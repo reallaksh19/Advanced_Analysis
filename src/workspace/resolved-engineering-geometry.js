@@ -58,7 +58,7 @@ function resolveEntityGeometry(entity) {
     classification,
     resolutionStatus: outcome.status,
     resolutionReason: outcome.reason,
-    primitive: outcome.primitive,
+    primitives: outcome.primitives,
     dimensions: dimensions.values,
     dimensionEvidence: dimensions.evidence,
     geometrySources: geometry.sources || {},
@@ -73,6 +73,7 @@ function buildPrimitive(kind, geometry, dimensions) {
   if (kind === 'FLANGE') return resolveFlange(geometry, dimensions);
   if (kind === 'VALVE') return resolveValve(geometry, dimensions);
   if (kind === 'SUPPORT') return resolveSupport(geometry, dimensions);
+  if (kind === 'OLET') return resolveOlet(geometry, dimensions);
   return resolveGeneric(geometry, dimensions);
 }
 
@@ -80,14 +81,14 @@ function resolvePipe(geometry, dimensions) {
   if (hasSpan(geometry.start, geometry.end)) {
     const length = distance3(geometry.start, geometry.end);
     const diameter = dimensions.outerDiameterMm;
-    return outcome(diameter ? 'resolved' : 'fallback', diameter ? '' : 'PIPE_DIAMETER_VISUAL_FALLBACK', {
-      kind: 'tube',
+    return outcome(diameter ? 'resolved' : 'fallback', diameter ? '' : 'PIPE_DIAMETER_VISUAL_FALLBACK', [{
+      kind: 'PIPE_TUBE',
       start: geometry.start,
       end: geometry.end,
       center: midpoint3(geometry.start, geometry.end),
       diameterMm: diameter,
       visualDiameterMm: symbolicDiameter(length, diameter || dimensions.nominalBoreMm),
-    });
+    }]);
   }
   return markerFallback(geometry.center, dimensions.outerDiameterMm || dimensions.nominalBoreMm, 'PIPE_TOPOLOGY_INCOMPLETE');
 }
@@ -97,27 +98,27 @@ function resolveElbow(geometry, dimensions) {
   if (hasSpan(geometry.start, geometry.end) && geometry.explicitCenter && geometry.center) {
     const path = buildCircularArcPath(geometry.start, geometry.end, geometry.center);
     if (path) {
-      return outcome(diameter ? 'resolved' : 'fallback', diameter ? '' : 'ELBOW_DIAMETER_VISUAL_FALLBACK', {
-        kind: 'swept-path',
+      return outcome(diameter ? 'resolved' : 'fallback', diameter ? '' : 'ELBOW_DIAMETER_VISUAL_FALLBACK', [{
+        kind: 'BEND_ARC',
         path,
         start: geometry.start,
         end: geometry.end,
         center: geometry.center,
         diameterMm: diameter,
         visualDiameterMm: symbolicDiameter(pathLength(path), diameter || dimensions.nominalBoreMm),
-      });
+      }]);
     }
   }
   if (hasSpan(geometry.start, geometry.end)) {
     const length = distance3(geometry.start, geometry.end);
-    return outcome('fallback', 'ELBOW_ARC_EVIDENCE_INCOMPLETE', {
-      kind: 'tube',
+    return outcome('fallback', 'ELBOW_ARC_EVIDENCE_INCOMPLETE', [{
+      kind: 'PIPE_TUBE',
       start: geometry.start,
       end: geometry.end,
       center: midpoint3(geometry.start, geometry.end),
       diameterMm: diameter,
       visualDiameterMm: symbolicDiameter(length, diameter || dimensions.nominalBoreMm),
-    });
+    }]);
   }
   return markerFallback(geometry.center, diameter || dimensions.nominalBoreMm, 'ELBOW_TOPOLOGY_INCOMPLETE');
 }
@@ -144,25 +145,46 @@ function resolveTee(geometry, dimensions) {
   if (legs.length >= 3) {
     const hasMain = Boolean(dimensions.outerDiameterMm);
     const hasBranch = Boolean(dimensions.branchDiameterMm);
+    const primitives = legs.map((leg, i) => ({
+      kind: i >= 2 ? 'TEE_BRANCH' : 'TEE_LEG',
+      start: leg.start,
+      end: leg.end,
+      diameterMm: leg.diameterMm,
+      visualDiameterMm: leg.visualDiameterMm,
+    }));
     return outcome(hasMain && hasBranch ? 'resolved' : 'fallback',
-      hasMain && hasBranch ? '' : 'TEE_DIAMETER_VISUAL_FALLBACK', {
-        kind: 'junction',
-        center,
-        legs,
-        visualDiameterMm: Math.max(...legs.map((leg) => leg.visualDiameterMm)),
-      });
+      hasMain && hasBranch ? '' : 'TEE_DIAMETER_VISUAL_FALLBACK', primitives);
   }
   if (hasSpan(geometry.start, geometry.end)) {
-    return outcome('fallback', 'TEE_BRANCH_TOPOLOGY_INCOMPLETE', {
-      kind: 'tube',
+    return outcome('fallback', 'TEE_BRANCH_TOPOLOGY_INCOMPLETE', [{
+      kind: 'PIPE_TUBE',
       start: geometry.start,
       end: geometry.end,
       center: midpoint3(geometry.start, geometry.end),
       diameterMm: dimensions.outerDiameterMm,
       visualDiameterMm: symbolicDiameter(distance3(geometry.start, geometry.end), dimensions.outerDiameterMm || dimensions.nominalBoreMm),
-    });
+    }]);
   }
   return markerFallback(center, dimensions.outerDiameterMm || dimensions.nominalBoreMm, 'TEE_TOPOLOGY_INCOMPLETE');
+}
+
+function resolveOlet(geometry, dimensions) {
+  if (hasSpan(geometry.start, geometry.end)) {
+    const length = distance3(geometry.start, geometry.end);
+    const runDiameter = dimensions.outerDiameterMm;
+    const branchDiameter = dimensions.branchDiameterMm || dimensions.nominalBoreMm;
+    return outcome(runDiameter && branchDiameter ? 'resolved' : 'fallback', runDiameter && branchDiameter ? '' : 'OLET_DIAMETER_VISUAL_FALLBACK', [{
+      kind: 'OLET_FRUSTUM',
+      start: geometry.start,
+      end: geometry.end,
+      center: midpoint3(geometry.start, geometry.end),
+      startDiameterMm: runDiameter,
+      endDiameterMm: branchDiameter,
+      visualStartDiameterMm: symbolicDiameter(length, runDiameter || 100),
+      visualEndDiameterMm: symbolicDiameter(length, branchDiameter || 50),
+    }]);
+  }
+  return markerFallback(geometry.center, dimensions.branchDiameterMm || dimensions.nominalBoreMm, 'OLET_TOPOLOGY_INCOMPLETE');
 }
 
 function resolveReducer(geometry, dimensions) {
@@ -173,8 +195,8 @@ function resolveReducer(geometry, dimensions) {
   const startDiameter = dimensions.inletDiameterMm;
   const endDiameter = dimensions.outletDiameterMm;
   const complete = Boolean(startDiameter && endDiameter);
-  return outcome(complete ? 'resolved' : 'fallback', complete ? '' : 'REDUCER_DIAMETER_VISUAL_FALLBACK', {
-    kind: 'frustum',
+  return outcome(complete ? 'resolved' : 'fallback', complete ? '' : 'REDUCER_DIAMETER_VISUAL_FALLBACK', [{
+    kind: 'REDUCER_FRUSTUM',
     start: geometry.start,
     end: geometry.end,
     center: midpoint3(geometry.start, geometry.end),
@@ -182,7 +204,7 @@ function resolveReducer(geometry, dimensions) {
     endDiameterMm: endDiameter,
     visualStartDiameterMm: symbolicDiameter(length, startDiameter || dimensions.outerDiameterMm || dimensions.nominalBoreMm),
     visualEndDiameterMm: symbolicDiameter(length, endDiameter || dimensions.outerDiameterMm || dimensions.nominalBoreMm),
-  });
+  }]);
 }
 
 function resolveFlange(geometry, dimensions) {
@@ -194,8 +216,8 @@ function resolveFlange(geometry, dimensions) {
   const axisEnd = geometry.end || { x: center.x + 1, y: center.y, z: center.z };
   const resolved = Boolean(outside && thickness && hasSpan(geometry.start, geometry.end));
   const referenceLength = distance3(axisStart, axisEnd) || outside || 100;
-  return outcome(resolved ? 'resolved' : 'fallback', resolved ? '' : 'FLANGE_DIMENSION_OR_AXIS_VISUAL_FALLBACK', {
-    kind: 'disc',
+  return outcome(resolved ? 'resolved' : 'fallback', resolved ? '' : 'FLANGE_DIMENSION_OR_AXIS_VISUAL_FALLBACK', [{
+    kind: 'FLANGE_DISC',
     center,
     axisStart,
     axisEnd,
@@ -203,21 +225,21 @@ function resolveFlange(geometry, dimensions) {
     thicknessMm: thickness,
     visualOutsideDiameterMm: symbolicDiameter(referenceLength, outside),
     visualThicknessMm: thickness || Math.max(symbolicDiameter(referenceLength, outside) * 0.18, 2),
-  });
+  }]);
 }
 
 function resolveValve(geometry, dimensions) {
   if (hasSpan(geometry.start, geometry.end)) {
     const length = distance3(geometry.start, geometry.end);
     const body = dimensions.valveBodyDiameterMm;
-    return outcome(body ? 'resolved' : 'fallback', body ? '' : 'VALVE_BODY_VISUAL_FALLBACK', {
-      kind: 'valve-body',
+    return outcome(body ? 'resolved' : 'fallback', body ? '' : 'VALVE_BODY_VISUAL_FALLBACK', [{
+      kind: 'VALVE_BODY',
       start: geometry.start,
       end: geometry.end,
       center: midpoint3(geometry.start, geometry.end),
       bodyDiameterMm: body,
       visualBodyDiameterMm: symbolicDiameter(length, body || dimensions.outerDiameterMm || dimensions.nominalBoreMm),
-    });
+    }]);
   }
   return markerFallback(geometry.center, dimensions.valveBodyDiameterMm || dimensions.outerDiameterMm || dimensions.nominalBoreMm, 'VALVE_TOPOLOGY_INCOMPLETE');
 }
@@ -226,45 +248,45 @@ function resolveSupport(geometry, dimensions) {
   const center = geometry.center || geometry.start || geometry.end;
   if (!center) return skipped('SUPPORT_POSITION_MISSING');
   const size = dimensions.supportSizeMm;
-  return outcome(size ? 'resolved' : 'fallback', size ? '' : 'SUPPORT_SIZE_VISUAL_FALLBACK', {
-    kind: 'support-marker',
+  return outcome(size ? 'resolved' : 'fallback', size ? '' : 'SUPPORT_SIZE_VISUAL_FALLBACK', [{
+    kind: 'SUPPORT_MARKER',
     center,
     sizeMm: size,
     visualSizeMm: symbolicDiameter(size || 100, size),
-  });
+  }]);
 }
 
 function resolveGeneric(geometry, dimensions) {
   if (hasSpan(geometry.start, geometry.end)) {
     const length = distance3(geometry.start, geometry.end);
-    return outcome('fallback', 'GENERIC_SEGMENT_SYMBOL', {
-      kind: 'tube',
+    return outcome('fallback', 'GENERIC_SEGMENT_SYMBOL', [{
+      kind: 'PIPE_TUBE',
       start: geometry.start,
       end: geometry.end,
       center: midpoint3(geometry.start, geometry.end),
       diameterMm: dimensions.outerDiameterMm,
       visualDiameterMm: symbolicDiameter(length, dimensions.outerDiameterMm || dimensions.nominalBoreMm),
-    });
+    }]);
   }
   return markerFallback(geometry.center, dimensions.outerDiameterMm || dimensions.nominalBoreMm, 'GENERIC_POINT_SYMBOL');
 }
 
 function markerFallback(center, diameter, reason) {
   if (!center) return skipped(reason);
-  return outcome('fallback', reason, {
-    kind: 'marker',
+  return outcome('fallback', reason, [{
+    kind: 'FALLBACK_MARKER',
     center,
     diameterMm: diameter,
     visualDiameterMm: symbolicDiameter(diameter || 100, diameter),
-  });
+  }]);
 }
 
-function outcome(status, reason, primitive) {
-  return { status, reason, primitive: freezeDeep(primitive) };
+function outcome(status, reason, primitives) {
+  return { status, reason, primitives: freezeDeep(primitives) };
 }
 
 function skipped(reason) {
-  return { status: 'skipped', reason, primitive: null };
+  return { status: 'skipped', reason, primitives: freezeDeep([]) };
 }
 
 function summarize(items, skipped) {

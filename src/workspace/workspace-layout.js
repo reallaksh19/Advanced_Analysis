@@ -74,28 +74,71 @@ function qualificationBanner(tabId) {
 function workspaceView() {
   return `<main class="workspace-shell" aria-label="Analysis Workspace">
     <aside class="workspace-panel tree-panel" data-panel="tree" aria-label="Dataset tree and layers">
-      <header class="panel-header"><span class="panel-eyebrow">Analysis Workspace</span><h1>Dataset Tree</h1></header>
-      <section class="dataset-toolbar" aria-label="Dataset actions">
-        <div class="dataset-toolbar__actions"><button type="button" data-action="load-mock-dataset" data-mock-data="true">[SIMULATED] Load Mock Data</button><button type="button" data-action="import-dataset">Import JSON</button><button type="button" data-action="clear-dataset" disabled>Clear</button></div>
-        <input data-role="dataset-file" type="file" accept=".json,application/json" hidden>
-        <output data-role="tree-status">No dataset loaded</output>
-        <p class="dataset-error" data-role="tree-error" hidden></p>
-      </section>
-      <section class="layer-summary" aria-label="Dataset summary"><span data-role="summary-pipes">Pipes 0</span><span data-role="summary-supports">Supports 0</span></section>
-      <div class="tree-list" data-role="tree-list"><p class="panel-empty">Import a supported workspace JSON package.</p></div>
+      <header class="panel-header">
+        <div class="panel-header__title">
+          <span class="panel-eyebrow">Analysis Workspace</span>
+          <h1>Dataset Tree</h1>
+        </div>
+        <button type="button" class="panel-collapse-btn" data-action="toggle-tree-collapse" aria-label="Toggle Tree Panel" title="Collapse Tree">◀</button>
+        <button type="button" class="panel-expand-btn" data-action="toggle-tree-collapse" aria-label="Expand Tree Panel" title="Expand Tree">▶</button>
+      </header>
+      <div class="panel-collapsible-content">
+        <section class="dataset-toolbar" aria-label="Dataset actions">
+          <div class="dataset-toolbar__actions"><button type="button" data-action="load-mock-dataset" data-mock-data="true">[SIMULATED] Load Mock Data</button><button type="button" data-action="import-dataset">Import JSON</button><button type="button" data-action="clear-dataset" disabled>Clear</button></div>
+          <div class="panel-search-container"><input type="search" data-role="tree-search" class="panel-search-input" placeholder="Search entities..."></div>
+          <input data-role="dataset-file" type="file" accept=".json,application/json" hidden>
+          <output data-role="tree-status">No dataset loaded</output>
+          <p class="dataset-error" data-role="tree-error" hidden></p>
+        </section>
+        <section class="layer-summary" aria-label="Dataset summary"><span data-role="summary-pipes">Pipes 0</span><span data-role="summary-supports">Supports 0</span></section>
+        <div class="tree-list" data-role="tree-list"><p class="panel-empty">Import a supported workspace JSON package.</p></div>
+      </div>
     </aside>
+    <div class="panel-resizer panel-resizer--left" data-action="resize-left" aria-label="Resize Left Panel"></div>
     <section class="workspace-panel viewport-panel" data-panel="viewport" aria-label="3D viewport">
       <header class="viewport-toolbar">
         <div><span class="panel-eyebrow">Read-only model review</span><h2>Model Viewport</h2></div>
-        <div class="viewport-toolbar__status"><output data-role="viewport-status">No dataset loaded</output><div class="viewport-toolbar__actions" aria-label="Viewport navigation"><button type="button" data-viewport-action="fit">Fit View</button><button type="button" data-viewport-action="reset">Reset View</button></div></div>
+        <div class="viewport-toolbar__actions" aria-label="Viewport navigation">
+          <div class="toolbar-group">
+            <button type="button" data-viewport-action="mode-select">Select</button>
+            <button type="button" data-viewport-action="mode-orbit">Orbit</button>
+            <button type="button" data-viewport-action="mode-pan">Pan</button>
+          </div>
+          <div class="toolbar-group">
+            <button type="button" data-viewport-action="fit">Fit All</button>
+            <button type="button" data-viewport-action="fit-selection">Fit Selection</button>
+            <button type="button" data-viewport-action="home">Home</button>
+          </div>
+          <div class="toolbar-group">
+            <button type="button" data-viewport-action="view-iso">ISO</button>
+            <button type="button" data-viewport-action="view-top">Top</button>
+            <button type="button" data-viewport-action="view-front">Front</button>
+            <button type="button" data-viewport-action="view-right">Right</button>
+          </div>
+        </div>
       </header>
       <div class="viewport-stage" data-webgl-host data-role="viewport-render-host" aria-label="Read-only model viewport"></div>
-      <footer class="viewport-footer" data-role="viewport-selection">Selection: none</footer>
+      <footer class="viewport-footer">
+        <output data-role="viewport-status">No dataset loaded</output>
+        <span class="footer-separator">|</span>
+        <span data-role="viewport-selection">Selection: none</span>
+      </footer>
     </section>
+    <div class="panel-resizer panel-resizer--right" data-action="resize-right" aria-label="Resize Right Panel"></div>
     <aside class="workspace-panel properties-panel" data-panel="properties" aria-label="Properties and analysis actions">
-      <header class="panel-header"><span class="panel-eyebrow">Model and contextual workflow</span><h2>Properties &amp; Actions</h2></header>
-      <div data-role="shared-model-summary"></div><div data-role="topology-summary"></div><div data-role="support-restraint-summary"></div><div data-role="model-load-summary"></div><div data-role="support-load-screening-summary"></div><div data-role="vertical-beam-summary"></div><div data-role="model-calculation-summary"></div><div data-role="model-support-load-summary"></div>
-      <div class="properties-content" data-role="properties-content"><p class="panel-empty">Select an entity to inspect its properties.</p></div>
+      <header class="panel-header">
+        <button type="button" class="panel-expand-btn" data-action="toggle-properties-collapse" aria-label="Expand Properties Panel" title="Expand Properties">◀</button>
+        <div class="panel-header__title">
+          <span class="panel-eyebrow">Model and contextual workflow</span>
+          <h2>Properties &amp; Actions</h2>
+        </div>
+        <button type="button" class="panel-collapse-btn" data-action="toggle-properties-collapse" aria-label="Toggle Properties Panel" title="Collapse Properties">▶</button>
+      </header>
+      <div class="panel-collapsible-content">
+        <div class="panel-search-container properties-search-container"><input type="search" data-role="properties-search" class="panel-search-input" placeholder="Filter properties..."></div>
+        <div data-role="shared-model-summary"></div><div data-role="topology-summary"></div><div data-role="support-restraint-summary"></div><div data-role="model-load-summary"></div><div data-role="support-load-screening-summary"></div><div data-role="vertical-beam-summary"></div><div data-role="model-calculation-summary"></div><div data-role="model-support-load-summary"></div>
+        <div class="properties-content" data-role="properties-content"><p class="panel-empty">Select an entity to inspect its properties.</p></div>
+      </div>
     </aside>
   </main>`;
 }

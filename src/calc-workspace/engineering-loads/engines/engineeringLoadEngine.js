@@ -15,6 +15,7 @@ export const VISIBLE_ENGINEERING_LOAD_CONFIG = Object.freeze({
   loadFactor: 1,
   distributionMethod: 'CHAINAGE_TRIBUTARY_SPAN_V2',
   source: 'visible-editable-config',
+  assumedVerticalSupportTypes: ['ATTA', 'REST', 'WP', 'BP', 'PAD SHOE', 'SUPPORT'],
 });
 
 export const ENGINEERING_LOAD_CONFIG_INFO = [
@@ -30,7 +31,7 @@ export const ENGINEERING_LOAD_CONFIG_INFO = [
 export function buildEngineeringLoadDistribution(workspace, config, evaluatedAt) {
   const objects = workspaceObjects(workspace);
   const supportCandidates = uniqueById([...workspaceSupports(workspace), ...objects.filter(isEngineeringSupport)]);
-  const supports = supportCandidates.map(resolveEngineeringSupport);
+  const supports = supportCandidates.map((support) => resolveEngineeringSupport(support, config));
   const elements = objects.filter((object) => !isEngineeringSupport(object)).map(resolveEngineeringElement).filter(hasLoadIntent);
   return distributeLoadsByChainage(elements, supports, {
     gravityMps2: config?.gravityMps2,
@@ -46,7 +47,12 @@ export function normalizeVisibleEngineeringLoadConfig(config) {
   const loadFactor = positive(config.loadFactor, 'loadFactor');
   const method = String(config.distributionMethod || '').trim();
   if (method !== 'CHAINAGE_TRIBUTARY_SPAN_V2') throw new TypeError('Only explicit CHAINAGE_TRIBUTARY_SPAN_V2 is enabled for engineering results.');
-  return Object.freeze({ gravityMps2, loadFactor, distributionMethod: method, source: String(config.source || 'visible-editable-config') });
+  
+  const assumedVerticalSupportTypes = Array.isArray(config.assumedVerticalSupportTypes) 
+    ? config.assumedVerticalSupportTypes.map(s => String(s).trim().toUpperCase())
+    : [];
+    
+  return Object.freeze({ gravityMps2, loadFactor, distributionMethod: method, source: String(config.source || 'visible-editable-config'), assumedVerticalSupportTypes });
 }
 
 function hasLoadIntent(element) {

@@ -41,6 +41,7 @@ import { ViewportPanel } from './viewport-panel.js';
 import { WorkspaceConsumerController } from './workspace-consumer-controller.js';
 import { renderWorkspaceLayout } from './workspace-layout.js';
 import { WorkspaceState } from './workspace-state.js';
+import { WorkspaceShellController } from './workspace-shell-controller.js';
 
 export function bootstrapAnalysisWorkspace(rootElement) {
   if (!rootElement) throw new Error('Application root #root was not found.');
@@ -80,7 +81,8 @@ export function bootstrapAnalysisWorkspace(rootElement) {
   const applicationShellController = new ApplicationShellController(rootElement,workspaceConsumerController,EventBus,{ settingsController,lafeaController:lafeaWorkbenchController,lfeaController:lfeaWorkbenchController });
   const benchmarkReportUrl = new URL(`${import.meta.env.BASE_URL}qualification/advanced-tab-benchmarks.json`,rootElement.ownerDocument.baseURI).href;
   const tabBenchmarkStatusController = new TabBenchmarkStatusController(rootElement,benchmarkReportUrl);
-  const controllers = [datasetController,sharedModelController,topologyController,supportRestraintController,modelLoadController,supportLoadScreeningController,verticalBeamController,modelCalculationController,modelSupportLoadController,sessionController,analysisCoordinator,ledgerController,treePanel,viewportPanel,sharedModelPanel,topologyPanel,supportRestraintPanel,modelLoadPanel,supportLoadScreeningPanel,verticalBeamPanel,modelCalculationPanel,modelSupportLoadPanel,propertiesPanel,workspaceConsumerController,settingsController,applicationShellController,tabBenchmarkStatusController];
+  const workspaceShellController = new WorkspaceShellController(rootElement);
+  const controllers = [workspaceShellController,datasetController,sharedModelController,topologyController,supportRestraintController,modelLoadController,supportLoadScreeningController,verticalBeamController,modelCalculationController,modelSupportLoadController,sessionController,analysisCoordinator,ledgerController,treePanel,viewportPanel,sharedModelPanel,topologyPanel,supportRestraintPanel,modelLoadPanel,supportLoadScreeningPanel,verticalBeamPanel,modelCalculationPanel,modelSupportLoadPanel,propertiesPanel,workspaceConsumerController,settingsController,applicationShellController,tabBenchmarkStatusController];
   controllers.forEach((controller) => controller.init());
   globalThis.EventBus = EventBus;
   return Object.freeze({

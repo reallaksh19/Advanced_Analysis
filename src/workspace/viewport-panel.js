@@ -25,6 +25,7 @@ export class ViewportPanel {
     this.hostElement = this.requireElement('[data-role="viewport-render-host"]');
     this.renderer.setSelectionRequestHandler(this.handleSelectionRequest);
     this.renderer.mount(this.hostElement);
+    this.updateCapabilities();
 
     this.unsubscribers = [
       this.eventBus.subscribe(
@@ -58,6 +59,7 @@ export class ViewportPanel {
       this.resolvedGeometry = buildResolvedEngineeringGeometry(snapshot.dataset);
       this.renderModel = buildViewportRenderModel(this.resolvedGeometry);
       this.renderer.renderModel(this.renderModel);
+      this.updateCapabilities(); // In case fallback triggered during mount/render
       this.statusElement.textContent = statusText(
         snapshot.dataset.datasetId,
         this.renderer.backendName,
@@ -91,9 +93,37 @@ export class ViewportPanel {
 
   handleClick(event) {
     const trigger = event.target?.closest?.('[data-viewport-action]');
-    if (!trigger || !this.rootElement.contains(trigger)) return;
-    if (trigger.dataset.viewportAction === 'fit') this.renderer.fitView();
-    if (trigger.dataset.viewportAction === 'reset') this.renderer.resetView();
+    if (!trigger || !this.rootElement.contains(trigger) || trigger.disabled) return;
+    const action = trigger.dataset.viewportAction;
+
+    if (action === 'fit') this.renderer.fitView();
+    if (action === 'fit-selection') this.renderer.fitSelection();
+    if (action === 'home' || action === 'reset') this.renderer.home ? this.renderer.home() : this.renderer.resetView();
+    
+    if (action === 'view-iso') this.renderer.setStandardView('iso');
+    if (action === 'view-top') this.renderer.setStandardView('top');
+    if (action === 'view-front') this.renderer.setStandardView('front');
+    if (action === 'view-right') this.renderer.setStandardView('right');
+
+    if (action === 'mode-select') this.renderer.setInteractionContext('select');
+    if (action === 'mode-orbit') this.renderer.setInteractionContext('orbit');
+    if (action === 'mode-pan') this.renderer.setInteractionContext('pan');
+  }
+
+  updateCapabilities() {
+    const caps = this.renderer.getCapabilities();
+    const actionButtons = this.rootElement.querySelectorAll('[data-viewport-action]');
+    actionButtons.forEach(btn => {
+      const action = btn.dataset.viewportAction;
+      if (action === 'mode-select' && !caps.select) btn.disabled = true;
+      else if (action === 'mode-orbit' && !caps.orbit) btn.disabled = true;
+      else if (action === 'mode-pan' && !caps.pan) btn.disabled = true;
+      else if (action === 'fit' && !caps.fitAll) btn.disabled = true;
+      else if (action === 'fit-selection' && !caps.fitSelection) btn.disabled = true;
+      else if ((action === 'home' || action === 'reset') && !caps.home) btn.disabled = true;
+      else if (action.startsWith('view-') && !caps.standardViews) btn.disabled = true;
+      else btn.disabled = false;
+    });
   }
 
   clear() {

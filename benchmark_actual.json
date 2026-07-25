@@ -1,0 +1,2533 @@
+{
+  "schema": "support-load-distribution/v2",
+  "method": "CHAINAGE_TRIBUTARY_SPAN_V2",
+  "methodLabel": "Chainage tributary span; engineering target with explicit evidence",
+  "evaluatedAt": "2026-07-25T18:09:25.557Z",
+  "config": {
+    "gravityMps2": 9.80665,
+    "loadFactor": 1,
+    "source": "visible-editable-config"
+  },
+  "totals": {
+    "elements": 25,
+    "supports": 6,
+    "totalWeightOpeKg": 1940.75,
+    "totalWeightHydKg": 2194.75,
+    "distributedWeightOpeKg": 1940.75,
+    "distributedWeightHydKg": 2194.75,
+    "unsupportedWeightOpeKg": 0,
+    "unsupportedWeightHydKg": 0,
+    "opeMassBalanceErrorKg": 0,
+    "hydMassBalanceErrorKg": 0,
+    "totalVerticalOpeN": 19032.256,
+    "totalVerticalHydN": 21523.145,
+    "cogOpe": {
+      "x": 5236.538709,
+      "y": 2517.866804,
+      "z": 1237.62463
+    },
+    "cogHyd": {
+      "x": 5252.061738,
+      "y": 2542.335118,
+      "z": 1223.246383
+    },
+    "cog": {
+      "x": 5236.538709,
+      "y": 2517.866804,
+      "z": 1237.62463
+    }
+  },
+  "supports": [
+    {
+      "supportId": "S001",
+      "name": "SUP-001 ANCHOR",
+      "supportType": "ANCHOR",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "chainageMm": 0,
+      "verticalCapability": true,
+      "diagnostics": [],
+      "verticalLoadOpeKg": 285,
+      "verticalLoadHydKg": 315.6,
+      "contributions": [
+        {
+          "elementId": "E001",
+          "name": "PIPE-001 6in",
+          "type": "PIPE",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.775,
+          "distanceMm": 900,
+          "opeKg": 69.75,
+          "hydKg": 93.465,
+          "rangeMm": [
+            0,
+            1800
+          ],
+          "chainageMm": 900
+        },
+        {
+          "elementId": "E002",
+          "name": "FLAN-001 6in",
+          "type": "FLANGE",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.55,
+          "distanceMm": 1800,
+          "opeKg": 24.75,
+          "hydKg": 24.75,
+          "chainageMm": 1800
+        },
+        {
+          "elementId": "E003",
+          "name": "VALV-001 6in",
+          "type": "VALVE",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.5,
+          "distanceMm": 2000,
+          "opeKg": 150,
+          "hydKg": 150,
+          "chainageMm": 2000
+        },
+        {
+          "elementId": "E004",
+          "name": "FLAN-002 6in",
+          "type": "FLANGE",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.45,
+          "distanceMm": 2200,
+          "opeKg": 20.25,
+          "hydKg": 20.25,
+          "chainageMm": 2200
+        },
+        {
+          "elementId": "E005",
+          "name": "PIPE-002 6in",
+          "type": "PIPE",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.225,
+          "distanceMm": 3100,
+          "opeKg": 20.25,
+          "hydKg": 27.135,
+          "rangeMm": [
+            2200,
+            4000
+          ],
+          "chainageMm": 3100
+        }
+      ],
+      "verticalLoadOpeN": 2794.895,
+      "verticalLoadHydN": 3094.979,
+      "contributionCount": 5
+    },
+    {
+      "supportId": "S002",
+      "name": "SUP-002 GUIDE",
+      "supportType": "GUIDE",
+      "position": {
+        "x": 4000,
+        "y": 0,
+        "z": 0
+      },
+      "chainageMm": 4000,
+      "verticalCapability": true,
+      "diagnostics": [],
+      "verticalLoadOpeKg": 460.687222,
+      "verticalLoadHydKg": 529.289444,
+      "contributions": [
+        {
+          "elementId": "E001",
+          "name": "PIPE-001 6in",
+          "type": "PIPE",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.225,
+          "distanceMm": 3100,
+          "opeKg": 20.25,
+          "hydKg": 27.135,
+          "rangeMm": [
+            0,
+            1800
+          ],
+          "chainageMm": 900
+        },
+        {
+          "elementId": "E002",
+          "name": "FLAN-001 6in",
+          "type": "FLANGE",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.45,
+          "distanceMm": 2200,
+          "opeKg": 20.25,
+          "hydKg": 20.25,
+          "chainageMm": 1800
+        },
+        {
+          "elementId": "E003",
+          "name": "VALV-001 6in",
+          "type": "VALVE",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.5,
+          "distanceMm": 2000,
+          "opeKg": 150,
+          "hydKg": 150,
+          "chainageMm": 2000
+        },
+        {
+          "elementId": "E004",
+          "name": "FLAN-002 6in",
+          "type": "FLANGE",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.55,
+          "distanceMm": 1800,
+          "opeKg": 24.75,
+          "hydKg": 24.75,
+          "chainageMm": 2200
+        },
+        {
+          "elementId": "E005",
+          "name": "PIPE-002 6in",
+          "type": "PIPE",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.775,
+          "distanceMm": 900,
+          "opeKg": 69.75,
+          "hydKg": 93.465,
+          "rangeMm": [
+            2200,
+            4000
+          ],
+          "chainageMm": 3100
+        },
+        {
+          "elementId": "E005",
+          "name": "PIPE-002 6in",
+          "type": "PIPE",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.888888889,
+          "distanceMm": 500,
+          "opeKg": 44.444444444,
+          "hydKg": 59.555555556,
+          "rangeMm": [
+            4000,
+            5000
+          ],
+          "chainageMm": 4500
+        },
+        {
+          "elementId": "E006",
+          "name": "ELBO-001 6in",
+          "type": "ELBO",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.711111111,
+          "distanceMm": 1300,
+          "opeKg": 21.333333333,
+          "hydKg": 28.586666667,
+          "rangeMm": [
+            5000,
+            5600
+          ],
+          "chainageMm": 5300
+        },
+        {
+          "elementId": "E006",
+          "name": "ELBO-001 6in",
+          "type": "ELBO",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.711111111,
+          "distanceMm": 1300,
+          "opeKg": 24.888888889,
+          "hydKg": 24.888888889,
+          "chainageMm": 5300
+        },
+        {
+          "elementId": "E007",
+          "name": "PIPE-003 6in",
+          "type": "PIPE",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.4,
+          "distanceMm": 2700,
+          "opeKg": 44,
+          "hydKg": 58.96,
+          "rangeMm": [
+            5600,
+            7800
+          ],
+          "chainageMm": 6700
+        },
+        {
+          "elementId": "E008",
+          "name": "REDU-001 6x4",
+          "type": "REDUCER",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.111111111,
+          "distanceMm": 4000,
+          "opeKg": 1.644444444,
+          "hydKg": 2.222222222,
+          "rangeMm": [
+            7800,
+            8200
+          ],
+          "chainageMm": 8000
+        },
+        {
+          "elementId": "E008",
+          "name": "REDU-001 6x4",
+          "type": "REDUCER",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.111111111,
+          "distanceMm": 4000,
+          "opeKg": 4.444444444,
+          "hydKg": 4.444444444,
+          "chainageMm": 8000
+        },
+        {
+          "elementId": "E009",
+          "name": "PIPE-004 4in",
+          "type": "PIPE",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.033333333,
+          "distanceMm": 4350,
+          "opeKg": 0.265,
+          "hydKg": 0.365,
+          "rangeMm": [
+            8200,
+            8500
+          ],
+          "chainageMm": 8350
+        },
+        {
+          "elementId": "E020",
+          "name": "FLAN-005 6in bypass",
+          "type": "FLANGE",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.288888889,
+          "distanceMm": 3200,
+          "opeKg": 7.222222222,
+          "hydKg": 7.222222222,
+          "chainageMm": 7200
+        },
+        {
+          "elementId": "E021",
+          "name": "VALV-003 6in bypass",
+          "type": "VALVE",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.266666667,
+          "distanceMm": 3300,
+          "opeKg": 21.333333333,
+          "hydKg": 21.333333333,
+          "chainageMm": 7300
+        },
+        {
+          "elementId": "E022",
+          "name": "FLAN-006 6in bypass",
+          "type": "FLANGE",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.244444444,
+          "distanceMm": 3400,
+          "opeKg": 6.111111111,
+          "hydKg": 6.111111111,
+          "chainageMm": 7400
+        }
+      ],
+      "verticalLoadOpeN": 4517.798,
+      "verticalLoadHydN": 5190.556,
+      "contributionCount": 15
+    },
+    {
+      "supportId": "S003",
+      "name": "SUP-003 GUIDE",
+      "supportType": "GUIDE",
+      "position": {
+        "x": 5000,
+        "y": 3500,
+        "z": 0
+      },
+      "chainageMm": 8500,
+      "verticalCapability": true,
+      "diagnostics": [],
+      "verticalLoadOpeKg": 350.937778,
+      "verticalLoadHydKg": 405.735556,
+      "contributions": [
+        {
+          "elementId": "E005",
+          "name": "PIPE-002 6in",
+          "type": "PIPE",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.111111111,
+          "distanceMm": 4000,
+          "opeKg": 5.555555556,
+          "hydKg": 7.444444444,
+          "rangeMm": [
+            4000,
+            5000
+          ],
+          "chainageMm": 4500
+        },
+        {
+          "elementId": "E006",
+          "name": "ELBO-001 6in",
+          "type": "ELBO",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.288888889,
+          "distanceMm": 3200,
+          "opeKg": 8.666666667,
+          "hydKg": 11.613333333,
+          "rangeMm": [
+            5000,
+            5600
+          ],
+          "chainageMm": 5300
+        },
+        {
+          "elementId": "E006",
+          "name": "ELBO-001 6in",
+          "type": "ELBO",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.288888889,
+          "distanceMm": 3200,
+          "opeKg": 10.111111111,
+          "hydKg": 10.111111111,
+          "chainageMm": 5300
+        },
+        {
+          "elementId": "E007",
+          "name": "PIPE-003 6in",
+          "type": "PIPE",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.6,
+          "distanceMm": 1800,
+          "opeKg": 66,
+          "hydKg": 88.44,
+          "rangeMm": [
+            5600,
+            7800
+          ],
+          "chainageMm": 6700
+        },
+        {
+          "elementId": "E008",
+          "name": "REDU-001 6x4",
+          "type": "REDUCER",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.888888889,
+          "distanceMm": 500,
+          "opeKg": 13.155555556,
+          "hydKg": 17.777777778,
+          "rangeMm": [
+            7800,
+            8200
+          ],
+          "chainageMm": 8000
+        },
+        {
+          "elementId": "E008",
+          "name": "REDU-001 6x4",
+          "type": "REDUCER",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.888888889,
+          "distanceMm": 500,
+          "opeKg": 35.555555556,
+          "hydKg": 35.555555556,
+          "chainageMm": 8000
+        },
+        {
+          "elementId": "E009",
+          "name": "PIPE-004 4in",
+          "type": "PIPE",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.966666667,
+          "distanceMm": 150,
+          "opeKg": 7.685,
+          "hydKg": 10.585,
+          "rangeMm": [
+            8200,
+            8500
+          ],
+          "chainageMm": 8350
+        },
+        {
+          "elementId": "E009",
+          "name": "PIPE-004 4in",
+          "type": "PIPE",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.9375,
+          "distanceMm": 250,
+          "opeKg": 12.421875,
+          "hydKg": 17.109375,
+          "rangeMm": [
+            8500,
+            9000
+          ],
+          "chainageMm": 8750
+        },
+        {
+          "elementId": "E010",
+          "name": "ELBO-002 4in",
+          "type": "ELBO",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.8,
+          "distanceMm": 800,
+          "opeKg": 12.72,
+          "hydKg": 17.52,
+          "rangeMm": [
+            9000,
+            9600
+          ],
+          "chainageMm": 9300
+        },
+        {
+          "elementId": "E010",
+          "name": "ELBO-002 4in",
+          "type": "ELBO",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.8,
+          "distanceMm": 800,
+          "opeKg": 20,
+          "hydKg": 20,
+          "chainageMm": 9300
+        },
+        {
+          "elementId": "E011",
+          "name": "PIPE-005 4in",
+          "type": "PIPE",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.45,
+          "distanceMm": 2200,
+          "opeKg": 26.235,
+          "hydKg": 36.135,
+          "rangeMm": [
+            9600,
+            11800
+          ],
+          "chainageMm": 10700
+        },
+        {
+          "elementId": "E012",
+          "name": "TEE-001 4in",
+          "type": "TEE",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.175,
+          "distanceMm": 3300,
+          "opeKg": 14,
+          "hydKg": 14,
+          "chainageMm": 11800
+        },
+        {
+          "elementId": "E013",
+          "name": "PIPE-006 4in",
+          "type": "PIPE",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.0875,
+          "distanceMm": 3650,
+          "opeKg": 1.623125,
+          "hydKg": 2.235625,
+          "rangeMm": [
+            11800,
+            12500
+          ],
+          "chainageMm": 12150
+        },
+        {
+          "elementId": "E020",
+          "name": "FLAN-005 6in bypass",
+          "type": "FLANGE",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.711111111,
+          "distanceMm": 1300,
+          "opeKg": 17.777777778,
+          "hydKg": 17.777777778,
+          "chainageMm": 7200
+        },
+        {
+          "elementId": "E021",
+          "name": "VALV-003 6in bypass",
+          "type": "VALVE",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.733333333,
+          "distanceMm": 1200,
+          "opeKg": 58.666666667,
+          "hydKg": 58.666666667,
+          "chainageMm": 7300
+        },
+        {
+          "elementId": "E022",
+          "name": "FLAN-006 6in bypass",
+          "type": "FLANGE",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.755555556,
+          "distanceMm": 1100,
+          "opeKg": 18.888888889,
+          "hydKg": 18.888888889,
+          "chainageMm": 7400
+        },
+        {
+          "elementId": "E023",
+          "name": "INSTR-001 4in",
+          "type": "INSTRUMENT",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.625,
+          "distanceMm": 1500,
+          "opeKg": 21.875,
+          "hydKg": 21.875,
+          "chainageMm": 10000
+        }
+      ],
+      "verticalLoadOpeN": 3441.524,
+      "verticalLoadHydN": 3978.907,
+      "contributionCount": 17
+    },
+    {
+      "supportId": "S004",
+      "name": "SUP-004 REST",
+      "supportType": "REST",
+      "position": {
+        "x": 5700,
+        "y": 4000,
+        "z": 2800
+      },
+      "chainageMm": 12500,
+      "verticalCapability": true,
+      "diagnostics": [],
+      "verticalLoadOpeKg": 397.703125,
+      "verticalLoadHydKg": 435.515625,
+      "contributions": [
+        {
+          "elementId": "E009",
+          "name": "PIPE-004 4in",
+          "type": "PIPE",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.0625,
+          "distanceMm": 3750,
+          "opeKg": 0.828125,
+          "hydKg": 1.140625,
+          "rangeMm": [
+            8500,
+            9000
+          ],
+          "chainageMm": 8750
+        },
+        {
+          "elementId": "E010",
+          "name": "ELBO-002 4in",
+          "type": "ELBO",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.2,
+          "distanceMm": 3200,
+          "opeKg": 3.18,
+          "hydKg": 4.38,
+          "rangeMm": [
+            9000,
+            9600
+          ],
+          "chainageMm": 9300
+        },
+        {
+          "elementId": "E010",
+          "name": "ELBO-002 4in",
+          "type": "ELBO",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.2,
+          "distanceMm": 3200,
+          "opeKg": 5,
+          "hydKg": 5,
+          "chainageMm": 9300
+        },
+        {
+          "elementId": "E011",
+          "name": "PIPE-005 4in",
+          "type": "PIPE",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.55,
+          "distanceMm": 1800,
+          "opeKg": 32.065,
+          "hydKg": 44.165,
+          "rangeMm": [
+            9600,
+            11800
+          ],
+          "chainageMm": 10700
+        },
+        {
+          "elementId": "E012",
+          "name": "TEE-001 4in",
+          "type": "TEE",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.825,
+          "distanceMm": 700,
+          "opeKg": 66,
+          "hydKg": 66,
+          "chainageMm": 11800
+        },
+        {
+          "elementId": "E013",
+          "name": "PIPE-006 4in",
+          "type": "PIPE",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.9125,
+          "distanceMm": 350,
+          "opeKg": 16.926875,
+          "hydKg": 23.314375,
+          "rangeMm": [
+            11800,
+            12500
+          ],
+          "chainageMm": 12150
+        },
+        {
+          "elementId": "E013",
+          "name": "PIPE-006 4in",
+          "type": "PIPE",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.75,
+          "distanceMm": 1000,
+          "opeKg": 39.75,
+          "hydKg": 54.75,
+          "rangeMm": [
+            12500,
+            14500
+          ],
+          "chainageMm": 13500
+        },
+        {
+          "elementId": "E014",
+          "name": "FLAN-003 4in",
+          "type": "FLANGE",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.5,
+          "distanceMm": 2000,
+          "opeKg": 25,
+          "hydKg": 25,
+          "chainageMm": 14500
+        },
+        {
+          "elementId": "E015",
+          "name": "VALV-002 4in",
+          "type": "VALVE",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.4375,
+          "distanceMm": 2250,
+          "opeKg": 153.125,
+          "hydKg": 153.125,
+          "chainageMm": 14750
+        },
+        {
+          "elementId": "E016",
+          "name": "FLAN-004 4in",
+          "type": "FLANGE",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.375,
+          "distanceMm": 2500,
+          "opeKg": 18.75,
+          "hydKg": 18.75,
+          "chainageMm": 15000
+        },
+        {
+          "elementId": "E017",
+          "name": "PIPE-007 4in",
+          "type": "PIPE",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.1875,
+          "distanceMm": 3250,
+          "opeKg": 7.453125,
+          "hydKg": 10.265625,
+          "rangeMm": [
+            15000,
+            16500
+          ],
+          "chainageMm": 15750
+        },
+        {
+          "elementId": "E023",
+          "name": "INSTR-001 4in",
+          "type": "INSTRUMENT",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.375,
+          "distanceMm": 2500,
+          "opeKg": 13.125,
+          "hydKg": 13.125,
+          "chainageMm": 10000
+        },
+        {
+          "elementId": "E024",
+          "name": "OLET-001 4in",
+          "type": "OLET",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.825,
+          "distanceMm": 700,
+          "opeKg": 16.5,
+          "hydKg": 16.5,
+          "chainageMm": 13200
+        }
+      ],
+      "verticalLoadOpeN": 3900.135,
+      "verticalLoadHydN": 4270.949,
+      "contributionCount": 13
+    },
+    {
+      "supportId": "S005",
+      "name": "SUP-005 GUIDE",
+      "supportType": "GUIDE",
+      "position": {
+        "x": 8200,
+        "y": 5500,
+        "z": 2800
+      },
+      "chainageMm": 16500,
+      "verticalCapability": true,
+      "diagnostics": [],
+      "verticalLoadOpeKg": 382.352431,
+      "verticalLoadHydKg": 422.039931,
+      "contributions": [
+        {
+          "elementId": "E013",
+          "name": "PIPE-006 4in",
+          "type": "PIPE",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.25,
+          "distanceMm": 3000,
+          "opeKg": 13.25,
+          "hydKg": 18.25,
+          "rangeMm": [
+            12500,
+            14500
+          ],
+          "chainageMm": 13500
+        },
+        {
+          "elementId": "E014",
+          "name": "FLAN-003 4in",
+          "type": "FLANGE",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.5,
+          "distanceMm": 2000,
+          "opeKg": 25,
+          "hydKg": 25,
+          "chainageMm": 14500
+        },
+        {
+          "elementId": "E015",
+          "name": "VALV-002 4in",
+          "type": "VALVE",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.5625,
+          "distanceMm": 1750,
+          "opeKg": 196.875,
+          "hydKg": 196.875,
+          "chainageMm": 14750
+        },
+        {
+          "elementId": "E016",
+          "name": "FLAN-004 4in",
+          "type": "FLANGE",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.625,
+          "distanceMm": 1500,
+          "opeKg": 31.25,
+          "hydKg": 31.25,
+          "chainageMm": 15000
+        },
+        {
+          "elementId": "E017",
+          "name": "PIPE-007 4in",
+          "type": "PIPE",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.8125,
+          "distanceMm": 750,
+          "opeKg": 32.296875,
+          "hydKg": 44.484375,
+          "rangeMm": [
+            15000,
+            16500
+          ],
+          "chainageMm": 15750
+        },
+        {
+          "elementId": "E017",
+          "name": "PIPE-007 4in",
+          "type": "PIPE",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.944444444,
+          "distanceMm": 250,
+          "opeKg": 12.513888889,
+          "hydKg": 17.236111111,
+          "rangeMm": [
+            16500,
+            17000
+          ],
+          "chainageMm": 16750
+        },
+        {
+          "elementId": "E018",
+          "name": "ELBO-003 4in",
+          "type": "ELBO",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.822222222,
+          "distanceMm": 800,
+          "opeKg": 13.073333333,
+          "hydKg": 18.006666667,
+          "rangeMm": [
+            17000,
+            17600
+          ],
+          "chainageMm": 17300
+        },
+        {
+          "elementId": "E018",
+          "name": "ELBO-003 4in",
+          "type": "ELBO",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.822222222,
+          "distanceMm": 800,
+          "opeKg": 20.555555556,
+          "hydKg": 20.555555556,
+          "chainageMm": 17300
+        },
+        {
+          "elementId": "E019",
+          "name": "PIPE-008 4in",
+          "type": "PIPE",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.377777778,
+          "distanceMm": 2800,
+          "opeKg": 34.037777778,
+          "hydKg": 46.882222222,
+          "rangeMm": [
+            17600,
+            21000
+          ],
+          "chainageMm": 19300
+        },
+        {
+          "elementId": "E024",
+          "name": "OLET-001 4in",
+          "type": "OLET",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.175,
+          "distanceMm": 3300,
+          "opeKg": 3.5,
+          "hydKg": 3.5,
+          "chainageMm": 13200
+        }
+      ],
+      "verticalLoadOpeN": 3749.596,
+      "verticalLoadHydN": 4138.798,
+      "contributionCount": 10
+    },
+    {
+      "supportId": "S006",
+      "name": "SUP-006 ANCHOR",
+      "supportType": "ANCHOR",
+      "position": {
+        "x": 11600,
+        "y": 6600,
+        "z": 2800
+      },
+      "chainageMm": 21000,
+      "verticalCapability": true,
+      "diagnostics": [],
+      "verticalLoadOpeKg": 64.069444,
+      "verticalLoadHydKg": 86.569444,
+      "contributions": [
+        {
+          "elementId": "E017",
+          "name": "PIPE-007 4in",
+          "type": "PIPE",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.055555556,
+          "distanceMm": 4250,
+          "opeKg": 0.736111111,
+          "hydKg": 1.013888889,
+          "rangeMm": [
+            16500,
+            17000
+          ],
+          "chainageMm": 16750
+        },
+        {
+          "elementId": "E018",
+          "name": "ELBO-003 4in",
+          "type": "ELBO",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.177777778,
+          "distanceMm": 3700,
+          "opeKg": 2.826666667,
+          "hydKg": 3.893333333,
+          "rangeMm": [
+            17000,
+            17600
+          ],
+          "chainageMm": 17300
+        },
+        {
+          "elementId": "E018",
+          "name": "ELBO-003 4in",
+          "type": "ELBO",
+          "method": "CHAINAGE_POINT_COMPONENT_V2",
+          "fraction": 0.177777778,
+          "distanceMm": 3700,
+          "opeKg": 4.444444444,
+          "hydKg": 4.444444444,
+          "chainageMm": 17300
+        },
+        {
+          "elementId": "E019",
+          "name": "PIPE-008 4in",
+          "type": "PIPE",
+          "method": "CHAINAGE_UDL_TRIBUTARY_V2",
+          "fraction": 0.622222222,
+          "distanceMm": 1700,
+          "opeKg": 56.062222222,
+          "hydKg": 77.217777778,
+          "rangeMm": [
+            17600,
+            21000
+          ],
+          "chainageMm": 19300
+        }
+      ],
+      "verticalLoadOpeN": 628.307,
+      "verticalLoadHydN": 848.956,
+      "contributionCount": 4
+    }
+  ],
+  "elements": [
+    {
+      "elementId": "BENCH-30_COMPLEX_3D_SUPPORT_LOAD",
+      "name": "BENCH-30_COMPLEX_3D_SUPPORT_LOAD",
+      "type": "BRANCH",
+      "center": null,
+      "chainageStartMm": null,
+      "chainageEndMm": null,
+      "chainageCenterMm": null,
+      "lengthM": null,
+      "lineWeightOpeKgPerM": 0,
+      "lineWeightHydKgPerM": 0,
+      "componentWeightKg": 0,
+      "totalWeightOpeKg": 0,
+      "totalWeightHydKg": 0,
+      "formulaTrace": {
+        "pipe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "insulation": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidOpe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidHyd": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "component": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        }
+      },
+      "diagnostics": [
+        {
+          "schema": "engineering-diagnostic/v1",
+          "id": "diag-BENCH-30_COMPLEX_3D_SUPPORT_LOAD-geometry-center",
+          "severity": "BLOCKED",
+          "category": "BROKEN_GEOMETRY",
+          "field": "geometry.center",
+          "message": "Element COG/center is missing.",
+          "requiredFor": [
+            "ElementWeight",
+            "SupportVerticalLoad"
+          ],
+          "sourceExpected": "pipingClassMaster",
+          "fallbackUsed": false,
+          "calculationAction": "BLOCK",
+          "ui": {
+            "badge": "COG?",
+            "icon": "X",
+            "color": "RED",
+            "layer": "engineering-data-health"
+          },
+          "context": {
+            "elementId": "BENCH-30_COMPLEX_3D_SUPPORT_LOAD"
+          }
+        },
+        {
+          "schema": "engineering-diagnostic/v1",
+          "id": "diag-BENCH-30_COMPLEX_3D_SUPPORT_LOAD-chainageCenterMm",
+          "severity": "BLOCKED",
+          "category": "BROKEN_GEOMETRY",
+          "field": "chainageCenterMm",
+          "message": "Element chainage is missing.",
+          "requiredFor": [
+            "ElementWeight",
+            "SupportVerticalLoad"
+          ],
+          "sourceExpected": "pipingClassMaster",
+          "fallbackUsed": false,
+          "calculationAction": "BLOCK",
+          "ui": {
+            "badge": "CH?",
+            "icon": "X",
+            "color": "RED",
+            "layer": "engineering-data-health"
+          },
+          "context": {
+            "elementId": "BENCH-30_COMPLEX_3D_SUPPORT_LOAD"
+          }
+        }
+      ]
+    },
+    {
+      "elementId": "E001",
+      "name": "PIPE-001 6in",
+      "type": "PIPE",
+      "center": {
+        "x": 900,
+        "y": 0,
+        "z": 0
+      },
+      "chainageStartMm": 0,
+      "chainageEndMm": 1800,
+      "chainageCenterMm": 900,
+      "lengthM": 1.8,
+      "lineWeightOpeKgPerM": 50,
+      "lineWeightHydKgPerM": 67,
+      "componentWeightKg": 0,
+      "totalWeightOpeKg": 90,
+      "totalWeightHydKg": 120.60000000000001,
+      "formulaTrace": {
+        "pipe": {
+          "value": 28,
+          "status": "OK_SOURCE",
+          "source": "pipeWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "insulation": {
+          "value": 4,
+          "status": "OK_SOURCE",
+          "source": "insulationWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "fluidOpe": {
+          "value": 18,
+          "status": "OK_SOURCE",
+          "source": "fluidWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "fluidHyd": {
+          "value": 35,
+          "status": "OK_SOURCE",
+          "source": "fluidWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "component": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "elementId": "E002",
+      "name": "FLAN-001 6in",
+      "type": "FLANGE",
+      "center": {
+        "x": 1800,
+        "y": 0,
+        "z": 0
+      },
+      "chainageStartMm": null,
+      "chainageEndMm": null,
+      "chainageCenterMm": 1800,
+      "lengthM": null,
+      "lineWeightOpeKgPerM": 0,
+      "lineWeightHydKgPerM": 0,
+      "componentWeightKg": 45,
+      "totalWeightOpeKg": 45,
+      "totalWeightHydKg": 45,
+      "formulaTrace": {
+        "pipe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "insulation": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidOpe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidHyd": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "component": {
+          "value": 45,
+          "status": "OK_SOURCE",
+          "source": "componentWeightKg",
+          "trace": null,
+          "missing": []
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "elementId": "E003",
+      "name": "VALV-001 6in",
+      "type": "VALVE",
+      "center": {
+        "x": 2000,
+        "y": 0,
+        "z": 0
+      },
+      "chainageStartMm": null,
+      "chainageEndMm": null,
+      "chainageCenterMm": 2000,
+      "lengthM": null,
+      "lineWeightOpeKgPerM": 0,
+      "lineWeightHydKgPerM": 0,
+      "componentWeightKg": 300,
+      "totalWeightOpeKg": 300,
+      "totalWeightHydKg": 300,
+      "formulaTrace": {
+        "pipe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "insulation": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidOpe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidHyd": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "component": {
+          "value": 300,
+          "status": "OK_SOURCE",
+          "source": "componentWeightKg",
+          "trace": null,
+          "missing": []
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "elementId": "E004",
+      "name": "FLAN-002 6in",
+      "type": "FLANGE",
+      "center": {
+        "x": 2200,
+        "y": 0,
+        "z": 0
+      },
+      "chainageStartMm": null,
+      "chainageEndMm": null,
+      "chainageCenterMm": 2200,
+      "lengthM": null,
+      "lineWeightOpeKgPerM": 0,
+      "lineWeightHydKgPerM": 0,
+      "componentWeightKg": 45,
+      "totalWeightOpeKg": 45,
+      "totalWeightHydKg": 45,
+      "formulaTrace": {
+        "pipe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "insulation": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidOpe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidHyd": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "component": {
+          "value": 45,
+          "status": "OK_SOURCE",
+          "source": "componentWeightKg",
+          "trace": null,
+          "missing": []
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "elementId": "E005",
+      "name": "PIPE-002 6in",
+      "type": "PIPE",
+      "center": {
+        "x": 3600,
+        "y": 0,
+        "z": 0
+      },
+      "chainageStartMm": 2200,
+      "chainageEndMm": 5000,
+      "chainageCenterMm": 3600,
+      "lengthM": 2.8,
+      "lineWeightOpeKgPerM": 50,
+      "lineWeightHydKgPerM": 67,
+      "componentWeightKg": 0,
+      "totalWeightOpeKg": 140,
+      "totalWeightHydKg": 187.6,
+      "formulaTrace": {
+        "pipe": {
+          "value": 28,
+          "status": "OK_SOURCE",
+          "source": "pipeWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "insulation": {
+          "value": 4,
+          "status": "OK_SOURCE",
+          "source": "insulationWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "fluidOpe": {
+          "value": 18,
+          "status": "OK_SOURCE",
+          "source": "fluidWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "fluidHyd": {
+          "value": 35,
+          "status": "OK_SOURCE",
+          "source": "fluidWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "component": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "elementId": "E006",
+      "name": "ELBO-001 6in",
+      "type": "ELBO",
+      "center": {
+        "x": 5000,
+        "y": 300,
+        "z": 0
+      },
+      "chainageStartMm": 5000,
+      "chainageEndMm": 5600,
+      "chainageCenterMm": 5300,
+      "lengthM": 0.6,
+      "lineWeightOpeKgPerM": 50,
+      "lineWeightHydKgPerM": 67,
+      "componentWeightKg": 35,
+      "totalWeightOpeKg": 65,
+      "totalWeightHydKg": 75.19999999999999,
+      "formulaTrace": {
+        "pipe": {
+          "value": 28,
+          "status": "OK_SOURCE",
+          "source": "pipeWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "insulation": {
+          "value": 4,
+          "status": "OK_SOURCE",
+          "source": "insulationWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "fluidOpe": {
+          "value": 18,
+          "status": "OK_SOURCE",
+          "source": "fluidWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "fluidHyd": {
+          "value": 35,
+          "status": "OK_SOURCE",
+          "source": "fluidWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "component": {
+          "value": 35,
+          "status": "OK_SOURCE",
+          "source": "componentWeightKg",
+          "trace": null,
+          "missing": []
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "elementId": "E007",
+      "name": "PIPE-003 6in",
+      "type": "PIPE",
+      "center": {
+        "x": 5000,
+        "y": 1700,
+        "z": 0
+      },
+      "chainageStartMm": 5600,
+      "chainageEndMm": 7800,
+      "chainageCenterMm": 6700,
+      "lengthM": 2.2,
+      "lineWeightOpeKgPerM": 50,
+      "lineWeightHydKgPerM": 67,
+      "componentWeightKg": 0,
+      "totalWeightOpeKg": 110.00000000000001,
+      "totalWeightHydKg": 147.4,
+      "formulaTrace": {
+        "pipe": {
+          "value": 28,
+          "status": "OK_SOURCE",
+          "source": "pipeWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "insulation": {
+          "value": 4,
+          "status": "OK_SOURCE",
+          "source": "insulationWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "fluidOpe": {
+          "value": 18,
+          "status": "OK_SOURCE",
+          "source": "fluidWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "fluidHyd": {
+          "value": 35,
+          "status": "OK_SOURCE",
+          "source": "fluidWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "component": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "elementId": "E008",
+      "name": "REDU-001 6x4",
+      "type": "REDUCER",
+      "center": {
+        "x": 5000,
+        "y": 3000,
+        "z": 0
+      },
+      "chainageStartMm": 7800,
+      "chainageEndMm": 8200,
+      "chainageCenterMm": 8000,
+      "lengthM": 0.4,
+      "lineWeightOpeKgPerM": 37,
+      "lineWeightHydKgPerM": 50,
+      "componentWeightKg": 40,
+      "totalWeightOpeKg": 54.8,
+      "totalWeightHydKg": 60,
+      "formulaTrace": {
+        "pipe": {
+          "value": 22,
+          "status": "OK_SOURCE",
+          "source": "pipeWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "insulation": {
+          "value": 3,
+          "status": "OK_SOURCE",
+          "source": "insulationWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "fluidOpe": {
+          "value": 12,
+          "status": "OK_SOURCE",
+          "source": "fluidWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "fluidHyd": {
+          "value": 25,
+          "status": "OK_SOURCE",
+          "source": "fluidWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "component": {
+          "value": 40,
+          "status": "OK_SOURCE",
+          "source": "componentWeightKg",
+          "trace": null,
+          "missing": []
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "elementId": "E009",
+      "name": "PIPE-004 4in",
+      "type": "PIPE",
+      "center": {
+        "x": 5000,
+        "y": 3600,
+        "z": 0
+      },
+      "chainageStartMm": 8200,
+      "chainageEndMm": 9000,
+      "chainageCenterMm": 8600,
+      "lengthM": 0.8,
+      "lineWeightOpeKgPerM": 26.5,
+      "lineWeightHydKgPerM": 36.5,
+      "componentWeightKg": 0,
+      "totalWeightOpeKg": 21.200000000000003,
+      "totalWeightHydKg": 29.200000000000003,
+      "formulaTrace": {
+        "pipe": {
+          "value": 16,
+          "status": "OK_SOURCE",
+          "source": "pipeWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "insulation": {
+          "value": 2.5,
+          "status": "OK_SOURCE",
+          "source": "insulationWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "fluidOpe": {
+          "value": 8,
+          "status": "OK_SOURCE",
+          "source": "fluidWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "fluidHyd": {
+          "value": 18,
+          "status": "OK_SOURCE",
+          "source": "fluidWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "component": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "elementId": "E010",
+      "name": "ELBO-002 4in",
+      "type": "ELBO",
+      "center": {
+        "x": 5000,
+        "y": 4000,
+        "z": 300
+      },
+      "chainageStartMm": 9000,
+      "chainageEndMm": 9600,
+      "chainageCenterMm": 9300,
+      "lengthM": 0.6,
+      "lineWeightOpeKgPerM": 26.5,
+      "lineWeightHydKgPerM": 36.5,
+      "componentWeightKg": 25,
+      "totalWeightOpeKg": 40.9,
+      "totalWeightHydKg": 46.9,
+      "formulaTrace": {
+        "pipe": {
+          "value": 16,
+          "status": "OK_SOURCE",
+          "source": "pipeWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "insulation": {
+          "value": 2.5,
+          "status": "OK_SOURCE",
+          "source": "insulationWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "fluidOpe": {
+          "value": 8,
+          "status": "OK_SOURCE",
+          "source": "fluidWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "fluidHyd": {
+          "value": 18,
+          "status": "OK_SOURCE",
+          "source": "fluidWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "component": {
+          "value": 25,
+          "status": "OK_SOURCE",
+          "source": "componentWeightKg",
+          "trace": null,
+          "missing": []
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "elementId": "E011",
+      "name": "PIPE-005 4in",
+      "type": "PIPE",
+      "center": {
+        "x": 5000,
+        "y": 4000,
+        "z": 1700
+      },
+      "chainageStartMm": 9600,
+      "chainageEndMm": 11800,
+      "chainageCenterMm": 10700,
+      "lengthM": 2.2,
+      "lineWeightOpeKgPerM": 26.5,
+      "lineWeightHydKgPerM": 36.5,
+      "componentWeightKg": 0,
+      "totalWeightOpeKg": 58.300000000000004,
+      "totalWeightHydKg": 80.30000000000001,
+      "formulaTrace": {
+        "pipe": {
+          "value": 16,
+          "status": "OK_SOURCE",
+          "source": "pipeWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "insulation": {
+          "value": 2.5,
+          "status": "OK_SOURCE",
+          "source": "insulationWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "fluidOpe": {
+          "value": 8,
+          "status": "OK_SOURCE",
+          "source": "fluidWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "fluidHyd": {
+          "value": 18,
+          "status": "OK_SOURCE",
+          "source": "fluidWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "component": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "elementId": "E012",
+      "name": "TEE-001 4in",
+      "type": "TEE",
+      "center": {
+        "x": 5000,
+        "y": 4000,
+        "z": 2800
+      },
+      "chainageStartMm": null,
+      "chainageEndMm": null,
+      "chainageCenterMm": 11800,
+      "lengthM": null,
+      "lineWeightOpeKgPerM": 0,
+      "lineWeightHydKgPerM": 0,
+      "componentWeightKg": 80,
+      "totalWeightOpeKg": 80,
+      "totalWeightHydKg": 80,
+      "formulaTrace": {
+        "pipe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "insulation": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidOpe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidHyd": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "component": {
+          "value": 80,
+          "status": "OK_SOURCE",
+          "source": "componentWeightKg",
+          "trace": null,
+          "missing": []
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "elementId": "E013",
+      "name": "PIPE-006 4in",
+      "type": "PIPE",
+      "center": {
+        "x": 6350,
+        "y": 4000,
+        "z": 2800
+      },
+      "chainageStartMm": 11800,
+      "chainageEndMm": 14500,
+      "chainageCenterMm": 13150,
+      "lengthM": 2.7,
+      "lineWeightOpeKgPerM": 26.5,
+      "lineWeightHydKgPerM": 36.5,
+      "componentWeightKg": 0,
+      "totalWeightOpeKg": 71.55000000000001,
+      "totalWeightHydKg": 98.55000000000001,
+      "formulaTrace": {
+        "pipe": {
+          "value": 16,
+          "status": "OK_SOURCE",
+          "source": "pipeWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "insulation": {
+          "value": 2.5,
+          "status": "OK_SOURCE",
+          "source": "insulationWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "fluidOpe": {
+          "value": 8,
+          "status": "OK_SOURCE",
+          "source": "fluidWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "fluidHyd": {
+          "value": 18,
+          "status": "OK_SOURCE",
+          "source": "fluidWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "component": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "elementId": "E014",
+      "name": "FLAN-003 4in",
+      "type": "FLANGE",
+      "center": {
+        "x": 7700,
+        "y": 4000,
+        "z": 2800
+      },
+      "chainageStartMm": null,
+      "chainageEndMm": null,
+      "chainageCenterMm": 14500,
+      "lengthM": null,
+      "lineWeightOpeKgPerM": 0,
+      "lineWeightHydKgPerM": 0,
+      "componentWeightKg": 50,
+      "totalWeightOpeKg": 50,
+      "totalWeightHydKg": 50,
+      "formulaTrace": {
+        "pipe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "insulation": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidOpe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidHyd": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "component": {
+          "value": 50,
+          "status": "OK_SOURCE",
+          "source": "componentWeightKg",
+          "trace": null,
+          "missing": []
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "elementId": "E015",
+      "name": "VALV-002 4in",
+      "type": "VALVE",
+      "center": {
+        "x": 7950,
+        "y": 4000,
+        "z": 2800
+      },
+      "chainageStartMm": null,
+      "chainageEndMm": null,
+      "chainageCenterMm": 14750,
+      "lengthM": null,
+      "lineWeightOpeKgPerM": 0,
+      "lineWeightHydKgPerM": 0,
+      "componentWeightKg": 350,
+      "totalWeightOpeKg": 350,
+      "totalWeightHydKg": 350,
+      "formulaTrace": {
+        "pipe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "insulation": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidOpe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidHyd": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "component": {
+          "value": 350,
+          "status": "OK_SOURCE",
+          "source": "componentWeightKg",
+          "trace": null,
+          "missing": []
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "elementId": "E016",
+      "name": "FLAN-004 4in",
+      "type": "FLANGE",
+      "center": {
+        "x": 8200,
+        "y": 4000,
+        "z": 2800
+      },
+      "chainageStartMm": null,
+      "chainageEndMm": null,
+      "chainageCenterMm": 15000,
+      "lengthM": null,
+      "lineWeightOpeKgPerM": 0,
+      "lineWeightHydKgPerM": 0,
+      "componentWeightKg": 50,
+      "totalWeightOpeKg": 50,
+      "totalWeightHydKg": 50,
+      "formulaTrace": {
+        "pipe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "insulation": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidOpe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidHyd": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "component": {
+          "value": 50,
+          "status": "OK_SOURCE",
+          "source": "componentWeightKg",
+          "trace": null,
+          "missing": []
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "elementId": "E017",
+      "name": "PIPE-007 4in",
+      "type": "PIPE",
+      "center": {
+        "x": 8200,
+        "y": 5000,
+        "z": 2800
+      },
+      "chainageStartMm": 15000,
+      "chainageEndMm": 17000,
+      "chainageCenterMm": 16000,
+      "lengthM": 2,
+      "lineWeightOpeKgPerM": 26.5,
+      "lineWeightHydKgPerM": 36.5,
+      "componentWeightKg": 0,
+      "totalWeightOpeKg": 53,
+      "totalWeightHydKg": 73,
+      "formulaTrace": {
+        "pipe": {
+          "value": 16,
+          "status": "OK_SOURCE",
+          "source": "pipeWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "insulation": {
+          "value": 2.5,
+          "status": "OK_SOURCE",
+          "source": "insulationWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "fluidOpe": {
+          "value": 8,
+          "status": "OK_SOURCE",
+          "source": "fluidWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "fluidHyd": {
+          "value": 18,
+          "status": "OK_SOURCE",
+          "source": "fluidWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "component": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "elementId": "E018",
+      "name": "ELBO-003 4in",
+      "type": "ELBO",
+      "center": {
+        "x": 8200,
+        "y": 6300,
+        "z": 2800
+      },
+      "chainageStartMm": 17000,
+      "chainageEndMm": 17600,
+      "chainageCenterMm": 17300,
+      "lengthM": 0.6,
+      "lineWeightOpeKgPerM": 26.5,
+      "lineWeightHydKgPerM": 36.5,
+      "componentWeightKg": 25,
+      "totalWeightOpeKg": 40.9,
+      "totalWeightHydKg": 46.9,
+      "formulaTrace": {
+        "pipe": {
+          "value": 16,
+          "status": "OK_SOURCE",
+          "source": "pipeWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "insulation": {
+          "value": 2.5,
+          "status": "OK_SOURCE",
+          "source": "insulationWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "fluidOpe": {
+          "value": 8,
+          "status": "OK_SOURCE",
+          "source": "fluidWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "fluidHyd": {
+          "value": 18,
+          "status": "OK_SOURCE",
+          "source": "fluidWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "component": {
+          "value": 25,
+          "status": "OK_SOURCE",
+          "source": "componentWeightKg",
+          "trace": null,
+          "missing": []
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "elementId": "E019",
+      "name": "PIPE-008 4in",
+      "type": "PIPE",
+      "center": {
+        "x": 9900,
+        "y": 6600,
+        "z": 2800
+      },
+      "chainageStartMm": 17600,
+      "chainageEndMm": 21000,
+      "chainageCenterMm": 19300,
+      "lengthM": 3.4,
+      "lineWeightOpeKgPerM": 26.5,
+      "lineWeightHydKgPerM": 36.5,
+      "componentWeightKg": 0,
+      "totalWeightOpeKg": 90.1,
+      "totalWeightHydKg": 124.1,
+      "formulaTrace": {
+        "pipe": {
+          "value": 16,
+          "status": "OK_SOURCE",
+          "source": "pipeWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "insulation": {
+          "value": 2.5,
+          "status": "OK_SOURCE",
+          "source": "insulationWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "fluidOpe": {
+          "value": 8,
+          "status": "OK_SOURCE",
+          "source": "fluidWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "fluidHyd": {
+          "value": 18,
+          "status": "OK_SOURCE",
+          "source": "fluidWeightKgPerM",
+          "trace": null,
+          "missing": []
+        },
+        "component": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "elementId": "E020",
+      "name": "FLAN-005 6in bypass",
+      "type": "FLANGE",
+      "center": {
+        "x": 5000,
+        "y": 2200,
+        "z": 0
+      },
+      "chainageStartMm": null,
+      "chainageEndMm": null,
+      "chainageCenterMm": 7200,
+      "lengthM": null,
+      "lineWeightOpeKgPerM": 0,
+      "lineWeightHydKgPerM": 0,
+      "componentWeightKg": 25,
+      "totalWeightOpeKg": 25,
+      "totalWeightHydKg": 25,
+      "formulaTrace": {
+        "pipe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "insulation": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidOpe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidHyd": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "component": {
+          "value": 25,
+          "status": "OK_SOURCE",
+          "source": "componentWeightKg",
+          "trace": null,
+          "missing": []
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "elementId": "E021",
+      "name": "VALV-003 6in bypass",
+      "type": "VALVE",
+      "center": {
+        "x": 5000,
+        "y": 2300,
+        "z": 0
+      },
+      "chainageStartMm": null,
+      "chainageEndMm": null,
+      "chainageCenterMm": 7300,
+      "lengthM": null,
+      "lineWeightOpeKgPerM": 0,
+      "lineWeightHydKgPerM": 0,
+      "componentWeightKg": 80,
+      "totalWeightOpeKg": 80,
+      "totalWeightHydKg": 80,
+      "formulaTrace": {
+        "pipe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "insulation": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidOpe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidHyd": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "component": {
+          "value": 80,
+          "status": "OK_SOURCE",
+          "source": "componentWeightKg",
+          "trace": null,
+          "missing": []
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "elementId": "E022",
+      "name": "FLAN-006 6in bypass",
+      "type": "FLANGE",
+      "center": {
+        "x": 5000,
+        "y": 2400,
+        "z": 0
+      },
+      "chainageStartMm": null,
+      "chainageEndMm": null,
+      "chainageCenterMm": 7400,
+      "lengthM": null,
+      "lineWeightOpeKgPerM": 0,
+      "lineWeightHydKgPerM": 0,
+      "componentWeightKg": 25,
+      "totalWeightOpeKg": 25,
+      "totalWeightHydKg": 25,
+      "formulaTrace": {
+        "pipe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "insulation": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidOpe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidHyd": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "component": {
+          "value": 25,
+          "status": "OK_SOURCE",
+          "source": "componentWeightKg",
+          "trace": null,
+          "missing": []
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "elementId": "E023",
+      "name": "INSTR-001 4in",
+      "type": "INSTRUMENT",
+      "center": {
+        "x": 5000,
+        "y": 4000,
+        "z": 1000
+      },
+      "chainageStartMm": null,
+      "chainageEndMm": null,
+      "chainageCenterMm": 10000,
+      "lengthM": null,
+      "lineWeightOpeKgPerM": 0,
+      "lineWeightHydKgPerM": 0,
+      "componentWeightKg": 35,
+      "totalWeightOpeKg": 35,
+      "totalWeightHydKg": 35,
+      "formulaTrace": {
+        "pipe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "insulation": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidOpe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidHyd": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "component": {
+          "value": 35,
+          "status": "OK_SOURCE",
+          "source": "componentWeightKg",
+          "trace": null,
+          "missing": []
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "elementId": "E024",
+      "name": "OLET-001 4in",
+      "type": "OLET",
+      "center": {
+        "x": 6400,
+        "y": 4000,
+        "z": 2800
+      },
+      "chainageStartMm": null,
+      "chainageEndMm": null,
+      "chainageCenterMm": 13200,
+      "lengthM": null,
+      "lineWeightOpeKgPerM": 0,
+      "lineWeightHydKgPerM": 0,
+      "componentWeightKg": 20,
+      "totalWeightOpeKg": 20,
+      "totalWeightHydKg": 20,
+      "formulaTrace": {
+        "pipe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "insulation": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidOpe": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "fluidHyd": {
+          "value": 0,
+          "status": "NOT_APPLICABLE",
+          "source": "not-applicable",
+          "trace": null,
+          "missing": []
+        },
+        "component": {
+          "value": 20,
+          "status": "OK_SOURCE",
+          "source": "componentWeightKg",
+          "trace": null,
+          "missing": []
+        }
+      },
+      "diagnostics": []
+    }
+  ],
+  "unsupported": [],
+  "diagnostics": [
+    {
+      "schema": "engineering-diagnostic/v1",
+      "id": "diag-BENCH-30_COMPLEX_3D_SUPPORT_LOAD-geometry-center",
+      "severity": "BLOCKED",
+      "category": "BROKEN_GEOMETRY",
+      "field": "geometry.center",
+      "message": "Element COG/center is missing.",
+      "requiredFor": [
+        "ElementWeight",
+        "SupportVerticalLoad"
+      ],
+      "sourceExpected": "pipingClassMaster",
+      "fallbackUsed": false,
+      "calculationAction": "BLOCK",
+      "ui": {
+        "badge": "COG?",
+        "icon": "X",
+        "color": "RED",
+        "layer": "engineering-data-health"
+      },
+      "context": {
+        "elementId": "BENCH-30_COMPLEX_3D_SUPPORT_LOAD"
+      }
+    },
+    {
+      "schema": "engineering-diagnostic/v1",
+      "id": "diag-BENCH-30_COMPLEX_3D_SUPPORT_LOAD-chainageCenterMm",
+      "severity": "BLOCKED",
+      "category": "BROKEN_GEOMETRY",
+      "field": "chainageCenterMm",
+      "message": "Element chainage is missing.",
+      "requiredFor": [
+        "ElementWeight",
+        "SupportVerticalLoad"
+      ],
+      "sourceExpected": "pipingClassMaster",
+      "fallbackUsed": false,
+      "calculationAction": "BLOCK",
+      "ui": {
+        "badge": "CH?",
+        "icon": "X",
+        "color": "RED",
+        "layer": "engineering-data-health"
+      },
+      "context": {
+        "elementId": "BENCH-30_COMPLEX_3D_SUPPORT_LOAD"
+      }
+    }
+  ],
+  "diagnosticSummary": {
+    "total": 2,
+    "blocked": 2,
+    "partial": 0,
+    "review": 0
+  },
+  "logs": [
+    {
+      "level": "warn",
+      "message": "Chainage V2 distributed OPE 1940.75 kg and HYD 2194.75 kg to 6 support(s)."
+    },
+    {
+      "level": "info",
+      "message": "No OPE-to-HYD fallback was used."
+    }
+  ]
+}

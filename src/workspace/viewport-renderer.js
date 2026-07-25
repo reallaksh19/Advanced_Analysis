@@ -59,8 +59,32 @@ export class ViewportRenderer {
     this.requireBackend().fitView();
   }
 
+  fitSelection() {
+    this.requireBackend().fitSelection?.();
+  }
+
+  home() {
+    this.requireBackend().home?.();
+  }
+
+  setStandardView(preset) {
+    this.requireBackend().setStandardView?.(preset);
+  }
+
+  setInteractionContext(mode) {
+    this.requireBackend().setInteractionContext?.(mode);
+  }
+
+  getCapabilities() {
+    return this.requireBackend().getCapabilities?.() || {};
+  }
+
   resetView() {
-    this.requireBackend().resetView();
+    if (this.requireBackend().resetView) {
+      this.requireBackend().resetView();
+    } else {
+      this.home();
+    }
   }
 
   resize() {
