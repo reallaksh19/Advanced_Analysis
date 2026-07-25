@@ -26,6 +26,13 @@ export class LoadCalcConsumerController {
     this.reviewModel = buildReviewModel(this.context);
     this.actionAvailability = createLoadCalcActionAvailability(this.context, this.reviewModel);
     this.status = {};
+    this.uiState = {
+      activeLoadCase: '',
+      searchQuery: '',
+      qualificationFilter: 'ALL',
+      typeFilter: 'ALL',
+      selectedPrimitiveId: ''
+    };
     this.unsubscribeCallbacks = [];
   }
   init() {
@@ -48,6 +55,13 @@ export class LoadCalcConsumerController {
     this.context = context;
     this.reviewModel = buildReviewModel(context);
     this.actionAvailability = createLoadCalcActionAvailability(context, this.reviewModel);
+    // Reset selected case if it no longer exists
+    if (this.reviewModel && this.reviewModel.loadCases.length > 0) {
+      if (!this.reviewModel.loadCases.find(c => c.loadCaseId === this.uiState.activeLoadCase)) {
+        this.uiState.activeLoadCase = this.reviewModel.loadCases[0].loadCaseId;
+        this.uiState.selectedPrimitiveId = '';
+      }
+    }
     this.render();
   }
   handleChanged(reason, fallback) {
@@ -59,12 +73,19 @@ export class LoadCalcConsumerController {
   render() {
     if (!this.rootElement) return;
     const missingContracts = getMissingLoadCalcContracts(this.context);
+    
+    // Default active case if empty
+    if (!this.uiState.activeLoadCase && this.reviewModel && this.reviewModel.loadCases.length > 0) {
+      this.uiState.activeLoadCase = this.reviewModel.loadCases[0].loadCaseId;
+    }
+    
     const view = renderLoadCalcConsumer(
       this.rootElement.ownerDocument,
       this.reviewModel,
       this.status,
       this.actionAvailability,
-      missingContracts
+      missingContracts,
+      this.uiState
     );
     this.rootElement.replaceChildren(view);
     bind(view, 'load-mock-data', () => this.loadMockData());
@@ -73,6 +94,45 @@ export class LoadCalcConsumerController {
     bind(view, 'rebuild-paths', () => this.publishAction('rebuildPaths', SUPPORT_LOAD_SCREENING_EVENTS.REBUILD_PATHS_REQUESTED));
     bind(view, 'run-screening', () => this.publishAction('runScreening', SUPPORT_LOAD_SCREENING_EVENTS.RUN_REQUESTED));
     bind(view, 'export-screening', () => this.publishAction('exportScreening', SUPPORT_LOAD_SCREENING_EVENTS.EXPORT_REQUESTED));
+    
+    // Bind UI state events
+    const documentRef = this.rootElement.ownerDocument;
+    view.querySelectorAll('[data-action="tab-load-case"]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        this.uiState.activeLoadCase = e.currentTarget.dataset.case;
+        this.uiState.selectedPrimitiveId = ''; // Clear selection on tab switch
+        this.render();
+      });
+    });
+    
+    const searchInput = view.querySelector('[data-role="filter-search"]');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        this.uiState.searchQuery = e.target.value;
+        this.render();
+        // Restore focus to search input after render
+        const newSearchInput = this.rootElement.querySelector('[data-role="filter-search"]');
+        if (newSearchInput) {
+          newSearchInput.focus();
+          newSearchInput.setSelectionRange(newSearchInput.value.length, newSearchInput.value.length);
+        }
+      });
+    }
+    
+    const qualFilter = view.querySelector('[data-role="filter-qualification"]');
+    if (qualFilter) qualFilter.addEventListener('change', (e) => { this.uiState.qualificationFilter = e.target.value; this.render(); });
+    
+    const typeFilter = view.querySelector('[data-role="filter-type"]');
+    if (typeFilter) typeFilter.addEventListener('change', (e) => { this.uiState.typeFilter = e.target.value; this.render(); });
+    
+    const tableRows = view.querySelectorAll('.load-calc-table tbody tr[data-primitive-id]');
+    tableRows.forEach(row => {
+      row.addEventListener('click', (e) => {
+        const id = e.currentTarget.dataset.primitiveId;
+        this.uiState.selectedPrimitiveId = this.uiState.selectedPrimitiveId === id ? '' : id;
+        this.render();
+      });
+    });
   }
   publishAction(actionKey, topic) {
     if (!this.actionAvailability[actionKey]) return this.handleFailure(ACTION_FAILURES[actionKey]);
@@ -80,6 +140,7 @@ export class LoadCalcConsumerController {
   }
   loadMockData() {
     this.status = { message: 'Loading [SIMULATED] Workspace and Load Calc inputs.' };
+    this.render();
     this.eventBus.publish(EVENT_TOPICS.DATASET_LOAD_REQUESTED, {
       rawPackage: createWorkspaceMockPackage(),
       sourceName: '[SIMULATED]-advanced-load-calc.json',
@@ -96,6 +157,7 @@ export class LoadCalcConsumerController {
     this.actionAvailability = Object.freeze({});
     this.consumerController = null;
     this.status = {};
+    this.uiState = {};
     this.rootElement?.replaceChildren();
   }
 }
@@ -103,6 +165,7 @@ export class LoadCalcConsumerController {
 export function createLoadCalcActionAvailability(context, reviewModel) {
   const contracts = context?.contracts || {};
   const hasModelLoads = Boolean(reviewModel);
+  const canRebuildModelLoads = Boolean(contracts.topologyGraph);
   const hasPathInputs = Boolean(hasModelLoads
     && contracts.sharedModel
     && contracts.topologyGraph
@@ -110,7 +173,7 @@ export function createLoadCalcActionAvailability(context, reviewModel) {
     && contracts.restraintCapabilityModel);
   const hasPathModel = Boolean(hasModelLoads && contracts.verticalLoadPathModel);
   return Object.freeze({
-    rebuildModelLoads: hasModelLoads,
+    rebuildModelLoads: canRebuildModelLoads,
     exportModelLoads: hasModelLoads,
     rebuildPaths: hasPathInputs,
     runScreening: hasPathModel,

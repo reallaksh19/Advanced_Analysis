@@ -10,8 +10,10 @@
 }
 
 .workspace-shell {
+  --left-panel: 300px;
+  --right-panel: 350px;
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr) 350px;
+  grid-template-columns: var(--left-panel) auto minmax(0, 1fr) auto var(--right-panel);
   height: 100vh;
   overflow: hidden;
   background: var(--workspace-canvas);
@@ -29,6 +31,126 @@
   flex-direction: column;
   overflow: hidden;
   background: var(--workspace-panel);
+  transition: min-width 0.2s ease-in-out;
+}
+
+.workspace-shell.tree-collapsed {
+  grid-template-columns: 48px auto minmax(0, 1fr) auto var(--right-panel);
+}
+
+.workspace-shell.properties-collapsed {
+  grid-template-columns: var(--left-panel) auto minmax(0, 1fr) auto 48px;
+}
+
+.workspace-shell.tree-collapsed.properties-collapsed {
+  grid-template-columns: 48px auto minmax(0, 1fr) auto 48px;
+}
+
+.panel-resizer {
+  width: 4px;
+  background: transparent;
+  cursor: col-resize;
+  transition: background-color 0.2s;
+  z-index: 10;
+}
+
+.panel-resizer:hover,
+.workspace-shell.is-resizing .panel-resizer:active {
+  background: var(--workspace-accent);
+}
+
+.workspace-shell.tree-collapsed .panel-resizer--left,
+.workspace-shell.properties-collapsed .panel-resizer--right {
+  pointer-events: none;
+  cursor: default;
+}
+
+.panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.panel-header__title {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.panel-collapse-btn,
+.panel-expand-btn {
+  flex: 0 0 24px;
+  height: 24px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--workspace-muted);
+  border-radius: 4px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+}
+
+.panel-collapse-btn:hover,
+.panel-expand-btn:hover {
+  background: rgba(255,255,255,0.1);
+  color: var(--workspace-text);
+}
+
+.panel-expand-btn {
+  display: none;
+}
+
+.workspace-shell.tree-collapsed .tree-panel .panel-collapse-btn,
+.workspace-shell.properties-collapsed .properties-panel .panel-collapse-btn {
+  display: none;
+}
+
+.workspace-shell.tree-collapsed .tree-panel .panel-expand-btn,
+.workspace-shell.properties-collapsed .properties-panel .panel-expand-btn {
+  display: grid;
+  margin: 0 auto;
+}
+
+.workspace-shell.tree-collapsed .tree-panel .panel-header__title,
+.workspace-shell.properties-collapsed .properties-panel .panel-header__title,
+.workspace-shell.tree-collapsed .tree-panel .panel-collapsible-content,
+.workspace-shell.properties-collapsed .properties-panel .panel-collapsible-content {
+  display: none;
+}
+
+.panel-collapsible-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.panel-search-container {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--workspace-border);
+}
+
+.properties-search-container {
+  border-bottom: none;
+}
+
+.panel-search-input {
+  width: 100%;
+  padding: 6px 12px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: var(--workspace-text);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.panel-search-input:focus {
+  outline: none;
+  border-color: var(--workspace-accent);
+  box-shadow: 0 0 0 1px var(--workspace-accent);
 }
 
 .tree-panel {
@@ -78,32 +200,83 @@
   font-size: 11px;
 }
 
-.tree-list,
+.tree-list {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0; /* Virtual lists usually don't have container padding to preserve absolute positioning */
+}
+
 .properties-content {
   min-height: 0;
   overflow: auto;
   padding: 12px;
 }
 
+.tree-list-content {
+  position: relative;
+  width: 100%;
+}
+
+.tree-branch-virtual {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--workspace-text);
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.tree-branch-virtual:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tree-branch-virtual:focus-visible,
+.tree-entity-virtual:focus-visible {
+  outline: 1px solid var(--workspace-accent);
+  outline-offset: -1px;
+}
+
+.tree-branch-chevron {
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 6px solid var(--workspace-muted);
+  transition: transform 0.1s;
+}
+
+.tree-branch-chevron--open {
+  transform: rotate(90deg);
+}
+
+.tree-branch-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .tree-entity {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   width: 100%;
-  margin: 0 0 6px;
+  margin: 0;
   border: 1px solid transparent;
   border-radius: 5px;
-  padding: 10px;
+  padding: 4px 10px;
   background: #0a1322;
   color: var(--workspace-text);
   text-align: left;
   cursor: pointer;
+  box-sizing: border-box;
+  align-items: center;
 }
 
-.tree-entity:hover,
-.tree-entity:focus-visible {
+.tree-entity:hover {
   border-color: #315070;
   background: #111c2e;
-  outline: none;
 }
 
 .tree-entity--selected,
@@ -148,6 +321,40 @@
   color: var(--workspace-muted);
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
+}
+
+.toolbar-group {
+  display: flex;
+  gap: 4px;
+}
+
+.viewport-toolbar__actions {
+  display: flex;
+  gap: 12px;
+}
+
+.toolbar-group button {
+  padding: 4px 8px;
+  background: var(--workspace-panel);
+  border: 1px solid var(--workspace-border);
+  color: var(--workspace-text);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.toolbar-group button:hover:not(:disabled) {
+  background: #1e293b;
+}
+
+.toolbar-group button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.footer-separator {
+  margin: 0 8px;
+  color: #315070;
 }
 
 .viewport-stage {

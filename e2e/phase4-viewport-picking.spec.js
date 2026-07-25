@@ -83,7 +83,7 @@ test('canvas segment hit selects through WorkspaceState without replacing the ca
   expect(await page.evaluate(() => globalThis.__phase4Canvas === document.querySelector('canvas'))).toBe(true);
 });
 
-test('canvas point hit selects and an empty-space click retains the selection', async ({ page }) => {
+test('canvas point hit selects and an empty-space click clears the selection', async ({ page }) => {
   await page.goto('/');
   await uploadJson(page, 'point.json', POINT_PACKAGE);
   const canvas = page.locator('canvas[data-viewport-backend="canvas2d"]');
@@ -99,9 +99,7 @@ test('canvas point hit selects and an empty-space click retains the selection', 
   );
 
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-  expect(await page.evaluate(() => AnalysisWorkspace.getSnapshot().selectedEntityId)).toBe(
-    'SUP-PICK-POINT',
-  );
+  expect(await page.evaluate(() => AnalysisWorkspace.getSnapshot().selectedEntityId)).toBe('');
 });
 
 test('direct selected notification updates consumers but cannot mutate WorkspaceState', async ({ page }) => {

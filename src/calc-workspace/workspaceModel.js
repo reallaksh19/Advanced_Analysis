@@ -42,12 +42,28 @@ export function normalizeCalculationWorkspacePackage(rawPackageJson, importSourc
         : [];
         
     const items = [];
-    function flatten(nodes) {
+    function flatten(nodes, currentBranch = '', currentBore = null) {
       if (!Array.isArray(nodes)) return;
       for (const node of nodes) {
         if (!node || typeof node !== 'object') continue;
+        
+        const type = String(node.type || node.kind || '').toUpperCase();
+        let branch = currentBranch;
+        let bore = currentBore;
+        
+        if (type === 'BRANCH' || type === 'BRAN') {
+           branch = String(node.name || node.id || currentBranch);
+           bore = node.attributes?.HBOR || node.attributes?.BORE || currentBore;
+        } else if (node.attributes?.HBOR || node.attributes?.BORE) {
+           bore = node.attributes?.HBOR || node.attributes?.BORE;
+        }
+        
+        // Inject so adapters can pick it up
+        node._branchName = branch;
+        node._boreMm = bore;
+        
         items.push(node);
-        if (Array.isArray(node.children)) flatten(node.children);
+        if (Array.isArray(node.children)) flatten(node.children, branch, bore);
       }
     }
     flatten(rawItems);

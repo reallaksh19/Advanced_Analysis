@@ -16,17 +16,23 @@ export class PropertiesPanel {
     this.analysisLedger = null;
     this.ledgerStatus = {};
     this.analysisState = idleAnalysis();
+    this.searchQuery = '';
     this.unsubscribeCallbacks = [];
     this.handleClick = this.handleClick.bind(this);
     this.handleChange = this.handleChange.bind(this);
+    this.handleSearch = this.handleSearch.bind(this);
   }
 
   init() {
     if (this.unsubscribeCallbacks.length) return;
     this.contentElement = this.rootElement.querySelector('[data-role="properties-content"]');
+    this.searchElement = this.rootElement.querySelector('[data-role="properties-search"]');
     if (!this.contentElement) throw new Error('PropertiesPanel content root is missing.');
     this.rootElement.addEventListener('click', this.handleClick);
     this.rootElement.addEventListener('change', this.handleChange);
+    if (this.searchElement) {
+      this.searchElement.addEventListener('input', this.handleSearch);
+    }
     this.unsubscribeCallbacks = [
       this.eventBus.subscribe(EVENT_TOPICS.VIEWPORT_ENTITY_SELECTED, (payload) => this.renderSelection(payload)),
       this.eventBus.subscribe(EVENT_TOPICS.ANALYSIS_CAPABILITIES_CHANGED, (payload) => this.handleCapabilities(payload)),
@@ -143,6 +149,7 @@ export class PropertiesPanel {
       session,
       this.analysisLedger,
       this.ledgerStatus,
+      this.searchQuery
     ));
   }
 
@@ -212,6 +219,11 @@ export class PropertiesPanel {
     });
   }
 
+  handleSearch(event) {
+    this.searchQuery = event.target.value.trim().toLowerCase();
+    this.render();
+  }
+
   renderEmpty() {
     this.selection = null;
     this.capabilityTargetId = '';
@@ -227,6 +239,9 @@ export class PropertiesPanel {
   destroy() {
     this.rootElement.removeEventListener('click', this.handleClick);
     this.rootElement.removeEventListener('change', this.handleChange);
+    if (this.searchElement) {
+      this.searchElement.removeEventListener('input', this.handleSearch);
+    }
     this.unsubscribeCallbacks.forEach((unsubscribe) => unsubscribe());
     this.unsubscribeCallbacks = [];
     this.selection = null;

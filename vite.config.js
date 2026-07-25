@@ -10,7 +10,7 @@ export default defineConfig({
   },
   server: {
     watch: {
-      ignored: ['**/benchmarks/**', '**/reports/**'],
+      ignored: ['**/benchmarks/**', '**/reports/**', '**/playwright-report/**'],
     },
   },
 });

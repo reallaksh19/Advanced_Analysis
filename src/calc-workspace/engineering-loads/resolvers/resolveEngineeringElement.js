@@ -39,23 +39,36 @@ export function resolveEngineeringElement(object) {
     componentWeightKg: component.value,
     totalWeightOpeKg: totalWeight(geometry.lengthM, [pipe, insulation, fluidOpe], component),
     totalWeightHydKg: totalWeight(geometry.lengthM, [pipe, insulation, fluidHyd], component),
+    branchName: stringValue(object?._branchName || source.BRANCH_NAME),
+    boreMm: numberMaybe(object?._boreMm || source.HBOR || source.BORE),
     formulaTrace: Object.freeze({ pipe, insulation, fluidOpe, fluidHyd, component }),
     diagnostics: Object.freeze(diagnostics),
   });
 }
 
-export function resolveEngineeringSupport(object) {
+export function resolveEngineeringSupport(object, config) {
   const source = sourceFields(object);
   const endpoints = readObjectEndpoints(object);
   const position = point(source.POS) || point(object?.pos) || endpoints.center;
-  const capability = booleanValue(source.VERTICAL_CAPABILITY ?? object?.enrichedAttributes?.supportVerticalCapability);
+  const rawType = stringValue(source.SUPPORT_TYPE || object?.enrichedAttributes?.supportType || object?.type || 'SUPPORT').toUpperCase();
+  
+  let capability = booleanValue(source.VERTICAL_CAPABILITY ?? object?.enrichedAttributes?.supportVerticalCapability);
+  
+  if (capability === null && config?.assumedVerticalSupportTypes?.length) {
+    if (config.assumedVerticalSupportTypes.includes(rawType) || config.assumedVerticalSupportTypes.includes(stringValue(source.TYPE).toUpperCase())) {
+      capability = true;
+    }
+  }
+  
   const diagnostics = [];
   if (!position) diagnostics.push(diag(object, 'geometry.position', 'BROKEN_GEOMETRY', 'Support position is missing.', 'POS?'));
   if (capability !== true) diagnostics.push(diag(object, 'supportVerticalCapability', 'MISSING_SUPPORT_CAPABILITY', 'Vertical support capability is not explicitly YES.', 'SUP?'));
   return Object.freeze({
     supportId: stringValue(object?.id || object?.name),
     name: stringValue(object?.name || object?.id),
-    supportType: stringValue(source.SUPPORT_TYPE || object?.enrichedAttributes?.supportType || object?.type || 'SUPPORT').toUpperCase(),
+    supportType: rawType,
+    branchName: stringValue(object?._branchName || source.BRANCH_NAME),
+    boreMm: numberMaybe(object?._boreMm || source.HBOR || source.BORE),
     position,
     chainageMm: numberMaybe(source.CHAINAGE_CENTER_MM ?? object?.chainageMm),
     verticalCapability: capability,

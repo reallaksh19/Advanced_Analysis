@@ -1,5 +1,6 @@
 import { assertViewportRenderModel } from './viewport-render-model.js';
 import { buildCanvasProjection, pickViewportItem } from './viewport-hit-test.js';
+import { CANVAS2D_VIEWPORT_CAPABILITIES } from './viewport-command-contract.js';
 
 const DEVICE_PIXEL_RATIO_LIMIT = 2;
 const MAX_POINTER_TRAVEL_PX = 5;
@@ -45,6 +46,10 @@ export class Canvas2DViewportBackend {
       throw new TypeError('Canvas viewport selection handler must be a function or null.');
     }
     this.selectionRequestHandler = callback;
+  }
+
+  getCapabilities() {
+    return CANVAS2D_VIEWPORT_CAPABILITIES;
   }
 
   renderModel(model) {

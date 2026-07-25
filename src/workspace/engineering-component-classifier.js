@@ -4,6 +4,7 @@ export const ENGINEERING_COMPONENT_KINDS = Object.freeze([
   'PIPE',
   'ELBOW',
   'TEE',
+  'OLET',
   'REDUCER',
   'FLANGE',
   'VALVE',
@@ -14,7 +15,8 @@ export const ENGINEERING_COMPONENT_KINDS = Object.freeze([
 const TYPE_ALIASES = new Map([
   ['PIPE', 'PIPE'], ['LINE', 'PIPE'], ['SEGMENT', 'PIPE'],
   ['ELBOW', 'ELBOW'], ['ELBO', 'ELBOW'], ['BEND', 'ELBOW'],
-  ['TEE', 'TEE'], ['OLET', 'TEE'], ['WELDOLET', 'TEE'], ['SOCKOLET', 'TEE'], ['CROSS', 'TEE'],
+  ['TEE', 'TEE'], ['CROSS', 'TEE'],
+  ['OLET', 'OLET'], ['WELDOLET', 'OLET'], ['SOCKOLET', 'OLET'], ['THREDOLET', 'OLET'], ['NIPOLET', 'OLET'],
   ['REDUCER', 'REDUCER'], ['REDU', 'REDUCER'], ['REDUCERCONCENTRIC', 'REDUCER'], ['REDUCERECCENTRIC', 'REDUCER'],
   ['FLANGE', 'FLANGE'], ['FLAN', 'FLANGE'], ['BLINDFLANGE', 'FLANGE'],
   ['VALVE', 'VALVE'], ['VALV', 'VALVE'], ['GATEVALVE', 'VALVE'], ['BALLVALVE', 'VALVE'],
@@ -50,7 +52,8 @@ function inferFromText(text) {
   if (/\b(FLANGE|WELD\s*NECK|WELDNECK|BLIND\s*FLANGE)\b/.test(text)) return 'FLANGE';
   if (/\b(GATE|GLOBE|BALL|CHECK|BUTTERFLY|VALVE)\b/.test(text)) return 'VALVE';
   if (/\b(ELBOW|BEND)\b/.test(text)) return 'ELBOW';
-  if (/\b(TEE|OLET|WELDOLET|SOCKOLET|CROSS)\b/.test(text)) return 'TEE';
+  if (/\b(OLET|WELDOLET|SOCKOLET|THREDOLET|NIPOLET)\b/.test(text)) return 'OLET';
+  if (/\b(TEE|CROSS)\b/.test(text)) return 'TEE';
   if (/\b(REDUCER|CONCENTRIC|ECCENTRIC)\b/.test(text)) return 'REDUCER';
   if (/\b(PIPE|LINE|RUN|SEGMENT)\b/.test(text)) return 'PIPE';
   return '';

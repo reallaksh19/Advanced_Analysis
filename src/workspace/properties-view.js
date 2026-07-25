@@ -11,10 +11,11 @@ export function renderPropertiesContent(
   analysisSession = null,
   analysisLedger = null,
   ledgerStatus = {},
+  searchQuery = ''
 ) {
   const fragment = documentRef.createDocumentFragment();
   fragment.append(renderSelectionHeader(documentRef, selection));
-  fragment.append(renderRows(documentRef, selection.properties, 'No properties supplied for this selection.'));
+  fragment.append(renderRows(documentRef, selection.properties, 'No properties supplied for this selection.', 240, searchQuery));
   fragment.append(renderAnalysisCapabilities(documentRef, capabilities, analysisSession));
   fragment.append(renderAnalysisSession(documentRef, analysisSession));
   fragment.append(renderAnalysis(documentRef, analysisState));
@@ -66,8 +67,16 @@ function renderAnalysis(documentRef, state) {
   return section;
 }
 
-function renderRows(documentRef, value, emptyText, limit = 240) {
-  const rows = flattenProperties(value, limit);
+function renderRows(documentRef, value, emptyText, limit = 240, searchQuery = '') {
+  let rows = flattenProperties(value, limit);
+  
+  if (searchQuery) {
+    rows = rows.filter(row => 
+      row.path.toLowerCase().includes(searchQuery) || 
+      row.value.toLowerCase().includes(searchQuery)
+    );
+  }
+
   if (!rows.length) {
     const empty = documentRef.createElement('p');
     empty.className = 'panel-empty';
