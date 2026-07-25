@@ -1,0 +1,118 @@
+{
+  "schemaVersion": "pcfx-roundtrip-adapter-v1",
+  "pcfxVersion": "PCFX1-SCREENING-JSON",
+  "project": {
+    "id": "FIXTURE-TEE",
+    "name": "Tee Fixture"
+  },
+  "units": {
+    "length": "mm"
+  },
+  "nodes": {
+    "W": {
+      "type": "free",
+      "pos": [-1000, 0, 0],
+      "rawAttributes": {},
+      "normalized": {},
+      "derived": {},
+      "meta": {}
+    },
+    "T": {
+      "type": "tee",
+      "pos": [0, 0, 0],
+      "rawAttributes": {
+        "CA97": "TEE-FIXTURE"
+      },
+      "normalized": {},
+      "derived": {
+        "componentData": {
+          "status": "SCREENING_SAMPLE"
+        }
+      },
+      "meta": {
+        "componentData": {
+          "status": "SCREENING_SAMPLE"
+        }
+      }
+    },
+    "E": {
+      "type": "free",
+      "pos": [1000, 0, 0],
+      "rawAttributes": {},
+      "normalized": {},
+      "derived": {},
+      "meta": {}
+    },
+    "N": {
+      "type": "free",
+      "pos": [0, 1000, 0],
+      "rawAttributes": {},
+      "normalized": {},
+      "derived": {},
+      "meta": {}
+    }
+  },
+  "segments": [
+    {
+      "id": "WEST",
+      "startNode": "W",
+      "endNode": "T",
+      "compType": null,
+      "properties": {},
+      "rawAttributes": {},
+      "normalized": {},
+      "derived": {}
+    },
+    {
+      "id": "EAST",
+      "startNode": "T",
+      "endNode": "E",
+      "compType": null,
+      "properties": {},
+      "rawAttributes": {},
+      "normalized": {},
+      "derived": {}
+    },
+    {
+      "id": "BRANCH",
+      "startNode": "T",
+      "endNode": "N",
+      "compType": null,
+      "properties": {},
+      "rawAttributes": {},
+      "normalized": {},
+      "derived": {}
+    }
+  ],
+  "components": [
+    {
+      "id": "CMP-T",
+      "nodeId": "T",
+      "componentType": "TEE",
+      "connectedSegmentIds": ["WEST", "EAST", "BRANCH"],
+      "rawAttributes": {
+        "CA97": "TEE-FIXTURE"
+      },
+      "normalized": {},
+      "derived": {
+        "componentData": {
+          "status": "SCREENING_SAMPLE"
+        }
+      },
+      "meta": {}
+    }
+  ],
+  "graphTranslatorComponents": [
+    {
+      "TEE_CLASSIFICATION": "VECTOR_COLINEARITY",
+      "MAIN_SEGMENT_A": "WEST",
+      "MAIN_SEGMENT_B": "EAST",
+      "BRANCH_SEGMENT": "BRANCH"
+    }
+  ],
+  "diagnostics": [],
+  "lossContract": [],
+  "rawAttributes": {},
+  "normalized": {},
+  "derived": {}
+}

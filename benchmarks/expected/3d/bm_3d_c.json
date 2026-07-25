@@ -1,0 +1,9 @@
+{
+  "caseId": "BM-3D-C",
+  "expected": {
+    "results": {
+      "mist": { "status": "PASS" },
+      "flange": { "status": "FAIL" }
+    }
+  }
+}

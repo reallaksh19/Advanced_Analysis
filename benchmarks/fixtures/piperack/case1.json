@@ -1,0 +1,29 @@
+{
+  "caseId": "pr-loop-001",
+  "title": "Basic Loop Sizing",
+  "module": "piperack-expansion-loop",
+  "engineeringLevel": "DESIGN_AID_SCREENING",
+  "description": "Standard loop layout check with two pipes.",
+  "input": {
+    "globalSettings": {
+      "anchorDistanceFt": 200,
+      "defaultSpacingFt": 2.5,
+      "allowableStressPsi": 20000
+    },
+    "methodology": "FLUOR",
+    "lines": [
+      {
+        "id": "L1",
+        "sizeNps": 6,
+        "material": "CS",
+        "tOperate": 300
+      },
+      {
+        "id": "L2",
+        "sizeNps": 12,
+        "material": "SS",
+        "tOperate": 400
+      }
+    ]
+  }
+}

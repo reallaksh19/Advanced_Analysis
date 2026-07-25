@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "UI-MOCK-CARDS-001",
+  "title": "UI mock cards metadata proof",
+  "module": "ui-proof",
+  "solverExport": "validateMockCatalogCompleteness",
+  "methodId": "UI_MOCK_CATALOG_PROOF",
+  "iconId": "mock-proof",
+  "input": {
+    "expectedTotal": 37
+  },
+  "expected": {
+    "status": "PASSED",
+    "methodId": "UI_MOCK_CATALOG_PROOF",
+    "formulaIds": [
+      "UI_MOCK_CATALOG_COMPLETENESS"
+    ],
+    "totalMockCards": 37,
+    "cardsMissingIcon": 0,
+    "cardsMissingFixture": 0,
+    "cardsMissingMethodId": 0,
+    "cardsMissingLoadTarget": 0
+  },
+  "compare": {
+    "mode": "rounded-zero-error",
+    "roundDecimals": 12,
+    "requiredStatus": "PASSED"
+  }
+}

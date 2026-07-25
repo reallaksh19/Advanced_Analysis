@@ -1,0 +1,49 @@
+{
+  "description": "Pipe with a single anchor \u2014 should return an error or skip stress evaluation.",
+  "input": {
+    "nodes": {
+      "A": {
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "type": "anchor"
+      },
+      "B": {
+        "pos": [
+          1200,
+          0,
+          0
+        ],
+        "type": "free"
+      }
+    },
+    "segments": [
+      {
+        "id": "S1",
+        "startNode": "A",
+        "endNode": "B",
+        "length_in": 1200,
+        "od_in": 6.625,
+        "wt_in": 0.28,
+        "axis": "X",
+        "compType": "PIPE"
+      }
+    ],
+    "params": {
+      "deltaT_F": 300,
+      "E_psi": 29500000,
+      "alpha_in_in_F": 6.5e-06,
+      "Sc_psi": 20000,
+      "Sh_psi": 18000,
+      "f": 1.0
+    },
+    "includeSIF": false
+  },
+  "expected": {
+    "overallResult": "FAIL",
+    "criticalRatio": null,
+    "tolerance": 0.005
+  }
+}

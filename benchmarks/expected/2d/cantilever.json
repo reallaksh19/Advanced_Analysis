@@ -1,0 +1,12 @@
+{
+  "caseId": "2D-CANTILEVER-001",
+  "expected": {
+    "results": {
+      "moment": {
+        "value": 50000,
+        "unit": "lb-in"
+      }
+    },
+    "tolerance": 0.005
+  }
+}

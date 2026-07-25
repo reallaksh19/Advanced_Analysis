@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "EXT-MATERIAL-DATA-EXISTS-001",
+  "title": "Material data exists — CS A106B at 300F",
+  "module": "engineering-data",
+  "solverExport": "runMaterialDataLookupBenchmark",
+  "methodId": "MATERIAL_DATA_LOOKUP",
+  "iconId": "material-data",
+  "input": { "materialId": "CS_A106B", "temperature_F": 300 },
+  "expected": {
+    "status": "PASSED",
+    "isQualified": true,
+    "methodId": "MATERIAL_DATA_LOOKUP",
+    "formulaIds": ["MATERIAL_PROPERTY_LOOKUP"],
+    "E_psi": 28300000,
+    "alpha_in_in_F": 0.0000065
+  },
+  "compare": { "mode": "rounded-zero-error", "roundDecimals": 12, "requiredStatus": "PASSED" }
+}

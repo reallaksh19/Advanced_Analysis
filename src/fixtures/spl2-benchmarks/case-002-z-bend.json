@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "spl2-benchmark-v1",
+  "id": "SPL2-Z-BEND-002",
+  "title": "Legacy SPL2 Z-bend screening benchmark placeholder",
+  "source": "public/spl2-bundle retained as legacy benchmark oracle; numeric workbook parity to be filled after formal extraction",
+  "geometryType": "Z_SHAPE",
+  "status": "PENDING_NUMERIC_EXTRACTION",
+  "input": {
+    "unit": "mm",
+    "segments": [
+      { "id": "S1", "start": [0, 0], "end": [5000, 0] },
+      { "id": "S2", "start": [5000, 0], "end": [5000, 2500] },
+      { "id": "S3", "start": [5000, 2500], "end": [9000, 2500] }
+    ],
+    "params": { "OD_mm": 273, "alpha_mm_per_m_C": 0.012, "C": 20 }
+  },
+  "expected": {
+    "resultStatus": "PENDING",
+    "tolerancePct": 3
+  },
+  "notes": [
+    "Use this file as the machine-readable target once SPL2/workbook values are extracted."
+  ]
+}

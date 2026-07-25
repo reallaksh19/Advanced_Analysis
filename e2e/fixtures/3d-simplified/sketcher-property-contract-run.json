@@ -1,0 +1,82 @@
+{
+  "caseId": "SLICE-D-SKETCHER-PROPERTY-CONTRACT-RUN",
+  "description": "Sketcher pipe run with assignable 3D Simplified Calculation properties. This fixture validates transfer and normalization only; it is not a support-load benchmark.",
+  "sketcher": {
+    "workingPlane": "XY",
+    "workingElevation": 0,
+    "designTemperature": 450,
+    "nodes": {
+      "N001": {
+        "pos": [0, 0, 0],
+        "type": "anchor",
+        "supportTag": "SUP-A",
+        "supportType": "anchor",
+        "frictionFactor": 0.3,
+        "restraint": {
+          "x": true,
+          "y": true,
+          "z": true,
+          "rx": false,
+          "ry": false,
+          "rz": false
+        }
+      },
+      "N002": {
+        "pos": [3000, 0, 0],
+        "type": "support",
+        "supportTag": "SUP-B",
+        "supportType": "rest",
+        "frictionFactor": 0.3,
+        "restraint": {
+          "x": false,
+          "y": true,
+          "z": true,
+          "rx": false,
+          "ry": false,
+          "rz": false
+        }
+      }
+    },
+    "segments": [
+      {
+        "id": "S001",
+        "startNode": "N001",
+        "endNode": "N002",
+        "type": "PIPE",
+        "properties": {
+          "type": "PIPE",
+          "dn_mm": 100,
+          "nps": "4",
+          "schedule": "STD",
+          "od_mm": 114.3,
+          "wall_mm": 6.02,
+          "material": "CARBON STEEL",
+          "materialDensity_kg_m3": 7850,
+          "ratingClass": 150,
+          "designTemperature_C": 232.2,
+          "designPressure_barg": 12.5,
+          "fluidDensity_kg_m3": 850,
+          "insulationThickness_mm": 50,
+          "insulationDensity_kg_m3": 120,
+          "componentWeight_kg": 0,
+          "componentLength_mm": 3000,
+          "propertySource": "SLICE-D-FIXTURE"
+        }
+      }
+    ]
+  },
+  "expected": {
+    "validationStatus": "READY",
+    "nodes": 2,
+    "segments": 1,
+    "supports": 2,
+    "pipeSegments": 1,
+    "componentSegments": 0,
+    "material": "CARBON STEEL",
+    "schedule": "STD",
+    "rating": "150",
+    "segmentsWithFluidDensity": 1,
+    "segmentsWithInsulation": 1,
+    "segmentsWithComponentWeight": 0
+  }
+}

@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPL2 Master Dashboard</title>
+    <link rel="stylesheet" href="css/app.css">
+    <style>
+        body {
+            padding: 0;
+            margin: 0;
+            background: var(--bg-1);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Main Content Area */
+        .content-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 2rem;
+        }
+
+        /* Generic layout logic imported from individual modules */
+        .layout-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .panel {
+            background: var(--bg-0);
+            border: 1px solid var(--steel);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+        }
+
+        .panel-header {
+            background: var(--bg-2);
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--steel);
+            font-weight: 600;
+            color: var(--amber);
+            /* using var amber, which is now map to blue */
+            font-family: var(--font-code);
+        }
+
+        .panel-body {
+            padding: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .form-group label {
+            width: 160px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .form-group input,
+        .form-group select {
+            flex: 1;
+            background: var(--bg-1);
+            border: 1px solid var(--steel);
+            color: var(--text-primary);
+            padding: 0.4rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.85rem;
+        }
+
+        .result-row {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px dashed var(--steel);
+            padding: 0.5rem 0;
+            font-family: var(--font-code);
+            font-size: 0.85rem;
+        }
+
+        .result-row:last-child {
+            border: none;
+        }
+
+        .val {
+            color: var(--green-light);
+            font-weight: bold;
+        }
+
+        .btn-calc {
+            background: var(--amber);
+            /* our new blue */
+            color: #fff;
+            /* better contrast than #000 on blue */
+            font-weight: bold;
+            width: 100%;
+            padding: 0.75rem;
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+
+        .btn-calc:hover {
+            opacity: 0.9;
+        }
+
+        .tab-pane {
+            display: none;
+        }
+
+        .tab-pane.active {
+            display: block;
+        }
+
+        .tab-pane.grid-layout-1.active {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto 1fr;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        .tab-pane.grid-layout-2.active {
+            display: grid;
+            grid-template-columns: 3fr 2fr;
+            grid-template-rows: auto 1fr;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        .tab-pane.grid-layout-3.active {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto 1fr;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        /* DB Viewer specific */
+        .db-tabs {
+            display: flex;
+            gap: 0.5rem;
+            border-bottom: 1px solid var(--steel);
+            margin-bottom: 1.5rem;
+        }
+
+        .db-tab-btn {
+            padding: 0.5rem 1rem;
+            background: var(--bg-0);
+            border: 1px solid var(--steel);
+            border-bottom: none;
+            border-radius: 4px 4px 0 0;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
+        .db-tab-btn.active {
+            background: var(--amber);
+            color: #fff;
+            font-weight: bold;
+            border-color: var(--amber);
+        }
+
+        .db-table-wrapper {
+            overflow-x: auto;
+            max-height: 600px;
+            overflow-y: auto;
+            background: var(--bg-0);
+            border: 1px solid var(--steel);
+            border-radius: 4px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+        }
+
+        th,
+        td {
+            padding: 0.2rem 0.4rem;
+            border: 1px solid var(--steel);
+            text-align: left;
+            white-space: nowrap;
+        }
+
+        th {
+            background: var(--bg-2);
+            color: var(--text-primary);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        /* Tighter inputs inside tables */
+        td input[type="number"],
+        td select {
+            padding: 0.1rem 0.2rem;
+            font-size: 0.8rem;
+            border: 1px solid var(--steel);
+            background: var(--bg-1);
+            color: var(--text-primary);
+            border-radius: 2px;
+        }
+
+        th {
+            background: var(--bg-2);
+            color: var(--text-primary);
+            /* Changed from blue so it doesn't clash with bg */
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        /* Zebra striping for table rows */
+        tbody tr:nth-child(even) {
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+
+        tbody tr:hover {
+            background-color: var(--amber-glow);
+        }
+
+        /* Sticky first column for material/NPS names */
+        .sticky-col {
+            position: sticky;
+            left: 0;
+            background: var(--bg-0);
+            z-index: 11;
+            /* higher than top row to overlap */
+            border-right: 2px solid var(--steel);
+        }
+
+        th.sticky-col {
+            background: var(--bg-2);
+            /* Corner cell */
+            z-index: 12;
+        }
+
+        .sidebar-nav {
+            width: 200px;
+            background: var(--bg-1);
+            border-right: 1px solid var(--steel);
+            display: flex;
+            flex-direction: column;
+            padding: 2rem 0;
+            flex-shrink: 0;
+        }
+
+        .side-btn {
+            background: transparent;
+            border: none;
+            border-left: 3px solid transparent;
+            padding: 0.6rem 1rem;
+            text-align: left;
+            color: var(--text-secondary);
+            font-family: var(--font-code);
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .side-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+        }
+
+        .side-btn.active {
+            color: var(--amber);
+            border-left-color: var(--amber);
+            background: rgba(255, 170, 0, 0.05);
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header id="app-header" style="display:none !important;">
+        <div class="app-title">
+            <div class="logo-mark"
+                style="border-radius:4px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; font-weight:bold; clip-path:none; background:var(--amber)">
+                3D</div>
+            <h1>Calc Suite</h1>
+        </div>
+        <div id="tab-nav" style="flex:1; margin-left: 2rem; border-bottom: none; gap: 1rem;">
+            <button class="nav-btn top-nav-btn" data-target="top-tab-viewer" style="opacity: 0.6;">
+                <i class="icon-viewer" style="margin-right:4px;"></i> 3D Viewer
+            </button>
+            <button class="nav-btn top-nav-btn" data-target="top-tab-trans" style="opacity: 0.6;">
+                <i class="icon-mapping" style="margin-right:4px;"></i> 3D to 2D Transformation
+            </button>
+            <button class="nav-btn top-nav-btn" data-target="top-tab-simp" style="opacity: 0.6;">
+                <i class="icon-sequence" style="margin-right:4px;"></i> Simp. Analysis
+            </button>
+            <button class="nav-btn top-nav-btn active" data-target="top-tab-spl2"
+                style="color:var(--amber); border-bottom: 2px solid var(--amber);">
+                <i class="icon-output" style="margin-right:4px;"></i> Simpl. Analysis 2D bundle
+            </button>
+        </div>
+    </header>
+
+    <!-- DUMMY TOP PANES -->
+    <div id="top-tab-viewer" class="top-pane" style="display:none; padding:2rem;">[3D Viewer Area]</div>
+    <div id="top-tab-trans" class="top-pane" style="display:none; padding:2rem;">[3D to 2D Transformation Area]</div>
+    <div id="top-tab-simp" class="top-pane" style="display:none; padding:2rem;">[Simp. Analysis Area]</div>
+
+    <!-- MAIN SPL2 BUNDLE TOP PANE -->
+    <div id="top-tab-spl2" class="top-pane active" style="display:flex; flex-direction:row; flex:1; overflow:hidden;">
+
+        <div class="sidebar-nav">
+            <button class="side-btn active" data-target="tab-loop">Loop Calculations</button>
+            <button class="side-btn" data-target="tab-rack">Pipe Rack Calculation</button>
+            <button class="side-btn" data-target="tab-simp">Simplified Method</button>
+            <button class="side-btn" data-target="tab-db">Database</button>
+            <button class="side-btn" data-target="tab-config">2D Bundle Config</button>
+            <button class="side-btn" data-target="tab-debug" style="color:var(--amber);">
+                <i>🐛</i> Diagnostics
+            </button>
+        </div>
+
+        <main class="content-area" style="flex:1; overflow-y:auto; padding: 2rem; position: relative;">
+
+            <!-- 2D BUNDLE CONFIG PANE -->
+            <div id="tab-config" class="tab-pane">
+                <div class="panel" style="max-width: 600px; margin: 0 auto;">
+                    <div class="panel-header">GLOBAL CONSTANTS & CONFIGURATION</div>
+                    <div class="panel-body">
+                        <table style="width:100%; border:1px solid var(--steel); background:var(--bg-1);">
+                            <thead>
+                                <tr>
+                                    <th style="padding: 0.75rem;">Parameter</th>
+                                    <th style="padding: 0.75rem; width:120px;">Value</th>
+                                    <th style="padding: 0.75rem; width:80px;">Unit</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="padding: 0.75rem; font-weight:bold; color:var(--amber);">Unit System</td>
+                                    <td>
+                                        <select id="global_inp_units"
+                                            style="width:100%; padding:4px; border:1px solid var(--amber); background:rgba(255, 170, 0, 0.2); color:var(--text); font-weight:bold;">
+                                            <option value="Imperial" style="background:#1e2227; color:#fff;">Imperial
+                                            </option>
+                                            <option value="SI" style="background:#1e2227; color:#fff;">SI Metric
+                                            </option>
+                                        </select>
+                                    </td>
+                                    <td style="padding: 0.75rem; color:var(--text-secondary);">-</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 0.75rem;">Insulation Density</td>
+                                    <td><input type="number" id="global_inp_ins_dens" value="8.112"
+                                            style="width:100%; border:1px solid var(--amber); background:rgba(255, 170, 0, 0.1);">
+                                    </td>
+                                    <td style="padding: 0.75rem; color:var(--text-secondary);"><span
+                                            class="unit-dens">lb/ft³</span></td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 0.75rem;">Ambient Temperature</td>
+                                    <td><input type="number" id="global_inp_amb_temp" value="70"
+                                            style="width:100%; border:1px solid var(--amber); background:rgba(255, 170, 0, 0.1);">
+                                    </td>
+                                    <td style="padding: 0.75rem; color:var(--text-secondary);"><span
+                                            class="unit-temp">°F</span></td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 0.75rem;">Friction Factor (μ)</td>
+                                    <td><input type="number" id="global_inp_fric" value="0.3"
+                                            style="width:100%; border:1px solid var(--amber); background:rgba(255, 170, 0, 0.1);">
+                                    </td>
+                                    <td style="padding: 0.75rem; color:var(--text-secondary);">-</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 0.75rem;">Design Factor</td>
+                                    <td><input type="number" id="global_inp_sf" value="1.1"
+                                            style="width:100%; border:1px solid var(--amber); background:rgba(255, 170, 0, 0.1);">
+                                    </td>
+                                    <td style="padding: 0.75rem; color:var(--text-secondary);">-</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 0.75rem;">Wind Force</td>
+                                    <td><input type="number" id="global_inp_wind" value="146.47"
+                                            style="width:100%; border:1px solid var(--amber); background:rgba(255, 170, 0, 0.1);">
+                                    </td>
+                                    <td style="padding: 0.75rem; color:var(--text-secondary);"><span
+                                            class="unit-wind">lb/ft²</span></td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 0.75rem;">Natural Frequency Factor, C</td>
+                                    <td><input type="number" id="global_inp_freq_c" value="2.45"
+                                            style="width:100%; border:1px solid var(--amber); background:rgba(255, 170, 0, 0.1);">
+                                    </td>
+                                    <td style="padding: 0.75rem; color:var(--text-secondary);">-</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p style="margin-top: 1rem; color: var(--text-muted); font-size: 0.85rem; line-height:1.4;">
+                            * Note: Values input into this table are applied globally across calculations.
+                            Changes require users to explicitly recalculate matrices to propagate dynamic updates.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LOOP CALCULATION PANE -->
+            <div id="tab-loop" class="tab-pane grid-layout-3 active">
+
+                <!-- INPUT DATA (Top Left) -->
+                <div class="panel" style="grid-column: 1; grid-row: 1; margin-bottom: 0px; height: 100%;">
+                    <div class="panel-header">INPUT DATA</div>
+                    <div class="panel-body">
+                        <h4
+                            style="margin-bottom:1rem;color:var(--text-secondary);font-size:0.9rem; grid-column: 1 / -1;">
+                            Pipe & Material</h4>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <!-- Column 1 -->
+                            <div style="display:flex; flex-direction:column; gap:1rem;">
+                                <div class="form-group" style="flex-direction:column; align-items:flex-start;">
+                                    <label>Temperature (<span class="unit-temp">°F</span>)</label><input type="number"
+                                        id="loop_inp_temp" value="220" style="width:100%;">
+                                </div>
+                                <div class="form-group" style="flex-direction:column; align-items:flex-start;">
+                                    <label>Schedule</label><select id="loop_inp_sch" style="width:100%;"></select>
+                                </div>
+                                <div class="form-group" style="flex-direction:column; align-items:flex-start;">
+                                    <label>Allowable Stress (SA) (<span class="unit-stress">psi</span>)</label><input
+                                        type="number" id="loop_inp_stress" value="27000" style="width:100%;">
+                                </div>
+                            </div>
+                            <!-- Column 2 -->
+                            <div style="display:flex; flex-direction:column; gap:1rem;">
+                                <div class="form-group" style="flex-direction:column; align-items:flex-start;">
+                                    <label>NPS (<span class="unit-len-sm">in</span>)</label><select id="loop_inp_nps"
+                                        style="width:100%;"></select>
+                                </div>
+                                <div class="form-group" style="flex-direction:column; align-items:flex-start;">
+                                    <label>Material</label><select id="loop_inp_mat" style="width:100%;"></select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr style="border:0;border-top:1px solid var(--steel);margin:1.5rem 0">
+                        <h4
+                            style="margin-bottom:1rem;color:var(--text-secondary);font-size:0.9rem; grid-column: 1 / -1;">
+                            Loop Data</h4>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <!-- Column 1 -->
+                            <div style="display:flex; flex-direction:column; gap:1rem;">
+                                <div class="form-group" style="flex-direction:column; align-items:flex-start;">
+                                    <label>Anchor Distance (S) [<span class="unit-len-lg">ft</span>]</label><input
+                                        type="number" id="loop_inp_s" value="325" style="width:100%;">
+                                </div>
+                                <div class="form-group" style="flex-direction:column; align-items:flex-start;">
+                                    <label>Loop Depth (H) [<span class="unit-len-lg">ft</span>]</label><input
+                                        type="number" id="loop_inp_h" value="25" style="width:100%;">
+                                </div>
+                            </div>
+                            <!-- Column 2 -->
+                            <div style="display:flex; flex-direction:column; gap:1rem;">
+                                <div class="form-group" style="flex-direction:column; align-items:flex-start;">
+                                    <label>Guide Distance (G) [<span class="unit-len-lg">ft</span>]</label><input
+                                        type="number" id="loop_inp_g" value="80" style="width:100%;">
+                                </div>
+                                <div class="form-group" style="flex-direction:column; align-items:flex-start;">
+                                    <label>Loop Width (W) [<span class="unit-len-lg">ft</span>]</label><input
+                                        type="number" id="loop_inp_w" value="15" style="width:100%;">
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn-calc" id="loop_btn_run" style="margin-top:1.5rem;">CALCULATE LOOP</button>
+                    </div>
+                </div>
+
+                <!-- Canvas Viewer Section (Top Right) -->
+                <div class="panel" style="grid-column: 2; grid-row: 1; margin-bottom: 0px; height: 100%;">
+                    <div class="panel-header">LOOP EXPANSION SCHEMATIC</div>
+                    <div class="panel-body" style="padding: 0;">
+                        <canvas id="canvas-loop" style="width:100%; display:block; background:var(--bg-1);"></canvas>
+                    </div>
+                </div>
+
+                <!-- RESULTS / OUTPUT (Bottom Full) -->
+                <div class="panel" style="grid-column: 1 / span 2; grid-row: 2;">
+                    <div class="panel-header">RESULTS / OUTPUT</div>
+                    <div class="panel-body" style="display:flex; justify-content:space-between; gap:2rem;">
+                        <!-- Col 1 -->
+                        <div style="flex:1;">
+                            <h4 style="margin-bottom:1rem;color:var(--text-secondary);font-size:0.9rem">Interpolated
+                                Data</h4>
+                            <div class="result-row"><span>Young's Modulus (Ec) (<span
+                                        class="unit-mod">Msi</span>)</span> <span class="val" id="loop_out_ec">-</span>
+                            </div>
+                            <div class="result-row"><span>Expansion (<span class="unit-exp">in/100ft</span>)</span>
+                                <span class="val" id="loop_out_exp">-</span>
+                            </div>
+
+                            <h4
+                                style="margin-top:1.5rem;margin-bottom:1rem;color:var(--text-secondary);font-size:0.9rem">
+                                Pipe Geometrics</h4>
+                            <div class="result-row"><span>O/D Pipe (D) (<span class="unit-len-sm">in</span>)</span>
+                                <span class="val" id="loop_out_d">-</span>
+                            </div>
+                            <div class="result-row"><span>Wall Thickness (t) (<span
+                                        class="unit-len-sm">in</span>)</span> <span class="val" id="loop_out_t">-</span>
+                            </div>
+                            <div class="result-row"><span>Moment of Inertia (I) (<span
+                                        class="unit-inertia">in⁴</span>)</span> <span class="val"
+                                    id="loop_out_i">-</span></div>
+                            <div class="result-row"><span>In-Plane SIF (β)</span> <span class="val"
+                                    id="loop_out_beta">-</span></div>
+                            <div class="result-row" style="color:var(--blue-light)"><span>Total Loop Length (L)
+                                    (<span class="unit-len-lg">ft</span>)</span><span class="val"
+                                    id="loop_out_l">-</span></div>
+                        </div>
+
+                        <!-- Col 2 -->
+                        <div style="flex:1;">
+                            <h4 style="margin-bottom:1rem;color:var(--amber);font-size:0.9rem">Forces & Stresses</h4>
+                            <div class="result-row"><span>Net Expansion (Δs) (<span
+                                        class="unit-len-sm">in</span>)</span> <span class="val"
+                                    style="color:var(--amber)" id="loop_out_ds">-</span></div>
+                            <div class="result-row"><span>Anchor Force (Fx) (<span class="unit-force">lb</span>)</span>
+                                <span class="val" style="color:var(--amber)" id="loop_out_fx">-</span>
+                            </div>
+                            <div class="result-row"><span>Hot Anchor Force (<span class="unit-force">lb</span>)</span>
+                                <span class="val" style="color:var(--amber)" id="loop_out_fhot">-</span>
+                            </div>
+                            <div class="result-row"><span>Guide Force (Fz) (<span class="unit-force">lb</span>)</span>
+                                <span class="val" style="color:var(--amber)" id="loop_out_fz">-</span>
+                            </div>
+                            <div class="result-row"><span>Stress @ Elbow A (<span class="unit-stress">psi</span>)</span>
+                                <span class="val" style="color:var(--amber)" id="loop_out_stress_a">-</span>
+                            </div>
+                            <div class="result-row"><span>Stress @ Elbow B (<span class="unit-stress">psi</span>)</span>
+                                <span class="val" style="color:var(--amber)" id="loop_out_stress_b">-</span>
+                            </div>
+                            <div class="result-row" style="font-size:1rem; border:none; padding-top:1rem;">
+                                <span>STATUS:</span> <span class="val" id="loop_out_status"
+                                    style="font-weight:bold;">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NOTES & ASSUMPTIONS (Bottom) -->
+                <div class="panel" style="grid-column: 1 / span 2; grid-row: 3; margin-top: 0;">
+                    <div class="panel-header">NOTES & ASSUMPTIONS</div>
+                    <div class="panel-body"
+                        style="background:var(--bg-0); font-family:var(--font-code); font-size:0.8rem; color:var(--text-muted); line-height:1.5;">
+                        1. Expansion Loop dimensions assume symmetrical configuration with identical parallel legs.<br>
+                        2. Calculated stresses are bending stresses due to thermal expansion per ASME B31.3.<br>
+                        3. Pressure stresses and dead weight stresses are not included in this thermal loop module.<br>
+                        4. Guide distances (G) should be adhered to strictly. First guide at G, second guide at 14D from
+                        first.
+                    </div>
+                </div>
+            </div>
+
+            <!-- PIPE RACK LOAD PANE -->
+            <div id="tab-rack" class="tab-pane grid-layout-3">
+                <!-- Canvas Viewers Section (Top Full width) -->
+                <div class="panel"
+                    style="grid-column: 1 / span 2; grid-row: 1; margin-bottom: 0px; height: 100%; display: flex; overflow: hidden;">
+                    <div
+                        style="flex:1; border-right:1px solid var(--steel); display:flex; flex-direction:column; padding-right:1rem; margin-right:1rem;">
+                        <div class="panel-header" style="background:none; border:none; padding:0 0 0.5rem 0;">SECTION
+                            VIEW 1-1</div>
+                        <canvas id="canvas-rack-section"
+                            style="width:100%; flex:1; display:block; background:var(--bg-1); min-height:150px;"></canvas>
+                    </div>
+                    <div style="flex:4; display:flex; flex-direction:column; position:relative;">
+                        <div class="panel-header"
+                            style="background:none; border:none; padding:0 0 0.5rem 0; display:flex; justify-content:space-between">
+                            <span>PLAN VIEW (U-LOOPS)</span>
+                            <span id="rack_out_status"
+                                style="font-weight:bold; color:var(--text); padding: 0 10px; background:var(--bg-1); border-radius:3px;">-</span>
+                        </div>
+                        <canvas id="canvas-rack-plan"
+                            style="width:100%; flex:1; display:block; background:var(--bg-1); min-height:150px; cursor:crosshair;"></canvas>
+
+                        <!-- Zoom Overlay -->
+                        <div
+                            style="position:absolute; top:40px; right:20px; display:flex; flex-direction:column; gap:8px;">
+                            <div
+                                style="display:flex; gap:4px; background:var(--bg-2); padding:4px; border-radius:4px; border:1px solid var(--steel);">
+                                <button id="rack-zoom-out" title="Zoom Out"
+                                    style="background:var(--bg-0); color:var(--text); border:1px solid var(--steel); border-radius:3px; cursor:pointer; width:24px; height:24px; display:flex; align-items:center; justify-content:center;">-</button>
+                                <button id="rack-zoom-in" title="Zoom In"
+                                    style="background:var(--bg-0); color:var(--text); border:1px solid var(--steel); border-radius:3px; cursor:pointer; width:24px; height:24px; display:flex; align-items:center; justify-content:center;">+</button>
+                            </div>
+                            <div
+                                style="display:flex; gap:4px; background:var(--bg-2); padding:4px; border-radius:4px; border:1px solid var(--steel);">
+                                <button id="rack-font-out" title="Font Smaller"
+                                    style="background:var(--bg-0); color:var(--text); border:1px solid var(--steel); border-radius:3px; cursor:pointer; width:24px; height:24px; font-size:10px; display:flex; align-items:center; justify-content:center;">F-</button>
+                                <button id="rack-font-in" title="Font Larger"
+                                    style="background:var(--bg-0); color:var(--text); border:1px solid var(--steel); border-radius:3px; cursor:pointer; width:24px; height:24px; font-size:10px; display:flex; align-items:center; justify-content:center;">F+</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Multi-Row Matrix Section (Bottom Full) -->
+                <div class="panel" style="grid-column: 1 / span 2; grid-row: 2;">
+                    <div class="panel-header" style="display:flex; justify-content:space-between; align-items:center;">
+                        <span>Pipe Rack Calculation</span>
+                        <div style="display:flex; gap:10px;">
+                            <button id="rack_btn_run"
+                                style="background:var(--green-ok); color:#000; font-weight:bold; border:none; cursor:pointer; padding:4px 12px; border-radius:3px;">&#9654;
+                                ANALYZE</button>
+                            <button id="rack_btn_add_row"
+                                style="background:var(--amber); color:#000; border:none; padding:4px 12px; font-weight:bold; cursor:pointer; border-radius:3px;">+
+                                ADD LINE</button>
+                        </div>
+                    </div>
+                    <div class="db-table-wrapper"
+                        style="max-height: 400px; border:none; border-top: 1px solid var(--steel); overflow-x:auto;">
+                        <div
+                            style="padding:0.5rem 1rem; background:var(--bg-2); font-family:var(--font-code); font-size:0.85rem; color:var(--text-secondary); border-bottom:1px solid var(--steel);">
+                            <strong>TABLE A: Pipe Geometrics, Anchors & Loop Configuration</strong>
+                        </div>
+                        <table id="table-rack-matrix" style="white-space:nowrap; min-width:1800px;">
+                            <thead>
+                                <tr style="font-size:0.8rem;">
+                                    <th class="sticky-col">Line No.</th>
+                                    <th>Temp (<span class="unit-temp">°F</span>)</th>
+                                    <th>Material</th>
+                                    <th>NPS</th>
+                                    <th>Sch</th>
+                                    <th style="background:var(--bg-2)">Allow Stress (<span
+                                            class="unit-stress">psi</span>)</th>
+                                    <th style="background:var(--bg-2)">O/D (<span class="unit-len-sm">in</span>)</th>
+                                    <th style="background:var(--bg-2)">Thk (<span class="unit-len-sm">in</span>)</th>
+                                    <th>SG</th>
+                                    <th>Insul (<span class="unit-len-sm">in</span>)</th>
+                                    <th style="background:var(--bg-2)">Pipe Wt (<span class="unit-weight">lb/ft</span>)
+                                    </th>
+                                    <th style="background:var(--bg-2)">Content Wt (<span
+                                            class="unit-weight">lb/ft</span>)</th>
+                                    <th style="background:var(--bg-2)">Insul Wt (<span class="unit-weight">lb/ft</span>)
+                                    </th>
+                                    <th style="background:var(--bg-2)">Hydro Wt (<span class="unit-weight">lb/ft</span>)
+                                    </th>
+                                    <th>Start Anchor Coor (<span class="unit-len-lg">ft</span>)</th>
+                                    <th>End Anchor Coor (<span class="unit-len-lg">ft</span>)</th>
+                                    <th>Main Bent Spacing (<span class="unit-len-lg">ft</span>)</th>
+                                    <th style="background:var(--bg-2)"
+                                        title="Total number of support structures (bents) spanning the defined distance">
+                                        Total Bents</th>
+                                    <th style="background:var(--bg-2)">Net Exp. (Δs) (<span
+                                            class="unit-len-sm">in</span>)</th>
+                                    <th>Loop Width (<span class="unit-len-lg">ft</span>)</th>
+                                    <th>Loop Depth (<span class="unit-len-lg">ft</span>)</th>
+                                    <th>Guide Dist (<span class="unit-len-lg">ft</span>)</th>
+                                    <th>Del</th>
+                                </tr>
+                            </thead>
+                            <tbody id="body-rack-matrix">
+                                <!-- Rows generated via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- PIPE RACK OUTPUT TABLE -->
+                    <div class="db-table-wrapper"
+                        style="max-height: 400px; border:none; border-top: 1px solid var(--steel); margin-top:1rem; overflow-x:auto;">
+                        <div
+                            style="padding:0.5rem 1rem; background:var(--bg-2); font-family:var(--font-code); font-size:0.85rem; color:var(--text-secondary); border-bottom:1px solid var(--steel);">
+                            <strong>TABLE B: Anchor Loads, Forces & Span Stresses</strong>
+                        </div>
+                        <table id="table-rack-output" style="white-space:nowrap; min-width:1400px;">
+                            <thead>
+                                <tr style="font-size:0.8rem;">
+                                    <th class="sticky-col">Line No.</th>
+                                    <th style="background:var(--bg-2)">Dead Wt @ Bent (<span
+                                            class="unit-force">lbs</span>)</th>
+                                    <th style="background:var(--bg-2)">Op Wt @ Bent (<span
+                                            class="unit-force">lbs</span>)</th>
+                                    <th style="background:var(--bg-2)">Hydro Wt @ Bent (<span
+                                            class="unit-force">lbs</span>)</th>
+                                    <th style="background:var(--bg-2)">Fric @ Bent (<span class="unit-force">lbs</span>)
+                                    </th>
+                                    <th style="background:var(--bg-2)">Fric @ Anch (<span class="unit-force">lbs</span>)
+                                    </th>
+                                    <th style="background:var(--bg-2)">Wind @ Bent (<span class="unit-force">lbs</span>)
+                                    </th>
+                                    <th style="background:var(--bg-2)" title="Net Thermal Expansion">Net Exp. (Δs)
+                                        (<span class="unit-len-sm">in</span>)
+                                    </th>
+                                    <th style="background:var(--amber); color:#000;">Force (<span
+                                            class="unit-force">lbs</span>)</th>
+                                    <th style="background:var(--amber); color:#000;">Stress (<span
+                                            class="unit-stress">psi</span>)</th>
+                                    <th style="background:var(--bg-2)">Span Freq (Hz)</th>
+                                    <th style="background:var(--bg-2)">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="body-rack-output">
+                                <!-- Output rows generated via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- NOTES (Bottom) -->
+                <div class="panel" style="grid-column: 1 / span 2; grid-row: 3; margin-top: 0;">
+                    <div class="panel-header">NOTES & ASSUMPTIONS</div>
+                    <div class="panel-body"
+                        style="background:var(--bg-0); font-family:var(--font-code); font-size:0.8rem; color:var(--text-muted); line-height:1.5;">
+                        1. Pipe schedule and wall thickness data is standardized per ASME B36.10M / B36.19M.<br>
+                        2. Global parameters (Ambient Temperature, Insulation Density, Friction Factor $\mu$, Wind
+                        Force) are drawn from the '2D Bundle Config' module.<br>
+                        3. Span loads (Dead, Operating, Hydrotest) resolve continuously distributed pipe/content gravity
+                        metrics uniformly across the Bent Spacing.<br>
+                        4. Span Natural Frequency (Hz) is evaluated assuming fixed-fixed uniform span topologies.
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- SIMPLIFIED METHOD PANE -->
+            <div id="tab-simp" class="tab-pane grid-layout-3">
+
+                <!-- Canvas Viewer Section (Top Left) -->
+                <div class="panel" style="grid-column: 1; grid-row: 1; margin-bottom: 0; height: 100%;">
+                    <div class="panel-header">3D ROUTING SCHEMATIC (ISOMETRIC PROJECTION)</div>
+                    <div class="panel-body" style="padding: 0;">
+                        <canvas id="canvas-simp-3d" style="width:100%; display:block; background:var(--bg-1);"></canvas>
+                    </div>
+                </div>
+
+                <!-- Global Results (Top Right) -->
+                <div class="panel" style="grid-column: 2; grid-row: 1; margin-bottom: 0; height: 100%;">
+                    <div class="panel-header">GLOBAL SYSTEM FLEXIBILITY (ASME B31.3)</div>
+                    <div class="panel-body" style="display:flex; flex-direction:column; gap:0.25rem; padding: 1rem;">
+                        <h4 style="margin:0; margin-bottom:0.1rem;color:var(--text-secondary);font-size:0.85rem">
+                            Geometrics</h4>
+                        <div class="result-row" style="padding: 0.25rem 0;"><span>System O/D (<span
+                                    class="unit-len-sm">in</span>)</span> <span class="val" id="simp_out_d">-</span>
+                        </div>
+                        <div class="result-row" style="padding: 0.25rem 0;"><span>System I (<span
+                                    class="unit-inertia">in⁴</span>)</span> <span class="val" id="simp_out_i">-</span>
+                        </div>
+
+                        <h4 style="margin:0.25rem 0 0.1rem 0;color:var(--text-secondary);font-size:0.85rem">Growth
+                            Vectors
+                            (Total)</h4>
+                        <div class="result-row" style="padding: 0.25rem 0;"><span>Total Δx (<span
+                                    class="unit-len-sm">in</span>)</span> <span class="val" id="simp_out_dx">-</span>
+                        </div>
+                        <div class="result-row" style="padding: 0.25rem 0;"><span>Total Δy (<span
+                                    class="unit-len-sm">in</span>)</span> <span class="val" id="simp_out_dy">-</span>
+                        </div>
+                        <div class="result-row" style="padding: 0.25rem 0;"><span>Total Δz (<span
+                                    class="unit-len-sm">in</span>)</span> <span class="val" id="simp_out_dz">-</span>
+                        </div>
+
+                        <h4 style="margin:0.25rem 0 0.1rem 0;color:var(--amber);font-size:0.85rem">Critical Stress
+                            Factors
+                        </h4>
+                        <div class="result-row" style="padding: 0.25rem 0;"><span>Flexibility Metric (U)</span> <span
+                                class="val" id="simp_out_u" style="color:var(--amber)">-</span></div>
+                        <div class="result-row" style="padding: 0.25rem 0;"><span>Max Segment Stress</span> <span
+                                class="val" id="simp_out_max_se" style="color:var(--amber)">-</span></div>
+                        <div class="result-row" style="padding: 0.25rem 0;"><span>Max Anchor Resultant</span> <span
+                                class="val" id="simp_out_max_fr" style="color:var(--amber)">-</span></div>
+                        <div class="result-row" style="margin-top:1rem; font-size:1.1rem; border:none;">
+                            <span>SYSTEM STATUS:</span> <span class="val" id="simp_out_status"
+                                style="font-weight:bold;">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Input & Matrix (Bottom Full) -->
+                <div class="panel" style="grid-column: 1 / span 2; grid-row: 2;">
+                    <div class="panel-header" style="display:flex; justify-content:space-between; align-items:center;">
+                        <span>ROUTING DEFINITION MATRIX</span>
+                        <button id="simp_btn_add_seg"
+                            style="background:var(--amber); color:#000; border:none; padding:4px 12px; font-weight:bold; cursor:pointer; border-radius:3px;">+
+                            ADD SEGMENT</button>
+                    </div>
+                    <div class="panel-body">
+                        <div
+                            style="display:grid; grid-template-columns: 80px 180px 80px 80px 140px 1fr; gap:0.5rem; margin-bottom:1.5rem; border-bottom:1px solid var(--steel); padding-bottom:1rem; align-items:end;">
+                            <div class="form-group"
+                                style="flex-direction:column; align-items:flex-start; margin-bottom:0;"><label
+                                    style="width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Temp
+                                    (<span class="unit-temp">°F</span>)</label><input type="number" id="simp_inp_temp"
+                                    value="200" style="width:100%;">
+                            </div>
+                            <div class="form-group"
+                                style="flex-direction:column; align-items:flex-start; margin-bottom:0;"><label
+                                    style="width:100%;">Material</label><select id="simp_inp_mat"
+                                    style="width:100%; padding:0.1rem 0.2rem; font-size:0.8rem; background:var(--bg-1); color:var(--text); border:1px solid var(--steel);"></select>
+                            </div>
+                            <div class="form-group"
+                                style="flex-direction:column; align-items:flex-start; margin-bottom:0;"><label
+                                    style="width:100%;">NPS (<span class="unit-len-sm">in</span>)</label><select
+                                    id="simp_inp_nps"
+                                    style="width:100%; padding:0.1rem 0.2rem; font-size:0.8rem; background:var(--bg-1); color:var(--text); border:1px solid var(--steel);"></select>
+                            </div>
+                            <div class="form-group"
+                                style="flex-direction:column; align-items:flex-start; margin-bottom:0;"><label
+                                    style="width:100%;">Schedule</label><select id="simp_inp_sch"
+                                    style="width:100%; padding:0.1rem 0.2rem; font-size:0.8rem; background:var(--bg-1); color:var(--text); border:1px solid var(--steel);"></select>
+                            </div>
+                            <div class="form-group"
+                                style="flex-direction:column; align-items:flex-start; margin-bottom:0;"><label
+                                    style="width:100%; white-space:nowrap;">Max Stress (SA) (<span
+                                        class="unit-stress">psi</span>)</label><input type="number" id="simp_inp_sa"
+                                    value="30000" style="width:100%;"></div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <button class="btn-calc" id="simp_btn_run"
+                                    style="margin:0; width:100%; padding:0.5rem;">ANALYZE</button>
+                            </div>
+                        </div>
+
+                        <!-- Routing Grid -->
+                        <div class="db-table-wrapper" style="max-height: 400px; border:none; margin:0;">
+                            <table id="table-simp-matrix">
+                                <thead>
+                                    <tr>
+                                        <th class="sticky-col">Seg ID</th>
+                                        <th>Axis</th>
+                                        <th>Length (<span class="unit-len-lg">ft</span>)</th>
+                                        <th>Exp Vector (<span class="unit-len-sm">in</span>)</th>
+                                        <th>Moment (<span class="unit-moment">ft-lb</span>)</th>
+                                        <th>Bend Stress (<span class="unit-stress">psi</span>)</th>
+                                        <th>Status</th>
+                                        <th>Del</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="body-simp-matrix">
+                                    <!-- Rows JS generated -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NOTES (Bottom) -->
+                <div class="panel" style="grid-column: 1 / span 2; grid-row: 3; margin-top: 0;">
+                    <div class="panel-header">NOTES & CONFIGURATION ASSUMPTIONS</div>
+                    <div class="panel-body"
+                        style="background:var(--bg-0); font-family:var(--font-code); font-size:0.8rem; color:var(--text-muted); line-height:1.5;">
+                        1. This module utilizes the Guided Cantilever Method for initial route flexibility
+                        approximation.<br>
+                        2. The total effective expansion lengths ($\Delta x, \Delta y, \Delta z$) distribute strictly
+                        over physical pipe segments relative to total inertia.<br>
+                        3. Max Stress captures the worst-case extreme fiber bending stress of the analyzed envelope.<br>
+                        4. Global pipeline configuration metrics (Insulation, etc.) adhere to parameters defined in the
+                        '2D Bundle Config' tab.
+                    </div>
+                </div>
+            </div>
+
+            <!-- MASTER DATABASE PANE -->
+            <div id="tab-db" class="tab-pane">
+
+                <div class="db-tabs">
+                    <button class="db-tab-btn active" data-dbsub="db-sch">Pipe Schedules</button>
+                    <button class="db-tab-btn" data-dbsub="db-exp">Thermal expansion data (<span
+                            class="unit-exp">in/100ft</span>)</button>
+                    <button class="db-tab-btn" data-dbsub="db-mod">Modulus of Elasticity (<span
+                            class="unit-mod">Msi</span>)</button>
+                </div>
+
+                <div class="db-table-wrapper" id="db-sch">
+                    <table id="table-sch">
+                        <thead id="head-sch">
+                            <tr>
+                                <th>NPS</th>
+                                <th>O/D (mm)</th>
+                                <th>Schedules...</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+
+                <div class="db-table-wrapper" id="db-exp" style="display:none">
+                    <table id="table-exp">
+                        <thead id="head-exp"></thead>
+                        <tbody id="body-exp"></tbody>
+                    </table>
+                </div>
+
+                <div class="db-table-wrapper" id="db-mod" style="display:none">
+                    <table id="table-mod">
+                        <thead id="head-mod"></thead>
+                        <tbody id="body-mod"></tbody>
+                    </table>
+                </div>
+
+            </div>
+
+            <!-- Debug Tracing Tab -->
+            <div id="tab-debug" class="tab-pane" style="overflow-y:auto; padding:20px;">
+                <div class="panel"
+                    style="grid-column: 1 / span 3; grid-row: 1 / span 2; display: flex; flex-direction: column;">
+                    <div class="panel-header" style="display:flex; justify-content:space-between;">
+                        <span>Calculations Diagnostics & Native State Values</span>
+                        <div>
+                            <button onclick="document.getElementById('debug_out').innerHTML=''"
+                                style="background:transparent; color:#fff; cursor:pointer;">CLEAR</button>
+                        </div>
+                    </div>
+                    <div style="flex:1; background:var(--bg-0); padding:10px; overflow-y:auto;">
+                        <div id="debug_out"
+                            style="color:var(--text); margin:0; display:flex; flex-direction:column; gap:15px;"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <!-- Scripts -->
+    <script src="js/spl2/spl2_database.js" type="module"></script>
+    <script type="module" src="js/spl2/spl2_simp_canvas.js"></script>
+    <script type="module" src="js/spl2/spl2_loop_canvas.js"></script>
+    <script type="module" src="js/spl2/spl2_rack_canvas.js"></script>
+    <script type="module" src="js/spl2/spl2_master.js"></script>
+</body>
+
+</html>

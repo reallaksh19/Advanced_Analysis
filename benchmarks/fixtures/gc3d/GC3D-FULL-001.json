@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "GC3D-FULL-001",
+  "title": "GC3D full deterministic route benchmark",
+  "module": "3d-guided-cantilever",
+  "solverExport": "solveGC3D",
+  "methodId": "GC_BASIC_12EI",
+  "iconId": "3d-route",
+  "input": {
+    "nodes": {
+      "A": { "pos": [0, 0, 0], "type": "anchor" },
+      "B": { "pos": [120, 0, 0], "type": "elbow" },
+      "C": { "pos": [120, 180, 0], "type": "support" },
+      "D": { "pos": [120, 180, 96], "type": "support" }
+    },
+    "segments": [
+      { "id": "S1", "startNode": "A", "endNode": "B", "length_in": 120, "od_in": 8.625, "wt_in": 0.322, "axis": "X", "compType": "PIPE" },
+      { "id": "S2", "startNode": "B", "endNode": "C", "length_in": 180, "od_in": 8.625, "wt_in": 0.322, "axis": "Y", "compType": "PIPE" },
+      { "id": "S3", "startNode": "C", "endNode": "D", "length_in": 96, "od_in": 8.625, "wt_in": 0.322, "axis": "Z", "compType": "PIPE" }
+    ],
+    "params": { "deltaT_F": 150, "E_psi": 29000000, "alpha_in_in_F": 0.0000065, "Sc_psi": 20000, "Sh_psi": 20000, "f": 1.0 },
+    "fittingData": {},
+    "includeSIF": true
+  },
+  "expected": { "criticalNode": "C", "overallResult": "PASS", "maxRatio": 0.584025228733 },
+  "compare": { "mode": "rounded-zero-error", "roundDecimals": 12, "requiredStatus": "PASSED" }
+}

@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "UI-MOCK-LOAD-001",
+  "title": "UI mock load action metadata proof",
+  "module": "ui-proof",
+  "solverExport": "validateMockLoadActions",
+  "methodId": "UI_MOCK_CATALOG_PROOF",
+  "iconId": "mock-load",
+  "input": {
+    "expectedTotal": 37
+  },
+  "expected": {
+    "status": "PASSED",
+    "methodId": "UI_MOCK_CATALOG_PROOF",
+    "formulaIds": [
+      "UI_MOCK_CATALOG_COMPLETENESS"
+    ],
+    "totalMockCards": 37,
+    "mockLoadFailures": 0,
+    "activeTabChanged": true,
+    "inputLoaded": true,
+    "benchmarkCaseIdVisible": true,
+    "currentInputMarkedAsBenchmarkMock": true
+  },
+  "compare": {
+    "mode": "rounded-zero-error",
+    "roundDecimals": 12,
+    "requiredStatus": "PASSED"
+  }
+}

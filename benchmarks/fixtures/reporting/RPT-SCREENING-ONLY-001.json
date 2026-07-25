@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "RPT-SCREENING-ONLY-001",
+  "title": "Report proof — screening only limitation",
+  "module": "reporting",
+  "solverExport": "createReportMarkdownCalcSheet",
+  "methodId": "REPORT_MARKDOWN_CALC_SHEET",
+  "iconId": "report-warning",
+  "input": {
+    "reportPayload": {
+      "title": "Screening Calculation Report",
+      "module": "3d-guided-cantilever",
+      "status": "SCREENING_ONLY",
+      "methodId": "GC_BASIC_12EI",
+      "formulaIds": ["GUIDED_CANTILEVER_F_12EID_OVER_L3"],
+      "unitSystem": "imperial",
+      "benchmarkStatus": "PASSED",
+      "scopeLimitations": ["Not for final code compliance", "Requires engineer review"]
+    }
+  },
+  "expected": {
+    "status": "SCREENING_ONLY",
+    "methodId": "REPORT_MARKDOWN_CALC_SHEET",
+    "formulaIds": ["REPORT_MARKDOWN_CALC_SHEET"],
+    "containsStatus": true,
+    "containsMethodId": true,
+    "containsFormulaId": true,
+    "containsUnits": true,
+    "noCleanPassClaim": true,
+    "isCriticalStatus": false
+  },
+  "compare": { "mode": "rounded-zero-error", "roundDecimals": 12, "requiredStatus": "SCREENING_ONLY" }
+}

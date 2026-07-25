@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "2D-GC-001",
+  "title": "Guided cantilever thermal displacement — exact algebra check",
+  "module": "2d-math",
+  "solverExport": "calcGuidedCantileverThermal",
+  "methodId": "GC_BASIC_12EI",
+  "iconId": "thermal-growth",
+  "input": { "deltaX": 1.2, "L": 180, "E": 29000000, "I": 80, "OD": 8.625 },
+  "expected": {
+    "status": "PASSED",
+    "methodId": "GC_BASIC_12EI",
+    "formulaIds": ["GUIDED_CANTILEVER_F_12EID_OVER_L3", "GUIDED_CANTILEVER_M_FL_OVER_2", "CANTILEVER_STRESS_M_OVER_Z"],
+    "unitSystem": { "length": "in", "force": "lbf", "stress": "psi", "moment": "in-lbf" },
+    "force": 5728.395061728395,
+    "moment": 515555.555555555562,
+    "stress": 27791.666666666664
+  },
+  "compare": { "mode": "rounded-zero-error", "roundDecimals": 12, "requiredStatus": "PASSED" }
+}

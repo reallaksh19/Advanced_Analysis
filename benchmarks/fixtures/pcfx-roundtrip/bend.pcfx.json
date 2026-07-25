@@ -1,0 +1,102 @@
+{
+  "schemaVersion": "pcfx-roundtrip-adapter-v1",
+  "pcfxVersion": "PCFX1-SCREENING-JSON",
+  "project": {
+    "id": "FIXTURE-BEND",
+    "name": "Bend Fixture"
+  },
+  "units": {
+    "length": "mm"
+  },
+  "nodes": {
+    "A": {
+      "type": "free",
+      "pos": [0, 0, 0],
+      "rawAttributes": {},
+      "normalized": {},
+      "derived": {},
+      "meta": {}
+    },
+    "B": {
+      "type": "elbow",
+      "pos": [1000, 0, 0],
+      "rawAttributes": {
+        "CA97": "BEND-FIXTURE"
+      },
+      "normalized": {},
+      "derived": {
+        "componentData": {
+          "status": "SCREENING_SAMPLE",
+          "componentType": "ELBOW_90_LR",
+          "c2e_in": 12,
+          "c2e_mm": 304.8
+        }
+      },
+      "meta": {
+        "componentData": {
+          "status": "SCREENING_SAMPLE",
+          "componentType": "ELBOW_90_LR",
+          "c2e_in": 12,
+          "c2e_mm": 304.8
+        }
+      }
+    },
+    "C": {
+      "type": "free",
+      "pos": [1000, 1000, 0],
+      "rawAttributes": {},
+      "normalized": {},
+      "derived": {},
+      "meta": {}
+    }
+  },
+  "segments": [
+    {
+      "id": "S1",
+      "startNode": "A",
+      "endNode": "B",
+      "compType": null,
+      "properties": {},
+      "rawAttributes": {},
+      "normalized": {},
+      "derived": {}
+    },
+    {
+      "id": "S2",
+      "startNode": "B",
+      "endNode": "C",
+      "compType": null,
+      "properties": {},
+      "rawAttributes": {},
+      "normalized": {},
+      "derived": {}
+    }
+  ],
+  "components": [
+    {
+      "id": "CMP-B",
+      "nodeId": "B",
+      "componentType": "ELBOW",
+      "connectedSegmentIds": ["S1", "S2"],
+      "rawAttributes": {
+        "CA97": "BEND-FIXTURE"
+      },
+      "normalized": {},
+      "derived": {
+        "componentData": {
+          "status": "SCREENING_SAMPLE",
+          "componentType": "ELBOW_90_LR",
+          "c2e_in": 12,
+          "c2e_mm": 304.8
+        }
+      },
+      "meta": {}
+    }
+  ],
+  "graphTranslatorComponents": [],
+  "diagnostics": [],
+  "lossContract": [],
+  "rawAttributes": {},
+  "normalized": {},
+  "derived": {}
+}

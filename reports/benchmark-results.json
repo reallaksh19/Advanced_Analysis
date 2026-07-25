@@ -1,0 +1,413 @@
+{
+  "summary": {
+    "total": 37,
+    "passed": 37,
+    "failed": 0,
+    "pending": 0,
+    "skippedLegacy": 15,
+    "invalidFixtures": 0,
+    "unreadableFixtures": 0,
+    "maxRoundedNumericError": 0
+  },
+  "caseResults": [
+    {
+      "caseId": "2D-CANT-001",
+      "title": "Cantilever end load — exact algebra check",
+      "module": "2d-math",
+      "solverExport": "calcCantileverEndLoad",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "2D-GC-001",
+      "title": "Guided cantilever thermal displacement — exact algebra check",
+      "module": "2d-math",
+      "solverExport": "calcGuidedCantileverThermal",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "2D-POINT-001",
+      "title": "Simple span concentrated load — exact algebra check",
+      "module": "2d-math",
+      "solverExport": "calcSimpleSpanPointLoad",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "2D-UDL-001",
+      "title": "Simple span distributed load — exact algebra check",
+      "module": "2d-math",
+      "solverExport": "calcSimpleSpanDistributedLoad",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "EXT-FLANG-001",
+      "title": "Calc Extended Koves flange equivalent load benchmark",
+      "module": "calc-extended",
+      "solverExport": "calcKovesFlange",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "EXT-GLOBAL-001",
+      "title": "Calc Extended global reaction numeric benchmark",
+      "module": "calc-extended",
+      "solverExport": "calcExtendedGlobalReaction",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "EXT-MATERIAL-DATA-EXISTS-001",
+      "title": "Material data exists — CS A106B at 300F",
+      "module": "engineering-data",
+      "solverExport": "runMaterialDataLookupBenchmark",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "EXT-MATERIAL-DATA-MISSING-001",
+      "title": "Material data missing — no fallback",
+      "module": "engineering-data",
+      "solverExport": "runMaterialDataLookupBenchmark",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "EXT-MATERIAL-TEMP-RANGE-001",
+      "title": "Material temperature out of verified range",
+      "module": "engineering-data",
+      "solverExport": "runMaterialDataLookupBenchmark",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "EXT-MIST-001",
+      "title": "Calc Extended MIST/nozzle check is not qualified without vendor loads",
+      "module": "calc-extended",
+      "solverExport": "calcMistNozzleQualification",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "EXT-SHORT-DROP-001",
+      "title": "Calc Extended short vertical drop <= 3 ft ignored",
+      "module": "calc-extended",
+      "solverExport": "analyzeShortDropGeometry",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "EXT-SHORT-DROP-002",
+      "title": "Calc Extended vertical leg over 3 ft retained",
+      "module": "calc-extended",
+      "solverExport": "analyzeShortDropGeometry",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "GC3D-BASIC-001",
+      "title": "GC3D basic guided cantilever",
+      "module": "3d-guided-cantilever",
+      "solverExport": "calcGuidedCantileverBasic",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "GC3D-BRANCH-001",
+      "title": "GC3D unsupported branch must not return clean pass",
+      "module": "3d-guided-cantilever",
+      "solverExport": "solveGC3D",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "GC3D-COMBINE-001",
+      "title": "GC3D node stress SRSS combination",
+      "module": "3d-guided-cantilever",
+      "solverExport": "combineNodeStress",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "GC3D-FULL-001",
+      "title": "GC3D full deterministic route benchmark",
+      "module": "3d-guided-cantilever",
+      "solverExport": "solveGC3D",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "GC3D-SECTION-001",
+      "title": "GC3D pipe section properties",
+      "module": "3d-guided-cantilever",
+      "solverExport": "calcPipeSection",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "GC3D-THERMAL-001",
+      "title": "GC3D thermal displacement",
+      "module": "3d-guided-cantilever",
+      "solverExport": "calcThermalDisplacement",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "PR-BUNDLE-001",
+      "title": "Pipe rack bundle method — friction factor 0.3",
+      "module": "piperack-expansion-loop",
+      "solverExport": "runPipeRackBundleBenchmark",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "PR-LOOP-001-L10",
+      "title": "Pipe rack line result — L10",
+      "module": "piperack-expansion-loop",
+      "solverExport": "runPipeRackLineBenchmark",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "PR-LOOP-001-L4",
+      "title": "Pipe rack line result — L4",
+      "module": "piperack-expansion-loop",
+      "solverExport": "runPipeRackLineBenchmark",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "PR-LOOP-001-L8",
+      "title": "Pipe rack line result — L8",
+      "module": "piperack-expansion-loop",
+      "solverExport": "runPipeRackLineBenchmark",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "PR-LOOP-001",
+      "title": "Pipe rack loop order — L10/L8/L4 sorted by I×delta",
+      "module": "piperack-expansion-loop",
+      "solverExport": "runPipeRackLoopOrderBenchmark",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "PR-MISSING-DATA-001",
+      "title": "Pipe rack missing pipe size blocks clean qualification",
+      "module": "piperack-expansion-loop",
+      "solverExport": "runPipeRackLoopOrderBenchmark",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "PR-MIST-001",
+      "title": "Pipe rack vessel/MIST check blocks absent vendor loads",
+      "module": "piperack-expansion-loop",
+      "solverExport": "runPipeRackMistBenchmark",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "PR-MIST-FAIL-001",
+      "title": "Pipe rack MIST/nozzle supplied loads over allowable returns FAILED",
+      "module": "piperack-expansion-loop",
+      "solverExport": "runPipeRackMistBenchmark",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "PR-PIPE-DATA-EXISTS-001",
+      "title": "Pipe data lookup exists — 8 in Sch 40",
+      "module": "engineering-data",
+      "solverExport": "runPipeDataLookupBenchmark",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "PR-PIPE-DATA-MISSING-001",
+      "title": "Pipe data lookup missing — no fallback",
+      "module": "engineering-data",
+      "solverExport": "runPipeDataLookupBenchmark",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "RPT-001",
+      "title": "Deterministic JSON report snapshot hash stable",
+      "module": "reporting",
+      "solverExport": "createReportJsonSnapshot",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "RPT-002",
+      "title": "Markdown report includes method/formula/units/warnings/benchmark status",
+      "module": "reporting",
+      "solverExport": "createReportMarkdownCalcSheet",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "RPT-003",
+      "title": "NOT_QUALIFIED report headline has no clean PASS claim",
+      "module": "reporting",
+      "solverExport": "createNotQualifiedReportHeadline",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "RPT-FAILED-001",
+      "title": "Report proof — failed result no passed headline",
+      "module": "reporting",
+      "solverExport": "createReportMarkdownCalcSheet",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "RPT-MISSING-PIPE-DATA-001",
+      "title": "Report proof — missing pipe data",
+      "module": "reporting",
+      "solverExport": "createReportMarkdownCalcSheet",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "RPT-NOT-QUALIFIED-VENDOR-LOAD-001",
+      "title": "Report proof — vendor loads missing",
+      "module": "reporting",
+      "solverExport": "createReportMarkdownCalcSheet",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "RPT-SCREENING-ONLY-001",
+      "title": "Report proof — screening only limitation",
+      "module": "reporting",
+      "solverExport": "createReportMarkdownCalcSheet",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "UI-MOCK-CARDS-001",
+      "title": "UI mock cards metadata proof",
+      "module": "ui-proof",
+      "solverExport": "validateMockCatalogCompleteness",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    },
+    {
+      "caseId": "UI-MOCK-LOAD-001",
+      "title": "UI mock load action metadata proof",
+      "module": "ui-proof",
+      "solverExport": "validateMockLoadActions",
+      "status": "PASSED",
+      "message": "",
+      "roundedError": 0
+    }
+  ],
+  "fixtureDiagnostics": {
+    "invalidFixtures": [],
+    "unreadable": [],
+    "skippedLegacy": [
+      {
+        "file": "benchmarks\\fixtures\\2d\\cantilever.json",
+        "reason": "not engineering-benchmark-v2"
+      },
+      {
+        "file": "benchmarks\\fixtures\\2d\\simple_span.json",
+        "reason": "not engineering-benchmark-v2"
+      },
+      {
+        "file": "benchmarks\\fixtures\\3d\\basic_gc.json",
+        "reason": "not engineering-benchmark-v2"
+      },
+      {
+        "file": "benchmarks\\fixtures\\3d\\edge_all_elbow.json",
+        "reason": "not engineering-benchmark-v2"
+      },
+      {
+        "file": "benchmarks\\fixtures\\3d\\edge_sif_off.json",
+        "reason": "not engineering-benchmark-v2"
+      },
+      {
+        "file": "benchmarks\\fixtures\\3d\\edge_single_anchor.json",
+        "reason": "not engineering-benchmark-v2"
+      },
+      {
+        "file": "benchmarks\\fixtures\\3d\\edge_zero_perpendicular_leg.json",
+        "reason": "not engineering-benchmark-v2"
+      },
+      {
+        "file": "benchmarks\\fixtures\\pcfx-roundtrip\\bend.pcfx.json",
+        "reason": "not engineering-benchmark-v2"
+      },
+      {
+        "file": "benchmarks\\fixtures\\pcfx-roundtrip\\missing-component.pcfx.json",
+        "reason": "not engineering-benchmark-v2"
+      },
+      {
+        "file": "benchmarks\\fixtures\\pcfx-roundtrip\\olet.pcfx.json",
+        "reason": "not engineering-benchmark-v2"
+      },
+      {
+        "file": "benchmarks\\fixtures\\pcfx-roundtrip\\tee.pcfx.json",
+        "reason": "not engineering-benchmark-v2"
+      },
+      {
+        "file": "benchmarks\\fixtures\\piperack\\case1.json",
+        "reason": "not engineering-benchmark-v2"
+      },
+      {
+        "file": "benchmarks\\fixtures\\piperack\\case2.json",
+        "reason": "not engineering-benchmark-v2"
+      },
+      {
+        "file": "benchmarks\\fixtures\\piperack\\case3.json",
+        "reason": "not engineering-benchmark-v2"
+      },
+      {
+        "file": "benchmarks\\fixtures\\reporting\\sample-report.json",
+        "reason": "not engineering-benchmark-v2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "EXT-FLANG-001",
+  "title": "Calc Extended Koves flange equivalent load benchmark",
+  "module": "calc-extended",
+  "solverExport": "calcKovesFlange",
+  "methodId": "KOVES_FLANGE_SCREENING",
+  "iconId": "koves-flange",
+  "input": {
+    "M_E": 18.90892871911899,
+    "F_E": 141.81475151909723,
+    "G": 10.625,
+    "P_D": 100,
+    "P_R": 230,
+    "F_M": 1
+  },
+  "expected": {
+    "equivalentLoad": 6329.669799067536,
+    "allowableCapacity": 1356560.569958787877,
+    "status": "PASSED"
+  },
+  "compare": { "mode": "rounded-zero-error", "roundDecimals": 12, "requiredStatus": "PASSED" }
+}

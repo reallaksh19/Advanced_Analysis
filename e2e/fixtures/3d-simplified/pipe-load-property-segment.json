@@ -1,0 +1,73 @@
+{
+  "caseId": "SLICE-M-PIPE-LOAD-PROPERTY-SEGMENT",
+  "description": "Verifies that pipe, fluid, and insulation properties edited on a segment flow into the 3D Simplified model contract.",
+  "sketcher": {
+    "workingPlane": "XY",
+    "workingElevation": 0,
+    "designTemperature": 450,
+    "nodes": {
+      "N001": {
+        "pos": [0, 0, 0],
+        "type": "anchor",
+        "supportTag": "SUP-A",
+        "supportType": "anchor",
+        "frictionFactor": 0.3,
+        "restraint": {
+          "x": true,
+          "y": true,
+          "z": true,
+          "rx": false,
+          "ry": false,
+          "rz": false
+        }
+      },
+      "N002": {
+        "pos": [3000, 0, 0],
+        "type": "support",
+        "supportTag": "SUP-B",
+        "supportType": "rest",
+        "frictionFactor": 0.3,
+        "restraint": {
+          "x": false,
+          "y": true,
+          "z": true,
+          "rx": false,
+          "ry": false,
+          "rz": false
+        }
+      }
+    },
+    "segments": [
+      {
+        "id": "S001",
+        "startNode": "N001",
+        "endNode": "N002",
+        "type": "PIPE",
+        "properties": {
+          "type": "PIPE",
+          "bore": 100,
+          "wt": 6.02,
+          "material": "CARBON STEEL"
+        }
+      }
+    ]
+  },
+  "manualEdits": {
+    "nps": "6",
+    "dn_mm": 150,
+    "schedule": "XS",
+    "od_mm": 168.3,
+    "wall_mm": 10.97,
+    "material": "STAINLESS STEEL",
+    "materialDensity_kg_m3": 8000,
+    "ratingClass": 300,
+    "designTemperature_C": 350,
+    "designPressure_barg": 45.5,
+    "fluidDensity_kg_m3": 1100,
+    "insulationThickness_mm": 75,
+    "insulationDensity_kg_m3": 150
+  },
+  "expected": {
+    "validationStatus": "READY"
+  }
+}

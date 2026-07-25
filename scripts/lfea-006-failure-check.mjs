@@ -1,0 +1,37 @@
+import assert from 'node:assert/strict';
+import { canonicalPrettyStringify,hashUtf8,semanticHash,utf8ByteLength } from '../src/core/shared-piping-model/canonical-json.js';
+import { createEngineeringReview,createEvidenceExport,reviewSemanticHash,validateCsv,validateEngineeringReview,validateEvidenceExport } from '../src/core/element-fea/index.js';
+import { buildFixture,clone,convergenceReviewFixture,projectionReviewFixture,q4ReviewFixture,resealArtifact,resealInput,reviewProfile,sparseReviewFixture } from './lfea-006-fixtures.mjs';
+
+const profile=reviewProfile();let count=0;
+function reject(input,pattern){const review=createEngineeringReview(input,profile);assert.notEqual(review.status,'QUALIFIED_FOR_REVIEW');assert.equal(review.geometryReview.nodes.length,0);assert.equal(review.rawStressReview.rows.length,0);assert.ok(review.diagnostics.some((row)=>row.severity==='ERROR'));if(pattern)assert.match(review.diagnostics[0].message,pattern);count+=1;return review;}
+function mutateFixture(fixture,callback){const input=clone(fixture.input);callback(input);return resealInput(input);}
+
+const base=q4ReviewFixture();
+reject(mutateFixture(base,(input)=>{const a=clone(input.adapterResult);a.status='REJECTED';a.qualifiedModel=null;a.qualifiedModelSemanticHash=null;a.topologyEvidence=null;a.entityEvidence=null;a.assignmentEvidence=null;a.mappingLedger=[];a.diagnostics=[{code:'REJECTED',severity:'ERROR',message:'Rejected fixture'}];input.adapterResult=resealArtifact(a);}),/accepted adapter result|Accepted adapter/);
+reject(mutateFixture(base,(input)=>{const a=clone(input.adapterResult);a.qualifiedModelSemanticHash='fnv1a64:0000000000000000';input.adapterResult=resealArtifact(a);}),/model identity|semantic hashes/);
+reject(mutateFixture(base,(input)=>{const a=clone(input.adapterResult);a.sourcePackageSemanticHash='fnv1a64:1111111111111111';input.adapterResult=resealArtifact(a);}),/ancestry|model/);
+reject(mutateFixture(base,(input)=>{const r=clone(input.result);r.modelSemanticHash='fnv1a64:2222222222222222';input.result=resealArtifact(r);}),/model semantic hash|Model and result/);
+reject(mutateFixture(base,(input)=>{const r=clone(input.result);r.schema='fea-continuum-result/v99';input.result=resealArtifact(r);}),/unsupported|schema/i);
+const sparse=sparseReviewFixture();reject(mutateFixture(sparse,(input)=>{const r=clone(input.result);r.status='QUARANTINED_NUMERICAL';r.qualifiedResults=null;input.result=resealArtifact(r);}),/qualified|status|partial/i);
+reject(mutateFixture(base,(input)=>{const r=clone(input.result);delete r.reactions;input.result=resealArtifact(r);}),/reactions|reaction/i);
+reject(mutateFixture(base,(input)=>{const r=clone(input.result);delete r.freeDofResidual;input.result=resealArtifact(r);}),/residual|system evidence/i);
+reject(mutateFixture(base,(input)=>{const r=clone(input.result);delete r.integrationPointResults;input.result=resealArtifact(r);}),/integration|raw-stress/i);
+const convergence=convergenceReviewFixture();reject(mutateFixture(convergence,(input)=>{const r=clone(input.convergenceResult);r.sourceStudySemanticHash='fnv1a64:3333333333333333';input.convergenceResult=resealArtifact(r);}),/study ancestry|belong/i);
+const other=q4ReviewFixture();reject(buildFixture({adapterResult:other.adapterResult,model:other.model,result:other.result,convergenceStudy:convergence.convergenceStudy,convergenceResult:convergence.convergenceResult,identity:'MISSING-LEVEL'}).input,/exactly once/);
+const projection=projectionReviewFixture();reject(mutateFixture(projection,(input)=>{const p=clone(input.stressProjection);p.sourceResultSemanticHash='fnv1a64:4444444444444444';input.stressProjection=resealArtifact(p);}),/source model\/result|result hashes/);
+reject(mutateFixture(projection,(input)=>{const p=clone(input.stressProjection);p.authority='AUTHORITATIVE';p.status='AUTHORITATIVE';input.stressProjection=resealArtifact(p);}),/authority/i);
+reject(mutateFixture(projection,(input)=>{const p=clone(input.stressProjection);p.consumerRestrictions.governingMaximum='PERMITTED';input.stressProjection=resealArtifact(p);}),/governingMaximum|governing/i);
+reject(mutateFixture(projection,(input)=>{const p=clone(input.stressProjection);p.consumerRestrictions.convergence='PERMITTED';input.stressProjection=resealArtifact(p);}),/convergence/i);
+const nonfiniteDisp=clone(base.input);nonfiniteDisp.result=clone(nonfiniteDisp.result);nonfiniteDisp.result.nodalDisplacements[0].value=Number.NaN;nonfiniteDisp.semanticHash=base.input.semanticHash;reject(nonfiniteDisp,/finite|Canonical JSON/i);
+const nonfiniteReaction=clone(base.input);nonfiniteReaction.result=clone(nonfiniteReaction.result);nonfiniteReaction.result.reactions[0].value=Number.POSITIVE_INFINITY;nonfiniteReaction.semanticHash=base.input.semanticHash;reject(nonfiniteReaction,/finite|Canonical JSON/i);
+const nonfiniteStress=clone(base.input);nonfiniteStress.result=clone(nonfiniteStress.result);nonfiniteStress.result.integrationPointResults[0].stress[0]=Number.NaN;nonfiniteStress.semanticHash=base.input.semanticHash;reject(nonfiniteStress,/finite|Canonical JSON/i);
+
+const goodReview=createEngineeringReview(base.input,profile);const goodExport=createEvidenceExport(goodReview,base.input,profile);
+const duplicate=clone(goodExport);duplicate.files.push(clone(duplicate.files[0]));duplicate.totalFileCount=duplicate.files.length;duplicate.totalByteLength=duplicate.files.reduce((sum,row)=>sum+row.byteLength,0);delete duplicate.semanticHash;duplicate.semanticHash=semanticHash(duplicate);assert.ok(validateEvidenceExport(duplicate).errors.some((row)=>/duplicate/i.test(row)));count+=1;
+assert.throws(()=>validateCsv('a,b\n1\n',2),/column count/);count+=1;
+const manifestTamper=clone(goodExport);const mf=manifestTamper.files.find((row)=>row.path==='manifest.json');const parsed=JSON.parse(mf.content);parsed.semanticHash='fnv1a64:ffffffffffffffff';mf.content=canonicalPrettyStringify(parsed);mf.contentHash=hashUtf8(mf.content);mf.byteLength=utf8ByteLength(mf.content);manifestTamper.totalByteLength=manifestTamper.files.reduce((sum,row)=>sum+row.byteLength,0);delete manifestTamper.semanticHash;manifestTamper.semanticHash=semanticHash(manifestTamper);assert.ok(validateEvidenceExport(manifestTamper).errors.some((row)=>/Manifest semantic hash mismatch/.test(row)));count+=1;
+const capacity=createEvidenceExport(goodReview,base.input,reviewProfile({maximumExportRows:1}));assert.equal(capacity.status,'REJECTED_EXPORT');assert.equal(capacity.files.length,0);count+=1;
+const rejected=reject(mutateFixture(base,(input)=>{const r=clone(input.result);r.status='REJECTED_SINGULAR';r.qualifiedResults=null;input.result=resealArtifact(r);}),/qualified|status|partial/i);const exposed=clone(rejected);exposed.geometryReview.nodes=[{nodeId:'N1'}];delete exposed.semanticHash;exposed.analysisSummary.reviewHash=null;const rh=semanticHash(exposed);exposed.analysisSummary.reviewHash=rh;exposed.semanticHash=rh;assert.ok(validateEngineeringReview(exposed).errors.some((row)=>/exposes qualified datasets/.test(row)));count+=1;
+const rejectedExport=clone(capacity);rejectedExport.files=[clone(goodExport.files[0])];rejectedExport.totalFileCount=1;rejectedExport.totalByteLength=rejectedExport.files[0].byteLength;delete rejectedExport.semanticHash;rejectedExport.semanticHash=semanticHash(rejectedExport);assert.ok(validateEvidenceExport(rejectedExport).errors.some((row)=>/exposes qualified files/.test(row)));count+=1;
+assert.equal(count,25);console.log(JSON.stringify({failureCases:count}));

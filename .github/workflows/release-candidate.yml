@@ -1,0 +1,195 @@
+name: Release Candidate Certification
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  certify:
+    continue-on-error: ${{ github.event_name == 'pull_request' && github.head_ref == 'agent/w10.r4-sketcher-recovery' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact workflow head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+
+      - name: Certify U7 browser QA registration
+        run: node scripts/u7-browser-qa-check.mjs
+      - name: Certify W10.8 release registration
+        run: node scripts/w10.8-registration-check.mjs
+      - name: Certify W10.9 release registration
+        run: node scripts/w10.9-registration-check.mjs
+      - name: Certify W10.10 release registration
+        run: node scripts/w10.10-registration-check.mjs
+      - name: Certify W10.11 release registration
+        run: node scripts/w10.11-registration-check.mjs
+
+      - name: Certify W10.7 package and ledger contracts
+        run: node scripts/w10.7-model-calculation-contract-check.mjs
+      - name: Certify W10.7 deterministic properties
+        run: node scripts/w10.7-model-calculation-property-check.mjs
+      - name: Certify W10.7 dependency, size, runtime and contract boundaries
+        run: node scripts/w10.7-model-calculation-source-guard.mjs dependencies && node scripts/w10.7-model-calculation-source-guard.mjs sizes && node scripts/w10.7-model-calculation-source-guard.mjs runtime && node scripts/w10.7-model-calculation-source-guard.mjs contracts
+      - name: Certify W10.8 consumer contracts
+        run: node scripts/w10.8-workspace-consumer-contract-check.mjs
+      - name: Certify W10.8 deterministic properties
+        run: node scripts/w10.8-workspace-consumer-property-check.mjs
+      - name: Certify W10.8 JavaScript standards
+        run: node scripts/w10.8-workspace-consumer-source-guard.mjs javascript
+      - name: Certify W10.8 import boundaries
+        run: node scripts/w10.8-workspace-consumer-source-guard.mjs imports
+      - name: Certify W10.8 runtime event boundary
+        run: node scripts/w10.8-workspace-consumer-source-guard.mjs runtime
+      - name: Certify W10.8 dependency boundary
+        run: node scripts/w10.8-workspace-consumer-source-guard.mjs dependencies
+      - name: Certify W10.8 integration registration
+        run: node scripts/w10.8-workspace-consumer-source-guard.mjs integration
+      - name: Certify W10.9 review and versioned contracts
+        run: node scripts/w10.9-load-calculation-contract-check.mjs
+      - name: Certify W10.9 deterministic projections
+        run: node scripts/w10.9-load-calculation-property-check.mjs
+      - name: Certify W10.9 JavaScript, imports, runtime, dependency, contract and integration boundaries
+        run: node scripts/w10.9-load-calculation-source-guard.mjs javascript && node scripts/w10.9-load-calculation-source-guard.mjs imports && node scripts/w10.9-load-calculation-source-guard.mjs runtime && node scripts/w10.9-load-calculation-source-guard.mjs dependencies && node scripts/w10.9-load-calculation-source-guard.mjs contracts && node scripts/w10.9-load-calculation-source-guard.mjs integration
+      - name: Certify W10.10 required evidence
+        run: node scripts/w10.10-three-d-calculation-contract-check.mjs required
+      - name: Certify W10.10 optional W10.4 inclusion
+        run: node scripts/w10.10-three-d-calculation-contract-check.mjs optional-load-inclusion
+      - name: Certify W10.10 optional W10.6 inclusion
+        run: node scripts/w10.10-three-d-calculation-contract-check.mjs optional-beam-inclusion
+      - name: Certify W10.10 optional evidence rejection
+        run: node scripts/w10.10-three-d-calculation-contract-check.mjs optional-rejection
+      - name: Certify W10.10 registry and view-state evolution
+        run: node scripts/w10.10-three-d-calculation-contract-check.mjs evolution
+      - name: Certify W10.10 action eligibility
+        run: node scripts/w10.10-three-d-calculation-contract-check.mjs actions
+      - name: Certify W10.10 immutability and reconstruction
+        run: node scripts/w10.10-three-d-calculation-contract-check.mjs immutability
+      - name: Certify W10.10 deterministic projections
+        run: node scripts/w10.10-three-d-calculation-property-check.mjs
+      - name: Certify W10.10 imports, runtime, dependency, contract and integration boundaries
+        run: node scripts/w10.10-three-d-calculation-source-guard.mjs javascript && node scripts/w10.10-three-d-calculation-source-guard.mjs imports && node scripts/w10.10-three-d-calculation-source-guard.mjs runtime && node scripts/w10.10-three-d-calculation-source-guard.mjs dependencies && node scripts/w10.10-three-d-calculation-source-guard.mjs contracts && node scripts/w10.10-three-d-calculation-source-guard.mjs integration
+      - name: Certify W10.11 guarded Pipe Solver contracts and boundaries
+        run: npm run check:w10.11:static
+      - name: Certify LAFEA.1 canonical attachment foundation
+        run: npm run check:lafea.1
+      - run: npx playwright install chromium --with-deps
+      - name: Certify Phase 1 workspace contracts
+        run: npm run check:phase1-workspace:static
+      - name: Certify Phase 2 dataset contracts
+        run: npm run check:phase2-workspace:static
+      - name: Certify Phase 3 viewport contracts
+        run: npm run check:phase3-workspace:static
+      - name: Certify Phase 4 picking contracts
+        run: npm run check:phase4-workspace:static
+      - name: Certify Phase 5 analysis contracts
+        run: npm run check:phase5-workspace:static
+      - name: Certify Phase 6 analysis session contracts
+        run: npm run check:phase6-workspace:static
+      - name: Certify Phase 7 analysis ledger contracts
+        run: npm run check:phase7-workspace:static
+      - name: Certify Phase 8 engineering geometry contracts
+        run: npm run check:phase8-workspace:static
+      - name: Certify Phase 9 analysis readiness contracts
+        run: npm run check:phase9-workspace:static
+      - name: Certify W10 staged model support-load bridge
+        run: node scripts/w10-staged-model-support-load-contract-check.mjs
+      - name: Certify W10.1 shared piping model contracts
+        run: npm run check:w10.1:static
+      - name: Certify W10.2 shared component-port topology
+        run: npm run check:w10.2:static
+      - name: Certify W10.3 support attachment and restraint capability
+        run: npm run check:w10.3:static
+      - name: Certify W10.4 reusable model loads
+        run: npm run check:w10.4:static
+      - name: Certify W10.5 topology-local tributary screening
+        run: npm run check:w10.5:static
+      - name: Certify W10.6 flexural aliases
+        run: node scripts/w10.6-flexural-property-contract-check.mjs aliases
+      - name: Certify W10.6 flexural precedence
+        run: node scripts/w10.6-flexural-property-contract-check.mjs precedence
+      - name: Certify W10.6 invalid flexural evidence
+        run: node scripts/w10.6-flexural-property-contract-check.mjs invalid
+      - name: Certify W10.6 circular-section derivation
+        run: node scripts/w10.6-flexural-property-contract-check.mjs circular
+      - name: Certify W10.6 unsupported component policy
+        run: node scripts/w10.6-flexural-property-contract-check.mjs unsupported
+      - name: Certify W10.6 flexural immutability
+        run: node scripts/w10.6-flexural-property-contract-check.mjs immutability
+      - name: Certify W10.6 model and reference integrity
+        run: node scripts/w10.6-vertical-beam-contract-check.mjs models
+      - name: Certify W10.6 support boundaries
+        run: node scripts/w10.6-vertical-beam-contract-check.mjs boundaries
+      - name: Certify W10.6 case isolation and moment policy
+        run: node scripts/w10.6-vertical-beam-contract-check.mjs isolation
+      - name: Certify W10.6 primitive path mismatch
+        run: node scripts/w10.6-vertical-beam-contract-check.mjs mismatch
+      - name: Certify W10.6 linear solver failures
+        run: node scripts/w10.6-vertical-beam-contract-check.mjs linear
+      - name: Certify W10.6 upstream immutability
+        run: node scripts/w10.6-vertical-beam-contract-check.mjs immutability
+      - name: Certify W10.6 simply supported uniform benchmark
+        run: node scripts/w10.6-engineering-benchmark-check.mjs uniform
+      - name: Certify W10.6 point-load benchmarks
+        run: node scripts/w10.6-engineering-benchmark-check.mjs point
+      - name: Certify W10.6 continuous-span benchmark
+        run: node scripts/w10.6-engineering-benchmark-check.mjs continuous
+      - name: Certify W10.6 unequal and piecewise benchmarks
+        run: node scripts/w10.6-engineering-benchmark-check.mjs piecewise
+      - name: Certify W10.6 overhang benchmark
+        run: node scripts/w10.6-engineering-benchmark-check.mjs overhang
+      - name: Certify W10.6 W10.5 parity
+        run: node scripts/w10.6-engineering-benchmark-check.mjs parity
+      - name: Certify W10.6 fixed-seed properties
+        run: node scripts/w10.6-vertical-beam-property-check.mjs
+      - name: Certify W10.6 dependency boundary
+        run: node scripts/w10.6-vertical-beam-source-guard.mjs dependencies
+      - name: Certify W10.6 JavaScript sizes
+        run: node scripts/w10.6-vertical-beam-source-guard.mjs sizes
+      - name: Certify W10.6 runtime source boundaries
+        run: node scripts/w10.6-vertical-beam-source-guard.mjs runtime
+      - name: Certify W10.6 explicit aliases
+        run: node scripts/w10.6-vertical-beam-source-guard.mjs aliases
+      - run: npm run check:full
+      - name: Run QA static checks
+        run: npm run check:qa -- --skip-e2e
+      - name: Certify W10.7 Workspace capability
+        run: npm run check:w10.7:browser
+      - name: Certify W10.8 application shell and Reports consumer
+        run: npm run check:w10.8:browser
+      - name: Certify W10.9 Load Calc consumer
+        run: npm run check:w10.9:browser
+      - name: Certify W10.10 3D Calc consumer
+        run: npm run check:w10.10:browser
+      - name: Certify W10.11 Pipe Solver consumer
+        run: npm run check:w10.11:browser
+      - name: Run consolidated workspace browser certification
+        run: npm run check:workspace-browser
+      - name: Upload workspace browser report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: analysis-workspace-playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+      - run: npm run check:u3
+      - run: npm run check:u3:behavior
+      - run: npm run check:u4
+      - run: npm run check:u4:behavior
+      - run: npm run check:u5
+      - run: npm run check:u5:behavior
+      - run: npm run check:u6
+      - run: npm run check:u6:behavior
+      - run: npm run check:u7
+      - run: npm run check:release
+      - run: npm run check:benchmarks
+      - run: npm run build

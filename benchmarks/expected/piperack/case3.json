@@ -1,0 +1,25 @@
+{
+  "caseId": "pr-loop-003",
+  "expected": {
+    "warnings": [
+      {
+        "code": "MISSING_MATERIAL"
+      },
+      {
+        "code": "MISSING_SIZE"
+      },
+      {
+        "code": "FORMAL_STRESS_REQUIRED"
+      }
+    ],
+    "lines": [
+      {
+        "id": "L1"
+      }
+    ],
+    "governingLine": {
+      "id": "L1"
+    },
+    "tolerance": 0.005
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "2D-UDL-001",
+  "title": "Simple span distributed load — exact algebra check",
+  "module": "2d-math",
+  "solverExport": "calcSimpleSpanDistributedLoad",
+  "methodId": "SIMPLE_SPAN_DISTRIBUTED",
+  "iconId": "distributed-load",
+  "input": { "w": 25, "L": 240, "E": 29000000, "I": 150, "Z": 30 },
+  "expected": {
+    "status": "PASSED",
+    "methodId": "SIMPLE_SPAN_DISTRIBUTED",
+    "formulaIds": ["SIMPLE_SPAN_UDL_M_WL2_8", "CANTILEVER_STRESS_M_OVER_Z", "SIMPLE_SPAN_UDL_DELTA_5WL4_384EI"],
+    "unitSystem": { "length": "in", "force": "lbf", "stress": "psi", "moment": "in-lbf" },
+    "moment": 180000,
+    "stress": 6000,
+    "delta": 0.248275862069
+  },
+  "compare": { "mode": "rounded-zero-error", "roundDecimals": 12, "requiredStatus": "PASSED" }
+}

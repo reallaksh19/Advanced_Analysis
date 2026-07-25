@@ -1,0 +1,61 @@
+name: LFEA-003 Convergence and Stress Interpretation Certification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/core/element-fea/**'
+      - 'scripts/lfea-003-*.mjs'
+      - 'docs/element-fea/LFEA-003_IMPLEMENTATION.md'
+      - '.github/workflows/lfea-003-certification.yml'
+  push:
+    branches:
+      - agent/lfea-003-convergence-evidence
+    paths:
+      - 'src/core/element-fea/**'
+      - 'scripts/lfea-003-*.mjs'
+      - 'docs/element-fea/LFEA-003_IMPLEMENTATION.md'
+      - '.github/workflows/lfea-003-certification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  certify-lfea-003:
+    name: Certify LFEA-003 convergence evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact authorized implementation head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Preserve LFEA-001 behavioral qualification
+        run: |
+          node scripts/lfea-001-contract-check.mjs
+          node scripts/lfea-001-numerical-check.mjs
+          node scripts/lfea-001-failure-check.mjs
+          node scripts/lfea-001-determinism-check.mjs
+      - name: Preserve LFEA-002 behavioral qualification
+        run: |
+          node scripts/lfea-002-contract-check.mjs
+          node scripts/lfea-002-numerical-check.mjs
+          node scripts/lfea-002-failure-check.mjs
+          node scripts/lfea-002-determinism-check.mjs
+      - name: Run complete LFEA-003 qualification suite
+        run: node scripts/lfea-003-check.mjs
+      - name: Run strict syntax validation
+        run: |
+          find src/core/element-fea scripts -type f \( -name '*.js' -o -name 'lfea-003-*.mjs' \) -print0 \
+            | xargs -0 -n1 node --check
+      - name: Verify LFEA-003 exact-baseline source boundary
+        run: node scripts/lfea-003-source-guard.mjs

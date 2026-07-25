@@ -1,0 +1,5 @@
+id,type,subtype,nps,schedule,class,face,x1,y1,z1,x2,y2,z2,x,y,z
+P-4SCH40,PIPE,,4,40,,,0,0,0,10000,0,0,,,
+V-GATE-8,VALVE,GATE,8,,150,RF,10000,0,0,10292,0,0,,,
+S-A,SUPPORT,SHOE,,,,,,,,,,0,0,-10
+S-B,SUPPORT,SHOE,,,,,,,,,,10000,0,-10

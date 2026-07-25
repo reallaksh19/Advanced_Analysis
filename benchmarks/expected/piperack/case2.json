@@ -1,0 +1,22 @@
+{
+  "caseId": "pr-loop-002",
+  "expected": {
+    "warnings": [
+      {
+        "code": "MISSING_TEMP_DELTA"
+      },
+      {
+        "code": "FORMAL_STRESS_REQUIRED"
+      }
+    ],
+    "lines": [
+      {
+        "id": "L1"
+      }
+    ],
+    "governingLine": {
+      "id": "L1"
+    },
+    "tolerance": 0.005
+  }
+}

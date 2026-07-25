@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "PR-MIST-FAIL-001",
+  "title": "Pipe rack MIST/nozzle supplied loads over allowable returns FAILED",
+  "module": "piperack-expansion-loop",
+  "solverExport": "runPipeRackMistBenchmark",
+  "methodId": "MIST_NOZZLE_SCREENING",
+  "iconId": "vessel",
+  "input": {
+    "lines": [
+      {
+        "id": "V2",
+        "sizeNps": 10,
+        "schedule": "40",
+        "material": "Carbon Steel",
+        "tOperate": 500,
+        "hasVessel": true,
+        "vendorLoads": { "radialForceN": 120, "momentNmm": 100 },
+        "nozzleAllowables": { "radialForceN": 100, "momentNmm": 100 }
+      }
+    ],
+    "globalSettings": { "anchorDistanceFt": 200, "allowableStressPsi": 20000, "constantsSource": "fixture", "defaultSpacingFt": 2.5, "defaultSpacingSource": "fixture", "strictData": true },
+    "methodology": "FLUOR",
+    "globalInputs": { "constantsSource": "fixture" }
+  },
+  "expected": { "status": "FAILED", "isQualified": false },
+  "compare": { "mode": "rounded-zero-error", "roundDecimals": 12, "requiredStatus": "FAILED" }
+}

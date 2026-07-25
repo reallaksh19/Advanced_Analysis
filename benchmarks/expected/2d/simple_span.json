@@ -1,0 +1,12 @@
+{
+  "caseId": "2D-SIMPLE-SPAN-001",
+  "expected": {
+    "results": {
+      "moment": {
+        "value": 18000,
+        "unit": "lb-in"
+      }
+    },
+    "tolerance": 0.005
+  }
+}

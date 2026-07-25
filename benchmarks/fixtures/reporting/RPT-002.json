@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "RPT-002",
+  "title": "Markdown report includes method/formula/units/warnings/benchmark status",
+  "module": "reporting",
+  "solverExport": "createReportMarkdownCalcSheet",
+  "methodId": "REPORT_MARKDOWN_CALC_SHEET",
+  "iconId": "report-md",
+  "input": {
+    "reportPayload": {
+      "title": "RPT deterministic benchmark",
+      "module": "piperack",
+      "status": "PASSED",
+      "methodId": "PIPERACK_LOOP_ORDER",
+      "formulaIds": ["PIPERACK_LOOP_REQUIRED_LEG"],
+      "unitSystem": "imperial",
+      "inputs": { "lineId": "L10" },
+      "engineeringDataSource": { "pipe": "internal" },
+      "formulaExpressions": ["L_req_ft = sqrt(3*E*OD*delta/(144*S_allow))"],
+      "substitutions": { "delta": 3.62 },
+      "results": { "L_req_ft": 33.266278909731 },
+      "benchmarkStatus": "PASSED",
+      "warnings": [{ "message": "screening only" }]
+    }
+  },
+  "expected": { "status": "PASSED", "containsMethodId": true, "containsFormulaId": true, "containsUnits": true, "containsWarnings": true, "containsBenchmarkStatus": true },
+  "compare": { "mode": "rounded-zero-error", "roundDecimals": 12, "requiredStatus": "PASSED" }
+}

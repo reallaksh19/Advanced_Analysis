@@ -1,0 +1,31 @@
+{
+  "name": "advanced-analysis",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "node scripts/advanced-shell-contract-check.mjs && vite build",
+    "preview": "vite preview",
+    "syntax": "node scripts/syntax-check.mjs",
+    "syntax:strict": "node scripts/syntax-check.mjs --strict",
+    "check:imports": "node scripts/import-check.mjs",
+    "check:advanced-shell": "node scripts/advanced-shell-contract-check.mjs",
+    "check:workspace-contracts": "node scripts/phase2-workspace-contract-check.mjs && node scripts/phase3-viewport-contract-check.mjs && node scripts/phase4-viewport-picking-contract-check.mjs && node scripts/w10.1-shared-piping-model-contract-check.mjs && node scripts/w10.2-topology-property-check.mjs && node scripts/w10.3-support-restraint-property-check.mjs && node scripts/w10.4-model-load-contract-check.mjs && node scripts/w10.4-model-load-property-check.mjs && node scripts/w10.5-support-load-screening-property-check.mjs && node scripts/w10.9-load-calculation-contract-check.mjs && node scripts/w10.9-load-calculation-property-check.mjs",
+    "check:lafea-workbench": "node scripts/lafea-workbench-check.mjs",
+    "check:lfea-workbench": "node scripts/lfea-workbench-check.mjs",
+    "check:e2e": "node scripts/run-playwright.mjs",
+    "benchmark:tabs": "node scripts/run-advanced-tab-benchmarks.mjs",
+    "benchmark:advanced": "node scripts/run-advanced-tab-benchmarks.mjs",
+    "test": "npm run check:advanced-shell && npm run check:lafea-workbench && npm run check:lfea-workbench"
+  },
+  "dependencies": {
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "@babel/parser": "^7.29.0",
+    "@playwright/test": "^1.59.1",
+    "playwright": "^1.59.1",
+    "vite": "^7.3.1"
+  }
+}

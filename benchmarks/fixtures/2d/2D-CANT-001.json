@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "2D-CANT-001",
+  "title": "Cantilever end load — exact algebra check",
+  "module": "2d-math",
+  "solverExport": "calcCantileverEndLoad",
+  "methodId": "CANTILEVER_END_LOAD",
+  "iconId": "cantilever-end-load",
+  "input": { "P": 1000, "L": 120, "E": 29000000, "I": 100, "Z": 20 },
+  "expected": {
+    "status": "PASSED",
+    "methodId": "CANTILEVER_END_LOAD",
+    "formulaIds": ["CANTILEVER_M_PL", "CANTILEVER_STRESS_M_OVER_Z", "CANTILEVER_DELTA_PL3_3EI"],
+    "unitSystem": { "length": "in", "force": "lbf", "stress": "psi", "moment": "in-lbf" },
+    "moment": 120000,
+    "stress": 6000,
+    "delta": 0.198620689655
+  },
+  "compare": { "mode": "rounded-zero-error", "roundDecimals": 12, "requiredStatus": "PASSED" }
+}

@@ -1,0 +1,738 @@
+{
+  "appId": "ADVANCED_ANALYSIS",
+  "qualifications": [
+    {
+      "failedCaseIds": [],
+      "missingCaseIds": [],
+      "passedCaseCount": 5,
+      "requiredCaseCount": 5,
+      "status": "Qualified",
+      "tabId": "WORKSPACE"
+    },
+    {
+      "failedCaseIds": [],
+      "missingCaseIds": [],
+      "passedCaseCount": 5,
+      "requiredCaseCount": 5,
+      "status": "Qualified",
+      "tabId": "LOAD_CALC"
+    },
+    {
+      "failedCaseIds": [],
+      "missingCaseIds": [],
+      "passedCaseCount": 7,
+      "requiredCaseCount": 7,
+      "status": "Qualified",
+      "tabId": "LAFEA"
+    },
+    {
+      "failedCaseIds": [],
+      "missingCaseIds": [],
+      "passedCaseCount": 6,
+      "requiredCaseCount": 6,
+      "status": "Qualified",
+      "tabId": "LFEA"
+    }
+  ],
+  "registrySemanticHash": "fnv1a64:7a808e8a82760a7e",
+  "results": [
+    {
+      "actualEvidence": {
+        "exitCodes": [
+          0
+        ],
+        "passed": true
+      },
+      "appId": "ADVANCED_ANALYSIS",
+      "caseId": "lafea-browser-workflow",
+      "category": "BROWSER_WORKFLOW",
+      "diagnostics": [],
+      "evidenceBasis": "[SIMULATED]",
+      "expectedEvidence": {
+        "exitCodes": [
+          0
+        ],
+        "passed": true
+      },
+      "inputSemanticHash": "sha256:804ed0b667261ea7131e55d1a120a58053a05dd025c97677365b3e0060ce8e82",
+      "schema": "tab-benchmark-result/v1",
+      "semanticHash": "fnv1a64:1281a1a1e0095a6b",
+      "status": "PASS",
+      "tabId": "LAFEA",
+      "tolerance": null
+    },
+    {
+      "actualEvidence": {
+        "exitCodes": [
+          0
+        ],
+        "passed": true
+      },
+      "appId": "ADVANCED_ANALYSIS",
+      "caseId": "lafea-editor-kernel-workflow",
+      "category": "EDITOR_TO_KERNEL",
+      "diagnostics": [],
+      "evidenceBasis": "[SIMULATED]",
+      "expectedEvidence": {
+        "exitCodes": [
+          0
+        ],
+        "passed": true
+      },
+      "inputSemanticHash": "sha256:02d1835d6197bc4eb636ea9ace776815d241ec8b2557cff5123157a5fd5ab36b",
+      "schema": "tab-benchmark-result/v1",
+      "semanticHash": "fnv1a64:e27e3061f09ddb32",
+      "status": "PASS",
+      "tabId": "LAFEA",
+      "tolerance": null
+    },
+    {
+      "actualEvidence": {
+        "exitCodes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "passed": true
+      },
+      "appId": "ADVANCED_ANALYSIS",
+      "caseId": "lafea-stage-1-foundation",
+      "category": "LAFEA_1",
+      "diagnostics": [],
+      "evidenceBasis": "ANALYTICAL",
+      "expectedEvidence": {
+        "exitCodes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "passed": true
+      },
+      "inputSemanticHash": "sha256:0f26bc23c5784584e630277106e9aa1a41457ec78c03b006c1c3098641b172a6",
+      "schema": "tab-benchmark-result/v1",
+      "semanticHash": "fnv1a64:d560e182fd055a68",
+      "status": "PASS",
+      "tabId": "LAFEA",
+      "tolerance": null
+    },
+    {
+      "actualEvidence": {
+        "exitCodes": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "passed": true
+      },
+      "appId": "ADVANCED_ANALYSIS",
+      "caseId": "lafea-stage-2-screening",
+      "category": "LAFEA_2",
+      "diagnostics": [],
+      "evidenceBasis": "ANALYTICAL",
+      "expectedEvidence": {
+        "exitCodes": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "passed": true
+      },
+      "inputSemanticHash": "sha256:e0564db3df1de4c782c5a75a5b6ef1bacf9132f61645871c69a242c0ea1e89d7",
+      "schema": "tab-benchmark-result/v1",
+      "semanticHash": "fnv1a64:3a215d33c00c39a2",
+      "status": "PASS",
+      "tabId": "LAFEA",
+      "tolerance": null
+    },
+    {
+      "actualEvidence": {
+        "exitCodes": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "passed": true
+      },
+      "appId": "ADVANCED_ANALYSIS",
+      "caseId": "lafea-stage-3-continuum",
+      "category": "LAFEA_3",
+      "diagnostics": [],
+      "evidenceBasis": "ANALYTICAL",
+      "expectedEvidence": {
+        "exitCodes": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "passed": true
+      },
+      "inputSemanticHash": "sha256:1cc3071274e36113626a217e9a75441e76aa5834afaea8526e74ef5f70560a94",
+      "schema": "tab-benchmark-result/v1",
+      "semanticHash": "fnv1a64:04918373d6d519ed",
+      "status": "PASS",
+      "tabId": "LAFEA",
+      "tolerance": null
+    },
+    {
+      "actualEvidence": {
+        "exitCodes": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "passed": true
+      },
+      "appId": "ADVANCED_ANALYSIS",
+      "caseId": "lafea-stage-4-shell",
+      "category": "LAFEA_4",
+      "diagnostics": [],
+      "evidenceBasis": "ANALYTICAL",
+      "expectedEvidence": {
+        "exitCodes": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "passed": true
+      },
+      "inputSemanticHash": "sha256:6a4e3248056fd57006a713d37a5978662439611b82d918b54b1ae266c9fe4087",
+      "schema": "tab-benchmark-result/v1",
+      "semanticHash": "fnv1a64:8df529b1b1f2ed6d",
+      "status": "PASS",
+      "tabId": "LAFEA",
+      "tolerance": null
+    },
+    {
+      "actualEvidence": {
+        "exitCodes": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "passed": true
+      },
+      "appId": "ADVANCED_ANALYSIS",
+      "caseId": "lafea-stage-5-trunnion",
+      "category": "LAFEA_5",
+      "diagnostics": [],
+      "evidenceBasis": "ANALYTICAL",
+      "expectedEvidence": {
+        "exitCodes": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "passed": true
+      },
+      "inputSemanticHash": "sha256:4b8dc2de9d1e07d8c834500983a4c4174169358841823d1358dbf4a0643fc2bc",
+      "schema": "tab-benchmark-result/v1",
+      "semanticHash": "fnv1a64:1d62349cea8f08fa",
+      "status": "PASS",
+      "tabId": "LAFEA",
+      "tolerance": null
+    },
+    {
+      "actualEvidence": {
+        "exitCodes": [
+          0
+        ],
+        "passed": true
+      },
+      "appId": "ADVANCED_ANALYSIS",
+      "caseId": "lfea-browser-workflow",
+      "category": "BROWSER_WORKFLOW",
+      "diagnostics": [],
+      "evidenceBasis": "[SIMULATED]",
+      "expectedEvidence": {
+        "exitCodes": [
+          0
+        ],
+        "passed": true
+      },
+      "inputSemanticHash": "sha256:fdf03692b953fe948949d3d9068cbe946a5c713a500b492f3798981b8d272f3d",
+      "schema": "tab-benchmark-result/v1",
+      "semanticHash": "fnv1a64:84d1e9ccac462fa3",
+      "status": "PASS",
+      "tabId": "LFEA",
+      "tolerance": null
+    },
+    {
+      "actualEvidence": {
+        "exitCodes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "passed": true
+      },
+      "appId": "ADVANCED_ANALYSIS",
+      "caseId": "lfea-dense-sparse-parity",
+      "category": "SOLVER_PARITY",
+      "diagnostics": [],
+      "evidenceBasis": "ANALYTICAL",
+      "expectedEvidence": {
+        "exitCodes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "passed": true
+      },
+      "inputSemanticHash": "sha256:ccbaea92059f187e770e0728e4ca9f223f9a799f7ed05fb7cecfdcc48383c98d",
+      "schema": "tab-benchmark-result/v1",
+      "semanticHash": "fnv1a64:e9b0812297162dde",
+      "status": "PASS",
+      "tabId": "LFEA",
+      "tolerance": null
+    },
+    {
+      "actualEvidence": {
+        "exitCodes": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "passed": true
+      },
+      "appId": "ADVANCED_ANALYSIS",
+      "caseId": "lfea-editor-review-export",
+      "category": "EDITOR_TO_EVIDENCE",
+      "diagnostics": [],
+      "evidenceBasis": "[SIMULATED]",
+      "expectedEvidence": {
+        "exitCodes": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "passed": true
+      },
+      "inputSemanticHash": "sha256:b2b22a624e71cb2c8a1e3b0a58272301ffb9f514a3df35cc7f9ca9c512d5f562",
+      "schema": "tab-benchmark-result/v1",
+      "semanticHash": "fnv1a64:d15839afb8e53f19",
+      "status": "PASS",
+      "tabId": "LFEA",
+      "tolerance": null
+    },
+    {
+      "actualEvidence": {
+        "exitCodes": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "passed": true
+      },
+      "appId": "ADVANCED_ANALYSIS",
+      "caseId": "lfea-equilibrium-convergence",
+      "category": "EQUILIBRIUM_AND_CONVERGENCE",
+      "diagnostics": [],
+      "evidenceBasis": "ANALYTICAL",
+      "expectedEvidence": {
+        "exitCodes": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "passed": true
+      },
+      "inputSemanticHash": "sha256:13c8f21f350aa9a15f23c325c7b281a76d7d1acaf99c1c8b68c12704f703a72a",
+      "schema": "tab-benchmark-result/v1",
+      "semanticHash": "fnv1a64:1a138874c2d237c2",
+      "status": "PASS",
+      "tabId": "LFEA",
+      "tolerance": null
+    },
+    {
+      "actualEvidence": {
+        "exitCodes": [
+          0,
+          0
+        ],
+        "passed": true
+      },
+      "appId": "ADVANCED_ANALYSIS",
+      "caseId": "lfea-singular-rejection",
+      "category": "FAIL_CLOSED",
+      "diagnostics": [],
+      "evidenceBasis": "REGRESSION",
+      "expectedEvidence": {
+        "exitCodes": [
+          0,
+          0
+        ],
+        "passed": true
+      },
+      "inputSemanticHash": "sha256:85d030f83dfbf7baaee798340c7e5b5b218f56942a8476bb6686fed4b8429e52",
+      "schema": "tab-benchmark-result/v1",
+      "semanticHash": "fnv1a64:de2147a6b37ae0ff",
+      "status": "PASS",
+      "tabId": "LFEA",
+      "tolerance": null
+    },
+    {
+      "actualEvidence": {
+        "exitCodes": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "passed": true
+      },
+      "appId": "ADVANCED_ANALYSIS",
+      "caseId": "lfea-t3-q4-patch",
+      "category": "PATCH_TESTS",
+      "diagnostics": [],
+      "evidenceBasis": "ANALYTICAL",
+      "expectedEvidence": {
+        "exitCodes": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "passed": true
+      },
+      "inputSemanticHash": "sha256:bc9f4053099262c1c8d6992bc6d45e4922ee0f4496bc9ebac7ec8f7f771988e3",
+      "schema": "tab-benchmark-result/v1",
+      "semanticHash": "fnv1a64:86084f296c5bbeee",
+      "status": "PASS",
+      "tabId": "LFEA",
+      "tolerance": null
+    },
+    {
+      "actualEvidence": {
+        "exitCodes": [
+          0
+        ],
+        "passed": true
+      },
+      "appId": "ADVANCED_ANALYSIS",
+      "caseId": "load-browser-workflow",
+      "category": "BROWSER_WORKFLOW",
+      "diagnostics": [],
+      "evidenceBasis": "[SIMULATED]",
+      "expectedEvidence": {
+        "exitCodes": [
+          0
+        ],
+        "passed": true
+      },
+      "inputSemanticHash": "sha256:3d5c86127d17e45d5ca2ac2e623671be825805ec86da38851775a01cdd421b2f",
+      "schema": "tab-benchmark-result/v1",
+      "semanticHash": "fnv1a64:4d7316fb9cf5f19b",
+      "status": "PASS",
+      "tabId": "LOAD_CALC",
+      "tolerance": null
+    },
+    {
+      "actualEvidence": {
+        "exitCodes": [
+          0
+        ],
+        "passed": true
+      },
+      "appId": "ADVANCED_ANALYSIS",
+      "caseId": "load-contributions-and-blockers",
+      "category": "LOAD_CONTRIBUTIONS",
+      "diagnostics": [],
+      "evidenceBasis": "[SIMULATED]",
+      "expectedEvidence": {
+        "exitCodes": [
+          0
+        ],
+        "passed": true
+      },
+      "inputSemanticHash": "sha256:4e73bee05d5b441673b536ba892d800e7743f3d4e9f17ad6973d2a7d3c52a8fd",
+      "schema": "tab-benchmark-result/v1",
+      "semanticHash": "fnv1a64:fd95fda6faf70629",
+      "status": "PASS",
+      "tabId": "LOAD_CALC",
+      "tolerance": null
+    },
+    {
+      "actualEvidence": {
+        "exitCodes": [
+          0
+        ],
+        "passed": true
+      },
+      "appId": "ADVANCED_ANALYSIS",
+      "caseId": "load-empty-ope-hyd",
+      "category": "WEIGHT_CASES",
+      "diagnostics": [],
+      "evidenceBasis": "ANALYTICAL",
+      "expectedEvidence": {
+        "exitCodes": [
+          0
+        ],
+        "passed": true
+      },
+      "inputSemanticHash": "sha256:c52e57ebc1bfb1089d0cb046ba430dd5cf77676149620c226e593bea538528fa",
+      "schema": "tab-benchmark-result/v1",
+      "semanticHash": "fnv1a64:bed5e6a039ec3de0",
+      "status": "PASS",
+      "tabId": "LOAD_CALC",
+      "tolerance": null
+    },
+    {
+      "actualEvidence": {
+        "exitCodes": [
+          0
+        ],
+        "passed": true
+      },
+      "appId": "ADVANCED_ANALYSIS",
+      "caseId": "load-force-balance-and-reactions",
+      "category": "FORCE_BALANCE",
+      "diagnostics": [],
+      "evidenceBasis": "ANALYTICAL",
+      "expectedEvidence": {
+        "exitCodes": [
+          0
+        ],
+        "passed": true
+      },
+      "inputSemanticHash": "sha256:cd50601f66bdf85c12e79014f151d5ba0a163727f020158698e935b5d2dddb93",
+      "schema": "tab-benchmark-result/v1",
+      "semanticHash": "fnv1a64:e82fbd7830dcaa0a",
+      "status": "PASS",
+      "tabId": "LOAD_CALC",
+      "tolerance": null
+    },
+    {
+      "actualEvidence": {
+        "exitCodes": [
+          0,
+          0
+        ],
+        "passed": true
+      },
+      "appId": "ADVANCED_ANALYSIS",
+      "caseId": "load-workspace-contract-propagation",
+      "category": "CONTRACT_PROPAGATION",
+      "diagnostics": [],
+      "evidenceBasis": "REGRESSION",
+      "expectedEvidence": {
+        "exitCodes": [
+          0,
+          0
+        ],
+        "passed": true
+      },
+      "inputSemanticHash": "sha256:97113bf09c6b03382c49dd350456fc04bb6002673323cb15ee0842dc90eca21a",
+      "schema": "tab-benchmark-result/v1",
+      "semanticHash": "fnv1a64:4fdc8c92d75a278f",
+      "status": "PASS",
+      "tabId": "LOAD_CALC",
+      "tolerance": null
+    },
+    {
+      "actualEvidence": {
+        "exitCodes": [
+          0
+        ],
+        "passed": true
+      },
+      "appId": "ADVANCED_ANALYSIS",
+      "caseId": "workspace-browser-workflow",
+      "category": "BROWSER_WORKFLOW",
+      "diagnostics": [],
+      "evidenceBasis": "[SIMULATED]",
+      "expectedEvidence": {
+        "exitCodes": [
+          0
+        ],
+        "passed": true
+      },
+      "inputSemanticHash": "sha256:762da725577f072a7d34454fd729ed5bb0e194479e63899241b0f85ef94a637c",
+      "schema": "tab-benchmark-result/v1",
+      "semanticHash": "fnv1a64:458744554adc7bbc",
+      "status": "PASS",
+      "tabId": "WORKSPACE",
+      "tolerance": null
+    },
+    {
+      "actualEvidence": {
+        "byteLength": 25219174,
+        "normalizedComponentCount": 276,
+        "normalizedPipeCount": 3277,
+        "normalizedSupportCount": 1331,
+        "rawNodeCount": 4884,
+        "rawRootCount": 276,
+        "rawSupportCount": 1331,
+        "schema": "inputxml-managed-stage/v1",
+        "sha256": "88e62782772d743e9236d13775476826f9649ab06d3161de35dc500baa85a9c6"
+      },
+      "appId": "ADVANCED_ANALYSIS",
+      "caseId": "workspace-real-project-import",
+      "category": "DATASET_IMPORT",
+      "diagnostics": [],
+      "evidenceBasis": "REAL_PROJECT",
+      "expectedEvidence": {
+        "byteLength": 25219174,
+        "normalizedComponentCount": 276,
+        "normalizedPipeCount": 3277,
+        "normalizedSupportCount": 1331,
+        "rawNodeCount": 4884,
+        "rawRootCount": 276,
+        "rawSupportCount": 1331,
+        "schema": "inputxml-managed-stage/v1",
+        "sha256": "88e62782772d743e9236d13775476826f9649ab06d3161de35dc500baa85a9c6"
+      },
+      "inputSemanticHash": "sha256:88e62782772d743e9236d13775476826f9649ab06d3161de35dc500baa85a9c6",
+      "schema": "tab-benchmark-result/v1",
+      "semanticHash": "fnv1a64:8a6fdda1b172bb65",
+      "status": "PASS",
+      "tabId": "WORKSPACE",
+      "tolerance": null
+    },
+    {
+      "actualEvidence": {
+        "exitCodes": [
+          0
+        ],
+        "passed": true
+      },
+      "appId": "ADVANCED_ANALYSIS",
+      "caseId": "workspace-schema-rejection",
+      "category": "SCHEMA_REJECTION",
+      "diagnostics": [],
+      "evidenceBasis": "REGRESSION",
+      "expectedEvidence": {
+        "exitCodes": [
+          0
+        ],
+        "passed": true
+      },
+      "inputSemanticHash": "sha256:7de590bfa1c5e5738d97f00bb322348d2d59ab0931663305fecf159fa2b922aa",
+      "schema": "tab-benchmark-result/v1",
+      "semanticHash": "fnv1a64:fd88526962c57a4a",
+      "status": "PASS",
+      "tabId": "WORKSPACE",
+      "tolerance": null
+    },
+    {
+      "actualEvidence": {
+        "exitCodes": [
+          0,
+          0
+        ],
+        "passed": true
+      },
+      "appId": "ADVANCED_ANALYSIS",
+      "caseId": "workspace-selection-export-reimport",
+      "category": "STATE_AND_ROUND_TRIP",
+      "diagnostics": [],
+      "evidenceBasis": "[SIMULATED]",
+      "expectedEvidence": {
+        "exitCodes": [
+          0,
+          0
+        ],
+        "passed": true
+      },
+      "inputSemanticHash": "sha256:a0cea4f58616c0259ed4aa6bda5633bccc0314c0471fd05282e5debbb820645d",
+      "schema": "tab-benchmark-result/v1",
+      "semanticHash": "fnv1a64:c045af9e2cca8acc",
+      "status": "PASS",
+      "tabId": "WORKSPACE",
+      "tolerance": null
+    },
+    {
+      "actualEvidence": {
+        "exitCodes": [
+          0
+        ],
+        "passed": true
+      },
+      "appId": "ADVANCED_ANALYSIS",
+      "caseId": "workspace-topology-invariance",
+      "category": "TOPOLOGY_INVARIANCE",
+      "diagnostics": [],
+      "evidenceBasis": "[SIMULATED]",
+      "expectedEvidence": {
+        "exitCodes": [
+          0
+        ],
+        "passed": true
+      },
+      "inputSemanticHash": "sha256:285f4cec4f6b96e5c6b20287d66a0fc001c1c53edd768a28f28efcea08ab8db7",
+      "schema": "tab-benchmark-result/v1",
+      "semanticHash": "fnv1a64:36afded1b70713ed",
+      "status": "PASS",
+      "tabId": "WORKSPACE",
+      "tolerance": null
+    }
+  ],
+  "schema": "tab-benchmark-suite/v1",
+  "semanticHash": "fnv1a64:d29d8ded0ba55aa0",
+  "tabIds": [
+    "WORKSPACE",
+    "LOAD_CALC",
+    "LAFEA",
+    "LFEA"
+  ]
+}
+

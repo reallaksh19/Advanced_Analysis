@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "spl2-benchmark-v1",
+  "id": "SPL2-U-LOOP-003",
+  "title": "Legacy SPL2 U-loop screening benchmark placeholder",
+  "source": "public/spl2-bundle retained as legacy benchmark oracle; numeric workbook parity to be filled after formal extraction",
+  "geometryType": "LOOP",
+  "status": "PENDING_NUMERIC_EXTRACTION",
+  "input": {
+    "unit": "mm",
+    "segments": [
+      { "id": "S1", "start": [0, 0], "end": [4000, 0] },
+      { "id": "S2", "start": [4000, 0], "end": [4000, 2500] },
+      { "id": "S3", "start": [4000, 2500], "end": [7000, 2500] },
+      { "id": "S4", "start": [7000, 2500], "end": [7000, 0] },
+      { "id": "S5", "start": [7000, 0], "end": [11000, 0] }
+    ],
+    "params": { "OD_mm": 273, "alpha_mm_per_m_C": 0.012, "C": 20 }
+  },
+  "expected": {
+    "resultStatus": "PENDING",
+    "tolerancePct": 3
+  },
+  "notes": [
+    "This is not a parity claim; it formalizes the future benchmark contract."
+  ]
+}

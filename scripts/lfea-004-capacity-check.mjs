@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import { solveContinuumModel } from '../src/core/element-fea/index.js';
+import { clone, mediumQ4Model } from './lfea-004-fixtures.mjs';
+
+const input=mediumQ4Model();
+const first=solveContinuumModel(input);
+assert.equal(first.status,'QUALIFIED',JSON.stringify(first.diagnostics));
+assert.equal(first.schema,'fea-continuum-result/v3');
+assert.ok(first.dofMap.length>=6000,first.dofMap.length);
+assert.ok(first.constraintPartition.freeDofIndices.length>=5000,first.constraintPartition.freeDofIndices.length);
+assert.ok(first.sparseMatrixEvidence.nonzeroCount<200000,first.sparseMatrixEvidence.nonzeroCount);
+assert.ok(first.sparseMatrixEvidence.estimatedStorageBytes<64*1024*1024,first.sparseMatrixEvidence.estimatedStorageBytes);
+assert.equal(first.capacityEvidence.status,'ACCEPTED');
+assert.ok(first.iterativeSolverEvidence.finalTrueResidualL2<=first.iterativeSolverEvidence.targetResidual);
+assert.ok(first.freeDofResidual.infinityNorm<=input.solverProfile.tolerances.residualForceAbsolute+input.solverProfile.tolerances.residualForceRelative);
+assert.ok(Math.abs(first.equilibriumTotals.fx)<=input.solverProfile.tolerances.forceEquilibriumAbsolute);
+assert.ok(Math.abs(first.equilibriumTotals.fy)<=input.solverProfile.tolerances.forceEquilibriumAbsolute);
+assert.ok(Math.abs(first.equilibriumTotals.mz)<=input.solverProfile.tolerances.momentEquilibriumAbsolute);
+assert.ok(first.energyConsistency.absoluteDifference<=input.solverProfile.tolerances.energyAbsolute);
+const repeated=solveContinuumModel(clone(input));
+assert.equal(repeated.status,'QUALIFIED'); assert.equal(first.semanticHash,repeated.semanticHash); assert.equal(JSON.stringify(first),JSON.stringify(repeated));
+console.log(JSON.stringify({dofs:first.dofMap.length,freeDofs:first.constraintPartition.freeDofIndices.length,nonzeros:first.sparseMatrixEvidence.nonzeroCount,estimatedStorageBytes:first.sparseMatrixEvidence.estimatedStorageBytes,iterations:first.iterativeSolverEvidence.iterationCount,finalTrueResidual:first.iterativeSolverEvidence.finalTrueResidualL2,semanticHash:first.semanticHash}));

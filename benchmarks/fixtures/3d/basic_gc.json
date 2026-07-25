@@ -1,0 +1,34 @@
+{
+  "caseId": "GC-3D-BASIC-1",
+  "title": "Basic 3D Guided Cantilever L-Shape",
+  "module": "3d-guided-cantilever",
+  "engineeringLevel": "SCREENING",
+  "description": "L-shape run screening for basic GC expansion.",
+  "input": {
+    "nodes": {
+        "n1": { "pos": [0, 0, 0], "type": "anchor" },
+        "n2": { "pos": [120, 0, 0], "type": "elbow" },
+        "n3": { "pos": [120, 120, 0], "type": "anchor" }
+    },
+    "segments": [
+        { "id": "s1", "startNode": "n1", "endNode": "n2", "length_in": 120, "od_in": 4.5, "wt_in": 0.237, "axis": "X" },
+        { "id": "s2", "startNode": "n2", "endNode": "n3", "length_in": 120, "od_in": 4.5, "wt_in": 0.237, "axis": "Y" }
+    ],
+    "params": {
+        "deltaT_F": 100,
+        "E_psi": 29000000,
+        "alpha_in_in_F": 0.000006,
+        "Sc_psi": 20000,
+        "Sh_psi": 20000,
+        "f": 1.0
+    }
+  },
+  "expected": {
+    "overallResult": "PASS"
+  },
+  "tolerance": 0.05,
+  "source": "INTERNAL",
+  "sourceStatus": "HAND_CALC",
+  "applicableSolvers": ["3d-guided-cantilever"],
+  "tags": ["screening", "guided-cantilever", "3d"]
+}

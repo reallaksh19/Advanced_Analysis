@@ -1,0 +1,67 @@
+import React from 'react';
+import { useGC3DStore } from './GC3DStore';
+import { GC3DCanvas } from './GC3DCanvas';
+import { GC3DComponentPanel } from './GC3DComponentPanel';
+import { GC3DDebugConsole } from './GC3DDebugConsole';
+import { GC3DDebugTable } from './GC3DDebugTable';
+import { GC3DConfigPanel } from './GC3DConfigPanel';
+import { Activity } from 'lucide-react';
+
+export const GC3DTab = () => {
+  const { activeSubTab, setActiveSubTab, includeSIF, setIncludeSIF } = useGC3DStore();
+
+  const SubTabBtn = ({ id, label }) => (
+    <button
+      onClick={() => setActiveSubTab(id)}
+      style={{
+        padding: '8px 16px',
+        background: activeSubTab === id ? '#3b82f6' : 'transparent',
+        color: activeSubTab === id ? '#fff' : '#94a3b8',
+        border: 'none',
+        borderRadius: '4px',
+        cursor: 'pointer',
+        fontWeight: 'bold',
+      }}
+    >
+      {label}
+    </button>
+  );
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: 'calc(100vh - 48px)', overflow: 'hidden' }}>
+      <div style={{ height: '56px', background: '#1e293b', borderBottom: '1px solid #334155', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', color: '#f8fafc', fontWeight: 'bold', fontSize: '18px' }}>
+          <Activity size={24} color="#3b82f6" />
+          GC 3D Analyzer
+          <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 'normal', marginLeft: '8px' }}>
+            Ver {new Date().toLocaleDateString('en-GB').replace(/\//g, '-')} (1)
+          </span>
+          <div style={{ display: 'flex', gap: '8px', marginLeft: '32px' }}>
+            <SubTabBtn id="3dview" label="3D View" />
+            <SubTabBtn id="debugtable" label="Calc Table" />
+            <SubTabBtn id="config" label="Config" />
+          </div>
+        </div>
+        <div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f8fafc', cursor: 'pointer' }}>
+            <input type="checkbox" checked={includeSIF} onChange={e => setIncludeSIF(e.target.checked)} />
+            Include SIF & k
+          </label>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        {activeSubTab === '3dview' && (
+          <>
+            <GC3DCanvas />
+            <GC3DComponentPanel />
+          </>
+        )}
+        {activeSubTab === 'debugtable' && <GC3DDebugTable />}
+        {activeSubTab === 'config' && <GC3DConfigPanel />}
+      </div>
+
+      <GC3DDebugConsole />
+    </div>
+  );
+};

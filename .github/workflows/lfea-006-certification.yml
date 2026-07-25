@@ -1,0 +1,82 @@
+name: LFEA-006 Engineering Review and Evidence Export Certification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/core/element-fea/**'
+      - 'scripts/lfea-006-*.mjs'
+      - 'docs/element-fea/LFEA-006_IMPLEMENTATION.md'
+      - '.github/workflows/lfea-006-certification.yml'
+  push:
+    branches:
+      - agent/lfea-006-review-export
+    paths:
+      - 'src/core/element-fea/**'
+      - 'scripts/lfea-006-*.mjs'
+      - 'docs/element-fea/LFEA-006_IMPLEMENTATION.md'
+      - '.github/workflows/lfea-006-certification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  certify-lfea-006:
+    name: Certify LFEA-006 engineering review and evidence export
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout exact authorized implementation head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Preserve LFEA-001 behavioral qualification
+        run: |
+          node scripts/lfea-001-contract-check.mjs
+          node scripts/lfea-001-numerical-check.mjs
+          node scripts/lfea-001-failure-check.mjs
+          node scripts/lfea-001-determinism-check.mjs
+      - name: Preserve LFEA-002 behavioral qualification
+        run: |
+          node scripts/lfea-002-contract-check.mjs
+          node scripts/lfea-002-numerical-check.mjs
+          node scripts/lfea-002-failure-check.mjs
+          node scripts/lfea-002-determinism-check.mjs
+      - name: Preserve LFEA-003 behavioral qualification
+        run: |
+          node scripts/lfea-003-contract-check.mjs
+          node scripts/lfea-003-numerical-check.mjs
+          node scripts/lfea-003-failure-check.mjs
+          node scripts/lfea-003-determinism-check.mjs
+      - name: Preserve LFEA-004 behavioral qualification
+        run: node scripts/lfea-004-check.mjs
+      - name: Preserve LFEA-005 behavioral qualification
+        run: node scripts/lfea-005-check.mjs
+      - name: Capture complete LFEA-006 qualification suite
+        id: lfea006_suite
+        continue-on-error: true
+        run: node scripts/lfea-006-check.mjs > lfea-006-suite.log 2>&1
+      - name: Upload LFEA-006 suite assertion
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lfea-006-suite-assertion
+          path: lfea-006-suite.log
+      - name: Enforce complete LFEA-006 qualification suite
+        if: steps.lfea006_suite.outcome != 'success'
+        run: exit 1
+      - name: Run strict syntax validation
+        run: |
+          find src/core/element-fea scripts -type f \( -name '*.js' -o -name 'lfea-006-*.mjs' \) -print0 \
+            | xargs -0 -n1 node --check
+      - name: Verify LFEA-006 exact-baseline source boundary
+        run: node scripts/lfea-006-source-guard.mjs

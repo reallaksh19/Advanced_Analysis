@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "RPT-FAILED-001",
+  "title": "Report proof — failed result no passed headline",
+  "module": "reporting",
+  "solverExport": "createReportMarkdownCalcSheet",
+  "methodId": "REPORT_MARKDOWN_CALC_SHEET",
+  "iconId": "report-warning",
+  "input": {
+    "reportPayload": {
+      "title": "Failed Benchmark Report",
+      "module": "piperack-expansion-loop",
+      "status": "FAILED",
+      "methodId": "MIST_NOZZLE_SCREENING",
+      "formulaIds": ["MIST_VENDOR_LOAD_SCREENING"],
+      "unitSystem": "imperial",
+      "benchmarkStatus": "FAILED",
+      "diagnostics": [{ "code": "BENCHMARK_FAILED", "severity": "ERROR", "message": "Benchmark failed." }]
+    }
+  },
+  "expected": {
+    "status": "FAILED",
+    "methodId": "REPORT_MARKDOWN_CALC_SHEET",
+    "formulaIds": ["REPORT_MARKDOWN_CALC_SHEET"],
+    "containsStatus": true,
+    "containsMethodId": true,
+    "containsFormulaId": true,
+    "containsUnits": true,
+    "containsBlockingDiagnostic": true,
+    "noCleanPassClaim": true,
+    "isCriticalStatus": true
+  },
+  "compare": { "mode": "rounded-zero-error", "roundDecimals": 12, "requiredStatus": "FAILED" }
+}

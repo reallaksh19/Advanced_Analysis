@@ -1,0 +1,77 @@
+{
+  "description": "Pipe evaluating SIF=OFF overrides. Even with elbow config, SIF parameters must not apply.",
+  "input": {
+    "nodes": {
+      "A": {
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "type": "anchor"
+      },
+      "B": {
+        "pos": [
+          120,
+          0,
+          0
+        ],
+        "type": "node"
+      },
+      "C": {
+        "pos": [
+          120,
+          120,
+          0
+        ],
+        "type": "anchor"
+      }
+    },
+    "segments": [
+      {
+        "id": "S1",
+        "startNode": "A",
+        "endNode": "B",
+        "length_in": 120,
+        "od_in": 6.625,
+        "wt_in": 0.28,
+        "axis": "X",
+        "compType": "ELBOW",
+        "fittingData": {
+          "k": 5.0,
+          "i_i": 4.5,
+          "R_e": 9.0
+        }
+      },
+      {
+        "id": "S2",
+        "startNode": "B",
+        "endNode": "C",
+        "length_in": 120,
+        "od_in": 6.625,
+        "wt_in": 0.28,
+        "axis": "Y",
+        "compType": "ELBOW",
+        "fittingData": {
+          "k": 5.0,
+          "i_i": 4.5,
+          "R_e": 9.0
+        }
+      }
+    ],
+    "params": {
+      "deltaT_F": 300,
+      "E_psi": 29500000,
+      "alpha_in_in_F": 6.5e-06,
+      "Sc_psi": 20000,
+      "Sh_psi": 18000,
+      "f": 1.0
+    },
+    "includeSIF": false
+  },
+  "expected": {
+    "overallResult": "PASS",
+    "criticalRatio": 0.0,
+    "tolerance": 0.005
+  }
+}

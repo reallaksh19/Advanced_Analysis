@@ -1,0 +1,48 @@
+import assert from 'node:assert/strict';
+import { createInitialLfeaConsumerProfile } from '../src/core/lfea-consumer/index.js';
+import { LfeaConsumerController } from '../src/workspace/lfea-consumer-controller.js';
+import { EventBus } from '../src/workspace/event-bus.js';
+import { q4ConsumerFixture, sourceFile } from './lfea-007-fixtures.mjs';
+
+const profile = createInitialLfeaConsumerProfile();
+assert.throws(() => new LfeaConsumerController(null, EventBus), /profile/i);
+const fixture = q4ConsumerFixture({ projection:true });
+const controller = new LfeaConsumerController(null, EventBus, profile);
+controller.init();
+let analysisRequests = 0;
+const unsubscribe = EventBus.subscribe('analysis:requested', () => { analysisRequests += 1; });
+const loaded = await controller.loadFile(sourceFile('qualified-review.json', fixture.review));
+assert(loaded);
+assert.equal(controller.getSession().status, 'QUALIFIED');
+assert.equal(controller.getLoadedReview().semanticHash, fixture.review.semanticHash);
+const acceptedHash = controller.getViewModel().semanticHash;
+const acceptedReview = controller.getLoadedReview();
+await controller.loadFile(sourceFile('invalid.json', '{'));
+assert.equal(controller.getSession().status, 'REJECTED');
+assert.equal(controller.getViewModel().semanticHash, acceptedHash);
+assert.equal(controller.getLoadedReview(), acceptedReview);
+
+let reads = 0;
+await controller.loadFile({ name:'oversized.json', size:profile.maximumSourceBytes + 1, text:async()=>{reads += 1;return '{}';} });
+assert.equal(reads, 0);
+assert.equal(controller.getSession().status, 'CAPACITY_BLOCKED');
+assert.equal(controller.getViewModel().semanticHash, acceptedHash);
+
+controller.setResultMode('PROJECTED');
+assert.equal(controller.getViewModel().display.resultMode, 'PROJECTED');
+controller.setStressComponent('SX');
+assert.equal(controller.getViewModel().display.stressComponent, 'SX');
+controller.selectRecord({ type:'NODE', identity:fixture.review.geometryReview.nodes[0].nodeId, tableId:'nodes' });
+assert.equal(controller.getSession().selectedRecord.type, 'NODE');
+const beforeMissing = controller.getViewModel().semanticHash;
+controller.selectRecord({ type:'NODE', identity:'ABSENT', tableId:'nodes' });
+assert.equal(controller.getViewModel().semanticHash, beforeMissing);
+assert.equal(analysisRequests, 0);
+const versionBeforeClear=controller.getSession().version;
+controller.clear();
+assert.equal(controller.getSession().status, 'EMPTY');
+assert.equal(controller.getSession().version, versionBeforeClear + 1);
+unsubscribe();
+controller.destroy();
+assert.equal(controller.getSession(), null);
+console.log('LFEA-007 controller qualification passed.');

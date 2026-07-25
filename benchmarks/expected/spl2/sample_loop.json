@@ -1,0 +1,19 @@
+{
+  "caseId": "spl2_loop_001",
+  "title": "SPL2 Basic Loop Extraction",
+  "module": "piperack-expansion-loop",
+  "engineeringLevel": "DESIGN_AID_SCREENING",
+  "sourceStatus": "PENDING_NUMERIC_EXTRACTION",
+  "inputs": {
+    "D": 10.75,
+    "t": 0.365,
+    "H": 10,
+    "W": 10,
+    "G": 5
+  },
+  "expected": {
+    "L": "PENDING_NUMERIC_EXTRACTION",
+    "Ix": "PENDING_NUMERIC_EXTRACTION",
+    "tolerance": 0.005
+  }
+}

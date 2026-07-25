@@ -1,0 +1,4 @@
+PIPE
+    END-POINT    0.0 0.0 0.0 100
+    END-POINT    100.0 0.0 0.0 100
+    ITEM-CODE    TEST-PIPE

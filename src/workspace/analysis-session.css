@@ -1,0 +1,137 @@
+.analysis-session {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--workspace-border);
+}
+
+.analysis-session header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.analysis-session h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.analysis-session header small,
+.analysis-session__status {
+  color: var(--workspace-muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+}
+
+.analysis-session__readiness {
+  display: block;
+  padding: 8px;
+  border: 1px solid #334155;
+  border-radius: 5px;
+  background: #060b14;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.analysis-session__readiness--ready {
+  border-color: #166534;
+  color: #bbf7d0;
+}
+
+.analysis-session__readiness--draft {
+  border-color: #92400e;
+  color: #fde68a;
+}
+
+.analysis-session__fields {
+  display: grid;
+  gap: 8px;
+}
+
+.analysis-session-field {
+  display: grid;
+  gap: 6px;
+  padding: 9px;
+  border: 1px solid var(--workspace-border);
+  border-left-width: 3px;
+  border-radius: 5px;
+  background: #091426;
+}
+
+.analysis-session-field--source { border-left-color: #60a5fa; }
+.analysis-session-field--derived { border-left-color: #a78bfa; }
+.analysis-session-field--override { border-left-color: #34d399; }
+.analysis-session-field--missing { border-left-color: #f59e0b; }
+
+.analysis-session-field__label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.analysis-session-field__source {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #111c2e;
+  color: var(--workspace-muted);
+  font-size: 9px;
+  font-style: normal;
+  text-transform: uppercase;
+}
+
+.analysis-session-field input {
+  min-width: 0;
+  border: 1px solid #315070;
+  border-radius: 4px;
+  padding: 8px;
+  background: #050b15;
+  color: var(--workspace-text);
+  font: inherit;
+}
+
+.analysis-session-field input:focus-visible {
+  border-color: var(--workspace-accent);
+  outline: 2px solid rgba(96, 165, 250, 0.35);
+  outline-offset: 1px;
+}
+
+.analysis-session-field small {
+  overflow-wrap: anywhere;
+  color: var(--workspace-muted);
+  font-size: 9px;
+}
+
+.analysis-session-field__error {
+  color: #fca5a5;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.analysis-session__actions {
+  display: grid;
+  gap: 7px;
+}
+
+.analysis-session__secondary {
+  border: 1px solid #334155;
+  border-radius: 5px;
+  padding: 8px 10px;
+  background: #111827;
+  color: var(--workspace-text);
+  cursor: pointer;
+}
+
+.analysis-session__secondary:disabled {
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.analysis-session__status {
+  margin: 0;
+  line-height: 1.45;
+}

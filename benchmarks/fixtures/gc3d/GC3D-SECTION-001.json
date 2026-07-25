@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "GC3D-SECTION-001",
+  "title": "GC3D pipe section properties",
+  "module": "3d-guided-cantilever",
+  "solverExport": "calcPipeSection",
+  "methodId": "GC_BASIC_12EI",
+  "iconId": "pipe-section",
+  "input": { "od_in": 8.625, "wt_in": 0.322 },
+  "expected": { "Di": 7.981, "I": 72.489240602574, "Z": 16.809099270162, "r2": 4.1515 },
+  "compare": { "mode": "rounded-zero-error", "roundDecimals": 12, "requiredStatus": "PASSED" }
+}

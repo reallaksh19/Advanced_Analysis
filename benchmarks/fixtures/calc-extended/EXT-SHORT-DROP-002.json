@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "EXT-SHORT-DROP-002",
+  "title": "Calc Extended vertical leg over 3 ft retained",
+  "module": "calc-extended",
+  "solverExport": "analyzeShortDropGeometry",
+  "methodId": "GC_ANCHOR_GUIDE_3EI",
+  "iconId": "short-drop-filter",
+  "input": {
+    "anchor1Id": "A1",
+    "anchor2Id": "A2",
+    "nodes": [
+      { "id": "A1", "x": 0, "y": 0, "z": 0 },
+      { "id": "N1", "x": 0, "y": 0, "z": 3.01 },
+      { "id": "A2", "x": 0, "y": 10, "z": 3.01 }
+    ],
+    "segments": [
+      { "id": "S1", "startNodeId": "A1", "endNodeId": "N1" },
+      { "id": "S2", "startNodeId": "N1", "endNodeId": "A2" }
+    ]
+  },
+  "expected": {
+    "shortDropLimit_ft": 3,
+    "shortDropsIgnored": 0,
+    "unitSystem": { "coordinate": "ft" }
+  },
+  "compare": { "mode": "rounded-zero-error", "roundDecimals": 12, "requiredStatus": "PASSED" }
+}

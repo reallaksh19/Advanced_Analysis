@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "2D-POINT-001",
+  "title": "Simple span concentrated load — exact algebra check",
+  "module": "2d-math",
+  "solverExport": "calcSimpleSpanPointLoad",
+  "methodId": "SIMPLE_SPAN_CONCENTRATED",
+  "iconId": "point-load",
+  "input": { "P": 2000, "L": 240, "a": 96, "E": 29000000, "I": 150, "Z": 30 },
+  "expected": {
+    "status": "PASSED",
+    "methodId": "SIMPLE_SPAN_CONCENTRATED",
+    "formulaIds": ["SIMPLE_SPAN_POINT_M_PAB_OVER_L", "CANTILEVER_STRESS_M_OVER_Z"],
+    "unitSystem": { "length": "in", "force": "lbf", "stress": "psi", "moment": "in-lbf" },
+    "moment": 115200,
+    "stress": 3840,
+    "delta": 0.122032551724
+  },
+  "compare": { "mode": "rounded-zero-error", "roundDecimals": 12, "requiredStatus": "PASSED" }
+}

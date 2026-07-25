@@ -1,0 +1,21 @@
+{
+  "caseId": "2D-SIMPLE-SPAN-001",
+  "title": "Simple Span Distributed Load Check",
+  "module": "2d-simplified-stress-check",
+  "engineeringLevel": "SCREENING",
+  "input": {
+    "calculationType": "SIMPLE_SPAN_DISTRIBUTED",
+    "inputs": { "w": 10 },
+    "geometry": {
+      "units": { "length": "in", "force": "lb" },
+      "materials": [{ "id": "mat1", "name": "Steel", "E": 29000000 }],
+      "nodes": [
+        { "id": "n1", "x": 0, "y": 0, "z": 0 },
+        { "id": "n2", "x": 120, "y": 0, "z": 0 }
+      ],
+      "segments": [
+        { "id": "s1", "startNodeId": "n1", "endNodeId": "n2", "outerDiameter": 4.5, "wallThickness": 0.237 }
+      ]
+    }
+  }
+}

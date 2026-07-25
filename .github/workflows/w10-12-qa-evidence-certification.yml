@@ -1,0 +1,69 @@
+name: W10.12 QA Evidence Consumer Certification
+
+on:
+  pull_request:
+    paths:
+      - 'src/core/qa-evidence/**'
+      - 'src/core/workspace-consumers/**'
+      - 'src/workspace/application-shell-controller.js'
+      - 'src/workspace/bootstrap.js'
+      - 'src/workspace/event-topics.js'
+      - 'src/workspace/qa-evidence-*.js'
+      - 'scripts/w10.12-*.mjs'
+      - 'e2e/w10.12-*.spec.js'
+      - 'docs/main-tab-recovery/W10.12_QA_EVIDENCE_CONSUMER.md'
+      - 'package.json'
+      - '.github/workflows/w10-12-qa-evidence-certification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact W10.12 head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+          show-progress: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright install chromium --with-deps
+      - name: Certify W10.12 contracts
+        run: |
+          set -o pipefail
+          npm run check:w10.12:contracts 2>&1 | tee w10-12-contracts.log
+      - name: Certify W10.12 properties
+        run: |
+          set -o pipefail
+          npm run check:w10.12:properties 2>&1 | tee w10-12-properties.log
+      - name: Certify W10.12 source boundaries
+        run: |
+          set -o pipefail
+          npm run check:w10.12:source 2>&1 | tee w10-12-source.log
+      - name: Certify W10.12 browser behavior
+        run: |
+          set -o pipefail
+          npm run check:w10.12:browser 2>&1 | tee w10-12-browser.log
+      - name: Run full repository checks
+        run: npm run check:full
+      - name: Build production application
+        run: npm run build
+      - name: Upload W10.12 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w10-12-qa-evidence-certification
+          path: |
+            w10-12-*.log
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7

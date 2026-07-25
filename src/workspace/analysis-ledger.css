@@ -1,0 +1,183 @@
+.analysis-ledger {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--workspace-border);
+}
+
+.analysis-ledger__heading,
+.analysis-ledger-entry__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.analysis-ledger__heading h3,
+.analysis-ledger-comparison h4 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.analysis-ledger__heading span {
+  color: var(--workspace-muted);
+  font-size: 10px;
+}
+
+.analysis-ledger__list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.analysis-ledger-entry {
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 6px;
+  background: #091426;
+}
+
+.analysis-ledger-entry--active {
+  border-color: #fbbf24;
+  box-shadow: inset 3px 0 0 #fbbf24;
+}
+
+.analysis-ledger-entry__header strong {
+  overflow: hidden;
+  color: #dbeafe;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysis-ledger-entry__header span {
+  padding: 2px 6px;
+  border: 1px solid #315070;
+  border-radius: 999px;
+  color: #bfdbfe;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.analysis-ledger-entry__header span[data-status='failed'] {
+  border-color: #7f1d1d;
+  color: #fecaca;
+}
+
+.analysis-ledger-entry p {
+  margin: 0;
+  color: var(--workspace-muted);
+  font-size: 10px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.analysis-ledger-entry__actions,
+.analysis-ledger-export {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.analysis-ledger-entry__actions button,
+.analysis-ledger-comparison button,
+.analysis-ledger-export button {
+  border: 1px solid #315070;
+  border-radius: 4px;
+  padding: 6px 8px;
+  background: #0f1d31;
+  color: #dbeafe;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.analysis-ledger-entry__actions button[aria-pressed='true'] {
+  border-color: #60a5fa;
+  background: #17345b;
+  color: #fff;
+}
+
+.analysis-ledger-entry__actions button:hover,
+.analysis-ledger-entry__actions button:focus-visible,
+.analysis-ledger-comparison button:hover,
+.analysis-ledger-comparison button:focus-visible,
+.analysis-ledger-export button:hover,
+.analysis-ledger-export button:focus-visible {
+  border-color: #60a5fa;
+  outline: 2px solid rgba(96, 165, 250, 0.3);
+  outline-offset: 1px;
+}
+
+.analysis-ledger-export button:disabled {
+  border-color: #334155;
+  background: #172033;
+  color: #718096;
+  cursor: not-allowed;
+}
+
+.analysis-ledger-comparison {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 6px;
+  background: #060b14;
+}
+
+.analysis-ledger-comparison > p {
+  margin: 0;
+  color: var(--workspace-muted);
+  font-size: 10px;
+}
+
+.analysis-ledger-comparison__rows {
+  display: grid;
+  max-height: 220px;
+  overflow: auto;
+  border-top: 1px solid var(--workspace-border);
+}
+
+.analysis-ledger-comparison__row {
+  display: grid;
+  gap: 3px;
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(30, 41, 59, 0.75);
+}
+
+.analysis-ledger-comparison__row strong,
+.analysis-ledger-comparison__row span {
+  overflow-wrap: anywhere;
+  font-size: 9px;
+}
+
+.analysis-ledger-comparison__row strong {
+  color: #bfdbfe;
+}
+
+.analysis-ledger-comparison__row span {
+  color: var(--workspace-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.analysis-ledger-comparison__row[data-comparison-status='changed'] {
+  box-shadow: inset 2px 0 0 #fbbf24;
+  padding-left: 7px;
+}
+
+.analysis-ledger-export {
+  margin-top: 10px;
+}
+
+.analysis-ledger-export output {
+  flex: 1 1 100%;
+  padding: 7px;
+  border-radius: 4px;
+  background: #060b14;
+  color: #bfdbfe;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  overflow-wrap: anywhere;
+}

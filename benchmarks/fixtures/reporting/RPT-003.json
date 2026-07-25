@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "RPT-003",
+  "title": "NOT_QUALIFIED report headline has no clean PASS claim",
+  "module": "reporting",
+  "solverExport": "createNotQualifiedReportHeadline",
+  "methodId": "REPORT_MARKDOWN_CALC_SHEET",
+  "iconId": "report-warning",
+  "input": {
+    "reportPayload": {
+      "title": "Nozzle check",
+      "module": "piperack",
+      "methodId": "MIST_NOZZLE_SCREENING",
+      "formulaIds": [
+        "MIST_VENDOR_LOAD_SCREENING"
+      ],
+      "unitSystem": "imperial",
+      "benchmarkStatus": "FAILED"
+    }
+  },
+  "expected": {
+    "status": "NOT_QUALIFIED",
+    "headline": "NOT_QUALIFIED \u2014 Calculation Not Qualified",
+    "cleanPassClaim": false
+  },
+  "compare": {
+    "mode": "rounded-zero-error",
+    "roundDecimals": 12,
+    "requiredStatus": "NOT_QUALIFIED"
+  }
+}

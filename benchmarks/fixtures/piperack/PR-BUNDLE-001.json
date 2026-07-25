@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "PR-BUNDLE-001",
+  "title": "Pipe rack bundle method \u2014 friction factor 0.3",
+  "module": "piperack-expansion-loop",
+  "solverExport": "runPipeRackBundleBenchmark",
+  "methodId": "PIPERACK_LOOP_ORDER",
+  "iconId": "friction",
+  "input": {
+    "targetLineId": "L10",
+    "lines": [
+      {
+        "id": "L10",
+        "sizeNps": 10,
+        "schedule": "40",
+        "material": "Carbon Steel",
+        "tOperate": 500
+      }
+    ],
+    "globalSettings": {
+      "anchorDistanceFt": 200,
+      "allowableStressPsi": 20000,
+      "constantsSource": "fixture",
+      "strictData": true,
+      "defaultSpacingFt": 2.5,
+      "defaultSpacingSource": "fixture"
+    },
+    "methodology": "2D_BUNDLE",
+    "globalInputs": {
+      "constantsSource": "fixture",
+      "frictionFactor": 0.3
+    }
+  },
+  "expected": {
+    "status": "PASSED",
+    "lineId": "L10",
+    "L_req_ft": 43.24616258265
+  },
+  "compare": {
+    "mode": "rounded-zero-error",
+    "roundDecimals": 12,
+    "requiredStatus": "PASSED"
+  }
+}

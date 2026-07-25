@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "GC3D-COMBINE-001",
+  "title": "GC3D node stress SRSS combination",
+  "module": "3d-guided-cantilever",
+  "solverExport": "combineNodeStress",
+  "methodId": "GC_BASIC_12EI",
+  "iconId": "stress-combine",
+  "input": { "components": [5000, 12000] },
+  "expected": { "combined": 13000 },
+  "compare": { "mode": "rounded-zero-error", "roundDecimals": 12, "requiredStatus": "PASSED" }
+}

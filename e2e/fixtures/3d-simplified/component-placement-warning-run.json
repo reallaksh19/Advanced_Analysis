@@ -1,0 +1,72 @@
+{
+  "caseId": "SLICE-R-COMPONENT-PLACEMENT-WARNING-RUN",
+  "description": "Verifies that splitting a component with an extreme requested ratio correctly triggers the Sketcher clamping fallback, creating upstream/downstream pipe stubs while issuing a visible warning in the Segment Editor panel.",
+  "sketcher": {
+    "workingPlane": "XY",
+    "workingElevation": 0,
+    "designTemperature": 450,
+    "nodes": {
+      "N001": {
+        "pos": [0, 0, 0],
+        "type": "anchor",
+        "supportTag": "SUP-A",
+        "supportType": "anchor",
+        "frictionFactor": 0.3,
+        "restraint": { "x": true, "y": true, "z": true, "rx": false, "ry": false, "rz": false }
+      },
+      "N002": {
+        "pos": [1500, 0, 0],
+        "type": "support",
+        "supportTag": "SUP-B",
+        "supportType": "rest",
+        "frictionFactor": 0.3,
+        "restraint": { "x": false, "y": true, "z": true, "rx": false, "ry": false, "rz": false }
+      }
+    },
+    "segments": [
+      {
+        "id": "S001",
+        "startNode": "N001",
+        "endNode": "N002",
+        "type": "PIPE",
+        "properties": {
+          "type": "PIPE",
+          "dn_mm": 100,
+          "nps": "4",
+          "schedule": "STD",
+          "od_mm": 114.3,
+          "wall_mm": 6.02,
+          "material": "CARBON STEEL",
+          "materialDensity_kg_m3": 7850,
+          "ratingClass": 150,
+          "designTemperature_C": 232.2,
+          "designPressure_barg": 12.5,
+          "fluidDensity_kg_m3": 850,
+          "insulationThickness_mm": 50,
+          "insulationDensity_kg_m3": 120,
+          "componentWeight_kg": 0,
+          "componentLength_mm": 1500
+        }
+      }
+    ]
+  },
+  "placement": {
+    "testId": "sketcher-place-component-valve",
+    "rowId": "MDB-VALVE-4IN-150-CS-001",
+    "requestedRatio": 5
+  },
+  "expected": {
+    "validationStatus": "READY",
+    "nodes": 4,
+    "segments": 3,
+    "supports": 2,
+    "masterDbRowId": "MDB-VALVE-4IN-150-CS-001",
+    "componentLength_mm": 300,
+    "warningVisible": true,
+    "requestedText": "Requested ratio: 5",
+    "actualText": "Actual ratio: 0.899333",
+    "minStubText": "Minimum pipe stub: 1 mm",
+    "startDistanceText": "Start distance: 1199 mm",
+    "endDistanceText": "End distance: 1499 mm"
+  }
+}

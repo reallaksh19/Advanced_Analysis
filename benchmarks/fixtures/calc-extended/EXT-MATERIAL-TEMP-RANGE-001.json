@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "EXT-MATERIAL-TEMP-RANGE-001",
+  "title": "Material temperature out of verified range",
+  "module": "engineering-data",
+  "solverExport": "runMaterialDataLookupBenchmark",
+  "methodId": "MATERIAL_DATA_LOOKUP",
+  "iconId": "material-data",
+  "input": { "materialId": "CS_A106B", "temperature_F": 1200 },
+  "expected": {
+    "status": "MISSING_DATA",
+    "isQualified": false,
+    "methodId": "MATERIAL_DATA_LOOKUP",
+    "formulaIds": ["MATERIAL_PROPERTY_LOOKUP"],
+    "diagnostics": [{ "code": "MATERIAL_TEMPERATURE_OUT_OF_RANGE", "severity": "ERROR" }]
+  },
+  "compare": { "mode": "rounded-zero-error", "roundDecimals": 12, "requiredStatus": "MISSING_DATA" }
+}

@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import { calculateLocalTrunnionFootprint } from '../src/core/local-trunnion-footprint/index.js';
+import { workflowSource } from './lafea.5-fixtures.mjs';
+
+const result=calculateLocalTrunnionFootprint(workflowSource());
+assert.equal(result.qualification.state,'ACCEPTED');
+assert.equal(result.assessmentRegionResults.length,4);
+const footprint=result.assessmentRegionResults.find((row)=>row.classification==='FOOTPRINT_ADJACENT');
+const near=result.assessmentRegionResults.find((row)=>row.classification==='NEAR_FIELD');
+assert.equal(footprint.loadIntroductionSensitive,true);
+assert.equal(near.loadIntroductionSensitive,false);
+assert.ok(footprint.records.every((row)=>row.loadCaseId&&row.elementId&&row.integrationPointId&&row.surface));
+assert.ok(footprint.records.every((row)=>row.membraneStress&&row.bendingStress&&row.combinedStress));
+assert.ok(new Set(near.records.map((row)=>row.elementId)).size>=2);
+assert.ok(footprint.records.some((row)=>near.records.some((other)=>other.elementId===row.elementId&&other.integrationPointId===row.integrationPointId&&other.surface===row.surface)));
+const max=Math.max(...footprint.records.map((row)=>row.vonMises));
+assert.equal(footprint.governingRecord.vonMises,max);
+assert.equal(footprint.authority,'RAW_LAFEA4_ELEMENT_INTEGRATION_POINT_SURFACE_STRESS');
+assert.ok(!JSON.stringify(result.assessmentRegionResults).match(/averag|smooth|extrapolat/i));
+console.log('LAFEA.5 raw stress provenance, overlapping regions and deterministic governing selection passed.');

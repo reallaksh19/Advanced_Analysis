@@ -1,0 +1,21 @@
+{
+  "caseId": "pr-loop-003",
+  "title": "Missing Material and Size",
+  "module": "piperack-expansion-loop",
+  "engineeringLevel": "DESIGN_AID_SCREENING",
+  "description": "Loop layout check with missing material and size.",
+  "input": {
+    "globalSettings": {
+      "anchorDistanceFt": 200,
+      "defaultSpacingFt": 2.5,
+      "allowableStressPsi": 20000
+    },
+    "methodology": "FLUOR",
+    "lines": [
+      {
+        "id": "L1",
+        "tOperate": 300
+      }
+    ]
+  }
+}

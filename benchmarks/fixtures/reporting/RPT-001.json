@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "RPT-001",
+  "title": "Deterministic JSON report snapshot hash stable",
+  "module": "reporting",
+  "solverExport": "createReportJsonSnapshot",
+  "methodId": "REPORT_DETERMINISTIC_JSON",
+  "iconId": "report-json",
+  "input": {
+    "reportPayload": {
+      "title": "RPT deterministic benchmark",
+      "module": "piperack",
+      "status": "PASSED",
+      "methodId": "PIPERACK_LOOP_ORDER",
+      "formulaIds": [
+        "PIPERACK_LOOP_REQUIRED_LEG"
+      ],
+      "unitSystem": "imperial",
+      "inputs": {
+        "lineId": "L10"
+      },
+      "engineeringDataSource": {
+        "pipe": "internal"
+      },
+      "formulaExpressions": [
+        "L_req_ft = sqrt(3*E*OD*delta/(144*S_allow))"
+      ],
+      "substitutions": {
+        "delta": 3.62
+      },
+      "results": {
+        "L_req_ft": 33.266278909731
+      },
+      "benchmarkStatus": "PASSED",
+      "warnings": [
+        {
+          "message": "screening only"
+        }
+      ]
+    }
+  },
+  "expected": {
+    "status": "PASSED",
+    "stableHash": "d7e7d390",
+    "timestampExcluded": true
+  },
+  "compare": {
+    "mode": "rounded-zero-error",
+    "roundDecimals": 12,
+    "requiredStatus": "PASSED"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "RPT-MISSING-PIPE-DATA-001",
+  "title": "Report proof — missing pipe data",
+  "module": "reporting",
+  "solverExport": "createReportMarkdownCalcSheet",
+  "methodId": "REPORT_MARKDOWN_CALC_SHEET",
+  "iconId": "report-warning",
+  "input": {
+    "reportPayload": {
+      "title": "Pipe Rack Missing Data Report",
+      "module": "piperack-expansion-loop",
+      "status": "MISSING_DATA",
+      "methodId": "PIPERACK_LOOP_ORDER",
+      "formulaIds": ["PIPERACK_LOOP_REQUIRED_LEG"],
+      "unitSystem": "imperial",
+      "benchmarkStatus": "FAILED",
+      "diagnostics": [{ "code": "PIPE_DATA_MISSING", "severity": "ERROR", "message": "Pipe property missing for NPS 22 Schedule 40." }]
+    }
+  },
+  "expected": {
+    "status": "MISSING_DATA",
+    "methodId": "REPORT_MARKDOWN_CALC_SHEET",
+    "formulaIds": ["REPORT_MARKDOWN_CALC_SHEET"],
+    "containsStatus": true,
+    "containsMethodId": true,
+    "containsFormulaId": true,
+    "containsUnits": true,
+    "containsBlockingDiagnostic": true,
+    "noCleanPassClaim": true,
+    "isCriticalStatus": true
+  },
+  "compare": { "mode": "rounded-zero-error", "roundDecimals": 12, "requiredStatus": "MISSING_DATA" }
+}

@@ -1,0 +1,257 @@
+{
+  "spl2_simp_logic.js": {
+    "functions": [
+      "interpolateValue",
+      "calculateSimplified"
+    ],
+    "inputs": [
+      "inp_mat",
+      "out_dy",
+      "out_stress",
+      "inp_sa",
+      "inp_lz",
+      "inp_temp",
+      "inp_lx",
+      "out_ec",
+      "out_moment",
+      "out_status",
+      "out_dx",
+      "out_dz",
+      "inp_nps",
+      "out_d",
+      "out_t",
+      "inp_sch",
+      "inp_ly",
+      "out_exp",
+      "btn_run"
+    ],
+    "formulas": [
+      [
+        "npsList",
+        "Object.keys(SPL2_DB.pipe_schedules)\n        .sort((a, b) => {\n            const getVal = (v) => parseFloat(v.replace(/[^0-9.]/g, '')) || 0"
+      ],
+      [
+        "value",
+        "nps"
+      ],
+      [
+        "textContent",
+        "nps"
+      ],
+      [
+        "matList",
+        "Object.keys(SPL2_DB.modulus.values)"
+      ],
+      [
+        "value",
+        "mat"
+      ],
+      [
+        "textContent",
+        "mat"
+      ],
+      [
+        "selected",
+        "inpNps.value"
+      ],
+      [
+        "schDict",
+        "SPL2_DB.pipe_schedules[selected]?.schedules || {}"
+      ],
+      [
+        "innerHTML",
+        "''"
+      ],
+      [
+        "value",
+        "sch"
+      ]
+    ]
+  },
+  "spl2_loop_logic.js": {
+    "functions": [
+      "calculateLoop",
+      "interpolateValue"
+    ],
+    "inputs": [
+      "inp_mat",
+      "out_centroid",
+      "inp_s",
+      "inp_temp",
+      "out_ec",
+      "inp_h",
+      "out_beta",
+      "out_l",
+      "btn_run",
+      "inp_w",
+      "inp_g",
+      "inp_nps",
+      "out_d",
+      "out_r",
+      "out_t",
+      "inp_sch",
+      "out_k",
+      "out_i",
+      "out_z",
+      "out_exp",
+      "inp_stress",
+      "out_h"
+    ],
+    "formulas": [
+      [
+        "npsList",
+        "Object.keys(SPL2_DB.pipe_schedules)\n        .sort((a, b) => {\n            const getVal = (v) => parseFloat(v.replace(/[^0-9.]/g, '')) || 0"
+      ],
+      [
+        "value",
+        "nps"
+      ],
+      [
+        "textContent",
+        "nps"
+      ],
+      [
+        "matList",
+        "Object.keys(SPL2_DB.modulus.values)"
+      ],
+      [
+        "value",
+        "mat"
+      ],
+      [
+        "textContent",
+        "mat"
+      ],
+      [
+        "selected",
+        "inpNps.value"
+      ],
+      [
+        "schDict",
+        "SPL2_DB.pipe_schedules[selected]?.schedules || {}"
+      ],
+      [
+        "innerHTML",
+        "''"
+      ],
+      [
+        "value",
+        "sch"
+      ]
+    ]
+  },
+  "spl2_rack_logic.js": {
+    "functions": [
+      "calculateRackLoad"
+    ],
+    "inputs": [
+      "inp_insul",
+      "out_w_pipe",
+      "inp_sg",
+      "out_de",
+      "inp_sch",
+      "inp_spacing",
+      "out_w_insul",
+      "out_do",
+      "out_dt",
+      "inp_bents",
+      "out_w_test",
+      "out_w_cont",
+      "inp_wind",
+      "btn_run",
+      "inp_dens",
+      "out_w",
+      "inp_nps"
+    ],
+    "formulas": [
+      [
+        "npsList",
+        "Object.keys(SPL2_DB.pipe_schedules)\n        .sort((a, b) => {\n            const getVal = (v) => parseFloat(v.replace(/[^0-9.]/g, '')) || 0"
+      ],
+      [
+        "value",
+        "nps"
+      ],
+      [
+        "textContent",
+        "nps"
+      ],
+      [
+        "selected",
+        "inpNps.value"
+      ],
+      [
+        "schDict",
+        "SPL2_DB.pipe_schedules[selected]?.schedules || {}"
+      ],
+      [
+        "innerHTML",
+        "''"
+      ],
+      [
+        "value",
+        "sch"
+      ],
+      [
+        "textContent",
+        "sch"
+      ],
+      [
+        "d_mm",
+        "SPL2_DB.pipe_schedules[nps]?.od_mm || 0"
+      ],
+      [
+        "d_in",
+        "d_mm / 25.4"
+      ]
+    ]
+  },
+  "spl2_loop_algo.js": {
+    "functions": [
+      "calcLoopFromSpreadsheet"
+    ],
+    "inputs": [],
+    "formulas": [
+      [
+        "V23",
+        "D (in)\n    // V24 = t (in)\n    // V27 = R (bend radius) -> typically D * 1.5\n    // V30 = S (ft)\n    // V31 = G (ft)\n    // V32 = H (ft)\n    // V33 = W (ft)\n    // V21 = Ec (Msi)\n    // V22 = e (in/100ft) -> Extracted from C-1 usually\n\n    // Formula Mapping (V42 to V60):\n    // V42 (h): =V24*V27 / ((V23-V24)/2)^2\n    const R = D * 1.5"
+      ],
+      [
+        "h",
+        "(t * R) / Math.pow((D - t) / 2, 2)"
+      ],
+      [
+        "k",
+        "h === 0 ? 0 : 1.65 / h"
+      ],
+      [
+        "beta",
+        "h === 0 ? 0 : 0.9 / Math.pow(h, 2 / 3)"
+      ],
+      [
+        "L",
+        "2 * Math.PI * (R / 12) * k + 2 * H + G - 8 * (R / 12)"
+      ],
+      [
+        "Z_bar",
+        "L === 0 ? 0 : (Math.PI * (R / 12) * k + W + H - 4 * (R / 12)) * H / L"
+      ],
+      [
+        "AA",
+        "(2 * W + H - 6 * (R / 12)) * Math.pow(H, 2) / 2"
+      ],
+      [
+        "BB",
+        "Math.pow(H - 2 * (R / 12), 3) / 6"
+      ],
+      [
+        "CC",
+        "((Math.pow(H, 2) + 3 * Math.pow(R / 12, 2) - 2 * H * (R / 12)) * Math.PI / 4 + H * (R / 12) - 2 * Math.pow(R / 12, 2)) * 4 * (R / 12) * k"
+      ],
+      [
+        "Ix",
+        "AA + BB + CC - Math.pow(Z_bar, 2) * L"
+      ]
+    ]
+  }
+}

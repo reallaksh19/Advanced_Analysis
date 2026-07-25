@@ -1,0 +1,77 @@
+{
+  "description": "Pipe run entirely composed of elbows \u2014 checking SIF logic bounds.",
+  "input": {
+    "nodes": {
+      "A": {
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "type": "anchor"
+      },
+      "B": {
+        "pos": [
+          24,
+          0,
+          0
+        ],
+        "type": "node"
+      },
+      "C": {
+        "pos": [
+          24,
+          24,
+          0
+        ],
+        "type": "anchor"
+      }
+    },
+    "segments": [
+      {
+        "id": "S1",
+        "startNode": "A",
+        "endNode": "B",
+        "length_in": 24,
+        "od_in": 6.625,
+        "wt_in": 0.28,
+        "axis": "X",
+        "compType": "ELBOW",
+        "fittingData": {
+          "k": 1.5,
+          "i_i": 2.0,
+          "R_e": 9.0
+        }
+      },
+      {
+        "id": "S2",
+        "startNode": "B",
+        "endNode": "C",
+        "length_in": 24,
+        "od_in": 6.625,
+        "wt_in": 0.28,
+        "axis": "Y",
+        "compType": "ELBOW",
+        "fittingData": {
+          "k": 1.5,
+          "i_i": 2.0,
+          "R_e": 9.0
+        }
+      }
+    ],
+    "params": {
+      "deltaT_F": 300,
+      "E_psi": 29500000,
+      "alpha_in_in_F": 6.5e-06,
+      "Sc_psi": 20000,
+      "Sh_psi": 18000,
+      "f": 1.0
+    },
+    "includeSIF": true
+  },
+  "expected": {
+    "overallResult": "PASS",
+    "criticalRatio": 0.0,
+    "tolerance": 0.005
+  }
+}

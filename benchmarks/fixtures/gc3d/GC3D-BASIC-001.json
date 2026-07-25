@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "GC3D-BASIC-001",
+  "title": "GC3D basic guided cantilever",
+  "module": "3d-guided-cantilever",
+  "solverExport": "calcGuidedCantileverBasic",
+  "methodId": "GC_BASIC_12EI",
+  "iconId": "guided-cantilever",
+  "input": { "E_psi": 29000000, "I_in4": 100, "Z_in3": 25, "OD_in": 8.625, "delta_in": 1, "L_in": 120 },
+  "expected": { "F": 20138.888888888891, "M": 1208333.333333333489, "Sb": 48333.333333333343 },
+  "compare": { "mode": "rounded-zero-error", "roundDecimals": 12, "requiredStatus": "PASSED" }
+}

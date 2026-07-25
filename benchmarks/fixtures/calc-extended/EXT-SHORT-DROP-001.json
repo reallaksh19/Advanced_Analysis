@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "EXT-SHORT-DROP-001",
+  "title": "Calc Extended short vertical drop <= 3 ft ignored",
+  "module": "calc-extended",
+  "solverExport": "analyzeShortDropGeometry",
+  "methodId": "GC_ANCHOR_GUIDE_3EI",
+  "iconId": "short-drop-filter",
+  "input": {
+    "anchor1Id": "A1",
+    "anchor2Id": "A2",
+    "nodes": [
+      { "id": "A1", "x": 0, "y": 0, "z": 0 },
+      { "id": "N1", "x": 140, "y": 0, "z": 0 },
+      { "id": "N2", "x": 140, "y": 0, "z": 2.5 },
+      { "id": "A2", "x": 140, "y": 40, "z": 2.5 }
+    ],
+    "segments": [
+      { "id": "S1", "startNodeId": "A1", "endNodeId": "N1" },
+      { "id": "S2", "startNodeId": "N1", "endNodeId": "N2" },
+      { "id": "S3", "startNodeId": "N2", "endNodeId": "A2" }
+    ]
+  },
+  "expected": {
+    "shortDropLimit_ft": 3,
+    "shortDropsIgnored": 1,
+    "bX": 40,
+    "bY": 140,
+    "bZ": 180,
+    "unitSystem": { "coordinate": "ft" }
+  },
+  "compare": { "mode": "rounded-zero-error", "roundDecimals": 12, "requiredStatus": "PASSED" }
+}

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "GC3D-THERMAL-001",
+  "title": "GC3D thermal displacement",
+  "module": "3d-guided-cantilever",
+  "solverExport": "calcThermalDisplacement",
+  "methodId": "GC_BASIC_12EI",
+  "iconId": "thermal-growth",
+  "input": { "alpha_in_in_F": 0.0000065, "length_in": 1200, "deltaT_F": 30 },
+  "expected": { "delta": 0.234 },
+  "compare": { "mode": "rounded-zero-error", "roundDecimals": 12, "requiredStatus": "PASSED" }
+}

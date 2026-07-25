@@ -1,0 +1,95 @@
+{
+  "caseId": "SLICE-T-COMPONENT-PLACEMENT-DIAGNOSTIC-EXPORT-RUN",
+  "description": "Verifies exported Markdown and JSON reports include clamped component placement diagnostics.",
+  "componentButton": {
+    "testId": "sketcher-place-component-vfv",
+    "rowId": "MDB-VFV-4IN-150-CS-001",
+    "expectedSource": "SLICE-F-MASTER-DB-FIXTURE",
+    "expectedComponentLength_mm": 650,
+    "expectedComponentWeight_kg": 86,
+    "requestedPlacementPercent": 5,
+    "requestedPlacementRatio": 0.05,
+    "actualPlacementRatio": 0.108667,
+    "placementWasClamped": true,
+    "minimumPipeStub_mm": 1,
+    "expectedStartDistance_mm": 1,
+    "expectedEndDistance_mm": 651
+  },
+  "sketcher": {
+    "workingPlane": "XY",
+    "workingElevation": 0,
+    "designTemperature": 450,
+    "nodes": {
+      "N001": {
+        "pos": [0, 0, 0],
+        "type": "anchor",
+        "supportTag": "SUP-A",
+        "supportType": "anchor",
+        "frictionFactor": 0.3,
+        "restraint": {
+          "x": true,
+          "y": true,
+          "z": true,
+          "rx": false,
+          "ry": false,
+          "rz": false
+        }
+      },
+      "N002": {
+        "pos": [3000, 0, 0],
+        "type": "support",
+        "supportTag": "SUP-B",
+        "supportType": "rest",
+        "frictionFactor": 0.3,
+        "restraint": {
+          "x": false,
+          "y": true,
+          "z": true,
+          "rx": false,
+          "ry": false,
+          "rz": false
+        }
+      }
+    },
+    "segments": [
+      {
+        "id": "S001",
+        "startNode": "N001",
+        "endNode": "N002",
+        "type": "PIPE",
+        "properties": {
+          "type": "PIPE",
+          "dn_mm": 100,
+          "nps": "4",
+          "schedule": "STD",
+          "od_mm": 114.3,
+          "wall_mm": 6.02,
+          "material": "CARBON STEEL",
+          "materialDensity_kg_m3": 7850,
+          "ratingClass": 150,
+          "designTemperature_C": 232.2,
+          "designPressure_barg": 12.5,
+          "fluidDensity_kg_m3": 850,
+          "insulationThickness_mm": 50,
+          "insulationDensity_kg_m3": 120,
+          "componentWeight_kg": 0,
+          "componentLength_mm": 3000,
+          "propertySource": "SLICE-T-BASE-FIXTURE"
+        }
+      }
+    ]
+  },
+  "expected": {
+    "validationStatus": "READY",
+    "nodes": 4,
+    "segments": 3,
+    "supports": 2,
+    "reportId": "3DSC-SLICE-G-REPORT",
+    "markdownFilename": "3DSC-SLICE-G-REPORT.md",
+    "jsonFilename": "3DSC-SLICE-G-REPORT.json",
+    "diagnosticCode": "COMPONENT_PLACEMENT_CLAMPED",
+    "diagnosticSeverity": "warning",
+    "masterDbRowId": "MDB-VFV-4IN-150-CS-001",
+    "propertySource": "SLICE-F-MASTER-DB-FIXTURE"
+  }
+}

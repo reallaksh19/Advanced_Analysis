@@ -1,0 +1,13 @@
+{
+  "version": "calculation-report-v1",
+  "projectInfo": {
+    "name": "Benchmark Project"
+  },
+  "inputSource": "canonical",
+  "calculationMethod": "3D Guided Cantilever",
+  "results": {
+    "stress": "100 MPa"
+  },
+  "warnings": [],
+  "engineeringLimitationNote": "This calculation is a simplified screening/design-aid calculation. It is not a replacement for formal code-compliant pipe stress analysis."
+}

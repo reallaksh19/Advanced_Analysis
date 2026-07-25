@@ -1,0 +1,31 @@
+{
+  "caseId": "SLICE-C-MINIMAL-SKETCHER-PIPE-RUN",
+  "description": "Minimal exported Sketcher pipe run used only to prove Sketcher to 3D Simplified transfer.",
+  "sketcher": {
+    "workingPlane": "XY",
+    "workingElevation": 0,
+    "designTemperature": 450,
+    "nodes": {
+      "N001": { "pos": [0, 0, 0], "type": "anchor" },
+      "N002": { "pos": [3000, 0, 0], "type": "anchor" }
+    },
+    "segments": [
+      {
+        "id": "S001",
+        "startNode": "N001",
+        "endNode": "N002",
+        "type": "PIPE",
+        "properties": {
+          "type": "PIPE",
+          "bore": 100,
+          "wt": 6.02,
+          "material": "CARBON STEEL",
+          "materialDensity_kg_m3": 7850
+        }
+      }
+    ]
+  },
+  "expected": {
+    "validationStatus": "READY"
+  }
+}

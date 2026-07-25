@@ -1,0 +1,12 @@
+{
+  "caseId": "BM-3D-A",
+  "expected": {
+    "results": {
+      "axes": {
+        "Z": {
+          "bendingLeg": { "value": 360, "unit": "in" }
+        }
+      }
+    }
+  }
+}

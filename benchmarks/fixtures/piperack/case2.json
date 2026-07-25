@@ -1,0 +1,22 @@
+{
+  "caseId": "pr-loop-002",
+  "title": "Missing Temp Delta Warning",
+  "module": "piperack-expansion-loop",
+  "engineeringLevel": "DESIGN_AID_SCREENING",
+  "description": "Loop layout check with missing temp delta.",
+  "input": {
+    "globalSettings": {
+      "defaultSpacingFt": 2.5,
+      "allowableStressPsi": 20000
+    },
+    "methodology": "FLUOR",
+    "lines": [
+      {
+        "id": "L1",
+        "sizeNps": 6,
+        "material": "CS",
+        "tOperate": 300
+      }
+    ]
+  }
+}

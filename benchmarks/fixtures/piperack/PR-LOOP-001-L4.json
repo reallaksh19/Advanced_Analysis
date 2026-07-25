@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "PR-LOOP-001-L4",
+  "title": "Pipe rack line result \u2014 L4",
+  "module": "piperack-expansion-loop",
+  "solverExport": "runPipeRackLineBenchmark",
+  "methodId": "PIPERACK_LOOP_ORDER",
+  "iconId": "rack-line",
+  "input": {
+    "targetLineId": "L4",
+    "lines": [
+      {
+        "id": "L10",
+        "sizeNps": 10,
+        "schedule": "40",
+        "material": "Carbon Steel",
+        "tOperate": 500
+      },
+      {
+        "id": "L8",
+        "sizeNps": 8,
+        "schedule": "40",
+        "material": "Carbon Steel",
+        "tOperate": 300
+      },
+      {
+        "id": "L4",
+        "sizeNps": 4,
+        "schedule": "40",
+        "material": "Carbon Steel",
+        "tOperate": 150,
+        "materialProps": {
+          "expansionInPer100ft": 0.61,
+          "modulusPsi": 29038461.53849858
+        }
+      }
+    ],
+    "globalSettings": {
+      "anchorDistanceFt": 200,
+      "allowableStressPsi": 20000,
+      "constantsSource": "fixture",
+      "strictData": true,
+      "defaultSpacingFt": 2.5,
+      "defaultSpacingSource": "fixture"
+    },
+    "methodology": "FLUOR",
+    "globalInputs": {
+      "constantsSource": "fixture"
+    }
+  },
+  "expected": {
+    "status": "PASSED",
+    "lineId": "L4",
+    "delta": 0.61,
+    "loopOrder": 4.4103,
+    "L_req_ft": 9.112181460092
+  },
+  "compare": {
+    "mode": "rounded-zero-error",
+    "roundDecimals": 12,
+    "requiredStatus": "PASSED"
+  }
+}

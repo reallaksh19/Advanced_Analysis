@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "PR-PIPE-DATA-EXISTS-001",
+  "title": "Pipe data lookup exists — 8 in Sch 40",
+  "module": "engineering-data",
+  "solverExport": "runPipeDataLookupBenchmark",
+  "methodId": "PIPE_DATA_LOOKUP",
+  "iconId": "pipe-data",
+  "input": { "nps": 8, "schedule": "40" },
+  "expected": {
+    "status": "PASSED",
+    "isQualified": true,
+    "methodId": "PIPE_DATA_LOOKUP",
+    "formulaIds": ["PIPE_SECTION_I_HOLLOW_CIRCLE", "PIPE_SECTION_Z_I_OVER_C"],
+    "od_in": 8.625,
+    "wall_in": 0.322,
+    "id_in": 7.981,
+    "I_in4": 72.489240602574,
+    "Z_in3": 16.809099270162
+  },
+  "compare": { "mode": "rounded-zero-error", "roundDecimals": 12, "requiredStatus": "PASSED" }
+}

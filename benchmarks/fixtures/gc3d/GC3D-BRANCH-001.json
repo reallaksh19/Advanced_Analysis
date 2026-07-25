@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "GC3D-BRANCH-001",
+  "title": "GC3D unsupported branch must not return clean pass",
+  "module": "3d-guided-cantilever",
+  "solverExport": "solveGC3D",
+  "methodId": "GC_BASIC_12EI",
+  "iconId": "3d-route",
+  "input": {
+    "nodes": {
+      "A": { "pos": [0, 0, 0], "type": "anchor" },
+      "B": { "pos": [120, 0, 0], "type": "tee" },
+      "C": { "pos": [120, 120, 0], "type": "anchor" }
+    },
+    "segments": [
+      { "id": "S1", "startNode": "A", "endNode": "B", "length_in": 120, "od_in": 6.625, "wt_in": 0.28, "axis": "X", "compType": "PIPE" },
+      { "id": "S2", "startNode": "B", "endNode": "C", "length_in": 120, "od_in": 6.625, "wt_in": 0.28, "axis": "Y", "compType": "BRANCH" }
+    ],
+    "params": { "deltaT_F": 100, "E_psi": 29000000, "alpha_in_in_F": 0.000006, "Sc_psi": 20000, "Sh_psi": 20000, "f": 1 }
+  },
+  "expected": { "status": "UNSUPPORTED_GEOMETRY" },
+  "compare": { "mode": "rounded-zero-error", "roundDecimals": 12, "requiredStatus": "UNSUPPORTED_GEOMETRY" }
+}

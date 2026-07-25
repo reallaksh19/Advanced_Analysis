@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "spl2-benchmark-v1",
+  "id": "SPL2-L-BEND-001",
+  "title": "Legacy SPL2 L-bend screening benchmark placeholder",
+  "source": "public/spl2-bundle retained as legacy benchmark oracle; numeric workbook parity to be filled after formal extraction",
+  "geometryType": "L_SHAPE",
+  "status": "PENDING_NUMERIC_EXTRACTION",
+  "input": {
+    "unit": "mm",
+    "segments": [
+      { "id": "S1", "start": [0, 0], "end": [6000, 0] },
+      { "id": "S2", "start": [6000, 0], "end": [6000, 3000] }
+    ],
+    "params": { "OD_mm": 273, "alpha_mm_per_m_C": 0.012, "C": 20 }
+  },
+  "expected": {
+    "resultStatus": "PENDING",
+    "tolerancePct": 3
+  },
+  "notes": [
+    "Phase 5 creates fixture structure only. Populate expected values from SPL2/workbook before claiming benchmark parity."
+  ]
+}

@@ -1,0 +1,69 @@
+.viewport-toolbar__status {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
+.viewport-toolbar__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.viewport-toolbar__actions button {
+  border: 1px solid #315070;
+  border-radius: 4px;
+  padding: 6px 9px;
+  background: #0a1322;
+  color: var(--workspace-text);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.viewport-toolbar__actions button:hover,
+.viewport-toolbar__actions button:focus-visible {
+  border-color: var(--workspace-accent);
+  background: #111c2e;
+  outline: none;
+}
+
+.viewport-stage {
+  isolation: isolate;
+}
+
+.viewport-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.viewport-stage[data-viewport-fallback='true']::after {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  padding: 4px 7px;
+  border: 1px solid #315070;
+  border-radius: 999px;
+  background: rgba(6, 11, 20, 0.86);
+  color: var(--workspace-muted);
+  content: 'Canvas fallback';
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 760px) {
+  .viewport-toolbar {
+    align-items: flex-start;
+  }
+
+  .viewport-toolbar__status {
+    justify-items: stretch;
+  }
+
+  .viewport-toolbar__actions {
+    flex-wrap: wrap;
+  }
+}

@@ -1,0 +1,6 @@
+import { semanticHash } from '../shared-piping-model/index.js';
+export function reconstructContinuumResultHashes(result){const payload={...result};delete payload.semanticHashes;return {sourceEvidenceSemanticHash:result.sourceAncestry?.sourceEvidenceSemanticHash??null,canonicalModelSemanticHash:result.canonicalModelSemanticHash??null,loadCaseInputSemanticHash:loadCaseInputHash(result),resultPayloadSemanticHash:semanticHash(payload),executionEvidenceHash:semanticHash(executionEvidence(result)),qualificationEvidenceHash:semanticHash(qualificationEvidence(result))};}
+export function attachContinuumResultHashes(result){return {...result,semanticHashes:reconstructContinuumResultHashes(result)};}
+function loadCaseInputHash(result){if(!result.loadCaseResults)return null;return semanticHash(result.loadCaseResults.map((row)=>({loadCaseId:row.loadCaseId,loadCaseInputSemanticHash:row.loadCaseInputSemanticHash})));}
+function executionEvidence(result){return {meshEvidence:result.meshEvidence??null,loadCaseResults:result.loadCaseResults??null,formulaTrace:result.formulaTrace,diagnostics:result.diagnostics};}
+function qualificationEvidence(result){return {qualification:result.qualification,limitations:result.limitations,diagnostics:result.diagnostics};}

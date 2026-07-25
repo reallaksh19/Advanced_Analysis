@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "PR-PIPE-DATA-MISSING-001",
+  "title": "Pipe data lookup missing — no fallback",
+  "module": "engineering-data",
+  "solverExport": "runPipeDataLookupBenchmark",
+  "methodId": "PIPE_DATA_LOOKUP",
+  "iconId": "pipe-data",
+  "input": { "nps": 22, "schedule": "40" },
+  "expected": {
+    "status": "MISSING_DATA",
+    "isQualified": false,
+    "methodId": "PIPE_DATA_LOOKUP",
+    "formulaIds": ["PIPE_SECTION_I_HOLLOW_CIRCLE", "PIPE_SECTION_Z_I_OVER_C"],
+    "diagnostics": [{ "code": "PIPE_DATA_MISSING", "severity": "ERROR" }]
+  },
+  "compare": { "mode": "rounded-zero-error", "roundDecimals": 12, "requiredStatus": "MISSING_DATA" }
+}

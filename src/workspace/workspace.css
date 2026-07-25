@@ -1,0 +1,372 @@
+:root {
+  color-scheme: dark;
+  --workspace-border: #1e293b;
+  --workspace-panel: #08111f;
+  --workspace-panel-strong: #060b14;
+  --workspace-canvas: #020711;
+  --workspace-text: #e5eefb;
+  --workspace-muted: #8ca0b8;
+  --workspace-accent: #60a5fa;
+}
+
+.workspace-shell {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr) 350px;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--workspace-canvas);
+  color: var(--workspace-text);
+}
+
+.workspace-panel {
+  min-width: 0;
+  min-height: 0;
+}
+
+.tree-panel,
+.properties-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--workspace-panel);
+}
+
+.tree-panel {
+  border-right: 1px solid var(--workspace-border);
+}
+
+.properties-panel {
+  border-left: 1px solid var(--workspace-border);
+}
+
+.panel-header,
+.viewport-toolbar {
+  flex: 0 0 auto;
+  padding: 16px;
+  border-bottom: 1px solid var(--workspace-border);
+  background: var(--workspace-panel-strong);
+}
+
+.panel-header h1,
+.panel-header h2,
+.viewport-toolbar h2 {
+  margin: 4px 0 0;
+  font-size: 16px;
+  line-height: 1.25;
+}
+
+.panel-eyebrow {
+  color: var(--workspace-accent);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.layer-summary {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--workspace-border);
+}
+
+.layer-summary span {
+  padding: 3px 7px;
+  border: 1px solid #315070;
+  border-radius: 999px;
+  color: #bfdbfe;
+  font-size: 11px;
+}
+
+.tree-list,
+.properties-content {
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+}
+
+.tree-entity {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  width: 100%;
+  margin: 0 0 6px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: 10px;
+  background: #0a1322;
+  color: var(--workspace-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.tree-entity:hover,
+.tree-entity:focus-visible {
+  border-color: #315070;
+  background: #111c2e;
+  outline: none;
+}
+
+.tree-entity--selected,
+.tree-entity[aria-current="true"] {
+  border-color: #fbbf24;
+  background: #1d2433;
+  box-shadow: inset 3px 0 0 #fbbf24;
+}
+
+.tree-entity--selected .tree-entity__type,
+.tree-entity[aria-current="true"] .tree-entity__type {
+  color: #fde68a;
+}
+
+.tree-entity__identity {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-entity__type {
+  color: var(--workspace-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.viewport-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: var(--workspace-canvas);
+}
+
+.viewport-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.viewport-toolbar output,
+.viewport-footer {
+  color: var(--workspace-muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+}
+
+.viewport-stage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background-image:
+    linear-gradient(rgba(96, 165, 250, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(96, 165, 250, 0.06) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.viewport-placeholder {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  display: grid;
+  gap: 6px;
+  transform: translate(-50%, -50%);
+  color: var(--workspace-muted);
+  text-align: center;
+}
+
+.viewport-placeholder strong {
+  color: var(--workspace-text);
+  font-size: 18px;
+}
+
+.viewport-footer {
+  padding: 9px 14px;
+  border-top: 1px solid var(--workspace-border);
+  background: var(--workspace-panel-strong);
+}
+
+.properties-selection {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--workspace-border);
+}
+
+.properties-selection span,
+.properties-selection em {
+  color: var(--workspace-muted);
+  font-size: 11px;
+}
+
+.properties-selection strong {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.properties-grid {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.8fr) minmax(0, 1.2fr);
+  margin: 0;
+  padding: 12px 0;
+}
+
+.properties-grid dt,
+.properties-grid dd {
+  margin: 0;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(30, 41, 59, 0.75);
+  overflow-wrap: anywhere;
+}
+
+.properties-grid dt {
+  color: var(--workspace-muted);
+}
+
+.properties-grid dd {
+  color: var(--workspace-text);
+  font-weight: 700;
+}
+
+.panel-empty {
+  color: var(--workspace-muted);
+  line-height: 1.5;
+}
+
+.analysis-capabilities,
+.analysis-result {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--workspace-border);
+}
+
+.analysis-capabilities h3,
+.analysis-result h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+
+.analysis-capability {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 6px;
+  background: #091426;
+}
+
+.analysis-capability p,
+.analysis-capability__reason {
+  margin: 0;
+  color: var(--workspace-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.analysis-capability__reason {
+  color: #fca5a5;
+}
+
+.analysis-action {
+  width: 100%;
+  border: 1px solid #2563eb;
+  border-radius: 5px;
+  padding: 10px 12px;
+  background: #1d4ed8;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.analysis-action:hover,
+.analysis-action:focus-visible {
+  background: #2563eb;
+  outline: 2px solid rgba(96, 165, 250, 0.45);
+  outline-offset: 2px;
+}
+
+.analysis-action:disabled {
+  border-color: #334155;
+  background: #172033;
+  color: #718096;
+  cursor: not-allowed;
+}
+
+.analysis-result output {
+  display: block;
+  padding: 9px;
+  border-radius: 5px;
+  background: #060b14;
+  color: #bfdbfe;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+}
+
+.analysis-error {
+  padding: 10px;
+  border: 1px solid #7f1d1d;
+  border-radius: 5px;
+  background: rgba(127, 29, 29, 0.22);
+  color: #fecaca;
+  line-height: 1.45;
+}
+
+/* Sketcher 3D Verification Overlay */
+.sketcher-stage {
+  position: relative;
+}
+
+.sketcher-3d-card {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 320px;
+  height: 240px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid #2563eb;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.sketcher-3d-header {
+  padding: 6px 12px;
+  background: rgba(37, 99, 235, 0.25);
+  border-bottom: 1px solid rgba(37, 99, 235, 0.4);
+  color: #60a5fa;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sketcher-3d-host {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+  background: #020711;
+}
+
+
+@media (max-width: 1100px) {
+  .workspace-shell {
+    grid-template-columns: 240px minmax(0, 1fr) 300px;
+  }
+}
+
+@media (max-width: 760px) {
+  .workspace-shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(200px, 28vh) minmax(360px, 1fr) minmax(240px, 34vh);
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .tree-panel,
+  .properties-panel {
+    border: 0;
+    border-bottom: 1px solid var(--workspace-border);
+  }
+}

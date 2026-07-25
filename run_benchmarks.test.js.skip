@@ -1,0 +1,112 @@
+import { runExtendedSolver } from './src/calc-extended/solver/ExtendedSolver.js';
+import { solvePipeRack } from './src/piperack/solver/PipeRackSolver.js';
+
+const runBM1 = () => {
+    const nodes = [
+        { id: 'A', x: 0, y: 0, z: 0 },
+        { id: 'B', x: 393.701, y: 0, z: 0 },
+        { id: 'C', x: 393.701, y: 196.85, z: 0 }
+    ];
+
+    const segments = [
+        { id: 'S1', startNodeId: 'A', endNodeId: 'B' },
+        { id: 'S2', startNodeId: 'B', endNodeId: 'C' }
+    ];
+
+    const payloadFLUOR = {
+        nodes,
+        segments,
+        anchors: { anchor1: 'A', anchor2: 'C' },
+        inputs: {
+            material: 'Carbon Steel',
+            sizeNps: 8,
+            schedule: '40',
+            tOperate: 302, // 150 C
+            frictionFactor: 0.3,
+            corrosionAllowance: 0.125,
+            millTolerance: 12.5
+        },
+        methodology: 'FLUOR'
+    };
+
+    const payload2D = { ...payloadFLUOR, methodology: '2D_BUNDLE' };
+
+    const resF = runExtendedSolver(payloadFLUOR);
+    const res2D = runExtendedSolver(payload2D);
+
+    console.log("=== BM1: L-Bend ===");
+    console.log("FLUOR Output X-Ax: Stress =", resF.axes.X.stress.toFixed(2), "psi, Delta =", resF.axes.X.delta.toFixed(4), "in");
+    console.log("2D_BD Output X-Ax: Stress =", res2D.axes.X.stress.toFixed(2), "psi, Delta =", res2D.axes.X.delta.toFixed(4), "in");
+};
+
+const runBM2 = () => {
+    const nodes = [
+        { id: 'A', x: 0, y: 0, z: 0 },
+        { id: 'B', x: 0, y: 240, z: 0 }, // 20ft = 240in
+        { id: 'C', x: 120, y: 240, z: 0 }, // 10ft = 120in
+        { id: 'D', x: 120, y: 480, z: 0 } // 40ft = 480in
+    ];
+
+    const segments = [
+        { id: 'S1', startNodeId: 'A', endNodeId: 'B' },
+        { id: 'S2', startNodeId: 'B', endNodeId: 'C' },
+        { id: 'S3', startNodeId: 'C', endNodeId: 'D' }
+    ];
+
+    const payloadFLUOR = {
+        nodes,
+        segments,
+        anchors: { anchor1: 'A', anchor2: 'D' },
+        inputs: {
+            material: 'Austenitic Stainless Steel 18 Cr 8 Ni',
+            sizeNps: 8,
+            schedule: '40',
+            tOperate: 400,
+            frictionFactor: 0.3,
+            corrosionAllowance: 0.125,
+            millTolerance: 12.5
+        },
+        methodology: 'FLUOR'
+    };
+
+    const payload2D = { ...payloadFLUOR, methodology: '2D_BUNDLE' };
+
+    const resF = runExtendedSolver(payloadFLUOR);
+    const res2D = runExtendedSolver(payload2D);
+
+    console.log("=== BM2: Z-Bend ===");
+    console.log("FLUOR Output Y-Ax: Stress =", resF.axes.Y.stress.toFixed(2), "psi");
+    console.log("2D_BD Output Y-Ax: Stress =", res2D.axes.Y.stress.toFixed(2), "psi");
+};
+
+const runPipeRackBM = () => {
+    const globalSettings = {
+        anchorDistanceFt: 100, // 50 + 50
+        defaultSpacingFt: 2.5,
+        allowableStressPsi: 20000
+    };
+
+    const lines = [
+        {
+            id: 'L1',
+            sizeNps: 8,
+            schedule: '40',
+            material: 'Carbon Steel',
+            tOperate: 572,
+            hasVessel: false
+        }
+    ];
+
+    const globalInputs = { frictionFactor: 0.3 };
+
+    const resF = solvePipeRack(lines, globalSettings, 'FLUOR', globalInputs);
+    const res2D = solvePipeRack(lines, globalSettings, '2D_BUNDLE', globalInputs);
+
+    console.log("=== BM3: U-Loop (Pipe Rack) ===");
+    console.log("FLUOR Dimensions: W=", resF.lines[0].dimensions.W_ft.toFixed(2), "H=", resF.lines[0].dimensions.H_ft.toFixed(2), "Req L=", resF.lines[0].dimensions.L_req_ft.toFixed(2));
+    console.log("2D_BD Dimensions: W=", res2D.lines[0].dimensions.W_ft.toFixed(2), "H=", res2D.lines[0].dimensions.H_ft.toFixed(2), "Req L=", res2D.lines[0].dimensions.L_req_ft.toFixed(2));
+}
+
+runBM1();
+runBM2();
+runPipeRackBM();

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "EXT-MIST-001",
+  "title": "Calc Extended MIST/nozzle check is not qualified without vendor loads",
+  "module": "calc-extended",
+  "solverExport": "calcMistNozzleQualification",
+  "methodId": "MIST_NOZZLE_SCREENING",
+  "iconId": "mist-nozzle",
+  "input": { "vendorLoads": null },
+  "expected": {
+    "status": "NOT_QUALIFIED",
+    "isQualified": false,
+    "diagnostic": "Vendor nozzle loads missing: F_r, M_l, M_c are required for qualified MIST/nozzle check."
+  },
+  "compare": { "mode": "rounded-zero-error", "roundDecimals": 12, "requiredStatus": "NOT_QUALIFIED" }
+}

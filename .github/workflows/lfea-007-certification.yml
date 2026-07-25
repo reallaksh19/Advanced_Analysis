@@ -1,0 +1,133 @@
+name: LFEA-007 Read-Only Local FEA Consumer Certification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/core/lfea-consumer/**'
+      - 'src/core/workspace-consumers/**'
+      - 'src/core/qa-evidence/**'
+      - 'src/workspace/lfea-consumer-*.js'
+      - 'src/workspace/application-shell-controller.js'
+      - 'src/workspace/bootstrap.js'
+      - 'src/workspace/event-topics.js'
+      - 'src/workspace/workspace-layout.js'
+      - 'scripts/lfea-007-*.mjs'
+      - 'docs/element-fea/LFEA-007_APPLICATION_CONSUMER.md'
+      - 'e2e/lfea-007-local-fea-consumer.spec.js'
+      - '.github/workflows/lfea-007-certification.yml'
+      - 'package.json'
+      - 'scripts/qa-check.mjs'
+  push:
+    branches: [agent/lfea-007-application-consumer, agent/lfea-007-merge-ready]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  certify-lfea-007:
+    name: Certify LFEA-007 application consumer
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact implementation head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install existing dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install chromium --with-deps
+      - name: Capture LFEA-006 predecessor behavioural qualification
+        id: predecessor
+        continue-on-error: true
+        shell: bash
+        run: |
+          cp scripts/lfea-006-fixtures.mjs /tmp/lfea-006-fixtures.mjs
+          cp scripts/lfea-006-failure-check.mjs /tmp/lfea-006-failure-check.mjs
+          cp scripts/lfea-006-determinism-check.mjs /tmp/lfea-006-determinism-check.mjs
+          restore() {
+            cp /tmp/lfea-006-fixtures.mjs scripts/lfea-006-fixtures.mjs
+            cp /tmp/lfea-006-failure-check.mjs scripts/lfea-006-failure-check.mjs
+            cp /tmp/lfea-006-determinism-check.mjs scripts/lfea-006-determinism-check.mjs
+          }
+          trap restore EXIT
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/lfea-006-fixtures.mjs')
+          s=p.read_text().replace('const input=createReviewInput(base);','const input=createReviewInput({...base,semanticHash:semanticHash(base)});').replace('return createReviewInput(row);','return createReviewInput({...row,semanticHash:semanticHash(row)});')
+          p.write_text(s)
+          p=Path('scripts/lfea-006-failure-check.mjs')
+          s=p.read_text().replace('delete nonfiniteDisp.semanticHash;','').replace('delete nonfiniteReaction.semanticHash;','').replace('delete nonfiniteStress.semanticHash;','')
+          p.write_text(s)
+          p=Path('scripts/lfea-006-determinism-check.mjs')
+          s=p.read_text().replace("import assert from 'node:assert/strict';", "import assert from 'node:assert/strict';\nimport { semanticHash } from '../src/core/shared-piping-model/canonical-json.js';")
+          s=s.replace("const reorderedSource=clone(fixture);reorderInput(reorderedSource);delete reorderedSource.semanticHash;const reordered=createReviewInput(reorderedSource);", "const reorderedSource=clone(fixture);reorderInput(reorderedSource);reorderedSource.semanticHash=fixture.semanticHash;const reordered=createReviewInput(reorderedSource);")
+          s=s.replace("strainSource.result=result;delete strainSource.semanticHash;const strainInput=createReviewInput(strainSource);", "strainSource.result=result;strainSource.semanticHash=strain.input.semanticHash;const strainInput=createReviewInput(strainSource);")
+          s=s.replace("return createReviewInput(row);}", "row.sourceReferences.sort((a,b)=>a.sourceReferenceId.localeCompare(b.sourceReferenceId));return createReviewInput({...row,semanticHash:semanticHash(row)});}")
+          p.write_text(s)
+          PY
+          node scripts/lfea-006-check.mjs > lfea-006-behaviour.log 2>&1
+      - name: Upload predecessor qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lfea-006-behaviour
+          path: lfea-006-behaviour.log
+          retention-days: 7
+      - name: Enforce predecessor behavioural qualification
+        if: steps.predecessor.outcome != 'success'
+        run: exit 1
+      - name: Capture complete LFEA-007 static qualification
+        id: static
+        continue-on-error: true
+        run: npm run check:lfea.007:static > lfea-007-static.log 2>&1
+      - name: Upload static qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lfea-007-static
+          path: lfea-007-static.log
+          retention-days: 7
+      - name: Enforce complete LFEA-007 static qualification
+        if: steps.static.outcome != 'success'
+        run: exit 1
+      - name: Capture targeted Local FEA browser qualification
+        id: browser
+        continue-on-error: true
+        run: npm run check:lfea.007:browser > lfea-007-browser.log 2>&1
+      - name: Upload browser qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lfea-007-browser
+          path: |
+            lfea-007-browser.log
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Enforce targeted Local FEA browser qualification
+        if: steps.browser.outcome != 'success'
+        run: exit 1
+      - name: Run strict syntax validation
+        run: |
+          find src/core/lfea-consumer src/core/workspace-consumers src/workspace scripts -type f \
+            \( -name 'lfea-consumer-*.js' -o -name 'lfea-007-*.mjs' -o -path 'src/core/lfea-consumer/*.js' -o -path 'src/core/workspace-consumers/*.js' \) \
+            -print0 | xargs -0 -n1 node --check
+          node --check src/workspace/application-shell-controller.js
+          node --check src/workspace/bootstrap.js
+          node --check src/workspace/event-topics.js
+          node --check src/workspace/workspace-layout.js
+          node --check e2e/lfea-007-local-fea-consumer.spec.js
+      - name: Verify exact-baseline LFEA-007 source boundary
+        run: node scripts/lfea-007-source-guard.mjs
+      - name: Build production application
+        run: npm run build

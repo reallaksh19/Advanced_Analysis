@@ -1,0 +1,89 @@
+{
+  "caseId": "SLICE-L-SUPPORT-NODE-EDITOR-RUN",
+  "description": "Verifies manual Sketcher support-node property editing writes supportTag, supportType, restraint, and frictionFactor into 3D Simplified model supports and report output.",
+  "sketcher": {
+    "workingPlane": "XY",
+    "workingElevation": 0,
+    "designTemperature": 450,
+    "nodes": {
+      "N001": {
+        "pos": [0, 0, 0],
+        "type": "free"
+      },
+      "N002": {
+        "pos": [3000, 0, 0],
+        "type": "free"
+      }
+    },
+    "segments": [
+      {
+        "id": "S001",
+        "startNode": "N001",
+        "endNode": "N002",
+        "type": "PIPE",
+        "properties": {
+          "type": "PIPE",
+          "dn_mm": 100,
+          "nps": "4",
+          "schedule": "STD",
+          "od_mm": 114.3,
+          "wall_mm": 6.02,
+          "material": "CARBON STEEL",
+          "materialDensity_kg_m3": 7850,
+          "ratingClass": 150,
+          "designTemperature_C": 232.2,
+          "designPressure_barg": 12.5,
+          "fluidDensity_kg_m3": 850,
+          "insulationThickness_mm": 50,
+          "insulationDensity_kg_m3": 120,
+          "componentWeight_kg": 0,
+          "componentLength_mm": 3000,
+          "propertySource": "SLICE-L-FIXTURE"
+        }
+      }
+    ]
+  },
+  "supportEdits": {
+    "N001": {
+      "supportTag": "SUP-ANCHOR-A",
+      "supportType": "anchor",
+      "frictionFactor": 0.25,
+      "restraint": {
+        "x": true,
+        "y": true,
+        "z": true,
+        "rx": false,
+        "ry": false,
+        "rz": false
+      }
+    },
+    "N002": {
+      "supportTag": "SUP-GUIDE-B",
+      "supportType": "guide",
+      "frictionFactor": 0.35,
+      "restraint": {
+        "x": false,
+        "y": true,
+        "z": true,
+        "rx": false,
+        "ry": false,
+        "rz": false
+      }
+    }
+  },
+  "expected": {
+    "validationStatus": "READY",
+    "supports": 2,
+    "supportA": "SUP-ANCHOR-A",
+    "supportB": "SUP-GUIDE-B",
+    "supportAType": "anchor",
+    "supportBType": "guide",
+    "supportAFriction": 0.25,
+    "supportBFriction": 0.35,
+    "supportReaction_N": 384.718,
+    "supportReaction_kgf": 39.230277,
+    "totalWeight_N": 769.435,
+    "restraintAText": "x y z",
+    "restraintBText": "y z"
+  }
+}

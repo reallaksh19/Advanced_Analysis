@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "PR-MISSING-DATA-001",
+  "title": "Pipe rack missing pipe size blocks clean qualification",
+  "module": "piperack-expansion-loop",
+  "solverExport": "runPipeRackLoopOrderBenchmark",
+  "methodId": "PIPERACK_LOOP_ORDER",
+  "iconId": "rack-line",
+  "input": {
+    "lines": [
+      { "id": "M1", "sizeNps": 24, "schedule": "40", "material": "Carbon Steel", "tOperate": 500 }
+    ],
+    "globalSettings": { "anchorDistanceFt": 200, "allowableStressPsi": 20000, "constantsSource": "fixture", "defaultSpacingFt": 2.5, "defaultSpacingSource": "fixture", "strictData": true },
+    "methodology": "FLUOR",
+    "globalInputs": { "constantsSource": "fixture" }
+  },
+  "expected": { "status": "MISSING_DATA", "isQualified": false },
+  "compare": { "mode": "rounded-zero-error", "roundDecimals": 12, "requiredStatus": "MISSING_DATA" }
+}

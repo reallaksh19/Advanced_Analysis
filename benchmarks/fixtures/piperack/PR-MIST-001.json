@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "PR-MIST-001",
+  "title": "Pipe rack vessel/MIST check blocks absent vendor loads",
+  "module": "piperack-expansion-loop",
+  "solverExport": "runPipeRackMistBenchmark",
+  "methodId": "MIST_NOZZLE_SCREENING",
+  "iconId": "vessel",
+  "input": {
+    "lines": [
+      {
+        "id": "V1",
+        "sizeNps": 10,
+        "schedule": "40",
+        "material": "Carbon Steel",
+        "tOperate": 500,
+        "hasVessel": true
+      }
+    ],
+    "globalSettings": {
+      "anchorDistanceFt": 200,
+      "allowableStressPsi": 20000,
+      "constantsSource": "fixture",
+      "strictData": true,
+      "defaultSpacingFt": 2.5,
+      "defaultSpacingSource": "fixture"
+    },
+    "methodology": "FLUOR",
+    "globalInputs": {
+      "constantsSource": "fixture"
+    }
+  },
+  "expected": {
+    "status": "NOT_QUALIFIED",
+    "isQualified": false
+  },
+  "compare": {
+    "mode": "rounded-zero-error",
+    "roundDecimals": 12,
+    "requiredStatus": "NOT_QUALIFIED"
+  }
+}

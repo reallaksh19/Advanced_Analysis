@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { basename, join, relative } from 'node:path';
+const BASE_SHA='33d5dd9b889a1f5c9856078468074661b1b62e6a';const root=new URL('../',import.meta.url).pathname;const core=join(root,'src/core/element-fea');
+const allowed=[/^src\/core\/element-fea\//,/^scripts\/lfea-005-[^/]+\.mjs$/,/^docs\/element-fea\/LFEA-005_IMPLEMENTATION\.md$/,/^\.github\/workflows\/lfea-005-certification\.yml$/];
+ensureBase();const changed=gitLines(['diff','--name-only',BASE_SHA,'HEAD']);const errors=[];
+changed.forEach((file)=>{if(!allowed.some((rule)=>rule.test(file)))errors.push(`Disallowed LFEA-005 changed path: ${file}`);});
+assert.ok(!changed.includes('.github/workflows/lfea-005-bootstrap.yml'),'Temporary LFEA-005 bootstrap workflow is prohibited from the final tree.');
+assert.ok(!changed.some((file)=>/w10\.11|lafea|w10\.r2|pcf|application-shell|workspace-consumer|view-state|registry|package(?:-lock)?\.json/i.test(file)),'LFEA-005 changed a prohibited authority path.');
+assert.ok(!changed.some((file)=>/^\.github\/workflows\/(?!lfea-005-certification\.yml$)/.test(file)),'LFEA-005 changed a predecessor or aggregate workflow.');
+assert.deepEqual(gitLines(['diff','--name-only',BASE_SHA,'HEAD','--','scripts/lfea-001-*','scripts/lfea-002-*','scripts/lfea-003-*','scripts/lfea-004-*']),[],'Predecessor LFEA guards or suites changed.');
+const newCore=walk(core).filter((file)=>/mesh-package-.*\.js$/.test(file));for(const file of newCore){const text=readFileSync(file,'utf8');assert.ok(!/export\s+default/.test(text),`${basename(file)} uses a default export.`);for(const specifier of [...text.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((row)=>row[1]))assert.ok(specifier.startsWith('.')||specifier.startsWith('node:'),`${basename(file)} imports external dependency ${specifier}.`);assert.ok(text.split(/\r?\n/).length<=300,`${basename(file)} exceeds 300 lines.`);}
+validateWorkflow();if(errors.length)throw new Error(errors.join('\n'));console.log(`LFEA-005 exact-baseline source boundary passed for ${changed.length} changed files.`);
+function validateWorkflow(){const file=join(root,'.github/workflows/lfea-005-certification.yml');const text=readFileSync(file,'utf8');for(const token of ['Checkout exact authorized implementation head','node scripts/lfea-001-contract-check.mjs','node scripts/lfea-002-contract-check.mjs','node scripts/lfea-003-contract-check.mjs','node scripts/lfea-004-check.mjs','node scripts/lfea-005-check.mjs','node scripts/lfea-005-source-guard.mjs'])assert.ok(text.includes(token),`LFEA-005 workflow is missing ${token}.`);for(const token of ['lfea-001-source-guard','lfea-002-source-guard','lfea-003-source-guard','lfea-004-source-guard','w10.11','LAFEA','application-shell'])assert.equal(text.includes(token),false,`LFEA-005 workflow invokes prohibited authority: ${token}`);}
+function ensureBase(){try{execFileSync('git',['cat-file','-e',`${BASE_SHA}^{commit}`],{cwd:root,stdio:'ignore'});}catch{execFileSync('git',['fetch','--no-tags','--depth=1','origin',BASE_SHA],{cwd:root,stdio:'ignore'});}const resolved=execFileSync('git',['rev-parse',BASE_SHA],{cwd:root,encoding:'utf8'}).trim();assert.equal(resolved,BASE_SHA,'Required LFEA-004 baseline is unavailable.');execFileSync('git',['merge-base','--is-ancestor',BASE_SHA,'HEAD'],{cwd:root});}
+function gitLines(args){const text=execFileSync('git',args,{cwd:root,encoding:'utf8'}).trim();return text?text.split(/\r?\n/).sort():[];}
+function walk(directory){return readdirSync(directory).flatMap((name)=>{const path=join(directory,name);return statSync(path).isDirectory()?walk(path):[path];});}

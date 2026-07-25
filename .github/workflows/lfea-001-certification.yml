@@ -1,0 +1,52 @@
+name: LFEA-001 Core Certification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/core/element-fea/**'
+      - 'scripts/lfea-001-*.mjs'
+      - 'docs/element-fea/LFEA-001_IMPLEMENTATION.md'
+      - '.github/workflows/lfea-001-certification.yml'
+  push:
+    branches:
+      - agent/lfea-001-core-foundation
+    paths:
+      - 'src/core/element-fea/**'
+      - 'scripts/lfea-001-*.mjs'
+      - 'docs/element-fea/LFEA-001_IMPLEMENTATION.md'
+      - '.github/workflows/lfea-001-certification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  certify-lfea-core:
+    name: Certify LFEA-001 core
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run LFEA qualification suite
+        run: node scripts/lfea-001-check.mjs
+
+      - name: Run strict syntax validation
+        run: |
+          find src/core/element-fea scripts -type f \( -name '*.js' -o -name 'lfea-001-*.mjs' \) -print0 \
+            | xargs -0 -n1 node --check
+
+      - name: Verify LFEA source boundary
+        run: node scripts/lfea-001-source-guard.mjs

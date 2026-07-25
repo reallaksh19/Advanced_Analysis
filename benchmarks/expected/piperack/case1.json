@@ -1,0 +1,22 @@
+{
+  "caseId": "pr-loop-001",
+  "expected": {
+    "warnings": [
+      {
+        "code": "FORMAL_STRESS_REQUIRED"
+      }
+    ],
+    "lines": [
+      {
+        "id": "L2"
+      },
+      {
+        "id": "L1"
+      }
+    ],
+    "governingLine": {
+      "id": "L2"
+    },
+    "tolerance": 0.005
+  }
+}

@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import { BASE_LIMITATIONS, QUALIFICATION_STATES, REQUEST_SCHEMA, RESULT_SCHEMA, calculateLocalAttachmentScreening, reconstructScreeningResultHashes } from '../src/core/local-attachment-screening/index.js';
+import { screeningRequestFixture } from './lafea.2-fixtures.mjs';
+const request=screeningRequestFixture();
+assert.equal(request.schema,REQUEST_SCHEMA);assert.ok(Object.isFrozen(request));assert.ok(Object.isFrozen(request.sourceEvidence));
+const result=calculateLocalAttachmentScreening(request);
+assert.equal(result.schema,RESULT_SCHEMA);assert.equal(result.qualification.state,QUALIFICATION_STATES.ACCEPTED);
+assert.deepEqual(result.semanticHashes,reconstructScreeningResultHashes(result));assert.ok(Object.isFrozen(result));
+BASE_LIMITATIONS.forEach((value)=>assert.ok(result.limitations.includes(value)));assert.doesNotThrow(()=>JSON.parse(JSON.stringify(result)));assert.equal(hasNegativeZero(result),false);
+const forged=JSON.parse(JSON.stringify(request));forged.semanticHash='fnv1a64:0000000000000000';const rejected=calculateLocalAttachmentScreening(forged);
+assert.equal(rejected.qualification.state,QUALIFICATION_STATES.REJECTED_REQUEST);for(const key of ['sectionProperties','screeningCases','pointStressStates','envelopes'])assert.equal(key in rejected,false);assert.deepEqual(rejected.formulaTrace,[]);
+const malformed=JSON.parse(JSON.stringify(request));malformed.evaluationLocations=null;assert.equal(calculateLocalAttachmentScreening(malformed).qualification.state,QUALIFICATION_STATES.REJECTED_REQUEST);
+assert.equal(calculateLocalAttachmentScreening(undefined).qualification.state,QUALIFICATION_STATES.REJECTED_REQUEST);
+assert.throws(()=>screeningRequestFixture((raw)=>{raw.unexpected=true;}),/keys must/);
+assert.throws(()=>screeningRequestFixture((raw)=>{raw.screeningCases[0].unexpected=true;}),/keys must/);
+assert.throws(()=>screeningRequestFixture((raw)=>{raw.screeningCases[0].mechanicalTerms[0].unexpected=true;}),/keys must/);
+assert.throws(()=>screeningRequestFixture((raw)=>{raw.evaluationLocations[0].unexpected=true;}),/keys must/);
+assert.throws(()=>screeningRequestFixture((raw)=>{raw.qualificationProfile.tolerances.stressTensor.unexpected=true;}),/keys must/);
+assert.throws(()=>screeningRequestFixture((raw)=>{raw.screeningCases[0].unexpected=()=>{};}),/JSON-safe plain data/);
+console.log('LAFEA.2 contract, fail-closed containment, JSON safety and hash reconstruction passed.');
+function hasNegativeZero(value){if(typeof value==='number')return Object.is(value,-0);if(Array.isArray(value))return value.some(hasNegativeZero);if(value&&typeof value==='object')return Object.values(value).some(hasNegativeZero);return false;}

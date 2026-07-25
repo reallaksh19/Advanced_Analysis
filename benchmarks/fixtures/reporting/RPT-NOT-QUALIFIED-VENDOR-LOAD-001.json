@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "engineering-benchmark-v2",
+  "caseId": "RPT-NOT-QUALIFIED-VENDOR-LOAD-001",
+  "title": "Report proof — vendor loads missing",
+  "module": "reporting",
+  "solverExport": "createReportMarkdownCalcSheet",
+  "methodId": "REPORT_MARKDOWN_CALC_SHEET",
+  "iconId": "report-warning",
+  "input": {
+    "reportPayload": {
+      "title": "Nozzle Vendor Load Report",
+      "module": "calc-extended",
+      "status": "NOT_QUALIFIED",
+      "methodId": "MIST_NOZZLE_SCREENING",
+      "formulaIds": ["MIST_VENDOR_LOAD_SCREENING"],
+      "unitSystem": "imperial",
+      "benchmarkStatus": "FAILED",
+      "diagnostics": [{ "code": "VENDOR_LOADS_MISSING", "severity": "ERROR", "message": "Vendor loads are required for qualified nozzle check." }]
+    }
+  },
+  "expected": {
+    "status": "NOT_QUALIFIED",
+    "methodId": "REPORT_MARKDOWN_CALC_SHEET",
+    "formulaIds": ["REPORT_MARKDOWN_CALC_SHEET"],
+    "containsStatus": true,
+    "containsMethodId": true,
+    "containsFormulaId": true,
+    "containsUnits": true,
+    "containsBlockingDiagnostic": true,
+    "noCleanPassClaim": true,
+    "isCriticalStatus": true
+  },
+  "compare": { "mode": "rounded-zero-error", "roundDecimals": 12, "requiredStatus": "NOT_QUALIFIED" }
+}

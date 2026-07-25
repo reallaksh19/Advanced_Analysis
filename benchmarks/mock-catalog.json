@@ -1,0 +1,125 @@
+{
+  "schemaVersion": "engineering-mock-catalog-v1",
+  "cases": [
+    {
+      "caseId": "2D-CANT-001",
+      "module": "2d-math",
+      "solverExport": "calcCantileverEndLoad",
+      "methodId": "CANTILEVER_END_LOAD",
+      "iconId": "cantilever-end-load",
+      "file": "benchmarks/fixtures/2d/2D-CANT-001.json"
+    },
+    {
+      "caseId": "2D-GC-001",
+      "module": "2d-math",
+      "solverExport": "calcGuidedCantileverThermal",
+      "methodId": "GC_BASIC_12EI",
+      "iconId": "thermal-growth",
+      "file": "benchmarks/fixtures/2d/2D-GC-001.json"
+    },
+    {
+      "caseId": "2D-POINT-001",
+      "module": "2d-math",
+      "solverExport": "calcSimpleSpanPointLoad",
+      "methodId": "SIMPLE_SPAN_CONCENTRATED",
+      "iconId": "point-load",
+      "file": "benchmarks/fixtures/2d/2D-POINT-001.json"
+    },
+    {
+      "caseId": "2D-UDL-001",
+      "module": "2d-math",
+      "solverExport": "calcSimpleSpanDistributedLoad",
+      "methodId": "SIMPLE_SPAN_DISTRIBUTED",
+      "iconId": "distributed-load",
+      "file": "benchmarks/fixtures/2d/2D-UDL-001.json"
+    },
+    {
+      "caseId": "EXT-FLANG-001",
+      "module": "calc-extended",
+      "solverExport": "calcKovesFlange",
+      "methodId": "KOVES_FLANGE_SCREENING",
+      "iconId": "koves-flange",
+      "file": "benchmarks/fixtures/calc-extended/EXT-FLANG-001.json"
+    },
+    {
+      "caseId": "EXT-GLOBAL-001",
+      "module": "calc-extended",
+      "solverExport": "calcExtendedGlobalReaction",
+      "methodId": "GC_ANCHOR_GUIDE_3EI",
+      "iconId": "global-reaction",
+      "file": "benchmarks/fixtures/calc-extended/EXT-GLOBAL-001.json"
+    },
+    {
+      "caseId": "EXT-MIST-001",
+      "module": "calc-extended",
+      "solverExport": "calcMistNozzleQualification",
+      "methodId": "MIST_NOZZLE_SCREENING",
+      "iconId": "mist-nozzle",
+      "file": "benchmarks/fixtures/calc-extended/EXT-MIST-001.json"
+    },
+    {
+      "caseId": "EXT-SHORT-DROP-001",
+      "module": "calc-extended",
+      "solverExport": "analyzeShortDropGeometry",
+      "methodId": "GC_ANCHOR_GUIDE_3EI",
+      "iconId": "short-drop-filter",
+      "file": "benchmarks/fixtures/calc-extended/EXT-SHORT-DROP-001.json"
+    },
+    {
+      "caseId": "EXT-SHORT-DROP-002",
+      "module": "calc-extended",
+      "solverExport": "analyzeShortDropGeometry",
+      "methodId": "GC_ANCHOR_GUIDE_3EI",
+      "iconId": "short-drop-filter",
+      "file": "benchmarks/fixtures/calc-extended/EXT-SHORT-DROP-002.json"
+    },
+    {
+      "caseId": "GC3D-BASIC-001",
+      "module": "3d-guided-cantilever",
+      "solverExport": "calcGuidedCantileverBasic",
+      "methodId": "GC_BASIC_12EI",
+      "iconId": "guided-cantilever",
+      "file": "benchmarks/fixtures/gc3d/GC3D-BASIC-001.json"
+    },
+    {
+      "caseId": "GC3D-BRANCH-001",
+      "module": "3d-guided-cantilever",
+      "solverExport": "solveGC3D",
+      "methodId": "GC_BASIC_12EI",
+      "iconId": "3d-route",
+      "file": "benchmarks/fixtures/gc3d/GC3D-BRANCH-001.json"
+    },
+    {
+      "caseId": "GC3D-COMBINE-001",
+      "module": "3d-guided-cantilever",
+      "solverExport": "combineNodeStress",
+      "methodId": "GC_BASIC_12EI",
+      "iconId": "stress-combine",
+      "file": "benchmarks/fixtures/gc3d/GC3D-COMBINE-001.json"
+    },
+    {
+      "caseId": "GC3D-FULL-001",
+      "module": "3d-guided-cantilever",
+      "solverExport": "solveGC3D",
+      "methodId": "GC_BASIC_12EI",
+      "iconId": "3d-route",
+      "file": "benchmarks/fixtures/gc3d/GC3D-FULL-001.json"
+    },
+    {
+      "caseId": "GC3D-SECTION-001",
+      "module": "3d-guided-cantilever",
+      "solverExport": "calcPipeSection",
+      "methodId": "GC_BASIC_12EI",
+      "iconId": "pipe-section",
+      "file": "benchmarks/fixtures/gc3d/GC3D-SECTION-001.json"
+    },
+    {
+      "caseId": "GC3D-THERMAL-001",
+      "module": "3d-guided-cantilever",
+      "solverExport": "calcThermalDisplacement",
+      "methodId": "GC_BASIC_12EI",
+      "iconId": "thermal-growth",
+      "file": "benchmarks/fixtures/gc3d/GC3D-THERMAL-001.json"
+    }
+  ]
+}
