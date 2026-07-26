@@ -7,7 +7,14 @@
 import { createLfeaWorkbenchStore } from './lfea-workbench-store.js';
 import { LFEA_WORKBENCH_STYLES } from './lfea-workbench-styles.js';
 import { LfeaWorkbenchView } from './lfea-workbench-view.js';
-import { createLfeaMockPackage } from './advanced-mock-data.js';
+import { FeaBenchmarkPanel } from './fea-benchmark-panel.js';
+import { FEA_BENCHMARK_STYLES } from './fea-benchmark-styles.js';
+import {
+  createLfeaWorkbenchAdapterProfile,
+  createLfeaWorkbenchReviewProfile,
+} from './lfea-pipeline-profiles.js';
+import { createLfeaWorkerClient } from './lfea-worker-client.js';
+import { LfeaConvergenceController } from './lfea-convergence-controller.js';
 
 export class LfeaWorkbenchController {
   /**
@@ -18,7 +25,30 @@ export class LfeaWorkbenchController {
     this.rootElement = rootElement;
     this.documentRef = rootElement?.ownerDocument ?? globalThis.document;
     this.store = createLfeaWorkbenchStore(options);
+    this.pipelineOptions = options?.pipelineOptions ?? {};
+    this.workerClient = typeof Worker === 'function'
+      ? createLfeaWorkerClient(null)
+      : null;
     this.view = new LfeaWorkbenchView(rootElement);
+    this.benchmarkHost = this.documentRef.createElement('div');
+    this.benchmarkHost.dataset.role = 'lfea-benchmark-host';
+    this.benchmarkPanel = new FeaBenchmarkPanel(this.benchmarkHost, { surface: 'LFEA' });
+    this.convergenceHost = this.documentRef.createElement('div');
+    this.convergenceHost.dataset.role = 'lfea-convergence-host';
+    this.convergenceController = new LfeaConvergenceController(
+      this.convergenceHost,
+      {
+        onQualified: (evidence) => {
+          this.pipelineOptions = {
+            ...this.pipelineOptions,
+            convergenceStudy: evidence.study,
+            convergenceResult: evidence.interpretation,
+          };
+        },
+      },
+    );
+    this.view.setBenchmarkHost(this.benchmarkHost);
+    this.view.setConvergenceHost(this.convergenceHost);
     this.unsubscribe = null;
   }
 
@@ -29,6 +59,7 @@ export class LfeaWorkbenchController {
       onMock: () => this.loadMockData(),
       onFile: (file) => this.loadFile(file),
       onRun: () => this.run(),
+      onCancelRun: () => this.cancelRun(),
       onExportDocument: () => this.downloadDocument(),
       onExportEvidence: () => this.downloadEvidence(),
       onUndo: () => this.undo(),
@@ -38,8 +69,14 @@ export class LfeaWorkbenchController {
       onAddRecord: (path, text) => this.addRecordText(path, text),
       onUpdateRecord: (path, index, text) => this.updateRecordText(path, index, text),
       onDeleteRecord: (path, index) => this.store.deleteRecord(path, index),
-      onMoveNode: (nodeId, x, y) => this.store.moveNode(nodeId, x, y),
+      onPreviewNode: (nodeId, x, y) =>
+        this.store.previewNodeMove(nodeId, x, y),
+      onCommitNode: () => this.store.commitNodeMove(),
+      onCancelNode: () => this.store.cancelNodeMove(),
+      onBenchmark: () => this.runBenchmark(),
     });
+    this.benchmarkPanel.render();
+    this.convergenceController.init();
     this.unsubscribe = this.store.subscribe((state) => this.view.render(state));
     this.view.render(this.store.getState());
     return this;
@@ -51,7 +88,7 @@ export class LfeaWorkbenchController {
       const text = await readUtf8(file);
       return this.importDocument(JSON.parse(text));
     } catch (error) {
-      return this.store.importDocument(invalidImport(error));
+      return this.store.reportEditError('document', null, error);
     }
   }
 
@@ -64,7 +101,8 @@ export class LfeaWorkbenchController {
    *
    * @returns {Readonly<Record<string, unknown>>} Updated workbench state.
    */
-  loadMockData() {
+  async loadMockData() {
+    const { createLfeaMockPackage } = await import('./advanced-mock-data.js');
     return this.importDocument(createLfeaMockPackage());
   }
 
@@ -84,7 +122,7 @@ export class LfeaWorkbenchController {
     try {
       return this.store.replaceDocument(parseJsonObject(text, 'LFEA package'));
     } catch (error) {
-      return this.store.importDocument(invalidImport(error));
+      return this.store.reportEditError('document', null, error);
     }
   }
 
@@ -92,7 +130,7 @@ export class LfeaWorkbenchController {
     try {
       return this.store.addRecord(path, parseJsonObject(text, 'LFEA record'));
     } catch (error) {
-      return this.store.importDocument(invalidImport(error));
+      return this.store.reportEditError(path, null, error);
     }
   }
 
@@ -100,12 +138,60 @@ export class LfeaWorkbenchController {
     try {
       return this.store.updateRecord(path, index, parseJsonObject(text, 'LFEA record'));
     } catch (error) {
-      return this.store.importDocument(invalidImport(error));
+      return this.store.reportEditError(path, index, error);
     }
   }
 
-  run() {
-    return this.store.run();
+  async run() {
+    if (!this.workerClient) return this.store.run();
+    const packageInput = this.store.getState().packageValue;
+    const includeProjectedStress =
+      this.pipelineOptions.includeProjectedStress ?? true;
+    const input = {
+      packageInput,
+      adapterProfile: this.pipelineOptions.adapterProfile
+        ?? createLfeaWorkbenchAdapterProfile(),
+      reviewProfile: this.pipelineOptions.reviewProfile
+        ?? createLfeaWorkbenchReviewProfile(
+          includeProjectedStress,
+          Boolean(this.pipelineOptions.convergenceStudy),
+        ),
+      includeProjectedStress,
+      convergenceStudy: this.pipelineOptions.convergenceStudy ?? null,
+      convergenceResult: this.pipelineOptions.convergenceResult ?? null,
+      untilStage: null,
+    };
+    this.store.beginRun();
+    try {
+      const execution = await this.workerClient.run(input, {
+        onProgress: (progress) => this.store.updateRunProgress(progress),
+      });
+      return this.store.completeRun(execution);
+    } catch (error) {
+      if (error?.name === 'AbortError') return this.store.cancelRun();
+      return this.store.failRun(error);
+    }
+  }
+
+  cancelRun() {
+    if (!this.workerClient?.cancel()) return this.store.getState();
+    return this.store.getState();
+  }
+
+  /**
+   * Run the FEA verification suite against the live code paths.
+   *
+   * @returns {Promise<Record<string, unknown>>} Benchmark report.
+   */
+  runBenchmark() {
+    return this.benchmarkPanel.run();
+  }
+
+  /**
+   * @returns {Record<string, unknown>|null} Last benchmark report, if any.
+   */
+  getBenchmarkReport() {
+    return this.benchmarkPanel.getReport();
   }
 
   undo() {
@@ -133,6 +219,9 @@ export class LfeaWorkbenchController {
   }
 
   destroy() {
+    this.convergenceController.destroy();
+    this.workerClient?.destroy();
+    this.benchmarkPanel.destroy();
     this.unsubscribe?.();
     this.unsubscribe = null;
     this.store.destroy();
@@ -145,7 +234,7 @@ function installStyles(documentRef) {
   if (!documentRef || documentRef.querySelector('[data-lfea-workbench-styles]')) return;
   const style = documentRef.createElement('style');
   style.dataset.lfeaWorkbenchStyles = 'true';
-  style.textContent = LFEA_WORKBENCH_STYLES;
+  style.textContent = `${LFEA_WORKBENCH_STYLES}\n${FEA_BENCHMARK_STYLES}`;
   documentRef.head?.append(style);
 }
 
@@ -163,10 +252,6 @@ function parseJsonObject(text, label) {
   return value;
 }
 
-function invalidImport(error) {
-  return { schema: 'lfea-invalid-import/v1', error: error instanceof Error ? error.message : 'Unknown import failure.' };
-}
-
 function downloadJson(documentRef, value, filename) {
   if (!documentRef || typeof Blob === 'undefined' || typeof URL === 'undefined') return;
   const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' }));
@@ -177,5 +262,13 @@ function downloadJson(documentRef, value, filename) {
   documentRef.body?.append(anchor);
   anchor.click();
   anchor.remove();
-  queueMicrotask(() => URL.revokeObjectURL(url));
+  let revoked = false;
+  const revoke = () => {
+    if (revoked) return;
+    revoked = true;
+    URL.revokeObjectURL(url);
+    clearTimeout(timeout);
+  };
+  const timeout = setTimeout(revoke, 30000);
+  documentRef.defaultView?.addEventListener('focus', revoke, { once: true });
 }

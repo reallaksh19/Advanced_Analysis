@@ -1,3 +1,5 @@
+> **SUPERSEDED** — Historical document. Follow `ARCHITECTURE_TRUTH.md`.
+
 # Simplified Analysis — Phase U0 Current Baseline Certification
 
 ## Scope

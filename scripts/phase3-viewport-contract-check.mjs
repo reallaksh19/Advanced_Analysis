@@ -48,12 +48,17 @@ assert.equal(model.summary.segmentCount, 2);
 assert.equal(model.summary.pointCount, 1);
 assert.equal(model.summary.skippedCount, 1);
 assert.deepEqual(model.skippedEntityIds, ['NO-GEOMETRY']);
-assert.deepEqual(model.items.find((item) => item.entityId === 'PIPE-A').end, { x: 100, y: 0, z: 0 });
-assert.deepEqual(model.items.find((item) => item.entityId === 'SUP-A').center, { x: 50, y: 20, z: 10 });
-assert.deepEqual(model.items.find((item) => item.entityId === 'PIPE-DELTA').end, { x: 100, y: 80, z: 0 });
+const items = [
+  ...model.physicalPrimitives,
+  ...model.supportOverlayPrimitives,
+  ...model.diagnosticPrimitives,
+];
+assert.deepEqual(items.find((item) => item.objectId === 'PIPE-A').end, { x: 100, y: 0, z: 0 });
+assert.deepEqual(items.find((item) => item.objectId === 'SUP-A').center, { x: 50, y: 20, z: 10 });
+assert.deepEqual(items.find((item) => item.objectId === 'PIPE-DELTA').end, { x: 100, y: 80, z: 0 });
 assert.ok(model.bounds.radius > 0);
 assert.ok(Object.isFrozen(model));
-assert.ok(Object.isFrozen(model.items[0]));
+assert.ok(Object.isFrozen(items[0]));
 
 const modules = [
   'src/workspace/geometry-evidence.js',
@@ -61,6 +66,8 @@ const modules = [
   'src/workspace/viewport-renderer.js',
   'src/workspace/canvas2d-viewport-backend.js',
   'src/workspace/three-viewport-backend.js',
+  'src/workspace/three-viewport-camera.js',
+  'src/workspace/three-viewport-scene.js',
   'src/workspace/viewport-panel.js',
   'src/workspace/dataset-adapter.js',
 ];
@@ -77,13 +84,15 @@ const rendererSources = await Promise.all([
   'src/workspace/viewport-renderer.js',
   'src/workspace/canvas2d-viewport-backend.js',
   'src/workspace/three-viewport-backend.js',
+  'src/workspace/three-viewport-camera.js',
+  'src/workspace/three-viewport-scene.js',
 ].map((file) => readFile(path.join(root, file), 'utf8')));
 const rendererSource = rendererSources.join('\n');
 assert.ok(!rendererSource.includes('inputxml-managed-stage'), 'Renderer parses a raw package schema.');
 assert.ok(!rendererSource.includes('rvm-selected-geometry-workspace-package'), 'Renderer parses a raw package schema.');
 assert.ok(rendererSources[0].includes('Canvas2DViewportBackend'));
 assert.ok(rendererSources[0].includes('ThreeViewportBackend'));
-assert.ok(rendererSources[1].includes('assertViewportRenderModel'));
+assert.ok(rendererSource.includes('assertViewportRenderModel'));
 assert.ok(rendererSources[2].includes('OrbitControls'));
 assert.ok(rendererSources[2].includes('forceContextLoss'));
 assert.ok(rendererSources[2].includes('cancelAnimationFrame'));

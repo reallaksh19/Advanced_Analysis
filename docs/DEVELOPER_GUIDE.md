@@ -1,5 +1,8 @@
 # Developer Guide
 
+The authoritative runtime and module map is `ARCHITECTURE_TRUTH.md`. Historical
+root specifications are retained for provenance but are superseded.
+
 ## Canonical Geometry
 * The canonical geometry serves as the strict backbone across all modules. It is strictly the sole interface by which parsing routines, calculators, visualizers, and reporters interchange model data.
 * Entities within canonical geometry (nodes, segments, supports, components) require unique identification and must be reliably validated before passing to calculators.

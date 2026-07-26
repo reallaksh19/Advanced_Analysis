@@ -12,6 +12,21 @@ import {
   resealLfeaMeshPackage,
 } from './lfea-workbench-model.js';
 import { executeLfeaWorkbench } from './lfea-workbench-pipeline.js';
+import {
+  assertCollectionPath,
+  assertIndex,
+  assertNodeCoordinates,
+  assertRecord,
+  assertResultMode,
+  collectionAt,
+  committedState,
+  failedState,
+  freeze,
+  importedState,
+  isRecord,
+  requirePackage,
+  setAtPath,
+} from './lfea-workbench-state.js';
 
 const HISTORY_LIMIT = 50;
 
@@ -30,6 +45,8 @@ export function createLfeaWorkbenchStore(options) {
     status: 'EMPTY',
     packageValue: null,
     execution: null,
+    progress: null,
+    nodeDraft: null,
     resultMode,
     past: [],
     future: [],
@@ -37,7 +54,7 @@ export function createLfeaWorkbenchStore(options) {
   });
   const listeners = new Set();
   if (configuration.initialDocument !== undefined) {
-    state = importedState(state, configuration.initialDocument);
+    state = importedState(state, configuration.initialDocument, HISTORY_LIMIT);
   }
 
   function publish(next) {
@@ -48,7 +65,7 @@ export function createLfeaWorkbenchStore(options) {
 
   function importDocument(value) {
     try {
-      return publish(importedState(state, value));
+      return publish(importedState(state, value, HISTORY_LIMIT));
     } catch (error) {
       return publish(failedState(state, error, 'LFEA_IMPORT_REJECTED'));
     }
@@ -57,7 +74,7 @@ export function createLfeaWorkbenchStore(options) {
   function replaceDocument(value) {
     try {
       const packageValue = resealLfeaMeshPackage(value);
-      return publish(committedState(state, packageValue));
+      return publish(committedState(state, packageValue, HISTORY_LIMIT));
     } catch (error) {
       return publish(failedState(state, error, 'LFEA_EDIT_REJECTED'));
     }
@@ -104,13 +121,90 @@ export function createLfeaWorkbenchStore(options) {
   }
 
   function run() {
-    const execution = executeLfeaWorkbench(requirePackage(state), configuration.pipelineOptions);
+    beginRun();
+    const execution = executeLfeaWorkbench(
+      requirePackage(state),
+      configuration.pipelineOptions,
+    );
+    return completeRun(execution);
+  }
+
+  function beginRun() {
+    requirePackage(state);
+    return publish({
+      ...state,
+      status: 'RUNNING',
+      progress: { stage: 'QUEUED', index: 0, total: 7 },
+      diagnostics: [],
+    });
+  }
+
+  function updateRunProgress(progress) {
+    if (state.status !== 'RUNNING') return state;
+    return publish({ ...state, progress: freeze(structuredClone(progress)) });
+  }
+
+  function completeRun(execution) {
+    if (!isRecord(execution)) {
+      throw new TypeError('LFEA execution result must be an object.');
+    }
     return publish({
       ...state,
       status: execution.status,
       execution,
-      diagnostics: execution.diagnostics,
+      progress: null,
+      diagnostics: execution.diagnostics ?? [],
     });
+  }
+
+  function failRun(error) {
+    return publish({
+      ...failedState(state, error, 'LFEA_WORKER_FAILURE'),
+      progress: null,
+    });
+  }
+
+  function cancelRun() {
+    return publish({
+      ...state,
+      status: state.packageValue ? 'READY' : 'EMPTY',
+      progress: null,
+      diagnostics: [{
+        severity: 'WARNING',
+        code: 'LFEA_RUN_CANCELLED',
+        message: 'LFEA execution was cancelled before qualification completed.',
+      }],
+    });
+  }
+
+  function previewNodeMove(nodeId, x, y) {
+    assertNodeCoordinates(nodeId, x, y);
+    return publish({
+      ...state,
+      nodeDraft: freeze({ nodeId, x, y }),
+      diagnostics: [],
+    });
+  }
+
+  function commitNodeMove() {
+    if (!state.nodeDraft) return state;
+    const { nodeId, x, y } = state.nodeDraft;
+    const next = moveNode(nodeId, x, y);
+    return publish({ ...next, nodeDraft: null });
+  }
+
+  function cancelNodeMove() {
+    if (!state.nodeDraft) return state;
+    return publish({ ...state, nodeDraft: null, diagnostics: [] });
+  }
+
+  function reportEditError(path, index, error) {
+    const location = Number.isInteger(index) ? `${path}[${index}]` : path;
+    return publish(failedState(
+      state,
+      new TypeError(`${location}: ${error instanceof Error ? error.message : 'Invalid record edit.'}`),
+      'LFEA_RECORD_EDIT_REJECTED',
+    ));
   }
 
   function undo() {
@@ -121,6 +215,8 @@ export function createLfeaWorkbenchStore(options) {
       status: 'READY',
       packageValue,
       execution: null,
+      progress: null,
+      nodeDraft: null,
       past: state.past.slice(0, -1),
       future: [state.packageValue, ...state.future].filter(Boolean).slice(0, HISTORY_LIMIT),
       diagnostics: [],
@@ -135,6 +231,8 @@ export function createLfeaWorkbenchStore(options) {
       status: 'READY',
       packageValue,
       execution: null,
+      progress: null,
+      nodeDraft: null,
       past: [...state.past, state.packageValue].filter(Boolean).slice(-HISTORY_LIMIT),
       future: state.future.slice(1),
       diagnostics: [],
@@ -173,8 +271,17 @@ export function createLfeaWorkbenchStore(options) {
     updateRecord,
     deleteRecord,
     moveNode,
+    previewNodeMove,
+    commitNodeMove,
+    cancelNodeMove,
     setResultMode,
     run,
+    beginRun,
+    updateRunProgress,
+    completeRun,
+    failRun,
+    cancelRun,
+    reportEditError,
     undo,
     redo,
     exportDocument,
@@ -184,90 +291,4 @@ export function createLfeaWorkbenchStore(options) {
     getState: () => state,
     destroy: () => listeners.clear(),
   });
-}
-
-function importedState(state, value) {
-  const envelope = isRecord(value) && value.schema === LFEA_WORKBENCH_DOCUMENT_SCHEMA;
-  const packageValue = normalizeLfeaMeshPackage(envelope ? value.packageValue : value);
-  return committedState(state, packageValue);
-}
-
-function committedState(state, packageValue) {
-  return {
-    ...state,
-    status: 'READY',
-    packageValue,
-    execution: null,
-    past: [...state.past, state.packageValue].filter(Boolean).slice(-HISTORY_LIMIT),
-    future: [],
-    diagnostics: [],
-  };
-}
-
-function failedState(state, error, fallbackCode) {
-  return {
-    ...state,
-    status: 'FAILED',
-    diagnostics: [{
-      severity: 'ERROR',
-      code: typeof error?.code === 'string' ? error.code : fallbackCode,
-      message: error instanceof Error ? error.message : 'Unknown LFEA workbench failure.',
-    }],
-  };
-}
-
-function requirePackage(state) {
-  if (!state.packageValue) throw new TypeError('Import a valid lfea-mesh-package/v1 before editing or solving.');
-  return state.packageValue;
-}
-
-function collectionAt(packageValue, path) {
-  assertCollectionPath(path);
-  const value = getAtPath(packageValue, path);
-  if (!Array.isArray(value)) throw new TypeError(`${path} is not an LFEA collection.`);
-  return structuredClone(value);
-}
-
-function getAtPath(value, path) {
-  return path.split('.').reduce((current, key) => current?.[key], value);
-}
-
-function setAtPath(value, path, replacement) {
-  const result = structuredClone(value);
-  const keys = path.split('.');
-  let current = result;
-  for (const key of keys.slice(0, -1)) {
-    if (!isRecord(current[key])) throw new TypeError(`Missing LFEA package path: ${path}.`);
-    current = current[key];
-  }
-  current[keys.at(-1)] = replacement;
-  return result;
-}
-
-function assertCollectionPath(path) {
-  if (!LFEA_COLLECTION_PATHS.includes(path)) throw new TypeError(`Unsupported LFEA collection path: ${path}.`);
-}
-
-function assertResultMode(mode) {
-  if (!LFEA_RESULT_MODES.includes(mode)) throw new TypeError(`Unsupported LFEA result mode: ${mode}.`);
-}
-
-function assertRecord(value) {
-  if (!isRecord(value)) throw new TypeError('LFEA record must be a JSON object.');
-}
-
-function assertIndex(rows, index, path) {
-  if (!Number.isInteger(index) || index < 0 || index >= rows.length) {
-    throw new RangeError(`LFEA record index ${index} is outside ${path}.`);
-  }
-}
-
-function isRecord(value) {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function freeze(value) {
-  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
-  Object.values(value).forEach(freeze);
-  return Object.freeze(value);
 }

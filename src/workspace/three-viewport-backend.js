@@ -1,11 +1,21 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { createThreePrimitive } from './three-primitive-factory.js';
-import { disposeThreeEngineeringObject } from './three-object-disposal.js';
-import { assertViewportRenderModel } from './viewport-render-model.js';
 import { DEFAULT_VIEWPORT_CAPABILITIES } from './viewport-command-contract.js';
 import { ThreeInteractionArbiter } from './three-interaction-arbiter.js';
 import { ThreeSelectionOverlay } from './three-selection-overlay.js';
+import {
+  fitThreeSelection,
+  fitThreeView,
+  restoreThreeHome,
+  setThreeStandardView,
+} from './three-viewport-camera.js';
+import {
+  clearThreeHostMetadata,
+  clearThreeSceneObjects,
+  renderThreeModel,
+  resolveThreeEntityId,
+  updateThreeHostMetadata,
+} from './three-viewport-scene.js';
 import { ViewportAxisHUD } from './viewport-axis-hud.js';
 
 export class ThreeViewportBackend {
@@ -109,44 +119,7 @@ export class ThreeViewportBackend {
   }
 
   renderModel(model) {
-    assertViewportRenderModel(model);
-    this.clearSceneObjects();
-    this.model = model;
-    this.selectedEntityId = '';
-    const markerRadius = Math.max(model.bounds.radius * 0.018, 0.5);
-    this.raycaster.params.Line.threshold = Math.max(model.bounds.radius * 0.015, 0.5);
-
-    const processPrimitives = (primitives, group) => {
-      primitives.forEach((item) => {
-        const object = createThreePrimitive(item);
-        if (object) {
-          object.userData.entityId = item.objectId;
-          object.traverse((child) => {
-            if (!child.userData.entityId) child.userData.entityId = item.objectId;
-          });
-          
-          if (!this.objects.has(item.objectId)) {
-            this.objects.set(item.objectId, []);
-          }
-          this.objects.get(item.objectId).push(object);
-          group.add(object);
-        }
-      });
-    };
-
-    processPrimitives(model.physicalPrimitives || [], this.physicalGroup);
-    processPrimitives(model.supportOverlayPrimitives || [], this.supportGroup);
-    processPrimitives(model.diagnosticPrimitives || [], this.diagnosticGroup);
-
-    this.updateHostMetadata();
-    this.fitView();
-    
-    // Save initial camera state for 'Home'
-    this.initialCameraState = {
-      position: this.camera.position.clone(),
-      target: this.controls.target.clone(),
-      zoom: this.camera.zoom
-    };
+    renderThreeModel(this, model);
   }
 
   clear() {
@@ -171,143 +144,19 @@ export class ThreeViewportBackend {
   }
 
   fitView(targetBox = null) {
-    if (!this.camera || !this.controls) return;
-    
-    let box = targetBox;
-    if (!box) {
-      if (!this.model) return;
-      // Default to model bounds
-      box = new THREE.Box3();
-      const { center, radius } = this.model.bounds;
-      box.expandByPoint(new THREE.Vector3(center.x - radius, center.y - radius, center.z - radius));
-      box.expandByPoint(new THREE.Vector3(center.x + radius, center.y + radius, center.z + radius));
-    }
-    
-    if (box.isEmpty()) return;
-
-    const center = new THREE.Vector3();
-    box.getCenter(center);
-    const size = new THREE.Vector3();
-    box.getSize(size);
-
-    // Get 8 corners of the box
-    const corners = [
-      new THREE.Vector3(box.min.x, box.min.y, box.min.z),
-      new THREE.Vector3(box.min.x, box.min.y, box.max.z),
-      new THREE.Vector3(box.min.x, box.max.y, box.min.z),
-      new THREE.Vector3(box.min.x, box.max.y, box.max.z),
-      new THREE.Vector3(box.max.x, box.min.y, box.min.z),
-      new THREE.Vector3(box.max.x, box.min.y, box.max.z),
-      new THREE.Vector3(box.max.x, box.max.y, box.min.z),
-      new THREE.Vector3(box.max.x, box.max.y, box.max.z)
-    ];
-
-    // Compute view-space bounds
-    const v = new THREE.Vector3();
-    const viewMatrix = this.camera.matrixWorldInverse;
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    
-    for (const corner of corners) {
-      v.copy(corner).applyMatrix4(viewMatrix);
-      if (v.x < minX) minX = v.x;
-      if (v.x > maxX) maxX = v.x;
-      if (v.y < minY) minY = v.y;
-      if (v.y > maxY) maxY = v.y;
-    }
-
-    const w = maxX - minX;
-    const h = maxY - minY;
-    
-    const aspect = this.camera.aspect;
-    const fovY = this.camera.fov * THREE.MathUtils.DEG2RAD;
-    const fovX = 2 * Math.atan(Math.tan(fovY / 2) * aspect);
-    
-    const distY = (h / 2) / Math.tan(fovY / 2);
-    const distX = (w / 2) / Math.tan(fovX / 2);
-    
-    // Apply 10% margin
-    const margin = 1.1;
-    let distance = Math.max(distX, distY) * margin;
-    
-    // Clamp to prevent degenerate zooming
-    distance = Math.max(distance, 1.0);
-
-    const forward = new THREE.Vector3();
-    this.camera.getWorldDirection(forward);
-    
-    this.camera.position.copy(center).addScaledVector(forward, -distance);
-    this.controls.target.copy(center);
-    
-    if (this.model) {
-      const sceneRadius = this.model.bounds.radius;
-      this.camera.near = Math.max(distance / 1000, 0.01);
-      this.camera.far = Math.max(distance + sceneRadius * 2, 1000);
-    }
-    
-    this.camera.updateProjectionMatrix();
-    this.controls.update();
-    this.markViewCommand('fit');
-    this.renderOnce();
+    fitThreeView(this, targetBox);
   }
 
   fitSelection() {
-    if (!this.selectedEntityId) return;
-    const objects = this.objects.get(this.selectedEntityId);
-    if (!objects || !objects.length) return;
-    
-    const box = new THREE.Box3();
-    objects.forEach(obj => {
-      const objBox = new THREE.Box3().setFromObject(obj);
-      if (!objBox.isEmpty()) box.union(objBox);
-    });
-    if (!box.isEmpty()) {
-      this.fitView(box);
-    }
+    fitThreeSelection(this);
   }
   
   home() {
-    if (!this.initialCameraState || !this.camera || !this.controls) return;
-    this.camera.position.copy(this.initialCameraState.position);
-    this.camera.zoom = this.initialCameraState.zoom;
-    this.controls.target.copy(this.initialCameraState.target);
-    this.camera.updateProjectionMatrix();
-    this.controls.update();
-    this.markViewCommand('home');
-    this.renderOnce();
+    restoreThreeHome(this);
   }
 
   setStandardView(preset) {
-    if (!this.camera || !this.controls) return;
-    
-    const center = this.controls.target.clone();
-    const distance = this.camera.position.distanceTo(center);
-    
-    const dirs = {
-      'iso': new THREE.Vector3(1, 1, 1).normalize(),
-      'top': new THREE.Vector3(0, 1, 0),
-      'front': new THREE.Vector3(0, 0, 1),
-      'right': new THREE.Vector3(1, 0, 0)
-    };
-    
-    const dir = dirs[preset.toLowerCase()] || dirs.iso;
-    
-    this.camera.position.copy(center).addScaledVector(dir, distance);
-    this.camera.lookAt(center);
-    // When doing top view, align 'up' nicely to z axis
-    if (preset.toLowerCase() === 'top') {
-      this.camera.up.set(0, 0, -1);
-    } else {
-      this.camera.up.set(0, 1, 0);
-    }
-    
-    this.camera.updateProjectionMatrix();
-    this.controls.update();
-    
-    // Fit view slightly to ensure the standard view bounds look right
-    this.fitView();
-    
-    this.markViewCommand(preset.toLowerCase());
-    this.renderOnce();
+    setThreeStandardView(this, preset);
   }
 
   resetView() {
@@ -339,7 +188,7 @@ export class ThreeViewportBackend {
     });
     
     const intersection = this.raycaster.intersectObjects(allMeshes, true)[0];
-    const entityId = resolveEntityId(intersection?.object);
+    const entityId = resolveThreeEntityId(intersection?.object);
     
     if (entityId) {
       this.hostElement.dataset.lastPickEntityId = entityId;
@@ -370,7 +219,7 @@ export class ThreeViewportBackend {
     this.renderer?.dispose();
     this.renderer?.forceContextLoss?.();
     this.renderer?.domElement.remove();
-    if (this.hostElement) clearHostMetadata(this.hostElement);
+    if (this.hostElement) clearThreeHostMetadata(this.hostElement);
     this.hostElement = null;
     this.renderer = null;
     this.scene = null;
@@ -385,28 +234,11 @@ export class ThreeViewportBackend {
   }
 
   clearSceneObjects() {
-    const clearGroup = (group) => {
-      if (!group) return;
-      [...group.children].forEach((object) => {
-        group.remove(object);
-        disposeThreeEngineeringObject(object);
-      });
-    };
-    clearGroup(this.physicalGroup);
-    clearGroup(this.supportGroup);
-    clearGroup(this.diagnosticGroup);
-    this.objects.clear();
+    clearThreeSceneObjects(this);
   }
 
   updateHostMetadata() {
-    if (!this.hostElement) return;
-    const summary = this.model?.summary || {};
-    this.hostElement.dataset.renderableCount = String(summary.renderableCount || 0);
-    this.hostElement.dataset.skippedCount = String(summary.skippedCount || 0);
-    this.hostElement.dataset.resolvedCount = String(summary.resolvedCount || 0);
-    this.hostElement.dataset.fallbackCount = String(summary.fallbackCount || 0);
-    this.hostElement.dataset.componentKinds = Object.keys(summary.byKind || {}).sort().join(',');
-    this.hostElement.dataset.selectedEntityId = this.selectedEntityId;
+    updateThreeHostMetadata(this);
   }
 
   markViewCommand(command) {
@@ -435,18 +267,4 @@ export class ThreeViewportBackend {
       }
     }
   }
-}
-
-function resolveEntityId(object) {
-  let current = object;
-  while (current) {
-    if (current.userData?.entityId) return current.userData.entityId;
-    current = current.parent;
-  }
-  return '';
-}
-
-function clearHostMetadata(hostElement) {
-  ['viewportBackend', 'renderableCount', 'skippedCount', 'resolvedCount', 'fallbackCount',
-    'componentKinds', 'selectedEntityId', 'lastPickEntityId'].forEach((key) => delete hostElement.dataset[key]);
 }

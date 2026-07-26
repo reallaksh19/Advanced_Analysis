@@ -22,12 +22,69 @@ function solveQualifiedModel(model, loadCase) {
   const sparse = profileLinearBackend(model.solverProfile) === LINEAR_BACKENDS.SPARSE_PCG_V1;
   const system = sparse ? assembleSparseContinuumSystem(model, loadCase) : assembleContinuumSystem(model, loadCase);
   const partition = sparse ? partitionSparseSystem(system, model) : partitionSystem(system, model);
+  if (sparse) {
+    const coupling = toleranceCouplingFailure(model, system, partition);
+    if (coupling) return coupling;
+  }
   const backend = solveLinearSystem(partition, model.solverProfile);
   if (!backend.ok) return failedBackendResult(model, system, backend);
   const displacement = reconstructDisplacement(system.dofMap.length, partition, backend.solution);
   const recovery = recoverSystem(model, system, partition, displacement, backend, sparse);
   const failure = qualificationFailure(model, recovery);
   return failure || qualifiedResult(model, loadCase, recovery);
+}
+
+/**
+ * Reject a solver profile whose iterative residual target cannot satisfy its own
+ * acceptance gate.
+ *
+ * `absoluteResidualTolerance` / `relativeResidualTolerance` (what the iterative
+ * backend stops at) and `tolerances.residualForce*` (what the solver accepts)
+ * are independent fields of lfea-profile/v2. Nothing previously required the
+ * first to be tight enough for the second, so a profile could be written in
+ * which no solve can ever qualify, and the resulting FREE_RESIDUAL_FAILURE gave
+ * the user no indication that their PROFILE was the cause.
+ *
+ * PCG guarantees ||r||_2 <= target and ||r||_inf <= ||r||_2, so target <= limit
+ * is sufficient for the gate. target > limit is therefore reported here, before
+ * any iteration is spent.
+ */
+function toleranceCouplingFailure(model, system, partition) {
+  const profile = model.solverProfile;
+  const tolerances = profile.tolerances;
+  const loadScale = Math.max(1, vectorNormInfinity(system.appliedLoad));
+  const acceptanceLimit = tolerances.residualForceAbsolute + tolerances.residualForceRelative * loadScale;
+  const freeLoadNorm = Math.sqrt(partition.effectiveFreeLoad.reduce((sum, value) => sum + value * value, 0));
+  const iterativeTarget = Math.max(
+    profile.absoluteResidualTolerance,
+    profile.relativeResidualTolerance * freeLoadNorm,
+  );
+  if (iterativeTarget <= acceptanceLimit) return null;
+  const message = 'Unsatisfiable solver profile: the iterative residual target '
+    + `(${iterativeTarget.toExponential(3)}) exceeds the acceptance gate `
+    + `(${acceptanceLimit.toExponential(3)}), so no solve of this model can ever qualify. `
+    + 'Tighten solverProfile.absoluteResidualTolerance / relativeResidualTolerance, '
+    + 'or relax solverProfile.tolerances.residualForceAbsolute / residualForceRelative, '
+    + 'so that the target is at or below the gate. This is a profile configuration error, '
+    + 'not a numerical failure of the model.';
+  return rejectedResult(
+    model,
+    RESULT_STATUS.REJECTED_INVALID,
+    [diagnostic('UNSATISFIABLE_SOLVER_PROFILE_TOLERANCES', message)],
+    model.limitations,
+    {
+      toleranceCouplingEvidence: {
+        iterativeTarget,
+        acceptanceLimit,
+        absoluteResidualTolerance: profile.absoluteResidualTolerance,
+        relativeResidualTolerance: profile.relativeResidualTolerance,
+        residualForceAbsolute: tolerances.residualForceAbsolute,
+        residualForceRelative: tolerances.residualForceRelative,
+        appliedLoadInfinityNorm: loadScale,
+        effectiveFreeLoadL2Norm: freeLoadNorm,
+      },
+    },
+  );
 }
 
 function rejectedException(model, error) {

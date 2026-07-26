@@ -6,9 +6,23 @@
  */
 import { validateMeshPackage } from '../core/element-fea/index.js';
 import { semanticHash } from '../core/shared-piping-model/canonical-json.js';
+import { FIELD_IDS, REDUCTIONS, selectElementField, selectProjectedField } from './lfea-field-adapter.js';
+import {
+  GEOMETRY_STATES, createGeometryOnlyDescriptor, createPlotDescriptor,
+} from './lfea-plot-descriptor.js';
+import {
+  QUALITY_METRICS,
+  selectQualityField,
+} from './lfea-quality-adapter.js';
 
 export const LFEA_WORKBENCH_DOCUMENT_SCHEMA = 'lfea-workbench-document/v1';
-export const LFEA_RESULT_MODES = Object.freeze(['MODEL', 'DEFORMED', 'RAW_STRESS', 'PROJECTED_STRESS']);
+export const LFEA_RESULT_MODES = Object.freeze([
+  'MODEL',
+  'DEFORMED',
+  'RAW_STRESS',
+  'PROJECTED_STRESS',
+  'MESH_QUALITY',
+]);
 export const LFEA_COLLECTION_PATHS = Object.freeze([
   'nodes',
   'elements',
@@ -55,40 +69,153 @@ export function resealLfeaMeshPackage(input) {
 }
 
 /**
+ * Apply one uncommitted node-coordinate draft for SVG preview only.
+ *
+ * The returned value is not resealed and must never enter the solver. Commit
+ * routes through resealLfeaMeshPackage after explicit user confirmation.
+ */
+export function lfeaPreviewPackage(packageInput, nodeDraft) {
+  if (!nodeDraft || !isRecord(packageInput)) return packageInput;
+  const value = structuredClone(packageInput);
+  value.nodes = (value.nodes ?? []).map((node) =>
+    node.nodeId === nodeDraft.nodeId
+      ? { ...node, x: nodeDraft.x, y: nodeDraft.y }
+      : node);
+  return value;
+}
+
+/**
  * Derive display geometry for model, displacement, and stress modes.
+ *
+ * Geometry state is now an EXPLICIT, orthogonal option. It is never implied by
+ * the result mode: a stress plot is drawn on undeformed source coordinates
+ * unless the caller asks for deformation and supplies a scale.
+ *
+ * Field values are SELECTED from kernel evidence through lfea-field-adapter.
+ * No physical quantity is computed in this module.
  *
  * @param {unknown} packageInput Current mesh package.
  * @param {unknown} execution Workbench execution or null.
  * @param {string} mode Result display mode.
- * @returns {Readonly<Record<string, unknown>>} SVG-ready geometry and authority.
+ * @param {{deformation?:{enabled:boolean,scale:number}, ipReduction?:string, fieldId?:string}} options Explicit display options.
+ * @returns {Readonly<Record<string, unknown>>} SVG-ready geometry and plot descriptor.
  */
-export function lfeaDisplayGeometry(packageInput, execution, mode) {
+export function lfeaDisplayGeometry(packageInput, execution, mode, options = {}) {
   if (!LFEA_RESULT_MODES.includes(mode)) throw new TypeError(`Unsupported LFEA result mode: ${mode}.`);
   const packageValue = isRecord(packageInput) ? packageInput : {};
   const nodes = Array.isArray(packageValue.nodes) ? packageValue.nodes : [];
   const elements = Array.isArray(packageValue.elements) ? packageValue.elements : [];
-  const displacement = displacementMap(execution?.result);
-  const scale = execution?.review?.geometryReview?.deformationScale ?? 10;
+
+  const deformation = resolveDeformation(mode, options.deformation);
+  const displacement = deformation.enabled ? displacementMap(execution?.result) : new Map();
   const displayNodes = nodes.map((node) => {
+    if (!deformation.enabled) {
+      return { nodeId: node.nodeId, sourceX: node.x, sourceY: node.y, x: node.x, y: node.y };
+    }
     const row = displacement.get(node.nodeId) ?? { UX: 0, UY: 0 };
-    const deformed = mode === 'MODEL' ? { x: node.x, y: node.y } : {
-      x: node.x + scale * row.UX,
-      y: node.y + scale * row.UY,
+    return {
+      nodeId: node.nodeId, sourceX: node.x, sourceY: node.y,
+      x: node.x + deformation.scale * row.UX,
+      y: node.y + deformation.scale * row.UY,
     };
-    return { nodeId: node.nodeId, sourceX: node.x, sourceY: node.y, ...deformed };
   });
+
+  const field = resolveField(packageValue, execution, mode, options);
+  const descriptor = field
+    ? createPlotDescriptor({
+      field,
+      geometryState: deformation.enabled ? GEOMETRY_STATES.DEFORMED : GEOMETRY_STATES.UNDEFORMED,
+      deformationScale: deformation.enabled ? deformation.scale : 0,
+      authority: field.authority,
+      unitsIdentity: packageValue.unitsIdentity ?? null,
+    })
+    : createGeometryOnlyDescriptor({ unitsIdentity: packageValue.unitsIdentity ?? null });
+
   return freeze({
     mode,
     nodes: displayNodes,
-    elements: elements.map((row) => ({ elementId: row.elementId, nodeIds: [...row.nodeIds], elementType: row.elementType })),
-    values: stressValues(execution, mode, elements),
-    authority: displayAuthority(execution, mode),
+    elements: elements.map((row) => ({
+      elementId: row.elementId, nodeIds: [...row.nodeIds], elementType: row.elementType,
+    })),
+    values: field ? { ...field.byElement } : {},
+    field: field ?? null,
+    plot: descriptor,
+    geometryState: descriptor.geometryState,
+    deformationScale: descriptor.deformationScale,
+    caption: descriptor.caption,
+    authority: displayAuthority(execution, mode, field),
   });
 }
 
-function displayAuthority(execution, mode) {
-  if (mode === 'RAW_STRESS') return execution?.authorityPolicy?.rawStress ?? 'NO_QUALIFIED_RESULT';
-  if (mode === 'PROJECTED_STRESS') return execution?.authorityPolicy?.projectedStress ?? 'NOT_GENERATED';
+/**
+ * Deformation is opt-in. DEFORMED mode implies it; every other mode requires
+ * an explicit request. There is no implicit default scale anywhere.
+ *
+ * @param {string} mode Result display mode.
+ * @param {{enabled?:boolean,scale?:number}|undefined} requested Caller request.
+ * @returns {{enabled:boolean,scale:number}} Resolved deformation state.
+ */
+function resolveDeformation(mode, requested) {
+  const wants = mode === 'DEFORMED' || Boolean(requested?.enabled);
+  if (!wants) return { enabled: false, scale: 0 };
+  const scale = requested?.scale;
+  if (!(Number.isFinite(scale) && scale > 0)) {
+    throw new TypeError('Deformed display requires an explicit positive deformation scale.');
+  }
+  return { enabled: true, scale };
+}
+
+function resolveField(packageValue, execution, mode, options) {
+  const result = execution?.result;
+  if (!result || result.status !== 'QUALIFIED') return null;
+  const unit = packageValue?.analysisDefinition?.solverProfile?.units?.stress;
+  if (mode === 'RAW_STRESS') {
+    assertStressUnit(unit);
+    const reduction = options.ipReduction ?? REDUCTIONS.Q4_MAX_OVER_IP;
+    return selectElementField(result, options.fieldId ?? FIELD_IDS.VON_MISES, unit, reduction);
+  }
+  if (mode === 'PROJECTED_STRESS') {
+    if (!execution.stressProjection) return null;
+    assertStressUnit(unit);
+    return selectProjectedField(
+      execution.stressProjection,
+      packageValue.elements ?? [],
+      options.fieldId ?? FIELD_IDS.PROJECTED_SX,
+      unit,
+    );
+  }
+  if (mode === 'MESH_QUALITY') {
+    return selectQualityField(
+      result,
+      options.fieldId ?? qualityMetricFor(result),
+    );
+  }
+  return null;
+}
+
+function qualityMetricFor(result) {
+  const rows = result.elementQualityEvidence ?? [];
+  const hasQ4Metric = rows.some((row) =>
+    Number.isFinite(row.evidence?.jacobianDeterminantRatio));
+  return hasQ4Metric
+    ? QUALITY_METRICS.JACOBIAN_RATIO
+    : QUALITY_METRICS.SIGNED_AREA;
+}
+
+function assertStressUnit(unit) {
+  if (typeof unit !== 'string' || !unit.trim()) {
+    throw new TypeError(
+      'The solver profile must declare a stress unit before a field can be displayed.',
+    );
+  }
+}
+
+function displayAuthority(execution, mode, field) {
+  if (mode === 'RAW_STRESS') return field?.authority ?? 'NO_QUALIFIED_RESULT';
+  if (mode === 'PROJECTED_STRESS') return field?.authority ?? 'NOT_GENERATED';
+  if (mode === 'MESH_QUALITY') {
+    return field?.authority ?? 'NO_QUALIFIED_QUALITY_EVIDENCE';
+  }
   if (mode === 'DEFORMED') return 'SCALED_DEFORMATION_REVIEW_GEOMETRY';
   return 'SOURCE_MESH_GEOMETRY';
 }
@@ -101,33 +228,6 @@ function displacementMap(result) {
     map.set(row.nodeId, values);
   }
   return map;
-}
-
-function stressValues(execution, mode, elements) {
-  if (mode === 'RAW_STRESS') return rawStressValues(execution?.result);
-  if (mode !== 'PROJECTED_STRESS') return {};
-  const rows = execution?.stressProjection?.nodalValues ?? [];
-  const byNode = new Map(rows.filter((row) => row.stressComponent === 'SX').map((row) => [row.nodeId, row.weightedValue]));
-  return Object.fromEntries(elements.map((element) => {
-    const values = element.nodeIds.map((id) => byNode.get(id)).filter(Number.isFinite);
-    return [element.elementId, values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null];
-  }));
-}
-
-function rawStressValues(result) {
-  const values = {};
-  for (const row of result?.elementStresses ?? []) values[row.elementId] = vonMises(row.values);
-  for (const row of result?.integrationPointResults ?? []) {
-    values[row.elementId] = Math.max(values[row.elementId] ?? -Infinity, row.vonMisesStress);
-  }
-  return values;
-}
-
-function vonMises(values) {
-  const [sx, sy, txy] = values ?? [];
-  return Number.isFinite(sx) && Number.isFinite(sy) && Number.isFinite(txy)
-    ? Math.sqrt(sx ** 2 - sx * sy + sy ** 2 + 3 * txy ** 2)
-    : null;
 }
 
 function canonicalOrder(value) {

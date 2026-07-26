@@ -94,7 +94,7 @@ function checkActionAvailability() {
   const minimalModel = createLoadCalculationReviewModel(minimalContext);
   const minimal = createLoadCalcActionAvailability(minimalContext, minimalModel);
   assert.deepEqual(minimal, {
-    rebuildModelLoads: true,
+    rebuildModelLoads: false,
     exportModelLoads: true,
     rebuildPaths: false,
     runScreening: false,

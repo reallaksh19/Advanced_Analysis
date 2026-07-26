@@ -1,3 +1,5 @@
+> **SUPERSEDED** — Historical document. Follow `ARCHITECTURE_TRUTH.md`.
+
 # Project Tasks Record
 
 | Date/Time | Task No. | Task Description | Implementation | Updated modules | Record | PR_Branchname | zip file path(if true) |

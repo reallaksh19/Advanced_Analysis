@@ -102,6 +102,19 @@ export function createLafeaWorkbenchStore(options) {
     return updateRecord(nodePath, index, row);
   }
 
+  function reportEditError(path, index, error) {
+    return publish({
+      ...failedState(state, error, 'LAFEA_RECORD_EDIT_REJECTED'),
+      diagnostics: [{
+        severity: 'ERROR',
+        code: 'LAFEA_RECORD_EDIT_REJECTED',
+        path,
+        index,
+        message: error instanceof Error ? error.message : 'Unknown LAFEA record edit failure.',
+      }],
+    });
+  }
+
   function run() {
     const document = requireDocument(state);
     const execution = executeLafeaStage(state.activeStageId, document);
@@ -166,6 +179,7 @@ export function createLafeaWorkbenchStore(options) {
     addRecord,
     deleteRecord,
     moveNode,
+    reportEditError,
     run,
     undo,
     redo,
