@@ -6,8 +6,9 @@
  */
 import { createLafeaWorkbenchStore } from './lafea-workbench-store.js';
 import { LAFEA_WORKBENCH_STYLES } from './lafea-workbench-styles.js';
+import { FeaBenchmarkPanel } from './fea-benchmark-panel.js';
+import { FEA_BENCHMARK_STYLES } from './fea-benchmark-styles.js';
 import { LafeaWorkbenchView } from './lafea-workbench-view.js';
-import { createLafeaMockDocument } from './advanced-mock-data.js';
 
 export class LafeaWorkbenchController {
   /**
@@ -19,6 +20,10 @@ export class LafeaWorkbenchController {
     this.documentRef = rootElement?.ownerDocument ?? globalThis.document;
     this.store = createLafeaWorkbenchStore(options);
     this.view = new LafeaWorkbenchView(rootElement);
+    this.benchmarkHost = this.documentRef.createElement('div');
+    this.benchmarkHost.dataset.role = 'lafea-benchmark-host';
+    this.benchmarkPanel = new FeaBenchmarkPanel(this.benchmarkHost, { surface: 'LAFEA' });
+    this.view.setBenchmarkHost(this.benchmarkHost);
     this.unsubscribe = null;
   }
 
@@ -38,10 +43,28 @@ export class LafeaWorkbenchController {
       onUpdateRecord: (path, index, text) => this.updateRecordText(path, index, text),
       onDeleteRecord: (path, index) => this.store.deleteRecord(path, index),
       onMoveNode: (path, nodeId, x, y) => this.store.moveNode(path, nodeId, x, y),
+      onBenchmark: () => this.runBenchmark(),
     });
+    this.benchmarkPanel.render();
     this.unsubscribe = this.store.subscribe((state) => this.view.render(state));
     this.view.render(this.store.getState());
     return this;
+  }
+
+  /**
+   * Run the FEA verification suite against the live code paths.
+   *
+   * @returns {Promise<Record<string, unknown>>} Benchmark report.
+   */
+  runBenchmark() {
+    return this.benchmarkPanel.run();
+  }
+
+  /**
+   * @returns {Record<string, unknown>|null} Last benchmark report, if any.
+   */
+  getBenchmarkReport() {
+    return this.benchmarkPanel.getReport();
   }
 
   async loadFile(file) {
@@ -64,7 +87,8 @@ export class LafeaWorkbenchController {
    * @param {string} stageId Exact active LAFEA stage.
    * @returns {Readonly<Record<string, unknown>>} Updated workbench state.
    */
-  loadMockData(stageId) {
+  async loadMockData(stageId) {
+    const { createLafeaMockDocument } = await import('./advanced-mock-data.js');
     return this.importDocument(createLafeaMockDocument(stageId), stageId);
   }
 
@@ -76,7 +100,7 @@ export class LafeaWorkbenchController {
     try {
       return this.store.replaceDocument(parseJsonObject(text, 'LAFEA document'));
     } catch (error) {
-      return this.store.importDocument(invalidImport(error));
+      return this.store.reportEditError('document', -1, error);
     }
   }
 
@@ -84,7 +108,7 @@ export class LafeaWorkbenchController {
     try {
       return this.store.addRecord(path, parseJsonObject(text, 'LAFEA record'));
     } catch (error) {
-      return this.store.importDocument(invalidImport(error));
+      return this.store.reportEditError(path, -1, error);
     }
   }
 
@@ -92,7 +116,7 @@ export class LafeaWorkbenchController {
     try {
       return this.store.updateRecord(path, index, parseJsonObject(text, 'LAFEA record'));
     } catch (error) {
-      return this.store.importDocument(invalidImport(error));
+      return this.store.reportEditError(path, index, error);
     }
   }
 
@@ -119,6 +143,7 @@ export class LafeaWorkbenchController {
   }
 
   destroy() {
+    this.benchmarkPanel.destroy();
     this.unsubscribe?.();
     this.unsubscribe = null;
     this.store.destroy();
@@ -131,7 +156,7 @@ function installStyles(documentRef) {
   if (!documentRef || documentRef.querySelector('[data-lafea-workbench-styles]')) return;
   const style = documentRef.createElement('style');
   style.dataset.lafeaWorkbenchStyles = 'true';
-  style.textContent = LAFEA_WORKBENCH_STYLES;
+  style.textContent = `${LAFEA_WORKBENCH_STYLES}\n${FEA_BENCHMARK_STYLES}`;
   documentRef.head?.append(style);
 }
 
@@ -168,5 +193,18 @@ function downloadJson(documentRef, value, filename) {
   documentRef.body?.append(anchor);
   anchor.click();
   anchor.remove();
-  queueMicrotask(() => URL.revokeObjectURL(url));
+  revokeObjectUrlAfterDownload(documentRef, url);
+}
+
+function revokeObjectUrlAfterDownload(documentRef, url) {
+  let revoked = false;
+  const revoke = () => {
+    if (revoked) return;
+    revoked = true;
+    URL.revokeObjectURL(url);
+    globalThis.clearTimeout(timeout);
+    globalThis.removeEventListener?.('focus', revoke);
+  };
+  const timeout = globalThis.setTimeout(revoke, 30_000);
+  globalThis.addEventListener?.('focus', revoke, { once: true });
 }

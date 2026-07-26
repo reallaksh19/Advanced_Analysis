@@ -4,7 +4,7 @@ export const VIEWPORT_HIT_TOLERANCE_PX = 10;
 export function buildCanvasProjection(model, width, height, padding = DEFAULT_PADDING) {
   const safeWidth = Math.max(Number(width) || 0, 1);
   const safeHeight = Math.max(Number(height) || 0, 1);
-  const projected = model.items
+  const projected = viewportItems(model)
     .flatMap(itemPoints)
     .filter(Boolean)
     .map(projectViewportPoint);
@@ -39,16 +39,17 @@ export function pickViewportItem(
   screenPoint,
   tolerance = VIEWPORT_HIT_TOLERANCE_PX,
 ) {
-  if (!model?.items?.length || !isScreenPoint(screenPoint)) return '';
+  const items = viewportItems(model);
+  if (!items.length || !isScreenPoint(screenPoint)) return '';
   const projection = buildCanvasProjection(model, width, height);
   let bestEntityId = '';
   let bestDistance = Number.POSITIVE_INFINITY;
 
-  model.items.forEach((item) => {
+  items.forEach((item) => {
     const distance = distanceToItem(item, screenPoint, projection);
     if (distance <= tolerance && distance < bestDistance) {
       bestDistance = distance;
-      bestEntityId = item.entityId;
+      bestEntityId = item.objectId;
     }
   });
 
@@ -74,13 +75,14 @@ function distanceToItem(item, screenPoint, projection) {
 
 function itemSegments(item) {
   const segments = [];
-  if (Array.isArray(item.path) && item.path.length > 1) {
-    for (let index = 1; index < item.path.length; index += 1) {
-      segments.push([item.path[index - 1], item.path[index]]);
+  const primitive = item.primitive ?? {};
+  if (Array.isArray(primitive.path) && primitive.path.length > 1) {
+    for (let index = 1; index < primitive.path.length; index += 1) {
+      segments.push([primitive.path[index - 1], primitive.path[index]]);
     }
   }
-  if (Array.isArray(item.legs)) {
-    item.legs.forEach((leg) => {
+  if (Array.isArray(primitive.legs)) {
+    primitive.legs.forEach((leg) => {
       if (leg?.start && leg?.end) segments.push([leg.start, leg.end]);
     });
   }
@@ -90,11 +92,20 @@ function itemSegments(item) {
 
 function itemPoints(item) {
   const points = [item.start, item.end, item.center];
-  if (Array.isArray(item.path)) points.push(...item.path);
-  if (Array.isArray(item.legs)) {
-    item.legs.forEach((leg) => points.push(leg?.start, leg?.end));
+  const primitive = item.primitive ?? {};
+  if (Array.isArray(primitive.path)) points.push(...primitive.path);
+  if (Array.isArray(primitive.legs)) {
+    primitive.legs.forEach((leg) => points.push(leg?.start, leg?.end));
   }
   return points;
+}
+
+function viewportItems(model) {
+  return [
+    ...(model?.physicalPrimitives ?? []),
+    ...(model?.supportOverlayPrimitives ?? []),
+    ...(model?.diagnosticPrimitives ?? []),
+  ];
 }
 
 function distanceToSegment(point, start, end) {

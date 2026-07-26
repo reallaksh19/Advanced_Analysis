@@ -11,6 +11,14 @@ import {
   symbolicDiameter,
   uniquePoints,
 } from './engineering-geometry-math.js';
+import {
+  hasSpan,
+  markerFallback,
+  outcome,
+  pathLength,
+  skipped,
+  summarizeGeometry,
+} from './resolved-engineering-outcomes.js';
 
 export const RESOLVED_ENGINEERING_GEOMETRY_SCHEMA = 'resolved-engineering-geometry/v1';
 export const RESOLVED_ENGINEERING_ITEM_SCHEMA = 'resolved-engineering-item/v1';
@@ -26,7 +34,7 @@ export function buildResolvedEngineeringGeometry(dataset) {
     else items.push(resolved);
   });
 
-  const summary = summarize(items, skipped);
+  const summary = summarizeGeometry(items, skipped);
   return freezeDeep({
     schema: RESOLVED_ENGINEERING_GEOMETRY_SCHEMA,
     datasetId: dataset.datasetId,
@@ -271,48 +279,6 @@ function resolveGeneric(geometry, dimensions) {
   return markerFallback(geometry.center, dimensions.outerDiameterMm || dimensions.nominalBoreMm, 'GENERIC_POINT_SYMBOL');
 }
 
-function markerFallback(center, diameter, reason) {
-  if (!center) return skipped(reason);
-  return outcome('fallback', reason, [{
-    kind: 'FALLBACK_MARKER',
-    center,
-    diameterMm: diameter,
-    visualDiameterMm: symbolicDiameter(diameter || 100, diameter),
-  }]);
-}
-
-function outcome(status, reason, primitives) {
-  return { status, reason, primitives: freezeDeep(primitives) };
-}
-
-function skipped(reason) {
-  return { status: 'skipped', reason, primitives: freezeDeep([]) };
-}
-
-function summarize(items, skipped) {
-  const byKind = {};
-  const byStatus = { resolved: 0, fallback: 0, skipped: skipped.length };
-  items.forEach((item) => {
-    byKind[item.componentKind] = (byKind[item.componentKind] || 0) + 1;
-    byStatus[item.resolutionStatus] += 1;
-  });
-  return freezeDeep({
-    renderableCount: items.length,
-    resolvedCount: byStatus.resolved,
-    fallbackCount: byStatus.fallback,
-    skippedCount: byStatus.skipped,
-    byKind,
-    byStatus,
-  });
-}
-
-function pathLength(path) {
-  let total = 0;
-  for (let index = 1; index < path.length; index += 1) total += distance3(path[index - 1], path[index]);
-  return total;
-}
-
-function hasSpan(start, end) { return Boolean(start && end && distance3(start, end) > 1e-6); }
 function assertDataset(dataset) {
   if (!dataset || dataset.schema !== WORKSPACE_DATASET_SCHEMA || !Array.isArray(dataset.entities)) {
     throw new TypeError(`Resolved engineering geometry requires ${WORKSPACE_DATASET_SCHEMA}.`);

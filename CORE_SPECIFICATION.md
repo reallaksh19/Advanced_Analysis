@@ -1,3 +1,5 @@
+> **SUPERSEDED** — Historical document. Follow `ARCHITECTURE_TRUTH.md`.
+
 # Core Specification
 
 ## Purpose

@@ -103,8 +103,13 @@ const model = buildViewportRenderModel(state.getSnapshot().dataset);
 const width = 500;
 const height = 360;
 const projection = buildCanvasProjection(model, width, height);
-const segment = model.items.find((item) => item.entityId === 'PIPE-SEGMENT');
-const point = model.items.find((item) => item.entityId === 'PIPE-POINT');
+const renderItems = [
+  ...model.physicalPrimitives,
+  ...model.supportOverlayPrimitives,
+  ...model.diagnosticPrimitives,
+];
+const segment = renderItems.find((item) => item.objectId === 'PIPE-SEGMENT');
+const point = renderItems.find((item) => item.objectId === 'PIPE-POINT');
 const segmentStart = projection(segment.start);
 const segmentEnd = projection(segment.end);
 const segmentMidpoint = {
@@ -118,10 +123,11 @@ assert.equal(pickViewportItem(model, width, height, pointScreen), 'PIPE-POINT');
 assert.equal(pickViewportItem(model, width, height, { x: width - 2, y: 2 }), '');
 
 const sourceChecks = new Map([
-  ['src/workspace/tree-panel.js', ['VIEWPORT_SELECTION_REQUESTED', "source: 'tree'"]],
+  ['src/workspace/tree-panel-events.js', ['VIEWPORT_SELECTION_REQUESTED', "source: 'tree'"]],
   ['src/workspace/viewport-panel.js', ['VIEWPORT_SELECTION_REQUESTED', "source: 'viewport'"]],
   ['src/workspace/canvas2d-viewport-backend.js', ['pickViewportItem', "removeEventListener('pointerup'"]],
-  ['src/workspace/three-viewport-backend.js', ['new THREE.Raycaster()', 'intersectObjects', "removeEventListener('pointerup'"]],
+  ['src/workspace/three-viewport-backend.js', ['new THREE.Raycaster()', 'intersectObjects']],
+  ['src/workspace/three-interaction-arbiter.js', ["removeEventListener('pointerup'"]],
   ['src/workspace/viewport-renderer.js', ['setSelectionRequestHandler', 'backend?.setSelectionRequestHandler(null)']],
 ]);
 for (const [relativePath, contracts] of sourceChecks) {

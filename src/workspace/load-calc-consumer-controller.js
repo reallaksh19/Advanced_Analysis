@@ -7,7 +7,6 @@ import { APPLICATION_EVENTS, EVENT_TOPICS } from './event-topics.js';
 import { MODEL_LOAD_EVENTS } from './model-load-events.js';
 import { SUPPORT_LOAD_SCREENING_EVENTS } from './support-load-screening-events.js';
 import { renderLoadCalcConsumer } from './load-calc-consumer-view.js';
-import { createWorkspaceMockPackage } from './advanced-mock-data.js';
 
 const ACTION_FAILURES = Object.freeze({
   rebuildModelLoads: 'Complete validated W10.4 evidence is required.',
@@ -138,7 +137,8 @@ export class LoadCalcConsumerController {
     if (!this.actionAvailability[actionKey]) return this.handleFailure(ACTION_FAILURES[actionKey]);
     this.eventBus.publish(topic, {});
   }
-  loadMockData() {
+  async loadMockData() {
+    const { createWorkspaceMockPackage } = await import('./advanced-mock-data.js');
     this.status = { message: 'Loading [SIMULATED] Workspace and Load Calc inputs.' };
     this.render();
     this.eventBus.publish(EVENT_TOPICS.DATASET_LOAD_REQUESTED, {

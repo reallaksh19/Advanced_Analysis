@@ -8,6 +8,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const WIDTH = 760;
 const HEIGHT = 440;
 const PADDING = 36;
+const KEYBOARD_NUDGE = 0.001;
 
 /**
  * Replace a host's content with the current LAFEA geometry preview.
@@ -22,7 +23,7 @@ export function renderLafeaWorkbenchSvg(host, geometry, handlers) {
   const documentRef = host.ownerDocument;
   const svg = documentRef.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('viewBox', `0 0 ${WIDTH} ${HEIGHT}`);
-  svg.setAttribute('role', 'img');
+  svg.setAttribute('role', geometry.nodePath ? 'group' : 'img');
   svg.setAttribute('aria-label', 'LAFEA editable geometry preview');
   const transform = viewportTransform(geometry.nodes);
   renderElements(svg, geometry, transform);
@@ -54,15 +55,40 @@ function renderNodes(svg, geometry, transform, handlers) {
     marker.setAttribute('cx', String(x));
     marker.setAttribute('cy', String(y));
     marker.setAttribute('r', '6');
-    marker.tabIndex = 0;
+    marker.setAttribute('tabindex', '0');
+    marker.setAttribute('role', geometry.nodePath ? 'button' : 'graphics-symbol');
+    marker.setAttribute(
+      'aria-label',
+      geometry.nodePath
+        ? `${node.nodeId} at ${node.x}, ${node.y}. Use arrow keys to move.`
+        : `${node.nodeId} at ${node.x}, ${node.y}.`,
+    );
     const label = svg.ownerDocument.createElementNS(SVG_NS, 'text');
     label.setAttribute('x', String(x + 8));
     label.setAttribute('y', String(y - 8));
     label.textContent = node.nodeId;
     group.append(marker, label);
-    if (geometry.nodePath) bindDrag(svg, marker, node, geometry.nodePath, transform, handlers);
+    if (geometry.nodePath) {
+      bindDrag(svg, marker, node, geometry.nodePath, transform, handlers);
+      bindKeyboard(marker, node, geometry.nodePath, handlers);
+    }
     svg.append(group);
   }
+}
+
+function bindKeyboard(marker, node, nodePath, handlers) {
+  marker.addEventListener('keydown', (event) => {
+    const offsets = {
+      ArrowLeft: [-KEYBOARD_NUDGE, 0],
+      ArrowRight: [KEYBOARD_NUDGE, 0],
+      ArrowUp: [0, KEYBOARD_NUDGE],
+      ArrowDown: [0, -KEYBOARD_NUDGE],
+    };
+    const offset = offsets[event.key];
+    if (!offset) return;
+    event.preventDefault();
+    handlers.onMoveNode(nodePath, node.nodeId, node.x + offset[0], node.y + offset[1]);
+  });
 }
 
 function bindDrag(svg, marker, node, nodePath, transform, handlers) {

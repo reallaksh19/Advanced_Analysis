@@ -1,3 +1,5 @@
+> **SUPERSEDED** — Historical document. Follow `ARCHITECTURE_TRUTH.md`.
+
 # Core Rules & Engineering Specifications: Calc Extended Module
 
 This document serves as the absolute source of truth for the mathematical formulas, structural logic, and architectural mandates required to build the "Calc Extended" module, derived directly from the Fluor Pipe Stress Analysis Manual.

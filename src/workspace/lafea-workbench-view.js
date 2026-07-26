@@ -9,6 +9,16 @@ import {
   lafeaCollectionPaths,
   lafeaPreviewGeometry,
 } from './lafea-workbench-model.js';
+import {
+  actionButton,
+  captureFocusedControl,
+  card,
+  collectionTable,
+  element,
+  restoreFocusedControl,
+  valueAt,
+} from './lafea-workbench-dom.js';
+import { renderLafeaEvidence } from './lafea-results-view.js';
 import { renderLafeaWorkbenchSvg } from './lafea-workbench-svg.js';
 
 export class LafeaWorkbenchView {
@@ -20,6 +30,20 @@ export class LafeaWorkbenchView {
     this.handlers = null;
     this.collectionPath = null;
     this.selectedIndex = -1;
+    // Persistent host so a completed benchmark report survives stage switches.
+    this.benchmarkHost = null;
+    this.section = null;
+    this.slots = null;
+  }
+
+  /**
+   * Attach the persistent benchmark host element.
+   *
+   * @param {Element} hostElement Host owned by the controller.
+   * @returns {void}
+   */
+  setBenchmarkHost(hostElement) {
+    this.benchmarkHost = hostElement;
   }
 
   /**
@@ -40,20 +64,40 @@ export class LafeaWorkbenchView {
    */
   render(state) {
     if (!this.rootElement || !this.handlers) return;
+    const focused = captureFocusedControl(this.rootElement);
     const stage = state.stages[state.activeStageId];
     const paths = lafeaCollectionPaths(state.activeStageId);
     if (!paths.includes(this.collectionPath)) {
       this.collectionPath = paths[0] ?? null;
       this.selectedIndex = -1;
     }
-    const section = element(this.rootElement, 'section', 'lafea-workbench');
-    section.dataset.role = 'lafea-workbench';
-    section.append(this.header(state), this.stageNavigation(state), this.toolbar(state.activeStageId, stage), this.content(state, stage));
-    this.rootElement.replaceChildren(section);
+    this.ensureShell();
+    this.slots.header.replaceChildren(this.header(state));
+    this.slots.navigation.replaceChildren(this.stageNavigation(state));
+    this.slots.toolbar.replaceChildren(this.toolbar(state.activeStageId, stage));
+    this.slots.content.replaceChildren(this.content(state, stage));
+    restoreFocusedControl(this.rootElement, focused);
+  }
+
+  ensureShell() {
+    if (this.section) return;
+    this.section = element(this.rootElement, 'section', 'lafea-workbench');
+    this.section.dataset.role = 'lafea-workbench';
+    this.slots = Object.fromEntries(
+      ['header', 'navigation', 'toolbar', 'content'].map((name) => {
+        const slot = element(this.rootElement, 'div');
+        slot.dataset.lafeaSlot = name;
+        this.section.append(slot);
+        return [name, slot];
+      }),
+    );
+    this.rootElement.append(this.section);
   }
 
   destroy() {
     this.rootElement?.replaceChildren();
+    this.section = null;
+    this.slots = null;
     this.handlers = null;
   }
 
@@ -89,6 +133,10 @@ export class LafeaWorkbenchView {
   toolbar(stageId, stage) {
     const toolbar = element(this.rootElement, 'div', 'lafea-workbench__toolbar');
     const file = element(this.rootElement, 'input');
+    const fileLabel = element(this.rootElement, 'label', null, 'Import stage JSON');
+    const fileId = `lafea-import-${stageId.replace('.', '-')}`;
+    file.id = fileId;
+    fileLabel.htmlFor = fileId;
     file.type = 'file';
     file.accept = '.json,application/json';
     file.dataset.role = 'lafea-import';
@@ -103,9 +151,12 @@ export class LafeaWorkbenchView {
     exportButton.disabled = !stage.document;
     const undo = actionButton(this.rootElement, 'Undo', this.handlers.onUndo);
     undo.disabled = !stage.past.length;
+    const benchmark = actionButton(this.rootElement, 'Run Benchmark', this.handlers.onBenchmark);
+    benchmark.dataset.role = 'lafea-benchmark';
+    benchmark.title = 'Run the FEA verification suite: closed-form, convergence, invariant and capacity cases.';
     const redo = actionButton(this.rootElement, 'Redo', this.handlers.onRedo);
     redo.disabled = !stage.future.length;
-    toolbar.append(mock, file, run, exportButton, undo, redo);
+    toolbar.append(mock, fileLabel, file, run, benchmark, exportButton, undo, redo);
     return toolbar;
   }
 
@@ -122,8 +173,19 @@ export class LafeaWorkbenchView {
     });
     previewCard.body.append(preview);
     const evidenceCard = card(this.rootElement, 'Results and diagnostics');
-    evidenceCard.body.append(this.evidence(state, stage.execution));
+    evidenceCard.body.append(renderLafeaEvidence(
+      this.rootElement,
+      state.activeStageId,
+      stage.document,
+      state,
+      stage.execution,
+    ));
     grid.append(modelCard.section, collectionsCard.section, previewCard.section, evidenceCard.section);
+    if (this.benchmarkHost) {
+      const benchmarkCard = element(this.rootElement, 'div', 'lafea-workbench__benchmark');
+      benchmarkCard.append(this.benchmarkHost);
+      grid.append(benchmarkCard);
+    }
     return grid;
   }
 
@@ -180,88 +242,8 @@ export class LafeaWorkbenchView {
     return wrapper;
   }
 
-  evidence(state, execution) {
-    const wrapper = element(this.rootElement, 'div', 'lafea-workbench__evidence');
-    const diagnostics = state.diagnostics?.length ? state.diagnostics : execution?.diagnostics ?? [];
-    if (diagnostics.length) wrapper.append(jsonBlock(this.rootElement, diagnostics, 'lafea-diagnostics'));
-    if (!execution) {
-      wrapper.append(element(this.rootElement, 'p', null, 'No calculation has been run for this stage.'));
-      return wrapper;
-    }
-    const warning = element(this.rootElement, 'p', 'lafea-workbench__authority', execution.status === 'QUALIFIED'
-      ? 'Qualified result evidence from the stage-specific retained API.'
-      : 'No authoritative result: the retained API rejected this document.');
-    wrapper.append(warning, jsonBlock(this.rootElement, execution.result, 'lafea-result'));
-    return wrapper;
-  }
-}
-
-function collectionTable(root, rows, selectedIndex, onSelect) {
-  const wrapper = element(root, 'div', 'lafea-workbench__table');
-  const table = element(root, 'table');
-  const header = element(root, 'tr');
-  ['#', 'Identity', 'Record'].forEach((label) => header.append(element(root, 'th', null, label)));
-  table.append(header);
-  rows.forEach((row, index) => {
-    const tr = element(root, 'tr');
-    tr.tabIndex = 0;
-    tr.dataset.selected = String(index === selectedIndex);
-    tr.addEventListener('click', () => onSelect(index));
-    tr.append(
-      element(root, 'td', null, String(index + 1)),
-      element(root, 'td', null, recordIdentity(row)),
-      element(root, 'td', null, compactJson(row)),
-    );
-    table.append(tr);
-  });
-  wrapper.append(table);
-  return wrapper;
-}
-
-function card(root, titleText) {
-  const section = element(root, 'section', 'lafea-workbench__card');
-  const title = element(root, 'h2', null, titleText);
-  const body = element(root, 'div');
-  section.append(title, body);
-  return { section, body };
-}
-
-function jsonBlock(root, value, role) {
-  const pre = element(root, 'pre');
-  pre.dataset.role = role;
-  pre.textContent = JSON.stringify(value, null, 2);
-  return pre;
-}
-
-function actionButton(root, text, handler) {
-  const button = element(root, 'button', null, text);
-  button.type = 'button';
-  button.addEventListener('click', handler);
-  return button;
-}
-
-function element(root, tag, className, text) {
-  const value = root.ownerDocument.createElement(tag);
-  if (className) value.className = className;
-  if (text !== undefined) value.textContent = text;
-  return value;
-}
-
-function valueAt(value, path) {
-  const rows = path.split('.').reduce((current, key) => current?.[key], value);
-  return Array.isArray(rows) ? rows : [];
 }
 
 function stageDefinition(stageId) {
   return LAFEA_STAGE_DEFINITIONS.find((row) => row.stageId === stageId);
-}
-
-function recordIdentity(row) {
-  const key = Object.keys(row ?? {}).find((name) => /(?:Id|ID|identity)$/u.test(name));
-  return key ? String(row[key]) : 'record';
-}
-
-function compactJson(row) {
-  const text = JSON.stringify(row);
-  return text.length > 160 ? `${text.slice(0, 157)}...` : text;
 }
