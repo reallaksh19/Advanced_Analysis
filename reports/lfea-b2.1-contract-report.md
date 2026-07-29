@@ -3,7 +3,9 @@
 ## Base and branch
 
 - Required base SHA: `88b3f3c3d1bd64b099c22a1bdd2a9cb1cc34180d`
+- Qualification head SHA: `9a8219f6b46af609158226bbb1590c745c2283c3`
 - Target branch: `feat/lfea-b2-1-linear-model-contract`
+- Draft PR: `#7`
 - Contract schema: `fea-linear-model/v1`
 
 ## Contract boundary
@@ -59,13 +61,27 @@ The fixture catalogue contains all required valid and invalid cases, including o
 
 ## Qualification checks
 
-Targeted B-2.1 execution currently reports:
+Targeted B-2.1 execution reports:
 
 - 28/28 qualification tests passing
 - 9/9 deliberate regressions detected
 - anti-drift source guard passing
 
-Repository-wide command evidence will be appended after CI executes the exact work-pack command list against the full checkout.
+GitHub Actions run `30466373200` executed the exact work-pack commands against the full checkout at qualification head `9a8219f6b46af609158226bbb1590c745c2283c3`:
+
+| Command | Result |
+| --- | --- |
+| `npm ci` | PASS |
+| `npm run check:lfea-b2.0` | PASS |
+| `npm run check:lfea-b2.1` | PASS |
+| `npm run check:lfea-core` | PASS |
+| `npm run check:lfea-workbench` | PASS |
+| `npm run syntax:strict` | PASS |
+| `npm run check:imports` | PASS |
+| `npm run build` | PASS |
+| `npm run gate` | PASS |
+| `git diff --check` | PASS |
+| `git status --short` | PASS — clean checkout |
 
 ## Deliberate regressions
 
@@ -91,4 +107,4 @@ The qualification script demonstrates detection of:
 
 ## Status
 
-B-2.1 STATUS: QUALIFICATION IN PROGRESS
+B-2.1 STATUS: QUALIFIED
