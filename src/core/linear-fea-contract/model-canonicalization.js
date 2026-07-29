@@ -12,7 +12,7 @@ function cloneValue(value) {
   return value;
 }
 
-function compareAsciiStrings(left, right) {
+function compareDeterministicStrings(left, right) {
   const a = String(left ?? '');
   const b = String(right ?? '');
   const length = Math.min(a.length, b.length);
@@ -29,7 +29,7 @@ function compareAsciiStrings(left, right) {
 function byFields(...fields) {
   return (left, right) => {
     for (const field of fields) {
-      const compared = compareAsciiStrings(left[field], right[field]);
+      const compared = compareDeterministicStrings(left[field], right[field]);
       if (compared !== 0) return compared;
     }
     return 0;
@@ -75,8 +75,10 @@ export function canonicalizeLinearFeaModel(candidate) {
       ...node,
       sourceAncestry: {
         ...node.sourceAncestry,
-        sourceNodeIds: copyArray(node.sourceAncestry.sourceNodeIds).sort(compareCanonicalIds),
-        sourceComponentIds: copyArray(node.sourceAncestry.sourceComponentIds).sort(compareCanonicalIds),
+        sourceNodeIds: copyArray(node.sourceAncestry.sourceNodeIds)
+          .sort(compareDeterministicStrings),
+        sourceComponentIds: copyArray(node.sourceAncestry.sourceComponentIds)
+          .sort(compareDeterministicStrings),
       },
     }))
     .sort(byCanonicalField('nodeId'));
