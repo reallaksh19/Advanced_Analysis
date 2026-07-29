@@ -1,3 +1,5 @@
+import { SharedAnalysisContractError } from '../shared-analysis-contract/errors.js';
+
 export const LINEAR_FEA_UNITS_SCHEMA = 'fea-linear-units/v1';
 
 export const LINEAR_FEA_UNITS = Object.freeze({
@@ -28,16 +30,14 @@ export const LINEAR_FEA_UNITS = Object.freeze({
 });
 
 function unitError(message, code) {
-  const error = new TypeError(message);
-  error.code = code;
-  return error;
+  return new SharedAnalysisContractError(message, code);
 }
 
 export function requireLinearFeaUnits(candidate) {
   if (candidate === null || typeof candidate !== 'object' || Array.isArray(candidate)) {
     throw unitError(
       'Linear FEA units must be a record.',
-      'INVALID_LINEAR_FEA_UNITS',
+      'NOT_A_RECORD',
     );
   }
 
@@ -48,7 +48,7 @@ export function requireLinearFeaUnits(candidate) {
     if (!Object.hasOwn(candidate, key)) {
       throw unitError(
         `Linear FEA units are missing ${key}.`,
-        'MISSING_LINEAR_FEA_UNIT',
+        'MISSING_FIELD',
       );
     }
   }
@@ -57,7 +57,7 @@ export function requireLinearFeaUnits(candidate) {
     if (!Object.hasOwn(LINEAR_FEA_UNITS, key)) {
       throw unitError(
         `Linear FEA units contain unexpected field ${key}.`,
-        'UNEXPECTED_LINEAR_FEA_UNIT',
+        'UNEXPECTED_FIELD',
       );
     }
   }
@@ -66,7 +66,7 @@ export function requireLinearFeaUnits(candidate) {
     if (candidate[key] !== expected) {
       throw unitError(
         `Linear FEA unit ${key} must be ${expected}.`,
-        'INVALID_LINEAR_FEA_UNIT',
+        'UNSUPPORTED_UNIT',
       );
     }
   }
