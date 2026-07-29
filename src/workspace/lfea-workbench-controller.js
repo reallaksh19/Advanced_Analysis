@@ -5,30 +5,44 @@
  * package imports and local editor actions.
  */
 import { createLfeaWorkbenchStore } from './lfea-workbench-store.js';
-import { LFEA_WORKBENCH_STYLES } from './lfea-workbench-styles.js';
 import { LfeaWorkbenchView } from './lfea-workbench-view.js';
 import { FeaBenchmarkPanel } from './fea-benchmark-panel.js';
-import { FEA_BENCHMARK_STYLES } from './fea-benchmark-styles.js';
 import {
   createLfeaWorkbenchAdapterProfile,
   createLfeaWorkbenchReviewProfile,
 } from './lfea-pipeline-profiles.js';
 import { createLfeaWorkerClient } from './lfea-worker-client.js';
 import { LfeaConvergenceController } from './lfea-convergence-controller.js';
+import {
+  downloadLfeaJson,
+  installLfeaWorkbenchStyles,
+  parseLfeaJsonObject,
+  readLfeaUtf8,
+  serializableLfeaError,
+} from './lfea-workbench-controller-utils.js';
 
 export class LfeaWorkbenchController {
   /**
    * @param {Element|null} rootElement Workbench host.
-   * @param {{initialDocument?:unknown,resultMode?:string,pipelineOptions?:unknown}|undefined} options Explicit initial state.
+   * @param {{initialDocument?:unknown,resultMode?:string,deformationScale?:number,pipelineOptions?:unknown,workerFactory?:Function}|undefined} options Explicit initial state.
    */
   constructor(rootElement, options) {
     this.rootElement = rootElement;
     this.documentRef = rootElement?.ownerDocument ?? globalThis.document;
-    this.store = createLfeaWorkbenchStore(options);
     this.pipelineOptions = options?.pipelineOptions ?? {};
     this.workerClient = typeof Worker === 'function'
-      ? createLfeaWorkerClient(null)
+      ? createLfeaWorkerClient(options?.workerFactory ?? null)
       : null;
+    this.store = createLfeaWorkbenchStore({
+      ...options,
+      beforeCommittedMutation: (activeRun) => this.workerClient?.cancel('MODEL_CHANGED')
+        ?? {
+          type: 'CANCELLED',
+          ...activeRun,
+          reason: 'MODEL_CHANGED',
+          code: 'LFEA_RUN_CANCELLED_MODEL_CHANGED',
+        },
+    });
     this.view = new LfeaWorkbenchView(rootElement);
     this.benchmarkHost = this.documentRef.createElement('div');
     this.benchmarkHost.dataset.role = 'lfea-benchmark-host';
@@ -54,7 +68,7 @@ export class LfeaWorkbenchController {
 
   init() {
     if (this.unsubscribe) return this;
-    installStyles(this.documentRef);
+    installLfeaWorkbenchStyles(this.documentRef);
     this.view.init({
       onMock: () => this.loadMockData(),
       onFile: (file) => this.loadFile(file),
@@ -65,13 +79,14 @@ export class LfeaWorkbenchController {
       onUndo: () => this.undo(),
       onRedo: () => this.redo(),
       onResultMode: (mode) => this.store.setResultMode(mode),
+      onDeformationScale: (scale) => this.store.setDeformationScale(scale),
       onApplyJson: (text) => this.applyDocumentText(text),
       onAddRecord: (path, text) => this.addRecordText(path, text),
       onUpdateRecord: (path, index, text) => this.updateRecordText(path, index, text),
-      onDeleteRecord: (path, index) => this.store.deleteRecord(path, index),
+      onDeleteRecord: (path, index) => this.deleteRecord(path, index),
       onPreviewNode: (nodeId, x, y) =>
         this.store.previewNodeMove(nodeId, x, y),
-      onCommitNode: () => this.store.commitNodeMove(),
+      onCommitNode: () => this.commitNodeMove(),
       onCancelNode: () => this.store.cancelNodeMove(),
       onBenchmark: () => this.runBenchmark(),
     });
@@ -85,7 +100,7 @@ export class LfeaWorkbenchController {
   async loadFile(file) {
     if (!file) return this.getState();
     try {
-      const text = await readUtf8(file);
+      const text = await readLfeaUtf8(file);
       return this.importDocument(JSON.parse(text));
     } catch (error) {
       return this.store.reportEditError('document', null, error);
@@ -120,7 +135,7 @@ export class LfeaWorkbenchController {
 
   applyDocumentText(text) {
     try {
-      return this.store.replaceDocument(parseJsonObject(text, 'LFEA package'));
+      return this.store.replaceDocument(parseLfeaJsonObject(text, 'LFEA package'));
     } catch (error) {
       return this.store.reportEditError('document', null, error);
     }
@@ -128,7 +143,7 @@ export class LfeaWorkbenchController {
 
   addRecordText(path, text) {
     try {
-      return this.store.addRecord(path, parseJsonObject(text, 'LFEA record'));
+      return this.store.addRecord(path, parseLfeaJsonObject(text, 'LFEA record'));
     } catch (error) {
       return this.store.reportEditError(path, null, error);
     }
@@ -136,15 +151,29 @@ export class LfeaWorkbenchController {
 
   updateRecordText(path, index, text) {
     try {
-      return this.store.updateRecord(path, index, parseJsonObject(text, 'LFEA record'));
+      return this.store.updateRecord(path, index, parseLfeaJsonObject(text, 'LFEA record'));
     } catch (error) {
       return this.store.reportEditError(path, index, error);
     }
   }
 
+  deleteRecord(path, index) {
+    try {
+      return this.store.deleteRecord(path, index);
+    } catch (error) {
+      return this.store.reportEditError(path, index, error);
+    }
+  }
+
+  commitNodeMove() {
+    return this.store.commitNodeMove();
+  }
+
   async run() {
     if (!this.workerClient) return this.store.run();
-    const packageInput = this.store.getState().packageValue;
+    const running = this.store.beginRun();
+    const identity = running.activeRun;
+    const packageInput = running.packageValue;
     const includeProjectedStress =
       this.pipelineOptions.includeProjectedStress ?? true;
     const input = {
@@ -161,21 +190,43 @@ export class LfeaWorkbenchController {
       convergenceResult: this.pipelineOptions.convergenceResult ?? null,
       untilStage: null,
     };
-    this.store.beginRun();
     try {
-      const execution = await this.workerClient.run(input, {
-        onProgress: (progress) => this.store.updateRunProgress(progress),
+      const message = await this.workerClient.run(input, identity, {
+        onProgress: (progressMessage) =>
+          this.store.updateRunProgress(progressMessage),
+        onLateMessage: (lateMessage) =>
+          this.handleWorkerMessage(lateMessage),
       });
-      return this.store.completeRun(execution);
+      return this.store.completeRun(message);
     } catch (error) {
-      if (error?.name === 'AbortError') return this.store.cancelRun();
-      return this.store.failRun(error);
+      if (error?.name === 'AbortError') {
+        return this.store.cancelRun(error.cancellation);
+      }
+      return this.store.failRun(error.workerMessage ?? {
+        type: 'FAILURE',
+        ...identity,
+        error: serializableLfeaError(error),
+      });
     }
   }
 
-  cancelRun() {
-    if (!this.workerClient?.cancel()) return this.store.getState();
+  handleWorkerMessage(message) {
+    if (message?.type === 'PROGRESS') {
+      return this.store.updateRunProgress(message);
+    }
+    if (message?.type === 'COMPLETE') {
+      return this.store.completeRun(message);
+    }
+    if (message?.type === 'FAILURE') {
+      return this.store.failRun(message);
+    }
     return this.store.getState();
+  }
+
+  cancelRun() {
+    const cancellation = this.workerClient?.cancel('USER');
+    if (!cancellation) return this.store.getState();
+    return this.store.cancelRun(cancellation);
   }
 
   /**
@@ -208,13 +259,13 @@ export class LfeaWorkbenchController {
 
   downloadDocument() {
     const value = this.exportPackage();
-    downloadJson(this.documentRef, value, 'lfea-mesh-package.json');
+    downloadLfeaJson(this.documentRef, value, 'lfea-mesh-package.json');
     return value;
   }
 
   downloadEvidence() {
     const value = this.exportEvidence();
-    downloadJson(this.documentRef, value, 'lfea-evidence-export.json');
+    downloadLfeaJson(this.documentRef, value, 'lfea-evidence-export.json');
     return value;
   }
 
@@ -228,47 +279,4 @@ export class LfeaWorkbenchController {
     this.view.destroy();
     this.rootElement = null;
   }
-}
-
-function installStyles(documentRef) {
-  if (!documentRef || documentRef.querySelector('[data-lfea-workbench-styles]')) return;
-  const style = documentRef.createElement('style');
-  style.dataset.lfeaWorkbenchStyles = 'true';
-  style.textContent = `${LFEA_WORKBENCH_STYLES}\n${FEA_BENCHMARK_STYLES}`;
-  documentRef.head?.append(style);
-}
-
-async function readUtf8(file) {
-  if (typeof file.arrayBuffer === 'function') {
-    return new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer());
-  }
-  if (typeof file.text === 'function') return file.text();
-  throw new TypeError('Selected LFEA source cannot be read.');
-}
-
-function parseJsonObject(text, label) {
-  const value = JSON.parse(text);
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError(`${label} must be a JSON object.`);
-  return value;
-}
-
-function downloadJson(documentRef, value, filename) {
-  if (!documentRef || typeof Blob === 'undefined' || typeof URL === 'undefined') return;
-  const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' }));
-  const anchor = documentRef.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.hidden = true;
-  documentRef.body?.append(anchor);
-  anchor.click();
-  anchor.remove();
-  let revoked = false;
-  const revoke = () => {
-    if (revoked) return;
-    revoked = true;
-    URL.revokeObjectURL(url);
-    clearTimeout(timeout);
-  };
-  const timeout = setTimeout(revoke, 30000);
-  documentRef.defaultView?.addEventListener('focus', revoke, { once: true });
 }

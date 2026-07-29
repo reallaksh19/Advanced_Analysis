@@ -33,8 +33,6 @@ export class LfeaWorkbenchView {
     this.handlers = null;
     this.collectionPath = LFEA_COLLECTION_PATHS[0];
     this.selectedIndex = -1;
-    // Persistent host so the benchmark panel survives workbench re-renders and
-    // does not lose a completed report when the mesh document changes.
     this.benchmarkHost = null;
     this.convergenceHost = null;
     this.section = null;
@@ -126,7 +124,13 @@ export class LfeaWorkbenchView {
     const geometry = lfeaDisplayGeometry(
       previewPackage,
       state.execution,
-      state.resultMode,
+      state.display.resultMode,
+      {
+        deformation: {
+          enabled: state.display.resultMode === 'DEFORMED',
+          scale: state.display.deformationScale,
+        },
+      },
     );
     renderLfeaWorkbenchSvg(svg, geometry, previewPackage, {
       onMoveNode: this.handlers.onPreviewNode,
@@ -234,5 +238,4 @@ export class LfeaWorkbenchView {
     wrapper.append(select, collectionMock, table, textarea, actions);
     return wrapper;
   }
-
 }

@@ -28,16 +28,7 @@ const LEGEND_TICK_COUNT = 5;
 export function createPlotDescriptor(input) {
   const { field, geometryState, deformationScale, authority, unitsIdentity } = input ?? {};
   if (!field || typeof field !== 'object') throw new TypeError('A field descriptor is required.');
-  if (!Object.values(GEOMETRY_STATES).includes(geometryState)) {
-    throw new TypeError(`Unknown geometry state: ${geometryState}.`);
-  }
-  const deformed = geometryState === GEOMETRY_STATES.DEFORMED;
-  if (deformed && !(Number.isFinite(deformationScale) && deformationScale > 0)) {
-    throw new TypeError('Deformed geometry requires an explicit positive deformation scale.');
-  }
-  if (!deformed && deformationScale !== 0) {
-    throw new TypeError('Undeformed geometry must declare a deformation scale of exactly 0.');
-  }
+  const deformed = requireGeometryState(geometryState, deformationScale);
   if (typeof field.unit !== 'string' || !field.unit.trim()) {
     throw new TypeError('A plot descriptor requires a unit taken from the solver profile.');
   }
@@ -62,10 +53,20 @@ export function createPlotDescriptor(input) {
 /**
  * Build a descriptor for a geometry-only view (no result field).
  *
- * @param {{unitsIdentity?:string}} input Explicit options.
+ * Geometry-only does not mean undeformed: a displacement-only review has no
+ * scalar field, but its coordinate state and scale remain authoritative plot
+ * metadata and must match the rendered node coordinates.
+ *
+ * @param {{unitsIdentity?:string,lengthUnit?:string,geometryState?:string,
+ *          deformationScale?:number,authority?:string}} input Explicit options.
  * @returns {Readonly<Record<string, unknown>>} Plot descriptor.
  */
 export function createGeometryOnlyDescriptor(input = {}) {
+  const geometryState = input.geometryState ?? GEOMETRY_STATES.UNDEFORMED;
+  const deformationScale = input.deformationScale ?? 0;
+  const deformed = requireGeometryState(geometryState, deformationScale);
+  const authority = input.authority
+    ?? (deformed ? 'SCALED_DEFORMATION_REVIEW_GEOMETRY' : 'SOURCE_MESH_GEOMETRY');
   return Object.freeze({
     quantityId: 'NONE',
     unit: input.lengthUnit ?? 'mm',
@@ -74,12 +75,27 @@ export function createGeometryOnlyDescriptor(input = {}) {
     min: null,
     max: null,
     ticks: Object.freeze([]),
-    geometryState: GEOMETRY_STATES.UNDEFORMED,
-    deformationScale: 0,
-    authority: 'SOURCE_MESH_GEOMETRY',
+    geometryState,
+    deformationScale,
+    authority,
     unitsIdentity: input.unitsIdentity ?? null,
-    caption: `Source mesh · no result field · UNDEFORMED · SOURCE_MESH_GEOMETRY`,
+    caption: `${deformed ? 'Deformed mesh' : 'Source mesh'} · no result field · `
+      + `${deformed ? `DEFORMED x${deformationScale}` : 'UNDEFORMED'} · ${authority}`,
   });
+}
+
+function requireGeometryState(geometryState, deformationScale) {
+  if (!Object.values(GEOMETRY_STATES).includes(geometryState)) {
+    throw new TypeError(`Unknown geometry state: ${geometryState}.`);
+  }
+  const deformed = geometryState === GEOMETRY_STATES.DEFORMED;
+  if (deformed && !(Number.isFinite(deformationScale) && deformationScale > 0)) {
+    throw new TypeError('Deformed geometry requires an explicit positive deformation scale.');
+  }
+  if (!deformed && deformationScale !== 0) {
+    throw new TypeError('Undeformed geometry must declare a deformation scale of exactly 0.');
+  }
+  return deformed;
 }
 
 /**
