@@ -7,6 +7,8 @@ export * from './dkt.js';
 export * from './element.js';
 export * from './matrix.js';
 export * from './recovery.js';
+export * from './resultant-recovery.js';
+export * from './surface-stress.js';
 export * from './result-hashes.js';
 export * from './transformation.js';
 export * from './result-validation.js';
