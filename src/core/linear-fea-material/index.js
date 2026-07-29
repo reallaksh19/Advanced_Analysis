@@ -19,7 +19,12 @@ export {
   compareMaterialText,
 } from './material-canonicalization.js';
 
-export { resolveLinearFeaMaterialState } from './material-resolution.js';
+export {
+  requireMaterialResolutionProfile,
+  requireMaterialResolutionResult,
+  resolveLinearFeaMaterialState,
+  sealMaterialResolutionProfile,
+} from './material-resolution.js';
 
 export {
   canonicalMaterialSourceEvidence,
@@ -32,11 +37,8 @@ export {
   materialResolutionEvidenceProjection,
   materialResolutionSemanticProjection,
   materialTableSemanticProjection,
-  requireMaterialResolutionProfile,
   requireMaterialResolutionRequest,
-  requireMaterialResolutionResult,
   requireMaterialTable,
   requireResolvedMaterialState,
-  sealMaterialResolutionProfile,
   sealMaterialTable,
 } from './material-validation.js';
