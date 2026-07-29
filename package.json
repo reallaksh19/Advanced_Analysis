@@ -18,6 +18,7 @@
     "check:e2e": "node scripts/run-playwright.mjs",
     "check:imports": "node scripts/import-check.mjs",
     "check:lafea-workbench": "node scripts/lafea-workbench-check.mjs",
+    "check:shared-analysis": "node scripts/shared-analysis-contract-check.mjs && node scripts/shared-attachment-load-contract-check.mjs && node scripts/shared-pipe-wall-geometry-check.mjs",
     "check:lfea-workbench": "node scripts/lfea-workbench-check.mjs",
     "check:lafea-core": "node scripts/lafea.1-contract-check.mjs && node scripts/lafea.2-contract-check.mjs && node scripts/lafea.3-contract-check.mjs && node scripts/lafea.4-contract-check.mjs && node scripts/lafea.5-contract-check.mjs",
     "check:ui-invariants": "node scripts/ui-invariant-check.mjs",
@@ -26,7 +27,7 @@
     "preview": "vite preview",
     "syntax": "node scripts/syntax-check.mjs",
     "syntax:strict": "node scripts/syntax-check.mjs --strict",
-    "gate": "npm run syntax:strict && npm run check:imports && npm run check:doc-drift && npm run check:core-fea && npm run check:lafea-core && npm run check:workspace-contracts && npm run check:lafea-workbench && npm run check:lfea-workbench && npm run check:fea-ui-upgrade && npm run check:ui-invariants && npm run build",
+    "gate": "npm run syntax:strict && npm run check:imports && npm run check:doc-drift && npm run check:shared-analysis && npm run check:core-fea && npm run check:lafea-core && npm run check:workspace-contracts && npm run check:lafea-workbench && npm run check:lfea-workbench && npm run check:fea-ui-upgrade && npm run check:ui-invariants && npm run build",
     "test": "npm run check:advanced-shell && npm run check:lafea-workbench && npm run check:lfea-workbench"
   },
   "dependencies": {
