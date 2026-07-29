@@ -1,8 +1,9 @@
+import { ELEMENT_TYPES, ELEMENT_TYPE_CORNER_COUNTS, ELEMENT_TYPE_NODE_COUNTS } from './constants.js';
 import { modelError } from './errors.js';
 import { positiveNumber, strictNumber, tolerance } from './numeric.js';
 import { convert } from './units.js';
 import {
-  arrayValue, codeUnitCompare, exactRecord, nonEmptyString, uniqueIdentities,
+  arrayValue, codeUnitCompare, enumValue, exactRecord, nonEmptyString, uniqueIdentities,
 } from './validation.js';
 
 export function normalizeMaterials(values) {
@@ -61,20 +62,22 @@ function normalizeElement(value, index, nodeMap) {
   const path = `elements[${index}]`;
   const row = exactRecord(
     value,
-    ['elementId', 'nodeIds', 'materialId', 'thickness', 'sourceReference'],
+    ['elementId', 'elementType', 'nodeIds', 'materialId', 'thickness', 'sourceReference'],
     path,
   );
+  const elementType = enumValue(row.elementType, ELEMENT_TYPES, `${path}.elementType`);
   const nodeIds = arrayValue(row.nodeIds, `${path}.nodeIds`).map((id, nodeIndex) => (
     nonEmptyString(id, `${path}.nodeIds[${nodeIndex}]`)
   ));
-  if (nodeIds.length !== 3) {
+  const expectedCount = ELEMENT_TYPE_NODE_COUNTS[elementType];
+  if (nodeIds.length !== expectedCount) {
     throw modelError(
-      'THREE_NODE_ELEMENT_REQUIRED',
+      'ELEMENT_NODE_COUNT_MISMATCH',
       `${path}.nodeIds`,
-      'CST elements require exactly three node IDs.',
+      `${elementType} elements require exactly ${expectedCount} node IDs.`,
     );
   }
-  if (new Set(nodeIds).size !== 3) {
+  if (new Set(nodeIds).size !== nodeIds.length) {
     throw modelError(
       'REPEATED_ELEMENT_NODE',
       `${path}.nodeIds`,
@@ -84,11 +87,42 @@ function normalizeElement(value, index, nodeMap) {
   nodeIds.forEach((id) => assertNodeReference(id, nodeMap, path));
   return {
     elementId: nonEmptyString(row.elementId, `${path}.elementId`),
-    nodeIds: canonicalTriangleIds(nodeIds, nodeMap),
+    elementType,
+    // T3's declared node order is not semantically meaningful (any rotation/
+    // reflection is the same triangle) and is canonicalized for determinism.
+    // T6/Q8 node order IS meaningful (corner/midside position) and is
+    // preserved exactly as declared, with a required-CCW check that rejects
+    // rather than silently repairs a clockwise declaration.
+    nodeIds: elementType === ELEMENT_TYPES.T3
+      ? canonicalTriangleIds(nodeIds, nodeMap)
+      : requireCounterClockwiseCorners(nodeIds, elementType, nodeMap, path),
     materialId: nonEmptyString(row.materialId, `${path}.materialId`),
     thickness: positiveNumber(row.thickness, `${path}.thickness`),
     sourceReference: nonEmptyString(row.sourceReference, `${path}.sourceReference`),
   };
+}
+
+function requireCounterClockwiseCorners(nodeIds, elementType, nodeMap, path) {
+  const cornerCount = ELEMENT_TYPE_CORNER_COUNTS[elementType];
+  const corners = nodeIds.slice(0, cornerCount);
+  if (!(polygonSignedArea(corners, nodeMap) > 0)) {
+    throw modelError(
+      'ELEMENT_NOT_COUNTERCLOCKWISE',
+      `${path}.nodeIds`,
+      `${elementType} corner nodes (first ${cornerCount} of nodeIds) must be declared counter-clockwise.`,
+    );
+  }
+  return nodeIds;
+}
+
+function polygonSignedArea(cornerIds, nodeMap) {
+  const points = cornerIds.map((id) => nodeMap.get(id));
+  let sum = 0;
+  for (let index = 0; index < points.length; index += 1) {
+    const a = points[index]; const b = points[(index + 1) % points.length];
+    sum += a.x * b.y - b.x * a.y;
+  }
+  return sum / 2;
 }
 
 function assertNodeReference(nodeId, nodeMap, path) {
@@ -106,7 +140,7 @@ function rejectDuplicateTriangles(rows) {
   rows.forEach((row) => {
     const key = [...row.nodeIds].sort(codeUnitCompare).join('\0');
     if (sets.has(key)) {
-      throw modelError('DUPLICATE_TRIANGLE', 'elements', `Duplicate triangle ${key}.`);
+      throw modelError('DUPLICATE_ELEMENT_NODE_SET', 'elements', `Duplicate element node set ${key}.`);
     }
     sets.add(key);
   });
@@ -168,8 +202,14 @@ function canonicalElement(row, nodeMap, units, profile) {
     units,
     `elements.${row.elementId}.thickness`,
   );
-  const coordinates = row.nodeIds.map((id) => nodeMap.get(id));
-  const area = Math.abs(signedDoubleArea(row.nodeIds, nodeMap)) / 2;
+  // Area is computed from the element's corner nodes (all of them for T3;
+  // the first `cornerCount` of nodeIds for T6/Q8) — a straight-edge polygon
+  // approximation of the true (possibly curved-boundary) area, sufficient
+  // for this degeneracy sanity check without claiming exact curved area.
+  const cornerCount = ELEMENT_TYPE_CORNER_COUNTS[row.elementType];
+  const cornerIds = row.nodeIds.slice(0, cornerCount);
+  const coordinates = cornerIds.map((id) => nodeMap.get(id));
+  const area = Math.abs(polygonSignedArea(cornerIds, nodeMap));
   const scale = geometryScale(coordinates);
   const limit = tolerance(profile, 'minimumElementArea', scale ** 2);
   if (!(area > limit)) {

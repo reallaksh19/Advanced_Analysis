@@ -1,5 +1,5 @@
 import {
-  FORMULATIONS, MODEL_SCHEMA, QUALIFICATION_PROFILE_SCHEMA, SOURCE_EVIDENCE_SCHEMA,
+  ELEMENT_TYPES, FORMULATIONS, MODEL_SCHEMA, QUALIFICATION_PROFILE_SCHEMA, SOURCE_EVIDENCE_SCHEMA,
 } from './constants.js';
 import { modelError } from './errors.js';
 import { strictNumber } from './numeric.js';
@@ -13,7 +13,8 @@ import {
 
 export const INPUT_KEYS = [
   'schema', 'modelIdentity', 'modelVersion', 'sourceAncestry', 'units',
-  'formulation', 'materials', 'nodes', 'elements', 'constraints', 'loadCases',
+  'formulation', 'materials', 'nodes', 'elements', 'elementTypePolicy',
+  'constraints', 'loadCases',
   'resultRequests', 'qualificationProfile', 'limitations',
 ];
 const TOLERANCE_KEYS = [
@@ -47,6 +48,7 @@ function normalizeSource(input) {
   const materials = normalizeMaterials(input.materials);
   const nodes = normalizeNodes(input.nodes);
   const elements = normalizeElements(input.elements, nodes);
+  const elementTypePolicy = normalizeElementTypePolicy(input.elementTypePolicy, elements);
   const constraints = normalizeConstraints(input.constraints);
   const loadCases = normalizeLoadCases(input.loadCases);
   const resultRequests = normalizeRequests(input.resultRequests, loadCases);
@@ -62,12 +64,40 @@ function normalizeSource(input) {
     materials,
     nodes,
     elements,
+    elementTypePolicy,
     constraints,
     loadCases,
     resultRequests,
     qualificationProfile,
     limitations: normalizeLimitations(input.limitations),
   };
+}
+
+/**
+ * Spec §7: T3 "is benchmark/fallback only and cannot be the default
+ * production mesh." A model containing any T3 element must explicitly
+ * acknowledge that with `allowT3Fallback: true` and a reason — never
+ * silently allowed, and never blocked without an escape hatch for the
+ * genuine benchmark/fallback use the spec itself names.
+ */
+function normalizeElementTypePolicy(value, elements) {
+  const row = exactRecord(value, ['allowT3Fallback', 'sourceReference'], 'elementTypePolicy');
+  const allowT3Fallback = requireBoolean(row.allowT3Fallback, 'elementTypePolicy.allowT3Fallback');
+  const sourceReference = nonEmptyString(row.sourceReference, 'elementTypePolicy.sourceReference');
+  const hasT3Element = elements.some((element) => element.elementType === ELEMENT_TYPES.T3);
+  if (hasT3Element && !allowT3Fallback) {
+    throw modelError(
+      'T3_REQUIRES_EXPLICIT_FALLBACK_ACKNOWLEDGEMENT',
+      'elementTypePolicy.allowT3Fallback',
+      'A model containing T3 elements must set elementTypePolicy.allowT3Fallback to true; T3 is benchmark/fallback only.',
+    );
+  }
+  return { allowT3Fallback, sourceReference };
+}
+
+function requireBoolean(value, path) {
+  if (typeof value !== 'boolean') throw modelError('BOOLEAN_REQUIRED', path, `${path} must be a boolean.`);
+  return value;
 }
 
 function normalizeAncestry(value) {

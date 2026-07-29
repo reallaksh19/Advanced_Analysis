@@ -1,17 +1,48 @@
-import { FORMULA_IDS } from './constants.js';
+import { ELEMENT_TYPES, FORMULA_IDS } from './constants.js';
 import { numericalError } from './errors.js';
 import {
   matrixScale, matrixVector, multiply, scaleMatrix, symmetryResidual, transpose,
 } from './matrix.js';
 import { canonicalNumber, maxAbs, tolerance } from './numeric.js';
 import { constitutiveEvidence } from './constitutive.js';
+import { t6ElementEvidence } from './t6-element.js';
+import { q8ElementEvidence } from './q8-element.js';
 
+/**
+ * Dispatches by `element.elementType`. T3 uses the original single-Gauss
+ * -point (constant-strain) evidence path, byte-for-byte unchanged. T6/Q8
+ * use the Gauss-integrated formulations in `t6-element.js`/`q8-element.js`,
+ * normalized here to the same physical-node-coordinate shape those
+ * formulations expect.
+ */
 export function buildElementEvidence(model) {
   const nodes = new Map(model.nodes.map((row) => [row.nodeId, row]));
   const materials = new Map(model.materials.map((row) => [row.materialId, row]));
   return model.elements.map((element) => (
-    elementEvidence(element, nodes, materials.get(element.materialId), model)
+    dispatchElementEvidence(element, nodes, materials.get(element.materialId), model)
   ));
+}
+
+function dispatchElementEvidence(element, nodeMap, material, model) {
+  if (element.elementType === ELEMENT_TYPES.T6 || element.elementType === ELEMENT_TYPES.Q8) {
+    const physicalNodes = element.nodeIds.map((id) => nodeMap.get(id));
+    const builder = element.elementType === ELEMENT_TYPES.T6 ? t6ElementEvidence : q8ElementEvidence;
+    const evidence = builder(element.elementId, physicalNodes, material, model.formulation, element.thickness, model.qualificationProfile);
+    return {
+      ...evidence,
+      nodeIds: element.nodeIds,
+      materialId: element.materialId,
+      thickness: element.thickness,
+      canonicalArea: element.canonicalArea,
+      localDofOrdering: element.nodeIds.flatMap((id) => [`${id}:UX`, `${id}:UY`]),
+      sourceReferences: {
+        element: element.sourceReference,
+        material: material.sourceReference,
+        nodes: physicalNodes.map((node) => node.sourceReference),
+      },
+    };
+  }
+  return elementEvidence(element, nodeMap, material, model);
 }
 
 export function elementEvidence(element, nodeMap, material, model) {
@@ -103,6 +134,7 @@ function affineFields(nodes) {
 function evidenceRecord(element, coordinates, material, b, constitutive, stiffness, qualifications) {
   return {
     elementId: element.elementId,
+    elementType: element.elementType,
     nodeIds: element.nodeIds,
     materialId: element.materialId,
     thickness: element.thickness,
