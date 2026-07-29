@@ -14,10 +14,10 @@ import {
 } from '../src/core/linear-fea-section/index.js';
 import { pipeSectionRequest } from './lfea-b2.3-pipe-section-fixtures.mjs';
 
-function expectHashMismatch(body) {
+function expectCode(body, expectedCode) {
   assert.throws(body, (error) => {
     assert.ok(error instanceof PipeSectionError);
-    assert.equal(error.code, 'PIPE_SECTION_HASH_MISMATCH');
+    assert.equal(error.code, expectedCode);
     return true;
   });
 }
@@ -47,13 +47,19 @@ const substitutedProfile = {
   profileId: 'PIPE-CIRCULAR-ANNULUS-R2',
 };
 substitutedProfile.semanticHash = computePipeSectionProfileSemanticHash(substitutedProfile);
-expectHashMismatch(() => requirePipeSectionProfile(substitutedProfile));
+expectCode(
+  () => requirePipeSectionProfile(substitutedProfile),
+  'PIPE_SECTION_PROFILE_INVALID',
+);
 
 const result = resolvePipeSection({ request: pipeSectionRequest() });
 const substitutedResult = structuredClone(result);
 substitutedResult.profileSemanticHash = 'fnv1a64:1111111111111111';
 substitutedResult.semanticHash = computePipeSectionResolutionSemanticHash(substitutedResult);
 substitutedResult.evidenceHash = computePipeSectionEvidenceHash(substitutedResult);
-expectHashMismatch(() => requirePipeSectionResolution(substitutedResult));
+expectCode(
+  () => requirePipeSectionResolution(substitutedResult),
+  'PIPE_SECTION_HASH_MISMATCH',
+);
 
 console.log('QUALIFIED LFEA B-2.3 reviewer checks: profile schema and R1 profile authority are hash-bound.');
