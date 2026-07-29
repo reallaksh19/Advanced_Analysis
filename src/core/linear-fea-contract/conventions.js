@@ -1,3 +1,4 @@
+import { SharedAnalysisContractError } from '../shared-analysis-contract/errors.js';
 import {
   CANONICAL_ID_ORDER_ID,
   CANONICAL_NODE_ID_GRAMMAR_ID,
@@ -111,9 +112,7 @@ export const LINEAR_FEA_CONVENTIONS = Object.freeze({
 });
 
 function contractError(message, code) {
-  const error = new TypeError(message);
-  error.code = code;
-  return error;
+  return new SharedAnalysisContractError(message, code);
 }
 
 function requireMember(value, expected, field, code) {
@@ -189,7 +188,7 @@ function requireEndActionConvention(candidate) {
 }
 
 export function dofIndex(dof) {
-  return requireMember(dof, DOF_ORDER, 'DOF', 'INVALID_DOF');
+  return requireMember(dof, DOF_ORDER, 'DOF', 'UNSUPPORTED_DOF');
 }
 
 export function endIndex(end) {
@@ -197,7 +196,7 @@ export function endIndex(end) {
     end,
     ELEMENT_END_ORDER,
     'Element end',
-    'INVALID_ELEMENT_END',
+    'UNSUPPORTED_ELEMENT_END',
   );
 }
 
