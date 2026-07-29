@@ -177,3 +177,55 @@ hidden values; fail closed; units declared; every package ends with `npm run gat
 green plus its own check script that fails when the defect is reintroduced. No PR under
 either plan modifies `src/core/element-fea/`, and none modifies the DKT/CST formulation
 or basis qualification in `src/core/local-shell/`.
+
+---
+
+## 6. LFEA ingestion: PCF abolished, InputXML adopted
+
+`pcfToCanonicalGeometry.js` is removed. It was confirmed unused anywhere in this
+repository (imported by nothing under `src/`, matching what both plans' baseline audit
+already found) before deletion. LFEA's geometry ingestion path is now CAESAR II
+InputXML, following a directed request to adopt the InputXML engine and connectivity
+logic in `reallaksh19/3D_Converters` — reimplemented against this repository's rules,
+not copied, since the source engine does not follow `no hidden values` / `fail closed`
+in several specific places (documented in the new modules' own doc comments).
+
+**`src/core/geometry/adapters/inputXmlToCanonicalGeometry.js`** — CAESAR II
+`PIPINGELEMENT` records to canonical geometry. Solves absolute node coordinates from
+CAESAR's relative deltas (a real graph propagation, not a read); rejects a disconnected
+node group instead of silently reseeding it at the origin; every diameter/thickness/
+material inheritance from a prior element is a diagnostic, never silent; a restraint's
+CAESAR `TYPE` code is never guessed into `ANCHOR`/`GUIDE` without a caller-declared
+table. `inputxml-bend-arc.js` resolves a bend's real arc centre from its declared
+radius and incoming tangent direction — closing the `BEND_ARC_GEOMETRY_NOT_DECLARED`
+gap every PCF-imported elbow left open for LFEA B-1 (verified end to end: an
+InputXML-sourced bend now curvature-seeds automatically through `conditionGeometry`).
+
+**Verified against real data, and scoped honestly as a result.** Run against a real
+CAESAR II InputXML export (`3D_Converters` benchmark `INLET-SEPARATOR-SKID-C2_INPUT.XML`,
+35 elements, 9 bends), the parser and coordinate solver handled the full file cleanly.
+The bend arc-centre resolver did not: 8 of 9 bends turned out to be compound multi-cut
+miters (two declared angles across one element), which a single-circle model cannot
+represent and now refuses cleanly (`BEND_COMPOUND_MITER_NOT_SUPPORTED`); the one
+genuinely simple bend still failed its own radius cross-check, meaning CAESAR's
+FROM/TO-node convention for an isolated bend needs more reverse-engineering than
+attempted here. The resolver's load-bearing property is that refusal — proven against
+real data — not the resolution rate. Fully resolving compound and simple CAESAR bends
+with confidence is unscoped follow-up work, not attempted blind.
+
+**`src/core/piping-topology/ray-projection.js`** — the "basic topology" logic adopted
+from the same source repository's ray-shooter (there itself credited as adapted from an
+earlier PCF-side concept): finds a branch tap's connection to a run when the two
+endpoints are not coincident — a coordinate-tolerance stage can never find that,
+because there is no tolerance small enough; the connection has to be found by casting a
+ray along the tap's own declared direction. Delivered as a standalone, declared-limit,
+non-mutating module (evaluates and ranks candidates; a caller decides), not wired into
+`piping-topology`'s staged connection-resolver pipeline in this change — that pipeline's
+profile schema (`connection-profile.js`) is strict and shared by every consumer of
+`piping-topology`, and extending it is a separate, dedicated work package. The module is
+shaped so that wiring later needs no rewrite.
+
+Checks: `scripts/lfea-inputxml-ingest-check.mjs` (11 tests, including a deliberate
+compound-miter case and a round trip through B-1's `conditionGeometry`) and
+`scripts/lfea-ray-topology-check.mjs` (8 tests, including a realistic branch-tap
+scenario). Both wired into `npm run gate` via `check:lfea-core`.

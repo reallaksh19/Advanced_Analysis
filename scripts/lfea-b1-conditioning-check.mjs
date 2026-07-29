@@ -152,7 +152,9 @@ function checkMissingSpanSeedingLimitRejected() {
 function checkTeeBranchConnectivity() {
   // Test 5. A run split into two legs at a branch node, plus a branch leg,
   // all three referencing the SAME node id — the way canonical geometry
-  // already represents a tee (see pcfToCanonicalGeometry.js TEE handling).
+  // already represents a tee (see inputXmlToCanonicalGeometry.js, which
+  // replaced the PCF importer: independently-listed elements sharing a node
+  // id is exactly how InputXML expresses a branch too).
   const geometry = baseGeometry(
     [
       node('N1', 0, 0, 0, 'ANCHOR'),
