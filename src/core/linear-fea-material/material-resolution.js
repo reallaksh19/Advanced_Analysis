@@ -1,6 +1,8 @@
 import { normalizeLinearFeaNumber } from '../linear-fea-contract/conventions.js';
 import {
+  LINEAR_FEA_MATERIAL_RESOLUTION_PROFILE,
   LINEAR_FEA_MATERIAL_RESOLUTION_SCHEMA,
+  LINEAR_MATERIAL_PROFILE_ID,
   MATERIAL_PROPERTY_KEYS,
   LinearFeaMaterialError,
 } from './material-contract.js';
@@ -9,15 +11,53 @@ import {
   canonicalMaterialTablePoints,
   computeMaterialResolutionEvidenceHash,
   computeMaterialResolutionSemanticHash,
-  requireMaterialResolutionProfile,
+  requireMaterialResolutionProfile as requireMaterialResolutionProfileRecord,
   requireMaterialResolutionRequest,
-  requireMaterialResolutionResult,
+  requireMaterialResolutionResult as requireMaterialResolutionResultRecord,
   requireMaterialTable,
   requireResolvedMaterialState,
+  sealMaterialResolutionProfile as sealMaterialResolutionProfileRecord,
 } from './material-validation.js';
 
 function fail(message, code) {
   throw new LinearFeaMaterialError(message, code);
+}
+
+function requireSupportedProfileAuthority(profileId, profileSemanticHash) {
+  if (profileId !== LINEAR_MATERIAL_PROFILE_ID
+    || profileSemanticHash !== LINEAR_FEA_MATERIAL_RESOLUTION_PROFILE.semanticHash) {
+    fail(
+      `Only ${LINEAR_MATERIAL_PROFILE_ID} is supported by B-2.2.`,
+      'MATERIAL_PROFILE_INVALID',
+    );
+  }
+}
+
+export function requireMaterialResolutionProfile(profile) {
+  const accepted = requireMaterialResolutionProfileRecord(profile);
+  requireSupportedProfileAuthority(accepted.profileId, accepted.semanticHash);
+  return accepted;
+}
+
+export function sealMaterialResolutionProfile(profile) {
+  if (profile?.profileId !== LINEAR_MATERIAL_PROFILE_ID) {
+    fail(
+      `Only ${LINEAR_MATERIAL_PROFILE_ID} may be sealed by B-2.2.`,
+      'MATERIAL_PROFILE_INVALID',
+    );
+  }
+  return requireMaterialResolutionProfile(
+    sealMaterialResolutionProfileRecord(profile),
+  );
+}
+
+export function requireMaterialResolutionResult(result) {
+  const accepted = requireMaterialResolutionResultRecord(result);
+  requireSupportedProfileAuthority(
+    accepted.profileId,
+    accepted.profileSemanticHash,
+  );
+  return accepted;
 }
 
 export function resolveLinearFeaMaterialState({ table, request, profile }) {
