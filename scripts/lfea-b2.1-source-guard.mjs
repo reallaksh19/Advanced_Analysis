@@ -50,16 +50,23 @@ assert.match(validation, /validateAxes/u);
 assert.match(validation, /NONUNIT_AXIS/u);
 assert.match(validation, /NONORTHOGONAL_AXES/u);
 assert.match(validation, /LEFT_HANDED_AXES/u);
+assert.match(validation, /requireSourceIdentity/u, 'source ancestry must not use kernel ID grammar');
 assert.doesNotMatch(validation, /\.localAxes\s*=|localAxes\.[xyz]\s*=/u, 'validator must not alter supplied axes');
 
 const canonicalization = source['src/core/linear-fea-contract/model-canonicalization.js'];
 assert.match(canonicalization, /copyArray/u);
+assert.match(canonicalization, /sourceNodeIds:[\s\S]*compareDeterministicStrings/u);
+assert.match(canonicalization, /sourceComponentIds:[\s\S]*compareDeterministicStrings/u);
 assert.doesNotMatch(canonicalization, /\b(?:nodes|materialStates|sectionStates|elements|constraints|limitations|diagnostics|sourceEvidence)\.sort\s*\(/u, 'caller-owned arrays must not be sorted directly');
+
+const hashes = source['src/core/linear-fea-contract/model-hashes.js'];
+assert.match(hashes, /canonicalizeProjectionRecords\(elementProjections\)/u);
+assert.match(hashes, /canonicalizeProjectionRecords\(constraintProjections\)/u);
 
 const packageJson = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
 assert.equal(
   packageJson.scripts['check:lfea-b2.1'],
-  'node scripts/lfea-b2.1-model-contract-check.mjs && node scripts/lfea-b2.1-source-guard.mjs',
+  'node scripts/lfea-b2.1-model-contract-check.mjs && node scripts/lfea-b2.1-reviewer-check.mjs && node scripts/lfea-b2.1-source-guard.mjs',
   'check:lfea-b2.1 registration is missing',
 );
 assert.match(packageJson.scripts['check:lfea-core'], /^npm run check:lfea-b2\.0 && npm run check:lfea-b2\.1 && /u);
