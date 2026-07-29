@@ -37,6 +37,7 @@ import {
   requireLinearFeaConventions,
   requireLinearFeaUnits,
 } from '../src/core/linear-fea-contract/index.js';
+import { SharedAnalysisContractError } from '../src/core/shared-analysis-contract/index.js';
 
 const tests = [];
 
@@ -46,6 +47,7 @@ function test(id, description, run) {
 
 function expectThrow(run, code) {
   assert.throws(run, (error) => {
+    assert.ok(error instanceof SharedAnalysisContractError);
     assert.equal(error?.code, code);
     return true;
   });
@@ -158,12 +160,12 @@ test('B20-T07', 'Element indices are exactly 0-11', () => {
   assert.equal(elementDofIndex('J', 'RZ'), 11);
 });
 
-test('B20-T08', 'Invalid DOFs and ends are rejected', () => {
+test('B20-T08', 'Invalid DOFs and ends preserve supplied API rejections', () => {
   for (const dof of ['ux', 'Ux', 'URX', '', null, 1]) {
-    expectThrow(() => dofIndex(dof), 'INVALID_DOF');
+    expectThrow(() => dofIndex(dof), 'UNSUPPORTED_DOF');
   }
   for (const end of ['i', 'j', 'K', '', null, 1]) {
-    expectThrow(() => endIndex(end), 'INVALID_ELEMENT_END');
+    expectThrow(() => endIndex(end), 'UNSUPPORTED_ELEMENT_END');
   }
 });
 
@@ -175,14 +177,15 @@ test('B20-T09', 'Exact unit record is accepted', () => {
   assert.equal(LINEAR_FEA_UNITS.temperatureDifference, 'K');
 });
 
-test('B20-T10', 'Missing and unexpected units are rejected', () => {
+test('B20-T10', 'Missing and unexpected units preserve supplied API rejections', () => {
   const missing = { ...EXPECTED_UNITS };
   delete missing.absoluteTemperature;
-  expectThrow(() => requireLinearFeaUnits(missing), 'MISSING_LINEAR_FEA_UNIT');
+  expectThrow(() => requireLinearFeaUnits(missing), 'MISSING_FIELD');
   expectThrow(
     () => requireLinearFeaUnits({ ...EXPECTED_UNITS, energy: 'J' }),
-    'UNEXPECTED_LINEAR_FEA_UNIT',
+    'UNEXPECTED_FIELD',
   );
+  expectThrow(() => requireLinearFeaUnits(null), 'NOT_A_RECORD');
 });
 
 test('B20-T11', 'Alternate units are rejected', () => {
@@ -194,7 +197,7 @@ test('B20-T11', 'Alternate units are rejected', () => {
   ]) {
     expectThrow(
       () => requireLinearFeaUnits({ ...EXPECTED_UNITS, ...change }),
-      'INVALID_LINEAR_FEA_UNIT',
+      'UNSUPPORTED_UNIT',
     );
   }
 });
