@@ -96,7 +96,7 @@ checkSpecContracts('e2e/phase4-viewport-picking.spec.js', [
   'PIPE-PICK-SEGMENT',
   'SUP-PICK-POINT',
   'direct selected notification',
-  'empty-space click retains',
+  'empty-space click clears',
   'AnalysisWorkspace.destroy()',
 ]);
 
