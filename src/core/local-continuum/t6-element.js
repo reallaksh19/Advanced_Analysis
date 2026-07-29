@@ -34,11 +34,19 @@ export const T6_FORMULA_IDS = Object.freeze({
   STIFFNESS: 'T6_GAUSS_INTEGRATED_STIFFNESS_V1',
 });
 
-/** Standard 3-point rule, exact for polynomials up to degree 2 over a triangle; weights sum to 1 (area fraction). */
+/**
+ * Standard Hammer 3-point rule, exact for polynomials up to degree 2 over a
+ * triangle. Weights sum to 1/2 — the true area of the reference triangle
+ * `{xi>=0, eta>=0, xi+eta<=1}` these natural coordinates map onto — so that
+ * `sum(weight_i * jacobianDeterminant_i)` reconstructs the physical element
+ * area exactly (`integral(1) dA`), the same convention every consumer of
+ * this table (`t6StiffnessMatrix`, and the body-force/thermal load
+ * integrators) relies on.
+ */
 export const T6_GAUSS_POINTS = Object.freeze([
-  Object.freeze({ pointId: 'GP1', xi: 1 / 6, eta: 1 / 6, weight: 1 / 3 }),
-  Object.freeze({ pointId: 'GP2', xi: 2 / 3, eta: 1 / 6, weight: 1 / 3 }),
-  Object.freeze({ pointId: 'GP3', xi: 1 / 6, eta: 2 / 3, weight: 1 / 3 }),
+  Object.freeze({ pointId: 'GP1', xi: 1 / 6, eta: 1 / 6, weight: 1 / 6 }),
+  Object.freeze({ pointId: 'GP2', xi: 2 / 3, eta: 1 / 6, weight: 1 / 6 }),
+  Object.freeze({ pointId: 'GP3', xi: 1 / 6, eta: 2 / 3, weight: 1 / 6 }),
 ]);
 
 export function t6ShapeFunctionsAndDerivatives(xi, eta) {

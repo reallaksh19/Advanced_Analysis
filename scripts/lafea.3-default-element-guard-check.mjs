@@ -80,7 +80,7 @@ function t6Source() {
       c('A', 'UX'), c('A', 'UY'), c('B', 'UY'), c('D', 'UY'),
     ],
     loadCases: [{
-      loadCaseId: 'L1', nodalForces: [{ loadId: 'F1', nodeId: 'B', fx: 1000, fy: 0, sourceReference: 'FORCE#F1' }], edgeTractions: [], sourceReference: 'CASE#L1',
+      loadCaseId: 'L1', nodalForces: [{ loadId: 'F1', nodeId: 'B', fx: 1000, fy: 0, sourceReference: 'FORCE#F1' }], edgeTractions: [], pressureLoads: [], bodyForces: [], temperatureLoads: [], imposedDisplacements: [], sourceReference: 'CASE#L1',
     }],
     resultRequests: { loadCaseIds: ['L1'] },
     qualificationProfile: profile(),
@@ -109,7 +109,7 @@ function q8Source() {
       c('A', 'UX'), c('A', 'UY'), c('D', 'UX'), c('H', 'UX'),
     ],
     loadCases: [{
-      loadCaseId: 'L1', nodalForces: [{ loadId: 'F1', nodeId: 'B', fx: 1000, fy: 0, sourceReference: 'FORCE#F1' }, { loadId: 'F2', nodeId: 'C', fx: 1000, fy: 0, sourceReference: 'FORCE#F2' }, { loadId: 'F3', nodeId: 'F', fx: 1000, fy: 0, sourceReference: 'FORCE#F3' }], edgeTractions: [], sourceReference: 'CASE#L1',
+      loadCaseId: 'L1', nodalForces: [{ loadId: 'F1', nodeId: 'B', fx: 1000, fy: 0, sourceReference: 'FORCE#F1' }, { loadId: 'F2', nodeId: 'C', fx: 1000, fy: 0, sourceReference: 'FORCE#F2' }, { loadId: 'F3', nodeId: 'F', fx: 1000, fy: 0, sourceReference: 'FORCE#F3' }], edgeTractions: [], pressureLoads: [], bodyForces: [], temperatureLoads: [], imposedDisplacements: [], sourceReference: 'CASE#L1',
     }],
     resultRequests: { loadCaseIds: ['L1'] },
     qualificationProfile: profile(),
