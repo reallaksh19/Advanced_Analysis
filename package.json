@@ -20,6 +20,7 @@
     "check:lafea-workbench": "node scripts/lafea-workbench-check.mjs",
     "check:lafea-foundation": "node scripts/lafea.15-profile-schema-check.mjs && node scripts/lafea.hash-lineage-check.mjs && node scripts/lafea.14-approximation-register-check.mjs",
     "check:lafea-meshing": "node scripts/lafea.10-topology-contract-check.mjs && node scripts/lafea.10-healing-preview-check.mjs && node scripts/lafea.10-quality-gate-check.mjs && node scripts/lafea.10-convergence-quantities-check.mjs && node scripts/lafea.10-3level-requirement-check.mjs && node scripts/lafea.10-t6-generation-check.mjs && node scripts/lafea.10-q8-recombination-check.mjs && node scripts/lafea.10-mapped-mitc-mesh-check.mjs && node scripts/lafea.10-determinism-check.mjs",
+    "check:lafea-solver": "node scripts/lafea.11-sparse-cholesky-check.mjs && node scripts/lafea.11-ldlt-pivoting-check.mjs && node scripts/lafea.11-mechanism-diagnosis-check.mjs && node scripts/lafea.11-tolerance-table-check.mjs && node scripts/lafea.11-scaling-reversibility-check.mjs && node scripts/lafea.11-determinism-check.mjs",
     "check:shared-analysis": "node scripts/shared-analysis-contract-check.mjs && node scripts/shared-attachment-load-contract-check.mjs && node scripts/shared-pipe-wall-geometry-check.mjs",
     "check:lfea-b2.0": "node scripts/lfea-b2.0-conventions-check.mjs && node scripts/lfea-b2.0-source-guard.mjs",
     "check:lfea-b2.1": "node scripts/lfea-b2.1-model-contract-check.mjs && node scripts/lfea-b2.1-reviewer-check.mjs && node scripts/lfea-b2.1-source-guard.mjs",
@@ -33,7 +34,7 @@
     "preview": "vite preview",
     "syntax": "node scripts/syntax-check.mjs",
     "syntax:strict": "node scripts/syntax-check.mjs --strict",
-    "gate": "npm run syntax:strict && npm run check:imports && npm run check:doc-drift && npm run check:shared-analysis && npm run check:lafea-foundation && npm run check:lafea-meshing && npm run check:core-fea && npm run check:lfea-core && npm run check:lafea-core && npm run check:workspace-contracts && npm run check:lafea-workbench && npm run check:lfea-workbench && npm run check:fea-ui-upgrade && npm run check:ui-invariants && npm run build",
+    "gate": "npm run syntax:strict && npm run check:imports && npm run check:doc-drift && npm run check:shared-analysis && npm run check:lafea-foundation && npm run check:lafea-meshing && npm run check:lafea-solver && npm run check:core-fea && npm run check:lfea-core && npm run check:lafea-core && npm run check:workspace-contracts && npm run check:lafea-workbench && npm run check:lfea-workbench && npm run check:fea-ui-upgrade && npm run check:ui-invariants && npm run build",
     "test": "npm run check:advanced-shell && npm run check:lafea-workbench && npm run check:lfea-workbench"
   },
   "dependencies": {
