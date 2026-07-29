@@ -1,9 +1,9 @@
+import { SharedAnalysisContractError } from '../shared-analysis-contract/errors.js';
+
 const CANONICAL_NODE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
 
 function identifierError(message, code) {
-  const error = new TypeError(message);
-  error.code = code;
-  return error;
+  return new SharedAnalysisContractError(message, code);
 }
 
 export const CANONICAL_NODE_ID_GRAMMAR_ID =
