@@ -42,8 +42,9 @@ export function renderLfeaToolbar(root, state, modes, handlers) {
     'Export evidence bundle',
     handlers.onExportEvidence,
   );
-  exportEvidence.disabled =
-    state.execution?.evidenceExport?.status !== 'QUALIFIED_EXPORT';
+  exportEvidence.dataset.role = 'lfea-export-evidence';
+  exportEvidence.disabled = !isCurrentExecution(state)
+    || state.execution?.evidenceExport?.status !== 'QUALIFIED_EXPORT';
   const undo = workbenchButton(root, 'Undo', handlers.onUndo);
   undo.disabled = !state.past.length;
   const redo = workbenchButton(root, 'Redo', handlers.onRedo);
@@ -61,6 +62,9 @@ export function renderLfeaToolbar(root, state, modes, handlers) {
     redo,
     mode,
   );
+  if (hasQualifiedDisplacements(state.execution)) {
+    toolbar.append(deformationScaleInput(root, state, handlers));
+  }
   if (state.progress) toolbar.append(progressOutput(root, state.progress));
   return toolbar;
 }
@@ -152,13 +156,32 @@ function resultModeSelect(root, state, modes, handlers) {
   for (const value of modes) {
     const option = workbenchElement(root, 'option', null, value.replaceAll('_', ' '));
     option.value = value;
-    option.selected = value === state.resultMode;
-    option.disabled =
-      value === 'PROJECTED_STRESS' && !state.execution?.stressProjection;
+    option.selected = value === state.display.resultMode;
+    option.disabled = value === 'DEFORMED'
+      ? !hasQualifiedDisplacements(state.execution)
+      : value === 'PROJECTED_STRESS' && !state.execution?.stressProjection;
     select.append(option);
   }
   select.addEventListener('change', () => handlers.onResultMode(select.value));
   return select;
+}
+
+function deformationScaleInput(root, state, handlers) {
+  const label = workbenchElement(
+    root,
+    'label',
+    'lfea-workbench__deformation-scale',
+    `Deformation scale (${state.display.deformationScaleSource}) `,
+  );
+  const input = workbenchElement(root, 'input');
+  input.type = 'number';
+  input.step = 'any';
+  input.min = '0';
+  input.value = String(state.display.deformationScale);
+  input.dataset.role = 'lfea-deformation-scale';
+  input.addEventListener('change', () => handlers.onDeformationScale(input.value));
+  label.append(input);
+  return label;
 }
 
 function progressOutput(root, progress) {
@@ -236,4 +259,16 @@ function reviewSummary(execution) {
     equilibriumTotals: execution.result?.equilibriumTotals ?? null,
     energyConsistency: execution.result?.energyConsistency ?? null,
   };
+}
+
+function hasQualifiedDisplacements(execution) {
+  return execution?.result?.status === 'QUALIFIED'
+    && Array.isArray(execution.result.nodalDisplacements)
+    && execution.result.nodalDisplacements.length > 0;
+}
+
+function isCurrentExecution(state) {
+  return Boolean(state.execution)
+    && state.execution.inputSemanticHash === state.packageValue?.semanticHash
+    && state.execution.inputModelVersion === state.modelVersion;
 }

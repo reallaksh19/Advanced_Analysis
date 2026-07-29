@@ -120,16 +120,25 @@ export function lfeaDisplayGeometry(packageInput, execution, mode, options = {})
     };
   });
 
+  const geometryState = deformation.enabled
+    ? GEOMETRY_STATES.DEFORMED
+    : GEOMETRY_STATES.UNDEFORMED;
+  const deformationScale = deformation.enabled ? deformation.scale : 0;
   const field = resolveField(packageValue, execution, mode, options);
   const descriptor = field
     ? createPlotDescriptor({
       field,
-      geometryState: deformation.enabled ? GEOMETRY_STATES.DEFORMED : GEOMETRY_STATES.UNDEFORMED,
-      deformationScale: deformation.enabled ? deformation.scale : 0,
+      geometryState,
+      deformationScale,
       authority: field.authority,
       unitsIdentity: packageValue.unitsIdentity ?? null,
     })
-    : createGeometryOnlyDescriptor({ unitsIdentity: packageValue.unitsIdentity ?? null });
+    : createGeometryOnlyDescriptor({
+      unitsIdentity: packageValue.unitsIdentity ?? null,
+      geometryState,
+      deformationScale,
+      authority: displayAuthority(execution, mode, field),
+    });
 
   return freeze({
     mode,

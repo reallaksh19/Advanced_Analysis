@@ -43,6 +43,14 @@ import { renderWorkspaceLayout } from './workspace-layout.js';
 import { WorkspaceState } from './workspace-state.js';
 import { WorkspaceShellController } from './workspace-shell-controller.js';
 
+export function requireUniqueRoot(root, selector) {
+  const matches = root.querySelectorAll(selector);
+  if (matches.length !== 1) {
+    throw new TypeError(`Expected exactly one ${selector}; found ${matches.length}.`);
+  }
+  return matches[0];
+}
+
 export function bootstrapAnalysisWorkspace(rootElement) {
   if (!rootElement) throw new Error('Application root #root was not found.');
   WorkspaceState.clearDataset(); AnalysisSessions.clear(); AnalysisLedger.clear();
@@ -76,8 +84,13 @@ export function bootstrapAnalysisWorkspace(rootElement) {
   const modelCalculationPanel = new ModelCalculationPanel(rootElement.querySelector('[data-role="model-calculation-summary"]'), EventBus);
   const modelSupportLoadPanel = new ModelSupportLoadPanel(rootElement.querySelector('[data-role="model-support-load-summary"]'), EventBus);
   const propertiesPanel = new PropertiesPanel(rootElement.querySelector('[data-panel="properties"]'), EventBus, WorkspaceState);
-  const lafeaWorkbenchController = new LafeaWorkbenchController(rootElement.querySelector('[data-role="lafea-consumer-root"]'),undefined);
-  const lfeaWorkbenchController = new LfeaWorkbenchController(rootElement.querySelector('[data-role="lfea-consumer-root"]'),undefined);
+  const lafeaRoot = requireUniqueRoot(rootElement, '[data-role="lafea-consumer-root"]');
+  const lfeaRoot = requireUniqueRoot(rootElement, '[data-role="lfea-consumer-root"]');
+  if (lafeaRoot === lfeaRoot) {
+    throw new TypeError('LAFEA and LFEA workbench roots must be different elements.');
+  }
+  const lafeaWorkbenchController = new LafeaWorkbenchController(lafeaRoot,undefined);
+  const lfeaWorkbenchController = new LfeaWorkbenchController(lfeaRoot,undefined);
   const applicationShellController = new ApplicationShellController(rootElement,workspaceConsumerController,EventBus,{ settingsController,lafeaController:lafeaWorkbenchController,lfeaController:lfeaWorkbenchController });
   const benchmarkReportUrl = new URL(`${import.meta.env.BASE_URL}qualification/advanced-tab-benchmarks.json`,rootElement.ownerDocument.baseURI).href;
   const tabBenchmarkStatusController = new TabBenchmarkStatusController(rootElement,benchmarkReportUrl);

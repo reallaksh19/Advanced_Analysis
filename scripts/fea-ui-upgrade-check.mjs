@@ -132,7 +132,7 @@ console.log(JSON.stringify({
   waves: ['UI-0', 'UI-1', 'UI-2', 'UI-3', 'UI-4', 'UI-5', 'UI-6', 'UI-7', 'UI-8'],
   presenterRows,
   crossKernel,
-  workerLifecycle: 'PROGRESS_AND_TERMINATING_CANCEL',
+  workerLifecycle: 'IDENTIFIED_PROGRESS_AND_TERMINATING_CANCEL',
   incrementalWorkbenchShells: true,
   capacityGate: 'PREFLIGHT_FAIL_CLOSED_AND_SOLVE_ONLY_EXIT',
 }));
@@ -169,15 +169,47 @@ async function verifyWorkerLifecycle() {
     worker = new FakeWorker();
     return worker;
   });
-  const progress = [];
-  const completion = client.run({}, { onProgress: (value) => progress.push(value) });
+  const firstIdentity = {
+    runId: 'fea-ui-upgrade-run-1',
+    inputSemanticHash: 'fea-ui-upgrade-hash-1',
+    inputModelVersion: 1,
+  };
+  const progressEvents = [];
+  const completion = client.run({}, firstIdentity, {
+    onProgress: (value) => progressEvents.push(value),
+  });
   const requestId = worker.request.requestId;
-  worker.emit('message', { data: { type: 'PROGRESS', requestId, progress: { stage: 'SOLVE' } } });
-  worker.emit('message', { data: { type: 'COMPLETE', requestId, execution: { status: 'QUALIFIED' } } });
-  assert.equal((await completion).status, 'QUALIFIED');
-  assert.deepEqual(progress, [{ stage: 'SOLVE' }]);
-  const cancelled = client.run({}, { onProgress: () => {} });
-  assert.equal(client.cancel(), true);
+  worker.emit('message', {
+    data: {
+      type: 'PROGRESS',
+      requestId,
+      ...firstIdentity,
+      progress: { stage: 'SOLVE' },
+    },
+  });
+  worker.emit('message', {
+    data: {
+      type: 'COMPLETE',
+      requestId,
+      ...firstIdentity,
+      execution: { status: 'QUALIFIED' },
+    },
+  });
+  const completionMessage = await completion;
+  assert.equal(completionMessage.execution.status, 'QUALIFIED');
+  assert.equal(completionMessage.runId, firstIdentity.runId);
+  assert.deepEqual(progressEvents[0].progress, { stage: 'SOLVE' });
+  assert.equal(progressEvents[0].inputSemanticHash, firstIdentity.inputSemanticHash);
+
+  const secondIdentity = {
+    runId: 'fea-ui-upgrade-run-2',
+    inputSemanticHash: 'fea-ui-upgrade-hash-2',
+    inputModelVersion: 2,
+  };
+  const cancelled = client.run({}, secondIdentity, { onProgress: () => {} });
+  const cancellation = client.cancel();
+  assert.equal(cancellation.code, 'LFEA_RUN_CANCELLED');
+  assert.equal(cancellation.runId, secondIdentity.runId);
   await assert.rejects(cancelled, { name: 'AbortError' });
 }
 

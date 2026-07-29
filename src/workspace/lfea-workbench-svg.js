@@ -172,7 +172,7 @@ function renderLegend(svg, geometry) {
   badge.dataset.role = 'lfea-geometry-state';
   badge.dataset.geometryState = plot?.geometryState ?? 'UNKNOWN';
   badge.textContent = plot?.deformationScale
-    ? `DEFORMED x${plot.deformationScale}`
+    ? `DEFORMED ×${plot.deformationScale}`
     : 'UNDEFORMED';
   svg.append(badge);
 
