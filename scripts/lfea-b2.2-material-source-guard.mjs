@@ -63,7 +63,7 @@ export async function runMaterialSourceGuard() {
   const packageJson = JSON.parse(await readFile(path.join(ROOT, 'package.json'), 'utf8'));
   assert.equal(
     packageJson.scripts['check:lfea-b2.2'],
-    'node scripts/lfea-b2.2-material-check.mjs && node scripts/lfea-b2.2-material-source-guard.mjs',
+    'node scripts/lfea-b2.2-material-check.mjs && node scripts/lfea-b2.2-reviewer-check.mjs && node scripts/lfea-b2.2-material-source-guard.mjs',
   );
   assert.match(
     packageJson.scripts['check:lfea-core'],
