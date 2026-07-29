@@ -1,7 +1,7 @@
 import { compareCanonicalIds } from './identifiers.js';
 
 function copyArray(value) {
-  return Array.isArray(value) ? value.map((entry) => cloneValue(entry)) : value;
+  return Array.isArray(value) ? value.map((entry) => cloneValue(entry)) : [];
 }
 
 function cloneValue(value) {
@@ -12,23 +12,32 @@ function cloneValue(value) {
   return value;
 }
 
-function compareOptionalCanonical(left, right) {
+function compareAsciiStrings(left, right) {
   const a = String(left ?? '');
   const b = String(right ?? '');
-  if (a === b) return 0;
-  if (a === '') return -1;
-  if (b === '') return 1;
-  return compareCanonicalIds(a, b);
+  const length = Math.min(a.length, b.length);
+  for (let index = 0; index < length; index += 1) {
+    const difference = a.charCodeAt(index) - b.charCodeAt(index);
+    if (difference < 0) return -1;
+    if (difference > 0) return 1;
+  }
+  if (a.length < b.length) return -1;
+  if (a.length > b.length) return 1;
+  return 0;
 }
 
 function byFields(...fields) {
   return (left, right) => {
     for (const field of fields) {
-      const compared = compareOptionalCanonical(left[field], right[field]);
+      const compared = compareAsciiStrings(left[field], right[field]);
       if (compared !== 0) return compared;
     }
     return 0;
   };
+}
+
+function byCanonicalField(field) {
+  return (left, right) => compareCanonicalIds(left[field], right[field]);
 }
 
 export function canonicalizeSourceEvidence(sourceEvidence) {
@@ -39,13 +48,22 @@ export function canonicalizeSourceEvidence(sourceEvidence) {
   ));
 }
 
+export function canonicalizeDiagnosticEvidence(evidence) {
+  return copyArray(evidence).sort(byFields(
+    'evidenceId',
+    'sourceId',
+    'sourceRevision',
+    'sourceSemanticHash',
+  ));
+}
+
 export function canonicalizeDiagnostics(diagnostics) {
   return copyArray(diagnostics)
     .map((diagnostic) => ({
       ...diagnostic,
-      evidence: canonicalizeSourceEvidence(diagnostic.evidence),
+      evidence: canonicalizeDiagnosticEvidence(diagnostic.evidence),
       qualificationEvidenceIds: copyArray(diagnostic.qualificationEvidenceIds)
-        .sort(compareOptionalCanonical),
+        .sort(compareCanonicalIds),
     }))
     .sort(byFields('severity', 'code', 'entityType', 'entityId'));
 }
@@ -57,20 +75,20 @@ export function canonicalizeLinearFeaModel(candidate) {
       ...node,
       sourceAncestry: {
         ...node.sourceAncestry,
-        sourceNodeIds: copyArray(node.sourceAncestry.sourceNodeIds).sort(compareOptionalCanonical),
-        sourceComponentIds: copyArray(node.sourceAncestry.sourceComponentIds).sort(compareOptionalCanonical),
+        sourceNodeIds: copyArray(node.sourceAncestry.sourceNodeIds).sort(compareCanonicalIds),
+        sourceComponentIds: copyArray(node.sourceAncestry.sourceComponentIds).sort(compareCanonicalIds),
       },
     }))
-    .sort(byFields('nodeId'));
+    .sort(byCanonicalField('nodeId'));
   model.materialStates = copyArray(model.materialStates)
     .map((state) => ({ ...state, sourceEvidence: canonicalizeSourceEvidence(state.sourceEvidence) }))
-    .sort(byFields('materialStateId'));
+    .sort(byCanonicalField('materialStateId'));
   model.sectionStates = copyArray(model.sectionStates)
     .map((state) => ({ ...state, sourceEvidence: canonicalizeSourceEvidence(state.sourceEvidence) }))
-    .sort(byFields('sectionStateId'));
-  model.elements = copyArray(model.elements).sort(byFields('elementId'));
-  model.constraints = copyArray(model.constraints).sort(byFields('constraintId'));
-  model.limitations = copyArray(model.limitations).sort(byFields('code'));
+    .sort(byCanonicalField('sectionStateId'));
+  model.elements = copyArray(model.elements).sort(byCanonicalField('elementId'));
+  model.constraints = copyArray(model.constraints).sort(byCanonicalField('constraintId'));
+  model.limitations = copyArray(model.limitations).sort(byCanonicalField('code'));
   model.diagnostics = canonicalizeDiagnostics(model.diagnostics);
   return model;
 }
