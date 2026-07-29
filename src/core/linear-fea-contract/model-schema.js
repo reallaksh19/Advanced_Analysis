@@ -1,6 +1,15 @@
+import { DOF_ORDER } from './conventions.js';
+
 export const LINEAR_FEA_MODEL_SCHEMA = 'fea-linear-model/v1';
 export const LINEAR_FEA_VALIDATION_PROFILE_ID = 'LINEAR-MODEL-VALIDATION-R1';
 export const LINEAR_FEA_FORMULATION_REGISTRY_VERSION = 'PIPE-LINEAR-R1';
+export const LINEAR_FEA_VALIDATION_PROFILE = Object.freeze({
+  profileId: LINEAR_FEA_VALIDATION_PROFILE_ID,
+  zeroLengthTolerance: 1e-10,
+  unitVectorTolerance: 1e-12,
+  orthogonalityTolerance: 1e-12,
+  handednessTolerance: 1e-12,
+});
 
 export const SUPPORTED_FORMULATIONS = Object.freeze({
   'PIPE-LINEAR-R1': Object.freeze(['PIPE_FRAME3D_LINEAR_V1']),
@@ -23,9 +32,9 @@ export const PROHIBITED_NONLINEAR_BEHAVIORS = Object.freeze([
 ]);
 
 export const CONSTRAINT_BASES = Object.freeze(['GLOBAL']);
-export const TRANSLATIONAL_DOFS = Object.freeze(['UX', 'UY', 'UZ']);
-export const ROTATIONAL_DOFS = Object.freeze(['RX', 'RY', 'RZ']);
-export const CONSTRAINT_DOFS = Object.freeze([...TRANSLATIONAL_DOFS, ...ROTATIONAL_DOFS]);
+export const CONSTRAINT_DOFS = DOF_ORDER;
+export const TRANSLATIONAL_DOFS = Object.freeze(DOF_ORDER.slice(0, 3));
+export const ROTATIONAL_DOFS = Object.freeze(DOF_ORDER.slice(3));
 
 export const MODEL_TOP_LEVEL_KEYS = Object.freeze([
   'schema',
