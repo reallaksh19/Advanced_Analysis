@@ -35,11 +35,10 @@ function requireRecord(value, field) {
 
 function requireExactKeys(value, expectedKeys, field) {
   requireRecord(value, field);
-  const actual = Object.keys(value);
   for (const key of expectedKeys) {
     if (!Object.hasOwn(value, key)) fail(`${field} is missing ${key}.`, 'MISSING_FIELD');
   }
-  for (const key of actual) {
+  for (const key of Object.keys(value)) {
     if (!expectedKeys.includes(key)) fail(`${field} contains unexpected field ${key}.`, 'UNEXPECTED_FIELD');
   }
 }
@@ -91,6 +90,12 @@ function requireIdentity(value, field) {
   }
 }
 
+function requireSourceIdentity(value, field) {
+  const sourceIdentity = requireString(value, field);
+  if (sourceIdentity.trim().length === 0) fail(`${field} must not be whitespace-only.`, 'INVALID_SOURCE_IDENTITY');
+  return sourceIdentity;
+}
+
 function requireHash(value, field, allowBlank) {
   if (allowBlank && value === '') return value;
   if (typeof value !== 'string' || !/^fnv1a64:[0-9a-f]{16}$/u.test(value)) {
@@ -109,14 +114,22 @@ function requireUniqueIdentities(records, field, identityKey) {
   return identities;
 }
 
-function validateStringArray(value, field) {
+function validateIdentityArray(value, field, validator, duplicateCode) {
   requireArray(value, field);
   const seen = new Set();
   value.forEach((entry, index) => {
-    const identity = requireIdentity(entry, `${field}[${index}]`);
-    if (seen.has(identity)) fail(`${field} contains duplicate ${identity}.`, 'DUPLICATE_ANCESTRY_IDENTITY');
+    const identity = validator(entry, `${field}[${index}]`);
+    if (seen.has(identity)) fail(`${field} contains duplicate ${identity}.`, duplicateCode);
     seen.add(identity);
   });
+}
+
+function validateCanonicalStringArray(value, field) {
+  validateIdentityArray(value, field, requireIdentity, 'DUPLICATE_ANCESTRY_IDENTITY');
+}
+
+function validateSourceStringArray(value, field) {
+  validateIdentityArray(value, field, requireSourceIdentity, 'DUPLICATE_SOURCE_IDENTITY');
 }
 
 function validateSourceEvidence(value, field) {
@@ -130,8 +143,10 @@ function validateSourceEvidence(value, field) {
       ['sourceId', 'sourceRevision', 'sourceSemanticHash'],
       evidenceField,
     );
-    requireIdentity(evidence.sourceId, `${evidenceField}.sourceId`);
-    if (Object.hasOwn(evidence, 'sourceRevision')) requireIdentity(evidence.sourceRevision, `${evidenceField}.sourceRevision`);
+    requireSourceIdentity(evidence.sourceId, `${evidenceField}.sourceId`);
+    if (Object.hasOwn(evidence, 'sourceRevision')) {
+      requireSourceIdentity(evidence.sourceRevision, `${evidenceField}.sourceRevision`);
+    }
     requireHash(evidence.sourceSemanticHash, `${evidenceField}.sourceSemanticHash`, false);
   });
 }
@@ -143,13 +158,17 @@ function validateAncestry(ancestry) {
 
 function validateProfile(profile, allowBlankHashes) {
   requireExactKeys(profile, RECORD_KEYS.validationProfile, 'validationProfile');
-  if (profile.profileId !== LINEAR_FEA_VALIDATION_PROFILE_ID) fail('validationProfile.profileId is unsupported.', 'UNSUPPORTED_VALIDATION_PROFILE');
+  if (profile.profileId !== LINEAR_FEA_VALIDATION_PROFILE_ID) {
+    fail('validationProfile.profileId is unsupported.', 'UNSUPPORTED_VALIDATION_PROFILE');
+  }
   requirePositive(profile.zeroLengthTolerance, 'validationProfile.zeroLengthTolerance');
   requireNonnegative(profile.unitVectorTolerance, 'validationProfile.unitVectorTolerance');
   requireNonnegative(profile.orthogonalityTolerance, 'validationProfile.orthogonalityTolerance');
   requireNonnegative(profile.handednessTolerance, 'validationProfile.handednessTolerance');
   for (const [key, expected] of Object.entries(LINEAR_FEA_VALIDATION_PROFILE)) {
-    if (profile[key] !== expected) fail(`validationProfile.${key} does not match ${LINEAR_FEA_VALIDATION_PROFILE_ID}.`, 'INVALID_VALIDATION_PROFILE_VALUE');
+    if (profile[key] !== expected) {
+      fail(`validationProfile.${key} does not match ${LINEAR_FEA_VALIDATION_PROFILE_ID}.`, 'INVALID_VALIDATION_PROFILE_VALUE');
+    }
   }
   requireHash(profile.semanticHash, 'validationProfile.semanticHash', allowBlankHashes);
 }
@@ -166,8 +185,8 @@ function validateNodes(nodes) {
     requireFinite(node.position.z, `${field}.position.z`);
     requireExactKeys(node.sourceAncestry, RECORD_KEYS.nodeAncestry, `${field}.sourceAncestry`);
     requireIdentity(node.sourceAncestry.conditionedNodeId, `${field}.sourceAncestry.conditionedNodeId`);
-    validateStringArray(node.sourceAncestry.sourceNodeIds, `${field}.sourceAncestry.sourceNodeIds`);
-    validateStringArray(node.sourceAncestry.sourceComponentIds, `${field}.sourceAncestry.sourceComponentIds`);
+    validateSourceStringArray(node.sourceAncestry.sourceNodeIds, `${field}.sourceAncestry.sourceNodeIds`);
+    validateSourceStringArray(node.sourceAncestry.sourceComponentIds, `${field}.sourceAncestry.sourceComponentIds`);
     requireIdentity(node.sourceAncestry.creationBasis, `${field}.sourceAncestry.creationBasis`);
   });
   return requireUniqueIdentities(nodes, 'nodes', 'nodeId');
@@ -179,7 +198,7 @@ function validateMaterialStates(states) {
     const field = `materialStates[${index}]`;
     requireExactKeys(state, RECORD_KEYS.materialState, field);
     requireIdentity(state.materialStateId, `${field}.materialStateId`);
-    requireIdentity(state.materialId, `${field}.materialId`);
+    requireSourceIdentity(state.materialId, `${field}.materialId`);
     requirePositive(state.elasticModulus, `${field}.elasticModulus`, 'INVALID_MATERIAL_VALUE');
     requirePositive(state.shearModulus, `${field}.shearModulus`, 'INVALID_MATERIAL_VALUE');
     const poisson = requireFinite(state.poissonRatio, `${field}.poissonRatio`);
@@ -237,10 +256,14 @@ function validateAxes(axes, field, profile) {
   requireIdentity(axes.policyId, `${field}.policyId`);
   requireIdentity(axes.evidenceIdentity, `${field}.evidenceIdentity`);
   for (const axis of ['x', 'y', 'z']) {
-    if (Math.abs(norm(axes[axis]) - 1) > profile.unitVectorTolerance) fail(`${field}.${axis} is not unit length.`, 'NONUNIT_AXIS');
+    if (Math.abs(norm(axes[axis]) - 1) > profile.unitVectorTolerance) {
+      fail(`${field}.${axis} is not unit length.`, 'NONUNIT_AXIS');
+    }
   }
   for (const [left, right] of [['x', 'y'], ['y', 'z'], ['z', 'x']]) {
-    if (Math.abs(dot(axes[left], axes[right])) > profile.orthogonalityTolerance) fail(`${field} axes are not orthogonal.`, 'NONORTHOGONAL_AXES');
+    if (Math.abs(dot(axes[left], axes[right])) > profile.orthogonalityTolerance) {
+      fail(`${field} axes are not orthogonal.`, 'NONORTHOGONAL_AXES');
+    }
   }
   const crossXY = cross(axes.x, axes.y);
   if (norm(crossXY) === 0 || dot(crossXY, axes.z) < 1 - profile.handednessTolerance) {
@@ -260,11 +283,15 @@ function validateElements(elements, nodeIds, materialIds, sectionIds, nodesById,
     requireIdentity(element.nodeI, `${field}.nodeI`);
     requireIdentity(element.nodeJ, `${field}.nodeJ`);
     if (element.nodeI === element.nodeJ) fail(`${field} has identical end nodes.`, 'ZERO_LENGTH_ELEMENT');
-    if (!nodeIds.has(element.nodeI) || !nodeIds.has(element.nodeJ)) fail(`${field} references a missing node.`, 'MISSING_NODE_REFERENCE');
+    if (!nodeIds.has(element.nodeI) || !nodeIds.has(element.nodeJ)) {
+      fail(`${field} references a missing node.`, 'MISSING_NODE_REFERENCE');
+    }
     const nodeI = nodesById.get(element.nodeI).position;
     const nodeJ = nodesById.get(element.nodeJ).position;
     const length = Math.hypot(nodeJ.x - nodeI.x, nodeJ.y - nodeI.y, nodeJ.z - nodeI.z);
-    if (!Number.isFinite(length) || !(length > model.validationProfile.zeroLengthTolerance)) fail(`${field} length is below tolerance.`, 'ZERO_LENGTH_ELEMENT');
+    if (!Number.isFinite(length) || !(length > model.validationProfile.zeroLengthTolerance)) {
+      fail(`${field} length is below tolerance.`, 'ZERO_LENGTH_ELEMENT');
+    }
     requireIdentity(element.materialStateId, `${field}.materialStateId`);
     if (!materialIds.has(element.materialStateId)) fail(`${field} references a missing material state.`, 'MISSING_MATERIAL_REFERENCE');
     requireIdentity(element.sectionStateId, `${field}.sectionStateId`);
@@ -272,7 +299,7 @@ function validateElements(elements, nodeIds, materialIds, sectionIds, nodesById,
     validateAxes(element.localAxes, `${field}.localAxes`, model.validationProfile);
     requireExactKeys(element.sourceAncestry, RECORD_KEYS.elementAncestry, `${field}.sourceAncestry`);
     requireIdentity(element.sourceAncestry.conditionedSegmentId, `${field}.sourceAncestry.conditionedSegmentId`);
-    requireIdentity(element.sourceAncestry.sourceComponentId, `${field}.sourceAncestry.sourceComponentId`);
+    requireSourceIdentity(element.sourceAncestry.sourceComponentId, `${field}.sourceAncestry.sourceComponentId`);
   });
   requireUniqueIdentities(elements, 'elements', 'elementId');
 }
@@ -287,10 +314,15 @@ function validateConstraints(constraints, nodeIds) {
     requireIdentity(constraint.nodeId, `${field}.nodeId`);
     if (!nodeIds.has(constraint.nodeId)) fail(`${field} references a missing node.`, 'MISSING_CONSTRAINT_NODE_REFERENCE');
     if (!CONSTRAINT_DOFS.includes(constraint.dof)) fail(`${field}.dof is unsupported.`, 'UNSUPPORTED_DOF');
-    if (!SUPPORTED_CONSTRAINT_BEHAVIORS.includes(constraint.behavior)) fail(`${field}.behavior is unsupported.`, 'UNSUPPORTED_CONSTRAINT_BEHAVIOR');
+    if (!SUPPORTED_CONSTRAINT_BEHAVIORS.includes(constraint.behavior)) {
+      fail(`${field}.behavior is unsupported.`, 'UNSUPPORTED_CONSTRAINT_BEHAVIOR');
+    }
     if (!CONSTRAINT_BASES.includes(constraint.basis)) fail(`${field}.basis is unsupported.`, 'UNSUPPORTED_CONSTRAINT_BASIS');
-    if (constraint.behavior === 'LINEAR_SPRING') requirePositive(constraint.stiffness, `${field}.stiffness`, 'INVALID_SPRING_STIFFNESS');
-    else if (constraint.stiffness !== null) fail(`${field}.stiffness must be null.`, 'INVALID_CONSTRAINT_STIFFNESS');
+    if (constraint.behavior === 'LINEAR_SPRING') {
+      requirePositive(constraint.stiffness, `${field}.stiffness`, 'INVALID_SPRING_STIFFNESS');
+    } else if (constraint.stiffness !== null) {
+      fail(`${field}.stiffness must be null.`, 'INVALID_CONSTRAINT_STIFFNESS');
+    }
     const slot = `${constraint.nodeId}:${constraint.dof}`;
     if (occupied.has(slot)) fail(`${field} duplicates an active node/DOF constraint.`, 'DUPLICATE_NODE_DOF_CONSTRAINT');
     occupied.add(slot);
@@ -333,11 +365,13 @@ function validateDiagnostics(diagnostics) {
         evidenceField,
       );
       requireIdentity(evidence.evidenceId, `${evidenceField}.evidenceId`);
-      requireIdentity(evidence.sourceId, `${evidenceField}.sourceId`);
-      if (Object.hasOwn(evidence, 'sourceRevision')) requireIdentity(evidence.sourceRevision, `${evidenceField}.sourceRevision`);
+      requireSourceIdentity(evidence.sourceId, `${evidenceField}.sourceId`);
+      if (Object.hasOwn(evidence, 'sourceRevision')) {
+        requireSourceIdentity(evidence.sourceRevision, `${evidenceField}.sourceRevision`);
+      }
       requireHash(evidence.sourceSemanticHash, `${evidenceField}.sourceSemanticHash`, false);
     });
-    validateStringArray(diagnostic.qualificationEvidenceIds, `${field}.qualificationEvidenceIds`);
+    validateCanonicalStringArray(diagnostic.qualificationEvidenceIds, `${field}.qualificationEvidenceIds`);
     const authority = `${diagnostic.severity}:${diagnostic.code}:${diagnostic.entityType}:${diagnostic.entityId}`;
     if (authorities.has(authority)) fail(`${field} duplicates a diagnostic authority.`, 'DUPLICATE_DIAGNOSTIC_AUTHORITY');
     authorities.add(authority);
@@ -348,11 +382,15 @@ function validateStructure(candidate, allowBlankHashes) {
   requireExactKeys(candidate, MODEL_TOP_LEVEL_KEYS, 'model');
   if (candidate.schema !== LINEAR_FEA_MODEL_SCHEMA) fail('model.schema is unsupported.', 'UNSUPPORTED_MODEL_SCHEMA');
   requireIdentity(candidate.modelIdentity, 'model.modelIdentity');
-  if (!Number.isInteger(candidate.modelRevision) || candidate.modelRevision < 1) fail('model.modelRevision must be a positive integer.', 'INVALID_MODEL_REVISION');
+  if (!Number.isInteger(candidate.modelRevision) || candidate.modelRevision < 1) {
+    fail('model.modelRevision must be a positive integer.', 'INVALID_MODEL_REVISION');
+  }
   requireLinearFeaUnits(candidate.units);
   requireLinearFeaConventions(candidate.conventions);
   validateAncestry(candidate.ancestry);
-  if (candidate.formulationRegistryVersion !== LINEAR_FEA_FORMULATION_REGISTRY_VERSION) fail('formulationRegistryVersion is unsupported.', 'UNSUPPORTED_FORMULATION_REGISTRY');
+  if (candidate.formulationRegistryVersion !== LINEAR_FEA_FORMULATION_REGISTRY_VERSION) {
+    fail('formulationRegistryVersion is unsupported.', 'UNSUPPORTED_FORMULATION_REGISTRY');
+  }
   validateProfile(candidate.validationProfile, allowBlankHashes);
   const nodeIds = validateNodes(candidate.nodes);
   const materialIds = validateMaterialStates(candidate.materialStates);
@@ -387,7 +425,9 @@ export function validateLinearFeaModel(candidate) {
   validateStructure(candidate, false);
   const canonical = canonicalizeLinearFeaModel(candidate);
   const expectedProfileHash = computeValidationProfileSemanticHash(canonical.validationProfile);
-  if (canonical.validationProfile.semanticHash !== expectedProfileHash) fail('validationProfile.semanticHash is stale.', 'STALE_VALIDATION_PROFILE_HASH');
+  if (canonical.validationProfile.semanticHash !== expectedProfileHash) {
+    fail('validationProfile.semanticHash is stale.', 'STALE_VALIDATION_PROFILE_HASH');
+  }
   const expectedStiffnessHash = computeStiffnessStateHash(canonical);
   if (canonical.stiffnessStateHash !== expectedStiffnessHash) fail('stiffnessStateHash is stale.', 'STALE_STIFFNESS_HASH');
   const expectedSemanticHash = computeSemanticHash(canonical);
