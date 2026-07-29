@@ -22,7 +22,7 @@
     "check:lfea-b2.0": "node scripts/lfea-b2.0-conventions-check.mjs && node scripts/lfea-b2.0-source-guard.mjs",
     "check:lfea-b2.1": "node scripts/lfea-b2.1-model-contract-check.mjs && node scripts/lfea-b2.1-reviewer-check.mjs && node scripts/lfea-b2.1-source-guard.mjs",
     "check:lfea-b2.4": "node scripts/lfea-b2.4-local-axes-check.mjs && node scripts/lfea-b2.4-reviewer-check.mjs && node scripts/lfea-b2.4-source-guard.mjs",
-    "check:lfea-b2.2": "node scripts/lfea-b2.2-material-check.mjs && node scripts/lfea-b2.2-material-source-guard.mjs",
+    "check:lfea-b2.2": "node scripts/lfea-b2.2-material-check.mjs && node scripts/lfea-b2.2-reviewer-check.mjs && node scripts/lfea-b2.2-material-source-guard.mjs",
     "check:lfea-core": "npm run check:lfea-b2.0 && npm run check:lfea-b2.1 && npm run check:lfea-b2.4 && npm run check:lfea-b2.2 && node scripts/lfea-inputxml-ingest-check.mjs && node scripts/lfea-b1-conditioning-check.mjs && node scripts/lfea-ray-topology-check.mjs",
     "check:lfea-workbench": "node scripts/lfea-p0-ui-containment-check.mjs && node scripts/lfea-workbench-check.mjs",
     "check:lafea-core": "node scripts/lafea.1-contract-check.mjs && node scripts/lafea.2-contract-check.mjs && node scripts/lafea.3-contract-check.mjs && node scripts/lafea.4-contract-check.mjs && node scripts/lafea-s4-resultant-check.mjs && node scripts/lafea.5-contract-check.mjs",
