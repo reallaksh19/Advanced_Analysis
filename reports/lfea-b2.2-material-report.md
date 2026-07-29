@@ -153,12 +153,26 @@ No deliberate regression remains in production source.
 
 ## Qualification status
 
-Targeted local qualification before repository CI:
+Qualification evidence:
 
 - 27/27 required checks passing;
 - 9/9 deliberate regressions detected;
 - anti-drift source guard passing.
 
-Repository-wide command evidence will be appended after the exact final head completes CI.
+GitHub Actions run `30475997279` passed the required command matrix on implementation head `503af123bd5784655064552235a7b6a0f98aa1da`:
 
-B-2.2 STATUS: QUALIFICATION IN PROGRESS
+- `npm ci`;
+- `npm run check:lfea-b2.0`;
+- `npm run check:lfea-b2.1`;
+- `npm run check:lfea-b2.4`;
+- `npm run check:lfea-b2.2`;
+- `npm run check:lfea-core`;
+- `npm run check:lfea-workbench`;
+- `npm run syntax:strict`;
+- `npm run check:imports`;
+- `npm run build`;
+- `npm run gate`;
+- `git diff --check`;
+- clean `git status --short`.
+
+B-2.2 STATUS: QUALIFIED
