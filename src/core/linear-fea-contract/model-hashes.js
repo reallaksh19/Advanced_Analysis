@@ -1,4 +1,7 @@
-import { semanticHash as hashCanonicalValue } from '../shared-piping-model/canonical-json.js';
+import {
+  canonicalStringify,
+  semanticHash as hashCanonicalValue,
+} from '../shared-piping-model/canonical-json.js';
 import { canonicalizeLinearFeaModel } from './model-canonicalization.js';
 import { canonicalDiagnosticEvidence } from './model-diagnostics.js';
 
@@ -30,10 +33,47 @@ function stiffnessConstraintProjection(constraint) {
   };
 }
 
+function compareCanonicalProjection(left, right) {
+  const a = canonicalStringify(left);
+  const b = canonicalStringify(right);
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
+
+function canonicalizeProjectionRecords(records) {
+  return [...records].sort(compareCanonicalProjection);
+}
+
 export function stiffnessStateProjection(candidate) {
   const model = canonicalizeLinearFeaModel(candidate);
   const materials = new Map(model.materialStates.map((state) => [state.materialStateId, state]));
   const sections = new Map(model.sectionStates.map((state) => [state.sectionStateId, state]));
+  const elementProjections = model.elements.map((element) => {
+    const material = materials.get(element.materialStateId);
+    const section = sections.get(element.sectionStateId);
+    return {
+      formulationId: element.formulationId,
+      nodeI: element.nodeI,
+      nodeJ: element.nodeJ,
+      localAxes: {
+        x: element.localAxes.x,
+        y: element.localAxes.y,
+        z: element.localAxes.z,
+      },
+      material: {
+        elasticModulus: material?.elasticModulus,
+        shearModulus: material?.shearModulus,
+      },
+      section: {
+        area: section?.area,
+        secondMomentY: section?.secondMomentY,
+        secondMomentZ: section?.secondMomentZ,
+        polarMoment: section?.polarMoment,
+      },
+    };
+  });
+  const constraintProjections = model.constraints.map(stiffnessConstraintProjection);
   return {
     schema: model.schema,
     units: model.units,
@@ -43,31 +83,8 @@ export function stiffnessStateProjection(candidate) {
       nodeId: node.nodeId,
       position: node.position,
     })),
-    elements: model.elements.map((element) => {
-      const material = materials.get(element.materialStateId);
-      const section = sections.get(element.sectionStateId);
-      return {
-        formulationId: element.formulationId,
-        nodeI: element.nodeI,
-        nodeJ: element.nodeJ,
-        localAxes: {
-          x: element.localAxes.x,
-          y: element.localAxes.y,
-          z: element.localAxes.z,
-        },
-        material: {
-          elasticModulus: material?.elasticModulus,
-          shearModulus: material?.shearModulus,
-        },
-        section: {
-          area: section?.area,
-          secondMomentY: section?.secondMomentY,
-          secondMomentZ: section?.secondMomentZ,
-          polarMoment: section?.polarMoment,
-        },
-      };
-    }),
-    constraints: model.constraints.map(stiffnessConstraintProjection),
+    elements: canonicalizeProjectionRecords(elementProjections),
+    constraints: canonicalizeProjectionRecords(constraintProjections),
     limitations: model.limitations
       .filter((limitation) => limitation.stiffnessRelevant)
       .map((limitation) => ({
