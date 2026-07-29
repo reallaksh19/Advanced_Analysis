@@ -229,3 +229,61 @@ Checks: `scripts/lfea-inputxml-ingest-check.mjs` (11 tests, including a delibera
 compound-miter case and a round trip through B-1's `conditionGeometry`) and
 `scripts/lfea-ray-topology-check.mjs` (8 tests, including a realistic branch-tap
 scenario). Both wired into `npm run gate` via `check:lfea-core`.
+
+---
+
+## 7. LFEA supersession: the Phase 1–3 Revamped Improvement Plan
+
+The user supplied a far more rigorous LFEA architecture ("LFEA Phase 1–3 Revamped
+Improvement Plan") that supersedes the original B-1…B-8 outline in sections 4–19 of
+this document for LFEA specifically. It correctly identifies that B-2 was undersold
+as "mostly wiring" when it is the central mechanical-model architecture package, that
+`N = EAαΔT` is the wrong general thermal formulation (initial strain is correct;
+`EAαΔT` is a fully-restrained *benchmark*, not the load method), that stress/SIF
+belongs in Phase 4 not the linear-solve phase, and that UI must ship per-phase, not
+deferred to the end. LAFEA's plan and sequencing (sections 1–6 above) are unaffected.
+
+**P0 (containment precondition) — done, with two claims verified false.** Before
+implementing anything, each of P0's four claimed defects was checked against this
+repository's actual code, not assumed:
+
+| Claim | Verified | Action |
+|---|---|---|
+| P0.1 mount-root collision | **Not present** — `workspace-layout.js` already declares distinct `lfea-consumer-root`/`lafea-consumer-root`, `bootstrap.js` already queries them distinctly | Locked in with a regression test, not "fixed" |
+| P0.2 stale worker result becomes current | **Real** — `lfea-workbench-store.js`'s `completeRun` accepted any resolved execution unconditionally; nothing blocked editing during `RUNNING` or checked the package hadn't changed | Fixed: `beginRun` captures `packageValue.semanticHash`; `completeRun` discards a mismatched result (`LFEA_RUN_INPUT_STALE`) instead of publishing it |
+| P0.3 DEFORMED requires an explicit scale | **Not present** — `lfea-workbench-model.js`'s `resolveDeformation` already throws without one | Locked in with a regression test (previously zero coverage) |
+| P0.4 e2e not in the release gate | **Real** — `check:e2e` exists (66 Playwright specs) but isn't in `npm run gate` | **Not wired in.** Adding the full suite, or any subset, changes CI runtime/reliability for the whole application, not just LFEA — flagged as an open decision requiring its own scope, not made unilaterally here |
+
+`scripts/lfea-p0-containment-check.mjs` carries the two lock-ins; the stale-run fix
+is covered by `scripts/lfea-workbench-check.mjs` (already in `check:lfea-workbench`).
+Both run inside `npm run gate` via `check:lfea-core`.
+
+**Reconciliation with work already built.** The revamped plan's Phase 1 (source
+intake → topology reconciliation → conditioned geometry) restates, with a stricter
+contract shape, most of what commits 3–4 above already deliver:
+
+| Revamped plan | Already built as |
+|---|---|
+| B-1A InputXML source contract | `inputXmlToCanonicalGeometry.js` — parsing, diagnostics and rejection codes exist; the `piping-inputxml-source/v1` envelope (acceptance state, interpretation profile as its own record) does not |
+| B-1B topology reconciliation | `ray-projection.js` — candidate detection/ranking exists as a standalone, non-mutating module exactly as B-1B requires; wiring it into a staged accept/reject flow with committed-topology evidence does not exist yet |
+| B-1C conditioned geometry ancestry | `geometry-conditioning.js` / `node-seeding.js` — node/segment generation with reasons exists; the specific `sourceNodeIds`/`sourceComponentIds` ancestry arrays and canonical (non-source-order) ordering are not yet in the exact shape specified |
+
+None of this is wasted — it is the computational core the new contract layer wraps.
+What is missing is the stricter envelope (acceptance states, profile-as-evidence,
+explicit ancestry fields) and all of the Phase 1 UI (source intake, findings, geometry
+review screens).
+
+**Not started:** Phase 2 in full (units/convention freeze, `fea-linear-model/v1`,
+strict material-state resolver, local-axis policy, bend mechanical state via
+`resolveBendArcCentre` wrapped in the declared bend-mechanics API, rigid components,
+linear restraint compiler) and Phase 3 in full (physical load-case contract, gravity
+with density authority — currently blocked, since metallic material records expose
+no density field — thermal initial strain, sparse solver, mechanical result recovery,
+attachment-load handoff wired to a real solved result).
+
+**Sequencing decision, open:** whether to (a) retrofit Phase 1's stricter contract
+shape onto the already-built ingestion/topology/conditioning modules before moving on,
+or (b) proceed directly to Phase 2's B-2.0 (units/conventions) and B-2.1
+(`fea-linear-model/v1`) since those are net-new regardless, returning to the Phase 1
+contract-hardening once Phase 2 clarifies what Phase 1's output actually needs to
+carry. Not decided in this change.

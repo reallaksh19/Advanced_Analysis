@@ -46,6 +46,28 @@ assert.equal(store.run().status, 'QUALIFIED');
 assert.equal(store.exportDocument().schema, 'lfea-workbench-document/v1');
 assert.equal(store.exportEvidence().status, 'QUALIFIED_EXPORT');
 
+// P0.2: a run started against one package must never become the current
+// result if the package changed while the run was in flight (the async
+// worker path can complete after an intervening edit).
+const raceStore = createLfeaWorkbenchStore({ initialDocument: packageValue });
+raceStore.beginRun();
+const runInputHash = raceStore.getState().activeRunInputHash;
+assert.equal(runInputHash, packageValue.semanticHash);
+raceStore.moveNode('N2', 3, 0); // edit committed while "the worker" is still running
+const staleExecution = executeLfeaWorkbench(resealLfeaMeshPackage(packageValue), {});
+raceStore.completeRun(staleExecution);
+assert.equal(raceStore.getState().execution, null, 'a stale execution must never become the current result');
+assert.equal(raceStore.getState().diagnostics[0]?.code, 'LFEA_RUN_INPUT_STALE');
+assert.notEqual(raceStore.getState().status, 'RUNNING');
+
+// A run that completes without an intervening edit is accepted normally.
+const noRaceStore = createLfeaWorkbenchStore({ initialDocument: packageValue });
+noRaceStore.beginRun();
+const currentExecution = executeLfeaWorkbench(noRaceStore.getState().packageValue, {});
+noRaceStore.completeRun(currentExecution);
+assert.equal(noRaceStore.getState().execution.status, 'QUALIFIED');
+assert.equal(noRaceStore.getState().activeRunInputHash, null);
+
 const forged = structuredClone(packageValue);
 forged.nodes[0].x += 0.01;
 const importStore = createLfeaWorkbenchStore(undefined);

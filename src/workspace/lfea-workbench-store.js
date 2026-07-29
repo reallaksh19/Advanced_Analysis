@@ -51,6 +51,7 @@ export function createLfeaWorkbenchStore(options) {
     past: [],
     future: [],
     diagnostics: [],
+    activeRunInputHash: null,
   });
   const listeners = new Set();
   if (configuration.initialDocument !== undefined) {
@@ -130,12 +131,13 @@ export function createLfeaWorkbenchStore(options) {
   }
 
   function beginRun() {
-    requirePackage(state);
+    const packageValue = requirePackage(state);
     return publish({
       ...state,
       status: 'RUNNING',
       progress: { stage: 'QUEUED', index: 0, total: 7 },
       diagnostics: [],
+      activeRunInputHash: packageValue.semanticHash,
     });
   }
 
@@ -144,36 +146,36 @@ export function createLfeaWorkbenchStore(options) {
     return publish({ ...state, progress: freeze(structuredClone(progress)) });
   }
 
+  // Discards a run whose input package no longer matches the store (an edit
+  // reseals packageValue.semanticHash), so a stale result never becomes current.
   function completeRun(execution) {
     if (!isRecord(execution)) {
       throw new TypeError('LFEA execution result must be an object.');
     }
+    if (state.activeRunInputHash && state.packageValue?.semanticHash !== state.activeRunInputHash) {
+      return revertToReady('LFEA_RUN_INPUT_STALE', 'The model changed while this run was executing; its result was discarded rather than shown as current.');
+    }
     return publish({
-      ...state,
-      status: execution.status,
-      execution,
-      progress: null,
-      diagnostics: execution.diagnostics ?? [],
+      ...state, status: execution.status, execution, progress: null,
+      activeRunInputHash: null, diagnostics: execution.diagnostics ?? [],
     });
   }
 
   function failRun(error) {
-    return publish({
-      ...failedState(state, error, 'LFEA_WORKER_FAILURE'),
-      progress: null,
-    });
+    return publish({ ...failedState(state, error, 'LFEA_WORKER_FAILURE'), progress: null, activeRunInputHash: null });
   }
 
   function cancelRun() {
+    return revertToReady('LFEA_RUN_CANCELLED', 'LFEA execution was cancelled before qualification completed.');
+  }
+
+  function revertToReady(code, message) {
     return publish({
       ...state,
       status: state.packageValue ? 'READY' : 'EMPTY',
       progress: null,
-      diagnostics: [{
-        severity: 'WARNING',
-        code: 'LFEA_RUN_CANCELLED',
-        message: 'LFEA execution was cancelled before qualification completed.',
-      }],
+      activeRunInputHash: null,
+      diagnostics: [{ severity: 'WARNING', code, message }],
     });
   }
 
