@@ -12,3 +12,14 @@ export {
   Q8_FORMULA_IDS, Q8_GAUSS_POINTS, q8BMatrixAt, q8ElementEvidence,
   q8ShapeFunctionsAndDerivatives, q8StiffnessMatrix,
 } from './q8-element.js';
+export {
+  DISPLAY_AUTHORITY, NODAL_PROJECTION_FORMULA_ID, projectElementGaussStressToNodes,
+  RECOVERY_LAYERS,
+} from './nodal-projection-display.js';
+export {
+  AVERAGING_FORMULA_ID, averageWithinGroups, averagingGroupKey, DISCONTINUITY_KINDS,
+  discontinuityNodes,
+} from './averaging-boundaries.js';
+export {
+  LINEARIZATION_FORMULA_ID, linearizeThroughThickness, STRUCTURAL_STRESS_LAYER,
+} from './structural-stress-extraction.js';
