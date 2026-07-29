@@ -41,3 +41,47 @@ export {
   normalizeLinearFeaNumber,
   requireLinearFeaConventions,
 } from './conventions.js';
+
+export {
+  CONSTRAINT_BASES,
+  CONSTRAINT_DOFS,
+  LINEAR_FEA_FORMULATION_REGISTRY_VERSION,
+  LINEAR_FEA_MODEL_SCHEMA,
+  LINEAR_FEA_VALIDATION_PROFILE,
+  LINEAR_FEA_VALIDATION_PROFILE_ID,
+  MODEL_TOP_LEVEL_KEYS,
+  PROHIBITED_NONLINEAR_BEHAVIORS,
+  RECORD_KEYS,
+  ROTATIONAL_DOFS,
+  SUPPORTED_CONSTRAINT_BEHAVIORS,
+  SUPPORTED_FORMULATIONS,
+  TRANSLATIONAL_DOFS,
+} from './model-schema.js';
+
+export {
+  canonicalizeDiagnosticEvidence,
+  canonicalizeDiagnostics,
+  canonicalizeLinearFeaModel,
+  canonicalizeSourceEvidence,
+} from './model-canonicalization.js';
+
+export {
+  canonicalDiagnosticEvidence,
+  DIAGNOSTIC_SEVERITIES,
+  LIMITATION_SEVERITIES,
+} from './model-diagnostics.js';
+
+export {
+  computeEvidenceHash,
+  computeSemanticHash,
+  computeStiffnessStateHash,
+  computeValidationProfileSemanticHash,
+  evidenceProjection,
+  semanticProjection,
+  stiffnessStateProjection,
+} from './model-hashes.js';
+
+export {
+  sealLinearFeaModel,
+  validateLinearFeaModel,
+} from './model-validation.js';
