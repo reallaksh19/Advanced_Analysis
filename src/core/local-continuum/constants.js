@@ -9,6 +9,15 @@ export const FORMULATIONS = Object.freeze({
   PLANE_STRAIN: 'PLANE_STRAIN',
 });
 export const DOFS = Object.freeze({ UX: 'UX', UY: 'UY' });
+/**
+ * Spec §7: "Default T6 quadratic triangle and Q8 quadratic quadrilateral.
+ * T3 is benchmark/fallback only and cannot be the default production mesh."
+ * T3 remains a valid element type but requires the model's
+ * `elementTypePolicy.allowT3Fallback` to be explicitly `true`.
+ */
+export const ELEMENT_TYPES = Object.freeze({ T3: 'T3', T6: 'T6', Q8: 'Q8' });
+export const ELEMENT_TYPE_NODE_COUNTS = Object.freeze({ T3: 3, T6: 6, Q8: 8 });
+export const ELEMENT_TYPE_CORNER_COUNTS = Object.freeze({ T3: 3, T6: 3, Q8: 4 });
 export const QUALIFICATION_STATES = Object.freeze({
   ACCEPTED: 'ACCEPTED',
   REJECTED_MODEL: 'REJECTED_MODEL',
@@ -19,6 +28,7 @@ export const QUALIFICATION_STATES = Object.freeze({
 });
 export const CANONICAL_UNITS = Object.freeze({
   length: 'mm', force: 'N', stress: 'MPa', modulus: 'MPa', strain: 'dimensionless',
+  bodyForceIntensity: 'N/mm^3',
 });
 export const BASE_LIMITATIONS = Object.freeze([
   'NO_ADAPTIVE_MESHING', 'NO_AUTOMATIC_MESH_GENERATION', 'NO_BENDING_DOF',
@@ -49,6 +59,10 @@ export const FORMULA_IDS = Object.freeze({
   VON_MISES: 'THREE_DIMENSIONAL_VON_MISES_RECOVERY_V1',
   ENERGY: 'LINEAR_ELASTIC_STRAIN_ENERGY_RECONSTRUCTION_V1',
   EQUILIBRIUM: 'FREE_DOF_AND_REACTION_EQUILIBRIUM_V1',
+  PRESSURE_LOAD: 'BOUNDARY_EDGE_NORMAL_PRESSURE_CONSISTENT_LOAD_V1',
+  BODY_FORCE_LOAD: 'ELEMENT_BODY_FORCE_CONSISTENT_LOAD_V1',
+  THERMAL_STRAIN_LOAD: 'ISOTROPIC_THERMAL_STRAIN_EQUIVALENT_NODAL_LOAD_V1',
+  IMPOSED_DISPLACEMENT_LOAD: 'LOAD_CASE_IMPOSED_DISPLACEMENT_PARTITION_V1',
 });
 export const QUALIFICATION_PROFILE = Object.freeze({
   schema: QUALIFICATION_PROFILE_SCHEMA,

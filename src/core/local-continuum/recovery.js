@@ -1,9 +1,58 @@
-import { FORMULA_IDS, FORMULATIONS } from './constants.js';
+import { ELEMENT_TYPES, FORMULA_IDS, FORMULATIONS } from './constants.js';
 import { numericalError } from './errors.js';
 import { dot, matrixVector } from './matrix.js';
 import { canonicalNumber, tolerance } from './numeric.js';
-export function recoverLoadCase(model,mesh,elementEvidence,load,solution){const dofIndex=new Map(mesh.dofOrdering.map((id,i)=>[id,i])),materialMap=new Map(model.materials.map((row)=>[row.materialId,row])),elementResults=elementEvidence.map((element)=>recoverElement(model,element,materialMap.get(element.materialId),solution.displacementVector,dofIndex)),elementSum=canonicalNumber(elementResults.reduce((sum,row)=>sum+row.strainEnergy,0),'element energy sum'),globalEnergy=canonicalNumber(0.5*dot(solution.displacementVector,matrixVector(mesh.globalStiffnessMatrix,solution.displacementVector)),'global strain energy'),limit=tolerance(model.qualificationProfile,'strainEnergy',elementSum,globalEnergy),residual=canonicalNumber(elementSum-globalEnergy,'energy residual');if(Math.abs(residual)>limit)throw numericalError('STRAIN_ENERGY_RECONSTRUCTION_FAILURE',`loadCases.${load.loadCaseId}`,'Element and global strain energy do not reconstruct.');return {loadCaseId:load.loadCaseId,loadCaseInputSemanticHash:load.loadCaseInputSemanticHash,forceEvidence:{forceVector:load.forceVector,contributions:load.contributions,sourceReference:load.sourceReference},nodalDisplacements:displacements(model,solution,mesh),supportReactions:solution.reactions,freeDofResiduals:solution.freeDofResiduals,solverEvidence:{...solution.solverEvidence,freeDofIdentities:solution.freeDofIdentities,constrainedDofIdentities:solution.constrainedDofIdentities},equilibrium:solution.equilibrium,elementResults,totalStrainEnergy:globalEnergy,energyQualification:{scale:Math.max(1,Math.abs(elementSum),Math.abs(globalEnergy)),elementEnergySum:elementSum,globalEnergy,residual,tolerance:limit,accepted:true},formulaIds:[...new Set([...load.formulaIds,...solution.formulaIds,...elementResults.flatMap((row)=>row.formulaIds),FORMULA_IDS.ENERGY])].sort()};}
-function recoverElement(model,element,material,u,dofIndex){const indices=element.localDofOrdering.map((id)=>dofIndex.get(id)),ue=indices.map((index)=>u[index]),strain=matrixVector(element.bMatrix,ue),inPlane=matrixVector(element.dMatrix,strain),[sigmaX,sigmaY,tauXY]=inPlane,sigmaZ=model.formulation===FORMULATIONS.PLANE_STRAIN?canonicalNumber(material.poissonRatio*(sigmaX+sigmaY),'plane strain sigma z'):0,principal=principalStress(sigmaX,sigmaY,tauXY),vonMises=vonMisesStress(sigmaX,sigmaY,sigmaZ,tauXY),energy=canonicalNumber(0.5*dot(ue,matrixVector(element.localStiffnessMatrix,ue)),'element strain energy');return {elementId:element.elementId,strain:{epsilonX:strain[0],epsilonY:strain[1],gammaXY:strain[2]},stress:{sigmaX,sigmaY,sigmaZ,tauXY},principalMaximum:principal.maximum,principalMinimum:principal.minimum,maximumInPlaneShear:principal.radius,vonMises,strainEnergy:energy,sourceReferences:element.sourceReferences,formulaIds:[FORMULA_IDS.STRAIN,FORMULA_IDS.STRESS,FORMULA_IDS.SIGMA_Z,FORMULA_IDS.PRINCIPAL,FORMULA_IDS.VON_MISES,FORMULA_IDS.ENERGY]};}
+export function recoverLoadCase(model,mesh,elementEvidence,load,solution){const dofIndex=new Map(mesh.dofOrdering.map((id,i)=>[id,i])),materialMap=new Map(model.materials.map((row)=>[row.materialId,row])),thermalStrainByElement=new Map(load.temperatureLoads.map((row)=>[row.elementId,row.thermalStrain])),elementResults=elementEvidence.map((element)=>dispatchRecoverElement(model,element,materialMap.get(element.materialId),solution.displacementVector,dofIndex,thermalStrainByElement.get(element.elementId)??0)),elementSum=canonicalNumber(elementResults.reduce((sum,row)=>sum+row.strainEnergy,0),'element energy sum'),globalEnergy=canonicalNumber(0.5*dot(solution.displacementVector,matrixVector(mesh.globalStiffnessMatrix,solution.displacementVector)),'global strain energy'),limit=tolerance(model.qualificationProfile,'strainEnergy',elementSum,globalEnergy),residual=canonicalNumber(elementSum-globalEnergy,'energy residual');if(Math.abs(residual)>limit)throw numericalError('STRAIN_ENERGY_RECONSTRUCTION_FAILURE',`loadCases.${load.loadCaseId}`,'Element and global strain energy do not reconstruct.');return {loadCaseId:load.loadCaseId,loadCaseInputSemanticHash:load.loadCaseInputSemanticHash,forceEvidence:{forceVector:load.forceVector,contributions:load.contributions,sourceReference:load.sourceReference},nodalDisplacements:displacements(model,solution,mesh),supportReactions:solution.reactions,freeDofResiduals:solution.freeDofResiduals,solverEvidence:{...solution.solverEvidence,freeDofIdentities:solution.freeDofIdentities,constrainedDofIdentities:solution.constrainedDofIdentities},equilibrium:solution.equilibrium,elementResults,totalStrainEnergy:globalEnergy,energyQualification:{scale:Math.max(1,Math.abs(elementSum),Math.abs(globalEnergy)),elementEnergySum:elementSum,globalEnergy,residual,tolerance:limit,accepted:true},formulaIds:[...new Set([...load.formulaIds,...solution.formulaIds,...elementResults.flatMap((row)=>row.formulaIds),FORMULA_IDS.ENERGY])].sort()};}
+function dispatchRecoverElement(model,element,material,u,dofIndex,appliedThermalStrain){if(element.elementType===ELEMENT_TYPES.T6||element.elementType===ELEMENT_TYPES.Q8)return recoverGaussPointElement(model,element,material,u,dofIndex,appliedThermalStrain);return recoverElement(model,element,material,u,dofIndex,appliedThermalStrain);}
+/**
+ * Stress is elastic stress only: `D * (epsilon_total - epsilon_thermal)`,
+ * not `D * epsilon_total` — a thermally-loaded element that is free to
+ * expand develops geometric strain equal to its free thermal strain but
+ * zero elastic stress, and reporting `D * epsilon_total` would silently
+ * misrepresent that free expansion as real mechanical stress. `strain`
+ * itself stays the measured total (geometric) strain, unaffected.
+ */
+function recoverElement(model,element,material,u,dofIndex,appliedThermalStrain){const indices=element.localDofOrdering.map((id)=>dofIndex.get(id)),ue=indices.map((index)=>u[index]),strain=matrixVector(element.bMatrix,ue),elasticStrain=subtractThermalStrain(strain,appliedThermalStrain),inPlane=matrixVector(element.dMatrix,elasticStrain),[sigmaX,sigmaY,tauXY]=inPlane,sigmaZ=model.formulation===FORMULATIONS.PLANE_STRAIN?canonicalNumber(material.poissonRatio*(sigmaX+sigmaY),'plane strain sigma z'):0,principal=principalStress(sigmaX,sigmaY,tauXY),vonMises=vonMisesStress(sigmaX,sigmaY,sigmaZ,tauXY),energy=canonicalNumber(0.5*dot(ue,matrixVector(element.localStiffnessMatrix,ue)),'element strain energy');return {elementId:element.elementId,strain:{epsilonX:strain[0],epsilonY:strain[1],gammaXY:strain[2]},stress:{sigmaX,sigmaY,sigmaZ,tauXY},principalMaximum:principal.maximum,principalMinimum:principal.minimum,maximumInPlaneShear:principal.radius,vonMises,strainEnergy:energy,sourceReferences:element.sourceReferences,formulaIds:[FORMULA_IDS.STRAIN,FORMULA_IDS.STRESS,FORMULA_IDS.SIGMA_Z,FORMULA_IDS.PRINCIPAL,FORMULA_IDS.VON_MISES,FORMULA_IDS.ENERGY]};}
+function subtractThermalStrain(strain,appliedThermalStrain){return appliedThermalStrain?[strain[0]-appliedThermalStrain,strain[1]-appliedThermalStrain,strain[2]]:strain;}
+
+/**
+ * T6/Q8 stress recovery (spec §7.1/§12.1): "Stress is recovered at Gauss
+ * points, retained before extrapolation and projected to nodes only for
+ * display." This produces `gaussPointResults` — one entry per integration
+ * point, each independently authoritative — and no single element-constant
+ * `stress` field, since claiming one would misrepresent a non-constant
+ * (quadratic) strain field as constant. Nodal projection for display is
+ * explicit future scope (`nodal-projection-display.js` in the phased plan),
+ * not silently implied here.
+ */
+function recoverGaussPointElement(model,element,material,u,dofIndex,appliedThermalStrain){
+  const indices=element.localDofOrdering.map((id)=>dofIndex.get(id));
+  const ue=indices.map((index)=>u[index]);
+  const gaussPointResults=element.gaussEvidence.map((gp)=>{
+    const strain=matrixVector(gp.B,ue);
+    const elasticStrain=subtractThermalStrain(strain,appliedThermalStrain);
+    const inPlane=matrixVector(element.dMatrix,elasticStrain);
+    const [sigmaX,sigmaY,tauXY]=inPlane;
+    const sigmaZ=model.formulation===FORMULATIONS.PLANE_STRAIN?canonicalNumber(material.poissonRatio*(sigmaX+sigmaY),'plane strain sigma z'):0;
+    const principal=principalStress(sigmaX,sigmaY,tauXY);
+    const vonMises=vonMisesStress(sigmaX,sigmaY,sigmaZ,tauXY);
+    return {
+      pointId:gp.pointId,xi:gp.xi,eta:gp.eta,weight:gp.weight,jacobianDeterminant:gp.jacobianDeterminant,
+      strain:{epsilonX:strain[0],epsilonY:strain[1],gammaXY:strain[2]},
+      stress:{sigmaX,sigmaY,sigmaZ,tauXY},
+      principalMaximum:principal.maximum,principalMinimum:principal.minimum,maximumInPlaneShear:principal.radius,vonMises,
+    };
+  });
+  const energy=canonicalNumber(0.5*dot(ue,matrixVector(element.localStiffnessMatrix,ue)),'element strain energy');
+  return {
+    elementId:element.elementId,elementType:element.elementType,
+    recoveryLayer:'INTEGRATION_POINT',
+    gaussPointResults,
+    strainEnergy:energy,
+    sourceReferences:element.sourceReferences,
+    formulaIds:[FORMULA_IDS.STRAIN,FORMULA_IDS.STRESS,FORMULA_IDS.SIGMA_Z,FORMULA_IDS.PRINCIPAL,FORMULA_IDS.VON_MISES,FORMULA_IDS.ENERGY],
+  };
+}
 export function principalStress(sigmaX,sigmaY,tauXY){const average=(sigmaX+sigmaY)/2,radius=Math.hypot((sigmaX-sigmaY)/2,tauXY);return {maximum:canonicalNumber(average+radius,'principal maximum'),minimum:canonicalNumber(average-radius,'principal minimum'),radius:canonicalNumber(radius,'maximum in-plane shear')};}
 export function vonMisesStress(sigmaX,sigmaY,sigmaZ,tauXY){return canonicalNumber(Math.sqrt(0.5*((sigmaX-sigmaY)**2+(sigmaY-sigmaZ)**2+(sigmaZ-sigmaX)**2)+3*tauXY**2),'von Mises stress');}
 function displacements(model,solution,mesh){const index=new Map(mesh.dofOrdering.map((id,i)=>[id,i]));return model.nodes.map((node)=>({nodeId:node.nodeId,ux:solution.displacementVector[index.get(`${node.nodeId}:UX`)],uy:solution.displacementVector[index.get(`${node.nodeId}:UY`)],sourceReference:node.sourceReference}));}

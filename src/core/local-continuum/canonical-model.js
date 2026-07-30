@@ -55,6 +55,7 @@ function sealSource(source) {
     materials: source.materials.map((row) => canonicalMaterial(row, units)),
     nodes: source.nodes.map((row) => canonicalNode(row, units)),
     elements: [],
+    elementTypePolicy: source.elementTypePolicy,
     constraints: source.constraints.map((row) => canonicalConstraint(row, units)),
     loadCases: source.loadCases.map((row) => canonicalLoadCase(row, units)),
     resultRequests: source.resultRequests,

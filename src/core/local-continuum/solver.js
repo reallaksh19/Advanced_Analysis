@@ -1,10 +1,11 @@
 import { FORMULA_IDS } from './constants.js';
 import { numericalError, singularError } from './errors.js';
+import { resolveImposedDisplacementIndices } from './imposed-displacement-loads.js';
 import { matrixVector, zeros } from './matrix.js';
 import { canonicalNumber, maxAbs, tolerance } from './numeric.js';
 
 export function solvePartitioned(model, mesh, load) {
-  const constraints = constraintData(model, mesh.dofOrdering);
+  const constraints = constraintData(model, mesh.dofOrdering, load);
   const free = freeIndices(mesh.dofOrdering.length, constraints.indexSet);
   const displacement = prescribedVector(mesh.dofOrdering.length, constraints);
   const solved = solveFreeSystem(model, mesh.globalStiffnessMatrix, load.forceVector, free, constraints);
@@ -69,12 +70,21 @@ function solutionRecord(dofs, free, constrained, displacement, residual, solverE
   };
 }
 
-function constraintData(model, dofs) {
+/**
+ * Merges the model's restraint-level `constraints` with this load case's own
+ * `imposedDisplacements` (spec §7.1: a per-load-case prescribed motion,
+ * distinct from a model-wide restraint). `source-loads.js` already rejects
+ * an imposed displacement declared on the same DOF as a model constraint, so
+ * no index can appear in both sets here.
+ */
+function constraintData(model, dofs, load) {
   const index = new Map(dofs.map((identity, position) => [identity, position]));
-  const rows = model.constraints.map((row) => ({
+  const modelRows = model.constraints.map((row) => ({
     index: index.get(`${row.nodeId}:${row.dof}`),
     value: row.value,
-  })).sort((left, right) => left.index - right.index);
+  }));
+  const imposedRows = resolveImposedDisplacementIndices(load.imposedDisplacements, index);
+  const rows = [...modelRows, ...imposedRows].sort((left, right) => left.index - right.index);
   return {
     indices: rows.map((row) => row.index),
     values: rows.map((row) => row.value),

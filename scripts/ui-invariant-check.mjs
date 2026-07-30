@@ -5,7 +5,10 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const WORKSPACE = path.join(ROOT, 'src', 'workspace');
-const FEA_UI_PATTERN = /(?:^|\\)(?:lfea|lafea|fea-benchmark)[^\\]*\.js$/u;
+// Matches either path separator: the previous `\\`-only form silently matched
+// zero files on POSIX, so the <=300-line and recomputation invariants below
+// were never actually enforced outside Windows.
+const FEA_UI_PATTERN = /(?:^|[\\/])(?:lfea|lafea|fea-benchmark)[^\\/]*\.js$/u;
 const NUMERIC_AUTHORITY_FILES = new Set([
   'lfea-field-adapter.js',
   'lfea-plot-descriptor.js',

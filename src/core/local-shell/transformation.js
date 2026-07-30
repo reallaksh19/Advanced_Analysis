@@ -11,13 +11,23 @@ import {
 import { maxAbs, qualification, tolerance } from './numeric.js';
 import { dot } from './vector.js';
 
+/**
+ * Generalized to N nodes (spec §8: MITC4's 4-node quad reuses this same
+ * per-node tangent-basis machinery, not a duplicate). Every dimension below
+ * is `nodes.length`-derived rather than hardcoded 3, so this reduces to
+ * byte-identical behavior for a 3-node element (CST/DKT, MITC3) — verified
+ * by `lafea.4-shell-transformation-generalization-check.mjs`, which compares
+ * this function's N=3 output against a frozen reference captured from the
+ * pre-generalization implementation.
+ */
 export function fiveDofTransformation(nodes, frame, profile) {
+  const nodeCount = nodes.length;
   const tangentSampling = buildTangentSampling(nodes);
-  const desiredRigid = buildDesiredRigid(frame);
+  const desiredRigid = buildDesiredRigid(frame, nodeCount);
   const pseudo = samplingPseudoInverse(tangentSampling, profile);
   const rigidProjection = multiply(tangentSampling, pseudo.pseudoInverse);
   const direct = buildDirectMapping(nodes, frame);
-  const residualProjection = addMatrices(identity(6), scaleMatrix(rigidProjection, -1));
+  const residualProjection = addMatrices(identity(2 * nodeCount), scaleMatrix(rigidProjection, -1));
   const rotationMapping = addMatrices(
     multiply(desiredRigid, pseudo.pseudoInverse),
     multiply(direct, residualProjection),
@@ -26,7 +36,7 @@ export function fiveDofTransformation(nodes, frame, profile) {
   const reproductionQualification = qualification(reproductionResidual, 1, profile.rigidRotation);
   if (!reproductionQualification.accepted) throw new ShellModelError('Nodal tangent-basis mapping failed rigid-rotation reproduction');
   return {
-    matrix: assembleTransformation(frame, rotationMapping),
+    matrix: assembleTransformation(frame, rotationMapping, nodeCount),
     rotationMapping,
     tangentSampling,
     desiredRigid,
@@ -38,17 +48,17 @@ export function fiveDofTransformation(nodes, frame, profile) {
 }
 
 function buildTangentSampling(nodes) {
-  const matrix = zeros(6, 3);
-  for (let node = 0; node < 3; node += 1) {
+  const matrix = zeros(2 * nodes.length, 3);
+  for (let node = 0; node < nodes.length; node += 1) {
     matrix[2 * node] = [...nodes[node].rotationBasis1];
     matrix[2 * node + 1] = [...nodes[node].rotationBasis2];
   }
   return matrix;
 }
 
-function buildDesiredRigid(frame) {
-  const matrix = zeros(6, 3);
-  for (let node = 0; node < 3; node += 1) {
+function buildDesiredRigid(frame, nodeCount) {
+  const matrix = zeros(2 * nodeCount, 3);
+  for (let node = 0; node < nodeCount; node += 1) {
     matrix[2 * node] = [...frame.ex];
     matrix[2 * node + 1] = [...frame.ey];
   }
@@ -56,8 +66,8 @@ function buildDesiredRigid(frame) {
 }
 
 function buildDirectMapping(nodes, frame) {
-  const matrix = zeros(6, 6);
-  for (let node = 0; node < 3; node += 1) {
+  const matrix = zeros(2 * nodes.length, 2 * nodes.length);
+  for (let node = 0; node < nodes.length; node += 1) {
     matrix[2 * node][2 * node] = dot(nodes[node].rotationBasis1, frame.ex);
     matrix[2 * node][2 * node + 1] = dot(nodes[node].rotationBasis2, frame.ex);
     matrix[2 * node + 1][2 * node] = dot(nodes[node].rotationBasis1, frame.ey);
@@ -88,17 +98,17 @@ function samplingPseudoInverse(sampling, profile) {
   };
 }
 
-function assembleTransformation(frame, rotationMapping) {
-  const matrix = zeros(15, 15);
-  for (let node = 0; node < 3; node += 1) {
+function assembleTransformation(frame, rotationMapping, nodeCount) {
+  const matrix = zeros(5 * nodeCount, 5 * nodeCount);
+  for (let node = 0; node < nodeCount; node += 1) {
     const row = 5 * node;
     const column = 5 * node;
     matrix[row].splice(column, 3, ...frame.ex);
     matrix[row + 1].splice(column, 3, ...frame.ey);
     matrix[row + 2].splice(column, 3, ...frame.ez);
   }
-  for (let localNode = 0; localNode < 3; localNode += 1) {
-    for (let globalNode = 0; globalNode < 3; globalNode += 1) {
+  for (let localNode = 0; localNode < nodeCount; localNode += 1) {
+    for (let globalNode = 0; globalNode < nodeCount; globalNode += 1) {
       matrix[5 * localNode + 3][5 * globalNode + 3] = rotationMapping[2 * localNode][2 * globalNode];
       matrix[5 * localNode + 3][5 * globalNode + 4] = rotationMapping[2 * localNode][2 * globalNode + 1];
       matrix[5 * localNode + 4][5 * globalNode + 3] = rotationMapping[2 * localNode + 1][2 * globalNode];

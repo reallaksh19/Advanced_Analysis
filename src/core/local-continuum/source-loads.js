@@ -1,6 +1,6 @@
 import { DOFS } from './constants.js';
 import { modelError } from './errors.js';
-import { strictNumber } from './numeric.js';
+import { canonicalNumber, strictNumber } from './numeric.js';
 import { convert } from './units.js';
 import {
   arrayValue, codeUnitCompare, enumValue, exactRecord, nonEmptyString,
@@ -50,13 +50,20 @@ export function normalizeLoadCases(values) {
     const path = `loadCases[${index}]`;
     const row = exactRecord(
       value,
-      ['loadCaseId', 'nodalForces', 'edgeTractions', 'sourceReference'],
+      [
+        'loadCaseId', 'nodalForces', 'edgeTractions', 'pressureLoads', 'bodyForces',
+        'temperatureLoads', 'imposedDisplacements', 'sourceReference',
+      ],
       path,
     );
     return {
       loadCaseId: nonEmptyString(row.loadCaseId, `${path}.loadCaseId`),
       nodalForces: normalizeForces(row.nodalForces, path),
       edgeTractions: normalizeTractions(row.edgeTractions, path),
+      pressureLoads: normalizePressureLoads(row.pressureLoads, path),
+      bodyForces: normalizeBodyForces(row.bodyForces, path),
+      temperatureLoads: normalizeTemperatureLoads(row.temperatureLoads, path),
+      imposedDisplacements: normalizeImposedDisplacements(row.imposedDisplacements, path),
       sourceReference: nonEmptyString(row.sourceReference, `${path}.sourceReference`),
     };
   });
@@ -92,42 +99,167 @@ function normalizeTractions(values, parent) {
       ['tractionId', 'elementId', 'edgeNodeIds', 'tx', 'ty', 'sourceReference'],
       path,
     );
-    const edgeNodeIds = arrayValue(row.edgeNodeIds, `${path}.edgeNodeIds`).map(
-      (id, nodeIndex) => nonEmptyString(id, `${path}.edgeNodeIds[${nodeIndex}]`),
-    );
-    if (edgeNodeIds.length !== 2 || edgeNodeIds[0] === edgeNodeIds[1]) {
-      throw modelError(
-        'EDGE_NODE_PAIR_REQUIRED',
-        `${path}.edgeNodeIds`,
-        'A traction requires two distinct edge node IDs.',
-      );
-    }
+    const edgeNodeIds = normalizeEdgeNodeIds(row.edgeNodeIds, path);
     return {
       tractionId: nonEmptyString(row.tractionId, `${path}.tractionId`),
       elementId: nonEmptyString(row.elementId, `${path}.elementId`),
-      edgeNodeIds: [...edgeNodeIds].sort(codeUnitCompare),
+      edgeNodeIds,
       tx: strictNumber(row.tx, `${path}.tx`),
       ty: strictNumber(row.ty, `${path}.ty`),
       sourceReference: nonEmptyString(row.sourceReference, `${path}.sourceReference`),
     };
   });
   uniqueIdentities(rows, 'tractionId', `${parent}.edgeTractions`);
-  rejectDuplicatePhysicalEdges(rows, parent);
+  rejectDuplicatePhysicalEdges(rows, parent, `${parent}.edgeTractions`);
   return rows.sort((left, right) => codeUnitCompare(left.tractionId, right.tractionId));
 }
 
-function rejectDuplicatePhysicalEdges(rows, parent) {
+/**
+ * A physical edge is 2 node IDs (T3, straight) or 3 (T6/Q8, quadratic —
+ * corner-midside-corner, order not yet known here). Full validation that the
+ * declared set matches a real boundary edge (with its true node order)
+ * happens later in `assembly.js`'s boundary-edge match.
+ */
+function normalizeEdgeNodeIds(value, path) {
+  const edgeNodeIds = arrayValue(value, `${path}.edgeNodeIds`).map(
+    (id, nodeIndex) => nonEmptyString(id, `${path}.edgeNodeIds[${nodeIndex}]`),
+  );
+  if (
+    edgeNodeIds.length < 2 || edgeNodeIds.length > 3
+    || new Set(edgeNodeIds).size !== edgeNodeIds.length
+  ) {
+    throw modelError(
+      'EDGE_NODE_SET_REQUIRED',
+      `${path}.edgeNodeIds`,
+      'An edge load requires 2 (straight) or 3 (quadratic) distinct edge node IDs.',
+    );
+  }
+  return [...edgeNodeIds].sort(codeUnitCompare);
+}
+
+function rejectDuplicatePhysicalEdges(rows, parent, path) {
   const edges = new Set();
   rows.forEach((row) => {
     const key = row.edgeNodeIds.join('\0');
     if (edges.has(key)) {
       throw modelError(
-        'DUPLICATE_EDGE_TRACTION',
-        parent,
-        `Duplicate physical-edge traction ${key}.`,
+        'DUPLICATE_EDGE_LOAD',
+        path ?? parent,
+        `Duplicate physical-edge load ${key}.`,
       );
     }
     edges.add(key);
+  });
+}
+
+function normalizePressureLoads(values, parent) {
+  const rows = arrayValue(values, `${parent}.pressureLoads`).map((value, index) => {
+    const path = `${parent}.pressureLoads[${index}]`;
+    const row = exactRecord(
+      value,
+      ['pressureLoadId', 'elementId', 'edgeNodeIds', 'pressure', 'sourceReference'],
+      path,
+    );
+    return {
+      pressureLoadId: nonEmptyString(row.pressureLoadId, `${path}.pressureLoadId`),
+      elementId: nonEmptyString(row.elementId, `${path}.elementId`),
+      edgeNodeIds: normalizeEdgeNodeIds(row.edgeNodeIds, path),
+      pressure: strictNumber(row.pressure, `${path}.pressure`),
+      sourceReference: nonEmptyString(row.sourceReference, `${path}.sourceReference`),
+    };
+  });
+  uniqueIdentities(rows, 'pressureLoadId', `${parent}.pressureLoads`);
+  rejectDuplicatePhysicalEdges(rows, parent, `${parent}.pressureLoads`);
+  return rows.sort((left, right) => codeUnitCompare(left.pressureLoadId, right.pressureLoadId));
+}
+
+function normalizeBodyForces(values, parent) {
+  const rows = arrayValue(values, `${parent}.bodyForces`).map((value, index) => {
+    const path = `${parent}.bodyForces[${index}]`;
+    const row = exactRecord(
+      value,
+      ['bodyForceId', 'elementId', 'bx', 'by', 'sourceReference'],
+      path,
+    );
+    return {
+      bodyForceId: nonEmptyString(row.bodyForceId, `${path}.bodyForceId`),
+      elementId: nonEmptyString(row.elementId, `${path}.elementId`),
+      bx: strictNumber(row.bx, `${path}.bx`),
+      by: strictNumber(row.by, `${path}.by`),
+      sourceReference: nonEmptyString(row.sourceReference, `${path}.sourceReference`),
+    };
+  });
+  uniqueIdentities(rows, 'bodyForceId', `${parent}.bodyForces`);
+  return rows.sort((left, right) => codeUnitCompare(left.bodyForceId, right.bodyForceId));
+}
+
+function normalizeTemperatureLoads(values, parent) {
+  const rows = arrayValue(values, `${parent}.temperatureLoads`).map((value, index) => {
+    const path = `${parent}.temperatureLoads[${index}]`;
+    const row = exactRecord(
+      value,
+      ['temperatureLoadId', 'elementId', 'thermalStrain', 'sourceReference'],
+      path,
+    );
+    return {
+      temperatureLoadId: nonEmptyString(row.temperatureLoadId, `${path}.temperatureLoadId`),
+      elementId: nonEmptyString(row.elementId, `${path}.elementId`),
+      thermalStrain: strictNumber(row.thermalStrain, `${path}.thermalStrain`),
+      sourceReference: nonEmptyString(row.sourceReference, `${path}.sourceReference`),
+    };
+  });
+  uniqueIdentities(rows, 'temperatureLoadId', `${parent}.temperatureLoads`);
+  rejectDuplicateTemperatureElements(rows, parent);
+  return rows.sort((left, right) => codeUnitCompare(left.temperatureLoadId, right.temperatureLoadId));
+}
+
+function rejectDuplicateTemperatureElements(rows, parent) {
+  const elementIds = new Set();
+  rows.forEach((row) => {
+    if (elementIds.has(row.elementId)) {
+      throw modelError(
+        'DUPLICATE_TEMPERATURE_LOAD_ELEMENT',
+        `${parent}.temperatureLoads`,
+        `Multiple temperature loads target element ${row.elementId} in the same load case.`,
+      );
+    }
+    elementIds.add(row.elementId);
+  });
+}
+
+function normalizeImposedDisplacements(values, parent) {
+  const rows = arrayValue(values, `${parent}.imposedDisplacements`).map((value, index) => {
+    const path = `${parent}.imposedDisplacements[${index}]`;
+    const row = exactRecord(
+      value,
+      ['imposedDisplacementId', 'nodeId', 'dof', 'value', 'sourceReference'],
+      path,
+    );
+    return {
+      imposedDisplacementId: nonEmptyString(row.imposedDisplacementId, `${path}.imposedDisplacementId`),
+      nodeId: nonEmptyString(row.nodeId, `${path}.nodeId`),
+      dof: enumValue(row.dof, DOFS, `${path}.dof`),
+      value: strictNumber(row.value, `${path}.value`),
+      sourceReference: nonEmptyString(row.sourceReference, `${path}.sourceReference`),
+    };
+  });
+  uniqueIdentities(rows, 'imposedDisplacementId', `${parent}.imposedDisplacements`);
+  rejectDuplicateImposedDisplacementDofs(rows, parent);
+  return rows.sort((left, right) => codeUnitCompare(left.imposedDisplacementId, right.imposedDisplacementId));
+}
+
+function rejectDuplicateImposedDisplacementDofs(rows, parent) {
+  const dofs = new Set();
+  rows.forEach((row) => {
+    const key = `${row.nodeId}:${row.dof}`;
+    if (dofs.has(key)) {
+      throw modelError(
+        'DUPLICATE_IMPOSED_DISPLACEMENT',
+        `${parent}.imposedDisplacements`,
+        `Multiple imposed displacements target ${key} in the same load case.`,
+      );
+    }
+    dofs.add(key);
   });
 }
 
@@ -186,8 +318,9 @@ export function validateReferences(context) {
       );
     }
   });
+  const constrainedDofs = new Set(context.constraints.map((row) => `${row.nodeId}:${row.dof}`));
   context.loadCases.forEach((loadCase) => (
-    validateLoadReferences(loadCase, nodes, elements)
+    validateLoadReferences(loadCase, nodes, elements, constrainedDofs)
   ));
 }
 
@@ -204,7 +337,7 @@ function rejectUnreferencedNodes(nodes, elements) {
   });
 }
 
-function validateLoadReferences(loadCase, nodes, elements) {
+function validateLoadReferences(loadCase, nodes, elements, constrainedDofs) {
   loadCase.nodalForces.forEach((row) => {
     if (!nodes.has(row.nodeId)) {
       throw modelError(
@@ -214,27 +347,57 @@ function validateLoadReferences(loadCase, nodes, elements) {
       );
     }
   });
-  loadCase.edgeTractions.forEach((row) => validateTractionReference(
-    loadCase.loadCaseId,
-    row,
-    elements,
+  loadCase.edgeTractions.forEach((row) => validateEdgeElementReference(
+    loadCase.loadCaseId, row.tractionId, row.elementId, row.edgeNodeIds, elements, 'TRACTION',
   ));
+  loadCase.pressureLoads.forEach((row) => validateEdgeElementReference(
+    loadCase.loadCaseId, row.pressureLoadId, row.elementId, row.edgeNodeIds, elements, 'PRESSURE_LOAD',
+  ));
+  loadCase.bodyForces.forEach((row) => validateElementReference(
+    loadCase.loadCaseId, row.bodyForceId, row.elementId, elements, 'UNRESOLVED_BODY_FORCE_ELEMENT',
+  ));
+  loadCase.temperatureLoads.forEach((row) => validateElementReference(
+    loadCase.loadCaseId, row.temperatureLoadId, row.elementId, elements, 'UNRESOLVED_TEMPERATURE_LOAD_ELEMENT',
+  ));
+  loadCase.imposedDisplacements.forEach((row) => {
+    if (!nodes.has(row.nodeId)) {
+      throw modelError(
+        'UNRESOLVED_IMPOSED_DISPLACEMENT_NODE',
+        `loadCases.${loadCase.loadCaseId}.${row.imposedDisplacementId}`,
+        `Unknown node ${row.nodeId}.`,
+      );
+    }
+    const key = `${row.nodeId}:${row.dof}`;
+    if (constrainedDofs.has(key)) {
+      throw modelError(
+        'IMPOSED_DISPLACEMENT_CONFLICTS_WITH_MODEL_CONSTRAINT',
+        `loadCases.${loadCase.loadCaseId}.${row.imposedDisplacementId}`,
+        `DOF ${key} is already a model-level constraint; an imposed displacement must target a DOF the model itself leaves free.`,
+      );
+    }
+  });
 }
 
-function validateTractionReference(loadCaseId, traction, elements) {
-  const element = elements.get(traction.elementId);
+function validateElementReference(loadCaseId, loadId, elementId, elements, code) {
+  if (!elements.has(elementId)) {
+    throw modelError(code, `loadCases.${loadCaseId}.${loadId}`, `Unknown element ${elementId}.`);
+  }
+}
+
+function validateEdgeElementReference(loadCaseId, loadId, elementId, edgeNodeIds, elements, kind) {
+  const element = elements.get(elementId);
   if (!element) {
     throw modelError(
-      'UNRESOLVED_TRACTION_ELEMENT',
-      `loadCases.${loadCaseId}.${traction.tractionId}`,
-      `Unknown element ${traction.elementId}.`,
+      `UNRESOLVED_${kind}_ELEMENT`,
+      `loadCases.${loadCaseId}.${loadId}`,
+      `Unknown element ${elementId}.`,
     );
   }
-  if (!traction.edgeNodeIds.every((id) => element.nodeIds.includes(id))) {
+  if (!edgeNodeIds.every((id) => element.nodeIds.includes(id))) {
     throw modelError(
-      'TRACTION_EDGE_NOT_ON_ELEMENT',
-      `loadCases.${loadCaseId}.${traction.tractionId}`,
-      'Traction edge must belong to the declared element.',
+      `${kind}_EDGE_NOT_ON_ELEMENT`,
+      `loadCases.${loadCaseId}.${loadId}`,
+      'Edge load must belong to the declared element.',
     );
   }
 }
@@ -260,6 +423,12 @@ export function canonicalLoadCase(row, units) {
     edgeTractions: row.edgeTractions.map((traction) => (
       canonicalTraction(row, traction, units)
     )),
+    pressureLoads: row.pressureLoads.map((pressure) => canonicalPressureLoad(row, pressure, units)),
+    bodyForces: row.bodyForces.map((bodyForce) => canonicalBodyForce(row, bodyForce, units)),
+    temperatureLoads: row.temperatureLoads.map((temperature) => canonicalTemperatureLoad(temperature)),
+    imposedDisplacements: row.imposedDisplacements.map((imposed) => (
+      canonicalImposedDisplacement(row, imposed, units)
+    )),
   };
 }
 
@@ -282,5 +451,45 @@ function canonicalTraction(loadCase, traction, units) {
     ty: convert(traction.ty, 'stress', units, `${prefix}.ty`),
     sourceUnit: units.declared.stress,
     canonicalUnit: units.canonical.stress,
+  };
+}
+
+function canonicalPressureLoad(loadCase, pressureLoad, units) {
+  const prefix = `loadCases.${loadCase.loadCaseId}.${pressureLoad.pressureLoadId}`;
+  return {
+    ...pressureLoad,
+    pressure: convert(pressureLoad.pressure, 'stress', units, `${prefix}.pressure`),
+    sourceUnit: units.declared.stress,
+    canonicalUnit: units.canonical.stress,
+  };
+}
+
+function canonicalBodyForce(loadCase, bodyForce, units) {
+  const prefix = `loadCases.${loadCase.loadCaseId}.${bodyForce.bodyForceId}`;
+  return {
+    ...bodyForce,
+    bx: convert(bodyForce.bx, 'bodyForceIntensity', units, `${prefix}.bx`),
+    by: convert(bodyForce.by, 'bodyForceIntensity', units, `${prefix}.by`),
+    sourceUnit: `${units.declared.stress}/${units.declared.length}`,
+    canonicalUnit: units.canonical.bodyForceIntensity,
+  };
+}
+
+function canonicalTemperatureLoad(temperatureLoad) {
+  return {
+    ...temperatureLoad,
+    thermalStrain: canonicalNumber(temperatureLoad.thermalStrain, 'thermal strain'),
+    sourceUnit: 'dimensionless',
+    canonicalUnit: 'dimensionless',
+  };
+}
+
+function canonicalImposedDisplacement(loadCase, imposed, units) {
+  const prefix = `loadCases.${loadCase.loadCaseId}.${imposed.imposedDisplacementId}`;
+  return {
+    ...imposed,
+    value: convert(imposed.value, 'length', units, `${prefix}.value`),
+    sourceUnit: units.declared.length,
+    canonicalUnit: units.canonical.length,
   };
 }
