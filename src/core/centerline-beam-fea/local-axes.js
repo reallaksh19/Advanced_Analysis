@@ -112,6 +112,36 @@ export function resolveFrameLocalAxes({ nodeI, nodeJ, referenceVector, profile }
   return verifyFrameLocalAxes(result, governedProfile);
 }
 
+/**
+ * Resolve one qualified local basis per span of a point chain.
+ *
+ * A component that generates its own geometry — a subdivided bend arc, a
+ * stepped reducer, a junction stub — cannot hand its element nodes to this
+ * package in advance, because the nodes do not exist until the subdivision has
+ * run. Rather than let those packages construct a basis of their own, the
+ * chain form lives here, beside the single resolver it calls: the local-axis
+ * authority stays in one place and the component layer stays a consumer.
+ *
+ * @param {{points: Array<Array<number>>, referenceVector: Array<number>, profile: object}} request
+ *        Ordered chain points, the shared reference vector and the governed profile.
+ * @returns {Array<Readonly<object>>} One qualified axis result per consecutive pair.
+ */
+export function resolveFrameLocalAxesForSpanChain({ points, referenceVector, profile }) {
+  if (!Array.isArray(points) || points.length < 2) {
+    throw axisError('FRAME_AXIS_NODE_COORDINATE_INVALID', 'A span chain needs at least two points');
+  }
+  const results = [];
+  for (let index = 1; index < points.length; index += 1) {
+    results.push(resolveFrameLocalAxes({
+      nodeI: points[index - 1],
+      nodeJ: points[index],
+      referenceVector,
+      profile,
+    }));
+  }
+  return results;
+}
+
 function cloneCoordinate(value, label) {
   try {
     requireFiniteVector(value, label, 'FRAME_AXIS_NODE_COORDINATE_INVALID');
