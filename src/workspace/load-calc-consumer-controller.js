@@ -182,11 +182,17 @@ export function createLoadCalcActionAvailability(context, reviewModel) {
 }
 
 function buildReviewModel(context) {
-  try { return context ? createLoadCalculationReviewModel(context) : null; }
+  if (!context || !hasRequiredLoadCalcContracts(context)) return null;
+  try { return createLoadCalculationReviewModel(context); }
   catch (error) {
     console.error('[LoadCalc] buildReviewModel failed:', error);
     return null;
   }
+}
+
+function hasRequiredLoadCalcContracts(context) {
+  const missing = getMissingLoadCalcContracts(context);
+  return !Object.values(missing).some(Boolean);
 }
 
 function getMissingLoadCalcContracts(context) {

@@ -1,0 +1,292 @@
+{
+  "schema": "fea-benchmark-comparison/v1",
+  "beforeLabel": "before",
+  "afterLabel": "after",
+  "beforeHash": "fnv1a64:8673649736d4b7c8",
+  "afterHash": "fnv1a64:e62265d703d9fbf6",
+  "regressions": [],
+  "repairs": [
+    {
+      "caseId": "BM-P1-DISPLAYED-VON-MISES",
+      "title": "Displayed stress field equals the authoritative solver von Mises, bit for bit",
+      "tier": "T4_PRESENTATION",
+      "beforeStatus": "FAIL",
+      "afterStatus": "PASS",
+      "transition": "FAIL_TO_PASS",
+      "beforeMaxRelativeError": 0,
+      "afterMaxRelativeError": 0
+    },
+    {
+      "caseId": "BM-P2-GEOMETRY-STATE",
+      "title": "Stress display modes plot undeformed source geometry unless deformation is explicitly requested",
+      "tier": "T4_PRESENTATION",
+      "beforeStatus": "FAIL",
+      "afterStatus": "PASS",
+      "transition": "FAIL_TO_PASS",
+      "beforeMaxRelativeError": 0,
+      "afterMaxRelativeError": 0
+    },
+    {
+      "caseId": "BM-P3-FIELD-METADATA",
+      "title": "Every displayed field declares its quantity, unit, reduction, provenance and value range",
+      "tier": "T4_PRESENTATION",
+      "beforeStatus": "FAIL",
+      "afterStatus": "PASS",
+      "transition": "FAIL_TO_PASS",
+      "beforeMaxRelativeError": 0,
+      "afterMaxRelativeError": 0
+    },
+    {
+      "caseId": "BM-P4-QUANTITY-DISAMBIGUATION",
+      "title": "Raw and projected stress modes declare different quantities and separate value ranges",
+      "tier": "T4_PRESENTATION",
+      "beforeStatus": "FAIL",
+      "afterStatus": "PASS",
+      "transition": "FAIL_TO_PASS",
+      "beforeMaxRelativeError": 0,
+      "afterMaxRelativeError": 0
+    },
+    {
+      "caseId": "BM-T3-TOLERANCE-COUPLING",
+      "title": "Unsatisfiable solver-profile tolerance configuration is rejected fail-closed",
+      "tier": "T3_INVARIANT",
+      "beforeStatus": "FAIL",
+      "afterStatus": "PASS",
+      "transition": "FAIL_TO_PASS",
+      "beforeMaxRelativeError": 0,
+      "afterMaxRelativeError": 0
+    },
+    {
+      "caseId": "BM-T5-CAPACITY-ENVELOPE",
+      "title": "Declared capacity is reachable and preflight predicts the export cost before any work is spent",
+      "tier": "T5_PERFORMANCE",
+      "beforeStatus": "FAIL",
+      "afterStatus": "PASS",
+      "transition": "FAIL_TO_PASS",
+      "beforeMaxRelativeError": 0,
+      "afterMaxRelativeError": 0
+    },
+    {
+      "caseId": "BM-T5-HASH",
+      "title": "Semantic hash is bit-identical to the FNV-1a-64 reference and meets its throughput budget",
+      "tier": "T5_PERFORMANCE",
+      "beforeStatus": "FAIL",
+      "afterStatus": "PASS",
+      "transition": "FAIL_TO_PASS",
+      "beforeMaxRelativeError": 0,
+      "afterMaxRelativeError": 0
+    }
+  ],
+  "rows": [
+    {
+      "caseId": "BM-P1-DISPLAYED-VON-MISES",
+      "title": "Displayed stress field equals the authoritative solver von Mises, bit for bit",
+      "tier": "T4_PRESENTATION",
+      "beforeStatus": "FAIL",
+      "afterStatus": "PASS",
+      "transition": "FAIL_TO_PASS",
+      "beforeMaxRelativeError": 0,
+      "afterMaxRelativeError": 0
+    },
+    {
+      "caseId": "BM-P2-GEOMETRY-STATE",
+      "title": "Stress display modes plot undeformed source geometry unless deformation is explicitly requested",
+      "tier": "T4_PRESENTATION",
+      "beforeStatus": "FAIL",
+      "afterStatus": "PASS",
+      "transition": "FAIL_TO_PASS",
+      "beforeMaxRelativeError": 0,
+      "afterMaxRelativeError": 0
+    },
+    {
+      "caseId": "BM-P3-FIELD-METADATA",
+      "title": "Every displayed field declares its quantity, unit, reduction, provenance and value range",
+      "tier": "T4_PRESENTATION",
+      "beforeStatus": "FAIL",
+      "afterStatus": "PASS",
+      "transition": "FAIL_TO_PASS",
+      "beforeMaxRelativeError": 0,
+      "afterMaxRelativeError": 0
+    },
+    {
+      "caseId": "BM-P4-QUANTITY-DISAMBIGUATION",
+      "title": "Raw and projected stress modes declare different quantities and separate value ranges",
+      "tier": "T4_PRESENTATION",
+      "beforeStatus": "FAIL",
+      "afterStatus": "PASS",
+      "transition": "FAIL_TO_PASS",
+      "beforeMaxRelativeError": 0,
+      "afterMaxRelativeError": 0
+    },
+    {
+      "caseId": "BM-T1-LAME-REFINEMENT",
+      "title": "Thick-walled cylinder under internal pressure — Lame refinement study (Q4, plane strain)",
+      "tier": "T1_CLOSED_FORM",
+      "beforeStatus": "PASS",
+      "afterStatus": "PASS",
+      "transition": "UNCHANGED",
+      "beforeMaxRelativeError": 2.205524651799351e-14,
+      "afterMaxRelativeError": 2.205524651799351e-14
+    },
+    {
+      "caseId": "BM-T1-PATCH-Q4-DISTORTED",
+      "title": "Distorted Q4 constant-strain patch test (PLANE_STRESS)",
+      "tier": "T1_CLOSED_FORM",
+      "beforeStatus": "PASS",
+      "afterStatus": "PASS",
+      "transition": "UNCHANGED",
+      "beforeMaxRelativeError": 8.526512829121201e-16,
+      "afterMaxRelativeError": 8.526512829121201e-16
+    },
+    {
+      "caseId": "BM-T1-PATCH-Q4-PLANE-STRAIN",
+      "title": "Distorted Q4 constant-strain patch test (PLANE_STRAIN)",
+      "tier": "T1_CLOSED_FORM",
+      "beforeStatus": "PASS",
+      "afterStatus": "PASS",
+      "transition": "UNCHANGED",
+      "beforeMaxRelativeError": 7.26850273957873e-16,
+      "afterMaxRelativeError": 7.26850273957873e-16
+    },
+    {
+      "caseId": "BM-T1-PATCH-Q4-REGULAR",
+      "title": "Regular Q4 constant-strain patch test (PLANE_STRESS)",
+      "tier": "T1_CLOSED_FORM",
+      "beforeStatus": "PASS",
+      "afterStatus": "PASS",
+      "transition": "UNCHANGED",
+      "beforeMaxRelativeError": 4.2632564145606005e-16,
+      "afterMaxRelativeError": 4.2632564145606005e-16
+    },
+    {
+      "caseId": "BM-T1-PATCH-T3-DISTORTED",
+      "title": "Distorted T3 constant-strain patch test (PLANE_STRESS)",
+      "tier": "T1_CLOSED_FORM",
+      "beforeStatus": "PASS",
+      "afterStatus": "PASS",
+      "transition": "UNCHANGED",
+      "beforeMaxRelativeError": 1.1368683772161601e-15,
+      "afterMaxRelativeError": 1.1368683772161601e-15
+    },
+    {
+      "caseId": "BM-T1-PATCH-T3-REGULAR",
+      "title": "Regular T3 constant-strain patch test (PLANE_STRESS)",
+      "tier": "T1_CLOSED_FORM",
+      "beforeStatus": "PASS",
+      "afterStatus": "PASS",
+      "transition": "UNCHANGED",
+      "beforeMaxRelativeError": 1.4210854715202002e-16,
+      "afterMaxRelativeError": 1.4210854715202002e-16
+    },
+    {
+      "caseId": "BM-T1-PLANE-STRAIN-SIGMAZ",
+      "title": "Plane-strain sigma_z recovery and 3D von Mises",
+      "tier": "T1_CLOSED_FORM",
+      "beforeStatus": "PASS",
+      "afterStatus": "PASS",
+      "transition": "UNCHANGED",
+      "beforeMaxRelativeError": 0,
+      "afterMaxRelativeError": 0
+    },
+    {
+      "caseId": "BM-T1-UNIAXIAL-Q4",
+      "title": "Uniaxial tension strip, Q4 plane stress",
+      "tier": "T1_CLOSED_FORM",
+      "beforeStatus": "PASS",
+      "afterStatus": "PASS",
+      "transition": "UNCHANGED",
+      "beforeMaxRelativeError": 3.552713678800501e-15,
+      "afterMaxRelativeError": 3.552713678800501e-15
+    },
+    {
+      "caseId": "BM-T2-CANTILEVER-Q4",
+      "title": "End-loaded cantilever: Q4 shear-locking characterisation",
+      "tier": "T2_CONVERGENCE",
+      "beforeStatus": "PASS",
+      "afterStatus": "PASS",
+      "transition": "UNCHANGED",
+      "beforeMaxRelativeError": 0,
+      "afterMaxRelativeError": 0
+    },
+    {
+      "caseId": "BM-T3-BACKEND-EQUIVALENCE",
+      "title": "Dense LDLt and sparse Jacobi-PCG backends agree",
+      "tier": "T3_INVARIANT",
+      "beforeStatus": "PASS",
+      "afterStatus": "PASS",
+      "transition": "UNCHANGED",
+      "beforeMaxRelativeError": 4.5198995740912424e-13,
+      "afterMaxRelativeError": 4.5198995740912424e-13
+    },
+    {
+      "caseId": "BM-T3-DETERMINISM",
+      "title": "Repeat solves are bit-identical",
+      "tier": "T3_INVARIANT",
+      "beforeStatus": "PASS",
+      "afterStatus": "PASS",
+      "transition": "UNCHANGED",
+      "beforeMaxRelativeError": 0,
+      "afterMaxRelativeError": 0
+    },
+    {
+      "caseId": "BM-T3-RIGID-TRANSLATION",
+      "title": "Rigid-body translation produces no stress",
+      "tier": "T3_INVARIANT",
+      "beforeStatus": "PASS",
+      "afterStatus": "PASS",
+      "transition": "UNCHANGED",
+      "beforeMaxRelativeError": 0,
+      "afterMaxRelativeError": 0
+    },
+    {
+      "caseId": "BM-T3-SPARSE-SCALING",
+      "title": "Sparse Jacobi-PCG iteration scaling and qualification",
+      "tier": "T3_INVARIANT",
+      "beforeStatus": "PASS",
+      "afterStatus": "PASS",
+      "transition": "UNCHANGED",
+      "beforeMaxRelativeError": 0,
+      "afterMaxRelativeError": 0
+    },
+    {
+      "caseId": "BM-T3-TOLERANCE-COUPLING",
+      "title": "Unsatisfiable solver-profile tolerance configuration is rejected fail-closed",
+      "tier": "T3_INVARIANT",
+      "beforeStatus": "FAIL",
+      "afterStatus": "PASS",
+      "transition": "FAIL_TO_PASS",
+      "beforeMaxRelativeError": 0,
+      "afterMaxRelativeError": 0
+    },
+    {
+      "caseId": "BM-T5-CAPACITY-ENVELOPE",
+      "title": "Declared capacity is reachable and preflight predicts the export cost before any work is spent",
+      "tier": "T5_PERFORMANCE",
+      "beforeStatus": "FAIL",
+      "afterStatus": "PASS",
+      "transition": "FAIL_TO_PASS",
+      "beforeMaxRelativeError": 0,
+      "afterMaxRelativeError": 0
+    },
+    {
+      "caseId": "BM-T5-HASH",
+      "title": "Semantic hash is bit-identical to the FNV-1a-64 reference and meets its throughput budget",
+      "tier": "T5_PERFORMANCE",
+      "beforeStatus": "FAIL",
+      "afterStatus": "PASS",
+      "transition": "FAIL_TO_PASS",
+      "beforeMaxRelativeError": 0,
+      "afterMaxRelativeError": 0
+    },
+    {
+      "caseId": "BM-T5-PIPELINE",
+      "title": "Workbench pipeline meets its interactive-latency budget on a small model",
+      "tier": "T5_PERFORMANCE",
+      "beforeStatus": "PASS",
+      "afterStatus": "PASS",
+      "transition": "UNCHANGED",
+      "beforeMaxRelativeError": 0,
+      "afterMaxRelativeError": 0
+    }
+  ]
+}

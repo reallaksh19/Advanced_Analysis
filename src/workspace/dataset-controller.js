@@ -24,7 +24,7 @@ export class DatasetController {
       ),
       this.eventBus.subscribe(
         EVENT_TOPICS.VIEWPORT_SELECTION_REQUESTED,
-        (payload) => this.select(payload.entityId, payload.source),
+        (payload) => this.select(payload.entityId, payload.source, payload.entity),
       ),
     ];
     this.initialized = true;
@@ -53,15 +53,17 @@ export class DatasetController {
     this.eventBus.publish(EVENT_TOPICS.DATASET_CLEARED, { version: snapshot.version });
   }
 
-  select(entityId, source = 'api') {
-    const entity = this.workspaceState.selectEntity(entityId);
+  select(entityId, source = 'api', fallbackEntity = null) {
+    const stateEntity = this.workspaceState.selectEntity(entityId);
+    const entity = stateEntity || fallbackEntity;
     if (!entity) return null;
 
     this.publishSnapshot(this.workspaceState.getSnapshot());
     this.eventBus.publish(EVENT_TOPICS.VIEWPORT_ENTITY_SELECTED, {
       entityId: entity.entityId,
-      type: entity.selectionType,
-      properties: entity.properties,
+      type: entity.selectionType || entity.entityType,
+      properties: entity.properties || {},
+      entity,
       source,
     });
     return entity;

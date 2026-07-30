@@ -42,6 +42,7 @@ import { WorkspaceConsumerController } from './workspace-consumer-controller.js'
 import { renderWorkspaceLayout } from './workspace-layout.js';
 import { WorkspaceState } from './workspace-state.js';
 import { WorkspaceShellController } from './workspace-shell-controller.js';
+import { SequentialSketcherController } from './sequential-sketcher/sequential-sketcher-controller.js';
 
 export function requireUniqueRoot(root, selector) {
   const matches = root.querySelectorAll(selector);
@@ -95,7 +96,9 @@ export function bootstrapAnalysisWorkspace(rootElement) {
   const benchmarkReportUrl = new URL(`${import.meta.env.BASE_URL}qualification/advanced-tab-benchmarks.json`,rootElement.ownerDocument.baseURI).href;
   const tabBenchmarkStatusController = new TabBenchmarkStatusController(rootElement,benchmarkReportUrl);
   const workspaceShellController = new WorkspaceShellController(rootElement);
-  const controllers = [workspaceShellController,datasetController,sharedModelController,topologyController,supportRestraintController,modelLoadController,supportLoadScreeningController,verticalBeamController,modelCalculationController,modelSupportLoadController,sessionController,analysisCoordinator,ledgerController,treePanel,viewportPanel,sharedModelPanel,topologyPanel,supportRestraintPanel,modelLoadPanel,supportLoadScreeningPanel,verticalBeamPanel,modelCalculationPanel,modelSupportLoadPanel,propertiesPanel,workspaceConsumerController,settingsController,applicationShellController,tabBenchmarkStatusController];
+  const sequentialSketcherRoot = rootElement.querySelector('[data-role="sequential-sketcher-root"]');
+  const sequentialSketcherController = sequentialSketcherRoot ? new SequentialSketcherController(sequentialSketcherRoot, EventBus, WorkspaceState) : null;
+  const controllers = [workspaceShellController,datasetController,sharedModelController,topologyController,supportRestraintController,modelLoadController,supportLoadScreeningController,verticalBeamController,modelCalculationController,modelSupportLoadController,sessionController,analysisCoordinator,ledgerController,treePanel,viewportPanel,sharedModelPanel,topologyPanel,supportRestraintPanel,modelLoadPanel,supportLoadScreeningPanel,verticalBeamPanel,modelCalculationPanel,modelSupportLoadPanel,propertiesPanel,workspaceConsumerController,settingsController,applicationShellController,tabBenchmarkStatusController,sequentialSketcherController].filter(Boolean);
   controllers.forEach((controller) => controller.init());
   globalThis.EventBus = EventBus;
   return Object.freeze({

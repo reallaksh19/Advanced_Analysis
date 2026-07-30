@@ -102,10 +102,28 @@ export class LfeaWorkbenchView {
       element(this.rootElement, 'h1', null, 'LFEA Workbench'),
       element(this.rootElement, 'p', null, 'Edit T3/Q4 mesh packages, solve, review raw evidence, and export deterministically.'),
     );
+    const statusGroup = element(this.rootElement, 'div', 'lfea-workbench__status-group');
     const status = element(this.rootElement, 'output', 'lfea-workbench__status', state.status);
     status.dataset.status = state.status;
     status.setAttribute('aria-live', 'polite');
-    header.append(block, status);
+    statusGroup.append(status);
+    header.append(block, statusGroup);
+
+    if (state.status === 'FAILED' && Array.isArray(state.diagnostics) && state.diagnostics.length > 0) {
+      const errorMsg = state.diagnostics.map((d) => d.message).filter(Boolean).join(' ');
+      const hint = errorMsg.includes('lfea-mesh-package/v1') || errorMsg.includes('schema')
+        ? ' Note: Piping datasets (e.g. Sjson.json, .inputxml) belong in the 3D Piping Workspace (W) tab.'
+        : '';
+      const errorBanner = element(
+        this.rootElement,
+        'div',
+        'lfea-workbench__error-banner',
+        `⚠️ Failed: ${errorMsg}${hint}`,
+      );
+      errorBanner.setAttribute('role', 'alert');
+      errorBanner.setAttribute('aria-live', 'assertive');
+      header.append(errorBanner);
+    }
     return header;
   }
 

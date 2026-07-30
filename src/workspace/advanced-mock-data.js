@@ -54,6 +54,67 @@ export function createWorkspaceMockPackage() {
   };
 }
 
+export function createStaggeredMockPackage() {
+  const children = [];
+  
+  // Realistic 3D routing:
+  // Starts (0,0,0) -> +X -> (2000,0,0)
+  // Drops -Z -> (2000,0,-1500)
+  // Turns +Y -> (2000,3000,-1500)
+  // Tee at +Y=1000, branches to +X -> (3000,1000,-1500)
+  // Drops -Z -> (3000,1000,-3000)
+  
+  // Segment 1: East (+X)
+  children.push(pipe('ROUTE-PIPE-1', [0, 0, 0], [2000, 0, 0]));
+  children.push(support('ROUTE-SUPP-1', [500, 0, 0], 'ROUTE-PIPE-1:port:mid'));
+  children.push({
+    id: 'ROUTE-ELBO-1', name: 'Elbow 1', type: 'ELBO', sourcePath: `/SIM/ELBO/1`, sourceAttributes: { POS: {x: 2000, y: 0, z: 0} }
+  });
+
+  // Segment 2: Down (-Z)
+  children.push(pipe('ROUTE-PIPE-2', [2000, 0, 0], [2000, 0, -1500]));
+  children.push({
+    id: 'ROUTE-ELBO-2', name: 'Elbow 2', type: 'ELBO', sourcePath: `/SIM/ELBO/2`, sourceAttributes: { POS: {x: 2000, y: 0, z: -1500} }
+  });
+
+  // Segment 3: North (+Y)
+  children.push(pipe('ROUTE-PIPE-3A', [2000, 0, -1500], [2000, 1000, -1500]));
+  children.push({
+    id: 'ROUTE-TEE-1', name: 'Tee 1', type: 'TEE', sourcePath: `/SIM/TEE/1`, sourceAttributes: { POS: {x: 2000, y: 1000, z: -1500} }
+  });
+  
+  children.push(pipe('ROUTE-PIPE-3B', [2000, 1000, -1500], [2000, 3000, -1500]));
+  children.push({
+    id: 'ROUTE-VALV-1', name: 'Valve 1', type: 'VALV', sourcePath: `/SIM/VALV/1`, sourceAttributes: { POS: {x: 2000, y: 2000, z: -1500} }
+  });
+  children.push(support('ROUTE-SUPP-2', [2000, 3000, -1500], 'ROUTE-PIPE-3B:port:end'));
+
+  // Segment 4: Branch East (+X)
+  children.push(pipe('ROUTE-PIPE-4', [2000, 1000, -1500], [3000, 1000, -1500]));
+  children.push({
+    id: 'ROUTE-ELBO-3', name: 'Elbow 3', type: 'ELBO', sourcePath: `/SIM/ELBO/3`, sourceAttributes: { POS: {x: 3000, y: 1000, z: -1500} }
+  });
+
+  // Segment 5: Down (-Z)
+  children.push(pipe('ROUTE-PIPE-5', [3000, 1000, -1500], [3000, 1000, -3000]));
+  children.push(support('ROUTE-SUPP-3', [3000, 1000, -2500], 'ROUTE-PIPE-5:port:mid'));
+  
+  // Add some flanges
+  children.push({
+    id: 'ROUTE-FLAN-1', name: 'Flange 1', type: 'FLAN', sourcePath: `/SIM/FLAN/1`, sourceAttributes: { POS: {x: 3000, y: 1000, z: -3000} }
+  });
+
+  return {
+    schema: 'inputxml-managed-stage/v1',
+    packageHash: 'SIM-ROUTED-3D',
+    unit: 'mm',
+    project: { name: 'Realistic 3D Routed Pipe' },
+    objects: [
+      { id: 'ROUTE-ROOT', name: 'Main Route', type: 'BRANCH', children }
+    ]
+  };
+}
+
 /**
  * Create the default document for one LAFEA stage.
  *

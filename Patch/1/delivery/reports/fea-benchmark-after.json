@@ -1,0 +1,1761 @@
+{
+  "schema": "fea-benchmark-report/v1",
+  "label": "after",
+  "totals": {
+    "cases": 21,
+    "passed": 21,
+    "failed": 0,
+    "errored": 0,
+    "checks": 71,
+    "failedChecks": 0,
+    "maximumRelativeError": 4.5198995740912424e-13
+  },
+  "byTier": [
+    {
+      "name": "T1_CLOSED_FORM",
+      "passed": 8,
+      "failed": 0,
+      "errored": 0
+    },
+    {
+      "name": "T2_CONVERGENCE",
+      "passed": 1,
+      "failed": 0,
+      "errored": 0
+    },
+    {
+      "name": "T3_INVARIANT",
+      "passed": 5,
+      "failed": 0,
+      "errored": 0
+    },
+    {
+      "name": "T4_PRESENTATION",
+      "passed": 4,
+      "failed": 0,
+      "errored": 0
+    },
+    {
+      "name": "T5_PERFORMANCE",
+      "passed": 3,
+      "failed": 0,
+      "errored": 0
+    }
+  ],
+  "byCategory": [
+    {
+      "name": "CAPACITY",
+      "passed": 1,
+      "failed": 0,
+      "errored": 0
+    },
+    {
+      "name": "CONSTITUTIVE",
+      "passed": 1,
+      "failed": 0,
+      "errored": 0
+    },
+    {
+      "name": "DETERMINISM",
+      "passed": 1,
+      "failed": 0,
+      "errored": 0
+    },
+    {
+      "name": "ELEMENT_BEHAVIOUR",
+      "passed": 1,
+      "failed": 0,
+      "errored": 0
+    },
+    {
+      "name": "ELEMENT_CONSISTENCY",
+      "passed": 6,
+      "failed": 0,
+      "errored": 0
+    },
+    {
+      "name": "EVIDENCE_COST",
+      "passed": 1,
+      "failed": 0,
+      "errored": 0
+    },
+    {
+      "name": "INTERACTION_COST",
+      "passed": 1,
+      "failed": 0,
+      "errored": 0
+    },
+    {
+      "name": "PRESENTATION_FIDELITY",
+      "passed": 4,
+      "failed": 0,
+      "errored": 0
+    },
+    {
+      "name": "PRESSURE_VESSEL",
+      "passed": 1,
+      "failed": 0,
+      "errored": 0
+    },
+    {
+      "name": "SOLVER",
+      "passed": 3,
+      "failed": 0,
+      "errored": 0
+    },
+    {
+      "name": "STRESS_ACCURACY",
+      "passed": 1,
+      "failed": 0,
+      "errored": 0
+    }
+  ],
+  "results": [
+    {
+      "caseId": "BM-T1-PATCH-Q4-REGULAR",
+      "title": "Regular Q4 constant-strain patch test (PLANE_STRESS)",
+      "tier": "T1_CLOSED_FORM",
+      "category": "ELEMENT_CONSISTENCY",
+      "kernel": "element-fea",
+      "reference": {
+        "type": "CLOSED_FORM",
+        "source": "Irons & Razzaque patch test; Zienkiewicz & Taylor FEM. Exact constant stress state."
+      },
+      "status": "PASS",
+      "checkCount": 2,
+      "failedCheckCount": 0,
+      "checks": [
+        {
+          "checkId": "BM-T1-PATCH-Q4-REGULAR.STRESS",
+          "quantity": "Maximum stress deviation from exact constant state",
+          "unit": "N/mm2",
+          "computed": 8.526512829121202e-14,
+          "reference": 0,
+          "absoluteError": 8.526512829121202e-14,
+          "relativeError": 4.2632564145606005e-16,
+          "tolerance": 1e-9,
+          "toleranceType": "RELATIVE",
+          "status": "PASS",
+          "note": "worst at E001_001:GP1:SX; exact = [200.00000, 1.4210855e-14, 38.461538]"
+        },
+        {
+          "checkId": "BM-T1-PATCH-Q4-REGULAR.ENERGY",
+          "quantity": "Element/global strain-energy consistency",
+          "unit": "N·mm",
+          "computed": 0,
+          "reference": 0,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 1e-10,
+          "toleranceType": "RELATIVE",
+          "status": "PASS",
+          "note": null
+        }
+      ],
+      "evidence": {
+        "elementCount": 16,
+        "exactStress": [
+          200.00000000000003,
+          1.4210854715202004e-14,
+          38.46153846153846
+        ],
+        "strainEnergy": 0.43846153846153846
+      },
+      "error": null
+    },
+    {
+      "caseId": "BM-T1-PATCH-Q4-DISTORTED",
+      "title": "Distorted Q4 constant-strain patch test (PLANE_STRESS)",
+      "tier": "T1_CLOSED_FORM",
+      "category": "ELEMENT_CONSISTENCY",
+      "kernel": "element-fea",
+      "reference": {
+        "type": "CLOSED_FORM",
+        "source": "Irons & Razzaque patch test; Zienkiewicz & Taylor FEM. Exact constant stress state."
+      },
+      "status": "PASS",
+      "checkCount": 2,
+      "failedCheckCount": 0,
+      "checks": [
+        {
+          "checkId": "BM-T1-PATCH-Q4-DISTORTED.STRESS",
+          "quantity": "Maximum stress deviation from exact constant state",
+          "unit": "N/mm2",
+          "computed": 1.7053025658242404e-13,
+          "reference": 0,
+          "absoluteError": 1.7053025658242404e-13,
+          "relativeError": 8.526512829121201e-16,
+          "tolerance": 1e-9,
+          "toleranceType": "RELATIVE",
+          "status": "PASS",
+          "note": "worst at E001_001:GP2:SX; exact = [200.00000, 1.4210855e-14, 38.461538]"
+        },
+        {
+          "checkId": "BM-T1-PATCH-Q4-DISTORTED.ENERGY",
+          "quantity": "Element/global strain-energy consistency",
+          "unit": "N·mm",
+          "computed": 2.7755575615628914e-16,
+          "reference": 0,
+          "absoluteError": 2.7755575615628914e-16,
+          "relativeError": 6.330219000055722e-16,
+          "tolerance": 1e-10,
+          "toleranceType": "RELATIVE",
+          "status": "PASS",
+          "note": null
+        }
+      ],
+      "evidence": {
+        "elementCount": 16,
+        "exactStress": [
+          200.00000000000003,
+          1.4210854715202004e-14,
+          38.46153846153846
+        ],
+        "strainEnergy": 0.4384615384615381
+      },
+      "error": null
+    },
+    {
+      "caseId": "BM-T1-PATCH-T3-REGULAR",
+      "title": "Regular T3 constant-strain patch test (PLANE_STRESS)",
+      "tier": "T1_CLOSED_FORM",
+      "category": "ELEMENT_CONSISTENCY",
+      "kernel": "element-fea",
+      "reference": {
+        "type": "CLOSED_FORM",
+        "source": "Irons & Razzaque patch test; Zienkiewicz & Taylor FEM. Exact constant stress state."
+      },
+      "status": "PASS",
+      "checkCount": 2,
+      "failedCheckCount": 0,
+      "checks": [
+        {
+          "checkId": "BM-T1-PATCH-T3-REGULAR.STRESS",
+          "quantity": "Maximum stress deviation from exact constant state",
+          "unit": "N/mm2",
+          "computed": 2.842170943040401e-14,
+          "reference": 0,
+          "absoluteError": 2.842170943040401e-14,
+          "relativeError": 1.4210854715202002e-16,
+          "tolerance": 1e-9,
+          "toleranceType": "RELATIVE",
+          "status": "PASS",
+          "note": "worst at E000_000A:T3_CONSTANT:SX; exact = [200.00000, 1.4210855e-14, 38.461538]"
+        },
+        {
+          "checkId": "BM-T1-PATCH-T3-REGULAR.ENERGY",
+          "quantity": "Element/global strain-energy consistency",
+          "unit": "N·mm",
+          "computed": 5.551115123125783e-17,
+          "reference": 0,
+          "absoluteError": 5.551115123125783e-17,
+          "relativeError": 1.2660438000111434e-16,
+          "tolerance": 1e-10,
+          "toleranceType": "RELATIVE",
+          "status": "PASS",
+          "note": null
+        }
+      ],
+      "evidence": {
+        "elementCount": 8,
+        "exactStress": [
+          200.00000000000003,
+          1.4210854715202004e-14,
+          38.46153846153846
+        ],
+        "strainEnergy": 0.43846153846153846
+      },
+      "error": null
+    },
+    {
+      "caseId": "BM-T1-PATCH-T3-DISTORTED",
+      "title": "Distorted T3 constant-strain patch test (PLANE_STRESS)",
+      "tier": "T1_CLOSED_FORM",
+      "category": "ELEMENT_CONSISTENCY",
+      "kernel": "element-fea",
+      "reference": {
+        "type": "CLOSED_FORM",
+        "source": "Irons & Razzaque patch test; Zienkiewicz & Taylor FEM. Exact constant stress state."
+      },
+      "status": "PASS",
+      "checkCount": 2,
+      "failedCheckCount": 0,
+      "checks": [
+        {
+          "checkId": "BM-T1-PATCH-T3-DISTORTED.STRESS",
+          "quantity": "Maximum stress deviation from exact constant state",
+          "unit": "N/mm2",
+          "computed": 2.2737367544323206e-13,
+          "reference": 0,
+          "absoluteError": 2.2737367544323206e-13,
+          "relativeError": 1.1368683772161601e-15,
+          "tolerance": 1e-9,
+          "toleranceType": "RELATIVE",
+          "status": "PASS",
+          "note": "worst at E001_000B:T3_CONSTANT:SX; exact = [200.00000, 1.4210855e-14, 38.461538]"
+        },
+        {
+          "checkId": "BM-T1-PATCH-T3-DISTORTED.ENERGY",
+          "quantity": "Element/global strain-energy consistency",
+          "unit": "N·mm",
+          "computed": 1.1102230246251565e-16,
+          "reference": 0,
+          "absoluteError": 1.1102230246251565e-16,
+          "relativeError": 2.532087600022287e-16,
+          "tolerance": 1e-10,
+          "toleranceType": "RELATIVE",
+          "status": "PASS",
+          "note": null
+        }
+      ],
+      "evidence": {
+        "elementCount": 8,
+        "exactStress": [
+          200.00000000000003,
+          1.4210854715202004e-14,
+          38.46153846153846
+        ],
+        "strainEnergy": 0.43846153846153846
+      },
+      "error": null
+    },
+    {
+      "caseId": "BM-T1-PATCH-Q4-PLANE-STRAIN",
+      "title": "Distorted Q4 constant-strain patch test (PLANE_STRAIN)",
+      "tier": "T1_CLOSED_FORM",
+      "category": "ELEMENT_CONSISTENCY",
+      "kernel": "element-fea",
+      "reference": {
+        "type": "CLOSED_FORM",
+        "source": "Irons & Razzaque patch test; Zienkiewicz & Taylor FEM. Exact constant stress state."
+      },
+      "status": "PASS",
+      "checkCount": 2,
+      "failedCheckCount": 0,
+      "checks": [
+        {
+          "checkId": "BM-T1-PATCH-Q4-PLANE-STRAIN.STRESS",
+          "quantity": "Maximum stress deviation from exact constant state",
+          "unit": "N/mm2",
+          "computed": 1.7053025658242404e-13,
+          "reference": 0,
+          "absoluteError": 1.7053025658242404e-13,
+          "relativeError": 7.26850273957873e-16,
+          "tolerance": 1e-9,
+          "toleranceType": "RELATIVE",
+          "status": "PASS",
+          "note": "worst at E001_000:GP4:SX; exact = [234.61538, 34.615385, 38.461538]"
+        },
+        {
+          "checkId": "BM-T1-PATCH-Q4-PLANE-STRAIN.ENERGY",
+          "quantity": "Element/global strain-energy consistency",
+          "unit": "N·mm",
+          "computed": 3.3306690738754696e-16,
+          "reference": 0,
+          "absoluteError": 3.3306690738754696e-16,
+          "relativeError": 6.840236644609969e-16,
+          "tolerance": 1e-10,
+          "toleranceType": "RELATIVE",
+          "status": "PASS",
+          "note": null
+        }
+      ],
+      "evidence": {
+        "elementCount": 16,
+        "exactStress": [
+          234.6153846153846,
+          34.61538461538461,
+          38.46153846153846
+        ],
+        "strainEnergy": 0.4869230769230769
+      },
+      "error": null
+    },
+    {
+      "caseId": "BM-T1-UNIAXIAL-Q4",
+      "title": "Uniaxial tension strip, Q4 plane stress",
+      "tier": "T1_CLOSED_FORM",
+      "category": "STRESS_ACCURACY",
+      "kernel": "element-fea",
+      "reference": {
+        "type": "CLOSED_FORM",
+        "source": "sigma_x = P/A = applied traction; sigma_y = tau_xy = 0; eps_y = -nu*eps_x."
+      },
+      "status": "PASS",
+      "checkCount": 4,
+      "failedCheckCount": 0,
+      "checks": [
+        {
+          "checkId": "BM-T1-UNIAXIAL-Q4.STRESS",
+          "quantity": "Maximum stress deviation from uniform uniaxial state",
+          "unit": "N/mm2",
+          "computed": 1.7763568394002505e-13,
+          "reference": 0,
+          "absoluteError": 1.7763568394002505e-13,
+          "relativeError": 3.552713678800501e-15,
+          "tolerance": 1e-10,
+          "toleranceType": "RELATIVE",
+          "status": "PASS",
+          "note": null
+        },
+        {
+          "checkId": "BM-T1-UNIAXIAL-Q4.UX",
+          "quantity": "Axial elongation at free end",
+          "unit": "mm",
+          "computed": 0.024999999999999963,
+          "reference": 0.025,
+          "absoluteError": 3.8163916471489756e-17,
+          "relativeError": 1.5265566588595902e-15,
+          "tolerance": 1e-10,
+          "toleranceType": "RELATIVE",
+          "status": "PASS",
+          "note": null
+        },
+        {
+          "checkId": "BM-T1-UNIAXIAL-Q4.UY_POISSON",
+          "quantity": "Lateral Poisson contraction",
+          "unit": "mm",
+          "computed": -0.001499999999999999,
+          "reference": -0.0014999999999999998,
+          "absoluteError": 8.673617379884035e-19,
+          "relativeError": 5.782411586589358e-16,
+          "tolerance": 1e-10,
+          "toleranceType": "RELATIVE",
+          "status": "PASS",
+          "note": null
+        },
+        {
+          "checkId": "BM-T1-UNIAXIAL-Q4.REACTION",
+          "quantity": "Sum of support reactions vs applied load",
+          "unit": "N",
+          "computed": -999.999999999998,
+          "reference": -1000,
+          "absoluteError": 2.0463630789890885e-12,
+          "relativeError": 2.0463630789890884e-15,
+          "tolerance": 1e-9,
+          "toleranceType": "RELATIVE",
+          "status": "PASS",
+          "note": null
+        }
+      ],
+      "evidence": {
+        "appliedTraction": 50,
+        "strainEnergy": 12.499999999999961
+      },
+      "error": null
+    },
+    {
+      "caseId": "BM-T1-PLANE-STRAIN-SIGMAZ",
+      "title": "Plane-strain sigma_z recovery and 3D von Mises",
+      "tier": "T1_CLOSED_FORM",
+      "category": "CONSTITUTIVE",
+      "kernel": "element-fea",
+      "reference": {
+        "type": "CLOSED_FORM",
+        "source": "sigma_z = nu*(sigma_x+sigma_y); von Mises = sqrt(0.5*[(sx-sy)^2+(sy-sz)^2+(sz-sx)^2]+3*txy^2)."
+      },
+      "status": "PASS",
+      "checkCount": 3,
+      "failedCheckCount": 0,
+      "checks": [
+        {
+          "checkId": "BM-T1-PLANE-STRAIN-SIGMAZ.SIGMA_Z",
+          "quantity": "Recovered out-of-plane stress",
+          "unit": "N/mm2",
+          "computed": 0,
+          "reference": 0,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 1e-12,
+          "toleranceType": "RELATIVE",
+          "status": "PASS",
+          "note": null
+        },
+        {
+          "checkId": "BM-T1-PLANE-STRAIN-SIGMAZ.VON_MISES_3D",
+          "quantity": "Kernel von Mises vs 3D invariant",
+          "unit": "N/mm2",
+          "computed": 0,
+          "reference": 0,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 1e-12,
+          "toleranceType": "RELATIVE",
+          "status": "PASS",
+          "note": null
+        },
+        {
+          "checkId": "BM-T1-PLANE-STRAIN-SIGMAZ.SENSITIVITY",
+          "quantity": "Case discriminates plane-stress from plane-strain von Mises",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "A sigma_z-ignoring expression differs by 12.51 % here; the case is only diagnostic if this exceeds 5 %."
+        }
+      ],
+      "evidence": {
+        "planeStressVonMisesErrorFraction": 0.12508790092602404
+      },
+      "error": null
+    },
+    {
+      "caseId": "BM-T1-LAME-REFINEMENT",
+      "title": "Thick-walled cylinder under internal pressure — Lame refinement study (Q4, plane strain)",
+      "tier": "T1_CLOSED_FORM",
+      "category": "PRESSURE_VESSEL",
+      "kernel": "element-fea",
+      "reference": {
+        "type": "CLOSED_FORM",
+        "source": "Lame thick cylinder: a=100 mm, b=200 mm, p=10 N/mm2, free outer surface. Exact bore hoop stress = 16.666667 N/mm2."
+      },
+      "status": "PASS",
+      "checkCount": 5,
+      "failedCheckCount": 0,
+      "checks": [
+        {
+          "checkId": "BM-T1-LAME-REFINEMENT.MONOTONE",
+          "quantity": "Hoop-stress error decreases monotonically under refinement",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "errors = [8.710%, 4.347%, 2.170%]"
+        },
+        {
+          "checkId": "BM-T1-LAME-REFINEMENT.BORE_HOOP",
+          "quantity": "Finest-mesh peak bore hoop stress vs Lame",
+          "unit": "-",
+          "computed": 0.0008619569754480238,
+          "reference": 0,
+          "absoluteError": 0.0008619569754480238,
+          "relativeError": 0.0008619569754480238,
+          "tolerance": 0.005,
+          "toleranceType": "ABSOLUTE",
+          "status": "PASS",
+          "note": "Declared in advance: 16x24 mesh must reach the exact bore hoop within 0.5 %. Computed peak = 16.652301, exact = 16.666667."
+        },
+        {
+          "checkId": "BM-T1-LAME-REFINEMENT.FIELD_ERROR",
+          "quantity": "Finest-mesh worst hoop-stress error over the whole field",
+          "unit": "-",
+          "computed": 0.021696672879432343,
+          "reference": 0,
+          "absoluteError": 0.021696672879432343,
+          "relativeError": 0.021696672879432343,
+          "tolerance": 0.03,
+          "toleranceType": "ABSOLUTE",
+          "status": "PASS",
+          "note": "Dominated by the faceted approximation of the circular boundary by straight Q4 edges."
+        },
+        {
+          "checkId": "BM-T1-LAME-REFINEMENT.OBSERVED_ORDER",
+          "quantity": "Observed convergence order of the hoop-stress field error",
+          "unit": "-",
+          "computed": 1.0025838490244097,
+          "reference": 1,
+          "absoluteError": 0.002583849024409668,
+          "relativeError": 0.002583849024409668,
+          "tolerance": 0.35,
+          "toleranceType": "ABSOLUTE",
+          "status": "PASS",
+          "note": "First order is EXPECTED: the error is geometric (polygonal boundary), not interpolation error. A value near 2 would indicate the geometry error is not dominant."
+        },
+        {
+          "checkId": "BM-T1-LAME-REFINEMENT.EQUILIBRIUM",
+          "quantity": "Finest-mesh global force imbalance",
+          "unit": "N",
+          "computed": 2.205524651799351e-11,
+          "reference": 0,
+          "absoluteError": 2.205524651799351e-11,
+          "relativeError": 2.205524651799351e-14,
+          "tolerance": 1e-9,
+          "toleranceType": "RELATIVE",
+          "status": "PASS",
+          "note": null
+        }
+      ],
+      "evidence": {
+        "lameA": 3.3333333333333335,
+        "lameB": 133333.33333333334,
+        "exactBoreHoop": 16.666666666666668,
+        "observedOrder": 1.0025838490244097,
+        "history": [
+          {
+            "mesh": "4x6",
+            "elements": 24,
+            "characteristicSize": 25,
+            "worstHoopRelativeError": 0.08709811673167482,
+            "worstRadialErrorOverPressure": 0.27964924542183367,
+            "innerRingPeakHoop": 16.35869884269325,
+            "boreHoopRelativeError": 0.018478069438405027,
+            "forceImbalance": 5.684341886080801e-13
+          },
+          {
+            "mesh": "8x12",
+            "elements": 96,
+            "characteristicSize": 12.5,
+            "worstHoopRelativeError": 0.04347418557871907,
+            "worstRadialErrorOverPressure": 0.15282140544594638,
+            "innerRingPeakHoop": 16.593933943050025,
+            "boreHoopRelativeError": 0.0043639634169985436,
+            "forceImbalance": 1.8189894035458565e-12
+          },
+          {
+            "mesh": "16x24",
+            "elements": 384,
+            "characteristicSize": 6.25,
+            "worstHoopRelativeError": 0.021696672879432343,
+            "worstRadialErrorOverPressure": 0.08011504323070931,
+            "innerRingPeakHoop": 16.652300717075867,
+            "boreHoopRelativeError": 0.0008619569754480238,
+            "forceImbalance": 2.205524651799351e-11
+          }
+        ]
+      },
+      "error": null
+    },
+    {
+      "caseId": "BM-T2-CANTILEVER-Q4",
+      "title": "End-loaded cantilever: Q4 shear-locking characterisation",
+      "tier": "T2_CONVERGENCE",
+      "category": "ELEMENT_BEHAVIOUR",
+      "kernel": "element-fea",
+      "reference": {
+        "type": "ENGINEERING_THEORY",
+        "source": "Timoshenko beam with kappa=5/6: delta = PL^3/(3EI) + PL/(kappa G A) = 2.0001560 mm."
+      },
+      "status": "PASS",
+      "checkCount": 3,
+      "failedCheckCount": 0,
+      "checks": [
+        {
+          "checkId": "BM-T2-CANTILEVER-Q4.MONOTONE",
+          "quantity": "Tip deflection increases monotonically under refinement (locking is relieved)",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "ratios = [0.2875, 0.6162, 0.8671, 0.9666]"
+        },
+        {
+          "checkId": "BM-T2-CANTILEVER-Q4.FINEST",
+          "quantity": "Finest-mesh tip deflection / Timoshenko reference",
+          "unit": "-",
+          "computed": 0.9666135898999684,
+          "reference": 1,
+          "absoluteError": 0.03338641010003163,
+          "relativeError": 0.03338641010003163,
+          "tolerance": 0.05,
+          "toleranceType": "ABSOLUTE",
+          "status": "PASS",
+          "note": "Declared in advance: the 32x8 mesh must be within 5 % of beam theory."
+        },
+        {
+          "checkId": "BM-T2-CANTILEVER-Q4.LOCKING_INDEX",
+          "quantity": "Coarse-mesh stiffness penalty (1 - coarse/reference)",
+          "unit": "-",
+          "computed": 0.7124930137802414,
+          "reference": 0,
+          "absoluteError": 0.7124930137802414,
+          "relativeError": null,
+          "tolerance": 1,
+          "toleranceType": "ABSOLUTE",
+          "status": "PASS",
+          "note": "Reported for characterisation, not acceptance. A large value documents shear locking."
+        }
+      ],
+      "evidence": {
+        "referenceDeflection": 2.000156,
+        "history": [
+          {
+            "mesh": "4x1",
+            "elements": 4,
+            "dof": 20,
+            "tipDeflection": 0.5750588235293675,
+            "ratio": 0.2875069862197586
+          },
+          {
+            "mesh": "8x2",
+            "elements": 16,
+            "dof": 54,
+            "tipDeflection": 1.232533648981071,
+            "ratio": 0.6162187594273002
+          },
+          {
+            "mesh": "16x4",
+            "elements": 64,
+            "dof": 170,
+            "tipDeflection": 1.7343409064070239,
+            "ratio": 0.8671028191836156
+          },
+          {
+            "mesh": "32x8",
+            "elements": 256,
+            "dof": 594,
+            "tipDeflection": 1.9333779715199613,
+            "ratio": 0.9666135898999684
+          }
+        ]
+      },
+      "error": null
+    },
+    {
+      "caseId": "BM-T3-RIGID-TRANSLATION",
+      "title": "Rigid-body translation produces no stress",
+      "tier": "T3_INVARIANT",
+      "category": "ELEMENT_CONSISTENCY",
+      "kernel": "element-fea",
+      "reference": {
+        "type": "INVARIANT",
+        "source": "Rigid-body motion produces zero strain by definition."
+      },
+      "status": "PASS",
+      "checkCount": 2,
+      "failedCheckCount": 0,
+      "checks": [
+        {
+          "checkId": "BM-T3-RIGID-TRANSLATION.STRESS",
+          "quantity": "Maximum spurious stress",
+          "unit": "N/mm2",
+          "computed": 6.1001265089294315e-12,
+          "reference": 0,
+          "absoluteError": 6.1001265089294315e-12,
+          "relativeError": 6.1001265089294315e-12,
+          "tolerance": 0.000001,
+          "toleranceType": "ABSOLUTE",
+          "status": "PASS",
+          "note": "Absolute tolerance: E = 2e5, so 1e-6 N/mm2 is ~5e-12 relative to modulus."
+        },
+        {
+          "checkId": "BM-T3-RIGID-TRANSLATION.ENERGY",
+          "quantity": "Strain energy under rigid-body motion",
+          "unit": "N·mm",
+          "computed": 1.1254996934439987e-10,
+          "reference": 0,
+          "absoluteError": 1.1254996934439987e-10,
+          "relativeError": 1.1254996934439987e-10,
+          "tolerance": 0.000001,
+          "toleranceType": "ABSOLUTE",
+          "status": "PASS",
+          "note": null
+        }
+      ],
+      "evidence": {
+        "strainEnergy": -1.1254996934439987e-10
+      },
+      "error": null
+    },
+    {
+      "caseId": "BM-T3-BACKEND-EQUIVALENCE",
+      "title": "Dense LDLt and sparse Jacobi-PCG backends agree",
+      "tier": "T3_INVARIANT",
+      "category": "SOLVER",
+      "kernel": "element-fea",
+      "reference": {
+        "type": "INVARIANT",
+        "source": "Two backends solving the same SPD system must agree."
+      },
+      "status": "PASS",
+      "checkCount": 2,
+      "failedCheckCount": 0,
+      "checks": [
+        {
+          "checkId": "BM-T3-BACKEND-EQUIVALENCE.DISPLACEMENT",
+          "quantity": "Maximum displacement difference between backends",
+          "unit": "mm",
+          "computed": 1.0803510863688359e-13,
+          "reference": 0,
+          "absoluteError": 1.0803510863688359e-13,
+          "relativeError": 4.5198995740912424e-13,
+          "tolerance": 1e-8,
+          "toleranceType": "RELATIVE",
+          "status": "PASS",
+          "note": null
+        },
+        {
+          "checkId": "BM-T3-BACKEND-EQUIVALENCE.ENERGY",
+          "quantity": "Strain-energy difference between backends",
+          "unit": "N·mm",
+          "computed": 1.1027623258996755e-11,
+          "reference": 0,
+          "absoluteError": 1.1027623258996755e-11,
+          "relativeError": 1.9780236261928375e-13,
+          "tolerance": 1e-8,
+          "toleranceType": "RELATIVE",
+          "status": "PASS",
+          "note": null
+        }
+      ],
+      "evidence": {
+        "denseEnergy": 55.75071557776061,
+        "sparseEnergy": 55.75071557774958,
+        "pcgIterations": 34
+      },
+      "error": null
+    },
+    {
+      "caseId": "BM-T3-DETERMINISM",
+      "title": "Repeat solves are bit-identical",
+      "tier": "T3_INVARIANT",
+      "category": "DETERMINISM",
+      "kernel": "element-fea",
+      "reference": {
+        "type": "INVARIANT",
+        "source": "CORE_SPECIFICATION: no hidden values, no Math.random, no silent switching."
+      },
+      "status": "PASS",
+      "checkCount": 2,
+      "failedCheckCount": 0,
+      "checks": [
+        {
+          "checkId": "BM-T3-DETERMINISM.RESULT_HASH",
+          "quantity": "Result semantic hash is reproducible",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "fnv1a64:3768712c3f33b755 vs fnv1a64:3768712c3f33b755"
+        },
+        {
+          "checkId": "BM-T3-DETERMINISM.MODEL_HASH",
+          "quantity": "Model semantic hash is reproducible",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": null
+        }
+      ],
+      "evidence": {
+        "semanticHash": "fnv1a64:3768712c3f33b755"
+      },
+      "error": null
+    },
+    {
+      "caseId": "BM-T3-SPARSE-SCALING",
+      "title": "Sparse Jacobi-PCG iteration scaling and qualification",
+      "tier": "T3_INVARIANT",
+      "category": "SOLVER",
+      "kernel": "element-fea",
+      "reference": {
+        "type": "ENGINEERING_THEORY",
+        "source": "PCG iterations ~ O(sqrt(kappa)); for 2D elasticity kappa ~ O(h^-2), so iterations ~ O(sqrt(N_dof)). Jacobi preconditioning does not alter this asymptotic."
+      },
+      "status": "PASS",
+      "checkCount": 2,
+      "failedCheckCount": 0,
+      "checks": [
+        {
+          "checkId": "BM-T3-SPARSE-SCALING.QUALIFIED_AT_SCALE",
+          "quantity": "Sparse backend qualifies at every declared mesh size",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "largest solved: 2210 DOF in 502 iterations"
+        },
+        {
+          "checkId": "BM-T3-SPARSE-SCALING.SQRT_SCALING",
+          "quantity": "Spread of iterations / sqrt(DOF) across four refinements",
+          "unit": "-",
+          "computed": 2.3079454682725666,
+          "reference": 1,
+          "absoluteError": 1.3079454682725666,
+          "relativeError": 1.3079454682725666,
+          "tolerance": 2.5,
+          "toleranceType": "ABSOLUTE",
+          "status": "PASS",
+          "note": "Characterises the preconditioner. A spread near 1 confirms the O(sqrt(N)) model. This is a documentation check, not an accuracy claim."
+        }
+      ],
+      "evidence": {
+        "history": [
+          {
+            "mesh": "8x2",
+            "dof": 54,
+            "iterations": 34,
+            "iterationsOverSqrtDof": 4.626813958590447
+          },
+          {
+            "mesh": "16x4",
+            "dof": 170,
+            "iterations": 96,
+            "iterationsOverSqrtDof": 7.362863892934755
+          },
+          {
+            "mesh": "32x8",
+            "dof": 594,
+            "iterations": 235,
+            "iterationsOverSqrtDof": 9.642166793381064
+          },
+          {
+            "mesh": "64x16",
+            "dof": 2210,
+            "iterations": 502,
+            "iterationsOverSqrtDof": 10.678434308269077
+          }
+        ]
+      },
+      "error": null
+    },
+    {
+      "caseId": "BM-T3-TOLERANCE-COUPLING",
+      "title": "Unsatisfiable solver-profile tolerance configuration is rejected fail-closed",
+      "tier": "T3_INVARIANT",
+      "category": "SOLVER",
+      "kernel": "element-fea",
+      "reference": {
+        "type": "INVARIANT",
+        "source": "A configuration whose iterative target exceeds the acceptance gate can never qualify; the solver must reject rather than return an unqualified result."
+      },
+      "status": "PASS",
+      "checkCount": 3,
+      "failedCheckCount": 0,
+      "checks": [
+        {
+          "checkId": "BM-T3-TOLERANCE-COUPLING.FAIL_CLOSED",
+          "quantity": "An unsatisfiable tolerance configuration does not produce a qualified result",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "status = REJECTED_INVALID, code = UNSATISFIABLE_SOLVER_PROFILE_TOLERANCES"
+        },
+        {
+          "checkId": "BM-T3-TOLERANCE-COUPLING.NO_PARTIAL_EVIDENCE",
+          "quantity": "No displacement or stress evidence is published for the rejected solve",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": null
+        },
+        {
+          "checkId": "BM-T3-TOLERANCE-COUPLING.DIAGNOSTIC_EXPLAINS_CAUSE",
+          "quantity": "The diagnostic tells the user the profile configuration is unsatisfiable",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "Observed diagnostic: \"UNSATISFIABLE_SOLVER_PROFILE_TOLERANCES: Unsatisfiable solver profile: the iterative residual target (1.000e+0) exceeds the acceptance gate (2.000e-12), so no solve of this model can ever qualify. Tighten solverProfile.absoluteResidualTolerance / relativeResidualTolerance, or relax solverProfile.tolerances.residualForceAbsolute / residualForceRelative, so that the target is at or below the gate. This is a profile configuration error, not a numerical failure of the model.\". A generic residual-failure message does not tell the user their PROFILE is at fault, so this check is expected to FAIL until the profile validates tolerance coupling."
+        }
+      ],
+      "evidence": {
+        "status": "REJECTED_INVALID",
+        "diagnosticCode": "UNSATISFIABLE_SOLVER_PROFILE_TOLERANCES",
+        "diagnosticMessage": "Unsatisfiable solver profile: the iterative residual target (1.000e+0) exceeds the acceptance gate (2.000e-12), so no solve of this model can ever qualify. Tighten solverProfile.absoluteResidualTolerance / relativeResidualTolerance, or relax solverProfile.tolerances.residualForceAbsolute / residualForceRelative, so that the target is at or below the gate. This is a profile configuration error, not a numerical failure of the model."
+      },
+      "error": null
+    },
+    {
+      "caseId": "BM-P1-DISPLAYED-VON-MISES",
+      "title": "Displayed stress field equals the authoritative solver von Mises, bit for bit",
+      "tier": "T4_PRESENTATION",
+      "category": "PRESENTATION_FIDELITY",
+      "kernel": "lfea-workbench",
+      "reference": {
+        "type": "PRESENTATION",
+        "source": "The view layer must SELECT a published kernel quantity, never re-derive one. Any deviation means the screen and the signed evidence bundle disagree."
+      },
+      "status": "PASS",
+      "checkCount": 8,
+      "failedCheckCount": 0,
+      "checks": [
+        {
+          "checkId": "BM-P1-DISPLAYED-VON-MISES.T3_PLANE_STRESS.BIT_IDENTICAL",
+          "quantity": "Displayed field is bit-identical to kernel evidence (T3_PLANE_STRESS)",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "source = result.vonMisesStress[].value"
+        },
+        {
+          "checkId": "BM-P1-DISPLAYED-VON-MISES.T3_PLANE_STRESS.RELATIVE",
+          "quantity": "Worst relative deviation of displayed stress (T3_PLANE_STRESS)",
+          "unit": "-",
+          "computed": 0,
+          "reference": 0,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "ABSOLUTE",
+          "status": "PASS",
+          "note": null
+        },
+        {
+          "checkId": "BM-P1-DISPLAYED-VON-MISES.T3_PLANE_STRAIN.BIT_IDENTICAL",
+          "quantity": "Displayed field is bit-identical to kernel evidence (T3_PLANE_STRAIN)",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "source = result.vonMisesStress[].value"
+        },
+        {
+          "checkId": "BM-P1-DISPLAYED-VON-MISES.T3_PLANE_STRAIN.RELATIVE",
+          "quantity": "Worst relative deviation of displayed stress (T3_PLANE_STRAIN)",
+          "unit": "-",
+          "computed": 0,
+          "reference": 0,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "ABSOLUTE",
+          "status": "PASS",
+          "note": null
+        },
+        {
+          "checkId": "BM-P1-DISPLAYED-VON-MISES.Q4_PLANE_STRESS.BIT_IDENTICAL",
+          "quantity": "Displayed field is bit-identical to kernel evidence (Q4_PLANE_STRESS)",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "source = result.integrationPointResults[].vonMisesStress"
+        },
+        {
+          "checkId": "BM-P1-DISPLAYED-VON-MISES.Q4_PLANE_STRESS.RELATIVE",
+          "quantity": "Worst relative deviation of displayed stress (Q4_PLANE_STRESS)",
+          "unit": "-",
+          "computed": 0,
+          "reference": 0,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "ABSOLUTE",
+          "status": "PASS",
+          "note": null
+        },
+        {
+          "checkId": "BM-P1-DISPLAYED-VON-MISES.Q4_PLANE_STRAIN.BIT_IDENTICAL",
+          "quantity": "Displayed field is bit-identical to kernel evidence (Q4_PLANE_STRAIN)",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "source = result.integrationPointResults[].vonMisesStress"
+        },
+        {
+          "checkId": "BM-P1-DISPLAYED-VON-MISES.Q4_PLANE_STRAIN.RELATIVE",
+          "quantity": "Worst relative deviation of displayed stress (Q4_PLANE_STRAIN)",
+          "unit": "-",
+          "computed": 0,
+          "reference": 0,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "ABSOLUTE",
+          "status": "PASS",
+          "note": null
+        }
+      ],
+      "evidence": [
+        {
+          "variant": "T3_PLANE_STRESS",
+          "authoritativeSource": "result.vonMisesStress[].value",
+          "elementCount": 8,
+          "worstRelativeDeviation": 0,
+          "worstAbsoluteDeviation": 0,
+          "worstLocation": null,
+          "referenceScale": 478.74726454139085
+        },
+        {
+          "variant": "T3_PLANE_STRAIN",
+          "authoritativeSource": "result.vonMisesStress[].value",
+          "elementCount": 8,
+          "worstRelativeDeviation": 0,
+          "worstAbsoluteDeviation": 0,
+          "worstLocation": null,
+          "referenceScale": 462.58813184435013
+        },
+        {
+          "variant": "Q4_PLANE_STRESS",
+          "authoritativeSource": "result.integrationPointResults[].vonMisesStress",
+          "elementCount": 4,
+          "worstRelativeDeviation": 0,
+          "worstAbsoluteDeviation": 0,
+          "worstLocation": null,
+          "referenceScale": 553.0720586554509
+        },
+        {
+          "variant": "Q4_PLANE_STRAIN",
+          "authoritativeSource": "result.integrationPointResults[].vonMisesStress",
+          "elementCount": 4,
+          "worstRelativeDeviation": 0,
+          "worstAbsoluteDeviation": 0,
+          "worstLocation": null,
+          "referenceScale": 495.09245136758125
+        }
+      ],
+      "error": null
+    },
+    {
+      "caseId": "BM-P2-GEOMETRY-STATE",
+      "title": "Stress display modes plot undeformed source geometry unless deformation is explicitly requested",
+      "tier": "T4_PRESENTATION",
+      "category": "PRESENTATION_FIDELITY",
+      "kernel": "lfea-workbench",
+      "reference": {
+        "type": "PRESENTATION",
+        "source": "A plot labelled with a stress authority must not silently apply a displacement magnification. Coordinates read off the plot must be the model coordinates."
+      },
+      "status": "PASS",
+      "checkCount": 6,
+      "failedCheckCount": 0,
+      "checks": [
+        {
+          "checkId": "BM-P2-GEOMETRY-STATE.MODEL.UNDEFORMED_BY_DEFAULT",
+          "quantity": "MODEL plots exact source coordinates when deformation is not requested",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "exact match"
+        },
+        {
+          "checkId": "BM-P2-GEOMETRY-STATE.MODEL.STATE_DECLARED",
+          "quantity": "MODEL declares its geometry state explicitly",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "geometryState = UNDEFORMED_SOURCE_GEOMETRY, deformationScale = 0, declaredDeformed = true"
+        },
+        {
+          "checkId": "BM-P2-GEOMETRY-STATE.RAW_STRESS.UNDEFORMED_BY_DEFAULT",
+          "quantity": "RAW_STRESS plots exact source coordinates when deformation is not requested",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "exact match"
+        },
+        {
+          "checkId": "BM-P2-GEOMETRY-STATE.RAW_STRESS.STATE_DECLARED",
+          "quantity": "RAW_STRESS declares its geometry state explicitly",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "geometryState = UNDEFORMED_SOURCE_GEOMETRY, deformationScale = 0, declaredDeformed = true"
+        },
+        {
+          "checkId": "BM-P2-GEOMETRY-STATE.PROJECTED_STRESS.UNDEFORMED_BY_DEFAULT",
+          "quantity": "PROJECTED_STRESS plots exact source coordinates when deformation is not requested",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "exact match"
+        },
+        {
+          "checkId": "BM-P2-GEOMETRY-STATE.PROJECTED_STRESS.STATE_DECLARED",
+          "quantity": "PROJECTED_STRESS declares its geometry state explicitly",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "geometryState = UNDEFORMED_SOURCE_GEOMETRY, deformationScale = 0, declaredDeformed = true"
+        }
+      ],
+      "evidence": [
+        {
+          "mode": "MODEL",
+          "worstCoordinateDeviation": 0,
+          "worstAt": null,
+          "geometryState": "UNDEFORMED_SOURCE_GEOMETRY"
+        },
+        {
+          "mode": "RAW_STRESS",
+          "worstCoordinateDeviation": 0,
+          "worstAt": null,
+          "geometryState": "UNDEFORMED_SOURCE_GEOMETRY"
+        },
+        {
+          "mode": "PROJECTED_STRESS",
+          "worstCoordinateDeviation": 0,
+          "worstAt": null,
+          "geometryState": "UNDEFORMED_SOURCE_GEOMETRY"
+        }
+      ],
+      "error": null
+    },
+    {
+      "caseId": "BM-P3-FIELD-METADATA",
+      "title": "Every displayed field declares its quantity, unit, reduction, provenance and value range",
+      "tier": "T4_PRESENTATION",
+      "category": "PRESENTATION_FIDELITY",
+      "kernel": "lfea-workbench",
+      "reference": {
+        "type": "PRESENTATION",
+        "source": "A coloured mesh with no quantity identity, no unit and no numeric range is not a reviewable engineering output. Units must come from solverProfile.units.stress, never a literal."
+      },
+      "status": "PASS",
+      "checkCount": 5,
+      "failedCheckCount": 0,
+      "checks": [
+        {
+          "checkId": "BM-P3-FIELD-METADATA.DESCRIPTOR_PRESENT",
+          "quantity": "Display geometry carries a field descriptor",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "present: [quantityId, unit, reduction, sourcePath, min, max]; missing: []"
+        },
+        {
+          "checkId": "BM-P3-FIELD-METADATA.UNIT_FROM_PROFILE",
+          "quantity": "Declared unit equals solverProfile.units.stress",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "declared = N/mm2, profile = N/mm2"
+        },
+        {
+          "checkId": "BM-P3-FIELD-METADATA.RANGE_FINITE",
+          "quantity": "Field declares a finite numeric range for the legend",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "min = 215.97734888784083, max = 553.0720586554509"
+        },
+        {
+          "checkId": "BM-P3-FIELD-METADATA.PROVENANCE",
+          "quantity": "Field declares which result path it was selected from",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "sourcePath = result.integrationPointResults[]"
+        },
+        {
+          "checkId": "BM-P3-FIELD-METADATA.CAPTION",
+          "quantity": "Display geometry provides a caption naming quantity, unit and geometry state",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "caption = VON_MISES [N/mm2] · Q4_MAXIMUM_OF_4_GAUSS_POINTS · UNDEFORMED · AUTHORITATIVE_RAW_ELEMENT_OR_INTEGRATION_POINT_STRESS"
+        }
+      ],
+      "evidence": {
+        "expectedUnit": "N/mm2",
+        "field": {
+          "byElement": {
+            "E000_000": 522.8707882715916,
+            "E000_001": 553.0720586554509,
+            "E001_000": 215.97734888784083,
+            "E001_001": 295.1196091191907
+          },
+          "elementReductions": {
+            "E000_000": "Q4_MAXIMUM_OF_4_GAUSS_POINTS",
+            "E000_001": "Q4_MAXIMUM_OF_4_GAUSS_POINTS",
+            "E001_000": "Q4_MAXIMUM_OF_4_GAUSS_POINTS",
+            "E001_001": "Q4_MAXIMUM_OF_4_GAUSS_POINTS"
+          },
+          "quantityId": "VON_MISES",
+          "unit": "N/mm2",
+          "reduction": "Q4_MAXIMUM_OF_4_GAUSS_POINTS",
+          "authority": "AUTHORITATIVE_RAW_ELEMENT_OR_INTEGRATION_POINT_STRESS",
+          "sourcePath": "result.integrationPointResults[]",
+          "min": 215.97734888784083,
+          "max": 553.0720586554509,
+          "elementCount": 4
+        },
+        "caption": "VON_MISES [N/mm2] · Q4_MAXIMUM_OF_4_GAUSS_POINTS · UNDEFORMED · AUTHORITATIVE_RAW_ELEMENT_OR_INTEGRATION_POINT_STRESS"
+      },
+      "error": null
+    },
+    {
+      "caseId": "BM-P4-QUANTITY-DISAMBIGUATION",
+      "title": "Raw and projected stress modes declare different quantities and separate value ranges",
+      "tier": "T4_PRESENTATION",
+      "category": "PRESENTATION_FIDELITY",
+      "kernel": "lfea-workbench",
+      "reference": {
+        "type": "PRESENTATION",
+        "source": "Raw mode shows a von Mises invariant (non-negative). Projected mode shows a signed stress component from a NON-AUTHORITATIVE projection. Sharing one unlabelled colour ramp between them lets a reader compare two different physical quantities as if they were one."
+      },
+      "status": "PASS",
+      "checkCount": 4,
+      "failedCheckCount": 0,
+      "checks": [
+        {
+          "checkId": "BM-P4-QUANTITY-DISAMBIGUATION.DISTINCT_QUANTITY_IDS",
+          "quantity": "Raw and projected modes declare distinct quantity identities",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "raw = VON_MISES, projected = PROJECTED_SX"
+        },
+        {
+          "checkId": "BM-P4-QUANTITY-DISAMBIGUATION.PROJECTED_AUTHORITY",
+          "quantity": "Projected mode is labelled non-authoritative",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "authority = NON_AUTHORITATIVE_REVIEW_PROJECTION"
+        },
+        {
+          "checkId": "BM-P4-QUANTITY-DISAMBIGUATION.RAW_AUTHORITY",
+          "quantity": "Raw mode is labelled authoritative",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "authority = AUTHORITATIVE_RAW_ELEMENT_OR_INTEGRATION_POINT_STRESS"
+        },
+        {
+          "checkId": "BM-P4-QUANTITY-DISAMBIGUATION.SEPARATE_RANGES",
+          "quantity": "Each mode carries its own numeric range rather than sharing one implicit scale",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "raw range = [215.97734888784083, 553.0720586554509], projected range = [-193.72562531798746, 265.8495626519434]"
+        }
+      ],
+      "evidence": {
+        "rawQuantityId": "VON_MISES",
+        "projectedQuantityId": "PROJECTED_SX"
+      },
+      "error": null
+    },
+    {
+      "caseId": "BM-T5-HASH",
+      "title": "Semantic hash is bit-identical to the FNV-1a-64 reference and meets its throughput budget",
+      "tier": "T5_PERFORMANCE",
+      "category": "EVIDENCE_COST",
+      "kernel": "shared-piping-model",
+      "reference": {
+        "type": "INVARIANT",
+        "source": "FNV-1a 64-bit (Fowler-Noll-Vo). Every committed evidence bundle depends on this value, so any implementation change must be proven bit-identical."
+      },
+      "status": "PASS",
+      "checkCount": 4,
+      "failedCheckCount": 0,
+      "checks": [
+        {
+          "checkId": "BM-T5-HASH.BIT_IDENTICAL_VECTORS",
+          "quantity": "Hash matches the BigInt reference on all fixed vectors",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "18 vectors verified"
+        },
+        {
+          "checkId": "BM-T5-HASH.BIT_IDENTICAL_RANDOM",
+          "quantity": "Hash matches the BigInt reference on 500 seeded pseudo-random inputs",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "0 mismatches"
+        },
+        {
+          "checkId": "BM-T5-HASH.FORMAT",
+          "quantity": "Hash string format is preserved",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": null
+        },
+        {
+          "checkId": "BM-T5-HASH.THROUGHPUT",
+          "quantity": "Hash throughput",
+          "unit": "MB/s",
+          "computed": -257.34635377210924,
+          "reference": -50,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BUDGET",
+          "status": "PASS",
+          "note": "measured 257.3 MB/s over a 4 MB payload; budget is at least 50 MB/s. A BigInt-per-byte implementation measures roughly 15 MB/s."
+        }
+      ],
+      "evidence": {
+        "megabytesPerSecond": 257.3,
+        "elapsedMsFor4MB": 15.54,
+        "vectorCount": 518
+      },
+      "error": null
+    },
+    {
+      "caseId": "BM-T5-PIPELINE",
+      "title": "Workbench pipeline meets its interactive-latency budget on a small model",
+      "tier": "T5_PERFORMANCE",
+      "category": "INTERACTION_COST",
+      "kernel": "lfea-workbench",
+      "reference": {
+        "type": "ENGINEERING_REQUIREMENT",
+        "source": "A 450-DOF model is trivially small for FEA. Anything beyond a few seconds on the UI thread is a frozen tab. Budget declared in advance: 6 s for the full evidence chain."
+      },
+      "status": "PASS",
+      "checkCount": 2,
+      "failedCheckCount": 0,
+      "checks": [
+        {
+          "checkId": "BM-T5-PIPELINE.SOLVES",
+          "quantity": "Model reaches a qualified solver result",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "status = QUALIFIED, failedStage = none"
+        },
+        {
+          "checkId": "BM-T5-PIPELINE.WALL_CLOCK",
+          "quantity": "Full pipeline wall clock",
+          "unit": "ms",
+          "computed": 2245.5541190000004,
+          "reference": 6000,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BUDGET",
+          "status": "PASS",
+          "note": "196 Q4 elements, 450 DOF."
+        }
+      ],
+      "evidence": {
+        "elements": 196,
+        "dof": 450,
+        "elapsedMs": 2246,
+        "pipelineStatus": "QUALIFIED",
+        "failedStage": null
+      },
+      "error": null
+    },
+    {
+      "caseId": "BM-T5-CAPACITY-ENVELOPE",
+      "title": "Declared capacity is reachable and preflight predicts the export cost before any work is spent",
+      "tier": "T5_PERFORMANCE",
+      "category": "CAPACITY",
+      "kernel": "lfea-workbench",
+      "reference": {
+        "type": "ENGINEERING_REQUIREMENT",
+        "source": "A declared mesh capacity that the evidence chain cannot deliver is a false statement to the user. Preflight must predict the export cost in O(N+E) so a doomed run is never started."
+      },
+      "status": "PASS",
+      "checkCount": 6,
+      "failedCheckCount": 0,
+      "checks": [
+        {
+          "checkId": "BM-T5-CAPACITY-ENVELOPE.SOLVES",
+          "quantity": "A 900-element model reaches a qualified solve",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "status = QUALIFIED"
+        },
+        {
+          "checkId": "BM-T5-CAPACITY-ENVELOPE.EXPORTS",
+          "quantity": "The same model completes the evidence export",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "export status = QUALIFIED_EXPORT"
+        },
+        {
+          "checkId": "BM-T5-CAPACITY-ENVELOPE.CAPACITY_CONSISTENT",
+          "quantity": "Declared element capacity does not exceed what the evidence chain can deliver",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "declared maximumElements = 2000, effective ceiling from the 64 MB export cap = 2134 elements"
+        },
+        {
+          "checkId": "BM-T5-CAPACITY-ENVELOPE.PREFLIGHT_ACCURACY",
+          "quantity": "Preflight export-size prediction error",
+          "unit": "-",
+          "computed": 0.0005456756193620809,
+          "reference": 0.15,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BUDGET",
+          "status": "PASS",
+          "note": "predicted 28622266 B, actual 28637893 B"
+        },
+        {
+          "checkId": "BM-T5-CAPACITY-ENVELOPE.PREFLIGHT_COST",
+          "quantity": "Preflight wall clock",
+          "unit": "ms",
+          "computed": 0.17466800000056537,
+          "reference": 50,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BUDGET",
+          "status": "PASS",
+          "note": "Preflight must be cheap enough to run on every package change."
+        },
+        {
+          "checkId": "BM-T5-CAPACITY-ENVELOPE.PREFLIGHT_STATUS",
+          "quantity": "Preflight status agrees with the outcome actually observed",
+          "unit": null,
+          "computed": 1,
+          "reference": 1,
+          "absoluteError": 0,
+          "relativeError": 0,
+          "tolerance": 0,
+          "toleranceType": "BOOLEAN",
+          "status": "PASS",
+          "note": "preflight said WITHIN_CAPACITY; export succeeded"
+        }
+      ],
+      "evidence": {
+        "elements": 900,
+        "declaredMaximumElements": 2000,
+        "effectiveElementCeiling": 2134,
+        "predictedExportBytes": 28622266,
+        "actualExportBytes": 28637893,
+        "predictionErrorFraction": 0.0005456756193620809,
+        "preflightMs": 0.17,
+        "preflightStatus": "WITHIN_CAPACITY",
+        "pipelineStatus": "QUALIFIED",
+        "failedStage": null
+      },
+      "error": null
+    }
+  ],
+  "semanticHash": "fnv1a64:e62265d703d9fbf6",
+  "timings": [
+    {
+      "caseId": "BM-T1-PATCH-Q4-REGULAR",
+      "elapsedMs": 26.906
+    },
+    {
+      "caseId": "BM-T1-PATCH-Q4-DISTORTED",
+      "elapsedMs": 11.186
+    },
+    {
+      "caseId": "BM-T1-PATCH-T3-REGULAR",
+      "elapsedMs": 5.209
+    },
+    {
+      "caseId": "BM-T1-PATCH-T3-DISTORTED",
+      "elapsedMs": 3.056
+    },
+    {
+      "caseId": "BM-T1-PATCH-Q4-PLANE-STRAIN",
+      "elapsedMs": 8.05
+    },
+    {
+      "caseId": "BM-T1-UNIAXIAL-Q4",
+      "elapsedMs": 13.632
+    },
+    {
+      "caseId": "BM-T1-PLANE-STRAIN-SIGMAZ",
+      "elapsedMs": 10.966
+    },
+    {
+      "caseId": "BM-T1-LAME-REFINEMENT",
+      "elapsedMs": 1170.124
+    },
+    {
+      "caseId": "BM-T2-CANTILEVER-Q4",
+      "elapsedMs": 539.628
+    },
+    {
+      "caseId": "BM-T3-RIGID-TRANSLATION",
+      "elapsedMs": 7.797
+    },
+    {
+      "caseId": "BM-T3-BACKEND-EQUIVALENCE",
+      "elapsedMs": 33.023
+    },
+    {
+      "caseId": "BM-T3-DETERMINISM",
+      "elapsedMs": 13.041
+    },
+    {
+      "caseId": "BM-T3-SPARSE-SCALING",
+      "elapsedMs": 2672.084
+    },
+    {
+      "caseId": "BM-T3-TOLERANCE-COUPLING",
+      "elapsedMs": 53.582
+    },
+    {
+      "caseId": "BM-P1-DISPLAYED-VON-MISES",
+      "elapsedMs": 193.626
+    },
+    {
+      "caseId": "BM-P2-GEOMETRY-STATE",
+      "elapsedMs": 44.122
+    },
+    {
+      "caseId": "BM-P3-FIELD-METADATA",
+      "elapsedMs": 44.741
+    },
+    {
+      "caseId": "BM-P4-QUANTITY-DISAMBIGUATION",
+      "elapsedMs": 40.774
+    },
+    {
+      "caseId": "BM-T5-HASH",
+      "elapsedMs": 54.097
+    },
+    {
+      "caseId": "BM-T5-PIPELINE",
+      "elapsedMs": 2248.476
+    },
+    {
+      "caseId": "BM-T5-CAPACITY-ENVELOPE",
+      "elapsedMs": 16231.723
+    }
+  ]
+}
