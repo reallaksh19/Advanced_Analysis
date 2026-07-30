@@ -188,6 +188,31 @@ export function transformLoadToGlobal(local, transformation) {
 }
 
 /**
+ * The plain forward B-2.0 identity `d_local = T d_global`, applied directly
+ * rather than through its transpose. `transformStiffnessToGlobal`/
+ * `transformLoadToGlobal` above only ever needed the transpose direction
+ * (local matrices/vectors pushed out to the global/joint frame); recovering a
+ * solved global displacement back into local element components (LFEA-B3.4)
+ * needs the plain forward map this identity already names, so it is added
+ * here rather than re-derived downstream. `transformation` is used exactly as
+ * supplied — the same function serves the axis rotation and, when rigid
+ * offsets are present, the offset kinematic map `H`, since both are 12x12
+ * matrices under the identical `d_local = M d_global` shape.
+ */
+export function transformDisplacementToLocal(globalVector, transformation) {
+  const size = ELEMENT_DOF_COUNT;
+  const local = new Array(size).fill(0);
+  for (let row = 0; row < size; row += 1) {
+    let sum = 0;
+    for (let column = 0; column < size; column += 1) {
+      sum += transformation[index(row, column)] * globalVector[column];
+    }
+    local[row] = sum;
+  }
+  return cleanVector(local);
+}
+
+/**
  * Rigid end-offset kinematics (section 5.3). For an offset vector `r` from the
  * joint to the element end, `u_end = u_joint + theta x r`, so the 6x6 block is
  * `[[I, -skew(r)], [0, I]]` and forces map by the transpose:

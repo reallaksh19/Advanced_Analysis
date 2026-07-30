@@ -31,12 +31,14 @@ export {
   frameOffsetMatrix,
   frameTransformationMatrix,
   shearFlexibility,
+  transformDisplacementToLocal,
   transformLoadToGlobal,
   transformStiffnessToGlobal,
 } from './frame-element-stiffness.js';
 
 export {
   distributedLoadLocalVector,
+  localDistributedLoadIntensity,
   thermalInitialStrainVector,
 } from './frame-element-loads.js';
 
