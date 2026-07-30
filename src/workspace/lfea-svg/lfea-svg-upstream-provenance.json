@@ -1,0 +1,24 @@
+{
+  "schema": "lfea-svg-upstream-provenance/v1",
+  "upstreamRepository": "reallaksh19/XML_Compare_Utilities",
+  "upstreamCommit": "126df8acc370d22540cb129dce789ea04773ebaf",
+  "sourceFiles": [
+    {
+      "path": "core/engineering-svg/engineering-svg-adapter.js",
+      "blobSha": "3f912463ffbb88ff3c022a5ba2a82a8eb9bd966a",
+      "usage": "PORTED_AND_HARDENED"
+    },
+    {
+      "path": "core/engineering-svg/engineering-svg-command-gateway.js",
+      "blobSha": "133e852d38059a4d671f40bab1a334cf9b614478",
+      "usage": "PORTED_AND_HARDENED"
+    },
+    {
+      "path": "tabs/topology-trace-validator/topology-svg-editor-overlay.js",
+      "blobSha": "9cbf0a9575ec251fca98bc466757f0a7858991e8",
+      "usage": "MATH_PATTERN_REFERENCE"
+    }
+  ],
+  "targetRepository": "reallaksh19/Advanced_Analysis",
+  "targetBase": "ea33e6aacc6a3328b648468dbd6a534bc9a4c867"
+}

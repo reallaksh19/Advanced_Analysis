@@ -1,0 +1,895 @@
+diff --git a/src/core/element-fea/solver.js b/src/core/element-fea/solver.js
+index 5a5c3b5..45867b8 100644
+--- a/src/core/element-fea/solver.js
++++ b/src/core/element-fea/solver.js
+@@ -22,6 +22,10 @@ function solveQualifiedModel(model, loadCase) {
+   const sparse = profileLinearBackend(model.solverProfile) === LINEAR_BACKENDS.SPARSE_PCG_V1;
+   const system = sparse ? assembleSparseContinuumSystem(model, loadCase) : assembleContinuumSystem(model, loadCase);
+   const partition = sparse ? partitionSparseSystem(system, model) : partitionSystem(system, model);
++  if (sparse) {
++    const coupling = toleranceCouplingFailure(model, system, partition);
++    if (coupling) return coupling;
++  }
+   const backend = solveLinearSystem(partition, model.solverProfile);
+   if (!backend.ok) return failedBackendResult(model, system, backend);
+   const displacement = reconstructDisplacement(system.dofMap.length, partition, backend.solution);
+@@ -30,6 +34,59 @@ function solveQualifiedModel(model, loadCase) {
+   return failure || qualifiedResult(model, loadCase, recovery);
+ }
+ 
++/**
++ * Reject a solver profile whose iterative residual target cannot satisfy its own
++ * acceptance gate.
++ *
++ * `absoluteResidualTolerance` / `relativeResidualTolerance` (what the iterative
++ * backend stops at) and `tolerances.residualForce*` (what the solver accepts)
++ * are independent fields of lfea-profile/v2. Nothing previously required the
++ * first to be tight enough for the second, so a profile could be written in
++ * which no solve can ever qualify, and the resulting FREE_RESIDUAL_FAILURE gave
++ * the user no indication that their PROFILE was the cause.
++ *
++ * PCG guarantees ||r||_2 <= target and ||r||_inf <= ||r||_2, so target <= limit
++ * is sufficient for the gate. target > limit is therefore reported here, before
++ * any iteration is spent.
++ */
++function toleranceCouplingFailure(model, system, partition) {
++  const profile = model.solverProfile;
++  const tolerances = profile.tolerances;
++  const loadScale = Math.max(1, vectorNormInfinity(system.appliedLoad));
++  const acceptanceLimit = tolerances.residualForceAbsolute + tolerances.residualForceRelative * loadScale;
++  const freeLoadNorm = Math.sqrt(partition.effectiveFreeLoad.reduce((sum, value) => sum + value * value, 0));
++  const iterativeTarget = Math.max(
++    profile.absoluteResidualTolerance,
++    profile.relativeResidualTolerance * freeLoadNorm,
++  );
++  if (iterativeTarget <= acceptanceLimit) return null;
++  const message = 'Unsatisfiable solver profile: the iterative residual target '
++    + `(${iterativeTarget.toExponential(3)}) exceeds the acceptance gate `
++    + `(${acceptanceLimit.toExponential(3)}), so no solve of this model can ever qualify. `
++    + 'Tighten solverProfile.absoluteResidualTolerance / relativeResidualTolerance, '
++    + 'or relax solverProfile.tolerances.residualForceAbsolute / residualForceRelative, '
++    + 'so that the target is at or below the gate. This is a profile configuration error, '
++    + 'not a numerical failure of the model.';
++  return rejectedResult(
++    model,
++    RESULT_STATUS.REJECTED_INVALID,
++    [diagnostic('UNSATISFIABLE_SOLVER_PROFILE_TOLERANCES', message)],
++    model.limitations,
++    {
++      toleranceCouplingEvidence: {
++        iterativeTarget,
++        acceptanceLimit,
++        absoluteResidualTolerance: profile.absoluteResidualTolerance,
++        relativeResidualTolerance: profile.relativeResidualTolerance,
++        residualForceAbsolute: tolerances.residualForceAbsolute,
++        residualForceRelative: tolerances.residualForceRelative,
++        appliedLoadInfinityNorm: loadScale,
++        effectiveFreeLoadL2Norm: freeLoadNorm,
++      },
++    },
++  );
++}
++
+ function rejectedException(model, error) {
+   const resource = error instanceof RangeError; const status = resource ? RESULT_STATUS.REJECTED_INVALID : RESULT_STATUS.QUARANTINED_NUMERICAL;
+   const code = resource ? 'RESOURCE_QUALIFICATION_FAILED' : 'SOLVER_FAILURE'; const trace = error?.capacityEvidence ? { capacityEvidence: error.capacityEvidence } : {};
+diff --git a/src/core/shared-piping-model/canonical-json.js b/src/core/shared-piping-model/canonical-json.js
+index cc0f200..99d850a 100644
+--- a/src/core/shared-piping-model/canonical-json.js
++++ b/src/core/shared-piping-model/canonical-json.js
+@@ -1,8 +1,9 @@
+ import { isPlainRecord } from './immutable.js';
+ 
+-const FNV_OFFSET = 0xcbf29ce484222325n;
+-const FNV_PRIME = 0x100000001b3n;
+-const UINT64_MASK = 0xffffffffffffffffn;
++// FNV-1a 64-bit multiplier 0x100000001b3, split into 32-bit halves so the hash
++// can be computed without BigInt. See hashBytes() for the derivation.
++const FNV_PRIME_LOW = 0x000001b3;
++const FNV_PRIME_HIGH = 0x00000100;
+ 
+ export function canonicalizeJson(value) {
+   return canonicalize(value, new Set(), '$');
+@@ -24,10 +25,50 @@ export function hashUtf8(value) {
+   return hashBytes(new TextEncoder().encode(String(value)));
+ }
+ 
++/**
++ * FNV-1a 64-bit, computed as two uint32 halves.
++ *
++ * Bit-identical to the previous BigInt implementation. Proven by benchmark case
++ * BM-T5-HASH, which retains the BigInt reference permanently and compares them
++ * on fixed vectors plus 500 seeded pseudo-random inputs. Every committed
++ * evidence bundle depends on this value, so the equality is not optional.
++ *
++ * Derivation. The multiplier is
++ *
++ *     0x100000001b3 = (FNV_PRIME_HIGH << 32) | FNV_PRIME_LOW
++ *                   = (0x100 << 32) | 0x1b3
++ *
++ * so for a 64-bit accumulator (hi, lo) the product modulo 2^64 is
++ *
++ *     lo' = lo * PL                        (mod 2^32)
++ *     hi' = hi * PL + lo * PH + carry      (mod 2^32)
++ *
++ * where `carry` is the overflow out of bit 31 of `lo * PL`. The terms
++ * hi * 2^32 * PH and above fall entirely outside 64 bits and are discarded,
++ * which is exactly what the BigInt mask did.
++ *
++ * `lo * PL` is split into 16-bit halves so that each partial product stays
++ * below 2^32 and is therefore exact in float64 (which is exact to 2^53).
++ * `Math.imul` is used for the `hi` terms, where only the low 32 bits are kept.
++ *
++ * @param {Uint8Array|Array<number>} bytes Input bytes.
++ * @returns {string} `fnv1a64:` followed by 16 lowercase hex digits.
++ */
+ export function hashBytes(bytes) {
+-  let hash = FNV_OFFSET;
+-  for (const byte of bytes) hash = ((hash ^ BigInt(byte)) * FNV_PRIME) & UINT64_MASK;
+-  return `fnv1a64:${hash.toString(16).padStart(16, '0')}`;
++  let hi = 0xcbf29ce4 >>> 0;
++  let lo = 0x84222325 >>> 0;
++  for (let index = 0; index < bytes.length; index += 1) {
++    lo = (lo ^ bytes[index]) >>> 0;
++    const low16 = lo & 0xffff;
++    const high16 = lo >>> 16;
++    const partialLow = low16 * FNV_PRIME_LOW;
++    const partialHigh = high16 * FNV_PRIME_LOW + (partialLow >>> 16);
++    const nextLo = (((partialHigh & 0xffff) << 16) | (partialLow & 0xffff)) >>> 0;
++    const carry = Math.floor(partialHigh / 0x10000);
++    hi = (Math.imul(hi, FNV_PRIME_LOW) + Math.imul(lo, FNV_PRIME_HIGH) + carry) >>> 0;
++    lo = nextLo;
++  }
++  return `fnv1a64:${hi.toString(16).padStart(8, '0')}${lo.toString(16).padStart(8, '0')}`;
+ }
+ 
+ export function utf8ByteLength(value) {
+diff --git a/src/workspace/lafea-workbench-controller.js b/src/workspace/lafea-workbench-controller.js
+index 8203caf..ee8bc8a 100644
+--- a/src/workspace/lafea-workbench-controller.js
++++ b/src/workspace/lafea-workbench-controller.js
+@@ -6,6 +6,7 @@
+  */
+ import { createLafeaWorkbenchStore } from './lafea-workbench-store.js';
+ import { LAFEA_WORKBENCH_STYLES } from './lafea-workbench-styles.js';
++import { FEA_BENCHMARK_STYLES, FeaBenchmarkPanel } from './fea-benchmark-panel.js';
+ import { LafeaWorkbenchView } from './lafea-workbench-view.js';
+ import { createLafeaMockDocument } from './advanced-mock-data.js';
+ 
+@@ -19,6 +20,10 @@ export class LafeaWorkbenchController {
+     this.documentRef = rootElement?.ownerDocument ?? globalThis.document;
+     this.store = createLafeaWorkbenchStore(options);
+     this.view = new LafeaWorkbenchView(rootElement);
++    this.benchmarkHost = this.documentRef.createElement('div');
++    this.benchmarkHost.dataset.role = 'lafea-benchmark-host';
++    this.benchmarkPanel = new FeaBenchmarkPanel(this.benchmarkHost, { surface: 'LAFEA' });
++    this.view.setBenchmarkHost(this.benchmarkHost);
+     this.unsubscribe = null;
+   }
+ 
+@@ -38,12 +43,30 @@ export class LafeaWorkbenchController {
+       onUpdateRecord: (path, index, text) => this.updateRecordText(path, index, text),
+       onDeleteRecord: (path, index) => this.store.deleteRecord(path, index),
+       onMoveNode: (path, nodeId, x, y) => this.store.moveNode(path, nodeId, x, y),
++      onBenchmark: () => this.runBenchmark(),
+     });
++    this.benchmarkPanel.render();
+     this.unsubscribe = this.store.subscribe((state) => this.view.render(state));
+     this.view.render(this.store.getState());
+     return this;
+   }
+ 
++  /**
++   * Run the FEA verification suite against the live code paths.
++   *
++   * @returns {Promise<Record<string, unknown>>} Benchmark report.
++   */
++  runBenchmark() {
++    return this.benchmarkPanel.run();
++  }
++
++  /**
++   * @returns {Record<string, unknown>|null} Last benchmark report, if any.
++   */
++  getBenchmarkReport() {
++    return this.benchmarkPanel.getReport();
++  }
++
+   async loadFile(file) {
+     if (!file) return this.getState();
+     try {
+@@ -119,6 +142,7 @@ export class LafeaWorkbenchController {
+   }
+ 
+   destroy() {
++    this.benchmarkPanel.destroy();
+     this.unsubscribe?.();
+     this.unsubscribe = null;
+     this.store.destroy();
+@@ -131,7 +155,7 @@ function installStyles(documentRef) {
+   if (!documentRef || documentRef.querySelector('[data-lafea-workbench-styles]')) return;
+   const style = documentRef.createElement('style');
+   style.dataset.lafeaWorkbenchStyles = 'true';
+-  style.textContent = LAFEA_WORKBENCH_STYLES;
++  style.textContent = `${LAFEA_WORKBENCH_STYLES}\n${FEA_BENCHMARK_STYLES}`;
+   documentRef.head?.append(style);
+ }
+ 
+diff --git a/src/workspace/lafea-workbench-styles.js b/src/workspace/lafea-workbench-styles.js
+index 2baad31..934ee01 100644
+--- a/src/workspace/lafea-workbench-styles.js
++++ b/src/workspace/lafea-workbench-styles.js
+@@ -16,6 +16,7 @@ export function lafeaWorkbenchStyles() {
+ .lafea-workbench__table{max-height:230px;overflow:auto}.lafea-workbench table{width:100%;border-collapse:collapse;font-size:12px}.lafea-workbench th,.lafea-workbench td{padding:6px;border:1px solid #334155;text-align:left;vertical-align:top}.lafea-workbench tr[data-selected="true"]{outline:2px solid #fbbf24;outline-offset:-2px}
+ .lafea-workbench pre{max-height:430px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}.lafea-workbench__authority{padding:8px;border-left:4px solid #f59e0b;background:#1e293b;font-weight:700}
+ @media(max-width:1000px){.lafea-workbench__grid{grid-template-columns:1fr}}@media(max-width:640px){.lafea-workbench__header{display:grid}}
++.lafea-workbench__benchmark{grid-column:1/-1}
+ `;
+ }
+ 
+diff --git a/src/workspace/lafea-workbench-view.js b/src/workspace/lafea-workbench-view.js
+index 8f4ee2a..520652c 100644
+--- a/src/workspace/lafea-workbench-view.js
++++ b/src/workspace/lafea-workbench-view.js
+@@ -20,6 +20,18 @@ export class LafeaWorkbenchView {
+     this.handlers = null;
+     this.collectionPath = null;
+     this.selectedIndex = -1;
++    // Persistent host so a completed benchmark report survives stage switches.
++    this.benchmarkHost = null;
++  }
++
++  /**
++   * Attach the persistent benchmark host element.
++   *
++   * @param {Element} hostElement Host owned by the controller.
++   * @returns {void}
++   */
++  setBenchmarkHost(hostElement) {
++    this.benchmarkHost = hostElement;
+   }
+ 
+   /**
+@@ -103,9 +115,12 @@ export class LafeaWorkbenchView {
+     exportButton.disabled = !stage.document;
+     const undo = actionButton(this.rootElement, 'Undo', this.handlers.onUndo);
+     undo.disabled = !stage.past.length;
++    const benchmark = actionButton(this.rootElement, 'Run Benchmark', this.handlers.onBenchmark);
++    benchmark.dataset.role = 'lafea-benchmark';
++    benchmark.title = 'Run the FEA verification suite: closed-form, convergence, invariant and capacity cases.';
+     const redo = actionButton(this.rootElement, 'Redo', this.handlers.onRedo);
+     redo.disabled = !stage.future.length;
+-    toolbar.append(mock, file, run, exportButton, undo, redo);
++    toolbar.append(mock, file, run, benchmark, exportButton, undo, redo);
+     return toolbar;
+   }
+ 
+@@ -124,6 +139,11 @@ export class LafeaWorkbenchView {
+     const evidenceCard = card(this.rootElement, 'Results and diagnostics');
+     evidenceCard.body.append(this.evidence(state, stage.execution));
+     grid.append(modelCard.section, collectionsCard.section, previewCard.section, evidenceCard.section);
++    if (this.benchmarkHost) {
++      const benchmarkCard = element(this.rootElement, 'div', 'lafea-workbench__benchmark');
++      benchmarkCard.append(this.benchmarkHost);
++      grid.append(benchmarkCard);
++    }
+     return grid;
+   }
+ 
+diff --git a/src/workspace/lfea-workbench-controller.js b/src/workspace/lfea-workbench-controller.js
+index 0fa1358..cbd4ede 100644
+--- a/src/workspace/lfea-workbench-controller.js
++++ b/src/workspace/lfea-workbench-controller.js
+@@ -8,6 +8,7 @@ import { createLfeaWorkbenchStore } from './lfea-workbench-store.js';
+ import { LFEA_WORKBENCH_STYLES } from './lfea-workbench-styles.js';
+ import { LfeaWorkbenchView } from './lfea-workbench-view.js';
+ import { createLfeaMockPackage } from './advanced-mock-data.js';
++import { FEA_BENCHMARK_STYLES, FeaBenchmarkPanel } from './fea-benchmark-panel.js';
+ 
+ export class LfeaWorkbenchController {
+   /**
+@@ -19,6 +20,10 @@ export class LfeaWorkbenchController {
+     this.documentRef = rootElement?.ownerDocument ?? globalThis.document;
+     this.store = createLfeaWorkbenchStore(options);
+     this.view = new LfeaWorkbenchView(rootElement);
++    this.benchmarkHost = this.documentRef.createElement('div');
++    this.benchmarkHost.dataset.role = 'lfea-benchmark-host';
++    this.benchmarkPanel = new FeaBenchmarkPanel(this.benchmarkHost, { surface: 'LFEA' });
++    this.view.setBenchmarkHost(this.benchmarkHost);
+     this.unsubscribe = null;
+   }
+ 
+@@ -39,7 +44,9 @@ export class LfeaWorkbenchController {
+       onUpdateRecord: (path, index, text) => this.updateRecordText(path, index, text),
+       onDeleteRecord: (path, index) => this.store.deleteRecord(path, index),
+       onMoveNode: (nodeId, x, y) => this.store.moveNode(nodeId, x, y),
++      onBenchmark: () => this.runBenchmark(),
+     });
++    this.benchmarkPanel.render();
+     this.unsubscribe = this.store.subscribe((state) => this.view.render(state));
+     this.view.render(this.store.getState());
+     return this;
+@@ -108,6 +115,22 @@ export class LfeaWorkbenchController {
+     return this.store.run();
+   }
+ 
++  /**
++   * Run the FEA verification suite against the live code paths.
++   *
++   * @returns {Promise<Record<string, unknown>>} Benchmark report.
++   */
++  runBenchmark() {
++    return this.benchmarkPanel.run();
++  }
++
++  /**
++   * @returns {Record<string, unknown>|null} Last benchmark report, if any.
++   */
++  getBenchmarkReport() {
++    return this.benchmarkPanel.getReport();
++  }
++
+   undo() {
+     return this.store.undo();
+   }
+@@ -133,6 +156,7 @@ export class LfeaWorkbenchController {
+   }
+ 
+   destroy() {
++    this.benchmarkPanel.destroy();
+     this.unsubscribe?.();
+     this.unsubscribe = null;
+     this.store.destroy();
+@@ -145,7 +169,7 @@ function installStyles(documentRef) {
+   if (!documentRef || documentRef.querySelector('[data-lfea-workbench-styles]')) return;
+   const style = documentRef.createElement('style');
+   style.dataset.lfeaWorkbenchStyles = 'true';
+-  style.textContent = LFEA_WORKBENCH_STYLES;
++  style.textContent = `${LFEA_WORKBENCH_STYLES}\n${FEA_BENCHMARK_STYLES}`;
+   documentRef.head?.append(style);
+ }
+ 
+diff --git a/src/workspace/lfea-workbench-model.js b/src/workspace/lfea-workbench-model.js
+index 9ee61e0..44cbfc8 100644
+--- a/src/workspace/lfea-workbench-model.js
++++ b/src/workspace/lfea-workbench-model.js
+@@ -6,6 +6,10 @@
+  */
+ import { validateMeshPackage } from '../core/element-fea/index.js';
+ import { semanticHash } from '../core/shared-piping-model/canonical-json.js';
++import { FIELD_IDS, REDUCTIONS, selectElementField, selectProjectedField } from './lfea-field-adapter.js';
++import {
++  GEOMETRY_STATES, createGeometryOnlyDescriptor, createPlotDescriptor,
++} from './lfea-plot-descriptor.js';
+ 
+ export const LFEA_WORKBENCH_DOCUMENT_SCHEMA = 'lfea-workbench-document/v1';
+ export const LFEA_RESULT_MODES = Object.freeze(['MODEL', 'DEFORMED', 'RAW_STRESS', 'PROJECTED_STRESS']);
+@@ -57,38 +61,110 @@ export function resealLfeaMeshPackage(input) {
+ /**
+  * Derive display geometry for model, displacement, and stress modes.
+  *
++ * Geometry state is now an EXPLICIT, orthogonal option. It is never implied by
++ * the result mode: a stress plot is drawn on undeformed source coordinates
++ * unless the caller asks for deformation and supplies a scale.
++ *
++ * Field values are SELECTED from kernel evidence through lfea-field-adapter.
++ * No physical quantity is computed in this module.
++ *
+  * @param {unknown} packageInput Current mesh package.
+  * @param {unknown} execution Workbench execution or null.
+  * @param {string} mode Result display mode.
+- * @returns {Readonly<Record<string, unknown>>} SVG-ready geometry and authority.
++ * @param {{deformation?:{enabled:boolean,scale:number}, ipReduction?:string, fieldId?:string}} options Explicit display options.
++ * @returns {Readonly<Record<string, unknown>>} SVG-ready geometry and plot descriptor.
+  */
+-export function lfeaDisplayGeometry(packageInput, execution, mode) {
++export function lfeaDisplayGeometry(packageInput, execution, mode, options = {}) {
+   if (!LFEA_RESULT_MODES.includes(mode)) throw new TypeError(`Unsupported LFEA result mode: ${mode}.`);
+   const packageValue = isRecord(packageInput) ? packageInput : {};
+   const nodes = Array.isArray(packageValue.nodes) ? packageValue.nodes : [];
+   const elements = Array.isArray(packageValue.elements) ? packageValue.elements : [];
+-  const displacement = displacementMap(execution?.result);
+-  const scale = execution?.review?.geometryReview?.deformationScale ?? 10;
++
++  const deformation = resolveDeformation(mode, options.deformation);
++  const displacement = deformation.enabled ? displacementMap(execution?.result) : new Map();
+   const displayNodes = nodes.map((node) => {
++    if (!deformation.enabled) {
++      return { nodeId: node.nodeId, sourceX: node.x, sourceY: node.y, x: node.x, y: node.y };
++    }
+     const row = displacement.get(node.nodeId) ?? { UX: 0, UY: 0 };
+-    const deformed = mode === 'MODEL' ? { x: node.x, y: node.y } : {
+-      x: node.x + scale * row.UX,
+-      y: node.y + scale * row.UY,
++    return {
++      nodeId: node.nodeId, sourceX: node.x, sourceY: node.y,
++      x: node.x + deformation.scale * row.UX,
++      y: node.y + deformation.scale * row.UY,
+     };
+-    return { nodeId: node.nodeId, sourceX: node.x, sourceY: node.y, ...deformed };
+   });
++
++  const field = resolveField(packageValue, execution, mode, options);
++  const descriptor = field
++    ? createPlotDescriptor({
++      field,
++      geometryState: deformation.enabled ? GEOMETRY_STATES.DEFORMED : GEOMETRY_STATES.UNDEFORMED,
++      deformationScale: deformation.enabled ? deformation.scale : 0,
++      authority: field.authority,
++      unitsIdentity: packageValue.unitsIdentity ?? null,
++    })
++    : createGeometryOnlyDescriptor({ unitsIdentity: packageValue.unitsIdentity ?? null });
++
+   return freeze({
+     mode,
+     nodes: displayNodes,
+-    elements: elements.map((row) => ({ elementId: row.elementId, nodeIds: [...row.nodeIds], elementType: row.elementType })),
+-    values: stressValues(execution, mode, elements),
+-    authority: displayAuthority(execution, mode),
++    elements: elements.map((row) => ({
++      elementId: row.elementId, nodeIds: [...row.nodeIds], elementType: row.elementType,
++    })),
++    values: field ? { ...field.byElement } : {},
++    field: field ?? null,
++    plot: descriptor,
++    geometryState: descriptor.geometryState,
++    deformationScale: descriptor.deformationScale,
++    caption: descriptor.caption,
++    authority: displayAuthority(execution, mode, field),
+   });
+ }
+ 
+-function displayAuthority(execution, mode) {
+-  if (mode === 'RAW_STRESS') return execution?.authorityPolicy?.rawStress ?? 'NO_QUALIFIED_RESULT';
+-  if (mode === 'PROJECTED_STRESS') return execution?.authorityPolicy?.projectedStress ?? 'NOT_GENERATED';
++/**
++ * Deformation is opt-in. DEFORMED mode implies it; every other mode requires
++ * an explicit request. There is no implicit default scale anywhere.
++ *
++ * @param {string} mode Result display mode.
++ * @param {{enabled?:boolean,scale?:number}|undefined} requested Caller request.
++ * @returns {{enabled:boolean,scale:number}} Resolved deformation state.
++ */
++function resolveDeformation(mode, requested) {
++  const wants = mode === 'DEFORMED' || Boolean(requested?.enabled);
++  if (!wants) return { enabled: false, scale: 0 };
++  const scale = requested?.scale;
++  if (!(Number.isFinite(scale) && scale > 0)) {
++    throw new TypeError('Deformed display requires an explicit positive deformation scale.');
++  }
++  return { enabled: true, scale };
++}
++
++function resolveField(packageValue, execution, mode, options) {
++  const result = execution?.result;
++  if (!result || result.status !== 'QUALIFIED') return null;
++  const unit = packageValue?.analysisDefinition?.solverProfile?.units?.stress;
++  if (typeof unit !== 'string' || !unit.trim()) {
++    throw new TypeError('The solver profile must declare a stress unit before a field can be displayed.');
++  }
++  const reduction = options.ipReduction ?? REDUCTIONS.Q4_MAX_OVER_IP;
++  if (mode === 'RAW_STRESS') {
++    return selectElementField(result, options.fieldId ?? FIELD_IDS.VON_MISES, unit, reduction);
++  }
++  if (mode === 'PROJECTED_STRESS') {
++    if (!execution.stressProjection) return null;
++    return selectProjectedField(
++      execution.stressProjection,
++      packageValue.elements ?? [],
++      options.fieldId ?? FIELD_IDS.PROJECTED_SX,
++      unit,
++    );
++  }
++  return null;
++}
++
++function displayAuthority(execution, mode, field) {
++  if (mode === 'RAW_STRESS') return field?.authority ?? 'NO_QUALIFIED_RESULT';
++  if (mode === 'PROJECTED_STRESS') return field?.authority ?? 'NOT_GENERATED';
+   if (mode === 'DEFORMED') return 'SCALED_DEFORMATION_REVIEW_GEOMETRY';
+   return 'SOURCE_MESH_GEOMETRY';
+ }
+@@ -103,33 +179,6 @@ function displacementMap(result) {
+   return map;
+ }
+ 
+-function stressValues(execution, mode, elements) {
+-  if (mode === 'RAW_STRESS') return rawStressValues(execution?.result);
+-  if (mode !== 'PROJECTED_STRESS') return {};
+-  const rows = execution?.stressProjection?.nodalValues ?? [];
+-  const byNode = new Map(rows.filter((row) => row.stressComponent === 'SX').map((row) => [row.nodeId, row.weightedValue]));
+-  return Object.fromEntries(elements.map((element) => {
+-    const values = element.nodeIds.map((id) => byNode.get(id)).filter(Number.isFinite);
+-    return [element.elementId, values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null];
+-  }));
+-}
+-
+-function rawStressValues(result) {
+-  const values = {};
+-  for (const row of result?.elementStresses ?? []) values[row.elementId] = vonMises(row.values);
+-  for (const row of result?.integrationPointResults ?? []) {
+-    values[row.elementId] = Math.max(values[row.elementId] ?? -Infinity, row.vonMisesStress);
+-  }
+-  return values;
+-}
+-
+-function vonMises(values) {
+-  const [sx, sy, txy] = values ?? [];
+-  return Number.isFinite(sx) && Number.isFinite(sy) && Number.isFinite(txy)
+-    ? Math.sqrt(sx ** 2 - sx * sy + sy ** 2 + 3 * txy ** 2)
+-    : null;
+-}
+-
+ function canonicalOrder(value) {
+   sortBy(value.nodes, 'nodeId');
+   sortBy(value.elements, 'elementId');
+diff --git a/src/workspace/lfea-workbench-pipeline.js b/src/workspace/lfea-workbench-pipeline.js
+index e24e4b6..50c0585 100644
+--- a/src/workspace/lfea-workbench-pipeline.js
++++ b/src/workspace/lfea-workbench-pipeline.js
+@@ -14,6 +14,7 @@ import {
+ } from '../core/element-fea/index.js';
+ import { semanticHash } from '../core/shared-piping-model/canonical-json.js';
+ import { normalizeLfeaMeshPackage } from './lfea-workbench-model.js';
++import { preflightMeshPackage } from './lfea-preflight.js';
+ 
+ /**
+  * Qualified default adapter capacity and geometry tolerances.
+@@ -27,8 +28,13 @@ export function createLfeaWorkbenchAdapterProfile() {
+     coordinateAbsoluteTolerance: 1e-9,
+     areaAbsoluteTolerance: 1e-12,
+     jacobianAbsoluteTolerance: 1e-12,
+-    maximumNodes: 10000,
+-    maximumElements: 10000,
++    // Capacity is declared at a level the FULL evidence chain can actually
++    // deliver. The previous 10 000/10 000 declaration was unreachable by more
++    // than an order of magnitude: the export byte cap rejected models at around
++    // 700 elements. See lfea-preflight.js::effectiveElementCeiling and
++    // benchmark case BM-T5-CAPACITY-ENVELOPE.
++    maximumNodes: 2400,
++    maximumElements: 2000,
+     maximumEdges: 50000,
+     maximumRegions: 1000,
+     maximumBoundaries: 1000,
+@@ -58,8 +64,8 @@ export function createLfeaWorkbenchReviewProfile(includeProjectedStress) {
+     includeProjectedStress,
+     includeConvergenceEvidence: false,
+     includeSourceArtifacts: false,
+-    maximumExportRows: 100000,
+-    maximumExportBytes: 20000000,
++    maximumExportRows: 400000,
++    maximumExportBytes: 67108864,
+   });
+ }
+ 
+@@ -78,24 +84,25 @@ export function executeLfeaWorkbench(packageInput, options) {
+     const includeProjectedStress = configuration.includeProjectedStress ?? true;
+     const reviewProfile = configuration.reviewProfile
+       ?? createLfeaWorkbenchReviewProfile(includeProjectedStress);
++    const preflight = preflightMeshPackage(packageValue, adapterProfile, reviewProfile);
+     const adapterResult = adaptMeshPackage(packageValue, adapterProfile);
+     if (adapterResult.status !== 'ACCEPTED') {
+-      return failure('ADAPTER', adapterResult.diagnostics, { packageValue, adapterResult });
++      return failure('ADAPTER', adapterResult.diagnostics, { packageValue, adapterResult, preflight });
+     }
+     const model = adapterResult.qualifiedModel;
+     const result = solveContinuumModel(model, packageValue.analysisDefinition.loadCase.loadCaseId);
+     if (result.status !== 'QUALIFIED') {
+-      return failure('SOLVER', result.diagnostics, { packageValue, adapterResult, model, result });
++      return failure('SOLVER', result.diagnostics, { packageValue, adapterResult, model, result, preflight });
+     }
+     const stressProjection = includeProjectedStress ? projectStress(model, result) : null;
+     const reviewInput = reviewInputFor(packageValue, adapterResult, model, result, stressProjection);
+     const review = createEngineeringReview(reviewInput, reviewProfile);
+     if (review.status !== 'QUALIFIED_FOR_REVIEW') {
+-      return failure('REVIEW', review.diagnostics, { packageValue, adapterResult, model, result, stressProjection, reviewInput, review });
++      return failure('REVIEW', review.diagnostics, { packageValue, adapterResult, model, result, stressProjection, reviewInput, review, preflight });
+     }
+     const evidenceExport = createEvidenceExport(review, reviewInput, reviewProfile);
+     if (evidenceExport.status !== 'QUALIFIED_EXPORT') {
+-      return failure('EXPORT', evidenceExport.diagnostics, { packageValue, adapterResult, model, result, stressProjection, reviewInput, review, evidenceExport });
++      return failure('EXPORT', evidenceExport.diagnostics, { packageValue, adapterResult, model, result, stressProjection, reviewInput, review, evidenceExport, preflight });
+     }
+     return freeze({
+       schema: 'lfea-workbench-execution/v1',
+@@ -109,6 +116,7 @@ export function executeLfeaWorkbench(packageInput, options) {
+       reviewInput,
+       review,
+       evidenceExport,
++      preflight,
+       authorityPolicy: authorityPolicy(stressProjection),
+       diagnostics: combinedDiagnostics(adapterResult, result, review),
+     });
+@@ -158,6 +166,7 @@ function failure(failedStage, diagnostics, evidence) {
+     reviewInput: evidence.reviewInput ?? null,
+     review: evidence.review ?? null,
+     evidenceExport: evidence.evidenceExport ?? null,
++    preflight: evidence.preflight ?? null,
+     authorityPolicy: authorityPolicy(null),
+     diagnostics: normalizedDiagnostics(diagnostics),
+   });
+diff --git a/src/workspace/lfea-workbench-styles.js b/src/workspace/lfea-workbench-styles.js
+index c003868..6b2cc45 100644
+--- a/src/workspace/lfea-workbench-styles.js
++++ b/src/workspace/lfea-workbench-styles.js
+@@ -11,9 +11,9 @@ export function lfeaWorkbenchStyles() {
+ .lfea-workbench__toolbar,.lfea-workbench__record-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.lfea-workbench button,.lfea-workbench select,.lfea-workbench input{border:1px solid #334155;border-radius:5px;padding:8px;background:#0b1628;color:inherit}.lfea-workbench button:disabled{opacity:.45}
+ .lfea-workbench__grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}.lfea-workbench__card{min-width:0;padding:14px;border:1px solid var(--workspace-border,#334155);border-radius:8px;background:var(--workspace-panel,#101b2e)}.lfea-workbench__card h2{margin:0 0 10px;font-size:15px}.lfea-workbench__card h3{font-size:13px}
+ .lfea-workbench textarea{box-sizing:border-box;width:100%;min-height:220px;padding:10px;border:1px solid #334155;border-radius:5px;background:#050b14;color:#dbeafe;font:12px/1.5 ui-monospace,monospace;resize:vertical}.lfea-workbench__editor,.lfea-workbench__records,.lfea-workbench__results{display:grid;gap:9px}
+-.lfea-workbench__svg{min-height:360px;border:1px solid #334155;background:#050a12}.lfea-workbench__svg svg{display:block;width:100%;height:auto}.lfea-workbench-svg__element{fill:rgba(59,130,246,.12);stroke:#93c5fd;stroke-width:2}.lfea-workbench-svg__node circle{fill:#f8fafc;stroke:#0f172a;stroke-width:2}.lfea-workbench-svg__node text,.lfea-workbench-svg__legend{fill:#e2e8f0;font-size:12px}.lfea-workbench-svg__load{stroke:#fb7185;stroke-width:5}.lfea-workbench-svg__constraint{fill:#60a5fa}
++.lfea-workbench__svg{min-height:360px;border:1px solid #334155;background:#050a12}.lfea-workbench__svg svg{display:block;width:100%;height:auto}.lfea-workbench-svg__element{fill:rgba(59,130,246,.12);stroke:#93c5fd;stroke-width:2}.lfea-workbench-svg__node circle{fill:#f8fafc;stroke:#0f172a;stroke-width:2}.lfea-workbench-svg__node text,.lfea-workbench-svg__legend{fill:#e2e8f0;font-size:12px}.lfea-workbench-svg__geometry-state{fill:#fbbf24;font-size:12px;font-weight:800}.lfea-workbench-svg__tick{fill:#cbd5e1;font-size:10px;font-family:ui-monospace,monospace}.lfea-workbench-svg__load{stroke:#fb7185;stroke-width:5}.lfea-workbench-svg__constraint{fill:#60a5fa}
+ .lfea-workbench__table{max-height:250px;overflow:auto}.lfea-workbench table{width:100%;border-collapse:collapse;font-size:12px}.lfea-workbench th,.lfea-workbench td{padding:6px;border:1px solid #334155;text-align:left;vertical-align:top;max-width:260px;overflow-wrap:anywhere}.lfea-workbench tr[data-selected="true"]{outline:2px solid #fbbf24;outline-offset:-2px}
+-.lfea-workbench pre{max-height:390px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}.lfea-workbench__authority{padding:8px;border-left:4px solid #f59e0b;background:#1e293b;font-weight:700}
++.lfea-workbench pre{max-height:390px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}.lfea-workbench__authority{padding:8px;border-left:4px solid #f59e0b;background:#1e293b;font-weight:700}\n.lfea-workbench__preflight{padding:8px;border-left:4px solid #38bdf8;background:#12203a;font-size:12px}.lfea-workbench__preflight[data-status=\"EXPORT_LIKELY_TO_EXCEED_BYTE_CAPACITY\"]{border-left-color:#fb923c}.lfea-workbench__preflight[data-status=\"BLOCKED_BY_DECLARED_CAPACITY\"]{border-left-color:#f87171}\n.lfea-workbench__benchmark{grid-column:1/-1}
+ @media(max-width:1000px){.lfea-workbench__grid{grid-template-columns:1fr}}@media(max-width:640px){.lfea-workbench__header{display:grid}}
+ `;
+ }
+diff --git a/src/workspace/lfea-workbench-svg.js b/src/workspace/lfea-workbench-svg.js
+index c81a5db..ef29935 100644
+--- a/src/workspace/lfea-workbench-svg.js
++++ b/src/workspace/lfea-workbench-svg.js
+@@ -4,10 +4,13 @@
+  * Raw stress uses retained solver evidence. Projected stress is colored only as
+  * non-authoritative review data and is always labelled with its authority.
+  */
++import { createLockedColourScale } from './lfea-plot-descriptor.js';
++
+ const SVG_NS = 'http://www.w3.org/2000/svg';
+ const WIDTH = 760;
+-const HEIGHT = 440;
++const HEIGHT = 470;
+ const PADDING = 38;
++const LEGEND_HEIGHT = 34;
+ 
+ /**
+  * Render an LFEA mesh or result field.
+@@ -35,7 +38,13 @@ export function renderLfeaWorkbenchSvg(host, geometry, packageValue, handlers) {
+ 
+ function renderElements(svg, geometry, transform) {
+   const nodeMap = new Map(geometry.nodes.map((node) => [node.nodeId, node]));
+-  const scale = colorScale(Object.values(geometry.values).filter(Number.isFinite));
++  // The colour scale is LOCKED to the descriptor's declared range, not
++  // re-normalised from whatever data happens to be present. A value therefore
++  // keeps its colour across edits and between two runs being compared.
++  const plot = geometry.plot;
++  const scale = Number.isFinite(plot?.min) && Number.isFinite(plot?.max)
++    ? createLockedColourScale(plot.min, plot.max)
++    : () => null;
+   for (const element of geometry.elements) {
+     const nodes = element.nodeIds.map((nodeId) => nodeMap.get(nodeId)).filter(Boolean);
+     if (nodes.length < 3) continue;
+@@ -44,7 +53,16 @@ function renderElements(svg, geometry, transform) {
+     polygon.setAttribute('points', nodes.map((node) => screenPoint(node, transform).join(',')).join(' '));
+     polygon.setAttribute('class', 'lfea-workbench-svg__element');
+     const value = geometry.values[element.elementId];
+-    if (Number.isFinite(value)) polygon.style.fill = scale(value);
++    if (Number.isFinite(value)) {
++      const fill = scale(value);
++      if (fill) polygon.style.fill = fill;
++      polygon.dataset.fieldValue = String(value);
++      polygon.dataset.fieldUnit = plot?.unit ?? '';
++      const title = svg.ownerDocument.createElementNS(SVG_NS, 'title');
++      title.textContent = `${element.elementId} — ${plot?.quantityId ?? 'value'} `
++        + `${value.toPrecision(6)} ${plot?.unit ?? ''} (${plot?.reduction ?? ''})`;
++      polygon.append(title);
++    }
+     svg.append(polygon);
+   }
+ }
+@@ -106,13 +124,102 @@ function renderConstraints(svg, packageValue, nodes, transform) {
+   }
+ }
+ 
++/**
++ * Render the caption, the geometry-state badge and a numeric colour bar.
++ *
++ * A colour ramp without numeric ticks and a unit is not a reviewable
++ * engineering output, so the bar is drawn whenever a field is present.
++ */
+ function renderLegend(svg, geometry) {
+-  const text = svg.ownerDocument.createElementNS(SVG_NS, 'text');
+-  text.setAttribute('x', '14');
+-  text.setAttribute('y', '24');
+-  text.setAttribute('class', 'lfea-workbench-svg__legend');
+-  text.textContent = `${geometry.mode.replaceAll('_', ' ')} — ${geometry.authority}`;
+-  svg.append(text);
++  const documentRef = svg.ownerDocument;
++  const plot = geometry.plot;
++
++  const caption = documentRef.createElementNS(SVG_NS, 'text');
++  caption.setAttribute('x', '14');
++  caption.setAttribute('y', '20');
++  caption.setAttribute('class', 'lfea-workbench-svg__legend');
++  caption.dataset.role = 'lfea-plot-caption';
++  caption.textContent = plot?.caption ?? `${geometry.mode.replaceAll('_', ' ')} — ${geometry.authority}`;
++  svg.append(caption);
++
++  const badge = documentRef.createElementNS(SVG_NS, 'text');
++  badge.setAttribute('x', String(WIDTH - 14));
++  badge.setAttribute('y', '20');
++  badge.setAttribute('text-anchor', 'end');
++  badge.setAttribute('class', 'lfea-workbench-svg__geometry-state');
++  badge.dataset.role = 'lfea-geometry-state';
++  badge.dataset.geometryState = plot?.geometryState ?? 'UNKNOWN';
++  badge.textContent = plot?.deformationScale
++    ? `DEFORMED x${plot.deformationScale}`
++    : 'UNDEFORMED';
++  svg.append(badge);
++
++  if (!plot || !Array.isArray(plot.ticks) || !plot.ticks.length) return;
++  if (plot.ticks.length === 1) {
++    // Degenerate field (a single element, or a perfectly uniform state). A bar
++    // would imply a range that does not exist, so the single value is stated.
++    const uniform = svg.ownerDocument.createElementNS(SVG_NS, 'text');
++    uniform.setAttribute('x', String(WIDTH / 2));
++    uniform.setAttribute('y', String(HEIGHT - LEGEND_HEIGHT + 14));
++    uniform.setAttribute('text-anchor', 'middle');
++    uniform.setAttribute('class', 'lfea-workbench-svg__tick');
++    uniform.dataset.role = 'lfea-uniform-value';
++    uniform.textContent = `${plot.quantityId} uniform at ${formatTick(plot.ticks[0])} ${plot.unit}`;
++    svg.append(uniform);
++    return;
++  }
++  renderColourBar(svg, plot);
++}
++
++function renderColourBar(svg, plot) {
++  const documentRef = svg.ownerDocument;
++  const barLeft = 14;
++  const barWidth = WIDTH - 28;
++  const barTop = HEIGHT - LEGEND_HEIGHT;
++  const scale = createLockedColourScale(plot.min, plot.max);
++  const group = documentRef.createElementNS(SVG_NS, 'g');
++  group.dataset.role = 'lfea-colour-bar';
++
++  const steps = 64;
++  for (let index = 0; index < steps; index += 1) {
++    const ratio = index / (steps - 1);
++    const cell = documentRef.createElementNS(SVG_NS, 'rect');
++    cell.setAttribute('x', String(barLeft + (index * barWidth) / steps));
++    cell.setAttribute('y', String(barTop));
++    cell.setAttribute('width', String(barWidth / steps + 0.6));
++    cell.setAttribute('height', '10');
++    cell.setAttribute('fill', scale(plot.min + ratio * (plot.max - plot.min)));
++    group.append(cell);
++  }
++
++  plot.ticks.forEach((value, index) => {
++    const ratio = index / (plot.ticks.length - 1);
++    const label = documentRef.createElementNS(SVG_NS, 'text');
++    label.setAttribute('x', String(barLeft + ratio * barWidth));
++    label.setAttribute('y', String(barTop + 23));
++    label.setAttribute('text-anchor', index === 0 ? 'start' : index === plot.ticks.length - 1 ? 'end' : 'middle');
++    label.setAttribute('class', 'lfea-workbench-svg__tick');
++    label.textContent = formatTick(value);
++    group.append(label);
++  });
++
++  const unit = documentRef.createElementNS(SVG_NS, 'text');
++  unit.setAttribute('x', String(barLeft + barWidth / 2));
++  unit.setAttribute('y', String(barTop - 4));
++  unit.setAttribute('text-anchor', 'middle');
++  unit.setAttribute('class', 'lfea-workbench-svg__tick');
++  unit.textContent = `${plot.quantityId} [${plot.unit}]`;
++  group.append(unit);
++
++  svg.append(group);
++}
++
++function formatTick(value) {
++  if (!Number.isFinite(value)) return '';
++  const magnitude = Math.abs(value);
++  if (magnitude === 0) return '0';
++  if (magnitude < 1e-2 || magnitude >= 1e5) return value.toExponential(2);
++  return value.toPrecision(4);
+ }
+ 
+ function bindDrag(svg, marker, node, transform, handlers) {
+@@ -144,14 +251,15 @@ function viewportTransform(nodes) {
+   const maximumY = ys.length ? Math.max(...ys) : 1;
+   const spanX = Math.max(maximumX - minimumX, 1e-12);
+   const spanY = Math.max(maximumY - minimumY, 1e-12);
+-  const scale = Math.min((WIDTH - 2 * PADDING) / spanX, (HEIGHT - 2 * PADDING) / spanY);
++  const usableHeight = HEIGHT - LEGEND_HEIGHT - PADDING;
++  const scale = Math.min((WIDTH - 2 * PADDING) / spanX, (usableHeight - PADDING) / spanY);
+   const offsetX = (WIDTH - scale * spanX) / 2;
+-  const offsetY = (HEIGHT - scale * spanY) / 2;
++  const offsetY = (usableHeight - scale * spanY) / 2;
+   return {
+     x: (value) => offsetX + (value - minimumX) * scale,
+-    y: (value) => HEIGHT - offsetY - (value - minimumY) * scale,
++    y: (value) => usableHeight - offsetY - (value - minimumY) * scale,
+     sourceX: (value) => (value - offsetX) / scale + minimumX,
+-    sourceY: (value) => (HEIGHT - offsetY - value) / scale + minimumY,
++    sourceY: (value) => (usableHeight - offsetY - value) / scale + minimumY,
+   };
+ }
+ 
+@@ -165,15 +273,3 @@ function sourcePoint(svg, event, transform) {
+ function screenPoint(node, transform) {
+   return [transform.x(node.x), transform.y(node.y)];
+ }
+-
+-function colorScale(values) {
+-  const minimum = values.length ? Math.min(...values) : 0;
+-  const maximum = values.length ? Math.max(...values) : 1;
+-  const span = Math.max(maximum - minimum, 1e-12);
+-  return (value) => {
+-    const ratio = (value - minimum) / span;
+-    const red = Math.round(40 + ratio * 210);
+-    const blue = Math.round(245 - ratio * 200);
+-    return `rgb(${red},85,${blue})`;
+-  };
+-}
+diff --git a/src/workspace/lfea-workbench-view.js b/src/workspace/lfea-workbench-view.js
+index bf372da..110dfc2 100644
+--- a/src/workspace/lfea-workbench-view.js
++++ b/src/workspace/lfea-workbench-view.js
+@@ -16,6 +16,19 @@ export class LfeaWorkbenchView {
+     this.handlers = null;
+     this.collectionPath = LFEA_COLLECTION_PATHS[0];
+     this.selectedIndex = -1;
++    // Persistent host so the benchmark panel survives workbench re-renders and
++    // does not lose a completed report when the mesh document changes.
++    this.benchmarkHost = null;
++  }
++
++  /**
++   * Attach the persistent benchmark host element.
++   *
++   * @param {Element} hostElement Host owned by the controller.
++   * @returns {void}
++   */
++  setBenchmarkHost(hostElement) {
++    this.benchmarkHost = hostElement;
+   }
+ 
+   init(handlers) {
+@@ -71,6 +84,10 @@ export class LfeaWorkbenchView {
+     undo.disabled = !state.past.length;
+     const redo = actionButton(this.rootElement, 'Redo', this.handlers.onRedo);
+     redo.disabled = !state.future.length;
++    const benchmark = actionButton(this.rootElement, 'Run Benchmark', this.handlers.onBenchmark);
++    benchmark.dataset.role = 'lfea-benchmark';
++    benchmark.title = 'Run the FEA verification suite: closed-form, convergence, invariant, '
++      + 'presentation-fidelity and capacity cases.';
+     const mode = element(this.rootElement, 'select');
+     mode.dataset.role = 'lfea-result-mode';
+     for (const value of LFEA_RESULT_MODES) {
+@@ -81,7 +98,7 @@ export class LfeaWorkbenchView {
+       mode.append(option);
+     }
+     mode.addEventListener('change', () => this.handlers.onResultMode(mode.value));
+-    toolbar.append(mock, file, run, exportDocument, exportEvidence, undo, redo, mode);
++    toolbar.append(mock, file, run, benchmark, exportDocument, exportEvidence, undo, redo, mode);
+     return toolbar;
+   }
+ 
+@@ -99,6 +116,11 @@ export class LfeaWorkbenchView {
+     const resultsCard = card(this.rootElement, 'Qualified results, review and diagnostics');
+     resultsCard.body.append(this.results(state));
+     grid.append(documentCard.section, recordsCard.section, svgCard.section, resultsCard.section);
++    if (this.benchmarkHost) {
++      const benchmarkCard = element(this.rootElement, 'div', 'lfea-workbench__benchmark');
++      benchmarkCard.append(this.benchmarkHost);
++      grid.append(benchmarkCard);
++    }
+     return grid;
+   }
+ 
+@@ -171,6 +193,15 @@ export class LfeaWorkbenchView {
+     }
+     const policy = element(this.rootElement, 'p', 'lfea-workbench__authority', `Raw: ${execution.authorityPolicy.rawStress}. Projected: ${execution.authorityPolicy.projectedStress}.`);
+     wrapper.append(policy);
++    if (execution.preflight) {
++      const preflight = element(this.rootElement, 'p', 'lfea-workbench__preflight',
++        `Preflight ${execution.preflight.status} — ${execution.preflight.nodeCount} nodes, `
++        + `${execution.preflight.elementCount} elements, ${execution.preflight.dofCount} DOF. `
++        + execution.preflight.advice);
++      preflight.dataset.role = 'lfea-preflight';
++      preflight.dataset.status = execution.preflight.status;
++      wrapper.append(preflight);
++    }
+     if (execution.result) {
+       wrapper.append(
+         resultTable(this.rootElement, 'Displacements', execution.result.nodalDisplacements ?? []),

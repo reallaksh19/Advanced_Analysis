@@ -83,8 +83,11 @@ export function calculatePrimitiveBounds(items) {
   const samples = [];
   let maxRadius = 0;
   (Array.isArray(items) ? items : []).forEach((item) => {
-    collectPrimitivePoints(item?.primitive, samples);
-    maxRadius = Math.max(maxRadius, primitiveRadius(item?.primitive));
+    const primitives = Array.isArray(item?.primitives) ? item.primitives : [item?.primitive].filter(Boolean);
+    primitives.forEach((p) => {
+      collectPrimitivePoints(p, samples);
+      maxRadius = Math.max(maxRadius, primitiveRadius(p));
+    });
   });
   if (!samples.length) return defaultBounds();
 

@@ -256,6 +256,9 @@ export class ThreeViewportBackend {
   }
 
   renderOnce() {
+    if (!this.hostElement || this.hostElement.offsetWidth === 0 || this.hostElement.offsetHeight === 0 || this.hostElement.style.display === 'none') {
+      return; // Pause WebGL render loop when tab is hidden or collapsed
+    }
     if (this.renderer && this.scene && this.camera) {
       this.renderer.render(this.scene, this.camera);
       

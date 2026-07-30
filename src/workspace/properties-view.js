@@ -2,6 +2,10 @@ import { renderAnalysisLedger } from './analysis-ledger-view.js';
 import { renderAnalysisCapabilities } from './analysis-readiness-view.js';
 import { renderAnalysisSession } from './analysis-session-view.js';
 import { flattenProperties } from './property-flattener.js';
+import { PipingSupportEngine } from './sequential-sketcher/support-engine.js';
+import { buildPropertyInspector } from './sequential-sketcher/property-inspector-view.js';
+
+const sharedSupportEngine = new PipingSupportEngine();
 
 export function renderPropertiesContent(
   documentRef,
@@ -14,8 +18,23 @@ export function renderPropertiesContent(
   searchQuery = ''
 ) {
   const fragment = documentRef.createDocumentFragment();
-  fragment.append(renderSelectionHeader(documentRef, selection));
-  fragment.append(renderRows(documentRef, selection.properties, 'No properties supplied for this selection.', 240, searchQuery));
+  const entityType = (selection.entityType || selection.type || 'COMPONENT').toUpperCase();
+  const isPipingEntity = Boolean(selection && selection.entityId && selection.entityId !== 'Unknown entity');
+
+  if (isPipingEntity) {
+    const entityObj = selection.entity || {
+      entityId: selection.entityId,
+      name: selection.name || selection.entityId,
+      entityType: entityType,
+      category: selection.category || 'component',
+      properties: selection.properties || {},
+    };
+    fragment.append(buildPropertyInspector(documentRef, entityObj, sharedSupportEngine, null));
+  } else {
+    fragment.append(renderSelectionHeader(documentRef, selection));
+    fragment.append(renderRows(documentRef, selection.properties, 'No properties supplied for this selection.', 240, searchQuery));
+  }
+
   fragment.append(renderAnalysisCapabilities(documentRef, capabilities, analysisSession));
   fragment.append(renderAnalysisSession(documentRef, analysisSession));
   fragment.append(renderAnalysis(documentRef, analysisState));

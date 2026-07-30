@@ -52,14 +52,20 @@ export class PropertiesPanel {
     const stateEntity = this.workspaceState.getEntity(payload.entityId);
     const selection = stateEntity ? {
       entityId: stateEntity.entityId,
+      name: stateEntity.name || stateEntity.entityId,
       type: stateEntity.selectionType,
       entityType: stateEntity.entityType,
+      category: stateEntity.category,
       properties: stateEntity.properties,
+      entity: stateEntity,
     } : {
       entityId: String(payload.entityId ?? 'Unknown entity'),
-      type: String(payload.type ?? 'unclassified'),
-      entityType: String(payload.type ?? 'unclassified'),
-      properties: isPlainObject(payload.properties) ? payload.properties : {},
+      name: payload.entity?.name || String(payload.entityId ?? 'Unknown entity'),
+      type: String(payload.type ?? payload.entity?.entityType ?? 'unclassified'),
+      entityType: String(payload.type ?? payload.entity?.entityType ?? 'unclassified'),
+      category: payload.entity?.category || 'component',
+      properties: isPlainObject(payload.properties) ? payload.properties : (payload.entity?.properties || {}),
+      entity: payload.entity || null,
     };
     const changed = this.selection?.entityId !== selection.entityId;
     this.selection = selection;

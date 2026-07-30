@@ -61,6 +61,18 @@ export async function handleTreeClick(panel, event) {
     });
     return;
   }
+  if (trigger.dataset.action === 'load-staggered-mock') {
+    const { createStaggeredMockPackage } =
+      await import('./advanced-mock-data.js');
+    panel.clearError();
+    panel.statusElement.textContent =
+      'Loading Staggered Mock data…';
+    panel.eventBus.publish(EVENT_TOPICS.DATASET_LOAD_REQUESTED, {
+      rawPackage: createStaggeredMockPackage(),
+      sourceName: 'staggered-mock.json',
+    });
+    return;
+  }
   if (trigger.dataset.action === 'clear-dataset') {
     panel.eventBus.publish(EVENT_TOPICS.DATASET_CLEAR_REQUESTED);
     return;

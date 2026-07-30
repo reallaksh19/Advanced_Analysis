@@ -3,6 +3,12 @@ import { EVENT_TOPICS } from './event-topics.js';
 import { buildResolvedEngineeringGeometry } from './resolved-engineering-geometry.js';
 import { buildViewportRenderModel } from './viewport-render-model.js';
 import { ViewportRenderer } from './viewport-renderer.js';
+import { SequentialEditPanel } from './sequential-sketcher/sequential-edit-panel.js';
+import { SequentialCommandGateway } from './sequential-sketcher/sequential-command-gateway.js';
+import { WorkspaceState } from './workspace-state.js';
+
+import { SequentialTableStore } from './sequential-sketcher/sequential-table-store.js';
+import { SequentialTopologyTableView } from './sequential-sketcher/sequential-topology-table-view.js';
 
 export class ViewportPanel {
   constructor(rootElement, eventBus = EventBus, renderer = new ViewportRenderer()) {
@@ -14,6 +20,10 @@ export class ViewportPanel {
     this.datasetReference = null;
     this.resolvedGeometry = null;
     this.renderModel = null;
+    this.gateway = new SequentialCommandGateway(WorkspaceState, eventBus);
+    this.tableStore = new SequentialTableStore(WorkspaceState, this.gateway);
+    this.tableView = null;
+    this.editPanel = null;
     this.handleClick = this.handleClick.bind(this);
     this.handleSelectionRequest = this.handleSelectionRequest.bind(this);
   }
@@ -23,6 +33,19 @@ export class ViewportPanel {
     this.statusElement = this.requireElement('[data-role="viewport-status"]');
     this.selectionElement = this.requireElement('[data-role="viewport-selection"]');
     this.hostElement = this.requireElement('[data-role="viewport-render-host"]');
+
+    const editBarHost = this.rootElement.querySelector('[data-role="viewport-edit-bar"]');
+    if (editBarHost) {
+      this.editPanel = new SequentialEditPanel(editBarHost, this.gateway);
+      this.editPanel.render(null);
+    }
+
+    const tableDockHost = this.rootElement.querySelector('[data-role="viewport-table-dock"]');
+    if (tableDockHost) {
+      this.tableView = new SequentialTopologyTableView(tableDockHost, this.tableStore);
+      this.tableView.mount();
+    }
+
     this.renderer.setSelectionRequestHandler(this.handleSelectionRequest);
     this.renderer.mount(this.hostElement);
     this.updateCapabilities();
@@ -75,6 +98,9 @@ export class ViewportPanel {
     this.selectionElement.textContent = selectedId
       ? `Selection: ${selectedId}`
       : 'Selection: none';
+    if (this.editPanel) {
+      this.editPanel.render(selectedId || null);
+    }
   }
 
   renderImportFailure(message) {

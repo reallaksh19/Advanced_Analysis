@@ -6,8 +6,9 @@
 export function lfeaWorkbenchStyles() {
   return `
 .lfea-workbench{display:grid;gap:14px;max-width:1700px;margin:0 auto;padding:18px;color:var(--workspace-text,#e5edf8);background:var(--workspace-canvas,#08111f)}
-.lfea-workbench__header{display:flex;justify-content:space-between;gap:18px;align-items:start}.lfea-workbench__header h1{margin:4px 0}.lfea-workbench__header p{margin:0;color:var(--workspace-muted,#94a3b8)}
+.lfea-workbench__header{display:flex;flex-wrap:wrap;justify-content:space-between;gap:18px;align-items:start}.lfea-workbench__header h1{margin:4px 0}.lfea-workbench__header p{margin:0;color:var(--workspace-muted,#94a3b8)}
 .lfea-workbench__status{padding:7px 10px;border:1px solid #334155;border-radius:999px;font-weight:800}.lfea-workbench__status[data-status="QUALIFIED"]{color:#86efac;border-color:#15803d}.lfea-workbench__status[data-status="FAILED"]{color:#fca5a5;border-color:#b91c1c}
+.lfea-workbench__error-banner{width:100%;padding:10px 14px;border:1px solid #f87171;border-radius:6px;background:#450a0a;color:#fca5a5;font-weight:600;font-size:13px;box-sizing:border-box;margin-top:6px}
 .lfea-workbench__toolbar,.lfea-workbench__record-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.lfea-workbench button,.lfea-workbench select,.lfea-workbench input{border:1px solid #334155;border-radius:5px;padding:8px;background:#0b1628;color:inherit}.lfea-workbench button:disabled{opacity:.45}
 .lfea-workbench__grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}.lfea-workbench__card{min-width:0;padding:14px;border:1px solid var(--workspace-border,#334155);border-radius:8px;background:var(--workspace-panel,#101b2e)}.lfea-workbench__card h2{margin:0 0 10px;font-size:15px}.lfea-workbench__card h3{font-size:13px}
 .lfea-workbench textarea{box-sizing:border-box;width:100%;min-height:220px;padding:10px;border:1px solid #334155;border-radius:5px;background:#050b14;color:#dbeafe;font:12px/1.5 ui-monospace,monospace;resize:vertical}.lfea-workbench__editor,.lfea-workbench__records,.lfea-workbench__results{display:grid;gap:9px}
