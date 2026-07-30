@@ -44,6 +44,32 @@ function rotateIntensityToLocal(axes, intensity) {
 }
 
 /**
+ * Project one accepted B-3.0 DISTRIBUTED_LOAD primitive's declared start/end
+ * intensity into local element components, exactly as
+ * `distributedLoadLocalVector` below does internally, without integrating it
+ * into an equivalent nodal vector. LFEA-B3.4 needs the raw local intensity
+ * function to build closed-form force-field distributions along a span; that
+ * is a different quantity from the consistent nodal load, and forming it here
+ * a second time (rather than re-deriving the rotation) keeps the two packages
+ * from disagreeing about what "local intensity" means.
+ *
+ * @param {{primitive: Readonly<object>, axes: object}} args Accepted primitive and element axes.
+ * @returns {{start: object, end: object}} Local `{fx,fy,fz}` intensities.
+ */
+export function localDistributedLoadIntensity({ primitive, axes }) {
+  if (primitive.kind !== 'DISTRIBUTED_LOAD') {
+    fail('localDistributedLoadIntensity accepts DISTRIBUTED_LOAD primitives only.', LOAD_CODE);
+  }
+  const toLocal = primitive.basis === 'GLOBAL'
+    ? (intensity) => rotateIntensityToLocal(axes, intensity)
+    : (intensity) => ({ ...intensity });
+  return {
+    start: toLocal(primitive.startIntensity),
+    end: toLocal(primitive.endIntensity),
+  };
+}
+
+/**
  * Consistent equivalent nodal vector, in local element DOFs, for one accepted
  * B-3.0 DISTRIBUTED_LOAD primitive. A GLOBAL-basis intensity is mapped through
  * the element basis (`q_local = R q_global`); an ELEMENT_LOCAL intensity is
