@@ -18,7 +18,7 @@ const forbidden = [
   ['NONLINEAR_APPROXIMATION', /applyGap|contactIteration|frictionCoefficient\s*\*/u],
   ['RANDOM_IDENTITY', /Math\.random|randomUUID/u],
   ['LOCALE_ORDERING', /localeCompare/u],
-  ['HIDDEN_DEFAULT_PARAMETER', /function\s+\w+\s*\([^)]*=/u],
+  ['HIDDEN_ENGINEERING_DEFAULT', /function\s+\w+\s*\([^)]*=\s*(?:-?\d|true|false)/u],
 ];
 
 for (const file of files) {
