@@ -61,11 +61,17 @@ assert.equal(releaseEvidence.gates.G9_COMMERCIAL_CORROBORATION, 'UNRESOLVED_GATE
 assert.equal(releaseEvidence.artifacts.realModelReconciliation, null);
 assert.equal(releaseEvidence.artifacts.commercialCorroboration, null);
 
+const releasePolicy = fs.readFileSync('scripts/lfea-piping-release-readiness-check.mjs', 'utf8');
+assert.match(releasePolicy, /linear-piping-project-qualification-check\.mjs/u);
+assert.match(releasePolicy, /linear-piping-project-qualification-anti-drift-check\.mjs/u);
+assert.match(releasePolicy, /SIMULATED_FIXTURES_ONLY/u);
+
 const packageValue = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 assert.equal(
-  packageValue.scripts['check:lfea-project-qualification'],
-  'node scripts/linear-piping-project-qualification-check.mjs && node scripts/linear-piping-project-qualification-anti-drift-check.mjs',
+  packageValue.scripts['check:lfea-piping-release-policy'],
+  'node scripts/lfea-piping-release-readiness-check.mjs',
 );
-assert.match(packageValue.scripts.gate, /check:lfea-project-qualification/u);
+assert.match(packageValue.scripts.gate, /check:lfea-piping-release-policy/u);
+assert.doesNotMatch(packageValue.scripts['check:lfea-core'], /project-qualification/u);
 
 console.log('Linear piping Phase 6A qualification anti-drift check PASS');
