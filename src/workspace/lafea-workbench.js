@@ -119,7 +119,7 @@ export {
   LAFEA_HYBRID_RESULT_VIEWPORT_STATUSES,
   createLafeaHybridResultViewportModel,
   mountLafeaHybridResultViewport,
-} from './lafea-hybrid-result-viewport.js';
+} from './lafea-hybrid-result-viewport-public.js';
 export {
   LAFEA_WORKBENCH_DOCUMENT_SCHEMA,
   executeLafeaStage,
