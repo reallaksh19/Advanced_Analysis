@@ -3,29 +3,44 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
+const planPath = 'scripts/lfea-piping-internal-evidence-plan.mjs';
 const collectorPath = 'scripts/lfea-piping-internal-evidence-collector.mjs';
 const checkPath = 'scripts/lfea-piping-internal-evidence-collector-check.mjs';
 const releasePath = 'release-evidence/lfea-piping-release-evidence.json';
 const wrapperPath = 'scripts/lfea-piping-release-readiness-check.mjs';
+const plan = fs.readFileSync(planPath, 'utf8');
 const collector = fs.readFileSync(collectorPath, 'utf8');
 const check = fs.readFileSync(checkPath, 'utf8');
 const release = JSON.parse(fs.readFileSync(releasePath, 'utf8'));
 const wrapper = fs.readFileSync(wrapperPath, 'utf8');
 
-assert.ok(collector.split(/\r?\n/u).length < 500, 'Phase 6F collector limit is <500 lines.');
+assert.ok(plan.split(/\r?\n/u).length < 200, 'Phase 6F plan limit is <200 lines.');
+assert.ok(collector.split(/\r?\n/u).length < 450, 'Phase 6F collector limit is <450 lines.');
 assert.ok(check.split(/\r?\n/u).length < 350, 'Phase 6F collector-check limit is <350 lines.');
 assert.match(collector, /path\.resolve\(process\.argv\[1\]/u);
 assert.match(collector, /spawnSync/u);
 assert.match(collector, /sealInternalExactHeadManifest/u);
 assert.match(collector, /contentHashForInternalArtifact/u);
+assert.match(collector, /requireCollectedBaseline/u);
+assert.match(collector, /EXACT_HEAD_BASELINE_CAPTURED/u);
+assert.match(collector, /auditBaselineContentHash/u);
 assert.match(collector, /LFEA_INTERNAL_COLLECTION_CHECKOUT_HEAD_MISMATCH/u);
 assert.match(collector, /LFEA_INTERNAL_COLLECTION_OUTPUT_INSIDE_REPOSITORY/u);
 assert.match(collector, /LFEA_INTERNAL_COLLECTION_OUTPUT_NOT_EMPTY/u);
 assert.match(collector, /LFEA_INTERNAL_COLLECTION_COMMAND_FAILED/u);
+assert.match(collector, /LFEA_INTERNAL_COLLECTION_BASELINE_MISSING/u);
 assert.match(collector, /collection-failure\.json/u);
-assert.match(collector, /npm.*run.*gate/us);
-assert.match(collector, /git diff --check/u);
-assert.match(collector, /git status --porcelain/u);
+assert.match(collector, /fs\.readdirSync\(requested\)\.length > 0/u);
+assert.doesNotMatch(
+  collector,
+  /rmSync\(requested/u,
+  'Phase 6F must never delete a caller-supplied output directory.',
+);
+
+assert.match(plan, /npm.*run.*gate/us);
+assert.match(plan, /git diff --check/u);
+assert.match(plan, /git status --porcelain/u);
+assert.match(plan, /\$EVIDENCE_ROOT\/internal\/audit-baseline\.runtime\.json/u);
 for (const commandId of [
   'EXACT_HEAD_BASELINE',
   'UPSTREAM_NUMERICAL_CHAIN',
@@ -37,9 +52,9 @@ for (const commandId of [
   'PRESENTATION_EXPORT',
   'FULL_REPOSITORY_GATE',
   'CLEAN_TREE',
-]) assert.match(collector, new RegExp(commandId, 'u'));
+]) assert.match(plan, new RegExp(commandId, 'u'));
 assert.doesNotMatch(
-  collector,
+  `${plan}\n${collector}`,
   /check:lfea-piping-release|externalQualificationPackage|commercialCorroboration/u,
   'Phase 6F collects internal evidence only and must not invoke release or external qualification.',
 );
@@ -48,16 +63,12 @@ assert.doesNotMatch(
   /release-evidence\/lfea-piping-release-evidence\.json/u,
   'Phase 6F must not read or write release gate state.',
 );
-assert.match(collector, /fs\.readdirSync\(requested\)\.length > 0/u);
-assert.doesNotMatch(
-  collector,
-  /rmSync\(requested/u,
-  'Phase 6F must never delete a caller-supplied output directory.',
-);
 
 assert.match(check, /\[SIMULATED\]\[NO_ENGINEERING_COMMAND_EXECUTION\]/u);
 assert.match(check, /successfulRunner/u);
+assert.match(check, /emitSimulatedBaseline/u);
 assert.match(check, /LFEA_INTERNAL_COLLECTION_COMMAND_FAILED/u);
+assert.match(check, /LFEA_INTERNAL_COLLECTION_BASELINE_MISSING/u);
 assert.match(check, /LFEA_INTERNAL_COLLECTION_OUTPUT_NOT_EMPTY/u);
 assert.match(check, /validateInternalReleaseEvidence/u);
 assert.doesNotMatch(
