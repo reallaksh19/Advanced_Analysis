@@ -330,14 +330,54 @@ function buildMeshGraphicPreview(documentRef, meshCfg, stageId) {
       gpGroup.append(createEl('circle', { cx: cx + rOut * Math.cos(-0.25) + (b - 1) * 4, cy: cy + rOut * Math.sin(-0.25), r: 2, opacity: opacity * 0.8 }));
     }
     svg.append(gpGroup);
+  } else if (st === 'LAFEA.3' || st === 'LAFEA.4') {
+    const shellPath = 'M 40 130 Q 220 30 400 130 L 380 150 Q 220 55 60 150 Z';
+    svg.append(createEl('path', { d: shellPath, fill: '#071224', stroke: '#38bdf8', 'stroke-width': 2 }));
+    const padPath = 'M 140 85 Q 220 40 300 85 L 290 102 Q 220 62 150 102 Z';
+    svg.append(createEl('path', { d: padPath, fill: 'rgba(245,158,11,0.22)', stroke: '#f59e0b', 'stroke-width': 2 }));
+    const gridGroup = createEl('g', { stroke: '#1e3a8a', 'stroke-width': 1 });
+    for (let i = 1; i <= 7; i += 1) {
+      const x1 = 40 + i * 45; const y1 = 130 - Math.sin((i / 8) * Math.PI) * 90;
+      const x2 = 60 + i * 40; const y2 = 150 - Math.sin((i / 8) * Math.PI) * 85;
+      gridGroup.append(createEl('line', { x1, y1, x2, y2 }));
+    }
+    svg.append(gridGroup);
+    const gpGroup = createEl('g', { fill: '#fbbf24' });
+    [150, 185, 220, 255, 290].forEach((x) => {
+      const y = 85 - Math.sin(((x - 40) / 360) * Math.PI) * 45;
+      for (let b = 1; b <= biasCount; b += 1) {
+        const r = b === 1 ? 3 : 2;
+        const opacity = b === 1 ? 1.0 : Math.max(0.25, 1.0 - (b - 1) * 0.2);
+        gpGroup.append(createEl('circle', { cx: x + (b - 1) * 4, cy: y + (b - 1) * 3, r, opacity }));
+      }
+    });
+    svg.append(gpGroup);
   } else if (st === 'LAFEA.6') {
     svg.append(createEl('polygon', { points: '60,135 380,135 60,35', fill: '#071224', stroke: '#38bdf8', 'stroke-width': 2 }));
     const gridGroup = createEl('g', { stroke: '#1e3a8a', 'stroke-width': 1 });
-    for (let i = 1; i < 7; i += 1) {
-      const x = 60 + i * 45; const y = 135 - (380 - x) * (100 / 320);
-      gridGroup.append(createEl('line', { x1: x, y1: 135, x2: x, y2: y }));
+    const stepX = 320 / divs;
+    const stepY = 100 / divs;
+    for (let i = 1; i < divs; i += 1) {
+      const x = 60 + i * stepX;
+      const yHypVertical = 135 - (380 - x) * (100 / 320);
+      gridGroup.append(createEl('line', { x1: x, y1: 135, x2: x, y2: yHypVertical }));
+      
+      const y = 135 - i * stepY;
+      const xHypHorizontal = 380 - (135 - y) * (320 / 100);
+      gridGroup.append(createEl('line', { x1: 60, y1: y, x2: xHypHorizontal, y2: y }));
     }
     svg.append(gridGroup);
+    
+    // Add bias refinement dots at the root and toes of the weld
+    const gpGroup = createEl('g', { fill: '#fbbf24' });
+    [[60, 135], [380, 135], [60, 35]].forEach(([x, y]) => {
+      for (let b = 1; b <= biasCount; b += 1) {
+        const radius = b === 1 ? 3 : 2;
+        const opacity = b === 1 ? 1.0 : Math.max(0.25, 1.0 - (b - 1) * 0.2);
+        gpGroup.append(createEl('circle', { cx: x + (b - 1) * 3, cy: y - (b - 1) * 3, r: radius, opacity }));
+      }
+    });
+    svg.append(gpGroup);
   } else {
     svg.append(createEl('rect', { x: 20, y: 20, width: 400, height: 130, fill: '#071224', stroke: '#38bdf8', 'stroke-width': 2 }));
     const gridGroup = createEl('g', { stroke: '#1e3a8a', 'stroke-width': 1 });

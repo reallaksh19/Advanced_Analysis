@@ -118,6 +118,11 @@ function formatEnglishFormula(id) {
     SAME_POINT_PIPE_STRESS_TENSOR_V1: '3D Cauchy stress tensor combination',
     THREE_DIMENSIONAL_VON_MISES_INVARIANT_V1: '3D Von Mises equivalent stress intensity',
     X_THETA_RADIAL_PRINCIPAL_STRESS_RECOVERY_V1: 'Principal stress invariants recovery (σ1, σ2, σ3)',
+    CST_CONSTANT_ENGINEERING_STRAIN_RECOVERY_V1: 'Constant Strain Triangle (T3) plane stress recovery (ASME basis)',
+    Q8_GAUSS_INTEGRATION_POINT_STRESS_V1: 'Quadratic 8-node (Q8) Gauss quadrature integration point stress',
+    T6_GAUSS_INTEGRATION_POINT_STRESS_V1: 'Quadratic 6-node (T6) Gauss quadrature integration point stress',
+    PLANE_STRESS_CAUCHY_TENSOR_V1: '2D plane stress Cauchy stress tensor equilibrium',
+    ISOPARAMETRIC_SHAPE_FUNCTION_RECOVERY_V1: 'Isoparametric shape function strain-displacement matrix (B-matrix)',
   };
   if (known[id]) return known[id];
   return String(id)

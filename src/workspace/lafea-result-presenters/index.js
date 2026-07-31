@@ -8,24 +8,32 @@ import { presentLocalStress } from './local-stress.js';
 import { presentTrunnionFootprint } from './trunnion-footprint.js';
 
 function presentWeldProfile(result, units) {
-  const rows = (result?.stresses ?? []).map((s) => ({
-    label: s.label ?? 'Fillet Weld Stress',
+  const rows = (result?.stresses ?? []).map((s, idx) => ({
+    label: `Element ${s.label ?? `Profile ${idx}`} · Fillet Weld Toe Shear Stress`,
     value: s.value ?? 0,
     unit: s.unit ?? units?.stress ?? 'MPa',
     formulaId: 'WELD-TOE-001',
-    sourcePath: 'weldProfile.stresses',
+    sourcePath: `Element ${s.label ?? `Profile ${idx}`} · Weld Toe Shear Stress`,
   }));
   if (result?.moments) {
-    result.moments.forEach((m) => rows.push({
-      label: m.label ?? 'Eccentric Moment M=F*X',
+    result.moments.forEach((m, idx) => rows.push({
+      label: `Moment Reaction ${m.label ?? `Profile ${idx}`} · Eccentric Lever Arm Moment M=F*X`,
       value: m.value ?? 0,
       unit: m.unit ?? 'N-m',
       formulaId: 'MOMENT-ARM-X',
-      sourcePath: 'weldProfile.moments',
+      sourcePath: `Moment Reaction ${m.label ?? `Profile ${idx}`} · Lever Arm Moment`,
     }));
   }
   return {
-    governing: rows[0] || null,
+    governing: rows[0]
+      ? {
+        label: 'Governing Fillet Weld Throat Shear Stress',
+        value: rows[0].value,
+        unit: rows[0].unit,
+        locationId: rows[0].label.split(' · ')[0],
+        sourcePath: rows[0].sourcePath,
+      }
+      : null,
     sections: [{ title: 'Weld Profile & Eccentric Load Evidence', rows }],
     limitations: ['Weld throat shear analysis per ASME B-3.2 / WRC guidelines.'],
   };
