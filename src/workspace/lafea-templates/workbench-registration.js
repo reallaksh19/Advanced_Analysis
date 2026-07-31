@@ -3,10 +3,9 @@ import {
   validateLafeaAccessoryPanelDescriptor,
 } from '../lafea-workbench.js';
 import {
-  LAFEA_TEMPLATE_ACCESSORY_PANEL_DESCRIPTOR,
-  createLafeaTemplateAccessoryPanelDescriptor,
-  validateLafeaTemplateAccessoryPanelDescriptor,
-} from './t6b-accessory-panel.js';
+  LAFEA_LIVE_TEMPLATE_ACCESSORY_PANEL_DESCRIPTOR,
+  createLafeaLiveTemplateAccessoryPanelDescriptor,
+} from './live-accessory-panel-descriptor.js';
 
 export const LAFEA_TEMPLATE_WORKBENCH_REGISTRATION_SCHEMA =
   'lafea-template-workbench-registration/v1';
@@ -39,15 +38,9 @@ export function createLafeaTemplateWorkbenchRegistration(options = {}) {
 
   const workbenchOptions = normalizeWorkbenchOptions(options.workbenchOptions ?? {});
   const descriptor = options.templatePanelOptions === undefined
-    ? LAFEA_TEMPLATE_ACCESSORY_PANEL_DESCRIPTOR
-    : createLafeaTemplateAccessoryPanelDescriptor(options.templatePanelOptions);
+    ? LAFEA_LIVE_TEMPLATE_ACCESSORY_PANEL_DESCRIPTOR
+    : createLafeaLiveTemplateAccessoryPanelDescriptor(options.templatePanelOptions);
 
-  const consumerValidation = validateLafeaTemplateAccessoryPanelDescriptor(descriptor);
-  if (!consumerValidation.ok) {
-    throw new TypeError(
-      `Template accessory descriptor is invalid: ${consumerValidation.errors.join('; ')}`,
-    );
-  }
   validateLafeaAccessoryPanelDescriptor(descriptor);
 
   const mountOptions = Object.freeze({
