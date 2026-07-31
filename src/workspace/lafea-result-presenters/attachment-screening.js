@@ -1,5 +1,10 @@
 /**
- * LAFEA.2 nominal run-pipe section screening presenter.
+ * LAFEA.2 nominal far-field pipe-section screening presenter.
+ *
+ * This presenter does not convert screening arithmetic into a code-assessment
+ * result, local attachment stress, shell stress or weld stress. Formula-trace
+ * identities remain available in the retained raw evidence; they are not
+ * represented as fabricated numeric rows.
  */
 import {
   formulaId,
@@ -10,63 +15,55 @@ import {
 
 export function presentAttachmentScreening(result, units) {
   const stress = requiredUnit(units, 'stress');
-  const QUANTITY_ENGLISH = {
-    vonMisesMaximum: 'Von Mises equivalent stress intensity (σvm max)',
-    principalMaximum: 'Maximum principal normal stress (σ1 max)',
-    principalMinimum: 'Minimum principal normal stress (σ3 min)',
-    sigmaRMaximum: 'Radial normal stress maximum (σr max)',
-    sigmaRMinimum: 'Radial normal stress minimum (σr min)',
-    sigmaThetaMaximum: 'Hoop circumferential stress maximum (σθ max)',
-    sigmaThetaMinimum: 'Hoop circumferential stress minimum (σθ min)',
-    sigmaXMaximum: 'Axial longitudinal stress maximum (σx max)',
-    sigmaXMinimum: 'Axial longitudinal stress minimum (σx min)',
-    tauXThetaMaximum: 'Torsional shear stress maximum (τxθ max)',
-    tauXThetaMinimum: 'Torsional shear stress minimum (τxθ min)',
+  const quantityLabels = {
+    vonMisesMaximum: 'Von Mises equivalent stress maximum',
+    principalMaximum: 'Maximum principal normal stress',
+    principalMinimum: 'Minimum principal normal stress',
+    sigmaRMaximum: 'Radial normal stress maximum',
+    sigmaRMinimum: 'Radial normal stress minimum',
+    sigmaThetaMaximum: 'Circumferential stress maximum',
+    sigmaThetaMinimum: 'Circumferential stress minimum',
+    sigmaXMaximum: 'Axial stress maximum',
+    sigmaXMinimum: 'Axial stress minimum',
+    tauXThetaMaximum: 'Torsional shear stress maximum',
+    tauXThetaMinimum: 'Torsional shear stress minimum',
   };
-  const LOCATION_ENGLISH = {
-    LMID: 'Mid-wall fiber',
-    L0: 'Outer surface fiber',
-    L1: 'Inner surface fiber',
+  const locationLabels = {
+    LMID: 'mid-wall location',
+    L0: 'outer-surface location',
+    L1: 'inner-surface location',
   };
-  const rows = (result.envelopes ?? []).map((record) => {
-    const quantLabel = QUANTITY_ENGLISH[record.quantity] || record.quantity;
-    const locLabel = LOCATION_ENGLISH[record.evaluationLocationId] || record.evaluationLocationId;
+
+  const rows = (result.envelopes ?? []).map((record, index) => {
+    const quantity = quantityLabels[record.quantity] || String(record.quantity);
+    const location = locationLabels[record.evaluationLocationId]
+      || String(record.evaluationLocationId);
     return presenterRow(
-      `${quantLabel} · Case ${record.screeningCaseId} (${locLabel})`,
+      `${quantity} · case ${record.screeningCaseId} (${location})`,
       record.value,
       stress,
       formulaId(record),
-      `Load Case ${record.screeningCaseId} · ${quantLabel}`,
+      `result.envelopes[${index}].value`,
     );
   });
-  const formulaRows = (result.formulaTrace ?? []).map((fid, idx) =>
-    presenterRow(
-      `Eq #${idx + 1}: ${String(fid).replace(/_V\d+$/, '').replace(/_/g, ' ')}`,
-      1.0,
-      'ASME Basis',
-      fid,
-      `result.formulaTrace[${idx}]`,
-    ));
-  const governingRecord = (result.envelopes ?? [])
-    .find((row) => row.quantity === 'vonMisesMaximum');
+
+  const governingIndex = (result.envelopes ?? [])
+    .findIndex((row) => row.quantity === 'vonMisesMaximum');
+  const governingRecord = governingIndex >= 0 ? result.envelopes[governingIndex] : null;
   const governing = governingRecord
     ? {
-      label: 'Governing Von Mises equivalent stress intensity (ASME B31.3 Eq. 17)',
+      label: 'Governing nominal von Mises equivalent stress',
       value: governingRecord.value,
       unit: stress,
       locationId: governingRecord.evaluationLocationId,
-      sourcePath: 'Load Case CASE-A · Von Mises equivalent stress intensity (σvm max)',
+      sourcePath: `result.envelopes[${governingIndex}].value`,
     }
     : null;
+
   return presenterResult(result, [
     {
-      title: 'ASME B31.3 Pipe-Section Stress Envelopes & Principal Stress Invariants',
+      title: 'Nominal pipe-section stress envelopes and tensor invariants',
       rows,
-    },
-    {
-      title: 'Governing ASME B31.3 Analytical Equations (Formula Trace)',
-      rows: formulaRows,
     },
   ], governing);
 }
-

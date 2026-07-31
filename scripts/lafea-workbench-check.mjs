@@ -11,49 +11,80 @@ import {
   LAFEA_STAGE_IDS,
   createLafeaWorkbenchStore,
   executeLafeaStage,
+  lafeaPreviewGeometry,
 } from '../src/workspace/lafea-workbench.js';
 
-function weldFixture() {
-  return {
-    schema: 'lafea-weld-profile/v1',
-    identity: 'WELD-PROFILE-STANDARD-001',
-    profileType: 'I_BEAM_FILLET',
-    weldThroatMm: 8.0,
-    allowableShearMpa: 110.0,
-    eccentricLoadN: 50000,
-    leverArmDistanceMm: 450.0,
-  };
-}
-
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const FIXTURES = Object.freeze({
+const QUALIFIED_FIXTURES = Object.freeze({
   'LAFEA.1': attachmentFixture,
   'LAFEA.2': screeningFixture,
   'LAFEA.3': continuumFixture,
   'LAFEA.4': shellFixture,
   'LAFEA.5': trunnionFixture,
-  'LAFEA.6': weldFixture,
 });
 
-assert.deepEqual(LAFEA_STAGE_IDS, ['LAFEA.1', 'LAFEA.2', 'LAFEA.3', 'LAFEA.4', 'LAFEA.5', 'LAFEA.6']);
+function weldPlaceholder() {
+  return {
+    schema: 'lafea-weld-profile-placeholder/v1',
+    identity: 'WELD-NOT-IMPLEMENTED',
+  };
+}
 
-for (const stageId of LAFEA_STAGE_IDS) {
-  const first = executeLafeaStage(stageId, FIXTURES[stageId]());
-  const second = executeLafeaStage(stageId, FIXTURES[stageId]());
-  assert.equal(first.status, 'QUALIFIED', `${stageId} [SIMULATED] analytical fixture must qualify.`);
+assert.deepEqual(
+  LAFEA_STAGE_IDS,
+  ['LAFEA.1', 'LAFEA.2', 'LAFEA.3', 'LAFEA.4', 'LAFEA.5', 'LAFEA.6'],
+);
+
+for (const [stageId, fixture] of Object.entries(QUALIFIED_FIXTURES)) {
+  const first = executeLafeaStage(stageId, fixture());
+  const second = executeLafeaStage(stageId, fixture());
+  assert.equal(first.status, 'QUALIFIED', `${stageId} retained fixture must qualify.`);
   assert.equal(JSON.stringify(first.result), JSON.stringify(second.result), `${stageId} result must be deterministic.`);
   assert.equal(first.stageId, stageId);
-  assert.equal(executeLafeaStage(stageId, first.canonicalInput).status, 'QUALIFIED', `${stageId} canonical import must reconstruct.`);
+  assert.equal(
+    executeLafeaStage(stageId, first.canonicalInput).status,
+    'QUALIFIED',
+    `${stageId} canonical import must reconstruct.`,
+  );
 }
+
+const unsupportedWeld = executeLafeaStage('LAFEA.6', weldPlaceholder());
+assert.equal(unsupportedWeld.status, 'FAILED');
+assert.equal(unsupportedWeld.result, null);
+assert.equal(unsupportedWeld.canonicalInput, null);
+assert.deepEqual(
+  unsupportedWeld.diagnostics.map((diagnostic) => diagnostic.code),
+  ['UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED'],
+);
+
+const foundationPreview = lafeaPreviewGeometry('LAFEA.1', attachmentFixture());
+assert.equal(foundationPreview.nodePath, null, 'LAFEA.1 source points must be display-only in U0.');
+assert.ok(foundationPreview.nodes.length > 0, 'LAFEA.1 explicit source points must remain visible.');
+
+const screeningPreview = lafeaPreviewGeometry('LAFEA.2', screeningFixture());
+assert.equal(screeningPreview.nodePath, null, 'LAFEA.2 preview must not expose unsupported geometry editing.');
+assert.equal(screeningPreview.nodes.length, 0, 'LAFEA.2 must not synthesize a pipe ring.');
+assert.equal(screeningPreview.elements.length, 0, 'LAFEA.2 must not synthesize mesh topology.');
+
+const continuumPreview = lafeaPreviewGeometry('LAFEA.3', continuumFixture());
+assert.equal(continuumPreview.nodePath, 'nodes');
+assert.equal(continuumPreview.nodes.length, continuumFixture().nodes.length);
+
+const weldPreview = lafeaPreviewGeometry('LAFEA.6', {
+  nodes: [{ nodeId: 'W1', x: 0, y: 0, z: 0 }],
+  elements: [],
+});
+assert.equal(weldPreview.nodePath, null, 'LAFEA.6 placeholder geometry must be display-only.');
+assert.equal(weldPreview.nodes.length, 1, 'Explicit placeholder source geometry may be shown without calculation.');
 
 const store = createLafeaWorkbenchStore({
   initialStage: 'LAFEA.3',
   initialDocument: continuumFixture(),
 });
-const originalX = store.getState().stages['LAFEA.3'].document.nodes.find((row) => row.nodeId === 'B').x;
-const nodeIndex = store.getState().stages['LAFEA.3'].document.nodes.findIndex((row) => row.nodeId === 'B');
-const editedNode = { ...store.getState().stages['LAFEA.3'].document.nodes[nodeIndex], x: originalX + 10 };
-store.updateRecord('nodes', nodeIndex, editedNode);
+const nodes = store.getState().stages['LAFEA.3'].document.nodes;
+const nodeIndex = nodes.findIndex((row) => row.nodeId === 'B');
+const originalX = nodes[nodeIndex].x;
+store.updateRecord('nodes', nodeIndex, { ...nodes[nodeIndex], x: originalX + 10 });
 assert.equal(store.getState().stages['LAFEA.3'].document.nodes[nodeIndex].x, originalX + 10);
 assert.equal(store.getState().stages['LAFEA.3'].execution, null);
 store.undo();
@@ -69,16 +100,59 @@ assert.equal(rejected.status, 'FAILED');
 assert.equal(rejected.result, null);
 assert.ok(rejected.diagnostics.some((row) => row.severity === 'ERROR'));
 
-const workbenchFiles = fs.readdirSync(path.join(ROOT, 'src', 'workspace'))
+const workspace = path.join(ROOT, 'src', 'workspace');
+const read = (relativePath) => fs.readFileSync(path.join(workspace, relativePath), 'utf8');
+const modelSource = read('lafea-workbench-model.js');
+const viewSource = read('lafea-workbench-view.js');
+const documentTableSource = read('lafea-document-table.js');
+const previewSource = read('lafea-stage-preview.js');
+const meshPanelSource = read('lafea-mesh-quality-panel.js');
+const resultsSource = read('lafea-results-view.js');
+const screeningPresenterSource = read('lafea-result-presenters/attachment-screening.js');
+
+assert.match(modelSource, /UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED/u);
+assert.doesNotMatch(modelSource, /85\.4/u);
+assert.doesNotMatch(modelSource, /allowable(?:Shear)?Mpa\s*\|\|/u);
+assert.doesNotMatch(modelSource, /Qualified Weld Profile evaluation passed/u);
+
+assert.doesNotMatch(viewSource, /stage\.document(?:\.|\[)[^;\n]*=/u);
+assert.doesNotMatch(viewSource, /\bprompt\s*\(/u);
+assert.doesNotMatch(viewSource, /createHybridViewport|webgl:\s*\{\s*render:\s*\(\)\s*=>\s*\{\}/u);
+assert.match(viewSource, /No geometry or mesh has been synthesized/u);
+assert.match(viewSource, /Calculation not implemented/u);
+
+assert.doesNotMatch(documentTableSource, /Number\([^)]*\)\s*\|\|\s*0/u);
+assert.doesNotMatch(documentTableSource, /structuredClone\([^)]*\.at\(-1\)/u);
+assert.match(documentTableSource, /Record creation is disabled/u);
+
+assert.doesNotMatch(previewSource, /PLATE-NW|VALVE-MASS|Q8-PLATE|SH3D-|WELD-FILLET/u);
+assert.match(previewSource, /does not manufacture pads/u);
+assert.match(previewSource, /nodePath: editable \? nodePath : null/u);
+
+assert.doesNotMatch(meshPanelSource, /J_min\s*=|Max AR\s*=|Max Skew\s*=/u);
+assert.doesNotMatch(meshPanelSource, /\[PASS\]/u);
+assert.match(meshPanelSource, /No numerical quality status is asserted/u);
+
+assert.doesNotMatch(resultsSource, /IMMUTABLE TRUTH/u);
+assert.doesNotMatch(resultsSource, /Raw qualified evidence/u);
+assert.match(resultsSource, /RAW_RETAINED_FIELD/u);
+
+assert.doesNotMatch(screeningPresenterSource, /ASME B31\.3/u);
+assert.match(screeningPresenterSource, /Nominal pipe-section stress envelopes/u);
+
+const workbenchFiles = fs.readdirSync(workspace)
   .filter((name) => name.startsWith('lafea-workbench') && name.endsWith('.js'));
-const sourceText = workbenchFiles.map((name) => fs.readFileSync(path.join(ROOT, 'src', 'workspace', name), 'utf8')).join('\n');
+const sourceText = workbenchFiles
+  .map((name) => fs.readFileSync(path.join(workspace, name), 'utf8'))
+  .join('\n');
 assert.doesNotMatch(sourceText, /EventBus|analysis-context|workspace-consumer-context/u);
 
 console.log(JSON.stringify({
-  check: 'lafea-workbench',
-  evidenceBasis: '[SIMULATED]/ANALYTICAL',
+  check: 'lafea-workbench-u0',
   status: 'PASS',
-  qualifiedStages: [...LAFEA_STAGE_IDS],
+  qualifiedStages: Object.keys(QUALIFIED_FIXTURES),
+  unsupportedStages: ['LAFEA.6'],
   failClosed: true,
+  fabricatedEngineeringClaims: false,
   workspaceCoupling: false,
 }));

@@ -1,18 +1,19 @@
 /**
- * Interactive live table and topology editor for LAFEA stage documents.
+ * Transitional generic editor for LAFEA stage documents.
  *
- * Provides real-time spreadsheet-style editing of global simulation parameters
- * and structural geometry topologies (nodes, elements, load reference points)
- * alongside a synchronized raw JSON editor.
+ * The editor works on a detached structured clone and commits only through the
+ * supplied command callback. It does not calculate, silently coerce invalid
+ * numeric input to zero, or create a new record by cloning an existing identity.
+ * Stage-specific typed descriptors remain a later authorized work package.
  */
 
 /**
- * Render the live geometry table editor or raw JSON fallback.
+ * Render the transitional source table and advanced raw JSON editor.
  *
  * @param {Element|DocumentFragment} rootElement Host DOM context.
  * @param {Record<string, unknown>|null} documentValue Editable stage document.
- * @param {(jsonText: string) => void} onApplyJson Callback to propagate edits.
- * @returns {HTMLElement} Editor widget root container.
+ * @param {(jsonText: string) => void} onApplyJson Command callback.
+ * @returns {HTMLElement}
  */
 export function renderDocumentTableEditor(rootElement, documentValue, onApplyJson) {
   const documentRef = rootElement.ownerDocument || document;
@@ -22,333 +23,367 @@ export function renderDocumentTableEditor(rootElement, documentValue, onApplyJso
   if (!documentValue || typeof documentValue !== 'object') {
     const empty = documentRef.createElement('p');
     empty.className = 'lafea-workbench-svg__empty';
-    empty.textContent = 'No validated source document loaded. Click "[SIMULATED] Load Mock Data" above.';
+    empty.textContent = 'No validated stage source document is loaded.';
     container.append(empty);
     return container;
   }
 
   const currentDoc = structuredClone(documentValue);
-  let isTableView = true;
+  let mode = 'TABLE';
+
+  const notice = documentRef.createElement('p');
+  notice.className = 'lafea-doc-table-notice';
+  notice.textContent = 'Transitional generic editor. Values remain subject to the exact stage source validator; '
+    + 'stage-specific typed input descriptors are not implemented in this phase.';
 
   const toolbar = documentRef.createElement('div');
   toolbar.className = 'lafea-doc-table-toolbar';
-
   const tabs = documentRef.createElement('div');
   tabs.className = 'lafea-doc-table-tabs';
 
-  const tableBtn = createTabButton(documentRef, '📊 Live Topology & Geometry Table', true, () => {
-    isTableView = true;
+  const tableButton = tabButton(documentRef, 'Source table', true, () => {
+    mode = 'TABLE';
     updateTabs();
-    refreshContent();
+    refresh();
   });
-
-  const jsonBtn = createTabButton(documentRef, '📝 Raw JSON Source', false, () => {
-    isTableView = false;
+  const jsonButton = tabButton(documentRef, 'Advanced raw JSON', false, () => {
+    mode = 'JSON';
     updateTabs();
-    refreshContent();
+    refresh();
   });
+  tabs.append(tableButton, jsonButton);
 
-  function updateTabs() {
-    tableBtn.setAttribute('aria-current', isTableView ? 'step' : 'false');
-    jsonBtn.setAttribute('aria-current', !isTableView ? 'step' : 'false');
-  }
-
-  tabs.append(tableBtn, jsonBtn);
-
-  const applyBtn = documentRef.createElement('button');
-  applyBtn.type = 'button';
-  applyBtn.className = 'lafea-doc-apply-btn';
-  applyBtn.textContent = '⚡ Apply Live Table Edits & Calculate';
-  applyBtn.title = 'Immediately pushes live spreadsheet modifications into solver truth and updates canvas geometry.';
-  applyBtn.addEventListener('click', () => onApplyJson(JSON.stringify(currentDoc, null, 2)));
-
-  toolbar.append(tabs, applyBtn);
+  const applyButton = documentRef.createElement('button');
+  applyButton.type = 'button';
+  applyButton.className = 'lafea-doc-apply-btn';
+  applyButton.textContent = 'Apply source edits';
+  applyButton.addEventListener('click', () => onApplyJson(JSON.stringify(currentDoc, null, 2)));
+  toolbar.append(tabs, applyButton);
 
   const content = documentRef.createElement('div');
   content.className = 'lafea-doc-table-content';
-  container.append(toolbar, content);
+  container.append(notice, toolbar, content);
 
-  function refreshContent() {
+  function updateTabs() {
+    tableButton.setAttribute('aria-current', mode === 'TABLE' ? 'step' : 'false');
+    jsonButton.setAttribute('aria-current', mode === 'JSON' ? 'step' : 'false');
+  }
+
+  function refresh() {
     content.replaceChildren();
-    if (!isTableView) {
+    if (mode === 'JSON') {
       renderJsonEditor(documentRef, content, currentDoc, onApplyJson);
       return;
     }
-    renderScalarsSection(documentRef, content, currentDoc);
-    renderCollectionsSection(documentRef, content, currentDoc, refreshContent);
+    renderScalarSection(documentRef, content, currentDoc);
+    renderCollectionSections(documentRef, content, currentDoc, refresh);
   }
 
-  refreshContent();
+  refresh();
   return container;
 }
 
-function createTabButton(doc, label, isActive, onClick) {
-  const btn = doc.createElement('button');
-  btn.type = 'button';
-  btn.textContent = label;
-  btn.setAttribute('aria-current', isActive ? 'step' : 'false');
-  btn.addEventListener('click', onClick);
-  return btn;
+function tabButton(documentRef, label, active, handler) {
+  const button = documentRef.createElement('button');
+  button.type = 'button';
+  button.textContent = label;
+  button.setAttribute('aria-current', active ? 'step' : 'false');
+  button.addEventListener('click', handler);
+  return button;
 }
 
-function renderJsonEditor(doc, container, currentDoc, onApplyJson) {
-  const textarea = doc.createElement('textarea');
+function renderJsonEditor(documentRef, container, currentDoc, onApplyJson) {
+  const explanation = documentRef.createElement('p');
+  explanation.textContent = 'Advanced import/evidence view. Invalid JSON is rejected and does not modify the stage source.';
+  const textarea = documentRef.createElement('textarea');
   textarea.dataset.role = 'lafea-document-json';
   textarea.spellcheck = false;
   textarea.value = JSON.stringify(currentDoc, null, 2);
-  textarea.addEventListener('input', () => {
-    try {
-      const parsed = JSON.parse(textarea.value);
-      Object.assign(currentDoc, parsed);
-    } catch {
-      // Allow temporary typing errors during manual JSON input
-    }
-  });
-  const apply = doc.createElement('button');
+
+  const message = documentRef.createElement('output');
+  message.setAttribute('aria-live', 'polite');
+
+  const apply = documentRef.createElement('button');
   apply.type = 'button';
   apply.textContent = 'Apply validated JSON';
-  apply.style.marginTop = '8px';
-  apply.addEventListener('click', () => onApplyJson(textarea.value));
-  container.append(textarea, apply);
+  apply.addEventListener('click', () => {
+    try {
+      const parsed = JSON.parse(textarea.value);
+      if (!isRecord(parsed)) throw new TypeError('LAFEA document must be a JSON object.');
+      message.textContent = '';
+      onApplyJson(JSON.stringify(parsed, null, 2));
+    } catch (error) {
+      message.textContent = error instanceof Error ? error.message : 'Invalid JSON.';
+    }
+  });
+  container.append(explanation, textarea, apply, message);
 }
 
-function formatEnglishParameterKey(key) {
-  if (!key) return '';
-  const known = {
-    'sourceEvidence.foundationModel.sourceAncestry.transformationEvidenceHash': 'Load transformation integrity hash (SHA-256)',
-    'sourceEvidence.foundationModel.sourceAncestry.canonicalModelSemanticHash': 'Canonical model semantic hash (SHA-256)',
-    'sourceEvidence.foundationModel.sourceEvidence.schema': 'Engineering reference specification schema ID',
-    'sourceEvidence.foundationModel.sourceEvidence.modelIdentity': 'Origin piping / vessel benchmark title',
-    'sourceEvidence.foundationModel.sourceEvidence.modelVersion': 'Origin engineering model revision version',
-    'sourceEvidence.foundationModel.sourceEvidence.sourceAncestry.sourceModelIdentity': 'Source piping simulation model identifier',
-    'sourceEvidence.foundationModel.sourceEvidence.sourceAncestry.sourceVersion': 'Source piping simulation model revision',
-    'sourceEvidence.foundationModel.sourceEvidence.sourceAncestry.adapterIdentity': 'Data import adapter driver name',
-    'sourceEvidence.foundationModel.sourceEvidence.sourceAncestry.adapterVersion': 'Data import adapter driver version',
-    'sourceEvidence.foundationModel.sourceEvidence.units.length': 'Length measurement unit (e.g., mm, inch)',
-    'sourceEvidence.foundationModel.sourceEvidence.units.force': 'Force measurement unit (e.g., N, lbf)',
-    'sourceEvidence.foundationModel.sourceEvidence.units.moment': 'Bending / torsion moment unit (e.g., N-mm)',
-    'sourceEvidence.foundationModel.sourceEvidence.units.pressure': 'Internal pressure measurement unit (e.g., MPa)',
-    'sourceEvidence.foundationModel.sourceEvidence.units.stress': 'Material stress measurement unit (e.g., MPa)',
-    'sourceEvidence.foundationModel.sourceEvidence.units.rotation': 'Angular rotation measurement unit (e.g., rad)',
-    'meshConfig.density': 'FEA global mesh density preset',
-    'meshConfig.bias': 'Discontinuity refinement concentration bias (k_refine)',
-    'meshConfig.formulation': 'FEA shell element formulation family',
-    'meshConfig.singularity': 'Weld-toe singularity mitigation strategy',
-    'schema': 'Engineering schema specification version',
-    'modelIdentity': 'Model benchmark identifier',
-    'modelVersion': 'Model revision version',
-    'units.length': 'Length measurement unit',
-    'units.force': 'Force measurement unit',
-    'units.moment': 'Moment measurement unit',
-    'units.pressure': 'Pressure measurement unit',
-    'units.stress': 'Stress measurement unit',
-    'units.rotation': 'Angular rotation unit',
-    'leverArmX': 'Trunnion / standoff lever arm length (X-direction)',
-    'leverArmY': 'Trunnion / standoff lever arm length (Y-direction)',
-    'leverArmZ': 'Trunnion / standoff lever arm length (Z-direction)',
-    'nodes': 'Structural Finite Element Nodes',
-    'elements': '2D Shell / Continuum Finite Elements',
-    'loadCases': 'Applied Linear Superposition Load Cases',
-    'referencePoints': 'Structural Reference & Measurement Points',
-    'id': 'Identifier',
-    'nodeId': 'Node ID',
-    'elementId': 'Element ID',
-    'identity': 'Element Identity',
-    'x': 'X Coord',
-    'y': 'Y Coord',
-    'z': 'Z Coord',
-    'type': 'Element Type',
-    'thickness': 'Wall Thickness',
-    'material': 'Material Basis',
-    'screeningCaseId': 'Load Case Identifier',
-    'evaluationLocationId': 'Wall Fiber Location',
-    'quantity': 'Engineering Stress Quantity',
-    'value': 'Calculated Value',
-  };
-  if (known[key]) return known[key];
-  return String(key)
-    .replace(/^sourceEvidence\.foundationModel\.sourceEvidence\./, '')
-    .replace(/^sourceEvidence\.foundationModel\./, '')
-    .replace(/\./g, ' · ')
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .replace(/_/g, ' ')
-    .replace(/^\w/, (c) => c.toUpperCase());
-}
-
-function renderScalarsSection(doc, container, currentDoc) {
-  const section = doc.createElement('div');
-  section.className = 'lafea-doc-table-section';
-  const title = doc.createElement('h4');
-  title.textContent = '📐 Global Stage Parameters & Properties (Simple English Form)';
-  section.append(title);
-
-  const table = doc.createElement('table');
-  table.className = 'lafea-doc-grid';
-  table.innerHTML = '<thead><tr><th>Engineering Parameter (Simple English)</th><th>Editable Value</th><th>Data Type</th></tr></thead>';
-  const tbody = doc.createElement('tbody');
-
+function renderScalarSection(documentRef, container, currentDoc) {
   const scalars = [];
-  function pushScalars(obj, prefix = '') {
-    for (const [k, v] of Object.entries(obj)) {
-      const fullKey = prefix ? `${prefix}.${k}` : k;
-      if (v && typeof v === 'object' && !Array.isArray(v)) {
-        if (v.value !== undefined && typeof v.value !== 'object') {
-          scalars.push({ key: fullKey, parent: obj, prop: k, valObj: v, isWrapper: true });
-        } else {
-          pushScalars(v, fullKey);
-        }
-      } else if (v !== null && typeof v !== 'object') {
-        scalars.push({ key: fullKey, parent: obj, prop: k, valObj: null, isWrapper: false });
-      }
-    }
-  }
-  pushScalars(currentDoc);
+  collectScalars(currentDoc, '', scalars);
+  if (!scalars.length) return;
 
-  for (const item of scalars) {
-    const row = doc.createElement('tr');
-    const tdKey = doc.createElement('td');
-    const englishName = formatEnglishParameterKey(item.key);
-    if (englishName !== item.key) {
-      tdKey.innerHTML = `<strong>${englishName}</strong> <code style="font-size:0.75em;color:#64748b;display:block;margin-top:2px;">${item.key}</code>`;
-    } else {
-      tdKey.textContent = item.key;
-    }
-    const tdVal = doc.createElement('td');
-    const input = doc.createElement('input');
-    const curVal = item.isWrapper ? item.valObj.value : item.parent[item.prop];
-    input.type = typeof curVal === 'number' ? 'number' : 'text';
-    input.value = String(curVal ?? '');
-    input.addEventListener('change', () => {
-      if (item.isWrapper) {
-        item.valObj.value = typeof curVal === 'number' ? (Number(input.value) || 0) : input.value;
-      } else {
-        item.parent[item.prop] = typeof curVal === 'number' ? (Number(input.value) || 0) : input.value;
-      }
-    });
-    tdVal.append(input);
-    const tdType = doc.createElement('td');
-    tdType.textContent = typeof curVal;
-    row.append(tdKey, tdVal, tdType);
-    tbody.append(row);
+  const section = documentRef.createElement('section');
+  section.className = 'lafea-doc-table-section';
+  const title = documentRef.createElement('h4');
+  title.textContent = 'Scalar source fields';
+  const table = documentRef.createElement('table');
+  table.className = 'lafea-doc-grid';
+  const header = documentRef.createElement('tr');
+  ['Field', 'Editable value', 'Type'].forEach((label) => {
+    const cell = documentRef.createElement('th');
+    cell.textContent = label;
+    cell.scope = 'col';
+    header.append(cell);
+  });
+  table.append(header);
+
+  for (const scalar of scalars) {
+    const row = documentRef.createElement('tr');
+    const keyCell = documentRef.createElement('th');
+    keyCell.scope = 'row';
+    keyCell.append(labelWithPath(documentRef, scalar.path));
+    const valueCell = documentRef.createElement('td');
+    const typeCell = documentRef.createElement('td');
+    typeCell.textContent = scalar.type;
+    valueCell.append(valueEditor(documentRef, scalar.value, scalar.set));
+    row.append(keyCell, valueCell, typeCell);
+    table.append(row);
   }
-  table.append(tbody);
-  section.append(table);
+
+  section.append(title, table);
   container.append(section);
 }
 
-function renderCollectionsSection(doc, container, currentDoc, onRefresh) {
-  const collections = [];
-  for (const [key, val] of Object.entries(currentDoc)) {
-    if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object') {
-      collections.push({ name: key, array: val });
-    } else if (val && typeof val === 'object' && !Array.isArray(val)) {
-      for (const [subKey, subVal] of Object.entries(val)) {
-        if (Array.isArray(subVal) && subVal.length > 0 && typeof subVal[0] === 'object') {
-          collections.push({ name: `${key}.${subKey}`, array: subVal });
-        }
-      }
+function collectScalars(value, prefix, output) {
+  if (!isRecord(value)) return;
+  for (const [key, child] of Object.entries(value)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    if (isRecord(child) && Object.hasOwn(child, 'value') && !isRecord(child.value)) {
+      output.push({
+        path,
+        value: child.value,
+        type: typeOf(child.value),
+        set: (next) => { child.value = next; },
+      });
+    } else if (isRecord(child)) {
+      collectScalars(child, path, output);
+    } else if (!Array.isArray(child)) {
+      output.push({
+        path,
+        value: child,
+        type: typeOf(child),
+        set: (next) => { value[key] = next; },
+      });
     }
   }
+}
 
-  for (const { name: key, array: val } of collections) {
-    const section = doc.createElement('div');
+function renderCollectionSections(documentRef, container, currentDoc, refresh) {
+  for (const collection of findCollections(currentDoc)) {
+    const section = documentRef.createElement('section');
     section.className = 'lafea-doc-table-section';
-    const title = doc.createElement('h4');
-    title.textContent = `🏷️ ${formatEnglishParameterKey(key).toUpperCase()} (Topology Edit Grid — ${val.length} rows)`;
-    section.append(title);
+    const title = documentRef.createElement('h4');
+    title.textContent = `${friendlyName(collection.path)} — ${collection.rows.length} records`;
+    const note = documentRef.createElement('p');
+    note.textContent = 'Record creation is disabled in the transitional generic editor to prevent duplicate or fabricated identities. '
+      + 'Use a validated stage source import until stage-specific creation commands are implemented.';
+    section.append(title, note);
 
-    const sample = val[0];
-    const columns = Object.keys(sample).slice(0, 8);
-    const table = doc.createElement('table');
+    if (!collection.rows.length) {
+      container.append(section);
+      continue;
+    }
+
+    const columns = stableColumns(collection.rows);
+    const table = documentRef.createElement('table');
     table.className = 'lafea-doc-grid';
+    const header = documentRef.createElement('tr');
+    const indexHeader = documentRef.createElement('th');
+    indexHeader.textContent = '#';
+    header.append(indexHeader);
+    columns.forEach((column) => {
+      const cell = documentRef.createElement('th');
+      cell.textContent = friendlyName(column);
+      cell.scope = 'col';
+      header.append(cell);
+    });
+    const actionHeader = documentRef.createElement('th');
+    actionHeader.textContent = 'Action';
+    header.append(actionHeader);
+    table.append(header);
 
-    const thead = doc.createElement('thead');
-    const headerRow = doc.createElement('tr');
-    headerRow.innerHTML = '<th>Index</th>' + columns.map((c) => `<th>${formatEnglishParameterKey(c)}</th>`).join('') + '<th>Action</th>';
-    thead.append(headerRow);
-    table.append(thead);
+    collection.rows.forEach((record, index) => {
+      const row = documentRef.createElement('tr');
+      row.className = 'lafea-table-row';
+      const identity = recordIdentity(record);
+      if (identity) row.dataset.rowId = identity;
 
-    const tbody = doc.createElement('tbody');
-    val.forEach((rowObj, idx) => {
-      const tr = doc.createElement('tr');
-      const rowId = String(rowObj.identity || rowObj.id || rowObj.nodeId || rowObj.elementId || idx);
-      tr.dataset.rowId = rowId;
-      tr.classList.add('lafea-table-row');
-      tr.addEventListener('click', () => {
-        doc.querySelectorAll('tr.lafea-row-selected').forEach((el) => el.classList.remove('lafea-row-selected'));
-        tr.classList.add('lafea-row-selected');
-        doc.querySelectorAll('.lafea-svg-highlighted').forEach((el) => el.classList.remove('lafea-svg-highlighted'));
-        doc.querySelectorAll(`[data-node-id="${rowId}"], [data-element-id="${rowId}"]`).forEach((el) => {
-          el.classList.add('lafea-svg-highlighted');
-          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        });
-      });
-      const tdIdx = doc.createElement('td');
-      tdIdx.textContent = `#${idx + 1}`;
-      tr.append(tdIdx);
+      const indexCell = documentRef.createElement('td');
+      indexCell.textContent = String(index + 1);
+      row.append(indexCell);
 
-      for (const col of columns) {
-        const td = doc.createElement('td');
-        const input = doc.createElement('input');
-        const origVal = rowObj[col];
-        const isWrapper = origVal && typeof origVal === 'object' && !Array.isArray(origVal) && origVal.value !== undefined;
-        const isArrWrap = Array.isArray(origVal) && origVal.length > 0 && origVal[0]?.value !== undefined;
-        if (isWrapper) {
-          const inner = origVal.value;
-          input.type = typeof inner === 'number' ? 'number' : 'text';
-          input.value = Array.isArray(inner) ? inner.join(', ') : String(inner ?? '');
-          input.addEventListener('change', () => {
-            if (Array.isArray(inner)) origVal.value = input.value.split(',').map((s) => Number(s.trim()) || 0);
-            else origVal.value = typeof inner === 'number' ? (Number(input.value) || 0) : input.value;
-          });
-        } else if (isArrWrap) {
-          input.type = 'text';
-          input.value = origVal.map((o) => o.value).join(', ');
-          input.addEventListener('change', () => {
-            const vals = input.value.split(',').map((s) => Number(s.trim()) || 0);
-            vals.forEach((n, i) => { if (origVal[i]) origVal[i].value = n; });
-          });
+      for (const column of columns) {
+        const cell = documentRef.createElement('td');
+        const original = record[column];
+        if (isValueWrapper(original)) {
+          cell.append(valueEditor(documentRef, original.value, (next) => { original.value = next; }));
         } else {
-          const isObj = origVal !== null && typeof origVal === 'object';
-          input.type = typeof origVal === 'number' ? 'number' : 'text';
-          input.value = isObj ? JSON.stringify(origVal) : String(origVal ?? '');
-          input.addEventListener('change', () => {
-            if (isObj) {
-              try { rowObj[col] = JSON.parse(input.value); } catch { /* keep text */ }
-            } else {
-              rowObj[col] = typeof origVal === 'number' ? (Number(input.value) || 0) : input.value;
-            }
-          });
+          cell.append(valueEditor(documentRef, original, (next) => { record[column] = next; }));
         }
-        td.append(input);
-        tr.append(td);
+        row.append(cell);
       }
 
-      const tdAct = doc.createElement('td');
-      const delBtn = doc.createElement('button');
-      delBtn.type = 'button';
-      delBtn.textContent = '❌';
-      delBtn.title = 'Delete topology row';
-      delBtn.addEventListener('click', () => {
-        val.splice(idx, 1);
-        onRefresh();
+      const actionCell = documentRef.createElement('td');
+      const remove = documentRef.createElement('button');
+      remove.type = 'button';
+      remove.textContent = 'Delete';
+      remove.addEventListener('click', () => {
+        collection.rows.splice(index, 1);
+        refresh();
       });
-      tdAct.append(delBtn);
-      tr.append(tdAct);
-      tbody.append(tr);
-    });
-    table.append(tbody);
-
-    const addRowBtn = doc.createElement('button');
-    addRowBtn.type = 'button';
-    addRowBtn.textContent = `➕ Add row to ${key}`;
-    addRowBtn.style.marginTop = '6px';
-    addRowBtn.addEventListener('click', () => {
-      val.push(structuredClone(val[val.length - 1] || {}));
-      onRefresh();
+      actionCell.append(remove);
+      row.append(actionCell);
+      table.append(row);
     });
 
-    section.append(table, addRowBtn);
+    section.append(table);
     container.append(section);
   }
+}
+
+function valueEditor(documentRef, original, setter) {
+  const input = documentRef.createElement('input');
+  input.type = typeof original === 'number' ? 'number' : 'text';
+  input.value = displayValue(original);
+  input.addEventListener('change', () => {
+    try {
+      const next = parseEditedValue(input.value, original);
+      setter(next);
+      input.setCustomValidity('');
+    } catch (error) {
+      input.setCustomValidity(error instanceof Error ? error.message : 'Invalid value.');
+      input.reportValidity();
+      input.value = displayValue(original);
+    }
+  });
+  return input;
+}
+
+function parseEditedValue(text, original) {
+  if (typeof original === 'number') {
+    if (!text.trim()) throw new TypeError('Numeric input cannot be blank.');
+    const value = Number(text);
+    if (!Number.isFinite(value)) throw new TypeError('Numeric input must be finite.');
+    return value;
+  }
+  if (typeof original === 'boolean') {
+    if (text === 'true') return true;
+    if (text === 'false') return false;
+    throw new TypeError('Boolean input must be true or false.');
+  }
+  if (Array.isArray(original) || isRecord(original)) {
+    const value = JSON.parse(text);
+    if (Array.isArray(original) && !Array.isArray(value)) {
+      throw new TypeError('Edited value must remain an array.');
+    }
+    if (isRecord(original) && !isRecord(value)) {
+      throw new TypeError('Edited value must remain an object.');
+    }
+    assertFiniteNumbers(value);
+    return value;
+  }
+  if (original === null) {
+    return text === 'null' ? null : text;
+  }
+  return text;
+}
+
+function assertFiniteNumbers(value, path = 'value') {
+  if (typeof value === 'number' && !Number.isFinite(value)) {
+    throw new TypeError(`${path} must be finite.`);
+  }
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => assertFiniteNumbers(entry, `${path}[${index}]`));
+  } else if (isRecord(value)) {
+    Object.entries(value).forEach(([key, entry]) => assertFiniteNumbers(entry, `${path}.${key}`));
+  }
+}
+
+function findCollections(currentDoc) {
+  const result = [];
+  walk(currentDoc, '', result);
+  return result;
+}
+
+function walk(value, prefix, output) {
+  if (!isRecord(value)) return;
+  for (const [key, child] of Object.entries(value)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    if (Array.isArray(child) && child.every((entry) => isRecord(entry))) {
+      output.push({ path, rows: child });
+    } else if (isRecord(child) && !isValueWrapper(child)) {
+      walk(child, path, output);
+    }
+  }
+}
+
+function stableColumns(rows) {
+  const columns = [];
+  const seen = new Set();
+  for (const row of rows) {
+    Object.keys(row).forEach((key) => {
+      if (!seen.has(key)) {
+        seen.add(key);
+        columns.push(key);
+      }
+    });
+  }
+  return columns;
+}
+
+function labelWithPath(documentRef, path) {
+  const wrapper = documentRef.createElement('span');
+  const label = documentRef.createElement('strong');
+  label.textContent = friendlyName(path);
+  const code = documentRef.createElement('code');
+  code.textContent = path;
+  code.style.display = 'block';
+  wrapper.append(label, code);
+  return wrapper;
+}
+
+function friendlyName(path) {
+  return String(path)
+    .split('.')
+    .at(-1)
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/_/g, ' ')
+    .replace(/^./, (character) => character.toUpperCase());
+}
+
+function recordIdentity(record) {
+  const key = Object.keys(record).find((name) => /(?:Id|ID|identity)$/u.test(name));
+  const value = key ? record[key] : null;
+  return typeof value === 'string' ? value : null;
+}
+
+function isValueWrapper(value) {
+  return isRecord(value) && Object.hasOwn(value, 'value');
+}
+
+function typeOf(value) {
+  if (Array.isArray(value)) return 'array';
+  if (value === null) return 'null';
+  return typeof value;
+}
+
+function displayValue(value) {
+  if (Array.isArray(value) || isRecord(value)) return JSON.stringify(value);
+  return String(value ?? '');
+}
+
+function isRecord(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
