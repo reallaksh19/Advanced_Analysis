@@ -1,0 +1,58 @@
+{
+  "schema": "lfea-piping-phase-slice/v1",
+  "phaseId": "PHASE_2E_MULTICASE_APPLICATION_ORCHESTRATION",
+  "ownerFindingId": "AUD-A3-001",
+  "baseHead": "e28f287d2ee4b086c84931c27676c4d0bdf39771",
+  "status": "PARTIALLY_VERIFIED",
+  "scope": [
+    "Consume multiple retained linear-piping-inputxml-analysis-context/v1 records without reparsing, recompiling or resolving engineering properties.",
+    "Require one exact InputXML source, raw-content hash, conditioned topology, B-2.5 compilation, mechanical-model identity and stiffness state across all cases.",
+    "Compile one governed Phase 3 interface set and recover every retained physical case through the existing interface-recovery authority.",
+    "Create one deterministic interface envelope retaining governing physical-case and recovery identities.",
+    "Assess every configured nozzle allowable profile in every retained case and deterministically retain the governing case assessment.",
+    "Compile sustained, occasional and ordered displacement-range B31.3 checks from retained B-3.4 recoveries through the existing Phase 4 authority.",
+    "Seal the complete multicase application parent chain through the existing qualified application-result contract."
+  ],
+  "evidencePaths": [
+    "src/core/linear-piping-multicase-application/contracts.js",
+    "src/core/linear-piping-multicase-application/orchestrator.js",
+    "src/core/linear-piping-multicase-application/index.js",
+    "scripts/linear-piping-multicase-application-check.mjs",
+    "scripts/linear-piping-multicase-application-anti-drift-check.mjs",
+    "scripts/linear-piping-analysis-consumer-anti-drift-check.mjs",
+    ".github/workflows/lfea-piping-phase-certification.yml"
+  ],
+  "addressedAgainstSection9": {
+    "findingId": "AUD-A3-001",
+    "priorStatus": "PARTIALLY_VERIFIED",
+    "statusAfterCoding": "PARTIALLY_VERIFIED",
+    "addressed": [
+      "Complete multi-case source-to-interface-to-nozzle-to-B31.3 application orchestration is now represented by one bounded production API.",
+      "Caller-injected B31.3 cases, recoveries and local actions are excluded from the orchestration request.",
+      "Mixed source, topology, compilation, stiffness, duplicate case and stale downstream parent chains fail closed.",
+      "All case contexts, recoveries, nozzle assessments, envelopes, B31.3 results and final application identities are retained for independent revalidation."
+    ],
+    "notClosed": [
+      "Successful exact-head Phase 2E, consumer, core and full-gate command logs are not yet retained.",
+      "Only metre-based InputXML is accepted; governed unit conversion remains unresolved.",
+      "Real project material, section, axis, constraint, load, interface, nozzle-allowable and code-dataset authorities remain caller supplied.",
+      "Real-model reconciliation, commercial corroboration, performance qualification and rollback rehearsal remain unresolved."
+    ]
+  },
+  "explicitNonScope": [
+    "InputXML parsing or geometry conditioning",
+    "Material, section, local-axis, constraint or load inference",
+    "Solver assembly, factorization or result recovery",
+    "Interface reaction mechanics or frame transformation",
+    "Nozzle allowable derivation",
+    "B31.3 equation or licensed dataset implementation",
+    "Presentation, workspace, project reconciliation or release promotion"
+  ],
+  "remainingConditions": [
+    "Retain successful exact-head multicase, consumer, core and full-gate logs from one clean head.",
+    "Provide caller-approved project authorities and execute real-model reconciliation.",
+    "Provide independent commercial comparison, performance evidence and rollback rehearsal."
+  ],
+  "releaseImpact": "NONE",
+  "programDisposition": "BLOCKED"
+}

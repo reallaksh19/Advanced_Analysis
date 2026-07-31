@@ -9,6 +9,7 @@ on:
       - 'reports/lfea-piping-phase2b-inputxml-binding.json'
       - 'reports/lfea-piping-phase2c-analysis-context.json'
       - 'reports/lfea-piping-phase2d-inputxml-context.json'
+      - 'reports/lfea-piping-phase2e-multicase-application.json'
       - 'reports/lfea-piping-phase5b-workspace-integration.json'
       - 'docs/LFEA_PIPING_100_PERCENT_CLOSURE_POLICY.md'
       - 'docs/LFEA_PIPING_PHASE_STATUS.md'
@@ -22,6 +23,7 @@ on:
       - 'scripts/linear-piping-inputxml-source-binding-check.mjs'
       - 'scripts/linear-piping-source-analysis-context-check.mjs'
       - 'scripts/linear-piping-inputxml-analysis-context-check.mjs'
+      - 'scripts/linear-piping-multicase-application-*.mjs'
       - 'scripts/linear-piping-interface-*.mjs'
       - 'scripts/linear-piping-nozzle-interface-check.mjs'
       - 'scripts/linear-piping-code-application-*.mjs'
@@ -31,6 +33,7 @@ on:
       - 'e2e/linear-piping-results-workspace.spec.js'
       - 'src/main.js'
       - 'src/core/linear-piping-analysis-consumer/**'
+      - 'src/core/linear-piping-multicase-application/**'
       - 'src/core/linear-piping-interface/**'
       - 'src/core/linear-piping-code-application/**'
       - 'src/core/linear-piping-presentation/**'
@@ -97,6 +100,11 @@ jobs:
 
       - name: Verify InputXML provenance and retained context directly
         run: node scripts/linear-piping-inputxml-analysis-context-check.mjs
+
+      - name: Verify complete multicase application orchestration directly
+        run: |
+          node scripts/linear-piping-multicase-application-check.mjs
+          node scripts/linear-piping-multicase-application-anti-drift-check.mjs
 
       - name: Verify governed interfaces and recovery
         run: npm run check:lfea-interfaces
