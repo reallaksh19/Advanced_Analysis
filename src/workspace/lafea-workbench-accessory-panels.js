@@ -76,8 +76,8 @@ export function createLafeaAccessoryPanelManager(documentRef, descriptorValues) 
   function mount(controller) {
     if (destroyed) throw accessoryError('LAFEA_ACCESSORY_PANEL_MANAGER_DESTROYED');
     if (mounted) return snapshot();
-    mounted = true;
     facade = createControllerFacade(controller);
+    mounted = true;
 
     for (const record of records) {
       try {
@@ -89,7 +89,7 @@ export function createLafeaAccessoryPanelManager(documentRef, descriptorValues) 
         if (typeof result.destroy !== 'function') {
           throw accessoryError('LAFEA_ACCESSORY_PANEL_DESTROY_INVALID', record.descriptor.panelId);
         }
-        record.destroy = once(result.destroy);
+        record.destroy = once(() => result.destroy());
         record.status = 'MOUNTED';
         record.section.dataset.status = 'MOUNTED';
       } catch (error) {
