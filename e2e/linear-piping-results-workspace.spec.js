@@ -70,7 +70,10 @@ test('[SIMULATED] conditional result blocks engineering export and rejected repl
   await page.goto('/');
   await expect.poll(() => page.evaluate(() => Boolean(globalThis.AnalysisWorkspace))).toBe(true);
 
-  await page.evaluate((value) => AnalysisWorkspace.importLinearPipingResultPackage(value), CONDITIONAL_PACKAGE);
+  await page.evaluate((value) => {
+    AnalysisWorkspace.importLinearPipingResultPackage(value);
+    return true;
+  }, CONDITIONAL_PACKAGE);
   const section = page.locator('[data-section-id="linear-piping-results"]');
   await expect(section).toHaveAttribute('data-qualification-status', 'CONDITIONAL');
   await expect(section.getByRole('button', { name: 'Download Audit JSON' })).toBeEnabled();
