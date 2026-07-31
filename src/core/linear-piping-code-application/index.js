@@ -38,10 +38,13 @@ export {
   B31_CHECK_KEYS,
   B31_RESULT_ENTRY_KEYS,
   b31ApplicationSemanticProjection,
-  compileLinearPipingB31Application,
   computeB31ApplicationEvidenceHash,
-  requireLinearPipingB31Application,
 } from './b31-application.js';
+
+export {
+  compileLinearPipingB31Application,
+  requireLinearPipingB31Application,
+} from './public-api.js';
 
 export {
   APPLICATION_RESULT_INPUT_KEYS,
