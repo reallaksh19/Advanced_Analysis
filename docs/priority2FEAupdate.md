@@ -1,16 +1,59 @@
 # Priority 2 FEA Update Plan
 
-Status: **[PROPOSED] — no Priority 2 FEA implementation or qualification evidence exists yet**
+Status: **BLOCKED — upstream numerical packages exist; the piping application chain is not implemented or qualified**
 
 This plan follows the thermal support, anchor, and nozzle concept note and the
 topology/SVG adoption procedure. Priority 1 first-cut screening is deliberately
 separate. No first-cut result may be relabelled as an FEA reaction.
 
+## Baseline-reconciled qualification
+
+Remote `main` resolves to `8379f6dedcd070fe89deb0190e4c8ece75da6c98`.
+The current feature branch commit `0bd3ba847440f03557428255142b47dc34a13312`
+is the content parent merged by that main revision. The repository aggregate
+gate passes on the current working tree, including B-2.x through B-4.0,
+first-cut, LAFEA, LFEA SVG, workspace, syntax, import, and build checks.
+
+That evidence qualifies individual package behavior only. It does not qualify
+the assembled piping application because:
+
+- no public piping execution gateway seals the B-2/B-3/B-4 parent chain;
+- no governed support/anchor/nozzle interface-result contract exists;
+- no nozzle reference-frame and offset recovery package exists;
+- no piping-result workspace or deterministic equipment-load export exists;
+- no real imported piping model or commercial corroboration was supplied;
+- the exact-main audit manifest, retained command artifacts, and clean-release
+  rehearsal remain unperformed.
+
+Program disposition: **BLOCKED**.
+
+## Current T0 implementation
+
+`src/core/linear-piping-analysis-consumer/` now provides the first qualified
+stage of the application boundary:
+
+- exact `linear-piping-analysis-request/v1` and
+  `linear-piping-analysis-result-chain/v1` contracts;
+- current-parent binding for source, conditioned topology, B-2.5 compilation,
+  B-3.0 load case, element authorities, solver profile, and recovery profile;
+- B-3.1/B-3.2 contribution normalization through their existing public APIs;
+- B-3.3 execution and B-3.4 recovery through their existing public APIs;
+- refusal of stale parents, partial or duplicate element authority, blocked
+  component state, blocked execution, and tampered result chains;
+- explicit `null` fields for interface loads, nozzle assessment, and B31.3
+  application orchestration;
+- a registered `[SIMULATED]` analytical vertical-slice check and source guard.
+
+This closes only the qualified-stage T0 result-authority slice. It does not yet
+compile source data into B-2.5/B-3.0, recover governed interface loads, assess
+nozzles, orchestrate B31.3 categories, or publish UI/export results.
+
 ## Release sequence
 
 ### Phase 1 — Analysis gateway and result authority
 
-Create the missing end-to-end LFEA consumer/orchestrator. It must bind the
+Create `src/core/linear-piping-analysis-consumer/` as the missing end-to-end
+piping consumer/orchestrator. It must bind the
 shared-model, topology, attachment, restraint, profile, load-case, solver,
 recovery, and presentation identities. A result is current only when every
 parent hash matches and every required stage is qualified.
@@ -20,7 +63,8 @@ Exit criteria:
 - one public gateway owns execution;
 - partial, blocked, and stale chains cannot become presentation results;
 - every result has a deterministic semantic identity and complete parent hashes;
-- the currently orphaned `lfea-consumer` checks import a real module.
+- dedicated piping-consumer checks import production B-2/B-3/B-4 entry points;
+- the Local FEA continuum consumer remains a distinct authority and package.
 
 ### Phase 2 — Support, anchor, and nozzle interfaces
 
@@ -64,6 +108,38 @@ Equipment/nozzle comparisons require an authorized allowable profile with
 source and revision. Add deterministic exports and sparse-solver/performance
 work only after correctness gates pass. Release requires thermal, support,
 anchor, nozzle, equilibrium, stale-state, UI, and real-model reconciliation.
+
+## High-ROI execution slices
+
+1. **Gate honesty and exact baseline**
+   - Create the exact-main audit manifest and retain command outputs.
+   - Register a dedicated, initially failing piping-consumer check in the
+     aggregate gate.
+   - Repair or explicitly disposition the separate orphaned `lfea-007` Local
+     FEA suite without treating it as Priority 2 completion.
+2. **One end-to-end analytical vertical slice**
+   - Straight pipe, one fixed anchor, one bilateral support, one equipment
+     interface, gravity, uniform temperature, and one prescribed movement.
+   - Execute through existing B-2.5, B-3.0, B-3.1/B-3.2, B-3.3, and B-3.4.
+   - Seal one current-only result chain; reject missing and stale parents.
+3. **Interface recovery**
+   - Group constrained node/DOF reactions by declared interface.
+   - Transform through an explicit right-handed frame.
+   - Benchmark `M_reference = M_node + r × F`, sign sense, equilibrium, and
+     governing-case envelopes.
+4. **Code and allowable binding**
+   - Bind recovered case/category actions into B-4.0.
+   - Add caller-supplied nozzle allowable profiles and governing assessments.
+   - Keep `OPERATING` a view, never a compliance category.
+5. **Read-only product surface**
+   - Only after the vertical slice is sealed, bind support/nozzle tables and
+     the hybrid canvas to current results.
+   - Add stale-state blocking and deterministic exports before visual polish.
+6. **Real-model release evidence**
+   - Reconcile one user-controlled import against independently reviewed
+     displacements, reactions, interface loads, diagrams, and code results.
+   - Add selected commercial corroboration, performance qualification, and
+     rollback rehearsal.
 
 ## Appendix A — Phase-wise code sketches
 
@@ -226,9 +302,9 @@ artifact are retained by the repository’s normal test workflow.
 
 | Test ID | Input basis | Expected result | Tolerance | Command | Status |
 |---|---|---|---|---|---|
-| FEA-GW-01 | [SIMULATED] complete parent chain | One qualified sealed result | Exact hashes | `npm run check:lfea-consumer` | NOT RUN |
-| FEA-GW-02 | [SIMULATED] changed profile hash | Result rejected as stale | Exact hashes | `npm run check:lfea-consumer` | NOT RUN |
-| FEA-GW-03 | [SIMULATED] missing recovery parent | Seal blocked | Exact | `npm run check:lfea-consumer` | NOT RUN |
+| FEA-GW-01 | [SIMULATED] complete B-2.5 to B-3.4 parent chain | One qualified sealed T0 result | Exact hashes | `npm run check:linear-piping-analysis-consumer` | PASS |
+| FEA-GW-02 | [SIMULATED] changed solver-profile hash | Request rejected as stale | Exact hashes | `npm run check:linear-piping-analysis-consumer` | PASS |
+| FEA-GW-03 | [SIMULATED] missing recovery-profile parent | Request blocked | Exact | `npm run check:linear-piping-analysis-consumer` | PASS |
 | FEA-IF-01 | [SIMULATED] bilateral support | Correct six-DOF map | Exact | `npm run check:lfea-interfaces` | NOT RUN |
 | FEA-IF-02 | [SIMULATED] anchor with offset | Station/frame/offset retained | 1e-12 m | `npm run check:lfea-interfaces` | NOT RUN |
 | FEA-IF-B01 | [SIMULATED] gap/friction input | Compilation blocked | Exact | `npm run check:lfea-interfaces` | NOT RUN |
@@ -274,9 +350,17 @@ artifact are retained by the repository’s normal test workflow.
 12. Priority 1 first-cut values retain their screening labels and can never be
     promoted to LFEA reactions by a presenter.
 
-## Current repository blocker
+## Separate repository blocker
 
-The repository currently contains `lfea-consumer` checks that reference a
-missing `src/core/lfea-consumer/index.js`. This is the first Priority 2 gap and
-must be resolved in Phase 1. It is not a reason to delete, skip, or weaken those
-checks, and it does not invalidate a fully passing Priority 1 gate.
+The repository contains orphaned `lfea-007` checks and a certification workflow
+that reference missing `src/core/lfea-consumer/`,
+`src/core/workspace-consumers/`, and workspace controller/view modules. The
+fixtures call the 2D continuum `element-fea` path and describe a Local FEA
+review/export consumer. They do not exercise the 3D piping-frame B-2/B-3/B-4
+chain.
+
+This suite must be repaired, registered, or formally removed through its own
+reviewed work package. It must not be renamed into, or used as evidence for,
+the Priority 2 piping consumer. Its current registration and module-import
+failures are repository gate-hygiene defects, while the missing piping
+application chain remains a separate Priority 2 blocker.
