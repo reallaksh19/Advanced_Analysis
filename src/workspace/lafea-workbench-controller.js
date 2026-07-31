@@ -13,6 +13,14 @@ import {
   createLafeaAccessoryPanelManager,
   lafeaAccessoryPanelConfigurationRequiresHost,
 } from './lafea-workbench-accessory-panels.js';
+import {
+  bindLafeaWorkbenchDisplayRenderPacket,
+  clearLafeaWorkbenchDisplayRenderPacket,
+  destroyLafeaWorkbenchRenderEvidence,
+  initializeLafeaWorkbenchRenderEvidence,
+  lafeaWorkbenchDisplayRenderPacket,
+  lafeaWorkbenchThreeNamespace,
+} from './lafea-workbench-render-evidence.js';
 import { LafeaWorkbenchView } from './lafea-workbench-view.js';
 
 const ACCESSORY_PANEL_MANAGERS = new WeakMap();
@@ -21,11 +29,15 @@ const DESTROYED_CONTROLLERS = new WeakSet();
 export class LafeaWorkbenchController {
   constructor(rootElement, options) {
     const configuration = isRecord(options) ? options : {};
-    const { accessoryPanels, ...storeOptions } = configuration;
+    const { accessoryPanels, THREE, ...storeOptions } = configuration;
     this.rootElement = rootElement;
     this.documentRef = rootElement?.ownerDocument ?? globalThis.document;
     this.store = createLafeaWorkbenchStore(storeOptions);
-    this.view = new LafeaWorkbenchView(rootElement);
+    initializeLafeaWorkbenchRenderEvidence(this, THREE ?? null);
+    this.view = new LafeaWorkbenchView(rootElement, {
+      getRenderPacket: (stageId) => lafeaWorkbenchDisplayRenderPacket(this, stageId),
+      THREE: lafeaWorkbenchThreeNamespace(this),
+    });
     this.benchmarkHost = this.documentRef.createElement('div');
     this.benchmarkHost.dataset.role = 'lafea-benchmark-host';
     this.benchmarkPanel = new FeaBenchmarkPanel(this.benchmarkHost, { surface: 'LAFEA' });
@@ -120,6 +132,38 @@ export class LafeaWorkbenchController {
     return this.store.revalidateLifecycleBinding(sourceHash, originRef);
   }
 
+  getDisplayViewportContext() {
+    const viewport = this.view.activeViewport;
+    if (!viewport) return null;
+    const state = viewport.getState();
+    return Object.freeze({
+      schema: 'lafea-workbench-display-context/v1',
+      stageId: state.stageId,
+      sceneRevision: state.sceneRevision,
+      sourceSemanticHash: viewport.scene.sourceSemanticHash,
+      mode: state.mode,
+      status: state.status,
+    });
+  }
+
+  setDisplayRenderPacket(packetValue) {
+    const binding = bindLafeaWorkbenchDisplayRenderPacket(this, packetValue);
+    this.renderActiveStageIf(binding.stageId);
+    return binding;
+  }
+
+  clearDisplayRenderPacket(stageId = this.getState().activeStageId) {
+    const binding = clearLafeaWorkbenchDisplayRenderPacket(this, stageId);
+    if (binding.status === 'CLEARED') this.renderActiveStageIf(binding.stageId);
+    return binding;
+  }
+
+  renderActiveStageIf(stageId) {
+    if (this.unsubscribe && this.getState().activeStageId === stageId) {
+      this.view.render(this.getState());
+    }
+  }
+
   setScalar(descriptorId, entityId, rawText) {
     try {
       return this.store.setScalar(descriptorId, entityId, rawText, 'FORM');
@@ -169,6 +213,7 @@ export class LafeaWorkbenchController {
     this.unsubscribe = null;
     this.store.destroy();
     this.view.destroy();
+    destroyLafeaWorkbenchRenderEvidence(this);
     this.rootElement = null;
   }
 }

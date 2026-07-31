@@ -71,8 +71,17 @@ export function createLafeaSourceWorkbenchViewportModel(input) {
 
 /** Mount a source-only hybrid viewport and return an immutable control facade. */
 export function mountLafeaSourceWorkbenchViewport(root, input) {
-  if (!root?.ownerDocument) throw new TypeError('LAFEA_SOURCE_WORKBENCH_VIEWPORT_ROOT_REQUIRED');
   const model = createLafeaSourceWorkbenchViewportModel(input);
+  return mountLafeaSourceWorkbenchViewportModel(root, model, input);
+}
+
+/** Mount an already-created U4B model without recompiling its source scene. */
+export function mountLafeaSourceWorkbenchViewportModel(root, model, input = {}) {
+  if (!root?.ownerDocument) throw new TypeError('LAFEA_SOURCE_WORKBENCH_VIEWPORT_ROOT_REQUIRED');
+  if (model?.schema !== LAFEA_WORKBENCH_SOURCE_VIEWPORT_SCHEMA
+    || !model.registryEntry || !model.scene || !model.viewport || !model.request) {
+    throw new TypeError('LAFEA_SOURCE_WORKBENCH_VIEWPORT_MODEL_INVALID');
+  }
   root.style.minHeight = `${model.viewport.cssHeight}px`;
   root.style.height = `${model.viewport.cssHeight}px`;
   const inspector = createAccessibleInspector();
