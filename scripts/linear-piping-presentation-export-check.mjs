@@ -72,8 +72,8 @@ test('P5-PRES-04', 'Missing current analysis parent is rejected before presentat
 });
 
 test('P5-EXP-01', 'Current audit JSON is deterministic and retains the qualification state', () => {
-  const first = createLinearPipingAuditJsonExport(presentation);
-  const second = createLinearPipingAuditJsonExport(presentation);
+  const first = createLinearPipingAuditJsonExport(presentation, fixture.applicationResult);
+  const second = createLinearPipingAuditJsonExport(presentation, fixture.applicationResult);
   assert.equal(first.content, second.content);
   assert.equal(first.contentHash, second.contentHash);
   assert.equal(first.qualificationStatus, 'QUALIFIED');
@@ -82,8 +82,8 @@ test('P5-EXP-01', 'Current audit JSON is deterministic and retains the qualifica
 });
 
 test('P5-EXP-02', 'Qualified interface, nozzle and B31 CSV exports are byte deterministic', () => {
-  const first = createQualifiedLinearPipingEngineeringExports(presentation);
-  const second = createQualifiedLinearPipingEngineeringExports(presentation);
+  const first = createQualifiedLinearPipingEngineeringExports(presentation, fixture.applicationResult);
+  const second = createQualifiedLinearPipingEngineeringExports(presentation, fixture.applicationResult);
   assert.equal(first.length, 3);
   assert.deepEqual(
     first.map((row) => ({ role: row.role, contentHash: row.contentHash, content: row.content })),
@@ -113,12 +113,28 @@ test('P5-EXP-03', 'Conditional current result remains audit-visible but engineer
   assert.equal(conditionalPresentation.status, 'CONDITIONAL');
   assert.equal(conditionalPresentation.exportEligibility, 'AUDIT_ONLY_CONDITIONAL');
   assert.match(
-    createLinearPipingAuditJsonExport(conditionalPresentation).content,
+    createLinearPipingAuditJsonExport(conditionalPresentation, conditionalApplication).content,
     /NOZZLE_ALLOWABLE_NOT_CONFIGURED/u,
   );
   expectCode(
-    () => createQualifiedLinearPipingEngineeringExports(conditionalPresentation),
+    () => createQualifiedLinearPipingEngineeringExports(conditionalPresentation, conditionalApplication),
     'PIPING_PRESENTATION_ENGINEERING_EXPORT_BLOCKED',
+  );
+});
+
+test('P5-EXP-04', 'A previously valid presentation is rejected against a different current application', () => {
+  const conditionalApplication = sealLinearPipingQualifiedApplicationResult({
+    schema: APPLICATION_RESULT_REQUEST_SCHEMA,
+    applicationId: 'PIPE-PHASE5-STALE-TARGET',
+    analysisResults: fixture.analysisResults,
+    interfaceSet: fixture.interfaceSet,
+    interfaceRecoveries: fixture.interfaceRecoveries,
+    nozzleAssessments: [],
+    b31Application: fixture.b31Application,
+  });
+  expectCode(
+    () => createLinearPipingAuditJsonExport(presentation, conditionalApplication),
+    'PIPING_PRESENTATION_STALE',
   );
 });
 
@@ -128,10 +144,10 @@ test('P5-PRES-05', 'Tampered presentation evidence is rejected independently', (
   expectCode(() => requireLinearPipingPresentation(tampered), 'PIPING_PRESENTATION_HASH_MISMATCH');
 });
 
-test('P5-UI-01', 'Workspace renderer consumes the sealed presentation without mechanics', () => {
+test('P5-UI-01', 'Workspace renderer consumes the sealed current presentation without mechanics', () => {
   const documentRef = new FakeDocument();
   const root = new FakeElement('div', documentRef);
-  const view = renderLinearPipingResultsView(root, presentation);
+  const view = renderLinearPipingResultsView(root, presentation, fixture.applicationResult);
   assert.equal(root.children.length, 1);
   assert.equal(view.dataset.currency, 'CURRENT');
   assert.equal(view.dataset.status, 'QUALIFIED');
