@@ -30,13 +30,17 @@ import {
 import { recoveryProfile } from './lfea-b3.4-recovery-fixtures.mjs';
 
 const SOURCE_ID = 'PROJECT-CAESAR-UNIT-NORMALIZATION';
-const XML_M = '<CAESARII xmlns="COADE" VERSION="14.00" XML_TYPE="Input"><PIPINGMODEL xmlns="" JOBNAME="PHASE2F-M"><PIPINGELEMENT FROM_NODE="10" TO_NODE="20" DELTA_X="1.2" DELTA_Y="0" DELTA_Z="0" DIAMETER="0.125" WALL_THICK="0.0078125" MATERIAL_NAME="A106 B"/><PIPINGELEMENT FROM_NODE="20" TO_NODE="30" DELTA_X="1.2" DELTA_Y="0" DELTA_Z="0" DIAMETER="0.125" WALL_THICK="0.0078125" MATERIAL_NAME="A106 B"/></PIPINGMODEL></CAESARII>';
-const XML_MM = '<CAESARII xmlns="COADE" VERSION="14.00" XML_TYPE="Input"><PIPINGMODEL xmlns="" JOBNAME="PHASE2F-MM"><PIPINGELEMENT FROM_NODE="10" TO_NODE="20" DELTA_X="1200" DELTA_Y="0" DELTA_Z="0" DIAMETER="125" WALL_THICK="7.8125" MATERIAL_NAME="A106 B"/><PIPINGELEMENT FROM_NODE="20" TO_NODE="30" DELTA_X="1200" DELTA_Y="0" DELTA_Z="0" DIAMETER="125" WALL_THICK="7.8125" MATERIAL_NAME="A106 B"/></PIPINGMODEL></CAESARII>';
+const XML_M = xmlFor('PHASE2F-M', '1.2', '0.125', '0.0078125');
+const XML_MM = xmlFor('PHASE2F-MM', '1200', '125', '7.8125');
 const CONDITIONING_PROFILE = Object.freeze({
   spanSeedingLimit: { value: 10, source: 'PHASE-2F-FIXTURE' },
   bendSeedingSegments: { value: 4, source: 'PHASE-2F-FIXTURE' },
   bendLengthErrorLimit: { value: 0.01, source: 'PHASE-2F-FIXTURE' },
 });
+
+function xmlFor(job, delta, diameter, thickness) {
+  return `<CAESARII xmlns="COADE" VERSION="14.00" XML_TYPE="Input"><PIPINGMODEL xmlns="" JOBNAME="${job}"><PIPINGELEMENT FROM_NODE="10" TO_NODE="20" DELTA_X="${delta}" DELTA_Y="0" DELTA_Z="0" DIAMETER="${diameter}" WALL_THICK="${thickness}" MATERIAL_NAME="A106 B"/><PIPINGELEMENT FROM_NODE="20" TO_NODE="30" DELTA_X="${delta}" DELTA_Y="0" DELTA_Z="0" DIAMETER="${diameter}" WALL_THICK="${thickness}" MATERIAL_NAME="A106 B"/></PIPINGMODEL></CAESARII>`;
+}
 
 function test(id, name, body) {
   body();
@@ -76,18 +80,18 @@ function source(content, revision) {
   });
 }
 
-function ingestionOptions(unit, profile = null) {
-  const base = {
+function ingestion(unit, profile = null) {
+  const value = {
     unit,
     source: SOURCE_ID,
     componentOrigins: {},
     restraintTypeCodeMap: {},
     bendRadiusTolerance: { value: 1e-8, source: 'PHASE-2F-FIXTURE' },
   };
-  return profile === null ? base : { ...base, unitNormalizationProfile: profile };
+  return profile === null ? value : { ...value, unitNormalizationProfile: profile };
 }
 
-function conditionedFrom(inputSource, options, profile = null) {
+function parseAndCondition(inputSource, options, profile) {
   const parsed = inputXmlToCanonicalGeometry(inputSource.content, {
     unit: options.unit,
     source: options.source,
@@ -104,8 +108,21 @@ function conditionedFrom(inputSource, options, profile = null) {
   return conditionGeometry(geometry, [], CONDITIONING_PROFILE);
 }
 
-function mechanicalInput(inputSource, conditioned) {
-  return compilerInput({
+function binding(elementId, segmentId, axisId, componentId) {
+  return {
+    elementId,
+    conditionedSegmentId: `C-${segmentId}`,
+    topologySegmentId: segmentId,
+    materialStateId: 'MAT-A106B-393K',
+    sectionStateId: 'SEC-NPS6-SCH40',
+    formulationId: 'PIPE_FRAME3D_LINEAR_V1',
+    localAxisEvidenceIdentity: axisId,
+    sourceComponentId: componentId,
+  };
+}
+
+function sourceAnalysisRequest(inputSource, conditioned) {
+  const mechanicalModelInput = compilerInput({
     sourceSemanticHash: inputSource.semanticHash,
     conditionedTopology: conditioned,
     nodeBindings: [
@@ -114,8 +131,8 @@ function mechanicalInput(inputSource, conditioned) {
       { nodeId: 'N-000122', conditionedNodeId: 'CN-000122', topologyNodeId: '30' },
     ],
     elementBindings: [
-      elementBinding('E-000120', 'CS-000120', 'IX-S1', 'AXIS-E-000120', 'PIPINGELEMENT[0]'),
-      elementBinding('E-000121', 'CS-000121', 'IX-S2', 'AXIS-E-000121', 'PIPINGELEMENT[1]'),
+      binding('E-000120', 'IX-S1', 'AXIS-E-000120', 'PIPINGELEMENT[0]'),
+      binding('E-000121', 'IX-S2', 'AXIS-E-000121', 'PIPINGELEMENT[1]'),
     ],
     materialResolutions: [materialResolution()],
     sectionResolutions: [sectionResolution()],
@@ -126,29 +143,12 @@ function mechanicalInput(inputSource, conditioned) {
     localAxisProfile: FRAME_LOCAL_AXIS_PROFILE,
     constraintDeclarations: cantileverConstraintDeclarations(),
   });
-}
-
-function elementBinding(elementId, conditionedSegmentId, topologySegmentId, axisId, sourceComponentId) {
-  return {
-    elementId,
-    conditionedSegmentId,
-    topologySegmentId,
-    materialStateId: 'MAT-A106B-393K',
-    sectionStateId: 'SEC-NPS6-SCH40',
-    formulationId: 'PIPE_FRAME3D_LINEAR_V1',
-    localAxisEvidenceIdentity: axisId,
-    sourceComponentId,
-  };
-}
-
-function sourceAnalysisRequest(inputSource, conditioned) {
-  const mechanicalModelInput = mechanicalInput(inputSource, conditioned);
   const physicalLoadCaseInput = {
     loadCaseId: 'LC-TIP-01',
     loadCaseClass: 'APPLIED_MECHANICAL',
     presentation: {
       label: 'Unit-normalized tip load',
-      description: 'Same SI load authority over metre and millimetre InputXML geometry.',
+      description: 'Same SI load authority over equivalent InputXML geometry.',
     },
     primitives: [tipLoadPrimitive()],
     profile: loadCaseProfile(),
@@ -174,8 +174,8 @@ function sourceAnalysisRequest(inputSource, conditioned) {
 
 function request({ content, revision, unit, schema, profile = null }) {
   const inputSource = source(content, revision);
-  const options = ingestionOptions(unit, profile);
-  const conditioned = conditionedFrom(inputSource, options, profile);
+  const options = ingestion(unit, profile);
+  const conditioned = parseAndCondition(inputSource, options, profile);
   return {
     schema,
     inputXmlSource: inputSource,
@@ -185,12 +185,12 @@ function request({ content, revision, unit, schema, profile = null }) {
   };
 }
 
-function directGeometry(unit = 'mm') {
+function directGeometry(unit, length) {
   return {
     schemaVersion: 'canonical-geometry-v1',
     nodes: [
       { id: '10', x: 0, y: 0, z: 0, restraint: 'FREE', meta: { caesarNodeNumber: '10' } },
-      { id: '20', x: 1000, y: 0, z: 0, restraint: 'FREE', meta: { caesarNodeNumber: '20' } },
+      { id: '20', x: length, y: 0, z: 0, restraint: 'FREE', meta: { caesarNodeNumber: '20' } },
     ],
     segments: [{
       id: 'IX-S1',
@@ -198,21 +198,19 @@ function directGeometry(unit = 'mm') {
       endNodeId: '20',
       type: 'BEND',
       sourceComponentUid: 'PIPINGELEMENT[0]',
-      length: 1000,
-      diameter: 125,
-      thickness: 7.8125,
+      length,
+      diameter: length / 8,
+      thickness: length / 128,
       material: 'A106 B',
       meta: {
         materialNumber: null,
         sourceType: 'BEND',
         sourceIndex: 0,
-        bendDeclaredRadius: 1500,
+        bendDeclaredRadius: length * 1.5,
         bendAngle1: 90,
-        bendAngle2: undefined,
         numMiter: 1,
-        bendCompoundMiter: undefined,
-        bendArcCentre: { x: 500, y: 500, z: 0 },
-        bendComputedRadius: 1500,
+        bendArcCentre: { x: length / 2, y: length / 2, z: 0 },
+        bendComputedRadius: length * 1.5,
       },
     }],
     source: SOURCE_ID,
@@ -224,29 +222,38 @@ function directGeometry(unit = 'mm') {
 }
 
 console.log('\n--- [SIMULATED] Linear piping Phase 2F InputXML unit normalization check ---');
-
 const profile = unitProfile();
-const normalized = normalizeLinearPipingInputXmlGeometry(directGeometry(), profile);
+const normalizedMm = normalizeLinearPipingInputXmlGeometry(directGeometry('mm', 1000), profile);
 
 test('P2F-UNIT-01', 'Exact registry scales every classified InputXML length field', () => {
-  assert.deepEqual(normalized.scale, { numerator: 1, denominator: 1000 });
-  assert.equal(normalized.geometry.unit, 'm');
-  assert.equal(normalized.geometry.nodes[1].x, 1);
-  assert.equal(normalized.geometry.segments[0].length, 1);
-  assert.equal(normalized.geometry.segments[0].diameter, 0.125);
-  assert.equal(normalized.geometry.segments[0].thickness, 0.0078125);
-  assert.equal(normalized.geometry.segments[0].meta.bendDeclaredRadius, 1.5);
-  assert.deepEqual(normalized.geometry.segments[0].meta.bendArcCentre, { x: 0.5, y: 0.5, z: 0 });
+  assert.deepEqual(normalizedMm.scale, { numerator: 1, denominator: 1000 });
+  assert.equal(normalizedMm.geometry.nodes[1].x, 1);
+  assert.equal(normalizedMm.geometry.segments[0].diameter, 0.125);
+  assert.equal(normalizedMm.geometry.segments[0].thickness, 0.0078125);
+  assert.equal(normalizedMm.geometry.segments[0].meta.bendDeclaredRadius, 1.5);
+  assert.deepEqual(normalizedMm.geometry.segments[0].meta.bendArcCentre, { x: 0.5, y: 0.5, z: 0 });
 });
 
-test('P2F-UNIT-02', 'Normalization is deterministic and independently revalidated', () => {
-  const repeated = normalizeLinearPipingInputXmlGeometry(directGeometry(), unitProfile());
-  assert.deepEqual(repeated, normalized);
-  assert.equal(requireLinearPipingInputXmlUnitResult(normalized, profile).semanticHash, normalized.semanticHash);
+test('P2F-UNIT-02', 'Inch and foot registry entries use exact rational definitions', () => {
+  const inches = normalizeLinearPipingInputXmlGeometry(directGeometry('in', 10), profile);
+  const feet = normalizeLinearPipingInputXmlGeometry(directGeometry('ft', 10), profile);
+  assert.deepEqual(inches.scale, { numerator: 127, denominator: 5000 });
+  assert.deepEqual(feet.scale, { numerator: 381, denominator: 1250 });
+  assert.equal(inches.geometry.nodes[1].x, 0.254);
+  assert.equal(feet.geometry.nodes[1].x, 3.048);
 });
 
-test('P2F-UNIT-03', 'Unknown numeric metadata is blocked rather than left unscaled', () => {
-  const geometry = directGeometry();
+test('P2F-UNIT-03', 'Normalization is deterministic and independently revalidated', () => {
+  const repeated = normalizeLinearPipingInputXmlGeometry(directGeometry('mm', 1000), unitProfile());
+  assert.deepEqual(repeated, normalizedMm);
+  assert.equal(
+    requireLinearPipingInputXmlUnitResult(normalizedMm, profile).semanticHash,
+    normalizedMm.semanticHash,
+  );
+});
+
+test('P2F-UNIT-04', 'Unknown numeric metadata is blocked rather than left unscaled', () => {
+  const geometry = directGeometry('mm', 1000);
   geometry.segments[0].meta.fabricationOffset = 25;
   expectCode(
     () => normalizeLinearPipingInputXmlGeometry(geometry, profile),
@@ -254,21 +261,21 @@ test('P2F-UNIT-03', 'Unknown numeric metadata is blocked rather than left unscal
   );
 });
 
-test('P2F-UNIT-04', 'Unauthorized source units fail closed', () => {
+test('P2F-UNIT-05', 'Unauthorized units and stale authorities fail closed', () => {
   expectCode(
-    () => normalizeLinearPipingInputXmlGeometry(directGeometry('cm'), unitProfile(['m', 'mm'])),
+    () => normalizeLinearPipingInputXmlGeometry(
+      directGeometry('cm', 100),
+      unitProfile(['m', 'mm']),
+    ),
     'PIPING_INPUTXML_UNIT_NOT_AUTHORIZED',
   );
-});
-
-test('P2F-UNIT-05', 'Stale profile and result identities are rejected', () => {
   const staleProfile = structuredClone(profile);
   staleProfile.semanticHash = 'fnv1a64:0000000000000000';
   expectCode(
-    () => normalizeLinearPipingInputXmlGeometry(directGeometry(), staleProfile),
+    () => normalizeLinearPipingInputXmlGeometry(directGeometry('mm', 1000), staleProfile),
     'PIPING_INPUTXML_UNIT_PROFILE_HASH_MISMATCH',
   );
-  const staleResult = structuredClone(normalized);
+  const staleResult = structuredClone(normalizedMm);
   staleResult.scale.denominator = 10;
   expectCode(
     () => requireLinearPipingInputXmlUnitResult(staleResult, profile),
@@ -289,16 +296,13 @@ const millimetreRequest = request({
   schema: LINEAR_PIPING_INPUTXML_ANALYSIS_REQUEST_V2_SCHEMA,
   profile,
 });
-const metreContext = compileLinearPipingInputXmlAnalysisContext(
-  metreRequest,
-  { factorizationCache: null },
-);
+const metreContext = compileLinearPipingInputXmlAnalysisContext(metreRequest, { factorizationCache: null });
 const millimetreContext = compileLinearPipingInputXmlAnalysisContext(
   millimetreRequest,
   { factorizationCache: null },
 );
 
-test('P2F-UNIT-06', 'Metre and millimetre sources produce one conditioned topology and stiffness state', () => {
+test('P2F-UNIT-06', 'Equivalent metre and millimetre sources share topology and stiffness', () => {
   assert.equal(millimetreContext.conditionedTopologyHash, metreContext.conditionedTopologyHash);
   assert.equal(
     millimetreContext.sourceAnalysisContext.compilation.stiffnessStateHash,
@@ -306,17 +310,17 @@ test('P2F-UNIT-06', 'Metre and millimetre sources produce one conditioned topolo
   );
 });
 
-test('P2F-UNIT-07', 'Metre and millimetre sources produce identical numerical execution and recovery', () => {
-  const metreResult = metreContext.sourceAnalysisContext.analysisResult;
-  const millimetreResult = millimetreContext.sourceAnalysisContext.analysisResult;
-  assert.deepEqual(millimetreResult.execution.displacement, metreResult.execution.displacement);
-  assert.deepEqual(millimetreResult.execution.reaction, metreResult.execution.reaction);
-  assert.deepEqual(millimetreResult.recovery.elementActions, metreResult.recovery.elementActions);
-  assert.deepEqual(millimetreResult.recovery.forceFields, metreResult.recovery.forceFields);
-  assert.deepEqual(millimetreResult.recovery.componentResultants, metreResult.recovery.componentResultants);
+test('P2F-UNIT-07', 'Equivalent sources produce identical numerical execution and recovery', () => {
+  const metre = metreContext.sourceAnalysisContext.analysisResult;
+  const millimetre = millimetreContext.sourceAnalysisContext.analysisResult;
+  assert.deepEqual(millimetre.execution.displacement, metre.execution.displacement);
+  assert.deepEqual(millimetre.execution.reactions, metre.execution.reactions);
+  assert.deepEqual(millimetre.recovery.elementActions, metre.recovery.elementActions);
+  assert.deepEqual(millimetre.recovery.forceFields, metre.recovery.forceFields);
+  assert.deepEqual(millimetre.recovery.componentResultants, metre.recovery.componentResultants);
 });
 
-test('P2F-UNIT-08', 'Conversion authority is retained in context ingestion evidence', () => {
+test('P2F-UNIT-08', 'Conversion authority is retained in context evidence', () => {
   const evidence = millimetreContext.ingestionEvidence.conditioningReport.unitNormalization;
   assert.equal(millimetreContext.ingestionEvidence.unit, 'm');
   assert.equal(evidence.sourceUnit, 'mm');
