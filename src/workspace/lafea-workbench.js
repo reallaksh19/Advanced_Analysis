@@ -20,6 +20,37 @@ export {
   requireLafeaStageRegistryEntry,
 } from './lafea-stage-registry.js';
 export {
+  LAFEA_COLLECTION_IDENTITY_KEYS,
+  LAFEA_INPUT_CONTROLS,
+  LAFEA_INPUT_DESCRIPTOR_REVISION,
+  LAFEA_INPUT_DESCRIPTOR_SCHEMA,
+  LAFEA_INPUT_DOMAIN_TYPES,
+  LAFEA_INVALIDATION_CLASSES,
+  LAFEA_VALUE_STATES,
+  lafeaCollectionIdentityKeys,
+  lafeaStageInputDescriptors,
+  requireLafeaInputDescriptor,
+  resolveDescriptorEntity,
+  resolveLafeaDescriptorSourceRef,
+  resolveLafeaDescriptorUnit,
+} from './lafea-stage-input-descriptors.js';
+export {
+  LAFEA_EDIT_COMMAND_SCHEMA,
+  LAFEA_EDIT_OPERATIONS,
+  LAFEA_EDIT_RESULT_SCHEMA,
+  LAFEA_EDIT_STATUSES,
+  allocateLafeaEntityIdentity,
+  applyLafeaStageEditCommand,
+  assertUniqueStageIdentities,
+  classifyLafeaNumericInput,
+  createLafeaAddEntityCommand,
+  createLafeaDeleteEntityCommand,
+  createLafeaDeleteFieldCommand,
+  createLafeaReplaceDocumentCommand,
+  createLafeaSetScalarCommand,
+  lafeaDocumentDigest,
+} from './lafea-edit-command.js';
+export {
   LAFEA_WORKBENCH_DOCUMENT_SCHEMA,
   executeLafeaStage,
   lafeaCollectionPaths,
