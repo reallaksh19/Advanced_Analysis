@@ -55,7 +55,7 @@ const ARTIFACT_BINDINGS = Object.freeze([
 ]);
 const ARTIFACT_ROLES = Object.freeze(ARTIFACT_BINDINGS.map((entry) => entry.role).sort(compareAscii));
 const INELIGIBLE_ROOTS = Object.freeze([
-  'script', 'scripts', 'test', 'tests', 'fixture', 'fixtures', 'mock', 'mocks',
+  'e2e', 'script', 'scripts', 'test', 'tests', 'fixture', 'fixtures', 'mock', 'mocks',
 ]);
 const MANIFEST_KEYS = Object.freeze([
   'schema', 'repository', 'exactHead', 'createdAtUtc', 'runtime', 'cleanTree',
@@ -342,6 +342,16 @@ function validateArtifactBinding(root, artifacts, manifest, binding, manifestPat
     if (!text.includes(manifest.exactHead)) {
       fail('LFEA_INTERNAL_ARTIFACT_HEAD_MISSING', { role: binding.role });
     }
+    const boundCommands = manifest.commands.filter((entry) => entry.artifactRole === binding.role);
+    for (const command of boundCommands) {
+      const commandEvidence = new RegExp(`(?:^|\\n)${escapeRegExp(command.commandId)}\\s+PASS(?:\\n|$)`, 'u');
+      if (!commandEvidence.test(text)) {
+        fail('LFEA_INTERNAL_ARTIFACT_COMMAND_MISSING', {
+          role: binding.role,
+          commandId: command.commandId,
+        });
+      }
+    }
     actualContentHash = contentHashForInternalArtifact(binding.mediaType, text);
   } else {
     const record = readJson(absolutePath, 'LFEA_INTERNAL_ARTIFACT_JSON_INVALID');
@@ -350,6 +360,18 @@ function validateArtifactBinding(root, artifacts, manifest, binding, manifestPat
         role: binding.role,
         artifactHead: record.exactHead,
         manifestHead: manifest.exactHead,
+      });
+    }
+    if (record.role !== binding.role) {
+      fail('LFEA_INTERNAL_ARTIFACT_ROLE_MISMATCH', {
+        expectedRole: binding.role,
+        artifactRole: record.role,
+      });
+    }
+    if (record.status !== 'PASS') {
+      fail('LFEA_INTERNAL_ARTIFACT_STATUS_INVALID', {
+        role: binding.role,
+        status: record.status,
       });
     }
     actualContentHash = contentHashForInternalArtifact(binding.mediaType, record);
@@ -454,6 +476,10 @@ function readJson(filePath, code) {
   } catch (error) {
     fail(code, { filePath, message: error.message });
   }
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 }
 
 function compareAscii(left, right) {
