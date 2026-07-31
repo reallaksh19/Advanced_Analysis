@@ -5,13 +5,13 @@ import {
 import { deepFreeze } from '../shared-piping-model/immutable.js';
 import {
   failPresentation,
-  requireLinearPipingPresentation,
+  requireCurrentLinearPipingPresentation,
 } from './contracts.js';
 
 export const EXPORT_RECORD_SCHEMA = 'linear-piping-export-record/v1';
 
-export function createLinearPipingAuditJsonExport(presentation) {
-  const accepted = requireLinearPipingPresentation(presentation);
+export function createLinearPipingAuditJsonExport(presentation, applicationResult) {
+  const accepted = requireCurrentLinearPipingPresentation(presentation, applicationResult);
   const content = canonicalPrettyStringify(accepted);
   return sealExportRecord({
     role: 'CURRENT_AUDIT_EVIDENCE',
@@ -24,8 +24,8 @@ export function createLinearPipingAuditJsonExport(presentation) {
   });
 }
 
-export function createQualifiedLinearPipingEngineeringExports(presentation) {
-  const accepted = requireLinearPipingPresentation(presentation);
+export function createQualifiedLinearPipingEngineeringExports(presentation, applicationResult) {
+  const accepted = requireCurrentLinearPipingPresentation(presentation, applicationResult);
   if (accepted.exportEligibility !== 'ENGINEERING_EXPORT_ALLOWED') {
     failPresentation(
       'Engineering issue exports require a CURRENT QUALIFIED application with no unconfigured nozzle profiles.',
