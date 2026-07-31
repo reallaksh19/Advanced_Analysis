@@ -28,6 +28,7 @@ const CHECKS = Object.freeze([
   'scripts/lafea-u4f-public-facade-check.mjs',
   'scripts/lafea-accessory-panel-contract-check.mjs',
   'scripts/lafea-accessory-panel-integration-check.mjs',
+  'scripts/lafea-accessory-panel-controller-lifecycle-check.mjs',
   'scripts/lafea-accessory-panel-source-guard.mjs',
   'scripts/lafea-canvas-contract-check.mjs',
   'scripts/lafea-workbench-check.mjs',
