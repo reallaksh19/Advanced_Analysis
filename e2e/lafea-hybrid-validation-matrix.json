@@ -1,0 +1,63 @@
+{
+  "schema": "lafea-hybrid-browser-validation-matrix/v1",
+  "phase": "PHASE_6_QUALIFIED_RESULTS_BROWSER_VALIDATION_REAL_DATA",
+  "basis": "docs/LAFEA_Hybrid_Canvas_Remediation_Implementation_Plan.md",
+  "cases": [
+    {
+      "testId": "HC-UI-01",
+      "inputBasis": "[SIMULATED] source-authoring scene",
+      "expectedResult": "SVG layer active, WebGL cleared",
+      "implementationStatus": "IMPLEMENTED_EXECUTION_REQUIRED",
+      "spec": "e2e/lafea-hybrid-workbench.spec.js"
+    },
+    {
+      "testId": "HC-UI-02",
+      "inputBasis": "[SIMULATED] qualified dense mesh",
+      "expectedResult": "WebGL layer active, SVG overlay retained",
+      "implementationStatus": "IMPLEMENTED_EXECUTION_REQUIRED",
+      "spec": "e2e/lafea-hybrid-workbench.spec.js"
+    },
+    {
+      "testId": "HC-UI-03",
+      "inputBasis": "[SIMULATED] stale worker reply",
+      "expectedResult": "Reply rejected, prior scene retained",
+      "implementationStatus": "BLOCKED_DEPENDENCY",
+      "blockingDependency": "No live LAFEA worker request/reply consumer exists."
+    },
+    {
+      "testId": "HC-UI-04",
+      "inputBasis": "[SIMULATED] GPU pick",
+      "expectedResult": "Engineering identity selected",
+      "implementationStatus": "BLOCKED_DEPENDENCY",
+      "blockingDependency": "The current U4F Three.js adapter has no GPU/raycast picking path."
+    },
+    {
+      "testId": "HC-UI-05",
+      "inputBasis": "[SIMULATED] unrecovered field",
+      "expectedResult": "Diagnostic colour, no averaging",
+      "implementationStatus": "BLOCKED_DEPENDENCY",
+      "blockingDependency": "The current U4E request rejects diagnostic quality flags and has no diagnostic-colour renderer."
+    },
+    {
+      "testId": "HC-UI-06",
+      "inputBasis": "[SIMULATED] WebGL loss",
+      "expectedResult": "Explicit blocked/fallback state",
+      "implementationStatus": "IMPLEMENTED_EXECUTION_REQUIRED",
+      "spec": "e2e/lafea-hybrid-workbench.spec.js"
+    },
+    {
+      "testId": "HC-UI-07",
+      "inputBasis": "[SIMULATED] authoring gesture",
+      "expectedResult": "One revision-checked command",
+      "implementationStatus": "BLOCKED_PHASE_4",
+      "blockingDependency": "The sequential SVG authoring bridge is a separate Phase 4 deliverable."
+    },
+    {
+      "testId": "HC-REAL-01",
+      "inputBasis": "User-supplied project package",
+      "expectedResult": "SVG/WebGL and exported evidence reconciled",
+      "implementationStatus": "BLOCKED_USER_EVIDENCE",
+      "blockingDependency": "No user-supplied real project package is present in the repository."
+    }
+  ]
+}
