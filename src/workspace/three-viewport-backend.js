@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { createOverlapHighlight, createNewConnectionLine } from './three-support-overlay.js';
 import { DEFAULT_VIEWPORT_CAPABILITIES } from './viewport-command-contract.js';
 import { ThreeInteractionArbiter } from './three-interaction-arbiter.js';
 import { ThreeSelectionOverlay } from './three-selection-overlay.js';
@@ -41,6 +42,13 @@ export class ThreeViewportBackend {
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
     this.selectionRequestHandler = null;
+    
+    this.selectionRequestHandler = null;
+    
+    this.htmlLabels = [];
+    this.htmlLabelContainer = document.createElement('div');
+    this.htmlLabelContainer.className = 'webgl-label-container';
+    this.htmlLabelContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; overflow: hidden;';
     
     this.initialCameraState = null;
   }
@@ -91,12 +99,25 @@ export class ThreeViewportBackend {
     light.position.set(1, 2, 3);
     this.scene.add(light);
 
-    hostElement.replaceChildren(this.renderer.domElement);
+    hostElement.replaceChildren(this.renderer.domElement, this.htmlLabelContainer);
     hostElement.dataset.viewportBackend = 'webgl';
     if (typeof ResizeObserver === 'function') {
       this.resizeObserver = new ResizeObserver(() => this.resize());
       this.resizeObserver.observe(hostElement);
     }
+    
+    // Bind Autofix Visualization Listeners
+    document.addEventListener('viewport:render-autofix-overlays', (e) => this.renderAutofixOverlays(e.detail.merges));
+    document.addEventListener('viewport:clear-autofix-overlays', () => this.clearAutofixOverlays());
+    document.addEventListener('viewport:fly-to', (e) => {
+      const target = e.detail.target;
+      if (this.controls && target) {
+        this.controls.target.set(target.x, target.y, target.z);
+        this.camera.position.set(target.x + 5000, target.y + 5000, target.z + 5000);
+        this.controls.update();
+      }
+    });
+
     this.resize();
     this.startAnimation();
   }
@@ -268,6 +289,72 @@ export class ThreeViewportBackend {
         this.renderer.clearDepth(); // ensure HUD is on top
         this.axisHUD.render(this.renderer, this.renderer.domElement.width, this.renderer.domElement.height);
       }
+      
+      this.updateHtmlLabels();
     }
+  }
+
+  updateHtmlLabels() {
+    if (!this.htmlLabels.length) return;
+    const widthHalf = this.hostElement.offsetWidth / 2;
+    const heightHalf = this.hostElement.offsetHeight / 2;
+
+    for (const label of this.htmlLabels) {
+      if (!label.element || !label.position) continue;
+      // Copy pos and project
+      const projected = new THREE.Vector3().copy(label.position).project(this.camera);
+      // Check if behind camera
+      if (projected.z > 1 || projected.z < -1) {
+        label.element.style.display = 'none';
+        continue;
+      }
+      label.element.style.display = 'block';
+      const x = (projected.x * widthHalf) + widthHalf;
+      const y = -(projected.y * heightHalf) + heightHalf;
+      // Center the label
+      label.element.style.transform = `translate(-50%, -50%) translate(${x}px,${y}px)`;
+    }
+  }
+  
+  addHtmlLabel(text, position) {
+    const el = document.createElement('div');
+    el.className = 'webgl-diagnostic-label';
+    el.style.cssText = 'position: absolute; top: 0; left: 0; background: rgba(15, 23, 42, 0.9); color: #38bdf8; padding: 4px 8px; border-radius: 4px; font-size: 11px; border: 1px solid #0284c7; white-space: nowrap; font-family: monospace; box-shadow: 0 4px 6px rgba(0,0,0,0.3); pointer-events: auto;';
+    el.textContent = text;
+    this.htmlLabelContainer.appendChild(el);
+    const labelObj = { element: el, position: new THREE.Vector3(position.x || 0, position.y || 0, position.z || 0) };
+    this.htmlLabels.push(labelObj);
+    return labelObj;
+  }
+  
+  clearHtmlLabels() {
+    this.htmlLabels.forEach(l => l.element?.remove());
+    this.htmlLabels = [];
+  }
+  
+  renderAutofixOverlays(merges) {
+    this.clearAutofixOverlays();
+    merges.forEach(merge => {
+      // 1. Blue Sphere Overlaps
+      const highlight = createOverlapHighlight(merge.coordinate, 150);
+      this.diagnosticGroup.add(highlight);
+      
+      // 2. HTML Label
+      this.addHtmlLabel(`Merged: ${merge.dominant.name} absorbs ${merge.absorbed.length}`, merge.coordinate);
+      
+      // 3. New Connection Line (dummy logic to show a connection from the node)
+      const endPos = { x: merge.coordinate.x, y: merge.coordinate.y + 1000, z: merge.coordinate.z };
+      const line = createNewConnectionLine(merge.coordinate, endPos);
+      this.diagnosticGroup.add(line);
+    });
+    this.renderOnce();
+  }
+  
+  clearAutofixOverlays() {
+    while(this.diagnosticGroup.children.length > 0) { 
+      this.diagnosticGroup.remove(this.diagnosticGroup.children[0]); 
+    }
+    this.clearHtmlLabels();
+    this.renderOnce();
   }
 }

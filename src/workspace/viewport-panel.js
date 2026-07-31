@@ -111,6 +111,7 @@ export class ViewportPanel {
   }
 
   handleSelectionRequest(entityId) {
+    if (!entityId) return; // Prevent crashes when clearing selection if strict validation is active
     this.eventBus.publish(EVENT_TOPICS.VIEWPORT_SELECTION_REQUESTED, {
       entityId,
       source: 'viewport',

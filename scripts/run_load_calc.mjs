@@ -51,9 +51,35 @@ function synthesizeChainage(rawData) {
   else if(Array.isArray(rawData)) traverse(rawData);
 }
 
+import { analyzeTopologyOverlaps } from '../src/calc-workspace/cii-standalone-port/core/topology-autofix.js';
+
 async function run() {
   console.log('Reading input dataset from:', inputPath);
   const rawData = JSON.parse(fs.readFileSync(inputPath, 'utf8'));
+
+  console.log('Applying Topology Autofix Engine...');
+  const allNodes = [];
+  function collect(nodes) {
+    if (!nodes) return;
+    for (const n of nodes) {
+      allNodes.push(n);
+      collect(n.children);
+    }
+  }
+  collect(rawData.objects || rawData);
+  
+  const autofixResults = analyzeTopologyOverlaps(allNodes, 1.0);
+  console.log(`Detected ${autofixResults.merges.length} overlaps to merge.`);
+  
+  // Mutate original tree elements to apply IGNORED_OVERLAP
+  const absorbedNames = new Set(autofixResults.merges.flatMap(m => m.absorbed.map(a => a.name)));
+  allNodes.forEach(n => {
+    if (absorbedNames.has(n.name)) {
+      if (!n.attributes) n.attributes = {};
+      n.attributes.IGNORED_OVERLAP = true;
+      n.type = 'IGNORED_SUPPORT'; // Change type so parsing skips it entirely
+    }
+  });
 
   console.log('Synthesizing missing chainage...');
   synthesizeChainage(rawData);

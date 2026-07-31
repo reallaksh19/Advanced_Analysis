@@ -36,8 +36,9 @@ export class ThreeInteractionArbiter {
   }
 
   handlePointerDown(event) {
+    if (event.__simulated) return;
+    if (this.pointerStart) return; // already tracking a pointer
     if (event.button !== 0 && event.button !== 1 && event.button !== 2) return;
-    this.canvas.setPointerCapture(event.pointerId);
     
     this.pointerStart = {
       pointerId: event.pointerId,
@@ -46,6 +47,7 @@ export class ThreeInteractionArbiter {
       button: event.button
     };
     this.pointerDownTime = performance.now();
+    this.canvas.setPointerCapture(event.pointerId);
 
     // Pass event to OrbitControls if it's a drag action
     this.controls.enabled = true;
@@ -64,6 +66,7 @@ export class ThreeInteractionArbiter {
   }
 
   handlePointerMove(event) {
+    if (event.__simulated) return;
     if (!this.pointerStart || this.pointerStart.pointerId !== event.pointerId) return;
     
     // Determine if drag threshold is crossed
@@ -79,6 +82,7 @@ export class ThreeInteractionArbiter {
   }
 
   handlePointerUp(event) {
+    if (event.__simulated) return;
     const start = this.pointerStart;
     this.pointerStart = null;
     this.canvas.releasePointerCapture(event.pointerId);
@@ -116,6 +120,8 @@ export class ThreeInteractionArbiter {
   }
 
   handlePointerCancel(event) {
+    if (event.__simulated) return;
+    this.pointerStart = null;
     if (this.pointerStart && this.pointerStart.pointerId === event.pointerId) {
       this.simulateEvent(this.controls, 'pointercancel', event, this.pointerStart.button);
       this.pointerStart = null;
@@ -156,6 +162,7 @@ export class ThreeInteractionArbiter {
       bubbles: true,
       cancelable: true
     });
+    evt.__simulated = true;
     controls.domElement.dispatchEvent(evt);
   }
 

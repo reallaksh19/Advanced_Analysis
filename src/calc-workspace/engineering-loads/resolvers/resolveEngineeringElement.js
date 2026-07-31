@@ -8,12 +8,14 @@
 import { isSupportLikeType, numberMaybe, readObjectEndpoints, stringValue } from '../../workspaceModel.js';
 import { createEngineeringDiagnostic } from '../contracts/engineeringDiagnostics.js';
 import { componentWeightKg, fluidWeightKgPerM, insulationWeightKgPerM, pipeMetalWeightKgPerM } from '../formulas/elementWeightFormulas.js';
+import { augmentEnrichedWithFallbacks } from './fallbackResolver.js';
 
 const COMPONENT_TYPES = new Set(['BEND', 'ELBOW', 'ELBO', 'TEE', 'FLANGE', 'FLAN', 'VALVE', 'VALV', 'REDUCER', 'REDU', 'GASKET', 'GASK', 'INSTRUMENT', 'INST', 'OLET']);
 
 export function resolveEngineeringElement(object) {
   const source = sourceFields(object);
-  const enriched = enrichedFields(object);
+  const rawEnriched = enrichedFields(object);
+  const enriched = augmentEnrichedWithFallbacks(object, rawEnriched, source);
   const geometry = resolveGeometry(object, source);
   const type = normalizedType(object);
   const hasLineLoad = geometry.lengthM !== null && geometry.lengthM > 0;

@@ -23,6 +23,17 @@ export class WorkspaceStateStore {
     return this.#snapshot;
   }
 
+  patchSharedModel(sharedModel) {
+    if (this.#snapshot.status !== 'ready') return null;
+    const newDataset = { ...this.#snapshot.dataset, sharedModel };
+    this.#snapshot = freezeDeep({
+      ...this.#snapshot,
+      dataset: newDataset,
+      version: this.#snapshot.version + 1,
+    });
+    return this.#snapshot;
+  }
+
   selectEntity(entityId) {
     const normalizedId = stringValue(entityId);
     const entity = this.#entities.get(normalizedId) || null;

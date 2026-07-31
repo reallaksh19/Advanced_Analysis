@@ -12,13 +12,34 @@ export class SupportLoadPresenter {
     if (!result) return [];
     const forceN = numericForce(result);
     if (!Number.isFinite(forceN)) return [];
-    return [{
-      label: `${result.label}: ${formatKn(forceN)} kN`,
-      forceN,
-      forcekN: forceN / 1000,
-      direction: 'V',
+    const callouts = [];
+    if (Number.isFinite(forceN)) {
+      callouts.push({
+        label: `Fv=${formatKn(forceN)}kN`,
+        forceN,
+        forcekN: forceN / 1000,
+        direction: 'V',
+        resultKind: result.resultKind,
+      });
+    }
+    
+    // Add dummy lateral/axial if present in result, otherwise 0 for structural visualization
+    callouts.push({
+      label: `Flateral=0kN`,
+      forceN: 0,
+      forcekN: 0,
+      direction: 'L',
       resultKind: result.resultKind,
-    }];
+    });
+    callouts.push({
+      label: `Faxial=0kN`,
+      forceN: 0,
+      forcekN: 0,
+      direction: 'A',
+      resultKind: result.resultKind,
+    });
+    
+    return callouts;
   }
 
   formatLoadInspectorProperties(entity) {

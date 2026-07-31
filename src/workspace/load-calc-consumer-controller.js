@@ -3,10 +3,19 @@ import {
   validateLoadCalculationReviewModel,
 } from '../core/load-calculation-consumer/index.js';
 import { EventBus } from './event-bus.js';
+import { WorkspaceState } from './workspace-state.js';
 import { APPLICATION_EVENTS, EVENT_TOPICS } from './event-topics.js';
 import { MODEL_LOAD_EVENTS } from './model-load-events.js';
 import { SUPPORT_LOAD_SCREENING_EVENTS } from './support-load-screening-events.js';
+import { SHARED_MODEL_EVENTS } from './shared-model-events.js';
+import { TOPOLOGY_EVENTS } from './topology-events.js';
 import { renderLoadCalcConsumer } from './load-calc-consumer-view.js';
+import { renderProjectConfiguration, renderPreflightGrid } from './lfea-preflight-ui.js';
+import { renderMasterDataUI } from './master-data-ui.js';
+import { renderJsonTraceUI } from './json-trace-ui.js';
+import { SequentialSketcherView } from './sequential-sketcher/sequential-sketcher-view.js';
+import { buildSequentialEngineeringSvgSceneFromTopology } from './sequential-sketcher/sequential-engineering-svg-scene.js';
+import { PropertiesPanel } from './properties-panel.js';
 
 const ACTION_FAILURES = Object.freeze({
   rebuildModelLoads: 'Complete validated W10.4 evidence is required.',
@@ -26,13 +35,18 @@ export class LoadCalcConsumerController {
     this.actionAvailability = createLoadCalcActionAvailability(this.context, this.reviewModel);
     this.status = {};
     this.uiState = {
+      activeTab: 'load-cases',
       activeLoadCase: '',
       searchQuery: '',
       qualificationFilter: 'ALL',
       typeFilter: 'ALL',
-      selectedPrimitiveId: ''
+      selectedPrimitiveId: '',
+      gridsCollapsed: false,
+      sidebarCollapsed: false,
+      sidebarWidth: 280
     };
     this.unsubscribeCallbacks = [];
+    this.sketcherView = null;
   }
   init() {
     if (this.unsubscribeCallbacks.length) return;
@@ -87,15 +101,114 @@ export class LoadCalcConsumerController {
       this.uiState
     );
     this.rootElement.replaceChildren(view);
+    
+    // Inject preflight/config tabs if active
+    const mainContent = view.querySelector('#load-calc-main-content');
+    if (mainContent) {
+      if (this.uiState.activeTab === 'preflight') {
+        renderPreflightGrid(mainContent, { ...this.reviewModel, _context: this.context }, () => this.render());
+      } else if (this.uiState.activeTab === 'project-config') {
+        renderProjectConfiguration(mainContent, () => this.render());
+      } else if (this.uiState.activeTab === 'master-data') {
+        const mdContainer = mainContent.querySelector('#master-data-container');
+        if (mdContainer) {
+          const mdView = renderMasterDataUI();
+          mdContainer.replaceChildren(mdView);
+        }
+      } else if (this.uiState.activeTab === 'json-trace') {
+        const jtContainer = mainContent.querySelector('#json-trace-container');
+        if (jtContainer) {
+          jtContainer.replaceChildren(renderJsonTraceUI());
+        }
+      }
+    }
+    
+    // Instantiate Canvas Preview
+    const canvasHost = view.querySelector('#load-calc-canvas-host');
+    if (canvasHost) {
+      if (!this.sketcherView) {
+         this.sketcherView = new SequentialSketcherView(canvasHost, null);
+      }
+      this.sketcherView.rootElement = canvasHost;
+      
+      const snapshot = WorkspaceState.getSnapshot();
+      let dataset = snapshot?.dataset || null;
+      
+      // If we have parsed supports from context, overlay them on the raw dataset
+      // so they show up in the preview without mutating the global state yet.
+      if (dataset && this.context?.contracts?.supportAttachmentModel?.supports) {
+          const supports = this.context.contracts.supportAttachmentModel.supports.map(supp => ({
+              entityId: supp.id || supp.supportId,
+              entityType: 'SUPPORT',
+              category: 'support',
+              name: supp.id || supp.supportId,
+              properties: {
+                  supportType: supp.type || 'REST',
+                  attributes: {
+                      center: supp.position || supp.point,
+                  }
+              }
+          }));
+          
+          // Merge supports, avoiding duplicates by entityId
+          const existingIds = new Set(dataset.entities.map(e => e.entityId));
+          const newSupports = supports.filter(s => !existingIds.has(s.entityId));
+          
+          if (newSupports.length > 0) {
+              dataset = { ...dataset, entities: [...dataset.entities, ...newSupports] };
+          }
+      }
+      this.sketcherView.render(dataset);
+    }
+
     bind(view, 'load-mock-data', () => this.loadMockData());
-    bind(view, 'rebuild-model-loads', () => this.publishAction('rebuildModelLoads', MODEL_LOAD_EVENTS.REBUILD_REQUESTED));
+    bind(view, 'rebuild-model-loads', () => {
+      this.eventBus.publish(TOPOLOGY_EVENTS.REBUILD_EXACT_REQUESTED, {});
+      setTimeout(() => {
+        this.publishAction('rebuildModelLoads', MODEL_LOAD_EVENTS.REBUILD_REQUESTED);
+      }, 60);
+    });
     bind(view, 'export-model-loads', () => this.publishAction('exportModelLoads', MODEL_LOAD_EVENTS.EXPORT_REQUESTED));
     bind(view, 'rebuild-paths', () => this.publishAction('rebuildPaths', SUPPORT_LOAD_SCREENING_EVENTS.REBUILD_PATHS_REQUESTED));
     bind(view, 'run-screening', () => this.publishAction('runScreening', SUPPORT_LOAD_SCREENING_EVENTS.RUN_REQUESTED));
     bind(view, 'export-screening', () => this.publishAction('exportScreening', SUPPORT_LOAD_SCREENING_EVENTS.EXPORT_REQUESTED));
     
+    // Listen for professional Autofix integration
+    const globalRebuildHandler = () => {
+      console.log('Topology autofix accepted. Requesting Model Loads Rebuild...');
+      if (this.context?.contracts?.sharedModel) {
+        // Patch the global workspace state and push it to the backend so everything synchronizes
+        const snapshot = WorkspaceState.patchSharedModel(this.context.contracts.sharedModel);
+        if (snapshot) {
+          this.eventBus.publish(EVENT_TOPICS.WORKSPACE_SNAPSHOT_CHANGED, { snapshot });
+        }
+      }
+      this.publishAction('rebuildModelLoads', MODEL_LOAD_EVENTS.REBUILD_REQUESTED);
+    };
+    document.addEventListener('topology:rebuild-requested', globalRebuildHandler);
+    this.unsubscribeCallbacks.push(() => document.removeEventListener('topology:rebuild-requested', globalRebuildHandler));
+    
     // Bind UI state events
-    const documentRef = this.rootElement.ownerDocument;
+    view.querySelectorAll('[data-action="tab-main"]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const targetTab = e.currentTarget.dataset.tab;
+        // If clicking the already active tab, toggle it back to load-cases (close window)
+        if (this.uiState.activeTab === targetTab) {
+          this.uiState.activeTab = 'load-cases';
+        } else {
+          this.uiState.activeTab = targetTab;
+        }
+        this.render();
+      });
+    });
+    
+    view.querySelectorAll('[data-action="close-active-tab"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.uiState.activeTab = 'load-cases';
+        this.render();
+      });
+    });
+
     view.querySelectorAll('[data-action="tab-load-case"]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         this.uiState.activeLoadCase = e.currentTarget.dataset.case;
@@ -132,10 +245,120 @@ export class LoadCalcConsumerController {
         this.render();
       });
     });
+
+    // Sidebar collapse/expand binding
+    view.querySelectorAll('[data-action="toggle-load-calc-sidebar"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.uiState.sidebarCollapsed = !this.uiState.sidebarCollapsed;
+        this.render();
+      });
+    });
+
+    view.querySelectorAll('[data-action="toggle-grids"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.uiState.gridsCollapsed = !this.uiState.gridsCollapsed;
+        this.render();
+      });
+    });
+
+    // Left Sidebar drag-resize binding
+    const resizerLeft = view.querySelector('[data-action="resize-load-calc-left"]');
+    if (resizerLeft) {
+      resizerLeft.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        const pointerId = e.pointerId;
+        resizerLeft.setPointerCapture(pointerId);
+        const startX = e.clientX;
+        const startWidth = this.uiState.sidebarWidth || 280;
+        const sidebar = this.rootElement.querySelector('#load-calc-left-sidebar');
+        
+        const onMove = (moveEvt) => {
+          const delta = moveEvt.clientX - startX;
+          const newWidth = Math.max(180, Math.min(600, startWidth + delta));
+          this.uiState.sidebarWidth = newWidth;
+          if (sidebar) sidebar.style.flex = `0 0 ${newWidth}px`;
+        };
+        const onUp = () => {
+          resizerLeft.releasePointerCapture(pointerId);
+          document.removeEventListener('pointermove', onMove);
+          document.removeEventListener('pointerup', onUp);
+        };
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
+      });
+    }
+
+    // Right Sidebar drag-resize binding
+    const resizerRight = view.querySelector('[data-action="resize-load-calc-right"]');
+    if (resizerRight) {
+      resizerRight.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        const pointerId = e.pointerId;
+        resizerRight.setPointerCapture(pointerId);
+        const startX = e.clientX;
+        const startWidth = this.uiState.rightWidth || 300;
+        const sidebar = this.rootElement.querySelector('#load-calc-right-sidebar');
+        
+        const onMove = (moveEvt) => {
+          const delta = startX - moveEvt.clientX;
+          const newWidth = Math.max(200, Math.min(700, startWidth + delta));
+          this.uiState.rightWidth = newWidth;
+          if (sidebar) sidebar.style.flex = `0 0 ${newWidth}px`;
+        };
+        const onUp = () => {
+          resizerRight.releasePointerCapture(pointerId);
+          document.removeEventListener('pointermove', onMove);
+          document.removeEventListener('pointerup', onUp);
+        };
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
+      });
+    }
+
+    // Bottom Panel drag-resize binding
+    const resizerBottom = view.querySelector('[data-action="resize-load-calc-bottom"]');
+    if (resizerBottom) {
+      resizerBottom.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        const pointerId = e.pointerId;
+        resizerBottom.setPointerCapture(pointerId);
+        const startY = e.clientY;
+        const startHeight = this.uiState.gridsHeight || 300;
+        const gridsPane = this.rootElement.querySelector('#load-calc-grids-pane');
+        
+        const onMove = (moveEvt) => {
+          const delta = startY - moveEvt.clientY;
+          const newHeight = Math.max(100, Math.min(800, startHeight + delta));
+          this.uiState.gridsHeight = newHeight;
+          if (gridsPane) gridsPane.style.flex = `0 0 ${newHeight}px`;
+        };
+        const onUp = () => {
+          resizerBottom.releasePointerCapture(pointerId);
+          document.removeEventListener('pointermove', onMove);
+          document.removeEventListener('pointerup', onUp);
+        };
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
+      });
+    }
+
+    // Mount PropertiesPanel
+    const propsHost = view.querySelector('#load-calc-properties-host');
+    if (propsHost) {
+      if (this.propertiesPanel) {
+        this.propertiesPanel.destroy();
+      }
+      this.propertiesPanel = new PropertiesPanel(propsHost, this.eventBus);
+      this.propertiesPanel.init();
+    }
   }
   publishAction(actionKey, topic) {
     if (!this.actionAvailability[actionKey]) return this.handleFailure(ACTION_FAILURES[actionKey]);
-    this.eventBus.publish(topic, {});
+    this.status = { message: `Requesting ${actionKey}...` };
+    this.render();
+    setTimeout(() => {
+      this.eventBus.publish(topic, {});
+    }, 50);
   }
   async loadMockData() {
     const { createWorkspaceMockPackage } = await import('./advanced-mock-data.js');
@@ -158,6 +381,9 @@ export class LoadCalcConsumerController {
     this.consumerController = null;
     this.status = {};
     this.uiState = {};
+    if (this.sketcherView) {
+       this.sketcherView = null;
+    }
     this.rootElement?.replaceChildren();
   }
 }
@@ -165,7 +391,8 @@ export class LoadCalcConsumerController {
 export function createLoadCalcActionAvailability(context, reviewModel) {
   const contracts = context?.contracts || {};
   const hasModelLoads = Boolean(reviewModel);
-  const canRebuildModelLoads = Boolean(contracts.topologyGraph);
+  const snapshot = WorkspaceState.getSnapshot();
+  const canRebuildModelLoads = Boolean(contracts.sharedModel || contracts.topologyGraph || snapshot?.dataset);
   const hasPathInputs = Boolean(hasModelLoads
     && contracts.sharedModel
     && contracts.topologyGraph
@@ -174,9 +401,9 @@ export function createLoadCalcActionAvailability(context, reviewModel) {
   const hasPathModel = Boolean(hasModelLoads && contracts.verticalLoadPathModel);
   return Object.freeze({
     rebuildModelLoads: canRebuildModelLoads,
-    exportModelLoads: hasModelLoads,
-    rebuildPaths: hasPathInputs,
-    runScreening: hasPathModel,
+    exportModelLoads: hasModelLoads || Boolean(snapshot?.dataset),
+    rebuildPaths: hasPathInputs || canRebuildModelLoads,
+    runScreening: hasPathModel || canRebuildModelLoads,
     exportScreening: Boolean(reviewModel?.summary.screeningIncluded),
   });
 }
@@ -208,3 +435,4 @@ function getMissingLoadCalcContracts(context) {
 function bind(view, action, callback) {
   view.querySelector(`[data-load-calc-action="${action}"]`)?.addEventListener('click', callback);
 }
+
