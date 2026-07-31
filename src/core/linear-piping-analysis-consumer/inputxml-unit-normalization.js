@@ -100,6 +100,7 @@ function normalizeNode(node, scale, index) {
     new Set(['caesarNodeNumber']),
     `nodes[${index}].meta`,
   );
+  rejectUnknownNumericFields(node, new Set(['x', 'y', 'z']), `nodes[${index}]`);
   return {
     ...structuredClone(node),
     x: scaleNumber(node.x, scale, `nodes[${index}].x`),
@@ -172,7 +173,8 @@ function scaleNumber(value, scale, field) {
 
 function rejectUnknownNumericFields(value, allowed, field) {
   const structural = new Set([
-    'id', 'startNodeId', 'endNodeId', 'type', 'sourceComponentUid', 'material', 'meta',
+    'id', 'startNodeId', 'endNodeId', 'type', 'sourceComponentUid', 'restraint',
+    'material', 'meta',
   ]);
   for (const [key, entry] of Object.entries(value)) {
     if (allowed.has(key) || structural.has(key)) continue;
