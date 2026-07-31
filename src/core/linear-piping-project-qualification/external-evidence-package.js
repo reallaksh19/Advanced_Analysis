@@ -11,10 +11,10 @@ import {
   requireExternalText,
   requireHash,
   requireHead,
-  requirePerformanceEvidence,
   requireReleaseReviewDisposition,
-  requireRollbackEvidence,
 } from './external-evidence-contracts.js';
+import { requirePerformanceEvidence } from './performance-evidence.js';
+import { requireRollbackEvidence } from './rollback-evidence.js';
 
 export const EXTERNAL_QUALIFICATION_PACKAGE_REQUEST_SCHEMA =
   'linear-piping-external-qualification-package-request/v1';
