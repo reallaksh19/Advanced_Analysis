@@ -43,7 +43,10 @@ export {
   computeInputXmlSourceSemanticHash,
   requireLinearPipingInputXmlAnalysisResult,
   requireLinearPipingInputXmlSource,
-  runLinearPipingAnalysisFromInputXml,
   sealLinearPipingInputXmlSource,
+} from './inputxml-source-contract.js';
+
+export {
+  runLinearPipingAnalysisFromInputXml,
   validateLinearPipingInputXmlAnalysisRequest,
 } from './inputxml-source-binding.js';
