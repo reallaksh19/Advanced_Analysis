@@ -71,15 +71,21 @@ function artifactPath(role) {
   return `evidence/${role.replaceAll(/[A-Z]/gu, (value) => `-${value.toLowerCase()}`)}.json`;
 }
 
-function artifactContent(role, exactHead = EXACT_HEAD) {
+function artifactContent(role, options = {}) {
+  const exactHead = options.exactHead ?? EXACT_HEAD;
   if (ROLE_MEDIA[role] === 'text/plain') {
-    return `${role} PASS\nexactHead=${exactHead}\n`;
+    const commandLines = Object.entries(COMMAND_ROLE)
+      .filter(([, artifactRole]) => artifactRole === role)
+      .filter(([commandId]) => commandId !== options.omitLogCommand)
+      .map(([commandId]) => `${commandId} PASS`)
+      .join('\n');
+    return `${commandLines}\nexactHead=${exactHead}\n`;
   }
   const record = {
     schema: 'lfea-piping-internal-phase-evidence/v1',
-    role,
+    role: options.roleOverride ?? role,
     exactHead,
-    status: 'PASS',
+    status: options.statusOverride ?? 'PASS',
   };
   return { ...record, semanticHash: semanticHash(record) };
 }
@@ -102,9 +108,18 @@ function buildCandidate(root, options = {}) {
   const artifactReferences = {};
   const contents = {};
   for (const role of Object.keys(ROLE_MEDIA)) {
-    const content = options.artifactHeadOverride?.role === role
-      ? artifactContent(role, options.artifactHeadOverride.exactHead)
-      : artifactContent(role);
+    const content = artifactContent(role, {
+      exactHead: options.artifactHeadOverride?.role === role
+        ? options.artifactHeadOverride.exactHead
+        : EXACT_HEAD,
+      omitLogCommand: options.omitLogCommand,
+      roleOverride: options.roleOverride?.role === role
+        ? options.roleOverride.value
+        : undefined,
+      statusOverride: options.statusOverride?.role === role
+        ? options.statusOverride.value
+        : undefined,
+    });
     contents[role] = content;
     artifactReferences[role] = {
       path: artifactPath(role),
@@ -337,7 +352,62 @@ try {
     );
   });
 
-  test('P6D-INTAKE-14', 'Committed release evidence remains blocked and unpopulated', () => {
+  test('P6D-INTAKE-14', 'A retained text log must identify every bound command', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lfea-phase6d-log-'));
+    try {
+      const candidate = buildCandidate(root, { omitLogCommand: 'FULL_REPOSITORY_GATE' });
+      expectCode(
+        () => validateInternalReleaseEvidence({
+          root,
+          ledger: candidate.ledger,
+          releaseMode: false,
+        }),
+        'LFEA_INTERNAL_ARTIFACT_COMMAND_MISSING',
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('P6D-INTAKE-15', 'JSON evidence role cannot be relabelled', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lfea-phase6d-role-'));
+    try {
+      const candidate = buildCandidate(root, {
+        roleOverride: { role: 'interfaceEvidence', value: 'otherEvidence' },
+      });
+      expectCode(
+        () => validateInternalReleaseEvidence({
+          root,
+          ledger: candidate.ledger,
+          releaseMode: false,
+        }),
+        'LFEA_INTERNAL_ARTIFACT_ROLE_MISMATCH',
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('P6D-INTAKE-16', 'JSON evidence must retain PASS status', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lfea-phase6d-status-'));
+    try {
+      const candidate = buildCandidate(root, {
+        statusOverride: { role: 'interfaceEvidence', value: 'FAIL' },
+      });
+      expectCode(
+        () => validateInternalReleaseEvidence({
+          root,
+          ledger: candidate.ledger,
+          releaseMode: false,
+        }),
+        'LFEA_INTERNAL_ARTIFACT_STATUS_INVALID',
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('P6D-INTAKE-17', 'Committed release evidence remains blocked and unpopulated', () => {
     const value = ledger();
     assert.equal(value.programDisposition, 'BLOCKED');
     assert.equal(value.artifacts.exactHeadManifest, null);
