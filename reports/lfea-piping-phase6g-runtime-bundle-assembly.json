@@ -1,0 +1,60 @@
+{
+  "schema": "lfea-piping-phase-slice/v1",
+  "phaseId": "PHASE_6G_RUNTIME_BUNDLE_ASSEMBLY",
+  "ownerFindingId": "AUD-A7-001",
+  "baseHead": "4f91cc4dccc2963ae2fc395a13a5a96da4363f32",
+  "status": "UNRESOLVED_GATE",
+  "scope": [
+    "Consume one successful Phase 6F internal evidence root and one governed Phase 6B external evidence root.",
+    "Require both sealed inputs and the Phase 6F support records to identify one exact head.",
+    "Copy only referenced authority files while preserving their governed relative paths.",
+    "Reject path traversal, symbolic links, path collisions, output overlap and stale support records.",
+    "Construct a runtime-only qualified release manifest after evidence inputs are supplied.",
+    "Run the existing Phase 6E evaluator with the real Phase 6C and Phase 6D validators before publication.",
+    "Publish atomically and remove only assembler-created staging data on failure."
+  ],
+  "evidencePaths": [
+    "scripts/lfea-piping-runtime-bundle-assembler.mjs",
+    "scripts/lfea-piping-runtime-bundle-assembler-check.mjs",
+    "scripts/lfea-piping-phase6g-anti-drift-check.mjs",
+    "scripts/lfea-piping-release-readiness-check.mjs",
+    "docs/LFEA_PIPING_PHASE6G_RUNTIME_BUNDLE_ASSEMBLY.md",
+    ".github/workflows/lfea-piping-runtime-bundle-assembly.yml",
+    ".github/workflows/lfea-piping-phase6g-certification.yml"
+  ],
+  "addressedAgainstSection9": {
+    "findingId": "AUD-A7-001",
+    "priorStatus": "UNRESOLVED_GATE",
+    "statusAfterCoding": "UNRESOLVED_GATE",
+    "addressed": [
+      "The repository now has a governed path to assemble already sealed internal and external evidence into the Phase 6E runtime bundle contract.",
+      "Assembly cannot publish unless the Phase 6E release evaluator accepts both persisted intake paths for the same exact head.",
+      "The committed blocked template is not read, changed or promoted by the assembler.",
+      "The committed qualification suite executes no engineering or commercial program."
+    ],
+    "notClosed": [
+      "No successful real Phase 6F internal evidence artifact has been retained.",
+      "No complete non-fictional Phase 6B external evidence artifact has been supplied.",
+      "No runtime bundle has been assembled from real evidence.",
+      "No runtime release-certification result has been retained.",
+      "A7 and all release gates remain unresolved or partially verified in the repository template."
+    ]
+  },
+  "explicitNonScope": [
+    "Executing internal engineering checks",
+    "Executing a commercial pipe-stress program",
+    "Creating comparison or allowable values",
+    "Signing a release disposition",
+    "Changing the committed release manifest",
+    "Closing A7 or promoting repository gate status"
+  ],
+  "remainingConditions": [
+    "Retain a successful Phase 6F artifact for the selected exact head.",
+    "Supply the governed external qualification artifact for the same head.",
+    "Run and retain successful Phase 6G assembly.",
+    "Run and retain successful Phase 6E runtime release certification.",
+    "Complete independent Section 9 evidence review."
+  ],
+  "releaseImpact": "NONE_WITHOUT_SUPPLIED_REAL_EVIDENCE",
+  "programDisposition": "BLOCKED"
+}
