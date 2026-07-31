@@ -49,13 +49,19 @@ export {
   canonicalArtifactReference,
   requireExternalText,
   requireHead,
-  requirePerformanceEvidence,
   requireReleaseReviewDisposition,
-  requireRollbackEvidence,
-  sealPerformanceEvidence,
   sealReleaseReviewDisposition,
-  sealRollbackEvidence,
 } from './external-evidence-contracts.js';
+
+export {
+  requirePerformanceEvidence,
+  sealPerformanceEvidence,
+} from './performance-evidence.js';
+
+export {
+  requireRollbackEvidence,
+  sealRollbackEvidence,
+} from './rollback-evidence.js';
 
 export {
   EXTERNAL_ARTIFACT_MAP_KEYS,
