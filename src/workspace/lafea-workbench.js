@@ -7,15 +7,27 @@ import { LAFEA_WORKBENCH_STYLES, lafeaWorkbenchStyles } from './lafea-workbench-
 export { LafeaWorkbenchController };
 export { LAFEA_WORKBENCH_STYLES, lafeaWorkbenchStyles };
 export {
+  LAFEA_ENGINE_STATES,
+  LAFEA_PREVIEW_POLICIES,
+  LAFEA_STAGE_CATEGORIES,
   LAFEA_STAGE_DEFINITIONS,
   LAFEA_STAGE_IDS,
+  LAFEA_STAGE_REGISTRY,
+  LAFEA_STAGE_REGISTRY_SCHEMA,
+  lafeaRegisteredCollectionPaths,
+  lafeaRegisteredExecutionSupported,
+  lafeaRegisteredPreviewSource,
+  requireLafeaStageRegistryEntry,
+} from './lafea-stage-registry.js';
+export {
   LAFEA_WORKBENCH_DOCUMENT_SCHEMA,
   executeLafeaStage,
   lafeaCollectionPaths,
-  lafeaPreviewGeometry,
+  lafeaStageExecutionSupported,
   normalizeLafeaStageEdit,
   normalizeLafeaStageDocument,
 } from './lafea-workbench-model.js';
+export { lafeaPreviewGeometry } from './lafea-stage-preview.js';
 export { createLafeaWorkbenchStore } from './lafea-workbench-store.js';
 
 /**
