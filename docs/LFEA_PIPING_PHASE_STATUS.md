@@ -16,6 +16,8 @@ Program disposition: `BLOCKED`.
 - Phase 2C revalidates the compilation and load-case semantic/evidence identities against the T0 parent set and preserves the existing result-only Phase 2A API.
 - Phase 2D seals the exact InputXML source authority, recomputed conditioned-topology identity, ingestion evidence and retained Phase 2C context in `linear-piping-inputxml-analysis-context/v1`.
 - Phase 2D parses and conditions the raw source once, preserves the existing Phase 2B result-only API, and exposes a direct governed handoff to Phase 3.
+- B-2.5 compiled-node ancestry now retains the deterministic union of raw component UIDs from incident conditioned spans and caller-approved engineering component IDs from their element bindings. This provides a valid Phase 3 interface source parent without inventing a separate node-level equipment identity.
+- The node-ancestry change alters model semantic and evidence identity but not the stiffness-state projection, which remains based on node coordinates, element mechanics, materials, sections, axes and constraints.
 - Phase 2E consumes multiple retained Phase 2D contexts and requires one exact InputXML source, raw-content hash, conditioned topology, B-2.5 compilation, mechanical-model identity and stiffness state across all physical cases.
 - Phase 2E compiles one governed Phase 3 interface set, recovers every retained case and seals one deterministic interface envelope.
 - Phase 2E evaluates each configured nozzle allowable profile in every retained case, retains the governing assessment deterministically and preserves every case assessment as evidence.
@@ -37,6 +39,7 @@ Program disposition: `BLOCKED`.
 ## Still open
 
 - Exact-head CI evidence remains unresolved while repository Actions jobs fail before exposing executable steps or retained logs.
+- Successful exact-head B-2.5, Phase 2D, Phase 2E, consumer, core and full-gate command evidence has not been retained.
 - Phase 2E provides the complete bounded multicase orchestration API, but a real project package still requires caller-approved B-2.2 material resolutions, B-2.3 section resolutions, B-2.4 axes, constraints, B-3.0 loads, interface definitions, nozzle allowable profiles and B31.3 datasets/checks.
 - Phase 2B/2D/2E accepts only metre-based InputXML. Unit conversion is a separate unresolved authority and is not performed silently.
 - Real-model reconciliation and commercial corroboration have not been supplied.
