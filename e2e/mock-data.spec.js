@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const LAFEA_STAGES = ['LAFEA.1', 'LAFEA.2', 'LAFEA.3', 'LAFEA.4', 'LAFEA.5'];
+const LAFEA_STAGES = ['LAFEA.1', 'LAFEA.2', 'LAFEA.3', 'LAFEA.4', 'LAFEA.5', 'LAFEA.6'];
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
