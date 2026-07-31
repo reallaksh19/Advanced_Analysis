@@ -22,10 +22,20 @@ export {
   SOURCE_ANALYSIS_REQUEST_KEYS,
   SOURCE_AUTHORITY_KEYS,
   SOURCE_LOAD_CASE_INPUT_KEYS,
+  compileLinearPipingSourceAnalysisContext,
   deriveLinearPipingSourceAuthoritySet,
   runLinearPipingAnalysisFromSourceAuthorities,
   validateLinearPipingSourceAnalysisRequest,
 } from './source-orchestration.js';
+
+export {
+  LINEAR_PIPING_SOURCE_ANALYSIS_CONTEXT_SCHEMA,
+  SOURCE_ANALYSIS_CONTEXT_KEYS,
+  computeSourceAnalysisContextEvidenceHash,
+  computeSourceAnalysisContextSemanticHash,
+  requireLinearPipingSourceAnalysisContext,
+  sealLinearPipingSourceAnalysisContext,
+} from './source-analysis-context.js';
 
 export {
   INPUTXML_ANALYSIS_REQUEST_KEYS,
