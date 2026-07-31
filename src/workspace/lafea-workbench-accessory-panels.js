@@ -16,6 +16,14 @@ const MOUNT_RESULT_KEYS = Object.freeze(['destroy']);
 const CONTROLLER_FACADE_KEYS = Object.freeze(['getState', 'importDocument']);
 const PANEL_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/u;
 
+/** Return whether supplied workbench options require an accessory host. */
+export function lafeaAccessoryPanelConfigurationRequiresHost(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  if (!Object.prototype.hasOwnProperty.call(value, 'accessoryPanels')) return false;
+  const descriptors = value.accessoryPanels;
+  return !Array.isArray(descriptors) || descriptors.length > 0;
+}
+
 /** Validate one exact public panel descriptor without importing any consumer. */
 export function validateLafeaAccessoryPanelDescriptor(value) {
   assertExactKeys(value, DESCRIPTOR_KEYS, 'LAFEA_ACCESSORY_PANEL_DESCRIPTOR_KEYS_INVALID');
