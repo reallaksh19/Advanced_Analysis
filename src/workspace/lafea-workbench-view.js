@@ -7,7 +7,6 @@
  * labels, capability state, preview policy and limitations are read from the
  * governed stage registry. Lifecycle evidence is presented read-only.
  */
-import { lafeaPreviewGeometry } from './lafea-stage-preview.js';
 import {
   LAFEA_STAGE_REGISTRY,
   lafeaRegisteredExecutionSupported,
@@ -21,10 +20,10 @@ import {
   restoreFocusedControl,
 } from './lafea-workbench-dom.js';
 import { renderLafeaEvidence } from './lafea-results-view.js';
-import { renderLafeaWorkbenchSvg } from './lafea-workbench-svg.js';
 import { renderMeshQualityPanel } from './lafea-mesh-quality-panel.js';
 import { renderDocumentTableEditor } from './lafea-document-table.js';
 import { renderLafeaLifecyclePanel } from './lafea-lifecycle-panel.js';
+import { mountLafeaSourceWorkbenchViewport } from './lafea-source-workbench-viewport.js';
 
 export class LafeaWorkbenchView {
   constructor(rootElement) {
@@ -33,6 +32,12 @@ export class LafeaWorkbenchView {
     this.benchmarkHost = null;
     this.section = null;
     this.slots = null;
+    this.activeViewport = null;
+    this.sceneDocuments = new Map();
+    this.sceneLifecycles = new Map();
+    this.sceneLifecycleBindings = new Map();
+    this.sceneRevisions = new Map();
+    this.sceneSelections = new Map();
   }
 
   setBenchmarkHost(hostElement) {
@@ -48,6 +53,8 @@ export class LafeaWorkbenchView {
     const focused = captureFocusedControl(this.rootElement);
     const stage = state.stages[state.activeStageId];
     this.ensureShell();
+    this.activeViewport?.destroy();
+    this.activeViewport = null;
     this.slots.header.replaceChildren(this.header(state));
     this.slots.navigation.replaceChildren(this.stageNavigation(state));
     this.slots.toolbar.replaceChildren(this.toolbar(state.activeStageId, stage));
@@ -71,6 +78,13 @@ export class LafeaWorkbenchView {
   }
 
   destroy() {
+    this.activeViewport?.destroy();
+    this.activeViewport = null;
+    this.sceneDocuments.clear();
+    this.sceneLifecycles.clear();
+    this.sceneLifecycleBindings.clear();
+    this.sceneRevisions.clear();
+    this.sceneSelections.clear();
     this.rootElement?.replaceChildren();
     this.section = null;
     this.slots = null;
@@ -194,27 +208,42 @@ export class LafeaWorkbenchView {
 
     const previewCard = card(
       this.rootElement,
-      `Source-derived geometry preview — ${state.activeStageId}`,
+      `Source engineering viewport — ${state.activeStageId}`,
     );
-    const geometry = lafeaPreviewGeometry(state.activeStageId, stage.document);
     const preview = element(this.rootElement, 'div', 'lafea-workbench__svg');
-    if (geometry.nodes.length || geometry.elements.length) {
-      renderLafeaWorkbenchSvg(
-        preview,
-        geometry,
-        registryEntry.previewSource.editable
-          ? { onMoveNode: this.handlers.onMoveNode }
-          : {},
-      );
-    } else {
-      preview.append(element(
+    const sceneRevision = this.nextSceneRevision(
+      state.activeStageId,
+      stage.document,
+      stage.lifecycle,
+      stage.lifecycleBinding,
+    );
+    this.activeViewport = mountLafeaSourceWorkbenchViewport(preview, {
+      stageId: state.activeStageId,
+      document: stage.document,
+      lifecycle: stage.lifecycle,
+      lifecycleBinding: stage.lifecycleBinding,
+      sceneRevision,
+      selection: this.sceneSelections.get(state.activeStageId),
+      cssWidth: 760,
+      cssHeight: 440,
+      devicePixelRatio: 1,
+      onMoveNode: registryEntry.previewSource.editable
+        ? this.handlers.onMoveNode
+        : undefined,
+      onSelectionChange: (selection) => {
+        this.sceneSelections.set(state.activeStageId, selection);
+      },
+    });
+    previewCard.body.append(preview);
+    if (!this.activeViewport.scene.sourcePrimitives.length) {
+      previewCard.body.append(element(
         this.rootElement,
         'p',
         'lafea-workbench-svg__empty',
         'No explicit source geometry is available for this stage. No geometry or mesh has been synthesized.',
       ));
     }
-    previewCard.body.append(preview, this.truthPanel(registryEntry));
+    previewCard.body.append(this.truthPanel(registryEntry));
 
     const evidenceCard = card(
       this.rootElement,
@@ -271,6 +300,21 @@ export class LafeaWorkbenchView {
     }
 
     return grid;
+  }
+
+  nextSceneRevision(stageId, document, lifecycle, lifecycleBinding) {
+    const inputsChanged = !this.sceneDocuments.has(stageId)
+      || this.sceneDocuments.get(stageId) !== document
+      || this.sceneLifecycles.get(stageId) !== lifecycle
+      || this.sceneLifecycleBindings.get(stageId) !== lifecycleBinding;
+    if (inputsChanged) {
+      this.sceneDocuments.set(stageId, document);
+      this.sceneLifecycles.set(stageId, lifecycle);
+      this.sceneLifecycleBindings.set(stageId, lifecycleBinding);
+      this.sceneRevisions.set(stageId, (this.sceneRevisions.get(stageId) ?? 0) + 1);
+      this.sceneSelections.delete(stageId);
+    }
+    return this.sceneRevisions.get(stageId) ?? 0;
   }
 
   truthPanel(registryEntry) {

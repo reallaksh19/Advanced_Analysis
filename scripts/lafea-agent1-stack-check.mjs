@@ -16,6 +16,7 @@ const CHECKS = Object.freeze([
   'scripts/lafea-u3b-live-lifecycle-check.mjs',
   'scripts/lafea-u4a-source-engineering-scene-check.mjs',
   'scripts/lafea-u4a-public-surface-check.mjs',
+  'scripts/lafea-u4b-live-source-viewport-check.mjs',
   'scripts/lafea-canvas-contract-check.mjs',
   'scripts/lafea-workbench-check.mjs',
   'scripts/lafea-template-t1-contract-check.mjs',
