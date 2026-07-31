@@ -1,0 +1,38 @@
+{
+  "schema": "lfea-piping-phase-slice/v1",
+  "phaseId": "PHASE_2C_QUALIFIED_ANALYSIS_CONTEXT",
+  "ownerFindingId": "AUD-A3-001",
+  "baseHead": "bdddc6b736c62f60f3e68ee19f20e2ae4b3cba9e",
+  "status": "PARTIALLY_VERIFIED",
+  "scope": [
+    "Retain the exact validated B-2.5 compilation, B-3.0 physical load case and T0 analysis result in linear-piping-source-analysis-context/v1.",
+    "Revalidate every compilation and load-case semantic/evidence parent against the T0 result parent set.",
+    "Preserve the existing result-only Phase 2A public behavior by projecting analysisResult from the new context path.",
+    "Allow Phase 3 interface definition and recovery to consume retained governed objects without recompilation or hash-based reconstruction.",
+    "Separate engineering semantic identity from factorization/runtime evidence in the context hashes."
+  ],
+  "evidencePaths": [
+    "src/core/linear-piping-analysis-consumer/source-analysis-context.js",
+    "src/core/linear-piping-analysis-consumer/source-orchestration.js",
+    "src/core/linear-piping-analysis-consumer/index.js",
+    "scripts/linear-piping-source-analysis-context-check.mjs",
+    "scripts/linear-piping-analysis-consumer-anti-drift-check.mjs",
+    ".github/workflows/lfea-piping-phase-certification.yml"
+  ],
+  "explicitNonScope": [
+    "Raw source parsing or unit conversion",
+    "Material, section, local-axis, constraint or load authority creation",
+    "Interface definition or recovery inside the context contract",
+    "Nozzle allowable assessment",
+    "B31.3 application orchestration",
+    "Presentation or workspace rendering",
+    "Project reconciliation or release qualification"
+  ],
+  "remainingConditions": [
+    "Bind Phase 2B InputXML source evidence directly to a retained Phase 2C context in a subsequent bounded slice.",
+    "Add a complete multi-case application orchestrator using retained contexts and separately supplied Phase 3/4 authorities.",
+    "Retain successful exact-head context, consumer, core and full-gate logs.",
+    "Supply non-fictional project and commercial evidence, performance qualification and rollback evidence."
+  ],
+  "releaseImpact": "NONE"
+}
