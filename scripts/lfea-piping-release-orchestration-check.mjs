@@ -8,7 +8,7 @@ import {
   evaluateReleaseReadiness,
   loadReleaseEvidence,
   parseReleaseInvocation,
-} from './lfea-piping-release-readiness-check.mjs';
+} from './lfea-piping-release-orchestrator.mjs';
 
 const EXACT_HEAD = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const REQUIRED_GATES = Object.freeze([
