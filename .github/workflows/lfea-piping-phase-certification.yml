@@ -9,6 +9,7 @@ on:
       - 'reports/lfea-piping-phase2b-inputxml-binding.json'
       - 'reports/lfea-piping-phase2c-analysis-context.json'
       - 'reports/lfea-piping-phase2d-inputxml-context.json'
+      - 'reports/lfea-piping-phase2e-multicase-application.json'
       - 'reports/lfea-piping-phase5b-workspace-integration.json'
       - 'docs/LFEA_PIPING_100_PERCENT_CLOSURE_POLICY.md'
       - 'docs/LFEA_PIPING_PHASE_STATUS.md'
@@ -18,10 +19,12 @@ on:
       - 'scripts/lfea-piping-a0-baseline-check.mjs'
       - 'scripts/lfea-piping-release-readiness-check.mjs'
       - 'scripts/lfea-piping-phase-findings-check.mjs'
+      - 'scripts/lfea-b2.5-*.mjs'
       - 'scripts/linear-piping-analysis-consumer-*.mjs'
       - 'scripts/linear-piping-inputxml-source-binding-check.mjs'
       - 'scripts/linear-piping-source-analysis-context-check.mjs'
       - 'scripts/linear-piping-inputxml-analysis-context-check.mjs'
+      - 'scripts/linear-piping-multicase-application-*.mjs'
       - 'scripts/linear-piping-interface-*.mjs'
       - 'scripts/linear-piping-nozzle-interface-check.mjs'
       - 'scripts/linear-piping-code-application-*.mjs'
@@ -30,7 +33,9 @@ on:
       - 'scripts/linear-piping-project-qualification-*.mjs'
       - 'e2e/linear-piping-results-workspace.spec.js'
       - 'src/main.js'
+      - 'src/core/linear-fea-model-compiler/**'
       - 'src/core/linear-piping-analysis-consumer/**'
+      - 'src/core/linear-piping-multicase-application/**'
       - 'src/core/linear-piping-interface/**'
       - 'src/core/linear-piping-code-application/**'
       - 'src/core/linear-piping-presentation/**'
@@ -89,6 +94,9 @@ jobs:
       - name: Verify T0 and source orchestration
         run: npm run check:linear-piping-analysis-consumer
 
+      - name: Verify B-2.5 node and element ancestry authority
+        run: npm run check:lfea-b2.5
+
       - name: Verify InputXML source and topology binding directly
         run: node scripts/linear-piping-inputxml-source-binding-check.mjs
 
@@ -97,6 +105,11 @@ jobs:
 
       - name: Verify InputXML provenance and retained context directly
         run: node scripts/linear-piping-inputxml-analysis-context-check.mjs
+
+      - name: Verify complete multicase application orchestration directly
+        run: |
+          node scripts/linear-piping-multicase-application-check.mjs
+          node scripts/linear-piping-multicase-application-anti-drift-check.mjs
 
       - name: Verify governed interfaces and recovery
         run: npm run check:lfea-interfaces

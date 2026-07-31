@@ -83,7 +83,7 @@ export function compileMechanicalModel(input) {
   const sections = requireSectionStateMap(input.sectionResolutions);
   const axes = requireLocalAxisMap(input.localAxisResults, input.localAxisProfile);
 
-  const nodes = buildNodes(topology, nodeBindings);
+  const nodes = buildNodes(topology, nodeBindings, elementBindings);
   const compiled = buildElements({ topology, nodeBindings, elementBindings, materials, sections, axes, profile });
   const constraints = buildConstraints(
     requireConstraintDeclarations(input.constraintDeclarations),
@@ -140,16 +140,31 @@ export function compileMechanicalModel(input) {
   return requireMechanicalModelCompilation(draft);
 }
 
-function buildNodes(topology, nodeBindings) {
+function buildNodes(topology, nodeBindings, elementBindings) {
+  const incidentComponentIds = new Map(
+    [...topology.nodes.keys()].map((nodeId) => [nodeId, new Set()]),
+  );
+  for (const span of topology.spans) {
+    const binding = elementBindings.get(span.id);
+    const sourceIds = [span.sourceComponentUid, binding?.sourceComponentId]
+      .filter((value) => typeof value === 'string' && value.length > 0);
+    for (const nodeId of [span.startNodeId, span.endNodeId]) {
+      const target = incidentComponentIds.get(nodeId);
+      sourceIds.forEach((sourceId) => target.add(sourceId));
+    }
+  }
+
   return [...topology.nodes.values()].map((node) => {
     const binding = nodeBindings.get(node.id);
+    const sourceComponentIds = incidentComponentIds.get(node.id);
+    if (node.sourceComponentUid !== null) sourceComponentIds.add(node.sourceComponentUid);
     return {
       nodeId: binding.nodeId,
       position: { x: node.x, y: node.y, z: node.z },
       sourceAncestry: {
         conditionedNodeId: binding.conditionedNodeId,
         sourceNodeIds: [node.id],
-        sourceComponentIds: node.sourceComponentUid === null ? [] : [node.sourceComponentUid],
+        sourceComponentIds: [...sourceComponentIds].sort(compareAscii),
         creationBasis: node.creationBasis,
       },
     };

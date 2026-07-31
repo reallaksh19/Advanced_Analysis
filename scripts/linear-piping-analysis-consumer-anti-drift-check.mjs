@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 
 /**
- * Static T0 and Phase 2A-2D authority guard.
+ * Static T0 and Phase 2A-2E authority guard.
  *
  * Phase 2B/2D may invoke the existing InputXML geometry adapter and B-1
  * conditioner exactly once. Phase 2C/2D may retain validated context objects.
- * No consumer file may become a second engineering or mechanics authority.
+ * Phase 2E may orchestrate those retained contexts through the separately
+ * governed interface and code-application packages. No consumer file may
+ * become a second engineering or mechanics authority.
  */
 
 import assert from 'node:assert/strict';
@@ -123,5 +125,7 @@ await import('./linear-piping-source-orchestration-check.mjs');
 await import('./linear-piping-inputxml-source-binding-check.mjs');
 await import('./linear-piping-source-analysis-context-check.mjs');
 await import('./linear-piping-inputxml-analysis-context-check.mjs');
+await import('./linear-piping-multicase-application-check.mjs');
+await import('./linear-piping-multicase-application-anti-drift-check.mjs');
 
-console.log('Linear piping analysis consumer T0 and Phase 2A-2D anti-drift check PASS');
+console.log('Linear piping analysis consumer T0 and Phase 2A-2E anti-drift check PASS');
