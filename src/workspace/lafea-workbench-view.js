@@ -3,13 +3,16 @@
  *
  * The view contains no engineering calculation, no hidden fallback and no
  * direct mutation of frozen stage documents. All edits pass through controller
- * commands. Geometry is rendered only from explicit source entities.
+ * commands. Geometry is rendered only from explicit source entities. Stage
+ * labels, capability state, preview policy and limitations are read from the
+ * governed stage registry.
  */
+import { lafeaPreviewGeometry } from './lafea-stage-preview.js';
 import {
-  LAFEA_STAGE_DEFINITIONS,
-  lafeaPreviewGeometry,
-  lafeaStageExecutionSupported,
-} from './lafea-workbench-model.js';
+  LAFEA_STAGE_REGISTRY,
+  lafeaRegisteredExecutionSupported,
+  requireLafeaStageRegistryEntry,
+} from './lafea-stage-registry.js';
 import {
   actionButton,
   captureFocusedControl,
@@ -21,57 +24,6 @@ import { renderLafeaEvidence } from './lafea-results-view.js';
 import { renderLafeaWorkbenchSvg } from './lafea-workbench-svg.js';
 import { renderMeshQualityPanel } from './lafea-mesh-quality-panel.js';
 import { renderDocumentTableEditor } from './lafea-document-table.js';
-
-const STAGE_TRUTH = Object.freeze({
-  'LAFEA.1': Object.freeze({
-    engine: 'src/core/local-stress',
-    authority: 'LOAD_TRANSFER_AND_PRESSURE_BASELINE_ONLY',
-    limitations: Object.freeze([
-      'No finite-element analysis or local attachment stress.',
-      'No shell bending, weld stress, contact or code assessment.',
-    ]),
-  }),
-  'LAFEA.2': Object.freeze({
-    engine: 'src/core/local-attachment-screening',
-    authority: 'NOMINAL_PIPE_SECTION_SCREENING_ONLY',
-    limitations: Object.freeze([
-      'No local discontinuity or attachment stress.',
-      'No transverse-shear recovery, shell analysis, weld analysis or code assessment.',
-    ]),
-  }),
-  'LAFEA.3': Object.freeze({
-    engine: 'src/core/local-continuum',
-    authority: 'T3_T6_Q8_LINEAR_CONTINUUM',
-    limitations: Object.freeze([
-      'Integration-point stress is authoritative for T6/Q8; nodal projection is display-only.',
-      'Production geometry-to-mesh-to-convergence orchestration is not complete.',
-    ]),
-  }),
-  'LAFEA.4': Object.freeze({
-    engine: 'src/core/local-shell',
-    authority: 'CST_DKT_TRI3_THIN_SHELL_V1',
-    limitations: Object.freeze([
-      'Current production dispatch is the legacy five-DOF triangular thin-shell path.',
-      'No production MITC4/MITC3 claim, drilling DOF, thick-shell claim, weld stress or code assessment.',
-    ]),
-  }),
-  'LAFEA.5': Object.freeze({
-    engine: 'src/core/local-trunnion-footprint',
-    authority: 'CALLER_AUTHORED_HOST_SHELL_FOOTPRINT_ONLY',
-    limitations: Object.freeze([
-      'No generated trunnion stiffness, weld, contact or pressure superposition.',
-      'No code assessment; footprint-adjacent peaks remain load-introduction-sensitive.',
-    ]),
-  }),
-  'LAFEA.6': Object.freeze({
-    engine: 'NONE',
-    authority: 'UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED',
-    limitations: Object.freeze([
-      'Calculation is disabled.',
-      'No qualified weld schema, calculator, result validator or benchmark manifest is registered.',
-    ]),
-  }),
-});
 
 export class LafeaWorkbenchView {
   /**
@@ -128,7 +80,7 @@ export class LafeaWorkbenchView {
   }
 
   header(state) {
-    const definition = stageDefinition(state.activeStageId);
+    const definition = requireLafeaStageRegistryEntry(state.activeStageId);
     const header = element(this.rootElement, 'header', 'lafea-workbench__header');
     const block = element(this.rootElement, 'div');
     const eyebrow = element(
@@ -156,7 +108,7 @@ export class LafeaWorkbenchView {
   stageNavigation(state) {
     const navigation = element(this.rootElement, 'nav', 'lafea-workbench__stages');
     navigation.setAttribute('aria-label', 'LAFEA stages');
-    for (const definition of LAFEA_STAGE_DEFINITIONS) {
+    for (const definition of LAFEA_STAGE_REGISTRY) {
       const button = actionButton(
         this.rootElement,
         `${definition.stageId} ${definition.label}`,
@@ -191,7 +143,7 @@ export class LafeaWorkbenchView {
     file.dataset.role = 'lafea-import';
     file.addEventListener('change', () => this.handlers.onFile(file.files?.[0] ?? null));
 
-    const executionSupported = lafeaStageExecutionSupported(stageId);
+    const executionSupported = lafeaRegisteredExecutionSupported(stageId);
     const run = actionButton(
       this.rootElement,
       executionSupported ? 'Validate and calculate' : 'Calculation not implemented',
@@ -225,6 +177,7 @@ export class LafeaWorkbenchView {
   }
 
   content(state, stage) {
+    const registryEntry = requireLafeaStageRegistryEntry(state.activeStageId);
     const grid = element(this.rootElement, 'div', 'lafea-workbench__grid');
 
     const sourceCard = card(
@@ -244,11 +197,12 @@ export class LafeaWorkbenchView {
     const geometry = lafeaPreviewGeometry(state.activeStageId, stage.document);
     const preview = element(this.rootElement, 'div', 'lafea-workbench__svg');
     if (geometry.nodes.length || geometry.elements.length) {
-      const editableGeometry = ['LAFEA.3', 'LAFEA.4', 'LAFEA.5'].includes(state.activeStageId);
       renderLafeaWorkbenchSvg(
         preview,
         geometry,
-        editableGeometry ? { onMoveNode: this.handlers.onMoveNode } : {},
+        registryEntry.previewSource.editable
+          ? { onMoveNode: this.handlers.onMoveNode }
+          : {},
       );
     } else {
       preview.append(element(
@@ -258,7 +212,7 @@ export class LafeaWorkbenchView {
         'No explicit source geometry is available for this stage. No geometry or mesh has been synthesized.',
       ));
     }
-    previewCard.body.append(preview, this.truthPanel(state.activeStageId));
+    previewCard.body.append(preview, this.truthPanel(registryEntry));
 
     const evidenceCard = card(
       this.rootElement,
@@ -306,21 +260,19 @@ export class LafeaWorkbenchView {
     return grid;
   }
 
-  truthPanel(stageId) {
-    const truth = STAGE_TRUTH[stageId];
+  truthPanel(registryEntry) {
     const section = element(this.rootElement, 'section', 'lafea-workbench__truth');
     const title = element(this.rootElement, 'h3', null, 'Current authority and limitations');
-    const engine = element(this.rootElement, 'p', null, `Declared engine: ${truth.engine}`);
-    const authority = element(this.rootElement, 'p', null, `Authority: ${truth.authority}`);
+    const enginePath = registryEntry.enginePackage
+      ? `src/core/${registryEntry.enginePackage}`
+      : 'NONE';
+    const engine = element(this.rootElement, 'p', null, `Declared engine: ${enginePath}`);
+    const authority = element(this.rootElement, 'p', null, `Authority: ${registryEntry.authority}`);
     const limitations = element(this.rootElement, 'ul');
-    truth.limitations.forEach((value) => limitations.append(element(this.rootElement, 'li', null, value)));
+    registryEntry.limitations.forEach((value) => {
+      limitations.append(element(this.rootElement, 'li', null, value));
+    });
     section.append(title, engine, authority, limitations);
     return section;
   }
-}
-
-function stageDefinition(stageId) {
-  const definition = LAFEA_STAGE_DEFINITIONS.find((row) => row.stageId === stageId);
-  if (!definition) throw new TypeError(`Unknown LAFEA stage: ${stageId}.`);
-  return definition;
 }
