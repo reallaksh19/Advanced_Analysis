@@ -114,6 +114,13 @@ export {
   createThreeMeshRendererV2,
 } from './lafea-canvas/three-mesh-renderer-v2.js';
 export {
+  LAFEA_HYBRID_RESULT_RENDER_POLICY,
+  LAFEA_HYBRID_RESULT_VIEWPORT_SCHEMA,
+  LAFEA_HYBRID_RESULT_VIEWPORT_STATUSES,
+  createLafeaHybridResultViewportModel,
+  mountLafeaHybridResultViewport,
+} from './lafea-hybrid-result-viewport-public.js';
+export {
   LAFEA_WORKBENCH_DOCUMENT_SCHEMA,
   executeLafeaStage,
   lafeaCollectionPaths,

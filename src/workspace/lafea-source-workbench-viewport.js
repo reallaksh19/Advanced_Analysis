@@ -7,13 +7,13 @@
  */
 import { createAccessibleInspector } from './lafea-canvas/accessible-inspector.js';
 import { createHybridViewport } from './lafea-canvas/hybrid-viewport.js';
+import { renderLafeaSourceOverlay } from './lafea-canvas/source-overlay-adapter.js';
 import {
   createLafeaSourceEngineeringScene,
   createLafeaSourceRenderRequest,
   createLafeaSourceViewportState,
 } from './lafea-engineering-scene.js';
 import { requireLafeaStageRegistryEntry } from './lafea-stage-registry.js';
-import { renderLafeaWorkbenchSvg } from './lafea-workbench-svg.js';
 
 export const LAFEA_WORKBENCH_SOURCE_VIEWPORT_SCHEMA = 'lafea-workbench-source-viewport/v1';
 
@@ -69,9 +69,7 @@ export function createLafeaSourceWorkbenchViewportModel(input) {
   });
 }
 
-/**
- * Mount a source-only hybrid viewport and return an immutable control facade.
- */
+/** Mount a source-only hybrid viewport and return an immutable control facade. */
 export function mountLafeaSourceWorkbenchViewport(root, input) {
   if (!root?.ownerDocument) throw new TypeError('LAFEA_SOURCE_WORKBENCH_VIEWPORT_ROOT_REQUIRED');
   const model = createLafeaSourceWorkbenchViewportModel(input);
@@ -86,16 +84,18 @@ export function mountLafeaSourceWorkbenchViewport(root, input) {
   const adapters = {
     svg: {
       render({ target, scene, viewport, selection: visibleSelection, authoringEnabled }) {
-        const editable = authoringEnabled
-          && model.registryEntry.previewSource.editable
-          && typeof input.onMoveNode === 'function';
-        renderLafeaWorkbenchSvg(
+        renderLafeaSourceOverlay({
           target,
-          sourceGeometry(scene, model.registryEntry, editable),
-          editable ? { onMoveNode: input.onMoveNode } : {},
+          scene,
           viewport,
-        );
-        bindSourceSelection(target, scene, visibleSelection, selectSource);
+          registryEntry: model.registryEntry,
+          selection: visibleSelection,
+          editable: authoringEnabled
+            && model.registryEntry.previewSource.editable
+            && typeof input.onMoveNode === 'function',
+          onMoveNode: input.onMoveNode,
+          onSelectSource: selectSource,
+        });
       },
       dispose() {},
     },
@@ -160,59 +160,6 @@ export function mountLafeaSourceWorkbenchViewport(root, input) {
       controller.destroy();
     },
   });
-}
-
-function sourceGeometry(scene, registryEntry, editable) {
-  const nodes = scene.sourcePrimitives
-    .filter((row) => row.kind === 'SOURCE_POINT')
-    .map((row) => ({
-      nodeId: row.nodeIds[0],
-      x: row.coordinates[0].x,
-      y: row.coordinates[0].y,
-      z: row.coordinates[0].z,
-      sceneEntityId: row.sceneEntityId,
-      sourceEntityId: row.sourceEntityId,
-      sourcePath: row.sourcePath,
-    }));
-  const elements = scene.sourcePrimitives
-    .filter((row) => row.kind === 'SOURCE_ELEMENT')
-    .map((row) => ({
-      elementId: row.sourceEntityId,
-      nodeIds: [...row.nodeIds],
-      nodes: [...row.nodeIds],
-      type: 'SOURCE_ELEMENT',
-      sceneEntityId: row.sceneEntityId,
-      sourceEntityId: row.sourceEntityId,
-      sourcePath: row.sourcePath,
-    }));
-  return Object.freeze({
-    nodes: Object.freeze(nodes),
-    elements: Object.freeze(elements),
-    nodePath: editable ? registryEntry.previewSource.nodePath : null,
-  });
-}
-
-function bindSourceSelection(target, scene, visibleSelection, selectSource) {
-  const selectedId = visibleSelection?.sourceEntityId ?? null;
-  for (const node of target.querySelectorAll?.('[data-node-id]') ?? []) {
-    const sourceEntityId = node.dataset.nodeId;
-    const selected = sourceEntityId === selectedId;
-    node.dataset.selected = selected ? 'true' : 'false';
-    node.classList[selected ? 'add' : 'remove']('lafea-svg-highlighted');
-    node.addEventListener('click', () => selectSource(sourceEntityId));
-  }
-  for (const node of target.querySelectorAll?.('[data-element-id]') ?? []) {
-    const sourceEntityId = node.dataset.elementId;
-    const selected = sourceEntityId === selectedId;
-    node.dataset.selected = selected ? 'true' : 'false';
-    node.classList[selected ? 'add' : 'remove']('lafea-svg-highlighted');
-    node.addEventListener('click', () => selectSource(sourceEntityId));
-  }
-  if (selectedId !== null && !scene.sourcePrimitives.some(
-    (row) => row.sourceEntityId === selectedId,
-  )) {
-    throw new TypeError('LAFEA_SOURCE_SELECTION_ENTITY_NOT_IN_SCENE');
-  }
 }
 
 function emptySelection(sceneRevision) {
