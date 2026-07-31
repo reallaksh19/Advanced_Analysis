@@ -1,5 +1,8 @@
 /**
- * LAFEA.5 trunnion footprint presenter.
+ * LAFEA.5 limited trunnion-footprint adapter presenter.
+ *
+ * The current core reports retained raw shell surface stress by declared
+ * assessment region. It does not produce weld, SCL, convergence or code stress.
  */
 import {
   presenterResult,
@@ -10,40 +13,41 @@ import {
 export function presentTrunnionFootprint(result, units) {
   const stress = requiredUnit(units, 'stress');
   const rows = [];
-  let maxStress = -Infinity;
-  let maxLoc = '';
-  let maxCase = '';
+  let maximumStress = -Infinity;
+  let maximumLocation = '';
+  let maximumPath = null;
 
   for (const [regionIndex, region] of (result.assessmentRegionResults ?? []).entries()) {
-    const caseName = region.loadCaseId || `Case #${regionIndex + 1}`;
-    for (const [recordIndex, record] of region.records.entries()) {
-      if (record.vonMises > maxStress) {
-        maxStress = record.vonMises;
-        maxLoc = `Region ${region.regionId} · Element ${record.elementId} (${record.integrationPointId}, ${record.surface})`;
-        maxCase = caseName;
+    const caseLabel = region.loadCaseId || `Case ${regionIndex + 1}`;
+    for (const [recordIndex, record] of (region.records ?? []).entries()) {
+      const sourcePath = `result.assessmentRegionResults[${regionIndex}].records[${recordIndex}].vonMises`;
+      if (record.vonMises > maximumStress) {
+        maximumStress = record.vonMises;
+        maximumLocation = `Region ${region.regionId} · Element ${record.elementId} (${record.integrationPointId}, ${record.surface})`;
+        maximumPath = sourcePath;
       }
       rows.push(presenterRow(
-        `${caseName} · Region ${region.regionId} · Element ${record.elementId} · ${record.integrationPointId} · ${record.surface} · Von Mises Equivalent Stress (σvm)`,
+        `${caseLabel} · Region ${region.regionId} · Element ${record.elementId} · ${record.integrationPointId} · ${record.surface} · raw von Mises equivalent stress`,
         record.vonMises,
         stress,
         null,
-        `Load Case ${caseName} · Region ${region.regionId} · Element ${record.elementId} · ${record.integrationPointId} · ${record.surface} · Von Mises Stress (σvm)`,
+        sourcePath,
       ));
     }
   }
 
-  const governing = maxStress > -Infinity
+  const governing = maximumPath
     ? {
-      label: 'Governing Trunnion Footprint Local Surface Stress Intensity',
-      value: maxStress,
+      label: 'Maximum retained raw assessment-region surface stress',
+      value: maximumStress,
       unit: stress,
-      locationId: maxLoc,
-      sourcePath: `Load Case ${maxCase} · ${maxLoc} · Von Mises Stress (σvm max)`,
+      locationId: maximumLocation,
+      sourcePath: maximumPath,
     }
     : null;
 
   return presenterResult(result, [{
-    title: 'Trunnion Footprint & Assessment Region Local Surface Stress',
+    title: 'Limited footprint-adapter raw shell surface stress evidence',
     rows,
   }], governing);
 }
