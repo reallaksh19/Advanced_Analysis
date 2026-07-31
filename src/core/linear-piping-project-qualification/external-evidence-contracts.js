@@ -1,7 +1,7 @@
 import { finiteNumber } from '../shared-analysis-contract/numeric.js';
 import { exactKeys, nonEmptyString } from '../shared-analysis-contract/validation.js';
 import { semanticHash } from '../shared-piping-model/canonical-json.js';
-import { deepFreeze, isPlainRecord } from '../shared-piping-model/immutable.js';
+import { deepFreeze } from '../shared-piping-model/immutable.js';
 import { compareAscii, failQualification } from './contracts.js';
 
 export const PERFORMANCE_EVIDENCE_SCHEMA = 'linear-piping-performance-evidence/v1';
@@ -66,20 +66,25 @@ export function sealPerformanceEvidence(source) {
   if (source.schema !== PERFORMANCE_EVIDENCE_SCHEMA) {
     failQualification('Performance evidence schema is invalid.', 'PIPING_PERFORMANCE_EVIDENCE_INVALID');
   }
-  const stageTimings = canonicalStageTimings(source.stageTimings);
   const draft = {
     schema: source.schema,
     evidenceId: requireExternalText(source.evidenceId, 'performanceEvidence.evidenceId'),
     exactHead: requireHead(source.exactHead, 'performanceEvidence.exactHead'),
     runtimeIdentity: canonicalRuntimeIdentity(source.runtimeIdentity),
     modelEnvelope: canonicalModelEnvelope(source.modelEnvelope),
-    stageTimings,
+    stageTimings: canonicalStageTimings(source.stageTimings),
     memoryEvidence: canonicalMemoryEvidence(source.memoryEvidence),
     deterministicReplay: canonicalReplay(source.deterministicReplay),
     failureBehavior: canonicalFailureBehavior(source.failureBehavior),
     declaredEnvelope: canonicalDeclaredEnvelope(source.declaredEnvelope),
-    exceededLimits: canonicalTextArray(source.exceededLimits, 'performanceEvidence.exceededLimits'),
-    sourceEvidence: canonicalSourceEvidence(source.sourceEvidence, 'performanceEvidence.sourceEvidence'),
+    exceededLimits: canonicalPlainTextArray(
+      source.exceededLimits,
+      'performanceEvidence.exceededLimits',
+    ),
+    sourceEvidence: canonicalSourceEvidence(
+      source.sourceEvidence,
+      'performanceEvidence.sourceEvidence',
+    ),
     reviewer: requireExternalText(source.reviewer, 'performanceEvidence.reviewer'),
     reviewedAtUtc: requireUtc(source.reviewedAtUtc, 'performanceEvidence.reviewedAtUtc'),
     semanticHash: '',
@@ -87,20 +92,21 @@ export function sealPerformanceEvidence(source) {
   };
   draft.semanticHash = semanticHash(performanceSemanticProjection(draft));
   draft.evidenceHash = semanticHash(performanceEvidenceProjection(draft));
-  if (source.semanticHash !== '' && source.semanticHash !== draft.semanticHash) {
-    failQualification('Performance semantic hash is stale.', 'PIPING_PERFORMANCE_EVIDENCE_HASH_MISMATCH');
-  }
-  if (source.evidenceHash !== '' && source.evidenceHash !== draft.evidenceHash) {
-    failQualification('Performance evidence hash is stale.', 'PIPING_PERFORMANCE_EVIDENCE_HASH_MISMATCH');
-  }
+  requireOptionalHashMatch(
+    source,
+    draft,
+    'PIPING_PERFORMANCE_EVIDENCE_HASH_MISMATCH',
+  );
   return deepFreeze(draft);
 }
 
 export function requirePerformanceEvidence(record) {
   const sealed = sealPerformanceEvidence(record);
-  if (record.semanticHash !== sealed.semanticHash || record.evidenceHash !== sealed.evidenceHash) {
-    failQualification('Performance evidence must carry current hashes.', 'PIPING_PERFORMANCE_EVIDENCE_HASH_MISMATCH');
-  }
+  requireCurrentHashes(
+    record,
+    sealed,
+    'PIPING_PERFORMANCE_EVIDENCE_HASH_MISMATCH',
+  );
   return sealed;
 }
 
@@ -117,10 +123,19 @@ export function sealRollbackEvidence(source) {
     releaseCommand: canonicalCommand(source.releaseCommand, 'rollbackEvidence.releaseCommand'),
     rollbackCommand: canonicalCommand(source.rollbackCommand, 'rollbackEvidence.rollbackCommand'),
     migrationImpact: canonicalMigrationImpact(source.migrationImpact),
-    restoredApplicationPath: requireBoolean(source.restoredApplicationPath, 'rollbackEvidence.restoredApplicationPath'),
-    preservedProjectData: requireBoolean(source.preservedProjectData, 'rollbackEvidence.preservedProjectData'),
+    restoredApplicationPath: requireBoolean(
+      source.restoredApplicationPath,
+      'rollbackEvidence.restoredApplicationPath',
+    ),
+    preservedProjectData: requireBoolean(
+      source.preservedProjectData,
+      'rollbackEvidence.preservedProjectData',
+    ),
     postRollbackChecks: canonicalRollbackChecks(source.postRollbackChecks),
-    sourceEvidence: canonicalSourceEvidence(source.sourceEvidence, 'rollbackEvidence.sourceEvidence'),
+    sourceEvidence: canonicalSourceEvidence(
+      source.sourceEvidence,
+      'rollbackEvidence.sourceEvidence',
+    ),
     reviewer: requireExternalText(source.reviewer, 'rollbackEvidence.reviewer'),
     completedAtUtc: requireUtc(source.completedAtUtc, 'rollbackEvidence.completedAtUtc'),
     semanticHash: '',
@@ -131,20 +146,13 @@ export function sealRollbackEvidence(source) {
   }
   draft.semanticHash = semanticHash(rollbackSemanticProjection(draft));
   draft.evidenceHash = semanticHash(rollbackEvidenceProjection(draft));
-  if (source.semanticHash !== '' && source.semanticHash !== draft.semanticHash) {
-    failQualification('Rollback semantic hash is stale.', 'PIPING_ROLLBACK_EVIDENCE_HASH_MISMATCH');
-  }
-  if (source.evidenceHash !== '' && source.evidenceHash !== draft.evidenceHash) {
-    failQualification('Rollback evidence hash is stale.', 'PIPING_ROLLBACK_EVIDENCE_HASH_MISMATCH');
-  }
+  requireOptionalHashMatch(source, draft, 'PIPING_ROLLBACK_EVIDENCE_HASH_MISMATCH');
   return deepFreeze(draft);
 }
 
 export function requireRollbackEvidence(record) {
   const sealed = sealRollbackEvidence(record);
-  if (record.semanticHash !== sealed.semanticHash || record.evidenceHash !== sealed.evidenceHash) {
-    failQualification('Rollback evidence must carry current hashes.', 'PIPING_ROLLBACK_EVIDENCE_HASH_MISMATCH');
-  }
+  requireCurrentHashes(record, sealed, 'PIPING_ROLLBACK_EVIDENCE_HASH_MISMATCH');
   return sealed;
 }
 
@@ -153,15 +161,24 @@ export function sealReleaseReviewDisposition(source) {
   if (source.schema !== RELEASE_REVIEW_DISPOSITION_SCHEMA
     || source.program !== 'PRIORITY_2_LINEAR_PIPING_FEA_APPLICATION_CHAIN'
     || source.decision !== RELEASE_REVIEW_DECISION) {
-    failQualification('Release-review disposition is invalid.', 'PIPING_RELEASE_REVIEW_DISPOSITION_INVALID');
+    failQualification(
+      'Release-review disposition is invalid.',
+      'PIPING_RELEASE_REVIEW_DISPOSITION_INVALID',
+    );
   }
   const draft = {
     schema: source.schema,
-    dispositionId: requireExternalText(source.dispositionId, 'releaseReviewDisposition.dispositionId'),
+    dispositionId: requireExternalText(
+      source.dispositionId,
+      'releaseReviewDisposition.dispositionId',
+    ),
     program: source.program,
     exactHead: requireHead(source.exactHead, 'releaseReviewDisposition.exactHead'),
     decision: source.decision,
-    organization: requireExternalText(source.organization, 'releaseReviewDisposition.organization'),
+    organization: requireExternalText(
+      source.organization,
+      'releaseReviewDisposition.organization',
+    ),
     reviewer: requireExternalText(source.reviewer, 'releaseReviewDisposition.reviewer'),
     role: requireExternalText(source.role, 'releaseReviewDisposition.role'),
     signedAtUtc: requireUtc(source.signedAtUtc, 'releaseReviewDisposition.signedAtUtc'),
@@ -169,7 +186,10 @@ export function sealReleaseReviewDisposition(source) {
       source.signatureReference,
       'releaseReviewDisposition.signatureReference',
     ),
-    sourceSemanticHash: requireHash(source.sourceSemanticHash, 'releaseReviewDisposition.sourceSemanticHash'),
+    sourceSemanticHash: requireHash(
+      source.sourceSemanticHash,
+      'releaseReviewDisposition.sourceSemanticHash',
+    ),
     semanticHash: '',
     evidenceHash: '',
   };
@@ -179,27 +199,31 @@ export function sealReleaseReviewDisposition(source) {
     signatureReference: draft.signatureReference,
     sourceSemanticHash: draft.sourceSemanticHash,
   });
-  if (source.semanticHash !== '' && source.semanticHash !== draft.semanticHash) {
-    failQualification('Release-review disposition hash is stale.', 'PIPING_RELEASE_REVIEW_DISPOSITION_HASH_MISMATCH');
-  }
-  if (source.evidenceHash !== '' && source.evidenceHash !== draft.evidenceHash) {
-    failQualification('Release-review disposition evidence is stale.', 'PIPING_RELEASE_REVIEW_DISPOSITION_HASH_MISMATCH');
-  }
+  requireOptionalHashMatch(
+    source,
+    draft,
+    'PIPING_RELEASE_REVIEW_DISPOSITION_HASH_MISMATCH',
+  );
   return deepFreeze(draft);
 }
 
 export function requireReleaseReviewDisposition(record) {
   const sealed = sealReleaseReviewDisposition(record);
-  if (record.semanticHash !== sealed.semanticHash || record.evidenceHash !== sealed.evidenceHash) {
-    failQualification('Release-review disposition must carry current hashes.', 'PIPING_RELEASE_REVIEW_DISPOSITION_HASH_MISMATCH');
-  }
+  requireCurrentHashes(
+    record,
+    sealed,
+    'PIPING_RELEASE_REVIEW_DISPOSITION_HASH_MISMATCH',
+  );
   return sealed;
 }
 
 export function canonicalArtifactReference(source, field) {
   exactKeys(source, ARTIFACT_REFERENCE_KEYS, field);
   if (source.schema !== EVIDENCE_ARTIFACT_REFERENCE_SCHEMA) {
-    failQualification(`${field}.schema is invalid.`, 'PIPING_EVIDENCE_ARTIFACT_REFERENCE_INVALID');
+    failQualification(
+      `${field}.schema is invalid.`,
+      'PIPING_EVIDENCE_ARTIFACT_REFERENCE_INVALID',
+    );
   }
   const path = requireExternalText(source.path, `${field}.path`);
   if (path.startsWith('/') || path.includes('..')
@@ -209,31 +233,46 @@ export function canonicalArtifactReference(source, field) {
   return deepFreeze({
     schema: source.schema,
     path,
-    mediaType: requireExternalText(source.mediaType, `${field}.mediaType`),
+    mediaType: nonEmptyString(source.mediaType, `${field}.mediaType`),
     contentHash: requireHash(source.contentHash, `${field}.contentHash`),
-    recordSemanticHash: requireHash(source.recordSemanticHash, `${field}.recordSemanticHash`),
-    recordEvidenceHash: requireHash(source.recordEvidenceHash, `${field}.recordEvidenceHash`),
+    recordSemanticHash: requireHash(
+      source.recordSemanticHash,
+      `${field}.recordSemanticHash`,
+    ),
+    recordEvidenceHash: requireHash(
+      source.recordEvidenceHash,
+      `${field}.recordEvidenceHash`,
+    ),
   });
 }
 
 export function requireExternalText(value, field) {
   const text = nonEmptyString(value, field);
   if (PROHIBITED_EVIDENCE_TOKEN.test(text.toUpperCase())) {
-    failQualification(`${field} contains an ineligible evidence token.`, 'PIPING_EXTERNAL_EVIDENCE_INELIGIBLE');
+    failQualification(
+      `${field} contains an ineligible evidence token.`,
+      'PIPING_EXTERNAL_EVIDENCE_INELIGIBLE',
+    );
   }
   return text;
 }
 
 export function requireHash(value, field) {
   if (typeof value !== 'string' || !HASH_PATTERN.test(value)) {
-    failQualification(`${field} must be a semantic hash.`, 'PIPING_EXTERNAL_EVIDENCE_HASH_INVALID');
+    failQualification(
+      `${field} must be a semantic hash.`,
+      'PIPING_EXTERNAL_EVIDENCE_HASH_INVALID',
+    );
   }
   return value;
 }
 
 export function requireHead(value, field) {
   if (typeof value !== 'string' || !HEAD_PATTERN.test(value)) {
-    failQualification(`${field} must be a 40-character commit SHA.`, 'PIPING_EXTERNAL_EVIDENCE_HEAD_INVALID');
+    failQualification(
+      `${field} must be a 40-character commit SHA.`,
+      'PIPING_EXTERNAL_EVIDENCE_HEAD_INVALID',
+    );
   }
   return value;
 }
@@ -243,9 +282,15 @@ function canonicalRuntimeIdentity(source) {
   return deepFreeze({
     runtimeName: requireExternalText(source.runtimeName, 'runtimeIdentity.runtimeName'),
     runtimeVersion: requireExternalText(source.runtimeVersion, 'runtimeIdentity.runtimeVersion'),
-    operatingSystem: requireExternalText(source.operatingSystem, 'runtimeIdentity.operatingSystem'),
+    operatingSystem: requireExternalText(
+      source.operatingSystem,
+      'runtimeIdentity.operatingSystem',
+    ),
     architecture: requireExternalText(source.architecture, 'runtimeIdentity.architecture'),
-    dependencyLockHash: requireHash(source.dependencyLockHash, 'runtimeIdentity.dependencyLockHash'),
+    dependencyLockHash: requireHash(
+      source.dependencyLockHash,
+      'runtimeIdentity.dependencyLockHash',
+    ),
   });
 }
 
@@ -266,12 +311,19 @@ function canonicalStageTimings(source) {
     }
     return deepFreeze({
       stage: row.stage,
-      durationMs: requireNonnegativeFinite(row.durationMs, `stageTimings[${index}].durationMs`),
+      durationMs: requireNonnegativeFinite(
+        row.durationMs,
+        `stageTimings[${index}].durationMs`,
+      ),
     });
   }).sort((left, right) => compareAscii(left.stage, right.stage));
   if (new Set(timings.map((row) => row.stage)).size !== timings.length
-    || JSON.stringify(timings.map((row) => row.stage)) !== JSON.stringify(REQUIRED_PERFORMANCE_STAGES)) {
-    failQualification('Performance stages are incomplete or duplicated.', 'PIPING_PERFORMANCE_STAGE_COVERAGE_INVALID');
+    || JSON.stringify(timings.map((row) => row.stage))
+      !== JSON.stringify(REQUIRED_PERFORMANCE_STAGES)) {
+    failQualification(
+      'Performance stages are incomplete or duplicated.',
+      'PIPING_PERFORMANCE_STAGE_COVERAGE_INVALID',
+    );
   }
   return deepFreeze(timings);
 }
@@ -279,17 +331,32 @@ function canonicalStageTimings(source) {
 function canonicalMemoryEvidence(source) {
   exactKeys(source, MEMORY_KEYS, 'performanceEvidence.memoryEvidence');
   return deepFreeze({
-    peakResidentBytes: requireNonnegativeInteger(source.peakResidentBytes, 'memoryEvidence.peakResidentBytes'),
-    measurementMethod: requireExternalText(source.measurementMethod, 'memoryEvidence.measurementMethod'),
-    sourceSemanticHash: requireHash(source.sourceSemanticHash, 'memoryEvidence.sourceSemanticHash'),
+    peakResidentBytes: requireNonnegativeInteger(
+      source.peakResidentBytes,
+      'memoryEvidence.peakResidentBytes',
+    ),
+    measurementMethod: requireExternalText(
+      source.measurementMethod,
+      'memoryEvidence.measurementMethod',
+    ),
+    sourceSemanticHash: requireHash(
+      source.sourceSemanticHash,
+      'memoryEvidence.sourceSemanticHash',
+    ),
   });
 }
 
 function canonicalReplay(source) {
   exactKeys(source, REPLAY_KEYS, 'performanceEvidence.deterministicReplay');
-  const runCount = requireNonnegativeInteger(source.runCount, 'deterministicReplay.runCount');
+  const runCount = requireNonnegativeInteger(
+    source.runCount,
+    'deterministicReplay.runCount',
+  );
   if (runCount < 2 || source.status !== 'PASS') {
-    failQualification('Deterministic replay must contain at least two passing runs.', 'PIPING_PERFORMANCE_REPLAY_INVALID');
+    failQualification(
+      'Deterministic replay must contain at least two passing runs.',
+      'PIPING_PERFORMANCE_REPLAY_INVALID',
+    );
   }
   const resultSemanticHashes = canonicalHashArray(
     source.resultSemanticHashes,
@@ -299,8 +366,10 @@ function canonicalReplay(source) {
     source.exportByteHashes,
     'deterministicReplay.exportByteHashes',
   );
-  if (resultSemanticHashes.length !== runCount || exportByteHashes.length !== runCount
-    || new Set(resultSemanticHashes).size !== 1 || new Set(exportByteHashes).size !== 1) {
+  if (resultSemanticHashes.length !== runCount
+    || exportByteHashes.length !== runCount
+    || new Set(resultSemanticHashes).size !== 1
+    || new Set(exportByteHashes).size !== 1) {
     failQualification('Deterministic replay hashes disagree.', 'PIPING_PERFORMANCE_REPLAY_INVALID');
   }
   return deepFreeze({ runCount, resultSemanticHashes, exportByteHashes, status: source.status });
@@ -309,7 +378,10 @@ function canonicalReplay(source) {
 function canonicalFailureBehavior(source) {
   exactKeys(source, FAILURE_KEYS, 'performanceEvidence.failureBehavior');
   if (source.cancellationStatus !== 'PASS' || source.invalidInputStatus !== 'PASS') {
-    failQualification('Failure-behavior checks must pass.', 'PIPING_PERFORMANCE_FAILURE_BEHAVIOR_INVALID');
+    failQualification(
+      'Failure-behavior checks must pass.',
+      'PIPING_PERFORMANCE_FAILURE_BEHAVIOR_INVALID',
+    );
   }
   return deepFreeze({ ...source });
 }
@@ -318,23 +390,35 @@ function canonicalDeclaredEnvelope(source) {
   exactKeys(source, DECLARED_ENVELOPE_KEYS, 'performanceEvidence.declaredEnvelope');
   return deepFreeze({
     maxNodes: requireNonnegativeInteger(source.maxNodes, 'declaredEnvelope.maxNodes'),
-    maxElements: requireNonnegativeInteger(source.maxElements, 'declaredEnvelope.maxElements'),
-    maxLoadCases: requireNonnegativeInteger(source.maxLoadCases, 'declaredEnvelope.maxLoadCases'),
-    maxStageDurationMs: requireNonnegativeFinite(source.maxStageDurationMs, 'declaredEnvelope.maxStageDurationMs'),
-    maxPeakResidentBytes: requireNonnegativeInteger(source.maxPeakResidentBytes, 'declaredEnvelope.maxPeakResidentBytes'),
+    maxElements: requireNonnegativeInteger(
+      source.maxElements,
+      'declaredEnvelope.maxElements',
+    ),
+    maxLoadCases: requireNonnegativeInteger(
+      source.maxLoadCases,
+      'declaredEnvelope.maxLoadCases',
+    ),
+    maxStageDurationMs: requireNonnegativeFinite(
+      source.maxStageDurationMs,
+      'declaredEnvelope.maxStageDurationMs',
+    ),
+    maxPeakResidentBytes: requireNonnegativeInteger(
+      source.maxPeakResidentBytes,
+      'declaredEnvelope.maxPeakResidentBytes',
+    ),
     source: requireExternalText(source.source, 'declaredEnvelope.source'),
   });
 }
 
 function canonicalCommand(source, field) {
   exactKeys(source, COMMAND_KEYS, field);
-  const commandText = requireExternalText(source.commandText, `${field}.commandText`);
+  const commandText = nonEmptyString(source.commandText, `${field}.commandText`);
   const commandHash = requireHash(source.commandHash, `${field}.commandHash`);
   if (commandHash !== semanticHash({ commandText })) {
     failQualification(`${field}.commandHash is stale.`, 'PIPING_ROLLBACK_COMMAND_HASH_MISMATCH');
   }
   return deepFreeze({
-    commandId: requireExternalText(source.commandId, `${field}.commandId`),
+    commandId: nonEmptyString(source.commandId, `${field}.commandId`),
     commandText,
     commandHash,
     logHash: requireHash(source.logHash, `${field}.logHash`),
@@ -344,11 +428,14 @@ function canonicalCommand(source, field) {
 function canonicalMigrationImpact(source) {
   exactKeys(source, MIGRATION_KEYS, 'rollbackEvidence.migrationImpact');
   if (!['NONE', 'REVERSIBLE', 'MANUAL'].includes(source.classification)) {
-    failQualification('Migration-impact classification is invalid.', 'PIPING_ROLLBACK_MIGRATION_INVALID');
+    failQualification(
+      'Migration-impact classification is invalid.',
+      'PIPING_ROLLBACK_MIGRATION_INVALID',
+    );
   }
   return deepFreeze({
     classification: source.classification,
-    details: requireExternalText(source.details, 'rollbackEvidence.migrationImpact.details'),
+    details: nonEmptyString(source.details, 'rollbackEvidence.migrationImpact.details'),
   });
 }
 
@@ -363,9 +450,12 @@ function canonicalRollbackChecks(source) {
       failQualification('Rollback checks must pass.', 'PIPING_ROLLBACK_CHECKS_INVALID');
     }
     return deepFreeze({
-      checkId: requireExternalText(row.checkId, `postRollbackChecks[${index}].checkId`),
+      checkId: nonEmptyString(row.checkId, `postRollbackChecks[${index}].checkId`),
       status: row.status,
-      evidenceHash: requireHash(row.evidenceHash, `postRollbackChecks[${index}].evidenceHash`),
+      evidenceHash: requireHash(
+        row.evidenceHash,
+        `postRollbackChecks[${index}].evidenceHash`,
+      ),
     });
   }).sort((left, right) => compareAscii(left.checkId, right.checkId));
   if (new Set(checks.map((row) => row.checkId)).size !== checks.length) {
@@ -388,9 +478,9 @@ function canonicalHashArray(source, field) {
   return deepFreeze(source.map((value, index) => requireHash(value, `${field}[${index}]`)));
 }
 
-function canonicalTextArray(source, field) {
+function canonicalPlainTextArray(source, field) {
   requireArray(source, field);
-  const values = source.map((value, index) => requireExternalText(value, `${field}[${index}]`));
+  const values = source.map((value, index) => nonEmptyString(value, `${field}[${index}]`));
   return deepFreeze([...new Set(values)].sort(compareAscii));
 }
 
@@ -403,7 +493,10 @@ function requireArray(value, field) {
 
 function requireNonnegativeInteger(value, field) {
   if (!Number.isInteger(value) || value < 0) {
-    failQualification(`${field} must be a non-negative integer.`, 'PIPING_EXTERNAL_EVIDENCE_NUMBER_INVALID');
+    failQualification(
+      `${field} must be a non-negative integer.`,
+      'PIPING_EXTERNAL_EVIDENCE_NUMBER_INVALID',
+    );
   }
   return value;
 }
@@ -424,10 +517,28 @@ function requireBoolean(value, field) {
 }
 
 function requireUtc(value, field) {
-  if (typeof value !== 'string' || !UTC_PATTERN.test(value) || !Number.isFinite(Date.parse(value))) {
-    failQualification(`${field} must be an exact UTC timestamp.`, 'PIPING_EXTERNAL_EVIDENCE_TIME_INVALID');
+  if (typeof value !== 'string'
+    || !UTC_PATTERN.test(value)
+    || !Number.isFinite(Date.parse(value))) {
+    failQualification(
+      `${field} must be an exact UTC timestamp.`,
+      'PIPING_EXTERNAL_EVIDENCE_TIME_INVALID',
+    );
   }
   return value;
+}
+
+function requireOptionalHashMatch(source, draft, code) {
+  if ((source.semanticHash !== '' && source.semanticHash !== draft.semanticHash)
+    || (source.evidenceHash !== '' && source.evidenceHash !== draft.evidenceHash)) {
+    failQualification('External evidence hash is stale.', code);
+  }
+}
+
+function requireCurrentHashes(record, sealed, code) {
+  if (record.semanticHash !== sealed.semanticHash || record.evidenceHash !== sealed.evidenceHash) {
+    failQualification('External evidence must carry current hashes.', code);
+  }
 }
 
 function performanceSemanticProjection(record) {
