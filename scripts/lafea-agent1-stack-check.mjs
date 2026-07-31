@@ -23,6 +23,8 @@ const CHECKS = Object.freeze([
   'scripts/lafea-u4e-v2-renderer-adapter-check.mjs',
   'scripts/lafea-u4e-result-viewport-guard.mjs',
   'scripts/lafea-u4e-renderer-state-guard.mjs',
+  'scripts/lafea-u4f-hybrid-result-model-check.mjs',
+  'scripts/lafea-u4f-hybrid-result-viewport-check.mjs',
   'scripts/lafea-canvas-contract-check.mjs',
   'scripts/lafea-workbench-check.mjs',
   'scripts/lafea-template-t1-contract-check.mjs',
