@@ -32,7 +32,6 @@ import {
   MULTICASE_NOZZLE_ENVELOPE_KEYS,
   compareAscii,
   failMulticaseApplication,
-  freezeClone,
   hashEvidenceProjection,
   hashSemanticProjection,
   requireArray,
@@ -493,10 +492,13 @@ function requireApplicationParents(
   )).sort(compareAscii);
   const expectedRecoveries = recoveries.map((row) => row.semanticHash).sort(compareAscii);
   const expectedNozzles = governingAssessments.map((row) => row.semanticHash).sort(compareAscii);
-  if (JSON.stringify(applicationResult.analysisResultSemanticHashes) !== JSON.stringify(expectedAnalysis)
+  const actualAnalysis = [...applicationResult.analysisResultSemanticHashes].sort(compareAscii);
+  const actualRecoveries = [...applicationResult.interfaceRecoverySemanticHashes].sort(compareAscii);
+  const actualNozzles = [...applicationResult.nozzleAssessmentSemanticHashes].sort(compareAscii);
+  if (JSON.stringify(actualAnalysis) !== JSON.stringify(expectedAnalysis)
     || applicationResult.interfaceSetSemanticHash !== interfaceSet.semanticHash
-    || JSON.stringify(applicationResult.interfaceRecoverySemanticHashes) !== JSON.stringify(expectedRecoveries)
-    || JSON.stringify(applicationResult.nozzleAssessmentSemanticHashes) !== JSON.stringify(expectedNozzles)
+    || JSON.stringify(actualRecoveries) !== JSON.stringify(expectedRecoveries)
+    || JSON.stringify(actualNozzles) !== JSON.stringify(expectedNozzles)
     || applicationResult.b31ApplicationSemanticHash !== b31Application.semanticHash) {
     failMulticaseApplication(
       'Sealed application result does not retain the complete multicase parent set.',
