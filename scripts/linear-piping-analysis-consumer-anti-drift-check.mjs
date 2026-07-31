@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 
 /**
- * Static T0, Phase 2A and Phase 2B authority guard.
+ * Static T0 and Phase 2A-2C authority guard.
  *
  * Phase 2B may invoke the existing InputXML geometry adapter and B-1
- * conditioner only. The consumer may not become a second material, section,
- * axis, mechanics, interface, code, workspace or empirical-reaction authority.
+ * conditioner. Phase 2C may retain validated compilation/load-case/result
+ * objects. No consumer file may become a second engineering or mechanics
+ * authority.
  */
 
 import assert from 'node:assert/strict';
@@ -49,10 +50,23 @@ const sourceGateway = fs.readFileSync(path.join(ROOT, 'source-orchestration.js')
 assert.match(sourceGateway, /compileMechanicalModel/u);
 assert.match(sourceGateway, /compilePhysicalLoadCase/u);
 assert.match(sourceGateway, /modelReferenceFromCompilation/u);
+assert.match(sourceGateway, /compileLinearPipingSourceAnalysisContext/u);
+assert.match(sourceGateway, /sealLinearPipingSourceAnalysisContext/u);
 assert.match(sourceGateway, /runLinearPipingAnalysis/u);
 assert.match(sourceGateway, /PIPING_SOURCE_AUTHORITY_MISMATCH/u);
 assert.doesNotMatch(sourceGateway, /compileSolverExecution|compileResultRecovery/u);
 assert.doesNotMatch(sourceGateway, /interfaceLoadResults|nozzleAssessments|codeResults/u);
+
+const contextContract = fs.readFileSync(path.join(ROOT, 'source-analysis-context.js'), 'utf8');
+assert.match(contextContract, /linear-piping-source-analysis-context\/v1/u);
+assert.match(contextContract, /requireMechanicalModelCompilation/u);
+assert.match(contextContract, /requirePhysicalLoadCase/u);
+assert.match(contextContract, /validateLinearPipingAnalysisResult/u);
+assert.match(contextContract, /PIPING_SOURCE_CONTEXT_PARENT_MISMATCH/u);
+assert.doesNotMatch(
+  contextContract,
+  /compileMechanicalModel|compilePhysicalLoadCase|compileSolverExecution|compileResultRecovery|recoverLinearPipingInterfaceLoads/u,
+);
 
 const inputXmlContract = fs.readFileSync(path.join(ROOT, 'inputxml-source-contract.js'), 'utf8');
 assert.match(inputXmlContract, /linear-piping-inputxml-source\/v1/u);
@@ -79,6 +93,8 @@ assert.deepEqual(adapterImports, ['inputxml-source-binding.js']);
 
 const index = fs.readFileSync(path.join(ROOT, 'index.js'), 'utf8');
 assert.match(index, /runLinearPipingAnalysisFromSourceAuthorities/u);
+assert.match(index, /compileLinearPipingSourceAnalysisContext/u);
+assert.match(index, /requireLinearPipingSourceAnalysisContext/u);
 assert.match(index, /runLinearPipingAnalysisFromInputXml/u);
 assert.match(index, /sealLinearPipingInputXmlSource/u);
 assert.match(index, /requireLinearPipingInputXmlAnalysisResult/u);
@@ -93,5 +109,6 @@ assert.match(packageValue.scripts.gate, /check:linear-piping-analysis-consumer/u
 
 await import('./linear-piping-source-orchestration-check.mjs');
 await import('./linear-piping-inputxml-source-binding-check.mjs');
+await import('./linear-piping-source-analysis-context-check.mjs');
 
-console.log('Linear piping analysis consumer T0, Phase 2A and Phase 2B anti-drift check PASS');
+console.log('Linear piping analysis consumer T0 and Phase 2A-2C anti-drift check PASS');
