@@ -144,8 +144,15 @@ export { lafeaPreviewGeometry } from './lafea-stage-preview.js';
  * extensions only and receive a frozen facade containing `getState` and
  * `importDocument`.
  *
+ * `THREE` is an optional injected Three.js namespace. It is used only after a
+ * producer supplies a V2 render packet whose scene revision and complete U3
+ * engineering/display lineage evaluate as current and qualified. Producers use
+ * `getDisplayViewportContext()`, `setDisplayRenderPacket(packet)` and
+ * `clearDisplayRenderPacket(stageId)` on the returned controller. These methods
+ * do not register lifecycle evidence or expose retained packet buffers.
+ *
  * @param {Element} rootElement Workbench host.
- * @param {{initialStage?:string,initialDocument?:unknown,initialSourceHash?:string,accessoryPanels?:unknown[]}|undefined} options Explicit initial state and optional accessory panels.
+ * @param {{initialStage?:string,initialDocument?:unknown,initialSourceHash?:string,accessoryPanels?:unknown[],THREE?:unknown}|undefined} options Explicit initial state, optional accessory panels and optional Three.js dependency.
  * @returns {LafeaWorkbenchController} Initialized controller.
  */
 export function mountLafeaWorkbench(rootElement, options) {

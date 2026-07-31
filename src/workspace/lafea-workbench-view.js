@@ -6,6 +6,7 @@
  * commands. Geometry is rendered only from explicit source entities. Stage
  * labels, capability state, preview policy and limitations are read from the
  * governed stage registry. Lifecycle evidence is presented read-only.
+ * U4G retains U4B through mountLafeaSourceWorkbenchViewportModel internally.
  */
 import {
   LAFEA_STAGE_REGISTRY,
@@ -23,11 +24,19 @@ import { renderLafeaEvidence } from './lafea-results-view.js';
 import { renderMeshQualityPanel } from './lafea-mesh-quality-panel.js';
 import { renderDocumentTableEditor } from './lafea-document-table.js';
 import { renderLafeaLifecyclePanel } from './lafea-lifecycle-panel.js';
-import { mountLafeaSourceWorkbenchViewport } from './lafea-source-workbench-viewport.js';
+import { mountLafeaLiveWorkbenchViewport } from './lafea-live-workbench-viewport.js';
+
+const VIEW_RENDER_DEPENDENCIES = new WeakMap();
 
 export class LafeaWorkbenchView {
-  constructor(rootElement) {
+  constructor(rootElement, options = {}) {
     this.rootElement = rootElement;
+    VIEW_RENDER_DEPENDENCIES.set(this, Object.freeze({
+      getRenderPacket: typeof options.getRenderPacket === 'function'
+        ? options.getRenderPacket
+        : () => null,
+      THREE: options.THREE ?? null,
+    }));
     this.handlers = null;
     this.benchmarkHost = null;
     this.section = null;
@@ -85,6 +94,7 @@ export class LafeaWorkbenchView {
     this.sceneLifecycleBindings.clear();
     this.sceneRevisions.clear();
     this.sceneSelections.clear();
+    VIEW_RENDER_DEPENDENCIES.delete(this);
     this.rootElement?.replaceChildren();
     this.section = null;
     this.slots = null;
@@ -190,6 +200,7 @@ export class LafeaWorkbenchView {
 
   content(state, stage) {
     const registryEntry = requireLafeaStageRegistryEntry(state.activeStageId);
+    const dependencies = VIEW_RENDER_DEPENDENCIES.get(this);
     const grid = element(this.rootElement, 'div', 'lafea-workbench__grid');
 
     const sourceCard = card(
@@ -208,7 +219,7 @@ export class LafeaWorkbenchView {
 
     const previewCard = card(
       this.rootElement,
-      `Source engineering viewport — ${state.activeStageId}`,
+      `Governed engineering viewport — ${state.activeStageId}`,
     );
     const preview = element(this.rootElement, 'div', 'lafea-workbench__svg');
     const sceneRevision = this.nextSceneRevision(
@@ -217,13 +228,15 @@ export class LafeaWorkbenchView {
       stage.lifecycle,
       stage.lifecycleBinding,
     );
-    this.activeViewport = mountLafeaSourceWorkbenchViewport(preview, {
+    this.activeViewport = mountLafeaLiveWorkbenchViewport(preview, {
       stageId: state.activeStageId,
       document: stage.document,
       lifecycle: stage.lifecycle,
       lifecycleBinding: stage.lifecycleBinding,
       sceneRevision,
+      renderPacket: dependencies.getRenderPacket(state.activeStageId),
       selection: this.sceneSelections.get(state.activeStageId),
+      THREE: dependencies.THREE,
       cssWidth: 760,
       cssHeight: 440,
       devicePixelRatio: 1,
