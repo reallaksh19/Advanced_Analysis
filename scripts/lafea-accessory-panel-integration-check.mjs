@@ -12,6 +12,7 @@ import {
   LAFEA_WORKBENCH_ACCESSORY_DIAGNOSTIC_SCHEMA,
   LAFEA_WORKBENCH_ACCESSORY_HOST_SCHEMA,
   LAFEA_WORKBENCH_ACCESSORY_PANEL_SCHEMA,
+  lafeaAccessoryPanelConfigurationRequiresHost,
   validateLafeaAccessoryPanelDescriptor,
 } from '../src/workspace/lafea-workbench-accessory-panels.js';
 
@@ -20,34 +21,39 @@ assert.equal(publicHostSchema, LAFEA_WORKBENCH_ACCESSORY_HOST_SCHEMA);
 assert.equal(publicDiagnosticSchema, LAFEA_WORKBENCH_ACCESSORY_DIAGNOSTIC_SCHEMA);
 assert.strictEqual(publicValidator, validateLafeaAccessoryPanelDescriptor);
 
+assert.equal(lafeaAccessoryPanelConfigurationRequiresHost(undefined), false);
+assert.equal(lafeaAccessoryPanelConfigurationRequiresHost({}), false);
+assert.equal(lafeaAccessoryPanelConfigurationRequiresHost({ accessoryPanels: [] }), false);
+assert.equal(lafeaAccessoryPanelConfigurationRequiresHost({ accessoryPanels: {} }), true);
+assert.equal(lafeaAccessoryPanelConfigurationRequiresHost({ accessoryPanels: [{}] }), true);
+
 const omitted = new LafeaWorkbenchController(new FakeRoot(new FakeDocument()), {
   initialStage: 'LAFEA.3',
 });
-assert.equal(omitted.accessoryPanelManager, null);
-assert.equal(omitted.getState().activeStageId, 'LAFEA.3');
-
 const empty = new LafeaWorkbenchController(new FakeRoot(new FakeDocument()), {
   initialStage: 'LAFEA.4',
   accessoryPanels: [],
 });
-assert.equal(empty.accessoryPanelManager, null);
-assert.equal(empty.getState().activeStageId, 'LAFEA.4');
-
 const invalid = new LafeaWorkbenchController(new FakeRoot(new FakeDocument()), {
   initialStage: 'LAFEA.3',
   accessoryPanels: { invalid: true },
 });
-assert.ok(invalid.accessoryPanelManager);
-assert.equal(invalid.accessoryPanelManager.getSnapshot().panelOrder.length, 0);
-assert.equal(
-  invalid.accessoryPanelManager.getSnapshot().diagnostics[0].code,
-  'LAFEA_ACCESSORY_PANEL_COLLECTION_INVALID',
-);
+
+assert.equal(omitted.getState().activeStageId, 'LAFEA.3');
+assert.equal(empty.getState().activeStageId, 'LAFEA.4');
 assert.equal(invalid.getState().activeStageId, 'LAFEA.3');
+assert.deepEqual(Object.keys(empty).sort(), Object.keys(omitted).sort());
+assert.deepEqual(Object.keys(invalid).sort(), Object.keys(omitted).sort());
+for (const controller of [omitted, empty, invalid]) {
+  assert.equal('accessoryPanelManager' in controller, false);
+  assert.equal('destroyed' in controller, false);
+}
 
 omitted.destroy();
 omitted.destroy();
 empty.destroy();
+empty.destroy();
+invalid.destroy();
 invalid.destroy();
 
 console.log(JSON.stringify({
@@ -55,7 +61,8 @@ console.log(JSON.stringify({
   status: 'PASS',
   omittedPanelsPreserveLegacyShape: true,
   emptyPanelsPreserveLegacyShape: true,
-  invalidCollectionContained: true,
+  accessoryStateControllerPrivate: true,
+  invalidCollectionDoesNotChangePublicShape: true,
   publicContractIdentity: true,
   controllerDestroyIdempotent: true,
 }));
