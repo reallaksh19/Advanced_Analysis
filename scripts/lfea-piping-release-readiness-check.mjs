@@ -99,6 +99,9 @@ if (mode === 'RELEASE') {
   });
 }
 
+await import('./linear-piping-project-qualification-check.mjs');
+await import('./linear-piping-project-qualification-anti-drift-check.mjs');
+
 console.log(JSON.stringify({
   check: 'lfea-piping-release-readiness',
   mode,
@@ -106,6 +109,7 @@ console.log(JSON.stringify({
   verifiedGateCount: Object.values(evidence.gates).filter((row) => row === 'VERIFIED').length,
   totalGateCount: REQUIRED_GATES.length,
   releaseEligible: mode === 'RELEASE',
+  qualificationHarness: 'SIMULATED_FIXTURES_ONLY',
 }));
 
 function requireExactKeys(value, keys, code) {

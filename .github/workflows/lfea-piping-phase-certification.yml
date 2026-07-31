@@ -8,6 +8,7 @@ on:
       - 'reports/lfea-piping-phase-findings-ledger.json'
       - 'docs/LFEA_PIPING_100_PERCENT_CLOSURE_POLICY.md'
       - 'docs/LFEA_PIPING_PHASE_STATUS.md'
+      - 'docs/LFEA_PIPING_PHASE6_EVIDENCE_REQUIREMENTS.md'
       - 'package.json'
       - 'package-lock.json'
       - 'scripts/lfea-piping-a0-baseline-check.mjs'
@@ -18,10 +19,12 @@ on:
       - 'scripts/linear-piping-nozzle-interface-check.mjs'
       - 'scripts/linear-piping-code-application-*.mjs'
       - 'scripts/linear-piping-presentation-*.mjs'
+      - 'scripts/linear-piping-project-qualification-*.mjs'
       - 'src/core/linear-piping-analysis-consumer/**'
       - 'src/core/linear-piping-interface/**'
       - 'src/core/linear-piping-code-application/**'
       - 'src/core/linear-piping-presentation/**'
+      - 'src/core/linear-piping-project-qualification/**'
       - 'src/workspace/linear-piping-results-view.js'
       - '.github/workflows/lfea-piping-phase-certification.yml'
   workflow_dispatch:
@@ -54,8 +57,13 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Validate fail-closed release policy
+      - name: Validate fail-closed release policy and simulated qualification harness
         run: node scripts/lfea-piping-release-readiness-check.mjs
+
+      - name: Validate Phase 6A qualification harness directly
+        run: |
+          node scripts/linear-piping-project-qualification-check.mjs
+          node scripts/linear-piping-project-qualification-anti-drift-check.mjs
 
       - name: Validate phase-to-finding ledger
         run: node scripts/lfea-piping-phase-findings-check.mjs
