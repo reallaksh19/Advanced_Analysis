@@ -59,6 +59,28 @@
         "AUD-L007-001"
       ],
       "completedAtUtc": null
+    },
+    {
+      "phaseId": "PHASE_2_SOURCE_ORCHESTRATION",
+      "title": "Compile explicit B-2.5 and B-3.0 source authorities before T0",
+      "status": "PARTIALLY_VERIFIED",
+      "scope": [
+        "Accept a closed source-authority request rather than precompiled B-2.5 and B-3.0 records.",
+        "Compile the mechanical model and physical load case through their existing production APIs.",
+        "Derive the B-3.0 model reference from the compiled B-2.5 record and reject caller injection.",
+        "Bind expected source, conditioned-topology, compiler-profile and load-case-profile hashes before delegating to T0.",
+        "Preserve explicit non-scope for raw project-file parsing, interfaces, nozzle assessment, code orchestration and presentation."
+      ],
+      "evidencePaths": [
+        "src/core/linear-piping-analysis-consumer/source-orchestration.js",
+        "src/core/linear-piping-analysis-consumer/index.js",
+        "scripts/linear-piping-source-orchestration-check.mjs",
+        "scripts/linear-piping-analysis-consumer-anti-drift-check.mjs"
+      ],
+      "addressedFindingIds": [
+        "AUD-A3-001"
+      ],
+      "completedAtUtc": null
     }
   ],
   "findings": [
@@ -84,10 +106,12 @@
       "currentStatus": "PARTIALLY_VERIFIED",
       "ownerPhase": "PHASE_2_SOURCE_ORCHESTRATION",
       "evidencePaths": [
-        "src/core/linear-piping-analysis-consumer/contracts.js",
-        "src/core/linear-piping-analysis-consumer/consumer.js"
+        "src/core/linear-piping-analysis-consumer/source-orchestration.js",
+        "src/core/linear-piping-analysis-consumer/index.js",
+        "scripts/linear-piping-source-orchestration-check.mjs",
+        "scripts/linear-piping-analysis-consumer-anti-drift-check.mjs"
       ],
-      "remainingCondition": "Compile engineering source through B-2.5 and B-3.0, then add interface, nozzle and configured code stages before sealing a complete application result."
+      "remainingCondition": "Raw project-file ingestion, governed interfaces, nozzle assessment, configured B31.3 stages, complete application-result sealing and exact-head retained evidence remain open."
     },
     {
       "findingId": "AUD-A3-002",
