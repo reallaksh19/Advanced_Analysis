@@ -88,15 +88,18 @@
       "status": "PARTIALLY_VERIFIED",
       "scope": [
         "Consume multiple retained InputXML analysis contexts under one exact source, content, topology, compilation, mechanical-model and stiffness authority.",
+        "Retain deterministic node source ancestry from incident raw InputXML span component UIDs and caller-approved B-2.5 element-binding component IDs without changing the stiffness-state projection.",
         "Compile one governed interface set, recover every physical case and create deterministic interface envelopes through the existing Phase 3 APIs.",
         "Assess each configured nozzle profile in every retained case and deterministically retain the governing assessment without deriving allowables.",
         "Compile sustained, occasional and ordered displacement-range B31.3 checks from retained B-3.4 recoveries through the existing Phase 4 APIs.",
         "Seal and independently revalidate the complete multi-case application parent and evidence chain without duplicating parser, compiler, solver, recovery or code mechanics."
       ],
       "evidencePaths": [
+        "src/core/linear-fea-model-compiler/model-compiler.js",
         "src/core/linear-piping-multicase-application/contracts.js",
         "src/core/linear-piping-multicase-application/orchestrator.js",
         "src/core/linear-piping-multicase-application/index.js",
+        "scripts/linear-piping-inputxml-analysis-context-check.mjs",
         "scripts/linear-piping-multicase-application-check.mjs",
         "scripts/linear-piping-multicase-application-anti-drift-check.mjs",
         "scripts/linear-piping-analysis-consumer-anti-drift-check.mjs",
@@ -214,6 +217,7 @@
       "currentStatus": "PARTIALLY_VERIFIED",
       "ownerPhase": "PHASE_2E_MULTICASE_APPLICATION_ORCHESTRATION",
       "evidencePaths": [
+        "src/core/linear-fea-model-compiler/model-compiler.js",
         "src/core/linear-piping-analysis-consumer/source-orchestration.js",
         "src/core/linear-piping-analysis-consumer/inputxml-source-binding.js",
         "src/core/linear-piping-analysis-consumer/inputxml-analysis-context.js",
@@ -230,7 +234,7 @@
         "reports/lfea-piping-phase2e-multicase-application.json",
         ".github/workflows/lfea-piping-phase-certification.yml"
       ],
-      "remainingCondition": "Retain successful exact-head Phase 2E, consumer, core and full-gate evidence; metre-only InputXML, caller-supplied project authorities, real-model reconciliation, commercial corroboration, performance qualification and rollback rehearsal remain open."
+      "remainingCondition": "Retain successful exact-head B-2.5, Phase 2D, Phase 2E, consumer, core and full-gate evidence; metre-only InputXML, caller-supplied project authorities, real-model reconciliation, commercial corroboration, performance qualification and rollback rehearsal remain open."
     },
     {
       "findingId": "AUD-A3-002",
