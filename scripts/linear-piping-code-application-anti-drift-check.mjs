@@ -58,6 +58,10 @@ assert.doesNotMatch(
   'B31 check schema must not accept caller-injected localAction.',
 );
 
+const b31Public = fs.readFileSync(path.join(ROOT, 'public-api.js'), 'utf8');
+assert.match(b31Public, /codeResult\.status\s*===\s*['"]BLOCKED['"]/u);
+assert.match(b31Public, /PIPING_B31_CODE_RESULT_BLOCKED/u);
+
 const application = fs.readFileSync(path.join(ROOT, 'application-result.js'), 'utf8');
 assert.match(application, /validateLinearPipingAnalysisResult/u);
 assert.match(application, /requireLinearPipingInterfaceRecovery/u);
@@ -69,6 +73,10 @@ assert.match(application, /interfaceRecoveryEvidenceHashes/u);
 assert.match(application, /nozzleAssessmentEvidenceHashes/u);
 assert.match(application, /b31ApplicationEvidenceHash/u);
 assert.match(application, /computeApplicationResultEvidenceHash/u);
+
+const applicationPublic = fs.readFileSync(path.join(ROOT, 'application-public-api.js'), 'utf8');
+assert.match(applicationPublic, /requireLinearPipingB31Application/u);
+assert.match(applicationPublic, /sealBaseApplicationResult/u);
 
 const packageValue = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 assert.equal(
