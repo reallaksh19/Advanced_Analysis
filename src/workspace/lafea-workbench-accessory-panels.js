@@ -286,9 +286,13 @@ function diagnostic(panelId, phase, code, error) {
 }
 
 function readablePanelId(value, index) {
-  return typeof value?.panelId === 'string' && value.panelId
-    ? value.panelId
-    : `INVALID_PANEL_${String(index + 1).padStart(4, '0')}`;
+  try {
+    return typeof value?.panelId === 'string' && value.panelId
+      ? value.panelId
+      : `INVALID_PANEL_${String(index + 1).padStart(4, '0')}`;
+  } catch {
+    return `INVALID_PANEL_${String(index + 1).padStart(4, '0')}`;
+  }
 }
 
 function asciiCompare(left, right) {
