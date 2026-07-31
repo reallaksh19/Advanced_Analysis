@@ -1,0 +1,106 @@
+name: LFEA Piping Runtime Bundle Assembly
+
+on:
+  workflow_dispatch:
+    inputs:
+      internal_run_id:
+        description: Workflow run ID containing the successful Phase 6F internal evidence artifact
+        required: true
+        type: string
+      internal_artifact_name:
+        description: Successful Phase 6F internal evidence artifact name
+        required: true
+        type: string
+      external_run_id:
+        description: Workflow run ID containing the governed Phase 6B external evidence artifact
+        required: true
+        type: string
+      external_artifact_name:
+        description: Governed Phase 6B external evidence artifact name
+        required: true
+        type: string
+      external_package_path:
+        description: Relative path to the sealed external qualification package in its artifact
+        required: true
+        default: external/external-qualification-package.json
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: lfea-piping-runtime-bundle-assembly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  assemble-runtime-bundle:
+    name: Assemble supplied internal and external evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout selected exact head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Download successful internal evidence
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.internal_run_id }}
+          name: ${{ inputs.internal_artifact_name }}
+          path: ${{ runner.temp }}/lfea-internal-evidence
+
+      - name: Download governed external evidence
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.external_run_id }}
+          name: ${{ inputs.external_artifact_name }}
+          path: ${{ runner.temp }}/lfea-external-evidence
+
+      - name: Assemble runtime release bundle
+        shell: bash
+        env:
+          INTERNAL_ROOT: ${{ runner.temp }}/lfea-internal-evidence
+          EXTERNAL_ROOT: ${{ runner.temp }}/lfea-external-evidence
+          EXTERNAL_PACKAGE: ${{ inputs.external_package_path }}
+          OUTPUT_ROOT: ${{ runner.temp }}/lfea-runtime-release-bundle
+          EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          node scripts/lfea-piping-runtime-bundle-assembler.mjs \
+            --internal-root="$INTERNAL_ROOT" \
+            --external-root="$EXTERNAL_ROOT" \
+            --external-package="$EXTERNAL_PACKAGE" \
+            --output="$OUTPUT_ROOT" \
+            --exact-head="$EXPECTED_HEAD"
+
+      - name: Revalidate assembled bundle through public release command
+        shell: bash
+        env:
+          EVIDENCE_ROOT: ${{ runner.temp }}/lfea-runtime-release-bundle
+          EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          npm run check:lfea-piping-release -- \
+            --evidence-root="$EVIDENCE_ROOT" \
+            --manifest=release-evidence.json \
+            --expected-head="$EXPECTED_HEAD"
+
+      - name: Upload assembled runtime release bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: lfea-piping-runtime-release-bundle-${{ github.sha }}
+          path: ${{ runner.temp }}/lfea-runtime-release-bundle
+          if-no-files-found: error
+          retention-days: 90
