@@ -2,6 +2,7 @@ import { SharedAnalysisContractError } from '../shared-analysis-contract/errors.
 import { exactKeys, nonEmptyString } from '../shared-analysis-contract/validation.js';
 import { semanticHash } from '../shared-piping-model/canonical-json.js';
 import { deepFreeze } from '../shared-piping-model/immutable.js';
+import { requireLinearPipingQualifiedApplicationResult } from '../linear-piping-code-application/index.js';
 
 export const PIPING_PRESENTATION_SCHEMA = 'linear-piping-presentation/v1';
 export const PRESENTATION_CURRENCY = 'CURRENT';
@@ -191,6 +192,26 @@ export function requireLinearPipingPresentation(record) {
     failPresentation('Presentation evidence hash is stale.', 'PIPING_PRESENTATION_HASH_MISMATCH');
   }
   return deepFreeze({ ...record });
+}
+
+export function requireCurrentLinearPipingPresentation(presentation, applicationResult) {
+  const accepted = requireLinearPipingPresentation(presentation);
+  const currentApplication = requireLinearPipingQualifiedApplicationResult(applicationResult);
+  if (accepted.applicationId !== currentApplication.applicationId
+    || accepted.applicationResultSemanticHash !== currentApplication.semanticHash
+    || accepted.applicationResultEvidenceHash !== currentApplication.evidenceHash
+    || accepted.status !== currentApplication.status
+    || JSON.stringify(accepted.notConfigured) !== JSON.stringify(currentApplication.notConfigured)) {
+    failPresentation(
+      'Presentation does not belong to the current sealed application result.',
+      'PIPING_PRESENTATION_STALE',
+      {
+        presentationApplicationHash: accepted.applicationResultSemanticHash,
+        currentApplicationHash: currentApplication.semanticHash,
+      },
+    );
+  }
+  return accepted;
 }
 
 function requireRows(rows, keys, field) {
