@@ -14,10 +14,14 @@ export {
 } from './contracts.js';
 
 export {
+  compileLinearPipingInterfaceSet,
+  recoverLinearPipingInterfaceLoads,
+} from './public-api.js';
+
+export {
   INTERFACE_DEFINITION_KEYS,
   INTERFACE_SET_INPUT_KEYS,
   INTERFACE_SET_KEYS,
-  compileLinearPipingInterfaceSet,
   computeInterfaceSetEvidenceHash,
   computeInterfaceSetSemanticHash,
   requireLinearPipingInterfaceSet,
@@ -32,7 +36,6 @@ export {
   computeInterfaceRecoveryEvidenceHash,
   computeInterfaceRecoverySemanticHash,
   createLinearPipingInterfaceEnvelope,
-  recoverLinearPipingInterfaceLoads,
   requireLinearPipingInterfaceEnvelope,
   requireLinearPipingInterfaceRecovery,
   reverseInterfaceResultSign,
