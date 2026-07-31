@@ -45,6 +45,7 @@ export {
   classifyLafeaNumericInput,
   createLafeaAddEntityCommand,
   createLafeaDeleteEntityCommand,
+  createLafeaDeleteFieldCommand,
   createLafeaReplaceDocumentCommand,
   createLafeaSetScalarCommand,
   lafeaDocumentDigest,
