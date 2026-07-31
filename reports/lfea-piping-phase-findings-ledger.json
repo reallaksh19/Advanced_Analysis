@@ -1,0 +1,173 @@
+{
+  "schema": "lfea-piping-phase-findings-ledger/v1",
+  "repository": "reallaksh19/Advanced_Analysis",
+  "program": "PRIORITY_2_LINEAR_PIPING_FEA",
+  "sourceAuditPath": "docs/CONSOLIDATED_LFEA_PIPING_AUDIT_2026-07-31.md",
+  "allowedStatuses": [
+    "VERIFIED",
+    "PARTIALLY_VERIFIED",
+    "CONTRADICTED",
+    "UNRESOLVED_GATE",
+    "NOT_IMPLEMENTED",
+    "NOT_APPLICABLE"
+  ],
+  "phases": [
+    {
+      "phaseId": "PHASE_1A_GOVERNANCE_CLOSURE",
+      "title": "Exact-head policy, T0 registration and documentation correction",
+      "status": "PARTIALLY_VERIFIED",
+      "scope": [
+        "Freeze the PR #16 merged rebase point and exact-head evidence policy.",
+        "Register the bounded T0 consumer inside check:lfea-core.",
+        "Correct the workspace-consumers and public-gateway documentation statements.",
+        "Add fail-closed release-readiness policy without promoting application qualification."
+      ],
+      "evidencePaths": [
+        "audit-baseline.json",
+        "scripts/lfea-piping-a0-baseline-check.mjs",
+        "scripts/lfea-piping-release-readiness-check.mjs",
+        "release-evidence/lfea-piping-release-evidence.json",
+        "docs/LFEA_PIPING_100_PERCENT_CLOSURE_POLICY.md",
+        "docs/LFEA_PIPING_PHASE_STATUS.md",
+        "package.json",
+        ".github/workflows/lfea-piping-phase-certification.yml"
+      ],
+      "addressedFindingIds": [
+        "AUD-A0-001",
+        "AUD-A3-002",
+        "AUD-DOC-001",
+        "AUD-DOC-002"
+      ],
+      "completedAtUtc": null
+    }
+  ],
+  "findings": [
+    {
+      "findingId": "AUD-A0-001",
+      "gate": "A0",
+      "severity": "BLOCKER",
+      "auditStatus": "UNRESOLVED_GATE",
+      "currentStatus": "PARTIALLY_VERIFIED",
+      "ownerPhase": "PHASE_1A_GOVERNANCE_CLOSURE",
+      "evidencePaths": [
+        "audit-baseline.json",
+        "scripts/lfea-piping-a0-baseline-check.mjs",
+        ".github/workflows/lfea-piping-phase-certification.yml"
+      ],
+      "remainingCondition": "Retain successful exact-head CI command logs and the runtime baseline artifact from one clean release-candidate head."
+    },
+    {
+      "findingId": "AUD-A3-001",
+      "gate": "A3",
+      "severity": "BLOCKER",
+      "auditStatus": "PARTIALLY_VERIFIED",
+      "currentStatus": "PARTIALLY_VERIFIED",
+      "ownerPhase": "PHASE_2_SOURCE_ORCHESTRATION",
+      "evidencePaths": [
+        "src/core/linear-piping-analysis-consumer/contracts.js",
+        "src/core/linear-piping-analysis-consumer/consumer.js"
+      ],
+      "remainingCondition": "Compile engineering source through B-2.5 and B-3.0, then add interface, nozzle and configured code stages before sealing a complete application result."
+    },
+    {
+      "findingId": "AUD-A3-002",
+      "gate": "A3",
+      "severity": "MAJOR",
+      "auditStatus": "CONTRADICTED",
+      "currentStatus": "VERIFIED",
+      "ownerPhase": "PHASE_1A_GOVERNANCE_CLOSURE",
+      "evidencePaths": [
+        "package.json"
+      ],
+      "remainingCondition": null
+    },
+    {
+      "findingId": "AUD-A4-001",
+      "gate": "A4",
+      "severity": "BLOCKER",
+      "auditStatus": "NOT_IMPLEMENTED",
+      "currentStatus": "NOT_IMPLEMENTED",
+      "ownerPhase": "PHASE_3_INTERFACE_AUTHORITY",
+      "evidencePaths": [
+        "docs/LFEA_PIPING_100_PERCENT_CLOSURE_POLICY.md"
+      ],
+      "remainingCondition": "Implement governed attachments, frames, offsets, six-DOF mappings, reaction grouping, transformations, reference transfer and envelopes."
+    },
+    {
+      "findingId": "AUD-A5-001",
+      "gate": "A5",
+      "severity": "BLOCKER",
+      "auditStatus": "PARTIALLY_VERIFIED",
+      "currentStatus": "PARTIALLY_VERIFIED",
+      "ownerPhase": "PHASE_4_CODE_AND_ALLOWABLES",
+      "evidencePaths": [
+        "src/core/linear-fea-load-case/index.js",
+        "src/core/linear-fea-code-engine/index.js"
+      ],
+      "remainingCondition": "Bind application load orchestration, recovered actions, B31.3 categories and caller-supplied nozzle allowable profiles."
+    },
+    {
+      "findingId": "AUD-A6-001",
+      "gate": "A6",
+      "severity": "BLOCKER",
+      "auditStatus": "NOT_IMPLEMENTED",
+      "currentStatus": "NOT_IMPLEMENTED",
+      "ownerPhase": "PHASE_5_PRESENTATION_EXPORT",
+      "evidencePaths": [
+        "docs/LFEA_PIPING_100_PERCENT_CLOSURE_POLICY.md"
+      ],
+      "remainingCondition": "Add read-only, stale-safe piping result surfaces and byte-deterministic evidence exports."
+    },
+    {
+      "findingId": "AUD-A7-001",
+      "gate": "A7",
+      "severity": "BLOCKER",
+      "auditStatus": "UNRESOLVED_GATE",
+      "currentStatus": "UNRESOLVED_GATE",
+      "ownerPhase": "PHASE_6_PROJECT_QUALIFICATION",
+      "evidencePaths": [
+        "release-evidence/lfea-piping-release-evidence.json"
+      ],
+      "remainingCondition": "Reconcile a real imported model, corroborate selected results, qualify performance, retain exact-head CI evidence and rehearse rollback."
+    },
+    {
+      "findingId": "AUD-DOC-001",
+      "gate": "Documentation",
+      "severity": "MAJOR",
+      "auditStatus": "CONTRADICTED",
+      "currentStatus": "VERIFIED",
+      "ownerPhase": "PHASE_1A_GOVERNANCE_CLOSURE",
+      "evidencePaths": [
+        "docs/LFEA_PIPING_100_PERCENT_CLOSURE_POLICY.md",
+        "docs/LFEA_PIPING_PHASE_STATUS.md"
+      ],
+      "remainingCondition": null
+    },
+    {
+      "findingId": "AUD-DOC-002",
+      "gate": "Documentation",
+      "severity": "MINOR",
+      "auditStatus": "CONTRADICTED",
+      "currentStatus": "VERIFIED",
+      "ownerPhase": "PHASE_1A_GOVERNANCE_CLOSURE",
+      "evidencePaths": [
+        "docs/LFEA_PIPING_100_PERCENT_CLOSURE_POLICY.md",
+        "docs/LFEA_PIPING_PHASE_STATUS.md"
+      ],
+      "remainingCondition": null
+    },
+    {
+      "findingId": "AUD-L007-001",
+      "gate": "Repository hygiene",
+      "severity": "MAJOR",
+      "auditStatus": "CONTRADICTED",
+      "currentStatus": "CONTRADICTED",
+      "ownerPhase": "PHASE_1B_LFEA007_DISPOSITION",
+      "evidencePaths": [
+        "scripts/lfea-007-check.mjs",
+        ".github/workflows/lfea-007-certification.yml"
+      ],
+      "remainingCondition": "Restore and independently register the continuum Local FEA consumer or formally retire its workflow, scripts, registry claim and documentation together."
+    }
+  ]
+}
