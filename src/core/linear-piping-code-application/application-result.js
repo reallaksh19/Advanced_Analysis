@@ -31,10 +31,14 @@ export const APPLICATION_RESULT_KEYS = Object.freeze([
   'schema',
   'applicationId',
   'analysisResultSemanticHashes',
+  'analysisEvidenceHashes',
   'interfaceSetSemanticHash',
   'interfaceRecoverySemanticHashes',
+  'interfaceRecoveryEvidenceHashes',
   'nozzleAssessmentSemanticHashes',
+  'nozzleAssessmentEvidenceHashes',
   'b31ApplicationSemanticHash',
+  'b31ApplicationEvidenceHash',
   'status',
   'assessmentSummary',
   'notConfigured',
@@ -48,6 +52,13 @@ export const ASSESSMENT_SUMMARY_KEYS = Object.freeze([
   'nozzleNotConfiguredCount',
   'codeQualifiedCount',
   'codeConditionalCount',
+]);
+
+const EVIDENCE_ONLY_KEYS = Object.freeze([
+  'analysisEvidenceHashes',
+  'interfaceRecoveryEvidenceHashes',
+  'nozzleAssessmentEvidenceHashes',
+  'b31ApplicationEvidenceHash',
 ]);
 
 export function sealLinearPipingQualifiedApplicationResult(input) {
@@ -135,15 +146,25 @@ export function sealLinearPipingQualifiedApplicationResult(input) {
     ? 'CONDITIONAL'
     : 'QUALIFIED';
 
-  const limitations = buildLimitations(analysisResults, nozzleAssessments, b31Application, notConfigured);
+  const limitations = buildLimitations(
+    analysisResults,
+    nozzleAssessments,
+    b31Application,
+    notConfigured,
+    interfaceSet.semanticHash,
+  );
   const draft = {
     schema: APPLICATION_RESULT_SCHEMA,
     applicationId,
     analysisResultSemanticHashes: analysisResults.map((row) => row.semanticHash),
+    analysisEvidenceHashes: analysisResults.map((row) => row.evidenceHash),
     interfaceSetSemanticHash: interfaceSet.semanticHash,
     interfaceRecoverySemanticHashes: interfaceRecoveries.map((row) => row.semanticHash),
+    interfaceRecoveryEvidenceHashes: interfaceRecoveries.map((row) => row.evidenceHash),
     nozzleAssessmentSemanticHashes: nozzleAssessments.map((row) => row.semanticHash),
+    nozzleAssessmentEvidenceHashes: nozzleAssessments.map((row) => row.evidenceHash),
     b31ApplicationSemanticHash: b31Application.semanticHash,
+    b31ApplicationEvidenceHash: b31Application.evidenceHash,
     status,
     assessmentSummary,
     notConfigured: deepFreeze(notConfigured),
@@ -152,17 +173,17 @@ export function sealLinearPipingQualifiedApplicationResult(input) {
     evidenceHash: '',
   };
   draft.semanticHash = semanticHash(applicationResultSemanticProjection(draft));
-  draft.evidenceHash = semanticHash({
-    semanticHash: draft.semanticHash,
-    analysisEvidenceHashes: analysisResults.map((row) => row.evidenceHash),
-    interfaceRecoveryEvidenceHashes: interfaceRecoveries.map((row) => row.evidenceHash),
-    nozzleAssessmentEvidenceHashes: nozzleAssessments.map((row) => row.evidenceHash),
-    b31ApplicationEvidenceHash: b31Application.evidenceHash,
-  });
+  draft.evidenceHash = computeApplicationResultEvidenceHash(draft);
   return requireLinearPipingQualifiedApplicationResult(draft);
 }
 
-function buildLimitations(analysisResults, nozzleAssessments, b31Application, notConfigured) {
+function buildLimitations(
+  analysisResults,
+  nozzleAssessments,
+  b31Application,
+  notConfigured,
+  interfaceSetSemanticHash,
+) {
   const rows = [];
   for (const result of analysisResults) {
     for (const limitation of result.limitations) {
@@ -198,7 +219,7 @@ function buildLimitations(analysisResults, nozzleAssessments, b31Application, no
     rows.push(deepFreeze({
       sourceKind: 'APPLICATION_CONFIGURATION',
       sourceId: code.split(':')[1],
-      sourceSemanticHash: 'fnv1a64:0000000000000000',
+      sourceSemanticHash: interfaceSetSemanticHash,
       limitation: deepFreeze({
         code,
         severity: 'BLOCKER',
@@ -225,29 +246,87 @@ export function requireLinearPipingQualifiedApplicationResult(record) {
     failCodeApplication('Qualified application result schema is invalid.', 'PIPING_APPLICATION_RESULT_INVALID');
   }
   nonEmptyString(record.applicationId, 'qualifiedApplicationResult.applicationId');
-  requireArray(record.analysisResultSemanticHashes, 'qualifiedApplicationResult.analysisResultSemanticHashes')
-    .forEach((hash, index) => requireHash(hash, `qualifiedApplicationResult.analysisResultSemanticHashes[${index}]`));
+  const analysisSemantic = requireHashArray(
+    record.analysisResultSemanticHashes,
+    'qualifiedApplicationResult.analysisResultSemanticHashes',
+  );
+  const analysisEvidence = requireHashArray(
+    record.analysisEvidenceHashes,
+    'qualifiedApplicationResult.analysisEvidenceHashes',
+  );
+  requireSameLength(analysisSemantic, analysisEvidence, 'analysis result');
   requireHash(record.interfaceSetSemanticHash, 'qualifiedApplicationResult.interfaceSetSemanticHash');
-  requireArray(record.interfaceRecoverySemanticHashes, 'qualifiedApplicationResult.interfaceRecoverySemanticHashes')
-    .forEach((hash, index) => requireHash(hash, `qualifiedApplicationResult.interfaceRecoverySemanticHashes[${index}]`));
-  requireArray(record.nozzleAssessmentSemanticHashes, 'qualifiedApplicationResult.nozzleAssessmentSemanticHashes')
-    .forEach((hash, index) => requireHash(hash, `qualifiedApplicationResult.nozzleAssessmentSemanticHashes[${index}]`));
+  const interfaceSemantic = requireHashArray(
+    record.interfaceRecoverySemanticHashes,
+    'qualifiedApplicationResult.interfaceRecoverySemanticHashes',
+  );
+  const interfaceEvidence = requireHashArray(
+    record.interfaceRecoveryEvidenceHashes,
+    'qualifiedApplicationResult.interfaceRecoveryEvidenceHashes',
+  );
+  requireSameLength(interfaceSemantic, interfaceEvidence, 'interface recovery');
+  const nozzleSemantic = requireHashArray(
+    record.nozzleAssessmentSemanticHashes,
+    'qualifiedApplicationResult.nozzleAssessmentSemanticHashes',
+  );
+  const nozzleEvidence = requireHashArray(
+    record.nozzleAssessmentEvidenceHashes,
+    'qualifiedApplicationResult.nozzleAssessmentEvidenceHashes',
+  );
+  requireSameLength(nozzleSemantic, nozzleEvidence, 'nozzle assessment');
   requireHash(record.b31ApplicationSemanticHash, 'qualifiedApplicationResult.b31ApplicationSemanticHash');
+  requireHash(record.b31ApplicationEvidenceHash, 'qualifiedApplicationResult.b31ApplicationEvidenceHash');
   requireHash(record.semanticHash, 'qualifiedApplicationResult.semanticHash');
   requireHash(record.evidenceHash, 'qualifiedApplicationResult.evidenceHash');
   if (!APPLICATION_STATUSES.includes(record.status)) {
     failCodeApplication('Qualified application status is invalid.', 'PIPING_APPLICATION_RESULT_INVALID');
   }
   exactKeys(record.assessmentSummary, ASSESSMENT_SUMMARY_KEYS, 'qualifiedApplicationResult.assessmentSummary');
-  requireArray(record.notConfigured, 'qualifiedApplicationResult.notConfigured');
+  for (const key of ASSESSMENT_SUMMARY_KEYS) {
+    if (!Number.isInteger(record.assessmentSummary[key]) || record.assessmentSummary[key] < 0) {
+      failCodeApplication('Assessment summary counts must be non-negative integers.', 'PIPING_APPLICATION_RESULT_INVALID');
+    }
+  }
+  requireArray(record.notConfigured, 'qualifiedApplicationResult.notConfigured')
+    .forEach((entry, index) => nonEmptyString(entry, `qualifiedApplicationResult.notConfigured[${index}]`));
   requireArray(record.limitations, 'qualifiedApplicationResult.limitations');
+  if (record.notConfigured.length > 0 && record.status !== 'CONDITIONAL') {
+    failCodeApplication('An unconfigured nozzle cannot produce a QUALIFIED application.', 'PIPING_APPLICATION_RESULT_INVALID');
+  }
   if (record.semanticHash !== semanticHash(applicationResultSemanticProjection(record))) {
     failCodeApplication('Qualified application result semantic hash is stale.', 'PIPING_APPLICATION_RESULT_HASH_MISMATCH');
+  }
+  if (record.evidenceHash !== computeApplicationResultEvidenceHash(record)) {
+    failCodeApplication('Qualified application result evidence hash is stale.', 'PIPING_APPLICATION_RESULT_HASH_MISMATCH');
   }
   return deepFreeze({ ...record });
 }
 
+function requireHashArray(value, field) {
+  return requireArray(value, field).map((hash, index) => requireHash(hash, `${field}[${index}]`));
+}
+
+function requireSameLength(semanticHashes, evidenceHashes, label) {
+  if (semanticHashes.length !== evidenceHashes.length) {
+    failCodeApplication(`${label} semantic/evidence hash counts differ.`, 'PIPING_APPLICATION_RESULT_INVALID');
+  }
+}
+
 export function applicationResultSemanticProjection(record) {
-  const { semanticHash: _semanticHash, evidenceHash: _evidenceHash, ...projection } = record;
+  const projection = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (key === 'semanticHash' || key === 'evidenceHash' || EVIDENCE_ONLY_KEYS.includes(key)) continue;
+    projection[key] = value;
+  }
   return projection;
+}
+
+export function computeApplicationResultEvidenceHash(record) {
+  return semanticHash({
+    semanticHash: record.semanticHash,
+    analysisEvidenceHashes: record.analysisEvidenceHashes,
+    interfaceRecoveryEvidenceHashes: record.interfaceRecoveryEvidenceHashes,
+    nozzleAssessmentEvidenceHashes: record.nozzleAssessmentEvidenceHashes,
+    b31ApplicationEvidenceHash: record.b31ApplicationEvidenceHash,
+  });
 }
