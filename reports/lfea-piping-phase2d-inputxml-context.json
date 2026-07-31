@@ -2,7 +2,7 @@
   "schema": "lfea-piping-phase-slice/v1",
   "phaseId": "PHASE_2D_INPUTXML_QUALIFIED_CONTEXT",
   "ownerFindingId": "AUD-A3-001",
-  "baseHead": "7fad71186b92e27ccc24bf1e37239dec688166d5",
+  "baseHead": "3f536973986e2cd0afe2a1d777a10dd7f453f939",
   "status": "PARTIALLY_VERIFIED",
   "scope": [
     "Seal the exact InputXML source authority, recomputed conditioned-topology identity, ingestion evidence and retained Phase 2C source-analysis context in linear-piping-inputxml-analysis-context/v1.",
