@@ -1,6 +1,6 @@
 # LFEA Piping Phase Status
 
-Exact Phase 6B development base: `main` at `98dbfa72584a9e41bdd658e9c72234285f3b5f98`.
+Exact Phase 6D development base: `main` at `a52e8fa2d2e7e94093300839c47cc425b16473b4`.
 
 Program disposition: `BLOCKED`.
 
@@ -40,24 +40,31 @@ Program disposition: `BLOCKED`.
 - Phase 6B derives required comparison categories from the current presentation, requiring interface force and reference moment, nozzle utilization and B31.3 stress/utilization where those result families are present.
 - Phase 6B requires independent G8 and G9 authority identities, exact-head performance within a declared envelope, deterministic replay, failure-behavior evidence, successful rollback, preserved project data and hash-bound artifact references.
 - Phase 6B produces only `ELIGIBLE_FOR_RELEASE_REVIEW`; it does not execute external programs, populate release-evidence paths, sign a disposition or promote G8, G9 or G10.
-- The Section 9 ledger now contains the previously missing `PHASE_6_PROJECT_QUALIFICATION` owner phase for `AUD-A7-001`; the finding remains `UNRESOLVED_GATE`.
+- Phase 6C validates a persisted Phase 6B package and five external JSON artifacts against the release manifest, exact head, canonical records, content hashes and retained semantic/evidence identities.
+- Phase 6C registers `externalQualificationPackage` inside the normal release-readiness exact-key contract and rejects unsafe, stale, missing or mismatched external evidence without changing G8, G9 or G10.
+- Phase 6D validates the persisted G0-G7 exact-head manifest, clean-tree proof, ten mandatory commands and seven internal artifact roles.
+- Phase 6D binds retained command status and artifact hashes, requires command IDs in text logs, and requires exact role, head and PASS status in JSON phase evidence.
+- Phase 6D produces only `ELIGIBLE_FOR_RELEASE_REVIEW`; it does not execute commands, generate evidence, populate paths or promote G0 through G7.
+- The Section 9 ledger contains the `PHASE_6_PROJECT_QUALIFICATION` owner phase for `AUD-A7-001`; the finding remains `UNRESOLVED_GATE`.
 - `check:linear-piping-analysis-consumer`, `check:lfea-interfaces`, `check:lfea-code-application` and `check:lfea-presentation-export` are registered inside `check:lfea-core`.
 - Phases 2B, 2C, 2D, 2E and 2F run under `check:linear-piping-analysis-consumer`; Phase 5B runs under `check:lfea-presentation-export` with a separate browser contract.
-- Phase 6A and Phase 6B simulated checks run through the fail-closed release-policy gate but remain ineligible as project evidence.
+- Phase 6A through Phase 6D simulated checks run through the fail-closed release-policy gate but remain ineligible as project or release evidence.
 - Release readiness remains fail closed through the Section 9 findings ledger and G0-G10 release-evidence ledger.
 
 ## Still open
 
 - Exact-head CI evidence remains unresolved while repository Actions jobs fail before exposing executable steps or retained logs.
-- Successful exact-head B-2.5, Phase 2D, Phase 2E, Phase 2F, Phase 6B, consumer, core, release-policy and full-gate command evidence has not been retained.
+- Successful exact-head B-2.5, Phase 2D, Phase 2E, Phase 2F, Phase 6B, Phase 6C, Phase 6D, consumer, core, release-policy and full-gate command evidence has not been retained.
 - Phase 2E and Phase 2F provide the bounded multicase orchestration and governed length-normalization APIs, but a real project package still requires caller-approved unit basis, B-2.2 material resolutions, B-2.3 section resolutions, B-2.4 axes, constraints, B-3.0 loads, interface definitions, nozzle allowable profiles and B31.3 datasets/checks.
 - InputXML request v1 remains metre-only by contract; request v2 performs only explicitly authorized length normalization and does not infer source units.
 - No complete non-fictional real-model reconciliation or independent commercial corroboration artifact has been supplied.
 - No qualifying performance record, rollback rehearsal record or signed release-review disposition has been supplied.
+- No real exact-head manifest, G0-G7 command log or internal phase evidence file has been supplied.
+- G0 through G7 remain `UNRESOLVED_GATE` or `PARTIALLY_VERIFIED`; their release-evidence artifact paths remain null.
 - G8, G9 and G10 remain `UNRESOLVED_GATE`; their release-evidence artifact paths remain null.
 - Real ASME B31.3/B31J datasets and equipment/nozzle allowable profiles remain caller-supplied project authorities; no licensed or vendor numerical tables are embedded in source.
 - Nonlinear gap, lift-off, contact and friction behavior remains outside the linear release.
 
 ## Release rule
 
-No downstream phase may change `programDisposition` to `QUALIFIED` until every gate in `release-evidence/lfea-piping-release-evidence.json` is `VERIFIED`, every required artifact path is populated, the Phase 6B package revalidates as `ELIGIBLE_FOR_RELEASE_REVIEW`, `npm run check:lfea-piping-release` passes at the exact release head, and project reconciliation evidence is retained.
+No downstream phase may change `programDisposition` to `QUALIFIED` until every gate in `release-evidence/lfea-piping-release-evidence.json` is `VERIFIED`, every required artifact path is populated, the Phase 6C external package and Phase 6D internal manifest both revalidate as `ELIGIBLE_FOR_RELEASE_REVIEW`, `npm run check:lfea-piping-release` passes at the exact release head, and project reconciliation evidence is retained.

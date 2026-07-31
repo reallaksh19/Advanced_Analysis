@@ -103,6 +103,7 @@ if (mode === 'RELEASE') {
 await import('./linear-piping-project-qualification-check.mjs');
 await import('./linear-piping-project-qualification-anti-drift-check.mjs');
 await import('./lfea-piping-phase6c-anti-drift-check.mjs');
+await import('./lfea-piping-phase6d-anti-drift-check.mjs');
 
 console.log(JSON.stringify({
   check: 'lfea-piping-release-readiness',

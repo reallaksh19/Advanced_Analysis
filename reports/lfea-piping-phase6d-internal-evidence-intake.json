@@ -1,0 +1,55 @@
+{
+  "schema": "lfea-piping-phase-slice/v1",
+  "phaseId": "PHASE_6D_INTERNAL_EVIDENCE_INTAKE",
+  "ownerFindingId": "AUD-A7-001",
+  "baseHead": "a52e8fa2d2e7e94093300839c47cc425b16473b4",
+  "status": "UNRESOLVED_GATE",
+  "scope": [
+    "Validate a persisted exact-head manifest for existing G0 through G7 release artifacts.",
+    "Require exact command coverage, successful command status and command-to-artifact hash binding.",
+    "Require clean-tree proof, exact-head equality and deterministic manifest identity.",
+    "Require exact release/manifest path equality and retained artifact content hashes.",
+    "Require text logs to prove bound command IDs and JSON evidence to prove exact role and PASS status.",
+    "Require G0 through G7 to be VERIFIED only in explicit internal release-intake mode.",
+    "Validate without running engineering commands, writing evidence files or mutating release state."
+  ],
+  "evidencePaths": [
+    "scripts/lfea-piping-internal-release-evidence-check.mjs",
+    "scripts/lfea-piping-internal-release-evidence-check-check.mjs",
+    "scripts/lfea-piping-phase6d-anti-drift-check.mjs",
+    "scripts/lfea-piping-release-readiness-check.mjs",
+    "docs/LFEA_PIPING_PHASE6D_INTERNAL_EVIDENCE_INTAKE.md",
+    ".github/workflows/lfea-piping-phase6d-certification.yml"
+  ],
+  "addressedAgainstSection9": {
+    "findingId": "AUD-A7-001",
+    "priorStatus": "UNRESOLVED_GATE",
+    "statusAfterCoding": "UNRESOLVED_GATE",
+    "addressed": [
+      "G0 through G7 artifact paths can now be checked as persisted evidence rather than accepted as non-empty strings.",
+      "The exact-head manifest binds runtime, clean-tree state, ten mandatory commands and seven retained artifacts.",
+      "Head, path, command, role, status and content-hash mismatches fail closed.",
+      "The validator is transitively registered under the existing release-policy and repository gate routes."
+    ],
+    "notClosed": [
+      "No real exact-head manifest, command log or phase evidence file has been supplied.",
+      "G0 through G7 artifact paths remain null.",
+      "G0 through G7 remain UNRESOLVED_GATE or PARTIALLY_VERIFIED.",
+      "Successful exact-head Phase 6D and complete release logs have not been retained."
+    ]
+  },
+  "explicitNonScope": [
+    "Executing the mandatory engineering and repository commands",
+    "Creating exact-head manifests, logs or phase evidence files",
+    "Changing release gate status or artifact paths",
+    "Promoting the program to QUALIFIED"
+  ],
+  "remainingConditions": [
+    "Execute all mandatory commands on one clean exact head.",
+    "Retain and populate the exact internal artifact paths and exactHead.",
+    "Independently review and promote G0 through G7.",
+    "Retain successful exact-head Phase 6D and complete release command logs."
+  ],
+  "releaseImpact": "NONE",
+  "programDisposition": "BLOCKED"
+}
