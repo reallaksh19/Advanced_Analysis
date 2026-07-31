@@ -99,6 +99,11 @@ export {
   sealRenderPacketV2,
 } from './lafea-canvas/render-packet-v2-contract.js';
 export {
+  LAFEA_RENDER_EVIDENCE_INTAKE_SCHEMA,
+  LAFEA_RENDER_EVIDENCE_INTAKE_STATUSES,
+  evaluateLafeaRenderEvidenceIntake,
+} from './lafea-render-evidence-intake.js';
+export {
   LAFEA_WORKBENCH_DOCUMENT_SCHEMA,
   executeLafeaStage,
   lafeaCollectionPaths,
