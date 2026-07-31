@@ -1,6 +1,6 @@
 # LFEA Piping Phase Status
 
-Exact Phase 5B development base: `main` at `88df34b7498c62b12a32d44bdb81a8c9a25f9a05`.
+Exact Phase 2B development base: `main` at `08ce413ef1700962a69856654601ef21f1551081`.
 
 Program disposition: `BLOCKED`.
 
@@ -8,7 +8,10 @@ Program disposition: `BLOCKED`.
 
 - Phase 1A governance and exact-head policy are merged.
 - Phase 1B formally retires the orphaned continuum `lfea-007` suite without using it as Priority 2 evidence.
-- Phase 2 compiles explicit B-2.5 and B-3.0 source-authority inputs before the bounded T0 solve and recovery chain.
+- Phase 2A compiles explicit B-2.5 and B-3.0 source-authority inputs before the bounded T0 solve and recovery chain.
+- Phase 2B seals exact CAESAR II InputXML text, recomputes canonical geometry and B-1 conditioning, and binds the resulting source and topology identities to the existing Phase 2A request.
+- Phase 2B compares the actual caller-supplied conditioned geometry with the recomputed InputXML topology; retaining an approved hash string over different geometry is rejected.
+- Phase 2B does not infer material states, pipe sections, local-axis policy, constraint behavior or load cases from raw file labels; those remain caller-approved engineering authorities.
 - Phase 3 provides governed support, anchor and nozzle interfaces, explicit frames and offsets, B-3.3 reaction grouping, local transformations, reference-point transfer and deterministic envelopes.
 - Phase 4 provides caller-supplied nozzle allowable profiles, configured nozzle assessments, sustained and occasional B31.3 application orchestration, explicit ordered displacement-stress-range case pairs and a sealed application result across analysis, interface, nozzle and code identities.
 - Phase 5 provides a current-only presentation contract, a textContent-only read-only result view, deterministic current audit JSON and qualified-only interface, nozzle and B31.3 CSV exports.
@@ -19,13 +22,14 @@ Program disposition: `BLOCKED`.
 - Conditional current results remain reviewable in audit evidence but cannot produce engineering issue CSVs.
 - Phase 6A provides a deterministic comparison harness for independently supplied project and commercial reference values; its committed fixtures remain explicitly ineligible as project evidence.
 - `check:linear-piping-analysis-consumer`, `check:lfea-interfaces`, `check:lfea-code-application` and `check:lfea-presentation-export` are registered inside `check:lfea-core`.
-- The Phase 5B controller check runs under `check:lfea-presentation-export`, and the exact-head workflow separately runs its browser contract.
+- Phase 2B runs under `check:linear-piping-analysis-consumer`; Phase 5B runs under `check:lfea-presentation-export` with a separate browser contract.
 - Release readiness remains fail closed through the Section 9 findings ledger and G0-G10 release-evidence ledger.
 
 ## Still open
 
 - Exact-head CI evidence remains unresolved while repository Actions jobs fail before exposing executable steps or retained logs.
-- Raw project-file ingestion is not yet bound to the complete application result; Phase 5B imports an already sealed result package and is not an ingestion authority.
+- InputXML source and topology are bound to T0, but a complete project application still requires caller-approved B-2.2 material resolutions, B-2.3 section resolutions, B-2.4 axes, constraints, B-3.0 loads, interface definitions, nozzle allowable profiles and B31.3 datasets/checks.
+- Phase 2B accepts only metre-based InputXML. Unit conversion is a separate unresolved authority and is not performed silently.
 - Real-model reconciliation and commercial corroboration have not been supplied.
 - Performance qualification and rollback rehearsal remain unresolved.
 - Real ASME B31.3/B31J datasets and equipment/nozzle allowable profiles remain caller-supplied project authorities; no licensed or vendor numerical tables are embedded in source.
