@@ -1,0 +1,59 @@
+name: LFEA Piping Phase 6I Certification
+
+on:
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'release-evidence/lfea-piping-release-evidence.json'
+      - 'reports/lfea-piping-phase6i-aggregate-anti-drift.json'
+      - 'docs/LFEA_PIPING_PHASE6I_ANTI_DRIFT.md'
+      - 'docs/LFEA_PIPING_PHASE_STATUS.md'
+      - 'scripts/lfea-piping-internal-release-evidence-check.mjs'
+      - 'scripts/lfea-piping-phase6d-anti-drift-check.mjs'
+      - 'scripts/lfea-piping-release-readiness-check.mjs'
+      - 'scripts/lfea-piping-phase6i-*.mjs'
+      - '.github/workflows/lfea-piping-phase6i-certification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lfea-piping-phase6i-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  certify-phase6i:
+    name: Certify Phase 6I anti-drift controls
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Validate Phase 6I aggregate anti-drift catalogue
+        run: npm run check:lfea-piping-phase6i-anti-drift
+
+      - name: Validate fail-closed release policy
+        run: npm run check:lfea-piping-release-policy
+
+      - name: Run full repository gate
+        run: npm run gate
+
+      - name: Verify clean exact-head checkout
+        shell: bash
+        run: |
+          git diff --check
+          test -z "$(git status --short)"
