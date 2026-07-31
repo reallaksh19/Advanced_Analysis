@@ -10,6 +10,8 @@ if (!base) throw new TypeError('Usage: node scripts/lafea-template-t6c-source-gu
 const expected = [
   'scripts/lafea-template-t6c-cross-contract-check.mjs',
   'scripts/lafea-template-t6c-source-guard.mjs',
+  'src/workspace/lafea-templates/live-accessory-panel-descriptor.js',
+  'src/workspace/lafea-templates/live-wizard.js',
   'src/workspace/lafea-templates/t6c-live-registration.js',
   'src/workspace/lafea-templates/workbench-registration.js',
 ].sort();
@@ -20,11 +22,12 @@ const statuses = git(['diff', '--name-status', `${base}...HEAD`])
   .trim().split('\n').filter(Boolean);
 assert.equal(statuses.every((line) => line.startsWith('A\t')), true);
 
-const registrationPath = 'src/workspace/lafea-templates/workbench-registration.js';
-const registration = readFileSync(registrationPath, 'utf8');
+const registration = read('src/workspace/lafea-templates/workbench-registration.js');
+const liveDescriptor = read('src/workspace/lafea-templates/live-accessory-panel-descriptor.js');
+const liveWizard = read('src/workspace/lafea-templates/live-wizard.js');
 for (const required of [
   "from '../lafea-workbench.js'",
-  "from './t6b-accessory-panel.js'",
+  "from './live-accessory-panel-descriptor.js'",
   "'lafea-template-workbench-registration/v1'",
   "'LIVE_UI_COMPOSITION_ONLY'",
   'accessoryPanels: Object.freeze([descriptor])',
@@ -33,19 +36,27 @@ for (const required of [
 ]) {
   assert.equal(registration.includes(required), true, `Missing required T6C token: ${required}`);
 }
-for (const forbidden of [
-  'controller.getState(',
-  'controller.importDocument(',
-  'executeLafeaStage',
-  'compileLafeaApplicationTemplate',
-  'compileLafeaContinuumApplicationTemplate',
-  'initializeLifecycle',
-  'registerLifecycleArtifact',
-  'applyLifecycleEvent',
-  'LAFEA_STAGE_REGISTRY',
-  'benchmarkPanel',
-]) {
-  assert.equal(registration.includes(forbidden), false, `Forbidden T6C authority token: ${forbidden}`);
+assert.match(liveDescriptor, /createLafeaTemplateAccessoryPanelDescriptor\(options\)/u);
+assert.match(liveDescriptor, /mountLafeaLiveTemplateWizard/u);
+assert.match(liveWizard, /RESOLVED_INTERFACE_MERGED/u);
+assert.match(liveWizard, /Live workbench composition is active/u);
+assert.match(liveWizard, /filter\(\(value\) => value !== BLOCKED_LIMITATION\)/u);
+
+for (const source of [registration, liveDescriptor, liveWizard]) {
+  for (const forbidden of [
+    'controller.getState(',
+    'controller.importDocument(',
+    'executeLafeaStage',
+    'compileLafeaApplicationTemplate',
+    'compileLafeaContinuumApplicationTemplate',
+    'initializeLifecycle',
+    'registerLifecycleArtifact',
+    'applyLifecycleEvent',
+    'LAFEA_STAGE_REGISTRY',
+    'benchmarkPanel',
+  ]) {
+    assert.equal(source.includes(forbidden), false, `Forbidden T6C authority token: ${forbidden}`);
+  }
 }
 
 for (const forbiddenPath of [
@@ -69,6 +80,7 @@ console.log(JSON.stringify({
   modifiedExistingFiles: 0,
   agent1FilesModified: 0,
   liveRegistrationPaths: 1,
+  truthfulLiveWizardPath: 1,
   controllerFacadeMethodInvocations: 0,
   workbenchImportPaths: 0,
   compilerInvocationPaths: 0,
@@ -77,6 +89,9 @@ console.log(JSON.stringify({
   releasePromotionPaths: 0,
 }, null, 2));
 
+function read(path) {
+  return readFileSync(path, 'utf8');
+}
 function git(args) {
   return execFileSync('git', args, { encoding: 'utf8' });
 }
