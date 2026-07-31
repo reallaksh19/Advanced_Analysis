@@ -66,6 +66,7 @@ assert.equal(materialResult.status, 'APPLIED');
 assert.equal(materialResult.document.materials[0].elasticModulus, 210000);
 assert.equal(materialResult.document.materials[0].sourceReference, 'MATERIAL#MAT');
 assert.ok(materialResult.dependencyImpact.includes('EXECUTION'));
+
 const noChangeCommand = createLafeaSetScalarCommand({
   commandId: 'CMD-U2A-NO-CHANGE-1',
   stageId: 'LAFEA.3',
@@ -154,6 +155,22 @@ const deleteFieldCommand = createLafeaDeleteFieldCommand({
 });
 assert.equal(deleteFieldCommand.operation, 'DELETE_FIELD');
 assert.equal(deleteFieldCommand.input.presence, 'DELETE');
+
+const weldPlaceholder = Object.freeze({
+  schema: 'lafea-weld-profile-placeholder/v1',
+  identity: 'WELD-NOT-IMPLEMENTED',
+});
+const weldReplaceCommand = createLafeaReplaceDocumentCommand({
+  commandId: 'CMD-U2A-WELD-EDIT-BLOCK-1',
+  stageId: 'LAFEA.6',
+  expectedDocumentDigest: lafeaDocumentDigest(weldPlaceholder),
+  documentValue: { ...weldPlaceholder, identity: 'EDITED-WELD' },
+  origin: { ...origin, sequence: 14 },
+});
+const weldEditResult = applyLafeaStageEditCommand(weldPlaceholder, weldReplaceCommand);
+assert.equal(weldEditResult.status, 'REJECTED');
+assert.ok(weldEditResult.diagnostics.some((row) => row.code === 'LAFEA_STAGE_EDIT_NOT_AUTHORIZED'));
+assert.equal(weldEditResult.currentDocumentDigest, lafeaDocumentDigest(weldPlaceholder));
 
 const withMeshConfig = normalizeLafeaStageDocument('LAFEA.3', {
   ...structuredClone(continuumFixture()),
