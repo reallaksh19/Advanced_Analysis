@@ -71,4 +71,6 @@ assert.equal(
 assert.match(packageValue.scripts['check:lfea-core'], /check:lfea-presentation-export/u);
 assert.match(packageValue.scripts.gate, /check:lfea-core/u);
 
+await import('./linear-piping-workspace-integration-check.mjs');
+
 console.log('Linear piping Phase 5 presentation anti-drift check PASS');
