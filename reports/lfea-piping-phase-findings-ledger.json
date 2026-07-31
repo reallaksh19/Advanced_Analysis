@@ -39,6 +39,26 @@
         "AUD-DOC-002"
       ],
       "completedAtUtc": null
+    },
+    {
+      "phaseId": "PHASE_1B_LFEA007_DISPOSITION",
+      "title": "Formal retirement of orphaned continuum Local FEA consumer suite",
+      "status": "PARTIALLY_VERIFIED",
+      "scope": [
+        "Remove the stale LFEA-007 workflow, static scripts, browser suite and obsolete implementation document together.",
+        "Preserve the historical v10 schema as a legacy closed contract while proving the active v11 registry does not advertise LOCAL_FEA.",
+        "Preserve the independent active LAFEA and LFEA workbenches and prevent the retired suite from becoming Priority 2 evidence."
+      ],
+      "evidencePaths": [
+        "docs/LFEA_007_RETIREMENT_DECISION.md",
+        "scripts/lfea-007-retirement-check.mjs",
+        "src/core/workspace-consumers/constants.js",
+        "src/core/workspace-consumers/registry.js"
+      ],
+      "addressedFindingIds": [
+        "AUD-L007-001"
+      ],
+      "completedAtUtc": null
     }
   ],
   "findings": [
@@ -161,13 +181,15 @@
       "gate": "Repository hygiene",
       "severity": "MAJOR",
       "auditStatus": "CONTRADICTED",
-      "currentStatus": "CONTRADICTED",
+      "currentStatus": "PARTIALLY_VERIFIED",
       "ownerPhase": "PHASE_1B_LFEA007_DISPOSITION",
       "evidencePaths": [
-        "scripts/lfea-007-check.mjs",
-        ".github/workflows/lfea-007-certification.yml"
+        "docs/LFEA_007_RETIREMENT_DECISION.md",
+        "scripts/lfea-007-retirement-check.mjs",
+        "src/core/workspace-consumers/constants.js",
+        "src/core/workspace-consumers/registry.js"
       ],
-      "remainingCondition": "Restore and independently register the continuum Local FEA consumer or formally retire its workflow, scripts, registry claim and documentation together."
+      "remainingCondition": "Retain a successful exact-head retirement source-guard result and clean full-gate evidence for the Phase 1B head."
     }
   ]
 }
