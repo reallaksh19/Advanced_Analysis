@@ -1,6 +1,10 @@
 export {
+  ANALYSIS_ROW_KEYS,
+  CODE_ROW_KEYS,
   EXPORT_ELIGIBILITY,
+  INTERFACE_ROW_KEYS,
   LinearPipingPresentationError,
+  NOZZLE_ROW_KEYS,
   PIPING_PRESENTATION_SCHEMA,
   PRESENTATION_CURRENCY,
   PRESENTATION_KEYS,
@@ -11,14 +15,11 @@ export {
   computePresentationSemanticHash,
   failPresentation,
   presentationSemanticProjection,
+  requireCurrentLinearPipingPresentation,
   requireLinearPipingPresentation,
 } from './contracts.js';
 
 export {
-  ANALYSIS_ROW_KEYS,
-  CODE_ROW_KEYS,
-  INTERFACE_ROW_KEYS,
-  NOZZLE_ROW_KEYS,
   PRESENTATION_INPUT_KEYS,
   compileLinearPipingPresentation,
 } from './presentation.js';
