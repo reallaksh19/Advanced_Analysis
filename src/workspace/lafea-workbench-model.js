@@ -78,27 +78,31 @@ const COLLECTIONS = Object.freeze({
  */
 export function normalizeLafeaStageDocument(stageId, input) {
   assertStageId(stageId);
-  const source = editableSource(stageId, cloneRecord(input));
+  const meshConfig = isRecord(input?.meshConfig) ? cloneRecord(input.meshConfig) : undefined;
+  const cleanInput = stripWorkbenchFields(cloneRecord(input));
+  const source = editableSource(stageId, cleanInput);
   if (stageId === 'LAFEA.1') {
     const retained = createCanonicalLocalAttachmentFoundationModel(source).sourceEvidence;
-    return freezeClone({ ...retained, schema: ATTACHMENT_MODEL_SCHEMA });
+    return freezeClone({ ...retained, schema: ATTACHMENT_MODEL_SCHEMA, ...(meshConfig ? { meshConfig } : {}) });
   }
   if (stageId === 'LAFEA.2') {
-    return freezeClone(editableScreening(createLocalAttachmentScreeningRequest(source)));
+    const base = editableScreening(createLocalAttachmentScreeningRequest(source));
+    return freezeClone({ ...base, ...(meshConfig ? { meshConfig } : {}) });
   }
   if (stageId === 'LAFEA.3') {
     const retained = createCanonicalLocalContinuumModel(source).sourceEvidence;
-    return freezeClone({ ...retained, schema: CONTINUUM_MODEL_SCHEMA });
+    return freezeClone({ ...retained, schema: CONTINUUM_MODEL_SCHEMA, ...(meshConfig ? { meshConfig } : {}) });
   }
   if (stageId === 'LAFEA.4') {
-    return freezeClone(withoutHash(createCanonicalLocalShellModel(source)));
+    const base = withoutHash(createCanonicalLocalShellModel(source));
+    return freezeClone({ ...base, ...(meshConfig ? { meshConfig } : {}) });
   }
   if (stageId === 'LAFEA.6') {
-    return freezeClone(source);
+    return freezeClone({ ...source, ...(meshConfig ? { meshConfig } : {}) });
   }
   const retained = createCanonicalTrunnionFootprintSource(source);
   createCanonicalTrunnionFootprintModel(retained);
-  return freezeClone(retained);
+  return freezeClone({ ...retained, ...(meshConfig ? { meshConfig } : {}) });
 }
 
 /**
@@ -159,13 +163,19 @@ export function lafeaCollectionPaths(stageId) {
   assertStageId(stageId);
   return COLLECTIONS[stageId];
 }
+function stripWorkbenchFields(input) {
+  if (!isRecord(input)) return input;
+  const { meshConfig, ...kernelSource } = input;
+  return kernelSource;
+}
 function canonicalCalculationInput(stageId, source) {
-  if (stageId === 'LAFEA.1') return createCanonicalLocalAttachmentFoundationModel(source);
-  if (stageId === 'LAFEA.2') return createLocalAttachmentScreeningRequest(source);
-  if (stageId === 'LAFEA.3') return createCanonicalLocalContinuumModel(source);
-  if (stageId === 'LAFEA.4') return createCanonicalLocalShellModel(source);
-  if (stageId === 'LAFEA.6') return source;
-  return createCanonicalTrunnionFootprintSource(source);
+  const cleanSource = stripWorkbenchFields(source);
+  if (stageId === 'LAFEA.1') return createCanonicalLocalAttachmentFoundationModel(cleanSource);
+  if (stageId === 'LAFEA.2') return createLocalAttachmentScreeningRequest(cleanSource);
+  if (stageId === 'LAFEA.3') return createCanonicalLocalContinuumModel(cleanSource);
+  if (stageId === 'LAFEA.4') return createCanonicalLocalShellModel(cleanSource);
+  if (stageId === 'LAFEA.6') return cleanSource;
+  return createCanonicalTrunnionFootprintSource(cleanSource);
 }
 function calculate(stageId, input) {
   if (stageId === 'LAFEA.1') return calculateLocalAttachmentFoundation(input);
@@ -193,23 +203,24 @@ function normalizedDiagnostics(result) {
   return rows.length ? rows : [{ severity: 'ERROR', code: 'LAFEA_CALCULATION_REJECTED', message: result?.qualification?.summary || 'The qualified kernel rejected the document.' }];
 }
 function editableSource(stageId, input) {
-  if (stageId === 'LAFEA.1' && isRecord(input.sourceEvidence)) {
-    const source = validateCanonicalLocalAttachmentFoundationModel(input).sourceEvidence;
+  const cleanInput = stripWorkbenchFields(input);
+  if (stageId === 'LAFEA.1' && isRecord(cleanInput.sourceEvidence)) {
+    const source = validateCanonicalLocalAttachmentFoundationModel(cleanInput).sourceEvidence;
     return { ...source, schema: ATTACHMENT_MODEL_SCHEMA };
   }
-  if (stageId === 'LAFEA.3' && isRecord(input.sourceEvidence)) {
-    const source = validateCanonicalLocalContinuumModel(input).sourceEvidence;
+  if (stageId === 'LAFEA.3' && isRecord(cleanInput.sourceEvidence)) {
+    const source = validateCanonicalLocalContinuumModel(cleanInput).sourceEvidence;
     return { ...source, schema: CONTINUUM_MODEL_SCHEMA };
   }
-  if (stageId === 'LAFEA.2' && typeof input.semanticHash === 'string') {
-    return editableScreening(validateLocalAttachmentScreeningRequest(input));
+  if (stageId === 'LAFEA.2' && typeof cleanInput.semanticHash === 'string') {
+    return editableScreening(validateLocalAttachmentScreeningRequest(cleanInput));
   }
-  if (stageId === 'LAFEA.4' && typeof input.semanticHash === 'string') {
-    return withoutHash(validateCanonicalLocalShellModel(input));
+  if (stageId === 'LAFEA.4' && typeof cleanInput.semanticHash === 'string') {
+    return withoutHash(validateCanonicalLocalShellModel(cleanInput));
   }
-  if (stageId === 'LAFEA.2') return editableScreening(input);
-  if (stageId === 'LAFEA.4') return withoutHash(input);
-  return input;
+  if (stageId === 'LAFEA.2') return editableScreening(cleanInput);
+  if (stageId === 'LAFEA.4') return withoutHash(cleanInput);
+  return cleanInput;
 }
 function editableScreening(input) {
   const result = withoutHash(input);

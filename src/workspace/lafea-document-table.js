@@ -112,33 +112,122 @@ function renderJsonEditor(doc, container, currentDoc, onApplyJson) {
   container.append(textarea, apply);
 }
 
+function formatEnglishParameterKey(key) {
+  if (!key) return '';
+  const known = {
+    'sourceEvidence.foundationModel.sourceAncestry.transformationEvidenceHash': 'Load transformation integrity hash (SHA-256)',
+    'sourceEvidence.foundationModel.sourceAncestry.canonicalModelSemanticHash': 'Canonical model semantic hash (SHA-256)',
+    'sourceEvidence.foundationModel.sourceEvidence.schema': 'Engineering reference specification schema ID',
+    'sourceEvidence.foundationModel.sourceEvidence.modelIdentity': 'Origin piping / vessel benchmark title',
+    'sourceEvidence.foundationModel.sourceEvidence.modelVersion': 'Origin engineering model revision version',
+    'sourceEvidence.foundationModel.sourceEvidence.sourceAncestry.sourceModelIdentity': 'Source piping simulation model identifier',
+    'sourceEvidence.foundationModel.sourceEvidence.sourceAncestry.sourceVersion': 'Source piping simulation model revision',
+    'sourceEvidence.foundationModel.sourceEvidence.sourceAncestry.adapterIdentity': 'Data import adapter driver name',
+    'sourceEvidence.foundationModel.sourceEvidence.sourceAncestry.adapterVersion': 'Data import adapter driver version',
+    'sourceEvidence.foundationModel.sourceEvidence.units.length': 'Length measurement unit (e.g., mm, inch)',
+    'sourceEvidence.foundationModel.sourceEvidence.units.force': 'Force measurement unit (e.g., N, lbf)',
+    'sourceEvidence.foundationModel.sourceEvidence.units.moment': 'Bending / torsion moment unit (e.g., N-mm)',
+    'sourceEvidence.foundationModel.sourceEvidence.units.pressure': 'Internal pressure measurement unit (e.g., MPa)',
+    'sourceEvidence.foundationModel.sourceEvidence.units.stress': 'Material stress measurement unit (e.g., MPa)',
+    'sourceEvidence.foundationModel.sourceEvidence.units.rotation': 'Angular rotation measurement unit (e.g., rad)',
+    'meshConfig.density': 'FEA global mesh density preset',
+    'meshConfig.bias': 'Discontinuity refinement concentration bias (k_refine)',
+    'meshConfig.formulation': 'FEA shell element formulation family',
+    'meshConfig.singularity': 'Weld-toe singularity mitigation strategy',
+    'schema': 'Engineering schema specification version',
+    'modelIdentity': 'Model benchmark identifier',
+    'modelVersion': 'Model revision version',
+    'units.length': 'Length measurement unit',
+    'units.force': 'Force measurement unit',
+    'units.moment': 'Moment measurement unit',
+    'units.pressure': 'Pressure measurement unit',
+    'units.stress': 'Stress measurement unit',
+    'units.rotation': 'Angular rotation unit',
+    'leverArmX': 'Trunnion / standoff lever arm length (X-direction)',
+    'leverArmY': 'Trunnion / standoff lever arm length (Y-direction)',
+    'leverArmZ': 'Trunnion / standoff lever arm length (Z-direction)',
+    'nodes': 'Structural Finite Element Nodes',
+    'elements': '2D Shell / Continuum Finite Elements',
+    'loadCases': 'Applied Linear Superposition Load Cases',
+    'referencePoints': 'Structural Reference & Measurement Points',
+    'id': 'Identifier',
+    'nodeId': 'Node ID',
+    'elementId': 'Element ID',
+    'identity': 'Element Identity',
+    'x': 'X Coord',
+    'y': 'Y Coord',
+    'z': 'Z Coord',
+    'type': 'Element Type',
+    'thickness': 'Wall Thickness',
+    'material': 'Material Basis',
+    'screeningCaseId': 'Load Case Identifier',
+    'evaluationLocationId': 'Wall Fiber Location',
+    'quantity': 'Engineering Stress Quantity',
+    'value': 'Calculated Value',
+  };
+  if (known[key]) return known[key];
+  return String(key)
+    .replace(/^sourceEvidence\.foundationModel\.sourceEvidence\./, '')
+    .replace(/^sourceEvidence\.foundationModel\./, '')
+    .replace(/\./g, ' · ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/_/g, ' ')
+    .replace(/^\w/, (c) => c.toUpperCase());
+}
+
 function renderScalarsSection(doc, container, currentDoc) {
   const section = doc.createElement('div');
   section.className = 'lafea-doc-table-section';
   const title = doc.createElement('h4');
-  title.textContent = '📐 Global Stage Parameters & Properties';
+  title.textContent = '📐 Global Stage Parameters & Properties (Simple English Form)';
   section.append(title);
 
   const table = doc.createElement('table');
   table.className = 'lafea-doc-grid';
-  table.innerHTML = '<thead><tr><th>Parameter / Key</th><th>Editable Value</th><th>Data Type</th></tr></thead>';
+  table.innerHTML = '<thead><tr><th>Engineering Parameter (Simple English)</th><th>Editable Value</th><th>Data Type</th></tr></thead>';
   const tbody = doc.createElement('tbody');
 
-  for (const [key, val] of Object.entries(currentDoc)) {
-    if (val !== null && typeof val === 'object') continue;
+  const scalars = [];
+  function pushScalars(obj, prefix = '') {
+    for (const [k, v] of Object.entries(obj)) {
+      const fullKey = prefix ? `${prefix}.${k}` : k;
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        if (v.value !== undefined && typeof v.value !== 'object') {
+          scalars.push({ key: fullKey, parent: obj, prop: k, valObj: v, isWrapper: true });
+        } else {
+          pushScalars(v, fullKey);
+        }
+      } else if (v !== null && typeof v !== 'object') {
+        scalars.push({ key: fullKey, parent: obj, prop: k, valObj: null, isWrapper: false });
+      }
+    }
+  }
+  pushScalars(currentDoc);
+
+  for (const item of scalars) {
     const row = doc.createElement('tr');
     const tdKey = doc.createElement('td');
-    tdKey.textContent = key;
+    const englishName = formatEnglishParameterKey(item.key);
+    if (englishName !== item.key) {
+      tdKey.innerHTML = `<strong>${englishName}</strong> <code style="font-size:0.75em;color:#64748b;display:block;margin-top:2px;">${item.key}</code>`;
+    } else {
+      tdKey.textContent = item.key;
+    }
     const tdVal = doc.createElement('td');
     const input = doc.createElement('input');
-    input.type = typeof val === 'number' ? 'number' : 'text';
-    input.value = String(val ?? '');
+    const curVal = item.isWrapper ? item.valObj.value : item.parent[item.prop];
+    input.type = typeof curVal === 'number' ? 'number' : 'text';
+    input.value = String(curVal ?? '');
     input.addEventListener('change', () => {
-      currentDoc[key] = typeof val === 'number' ? (Number(input.value) || 0) : input.value;
+      if (item.isWrapper) {
+        item.valObj.value = typeof curVal === 'number' ? (Number(input.value) || 0) : input.value;
+      } else {
+        item.parent[item.prop] = typeof curVal === 'number' ? (Number(input.value) || 0) : input.value;
+      }
     });
     tdVal.append(input);
     const tdType = doc.createElement('td');
-    tdType.textContent = typeof val;
+    tdType.textContent = typeof curVal;
     row.append(tdKey, tdVal, tdType);
     tbody.append(row);
   }
@@ -165,7 +254,7 @@ function renderCollectionsSection(doc, container, currentDoc, onRefresh) {
     const section = doc.createElement('div');
     section.className = 'lafea-doc-table-section';
     const title = doc.createElement('h4');
-    title.textContent = `🏷️ ${key.toUpperCase()} (Topology Edit Grid — ${val.length} rows)`;
+    title.textContent = `🏷️ ${formatEnglishParameterKey(key).toUpperCase()} (Topology Edit Grid — ${val.length} rows)`;
     section.append(title);
 
     const sample = val[0];
@@ -175,13 +264,25 @@ function renderCollectionsSection(doc, container, currentDoc, onRefresh) {
 
     const thead = doc.createElement('thead');
     const headerRow = doc.createElement('tr');
-    headerRow.innerHTML = '<th>Index</th>' + columns.map((c) => `<th>${c}</th>`).join('') + '<th>Action</th>';
+    headerRow.innerHTML = '<th>Index</th>' + columns.map((c) => `<th>${formatEnglishParameterKey(c)}</th>`).join('') + '<th>Action</th>';
     thead.append(headerRow);
     table.append(thead);
 
     const tbody = doc.createElement('tbody');
     val.forEach((rowObj, idx) => {
       const tr = doc.createElement('tr');
+      const rowId = String(rowObj.identity || rowObj.id || rowObj.nodeId || rowObj.elementId || idx);
+      tr.dataset.rowId = rowId;
+      tr.classList.add('lafea-table-row');
+      tr.addEventListener('click', () => {
+        doc.querySelectorAll('tr.lafea-row-selected').forEach((el) => el.classList.remove('lafea-row-selected'));
+        tr.classList.add('lafea-row-selected');
+        doc.querySelectorAll('.lafea-svg-highlighted').forEach((el) => el.classList.remove('lafea-svg-highlighted'));
+        doc.querySelectorAll(`[data-node-id="${rowId}"], [data-element-id="${rowId}"]`).forEach((el) => {
+          el.classList.add('lafea-svg-highlighted');
+          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+      });
       const tdIdx = doc.createElement('td');
       tdIdx.textContent = `#${idx + 1}`;
       tr.append(tdIdx);
@@ -190,16 +291,35 @@ function renderCollectionsSection(doc, container, currentDoc, onRefresh) {
         const td = doc.createElement('td');
         const input = doc.createElement('input');
         const origVal = rowObj[col];
-        const isObj = origVal !== null && typeof origVal === 'object';
-        input.type = typeof origVal === 'number' ? 'number' : 'text';
-        input.value = isObj ? JSON.stringify(origVal) : String(origVal ?? '');
-        input.addEventListener('change', () => {
-          if (isObj) {
-            try { rowObj[col] = JSON.parse(input.value); } catch { /* Keep text if syntax invalid */ }
-          } else {
-            rowObj[col] = typeof origVal === 'number' ? (Number(input.value) || 0) : input.value;
-          }
-        });
+        const isWrapper = origVal && typeof origVal === 'object' && !Array.isArray(origVal) && origVal.value !== undefined;
+        const isArrWrap = Array.isArray(origVal) && origVal.length > 0 && origVal[0]?.value !== undefined;
+        if (isWrapper) {
+          const inner = origVal.value;
+          input.type = typeof inner === 'number' ? 'number' : 'text';
+          input.value = Array.isArray(inner) ? inner.join(', ') : String(inner ?? '');
+          input.addEventListener('change', () => {
+            if (Array.isArray(inner)) origVal.value = input.value.split(',').map((s) => Number(s.trim()) || 0);
+            else origVal.value = typeof inner === 'number' ? (Number(input.value) || 0) : input.value;
+          });
+        } else if (isArrWrap) {
+          input.type = 'text';
+          input.value = origVal.map((o) => o.value).join(', ');
+          input.addEventListener('change', () => {
+            const vals = input.value.split(',').map((s) => Number(s.trim()) || 0);
+            vals.forEach((n, i) => { if (origVal[i]) origVal[i].value = n; });
+          });
+        } else {
+          const isObj = origVal !== null && typeof origVal === 'object';
+          input.type = typeof origVal === 'number' ? 'number' : 'text';
+          input.value = isObj ? JSON.stringify(origVal) : String(origVal ?? '');
+          input.addEventListener('change', () => {
+            if (isObj) {
+              try { rowObj[col] = JSON.parse(input.value); } catch { /* keep text */ }
+            } else {
+              rowObj[col] = typeof origVal === 'number' ? (Number(input.value) || 0) : input.value;
+            }
+          });
+        }
         td.append(input);
         tr.append(td);
       }

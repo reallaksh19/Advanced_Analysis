@@ -68,6 +68,14 @@ function loadReferencePoints(ref) {
   return [
     { identity: 'SOURCE', coordinateSystem: COORDINATE_SYSTEMS.GLOBAL, point: { value: [0, 0, 1000], sourceRef: ref('points.source') } },
     { identity: 'TARGET', coordinateSystem: COORDINATE_SYSTEMS.GLOBAL, point: { value: [0, 0, 0], sourceRef: ref('points.target') } },
+    { identity: 'PLATE-NW', coordinateSystem: COORDINATE_SYSTEMS.GLOBAL, point: { value: [-200, 225, 0], sourceRef: ref('points.plate-nw') } },
+    { identity: 'PLATE-NE', coordinateSystem: COORDINATE_SYSTEMS.GLOBAL, point: { value: [200, 225, 0], sourceRef: ref('points.plate-ne') } },
+    { identity: 'PLATE-SE', coordinateSystem: COORDINATE_SYSTEMS.GLOBAL, point: { value: [200, -225, 0], sourceRef: ref('points.plate-se') } },
+    { identity: 'PLATE-SW', coordinateSystem: COORDINATE_SYSTEMS.GLOBAL, point: { value: [-200, -225, 0], sourceRef: ref('points.plate-sw') } },
+    { identity: 'LUG-BASE-NW', coordinateSystem: COORDINATE_SYSTEMS.GLOBAL, point: { value: [-84, 63, 0], sourceRef: ref('points.lug-nw') } },
+    { identity: 'LUG-BASE-NE', coordinateSystem: COORDINATE_SYSTEMS.GLOBAL, point: { value: [84, 63, 0], sourceRef: ref('points.lug-ne') } },
+    { identity: 'LUG-BASE-SE', coordinateSystem: COORDINATE_SYSTEMS.GLOBAL, point: { value: [84, -63, 0], sourceRef: ref('points.lug-se') } },
+    { identity: 'LUG-BASE-SW', coordinateSystem: COORDINATE_SYSTEMS.GLOBAL, point: { value: [-84, -63, 0], sourceRef: ref('points.lug-sw') } },
   ];
 }
 function loadCases(ref) {

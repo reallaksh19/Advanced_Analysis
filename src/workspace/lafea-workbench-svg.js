@@ -32,6 +32,20 @@ export function renderLafeaWorkbenchSvg(host, geometry, handlers) {
   host.append(svg);
 }
 
+function bindHighlight(svg, el, id) {
+  el.addEventListener('click', (event) => {
+    event.stopPropagation();
+    svg.ownerDocument.querySelectorAll('.lafea-svg-highlighted').forEach((node) => node.classList.remove('lafea-svg-highlighted'));
+    el.classList.add('lafea-svg-highlighted');
+    const tr = svg.ownerDocument.querySelector(`tr[data-row-id="${id}"]`);
+    if (tr) {
+      svg.ownerDocument.querySelectorAll('tr.lafea-row-selected').forEach((row) => row.classList.remove('lafea-row-selected'));
+      tr.classList.add('lafea-row-selected');
+      tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
+}
+
 function renderElements(svg, geometry, transform) {
   const nodeMap = new Map(geometry.nodes.map((node) => [node.nodeId, node]));
   for (const element of geometry.elements) {
@@ -41,6 +55,7 @@ function renderElements(svg, geometry, transform) {
     polygon.setAttribute('points', points.map((point) => screenPoint(point, transform).join(',')).join(' '));
     polygon.setAttribute('class', 'lafea-workbench-svg__element');
     polygon.dataset.elementId = element.elementId;
+    bindHighlight(svg, polygon, element.elementId);
     svg.append(polygon);
   }
 }
@@ -68,6 +83,7 @@ function renderNodes(svg, geometry, transform, handlers) {
     label.setAttribute('y', String(y - 8));
     label.textContent = node.nodeId;
     group.append(marker, label);
+    bindHighlight(svg, group, node.nodeId);
     if (geometry.nodePath) {
       bindDrag(svg, marker, node, geometry.nodePath, transform, handlers);
       bindKeyboard(marker, node, geometry.nodePath, handlers);

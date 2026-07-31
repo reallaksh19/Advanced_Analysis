@@ -91,14 +91,13 @@ export function createLafeaWorkbenchStore(options) {
   function moveNode(nodePath, nodeId, x, y) {
     if (!Number.isFinite(x) || !Number.isFinite(y)) throw new TypeError('Node coordinates must be finite.');
     const rows = collectionAt(requireDocument(state), nodePath);
-    const index = rows.findIndex((row) => row.nodeId === nodeId);
+    const index = rows.findIndex((r) => r.nodeId === nodeId || r.identity === nodeId || r.evaluationLocationId === nodeId);
     if (index < 0) throw new TypeError(`Unknown LAFEA node: ${nodeId}.`);
     const row = structuredClone(rows[index]);
     if (Array.isArray(row.position)) row.position = [x, y, row.position[2] ?? 0];
-    else {
-      row.x = x;
-      row.y = y;
-    }
+    else if (row.point?.value) row.point.value = [row.point.value[0] ?? 0, row.point.value[1] ?? 0, Math.max(10, Math.round(Math.abs(300 - y)))];
+    else if (row.angle !== undefined) row.angle = Math.atan2(y - 400, x - 400);
+    else Object.assign(row, { x, y });
     return updateRecord(nodePath, index, row);
   }
 
