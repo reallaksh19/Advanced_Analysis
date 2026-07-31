@@ -101,54 +101,70 @@ export function buildInternalEvidenceCommandPlan({ outputRoot }) {
         '--release',
         `--emit=${baselinePath}`,
       ],
+      {
+        executable: 'node',
+        args: [
+          'scripts/lfea-piping-a0-baseline-check.mjs',
+          '--release',
+          `--emit=$EVIDENCE_ROOT/${BASELINE_RELATIVE_PATH}`,
+        ],
+      },
     ),
     command(
       'UPSTREAM_NUMERICAL_CHAIN',
       'upstreamGateLog',
       npmExecutable(),
       ['run', 'check:lfea-core'],
+      { executable: 'npm' },
     ),
     command(
       'T0_APPLICATION_SEQUENCING',
       't0GateLog',
       process.execPath,
       ['scripts/linear-piping-analysis-consumer-check.mjs'],
+      { executable: 'node' },
     ),
     command(
       'SOURCE_ORCHESTRATION',
       'sourceOrchestrationEvidence',
       process.execPath,
       ['scripts/linear-piping-source-orchestration-check.mjs'],
+      { executable: 'node' },
     ),
     command(
       'INTERFACES',
       'interfaceEvidence',
       npmExecutable(),
       ['run', 'check:lfea-interfaces'],
+      { executable: 'npm' },
     ),
     command(
       'INTERFACE_RECOVERY',
       'interfaceRecoveryEvidence',
       process.execPath,
       ['scripts/linear-piping-interface-check.mjs'],
+      { executable: 'node' },
     ),
     command(
       'CODE_AND_ALLOWABLES',
       'codeAndAllowableEvidence',
       npmExecutable(),
       ['run', 'check:lfea-code-application'],
+      { executable: 'npm' },
     ),
     command(
       'PRESENTATION_EXPORT',
       'presentationExportEvidence',
       npmExecutable(),
       ['run', 'check:lfea-presentation-export'],
+      { executable: 'npm' },
     ),
     command(
       'FULL_REPOSITORY_GATE',
       'upstreamGateLog',
       npmExecutable(),
       ['run', 'gate'],
+      { executable: 'npm' },
     ),
     Object.freeze({
       commandId: 'CLEAN_TREE',
@@ -368,8 +384,17 @@ function prepareOutputRoot(repositoryRoot, outputRoot) {
   if (relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative))) {
     fail('LFEA_INTERNAL_COLLECTION_OUTPUT_INSIDE_REPOSITORY', { outputRoot: requested });
   }
-  fs.rmSync(requested, { recursive: true, force: true });
-  fs.mkdirSync(requested, { recursive: true });
+  if (fs.existsSync(requested)) {
+    const status = fs.lstatSync(requested);
+    if (status.isSymbolicLink() || !status.isDirectory()) {
+      fail('LFEA_INTERNAL_COLLECTION_OUTPUT_INVALID', { outputRoot: requested });
+    }
+    if (fs.readdirSync(requested).length > 0) {
+      fail('LFEA_INTERNAL_COLLECTION_OUTPUT_NOT_EMPTY', { outputRoot: requested });
+    }
+  } else {
+    fs.mkdirSync(requested, { recursive: true });
+  }
   const realOutput = fs.realpathSync(requested);
   const realRelative = path.relative(repositoryRoot, realOutput);
   if (realRelative === '' || (!realRelative.startsWith('..') && !path.isAbsolute(realRelative))) {
@@ -418,15 +443,23 @@ function writeFailureRecord(outputRoot, exactHead, results, collectedAtUtc) {
   return Object.freeze({ path: relativePath, record });
 }
 
-function command(commandId, artifactRole, executable, args) {
+function command(commandId, artifactRole, executable, args, display = {}) {
+  const displayExecutable = display.executable ?? normalizedExecutable(executable);
+  const displayArgs = display.args ?? args;
   return Object.freeze({
     commandId,
     artifactRole,
     kind: 'PROCESS',
     executable,
     args: Object.freeze([...args]),
-    commandText: formatCommand(executable, args),
+    commandText: formatCommand(displayExecutable, displayArgs),
   });
+}
+
+function normalizedExecutable(executable) {
+  if (executable === process.execPath) return 'node';
+  if (/npm(?:\.cmd)?$/u.test(executable)) return 'npm';
+  return executable;
 }
 
 function formatCommand(executable, args) {
