@@ -5,7 +5,7 @@ const ROUNDING_RULE = 'NONE_CANONICAL_DOUBLE';
 
 export function pipeMetalMassPerLength(odM, wallM, densityKgM3, evidence) {
   const idM = odM - (2 * wallM);
-  const areaM2 = (Math.PI / 4) * ((odM ** 2) - (idM ** 2));
+  const areaM2 = Math.PI * wallM * (odM - wallM);
   const result = areaM2 * densityKgM3;
   return formulaResult(FORMULA_IDS.PIPE, result, 'kg/m', evidence, { odM, wallM, idM, areaM2, densityKgM3 });
 }

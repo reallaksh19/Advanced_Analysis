@@ -12,7 +12,7 @@ import { SequentialEditPanel } from './sequential-edit-panel.js';
 import { SequentialTableStore } from './sequential-table-store.js';
 import { SequentialTopologyTableView } from './sequential-topology-table-view.js';
 import { SvgSymbolFactory } from './svg-symbol-factory.js';
-import { PipingSupportEngine } from './support-engine.js';
+import { SupportLoadPresenter } from './support-load-presenter.js';
 import { buildPropertyInspector } from './property-inspector-view.js';
 import { buildSvgDefs, buildEngineeringGrid } from './sketcher-grid-view.js';
 import { buildHeaderToolbar } from './sketcher-toolbar-view.js';
@@ -40,7 +40,7 @@ export class SequentialSketcherView {
     this.loadScale = 1.0;
     this.selectedBranch = 'All Branches';
     this.symbolFactory = new SvgSymbolFactory();
-    this.supportEngine = new PipingSupportEngine();
+    this.supportPresenter = new SupportLoadPresenter();
     this.tableView = this.tableStore ? new SequentialTopologyTableView(null, this.tableStore) : null;
   }
 
@@ -259,7 +259,7 @@ export class SequentialSketcherView {
 
     renderEntities(doc, svg, entityProjected, {
       symbolFactory: this.symbolFactory,
-      supportEngine: this.supportEngine,
+      supportPresenter: this.supportPresenter,
       selectedEntityId: this.selectedEntity?.entityId || null,
       baseStroke,
       bendRadius,
@@ -280,7 +280,7 @@ export class SequentialSketcherView {
   }
 
   buildPropertyInspector(entity) {
-    return buildPropertyInspector(this.rootElement.ownerDocument, entity, this.supportEngine, () => {
+    return buildPropertyInspector(this.rootElement.ownerDocument, entity, this.supportPresenter, () => {
       this.selectedEntity = null;
       this.render(this.currentDataset);
     });
