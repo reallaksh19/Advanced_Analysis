@@ -193,6 +193,17 @@ const nozzleAssessment = compileNozzleAllowableAssessment({
   allowableProfile,
 });
 
+function commonCodeCheck() {
+  return {
+    codePointId: 'RED-001.S1',
+    componentId: 'RED-001',
+    frameElementRecord: reducerFrameElementE1(component),
+    sectionResolution: reducerSectionResolutionE1(),
+    materialResolution: reducerMaterialResolution(),
+    stressFactorSet: stressFactorSet(),
+  };
+}
+
 function b31Request(overrides = {}) {
   return {
     schema: B31_APPLICATION_REQUEST_SCHEMA,
@@ -207,29 +218,29 @@ function b31Request(overrides = {}) {
       {
         checkId: 'B31-SUS-RED-S1',
         category: 'SUSTAINED',
-        codePointId: 'RED-001.S1',
-        componentId: 'RED-001',
         combinationId: highCase.loadCaseId,
         actionSource: { kind: 'SINGLE_CASE', caseId: 'HIGH' },
-        frameElementRecord: reducerFrameElementE1(component),
-        sectionResolution: reducerSectionResolutionE1(),
-        materialResolution: reducerMaterialResolution(),
-        stressFactorSet: stressFactorSet(),
+        ...commonCodeCheck(),
         pressureStressContribution: pressureStressContribution(),
         coldTemperature: null,
         occasionalCategoryId: null,
       },
       {
+        checkId: 'B31-OCC-RED-S1',
+        category: 'OCCASIONAL',
+        combinationId: `${highCase.loadCaseId}-WIND_FIXTURE`,
+        actionSource: { kind: 'SINGLE_CASE', caseId: 'HIGH' },
+        ...commonCodeCheck(),
+        pressureStressContribution: pressureStressContribution(),
+        coldTemperature: null,
+        occasionalCategoryId: 'WIND_FIXTURE',
+      },
+      {
         checkId: 'B31-EXP-RED-S1',
         category: 'DISPLACEMENT_STRESS_RANGE',
-        codePointId: 'RED-001.S1',
-        componentId: 'RED-001',
         combinationId: 'RANGE-HIGH-MINUS-LOW',
         actionSource: { kind: 'CASE_RANGE', fromCaseId: 'LOW', toCaseId: 'HIGH' },
-        frameElementRecord: reducerFrameElementE1(component),
-        sectionResolution: reducerSectionResolutionE1(),
-        materialResolution: reducerMaterialResolution(),
-        stressFactorSet: stressFactorSet(),
+        ...commonCodeCheck(),
         pressureStressContribution: null,
         coldTemperature: {
           value: COLD_TEMPERATURE,
@@ -287,6 +298,12 @@ test('P4-NOZ-03', 'A nozzle profile not declared by the governed interface is re
   }), 'PIPING_NOZZLE_ALLOWABLE_PROFILE_MISMATCH');
 });
 
+test('P4-NOZ-04', 'A tampered nozzle evidence hash is rejected independently', () => {
+  const tampered = clone(nozzleAssessment);
+  tampered.evidenceHash = 'fnv1a64:0000000000000000';
+  expectCode(() => requireNozzleAllowableAssessment(tampered), 'PIPING_NOZZLE_ASSESSMENT_HASH_MISMATCH');
+});
+
 test('P4-B31-01', 'SUSTAINED B31.3 action is resolved from one sealed B-3.4 case, never caller-injected', () => {
   const entry = b31Application.results.find((row) => row.checkId === 'B31-SUS-RED-S1');
   assert.deepEqual(entry.sourceRecoveryHashes, [highAnalysis.recovery.semanticHash]);
@@ -294,7 +311,14 @@ test('P4-B31-01', 'SUSTAINED B31.3 action is resolved from one sealed B-3.4 case
   assert.equal(entry.codeResult.status, 'QUALIFIED UNDER CONFIGURED PROFILE');
 });
 
-test('P4-B31-02', 'Displacement stress range uses an explicit ordered recovery pair and excludes pressure', () => {
+test('P4-B31-02', 'OCCASIONAL is resolved from a sealed case and a declared duration category', () => {
+  const entry = b31Application.results.find((row) => row.checkId === 'B31-OCC-RED-S1');
+  assert.deepEqual(entry.sourceRecoveryHashes, [highAnalysis.recovery.semanticHash]);
+  assert.equal(entry.codeResult.category, 'OCCASIONAL');
+  assert.equal(entry.codeResult.status, 'QUALIFIED UNDER CONFIGURED PROFILE');
+});
+
+test('P4-B31-03', 'Displacement stress range uses an explicit ordered recovery pair and excludes pressure', () => {
   const entry = b31Application.results.find((row) => row.checkId === 'B31-EXP-RED-S1');
   assert.deepEqual(entry.sourceRecoveryHashes, [
     lowAnalysis.recovery.semanticHash,
@@ -304,37 +328,47 @@ test('P4-B31-02', 'Displacement stress range uses an explicit ordered recovery p
   assert.equal(entry.codeResult.stressTerms.pressure, 0);
 });
 
-test('P4-B31-03', 'OPERATING cannot be introduced as a compliance category', () => {
+test('P4-B31-04', 'OPERATING cannot be introduced as a compliance category', () => {
   const request = b31Request();
   request.checks[0] = { ...request.checks[0], category: 'OPERATING' };
   expectCode(() => compileLinearPipingB31Application(request), 'PIPING_B31_CATEGORY_UNSUPPORTED');
 });
 
-test('P4-B31-04', 'Caller localAction injection is rejected by the exact check schema', () => {
+test('P4-B31-05', 'Caller localAction injection is rejected by the exact check schema', () => {
   const request = b31Request();
-  request.checks[0] = { ...request.checks[0], localAction: { fx: 0, fy: 0, fz: 0, mx: 0, my: 0, mz: 0 } };
+  request.checks[0] = {
+    ...request.checks[0],
+    localAction: { fx: 0, fy: 0, fz: 0, mx: 0, my: 0, mz: 0 },
+  };
   assert.throws(() => compileLinearPipingB31Application(request));
 });
 
-test('P4-B31-05', 'A displacement range with identical endpoint cases is rejected', () => {
+test('P4-B31-06', 'A displacement range with identical endpoint cases is rejected', () => {
   const request = b31Request();
-  request.checks[1] = {
-    ...request.checks[1],
+  request.checks[2] = {
+    ...request.checks[2],
     actionSource: { kind: 'CASE_RANGE', fromCaseId: 'HIGH', toCaseId: 'HIGH' },
   };
   expectCode(() => compileLinearPipingB31Application(request), 'PIPING_B31_RANGE_CASES_IDENTICAL');
 });
 
-test('P4-B31-06', 'B31 application is deterministic and revalidates as a sealed record', () => {
-  const second = compileLinearPipingB31Application(b31Request({ cases: [...b31Request().cases].reverse() }));
+test('P4-B31-07', 'B31 application is deterministic and revalidates its evidence chain', () => {
+  const request = b31Request();
+  const second = compileLinearPipingB31Application({ ...request, cases: [...request.cases].reverse() });
   assert.equal(second.semanticHash, b31Application.semanticHash);
   assert.equal(requireLinearPipingB31Application(b31Application).semanticHash, b31Application.semanticHash);
+});
+
+test('P4-B31-08', 'A tampered retained recovery evidence hash is rejected', () => {
+  const tampered = clone(b31Application);
+  tampered.caseBindings[0].recoveryEvidenceHash = 'fnv1a64:0000000000000000';
+  expectCode(() => requireLinearPipingB31Application(tampered), 'PIPING_B31_APPLICATION_HASH_MISMATCH');
 });
 
 test('P4-APP-01', 'Combined application result seals analysis, interface, nozzle and B31 parent identities', () => {
   assert.equal(applicationResult.notConfigured.length, 0);
   assert.equal(applicationResult.assessmentSummary.nozzlePassCount, 1);
-  assert.equal(applicationResult.assessmentSummary.codeQualifiedCount, 2);
+  assert.equal(applicationResult.assessmentSummary.codeQualifiedCount, 3);
   assert.equal(applicationResult.status, 'CONDITIONAL');
   assert.equal(
     requireLinearPipingQualifiedApplicationResult(applicationResult).semanticHash,
@@ -354,6 +388,10 @@ test('P4-APP-02', 'Missing nozzle configuration remains explicit and makes the a
   });
   assert.deepEqual(result.notConfigured, ['NOZZLE_ALLOWABLE_NOT_CONFIGURED:IF-NOZZLE-RED-001']);
   assert.equal(result.status, 'CONDITIONAL');
+  assert.equal(
+    result.limitations.find((row) => row.sourceKind === 'APPLICATION_CONFIGURATION').sourceSemanticHash,
+    interfaceSet.semanticHash,
+  );
 });
 
 test('P4-APP-03', 'Tampered nozzle assessment identity is rejected before application sealing', () => {
@@ -368,6 +406,15 @@ test('P4-APP-03', 'Tampered nozzle assessment identity is rejected before applic
     nozzleAssessments: [tampered],
     b31Application,
   }), 'PIPING_NOZZLE_ASSESSMENT_HASH_MISMATCH');
+});
+
+test('P4-APP-04', 'Tampered application evidence is rejected independently', () => {
+  const tampered = clone(applicationResult);
+  tampered.analysisEvidenceHashes[0] = 'fnv1a64:0000000000000000';
+  expectCode(
+    () => requireLinearPipingQualifiedApplicationResult(tampered),
+    'PIPING_APPLICATION_RESULT_HASH_MISMATCH',
+  );
 });
 
 console.log('Linear piping Phase 4 code and allowable checks PASS');
