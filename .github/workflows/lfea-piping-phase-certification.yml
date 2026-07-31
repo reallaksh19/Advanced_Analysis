@@ -11,6 +11,7 @@ on:
       - 'reports/lfea-piping-phase2d-inputxml-context.json'
       - 'reports/lfea-piping-phase2e-multicase-application.json'
       - 'reports/lfea-piping-phase2f-unit-normalization.json'
+      - 'reports/lfea-piping-phase6b-external-evidence-package.json'
       - 'reports/lfea-piping-phase5b-workspace-integration.json'
       - 'docs/LFEA_PIPING_100_PERCENT_CLOSURE_POLICY.md'
       - 'docs/LFEA_PIPING_PHASE_STATUS.md'
@@ -33,6 +34,7 @@ on:
       - 'scripts/linear-piping-presentation-*.mjs'
       - 'scripts/linear-piping-workspace-integration-check.mjs'
       - 'scripts/linear-piping-project-qualification-*.mjs'
+      - 'scripts/linear-piping-external-evidence-package-check.mjs'
       - 'e2e/linear-piping-results-workspace.spec.js'
       - 'src/main.js'
       - 'src/core/linear-fea-model-compiler/**'
@@ -80,8 +82,11 @@ jobs:
         run: node scripts/lfea-piping-release-readiness-check.mjs
 
       - name: Validate Phase 6A qualification harness directly
+        run: node scripts/linear-piping-project-qualification-check.mjs
+
+      - name: Validate Phase 6B external evidence eligibility directly
         run: |
-          node scripts/linear-piping-project-qualification-check.mjs
+          node scripts/linear-piping-external-evidence-package-check.mjs
           node scripts/linear-piping-project-qualification-anti-drift-check.mjs
 
       - name: Validate phase-to-finding ledger

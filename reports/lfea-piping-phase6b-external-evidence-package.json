@@ -1,0 +1,60 @@
+{
+  "schema": "lfea-piping-phase-slice/v1",
+  "phaseId": "PHASE_6_PROJECT_QUALIFICATION",
+  "ownerFindingId": "AUD-A7-001",
+  "baseHead": "98dbfa72584a9e41bdd658e9c72234285f3b5f98",
+  "status": "UNRESOLVED_GATE",
+  "scope": [
+    "Preserve Phase 6A as a deterministic comparison kernel for independently supplied project and commercial reference values.",
+    "Seal external performance, rollback and signed release-review disposition records without executing commercial software or manufacturing evidence.",
+    "Bind passing G8 and G9 comparison records to one current application and presentation identity with complete selector coverage.",
+    "Require independent real-model and commercial authorities, exact-head performance evidence, successful rollback evidence and hash-bound artifact references.",
+    "Produce only ELIGIBLE_FOR_RELEASE_REVIEW status; never mutate the G8, G9 or G10 release ledger from code or simulated fixtures."
+  ],
+  "evidencePaths": [
+    "src/core/linear-piping-project-qualification/contracts.js",
+    "src/core/linear-piping-project-qualification/comparison.js",
+    "src/core/linear-piping-project-qualification/external-evidence-contracts.js",
+    "src/core/linear-piping-project-qualification/performance-evidence.js",
+    "src/core/linear-piping-project-qualification/rollback-evidence.js",
+    "src/core/linear-piping-project-qualification/external-evidence-package.js",
+    "src/core/linear-piping-project-qualification/index.js",
+    "scripts/linear-piping-project-qualification-check.mjs",
+    "scripts/linear-piping-external-evidence-package-check.mjs",
+    "scripts/linear-piping-project-qualification-anti-drift-check.mjs",
+    "docs/LFEA_PIPING_PHASE6_EVIDENCE_REQUIREMENTS.md",
+    ".github/workflows/lfea-piping-phase-certification.yml"
+  ],
+  "addressedAgainstSection9": {
+    "findingId": "AUD-A7-001",
+    "priorStatus": "UNRESOLVED_GATE",
+    "statusAfterCoding": "UNRESOLVED_GATE",
+    "addressed": [
+      "A complete fail-closed contract now exists for validating supplied G8, G9, performance, rollback and signed-disposition evidence as one current package.",
+      "Required interface, nozzle and B31.3 comparison categories are derived from the current presentation and cannot be silently omitted.",
+      "G8 and G9 authorities must be independently identified and cannot alias application or presentation evidence hashes.",
+      "Performance limits, deterministic replay, failure behavior, rollback commands, post-rollback checks and artifact references are independently revalidated."
+    ],
+    "notClosed": [
+      "No non-fictional project reconciliation or commercial corroboration artifact has been supplied.",
+      "No qualifying performance measurement, rollback rehearsal or signed program disposition has been supplied.",
+      "Successful exact-head Phase 6B, release-policy and full-gate command logs have not been retained.",
+      "The G8, G9 and G10 release-evidence gates and artifact paths remain unresolved and null."
+    ]
+  },
+  "explicitNonScope": [
+    "Executing a commercial pipe-stress program or parsing its proprietary output",
+    "Generating independent expected values from the application result",
+    "Creating or signing project, vendor, commercial, performance or rollback evidence",
+    "Changing G8, G9 or G10 to VERIFIED from a code-only pull request",
+    "Promoting the program disposition to QUALIFIED or release-ready"
+  ],
+  "remainingConditions": [
+    "Retain successful exact-head Phase 6B, release-policy and full-gate logs.",
+    "Supply complete non-fictional G8 and G9 records under independent authorities.",
+    "Supply performance evidence, successful rollback evidence and a signed release-review disposition.",
+    "Populate the release-evidence artifact paths and pass the release check at the exact candidate head."
+  ],
+  "releaseImpact": "NONE",
+  "programDisposition": "BLOCKED"
+}

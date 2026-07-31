@@ -34,3 +34,44 @@ export {
   qualificationSemanticProjection,
   requireLinearPipingQualificationComparison,
 } from './comparison.js';
+
+export {
+  ARTIFACT_REFERENCE_KEYS,
+  EVIDENCE_ARTIFACT_REFERENCE_SCHEMA,
+  PERFORMANCE_EVIDENCE_KEYS,
+  PERFORMANCE_EVIDENCE_SCHEMA,
+  RELEASE_REVIEW_DECISION,
+  RELEASE_REVIEW_DISPOSITION_KEYS,
+  RELEASE_REVIEW_DISPOSITION_SCHEMA,
+  REQUIRED_PERFORMANCE_STAGES,
+  ROLLBACK_EVIDENCE_KEYS,
+  ROLLBACK_EVIDENCE_SCHEMA,
+  canonicalArtifactReference,
+  requireExternalText,
+  requireHead,
+  requireReleaseReviewDisposition,
+  sealReleaseReviewDisposition,
+} from './external-evidence-contracts.js';
+
+export {
+  requirePerformanceEvidence,
+  sealPerformanceEvidence,
+} from './performance-evidence.js';
+
+export {
+  requireRollbackEvidence,
+  sealRollbackEvidence,
+} from './rollback-evidence.js';
+
+export {
+  EXTERNAL_ARTIFACT_MAP_KEYS,
+  EXTERNAL_PACKAGE_INPUT_KEYS,
+  EXTERNAL_PACKAGE_KEYS,
+  EXTERNAL_PACKAGE_STATUS,
+  EXTERNAL_QUALIFICATION_PACKAGE_REQUEST_SCHEMA,
+  EXTERNAL_QUALIFICATION_PACKAGE_SCHEMA,
+  compileLinearPipingExternalQualificationPackage,
+  computeExternalPackageEvidenceHash,
+  externalPackageSemanticProjection,
+  requireLinearPipingExternalQualificationPackage,
+} from './external-evidence-package.js';

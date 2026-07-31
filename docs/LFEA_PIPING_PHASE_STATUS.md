@@ -1,6 +1,6 @@
 # LFEA Piping Phase Status
 
-Exact Phase 2F development base: `main` at `c4998c3902235e45dc98d29d95d83f0a0a0325fd`.
+Exact Phase 6B development base: `main` at `98dbfa72584a9e41bdd658e9c72234285f3b5f98`.
 
 Program disposition: `BLOCKED`.
 
@@ -36,21 +36,28 @@ Program disposition: `BLOCKED`.
 - Render and export operations revalidate the current application semantic and evidence identities; a previously valid presentation is rejected after an application change.
 - Conditional current results remain reviewable in audit evidence but cannot produce engineering issue CSVs.
 - Phase 6A provides a deterministic comparison harness for independently supplied project and commercial reference values; its committed fixtures remain explicitly ineligible as project evidence.
+- Phase 6B seals externally supplied performance, rollback and signed release-review disposition records, then binds them to passing G8 and G9 comparison records for the current application and presentation.
+- Phase 6B derives required comparison categories from the current presentation, requiring interface force and reference moment, nozzle utilization and B31.3 stress/utilization where those result families are present.
+- Phase 6B requires independent G8 and G9 authority identities, exact-head performance within a declared envelope, deterministic replay, failure-behavior evidence, successful rollback, preserved project data and hash-bound artifact references.
+- Phase 6B produces only `ELIGIBLE_FOR_RELEASE_REVIEW`; it does not execute external programs, populate release-evidence paths, sign a disposition or promote G8, G9 or G10.
+- The Section 9 ledger now contains the previously missing `PHASE_6_PROJECT_QUALIFICATION` owner phase for `AUD-A7-001`; the finding remains `UNRESOLVED_GATE`.
 - `check:linear-piping-analysis-consumer`, `check:lfea-interfaces`, `check:lfea-code-application` and `check:lfea-presentation-export` are registered inside `check:lfea-core`.
 - Phases 2B, 2C, 2D, 2E and 2F run under `check:linear-piping-analysis-consumer`; Phase 5B runs under `check:lfea-presentation-export` with a separate browser contract.
+- Phase 6A and Phase 6B simulated checks run through the fail-closed release-policy gate but remain ineligible as project evidence.
 - Release readiness remains fail closed through the Section 9 findings ledger and G0-G10 release-evidence ledger.
 
 ## Still open
 
 - Exact-head CI evidence remains unresolved while repository Actions jobs fail before exposing executable steps or retained logs.
-- Successful exact-head B-2.5, Phase 2D, Phase 2E, Phase 2F, consumer, core and full-gate command evidence has not been retained.
+- Successful exact-head B-2.5, Phase 2D, Phase 2E, Phase 2F, Phase 6B, consumer, core, release-policy and full-gate command evidence has not been retained.
 - Phase 2E and Phase 2F provide the bounded multicase orchestration and governed length-normalization APIs, but a real project package still requires caller-approved unit basis, B-2.2 material resolutions, B-2.3 section resolutions, B-2.4 axes, constraints, B-3.0 loads, interface definitions, nozzle allowable profiles and B31.3 datasets/checks.
 - InputXML request v1 remains metre-only by contract; request v2 performs only explicitly authorized length normalization and does not infer source units.
-- Real-model reconciliation and commercial corroboration have not been supplied.
-- Performance qualification and rollback rehearsal remain unresolved.
+- No complete non-fictional real-model reconciliation or independent commercial corroboration artifact has been supplied.
+- No qualifying performance record, rollback rehearsal record or signed release-review disposition has been supplied.
+- G8, G9 and G10 remain `UNRESOLVED_GATE`; their release-evidence artifact paths remain null.
 - Real ASME B31.3/B31J datasets and equipment/nozzle allowable profiles remain caller-supplied project authorities; no licensed or vendor numerical tables are embedded in source.
 - Nonlinear gap, lift-off, contact and friction behavior remains outside the linear release.
 
 ## Release rule
 
-No downstream phase may change `programDisposition` to `QUALIFIED` until every gate in `release-evidence/lfea-piping-release-evidence.json` is `VERIFIED`, every required artifact path is populated, `npm run check:lfea-piping-release` passes at the exact release head, and project reconciliation evidence is retained.
+No downstream phase may change `programDisposition` to `QUALIFIED` until every gate in `release-evidence/lfea-piping-release-evidence.json` is `VERIFIED`, every required artifact path is populated, the Phase 6B package revalidates as `ELIGIBLE_FOR_RELEASE_REVIEW`, `npm run check:lfea-piping-release` passes at the exact release head, and project reconciliation evidence is retained.

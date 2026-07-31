@@ -221,6 +221,37 @@
         "AUD-A6-001"
       ],
       "completedAtUtc": null
+    },
+    {
+      "phaseId": "PHASE_6_PROJECT_QUALIFICATION",
+      "title": "External reconciliation, performance and rollback evidence eligibility",
+      "status": "UNRESOLVED_GATE",
+      "scope": [
+        "Compare current application values against independently supplied real-model and commercial authorities through the Phase 6A comparison kernel.",
+        "Validate complete selector coverage for current interface, nozzle and B31.3 presentation quantities.",
+        "Seal exact-head performance, deterministic replay, failure-behavior, rollback and signed release-review disposition records.",
+        "Require independent G8 and G9 authorities and hash-bound artifact references without executing external programs or manufacturing evidence.",
+        "Produce only ELIGIBLE_FOR_RELEASE_REVIEW status and keep G8, G9 and G10 unresolved until real artifacts are supplied."
+      ],
+      "evidencePaths": [
+        "src/core/linear-piping-project-qualification/contracts.js",
+        "src/core/linear-piping-project-qualification/comparison.js",
+        "src/core/linear-piping-project-qualification/external-evidence-contracts.js",
+        "src/core/linear-piping-project-qualification/performance-evidence.js",
+        "src/core/linear-piping-project-qualification/rollback-evidence.js",
+        "src/core/linear-piping-project-qualification/external-evidence-package.js",
+        "src/core/linear-piping-project-qualification/index.js",
+        "scripts/linear-piping-project-qualification-check.mjs",
+        "scripts/linear-piping-external-evidence-package-check.mjs",
+        "scripts/linear-piping-project-qualification-anti-drift-check.mjs",
+        "reports/lfea-piping-phase6b-external-evidence-package.json",
+        "docs/LFEA_PIPING_PHASE6_EVIDENCE_REQUIREMENTS.md",
+        ".github/workflows/lfea-piping-phase-certification.yml"
+      ],
+      "addressedFindingIds": [
+        "AUD-A7-001"
+      ],
+      "completedAtUtc": null
     }
   ],
   "findings": [
@@ -357,9 +388,22 @@
       "currentStatus": "UNRESOLVED_GATE",
       "ownerPhase": "PHASE_6_PROJECT_QUALIFICATION",
       "evidencePaths": [
-        "release-evidence/lfea-piping-release-evidence.json"
+        "src/core/linear-piping-project-qualification/contracts.js",
+        "src/core/linear-piping-project-qualification/comparison.js",
+        "src/core/linear-piping-project-qualification/external-evidence-contracts.js",
+        "src/core/linear-piping-project-qualification/performance-evidence.js",
+        "src/core/linear-piping-project-qualification/rollback-evidence.js",
+        "src/core/linear-piping-project-qualification/external-evidence-package.js",
+        "src/core/linear-piping-project-qualification/index.js",
+        "scripts/linear-piping-project-qualification-check.mjs",
+        "scripts/linear-piping-external-evidence-package-check.mjs",
+        "scripts/linear-piping-project-qualification-anti-drift-check.mjs",
+        "reports/lfea-piping-phase6b-external-evidence-package.json",
+        "docs/LFEA_PIPING_PHASE6_EVIDENCE_REQUIREMENTS.md",
+        "release-evidence/lfea-piping-release-evidence.json",
+        ".github/workflows/lfea-piping-phase-certification.yml"
       ],
-      "remainingCondition": "Reconcile a real imported model, corroborate selected results, qualify performance, retain exact-head CI evidence and rehearse rollback."
+      "remainingCondition": "Supply complete non-fictional real-model reconciliation, independent commercial corroboration, performance evidence, rollback evidence and signed disposition; populate G8, G9 and G10 artifact paths and retain successful exact-head CI and full-gate evidence."
     },
     {
       "findingId": "AUD-DOC-001",
