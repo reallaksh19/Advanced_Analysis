@@ -51,6 +51,22 @@ export {
   lafeaDocumentDigest,
 } from './lafea-edit-command.js';
 export {
+  LAFEA_ARTIFACT_KINDS,
+  LAFEA_ARTIFACT_RECORD_SCHEMA,
+  LAFEA_ARTIFACT_STATUSES,
+  LAFEA_ARTIFACT_REGISTRATION_SCHEMA,
+  LAFEA_LIFECYCLE_CHANGE_CLASSES,
+  LAFEA_LIFECYCLE_EVENT_SCHEMA,
+  LAFEA_LIFECYCLE_SCHEMA,
+  LAFEA_QUALIFICATION_STATES,
+  applyLafeaLifecycleEvent,
+  createLafeaArtifactRecord,
+  createLafeaLifecycle,
+  createLafeaLifecycleEvent,
+  lafeaLifecycleReadiness,
+  registerLafeaArtifact,
+} from './lafea-lifecycle.js';
+export {
   LAFEA_WORKBENCH_DOCUMENT_SCHEMA,
   executeLafeaStage,
   lafeaCollectionPaths,
