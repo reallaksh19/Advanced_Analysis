@@ -181,7 +181,7 @@ export function requireFinite(value, field) {
   return Object.is(value, -0) ? 0 : value;
 }
 
-export function failInputXml(message, code, evidence = null) {
+export function failInputXml(message, code, evidence) {
   failLinearPipingAnalysis(message, code, evidence);
 }
 
