@@ -16,9 +16,9 @@ const packageValue = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
 
 assert.ok(orchestrator.split(/\r?\n/u).length < 400, 'Phase 6E orchestrator limit is <400 lines.');
 assert.ok(wrapper.split(/\r?\n/u).length < 80, 'Release wrapper limit is <80 lines.');
-assert.match(orchestrator, /--evidence-root/u);
-assert.match(orchestrator, /--expected-head/u);
-assert.match(orchestrator, /--manifest/u);
+assert.match(orchestrator, /['"]evidence-root['"]/u);
+assert.match(orchestrator, /['"]expected-head['"]/u);
+assert.match(orchestrator, /['"]manifest['"]/u);
 assert.match(orchestrator, /LFEA_RELEASE_RUNTIME_OPTIONS_MISSING/u);
 assert.match(orchestrator, /LFEA_RELEASE_CHECKOUT_HEAD_MISMATCH/u);
 assert.match(orchestrator, /PERSISTED_RELEASE_EVIDENCE/u);
