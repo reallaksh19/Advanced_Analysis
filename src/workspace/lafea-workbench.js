@@ -73,6 +73,16 @@ export {
   createLafeaWorkbenchStore,
 } from './lafea-lifecycle-workbench-store.js';
 export {
+  LAFEA_SOURCE_PRIMITIVE_KINDS,
+  LAFEA_SOURCE_PRIMITIVE_SCHEMA,
+  LAFEA_SOURCE_RENDER_REQUEST_SCHEMA,
+  createLafeaSourceEngineeringScene,
+  createLafeaSourceRenderRequest,
+  createLafeaSourceViewportState,
+  validateSourceScene,
+  validateSourceViewport,
+} from './lafea-engineering-scene.js';
+export {
   LAFEA_WORKBENCH_DOCUMENT_SCHEMA,
   executeLafeaStage,
   lafeaCollectionPaths,
