@@ -1,0 +1,37 @@
+{
+  "schema": "lfea-piping-phase-slice/v1",
+  "phaseId": "PHASE_2D_INPUTXML_QUALIFIED_CONTEXT",
+  "ownerFindingId": "AUD-A3-001",
+  "baseHead": "7fad71186b92e27ccc24bf1e37239dec688166d5",
+  "status": "PARTIALLY_VERIFIED",
+  "scope": [
+    "Seal the exact InputXML source authority, recomputed conditioned-topology identity, ingestion evidence and retained Phase 2C source-analysis context in linear-piping-inputxml-analysis-context/v1.",
+    "Parse and condition the raw source exactly once through the existing Phase 2B gateway.",
+    "Compile the bound B-2.5/B-3.0/T0 context through the existing Phase 2C authority.",
+    "Preserve the existing linear-piping-inputxml-analysis-result/v1 result-only behavior.",
+    "Allow Phase 3 to consume the retained compilation, load case and T0 result directly from the InputXML provenance context.",
+    "Separate engineering semantic identity from raw-content and runtime/factorization evidence."
+  ],
+  "evidencePaths": [
+    "src/core/linear-piping-analysis-consumer/inputxml-analysis-context.js",
+    "src/core/linear-piping-analysis-consumer/inputxml-source-binding.js",
+    "src/core/linear-piping-analysis-consumer/index.js",
+    "scripts/linear-piping-inputxml-analysis-context-check.mjs",
+    "scripts/linear-piping-analysis-consumer-anti-drift-check.mjs",
+    ".github/workflows/lfea-piping-phase-certification.yml"
+  ],
+  "explicitNonScope": [
+    "Unit conversion",
+    "Engineering-property inference",
+    "Constraint, load, interface, nozzle or B31.3 authority creation",
+    "Multi-case application orchestration",
+    "Presentation or workspace rendering",
+    "Project reconciliation or release qualification"
+  ],
+  "remainingConditions": [
+    "Add a complete multi-case application orchestrator consuming retained InputXML contexts plus separately supplied Phase 3 and Phase 4 authorities.",
+    "Retain successful exact-head Phase 2D, consumer, core and full-gate logs.",
+    "Supply non-fictional project reconciliation, commercial corroboration, performance and rollback evidence."
+  ],
+  "releaseImpact": "NONE"
+}
