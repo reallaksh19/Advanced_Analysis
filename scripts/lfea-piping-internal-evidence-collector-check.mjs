@@ -69,9 +69,25 @@ function ledger() {
   return JSON.parse(fs.readFileSync('release-evidence/lfea-piping-release-evidence.json', 'utf8'));
 }
 
+function emitSimulatedBaseline(entry) {
+  if (entry.commandId !== 'EXACT_HEAD_BASELINE') return;
+  const emitArgument = entry.args.find((argument) => argument.startsWith('--emit='));
+  assert.ok(emitArgument, 'EXACT_HEAD_BASELINE requires --emit');
+  const emitPath = emitArgument.slice('--emit='.length);
+  fs.mkdirSync(path.dirname(emitPath), { recursive: true });
+  fs.writeFileSync(emitPath, `${JSON.stringify({
+    schema: 'lfea-piping-audit-baseline-runtime/v1',
+    repository: 'reallaksh19/Advanced_Analysis',
+    exactHeadCommit: EXACT_HEAD,
+    checkout: { clean: true },
+    evidenceStatus: 'EXACT_HEAD_BASELINE_CAPTURED',
+  }, null, 2)}\n`, 'utf8');
+}
+
 function successfulRunner(calls = []) {
   return (entry) => {
     calls.push(entry.commandId);
+    emitSimulatedBaseline(entry);
     return {
       exitCode: 0,
       stdout: `${entry.commandId} completed successfully\n`,
@@ -138,6 +154,7 @@ test('P6F-COLLECT-03', 'Successful collection seals a Phase 6D-valid manifest', 
     assert.equal(result.status, 'PASS');
     assert.equal(result.commandCount, 10);
     assert.equal(result.artifactCount, 7);
+    assert.match(result.auditBaselineContentHash, /^fnv1a64:[0-9a-f]{16}$/u);
     assert.deepEqual(calls, COMMAND_IDS);
     const manifest = JSON.parse(fs.readFileSync(
       path.join(outputRoot, 'internal/exact-head-manifest.json'),
@@ -152,6 +169,11 @@ test('P6F-COLLECT-03', 'Successful collection seals a Phase 6D-valid manifest', 
     assert.equal(intake.status, 'ELIGIBLE_FOR_RELEASE_REVIEW');
     assert.equal(intake.releaseEligible, true);
     assert.equal(intake.exactHead, EXACT_HEAD);
+    const upstream = fs.readFileSync(
+      path.join(outputRoot, 'internal/upstream-gate.log'),
+      'utf8',
+    );
+    assert.match(upstream, /auditBaselineContentHash=fnv1a64:[0-9a-f]{16}/u);
   } finally {
     fs.rmSync(outputRoot, { recursive: true, force: true });
   }
@@ -179,11 +201,14 @@ test('P6F-COLLECT-05', 'A failed command writes failure evidence and never seals
   try {
     expectCode(
       () => collectInternalEvidence(collectorOptions(outputRoot, {
-        runner: (entry) => ({
-          exitCode: entry.commandId === 'CODE_AND_ALLOWABLES' ? 7 : 0,
-          stdout: `${entry.commandId} output\n`,
-          stderr: entry.commandId === 'CODE_AND_ALLOWABLES' ? 'qualification failed\n' : '',
-        }),
+        runner: (entry) => {
+          emitSimulatedBaseline(entry);
+          return {
+            exitCode: entry.commandId === 'CODE_AND_ALLOWABLES' ? 7 : 0,
+            stdout: `${entry.commandId} output\n`,
+            stderr: entry.commandId === 'CODE_AND_ALLOWABLES' ? 'qualification failed\n' : '',
+          };
+        },
       })),
       'LFEA_INTERNAL_COLLECTION_COMMAND_FAILED',
     );
@@ -197,7 +222,26 @@ test('P6F-COLLECT-05', 'A failed command writes failure evidence and never seals
   }
 });
 
-test('P6F-COLLECT-06', 'Collector never deletes or overwrites a non-empty output directory', () => {
+test('P6F-COLLECT-06', 'A zero exit without an emitted A0 baseline is rejected', () => {
+  const outputRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'lfea-phase6f-baseline-'));
+  try {
+    expectCode(
+      () => collectInternalEvidence(collectorOptions(outputRoot, {
+        runner: (entry) => ({
+          exitCode: 0,
+          stdout: `${entry.commandId} completed successfully\n`,
+          stderr: '',
+        }),
+      })),
+      'LFEA_INTERNAL_COLLECTION_BASELINE_MISSING',
+    );
+    assert.equal(fs.existsSync(path.join(outputRoot, ARTIFACT_PATHS.exactHeadManifest)), false);
+  } finally {
+    fs.rmSync(outputRoot, { recursive: true, force: true });
+  }
+});
+
+test('P6F-COLLECT-07', 'Collector never deletes or overwrites a non-empty output directory', () => {
   const outputRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'lfea-phase6f-nondestructive-'));
   const sentinelPath = path.join(outputRoot, 'sentinel.txt');
   fs.writeFileSync(sentinelPath, 'retain me', 'utf8');
@@ -212,7 +256,7 @@ test('P6F-COLLECT-06', 'Collector never deletes or overwrites a non-empty output
   }
 });
 
-test('P6F-COLLECT-07', 'Evidence output is prohibited inside the repository', () => {
+test('P6F-COLLECT-08', 'Evidence output is prohibited inside the repository', () => {
   expectCode(
     () => collectInternalEvidence(collectorOptions(
       path.join(process.cwd(), 'temporary-internal-evidence'),
@@ -221,7 +265,7 @@ test('P6F-COLLECT-07', 'Evidence output is prohibited inside the repository', ()
   );
 });
 
-test('P6F-COLLECT-08', 'Manifest identity is independent of runner-temporary output paths', () => {
+test('P6F-COLLECT-09', 'Manifest identity is independent of runner-temporary output paths', () => {
   const leftRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'lfea-phase6f-left-'));
   const rightRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'lfea-phase6f-right-'));
   try {
@@ -235,7 +279,7 @@ test('P6F-COLLECT-08', 'Manifest identity is independent of runner-temporary out
   }
 });
 
-test('P6F-COLLECT-09', 'Collected phase evidence retains real command output and hashes', () => {
+test('P6F-COLLECT-10', 'Collected phase evidence retains real command output and hashes', () => {
   const outputRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'lfea-phase6f-output-'));
   try {
     collectInternalEvidence(collectorOptions(outputRoot));
@@ -253,7 +297,7 @@ test('P6F-COLLECT-09', 'Collected phase evidence retains real command output and
   }
 });
 
-test('P6F-COLLECT-10', 'Committed release template remains blocked and unpopulated', () => {
+test('P6F-COLLECT-11', 'Committed release template remains blocked and unpopulated', () => {
   const value = ledger();
   assert.equal(value.programDisposition, 'BLOCKED');
   assert.equal(value.exactHead, null);
