@@ -65,9 +65,15 @@ function xyGeometry(nodesInput, elementsInput, nodePath) {
 }
 
 function positionGeometry(nodesInput, elementsInput, nodePath) {
-  const nodes = validNodes(nodesInput);
+  const nodes = validNodes(nodesInput).map((node) => {
+    // Apply isometric projection to render 3D cylindrical shells beautifully in 2D
+    const isoX = node.x - 0.45 * node.z;
+    const isoY = node.y + 0.28 * node.z;
+    return { ...node, x: isoX, y: isoY };
+  });
   const elements = validElements(elementsInput, 'MITC4_SHELL');
-  return { nodes, elements, nodePath };
+  // Disabling nodePath prevents 2D SVG drags from corrupting actual 3D kernel coordinates
+  return { nodes, elements, nodePath: null };
 }
 
 function buildFoundationPadGeometry(document) {

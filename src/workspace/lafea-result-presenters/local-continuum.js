@@ -26,52 +26,85 @@ const INTEGRATION_POINT_LAYER = 'INTEGRATION_POINT';
 export function presentLocalContinuum(result, units) {
   const stress = requiredUnit(units, 'stress');
   const length = requiredUnit(units, 'length');
-  const rows = [];
+  const stressRows = [];
+  const dispRows = [];
+  let maxStress = -Infinity;
+  let maxLoc = '';
+  let maxCase = '';
+
   for (const [caseIndex, loadCase] of (result.loadCaseResults ?? []).entries()) {
-    for (const [index, record] of loadCase.elementResults.entries()) {
-      rows.push(...elementStressRows(record, loadCase, caseIndex, index, stress));
+    const caseName = loadCase.loadCaseId || `Case #${caseIndex + 1}`;
+    for (const [index, record] of (loadCase.elementResults ?? []).entries()) {
+      if (record.recoveryLayer === INTEGRATION_POINT_LAYER && record.gaussPointResults) {
+        record.gaussPointResults.forEach((point, pointIndex) => {
+          if (point.vonMises > maxStress) {
+            maxStress = point.vonMises;
+            maxLoc = `Element ${record.elementId} (${point.pointId})`;
+            maxCase = caseName;
+          }
+          stressRows.push(presenterRow(
+            `${caseName} · Element ${record.elementId} · ${point.pointId} · Von Mises Equivalent Stress (σvm)`,
+            point.vonMises,
+            stress,
+            formulaId(record),
+            `Load Case ${caseName} · Element ${record.elementId} · ${point.pointId} · Von Mises Stress (σvm)`,
+          ));
+        });
+      } else {
+        if (record.vonMises > maxStress) {
+          maxStress = record.vonMises;
+          maxLoc = `Element ${record.elementId}`;
+          maxCase = caseName;
+        }
+        stressRows.push(presenterRow(
+          `${caseName} · Element ${record.elementId} · Von Mises Equivalent Stress (σvm)`,
+          record.vonMises,
+          stress,
+          formulaId(record),
+          `Load Case ${caseName} · Element ${record.elementId} · Von Mises Stress (σvm)`,
+        ));
+      }
     }
-    for (const [index, record] of loadCase.nodalDisplacements.entries()) {
-      rows.push(
+
+    for (const [index, record] of (loadCase.nodalDisplacements ?? []).entries()) {
+      dispRows.push(
         presenterRow(
-          `${loadCase.loadCaseId} ${record.nodeId} UX`,
+          `${caseName} · Node ${record.nodeId} · Radial / X-Direction Displacement (UX)`,
           record.ux,
           length,
           formulaId(loadCase),
-          `result.loadCaseResults[${caseIndex}].nodalDisplacements[${index}].ux`,
+          `Load Case ${caseName} · Node ${record.nodeId} · Radial Displacement UX`,
         ),
         presenterRow(
-          `${loadCase.loadCaseId} ${record.nodeId} UY`,
+          `${caseName} · Node ${record.nodeId} · Axial / Y-Direction Displacement (UY)`,
           record.uy,
           length,
           formulaId(loadCase),
-          `result.loadCaseResults[${caseIndex}].nodalDisplacements[${index}].uy`,
+          `Load Case ${caseName} · Node ${record.nodeId} · Axial Displacement UY`,
         ),
       );
     }
   }
-  return presenterResult(result, [{
-    title: 'Authoritative raw element/integration-point stress and nodal displacement',
-    rows,
-  }], null);
+
+  const governing = maxStress > -Infinity
+    ? {
+      label: 'Governing 2D Continuum Gauss Point Von Mises Stress Intensity',
+      value: maxStress,
+      unit: stress,
+      locationId: maxLoc,
+      sourcePath: `Load Case ${maxCase} · ${maxLoc} · Von Mises Stress (σvm max)`,
+    }
+    : null;
+
+  return presenterResult(result, [
+    {
+      title: '2D Pipe-Pad Continuum Element & Gauss Integration-Point Stress',
+      rows: stressRows,
+    },
+    {
+      title: '2D Continuum Node Deformation & Translational Displacements',
+      rows: dispRows,
+    },
+  ], governing);
 }
 
-function elementStressRows(record, loadCase, caseIndex, index, stress) {
-  const base = `result.loadCaseResults[${caseIndex}].elementResults[${index}]`;
-  if (record.recoveryLayer === INTEGRATION_POINT_LAYER) {
-    return record.gaussPointResults.map((point, pointIndex) => presenterRow(
-      `${loadCase.loadCaseId} ${record.elementId} ${point.pointId} von Mises`,
-      point.vonMises,
-      stress,
-      formulaId(record),
-      `${base}.gaussPointResults[${pointIndex}].vonMises`,
-    ));
-  }
-  return [presenterRow(
-    `${loadCase.loadCaseId} ${record.elementId} von Mises`,
-    record.vonMises,
-    stress,
-    formulaId(record),
-    `${base}.vonMises`,
-  )];
-}

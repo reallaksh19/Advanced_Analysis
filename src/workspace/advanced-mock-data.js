@@ -7,8 +7,9 @@
  */
 import { sourceFixture as lafea1Source } from '../../scripts/lafea.1-fixtures.mjs';
 import { screeningRequestFixture as lafea2Source } from '../../scripts/lafea.2-fixtures.mjs';
-import { triangleSource as lafea3Source } from '../../scripts/lafea.3-fixtures.mjs';
-import { triangleSource as lafea4Source } from '../../scripts/lafea.4-fixtures.mjs';
+import { pipePadContinuumSource as lafea3Source } from '../../scripts/lafea.3-fixtures.mjs';
+import { cylindricalSource } from '../../scripts/lafea.4-fixtures.mjs';
+const lafea4Source = () => cylindricalSource(12, { override: { modelIdentity: 'CYLINDRICAL_PIPE_SHELL_BENCHMARK' } });
 import { workflowSource as lafea5Source } from '../../scripts/lafea.5-fixtures.mjs';
 import { rectangularQ4Package } from '../../scripts/lfea-005-fixtures.mjs';
 import { lafeaPreviewGeometry } from './lafea-stage-preview.js';
@@ -31,12 +32,26 @@ function lafea6Source() {
       { nodeId: 'W6', x: 425, y: 390 },
       { nodeId: 'W7', x: 425, y: 450 },
       { nodeId: 'W8', x: 175, y: 450 },
+      { nodeId: 'W9', x: 175, y: 390 },
+      { nodeId: 'W10', x: 270, y: 390 },
+      { nodeId: 'W11', x: 270, y: 210 },
+      { nodeId: 'W12', x: 175, y: 210 },
       { nodeId: 'CENTROID', x: 300, y: 300 },
       { nodeId: 'LEVER-LOAD-P', x: 750, y: 100 },
     ],
     elements: [
-      { elementId: 'WELD-TOE-TOP', nodes: ['W1', 'W2'], type: 'FILLET_WELD' },
-      { elementId: 'WELD-TOE-BOT', nodes: ['W8', 'W7'], type: 'FILLET_WELD' },
+      { elementId: 'WELD-1', nodes: ['W1', 'W2'], type: 'FILLET_WELD' },
+      { elementId: 'WELD-2', nodes: ['W2', 'W3'], type: 'FILLET_WELD' },
+      { elementId: 'WELD-3', nodes: ['W3', 'W4'], type: 'FILLET_WELD' },
+      { elementId: 'WELD-4', nodes: ['W4', 'W5'], type: 'FILLET_WELD' },
+      { elementId: 'WELD-5', nodes: ['W5', 'W6'], type: 'FILLET_WELD' },
+      { elementId: 'WELD-6', nodes: ['W6', 'W7'], type: 'FILLET_WELD' },
+      { elementId: 'WELD-7', nodes: ['W7', 'W8'], type: 'FILLET_WELD' },
+      { elementId: 'WELD-8', nodes: ['W8', 'W9'], type: 'FILLET_WELD' },
+      { elementId: 'WELD-9', nodes: ['W9', 'W10'], type: 'FILLET_WELD' },
+      { elementId: 'WELD-10', nodes: ['W10', 'W11'], type: 'FILLET_WELD' },
+      { elementId: 'WELD-11', nodes: ['W11', 'W12'], type: 'FILLET_WELD' },
+      { elementId: 'WELD-12', nodes: ['W12', 'W1'], type: 'FILLET_WELD' },
       { elementId: 'ARM-X', nodes: ['CENTROID', 'LEVER-LOAD-P'], type: 'LEVER_ARM_X' },
     ],
   };

@@ -10,22 +10,40 @@ import {
 export function presentTrunnionFootprint(result, units) {
   const stress = requiredUnit(units, 'stress');
   const rows = [];
-  for (const [regionIndex, region] of
-    (result.assessmentRegionResults ?? []).entries()) {
+  let maxStress = -Infinity;
+  let maxLoc = '';
+  let maxCase = '';
+
+  for (const [regionIndex, region] of (result.assessmentRegionResults ?? []).entries()) {
+    const caseName = region.loadCaseId || `Case #${regionIndex + 1}`;
     for (const [recordIndex, record] of region.records.entries()) {
+      if (record.vonMises > maxStress) {
+        maxStress = record.vonMises;
+        maxLoc = `Region ${region.regionId} · Element ${record.elementId} (${record.integrationPointId}, ${record.surface})`;
+        maxCase = caseName;
+      }
       rows.push(presenterRow(
-        `${region.loadCaseId} ${region.regionId} ${record.elementId} `
-          + `${record.integrationPointId} ${record.surface}`,
+        `${caseName} · Region ${region.regionId} · Element ${record.elementId} · ${record.integrationPointId} · ${record.surface} · Von Mises Equivalent Stress (σvm)`,
         record.vonMises,
         stress,
         null,
-        `result.assessmentRegionResults[${regionIndex}]`
-          + `.records[${recordIndex}].vonMises`,
+        `Load Case ${caseName} · Region ${region.regionId} · Element ${record.elementId} · ${record.integrationPointId} · ${record.surface} · Von Mises Stress (σvm)`,
       ));
     }
   }
+
+  const governing = maxStress > -Infinity
+    ? {
+      label: 'Governing Trunnion Footprint Local Surface Stress Intensity',
+      value: maxStress,
+      unit: stress,
+      locationId: maxLoc,
+      sourcePath: `Load Case ${maxCase} · ${maxLoc} · Von Mises Stress (σvm max)`,
+    }
+    : null;
+
   return presenterResult(result, [{
-    title: 'Raw shell footprint stress by assessment region',
+    title: 'Trunnion Footprint & Assessment Region Local Surface Stress',
     rows,
-  }], null);
+  }], governing);
 }
