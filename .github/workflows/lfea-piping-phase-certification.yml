@@ -10,6 +10,7 @@ on:
       - 'reports/lfea-piping-phase2c-analysis-context.json'
       - 'reports/lfea-piping-phase2d-inputxml-context.json'
       - 'reports/lfea-piping-phase2e-multicase-application.json'
+      - 'reports/lfea-piping-phase2f-unit-normalization.json'
       - 'reports/lfea-piping-phase5b-workspace-integration.json'
       - 'docs/LFEA_PIPING_100_PERCENT_CLOSURE_POLICY.md'
       - 'docs/LFEA_PIPING_PHASE_STATUS.md'
@@ -22,6 +23,7 @@ on:
       - 'scripts/lfea-b2.5-*.mjs'
       - 'scripts/linear-piping-analysis-consumer-*.mjs'
       - 'scripts/linear-piping-inputxml-source-binding-check.mjs'
+      - 'scripts/linear-piping-inputxml-unit-normalization-check.mjs'
       - 'scripts/linear-piping-source-analysis-context-check.mjs'
       - 'scripts/linear-piping-inputxml-analysis-context-check.mjs'
       - 'scripts/linear-piping-multicase-application-*.mjs'
@@ -99,6 +101,9 @@ jobs:
 
       - name: Verify InputXML source and topology binding directly
         run: node scripts/linear-piping-inputxml-source-binding-check.mjs
+
+      - name: Verify governed InputXML length normalization directly
+        run: node scripts/linear-piping-inputxml-unit-normalization-check.mjs
 
       - name: Verify retained B-2.5 B-3.0 T0 context directly
         run: node scripts/linear-piping-source-analysis-context-check.mjs

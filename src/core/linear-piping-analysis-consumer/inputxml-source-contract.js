@@ -6,6 +6,8 @@ import { failLinearPipingAnalysis } from './validation.js';
 export const LINEAR_PIPING_INPUTXML_SOURCE_SCHEMA = 'linear-piping-inputxml-source/v1';
 export const LINEAR_PIPING_INPUTXML_ANALYSIS_REQUEST_SCHEMA =
   'linear-piping-inputxml-analysis-request/v1';
+export const LINEAR_PIPING_INPUTXML_ANALYSIS_REQUEST_V2_SCHEMA =
+  'linear-piping-inputxml-analysis-request/v2';
 export const LINEAR_PIPING_INPUTXML_ANALYSIS_RESULT_SCHEMA =
   'linear-piping-inputxml-analysis-result/v1';
 
@@ -15,6 +17,10 @@ export const INPUTXML_SOURCE_KEYS = Object.freeze([
 ]);
 export const INPUTXML_INGESTION_KEYS = Object.freeze([
   'unit', 'source', 'componentOrigins', 'restraintTypeCodeMap', 'bendRadiusTolerance',
+]);
+export const INPUTXML_INGESTION_V2_KEYS = Object.freeze([
+  ...INPUTXML_INGESTION_KEYS,
+  'unitNormalizationProfile',
 ]);
 export const INPUTXML_CONDITIONING_KEYS = Object.freeze([
   'requiredAttachmentPoints', 'profile',

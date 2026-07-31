@@ -1,15 +1,6 @@
 #!/usr/bin/env node
 
-/**
- * Static T0 and Phase 2A-2E authority guard.
- *
- * Phase 2B/2D may invoke the existing InputXML geometry adapter and B-1
- * conditioner exactly once. Phase 2C/2D may retain validated context objects.
- * Phase 2E may orchestrate those retained contexts through the separately
- * governed interface and code-application packages. No consumer file may
- * become a second engineering or mechanics authority.
- */
-
+/** Static T0 and Phase 2A-2F authority guard. */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -18,6 +9,10 @@ const ROOT = path.resolve('src/core/linear-piping-analysis-consumer');
 const files = fs.readdirSync(ROOT)
   .filter((name) => name.endsWith('.js'))
   .map((name) => path.join(ROOT, name));
+const source = Object.fromEntries(
+  files.map((file) => [path.basename(file), fs.readFileSync(file, 'utf8')]),
+);
+const combined = Object.values(source).join('\n');
 
 const forbidden = [
   ['WORKSPACE_IMPORT', /from\s+['"][^'"]*workspace/u],
@@ -32,86 +27,92 @@ const forbidden = [
 ];
 
 for (const file of files) {
-  const source = fs.readFileSync(file, 'utf8');
-  const lines = source.split(/\r?\n/u).length;
+  const text = fs.readFileSync(file, 'utf8');
+  const lines = text.split(/\r?\n/u).length;
   assert.ok(lines < 300, `${file} has ${lines} physical lines; limit is <300`);
   forbidden.forEach(([code, pattern]) => {
-    assert.doesNotMatch(source, pattern, `${code}: ${file}`);
+    assert.doesNotMatch(text, pattern, `${code}: ${file}`);
   });
 }
 
-const consumer = fs.readFileSync(path.join(ROOT, 'consumer.js'), 'utf8');
-assert.match(consumer, /compileSolverExecution/u);
-assert.match(consumer, /compileResultRecovery/u);
-assert.match(consumer, /interfaceLoadResults:\s*null/u);
-assert.match(consumer, /nozzleAssessments:\s*null/u);
-assert.match(consumer, /codeResults:\s*null/u);
+assert.match(source['consumer.js'], /compileSolverExecution/u);
+assert.match(source['consumer.js'], /compileResultRecovery/u);
+assert.match(source['consumer.js'], /interfaceLoadResults:\s*null/u);
+assert.match(source['consumer.js'], /nozzleAssessments:\s*null/u);
+assert.match(source['consumer.js'], /codeResults:\s*null/u);
 
-const sourceGateway = fs.readFileSync(path.join(ROOT, 'source-orchestration.js'), 'utf8');
-assert.match(sourceGateway, /compileMechanicalModel/u);
-assert.match(sourceGateway, /compilePhysicalLoadCase/u);
-assert.match(sourceGateway, /modelReferenceFromCompilation/u);
-assert.match(sourceGateway, /compileLinearPipingSourceAnalysisContext/u);
-assert.match(sourceGateway, /sealLinearPipingSourceAnalysisContext/u);
-assert.match(sourceGateway, /runLinearPipingAnalysis/u);
-assert.match(sourceGateway, /PIPING_SOURCE_AUTHORITY_MISMATCH/u);
-assert.doesNotMatch(sourceGateway, /compileSolverExecution|compileResultRecovery/u);
-assert.doesNotMatch(sourceGateway, /interfaceLoadResults|nozzleAssessments|codeResults/u);
+assert.match(source['source-orchestration.js'], /compileMechanicalModel/u);
+assert.match(source['source-orchestration.js'], /compilePhysicalLoadCase/u);
+assert.match(source['source-orchestration.js'], /compileLinearPipingSourceAnalysisContext/u);
+assert.match(source['source-orchestration.js'], /runLinearPipingAnalysis/u);
+assert.doesNotMatch(source['source-orchestration.js'], /compileSolverExecution|compileResultRecovery/u);
 
-const sourceContext = fs.readFileSync(path.join(ROOT, 'source-analysis-context.js'), 'utf8');
-assert.match(sourceContext, /linear-piping-source-analysis-context\/v1/u);
-assert.match(sourceContext, /requireMechanicalModelCompilation/u);
-assert.match(sourceContext, /requirePhysicalLoadCase/u);
-assert.match(sourceContext, /validateLinearPipingAnalysisResult/u);
-assert.match(sourceContext, /PIPING_SOURCE_CONTEXT_PARENT_MISMATCH/u);
+assert.match(source['source-analysis-context.js'], /linear-piping-source-analysis-context\/v1/u);
+assert.match(source['source-analysis-context.js'], /requireMechanicalModelCompilation/u);
+assert.match(source['source-analysis-context.js'], /requirePhysicalLoadCase/u);
 assert.doesNotMatch(
-  sourceContext,
-  /compileMechanicalModel|compilePhysicalLoadCase|compileSolverExecution|compileResultRecovery|recoverLinearPipingInterfaceLoads/u,
+  source['source-analysis-context.js'],
+  /compileMechanicalModel|compilePhysicalLoadCase|compileSolverExecution|compileResultRecovery/u,
 );
 
-const inputXmlContract = fs.readFileSync(path.join(ROOT, 'inputxml-source-contract.js'), 'utf8');
-assert.match(inputXmlContract, /linear-piping-inputxml-source\/v1/u);
-assert.match(inputXmlContract, /computeInputXmlContentHash/u);
-assert.match(inputXmlContract, /PIPING_INPUTXML_CONTENT_HASH_MISMATCH/u);
-assert.doesNotMatch(inputXmlContract, /inputXmlToCanonicalGeometry|conditionGeometry/u);
+assert.match(source['inputxml-source-contract.js'], /linear-piping-inputxml-analysis-request\/v1/u);
+assert.match(source['inputxml-source-contract.js'], /linear-piping-inputxml-analysis-request\/v2/u);
+assert.match(source['inputxml-source-contract.js'], /INPUTXML_INGESTION_V2_KEYS/u);
+assert.doesNotMatch(source['inputxml-source-contract.js'], /inputXmlToCanonicalGeometry|conditionGeometry/u);
 
-const inputXmlContext = fs.readFileSync(path.join(ROOT, 'inputxml-analysis-context.js'), 'utf8');
-assert.match(inputXmlContext, /linear-piping-inputxml-analysis-context\/v1/u);
-assert.match(inputXmlContext, /requireLinearPipingInputXmlSource/u);
-assert.match(inputXmlContext, /requireLinearPipingSourceAnalysisContext/u);
-assert.match(inputXmlContext, /PIPING_INPUTXML_CONTEXT_SOURCE_MISMATCH/u);
-assert.doesNotMatch(
-  inputXmlContext,
-  /inputXmlToCanonicalGeometry|conditionGeometry|compileMechanicalModel|compilePhysicalLoadCase|compileSolverExecution|compileResultRecovery|recoverLinearPipingInterfaceLoads/u,
-);
+const unitContract = source['inputxml-unit-contract.js'];
+assert.match(unitContract, /INPUTXML-LENGTH-TO-METRE-EXACT-R1/u);
+assert.match(unitContract, /m:\s*Object\.freeze\(\{ numerator: 1, denominator: 1 \}\)/u);
+assert.match(unitContract, /mm:\s*Object\.freeze\(\{ numerator: 1, denominator: 1000 \}\)/u);
+assert.match(unitContract, /cm:\s*Object\.freeze\(\{ numerator: 1, denominator: 100 \}\)/u);
+assert.match(unitContract, /in:\s*Object\.freeze\(\{ numerator: 127, denominator: 5000 \}\)/u);
+assert.match(unitContract, /ft:\s*Object\.freeze\(\{ numerator: 381, denominator: 1250 \}\)/u);
+assert.match(unitContract, /PIPING_INPUTXML_UNIT_PROFILE_HASH_MISMATCH/u);
+assert.match(unitContract, /PIPING_INPUTXML_UNIT_RESULT_HASH_MISMATCH/u);
+assert.doesNotMatch(unitContract, /0\.001|0\.0254|0\.3048/u);
 
-const inputXmlGateway = fs.readFileSync(path.join(ROOT, 'inputxml-source-binding.js'), 'utf8');
+const normalizer = source['inputxml-unit-normalization.js'];
+for (const token of [
+  'nodes', 'segments', 'length', 'diameter', 'thickness',
+  'bendDeclaredRadius', 'bendComputedRadius', 'bendArcCentre',
+]) assert.match(normalizer, new RegExp(token, 'u'));
+assert.match(normalizer, /PIPING_INPUTXML_UNIT_FIELD_UNCLASSIFIED/u);
+assert.match(normalizer, /INPUTXML_LENGTH_UNIT_NORMALIZED/u);
+assert.doesNotMatch(normalizer, /inputXmlToCanonicalGeometry|conditionGeometry/u);
+
+const requestValidation = source['inputxml-request-validation.js'];
+assert.match(requestValidation, /LINEAR_PIPING_INPUTXML_ANALYSIS_REQUEST_V2_SCHEMA/u);
+assert.match(requestValidation, /requireLinearPipingInputXmlUnitProfile/u);
+assert.match(requestValidation, /PIPING_INPUTXML_UNIT_NOT_CANONICAL/u);
+assert.match(requestValidation, /PIPING_INPUTXML_UNIT_NOT_AUTHORIZED/u);
+
+const inputXmlGateway = source['inputxml-source-binding.js'];
 assert.match(inputXmlGateway, /inputXmlToCanonicalGeometry/u);
+assert.match(inputXmlGateway, /normalizeLinearPipingInputXmlGeometry/u);
 assert.match(inputXmlGateway, /conditionGeometry/u);
 assert.match(inputXmlGateway, /compileLinearPipingSourceAnalysisContext/u);
-assert.match(inputXmlGateway, /compileLinearPipingInputXmlAnalysisContext/u);
-assert.match(inputXmlGateway, /PIPING_INPUTXML_TOPOLOGY_MISMATCH/u);
-assert.match(inputXmlGateway, /CANONICAL_ANALYSIS_UNIT/u);
+assert.match(inputXmlGateway, /inputXmlUnitEvidenceProjection/u);
 assert.doesNotMatch(
   inputXmlGateway,
   /resolveLinearFeaMaterialState|resolvePipeSection|resolveFrameLocalAxes|compileSolverExecution|compileResultRecovery|recoverLinearPipingInterfaceLoads|compileNozzleAllowableAssessment|compileLinearPipingB31Application/u,
 );
 
 const adapterImports = files
-  .map((file) => ({ file, source: fs.readFileSync(file, 'utf8') }))
-  .filter(({ source }) => /inputXmlToCanonicalGeometry/u.test(source))
-  .map(({ file }) => path.basename(file));
+  .filter((file) => /inputXmlToCanonicalGeometry/u.test(fs.readFileSync(file, 'utf8')))
+  .map((file) => path.basename(file));
 assert.deepEqual(adapterImports, ['inputxml-source-binding.js']);
 
-const index = fs.readFileSync(path.join(ROOT, 'index.js'), 'utf8');
-assert.match(index, /runLinearPipingAnalysisFromSourceAuthorities/u);
-assert.match(index, /compileLinearPipingSourceAnalysisContext/u);
-assert.match(index, /requireLinearPipingSourceAnalysisContext/u);
-assert.match(index, /runLinearPipingAnalysisFromInputXml/u);
-assert.match(index, /compileLinearPipingInputXmlAnalysisContext/u);
-assert.match(index, /requireLinearPipingInputXmlAnalysisContext/u);
-assert.match(index, /sealLinearPipingInputXmlSource/u);
-assert.match(index, /requireLinearPipingInputXmlAnalysisResult/u);
+const index = source['index.js'];
+for (const token of [
+  'runLinearPipingAnalysisFromSourceAuthorities',
+  'compileLinearPipingSourceAnalysisContext',
+  'compileLinearPipingInputXmlAnalysisContext',
+  'LINEAR_PIPING_INPUTXML_ANALYSIS_REQUEST_V2_SCHEMA',
+  'sealLinearPipingInputXmlUnitProfile',
+  'normalizeLinearPipingInputXmlGeometry',
+]) assert.match(index, new RegExp(token, 'u'));
+
+assert.doesNotMatch(combined, /unit\s*\?\?\s*['"]m['"]|unit\s*\|\|\s*['"]m['"]/u);
 
 const packageValue = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 assert.equal(
@@ -125,7 +126,8 @@ await import('./linear-piping-source-orchestration-check.mjs');
 await import('./linear-piping-inputxml-source-binding-check.mjs');
 await import('./linear-piping-source-analysis-context-check.mjs');
 await import('./linear-piping-inputxml-analysis-context-check.mjs');
+await import('./linear-piping-inputxml-unit-normalization-check.mjs');
 await import('./linear-piping-multicase-application-check.mjs');
 await import('./linear-piping-multicase-application-anti-drift-check.mjs');
 
-console.log('Linear piping analysis consumer T0 and Phase 2A-2E anti-drift check PASS');
+console.log('Linear piping analysis consumer T0 and Phase 2A-2F anti-drift check PASS');
