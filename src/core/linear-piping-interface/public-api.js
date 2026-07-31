@@ -9,13 +9,15 @@ import {
 import { failInterface } from './contracts.js';
 
 export function compileLinearPipingInterfaceSet(input) {
-  for (const [index, definition] of (input?.definitions ?? []).entries()) {
-    requireFinitePoint(definition?.basis?.origin, `definitions[${index}].basis.origin`);
-    requireFinitePoint(definition?.referencePointGlobal, `definitions[${index}].referencePointGlobal`);
-    requireFinitePoint(
-      definition?.leverReferenceToNodeLocal,
-      `definitions[${index}].leverReferenceToNodeLocal`,
-    );
+  if (Array.isArray(input?.definitions)) {
+    for (const [index, definition] of input.definitions.entries()) {
+      requireFinitePoint(definition?.basis?.origin, `definitions[${index}].basis.origin`);
+      requireFinitePoint(definition?.referencePointGlobal, `definitions[${index}].referencePointGlobal`);
+      requireFinitePoint(
+        definition?.leverReferenceToNodeLocal,
+        `definitions[${index}].leverReferenceToNodeLocal`,
+      );
+    }
   }
   return compileBase(input);
 }
