@@ -104,6 +104,16 @@ export {
   evaluateLafeaRenderEvidenceIntake,
 } from './lafea-render-evidence-intake.js';
 export {
+  LAFEA_RESULT_RENDER_MODES,
+  LAFEA_RESULT_RENDER_REQUEST_SCHEMA,
+  createLafeaResultRenderRequest,
+  requireLafeaResultRenderRequest,
+} from './lafea-canvas/result-render-request.js';
+export {
+  LAFEA_THREE_RENDER_RESULT_SCHEMA,
+  createThreeMeshRendererV2,
+} from './lafea-canvas/three-mesh-renderer-v2.js';
+export {
   LAFEA_WORKBENCH_DOCUMENT_SCHEMA,
   executeLafeaStage,
   lafeaCollectionPaths,
