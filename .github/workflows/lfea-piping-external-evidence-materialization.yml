@@ -1,0 +1,77 @@
+name: LFEA Piping External Evidence Materialization
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Workflow run ID containing caller-supplied sealed external evidence records
+        required: true
+        type: string
+      source_artifact_name:
+        description: Artifact name containing the materialization request and source records
+        required: true
+        type: string
+      request_path:
+        description: Relative path to lfea-piping-external-materialization-request/v1
+        required: true
+        default: request/external-materialization-request.json
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: lfea-piping-external-materialization-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  materialize-external-evidence:
+    name: Materialize supplied external qualification evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout selected exact head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Download caller-supplied sealed source records
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.source_run_id }}
+          name: ${{ inputs.source_artifact_name }}
+          path: ${{ runner.temp }}/lfea-external-source
+
+      - name: Materialize governed external evidence package
+        shell: bash
+        env:
+          INPUT_ROOT: ${{ runner.temp }}/lfea-external-source
+          REQUEST_PATH: ${{ inputs.request_path }}
+          OUTPUT_ROOT: ${{ runner.temp }}/lfea-external-evidence
+          EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          node scripts/lfea-piping-external-evidence-materializer.mjs \
+            --input-root="$INPUT_ROOT" \
+            --request="$REQUEST_PATH" \
+            --output="$OUTPUT_ROOT" \
+            --exact-head="$EXPECTED_HEAD"
+
+      - name: Upload governed external evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lfea-piping-external-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/lfea-external-evidence
+          if-no-files-found: error
+          retention-days: 90
