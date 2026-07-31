@@ -26,9 +26,6 @@ import { renderMeshQualityPanel } from './lafea-mesh-quality-panel.js';
 import { renderDocumentTableEditor } from './lafea-document-table.js';
 
 export class LafeaWorkbenchView {
-  /**
-   * @param {Element|null} rootElement Workbench host.
-   */
   constructor(rootElement) {
     this.rootElement = rootElement;
     this.handlers = null;
@@ -151,9 +148,7 @@ export class LafeaWorkbenchView {
     );
     run.dataset.role = 'lafea-run';
     run.disabled = !stage.document || !executionSupported;
-    if (!executionSupported) {
-      run.title = 'UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED';
-    }
+    if (!executionSupported) run.title = 'UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED';
 
     const benchmark = actionButton(
       this.rootElement,
@@ -186,8 +181,12 @@ export class LafeaWorkbenchView {
     );
     sourceCard.body.append(renderDocumentTableEditor(
       sourceCard.body,
+      state.activeStageId,
       stage.document,
-      (json) => this.handlers.onApplyJson(json),
+      {
+        onSetScalar: this.handlers.onSetScalar,
+        onApplyJson: this.handlers.onApplyJson,
+      },
     ));
 
     const previewCard = card(

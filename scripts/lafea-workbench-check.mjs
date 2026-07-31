@@ -111,16 +111,17 @@ const store = createLafeaWorkbenchStore({
   initialDocument: continuumFixture(),
 });
 const nodes = store.getState().stages['LAFEA.3'].document.nodes;
-const nodeIndex = nodes.findIndex((row) => row.nodeId === 'B');
-const originalX = nodes[nodeIndex].x;
-store.updateRecord('nodes', nodeIndex, { ...nodes[nodeIndex], x: originalX + 10 });
-assert.equal(store.getState().stages['LAFEA.3'].document.nodes[nodeIndex].x, originalX + 10);
+const originalX = nodes.find((row) => row.nodeId === 'B').x;
+store.setScalar('LAFEA.3.node.x', 'B', String(originalX + 10));
+assert.equal(store.getState().stages['LAFEA.3'].document.nodes.find((row) => row.nodeId === 'B').x, originalX + 10);
 assert.equal(store.getState().stages['LAFEA.3'].execution, null);
 store.undo();
-assert.equal(store.getState().stages['LAFEA.3'].document.nodes[nodeIndex].x, originalX);
+assert.equal(store.getState().stages['LAFEA.3'].document.nodes.find((row) => row.nodeId === 'B').x, originalX);
 store.redo();
-assert.equal(store.getState().stages['LAFEA.3'].document.nodes[nodeIndex].x, originalX + 10);
+assert.equal(store.getState().stages['LAFEA.3'].document.nodes.find((row) => row.nodeId === 'B').x, originalX + 10);
 assert.equal(store.exportDocument().schema, 'lafea-workbench-document/v1');
+assert.equal(store.updateRecord, undefined);
+assert.equal(store.deleteRecord, undefined);
 
 const invalid = attachmentFixture();
 invalid.pipeGeometry.outsideDiameter.value = -1;
@@ -133,6 +134,7 @@ const workspace = path.join(ROOT, 'src', 'workspace');
 const read = (relativePath) => fs.readFileSync(path.join(workspace, relativePath), 'utf8');
 const modelSource = read('lafea-workbench-model.js');
 const viewSource = read('lafea-workbench-view.js');
+const storeSource = read('lafea-workbench-store.js');
 const documentTableSource = read('lafea-document-table.js');
 const previewSource = read('lafea-stage-preview.js');
 const meshPanelSource = read('lafea-mesh-quality-panel.js');
@@ -153,10 +155,14 @@ assert.doesNotMatch(viewSource, /\bprompt\s*\(/u);
 assert.doesNotMatch(viewSource, /createHybridViewport|webgl:\s*\{\s*render:\s*\(\)\s*=>\s*\{\}/u);
 assert.match(viewSource, /No geometry or mesh has been synthesized/u);
 assert.match(viewSource, /Calculation not implemented/u);
+assert.match(viewSource, /onSetScalar/u);
 
+assert.match(storeSource, /applyLafeaStageEditCommand/u);
+assert.doesNotMatch(storeSource, /function updateRecord|function deleteRecord|rowIndex === index/u);
 assert.doesNotMatch(documentTableSource, /Number\([^)]*\)\s*\|\|\s*0/u);
-assert.doesNotMatch(documentTableSource, /structuredClone\([^)]*\.at\(-1\)/u);
-assert.match(documentTableSource, /Record creation is disabled/u);
+assert.doesNotMatch(documentTableSource, /collectScalars|findCollections|stableColumns|recordIdentity/u);
+assert.match(documentTableSource, /Governed stage-specific inputs/u);
+assert.match(documentTableSource, /whole-document replacement/u);
 
 assert.doesNotMatch(previewSource, /PLATE-NW|VALVE-MASS|Q8-PLATE|SH3D-|WELD-FILLET/u);
 assert.match(previewSource, /does not manufacture pads/u);
@@ -188,12 +194,14 @@ const sourceText = workbenchFiles
 assert.doesNotMatch(sourceText, /EventBus|analysis-context|workspace-consumer-context/u);
 
 console.log(JSON.stringify({
-  check: 'lafea-workbench-u0',
+  check: 'lafea-workbench-u0-u2b',
   status: 'PASS',
   qualifiedStages: Object.keys(QUALIFIED_FIXTURES),
   unsupportedStages: ['LAFEA.6'],
   failClosed: true,
   fabricatedEngineeringClaims: false,
   presenterPathsRetained: true,
+  typedCommandEditing: true,
+  arrayIndexEditAuthority: false,
   workspaceCoupling: false,
 }));
