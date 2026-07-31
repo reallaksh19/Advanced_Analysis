@@ -52,7 +52,13 @@ export function applyLafeaStageEditCommand(currentDocument, command) {
   const previousDocumentDigest = safeDigest(currentDocument);
   try {
     validateCommand(command);
-    requireLafeaStageRegistryEntry(command.stageId);
+    const stageEntry = requireLafeaStageRegistryEntry(command.stageId);
+    if (stageEntry.engineState === 'ENGINE_NOT_IMPLEMENTED') {
+      throw contractError(
+        'LAFEA_STAGE_EDIT_NOT_AUTHORIZED',
+        `${stageEntry.stageId} source editing is blocked because no qualified stage engine is registered.`,
+      );
+    }
     if (previousDocumentDigest !== command.expectedDocumentDigest) {
       return result({
         command,
