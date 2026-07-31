@@ -250,9 +250,13 @@ export class SvgSymbolFactory {
     const badgeGroup = doc.createElementNS(this.ns, 'g');
     badgeGroup.setAttribute('class', 'reaction-load-badge');
 
-    const isHorizontal = callout.direction === 'H' || callout.direction === 'A';
+    const isHorizontal = callout.direction === 'H' || callout.direction === 'A' || callout.direction === 'L';
     const offsetX = isHorizontal ? size * 1.8 * loadScale : size * (index === 0 ? 1.4 : -2.4) * loadScale;
-    const offsetY = isHorizontal ? size * (index * 0.8 - 0.4) * loadScale : -size * (0.8 + index * 0.7) * loadScale;
+    
+    // Stack vertically based on index
+    const offsetY = isHorizontal 
+      ? size * (index * 1.2 - 0.8) * loadScale 
+      : -size * (0.8 + index * 1.1) * loadScale;
 
     badgeGroup.setAttribute('transform', `translate(${offsetX}, ${offsetY})`);
 

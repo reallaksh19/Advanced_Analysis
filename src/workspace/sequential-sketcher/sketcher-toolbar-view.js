@@ -137,22 +137,7 @@ export function buildHeaderToolbar(doc, options = {}) {
     createBtn(doc, '🏷️ Load A+', () => { if (onIncreaseLoadFont) onIncreaseLoadFont(); })
   );
 
-  // Group 4: Topology Check & Validation Icons (Ported from Topo Validator)
-  const topoGroup = createGroup(doc);
-  topoGroup.append(
-    createBtn(doc, '⚡ Check Topo', () => { if (options.onCheckTopology) options.onCheckTopology(); }),
-    createBtn(doc, '📐 Rebuild Exact', () => { if (options.onRebuildExact) options.onRebuildExact(); }),
-    createBtn(doc, '⚙️ Rebuild Tol', () => { if (options.onRebuildTolerance) options.onRebuildTolerance(); }),
-    createBtn(doc, '📊 Export Topo', () => { if (options.onExportTopology) options.onExportTopology(); })
-  );
-
-  // Group 5: Export
-  const exportGroup = createGroup(doc);
-  exportGroup.append(
-    createBtn(doc, '💾 Export SVG', () => { if (onExportSvg) onExportSvg(); })
-  );
-
-  controls.append(projGroup, branchGroup, navGroup, topoGroup, exportGroup);
+  controls.append(projGroup, branchGroup, navGroup);
   header.append(controls);
 
   return header;

@@ -93,6 +93,7 @@ export function createWorkspaceMockPackage() {
         type: 'GROUP',
         children: [
           support('SIM-SUPPORT-A', [0, 0, 0], 'SIM-PIPE-A:port:start'),
+          support('SIM-SUPPORT-A-SREF', [0, 0, 0], 'SIM-PIPE-A:port:start'),
           support('SIM-SUPPORT-B', [2000, 0, 0], 'SIM-PIPE-B:port:end'),
         ],
       },
@@ -113,6 +114,7 @@ export function createStaggeredMockPackage() {
   // Segment 1: East (+X)
   children.push(pipe('ROUTE-PIPE-1', [0, 0, 0], [2000, 0, 0]));
   children.push(support('ROUTE-SUPP-1', [500, 0, 0], 'ROUTE-PIPE-1:port:mid'));
+  children.push(support('ROUTE-SUPP-1-SREF', [500, 0, 0], 'ROUTE-PIPE-1:port:mid'));
   children.push({
     id: 'ROUTE-ELBO-1', name: 'Elbow 1', type: 'ELBO', sourcePath: `/SIM/ELBO/1`, sourceAttributes: { POS: {x: 2000, y: 0, z: 0} }
   });
@@ -193,6 +195,8 @@ function pipe(id, startPoint, endPoint) {
       SYSTEM_ID: 'SIM-SYSTEM-1',
       EI_N_M2: 2000000,
       UNIT_PIPE_WEIGHT_KG_PER_M: 10,
+      OUTSIDE_DIAMETER_MM: 219.1,
+      WALL_THICKNESS_MM: 8.18,
       INSULATION_THICKNESS_MM: 30,
       INSULATION_DENSITY_KG_M3: 120,
       FLUID_WT_OPE_KG_M: 2,

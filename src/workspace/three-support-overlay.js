@@ -38,3 +38,22 @@ export function createFallbackMarker(primitive, color) {
   mesh.position.copy(vector(primitive.center));
   return mesh;
 }
+
+export function createOverlapHighlight(pos, radius = 50) {
+  const mesh = new THREE.Mesh(
+    new THREE.SphereGeometry(radius, 16, 12),
+    new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.5, depthTest: false })
+  );
+  mesh.position.copy(vector(pos));
+  return mesh;
+}
+
+export function createNewConnectionLine(pos1, pos2) {
+  const points = [];
+  points.push(vector(pos1));
+  points.push(vector(pos2));
+  
+  const geometry = new THREE.BufferGeometry().setFromPoints(points);
+  const material = new THREE.LineBasicMaterial({ color: 0xef4444, linewidth: 2, depthTest: false });
+  return new THREE.Line(geometry, material);
+}

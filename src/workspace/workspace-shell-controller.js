@@ -1,5 +1,7 @@
 import { showZoneDensitySelectorPopup } from './zone-density-selector-popup.js';
 import { WorkspaceState } from './workspace-state.js';
+import { EventBus } from './event-bus.js';
+import { EVENT_TOPICS } from './event-topics.js';
 
 const STORAGE_KEY = 'workspace-layout-prefs';
 const MIN_WIDTH = 200;
@@ -25,6 +27,14 @@ export class WorkspaceShellController {
     this.applyState();
     this.shellElement.addEventListener('pointerdown', this.handlePointerDown);
     this.shellElement.addEventListener('click', this.handleClick);
+    
+    // Update dataset name in topbar
+    this.unsubscribeCallbacks = [
+      EventBus.subscribe(EVENT_TOPICS.WORKSPACE_SNAPSHOT_CHANGED, ({ snapshot }) => {
+        const el = this.shellElement.querySelector('[data-role="topbar-dataset"]');
+        if (el) el.textContent = snapshot?.dataset?.datasetId || 'None Loaded';
+      })
+    ];
   }
 
   loadState() {
@@ -160,6 +170,11 @@ export class WorkspaceShellController {
     }
   }
 
+  updateTopBar(context) {
+    const el = this.shellElement.querySelector('[data-role="topbar-dataset"]');
+    if (el) el.textContent = context?.datasetId || 'None Loaded';
+  }
+
   openPopup(section) {
     if (!section) return;
     if (this.poppedSection) this.closePopup();
@@ -243,9 +258,12 @@ export class WorkspaceShellController {
       startLeftWidth: this.state.leftPanelWidth,
       startRightWidth: this.state.rightPanelWidth,
       startWebglHeight: stage ? stage.offsetHeight : (this.state.webglHeight || 350),
-      maxWidth: window.innerWidth * 0.5
+      maxWidth: window.innerWidth * 0.5,
+      pointerId: event.pointerId,
+      resizer: resizer
     };
 
+    resizer.setPointerCapture(event.pointerId);
     document.addEventListener('pointermove', this.handlePointerMove, { passive: false });
     document.addEventListener('pointerup', this.handlePointerUp);
     this.shellElement.classList.add('is-resizing');
@@ -275,8 +293,13 @@ export class WorkspaceShellController {
     }
   }
 
-  handlePointerUp() {
+  handlePointerUp(event) {
     if (!this.dragContext) return;
+    
+    if (this.dragContext.resizer && this.dragContext.pointerId !== undefined) {
+      this.dragContext.resizer.releasePointerCapture(this.dragContext.pointerId);
+    }
+    
     document.removeEventListener('pointermove', this.handlePointerMove);
     document.removeEventListener('pointerup', this.handlePointerUp);
     this.dragContext = null;
