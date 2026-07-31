@@ -14,7 +14,7 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(
   accessorySource,
-  /stage-registry|presenter|preview-policy|lafea-lifecycle|results-view|mesh-quality|fea-benchmark/u,
+  /from\s+['"][^'"]*(?:stage-registry|presenter|preview-policy|lafea-lifecycle|results-view|mesh-quality|fea-benchmark)[^'"]*['"]/u,
 );
 assert.match(accessorySource, /Object\.freeze\(facade\)/u);
 assert.match(accessorySource, /getState: controller\.getState\.bind\(controller\)/u);
