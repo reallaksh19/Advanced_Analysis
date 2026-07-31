@@ -1,0 +1,57 @@
+name: LFEA Piping Phase 6C Certification
+
+on:
+  pull_request:
+    paths:
+      - 'release-evidence/lfea-piping-release-evidence.json'
+      - 'reports/lfea-piping-phase6c-release-evidence-intake.json'
+      - 'docs/LFEA_PIPING_PHASE6C_RELEASE_EVIDENCE_INTAKE.md'
+      - 'scripts/lfea-piping-external-release-evidence-check.mjs'
+      - 'scripts/lfea-piping-external-release-evidence-check-check.mjs'
+      - 'scripts/lfea-piping-phase6c-anti-drift-check.mjs'
+      - 'src/core/linear-piping-project-qualification/**'
+      - '.github/workflows/lfea-piping-phase6c-certification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lfea-piping-phase6c-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  certify-release-evidence-intake:
+    name: Certify persisted release evidence intake
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Validate unresolved policy mode
+        run: node scripts/lfea-piping-external-release-evidence-check.mjs
+
+      - name: Validate Phase 6C analytical checks
+        run: node scripts/lfea-piping-external-release-evidence-check-check.mjs
+
+      - name: Validate Phase 6C containment
+        run: node scripts/lfea-piping-phase6c-anti-drift-check.mjs
+
+      - name: Verify clean exact-head checkout
+        shell: bash
+        run: |
+          git diff --check
+          test -z "$(git status --short)"
