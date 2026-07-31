@@ -14,7 +14,10 @@ on:
       - 'scripts/lfea-piping-release-readiness-check.mjs'
       - 'scripts/lfea-piping-phase-findings-check.mjs'
       - 'scripts/linear-piping-analysis-consumer-*.mjs'
+      - 'scripts/linear-piping-interface-*.mjs'
+      - 'scripts/linear-piping-nozzle-interface-check.mjs'
       - 'src/core/linear-piping-analysis-consumer/**'
+      - 'src/core/linear-piping-interface/**'
       - '.github/workflows/lfea-piping-phase-certification.yml'
   workflow_dispatch:
 
@@ -27,7 +30,7 @@ concurrency:
 
 jobs:
   certify-phase-a0:
-    name: Certify exact-head A0 baseline
+    name: Certify exact-head piping phase
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -58,8 +61,11 @@ jobs:
           --release
           --emit=${RUNNER_TEMP}/audit-baseline.runtime.json
 
-      - name: Verify T0 piping consumer
+      - name: Verify T0 and source orchestration
         run: npm run check:linear-piping-analysis-consumer
+
+      - name: Verify governed interfaces and recovery
+        run: npm run check:lfea-interfaces
 
       - name: Run full repository gate
         run: npm run gate
@@ -73,7 +79,7 @@ jobs:
       - name: Upload exact-head baseline evidence
         uses: actions/upload-artifact@v4
         with:
-          name: lfea-piping-a0-${{ github.sha }}
+          name: lfea-piping-phase-${{ github.sha }}
           path: ${{ runner.temp }}/audit-baseline.runtime.json
           if-no-files-found: error
           retention-days: 90
