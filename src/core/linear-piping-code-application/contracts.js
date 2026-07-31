@@ -8,6 +8,7 @@ export const NOZZLE_ALLOWABLE_PROFILE_SCHEMA = 'linear-piping-nozzle-allowable-p
 export const NOZZLE_ASSESSMENT_SCHEMA = 'linear-piping-nozzle-assessment/v1';
 export const B31_APPLICATION_REQUEST_SCHEMA = 'linear-piping-b31-application-request/v1';
 export const B31_APPLICATION_SCHEMA = 'linear-piping-b31-application/v1';
+export const APPLICATION_RESULT_REQUEST_SCHEMA = 'linear-piping-qualified-application-result-request/v1';
 export const APPLICATION_RESULT_SCHEMA = 'linear-piping-qualified-application-result/v1';
 
 export const NOZZLE_INTERACTION_RULE = 'LINEAR_ABSOLUTE_SUM_V1';
