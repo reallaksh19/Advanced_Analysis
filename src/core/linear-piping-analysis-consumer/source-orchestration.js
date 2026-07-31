@@ -1,11 +1,10 @@
 /**
- * Phase 2A source-authority orchestration for the linear piping application.
+ * Phase 2A/2C source-authority orchestration for the linear piping application.
  *
- * This gateway starts before the existing T0 boundary: it compiles explicit
- * B-2.5 mechanical-model inputs and B-3.0 physical-load-case inputs through
- * their production APIs, then delegates execution and recovery to T0. It does
- * not parse raw project files, resolve materials/sections/axes, recover
- * interface loads, assess nozzles, or compile B31.3 application results.
+ * The gateway compiles explicit B-2.5 and B-3.0 inputs through production
+ * APIs, delegates B-3.3/B-3.4 to T0 and may retain the exact compilation and
+ * load case for downstream interface recovery. It does not parse project
+ * files, resolve engineering properties or perform interface/code mechanics.
  */
 
 import { deepFreeze } from '../shared-piping-model/immutable.js';
@@ -14,10 +13,9 @@ import {
   compilePhysicalLoadCase,
   modelReferenceFromCompilation,
 } from '../linear-fea-load-case/index.js';
-import {
-  deriveLinearPipingParentSet,
-} from './contracts.js';
+import { deriveLinearPipingParentSet } from './contracts.js';
 import { runLinearPipingAnalysis } from './consumer.js';
+import { sealLinearPipingSourceAnalysisContext } from './source-analysis-context.js';
 import {
   failLinearPipingAnalysis,
   requireArray,
@@ -58,21 +56,23 @@ export const SOURCE_AUTHORITY_KEYS = Object.freeze([
   'loadCaseProfileSemanticHash',
 ]);
 
-/**
- * Compile explicit upstream authorities and run the bounded T0 chain.
- *
- * @param {object} request Closed `linear-piping-source-analysis-request/v1`.
- * @param {{factorizationCache: Map|null}} runtime Existing T0 runtime.
- * @returns {Readonly<object>} Existing T0 result-chain schema.
- */
+/** Existing behavior-compatible Phase 2A result-only boundary. */
 export function runLinearPipingAnalysisFromSourceAuthorities(request, runtime) {
+  return compileLinearPipingSourceAnalysisContext(request, runtime).analysisResult;
+}
+
+/**
+ * Compile source authorities once and retain the exact B-2.5/B-3.0/T0 chain.
+ * Phase 3 callers consume `compilation`, `loadCase` and `analysisResult`
+ * directly from this context instead of reconstructing governed parents.
+ */
+export function compileLinearPipingSourceAnalysisContext(request, runtime) {
   const accepted = validateLinearPipingSourceAnalysisRequest(request);
   const compilation = compileMechanicalModel(accepted.mechanicalModelInput);
   const loadCase = compilePhysicalLoadCase({
     ...accepted.physicalLoadCaseInput,
     modelReference: modelReferenceFromCompilation(compilation),
   });
-
   const currentSourceAuthorities = deriveLinearPipingSourceAuthoritySet({
     compilation,
     loadCase,
@@ -81,7 +81,6 @@ export function runLinearPipingAnalysisFromSourceAuthorities(request, runtime) {
     accepted.expectedSourceAuthorities,
     currentSourceAuthorities,
   );
-
   const parentInput = {
     compilation,
     loadCase,
@@ -90,14 +89,18 @@ export function runLinearPipingAnalysisFromSourceAuthorities(request, runtime) {
     solverProfile: accepted.solverProfile,
     recoveryProfile: accepted.recoveryProfile,
   };
-
-  return runLinearPipingAnalysis({
+  const analysisResult = runLinearPipingAnalysis({
     schema: 'linear-piping-analysis-request/v1',
     analysisIdentity: accepted.analysisIdentity,
     analysisRevision: accepted.analysisRevision,
     ...parentInput,
     expectedParents: deriveLinearPipingParentSet(parentInput),
   }, runtime);
+  return sealLinearPipingSourceAnalysisContext({
+    compilation,
+    loadCase,
+    analysisResult,
+  });
 }
 
 export function validateLinearPipingSourceAnalysisRequest(value) {
@@ -126,7 +129,6 @@ export function validateLinearPipingSourceAnalysisRequest(value) {
     value.expectedSourceAuthorities[field],
     `sourceRequest.expectedSourceAuthorities.${field}`,
   ));
-
   return Object.freeze({
     ...value,
     physicalLoadCaseInput: Object.freeze({ ...value.physicalLoadCaseInput }),
