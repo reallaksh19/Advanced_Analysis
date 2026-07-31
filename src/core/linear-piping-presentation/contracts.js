@@ -40,6 +40,27 @@ export const SUMMARY_KEYS = Object.freeze([
   'codeQualifiedCount',
   'codeConditionalCount',
 ]);
+export const ANALYSIS_ROW_KEYS = Object.freeze([
+  'analysisIdentity', 'analysisRevision', 'status', 'physicalLoadCaseHash',
+  'executionHash', 'recoveryHash', 'analysisResultSemanticHash', 'evidenceHash',
+]);
+export const INTERFACE_ROW_KEYS = Object.freeze([
+  'interfaceId', 'interfaceKind', 'nodeId', 'loadCaseId', 'status', 'frameSemanticHash',
+  'reportingSignConvention', 'units', 'forceGlobal', 'momentAtNodeGlobal', 'forceLocal',
+  'momentAtReferenceLocal', 'referencePointGlobal', 'leverReferenceToNodeLocal',
+  'resultSemanticHash', 'recoverySemanticHash', 'recoveryEvidenceHash',
+]);
+export const NOZZLE_ROW_KEYS = Object.freeze([
+  'profileId', 'profileSemanticHash', 'interfaceId', 'loadCaseId', 'reportingSignConvention',
+  'units', 'forceLocal', 'momentAtReferenceLocal', 'governingTerm', 'interactionValue',
+  'interactionLimit', 'utilization', 'assessmentStatus', 'qualificationStatus',
+  'semanticHash', 'evidenceHash',
+]);
+export const CODE_ROW_KEYS = Object.freeze([
+  'checkId', 'category', 'componentId', 'codePointId', 'combinationId', 'status',
+  'calculatedStress', 'allowableStress', 'utilization', 'governingRuleId',
+  'sourceRecoveryHashes', 'semanticHash', 'evidenceHash',
+]);
 
 const HASH_PATTERN = /^fnv1a64:[0-9a-f]{16}$/u;
 
@@ -117,6 +138,9 @@ export function requireLinearPipingPresentation(record) {
   if (!EXPORT_ELIGIBILITY.includes(record.exportEligibility)) {
     failPresentation('Presentation export eligibility is invalid.', 'PIPING_PRESENTATION_INVALID');
   }
+  for (const field of ['analysisRows', 'interfaceRows', 'nozzleRows', 'codeRows', 'notConfigured', 'limitations']) {
+    requireArray(record[field], `linearPipingPresentation.${field}`);
+  }
   const expectedEligibility = record.status === 'QUALIFIED' && record.notConfigured.length === 0
     ? 'ENGINEERING_EXPORT_ALLOWED'
     : 'AUDIT_ONLY_CONDITIONAL';
@@ -132,9 +156,34 @@ export function requireLinearPipingPresentation(record) {
       failPresentation('Presentation summary counts must be non-negative integers.', 'PIPING_PRESENTATION_INVALID');
     }
   }
-  for (const field of ['analysisRows', 'interfaceRows', 'nozzleRows', 'codeRows', 'notConfigured', 'limitations']) {
-    requireArray(record[field], `linearPipingPresentation.${field}`);
-  }
+  requireRows(record.analysisRows, ANALYSIS_ROW_KEYS, 'analysisRows');
+  requireRows(record.interfaceRows, INTERFACE_ROW_KEYS, 'interfaceRows');
+  requireRows(record.nozzleRows, NOZZLE_ROW_KEYS, 'nozzleRows');
+  requireRows(record.codeRows, CODE_ROW_KEYS, 'codeRows');
+  record.analysisRows.forEach((row, index) => {
+    requireHash(row.physicalLoadCaseHash, `analysisRows[${index}].physicalLoadCaseHash`);
+    requireHash(row.executionHash, `analysisRows[${index}].executionHash`);
+    requireHash(row.recoveryHash, `analysisRows[${index}].recoveryHash`);
+    requireHash(row.analysisResultSemanticHash, `analysisRows[${index}].analysisResultSemanticHash`);
+    requireHash(row.evidenceHash, `analysisRows[${index}].evidenceHash`);
+  });
+  record.interfaceRows.forEach((row, index) => {
+    requireHash(row.frameSemanticHash, `interfaceRows[${index}].frameSemanticHash`);
+    requireHash(row.resultSemanticHash, `interfaceRows[${index}].resultSemanticHash`);
+    requireHash(row.recoverySemanticHash, `interfaceRows[${index}].recoverySemanticHash`);
+    requireHash(row.recoveryEvidenceHash, `interfaceRows[${index}].recoveryEvidenceHash`);
+  });
+  record.nozzleRows.forEach((row, index) => {
+    requireHash(row.profileSemanticHash, `nozzleRows[${index}].profileSemanticHash`);
+    requireHash(row.semanticHash, `nozzleRows[${index}].semanticHash`);
+    requireHash(row.evidenceHash, `nozzleRows[${index}].evidenceHash`);
+  });
+  record.codeRows.forEach((row, index) => {
+    requireArray(row.sourceRecoveryHashes, `codeRows[${index}].sourceRecoveryHashes`)
+      .forEach((hash, hashIndex) => requireHash(hash, `codeRows[${index}].sourceRecoveryHashes[${hashIndex}]`));
+    requireHash(row.semanticHash, `codeRows[${index}].semanticHash`);
+    requireHash(row.evidenceHash, `codeRows[${index}].evidenceHash`);
+  });
   if (record.semanticHash !== computePresentationSemanticHash(record)) {
     failPresentation('Presentation semantic hash is stale.', 'PIPING_PRESENTATION_HASH_MISMATCH');
   }
@@ -142,4 +191,8 @@ export function requireLinearPipingPresentation(record) {
     failPresentation('Presentation evidence hash is stale.', 'PIPING_PRESENTATION_HASH_MISMATCH');
   }
   return deepFreeze({ ...record });
+}
+
+function requireRows(rows, keys, field) {
+  rows.forEach((row, index) => exactKeys(row, keys, `linearPipingPresentation.${field}[${index}]`));
 }
