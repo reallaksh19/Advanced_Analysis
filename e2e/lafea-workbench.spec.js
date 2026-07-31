@@ -50,12 +50,12 @@ test('P0-E02 switching tabs shows only the correct workbench', async ({ page }) 
   await expect(lfeaView.locator('[data-role="lfea-workbench"]')).toBeVisible();
 });
 
-test('LAFEA exposes five independent stages and runs editor-to-kernel evidence', async ({ page }) => {
+test('LAFEA exposes six stages and runs retained editor-to-kernel evidence for LAFEA.3', async ({ page }) => {
   await page.goto('/');
   await page.locator('[data-application-nav="LAFEA"]').click();
   const workbench = page.locator('[data-role="lafea-workbench"]');
   await expect(workbench).toBeVisible();
-  await expect(workbench.locator('[data-stage-id]')).toHaveCount(5);
+  await expect(workbench.locator('[data-stage-id]')).toHaveCount(6);
   await workbench.getByRole('button', { name: /LAFEA\.3 2D continuum/u }).click();
   await workbench.locator('[data-role="lafea-import"]').setInputFiles({
     name: 'lafea-3-simulated.json',
@@ -67,6 +67,20 @@ test('LAFEA exposes five independent stages and runs editor-to-kernel evidence',
   await workbench.locator('[data-role="lafea-run"]').click();
   await expect(workbench.locator('.lafea-workbench__status')).toHaveText('QUALIFIED');
   await expect(workbench.locator('[data-role="lafea-result"]')).toContainText('"state": "ACCEPTED"');
+});
+
+test('LAFEA.6 remains visible as a fail-closed non-calculating placeholder', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('[data-application-nav="LAFEA"]').click();
+  const workbench = page.locator('[data-role="lafea-workbench"]');
+  await workbench.getByRole('button', { name: /LAFEA\.6 Weld profile/u }).click();
+
+  const run = workbench.locator('[data-role="lafea-run"]');
+  await expect(run).toBeDisabled();
+  await expect(run).toHaveText('Calculation not implemented');
+  await expect(workbench).toContainText('UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED');
+  await expect(workbench).toContainText('No qualified weld schema, calculator, result validator or benchmark manifest');
+  await expect(workbench.locator('[data-role="lafea-result"]')).toHaveCount(0);
 });
 
 test('LAFEA rejects malformed source without exposing a result', async ({ page }) => {
