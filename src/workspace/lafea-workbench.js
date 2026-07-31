@@ -83,6 +83,12 @@ export {
   validateSourceViewport,
 } from './lafea-engineering-scene.js';
 export {
+  LAFEA_WORKBENCH_SOURCE_RENDER_POLICY,
+  LAFEA_WORKBENCH_SOURCE_VIEWPORT_SCHEMA,
+  createLafeaSourceWorkbenchViewportModel,
+  mountLafeaSourceWorkbenchViewport,
+} from './lafea-source-workbench-viewport.js';
+export {
   LAFEA_WORKBENCH_DOCUMENT_SCHEMA,
   executeLafeaStage,
   lafeaCollectionPaths,
