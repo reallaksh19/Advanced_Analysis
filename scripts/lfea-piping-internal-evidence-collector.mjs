@@ -213,7 +213,8 @@ export function collectInternalEvidence({
     }
   }
 
-  const artifacts = writeCollectedArtifacts(output, expectedHead, results);
+  const baseline = requireCollectedBaseline(output, expectedHead);
+  const artifacts = writeCollectedArtifacts(output, expectedHead, results, baseline);
   const manifest = sealInternalExactHeadManifest({
     schema: 'lfea-piping-exact-head-manifest/v1',
     repository: 'reallaksh19/Advanced_Analysis',
@@ -249,6 +250,8 @@ export function collectInternalEvidence({
     commandCount: results.length,
     artifactCount: Object.keys(artifacts.references).length,
     manifestPath: MANIFEST_RELATIVE_PATH,
+    auditBaselinePath: BASELINE_RELATIVE_PATH,
+    auditBaselineContentHash: baseline.contentHash,
     manifestSemanticHash: manifest.semanticHash,
     manifestEvidenceHash: manifest.evidenceHash,
   });
@@ -256,13 +259,54 @@ export function collectInternalEvidence({
   return collection;
 }
 
-function writeCollectedArtifacts(outputRoot, exactHead, results) {
+function requireCollectedBaseline(outputRoot, exactHead) {
+  const absolutePath = outputPath(outputRoot, BASELINE_RELATIVE_PATH);
+  if (!fs.existsSync(absolutePath)) {
+    fail('LFEA_INTERNAL_COLLECTION_BASELINE_MISSING', {
+      path: BASELINE_RELATIVE_PATH,
+    });
+  }
+  const status = fs.lstatSync(absolutePath);
+  if (status.isSymbolicLink() || !status.isFile()) {
+    fail('LFEA_INTERNAL_COLLECTION_BASELINE_INVALID', {
+      path: BASELINE_RELATIVE_PATH,
+    });
+  }
+  let record;
+  try {
+    record = JSON.parse(fs.readFileSync(absolutePath, 'utf8'));
+  } catch (error) {
+    fail('LFEA_INTERNAL_COLLECTION_BASELINE_INVALID', {
+      path: BASELINE_RELATIVE_PATH,
+      message: error.message,
+    });
+  }
+  if (record.schema !== 'lfea-piping-audit-baseline-runtime/v1'
+    || record.repository !== 'reallaksh19/Advanced_Analysis'
+    || record.exactHeadCommit !== exactHead
+    || record.checkout?.clean !== true
+    || record.evidenceStatus !== 'EXACT_HEAD_BASELINE_CAPTURED') {
+    fail('LFEA_INTERNAL_COLLECTION_BASELINE_INVALID', {
+      schema: record.schema,
+      repository: record.repository,
+      exactHeadCommit: record.exactHeadCommit,
+      checkoutClean: record.checkout?.clean,
+      evidenceStatus: record.evidenceStatus,
+    });
+  }
+  return Object.freeze({ record, contentHash: semanticHash(record) });
+}
+
+function writeCollectedArtifacts(outputRoot, exactHead, results, baseline) {
   const references = {};
   for (const [role, definition] of Object.entries(ARTIFACT_DEFINITIONS)) {
     const roleResults = results.filter((result) => result.artifactRole === role);
-    const content = definition.mediaType === 'text/plain'
+    let content = definition.mediaType === 'text/plain'
       ? renderTextEvidence(roleResults, exactHead)
       : renderJsonEvidence(role, roleResults[0], exactHead);
+    if (role === 'upstreamGateLog') {
+      content = `${content}auditBaselinePath=${BASELINE_RELATIVE_PATH}\nauditBaselineContentHash=${baseline.contentHash}\n`;
+    }
     writeArtifact(outputRoot, definition, content);
     references[role] = Object.freeze({
       path: definition.path,
