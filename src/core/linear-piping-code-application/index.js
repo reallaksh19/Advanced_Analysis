@@ -25,6 +25,7 @@ export {
   NOZZLE_ASSESSMENT_INPUT_KEYS,
   NOZZLE_ASSESSMENT_KEYS,
   compileNozzleAllowableAssessment,
+  computeNozzleAssessmentEvidenceHash,
   nozzleAssessmentSemanticProjection,
   requireNozzleAllowableAssessment,
 } from './nozzle-assessment.js';
@@ -38,6 +39,7 @@ export {
   B31_RESULT_ENTRY_KEYS,
   b31ApplicationSemanticProjection,
   compileLinearPipingB31Application,
+  computeB31ApplicationEvidenceHash,
   requireLinearPipingB31Application,
 } from './b31-application.js';
 
@@ -46,6 +48,7 @@ export {
   APPLICATION_RESULT_KEYS,
   ASSESSMENT_SUMMARY_KEYS,
   applicationResultSemanticProjection,
+  computeApplicationResultEvidenceHash,
   requireLinearPipingQualifiedApplicationResult,
   sealLinearPipingQualifiedApplicationResult,
 } from './application-result.js';
