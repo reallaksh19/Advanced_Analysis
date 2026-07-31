@@ -1,8 +1,8 @@
-import path from 'node:path';
 import process from 'node:process';
 
 export const MANIFEST_RELATIVE_PATH = 'internal/exact-head-manifest.json';
 export const BASELINE_RELATIVE_PATH = 'internal/audit-baseline.runtime.json';
+export const BASELINE_STAGE_DIRECTORY = 'lfea-piping-evidence';
 export const ARTIFACT_DEFINITIONS = Object.freeze({
   upstreamGateLog: Object.freeze({
     path: 'internal/upstream-gate.log',
@@ -34,8 +34,7 @@ export const ARTIFACT_DEFINITIONS = Object.freeze({
   }),
 });
 
-export function buildInternalEvidenceCommandPlan({ outputRoot }) {
-  const baselinePath = path.join(outputRoot, ...BASELINE_RELATIVE_PATH.split('/'));
+export function buildInternalEvidenceCommandPlan({ baselineEmitPath }) {
   return Object.freeze([
     command(
       'EXACT_HEAD_BASELINE',
@@ -44,14 +43,14 @@ export function buildInternalEvidenceCommandPlan({ outputRoot }) {
       [
         'scripts/lfea-piping-a0-baseline-check.mjs',
         '--release',
-        `--emit=${baselinePath}`,
+        `--emit=${baselineEmitPath}`,
       ],
       {
         executable: 'node',
         args: [
           'scripts/lfea-piping-a0-baseline-check.mjs',
           '--release',
-          `--emit=$EVIDENCE_ROOT/${BASELINE_RELATIVE_PATH}`,
+          '--emit=$GIT_DIR/lfea-piping-evidence/$EXPECTED_HEAD/audit-baseline.runtime.json',
         ],
       },
     ),
