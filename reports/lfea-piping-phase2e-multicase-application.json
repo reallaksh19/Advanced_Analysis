@@ -2,7 +2,7 @@
   "schema": "lfea-piping-phase-slice/v1",
   "phaseId": "PHASE_2E_MULTICASE_APPLICATION_ORCHESTRATION",
   "ownerFindingId": "AUD-A3-001",
-  "baseHead": "e28f287d2ee4b086c84931c27676c4d0bdf39771",
+  "baseHead": "9ea51ffa8c87067c57455495af5e6c30270718cf",
   "status": "PARTIALLY_VERIFIED",
   "scope": [
     "Consume multiple retained linear-piping-inputxml-analysis-context/v1 records without reparsing, recompiling or resolving engineering properties.",
