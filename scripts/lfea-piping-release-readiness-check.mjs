@@ -40,4 +40,5 @@ async function runPolicyChecks() {
   await import('./lfea-piping-phase6c-anti-drift-check.mjs');
   await import('./lfea-piping-phase6d-anti-drift-check.mjs');
   await import('./lfea-piping-phase6e-anti-drift-check.mjs');
+  await import('./lfea-piping-phase6f-anti-drift-check.mjs');
 }
