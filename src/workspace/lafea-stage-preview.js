@@ -4,8 +4,10 @@
  * This module does not manufacture pads, pipe rings, continuum grids, shell
  * cylinders, weld profiles, loads, dimensions, mesh topology or quality
  * evidence. A rendered primitive exists only when an accepted stage document
- * contains the corresponding source entity.
+ * contains the corresponding source entity. The governed stage registry owns
+ * the source paths and editability policy.
  */
+import { lafeaRegisteredPreviewSource } from './lafea-stage-registry.js';
 
 function isRecord(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -42,8 +44,9 @@ function sourceNode(row, index, nodePath) {
     x,
     y,
     z,
-    sceneEntityId: `SCENE:${nodePath}[${index}]`,
-    sourceEntityId: `${nodePath}[${index}]`,
+    sceneEntityId: `SCENE:NODE:${nodeId}`,
+    sourceEntityId: nodeId,
+    sourcePath: `${nodePath}[${index}]`,
   });
 }
 
@@ -62,8 +65,9 @@ function sourceElement(row, index, elementPath, knownNodeIds) {
     nodeIds: Object.freeze(nodeIds),
     nodes: Object.freeze([...nodeIds]),
     type: typeof row.type === 'string' && row.type ? row.type : 'SOURCE_ELEMENT',
-    sceneEntityId: `SCENE:${elementPath}[${index}]`,
-    sourceEntityId: `${elementPath}[${index}]`,
+    sceneEntityId: `SCENE:ELEMENT:${elementId}`,
+    sourceEntityId: elementId,
+    sourcePath: `${elementPath}[${index}]`,
   });
 }
 
@@ -93,37 +97,18 @@ function sourceGeometry(nodesInput, elementsInput, nodePath, elementPath, editab
  */
 export function lafeaPreviewGeometry(stageId, input) {
   const document = isRecord(input) ? input : {};
+  const previewSource = lafeaRegisteredPreviewSource(stageId);
+  const nodePath = previewSource.nodePath ?? 'nodes';
+  const elementPath = previewSource.elementPath ?? 'elements';
+  return sourceGeometry(
+    previewSource.nodePath ? getAtPath(document, previewSource.nodePath) : [],
+    previewSource.elementPath ? getAtPath(document, previewSource.elementPath) : [],
+    nodePath,
+    elementPath,
+    previewSource.editable,
+  );
+}
 
-  if (stageId === 'LAFEA.1') {
-    return sourceGeometry(
-      document.loadReferencePoints,
-      [],
-      'loadReferencePoints',
-      'loadReferenceElements',
-    );
-  }
-
-  if (stageId === 'LAFEA.2') {
-    return sourceGeometry(document.nodes, document.elements, 'nodes', 'elements');
-  }
-
-  if (stageId === 'LAFEA.3' || stageId === 'LAFEA.4') {
-    return sourceGeometry(document.nodes, document.elements, 'nodes', 'elements', true);
-  }
-
-  if (stageId === 'LAFEA.5') {
-    return sourceGeometry(
-      document.shellTemplate?.nodes,
-      document.shellTemplate?.elements,
-      'shellTemplate.nodes',
-      'shellTemplate.elements',
-      true,
-    );
-  }
-
-  if (stageId === 'LAFEA.6') {
-    return sourceGeometry(document.nodes, document.elements, 'nodes', 'elements');
-  }
-
-  return sourceGeometry([], [], 'nodes', 'elements');
+function getAtPath(value, path) {
+  return path.split('.').reduce((current, key) => current?.[key], value);
 }
