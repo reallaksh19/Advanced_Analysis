@@ -89,6 +89,16 @@ export {
   mountLafeaSourceWorkbenchViewport,
 } from './lafea-source-workbench-viewport.js';
 export {
+  LAFEA_RENDER_FIELD_SCHEMA,
+  LAFEA_RENDER_LINEAGE_SCHEMA,
+  LAFEA_RENDER_PACKET_V2_SCHEMA,
+  LAFEA_RENDER_SOURCE_ELEMENT_TYPES,
+  LAFEA_RENDER_VALUE_ROLES,
+  LAFEA_SUPPORTED_COLOR_MAPS,
+  requireRenderPacketV2,
+  sealRenderPacketV2,
+} from './lafea-canvas/render-packet-v2-contract.js';
+export {
   LAFEA_WORKBENCH_DOCUMENT_SCHEMA,
   executeLafeaStage,
   lafeaCollectionPaths,
