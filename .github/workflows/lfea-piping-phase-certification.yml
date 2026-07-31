@@ -11,16 +11,21 @@ on:
       - 'reports/lfea-piping-phase2d-inputxml-context.json'
       - 'reports/lfea-piping-phase2e-multicase-application.json'
       - 'reports/lfea-piping-phase2f-unit-normalization.json'
-      - 'reports/lfea-piping-phase6b-external-evidence-package.json'
       - 'reports/lfea-piping-phase5b-workspace-integration.json'
+      - 'reports/lfea-piping-phase6b-external-evidence-package.json'
+      - 'reports/lfea-piping-phase6i-aggregate-anti-drift.json'
       - 'docs/LFEA_PIPING_100_PERCENT_CLOSURE_POLICY.md'
       - 'docs/LFEA_PIPING_PHASE_STATUS.md'
       - 'docs/LFEA_PIPING_PHASE6_EVIDENCE_REQUIREMENTS.md'
+      - 'docs/LFEA_PIPING_PHASE6I_ANTI_DRIFT.md'
       - 'package.json'
       - 'package-lock.json'
       - 'scripts/lfea-piping-a0-baseline-check.mjs'
+      - 'scripts/lfea-piping-internal-release-evidence-check.mjs'
       - 'scripts/lfea-piping-release-readiness-check.mjs'
       - 'scripts/lfea-piping-phase-findings-check.mjs'
+      - 'scripts/lfea-piping-phase6d-anti-drift-check.mjs'
+      - 'scripts/lfea-piping-phase6i-*.mjs'
       - 'scripts/lfea-b2.5-*.mjs'
       - 'scripts/linear-piping-analysis-consumer-*.mjs'
       - 'scripts/linear-piping-inputxml-source-binding-check.mjs'
@@ -48,6 +53,7 @@ on:
       - 'src/workspace/linear-piping-results-workbench.js'
       - 'src/workspace/linear-piping-results-workbench.css'
       - '.github/workflows/lfea-piping-phase-certification.yml'
+      - '.github/workflows/lfea-piping-phase6i-certification.yml'
   workflow_dispatch:
 
 permissions:
@@ -61,7 +67,7 @@ jobs:
   certify-phase-a0:
     name: Certify exact-head piping phase
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
 
     steps:
       - name: Checkout exact head
@@ -80,6 +86,9 @@ jobs:
 
       - name: Validate fail-closed release policy and simulated qualification harness
         run: node scripts/lfea-piping-release-readiness-check.mjs
+
+      - name: Validate Phase 6I aggregate anti-drift controls directly
+        run: npm run check:lfea-piping-phase6i-anti-drift
 
       - name: Validate Phase 6A qualification harness directly
         run: node scripts/linear-piping-project-qualification-check.mjs
