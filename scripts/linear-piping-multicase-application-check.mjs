@@ -246,6 +246,8 @@ function nozzleProfile() {
 function interfaceAuthority(context, allowableProfile) {
   const compilation = context.sourceAnalysisContext.compilation;
   const node = compilation.model.nodes.find((row) => row.nodeId === 'RED-001.N0');
+  const sourceEntityId = node.sourceAncestry.sourceComponentIds[0];
+  assert.equal(typeof sourceEntityId, 'string');
   const dofMappings = compilation.model.constraints
     .filter((row) => row.nodeId === node.nodeId)
     .map((row) => ({
@@ -261,7 +263,7 @@ function interfaceAuthority(context, allowableProfile) {
       interfaceId: allowableProfile.interfaceId,
       interfaceKind: 'NOZZLE',
       nodeId: node.nodeId,
-      sourceEntityId: 'EQUIPMENT-PHASE2E',
+      sourceEntityId,
       supportBinding: null,
       basis: {
         origin: node.position,
