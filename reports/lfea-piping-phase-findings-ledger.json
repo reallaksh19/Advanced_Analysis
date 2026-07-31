@@ -135,6 +135,34 @@
         "AUD-A5-001"
       ],
       "completedAtUtc": null
+    },
+    {
+      "phaseId": "PHASE_5_PRESENTATION_EXPORT",
+      "title": "Current-only read-only presentation and deterministic evidence exports",
+      "status": "PARTIALLY_VERIFIED",
+      "scope": [
+        "Compile a presentation only when every analysis, interface recovery, nozzle assessment and B31.3 parent matches the sealed application result.",
+        "Require the current application identity again at render and export time so a previously valid presentation cannot remain usable after an application change.",
+        "Render support, anchor, nozzle and code result tables through a read-only textContent-only workspace view.",
+        "Permit current conditional results only as explicit audit JSON and block engineering issue CSVs unless the application is fully QUALIFIED and all nozzle profiles are configured.",
+        "Emit deterministic interface, nozzle and B31.3 CSV records containing units, sign convention and direct semantic and evidence identities."
+      ],
+      "evidencePaths": [
+        "src/core/linear-piping-presentation/contracts.js",
+        "src/core/linear-piping-presentation/presentation.js",
+        "src/core/linear-piping-presentation/export.js",
+        "src/core/linear-piping-presentation/index.js",
+        "src/workspace/linear-piping-results-view.js",
+        "scripts/linear-piping-presentation-fixtures.mjs",
+        "scripts/linear-piping-presentation-export-check.mjs",
+        "scripts/linear-piping-presentation-anti-drift-check.mjs",
+        "package.json",
+        ".github/workflows/lfea-piping-phase-certification.yml"
+      ],
+      "addressedFindingIds": [
+        "AUD-A6-001"
+      ],
+      "completedAtUtc": null
     }
   ],
   "findings": [
@@ -163,10 +191,11 @@
         "src/core/linear-piping-analysis-consumer/source-orchestration.js",
         "src/core/linear-piping-analysis-consumer/index.js",
         "src/core/linear-piping-code-application/application-result.js",
+        "src/core/linear-piping-presentation/presentation.js",
         "scripts/linear-piping-source-orchestration-check.mjs",
         "scripts/linear-piping-analysis-consumer-anti-drift-check.mjs"
       ],
-      "remainingCondition": "Raw project-file ingestion, read-only presentation/export integration and successful exact-head retained evidence remain open."
+      "remainingCondition": "Raw project-file ingestion and successful exact-head retained evidence remain open."
     },
     {
       "findingId": "AUD-A3-002",
@@ -194,6 +223,7 @@
         "src/core/linear-piping-interface/public-api.js",
         "src/core/linear-piping-interface/index.js",
         "src/core/linear-piping-code-application/application-result.js",
+        "src/core/linear-piping-presentation/presentation.js",
         "scripts/linear-piping-interface-check.mjs",
         "scripts/linear-piping-nozzle-interface-check.mjs",
         "scripts/linear-piping-interface-anti-drift-check.mjs",
@@ -217,6 +247,7 @@
         "src/core/linear-piping-code-application/b31-application.js",
         "src/core/linear-piping-code-application/application-result.js",
         "src/core/linear-piping-code-application/index.js",
+        "src/core/linear-piping-presentation/presentation.js",
         "scripts/linear-piping-code-application-check.mjs",
         "scripts/linear-piping-code-application-anti-drift-check.mjs",
         "package.json"
@@ -228,12 +259,20 @@
       "gate": "A6",
       "severity": "BLOCKER",
       "auditStatus": "NOT_IMPLEMENTED",
-      "currentStatus": "NOT_IMPLEMENTED",
+      "currentStatus": "PARTIALLY_VERIFIED",
       "ownerPhase": "PHASE_5_PRESENTATION_EXPORT",
       "evidencePaths": [
-        "docs/LFEA_PIPING_100_PERCENT_CLOSURE_POLICY.md"
+        "src/core/linear-piping-presentation/contracts.js",
+        "src/core/linear-piping-presentation/presentation.js",
+        "src/core/linear-piping-presentation/export.js",
+        "src/core/linear-piping-presentation/index.js",
+        "src/workspace/linear-piping-results-view.js",
+        "scripts/linear-piping-presentation-fixtures.mjs",
+        "scripts/linear-piping-presentation-export-check.mjs",
+        "scripts/linear-piping-presentation-anti-drift-check.mjs",
+        "package.json"
       ],
-      "remainingCondition": "Add read-only, stale-safe piping result surfaces and byte-deterministic evidence exports."
+      "remainingCondition": "Retain successful exact-head presentation, core and full-gate evidence and mount the read-only result view and export controls in the active piping workspace with browser qualification."
     },
     {
       "findingId": "AUD-A7-001",
