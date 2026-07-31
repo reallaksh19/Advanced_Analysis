@@ -86,7 +86,9 @@ export function applyLafeaStageEditCommand(currentDocument, command) {
       currentDocumentDigest,
       document: normalized,
       change: applied.change,
-      dependencyImpact: descriptor?.invalidation.descendants ?? REPLACE_DESCENDANTS,
+      dependencyImpact: status === 'NO_CHANGE'
+        ? []
+        : descriptor?.invalidation.descendants ?? REPLACE_DESCENDANTS,
       diagnostics: [],
       descriptor,
     });
@@ -243,6 +245,15 @@ export function createLafeaAddEntityCommand(options) {
   });
 }
 
+export function createLafeaDeleteFieldCommand(options) {
+  return command({
+    ...options,
+    operation: 'DELETE_FIELD',
+    descriptorRevision: options.descriptorRevision ?? LAFEA_INPUT_DESCRIPTOR_REVISION,
+    input: { presence: 'DELETE', encoding: 'JSON', rawText: null, jsonValue: null },
+  });
+}
+
 export function createLafeaDeleteEntityCommand(options) {
   return command({
     ...options,
@@ -356,10 +367,13 @@ function applyAddEntity(currentDocument, command, descriptor) {
   if (!Array.isArray(rows)) throw contractError('LAFEA_COLLECTION_NOT_FOUND', `Missing collection ${descriptor.target.collectionPath}.`);
   const record = structuredClone(command.input.jsonValue);
   const identityKey = descriptor.target.identityKey;
-  const suppliedIdentity = record[identityKey];
-  const identity = typeof suppliedIdentity === 'string' && suppliedIdentity
-    ? suppliedIdentity
-    : allocateLafeaEntityIdentity(command.stageId, document, descriptor, record);
+  if (Object.hasOwn(record, identityKey)) {
+    throw contractError(
+      'LAFEA_ADD_ENTITY_ID_FORBIDDEN',
+      `ADD_ENTITY allocates ${identityKey}; imported identities require whole-document replacement.`,
+    );
+  }
+  const identity = allocateLafeaEntityIdentity(command.stageId, document, descriptor, record);
   if (rows.some((row) => row?.[identityKey] === identity)) {
     throw entityError('LAFEA_IDENTITY_COLLISION', identity, `Duplicate ${identityKey}: ${identity}.`);
   }
@@ -432,6 +446,7 @@ function validateCommand(commandValue) {
   if (!['PRESENT', 'DELETE'].includes(commandValue.input.presence)) throw new TypeError('input.presence is invalid.');
   if (!['TEXT', 'JSON'].includes(commandValue.input.encoding)) throw new TypeError('input.encoding is invalid.');
   if (!Number.isInteger(commandValue.origin.sequence) || commandValue.origin.sequence < 0) throw new TypeError('origin.sequence must be a non-negative integer.');
+  validateOperationInput(commandValue);
   if (commandValue.operation === 'REPLACE_DOCUMENT') {
     if (commandValue.descriptorId !== null || commandValue.descriptorRevision !== null) {
       throw new TypeError('REPLACE_DOCUMENT must not claim a field descriptor.');
@@ -442,6 +457,25 @@ function validateCommand(commandValue) {
   return commandValue;
 }
 
+function validateOperationInput(commandValue) {
+  const { operation, input, target } = commandValue;
+  if (operation === 'SET_SCALAR' && (input.presence !== 'PRESENT' || input.encoding !== 'TEXT')) {
+    throw new TypeError('SET_SCALAR requires PRESENT text input.');
+  }
+  if (operation === 'DELETE_FIELD' && input.presence !== 'DELETE') {
+    throw new TypeError('DELETE_FIELD requires DELETE input.');
+  }
+  if (operation === 'ADD_ENTITY' && (input.presence !== 'PRESENT' || input.encoding !== 'JSON')) {
+    throw new TypeError('ADD_ENTITY requires PRESENT JSON input.');
+  }
+  if (operation === 'DELETE_ENTITY' && (input.presence !== 'DELETE' || typeof target.entityId !== 'string' || !target.entityId)) {
+    throw new TypeError('DELETE_ENTITY requires DELETE input and an exact entity ID.');
+  }
+  if (operation === 'REPLACE_DOCUMENT' && (input.presence !== 'PRESENT' || input.encoding !== 'JSON')) {
+    throw new TypeError('REPLACE_DOCUMENT requires PRESENT JSON input.');
+  }
+}
+
 function result(options) {
   const value = {
     schema: LAFEA_EDIT_RESULT_SCHEMA,
@@ -450,7 +484,7 @@ function result(options) {
     status: options.status,
     previousDocumentDigest: options.previousDocumentDigest,
     currentDocumentDigest: options.currentDocumentDigest,
-    document: options.document,
+    document: frozenClone(options.document),
     change: options.change,
     dependencyImpact: Object.freeze([...options.dependencyImpact]),
     diagnostics: Object.freeze(options.diagnostics.map((row) => deepFreeze(row))),
@@ -585,6 +619,10 @@ function sanitizeCommand(value) {
     commandId: 'INVALID_COMMAND', stageId: null, operation: null,
     target: { entityId: null }, input: null,
   };
+}
+
+function frozenClone(value) {
+  return deepFreeze(structuredClone(value));
 }
 
 function safeDigest(value) {
