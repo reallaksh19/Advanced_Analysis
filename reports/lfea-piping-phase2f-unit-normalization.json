@@ -1,0 +1,57 @@
+{
+  "schema": "lfea-piping-phase-slice/v1",
+  "phaseId": "PHASE_2F_INPUTXML_UNIT_NORMALIZATION",
+  "ownerFindingId": "AUD-A3-001",
+  "baseHead": "c4998c3902235e45dc98d29d95d83f0a0a0325fd",
+  "status": "PARTIALLY_VERIFIED",
+  "scope": [
+    "Preserve linear-piping-inputxml-analysis-request/v1 as a metre-only compatibility boundary.",
+    "Introduce linear-piping-inputxml-analysis-request/v2 with a required caller-supplied and hash-bound unit-normalization profile.",
+    "Normalize declared m, mm, cm, in and ft InputXML length fields to canonical metres through exact rational registry entries rather than decimal approximations or inferred units.",
+    "Scale node coordinates, segment lengths, diameters, thicknesses, bend radii, bend centres and caller-declared component origins before B-1 conditioning.",
+    "Reject unsupported units, stale profiles, stale results and unknown numeric geometry fields that could conceal an unconverted length.",
+    "Retain source unit, target unit, rational scale, profile identity and input/normalized geometry identities inside the existing InputXML ingestion evidence."
+  ],
+  "evidencePaths": [
+    "src/core/linear-piping-analysis-consumer/inputxml-source-contract.js",
+    "src/core/linear-piping-analysis-consumer/inputxml-unit-contract.js",
+    "src/core/linear-piping-analysis-consumer/inputxml-unit-normalization.js",
+    "src/core/linear-piping-analysis-consumer/inputxml-request-validation.js",
+    "src/core/linear-piping-analysis-consumer/inputxml-source-binding.js",
+    "src/core/linear-piping-analysis-consumer/index.js",
+    "scripts/linear-piping-inputxml-unit-normalization-check.mjs",
+    "scripts/linear-piping-inputxml-source-binding-check.mjs",
+    "scripts/linear-piping-analysis-consumer-anti-drift-check.mjs",
+    ".github/workflows/lfea-piping-phase-certification.yml"
+  ],
+  "addressedAgainstSection9": {
+    "findingId": "AUD-A3-001",
+    "priorStatus": "PARTIALLY_VERIFIED",
+    "statusAfterCoding": "PARTIALLY_VERIFIED",
+    "addressed": [
+      "The metre-only InputXML limitation is removed from the versioned v2 application path without changing v1 behavior.",
+      "Length conversion is explicit, exact, caller-authorized and retained as evidence before topology conditioning and mechanical-model compilation.",
+      "Equivalent metre and millimetre source fixtures are required to produce the same conditioned topology, stiffness state, displacements, reactions and recovered actions.",
+      "Unclassified numeric geometry metadata is rejected rather than silently left in source units."
+    ],
+    "notClosed": [
+      "Successful exact-head Phase 2F, consumer, core and full-gate command logs are not yet retained.",
+      "Real project unit-basis documents, material, section, axis, constraint, load, interface, nozzle-allowable and code-dataset authorities remain caller supplied.",
+      "Real-model reconciliation, commercial corroboration, performance qualification and rollback rehearsal remain unresolved."
+    ]
+  },
+  "explicitNonScope": [
+    "Inferring InputXML units from dimensions, filenames, CAESAR versions or magnitude heuristics",
+    "Changing force, moment, stress, temperature or material-property units",
+    "Rescaling already compiled mechanical models or solver results",
+    "Material, section, local-axis, constraint or load inference",
+    "Real-project reconciliation, commercial corroboration or release promotion"
+  ],
+  "remainingConditions": [
+    "Retain successful exact-head Phase 2F, consumer, core and full-gate logs from one clean head.",
+    "Provide caller-approved project authorities and execute real-model reconciliation.",
+    "Provide independent commercial comparison, performance evidence and rollback rehearsal."
+  ],
+  "releaseImpact": "NONE",
+  "programDisposition": "BLOCKED"
+}
