@@ -5,10 +5,42 @@ import './workspace/viewport-renderer.css';
 import './workspace/analysis-session.css';
 import './workspace/analysis-ledger.css';
 import './workspace/enrichment/first-cut-workbench.css';
+import './workspace/linear-piping-results-workbench.css';
 import { bootstrapAnalysisWorkspace } from './workspace/bootstrap.js';
+import { mountLinearPipingResultsWorkbench } from './workspace/linear-piping-results-workbench.js';
 
 const applicationRoot = document.getElementById('root');
-const workspace = bootstrapAnalysisWorkspace(applicationRoot);
+const coreWorkspace = bootstrapAnalysisWorkspace(applicationRoot);
+const linearPipingResults = mountLinearPipingResultsWorkbench(applicationRoot, {
+  documentRef: applicationRoot.ownerDocument,
+  urlApi: applicationRoot.ownerDocument.defaultView?.URL,
+});
+
+const workspace = Object.freeze({
+  ...coreWorkspace,
+  importLinearPipingResultPackage(value) {
+    return linearPipingResults.loadPackage(value);
+  },
+  clearLinearPipingResultPackage() {
+    linearPipingResults.clear();
+  },
+  getLinearPipingResultState() {
+    return linearPipingResults.getSnapshot();
+  },
+  getLinearPipingPresentation() {
+    return linearPipingResults.getPresentation();
+  },
+  createLinearPipingAuditExportRecord() {
+    return linearPipingResults.createAuditExport();
+  },
+  createLinearPipingEngineeringExportRecords() {
+    return linearPipingResults.createEngineeringExports();
+  },
+  destroy() {
+    linearPipingResults.destroy();
+    coreWorkspace.destroy();
+  },
+});
 
 globalThis.AnalysisWorkspace = workspace;
 

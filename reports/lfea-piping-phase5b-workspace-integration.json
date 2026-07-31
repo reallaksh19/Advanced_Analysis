@@ -1,0 +1,43 @@
+{
+  "schema": "lfea-piping-phase-slice/v1",
+  "phaseId": "PHASE_5B_ACTIVE_WORKSPACE_INTEGRATION",
+  "ownerFindingId": "AUD-A6-001",
+  "baseHead": "88df34b7498c62b12a32d44bdb81a8c9a25f9a05",
+  "status": "PARTIALLY_VERIFIED",
+  "scope": [
+    "Mount the existing current-only Phase 5 presentation in the active WORKSPACE properties panel.",
+    "Accept only linear-piping-workspace-result-package/v1 records containing the sealed Phase 4 and Phase 5 parent chain.",
+    "Recompile and revalidate the current presentation before display.",
+    "Revalidate the current application again before each audit or engineering export.",
+    "Expose deterministic audit JSON and qualified-only engineering CSV records through the public AnalysisWorkspace boundary.",
+    "Clear previously displayed results when a replacement package is invalid or stale."
+  ],
+  "evidencePaths": [
+    "src/workspace/linear-piping-results-workbench.js",
+    "src/workspace/linear-piping-results-workbench.css",
+    "src/workspace/linear-piping-results-view.js",
+    "src/main.js",
+    "scripts/linear-piping-workspace-integration-check.mjs",
+    "e2e/linear-piping-results-workspace.spec.js",
+    ".github/workflows/lfea-piping-phase-certification.yml"
+  ],
+  "explicitNonScope": [
+    "Mechanical-model compilation",
+    "Solver execution",
+    "Result recovery",
+    "Interface transformation or reference-point transfer",
+    "Nozzle allowable calculation",
+    "B31.3 stress calculation",
+    "Raw project-file ingestion",
+    "Real-model reconciliation",
+    "Commercial corroboration",
+    "Release qualification"
+  ],
+  "remainingConditions": [
+    "Retain successful exact-head controller, browser, core and full-gate logs.",
+    "Bind raw project-file ingestion to the complete application result in a separate authority.",
+    "Supply non-fictional project and commercial evidence for G8 and G9.",
+    "Complete performance qualification and rollback rehearsal."
+  ],
+  "releaseImpact": "NONE"
+}
