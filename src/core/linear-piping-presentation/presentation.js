@@ -30,69 +30,6 @@ export const PRESENTATION_INPUT_KEYS = Object.freeze([
   'b31Application',
 ]);
 
-export const ANALYSIS_ROW_KEYS = Object.freeze([
-  'analysisIdentity',
-  'analysisRevision',
-  'status',
-  'physicalLoadCaseHash',
-  'executionHash',
-  'recoveryHash',
-  'analysisResultSemanticHash',
-  'evidenceHash',
-]);
-export const INTERFACE_ROW_KEYS = Object.freeze([
-  'interfaceId',
-  'interfaceKind',
-  'nodeId',
-  'loadCaseId',
-  'status',
-  'frameSemanticHash',
-  'reportingSignConvention',
-  'units',
-  'forceGlobal',
-  'momentAtNodeGlobal',
-  'forceLocal',
-  'momentAtReferenceLocal',
-  'referencePointGlobal',
-  'leverReferenceToNodeLocal',
-  'resultSemanticHash',
-  'recoverySemanticHash',
-  'recoveryEvidenceHash',
-]);
-export const NOZZLE_ROW_KEYS = Object.freeze([
-  'profileId',
-  'profileSemanticHash',
-  'interfaceId',
-  'loadCaseId',
-  'reportingSignConvention',
-  'units',
-  'forceLocal',
-  'momentAtReferenceLocal',
-  'governingTerm',
-  'interactionValue',
-  'interactionLimit',
-  'utilization',
-  'assessmentStatus',
-  'qualificationStatus',
-  'semanticHash',
-  'evidenceHash',
-]);
-export const CODE_ROW_KEYS = Object.freeze([
-  'checkId',
-  'category',
-  'componentId',
-  'codePointId',
-  'combinationId',
-  'status',
-  'calculatedStress',
-  'allowableStress',
-  'utilization',
-  'governingRuleId',
-  'sourceRecoveryHashes',
-  'semanticHash',
-  'evidenceHash',
-]);
-
 export function compileLinearPipingPresentation(input) {
   exactKeys(input, PRESENTATION_INPUT_KEYS, 'linearPipingPresentationInput');
   const applicationResult = requireLinearPipingQualifiedApplicationResult(input.applicationResult);
