@@ -15,6 +15,7 @@ const release = JSON.parse(fs.readFileSync(releasePath, 'utf8'));
 assert.ok(intake.split(/\r?\n/u).length < 500, 'Phase 6D intake source limit is <500 lines.');
 assert.match(intake, /lfea-piping-exact-head-manifest\/v1/u);
 assert.match(intake, /exactHeadManifest/u);
+assert.match(intake, /createdAtUtc:\s*_createdAtUtc/u);
 for (const gate of [
   'G0_EXACT_HEAD',
   'G1_UPSTREAM_NUMERICAL_CHAIN',
