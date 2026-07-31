@@ -121,6 +121,12 @@ export {
   mountLafeaHybridResultViewport,
 } from './lafea-hybrid-result-viewport-public.js';
 export {
+  LAFEA_WORKBENCH_ACCESSORY_DIAGNOSTIC_SCHEMA,
+  LAFEA_WORKBENCH_ACCESSORY_HOST_SCHEMA,
+  LAFEA_WORKBENCH_ACCESSORY_PANEL_SCHEMA,
+  validateLafeaAccessoryPanelDescriptor,
+} from './lafea-workbench-accessory-panels.js';
+export {
   LAFEA_WORKBENCH_DOCUMENT_SCHEMA,
   executeLafeaStage,
   lafeaCollectionPaths,
@@ -133,8 +139,13 @@ export { lafeaPreviewGeometry } from './lafea-stage-preview.js';
 /**
  * Mount and initialize a LAFEA workbench in an existing shell root.
  *
+ * `accessoryPanels` is an optional array of exact
+ * `lafea-workbench-accessory-panel/v1` descriptors. Panels are UI composition
+ * extensions only and receive a frozen facade containing `getState` and
+ * `importDocument`.
+ *
  * @param {Element} rootElement Workbench host.
- * @param {{initialStage?:string,initialDocument?:unknown}|undefined} options Explicit initial state.
+ * @param {{initialStage?:string,initialDocument?:unknown,initialSourceHash?:string,accessoryPanels?:unknown[]}|undefined} options Explicit initial state and optional accessory panels.
  * @returns {LafeaWorkbenchController} Initialized controller.
  */
 export function mountLafeaWorkbench(rootElement, options) {
