@@ -61,4 +61,6 @@ assert.equal(
 assert.match(packageValue.scripts['check:lfea-core'], /check:lfea-interfaces/u);
 assert.match(packageValue.scripts.gate, /check:lfea-core/u);
 
+await import('./linear-piping-nozzle-interface-check.mjs');
+
 console.log('Linear piping interface anti-drift check PASS');
