@@ -1,6 +1,6 @@
 # LFEA Piping Phase Status
 
-Exact Phase 6E development base: `main` at `d4c365dd6aa58f34cf84f32637120a0d36ce84e6`.
+Exact Phase 6F development base: `main` at `48a480aba1a8b50ff3ace4f5c298006b621a57c0`.
 
 Program disposition: `BLOCKED`.
 
@@ -48,22 +48,25 @@ Program disposition: `BLOCKED`.
 - Phase 6E preserves the committed release manifest as a blocked, null-headed policy template and requires a separate runtime bundle for explicit release validation.
 - Phase 6E binds the runtime manifest to an explicitly supplied checkout SHA, runs Phase 6C and Phase 6D persisted intakes only in release mode, and runs simulated checks only in policy mode.
 - Phase 6E provides a manual workflow that runs the full repository gate, downloads a retained evidence artifact and validates the runtime bundle against `${{ github.sha }}` without modifying repository evidence files.
+- Phase 6F executes the governed ten-command G0-G7 plan on one selected checkout and retains actual stdout, stderr, exit status, clean-tree proof and content hashes.
+- Phase 6F seals the existing Phase 6D exact-head manifest only after every real command succeeds and writes explicit failure evidence without a manifest when a command fails.
+- Phase 6F uploads successful and failed collection outputs through separate manual workflow artifact paths and does not collect or fabricate G8-G10 evidence.
 - The Section 9 ledger contains the `PHASE_6_PROJECT_QUALIFICATION` owner phase for `AUD-A7-001`; the finding remains `UNRESOLVED_GATE`.
 - `check:linear-piping-analysis-consumer`, `check:lfea-interfaces`, `check:lfea-code-application` and `check:lfea-presentation-export` are registered inside `check:lfea-core`.
 - Phases 2B, 2C, 2D, 2E and 2F run under `check:linear-piping-analysis-consumer`; Phase 5B runs under `check:lfea-presentation-export` with a separate browser contract.
-- Phase 6A through Phase 6E simulated checks run through the fail-closed policy route but remain ineligible as project or release evidence.
+- Phase 6A through Phase 6F simulated checks run through the fail-closed policy route but remain ineligible as project or release evidence.
 - Release readiness remains fail closed through the Section 9 findings ledger, the blocked repository template and runtime G0-G10 evidence validation.
 
 ## Still open
 
 - Exact-head CI evidence remains unresolved while repository Actions jobs fail before exposing executable steps or retained logs.
-- Successful exact-head B-2.5, Phase 2D, Phase 2E, Phase 2F, Phase 6B, Phase 6C, Phase 6D, Phase 6E, consumer, core, policy and full-gate command evidence has not been retained.
+- Successful exact-head B-2.5, Phase 2D, Phase 2E, Phase 2F, Phase 6B, Phase 6C, Phase 6D, Phase 6E, Phase 6F, consumer, core, policy and full-gate command evidence has not been retained.
 - Phase 2E and Phase 2F provide the bounded multicase orchestration and governed length-normalization APIs, but a real project package still requires caller-approved unit basis, B-2.2 material resolutions, B-2.3 section resolutions, B-2.4 axes, constraints, B-3.0 loads, interface definitions, nozzle allowable profiles and B31.3 datasets/checks.
 - InputXML request v1 remains metre-only by contract; request v2 performs only explicitly authorized length normalization and does not infer source units.
 - No complete non-fictional real-model reconciliation or independent commercial corroboration artifact has been supplied.
 - No qualifying performance record, rollback rehearsal record or signed release-review disposition has been supplied.
-- No real exact-head manifest, G0-G7 command log or internal phase evidence file has been supplied.
-- No complete runtime release evidence bundle has been retained or certified.
+- No successful real Phase 6F internal evidence collection has been retained.
+- No complete runtime release evidence bundle has been assembled or certified.
 - G0 through G7 remain `UNRESOLVED_GATE` or `PARTIALLY_VERIFIED`; their repository-template artifact paths remain null.
 - G8, G9 and G10 remain `UNRESOLVED_GATE`; their repository-template artifact paths remain null.
 - Real ASME B31.3/B31J datasets and equipment/nozzle allowable profiles remain caller-supplied project authorities; no licensed or vendor numerical tables are embedded in source.
@@ -71,4 +74,4 @@ Program disposition: `BLOCKED`.
 
 ## Release rule
 
-The committed repository manifest remains `BLOCKED` and null-headed. Release qualification requires every G0-G10 gate and artifact to be populated in a retained runtime bundle, the runtime manifest head to equal the selected checkout SHA, the Phase 6C external package and Phase 6D internal manifest both to revalidate as `ELIGIBLE_FOR_RELEASE_REVIEW`, the full repository gate to pass on that checkout, and the explicit runtime release command to pass against the retained bundle.
+The committed repository manifest remains `BLOCKED` and null-headed. Release qualification requires a successful Phase 6F internal collection for the selected exact head, a governed external evidence package, every G0-G10 gate and artifact populated in one retained runtime bundle, the runtime manifest head equal to the selected checkout SHA, the Phase 6C external package and Phase 6D internal manifest both revalidated as `ELIGIBLE_FOR_RELEASE_REVIEW`, the full repository gate passed on that checkout, and the explicit Phase 6E runtime release command passed against the retained bundle.
