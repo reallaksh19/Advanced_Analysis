@@ -1,9 +1,9 @@
 /**
  * LAFEA workbench stage contracts.
  *
- * Editable source documents are canonicalized immediately before a calculation.
- * This keeps derived semantic hashes out of form state and prevents stale evidence
- * from being presented as an accepted engineering result.
+ * Editable source documents are canonicalized immediately before calculation.
+ * Workspace code does not create engineering results or silently substitute a
+ * missing stage engine.
  */
 import {
   calculateLocalAttachmentFoundation,
@@ -47,13 +47,14 @@ export const LAFEA_STAGE_IDS = Object.freeze([
 ]);
 
 export const LAFEA_STAGE_DEFINITIONS = Object.freeze([
-  stage('LAFEA.1', 'Attachment foundation', 'Load transfer and pressure baseline'),
-  stage('LAFEA.2', 'Pipe-section screening', 'Nominal local pipe-section screening'),
-  stage('LAFEA.3', '2D continuum', 'T3 plane-stress or plane-strain continuum'),
-  stage('LAFEA.4', 'Thin shell', 'Five-DOF triangular thin-shell kernel'),
-  stage('LAFEA.5', 'Trunnion footprint', 'Attachment-to-shell footprint workflow'),
-  stage('LAFEA.6', 'Weld profile', 'Universal eccentric load decomposition & fillet weld stress'),
+  stage('LAFEA.1', 'Attachment foundation', 'Load transfer and elastic pressure baseline only'),
+  stage('LAFEA.2', 'Pipe-section screening', 'Nominal far-field pipe-section screening only'),
+  stage('LAFEA.3', '2D continuum', 'T6/Q8 continuum with T3 fallback and benchmark support'),
+  stage('LAFEA.4', 'Thin shell', 'Legacy five-DOF triangular CST+DKT thin-shell path'),
+  stage('LAFEA.5', 'Trunnion footprint', 'Caller-authored host-shell footprint load distribution'),
+  stage('LAFEA.6', 'Weld profile', 'Not implemented — no qualified stage engine'),
 ]);
+
 const COLLECTIONS = Object.freeze({
   'LAFEA.1': ['materials', 'pressureDefinitions', 'loadReferencePoints', 'loadCases'],
   'LAFEA.2': ['screeningCases', 'evaluationLocations'],
@@ -69,6 +70,14 @@ const COLLECTIONS = Object.freeze({
   ],
   'LAFEA.6': ['nodes', 'elements', 'materials', 'loadCases'],
 });
+
+const UNSUPPORTED_WELD_STAGE_DIAGNOSTIC = Object.freeze({
+  severity: 'ERROR',
+  code: 'UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED',
+  path: 'stageId',
+  message: 'LAFEA.6 calculation is disabled because no qualified weld-profile core engine is registered.',
+});
+
 /**
  * Validate and normalize an editable document for one exact LAFEA stage.
  *
@@ -119,6 +128,19 @@ export function normalizeLafeaStageEdit(stageId, input) {
   }
   return normalizeLafeaStageDocument(stageId, source);
 }
+
+/**
+ * Whether the active stage has a qualified calculation route in the current
+ * workbench contract.
+ *
+ * @param {string} stageId Exact LAFEA stage identity.
+ * @returns {boolean}
+ */
+export function lafeaStageExecutionSupported(stageId) {
+  assertStageId(stageId);
+  return stageId !== 'LAFEA.6';
+}
+
 /**
  * Execute the only qualified calculation API assigned to a LAFEA stage.
  *
@@ -128,6 +150,16 @@ export function normalizeLafeaStageEdit(stageId, input) {
  */
 export function executeLafeaStage(stageId, document) {
   assertStageId(stageId);
+  if (!lafeaStageExecutionSupported(stageId)) {
+    return freezeClone({
+      stageId,
+      status: 'FAILED',
+      source: null,
+      canonicalInput: null,
+      result: null,
+      diagnostics: [UNSUPPORTED_WELD_STAGE_DIAGNOSTIC],
+    });
+  }
   try {
     const source = normalizeLafeaStageDocument(stageId, document);
     const canonicalInput = canonicalCalculationInput(stageId, source);
@@ -153,8 +185,9 @@ export function executeLafeaStage(stageId, document) {
     });
   }
 }
+
 /**
- * Return collection paths exposed by the stage record editor.
+ * Return collection paths exposed by the transitional stage record editor.
  *
  * @param {string} stageId Exact LAFEA stage identity.
  * @returns {ReadonlyArray<string>} Stable collection paths.
@@ -163,45 +196,48 @@ export function lafeaCollectionPaths(stageId) {
   assertStageId(stageId);
   return COLLECTIONS[stageId];
 }
+
 function stripWorkbenchFields(input) {
   if (!isRecord(input)) return input;
   const { meshConfig, ...kernelSource } = input;
   return kernelSource;
 }
+
 function canonicalCalculationInput(stageId, source) {
   const cleanSource = stripWorkbenchFields(source);
   if (stageId === 'LAFEA.1') return createCanonicalLocalAttachmentFoundationModel(cleanSource);
   if (stageId === 'LAFEA.2') return createLocalAttachmentScreeningRequest(cleanSource);
   if (stageId === 'LAFEA.3') return createCanonicalLocalContinuumModel(cleanSource);
   if (stageId === 'LAFEA.4') return createCanonicalLocalShellModel(cleanSource);
-  if (stageId === 'LAFEA.6') return cleanSource;
-  return createCanonicalTrunnionFootprintSource(cleanSource);
+  if (stageId === 'LAFEA.5') return createCanonicalTrunnionFootprintSource(cleanSource);
+  throw unsupportedStageError(stageId);
 }
+
 function calculate(stageId, input) {
   if (stageId === 'LAFEA.1') return calculateLocalAttachmentFoundation(input);
   if (stageId === 'LAFEA.2') return calculateLocalAttachmentScreening(input);
   if (stageId === 'LAFEA.3') return calculateLocalContinuum(input);
   if (stageId === 'LAFEA.4') return calculateLocalShell(input);
-  if (stageId === 'LAFEA.6') {
-    return {
-      qualification: { state: 'ACCEPTED', summary: 'Qualified Weld Profile evaluation passed.' },
-      stresses: [{ label: 'Max Fillet Weld Toe Stress', value: 85.4, unit: 'MPa', allowable: input.allowableShearMpa || 110.0 }],
-      moments: [{ label: 'Applied Eccentric Moment', value: (input.eccentricLoadN || 50000) * (input.leverArmDistanceMm || 450) / 1000, unit: 'N-m' }],
-      modelStatus: 'PASS - WELD CONSTRAINTS WITHIN TOLERANCE',
-    };
-  }
-  return calculateLocalTrunnionFootprint(input);
+  if (stageId === 'LAFEA.5') return calculateLocalTrunnionFootprint(input);
+  throw unsupportedStageError(stageId);
 }
+
 function acceptedResult(stageId, result) {
   if (stageId === 'LAFEA.4' || stageId === 'LAFEA.5') {
     return result?.qualification?.accepted === true;
   }
   return result?.qualification?.state === 'ACCEPTED';
 }
+
 function normalizedDiagnostics(result) {
   const rows = Array.isArray(result?.diagnostics) ? result.diagnostics : [];
-  return rows.length ? rows : [{ severity: 'ERROR', code: 'LAFEA_CALCULATION_REJECTED', message: result?.qualification?.summary || 'The qualified kernel rejected the document.' }];
+  return rows.length ? rows : [{
+    severity: 'ERROR',
+    code: 'LAFEA_CALCULATION_REJECTED',
+    message: result?.qualification?.summary || 'The qualified kernel rejected the document.',
+  }];
 }
+
 function editableSource(stageId, input) {
   const cleanInput = stripWorkbenchFields(input);
   if (stageId === 'LAFEA.1' && isRecord(cleanInput.sourceEvidence)) {
@@ -222,6 +258,7 @@ function editableSource(stageId, input) {
   if (stageId === 'LAFEA.4') return withoutHash(cleanInput);
   return cleanInput;
 }
+
 function editableScreening(input) {
   const result = withoutHash(input);
   if (Array.isArray(result.evaluationLocations)) {
@@ -232,6 +269,13 @@ function editableScreening(input) {
     });
   }
   return result;
+}
+
+function unsupportedStageError(stageId) {
+  const error = new Error(`No qualified calculation engine is registered for ${stageId}.`);
+  error.code = 'UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED';
+  error.path = 'stageId';
+  return error;
 }
 
 function errorDiagnostic(error) {
