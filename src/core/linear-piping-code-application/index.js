@@ -53,5 +53,8 @@ export {
   applicationResultSemanticProjection,
   computeApplicationResultEvidenceHash,
   requireLinearPipingQualifiedApplicationResult,
-  sealLinearPipingQualifiedApplicationResult,
 } from './application-result.js';
+
+export {
+  sealLinearPipingQualifiedApplicationResult,
+} from './application-public-api.js';
