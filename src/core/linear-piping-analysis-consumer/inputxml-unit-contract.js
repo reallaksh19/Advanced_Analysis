@@ -103,6 +103,7 @@ export function requireLinearPipingInputXmlUnitResult(value, profileValue) {
     'profileSemanticHash', 'inputGeometrySemanticHash', 'normalizedGeometrySemanticHash',
     'semanticHash', 'evidenceHash',
   ]) requireHash(value[field], `inputXmlUnitResult.${field}`);
+  requireRecord(value.geometry, 'inputXmlUnitResult.geometry');
   const validation = validateCanonicalGeometry(value.geometry, { requireKnownUnit: true });
   if (!validation.ok || value.geometry.unit !== 'm') {
     failInputXml('InputXML unit result geometry is invalid.', 'PIPING_INPUTXML_UNIT_RESULT_INVALID');
@@ -135,7 +136,8 @@ export function computeInputXmlUnitResultEvidenceHash(value, profile) {
     profileSourceEvidence: profile.sourceEvidence,
     geometryDiagnosticCodes: (value.geometry.diagnostics ?? [])
       .map((row) => row.code)
-      .filter(Boolean),
+      .filter(Boolean)
+      .sort(compareAscii),
   });
 }
 
