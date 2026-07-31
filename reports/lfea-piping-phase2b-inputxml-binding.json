@@ -1,0 +1,40 @@
+{
+  "schema": "lfea-piping-phase-slice/v1",
+  "phaseId": "PHASE_2B_INPUTXML_SOURCE_BINDING",
+  "ownerFindingId": "AUD-A3-001",
+  "baseHead": "08ce413ef1700962a69856654601ef21f1551081",
+  "status": "PARTIALLY_VERIFIED",
+  "scope": [
+    "Seal exact decoded CAESAR II InputXML text as a content-hash-bound project source authority.",
+    "Invoke the existing InputXML-to-canonical-geometry adapter with explicit metre units and explicit ingestion policies.",
+    "Recompute B-1 conditioned topology from the sealed source and declared conditioning profile.",
+    "Reject caller-supplied conditioned geometry that differs from the recomputed topology even when the caller retains the approved hash string.",
+    "Bind the recomputed source and topology identities to the existing Phase 2A B-2.5/B-3.0/T0 request.",
+    "Retain source, content, conditioned-topology, analysis semantic and analysis evidence identities in a sealed result wrapper."
+  ],
+  "evidencePaths": [
+    "src/core/linear-piping-analysis-consumer/inputxml-source-contract.js",
+    "src/core/linear-piping-analysis-consumer/inputxml-source-binding.js",
+    "src/core/linear-piping-analysis-consumer/index.js",
+    "scripts/linear-piping-inputxml-source-binding-check.mjs",
+    "scripts/linear-piping-analysis-consumer-anti-drift-check.mjs",
+    ".github/workflows/lfea-piping-phase-certification.yml"
+  ],
+  "explicitNonScope": [
+    "Unit conversion into metres",
+    "Material-state inference from InputXML material labels",
+    "Pipe-section authority inference from diameter and wall fields",
+    "Local-axis policy selection",
+    "Constraint or support behavior inference from unconfigured restraint codes",
+    "Load-case extraction or combination selection",
+    "Interface, nozzle or B31.3 application orchestration",
+    "Real-model reconciliation or commercial corroboration",
+    "Release qualification"
+  ],
+  "remainingConditions": [
+    "Supply caller-approved B-2.2 material resolutions, B-2.3 section resolutions, B-2.4 axes, constraints and B-3.0 loads for each project model.",
+    "Retain successful exact-head InputXML, consumer, core and full-gate logs.",
+    "Supply non-fictional G8 and G9 evidence, performance qualification and rollback evidence."
+  ],
+  "releaseImpact": "NONE"
+}
