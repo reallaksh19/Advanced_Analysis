@@ -1,0 +1,57 @@
+name: LAFEA Agent 1 Stack Certification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/lafea-agent1-stack.yml'
+      - 'package.json'
+      - 'src/workspace/lafea-**'
+      - 'src/core/lafea-application-templates/**'
+      - 'scripts/lafea-*.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lafea-agent1-stack-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run governed Agent 1 and template checks
+        run: node scripts/lafea-agent1-stack-check.mjs
+
+      - name: Run retained LAFEA numerical-core checks
+        run: npm run check:lafea-core
+
+      - name: Run strict syntax and import checks
+        run: |
+          npm run syntax:strict
+          npm run check:imports
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Run complete repository gate
+        run: npm run gate
+
+      - name: Verify patch hygiene and clean tree
+        run: |
+          git diff --check
+          test -z "$(git status --short)"
