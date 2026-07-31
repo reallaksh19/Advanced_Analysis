@@ -1,0 +1,81 @@
+name: LFEA Piping Runtime Release Certification
+
+on:
+  workflow_dispatch:
+    inputs:
+      evidence_run_id:
+        description: Workflow run ID containing the retained release evidence bundle
+        required: true
+        type: string
+      evidence_artifact_name:
+        description: Artifact name containing the release manifest and referenced evidence
+        required: true
+        type: string
+      manifest_path:
+        description: Repository-relative path to the runtime manifest inside the bundle
+        required: true
+        default: release-evidence.json
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: lfea-piping-runtime-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  certify-runtime-release-bundle:
+    name: Certify supplied runtime release bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout selected exact head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run full repository gate against blocked policy template
+        run: npm run gate
+
+      - name: Download retained release evidence bundle
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.evidence_run_id }}
+          name: ${{ inputs.evidence_artifact_name }}
+          path: ${{ runner.temp }}/lfea-release-bundle
+
+      - name: Validate runtime release bundle against selected checkout
+        shell: bash
+        env:
+          EVIDENCE_ROOT: ${{ runner.temp }}/lfea-release-bundle
+          MANIFEST_PATH: ${{ inputs.manifest_path }}
+          EXPECTED_HEAD: ${{ github.sha }}
+          VALIDATION_OUTPUT: ${{ runner.temp }}/lfea-runtime-release-validation.json
+        run: |
+          set -o pipefail
+          npm run check:lfea-piping-release -- \
+            --evidence-root="$EVIDENCE_ROOT" \
+            --manifest="$MANIFEST_PATH" \
+            --expected-head="$EXPECTED_HEAD" \
+            | tee "$VALIDATION_OUTPUT"
+
+      - name: Upload runtime release validation result
+        uses: actions/upload-artifact@v4
+        with:
+          name: lfea-runtime-release-validation-${{ github.sha }}
+          path: ${{ runner.temp }}/lfea-runtime-release-validation.json
+          if-no-files-found: error
+          retention-days: 90
