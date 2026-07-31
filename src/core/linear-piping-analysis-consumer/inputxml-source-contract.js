@@ -55,7 +55,9 @@ export function sealLinearPipingInputXmlSource(input) {
   return requireLinearPipingInputXmlSource(draft);
 }
 
-export function computeInputXmlContentHash(content, mediaType = INPUTXML_MEDIA_TYPE) {
+export function computeInputXmlContentHash(content, mediaType) {
+  requireMediaType(mediaType);
+  requireText(content, 'inputXmlContent');
   return semanticHash({ mediaType, content });
 }
 
