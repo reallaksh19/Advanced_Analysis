@@ -17,9 +17,12 @@ on:
       - 'scripts/linear-piping-interface-*.mjs'
       - 'scripts/linear-piping-nozzle-interface-check.mjs'
       - 'scripts/linear-piping-code-application-*.mjs'
+      - 'scripts/linear-piping-presentation-*.mjs'
       - 'src/core/linear-piping-analysis-consumer/**'
       - 'src/core/linear-piping-interface/**'
       - 'src/core/linear-piping-code-application/**'
+      - 'src/core/linear-piping-presentation/**'
+      - 'src/workspace/linear-piping-results-view.js'
       - '.github/workflows/lfea-piping-phase-certification.yml'
   workflow_dispatch:
 
@@ -71,6 +74,9 @@ jobs:
 
       - name: Verify configured nozzle and B31 application results
         run: npm run check:lfea-code-application
+
+      - name: Verify current-only presentation and deterministic exports
+        run: npm run check:lfea-presentation-export
 
       - name: Run full repository gate
         run: npm run gate
