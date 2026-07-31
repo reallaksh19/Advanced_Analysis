@@ -12,10 +12,8 @@ import {
   failInputXml,
   requireLinearPipingInputXmlAnalysisResult,
 } from './inputxml-source-contract.js';
-import {
-  inputXmlUnitEvidenceProjection,
-  normalizeLinearPipingInputXmlGeometry,
-} from './inputxml-unit-normalization.js';
+import { inputXmlUnitEvidenceProjection } from './inputxml-unit-contract.js';
+import { normalizeLinearPipingInputXmlGeometry } from './inputxml-unit-normalization.js';
 import { sealLinearPipingInputXmlAnalysisContext } from './inputxml-analysis-context.js';
 import { compileLinearPipingSourceAnalysisContext } from './source-orchestration.js';
 import { validateLinearPipingInputXmlAnalysisRequest } from './inputxml-request-validation.js';
