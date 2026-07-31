@@ -10,12 +10,13 @@ import {
 import {
   LAFEA_TEMPLATE_ACCESSORY_PANEL_DESCRIPTOR,
   LAFEA_TEMPLATE_ACCESSORY_PANEL_ID,
-  LAFEA_TEMPLATE_ACCESSORY_PANEL_LABEL,
-  LAFEA_TEMPLATE_ACCESSORY_PANEL_ORDER,
   LAFEA_WORKBENCH_ACCESSORY_PANEL_SCHEMA as AGENT2_PANEL_SCHEMA,
   validateLafeaTemplateAccessoryPanelDescriptor,
 } from '../src/workspace/lafea-templates/t6b-accessory-panel.js';
 import {
+  LAFEA_LIVE_TEMPLATE_ACCESSORY_PANEL_DESCRIPTOR,
+  LAFEA_LIVE_TEMPLATE_WIZARD_INTEGRATION,
+  LAFEA_LIVE_TEMPLATE_WIZARD_INTEGRATION_STATUS,
   LAFEA_TEMPLATE_WORKBENCH_REGISTRATION_AUTHORITY,
   LAFEA_TEMPLATE_WORKBENCH_REGISTRATION_SCHEMA,
   LAFEA_TEMPLATE_WORKBENCH_REGISTRATION_STATUS,
@@ -29,18 +30,23 @@ assert.equal(
   ).ok,
   true,
 );
-const hostValidated = validateLafeaAccessoryPanelDescriptor(
-  LAFEA_TEMPLATE_ACCESSORY_PANEL_DESCRIPTOR,
+validateLafeaAccessoryPanelDescriptor(LAFEA_TEMPLATE_ACCESSORY_PANEL_DESCRIPTOR);
+const liveValidated = validateLafeaAccessoryPanelDescriptor(
+  LAFEA_LIVE_TEMPLATE_ACCESSORY_PANEL_DESCRIPTOR,
 );
-assert.equal(hostValidated.schema, AGENT1_PANEL_SCHEMA);
-assert.equal(hostValidated.panelId, LAFEA_TEMPLATE_ACCESSORY_PANEL_ID);
-assert.equal(hostValidated.label, LAFEA_TEMPLATE_ACCESSORY_PANEL_LABEL);
-assert.equal(hostValidated.order, LAFEA_TEMPLATE_ACCESSORY_PANEL_ORDER);
+assert.equal(liveValidated.schema, AGENT1_PANEL_SCHEMA);
+assert.equal(liveValidated.panelId, LAFEA_TEMPLATE_ACCESSORY_PANEL_ID);
+assert.equal(
+  LAFEA_LIVE_TEMPLATE_WIZARD_INTEGRATION.status,
+  'RESOLVED_INTERFACE_MERGED',
+);
+assert.equal(
+  LAFEA_LIVE_TEMPLATE_WIZARD_INTEGRATION_STATUS,
+  'LIVE_UI_COMPOSITION_ONLY',
+);
 
 const registration = createLafeaTemplateWorkbenchRegistration({
-  workbenchOptions: {
-    initialStage: 'LAFEA.3',
-  },
+  workbenchOptions: { initialStage: 'LAFEA.3' },
 });
 assert.equal(registration.schema, LAFEA_TEMPLATE_WORKBENCH_REGISTRATION_SCHEMA);
 assert.equal(registration.status, LAFEA_TEMPLATE_WORKBENCH_REGISTRATION_STATUS);
@@ -49,7 +55,7 @@ assert.equal(Object.isFrozen(registration), true);
 assert.equal(Object.isFrozen(registration.mountOptions), true);
 assert.equal(Object.isFrozen(registration.mountOptions.accessoryPanels), true);
 assert.deepEqual(registration.mountOptions.accessoryPanels, [
-  LAFEA_TEMPLATE_ACCESSORY_PANEL_DESCRIPTOR,
+  LAFEA_LIVE_TEMPLATE_ACCESSORY_PANEL_DESCRIPTOR,
 ]);
 assert.equal(registration.mountOptions.initialStage, 'LAFEA.3');
 assert.equal(registration.authority.liveUiComposition, true);
@@ -80,13 +86,13 @@ let templateDestroyCount = 0;
 let getStateCalls = 0;
 let importDocumentCalls = 0;
 const countedTemplateDescriptor = Object.freeze({
-  schema: LAFEA_TEMPLATE_ACCESSORY_PANEL_DESCRIPTOR.schema,
-  panelId: LAFEA_TEMPLATE_ACCESSORY_PANEL_DESCRIPTOR.panelId,
-  label: LAFEA_TEMPLATE_ACCESSORY_PANEL_DESCRIPTOR.label,
-  order: LAFEA_TEMPLATE_ACCESSORY_PANEL_DESCRIPTOR.order,
+  schema: LAFEA_LIVE_TEMPLATE_ACCESSORY_PANEL_DESCRIPTOR.schema,
+  panelId: LAFEA_LIVE_TEMPLATE_ACCESSORY_PANEL_DESCRIPTOR.panelId,
+  label: LAFEA_LIVE_TEMPLATE_ACCESSORY_PANEL_DESCRIPTOR.label,
+  order: LAFEA_LIVE_TEMPLATE_ACCESSORY_PANEL_DESCRIPTOR.order,
   mount(context) {
     templateMountCount += 1;
-    const handle = LAFEA_TEMPLATE_ACCESSORY_PANEL_DESCRIPTOR.mount(context);
+    const handle = LAFEA_LIVE_TEMPLATE_ACCESSORY_PANEL_DESCRIPTOR.mount(context);
     return Object.freeze({
       destroy() {
         templateDestroyCount += 1;
@@ -154,6 +160,9 @@ const templateHost = templateSection.children.find(
 );
 const initialWizardRoot = templateHost.children[0];
 assert.ok(initialWizardRoot);
+const renderedText = collectText(templateHost);
+assert.match(renderedText, /Live workbench composition is active/u);
+assert.doesNotMatch(renderedText, /insertion is blocked|remains blocked/u);
 manager.mount(controller);
 assert.equal(templateMountCount, 1);
 assert.equal(templateDestroyCount, 0);
@@ -173,7 +182,9 @@ console.log(JSON.stringify({
   check: 'lafea-template-t6c-cross-contract',
   status: 'PASS',
   agent1SchemaMatchesAgent2: true,
-  canonicalDescriptorAccepted: true,
+  canonicalT6BDescriptorAccepted: true,
+  truthfulLiveDescriptorAccepted: true,
+  resolvedInterfaceRendered: true,
   liveUiCompositionRegistered: true,
   templateMountCount,
   templateDestroyCount,
@@ -187,19 +198,19 @@ console.log(JSON.stringify({
   releasePromotionPaths: 0,
 }, null, 2));
 
+function collectText(node) {
+  return [node.textContent, ...node.children.flatMap((child) => collectText(child))]
+    .filter(Boolean)
+    .join(' ');
+}
+
 class FakeDocument {
   constructor() {
     this.head = new FakeElement('head', this);
     this.body = new FakeElement('body', this);
   }
-
-  createElement(tagName) {
-    return new FakeElement(tagName, this);
-  }
-
-  querySelector() {
-    return null;
-  }
+  createElement(tagName) { return new FakeElement(tagName, this); }
+  querySelector() { return null; }
 }
 
 class FakeElement {
@@ -218,20 +229,8 @@ class FakeElement {
     this.value = '';
     this.listeners = new Map();
   }
-
-  append(...nodes) {
-    this.children.push(...nodes);
-  }
-
-  replaceChildren(...nodes) {
-    this.children = [...nodes];
-  }
-
-  setAttribute(name, value) {
-    this.attributes[name] = String(value);
-  }
-
-  addEventListener(name, callback) {
-    this.listeners.set(name, callback);
-  }
+  append(...nodes) { this.children.push(...nodes); }
+  replaceChildren(...nodes) { this.children = [...nodes]; }
+  setAttribute(name, value) { this.attributes[name] = String(value); }
+  addEventListener(name, callback) { this.listeners.set(name, callback); }
 }
