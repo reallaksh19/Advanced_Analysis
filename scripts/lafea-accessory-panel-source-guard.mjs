@@ -23,25 +23,31 @@ assert.doesNotMatch(accessorySource, /controller\.store|controller\.view|control
 assert.match(accessorySource, /controller: facade/u);
 assert.doesNotMatch(accessorySource, /controller:\s*controller/u);
 
+assert.match(controllerSource, /const ACCESSORY_PANEL_MANAGERS = new WeakMap\(\)/u);
+assert.match(controllerSource, /const DESTROYED_CONTROLLERS = new WeakSet\(\)/u);
+assert.doesNotMatch(controllerSource, /this\.accessoryPanelManager|this\.destroyed/u);
 assert.match(controllerSource, /const \{ accessoryPanels, \.\.\.storeOptions \} = configuration/u);
 assert.match(controllerSource, /createLafeaWorkbenchStore\(storeOptions\)/u);
 assert.doesNotMatch(controllerSource, /createLafeaWorkbenchStore\(options\)/u);
+assert.match(controllerSource, /lafeaAccessoryPanelConfigurationRequiresHost\(configuration\)/u);
+assert.match(controllerSource, /ACCESSORY_PANEL_MANAGERS\.set\([\s\S]*this,[\s\S]*createLafeaAccessoryPanelManager/u);
 assert.equal((controllerSource.match(/accessoryPanelManager\.mount\(this\)/gu) ?? []).length, 1);
 assert.match(
   controllerSource,
-  /this\.view\.render\(this\.store\.getState\(\)\);[\s\S]*this\.rootElement\.append\(this\.accessoryPanelManager\.hostElement\);[\s\S]*this\.accessoryPanelManager\.mount\(this\);/u,
+  /this\.view\.render\(this\.store\.getState\(\)\);[\s\S]*const accessoryPanelManager = ACCESSORY_PANEL_MANAGERS\.get\(this\);[\s\S]*this\.rootElement\.append\(accessoryPanelManager\.hostElement\);[\s\S]*accessoryPanelManager\.mount\(this\);/u,
 );
 assert.match(
   controllerSource,
-  /this\.accessoryPanelManager\?\.destroy\(\);[\s\S]*this\.benchmarkPanel\.destroy\(\);[\s\S]*this\.view\.destroy\(\);/u,
+  /const accessoryPanelManager = ACCESSORY_PANEL_MANAGERS\.get\(this\);[\s\S]*accessoryPanelManager\?\.destroy\(\);[\s\S]*ACCESSORY_PANEL_MANAGERS\.delete\(this\);[\s\S]*this\.benchmarkPanel\.destroy\(\);[\s\S]*this\.view\.destroy\(\);/u,
 );
-assert.doesNotMatch(controllerSource, /setBenchmarkHost\(this\.accessoryPanelManager/u);
+assert.doesNotMatch(controllerSource, /setBenchmarkHost\(.*accessory/u);
 assert.doesNotMatch(controllerSource, /benchmarkHost.*accessory|accessory.*benchmarkHost/u);
 
 assert.doesNotMatch(viewSource, /accessoryPanels|accessory-panel|accessoryPanelManager/u);
 assert.match(workbenchSource, /LAFEA_WORKBENCH_ACCESSORY_PANEL_SCHEMA/u);
 assert.match(workbenchSource, /validateLafeaAccessoryPanelDescriptor/u);
 assert.match(workbenchSource, /accessoryPanels\?:unknown\[\]/u);
+assert.doesNotMatch(workbenchSource, /createLafeaAccessoryPanelManager|lafeaAccessoryPanelConfigurationRequiresHost/u);
 
 console.log(JSON.stringify({
   check: 'lafea-accessory-panel-source-guard',
@@ -50,6 +56,7 @@ console.log(JSON.stringify({
   benchmarkHostReused: false,
   fixedViewSlotsModified: false,
   rawControllerExposed: false,
+  controllerStatePubliclyExpanded: false,
   storeOptionsContaminated: false,
 }));
 
