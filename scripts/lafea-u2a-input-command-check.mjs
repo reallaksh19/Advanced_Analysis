@@ -11,6 +11,7 @@ import {
   classifyLafeaNumericInput,
   createLafeaAddEntityCommand,
   createLafeaDeleteEntityCommand,
+  createLafeaDeleteFieldCommand,
   createLafeaReplaceDocumentCommand,
   createLafeaSetScalarCommand,
   lafeaDocumentDigest,
@@ -65,6 +66,18 @@ assert.equal(materialResult.status, 'APPLIED');
 assert.equal(materialResult.document.materials[0].elasticModulus, 210000);
 assert.equal(materialResult.document.materials[0].sourceReference, 'MATERIAL#MAT');
 assert.ok(materialResult.dependencyImpact.includes('EXECUTION'));
+const noChangeCommand = createLafeaSetScalarCommand({
+  commandId: 'CMD-U2A-NO-CHANGE-1',
+  stageId: 'LAFEA.3',
+  descriptorId: materialDescriptor.descriptorId,
+  expectedDocumentDigest: lafeaDocumentDigest(continuum),
+  entityId: 'MAT',
+  rawText: '200000',
+  origin: { ...origin, sequence: 11 },
+});
+const noChangeResult = applyLafeaStageEditCommand(continuum, noChangeCommand);
+assert.equal(noChangeResult.status, 'NO_CHANGE');
+assert.deepEqual(noChangeResult.dependencyImpact, []);
 
 const nodeDescriptor = requireLafeaInputDescriptor('LAFEA.3', 'LAFEA.3.node.x');
 const nodeBefore = continuum.nodes.find((row) => row.nodeId === 'B');
@@ -131,6 +144,16 @@ const missing = classifyLafeaNumericInput(
   materialDescriptor,
 );
 assert.equal(missing.state, 'MISSING');
+const deleteFieldCommand = createLafeaDeleteFieldCommand({
+  commandId: 'CMD-U2A-DELETE-FIELD-1',
+  stageId: 'LAFEA.2',
+  descriptorId: 'LAFEA.2.location.explicitRadius',
+  expectedDocumentDigest: 'fnv1a64:0000000000000000',
+  entityId: 'L0',
+  origin: { ...origin, sequence: 12 },
+});
+assert.equal(deleteFieldCommand.operation, 'DELETE_FIELD');
+assert.equal(deleteFieldCommand.input.presence, 'DELETE');
 
 const withMeshConfig = normalizeLafeaStageDocument('LAFEA.3', {
   ...structuredClone(continuumFixture()),
@@ -175,6 +198,18 @@ const allocatedFirst = allocateLafeaEntityIdentity('LAFEA.3', continuum, entityD
 const allocatedSecond = allocateLafeaEntityIdentity('LAFEA.3', continuum, entityDescriptor, proposedNode);
 assert.equal(allocatedFirst, allocatedSecond);
 assert.match(allocatedFirst, /^N-[0-9A-F]{12}$/u);
+const suppliedIdentityCommand = createLafeaAddEntityCommand({
+  commandId: 'CMD-U2A-ADD-SUPPLIED-ID-1',
+  stageId: 'LAFEA.3',
+  descriptorId: entityDescriptor.descriptorId,
+  expectedDocumentDigest: lafeaDocumentDigest(continuum),
+  recordValue: { nodeId: 'CLONED-ID', ...proposedNode },
+  origin: { ...origin, sequence: 13 },
+});
+const suppliedIdentityResult = applyLafeaStageEditCommand(continuum, suppliedIdentityCommand);
+assert.equal(suppliedIdentityResult.status, 'REJECTED');
+assert.ok(suppliedIdentityResult.diagnostics.some((row) => row.code === 'LAFEA_ADD_ENTITY_ID_FORBIDDEN'));
+
 const addCommand = createLafeaAddEntityCommand({
   commandId: 'CMD-U2A-ADD-1',
   stageId: 'LAFEA.3',
