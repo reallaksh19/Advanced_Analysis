@@ -10,6 +10,10 @@ const PACKAGE = path.join(ROOT, 'src/core/linear-piping-multicase-application');
 const orchestrator = fs.readFileSync(path.join(PACKAGE, 'orchestrator.js'), 'utf8');
 const contracts = fs.readFileSync(path.join(PACKAGE, 'contracts.js'), 'utf8');
 const index = fs.readFileSync(path.join(PACKAGE, 'index.js'), 'utf8');
+const compiler = fs.readFileSync(
+  path.join(ROOT, 'src/core/linear-fea-model-compiler/model-compiler.js'),
+  'utf8',
+);
 const consumerGuard = fs.readFileSync(
   path.join(ROOT, 'scripts/linear-piping-analysis-consumer-anti-drift-check.mjs'),
   'utf8',
@@ -27,6 +31,12 @@ assert.match(orchestrator, /compileLinearPipingB31Application/u);
 assert.match(orchestrator, /sealLinearPipingQualifiedApplicationResult/u);
 assert.match(index, /compileLinearPipingMulticaseApplication/u);
 assert.match(index, /requireLinearPipingMulticaseApplication/u);
+
+assert.match(compiler, /buildNodes\(topology, nodeBindings, elementBindings\)/u);
+assert.match(compiler, /incidentComponentIds/u);
+assert.match(compiler, /span\.sourceComponentUid/u);
+assert.match(compiler, /binding\?\.sourceComponentId/u);
+assert.match(compiler, /sourceComponentIds:\s*\[\.\.\.sourceComponentIds\]\.sort\(compareAscii\)/u);
 
 for (const prohibited of [
   /inputXmlToCanonicalGeometry/u,
@@ -59,6 +69,7 @@ console.log(JSON.stringify({
   check: 'linear-piping-multicase-application-anti-drift',
   status: 'PASS',
   authority: 'ORCHESTRATION_ONLY',
+  nodeAncestry: 'INCIDENT_BOUND_COMPONENTS',
   registration: 'check:linear-piping-analysis-consumer',
   prohibitedMechanics: true,
 }));
