@@ -48,7 +48,7 @@ class FakeWorker {
   }
 }
 
-const stageIds = ['LAFEA.1', 'LAFEA.2', 'LAFEA.3', 'LAFEA.4', 'LAFEA.5'];
+const stageIds = ['LAFEA.1', 'LAFEA.2', 'LAFEA.3', 'LAFEA.4', 'LAFEA.5', 'LAFEA.6'];
 const presenterRows = {};
 for (const stageId of stageIds) {
   const documentValue = createLafeaMockDocument(stageId);

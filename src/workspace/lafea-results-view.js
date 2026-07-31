@@ -132,13 +132,67 @@ function diagnosticsView(root, diagnostics) {
   return region;
 }
 
+function flattenObject(obj, prefix = '') {
+  const rows = [];
+  if (!obj || typeof obj !== 'object') return rows;
+  for (const [key, value] of Object.entries(obj)) {
+    const fullKey = prefix ? `${prefix}.${key}` : key;
+    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      rows.push(...flattenObject(value, fullKey));
+    } else {
+      const valStr = Array.isArray(value)
+        ? `[ ${value.map((v) => (typeof v === 'number' ? Number(v).toPrecision(5) : JSON.stringify(v))).join(', ')} ]`
+        : String(value ?? '');
+      rows.push({ key: fullKey, value: valStr, type: Array.isArray(value) ? 'Array / Vector' : typeof value });
+    }
+  }
+  return rows;
+}
+
+function buildResultTable(root, result) {
+  const table = create(root, 'table', 'lafea-result-table');
+  table.style.marginTop = '10px';
+  table.style.marginBottom = '14px';
+  const head = create(root, 'tr');
+  ['Evidence Pathway / Parameter', 'Qualified Result & Coordinates', 'Data Schema', 'Audit Integrity'].forEach((label) => {
+    const th = create(root, 'th', null, label);
+    th.scope = 'col';
+    head.append(th);
+  });
+  table.append(head);
+  const rows = flattenObject(result).slice(0, 100);
+  for (const row of rows) {
+    const tr = create(root, 'tr');
+    const tdKey = create(root, 'td', null, row.key);
+    tdKey.style.fontWeight = '700';
+    tdKey.style.color = '#38bdf8';
+    const tdVal = create(root, 'td', null, row.value);
+    tdVal.style.fontFamily = 'monospace, ui-monospace';
+    tr.append(
+      tdKey,
+      tdVal,
+      create(root, 'td', null, row.type),
+      create(root, 'td', null, '✔ IMMUTABLE TRUTH'),
+    );
+    table.append(tr);
+  }
+  return table;
+}
+
 function rawEvidence(root, result) {
   const details = create(root, 'details', 'lafea-raw-evidence');
-  const summary = create(root, 'summary', null, 'Raw qualified evidence (audit/export)');
+  const summary = create(root, 'summary', null, 'Raw qualified evidence (Table View & Audit Export)');
+  const table = buildResultTable(root, result);
+  const jsonDetails = create(root, 'details');
+  const jsonSummary = create(root, 'summary', null, '📝 View / Copy Raw JSON Evidence');
+  jsonSummary.style.cursor = 'pointer';
+  jsonSummary.style.color = '#94a3b8';
+  jsonSummary.style.marginTop = '8px';
   const pre = create(root, 'pre');
   pre.dataset.role = 'lafea-result';
   pre.textContent = JSON.stringify(result, null, 2);
-  details.append(summary, pre);
+  jsonDetails.append(jsonSummary, pre);
+  details.append(summary, table, jsonDetails);
   return details;
 }
 

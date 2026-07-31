@@ -11,6 +11,36 @@ import { triangleSource as lafea3Source } from '../../scripts/lafea.3-fixtures.m
 import { triangleSource as lafea4Source } from '../../scripts/lafea.4-fixtures.mjs';
 import { workflowSource as lafea5Source } from '../../scripts/lafea.5-fixtures.mjs';
 import { rectangularQ4Package } from '../../scripts/lfea-005-fixtures.mjs';
+import { lafeaPreviewGeometry } from './lafea-stage-preview.js';
+
+function lafea6Source() {
+  return {
+    schema: 'lafea-weld-profile/v1',
+    identity: 'WELD-PROFILE-STANDARD-001',
+    profileType: 'I_BEAM_FILLET',
+    weldThroatMm: 8.0,
+    allowableShearMpa: 110.0,
+    eccentricLoadN: 50000,
+    leverArmDistanceMm: 450.0,
+    nodes: [
+      { nodeId: 'W1', x: 175, y: 150 },
+      { nodeId: 'W2', x: 425, y: 150 },
+      { nodeId: 'W3', x: 425, y: 210 },
+      { nodeId: 'W4', x: 330, y: 210 },
+      { nodeId: 'W5', x: 330, y: 390 },
+      { nodeId: 'W6', x: 425, y: 390 },
+      { nodeId: 'W7', x: 425, y: 450 },
+      { nodeId: 'W8', x: 175, y: 450 },
+      { nodeId: 'CENTROID', x: 300, y: 300 },
+      { nodeId: 'LEVER-LOAD-P', x: 750, y: 100 },
+    ],
+    elements: [
+      { elementId: 'WELD-TOE-TOP', nodes: ['W1', 'W2'], type: 'FILLET_WELD' },
+      { elementId: 'WELD-TOE-BOT', nodes: ['W8', 'W7'], type: 'FILLET_WELD' },
+      { elementId: 'ARM-X', nodes: ['CENTROID', 'LEVER-LOAD-P'], type: 'LEVER_ARM_X' },
+    ],
+  };
+}
 
 const LAFEA_BUILDERS = Object.freeze({
   'LAFEA.1': lafea1Source,
@@ -18,6 +48,7 @@ const LAFEA_BUILDERS = Object.freeze({
   'LAFEA.3': lafea3Source,
   'LAFEA.4': lafea4Source,
   'LAFEA.5': lafea5Source,
+  'LAFEA.6': lafea6Source,
 });
 
 /**

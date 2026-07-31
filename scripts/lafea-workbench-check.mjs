@@ -13,6 +13,18 @@ import {
   executeLafeaStage,
 } from '../src/workspace/lafea-workbench.js';
 
+function weldFixture() {
+  return {
+    schema: 'lafea-weld-profile/v1',
+    identity: 'WELD-PROFILE-STANDARD-001',
+    profileType: 'I_BEAM_FILLET',
+    weldThroatMm: 8.0,
+    allowableShearMpa: 110.0,
+    eccentricLoadN: 50000,
+    leverArmDistanceMm: 450.0,
+  };
+}
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURES = Object.freeze({
   'LAFEA.1': attachmentFixture,
@@ -20,9 +32,10 @@ const FIXTURES = Object.freeze({
   'LAFEA.3': continuumFixture,
   'LAFEA.4': shellFixture,
   'LAFEA.5': trunnionFixture,
+  'LAFEA.6': weldFixture,
 });
 
-assert.deepEqual(LAFEA_STAGE_IDS, ['LAFEA.1', 'LAFEA.2', 'LAFEA.3', 'LAFEA.4', 'LAFEA.5']);
+assert.deepEqual(LAFEA_STAGE_IDS, ['LAFEA.1', 'LAFEA.2', 'LAFEA.3', 'LAFEA.4', 'LAFEA.5', 'LAFEA.6']);
 
 for (const stageId of LAFEA_STAGE_IDS) {
   const first = executeLafeaStage(stageId, FIXTURES[stageId]());
