@@ -202,6 +202,16 @@ assert.match(
   /key === 'semanticHash' \|\| key === 'evidenceHash' \|\| key === 'executionHash'/u,
   'executionSemanticProjection must exclude executionHash from its own hash input',
 );
+assert.match(
+  source['src/core/linear-fea-solver/solve.js'],
+  /key === 'factorization'/u,
+  'executionSemanticProjection must isolate runtime factorization reuse evidence',
+);
+assert.match(
+  source['src/core/linear-fea-solver/solve.js'],
+  /factorizationReused:\s*record\.factorization\.reused/u,
+  'execution evidence must retain the runtime factorization reuse flag',
+);
 
 const packageJson = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
 assert.equal(

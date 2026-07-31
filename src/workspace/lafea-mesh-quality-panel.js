@@ -112,3 +112,56 @@ function requireText(value, key) {
     throw new TypeError(`buildMeshQualityPanel requires a ${key}.`);
   }
 }
+
+/**
+ * Render the mesh quality panel into a DOM host element without production mocks.
+ *
+ * @param {Element} rootElement Target DOM host.
+ * @param {object|null} panel Frozen panel model from buildMeshQualityPanel, or null if uninitialized.
+ * @returns {void}
+ */
+export function renderMeshQualityPanel(rootElement, panel) {
+  if (!rootElement) return;
+  rootElement.replaceChildren();
+  const documentRef = rootElement.ownerDocument;
+  const container = documentRef.createElement('div');
+  container.className = 'lafea-mesh-quality-panel';
+  container.setAttribute('role', 'region');
+  container.setAttribute('aria-label', 'LAFEA Mesh Quality and Stress Probe Inspector');
+
+  if (!panel) {
+    const neutralMessage = documentRef.createElement('p');
+    neutralMessage.className = 'lafea-mesh-quality-panel__neutral';
+    neutralMessage.textContent = '🔬 AUTODESK SIMULATION MESH QUALITY & PROBE: No mesh quality results evaluated for this stage. Execute calculation or select a mesh element to review Jacobian, Aspect Ratio, and Skewness metrics against kernel thresholds.';
+    container.append(neutralMessage);
+    rootElement.append(container);
+    return;
+  }
+
+  const header = documentRef.createElement('div');
+  header.className = 'lafea-mesh-quality-panel__header';
+  const title = documentRef.createElement('h4');
+  title.textContent = `Mesh Quality Gates — Stage ${panel.stageId} (Profile: ${panel.meshProfileIdentity})`;
+  header.append(title);
+
+  if (panel.blocksAdvance) {
+    const blockBadge = documentRef.createElement('span');
+    blockBadge.className = 'lafea-mesh-quality-panel__badge-block';
+    blockBadge.setAttribute('role', 'alert');
+    blockBadge.textContent = '⛔ MESH QUALITY BLOCKS ADVANCE';
+    header.append(blockBadge);
+  }
+
+  const list = documentRef.createElement('ul');
+  list.className = 'lafea-mesh-quality-panel__list';
+  for (const row of panel.rows) {
+    const item = documentRef.createElement('li');
+    item.className = `lafea-mesh-quality-panel__row lafea-mesh-quality-panel__row--${row.status.toLowerCase()}`;
+    const thresholdText = row.threshold ? ` [Gate: ${row.threshold}]` : '';
+    item.textContent = `${row.label}: ${row.value} ${row.unit}${thresholdText} ──► [${row.status}]`;
+    list.append(item);
+  }
+
+  container.append(header, list);
+  rootElement.append(container);
+}

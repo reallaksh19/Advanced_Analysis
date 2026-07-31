@@ -259,6 +259,12 @@ export function executionSemanticProjection(record) {
   const projection = {};
   for (const key of EXECUTION_RECORD_KEYS) {
     if (key === 'semanticHash' || key === 'evidenceHash' || key === 'executionHash') continue;
+    if (key === 'factorization') {
+      const { reused: runtimeReuseEvidence, ...engineeringFactorization } = record.factorization;
+      void runtimeReuseEvidence;
+      projection.factorization = engineeringFactorization;
+      continue;
+    }
     projection[key] = record[key];
   }
   return projection;
@@ -269,7 +275,12 @@ export function computeExecutionSemanticHash(record) {
 }
 
 export function computeExecutionEvidenceHash(record) {
-  return semanticHash({ semanticHash: record.semanticHash, diagnostics: record.diagnostics, status: record.status });
+  return semanticHash({
+    semanticHash: record.semanticHash,
+    diagnostics: record.diagnostics,
+    status: record.status,
+    factorizationReused: record.factorization.reused,
+  });
 }
 
 function requireVector6(entry, field) {

@@ -1,0 +1,295 @@
+{
+  "schema": "lfea-piping-consolidated-audit-ledger/v1",
+  "auditDate": "2026-07-31",
+  "repository": "reallaksh19/Advanced_Analysis",
+  "branch": "feat/first-cut-load-estimation-and-enrichment",
+  "commitSha": "0bd3ba847440f03557428255142b47dc34a13312",
+  "originMainSha": "8379f6dedcd070fe89deb0190e4c8ece75da6c98",
+  "programDisposition": "BLOCKED",
+  "evidenceBasis": "[SIMULATED]/ANALYTICAL plus current-working-tree source inspection",
+  "realModelSupplied": false,
+  "findings": [
+    {
+      "findingId": "AUD-A0-001",
+      "auditGate": "A0",
+      "severity": "BLOCKER",
+      "status": "UNRESOLVED_GATE",
+      "subject": "Exact-main baseline is not frozen",
+      "repository": "reallaksh19/Advanced_Analysis",
+      "branch": "feat/first-cut-load-estimation-and-enrichment",
+      "commitSha": "0bd3ba847440f03557428255142b47dc34a13312",
+      "filePaths": [
+        "package.json",
+        "src/core/linear-piping-analysis-consumer/",
+        "src/core/linear-fea-solver/solve.js"
+      ],
+      "contractIds": [
+        "Gate A0"
+      ],
+      "command": "git status --short; git rev-parse HEAD; git rev-parse origin/main; git diff --check",
+      "commandResult": "HEAD and origin/main resolved and diff check passed, but the working tree contains modified and untracked implementation files; audit-baseline.json is absent.",
+      "evidenceArtifact": "docs/CONSOLIDATED_LFEA_PIPING_AUDIT_2026-07-31.md",
+      "expectedBehavior": "One clean immutable baseline with a manifest and retained exact-head command evidence.",
+      "observedBehavior": "The T0 consumer and related solver/package changes are present only in a dirty mixed working tree.",
+      "engineeringImpact": "The passing checks cannot be reproduced from the named commit and cannot qualify a release.",
+      "requiredCorrection": "Freeze a clean exact release candidate, create audit-baseline.json, retain command output and exit status, and repeat the audit.",
+      "retestCommand": "npm ci && git status --short && git diff --check && npm run gate",
+      "owner": "UNASSIGNED",
+      "disposition": "OPEN"
+    },
+    {
+      "findingId": "AUD-A3-001",
+      "auditGate": "A3",
+      "severity": "BLOCKER",
+      "status": "PARTIALLY_VERIFIED",
+      "subject": "T0 consumer is not the complete application consumer",
+      "repository": "reallaksh19/Advanced_Analysis",
+      "branch": "feat/first-cut-load-estimation-and-enrichment",
+      "commitSha": "0bd3ba847440f03557428255142b47dc34a13312",
+      "filePaths": [
+        "src/core/linear-piping-analysis-consumer/consumer.js",
+        "src/core/linear-piping-analysis-consumer/contracts.js",
+        "scripts/linear-piping-analysis-consumer-check.mjs"
+      ],
+      "contractIds": [
+        "linear-piping-analysis-request/v1",
+        "linear-piping-analysis-result-chain/v1",
+        "Gate A3"
+      ],
+      "command": "npm run check:linear-piping-analysis-consumer",
+      "commandResult": "Exit 0; 13 [SIMULATED] T0 checks and the anti-drift check passed.",
+      "evidenceArtifact": "reports/audit-evidence/2026-07-31-lfea-piping/check-linear-piping-analysis-consumer.log",
+      "expectedBehavior": "One consumer compiles source through B-2.5/B-3.0, solves, recovers interfaces, performs configured nozzle/code assessments and seals a complete current result.",
+      "observedBehavior": "The consumer accepts sealed B-2.5/B-3.0 records, executes through B-3.4 and requires interfaceLoadResults, nozzleAssessments and codeResults to remain null.",
+      "engineeringImpact": "The stage cannot publish governed support, anchor, nozzle or application-level B31.3 results.",
+      "requiredCorrection": "Extend or supersede T0 with the missing source, interface, nozzle and code orchestration while preserving fail-closed parent currency.",
+      "retestCommand": "npm run check:linear-piping-analysis-consumer",
+      "owner": "UNASSIGNED",
+      "disposition": "OPEN"
+    },
+    {
+      "findingId": "AUD-A3-002",
+      "auditGate": "A3",
+      "severity": "MAJOR",
+      "status": "CONTRADICTED",
+      "subject": "Consumer check registration does not match the PDF gate",
+      "repository": "reallaksh19/Advanced_Analysis",
+      "branch": "feat/first-cut-load-estimation-and-enrichment",
+      "commitSha": "0bd3ba847440f03557428255142b47dc34a13312",
+      "filePaths": [
+        "package.json"
+      ],
+      "contractIds": [
+        "Gate A3"
+      ],
+      "command": "Inspect package.json scripts",
+      "commandResult": "check:linear-piping-analysis-consumer is registered directly in gate but is not included in check:lfea-core.",
+      "evidenceArtifact": "docs/CONSOLIDATED_LFEA_PIPING_AUDIT_2026-07-31.md",
+      "expectedBehavior": "The PDF requires registration in package.json, check:lfea-core and the full repository gate.",
+      "observedBehavior": "Two of the three registration locations are present.",
+      "engineeringImpact": "Running check:lfea-core alone does not exercise the application-consumer boundary.",
+      "requiredCorrection": "Register the consumer in check:lfea-core or formally revise the governing rule with an explicit downstream-gate rationale.",
+      "retestCommand": "npm run check:lfea-core && npm run gate",
+      "owner": "UNASSIGNED",
+      "disposition": "OPEN"
+    },
+    {
+      "findingId": "AUD-A4-001",
+      "auditGate": "A4",
+      "severity": "BLOCKER",
+      "status": "NOT_IMPLEMENTED",
+      "subject": "Support, anchor and nozzle interface authority is missing",
+      "repository": "reallaksh19/Advanced_Analysis",
+      "branch": "feat/first-cut-load-estimation-and-enrichment",
+      "commitSha": "0bd3ba847440f03557428255142b47dc34a13312",
+      "filePaths": [
+        "src/core/linear-piping-analysis-consumer/consumer.js",
+        "src/core/linear-piping-analysis-consumer/contracts.js"
+      ],
+      "contractIds": [
+        "Gate A4",
+        "lfea-interface-definition/v1",
+        "lfea-interface-load-result/v1"
+      ],
+      "command": "Source inspection and npm run check:linear-piping-analysis-consumer",
+      "commandResult": "The source guard forbids premature interface mechanics and the T0 result keeps interfaceLoadResults null.",
+      "evidenceArtifact": "reports/audit-evidence/2026-07-31-lfea-piping/check-linear-piping-analysis-consumer.log",
+      "expectedBehavior": "Qualified attachment/frame/offset/six-DOF contracts and reaction, local-frame and reference-point recovery.",
+      "observedBehavior": "No piping application interface contract or recovery package exists.",
+      "engineeringImpact": "Support, anchor and nozzle actions cannot be issued as governed results.",
+      "requiredCorrection": "Implement and benchmark interface definitions, constrained reaction grouping, local transformations, offset transfer, sign conventions and envelopes.",
+      "retestCommand": "npm run check:lfea-interfaces && npm run check:lfea-interface-frames && npm run check:lfea-envelopes",
+      "owner": "UNASSIGNED",
+      "disposition": "OPEN"
+    },
+    {
+      "findingId": "AUD-A5-001",
+      "auditGate": "A5",
+      "severity": "BLOCKER",
+      "status": "PARTIALLY_VERIFIED",
+      "subject": "Upstream load/code packages exist but application orchestration is missing",
+      "repository": "reallaksh19/Advanced_Analysis",
+      "branch": "feat/first-cut-load-estimation-and-enrichment",
+      "commitSha": "0bd3ba847440f03557428255142b47dc34a13312",
+      "filePaths": [
+        "src/core/linear-fea-load-case/",
+        "src/core/linear-fea-b31-code-engine/",
+        "src/core/linear-piping-analysis-consumer/consumer.js"
+      ],
+      "contractIds": [
+        "Gate A5",
+        "B-3.0",
+        "B-4.0"
+      ],
+      "command": "npm run check:lfea-core; npm run check:linear-piping-analysis-consumer",
+      "commandResult": "Both commands exited 0; T0 codeResults and nozzleAssessments remain null.",
+      "evidenceArtifact": "reports/audit-evidence/2026-07-31-lfea-piping/check-lfea-core.log",
+      "expectedBehavior": "Immutable application load cases, versioned combinations, recovery-bound B31.3 results and configured nozzle allowables.",
+      "observedBehavior": "B-3.0 and B-4.0 pass independently but are not joined to interface recovery or T0 output.",
+      "engineeringImpact": "The application cannot issue nozzle utilization or B31.3 compliance results.",
+      "requiredCorrection": "Bind source load orchestration, recovered case/category actions, B31.3 compilation and caller-supplied nozzle profiles.",
+      "retestCommand": "npm run check:lfea-thermal && npm run check:lfea-allowables && npm run check:linear-piping-analysis-consumer",
+      "owner": "UNASSIGNED",
+      "disposition": "OPEN"
+    },
+    {
+      "findingId": "AUD-A6-001",
+      "auditGate": "A6",
+      "severity": "BLOCKER",
+      "status": "NOT_IMPLEMENTED",
+      "subject": "Piping result presentation and export are absent",
+      "repository": "reallaksh19/Advanced_Analysis",
+      "branch": "feat/first-cut-load-estimation-and-enrichment",
+      "commitSha": "0bd3ba847440f03557428255142b47dc34a13312",
+      "filePaths": [
+        "src/core/linear-piping-analysis-consumer/",
+        "src/workspace/"
+      ],
+      "contractIds": [
+        "Gate A6"
+      ],
+      "command": "Search production src imports for linear-piping-analysis-consumer",
+      "commandResult": "No production module outside the consumer package imports or presents the T0 result.",
+      "evidenceArtifact": "docs/CONSOLIDATED_LFEA_PIPING_AUDIT_2026-07-31.md",
+      "expectedBehavior": "Read-only stale-safe support/nozzle/B31.3 surfaces and byte-deterministic exports with parent hashes.",
+      "observedBehavior": "No piping result presenter or equipment-load export exists.",
+      "engineeringImpact": "There is no qualified route from T0 output to a user-visible or exportable engineering result.",
+      "requiredCorrection": "Add read-only current-result presenters, stale blocking and deterministic exports after A4/A5 are qualified.",
+      "retestCommand": "npm run check:lfea-interface-e2e && npm run check:lfea-interface-export",
+      "owner": "UNASSIGNED",
+      "disposition": "OPEN"
+    },
+    {
+      "findingId": "AUD-A7-001",
+      "auditGate": "A7",
+      "severity": "BLOCKER",
+      "status": "UNRESOLVED_GATE",
+      "subject": "Release evidence pyramid is incomplete",
+      "repository": "reallaksh19/Advanced_Analysis",
+      "branch": "feat/first-cut-load-estimation-and-enrichment",
+      "commitSha": "0bd3ba847440f03557428255142b47dc34a13312",
+      "filePaths": [
+        "docs/priority2FEAupdate.md"
+      ],
+      "contractIds": [
+        "Gate A7",
+        "FEA-REAL-01"
+      ],
+      "command": "Review source documents, repository checks and supplied evidence",
+      "commandResult": "Analytical and simulated checks exist; no real imported piping model, commercial corroboration, signed release disposition or rollback rehearsal was supplied.",
+      "evidenceArtifact": "reports/audit-evidence/2026-07-31-lfea-piping/npm-run-gate.log",
+      "expectedBehavior": "All six qualification levels and exact-head release evidence are complete.",
+      "observedBehavior": "Levels based on real model, commercial comparison and release operations are absent.",
+      "engineeringImpact": "Production engineering validity and release readiness are unproven.",
+      "requiredCorrection": "Complete real-model reconciliation, selected commercial corroboration, performance qualification, exact-head CI, limitations, rollback and signed disposition.",
+      "retestCommand": "Project-specific FEA-REAL-01 command TBD, followed by npm run gate",
+      "owner": "UNASSIGNED",
+      "disposition": "OPEN"
+    },
+    {
+      "findingId": "AUD-DOC-001",
+      "auditGate": "DOCUMENTATION",
+      "severity": "MAJOR",
+      "status": "CONTRADICTED",
+      "subject": "The update incorrectly reports workspace-consumers as missing",
+      "repository": "reallaksh19/Advanced_Analysis",
+      "branch": "feat/first-cut-load-estimation-and-enrichment",
+      "commitSha": "0bd3ba847440f03557428255142b47dc34a13312",
+      "filePaths": [
+        "docs/priority2FEAupdate.md",
+        "src/core/workspace-consumers/"
+      ],
+      "contractIds": [],
+      "command": "Test-Path src/core/workspace-consumers; enumerate its source files",
+      "commandResult": "The directory exists and contains index, registry, readiness, validators and related modules.",
+      "evidenceArtifact": "docs/CONSOLIDATED_LFEA_PIPING_AUDIT_2026-07-31.md",
+      "expectedBehavior": "The blocker statement names only paths that are actually absent.",
+      "observedBehavior": "The update groups an existing directory with missing lfea-007 modules.",
+      "engineeringImpact": "Remediation scope and repository-hygiene findings are misstated.",
+      "requiredCorrection": "Remove src/core/workspace-consumers from the missing-path list and identify the actual missing consumer/controller/view paths.",
+      "retestCommand": "Test-Path src/core/workspace-consumers; Test-Path src/core/lfea-consumer",
+      "owner": "UNASSIGNED",
+      "disposition": "OPEN"
+    },
+    {
+      "findingId": "AUD-DOC-002",
+      "auditGate": "DOCUMENTATION",
+      "severity": "MINOR",
+      "status": "CONTRADICTED",
+      "subject": "The update uses conflicting public-gateway wording",
+      "repository": "reallaksh19/Advanced_Analysis",
+      "branch": "feat/first-cut-load-estimation-and-enrichment",
+      "commitSha": "0bd3ba847440f03557428255142b47dc34a13312",
+      "filePaths": [
+        "docs/priority2FEAupdate.md",
+        "src/core/linear-piping-analysis-consumer/index.js"
+      ],
+      "contractIds": [
+        "linear-piping-analysis-request/v1",
+        "linear-piping-analysis-result-chain/v1"
+      ],
+      "command": "Compare the update baseline blocker list with its Current T0 implementation section",
+      "commandResult": "A public T0 gateway exists, but a complete source-to-presentation gateway does not.",
+      "evidenceArtifact": "docs/CONSOLIDATED_LFEA_PIPING_AUDIT_2026-07-31.md",
+      "expectedBehavior": "Documentary status distinguishes stage-local and complete gateways.",
+      "observedBehavior": "The unqualified phrase no public piping execution gateway conflicts with the later T0 section.",
+      "engineeringImpact": "Readers can misinterpret whether any application boundary exists.",
+      "requiredCorrection": "Use no complete end-to-end public piping gateway.",
+      "retestCommand": "Review docs/priority2FEAupdate.md for consistent gateway terminology",
+      "owner": "UNASSIGNED",
+      "disposition": "OPEN"
+    },
+    {
+      "findingId": "AUD-L007-001",
+      "auditGate": "REPOSITORY_HYGIENE",
+      "severity": "MAJOR",
+      "status": "CONTRADICTED",
+      "subject": "lfea-007 certification assets are orphaned and unregistered",
+      "repository": "reallaksh19/Advanced_Analysis",
+      "branch": "feat/first-cut-load-estimation-and-enrichment",
+      "commitSha": "0bd3ba847440f03557428255142b47dc34a13312",
+      "filePaths": [
+        ".github/workflows/lfea-007-certification.yml",
+        "scripts/lfea-007-check.mjs",
+        "scripts/lfea-007-registration-check.mjs",
+        "src/core/lfea-consumer/",
+        "src/workspace/lfea-consumer-controller.js"
+      ],
+      "contractIds": [
+        "lfea-consumer-profile/v1",
+        "lfea-consumer-session/v1",
+        "lfea-consumer-view-model/v1"
+      ],
+      "command": "npm run check:lfea.007:static; node scripts/lfea-007-check.mjs",
+      "commandResult": "Both exit 1: the package script is missing and the direct suite fails on missing src/core/lfea-consumer/index.js.",
+      "evidenceArtifact": "reports/audit-evidence/2026-07-31-lfea-piping/node-lfea-007-check.log",
+      "expectedBehavior": "A registered, executable continuum Local FEA consumer suite or a formally retired work package.",
+      "observedBehavior": "Scripts and certification workflow remain while required consumer and workspace modules are absent.",
+      "engineeringImpact": "The repository carries non-executable certification claims and ambiguous Local FEA ownership.",
+      "requiredCorrection": "Repair and register lfea-007 or formally retire it through a separate reviewed work package; do not treat it as piping T0 evidence.",
+      "retestCommand": "npm run check:lfea.007:static && npm run check:lfea.007:browser",
+      "owner": "UNASSIGNED",
+      "disposition": "OPEN"
+    }
+  ]
+}

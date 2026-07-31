@@ -220,6 +220,8 @@ test('B33-T09', 'Factorization is reused across load cases sharing stiffnessStat
   });
   assert.equal(second.factorization.reused, true);
   assert.equal(first.factorizationHandle, second.factorizationHandle, 'reuse must return the identical factorization object');
+  assert.equal(first.executionHash, second.executionHash, 'cache reuse is runtime evidence, not engineering identity');
+  assert.notEqual(first.evidenceHash, second.evidenceHash, 'cache reuse remains visible in evidence');
 
   const settled = cantileverWithSettlementSlotCompilation();
   const third = compileSolverExecution({
