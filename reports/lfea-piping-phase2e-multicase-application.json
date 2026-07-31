@@ -7,6 +7,7 @@
   "scope": [
     "Consume multiple retained linear-piping-inputxml-analysis-context/v1 records without reparsing, recompiling or resolving engineering properties.",
     "Require one exact InputXML source, raw-content hash, conditioned topology, B-2.5 compilation, mechanical-model identity and stiffness state across all cases.",
+    "Retain deterministic node source ancestry from incident raw InputXML span component UIDs and caller-approved B-2.5 element-binding component IDs, without changing stiffness-state identity.",
     "Compile one governed Phase 3 interface set and recover every retained physical case through the existing interface-recovery authority.",
     "Create one deterministic interface envelope retaining governing physical-case and recovery identities.",
     "Assess every configured nozzle allowable profile in every retained case and deterministically retain the governing case assessment.",
@@ -14,9 +15,11 @@
     "Seal the complete multicase application parent chain through the existing qualified application-result contract."
   ],
   "evidencePaths": [
+    "src/core/linear-fea-model-compiler/model-compiler.js",
     "src/core/linear-piping-multicase-application/contracts.js",
     "src/core/linear-piping-multicase-application/orchestrator.js",
     "src/core/linear-piping-multicase-application/index.js",
+    "scripts/linear-piping-inputxml-analysis-context-check.mjs",
     "scripts/linear-piping-multicase-application-check.mjs",
     "scripts/linear-piping-multicase-application-anti-drift-check.mjs",
     "scripts/linear-piping-analysis-consumer-anti-drift-check.mjs",
@@ -28,12 +31,13 @@
     "statusAfterCoding": "PARTIALLY_VERIFIED",
     "addressed": [
       "Complete multi-case source-to-interface-to-nozzle-to-B31.3 application orchestration is now represented by one bounded production API.",
+      "B-2.5 compiled nodes now retain the sorted union of incident raw span component UIDs and caller-approved engineering component IDs, allowing Phase 3 interfaces to bind to retained ancestry rather than an invented node source identity.",
       "Caller-injected B31.3 cases, recoveries and local actions are excluded from the orchestration request.",
       "Mixed source, topology, compilation, stiffness, duplicate case and stale downstream parent chains fail closed.",
       "All case contexts, recoveries, nozzle assessments, envelopes, B31.3 results and final application identities are retained for independent revalidation."
     ],
     "notClosed": [
-      "Successful exact-head Phase 2E, consumer, core and full-gate command logs are not yet retained.",
+      "Successful exact-head B-2.5, Phase 2D, Phase 2E, consumer, core and full-gate command logs are not yet retained.",
       "Only metre-based InputXML is accepted; governed unit conversion remains unresolved.",
       "Real project material, section, axis, constraint, load, interface, nozzle-allowable and code-dataset authorities remain caller supplied.",
       "Real-model reconciliation, commercial corroboration, performance qualification and rollback rehearsal remain unresolved."
@@ -49,7 +53,7 @@
     "Presentation, workspace, project reconciliation or release promotion"
   ],
   "remainingConditions": [
-    "Retain successful exact-head multicase, consumer, core and full-gate logs from one clean head.",
+    "Retain successful exact-head B-2.5, Phase 2D, Phase 2E, consumer, core and full-gate logs from one clean head.",
     "Provide caller-approved project authorities and execute real-model reconciliation.",
     "Provide independent commercial comparison, performance evidence and rollback rehearsal."
   ],
