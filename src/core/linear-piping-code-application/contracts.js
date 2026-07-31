@@ -53,8 +53,8 @@ export function failCodeApplication(message, code, evidence = null) {
   throw new LinearPipingCodeApplicationError(message, code, evidence);
 }
 
-export function requireHash(value, field, nullable = false) {
-  if (nullable && value === null) return null;
+export function requireHash(value, field, nullable) {
+  if (nullable === true && value === null) return null;
   if (typeof value !== 'string' || !HASH_PATTERN.test(value)) {
     failCodeApplication(`${field} must be a semantic hash.`, 'PIPING_CODE_HASH_INVALID', { field, value });
   }
