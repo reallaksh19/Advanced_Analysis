@@ -75,11 +75,18 @@ assert.match(packageValue.scripts['check:lfea-piping-release-policy'],
   /lfea-piping-release-readiness-check\.mjs/u);
 assert.match(packageValue.scripts.gate, /check:lfea-piping-release-policy/u);
 assert.match(wrapper, /lfea-piping-phase6i-anti-drift-check\.mjs/u);
-assert.doesNotMatch(
-  self,
-  /child_process|spawn\(|spawnSync|execFile\(|shelljs|writeFile|appendFile|createWriteStream/u,
-  'Phase 6I aggregate qualification must not execute engineering tools or write evidence.',
-);
+for (const token of [
+  'child_' + 'process',
+  'spawn' + 'Sync',
+  'exec' + 'File',
+  'shell' + 'js',
+  'write' + 'File',
+  'append' + 'File',
+  'create' + 'WriteStream',
+]) {
+  assert.equal(self.includes(token), false,
+    `Phase 6I aggregate qualification contains prohibited token ${token}.`);
+}
 
 await import('./lfea-piping-phase6i-evidence-policy-check.mjs');
 await import('./linear-piping-project-qualification-anti-drift-check.mjs');
