@@ -57,6 +57,16 @@ export {
 } from './inputxml-source-contract.js';
 
 export {
+  INPUTXML_ANALYSIS_CONTEXT_KEYS,
+  LINEAR_PIPING_INPUTXML_ANALYSIS_CONTEXT_SCHEMA,
+  computeInputXmlAnalysisContextEvidenceHash,
+  computeInputXmlAnalysisContextSemanticHash,
+  requireLinearPipingInputXmlAnalysisContext,
+  sealLinearPipingInputXmlAnalysisContext,
+} from './inputxml-analysis-context.js';
+
+export {
+  compileLinearPipingInputXmlAnalysisContext,
   runLinearPipingAnalysisFromInputXml,
   validateLinearPipingInputXmlAnalysisRequest,
 } from './inputxml-source-binding.js';

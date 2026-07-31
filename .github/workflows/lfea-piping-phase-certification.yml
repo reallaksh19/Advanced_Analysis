@@ -8,6 +8,7 @@ on:
       - 'reports/lfea-piping-phase-findings-ledger.json'
       - 'reports/lfea-piping-phase2b-inputxml-binding.json'
       - 'reports/lfea-piping-phase2c-analysis-context.json'
+      - 'reports/lfea-piping-phase2d-inputxml-context.json'
       - 'reports/lfea-piping-phase5b-workspace-integration.json'
       - 'docs/LFEA_PIPING_100_PERCENT_CLOSURE_POLICY.md'
       - 'docs/LFEA_PIPING_PHASE_STATUS.md'
@@ -20,6 +21,7 @@ on:
       - 'scripts/linear-piping-analysis-consumer-*.mjs'
       - 'scripts/linear-piping-inputxml-source-binding-check.mjs'
       - 'scripts/linear-piping-source-analysis-context-check.mjs'
+      - 'scripts/linear-piping-inputxml-analysis-context-check.mjs'
       - 'scripts/linear-piping-interface-*.mjs'
       - 'scripts/linear-piping-nozzle-interface-check.mjs'
       - 'scripts/linear-piping-code-application-*.mjs'
@@ -92,6 +94,9 @@ jobs:
 
       - name: Verify retained B-2.5 B-3.0 T0 context directly
         run: node scripts/linear-piping-source-analysis-context-check.mjs
+
+      - name: Verify InputXML provenance and retained context directly
+        run: node scripts/linear-piping-inputxml-analysis-context-check.mjs
 
       - name: Verify governed interfaces and recovery
         run: npm run check:lfea-interfaces
