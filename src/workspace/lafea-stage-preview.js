@@ -76,33 +76,58 @@ function buildFoundationPadGeometry(document) {
       nodeId: row.identity,
       x: Number(row.point?.value?.[0] ?? 0),
       y: Number(row.point?.value?.[1] ?? 0),
+      z: Number(row.point?.value?.[2] ?? 0),
     }))
     : [];
-  const center = points[0] || { x: 200, y: 300 };
-  const L = 600;
-  const W = 600;
+  const sourcePt = points.find((p) => p.nodeId === 'SOURCE') || points[0] || { x: 200, y: 300, z: 1000 };
+  const targetPt = points.find((p) => p.nodeId === 'TARGET') || points[1] || { x: 200, y: 300, z: 0 };
+  const center = { x: targetPt.x ?? 200, y: targetPt.y ?? 300 };
+
+  const explicitArm = Number(document?.leverArmDistanceMm);
+  const leverArm = !isNaN(explicitArm) && explicitArm > 0
+    ? explicitArm
+    : (Math.abs(sourcePt.z - targetPt.z) || 450);
+
+  const padThk = Number(document?.thicknessBasis?.wearPadThickness?.value ?? 20);
+  const cradleThk = Number(document?.thicknessBasis?.cradleThickness?.value ?? 30);
+  const L = padThk * 20;
+  const W = cradleThk * 15;
   const h = L / 2;
   const w = W / 2;
+  const lh = h * 0.42;
+  const lw = w * 0.28;
+
+  const getXY = (id, defX, defY) => {
+    const p = points.find((row) => row.nodeId === id);
+    return p && (p.x !== 0 || p.y !== 0 || id === 'TARGET') ? { x: p.x, y: p.y } : { x: defX, y: defY };
+  };
+
   const padNodes = [
-    { nodeId: 'ANCHOR-NW', x: center.x - h, y: center.y - w },
-    { nodeId: 'ANCHOR-NE', x: center.x + h, y: center.y - w },
-    { nodeId: 'ANCHOR-SE', x: center.x + h, y: center.y + w },
-    { nodeId: 'ANCHOR-SW', x: center.x - h, y: center.y + w },
-    { nodeId: 'SERVICE', x: center.x, y: center.y },
-    { nodeId: 'LEVER-ARM-X', x: center.x, y: center.y - 450 },
+    { nodeId: 'PLATE-NW', ...getXY('PLATE-NW', center.x - h, center.y + w) },
+    { nodeId: 'PLATE-NE', ...getXY('PLATE-NE', center.x + h, center.y + w) },
+    { nodeId: 'PLATE-SE', ...getXY('PLATE-SE', center.x + h, center.y - w) },
+    { nodeId: 'PLATE-SW', ...getXY('PLATE-SW', center.x - h, center.y - w) },
+    { nodeId: 'LUG-BASE-NW', ...getXY('LUG-BASE-NW', center.x - lh, center.y + lw) },
+    { nodeId: 'LUG-BASE-NE', ...getXY('LUG-BASE-NE', center.x + lh, center.y + lw) },
+    { nodeId: 'LUG-BASE-SE', ...getXY('LUG-BASE-SE', center.x + lh, center.y - lw) },
+    { nodeId: 'LUG-BASE-SW', ...getXY('LUG-BASE-SW', center.x - lh, center.y - lw) },
+    { nodeId: 'TARGET', x: center.x, y: center.y },
+    { nodeId: 'SOURCE', x: center.x, y: center.y - leverArm },
   ];
   const padElements = [
-    { elementId: 'PAD-NORTH', nodes: ['ANCHOR-NW', 'ANCHOR-NE'], type: 'BOUNDARY' },
-    { elementId: 'PAD-EAST', nodes: ['ANCHOR-NE', 'ANCHOR-SE'], type: 'BOUNDARY' },
-    { elementId: 'PAD-SOUTH', nodes: ['ANCHOR-SE', 'ANCHOR-SW'], type: 'BOUNDARY' },
-    { elementId: 'PAD-WEST', nodes: ['ANCHOR-SW', 'ANCHOR-NW'], type: 'BOUNDARY' },
-    { elementId: 'ARM-STANDOFF', nodes: ['SERVICE', 'LEVER-ARM-X'], type: 'ECCENTRIC_ARM' },
-    { elementId: 'STRUT-NW', nodes: ['SERVICE', 'ANCHOR-NW'], type: 'REACTION' },
-    { elementId: 'STRUT-NE', nodes: ['SERVICE', 'ANCHOR-NE'], type: 'REACTION' },
-    { elementId: 'STRUT-SE', nodes: ['SERVICE', 'ANCHOR-SE'], type: 'REACTION' },
-    { elementId: 'STRUT-SW', nodes: ['SERVICE', 'ANCHOR-SW'], type: 'REACTION' },
+    { elementId: 'PLATE-NORTH', nodes: ['PLATE-NW', 'PLATE-NE'], type: 'PLATE_EDGE' },
+    { elementId: 'PLATE-EAST', nodes: ['PLATE-NE', 'PLATE-SE'], type: 'PLATE_EDGE' },
+    { elementId: 'PLATE-SOUTH', nodes: ['PLATE-SE', 'PLATE-SW'], type: 'PLATE_EDGE' },
+    { elementId: 'PLATE-WEST', nodes: ['PLATE-SW', 'PLATE-NW'], type: 'PLATE_EDGE' },
+    { elementId: 'WELD-NORTH', nodes: ['LUG-BASE-NW', 'LUG-BASE-NE'], type: 'WELD_FOOTPRINT' },
+    { elementId: 'WELD-EAST', nodes: ['LUG-BASE-NE', 'LUG-BASE-SE'], type: 'WELD_FOOTPRINT' },
+    { elementId: 'WELD-SOUTH', nodes: ['LUG-BASE-SE', 'LUG-BASE-SW'], type: 'WELD_FOOTPRINT' },
+    { elementId: 'WELD-WEST', nodes: ['LUG-BASE-SW', 'LUG-BASE-NW'], type: 'WELD_FOOTPRINT' },
+    { elementId: 'LUG-CENTER-STANDOFF', nodes: ['TARGET', 'SOURCE'], type: 'LEVER_ARM' },
+    { elementId: 'LUG-WEB-LEFT', nodes: ['LUG-BASE-NW', 'SOURCE'], type: 'LUG_CHEEK' },
+    { elementId: 'LUG-WEB-RIGHT', nodes: ['LUG-BASE-NE', 'SOURCE'], type: 'LUG_CHEEK' },
   ];
-  return { nodes: validNodes(padNodes), elements: validElements(padElements, 'PAD_ELEMENT'), nodePath: 'nodes' };
+  return { nodes: validNodes(padNodes), elements: validElements(padElements, 'LUG_BENCHMARK'), nodePath: 'loadReferencePoints' };
 }
 
 function buildPipeSectionGeometry(document) {
