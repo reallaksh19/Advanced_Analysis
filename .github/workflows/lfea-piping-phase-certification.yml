@@ -4,9 +4,12 @@ on:
   pull_request:
     paths:
       - 'audit-baseline.json'
+      - 'release-evidence/lfea-piping-release-evidence.json'
+      - 'docs/LFEA_PIPING_100_PERCENT_CLOSURE_POLICY.md'
       - 'package.json'
       - 'package-lock.json'
       - 'scripts/lfea-piping-a0-baseline-check.mjs'
+      - 'scripts/lfea-piping-release-readiness-check.mjs'
       - 'scripts/linear-piping-analysis-consumer-*.mjs'
       - 'src/core/linear-piping-analysis-consumer/**'
       - '.github/workflows/lfea-piping-phase-certification.yml'
@@ -39,6 +42,9 @@ jobs:
 
       - name: Install locked dependencies
         run: npm ci
+
+      - name: Validate fail-closed release policy
+        run: node scripts/lfea-piping-release-readiness-check.mjs
 
       - name: Capture exact-head baseline
         run: >-
