@@ -4,6 +4,7 @@ import './workspace/dataset.css';
 import './workspace/viewport-renderer.css';
 import './workspace/analysis-session.css';
 import './workspace/analysis-ledger.css';
+import './workspace/enrichment/first-cut-workbench.css';
 import { bootstrapAnalysisWorkspace } from './workspace/bootstrap.js';
 
 const applicationRoot = document.getElementById('root');

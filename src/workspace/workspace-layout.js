@@ -169,6 +169,10 @@ function workspaceView() {
           <header class="accordion-section-header"><span class="accordion-section-title">Support &amp; Restraint Health</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▶</span></div></header>
           <div class="accordion-section-body"><div data-role="support-restraint-summary"></div></div>
         </div>
+        <div class="properties-accordion-section accordion-collapsed" data-section-id="first-cut">
+          <header class="accordion-section-header"><span class="accordion-section-title">First-Cut Load Enrichment</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▶</span></div></header>
+          <div class="accordion-section-body" data-first-cut-section="true"><div data-role="first-cut-workbench-root"></div></div>
+        </div>
         <div class="properties-accordion-section accordion-collapsed" data-section-id="loads">
           <header class="accordion-section-header"><span class="accordion-section-title">Model Loads</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▶</span></div></header>
           <div class="accordion-section-body"><div data-role="model-load-summary"></div></div>

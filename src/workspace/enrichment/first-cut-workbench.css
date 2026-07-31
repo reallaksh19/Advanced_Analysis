@@ -1,0 +1,14 @@
+.first-cut-workbench{display:flex;flex-direction:column;gap:10px;color:#e2e8f0;font-size:12px}
+.first-cut-workbench__header{display:flex;flex-direction:column;gap:4px}.first-cut-workbench__header h3,.first-cut-workbench__header p{margin:0}
+.first-cut-tabs,.first-cut-actions{display:flex;gap:6px;flex-wrap:wrap}.first-cut-tabs button.is-active{background:#0369a1;color:#fff}
+.first-cut-workbench button{border:1px solid #475569;border-radius:4px;background:#0f172a;color:#cbd5e1;padding:5px 8px;cursor:pointer}
+.first-cut-workbench button.is-primary{background:#0369a1;color:#fff}.first-cut-workbench button:disabled{opacity:.45;cursor:not-allowed}
+.first-cut-tab-panel,.first-cut-profile-form,.first-cut-basis,.first-cut-dialog{border:1px solid #334155;border-radius:6px;background:#08111f;padding:10px}
+.first-cut-profile-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px}
+.first-cut-field{display:flex;flex-direction:column;gap:3px}.first-cut-field input,.first-cut-field select,.first-cut-field textarea,.first-cut-binding-form input,.first-cut-binding-form select{background:#020617;color:#e2e8f0;border:1px solid #475569;border-radius:4px;padding:5px}
+.first-cut-binding-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:5px;margin-top:8px}
+.first-cut-table{width:100%;border-collapse:collapse}.first-cut-table th,.first-cut-table td{border:1px solid #334155;padding:4px;text-align:left;overflow-wrap:anywhere}
+.first-cut-dialog{position:fixed;inset:10% 12%;z-index:10020;overflow:auto;box-shadow:0 20px 70px #000;background:#0b1220}
+.first-cut-basis{margin-top:4px}.first-cut-basis dl{display:grid;grid-template-columns:minmax(120px,auto) 1fr;gap:4px}.first-cut-basis dt{font-weight:700}.first-cut-basis dd{margin:0;overflow-wrap:anywhere}
+.first-cut-basis pre{max-width:100%;overflow:auto;white-space:pre-wrap;background:#020617;border:1px solid #334155;padding:6px}.first-cut-audit-list h5{margin:8px 0 3px}.first-cut-audit-list ul{margin:0;padding-left:18px}
+.first-cut-error{color:#fecaca;background:#7f1d1d;padding:6px}.first-cut-message{color:#bbf7d0;background:#14532d;padding:6px}

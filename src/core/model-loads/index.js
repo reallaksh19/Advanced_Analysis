@@ -13,7 +13,7 @@ export {
   MODEL_LOAD_READINESS_AUDIT_SCHEMA,
   PRIMITIVE_TYPES,
 } from './constants.js';
-export { createStandardGravityProfile, validateGravityProfile } from './gravity-profile.js';
+export { createExplicitGravityProfile, createStandardGravityProfile, validateGravityProfile } from './gravity-profile.js';
 export { createDefaultLoadCaseSet, validateLoadCaseSet } from './load-case-set.js';
 export {
   classifyLoadComponent,

@@ -4,10 +4,10 @@
  * STRICT MODULE LIMIT: Maximum 300 lines.
  */
 
-import { PipingSupportEngine } from './support-engine.js';
+import { SupportLoadPresenter } from './support-load-presenter.js';
 import { buildDatasetHierarchy } from '../dataset-hierarchy.js';
 
-const defaultSupportEngine = new PipingSupportEngine();
+const defaultSupportPresenter = new SupportLoadPresenter();
 
 export function buildTableHeader(doc) {
   const thead = doc.createElement('thead');
@@ -33,7 +33,7 @@ export function buildTableHeader(doc) {
   return thead;
 }
 
-export function buildTableBody(doc, dataset, state, store, supportEngine = defaultSupportEngine) {
+export function buildTableBody(doc, dataset, state, store, supportPresenter = defaultSupportPresenter) {
   const tbody = doc.createElement('tbody');
   const query = (state.searchQuery || '').toLowerCase();
   const selectedId = state.selectedEntityId;
@@ -47,11 +47,11 @@ export function buildTableBody(doc, dataset, state, store, supportEngine = defau
   }
 
   const renderedIds = new Set();
-  appendHierarchyNodes(doc, hierarchy, 0, tbody, entityMap, state, store, supportEngine, renderedIds, query, selectedId);
+  appendHierarchyNodes(doc, hierarchy, 0, tbody, entityMap, state, store, supportPresenter, renderedIds, query, selectedId);
 
   entities.forEach((entity) => {
     if (!renderedIds.has(entity.entityId)) {
-      const tr = renderEntityRow(doc, entity, 0, state, store, supportEngine, selectedId, query);
+      const tr = renderEntityRow(doc, entity, 0, state, store, supportPresenter, selectedId, query);
       if (tr) {
         tbody.append(tr);
         renderedIds.add(entity.entityId);
@@ -62,7 +62,7 @@ export function buildTableBody(doc, dataset, state, store, supportEngine = defau
   return tbody;
 }
 
-function appendHierarchyNodes(doc, nodes, depth, tbody, entityMap, state, store, supportEngine, renderedIds, query, selectedId) {
+function appendHierarchyNodes(doc, nodes, depth, tbody, entityMap, state, store, supportPresenter, renderedIds, query, selectedId) {
   nodes.forEach((node) => {
     if (query && !branchMatchesQuery(node, query, entityMap)) return;
 
@@ -81,12 +81,12 @@ function appendHierarchyNodes(doc, nodes, depth, tbody, entityMap, state, store,
 
     if (isExpanded) {
       if (node.children && node.children.length) {
-        appendHierarchyNodes(doc, node.children, depth + 1, tbody, entityMap, state, store, supportEngine, renderedIds, query, selectedId);
+        appendHierarchyNodes(doc, node.children, depth + 1, tbody, entityMap, state, store, supportPresenter, renderedIds, query, selectedId);
       }
       (node.directEntityIds || []).forEach((entityId) => {
         const entity = entityMap.get(entityId);
         if (!entity || renderedIds.has(entityId)) return;
-        const tr = renderEntityRow(doc, entity, depth + 1, state, store, supportEngine, selectedId, query);
+        const tr = renderEntityRow(doc, entity, depth + 1, state, store, supportPresenter, selectedId, query);
         if (tr) {
           tbody.append(tr);
           renderedIds.add(entityId);
@@ -149,7 +149,7 @@ function renderHierarchyHeaderRow(doc, node, depth, isExpanded, onToggle) {
   return trGroup;
 }
 
-function renderEntityRow(doc, entity, depth, state, store, supportEngine, selectedId, query) {
+function renderEntityRow(doc, entity, depth, state, store, supportPresenter, selectedId, query) {
   const id = entity.entityId;
   const name = entity.name || id;
   const type = entity.entityType || 'OBJECT';
@@ -240,7 +240,7 @@ function renderEntityRow(doc, entity, depth, state, store, supportEngine, select
   tr.append(tdLen, tdCell(doc, lineNo));
 
   const isSupp = type === 'SUPPORT' || entity.category === 'support';
-  const loadStr = isSupp ? `OPE_V: ${supportEngine.calculateEntityLoads(entity).opeVN} N (${supportEngine.calculateEntityLoads(entity).opeVkN} kN)` : '-';
+  const loadStr = isSupp ? supportPresenter.getTableSummary(entity) : '-';
   tr.append(tdCell(doc, loadStr, isSupp ? '#38bdf8' : '#64748b'));
 
   const tdActions = doc.createElement('td');

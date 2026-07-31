@@ -2,10 +2,10 @@ import { renderAnalysisLedger } from './analysis-ledger-view.js';
 import { renderAnalysisCapabilities } from './analysis-readiness-view.js';
 import { renderAnalysisSession } from './analysis-session-view.js';
 import { flattenProperties } from './property-flattener.js';
-import { PipingSupportEngine } from './sequential-sketcher/support-engine.js';
+import { SupportLoadPresenter } from './sequential-sketcher/support-load-presenter.js';
 import { buildPropertyInspector } from './sequential-sketcher/property-inspector-view.js';
 
-const sharedSupportEngine = new PipingSupportEngine();
+const sharedSupportPresenter = new SupportLoadPresenter();
 
 export function renderPropertiesContent(
   documentRef,
@@ -29,7 +29,7 @@ export function renderPropertiesContent(
       category: selection.category || 'component',
       properties: selection.properties || {},
     };
-    fragment.append(buildPropertyInspector(documentRef, entityObj, sharedSupportEngine, null));
+    fragment.append(buildPropertyInspector(documentRef, entityObj, sharedSupportPresenter, null));
   } else {
     fragment.append(renderSelectionHeader(documentRef, selection));
     fragment.append(renderRows(documentRef, selection.properties, 'No properties supplied for this selection.', 240, searchQuery));

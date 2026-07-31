@@ -36,7 +36,7 @@ function createSectionHeader(doc, titleText, badgeText = null) {
   return header;
 }
 
-export function buildPropertyInspector(doc, entity, supportEngine, onClose) {
+export function buildPropertyInspector(doc, entity, supportPresenter, onClose) {
   const panel = doc.createElement('div');
   panel.className = 'sequential-sketcher-property-card';
   panel.style.background = '#0f172a';
@@ -177,19 +177,14 @@ export function buildPropertyInspector(doc, entity, supportEngine, onClose) {
     if (geom.end) addRow('End Point', `X:${geom.end.x?.toFixed?.(1) || geom.end.x} Y:${geom.end.y?.toFixed?.(1) || geom.end.y} Z:${geom.end.z?.toFixed?.(1) || geom.end.z}`);
   }
 
-  // Section 3: FEA & CAD Support Loads
-  if (supportEngine && typeof supportEngine.formatLoadInspectorProperties === 'function') {
-    const loadProps = supportEngine.formatLoadInspectorProperties(entity);
+  // Section 3: sealed LFEA or first-cut screening results.
+  if (supportPresenter && typeof supportPresenter.formatLoadInspectorProperties === 'function') {
+    const loadProps = supportPresenter.formatLoadInspectorProperties(entity);
     if (Object.keys(loadProps).length > 0) {
-      panel.append(createSectionHeader(doc, 'ASME B31.3 Support Loads', 'CALCULATED'));
+      panel.append(createSectionHeader(doc, 'Qualified / First-Cut Support Results', 'READ-ONLY'));
       Object.entries(loadProps).forEach(([key, val]) => {
         let hl = null;
-        if (key.includes('Allowable Stress Ratio')) {
-          const ratioNum = parseFloat(String(val).replace(/[^0-9.]/g, ''));
-          if (ratioNum > 100) hl = '#f87171'; // red
-          else if (ratioNum > 80) hl = '#fbbf24'; // orange
-          else hl = '#4ade80'; // green
-        } else if (key.includes('Operating Vertical Load')) {
+        if (key.includes('vertical') || key.includes('Vertical')) {
           hl = '#38bdf8';
         }
         addRow(key, val, hl);

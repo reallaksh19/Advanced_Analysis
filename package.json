@@ -16,6 +16,13 @@
     "check:doc-drift": "node scripts/doc-drift-check.mjs",
     "check:fea-ui-upgrade": "node scripts/fea-ui-upgrade-check.mjs",
     "check:e2e": "node scripts/run-playwright.mjs",
+    "check:first-cut-load-estimation": "node scripts/first-cut-load-estimation-check.mjs",
+    "check:first-cut-beam-screening": "node scripts/first-cut-beam-screening-check.mjs",
+    "check:first-cut-sustained-screening": "node scripts/first-cut-sustained-screening-check.mjs",
+    "check:first-cut-anti-drift": "node scripts/first-cut-anti-drift-check.mjs",
+    "check:first-cut-workbench": "node scripts/first-cut-workbench-check.mjs",
+    "check:first-cut-e2e": "node scripts/run-playwright.mjs e2e/first-cut-workbench.spec.js",
+    "check:first-cut": "npm run check:first-cut-load-estimation && npm run check:first-cut-beam-screening && npm run check:first-cut-sustained-screening && npm run check:first-cut-workbench && npm run check:first-cut-anti-drift",
     "check:imports": "node scripts/import-check.mjs",
     "check:lafea-workbench": "node scripts/lafea-workbench-check.mjs",
     "check:lafea-foundation": "node scripts/lafea.15-profile-schema-check.mjs && node scripts/lafea.hash-lineage-check.mjs && node scripts/lafea.14-approximation-register-check.mjs",
@@ -52,7 +59,7 @@
     "preview": "vite preview",
     "syntax": "node scripts/syntax-check.mjs",
     "syntax:strict": "node scripts/syntax-check.mjs --strict",
-    "gate": "npm run syntax:strict && npm run check:imports && npm run check:doc-drift && npm run check:shared-analysis && npm run check:lafea-foundation && npm run check:lafea-meshing && npm run check:lafea-solver && npm run check:core-fea && npm run check:lfea-core && npm run check:lfea-svg && npm run check:sequential-sketcher && npm run check:lafea-core && npm run check:workspace-contracts && npm run check:lafea-workbench && npm run check:lfea-workbench && npm run check:fea-ui-upgrade && npm run check:ui-invariants && npm run build",
+    "gate": "npm run syntax:strict && npm run check:imports && npm run check:doc-drift && npm run check:shared-analysis && npm run check:first-cut && npm run check:lafea-foundation && npm run check:lafea-meshing && npm run check:lafea-solver && npm run check:core-fea && npm run check:lfea-core && npm run check:lfea-svg && npm run check:sequential-sketcher && npm run check:lafea-core && npm run check:workspace-contracts && npm run check:lafea-workbench && npm run check:lfea-workbench && npm run check:fea-ui-upgrade && npm run check:ui-invariants && npm run build",
     "test": "npm run check:advanced-shell && npm run check:lafea-workbench && npm run check:lfea-workbench && npm run check:lfea-svg && npm run check:sequential-sketcher"
   },
   "dependencies": {
