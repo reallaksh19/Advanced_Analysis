@@ -21,18 +21,67 @@ import {
   requireRecord,
   requireText,
 } from './inputxml-source-contract.js';
+import { sealLinearPipingInputXmlAnalysisContext } from './inputxml-analysis-context.js';
 import {
-  runLinearPipingAnalysisFromSourceAuthorities,
+  compileLinearPipingSourceAnalysisContext,
   validateLinearPipingSourceAnalysisRequest,
 } from './source-orchestration.js';
 
-/**
- * Recompute InputXML geometry and B-1 conditioning, bind those identities to
- * an existing Phase 2A request, then delegate B-2.5/B-3.0/T0 execution.
- * Material, section, local-axis, constraint and load authorities remain
- * caller-supplied through the Phase 2A request and are never inferred here.
- */
+/** Existing Phase 2B result-only boundary, preserved for compatibility. */
 export function runLinearPipingAnalysisFromInputXml(request, runtime) {
+  const compiled = compileBoundInputXml(request, runtime);
+  return sealInputXmlAnalysisResult({
+    source: compiled.source,
+    geometry: compiled.geometry,
+    conditionedTopology: compiled.conditionedTopology,
+    analysisResult: compiled.sourceAnalysisContext.analysisResult,
+  });
+}
+
+/**
+ * Compile one sealed InputXML source into the retained B-2.5/B-3.0/T0 context.
+ * The raw source is parsed and conditioned once; engineering authorities remain
+ * caller-supplied through the existing Phase 2A request.
+ */
+export function compileLinearPipingInputXmlAnalysisContext(request, runtime) {
+  const compiled = compileBoundInputXml(request, runtime);
+  return sealLinearPipingInputXmlAnalysisContext({
+    inputXmlSource: compiled.source,
+    conditionedTopologyHash: compiled.conditionedTopology.semanticHash,
+    ingestionEvidence: ingestionEvidence(
+      compiled.source,
+      compiled.geometry,
+      compiled.conditionedTopology,
+    ),
+    sourceAnalysisContext: compiled.sourceAnalysisContext,
+  });
+}
+
+export function validateLinearPipingInputXmlAnalysisRequest(value) {
+  requireRecord(value, 'inputXmlAnalysisRequest');
+  requireExactKeys(value, INPUTXML_ANALYSIS_REQUEST_KEYS, 'inputXmlAnalysisRequest');
+  if (value.schema !== LINEAR_PIPING_INPUTXML_ANALYSIS_REQUEST_SCHEMA) {
+    failInputXml(
+      'InputXML analysis request schema is unsupported.',
+      'PIPING_INPUTXML_REQUEST_INVALID',
+    );
+  }
+  const inputXmlSource = requireLinearPipingInputXmlSource(value.inputXmlSource);
+  const ingestionOptions = requireIngestionOptions(value.ingestionOptions, inputXmlSource);
+  const conditioning = requireConditioning(value.conditioning);
+  const sourceAnalysisRequest = validateLinearPipingSourceAnalysisRequest(
+    value.sourceAnalysisRequest,
+  );
+  return Object.freeze({
+    schema: value.schema,
+    inputXmlSource,
+    ingestionOptions,
+    conditioning,
+    sourceAnalysisRequest,
+  });
+}
+
+function compileBoundInputXml(request, runtime) {
   const accepted = validateLinearPipingInputXmlAnalysisRequest(request);
   const source = accepted.inputXmlSource;
   const bendRadiusTolerance = requireDeclaredValue(
@@ -67,40 +116,11 @@ export function runLinearPipingAnalysisFromInputXml(request, runtime) {
       conditionedTopology,
     },
   };
-  const analysisResult = runLinearPipingAnalysisFromSourceAuthorities(
+  const sourceAnalysisContext = compileLinearPipingSourceAnalysisContext(
     boundSourceRequest,
     runtime,
   );
-  return sealInputXmlAnalysisResult({
-    source,
-    geometry,
-    conditionedTopology,
-    analysisResult,
-  });
-}
-
-export function validateLinearPipingInputXmlAnalysisRequest(value) {
-  requireRecord(value, 'inputXmlAnalysisRequest');
-  requireExactKeys(value, INPUTXML_ANALYSIS_REQUEST_KEYS, 'inputXmlAnalysisRequest');
-  if (value.schema !== LINEAR_PIPING_INPUTXML_ANALYSIS_REQUEST_SCHEMA) {
-    failInputXml(
-      'InputXML analysis request schema is unsupported.',
-      'PIPING_INPUTXML_REQUEST_INVALID',
-    );
-  }
-  const inputXmlSource = requireLinearPipingInputXmlSource(value.inputXmlSource);
-  const ingestionOptions = requireIngestionOptions(value.ingestionOptions, inputXmlSource);
-  const conditioning = requireConditioning(value.conditioning);
-  const sourceAnalysisRequest = validateLinearPipingSourceAnalysisRequest(
-    value.sourceAnalysisRequest,
-  );
-  return Object.freeze({
-    schema: value.schema,
-    inputXmlSource,
-    ingestionOptions,
-    conditioning,
-    sourceAnalysisRequest,
-  });
+  return Object.freeze({ source, geometry, conditionedTopology, sourceAnalysisContext });
 }
 
 function sealInputXmlAnalysisResult({ source, geometry, conditionedTopology, analysisResult }) {
@@ -109,15 +129,7 @@ function sealInputXmlAnalysisResult({ source, geometry, conditionedTopology, ana
     sourceSemanticHash: source.semanticHash,
     contentHash: source.contentHash,
     conditionedTopologyHash: conditionedTopology.semanticHash,
-    ingestionEvidence: deepFreeze({
-      fileName: source.fileName,
-      unit: geometry.unit,
-      source: geometry.source,
-      geometryDiagnosticCodes: Object.freeze(
-        (geometry.diagnostics ?? []).map((row) => row.code).filter(Boolean).sort(compareAscii),
-      ),
-      conditioningReport: conditionedTopology.report,
-    }),
+    ingestionEvidence: ingestionEvidence(source, geometry, conditionedTopology),
     analysisResult,
     semanticHash: '',
     evidenceHash: '',
@@ -125,6 +137,18 @@ function sealInputXmlAnalysisResult({ source, geometry, conditionedTopology, ana
   draft.semanticHash = computeInputXmlAnalysisResultSemanticHash(draft);
   draft.evidenceHash = computeInputXmlAnalysisResultEvidenceHash(draft);
   return requireLinearPipingInputXmlAnalysisResult(draft);
+}
+
+function ingestionEvidence(source, geometry, conditionedTopology) {
+  return deepFreeze({
+    fileName: source.fileName,
+    unit: geometry.unit,
+    source: geometry.source,
+    geometryDiagnosticCodes: Object.freeze(
+      (geometry.diagnostics ?? []).map((row) => row.code).filter(Boolean).sort(compareAscii),
+    ),
+    conditioningReport: conditionedTopology.report,
+  });
 }
 
 function requireSourceRequestMatchesInputXml(sourceRequest, source, conditionedTopology) {
