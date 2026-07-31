@@ -1,0 +1,20 @@
+{
+  "schema": "lfea-piping-audit-baseline/v1",
+  "repository": "reallaksh19/Advanced_Analysis",
+  "program": "PRIORITY_2_LINEAR_PIPING_FEA",
+  "sourceBaselineCommit": "a59b5d2ac1d47150aebe1609b0ecdaabeeeaec5e",
+  "sourceBaselineRole": "MERGED_PR16_REBASE_POINT",
+  "requiredDefaultBranch": "main",
+  "requiredCleanCheckout": true,
+  "exactHeadAuthority": "GITHUB_SHA",
+  "dependencyLockPath": "package-lock.json",
+  "requiredCommands": [
+    "npm ci",
+    "node scripts/lfea-piping-a0-baseline-check.mjs --release",
+    "npm run check:linear-piping-analysis-consumer",
+    "npm run gate",
+    "git diff --check",
+    "test -z \"$(git status --short)\""
+  ],
+  "programDispositionBeforeA0A7": "BLOCKED"
+}
