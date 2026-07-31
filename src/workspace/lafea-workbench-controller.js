@@ -3,8 +3,9 @@
  *
  * DOM/file actions are translated into store-owned immutable edit commands. The
  * controller has no Workspace coupling and no numerical calculation logic.
+ * Lifecycle evidence enters only through explicit producer-owned records/events.
  */
-import { createLafeaWorkbenchStore } from './lafea-workbench-store.js';
+import { createLafeaWorkbenchStore } from './lafea-lifecycle-workbench-store.js';
 import { LAFEA_WORKBENCH_STYLES } from './lafea-workbench-styles.js';
 import { FeaBenchmarkPanel } from './fea-benchmark-panel.js';
 import { FEA_BENCHMARK_STYLES } from './fea-benchmark-styles.js';
@@ -63,8 +64,8 @@ export class LafeaWorkbenchController {
     }
   }
 
-  importDocument(value, stageId) {
-    return this.store.importDocument(value, stageId);
+  importDocument(value, stageId, sourceHash = null) {
+    return this.store.importDocument(value, stageId, sourceHash);
   }
 
   async loadMockData(stageId) {
@@ -74,6 +75,26 @@ export class LafeaWorkbenchController {
 
   exportDocument() {
     return this.store.exportDocument();
+  }
+
+  exportLifecycle() {
+    return this.store.exportLifecycle();
+  }
+
+  initializeLifecycle(sourceHash, originRef) {
+    return this.store.initializeLifecycle(sourceHash, originRef);
+  }
+
+  applyLifecycleEvent(event) {
+    return this.store.applyLifecycleEvent(event);
+  }
+
+  registerLifecycleArtifact(record, registrationId) {
+    return this.store.registerLifecycleArtifact(record, registrationId);
+  }
+
+  revalidateLifecycleBinding(sourceHash, originRef) {
+    return this.store.revalidateLifecycleBinding(sourceHash, originRef);
   }
 
   setScalar(descriptorId, entityId, rawText) {

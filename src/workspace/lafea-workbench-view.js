@@ -5,7 +5,7 @@
  * direct mutation of frozen stage documents. All edits pass through controller
  * commands. Geometry is rendered only from explicit source entities. Stage
  * labels, capability state, preview policy and limitations are read from the
- * governed stage registry.
+ * governed stage registry. Lifecycle evidence is presented read-only.
  */
 import { lafeaPreviewGeometry } from './lafea-stage-preview.js';
 import {
@@ -24,6 +24,7 @@ import { renderLafeaEvidence } from './lafea-results-view.js';
 import { renderLafeaWorkbenchSvg } from './lafea-workbench-svg.js';
 import { renderMeshQualityPanel } from './lafea-mesh-quality-panel.js';
 import { renderDocumentTableEditor } from './lafea-document-table.js';
+import { renderLafeaLifecyclePanel } from './lafea-lifecycle-panel.js';
 
 export class LafeaWorkbenchView {
   constructor(rootElement) {
@@ -148,7 +149,9 @@ export class LafeaWorkbenchView {
     );
     run.dataset.role = 'lafea-run';
     run.disabled = !stage.document || !executionSupported;
-    if (!executionSupported) run.title = 'UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED';
+    run.title = executionSupported
+      ? 'Retained calculation output is not promoted automatically into lifecycle evidence.'
+      : 'UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED';
 
     const benchmark = actionButton(
       this.rootElement,
@@ -236,11 +239,22 @@ export class LafeaWorkbenchView {
     });
     meshCard.body.append(qualityPanelHost);
 
+    const lifecycleCard = card(
+      this.rootElement,
+      `Lifecycle and lineage evidence — ${state.activeStageId}`,
+    );
+    lifecycleCard.body.append(renderLafeaLifecyclePanel(
+      lifecycleCard.body,
+      state.activeStageId,
+      stage,
+    ));
+
     grid.append(
       sourceCard.section,
       previewCard.section,
       evidenceCard.section,
       meshCard.section,
+      lifecycleCard.section,
     );
 
     if (this.benchmarkHost) {

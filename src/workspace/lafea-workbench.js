@@ -67,6 +67,12 @@ export {
   registerLafeaArtifact,
 } from './lafea-lifecycle.js';
 export {
+  LAFEA_LIFECYCLE_BINDING_SCHEMA,
+  LAFEA_LIFECYCLE_BINDING_STATUSES,
+  LAFEA_WORKBENCH_STATE_SCHEMA,
+  createLafeaWorkbenchStore,
+} from './lafea-lifecycle-workbench-store.js';
+export {
   LAFEA_WORKBENCH_DOCUMENT_SCHEMA,
   executeLafeaStage,
   lafeaCollectionPaths,
@@ -75,7 +81,6 @@ export {
   normalizeLafeaStageDocument,
 } from './lafea-workbench-model.js';
 export { lafeaPreviewGeometry } from './lafea-stage-preview.js';
-export { createLafeaWorkbenchStore } from './lafea-workbench-store.js';
 
 /**
  * Mount and initialize a LAFEA workbench in an existing shell root.
