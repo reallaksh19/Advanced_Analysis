@@ -1,9 +1,9 @@
 /**
- * LAFEA workbench stage contracts.
+ * LAFEA workbench stage calculation adapters.
  *
- * Editable source documents are canonicalized immediately before calculation.
- * Workspace code does not create engineering results or silently substitute a
- * missing stage engine.
+ * Stage identity, taxonomy, capability state and collection paths are owned by
+ * `lafea-stage-registry.js`. This module owns only source normalization and
+ * dispatch to already-qualified core calculation packages.
  */
 import {
   calculateLocalAttachmentFoundation,
@@ -33,50 +33,18 @@ import {
   createCanonicalTrunnionFootprintModel,
   createCanonicalTrunnionFootprintSource,
 } from '../core/local-trunnion-footprint/index.js';
+import {
+  LAFEA_STAGE_DEFINITIONS,
+  LAFEA_STAGE_IDS,
+  lafeaRegisteredCollectionPaths,
+  lafeaRegisteredExecutionSupported,
+  requireLafeaStageRegistryEntry,
+} from './lafea-stage-registry.js';
 
 export { lafeaPreviewGeometry } from './lafea-stage-preview.js';
+export { LAFEA_STAGE_DEFINITIONS, LAFEA_STAGE_IDS };
 
 export const LAFEA_WORKBENCH_DOCUMENT_SCHEMA = 'lafea-workbench-document/v1';
-export const LAFEA_STAGE_IDS = Object.freeze([
-  'LAFEA.1',
-  'LAFEA.2',
-  'LAFEA.3',
-  'LAFEA.4',
-  'LAFEA.5',
-  'LAFEA.6',
-]);
-
-export const LAFEA_STAGE_DEFINITIONS = Object.freeze([
-  stage('LAFEA.1', 'Attachment foundation', 'Load transfer and elastic pressure baseline only'),
-  stage('LAFEA.2', 'Pipe-section screening', 'Nominal far-field pipe-section screening only'),
-  stage('LAFEA.3', '2D continuum', 'T6/Q8 continuum with T3 fallback and benchmark support'),
-  stage('LAFEA.4', 'Thin shell', 'Legacy five-DOF triangular CST+DKT thin-shell path'),
-  stage('LAFEA.5', 'Trunnion footprint', 'Caller-authored host-shell footprint load distribution'),
-  stage('LAFEA.6', 'Weld profile', 'Not implemented — no qualified stage engine'),
-]);
-
-const COLLECTIONS = Object.freeze({
-  'LAFEA.1': ['materials', 'pressureDefinitions', 'loadReferencePoints', 'loadCases'],
-  'LAFEA.2': ['screeningCases', 'evaluationLocations'],
-  'LAFEA.3': ['materials', 'nodes', 'elements', 'constraints', 'loadCases'],
-  'LAFEA.4': ['materials', 'nodes', 'elements', 'constraints', 'loadCases'],
-  'LAFEA.5': [
-    'shellTemplate.materials',
-    'shellTemplate.nodes',
-    'shellTemplate.elements',
-    'shellTemplate.constraints',
-    'loadCaseMappings',
-    'assessmentRegions',
-  ],
-  'LAFEA.6': ['nodes', 'elements', 'materials', 'loadCases'],
-});
-
-const UNSUPPORTED_WELD_STAGE_DIAGNOSTIC = Object.freeze({
-  severity: 'ERROR',
-  code: 'UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED',
-  path: 'stageId',
-  message: 'LAFEA.6 calculation is disabled because no qualified weld-profile core engine is registered.',
-});
 
 /**
  * Validate and normalize an editable document for one exact LAFEA stage.
@@ -130,19 +98,17 @@ export function normalizeLafeaStageEdit(stageId, input) {
 }
 
 /**
- * Whether the active stage has a qualified calculation route in the current
- * workbench contract.
+ * Whether the registry declares a qualified calculation route.
  *
  * @param {string} stageId Exact LAFEA stage identity.
  * @returns {boolean}
  */
 export function lafeaStageExecutionSupported(stageId) {
-  assertStageId(stageId);
-  return stageId !== 'LAFEA.6';
+  return lafeaRegisteredExecutionSupported(stageId);
 }
 
 /**
- * Execute the only qualified calculation API assigned to a LAFEA stage.
+ * Execute the qualified calculation adapter assigned to a registered stage.
  *
  * @param {string} stageId Exact LAFEA stage identity.
  * @param {unknown} document Editable stage source.
@@ -157,7 +123,7 @@ export function executeLafeaStage(stageId, document) {
       source: null,
       canonicalInput: null,
       result: null,
-      diagnostics: [UNSUPPORTED_WELD_STAGE_DIAGNOSTIC],
+      diagnostics: [unsupportedStageDiagnostic(stageId)],
     });
   }
   try {
@@ -187,14 +153,13 @@ export function executeLafeaStage(stageId, document) {
 }
 
 /**
- * Return collection paths exposed by the transitional stage record editor.
+ * Return collection paths owned by the stage registry.
  *
  * @param {string} stageId Exact LAFEA stage identity.
  * @returns {ReadonlyArray<string>} Stable collection paths.
  */
 export function lafeaCollectionPaths(stageId) {
-  assertStageId(stageId);
-  return COLLECTIONS[stageId];
+  return lafeaRegisteredCollectionPaths(stageId);
 }
 
 function stripWorkbenchFields(input) {
@@ -271,6 +236,16 @@ function editableScreening(input) {
   return result;
 }
 
+function unsupportedStageDiagnostic(stageId) {
+  const entry = requireLafeaStageRegistryEntry(stageId);
+  return {
+    severity: 'ERROR',
+    code: 'UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED',
+    path: 'stageId',
+    message: `${entry.stageId} calculation is disabled because no qualified core engine is registered.`,
+  };
+}
+
 function unsupportedStageError(stageId) {
   const error = new Error(`No qualified calculation engine is registered for ${stageId}.`);
   error.code = 'UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED';
@@ -287,12 +262,8 @@ function errorDiagnostic(error) {
   };
 }
 
-function stage(stageId, label, purpose) {
-  return Object.freeze({ stageId, label, purpose });
-}
-
 function assertStageId(stageId) {
-  if (!LAFEA_STAGE_IDS.includes(stageId)) throw new TypeError(`Unsupported LAFEA stage: ${stageId}.`);
+  requireLafeaStageRegistryEntry(stageId);
 }
 
 function withoutHash(value) {
