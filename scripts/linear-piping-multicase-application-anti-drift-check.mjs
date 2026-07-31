@@ -10,6 +10,10 @@ const PACKAGE = path.join(ROOT, 'src/core/linear-piping-multicase-application');
 const orchestrator = fs.readFileSync(path.join(PACKAGE, 'orchestrator.js'), 'utf8');
 const contracts = fs.readFileSync(path.join(PACKAGE, 'contracts.js'), 'utf8');
 const index = fs.readFileSync(path.join(PACKAGE, 'index.js'), 'utf8');
+const consumerGuard = fs.readFileSync(
+  path.join(ROOT, 'scripts/linear-piping-analysis-consumer-anti-drift-check.mjs'),
+  'utf8',
+);
 const packageJson = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 
 assert.match(contracts, /linear-piping-multicase-application-request\/v1/u);
@@ -46,15 +50,15 @@ assert.doesNotMatch(contracts, /allowableStress|stressIntensification|flexibilit
 assert.ok(orchestrator.split('\n').length <= 560, 'Phase 2E orchestrator must remain bounded.');
 assert.ok(contracts.split('\n').length <= 260, 'Phase 2E contracts must remain bounded.');
 
-assert.equal(
-  packageJson.scripts['check:lfea-multicase-application'],
-  'node scripts/linear-piping-multicase-application-check.mjs && node scripts/linear-piping-multicase-application-anti-drift-check.mjs',
-);
-assert.match(packageJson.scripts['check:lfea-core'], /check:lfea-multicase-application/u);
+assert.match(consumerGuard, /linear-piping-multicase-application-check\.mjs/u);
+assert.match(consumerGuard, /linear-piping-multicase-application-anti-drift-check\.mjs/u);
+assert.match(packageJson.scripts['check:lfea-core'], /check:linear-piping-analysis-consumer/u);
+assert.match(packageJson.scripts.gate, /check:linear-piping-analysis-consumer/u);
 
 console.log(JSON.stringify({
   check: 'linear-piping-multicase-application-anti-drift',
   status: 'PASS',
   authority: 'ORCHESTRATION_ONLY',
+  registration: 'check:linear-piping-analysis-consumer',
   prohibitedMechanics: true,
 }));
