@@ -15,9 +15,7 @@ import {
   requireSchema,
 } from './lafea-canvas/contracts.js';
 import { createHybridViewport } from './lafea-canvas/hybrid-viewport.js';
-import {
-  createLafeaResultRenderRequest,
-} from './lafea-canvas/result-render-request.js';
+import { createLafeaResultRenderRequest } from './lafea-canvas/result-render-request.js';
 import { renderLafeaSourceOverlay } from './lafea-canvas/source-overlay-adapter.js';
 import { createThreeMeshRendererV2 } from './lafea-canvas/three-mesh-renderer-v2.js';
 import { validateSourceScene } from './lafea-engineering-scene.js';
@@ -56,6 +54,9 @@ const SELECTION_KEYS = Object.freeze([
 const DISPLAY_KEYS = Object.freeze([
   'sourceAuthoring', 'wireframe', 'fieldBounds', 'colorMapId',
   'deformationScale',
+]);
+const FIELD_BOUNDS_KEYS = Object.freeze([
+  'minimum', 'maximum', 'source', 'semanticHash',
 ]);
 const WORLD_BOUNDS_KEYS = Object.freeze(['minimum', 'maximum']);
 const VECTOR_KEYS = Object.freeze(['x', 'y', 'z']);
@@ -241,6 +242,10 @@ export function mountLafeaHybridResultViewport(root, input) {
         runtimeBlock = 'LAFEA_HYBRID_RESULT_WEBGL_UNAVAILABLE';
         return renderBlocked();
       }
+      if (typeof error?.code === 'string' && error.code.startsWith('LAFEA_V2_')) {
+        runtimeBlock = error.code;
+        return renderBlocked();
+      }
       throw error;
     }
   }
@@ -337,8 +342,10 @@ export function mountLafeaHybridResultViewport(root, input) {
       destroyed = true;
       controller.destroy();
       root.dataset.resultStatus = 'DESTROYED';
-      delete root.dataset.resultRenderer;
-      delete root.dataset.resultFieldId;
+      for (const field of [
+        'resultRenderer', 'resultFieldId', 'resultBlockingReasonCount',
+        'resultBlockingReasons',
+      ]) delete root.dataset[field];
     },
   });
 }
@@ -418,6 +425,11 @@ function validateSharedViewport(value) {
       `worldBounds.${endpoint}.${axis}`,
     ));
   }
+  if (value.worldBounds.maximum.x <= value.worldBounds.minimum.x
+    || value.worldBounds.maximum.y <= value.worldBounds.minimum.y
+    || value.worldBounds.maximum.z < value.worldBounds.minimum.z) {
+    throw contractError('LAFEA_HYBRID_RESULT_WORLD_BOUNDS_ORDER_INVALID');
+  }
   for (const matrix of ['viewMatrix', 'projectionMatrix']) {
     if (!Array.isArray(value[matrix]) || value[matrix].length !== 16
       || value[matrix].some((entry) => !Number.isFinite(entry))) {
@@ -433,6 +445,21 @@ function validateSharedViewport(value) {
     || value.displayOptions.wireframe !== false
     || value.displayOptions.deformationScale !== 0) {
     throw contractError('LAFEA_HYBRID_RESULT_DISPLAY_AUTHORITY_INVALID');
+  }
+  const fieldBounds = value.displayOptions.fieldBounds;
+  if (fieldBounds !== null) {
+    assertExactKeys(fieldBounds, FIELD_BOUNDS_KEYS, 'LAFEA_HYBRID_RESULT_FIELD_BOUNDS_INVALID');
+    requireFiniteNumber(fieldBounds.minimum, 'fieldBounds.minimum');
+    requireFiniteNumber(fieldBounds.maximum, 'fieldBounds.maximum');
+    if (fieldBounds.maximum < fieldBounds.minimum
+      || typeof fieldBounds.source !== 'string' || !fieldBounds.source
+      || typeof fieldBounds.semanticHash !== 'string' || !fieldBounds.semanticHash) {
+      throw contractError('LAFEA_HYBRID_RESULT_FIELD_BOUNDS_INVALID');
+    }
+  }
+  const colorMapId = value.displayOptions.colorMapId;
+  if (colorMapId !== null && (typeof colorMapId !== 'string' || !colorMapId)) {
+    throw contractError('LAFEA_HYBRID_RESULT_COLOR_MAP_INVALID');
   }
   return deepFreeze(structuredClone(value));
 }
