@@ -28,6 +28,14 @@ const documentRef = new FakeDocument();
 const mountCounts = new Map();
 const destroyCounts = new Map();
 let observedFacade = null;
+const throwingDescriptor = {};
+Object.defineProperties(throwingDescriptor, {
+  schema: { enumerable: true, value: LAFEA_WORKBENCH_ACCESSORY_PANEL_SCHEMA },
+  panelId: { enumerable: true, get() { throw new Error('PANEL_ID_GETTER_REJECTED'); } },
+  label: { enumerable: true, value: 'Throwing panel' },
+  order: { enumerable: true, value: 30 },
+  mount: { enumerable: true, value: () => ({ destroy() {} }) },
+});
 
 const values = [
   descriptor('PANEL_B', 'Panel B', 100, mounted('PANEL_B')),
@@ -44,6 +52,7 @@ const values = [
   descriptor('PANEL_DUPLICATE', 'Duplicate one', 1, mounted('PANEL_DUPLICATE_1')),
   descriptor('PANEL_DUPLICATE', 'Duplicate two', 2, mounted('PANEL_DUPLICATE_2')),
   { ...valid, panelId: 'INVALID PANEL' },
+  throwingDescriptor,
 ];
 
 const manager = createLafeaAccessoryPanelManager(documentRef, values);
@@ -60,6 +69,10 @@ assert.equal(manager.getSnapshot().diagnostics.filter(
 ).length, 2);
 assert.ok(manager.getSnapshot().diagnostics.some(
   (entry) => entry.code === 'LAFEA_ACCESSORY_PANEL_ID_INVALID',
+));
+assert.ok(manager.getSnapshot().diagnostics.some(
+  (entry) => entry.code === 'LAFEA_ACCESSORY_PANEL_DESCRIPTOR_INVALID'
+    && entry.panelId === 'INVALID_PANEL_0009',
 ));
 
 const controller = {
@@ -127,6 +140,7 @@ console.log(JSON.stringify({
   status: 'PASS',
   deterministicOrder: true,
   duplicateGroupRejected: true,
+  throwingDescriptorContained: true,
   mountFailureContained: true,
   facadeFrozen: true,
   teardownExactlyOnce: true,
