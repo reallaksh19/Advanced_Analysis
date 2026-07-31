@@ -1,4 +1,4 @@
-import { requireLinearPipingPresentation } from '../core/linear-piping-presentation/index.js';
+import { requireCurrentLinearPipingPresentation } from '../core/linear-piping-presentation/index.js';
 
 /**
  * Read-only DOM renderer for one CURRENT sealed piping presentation.
@@ -7,11 +7,11 @@ import { requireLinearPipingPresentation } from '../core/linear-piping-presentat
  * calculate reactions, transform vectors, transfer moments, derive stress,
  * choose combinations or calculate utilization.
  */
-export function renderLinearPipingResultsView(root, presentation) {
+export function renderLinearPipingResultsView(root, presentation, applicationResult) {
   if (!root || typeof root.replaceChildren !== 'function') {
     throw new TypeError('Linear piping results view requires a DOM root.');
   }
-  const accepted = requireLinearPipingPresentation(presentation);
+  const accepted = requireCurrentLinearPipingPresentation(presentation, applicationResult);
   const documentRef = root.ownerDocument ?? document;
   const view = element(documentRef, 'section', 'linear-piping-results');
   view.dataset.currency = accepted.currency;
