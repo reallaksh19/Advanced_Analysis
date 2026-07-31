@@ -57,6 +57,7 @@ export const B31_CASE_BINDING_KEYS = Object.freeze([
   'caseId',
   'physicalLoadCaseHash',
   'recoverySemanticHash',
+  'recoveryEvidenceHash',
   'executionHash',
   'mechanicalModelSemanticHash',
   'stiffnessStateHash',
@@ -112,14 +113,7 @@ export function compileLinearPipingB31Application(input) {
     evidenceHash: '',
   };
   draft.semanticHash = semanticHash(b31ApplicationSemanticProjection(draft));
-  draft.evidenceHash = semanticHash({
-    semanticHash: draft.semanticHash,
-    resultEvidence: results.map((row) => ({
-      checkId: row.checkId,
-      sourceRecoveryHashes: row.sourceRecoveryHashes,
-      codeResultEvidenceHash: row.codeResult.evidenceHash,
-    })),
-  });
+  draft.evidenceHash = computeB31ApplicationEvidenceHash(draft);
   return requireLinearPipingB31Application(draft);
 }
 
@@ -276,6 +270,7 @@ function caseBinding(entry) {
     caseId: entry.caseId,
     physicalLoadCaseHash: entry.loadCase.physicalLoadCaseHash,
     recoverySemanticHash: entry.recovery.semanticHash,
+    recoveryEvidenceHash: entry.recovery.evidenceHash,
     executionHash: entry.recovery.executionHash,
     mechanicalModelSemanticHash: entry.recovery.mechanicalModelSemanticHash,
     stiffnessStateHash: entry.recovery.stiffnessStateHash,
@@ -298,31 +293,80 @@ export function requireLinearPipingB31Application(record) {
   requireHash(record.editionDatasetSemanticHash, 'b31Application.editionDatasetSemanticHash');
   requireHash(record.semanticHash, 'b31Application.semanticHash');
   requireHash(record.evidenceHash, 'b31Application.evidenceHash');
-  requireArray(record.caseBindings, 'b31Application.caseBindings').forEach((entry, index) => {
-    exactKeys(entry, B31_CASE_BINDING_KEYS, `b31Application.caseBindings[${index}]`);
-    requireHash(entry.physicalLoadCaseHash, `b31Application.caseBindings[${index}].physicalLoadCaseHash`);
-    requireHash(entry.recoverySemanticHash, `b31Application.caseBindings[${index}].recoverySemanticHash`);
-    requireHash(entry.executionHash, `b31Application.caseBindings[${index}].executionHash`);
-    requireHash(entry.mechanicalModelSemanticHash, `b31Application.caseBindings[${index}].mechanicalModelSemanticHash`);
-    requireHash(entry.stiffnessStateHash, `b31Application.caseBindings[${index}].stiffnessStateHash`);
-  });
-  requireArray(record.results, 'b31Application.results').forEach((entry, index) => {
-    exactKeys(entry, B31_RESULT_ENTRY_KEYS, `b31Application.results[${index}]`);
-    nonEmptyString(entry.checkId, `b31Application.results[${index}].checkId`);
-    requireArray(entry.sourceRecoveryHashes, `b31Application.results[${index}].sourceRecoveryHashes`)
-      .forEach((hash, hashIndex) => requireHash(hash, `b31Application.results[${index}].sourceRecoveryHashes[${hashIndex}]`));
-    requireCodeResult(entry.codeResult);
-  });
+  const caseBindings = requireArray(record.caseBindings, 'b31Application.caseBindings');
+  const bindingByCaseId = new Map();
+  for (const [index, entry] of caseBindings.entries()) {
+    const field = `b31Application.caseBindings[${index}]`;
+    exactKeys(entry, B31_CASE_BINDING_KEYS, field);
+    nonEmptyString(entry.caseId, `${field}.caseId`);
+    requireHash(entry.physicalLoadCaseHash, `${field}.physicalLoadCaseHash`);
+    requireHash(entry.recoverySemanticHash, `${field}.recoverySemanticHash`);
+    requireHash(entry.recoveryEvidenceHash, `${field}.recoveryEvidenceHash`);
+    requireHash(entry.executionHash, `${field}.executionHash`);
+    requireHash(entry.mechanicalModelSemanticHash, `${field}.mechanicalModelSemanticHash`);
+    requireHash(entry.stiffnessStateHash, `${field}.stiffnessStateHash`);
+    if (bindingByCaseId.has(entry.caseId)) {
+      failCodeApplication('B31 case binding IDs must be unique.', 'PIPING_B31_CASE_ID_DUPLICATE');
+    }
+    bindingByCaseId.set(entry.caseId, entry);
+  }
+  const results = requireArray(record.results, 'b31Application.results');
+  for (const [index, entry] of results.entries()) {
+    const field = `b31Application.results[${index}]`;
+    exactKeys(entry, B31_RESULT_ENTRY_KEYS, field);
+    nonEmptyString(entry.checkId, `${field}.checkId`);
+    const codeResult = requireCodeResult(entry.codeResult);
+    const actionSource = canonicalActionSource(entry.actionSource, codeResult.category, field);
+    const sourceRecoveryHashes = requireArray(entry.sourceRecoveryHashes, `${field}.sourceRecoveryHashes`);
+    sourceRecoveryHashes.forEach((hash, hashIndex) => requireHash(hash, `${field}.sourceRecoveryHashes[${hashIndex}]`));
+    requireOutputSourceBinding(actionSource, sourceRecoveryHashes, bindingByCaseId);
+  }
   if (!['QUALIFIED', 'CONDITIONAL'].includes(record.status)) {
     failCodeApplication('B31 application status is invalid.', 'PIPING_B31_APPLICATION_INVALID');
   }
   if (record.semanticHash !== semanticHash(b31ApplicationSemanticProjection(record))) {
     failCodeApplication('B31 application semantic hash is stale.', 'PIPING_B31_APPLICATION_HASH_MISMATCH');
   }
+  if (record.evidenceHash !== computeB31ApplicationEvidenceHash(record)) {
+    failCodeApplication('B31 application evidence hash is stale.', 'PIPING_B31_APPLICATION_HASH_MISMATCH');
+  }
   return deepFreeze({ ...record });
+}
+
+function requireOutputSourceBinding(actionSource, sourceHashes, bindingByCaseId) {
+  const expected = actionSource.kind === 'SINGLE_CASE'
+    ? [bindingByCaseId.get(actionSource.caseId)?.recoverySemanticHash]
+    : [
+      bindingByCaseId.get(actionSource.fromCaseId)?.recoverySemanticHash,
+      bindingByCaseId.get(actionSource.toCaseId)?.recoverySemanticHash,
+    ];
+  if (expected.some((value) => value === undefined)
+    || JSON.stringify(sourceHashes) !== JSON.stringify(expected)) {
+    failCodeApplication(
+      'B31 result action source does not match the retained case bindings.',
+      'PIPING_B31_RESULT_PARENT_MISMATCH',
+      { actionSource, sourceHashes, expected },
+    );
+  }
 }
 
 export function b31ApplicationSemanticProjection(record) {
   const { semanticHash: _semanticHash, evidenceHash: _evidenceHash, ...projection } = record;
   return projection;
+}
+
+export function computeB31ApplicationEvidenceHash(record) {
+  return semanticHash({
+    semanticHash: record.semanticHash,
+    caseEvidence: record.caseBindings.map((entry) => ({
+      caseId: entry.caseId,
+      recoverySemanticHash: entry.recoverySemanticHash,
+      recoveryEvidenceHash: entry.recoveryEvidenceHash,
+    })),
+    resultEvidence: record.results.map((entry) => ({
+      checkId: entry.checkId,
+      sourceRecoveryHashes: entry.sourceRecoveryHashes,
+      codeResultEvidenceHash: entry.codeResult.evidenceHash,
+    })),
+  });
 }
