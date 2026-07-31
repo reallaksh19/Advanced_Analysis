@@ -1,0 +1,34 @@
+{
+  "schema": "lfea-piping-release-evidence/v1",
+  "program": "PRIORITY_2_LINEAR_PIPING_FEA_APPLICATION_CHAIN",
+  "programDisposition": "BLOCKED",
+  "exactHead": null,
+  "gates": {
+    "G0_EXACT_HEAD": "UNRESOLVED_GATE",
+    "G1_UPSTREAM_NUMERICAL_CHAIN": "PARTIALLY_VERIFIED",
+    "G2_T0_APPLICATION_SEQUENCING": "PARTIALLY_VERIFIED",
+    "G3_SOURCE_ORCHESTRATION": "NOT_IMPLEMENTED",
+    "G4_INTERFACES": "NOT_IMPLEMENTED",
+    "G5_INTERFACE_RECOVERY": "NOT_IMPLEMENTED",
+    "G6_CODE_AND_ALLOWABLES": "NOT_IMPLEMENTED",
+    "G7_PRESENTATION_EXPORT": "NOT_IMPLEMENTED",
+    "G8_REAL_MODEL_RECONCILIATION": "UNRESOLVED_GATE",
+    "G9_COMMERCIAL_CORROBORATION": "UNRESOLVED_GATE",
+    "G10_RELEASE_ROLLBACK": "UNRESOLVED_GATE"
+  },
+  "artifacts": {
+    "exactHeadManifest": null,
+    "upstreamGateLog": null,
+    "t0GateLog": null,
+    "sourceOrchestrationEvidence": null,
+    "interfaceEvidence": null,
+    "interfaceRecoveryEvidence": null,
+    "codeAndAllowableEvidence": null,
+    "presentationExportEvidence": null,
+    "realModelReconciliation": null,
+    "commercialCorroboration": null,
+    "performanceEvidence": null,
+    "rollbackEvidence": null,
+    "signedDisposition": null
+  }
+}
