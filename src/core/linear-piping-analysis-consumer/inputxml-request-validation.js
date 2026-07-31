@@ -15,7 +15,7 @@ import {
   requireRecord,
   requireText,
 } from './inputxml-source-contract.js';
-import { requireLinearPipingInputXmlUnitProfile } from './inputxml-unit-normalization.js';
+import { requireLinearPipingInputXmlUnitProfile } from './inputxml-unit-contract.js';
 import { validateLinearPipingSourceAnalysisRequest } from './source-orchestration.js';
 
 const INPUTXML_REQUEST_SCHEMAS = Object.freeze([
