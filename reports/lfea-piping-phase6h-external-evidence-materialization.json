@@ -1,0 +1,59 @@
+{
+  "schema": "lfea-piping-phase-slice/v1",
+  "phaseId": "PHASE_6H_EXTERNAL_EVIDENCE_MATERIALIZATION",
+  "ownerFindingId": "AUD-A7-001",
+  "baseHead": "dd89a3d2a6a948c4faa35184e08e507aab2f19e2",
+  "status": "UNRESOLVED_GATE",
+  "scope": [
+    "Consume a strict path-only request and seven caller-supplied sealed source records.",
+    "Require the source request and the existing Phase 6B compiler to bind one exact head.",
+    "Derive only canonical artifact-reference metadata for five governed external evidence roles.",
+    "Compile the existing external qualification package without generating source evidence values.",
+    "Persist the five supplied records and package, then run the existing Phase 6C intake before publication.",
+    "Publish atomically and remove only materializer-created staging data on failure."
+  ],
+  "evidencePaths": [
+    "scripts/lfea-piping-external-evidence-materializer.mjs",
+    "scripts/lfea-piping-external-evidence-materializer-check.mjs",
+    "scripts/lfea-piping-phase6h-anti-drift-check.mjs",
+    "scripts/lfea-piping-release-readiness-check.mjs",
+    "docs/LFEA_PIPING_PHASE6H_EXTERNAL_EVIDENCE_MATERIALIZATION.md",
+    ".github/workflows/lfea-piping-external-evidence-materialization.yml",
+    ".github/workflows/lfea-piping-phase6h-certification.yml"
+  ],
+  "addressedAgainstSection9": {
+    "findingId": "AUD-A7-001",
+    "priorStatus": "UNRESOLVED_GATE",
+    "statusAfterCoding": "UNRESOLVED_GATE",
+    "addressed": [
+      "The repository now has a production file boundary that materializes caller-supplied sealed records into the governed Phase 6B external artifact.",
+      "The existing Phase 6B compiler and Phase 6C persisted intake remain the package and persistence authorities.",
+      "The materializer derives only paths and hashes and cannot create comparison, performance, rollback or signature values.",
+      "The committed qualification suite executes no engineering or commercial program."
+    ],
+    "notClosed": [
+      "No non-fictional sealed source records have been supplied.",
+      "No governed real Phase 6H external artifact has been retained.",
+      "No successful Phase 6F internal artifact has been retained for the same head.",
+      "No Phase 6G runtime bundle or Phase 6E certification result has been retained.",
+      "A7 and all release gates remain unresolved or partially verified in the repository template."
+    ]
+  },
+  "explicitNonScope": [
+    "Executing a project or commercial analysis",
+    "Creating comparison or allowable values",
+    "Sealing performance, rollback or disposition source records",
+    "Signing a release disposition",
+    "Changing the committed release manifest",
+    "Closing A7 or promoting repository gate status"
+  ],
+  "remainingConditions": [
+    "Supply seven complete non-fictional sealed source records for one exact head.",
+    "Run and retain successful Phase 6H materialization.",
+    "Run and retain successful Phase 6F collection for the same head.",
+    "Run and retain successful Phase 6G assembly and Phase 6E certification.",
+    "Complete independent Section 9 evidence review."
+  ],
+  "releaseImpact": "NONE_WITHOUT_CALLER_SUPPLIED_REAL_EVIDENCE",
+  "programDisposition": "BLOCKED"
+}
