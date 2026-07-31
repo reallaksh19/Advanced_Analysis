@@ -1,8 +1,8 @@
 /**
  * Controller for the independent LAFEA editor and qualified calculation stages.
  *
- * The controller translates DOM/file actions into immutable store operations and
- * deliberately has no dependency on Workspace state or its event bus.
+ * DOM/file actions are translated into store-owned immutable edit commands. The
+ * controller has no Workspace coupling and no numerical calculation logic.
  */
 import { createLafeaWorkbenchStore } from './lafea-workbench-store.js';
 import { LAFEA_WORKBENCH_STYLES } from './lafea-workbench-styles.js';
@@ -11,10 +11,6 @@ import { FEA_BENCHMARK_STYLES } from './fea-benchmark-styles.js';
 import { LafeaWorkbenchView } from './lafea-workbench-view.js';
 
 export class LafeaWorkbenchController {
-  /**
-   * @param {Element|null} rootElement Workbench host.
-   * @param {{initialStage?:string,initialDocument?:unknown}|undefined} options Explicit initial state.
-   */
   constructor(rootElement, options) {
     this.rootElement = rootElement;
     this.documentRef = rootElement?.ownerDocument ?? globalThis.document;
@@ -38,10 +34,8 @@ export class LafeaWorkbenchController {
       onExport: () => this.downloadDocument(),
       onUndo: () => this.undo(),
       onRedo: () => this.redo(),
+      onSetScalar: (descriptorId, entityId, rawText) => this.setScalar(descriptorId, entityId, rawText),
       onApplyJson: (text) => this.applyDocumentText(text),
-      onAddRecord: (path, text) => this.addRecordText(path, text),
-      onUpdateRecord: (path, index, text) => this.updateRecordText(path, index, text),
-      onDeleteRecord: (path, index) => this.store.deleteRecord(path, index),
       onMoveNode: (path, nodeId, x, y) => this.store.moveNode(path, nodeId, x, y),
       onBenchmark: () => this.runBenchmark(),
     });
@@ -51,18 +45,10 @@ export class LafeaWorkbenchController {
     return this;
   }
 
-  /**
-   * Run the FEA verification suite against the live code paths.
-   *
-   * @returns {Promise<Record<string, unknown>>} Benchmark report.
-   */
   runBenchmark() {
     return this.benchmarkPanel.run();
   }
 
-  /**
-   * @returns {Record<string, unknown>|null} Last benchmark report, if any.
-   */
   getBenchmarkReport() {
     return this.benchmarkPanel.getReport();
   }
@@ -73,7 +59,7 @@ export class LafeaWorkbenchController {
       const text = await readUtf8(file);
       return this.importDocument(JSON.parse(text));
     } catch (error) {
-      return this.store.importDocument(invalidImport(error));
+      return this.store.reportEditError('document', null, error);
     }
   }
 
@@ -81,12 +67,6 @@ export class LafeaWorkbenchController {
     return this.store.importDocument(value, stageId);
   }
 
-  /**
-   * Load one deterministic demonstration document through the normal importer.
-   *
-   * @param {string} stageId Exact active LAFEA stage.
-   * @returns {Readonly<Record<string, unknown>>} Updated workbench state.
-   */
   async loadMockData(stageId) {
     const { createLafeaMockDocument } = await import('./advanced-mock-data.js');
     return this.importDocument(createLafeaMockDocument(stageId), stageId);
@@ -96,27 +76,19 @@ export class LafeaWorkbenchController {
     return this.store.exportDocument();
   }
 
+  setScalar(descriptorId, entityId, rawText) {
+    try {
+      return this.store.setScalar(descriptorId, entityId, rawText, 'FORM');
+    } catch (error) {
+      return this.store.reportEditError(descriptorId, entityId, error);
+    }
+  }
+
   applyDocumentText(text) {
     try {
-      return this.store.replaceDocument(parseJsonObject(text, 'LAFEA document'));
+      return this.store.replaceDocument(parseJsonObject(text, 'LAFEA document'), 'RAW_JSON');
     } catch (error) {
-      return this.store.reportEditError('document', -1, error);
-    }
-  }
-
-  addRecordText(path, text) {
-    try {
-      return this.store.addRecord(path, parseJsonObject(text, 'LAFEA record'));
-    } catch (error) {
-      return this.store.reportEditError(path, -1, error);
-    }
-  }
-
-  updateRecordText(path, index, text) {
-    try {
-      return this.store.updateRecord(path, index, parseJsonObject(text, 'LAFEA record'));
-    } catch (error) {
-      return this.store.reportEditError(path, index, error);
+      return this.store.reportEditError('document', null, error);
     }
   }
 
@@ -174,13 +146,6 @@ function parseJsonObject(text, label) {
     throw new TypeError(`${label} must be a JSON object.`);
   }
   return value;
-}
-
-function invalidImport(error) {
-  return {
-    schema: 'lafea-invalid-import/v1',
-    error: error instanceof Error ? error.message : 'Unknown import failure.',
-  };
 }
 
 function downloadJson(documentRef, value, filename) {
