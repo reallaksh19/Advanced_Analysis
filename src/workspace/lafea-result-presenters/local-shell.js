@@ -1,5 +1,8 @@
 /**
- * LAFEA.4 thin-shell CST+DKT presenter.
+ * LAFEA.4 legacy five-DOF triangular CST+DKT shell presenter.
+ *
+ * The presenter reports only retained integration-point surface stress and
+ * nodal displacement fields from the currently dispatched legacy core.
  */
 import {
   formulaId,
@@ -12,60 +15,63 @@ export function presentLocalShell(result, units) {
   const stress = requiredUnit(units, 'stress');
   const length = requiredUnit(units, 'length');
   const stressRows = [];
-  const dispRows = [];
-  let maxStress = -Infinity;
-  let maxLoc = '';
-  let maxCase = '';
+  const displacementRows = [];
+  let maximumStress = -Infinity;
+  let maximumLocation = '';
+  let maximumPath = null;
 
   for (const [caseIndex, loadCase] of (result.loadCaseResults ?? []).entries()) {
-    const caseName = loadCase.loadCaseId || `Case #${caseIndex + 1}`;
+    const caseLabel = loadCase.loadCaseId || `Case ${caseIndex + 1}`;
     for (const [elementIndex, element] of (loadCase.elementResults ?? []).entries()) {
-      element.integrationPoints.forEach((point, pointIndex) => {
-        point.surfaces.forEach((surface, surfaceIndex) => {
-          if (surface.vonMises > maxStress) {
-            maxStress = surface.vonMises;
-            maxLoc = `Element ${element.elementId} (${point.integrationPointId}, ${surface.surface})`;
-            maxCase = caseName;
+      for (const [pointIndex, point] of (element.integrationPoints ?? []).entries()) {
+        for (const [surfaceIndex, surface] of (point.surfaces ?? []).entries()) {
+          const sourcePath = `result.loadCaseResults[${caseIndex}].elementResults[${elementIndex}]`
+            + `.integrationPoints[${pointIndex}].surfaces[${surfaceIndex}].vonMises`;
+          if (surface.vonMises > maximumStress) {
+            maximumStress = surface.vonMises;
+            maximumLocation = `Element ${element.elementId} (${point.integrationPointId}, ${surface.surface})`;
+            maximumPath = sourcePath;
           }
           stressRows.push(presenterRow(
-            `${caseName} · Element ${element.elementId} · ${point.integrationPointId} · ${surface.surface} · Von Mises Equivalent Stress (σvm)`,
+            `${caseLabel} · Element ${element.elementId} · ${point.integrationPointId} · ${surface.surface} · von Mises equivalent stress`,
             surface.vonMises,
             stress,
             formulaId(surface),
-            `Load Case ${caseName} · Element ${element.elementId} · ${point.integrationPointId} · ${surface.surface} · Von Mises Stress (σvm)`,
+            sourcePath,
           ));
-        });
-      });
+        }
+      }
     }
-    (loadCase.nodalDisplacements ?? []).forEach((record, index) => {
-      dispRows.push(presenterRow(
-        `${caseName} · Node ${record.nodeId} · Out-of-Plane Displacement UZ`,
+
+    for (const [nodeIndex, record] of (loadCase.nodalDisplacements ?? []).entries()) {
+      displacementRows.push(presenterRow(
+        `${caseLabel} · Node ${record.nodeId} · UZ`,
         record.uz,
         length,
         formulaId(loadCase),
-        `Load Case ${caseName} · Node ${record.nodeId} · Out-of-Plane Displacement UZ`,
+        `result.loadCaseResults[${caseIndex}].nodalDisplacements[${nodeIndex}].uz`,
       ));
-    });
+    }
   }
 
-  const governing = maxStress > -Infinity
+  const governing = maximumPath
     ? {
-      label: 'Governing Thin-Shell Gauss Point Von Mises Stress Intensity',
-      value: maxStress,
+      label: 'Governing retained legacy shell von Mises equivalent stress',
+      value: maximumStress,
       unit: stress,
-      locationId: maxLoc,
-      sourcePath: `Load Case ${maxCase} · ${maxLoc} · Von Mises Stress (σvm max)`,
+      locationId: maximumLocation,
+      sourcePath: maximumPath,
     }
     : null;
 
   return presenterResult(result, [
     {
-      title: 'Thin-Shell Element & Gauss Integration-Point Surface Stress',
+      title: 'Legacy CST+DKT integration-point surface stress evidence',
       rows: stressRows,
     },
     {
-      title: 'Thin-Shell Node Out-of-Plane Displacements',
-      rows: dispRows,
-    }
+      title: 'Legacy CST+DKT nodal displacement evidence',
+      rows: displacementRows,
+    },
   ], governing);
 }

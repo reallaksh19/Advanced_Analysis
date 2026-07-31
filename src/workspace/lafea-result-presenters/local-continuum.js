@@ -1,18 +1,9 @@
 /**
  * LAFEA.3 continuum presenter.
  *
- * Dispatches on the recovery layer each element result actually carries
- * (spec §12.1), because the default T6/Q8 elements deliberately expose no
- * single element-constant stress — claiming one would misrepresent a
- * quadratic strain field as constant. T3 keeps its existing element-constant
- * row verbatim (same label, same sourcePath); T6/Q8 expose one row per
- * integration point, the authoritative layer.
- *
- * Nodal-projected values are NOT surfaced here: they are
- * `NON_AUTHORITATIVE_DISPLAY_PROJECTION` (see
- * `local-continuum/nodal-projection-display.js`) and the repo invariant is
- * that raw and projected stress never share authority — mixing them into one
- * table is exactly the blur that invariant forbids.
+ * Integration-point stress is authoritative for T6/Q8. T3 retains its
+ * element-constant recovery. Nodal projection is display-only and is not
+ * surfaced as retained engineering stress evidence.
  */
 import {
   formulaId,
@@ -27,84 +18,87 @@ export function presentLocalContinuum(result, units) {
   const stress = requiredUnit(units, 'stress');
   const length = requiredUnit(units, 'length');
   const stressRows = [];
-  const dispRows = [];
-  let maxStress = -Infinity;
-  let maxLoc = '';
-  let maxCase = '';
+  const displacementRows = [];
+  let maximumStress = -Infinity;
+  let maximumLocation = '';
+  let maximumPath = null;
 
   for (const [caseIndex, loadCase] of (result.loadCaseResults ?? []).entries()) {
-    const caseName = loadCase.loadCaseId || `Case #${caseIndex + 1}`;
-    for (const [index, record] of (loadCase.elementResults ?? []).entries()) {
-      if (record.recoveryLayer === INTEGRATION_POINT_LAYER && record.gaussPointResults) {
+    const caseLabel = loadCase.loadCaseId || `Case ${caseIndex + 1}`;
+    for (const [elementIndex, record] of (loadCase.elementResults ?? []).entries()) {
+      const elementPrefix = `result.loadCaseResults[${caseIndex}].elementResults[${elementIndex}]`;
+      if (record.recoveryLayer === INTEGRATION_POINT_LAYER && Array.isArray(record.gaussPointResults)) {
         record.gaussPointResults.forEach((point, pointIndex) => {
-          if (point.vonMises > maxStress) {
-            maxStress = point.vonMises;
-            maxLoc = `Element ${record.elementId} (${point.pointId})`;
-            maxCase = caseName;
+          const sourcePath = `${elementPrefix}.gaussPointResults[${pointIndex}].vonMises`;
+          if (point.vonMises > maximumStress) {
+            maximumStress = point.vonMises;
+            maximumLocation = `Element ${record.elementId} (${point.pointId})`;
+            maximumPath = sourcePath;
           }
           stressRows.push(presenterRow(
-            `${caseName} · Element ${record.elementId} · ${point.pointId} · Von Mises Equivalent Stress (σvm)`,
+            `${caseLabel} · Element ${record.elementId} · ${point.pointId} · von Mises equivalent stress`,
             point.vonMises,
             stress,
             formulaId(record),
-            `Load Case ${caseName} · Element ${record.elementId} · ${point.pointId} · Von Mises Stress (σvm)`,
+            sourcePath,
           ));
         });
       } else {
-        if (record.vonMises > maxStress) {
-          maxStress = record.vonMises;
-          maxLoc = `Element ${record.elementId}`;
-          maxCase = caseName;
+        const sourcePath = `${elementPrefix}.vonMises`;
+        if (record.vonMises > maximumStress) {
+          maximumStress = record.vonMises;
+          maximumLocation = `Element ${record.elementId}`;
+          maximumPath = sourcePath;
         }
         stressRows.push(presenterRow(
-          `${caseName} · Element ${record.elementId} · Von Mises Equivalent Stress (σvm)`,
+          `${caseLabel} · Element ${record.elementId} · von Mises equivalent stress`,
           record.vonMises,
           stress,
           formulaId(record),
-          `Load Case ${caseName} · Element ${record.elementId} · Von Mises Stress (σvm)`,
+          sourcePath,
         ));
       }
     }
 
-    for (const [index, record] of (loadCase.nodalDisplacements ?? []).entries()) {
-      dispRows.push(
+    for (const [nodeIndex, record] of (loadCase.nodalDisplacements ?? []).entries()) {
+      const nodePrefix = `result.loadCaseResults[${caseIndex}].nodalDisplacements[${nodeIndex}]`;
+      displacementRows.push(
         presenterRow(
-          `${caseName} · Node ${record.nodeId} · Radial / X-Direction Displacement (UX)`,
+          `${caseLabel} · Node ${record.nodeId} · UX`,
           record.ux,
           length,
           formulaId(loadCase),
-          `Load Case ${caseName} · Node ${record.nodeId} · Radial Displacement UX`,
+          `${nodePrefix}.ux`,
         ),
         presenterRow(
-          `${caseName} · Node ${record.nodeId} · Axial / Y-Direction Displacement (UY)`,
+          `${caseLabel} · Node ${record.nodeId} · UY`,
           record.uy,
           length,
           formulaId(loadCase),
-          `Load Case ${caseName} · Node ${record.nodeId} · Axial Displacement UY`,
+          `${nodePrefix}.uy`,
         ),
       );
     }
   }
 
-  const governing = maxStress > -Infinity
+  const governing = maximumPath
     ? {
-      label: 'Governing 2D Continuum Gauss Point Von Mises Stress Intensity',
-      value: maxStress,
+      label: 'Governing retained continuum von Mises equivalent stress',
+      value: maximumStress,
       unit: stress,
-      locationId: maxLoc,
-      sourcePath: `Load Case ${maxCase} · ${maxLoc} · Von Mises Stress (σvm max)`,
+      locationId: maximumLocation,
+      sourcePath: maximumPath,
     }
     : null;
 
   return presenterResult(result, [
     {
-      title: '2D Pipe-Pad Continuum Element & Gauss Integration-Point Stress',
+      title: 'Continuum retained stress evidence',
       rows: stressRows,
     },
     {
-      title: '2D Continuum Node Deformation & Translational Displacements',
-      rows: dispRows,
+      title: 'Continuum retained nodal displacement evidence',
+      rows: displacementRows,
     },
   ], governing);
 }
-

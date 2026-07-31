@@ -13,6 +13,10 @@ import {
   executeLafeaStage,
   lafeaPreviewGeometry,
 } from '../src/workspace/lafea-workbench.js';
+import {
+  presentLafeaResult,
+  resolveLafeaUnits,
+} from '../src/workspace/lafea-result-presenters/index.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const QUALIFIED_FIXTURES = Object.freeze({
@@ -35,6 +39,7 @@ assert.deepEqual(
   ['LAFEA.1', 'LAFEA.2', 'LAFEA.3', 'LAFEA.4', 'LAFEA.5', 'LAFEA.6'],
 );
 
+const qualifiedExecutions = new Map();
 for (const [stageId, fixture] of Object.entries(QUALIFIED_FIXTURES)) {
   const first = executeLafeaStage(stageId, fixture());
   const second = executeLafeaStage(stageId, fixture());
@@ -46,6 +51,22 @@ for (const [stageId, fixture] of Object.entries(QUALIFIED_FIXTURES)) {
     'QUALIFIED',
     `${stageId} canonical import must reconstruct.`,
   );
+  qualifiedExecutions.set(stageId, first);
+
+  const units = resolveLafeaUnits(stageId, first.source);
+  const presentation = presentLafeaResult(stageId, first.result, units);
+  const rows = presentation.sections.flatMap((section) => section.rows);
+  assert.ok(rows.length > 0, `${stageId} presenter must expose retained result rows.`);
+  rows.forEach((row) => {
+    assert.match(row.sourcePath, /^result\./u, `${stageId} presenter row must cite an exact retained result path.`);
+  });
+  if (presentation.governing) {
+    assert.match(
+      presentation.governing.sourcePath,
+      /^result\./u,
+      `${stageId} governing row must cite an exact retained result path.`,
+    );
+  }
 }
 
 const unsupportedWeld = executeLafeaStage('LAFEA.6', weldPlaceholder());
@@ -55,6 +76,14 @@ assert.equal(unsupportedWeld.canonicalInput, null);
 assert.deepEqual(
   unsupportedWeld.diagnostics.map((diagnostic) => diagnostic.code),
   ['UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED'],
+);
+assert.throws(
+  () => presentLafeaResult('LAFEA.6', {}, {}),
+  (error) => error?.code === 'UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED',
+);
+assert.throws(
+  () => resolveLafeaUnits('LAFEA.6', weldPlaceholder()),
+  (error) => error?.code === 'UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED',
 );
 
 const foundationPreview = lafeaPreviewGeometry('LAFEA.1', attachmentFixture());
@@ -108,7 +137,11 @@ const documentTableSource = read('lafea-document-table.js');
 const previewSource = read('lafea-stage-preview.js');
 const meshPanelSource = read('lafea-mesh-quality-panel.js');
 const resultsSource = read('lafea-results-view.js');
+const presenterIndexSource = read('lafea-result-presenters/index.js');
 const screeningPresenterSource = read('lafea-result-presenters/attachment-screening.js');
+const continuumPresenterSource = read('lafea-result-presenters/local-continuum.js');
+const shellPresenterSource = read('lafea-result-presenters/local-shell.js');
+const trunnionPresenterSource = read('lafea-result-presenters/trunnion-footprint.js');
 
 assert.match(modelSource, /UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED/u);
 assert.doesNotMatch(modelSource, /85\.4/u);
@@ -137,8 +170,15 @@ assert.doesNotMatch(resultsSource, /IMMUTABLE TRUTH/u);
 assert.doesNotMatch(resultsSource, /Raw qualified evidence/u);
 assert.match(resultsSource, /RAW_RETAINED_FIELD/u);
 
+assert.doesNotMatch(presenterIndexSource, /presentWeldProfile|WELD-TOE-001|MOMENT-ARM-X/u);
+assert.doesNotMatch(presenterIndexSource, /LAFEA\.6['"]:\s*documentValue/u);
+assert.match(presenterIndexSource, /UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED/u);
+
 assert.doesNotMatch(screeningPresenterSource, /ASME B31\.3/u);
 assert.match(screeningPresenterSource, /Nominal pipe-section stress envelopes/u);
+assert.match(continuumPresenterSource, /result\.loadCaseResults\[/u);
+assert.match(shellPresenterSource, /result\.loadCaseResults\[/u);
+assert.match(trunnionPresenterSource, /result\.assessmentRegionResults\[/u);
 
 const workbenchFiles = fs.readdirSync(workspace)
   .filter((name) => name.startsWith('lafea-workbench') && name.endsWith('.js'));
@@ -154,5 +194,6 @@ console.log(JSON.stringify({
   unsupportedStages: ['LAFEA.6'],
   failClosed: true,
   fabricatedEngineeringClaims: false,
+  presenterPathsRetained: true,
   workspaceCoupling: false,
 }));
