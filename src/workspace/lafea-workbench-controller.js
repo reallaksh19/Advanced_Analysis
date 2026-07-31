@@ -11,8 +11,12 @@ import { FeaBenchmarkPanel } from './fea-benchmark-panel.js';
 import { FEA_BENCHMARK_STYLES } from './fea-benchmark-styles.js';
 import {
   createLafeaAccessoryPanelManager,
+  lafeaAccessoryPanelConfigurationRequiresHost,
 } from './lafea-workbench-accessory-panels.js';
 import { LafeaWorkbenchView } from './lafea-workbench-view.js';
+
+const ACCESSORY_PANEL_MANAGERS = new WeakMap();
+const DESTROYED_CONTROLLERS = new WeakSet();
 
 export class LafeaWorkbenchController {
   constructor(rootElement, options) {
@@ -26,15 +30,19 @@ export class LafeaWorkbenchController {
     this.benchmarkHost.dataset.role = 'lafea-benchmark-host';
     this.benchmarkPanel = new FeaBenchmarkPanel(this.benchmarkHost, { surface: 'LAFEA' });
     this.view.setBenchmarkHost(this.benchmarkHost);
-    this.accessoryPanelManager = shouldCreateAccessoryHost(configuration, accessoryPanels)
-      ? createLafeaAccessoryPanelManager(this.documentRef, accessoryPanels)
-      : null;
+    if (lafeaAccessoryPanelConfigurationRequiresHost(configuration)) {
+      ACCESSORY_PANEL_MANAGERS.set(
+        this,
+        createLafeaAccessoryPanelManager(this.documentRef, accessoryPanels),
+      );
+    }
     this.unsubscribe = null;
-    this.destroyed = false;
   }
 
   init() {
-    if (this.destroyed) throw new TypeError('LAFEA_WORKBENCH_CONTROLLER_DESTROYED');
+    if (DESTROYED_CONTROLLERS.has(this)) {
+      throw new TypeError('LAFEA_WORKBENCH_CONTROLLER_DESTROYED');
+    }
     if (this.unsubscribe) return this;
     installStyles(this.documentRef);
     this.view.init({
@@ -53,9 +61,10 @@ export class LafeaWorkbenchController {
     this.benchmarkPanel.render();
     this.unsubscribe = this.store.subscribe((state) => this.view.render(state));
     this.view.render(this.store.getState());
-    if (this.accessoryPanelManager) {
-      this.rootElement.append(this.accessoryPanelManager.hostElement);
-      this.accessoryPanelManager.mount(this);
+    const accessoryPanelManager = ACCESSORY_PANEL_MANAGERS.get(this);
+    if (accessoryPanelManager) {
+      this.rootElement.append(accessoryPanelManager.hostElement);
+      accessoryPanelManager.mount(this);
     }
     return this;
   }
@@ -150,9 +159,11 @@ export class LafeaWorkbenchController {
   }
 
   destroy() {
-    if (this.destroyed) return;
-    this.destroyed = true;
-    this.accessoryPanelManager?.destroy();
+    if (DESTROYED_CONTROLLERS.has(this)) return;
+    DESTROYED_CONTROLLERS.add(this);
+    const accessoryPanelManager = ACCESSORY_PANEL_MANAGERS.get(this);
+    accessoryPanelManager?.destroy();
+    ACCESSORY_PANEL_MANAGERS.delete(this);
     this.benchmarkPanel.destroy();
     this.unsubscribe?.();
     this.unsubscribe = null;
@@ -160,11 +171,6 @@ export class LafeaWorkbenchController {
     this.view.destroy();
     this.rootElement = null;
   }
-}
-
-function shouldCreateAccessoryHost(configuration, accessoryPanels) {
-  if (!Object.prototype.hasOwnProperty.call(configuration, 'accessoryPanels')) return false;
-  return !Array.isArray(accessoryPanels) || accessoryPanels.length > 0;
 }
 
 function installStyles(documentRef) {
