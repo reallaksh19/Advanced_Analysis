@@ -81,6 +81,33 @@
         "AUD-A3-001"
       ],
       "completedAtUtc": null
+    },
+    {
+      "phaseId": "PHASE_3_INTERFACE_AUTHORITY",
+      "title": "Governed support, anchor and nozzle interfaces with reaction recovery",
+      "status": "PARTIALLY_VERIFIED",
+      "scope": [
+        "Bind support and anchor interfaces to governed support-attachment, restraint-capability and B-2.5 constraint authorities.",
+        "Require explicit right-handed frames, reference points, reference-to-node lever vectors and six-DOF mappings.",
+        "Recover interface resultants only from B-3.3 constrained reactions, with declared sign convention, local transformation and reference-point transfer.",
+        "Produce deterministic component envelopes retaining governing load-case and recovery identities.",
+        "Bind explicit nozzle interface identity without performing nozzle allowable assessment, and keep gaps, friction, lift-off and contact blocked."
+      ],
+      "evidencePaths": [
+        "src/core/linear-piping-interface/contracts.js",
+        "src/core/linear-piping-interface/interface-set.js",
+        "src/core/linear-piping-interface/recovery.js",
+        "src/core/linear-piping-interface/public-api.js",
+        "src/core/linear-piping-interface/index.js",
+        "scripts/linear-piping-interface-check.mjs",
+        "scripts/linear-piping-nozzle-interface-check.mjs",
+        "scripts/linear-piping-interface-anti-drift-check.mjs",
+        "package.json"
+      ],
+      "addressedFindingIds": [
+        "AUD-A4-001"
+      ],
+      "completedAtUtc": null
     }
   ],
   "findings": [
@@ -111,7 +138,7 @@
         "scripts/linear-piping-source-orchestration-check.mjs",
         "scripts/linear-piping-analysis-consumer-anti-drift-check.mjs"
       ],
-      "remainingCondition": "Raw project-file ingestion, governed interfaces, nozzle assessment, configured B31.3 stages, complete application-result sealing and exact-head retained evidence remain open."
+      "remainingCondition": "Raw project-file ingestion, complete source-to-interface-to-code-to-presentation result sealing, nozzle assessment, configured B31.3 stages and exact-head retained evidence remain open."
     },
     {
       "findingId": "AUD-A3-002",
@@ -130,12 +157,20 @@
       "gate": "A4",
       "severity": "BLOCKER",
       "auditStatus": "NOT_IMPLEMENTED",
-      "currentStatus": "NOT_IMPLEMENTED",
+      "currentStatus": "PARTIALLY_VERIFIED",
       "ownerPhase": "PHASE_3_INTERFACE_AUTHORITY",
       "evidencePaths": [
-        "docs/LFEA_PIPING_100_PERCENT_CLOSURE_POLICY.md"
+        "src/core/linear-piping-interface/contracts.js",
+        "src/core/linear-piping-interface/interface-set.js",
+        "src/core/linear-piping-interface/recovery.js",
+        "src/core/linear-piping-interface/public-api.js",
+        "src/core/linear-piping-interface/index.js",
+        "scripts/linear-piping-interface-check.mjs",
+        "scripts/linear-piping-nozzle-interface-check.mjs",
+        "scripts/linear-piping-interface-anti-drift-check.mjs",
+        "package.json"
       ],
-      "remainingCondition": "Implement governed attachments, frames, offsets, six-DOF mappings, reaction grouping, transformations, reference transfer and envelopes."
+      "remainingCondition": "Retain successful exact-head interface, core and full-gate evidence and integrate the governed interface stages into the complete application result chain; nonlinear contact remains a separate deferred authority."
     },
     {
       "findingId": "AUD-A5-001",
