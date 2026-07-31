@@ -57,7 +57,10 @@ const workspace = fs.readFileSync(WORKSPACE_VIEW, 'utf8');
 assert.match(workspace, /requireCurrentLinearPipingPresentation/u);
 assert.match(workspace, /textContent/u);
 assert.doesNotMatch(workspace, /innerHTML|insertAdjacentHTML|outerHTML/u);
-assert.doesNotMatch(workspace, /compile|recover|cross\(|dot\(|utilization\s*=|calculatedStress\s*=/u);
+assert.doesNotMatch(
+  workspace,
+  /compileSolverExecution|compileResultRecovery|recoverLinearPiping|compileCodeResult|cross\(|dot\(|utilization\s*=|calculatedStress\s*=/u,
+);
 assert.doesNotMatch(workspace, /linear-fea-solver|linear-fea-result-recovery|linear-fea-b31-code-engine|linear-piping-interface/u);
 
 const packageValue = JSON.parse(fs.readFileSync('package.json', 'utf8'));
