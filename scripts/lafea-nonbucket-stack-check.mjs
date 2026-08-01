@@ -9,6 +9,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const CHECKS = Object.freeze([
   Object.freeze({ scope: 'NB-T0', path: 'scripts/lafea-nonbucket-scope-guard.mjs' }),
+  Object.freeze({ scope: 'NB-T1', path: 'scripts/lafea-nonbucket-lifecycle-profiles-check.mjs' }),
   Object.freeze({ scope: 'U1', path: 'scripts/lafea-u1-stage-registry-check.mjs' }),
   Object.freeze({ scope: 'U1', path: 'scripts/lafea-u1b-registry-consumer-check.mjs' }),
   Object.freeze({ scope: 'U2', path: 'scripts/lafea-u2a-input-command-check.mjs' }),
