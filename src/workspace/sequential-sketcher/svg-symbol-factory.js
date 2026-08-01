@@ -104,16 +104,21 @@ export class SvgSymbolFactory {
   }
 
   createWeldTick(doc, pt, targetPt, size, color) {
-    const angle = Math.atan2(targetPt.py - pt.py, targetPt.px - pt.px);
+    const px1 = pt?.px ?? pt?.x ?? 0;
+    const py1 = pt?.py ?? pt?.y ?? 0;
+    const px2 = targetPt?.px ?? targetPt?.x ?? 0;
+    const py2 = targetPt?.py ?? targetPt?.y ?? 0;
+
+    const angle = Math.atan2(py2 - py1, px2 - px1);
     const perp = angle + Math.PI / 2;
     const dx = Math.cos(perp) * size;
     const dy = Math.sin(perp) * size;
 
     const line = doc.createElementNS(this.ns, 'line');
-    line.setAttribute('x1', String(pt.px - dx));
-    line.setAttribute('y1', String(pt.py - dy));
-    line.setAttribute('x2', String(pt.px + dx));
-    line.setAttribute('y2', String(pt.py + dy));
+    line.setAttribute('x1', String(px1 - dx));
+    line.setAttribute('y1', String(py1 - dy));
+    line.setAttribute('x2', String(px1 + dx));
+    line.setAttribute('y2', String(py1 + dy));
     line.setAttribute('stroke', color);
     line.setAttribute('stroke-width', String(size * 0.4));
     return line;

@@ -217,7 +217,7 @@ npm run check:full
 
 ## Phase 6 — Master Data Fuzzy Logic & UI
 
-**Status:** Completed.
+**Status:** Incomplete / Experimental.
 
 ### Completed
 
@@ -225,5 +225,5 @@ npm run check:full
 - Implemented temporary state management in `src/workspace/master-data-store.js` for imported line lists and piping classes.
 - Created `src/workspace/master-data-ui.js` with an import UI and "Apply Overrides" functionality.
 - Integrated the new Master Data tab into the Load Calc Consumer View (`src/workspace/load-calc-consumer-view.js`).
-- "Apply Overrides" safely clones the workspace dataset, applies fuzzy mapping to `engineeringProperties` (P1, T1, T2, phase, fluidDensityKgM3) based on matching Line IDs, reloads the dataset into `WorkspaceState`, and dispatches `WORKSPACE_SNAPSHOT_CHANGED`.
+- (Incomplete) "Apply Overrides" functionality requires validation and proper event dispatching.
 

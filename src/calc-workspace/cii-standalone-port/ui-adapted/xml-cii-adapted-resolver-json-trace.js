@@ -253,7 +253,7 @@ function renderJsonConfig(parent, state) {
 
 function renderTraceTreeHtml(parent, state) {
   const result = state.resolverJsonTraceResult;
-  const traceRows = result?.matchedFacts || [];
+  const traceRows = result?.traceRows || [];
   const delimiter = state.regexTesterConfig?.tokenDelimiter || '-';
   const treeData = buildAdaptedJsonTraceTree(traceRows, delimiter);
   const evidenceRows = buildEvidenceTreeRows(result);
@@ -267,22 +267,33 @@ function renderTraceTreeHtml(parent, state) {
     return;
   }
   const container = createElement('div', '', 'xml-cii-tree-container');
-  if (container.style) Object.assign(container.style, { maxHeight: '400px', overflowY: 'auto', backgroundColor: '#0b1329', border: '1px solid rgba(148,163,184,0.12)', borderRadius: '8px', padding: '12px' });
+  if (container.style) Object.assign(container.style, { maxHeight: '600px', overflowY: 'auto', backgroundColor: '#0b1329', border: '1px solid rgba(148,163,184,0.12)', borderRadius: '8px', padding: '12px' });
+  
+  const renderRow = (row) => `
+    <div style="margin-left: 18px; margin-top: 4px; padding: 6px 10px; background: rgba(30, 41, 59, 0.5); border-left: 2px solid #38bdf8; border-radius: 4px; font-size: 11px;">
+      <div style="color: #38bdf8; font-weight: bold;">↳ ${row.objectType || 'COMPONENT'}: ${row.componentRef || 'NODE'}</div>
+      <div style="color: #cbd5e1; margin-top: 2px;">${row.value || ''}</div>
+    </div>
+  `;
+
   const renderPosition = (position) => `
-    <details style="margin-left: 12px; margin-top: 4px;">
-      <summary style="font-size: 0.78rem; color: #fbbf24; cursor: pointer;">📍 ${position.label} (${position.count} items)</summary>
-      <div style="margin-left: 18px; font-size: 0.74rem; color: #94a3b8; font-family: monospace; border-left: 2px solid rgba(148,163,184,0.15); padding-left: 6px; margin-top: 2px; white-space: pre-wrap; word-break: break-all;">${position.concatenated}</div>
+    <details style="margin-left: 12px; margin-top: 4px;" open>
+      <summary style="font-size: 0.78rem; color: #fbbf24; cursor: pointer; font-weight: bold;">📍 ${position.label} (${position.count} items)</summary>
+      ${position.rows ? position.rows.map(renderRow).join('') : `<div style="margin-left: 18px; font-size: 0.74rem; color: #94a3b8; font-family: monospace;">${position.concatenated}</div>`}
     </details>`;
+
   const renderBore = (bore) => `
-    <details style="margin-left: 12px; margin-top: 4px;">
+    <details style="margin-left: 12px; margin-top: 4px;" open>
       <summary style="font-size: 0.84rem; color: #e2e8f0; font-weight: bold; cursor: pointer;">🪈 Bore: ${bore.bore} (${bore.count} items)</summary>
       ${bore.positions.map(renderPosition).join('')}
     </details>`;
+
   const renderBranch = (branch) => `
-    <details style="margin-top: 6px; border-bottom: 1px solid rgba(148,163,184,0.06); padding-bottom: 6px;">
+    <details style="margin-top: 6px; border-bottom: 1px solid rgba(148,163,184,0.06); padding-bottom: 6px;" open>
       <summary style="font-size: 0.88rem; color: #38bdf8; font-weight: bold; cursor: pointer;">🌿 Branch: ${branch.branchName} (${branch.count} rows)</summary>
       ${branch.bores.map(renderBore).join('')}
     </details>`;
+
   container.innerHTML = treeData.map(renderBranch).join('');
   section.appendChild(container);
   parent.appendChild(section);
@@ -334,7 +345,7 @@ export function renderStandaloneResolverJsonTracePanel(card, state, stateRef, re
     return;
   }
 
-  const subTabId = state.jsonTraceActiveSubTabId || 'index';
+  const subTabId = state.jsonTraceActiveSubTabId || 'tree';
   let result = state.resolverJsonTraceResult;
   if (!result && state.sourceText && state.stagedJsonText) {
     result = runStandaloneResolverJsonTrace({ sourceText: state.sourceText, stagedJsonText: state.stagedJsonText, jsonConfig: state.resolverJsonTraceConfig, supportConfigJson: state.supportConfigJson });
@@ -348,19 +359,11 @@ export function renderStandaloneResolverJsonTracePanel(card, state, stateRef, re
   const rail = createElement('nav', '', 'xml-cii-sub-nav-rail');
   rail.setAttribute('aria-label', 'Resolver sub-tabs');
   const subTabs = [
-    { id: 'index', label: '⚙️ Config & Index' },
-    { id: 'tableImport', label: 'CSV/XLS Trace' },
     { id: 'tree', label: '🌿 Evidence Tree' },
-    { id: 'nodeTrace', label: '📋 XML Node Wise Trace' },
-    { id: 'matched', label: '✅ Matched Facts' },
-    { id: 'rejected', label: '❌ Rejected Facts' },
+    { id: 'index', label: '⚙️ Config & Index' },
   ];
   const subTabHasData = {
-    tableImport: rows(state.jsonTraceTableRows).length > 0 || !!state.resolverJsonTraceTableResult,
     tree: buildEvidenceTreeRows(result).length > 0,
-    nodeTrace: buildXmlNodeWiseTraceRows(result).length > 0,
-    matched: buildMatchedFactsRows(result).length > 0,
-    rejected: rows(result?.rejectedFacts).length > 0,
   };
   for (const sub of subTabs) {
     const button = createElement('button', sub.label, 'xml-cii-sub-phase-pill');
@@ -376,19 +379,11 @@ export function renderStandaloneResolverJsonTracePanel(card, state, stateRef, re
   container.appendChild(rail);
 
   const workspace = createElement('div', '', 'xml-cii-sub-workspace');
-  if (subTabId === 'index') {
+  if (subTabId === 'tree') {
+    renderTraceTreeHtml(workspace, state);
+  } else if (subTabId === 'index') {
     renderResolverIndex(workspace, state);
     renderJsonConfig(workspace, state);
-  } else if (subTabId === 'tableImport') {
-    renderStandaloneTraceTableImportPanel(workspace, state);
-  } else if (subTabId === 'tree') {
-    renderTraceTreeHtml(workspace, state);
-  } else if (subTabId === 'nodeTrace') {
-    renderXmlNodeWiseTraceTable(workspace, state);
-  } else if (subTabId === 'matched') {
-    renderMatchedFacts(workspace, state, result);
-  } else if (subTabId === 'rejected') {
-    workspace.appendChild(table(['Path', 'Node', 'PS', 'POS', 'Hits'], buildMatchedFactsRows({ matchedFacts: result?.rejectedFacts || [] }), 'No rejected JSON facts.'));
   }
   container.appendChild(workspace);
   card.appendChild(container);

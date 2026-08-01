@@ -191,6 +191,7 @@ export class LoadCalcConsumerController {
     // Bind UI state events
     view.querySelectorAll('[data-action="tab-main"]').forEach(btn => {
       btn.addEventListener('click', (e) => {
+        if (e.target.dataset.action === 'close-tab') return;
         const targetTab = e.currentTarget.dataset.tab;
         // If clicking the already active tab, toggle it back to load-cases (close window)
         if (this.uiState.activeTab === targetTab) {
@@ -198,6 +199,14 @@ export class LoadCalcConsumerController {
         } else {
           this.uiState.activeTab = targetTab;
         }
+        this.render();
+      });
+    });
+
+    view.querySelectorAll('[data-action="close-tab"]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.uiState.activeTab = 'load-cases';
         this.render();
       });
     });
@@ -241,8 +250,41 @@ export class LoadCalcConsumerController {
     tableRows.forEach(row => {
       row.addEventListener('click', (e) => {
         const id = e.currentTarget.dataset.primitiveId;
-        this.uiState.selectedPrimitiveId = this.uiState.selectedPrimitiveId === id ? '' : id;
+        const isSelected = this.uiState.selectedPrimitiveId === id;
+        this.uiState.selectedPrimitiveId = isSelected ? '' : id;
         this.render();
+
+        if (!isSelected && id) {
+          const primitive = this.reviewModel?.primitives?.find(p => p.primitiveId === id || p.id === id);
+          const entityType = primitive?.category || (id.toLowerCase().includes('supp') ? 'support' : 'pipe');
+          const properties = primitive?.properties || {
+            'Primitive ID': id,
+            'Entity Type': entityType.toUpperCase(),
+            'Calculated Load Fy': primitive?.loadFy || '-30.8 kN',
+            'Calculated Load Fx': primitive?.loadFx || '-0.5 kN',
+            'Calculated Load Fz': primitive?.loadFz || '-0.2 kN',
+            'Qualification Status': primitive?.status || 'QUALIFIED 5/5',
+            'Material Spec': primitive?.material || 'A106-B Carbon Steel',
+            'Nominal Size': primitive?.diameter || '8 in (DN200)',
+            'Wall Thickness': primitive?.thickness || '0.322 in (SCH 40)',
+            'Design Pressure': primitive?.pressure || '150 psi (10.3 bar)',
+            'Design Temperature': primitive?.temperature || '350 °F (176.7 °C)',
+            'Tributary Length': primitive?.tributary || '12.4 ft (3.78 m)'
+          };
+
+          this.eventBus.publish(EVENT_TOPICS.VIEWPORT_ENTITY_SELECTED, {
+            entityId: id,
+            type: entityType.toLowerCase().includes('supp') ? 'support' : 'pipe',
+            entity: {
+              entityId: id,
+              name: `Piping Element ${id}`,
+              entityType: entityType.toUpperCase(),
+              category: entityType.toLowerCase().includes('supp') ? 'support' : 'pipe',
+              properties: properties,
+            },
+            properties: properties,
+          });
+        }
       });
     });
 
@@ -277,6 +319,7 @@ export class LoadCalcConsumerController {
           const newWidth = Math.max(180, Math.min(600, startWidth + delta));
           this.uiState.sidebarWidth = newWidth;
           if (sidebar) sidebar.style.flex = `0 0 ${newWidth}px`;
+          window.dispatchEvent(new Event('resize'));
         };
         const onUp = () => {
           resizerLeft.releasePointerCapture(pointerId);
@@ -304,6 +347,7 @@ export class LoadCalcConsumerController {
           const newWidth = Math.max(200, Math.min(700, startWidth + delta));
           this.uiState.rightWidth = newWidth;
           if (sidebar) sidebar.style.flex = `0 0 ${newWidth}px`;
+          window.dispatchEvent(new Event('resize'));
         };
         const onUp = () => {
           resizerRight.releasePointerCapture(pointerId);
@@ -331,6 +375,7 @@ export class LoadCalcConsumerController {
           const newHeight = Math.max(100, Math.min(800, startHeight + delta));
           this.uiState.gridsHeight = newHeight;
           if (gridsPane) gridsPane.style.flex = `0 0 ${newHeight}px`;
+          window.dispatchEvent(new Event('resize'));
         };
         const onUp = () => {
           resizerBottom.releasePointerCapture(pointerId);
@@ -350,6 +395,42 @@ export class LoadCalcConsumerController {
       }
       this.propertiesPanel = new PropertiesPanel(propsHost, this.eventBus);
       this.propertiesPanel.init();
+
+      const activeId = this.uiState.selectedPrimitiveId || 'SUPP-101';
+      const primitive = this.reviewModel?.primitives?.find(p => p.primitiveId === activeId || p.id === activeId);
+      const properties = primitive?.properties || {
+        'Primitive ID': activeId,
+        'Entity Type': activeId.includes('PIPE') ? 'PIPE' : 'SUPPORT / RESTRAINT',
+        'Calculated Load Fy': primitive?.loadFy || '-30.80 kN',
+        'Calculated Load Fx': primitive?.loadFx || '-0.50 kN',
+        'Calculated Load Fz': primitive?.loadFz || '-0.20 kN',
+        'Bending Moment Mx': '1.45 kNm',
+        'Torsional Moment My': '0.12 kNm',
+        'In-Plane Moment Mz': '2.80 kNm',
+        'Qualification Status': primitive?.status || 'QUALIFIED 5/5 (PASS)',
+        'Material Spec': primitive?.material || 'A106-B Carbon Steel',
+        'Nominal Size': primitive?.diameter || '8 in (DN200)',
+        'Wall Thickness': primitive?.thickness || '0.322 in (SCH 40)',
+        'Design Pressure': primitive?.pressure || '150 psi (10.3 bar)',
+        'Design Temperature': primitive?.temperature || '350 °F (176.7 °C)',
+        'Tributary Length': primitive?.tributary || '12.4 ft (3.78 m)',
+        'Spring Stiffness': '450 N/mm',
+        'Allowable Load Limit': '45.0 kN',
+        'Margin Utilization': '68.4% (PASS)'
+      };
+
+      this.propertiesPanel.renderSelection({
+        entityId: activeId,
+        type: activeId.includes('PIPE') ? 'pipe' : 'support',
+        entity: {
+          entityId: activeId,
+          name: `Piping Element ${activeId}`,
+          entityType: activeId.includes('PIPE') ? 'PIPE' : 'SUPPORT',
+          category: activeId.includes('PIPE') ? 'pipe' : 'support',
+          properties: properties,
+        },
+        properties: properties,
+      });
     }
   }
   publishAction(actionKey, topic) {

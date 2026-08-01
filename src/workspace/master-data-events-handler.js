@@ -1,20 +1,10 @@
 import { getSavedMappingsForMaster, saveMappingForFile } from '../calc-workspace/cii-standalone-port/ui-adapted/xml-cii-adapted-state.js';
 import { MASTER_FIELDS } from '../calc-workspace/cii-standalone-port/ui-adapted/xml-cii-adapted-fields-config.js';
 import { fuzzyAutoMapFields } from '../calc-workspace/cii-standalone-port/ui-adapted/xml-cii-adapted-fuzzy-mapper.js';
+import { detectLineListFieldMap } from '../calc-workspace/cii-standalone-port/core/linelist-mapping.js';
 
-async function getXlsxModule() {
-  if (typeof window !== 'undefined' && typeof window.XLSX !== 'undefined' && typeof window.XLSX.read === 'function') {
-    return window.XLSX;
-  }
-  try {
-    const mod = await import(/* @vite-ignore */ 'https://cdn.sheetjs.com/xlsx-latest/package/xlsx.mjs');
-    if (mod && typeof mod.read === 'function') return mod;
-    if (mod && mod.default && typeof mod.default.read === 'function') return mod.default;
-  } catch (e) {
-    console.warn('CDN XLSX import failed:', e);
-  }
-  return null;
-}
+import * as XLSX from 'xlsx';
+import Papa from 'papaparse';
 
 export async function parseMasterFile(fileOrBuffer, fileName, masterKey) {
   let buffer;
@@ -31,8 +21,7 @@ export async function parseMasterFile(fileOrBuffer, fileName, masterKey) {
   const isXlsx = /\.(xlsx|xlsm|xlsb|xls|ods)$/i.test(fileName);
 
   if (isXlsx) {
-    const XLSX = await getXlsxModule();
-    if (!XLSX) throw new Error('XLSX module is unavailable. Please check internet connection or load SheetJS script.');
+    if (!XLSX) throw new Error('XLSX module is unavailable.');
     const data = new Uint8Array(buffer);
     const workbook = XLSX.read(data, { type: 'array', cellDates: false, raw: false });
     const sheetName = workbook.SheetNames[0];
@@ -52,24 +41,48 @@ export async function parseMasterFile(fileOrBuffer, fileName, masterKey) {
     }).filter(Boolean);
   } else {
     // CSV parser fallback
-    const lines = text.split(/\r?\n/).filter(l => l.trim());
-    if (lines.length > 0) {
-      const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-      for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
-        const row = {};
-        headers.forEach((h, idx) => { row[h] = cols[idx] || ''; });
-        rawRows.push(row);
-      }
+    const parsed = Papa.parse(text, {
+      header: true,
+      skipEmptyLines: true
+    });
+    if (parsed.errors.length) {
+      console.warn('CSV Parse Errors:', parsed.errors);
     }
+    rawRows = parsed.data;
   }
 
   return { rawRows, fileName, sheetName: 'Sheet1' };
 }
 
-export function autoMapMasterColumns(rawRows, masterKey) {
+function headersFromRows(rows) {
+  const headers = [];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    for (const key of Object.keys(row || {})) {
+      if (key !== '_rowIndex' && !headers.includes(key)) headers.push(key);
+    }
+    if (headers.length >= 30) break;
+  }
+  return headers;
+}
+
+export function autoMapMasterColumns(rawRows, masterKey, currentMap = {}, config = {}) {
   if (!rawRows || !rawRows.length) return {};
   const fields = MASTER_FIELDS[masterKey]?.fields || [];
-  const headers = Object.keys(rawRows[0] || {}).filter(k => k !== '_rowIndex');
-  return fuzzyAutoMapFields(masterKey, fields, headers, rawRows);
+  const headers = headersFromRows(rawRows);
+  
+  const fuzzyMap = fuzzyAutoMapFields(headers, fields, rawRows);
+  if (masterKey !== 'lineList') return fuzzyMap;
+
+  const lineListMap = detectLineListFieldMap(rawRows, currentMap || {}, config?.linelist || config || null);
+  const mergedMap = { ...fuzzyMap, ...lineListMap };
+
+  // Keep dynamic standalone-only fields that the core XML->CII line-list detector
+  // intentionally does not own yet, such as From/To equipment columns.
+  for (const field of fields) {
+    if (!(field.name in mergedMap)) mergedMap[field.name] = fuzzyMap[field.name] || '';
+  }
+  if (mergedMap.lineKey2 && !mergedMap.lineSeqNo) {
+    mergedMap.lineSeqNo = mergedMap.lineKey2;
+  }
+  return mergedMap;
 }

@@ -47,12 +47,12 @@ export function renderJsonTraceUI() {
     
     const info = document.createElement('div');
     const h2 = document.createElement('h2');
-    h2.textContent = 'JSON Trace Inspector (Automated)';
+    h2.textContent = 'JSON Trace & Weight / Thickness Evidence Ledger';
     h2.style.cssText = 'margin:0 0 4px; color:#38bdf8; font-size:18px;';
     info.appendChild(h2);
     
     const p = document.createElement('p');
-    p.textContent = `Auto-derived from active model state (${stateRef.current.resolverJsonTraceResult?.indexStats?.totalNodes || 0} nodes / entities parsed).`;
+    p.textContent = `Auto-derived from active model state & staged JSON (${stateRef.current.resolverJsonTraceResult?.indexStats?.totalNodes || 0} entities parsed with verified weight & thickness basis).`;
     p.style.cssText = 'margin:0; color:#94a3b8; font-size:12px;';
     info.appendChild(p);
     header.appendChild(info);

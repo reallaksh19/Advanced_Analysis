@@ -268,10 +268,19 @@ export class ThreeViewportBackend {
   }
 
   startAnimation() {
+    this.isDirty = true;
+    this.requestRender = () => { this.isDirty = true; };
+    if (this.controls && !this._controlsListenerAttached) {
+      this.controls.addEventListener('change', () => { this.isDirty = true; });
+      this._controlsListenerAttached = true;
+    }
     const animate = () => {
       this.animationFrame = requestAnimationFrame(animate);
-      this.controls?.update();
-      this.renderOnce();
+      if (this.isDirty || this.controls?.isAnimating) {
+        this.controls?.update();
+        this.renderOnce();
+        this.isDirty = false;
+      }
     };
     animate();
   }

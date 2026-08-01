@@ -115,8 +115,9 @@ function getBore(row) {
 
 export function buildAdaptedJsonTraceTree(traceRows, delimiter = '-') {
   const branchMap = new Map();
-  for (const row of traceRows) {
-    if (Number(row?.hitCount || 0) <= 0) continue;
+  for (const row of (traceRows || [])) {
+    const hitCount = row?.hitCount !== undefined ? Number(row.hitCount) : 1;
+    if (hitCount <= 0) continue;
     const branchName = getBranch(row.branchName || row.stagedBranchKey);
     const bore = getBore(row);
     if (!branchMap.has(branchName)) {

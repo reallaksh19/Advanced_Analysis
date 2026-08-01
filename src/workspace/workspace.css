@@ -14,7 +14,9 @@
   --right-panel: 350px;
   display: grid;
   grid-template-columns: var(--left-panel) auto minmax(0, 1fr) auto var(--right-panel);
-  height: 100vh;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
   background: var(--workspace-canvas);
   color: var(--workspace-text);
@@ -47,16 +49,37 @@
 }
 
 .panel-resizer {
-  width: 4px;
+  width: 10px;
+  margin: 0 -3px;
   background: transparent;
   cursor: col-resize;
-  transition: background-color 0.2s;
-  z-index: 10;
+  position: relative;
+  z-index: 50;
+  user-select: none;
+  transition: background-color 0.15s ease;
 }
 
-.panel-resizer:hover,
-.workspace-shell.is-resizing .panel-resizer:active {
-  background: var(--workspace-accent);
+.panel-resizer::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(56, 189, 248, 0.2);
+  transition: all 0.15s ease;
+}
+
+.panel-resizer:hover::after,
+.panel-resizer.is-resizing::after,
+.panel-resizer:active::after {
+  background: #38bdf8;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.9);
+}
+
+.workspace-shell.is-resizing-active {
+  user-select: none !important;
+  cursor: col-resize !important;
 }
 
 .workspace-shell.tree-collapsed .panel-resizer--left,
@@ -116,8 +139,15 @@
 .workspace-shell.tree-collapsed .tree-panel .panel-header__title,
 .workspace-shell.properties-collapsed .properties-panel .panel-header__title,
 .workspace-shell.tree-collapsed .tree-panel .panel-collapsible-content,
-.workspace-shell.properties-collapsed .properties-panel .panel-collapsible-content {
-  display: none;
+.workspace-shell.properties-collapsed .properties-panel .panel-collapsible-content,
+.workspace-shell.properties-collapsed .properties-panel .right-panel-sub-nav {
+  display: none !important;
+}
+
+.workspace-shell.tree-collapsed .tree-panel .panel-header,
+.workspace-shell.properties-collapsed .properties-panel .panel-header {
+  padding: 10px 4px !important;
+  justify-content: center !important;
 }
 
 .panel-collapsible-content {
@@ -576,4 +606,168 @@
     border: 0;
     border-bottom: 1px solid var(--workspace-border);
   }
+}
+
+/* Master Data Grid Alignment */
+.xml-cii-mapping-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+  margin-bottom: 24px;
+}
+.xml-cii-mapping-grid label {
+  background: rgba(30, 41, 59, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  margin-bottom: 0 !important;
+  transition: all 0.2s ease;
+}
+.xml-cii-mapping-grid label:focus-within {
+  border-color: rgba(59, 130, 246, 0.4);
+  background: rgba(30, 41, 59, 0.4);
+}
+.xml-cii-mapping-grid label span {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+.xml-cii-mapping-grid label select {
+  background: rgba(15, 23, 42, 0.8) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 8px !important;
+  padding: 6px 10px !important;
+  font-size: 0.85rem !important;
+  color: #f8fafc !important;
+  outline: none;
+  cursor: pointer;
+}
+.xml-cii-field-required-asterisk {
+  color: #f87171;
+  margin-left: 2px;
+}
+
+/* Master Card Dashboard Overhaul */
+.xml-cii-master-card {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.35) 0%, rgba(15, 23, 42, 0.5) 100%);
+  border: 1px solid rgba(148, 163, 184, 0.08) !important;
+  border-radius: 16px !important;
+  padding: 24px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(12px);
+  margin-bottom: 24px;
+}
+.xml-cii-master-card h3 {
+  font-size: 1.15rem !important;
+  font-weight: 600;
+  color: #f8fafc;
+  margin-top: 0;
+  margin-bottom: 18px !important;
+}
+
+/* Custom Styled File Input */
+.xml-cii-master-card label[for], .xml-cii-master-card > label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #94a3b8;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 20px;
+}
+.xml-cii-master-card input[type="file"] {
+  background: rgba(15, 23, 42, 0.6) !important;
+  border: 1.5px dashed rgba(148, 163, 184, 0.25) !important;
+  border-radius: 10px !important;
+  padding: 16px !important;
+  color: #cbd5e1 !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.xml-cii-master-card input[type="file"]:hover {
+  border-color: rgba(96, 165, 250, 0.6) !important;
+  background: rgba(59, 130, 246, 0.04) !important;
+}
+
+/* Stats metrics badge cards */
+.xml-cii-master-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+}
+.xml-cii-master-metric {
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  align-items: flex-start !important;
+  transition: all 0.2s ease;
+}
+.xml-cii-master-metric:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(30, 41, 59, 0.7);
+}
+.xml-cii-master-metric span {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  font-weight: 600;
+}
+.xml-cii-master-metric strong {
+  font-size: 1.05rem;
+  color: #f8fafc;
+  word-break: break-all;
+  font-weight: 600;
+}
+
+/* Clean Form Grid & Column Mappings */
+.xml-cii-master-column-mapping h4, .xml-cii-master-preview h4 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  margin: 24px 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+/* Elegant Master Preview Data Table */
+.xml-cii-master-preview-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 11px;
+  text-align: left;
+}
+.xml-cii-master-preview-table th {
+  background: #1e293b !important;
+  color: #94a3b8 !important;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-bottom: 2px solid rgba(148, 163, 184, 0.15);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+.xml-cii-master-preview-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.06);
+  background: rgba(15, 23, 42, 0.25);
+  color: #cbd5e1;
+  white-space: nowrap;
+}
+.xml-cii-master-preview-table tr:hover td {
+  background: rgba(30, 41, 59, 0.4);
+}
+.xml-cii-master-preview-table tr:last-child td {
+  border-bottom: none;
 }

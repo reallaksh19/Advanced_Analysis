@@ -28,11 +28,18 @@ export class WorkspaceShellController {
     this.shellElement.addEventListener('pointerdown', this.handlePointerDown);
     this.shellElement.addEventListener('click', this.handleClick);
     
-    // Update dataset name in topbar
+    // Update dataset name in topbar and auto-popup zone selector on dataset load
     this.unsubscribeCallbacks = [
       EventBus.subscribe(EVENT_TOPICS.WORKSPACE_SNAPSHOT_CHANGED, ({ snapshot }) => {
         const el = this.shellElement.querySelector('[data-role="topbar-dataset"]');
         if (el) el.textContent = snapshot?.dataset?.datasetId || 'None Loaded';
+      }),
+      EventBus.subscribe(EVENT_TOPICS.DATASET_LOADED, ({ dataset }) => {
+        if (dataset) {
+          showZoneDensitySelectorPopup(dataset, (selectedZones, qualities) => {
+            window.dispatchEvent(new CustomEvent('workspace-zone-filter-changed', { detail: { selectedZones, qualities } }));
+          });
+        }
       })
     ];
   }
@@ -83,17 +90,47 @@ export class WorkspaceShellController {
         webglStage.style.minHeight = isWebgl ? '0px' : '100px';
       }
     }
-    if (resizer) resizer.style.display = isSplit ? 'flex' : 'none';
+    const editBar = this.shellElement.querySelector('[data-role="viewport-edit-bar"]');
+    const tableDock = this.shellElement.querySelector('[data-role="viewport-table-dock"]');
+    const isTableOpen = Boolean(tableDock && tableDock.style.display !== 'none' && tableDock.style.display !== '');
+
     if (svgRoot) {
       if (isWebgl) {
         svgRoot.style.display = 'none';
         svgRoot.style.height = '0px';
       } else {
         svgRoot.style.display = 'flex';
-        svgRoot.style.height = isSvg ? '100%' : 'flex-1';
+        svgRoot.style.flex = '1';
+        svgRoot.style.height = (isSvg && !isTableOpen) ? '100%' : 'auto';
+        svgRoot.style.minHeight = '0px';
       }
     }
+
     if (prompt) prompt.style.display = (!isSvg && !this.webglLoaded) ? 'flex' : 'none';
+
+    if (resizer) resizer.style.display = (isSplit || isTableOpen) ? 'flex' : 'none';
+
+    if (editBar) {
+      const hasContent = editBar.children.length > 0 && (editBar.firstElementChild?.children?.length ?? 0) > 0;
+      editBar.style.display = (hasContent && (isSvg || isSplit) && !isTableOpen) ? 'flex' : 'none';
+    }
+  }
+
+  switchRightTab(tabId) {
+    const tabBtns = this.shellElement.querySelectorAll('[data-action="switch-right-tab"]');
+    const tabGroups = this.shellElement.querySelectorAll('[data-tab-group]');
+    
+    tabBtns.forEach(btn => {
+      const isActive = btn.dataset.tab === tabId;
+      btn.style.background = isActive ? '#0284c7' : 'transparent';
+      btn.style.color = isActive ? '#ffffff' : '#94a3b8';
+      btn.classList.toggle('right-tab-btn--active', isActive);
+    });
+
+    tabGroups.forEach(group => {
+      const isActive = group.dataset.tabGroup === tabId;
+      group.style.display = isActive ? 'flex' : 'none';
+    });
   }
 
   handleClick(event) {
@@ -140,26 +177,31 @@ export class WorkspaceShellController {
       this.state.propertiesCollapsed = !this.state.propertiesCollapsed;
     } else if (action === 'switch-viewport-tab') {
       this.state.activeViewportTab = trigger.dataset.tab;
+    } else if (action === 'switch-right-tab') {
+      this.switchRightTab(trigger.dataset.tab);
     } else if (action === 'load-webgl-geometry') {
       this.webglLoaded = true;
       const btn = this.shellElement.querySelector('.viewport-load-geo-btn');
       if (btn) {
-        btn.innerHTML = '✅ 3D Loaded';
+        btn.textContent = '✓ 3D Loaded';
         btn.style.background = '#10b981';
+        btn.style.borderColor = '#34d399';
       }
     } else if (action === 'toggle-viewport-table') {
       const dock = this.shellElement.querySelector('[data-role="viewport-table-dock"]');
       if (dock) {
         const isHidden = dock.style.display === 'none';
-        dock.style.display = isHidden ? 'block' : 'none';
+        dock.style.display = isHidden ? 'flex' : 'none';
+        dock.style.flexDirection = 'column';
         const btn = this.shellElement.querySelector('.viewport-table-toggle-btn');
         if (btn) {
           btn.style.background = isHidden ? '#0284c7' : '#0f172a';
-          btn.style.color = isHidden ? '#ffffff' : '#38bdf8';
+          btn.style.color = isHidden ? '#38bdf8' : '#38bdf8';
         }
       }
     } else if (action === 'open-zone-selector') {
-      showZoneDensitySelectorPopup(WorkspaceState.dataset, (selectedZones, qualities) => {
+      const dataset = WorkspaceState.dataset || null;
+      showZoneDensitySelectorPopup(dataset, (selectedZones, qualities) => {
         window.dispatchEvent(new CustomEvent('workspace-zone-filter-changed', { detail: { selectedZones, qualities } }));
       });
     }
@@ -250,23 +292,34 @@ export class WorkspaceShellController {
     event.preventDefault();
     const action = resizer.dataset.action;
     const stage = this.shellElement.querySelector('[data-webgl-host]');
+    const tableDock = this.shellElement.querySelector('[data-role="viewport-table-dock"]');
+    const treePanel = this.shellElement.querySelector('.tree-panel');
+    const propertiesPanel = this.shellElement.querySelector('.properties-panel');
+    const isTableOpen = Boolean(tableDock && tableDock.style.display !== 'none' && tableDock.style.display !== '');
+    const startTableHeight = tableDock ? (tableDock.getBoundingClientRect().height || 220) : 220;
+    const startWebglHeight = stage ? (stage.getBoundingClientRect().height || this.state.webglHeight || 350) : 350;
+    const startLeftWidth = treePanel ? (treePanel.getBoundingClientRect().width || this.state.leftPanelWidth || 300) : 300;
+    const startRightWidth = propertiesPanel ? (propertiesPanel.getBoundingClientRect().width || this.state.rightPanelWidth || 350) : 350;
     
     this.dragContext = {
       action,
       startX: event.clientX,
       startY: event.clientY,
-      startLeftWidth: this.state.leftPanelWidth,
-      startRightWidth: this.state.rightPanelWidth,
-      startWebglHeight: stage ? stage.offsetHeight : (this.state.webglHeight || 350),
+      startLeftWidth,
+      startRightWidth,
+      startWebglHeight,
+      startTableHeight,
+      isTableOpen,
       maxWidth: window.innerWidth * 0.5,
       pointerId: event.pointerId,
       resizer: resizer
     };
 
     resizer.setPointerCapture(event.pointerId);
+    resizer.classList.add('is-resizing');
     document.addEventListener('pointermove', this.handlePointerMove, { passive: false });
     document.addEventListener('pointerup', this.handlePointerUp);
-    this.shellElement.classList.add('is-resizing');
+    this.shellElement.classList.add('is-resizing-active');
   }
 
   handlePointerMove(event) {
@@ -286,10 +339,29 @@ export class WorkspaceShellController {
       this.shellElement.style.setProperty('--right-panel', `${newWidth}px`);
     } else if (action === 'resize-viewport-vertical') {
       const deltaY = event.clientY - this.dragContext.startY;
-      let newHeight = Math.max(100, Math.min(this.dragContext.startWebglHeight + deltaY, window.innerHeight * 0.75));
-      this.state.webglHeight = newHeight;
-      const stage = this.shellElement.querySelector('[data-webgl-host]');
-      if (stage) stage.style.height = `${newHeight}px`;
+      if (this.dragContext.isTableOpen) {
+        const tableDock = this.shellElement.querySelector('[data-role="viewport-table-dock"]');
+        let newBasis = Math.max(60, Math.min(this.dragContext.startTableHeight - deltaY, window.innerHeight * 0.75));
+        if (tableDock) {
+          tableDock.style.flex = `0 0 ${newBasis}px`;
+          tableDock.style.height = `${newBasis}px`;
+        }
+      } else {
+        let newHeight = Math.max(100, Math.min(this.dragContext.startWebglHeight + deltaY, window.innerHeight * 0.75));
+        this.state.webglHeight = newHeight;
+        const stage = this.shellElement.querySelector('[data-webgl-host]');
+        if (stage) {
+          stage.style.flex = `0 0 ${newHeight}px`;
+          stage.style.height = `${newHeight}px`;
+        }
+      }
+    }
+
+    if (!this._rafResize) {
+      this._rafResize = requestAnimationFrame(() => {
+        window.dispatchEvent(new Event('resize'));
+        this._rafResize = null;
+      });
     }
   }
 
@@ -298,12 +370,13 @@ export class WorkspaceShellController {
     
     if (this.dragContext.resizer && this.dragContext.pointerId !== undefined) {
       this.dragContext.resizer.releasePointerCapture(this.dragContext.pointerId);
+      this.dragContext.resizer.classList.remove('is-resizing');
     }
     
     document.removeEventListener('pointermove', this.handlePointerMove);
     document.removeEventListener('pointerup', this.handlePointerUp);
     this.dragContext = null;
-    this.shellElement.classList.remove('is-resizing');
+    this.shellElement.classList.remove('is-resizing-active');
     this.saveState();
     window.dispatchEvent(new Event('resize'));
   }
