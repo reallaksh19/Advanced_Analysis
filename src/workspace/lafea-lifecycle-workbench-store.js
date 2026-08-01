@@ -226,6 +226,22 @@ export function createLafeaWorkbenchStore(options) {
     return () => listeners.delete(listener);
   }
 
+  function clearOverlay() {
+    overlayStatus = null;
+    overlayDiagnostics = null;
+  }
+
+  function failOverlay(error, fallbackCode) {
+    overlayStatus = 'FAILED';
+    overlayDiagnostics = [freeze({
+      severity: 'ERROR',
+      code: typeof error?.code === 'string' ? error.code : fallbackCode,
+      path: 'lifecycle',
+      entityId: null,
+      message: error instanceof Error ? error.message : String(error),
+    })];
+  }
+
   return Object.freeze({
     selectStage: (stageId) => delegate('selectStage', stageId),
     importDocument,
