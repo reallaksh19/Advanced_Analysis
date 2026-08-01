@@ -18,7 +18,10 @@ const forbidden = [
   ['NONLINEAR_APPROXIMATION', /applyGap|contactIteration|frictionCoefficient\s*\*/u],
   ['RANDOM_IDENTITY', /Math\.random|randomUUID/u],
   ['LOCALE_ORDERING', /localeCompare/u],
-  ['HIDDEN_ENGINEERING_DEFAULT', /function\s+\w+\s*\([^)]*=\s*(?:-?\d|true|false)/u],
+  [
+    'HIDDEN_ENGINEERING_DEFAULT',
+    /function\s+(?!requireHash\b)\w+\s*\([^)]*=\s*(?:-?\d|true|false)/u,
+  ],
 ];
 
 for (const file of files) {
@@ -35,6 +38,16 @@ assert.match(contracts, /REFERENCE_TRANSFER_FORMULA/u);
 assert.match(contracts, /leverReferenceToNodeLocal/u);
 assert.match(contracts, /requireOrthonormalBasis/u);
 assert.match(contracts, /PROHIBITED_INTERFACE_STATES/u);
+assert.match(
+  contracts,
+  /function requireHash\(value, field, nullable = false\)/u,
+  'The only permitted boolean function default is validation nullability, not engineering data.',
+);
+assert.equal(
+  (contracts.match(/function requireHash\(value, field, nullable = false\)/gu) ?? []).length,
+  1,
+  'Validation nullability default must have one explicit owner.',
+);
 
 const interfaceSet = fs.readFileSync(path.join(ROOT, 'interface-set.js'), 'utf8');
 assert.match(interfaceSet, /requireMechanicalModelCompilation/u);
