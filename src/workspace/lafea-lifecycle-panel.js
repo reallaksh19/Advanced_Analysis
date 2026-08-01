@@ -26,21 +26,57 @@ export function renderLafeaLifecyclePanel(rootElement, stageId, stage) {
   if (!stage.lifecycle) {
     panel.append(paragraph(
       rootElement,
-      'Lifecycle not initialized. No source, model, mesh, execution, recovery, convergence, code or report evidence is promoted.',
+      'Lifecycle not initialized. No source, model, execution, result, mesh, recovery, convergence, assessment or report evidence is promoted.',
     ));
     panel.append(authorityNotice(rootElement));
     return panel;
   }
 
-  panel.append(paragraph(rootElement, `Opaque source hash: ${stage.lifecycle.source.sourceHash}`));
+  const artifacts = stage.lifecycle.artifacts;
+  panel.append(
+    paragraph(rootElement, `Lifecycle profile: ${stage.lifecycle.profileId}`),
+    paragraph(rootElement, `Opaque source hash: ${stage.lifecycle.source.sourceHash}`),
+  );
 
   const readinessList = element(rootElement, 'dl', 'lafea-lifecycle-panel__readiness');
   appendDefinition(rootElement, readinessList, 'Source current', readiness.sourceCurrent);
   appendDefinition(rootElement, readinessList, 'Model current', readiness.modelCurrent);
-  appendDefinition(rootElement, readinessList, 'Mesh generated', readiness.meshGenerated);
-  appendDefinition(rootElement, readinessList, 'Mesh qualified', readiness.meshQualified);
+  appendApplicableDefinition(
+    rootElement,
+    readinessList,
+    'Mesh generated',
+    'ANALYSIS_MESH' in artifacts,
+    readiness.meshGenerated,
+  );
+  appendApplicableDefinition(
+    rootElement,
+    readinessList,
+    'Mesh qualified',
+    'ANALYSIS_MESH' in artifacts,
+    readiness.meshQualified,
+  );
   appendDefinition(rootElement, readinessList, 'Result ready', readiness.resultReady);
-  appendDefinition(rootElement, readinessList, 'Code ready', readiness.codeReady);
+  appendApplicableDefinition(
+    rootElement,
+    readinessList,
+    'Screening assessment ready',
+    'SCREENING_ASSESSMENT' in artifacts,
+    currentPass(artifacts.SCREENING_ASSESSMENT),
+  );
+  appendApplicableDefinition(
+    rootElement,
+    readinessList,
+    'Convergence ready',
+    'CONVERGENCE' in artifacts,
+    currentPass(artifacts.CONVERGENCE),
+  );
+  appendApplicableDefinition(
+    rootElement,
+    readinessList,
+    'Code assessment ready',
+    'CODE_ASSESSMENT' in artifacts,
+    readiness.codeReady,
+  );
   appendDefinition(rootElement, readinessList, 'Report current', readiness.reportCurrent);
   panel.append(readinessList);
 
@@ -52,7 +88,7 @@ export function renderLafeaLifecyclePanel(rootElement, stageId, stage) {
   });
   head.append(headRow);
   const body = element(rootElement, 'tbody');
-  Object.values(stage.lifecycle.artifacts).forEach((artifact) => {
+  Object.values(artifacts).forEach((artifact) => {
     const row = element(rootElement, 'tr');
     row.dataset.artifactKind = artifact.kind;
     [
@@ -91,10 +127,22 @@ function appendDefinition(rootElement, list, label, value) {
   );
 }
 
+function appendApplicableDefinition(rootElement, list, label, applicable, value) {
+  list.append(
+    element(rootElement, 'dt', null, label),
+    element(rootElement, 'dd', null, applicable ? (value ? 'YES' : 'NO') : 'NOT APPLICABLE'),
+  );
+}
+
+function currentPass(artifact) {
+  return artifact?.status === 'CURRENT' && artifact?.qualification === 'PASS';
+}
+
 function authorityNotice(rootElement) {
   return paragraph(
     rootElement,
     'A retained workbench calculation is not registered automatically as lifecycle evidence. '
-      + 'Only explicit producer-owned artifact records with current parent lineage may promote readiness.',
+      + 'Only explicit producer-owned artifact records authorized by the current stage profile '
+      + 'and carrying current parent lineage may promote readiness.',
   );
 }
