@@ -82,14 +82,22 @@ function updateScalar(document, entity, command, descriptor, parsedValue) {
     ? requireParent(entity, descriptor.target.propertyPath)
     : entity;
   const finalKey = descriptor.target.propertyPath.at(-1);
+  const entityId = command.target.entityId;
   const updated = descriptor.target.scalarWrapperKey
-    ? updateWrappedScalar(parent, entity, finalKey, descriptor, parsedValue)
-    : updateDirectScalar(parent, finalKey, descriptor, parsedValue);
+    ? updateWrappedScalar(
+      parent,
+      entity,
+      finalKey,
+      descriptor,
+      entityId,
+      parsedValue,
+    )
+    : updateDirectScalar(parent, finalKey, descriptor, entityId, parsedValue);
   return {
     document,
     change: {
       operation: command.operation,
-      entityId: command.target.entityId,
+      entityId,
       resolvedPath: updated.resolvedPath,
       previousState: classifyStoredValue(updated.previousValue),
       currentState: parsedValue.state,
@@ -99,7 +107,14 @@ function updateScalar(document, entity, command, descriptor, parsedValue) {
   };
 }
 
-function updateWrappedScalar(parent, entity, finalKey, descriptor, parsedValue) {
+function updateWrappedScalar(
+  parent,
+  entity,
+  finalKey,
+  descriptor,
+  entityId,
+  parsedValue,
+) {
   const wrapper = descriptor.target.propertyPath.length ? parent[finalKey] : entity;
   if (!isRecord(wrapper)) {
     throw contractError(
@@ -113,11 +128,11 @@ function updateWrappedScalar(parent, entity, finalKey, descriptor, parsedValue) 
   else wrapper[key] = parsedValue.value;
   return {
     previousValue,
-    resolvedPath: `${descriptorPath(descriptor, null)}.${key}`,
+    resolvedPath: `${descriptorPath(descriptor, entityId)}.${key}`,
   };
 }
 
-function updateDirectScalar(parent, finalKey, descriptor, parsedValue) {
+function updateDirectScalar(parent, finalKey, descriptor, entityId, parsedValue) {
   if (finalKey === undefined) {
     throw contractError(
       'LAFEA_SCALAR_PATH_REQUIRED',
@@ -129,7 +144,7 @@ function updateDirectScalar(parent, finalKey, descriptor, parsedValue) {
   else parent[finalKey] = parsedValue.value;
   return {
     previousValue,
-    resolvedPath: descriptorPath(descriptor, null),
+    resolvedPath: descriptorPath(descriptor, entityId),
   };
 }
 
@@ -239,10 +254,7 @@ function requireCollection(document, descriptor) {
 }
 
 function requireDomain(descriptor, expected, code) {
-  if (descriptor.valueContract.domainType !== expected) {
-    throw contractError(
-      code,
-      `${descriptor.descriptorId} is not a ${expected.toLowerCase()} descriptor.`,
-    );
-  }
+  if (descriptor.valueContract.domainType === expected) return;
+  const kind = expected === 'NUMBER' ? 'numeric' : 'entity';
+  throw contractError(code, `${descriptor.descriptorId} is not a ${kind} descriptor.`);
 }
