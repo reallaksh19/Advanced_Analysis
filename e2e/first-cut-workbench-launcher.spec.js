@@ -41,10 +41,11 @@ test.describe('First-cut workbench Phase 5 launcher', () => {
     );
     await expect(originalHost).toHaveCount(1);
 
-    await root.locator(
-      '.properties-panel .panel-collapse-btn[data-action="toggle-properties-collapse"]',
+    const propertiesPanel = root.locator('.properties-panel');
+    await propertiesPanel.locator(
+      '[data-action="toggle-properties-collapse"]',
     ).click();
-    await expect(root.locator('.workspace-shell')).toHaveClass(/properties-collapsed/u);
+    await expect(propertiesPanel).toHaveClass(/workspace-panel--collapsed/u);
     await root.locator('[data-role="first-cut-workbench-focus"]').click();
 
     let state = await browserState(page);
@@ -63,6 +64,7 @@ test.describe('First-cut workbench Phase 5 launcher', () => {
         lastMode: 'FOCUS',
       },
     });
+    await expect(propertiesPanel).not.toHaveClass(/workspace-panel--collapsed/u);
     await expect(originalHost).toBeFocused();
 
     await root.locator('[data-role="first-cut-workbench-popout"]').click();

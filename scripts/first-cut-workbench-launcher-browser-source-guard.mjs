@@ -16,6 +16,9 @@ assert.match(fixture, /workbenchController\.init\(\)/u);
 assert.match(fixture, /launcherController\.init\(\)/u);
 assert.match(fixture, /host\.dataset\.fixtureIdentity/u);
 assert.match(fixture, /getFirstCutLauncherBrowserState/u);
+assert.match(fixture, /workspace-panel--collapsed/u);
+assert.match(fixture, /panel-popup-overlay/u);
+assert.doesNotMatch(fixture, /properties-collapsed/u);
 assert.doesNotMatch(
   fixture,
   /prepareCalculation|confirmAndRun|runFirstCutLoadEstimation|sealFirstCutAssumptionSet/u,
@@ -24,12 +27,15 @@ assert.doesNotMatch(fixture, /\[SIMULATED\].*(?:mass|rating|density|allowable)/i
 
 assert.match(spec, /first-cut-workbench-focus/u);
 assert.match(spec, /first-cut-workbench-popout/u);
-assert.match(spec, /properties-collapsed/u);
+assert.match(spec, /workspace-panel--collapsed/u);
+assert.match(spec, /toggle-properties-collapse/u);
+assert.doesNotMatch(spec, /properties-collapsed/u);
 assert.match(spec, /hostIdentity: 'FIRST-CUT-WORKBENCH-HOST-1'/u);
 assert.match(spec, /workbenchCount: 1/u);
 assert.match(spec, /launcherCount: 1/u);
 assert.match(spec, /toBeFocused\(\)/u);
 assert.match(spec, /panel-popup-body/u);
+assert.match(spec, /popupVisible: true/u);
 assert.match(spec, /First-Cut Piping Load Estimation/u);
 assert.match(spec, /require LFEA/u);
 assert.doesNotMatch(spec, /test\.skip|test\.fixme|\.only\(/u);
@@ -39,9 +45,18 @@ assert.doesNotMatch(spec, /status\s*:\s*['"](?:PASS|QUALIFIED)['"]/u);
 assert.match(launcher, /First-cut enrichment launcher/u);
 assert.match(launcher, /first-cut-workbench-action-bar/u);
 assert.match(launcher, /\[data-panel="viewport"\]/u);
-assert.match(launcher, /\[data-action="switch-right-tab"\]\[data-tab="overrides"\]/u);
-assert.match(launcher, /\[data-tab-group="overrides"\]/u);
-assert.match(launcher, /ensureOverridesVisible\(\)/u);
+assert.match(launcher, /\.properties-panel/u);
+assert.match(launcher, /\[data-action="toggle-properties-collapse"\]/u);
+assert.match(launcher, /workspace-panel--collapsed/u);
+assert.match(launcher, /ensurePropertiesVisible\(\)/u);
+assert.match(launcher, /handleSectionPopout/u);
+assert.match(launcher, /panel-popup-overlay/u);
+assert.match(launcher, /panel-popup-window/u);
+assert.match(launcher, /panel-popup-body/u);
+assert.match(launcher, /popup-dock/u);
+assert.match(launcher, /dockWorkbench/u);
+assert.doesNotMatch(launcher, /switch-right-tab|data-tab-group="overrides"/u);
+assert.doesNotMatch(launcher, /properties-collapsed/u);
 assert.doesNotMatch(launcher, /queueMicrotask|requestAnimationFrame|setTimeout/u);
 assert.doesNotMatch(launcher, /viewport-edit-bar/u);
 assert.doesNotMatch(
@@ -93,7 +108,11 @@ console.log(JSON.stringify({
   productionWorkbenchMounted: true,
   productionShellMounted: true,
   launcherActionBandVisibleAcrossViewportModes: true,
-  owningPropertiesTabActivated: true,
+  currentPropertiesPanelExpanded: true,
+  governedPopupOwned: true,
+  sectionPopoutBound: true,
+  dockRestorationBound: true,
+  obsoleteRightTabContractRetained: false,
   hiddenHostFocusAttempted: false,
   timingWorkaroundUsed: false,
   hostIdentityAsserted: true,

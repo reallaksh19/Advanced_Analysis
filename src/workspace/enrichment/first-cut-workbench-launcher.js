@@ -2,17 +2,18 @@
  * Toolbar composition controller for the existing first-cut workbench.
  *
  * This module never creates enrichment state or calculation authority. It only
- * focuses or pops out the existing, bootstrap-owned workbench host.
+ * focuses or moves the existing, bootstrap-owned workbench host.
  */
 
 export const FIRST_CUT_WORKBENCH_LAUNCHER_SCHEMA =
   'first-cut-workbench-launcher/v1';
 
-const FIRST_CUT_SECTION_SELECTOR = '[data-section-id="first-cut"]';
-const FIRST_CUT_HOST_SELECTOR = '[data-role="first-cut-workbench-root"]';
-const VIEWPORT_PANEL_SELECTOR = '[data-panel="viewport"]';
-const OVERRIDES_TAB_SELECTOR = '[data-action="switch-right-tab"][data-tab="overrides"]';
-const OVERRIDES_GROUP_SELECTOR = '[data-tab-group="overrides"]';
+const SECTION_SELECTOR = '[data-section-id="first-cut"]';
+const HOST_SELECTOR = '[data-role="first-cut-workbench-root"]';
+const VIEWPORT_SELECTOR = '[data-panel="viewport"]';
+const PROPERTIES_SELECTOR = '.properties-panel';
+const PROPERTIES_TOGGLE = '[data-action="toggle-properties-collapse"]';
+const PROPERTIES_COLLAPSED = 'workspace-panel--collapsed';
 const ACTION_BAR_ROLE = 'first-cut-workbench-action-bar';
 
 export class FirstCutWorkbenchLauncherController {
@@ -25,20 +26,30 @@ export class FirstCutWorkbenchLauncherController {
     this.group = null;
     this.host = null;
     this.section = null;
+    this.sectionBody = null;
+    this.sectionPopout = null;
+    this.popup = null;
     this.focusCount = 0;
     this.popoutCount = 0;
     this.lastMode = null;
     this.destroyed = false;
     this.handleFocus = () => this.focusWorkbench();
     this.handlePopout = () => this.popoutWorkbench();
+    this.handleSectionPopout = (event) => {
+      event?.stopPropagation?.();
+      this.popoutWorkbench();
+    };
+    this.handleDock = () => this.dockWorkbench();
   }
 
   init() {
     this.requireLive();
     if (this.group) return this.getState();
-    const viewportPanel = requireUnique(this.rootElement, VIEWPORT_PANEL_SELECTOR);
-    this.section = requireUnique(this.rootElement, FIRST_CUT_SECTION_SELECTOR);
-    this.host = requireUnique(this.rootElement, FIRST_CUT_HOST_SELECTOR);
+    const viewport = requireUnique(this.rootElement, VIEWPORT_SELECTOR);
+    this.section = requireUnique(this.rootElement, SECTION_SELECTOR);
+    this.host = requireUnique(this.rootElement, HOST_SELECTOR);
+    this.sectionBody = requireUnique(this.section, '.accordion-section-body');
+    this.sectionPopout = requireUnique(this.section, '.accordion-popout-btn');
     if (!this.section.contains(this.host)) {
       throw launcherError('FIRST_CUT_LAUNCHER_HOST_SECTION_MISMATCH');
     }
@@ -52,14 +63,9 @@ export class FirstCutWorkbenchLauncherController {
     this.actionBar.dataset.role = ACTION_BAR_ROLE;
     this.actionBar.setAttribute('aria-label', 'Workspace enrichment actions');
     Object.assign(this.actionBar.style, {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '6px',
-      minHeight: '34px',
-      padding: '4px 8px',
-      borderTop: '1px solid #1e293b',
-      background: '#091322',
-      flex: 'none',
+      display: 'flex', alignItems: 'center', gap: '6px', minHeight: '34px',
+      padding: '4px 8px', borderTop: '1px solid #1e293b',
+      background: '#091322', flex: 'none',
     });
 
     this.group = documentRef.createElement('div');
@@ -68,34 +74,30 @@ export class FirstCutWorkbenchLauncherController {
     this.group.setAttribute('aria-label', 'First-cut enrichment launcher');
 
     const focusButton = actionButton(
-      documentRef,
-      'Enrichment',
+      documentRef, 'Enrichment',
       'Focus the existing first-cut enrichment and preflight workbench',
     );
     focusButton.dataset.role = 'first-cut-workbench-focus';
     focusButton.addEventListener('click', this.handleFocus);
 
     const popoutButton = actionButton(
-      documentRef,
-      'Pop Out',
+      documentRef, 'Pop Out',
       'Pop out the existing first-cut enrichment and preflight workbench',
     );
     popoutButton.dataset.role = 'first-cut-workbench-popout';
     popoutButton.addEventListener('click', this.handlePopout);
 
+    this.sectionPopout.addEventListener('click', this.handleSectionPopout);
     this.group.append(focusButton, popoutButton);
     this.actionBar.append(this.group);
-    viewportPanel.append(this.actionBar);
+    viewport.append(this.actionBar);
     return this.getState();
   }
 
   focusWorkbench() {
     this.requireMounted();
     this.ensurePropertiesVisible();
-    this.ensureOverridesVisible();
-    if (this.section.classList.contains('accordion-collapsed')) {
-      activate(this.section.querySelector('.accordion-section-header'));
-    }
+    if (!this.popup) this.section.classList.remove('accordion-collapsed');
     this.focusHost();
     this.focusCount += 1;
     this.lastMode = 'FOCUS';
@@ -105,17 +107,63 @@ export class FirstCutWorkbenchLauncherController {
   popoutWorkbench() {
     this.requireMounted();
     this.ensurePropertiesVisible();
-    this.ensureOverridesVisible();
-    if (!this.section.classList.contains('is-popped-out')) {
-      activate(this.section.querySelector('.accordion-popout-btn'));
-    }
-    if (!this.section.classList.contains('is-popped-out')) {
-      throw launcherError('FIRST_CUT_LAUNCHER_POPOUT_NOT_ACTIVATED');
-    }
+    if (!this.popup) this.openPopup();
     this.focusHost();
     this.popoutCount += 1;
     this.lastMode = 'POPOUT';
     return this.getState();
+  }
+
+  dockWorkbench() {
+    this.requireMounted();
+    if (!this.popup) return this.getState();
+    this.section.append(this.sectionBody);
+    this.sectionBody.classList.remove('panel-popup-body');
+    delete this.sectionBody.dataset.role;
+    this.sectionBody.style.maxHeight = '';
+    this.sectionBody.style.padding = '';
+    this.section.classList.remove('is-popped-out');
+    this.popup.remove();
+    this.popup = null;
+    this.focusHost();
+    return this.getState();
+  }
+
+  openPopup() {
+    const documentRef = this.rootElement.ownerDocument;
+    const overlay = documentRef.createElement('div');
+    overlay.dataset.role = 'panel-popup-overlay';
+    Object.assign(overlay.style, {
+      display: 'flex', position: 'fixed', inset: '0', zIndex: '9998',
+      pointerEvents: 'none',
+    });
+    const popupWindow = documentRef.createElement('section');
+    popupWindow.className = 'panel-popup-window';
+    popupWindow.dataset.role = 'panel-popup-window';
+    popupWindow.style.pointerEvents = 'auto';
+    const header = documentRef.createElement('header');
+    header.className = 'panel-popup-header';
+    const title = documentRef.createElement('strong');
+    title.className = 'panel-popup-title';
+    title.textContent = 'First-Cut Load Enrichment';
+    const controls = documentRef.createElement('div');
+    controls.className = 'panel-popup-controls';
+    const dock = actionButton(documentRef, 'Dock', 'Dock first-cut workbench');
+    dock.className = 'panel-popup-btn';
+    dock.dataset.action = 'popup-dock';
+    dock.addEventListener('click', this.handleDock);
+    controls.append(dock);
+    header.append(title, controls);
+
+    this.sectionBody.classList.add('panel-popup-body');
+    this.sectionBody.dataset.role = 'panel-popup-body';
+    this.sectionBody.style.maxHeight = 'none';
+    this.sectionBody.style.padding = '18px';
+    popupWindow.append(header, this.sectionBody);
+    overlay.append(popupWindow);
+    this.rootElement.append(overlay);
+    this.section.classList.add('is-popped-out');
+    this.popup = overlay;
   }
 
   getState() {
@@ -126,40 +174,34 @@ export class FirstCutWorkbenchLauncherController {
       popoutCount: this.popoutCount,
       lastMode: this.lastMode,
       hostIdentityRetained: Boolean(this.host),
-      poppedOut: Boolean(this.section?.classList.contains('is-popped-out')),
+      poppedOut: Boolean(this.popup && this.section?.classList.contains('is-popped-out')),
     });
   }
 
   destroy() {
     if (this.destroyed) return;
+    if (this.popup) this.dockWorkbench();
     this.group?.querySelector('[data-role="first-cut-workbench-focus"]')
       ?.removeEventListener('click', this.handleFocus);
     this.group?.querySelector('[data-role="first-cut-workbench-popout"]')
       ?.removeEventListener('click', this.handlePopout);
+    this.sectionPopout?.removeEventListener('click', this.handleSectionPopout);
     this.actionBar?.remove();
     this.actionBar = null;
     this.group = null;
     this.host = null;
     this.section = null;
+    this.sectionBody = null;
+    this.sectionPopout = null;
     this.destroyed = true;
   }
 
   ensurePropertiesVisible() {
-    const shell = this.rootElement.querySelector('.workspace-shell');
-    if (!shell) throw launcherError('FIRST_CUT_LAUNCHER_SHELL_REQUIRED');
-    if (!shell.classList.contains('properties-collapsed')) return;
-    activate(shell.querySelector('[data-action="toggle-properties-collapse"]'));
-    if (shell.classList.contains('properties-collapsed')) {
+    const panel = requireUnique(this.rootElement, PROPERTIES_SELECTOR);
+    if (!panel.classList.contains(PROPERTIES_COLLAPSED)) return;
+    requireUnique(panel, PROPERTIES_TOGGLE).click();
+    if (panel.classList.contains(PROPERTIES_COLLAPSED)) {
       throw launcherError('FIRST_CUT_LAUNCHER_PROPERTIES_NOT_EXPANDED');
-    }
-  }
-
-  ensureOverridesVisible() {
-    const group = requireUnique(this.rootElement, OVERRIDES_GROUP_SELECTOR);
-    if (group.style.display !== 'none') return;
-    activate(requireUnique(this.rootElement, OVERRIDES_TAB_SELECTOR));
-    if (group.style.display === 'none') {
-      throw launcherError('FIRST_CUT_LAUNCHER_OVERRIDES_NOT_ACTIVATED');
     }
   }
 
@@ -197,17 +239,10 @@ function requireUnique(root, selector) {
   const matches = root.querySelectorAll(selector);
   if (matches.length !== 1) {
     throw launcherError('FIRST_CUT_LAUNCHER_UNIQUE_TARGET_REQUIRED', {
-      selector,
-      count: matches.length,
+      selector, count: matches.length,
     });
   }
   return matches[0];
-}
-
-function activate(element) {
-  if (!element) throw launcherError('FIRST_CUT_LAUNCHER_CONTROL_REQUIRED');
-  if (typeof element.click === 'function') element.click();
-  else element.dispatchEvent?.(new Event('click', { bubbles: true }));
 }
 
 function freeze(value) {
