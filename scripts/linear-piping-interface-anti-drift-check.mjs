@@ -58,8 +58,8 @@ assert.equal(
   packageValue.scripts['check:lfea-interfaces'],
   'node scripts/linear-piping-interface-check.mjs && node scripts/linear-piping-interface-anti-drift-check.mjs',
 );
-assert.match(packageValue.scripts['check:lfea-core'], /check:lfea-interfaces/u);
-assert.match(packageValue.scripts.gate, /check:lfea-core/u);
+assert.match(packageValue.scripts['check:lfea-linear-core'], /check:lfea-interfaces/u);
+assert.match(packageValue.scripts.gate, /check:lfea-linear-core/u);
 
 await import('./linear-piping-nozzle-interface-check.mjs');
 
