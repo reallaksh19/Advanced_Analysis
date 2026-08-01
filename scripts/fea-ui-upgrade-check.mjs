@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import { calculateLocalContinuum, createCanonicalLocalContinuumModel } from '../src/core/local-continuum/index.js';
 import { createLafeaMockDocument } from '../src/workspace/advanced-mock-data.js';
 import { presentLafeaResult, resolveLafeaUnits } from '../src/workspace/lafea-result-presenters/index.js';
-import { selectShellSurfaceField } from '../src/workspace/lafea-field-adapter.js';
+import { selectShellSurfaceField } from '../src/workspace/lfea-field-adapter.js';
 import { buildConvergenceStudy } from '../src/workspace/lfea-convergence-model.js';
 import { QUALITY_METRICS, selectQualityField } from '../src/workspace/lfea-quality-adapter.js';
 import { createLfeaWorkerClient } from '../src/workspace/lfea-worker-client.js';
