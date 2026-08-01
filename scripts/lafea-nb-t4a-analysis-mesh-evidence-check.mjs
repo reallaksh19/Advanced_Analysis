@@ -140,8 +140,8 @@ expectCode(() => createLafeaAnalysisMeshEvidence(intakeRaw({
 })), 'LAFEA_ANALYSIS_MESH_EXACT_KEYS_INVALID');
 
 const unsupported = structuredClone(TRIANGLE);
-unsupported.elements[0].elementType = 'MITC4';
-const unsupportedProfile = meshProfile('MITC4', 'CST_DKT_TRI3_THIN_SHELL_V1');
+unsupported.elements[0].elementType = 'CST_DKT_TRI3_THIN_SHELL_V1';
+const unsupportedProfile = meshProfile('T3', 'CST_DKT_TRI3_THIN_SHELL_V1');
 expectCode(() => createLafeaAnalysisMeshEvidence(intakeRaw({
   meshValue: unsupported,
   profile: unsupportedProfile,
@@ -181,16 +181,22 @@ tampered.quality.elementCount = 99;
 expectCode(() => registerLafeaAnalysisMeshEvidence(lifecycle, tampered),
   'LAFEA_ANALYSIS_MESH_EVIDENCE_TAMPERED');
 
-const source = fs.readFileSync('src/workspace/lafea-analysis-mesh-evidence.js', 'utf8');
-assert.doesNotMatch(source,
+const evidenceSource = fs.readFileSync(
+  'src/workspace/lafea-analysis-mesh-evidence.js', 'utf8',
+);
+const contractSource = fs.readFileSync(
+  'src/workspace/lafea-analysis-mesh-contract.js', 'utf8',
+);
+const productionSource = `${contractSource}\n${evidenceSource}`;
+assert.doesNotMatch(productionSource,
   /from ['"][^'"]*(?:local-continuum|local-shell|lafea-canvas|render-packet)[^'"]*['"]/u);
-assert.doesNotMatch(source,
+assert.doesNotMatch(productionSource,
   /\b(?:calculateLocalContinuum|calculateLocalShell|executeLafeaStage|sealRenderPacketV2|generateMesh)\b/u);
-assert.match(source, /LAFEA_ANALYSIS_MESH_EXACT_KEYS_INVALID/u);
-assert.match(source, /RELEASE_NOT_QUALIFIED/u);
-assert.match(source, /convergenceProduced:\s*false/u);
-assert.match(source, /codeAssessmentProduced:\s*false/u);
-assert.match(source, /releaseQualified:\s*false/u);
+assert.match(contractSource, /LAFEA_ANALYSIS_MESH_EXACT_KEYS_INVALID/u);
+assert.match(evidenceSource, /RELEASE_NOT_QUALIFIED/u);
+assert.match(evidenceSource, /convergenceProduced:\s*false/u);
+assert.match(evidenceSource, /codeAssessmentProduced:\s*false/u);
+assert.match(evidenceSource, /releaseQualified:\s*false/u);
 
 console.log(JSON.stringify({
   check: 'lafea-nb-t4a-analysis-mesh-evidence',
