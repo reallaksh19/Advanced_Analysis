@@ -1,13 +1,17 @@
 /** Concrete technical components referenced by the LAFEA composition bindings. */
 import {
   calculateLocalAttachmentFoundation,
+  compileFiniteFootprintDistribution,
   createCanonicalLocalAttachmentFoundationModel,
   MODEL_SCHEMA as ATTACHMENT_MODEL_SCHEMA,
   validateCanonicalLocalAttachmentFoundationModel,
 } from '../core/local-stress/index.js';
+import { createFiniteFootprintHandoff } from '../core/local-stress/finite-footprint-handoff.js';
 import {
   calculateLocalAttachmentScreening,
+  createLocalAttachmentScreeningHandoff,
   createLocalAttachmentScreeningRequest,
+  evaluateLocalAttachmentScreeningProduct,
   validateLocalAttachmentScreeningRequest,
 } from '../core/local-attachment-screening/index.js';
 import {
@@ -73,6 +77,14 @@ const COMPONENTS = Object.freeze({
     [IDS.unitResolver.foundation]: (documentValue) => documentValue?.sourceEvidence
       ?.foundationModel?.units?.canonical,
     [IDS.unitResolver.shellTemplate]: (documentValue) => documentValue?.shellTemplate?.units,
+  }),
+  PRODUCT_ASSESSMENT: Object.freeze({
+    [IDS.productAssessment.foundation]: compileFiniteFootprintDistribution,
+    [IDS.productAssessment.screening]: evaluateLocalAttachmentScreeningProduct,
+  }),
+  HANDOFF: Object.freeze({
+    [IDS.handoff.foundation]: createFiniteFootprintHandoff,
+    [IDS.handoff.screening]: createLocalAttachmentScreeningHandoff,
   }),
 });
 
