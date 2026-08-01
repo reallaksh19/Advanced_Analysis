@@ -1,7 +1,7 @@
 import { showZoneDensitySelectorPopup } from './zone-density-selector-popup.js';
 import { WorkspaceState } from './workspace-state.js';
 import { EventBus } from './event-bus.js';
-import { EVENT_TOPICS } from './event-topics.js';
+import { APPLICATION_EVENTS, EVENT_TOPICS } from './event-topics.js';
 
 const STORAGE_KEY = 'workspace-layout-prefs';
 const MIN_WIDTH = 200;
