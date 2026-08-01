@@ -68,8 +68,8 @@ assert.equal(
   packageValue.scripts['check:lfea-presentation-export'],
   'node scripts/linear-piping-presentation-export-check.mjs && node scripts/linear-piping-presentation-anti-drift-check.mjs',
 );
-assert.match(packageValue.scripts['check:lfea-core'], /check:lfea-presentation-export/u);
-assert.match(packageValue.scripts.gate, /check:lfea-core/u);
+assert.match(packageValue.scripts['check:lfea-linear-core'], /check:lfea-presentation-export/u);
+assert.match(packageValue.scripts.gate, /check:lfea-linear-core/u);
 
 await import('./linear-piping-workspace-integration-check.mjs');
 
