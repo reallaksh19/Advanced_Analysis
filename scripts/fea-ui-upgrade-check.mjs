@@ -53,6 +53,16 @@ const presenterRows = {};
 for (const stageId of stageIds) {
   const documentValue = createLafeaMockDocument(stageId);
   const execution = executeLafeaStage(stageId, documentValue);
+  if (stageId === 'LAFEA.6') {
+    assert.equal(execution.status, 'FAILED', 'LAFEA.6 must remain unsupported and fail closed.');
+    assert.equal(execution.result, null);
+    assert.deepEqual(
+      execution.diagnostics.map((diagnostic) => diagnostic.code),
+      ['UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED'],
+    );
+    presenterRows[stageId] = 0;
+    continue;
+  }
   assert.equal(execution.status, 'QUALIFIED', `${stageId} must qualify.`);
   const units = resolveLafeaUnits(stageId, documentValue);
   const presentation = presentLafeaResult(stageId, execution.result, units);

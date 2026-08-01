@@ -94,6 +94,11 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Install governed Chromium runtime
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: '0'
+        run: npx playwright install --with-deps chromium
+
       - name: Validate fail-closed release policy and simulated qualification harness
         run: node scripts/lfea-piping-release-readiness-check.mjs
 
@@ -115,7 +120,10 @@ jobs:
         run: node scripts/lfea-007-retirement-check.mjs
 
       - name: Capture exact-head baseline
+        env:
+          LFEA_EXACT_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: >-
+          GITHUB_SHA="$LFEA_EXACT_HEAD"
           node scripts/lfea-piping-a0-baseline-check.mjs
           --release
           --emit=${RUNNER_TEMP}/audit-baseline.runtime.json

@@ -254,16 +254,16 @@ assert.equal(
   'check:lfea-b2.0 must run the qualification check and source guard.',
 );
 
-const lfeaCore = packageRecord.scripts['check:lfea-core'] ?? '';
+const lfeaLinearCore = packageRecord.scripts['check:lfea-linear-core'] ?? '';
 assert(
-  lfeaCore.startsWith('npm run check:lfea-b2.0 && '),
-  'check:lfea-b2.0 must be first in check:lfea-core.',
+  lfeaLinearCore.startsWith('npm run check:lfea-b2.0 && '),
+  'check:lfea-b2.0 must be first in check:lfea-linear-core.',
 );
 
 const gate = packageRecord.scripts.gate ?? '';
 assert(
-  gate.includes('npm run check:lfea-core'),
-  'check:lfea-core must be reachable from npm run gate.',
+  gate.includes('npm run check:lfea-linear-core'),
+  'check:lfea-linear-core must be reachable from npm run gate.',
 );
 
 const contractFiles = await filesBelow(CONTRACT_DIR, (file) => /\.(?:js|mjs)$/u.test(file));
@@ -281,8 +281,8 @@ for (const file of contractFiles) {
 console.log('PASS B20-G01 Single production owner for convention declarations');
 console.log('PASS B20-G02 No duplicate six-DOF or 12-DOF literals');
 console.log('PASS B20-G03 Canonical ordering is locale-independent');
-console.log('PASS B20-G04 B-2.0 check is first in check:lfea-core');
-console.log('PASS B20-G05 check:lfea-core is reachable from npm run gate');
+console.log('PASS B20-G04 B-2.0 check is first in check:lfea-linear-core');
+console.log('PASS B20-G05 check:lfea-linear-core is reachable from npm run gate');
 console.log('PASS B20-G06 package.json script keys are unique');
 console.log('PASS B20-G07 Linear FEA contract imports respect package boundaries');
 console.log('LFEA B-2.0 source guard passed.');

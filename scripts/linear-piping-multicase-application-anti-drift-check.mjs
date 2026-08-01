@@ -62,8 +62,8 @@ assert.ok(contracts.split('\n').length <= 260, 'Phase 2E contracts must remain b
 
 assert.match(consumerGuard, /linear-piping-multicase-application-check\.mjs/u);
 assert.match(consumerGuard, /linear-piping-multicase-application-anti-drift-check\.mjs/u);
-assert.match(packageJson.scripts['check:lfea-core'], /check:linear-piping-analysis-consumer/u);
-assert.match(packageJson.scripts.gate, /check:linear-piping-analysis-consumer/u);
+assert.match(packageJson.scripts['check:lfea-linear-core'] ?? '', /check:linear-piping-analysis-consumer/u);
+assert.match(packageJson.scripts.gate ?? '', /check:linear-piping-analysis-consumer/u);
 
 console.log(JSON.stringify({
   check: 'linear-piping-multicase-application-anti-drift',

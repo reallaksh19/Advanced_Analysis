@@ -66,7 +66,7 @@ export async function runMaterialSourceGuard() {
     'node scripts/lfea-b2.2-material-check.mjs && node scripts/lfea-b2.2-reviewer-check.mjs && node scripts/lfea-b2.2-material-source-guard.mjs',
   );
   assert.match(
-    packageJson.scripts['check:lfea-core'],
+    packageJson.scripts['check:lfea-linear-core'],
     /check:lfea-b2\.0.*check:lfea-b2\.1.*check:lfea-b2\.4.*check:lfea-b2\.2/u,
   );
 
