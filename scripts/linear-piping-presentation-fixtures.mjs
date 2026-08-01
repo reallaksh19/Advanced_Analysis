@@ -1,4 +1,13 @@
 import {
+  discretiseBend,
+  resolveFrameLocalAxesForSpanChain,
+} from '../src/core/centerline-beam-fea/index.js';
+import {
+  compilePhysicalLoadCase,
+  modelReferenceFromCompilation,
+} from '../src/core/linear-fea-load-case/index.js';
+import { compileMechanicalModel } from '../src/core/linear-fea-model-compiler/index.js';
+import {
   deriveLinearPipingParentSet,
   runLinearPipingAnalysis,
 } from '../src/core/linear-piping-analysis-consumer/index.js';
@@ -18,33 +27,43 @@ import {
   sealNozzleAllowableProfile,
 } from '../src/core/linear-piping-code-application/index.js';
 import {
+  FRAME_LOCAL_AXIS_PROFILE,
+  compileFixtureBend,
+} from './lfea-b3.2-piping-component-fixtures.mjs';
+import {
+  compilerProfile,
+  materialResolution,
+  sectionResolution,
+} from './lfea-b2.5-model-compiler-fixtures.mjs';
+import {
+  loadCaseProfile,
+  solverProfile,
+} from './lfea-b3.3-solver-fixtures.mjs';
+import { recoveryProfile } from './lfea-b3.4-recovery-fixtures.mjs';
+import {
   codeProfile,
   editionDataset,
   pressureStressContribution,
-  reducerFrameElementE1,
-  reducerMaterialResolution,
-  reducerSectionResolutionE1,
   stressFactorSet,
 } from './lfea-b4.0-code-engine-fixtures.mjs';
-import {
-  recoveryProfile,
-  reducerCompilation,
-  reducerComponent,
-  reducerTipLoadCase,
-  solverProfile,
-} from './lfea-b3.4-recovery-fixtures.mjs';
+
+const BEND_ID = 'BEND-001';
+const FIXTURE_SOURCE = 'PHASE-5-QUALIFIED-FIXTURE';
 
 function declared(value, source) {
   return { value, source };
 }
 
 export function buildQualifiedPresentationFixture() {
-  const compilation = reducerCompilation();
-  const component = reducerComponent();
-  const loadCase = reducerTipLoadCase(compilation);
+  const component = compileFixtureBend();
+  if (component.acceptanceState !== 'ACCEPTED') {
+    throw new Error('The Phase 5 qualified fixture requires an ACCEPTED piping component.');
+  }
+  const compilation = bendCompilation(component);
+  const loadCase = bendTipLoadCase(compilation, component);
   const qualifiedSolverProfile = solverProfile({
-    conditionWarning: declared(1e30, 'PHASE-5-QUALIFIED-FIXTURE-PROFILE'),
-    conditionBlock: declared(1e40, 'PHASE-5-QUALIFIED-FIXTURE-PROFILE'),
+    conditionWarning: declared(1e30, `${FIXTURE_SOURCE}-PROFILE`),
+    conditionBlock: declared(1e40, `${FIXTURE_SOURCE}-PROFILE`),
   });
   const parentInput = {
     compilation,
@@ -86,7 +105,7 @@ export function buildQualifiedPresentationFixture() {
     interactionLimit: declared(1, 'FIXTURE-PHASE5-NOZZLE-DATASHEET'),
     semanticHash: '',
   });
-  const node = compilation.model.nodes.find((row) => row.nodeId === 'RED-001.N0');
+  const node = compilation.model.nodes.find((row) => row.nodeId === `${BEND_ID}.N0`);
   const dofMappings = compilation.model.constraints
     .filter((row) => row.nodeId === node.nodeId)
     .map((row) => ({
@@ -103,7 +122,7 @@ export function buildQualifiedPresentationFixture() {
       interfaceId: allowableProfile.interfaceId,
       interfaceKind: 'NOZZLE',
       nodeId: node.nodeId,
-      sourceEntityId: 'RED-001',
+      sourceEntityId: BEND_ID,
       supportBinding: null,
       basis: {
         origin: node.position,
@@ -141,6 +160,7 @@ export function buildQualifiedPresentationFixture() {
     interfaceRecovery,
     allowableProfile,
   });
+  const firstElement = component.elements[0].frameElement;
   const b31Application = compileLinearPipingB31Application({
     schema: B31_APPLICATION_REQUEST_SCHEMA,
     applicationId: 'B31-PHASE5-QUALIFIED',
@@ -150,14 +170,14 @@ export function buildQualifiedPresentationFixture() {
     checks: [{
       checkId: 'B31-PHASE5-SUSTAINED',
       category: 'SUSTAINED',
-      codePointId: 'RED-001.S1',
-      componentId: 'RED-001',
+      codePointId: component.codeStations[0].stationId,
+      componentId: component.componentId,
       combinationId: loadCase.loadCaseId,
       actionSource: { kind: 'SINGLE_CASE', caseId: 'OPERATING_CASE' },
-      frameElementRecord: reducerFrameElementE1(component),
-      sectionResolution: reducerSectionResolutionE1(),
-      materialResolution: reducerMaterialResolution(),
-      stressFactorSet: stressFactorSet(),
+      frameElementRecord: firstElement,
+      sectionResolution: sectionResolution(),
+      materialResolution: materialResolution(),
+      stressFactorSet: bendStressFactorSet(component.componentId),
       pressureStressContribution: pressureStressContribution(),
       coldTemperature: null,
       occasionalCategoryId: null,
@@ -180,4 +200,144 @@ export function buildQualifiedPresentationFixture() {
     nozzleAssessments: [nozzleAssessment],
     b31Application,
   };
+}
+
+function bendCompilation(component) {
+  const points = bendPoints(component);
+  const nodeIds = points.map((_, index) => `${component.componentId}.N${index}`);
+  const axisResults = resolveFrameLocalAxesForSpanChain({
+    points,
+    referenceVector: component.geometry.referenceVector,
+    profile: FRAME_LOCAL_AXIS_PROFILE,
+  });
+  component.elements.forEach((entry, index) => {
+    if (entry.frameElement.localAxes.resultSemanticHash !== axisResults[index].semanticHash) {
+      throw new Error(`Bend local-axis evidence diverges at ${entry.elementId}.`);
+    }
+  });
+  const geometry = {
+    schemaVersion: 'canonical-geometry-v1',
+    nodes: nodeIds.map((id, index) => ({
+      id: `TOPO/${id}`,
+      x: points[index][0],
+      y: points[index][1],
+      z: points[index][2],
+      restraint: index === 0 ? 'ANCHOR' : 'FREE',
+      sourceComponentUid: component.componentId,
+      meta: {},
+    })),
+    segments: component.elements.map((entry, index) => ({
+      id: `TOPO/${entry.elementId}`,
+      startNodeId: `TOPO/${nodeIds[index]}`,
+      endNodeId: `TOPO/${nodeIds[index + 1]}`,
+      type: 'PIPE',
+    })),
+    source: 'fixture',
+    unit: 'm',
+    diagnostics: [],
+    summary: {},
+  };
+  const conditionedTopology = {
+    geometry,
+    semanticHash: 'fnv1a64:4444444444444444',
+  };
+  const nodeBindings = nodeIds.map((id, index) => ({
+    nodeId: id,
+    conditionedNodeId: `C-BEND-N${index}`,
+    topologyNodeId: `TOPO/${id}`,
+  }));
+  const elementBindings = component.elements.map((entry, index) => ({
+    elementId: entry.elementId,
+    conditionedSegmentId: `CS-BEND-E${index + 1}`,
+    topologySegmentId: `TOPO/${entry.elementId}`,
+    materialStateId: entry.frameElement.material.materialStateId,
+    sectionStateId: entry.frameElement.section.sectionStateId,
+    formulationId: 'PIPE_FRAME3D_LINEAR_V1',
+    localAxisEvidenceIdentity: `AXIS-BEND-E${index + 1}`,
+    sourceComponentId: component.componentId,
+  }));
+  const localAxisResults = axisResults.map((result, index) => ({
+    evidenceIdentity: `AXIS-BEND-E${index + 1}`,
+    result,
+  }));
+  const constraintDeclarations = ['UX', 'UY', 'UZ', 'RX', 'RY', 'RZ'].map((dof) => ({
+    declarationId: `C-BEND-N0-${dof}`,
+    kind: 'NODAL_RESTRAINT',
+    nodeId: `${component.componentId}.N0`,
+    dof,
+    behavior: 'FIXED',
+  }));
+  return compileMechanicalModel({
+    modelIdentity: 'SYS-BEND-PHASE5-MECH-01',
+    modelRevision: 1,
+    sourceSemanticHash: 'fnv1a64:1111111111111111',
+    conditionedTopology,
+    nodeBindings,
+    elementBindings,
+    materialResolutions: [materialResolution()],
+    sectionResolutions: [sectionResolution()],
+    localAxisResults,
+    localAxisProfile: FRAME_LOCAL_AXIS_PROFILE,
+    constraintDeclarations,
+    profile: compilerProfile(),
+  });
+}
+
+function bendPoints(component) {
+  const result = discretiseBend(
+    point(component.geometry.tangentStart),
+    point(component.geometry.tangentEnd),
+    point(component.geometry.centre),
+    component.subdivision.elementCount,
+  );
+  return result.points.map((entry) => [entry.x, entry.y, entry.z]);
+}
+
+function point(value) {
+  return { x: value[0], y: value[1], z: value[2] };
+}
+
+function bendTipLoadCase(compilation, component) {
+  const modelReference = modelReferenceFromCompilation(compilation);
+  const endNodeId = `${component.componentId}.N${component.subdivision.elementCount}`;
+  return compilePhysicalLoadCase({
+    loadCaseId: 'LC-BEND-TIP-01',
+    loadCaseClass: 'APPLIED_MECHANICAL',
+    presentation: {
+      label: 'Bend tip load',
+      description: 'Fixture nodal load at the second bend tangent.',
+    },
+    modelReference,
+    primitives: [{
+      schema: 'fea-linear-load-primitive/v1',
+      primitiveId: 'LP-TIP-BEND-END',
+      kind: 'NODAL_FORCE_MOMENT',
+      nodeId: endNodeId,
+      basis: { kind: 'GLOBAL' },
+      force: { fx: 0, fy: 0, fz: -1000 },
+      moment: { mx: 0, my: 0, mz: 0 },
+      units: { force: 'N', moment: 'N*m', length: 'm' },
+      signConvention: 'APPLIED_TO_STRUCTURE',
+      sourceEvidence: {
+        sourceId: 'FIXTURE-PHASE5-LOAD-REGISTER',
+        sourceRevision: '01',
+        sourceSemanticHash: 'fnv1a64:6666666666666666',
+      },
+    }],
+    profile: loadCaseProfile(),
+  });
+}
+
+function bendStressFactorSet(componentId) {
+  return stressFactorSet({
+    factorSetId: 'SF-BEND-001-FIXTURE',
+    componentId,
+    sourceIdentity: {
+      standard: 'FIXTURE-B31J-FACTOR-SET-NOT-ASME',
+      edition: 'FIXTURE-2023',
+      ruleId: 'FIXTURE-RULE-BEND',
+      sourceRevision: '00',
+      sourceSemanticHash: 'fnv1a64:abcdef1234567890',
+    },
+  });
 }
