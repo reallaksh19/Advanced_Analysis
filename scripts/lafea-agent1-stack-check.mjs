@@ -37,6 +37,8 @@ const CHECKS = Object.freeze([
   'scripts/lafea-u4j-source-guard.mjs',
   'scripts/sequential-sketcher-authoring-bridge-check.mjs',
   'scripts/sequential-sketcher-authoring-bridge-source-guard.mjs',
+  'scripts/first-cut-workbench-launcher-check.mjs',
+  'scripts/first-cut-workbench-launcher-source-guard.mjs',
   'scripts/lafea-accessory-panel-contract-check.mjs',
   'scripts/lafea-accessory-panel-integration-check.mjs',
   'scripts/lafea-accessory-panel-controller-lifecycle-check.mjs',

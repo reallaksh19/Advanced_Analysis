@@ -9,6 +9,7 @@ import { DatasetController } from './dataset-controller.js';
 import { EventBus } from './event-bus.js';
 import { FirstCutResultStore } from './first-cut-result-store.js';
 import { FirstCutWorkbenchController } from './enrichment/first-cut-workbench-controller.js';
+import { FirstCutWorkbenchLauncherController } from './enrichment/first-cut-workbench-launcher.js';
 import { LafeaWorkbenchController } from './lafea-workbench.js';
 import { LfeaWorkbenchController } from './lfea-workbench.js';
 import { ModelCalculationController } from './model-calculation-controller.js';
@@ -109,9 +110,10 @@ export function bootstrapAnalysisWorkspace(rootElement) {
     browserWindow?.navigator?.clipboard,
     browserWindow?.URL,
   );
+  const firstCutWorkbenchLauncherController = new FirstCutWorkbenchLauncherController(rootElement);
   const sequentialSketcherRoot = rootElement.querySelector('[data-role="sequential-sketcher-root"]');
   const sequentialSketcherController = sequentialSketcherRoot ? new SequentialSketcherController(sequentialSketcherRoot, EventBus, WorkspaceState) : null;
-  const controllers = [workspaceShellController,firstCutWorkbenchController,datasetController,sharedModelController,topologyController,supportRestraintController,modelLoadController,supportLoadScreeningController,verticalBeamController,modelCalculationController,modelSupportLoadController,sessionController,analysisCoordinator,ledgerController,treePanel,viewportPanel,sharedModelPanel,topologyPanel,supportRestraintPanel,modelLoadPanel,supportLoadScreeningPanel,verticalBeamPanel,modelCalculationPanel,modelSupportLoadPanel,propertiesPanel,workspaceConsumerController,settingsController,applicationShellController,tabBenchmarkStatusController,sequentialSketcherController].filter(Boolean);
+  const controllers = [workspaceShellController,firstCutWorkbenchController,firstCutWorkbenchLauncherController,datasetController,sharedModelController,topologyController,supportRestraintController,modelLoadController,supportLoadScreeningController,verticalBeamController,modelCalculationController,modelSupportLoadController,sessionController,analysisCoordinator,ledgerController,treePanel,viewportPanel,sharedModelPanel,topologyPanel,supportRestraintPanel,modelLoadPanel,supportLoadScreeningPanel,verticalBeamPanel,modelCalculationPanel,modelSupportLoadPanel,propertiesPanel,workspaceConsumerController,settingsController,applicationShellController,tabBenchmarkStatusController,sequentialSketcherController].filter(Boolean);
   controllers.forEach((controller) => controller.init());
   globalThis.EventBus = EventBus;
   return Object.freeze({
