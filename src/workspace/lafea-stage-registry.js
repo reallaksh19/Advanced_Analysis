@@ -1,4 +1,8 @@
-export const LAFEA_STAGE_REGISTRY_SCHEMA = 'lafea-stage-registry/v1';
+import {
+  requireLafeaStageCompositionBinding,
+} from './lafea-stage-composition-bindings.js';
+
+export const LAFEA_STAGE_REGISTRY_SCHEMA = 'lafea-stage-registry/v2';
 
 export const LAFEA_STAGE_CATEGORIES = Object.freeze([
   'FOUNDATION_LOAD_TRANSFER',
@@ -215,10 +219,16 @@ export function lafeaRegisteredPreviewSource(stageId) {
   return requireLafeaStageRegistryEntry(stageId).previewSource;
 }
 
+export function lafeaRegisteredComposition(stageId) {
+  return requireLafeaStageRegistryEntry(stageId).composition;
+}
+
 function entry(value) {
+  const composition = requireLafeaStageCompositionBinding(value.stageId);
   return deepFreeze({
     schema: LAFEA_STAGE_REGISTRY_SCHEMA,
     ...value,
+    composition,
   });
 }
 

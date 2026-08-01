@@ -13,10 +13,25 @@ export {
   LAFEA_STAGE_REGISTRY,
   LAFEA_STAGE_REGISTRY_SCHEMA,
   lafeaRegisteredCollectionPaths,
+  lafeaRegisteredComposition,
   lafeaRegisteredExecutionSupported,
   lafeaRegisteredPreviewSource,
   requireLafeaStageRegistryEntry,
 } from './lafea-stage-registry.js';
+export {
+  LAFEA_BENCHMARK_BINDING_STATES,
+  LAFEA_RELEASE_STATE_BINDINGS,
+  LAFEA_STAGE_COMPOSITION_BINDINGS,
+  LAFEA_STAGE_COMPOSITION_BINDING_SCHEMA,
+  LAFEA_TECHNICAL_COMPONENT_IDS,
+  LAFEA_TECHNICAL_COMPONENT_KINDS,
+  requireLafeaStageCompositionBinding,
+} from './lafea-stage-composition-bindings.js';
+export {
+  LAFEA_STAGE_COMPOSITION_SCHEMA,
+  lafeaStageCompositionIdentity,
+  requireLafeaStageComposition,
+} from './lafea-stage-composition-root.js';
 export {
   LAFEA_LIFECYCLE_PROFILE_IDS,
   LAFEA_LIFECYCLE_PROFILE_SCHEMA,

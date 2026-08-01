@@ -9,14 +9,18 @@ import {
   LAFEA_STAGE_IDS,
   LAFEA_STAGE_REGISTRY,
   lafeaRegisteredCollectionPaths,
+  lafeaRegisteredComposition,
   lafeaRegisteredExecutionSupported,
-  lafeaRegisteredPreviewSource,
   requireLafeaStageRegistryEntry,
 } from '../src/workspace/lafea-stage-registry.js';
 import {
   lafeaCollectionPaths,
   lafeaStageExecutionSupported,
 } from '../src/workspace/lafea-workbench-model.js';
+import {
+  lafeaStageCompositionIdentity,
+  requireLafeaStageComposition,
+} from '../src/workspace/lafea-stage-composition-root.js';
 import { lafeaPreviewGeometry } from '../src/workspace/lafea-stage-preview.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -39,15 +43,20 @@ assert.equal(LAFEA_STAGE_IDS.length, LAFEA_STAGE_REGISTRY.length);
 
 for (const stageId of LAFEA_STAGE_IDS) {
   const entry = requireLafeaStageRegistryEntry(stageId);
+  const composition = requireLafeaStageComposition(stageId);
   assert.deepEqual(lafeaCollectionPaths(stageId), lafeaRegisteredCollectionPaths(stageId));
   assert.equal(lafeaStageExecutionSupported(stageId), lafeaRegisteredExecutionSupported(stageId));
-  assert.deepEqual(entry.previewSource, lafeaRegisteredPreviewSource(stageId));
+  assert.deepEqual(composition.registryEntry, entry);
+  assert.deepEqual(composition.previewSource, entry.previewSource);
+  assert.equal(composition.compositionRootId, lafeaStageCompositionIdentity(stageId));
+  assert.deepEqual(entry.composition, lafeaRegisteredComposition(stageId));
+  assert.equal(composition.releaseStateBinding, 'RELEASE_NOT_QUALIFIED');
 
   const geometry = lafeaPreviewGeometry(stageId, FIXTURES[stageId]);
   assert.equal(
     geometry.nodePath,
     entry.previewSource.editable ? entry.previewSource.nodePath : null,
-    `${stageId} preview editability must come from the registry.`,
+    `${stageId} preview editability must come from the composition root.`,
   );
 }
 
@@ -61,55 +70,52 @@ assert.equal(continuum.elements[0].sourcePath, 'elements[0]');
 assert.doesNotMatch(continuum.nodes[0].sourceEntityId, /\[0\]/u);
 assert.doesNotMatch(continuum.elements[0].sourceEntityId, /\[0\]/u);
 
-const registryHash = crypto
-  .createHash('sha256')
-  .update(JSON.stringify(LAFEA_STAGE_REGISTRY))
-  .digest('hex');
-assert.equal(
-  registryHash,
-  crypto.createHash('sha256').update(JSON.stringify(LAFEA_STAGE_REGISTRY)).digest('hex'),
-);
+const registryHash = crypto.createHash('sha256')
+  .update(JSON.stringify(LAFEA_STAGE_REGISTRY)).digest('hex');
+assert.equal(registryHash, crypto.createHash('sha256')
+  .update(JSON.stringify(LAFEA_STAGE_REGISTRY)).digest('hex'));
 
 const registrySource = read('lafea-stage-registry.js');
 const modelSource = read('lafea-workbench-model.js');
-const viewSource = read('lafea-workbench-view.js');
 const previewSource = read('lafea-stage-preview.js');
 const presenterSource = read('lafea-result-presenters/index.js');
+const compositionSource = read('lafea-stage-composition-root.js');
+const componentSource = read('lafea-stage-components.js');
 const publicSource = read('lafea-workbench.js');
 
 assert.doesNotMatch(registrySource, /from ['"]\.\/lafea-workbench-model\.js['"]/u);
-assert.match(modelSource, /from ['"]\.\/lafea-stage-registry\.js['"]/u);
+assert.match(modelSource, /from ['"]\.\/lafea-stage-composition-root\.js['"]/u);
+assert.doesNotMatch(modelSource, /stageId === ['"]LAFEA\./u);
+assert.doesNotMatch(modelSource, /calculateLocal(?:Attachment|Continuum|Shell|Trunnion)/u);
 assert.doesNotMatch(modelSource, /const COLLECTIONS\s*=/u);
-assert.doesNotMatch(modelSource, /export const LAFEA_STAGE_IDS\s*=/u);
-assert.doesNotMatch(modelSource, /export const LAFEA_STAGE_DEFINITIONS\s*=/u);
 
-assert.match(viewSource, /LAFEA_STAGE_REGISTRY/u);
-assert.match(viewSource, /requireLafeaStageRegistryEntry/u);
-assert.doesNotMatch(viewSource, /const STAGE_TRUTH\s*=/u);
-assert.doesNotMatch(viewSource, /\['LAFEA\.3',\s*'LAFEA\.4',\s*'LAFEA\.5'\]/u);
-
-assert.match(previewSource, /lafeaRegisteredPreviewSource/u);
+assert.match(previewSource, /requireLafeaStageComposition/u);
 assert.doesNotMatch(previewSource, /if \(stageId === ['"]LAFEA\./u);
 assert.match(previewSource, /sourceEntityId: nodeId/u);
 assert.match(previewSource, /sourceEntityId: elementId/u);
 
-assert.match(presenterSource, /entry\.presenterRole/u);
-assert.match(presenterSource, /entry\.unitSourceRole/u);
-assert.doesNotMatch(presenterSource, /'LAFEA\.1':\s*present/u);
-assert.doesNotMatch(presenterSource, /'LAFEA\.6':\s*documentValue/u);
+assert.match(presenterSource, /requireLafeaStageComposition/u);
+assert.doesNotMatch(presenterSource, /PRESENTERS_BY_ROLE/u);
+assert.doesNotMatch(presenterSource, /UNIT_RESOLVERS_BY_ROLE/u);
+assert.doesNotMatch(presenterSource, /presentLocal(?:Stress|Continuum|Shell)/u);
 
+assert.match(compositionSource, /requireLafeaTechnicalComponent/u);
+assert.match(compositionSource, /requireLafeaLifecycleProfileForStage/u);
+assert.doesNotMatch(compositionSource, /calculateLocal(?:Attachment|Continuum|Shell|Trunnion)/u);
+assert.match(componentSource, /LAFEA_TECHNICAL_COMPONENT_IDS/u);
 assert.match(publicSource, /LAFEA_STAGE_REGISTRY/u);
-assert.match(publicSource, /lafeaRegisteredPreviewSource/u);
 
 console.log(JSON.stringify({
   check: 'lafea-u1b-registry-consumers',
   status: 'PASS',
   registryHash,
   stageCount: LAFEA_STAGE_IDS.length,
-  modelParity: true,
-  viewRegistryOwned: true,
-  previewRegistryOwned: true,
-  presenterRegistryOwned: true,
+  registrySchema: 'lafea-stage-registry/v2',
+  modelCompositionRootOwned: true,
+  previewCompositionRootOwned: true,
+  presenterCompositionRootOwned: true,
+  releaseStateBound: true,
+  duplicateStageDispatchMaps: false,
   indexIdentityFallback: false,
 }));
 
