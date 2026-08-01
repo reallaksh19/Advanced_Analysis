@@ -39,6 +39,10 @@ assert.doesNotMatch(spec, /status\s*:\s*['"](?:PASS|QUALIFIED)['"]/u);
 assert.match(launcher, /First-cut enrichment launcher/u);
 assert.match(launcher, /first-cut-workbench-action-bar/u);
 assert.match(launcher, /\[data-panel="viewport"\]/u);
+assert.match(launcher, /\[data-action="switch-right-tab"\]\[data-tab="overrides"\]/u);
+assert.match(launcher, /\[data-tab-group="overrides"\]/u);
+assert.match(launcher, /ensureOverridesVisible\(\)/u);
+assert.doesNotMatch(launcher, /queueMicrotask|requestAnimationFrame|setTimeout/u);
 assert.doesNotMatch(launcher, /viewport-edit-bar/u);
 assert.doesNotMatch(
   launcher,
@@ -89,6 +93,9 @@ console.log(JSON.stringify({
   productionWorkbenchMounted: true,
   productionShellMounted: true,
   launcherActionBandVisibleAcrossViewportModes: true,
+  owningPropertiesTabActivated: true,
+  hiddenHostFocusAttempted: false,
+  timingWorkaroundUsed: false,
   hostIdentityAsserted: true,
   focusBrowserCaseRegistered: true,
   popoutBrowserCaseRegistered: true,
