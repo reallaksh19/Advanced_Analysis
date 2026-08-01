@@ -14,46 +14,49 @@
     code, pre { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
     .banner { padding: 1rem; border: 2px solid currentColor; border-radius: .75rem; font-weight: 800; }
     .subtle { opacity: .76; }
-    .toolbar { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1rem 0; }
-    button { border: 1px solid currentColor; border-radius: .55rem; padding: .7rem 1rem; background: Canvas; color: CanvasText; font-weight: 700; cursor: pointer; }
+    .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin: 1rem 0; }
+    button { padding: .7rem 1rem; border: 1px solid currentColor; border-radius: .55rem; background: Canvas; color: CanvasText; font-weight: 700; cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: .55; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; margin: 1rem 0; }
-    .card { border: 1px solid color-mix(in srgb, CanvasText 22%, transparent); border-radius: .75rem; padding: 1rem; min-width: 0; }
-    .metric { font-size: 1.35rem; font-weight: 800; overflow-wrap: anywhere; }
+    .card { min-width: 0; padding: 1rem; border: 1px solid color-mix(in srgb, CanvasText 22%, transparent); border-radius: .75rem; }
+    .metric { overflow-wrap: anywhere; font-size: 1.35rem; font-weight: 800; }
     .layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr); gap: 1rem; }
-    @media (max-width: 850px) { .layout { grid-template-columns: 1fr; } }
     svg { width: 100%; min-height: 290px; border: 1px solid color-mix(in srgb, CanvasText 18%, transparent); border-radius: .75rem; background: color-mix(in srgb, Canvas 94%, CanvasText 6%); }
-    .pipe { stroke: currentColor; stroke-width: 8; fill: none; stroke-linecap: round; }
+    .pipe { fill: none; stroke: currentColor; stroke-linecap: round; stroke-width: 8; }
     .node { fill: Canvas; stroke: currentColor; stroke-width: 3; }
     .node-label { fill: currentColor; font: 700 14px ui-monospace, monospace; }
-    .bar { height: .7rem; border: 1px solid currentColor; border-radius: 999px; overflow: hidden; }
+    .bar { height: .7rem; overflow: hidden; border: 1px solid currentColor; border-radius: 999px; }
     .bar > span { display: block; height: 100%; background: currentColor; opacity: .55; }
     .scroll { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; font-size: .92rem; }
-    th, td { text-align: left; border-bottom: 1px solid color-mix(in srgb, CanvasText 18%, transparent); padding: .65rem; vertical-align: top; }
-    details { border: 1px solid color-mix(in srgb, CanvasText 18%, transparent); border-radius: .6rem; padding: .7rem; margin-top: .65rem; }
-    pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 480px; overflow: auto; }
+    th, td { padding: .65rem; border-bottom: 1px solid color-mix(in srgb, CanvasText 18%, transparent); text-align: left; vertical-align: top; }
+    details { margin-top: .65rem; padding: .7rem; border: 1px solid color-mix(in srgb, CanvasText 18%, transparent); border-radius: .6rem; }
+    pre { max-height: 480px; overflow: auto; overflow-wrap: anywhere; white-space: pre-wrap; }
+    .section-gap { margin-top: 1rem; }
+    @media (max-width: 850px) { .layout { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <header>
     <h1>LFEA Phase 6H — Approved Demo-Only Sample</h1>
-    <div class="subtle">Static non-release preview. No solver, materializer, seal, signature, gate or release command is invoked.</div>
+    <div class="subtle">Segregated non-release preview. No solver, materializer, seal, signature, gate or release command is invoked.</div>
   </header>
   <main>
     <section class="banner" role="status">DEMO ONLY — INELIGIBLE FOR PROJECT EVIDENCE — WP-3 REMAINS BLOCKED</section>
     <div class="toolbar">
       <button id="reload" type="button">Reload approved sample</button>
-      <button id="download" type="button">Download demo JSON</button>
+      <button id="download" type="button" disabled>Download demo JSON</button>
+      <output id="load-status" aria-live="polite">Loading demo-only sample…</output>
     </div>
     <div class="grid" id="identity"></div>
     <div class="layout">
       <section class="card">
         <h2>Sample line model</h2>
         <svg viewBox="0 0 620 320" role="img" aria-label="Three-node two-element sample piping model">
-          <path class="pipe" d="M90 235 L365 235 L365 75" />
-          <circle class="node" cx="90" cy="235" r="15" />
-          <circle class="node" cx="365" cy="235" r="15" />
-          <circle class="node" cx="365" cy="75" r="15" />
+          <path class="pipe" d="M90 235 L365 235 L365 75"></path>
+          <circle class="node" cx="90" cy="235" r="15"></circle>
+          <circle class="node" cx="365" cy="235" r="15"></circle>
+          <circle class="node" cx="365" cy="75" r="15"></circle>
           <text class="node-label" x="62" y="272">N1 ANCHOR</text>
           <text class="node-label" x="320" y="272">N2 GUIDE</text>
           <text class="node-label" x="390" y="82">N3 NOZZLE</text>
@@ -64,184 +67,38 @@
       <section class="card">
         <h2>Result summary</h2>
         <div id="results"></div>
-        <h3 style="margin-top:1rem">Local nozzle actions</h3>
+        <h3 class="section-gap">Local nozzle actions</h3>
         <div id="actions"></div>
       </section>
     </div>
-    <section class="card" style="margin-top:1rem">
+    <section class="card section-gap">
       <h2>Demo guard</h2>
       <div id="guard"></div>
     </section>
-    <section class="card" style="margin-top:1rem">
+    <section class="card section-gap">
       <h2>Seven-record register</h2>
-      <div class="scroll"><table>
-        <thead><tr><th>Record</th><th>Human owner role</th><th>Human approver role</th><th>State</th><th>Authority / independence</th></tr></thead>
-        <tbody id="records"></tbody>
-      </table></div>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Record</th><th>Human owner role</th><th>Human approver role</th><th>State</th><th>Authority / independence</th></tr></thead>
+          <tbody id="records"></tbody>
+        </table>
+      </div>
     </section>
-    <section class="card" style="margin-top:1rem">
+    <section class="card section-gap">
       <h2>G8 / G9 sample comparison</h2>
-      <div class="scroll"><table>
-        <thead><tr><th>Selector</th><th>Application</th><th>G8 reference</th><th>G9 reference</th><th>Unit</th></tr></thead>
-        <tbody id="comparisons"></tbody>
-      </table></div>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Selector</th><th>Application</th><th>G8 reference</th><th>G9 reference</th><th>Unit</th></tr></thead>
+          <tbody id="comparisons"></tbody>
+        </table>
+      </div>
     </section>
-    <section class="card" style="margin-top:1rem">
+    <section class="card section-gap">
       <h2>Governed source layout represented by this demo</h2>
       <pre id="paths"></pre>
       <details><summary>Inspect loaded demo object</summary><pre id="raw"></pre></details>
     </section>
   </main>
-  <script>
-    const DEMO = Object.freeze({
-      schema: 'lfea-phase6h-demo-only-sample/v1',
-      exactHead: '617f7c2be0c65196a44bc88b6a2bb5ad3b5f1b54',
-      immutableRef: 'release/lfea-piping-phase6i-617f7c2',
-      evidenceClass: 'SAMPLE_FOR_UI_AND_WORKFLOW_SHAPE_APPROVAL_ONLY',
-      eligibility: 'INELIGIBLE_FOR_PROJECT_EVIDENCE',
-      workflowRun: null,
-      workflowJob: null,
-      artifactId: null,
-      model: {
-        modelId: 'SAMPLE-LINE-1001', revision: 'S0', loadCaseId: 'OPE-1',
-        nodes: [
-          { id: 'N1', xyz: [0, 0, 0], restraint: 'ANCHOR' },
-          { id: 'N2', xyz: [3, 0, 0], restraint: 'GUIDE_YZ' },
-          { id: 'N3', xyz: [3, 2, 0], restraint: 'NOZZLE_INTERFACE' }
-        ],
-        elements: [
-          { id: 'E1', from: 'N1', to: 'N2', type: 'PIPE', odM: 0.1683, thicknessM: 0.00711 },
-          { id: 'E2', from: 'N2', to: 'N3', type: 'PIPE', odM: 0.1683, thicknessM: 0.00711 }
-        ]
-      },
-      results: {
-        forceLocalN: [1200, -850, 300], momentLocalNm: [450, 120, -80],
-        nozzleUtilization: 0.42, b31CalculatedStressPa: 82000000,
-        b31AllowableStressPa: 138000000, b31Utilization: 0.5942028986
-      },
-      records: [
-        record('application-result.json', 'LFEA application result owner', 'Piping/stress authority', 'SAMPLE_QUALIFIED', 'Production result identity — sample placeholder'),
-        record('presentation.json', 'Presentation/export owner', 'Piping/stress authority', 'SAMPLE_CURRENT', 'Bound to sample application identity'),
-        record('real-model-reconciliation.json', 'G8 evidence owner', 'Independent technical reviewer', 'PASS_SAMPLE_ONLY', 'Independent engineering review / SAMPLE-G8-RUN-001'),
-        record('commercial-corroboration.json', 'G9 evidence owner', 'Independent commercial reviewer', 'PASS_SAMPLE_ONLY', 'Commercial pipe-stress suite / SAMPLE-G9-RUN-001'),
-        record('performance-evidence.json', 'Performance-test owner', 'Performance reviewer', 'PASS_SAMPLE_ONLY', '2 deterministic sample replays'),
-        record('rollback-evidence.json', 'Release/rollback owner', 'Rollback reviewer', 'PASS_SAMPLE_ONLY', 'Sample rollback to 52b8e742…'),
-        record('signed-disposition.json', 'Independent release-review authority', 'Program release authority', 'NOT_SIGNED', 'Signature reference intentionally absent')
-      ],
-      comparisons: [
-        comparison('INTERFACE_FORCE_LOCAL', 1200, 1188, 1190.376, 'N'),
-        comparison('INTERFACE_MOMENT_REFERENCE_LOCAL', 450, 447, 447.894, 'N·m'),
-        comparison('NOZZLE_UTILIZATION', 0.42, 0.415, 0.41583, '1'),
-        comparison('B31_CALCULATED_STRESS', 82000000, 81400000, 81562800, 'Pa'),
-        comparison('B31_UTILIZATION', 0.5942028986, 0.5898550725, 0.5910347826, '1')
-      ],
-      paths: [
-        'request/external-materialization-request.json',
-        'records/application-result.json',
-        'records/presentation.json',
-        'records/real-model-reconciliation.json',
-        'records/commercial-corroboration.json',
-        'records/performance-evidence.json',
-        'records/rollback-evidence.json',
-        'records/signed-disposition.json'
-      ]
-    });
-
-    document.querySelector('#reload').addEventListener('click', render);
-    document.querySelector('#download').addEventListener('click', downloadDemo);
-    render();
-
-    function record(name, owner, approver, state, authority) {
-      return Object.freeze({ name, owner, approver, state, authority, eligibility: 'INELIGIBLE_FOR_PROJECT_EVIDENCE' });
-    }
-
-    function comparison(selector, application, g8, g9, unit) {
-      return Object.freeze({ selector, application, g8, g9, unit });
-    }
-
-    function render() {
-      renderIdentity();
-      renderResults();
-      renderGuard();
-      renderRecords();
-      renderComparisons();
-      document.querySelector('#paths').textContent = DEMO.paths.join('\n');
-      document.querySelector('#raw').textContent = JSON.stringify(DEMO, null, 2);
-    }
-
-    function renderIdentity() {
-      const cards = [
-        ['Candidate SHA', DEMO.exactHead], ['Immutable ref', DEMO.immutableRef],
-        ['Model', DEMO.model.modelId], ['Load case', DEMO.model.loadCaseId],
-        ['WP-3', 'BLOCKED_INPUT_REQUIRED'], ['Phase 6H', 'NOT READY']
-      ];
-      document.querySelector('#identity').innerHTML = cards.map(([label, value]) => card(label, value)).join('');
-    }
-
-    function card(label, value) {
-      return `<article class="card"><div class="subtle">${escapeHtml(label)}</div><div class="metric">${escapeHtml(value)}</div></article>`;
-    }
-
-    function renderResults() {
-      const result = DEMO.results;
-      document.querySelector('#results').innerHTML = utilization('Nozzle', result.nozzleUtilization)
-        + utilization('B31.3', result.b31Utilization)
-        + `<p><strong>B31 stress:</strong> ${(result.b31CalculatedStressPa / 1e6).toFixed(1)} MPa / ${(result.b31AllowableStressPa / 1e6).toFixed(1)} MPa</p>`;
-      document.querySelector('#actions').innerHTML = vector('Force [N]', result.forceLocalN)
-        + vector('Moment [N·m]', result.momentLocalNm);
-    }
-
-    function utilization(label, value) {
-      const percent = Math.max(0, Math.min(100, value * 100));
-      return `<p><strong>${label}:</strong> ${value.toFixed(3)}</p><div class="bar"><span style="width:${percent}%"></span></div>`;
-    }
-
-    function vector(label, values) {
-      return `<p><strong>${label}:</strong> <code>[${values.join(', ')}]</code></p>`;
-    }
-
-    function renderGuard() {
-      const failures = validateDemo();
-      const target = document.querySelector('#guard');
-      target.innerHTML = failures.length
-        ? `<p><strong>FAIL CLOSED</strong></p><ul>${failures.map((value) => `<li>${escapeHtml(value)}</li>`).join('')}</ul>`
-        : '<p><strong>PASS — demo is explicitly segregated and ineligible.</strong></p><p>Release qualification, WP-2, WP-3, Phase 6H and WP-4 are unchanged.</p>';
-    }
-
-    function validateDemo() {
-      const failures = [];
-      if (DEMO.exactHead !== '617f7c2be0c65196a44bc88b6a2bb5ad3b5f1b54') failures.push('Candidate mismatch.');
-      if (DEMO.immutableRef !== 'release/lfea-piping-phase6i-617f7c2') failures.push('Immutable ref mismatch.');
-      if (DEMO.eligibility !== 'INELIGIBLE_FOR_PROJECT_EVIDENCE') failures.push('Top-level eligibility missing.');
-      if (DEMO.records.some((row) => row.eligibility !== DEMO.eligibility)) failures.push('Record eligibility mismatch.');
-      if (DEMO.records.length !== 7) failures.push('Seven records are required.');
-      if (DEMO.records.at(-1).state !== 'NOT_SIGNED') failures.push('Demo disposition must remain unsigned.');
-      return failures;
-    }
-
-    function renderRecords() {
-      document.querySelector('#records').innerHTML = DEMO.records.map((row) => `<tr><td><code>${escapeHtml(row.name)}</code></td><td>${escapeHtml(row.owner)}</td><td>${escapeHtml(row.approver)}</td><td>${escapeHtml(row.state)}</td><td>${escapeHtml(row.authority)}</td></tr>`).join('');
-    }
-
-    function renderComparisons() {
-      document.querySelector('#comparisons').innerHTML = DEMO.comparisons.map((row) => `<tr><td>${escapeHtml(row.selector)}</td><td>${row.application}</td><td>${row.g8}</td><td>${row.g9}</td><td>${escapeHtml(row.unit)}</td></tr>`).join('');
-    }
-
-    function downloadDemo() {
-      const blob = new Blob([JSON.stringify(DEMO, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = 'lfea-phase6h-demo-only-sample.json';
-      anchor.click();
-      URL.revokeObjectURL(url);
-    }
-
-    function escapeHtml(value) {
-      return String(value).replace(/[&<>"']/g, (character) => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-      })[character]);
-    }
-  </script>
+  <script type="module" src="./demo.js"></script>
 </body>
 </html>
