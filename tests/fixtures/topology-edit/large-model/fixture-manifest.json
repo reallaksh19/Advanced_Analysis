@@ -1,0 +1,29 @@
+{
+  "schema": "TopologyEditPortableLargeModelFixture.v1",
+  "fixtureId": "topology-edit-synthetic-25600-v1",
+  "description": "Deterministic repository-owned generator manifest for scope, spatial-index, worker, and percentile qualification.",
+  "generator": {
+    "branchCount": 100,
+    "componentsPerBranch": 256,
+    "branchSpacingMm": 100000,
+    "componentSpacingMm": 250,
+    "componentLengthMm": 100,
+    "sourceHash": "fixture:source:topology-edit-synthetic-25600-v1",
+    "baseCanonicalHash": "fixture:canonical:topology-edit-synthetic-25600-v1"
+  },
+  "expected": {
+    "componentCount": 25600,
+    "branchCount": 100,
+    "coordinateFrame": "ENGINEERING_CANONICAL",
+    "portable": true,
+    "absolutePathDependencies": 0
+  },
+  "qualification": {
+    "scopeTree": true,
+    "scopeHash": true,
+    "canonicalSpatialIndex": true,
+    "staleWorkerResponse": true,
+    "percentileBudgets": true,
+    "browserAndGpuTiming": "DEFERRED_TO_EXACT_HEAD_BROWSER_RUN"
+  }
+}
