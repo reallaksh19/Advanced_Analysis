@@ -7,7 +7,7 @@ import { LINEAR_PIPING_WORKSPACE_PACKAGE_SCHEMA } from '../src/workspace/linear-
 import { buildQualifiedPresentationFixture } from '../scripts/linear-piping-presentation-fixtures.mjs';
 
 const fixture = buildQualifiedPresentationFixture();
-const QUALIFIED_PACKAGE = jsonValue(workspacePackage(fixture));
+const GOVERNED_PACKAGE = jsonValue(workspacePackage(fixture));
 const conditionalApplication = sealLinearPipingQualifiedApplicationResult({
   schema: APPLICATION_RESULT_REQUEST_SCHEMA,
   applicationId: 'PIPE-PHASE5B-E2E-CONDITIONAL',
@@ -23,35 +23,45 @@ const CONDITIONAL_PACKAGE = jsonValue(workspacePackage({
   nozzleAssessments: [],
 }));
 
-test('[SIMULATED] current qualified piping package renders and downloads governed audit evidence', async ({ page }) => {
+test('[SIMULATED] current stepped-reducer package renders governed audit evidence and blocks engineering issue', async ({ page }) => {
   await page.goto('/');
   await expect.poll(() => page.evaluate(() => Boolean(globalThis.AnalysisWorkspace))).toBe(true);
 
   const state = await page.evaluate((value) => {
     AnalysisWorkspace.importLinearPipingResultPackage(value);
     return AnalysisWorkspace.getLinearPipingResultState();
-  }, QUALIFIED_PACKAGE);
+  }, GOVERNED_PACKAGE);
   expect(state.status).toBe('CURRENT');
-  expect(state.exportEligibility).toBe('ENGINEERING_EXPORT_ALLOWED');
+  expect(state.qualificationStatus).toBe('CONDITIONAL');
+  expect(state.exportEligibility).toBe('AUDIT_ONLY_CONDITIONAL');
 
   const section = page.locator('[data-section-id="linear-piping-results"]');
   await expect(section).toBeVisible();
   await expect(section).toHaveAttribute('data-current', 'true');
+  await expect(section).toHaveAttribute('data-qualification-status', 'CONDITIONAL');
   await expect(section.locator('[data-role="linear-piping-results-root"]')).toContainText(
     'Support, anchor and nozzle interface actions',
   );
   await expect(section.locator('[data-role="linear-piping-results-root"]')).toContainText(
     'B31.3 application results',
   );
+  await expect(section.locator('[data-role="linear-piping-results-root"]')).toContainText(
+    'REDUCER_APPROXIMATION',
+  );
   await expect(section.getByRole('button', { name: 'Download Audit JSON' })).toBeEnabled();
-  await expect(section.getByRole('button', { name: 'Download Engineering CSVs' })).toBeEnabled();
+  await expect(section.getByRole('button', { name: 'Download Engineering CSVs' })).toBeDisabled();
 
-  const exportSummary = await page.evaluate(() => ({
-    audit: AnalysisWorkspace.createLinearPipingAuditExportRecord(),
-    engineering: AnalysisWorkspace.createLinearPipingEngineeringExportRecords(),
-  }));
+  const exportSummary = await page.evaluate(() => {
+    const audit = AnalysisWorkspace.createLinearPipingAuditExportRecord();
+    try {
+      AnalysisWorkspace.createLinearPipingEngineeringExportRecords();
+      return { audit, engineeringErrorCode: null };
+    } catch (error) {
+      return { audit, engineeringErrorCode: error.code };
+    }
+  });
   expect(exportSummary.audit.role).toBe('CURRENT_AUDIT_EVIDENCE');
-  expect(exportSummary.engineering).toHaveLength(3);
+  expect(exportSummary.engineeringErrorCode).toBe('PIPING_PRESENTATION_ENGINEERING_EXPORT_BLOCKED');
 
   const downloadPromise = page.waitForEvent('download');
   await section.getByRole('button', { name: 'Download Audit JSON' }).click();
@@ -66,7 +76,7 @@ test('[SIMULATED] current qualified piping package renders and downloads governe
   await expect(section.getByRole('button', { name: 'Download Audit JSON' })).toBeDisabled();
 });
 
-test('[SIMULATED] conditional result blocks engineering export and rejected replacement clears prior state', async ({ page }) => {
+test('[SIMULATED] missing nozzle authority blocks engineering export and rejected replacement clears prior state', async ({ page }) => {
   await page.goto('/');
   await expect.poll(() => page.evaluate(() => Boolean(globalThis.AnalysisWorkspace))).toBe(true);
 
@@ -82,7 +92,7 @@ test('[SIMULATED] conditional result blocks engineering export and rejected repl
     'NOZZLE_ALLOWABLE_NOT_CONFIGURED',
   );
 
-  const invalidPackage = { ...QUALIFIED_PACKAGE, injectedApplicationValue: 123 };
+  const invalidPackage = { ...GOVERNED_PACKAGE, injectedApplicationValue: 123 };
   const rejection = await page.evaluate((value) => {
     try {
       AnalysisWorkspace.importLinearPipingResultPackage(value);
