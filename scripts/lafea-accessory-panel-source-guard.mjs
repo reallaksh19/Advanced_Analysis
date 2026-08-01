@@ -3,7 +3,10 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const accessorySource = read('../src/workspace/lafea-workbench-accessory-panels.js');
+const facadeSource = read('../src/workspace/lafea-workbench-accessory-panels.js');
+const contractsSource = read('../src/workspace/lafea-workbench-accessory-panel-contracts.js');
+const managerSource = read('../src/workspace/lafea-workbench-accessory-panel-manager.js');
+const accessorySource = `${facadeSource}\n${contractsSource}\n${managerSource}`;
 const controllerSource = read('../src/workspace/lafea-workbench-controller.js');
 const viewSource = read('../src/workspace/lafea-workbench-view.js');
 const workbenchSource = read('../src/workspace/lafea-workbench.js');
@@ -16,12 +19,14 @@ assert.doesNotMatch(
   accessorySource,
   /from\s+['"][^'"]*(?:stage-registry|presenter|preview-policy|lafea-lifecycle|results-view|mesh-quality|fea-benchmark)[^'"]*['"]/u,
 );
-assert.match(accessorySource, /Object\.freeze\(facade\)/u);
-assert.match(accessorySource, /getState: controller\.getState\.bind\(controller\)/u);
-assert.match(accessorySource, /importDocument: controller\.importDocument\.bind\(controller\)/u);
+assert.match(contractsSource, /Object\.freeze\(facade\)/u);
+assert.match(contractsSource, /getState: controller\.getState\.bind\(controller\)/u);
+assert.match(contractsSource, /importDocument: controller\.importDocument\.bind\(controller\)/u);
 assert.doesNotMatch(accessorySource, /controller\.store|controller\.view|controller\.initializeLifecycle|controller\.run\(/u);
-assert.match(accessorySource, /controller: facade/u);
-assert.doesNotMatch(accessorySource, /controller:\s*controller/u);
+assert.match(managerSource, /controller: this\.facade/u);
+assert.doesNotMatch(managerSource, /controller:\s*controller/u);
+assert.match(facadeSource, /createLafeaAccessoryPanelManager/u);
+assert.match(facadeSource, /lafeaAccessoryPanelConfigurationRequiresHost/u);
 
 assert.match(controllerSource, /const ACCESSORY_PANEL_MANAGERS = new WeakMap\(\)/u);
 assert.match(controllerSource, /const DESTROYED_CONTROLLERS = new WeakSet\(\)/u);
@@ -52,6 +57,7 @@ assert.doesNotMatch(workbenchSource, /createLafeaAccessoryPanelManager|lafeaAcce
 console.log(JSON.stringify({
   check: 'lafea-accessory-panel-source-guard',
   status: 'PASS',
+  splitAuthorityValidated: true,
   templateDependencyAdded: false,
   benchmarkHostReused: false,
   fixedViewSlotsModified: false,
