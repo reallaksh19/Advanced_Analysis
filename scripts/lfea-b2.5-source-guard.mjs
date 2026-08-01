@@ -137,9 +137,9 @@ assert.equal(
   'check:lfea-b2.5 registration is missing',
 );
 assert.match(
-  packageJson.scripts['check:lfea-core'],
+  packageJson.scripts['check:lfea-linear-core'] ?? '',
   /npm run check:lfea-b2\.5/u,
-  'check:lfea-b2.5 must run inside check:lfea-core',
+  'check:lfea-b2.5 must run inside check:lfea-linear-core',
 );
 for (const script of ['check:lfea-b2.0', 'check:lfea-b2.1', 'check:lfea-b2.2', 'check:lfea-b2.3', 'check:lfea-b2.4']) {
   assert.ok(packageJson.scripts[script], `${script} must be preserved`);
