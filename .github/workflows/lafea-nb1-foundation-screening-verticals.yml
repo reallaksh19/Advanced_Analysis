@@ -1,0 +1,147 @@
+name: LAFEA NB1 Foundation Screening Verticals
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/lafea-nb1-foundation-screening-verticals.yml'
+      - '.github/workflows/lafea-nonbucket-stack.yml'
+      - 'docs/LAFEA_NonBucket_NB1_Foundation_Screening_Verticals.md'
+      - 'scripts/lafea-nb1-*.mjs'
+      - 'scripts/lafea-nb-t3-composition-root-check.mjs'
+      - 'scripts/lafea-nonbucket-*.mjs'
+      - 'scripts/lafea-u3a-public-surface-check.mjs'
+      - 'src/core/lafea-analytical-handoff.js'
+      - 'src/core/local-stress/finite-footprint*.js'
+      - 'src/core/local-stress/index.js'
+      - 'src/core/local-attachment-screening/product-*.js'
+      - 'src/core/local-attachment-screening/index.js'
+      - 'src/workspace/lafea-stage-components.js'
+      - 'src/workspace/lafea-stage-composition-bindings.js'
+      - 'src/workspace/lafea-stage-composition-root.js'
+      - 'src/workspace/lafea-workbench.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lafea-nb1-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  certify-nb1:
+    name: NB1 exact-head analytical verticals
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+    steps:
+      - name: Checkout exact NB1 head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Assert exact checkout identity
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install locked dependencies
+        shell: bash
+        run: |
+          set -o pipefail
+          npm ci 2>&1 | tee lafea-nb1-npm-ci.log
+
+      - name: Run NB1 product vertical benchmarks
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/lafea-nb1-analytical-verticals-check.mjs \
+            2>&1 | tee lafea-nb1-functional.log
+
+      - name: Enforce bounded NB1 source set
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/lafea-nb1-source-guard.mjs --base "$PR_BASE_SHA" \
+            2>&1 | tee lafea-nb1-source-guard.log
+
+      - name: Run bounded non-bucket stack
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run check:lafea-nonbucket-stack \
+            2>&1 | tee lafea-nb1-nonbucket.log
+
+      - name: Run retained LAFEA numerical core
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run check:lafea-core 2>&1 | tee lafea-nb1-core.log
+
+      - name: Run repository foundations
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run syntax:strict 2>&1 | tee lafea-nb1-syntax.log
+          npm run check:imports 2>&1 | tee lafea-nb1-imports.log
+          npm run build 2>&1 | tee lafea-nb1-build.log
+
+      - name: Verify exact patch hygiene and clean tree
+        shell: bash
+        run: |
+          set -o pipefail
+          {
+            test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+            git diff --check "$PR_BASE_SHA...HEAD"
+            test -z "$(git status --short)"
+          } 2>&1 | tee lafea-nb1-hygiene.log
+
+      - name: Write NB1 disposition
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          const exactHead = execFileSync('git', ['rev-parse', 'HEAD'], {
+            encoding: 'utf8',
+          }).trim();
+          const report = {
+            schema: 'lafea-nb1-foundation-screening-evidence/v1',
+            status: 'PASS',
+            disposition: 'NB1_ANALYTICAL_VERTICALS_ACCEPTED_AT_EXACT_HEAD',
+            exactHead,
+            baseSha: process.env.PR_BASE_SHA,
+            finiteFootprintTypes: 6,
+            screeningProductStates: ['PASS', 'ESCALATE', 'BLOCKED'],
+            downstreamTargetsValidated: ['LAFEA.3', 'LAFEA.4', 'LAFEA.5'],
+            targetEnginesExecutedByHandoff: false,
+            lifecycleSemanticsChanged: false,
+            codeAuthorityPromoted: false,
+            releaseQualified: false,
+            lafea6Enabled: false,
+          };
+          fs.writeFileSync(
+            'lafea-nb1-disposition.json',
+            `${JSON.stringify(report, null, 2)}\n`,
+          );
+          console.log(JSON.stringify(report));
+          NODE
+
+      - name: Upload exact-head NB1 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nb1-foundation-screening-${{ env.EXPECTED_HEAD_SHA }}
+          path: |
+            lafea-nb1-*.log
+            lafea-nb1-disposition.json
+          if-no-files-found: error
+          retention-days: 14
