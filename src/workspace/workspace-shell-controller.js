@@ -52,6 +52,29 @@ export class WorkspaceShellController {
             window.dispatchEvent(new CustomEvent('topology-primitive-selected', { detail: { type: primitiveType } }));
           });
         });
+
+        // Bind 3D Editing Tools Bar
+        this.shellElement.querySelectorAll('[data-edit-tool]').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const toolId = e.currentTarget.dataset.editTool;
+            window.dispatchEvent(new CustomEvent('topology-edit-tool-selected', { detail: { toolId } }));
+            
+            this.shellElement.querySelectorAll('[data-edit-tool]').forEach(b => {
+              const isActive = b.dataset.editTool === toolId;
+              b.style.background = isActive ? '#0284c7' : '#0f172a';
+              b.style.color = isActive ? '#ffffff' : '#f8fafc';
+              b.style.borderColor = isActive ? '#38bdf8' : '#334155';
+            });
+          });
+        });
+
+        // Bind 6-DOF Camera & Navigation Controls
+        this.shellElement.querySelectorAll('[data-viewport-action]').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const action = e.currentTarget.dataset.viewportAction;
+            window.dispatchEvent(new CustomEvent('viewport-navigation-action', { detail: { action } }));
+          });
+        });
       })
     ];
   }

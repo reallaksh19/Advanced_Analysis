@@ -125,17 +125,31 @@ function workspaceView() {
           <button type="button" data-action="open-zone-selector" class="viewport-zone-btn" title="Open 2D Drag-Rectangle Zone &amp; Sub-Graph Selector" style="padding:5px 10px; border:1px solid #334155; border-radius:5px; background:#0f172a; color:#facc15; font-weight:700; font-size:11px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:all 0.15s;">🎯 Select Zones</button>
           
           <!-- Topology Primitives Quick-Icons Bar -->
-          <div class="topology-primitives-bar" style="display:flex; align-items:center; gap:4px; border-left:1px solid #334155; padding-left:8px; margin-left:4px;">
-            <span style="font-size:10px; font-weight:700; color:#38bdf8; text-transform:uppercase; margin-right:4px;">Topology:</span>
-            <button type="button" data-topology-primitive="Node" title="Add/Select Pipe Node" style="padding:3px 8px; background:#0f172a; color:#38bdf8; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">📍 Node</button>
-            <button type="button" data-topology-primitive="Elbow" title="Elbow Fitting" style="padding:3px 8px; background:#0f172a; color:#38bdf8; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">⭕ Elbow</button>
-            <button type="button" data-topology-primitive="Tee" title="Branch Tee Fitting" style="padding:3px 8px; background:#0f172a; color:#38bdf8; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🔀 Tee</button>
-            <button type="button" data-topology-primitive="Anchor" title="Rigid Anchor Boundary" style="padding:3px 8px; background:#0f172a; color:#ef4444; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">⚓ Anchor</button>
-            <button type="button" data-topology-primitive="Hanger" title="Spring Hanger Support" style="padding:3px 8px; background:#0f172a; color:#facc15; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🪝 Hanger</button>
-            <button type="button" data-topology-primitive="Restraint" title="Guide/Restraint Support" style="padding:3px 8px; background:#0f172a; color:#4ade80; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🛡️ Restraint</button>
+          <div class="topology-primitives-bar" style="display:flex; align-items:center; gap:4px; border-left:1px solid #334155; padding-left:8px; margin-left:4px; flex-wrap:wrap;">
+            <span style="font-size:10px; font-weight:700; color:#38bdf8; text-transform:uppercase; margin-right:2px;">Add:</span>
+            <button type="button" data-topology-primitive="Node" title="Add/Select Pipe Node" style="padding:3px 7px; background:#0f172a; color:#38bdf8; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">📍 Node</button>
+            <button type="button" data-topology-primitive="Elbow" title="Elbow Fitting" style="padding:3px 7px; background:#0f172a; color:#38bdf8; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">⭕ Elbow</button>
+            <button type="button" data-topology-primitive="Tee" title="Branch Tee Fitting" style="padding:3px 7px; background:#0f172a; color:#38bdf8; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🔀 Tee</button>
+            <button type="button" data-topology-primitive="Anchor" title="Rigid Anchor Boundary" style="padding:3px 7px; background:#0f172a; color:#ef4444; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">⚓ Anchor</button>
+            <button type="button" data-topology-primitive="Hanger" title="Spring Hanger Support" style="padding:3px 7px; background:#0f172a; color:#facc15; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🪝 Hanger</button>
+            <button type="button" data-topology-primitive="Restraint" title="Guide/Restraint Support" style="padding:3px 7px; background:#0f172a; color:#4ade80; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🛡️ Restraint</button>
+          </div>
+
+          <!-- 3D Edit Tools Bar (Move, Stretch, Connect, Split, Rotate, Bridge, Delete, Measure, Autofix) -->
+          <div class="topology-edit-tools-bar" style="display:flex; align-items:center; gap:4px; border-left:1px solid #334155; padding-left:8px; margin-left:4px; flex-wrap:wrap;">
+            <span style="font-size:10px; font-weight:700; color:#facc15; text-transform:uppercase; margin-right:2px;">Edit:</span>
+            <button type="button" data-edit-tool="move-node" title="Move 3D Node Position" style="padding:3px 7px; background:#0f172a; color:#f8fafc; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">✋ Move</button>
+            <button type="button" data-edit-tool="stretch-pipe" title="Axial Pipe Elongation" style="padding:3px 7px; background:#0f172a; color:#f8fafc; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">↔️ Stretch</button>
+            <button type="button" data-edit-tool="connect-node" title="Snap / Merge Node Endpoints" style="padding:3px 7px; background:#0f172a; color:#f8fafc; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🔗 Connect</button>
+            <button type="button" data-edit-tool="split-edge" title="Split Pipe Segment with Node" style="padding:3px 7px; background:#0f172a; color:#f8fafc; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">✂️ Split</button>
+            <button type="button" data-edit-tool="rotate-subgraph" title="Rotate Pipe Sub-Graph" style="padding:3px 7px; background:#0f172a; color:#f8fafc; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🔄 Rotate</button>
+            <button type="button" data-edit-tool="bridge-gap" title="Bridge Disconnected Pipe Gap" style="padding:3px 7px; background:#0f172a; color:#f8fafc; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🌉 Bridge</button>
+            <button type="button" data-edit-tool="delete-entity" title="Delete Selected Entity" style="padding:3px 7px; background:#0f172a; color:#f87171; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🗑️ Delete</button>
+            <button type="button" data-edit-tool="measure" title="3D Distance Measurement" style="padding:3px 7px; background:#0f172a; color:#38bdf8; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">📏 Measure</button>
+            <button type="button" data-edit-tool="run-autofix" title="Run Governed Topology Autofix Engine" style="padding:3px 7px; background:#6366f1; color:#ffffff; border:1px solid #818cf8; border-radius:4px; font-size:11px; font-weight:800; cursor:pointer;">⚡ Autofix</button>
           </div>
         </div>
-        <div class="viewport-toolbar__actions" aria-label="Viewport navigation" style="display:flex; gap:6px; align-items:center;">
+        <div class="viewport-toolbar__actions" aria-label="Viewport navigation" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
           <div class="toolbar-group">
             <button type="button" data-viewport-action="mode-select" title="Select Entity">Select</button>
             <button type="button" data-viewport-action="mode-orbit" title="Orbit Camera">Orbit</button>
@@ -144,13 +158,22 @@ function workspaceView() {
           <div class="toolbar-group">
             <button type="button" data-viewport-action="fit" title="Fit Entire Model">Fit All</button>
             <button type="button" data-viewport-action="fit-selection" title="Fit Selected Entity">Fit Sel</button>
+            <button type="button" data-viewport-action="pivot-selection" title="Set Orbit Pivot to Selection">Pivot Sel</button>
+            <button type="button" data-viewport-action="clear-pivot" title="Reset Orbit Pivot to Origin">Clear Pivot</button>
             <button type="button" data-viewport-action="home" title="Reset Camera">Home</button>
           </div>
           <div class="toolbar-group">
             <button type="button" data-viewport-action="view-iso" title="Isometric View">ISO</button>
             <button type="button" data-viewport-action="view-top" title="Top View">Top</button>
+            <button type="button" data-viewport-action="view-bottom" title="Bottom View">Bot</button>
             <button type="button" data-viewport-action="view-front" title="Front View">Front</button>
+            <button type="button" data-viewport-action="view-back" title="Back View">Back</button>
+            <button type="button" data-viewport-action="view-left" title="Left View">Left</button>
             <button type="button" data-viewport-action="view-right" title="Right View">Right</button>
+          </div>
+          <div class="toolbar-group">
+            <button type="button" data-viewport-action="toggle-projection" title="Toggle Perspective / Orthographic Camera">🎥 Persp/Ortho</button>
+            <button type="button" data-viewport-action="toggle-axis" title="Toggle Y-Up / Z-Up World Alignment">⬆️ Axis</button>
           </div>
         </div>
       </header>

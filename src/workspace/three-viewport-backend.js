@@ -118,6 +118,49 @@ export class ThreeViewportBackend {
       }
     });
 
+    window.addEventListener('viewport-navigation-action', (e) => {
+      const action = e.detail?.action;
+      if (!action) return;
+
+      switch (action) {
+        case 'view-iso': this.setStandardView('iso'); break;
+        case 'view-top': this.setStandardView('top'); break;
+        case 'view-bottom': this.setStandardView('bottom'); break;
+        case 'view-front': this.setStandardView('front'); break;
+        case 'view-back': this.setStandardView('back'); break;
+        case 'view-left': this.setStandardView('left'); break;
+        case 'view-right': this.setStandardView('right'); break;
+        case 'fit': this.fitView(); break;
+        case 'fit-selection': this.fitSelection(); break;
+        case 'home': this.home(); break;
+        case 'pivot-selection':
+          if (this.selectedEntityId && this.controls) {
+            const obj = this.objects.get(this.selectedEntityId);
+            if (obj && obj[0]) {
+              const pos = new THREE.Vector3();
+              obj[0].getWorldPosition(pos);
+              this.controls.target.copy(pos);
+              this.controls.update();
+            }
+          }
+          break;
+        case 'clear-pivot':
+          if (this.controls) {
+            this.controls.target.set(0, 0, 0);
+            this.controls.update();
+          }
+          break;
+        case 'toggle-axis':
+          if (this.camera) {
+            const isYUp = this.camera.up.y === 1;
+            this.camera.up.set(0, isYUp ? 0 : 1, isYUp ? 1 : 0);
+            this.camera.updateProjectionMatrix();
+            this.renderOnce();
+          }
+          break;
+      }
+    });
+
     this.resize();
     this.startAnimation();
   }
