@@ -52,23 +52,24 @@ assert.strictEqual(journal.getActiveJournal().length, 1);
 const mockIssues = [
   {
     id: '1',
-    kind: 'OVERLAPPING_NODES',
-    distance: 2.4,
-    node1: 'N101',
-    node2: 'N100',
+    kind: 'SNAP_GAP',
+    distanceMm: 2.4,
+    nodeIds: ['N101', 'N100'],
+    suggestedAutofix: 'MERGE_NODES',
   },
   {
     id: '2',
-    kind: 'OVERLAPPING_NODES',
-    distance: 14.5,
-    node1: 'N210',
-    node2: 'N208',
+    kind: 'SNAP_GAP',
+    distanceMm: 14.5,
+    nodeIds: ['N210', 'N208'],
+    suggestedAutofix: 'MERGE_NODES',
   },
   {
     id: '3',
     kind: 'ZERO_LENGTH_ELEMENT',
-    distance: 0,
+    distanceMm: 0,
     elementId: 'P109',
+    suggestedAutofix: null,
   },
 ];
 
@@ -81,6 +82,8 @@ assert.strictEqual(grouped.buckets.exactMerges.length, 1);
 assert.strictEqual(grouped.buckets.exactMerges[0].checked, true);
 assert.strictEqual(grouped.buckets.nearMatches.length, 1);
 assert.strictEqual(grouped.buckets.nearMatches[0].checked, false);
+assert.strictEqual(grouped.buckets.structuralIssues.length, 1);
+assert.strictEqual(grouped.buckets.structuralIssues[0].checked, false);
 
 const auditPackage = buildSealedAuditPackage(
   journal.exportJournalPackage(),
