@@ -109,8 +109,8 @@ function normalizeFoundation(input) {
 function normalizeScreening(input) {
   const { cleanInput, meshConfig } = prepareInput(input);
   const source = typeof cleanInput.semanticHash === 'string'
-    ? validateLocalAttachmentScreeningRequest(cleanInput)
-    : cleanInput;
+    ? editableScreening(validateLocalAttachmentScreeningRequest(cleanInput))
+    : editableScreening(cleanInput);
   const retained = editableScreening(createLocalAttachmentScreeningRequest(source));
   return freezeClone({ ...retained, ...(meshConfig ? { meshConfig } : {}) });
 }
