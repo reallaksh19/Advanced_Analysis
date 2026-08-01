@@ -236,9 +236,10 @@ const addCommand = createLafeaAddEntityCommand({
   origin: { ...origin, sequence: 6 },
 });
 const addResult = applyLafeaStageEditCommand(continuum, addCommand);
-assert.equal(addResult.status, 'APPLIED');
-assert.equal(addResult.change.entityId, allocatedFirst);
-assert.equal(addResult.document.nodes.filter((row) => row.nodeId === allocatedFirst).length, 1);
+assert.equal(addResult.status, 'REJECTED');
+assert.ok(addResult.diagnostics.some((row) => row.code === 'DISCONNECTED_UNREFERENCED_NODE'));
+assert.equal(addResult.change.entityId, null);
+assert.equal(addResult.currentDocumentDigest, lafeaDocumentDigest(continuum));
 
 const deleteCommand = createLafeaDeleteEntityCommand({
   commandId: 'CMD-U2A-DELETE-1',
@@ -289,4 +290,5 @@ console.log(JSON.stringify({
   arrayIndexAuthority: false,
   wholeDocumentReplacement: true,
   deterministicIdentityAllocation: true,
+  orphanEntityAddRejected: true,
 }));

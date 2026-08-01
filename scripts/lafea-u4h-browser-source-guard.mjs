@@ -19,10 +19,9 @@ assert.deepEqual(
   ],
 );
 
-const implemented = new Set(['HC-UI-01', 'HC-UI-02', 'HC-UI-06']);
+const implemented = new Set(['HC-UI-01', 'HC-UI-02', 'HC-UI-04', 'HC-UI-06']);
 const blocked = new Map([
   ['HC-UI-03', 'BLOCKED_DEPENDENCY'],
-  ['HC-UI-04', 'BLOCKED_DEPENDENCY'],
   ['HC-UI-05', 'BLOCKED_DEPENDENCY'],
   ['HC-UI-07', 'BLOCKED_PHASE_4'],
   ['HC-REAL-01', 'BLOCKED_USER_EVIDENCE'],
@@ -57,7 +56,11 @@ assert.match(spec, /page\.goto\('\/'\)/u);
 assert.match(spec, /import\(fixtureUrl\)/u);
 assert.match(spec, /data-live-viewport-mode/u);
 assert.match(spec, /data-result-renderer/u);
-assert.match(spec, /webglcontextlost/u);
+assert.match(spec, /data-gpu-pick-status/u);
+assert.match(spec, /Selected Entity: E1 \(ELEMENT\)/u);
+assert.match(spec, /new MouseEvent\('click'/u);
+assert.match(spec, /triggerHcWebglLoss/u);
+assert.match(fixture, /webglcontextlost/u);
 assert.doesNotMatch(spec, /test\.skip|test\.fixme|\.only\(/u);
 assert.doesNotMatch(spec, /setContent\(/u);
 assert.doesNotMatch(
@@ -90,7 +93,10 @@ assert.match(workflow, /github\.event\.pull_request\.head\.sha \|\| github\.sha/
 assert.match(workflow, /actions\/setup-node@v4/u);
 assert.match(workflow, /node-version: 20/u);
 assert.match(workflow, /npm ci/u);
-assert.match(workflow, /npx playwright install chromium --with-deps/u);
+assert.match(
+  workflow,
+  /Install pinned Chromium[\s\S]*PLAYWRIGHT_BROWSERS_PATH:\s*'0'[\s\S]*npx playwright install chromium --with-deps/u,
+);
 assert.match(workflow, /node scripts\/lafea-u4h-browser-source-guard\.mjs/u);
 assert.match(
   workflow,
@@ -112,6 +118,8 @@ console.log(JSON.stringify({
   status: 'PASS',
   implementedCases: [...implemented],
   blockedCases: [...blocked.keys()],
+  gpuPickBrowserCaseRegistered: true,
+  projectLocalBrowserInstall: true,
   browserExecutionClaimed: false,
   realProjectEvidencePresent: false,
   privateRenderRegistryUsed: false,

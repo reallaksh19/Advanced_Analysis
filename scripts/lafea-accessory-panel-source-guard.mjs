@@ -26,9 +26,10 @@ assert.doesNotMatch(accessorySource, /controller:\s*controller/u);
 assert.match(controllerSource, /const ACCESSORY_PANEL_MANAGERS = new WeakMap\(\)/u);
 assert.match(controllerSource, /const DESTROYED_CONTROLLERS = new WeakSet\(\)/u);
 assert.doesNotMatch(controllerSource, /this\.accessoryPanelManager|this\.destroyed/u);
-assert.match(controllerSource, /const \{ accessoryPanels, \.\.\.storeOptions \} = configuration/u);
+assert.match(controllerSource, /const \{ accessoryPanels, THREE, \.\.\.storeOptions \} = configuration/u);
 assert.match(controllerSource, /createLafeaWorkbenchStore\(storeOptions\)/u);
-assert.doesNotMatch(controllerSource, /createLafeaWorkbenchStore\(options\)/u);
+assert.doesNotMatch(controllerSource, /createLafeaWorkbenchStore\(options\)|createLafeaWorkbenchStore\(configuration\)/u);
+assert.match(controllerSource, /initializeLafeaWorkbenchRenderEvidence\(this, THREE \?\? null\)/u);
 assert.match(controllerSource, /lafeaAccessoryPanelConfigurationRequiresHost\(configuration\)/u);
 assert.match(controllerSource, /ACCESSORY_PANEL_MANAGERS\.set\([\s\S]*this,[\s\S]*createLafeaAccessoryPanelManager/u);
 assert.equal((controllerSource.match(/accessoryPanelManager\.mount\(this\)/gu) ?? []).length, 1);
@@ -58,6 +59,7 @@ console.log(JSON.stringify({
   rawControllerExposed: false,
   controllerStatePubliclyExpanded: false,
   storeOptionsContaminated: false,
+  threeInjectionStoreContamination: false,
 }));
 
 function read(relativePath) {

@@ -16,6 +16,7 @@ import {
 } from './lafea-canvas/contracts.js';
 import { createHybridViewport } from './lafea-canvas/hybrid-viewport.js';
 import { createLafeaResultRenderRequest } from './lafea-canvas/result-render-request.js';
+import { createLafeaResultSelectionAuthority } from './lafea-canvas/result-selection-authority.js';
 import { renderLafeaSourceOverlay } from './lafea-canvas/source-overlay-adapter.js';
 import { createThreeMeshRendererV2 } from './lafea-canvas/three-mesh-renderer-v2.js';
 import { validateSourceScene } from './lafea-engineering-scene.js';
@@ -71,6 +72,7 @@ export function createLafeaHybridResultViewportModel(input) {
   const selection = validateSelection(
     input.selection ?? emptySelection(sourceScene.sceneRevision),
     sourceScene,
+    intake.packet?.pickMap ?? null,
   );
   const reasons = [];
   const addReason = (code) => {
@@ -136,6 +138,12 @@ export function mountLafeaHybridResultViewport(root, input) {
     selection: input?.selection ?? null,
   });
   const registryEntry = requireLafeaStageRegistryEntry(model.stageId);
+  const selectionAuthority = createLafeaResultSelectionAuthority({
+    sceneRevision: model.sceneRevision,
+    sourceScene: model.sourceScene,
+    pickMap: model.resultRequest?.renderPacket.pickMap ?? null,
+    initialSelection: model.selection,
+  });
   root.style.minHeight = `${model.viewport.cssHeight}px`;
   root.style.height = `${model.viewport.cssHeight}px`;
 
@@ -143,13 +151,14 @@ export function mountLafeaHybridResultViewport(root, input) {
   let renderer = 'NONE';
   let blockingReasons = [...model.blockingReasons];
   let runtimeBlock = null;
-  let selection = model.selection;
+  let selection = selectionAuthority.getSelection();
   let renderResult = null;
   let destroyed = false;
   let controller = null;
   let threeAdapter = null;
   let canvasRef = null;
   let contextListenersBound = false;
+  let pickListenerBound = false;
   const baseInspector = createAccessibleInspector();
 
   const adapters = {
@@ -174,6 +183,7 @@ export function mountLafeaHybridResultViewport(root, input) {
         if (!threeAdapter) {
           threeAdapter = createThreeMeshRendererV2(input.THREE, canvas);
           bindContextEvents(canvas);
+          bindPickEvents();
         }
         return threeAdapter.isAvailable();
       },
@@ -224,6 +234,37 @@ export function mountLafeaHybridResultViewport(root, input) {
     });
   }
 
+  function bindPickEvents() {
+    if (pickListenerBound) return;
+    pickListenerBound = true;
+    root.addEventListener('click', handleGpuPick);
+  }
+
+  function handleGpuPick(event) {
+    if (destroyed || status !== 'READY' || renderer !== 'THREE_WEBGL'
+      || runtimeBlock !== null || !threeAdapter) return;
+    const layer = event.target?.closest?.('[data-layer]');
+    if (layer?.dataset?.layer === 'accessible-inspector'
+      || event.target?.closest?.('[data-node-id], [data-element-id]')) return;
+    try {
+      const pick = threeAdapter.pickClientPoint({
+        clientX: event.clientX,
+        clientY: event.clientY,
+      });
+      if (pick === null) {
+        root.dataset.gpuPickStatus = 'NO_HIT';
+        delete root.dataset.gpuPickReason;
+        return;
+      }
+      selectMeshPick(pick);
+      root.dataset.gpuPickStatus = 'SELECTED';
+      delete root.dataset.gpuPickReason;
+    } catch (error) {
+      root.dataset.gpuPickStatus = 'REJECTED';
+      root.dataset.gpuPickReason = error?.code ?? 'LAFEA_GPU_PICK_FAILED';
+    }
+  }
+
   function renderCurrent(retryRuntime) {
     if (destroyed) throw contractError('LAFEA_HYBRID_RESULT_VIEWPORT_DESTROYED');
     if (retryRuntime) runtimeBlock = null;
@@ -265,19 +306,21 @@ export function mountLafeaHybridResultViewport(root, input) {
   }
 
   function selectSource(sourceEntityId) {
-    selection = validateSelection({
-      sceneRevision: model.sceneRevision,
-      sourceEntityId,
-      meshEntityId: null,
-      entityRole: 'SOURCE',
-    }, model.sourceScene);
+    selection = selectionAuthority.selectSource(sourceEntityId);
+    const result = renderCurrent(false);
+    input.onSelectionChange?.(selection);
+    return result;
+  }
+
+  function selectMeshPick(pick) {
+    selection = selectionAuthority.selectMeshPick(pick);
     const result = renderCurrent(false);
     input.onSelectionChange?.(selection);
     return result;
   }
 
   function clearSelection() {
-    selection = emptySelection(model.sceneRevision);
+    selection = selectionAuthority.clear();
     const result = renderCurrent(false);
     input.onSelectionChange?.(selection);
     return result;
@@ -340,11 +383,12 @@ export function mountLafeaHybridResultViewport(root, input) {
     destroy() {
       if (destroyed) return;
       destroyed = true;
+      root.removeEventListener?.('click', handleGpuPick);
       controller.destroy();
       root.dataset.resultStatus = 'DESTROYED';
       for (const field of [
         'resultRenderer', 'resultFieldId', 'resultBlockingReasonCount',
-        'resultBlockingReasons',
+        'resultBlockingReasons', 'gpuPickStatus', 'gpuPickReason',
       ]) delete root.dataset[field];
     },
   });
@@ -394,18 +438,29 @@ function validateIntake(value) {
   return value;
 }
 
-function validateSelection(value, scene) {
+function validateSelection(value, scene, pickMap) {
   assertExactKeys(value, SELECTION_KEYS, 'LAFEA_HYBRID_RESULT_SELECTION_KEYS_INVALID');
-  if (value.sceneRevision !== scene.sceneRevision || value.meshEntityId !== null) {
+  if (value.sceneRevision !== scene.sceneRevision) {
     throw contractError('LAFEA_HYBRID_RESULT_SELECTION_IDENTITY_INVALID');
   }
   if (value.sourceEntityId === null) {
-    if (value.entityRole !== null) {
+    if (value.meshEntityId !== null || value.entityRole !== null) {
       throw contractError('LAFEA_HYBRID_RESULT_EMPTY_SELECTION_INVALID');
     }
-  } else if (value.entityRole !== 'SOURCE'
-    || !scene.sourcePrimitives.some((row) => row.sourceEntityId === value.sourceEntityId)) {
-    throw contractError('LAFEA_HYBRID_RESULT_SOURCE_SELECTION_INVALID');
+  } else if (value.meshEntityId === null) {
+    if (value.entityRole !== 'SOURCE'
+      || !scene.sourcePrimitives.some((row) => row.sourceEntityId === value.sourceEntityId)) {
+      throw contractError('LAFEA_HYBRID_RESULT_SOURCE_SELECTION_INVALID');
+    }
+  } else {
+    const entry = pickMap?.entries?.find((candidate) =>
+      candidate.sourceEntityId === value.sourceEntityId
+      && candidate.meshEntityId === value.meshEntityId
+      && candidate.entityRole === value.entityRole);
+    if (!entry || pickMap.sceneRevision !== scene.sceneRevision
+      || !scene.sourcePrimitives.some((row) => row.sourceEntityId === value.sourceEntityId)) {
+      throw contractError('LAFEA_HYBRID_RESULT_MESH_SELECTION_INVALID');
+    }
   }
   return deepFreeze(structuredClone(value));
 }

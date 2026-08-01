@@ -28,8 +28,8 @@
       "testId": "HC-UI-04",
       "inputBasis": "[SIMULATED] GPU pick",
       "expectedResult": "Engineering identity selected",
-      "implementationStatus": "BLOCKED_DEPENDENCY",
-      "blockingDependency": "The current U4F Three.js adapter has no GPU/raycast picking path."
+      "implementationStatus": "IMPLEMENTED_EXECUTION_REQUIRED",
+      "spec": "e2e/lafea-hybrid-workbench.spec.js"
     },
     {
       "testId": "HC-UI-05",

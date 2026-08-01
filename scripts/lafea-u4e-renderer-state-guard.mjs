@@ -17,75 +17,52 @@ import {
   LAFEA_RENDER_EVIDENCE_INTAKE_SCHEMA,
 } from '../src/workspace/lafea-render-evidence-intake.js';
 
-const packet = sealRenderPacketV2(packetValue());
-const request = createLafeaResultRenderRequest({
-  intake: {
-    schema: LAFEA_RENDER_EVIDENCE_INTAKE_SCHEMA,
-    stageId: packet.stageId,
-    sceneRevision: packet.sceneRevision,
-    status: 'READY',
-    renderEvidenceReady: true,
-    packet,
-    blockingReasons: [],
-  },
-  viewport: viewportValue(packet),
-  mode: 'STRESS_CONTOUR',
-});
-const canvas = new FakeCanvas();
-const THREE = fakeThree();
-const adapter = createThreeMeshRendererV2(THREE, canvas);
+class FakeCanvas {
+  constructor() { this.dataset = {}; this.listeners = new Map(); }
+  addEventListener(type, listener) { this.listeners.set(type, listener); }
+  dispatch(type) { this.listeners.get(type)?.({ preventDefault() {} }); }
+}
 
-adapter.render(request);
-const firstGeometry = THREE.lastGeometry;
-const firstMaterial = THREE.lastMaterial;
-assert.equal(canvas.dataset.ready, 'true');
-assert.equal(canvas.dataset.renderer, 'THREE_WEBGL');
-
-adapter.clearCurrentScene();
-assert.equal(canvas.dataset.ready, 'false');
-assert.equal(canvas.dataset.renderer, undefined);
-assert.equal(canvas.dataset.stageId, undefined);
-assert.equal(canvas.dataset.sceneRevision, undefined);
-assert.equal(canvas.dataset.fieldId, undefined);
-assert.equal(firstGeometry.disposed, true);
-assert.equal(firstMaterial.disposed, true);
-
-adapter.render(request);
-const secondGeometry = THREE.lastGeometry;
-const secondMaterial = THREE.lastMaterial;
-assert.notEqual(secondGeometry, firstGeometry);
-assert.equal(canvas.dataset.ready, 'true');
-canvas.dispatch('webglcontextlost');
-assert.equal(canvas.dataset.ready, 'false');
-assert.equal(canvas.dataset.renderer, undefined);
-assert.equal(secondGeometry.disposed, true);
-assert.equal(secondMaterial.disposed, true);
-assert.equal(adapter.isAvailable(), false);
-assert.throws(
-  () => adapter.render(request),
-  (error) => error.code === 'LAFEA_V2_WEBGL_CONTEXT_LOST',
-);
-
-canvas.dispatch('webglcontextrestored');
-assert.equal(adapter.isAvailable(), true);
-assert.equal(canvas.dataset.ready, 'false');
-adapter.render(request);
-assert.equal(canvas.dataset.ready, 'true');
-adapter.dispose();
-assert.equal(canvas.dataset.ready, 'false');
-assert.equal(canvas.dataset.renderer, undefined);
-assert.equal(THREE.lastRenderer.disposed, true);
-assert.equal(THREE.lastRenderer.contextLost, true);
-
-console.log(JSON.stringify({
-  check: 'lafea-u4e-renderer-state-truth',
-  status: 'PASS',
-  explicitClearReady: false,
-  contextLossReady: false,
-  contextRestoreRequiresRerender: true,
-  disposeReady: false,
-  staleIdentityRetained: false,
-}));
+function fakeThree() {
+  const api = { DoubleSide: 'DOUBLE_SIDE' };
+  class Matrix {
+    fromArray(value) { this.value = [...value]; return this; }
+    copy(value) { this.value = [...(value.value ?? [])]; return this; }
+    invert() { return this; }
+  }
+  api.WebGLRenderer = class {
+    constructor({ canvas }) { this.domElement = canvas; this.capabilities = { isWebGL2: true }; api.lastRenderer = this; }
+    setPixelRatio() {}
+    setSize() {}
+    render() {}
+    dispose() { this.disposed = true; }
+    forceContextLoss() { this.contextLost = true; }
+  };
+  api.Scene = class {
+    constructor() { this.objects = []; }
+    add(value) { this.objects.push(value); }
+    remove(value) { this.objects = this.objects.filter((row) => row !== value); }
+  };
+  api.BufferGeometry = class {
+    constructor() { this.attributes = {}; api.lastGeometry = this; }
+    setAttribute(name, value) { this.attributes[name] = value; }
+    setIndex(value) { this.index = value; }
+    dispose() { this.disposed = true; }
+  };
+  api.BufferAttribute = class { constructor(array, itemSize) { this.array = array; this.itemSize = itemSize; } };
+  api.MeshBasicMaterial = class {
+    constructor() { api.lastMaterial = this; }
+    dispose() { this.disposed = true; }
+  };
+  api.Mesh = class { constructor(geometry, material) { this.geometry = geometry; this.material = material; } };
+  api.Camera = class {
+    constructor() {
+      this.matrixWorldInverse = new Matrix(); this.matrixWorld = new Matrix();
+      this.projectionMatrix = new Matrix(); this.projectionMatrixInverse = new Matrix();
+    }
+  };
+  return api;
+}
 
 function packetValue() {
   return {
@@ -154,49 +131,76 @@ function viewportValue(packetValueInput) {
   };
 }
 
-class FakeCanvas {
-  constructor() { this.dataset = {}; this.listeners = new Map(); }
-  addEventListener(type, listener) { this.listeners.set(type, listener); }
-  dispatch(type) { this.listeners.get(type)?.({ preventDefault() {} }); }
+function run() {
+  const packet = sealRenderPacketV2(packetValue());
+  const request = createLafeaResultRenderRequest({
+    intake: {
+      schema: LAFEA_RENDER_EVIDENCE_INTAKE_SCHEMA,
+      stageId: packet.stageId,
+      sceneRevision: packet.sceneRevision,
+      status: 'READY',
+      renderEvidenceReady: true,
+      packet,
+      blockingReasons: [],
+    },
+    viewport: viewportValue(packet),
+    mode: 'STRESS_CONTOUR',
+  });
+  const canvas = new FakeCanvas();
+  const THREE = fakeThree();
+  const adapter = createThreeMeshRendererV2(THREE, canvas);
+
+  adapter.render(request);
+  const firstGeometry = THREE.lastGeometry;
+  const firstMaterial = THREE.lastMaterial;
+  assert.equal(canvas.dataset.ready, 'true');
+  assert.equal(canvas.dataset.renderer, 'THREE_WEBGL');
+
+  adapter.clearCurrentScene();
+  assert.equal(canvas.dataset.ready, 'false');
+  assert.equal(canvas.dataset.renderer, undefined);
+  assert.equal(canvas.dataset.stageId, undefined);
+  assert.equal(canvas.dataset.sceneRevision, undefined);
+  assert.equal(canvas.dataset.fieldId, undefined);
+  assert.equal(firstGeometry.disposed, true);
+  assert.equal(firstMaterial.disposed, true);
+
+  adapter.render(request);
+  const secondGeometry = THREE.lastGeometry;
+  const secondMaterial = THREE.lastMaterial;
+  assert.notEqual(secondGeometry, firstGeometry);
+  assert.equal(canvas.dataset.ready, 'true');
+  canvas.dispatch('webglcontextlost');
+  assert.equal(canvas.dataset.ready, 'false');
+  assert.equal(canvas.dataset.renderer, undefined);
+  assert.equal(secondGeometry.disposed, true);
+  assert.equal(secondMaterial.disposed, true);
+  assert.equal(adapter.isAvailable(), false);
+  assert.throws(
+    () => adapter.render(request),
+    (error) => error.code === 'LAFEA_V2_WEBGL_CONTEXT_LOST',
+  );
+
+  canvas.dispatch('webglcontextrestored');
+  assert.equal(adapter.isAvailable(), true);
+  assert.equal(canvas.dataset.ready, 'false');
+  adapter.render(request);
+  assert.equal(canvas.dataset.ready, 'true');
+  adapter.dispose();
+  assert.equal(canvas.dataset.ready, 'false');
+  assert.equal(canvas.dataset.renderer, undefined);
+  assert.equal(THREE.lastRenderer.disposed, true);
+  assert.equal(THREE.lastRenderer.contextLost, true);
+
+  console.log(JSON.stringify({
+    check: 'lafea-u4e-renderer-state-truth',
+    status: 'PASS',
+    explicitClearReady: false,
+    contextLossReady: false,
+    contextRestoreRequiresRerender: true,
+    disposeReady: false,
+    staleIdentityRetained: false,
+  }));
 }
 
-function fakeThree() {
-  const api = { DoubleSide: 'DOUBLE_SIDE' };
-  class Matrix {
-    fromArray(value) { this.value = [...value]; return this; }
-    copy(value) { this.value = [...(value.value ?? [])]; return this; }
-    invert() { return this; }
-  }
-  api.WebGLRenderer = class {
-    constructor({ canvas }) { this.domElement = canvas; this.capabilities = { isWebGL2: true }; api.lastRenderer = this; }
-    setPixelRatio() {}
-    setSize() {}
-    render() {}
-    dispose() { this.disposed = true; }
-    forceContextLoss() { this.contextLost = true; }
-  };
-  api.Scene = class {
-    constructor() { this.objects = []; }
-    add(value) { this.objects.push(value); }
-    remove(value) { this.objects = this.objects.filter((row) => row !== value); }
-  };
-  api.BufferGeometry = class {
-    constructor() { this.attributes = {}; api.lastGeometry = this; }
-    setAttribute(name, value) { this.attributes[name] = value; }
-    setIndex(value) { this.index = value; }
-    dispose() { this.disposed = true; }
-  };
-  api.BufferAttribute = class { constructor(array, itemSize) { this.array = array; this.itemSize = itemSize; } };
-  api.MeshBasicMaterial = class {
-    constructor() { api.lastMaterial = this; }
-    dispose() { this.disposed = true; }
-  };
-  api.Mesh = class { constructor(geometry, material) { this.geometry = geometry; this.material = material; } };
-  api.Camera = class {
-    constructor() {
-      this.matrixWorldInverse = new Matrix(); this.matrixWorld = new Matrix();
-      this.projectionMatrix = new Matrix(); this.projectionMatrixInverse = new Matrix();
-    }
-  };
-  return api;
-}
+run();
