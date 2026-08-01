@@ -19,6 +19,8 @@ export const LAFEA_TECHNICAL_COMPONENT_KINDS = Object.freeze([
   'ACCEPTANCE',
   'PRESENTER',
   'UNIT_RESOLVER',
+  'PRODUCT_ASSESSMENT',
+  'HANDOFF',
 ]);
 
 export const LAFEA_TECHNICAL_COMPONENT_IDS = deepFreeze({
@@ -60,6 +62,14 @@ export const LAFEA_TECHNICAL_COMPONENT_IDS = deepFreeze({
     foundation: 'LAFEA.COMPONENT.UNITS.FOUNDATION_CANONICAL/V1',
     shellTemplate: 'LAFEA.COMPONENT.UNITS.SHELL_TEMPLATE/V1',
   },
+  productAssessment: {
+    foundation: 'LAFEA.COMPONENT.PRODUCT.FINITE_FOOTPRINT_DISTRIBUTION/V2',
+    screening: 'LAFEA.COMPONENT.PRODUCT.SCREENING_ESCALATION/V1',
+  },
+  handoff: {
+    foundation: 'LAFEA.COMPONENT.HANDOFF.FINITE_FOOTPRINT/V1',
+    screening: 'LAFEA.COMPONENT.HANDOFF.SCREENING_ESCALATION/V1',
+  },
 });
 
 const IDS = LAFEA_TECHNICAL_COMPONENT_IDS;
@@ -72,6 +82,8 @@ export const LAFEA_STAGE_COMPOSITION_BINDINGS = deepFreeze([
     acceptance: IDS.acceptance.state,
     presenter: IDS.presenter.foundation,
     unitResolver: IDS.unitResolver.document,
+    productAssessment: IDS.productAssessment.foundation,
+    handoff: IDS.handoff.foundation,
   }, 'ANALYTICAL_FOUNDATION_V1', []),
   binding('LAFEA.2', 'LAFEA.COMPOSITION.PIPE_SECTION_SCREENING/V1', {
     normalizer: IDS.normalizer.screening,
@@ -80,6 +92,8 @@ export const LAFEA_STAGE_COMPOSITION_BINDINGS = deepFreeze([
     acceptance: IDS.acceptance.state,
     presenter: IDS.presenter.screening,
     unitResolver: IDS.unitResolver.foundation,
+    productAssessment: IDS.productAssessment.screening,
+    handoff: IDS.handoff.screening,
   }, 'ANALYTICAL_SCREENING_V1', []),
   binding('LAFEA.3', 'LAFEA.COMPOSITION.CONTINUUM_2D/V1', {
     normalizer: IDS.normalizer.continuum,
@@ -88,6 +102,8 @@ export const LAFEA_STAGE_COMPOSITION_BINDINGS = deepFreeze([
     acceptance: IDS.acceptance.state,
     presenter: IDS.presenter.continuum,
     unitResolver: IDS.unitResolver.document,
+    productAssessment: null,
+    handoff: null,
   }, 'FEA_MESH_RECOVERY_V1', [
     'CONT-PATCH-01',
     'CONT-CYL-01',
@@ -100,6 +116,8 @@ export const LAFEA_STAGE_COMPOSITION_BINDINGS = deepFreeze([
     acceptance: IDS.acceptance.boolean,
     presenter: IDS.presenter.shell,
     unitResolver: IDS.unitResolver.document,
+    productAssessment: null,
+    handoff: null,
   }, 'FEA_MESH_RECOVERY_V1', [
     'SHELL-PATCH-01',
     'SHELL-BEND-01',
@@ -111,6 +129,8 @@ export const LAFEA_STAGE_COMPOSITION_BINDINGS = deepFreeze([
     acceptance: IDS.acceptance.boolean,
     presenter: IDS.presenter.trunnion,
     unitResolver: IDS.unitResolver.shellTemplate,
+    productAssessment: null,
+    handoff: null,
   }, 'FEA_MESH_RECOVERY_V1', []),
   binding('LAFEA.6', 'LAFEA.COMPOSITION.UNSUPPORTED_WELD_PROFILE/V1', {
     normalizer: IDS.normalizer.unsupported,
@@ -119,6 +139,8 @@ export const LAFEA_STAGE_COMPOSITION_BINDINGS = deepFreeze([
     acceptance: null,
     presenter: null,
     unitResolver: null,
+    productAssessment: null,
+    handoff: null,
   }, 'UNSUPPORTED_STAGE_V1', []),
 ]);
 
