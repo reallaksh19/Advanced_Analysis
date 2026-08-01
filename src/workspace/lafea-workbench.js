@@ -33,6 +33,34 @@ export {
   requireLafeaStageComposition,
 } from './lafea-stage-composition-root.js';
 export {
+  LAFEA_ANALYTICAL_HANDOFF_LIMITATIONS,
+  LAFEA_ANALYTICAL_HANDOFF_SCHEMA,
+  LAFEA_ANALYTICAL_HANDOFF_TARGETS,
+  createValidatedLafeaAnalyticalHandoff,
+  validateLafeaAnalyticalHandoff,
+} from '../core/lafea-analytical-handoff.js';
+export {
+  FINITE_FOOTPRINT_DISTRIBUTION_RULE,
+  FINITE_FOOTPRINT_LIMITATIONS,
+  FINITE_FOOTPRINT_REQUEST_SCHEMA,
+  FINITE_FOOTPRINT_RESULT_SCHEMA,
+  FINITE_FOOTPRINT_TYPES,
+  compileFiniteFootprintDistribution,
+  validateFiniteFootprintDistribution,
+} from '../core/local-stress/index.js';
+export { createFiniteFootprintHandoff } from '../core/local-stress/finite-footprint-handoff.js';
+export {
+  SCREENING_APPLICABILITY_KINDS,
+  SCREENING_APPLICABILITY_STATUSES,
+  SCREENING_PRODUCT_LIMITATIONS,
+  SCREENING_PRODUCT_REQUEST_SCHEMA,
+  SCREENING_PRODUCT_RESULT_SCHEMA,
+  SCREENING_PRODUCT_STATES,
+  createLocalAttachmentScreeningHandoff,
+  evaluateLocalAttachmentScreeningProduct,
+  validateLocalAttachmentScreeningProduct,
+} from '../core/local-attachment-screening/index.js';
+export {
   LAFEA_LIFECYCLE_PROFILE_IDS,
   LAFEA_LIFECYCLE_PROFILE_SCHEMA,
   LAFEA_LIFECYCLE_PROFILES,
