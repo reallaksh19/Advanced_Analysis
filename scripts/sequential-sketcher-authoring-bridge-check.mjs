@@ -14,7 +14,7 @@ import {
 const workspaceState = new WorkspaceStateStore();
 const eventBus = { publish() {} };
 const gateway = new SequentialCommandGateway(workspaceState, eventBus);
-const eventTarget = new FakeEventTarget();
+const eventTarget = createFakeEventTarget();
 const previews = [];
 const selections = [];
 
@@ -205,18 +205,22 @@ function entity(entityId, entityType, category, geometry) {
   };
 }
 
-class FakeEventTarget {
-  constructor() { this.listeners = new Map(); }
-  addEventListener(type, listener) {
-    const listeners = this.listeners.get(type) ?? new Set();
-    listeners.add(listener);
-    this.listeners.set(type, listeners);
-  }
-  removeEventListener(type, listener) {
-    this.listeners.get(type)?.delete(listener);
-  }
-  dispatch(type, event) {
-    for (const listener of [...(this.listeners.get(type) ?? [])]) listener(event);
-  }
-  listenerCount(type) { return this.listeners.get(type)?.size ?? 0; }
+function createFakeEventTarget() {
+  const listeners = new Map();
+  return Object.freeze({
+    addEventListener(type, listener) {
+      const rows = listeners.get(type) ?? new Set();
+      rows.add(listener);
+      listeners.set(type, rows);
+    },
+    removeEventListener(type, listener) {
+      listeners.get(type)?.delete(listener);
+    },
+    dispatch(type, event) {
+      for (const listener of [...(listeners.get(type) ?? [])]) listener(event);
+    },
+    listenerCount(type) {
+      return listeners.get(type)?.size ?? 0;
+    },
+  });
 }
