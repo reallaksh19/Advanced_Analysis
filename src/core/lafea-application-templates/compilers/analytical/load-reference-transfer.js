@@ -26,8 +26,11 @@ import {
   sortedStrings,
   sourceRefRecord,
   sourceRefRecords,
-  unitRecords,
 } from './common.js';
+import {
+  T3_RESULT_UNIT_PROJECTION_POLICY_ID,
+  projectT3ResultUnits,
+} from './result-unit-projection.js';
 
 const TEMPLATE_ID = 'ALG-LOAD-REFERENCE-TRANSFER';
 
@@ -86,6 +89,7 @@ export function compileLoadReferenceTransfer(rawParameters) {
     ...deepClone(canonicalModel.sourceEvidence),
     schema: MODEL_SCHEMA,
   };
+  const resultUnitProjection = projectT3ResultUnits(canonicalModel.units);
 
   const status = parameterSourceStatus(byId, [
     'identity',
@@ -103,7 +107,7 @@ export function compileLoadReferenceTransfer(rawParameters) {
       ...coordinate,
       sourceRef: sourceRefRecord(requiredParameterRef(byId, 'pipeContext')),
     },
-    units: unitRecords(canonicalModel.units),
+    units: resultUnitProjection.records,
     features: geometryFeatures(canonicalModel, status),
     localFrames: [{
       frameId: coordinate.identity,
@@ -117,8 +121,10 @@ export function compileLoadReferenceTransfer(rawParameters) {
       canonicalModelSemanticHash: canonicalModel.semanticHash,
       sourceSemanticHash: canonicalModel.sourceAncestry.sourceSemanticHash,
       stageSourceSemanticHash: semanticHash(stageSource),
+      resultUnitProjection: resultUnitProjection.ancestry,
     },
     status,
+    diagnostics: resultUnitProjection.diagnostics,
   });
 
   const loads = createLoadArtifact({
@@ -126,7 +132,12 @@ export function compileLoadReferenceTransfer(rawParameters) {
     binding,
     parameterSet,
     geometry,
-    loadCases: loadCases(canonicalModel, status),
+    loadCases: loadCases(
+      canonicalModel,
+      status,
+      resultUnitProjection.resultUnits,
+    ),
+    diagnostics: resultUnitProjection.diagnostics,
   });
   const boundaries = createNoBoundaryArtifact({
     template,
@@ -144,6 +155,7 @@ export function compileLoadReferenceTransfer(rawParameters) {
     stageSource,
     diagnostics: [
       'STAGE_SOURCE_VALIDATED_BY_LAFEA1_CANONICAL_MODEL_FACTORY',
+      'SOURCE_UNIT_IDENTITY_RETAINED_IN_STAGE_SOURCE',
       'ENGINE_NOT_EXECUTED',
     ],
   });
@@ -161,6 +173,7 @@ export function compileLoadReferenceTransfer(rawParameters) {
       'LOAD_TRANSFER_ONLY',
       'NO_PRESSURE_REQUEST_GENERATED',
       'NO_STRESS_OR_UTILIZATION_CALCULATED',
+      `RESULT_UNIT_PROJECTION_POLICY:${T3_RESULT_UNIT_PROJECTION_POLICY_ID}`,
     ],
   });
 }
@@ -256,7 +269,7 @@ function geometryFeatures(model, status) {
   return features.sort((left, right) => codeSort(left.featureId, right.featureId));
 }
 
-function loadCases(model, status) {
+function loadCases(model, status, resultUnits) {
   return model.loadCases.map((loadCase) => ({
     caseId: loadCase.identity,
     primitives: [
@@ -270,7 +283,7 @@ function loadCases(model, status) {
           actionSense: loadCase.actionSense,
           vector: loadCase.force.value,
         },
-        units: [{ dimension: 'force', unit: model.units.canonical.force }],
+        units: [{ dimension: 'force', unit: resultUnits.force }],
         sourceRef: sourceRefRecord(loadCase.force.sourceRef),
         status,
       },
@@ -284,7 +297,7 @@ function loadCases(model, status) {
           actionSense: loadCase.actionSense,
           vector: loadCase.moment.value,
         },
-        units: [{ dimension: 'moment', unit: model.units.canonical.moment }],
+        units: [{ dimension: 'moment', unit: resultUnits.moment }],
         sourceRef: sourceRefRecord(loadCase.moment.sourceRef),
         status,
       },
