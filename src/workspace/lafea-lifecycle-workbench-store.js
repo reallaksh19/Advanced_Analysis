@@ -3,8 +3,9 @@
  *
  * The retained implementation remains the authority for lifecycle validation,
  * edit bindings and manual evidence APIs. This facade adds canonical SHA-256
- * source authority, typed source events, current-core producer registration and
- * distinct calculation/result/code/release terminology.
+ * source authority while retaining FNV only as a document-revision token,
+ * typed source events, current-core producer registration and distinct
+ * calculation/result/code/release terminology.
  */
 import { lafeaDocumentDigest } from './lafea-edit-command.js';
 import { createLafeaLifecycleEvent, lafeaLifecycleReadiness } from './lafea-lifecycle.js';
