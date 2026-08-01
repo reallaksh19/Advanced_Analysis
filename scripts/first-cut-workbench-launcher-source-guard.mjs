@@ -13,11 +13,16 @@ assert.match(launcher, /first-cut-workbench-launcher\/v1/u);
 assert.match(launcher, /\[data-section-id="first-cut"\]/u);
 assert.match(launcher, /\[data-role="first-cut-workbench-root"\]/u);
 assert.match(launcher, /\[data-panel="viewport"\]/u);
+assert.match(launcher, /\[data-action="switch-right-tab"\]\[data-tab="overrides"\]/u);
+assert.match(launcher, /\[data-tab-group="overrides"\]/u);
+assert.match(launcher, /ensureOverridesVisible\(\)/u);
+assert.match(launcher, /FIRST_CUT_LAUNCHER_OVERRIDES_NOT_ACTIVATED/u);
 assert.match(launcher, /first-cut-workbench-action-bar/u);
 assert.match(launcher, /viewportPanel\.append\(this\.actionBar\)/u);
 assert.match(launcher, /display: 'flex'/u);
 assert.match(launcher, /flex: 'none'/u);
 assert.doesNotMatch(launcher, /viewport-edit-bar/u);
+assert.doesNotMatch(launcher, /queueMicrotask|requestAnimationFrame|setTimeout/u);
 assert.doesNotMatch(launcher, /const (?:TOOLBAR|ACTION_BAR)_SELECTOR = '\.viewport-toolbar'/u);
 assert.match(launcher, /\[data-role="first-cut-workbench-focus"\]/u);
 assert.match(launcher, /\[data-role="first-cut-workbench-popout"\]/u);
@@ -98,6 +103,9 @@ console.log(JSON.stringify({
   enrichmentControllerCount: 1,
   launcherOwnedActionBand: true,
   actionBarVisibleAcrossViewportModes: true,
+  owningPropertiesTabActivated: true,
+  hiddenPropertiesGroupFocused: false,
+  timingWorkaroundUsed: false,
   hiddenViewportEditBarUsed: false,
   heightCappedViewportToolbarUsed: false,
   hostReused: true,
