@@ -16,8 +16,17 @@ import { buildCanonicalTopologyFromWorkspaceDataset, applyCanonicalTopologyToWor
 import { commitDraftToWorkspace } from './topology-edit/topology-edit-commit-service.js';
 import { checkCanonicalTopology } from './topology-edit/topology-edit-checker.js';
 import { TopologyEditAutofixController } from './topology-edit/topology-edit-autofix-controller.js';
+import {
+  createTopologyEditPresentationBasis,
+  createTopologyEditPresentationState,
+  reduceTopologyEditPresentationState,
+  topologyEditPresentationActions,
+} from './viewport-presentation/topology-edit-presentation-contract.js';
+import { TopologyEditPresentationRuntime } from './viewport-presentation/topology-edit-presentation-runtime.js';
+import { TopologyEditPresentationToolbar } from './viewport-presentation/topology-edit-presentation-toolbar.js';
 import { semanticHash } from '../core/shared-piping-model/index.js';
 
+const PRESENTATION_ACTIONS = topologyEditPresentationActions();
 let sessionSequence = 0;
 
 export class TopologyEdit3DViewController {
@@ -25,8 +34,12 @@ export class TopologyEdit3DViewController {
     this.eventBus = eventBus;
     this.viewportBackend = null;
     this.toolsController = null;
+    this.presentationRuntime = null;
+    this.presentationToolbar = null;
+    this.presentationState = null;
     this.hostElement = null;
     this.canvasMount = null;
+    this.presentationMount = null;
     this.statusElement = null;
     this.baseCanonicalTopology = null;
     this.canonicalTopology = null;
@@ -39,15 +52,18 @@ export class TopologyEdit3DViewController {
   }
 
   async activate() {
-    if (this.hostElement) return; // already active
+    if (this.hostElement) return;
     this.hostElement = globalThis.document?.querySelector('[data-role="topology-edit-render-host"]');
     if (!this.hostElement) throw new Error('TopologyEdit3DViewController: render host is missing.');
     sessionSequence += 1;
     this.editSessionId = `session:${semanticHash({ startedAt: Date.now(), sequence: sessionSequence }).slice(0, 20)}`;
     this.eventBus.publish(EVENT_TOPICS.TOPOLOGY_EDIT_3D_MODE_CHANGED, { active: true });
     this.buildShell();
+    this.initializePresentation();
     this.viewportBackend = new TopologyEditViewportBackend();
     this.viewportBackend.mount(this.canvasMount);
+    this.presentationRuntime = new TopologyEditPresentationRuntime(this.viewportBackend);
+    this.presentationRuntime.apply(this.presentationState);
     this.toolsController = new TopologyEditToolsController(EDIT_TOOLS.SELECT);
     this.unsubscribers = [
       this.eventBus.subscribe(EVENT_TOPICS.WORKSPACE_SNAPSHOT_CHANGED, () => this.refreshFromWorkspace()),
@@ -63,12 +79,18 @@ export class TopologyEdit3DViewController {
     this.unsubscribers = [];
     this.canvasMount?.removeEventListener('pointerdown', this.pointerHandler);
     this.hostElement.removeEventListener('click', this.clickHandler);
+    this.presentationToolbar?.destroy();
+    this.presentationRuntime?.destroy();
     this.viewportBackend?.destroy();
     this.viewportBackend = null;
     this.toolsController = null;
+    this.presentationToolbar = null;
+    this.presentationRuntime = null;
+    this.presentationState = null;
     this.hostElement.replaceChildren();
     this.hostElement = null;
     this.canvasMount = null;
+    this.presentationMount = null;
     this.statusElement = null;
     this.baseCanonicalTopology = null;
     this.canonicalTopology = null;
@@ -76,7 +98,6 @@ export class TopologyEdit3DViewController {
     this.eventBus.publish(EVENT_TOPICS.TOPOLOGY_EDIT_3D_MODE_CHANGED, { active: false });
   }
 
-  /** Renders the (mostly hidden while active) Load Calc dock pane for this tab; the real canvas lives in the shared render host, not this pane. */
   renderPane(pane) {
     if (!pane) return;
     pane.innerHTML = '<p class="panel-empty">The 3D topology editor is active in the shared viewport above, and shares the left tree, right properties panel, and bottom live table with the rest of the workspace.</p>';
@@ -86,6 +107,7 @@ export class TopologyEdit3DViewController {
     this.hostElement.innerHTML = `
       <header class="topology-edit-3d-toolbar">
         <div role="tablist" aria-label="Topology edit tools" data-role="topology-edit-tools"></div>
+        <div data-role="topology-edit-presentation-toolbar"></div>
         <output data-role="topology-edit-status" aria-live="polite">Loading topology…</output>
         <div class="topology-edit-3d-toolbar__actions">
           <button type="button" data-action="nudge-selected">Nudge selected +Z 100mm</button>
@@ -96,9 +118,37 @@ export class TopologyEdit3DViewController {
       <div data-role="topology-edit-checker" class="topology-edit-3d-checker" aria-live="polite"></div>
       <div data-role="topology-edit-canvas-mount" class="topology-edit-3d-canvas"></div>`;
     this.canvasMount = this.hostElement.querySelector('[data-role="topology-edit-canvas-mount"]');
+    this.presentationMount = this.hostElement.querySelector('[data-role="topology-edit-presentation-toolbar"]');
     this.statusElement = this.hostElement.querySelector('[data-role="topology-edit-status"]');
     this.checkerElement = this.hostElement.querySelector('[data-role="topology-edit-checker"]');
     this.hostElement.addEventListener('click', this.clickHandler);
+  }
+
+  initializePresentation() {
+    this.presentationState = createTopologyEditPresentationState({
+      basis: createTopologyEditPresentationBasis(),
+    });
+    this.presentationToolbar = new TopologyEditPresentationToolbar({
+      onAction: (action) => this.applyPresentationAction(action),
+    });
+    this.presentationToolbar.mount(this.presentationMount, this.presentationState);
+  }
+
+  applyPresentationAction(action) {
+    this.presentationState = reduceTopologyEditPresentationState(this.presentationState, action);
+    this.presentationToolbar?.update(this.presentationState);
+    this.presentationRuntime?.apply(this.presentationState);
+  }
+
+  updatePresentationBasis(canonical) {
+    const basis = createTopologyEditPresentationBasis({
+      sourceHash: canonical.sourceHash,
+      baseCanonicalHash: this.baseCanonicalTopology?.canonicalTopologyHash,
+      draftCanonicalHash: draftTopologyHash(canonical),
+      visualModelHash: null,
+      scopeHash: null,
+    });
+    this.applyPresentationAction({ type: PRESENTATION_ACTIONS.REBASE, basis });
   }
 
   handleHostClick(event) {
@@ -149,6 +199,7 @@ export class TopologyEdit3DViewController {
       if (!this.baseCanonicalTopology || this.baseCanonicalTopology.datasetVersion !== canonical.datasetVersion) {
         this.baseCanonicalTopology = canonical;
       }
+      this.updatePresentationBasis(canonical);
       this.renderScene(canonical);
       this.runChecker();
       this.setStatus(`${canonical.nodes.length} nodes, ${canonical.edges.length} edges, ${canonical.supports.length} supports.`);
@@ -185,6 +236,7 @@ export class TopologyEdit3DViewController {
     if (!fixable.length) { this.setStatus('No auto-fixable issues.'); return; }
     const result = TopologyEditAutofixController.applyAutofix(this.canonicalTopology, fixable);
     this.canonicalTopology = result.finalTopology;
+    this.updatePresentationBasis(this.canonicalTopology);
     this.renderScene(this.canonicalTopology);
     this.runChecker();
     this.setStatus(`Autofix: ${result.applied.length} applied, ${result.rejected.length} rejected (draft, not committed).`);
@@ -209,6 +261,7 @@ export class TopologyEdit3DViewController {
       };
     }).filter(Boolean);
     this.viewportBackend.renderSession({ source: { elements, segments }, draft: { elements, segments } });
+    this.presentationRuntime?.apply(this.presentationState);
   }
 
   nudgeSelectedNode() {
@@ -219,6 +272,7 @@ export class TopologyEdit3DViewController {
         : node
     ));
     this.canonicalTopology = { ...this.canonicalTopology, nodes };
+    this.updatePresentationBasis(this.canonicalTopology);
     this.renderScene(this.canonicalTopology);
     this.runChecker();
     this.setStatus(`Node ${this.selectedNodeId} moved +Z 100mm (draft, not committed).`);
@@ -242,4 +296,15 @@ export class TopologyEdit3DViewController {
   setStatus(message) {
     if (this.statusElement) this.statusElement.textContent = message;
   }
+}
+
+function draftTopologyHash(canonical) {
+  return semanticHash({
+    schema: canonical.schema,
+    datasetId: canonical.datasetId,
+    nodes: canonical.nodes,
+    edges: canonical.edges,
+    junctions: canonical.junctions,
+    supports: canonical.supports,
+  });
 }
