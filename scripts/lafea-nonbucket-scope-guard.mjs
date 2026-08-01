@@ -15,7 +15,6 @@ assert.equal(new Set(registeredChecks).size, registeredChecks.length, 'The non-b
 
 for (const required of [
   'scripts/lafea-nonbucket-scope-guard.mjs',
-  'scripts/lafea-p0-ui-containment-check.mjs',
   'scripts/lafea-u1-stage-registry-check.mjs',
   'scripts/lafea-u1b-registry-consumer-check.mjs',
   'scripts/lafea-u2a-input-command-check.mjs',
@@ -48,9 +47,14 @@ assert.match(
   packageJson,
   /"check:lafea-nonbucket-stack"\s*:\s*"node scripts\/lafea-nonbucket-stack-check\.mjs"/u,
 );
+assert.match(
+  packageJson,
+  /"check:lafea-workbench"\s*:\s*"node scripts\/lafea-workbench-check\.mjs"/u,
+);
 
 assert.match(workflow, /name:\s*LAFEA Non-Bucket Stack Certification/u);
 assert.match(workflow, /npm run check:lafea-nonbucket-stack/u);
+assert.match(workflow, /npm run check:lafea-workbench/u);
 assert.match(workflow, /node scripts\/run-playwright\.mjs e2e\/lafea-hybrid-workbench\.spec\.js/u);
 assert.match(workflow, /npm run check:lafea-agent1-stack/u);
 assert.match(workflow, /npm run gate/u);
@@ -88,6 +92,7 @@ console.log(JSON.stringify({
   status: 'PASS',
   registeredCheckCount: registeredChecks.length,
   dedicatedPackageScript: true,
+  dedicatedWorkbenchScript: true,
   dedicatedWorkflow: true,
   browserScope: 'e2e/lafea-hybrid-workbench.spec.js',
   legacyAggregateRetainedForAttributionOnly: true,
