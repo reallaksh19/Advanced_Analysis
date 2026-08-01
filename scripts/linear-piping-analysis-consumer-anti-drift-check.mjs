@@ -119,7 +119,7 @@ assert.equal(
   packageValue.scripts['check:linear-piping-analysis-consumer'],
   'node scripts/linear-piping-analysis-consumer-check.mjs && node scripts/linear-piping-analysis-consumer-anti-drift-check.mjs',
 );
-assert.match(packageValue.scripts['check:lfea-core'], /check:linear-piping-analysis-consumer/u);
+assert.match(packageValue.scripts['check:lfea-linear-core'], /check:linear-piping-analysis-consumer/u);
 assert.match(packageValue.scripts.gate, /check:linear-piping-analysis-consumer/u);
 
 await import('./linear-piping-source-orchestration-check.mjs');
