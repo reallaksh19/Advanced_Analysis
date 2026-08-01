@@ -37,7 +37,7 @@ function run() {
     urlApi,
   ).init();
   const fixture = buildQualifiedPresentationFixture();
-  const qualifiedPackage = workspacePackage(fixture);
+  const governedPackage = workspacePackage(fixture);
 
   test('P5B-MOUNT-01', 'Controller mounts one active properties-panel section', () => {
     assert.equal(panelContainer.children.length, 1);
@@ -48,43 +48,46 @@ function run() {
     assert.equal(controller.elements.engineeringButton.disabled, true);
   });
 
-  test('P5B-LOAD-01', 'Qualified sealed package compiles and renders through Phase 5 authority', () => {
-    const presentation = controller.loadPackage(qualifiedPackage);
+  test('P5B-LOAD-01', 'Governed stepped-reducer package remains current and audit-only', () => {
+    const presentation = controller.loadPackage(governedPackage);
     const snapshot = controller.getSnapshot();
     assert.equal(snapshot.status, 'CURRENT');
     assert.equal(snapshot.applicationId, fixture.applicationResult.applicationId);
     assert.equal(snapshot.presentationSemanticHash, presentation.semanticHash);
-    assert.equal(snapshot.exportEligibility, 'ENGINEERING_EXPORT_ALLOWED');
+    assert.equal(snapshot.qualificationStatus, 'CONDITIONAL');
+    assert.equal(snapshot.exportEligibility, 'AUDIT_ONLY_CONDITIONAL');
     assert.equal(controller.elements.auditButton.disabled, false);
-    assert.equal(controller.elements.engineeringButton.disabled, false);
+    assert.equal(controller.elements.engineeringButton.disabled, true);
+    assert.ok(fixture.applicationResult.limitations.some(
+      (row) => row.limitation?.code === 'REDUCER_APPROXIMATION',
+    ));
     assert.match(flattenText(controller.elements.resultsRoot), /B31\.3 application results/u);
     assert.match(flattenText(controller.elements.resultsRoot), /Support, anchor and nozzle interface actions/u);
   });
 
-  test('P5B-EXPORT-01', 'Audit and engineering export records remain deterministic', () => {
+  test('P5B-EXPORT-01', 'Audit export is deterministic and engineering export fails closed', () => {
     const auditA = controller.createAuditExport();
     const auditB = controller.createAuditExport();
     assert.equal(auditA.content, auditB.content);
     assert.equal(auditA.contentHash, auditB.contentHash);
-    const engineeringA = controller.createEngineeringExports();
-    const engineeringB = controller.createEngineeringExports();
-    assert.equal(engineeringA.length, 3);
-    assert.deepEqual(
-      engineeringA.map((row) => ({ role: row.role, contentHash: row.contentHash, content: row.content })),
-      engineeringB.map((row) => ({ role: row.role, contentHash: row.contentHash, content: row.content })),
+    assert.match(auditA.content, /REDUCER_APPROXIMATION/u);
+    expectCode(
+      () => controller.createEngineeringExports(),
+      'PIPING_PRESENTATION_ENGINEERING_EXPORT_BLOCKED',
     );
   });
 
-  test('P5B-DOWNLOAD-01', 'Browser adapter downloads governed records and revokes object URLs', () => {
+  test('P5B-DOWNLOAD-01', 'Browser adapter downloads audit evidence and contains blocked engineering export', () => {
     controller.downloadAuditExport();
     assert.equal(documentRef.downloads.at(-1).fileName.endsWith('-piping-audit.json'), true);
     const before = documentRef.downloads.length;
     controller.downloadEngineeringExports();
-    assert.equal(documentRef.downloads.length - before, 3);
+    assert.equal(documentRef.downloads.length, before);
+    assert.ok(controller.getSnapshot().error);
     assert.equal(urlApi.created.length, urlApi.revoked.length);
   });
 
-  test('P5B-STALE-01', 'Previously valid presentation is rejected against a different current application', () => {
+  test('P5B-STALE-01', 'Previously current presentation is rejected against a different current application', () => {
     const staleApplication = sealLinearPipingQualifiedApplicationResult({
       schema: APPLICATION_RESULT_REQUEST_SCHEMA,
       applicationId: 'PIPE-PHASE5B-DIFFERENT-CURRENT',
@@ -96,12 +99,12 @@ function run() {
     });
     controller.applicationResult = staleApplication;
     expectCode(() => controller.createAuditExport(), 'PIPING_PRESENTATION_STALE');
-    controller.loadPackage(qualifiedPackage);
+    controller.loadPackage(governedPackage);
   });
 
   test('P5B-FAILCLOSED-01', 'Rejected replacement clears the previously displayed current result', () => {
     expectCode(
-      () => controller.loadPackage({ ...qualifiedPackage, injectedApplicationValue: 123 }),
+      () => controller.loadPackage({ ...governedPackage, injectedApplicationValue: 123 }),
       'PIPING_WORKSPACE_PACKAGE_KEYS_INVALID',
     );
     assert.equal(controller.getSnapshot().status, 'EMPTY');
@@ -109,7 +112,7 @@ function run() {
     assert.match(flattenText(controller.elements.resultsRoot), /No CURRENT sealed piping application result/u);
   });
 
-  test('P5B-CONDITIONAL-01', 'Conditional result remains audit-visible and blocks engineering controls', () => {
+  test('P5B-CONDITIONAL-01', 'Missing nozzle configuration remains audit-visible and blocks engineering controls', () => {
     const conditionalApplication = sealLinearPipingQualifiedApplicationResult({
       schema: APPLICATION_RESULT_REQUEST_SCHEMA,
       applicationId: 'PIPE-PHASE5B-CONDITIONAL',
