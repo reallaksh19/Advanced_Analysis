@@ -46,8 +46,12 @@ for (const [stageId, fixtureFactory] of Object.entries(FIXTURES)) {
   assert.equal(authority.canonicalizationProfile, LAFEA_CANONICAL_SHA256_PROFILE);
   assert.match(authority.sourceHash, /^sha256:[0-9a-f]{64}$/u);
   assert.equal(authority.sourceHash.startsWith('fnv1a64:'), false);
-  assert.deepEqual(authority.sourceDocument, sourceAuthorityDocument(stageId, document));
-  assert.equal(authority.sourceHash, canonicalLafeaSha256(authority.sourceDocument));
+  const source = sourceAuthorityDocument(document);
+  assert.equal(authority.sourceHash, canonicalLafeaSha256({
+    schema: 'lafea-source-authority-payload/v1',
+    stageId,
+    source,
+  }));
 }
 
 const screeningDocument = screeningFixture();
