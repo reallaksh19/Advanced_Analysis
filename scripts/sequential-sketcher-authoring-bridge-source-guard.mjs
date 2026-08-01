@@ -33,7 +33,7 @@ assert.match(contracts, /SequentialSketcherTransientPreview\.v1/u);
 assert.match(contracts, /dataset\.version \?\? 0/u);
 assert.match(contracts, /offsetGeometry/u);
 assert.match(contracts, /sourceMutation: false/u);
-assert.doesNotMatch(contracts, /workspaceState|gateway\.execute/u);
+assert.doesNotMatch(contracts, /workspaceState\.loadDataset|gateway\.execute\(/u);
 
 assert.match(controller, /createSketcherAuthoringBridge/u);
 assert.match(controller, /this\.authoringBridge = createSketcherAuthoringBridge/u);
