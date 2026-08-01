@@ -17,6 +17,11 @@ function findFiles(dir, files = []) {
     return files;
 }
 
+function filesystemImportPath(importPath) {
+    const suffixIndex = importPath.search(/[?#]/u);
+    return suffixIndex === -1 ? importPath : importPath.slice(0, suffixIndex);
+}
+
 const files = findFiles(srcDir);
 let success = true;
 
@@ -31,22 +36,22 @@ for (const file of files) {
     while ((match = importRegex.exec(code)) !== null) {
         const importPath = match[1];
         if (importPath.startsWith('.')) {
-            // Local import, let's roughly resolve it.
-            const absPath = path.resolve(path.dirname(file), importPath);
+            const resolvedImportPath = filesystemImportPath(importPath);
+            const absPath = path.resolve(path.dirname(file), resolvedImportPath);
             let found = false;
 
-            if (fs.existsSync(absPath)) {
-                 if (fs.statSync(absPath).isDirectory()) {
-                     // Check for index
-                     if (fs.existsSync(path.join(absPath, 'index.js')) || fs.existsSync(path.join(absPath, 'index.jsx'))) {
-                         found = true;
-                     }
-                 } else {
-                     found = true; // file exists (e.g. .css or exact .js file)
-                 }
-            } else {
+            if (resolvedImportPath && fs.existsSync(absPath)) {
+                if (fs.statSync(absPath).isDirectory()) {
+                    // Check for index
+                    if (fs.existsSync(path.join(absPath, 'index.js')) || fs.existsSync(path.join(absPath, 'index.jsx'))) {
+                        found = true;
+                    }
+                } else {
+                    found = true; // file exists (e.g. .css or exact .js file)
+                }
+            } else if (resolvedImportPath) {
                 // Try appending extensions
-                for (const ext of ['.js', '.jsx', '.json']) {
+                for (const ext of ['.js', '.jsx', '.mjs', '.cjs', '.json']) {
                     if (fs.existsSync(absPath + ext)) {
                         found = true;
                         break;
