@@ -27,8 +27,16 @@ export class FirstCutWorkbenchLauncherController {
     this.popoutCount = 0;
     this.lastMode = null;
     this.destroyed = false;
-    this.handleFocus = () => this.focusWorkbench();
-    this.handlePopout = () => this.popoutWorkbench();
+    this.handleFocus = () => {
+      const state = this.focusWorkbench();
+      this.deferHostFocus();
+      return state;
+    };
+    this.handlePopout = () => {
+      const state = this.popoutWorkbench();
+      this.deferHostFocus();
+      return state;
+    };
   }
 
   init() {
@@ -147,6 +155,13 @@ export class FirstCutWorkbenchLauncherController {
     if (shell.classList.contains('properties-collapsed')) {
       throw launcherError('FIRST_CUT_LAUNCHER_PROPERTIES_NOT_EXPANDED');
     }
+  }
+
+  deferHostFocus() {
+    queueMicrotask(() => {
+      if (this.destroyed || !this.actionBar || !this.host?.isConnected) return;
+      this.focusHost();
+    });
   }
 
   focusHost() {
