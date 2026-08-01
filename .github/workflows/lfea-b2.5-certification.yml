@@ -37,7 +37,7 @@ jobs:
       - name: B-2.5 mechanical-model compiler
         run: npm run check:lfea-b2.5
       - name: LFEA core
-        run: npm run check:lfea-core
+        run: npm run check:lfea-linear-core
       - name: LFEA workbench
         run: npm run check:lfea-workbench
       - name: Strict syntax
