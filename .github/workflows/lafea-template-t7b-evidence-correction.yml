@@ -1,0 +1,110 @@
+name: LAFEA Template T7B Evidence Correction
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/lafea-template-t7b-compilation-preview-check.mjs'
+      - 'scripts/lafea-template-t7b-source-guard.mjs'
+      - 'scripts/lafea-template-t7b-validation-parent-check.mjs'
+      - '.github/workflows/lafea-template-t7b-evidence-correction.yml'
+      - 'scripts/lafea-template-t7b-evidence-correction-workflow-check.mjs'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lafea-template-t7b-evidence-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: false
+
+jobs:
+  t7b-evidence-correction:
+    runs-on: ubuntu-24.04
+    env:
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+    steps:
+      - name: Checkout exact T7B pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Validate dedicated workflow contract
+        run: node scripts/lafea-template-t7b-evidence-correction-workflow-check.mjs
+
+      - name: Detect issue-94 evidence correction
+        id: t7b_correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$PR_BASE_SHA"
+          mapfile -t changed < <(git diff --name-only "$PR_BASE_SHA...HEAD" | sort)
+          expected=(
+            scripts/lafea-template-t7b-compilation-preview-check.mjs
+            scripts/lafea-template-t7b-source-guard.mjs
+          )
+          if [[ "${changed[*]}" == "${expected[*]}" ]]; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Confirm workflow-only bootstrap scope
+        if: steps.t7b_correction.outputs.present != 'true'
+        run: |
+          echo 'Dedicated T7B evidence-correction route validated.'
+          echo 'No issue-94 evidence correction exists on this workflow-only head.'
+          echo 'No T7B behavioral qualification is claimed by this run.'
+
+      - name: Install repository dependencies
+        if: steps.t7b_correction.outputs.present == 'true'
+        run: npm ci
+
+      - name: Execute T7B compilation-preview check
+        if: steps.t7b_correction.outputs.present == 'true'
+        run: |
+          set -o pipefail
+          node scripts/lafea-template-t7b-compilation-preview-check.mjs 2>&1 | tee lafea-template-t7b-compilation-preview.log
+
+      - name: Execute T7B validation-parent check
+        if: steps.t7b_correction.outputs.present == 'true'
+        run: |
+          set -o pipefail
+          node scripts/lafea-template-t7b-validation-parent-check.mjs 2>&1 | tee lafea-template-t7b-validation-parent.log
+
+      - name: Execute T7B exact-base source guard
+        if: steps.t7b_correction.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          test -n "$PR_BASE_SHA"
+          node scripts/lafea-template-t7b-source-guard.mjs --base "$PR_BASE_SHA" 2>&1 | tee lafea-template-t7b-source-guard.log
+
+      - name: Run strict syntax gate
+        if: steps.t7b_correction.outputs.present == 'true'
+        run: npm run syntax:strict
+
+      - name: Check exact base-to-head diff
+        if: steps.t7b_correction.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          test -n "$PR_BASE_SHA"
+          git diff --check "$PR_BASE_SHA...HEAD"
+
+      - name: Require clean checkout
+        if: steps.t7b_correction.outputs.present == 'true'
+        run: test -z "$(git status --short)"
+
+      - name: Upload T7B command logs
+        if: always() && steps.t7b_correction.outputs.present == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-template-t7b-evidence-correction
+          path: lafea-template-t7b-*.log
+          if-no-files-found: error
+          retention-days: 7
