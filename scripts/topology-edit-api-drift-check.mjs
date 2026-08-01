@@ -9,7 +9,7 @@ const ROOT = path.resolve(SCRIPT_DIR, '..');
 const MANIFEST_PATH = path.join(ROOT, 'src/vendor/topology-edit/source-manifest.json');
 const DISPOSITION_PATH = path.join(ROOT, 'src/vendor/topology-edit/behavior-disposition.json');
 
-export const EXPECTED_DISPOSITION_SHA256 = 'ba04f64dc9afcedda16eb6cdf5bc4bce98e80acc08683ad754a0f00182815f57';
+export const EXPECTED_DISPOSITION_SHA256 = '65a9a20baaa94b12e29bc539cd3a75a8061ba6d7c81412c9ca5b8dcdc78834f1';
 
 export const EXPECTED_NATIVE_COMMANDS = Object.freeze([
   'MOVE_NODE',
