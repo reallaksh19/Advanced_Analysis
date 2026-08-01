@@ -90,7 +90,7 @@ for (const stageId of ['LAFEA.3', 'LAFEA.4', 'LAFEA.5']) {
   assert.match(meshRecord.parentHashes.meshProfileHash, /^sha256:[0-9a-f]{64}$/u);
   assert.match(meshRecord.producerRef, /^NB-T2\//u);
   assert.equal(stage.lifecycle.artifacts.RECOVERY.status, 'CURRENT');
-  assert.equal(stage.lifecycle.artifacts.CONVERGENCE, undefined);
+  assert.equal(stage.lifecycle.artifacts.CONVERGENCE.status, 'ABSENT');
   assert.equal(stage.lifecycleReadiness.resultState, 'RESULT_READY');
   assert.equal(stage.lifecycleReadiness.codeState, 'CODE_NOT_READY');
   assert.equal(stage.lifecycleReadiness.releaseState, 'RELEASE_NOT_QUALIFIED');
