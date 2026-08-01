@@ -8,42 +8,39 @@
  */
 import {
   SCHEMAS,
-  SCENE_KEYS,
   assertExactKeys,
   contractError,
   deepFreeze,
-  requireAsciiIdentity,
-  requireSchema,
 } from './lafea-canvas/contracts.js';
 import { requireRenderPolicy } from './lafea-canvas/render-policy.js';
-import { lafeaPreviewGeometry } from './lafea-stage-preview.js';
-import { requireLafeaStageRegistryEntry } from './lafea-stage-registry.js';
 import {
   RENDER_REQUEST_KEYS,
   currentLifecycleSourceHash,
   diagnostic,
   emptySelection,
   isRecord,
-  requireNullableHash,
   requireRevision,
-  requireUnique,
-  validateDiagnostic,
   validateSourceSelection,
 } from './lafea-engineering-scene-contracts.js';
 import {
   LAFEA_SOURCE_PRIMITIVE_KINDS,
   LAFEA_SOURCE_PRIMITIVE_SCHEMA,
   createSourcePrimitives,
-  validateSourcePrimitive,
 } from './lafea-engineering-scene-primitives.js';
+import {
+  validateSourceScene,
+} from './lafea-engineering-scene-validation.js';
 import {
   createSourceViewportState,
   validateSourceViewportState,
 } from './lafea-engineering-scene-viewport.js';
+import { lafeaPreviewGeometry } from './lafea-stage-preview.js';
+import { requireLafeaStageRegistryEntry } from './lafea-stage-registry.js';
 
 export {
   LAFEA_SOURCE_PRIMITIVE_KINDS,
   LAFEA_SOURCE_PRIMITIVE_SCHEMA,
+  validateSourceScene,
 };
 export const LAFEA_SOURCE_RENDER_REQUEST_SCHEMA = 'lafea-source-render-request/v1';
 
@@ -97,8 +94,7 @@ export function createLafeaSourceEngineeringScene(input) {
  * Create one shared orthographic viewport/camera state for SVG and WebGL.
  */
 export function createLafeaSourceViewportState(sceneValue, options = {}) {
-  const scene = validateSourceScene(sceneValue);
-  return createSourceViewportState(scene, options);
+  return createSourceViewportState(validateSourceScene(sceneValue), options);
 }
 
 /**
@@ -129,53 +125,6 @@ export function createLafeaSourceRenderRequest(input) {
     'LAFEA_SOURCE_RENDER_REQUEST_KEYS_INVALID',
   );
   return deepFreeze(request);
-}
-
-export function validateSourceScene(scene) {
-  requireSchema(scene, SCHEMAS.scene);
-  assertExactKeys(scene, SCENE_KEYS, 'LAFEA_SCENE_KEYS_INVALID');
-  requireAsciiIdentity(scene.sceneId, 'sceneId');
-  requireRevision(scene.sceneRevision);
-  requireNullableHash(scene.sourceSemanticHash, 'sourceSemanticHash');
-  for (const field of [
-    'topologySemanticHash', 'meshSemanticHash', 'recoverySemanticHash',
-  ]) {
-    if (scene[field] !== null) {
-      throw contractError('LAFEA_SOURCE_SCENE_ENGINEERING_EVIDENCE_FORBIDDEN', { field });
-    }
-  }
-  if (!Array.isArray(scene.sourcePrimitives)
-    || !Array.isArray(scene.meshReferences)
-    || !Array.isArray(scene.resultFields)
-    || !Array.isArray(scene.labels)
-    || !Array.isArray(scene.diagnostics)
-    || !Array.isArray(scene.parentHashes)) {
-    throw contractError('LAFEA_SOURCE_SCENE_ARRAYS_REQUIRED');
-  }
-  if (scene.meshReferences.length || scene.resultFields.length) {
-    throw contractError('LAFEA_SOURCE_SCENE_MESH_RESULT_FORBIDDEN');
-  }
-  scene.sourcePrimitives.forEach(validateSourcePrimitive);
-  scene.diagnostics.forEach(validateDiagnostic);
-  requireUnique(
-    scene.sourcePrimitives.map((row) => row.primitiveId),
-    'LAFEA_SOURCE_PRIMITIVE_ID_COLLISION',
-  );
-  requireUnique(
-    scene.sourcePrimitives.map((row) => row.sceneEntityId),
-    'LAFEA_SCENE_ENTITY_ID_COLLISION',
-  );
-  if (scene.sourceSemanticHash === null && scene.parentHashes.length) {
-    throw contractError('LAFEA_SOURCE_SCENE_PARENT_HASH_WITHOUT_AUTHORITY');
-  }
-  if (scene.sourceSemanticHash !== null) {
-    if (scene.parentHashes.length !== 1
-      || scene.parentHashes[0]?.authorityLayer !== 'SOURCE'
-      || scene.parentHashes[0]?.hash !== scene.sourceSemanticHash) {
-      throw contractError('LAFEA_SOURCE_SCENE_PARENT_HASH_INVALID');
-    }
-  }
-  return deepFreeze(structuredClone(scene));
 }
 
 export function validateSourceViewport(viewport) {
