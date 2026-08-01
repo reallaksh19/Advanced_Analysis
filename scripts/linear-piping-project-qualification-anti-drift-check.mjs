@@ -138,7 +138,10 @@ assert.equal(
   'node scripts/lfea-piping-release-readiness-check.mjs',
 );
 assert.match(packageValue.scripts.gate, /check:lfea-piping-release-policy/u);
-assert.doesNotMatch(packageValue.scripts['check:lfea-core'], /project-qualification/u);
+assert.doesNotMatch(
+  packageValue.scripts['check:lfea-core'] ?? '',
+  /project-qualification/u,
+);
 
 await import('./linear-piping-external-evidence-package-check.mjs');
 
