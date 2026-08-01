@@ -22,6 +22,12 @@
       "status": "PHASE_ONE_RETAINED_NOT_CERTIFIED"
     },
     {
+      "targetPath": "src/workspace/topology-edit/topology-edit-authority-receipt.js",
+      "classification": "FORKED",
+      "authority": "Wave1 deterministic certification receipt authority",
+      "status": "W1_2_CANDIDATE_CERTIFICATION"
+    },
+    {
       "targetPath": "src/workspace/topology-edit/topology-edit-autofix-controller.js",
       "classification": "FORKED",
       "authority": "Wave3 checker/ghost/autofix authority",
@@ -40,6 +46,18 @@
       "status": "GOVERNANCE"
     },
     {
+      "targetPath": "src/workspace/topology-edit/topology-edit-candidate-builder.js",
+      "classification": "FORKED",
+      "authority": "Wave1 complete candidate regeneration authority",
+      "status": "W1_2_CANDIDATE_CERTIFICATION"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-candidate-validator.js",
+      "classification": "FORKED",
+      "authority": "Wave1 structural and checker-policy validation authority",
+      "status": "W1_2_CANDIDATE_CERTIFICATION"
+    },
+    {
       "targetPath": "src/workspace/topology-edit/topology-edit-canonical-state.js",
       "classification": "FORKED",
       "authority": "Wave1 canonical normalization and hash authority",
@@ -50,6 +68,12 @@
       "classification": "WRAPPED",
       "authority": "Source canvas/navigation UX contract",
       "status": "PHASE_ONE_RETAINED"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-certification-service.js",
+      "classification": "FORKED",
+      "authority": "Wave1 atomic candidate certification authority",
+      "status": "W1_2_CANDIDATE_CERTIFICATION"
     },
     {
       "targetPath": "src/workspace/topology-edit/topology-edit-checker.js",
@@ -174,7 +198,8 @@
   ],
   "deferredBehavior": [
     "The retained phase-one command journal remains non-certifying until W1.3 replaces its acceptance and replay authority.",
-    "The W1.1 pure kernel is isolated from the UI and WorkspaceState until candidate certification and session integration close.",
+    "W1.2 certifies exact candidates and receipts but does not append them to a journal or alter active/redo projections.",
+    "The W1.1/W1.2 kernel remains isolated from the UI and WorkspaceState until W1.4.",
     "The existing support overlay is retained as visual evidence and is not restraint-semantic authority.",
     "Workspace commit remains outside Wave 1 and is not qualified by this disposition.",
     "Large-model scaffolding is not performance qualification."
