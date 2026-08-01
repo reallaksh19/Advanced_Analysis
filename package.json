@@ -26,6 +26,7 @@
     "check:first-cut": "npm run check:first-cut-load-estimation && npm run check:first-cut-beam-screening && npm run check:first-cut-sustained-screening && npm run check:first-cut-workbench && npm run check:first-cut-anti-drift",
     "check:imports": "node scripts/import-check.mjs",
     "check:lafea-agent1-stack": "node scripts/lafea-agent1-stack-check.mjs",
+    "check:lafea-nonbucket-stack": "node scripts/lafea-nonbucket-stack-check.mjs",
     "check:lafea-foundation": "node scripts/lafea.15-profile-schema-check.mjs && node scripts/lafea.hash-lineage-check.mjs && node scripts/lafea.14-approximation-register-check.mjs",
     "check:lafea-meshing": "node scripts/lafea.10-topology-contract-check.mjs && node scripts/lafea.10-healing-preview-check.mjs && node scripts/lafea.10-quality-gate-check.mjs && node scripts/lafea.10-convergence-quantities-check.mjs && node scripts/lafea.10-3level-requirement-check.mjs && node scripts/lafea.10-t6-generation-check.mjs && node scripts/lafea.10-q8-recombination-check.mjs && node scripts/lafea.10-mapped-mitc-mesh-check.mjs && node scripts/lafea.10-mesh-quality-panel-check.mjs && node scripts/lafea.10-determinism-check.mjs",
     "check:lafea-solver": "node scripts/lafea.11-sparse-cholesky-check.mjs && node scripts/lafea.11-ldlt-pivoting-check.mjs && node scripts/lafea.11-mechanism-diagnosis-check.mjs && node scripts/lafea.11-tolerance-table-check.mjs && node scripts/lafea.11-scaling-reversibility-check.mjs && node scripts/lafea.11-determinism-check.mjs",
