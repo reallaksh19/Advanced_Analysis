@@ -55,13 +55,15 @@ for (const [stageId, fixtureFactory] of Object.entries(FIXTURES)) {
 }
 
 const screeningDocument = screeningFixture();
-const screeningAuthority = issueLafeaSourceAuthority(
-  'LAFEA.2', screeningDocument, 'NB-T2-SCREENING',
-);
 const screeningStore = createLafeaWorkbenchStore({
   initialStage: 'LAFEA.2',
   initialDocument: screeningDocument,
 });
+const normalizedScreeningDocument =
+  screeningStore.getState().stages['LAFEA.2'].document;
+const screeningAuthority = issueLafeaSourceAuthority(
+  'LAFEA.2', normalizedScreeningDocument, 'NB-T2-SCREENING',
+);
 assert.equal(screeningStore.getState().stages['LAFEA.2'].lifecycle, null);
 screeningStore.run();
 let screeningStage = screeningStore.getState().stages['LAFEA.2'];
