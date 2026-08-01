@@ -39,7 +39,12 @@ export function manualChunk(id) {
     || source.includes('/src/workspace/lfea-')
     || source.endsWith('/src/workspace/workbench-dom.js')) return 'fea-workbenches';
   if (source.includes('/src/core/')) return 'core-application';
-  if (source.includes('/src/calc-workspace/cii-standalone-port/')) return 'cii-standalone';
+  if (source.includes('/src/calc-workspace/cii-standalone-port/ui-adapted/')) {
+    return 'cii-standalone-ui';
+  }
+  if (source.includes('/src/calc-workspace/cii-standalone-port/')) {
+    return 'cii-standalone-core';
+  }
   if (source.includes('/src/calc-workspace/')) return 'calculation-workspaces';
   if (source.includes('/src/vendors/')) return 'vendor-integrations';
   if (source.includes('/src/utils/') || source.includes('/src/mocks/')) return 'application-support';
