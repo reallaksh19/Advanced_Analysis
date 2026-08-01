@@ -1,0 +1,241 @@
+name: LAFEA Template Stack Certification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/lafea-template-stack.yml'
+      - 'package.json'
+      - 'scripts/lafea-template-stack-check.mjs'
+      - 'scripts/lafea-template-t*.mjs'
+      - 'src/core/lafea-application-templates/**'
+      - 'src/workspace/lafea-templates/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lafea-template-stack-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  template-certification:
+    name: Bucket exact-head certification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+    steps:
+      - name: Checkout exact Bucket head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Assert exact checkout identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install locked dependencies
+        id: npm_ci
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm ci 2>&1 | tee lafea-template-npm-ci.log
+
+      - name: Run bounded Bucket template stack
+        id: template_stack
+        if: always() && steps.npm_ci.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run check:lafea-template-stack 2>&1 | tee lafea-template-stack.log
+
+      - name: Build production bundle
+        id: build
+        if: always() && steps.npm_ci.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee lafea-template-build.log
+
+      - name: Verify exact patch hygiene and clean tree
+        id: hygiene
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          {
+            test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+            git diff --check "$PR_BASE_SHA...HEAD"
+            test -z "$(git status --short)"
+          } 2>&1 | tee lafea-template-hygiene.log
+
+      - name: Write Bucket failure matrix
+        if: always()
+        env:
+          OUTCOMES: >-
+            {"npmCi":"${{ steps.npm_ci.outcome }}","templateStack":"${{ steps.template_stack.outcome }}","build":"${{ steps.build.outcome }}","hygiene":"${{ steps.hygiene.outcome }}"}
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          const outcomes = JSON.parse(process.env.OUTCOMES);
+          const exactHead = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          const failures = Object.entries(outcomes)
+            .filter(([, outcome]) => outcome !== 'success')
+            .map(([command, outcome]) => ({ command, outcome }));
+          const matrix = {
+            schema: 'lafea-template-stack-failure-matrix/v1',
+            scope: 'LAFEA_BUCKET_APPLICATION_TEMPLATES',
+            exactHead,
+            expectedHead: process.env.EXPECTED_HEAD_SHA,
+            baseSha: process.env.PR_BASE_SHA,
+            status: failures.length ? 'FAIL' : 'PASS',
+            disposition: failures.length
+              ? 'BUCKET_STACK_NOT_CERTIFIED'
+              : 'BUCKET_STACK_ACCEPTED_AT_EXACT_HEAD',
+            outcomes,
+            failures,
+            executableTemplateCount: 0,
+            qualifiedManifestCount: 0,
+            t7cAuthority: 'IMPORT_FOR_EDITING_ONLY',
+            t7dAuthorized: false,
+            engineExecutionAuthorityChanged: false,
+            lifecycleAuthorityChanged: false,
+            resultBindingAuthorityChanged: false,
+            releaseAuthorityChanged: false,
+          };
+          fs.writeFileSync('lafea-template-stack-failure-matrix.json', `${JSON.stringify(matrix, null, 2)}\n`);
+          console.log(JSON.stringify(matrix));
+          NODE
+
+      - name: Enforce Bucket certification result
+        if: always()
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const matrix = JSON.parse(fs.readFileSync('lafea-template-stack-failure-matrix.json', 'utf8'));
+          if (matrix.status !== 'PASS') process.exit(1);
+          NODE
+
+      - name: Upload Bucket exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-template-stack-exact-head-evidence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            lafea-template-*.log
+            lafea-template-stack-failure-matrix.json
+          if-no-files-found: error
+          retention-days: 14
+
+  repository-integration:
+    name: Repository integration attribution
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+    steps:
+      - name: Checkout exact integration head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install locked dependencies
+        id: npm_ci
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm ci 2>&1 | tee lafea-template-integration-npm-ci.log
+
+      - name: Run full repository gate for attribution
+        id: gate
+        if: always() && steps.npm_ci.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run gate 2>&1 | tee lafea-template-integration-gate.log
+
+      - name: Verify integration checkout and hygiene
+        id: hygiene
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          {
+            test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+            git diff --check "$PR_BASE_SHA...HEAD"
+            test -z "$(git status --short)"
+          } 2>&1 | tee lafea-template-integration-hygiene.log
+
+      - name: Write repository integration matrix
+        if: always()
+        env:
+          OUTCOMES: >-
+            {"npmCi":"${{ steps.npm_ci.outcome }}","fullGate":"${{ steps.gate.outcome }}","hygiene":"${{ steps.hygiene.outcome }}"}
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          const outcomes = JSON.parse(process.env.OUTCOMES);
+          const exactHead = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          const failures = Object.entries(outcomes)
+            .filter(([, outcome]) => outcome !== 'success')
+            .map(([command, outcome]) => ({ command, outcome }));
+          const matrix = {
+            schema: 'lafea-template-repository-integration-matrix/v1',
+            scope: 'REPOSITORY_INTEGRATION_ATTRIBUTION',
+            exactHead,
+            baseSha: process.env.PR_BASE_SHA,
+            status: failures.length ? 'FAIL' : 'PASS',
+            disposition: failures.length
+              ? 'REPOSITORY_INTEGRATION_BLOCKED'
+              : 'REPOSITORY_INTEGRATION_PASS',
+            outcomes,
+            failures,
+            bucketReleaseQualified: false,
+          };
+          fs.writeFileSync('lafea-template-repository-integration-matrix.json', `${JSON.stringify(matrix, null, 2)}\n`);
+          console.log(JSON.stringify(matrix));
+          NODE
+
+      - name: Upload repository integration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-template-repository-integration-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            lafea-template-integration-*.log
+            lafea-template-repository-integration-matrix.json
+          if-no-files-found: error
+          retention-days: 14
