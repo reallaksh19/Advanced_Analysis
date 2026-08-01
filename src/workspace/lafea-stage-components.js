@@ -93,7 +93,10 @@ export function lafeaTechnicalComponentRegistered(kind, componentId) {
 function normalizeFoundation(input) {
   const { cleanInput, meshConfig } = prepareInput(input);
   const source = isRecord(cleanInput.sourceEvidence)
-    ? validateCanonicalLocalAttachmentFoundationModel(cleanInput).sourceEvidence
+    ? {
+      ...validateCanonicalLocalAttachmentFoundationModel(cleanInput).sourceEvidence,
+      schema: ATTACHMENT_MODEL_SCHEMA,
+    }
     : cleanInput;
   const retained = createCanonicalLocalAttachmentFoundationModel(source).sourceEvidence;
   return freezeClone({
@@ -115,7 +118,10 @@ function normalizeScreening(input) {
 function normalizeContinuum(input) {
   const { cleanInput, meshConfig } = prepareInput(input);
   const source = isRecord(cleanInput.sourceEvidence)
-    ? validateCanonicalLocalContinuumModel(cleanInput).sourceEvidence
+    ? {
+      ...validateCanonicalLocalContinuumModel(cleanInput).sourceEvidence,
+      schema: CONTINUUM_MODEL_SCHEMA,
+    }
     : cleanInput;
   const retained = createCanonicalLocalContinuumModel(source).sourceEvidence;
   return freezeClone({
