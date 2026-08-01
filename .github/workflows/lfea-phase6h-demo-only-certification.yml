@@ -1,0 +1,120 @@
+name: LFEA Phase 6H Demo-Only Certification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/lfea-phase6h-demo-only-certification.yml'
+      - 'public/demo-only/lfea-phase6h/**'
+      - 'scripts/lfea-phase6h-demo-only-check.mjs'
+      - 'vite.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lfea-phase6h-demo-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  certify-demo-only-boundary:
+    name: Demo-only exact-head certification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+      SOURCE_PAGE: public/demo-only/lfea-phase6h/index.html
+      BUILT_PAGE: dist/demo-only/lfea-phase6h/index.html
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Assert exact checkout identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+          cache: npm
+
+      - name: Install locked dependencies
+        shell: bash
+        run: npm ci
+
+      - name: Enforce demo-only source boundary
+        shell: bash
+        run: node scripts/lfea-phase6h-demo-only-check.mjs
+
+      - name: Build deployable site
+        shell: bash
+        run: npm run build
+
+      - name: Verify deployed demo projection
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "$SOURCE_PAGE"
+          test -f "$BUILT_PAGE"
+          cmp "$SOURCE_PAGE" "$BUILT_PAGE"
+          grep -Fq 'INELIGIBLE_FOR_PROJECT_EVIDENCE' "$BUILT_PAGE"
+          grep -Fq 'WP-3 REMAINS BLOCKED' "$BUILT_PAGE"
+          grep -Fq 'Phase 6H' "$BUILT_PAGE"
+          ! grep -Fq 'ELIGIBLE_FOR_RELEASE_REVIEW' "$BUILT_PAGE"
+          ! grep -Fq 'RELEASE_APPROVED' "$BUILT_PAGE"
+
+      - name: Write exact-head demo report
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import { createHash } from 'node:crypto';
+          import fs from 'node:fs';
+          const hash = (path) => createHash('sha256').update(fs.readFileSync(path)).digest('hex');
+          const report = {
+            schema: 'lfea-phase6h-demo-only-certification/v1',
+            exactHead: process.env.EXPECTED_HEAD_SHA,
+            sourcePage: process.env.SOURCE_PAGE,
+            builtPage: process.env.BUILT_PAGE,
+            sourceSha256: hash(process.env.SOURCE_PAGE),
+            builtSha256: hash(process.env.BUILT_PAGE),
+            sourceAndBuildIdentical: true,
+            evidenceEligibility: 'INELIGIBLE_FOR_PROJECT_EVIDENCE',
+            wp3: 'BLOCKED_INPUT_REQUIRED',
+            phase6h: 'NOT_READY',
+            wp4: 'BLOCKED',
+            solverInvoked: false,
+            materializerInvoked: false,
+            releaseAuthorityChanged: false,
+            status: 'PASS',
+          };
+          fs.writeFileSync(
+            'lfea-phase6h-demo-only-certification.json',
+            `${JSON.stringify(report, null, 2)}\n`,
+          );
+          console.log(JSON.stringify(report));
+          NODE
+
+      - name: Verify patch hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check "$BASE_SHA...HEAD"
+          test -z "$(git status --short --untracked-files=no)"
+
+      - name: Upload demo-only evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lfea-phase6h-demo-only-${{ github.event.pull_request.head.sha || github.sha }}
+          path: lfea-phase6h-demo-only-certification.json
+          if-no-files-found: error
+          retention-days: 14
