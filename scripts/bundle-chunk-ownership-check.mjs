@@ -7,7 +7,8 @@ const viteSource = fs.readFileSync('vite.config.js', 'utf8');
 const policySource = fs.readFileSync('scripts/bundle-chunk-check.mjs', 'utf8');
 
 const expectedOwnership = new Map([
-  ['/repo/src/calc-workspace/cii-standalone-port/ui-adapted/panel.js', 'cii-standalone'],
+  ['/repo/src/calc-workspace/cii-standalone-port/ui-adapted/panel.js', 'cii-standalone-ui'],
+  ['/repo/src/calc-workspace/cii-standalone-port/xml-cii-table-trace-source.js', 'cii-standalone-core'],
   ['/repo/src/calc-workspace/other-calc/controller.js', 'calculation-workspaces'],
   ['/repo/src/vendors/catalog.js', 'vendor-integrations'],
   ['/repo/src/utils/format.js', 'application-support'],
@@ -37,7 +38,7 @@ assert.equal(viteSource.includes('onlyExplicitManualChunks: true'), true);
 assert.equal(viteSource.includes('chunkSizeWarningLimit'), false);
 assert.equal(policySource.includes('const maximumBytes = 500 * 1024;'), true);
 assert.equal(policySource.includes('chunk.bytes <= maximumBytes'), true);
-assert.equal(new Set(expectedOwnership.values()).size >= 10, true);
+assert.equal(new Set(expectedOwnership.values()).size >= 11, true);
 
 console.log(JSON.stringify({
   check: 'bundle-chunk-ownership',
