@@ -1,26 +1,31 @@
-/**
- * Topology Edit Draft — Phase 0 Baseline Manifest & Anti-Drift Contract
- *
- * Source Baseline: reallaksh19/XML_Compare_Utilities@c20bb037566d52ba5b789712594b754a5fb94651
- * Target Baseline: reallaksh19/Advanced_Analysis@c085e96504ee3b16b4bc9cf6a3a4c5b48bac8cee
- */
+/** Topology Edit Draft — Wave 0 baseline and containment authority. */
 
 export const TOPOLOGY_EDIT_BASELINE_MANIFEST = Object.freeze({
-  schema: 'advanced-topology-edit-baseline-manifest/v1',
+  schema: 'advanced-topology-edit-baseline-manifest/v2',
   sourceRepository: 'reallaksh19/XML_Compare_Utilities',
   sourceCommit: 'c20bb037566d52ba5b789712594b754a5fb94651',
   targetRepository: 'reallaksh19/Advanced_Analysis',
-  targetCommit: 'c085e96504ee3b16b4bc9cf6a3a4c5b48bac8cee',
+  targetCommit: '5b0dad3d1e5566a73d8e2f37420269476eaf15e9',
+  targetBasis: 'WAVE_0_START_HEAD',
+  sourceManifestPath: 'src/vendor/topology-edit/source-manifest.json',
+  behaviorDispositionPath: 'src/vendor/topology-edit/behavior-disposition.json',
+  phaseOneResultLabel: 'TOPOLOGY EDIT PHASE-ONE SMOKE CONTRACTS PASSED',
   isolationRules: Object.freeze([
-    'WorkspaceState.dataset remains 100% immutable during active Edit Draft sessions.',
-    'Rendered Three.js object IDs must never replace canonical engineering entity IDs.',
-    'Draft edits are accumulated in a deterministic command journal before workspace commit.',
-    'Downstream topology, load calculation, and FEA evidence invalidate strictly on workspace commit.',
+    'WorkspaceState.dataset remains immutable during active Edit Draft sessions.',
+    'Rendered Three.js object IDs never replace canonical engineering entity IDs.',
+    'Draft edits remain isolated from workspace mutation until governed commit.',
+    'Canonical Topology Edit modules cannot dispatch through SequentialCommandGateway.',
+    'Downstream topology, load calculation, and FEA evidence invalidate only on governed workspace commit.',
   ]),
 });
 
-export function verifySourceImmutability(originalDatasetSnapshot, currentDatasetSnapshot) {
+export function verifySourceImmutability(
+  originalDatasetSnapshot,
+  currentDatasetSnapshot,
+) {
   if (!originalDatasetSnapshot || !currentDatasetSnapshot) return true;
-  return originalDatasetSnapshot.datasetId === currentDatasetSnapshot.datasetId &&
-         originalDatasetSnapshot.version === currentDatasetSnapshot.version;
+  return (
+    originalDatasetSnapshot.datasetId === currentDatasetSnapshot.datasetId &&
+    originalDatasetSnapshot.version === currentDatasetSnapshot.version
+  );
 }
