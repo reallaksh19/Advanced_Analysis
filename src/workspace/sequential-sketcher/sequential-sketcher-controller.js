@@ -2,6 +2,7 @@ import { EventBus } from '../event-bus.js';
 import { EVENT_TOPICS } from '../event-topics.js';
 import { WorkspaceState } from '../workspace-state.js';
 import { SequentialCommandGateway } from './sequential-command-gateway.js';
+import { createSketcherAuthoringBridge } from './sketcher-authoring-bridge.js';
 import { SequentialSketcherView } from './sequential-sketcher-view.js';
 
 export class SequentialSketcherController {
@@ -13,6 +14,12 @@ export class SequentialSketcherController {
     this.view = new SequentialSketcherView(rootElement, this.gateway);
     this.currentDataset = null;
     this.unsubscribeCallbacks = [];
+    this.authoringBridge = createSketcherAuthoringBridge({
+      gateway: this.gateway,
+      workspaceState,
+      eventTarget: rootElement,
+      onSelectionChange: (selection) => this.handleSelection(selection.entityId),
+    });
   }
 
   init() {
@@ -61,6 +68,7 @@ export class SequentialSketcherController {
   }
 
   handleSnapshot(snapshot) {
+    this.authoringBridge.handleWorkspaceSnapshot(snapshot);
     if (snapshot?.status === 'ready' && snapshot.dataset) {
       this.currentDataset = snapshot.dataset;
       const selectedId = snapshot.selectedEntityId || this.view.selectedEntity?.entityId;
@@ -83,6 +91,7 @@ export class SequentialSketcherController {
   }
 
   handleClear() {
+    this.authoringBridge.handleWorkspaceSnapshot(this.workspaceState.getSnapshot());
     this.currentDataset = null;
     this.view.selectedEntity = null;
     this.view.render(null);
@@ -91,6 +100,7 @@ export class SequentialSketcherController {
   destroy() {
     this.unsubscribeCallbacks.forEach((unsubscribe) => unsubscribe());
     this.unsubscribeCallbacks = [];
+    this.authoringBridge.destroy();
     this.currentDataset = null;
   }
 }

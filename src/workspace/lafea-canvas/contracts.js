@@ -8,6 +8,7 @@ export const SCHEMAS = Object.freeze({
   svgDraft: 'LafeaSvgDraft.v2',
   renderEvidence: 'LafeaRenderEvidence.v1',
   renderPacket: 'LafeaRenderPacket.v1',
+  renderPacketV2: 'LafeaRenderPacket.v2',
   meshingCommand: 'LafeaMeshingCommand.v1',
 });
 

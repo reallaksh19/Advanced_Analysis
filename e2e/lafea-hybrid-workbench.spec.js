@@ -1,0 +1,223 @@
+import { expect, test } from '@playwright/test';
+
+const FIXTURE_URL = '/Advanced_Analysis/e2e/fixtures/lafea-hybrid-workbench-fixture.js';
+const AUTHORING_FIXTURE_URL =
+  '/Advanced_Analysis/e2e/fixtures/sequential-authoring-bridge-fixture.js';
+
+test.describe('LAFEA hybrid workbench Phase 6 browser validation', () => {
+  test.afterEach(async ({ page }) => {
+    await page.evaluate(() => {
+      globalThis.__LAFEA_HC_BROWSER__?.controller?.destroy?.();
+      delete globalThis.__LAFEA_HC_BROWSER__;
+    }).catch(() => {});
+  });
+
+  test('HC-UI-01: simulated source-authoring scene uses SVG and clears WebGL', async ({ page }) => {
+    const context = await mountScenario(page, 'mountHcSourceAuthoring');
+    expect(context).toMatchObject({
+      stageId: 'LAFEA.3',
+      mode: 'SOURCE_AUTHORING',
+      status: 'BLOCKED',
+    });
+
+    const liveRoot = page.locator('[data-live-viewport-mode="SOURCE_AUTHORING"]');
+    await expect(liveRoot).toHaveCount(1);
+    await expect(liveRoot.locator('.lafea-viewport[data-renderer="SVG"]')).toHaveCount(1);
+    await expect(liveRoot.locator('svg[data-layer="engineering-overlay"]')).toHaveCount(1);
+    await expect(liveRoot.locator('[data-node-id]')).toHaveCount(3);
+    await expect(liveRoot.locator('[data-element-id="E1"]')).toHaveCount(1);
+    await expect(liveRoot.locator('[data-role="lafea-live-result-blocked-status"]')).toContainText(
+      'LAFEA_RENDER_PACKET_NOT_SUPPLIED',
+    );
+
+    const canvasReady = await liveRoot.locator('canvas[data-layer="webgl"]').evaluate(
+      (canvas) => canvas.dataset.ready ?? null,
+    );
+    expect(canvasReady).not.toBe('true');
+    await expect(liveRoot.locator('[data-result-field-id]')).toHaveCount(0);
+  });
+
+  test('HC-UI-02: simulated qualified dense mesh uses WebGL with SVG overlay retained', async ({ page }) => {
+    const context = await mountScenario(page, 'mountHcQualifiedResult');
+    expect(context).toMatchObject({
+      stageId: 'LAFEA.3',
+      mode: 'QUALIFIED_RESULT',
+      status: 'READY',
+    });
+
+    const liveRoot = page.locator('[data-live-viewport-mode="QUALIFIED_RESULT"]');
+    await expect(liveRoot).toHaveCount(1);
+    const resultRoot = liveRoot.locator(
+      '.lafea-viewport[data-result-status="READY"][data-result-renderer="THREE_WEBGL"]',
+    );
+    await expect(resultRoot).toHaveCount(1);
+    await expect(resultRoot).toHaveAttribute('data-renderer', 'THREE_WEBGL');
+    await expect(resultRoot).toHaveAttribute('data-result-field-id', 'HC-UI-FIELD');
+    await expect(resultRoot.locator('canvas[data-layer="webgl"]')).toHaveAttribute(
+      'data-ready',
+      'true',
+    );
+    await expect(resultRoot.locator('svg[data-layer="engineering-overlay"]')).toHaveCount(1);
+    await expect(resultRoot.locator('[data-node-id]')).toHaveCount(3);
+    await expect(resultRoot.locator('[data-element-id="E1"]')).toHaveCount(1);
+    await expect(resultRoot.locator('[data-role="lafea-result-display-status"]')).toContainText(
+      'Result display READY: HC-UI-FIELD',
+    );
+  });
+
+  test('HC-UI-04: simulated GPU pick resolves exact engineering identity', async ({ page }) => {
+    await mountScenario(page, 'mountHcQualifiedResult');
+    const resultRoot = page.locator(
+      '[data-live-viewport-mode="QUALIFIED_RESULT"] .lafea-viewport',
+    );
+    await expect(resultRoot).toHaveAttribute('data-result-status', 'READY');
+
+    await resultRoot.evaluate((root) => {
+      const rect = root.getBoundingClientRect();
+      root.dispatchEvent(new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        clientX: rect.left + rect.width * 0.25,
+        clientY: rect.top + rect.height * 0.75,
+      }));
+    });
+
+    await expect(resultRoot).toHaveAttribute('data-gpu-pick-status', 'SELECTED');
+    await expect(resultRoot).not.toHaveAttribute('data-gpu-pick-reason', /.+/u);
+    await expect(resultRoot.locator('[data-element-id="E1"]')).toHaveAttribute(
+      'data-selected',
+      'true',
+    );
+    await expect(resultRoot.locator('[data-layer="accessible-inspector"]')).toContainText(
+      'Selected Entity: E1 (ELEMENT)',
+    );
+    await expect(resultRoot).toHaveAttribute('data-result-status', 'READY');
+    await expect(resultRoot).toHaveAttribute('data-result-renderer', 'THREE_WEBGL');
+  });
+
+  test('HC-UI-05: simulated unrecovered sample uses explicit diagnostic colour policy', async ({ page }) => {
+    const context = await mountScenario(page, 'mountHcDiagnosticResult');
+    expect(context).toMatchObject({
+      stageId: 'LAFEA.3',
+      mode: 'QUALIFIED_RESULT',
+      status: 'READY',
+    });
+
+    const resultRoot = page.locator(
+      '[data-live-viewport-mode="QUALIFIED_RESULT"] .lafea-viewport',
+    );
+    await expect(resultRoot).toHaveAttribute('data-result-status', 'READY');
+    await expect(resultRoot).toHaveAttribute('data-result-renderer', 'THREE_WEBGL');
+    await expect(resultRoot).toHaveAttribute(
+      'data-result-field-id',
+      'HC-UI-DIAGNOSTIC-FIELD',
+    );
+    const canvas = resultRoot.locator('canvas[data-layer="webgl"]');
+    await expect(canvas).toHaveAttribute('data-ready', 'true');
+    await expect(canvas).toHaveAttribute('data-diagnostic-vertex-count', '1');
+    await expect(canvas).toHaveAttribute(
+      'data-diagnostic-policy-id',
+      'LAFEA-UNRECOVERED-VERTEX-MAGENTA-V1',
+    );
+    await expect(canvas).toHaveAttribute(
+      'data-diagnostic-policy-hash',
+      'sha256:lafea-u4j-unrecovered-magenta-v1',
+    );
+    await expect(resultRoot.locator('svg[data-layer="engineering-overlay"]')).toHaveCount(1);
+    await expect(resultRoot.locator('[data-node-id]')).toHaveCount(3);
+  });
+
+  test('HC-UI-06: simulated WebGL loss enters explicit blocked SVG state', async ({ page }) => {
+    await mountScenario(page, 'mountHcQualifiedResult');
+    const liveRoot = page.locator('[data-live-viewport-mode="QUALIFIED_RESULT"]');
+    const resultRoot = liveRoot.locator('.lafea-viewport');
+    await expect(resultRoot).toHaveAttribute('data-result-status', 'READY');
+
+    await page.evaluate(async (fixtureUrl) => {
+      const fixture = await import(fixtureUrl);
+      fixture.triggerHcWebglLoss(globalThis.__LAFEA_HC_BROWSER__.controller);
+    }, FIXTURE_URL);
+
+    await expect(resultRoot).toHaveAttribute('data-result-status', 'BLOCKED');
+    await expect(resultRoot).toHaveAttribute('data-result-renderer', 'SVG');
+    await expect(resultRoot).toHaveAttribute(
+      'data-result-blocking-reasons',
+      /LAFEA_HYBRID_RESULT_WEBGL_CONTEXT_LOST/u,
+    );
+    await expect(resultRoot.locator('canvas[data-layer="webgl"]')).toHaveAttribute(
+      'data-ready',
+      'false',
+    );
+    await expect(resultRoot.locator('svg[data-layer="engineering-overlay"]')).toHaveCount(1);
+    await expect(resultRoot.locator('[data-node-id]')).toHaveCount(3);
+    await expect(resultRoot.locator('[data-role="lafea-result-display-status"]')).toContainText(
+      'Result display BLOCKED',
+    );
+  });
+
+  test('HC-UI-07: simulated authoring gesture commits one revision-checked command', async ({ page }) => {
+    await page.goto('/');
+    const context = await page.evaluate(async (fixtureUrl) => {
+      const fixture = await import(fixtureUrl);
+      const root = document.createElement('main');
+      root.id = 'lafea-sequential-authoring-browser-root';
+      document.body.replaceChildren(root);
+      return fixture.mountHcSequentialAuthoring(root).context;
+    }, AUTHORING_FIXTURE_URL);
+    expect(context).toMatchObject({
+      datasetId: 'HC-UI-07-DATASET',
+      datasetRevision: 1,
+      bridgeStatus: 'IDLE',
+      entityId: 'PIPE-1',
+    });
+    await expect(page.locator('.sequential-sketcher-svg-host svg')).toHaveCount(1);
+
+    const result = await page.evaluate(async (fixtureUrl) => {
+      const fixture = await import(fixtureUrl);
+      return fixture.executeHcSequentialAuthoringGesture(
+        globalThis.__LAFEA_HC_BROWSER__.controller,
+      );
+    }, AUTHORING_FIXTURE_URL);
+
+    expect(result.sourceUnchangedDuringPreview).toBe(true);
+    expect(result.previewFrozen).toBe(true);
+    expect(result.preview).toMatchObject({
+      operation: 'STRETCH_NODE',
+      sourceMutation: false,
+      sourceEntityId: 'PIPE-1',
+      offset: { x: 20, y: 5, z: 0 },
+    });
+    expect(result.receiptFrozen).toBe(true);
+    expect(result.receipt).toMatchObject({
+      status: 'APPLIED',
+      commandCount: 1,
+      command: {
+        op: 'STRETCH_NODE',
+        targetEntityId: 'PIPE-1',
+        offset: { x: 20, y: 5, z: 0 },
+      },
+    });
+    expect(result.gatewayHistoryCount).toBe(1);
+    expect(result.acceptedCommandCount).toBe(1);
+    expect(result.bridgeStatus).toBe('IDLE');
+    expect(result.datasetRevision).toBe(2);
+    expect(result.afterGeometry).toEqual({
+      start: { x: 20, y: 5, z: 0 },
+      end: { x: 120, y: 5, z: 0 },
+      center: { x: 70, y: 5, z: 0 },
+    });
+    await expect(page.locator('.sequential-sketcher-svg-host svg')).toHaveCount(1);
+  });
+});
+
+async function mountScenario(page, exportName) {
+  await page.goto('/');
+  return page.evaluate(async ({ fixtureUrl, exportName: selectedExport }) => {
+    const fixture = await import(fixtureUrl);
+    const root = document.createElement('main');
+    root.id = 'lafea-hybrid-browser-root';
+    document.body.replaceChildren(root);
+    const mounted = fixture[selectedExport](root);
+    return mounted.context;
+  }, { fixtureUrl: FIXTURE_URL, exportName });
+}

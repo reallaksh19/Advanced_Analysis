@@ -141,6 +141,8 @@ function elementBinding(elementId, conditionedSegmentId, topologySegmentId, axis
 function interfaceSet(context) {
   const sourceContext = context.sourceAnalysisContext;
   const node = sourceContext.compilation.model.nodes.find((row) => row.nodeId === 'N-000120');
+  const sourceEntityId = node.sourceAncestry.sourceComponentIds[0];
+  assert.equal(sourceEntityId, 'PIPINGELEMENT[0]');
   const dofMappings = sourceContext.compilation.model.constraints
     .filter((row) => row.nodeId === node.nodeId)
     .map((row) => ({
@@ -157,7 +159,7 @@ function interfaceSet(context) {
       interfaceId: 'IF-PHASE2D-NOZZLE',
       interfaceKind: 'NOZZLE',
       nodeId: node.nodeId,
-      sourceEntityId: 'EQUIPMENT-PHASE2D',
+      sourceEntityId,
       supportBinding: null,
       basis: {
         origin: node.position,

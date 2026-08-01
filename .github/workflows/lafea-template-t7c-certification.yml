@@ -1,0 +1,150 @@
+name: LAFEA Template T7C Certification
+
+on:
+  pull_request:
+    paths:
+      - 'src/workspace/lafea-templates/workbench-import*.js'
+      - 'src/workspace/lafea-templates/t7c-workbench-import.js'
+      - 'scripts/lafea-template-t7c-*.mjs'
+      - '.github/workflows/lafea-template-t7c-certification.yml'
+      - 'scripts/lafea-template-t7c-certification-workflow-check.mjs'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lafea-template-t7c-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: false
+
+jobs:
+  t7c-certification:
+    runs-on: ubuntu-24.04
+    env:
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+    steps:
+      - name: Checkout exact T7C pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Validate dedicated workflow contract
+        run: node scripts/lafea-template-t7c-certification-workflow-check.mjs
+
+      - name: Detect T7C package on exact head
+        id: t7c_package
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            src/workspace/lafea-templates/workbench-import.js
+            src/workspace/lafea-templates/workbench-import-wizard.js
+            src/workspace/lafea-templates/workbench-import-panel.js
+            src/workspace/lafea-templates/workbench-import-accessory-panel.js
+            src/workspace/lafea-templates/workbench-import-workbench-registration.js
+            src/workspace/lafea-templates/t7c-workbench-import.js
+            scripts/lafea-template-t7c-workbench-import-check.mjs
+            scripts/lafea-template-t7c-source-guard.mjs
+          )
+          missing=0
+          for path in "${required[@]}"; do
+            if [[ ! -f "$path" ]]; then
+              echo "T7C package file not present on this head: $path"
+              missing=1
+            fi
+          done
+          if [[ "$missing" -eq 0 ]]; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Confirm workflow-only bootstrap scope
+        if: steps.t7c_package.outputs.present != 'true'
+        run: |
+          echo 'Dedicated T7C route validated; no T7C package exists on this workflow-only head.'
+          echo 'No T7C behavioral or import qualification is claimed by this run.'
+
+      - name: Install repository dependencies
+        if: steps.t7c_package.outputs.present == 'true'
+        run: npm ci
+
+      - name: Execute T7C controlled-import behavior check
+        if: steps.t7c_package.outputs.present == 'true'
+        run: |
+          set -o pipefail
+          node scripts/lafea-template-t7c-workbench-import-check.mjs 2>&1 | tee lafea-template-t7c-workbench-import.log
+
+      - name: Execute T7C exact-base source guard
+        if: steps.t7c_package.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          test -n "$PR_BASE_SHA"
+          node scripts/lafea-template-t7c-source-guard.mjs --base "$PR_BASE_SHA" 2>&1 | tee lafea-template-t7c-source-guard.log
+
+      - name: Recheck T7B compilation preview
+        if: steps.t7c_package.outputs.present == 'true'
+        run: node scripts/lafea-template-t7b-compilation-preview-check.mjs
+
+      - name: Recheck T7B validation parent
+        if: steps.t7c_package.outputs.present == 'true'
+        run: node scripts/lafea-template-t7b-validation-parent-check.mjs
+
+      - name: Recheck T7A parameter entry
+        if: steps.t7c_package.outputs.present == 'true'
+        run: node scripts/lafea-template-t7a-parameter-entry-check.mjs
+
+      - name: Recheck T6C cross-contract
+        if: steps.t7c_package.outputs.present == 'true'
+        run: node scripts/lafea-template-t6c-cross-contract-check.mjs
+
+      - name: Recheck accessory-panel controller lifecycle
+        if: steps.t7c_package.outputs.present == 'true'
+        run: node scripts/lafea-accessory-panel-controller-lifecycle-check.mjs
+
+      - name: Run strict syntax gate
+        if: steps.t7c_package.outputs.present == 'true'
+        run: npm run syntax:strict
+
+      - name: Run import-boundary gate
+        if: steps.t7c_package.outputs.present == 'true'
+        run: npm run check:imports
+
+      - name: Run LAFEA core gate
+        if: steps.t7c_package.outputs.present == 'true'
+        run: npm run check:lafea-core
+
+      - name: Run LAFEA workbench gate
+        if: steps.t7c_package.outputs.present == 'true'
+        run: npm run check:lafea-workbench
+
+      - name: Build exact T7C head
+        if: steps.t7c_package.outputs.present == 'true'
+        run: npm run build
+
+      - name: Check exact base-to-head diff
+        if: steps.t7c_package.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          test -n "$PR_BASE_SHA"
+          git diff --check "$PR_BASE_SHA...HEAD"
+
+      - name: Require clean checkout
+        if: steps.t7c_package.outputs.present == 'true'
+        run: test -z "$(git status --short)"
+
+      - name: Upload T7C command logs
+        if: always() && steps.t7c_package.outputs.present == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-template-t7c-certification
+          path: lafea-template-t7c-*.log
+          if-no-files-found: error
+          retention-days: 7

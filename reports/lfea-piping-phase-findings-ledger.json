@@ -83,6 +83,64 @@
       "completedAtUtc": null
     },
     {
+      "phaseId": "PHASE_2E_MULTICASE_APPLICATION_ORCHESTRATION",
+      "title": "Complete retained InputXML multi-case application orchestration",
+      "status": "PARTIALLY_VERIFIED",
+      "scope": [
+        "Consume multiple retained InputXML analysis contexts under one exact source, content, topology, compilation, mechanical-model and stiffness authority.",
+        "Retain deterministic node source ancestry from incident raw InputXML span component UIDs and caller-approved B-2.5 element-binding component IDs without changing the stiffness-state projection.",
+        "Compile one governed interface set, recover every physical case and create deterministic interface envelopes through the existing Phase 3 APIs.",
+        "Assess each configured nozzle profile in every retained case and deterministically retain the governing assessment without deriving allowables.",
+        "Compile sustained, occasional and ordered displacement-range B31.3 checks from retained B-3.4 recoveries through the existing Phase 4 APIs.",
+        "Seal and independently revalidate the complete multi-case application parent and evidence chain without duplicating parser, compiler, solver, recovery or code mechanics."
+      ],
+      "evidencePaths": [
+        "src/core/linear-fea-model-compiler/model-compiler.js",
+        "src/core/linear-piping-multicase-application/contracts.js",
+        "src/core/linear-piping-multicase-application/orchestrator.js",
+        "src/core/linear-piping-multicase-application/index.js",
+        "scripts/linear-piping-inputxml-analysis-context-check.mjs",
+        "scripts/linear-piping-multicase-application-check.mjs",
+        "scripts/linear-piping-multicase-application-anti-drift-check.mjs",
+        "scripts/linear-piping-analysis-consumer-anti-drift-check.mjs",
+        "reports/lfea-piping-phase2e-multicase-application.json",
+        ".github/workflows/lfea-piping-phase-certification.yml"
+      ],
+      "addressedFindingIds": [
+        "AUD-A3-001"
+      ],
+      "completedAtUtc": null
+    },
+    {
+      "phaseId": "PHASE_2F_INPUTXML_UNIT_NORMALIZATION",
+      "title": "Governed InputXML length-unit normalization before B-1",
+      "status": "PARTIALLY_VERIFIED",
+      "scope": [
+        "Preserve request v1 as a metre-only compatibility boundary and introduce request v2 with a required caller-supplied normalization profile.",
+        "Use an exact rational registry for m, mm, cm, in and ft rather than inferred units or decimal conversion approximations.",
+        "Normalize all classified InputXML length fields before B-1 conditioning and reject unclassified numeric geometry fields.",
+        "Retain source unit, target unit, rational scale, profile identity and geometry identities inside InputXML ingestion evidence.",
+        "Require equivalent metre and millimetre fixtures to produce the same conditioned topology, stiffness state and numerical results."
+      ],
+      "evidencePaths": [
+        "src/core/linear-piping-analysis-consumer/inputxml-source-contract.js",
+        "src/core/linear-piping-analysis-consumer/inputxml-unit-contract.js",
+        "src/core/linear-piping-analysis-consumer/inputxml-unit-normalization.js",
+        "src/core/linear-piping-analysis-consumer/inputxml-request-validation.js",
+        "src/core/linear-piping-analysis-consumer/inputxml-source-binding.js",
+        "src/core/linear-piping-analysis-consumer/index.js",
+        "scripts/linear-piping-inputxml-unit-normalization-check.mjs",
+        "scripts/linear-piping-inputxml-source-binding-check.mjs",
+        "scripts/linear-piping-analysis-consumer-anti-drift-check.mjs",
+        "reports/lfea-piping-phase2f-unit-normalization.json",
+        ".github/workflows/lfea-piping-phase-certification.yml"
+      ],
+      "addressedFindingIds": [
+        "AUD-A3-001"
+      ],
+      "completedAtUtc": null
+    },
+    {
       "phaseId": "PHASE_3_INTERFACE_AUTHORITY",
       "title": "Governed support, anchor and nozzle interfaces with reaction recovery",
       "status": "PARTIALLY_VERIFIED",
@@ -163,6 +221,37 @@
         "AUD-A6-001"
       ],
       "completedAtUtc": null
+    },
+    {
+      "phaseId": "PHASE_6_PROJECT_QUALIFICATION",
+      "title": "External reconciliation, performance and rollback evidence eligibility",
+      "status": "UNRESOLVED_GATE",
+      "scope": [
+        "Compare current application values against independently supplied real-model and commercial authorities through the Phase 6A comparison kernel.",
+        "Validate complete selector coverage for current interface, nozzle and B31.3 presentation quantities.",
+        "Seal exact-head performance, deterministic replay, failure-behavior, rollback and signed release-review disposition records.",
+        "Require independent G8 and G9 authorities and hash-bound artifact references without executing external programs or manufacturing evidence.",
+        "Produce only ELIGIBLE_FOR_RELEASE_REVIEW status and keep G8, G9 and G10 unresolved until real artifacts are supplied."
+      ],
+      "evidencePaths": [
+        "src/core/linear-piping-project-qualification/contracts.js",
+        "src/core/linear-piping-project-qualification/comparison.js",
+        "src/core/linear-piping-project-qualification/external-evidence-contracts.js",
+        "src/core/linear-piping-project-qualification/performance-evidence.js",
+        "src/core/linear-piping-project-qualification/rollback-evidence.js",
+        "src/core/linear-piping-project-qualification/external-evidence-package.js",
+        "src/core/linear-piping-project-qualification/index.js",
+        "scripts/linear-piping-project-qualification-check.mjs",
+        "scripts/linear-piping-external-evidence-package-check.mjs",
+        "scripts/linear-piping-project-qualification-anti-drift-check.mjs",
+        "reports/lfea-piping-phase6b-external-evidence-package.json",
+        "docs/LFEA_PIPING_PHASE6_EVIDENCE_REQUIREMENTS.md",
+        ".github/workflows/lfea-piping-phase-certification.yml"
+      ],
+      "addressedFindingIds": [
+        "AUD-A7-001"
+      ],
+      "completedAtUtc": null
     }
   ],
   "findings": [
@@ -186,16 +275,33 @@
       "severity": "BLOCKER",
       "auditStatus": "PARTIALLY_VERIFIED",
       "currentStatus": "PARTIALLY_VERIFIED",
-      "ownerPhase": "PHASE_2_SOURCE_ORCHESTRATION",
+      "ownerPhase": "PHASE_2F_INPUTXML_UNIT_NORMALIZATION",
       "evidencePaths": [
+        "src/core/linear-fea-model-compiler/model-compiler.js",
         "src/core/linear-piping-analysis-consumer/source-orchestration.js",
-        "src/core/linear-piping-analysis-consumer/index.js",
+        "src/core/linear-piping-analysis-consumer/inputxml-source-contract.js",
+        "src/core/linear-piping-analysis-consumer/inputxml-unit-contract.js",
+        "src/core/linear-piping-analysis-consumer/inputxml-unit-normalization.js",
+        "src/core/linear-piping-analysis-consumer/inputxml-request-validation.js",
+        "src/core/linear-piping-analysis-consumer/inputxml-source-binding.js",
+        "src/core/linear-piping-analysis-consumer/inputxml-analysis-context.js",
+        "src/core/linear-piping-multicase-application/contracts.js",
+        "src/core/linear-piping-multicase-application/orchestrator.js",
+        "src/core/linear-piping-multicase-application/index.js",
         "src/core/linear-piping-code-application/application-result.js",
         "src/core/linear-piping-presentation/presentation.js",
         "scripts/linear-piping-source-orchestration-check.mjs",
-        "scripts/linear-piping-analysis-consumer-anti-drift-check.mjs"
+        "scripts/linear-piping-inputxml-source-binding-check.mjs",
+        "scripts/linear-piping-inputxml-analysis-context-check.mjs",
+        "scripts/linear-piping-inputxml-unit-normalization-check.mjs",
+        "scripts/linear-piping-multicase-application-check.mjs",
+        "scripts/linear-piping-multicase-application-anti-drift-check.mjs",
+        "scripts/linear-piping-analysis-consumer-anti-drift-check.mjs",
+        "reports/lfea-piping-phase2e-multicase-application.json",
+        "reports/lfea-piping-phase2f-unit-normalization.json",
+        ".github/workflows/lfea-piping-phase-certification.yml"
       ],
-      "remainingCondition": "Raw project-file ingestion and successful exact-head retained evidence remain open."
+      "remainingCondition": "Retain successful exact-head Phase 2F, consumer, core and full-gate evidence; caller-supplied project authorities, real-model reconciliation, commercial corroboration, performance qualification and rollback rehearsal remain open."
     },
     {
       "findingId": "AUD-A3-002",
@@ -282,9 +388,22 @@
       "currentStatus": "UNRESOLVED_GATE",
       "ownerPhase": "PHASE_6_PROJECT_QUALIFICATION",
       "evidencePaths": [
-        "release-evidence/lfea-piping-release-evidence.json"
+        "src/core/linear-piping-project-qualification/contracts.js",
+        "src/core/linear-piping-project-qualification/comparison.js",
+        "src/core/linear-piping-project-qualification/external-evidence-contracts.js",
+        "src/core/linear-piping-project-qualification/performance-evidence.js",
+        "src/core/linear-piping-project-qualification/rollback-evidence.js",
+        "src/core/linear-piping-project-qualification/external-evidence-package.js",
+        "src/core/linear-piping-project-qualification/index.js",
+        "scripts/linear-piping-project-qualification-check.mjs",
+        "scripts/linear-piping-external-evidence-package-check.mjs",
+        "scripts/linear-piping-project-qualification-anti-drift-check.mjs",
+        "reports/lfea-piping-phase6b-external-evidence-package.json",
+        "docs/LFEA_PIPING_PHASE6_EVIDENCE_REQUIREMENTS.md",
+        "release-evidence/lfea-piping-release-evidence.json",
+        ".github/workflows/lfea-piping-phase-certification.yml"
       ],
-      "remainingCondition": "Reconcile a real imported model, corroborate selected results, qualify performance, retain exact-head CI evidence and rehearse rollback."
+      "remainingCondition": "Supply complete non-fictional real-model reconciliation, independent commercial corroboration, performance evidence, rollback evidence and signed disposition; populate G8, G9 and G10 artifact paths and retain successful exact-head CI and full-gate evidence."
     },
     {
       "findingId": "AUD-DOC-001",

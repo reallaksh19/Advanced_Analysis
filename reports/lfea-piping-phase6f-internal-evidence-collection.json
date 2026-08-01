@@ -1,0 +1,56 @@
+{
+  "schema": "lfea-piping-phase-slice/v1",
+  "phaseId": "PHASE_6F_INTERNAL_EVIDENCE_COLLECTION",
+  "ownerFindingId": "AUD-A7-001",
+  "baseHead": "48a480aba1a8b50ff3ace4f5c298006b621a57c0",
+  "status": "UNRESOLVED_GATE",
+  "scope": [
+    "Execute the governed ten-command G0 through G7 evidence plan on one checked-out head.",
+    "Verify the checked-out Git head before executing any engineering command.",
+    "Retain actual stdout, stderr, exit status and content hashes in seven Phase 6D artifact roles.",
+    "Seal the existing Phase 6D exact-head manifest only after every command and clean-tree check passes.",
+    "Write explicit failure evidence and omit the exact-head manifest when any command fails.",
+    "Upload successful and failed collection outputs through separate manual workflow artifact paths.",
+    "Collect internal evidence without creating external evidence or changing release state."
+  ],
+  "evidencePaths": [
+    "scripts/lfea-piping-internal-evidence-collector.mjs",
+    "scripts/lfea-piping-internal-evidence-collector-check.mjs",
+    "scripts/lfea-piping-phase6f-anti-drift-check.mjs",
+    "scripts/lfea-piping-release-readiness-check.mjs",
+    "docs/LFEA_PIPING_PHASE6F_INTERNAL_EVIDENCE_COLLECTION.md",
+    ".github/workflows/lfea-piping-internal-evidence-collection.yml",
+    ".github/workflows/lfea-piping-phase6f-certification.yml"
+  ],
+  "addressedAgainstSection9": {
+    "findingId": "AUD-A7-001",
+    "priorStatus": "UNRESOLVED_GATE",
+    "statusAfterCoding": "UNRESOLVED_GATE",
+    "addressed": [
+      "The repository can now collect real G0 through G7 command outputs for one selected exact head.",
+      "Successful collection creates a Phase 6D-valid manifest and retained artifact set.",
+      "Command failure, checkout mismatch, dirty tree and unsafe output state fail closed.",
+      "Collector tests do not execute engineering commands and are safe inside the normal policy gate."
+    ],
+    "notClosed": [
+      "No successful real collection workflow has been retained.",
+      "No external G8 through G10 package has been supplied.",
+      "No complete runtime release bundle has been assembled or certified.",
+      "A7 and all release gates remain unresolved or partially verified."
+    ]
+  },
+  "explicitNonScope": [
+    "Creating project or commercial comparison values",
+    "Generating performance, rollback or signed-disposition evidence",
+    "Editing release gate status or artifact paths",
+    "Assembling or qualifying the complete runtime release bundle"
+  ],
+  "remainingConditions": [
+    "Run and retain a successful exact-head internal evidence collection.",
+    "Supply the governed external evidence package.",
+    "Assemble and certify the complete runtime release bundle.",
+    "Retain successful exact-head and release validation logs."
+  ],
+  "releaseImpact": "NONE",
+  "programDisposition": "BLOCKED"
+}

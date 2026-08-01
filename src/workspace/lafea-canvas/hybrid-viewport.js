@@ -77,8 +77,8 @@ export function createHybridViewport(root, adapters) {
       const renderer = resolveLafeaRenderer({
         mode: input.mode,
         displayedPrimitiveCount: input.displayedPrimitiveCount,
-        webglAvailable: adapters.webgl.isAvailable(),
-        canvas2dAvailable: adapters.canvas2d?.isAvailable() === true,
+        webglAvailable: adapters.webgl.isAvailable(canvas),
+        canvas2dAvailable: adapters.canvas2d?.isAvailable(canvas) === true,
         policy: input.policy,
       });
 

@@ -1,0 +1,67 @@
+{
+  "schema": "lfea-piping-phase6i-aggregate-anti-drift/v1",
+  "repository": "reallaksh19/Advanced_Analysis",
+  "program": "PRIORITY_2_LINEAR_PIPING_FEA_APPLICATION_CHAIN",
+  "phaseId": "PHASE_6I_AGGREGATE_ANTI_DRIFT",
+  "title": "Aggregate evidence eligibility and AD-01 through AD-25 anti-drift enforcement",
+  "developmentBase": "f48b8edff9031bf9b0be5ea80fa8a8a9bb865bcb",
+  "sourceChangeAuthorized": true,
+  "supersededExecutionCandidates": [
+    "921491eaee42a89115c958797508686c551e19b6",
+    "e76d2171015275836fe80e7d5e8b12d426eeb79e"
+  ],
+  "finding": {
+    "findingId": "AUD-A7-001",
+    "statusBefore": "UNRESOLVED_GATE",
+    "statusAfterCoding": "UNRESOLVED_GATE",
+    "ownerPhase": "PHASE_6_PROJECT_QUALIFICATION"
+  },
+  "implemented": [
+    "Expose npm run check:lfea-piping-phase6i-anti-drift.",
+    "Define an immutable ordered catalogue for AD-01 through AD-25.",
+    "Bind every catalogue scenario to concrete existing rejection codes or source guards.",
+    "Reject pre-step, partial, cancelled, unsuccessful, log-less and artifact-less workflow records.",
+    "Reject superseded and mixed-head Phase 6I evidence chains.",
+    "Separate Phase 6D createdAtUtc metadata from internal-manifest semantic identity while retaining it in evidence identity.",
+    "Run existing Phase 6A through Phase 6H, interface, code-application, presentation and B-4.0 source guards through one aggregate policy command.",
+    "Register Phase 6I under the normal release-policy route and dedicated/consolidated certification workflows."
+  ],
+  "qualificationCoverageCoded": {
+    "scenarioCount": 25,
+    "workflowEvidenceCases": [
+      "completed successful workflow with executable steps, logs and artifact",
+      "pre-step failure",
+      "partial workflow",
+      "cancelled workflow",
+      "failed executable step",
+      "missing logs",
+      "missing artifact",
+      "superseded head",
+      "mixed artifact heads",
+      "timestamp-separated semantic and evidence identities"
+    ],
+    "fixtureClassification": "SIMULATED_INELIGIBLE_FOR_RELEASE_EVIDENCE",
+    "engineeringCommandsExecutedByQualification": false
+  },
+  "releaseImpact": "NONE",
+  "nonScope": [
+    "No real project reconciliation is produced.",
+    "No commercial pipe-stress program is executed.",
+    "No performance or rollback rehearsal evidence is manufactured.",
+    "No signed release disposition is created.",
+    "No committed release manifest gate or artifact path is promoted.",
+    "No nonlinear gap, lift-off, contact or friction authority is introduced.",
+    "No licensed or vendor numerical table is embedded."
+  ],
+  "remainingConditions": [
+    "Select a new immutable exact-head candidate only after this source change is merged.",
+    "Resolve the GitHub Actions pre-step infrastructure gate and retain executable logs.",
+    "Freeze caller-approved project engineering authorities.",
+    "Produce seven complete non-fictional external source records.",
+    "Complete successful same-head Phase 6F, Phase 6H, Phase 6G and Phase 6E execution.",
+    "Retain applicable BM-01 through BM-22 evidence.",
+    "Complete independent AUD-A7-001 and G0 through G10 review."
+  ],
+  "disposition": "BLOCKED",
+  "completedAtUtc": null
+}

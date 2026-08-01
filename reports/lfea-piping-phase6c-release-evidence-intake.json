@@ -1,0 +1,58 @@
+{
+  "schema": "lfea-piping-phase-slice/v1",
+  "phaseId": "PHASE_6C_RELEASE_EVIDENCE_INTAKE",
+  "ownerFindingId": "AUD-A7-001",
+  "baseHead": "f9ac74210373b9f1c01a53cda199a7ec2976ea78",
+  "status": "UNRESOLVED_GATE",
+  "scope": [
+    "Reserve a persisted externalQualificationPackage path in the release manifest without populating it.",
+    "Register that path inside the existing release-readiness exact-key and missing-artifact contracts.",
+    "Load and independently revalidate a supplied Phase 6B external qualification package.",
+    "Require exact-head equality and manifest/package path equality for five external JSON artifacts.",
+    "Require canonical JSON record equality, canonical content hashes and retained record semantic/evidence hashes.",
+    "Require G8, G9 and G10 to be VERIFIED only in explicit release-candidate mode.",
+    "Validate without writing files, executing external tools or mutating release state."
+  ],
+  "evidencePaths": [
+    "release-evidence/lfea-piping-release-evidence.json",
+    "scripts/lfea-piping-release-readiness-check.mjs",
+    "scripts/lfea-piping-external-release-evidence-check.mjs",
+    "scripts/lfea-piping-external-release-evidence-check-check.mjs",
+    "scripts/lfea-piping-phase6c-anti-drift-check.mjs",
+    "docs/LFEA_PIPING_PHASE6C_RELEASE_EVIDENCE_INTAKE.md",
+    ".github/workflows/lfea-piping-phase6c-certification.yml"
+  ],
+  "addressedAgainstSection9": {
+    "findingId": "AUD-A7-001",
+    "priorStatus": "UNRESOLVED_GATE",
+    "statusAfterCoding": "UNRESOLVED_GATE",
+    "addressed": [
+      "A persisted release-candidate package and its five external JSON records can now be verified against the release manifest.",
+      "Package, artifact path, canonical record, content hash, record identity and exact-head mismatches fail closed.",
+      "The new package slot is enforced by the normal release-policy and repository gate routes.",
+      "Release mode additionally blocks unless G8, G9 and G10 are VERIFIED.",
+      "The committed unresolved manifest remains valid in policy mode and cannot be mistaken for release evidence."
+    ],
+    "notClosed": [
+      "No non-fictional Phase 6B package or external artifact has been supplied.",
+      "The externalQualificationPackage and five external artifact paths remain null.",
+      "G8, G9 and G10 remain UNRESOLVED_GATE.",
+      "Successful exact-head Phase 6C and release-candidate command logs have not been retained."
+    ]
+  },
+  "explicitNonScope": [
+    "Creating or modifying external evidence JSON files",
+    "Executing commercial or independent analysis software",
+    "Changing release gate status or artifact paths",
+    "Signing a release disposition",
+    "Promoting the program to QUALIFIED"
+  ],
+  "remainingConditions": [
+    "Supply and retain the non-fictional Phase 6B package and five external JSON artifacts.",
+    "Populate exact release-manifest paths and exactHead.",
+    "Independently review and promote G8, G9 and G10.",
+    "Retain successful exact-head Phase 6C and full release command logs."
+  ],
+  "releaseImpact": "NONE",
+  "programDisposition": "BLOCKED"
+}

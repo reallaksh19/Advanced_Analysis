@@ -5,9 +5,9 @@
  * direct mutation of frozen stage documents. All edits pass through controller
  * commands. Geometry is rendered only from explicit source entities. Stage
  * labels, capability state, preview policy and limitations are read from the
- * governed stage registry.
+ * governed stage registry. Lifecycle evidence is presented read-only.
+ * U4G retains U4B through mountLafeaSourceWorkbenchViewportModel internally.
  */
-import { lafeaPreviewGeometry } from './lafea-stage-preview.js';
 import {
   LAFEA_STAGE_REGISTRY,
   lafeaRegisteredExecutionSupported,
@@ -21,20 +21,32 @@ import {
   restoreFocusedControl,
 } from './lafea-workbench-dom.js';
 import { renderLafeaEvidence } from './lafea-results-view.js';
-import { renderLafeaWorkbenchSvg } from './lafea-workbench-svg.js';
 import { renderMeshQualityPanel } from './lafea-mesh-quality-panel.js';
 import { renderDocumentTableEditor } from './lafea-document-table.js';
+import { renderLafeaLifecyclePanel } from './lafea-lifecycle-panel.js';
+import { mountLafeaLiveWorkbenchViewport } from './lafea-live-workbench-viewport.js';
+
+const VIEW_RENDER_DEPENDENCIES = new WeakMap();
 
 export class LafeaWorkbenchView {
-  /**
-   * @param {Element|null} rootElement Workbench host.
-   */
-  constructor(rootElement) {
+  constructor(rootElement, options = {}) {
     this.rootElement = rootElement;
+    VIEW_RENDER_DEPENDENCIES.set(this, Object.freeze({
+      getRenderPacket: typeof options.getRenderPacket === 'function'
+        ? options.getRenderPacket
+        : () => null,
+      THREE: options.THREE ?? null,
+    }));
     this.handlers = null;
     this.benchmarkHost = null;
     this.section = null;
     this.slots = null;
+    this.activeViewport = null;
+    this.sceneDocuments = new Map();
+    this.sceneLifecycles = new Map();
+    this.sceneLifecycleBindings = new Map();
+    this.sceneRevisions = new Map();
+    this.sceneSelections = new Map();
   }
 
   setBenchmarkHost(hostElement) {
@@ -50,6 +62,8 @@ export class LafeaWorkbenchView {
     const focused = captureFocusedControl(this.rootElement);
     const stage = state.stages[state.activeStageId];
     this.ensureShell();
+    this.activeViewport?.destroy();
+    this.activeViewport = null;
     this.slots.header.replaceChildren(this.header(state));
     this.slots.navigation.replaceChildren(this.stageNavigation(state));
     this.slots.toolbar.replaceChildren(this.toolbar(state.activeStageId, stage));
@@ -73,6 +87,14 @@ export class LafeaWorkbenchView {
   }
 
   destroy() {
+    this.activeViewport?.destroy();
+    this.activeViewport = null;
+    this.sceneDocuments.clear();
+    this.sceneLifecycles.clear();
+    this.sceneLifecycleBindings.clear();
+    this.sceneRevisions.clear();
+    this.sceneSelections.clear();
+    VIEW_RENDER_DEPENDENCIES.delete(this);
     this.rootElement?.replaceChildren();
     this.section = null;
     this.slots = null;
@@ -151,9 +173,9 @@ export class LafeaWorkbenchView {
     );
     run.dataset.role = 'lafea-run';
     run.disabled = !stage.document || !executionSupported;
-    if (!executionSupported) {
-      run.title = 'UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED';
-    }
+    run.title = executionSupported
+      ? 'Retained calculation output is not promoted automatically into lifecycle evidence.'
+      : 'UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED';
 
     const benchmark = actionButton(
       this.rootElement,
@@ -178,6 +200,7 @@ export class LafeaWorkbenchView {
 
   content(state, stage) {
     const registryEntry = requireLafeaStageRegistryEntry(state.activeStageId);
+    const dependencies = VIEW_RENDER_DEPENDENCIES.get(this);
     const grid = element(this.rootElement, 'div', 'lafea-workbench__grid');
 
     const sourceCard = card(
@@ -186,33 +209,54 @@ export class LafeaWorkbenchView {
     );
     sourceCard.body.append(renderDocumentTableEditor(
       sourceCard.body,
+      state.activeStageId,
       stage.document,
-      (json) => this.handlers.onApplyJson(json),
+      {
+        onSetScalar: this.handlers.onSetScalar,
+        onApplyJson: this.handlers.onApplyJson,
+      },
     ));
 
     const previewCard = card(
       this.rootElement,
-      `Source-derived geometry preview — ${state.activeStageId}`,
+      `Governed engineering viewport — ${state.activeStageId}`,
     );
-    const geometry = lafeaPreviewGeometry(state.activeStageId, stage.document);
     const preview = element(this.rootElement, 'div', 'lafea-workbench__svg');
-    if (geometry.nodes.length || geometry.elements.length) {
-      renderLafeaWorkbenchSvg(
-        preview,
-        geometry,
-        registryEntry.previewSource.editable
-          ? { onMoveNode: this.handlers.onMoveNode }
-          : {},
-      );
-    } else {
-      preview.append(element(
+    const sceneRevision = this.nextSceneRevision(
+      state.activeStageId,
+      stage.document,
+      stage.lifecycle,
+      stage.lifecycleBinding,
+    );
+    this.activeViewport = mountLafeaLiveWorkbenchViewport(preview, {
+      stageId: state.activeStageId,
+      document: stage.document,
+      lifecycle: stage.lifecycle,
+      lifecycleBinding: stage.lifecycleBinding,
+      sceneRevision,
+      renderPacket: dependencies.getRenderPacket(state.activeStageId),
+      selection: this.sceneSelections.get(state.activeStageId),
+      THREE: dependencies.THREE,
+      cssWidth: 760,
+      cssHeight: 440,
+      devicePixelRatio: 1,
+      onMoveNode: registryEntry.previewSource.editable
+        ? this.handlers.onMoveNode
+        : undefined,
+      onSelectionChange: (selection) => {
+        this.sceneSelections.set(state.activeStageId, selection);
+      },
+    });
+    previewCard.body.append(preview);
+    if (!this.activeViewport.scene.sourcePrimitives.length) {
+      previewCard.body.append(element(
         this.rootElement,
         'p',
         'lafea-workbench-svg__empty',
         'No explicit source geometry is available for this stage. No geometry or mesh has been synthesized.',
       ));
     }
-    previewCard.body.append(preview, this.truthPanel(registryEntry));
+    previewCard.body.append(this.truthPanel(registryEntry));
 
     const evidenceCard = card(
       this.rootElement,
@@ -237,11 +281,22 @@ export class LafeaWorkbenchView {
     });
     meshCard.body.append(qualityPanelHost);
 
+    const lifecycleCard = card(
+      this.rootElement,
+      `Lifecycle and lineage evidence — ${state.activeStageId}`,
+    );
+    lifecycleCard.body.append(renderLafeaLifecyclePanel(
+      lifecycleCard.body,
+      state.activeStageId,
+      stage,
+    ));
+
     grid.append(
       sourceCard.section,
       previewCard.section,
       evidenceCard.section,
       meshCard.section,
+      lifecycleCard.section,
     );
 
     if (this.benchmarkHost) {
@@ -258,6 +313,21 @@ export class LafeaWorkbenchView {
     }
 
     return grid;
+  }
+
+  nextSceneRevision(stageId, document, lifecycle, lifecycleBinding) {
+    const inputsChanged = !this.sceneDocuments.has(stageId)
+      || this.sceneDocuments.get(stageId) !== document
+      || this.sceneLifecycles.get(stageId) !== lifecycle
+      || this.sceneLifecycleBindings.get(stageId) !== lifecycleBinding;
+    if (inputsChanged) {
+      this.sceneDocuments.set(stageId, document);
+      this.sceneLifecycles.set(stageId, lifecycle);
+      this.sceneLifecycleBindings.set(stageId, lifecycleBinding);
+      this.sceneRevisions.set(stageId, (this.sceneRevisions.get(stageId) ?? 0) + 1);
+      this.sceneSelections.delete(stageId);
+    }
+    return this.sceneRevisions.get(stageId) ?? 0;
   }
 
   truthPanel(registryEntry) {

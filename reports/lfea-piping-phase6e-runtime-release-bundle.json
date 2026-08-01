@@ -1,0 +1,56 @@
+{
+  "schema": "lfea-piping-phase-slice/v1",
+  "phaseId": "PHASE_6E_RUNTIME_RELEASE_BUNDLE",
+  "ownerFindingId": "AUD-A7-001",
+  "baseHead": "d4c365dd6aa58f34cf84f32637120a0d36ce84e6",
+  "status": "UNRESOLVED_GATE",
+  "scope": [
+    "Preserve the committed release manifest as a blocked, null-headed policy template.",
+    "Require an external runtime release manifest and evidence root for explicit release validation.",
+    "Bind runtime manifest exactHead to an explicitly supplied checked-out repository SHA.",
+    "Run simulated policy checks only in policy mode.",
+    "Run persisted Phase 6C and Phase 6D intake validators only in release mode.",
+    "Require both persisted intakes to be current, release eligible and bound to the same exact head.",
+    "Provide a manual workflow that downloads a retained evidence bundle and validates it against github.sha."
+  ],
+  "evidencePaths": [
+    "scripts/lfea-piping-release-orchestrator.mjs",
+    "scripts/lfea-piping-release-readiness-check.mjs",
+    "scripts/lfea-piping-release-orchestration-check.mjs",
+    "scripts/lfea-piping-phase6e-anti-drift-check.mjs",
+    "docs/LFEA_PIPING_PHASE6E_RUNTIME_RELEASE_BUNDLE.md",
+    ".github/workflows/lfea-piping-phase6e-certification.yml",
+    ".github/workflows/lfea-piping-runtime-release-certification.yml"
+  ],
+  "addressedAgainstSection9": {
+    "findingId": "AUD-A7-001",
+    "priorStatus": "UNRESOLVED_GATE",
+    "statusAfterCoding": "UNRESOLVED_GATE",
+    "addressed": [
+      "The release path no longer requires a committed manifest to contain its own commit SHA.",
+      "Policy-mode simulated checks no longer conflict with a qualified runtime release manifest.",
+      "Runtime release validation now binds both internal and external evidence intake to the actual checked-out head.",
+      "A governed manual workflow can consume a retained evidence artifact without modifying repository evidence files."
+    ],
+    "notClosed": [
+      "No real runtime release bundle has been supplied.",
+      "No successful manual runtime release certification has been retained.",
+      "G0 through G10 and all real evidence requirements remain unresolved or partially verified.",
+      "Program disposition remains BLOCKED in the committed repository template."
+    ]
+  },
+  "explicitNonScope": [
+    "Generating, editing or signing runtime release evidence",
+    "Executing commercial or independent engineering analysis",
+    "Changing the committed release manifest to QUALIFIED",
+    "Promoting any G0 through G10 gate"
+  ],
+  "remainingConditions": [
+    "Retain one complete internal and external runtime release bundle for the selected exact head.",
+    "Run the full repository gate on that selected head.",
+    "Run the manual runtime release certification workflow against the retained bundle.",
+    "Retain the validation output and governed signed disposition."
+  ],
+  "releaseImpact": "NONE",
+  "programDisposition": "BLOCKED"
+}

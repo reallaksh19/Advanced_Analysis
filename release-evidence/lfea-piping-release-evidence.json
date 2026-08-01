@@ -29,6 +29,7 @@
     "commercialCorroboration": null,
     "performanceEvidence": null,
     "rollbackEvidence": null,
-    "signedDisposition": null
+    "signedDisposition": null,
+    "externalQualificationPackage": null
   }
 }

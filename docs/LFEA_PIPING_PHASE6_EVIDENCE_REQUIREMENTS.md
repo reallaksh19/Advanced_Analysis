@@ -4,17 +4,41 @@ Program disposition remains `BLOCKED` until every required external and exact-he
 
 ## 1. Purpose
 
-The Phase 6A code provides a deterministic comparison harness. It does not provide project evidence by itself.
+Phase 6A provides a deterministic comparison harness. Phase 6B provides a fail-closed package contract for validating supplied G8, G9, performance, rollback and signed-disposition records together.
 
-The committed analytical fixtures are explicitly fictional and are ineligible for:
+Neither phase provides project evidence by itself. Phase 6B can produce only `ELIGIBLE_FOR_RELEASE_REVIEW`; it cannot change a release gate to `VERIFIED`, populate the release ledger, execute commercial software, create a signature or manufacture an independent expected value.
+
+The committed analytical fixtures are explicitly fictional or simulated and are ineligible for:
 
 - `G8_REAL_MODEL_RECONCILIATION`;
 - `G9_COMMERCIAL_CORROBORATION`;
+- `G10_RELEASE_ROLLBACK`;
 - release qualification;
 - project acceptance;
 - vendor or code-compliance claims.
 
-## 2. Real-model reconciliation evidence
+## 2. Phase 6B package boundary
+
+A Phase 6B external-evidence package must bind all of the following to one exact application and presentation identity:
+
+- a passing `REAL_MODEL_RECONCILIATION` comparison;
+- a passing `COMMERCIAL_CORROBORATION` comparison;
+- exact-head performance evidence;
+- successful rollback evidence;
+- a signed `ACCEPT_FOR_RELEASE_REVIEW` disposition;
+- hash-bound artifact references for every retained external record.
+
+The package derives required comparison categories from the current presentation. Where present, both G8 and G9 must cover:
+
+- local interface force;
+- local reference-point moment;
+- nozzle utilization;
+- B31.3 calculated stress;
+- B31.3 utilization.
+
+The package is rejected when comparison coverage is incomplete, G8 and G9 authority identities are not independent, an authority aliases application evidence, a production limit is exceeded, rollback does not restore the prior application path or project data, a disposition is stale, or an artifact reference does not match its retained record.
+
+## 3. Real-model reconciliation evidence
 
 A qualifying G8 artifact must identify:
 
@@ -34,7 +58,7 @@ A qualifying G8 artifact must identify:
 
 A real-model artifact is not accepted when the authority is fictional, self-generated from the application output, missing source identity, stale against the current application, or incomplete.
 
-## 3. Commercial corroboration evidence
+## 4. Commercial corroboration evidence
 
 A qualifying G9 artifact must identify:
 
@@ -54,7 +78,7 @@ A qualifying G9 artifact must identify:
 
 Commercial output is corroborating evidence. It does not replace controlled analytical benchmarks or exact-head repository qualification.
 
-## 4. Performance evidence
+## 5. Performance evidence
 
 Performance evidence must record:
 
@@ -63,33 +87,52 @@ Performance evidence must record:
 - model sizes and load-case counts;
 - compile, solve, recovery, presentation and export timings;
 - memory measurements;
-- deterministic replay results;
-- cancellation and failure behavior where applicable;
-- the declared production envelope and any exceeded limit.
+- deterministic replay results from at least two runs;
+- cancellation and invalid-input failure behavior;
+- the declared production envelope and every exceeded limit;
+- source document, reviewer and exact UTC review time;
+- current semantic and evidence hashes.
 
-## 5. Rollback evidence
+A Phase 6B package is ineligible when node, element, load-case, timing or memory limits are exceeded.
+
+## 6. Rollback evidence
 
 Rollback evidence must record:
 
 - exact qualified release head;
 - exact rollback target;
-- release and rollback commands;
+- release and rollback commands with command and log hashes;
 - database or file migration implications, if any;
 - successful restoration of the prior application path;
 - preservation of existing project data;
-- post-rollback smoke checks;
-- reviewer and exact UTC completion time.
+- passing post-rollback checks with evidence hashes;
+- source document, reviewer and exact UTC completion time;
+- current semantic and evidence hashes.
 
-## 6. Promotion rule
+The package does not run these commands. It validates records supplied after a controlled rehearsal.
 
-No simulated fixture, code-only pull request, passing unit test or commercial-program name may change G8, G9 or G10 to `VERIFIED`.
+## 7. Artifact-reference requirements
+
+Every external record must have a unique repository-relative artifact reference containing:
+
+- media type;
+- artifact content hash;
+- retained-record semantic hash;
+- retained-record evidence hash.
+
+Paths under scripts, tests, fixtures or mocks are ineligible. A committed simulated fixture cannot be renamed or referenced as project evidence.
+
+## 8. Promotion rule
+
+No simulated fixture, code-only pull request, passing unit test, eligibility package or commercial-program name may change G8, G9 or G10 to `VERIFIED`.
 
 Promotion requires all of the following:
 
 1. A current exact-head repository gate with retained command logs.
-2. Complete non-fictional G8 and G9 artifacts.
-3. Performance evidence.
+2. Complete non-fictional G8 and G9 artifacts under independent authorities.
+3. Performance evidence within the declared production envelope.
 4. A successful rollback rehearsal.
 5. Populated release-evidence artifact paths.
 6. A signed program disposition.
-7. A passing `npm run check:lfea-piping-release` at the exact release head.
+7. A Phase 6B package that revalidates as `ELIGIBLE_FOR_RELEASE_REVIEW`.
+8. A passing `npm run check:lfea-piping-release` at the exact release head.

@@ -15,21 +15,23 @@ const KEYBOARD_NUDGE = 0.001;
  *
  * @param {Element} host SVG host.
  * @param {{nodes:Array<Record<string, unknown>>,elements:Array<Record<string, unknown>>,nodePath:string|null}} geometry Preview geometry.
- * @param {{onMoveNode:(nodePath:string,nodeId:string,x:number,y:number)=>void}} handlers Edit callbacks.
+ * @param {{onMoveNode?:(nodePath:string,nodeId:string,x:number,y:number)=>void}} handlers Edit callbacks.
+ * @param {object|null} viewport Optional governed `LafeaViewportState.v2`.
  * @returns {void}
  */
-export function renderLafeaWorkbenchSvg(host, geometry, handlers) {
+export function renderLafeaWorkbenchSvg(host, geometry, handlers, viewport = null) {
   host.replaceChildren();
   const documentRef = host.ownerDocument;
+  const dimensions = rendererDimensions(viewport);
   const svg = documentRef.createElementNS(SVG_NS, 'svg');
-  svg.setAttribute('viewBox', `0 0 ${WIDTH} ${HEIGHT}`);
+  svg.setAttribute('viewBox', `0 0 ${dimensions.width} ${dimensions.height}`);
   svg.setAttribute('role', geometry.nodePath ? 'group' : 'img');
   svg.setAttribute('aria-label', 'LAFEA editable geometry preview');
   const transform = viewportTransform(geometry.nodes);
   bindGlobalHighlight(svg);
   renderElements(svg, geometry, transform);
   renderNodes(svg, geometry, transform, handlers);
-  if (!geometry.nodes.length) renderEmpty(svg, documentRef);
+  if (!geometry.nodes.length) renderEmpty(svg, documentRef, dimensions);
   host.append(svg);
 }
 
@@ -139,12 +141,44 @@ function bindDrag(svg, marker, node, nodePath, transform, handlers) {
 
 function sourcePoint(svg, event, transform) {
   const rect = svg.getBoundingClientRect();
-  const screenX = (event.clientX - rect.left) * WIDTH / Math.max(rect.width, 1);
-  const screenY = (event.clientY - rect.top) * HEIGHT / Math.max(rect.height, 1);
+  const screenX = (event.clientX - rect.left) * transform.width / Math.max(rect.width, 1);
+  const screenY = (event.clientY - rect.top) * transform.height / Math.max(rect.height, 1);
   return { x: transform.sourceX(screenX), y: transform.sourceY(screenY) };
 }
 
-function viewportTransform(nodes) {
+function rendererDimensions(viewport) {
+  if (viewport === null) return { width: WIDTH, height: HEIGHT };
+  const width = viewport?.cssWidth;
+  const height = viewport?.cssHeight;
+  if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
+    throw new TypeError('LAFEA_SVG_VIEWPORT_DIMENSIONS_INVALID');
+  }
+  return { width, height };
+}
+
+function governedViewportTransform(viewport, dimensions) {
+  const worldBounds = viewport.worldBounds;
+  const minimumX = worldBounds?.minimum?.x;
+  const maximumX = worldBounds?.maximum?.x;
+  const minimumY = worldBounds?.minimum?.y;
+  const maximumY = worldBounds?.maximum?.y;
+  if (![minimumX, maximumX, minimumY, maximumY].every(Number.isFinite)
+    || maximumX <= minimumX || maximumY <= minimumY) {
+    throw new TypeError('LAFEA_SVG_WORLD_BOUNDS_INVALID');
+  }
+  const spanX = maximumX - minimumX;
+  const spanY = maximumY - minimumY;
+  return {
+    width: dimensions.width,
+    height: dimensions.height,
+    x: (value) => (value - minimumX) * dimensions.width / spanX,
+    y: (value) => dimensions.height - (value - minimumY) * dimensions.height / spanY,
+    sourceX: (value) => minimumX + value * spanX / dimensions.width,
+    sourceY: (value) => minimumY + (dimensions.height - value) * spanY / dimensions.height,
+  };
+}
+
+function legacyViewportTransform(nodes, dimensions) {
   const xs = nodes.map((row) => row.x);
   const ys = nodes.map((row) => row.y);
   const minimumX = xs.length ? Math.min(...xs) : 0;
@@ -153,14 +187,19 @@ function viewportTransform(nodes) {
   const maximumY = ys.length ? Math.max(...ys) : 1;
   const spanX = Math.max(maximumX - minimumX, 1e-12);
   const spanY = Math.max(maximumY - minimumY, 1e-12);
-  const scale = Math.min((WIDTH - 2 * PADDING) / spanX, (HEIGHT - 2 * PADDING) / spanY);
-  const offsetX = (WIDTH - scale * spanX) / 2;
-  const offsetY = (HEIGHT - scale * spanY) / 2;
+  const scale = Math.min(
+    (dimensions.width - 2 * PADDING) / spanX,
+    (dimensions.height - 2 * PADDING) / spanY,
+  );
+  const offsetX = (dimensions.width - scale * spanX) / 2;
+  const offsetY = (dimensions.height - scale * spanY) / 2;
   return {
+    width: dimensions.width,
+    height: dimensions.height,
     x: (value) => offsetX + (value - minimumX) * scale,
-    y: (value) => HEIGHT - offsetY - (value - minimumY) * scale,
+    y: (value) => dimensions.height - offsetY - (value - minimumY) * scale,
     sourceX: (value) => (value - offsetX) / scale + minimumX,
-    sourceY: (value) => (HEIGHT - offsetY - value) / scale + minimumY,
+    sourceY: (value) => (dimensions.height - offsetY - value) / scale + minimumY,
   };
 }
 
@@ -168,10 +207,10 @@ function screenPoint(node, transform) {
   return [transform.x(node.x), transform.y(node.y)];
 }
 
-function renderEmpty(svg, documentRef) {
+function renderEmpty(svg, documentRef, dimensions) {
   const text = documentRef.createElementNS(SVG_NS, 'text');
-  text.setAttribute('x', String(WIDTH / 2));
-  text.setAttribute('y', String(HEIGHT / 2));
+  text.setAttribute('x', String(dimensions.width / 2));
+  text.setAttribute('y', String(dimensions.height / 2));
   text.setAttribute('text-anchor', 'middle');
   text.setAttribute('class', 'lafea-workbench-svg__empty');
   text.textContent = 'Import a valid stage document to preview its geometry.';

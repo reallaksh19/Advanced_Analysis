@@ -78,6 +78,7 @@ requireArray(ledger.findings, 'findings');
 if (ledger.phases.length === 0) fail('LFEA_PHASE_LEDGER_EMPTY');
 
 const phaseIds = new Set();
+const phaseById = new Map();
 for (const [index, phase] of ledger.phases.entries()) {
   requireExactKeys(phase, PHASE_KEYS, `LFEA_PHASE_${index}_KEYS_INVALID`);
   requireIdentity(phase.phaseId, `phases[${index}].phaseId`);
@@ -95,6 +96,7 @@ for (const [index, phase] of ledger.phases.entries()) {
   phase.evidencePaths.forEach((entry) => requireExistingPath(entry, 'LFEA_PHASE_EVIDENCE_MISSING'));
   requireNonEmptyTextArray(phase.addressedFindingIds, `phases[${index}].addressedFindingIds`);
   requireAsciiSortedUnique(phase.addressedFindingIds, `phases[${index}].addressedFindingIds`);
+  phaseById.set(phase.phaseId, phase);
 }
 
 const findingIds = [];
@@ -133,15 +135,26 @@ requireEqual(
 
 for (const phase of ledger.phases) {
   for (const findingId of phase.addressedFindingIds) {
-    const finding = findingById.get(findingId);
-    if (!finding) fail('LFEA_PHASE_REFERENCES_UNKNOWN_FINDING', { phaseId: phase.phaseId, findingId });
-    if (finding.ownerPhase !== phase.phaseId) {
-      fail('LFEA_FINDING_OWNER_PHASE_MISMATCH', {
-        phaseId: phase.phaseId,
-        findingId,
-        ownerPhase: finding.ownerPhase,
-      });
+    if (!findingById.has(findingId)) {
+      fail('LFEA_PHASE_REFERENCES_UNKNOWN_FINDING', { phaseId: phase.phaseId, findingId });
     }
+  }
+}
+
+for (const finding of ledger.findings) {
+  const owner = phaseById.get(finding.ownerPhase);
+  if (!owner) {
+    fail('LFEA_FINDING_OWNER_PHASE_MISSING', {
+      findingId: finding.findingId,
+      ownerPhase: finding.ownerPhase,
+    });
+  }
+  if (!owner.addressedFindingIds.includes(finding.findingId)) {
+    fail('LFEA_FINDING_OWNER_PHASE_MISMATCH', {
+      findingId: finding.findingId,
+      ownerPhase: finding.ownerPhase,
+      addressedFindingIds: owner.addressedFindingIds,
+    });
   }
 }
 

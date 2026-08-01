@@ -20,6 +20,113 @@ export {
   requireLafeaStageRegistryEntry,
 } from './lafea-stage-registry.js';
 export {
+  LAFEA_COLLECTION_IDENTITY_KEYS,
+  LAFEA_INPUT_CONTROLS,
+  LAFEA_INPUT_DESCRIPTOR_REVISION,
+  LAFEA_INPUT_DESCRIPTOR_SCHEMA,
+  LAFEA_INPUT_DOMAIN_TYPES,
+  LAFEA_INVALIDATION_CLASSES,
+  LAFEA_VALUE_STATES,
+  lafeaCollectionIdentityKeys,
+  lafeaStageInputDescriptors,
+  requireLafeaInputDescriptor,
+  resolveDescriptorEntity,
+  resolveLafeaDescriptorSourceRef,
+  resolveLafeaDescriptorUnit,
+} from './lafea-stage-input-descriptors.js';
+export {
+  LAFEA_EDIT_COMMAND_SCHEMA,
+  LAFEA_EDIT_OPERATIONS,
+  LAFEA_EDIT_RESULT_SCHEMA,
+  LAFEA_EDIT_STATUSES,
+  allocateLafeaEntityIdentity,
+  applyLafeaStageEditCommand,
+  assertUniqueStageIdentities,
+  classifyLafeaNumericInput,
+  createLafeaAddEntityCommand,
+  createLafeaDeleteEntityCommand,
+  createLafeaDeleteFieldCommand,
+  createLafeaReplaceDocumentCommand,
+  createLafeaSetScalarCommand,
+  lafeaDocumentDigest,
+} from './lafea-edit-command.js';
+export {
+  LAFEA_ARTIFACT_KINDS,
+  LAFEA_ARTIFACT_RECORD_SCHEMA,
+  LAFEA_ARTIFACT_STATUSES,
+  LAFEA_ARTIFACT_REGISTRATION_SCHEMA,
+  LAFEA_LIFECYCLE_CHANGE_CLASSES,
+  LAFEA_LIFECYCLE_EVENT_SCHEMA,
+  LAFEA_LIFECYCLE_SCHEMA,
+  LAFEA_QUALIFICATION_STATES,
+  applyLafeaLifecycleEvent,
+  createLafeaArtifactRecord,
+  createLafeaLifecycle,
+  createLafeaLifecycleEvent,
+  lafeaLifecycleReadiness,
+  registerLafeaArtifact,
+} from './lafea-lifecycle.js';
+export {
+  LAFEA_LIFECYCLE_BINDING_SCHEMA,
+  LAFEA_LIFECYCLE_BINDING_STATUSES,
+  LAFEA_WORKBENCH_STATE_SCHEMA,
+  createLafeaWorkbenchStore,
+} from './lafea-lifecycle-workbench-store.js';
+export {
+  LAFEA_SOURCE_PRIMITIVE_KINDS,
+  LAFEA_SOURCE_PRIMITIVE_SCHEMA,
+  LAFEA_SOURCE_RENDER_REQUEST_SCHEMA,
+  createLafeaSourceEngineeringScene,
+  createLafeaSourceRenderRequest,
+  createLafeaSourceViewportState,
+  validateSourceScene,
+  validateSourceViewport,
+} from './lafea-engineering-scene.js';
+export {
+  LAFEA_WORKBENCH_SOURCE_RENDER_POLICY,
+  LAFEA_WORKBENCH_SOURCE_VIEWPORT_SCHEMA,
+  createLafeaSourceWorkbenchViewportModel,
+  mountLafeaSourceWorkbenchViewport,
+} from './lafea-source-workbench-viewport.js';
+export {
+  LAFEA_RENDER_FIELD_SCHEMA,
+  LAFEA_RENDER_LINEAGE_SCHEMA,
+  LAFEA_RENDER_PACKET_V2_SCHEMA,
+  LAFEA_RENDER_SOURCE_ELEMENT_TYPES,
+  LAFEA_RENDER_VALUE_ROLES,
+  LAFEA_SUPPORTED_COLOR_MAPS,
+  requireRenderPacketV2,
+  sealRenderPacketV2,
+} from './lafea-canvas/render-packet-v2-contract.js';
+export {
+  LAFEA_RENDER_EVIDENCE_INTAKE_SCHEMA,
+  LAFEA_RENDER_EVIDENCE_INTAKE_STATUSES,
+  evaluateLafeaRenderEvidenceIntake,
+} from './lafea-render-evidence-intake.js';
+export {
+  LAFEA_RESULT_RENDER_MODES,
+  LAFEA_RESULT_RENDER_REQUEST_SCHEMA,
+  createLafeaResultRenderRequest,
+  requireLafeaResultRenderRequest,
+} from './lafea-canvas/result-render-request.js';
+export {
+  LAFEA_THREE_RENDER_RESULT_SCHEMA,
+  createThreeMeshRendererV2,
+} from './lafea-canvas/three-mesh-renderer-v2.js';
+export {
+  LAFEA_HYBRID_RESULT_RENDER_POLICY,
+  LAFEA_HYBRID_RESULT_VIEWPORT_SCHEMA,
+  LAFEA_HYBRID_RESULT_VIEWPORT_STATUSES,
+  createLafeaHybridResultViewportModel,
+  mountLafeaHybridResultViewport,
+} from './lafea-hybrid-result-viewport-public.js';
+export {
+  LAFEA_WORKBENCH_ACCESSORY_DIAGNOSTIC_SCHEMA,
+  LAFEA_WORKBENCH_ACCESSORY_HOST_SCHEMA,
+  LAFEA_WORKBENCH_ACCESSORY_PANEL_SCHEMA,
+  validateLafeaAccessoryPanelDescriptor,
+} from './lafea-workbench-accessory-panels.js';
+export {
   LAFEA_WORKBENCH_DOCUMENT_SCHEMA,
   executeLafeaStage,
   lafeaCollectionPaths,
@@ -28,13 +135,24 @@ export {
   normalizeLafeaStageDocument,
 } from './lafea-workbench-model.js';
 export { lafeaPreviewGeometry } from './lafea-stage-preview.js';
-export { createLafeaWorkbenchStore } from './lafea-workbench-store.js';
 
 /**
  * Mount and initialize a LAFEA workbench in an existing shell root.
  *
+ * `accessoryPanels` is an optional array of exact
+ * `lafea-workbench-accessory-panel/v1` descriptors. Panels are UI composition
+ * extensions only and receive a frozen facade containing `getState` and
+ * `importDocument`.
+ *
+ * `THREE` is an optional injected Three.js namespace. It is used only after a
+ * producer supplies a V2 render packet whose scene revision and complete U3
+ * engineering/display lineage evaluate as current and qualified. Producers use
+ * `getDisplayViewportContext()`, `setDisplayRenderPacket(packet)` and
+ * `clearDisplayRenderPacket(stageId)` on the returned controller. These methods
+ * do not register lifecycle evidence or expose retained packet buffers.
+ *
  * @param {Element} rootElement Workbench host.
- * @param {{initialStage?:string,initialDocument?:unknown}|undefined} options Explicit initial state.
+ * @param {{initialStage?:string,initialDocument?:unknown,initialSourceHash?:string,accessoryPanels?:unknown[],THREE?:unknown}|undefined} options Explicit initial state, optional accessory panels and optional Three.js dependency.
  * @returns {LafeaWorkbenchController} Initialized controller.
  */
 export function mountLafeaWorkbench(rootElement, options) {
