@@ -67,22 +67,27 @@ export class WorkspaceShellController {
         editBar.style.display = 'flex';
         editBar.innerHTML = `
           <div style="display:flex; flex-direction:column; width:100%; gap:6px;">
-            <!-- Row 1: Load Calc Calculation Workflow Bar -->
+            <!-- Row 1: Load Calc Calculation Workflow Bar & FEA Mode Toggle -->
             <div style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:8px;">
               <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                <span style="font-size:10px; font-weight:700; color:#38bdf8; text-transform:uppercase; letter-spacing:0.5px;">⚡ Load Calc Workflow</span>
+                <button type="button" data-action="toggle-fea-mode" title="Toggle between Empirical Mass Loads (OFF) and Linear FEA Solver (ON)" style="padding:4px 12px; border-radius:4px; font-size:11px; font-weight:800; cursor:pointer; transition:all 0.15s; background:${this.feaMode ? '#0284c7' : '#0f172a'}; border:1px solid ${this.feaMode ? '#38bdf8' : '#334155'}; color:${this.feaMode ? '#ffffff' : '#94a3b8'}; box-shadow:${this.feaMode ? '0 0 10px rgba(56,189,248,0.4)' : 'none'};">FEA Mode: ${this.feaMode ? 'ON ⚡' : 'OFF (Empirical)'}</button>
+                <span style="height:16px; width:1px; background:#334155;"></span>
                 <button type="button" data-action="rebuild-model-loads" style="padding:4px 10px; background:#0284c7; color:#fff; border:1px solid #38bdf8; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">⚡ 1. Calculate Model Loads</button>
                 <button type="button" data-action="rebuild-paths" style="padding:4px 10px; background:#0f172a; color:#38bdf8; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">📐 2. Build Load Paths</button>
                 <button type="button" data-action="run-screening" style="padding:4px 10px; background:#0f172a; color:#facc15; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🎯 3. Support Screening</button>
                 <button type="button" data-action="export-model-loads" style="padding:4px 10px; background:#0f172a; color:#94a3b8; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">📥 Export Loads</button>
               </div>
               <div style="display:flex; align-items:center; gap:6px;">
-                <span style="font-size:10px; color:#94a3b8; font-weight:700;">Load Case:</span>
-                <select data-action="select-load-case" style="background:#020617; color:#f8fafc; border:1px solid #334155; border-radius:4px; padding:3px 8px; font-size:11px; font-weight:700; cursor:pointer;">
-                  <option value="LC1">LC1: Operating Gravity + Pressure</option>
-                  <option value="LC2">LC2: Thermal Expansion (T1)</option>
-                  <option value="LC3">LC3: Seismic Design Envelope</option>
-                </select>
+                ${this.feaMode ? `
+                  <span style="font-size:10px; color:#94a3b8; font-weight:700;">Load Case:</span>
+                  <select data-action="select-load-case" style="background:#020617; color:#f8fafc; border:1px solid #38bdf8; border-radius:4px; padding:3px 8px; font-size:11px; font-weight:700; cursor:pointer;">
+                    <option value="LC1">LC1: Operating Gravity + Pressure</option>
+                    <option value="LC2">LC2: Thermal Expansion (T1)</option>
+                    <option value="LC3">LC3: Seismic Design Envelope</option>
+                  </select>
+                ` : `
+                  <span style="font-size:10px; font-weight:700; color:#38bdf8; background:#091322; border:1px solid #1e293b; padding:3px 8px; border-radius:4px;">📊 Mode: Empirical / Mass-Based (W = mg)</span>
+                `}
               </div>
             </div>
 
@@ -95,11 +100,55 @@ export class WorkspaceShellController {
               <button type="button" data-action="tab-main" data-tab="json-trace" style="padding:3px 10px; border:1px solid #334155; border-radius:4px; background:#0f172a; color:#94a3b8; font-size:10px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px;">🔍 JSON Trace <span data-action="close-tab" data-tab="json-trace" title="Close tab & return to canvas" style="display:inline-flex; align-items:center; justify-content:center; width:12px; height:12px; border-radius:50%; background:#334155; color:#fff; font-size:8px;">✕</span></button>
             </div>
           </div>`;
+        this.bindEditBarEvents(editBar);
       } else {
         editBar.style.display = 'none';
         editBar.innerHTML = '';
       }
     }
+  }
+
+  bindEditBarEvents(editBar) {
+    if (!editBar) return;
+    
+    // FEA Mode Toggle
+    const feaToggle = editBar.querySelector('[data-action="toggle-fea-mode"]');
+    if (feaToggle) {
+      feaToggle.addEventListener('click', () => {
+        this.feaMode = !this.feaMode;
+        window.dispatchEvent(new CustomEvent('fea-mode-changed', { detail: { feaMode: this.feaMode } }));
+        this.switchWorkbenchView('LOAD_CALC');
+      });
+    }
+
+    // Sub-Nav Tabs Click & Close Handlers
+    editBar.querySelectorAll('[data-action="tab-main"]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const targetTab = e.currentTarget.dataset.tab;
+        window.dispatchEvent(new CustomEvent('load-calc-tab-requested', { detail: { tabId: targetTab } }));
+        
+        editBar.querySelectorAll('[data-action="tab-main"]').forEach(b => {
+          const isActive = b.dataset.tab === targetTab;
+          b.style.background = isActive ? '#0284c7' : '#0f172a';
+          b.style.color = isActive ? '#fff' : '#94a3b8';
+          b.style.borderColor = isActive ? '#0284c7' : '#334155';
+        });
+      });
+    });
+
+    editBar.querySelectorAll('[data-action="close-tab"]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        window.dispatchEvent(new CustomEvent('load-calc-tab-requested', { detail: { tabId: 'load-cases' } }));
+        
+        editBar.querySelectorAll('[data-action="tab-main"]').forEach(b => {
+          const isActive = b.dataset.tab === 'load-cases';
+          b.style.background = isActive ? '#0284c7' : '#0f172a';
+          b.style.color = isActive ? '#fff' : '#94a3b8';
+          b.style.borderColor = isActive ? '#0284c7' : '#334155';
+        });
+      });
+    });
   }
 
   loadState() {

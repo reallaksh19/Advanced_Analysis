@@ -62,6 +62,25 @@ export class LoadCalcConsumerController {
       this.eventBus.subscribe(SUPPORT_LOAD_SCREENING_EVENTS.EXPORT_COMPLETED, ({ artifact }) => this.handleExport(artifact)),
       this.eventBus.subscribe(SUPPORT_LOAD_SCREENING_EVENTS.EXPORT_FAILED, ({ message }) => this.handleFailure(message)),
     ];
+
+    const tabHandler = (e) => {
+      const tabId = e.detail?.tabId;
+      if (tabId) {
+        this.uiState.activeTab = (this.uiState.activeTab === tabId) ? 'load-cases' : tabId;
+        this.render();
+      }
+    };
+    const feaModeHandler = (e) => {
+      this.uiState.feaMode = Boolean(e.detail?.feaMode);
+      this.render();
+    };
+    window.addEventListener('load-calc-tab-requested', tabHandler);
+    window.addEventListener('fea-mode-changed', feaModeHandler);
+    this.unsubscribeCallbacks.push(() => {
+      window.removeEventListener('load-calc-tab-requested', tabHandler);
+      window.removeEventListener('fea-mode-changed', feaModeHandler);
+    });
+
     this.render();
   }
   handleContext(context) {
