@@ -94,6 +94,9 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Install governed Chromium runtime
+        run: npx playwright install --with-deps chromium
+
       - name: Validate fail-closed release policy and simulated qualification harness
         run: node scripts/lfea-piping-release-readiness-check.mjs
 
