@@ -265,20 +265,30 @@ function geometryFeatures(request, status) {
 function screeningLoadCases(request, status) {
   return request.screeningCases.map((screeningCase) => ({
     caseId: screeningCase.screeningCaseId,
-    primitives: screeningCase.mechanicalTerms.map((term) => ({
-      loadId: `${screeningCase.screeningCaseId}-${term.loadCaseId}`,
-      kind: 'REFERENCED_FOUNDATION_LOAD_CASE',
-      entityId: term.loadCaseId,
-      basis: 'LAFEA1_RESULTANT_AND_PRESSURE_REFERENCE',
-      referencePoint: null,
-      values: {
-        factor: term.factor,
-        pressureDefinitionId: term.pressureDefinitionId,
+    primitives: [
+      ...screeningCase.mechanicalTerms.map((term) => ({
+        loadId: `${screeningCase.screeningCaseId}-MECHANICAL-${term.loadCaseId}`,
+        kind: 'RETAINED_MECHANICAL_RESULTANT_FACTOR',
+        entityId: term.loadCaseId,
+        basis: 'RETAINED_LAFEA1_PIPE_LOCAL_RESULTANT',
+        referencePoint: null,
+        values: { factor: term.factor },
+        units: [],
+        sourceRef: sourceRefRecord(screeningCase.sourceReference),
+        status,
+      })),
+      {
+        loadId: `${screeningCase.screeningCaseId}-PRESSURE-${screeningCase.pressureDefinitionId}`,
+        kind: 'RETAINED_PRESSURE_DEFINITION_FACTOR',
+        entityId: screeningCase.pressureDefinitionId,
+        basis: 'RETAINED_LAFEA1_PRESSURE_EVIDENCE',
+        referencePoint: null,
+        values: { factor: screeningCase.pressureFactor },
+        units: [],
+        sourceRef: sourceRefRecord(screeningCase.sourceReference),
+        status,
       },
-      units: [],
-      sourceRef: sourceRefRecord(term.sourceReference),
-      status,
-    })),
+    ],
     sourceRefs: sourceRefRecords([screeningCase.sourceReference]),
     status,
   }));
