@@ -44,6 +44,14 @@ export class WorkspaceShellController {
       EventBus.subscribe(APPLICATION_EVENTS.CHANGED, (payload) => {
         const activeViewId = payload?.state?.activeViewId || payload?.activeViewId;
         this.switchWorkbenchView(activeViewId);
+        
+        // Bind Topology Primitive Quick-Icons Bar
+        this.shellElement.querySelectorAll('[data-topology-primitive]').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const primitiveType = e.currentTarget.dataset.topologyPrimitive;
+            window.dispatchEvent(new CustomEvent('topology-primitive-selected', { detail: { type: primitiveType } }));
+          });
+        });
       })
     ];
   }

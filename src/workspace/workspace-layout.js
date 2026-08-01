@@ -123,6 +123,17 @@ function workspaceView() {
           <button type="button" data-action="load-webgl-geometry" class="viewport-load-geo-btn" title="Load/Refresh 3D Mesh Geometry" style="padding:5px 10px; border:1px solid #38bdf8; border-radius:5px; background:#0284c7; color:#ffffff; font-weight:700; font-size:11px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:all 0.15s; box-shadow:0 0 10px rgba(56,189,248,0.3);">⚡ Load Geometry</button>
           <button type="button" data-action="toggle-viewport-table" class="viewport-table-toggle-btn" title="Toggle Interactive Editing Data Table" style="padding:5px 10px; border:1px solid #334155; border-radius:5px; background:#0f172a; color:#38bdf8; font-weight:700; font-size:11px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:all 0.15s;">📊 Data Table</button>
           <button type="button" data-action="open-zone-selector" class="viewport-zone-btn" title="Open 2D Drag-Rectangle Zone &amp; Sub-Graph Selector" style="padding:5px 10px; border:1px solid #334155; border-radius:5px; background:#0f172a; color:#facc15; font-weight:700; font-size:11px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:all 0.15s;">🎯 Select Zones</button>
+          
+          <!-- Topology Primitives Quick-Icons Bar -->
+          <div class="topology-primitives-bar" style="display:flex; align-items:center; gap:4px; border-left:1px solid #334155; padding-left:8px; margin-left:4px;">
+            <span style="font-size:10px; font-weight:700; color:#38bdf8; text-transform:uppercase; margin-right:4px;">Topology:</span>
+            <button type="button" data-topology-primitive="Node" title="Add/Select Pipe Node" style="padding:3px 8px; background:#0f172a; color:#38bdf8; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">📍 Node</button>
+            <button type="button" data-topology-primitive="Elbow" title="Elbow Fitting" style="padding:3px 8px; background:#0f172a; color:#38bdf8; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">⭕ Elbow</button>
+            <button type="button" data-topology-primitive="Tee" title="Branch Tee Fitting" style="padding:3px 8px; background:#0f172a; color:#38bdf8; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🔀 Tee</button>
+            <button type="button" data-topology-primitive="Anchor" title="Rigid Anchor Boundary" style="padding:3px 8px; background:#0f172a; color:#ef4444; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">⚓ Anchor</button>
+            <button type="button" data-topology-primitive="Hanger" title="Spring Hanger Support" style="padding:3px 8px; background:#0f172a; color:#facc15; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🪝 Hanger</button>
+            <button type="button" data-topology-primitive="Restraint" title="Guide/Restraint Support" style="padding:3px 8px; background:#0f172a; color:#4ade80; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🛡️ Restraint</button>
+          </div>
         </div>
         <div class="viewport-toolbar__actions" aria-label="Viewport navigation" style="display:flex; gap:6px; align-items:center;">
           <div class="toolbar-group">
