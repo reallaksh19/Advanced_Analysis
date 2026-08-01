@@ -58,9 +58,10 @@ function run() {
     assert.equal(snapshot.exportEligibility, 'AUDIT_ONLY_CONDITIONAL');
     assert.equal(controller.elements.auditButton.disabled, false);
     assert.equal(controller.elements.engineeringButton.disabled, true);
-    assert.ok(fixture.applicationResult.limitations.some(
-      (row) => row.limitation?.code === 'REDUCER_APPROXIMATION',
-    ));
+    assert.match(
+      JSON.stringify(fixture.applicationResult.limitations),
+      /PIPING_COMPONENT_APPROXIMATION_REDUCER_SECTION/u,
+    );
     assert.match(flattenText(controller.elements.resultsRoot), /B31\.3 application results/u);
     assert.match(flattenText(controller.elements.resultsRoot), /Support, anchor and nozzle interface actions/u);
   });
