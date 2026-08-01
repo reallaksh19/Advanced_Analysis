@@ -1,4 +1,4 @@
-import { WORKSPACE_DATASET_SCHEMA } from '../../src/workspace/dataset-adapter.js';
+import { normalizeWorkspaceDataset } from '../../src/workspace/dataset-adapter.js';
 import { WorkspaceStateStore } from '../../src/workspace/workspace-state.js';
 import { SequentialSketcherController } from '../../src/workspace/sequential-sketcher/sequential-sketcher-controller.js';
 
@@ -39,7 +39,7 @@ export function executeHcSequentialAuthoringGesture(controller) {
   }
   const beforeSnapshot = controller.workspaceState.getSnapshot();
   const beforeDataset = beforeSnapshot.dataset;
-  const beforeGeometry = structuredClone(beforeDataset.entities[0].properties.geometry);
+  const beforeGeometry = primaryGeometry(beforeDataset.entities[0]);
 
   controller.authoringBridge.beginStretchGesture({
     gestureId: 'HC-UI-07-GESTURE',
@@ -52,14 +52,12 @@ export function executeHcSequentialAuthoringGesture(controller) {
   });
   const duringDataset = controller.workspaceState.getSnapshot().dataset;
   const sourceUnchangedDuringPreview = duringDataset === beforeDataset
-    && JSON.stringify(duringDataset.entities[0].properties.geometry)
+    && JSON.stringify(primaryGeometry(duringDataset.entities[0]))
       === JSON.stringify(beforeGeometry);
 
   const receipt = controller.authoringBridge.acceptGesture({ pointerId: 17 });
   const afterSnapshot = controller.workspaceState.getSnapshot();
-  const afterGeometry = structuredClone(
-    afterSnapshot.dataset.entities[0].properties.geometry,
-  );
+  const afterGeometry = primaryGeometry(afterSnapshot.dataset.entities[0]);
 
   return Object.freeze({
     schema: 'lafea-sequential-authoring-browser-result/v1',
@@ -78,34 +76,30 @@ export function executeHcSequentialAuthoringGesture(controller) {
 }
 
 function authoringDataset() {
-  return {
-    schema: WORKSPACE_DATASET_SCHEMA,
-    datasetId: 'HC-UI-07-DATASET',
-    version: 1,
-    sourceSchema: 'SIMULATED',
-    sourceName: '[SIMULATED] sequential authoring gesture',
-    entities: [{
-      entityId: 'PIPE-1',
-      sourceEntityId: 'PIPE-1',
+  const normalized = normalizeWorkspaceDataset({
+    schema: 'inputxml-managed-stage/v1',
+    packageHash: 'HC-UI-07-DATASET',
+    unit: 'mm',
+    project: { name: 'HC-UI-07 sequential authoring' },
+    objects: [{
+      id: 'PIPE-1',
       name: 'HC-UI-07 Pipe',
-      entityType: 'PIPE',
-      category: 'pipe',
-      properties: {
-        identity: {
-          entityId: 'PIPE-1',
-          name: 'HC-UI-07 Pipe',
-          entityType: 'PIPE',
-        },
-        geometry: {
-          start: { x: 0, y: 0, z: 0 },
-          end: { x: 100, y: 0, z: 0 },
-          center: { x: 50, y: 0, z: 0 },
-        },
-        sourceAttributes: {},
-        attributes: { TYPE: 'PIPE' },
+      type: 'PIPE',
+      sourcePath: '/PIPE-1',
+      nativeParams: {
+        startPoint: [0, 0, 0],
+        endPoint: [100, 0, 0],
+        center: [50, 0, 0],
       },
+      attributes: { TYPE: 'PIPE' },
     }],
-  };
+  }, '[SIMULATED] sequential authoring gesture');
+  return Object.freeze({ ...normalized, version: 1 });
+}
+
+function primaryGeometry(entity) {
+  const { start, end, center } = entity.properties.geometry;
+  return structuredClone({ start, end, center });
 }
 
 function createFixtureEventBus() {
