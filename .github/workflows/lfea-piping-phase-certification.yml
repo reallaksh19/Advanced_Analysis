@@ -95,6 +95,8 @@ jobs:
         run: npm ci
 
       - name: Install governed Chromium runtime
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: '0'
         run: npx playwright install --with-deps chromium
 
       - name: Validate fail-closed release policy and simulated qualification harness
