@@ -234,9 +234,9 @@ assert.equal(
   'check:lfea-b3.2 registration is missing',
 );
 assert.match(
-  packageJson.scripts['check:lfea-core'],
+  packageJson.scripts['check:lfea-linear-core'],
   /npm run check:lfea-b3\.1 && npm run check:lfea-b3\.2/u,
-  'check:lfea-b3.2 must run inside check:lfea-core, directly after check:lfea-b3.1',
+  'check:lfea-b3.2 must run inside check:lfea-linear-core, directly after check:lfea-b3.1',
 );
 for (const script of [
   'check:lfea-b2.0',
