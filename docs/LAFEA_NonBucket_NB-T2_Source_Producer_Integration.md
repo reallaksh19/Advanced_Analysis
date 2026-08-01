@@ -19,7 +19,7 @@
 `lafea-source-authority/v1` binds one normalized stage document to:
 
 - exact stage identity;
-- `LAFEA_CANNICAL_JSON_SHA256_V1` canonicalization;
+- `LAFEA_CANONICAL_JSON_SHA256_V1` canonicalization;
 - a `sha256:<64-hex>` engineering source hash;
 - the editor's `fnv1a64` document digest retained only as a revision token;
 - an explicit origin reference.
@@ -69,7 +69,7 @@ The workbench now exposes distinct states:
 - `CALCULATION_ACCEPTED_BY_STAGE_CONTRACT`;
 - `RESULT_READY` / `RESULT_NOT_READY`;
 - `CODE_READY` / `CODE_NOT_READY`;
-- `RELEASE_QUALIFIED` / `RELEASE_NOT_QUALIFIEK`.
+- `RELEASE_QUALIFIED` / `RELEASE_NOT_QUALIFIED`.
 
 A qualified base calculation does not itself establish result, code or release readiness. Result readiness requires successful explicit producer registration under current source authority and exact parent lineage. NB-T2 never emits `RELEASE_QUALIFIED`.
 

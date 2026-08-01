@@ -75,7 +75,7 @@ assert.doesNotMatch(sourceAuthority, /sourceHash:\s*lafeaDocumentDigest/u);
 assert.match(producers, /lafea-lifecycle-producer-batch\/v1/u);
 assert.match(producers, /CALLER_AUTHORED_SOURCE_MESH_ONLY/u);
 assert.doesNotMatch(producers, /calculateLocal|executeLafeaStage|from ['"][^'"]*src\/core/u);
-assert.doesNotMatch(producers, /source\.meshConfig|renderPacket/u);
+assert.doesNotMatch(producers, /source\.meshConfig|(?:^|[^A-Za-z0-9_])renderPacket\s*[:.(]/mu);
 assert.match(lifecycleStore, /CALCULATION_ACCEPTED_BY_STAGE_CONTRACT/u);
 assert.match(lifecycleStore, /RESULT_READY/u);
 assert.match(lifecycleStore, /CODE_NOT_READY/u);

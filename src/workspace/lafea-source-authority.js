@@ -134,7 +134,7 @@ export function validateLafeaSourceAuthorityEvent(value) {
 
 export function sourceAuthorityDocument(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new TypeError 'LAFEA source authority requires a normalized document object.');
+    throw new TypeError('LAFEA source authority requires a normalized document object.');
   }
   const source = structuredClone(value);
   delete source.meshConfig;
