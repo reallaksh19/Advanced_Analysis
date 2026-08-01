@@ -7,9 +7,11 @@ const intakePath = 'scripts/lfea-piping-external-release-evidence-check.mjs';
 const checkPath = 'scripts/lfea-piping-external-release-evidence-check-check.mjs';
 const releasePath = 'release-evidence/lfea-piping-release-evidence.json';
 const policyPath = 'scripts/lfea-piping-release-readiness-check.mjs';
+const orchestratorPath = 'scripts/lfea-piping-release-orchestrator.mjs';
 const intake = fs.readFileSync(intakePath, 'utf8');
 const check = fs.readFileSync(checkPath, 'utf8');
 const policy = fs.readFileSync(policyPath, 'utf8');
+const orchestrator = fs.readFileSync(orchestratorPath, 'utf8');
 const release = JSON.parse(fs.readFileSync(releasePath, 'utf8'));
 
 assert.match(intake, /requireLinearPipingExternalQualificationPackage/u);
@@ -59,9 +61,14 @@ assert.equal(release.artifacts.rollbackEvidence, null);
 assert.equal(release.artifacts.signedDisposition, null);
 assert.equal(release.artifacts.externalQualificationPackage, null);
 
-assert.match(policy, /'externalQualificationPackage'/u);
+assert.match(policy, /policyRunner:\s*runPolicyChecks/u);
 assert.match(policy, /lfea-piping-phase6c-anti-drift-check\.mjs/u);
-assert.match(policy, /requireExactKeys\(evidence\.artifacts, REQUIRED_ARTIFACTS/u);
+assert.match(orchestrator, /const REQUIRED_ARTIFACTS = Object\.freeze/u);
+assert.match(orchestrator, /'externalQualificationPackage'/u);
+assert.match(
+  orchestrator,
+  /requireExactKeys\(\s*evidence\.artifacts,\s*REQUIRED_ARTIFACTS,/u,
+);
 
 await import('./lfea-piping-external-release-evidence-check-check.mjs');
 

@@ -7,9 +7,11 @@ const intakePath = 'scripts/lfea-piping-internal-release-evidence-check.mjs';
 const checkPath = 'scripts/lfea-piping-internal-release-evidence-check-check.mjs';
 const releasePath = 'release-evidence/lfea-piping-release-evidence.json';
 const policyPath = 'scripts/lfea-piping-release-readiness-check.mjs';
+const orchestratorPath = 'scripts/lfea-piping-release-orchestrator.mjs';
 const intake = fs.readFileSync(intakePath, 'utf8');
 const check = fs.readFileSync(checkPath, 'utf8');
 const policy = fs.readFileSync(policyPath, 'utf8');
+const orchestrator = fs.readFileSync(orchestratorPath, 'utf8');
 const release = JSON.parse(fs.readFileSync(releasePath, 'utf8'));
 
 assert.ok(intake.split(/\r?\n/u).length < 500, 'Phase 6D intake source limit is <500 lines.');
@@ -90,9 +92,16 @@ for (const gate of [
   'G7_PRESENTATION_EXPORT',
 ]) assert.notEqual(release.gates[gate], 'VERIFIED');
 
+assert.match(policy, /policyRunner:\s*runPolicyChecks/u);
 assert.match(policy, /lfea-piping-phase6c-anti-drift-check\.mjs/u);
 assert.match(policy, /lfea-piping-phase6d-anti-drift-check\.mjs/u);
-assert.match(policy, /requireExactKeys\(evidence\.artifacts, REQUIRED_ARTIFACTS/u);
+assert.match(orchestrator, /const REQUIRED_ARTIFACTS = Object\.freeze/u);
+assert.match(orchestrator, /'exactHeadManifest'/u);
+assert.match(orchestrator, /'presentationExportEvidence'/u);
+assert.match(
+  orchestrator,
+  /requireExactKeys\(\s*evidence\.artifacts,\s*REQUIRED_ARTIFACTS,/u,
+);
 
 await import('./lfea-piping-internal-release-evidence-check-check.mjs');
 

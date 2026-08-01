@@ -1,6 +1,4 @@
-/**
- * Public integration surface for the standalone LAFEA calculation workbench.
- */
+/** Public integration surface for the standalone LAFEA calculation workbench. */
 import { LafeaWorkbenchController } from './lafea-workbench-controller.js';
 import { LAFEA_WORKBENCH_STYLES, lafeaWorkbenchStyles } from './lafea-workbench-styles.js';
 
@@ -15,10 +13,35 @@ export {
   LAFEA_STAGE_REGISTRY,
   LAFEA_STAGE_REGISTRY_SCHEMA,
   lafeaRegisteredCollectionPaths,
+  lafeaRegisteredComposition,
   lafeaRegisteredExecutionSupported,
   lafeaRegisteredPreviewSource,
   requireLafeaStageRegistryEntry,
 } from './lafea-stage-registry.js';
+export {
+  LAFEA_BENCHMARK_BINDING_STATES,
+  LAFEA_RELEASE_STATE_BINDINGS,
+  LAFEA_STAGE_COMPOSITION_BINDINGS,
+  LAFEA_STAGE_COMPOSITION_BINDING_SCHEMA,
+  LAFEA_TECHNICAL_COMPONENT_IDS,
+  LAFEA_TECHNICAL_COMPONENT_KINDS,
+  requireLafeaStageCompositionBinding,
+} from './lafea-stage-composition-bindings.js';
+export {
+  LAFEA_STAGE_COMPOSITION_SCHEMA,
+  lafeaStageCompositionIdentity,
+  requireLafeaStageComposition,
+} from './lafea-stage-composition-root.js';
+export {
+  LAFEA_LIFECYCLE_PROFILE_IDS,
+  LAFEA_LIFECYCLE_PROFILE_SCHEMA,
+  LAFEA_LIFECYCLE_PROFILES,
+  LAFEA_STAGE_LIFECYCLE_PROFILE_IDS,
+  lafeaLifecycleArtifactKinds,
+  requireLafeaLifecycleArtifactDefinition,
+  requireLafeaLifecycleProfile,
+  requireLafeaLifecycleProfileForStage,
+} from './lafea-lifecycle-profiles.js';
 export {
   LAFEA_COLLECTION_IDENTITY_KEYS,
   LAFEA_INPUT_CONTROLS,
@@ -55,6 +78,10 @@ export {
   LAFEA_ARTIFACT_RECORD_SCHEMA,
   LAFEA_ARTIFACT_STATUSES,
   LAFEA_ARTIFACT_REGISTRATION_SCHEMA,
+  LAFEA_LEGACY_ARTIFACT_KINDS,
+  LAFEA_LEGACY_ARTIFACT_RECORD_SCHEMA,
+  LAFEA_LEGACY_ARTIFACT_REGISTRATION_SCHEMA,
+  LAFEA_LEGACY_LIFECYCLE_SCHEMA,
   LAFEA_LIFECYCLE_CHANGE_CLASSES,
   LAFEA_LIFECYCLE_EVENT_SCHEMA,
   LAFEA_LIFECYCLE_SCHEMA,
@@ -64,14 +91,60 @@ export {
   createLafeaLifecycle,
   createLafeaLifecycleEvent,
   lafeaLifecycleReadiness,
+  migrateLafeaLifecycleV1,
   registerLafeaArtifact,
 } from './lafea-lifecycle.js';
 export {
+  LAFEA_CALCULATION_STATES,
+  LAFEA_CODE_STATES,
   LAFEA_LIFECYCLE_BINDING_SCHEMA,
   LAFEA_LIFECYCLE_BINDING_STATUSES,
+  LAFEA_RELEASE_STATES,
+  LAFEA_RESULT_STATES,
   LAFEA_WORKBENCH_STATE_SCHEMA,
   createLafeaWorkbenchStore,
 } from './lafea-lifecycle-workbench-store.js';
+export {
+  LAFEA_CANONICAL_SHA256_PROFILE,
+  canonicalLafeaJson,
+  canonicalLafeaSha256,
+} from './lafea-canonical-sha256.js';
+export {
+  LAFEA_SOURCE_AUTHORITY_EVENT_SCHEMA,
+  LAFEA_SOURCE_AUTHORITY_ROLE,
+  LAFEA_SOURCE_AUTHORITY_SCHEMA,
+  createLafeaSourceAuthorityEvent,
+  issueLafeaSourceAuthority,
+  sourceAuthorityDocument,
+  validateLafeaSourceAuthority,
+  validateLafeaSourceAuthorityEvent,
+} from './lafea-source-authority.js';
+export {
+  LAFEA_PRODUCER_BATCH_SCHEMA,
+  LAFEA_PRODUCER_REVISION,
+  createLafeaLifecycleProducerBatch,
+  registerLafeaLifecycleProducerBatch,
+} from './lafea-lifecycle-producers.js';
+export {
+  LAFEA_ANALYTICAL_PRODUCT_BATCH_SCHEMA,
+  LAFEA_ANALYTICAL_PRODUCT_PRODUCER_REVISION,
+  createLafeaAnalyticalProductBatch,
+  registerLafeaAnalyticalProductBatch,
+} from './lafea-analytical-product-producers.js';
+export {
+  LAFEA_ANALYSIS_MESH_AUTHORITY_ROLE,
+  LAFEA_ANALYSIS_MESH_AUTHORITY_SCHEMA,
+  LAFEA_ANALYSIS_MESH_AUTHORITY_STATUS,
+  LAFEA_ANALYSIS_MESH_EVIDENCE_SCHEMA,
+  LAFEA_ANALYSIS_MESH_FEA_STAGES,
+  LAFEA_ANALYSIS_MESH_INTAKE_SCHEMA,
+  LAFEA_ANALYSIS_MESH_PRODUCER_REVISION,
+  LAFEA_ANALYSIS_MESH_QUALITY_SCHEMA,
+  LAFEA_ANALYSIS_MESH_SCHEMA,
+  createLafeaAnalysisMeshEvidence,
+  lafeaAnalysisMeshContentHash,
+  registerLafeaAnalysisMeshEvidence,
+} from './lafea-analysis-mesh-evidence.js';
 export {
   LAFEA_SOURCE_PRIMITIVE_KINDS,
   LAFEA_SOURCE_PRIMITIVE_SCHEMA,

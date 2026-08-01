@@ -1,0 +1,170 @@
+{
+  "schema": "lfea-phase6h-demo-only-sample/v2",
+  "exactHead": "617f7c2be0c65196a44bc88b6a2bb5ad3b5f1b54",
+  "immutableRef": "release/lfea-piping-phase6i-617f7c2",
+  "evidenceClass": "SAMPLE_FOR_UI_AND_WORKFLOW_SHAPE_APPROVAL_ONLY",
+  "eligibility": "INELIGIBLE_FOR_PROJECT_EVIDENCE",
+  "workflowRun": null,
+  "workflowJob": null,
+  "artifactId": null,
+  "authorityState": {
+    "wp2": "UNRESOLVED_GATE",
+    "wp3": "BLOCKED_INPUT_REQUIRED",
+    "phase6h": "NOT_READY",
+    "wp4": "BLOCKED"
+  },
+  "model": {
+    "modelId": "SAMPLE-LINE-1001",
+    "revision": "S0",
+    "loadCaseId": "OPE-1",
+    "description": "Three-node, two-element non-release piping demonstration.",
+    "nodes": [
+      {
+        "id": "N1",
+        "xyz": [0, 0, 0],
+        "restraint": "ANCHOR"
+      },
+      {
+        "id": "N2",
+        "xyz": [3, 0, 0],
+        "restraint": "GUIDE_YZ"
+      },
+      {
+        "id": "N3",
+        "xyz": [3, 2, 0],
+        "restraint": "NOZZLE_INTERFACE"
+      }
+    ],
+    "elements": [
+      {
+        "id": "E1",
+        "from": "N1",
+        "to": "N2",
+        "type": "PIPE",
+        "odM": 0.1683,
+        "thicknessM": 0.00711
+      },
+      {
+        "id": "E2",
+        "from": "N2",
+        "to": "N3",
+        "type": "PIPE",
+        "odM": 0.1683,
+        "thicknessM": 0.00711
+      }
+    ]
+  },
+  "results": {
+    "forceLocalN": [1200, -850, 300],
+    "momentLocalNm": [450, 120, -80],
+    "nozzleUtilization": 0.42,
+    "b31CalculatedStressPa": 82000000,
+    "b31AllowableStressPa": 138000000,
+    "b31Utilization": 0.5942028986
+  },
+  "records": [
+    {
+      "name": "application-result.json",
+      "owner": "LFEA application result owner",
+      "approver": "Piping/stress authority",
+      "state": "SAMPLE_QUALIFIED",
+      "authority": "Production result identity — sample placeholder",
+      "eligibility": "INELIGIBLE_FOR_PROJECT_EVIDENCE"
+    },
+    {
+      "name": "presentation.json",
+      "owner": "Presentation/export owner",
+      "approver": "Piping/stress authority",
+      "state": "SAMPLE_CURRENT",
+      "authority": "Bound to sample application identity",
+      "eligibility": "INELIGIBLE_FOR_PROJECT_EVIDENCE"
+    },
+    {
+      "name": "real-model-reconciliation.json",
+      "owner": "G8 evidence owner",
+      "approver": "Independent technical reviewer",
+      "state": "PASS_SAMPLE_ONLY",
+      "authority": "Independent engineering review / SAMPLE-G8-RUN-001",
+      "eligibility": "INELIGIBLE_FOR_PROJECT_EVIDENCE"
+    },
+    {
+      "name": "commercial-corroboration.json",
+      "owner": "G9 evidence owner",
+      "approver": "Independent commercial reviewer",
+      "state": "PASS_SAMPLE_ONLY",
+      "authority": "Commercial pipe-stress suite / SAMPLE-G9-RUN-001",
+      "eligibility": "INELIGIBLE_FOR_PROJECT_EVIDENCE"
+    },
+    {
+      "name": "performance-evidence.json",
+      "owner": "Performance-test owner",
+      "approver": "Performance reviewer",
+      "state": "PASS_SAMPLE_ONLY",
+      "authority": "Two deterministic sample replays",
+      "eligibility": "INELIGIBLE_FOR_PROJECT_EVIDENCE"
+    },
+    {
+      "name": "rollback-evidence.json",
+      "owner": "Release/rollback owner",
+      "approver": "Rollback reviewer",
+      "state": "PASS_SAMPLE_ONLY",
+      "authority": "Sample rollback to superseded candidate 52b8e742…",
+      "eligibility": "INELIGIBLE_FOR_PROJECT_EVIDENCE"
+    },
+    {
+      "name": "signed-disposition.json",
+      "owner": "Independent release-review authority",
+      "approver": "Program release authority",
+      "state": "NOT_SIGNED",
+      "authority": "Signature reference intentionally absent",
+      "eligibility": "INELIGIBLE_FOR_PROJECT_EVIDENCE"
+    }
+  ],
+  "comparisons": [
+    {
+      "selector": "INTERFACE_FORCE_LOCAL",
+      "application": 1200,
+      "g8": 1188,
+      "g9": 1190.376,
+      "unit": "N"
+    },
+    {
+      "selector": "INTERFACE_MOMENT_REFERENCE_LOCAL",
+      "application": 450,
+      "g8": 447,
+      "g9": 447.894,
+      "unit": "N·m"
+    },
+    {
+      "selector": "NOZZLE_UTILIZATION",
+      "application": 0.42,
+      "g8": 0.415,
+      "g9": 0.41583,
+      "unit": "1"
+    },
+    {
+      "selector": "B31_CALCULATED_STRESS",
+      "application": 82000000,
+      "g8": 81400000,
+      "g9": 81562800,
+      "unit": "Pa"
+    },
+    {
+      "selector": "B31_UTILIZATION",
+      "application": 0.5942028986,
+      "g8": 0.5898550725,
+      "g9": 0.5910347826,
+      "unit": "1"
+    }
+  ],
+  "paths": [
+    "request/external-materialization-request.json",
+    "records/application-result.json",
+    "records/presentation.json",
+    "records/real-model-reconciliation.json",
+    "records/commercial-corroboration.json",
+    "records/performance-evidence.json",
+    "records/rollback-evidence.json",
+    "records/signed-disposition.json"
+  ]
+}
