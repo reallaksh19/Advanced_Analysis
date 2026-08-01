@@ -1,0 +1,132 @@
+name: LAFEA T5 Controlled Reference Recovery
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/lafea-template-t5-controlled-reference-recovery.yml'
+      - 'scripts/lafea-template-t5-controlled-reference-adjudication.mjs'
+      - 'scripts/lafea-template-t5-recovery-source-guard.mjs'
+      - 'src/core/lafea-application-templates/compilers/analytical/pipe-section-combined.js'
+
+permissions:
+  contents: read
+
+jobs:
+  t5-controlled-reference-recovery:
+    name: T5 controlled-reference recovery
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+    steps:
+      - name: Checkout exact recovery head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Assert exact checkout identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install locked dependencies
+        shell: bash
+        run: |
+          set -o pipefail
+          npm ci 2>&1 | tee lafea-t5-npm-ci.log
+
+      - name: Run independent T5 adjudication
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/lafea-template-t5-controlled-reference-adjudication.mjs \
+            2>&1 | tee lafea-t5-adjudication.log
+
+      - name: Enforce bounded recovery write set
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/lafea-template-t5-recovery-source-guard.mjs --base "$PR_BASE_SHA" \
+            2>&1 | tee lafea-t5-source-guard.log
+
+      - name: Run complete Bucket template stack
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run check:lafea-template-stack 2>&1 | tee lafea-t5-template-stack.log
+
+      - name: Run repository foundations
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run syntax:strict 2>&1 | tee lafea-t5-syntax.log
+          npm run check:imports 2>&1 | tee lafea-t5-imports.log
+          npm run build 2>&1 | tee lafea-t5-build.log
+
+      - name: Verify exact patch hygiene and clean tree
+        shell: bash
+        run: |
+          set -o pipefail
+          {
+            test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+            git diff --check "$PR_BASE_SHA...HEAD"
+            test -z "$(git status --short)"
+          } 2>&1 | tee lafea-t5-hygiene.log
+
+      - name: Write recovery disposition
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          const exactHead = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          const report = {
+            schema: 'lafea-template-t5-controlled-reference-recovery/v1',
+            status: 'PASS',
+            disposition: 'T5_CONTROLLED_REFERENCE_RECOVERED_AT_EXACT_HEAD',
+            exactHead,
+            expectedHead: process.env.EXPECTED_HEAD_SHA,
+            baseSha: process.env.PR_BASE_SHA,
+            benchmarkId: 'ALG-PIPE-SECTION-COMBINED-LOAD-01',
+            retainedExpectedHash: 'fnv1a64:94de6d2af6543bf7',
+            controlledReferenceChanged: false,
+            compilerSemantics: [
+              'RETAINED_MECHANICAL_RESULTANT_FACTOR',
+              'RETAINED_PRESSURE_DEFINITION_FACTOR',
+            ],
+            executableTemplateCount: 0,
+            qualifiedManifestCount: 0,
+            t7cAuthority: 'IMPORT_FOR_EDITING_ONLY',
+            engineExecutionAuthorityChanged: false,
+            lifecycleAuthorityChanged: false,
+            resultBindingAuthorityChanged: false,
+            releaseAuthorityChanged: false,
+            t7dAuthorized: false,
+          };
+          fs.writeFileSync(
+            'lafea-t5-controlled-reference-recovery.json',
+            `${JSON.stringify(report, null, 2)}\n`,
+          );
+          console.log(JSON.stringify(report));
+          NODE
+
+      - name: Upload exact-head recovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-t5-controlled-reference-recovery-${{ env.EXPECTED_HEAD_SHA }}
+          path: |
+            lafea-t5-*.log
+            lafea-t5-controlled-reference-recovery.json
+          if-no-files-found: error
+          retention-days: 14
