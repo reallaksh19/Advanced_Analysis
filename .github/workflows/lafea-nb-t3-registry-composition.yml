@@ -1,0 +1,128 @@
+name: LAFEA NB-T3 Registry Composition Certification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/lafea-nb-t3-registry-composition.yml'
+      - 'docs/LAFEA_NonBucket_NB-T3_Registry_Composition.md'
+      - 'scripts/lafea-nb-t3-*.mjs'
+      - 'scripts/lafea-nonbucket-*.mjs'
+      - 'scripts/lafea-u1*.mjs'
+      - 'src/workspace/lafea-stage-*.js'
+      - 'src/workspace/lafea-workbench-model.js'
+      - 'src/workspace/lafea-workbench.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  certify-nb-t3:
+    name: NB-T3 exact-head registry composition
+    runs-on: ubuntu-24.04
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha || '81e6384e5d75362b843b73a7be75b0022b1437f3' }}
+    steps:
+      - name: Checkout exact NB-T3 head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Assert exact checkout identity
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install locked dependencies
+        shell: bash
+        run: |
+          set -o pipefail
+          npm ci 2>&1 | tee lafea-nb-t3-npm-ci.log
+
+      - name: Run NB-T3 registry composition check
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/lafea-nb-t3-registry-composition-check.mjs \
+            2>&1 | tee lafea-nb-t3-functional.log
+
+      - name: Enforce bounded NB-T3 write set
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/lafea-nb-t3-source-guard.mjs --base "$PR_BASE_SHA" \
+            2>&1 | tee lafea-nb-t3-source-guard.log
+
+      - name: Run complete bounded non-bucket stack
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run check:lafea-nonbucket-stack \
+            2>&1 | tee lafea-nb-t3-nonbucket-stack.log
+
+      - name: Run repository foundations
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run syntax:strict 2>&1 | tee lafea-nb-t3-syntax.log
+          npm run check:imports 2>&1 | tee lafea-nb-t3-imports.log
+          npm run build 2>&1 | tee lafea-nb-t3-build.log
+
+      - name: Verify exact patch hygiene and clean tree
+        shell: bash
+        run: |
+          set -o pipefail
+          {
+            test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+            git diff --check "$PR_BASE_SHA...HEAD"
+            test -z "$(git status --short)"
+          } 2>&1 | tee lafea-nb-t3-hygiene.log
+
+      - name: Write NB-T3 disposition
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          const exactHead = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          const report = {
+            schema: 'lafea-nb-t3-registry-composition-evidence/v1',
+            status: 'PASS',
+            disposition: 'NB_T3_REGISTRY_V2_COMPOSITION_ROOT_ACCEPTED_AT_EXACT_HEAD',
+            exactHead,
+            baseSha: process.env.PR_BASE_SHA,
+            registrySchema: 'lafea-stage-registry/v2',
+            stageCount: 6,
+            compositionRouteCount: 6,
+            duplicateDispatchMaps: 0,
+            benchmarkManifestCount: 5,
+            independentBenchmarkGateCount: 16,
+            antiDriftGateCount: 16,
+            qualifiedManifestCount: 0,
+            releaseQualifiedStageCount: 0,
+            numericalAuthorityChanged: false,
+            lifecycleSemanticsChanged: false,
+            codeAuthorityPromoted: false,
+            lafea6Enabled: false,
+          };
+          fs.writeFileSync('lafea-nb-t3-disposition.json', `${JSON.stringify(report, null, 2)}\n`);
+          console.log(JSON.stringify(report));
+          NODE
+
+      - name: Upload exact-head NB-T3 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nb-t3-registry-composition-${{ env.EXPECTED_HEAD_SHA }}
+          path: |
+            lafea-nb-t3-*.log
+            lafea-nb-t3-disposition.json
+          if-no-files-found: error
+          retention-days: 14
