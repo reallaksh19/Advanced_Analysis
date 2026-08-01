@@ -24,7 +24,6 @@ assert.match(bridge, /addEventListener\('pointercancel'/u);
 assert.match(bridge, /removeEventListener\('pointercancel'/u);
 assert.match(bridge, /cancelGesture\('DATASET_CHANGED'\)/u);
 assert.match(bridge, /cancelGesture\('STALE_DATASET_REVISION'\)/u);
-assert.match(bridge, /sourceMutation: false/u);
 assert.match(bridge, /workspaceState\.selectEntity\?\./u);
 assert.match(bridge, /entityRole: 'SOURCE'/u);
 assert.match(bridge, /clearActive\(\);\n    const gatewayResult = gateway\.execute/u);
@@ -33,6 +32,7 @@ assert.doesNotMatch(bridge, /Math\.random|Date\.now|crypto\.randomUUID/u);
 assert.match(contracts, /SequentialSketcherTransientPreview\.v1/u);
 assert.match(contracts, /dataset\.version \?\? 0/u);
 assert.match(contracts, /offsetGeometry/u);
+assert.match(contracts, /sourceMutation: false/u);
 assert.doesNotMatch(contracts, /workspaceState|gateway\.execute/u);
 
 assert.match(controller, /createSketcherAuthoringBridge/u);
