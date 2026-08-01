@@ -69,7 +69,16 @@ assert.equal(
   'node scripts/lfea-b2.1-model-contract-check.mjs && node scripts/lfea-b2.1-reviewer-check.mjs && node scripts/lfea-b2.1-source-guard.mjs',
   'check:lfea-b2.1 registration is missing',
 );
-assert.match(packageJson.scripts['check:lfea-core'], /^npm run check:lfea-b2\.0 && npm run check:lfea-b2\.1 && /u);
+assert.match(
+  packageJson.scripts['check:lfea-linear-core'],
+  /^npm run check:lfea-b2\.0 && npm run check:lfea-b2\.1 && /u,
+  'check:lfea-b2.0 and check:lfea-b2.1 must lead check:lfea-linear-core in order',
+);
+assert.match(
+  packageJson.scripts.gate,
+  /npm run check:lfea-linear-core/u,
+  'gate must retain the current linear-core aggregate',
+);
 assert.ok(packageJson.scripts['check:lfea-b2.0'], 'B-2.0 check must be preserved');
 
 console.log('LFEA B-2.1 source guard PASS');
