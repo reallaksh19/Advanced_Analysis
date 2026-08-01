@@ -30,8 +30,8 @@ jobs:
         run: npm run check:lfea-b2.1
       - name: B-2.4 local-axis qualification
         run: npm run check:lfea-b2.4
-      - name: LFEA core
-        run: npm run check:lfea-core
+      - name: LFEA linear core
+        run: npm run check:lfea-linear-core
       - name: LFEA workbench
         run: npm run check:lfea-workbench
       - name: Strict syntax
