@@ -11,11 +11,15 @@ const lifecycle = read('../src/workspace/lafea-lifecycle.js');
 const sourceAuthority = read('../src/workspace/lafea-source-authority.js');
 const producers = read('../src/workspace/lafea-lifecycle-producers.js');
 const lifecycleStore = read('../src/workspace/lafea-lifecycle-workbench-store.js');
+const registry = read('../src/workspace/lafea-stage-registry.js');
+const composition = read('../src/workspace/lafea-stage-composition-root.js');
+const manifests = read('../src/workspace/lafea-stage-benchmark-manifests.js');
+const model = read('../src/workspace/lafea-workbench-model.js');
 
 const registeredChecks = [...aggregator.matchAll(/['"](scripts\/[A-Za-z0-9._-]+\.mjs)['"]/gu)]
   .map((match) => match[1]);
-assert.ok(registeredChecks.length >= 32,
-  'The non-bucket aggregate must retain the complete NB-T0/NB-T1/NB-T2 and U0-U4 boundary.');
+assert.ok(registeredChecks.length >= 34,
+  'The non-bucket aggregate must retain the complete NB-T0 through NB-T3 and U0-U4 boundary.');
 assert.equal(new Set(registeredChecks).size, registeredChecks.length,
   'The non-bucket aggregate cannot register duplicate checks.');
 
@@ -23,6 +27,7 @@ for (const required of [
   'scripts/lafea-nonbucket-scope-guard.mjs',
   'scripts/lafea-nonbucket-lifecycle-profiles-check.mjs',
   'scripts/lafea-nb-t2-source-producer-check.mjs',
+  'scripts/lafea-nb-t3-registry-composition-check.mjs',
   'scripts/lafea-u1-stage-registry-check.mjs',
   'scripts/lafea-u1b-registry-consumer-check.mjs',
   'scripts/lafea-u2a-input-command-check.mjs',
@@ -69,9 +74,7 @@ assert.match(lifecycleProfiles, /ANALYTICAL_FOUNDATION_V1/u);
 assert.match(lifecycleProfiles, /FEA_MESH_RECOVERY_V1/u);
 assert.match(lifecycle, /lafea-analysis-lifecycle\/v2/u);
 assert.match(sourceAuthority, /lafea-source-authority\/v1/u);
-assert.match(sourceAuthority,
-  /canonicalizationProfile:\s*LAFEA_CANONICAL_SHA256_PROFILE/u);
-assert.match(sourceAuthority, /sourceAuthorityDocument/u);
+assert.match(sourceAuthority, /canonicalizationProfile:\s*LAFEA_CANONICAL_SHA256_PROFILE/u);
 assert.doesNotMatch(sourceAuthority, /sourceHash:\s*lafeaDocumentDigest/u);
 assert.match(producers, /lafea-lifecycle-producer-batch\/v1/u);
 assert.match(producers, /CALLER_AUTHORED_SOURCE_MESH_ONLY/u);
@@ -82,8 +85,22 @@ assert.match(lifecycleStore, /RESULT_READY/u);
 assert.match(lifecycleStore, /CODE_NOT_READY/u);
 assert.match(lifecycleStore, /RELEASE_NOT_QUALIFIED/u);
 assert.doesNotMatch(lifecycleStore, /RELEASE_QUALIFIED'\s*:/u);
-assert.doesNotMatch(read('../src/workspace/lafea-stage-registry.js'),
-  /lafea-stage-registry\/v2/u, 'Registry v2 belongs to NB-T3.');
+
+assert.match(registry, /lafea-stage-registry\/v2/u);
+assert.match(registry, /compositionRootId/u);
+assert.match(registry, /lifecycleProfileId/u);
+assert.match(registry, /benchmarkManifestId/u);
+assert.match(registry, /releaseState:\s*'RELEASE_NOT_QUALIFIED'/u);
+assert.doesNotMatch(registry, /releaseState:\s*'RELEASE_QUALIFIED'/u);
+assert.match(composition, /const ROUTES = Object\.freeze/u);
+assert.match(composition, /Every LAFEA stage must have exactly one composition route/u);
+assert.match(manifests, /NB-BM-16/u);
+assert.match(manifests, /NB-AD-16/u);
+assert.match(manifests, /INDEPENDENT_EXPECTED_EVIDENCE_REQUIRED/u);
+assert.match(manifests, /ANY_REQUIRED_GATE_FAILURE_BLOCKS_RELEASE/u);
+assert.match(model, /from ['"]\.\/lafea-stage-composition-root\.js['"]/u);
+assert.doesNotMatch(model,
+  /calculateLocalAttachment|calculateLocalContinuum|calculateLocalShell|calculateLocalTrunnion/u);
 
 assert.match(legacyAggregate, /lafea-template-t1-contract-check\.mjs/u);
 assert.match(legacyAggregate, /sequential-sketcher-authoring-bridge-check\.mjs/u);
@@ -100,7 +117,12 @@ console.log(JSON.stringify({
   canonicalSha256SourceAuthority: true,
   currentCoreProducerAdapters: true,
   typedSourceEvents: true,
-  registryV2Implemented: false,
+  registryV2Implemented: true,
+  compositionRoutes: 6,
+  duplicateDispatchMaps: 0,
+  benchmarkManifestCount: 5,
+  independentBenchmarkGateCount: 16,
+  antiDriftGateCount: 16,
   browserScope: 'e2e/lafea-hybrid-workbench.spec.js',
   legacyAggregateRetainedForAttributionOnly: true,
   agent2TemplateBucketIncluded: false,
