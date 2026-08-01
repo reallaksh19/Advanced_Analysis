@@ -1,0 +1,367 @@
+name: LAFEA Non-Bucket Stack Certification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/lafea-nonbucket-stack.yml'
+      - 'package.json'
+      - 'scripts/lafea-nonbucket-*.mjs'
+      - 'scripts/lafea-p0-ui-containment-check.mjs'
+      - 'scripts/lafea-u1*.mjs'
+      - 'scripts/lafea-u2*.mjs'
+      - 'scripts/lafea-u3*.mjs'
+      - 'scripts/lafea-u4*.mjs'
+      - 'scripts/lafea-canvas-contract-check.mjs'
+      - 'scripts/lafea-workbench-check.mjs'
+      - 'scripts/lafea.[1-5]-*.mjs'
+      - 'scripts/run-playwright.mjs'
+      - 'src/workspace/lafea-*.js'
+      - 'src/workspace/lafea-canvas/**'
+      - 'e2e/lafea-hybrid-workbench.spec.js'
+      - 'e2e/fixtures/lafea-hybrid-*.js'
+      - 'e2e/lafea-hybrid-validation-matrix.json'
+      - 'docs/LAFEA_NonBucket_NB-T0_Certification.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lafea-nonbucket-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  nonbucket-certification:
+    name: Non-bucket exact-head certification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+    steps:
+      - name: Checkout exact non-bucket head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install locked dependencies
+        id: npm_ci
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm ci 2>&1 | tee lafea-nb-t0-npm-ci.log
+
+      - name: Run bounded non-bucket stack
+        id: nonbucket
+        if: always() && steps.npm_ci.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run check:lafea-nonbucket-stack 2>&1 | tee lafea-nb-t0-nonbucket.log
+
+      - name: Run retained LAFEA numerical-core checks
+        id: core
+        if: always() && steps.npm_ci.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run check:lafea-core 2>&1 | tee lafea-nb-t0-core.log
+
+      - name: Run retained foundation checks
+        id: foundation
+        if: always() && steps.npm_ci.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run check:lafea-foundation 2>&1 | tee lafea-nb-t0-foundation.log
+
+      - name: Run retained meshing checks
+        id: meshing
+        if: always() && steps.npm_ci.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run check:lafea-meshing 2>&1 | tee lafea-nb-t0-meshing.log
+
+      - name: Run retained solver checks
+        id: solver
+        if: always() && steps.npm_ci.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run check:lafea-solver 2>&1 | tee lafea-nb-t0-solver.log
+
+      - name: Run retained workbench checks
+        id: workbench
+        if: always() && steps.npm_ci.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run check:lafea-workbench 2>&1 | tee lafea-nb-t0-workbench.log
+
+      - name: Run retained canvas checks
+        id: canvas
+        if: always() && steps.npm_ci.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run check:lafea-canvas 2>&1 | tee lafea-nb-t0-canvas.log
+
+      - name: Install pinned Chromium
+        id: chromium
+        if: always() && steps.npm_ci.outcome == 'success'
+        continue-on-error: true
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: '0'
+        shell: bash
+        run: |
+          set -o pipefail
+          npx playwright install chromium --with-deps 2>&1 | tee lafea-nb-t0-chromium-install.log
+
+      - name: Run scoped non-bucket Chromium validation
+        id: browser
+        if: always() && steps.chromium.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/run-playwright.mjs e2e/lafea-hybrid-workbench.spec.js 2>&1 | tee lafea-nb-t0-browser.log
+
+      - name: Run strict syntax check
+        id: syntax
+        if: always() && steps.npm_ci.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run syntax:strict 2>&1 | tee lafea-nb-t0-syntax.log
+
+      - name: Run import-boundary check
+        id: imports
+        if: always() && steps.npm_ci.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run check:imports 2>&1 | tee lafea-nb-t0-imports.log
+
+      - name: Build production bundle
+        id: build
+        if: always() && steps.npm_ci.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee lafea-nb-t0-build.log
+
+      - name: Verify exact patch hygiene and clean tree
+        id: hygiene
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          {
+            git diff --check "$PR_BASE_SHA...HEAD"
+            test -z "$(git status --short)"
+          } 2>&1 | tee lafea-nb-t0-hygiene.log
+
+      - name: Write non-bucket failure matrix
+        if: always()
+        env:
+          OUTCOMES: >-
+            {"npmCi":"${{ steps.npm_ci.outcome }}","nonbucket":"${{ steps.nonbucket.outcome }}","core":"${{ steps.core.outcome }}","foundation":"${{ steps.foundation.outcome }}","meshing":"${{ steps.meshing.outcome }}","solver":"${{ steps.solver.outcome }}","workbench":"${{ steps.workbench.outcome }}","canvas":"${{ steps.canvas.outcome }}","chromiumInstall":"${{ steps.chromium.outcome }}","browser":"${{ steps.browser.outcome }}","syntax":"${{ steps.syntax.outcome }}","imports":"${{ steps.imports.outcome }}","build":"${{ steps.build.outcome }}","hygiene":"${{ steps.hygiene.outcome }}"}
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          const outcomes = JSON.parse(process.env.OUTCOMES);
+          const exactHead = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          const failures = Object.entries(outcomes)
+            .filter(([, outcome]) => outcome !== 'success')
+            .map(([command, outcome]) => ({ command, outcome }));
+          const matrix = {
+            schema: 'lafea-nonbucket-failure-matrix/v1',
+            scope: 'LAFEA_NON_BUCKET',
+            exactHead,
+            baseSha: process.env.PR_BASE_SHA,
+            status: failures.length ? 'FAIL' : 'PASS',
+            outcomes,
+            failures,
+            scopeBoundary: {
+              agent2TemplateBucket: false,
+              lfeaPiping: false,
+              sequentialSketcher: false,
+              firstCut: false,
+              accessoryPanels: false,
+            },
+            numericalAuthorityChanged: false,
+            lifecycleSemanticsChanged: false,
+            shellAuthorityChanged: false,
+            lafea6Enabled: false,
+          };
+          fs.writeFileSync('lafea-nonbucket-failure-matrix.json', `${JSON.stringify(matrix, null, 2)}\n`);
+          console.log(JSON.stringify(matrix));
+          NODE
+
+      - name: Enforce bounded certification result
+        if: always()
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const matrix = JSON.parse(fs.readFileSync('lafea-nonbucket-failure-matrix.json', 'utf8'));
+          if (matrix.status !== 'PASS') process.exit(1);
+          NODE
+
+      - name: Upload non-bucket exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nonbucket-exact-head-evidence
+          path: |
+            lafea-nb-t0-*.log
+            lafea-nonbucket-failure-matrix.json
+            playwright-report/
+            test-results/
+          if-no-files-found: error
+          retention-days: 14
+
+  repository-integration:
+    name: Repository integration attribution
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+    steps:
+      - name: Checkout exact integration head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install locked dependencies
+        id: npm_ci
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm ci 2>&1 | tee lafea-repository-npm-ci.log
+
+      - name: Run legacy cross-scope Agent 1 aggregate for attribution
+        id: legacy_agent1
+        if: always() && steps.npm_ci.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run check:lafea-agent1-stack 2>&1 | tee lafea-repository-agent1.log
+
+      - name: Run complete repository gate
+        id: gate
+        if: always() && steps.npm_ci.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run gate 2>&1 | tee lafea-repository-gate.log
+
+      - name: Verify integration patch hygiene and clean tree
+        id: hygiene
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          {
+            git diff --check "$PR_BASE_SHA...HEAD"
+            test -z "$(git status --short)"
+          } 2>&1 | tee lafea-repository-hygiene.log
+
+      - name: Write repository integration matrix
+        if: always()
+        env:
+          OUTCOMES: >-
+            {"npmCi":"${{ steps.npm_ci.outcome }}","legacyAgent1":"${{ steps.legacy_agent1.outcome }}","fullGate":"${{ steps.gate.outcome }}","hygiene":"${{ steps.hygiene.outcome }}"}
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          const outcomes = JSON.parse(process.env.OUTCOMES);
+          const exactHead = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          const gateLog = fs.existsSync('lafea-repository-gate.log')
+            ? fs.readFileSync('lafea-repository-gate.log', 'utf8')
+            : '';
+          const issue116Signature = /lfea-piping-phase6c-anti-drift-check|externalQualificationPackage|PHASE6C_AUTHORITY_REMAINS_IN_ORCHESTRATOR/iu.test(gateLog);
+          const failures = Object.entries(outcomes)
+            .filter(([, outcome]) => outcome !== 'success')
+            .map(([command, outcome]) => ({ command, outcome }));
+          let disposition = failures.length ? 'REPOSITORY_INTEGRATION_FAILED' : 'REPOSITORY_INTEGRATION_PASS';
+          if (
+            outcomes.npmCi === 'success'
+            && outcomes.fullGate === 'failure'
+            && issue116Signature
+          ) {
+            disposition = 'REPOSITORY_INTEGRATION_BLOCKED_ISSUE_116';
+          }
+          const matrix = {
+            schema: 'lafea-repository-integration-matrix/v1',
+            scope: 'REPOSITORY_INTEGRATION_ATTRIBUTION',
+            exactHead,
+            baseSha: process.env.PR_BASE_SHA,
+            status: failures.length ? 'FAIL' : 'PASS',
+            disposition,
+            issue116Signature,
+            outcomes,
+            failures,
+            nonBucketAuthorityPromoted: false,
+            releaseQualified: false,
+          };
+          fs.writeFileSync('lafea-repository-integration-matrix.json', `${JSON.stringify(matrix, null, 2)}\n`);
+          console.log(JSON.stringify(matrix));
+          NODE
+
+      - name: Enforce repository integration result
+        if: always()
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const matrix = JSON.parse(fs.readFileSync('lafea-repository-integration-matrix.json', 'utf8'));
+          if (matrix.status !== 'PASS') process.exit(1);
+          NODE
+
+      - name: Upload repository integration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-repository-integration-evidence
+          path: |
+            lafea-repository-*.log
+            lafea-repository-integration-matrix.json
+          if-no-files-found: error
+          retention-days: 14
