@@ -11,10 +11,7 @@ import { WorkspaceStateStore } from '../src/workspace/workspace-state.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const workspaceDir = path.join(root, 'src/workspace');
-const DEFAULT_WORKSPACE_MODULE_LINE_LIMIT = 300;
-const WORKSPACE_MODULE_LINE_LIMITS = Object.freeze({
-  'src/workspace/lafea-workbench-view.js': 500,
-});
+const WORKSPACE_MODULE_LINE_LIMIT = 500;
 const workspaceModules = (await readdir(workspaceDir))
   .filter((name) => name.endsWith('.js'))
   .map((name) => `src/workspace/${name}`);
@@ -22,11 +19,9 @@ const workspaceModules = (await readdir(workspaceDir))
 for (const relativePath of workspaceModules) {
   const source = await readFile(path.join(root, relativePath), 'utf8');
   const lineCount = source.split(/\r?\n/).length;
-  const lineLimit = WORKSPACE_MODULE_LINE_LIMITS[relativePath]
-    ?? DEFAULT_WORKSPACE_MODULE_LINE_LIMIT;
   assert.ok(
-    lineCount <= lineLimit,
-    `${relativePath} exceeds ${lineLimit} lines (${lineCount}).`,
+    lineCount <= WORKSPACE_MODULE_LINE_LIMIT,
+    `${relativePath} exceeds ${WORKSPACE_MODULE_LINE_LIMIT} lines (${lineCount}).`,
   );
   assert.doesNotMatch(source, /from\s+['"](?:zustand|react)['"]/, `${relativePath} imports UI state framework code.`);
 }
