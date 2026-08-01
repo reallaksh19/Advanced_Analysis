@@ -190,9 +190,9 @@ assert.equal(
   'check:lfea-b2.4 must run analytical, reviewer, and source-guard checks.',
 );
 assert.match(
-  packageJson.scripts['check:lfea-core'],
+  packageJson.scripts['check:lfea-linear-core'],
   /^npm run check:lfea-b2\.0 && npm run check:lfea-b2\.1 && npm run check:lfea-b2\.4 && /u,
-  'B-2.4 must be reached from check:lfea-core after B-2.1.',
+  'B-2.4 must be reached from check:lfea-linear-core after B-2.1.',
 );
 
 console.log('PASS B24-G01 No presentation, clock, locale, or nondeterministic source inputs');
