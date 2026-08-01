@@ -10,6 +10,7 @@ const CHECKS = Object.freeze([
   { scope: 'NB-T1', path: 'scripts/lafea-nonbucket-lifecycle-profiles-check.mjs' },
   { scope: 'NB-T2', path: 'scripts/lafea-nb-t2-source-producer-check.mjs' },
   { scope: 'NB-T3', path: 'scripts/lafea-nb-t3-composition-root-check.mjs' },
+  { scope: 'PR-NB1-A', path: 'scripts/lafea-nb1-analytical-verticals-check.mjs' },
   { scope: 'U1', path: 'scripts/lafea-u1-stage-registry-check.mjs' },
   { scope: 'U1', path: 'scripts/lafea-u1b-registry-consumer-check.mjs' },
   { scope: 'U2', path: 'scripts/lafea-u2a-input-command-check.mjs' },
@@ -79,7 +80,7 @@ for (const row of CHECKS) {
 }
 
 const report = Object.freeze({
-  schema: 'lafea-nonbucket-stack-report/v3',
+  schema: 'lafea-nonbucket-stack-report/v4',
   check: 'lafea-nonbucket-stack-certification',
   status: failures.length ? 'FAIL' : 'PASS',
   exactHead: gitHead(),
@@ -99,6 +100,9 @@ const report = Object.freeze({
   currentCoreProducerAdaptersIntegrated: true,
   registryV2Implemented: true,
   compositionRootIntegrated: true,
+  analyticalProductEvidenceIntegrated: true,
+  finiteFoundationMethods: 6,
+  screeningProductStates: ['PASS', 'ESCALATE', 'BLOCKED'],
   releaseStateBinding: 'RELEASE_NOT_QUALIFIED',
   numericalAuthorityChanged: false,
   lifecycleSemanticsChanged: true,
