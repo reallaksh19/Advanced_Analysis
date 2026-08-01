@@ -6,6 +6,7 @@ import fs from 'node:fs';
 const matrix = JSON.parse(read('../e2e/lafea-hybrid-validation-matrix.json'));
 const spec = read('../e2e/lafea-hybrid-workbench.spec.js');
 const fixture = read('../e2e/fixtures/lafea-hybrid-workbench-fixture.js');
+const authoringFixture = read('../e2e/fixtures/sequential-authoring-bridge-fixture.js');
 const workflow = read('../.github/workflows/lafea-hybrid-browser-validation.yml');
 
 assert.deepEqual(Object.keys(matrix).sort(), ['basis', 'cases', 'phase', 'schema']);
@@ -20,11 +21,10 @@ assert.deepEqual(
 );
 
 const implemented = new Set([
-  'HC-UI-01', 'HC-UI-02', 'HC-UI-04', 'HC-UI-05', 'HC-UI-06',
+  'HC-UI-01', 'HC-UI-02', 'HC-UI-04', 'HC-UI-05', 'HC-UI-06', 'HC-UI-07',
 ]);
 const blocked = new Map([
   ['HC-UI-03', 'BLOCKED_DEPENDENCY'],
-  ['HC-UI-07', 'BLOCKED_PHASE_4'],
   ['HC-REAL-01', 'BLOCKED_USER_EVIDENCE'],
 ]);
 
@@ -65,15 +65,15 @@ assert.match(spec, /data-diagnostic-vertex-count/u);
 assert.match(spec, /LAFEA-UNRECOVERED-VERTEX-MAGENTA-V1/u);
 assert.match(spec, /sha256:lafea-u4j-unrecovered-magenta-v1/u);
 assert.match(spec, /triggerHcWebglLoss/u);
-assert.match(fixture, /webglcontextlost/u);
-assert.match(fixture, /Number\.NaN/u);
-assert.match(fixture, /DIAGNOSTIC_VERTEX_FIELD/u);
+assert.match(spec, /mountHcSequentialAuthoring/u);
+assert.match(spec, /executeHcSequentialAuthoringGesture/u);
+assert.match(spec, /sourceUnchangedDuringPreview/u);
+assert.match(spec, /gatewayHistoryCount/u);
+assert.match(spec, /commandCount: 1/u);
+assert.match(spec, /op: 'STRETCH_NODE'/u);
 assert.doesNotMatch(spec, /test\.skip|test\.fixme|\.only\(/u);
 assert.doesNotMatch(spec, /setContent\(/u);
-assert.doesNotMatch(
-  spec,
-  /status\s*:\s*['"](?:PASS|QUALIFIED)['"]/u,
-);
+assert.doesNotMatch(spec, /status\s*:\s*['"](?:PASS|QUALIFIED)['"]/u);
 
 assert.match(fixture, /import \* as THREE from 'three'/u);
 assert.match(fixture, /mountLafeaWorkbench/u);
@@ -84,6 +84,9 @@ assert.match(fixture, /applyLifecycleEvent/u);
 assert.match(fixture, /getDisplayViewportContext/u);
 assert.match(fixture, /setDisplayRenderPacket/u);
 assert.match(fixture, /HC-UI-SIMULATED/u);
+assert.match(fixture, /webglcontextlost/u);
+assert.match(fixture, /Number\.NaN/u);
+assert.match(fixture, /DIAGNOSTIC_VERTEX_FIELD/u);
 assert.doesNotMatch(
   fixture,
   /lafea-workbench-(?:controller|render-evidence)|lafea-live-workbench-viewport|lafea-hybrid-result-viewport/u,
@@ -95,6 +98,19 @@ assert.doesNotMatch(
 assert.doesNotMatch(fixture, /stage\.execution|executeLafeaStage|\.run\(\)/u);
 assert.doesNotMatch(fixture, /src\/core\/local-shell|lafea-templates/u);
 
+assert.match(authoringFixture, /SequentialSketcherController/u);
+assert.match(authoringFixture, /WorkspaceStateStore/u);
+assert.match(authoringFixture, /controller\.authoringBridge\.beginStretchGesture/u);
+assert.match(authoringFixture, /controller\.authoringBridge\.updateStretchGesture/u);
+assert.match(authoringFixture, /controller\.authoringBridge\.acceptGesture/u);
+assert.match(authoringFixture, /controller\.gateway\.history\.length/u);
+assert.match(authoringFixture, /sourceUnchangedDuringPreview/u);
+assert.match(authoringFixture, /\[SIMULATED\] sequential authoring gesture/u);
+assert.doesNotMatch(
+  authoringFixture,
+  /gateway\.execute|workspaceState\.loadDataset\([^)]*after|solver|mesher|recovery|renderPacket/u,
+);
+
 assert.match(workflow, /actions\/checkout@v4/u);
 assert.match(workflow, /github\.event\.pull_request\.head\.sha \|\| github\.sha/u);
 assert.match(workflow, /actions\/setup-node@v4/u);
@@ -105,6 +121,11 @@ assert.match(
   /Install pinned Chromium[\s\S]*PLAYWRIGHT_BROWSERS_PATH:\s*'0'[\s\S]*npx playwright install chromium --with-deps/u,
 );
 assert.match(workflow, /node scripts\/lafea-u4h-browser-source-guard\.mjs/u);
+assert.match(workflow, /node scripts\/sequential-sketcher-authoring-bridge-check\.mjs/u);
+assert.match(
+  workflow,
+  /node scripts\/sequential-sketcher-authoring-bridge-source-guard\.mjs/u,
+);
 assert.match(
   workflow,
   /node scripts\/run-playwright\.mjs e2e\/lafea-hybrid-workbench\.spec\.js/u,
@@ -115,6 +136,7 @@ assert.match(workflow, /test-results\//u);
 for (const [path, source] of [
   ['e2e/lafea-hybrid-workbench.spec.js', spec],
   ['e2e/fixtures/lafea-hybrid-workbench-fixture.js', fixture],
+  ['e2e/fixtures/sequential-authoring-bridge-fixture.js', authoringFixture],
   ['scripts/lafea-u4h-browser-source-guard.mjs', read('./lafea-u4h-browser-source-guard.mjs')],
 ]) {
   assert.ok(source.split(/\r?\n/u).length <= 300, `${path} exceeds 300 lines.`);
@@ -127,6 +149,7 @@ console.log(JSON.stringify({
   blockedCases: [...blocked.keys()],
   gpuPickBrowserCaseRegistered: true,
   diagnosticBrowserCaseRegistered: true,
+  authoringBridgeBrowserCaseRegistered: true,
   projectLocalBrowserInstall: true,
   browserExecutionClaimed: false,
   realProjectEvidencePresent: false,

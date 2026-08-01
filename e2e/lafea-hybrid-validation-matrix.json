@@ -49,8 +49,8 @@
       "testId": "HC-UI-07",
       "inputBasis": "[SIMULATED] authoring gesture",
       "expectedResult": "One revision-checked command",
-      "implementationStatus": "BLOCKED_PHASE_4",
-      "blockingDependency": "The sequential SVG authoring bridge is a separate Phase 4 deliverable."
+      "implementationStatus": "IMPLEMENTED_EXECUTION_REQUIRED",
+      "spec": "e2e/lafea-hybrid-workbench.spec.js"
     },
     {
       "testId": "HC-REAL-01",
