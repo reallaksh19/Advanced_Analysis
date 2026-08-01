@@ -34,9 +34,10 @@ function run() {
 
   test('P5-PRES-01', 'Current stepped-reducer chain compiles into a truthful conditional presentation', () => {
     assert.equal(fixture.applicationResult.status, 'CONDITIONAL');
-    assert.ok(fixture.applicationResult.limitations.some(
-      (row) => row.limitation?.code === 'REDUCER_APPROXIMATION',
-    ));
+    assert.match(
+      JSON.stringify(fixture.applicationResult.limitations),
+      /PIPING_COMPONENT_APPROXIMATION_REDUCER_SECTION/u,
+    );
     assert.equal(presentation.currency, 'CURRENT');
     assert.equal(presentation.status, 'CONDITIONAL');
     assert.equal(presentation.exportEligibility, 'AUDIT_ONLY_CONDITIONAL');
