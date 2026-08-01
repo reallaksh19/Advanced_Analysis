@@ -7,6 +7,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const HEAD_ARCHIVE = execFileSync(
+  'git',
+  ['archive', '--format=tar', 'HEAD'],
+  { cwd: ROOT },
+);
 
 const BEHAVIOR_CHECKS = Object.freeze([
   ['T1', 'scripts/lafea-template-t1-contract-check.mjs'],
@@ -31,10 +36,22 @@ const DIRECT_SOURCE_GUARDS = Object.freeze([
   ['T1', 'scripts/lafea-template-t1-source-guard.mjs'],
   ['T2', 'scripts/lafea-template-t2-source-guard.mjs'],
   ['T3', 'scripts/lafea-template-t3-source-guard.mjs'],
-  ['T3', 'scripts/lafea-template-t3-unit-projection-source-guard.mjs'],
 ]);
 
 const SYNTHETIC_SOURCE_GUARDS = Object.freeze([
+  guard(
+    'T3-UNIT-PROJECTION',
+    'scripts/lafea-template-t3-unit-projection-source-guard.mjs',
+    [
+      'scripts/lafea-template-t3-analytical-compiler-check.mjs',
+      'scripts/lafea-template-t3-unit-projection-source-guard.mjs',
+    ],
+    [
+      'src/core/lafea-application-templates/compilers/analytical/load-reference-transfer.js',
+      'src/core/lafea-application-templates/compilers/analytical/pipe-section-combined.js',
+      'src/core/lafea-application-templates/compilers/analytical/result-unit-projection.js',
+    ],
+  ),
   guard('T4', 'scripts/lafea-template-t4-source-guard.mjs', [
     'scripts/lafea-template-t4-continuum-compiler-check.mjs',
     'scripts/lafea-template-t4-source-guard.mjs',
@@ -114,7 +131,12 @@ const SYNTHETIC_SOURCE_GUARDS = Object.freeze([
 const failures = [];
 const packageAudit = auditPackageScriptKeys();
 if (packageAudit.duplicateKeys.length) {
-  failures.push({ scope: 'PACKAGE', check: 'script-key-uniqueness', code: 'DUPLICATE_PACKAGE_SCRIPT_KEYS', details: packageAudit.duplicateKeys });
+  failures.push({
+    scope: 'PACKAGE',
+    check: 'script-key-uniqueness',
+    code: 'DUPLICATE_PACKAGE_SCRIPT_KEYS',
+    details: packageAudit.duplicateKeys,
+  });
 }
 
 for (const [scope, script] of [...BEHAVIOR_CHECKS, ...DIRECT_SOURCE_GUARDS]) {
@@ -131,7 +153,12 @@ const report = Object.freeze({
   exactHead: git(ROOT, ['rev-parse', 'HEAD'], true),
   behaviorChecks: BEHAVIOR_CHECKS.map(([scope, script]) => ({ scope, script })),
   directSourceGuards: DIRECT_SOURCE_GUARDS.map(([scope, script]) => ({ scope, script })),
-  syntheticSourceGuards: SYNTHETIC_SOURCE_GUARDS.map(({ scope, script, packagePaths }) => ({ scope, script, packagePaths })),
+  syntheticSourceGuards: SYNTHETIC_SOURCE_GUARDS.map((row) => ({
+    scope: row.scope,
+    script: row.script,
+    addedPaths: row.addedPaths,
+    modifiedPaths: row.modifiedPaths,
+  })),
   packageScriptKeyCount: packageAudit.keyCount,
   duplicatePackageScriptKeys: packageAudit.duplicateKeys,
   failures,
@@ -154,8 +181,13 @@ const report = Object.freeze({
 console.log(JSON.stringify(report));
 if (failures.length) process.exit(1);
 
-function guard(scope, script, packagePaths) {
-  return Object.freeze({ scope, script, packagePaths: Object.freeze(packagePaths) });
+function guard(scope, script, addedPaths, modifiedPaths = []) {
+  return Object.freeze({
+    scope,
+    script,
+    addedPaths: Object.freeze(addedPaths),
+    modifiedPaths: Object.freeze(modifiedPaths),
+  });
 }
 
 function runNode(scope, script, args, cwd, targetFailures) {
@@ -164,48 +196,107 @@ function runNode(scope, script, args, cwd, targetFailures) {
     targetFailures.push({ scope, check: script, code: 'CHECK_SCRIPT_MISSING' });
     return;
   }
-  const result = spawnSync(process.execPath, [absolute, ...args], { cwd, encoding: 'utf8', stdio: 'inherit' });
-  if (result.error) targetFailures.push({ scope, check: script, code: 'CHECK_SPAWN_FAILED', message: result.error.message });
-  else if (result.status !== 0) targetFailures.push({ scope, check: script, code: 'CHECK_FAILED', status: result.status });
+  const result = spawnSync(process.execPath, [absolute, ...args], {
+    cwd,
+    encoding: 'utf8',
+    stdio: 'inherit',
+  });
+  if (result.error) {
+    targetFailures.push({
+      scope,
+      check: script,
+      code: 'CHECK_SPAWN_FAILED',
+      message: result.error.message,
+    });
+  } else if (result.status !== 0) {
+    targetFailures.push({ scope, check: script, code: 'CHECK_FAILED', status: result.status });
+  }
 }
 
 function runNpm(scope, script, targetFailures) {
-  const result = spawnSync('npm', ['run', script], { cwd: ROOT, encoding: 'utf8', stdio: 'inherit', shell: process.platform === 'win32' });
-  if (result.error) targetFailures.push({ scope, check: `npm run ${script}`, code: 'CHECK_SPAWN_FAILED', message: result.error.message });
-  else if (result.status !== 0) targetFailures.push({ scope, check: `npm run ${script}`, code: 'CHECK_FAILED', status: result.status });
+  const result = spawnSync('npm', ['run', script], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    stdio: 'inherit',
+    shell: process.platform === 'win32',
+  });
+  if (result.error) {
+    targetFailures.push({
+      scope,
+      check: `npm run ${script}`,
+      code: 'CHECK_SPAWN_FAILED',
+      message: result.error.message,
+    });
+  } else if (result.status !== 0) {
+    targetFailures.push({
+      scope,
+      check: `npm run ${script}`,
+      code: 'CHECK_FAILED',
+      status: result.status,
+    });
+  }
 }
 
 function runSyntheticGuard(row, targetFailures) {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'lafea-template-guard-'));
   try {
-    const archive = execFileSync('git', ['archive', '--format=tar', 'HEAD'], { cwd: ROOT, encoding: 'buffer' });
-    const extract = spawnSync('tar', ['-xf', '-', '-C', temp], { input: archive, encoding: 'buffer' });
-    if (extract.status !== 0) throw new Error(`tar extraction failed with status ${extract.status}.`);
+    const extract = spawnSync('tar', ['-xf', '-', '-C', temp], {
+      input: HEAD_ARCHIVE,
+    });
+    if (extract.error) throw extract.error;
+    if (extract.status !== 0) {
+      throw new Error(`tar extraction failed with status ${extract.status}.`);
+    }
+
     git(temp, ['init', '--quiet']);
     git(temp, ['config', 'user.email', 'lafea-template-stack@invalid.local']);
     git(temp, ['config', 'user.name', 'LAFEA Template Stack']);
-    for (const relative of row.packagePaths) fs.rmSync(path.join(temp, relative), { recursive: true, force: true });
+
+    for (const relative of row.addedPaths) {
+      fs.rmSync(path.join(temp, relative), { recursive: true, force: true });
+    }
+    for (const relative of row.modifiedPaths) {
+      const target = path.join(temp, relative);
+      if (!fs.existsSync(target)) {
+        throw new Error(`Synthetic modified source is missing: ${relative}.`);
+      }
+      fs.appendFileSync(target, '\n// synthetic source-guard baseline\n', 'utf8');
+    }
+
     git(temp, ['add', '-A']);
     git(temp, ['commit', '--quiet', '-m', `synthetic ${row.scope} base`]);
     const base = git(temp, ['rev-parse', 'HEAD']);
-    for (const relative of row.packagePaths) copyPath(path.join(ROOT, relative), path.join(temp, relative));
+
+    for (const relative of [...row.addedPaths, ...row.modifiedPaths]) {
+      copyPath(path.join(ROOT, relative), path.join(temp, relative));
+    }
     git(temp, ['add', '-A']);
     git(temp, ['commit', '--quiet', '-m', `synthetic ${row.scope} head`]);
+
     const rootModules = path.join(ROOT, 'node_modules');
     const tempModules = path.join(temp, 'node_modules');
-    if (fs.existsSync(rootModules) && !fs.existsSync(tempModules)) fs.symlinkSync(rootModules, tempModules, 'dir');
+    if (fs.existsSync(rootModules) && !fs.existsSync(tempModules)) {
+      fs.symlinkSync(rootModules, tempModules, 'dir');
+    }
     runNode(row.scope, row.script, ['--base', base], temp, targetFailures);
   } catch (error) {
-    targetFailures.push({ scope: row.scope, check: row.script, code: 'SYNTHETIC_SOURCE_GUARD_FAILED', message: error.message });
+    targetFailures.push({
+      scope: row.scope,
+      check: row.script,
+      code: 'SYNTHETIC_SOURCE_GUARD_FAILED',
+      message: error.message,
+    });
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
   }
 }
 
 function copyPath(source, destination) {
-  if (!fs.existsSync(source)) throw new Error(`Required retained source is missing: ${path.relative(ROOT, source)}.`);
+  if (!fs.existsSync(source)) {
+    throw new Error(`Required retained source is missing: ${path.relative(ROOT, source)}.`);
+  }
   fs.mkdirSync(path.dirname(destination), { recursive: true });
-  fs.cpSync(source, destination, { recursive: true });
+  fs.cpSync(source, destination, { recursive: true, force: true });
 }
 
 function git(cwd, args, nullable = false) {
@@ -217,29 +308,42 @@ function git(cwd, args, nullable = false) {
 
 function auditPackageScriptKeys() {
   const text = fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8');
-  const start = text.indexOf('{', text.indexOf('"scripts"') + 9);
+  const markerIndex = text.indexOf('"scripts"');
+  if (markerIndex < 0) throw new Error('package.json has no scripts object.');
+  const start = text.indexOf('{', markerIndex + 9);
+  if (start < 0) throw new Error('package.json scripts object is malformed.');
   const end = matchingBrace(text, start);
   const counts = new Map();
-  for (const match of text.slice(start + 1, end).matchAll(/^\s*"([^"]+)"\s*:/gmu)) counts.set(match[1], (counts.get(match[1]) ?? 0) + 1);
+  for (const match of text.slice(start + 1, end).matchAll(/^\s*"([^"]+)"\s*:/gmu)) {
+    counts.set(match[1], (counts.get(match[1]) ?? 0) + 1);
+  }
   return {
     keyCount: [...counts.values()].reduce((sum, count) => sum + count, 0),
-    duplicateKeys: [...counts].filter(([, count]) => count > 1).map(([key, count]) => ({ key, count })).sort((a, b) => a.key.localeCompare(b.key)),
+    duplicateKeys: [...counts]
+      .filter(([, count]) => count > 1)
+      .map(([key, count]) => ({ key, count }))
+      .sort((left, right) => left.key.localeCompare(right.key)),
   };
 }
 
 function matchingBrace(text, start) {
   let depth = 0;
-  let string = false;
+  let inString = false;
   let escaped = false;
   for (let index = start; index < text.length; index += 1) {
-    const char = text[index];
-    if (string) {
+    const character = text[index];
+    if (inString) {
       if (escaped) escaped = false;
-      else if (char === '\\') escaped = true;
-      else if (char === '"') string = false;
-    } else if (char === '"') string = true;
-    else if (char === '{') depth += 1;
-    else if (char === '}' && --depth === 0) return index;
+      else if (character === '\\') escaped = true;
+      else if (character === '"') inString = false;
+      continue;
+    }
+    if (character === '"') inString = true;
+    else if (character === '{') depth += 1;
+    else if (character === '}') {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
   }
   throw new Error('package.json scripts object is not closed.');
 }
