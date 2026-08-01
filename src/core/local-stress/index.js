@@ -22,4 +22,3 @@ export {
   compileFiniteFootprintDistribution,
   validateFiniteFootprintDistribution,
 } from './finite-footprint.js';
-export { createFiniteFootprintHandoff } from './finite-footprint-handoff.js';
