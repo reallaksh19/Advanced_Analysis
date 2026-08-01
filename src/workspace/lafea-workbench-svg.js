@@ -27,7 +27,9 @@ export function renderLafeaWorkbenchSvg(host, geometry, handlers, viewport = nul
   svg.setAttribute('viewBox', `0 0 ${dimensions.width} ${dimensions.height}`);
   svg.setAttribute('role', geometry.nodePath ? 'group' : 'img');
   svg.setAttribute('aria-label', 'LAFEA editable geometry preview');
-  const transform = viewportTransform(geometry.nodes);
+  const transform = viewport === null
+    ? legacyViewportTransform(geometry.nodes, dimensions)
+    : governedViewportTransform(viewport, dimensions);
   bindGlobalHighlight(svg);
   renderElements(svg, geometry, transform);
   renderNodes(svg, geometry, transform, handlers);
