@@ -20,6 +20,16 @@ export {
   requireLafeaStageRegistryEntry,
 } from './lafea-stage-registry.js';
 export {
+  LAFEA_LIFECYCLE_PROFILE_IDS,
+  LAFEA_LIFECYCLE_PROFILE_SCHEMA,
+  LAFEA_LIFECYCLE_PROFILES,
+  LAFEA_STAGE_LIFECYCLE_PROFILE_IDS,
+  lafeaLifecycleArtifactKinds,
+  requireLafeaLifecycleArtifactDefinition,
+  requireLafeaLifecycleProfile,
+  requireLafeaLifecycleProfileForStage,
+} from './lafea-lifecycle-profiles.js';
+export {
   LAFEA_COLLECTION_IDENTITY_KEYS,
   LAFEA_INPUT_CONTROLS,
   LAFEA_INPUT_DESCRIPTOR_REVISION,
@@ -55,6 +65,10 @@ export {
   LAFEA_ARTIFACT_RECORD_SCHEMA,
   LAFEA_ARTIFACT_STATUSES,
   LAFEA_ARTIFACT_REGISTRATION_SCHEMA,
+  LAFEA_LEGACY_ARTIFACT_KINDS,
+  LAFEA_LEGACY_ARTIFACT_RECORD_SCHEMA,
+  LAFEA_LEGACY_ARTIFACT_REGISTRATION_SCHEMA,
+  LAFEA_LEGACY_LIFECYCLE_SCHEMA,
   LAFEA_LIFECYCLE_CHANGE_CLASSES,
   LAFEA_LIFECYCLE_EVENT_SCHEMA,
   LAFEA_LIFECYCLE_SCHEMA,
@@ -64,6 +78,7 @@ export {
   createLafeaLifecycle,
   createLafeaLifecycleEvent,
   lafeaLifecycleReadiness,
+  migrateLafeaLifecycleV1,
   registerLafeaArtifact,
 } from './lafea-lifecycle.js';
 export {
