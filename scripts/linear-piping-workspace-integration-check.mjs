@@ -24,6 +24,7 @@ function expectCode(body, expectedCode) {
   });
 }
 
+function runWorkspaceChecks() {
 console.log('\n--- [SIMULATED] Linear piping Phase 5B active workspace checks ---');
 
 const documentRef = new FakeDocument();
@@ -180,6 +181,7 @@ test('P5B-GUARD-01', 'Workspace integration remains presentation-only and regist
 });
 
 console.log('Linear piping Phase 5B active workspace checks PASS');
+}
 
 function workspacePackage(value) {
   return {
@@ -290,3 +292,5 @@ class FakeUrlApi {
     this.revoked.push(value);
   }
 }
+
+runWorkspaceChecks();
