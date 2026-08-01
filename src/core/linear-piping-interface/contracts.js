@@ -62,12 +62,16 @@ export function compareAscii(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
-export function requireHash(value, field, nullable = false) {
-  if (nullable && value === null) return null;
+export function requireHash(value, field) {
   if (typeof value !== 'string' || !HASH_PATTERN.test(value)) {
-    failInterface(`${field} must be a semantic hash${nullable ? ' or null' : ''}.`, 'PIPING_INTERFACE_HASH_INVALID');
+    failInterface(`${field} must be a semantic hash.`, 'PIPING_INTERFACE_HASH_INVALID');
   }
   return value;
+}
+
+export function requireNullableHash(value, field) {
+  if (value === null) return null;
+  return requireHash(value, field);
 }
 
 export function requireRecord(value, field) {
