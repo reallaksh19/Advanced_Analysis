@@ -19,14 +19,16 @@ concurrency:
 
 jobs:
   certify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
+    env:
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
     steps:
       - name: Checkout exact head
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 2
+          fetch-depth: 0
           show-progress: false
 
       - name: Set up Node.js
@@ -36,26 +38,57 @@ jobs:
           cache: npm
 
       - name: Install locked dependencies
-        run: npm ci
+        shell: bash
+        run: |
+          set -o pipefail
+          npm ci 2>&1 | tee lafea-infrastructure-npm-ci.log
 
       - name: Run governed Agent 1 and template checks
-        run: node scripts/lafea-agent1-stack-check.mjs
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/lafea-agent1-stack-check.mjs 2>&1 | tee lafea-infrastructure-agent1.log
 
       - name: Run retained LAFEA numerical-core checks
-        run: npm run check:lafea-core
-
-      - name: Run strict syntax and import checks
+        shell: bash
         run: |
-          npm run syntax:strict
-          npm run check:imports
+          set -o pipefail
+          npm run check:lafea-core 2>&1 | tee lafea-infrastructure-core.log
+
+      - name: Run strict syntax check
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run syntax:strict 2>&1 | tee lafea-infrastructure-syntax.log
+
+      - name: Run import-boundary check
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run check:imports 2>&1 | tee lafea-infrastructure-imports.log
 
       - name: Build production bundle
-        run: npm run build
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee lafea-infrastructure-build.log
 
       - name: Run complete repository gate
-        run: npm run gate
-
-      - name: Verify patch hygiene and clean tree
+        shell: bash
         run: |
-          git diff --check
+          set -o pipefail
+          npm run gate 2>&1 | tee lafea-infrastructure-gate.log
+
+      - name: Verify exact patch hygiene and clean tree
+        run: |
+          git diff --check "$PR_BASE_SHA...HEAD"
           test -z "$(git status --short)"
+
+      - name: Upload infrastructure recovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-infrastructure-recovery
+          path: lafea-infrastructure-*.log
+          if-no-files-found: error
+          retention-days: 7
