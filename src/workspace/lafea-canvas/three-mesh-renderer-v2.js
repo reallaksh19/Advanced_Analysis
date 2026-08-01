@@ -1,5 +1,8 @@
-/** Standalone U4E Three.js adapter for exact U4D/U4C result requests. */
+/** Standalone U4E/U4J Three.js adapter for exact U4D result requests. */
 import { contractError, deepFreeze } from './contracts.js';
+import {
+  createLafeaDiagnosticSafeVertexColors,
+} from './diagnostic-field-display.js';
 import { requireLafeaResultRenderRequest } from './result-render-request.js';
 import { createThreePrimitivePicker } from './three-primitive-picker.js';
 
@@ -41,7 +44,10 @@ export function createThreeMeshRendererV2(THREE, canvas) {
     geometry.setIndex(new THREE.BufferAttribute(packet.drawTriangleIndices, 1));
     geometry.setAttribute('resultValue', new THREE.BufferAttribute(packet.fieldValues, 1));
     geometry.setAttribute('qualityFlag', new THREE.BufferAttribute(packet.qualityFlags, 1));
-    geometry.setAttribute('color', new THREE.BufferAttribute(vertexColors(packet), 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(
+      createLafeaDiagnosticSafeVertexColors(packet, request.diagnosticDisplay),
+      3,
+    ));
     const material = new THREE.MeshBasicMaterial({
       vertexColors: true, wireframe: false, side: THREE.DoubleSide,
     });
@@ -70,6 +76,9 @@ export function createThreeMeshRendererV2(THREE, canvas) {
       stageId: request.stageId,
       sceneRevision: String(request.sceneRevision),
       fieldId: packet.field.fieldId,
+      diagnosticVertexCount: String(request.diagnosticDisplay.diagnosticVertexCount),
+      diagnosticPolicyId: request.diagnosticDisplay.policy.policyId,
+      diagnosticPolicyHash: request.diagnosticDisplay.policy.semanticHash,
     });
 
     return deepFreeze({
@@ -79,6 +88,9 @@ export function createThreeMeshRendererV2(THREE, canvas) {
       renderer: 'THREE_WEBGL',
       fieldId: packet.field.fieldId,
       triangleCount: request.displayedPrimitiveCount,
+      diagnosticVertexCount: request.diagnosticDisplay.diagnosticVertexCount,
+      diagnosticPolicyId: request.diagnosticDisplay.policy.policyId,
+      diagnosticPolicyHash: request.diagnosticDisplay.policy.semanticHash,
       meshHash: packet.lineage.meshHash,
       recoveryHash: packet.lineage.recoveryHash,
       renderProfileHash: packet.lineage.renderProfileHash,
@@ -108,9 +120,10 @@ export function createThreeMeshRendererV2(THREE, canvas) {
 
   function markNotReady() {
     canvas.dataset.ready = 'false';
-    for (const key of ['renderer', 'stageId', 'sceneRevision', 'fieldId']) {
-      delete canvas.dataset[key];
-    }
+    for (const key of [
+      'renderer', 'stageId', 'sceneRevision', 'fieldId',
+      'diagnosticVertexCount', 'diagnosticPolicyId', 'diagnosticPolicyHash',
+    ]) delete canvas.dataset[key];
   }
 
   return Object.freeze({
@@ -147,37 +160,6 @@ function orthographicDepth(matrix) {
     throw contractError('LAFEA_V2_ORTHOGRAPHIC_DEPTH_INVALID');
   }
   return [near, far];
-}
-
-function vertexColors(packet) {
-  const colors = new Float32Array(packet.fieldValues.length * 3);
-  const minimum = packet.field.bounds.minimum;
-  const maximum = packet.field.bounds.maximum;
-  const range = maximum - minimum;
-  for (let index = 0; index < packet.fieldValues.length; index += 1) {
-    const normalized = range === 0 ? 0.5
-      : Math.min(1, Math.max(0, (packet.fieldValues[index] - minimum) / range));
-    const [red, green, blue] = colorMap(normalized, packet.field.colorMapId);
-    colors[index * 3] = red;
-    colors[(index * 3) + 1] = green;
-    colors[(index * 3) + 2] = blue;
-  }
-  return colors;
-}
-
-function colorMap(value, colorMapId) {
-  if (colorMapId === 'COOL_WARM') {
-    return [
-      Math.min(1, value * 2),
-      1 - Math.abs((value * 2) - 1),
-      Math.min(1, (1 - value) * 2),
-    ];
-  }
-  return [
-    Math.min(1, Math.max(0, 1.5 - Math.abs((4 * value) - 3))),
-    Math.min(1, Math.max(0, 1.5 - Math.abs((4 * value) - 2))),
-    Math.min(1, Math.max(0, 1.5 - Math.abs((4 * value) - 1))),
-  ];
 }
 
 function requireThreeAdapter(THREE, canvas) {

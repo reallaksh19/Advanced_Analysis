@@ -93,6 +93,38 @@ test.describe('LAFEA hybrid workbench Phase 6 browser validation', () => {
     await expect(resultRoot).toHaveAttribute('data-result-renderer', 'THREE_WEBGL');
   });
 
+  test('HC-UI-05: simulated unrecovered sample uses explicit diagnostic colour policy', async ({ page }) => {
+    const context = await mountScenario(page, 'mountHcDiagnosticResult');
+    expect(context).toMatchObject({
+      stageId: 'LAFEA.3',
+      mode: 'QUALIFIED_RESULT',
+      status: 'READY',
+    });
+
+    const resultRoot = page.locator(
+      '[data-live-viewport-mode="QUALIFIED_RESULT"] .lafea-viewport',
+    );
+    await expect(resultRoot).toHaveAttribute('data-result-status', 'READY');
+    await expect(resultRoot).toHaveAttribute('data-result-renderer', 'THREE_WEBGL');
+    await expect(resultRoot).toHaveAttribute(
+      'data-result-field-id',
+      'HC-UI-DIAGNOSTIC-FIELD',
+    );
+    const canvas = resultRoot.locator('canvas[data-layer="webgl"]');
+    await expect(canvas).toHaveAttribute('data-ready', 'true');
+    await expect(canvas).toHaveAttribute('data-diagnostic-vertex-count', '1');
+    await expect(canvas).toHaveAttribute(
+      'data-diagnostic-policy-id',
+      'LAFEA-UNRECOVERED-VERTEX-MAGENTA-V1',
+    );
+    await expect(canvas).toHaveAttribute(
+      'data-diagnostic-policy-hash',
+      'sha256:lafea-u4j-unrecovered-magenta-v1',
+    );
+    await expect(resultRoot.locator('svg[data-layer="engineering-overlay"]')).toHaveCount(1);
+    await expect(resultRoot.locator('[data-node-id]')).toHaveCount(3);
+  });
+
   test('HC-UI-06: simulated WebGL loss enters explicit blocked SVG state', async ({ page }) => {
     await mountScenario(page, 'mountHcQualifiedResult');
     const liveRoot = page.locator('[data-live-viewport-mode="QUALIFIED_RESULT"]');
