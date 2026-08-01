@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 
 const FIXTURE_URL = '/Advanced_Analysis/e2e/fixtures/lafea-hybrid-workbench-fixture.js';
+const AUTHORING_FIXTURE_URL =
+  '/Advanced_Analysis/e2e/fixtures/sequential-authoring-bridge-fixture.js';
 
 test.describe('LAFEA hybrid workbench Phase 6 browser validation', () => {
   test.afterEach(async ({ page }) => {
@@ -151,6 +153,60 @@ test.describe('LAFEA hybrid workbench Phase 6 browser validation', () => {
     await expect(resultRoot.locator('[data-role="lafea-result-display-status"]')).toContainText(
       'Result display BLOCKED',
     );
+  });
+
+  test('HC-UI-07: simulated authoring gesture commits one revision-checked command', async ({ page }) => {
+    await page.goto('/');
+    const context = await page.evaluate(async (fixtureUrl) => {
+      const fixture = await import(fixtureUrl);
+      const root = document.createElement('main');
+      root.id = 'lafea-sequential-authoring-browser-root';
+      document.body.replaceChildren(root);
+      return fixture.mountHcSequentialAuthoring(root).context;
+    }, AUTHORING_FIXTURE_URL);
+    expect(context).toMatchObject({
+      datasetId: 'HC-UI-07-DATASET',
+      datasetRevision: 1,
+      bridgeStatus: 'IDLE',
+      entityId: 'PIPE-1',
+    });
+    await expect(page.locator('.sequential-sketcher-svg-host svg')).toHaveCount(1);
+
+    const result = await page.evaluate(async (fixtureUrl) => {
+      const fixture = await import(fixtureUrl);
+      return fixture.executeHcSequentialAuthoringGesture(
+        globalThis.__LAFEA_HC_BROWSER__.controller,
+      );
+    }, AUTHORING_FIXTURE_URL);
+
+    expect(result.sourceUnchangedDuringPreview).toBe(true);
+    expect(result.previewFrozen).toBe(true);
+    expect(result.preview).toMatchObject({
+      operation: 'STRETCH_NODE',
+      sourceMutation: false,
+      sourceEntityId: 'PIPE-1',
+      offset: { x: 20, y: 5, z: 0 },
+    });
+    expect(result.receiptFrozen).toBe(true);
+    expect(result.receipt).toMatchObject({
+      status: 'APPLIED',
+      commandCount: 1,
+      command: {
+        op: 'STRETCH_NODE',
+        targetEntityId: 'PIPE-1',
+        offset: { x: 20, y: 5, z: 0 },
+      },
+    });
+    expect(result.gatewayHistoryCount).toBe(1);
+    expect(result.acceptedCommandCount).toBe(1);
+    expect(result.bridgeStatus).toBe('IDLE');
+    expect(result.datasetRevision).toBe(2);
+    expect(result.afterGeometry).toEqual({
+      start: { x: 20, y: 5, z: 0 },
+      end: { x: 120, y: 5, z: 0 },
+      center: { x: 70, y: 5, z: 0 },
+    });
+    await expect(page.locator('.sequential-sketcher-svg-host svg')).toHaveCount(1);
   });
 });
 
