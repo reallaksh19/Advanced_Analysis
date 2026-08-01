@@ -14,12 +14,14 @@ on:
       - 'reports/lfea-piping-phase5b-workspace-integration.json'
       - 'reports/lfea-piping-phase6b-external-evidence-package.json'
       - 'reports/lfea-piping-phase6i-aggregate-anti-drift.json'
+      - 'docs/LFEA_007_RETIREMENT_DECISION.md'
       - 'docs/LFEA_PIPING_100_PERCENT_CLOSURE_POLICY.md'
       - 'docs/LFEA_PIPING_PHASE_STATUS.md'
       - 'docs/LFEA_PIPING_PHASE6_EVIDENCE_REQUIREMENTS.md'
       - 'docs/LFEA_PIPING_PHASE6I_ANTI_DRIFT.md'
       - 'package.json'
       - 'package-lock.json'
+      - 'scripts/lfea-007-retirement-check.mjs'
       - 'scripts/lfea-piping-a0-baseline-check.mjs'
       - 'scripts/lfea-piping-internal-release-evidence-check.mjs'
       - 'scripts/lfea-piping-release-readiness-check.mjs'
@@ -42,6 +44,7 @@ on:
       - 'scripts/linear-piping-external-evidence-package-check.mjs'
       - 'e2e/linear-piping-results-workspace.spec.js'
       - 'src/main.js'
+      - 'src/core/workspace-consumers/**'
       - 'src/core/linear-fea-model-compiler/**'
       - 'src/core/linear-piping-analysis-consumer/**'
       - 'src/core/linear-piping-multicase-application/**'
@@ -53,7 +56,6 @@ on:
       - 'src/workspace/linear-piping-results-workbench.js'
       - 'src/workspace/linear-piping-results-workbench.css'
       - '.github/workflows/lfea-piping-phase-certification.yml'
-      - '.github/workflows/lfea-piping-phase6i-certification.yml'
   workflow_dispatch:
 
 permissions:
@@ -108,6 +110,9 @@ jobs:
 
       - name: Validate phase-to-finding ledger
         run: node scripts/lfea-piping-phase-findings-check.mjs
+
+      - name: Validate LFEA-007 retirement boundary
+        run: node scripts/lfea-007-retirement-check.mjs
 
       - name: Capture exact-head baseline
         run: >-
