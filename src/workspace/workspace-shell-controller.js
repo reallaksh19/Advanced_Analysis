@@ -94,12 +94,38 @@ export class WorkspaceShellController {
     });
 
     if (editBar) {
-      if (activeView === 'loadcalc') {
-        editBar.style.display = 'flex';
-        editBar.innerHTML = `
-          <div style="display:flex; flex-direction:column; width:100%; gap:6px;">
-            <!-- Row 1: Load Calc Calculation Workflow Bar & FEA Mode Toggle -->
-            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:8px;">
+      editBar.style.display = 'flex';
+      editBar.innerHTML = `
+        <div style="display:flex; flex-direction:column; width:100%; gap:6px;">
+          <!-- Row 1: Topology Primitives & 3D Interactive Editing Tools -->
+          <div style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:8px; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+              <span style="font-size:10px; font-weight:700; color:#38bdf8; text-transform:uppercase; margin-right:2px;">Topology:</span>
+              <button type="button" data-topology-primitive="Node" title="Add/Select Pipe Node" style="padding:3px 7px; background:#0f172a; color:#38bdf8; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">📍 Node</button>
+              <button type="button" data-topology-primitive="Elbow" title="Elbow Fitting" style="padding:3px 7px; background:#0f172a; color:#38bdf8; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">⭕ Elbow</button>
+              <button type="button" data-topology-primitive="Tee" title="Branch Tee Fitting" style="padding:3px 7px; background:#0f172a; color:#38bdf8; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🔀 Tee</button>
+              <button type="button" data-topology-primitive="Anchor" title="Rigid Anchor Boundary" style="padding:3px 7px; background:#0f172a; color:#ef4444; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">⚓ Anchor</button>
+              <button type="button" data-topology-primitive="Hanger" title="Spring Hanger Support" style="padding:3px 7px; background:#0f172a; color:#facc15; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🪝 Hanger</button>
+              <button type="button" data-topology-primitive="Restraint" title="Guide/Restraint Support" style="padding:3px 7px; background:#0f172a; color:#4ade80; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🛡️ Restraint</button>
+
+              <span style="height:14px; width:1px; background:#334155; margin:0 4px;"></span>
+
+              <span style="font-size:10px; font-weight:700; color:#facc15; text-transform:uppercase; margin-right:2px;">3D Edit:</span>
+              <button type="button" data-edit-tool="move-node" title="Move 3D Node Position" style="padding:3px 7px; background:#0f172a; color:#f8fafc; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">✋ Move</button>
+              <button type="button" data-edit-tool="stretch-pipe" title="Axial Pipe Elongation" style="padding:3px 7px; background:#0f172a; color:#f8fafc; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">↔️ Stretch</button>
+              <button type="button" data-edit-tool="connect-node" title="Snap / Merge Node Endpoints" style="padding:3px 7px; background:#0f172a; color:#f8fafc; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🔗 Connect</button>
+              <button type="button" data-edit-tool="split-edge" title="Split Pipe Segment with Node" style="padding:3px 7px; background:#0f172a; color:#f8fafc; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">✂️ Split</button>
+              <button type="button" data-edit-tool="rotate-subgraph" title="Rotate Pipe Sub-Graph" style="padding:3px 7px; background:#0f172a; color:#f8fafc; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🔄 Rotate</button>
+              <button type="button" data-edit-tool="bridge-gap" title="Bridge Disconnected Pipe Gap" style="padding:3px 7px; background:#0f172a; color:#f8fafc; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🌉 Bridge</button>
+              <button type="button" data-edit-tool="delete-entity" title="Delete Selected Entity" style="padding:3px 7px; background:#0f172a; color:#f87171; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🗑️ Delete</button>
+              <button type="button" data-edit-tool="measure" title="3D Distance Measurement" style="padding:3px 7px; background:#0f172a; color:#38bdf8; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">📏 Measure</button>
+              <button type="button" data-edit-tool="run-autofix" title="Run Governed Topology Autofix Engine" style="padding:3px 7px; background:#6366f1; color:#ffffff; border:1px solid #818cf8; border-radius:4px; font-size:11px; font-weight:800; cursor:pointer;">⚡ Autofix</button>
+            </div>
+          </div>
+
+          ${activeView === 'loadcalc' ? `
+            <!-- Row 2: Load Calc Calculation Workflow Bar & FEA Mode Toggle -->
+            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:8px; border-top:1px solid #1e293b; padding-top:4px; flex-wrap:wrap;">
               <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                 <button type="button" data-action="toggle-fea-mode" title="Toggle between Empirical Mass Loads (OFF) and Linear FEA Solver (ON)" style="padding:4px 12px; border-radius:4px; font-size:11px; font-weight:800; cursor:pointer; transition:all 0.15s; background:${this.feaMode ? '#0284c7' : '#0f172a'}; border:1px solid ${this.feaMode ? '#38bdf8' : '#334155'}; color:${this.feaMode ? '#ffffff' : '#94a3b8'}; box-shadow:${this.feaMode ? '0 0 10px rgba(56,189,248,0.4)' : 'none'};">FEA Mode: ${this.feaMode ? 'ON ⚡' : 'OFF (Empirical)'}</button>
                 <span style="height:16px; width:1px; background:#334155;"></span>
@@ -122,7 +148,7 @@ export class WorkspaceShellController {
               </div>
             </div>
 
-            <!-- Row 2: Sub-Nav Workbench Tabs Bar -->
+            <!-- Row 3: Sub-Nav Workbench Tabs Bar -->
             <div class="load-calc-tabs" style="display:flex; align-items:center; gap:4px; border-top:1px solid #1e293b; padding-top:4px; flex-wrap:wrap;">
               <button type="button" data-action="tab-main" data-tab="load-cases" class="is-active" style="padding:3px 10px; border:1px solid #0284c7; border-radius:4px; background:#0284c7; color:#fff; font-size:10px; font-weight:700; cursor:pointer;">📊 Load Evaluation</button>
               <button type="button" data-action="tab-main" data-tab="preflight" style="padding:3px 10px; border:1px solid #334155; border-radius:4px; background:#0f172a; color:#94a3b8; font-size:10px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px;">📋 Pre-Flight Grid <span data-action="close-tab" data-tab="preflight" title="Close tab & return to canvas" style="display:inline-flex; align-items:center; justify-content:center; width:12px; height:12px; border-radius:50%; background:#334155; color:#fff; font-size:8px;">✕</span></button>
@@ -130,12 +156,9 @@ export class WorkspaceShellController {
               <button type="button" data-action="tab-main" data-tab="master-data" style="padding:3px 10px; border:1px solid #334155; border-radius:4px; background:#0f172a; color:#94a3b8; font-size:10px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px;">🗄️ Master Data <span data-action="close-tab" data-tab="master-data" title="Close tab & return to canvas" style="display:inline-flex; align-items:center; justify-content:center; width:12px; height:12px; border-radius:50%; background:#334155; color:#fff; font-size:8px;">✕</span></button>
               <button type="button" data-action="tab-main" data-tab="json-trace" style="padding:3px 10px; border:1px solid #334155; border-radius:4px; background:#0f172a; color:#94a3b8; font-size:10px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px;">🔍 JSON Trace <span data-action="close-tab" data-tab="json-trace" title="Close tab & return to canvas" style="display:inline-flex; align-items:center; justify-content:center; width:12px; height:12px; border-radius:50%; background:#334155; color:#fff; font-size:8px;">✕</span></button>
             </div>
-          </div>`;
-        this.bindEditBarEvents(editBar);
-      } else {
-        editBar.style.display = 'none';
-        editBar.innerHTML = '';
-      }
+          ` : ''}
+        </div>`;
+      this.bindEditBarEvents(editBar);
     }
   }
 

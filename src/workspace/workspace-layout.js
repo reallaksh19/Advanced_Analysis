@@ -113,7 +113,7 @@ function workspaceView() {
     </aside>
     <div class="panel-resizer panel-resizer--left" data-action="resize-left" aria-label="Resize Left Panel"></div>
     <section class="workspace-panel viewport-panel" data-panel="viewport" aria-label="3D viewport" style="display:flex; flex-direction:column; flex:1; height:100%; min-height:0; overflow:hidden;">
-      <header class="viewport-toolbar" style="padding:4px 12px; min-height:38px; max-height:40px; border-bottom:1px solid #1e293b; background:#0f172a; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <header class="viewport-toolbar" style="padding:4px 12px; min-height:38px; height:auto; border-bottom:1px solid #1e293b; background:#0f172a; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
         <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
           <div class="viewport-tab-selector" style="display:flex; background:#020617; border:1px solid #334155; border-radius:6px; padding:2px; gap:2px;">
             <button type="button" data-action="switch-viewport-tab" data-tab="svg" class="viewport-tab-btn viewport-tab-btn--active" style="padding:4px 12px; border:none; border-radius:4px; background:#0284c7; color:#ffffff; font-weight:700; font-size:11px; cursor:pointer; transition:all 0.15s;">📐 2D SVG &amp; Topology Draft</button>
