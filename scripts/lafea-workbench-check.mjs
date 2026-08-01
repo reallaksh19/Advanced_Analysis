@@ -133,6 +133,7 @@ assert.ok(rejected.diagnostics.some((row) => row.severity === 'ERROR'));
 const workspace = path.join(ROOT, 'src', 'workspace');
 const read = (relativePath) => fs.readFileSync(path.join(workspace, relativePath), 'utf8');
 const modelSource = read('lafea-workbench-model.js');
+const compositionSource = read('lafea-stage-composition.js');
 const viewSource = read('lafea-workbench-view.js');
 const storeSource = read('lafea-workbench-store.js');
 const documentTableSource = read('lafea-document-table.js');
@@ -145,7 +146,10 @@ const continuumPresenterSource = read('lafea-result-presenters/local-continuum.j
 const shellPresenterSource = read('lafea-result-presenters/local-shell.js');
 const trunnionPresenterSource = read('lafea-result-presenters/trunnion-footprint.js');
 
-assert.match(modelSource, /UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED/u);
+assert.match(modelSource, /from ['"]\.\/lafea-stage-composition\.js['"]/u);
+assert.match(compositionSource, /UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED/u);
+assert.doesNotMatch(modelSource, /calculateLocal|createCanonicalLocal/u);
+assert.doesNotMatch(modelSource, /if \(stageId === ['"]LAFEA\./u);
 assert.doesNotMatch(modelSource, /85\.4/u);
 assert.doesNotMatch(modelSource, /allowable(?:Shear)?Mpa\s*\|\|/u);
 assert.doesNotMatch(modelSource, /Qualified Weld Profile evaluation passed/u);
@@ -203,5 +207,6 @@ console.log(JSON.stringify({
   presenterPathsRetained: true,
   typedCommandEditing: true,
   arrayIndexEditAuthority: false,
+  compositionRootOwnedDispatch: true,
   workspaceCoupling: false,
 }));
