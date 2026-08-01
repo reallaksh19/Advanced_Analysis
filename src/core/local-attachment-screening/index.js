@@ -3,8 +3,14 @@ export {
   PROFILE_SCHEMA, QUALIFICATION_PROFILE, QUALIFICATION_STATES, RADIUS_BASES,
   REQUEST_SCHEMA, RESULT_SCHEMA, SECTION_BASIS, SOURCE_SCHEMA,
 } from './constants.js';
-export { createLocalAttachmentScreeningRequest, validateLocalAttachmentScreeningRequest } from './canonical-request.js';
-export { calculateLocalAttachmentScreening, reconstructScreeningResultHashes } from './calculate.js';
+export {
+  createLocalAttachmentScreeningRequest,
+  validateLocalAttachmentScreeningRequest,
+} from './canonical-request.js';
+export {
+  calculateLocalAttachmentScreening,
+  reconstructScreeningResultHashes,
+} from './calculate.js';
 export { calculateSectionProperties } from './section-properties.js';
 export { principalStresses, vonMisesStress } from './invariants.js';
 export {
@@ -14,7 +20,11 @@ export {
   SCREENING_PRODUCT_REQUEST_SCHEMA,
   SCREENING_PRODUCT_RESULT_SCHEMA,
   SCREENING_PRODUCT_STATES,
-  createLocalAttachmentScreeningHandoff,
-  evaluateLocalAttachmentScreeningProduct,
   validateLocalAttachmentScreeningProduct,
+} from './product-escalation-contract.js';
+export {
+  evaluateLocalAttachmentScreeningProduct,
 } from './product-escalation.js';
+export {
+  createLocalAttachmentScreeningHandoff,
+} from './product-handoff.js';
