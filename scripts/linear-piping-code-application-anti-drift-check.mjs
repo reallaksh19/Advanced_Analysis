@@ -83,7 +83,7 @@ assert.equal(
   packageValue.scripts['check:lfea-code-application'],
   'node scripts/linear-piping-code-application-check.mjs && node scripts/linear-piping-code-application-anti-drift-check.mjs',
 );
-assert.match(packageValue.scripts['check:lfea-core'], /check:lfea-code-application/u);
-assert.match(packageValue.scripts.gate, /check:lfea-core/u);
+assert.match(packageValue.scripts['check:lfea-linear-core'], /check:lfea-code-application/u);
+assert.match(packageValue.scripts.gate, /check:lfea-linear-core/u);
 
 console.log('Linear piping Phase 4 code application anti-drift check PASS');

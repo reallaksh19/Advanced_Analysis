@@ -345,7 +345,10 @@ function validateArtifactBinding(root, artifacts, manifest, binding, manifestPat
     }
     const boundCommands = manifest.commands.filter((entry) => entry.artifactRole === binding.role);
     for (const command of boundCommands) {
-      const commandEvidence = new RegExp(`(?:^|\n)${escapeRegExp(command.commandId)}\s+PASS(?:\n|$)`, 'u');
+      const commandEvidence = new RegExp(
+        String.raw`(?:^|\n)${escapeRegExp(command.commandId)}\s+PASS(?:\n|$)`,
+        'u',
+      );
       if (!commandEvidence.test(text)) {
         fail('LFEA_INTERNAL_ARTIFACT_COMMAND_MISSING', {
           role: binding.role,

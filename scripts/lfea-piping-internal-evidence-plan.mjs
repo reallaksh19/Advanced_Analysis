@@ -1,3 +1,4 @@
+import path from 'node:path';
 import process from 'node:process';
 
 export const MANIFEST_RELATIVE_PATH = 'internal/exact-head-manifest.json';
@@ -34,7 +35,11 @@ export const ARTIFACT_DEFINITIONS = Object.freeze({
   }),
 });
 
-export function buildInternalEvidenceCommandPlan({ baselineEmitPath }) {
+export function buildInternalEvidenceCommandPlan({ baselineEmitPath, outputRoot } = {}) {
+  const resolvedBaselineEmitPath = resolveBaselineEmitPath({
+    baselineEmitPath,
+    outputRoot,
+  });
   return Object.freeze([
     command(
       'EXACT_HEAD_BASELINE',
@@ -43,14 +48,14 @@ export function buildInternalEvidenceCommandPlan({ baselineEmitPath }) {
       [
         'scripts/lfea-piping-a0-baseline-check.mjs',
         '--release',
-        `--emit=${baselineEmitPath}`,
+        `--emit=${resolvedBaselineEmitPath}`,
       ],
       {
         executable: 'node',
         args: [
           'scripts/lfea-piping-a0-baseline-check.mjs',
           '--release',
-          '--emit=$GIT_DIR/lfea-piping-evidence/$EXPECTED_HEAD/audit-baseline.runtime.json',
+          '--emit=$EVIDENCE_ROOT/internal/audit-baseline.runtime.json',
         ],
       },
     ),
@@ -119,6 +124,16 @@ export function buildInternalEvidenceCommandPlan({ baselineEmitPath }) {
       commandText: 'git diff --check && test -z "$(git status --porcelain)"',
     }),
   ]);
+}
+
+function resolveBaselineEmitPath({ baselineEmitPath, outputRoot }) {
+  if (typeof baselineEmitPath === 'string' && baselineEmitPath.trim() !== '') {
+    return baselineEmitPath;
+  }
+  if (typeof outputRoot === 'string' && outputRoot.trim() !== '') {
+    return path.join(outputRoot, ...BASELINE_RELATIVE_PATH.split('/'));
+  }
+  throw new TypeError('baselineEmitPath or outputRoot is required.');
 }
 
 function command(commandId, artifactRole, executable, args, display = {}) {

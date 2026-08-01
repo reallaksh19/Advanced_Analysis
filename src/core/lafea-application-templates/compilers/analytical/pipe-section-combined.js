@@ -26,8 +26,11 @@ import {
   sortedStrings,
   sourceRefRecord,
   sourceRefRecords,
-  unitRecords,
 } from './common.js';
+import {
+  T3_RESULT_UNIT_PROJECTION_POLICY_ID,
+  projectT3ResultUnits,
+} from './result-unit-projection.js';
 
 const TEMPLATE_ID = 'ALG-PIPE-SECTION-COMBINED';
 
@@ -74,6 +77,7 @@ export function compilePipeSectionCombined(rawParameters) {
   };
   const stageSource = createLocalAttachmentScreeningRequest(rawRequest);
   const foundationModel = stageSource.sourceEvidence.foundationModel;
+  const resultUnitProjection = projectT3ResultUnits(foundationModel.units);
   const status = parameterSourceStatus(byId, [
     'requestIdentity',
     'requestVersion',
@@ -83,7 +87,9 @@ export function compilePipeSectionCombined(rawParameters) {
     'envelopeQuantities',
     'qualificationProfile',
   ]);
-  const coordinate = pipeCoordinateArtifacts(foundationModel.pipeCoordinateSystem);
+  const coordinate = pipeCoordinateArtifacts(
+    projectCoordinateEvidence(foundationModel.pipeCoordinateSystem),
+  );
 
   const geometry = createGeometryArtifact({
     template,
@@ -93,7 +99,7 @@ export function compilePipeSectionCombined(rawParameters) {
       ...coordinate,
       sourceRef: sourceRefRecord(requiredParameterRef(byId, 'sourceEvidence')),
     },
-    units: unitRecords(foundationModel.units),
+    units: resultUnitProjection.records,
     features: geometryFeatures(stageSource, status),
     localFrames: [{
       frameId: coordinate.identity,
@@ -109,8 +115,16 @@ export function compilePipeSectionCombined(rawParameters) {
         stageSource.sourceEvidence.foundationResult.semanticHash,
       screeningRequestSemanticHash: stageSource.semanticHash,
       stageSourceSemanticHash: semanticHash(stageSource),
+      coordinateEvidenceProjection:
+        'T3_CANONICAL_VECTOR_TO_GEOMETRY_EVIDENCE/V1',
+      resultUnitProjection: resultUnitProjection.ancestry,
     },
     status,
+    diagnostics: [
+      ...resultUnitProjection.diagnostics,
+      'CANONICAL_COORDINATE_METADATA_RETAINED_IN_STAGE_SOURCE',
+      'GEOMETRY_COORDINATE_EVIDENCE_PROJECTED_TO_EXACT_VECTOR_CONTRACT',
+    ],
   });
 
   const loads = createLoadArtifact({
@@ -120,6 +134,7 @@ export function compilePipeSectionCombined(rawParameters) {
     geometry,
     loadCases: screeningLoadCases(stageSource, status),
     diagnostics: [
+      ...resultUnitProjection.diagnostics,
       'LOAD_COMBINATIONS_REFERENCE_RETAINED_LAFEA1_RESULTANTS_AND_PRESSURE_EVIDENCE',
     ],
   });
@@ -140,6 +155,7 @@ export function compilePipeSectionCombined(rawParameters) {
     diagnostics: [
       'STAGE_SOURCE_VALIDATED_BY_LAFEA2_REQUEST_FACTORY',
       'FOUNDATION_SOURCE_AND_RESULT_EVIDENCE_RECONSTRUCTED',
+      'SOURCE_UNIT_IDENTITY_RETAINED_IN_STAGE_SOURCE',
       'ENGINE_NOT_EXECUTED',
     ],
   });
@@ -157,6 +173,7 @@ export function compilePipeSectionCombined(rawParameters) {
       'NOMINAL_PIPE_SECTION_SCREENING_INPUT_ONLY',
       'NO_LOCAL_DISCONTINUITY_STRESS_CALCULATED',
       'NO_ALLOWABLE_OR_CODE_RESULT_CALCULATED',
+      `RESULT_UNIT_PROJECTION_POLICY:${T3_RESULT_UNIT_PROJECTION_POLICY_ID}`,
     ],
   });
 }
@@ -185,6 +202,32 @@ function wrappedValues(record, label) {
   exactWrapper(record, ['values'], label);
   if (!Array.isArray(record.values)) throw new TypeError(`${label}.values must be an array.`);
   return deepClone(record.values);
+}
+
+function projectCoordinateEvidence(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError('T3_SCREENING_COORDINATE_SYSTEM_REQUIRED');
+  }
+  return {
+    identity: value.identity,
+    origin: exactVectorEvidence(value.origin, 'origin'),
+    axialDirection: exactVectorEvidence(value.axialDirection, 'axialDirection'),
+    circumferentialHint: exactVectorEvidence(
+      value.circumferentialHint,
+      'circumferentialHint',
+    ),
+    radialHint: exactVectorEvidence(value.radialHint, 'radialHint'),
+  };
+}
+
+function exactVectorEvidence(value, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError(`T3_SCREENING_${label.toUpperCase()}_EVIDENCE_REQUIRED`);
+  }
+  return {
+    value: deepClone(value.value),
+    sourceRef: value.sourceRef,
+  };
 }
 
 function geometryFeatures(request, status) {
@@ -222,30 +265,20 @@ function geometryFeatures(request, status) {
 function screeningLoadCases(request, status) {
   return request.screeningCases.map((screeningCase) => ({
     caseId: screeningCase.screeningCaseId,
-    primitives: [
-      ...screeningCase.mechanicalTerms.map((term) => ({
-        loadId: `${screeningCase.screeningCaseId}-MECHANICAL-${term.loadCaseId}`,
-        kind: 'RETAINED_MECHANICAL_RESULTANT_FACTOR',
-        entityId: term.loadCaseId,
-        basis: 'RETAINED_LAFEA1_PIPE_LOCAL_RESULTANT',
-        referencePoint: null,
-        values: { factor: term.factor },
-        units: [],
-        sourceRef: sourceRefRecord(screeningCase.sourceReference),
-        status,
-      })),
-      {
-        loadId: `${screeningCase.screeningCaseId}-PRESSURE-${screeningCase.pressureDefinitionId}`,
-        kind: 'RETAINED_PRESSURE_DEFINITION_FACTOR',
-        entityId: screeningCase.pressureDefinitionId,
-        basis: 'RETAINED_LAFEA1_PRESSURE_EVIDENCE',
-        referencePoint: null,
-        values: { factor: screeningCase.pressureFactor },
-        units: [],
-        sourceRef: sourceRefRecord(screeningCase.sourceReference),
-        status,
+    primitives: screeningCase.mechanicalTerms.map((term) => ({
+      loadId: `${screeningCase.screeningCaseId}-${term.loadCaseId}`,
+      kind: 'REFERENCED_FOUNDATION_LOAD_CASE',
+      entityId: term.loadCaseId,
+      basis: 'LAFEA1_RESULTANT_AND_PRESSURE_REFERENCE',
+      referencePoint: null,
+      values: {
+        factor: term.factor,
+        pressureDefinitionId: term.pressureDefinitionId,
       },
-    ],
+      units: [],
+      sourceRef: sourceRefRecord(term.sourceReference),
+      status,
+    })),
     sourceRefs: sourceRefRecords([screeningCase.sourceReference]),
     status,
   }));
@@ -257,10 +290,10 @@ function requiredParameterRef(byId, parameterId) {
   return refs[0];
 }
 
-function sortWrappedValues(raw, envelopeId, identityKey) {
-  const values = raw?.[envelopeId]?.value?.values;
+function sortWrappedValues(raw, parameterId, identityKey) {
+  const values = raw?.[parameterId]?.value?.values;
   if (!Array.isArray(values)) return;
-  raw[envelopeId].value.values = identityKey === null
+  raw[parameterId].value.values = identityKey === null
     ? [...values].sort(codeSort)
     : [...values].sort((left, right) => codeSort(left?.[identityKey], right?.[identityKey]));
 }

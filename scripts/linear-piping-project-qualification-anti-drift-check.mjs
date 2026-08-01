@@ -120,7 +120,11 @@ const releasePolicy = fs.readFileSync(
 );
 assert.match(releasePolicy, /linear-piping-project-qualification-check\.mjs/u);
 assert.match(releasePolicy, /linear-piping-project-qualification-anti-drift-check\.mjs/u);
-assert.match(releasePolicy, /SIMULATED_FIXTURES_ONLY/u);
+assert.match(releasePolicy, /parseReleaseInvocation/u);
+assert.match(releasePolicy, /releaseMode:\s*invocation\.releaseMode/u);
+assert.match(releasePolicy, /expectedHead:\s*invocation\.expectedHead/u);
+assert.match(releasePolicy, /validateExternalReleaseEvidence/u);
+assert.match(releasePolicy, /validateInternalReleaseEvidence/u);
 
 const index = source['index.js'];
 assert.match(index, /compileLinearPipingExternalQualificationPackage/u);
@@ -134,7 +138,10 @@ assert.equal(
   'node scripts/lfea-piping-release-readiness-check.mjs',
 );
 assert.match(packageValue.scripts.gate, /check:lfea-piping-release-policy/u);
-assert.doesNotMatch(packageValue.scripts['check:lfea-core'], /project-qualification/u);
+assert.doesNotMatch(
+  packageValue.scripts['check:lfea-core'] ?? '',
+  /project-qualification/u,
+);
 
 await import('./linear-piping-external-evidence-package-check.mjs');
 

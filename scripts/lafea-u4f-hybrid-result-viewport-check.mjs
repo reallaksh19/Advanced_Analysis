@@ -21,194 +21,200 @@ import {
 } from '../src/workspace/lafea-hybrid-result-viewport.js';
 import * as publicSurface from '../src/workspace/lafea-workbench.js';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const sourceHash = 'sha256:u4f-mounted-source';
-const scene = sourceScene(9, sourceHash);
-const packet = sealRenderPacketV2(packetValue(9, sourceHash));
-const viewport = viewportValue(packet);
-const readyIntake = intakeReady(packet);
+function run() {
+  const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const sourceHash = 'sha256:u4f-mounted-source';
+  const scene = sourceScene(9, sourceHash);
+  const packet = sealRenderPacketV2(packetValue(9, sourceHash));
+  const viewport = viewportValue(packet);
+  const readyIntake = intakeReady(packet);
 
-const documentRef = new FakeDocument();
-const root = documentRef.createElement('div');
-const THREE = fakeThree(true);
-const selections = [];
-const mounted = mountLafeaHybridResultViewport(root, {
-  stageId: 'LAFEA.3',
-  sourceScene: scene,
-  intake: readyIntake,
-  viewport,
-  selection: null,
-  THREE,
-  onSelectionChange: (selection) => selections.push(selection),
-});
-
-assert.equal(mounted.getState().status, 'READY');
-assert.equal(mounted.getState().renderer, 'THREE_WEBGL');
-assert.equal(mounted.getState().renderResult.fieldId, 'FIELD-U4F-MOUNT');
-assert.equal(root.dataset.resultStatus, 'READY');
-assert.equal(root.dataset.resultRenderer, 'THREE_WEBGL');
-assert.equal(root.dataset.resultFieldId, 'FIELD-U4F-MOUNT');
-assert.equal(root.dataset.resultBlockingReasonCount, '0');
-assert.equal(root.children.length, 3);
-assert.equal(root.children[0].dataset.layer, 'webgl');
-assert.equal(root.children[1].dataset.layer, 'engineering-overlay');
-assert.equal(root.children[2].dataset.layer, 'accessible-inspector');
-assert.equal(root.children[0].dataset.ready, 'true');
-assert.equal(root.children[0].hidden, false);
-assert.ok(root.children[1].querySelectorAll('[data-node-id]').length >= 3);
-assert.match(
-  root.children[2].querySelector('[data-role="lafea-result-display-status"]').textContent,
-  /Result display READY: FIELD-U4F-MOUNT/u,
-);
-
-const initialRenderCount = THREE.lastRenderer.renderCount;
-const nodeN2 = root.children[1].querySelectorAll('[data-node-id]')
-  .find((node) => node.dataset.nodeId === 'N2');
-nodeN2.dispatchEvent({ type: 'click' });
-assert.equal(mounted.getSelection().sourceEntityId, 'N2');
-assert.equal(selections.at(-1).sourceEntityId, 'N2');
-assert.ok(THREE.lastRenderer.renderCount > initialRenderCount);
-assert.ok(root.children[1].querySelectorAll('[data-node-id]').some(
-  (node) => node.dataset.nodeId === 'N2'
-    && node.dataset.selected === 'true'
-    && node.classList.contains('lafea-svg-highlighted'),
-));
-assert.match(root.children[2].children[1].textContent, /Selected Entity: N2 \(SOURCE\)/u);
-assert.throws(
-  () => mounted.selectSource('0'),
-  (error) => error.code === 'LAFEA_HYBRID_RESULT_SOURCE_SELECTION_INVALID',
-);
-mounted.clearSelection();
-assert.equal(mounted.getSelection().sourceEntityId, null);
-
-const canvas = root.children[0];
-canvas.dispatchEvent({ type: 'webglcontextlost' });
-assert.equal(mounted.getState().status, 'BLOCKED');
-assert.equal(mounted.getState().renderer, 'SVG');
-assert.ok(mounted.getState().blockingReasons.includes(
-  'LAFEA_HYBRID_RESULT_WEBGL_CONTEXT_LOST',
-));
-assert.equal(root.dataset.resultStatus, 'BLOCKED');
-assert.equal(root.dataset.resultRenderer, 'SVG');
-assert.equal(canvas.dataset.ready, 'false');
-assert.equal(canvas.hidden, true);
-assert.match(
-  root.children[2].querySelector('[data-role="lafea-result-display-status"]').textContent,
-  /Result display BLOCKED/u,
-);
-
-canvas.dispatchEvent({ type: 'webglcontextrestored' });
-assert.ok(mounted.getState().blockingReasons.includes(
-  'LAFEA_HYBRID_RESULT_RERENDER_REQUIRED',
-));
-assert.equal(mounted.getState().status, 'BLOCKED');
-const refreshed = mounted.refresh();
-assert.equal(refreshed.status, 'READY');
-assert.equal(refreshed.renderer, 'THREE_WEBGL');
-assert.equal(canvas.dataset.ready, 'true');
-assert.equal(canvas.hidden, false);
-
-const unavailableRoot = new FakeDocument().createElement('div');
-const unavailable = mountLafeaHybridResultViewport(unavailableRoot, {
-  stageId: 'LAFEA.3',
-  sourceScene: scene,
-  intake: readyIntake,
-  viewport,
-  selection: null,
-  THREE: fakeThree(false),
-});
-assert.equal(unavailable.getState().status, 'BLOCKED');
-assert.equal(unavailable.getState().renderer, 'SVG');
-assert.ok(unavailable.getState().blockingReasons.includes(
-  'LAFEA_HYBRID_RESULT_WEBGL_UNAVAILABLE',
-));
-assert.ok(unavailableRoot.children[1].querySelectorAll('[data-node-id]').length >= 3);
-assert.equal(unavailableRoot.children[0].dataset.ready, 'false');
-assert.equal(unavailable.refresh().status, 'BLOCKED');
-
-const blockedRoot = new FakeDocument().createElement('div');
-const blocked = mountLafeaHybridResultViewport(blockedRoot, {
-  stageId: 'LAFEA.3',
-  sourceScene: scene,
-  intake: {
-    schema: LAFEA_RENDER_EVIDENCE_INTAKE_SCHEMA,
+  const documentRef = new FakeDocument();
+  const root = documentRef.createElement('div');
+  const THREE = fakeThree(true);
+  const selections = [];
+  const mounted = mountLafeaHybridResultViewport(root, {
     stageId: 'LAFEA.3',
-    sceneRevision: 9,
-    status: 'BLOCKED',
-    renderEvidenceReady: false,
-    packet: null,
-    blockingReasons: ['LAFEA_RENDER_LIFECYCLE_RESULT_NOT_READY'],
-  },
-  viewport: sourceOnlyViewport(),
-  selection: null,
-  THREE: null,
-});
-assert.equal(blocked.getState().status, 'BLOCKED');
-assert.equal(blocked.getState().renderer, 'SVG');
-assert.deepEqual(blocked.getState().blockingReasons, [
-  'LAFEA_RENDER_LIFECYCLE_RESULT_NOT_READY',
-]);
-assert.equal(blockedRoot.children[0].dataset.ready, 'false');
-assert.ok(blockedRoot.children[1].querySelectorAll('[data-node-id]').length >= 3);
-assert.match(
-  blockedRoot.children[2].querySelector('[data-role="lafea-result-blocking-reasons"]')
-    .children[0].textContent,
-  /LAFEA_RENDER_LIFECYCLE_RESULT_NOT_READY/u,
-);
+    sourceScene: scene,
+    intake: readyIntake,
+    viewport,
+    selection: null,
+    THREE,
+    onSelectionChange: (selection) => selections.push(selection),
+  });
 
-assert.equal(publicSurface.mountLafeaHybridResultViewport, mountLafeaHybridResultViewport);
-const coordinatorSource = fs.readFileSync(
-  path.join(ROOT, 'src/workspace/lafea-hybrid-result-viewport.js'),
-  'utf8',
-);
-const sharedOverlaySource = fs.readFileSync(
-  path.join(ROOT, 'src/workspace/lafea-canvas/source-overlay-adapter.js'),
-  'utf8',
-);
-const sourceViewportSource = fs.readFileSync(
-  path.join(ROOT, 'src/workspace/lafea-source-workbench-viewport.js'),
-  'utf8',
-);
-const hybridSource = fs.readFileSync(
-  path.join(ROOT, 'src/workspace/lafea-canvas/hybrid-viewport.js'),
-  'utf8',
-);
-const liveViewSource = fs.readFileSync(
-  path.join(ROOT, 'src/workspace/lafea-workbench-view.js'),
-  'utf8',
-);
-assert.match(coordinatorSource, /LAFEA_HYBRID_RESULT_WEBGL_UNAVAILABLE/u);
-assert.match(coordinatorSource, /LAFEA_HYBRID_RESULT_RERENDER_REQUIRED/u);
-assert.doesNotMatch(coordinatorSource, /stage\.execution|initializeLifecycle|registerLifecycleArtifact/u);
-assert.doesNotMatch(coordinatorSource, /SVG_FALLBACK|CANVAS2D_FALLBACK|RASTER_WEBGL_CAPTURE/u);
-assert.match(sourceViewportSource, /renderLafeaSourceOverlay/u);
-assert.doesNotMatch(sourceViewportSource, /function sourceGeometry|function bindSourceSelection/u);
-assert.match(sharedOverlaySource, /renderLafeaWorkbenchSvg/u);
-assert.match(hybridSource, /isAvailable\(canvas\)/u);
-assert.doesNotMatch(liveViewSource, /mountLafeaHybridResultViewport/u);
+  assert.equal(mounted.getState().status, 'READY');
+  assert.equal(mounted.getState().renderer, 'THREE_WEBGL');
+  assert.equal(mounted.getState().renderResult.fieldId, 'FIELD-U4F-MOUNT');
+  assert.equal(root.dataset.resultStatus, 'READY');
+  assert.equal(root.dataset.resultRenderer, 'THREE_WEBGL');
+  assert.equal(root.dataset.resultFieldId, 'FIELD-U4F-MOUNT');
+  assert.equal(root.dataset.resultBlockingReasonCount, '0');
+  assert.equal(root.children.length, 3);
+  assert.equal(root.children[0].dataset.layer, 'webgl');
+  assert.equal(root.children[1].dataset.layer, 'engineering-overlay');
+  assert.equal(root.children[2].dataset.layer, 'accessible-inspector');
+  assert.equal(root.children[0].dataset.ready, 'true');
+  assert.equal(root.children[0].hidden, false);
+  assert.ok(root.children[1].querySelectorAll('[data-node-id]').length >= 3);
+  assert.match(
+    root.children[2].querySelector('[data-role="lafea-result-display-status"]').textContent,
+    /Result display READY: FIELD-U4F-MOUNT/u,
+  );
 
-blocked.destroy();
-unavailable.destroy();
-mounted.destroy();
-assert.equal(root.children.length, 0);
-assert.equal(root.dataset.resultStatus, 'DESTROYED');
-assert.equal(root.dataset.resultRenderer, undefined);
-assert.equal(root.dataset.resultFieldId, undefined);
-assert.equal(root.dataset.resultBlockingReasons, undefined);
+  const initialRenderCount = THREE.lastRenderer.renderCount;
+  const nodeN2 = root.children[1].querySelectorAll('[data-node-id]')
+    .find((node) => node.dataset.nodeId === 'N2');
+  nodeN2.dispatchEvent({ type: 'click' });
+  assert.equal(mounted.getSelection().sourceEntityId, 'N2');
+  assert.equal(selections.at(-1).sourceEntityId, 'N2');
+  assert.ok(THREE.lastRenderer.renderCount > initialRenderCount);
+  assert.ok(root.children[1].querySelectorAll('[data-node-id]').some(
+    (node) => node.dataset.nodeId === 'N2'
+      && node.dataset.selected === 'true'
+      && node.classList.contains('lafea-svg-highlighted'),
+  ));
+  assert.match(root.children[2].children[1].textContent, /Selected Entity: N2 \(SOURCE\)/u);
+  assert.throws(
+    () => mounted.selectSource('0'),
+    (error) => error.code === 'LAFEA_HYBRID_RESULT_SOURCE_SELECTION_INVALID',
+  );
+  mounted.clearSelection();
+  assert.equal(mounted.getSelection().sourceEntityId, null);
 
-console.log(JSON.stringify({
-  check: 'lafea-u4f-hybrid-result-viewport',
-  status: 'PASS',
-  readyRenderer: 'THREE_WEBGL',
-  blockedRenderer: 'SVG',
-  sourceOverlayAlwaysVisible: true,
-  exactSourceSelection: true,
-  webglFallbackUsed: false,
-  contextRestoreRequiresRefresh: true,
-  liveWorkbenchMounted: false,
-  numericalAuthorityChanged: false,
-  lafea6Enabled: false,
-}));
+  const canvas = root.children[0];
+  canvas.dispatchEvent({ type: 'webglcontextlost' });
+  assert.equal(mounted.getState().status, 'BLOCKED');
+  assert.equal(mounted.getState().renderer, 'SVG');
+  assert.ok(mounted.getState().blockingReasons.includes(
+    'LAFEA_HYBRID_RESULT_WEBGL_CONTEXT_LOST',
+  ));
+  assert.equal(root.dataset.resultStatus, 'BLOCKED');
+  assert.equal(root.dataset.resultRenderer, 'SVG');
+  assert.equal(canvas.dataset.ready, 'false');
+  assert.equal(canvas.hidden, true);
+  assert.match(
+    root.children[2].querySelector('[data-role="lafea-result-display-status"]').textContent,
+    /Result display BLOCKED/u,
+  );
+
+  canvas.dispatchEvent({ type: 'webglcontextrestored' });
+  assert.ok(mounted.getState().blockingReasons.includes(
+    'LAFEA_HYBRID_RESULT_RERENDER_REQUIRED',
+  ));
+  assert.equal(mounted.getState().status, 'BLOCKED');
+  const refreshed = mounted.refresh();
+  assert.equal(refreshed.status, 'READY');
+  assert.equal(refreshed.renderer, 'THREE_WEBGL');
+  assert.equal(canvas.dataset.ready, 'true');
+  assert.equal(canvas.hidden, false);
+
+  const unavailableRoot = new FakeDocument().createElement('div');
+  const unavailable = mountLafeaHybridResultViewport(unavailableRoot, {
+    stageId: 'LAFEA.3',
+    sourceScene: scene,
+    intake: readyIntake,
+    viewport,
+    selection: null,
+    THREE: fakeThree(false),
+  });
+  assert.equal(unavailable.getState().status, 'BLOCKED');
+  assert.equal(unavailable.getState().renderer, 'SVG');
+  assert.ok(unavailable.getState().blockingReasons.includes(
+    'LAFEA_HYBRID_RESULT_WEBGL_UNAVAILABLE',
+  ));
+  assert.ok(unavailableRoot.children[1].querySelectorAll('[data-node-id]').length >= 3);
+  assert.equal(unavailableRoot.children[0].dataset.ready, 'false');
+  assert.equal(unavailable.refresh().status, 'BLOCKED');
+
+  const blockedRoot = new FakeDocument().createElement('div');
+  const blocked = mountLafeaHybridResultViewport(blockedRoot, {
+    stageId: 'LAFEA.3',
+    sourceScene: scene,
+    intake: {
+      schema: LAFEA_RENDER_EVIDENCE_INTAKE_SCHEMA,
+      stageId: 'LAFEA.3',
+      sceneRevision: 9,
+      status: 'BLOCKED',
+      renderEvidenceReady: false,
+      packet: null,
+      blockingReasons: ['LAFEA_RENDER_LIFECYCLE_RESULT_NOT_READY'],
+    },
+    viewport: sourceOnlyViewport(),
+    selection: null,
+    THREE: null,
+  });
+  assert.equal(blocked.getState().status, 'BLOCKED');
+  assert.equal(blocked.getState().renderer, 'SVG');
+  assert.deepEqual(blocked.getState().blockingReasons, [
+    'LAFEA_RENDER_LIFECYCLE_RESULT_NOT_READY',
+  ]);
+  assert.equal(blockedRoot.children[0].dataset.ready, 'false');
+  assert.ok(blockedRoot.children[1].querySelectorAll('[data-node-id]').length >= 3);
+  assert.match(
+    blockedRoot.children[2].querySelector('[data-role="lafea-result-blocking-reasons"]')
+      .children[0].textContent,
+    /LAFEA_RENDER_LIFECYCLE_RESULT_NOT_READY/u,
+  );
+
+  assert.notStrictEqual(
+    publicSurface.mountLafeaHybridResultViewport,
+    mountLafeaHybridResultViewport,
+  );
+  const coordinatorSource = fs.readFileSync(
+    path.join(ROOT, 'src/workspace/lafea-hybrid-result-viewport.js'),
+    'utf8',
+  );
+  const sharedOverlaySource = fs.readFileSync(
+    path.join(ROOT, 'src/workspace/lafea-canvas/source-overlay-adapter.js'),
+    'utf8',
+  );
+  const sourceViewportSource = fs.readFileSync(
+    path.join(ROOT, 'src/workspace/lafea-source-workbench-viewport.js'),
+    'utf8',
+  );
+  const hybridSource = fs.readFileSync(
+    path.join(ROOT, 'src/workspace/lafea-canvas/hybrid-viewport.js'),
+    'utf8',
+  );
+  const liveViewSource = fs.readFileSync(
+    path.join(ROOT, 'src/workspace/lafea-workbench-view.js'),
+    'utf8',
+  );
+  assert.match(coordinatorSource, /LAFEA_HYBRID_RESULT_WEBGL_UNAVAILABLE/u);
+  assert.match(coordinatorSource, /LAFEA_HYBRID_RESULT_RERENDER_REQUIRED/u);
+  assert.doesNotMatch(coordinatorSource, /stage\.execution|initializeLifecycle|registerLifecycleArtifact/u);
+  assert.doesNotMatch(coordinatorSource, /SVG_FALLBACK|CANVAS2D_FALLBACK|RASTER_WEBGL_CAPTURE/u);
+  assert.match(sourceViewportSource, /renderLafeaSourceOverlay/u);
+  assert.doesNotMatch(sourceViewportSource, /function sourceGeometry|function bindSourceSelection/u);
+  assert.match(sharedOverlaySource, /renderLafeaWorkbenchSvg/u);
+  assert.match(hybridSource, /isAvailable\(canvas\)/u);
+  assert.doesNotMatch(liveViewSource, /mountLafeaHybridResultViewport/u);
+
+  blocked.destroy();
+  unavailable.destroy();
+  mounted.destroy();
+  assert.equal(root.children.length, 0);
+  assert.equal(root.dataset.resultStatus, 'DESTROYED');
+  assert.equal(root.dataset.resultRenderer, undefined);
+  assert.equal(root.dataset.resultFieldId, undefined);
+  assert.equal(root.dataset.resultBlockingReasons, undefined);
+
+  console.log(JSON.stringify({
+    check: 'lafea-u4f-hybrid-result-viewport',
+    status: 'PASS',
+    readyRenderer: 'THREE_WEBGL',
+    blockedRenderer: 'SVG',
+    sourceOverlayAlwaysVisible: true,
+    exactSourceSelection: true,
+    publicFacadeIsolated: true,
+    webglFallbackUsed: false,
+    contextRestoreRequiresRefresh: true,
+    liveWorkbenchMounted: false,
+    numericalAuthorityChanged: false,
+    lafea6Enabled: false,
+  }));
+}
 
 function sourceScene(sceneRevision, hash) {
   return createLafeaSourceEngineeringScene({
@@ -443,3 +449,5 @@ function fakeThree(webgl2) {
   };
   return api;
 }
+
+run();
