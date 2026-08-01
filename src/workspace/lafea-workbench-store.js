@@ -18,8 +18,20 @@ import {
 } from './lafea-workbench-model.js';
 import { requireLafeaInputDescriptor } from './lafea-stage-input-descriptors.js';
 import { requireLafeaStageRegistryEntry } from './lafea-stage-registry.js';
+import {
+  HISTORY_LIMIT,
+  assertStage,
+  commandError,
+  commitDocument,
+  currentStage,
+  failedState,
+  freeze,
+  importIntoState,
+  initialState,
+  requireDocument,
+  withCurrentStage,
+} from './lafea-workbench-store-state.js';
 
-const HISTORY_LIMIT = 50;
 const NODE_COORDINATE_DESCRIPTORS = Object.freeze({
   'LAFEA.3': Object.freeze({ x: 'LAFEA.3.node.x', y: 'LAFEA.3.node.y' }),
   'LAFEA.4': Object.freeze({ x: 'LAFEA.4.node.position.x', y: 'LAFEA.4.node.position.y' }),
@@ -64,7 +76,10 @@ export function createLafeaWorkbenchStore(options) {
     if (command?.stageId !== state.activeStageId) {
       return publish(failedState(
         state,
-        commandError('LAFEA_EDIT_STAGE_MISMATCH', `Active stage ${state.activeStageId} cannot apply a ${command?.stageId ?? 'missing'} command.`),
+        commandError(
+          'LAFEA_EDIT_STAGE_MISMATCH',
+          `Active stage ${state.activeStageId} cannot apply a ${command?.stageId ?? 'missing'} command.`,
+        ),
         'LAFEA_EDIT_STAGE_MISMATCH',
       ));
     }
@@ -117,26 +132,51 @@ export function createLafeaWorkbenchStore(options) {
 
   function moveNode(nodePath, nodeId, x, y) {
     if (!Number.isFinite(x) || !Number.isFinite(y)) {
-      return publish(failedState(state, new TypeError('Node coordinates must be finite.'), 'LAFEA_NODE_MOVE_REJECTED'));
+      return publish(failedState(
+        state,
+        new TypeError('Node coordinates must be finite.'),
+        'LAFEA_NODE_MOVE_REJECTED',
+      ));
     }
     const route = NODE_COORDINATE_DESCRIPTORS[state.activeStageId];
-    const registeredNodePath = requireLafeaStageRegistryEntry(state.activeStageId).previewSource.nodePath;
+    const registeredNodePath = requireLafeaStageRegistryEntry(
+      state.activeStageId,
+    ).previewSource.nodePath;
     if (!route || nodePath !== registeredNodePath) {
       return publish(failedState(
         state,
-        commandError('LAFEA_NODE_PATH_NOT_AUTHORIZED', `${nodePath} is not the registered editable node path for ${state.activeStageId}.`),
+        commandError(
+          'LAFEA_NODE_PATH_NOT_AUTHORIZED',
+          `${nodePath} is not the registered editable node path for ${state.activeStageId}.`,
+        ),
         'LAFEA_NODE_PATH_NOT_AUTHORIZED',
       ));
     }
 
     const initialDocument = requireDocument(state);
-    const xCommand = scalarCommand(route.x, nodeId, String(x), initialDocument, 'SVG_DRAG');
+    const xCommand = scalarCommand(
+      route.x,
+      nodeId,
+      String(x),
+      initialDocument,
+      'SVG_DRAG',
+    );
     const xResult = applyLafeaStageEditCommand(initialDocument, xCommand);
-    if (!['APPLIED', 'NO_CHANGE'].includes(xResult.status)) return publishEditFailure(xResult);
+    if (!['APPLIED', 'NO_CHANGE'].includes(xResult.status)) {
+      return publishEditFailure(xResult);
+    }
 
-    const yCommand = scalarCommand(route.y, nodeId, String(y), xResult.document, 'SVG_DRAG');
+    const yCommand = scalarCommand(
+      route.y,
+      nodeId,
+      String(y),
+      xResult.document,
+      'SVG_DRAG',
+    );
     const yResult = applyLafeaStageEditCommand(xResult.document, yCommand);
-    if (!['APPLIED', 'NO_CHANGE'].includes(yResult.status)) return publishEditFailure(yResult);
+    if (!['APPLIED', 'NO_CHANGE'].includes(yResult.status)) {
+      return publishEditFailure(yResult);
+    }
 
     if (xResult.status === 'NO_CHANGE' && yResult.status === 'NO_CHANGE') {
       return publish(withCurrentStage(state, {
@@ -172,10 +212,14 @@ export function createLafeaWorkbenchStore(options) {
       ...failedState(state, error, 'LAFEA_SOURCE_EDIT_REJECTED'),
       diagnostics: [{
         severity: 'ERROR',
-        code: typeof error?.code === 'string' ? error.code : 'LAFEA_SOURCE_EDIT_REJECTED',
+        code: typeof error?.code === 'string'
+          ? error.code
+          : 'LAFEA_SOURCE_EDIT_REJECTED',
         path,
         entityId: typeof entityId === 'string' ? entityId : null,
-        message: error instanceof Error ? error.message : 'Unknown LAFEA source-edit failure.',
+        message: error instanceof Error
+          ? error.message
+          : 'Unknown LAFEA source-edit failure.',
       }],
     });
   }
@@ -202,7 +246,9 @@ export function createLafeaWorkbenchStore(options) {
       execution: null,
       lastEditResult: null,
       past: stage.past.slice(0, -1),
-      future: [stage.document, ...stage.future].filter(Boolean).slice(0, HISTORY_LIMIT),
+      future: [stage.document, ...stage.future]
+        .filter(Boolean)
+        .slice(0, HISTORY_LIMIT),
     };
     return publish(withCurrentStage(state, nextStage, 'READY', []));
   }
@@ -216,14 +262,19 @@ export function createLafeaWorkbenchStore(options) {
       document,
       execution: null,
       lastEditResult: null,
-      past: [...stage.past, stage.document].filter(Boolean).slice(-HISTORY_LIMIT),
+      past: [...stage.past, stage.document]
+        .filter(Boolean)
+        .slice(-HISTORY_LIMIT),
       future: stage.future.slice(1),
     };
     return publish(withCurrentStage(state, nextStage, 'READY', []));
   }
 
   function exportDocument() {
-    const document = normalizeLafeaStageDocument(state.activeStageId, requireDocument(state));
+    const document = normalizeLafeaStageDocument(
+      state.activeStageId,
+      requireDocument(state),
+    );
     return freeze({
       schema: LAFEA_WORKBENCH_DOCUMENT_SCHEMA,
       stageId: state.activeStageId,
@@ -232,7 +283,9 @@ export function createLafeaWorkbenchStore(options) {
   }
 
   function subscribe(listener) {
-    if (typeof listener !== 'function') throw new TypeError('LAFEA subscriber must be a function.');
+    if (typeof listener !== 'function') {
+      throw new TypeError('LAFEA subscriber must be a function.');
+    }
     listeners.add(listener);
     return () => listeners.delete(listener);
   }
@@ -266,104 +319,4 @@ export function createLafeaWorkbenchStore(options) {
     getState: () => state,
     destroy: () => listeners.clear(),
   });
-}
-
-function initialState(activeStageId) {
-  const stages = Object.fromEntries(LAFEA_STAGE_IDS.map((stageId) => [
-    stageId,
-    freeze({ document: null, execution: null, lastEditResult: null, past: [], future: [] }),
-  ]));
-  return freeze({
-    schema: 'lafea-workbench-state/v1',
-    activeStageId,
-    status: 'EMPTY',
-    stages,
-    diagnostics: [],
-  });
-}
-
-function importIntoState(state, stageId, value) {
-  assertStage(stageId);
-  const envelope = isRecord(value) && value.schema === LAFEA_WORKBENCH_DOCUMENT_SCHEMA;
-  const targetStage = envelope ? value.stageId : stageId;
-  assertStage(targetStage);
-  const document = normalizeLafeaStageDocument(targetStage, envelope ? value.document : value);
-  const stage = state.stages[targetStage];
-  const nextStage = {
-    document,
-    execution: null,
-    lastEditResult: null,
-    past: stage.document ? [...stage.past, stage.document].slice(-HISTORY_LIMIT) : stage.past,
-    future: [],
-  };
-  return withStage({ ...state, activeStageId: targetStage }, targetStage, nextStage, 'READY', []);
-}
-
-function commitDocument(state, document, editResult) {
-  const stage = currentStage(state);
-  const nextStage = {
-    document,
-    execution: null,
-    lastEditResult: editResult,
-    past: [...stage.past, stage.document].filter(Boolean).slice(-HISTORY_LIMIT),
-    future: [],
-  };
-  return withCurrentStage(state, nextStage, 'READY', []);
-}
-
-function withCurrentStage(state, stage, status, diagnostics) {
-  return withStage(state, state.activeStageId, stage, status, diagnostics);
-}
-
-function withStage(state, stageId, stage, status, diagnostics) {
-  return {
-    ...state,
-    status,
-    stages: { ...state.stages, [stageId]: freeze(stage) },
-    diagnostics: freeze([...diagnostics]),
-  };
-}
-
-function failedState(state, error, code) {
-  return {
-    ...state,
-    status: 'FAILED',
-    diagnostics: [{
-      severity: 'ERROR',
-      code: typeof error?.code === 'string' ? error.code : code,
-      path: typeof error?.path === 'string' ? error.path : 'document',
-      entityId: typeof error?.entityId === 'string' ? error.entityId : null,
-      message: error instanceof Error ? error.message : 'Unknown LAFEA workbench failure.',
-    }],
-  };
-}
-
-function currentStage(state) {
-  return state.stages[state.activeStageId];
-}
-
-function requireDocument(state) {
-  const document = currentStage(state).document;
-  if (!document) throw new TypeError(`Import a ${state.activeStageId} document before editing or calculating.`);
-  return document;
-}
-
-function assertStage(stageId) {
-  requireLafeaStageRegistryEntry(stageId);
-}
-
-function commandError(code, message) {
-  const error = new Error(message);
-  error.code = code;
-  return error;
-}
-
-function isRecord(value) {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function freeze(value) {
-  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
-  Object.values(value).forEach(freeze);
-  return Object.freeze(value);
 }
