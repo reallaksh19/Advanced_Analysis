@@ -10,6 +10,10 @@ const lifecycleProfiles = read('../src/workspace/lafea-lifecycle-profiles.js');
 const lifecycle = read('../src/workspace/lafea-lifecycle.js');
 const sourceAuthority = read('../src/workspace/lafea-source-authority.js');
 const producers = read('../src/workspace/lafea-lifecycle-producers.js');
+const productProducers = read('../src/workspace/lafea-analytical-product-producers.js');
+const productComponents = read('../src/workspace/lafea-stage-product-components.js');
+const foundationCompiler = read('../src/core/local-load-foundation/compile.js');
+const screeningProduct = read('../src/core/local-attachment-screening/product-assessment.js');
 const lifecycleStore = read('../src/workspace/lafea-lifecycle-workbench-store.js');
 const registry = read('../src/workspace/lafea-stage-registry.js');
 const bindings = read('../src/workspace/lafea-stage-composition-bindings.js');
@@ -19,8 +23,8 @@ const presenterIndex = read('../src/workspace/lafea-result-presenters/index.js')
 
 const registeredChecks = [...aggregator.matchAll(/['"](scripts\/[A-Za-z0-9._-]+\.mjs)['"]/gu)]
   .map((match) => match[1]);
-assert.ok(registeredChecks.length >= 33,
-  'The non-bucket aggregate must retain the complete NB-T0 through NB-T3 and U0-U4 boundary.');
+assert.ok(registeredChecks.length >= 34,
+  'The non-bucket aggregate must retain NB-T0 through PR-NB1-A and U0-U4.');
 assert.equal(new Set(registeredChecks).size, registeredChecks.length,
   'The non-bucket aggregate cannot register duplicate checks.');
 
@@ -29,6 +33,7 @@ for (const required of [
   'scripts/lafea-nonbucket-lifecycle-profiles-check.mjs',
   'scripts/lafea-nb-t2-source-producer-check.mjs',
   'scripts/lafea-nb-t3-composition-root-check.mjs',
+  'scripts/lafea-nb1-analytical-verticals-check.mjs',
   'scripts/lafea-u1-stage-registry-check.mjs',
   'scripts/lafea-u1b-registry-consumer-check.mjs',
   'scripts/lafea-u2a-input-command-check.mjs',
@@ -72,6 +77,7 @@ for (const forbiddenWorkflowCommand of [
   `Dedicated workflow directly invokes out-of-scope command: ${forbiddenWorkflowCommand}`);
 
 assert.match(lifecycleProfiles, /ANALYTICAL_FOUNDATION_V1/u);
+assert.match(lifecycleProfiles, /FOUNDATION_DISTRIBUTION/u);
 assert.match(lifecycleProfiles, /FEA_MESH_RECOVERY_V1/u);
 assert.match(lifecycle, /lafea-analysis-lifecycle\/v2/u);
 assert.match(sourceAuthority, /lafea-source-authority\/v1/u);
@@ -83,6 +89,20 @@ assert.match(producers, /lafea-lifecycle-producer-batch\/v1/u);
 assert.match(producers, /CALLER_AUTHORED_SOURCE_MESH_ONLY/u);
 assert.doesNotMatch(producers, /calculateLocal|executeLafeaStage|from ['"][^'"]*src\/core/u);
 assert.doesNotMatch(producers, /source\.meshConfig|(?:^|[^A-Za-z0-9_])renderPacket\s*[:.(]/mu);
+assert.match(productProducers, /lafea-analytical-product-batch\/v1/u);
+assert.match(productProducers, /canonicalLafeaSha256/u);
+assert.match(productProducers, /releaseQualified:\s*false/u);
+assert.doesNotMatch(productProducers, /RELEASE_QUALIFIED|CODE_READY/u);
+assert.match(productComponents, /compileLafeaLoadFoundation/u);
+assert.match(productComponents, /createLocalAttachmentScreeningAssessment/u);
+assert.match(foundationCompiler, /MINIMUM_NORM_FORCE_ONLY_RIGID_SPIDER_V1/u);
+assert.match(foundationCompiler, /forceMomentClosure/u);
+assert.doesNotMatch(foundationCompiler, /stress|allowable|utilization/iu);
+assert.match(screeningProduct, /PASS/u);
+assert.match(screeningProduct, /ESCALATE/u);
+assert.match(screeningProduct, /BLOCKED/u);
+assert.match(screeningProduct, /NO_NOMINAL_STRESS_TRANSFER_AS_FE_STRESS/u);
+assert.doesNotMatch(screeningProduct, /allowable|codeUtilization|RELEASE_QUALIFIED/u);
 assert.match(lifecycleStore, /CALCULATION_ACCEPTED_BY_STAGE_CONTRACT/u);
 assert.match(lifecycleStore, /RESULT_READY/u);
 assert.match(lifecycleStore, /CODE_NOT_READY/u);
@@ -91,13 +111,17 @@ assert.doesNotMatch(lifecycleStore, /RELEASE_QUALIFIED'\s*:/u);
 
 assert.match(registry, /lafea-stage-registry\/v2/u);
 assert.match(registry, /lafeaRegisteredComposition/u);
-assert.match(bindings, /lafea-stage-composition-binding\/v1/u);
+assert.match(bindings, /lafea-stage-composition-binding\/v2/u);
+assert.match(bindings, /PRODUCT_ADAPTER/u);
+assert.match(bindings, /A1-FP-POINT/u);
+assert.match(bindings, /A2-ESC-01/u);
 assert.match(bindings, /CONT-PATCH-01/u);
 assert.match(bindings, /SHELL-PATCH-01/u);
 assert.match(bindings, /releaseStateBinding:\s*'RELEASE_NOT_QUALIFIED'/u);
 assert.doesNotMatch(bindings, /releaseStateBinding:\s*'RELEASE_QUALIFIED'/u);
-assert.match(compositionRoot, /lafea-stage-composition\/v1/u);
+assert.match(compositionRoot, /lafea-stage-composition\/v2/u);
 assert.match(compositionRoot, /requireLafeaTechnicalComponent/u);
+assert.match(compositionRoot, /requireLafeaProductComponent/u);
 assert.match(compositionRoot, /requireLafeaLifecycleProfileForStage/u);
 assert.match(workbenchModel, /requireLafeaStageComposition/u);
 assert.doesNotMatch(workbenchModel, /calculateLocal(?:Attachment|Continuum|Shell|Trunnion)/u);
@@ -118,6 +142,9 @@ console.log(JSON.stringify({
   stageCorrectLifecycleProfiles: true,
   canonicalSha256SourceAuthority: true,
   currentCoreProducerAdapters: true,
+  analyticalProductEvidenceIntegrated: true,
+  finiteFoundationResultantClosure: true,
+  screeningApplicabilityStates: ['PASS', 'ESCALATE', 'BLOCKED'],
   typedSourceEvents: true,
   registryV2Implemented: true,
   compositionRootIntegrated: true,

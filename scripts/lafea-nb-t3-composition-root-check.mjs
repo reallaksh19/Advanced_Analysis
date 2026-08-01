@@ -18,6 +18,9 @@ import {
   lafeaTechnicalComponentRegistered,
 } from '../src/workspace/lafea-stage-components.js';
 import {
+  lafeaProductComponentRegistered,
+} from '../src/workspace/lafea-stage-product-components.js';
+import {
   LAFEA_STAGE_COMPOSITION_SCHEMA,
   requireLafeaStageComposition,
 } from '../src/workspace/lafea-stage-composition-root.js';
@@ -42,9 +45,11 @@ const FIXTURES = Object.freeze({
 });
 
 assert.equal(LAFEA_STAGE_REGISTRY_SCHEMA, 'lafea-stage-registry/v2');
+assert.equal(LAFEA_STAGE_COMPOSITION_SCHEMA, 'lafea-stage-composition/v2');
 assert.equal(LAFEA_STAGE_COMPOSITION_BINDINGS.length, LAFEA_STAGE_REGISTRY.length);
 assert.equal(new Set(LAFEA_STAGE_COMPOSITION_BINDINGS
   .map((row) => row.compositionRootId)).size, LAFEA_STAGE_REGISTRY.length);
+assert.equal(LAFEA_TECHNICAL_COMPONENT_KINDS.includes('PRODUCT_ADAPTER'), true);
 
 for (const entry of LAFEA_STAGE_REGISTRY) {
   const composition = requireLafeaStageComposition(entry.stageId);
@@ -73,6 +78,17 @@ for (const stageId of ['LAFEA.1', 'LAFEA.2', 'LAFEA.3', 'LAFEA.4', 'LAFEA.5']) {
   assert.equal(result.stageId, stageId);
 }
 
+for (const stageId of ['LAFEA.1', 'LAFEA.2']) {
+  const composition = requireLafeaStageComposition(stageId);
+  assert.equal(composition.productSupported, true);
+  assert.equal(typeof composition.createProductEvidence, 'function');
+}
+for (const stageId of ['LAFEA.3', 'LAFEA.4', 'LAFEA.5', 'LAFEA.6']) {
+  const composition = requireLafeaStageComposition(stageId);
+  assert.equal(composition.productSupported, false);
+  assert.equal(composition.createProductEvidence, null);
+}
+
 const unsupportedComposition = requireLafeaStageComposition('LAFEA.6');
 assert.equal(unsupportedComposition.executionSupported, false);
 assert.equal(unsupportedComposition.calculate, null);
@@ -83,13 +99,21 @@ assert.equal(unsupportedResult.status, 'FAILED');
 assert.equal(unsupportedResult.diagnostics[0].code,
   'UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED');
 
+assert.deepEqual(requireLafeaStageComposition('LAFEA.1').benchmarkManifestIds, [
+  'A1-FP-POINT', 'A1-FP-LINE', 'A1-FP-RECT', 'A1-FP-CIRC',
+  'A1-FP-WELD', 'A1-FP-RSP', 'A1-FP-RANK', 'A1-HO-ANCESTRY',
+]);
+assert.deepEqual(requireLafeaStageComposition('LAFEA.2').benchmarkManifestIds, [
+  'A2-ESC-01', 'A2-ESC-02', 'A2-ESC-03',
+  'A2-ESC-04', 'A2-HO-01', 'A2-HO-02',
+]);
 assert.deepEqual(requireLafeaStageComposition('LAFEA.3').benchmarkManifestIds, [
   'CONT-PATCH-01', 'CONT-CYL-01', 'CONT-HOLE-01',
 ]);
 assert.deepEqual(requireLafeaStageComposition('LAFEA.4').benchmarkManifestIds, [
   'SHELL-PATCH-01', 'SHELL-BEND-01',
 ]);
-for (const stageId of ['LAFEA.1', 'LAFEA.2', 'LAFEA.5', 'LAFEA.6']) {
+for (const stageId of ['LAFEA.5', 'LAFEA.6']) {
   const composition = requireLafeaStageComposition(stageId);
   assert.deepEqual(composition.benchmarkManifestIds, []);
   assert.equal(composition.benchmarkBindingState,
@@ -100,11 +124,15 @@ console.log(JSON.stringify({
   check: 'lafea-nb-t3-registry-v2-composition-root',
   status: 'PASS',
   registrySchema: LAFEA_STAGE_REGISTRY_SCHEMA,
+  compositionSchema: LAFEA_STAGE_COMPOSITION_SCHEMA,
   stageCount: LAFEA_STAGE_REGISTRY.length,
   compositionRootCount: LAFEA_STAGE_COMPOSITION_BINDINGS.length,
   retainedQualifiedRoutes: 5,
+  analyticalProductRoutes: 2,
   unsupportedStages: ['LAFEA.6'],
   benchmarkManifestBindings: {
+    'LAFEA.1': requireLafeaStageComposition('LAFEA.1').benchmarkManifestIds,
+    'LAFEA.2': requireLafeaStageComposition('LAFEA.2').benchmarkManifestIds,
     'LAFEA.3': ['CONT-PATCH-01', 'CONT-CYL-01', 'CONT-HOLE-01'],
     'LAFEA.4': ['SHELL-PATCH-01', 'SHELL-BEND-01'],
   },
@@ -127,7 +155,6 @@ function assertComponents(entry) {
     presenter: 'PRESENTER',
     unitResolver: 'UNIT_RESOLVER',
   });
-  assert.deepEqual(Object.values(kindsByKey), LAFEA_TECHNICAL_COMPONENT_KINDS);
   for (const [key, kind] of Object.entries(kindsByKey)) {
     const componentId = componentIds[key];
     if (componentId === null) {
@@ -137,4 +164,7 @@ function assertComponents(entry) {
     assert.equal(lafeaTechnicalComponentRegistered(kind, componentId), true,
       `${entry.stageId} ${key} must resolve to one technical component.`);
   }
+  if (componentIds.productAdapter === null) return;
+  assert.equal(lafeaProductComponentRegistered(componentIds.productAdapter), true,
+    `${entry.stageId} product adapter must resolve to one product component.`);
 }

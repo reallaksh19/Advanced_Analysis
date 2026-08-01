@@ -4,6 +4,7 @@
  * The adapters translate already-accepted workbench calculations into exact
  * profile-authorized lifecycle records. They do not run numerical kernels,
  * generate meshes, infer convergence, assess code or qualify release.
+ * Product-level foundation and applicability evidence is produced separately.
  */
 import {
   createLafeaArtifactRecord,
@@ -117,7 +118,7 @@ function analyticalRecords(stage, profile, authority, execution) {
     resultProfileHash,
     result: execution.result,
   });
-  const records = [
+  return [
     record(stage.stageId, 'CANONICAL_MODEL', canonicalModelHash, { sourceHash }, producerRef),
     record(stage.stageId, 'EXECUTION', executionHash, {
       canonicalModelHash, physicalLoadCaseHash, solverProfileHash,
@@ -126,29 +127,6 @@ function analyticalRecords(stage, profile, authority, execution) {
       canonicalModelHash, executionHash, resultProfileHash,
     }, producerRef),
   ];
-  if (stage.stageId === 'LAFEA.2') {
-    if (!Array.isArray(execution.result.envelopes)) {
-      throw producerError('LAFEA_SCREENING_ASSESSMENT_EVIDENCE_MISSING');
-    }
-    const screeningProfileHash = engineeringHash(stage.stageId, 'SCREENING_PROFILE', {
-      qualificationProfile: execution.result.qualification?.qualificationProfile ?? null,
-      resultContractRole: stage.resultContractRole,
-    });
-    const screeningAssessmentHash = engineeringHash(stage.stageId, 'SCREENING_ASSESSMENT', {
-      sourceHash,
-      canonicalModelHash,
-      executionHash,
-      resultEvidenceHash,
-      screeningProfileHash,
-      envelopes: execution.result.envelopes,
-      limitations: execution.result.limitations,
-    });
-    records.push(record(stage.stageId, 'SCREENING_ASSESSMENT', screeningAssessmentHash, {
-      sourceHash, canonicalModelHash, executionHash, resultEvidenceHash,
-      screeningProfileHash,
-    }, producerRef));
-  }
-  return records;
 }
 
 function feaRecords(stage, profile, authority, execution) {

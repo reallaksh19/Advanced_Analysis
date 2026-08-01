@@ -2,8 +2,9 @@
 import { requireLafeaLifecycleProfileForStage } from './lafea-lifecycle-profiles.js';
 import { requireLafeaStageRegistryEntry } from './lafea-stage-registry.js';
 import { requireLafeaTechnicalComponent } from './lafea-stage-components.js';
+import { requireLafeaProductComponent } from './lafea-stage-product-components.js';
 
-export const LAFEA_STAGE_COMPOSITION_SCHEMA = 'lafea-stage-composition/v1';
+export const LAFEA_STAGE_COMPOSITION_SCHEMA = 'lafea-stage-composition/v2';
 
 export function requireLafeaStageComposition(stageId) {
   const entry = requireLafeaStageRegistryEntry(stageId);
@@ -16,6 +17,7 @@ export function requireLafeaStageComposition(stageId) {
   }
   const executionSupported = entry.engineState === 'QUALIFIED_ROUTE_REGISTERED';
   validateExecutionBinding(stageId, binding.componentIds, executionSupported);
+  const productSupported = typeof binding.componentIds.productAdapter === 'string';
   return Object.freeze({
     schema: LAFEA_STAGE_COMPOSITION_SCHEMA,
     stageId,
@@ -27,6 +29,7 @@ export function requireLafeaStageComposition(stageId) {
     releaseStateBinding: binding.releaseStateBinding,
     previewSource: entry.previewSource,
     executionSupported,
+    productSupported,
     normalizeDocument: (input) => component('NORMALIZER', binding.componentIds.normalizer)(input, 'document'),
     normalizeEdit: (input) => component('NORMALIZER', binding.componentIds.normalizer)(input, 'edit'),
     canonicalize: executionSupported
@@ -47,6 +50,9 @@ export function requireLafeaStageComposition(stageId) {
         component('UNIT_RESOLVER', binding.componentIds.unitResolver)(documentValue),
       )
       : null,
+    createProductEvidence: productSupported
+      ? (input) => productComponent(binding.componentIds.productAdapter)(input)
+      : null,
   });
 }
 
@@ -56,6 +62,10 @@ export function lafeaStageCompositionIdentity(stageId) {
 
 function component(kind, componentId) {
   return requireLafeaTechnicalComponent(kind, componentId);
+}
+
+function productComponent(componentId) {
+  return requireLafeaProductComponent(componentId);
 }
 
 function validateExecutionBinding(stageId, componentIds, executionSupported) {
@@ -68,8 +78,16 @@ function validateExecutionBinding(stageId, componentIds, executionSupported) {
       throw new TypeError(`${stageId} composition is missing ${key}.`);
     }
   }
+  if (componentIds.productAdapter !== null
+    && (typeof componentIds.productAdapter !== 'string'
+      || !componentIds.productAdapter)) {
+    throw new TypeError(`${stageId} product adapter binding is invalid.`);
+  }
   if (!executionSupported) {
-    for (const key of ['canonicalizer', 'calculator', 'acceptance', 'presenter', 'unitResolver']) {
+    for (const key of [
+      'canonicalizer', 'calculator', 'acceptance', 'presenter',
+      'unitResolver', 'productAdapter',
+    ]) {
       if (componentIds[key] !== null) {
         throw new TypeError(`${stageId} unsupported composition must not bind ${key}.`);
       }

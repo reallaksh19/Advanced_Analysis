@@ -51,7 +51,8 @@ for (const [stageId, profileId] of Object.entries(EXPECTED)) {
   assert.deepEqual(lafeaLifecycleArtifactKinds(stageId), profile.artifactKinds);
 }
 assert.deepEqual(lafeaLifecycleArtifactKinds('LAFEA.1'), [
-  'CANONICAL_MODEL', 'EXECUTION', 'RESULT_EVIDENCE', 'REPORT_EVIDENCE',
+  'CANONICAL_MODEL', 'EXECUTION', 'RESULT_EVIDENCE',
+  'FOUNDATION_DISTRIBUTION', 'REPORT_EVIDENCE',
 ]);
 assert.deepEqual(lafeaLifecycleArtifactKinds('LAFEA.2'), [
   'CANONICAL_MODEL', 'EXECUTION', 'RESULT_EVIDENCE',
@@ -73,6 +74,11 @@ lifecycle = add(lifecycle, 'RESULT_EVIDENCE', 'sha256:f-result', {
   canonicalModelHash: 'sha256:f-model', executionHash: 'sha256:f-exec',
   resultProfileHash: 'sha256:f-result-profile',
 });
+lifecycle = add(lifecycle, 'FOUNDATION_DISTRIBUTION', 'sha256:f-distribution', {
+  sourceHash: 'sha256:f-source', canonicalModelHash: 'sha256:f-model',
+  executionHash: 'sha256:f-exec', resultEvidenceHash: 'sha256:f-result',
+  productProfileHash: 'sha256:f-product-profile',
+});
 lifecycle = add(lifecycle, 'REPORT_EVIDENCE', 'sha256:f-report', {
   sourceHash: 'sha256:f-source', canonicalModelHash: 'sha256:f-model',
   executionHash: 'sha256:f-exec', resultEvidenceHash: 'sha256:f-result',
@@ -84,6 +90,7 @@ assert.equal(readiness.resultReady, true);
 assert.equal(readiness.codeAssessmentApplicable, false);
 assert.equal(readiness.codeReady, false);
 assert.equal(readiness.reportQualified, true);
+assert.equal(lifecycle.artifacts.FOUNDATION_DISTRIBUTION.status, 'CURRENT');
 
 let screening = createLafeaLifecycle('LAFEA.2', 'sha256:s-source');
 screening = add(screening, 'CANONICAL_MODEL', 'sha256:s-model', { sourceHash: 'sha256:s-source' });
@@ -98,7 +105,7 @@ screening = add(screening, 'RESULT_EVIDENCE', 'sha256:s-result', {
 screening = add(screening, 'SCREENING_ASSESSMENT', 'sha256:s-assess', {
   sourceHash: 'sha256:s-source', canonicalModelHash: 'sha256:s-model',
   executionHash: 'sha256:s-exec', resultEvidenceHash: 'sha256:s-result',
-  screeningProfileHash: 'sha256:s-profile',
+  productProfileHash: 'sha256:s-profile',
 });
 readiness = lafeaLifecycleReadiness(screening);
 assert.equal(readiness.resultReady, true);
@@ -149,6 +156,7 @@ console.log(JSON.stringify({
   check: 'lafea-nonbucket-lifecycle-profiles', status: 'PASS',
   lifecycleSchema: LAFEA_LIFECYCLE_SCHEMA, profileSchema: LAFEA_LIFECYCLE_PROFILE_SCHEMA,
   stageProfiles: EXPECTED, analyticalStagesRequireMesh: false,
+  analyticalProductArtifactsAuthorized: true,
   feaStagesRequireRecoveryForResultReady: true,
   currentStagesAuthorizeCodeAssessment: false, unsupportedStageArtifactSlots: 0,
   legacyMigrationSynthesizesEvidence: false, numericalAuthorityChanged: false,
