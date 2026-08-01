@@ -9,6 +9,7 @@ import {
   LAFEA_LIFECYCLE_BINDING_STATUSES,
 } from './lafea-lifecycle-workbench-store.js';
 import { lafeaLifecycleReadiness } from './lafea-lifecycle.js';
+import { requireLafeaLifecycleProfileForStage } from './lafea-lifecycle-profiles.js';
 import { requireLafeaStageRegistryEntry } from './lafea-stage-registry.js';
 import {
   sealRenderPacketV2,
@@ -51,10 +52,11 @@ const ARTIFACT_BINDINGS = Object.freeze([
   Object.freeze(['recoveryHash', 'RECOVERY']),
 ]);
 
-/** Return READY only when packet, lifecycle, binding and display lineage agree. */
+/** Return READY only when packet, profile, lifecycle, binding and display lineage agree. */
 export function evaluateLafeaRenderEvidenceIntake(input) {
   exactKeys(input, INPUT_KEYS, 'LAFEA_RENDER_INTAKE_INPUT_KEYS_INVALID');
   const stage = requireLafeaStageRegistryEntry(input.stageId);
+  const profile = requireLafeaLifecycleProfileForStage(input.stageId);
   requireRevision(input.sceneRevision);
   const reasons = [];
   const addReason = (code) => {
@@ -82,6 +84,9 @@ export function evaluateLafeaRenderEvidenceIntake(input) {
   if (stage.engineState === 'ENGINE_NOT_IMPLEMENTED') {
     addReason('LAFEA_RENDER_STAGE_ENGINE_NOT_IMPLEMENTED');
   }
+  if (!profile.meshApplicable) {
+    addReason('LAFEA_RENDER_PROFILE_NOT_MESH_RESULT_AUTHORIZED');
+  }
   if (packet?.stageId !== undefined && packet.stageId !== stage.stageId) {
     addReason('LAFEA_RENDER_PACKET_STAGE_MISMATCH');
   }
@@ -92,11 +97,14 @@ export function evaluateLafeaRenderEvidenceIntake(input) {
   if (lifecycle?.stageId !== undefined && lifecycle.stageId !== stage.stageId) {
     addReason('LAFEA_RENDER_LIFECYCLE_STAGE_MISMATCH');
   }
+  if (lifecycle?.profileId !== undefined && lifecycle.profileId !== profile.profileId) {
+    addReason('LAFEA_RENDER_LIFECYCLE_PROFILE_MISMATCH');
+  }
   if (binding && binding.status !== 'CURRENT') {
     addReason(`LAFEA_RENDER_LIFECYCLE_BINDING_${binding.status}`);
   }
 
-  if (packet && lifecycle && packet.stageId === lifecycle.stageId) {
+  if (profile.meshApplicable && packet && lifecycle && packet.stageId === lifecycle.stageId) {
     evaluateEngineeringLineage(packet, lifecycle, readiness, addReason);
     evaluateDisplayLineage(packet, lifecycle, addReason);
   }
@@ -121,7 +129,7 @@ function evaluateEngineeringLineage(packet, lifecycle, readiness, addReason) {
   }
   for (const [lineageKey, artifactKind] of ARTIFACT_BINDINGS) {
     const artifact = lifecycle.artifacts[artifactKind];
-    if (artifact.status !== 'CURRENT' || artifact.qualification !== 'PASS') {
+    if (!artifact || artifact.status !== 'CURRENT' || artifact.qualification !== 'PASS') {
       addReason(`LAFEA_RENDER_${artifactKind}_NOT_CURRENT_PASS`);
     } else if (artifact.artifactHash !== packet.lineage[lineageKey]) {
       addReason(`LAFEA_RENDER_${artifactKind}_HASH_MISMATCH`);
