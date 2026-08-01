@@ -33,9 +33,17 @@ assert.match(spec, /panel-popup-body/u);
 assert.match(spec, /First-Cut Piping Load Estimation/u);
 assert.match(spec, /require LFEA/u);
 assert.doesNotMatch(spec, /test\.skip|test\.fixme|\.only\(/u);
+assert.doesNotMatch(spec, /\.click\(\{\s*force:\s*true/u);
 assert.doesNotMatch(spec, /status\s*:\s*['"](?:PASS|QUALIFIED)['"]/u);
 
 assert.match(launcher, /First-cut enrichment launcher/u);
+assert.match(launcher, /first-cut-workbench-action-bar/u);
+assert.match(launcher, /\[data-panel="viewport"\]/u);
+assert.match(launcher, /\[data-action="switch-right-tab"\]\[data-tab="overrides"\]/u);
+assert.match(launcher, /\[data-tab-group="overrides"\]/u);
+assert.match(launcher, /ensureOverridesVisible\(\)/u);
+assert.doesNotMatch(launcher, /queueMicrotask|requestAnimationFrame|setTimeout/u);
+assert.doesNotMatch(launcher, /viewport-edit-bar/u);
 assert.doesNotMatch(
   launcher,
   /FirstCutWorkbenchController|FirstCutWorkbenchStore|FirstCutResultStore/u,
@@ -84,9 +92,14 @@ console.log(JSON.stringify({
   status: 'PASS',
   productionWorkbenchMounted: true,
   productionShellMounted: true,
+  launcherActionBandVisibleAcrossViewportModes: true,
+  owningPropertiesTabActivated: true,
+  hiddenHostFocusAttempted: false,
+  timingWorkaroundUsed: false,
   hostIdentityAsserted: true,
   focusBrowserCaseRegistered: true,
   popoutBrowserCaseRegistered: true,
+  ordinaryClicksRequired: true,
   duplicateWorkbenchAllowed: false,
   calculationInvokedByFixture: false,
   hiddenDefaultsIntroduced: false,

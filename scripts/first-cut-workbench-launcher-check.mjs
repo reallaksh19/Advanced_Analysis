@@ -22,12 +22,17 @@ function run() {
   assert.equal(Object.isFrozen(initial), true);
   assert.deepEqual(launcher.init(), initial);
   assert.equal(fixture.actionHost.querySelectorAll(
+    '[data-role="first-cut-workbench-action-bar"]',
+  ).length, 1);
+  assert.equal(fixture.actionHost.querySelectorAll(
     '[data-role="first-cut-workbench-launcher"]',
   ).length, 1);
+  assert.equal(fixture.overridesGroup.style.display, 'none');
 
   const originalHost = fixture.host;
   fixture.focusButton().click();
   assert.equal(fixture.shell.classList.contains('properties-collapsed'), false);
+  assert.equal(fixture.overridesGroup.style.display, 'flex');
   assert.equal(fixture.section.classList.contains('accordion-collapsed'), false);
   assert.strictEqual(fixture.root.querySelector(
     '[data-role="first-cut-workbench-root"]',
@@ -65,6 +70,9 @@ function run() {
   launcher.destroy();
   launcher.destroy();
   assert.equal(fixture.actionHost.querySelectorAll(
+    '[data-role="first-cut-workbench-action-bar"]',
+  ).length, 0);
+  assert.equal(fixture.actionHost.querySelectorAll(
     '[data-role="first-cut-workbench-launcher"]',
   ).length, 0);
   assert.strictEqual(fixture.root.querySelector(
@@ -91,6 +99,8 @@ function run() {
     status: 'PASS',
     launcherSchema: FIRST_CUT_WORKBENCH_LAUNCHER_SCHEMA,
     actionBarMountCount: 1,
+    actionBarVisibleAcrossViewportModes: true,
+    owningPropertiesTabActivated: true,
     focusCount: 1,
     popoutCount: 1,
     hostIdentityRetained: true,
@@ -106,12 +116,20 @@ function createFixture() {
   const root = documentRef.createElement('main');
   const shell = documentRef.createElement('section');
   shell.classList.add('workspace-shell', 'properties-collapsed');
-  const actionHost = documentRef.createElement('div');
-  actionHost.dataset.role = 'viewport-edit-bar';
+  const actionHost = documentRef.createElement('section');
+  actionHost.dataset.panel = 'viewport';
 
   const toggle = documentRef.createElement('button');
   toggle.dataset.action = 'toggle-properties-collapse';
   toggle.onClick = () => shell.classList.remove('properties-collapsed');
+
+  const overridesTab = documentRef.createElement('button');
+  overridesTab.dataset.action = 'switch-right-tab';
+  overridesTab.dataset.tab = 'overrides';
+  const overridesGroup = documentRef.createElement('div');
+  overridesGroup.dataset.tabGroup = 'overrides';
+  overridesGroup.style.display = 'none';
+  overridesTab.onClick = () => { overridesGroup.style.display = 'flex'; };
 
   const section = documentRef.createElement('section');
   section.dataset.sectionId = 'first-cut';
@@ -129,7 +147,8 @@ function createFixture() {
   host.dataset.role = 'first-cut-workbench-root';
   body.append(host);
   section.append(header, body);
-  shell.append(actionHost, toggle, section);
+  overridesGroup.append(section);
+  shell.append(actionHost, toggle, overridesTab, overridesGroup);
   root.append(shell);
   documentRef.connect(root);
 
@@ -138,6 +157,7 @@ function createFixture() {
     root,
     shell,
     actionHost,
+    overridesGroup,
     section,
     host,
     focusButton: () => root.querySelector('[data-role="first-cut-workbench-focus"]'),
@@ -161,6 +181,7 @@ class FakeElement {
     this.className = '';
     this.classList = new FakeClassList(this);
     this.listeners = new Map();
+    this.style = {};
     this.textContent = '';
     this.title = '';
     this.type = '';
@@ -229,10 +250,12 @@ function visit(node, callback) {
 
 function matches(node, selector) {
   if (selector.startsWith('.')) return node.classList.contains(selector.slice(1));
-  const data = /^\[data-([a-z-]+)="([^"]+)"\]$/u.exec(selector);
-  if (!data) return false;
-  const key = data[1].replace(/-([a-z])/gu, (_match, letter) => letter.toUpperCase());
-  return node.dataset[key] === data[2];
+  const dataSelectors = [...selector.matchAll(/\[data-([a-z-]+)="([^"]+)"\]/gu)];
+  if (!dataSelectors.length) return false;
+  return dataSelectors.every(([, rawKey, expected]) => {
+    const key = rawKey.replace(/-([a-z])/gu, (_match, letter) => letter.toUpperCase());
+    return node.dataset[key] === expected;
+  });
 }
 
 function markConnected(node, connected) {

@@ -10,7 +10,10 @@ export const FIRST_CUT_WORKBENCH_LAUNCHER_SCHEMA =
 
 const FIRST_CUT_SECTION_SELECTOR = '[data-section-id="first-cut"]';
 const FIRST_CUT_HOST_SELECTOR = '[data-role="first-cut-workbench-root"]';
-const ACTION_BAR_SELECTOR = '[data-role="viewport-edit-bar"]';
+const VIEWPORT_PANEL_SELECTOR = '[data-panel="viewport"]';
+const OVERRIDES_TAB_SELECTOR = '[data-action="switch-right-tab"][data-tab="overrides"]';
+const OVERRIDES_GROUP_SELECTOR = '[data-tab-group="overrides"]';
+const ACTION_BAR_ROLE = 'first-cut-workbench-action-bar';
 
 export class FirstCutWorkbenchLauncherController {
   constructor(rootElement) {
@@ -18,6 +21,7 @@ export class FirstCutWorkbenchLauncherController {
       throw launcherError('FIRST_CUT_LAUNCHER_ROOT_REQUIRED');
     }
     this.rootElement = rootElement;
+    this.actionBar = null;
     this.group = null;
     this.host = null;
     this.section = null;
@@ -32,14 +36,32 @@ export class FirstCutWorkbenchLauncherController {
   init() {
     this.requireLive();
     if (this.group) return this.getState();
-    const actionBar = requireUnique(this.rootElement, ACTION_BAR_SELECTOR);
+    const viewportPanel = requireUnique(this.rootElement, VIEWPORT_PANEL_SELECTOR);
     this.section = requireUnique(this.rootElement, FIRST_CUT_SECTION_SELECTOR);
     this.host = requireUnique(this.rootElement, FIRST_CUT_HOST_SELECTOR);
     if (!this.section.contains(this.host)) {
       throw launcherError('FIRST_CUT_LAUNCHER_HOST_SECTION_MISMATCH');
     }
+    if (this.rootElement.querySelectorAll(`[data-role="${ACTION_BAR_ROLE}"]`).length) {
+      throw launcherError('FIRST_CUT_LAUNCHER_ACTION_BAR_ALREADY_PRESENT');
+    }
 
     const documentRef = this.rootElement.ownerDocument;
+    this.actionBar = documentRef.createElement('div');
+    this.actionBar.className = 'first-cut-workbench-action-bar';
+    this.actionBar.dataset.role = ACTION_BAR_ROLE;
+    this.actionBar.setAttribute('aria-label', 'Workspace enrichment actions');
+    Object.assign(this.actionBar.style, {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      minHeight: '34px',
+      padding: '4px 8px',
+      borderTop: '1px solid #1e293b',
+      background: '#091322',
+      flex: 'none',
+    });
+
     this.group = documentRef.createElement('div');
     this.group.className = 'first-cut-workbench-launcher';
     this.group.dataset.role = 'first-cut-workbench-launcher';
@@ -62,13 +84,15 @@ export class FirstCutWorkbenchLauncherController {
     popoutButton.addEventListener('click', this.handlePopout);
 
     this.group.append(focusButton, popoutButton);
-    actionBar.append(this.group);
+    this.actionBar.append(this.group);
+    viewportPanel.append(this.actionBar);
     return this.getState();
   }
 
   focusWorkbench() {
     this.requireMounted();
     this.ensurePropertiesVisible();
+    this.ensureOverridesVisible();
     if (this.section.classList.contains('accordion-collapsed')) {
       activate(this.section.querySelector('.accordion-section-header'));
     }
@@ -80,6 +104,8 @@ export class FirstCutWorkbenchLauncherController {
 
   popoutWorkbench() {
     this.requireMounted();
+    this.ensurePropertiesVisible();
+    this.ensureOverridesVisible();
     if (!this.section.classList.contains('is-popped-out')) {
       activate(this.section.querySelector('.accordion-popout-btn'));
     }
@@ -110,7 +136,8 @@ export class FirstCutWorkbenchLauncherController {
       ?.removeEventListener('click', this.handleFocus);
     this.group?.querySelector('[data-role="first-cut-workbench-popout"]')
       ?.removeEventListener('click', this.handlePopout);
-    this.group?.remove();
+    this.actionBar?.remove();
+    this.actionBar = null;
     this.group = null;
     this.host = null;
     this.section = null;
@@ -124,6 +151,15 @@ export class FirstCutWorkbenchLauncherController {
     activate(shell.querySelector('[data-action="toggle-properties-collapse"]'));
     if (shell.classList.contains('properties-collapsed')) {
       throw launcherError('FIRST_CUT_LAUNCHER_PROPERTIES_NOT_EXPANDED');
+    }
+  }
+
+  ensureOverridesVisible() {
+    const group = requireUnique(this.rootElement, OVERRIDES_GROUP_SELECTOR);
+    if (group.style.display !== 'none') return;
+    activate(requireUnique(this.rootElement, OVERRIDES_TAB_SELECTOR));
+    if (group.style.display === 'none') {
+      throw launcherError('FIRST_CUT_LAUNCHER_OVERRIDES_NOT_ACTIVATED');
     }
   }
 
@@ -142,7 +178,7 @@ export class FirstCutWorkbenchLauncherController {
 
   requireMounted() {
     this.requireLive();
-    if (!this.group || !this.host || !this.section) {
+    if (!this.actionBar || !this.group || !this.host || !this.section) {
       throw launcherError('FIRST_CUT_LAUNCHER_NOT_INITIALIZED');
     }
   }
