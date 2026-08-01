@@ -7,13 +7,17 @@ on:
       - 'src/workspace/lafea-*viewport*.js'
       - 'src/workspace/lafea-workbench*.js'
       - 'src/workspace/lafea-render-evidence-intake.js'
+      - 'src/workspace/sequential-sketcher/sketcher-authoring-*.js'
+      - 'src/workspace/sequential-sketcher/sequential-sketcher-controller.js'
       - 'e2e/lafea-hybrid-*.js'
       - 'e2e/fixtures/lafea-hybrid-*.js'
+      - 'e2e/fixtures/sequential-authoring-*.js'
       - 'e2e/lafea-hybrid-validation-matrix.json'
       - 'scripts/lafea-u4g-*.mjs'
       - 'scripts/lafea-u4h-*.mjs'
       - 'scripts/lafea-u4i-*.mjs'
       - 'scripts/lafea-u4j-*.mjs'
+      - 'scripts/sequential-sketcher-authoring-bridge-*.mjs'
       - 'scripts/run-playwright.mjs'
       - 'docs/LAFEA_Hybrid_Canvas_Remediation_Implementation_Plan.md'
       - '.github/workflows/lafea-hybrid-browser-validation.yml'
@@ -47,7 +51,8 @@ jobs:
           set -o pipefail
           node scripts/lafea-u4h-browser-source-guard.mjs 2>&1 | tee lafea-u4h-source-guard.log
           node scripts/lafea-u4j-source-guard.mjs 2>&1 | tee lafea-u4j-source-guard.log
-      - name: Recheck live viewport contracts
+          node scripts/sequential-sketcher-authoring-bridge-source-guard.mjs 2>&1 | tee sequential-authoring-source-guard.log
+      - name: Recheck live viewport and authoring contracts
         run: |
           set -o pipefail
           node scripts/lafea-u4g-live-workbench-viewport-check.mjs 2>&1 | tee lafea-u4g-live-viewport.log
@@ -57,6 +62,7 @@ jobs:
           node scripts/lafea-u4i-result-selection-check.mjs 2>&1 | tee lafea-u4i-result-selection.log
           node scripts/lafea-u4i-source-guard.mjs 2>&1 | tee lafea-u4i-source-guard.log
           node scripts/lafea-u4j-diagnostic-field-check.mjs 2>&1 | tee lafea-u4j-diagnostic-field.log
+          node scripts/sequential-sketcher-authoring-bridge-check.mjs 2>&1 | tee sequential-authoring-bridge.log
       - name: Run scoped Chromium validation
         run: |
           set -o pipefail
@@ -71,6 +77,7 @@ jobs:
             lafea-u4h-*.log
             lafea-u4i-*.log
             lafea-u4j-*.log
+            sequential-authoring-*.log
             playwright-report/
             test-results/
           if-no-files-found: ignore
