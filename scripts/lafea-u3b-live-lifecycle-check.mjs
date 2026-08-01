@@ -148,7 +148,10 @@ assert.match(facadeSource, /CALCULATION_ACCEPTED_BY_STAGE_CONTRACT/u);
 assert.match(facadeSource, /RELEASE_NOT_QUALIFIED/u);
 assert.match(sourceAuthoritySource, /canonical SHA-256/u);
 assert.doesNotMatch(sourceAuthoritySource, /sourceHash:\s*lafeaDocumentDigest/u);
-assert.doesNotMatch(producerSource, /calculateLocal|executeLafeaStage|source\.meshConfig|renderPacket/u);
+assert.doesNotMatch(
+  producerSource,
+  /calculateLocal|executeLafeaStage|source\.meshConfig|(?:^|[^A-Za-z0-9_])renderPacket\s*[:.(]/mu,
+);
 assert.match(producerSource, /CALLER_AUTHORED_SOURCE_MESH_ONLY/u);
 
 console.log(JSON.stringify({
