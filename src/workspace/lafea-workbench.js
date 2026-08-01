@@ -132,6 +132,20 @@ export {
   registerLafeaAnalyticalProductBatch,
 } from './lafea-analytical-product-producers.js';
 export {
+  LAFEA_ANALYSIS_MESH_AUTHORITY_ROLE,
+  LAFEA_ANALYSIS_MESH_AUTHORITY_SCHEMA,
+  LAFEA_ANALYSIS_MESH_AUTHORITY_STATUS,
+  LAFEA_ANALYSIS_MESH_EVIDENCE_SCHEMA,
+  LAFEA_ANALYSIS_MESH_FEA_STAGES,
+  LAFEA_ANALYSIS_MESH_INTAKE_SCHEMA,
+  LAFEA_ANALYSIS_MESH_PRODUCER_REVISION,
+  LAFEA_ANALYSIS_MESH_QUALITY_SCHEMA,
+  LAFEA_ANALYSIS_MESH_SCHEMA,
+  createLafeaAnalysisMeshEvidence,
+  lafeaAnalysisMeshContentHash,
+  registerLafeaAnalysisMeshEvidence,
+} from './lafea-analysis-mesh-evidence.js';
+export {
   LAFEA_SOURCE_PRIMITIVE_KINDS,
   LAFEA_SOURCE_PRIMITIVE_SCHEMA,
   LAFEA_SOURCE_RENDER_REQUEST_SCHEMA,

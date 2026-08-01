@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import * as analyticalProducts from '../src/workspace/lafea-analytical-product-producers.js';
+import * as meshEvidence from '../src/workspace/lafea-analysis-mesh-evidence.js';
 import * as compositionBindings from '../src/workspace/lafea-stage-composition-bindings.js';
 import * as compositionRoot from '../src/workspace/lafea-stage-composition-root.js';
 import * as hash from '../src/workspace/lafea-canonical-sha256.js';
@@ -62,6 +63,20 @@ const groups = Object.freeze([
     'LAFEA_ANALYTICAL_PRODUCT_PRODUCER_REVISION',
     'createLafeaAnalyticalProductBatch', 'registerLafeaAnalyticalProductBatch',
   ]],
+  [meshEvidence, [
+    'LAFEA_ANALYSIS_MESH_AUTHORITY_ROLE',
+    'LAFEA_ANALYSIS_MESH_AUTHORITY_SCHEMA',
+    'LAFEA_ANALYSIS_MESH_AUTHORITY_STATUS',
+    'LAFEA_ANALYSIS_MESH_EVIDENCE_SCHEMA',
+    'LAFEA_ANALYSIS_MESH_FEA_STAGES',
+    'LAFEA_ANALYSIS_MESH_INTAKE_SCHEMA',
+    'LAFEA_ANALYSIS_MESH_PRODUCER_REVISION',
+    'LAFEA_ANALYSIS_MESH_QUALITY_SCHEMA',
+    'LAFEA_ANALYSIS_MESH_SCHEMA',
+    'createLafeaAnalysisMeshEvidence',
+    'lafeaAnalysisMeshContentHash',
+    'registerLafeaAnalysisMeshEvidence',
+  ]],
   [store, [
     'LAFEA_CALCULATION_STATES', 'LAFEA_CODE_STATES',
     'LAFEA_LIFECYCLE_BINDING_SCHEMA', 'LAFEA_LIFECYCLE_BINDING_STATUSES',
@@ -89,11 +104,17 @@ assert.equal(publicApi.LAFEA_SOURCE_AUTHORITY_SCHEMA, 'lafea-source-authority/v1
 assert.equal(publicApi.LAFEA_PRODUCER_BATCH_SCHEMA, 'lafea-lifecycle-producer-batch/v1');
 assert.equal(publicApi.LAFEA_ANALYTICAL_PRODUCT_BATCH_SCHEMA,
   'lafea-analytical-product-batch/v1');
+assert.equal(publicApi.LAFEA_ANALYSIS_MESH_INTAKE_SCHEMA,
+  'lafea-analysis-mesh-intake/v1');
+assert.equal(publicApi.LAFEA_ANALYSIS_MESH_EVIDENCE_SCHEMA,
+  'lafea-analysis-mesh-evidence/v1');
 assert.equal(publicApi.LAFEA_WORKBENCH_STATE_SCHEMA, 'lafea-workbench-state/v2');
 assert.equal(publicApi.requireLafeaStageComposition('LAFEA.1').releaseStateBinding,
   'RELEASE_NOT_QUALIFIED');
 assert.equal(publicApi.requireLafeaStageComposition('LAFEA.1').productSupported, true);
 assert.equal(publicApi.requireLafeaStageComposition('LAFEA.2').productSupported, true);
+assert.deepEqual(publicApi.LAFEA_ANALYSIS_MESH_FEA_STAGES,
+  ['LAFEA.3', 'LAFEA.4', 'LAFEA.5']);
 assert.deepEqual(publicApi.lafeaLifecycleArtifactKinds('LAFEA.1'), [
   'CANONICAL_MODEL', 'EXECUTION', 'RESULT_EVIDENCE',
   'FOUNDATION_DISTRIBUTION', 'REPORT_EVIDENCE',
@@ -107,6 +128,7 @@ console.log(JSON.stringify({
   sourceAuthorityPublic: true,
   producerAdaptersPublic: true,
   analyticalProductProducersPublic: true,
+  analysisMeshEvidencePublic: true,
   calculationResultCodeReleaseStatesPublic: true,
   stageCorrectProfilesPublic: true,
   registryV2Implemented: true,
