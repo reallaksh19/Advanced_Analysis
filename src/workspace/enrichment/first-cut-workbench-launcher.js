@@ -11,6 +11,8 @@ export const FIRST_CUT_WORKBENCH_LAUNCHER_SCHEMA =
 const FIRST_CUT_SECTION_SELECTOR = '[data-section-id="first-cut"]';
 const FIRST_CUT_HOST_SELECTOR = '[data-role="first-cut-workbench-root"]';
 const VIEWPORT_PANEL_SELECTOR = '[data-panel="viewport"]';
+const OVERRIDES_TAB_SELECTOR = '[data-action="switch-right-tab"][data-tab="overrides"]';
+const OVERRIDES_GROUP_SELECTOR = '[data-tab-group="overrides"]';
 const ACTION_BAR_ROLE = 'first-cut-workbench-action-bar';
 
 export class FirstCutWorkbenchLauncherController {
@@ -27,16 +29,8 @@ export class FirstCutWorkbenchLauncherController {
     this.popoutCount = 0;
     this.lastMode = null;
     this.destroyed = false;
-    this.handleFocus = () => {
-      const state = this.focusWorkbench();
-      this.deferHostFocus();
-      return state;
-    };
-    this.handlePopout = () => {
-      const state = this.popoutWorkbench();
-      this.deferHostFocus();
-      return state;
-    };
+    this.handleFocus = () => this.focusWorkbench();
+    this.handlePopout = () => this.popoutWorkbench();
   }
 
   init() {
@@ -98,6 +92,7 @@ export class FirstCutWorkbenchLauncherController {
   focusWorkbench() {
     this.requireMounted();
     this.ensurePropertiesVisible();
+    this.ensureOverridesVisible();
     if (this.section.classList.contains('accordion-collapsed')) {
       activate(this.section.querySelector('.accordion-section-header'));
     }
@@ -109,6 +104,8 @@ export class FirstCutWorkbenchLauncherController {
 
   popoutWorkbench() {
     this.requireMounted();
+    this.ensurePropertiesVisible();
+    this.ensureOverridesVisible();
     if (!this.section.classList.contains('is-popped-out')) {
       activate(this.section.querySelector('.accordion-popout-btn'));
     }
@@ -157,11 +154,13 @@ export class FirstCutWorkbenchLauncherController {
     }
   }
 
-  deferHostFocus() {
-    queueMicrotask(() => {
-      if (this.destroyed || !this.actionBar || !this.host?.isConnected) return;
-      this.focusHost();
-    });
+  ensureOverridesVisible() {
+    const group = requireUnique(this.rootElement, OVERRIDES_GROUP_SELECTOR);
+    if (group.style.display !== 'none') return;
+    activate(requireUnique(this.rootElement, OVERRIDES_TAB_SELECTOR));
+    if (group.style.display === 'none') {
+      throw launcherError('FIRST_CUT_LAUNCHER_OVERRIDES_NOT_ACTIVATED');
+    }
   }
 
   focusHost() {
