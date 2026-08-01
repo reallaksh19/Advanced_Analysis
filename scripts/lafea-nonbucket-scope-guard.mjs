@@ -16,7 +16,11 @@ const bindings = read('../src/workspace/lafea-stage-composition-bindings.js');
 const compositionRoot = read('../src/workspace/lafea-stage-composition-root.js');
 const workbenchModel = read('../src/workspace/lafea-workbench-model.js');
 const presenterIndex = read('../src/workspace/lafea-result-presenters/index.js');
+const footprintContract = read('../src/core/local-stress/finite-footprint-contract.js');
 const footprint = read('../src/core/local-stress/finite-footprint.js');
+const screeningProductContract = read(
+  '../src/core/local-attachment-screening/product-escalation-contract.js',
+);
 const screeningProduct = read('../src/core/local-attachment-screening/product-escalation.js');
 const analyticalHandoff = read('../src/core/lafea-analytical-handoff.js');
 
@@ -109,14 +113,18 @@ assert.doesNotMatch(workbenchModel, /calculateLocal(?:Attachment|Continuum|Shell
 assert.match(presenterIndex, /requireLafeaStageComposition/u);
 assert.doesNotMatch(presenterIndex, /PRESENTERS_BY_ROLE|UNIT_RESOLVERS_BY_ROLE/u);
 
-assert.match(footprint, /lafea-load-foundation-footprint-request\/v2/u);
-assert.match(footprint, /POINT.*LINE.*RECTANGULAR_PATCH.*CIRCULAR_PATCH.*WELD_LINE.*RIGID_SPIDER/su);
-assert.match(footprint, /pressure.*area/isu);
-assert.match(footprint, /FOOTPRINT_GEOMETRY_RANK_DEFICIENT/u);
-assert.match(footprint, /NO_LOCAL_ATTACHMENT_STRESS/u);
-assert.match(screeningProduct, /PASS.*ESCALATE.*BLOCKED/su);
+assert.match(footprintContract, /lafea-load-foundation-footprint-request\/v2/u);
+assert.match(footprintContract,
+  /POINT.*LINE.*RECTANGULAR_PATCH.*CIRCULAR_PATCH.*WELD_LINE.*RIGID_SPIDER/su);
+assert.match(footprintContract, /pressure.*area.*normal.*applicationPoint/isu);
+assert.match(footprintContract, /FOOTPRINT_GEOMETRY_RANK_DEFICIENT/u);
+assert.match(footprintContract, /NO_LOCAL_ATTACHMENT_STRESS/u);
+assert.match(footprint, /balancingMoment/u);
+assert.match(footprint, /FOOTPRINT_FORCE_CLOSURE_FAILED/u);
+assert.match(footprint, /FOOTPRINT_MOMENT_CLOSURE_FAILED/u);
+assert.match(screeningProductContract, /PASS.*ESCALATE.*BLOCKED/su);
 assert.match(screeningProduct, /MISSING_APPLICABILITY_EVIDENCE/u);
-assert.match(screeningProduct, /NO_MATERIAL_ALLOWABLE_OR_CODE_UTILIZATION/u);
+assert.match(screeningProductContract, /NO_MATERIAL_ALLOWABLE_OR_CODE_UTILIZATION/u);
 assert.match(analyticalHandoff, /TARGET_SOURCE_VALIDATION_ONLY/u);
 assert.match(analyticalHandoff, /NO_FE_OR_CODE_STRESS_TRANSFER/u);
 assert.match(analyticalHandoff, /targetEngineExecuted:\s*false/u);
