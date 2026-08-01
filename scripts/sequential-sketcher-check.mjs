@@ -1,61 +1,47 @@
 /**
  * Sequential Sketcher Verification Check Script
  */
-import fs from 'node:fs';
-import path from 'node:path';
+import assert from 'node:assert/strict';
 import { parseStagedJson, buildBranchInventory } from '../src/workspace/sequential-sketcher/sequential-sketcher-source.js';
 import { buildBranchTopology } from '../src/workspace/sequential-sketcher/sequential-sketcher-topology.js';
 import { planSequentialTraversal } from '../src/workspace/sequential-sketcher/sequential-sketcher-traversal.js';
 import { buildSequentialEngineeringSvgSceneFromTopology } from '../src/workspace/sequential-sketcher/sequential-engineering-svg-scene.js';
+import { serializeSequentialSketcherCertificationFixture } from './sequential-sketcher-fixtures.mjs';
 
-console.log('--- Sequential Sketcher Verification Check ---');
+console.log('--- [SIMULATED] Sequential Sketcher Verification Check ---');
 
-const sjsonPath = 'F:/CODE-5-SS/3D_Converters/Benchmarks/1885Sjson/Sjson.json';
-if (!fs.existsSync(sjsonPath)) {
-  console.log('WARN: Benchmark file Sjson.json not found at target path, running synthetic verification.');
-  process.exit(0);
-}
+const content = serializeSequentialSketcherCertificationFixture();
+const records = parseStagedJson(content);
+assert.equal(records.length, 1);
+console.log('SEQUENTIAL-SKETCHER-T01 PASS parseStagedJson parsed the repository certification fixture.');
 
-try {
-  const content = fs.readFileSync(sjsonPath, 'utf8');
-  const records = parseStagedJson(content);
-  if (!Array.isArray(records) || records.length === 0) {
-    console.error('FAIL: Staged JSON parsing failed to yield branch records.');
-    process.exit(1);
-  }
-  console.log('SEQUENTIAL-SKETCHER-T01 PASS parseStagedJson successfully parsed Sjson records.');
+const branch = records[0];
+const inventory = buildBranchInventory(branch);
+assert.equal(inventory.branchId, 'SEQ-BRANCH-001');
+assert.equal(inventory.routeComponents.length, 5);
+assert.equal(inventory.supportRecords.length, 1);
+console.log('SEQUENTIAL-SKETCHER-T02 PASS buildBranchInventory retained route and support evidence.');
 
-  const branch = records[0];
-  const inventory = buildBranchInventory(branch);
-  if (!inventory.branchId || !Array.isArray(inventory.routeComponents)) {
-    console.error('FAIL: buildBranchInventory failed to extract route components.');
-    process.exit(1);
-  }
-  console.log('SEQUENTIAL-SKETCHER-T02 PASS buildBranchInventory extracted route components.');
+const topology = buildBranchTopology(inventory);
+assert.equal(topology.schema, 'SequentialBranchSketch.v1');
+assert.equal(topology.branchId, inventory.branchId);
+assert.equal(topology.segments.length, 3);
+assert.equal(topology.inventory.supportRecordCount, 1);
+assert.equal(topology.issues.filter((issue) => issue.severity === 'ERROR').length, 0);
+console.log('SEQUENTIAL-SKETCHER-T03 PASS buildBranchTopology constructed the governed branch graph.');
 
-  const topology = buildBranchTopology(inventory);
-  if (!topology.branchId || !Array.isArray(topology.nodes)) {
-    console.error('FAIL: buildBranchTopology failed to construct topology.');
-    process.exit(1);
-  }
-  console.log('SEQUENTIAL-SKETCHER-T03 PASS buildBranchTopology constructed branch nodes & segments.');
+const traversal = planSequentialTraversal(topology);
+assert.equal(traversal.commands.filter((command) => command.op === 'DRAW_SEGMENT').length, 3);
+assert.equal(traversal.commands.filter((command) => command.op === 'MARK_COMPONENT').length, 2);
+assert.equal(traversal.issues.filter((issue) => issue.severity === 'ERROR').length, 0);
+console.log('SEQUENTIAL-SKETCHER-T04 PASS planSequentialTraversal accounted for every route component.');
 
-  const traversal = planSequentialTraversal(topology);
-  if (!Array.isArray(traversal.commands)) {
-    console.error('FAIL: planSequentialTraversal failed.');
-    process.exit(1);
-  }
-  console.log('SEQUENTIAL-SKETCHER-T04 PASS planSequentialTraversal generated stroke commands.');
+const sceneResult = buildSequentialEngineeringSvgSceneFromTopology(topology, {
+  sceneId: 'sequential-certification-scene',
+  projection: 'ISO',
+});
+assert.equal(sceneResult.scene.schema, 'EngineeringScene.v1');
+assert.equal(sceneResult.scene.sceneId, 'sequential-certification-scene');
+console.log('SEQUENTIAL-SKETCHER-T05 PASS source-derived EngineeringScene.v1 generated.');
 
-  const sceneResult = buildSequentialEngineeringSvgSceneFromTopology(topology, { sceneId: 'test-scene', projection: 'ISO' });
-  if (sceneResult.scene.schema !== 'EngineeringScene.v1') {
-    console.error('FAIL: buildSequentialEngineeringSvgSceneFromTopology schema mismatch.');
-    process.exit(1);
-  }
-  console.log('SEQUENTIAL-SKETCHER-T05 PASS buildSequentialEngineeringSvgSceneFromTopology generated EngineeringScene.v1.');
-
-  console.log('Sequential Sketcher verification PASS');
-} catch (error) {
-  console.error('FAIL: Sequential Sketcher check failed:', error);
-  process.exit(1);
-}
+console.log('Sequential Sketcher verification PASS');
