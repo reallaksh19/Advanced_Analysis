@@ -41,7 +41,8 @@ export class WorkspaceShellController {
           });
         }
       }),
-      EventBus.subscribe(APPLICATION_EVENTS.CHANGED, ({ activeViewId }) => {
+      EventBus.subscribe(APPLICATION_EVENTS.CHANGED, (payload) => {
+        const activeViewId = payload?.state?.activeViewId || payload?.activeViewId;
         this.switchWorkbenchView(activeViewId);
       })
     ];
@@ -51,6 +52,7 @@ export class WorkspaceShellController {
     const activeView = (viewId === 'LOAD_CALC') ? 'loadcalc' : 'workspace';
     const leftViews = this.shellElement.querySelectorAll('[data-left-view]');
     const rightViews = this.shellElement.querySelectorAll('[data-right-view]');
+    const editBar = this.shellElement.querySelector('[data-role="viewport-edit-bar"]');
 
     leftViews.forEach(el => {
       el.style.display = el.dataset.leftView === activeView ? 'flex' : 'none';
@@ -59,6 +61,33 @@ export class WorkspaceShellController {
     rightViews.forEach(el => {
       el.style.display = el.dataset.rightView === activeView ? 'flex' : 'none';
     });
+
+    if (editBar) {
+      if (activeView === 'loadcalc') {
+        editBar.style.display = 'flex';
+        editBar.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:8px;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <span style="font-size:10px; font-weight:700; color:#38bdf8; text-transform:uppercase; letter-spacing:0.5px;">⚡ Load Calc Workflow</span>
+              <button type="button" data-action="rebuild-model-loads" style="padding:4px 10px; background:#0284c7; color:#fff; border:1px solid #38bdf8; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">⚡ 1. Calculate Model Loads</button>
+              <button type="button" data-action="rebuild-paths" style="padding:4px 10px; background:#0f172a; color:#38bdf8; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">📐 2. Build Load Paths</button>
+              <button type="button" data-action="run-screening" style="padding:4px 10px; background:#0f172a; color:#facc15; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🎯 3. Support Screening</button>
+              <button type="button" data-action="export-model-loads" style="padding:4px 10px; background:#0f172a; color:#94a3b8; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">📥 Export Loads</button>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:10px; color:#94a3b8; font-weight:700;">Load Case:</span>
+              <select data-action="select-load-case" style="background:#020617; color:#f8fafc; border:1px solid #334155; border-radius:4px; padding:3px 8px; font-size:11px; font-weight:700; cursor:pointer;">
+                <option value="LC1">LC1: Operating Gravity + Pressure</option>
+                <option value="LC2">LC2: Thermal Expansion (T1)</option>
+                <option value="LC3">LC3: Seismic Design Envelope</option>
+              </select>
+            </div>
+          </div>`;
+      } else {
+        editBar.style.display = 'none';
+        editBar.innerHTML = '';
+      }
+    }
   }
 
   loadState() {

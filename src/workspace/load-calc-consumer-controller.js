@@ -124,7 +124,7 @@ export class LoadCalcConsumerController {
     }
     
     // Render Topology & Evidence summary into the Left Panel load-calc host
-    const leftHost = this.rootElement.querySelector('[data-role="load-calc-left-host"]');
+    const leftHost = (this.rootElement?.ownerDocument || document).querySelector('[data-role="load-calc-left-host"]');
     if (leftHost) {
       const activeCase = (this.reviewModel?.loadCases || []).find(c => c.loadCaseId === this.uiState.activeLoadCase) || (this.reviewModel?.loadCases || [])[0];
       leftHost.innerHTML = renderSidebarSummary(activeCase, this.reviewModel);
