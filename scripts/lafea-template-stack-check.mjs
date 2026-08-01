@@ -10,7 +10,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HEAD_ARCHIVE = execFileSync(
   'git',
   ['archive', '--format=tar', 'HEAD'],
-  { cwd: ROOT },
+  { cwd: ROOT, maxBuffer: 256 * 1024 * 1024 },
 );
 
 const BEHAVIOR_CHECKS = Object.freeze([
