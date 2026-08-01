@@ -190,7 +190,7 @@ export function assertTopologyEditCertifiedJournal(value) {
     || rebuilt.redoLedgerHash !== value.redoLedgerHash) {
     throw new Error('TopologyEditCertifiedJournal: journal authority hash mismatch.');
   }
-  return rebuilt;
+  return Object.isFrozen(value) ? value : rebuilt;
 }
 
 export function appendTopologyEditJournalEntry(journalInput, entryInput) {
