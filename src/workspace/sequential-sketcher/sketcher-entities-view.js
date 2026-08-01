@@ -34,6 +34,7 @@ export function renderEntities(doc, svg, entityProjected, options = {}) {
       // 1. PIPES
       if (type === 'PIPE' && p1 && p2) {
         const symbol = symbolFactory.createPipeSymbol(doc, p1, p2, isSelected, baseStroke);
+        symbol.dataset.entityId = entity.entityId;
         symbol.style.cursor = 'pointer';
         symbol.addEventListener('click', clickHandler);
         const title = doc.createElementNS(SVG_NS, 'title');
@@ -45,6 +46,7 @@ export function renderEntities(doc, svg, entityProjected, options = {}) {
       else if ((type === 'ELBO' || type === 'BEND') && p1 && p2) {
         const corner = { px: (p1.px + p2.px) / 2, py: (p1.py + p2.py) / 2 };
         const symbol = symbolFactory.createBendSymbol(doc, p1, corner, p2, isSelected, baseStroke, bendRadius);
+        symbol.dataset.entityId = entity.entityId;
         symbol.style.cursor = 'pointer';
         symbol.addEventListener('click', clickHandler);
         const title = doc.createElementNS(SVG_NS, 'title');
@@ -55,6 +57,7 @@ export function renderEntities(doc, svg, entityProjected, options = {}) {
       // 3. TEES / OLETS
       else if ((type === 'TEE' || type === 'OLET') && p1 && p2) {
         const symbol = symbolFactory.createTeeSymbol ? symbolFactory.createTeeSymbol(doc, p1, p2, isSelected, baseStroke, teeSize) : symbolFactory.createValveSymbol(doc, p1, p2, isSelected, baseStroke, teeSize);
+        symbol.dataset.entityId = entity.entityId;
         symbol.style.cursor = 'pointer';
         symbol.addEventListener('click', clickHandler);
         const title = doc.createElementNS(SVG_NS, 'title');
@@ -68,6 +71,7 @@ export function renderEntities(doc, svg, entityProjected, options = {}) {
         const supportType = entity.properties?.supportType || entity.properties?.SUPPORT_TYPE || 'REST';
         const callouts = (options.showReactions !== false && supportPresenter) ? supportPresenter.getResultCallouts(entity) : [];
         const symbol = symbolFactory.createSupportSymbol(doc, p, supportType, isSelected, baseStroke, supportSize, callouts, loadScale);
+        symbol.dataset.entityId = entity.entityId;
         symbol.style.cursor = 'pointer';
         symbol.addEventListener('click', clickHandler);
         const title = doc.createElementNS(SVG_NS, 'title');
@@ -80,6 +84,7 @@ export function renderEntities(doc, svg, entityProjected, options = {}) {
       const symbol = type === 'VALV'
         ? symbolFactory.createValveSymbol(doc, p1, p2, isSelected, baseStroke, valveRadius * 2)
         : symbolFactory.createFlangePairSymbol(doc, p1, p2, isSelected, baseStroke, valveRadius * 2);
+      symbol.dataset.entityId = entity.entityId;
       symbol.style.cursor = 'pointer';
       symbol.addEventListener('click', clickHandler);
       const title = doc.createElementNS(SVG_NS, 'title');
@@ -91,6 +96,7 @@ export function renderEntities(doc, svg, entityProjected, options = {}) {
     else if (p1 || p2) {
       const p = p1 || p2;
       const dot = doc.createElementNS(SVG_NS, 'circle');
+      dot.dataset.entityId = entity.entityId;
       dot.setAttribute('cx', String(p.px));
       dot.setAttribute('cy', String(p.py));
       dot.setAttribute('r', String(valveRadius));

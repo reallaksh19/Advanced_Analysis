@@ -33,19 +33,20 @@ export class TopologyEditCanvasCallout {
       font-size: 11px;
     `;
 
-    const isExact = (issue.distance || 0) < 6.0;
+    const isExact = (issue.distanceMm ?? 0) < 6.0;
+    const [node1, node2] = issue.nodeIds || [];
     card.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
         <span style="font-weight:800; color:${isExact ? '#38bdf8' : '#facc15'}; text-transform:uppercase; font-size:10px;">
-          ${isExact ? '🔴 Exact Merge (<6mm)' : '🟧 Near-Match (6-25mm)'}
+          ${issue.kind}${issue.suggestedAutofix ? ` → ${issue.suggestedAutofix}` : ' (manual review)'}
         </span>
         <button type="button" data-action="close-callout" style="background:none; border:none; color:#94a3b8; cursor:pointer; font-size:12px;">✕</button>
       </div>
       <div style="font-size:11px; font-weight:600; color:#e2e8f0; margin-bottom:4px;">
-        Nodes: ${issue.node1 || 'N1'} ➔ ${issue.node2 || 'N2'}
+        Nodes: ${node1 || issue.edgeId || 'N1'} ${node2 ? `➔ ${node2}` : ''}
       </div>
       <div style="font-size:10px; color:#94a3b8; margin-bottom:8px;">
-        Distance: <strong>${(issue.distance || 0).toFixed(2)} mm</strong>
+        ${issue.distanceMm != null ? `Distance: <strong>${issue.distanceMm.toFixed(2)} mm</strong>` : issue.message}
       </div>
       <div style="display:flex; gap:6px;">
         <button type="button" data-action="apply-callout-fix" style="flex:1; padding:4px 8px; background:#0284c7; color:#fff; border:none; border-radius:4px; font-weight:700; font-size:10px; cursor:pointer;">⚡ Apply Fix</button>

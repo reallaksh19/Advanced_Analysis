@@ -6,7 +6,7 @@ const STAGED_PACKAGE={schema:'inputxml-managed-stage/v1',packageHash:'W10.10-BRO
   {id:'PIPES',name:'Pipes',type:'BRANCH',children:[pipe('PIPE-A',[0,0,0],[1000,0,0]),pipe('PIPE-B',[1000,0,0],[2000,0,0])]},
   {id:'SUPPORTS',name:'Supports',type:'GROUP',children:[support('SUP-START',[0,0,0],'PIPE-A:port:start'),support('SUP-END',[2000,0,0],'PIPE-B:port:end')]},
 ]};
-const NAVIGATION=['Home','Workspace','Load Calc','PCF','Sketcher','3D Calc','Pipe Solver','Local FEA','Reports','QA','Settings','Debug'];
+const NAVIGATION=['Home','Workspace','Edit, Topo fix and Load Calc','PCF','Sketcher','3D Calc','Pipe Solver','Local FEA','Reports','QA','Settings','Debug'];
 const REQUEST_TOPICS=['sharedModel:exportRequested','topology:rebuildExactRequested','topology:exportRequested','supportRestraint:rebuildEvidenceRequested','supportRestraint:exportRequested','verticalBeam:rebuildRequested','verticalBeam:solveRequested','verticalBeam:exportRequested','applicationView:changeRequested'];
 
 test.beforeEach(async({page})=>{await page.addInitScript(()=>{
@@ -88,7 +88,7 @@ test('preserves Workspace, Load Calc, Reports and W10.4-W10.9 state',async({page
   await page.getByRole('button',{name:'Create Calculation Package'}).click();
   await expect.poll(()=>page.evaluate(()=>AnalysisWorkspace.getActiveModelCalculationPackage()?.semanticHash||null)).not.toBeNull();
   const before=await preservedState(page),actions=await eventCounts(page);
-  await navButton(nav,'Load Calc').click();await expect(page.locator('[data-role="load-calc-consumer"]')).toBeVisible();
+  await navButton(nav,'Edit, Topo fix and Load Calc').click();await expect(page.locator('[data-role="load-calc-consumer"]')).toBeVisible();
   await navButton(nav,'Reports').click();await expect(page.locator('[data-role="reports-consumer"]')).toContainText('SCREENING_AND_VERTICAL_BEAM');
   await navButton(nav,'3D Calc').click();await expect(page.locator('[data-role="three-d-calc-beam"]')).toContainText('signedSupportForceN');
   await navButton(nav,'Workspace').click();

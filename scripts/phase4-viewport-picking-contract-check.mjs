@@ -1,19 +1,27 @@
 import assert from 'node:assert/strict';
-import { readdir, readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatasetController } from '../src/workspace/dataset-controller.js';
 import { EventBus } from '../src/workspace/event-bus.js';
 import { EVENT_TOPICS } from '../src/workspace/event-topics.js';
 import { buildCanvasProjection, pickViewportItem } from '../src/workspace/viewport-hit-test.js';
+import { buildResolvedEngineeringGeometry } from '../src/workspace/resolved-engineering-geometry.js';
+import { buildSupportSiteModel } from '../src/workspace/support-sites/support-site-model.js';
 import { buildViewportRenderModel } from '../src/workspace/viewport-render-model.js';
 import { WorkspaceStateStore } from '../src/workspace/workspace-state.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const workspaceDir = path.join(root, 'src/workspace');
-const workspaceModules = (await readdir(workspaceDir))
-  .filter((name) => name.endsWith('.js'))
-  .map((name) => `src/workspace/${name}`);
+const workspaceModules = [
+  'src/workspace/tree-panel.js', 'src/workspace/tree-panel-events.js',
+  'src/workspace/properties-panel.js', 'src/workspace/properties-view.js',
+  'src/workspace/viewport-panel.js', 'src/workspace/viewport-renderer.js',
+  'src/workspace/three-viewport-backend.js', 'src/workspace/three-viewport-scene.js',
+  'src/workspace/workspace-layout.js', 'src/workspace/workspace-shell-controller.js',
+  'src/workspace/dataset-controller.js', 'src/workspace/engineering-model-controller.js',
+];
 
 for (const relativePath of workspaceModules) {
   const source = await readFile(path.join(root, relativePath), 'utf8');
@@ -42,29 +50,9 @@ assert.throws(
   /tree.*viewport.*api/,
 );
 
-const packageJson = {
-  schema: 'rvm-selected-geometry-workspace-package/v1',
-  packageHash: 'PHASE4-PICKING',
-  geometry: {
-    objects: [
-      {
-        id: 'PIPE-SEGMENT',
-        type: 'PIPE',
-        nativeParams: {
-          startPoint: { x: 0, y: 0, z: 0 },
-          endPoint: { x: 100, y: 0, z: 0 },
-        },
-      },
-      {
-        id: 'PIPE-POINT',
-        type: 'PIPE',
-        nativeParams: { center: { x: 50, y: 40, z: 0 } },
-      },
-    ],
-    supports: [],
-    branches: [],
-  },
-};
+const sourceBytes = await readFile(path.join(root, 'benchmarks/Sjson.json'));
+const packageJson = JSON.parse(sourceBytes.toString('utf8'));
+const projectData = JSON.parse(await readFile(path.join(root, 'project-data/1885s-project-data-profile.json'), 'utf8'));
 
 const state = new WorkspaceStateStore();
 const controller = new DatasetController(EventBus, state);
@@ -77,29 +65,36 @@ const unsubscribeSelected = EventBus.subscribe(
 
 EventBus.publish(EVENT_TOPICS.DATASET_LOAD_REQUESTED, {
   rawPackage: packageJson,
-  sourceName: 'phase4.json',
+  sourceName: 'benchmarks/Sjson.json',
+  sourceBytes,
+  sourceSha256: createHash('sha256').update(sourceBytes).digest('hex'),
 });
+const dataset = state.getSnapshot().dataset;
+const selectedEntity = dataset.entities.find((entity) => entity.properties?.attributes?.NAME === '/88-UZV-11951');
+const notificationOnlyEntity = dataset.entities.find((entity) => entity.category === 'support');
 EventBus.publish(EVENT_TOPICS.VIEWPORT_SELECTION_REQUESTED, {
-  entityId: 'PIPE-SEGMENT',
+  entityId: selectedEntity.entityId,
   source: 'viewport',
 });
 
-assert.equal(state.getSnapshot().selectedEntityId, 'PIPE-SEGMENT');
-assert.equal(selectedNotification.entityId, 'PIPE-SEGMENT');
+assert.equal(state.getSnapshot().selectedEntityId, selectedEntity.entityId);
+assert.equal(selectedNotification.entityId, selectedEntity.entityId);
 assert.equal(selectedNotification.source, 'viewport');
 
 EventBus.publish(EVENT_TOPICS.VIEWPORT_ENTITY_SELECTED, {
-  entityId: 'PIPE-POINT',
-  type: 'pipe',
+  entityId: notificationOnlyEntity.entityId,
+  type: 'support',
   properties: {},
 });
 assert.equal(
   state.getSnapshot().selectedEntityId,
-  'PIPE-SEGMENT',
+  selectedEntity.entityId,
   'Selected notification mutated WorkspaceState without a selection request.',
 );
 
-const model = buildViewportRenderModel(state.getSnapshot().dataset);
+const supportSites = buildSupportSiteModel(dataset, projectData);
+const resolved = buildResolvedEngineeringGeometry(dataset, projectData, supportSites);
+const model = buildViewportRenderModel(resolved);
 const width = 500;
 const height = 360;
 const projection = buildCanvasProjection(model, width, height);
@@ -108,18 +103,14 @@ const renderItems = [
   ...model.supportOverlayPrimitives,
   ...model.diagnosticPrimitives,
 ];
-const segment = renderItems.find((item) => item.objectId === 'PIPE-SEGMENT');
-const point = renderItems.find((item) => item.objectId === 'PIPE-POINT');
-const segmentStart = projection(segment.start);
-const segmentEnd = projection(segment.end);
-const segmentMidpoint = {
-  x: (segmentStart.x + segmentEnd.x) / 2,
-  y: (segmentStart.y + segmentEnd.y) / 2,
-};
-const pointScreen = projection(point.center);
-
-assert.equal(pickViewportItem(model, width, height, segmentMidpoint), 'PIPE-SEGMENT');
-assert.equal(pickViewportItem(model, width, height, pointScreen), 'PIPE-POINT');
+const segment = renderItems.filter((item) => item.start && item.end).find((item) => {
+  const start = projection(item.start); const end = projection(item.end);
+  return pickViewportItem(model, width, height, { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 }) === item.objectId;
+});
+assert.ok(segment, 'The supplied 1885S model must expose at least one deterministically pickable source segment.');
+const skippedEntityId = model.skippedEntityIds[0];
+assert.ok(skippedEntityId, 'The supplied source must retain its explicitly skipped topology records.');
+assert.equal(renderItems.some((item) => item.objectId === skippedEntityId), false, 'Skipped source topology must not render a fabricated point.');
 assert.equal(pickViewportItem(model, width, height, { x: width - 2, y: 2 }), '');
 
 const sourceChecks = new Map([

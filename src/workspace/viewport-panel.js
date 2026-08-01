@@ -1,186 +1,143 @@
+import { ENGINEERING_MODEL_EVENTS } from './engineering-model-controller.js';
+import { engineeringModelStore } from './engineering-model-store.js';
 import { EventBus } from './event-bus.js';
 import { EVENT_TOPICS } from './event-topics.js';
+import { masterDataController } from './master-data-controller.js';
+import { projectDataStore } from './project-data/project-data-store.js';
 import { buildResolvedEngineeringGeometry } from './resolved-engineering-geometry.js';
-import { buildViewportRenderModel } from './viewport-render-model.js';
-import { ViewportRenderer } from './viewport-renderer.js';
-import { SequentialEditPanel } from './sequential-sketcher/sequential-edit-panel.js';
 import { SequentialCommandGateway } from './sequential-sketcher/sequential-command-gateway.js';
-import { WorkspaceState } from './workspace-state.js';
-
+import { SequentialEditPanel } from './sequential-sketcher/sequential-edit-panel.js';
 import { SequentialTableStore } from './sequential-sketcher/sequential-table-store.js';
 import { SequentialTopologyTableView } from './sequential-sketcher/sequential-topology-table-view.js';
+import { buildViewportRenderModel } from './viewport-render-model.js';
+import { ViewportRenderer } from './viewport-renderer.js';
+import { WorkspaceState } from './workspace-state.js';
 
+/** Owns one mounted renderer, governed edit preview, and cross-view selection. */
 export class ViewportPanel {
-  constructor(rootElement, eventBus = EventBus, renderer = new ViewportRenderer()) {
+  constructor(rootElement, eventBus, renderer) {
     if (!rootElement) throw new TypeError('ViewportPanel requires a root element.');
     this.rootElement = rootElement;
-    this.eventBus = eventBus;
-    this.renderer = renderer;
+    this.eventBus = eventBus || EventBus;
+    this.renderer = renderer || new ViewportRenderer();
+    this.gateway = new SequentialCommandGateway(WorkspaceState, this.eventBus);
+    this.tableStore = new SequentialTableStore(WorkspaceState, this.gateway, this.eventBus);
     this.unsubscribers = [];
     this.datasetReference = null;
-    this.resolvedGeometry = null;
-    this.renderModel = null;
-    this.gateway = new SequentialCommandGateway(WorkspaceState, eventBus);
-    this.tableStore = new SequentialTableStore(WorkspaceState, this.gateway);
-    this.tableView = null;
-    this.editPanel = null;
-    this.handleClick = this.handleClick.bind(this);
-    this.handleSelectionRequest = this.handleSelectionRequest.bind(this);
+    this.handleClick = (event) => this.click(event);
+    this.handleSelectionRequest = (entityId) => this.selectionRequested(entityId);
+    this.handleToolSelected = (event) => this.toolSelected(event);
   }
 
   init() {
-    if (this.unsubscribers.length > 0) return;
+    if (this.unsubscribers.length) return;
     this.statusElement = this.requireElement('[data-role="viewport-status"]');
     this.selectionElement = this.requireElement('[data-role="viewport-selection"]');
     this.hostElement = this.requireElement('[data-role="viewport-render-host"]');
-
-    const editBarHost = this.rootElement.querySelector('[data-role="viewport-edit-bar"]');
-    if (editBarHost) {
-      this.editPanel = new SequentialEditPanel(editBarHost, this.gateway);
-      this.editPanel.render(null);
-    }
-
-    const tableDockHost = this.rootElement.querySelector('[data-role="viewport-table-dock"]');
-    if (tableDockHost) {
-      this.tableView = new SequentialTopologyTableView(tableDockHost, this.tableStore);
-      this.tableView.mount();
-    }
-
+    const editHost = this.rootElement.querySelector('[data-role="viewport-edit-bar"]');
+    this.editPanel = new SequentialEditPanel(editHost, this.gateway);
+    this.editPanel.onActionRequested = (request) => this.editAction(request);
+    this.editPanel.render(null);
+    const tableHost = this.rootElement.querySelector('[data-role="viewport-table-dock"]');
+    this.tableView = new SequentialTopologyTableView(tableHost, this.tableStore);
+    this.tableView.mount();
     this.renderer.setSelectionRequestHandler(this.handleSelectionRequest);
     this.renderer.mount(this.hostElement);
-    this.updateCapabilities();
-
     this.unsubscribers = [
-      this.eventBus.subscribe(
-        EVENT_TOPICS.WORKSPACE_SNAPSHOT_CHANGED,
-        ({ snapshot }) => this.renderSnapshot(snapshot),
-      ),
-      this.eventBus.subscribe(
-        EVENT_TOPICS.DATASET_LOAD_FAILED,
-        (payload) => this.renderImportFailure(payload.message),
-      ),
+      this.eventBus.subscribe(EVENT_TOPICS.WORKSPACE_SNAPSHOT_CHANGED, ({ snapshot }) => this.renderSnapshot(snapshot)),
+      this.eventBus.subscribe(EVENT_TOPICS.DATASET_LOAD_FAILED, ({ message }) => this.importFailure(message)),
       this.eventBus.subscribe(EVENT_TOPICS.DATASET_CLEARED, () => this.clear()),
-      this.eventBus.subscribe(
-        EVENT_TOPICS.VIEWPORT_ENTITY_SELECTED,
-        (payload) => this.renderSelection(payload.entityId),
-      ),
+      this.eventBus.subscribe(EVENT_TOPICS.VIEWPORT_ENTITY_SELECTED, ({ entityId }) => this.renderSelection(entityId)),
+      this.eventBus.subscribe(ENGINEERING_MODEL_EVENTS.CHANGED, () => this.rerenderActiveDataset()),
     ];
     this.rootElement.addEventListener('click', this.handleClick);
-  }
-
-  requireElement(selector) {
-    const element = this.rootElement.querySelector(selector);
-    if (!element) throw new Error(`ViewportPanel element is missing: ${selector}`);
-    return element;
+    globalThis.addEventListener?.('topology-edit-tool-selected', this.handleToolSelected);
+    this.updateCapabilities();
   }
 
   renderSnapshot(snapshot) {
     if (snapshot.status !== 'ready' || !snapshot.dataset) return;
-
-    if (snapshot.dataset !== this.datasetReference) {
-      this.datasetReference = snapshot.dataset;
-      this.resolvedGeometry = buildResolvedEngineeringGeometry(snapshot.dataset);
-      this.renderModel = buildViewportRenderModel(this.resolvedGeometry);
-      this.renderer.renderModel(this.renderModel);
-      this.updateCapabilities(); // In case fallback triggered during mount/render
-      this.statusElement.textContent = statusText(
-        snapshot.dataset.datasetId,
-        this.renderer.backendName,
-        this.renderModel.summary,
-      );
-    }
+    if (snapshot.dataset !== this.datasetReference) { this.datasetReference = snapshot.dataset; this.renderDataset(snapshot.dataset, false); }
     this.renderSelection(snapshot.selectedEntityId);
+  }
+
+  renderDataset(dataset, preview) {
+    try {
+      const resolved = buildResolvedEngineeringGeometry(dataset, projectDataStore.getProfile(), engineeringModelStore.getSupportSiteModel());
+      const renderModel = buildViewportRenderModel(resolved);
+      this.renderer.renderModel(renderModel);
+      this.renderModel = renderModel;
+      this.statusElement.textContent = `${preview ? 'PREVIEW · ' : ''}${dataset.datasetId} · ${renderModel.summary.renderableCount} source-backed items rendered`;
+    } catch (error) {
+      this.statusElement.textContent = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  editAction({ action, selectedEntityId }) {
+    if (action === 'preview-replacement') {
+      const result = this.gateway.previewInlineReplacement(selectedEntityId, projectDataStore.getProfile(), masterDataController.getMasterData());
+      if (result.status === 'preview') this.renderDataset(result.dataset, true);
+      this.editPanel.setStatus(result.status === 'preview' ? `Preview ready: ${result.command.commandId}` : result.reason);
+      return;
+    }
+    if (action === 'commit-replacement') {
+      const result = this.gateway.commitPreview();
+      this.editPanel.setStatus(result.status === 'applied' ? `Committed ${result.command.commandId}; loads are stale.` : result.reason);
+      return;
+    }
+    if (action === 'cancel-replacement') {
+      this.gateway.cancelPreview();
+      const dataset = WorkspaceState.getSnapshot()?.dataset;
+      if (dataset) this.renderDataset(dataset, false);
+      this.editPanel.setStatus('Preview cancelled.');
+      return;
+    }
+    if (action === 'undo') { this.editPanel.setStatus(this.gateway.undo() ? 'Undo applied; loads are stale.' : 'Nothing to undo.'); return; }
+    if (action === 'redo') this.editPanel.setStatus(this.gateway.redo() ? 'Redo applied; loads are stale.' : 'Nothing to redo.');
   }
 
   renderSelection(entityId) {
     const selectedId = String(entityId || '');
     this.renderer.setSelection(selectedId);
-    this.selectionElement.textContent = selectedId
-      ? `Selection: ${selectedId}`
-      : 'Selection: none';
-    if (this.editPanel) {
-      this.editPanel.render(selectedId || null);
-    }
+    this.selectionElement.textContent = selectedId ? `Selection: ${selectedId}` : 'Selection: none';
+    this.editPanel.render(selectedId || null);
   }
 
-  renderImportFailure(message) {
-    const retained = this.renderModel?.summary.renderableCount || 0;
-    this.statusElement.textContent = retained
-      ? `Import failed · retained ${retained} rendered · ${message}`
-      : `Import failed: ${message}`;
+  selectionRequested(entityId) {
+    if (typeof entityId !== 'string' || !entityId) return;
+    this.eventBus.publish(EVENT_TOPICS.VIEWPORT_SELECTION_REQUESTED, { entityId, source: 'viewport' });
   }
 
-  handleSelectionRequest(entityId) {
-    if (!entityId) return; // Prevent crashes when clearing selection if strict validation is active
-    this.eventBus.publish(EVENT_TOPICS.VIEWPORT_SELECTION_REQUESTED, {
-      entityId,
-      source: 'viewport',
-    });
-  }
+  rerenderActiveDataset() { const dataset = WorkspaceState.getSnapshot()?.dataset; if (dataset) this.renderDataset(dataset, false); }
+  toolSelected(event) { const toolId = event.detail?.toolId; if (toolId) this.renderer.setInteractionContext(toolId); }
 
-  handleClick(event) {
+  click(event) {
     const trigger = event.target?.closest?.('[data-viewport-action]');
     if (!trigger || !this.rootElement.contains(trigger) || trigger.disabled) return;
-    const action = trigger.dataset.viewportAction;
-
-    if (action === 'fit') this.renderer.fitView();
-    if (action === 'fit-selection') this.renderer.fitSelection();
-    if (action === 'home' || action === 'reset') this.renderer.home ? this.renderer.home() : this.renderer.resetView();
-    
-    if (action === 'view-iso') this.renderer.setStandardView('iso');
-    if (action === 'view-top') this.renderer.setStandardView('top');
-    if (action === 'view-front') this.renderer.setStandardView('front');
-    if (action === 'view-right') this.renderer.setStandardView('right');
-
-    if (action === 'mode-select') this.renderer.setInteractionContext('select');
-    if (action === 'mode-orbit') this.renderer.setInteractionContext('orbit');
-    if (action === 'mode-pan') this.renderer.setInteractionContext('pan');
+    const actions = {
+      fit: () => this.renderer.fitView(), 'fit-selection': () => this.renderer.fitSelection(), home: () => this.renderer.home(), reset: () => this.renderer.resetView(),
+      'pivot-selection': () => this.renderer.pivotSelection(),
+      'previous-view': () => this.renderer.previousView(), 'toggle-projection': () => this.renderer.toggleProjection(),
+      'view-iso': () => this.renderer.setStandardView('iso'), 'view-top': () => this.renderer.setStandardView('top'), 'view-bottom': () => this.renderer.setStandardView('bottom'),
+      'view-front': () => this.renderer.setStandardView('front'), 'view-back': () => this.renderer.setStandardView('back'), 'view-left': () => this.renderer.setStandardView('left'), 'view-right': () => this.renderer.setStandardView('right'),
+      'mode-select': () => this.renderer.setInteractionContext('select'), 'mode-orbit': () => this.renderer.setInteractionContext('orbit'), 'mode-pan': () => this.renderer.setInteractionContext('pan'),
+    };
+    actions[trigger.dataset.viewportAction]?.();
   }
 
   updateCapabilities() {
-    const caps = this.renderer.getCapabilities();
-    const actionButtons = this.rootElement.querySelectorAll('[data-viewport-action]');
-    actionButtons.forEach(btn => {
-      const action = btn.dataset.viewportAction;
-      if (action === 'mode-select' && !caps.select) btn.disabled = true;
-      else if (action === 'mode-orbit' && !caps.orbit) btn.disabled = true;
-      else if (action === 'mode-pan' && !caps.pan) btn.disabled = true;
-      else if (action === 'fit' && !caps.fitAll) btn.disabled = true;
-      else if (action === 'fit-selection' && !caps.fitSelection) btn.disabled = true;
-      else if ((action === 'home' || action === 'reset') && !caps.home) btn.disabled = true;
-      else if (action.startsWith('view-') && !caps.standardViews) btn.disabled = true;
-      else btn.disabled = false;
-    });
+    const capabilities = this.renderer.getCapabilities();
+    this.rootElement.querySelectorAll('[data-viewport-action]').forEach((button) => { button.disabled = capabilityFor(button.dataset.viewportAction, capabilities) === false; });
   }
 
-  clear() {
-    this.datasetReference = null;
-    this.resolvedGeometry = null;
-    this.renderModel = null;
-    this.renderer.clear();
-    this.statusElement.textContent = 'No dataset loaded';
-    this.selectionElement.textContent = 'Selection: none';
-  }
-
-  destroy() {
-    this.rootElement.removeEventListener('click', this.handleClick);
-    this.unsubscribers.forEach((unsubscribe) => unsubscribe());
-    this.unsubscribers = [];
-    this.datasetReference = null;
-    this.resolvedGeometry = null;
-    this.renderModel = null;
-    this.renderer.setSelectionRequestHandler(null);
-    this.renderer.destroy();
-  }
+  importFailure(message) { this.statusElement.textContent = `Import failed: ${message}`; }
+  requireElement(selector) { const element = this.rootElement.querySelector(selector); if (!element) throw new Error(`ViewportPanel element is missing: ${selector}`); return element; }
+  clear() { this.datasetReference = null; this.renderModel = null; this.gateway.cancelPreview(); this.renderer.clear(); this.statusElement.textContent = 'No dataset loaded'; this.selectionElement.textContent = 'Selection: none'; this.editPanel.render(null); }
+  destroy() { this.rootElement.removeEventListener('click', this.handleClick); globalThis.removeEventListener?.('topology-edit-tool-selected', this.handleToolSelected); this.unsubscribers.forEach((unsubscribe) => unsubscribe()); this.unsubscribers = []; this.renderer.setSelectionRequestHandler(null); this.renderer.destroy(); this.datasetReference = null; }
 }
 
-function statusText(datasetId, backend, summary) {
-  return [
-    datasetId,
-    backend,
-    `${summary.renderableCount} rendered`,
-    `${summary.resolvedCount || 0} resolved`,
-    `${summary.fallbackCount || 0} fallback`,
-    `${summary.skippedCount} skipped`,
-  ].join(' · ');
+function capabilityFor(action, capabilities) {
+  const map = { 'mode-select': 'select', 'mode-orbit': 'orbit', 'mode-pan': 'pan', fit: 'fitAll', 'fit-selection': 'fitSelection', 'pivot-selection': 'pivot', home: 'home', reset: 'home', 'toggle-projection': 'orthographic' };
+  if (action.startsWith('view-')) return capabilities.standardViews;
+  return map[action] ? capabilities[map[action]] : true;
 }

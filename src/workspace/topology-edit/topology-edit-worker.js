@@ -5,7 +5,7 @@
  * checker runs for large piping models (>25,000 components) off the main UI thread.
  */
 
-import { checkTopologyRules } from './topology-edit-checker.js';
+import { checkCanonicalTopology } from './topology-edit-checker.js';
 
 globalThis.onmessage = function (event) {
   const { requestId, action, payload } = event.data || {};
@@ -14,8 +14,8 @@ globalThis.onmessage = function (event) {
   try {
     switch (action) {
       case 'CHECK_TOPOLOGY': {
-        const { nodes, elements, supports, epsilon } = payload || {};
-        const issues = checkTopologyRules(nodes, elements, supports, epsilon);
+        const { canonical, options } = payload || {};
+        const issues = checkCanonicalTopology(canonical, options);
         globalThis.postMessage({
           requestId,
           success: true,

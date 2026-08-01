@@ -302,10 +302,10 @@ function renderMasterCard(master, state) {
   card.dataset.master = master.key;
   card.appendChild(createElement('h3', master.label));
 
-  const fileLabel = createElement('label', 'Upload CSV/Excel/Text file:');
+  const fileLabel = createElement('label', 'Upload the authoritative master file:');
   const fileInput = createElement('input');
   fileInput.type = 'file';
-  fileInput.accept = master.key === 'materialMap' ? '.csv,.xlsx,.xls,.txt,.map' : '.csv,.xlsx,.xls';
+  fileInput.accept = master.key === 'materialMap' ? '.csv,.xlsx,.xls,.txt,.map' : master.key === 'weight' ? '.json,.csv,.xlsx,.xls' : '.csv,.xlsx,.xls';
   fileInput.dataset.masterFile = master.key;
   fileLabel.appendChild(fileInput);
   const alreadyLoaded = Number(master.rowCount || 0) > 0;

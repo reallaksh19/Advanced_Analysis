@@ -32,23 +32,13 @@ export class SequentialSketcherController {
     };
 
     this.view.onSelectEntity = (entityId, entity) => {
-      const type = entity?.entityType?.toLowerCase()?.includes('supp') ? 'support' : 'pipe';
+      if (!entityId || typeof entityId !== 'string') {
+        this.workspaceState.selectEntity(null);
+        return;
+      }
       this.eventBus.publish(EVENT_TOPICS.VIEWPORT_SELECTION_REQUESTED, {
         entityId,
         entity,
-        source: 'sequential-sketcher',
-      });
-      this.eventBus.publish(EVENT_TOPICS.VIEWPORT_ENTITY_SELECTED, {
-        entityId,
-        type,
-        entity: entity || {
-          entityId,
-          name: entityId,
-          entityType: type.toUpperCase(),
-          category: type,
-          properties: entity?.properties || {}
-        },
-        properties: entity?.properties || {},
         source: 'sequential-sketcher',
       });
     };

@@ -1,88 +1,70 @@
 import * as THREE from 'three';
 import { createStandardMaterial } from './three-object-materials.js';
+import { createSourceCenterline, segmentCount, vector } from './three-pipe-primitives.js';
 
-function vector(point) {
-  return new THREE.Vector3(point?.x || 0, point?.y || 0, point?.z || 0);
-}
+export function createTubeSegment(primitive, color, settings) { return createCylinder(primitive, color, settings); }
 
-function orientAlong(object, start, end) {
-  const direction = new THREE.Vector3().subVectors(vector(end), vector(start));
-  if (direction.lengthSq() <= 1e-12) return;
-  object.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
-}
-
-export function createTubeSegment(primitive, color) {
-  const start = vector(primitive.start);
-  const end = vector(primitive.end);
-  const direction = new THREE.Vector3().subVectors(end, start);
-  const length = Math.max(direction.length(), 1e-6);
-  const radius = Math.max(Number(primitive.visualDiameterMm) / 2 || 0.5, 0.1);
-  
-  const geometry = new THREE.CylinderGeometry(radius, radius, length, 20, 1, false);
-  const mesh = new THREE.Mesh(geometry, createStandardMaterial(color));
-  
-  mesh.position.copy(start).add(end).multiplyScalar(0.5);
-  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
-  
+export function createFrustum(primitive, color, settings) {
+  const startDiameter = positive(primitive.visualStartDiameterMm);
+  const endDiameter = positive(primitive.visualEndDiameterMm);
+  const segments = segmentCount(settings?.meshRadialSegments);
+  if (startDiameter === null || endDiameter === null || segments === null) return createSourceCenterline(primitive.start, primitive.end, color);
+  const frame = spanFrame(primitive.start, primitive.end);
+  if (!frame) return null;
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(endDiameter / 2, startDiameter / 2, frame.length, segments, 1, false), createStandardMaterial(color));
+  placeAlong(mesh, frame);
   return mesh;
 }
 
-export function createFrustum(primitive, color) {
-  const start = vector(primitive.start);
-  const end = vector(primitive.end);
-  const direction = new THREE.Vector3().subVectors(end, start);
-  const length = Math.max(direction.length(), 1e-6);
-  const startRadius = Math.max(Number(primitive.visualStartDiameterMm) / 2 || 0.5, 0.1);
-  const endRadius = Math.max(Number(primitive.visualEndDiameterMm) / 2 || 0.5, 0.1);
-  
-  // Note: CylinderGeometry is (radiusTop, radiusBottom, height).
-  // Top is +y (end), Bottom is -y (start) in its local un-rotated frame.
-  const geometry = new THREE.CylinderGeometry(endRadius, startRadius, length, 20, 1, false);
-  const mesh = new THREE.Mesh(geometry, createStandardMaterial(color));
-  
-  mesh.position.copy(start).add(end).multiplyScalar(0.5);
-  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
-  
+export function createDisc(primitive, color, settings) {
+  const diameter = positive(primitive.visualOutsideDiameterMm);
+  const segments = segmentCount(settings?.meshRadialSegments);
+  const frame = spanFrame(primitive.start || primitive.axisStart, primitive.end || primitive.axisEnd);
+  if (!frame) return null;
+  if (diameter === null || segments === null) return createSourceCenterline(primitive.start || primitive.axisStart, primitive.end || primitive.axisEnd, color);
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(diameter / 2, diameter / 2, frame.length, segments, 1, false), createStandardMaterial(color));
+  placeAlong(mesh, frame);
   return mesh;
 }
 
-export function createDisc(primitive, color) {
-  const radius = Math.max(Number(primitive.visualOutsideDiameterMm) / 2 || 0.5, 0.1);
-  const thickness = Math.max(Number(primitive.visualThicknessMm) || radius * 0.2, 0.1);
-  
-  const geometry = new THREE.CylinderGeometry(radius, radius, thickness, 24, 1, false);
-  const mesh = new THREE.Mesh(geometry, createStandardMaterial(color));
-  
-  mesh.position.copy(vector(primitive.center));
-  orientAlong(mesh, primitive.axisStart, primitive.axisEnd);
-  
-  return mesh;
-}
-
-export function createValveBody(primitive, color) {
+export function createValveBody(primitive, color, settings) {
+  const diameter = positive(primitive.visualBodyDiameterMm);
+  const segments = segmentCount(settings?.meshRadialSegments);
+  const frame = spanFrame(primitive.start, primitive.end);
+  if (!frame) return null;
+  if (diameter === null || segments === null) return createSourceCenterline(primitive.start, primitive.end, color);
   const group = new THREE.Group();
-  const bodyDiameter = Math.max(Number(primitive.visualBodyDiameterMm) || 1, 0.2);
-  
-  const start = vector(primitive.start);
-  const end = vector(primitive.end);
-  const direction = new THREE.Vector3().subVectors(end, start);
-  const length = Math.max(direction.length(), 1e-6);
-  
-  const neckRadius = bodyDiameter * 0.45 / 2;
-  const cylinder = new THREE.Mesh(
-    new THREE.CylinderGeometry(neckRadius, neckRadius, length, 16, 1, false),
-    createStandardMaterial(color)
-  );
-  cylinder.position.copy(start).add(end).multiplyScalar(0.5);
-  cylinder.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
-  group.add(cylinder);
-
-  const sphere = new THREE.Mesh(
-    new THREE.SphereGeometry(bodyDiameter / 2, 20, 14),
-    createStandardMaterial(color)
-  );
-  sphere.position.copy(vector(primitive.center));
-  group.add(sphere);
-
+  const body = new THREE.Mesh(new THREE.SphereGeometry(diameter / 2, segments, segments), createStandardMaterial(color));
+  body.position.copy(vector(primitive.center));
+  group.add(body);
+  const connection = new THREE.Mesh(new THREE.CylinderGeometry(diameter / 2, diameter / 2, frame.length, segments, 1, false), createStandardMaterial(color));
+  placeAlong(connection, frame);
+  group.add(connection);
   return group;
 }
+
+function createCylinder(primitive, color, settings) {
+  const diameter = positive(primitive.visualDiameterMm);
+  const segments = segmentCount(settings?.meshRadialSegments);
+  const frame = spanFrame(primitive.start, primitive.end);
+  if (!frame) return null;
+  if (diameter === null || segments === null) return createSourceCenterline(primitive.start, primitive.end, color);
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(diameter / 2, diameter / 2, frame.length, segments, 1, false), createStandardMaterial(color));
+  placeAlong(mesh, frame);
+  return mesh;
+}
+
+function spanFrame(startPoint, endPoint) {
+  const start = vector(startPoint);
+  const end = vector(endPoint);
+  const direction = new THREE.Vector3().subVectors(end, start);
+  const length = direction.length();
+  return length > 0 ? { start, end, direction: direction.normalize(), length } : null;
+}
+
+function placeAlong(mesh, frame) {
+  mesh.position.copy(frame.start).add(frame.end).multiplyScalar(0.5);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), frame.direction);
+}
+
+function positive(value) { return Number.isFinite(value) && value > 0 ? value : null; }

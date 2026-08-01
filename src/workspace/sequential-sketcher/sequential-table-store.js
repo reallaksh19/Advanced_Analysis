@@ -37,7 +37,11 @@ export class SequentialTableStore {
 
   setState(partialState) {
     this.state = { ...this.state, ...partialState };
-    this.listeners.forEach((listener) => listener(this.state));
+    if (this._pendingRaf) cancelAnimationFrame(this._pendingRaf);
+    this._pendingRaf = requestAnimationFrame(() => {
+      this._pendingRaf = null;
+      this.listeners.forEach((listener) => listener(this.state));
+    });
   }
 
   subscribe(listener) {
@@ -47,7 +51,7 @@ export class SequentialTableStore {
 
   selectEntity(entityId) {
     this.setState({ selectedEntityId: entityId });
-    if (entityId && this.eventBus) {
+    if (entityId && typeof entityId === 'string' && this.eventBus) {
       const targetEntity = this.state.dataset?.entities?.find((e) => e.entityId === entityId) || null;
       this.eventBus.publish(EVENT_TOPICS.VIEWPORT_SELECTION_REQUESTED, {
         entityId,

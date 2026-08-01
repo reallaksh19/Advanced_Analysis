@@ -1,113 +1,55 @@
-import { renderStandaloneResolverJsonTracePanel } from '../calc-workspace/cii-standalone-port/ui-adapted/xml-cii-adapted-resolver-json-trace.js';
-import { runStandaloneResolverJsonTrace } from '../calc-workspace/cii-standalone-port/xml-cii-resolver-json-trace.js';
 import { WorkspaceState } from './workspace-state.js';
 
-export function renderJsonTraceUI() {
-  const container = document.createElement('div');
+/**
+ * Renders source-preserving JSON trace rows from the normalized active dataset.
+ * It does not load example data, substitute resolver configuration, or infer IDs.
+ */
+export function renderJsonTraceUI(documentRef) {
+  if (!documentRef) throw new TypeError('JSON Trace UI requires a document.');
+  const container = documentRef.createElement('section');
   container.className = 'json-trace-ui';
-  container.style.cssText = 'display:flex; flex-direction:column; height:100%; overflow:hidden; background:#0b1120; color:#e2e8f0; padding:20px;';
+  container.style.cssText = 'display:flex;flex-direction:column;height:100%;overflow:hidden;background:#0b1120;color:#e2e8f0;padding:16px;box-sizing:border-box;gap:10px;';
+  const dataset = WorkspaceState.getSnapshot()?.dataset ?? null;
+  if (!dataset) {
+    container.innerHTML = '<h2>JSON Trace</h2><p class="load-blockers">BLOCKED: import an authoritative SJSON dataset.</p>';
+    return container;
+  }
 
-  const snapshot = WorkspaceState.getSnapshot();
-  const activeDataset = snapshot?.dataset || null;
-
-  const stateRef = {
-    current: {
-      jsonTraceActiveSubTabId: 'tree', // Default directly to Evidence Tree!
-      sourceKind: 'json',
-      resolverJsonTraceConfig: {},
-      supportConfigJson: '{}',
-      sourceText: '',
-      stagedJsonText: '',
-      resolverJsonTraceResult: null,
-      jsonTraceTableRows: []
-    }
-  };
-
-  // Automatically form JSON Trace from WorkspaceState dataset on open!
-  const generateTraceFromDataset = (datasetOverride = null) => {
-    const ds = datasetOverride || activeDataset;
-    const result = runStandaloneResolverJsonTrace({
-      dataset: ds,
-      stagedJsonText: stateRef.current.stagedJsonText,
-      jsonConfig: stateRef.current.resolverJsonTraceConfig
-    });
-    stateRef.current.resolverJsonTraceResult = result;
-    stateRef.current.resolverJsonTraceJsonResult = result;
-  };
-
-  // Run automatically on initialization
-  generateTraceFromDataset();
-
-  const render = () => {
-    container.innerHTML = '';
-    
-    // Top Bar Header
-    const header = document.createElement('div');
-    header.style.cssText = 'display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex:none; border-bottom:1px solid #1e293b; padding-bottom:12px;';
-    
-    const info = document.createElement('div');
-    const h2 = document.createElement('h2');
-    h2.textContent = 'JSON Trace & Weight / Thickness Evidence Ledger';
-    h2.style.cssText = 'margin:0 0 4px; color:#38bdf8; font-size:18px;';
-    info.appendChild(h2);
-    
-    const p = document.createElement('p');
-    p.textContent = `Auto-derived from active model state & staged JSON (${stateRef.current.resolverJsonTraceResult?.indexStats?.totalNodes || 0} entities parsed with verified weight & thickness basis).`;
-    p.style.cssText = 'margin:0; color:#94a3b8; font-size:12px;';
-    info.appendChild(p);
-    header.appendChild(info);
-
-    const btnGroup = document.createElement('div');
-    btnGroup.style.cssText = 'display:flex; gap:10px; align-items:center;';
-
-    const loadSjsonBtn = document.createElement('button');
-    loadSjsonBtn.textContent = '🧪 Load Sjson.json Fixture';
-    loadSjsonBtn.style.cssText = 'background:#854d0e; color:#fef08a; border:1px solid #ca8a04; border-radius:4px; padding:6px 12px; font-weight:bold; font-size:12px; cursor:pointer;';
-    loadSjsonBtn.addEventListener('click', async () => {
-      try {
-        const res = await fetch('/fixtures/Sjson.json');
-        if (!res.ok) throw new Error('Failed to load Sjson.json');
-        const text = await res.text();
-        stateRef.current.stagedJsonText = text;
-        generateTraceFromDataset(null);
-        render();
-        alert('Sjson.json Fixture Loaded!');
-      } catch (e) {
-        alert(e.message);
-      }
-    });
-    btnGroup.appendChild(loadSjsonBtn);
-
-    const refreshBtn = document.createElement('button');
-    refreshBtn.textContent = '↺ Refresh Trace from Workspace';
-    refreshBtn.style.cssText = 'background:#0284c7; color:#fff; border:none; border-radius:4px; padding:6px 12px; font-weight:bold; font-size:12px; cursor:pointer;';
-    refreshBtn.addEventListener('click', () => {
-      generateTraceFromDataset();
-      render();
-    });
-    btnGroup.appendChild(refreshBtn);
-
-    header.appendChild(btnGroup);
-    container.appendChild(header);
-
-    // Body Container
-    const body = document.createElement('div');
-    body.style.cssText = 'flex:1; overflow-y:auto; padding-right:12px;';
-
-    // Sub-tab switching delegation
-    body.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-json-trace-sub-tab]');
-      if (btn) {
-        stateRef.current.jsonTraceActiveSubTabId = btn.dataset.jsonTraceSubTab;
-        render();
-      }
-    });
-
-    renderStandaloneResolverJsonTracePanel(body, stateRef.current, stateRef, render);
-
-    container.appendChild(body);
-  };
-
-  render();
+  const rows = dataset.entities.map(traceRow);
+  container.innerHTML = `<header style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+    <div><h2 style="margin:0;color:#38bdf8">JSON Trace and DTXR evidence</h2><p style="margin:4px 0;color:#94a3b8">${escapeHtml(dataset.sourceName)} · ${escapeHtml(dataset.sourceSha256)} · ${rows.length} normalized records</p></div>
+    <input type="search" data-json-trace-search placeholder="Search source ID, pointer, branch, DTXR" aria-label="Filter JSON trace rows">
+  </header><div data-json-trace-table style="overflow:auto;flex:1"></div>`;
+  const tableHost = container.querySelector('[data-json-trace-table]');
+  renderRows(tableHost, rows);
+  container.querySelector('[data-json-trace-search]').addEventListener('input', (event) => {
+    const query = event.target.value.trim().toLowerCase();
+    renderRows(tableHost, query ? rows.filter((row) => row.searchText.includes(query)) : rows);
+  });
   return container;
 }
+
+function traceRow(entity) {
+  const dtxr = entity.properties?.attributes?.DTXR ?? '';
+  const values = {
+    sourceEntityId: entity.sourceEntityId ?? '',
+    jsonPointer: entity.jsonPointer ?? '',
+    branchOwner: entity.branchOwner ?? '',
+    lineKey: entity.lineKey ?? '',
+    pipingClass: entity.pipingClass ?? '',
+    componentReference: entity.componentReference ?? '',
+    dtxr,
+  };
+  return {
+    ...values,
+    status: values.sourceEntityId && values.jsonPointer ? 'TRACEABLE' : 'BLOCKED',
+    searchText: Object.values(values).join(' ').toLowerCase(),
+  };
+}
+
+function renderRows(container, rows) {
+  container.innerHTML = `<table><thead><tr><th>Status</th><th>Source ID</th><th>JSON pointer</th><th>Branch owner</th><th>Line</th><th>Class</th><th>Component reference</th><th>DTXR</th></tr></thead>
+    <tbody>${rows.map((row) => `<tr><td>${escapeHtml(row.status)}</td><td>${escapeHtml(row.sourceEntityId)}</td><td><code>${escapeHtml(row.jsonPointer)}</code></td><td>${escapeHtml(row.branchOwner)}</td><td>${escapeHtml(row.lineKey)}</td><td>${escapeHtml(row.pipingClass)}</td><td>${escapeHtml(row.componentReference)}</td><td>${escapeHtml(row.dtxr)}</td></tr>`).join('')}</tbody></table>`;
+}
+
+function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character]); }

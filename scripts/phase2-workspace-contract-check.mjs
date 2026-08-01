@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,49 +41,27 @@ for (const relativePath of [
   assert.doesNotMatch(source, /document\.(querySelector|getElementById)/, `${relativePath} crosses panel scope.`);
 }
 
-const realPackage = {
-  schema: 'rvm-selected-geometry-workspace-package/v1',
-  packageHash: 'REAL-DATASET-001',
-  source: { sourceFileName: 'real-workspace.json' },
-  geometry: {
-    objects: [
-      {
-        id: 'PIPE-REAL-1',
-        name: 'Real Pipe',
-        type: 'PIPE',
-        sourcePath: '/AREA-A/LINE-100/PIPE-REAL-1',
-        sourceAttributes: { MATERIAL: 'A106-B', LINE_NO: 'LINE-100' },
-      },
-    ],
-    supports: [
-      {
-        id: 'SUP-REAL-1',
-        name: 'Real Guide',
-        type: 'GUIDE',
-        sourcePath: '/AREA-A/LINE-100/SUP-REAL-1',
-        sourceAttributes: { GAP_MM: 5 },
-      },
-    ],
-    branches: [],
-  },
-};
-
-const dataset = normalizeWorkspaceDataset(realPackage, 'real-workspace.json');
-assert.equal(dataset.datasetId, 'REAL-DATASET-001');
-assert.equal(dataset.summary.nodeCount, 2);
-assert.equal(dataset.summary.pipes, 1);
-assert.equal(dataset.summary.supports, 1);
-assert.equal(dataset.hierarchy[0].label, 'AREA-A');
-assert.equal(dataset.entities[1].selectionType, 'support');
-assert.equal(dataset.entities[0].properties.sourceAttributes.MATERIAL, 'A106-B');
+const sourceBytes = await readFile(path.join(root, 'benchmarks/Sjson.json'));
+const sourceSha256 = createHash('sha256').update(sourceBytes).digest('hex');
+const realPackage = JSON.parse(sourceBytes.toString('utf8'));
+const dataset = normalizeWorkspaceDataset(realPackage, 'benchmarks/Sjson.json', { sourceBytes, sourceSha256 });
+const target = dataset.entities.find((entity) => entity.properties?.attributes?.NAME === '/88-UZV-11951');
+const selectedSupport = dataset.entities.find((entity) => entity.category === 'support');
+assert.equal(dataset.summary.nodeCount, 279);
+assert.equal(dataset.summary.supports, 139);
+assert.equal(dataset.sourceSha256, sourceSha256);
+assert.equal(target.lineKey, 'S8811951');
+assert.equal(target.pipingClass, '91261M7');
+assert.equal(target.nominalDiameterMm, 150);
+assert.equal(selectedSupport.selectionType, 'support');
 assert.ok(Object.isFrozen(dataset));
 
 const state = new WorkspaceStateStore();
 const readySnapshot = state.loadDataset(dataset);
 assert.equal(readySnapshot.status, 'ready');
-assert.equal(state.getEntity('PIPE-REAL-1').name, 'Real Pipe');
-assert.equal(state.selectEntity('SUP-REAL-1').entityId, 'SUP-REAL-1');
-assert.equal(state.getSnapshot().selectedEntityId, 'SUP-REAL-1');
+assert.equal(state.getEntity(target.entityId).properties.attributes.NAME, '/88-UZV-11951');
+assert.equal(state.selectEntity(selectedSupport.entityId).entityId, selectedSupport.entityId);
+assert.equal(state.getSnapshot().selectedEntityId, selectedSupport.entityId);
 assert.equal(state.selectEntity('MISSING'), null);
 
 const beforeInvalidImport = state.getSnapshot();
@@ -99,6 +78,6 @@ assert.equal(flattenProperties(manyProperties).length, MAX_PROPERTY_ROWS);
 
 const cleared = state.clearDataset();
 assert.equal(cleared.status, 'empty');
-assert.equal(state.getEntity('PIPE-REAL-1'), null);
+assert.equal(state.getEntity(target.entityId), null);
 
 console.log('Phase 2 workspace contract check passed.');

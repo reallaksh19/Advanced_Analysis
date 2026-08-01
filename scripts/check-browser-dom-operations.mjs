@@ -73,6 +73,15 @@ async function runBrowserDomCheck() {
     console.log(`     Clicked [${tool.text}] -> Active Background: ${bg}`);
   }
 
+  // Check Debug Tracker in Browser
+  const trackerSummary = await page.evaluate(() => {
+    return window.__DEBUG_TRACKER__ ? {
+      count: window.__DEBUG_TRACKER__.events.length,
+      lastEvent: window.__DEBUG_TRACKER__.events[window.__DEBUG_TRACKER__.events.length - 1]
+    } : null;
+  });
+  console.log('🔍 Browser __DEBUG_TRACKER__ Summary:', JSON.stringify(trackerSummary, null, 2));
+
   await browser.close();
   console.log('🎉 REAL BROWSER DOM OPERATIONS CHECK PASSED (100% SUCCESS)!');
 }

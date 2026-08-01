@@ -3,13 +3,21 @@
  *
  * Atomically commits active Edit Draft changes into WorkspaceState.dataset and
  * invalidates downstream topology, load calculation, and FEA evidence packages.
+ *
+ * Mirrors the one established commit pattern already used by
+ * sequential-sketcher/sequential-command-gateway.js: rebuild the dataset via
+ * rebuildWorkspaceDataset (so hierarchy/summary/sharedModel/calculationFreshness
+ * are recomputed, not dropped), push it through WorkspaceState.loadDataset, then
+ * publish exactly one WORKSPACE_SNAPSHOT_CHANGED event.
  */
 
 import { WorkspaceState } from '../workspace-state.js';
 import { EventBus } from '../event-bus.js';
 import { EVENT_TOPICS } from '../event-topics.js';
+import { rebuildWorkspaceDataset } from '../dataset-adapter.js';
+import { semanticHash } from '../../core/shared-piping-model/index.js';
 
-export function commitDraftToWorkspace(journalPackage, updatedEntities = []) {
+export function commitDraftToWorkspace(journalPackage, updatedEntities = [], editAudit = null) {
   if (!journalPackage || !Array.isArray(updatedEntities)) {
     throw new TypeError('commitDraftToWorkspace: Invalid journal package or entities.');
   }
@@ -19,19 +27,10 @@ export function commitDraftToWorkspace(journalPackage, updatedEntities = []) {
     throw new Error('commitDraftToWorkspace: No active workspace dataset to commit into.');
   }
 
-  // Atomically update dataset entities
-  const updatedDataset = {
-    ...snapshot.dataset,
-    version: (snapshot.dataset.version || 1) + 1,
-    lastCommittedAt: Date.now(),
-    entities: updatedEntities,
-  };
+  const audit = editAudit || defaultEditAudit(snapshot.dataset, journalPackage);
+  const updatedDataset = rebuildWorkspaceDataset(snapshot.dataset, updatedEntities, audit);
 
-  // Push updated dataset into WorkspaceState
   const newSnapshot = WorkspaceState.loadDataset(updatedDataset);
-
-  // Publish invalidation and load events
-  EventBus.publish(EVENT_TOPICS.DATASET_LOADED, { dataset: updatedDataset });
   EventBus.publish(EVENT_TOPICS.WORKSPACE_SNAPSHOT_CHANGED, { snapshot: newSnapshot });
 
   return Object.freeze({
@@ -40,4 +39,13 @@ export function commitDraftToWorkspace(journalPackage, updatedEntities = []) {
     newVersion: updatedDataset.version,
     entityCount: updatedEntities.length,
   });
+}
+
+function defaultEditAudit(dataset, journalPackage) {
+  return {
+    schema: 'topology-edit-draft-commit/v1',
+    journal: journalPackage,
+    sourceDatasetHash: dataset.sourceSnapshot?.sourceSemanticHash,
+    commitHash: semanticHash(journalPackage),
+  };
 }

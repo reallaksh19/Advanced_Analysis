@@ -9,19 +9,9 @@ import { FirstCutResultStore } from '../first-cut-result-store.js';
 export class SupportLoadPresenter {
   getResultCallouts(entity) {
     const result = qualifiedResult(entity);
-    let forceN = result ? numericForce(result) : null;
-    
-    if (!Number.isFinite(forceN)) {
-      const props = entity?.properties?.attributes || entity?.properties || {};
-      const bNum = parseFloat(props.ABORE || props.HBOR || '150');
-      forceN = (bNum * 0.16 + 6.8) * 1000;
-    }
-
-    return [
-      { label: `Fy=${(forceN / 1000).toFixed(1)}kN`, forceN, forcekN: forceN / 1000, direction: 'V', resultKind: 'CALCULATED' },
-      { label: `Fx=0.5kN`, forceN: 500, forcekN: 0.5, direction: 'A', resultKind: 'CALCULATED' },
-      { label: `Fz=0.2kN`, forceN: 200, forcekN: 0.2, direction: 'L', resultKind: 'CALCULATED' }
-    ];
+    const forceN = result ? numericForce(result) : null;
+    if (!Number.isFinite(forceN)) return [];
+    return [{ label: `Vertical=${(forceN / 1000).toFixed(3)}kN`, forceN, forcekN: forceN / 1000, direction: 'V', resultKind: result.resultKind }];
   }
 
   formatLoadInspectorProperties(entity) {

@@ -17,14 +17,57 @@ import * as THREE from 'three';
 import { createTopologyEditPick } from './topology-edit-picking-contract.js';
 import { createTopologyEditViewState } from './topology-edit-view-state.js';
 
+const STANDARD_VIEW_DIRECTIONS = Object.freeze({
+  TOP: new THREE.Vector3(0, 1, 0.001).normalize(),
+  BOTTOM: new THREE.Vector3(0, -1, 0.001).normalize(),
+  FRONT: new THREE.Vector3(0, 0, 1),
+  BACK: new THREE.Vector3(0, 0, -1),
+  LEFT: new THREE.Vector3(-1, 0, 0),
+  RIGHT: new THREE.Vector3(1, 0, 0),
+  ISO: new THREE.Vector3(1, 1, 1).normalize(),
+});
+
+function computeElementBounds(elements, segments = []) {
+  const bounds = new THREE.Box3();
+  elements.forEach((el) => {
+    if (Number.isFinite(el.x) && Number.isFinite(el.y) && Number.isFinite(el.z)) {
+      bounds.expandByPoint(new THREE.Vector3(el.x, el.y, el.z));
+    }
+  });
+  segments.forEach((segment) => {
+    if (isFinitePoint(segment.start)) bounds.expandByPoint(new THREE.Vector3(segment.start.x, segment.start.y, segment.start.z));
+    if (isFinitePoint(segment.end)) bounds.expandByPoint(new THREE.Vector3(segment.end.x, segment.end.y, segment.end.z));
+  });
+  return bounds;
+}
+
+function isFinitePoint(point) {
+  return point && Number.isFinite(point.x) && Number.isFinite(point.y) && Number.isFinite(point.z);
+}
+
+function markerSizeForBounds(bounds) {
+  if (!bounds || bounds.isEmpty()) return 10;
+  const diagonal = bounds.getSize(new THREE.Vector3()).length();
+  return Math.max(diagonal * 0.008, 5);
+}
+
+function finiteOr(value, fallback) {
+  return Number.isFinite(value) ? value : fallback;
+}
+
 export class TopologyEditViewportBackend {
   constructor(options = {}) {
     this.hostElement = null;
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(45, 1, 0.1, 2000);
-    this.orthoCamera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 2000);
+    // Far plane and marker sizes are scaled from real scene bounds (renderSession),
+    // not fixed unit-scale constants — piping models are typically thousands of mm
+    // across, so a 2000-unit far plane / 0.2-unit marker (the original constants
+    // here) leaves the actual geometry invisible or clipped.
+    this.camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000000);
+    this.orthoCamera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 1000000);
     this.activeCamera = this.camera;
     this.renderer = null;
+    this.hasFitOnce = false;
 
     // 9 Isolated Scene Groups
     this.groups = Object.freeze({
@@ -107,16 +150,63 @@ export class TopologyEditViewportBackend {
     this.clearGroup(this.groups.sourceGroup);
     this.clearGroup(this.groups.draftGroup);
 
-    // Build source & draft visual meshes
-    if (model.source && model.source.elements) {
-      this.buildMeshGroup(this.groups.sourceGroup, model.source.elements, 0x38bdf8, 0.4);
+    const allElements = [...(model.source?.elements || []), ...(model.draft?.elements || [])];
+    const allSegments = [...(model.source?.segments || []), ...(model.draft?.segments || [])];
+    this.lastBounds = computeElementBounds(allElements, allSegments);
+    const markerSize = markerSizeForBounds(this.lastBounds);
+
+    // Build source & draft visual meshes — segments (pipe runs) first so node
+    // markers render on top at each segment's endpoints/junctions.
+    if (model.source) {
+      this.buildSegmentGroup(this.groups.sourceGroup, model.source.segments, 0x38bdf8, 0.4, markerSize);
+      this.buildMeshGroup(this.groups.sourceGroup, model.source.elements, 0x38bdf8, 0.4, markerSize);
     }
-    if (model.draft && model.draft.elements) {
-      this.buildMeshGroup(this.groups.draftGroup, model.draft.elements, 0x0284c7, 1.0);
+    if (model.draft) {
+      this.buildSegmentGroup(this.groups.draftGroup, model.draft.segments, 0x0284c7, 1.0, markerSize);
+      this.buildMeshGroup(this.groups.draftGroup, model.draft.elements, 0x0284c7, 1.0, markerSize);
+    }
+
+    if (!this.hasFitOnce && (allElements.length || allSegments.length)) {
+      this.hasFitOnce = true;
+      this.fitAll();
     }
   }
 
-  buildMeshGroup(group, elements = [], colorHex = 0x0284c7, opacity = 1.0) {
+  /**
+   * Renders real oriented pipe-run cylinders between each segment's actual
+   * two endpoints (radius from source bore data where available), replacing
+   * the earlier placeholder of one fixed-size, fixed-orientation cylinder
+   * per element. Full per-type fitting shapes (valve/flange/tee/OLET/elbow)
+   * are a later phase — see futureplan.md item 1.
+   */
+  buildSegmentGroup(group, segments = [], colorHex = 0x0284c7, opacity = 1.0, fallbackMarkerSize = 10) {
+    if (!segments || segments.length === 0) return;
+    const material = new THREE.MeshStandardMaterial({
+      color: colorHex,
+      roughness: 0.3,
+      metalness: 0.2,
+      transparent: opacity < 1.0,
+      opacity,
+    });
+    const up = new THREE.Vector3(0, 1, 0);
+    segments.forEach((segment) => {
+      if (!isFinitePoint(segment.start) || !isFinitePoint(segment.end)) return;
+      const start = new THREE.Vector3(segment.start.x, segment.start.y, segment.start.z);
+      const end = new THREE.Vector3(segment.end.x, segment.end.y, segment.end.z);
+      const direction = new THREE.Vector3().subVectors(end, start);
+      const length = direction.length();
+      if (length < 1e-6) return;
+      const radius = Number.isFinite(segment.radiusMm) && segment.radiusMm > 0 ? segment.radiusMm : fallbackMarkerSize * 0.6;
+      const geometry = new THREE.CylinderGeometry(radius, radius, length, 12);
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.addVectors(start, end).multiplyScalar(0.5);
+      mesh.quaternion.setFromUnitVectors(up, direction.normalize());
+      mesh.userData = { canonicalId: segment.id ?? segment.entityId, type: segment.type || 'edge' };
+      group.add(mesh);
+    });
+  }
+
+  buildMeshGroup(group, elements = [], colorHex = 0x0284c7, opacity = 1.0, markerSize = 10) {
     if (!elements || elements.length === 0) return;
 
     const material = new THREE.MeshStandardMaterial({
@@ -126,14 +216,22 @@ export class TopologyEditViewportBackend {
       transparent: opacity < 1.0,
       opacity: opacity,
     });
-    const geometry = new THREE.CylinderGeometry(0.2, 0.2, 5, 12);
+    // Real elbow/valve/flange/OLET shapes are a later phase (see futureplan.md);
+    // for now every element renders as a sphere marker sized relative to the
+    // scene's real coordinate range, not a fixed unit-scale constant.
+    const geometry = new THREE.SphereGeometry(markerSize, 12, 10);
 
     if (elements.length >= 500) {
       const instancedMesh = new THREE.InstancedMesh(geometry, material, elements.length);
       const dummy = new THREE.Object3D();
+      // Pick-ID table: InstancedMesh hits report an instanceId, not userData,
+      // so pickAt() needs an explicit instanceId -> canonicalId lookup — the
+      // prior version never built one, so every pick on an instanced scene
+      // silently returned the literal string 'primitive-hit'.
+      instancedMesh.userData.pickTable = elements.map((el) => el.id ?? el.entityId ?? null);
 
       elements.forEach((el, idx) => {
-        dummy.position.set(el.x || (idx * 2) % 50, el.y || 0, el.z || Math.floor(idx / 25) * 2);
+        dummy.position.set(finiteOr(el.x, 0), finiteOr(el.y, 0), finiteOr(el.z, 0));
         dummy.updateMatrix();
         instancedMesh.setMatrixAt(idx, dummy.matrix);
       });
@@ -143,6 +241,7 @@ export class TopologyEditViewportBackend {
     } else {
       elements.forEach(el => {
         const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(finiteOr(el.x, 0), finiteOr(el.y, 0), finiteOr(el.z, 0));
         mesh.userData = { canonicalId: el.id || el.entityId, type: el.type };
         group.add(mesh);
       });
@@ -161,28 +260,22 @@ export class TopologyEditViewportBackend {
   }
 
   setStandardView(viewName) {
-    const dist = 30;
-    switch (viewName.toUpperCase()) {
-      case 'TOP':
-        this.camera.position.set(0, dist, 0.001);
-        break;
-      case 'FRONT':
-        this.camera.position.set(0, 0, dist);
-        break;
-      case 'RIGHT':
-        this.camera.position.set(dist, 0, 0);
-        break;
-      case 'ISO':
-      default:
-        this.camera.position.set(dist, dist, dist);
-        break;
-    }
-    this.camera.lookAt(0, 0, 0);
+    const bounds = this.lastBounds;
+    const center = bounds ? bounds.getCenter(new THREE.Vector3()) : new THREE.Vector3(0, 0, 0);
+    const dist = bounds ? Math.max(bounds.getSize(new THREE.Vector3()).length(), 10) : 30;
+    const direction = STANDARD_VIEW_DIRECTIONS[viewName.toUpperCase()] || STANDARD_VIEW_DIRECTIONS.ISO;
+    this.camera.position.copy(center).addScaledVector(direction, dist);
+    this.camera.lookAt(center);
+    this.camera.near = Math.max(dist / 1000, 0.01);
+    this.camera.far = Math.max(dist * 100, 1000);
+    this.camera.updateProjectionMatrix();
   }
 
   fitAll() {
-    this.camera.position.set(25, 25, 25);
-    this.camera.lookAt(0, 0, 0);
+    const bounds = this.lastBounds && !this.lastBounds.isEmpty() ? this.lastBounds : new THREE.Box3().setFromObject(this.scene);
+    if (bounds.isEmpty()) { this.camera.position.set(25, 25, 25); this.camera.lookAt(0, 0, 0); return; }
+    this.lastBounds = bounds;
+    this.setStandardView('ISO');
   }
 
   pickAt(clientX, clientY) {
@@ -197,8 +290,11 @@ export class TopologyEditViewportBackend {
 
     if (intersects.length > 0) {
       const hit = intersects[0];
+      const objectId = hit.instanceId !== undefined
+        ? (hit.object.userData?.pickTable?.[hit.instanceId] ?? 'primitive-hit')
+        : (hit.object.userData?.canonicalId || 'primitive-hit');
       return createTopologyEditPick({
-        objectId: hit.object.userData?.canonicalId || 'primitive-hit',
+        objectId,
         point: { x: hit.point.x, y: hit.point.y, z: hit.point.z },
       });
     }

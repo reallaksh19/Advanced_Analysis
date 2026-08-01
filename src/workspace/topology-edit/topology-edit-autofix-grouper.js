@@ -22,14 +22,19 @@ export class TopologyEditAutofixGrouper {
     };
 
     issues.forEach(issue => {
-      const dist = issue.distance ?? 0;
-      if (issue.kind === 'ZERO_LENGTH_ELEMENT' || issue.kind === 'UNSUPPORTED_BRANCH') {
+      // Only issues with a confident automatic fix (currently SNAP_GAP -> MERGE_NODES,
+      // see topology-edit-checker.js) are distance-bucketed; everything else has no
+      // suggestedAutofix and goes straight to manual review, unchecked.
+      if (!issue.suggestedAutofix) {
         buckets.structuralIssues.push({
           ...issue,
           bucket: AUTOFIX_BUCKETS.DEGENERATE_STRUCTURAL,
-          checked: true,
+          checked: false,
         });
-      } else if (dist < toleranceExact) {
+        return;
+      }
+      const dist = issue.distanceMm ?? 0;
+      if (dist < toleranceExact) {
         buckets.exactMerges.push({
           ...issue,
           bucket: AUTOFIX_BUCKETS.EXACT_MERGE_HIGH_CONFIDENCE,
@@ -40,6 +45,12 @@ export class TopologyEditAutofixGrouper {
           ...issue,
           bucket: AUTOFIX_BUCKETS.NEAR_MATCH_MEDIUM_CONFIDENCE,
           checked: false, // Manual review required!
+        });
+      } else {
+        buckets.structuralIssues.push({
+          ...issue,
+          bucket: AUTOFIX_BUCKETS.DEGENERATE_STRUCTURAL,
+          checked: false,
         });
       }
     });
@@ -56,7 +67,9 @@ export class TopologyEditAutofixGrouper {
     const b = groupedResult.buckets;
     b.exactMerges.forEach(i => i.checked = true);
     b.nearMatches.forEach(i => i.checked = false);
-    b.structuralIssues.forEach(i => i.checked = true);
+    // structuralIssues never have a suggestedAutofix (see groupIssues above),
+    // so they are never auto-checked, even in "high confidence only" mode.
+    b.structuralIssues.forEach(i => i.checked = false);
     return groupedResult;
   }
 

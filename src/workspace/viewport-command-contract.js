@@ -8,6 +8,7 @@ export const DEFAULT_VIEWPORT_CAPABILITIES = {
   pan: true,
   fitAll: true,
   fitSelection: true,
+  pivot: true,
   home: true,
   standardViews: true,
   orthographic: true
@@ -19,6 +20,7 @@ export const CANVAS2D_VIEWPORT_CAPABILITIES = {
   pan: false,
   fitAll: true,
   fitSelection: false,
+  pivot: false,
   home: true,
   standardViews: false,
   orthographic: false

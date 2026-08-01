@@ -1,555 +1,206 @@
-import { showZoneDensitySelectorPopup } from './zone-density-selector-popup.js';
 import { WorkspaceState } from './workspace-state.js';
 import { EventBus } from './event-bus.js';
 import { APPLICATION_EVENTS, EVENT_TOPICS } from './event-topics.js';
 
-const STORAGE_KEY = 'workspace-layout-prefs';
-const MIN_WIDTH = 200;
+const STORAGE_KEY = 'workspace-layout-prefs/v2';
+const PANEL_MINIMUM_PX = 200;
 
+/** Owns layout, shared-view switching, and panel resizing only. */
 export class WorkspaceShellController {
   constructor(rootElement) {
     if (!rootElement) throw new TypeError('WorkspaceShellController requires a root element.');
     this.rootElement = rootElement;
     this.shellElement = null;
-    this.state = { leftPanelWidth: 300, rightPanelWidth: 350, webglHeight: 320, activeViewportTab: 'webgl', treeCollapsed: false, propertiesCollapsed: false };
-    this.webglLoaded = false;
+    this.state = { leftPanelWidth: 300, rightPanelWidth: 350, activeViewportTab: 'webgl', treeCollapsed: false, propertiesCollapsed: false, topologyEdit3DActive: false };
     this.dragContext = null;
-    this.handlePointerDown = this.handlePointerDown.bind(this);
-    this.handlePointerMove = this.handlePointerMove.bind(this);
-    this.handlePointerUp = this.handlePointerUp.bind(this);
-    this.handleClick = this.handleClick.bind(this);
+    this.unsubscribers = [];
+    this.handlePointerDown = (event) => this.pointerDown(event);
+    this.handlePointerMove = (event) => this.pointerMove(event);
+    this.handlePointerUp = () => this.pointerUp();
+    this.handleClick = (event) => this.click(event);
+    this.handleKeyDown = (event) => this.keyDown(event);
   }
 
   init() {
+    if (this.unsubscribers.length) return;
     this.shellElement = this.rootElement.querySelector('.workspace-shell');
-    if (!this.shellElement) return;
+    if (!this.shellElement) throw new Error('Workspace shell element is missing.');
     this.loadState();
     this.applyState();
     this.shellElement.addEventListener('pointerdown', this.handlePointerDown);
     this.shellElement.addEventListener('click', this.handleClick);
-    
-    // Update dataset name in topbar, auto-popup zone selector on dataset load, and switch panel sub-views
-    this.unsubscribeCallbacks = [
-      EventBus.subscribe(EVENT_TOPICS.WORKSPACE_SNAPSHOT_CHANGED, ({ snapshot }) => {
-        const el = this.shellElement.querySelector('[data-role="topbar-dataset"]');
-        if (el) el.textContent = snapshot?.dataset?.datasetId || 'None Loaded';
-      }),
-      EventBus.subscribe(EVENT_TOPICS.DATASET_LOADED, ({ dataset }) => {
-        if (dataset) {
-          showZoneDensitySelectorPopup(dataset, (selectedZones, qualities) => {
-            window.dispatchEvent(new CustomEvent('workspace-zone-filter-changed', { detail: { selectedZones, qualities } }));
-          });
-        }
-      }),
-      EventBus.subscribe(APPLICATION_EVENTS.CHANGED, (payload) => {
-        const activeViewId = payload?.state?.activeViewId || payload?.activeViewId;
-        this.switchWorkbenchView(activeViewId);
-        
-        // Bind Topology Primitive Quick-Icons Bar
-        this.shellElement.querySelectorAll('[data-topology-primitive]').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-            const primitiveType = e.currentTarget.dataset.topologyPrimitive;
-            window.dispatchEvent(new CustomEvent('topology-primitive-selected', { detail: { type: primitiveType } }));
-          });
-        });
-
-        // Bind 3D Editing Tools Bar
-        this.shellElement.querySelectorAll('[data-edit-tool]').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-            const toolId = e.currentTarget.dataset.editTool;
-            window.dispatchEvent(new CustomEvent('topology-edit-tool-selected', { detail: { toolId } }));
-            
-            this.shellElement.querySelectorAll('[data-edit-tool]').forEach(b => {
-              const isActive = b.dataset.editTool === toolId;
-              b.style.background = isActive ? '#0284c7' : '#0f172a';
-              b.style.color = isActive ? '#ffffff' : '#f8fafc';
-              b.style.borderColor = isActive ? '#38bdf8' : '#334155';
-            });
-          });
-        });
-
-        // Bind 6-DOF Camera & Navigation Controls
-        this.shellElement.querySelectorAll('[data-viewport-action]').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-            const action = e.currentTarget.dataset.viewportAction;
-            window.dispatchEvent(new CustomEvent('viewport-navigation-action', { detail: { action } }));
-          });
-        });
-      })
+    this.rootElement.ownerDocument.addEventListener('keydown', this.handleKeyDown);
+    this.unsubscribers = [
+      EventBus.subscribe(EVENT_TOPICS.WORKSPACE_SNAPSHOT_CHANGED, ({ snapshot }) => this.updateDatasetLabel(snapshot)),
+      EventBus.subscribe(APPLICATION_EVENTS.CHANGED, ({ state }) => this.switchWorkbenchView(state?.activeViewId)),
+      EventBus.subscribe(EVENT_TOPICS.TOPOLOGY_EDIT_3D_MODE_CHANGED, ({ active }) => this.setTopologyEdit3DActive(active)),
     ];
   }
 
   switchWorkbenchView(viewId) {
-    const activeView = (viewId === 'LOAD_CALC') ? 'loadcalc' : 'workspace';
-    const leftViews = this.shellElement.querySelectorAll('[data-left-view]');
-    const rightViews = this.shellElement.querySelectorAll('[data-right-view]');
-    const editBar = this.shellElement.querySelector('[data-role="viewport-edit-bar"]');
-
-    leftViews.forEach(el => {
-      el.style.display = el.dataset.leftView === activeView ? 'flex' : 'none';
-    });
-
-    rightViews.forEach(el => {
-      el.style.display = el.dataset.rightView === activeView ? 'flex' : 'none';
-    });
-
-    if (editBar) {
-      editBar.style.display = 'flex';
-      editBar.innerHTML = `
-        <div style="display:flex; flex-direction:column; width:100%; gap:6px;">
-          <!-- Row 1: Topology Primitives & 3D Interactive Editing Tools -->
-          <div style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:8px; flex-wrap:wrap;">
-            <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
-              <span style="font-size:10px; font-weight:700; color:#38bdf8; text-transform:uppercase; margin-right:2px;">Topology:</span>
-              <button type="button" data-topology-primitive="Node" title="Add/Select Pipe Node" style="padding:3px 7px; background:#0f172a; color:#38bdf8; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">📍 Node</button>
-              <button type="button" data-topology-primitive="Elbow" title="Elbow Fitting" style="padding:3px 7px; background:#0f172a; color:#38bdf8; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">⭕ Elbow</button>
-              <button type="button" data-topology-primitive="Tee" title="Branch Tee Fitting" style="padding:3px 7px; background:#0f172a; color:#38bdf8; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🔀 Tee</button>
-              <button type="button" data-topology-primitive="Valve" title="Inline Control Valve" style="padding:3px 7px; background:#0f172a; color:#a855f7; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🚏 Valve</button>
-              <button type="button" data-topology-primitive="Anchor" title="Rigid Anchor Boundary" style="padding:3px 7px; background:#0f172a; color:#ef4444; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">⚓ Anchor</button>
-              <button type="button" data-topology-primitive="Hanger" title="Spring Hanger Support" style="padding:3px 7px; background:#0f172a; color:#facc15; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🪝 Hanger</button>
-              <button type="button" data-topology-primitive="Restraint" title="Guide/Restraint Support" style="padding:3px 7px; background:#0f172a; color:#4ade80; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🛡️ Restraint</button>
-
-              <span style="height:14px; width:1px; background:#334155; margin:0 4px;"></span>
-
-              <span style="font-size:10px; font-weight:700; color:#facc15; text-transform:uppercase; margin-right:2px;">3D Edit:</span>
-              <button type="button" data-edit-tool="move-node" title="Move 3D Node Position" style="padding:3px 7px; background:#0f172a; color:#f8fafc; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">✋ Move</button>
-              <button type="button" data-edit-tool="stretch-pipe" title="Axial Pipe Elongation" style="padding:3px 7px; background:#0f172a; color:#f8fafc; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">↔️ Stretch</button>
-              <button type="button" data-edit-tool="connect-node" title="Snap / Merge Node Endpoints" style="padding:3px 7px; background:#0f172a; color:#f8fafc; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🔗 Connect</button>
-              <button type="button" data-edit-tool="split-edge" title="Split Pipe Segment with Node" style="padding:3px 7px; background:#0f172a; color:#f8fafc; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">✂️ Split</button>
-              <button type="button" data-edit-tool="rotate-subgraph" title="Rotate Pipe Sub-Graph" style="padding:3px 7px; background:#0f172a; color:#f8fafc; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🔄 Rotate</button>
-              <button type="button" data-edit-tool="bridge-gap" title="Bridge Disconnected Pipe Gap" style="padding:3px 7px; background:#0f172a; color:#f8fafc; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🌉 Bridge</button>
-              <button type="button" data-edit-tool="delete-entity" title="Delete Selected Entity" style="padding:3px 7px; background:#0f172a; color:#f87171; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🗑️ Delete</button>
-              <button type="button" data-edit-tool="measure" title="3D Distance Measurement" style="padding:3px 7px; background:#0f172a; color:#38bdf8; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">📏 Measure</button>
-              <button type="button" data-edit-tool="run-autofix" title="Run Governed Topology Autofix Engine" style="padding:3px 7px; background:#6366f1; color:#ffffff; border:1px solid #818cf8; border-radius:4px; font-size:11px; font-weight:800; cursor:pointer;">⚡ Autofix</button>
-            </div>
-          </div>
-
-          ${activeView === 'loadcalc' ? `
-            <!-- Row 2: Load Calc Calculation Workflow Bar & FEA Mode Toggle -->
-            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:8px; border-top:1px solid #1e293b; padding-top:4px; flex-wrap:wrap;">
-              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                <button type="button" data-action="toggle-fea-mode" title="Toggle between Empirical Mass Loads (OFF) and Linear FEA Solver (ON)" style="padding:4px 12px; border-radius:4px; font-size:11px; font-weight:800; cursor:pointer; transition:all 0.15s; background:${this.feaMode ? '#0284c7' : '#0f172a'}; border:1px solid ${this.feaMode ? '#38bdf8' : '#334155'}; color:${this.feaMode ? '#ffffff' : '#94a3b8'}; box-shadow:${this.feaMode ? '0 0 10px rgba(56,189,248,0.4)' : 'none'};">FEA Mode: ${this.feaMode ? 'ON ⚡' : 'OFF (Empirical)'}</button>
-                <span style="height:16px; width:1px; background:#334155;"></span>
-                <button type="button" data-action="rebuild-model-loads" style="padding:4px 10px; background:#0284c7; color:#fff; border:1px solid #38bdf8; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">⚡ 1. Calculate Model Loads</button>
-                <button type="button" data-action="rebuild-paths" style="padding:4px 10px; background:#0f172a; color:#38bdf8; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">📐 2. Build Load Paths</button>
-                <button type="button" data-action="run-screening" style="padding:4px 10px; background:#0f172a; color:#facc15; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">🎯 3. Support Screening</button>
-                <button type="button" data-action="export-model-loads" style="padding:4px 10px; background:#0f172a; color:#94a3b8; border:1px solid #334155; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">📥 Export Loads</button>
-              </div>
-              <div style="display:flex; align-items:center; gap:6px;">
-                ${this.feaMode ? `
-                  <span style="font-size:10px; color:#94a3b8; font-weight:700;">Load Case:</span>
-                  <select data-action="select-load-case" style="background:#020617; color:#f8fafc; border:1px solid #38bdf8; border-radius:4px; padding:3px 8px; font-size:11px; font-weight:700; cursor:pointer;">
-                    <option value="LC1">LC1: Operating Gravity + Pressure</option>
-                    <option value="LC2">LC2: Thermal Expansion (T1)</option>
-                    <option value="LC3">LC3: Seismic Design Envelope</option>
-                  </select>
-                ` : `
-                  <span style="font-size:10px; font-weight:700; color:#38bdf8; background:#091322; border:1px solid #1e293b; padding:3px 8px; border-radius:4px;">📊 Mode: Empirical / Mass-Based (W = mg)</span>
-                `}
-              </div>
-            </div>
-
-            <!-- Row 3: Sub-Nav Workbench Tabs Bar -->
-            <div class="load-calc-tabs" style="display:flex; align-items:center; gap:4px; border-top:1px solid #1e293b; padding-top:4px; flex-wrap:wrap;">
-              <button type="button" data-action="tab-main" data-tab="load-cases" class="is-active" style="padding:3px 10px; border:1px solid #0284c7; border-radius:4px; background:#0284c7; color:#fff; font-size:10px; font-weight:700; cursor:pointer;">📊 Load Evaluation</button>
-              <button type="button" data-action="tab-main" data-tab="preflight" style="padding:3px 10px; border:1px solid #334155; border-radius:4px; background:#0f172a; color:#94a3b8; font-size:10px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px;">📋 Pre-Flight Grid <span data-action="close-tab" data-tab="preflight" title="Close tab & return to canvas" style="display:inline-flex; align-items:center; justify-content:center; width:12px; height:12px; border-radius:50%; background:#334155; color:#fff; font-size:8px;">✕</span></button>
-              <button type="button" data-action="tab-main" data-tab="project-config" style="padding:3px 10px; border:1px solid #334155; border-radius:4px; background:#0f172a; color:#94a3b8; font-size:10px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px;">⚙️ Project Data <span data-action="close-tab" data-tab="project-config" title="Close tab & return to canvas" style="display:inline-flex; align-items:center; justify-content:center; width:12px; height:12px; border-radius:50%; background:#334155; color:#fff; font-size:8px;">✕</span></button>
-              <button type="button" data-action="tab-main" data-tab="master-data" style="padding:3px 10px; border:1px solid #334155; border-radius:4px; background:#0f172a; color:#94a3b8; font-size:10px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px;">🗄️ Master Data <span data-action="close-tab" data-tab="master-data" title="Close tab & return to canvas" style="display:inline-flex; align-items:center; justify-content:center; width:12px; height:12px; border-radius:50%; background:#334155; color:#fff; font-size:8px;">✕</span></button>
-              <button type="button" data-action="tab-main" data-tab="json-trace" style="padding:3px 10px; border:1px solid #334155; border-radius:4px; background:#0f172a; color:#94a3b8; font-size:10px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px;">🔍 JSON Trace <span data-action="close-tab" data-tab="json-trace" title="Close tab & return to canvas" style="display:inline-flex; align-items:center; justify-content:center; width:12px; height:12px; border-radius:50%; background:#334155; color:#fff; font-size:8px;">✕</span></button>
-            </div>
-          ` : ''}
-        </div>`;
-      this.bindEditBarEvents(editBar);
-    }
+    const loadCalc = viewId === 'LOAD_CALC';
+    if (!loadCalc) this.setTopologyEdit3DActive(false);
+    this.shellElement.dataset.workbenchView = loadCalc ? 'load-calc' : 'workspace';
+    this.applyViewportLayout();
   }
 
-  bindEditBarEvents(editBar) {
-    if (!editBar) return;
-    
-    // FEA Mode Toggle
-    const feaToggle = editBar.querySelector('[data-action="toggle-fea-mode"]');
-    if (feaToggle) {
-      feaToggle.addEventListener('click', () => {
-        this.feaMode = !this.feaMode;
-        window.dispatchEvent(new CustomEvent('fea-mode-changed', { detail: { feaMode: this.feaMode } }));
-        this.switchWorkbenchView('LOAD_CALC');
-      });
+  /** Gives the ported Topology Edit Draft 3D canvas the full viewport-stack height, hiding the shared read-only SVG/WebGL stage while it's active. The Load Calc dock stays visible (compacted to just its header/sub-nav) so the sub-nav tabs remain reachable to leave the 3D sub-tab. */
+  setTopologyEdit3DActive(active) {
+    const next = Boolean(active);
+    if (this.state.topologyEdit3DActive === next) return;
+    this.state.topologyEdit3DActive = next;
+    this.updateViewportTabButtons();
+    this.applyViewportLayout();
+  }
+
+  /** "3D Edit" is a peer of 3D WebGL/2D SVG/Split in the shared toolbar, reflecting topologyEdit3DActive rather than activeViewportTab. */
+  updateViewportTabButtons() {
+    const selected = this.state.topologyEdit3DActive ? 'topology-edit' : this.state.activeViewportTab;
+    this.shellElement?.querySelectorAll('[data-action="switch-viewport-tab"]').forEach((button) => button.setAttribute('aria-selected', String(button.dataset.tab === selected)));
+  }
+
+  /** Single source of truth for viewport-stack visibility, reconciling the workbench view (Workspace/Load Calc) and the 3D-active flag. */
+  applyViewportLayout() {
+    if (!this.shellElement) return;
+    const loadCalc = this.shellElement.dataset.workbenchView === 'load-calc';
+    const topologyEdit3DActive = this.state.topologyEdit3DActive;
+    const host = this.shellElement.querySelector('[data-role="topology-edit-render-host"]');
+    const dock = this.shellElement.querySelector('[data-role="load-calc-consumer-root"]');
+    const stage = this.shellElement.querySelector('[data-role="viewport-stage"]');
+    if (host) host.hidden = !topologyEdit3DActive;
+    if (dock) { dock.hidden = !loadCalc; dock.classList.toggle('load-calc-dock--compact', topologyEdit3DActive); }
+    if (stage) {
+      // `.viewport-stage{display:flex}` (an author rule) outranks the UA
+      // `[hidden]{display:none}` rule, so the `hidden` attribute alone does
+      // not actually hide this element — it must be set inline explicitly.
+      stage.hidden = topologyEdit3DActive;
+      stage.style.display = topologyEdit3DActive ? 'none' : 'flex';
+      stage.style.flex = topologyEdit3DActive ? '0 0 0' : loadCalc ? '1 1 55%' : '1 1 100%';
     }
+    globalThis.requestAnimationFrame?.(() => globalThis.dispatchEvent?.(new Event('resize')));
+  }
 
-    // Sub-Nav Tabs Click & Close Handlers
-    editBar.querySelectorAll('[data-action="tab-main"]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const targetTab = e.currentTarget.dataset.tab;
-        window.dispatchEvent(new CustomEvent('load-calc-tab-requested', { detail: { tabId: targetTab } }));
-        
-        editBar.querySelectorAll('[data-action="tab-main"]').forEach(b => {
-          const isActive = b.dataset.tab === targetTab;
-          b.style.background = isActive ? '#0284c7' : '#0f172a';
-          b.style.color = isActive ? '#fff' : '#94a3b8';
-          b.style.borderColor = isActive ? '#0284c7' : '#334155';
-        });
-      });
-    });
+  click(event) {
+    const trigger = event.target.closest('[data-action]');
+    if (!trigger || !this.shellElement.contains(trigger)) return;
+    const action = trigger.dataset.action;
+    if (action === 'switch-viewport-tab') this.switchViewportTab(trigger.dataset.tab);
+    else if (action === 'toggle-viewport-table') this.toggleTable();
+    else if (action === 'toggle-tree-collapse') this.togglePanel('treeCollapsed');
+    else if (action === 'toggle-properties-collapse') this.togglePanel('propertiesCollapsed');
+  }
 
-    editBar.querySelectorAll('[data-action="close-tab"]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        window.dispatchEvent(new CustomEvent('load-calc-tab-requested', { detail: { tabId: 'load-cases' } }));
-        
-        editBar.querySelectorAll('[data-action="tab-main"]').forEach(b => {
-          const isActive = b.dataset.tab === 'load-cases';
-          b.style.background = isActive ? '#0284c7' : '#0f172a';
-          b.style.color = isActive ? '#fff' : '#94a3b8';
-          b.style.borderColor = isActive ? '#0284c7' : '#334155';
-        });
-      });
-    });
+  switchViewportTab(tab) {
+    if (!['webgl', 'svg', 'split', 'topology-edit'].includes(tab)) throw new TypeError(`Unsupported viewport tab: ${tab}`);
+    if (tab === 'topology-edit') {
+      if (this.shellElement.dataset.workbenchView !== 'load-calc') EventBus.publish(APPLICATION_EVENTS.CHANGE_REQUESTED, { viewId: 'LOAD_CALC', source: 'navigation' });
+      EventBus.publish(EVENT_TOPICS.LOAD_CALC_SUBTAB_REQUESTED, { tab: '3d' });
+      this.setTopologyEdit3DActive(true);
+      return;
+    }
+    const wasTopologyEdit3D = this.state.topologyEdit3DActive;
+    this.setTopologyEdit3DActive(false);
+    if (wasTopologyEdit3D) EventBus.publish(EVENT_TOPICS.LOAD_CALC_SUBTAB_REQUESTED, { tab: 'loads' });
+    this.state.activeViewportTab = tab;
+    const webgl = this.shellElement.querySelector('[data-role="viewport-render-host"]');
+    const svg = this.shellElement.querySelector('[data-role="sequential-sketcher-root"]');
+    webgl.hidden = tab === 'svg';
+    svg.hidden = tab === 'webgl';
+    webgl.style.width = tab === 'split' ? '50%' : '100%';
+    svg.style.width = tab === 'split' ? '50%' : '100%';
+    this.updateViewportTabButtons();
+    this.saveState();
+    globalThis.requestAnimationFrame?.(() => globalThis.dispatchEvent?.(new Event('resize')));
+  }
+
+  toggleTable() {
+    const dock = this.shellElement.querySelector('[data-role="viewport-table-dock"]');
+    if (dock) dock.hidden = !dock.hidden;
+  }
+
+  togglePanel(key) {
+    this.state[key] = !this.state[key];
+    this.applyState();
+    this.saveState();
+  }
+
+  keyDown(event) {
+    if (event.key !== 'Escape') return;
+    WorkspaceState.selectEntity(null);
+  }
+
+  pointerDown(event) {
+    const resizer = event.target.closest('.panel-resizer');
+    if (!resizer) return;
+    const tree = this.shellElement.querySelector('.tree-panel');
+    const properties = this.shellElement.querySelector('.properties-panel');
+    this.dragContext = {
+      action: resizer.dataset.action,
+      startX: event.clientX,
+      leftWidth: tree.getBoundingClientRect().width,
+      rightWidth: properties.getBoundingClientRect().width,
+      maximumWidth: this.shellElement.getBoundingClientRect().width / 2,
+    };
+    event.preventDefault();
+    this.rootElement.ownerDocument.addEventListener('pointermove', this.handlePointerMove, { passive: false });
+    this.rootElement.ownerDocument.addEventListener('pointerup', this.handlePointerUp);
+  }
+
+  pointerMove(event) {
+    if (!this.dragContext) return;
+    event.preventDefault();
+    const delta = event.clientX - this.dragContext.startX;
+    if (this.dragContext.action === 'resize-left') this.state.leftPanelWidth = clamp(this.dragContext.leftWidth + delta, PANEL_MINIMUM_PX, this.dragContext.maximumWidth);
+    if (this.dragContext.action === 'resize-right') this.state.rightPanelWidth = clamp(this.dragContext.rightWidth - delta, PANEL_MINIMUM_PX, this.dragContext.maximumWidth);
+    this.applyState();
+  }
+
+  pointerUp() {
+    if (!this.dragContext) return;
+    this.dragContext = null;
+    this.rootElement.ownerDocument.removeEventListener('pointermove', this.handlePointerMove);
+    this.rootElement.ownerDocument.removeEventListener('pointerup', this.handlePointerUp);
+    this.saveState();
+    globalThis.dispatchEvent?.(new Event('resize'));
+  }
+
+  applyState() {
+    if (!this.shellElement) return;
+    const left = this.state.treeCollapsed ? 48 : this.state.leftPanelWidth;
+    const right = this.state.propertiesCollapsed ? 48 : this.state.rightPanelWidth;
+    this.shellElement.style.gridTemplateColumns = `${left}px 4px minmax(360px,1fr) 4px ${right}px`;
+    this.shellElement.querySelector('.tree-panel').classList.toggle('workspace-panel--collapsed', this.state.treeCollapsed);
+    this.shellElement.querySelector('.properties-panel').classList.toggle('workspace-panel--collapsed', this.state.propertiesCollapsed);
+    this.switchViewportTab(this.state.activeViewportTab);
+  }
+
+  updateDatasetLabel(snapshot) {
+    const label = this.rootElement.querySelector('[data-role="topbar-dataset"]');
+    if (label) label.textContent = snapshot?.status === 'ready' ? snapshot.dataset?.datasetId || 'Unnamed' : 'None loaded';
   }
 
   loadState() {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) this.state = { ...this.state, ...JSON.parse(stored) };
-    } catch { /* ignore fallback */ }
+      const saved = JSON.parse(globalThis.localStorage?.getItem(STORAGE_KEY) || 'null');
+      if (!saved) return;
+      if (Number.isFinite(saved.leftPanelWidth)) this.state.leftPanelWidth = saved.leftPanelWidth;
+      if (Number.isFinite(saved.rightPanelWidth)) this.state.rightPanelWidth = saved.rightPanelWidth;
+      if (['webgl', 'svg', 'split'].includes(saved.activeViewportTab)) this.state.activeViewportTab = saved.activeViewportTab;
+    } catch { globalThis.localStorage?.removeItem(STORAGE_KEY); }
   }
 
   saveState() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
-    } catch (e) {
-      console.warn('Failed to save workspace layout preferences to localStorage.', e);
-    }
-  }
-
-  applyState() {
-    this.shellElement.style.setProperty('--left-panel', `${this.state.leftPanelWidth}px`);
-    this.shellElement.style.setProperty('--right-panel', `${this.state.rightPanelWidth}px`);
-    this.shellElement.classList.toggle('tree-collapsed', this.state.treeCollapsed);
-    this.shellElement.classList.toggle('properties-collapsed', this.state.propertiesCollapsed);
-
-    const activeTab = this.state.activeViewportTab || 'svg';
-    const isSvg = activeTab === 'svg', isWebgl = activeTab === 'webgl', isSplit = activeTab === 'split';
-    const webglStage = this.shellElement.querySelector('[data-webgl-host]');
-    const resizer = this.shellElement.querySelector('[data-action="resize-viewport-vertical"]');
-    const svgRoot = this.shellElement.querySelector('[data-role="sequential-sketcher-root"]');
-    const prompt = this.shellElement.querySelector('[data-role="webgl-load-prompt"]');
-    const tabBtns = this.shellElement.querySelectorAll('[data-action="switch-viewport-tab"]');
-
-    tabBtns.forEach((btn) => {
-      const isTab = btn.dataset.tab === activeTab;
-      btn.style.background = isTab ? '#0284c7' : 'transparent';
-      btn.style.color = isTab ? '#ffffff' : '#94a3b8';
-    });
-
-    if (webglStage) {
-      if (isSvg) {
-        webglStage.style.display = 'none';
-        webglStage.style.height = '0px';
-        webglStage.style.minHeight = '0px';
-      } else {
-        webglStage.style.display = 'block';
-        webglStage.style.height = isWebgl ? '100%' : `${this.state.webglHeight || 320}px`;
-        webglStage.style.minHeight = isWebgl ? '0px' : '100px';
-      }
-    }
-    const editBar = this.shellElement.querySelector('[data-role="viewport-edit-bar"]');
-    const tableDock = this.shellElement.querySelector('[data-role="viewport-table-dock"]');
-    const isTableOpen = Boolean(tableDock && tableDock.style.display !== 'none' && tableDock.style.display !== '');
-
-    if (svgRoot) {
-      if (isWebgl) {
-        svgRoot.style.display = 'none';
-        svgRoot.style.height = '0px';
-      } else {
-        svgRoot.style.display = 'flex';
-        svgRoot.style.flex = '1';
-        svgRoot.style.height = (isSvg && !isTableOpen) ? '100%' : 'auto';
-        svgRoot.style.minHeight = '0px';
-      }
-    }
-
-    if (prompt) prompt.style.display = (!isSvg && !this.webglLoaded) ? 'flex' : 'none';
-
-    if (resizer) resizer.style.display = (isSplit || isTableOpen) ? 'flex' : 'none';
-
-    if (editBar) {
-      const hasContent = editBar.children.length > 0 && (editBar.firstElementChild?.children?.length ?? 0) > 0;
-      editBar.style.display = (hasContent && (isSvg || isSplit) && !isTableOpen) ? 'flex' : 'none';
-    }
-  }
-
-  switchRightTab(tabId) {
-    const tabBtns = this.shellElement.querySelectorAll('[data-action="switch-right-tab"]');
-    const tabGroups = this.shellElement.querySelectorAll('[data-tab-group]');
-    
-    tabBtns.forEach(btn => {
-      const isActive = btn.dataset.tab === tabId;
-      btn.style.background = isActive ? '#0284c7' : 'transparent';
-      btn.style.color = isActive ? '#ffffff' : '#94a3b8';
-      btn.classList.toggle('right-tab-btn--active', isActive);
-    });
-
-    tabGroups.forEach(group => {
-      const isActive = group.dataset.tabGroup === tabId;
-      group.style.display = isActive ? 'flex' : 'none';
-    });
-  }
-
-  handleClick(event) {
-    const popoutBtn = event.target?.closest?.('.accordion-popout-btn');
-    if (popoutBtn && this.shellElement.contains(popoutBtn)) {
-      event.stopPropagation();
-      this.openPopup(popoutBtn.closest('.properties-accordion-section'));
-      return;
-    }
-
-    const popupControl = event.target?.closest?.('[data-action^="popup-"]');
-    if (popupControl && this.shellElement.contains(popupControl)) {
-      const action = popupControl.dataset.action;
-      const win = this.shellElement.querySelector('[data-role="panel-popup-overlay"]');
-      if (action === 'popup-close' || action === 'popup-dock') {
-        this.closePopup();
-      } else if (action === 'popup-maximize' && win) {
-        win.classList.toggle('is-maximized');
-      } else if (action === 'popup-collapse' && win) {
-        win.classList.toggle('is-collapsed');
-        popupControl.textContent = win.classList.contains('is-collapsed') ? '▶' : '▼';
-      }
-      return;
-    }
-
-    const accordionHeader = event.target?.closest?.('.accordion-section-header');
-    if (accordionHeader && this.shellElement.contains(accordionHeader)) {
-      const section = accordionHeader.closest('.properties-accordion-section');
-      if (section) {
-        section.classList.toggle('accordion-collapsed');
-        const icon = accordionHeader.querySelector('.accordion-toggle-icon');
-        if (icon) icon.textContent = section.classList.contains('accordion-collapsed') ? '▶' : '▼';
-      }
-      return;
-    }
-
-    const trigger = event.target?.closest?.('[data-action]');
-    if (!trigger || !this.shellElement.contains(trigger)) return;
-
-    const action = trigger.dataset.action;
-    if (action === 'toggle-tree-collapse') {
-      this.state.treeCollapsed = !this.state.treeCollapsed;
-    } else if (action === 'toggle-properties-collapse') {
-      this.state.propertiesCollapsed = !this.state.propertiesCollapsed;
-    } else if (action === 'switch-viewport-tab') {
-      this.state.activeViewportTab = trigger.dataset.tab;
-    } else if (action === 'switch-right-tab') {
-      this.switchRightTab(trigger.dataset.tab);
-    } else if (action === 'load-webgl-geometry') {
-      this.webglLoaded = true;
-      const btn = this.shellElement.querySelector('.viewport-load-geo-btn');
-      if (btn) {
-        btn.textContent = '✓ 3D Loaded';
-        btn.style.background = '#10b981';
-        btn.style.borderColor = '#34d399';
-      }
-    } else if (action === 'toggle-viewport-table') {
-      const dock = this.shellElement.querySelector('[data-role="viewport-table-dock"]');
-      if (dock) {
-        const isHidden = dock.style.display === 'none';
-        dock.style.display = isHidden ? 'flex' : 'none';
-        dock.style.flexDirection = 'column';
-        const btn = this.shellElement.querySelector('.viewport-table-toggle-btn');
-        if (btn) {
-          btn.style.background = isHidden ? '#0284c7' : '#0f172a';
-          btn.style.color = isHidden ? '#38bdf8' : '#38bdf8';
-        }
-      }
-    } else if (action === 'open-zone-selector') {
-      const dataset = WorkspaceState.dataset || null;
-      showZoneDensitySelectorPopup(dataset, (selectedZones, qualities) => {
-        window.dispatchEvent(new CustomEvent('workspace-zone-filter-changed', { detail: { selectedZones, qualities } }));
-      });
-    }
-    this.applyState();
-    this.saveState();
-    if (['switch-viewport-tab', 'load-webgl-geometry', 'toggle-viewport-table'].includes(action)) {
-      window.dispatchEvent(new Event('resize'));
-    }
-  }
-
-  updateTopBar(context) {
-    const el = this.shellElement.querySelector('[data-role="topbar-dataset"]');
-    if (el) el.textContent = context?.datasetId || 'None Loaded';
-  }
-
-  openPopup(section) {
-    if (!section) return;
-    if (this.poppedSection) this.closePopup();
-    const win = this.shellElement.querySelector('[data-role="panel-popup-overlay"]');
-    const body = win?.querySelector('[data-role="panel-popup-body"]');
-    if (!win || !body) return;
-
-    this.poppedSection = section;
-    section.classList.add('is-popped-out');
-    win.classList.remove('is-collapsed', 'is-maximized');
-    
-    const titleEl = section.querySelector('.accordion-section-title');
-    const title = win.querySelector('[data-role="panel-popup-title"]');
-    if (title && titleEl) title.textContent = titleEl.textContent;
-
-    const colBtn = win.querySelector('[data-action="popup-collapse"]');
-    if (colBtn) colBtn.textContent = '▼';
-
-    const sectionBody = section.querySelector('.accordion-section-body');
-    if (sectionBody) {
-      while (sectionBody.firstChild) body.append(sectionBody.firstChild);
-    }
-    win.style.display = 'flex';
-    this._onEsc = (e) => { if (e.key === 'Escape') this.closePopup(); };
-    document.addEventListener('keydown', this._onEsc);
-  }
-
-  closePopup() {
-    if (!this.poppedSection) return;
-    const win = this.shellElement.querySelector('[data-role="panel-popup-overlay"]');
-    const body = win?.querySelector('[data-role="panel-popup-body"]');
-    const sectionBody = this.poppedSection.querySelector('.accordion-section-body');
-
-    if (body && sectionBody) {
-      while (body.firstChild) sectionBody.append(body.firstChild);
-    }
-    this.poppedSection.classList.remove('is-popped-out');
-    this.poppedSection = null;
-    if (win) win.style.display = 'none';
-    if (this._onEsc) {
-      document.removeEventListener('keydown', this._onEsc);
-      this._onEsc = null;
-    }
-  }
-
-  handlePointerDown(event) {
-    const dragHandle = event.target?.closest?.('[data-role="popup-drag-handle"]');
-    if (dragHandle && !event.target.closest('button')) {
-      event.preventDefault();
-      const win = this.shellElement.querySelector('[data-role="panel-popup-overlay"]');
-      const rect = win.getBoundingClientRect();
-      const startX = event.clientX, startY = event.clientY, startLeft = rect.left, startTop = rect.top;
-      win.style.left = `${startLeft}px`;
-      win.style.top = `${startTop}px`;
-      win.style.transform = 'none';
-
-      this._winMove = (e) => {
-        win.style.left = `${Math.max(0, Math.min(window.innerWidth - 100, startLeft + (e.clientX - startX)))}px`;
-        win.style.top = `${Math.max(0, Math.min(window.innerHeight - 40, startTop + (e.clientY - startY)))}px`;
-      };
-      this._winUp = () => {
-        document.removeEventListener('pointermove', this._winMove);
-        document.removeEventListener('pointerup', this._winUp);
-      };
-      document.addEventListener('pointermove', this._winMove, { passive: false });
-      document.addEventListener('pointerup', this._winUp);
-      return;
-    }
-
-    const resizer = event.target?.closest?.('.panel-resizer');
-    if (!resizer) return;
-
-    event.preventDefault();
-    const action = resizer.dataset.action;
-    const stage = this.shellElement.querySelector('[data-webgl-host]');
-    const tableDock = this.shellElement.querySelector('[data-role="viewport-table-dock"]');
-    const treePanel = this.shellElement.querySelector('.tree-panel');
-    const propertiesPanel = this.shellElement.querySelector('.properties-panel');
-    const isTableOpen = Boolean(tableDock && tableDock.style.display !== 'none' && tableDock.style.display !== '');
-    const startTableHeight = tableDock ? (tableDock.getBoundingClientRect().height || 220) : 220;
-    const startWebglHeight = stage ? (stage.getBoundingClientRect().height || this.state.webglHeight || 350) : 350;
-    const startLeftWidth = treePanel ? (treePanel.getBoundingClientRect().width || this.state.leftPanelWidth || 300) : 300;
-    const startRightWidth = propertiesPanel ? (propertiesPanel.getBoundingClientRect().width || this.state.rightPanelWidth || 350) : 350;
-    
-    this.dragContext = {
-      action,
-      startX: event.clientX,
-      startY: event.clientY,
-      startLeftWidth,
-      startRightWidth,
-      startWebglHeight,
-      startTableHeight,
-      isTableOpen,
-      maxWidth: window.innerWidth * 0.5,
-      pointerId: event.pointerId,
-      resizer: resizer
-    };
-
-    resizer.setPointerCapture(event.pointerId);
-    resizer.classList.add('is-resizing');
-    document.addEventListener('pointermove', this.handlePointerMove, { passive: false });
-    document.addEventListener('pointerup', this.handlePointerUp);
-    this.shellElement.classList.add('is-resizing-active');
-  }
-
-  handlePointerMove(event) {
-    if (!this.dragContext) return;
-    event.preventDefault();
-
-    const { action, startX, startLeftWidth, startRightWidth, maxWidth } = this.dragContext;
-    const deltaX = event.clientX - startX;
-
-    if (action === 'resize-left') {
-      let newWidth = Math.max(MIN_WIDTH, Math.min(startLeftWidth + deltaX, maxWidth));
-      this.state.leftPanelWidth = newWidth;
-      this.shellElement.style.setProperty('--left-panel', `${newWidth}px`);
-    } else if (action === 'resize-right') {
-      let newWidth = Math.max(MIN_WIDTH, Math.min(startRightWidth - deltaX, maxWidth));
-      this.state.rightPanelWidth = newWidth;
-      this.shellElement.style.setProperty('--right-panel', `${newWidth}px`);
-    } else if (action === 'resize-viewport-vertical') {
-      const deltaY = event.clientY - this.dragContext.startY;
-      if (this.dragContext.isTableOpen) {
-        const tableDock = this.shellElement.querySelector('[data-role="viewport-table-dock"]');
-        let newBasis = Math.max(60, Math.min(this.dragContext.startTableHeight - deltaY, window.innerHeight * 0.75));
-        if (tableDock) {
-          tableDock.style.flex = `0 0 ${newBasis}px`;
-          tableDock.style.height = `${newBasis}px`;
-        }
-      } else {
-        let newHeight = Math.max(100, Math.min(this.dragContext.startWebglHeight + deltaY, window.innerHeight * 0.75));
-        this.state.webglHeight = newHeight;
-        const stage = this.shellElement.querySelector('[data-webgl-host]');
-        if (stage) {
-          stage.style.flex = `0 0 ${newHeight}px`;
-          stage.style.height = `${newHeight}px`;
-        }
-      }
-    }
-
-    if (!this._rafResize) {
-      this._rafResize = requestAnimationFrame(() => {
-        window.dispatchEvent(new Event('resize'));
-        this._rafResize = null;
-      });
-    }
-  }
-
-  handlePointerUp(event) {
-    if (!this.dragContext) return;
-    
-    if (this.dragContext.resizer && this.dragContext.pointerId !== undefined) {
-      this.dragContext.resizer.releasePointerCapture(this.dragContext.pointerId);
-      this.dragContext.resizer.classList.remove('is-resizing');
-    }
-    
-    document.removeEventListener('pointermove', this.handlePointerMove);
-    document.removeEventListener('pointerup', this.handlePointerUp);
-    this.dragContext = null;
-    this.shellElement.classList.remove('is-resizing-active');
-    this.saveState();
-    window.dispatchEvent(new Event('resize'));
+    globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify({ leftPanelWidth: this.state.leftPanelWidth, rightPanelWidth: this.state.rightPanelWidth, activeViewportTab: this.state.activeViewportTab }));
   }
 
   destroy() {
-    this.closePopup();
-    if (this.shellElement) {
-      this.shellElement.removeEventListener('pointerdown', this.handlePointerDown);
-      this.shellElement.removeEventListener('click', this.handleClick);
-    }
-    document.removeEventListener('pointermove', this.handlePointerMove);
-    document.removeEventListener('pointerup', this.handlePointerUp);
+    this.pointerUp();
+    this.shellElement?.removeEventListener('pointerdown', this.handlePointerDown);
+    this.shellElement?.removeEventListener('click', this.handleClick);
+    this.rootElement.ownerDocument.removeEventListener('keydown', this.handleKeyDown);
+    this.unsubscribers.forEach((unsubscribe) => unsubscribe());
+    this.unsubscribers = [];
   }
 }
+
+function clamp(value, minimum, maximum) { return Math.max(minimum, Math.min(value, maximum)); }

@@ -12,7 +12,6 @@ import {
   rankXmlCiiWeightCandidates
 } from '../core/weight-valve-hints.js';
 import { saveMasterContextToLocalStorage, xmlCiiEnrichedConfigFromState } from './xml-cii-adapted-state.js';
-import { DEFAULT_WEIGHT_MASTER_ROWS } from '../core/default-weight-master-rows.js';
 
 const WM_CACHE_KEY = 'xml-cii-wm-cache-v1';
 
@@ -34,9 +33,8 @@ function hasWeightMasterRows(config) {
 async function ensureWeightMasterRows(config, masterContext) {
   const out = config && typeof config === 'object' && !Array.isArray(config) ? config : {};
   if (hasWeightMasterRows(out)) return out;
-  const rows = Array.isArray(masterContext?.weightMasterRows) && masterContext.weightMasterRows.length > 0
-    ? masterContext.weightMasterRows
-    : DEFAULT_WEIGHT_MASTER_ROWS;
+  const rows = Array.isArray(masterContext?.weightMasterRows) ? masterContext.weightMasterRows : [];
+  if (!rows.length) throw new Error('Component-weight master is required; import the authoritative master in Master Data.');
   out.weight = out.weight && typeof out.weight === 'object' ? { ...out.weight } : {};
   out.weight.masterRows = rows.map((row) => ({ ...row }));
   return out;

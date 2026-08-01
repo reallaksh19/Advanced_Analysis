@@ -6,7 +6,7 @@ const STAGED_PACKAGE={schema:'inputxml-managed-stage/v1',packageHash:'W10.9-BROW
   {id:'PIPES',name:'Pipes',type:'BRANCH',children:[pipe('PIPE-A',[0,0,0],[1000,0,0]),pipe('PIPE-B',[1000,0,0],[2000,0,0])]},
   {id:'SUPPORTS',name:'Supports',type:'GROUP',children:[support('SUP-START',[0,0,0],'PIPE-A:port:start'),support('SUP-END',[2000,0,0],'PIPE-B:port:end')]},
 ]};
-const NAVIGATION=['Home','Workspace','Load Calc','PCF','Sketcher','3D Calc','Pipe Solver','Local FEA','Reports','QA','Settings','Debug'];
+const NAVIGATION=['Home','Workspace','Edit, Topo fix and Load Calc','PCF','Sketcher','3D Calc','Pipe Solver','Local FEA','Reports','QA','Settings','Debug'];
 const REQUEST_TOPICS=['modelLoad:rebuildRequested','supportLoadScreening:runRequested','applicationView:changeRequested'];
 
 test.beforeEach(async({page})=>{await page.addInitScript(()=>{
@@ -20,7 +20,7 @@ test('adopts exact W10.4 evidence and delegates optional W10.5 actions',async({p
   await page.goto('/');await installEventAudit(page);
   const nav=applicationNavigation(page);
   await expect(nav.getByRole('button')).toHaveText(NAVIGATION);
-  const home=navButton(nav,'Home'),workspace=navButton(nav,'Workspace'),loadCalc=navButton(nav,'Load Calc');
+  const home=navButton(nav,'Home'),workspace=navButton(nav,'Workspace'),loadCalc=navButton(nav,'Edit, Topo fix and Load Calc');
   await expect(home).toHaveAttribute('aria-current','page');
   await home.focus();await page.keyboard.press('ArrowRight');await expect(workspace).toBeFocused();
   await workspace.click();await expect(workspace).toHaveAttribute('aria-current','page');
@@ -84,7 +84,7 @@ test('preserves Workspace, W10.5-W10.7 and Reports state across views',async({pa
   await expect.poll(()=>page.evaluate(()=>AnalysisWorkspace.getActiveModelCalculationPackage()?.semanticHash||null)).not.toBeNull();
   const before=await preservedState(page),actions=await eventCounts(page);
 
-  await navButton(nav,'Load Calc').click();
+  await navButton(nav,'Edit, Topo fix and Load Calc').click();
   await expect(page.locator('[data-role="load-calc-consumer"]')).toContainText('Topology-local tributary screening');
   await navButton(nav,'Reports').click();
   await expect(page.locator('[data-role="reports-consumer"]')).toContainText('SCREENING_AND_VERTICAL_BEAM');
@@ -101,7 +101,7 @@ test('same-ID replacement, clear and teardown remove stale Load Calc state',asyn
   let downloads=0;page.on('download',()=>{downloads+=1;});
   await page.goto('/');await uploadJson(page,'w10.9-first.json',STAGED_PACKAGE);
   const nav=applicationNavigation(page);
-  const loadCalc=navButton(nav,'Load Calc'),workspace=navButton(nav,'Workspace');
+  const loadCalc=navButton(nav,'Edit, Topo fix and Load Calc'),workspace=navButton(nav,'Workspace');
   const datasetId=await page.evaluate(()=>AnalysisWorkspace.getSnapshot().dataset.datasetId);
   await loadCalc.click();
   await uploadJson(page,'w10.9-replacement.json',STAGED_PACKAGE);

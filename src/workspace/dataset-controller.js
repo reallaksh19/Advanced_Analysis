@@ -2,6 +2,7 @@ import { normalizeWorkspaceDataset } from './dataset-adapter.js';
 import { EventBus } from './event-bus.js';
 import { EVENT_TOPICS } from './event-topics.js';
 import { WorkspaceState } from './workspace-state.js';
+import { engineeringModelStore } from './engineering-model-store.js';
 
 export class DatasetController {
   constructor(eventBus = EventBus, workspaceState = WorkspaceState) {
@@ -30,9 +31,9 @@ export class DatasetController {
     this.initialized = true;
   }
 
-  load({ rawPackage, sourceName = '' }) {
+  load({ rawPackage, sourceName = '', sourceBytes = null, sourceSha256 = '' }) {
     try {
-      const dataset = normalizeWorkspaceDataset(rawPackage, sourceName);
+      const dataset = normalizeWorkspaceDataset(rawPackage, sourceName, { sourceBytes, sourceSha256 });
       const snapshot = this.workspaceState.loadDataset(dataset);
       this.publishSnapshot(snapshot);
       this.eventBus.publish(EVENT_TOPICS.DATASET_LOADED, {
@@ -54,7 +55,8 @@ export class DatasetController {
   }
 
   select(entityId, source = 'api', fallbackEntity = null) {
-    const stateEntity = this.workspaceState.selectEntity(entityId);
+    const canonicalEntityId = engineeringModelStore.canonicalEntityId(entityId);
+    const stateEntity = this.workspaceState.selectEntity(canonicalEntityId);
     const entity = stateEntity || fallbackEntity;
     if (!entity) return null;
 

@@ -1,38 +1,45 @@
 import * as THREE from 'three';
-import { createStandardMaterial } from './three-object-materials.js';
+import { createLineMaterial, createStandardMaterial } from './three-object-materials.js';
 
-function vector(point) {
-  return new THREE.Vector3(point?.x || 0, point?.y || 0, point?.z || 0);
+export function createSourceCenterline(startPoint, endPoint, color) {
+  const start = vector(startPoint);
+  const end = vector(endPoint);
+  const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
+  return new THREE.Line(geometry, createLineMaterial(color));
 }
 
-export function createPipeTube(primitive, color) {
+/** Creates a physical tube only when source diameter and mesh quality exist. */
+export function createPipeTube(primitive, color, settings) {
+  const diameter = positive(primitive.visualDiameterMm);
+  const segments = segmentCount(settings?.meshRadialSegments);
+  if (diameter === null || segments === null) return createSourceCenterline(primitive.start, primitive.end, color);
   const start = vector(primitive.start);
   const end = vector(primitive.end);
   const direction = new THREE.Vector3().subVectors(end, start);
-  const length = Math.max(direction.length(), 1e-6);
-  const radius = Math.max(Number(primitive.visualDiameterMm) / 2 || 0.5, 0.1);
-  
-  const geometry = new THREE.CylinderGeometry(radius, radius, length, 20, 1, false);
-  const mesh = new THREE.Mesh(geometry, createStandardMaterial(color));
-  
+  const length = direction.length();
+  if (!(length > 0)) return null;
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(diameter / 2, diameter / 2, length, segments, 1, false), createStandardMaterial(color));
   mesh.position.copy(start).add(end).multiplyScalar(0.5);
   mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
-  
   return mesh;
 }
 
-export function createBendArc(primitive, color) {
-  if (!primitive.path || primitive.path.length < 2) {
-    // Fallback to straight tube if path is missing
-    return createPipeTube(primitive, color);
+export function createBendArc(primitive, color, settings) {
+  if (!Array.isArray(primitive.path) || primitive.path.length < 2) return createSourceCenterline(primitive.start, primitive.end, color);
+  const diameter = positive(primitive.visualDiameterMm);
+  const segments = segmentCount(settings?.meshRadialSegments);
+  if (diameter === null || segments === null) {
+    const geometry = new THREE.BufferGeometry().setFromPoints(primitive.path.map(vector));
+    return new THREE.Line(geometry, createLineMaterial(color));
   }
-
-  const points = primitive.path.map(vector);
-  const curve = new THREE.CatmullRomCurve3(points, false, 'centripetal');
-  const radius = Math.max(Number(primitive.visualDiameterMm) / 2 || 0.5, 0.1);
-  
-  return new THREE.Mesh(
-    new THREE.TubeGeometry(curve, Math.max(points.length * 2, 12), radius, 16, false),
-    createStandardMaterial(color),
-  );
+  const curve = new THREE.CatmullRomCurve3(primitive.path.map(vector), false, 'centripetal');
+  return new THREE.Mesh(new THREE.TubeGeometry(curve, primitive.path.length, diameter / 2, segments, false), createStandardMaterial(color));
 }
+
+export function vector(point) {
+  if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y) || !Number.isFinite(point.z)) throw new TypeError('Three primitive requires a finite source coordinate.');
+  return new THREE.Vector3(point.x, point.y, point.z);
+}
+
+export function segmentCount(value) { return Number.isInteger(value) && value >= 3 ? value : null; }
+function positive(value) { return Number.isFinite(value) && value > 0 ? value : null; }

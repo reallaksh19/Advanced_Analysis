@@ -35,12 +35,15 @@ export function createEngineeringCoordinateSystem(cs = {}) {
   });
 }
 
-export function createEngineeringSceneEntity(input = {}) {
+export function createEngineeringSceneEntity(input) {
+  if (!input || typeof input !== 'object') throw new TypeError('Engineering scene entity input is required.');
   const id = String(input.id || '').trim();
-  const kind = String(input.kind || 'segment').trim();
+  const kind = String(input.kind || '').trim();
+  if (!id) throw new TypeError('Engineering scene entity id is required.');
+  if (!kind) throw new TypeError('Engineering scene entity kind is required.');
   return freezeJsonValue({
     schema: ENGINEERING_SCENE_ENTITY_SCHEMA,
-    id: id || `entity-${Math.random().toString(36).slice(2, 9)}`,
+    id,
     kind,
     domainType: String(input.domainType || kind).trim(),
     geometry: input.geometry || null,

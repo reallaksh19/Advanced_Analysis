@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const NAVIGATION = ['Home','Workspace','Load Calc','PCF','Sketcher','3D Calc','Pipe Solver','Local FEA','Reports','QA','Settings','Debug'];
+const NAVIGATION = ['Home','Workspace','Edit, Topo fix and Load Calc','PCF','Sketcher','3D Calc','Pipe Solver','Local FEA','Reports','QA','Settings','Debug'];
 const DATASET = {
   schema:'rvm-selected-geometry-workspace-package/v1',
   packageHash:'QA-<img src=x onerror=globalThis.__qaUnsafe=1>',

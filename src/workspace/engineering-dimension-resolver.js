@@ -22,6 +22,7 @@ const FIELD_ALIASES = Object.freeze({
   flangeThicknessMm: ['flangeThicknessMm', 'flangeThickness', 'FLANGE_THICKNESS', 'FLANGE_WIDTH'],
   valveBodyDiameterMm: ['valveBodyDiameterMm', 'valveBodyDiameter', 'VALVE_BODY_DIAMETER', 'BODY_DIAMETER'],
   valveLengthMm: ['valveLengthMm', 'valveLength', 'VALVE_LENGTH', 'FACE_TO_FACE', 'FACE_TO_FACE_MM'],
+  componentLengthMm: ['componentLengthMm', 'CATALOG_LENGTH_MM'],
   supportSizeMm: ['supportSizeMm', 'supportSize', 'SUPPORT_SIZE', 'SHOE_HEIGHT', 'GUIDE_HEIGHT'],
 });
 

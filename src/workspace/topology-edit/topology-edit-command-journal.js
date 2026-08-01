@@ -5,6 +5,8 @@
  * replay, state recovery, and source immutability verification.
  */
 
+import { semanticHash } from '../../core/shared-piping-model/index.js';
+
 export class TopologyEditCommandJournal {
   constructor(initialState = {}) {
     this.initialState = Object.freeze(JSON.parse(JSON.stringify(initialState)));
@@ -22,11 +24,16 @@ export class TopologyEditCommandJournal {
       this.entries = this.entries.slice(0, this.pointer + 1);
     }
 
+    const payload = Object.freeze(JSON.parse(JSON.stringify(command.payload || {})));
+    // Deterministic, replayable ID — sequence-derived, never Math.random()
+    // (the port's own P0 rule explicitly bans random identity generation,
+    // since it makes replay/export byte-reproducibility impossible to verify).
+    const id = `cmd:${semanticHash({ sequence: this.entries.length, type: command.type, payload }).slice(0, 20)}`;
     const entry = Object.freeze({
-      id: `cmd-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      id,
       timestamp: Date.now(),
       type: command.type,
-      payload: Object.freeze(JSON.parse(JSON.stringify(command.payload || {}))),
+      payload,
     });
 
     this.entries.push(entry);

@@ -18,32 +18,14 @@ export function renderPropertiesContent(
   searchQuery = ''
 ) {
   const fragment = documentRef.createDocumentFragment();
-  const activeSelection = (selection && selection.entityId && selection.entityId !== 'Unknown entity') ? selection : {
-    entityId: 'SUPP-101',
-    name: 'Piping Support SUPP-101',
-    entityType: 'SUPPORT',
-    category: 'support',
-    properties: {
-      'Primitive ID': 'SUPP-101',
-      'Entity Type': 'SUPPORT / RESTRAINT',
-      'Calculated Load Fy': '-30.80 kN',
-      'Calculated Load Fx': '-0.50 kN',
-      'Calculated Load Fz': '-0.20 kN',
-      'Bending Moment Mx': '1.45 kNm',
-      'Torsional Moment My': '0.12 kNm',
-      'In-Plane Moment Mz': '2.80 kNm',
-      'Qualification Status': 'QUALIFIED 5/5 (PASS)',
-      'Material Spec': 'A106-B Carbon Steel',
-      'Nominal Size': '8 in (DN200)',
-      'Wall Thickness': '0.322 in (SCH 40)',
-      'Design Pressure': '150 psi (10.3 bar)',
-      'Design Temperature': '350 °F (176.7 °C)',
-      'Tributary Length': '12.4 ft (3.78 m)',
-      'Spring Stiffness': '450 N/mm',
-      'Allowable Load Limit': '45.0 kN',
-      'Margin Utilization': '68.4% (PASS)'
-    }
-  };
+  if (!selection || !selection.entityId || selection.entityId === 'Unknown entity') {
+    const empty = documentRef.createElement('p');
+    empty.className = 'panel-empty';
+    empty.textContent = 'Select a source entity or canonical support site.';
+    fragment.append(empty);
+    return fragment;
+  }
+  const activeSelection = selection;
 
   const entityType = (activeSelection.entityType || activeSelection.type || 'COMPONENT').toUpperCase();
   const entityObj = activeSelection.entity || {

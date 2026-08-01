@@ -46,6 +46,10 @@ import { renderWorkspaceLayout } from './workspace-layout.js';
 import { WorkspaceState } from './workspace-state.js';
 import { WorkspaceShellController } from './workspace-shell-controller.js';
 import { SequentialSketcherController } from './sequential-sketcher/sequential-sketcher-controller.js';
+import { EngineeringModelController } from './engineering-model-controller.js';
+import { engineeringModelStore } from './engineering-model-store.js';
+import { projectDataStore } from './project-data/project-data-store.js';
+import { masterDataController } from './master-data-controller.js';
 
 export function requireUniqueRoot(root, selector) {
   const matches = root.querySelectorAll(selector);
@@ -67,6 +71,7 @@ export function bootstrapAnalysisWorkspace(rootElement) {
   const settingsPersistence = new SettingsPersistenceAdapter(rootElement.ownerDocument.defaultView?.localStorage);
   const settingsController = new SettingsController(rootElement.querySelector('[data-role="settings-consumer-root"]'),EventBus,settingsPersistence,() => ({ materializedContractKeys: workspaceConsumerController.getContext()?.availabilitySummary?.availableContractKeys || [] }));
   const datasetController = new DatasetController(EventBus, WorkspaceState);
+  const engineeringModelController = new EngineeringModelController(EventBus, WorkspaceState, masterDataController);
   const sharedModelController = new SharedModelController(EventBus, WorkspaceState, rootElement.ownerDocument);
   const topologyController = new TopologyController(EventBus, TopologyStore, rootElement.ownerDocument);
   const supportRestraintController = new SupportRestraintController(EventBus, SupportRestraintStore, TopologyStore, rootElement.ownerDocument);
@@ -113,7 +118,7 @@ export function bootstrapAnalysisWorkspace(rootElement) {
   const firstCutWorkbenchLauncherController = new FirstCutWorkbenchLauncherController(rootElement);
   const sequentialSketcherRoot = rootElement.querySelector('[data-role="sequential-sketcher-root"]');
   const sequentialSketcherController = sequentialSketcherRoot ? new SequentialSketcherController(sequentialSketcherRoot, EventBus, WorkspaceState) : null;
-  const controllers = [workspaceShellController,firstCutWorkbenchController,firstCutWorkbenchLauncherController,datasetController,sharedModelController,topologyController,supportRestraintController,modelLoadController,supportLoadScreeningController,verticalBeamController,modelCalculationController,modelSupportLoadController,sessionController,analysisCoordinator,ledgerController,treePanel,viewportPanel,sharedModelPanel,topologyPanel,supportRestraintPanel,modelLoadPanel,supportLoadScreeningPanel,verticalBeamPanel,modelCalculationPanel,modelSupportLoadPanel,propertiesPanel,workspaceConsumerController,settingsController,applicationShellController,tabBenchmarkStatusController,sequentialSketcherController].filter(Boolean);
+  const controllers = [workspaceShellController,firstCutWorkbenchController,firstCutWorkbenchLauncherController,datasetController,engineeringModelController,sharedModelController,topologyController,supportRestraintController,modelLoadController,supportLoadScreeningController,verticalBeamController,modelCalculationController,modelSupportLoadController,sessionController,analysisCoordinator,ledgerController,treePanel,viewportPanel,sharedModelPanel,topologyPanel,supportRestraintPanel,modelLoadPanel,supportLoadScreeningPanel,verticalBeamPanel,modelCalculationPanel,modelSupportLoadPanel,propertiesPanel,workspaceConsumerController,settingsController,applicationShellController,tabBenchmarkStatusController,sequentialSketcherController].filter(Boolean);
   controllers.forEach((controller) => controller.init());
   globalThis.EventBus = EventBus;
   return Object.freeze({
@@ -129,6 +134,10 @@ export function bootstrapAnalysisWorkspace(rootElement) {
     getEngineeringSettingsProfile(){return settingsController.getProfile();},getEngineeringSettingsAudit(){return settingsController.getAudit();},getSettingsReviewModel(){return settingsController.getReviewModel();},
     getWorkspaceConsumerContext(){return workspaceConsumerController.getContext();},listWorkspaceConsumers(){return applicationShellController.getRegistry().consumers;},getWorkspaceConsumerReadiness(consumerId){return applicationShellController.getReadiness(consumerId);},getApplicationViewState(){return applicationShellController.getPublicState();},activateApplicationView(viewId){return applicationShellController.activate(viewId);},
     getLoadCalculationReviewModel(){return applicationShellController.getLoadCalculationReviewModel();},
+    getProjectDataProfile(){return projectDataStore.getProfile();},
+    getSupportSiteModel(){return engineeringModelStore.getSupportSiteModel();},
+    getRoutePartitionModel(){return engineeringModelStore.getRoutePartitionModel();},
+    getEngineeringSupportLoadDistribution(){return engineeringModelStore.getDistribution();},
     getLafeaWorkbenchState(){return applicationShellController.getLafeaWorkbenchState();},getLfeaWorkbenchState(){return applicationShellController.getLfeaWorkbenchState();},
     importLafeaDocument(value,stageId){return lafeaWorkbenchController.importDocument(value,stageId);},exportLafeaDocument(){return lafeaWorkbenchController.exportDocument();},runLafea(){return lafeaWorkbenchController.run();},undoLafea(){return lafeaWorkbenchController.undo();},redoLafea(){return lafeaWorkbenchController.redo();},
     importLfeaDocument(value){return lfeaWorkbenchController.importDocument(value);},exportLfeaDocument(){return lfeaWorkbenchController.exportDocument();},exportLfeaEvidence(){return lfeaWorkbenchController.exportEvidence();},runLfea(){return lfeaWorkbenchController.run();},undoLfea(){return lfeaWorkbenchController.undo();},redoLfea(){return lfeaWorkbenchController.redo();},

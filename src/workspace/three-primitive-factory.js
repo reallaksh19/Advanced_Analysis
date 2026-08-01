@@ -12,20 +12,21 @@ export function createThreePrimitive(renderItem) {
     case 'PIPE_TUBE':
     case 'TEE_LEG':
     case 'TEE_BRANCH':
-      object = createPipeTube(primitive, color);
+      object = createPipeTube(primitive, color, renderItem.renderSettings);
       break;
     case 'BEND_ARC':
-      object = createBendArc(primitive, color);
+    case 'BEND_CENTERLINE':
+      object = createBendArc(primitive, color, renderItem.renderSettings);
       break;
     case 'REDUCER_FRUSTUM':
     case 'OLET_FRUSTUM':
-      object = createFrustum(primitive, color);
+      object = createFrustum(primitive, color, renderItem.renderSettings);
       break;
     case 'FLANGE_DISC':
-      object = createDisc(primitive, color);
+      object = createDisc(primitive, color, renderItem.renderSettings);
       break;
     case 'VALVE_BODY':
-      object = createValveBody(primitive, color);
+      object = createValveBody(primitive, color, renderItem.renderSettings);
       break;
     case 'SUPPORT_MARKER':
       object = createSupportSymbol(primitive, color);
