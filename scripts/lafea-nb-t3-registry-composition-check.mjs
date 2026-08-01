@@ -79,7 +79,7 @@ for (const [stageId, fixtureFactory] of Object.entries(FIXTURES)) {
   const facade = executeLafeaStage(stageId, source);
   assert.deepEqual(facade, composed);
   assert.equal(composed.status, 'QUALIFIED');
-  assert.equal(composed.authorityPathId, requireLafeaStageRegistryEntry(stageId).authorityPathId);
+  assert.equal('authorityPathId' in composed, false);
   assert.equal(composed.diagnostics.length, 0);
 }
 
@@ -88,7 +88,7 @@ const weld = executeLafeaStage('LAFEA.6', {
   identity: 'WELD-NOT-IMPLEMENTED',
 });
 assert.equal(weld.status, 'FAILED');
-assert.equal(weld.authorityPathId, 'LAFEA.6/UNSUPPORTED/WELD_PROFILE_PLACEHOLDER/V1');
+assert.equal('authorityPathId' in weld, false);
 assert.equal(weld.diagnostics[0].code, 'UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED');
 assert.deepEqual(requireLafeaStageRegistryEntry('LAFEA.6').benchmarkManifestIds, []);
 
@@ -122,6 +122,7 @@ console.log(JSON.stringify({
   releaseStateBinding: 'RELEASE_NOT_QUALIFIED',
   automaticReleasePromotion: false,
   workbenchDispatchOwnedByCompositionRoot: true,
+  executionContractChanged: false,
   numericalAuthorityChanged: false,
   shellAuthorityChanged: false,
   lafea6Enabled: false,
