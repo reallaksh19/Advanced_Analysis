@@ -143,7 +143,6 @@ export function executeLafeaComposedStage(stageId, document) {
   if (composition.engineState !== 'QUALIFIED_ROUTE_REGISTERED') {
     return freezeClone({
       stageId,
-      authorityPathId: composition.authorityPathId,
       status: 'FAILED',
       source: null,
       canonicalInput: null,
@@ -158,7 +157,6 @@ export function executeLafeaComposedStage(stageId, document) {
     const accepted = composition.acceptanceEvaluator(result);
     return freezeClone({
       stageId,
-      authorityPathId: composition.authorityPathId,
       status: accepted ? 'QUALIFIED' : 'FAILED',
       source,
       canonicalInput,
@@ -168,7 +166,6 @@ export function executeLafeaComposedStage(stageId, document) {
   } catch (error) {
     return freezeClone({
       stageId,
-      authorityPathId: composition.authorityPathId,
       status: 'FAILED',
       source: null,
       canonicalInput: null,
