@@ -9,7 +9,7 @@ import { MODEL_LOAD_EVENTS } from './model-load-events.js';
 import { SUPPORT_LOAD_SCREENING_EVENTS } from './support-load-screening-events.js';
 import { SHARED_MODEL_EVENTS } from './shared-model-events.js';
 import { TOPOLOGY_EVENTS } from './topology-events.js';
-import { renderLoadCalcConsumer } from './load-calc-consumer-view.js';
+import { renderLoadCalcConsumer, renderSidebarSummary } from './load-calc-consumer-view.js';
 import { renderProjectConfiguration, renderPreflightGrid } from './lfea-preflight-ui.js';
 import { renderMasterDataUI } from './master-data-ui.js';
 import { renderJsonTraceUI } from './json-trace-ui.js';

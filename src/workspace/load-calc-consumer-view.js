@@ -180,7 +180,7 @@ function availableMarkup(model, activeCaseId, uiState) {
   `;
 }
 
-function renderSidebarSummary(activeCase, model) {
+export function renderSidebarSummary(activeCase, model) {
   if (!activeCase) return '<p class="panel-empty">No load cases.</p>';
   
   // Calculate branches and supports if possible
