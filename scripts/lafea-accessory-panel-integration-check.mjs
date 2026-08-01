@@ -16,6 +16,38 @@ import {
   validateLafeaAccessoryPanelDescriptor,
 } from '../src/workspace/lafea-workbench-accessory-panels.js';
 
+class FakeDocument {
+  constructor() {
+    this.head = new FakeElement('head', this);
+    this.body = new FakeElement('body', this);
+  }
+
+  createElement(tagName) { return new FakeElement(tagName, this); }
+  querySelector() { return null; }
+}
+
+class FakeElement {
+  constructor(tagName, ownerDocument) {
+    this.tagName = tagName.toUpperCase();
+    this.ownerDocument = ownerDocument;
+    this.dataset = {};
+    this.children = [];
+    this.attributes = {};
+    this.style = {};
+    this.classList = { add() {}, remove() {} };
+    this.hidden = false;
+    this.textContent = '';
+  }
+
+  append(...nodes) { this.children.push(...nodes); }
+  replaceChildren(...nodes) { this.children = [...nodes]; }
+  setAttribute(name, value) { this.attributes[name] = String(value); }
+}
+
+class FakeRoot extends FakeElement {
+  constructor(ownerDocument) { super('main', ownerDocument); }
+}
+
 assert.equal(publicPanelSchema, LAFEA_WORKBENCH_ACCESSORY_PANEL_SCHEMA);
 assert.equal(publicHostSchema, LAFEA_WORKBENCH_ACCESSORY_HOST_SCHEMA);
 assert.equal(publicDiagnosticSchema, LAFEA_WORKBENCH_ACCESSORY_DIAGNOSTIC_SCHEMA);
@@ -66,35 +98,3 @@ console.log(JSON.stringify({
   publicContractIdentity: true,
   controllerDestroyIdempotent: true,
 }));
-
-class FakeDocument {
-  constructor() {
-    this.head = new FakeElement('head', this);
-    this.body = new FakeElement('body', this);
-  }
-
-  createElement(tagName) { return new FakeElement(tagName, this); }
-  querySelector() { return null; }
-}
-
-class FakeRoot extends FakeElement {
-  constructor(ownerDocument) { super('main', ownerDocument); }
-}
-
-class FakeElement {
-  constructor(tagName, ownerDocument) {
-    this.tagName = tagName.toUpperCase();
-    this.ownerDocument = ownerDocument;
-    this.dataset = {};
-    this.children = [];
-    this.attributes = {};
-    this.style = {};
-    this.classList = { add() {}, remove() {} };
-    this.hidden = false;
-    this.textContent = '';
-  }
-
-  append(...nodes) { this.children.push(...nodes); }
-  replaceChildren(...nodes) { this.children = [...nodes]; }
-  setAttribute(name, value) { this.attributes[name] = String(value); }
-}
