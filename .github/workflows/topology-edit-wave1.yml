@@ -15,8 +15,8 @@ permissions:
   contents: read
 
 jobs:
-  pure-kernel:
-    name: W1.1 pure command kernel
+  certified-kernel:
+    name: W1.2 candidate certification
     runs-on: ubuntu-24.04
     env:
       TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -48,13 +48,20 @@ jobs:
 
       - name: Syntax
         run: |
+          node --check src/workspace/topology-edit/topology-edit-authority-receipt.js
+          node --check src/workspace/topology-edit/topology-edit-candidate-builder.js
+          node --check src/workspace/topology-edit/topology-edit-candidate-validator.js
           node --check src/workspace/topology-edit/topology-edit-canonical-state.js
+          node --check src/workspace/topology-edit/topology-edit-certification-service.js
           node --check src/workspace/topology-edit/topology-edit-command-contract.js
           node --check src/workspace/topology-edit/topology-edit-command-resolver.js
           node --check src/workspace/topology-edit/topology-edit-pure-reducer.js
 
-      - name: Pure kernel contracts
+      - name: W1.1 pure kernel contracts
         run: node --test tests/topology-edit-wave1-pure-kernel.test.mjs
+
+      - name: W1.2 candidate certification contracts
+        run: node --test tests/topology-edit-wave1-candidate-certification.test.mjs
 
       - name: Bounded phase-one smoke contracts
         run: node tests/topology-edit-anti-drift.test.js
@@ -66,7 +73,7 @@ jobs:
           import { writeFile } from 'node:fs/promises';
           const evidence = {
             schema: 'TopologyEditWave1SliceEvidence.v1',
-            slice: 'W1.1',
+            slice: 'W1.2',
             repository: process.env.GITHUB_REPOSITORY,
             commit: process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA,
             sourceCommit: process.env.TOPOLOGY_EDIT_SOURCE_COMPARATOR,
@@ -75,18 +82,21 @@ jobs:
               'source-authority-drift',
               'api-and-disposition-drift',
               'prohibited-imports-and-cycles',
-              'pure-kernel-syntax',
+              'certified-kernel-syntax',
               'seven-command-pure-kernel-contracts',
+              'complete-candidate-regeneration',
+              'structural-and-checker-policy-validation',
+              'deterministic-acceptance-and-rejection-receipts',
               'bounded-phase-one-smoke',
             ],
           };
-          await writeFile('reports/qualification/topology-edit-wave1-w1.1-evidence.json', `${JSON.stringify(evidence, null, 2)}\n`);
+          await writeFile('reports/qualification/topology-edit-wave1-w1.2-evidence.json', `${JSON.stringify(evidence, null, 2)}\n`);
           NODE
 
       - name: Upload exact-head slice evidence
         uses: actions/upload-artifact@v4
         with:
-          name: topology-edit-wave1-w1.1-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
-          path: reports/qualification/topology-edit-wave1-w1.1-evidence.json
+          name: topology-edit-wave1-w1.2-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          path: reports/qualification/topology-edit-wave1-w1.2-evidence.json
           if-no-files-found: error
           retention-days: 30
