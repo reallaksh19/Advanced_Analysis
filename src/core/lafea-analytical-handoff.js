@@ -81,6 +81,7 @@ export function validateLafeaAnalyticalHandoff(input) {
     throw handoffError('HANDOFF_TARGET_HASH_MISMATCH', 'targetCanonicalModelHash');
   }
   normalizeBindings(copy.targetLoadBindings, target.loadCaseIds);
+  normalizeResultant(copy.resultant);
   rejectStressAuthority(copy.governingRecord, 'governingRecord');
   if (copy.qualification?.targetEngineExecuted !== false
     || copy.qualification?.releaseQualified !== false) {
@@ -138,8 +139,11 @@ function targetEvidence(model, ids) {
 }
 
 function normalizeResultant(value) {
-  const row = exactRecord(value, ['referencePoint', 'force', 'moment'], 'resultant');
+  const row = exactRecord(value,
+    ['coordinateSystem', 'referencePoint', 'force', 'moment'], 'resultant');
   return {
+    coordinateSystem: member(row.coordinateSystem, ['GLOBAL', 'PIPE_LOCAL'],
+      'resultant.coordinateSystem'),
     referencePoint: vector3(row.referencePoint, 'resultant.referencePoint'),
     force: vector3(row.force, 'resultant.force'),
     moment: vector3(row.moment, 'resultant.moment'),
