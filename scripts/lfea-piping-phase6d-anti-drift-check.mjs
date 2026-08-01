@@ -95,7 +95,10 @@ for (const gate of [
 assert.match(policy, /lfea-piping-phase6c-anti-drift-check\.mjs/u);
 assert.match(policy, /lfea-piping-phase6d-anti-drift-check\.mjs/u);
 assert.match(policy, /validateInternalReleaseEvidence/u);
-assert.match(orchestrator, /requireExactKeys\(evidence\.artifacts, REQUIRED_ARTIFACTS/u);
+assert.match(
+  orchestrator,
+  /requireExactKeys\([\s\S]*?evidence\.artifacts,[\s\S]*?REQUIRED_ARTIFACTS/u,
+);
 assert.match(orchestrator, /requireEligibleIntake\(internal, 'INTERNAL'/u);
 
 await import('./lfea-piping-internal-release-evidence-check-check.mjs');

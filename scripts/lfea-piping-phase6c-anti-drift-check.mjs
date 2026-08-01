@@ -64,7 +64,10 @@ assert.equal(release.artifacts.externalQualificationPackage, null);
 assert.match(policy, /lfea-piping-phase6c-anti-drift-check\.mjs/u);
 assert.match(policy, /validateExternalReleaseEvidence/u);
 assert.match(orchestrator, /'externalQualificationPackage'/u);
-assert.match(orchestrator, /requireExactKeys\(evidence\.artifacts, REQUIRED_ARTIFACTS/u);
+assert.match(
+  orchestrator,
+  /requireExactKeys\([\s\S]*?evidence\.artifacts,[\s\S]*?REQUIRED_ARTIFACTS/u,
+);
 assert.match(orchestrator, /requireEligibleIntake\(external, 'EXTERNAL'/u);
 
 await import('./lfea-piping-external-release-evidence-check-check.mjs');
