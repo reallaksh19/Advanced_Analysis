@@ -1,0 +1,79 @@
+name: Sequential Sketcher Edit Certification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/sequential-sketcher-edit.yml'
+      - 'scripts/sequential-sketcher-edit-check.mjs'
+      - 'src/workspace/dataset-adapter.js'
+      - 'src/workspace/dataset-utils.js'
+      - 'src/workspace/geometry-evidence.js'
+      - 'src/workspace/sequential-sketcher/**'
+      - 'src/core/shared-piping-model/**'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/sequential-sketcher-edit.yml'
+      - 'scripts/sequential-sketcher-edit-check.mjs'
+      - 'src/workspace/dataset-adapter.js'
+      - 'src/workspace/dataset-utils.js'
+      - 'src/workspace/geometry-evidence.js'
+      - 'src/workspace/sequential-sketcher/**'
+      - 'src/core/shared-piping-model/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sequential-sketcher-edit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  certify:
+    name: Portable sequential edit contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Assert exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          git merge-base --is-ancestor "$BASE_SHA" "$EXPECTED_HEAD_SHA"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install locked dependencies
+        shell: bash
+        run: npm ci
+
+      - name: Run sequential edit contract
+        shell: bash
+        run: node scripts/sequential-sketcher-edit-check.mjs
+
+      - name: Run strict syntax
+        shell: bash
+        run: npm run syntax:strict
+
+      - name: Verify patch hygiene and tracked clean tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check "$BASE_SHA...HEAD"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
