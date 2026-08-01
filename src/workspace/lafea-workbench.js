@@ -5,6 +5,7 @@ import { LAFEA_WORKBENCH_STYLES, lafeaWorkbenchStyles } from './lafea-workbench-
 export { LafeaWorkbenchController };
 export { LAFEA_WORKBENCH_STYLES, lafeaWorkbenchStyles };
 export {
+  LAFEA_COMPONENT_ROLES,
   LAFEA_ENGINE_STATES,
   LAFEA_PREVIEW_POLICIES,
   LAFEA_STAGE_CATEGORIES,
@@ -12,11 +13,35 @@ export {
   LAFEA_STAGE_IDS,
   LAFEA_STAGE_REGISTRY,
   LAFEA_STAGE_REGISTRY_SCHEMA,
+  LAFEA_STAGE_RELEASE_GATE_POLICIES,
+  LAFEA_STAGE_RELEASE_STATES,
+  lafeaRegisteredBenchmarkManifestId,
   lafeaRegisteredCollectionPaths,
+  lafeaRegisteredComponentIds,
+  lafeaRegisteredCompositionRootId,
   lafeaRegisteredExecutionSupported,
+  lafeaRegisteredLifecycleProfileId,
   lafeaRegisteredPreviewSource,
+  lafeaRegisteredReleaseState,
   requireLafeaStageRegistryEntry,
 } from './lafea-stage-registry.js';
+export {
+  LAFEA_STAGE_COMPOSITION_METADATA,
+  LAFEA_STAGE_COMPOSITION_SCHEMA,
+} from './lafea-stage-composition-root.js';
+export {
+  LAFEA_BENCHMARK_GATE_CATALOG,
+  LAFEA_BENCHMARK_GATE_SCHEMA,
+  LAFEA_BENCHMARK_GATE_STATUSES,
+  LAFEA_BENCHMARK_MANIFEST_QUALIFICATION_STATES,
+  LAFEA_REQUIRED_ANTI_DRIFT_GATE_IDS,
+  LAFEA_REQUIRED_BENCHMARK_GATE_IDS,
+  LAFEA_STAGE_BENCHMARK_MANIFEST_IDS,
+  LAFEA_STAGE_BENCHMARK_MANIFEST_SCHEMA,
+  LAFEA_STAGE_BENCHMARK_MANIFESTS,
+  requireLafeaBenchmarkGate,
+  requireLafeaStageBenchmarkManifest,
+} from './lafea-stage-benchmark-manifests.js';
 export {
   LAFEA_LIFECYCLE_PROFILE_IDS,
   LAFEA_LIFECYCLE_PROFILE_SCHEMA,
