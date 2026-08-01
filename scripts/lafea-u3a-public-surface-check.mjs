@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
+import * as analyticalProducts from '../src/workspace/lafea-analytical-product-producers.js';
 import * as compositionBindings from '../src/workspace/lafea-stage-composition-bindings.js';
 import * as compositionRoot from '../src/workspace/lafea-stage-composition-root.js';
 import * as hash from '../src/workspace/lafea-canonical-sha256.js';
@@ -56,6 +57,11 @@ const groups = Object.freeze([
     'LAFEA_PRODUCER_BATCH_SCHEMA', 'LAFEA_PRODUCER_REVISION',
     'createLafeaLifecycleProducerBatch', 'registerLafeaLifecycleProducerBatch',
   ]],
+  [analyticalProducts, [
+    'LAFEA_ANALYTICAL_PRODUCT_BATCH_SCHEMA',
+    'LAFEA_ANALYTICAL_PRODUCT_PRODUCER_REVISION',
+    'createLafeaAnalyticalProductBatch', 'registerLafeaAnalyticalProductBatch',
+  ]],
   [store, [
     'LAFEA_CALCULATION_STATES', 'LAFEA_CODE_STATES',
     'LAFEA_LIFECYCLE_BINDING_SCHEMA', 'LAFEA_LIFECYCLE_BINDING_STATUSES',
@@ -76,16 +82,21 @@ for (const [module, names] of groups) {
 
 assert.equal(publicApi.LAFEA_STAGE_REGISTRY_SCHEMA, 'lafea-stage-registry/v2');
 assert.equal(publicApi.LAFEA_STAGE_COMPOSITION_BINDING_SCHEMA,
-  'lafea-stage-composition-binding/v1');
-assert.equal(publicApi.LAFEA_STAGE_COMPOSITION_SCHEMA, 'lafea-stage-composition/v1');
+  'lafea-stage-composition-binding/v2');
+assert.equal(publicApi.LAFEA_STAGE_COMPOSITION_SCHEMA, 'lafea-stage-composition/v2');
 assert.equal(publicApi.LAFEA_LIFECYCLE_SCHEMA, 'lafea-analysis-lifecycle/v2');
 assert.equal(publicApi.LAFEA_SOURCE_AUTHORITY_SCHEMA, 'lafea-source-authority/v1');
 assert.equal(publicApi.LAFEA_PRODUCER_BATCH_SCHEMA, 'lafea-lifecycle-producer-batch/v1');
+assert.equal(publicApi.LAFEA_ANALYTICAL_PRODUCT_BATCH_SCHEMA,
+  'lafea-analytical-product-batch/v1');
 assert.equal(publicApi.LAFEA_WORKBENCH_STATE_SCHEMA, 'lafea-workbench-state/v2');
 assert.equal(publicApi.requireLafeaStageComposition('LAFEA.1').releaseStateBinding,
   'RELEASE_NOT_QUALIFIED');
+assert.equal(publicApi.requireLafeaStageComposition('LAFEA.1').productSupported, true);
+assert.equal(publicApi.requireLafeaStageComposition('LAFEA.2').productSupported, true);
 assert.deepEqual(publicApi.lafeaLifecycleArtifactKinds('LAFEA.1'), [
-  'CANONICAL_MODEL', 'EXECUTION', 'RESULT_EVIDENCE', 'REPORT_EVIDENCE',
+  'CANONICAL_MODEL', 'EXECUTION', 'RESULT_EVIDENCE',
+  'FOUNDATION_DISTRIBUTION', 'REPORT_EVIDENCE',
 ]);
 assert.deepEqual(publicApi.lafeaLifecycleArtifactKinds('LAFEA.6'), []);
 
@@ -95,6 +106,7 @@ console.log(JSON.stringify({
   exportedContracts: exported,
   sourceAuthorityPublic: true,
   producerAdaptersPublic: true,
+  analyticalProductProducersPublic: true,
   calculationResultCodeReleaseStatesPublic: true,
   stageCorrectProfilesPublic: true,
   registryV2Implemented: true,

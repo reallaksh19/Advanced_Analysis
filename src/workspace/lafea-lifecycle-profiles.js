@@ -42,6 +42,15 @@ const ANALYTICAL_RESULT = Object.freeze({
   prerequisites: [['EXECUTION', 'PASS']],
 });
 
+const ANALYTICAL_PRODUCT = Object.freeze({
+  parentKeys: [
+    'sourceHash', 'canonicalModelHash', 'executionHash',
+    'resultEvidenceHash', 'productProfileHash',
+  ],
+  opaqueParentKeys: ['productProfileHash'],
+  prerequisites: [['RESULT_EVIDENCE', 'PASS']],
+});
+
 const FEA_GEOMETRY = Object.freeze({
   parentKeys: ['sourceHash', 'canonicalModelHash'],
   opaqueParentKeys: [],
@@ -84,6 +93,7 @@ export const LAFEA_LIFECYCLE_PROFILES = deepFreeze([
       CANONICAL_MODEL,
       EXECUTION: ANALYTICAL_EXECUTION,
       RESULT_EVIDENCE: ANALYTICAL_RESULT,
+      FOUNDATION_DISTRIBUTION: ANALYTICAL_PRODUCT,
       REPORT_EVIDENCE: {
         parentKeys: [
           'sourceHash', 'canonicalModelHash', 'executionHash',
@@ -111,14 +121,7 @@ export const LAFEA_LIFECYCLE_PROFILES = deepFreeze([
       CANONICAL_MODEL,
       EXECUTION: ANALYTICAL_EXECUTION,
       RESULT_EVIDENCE: ANALYTICAL_RESULT,
-      SCREENING_ASSESSMENT: {
-        parentKeys: [
-          'sourceHash', 'canonicalModelHash', 'executionHash',
-          'resultEvidenceHash', 'screeningProfileHash',
-        ],
-        opaqueParentKeys: ['screeningProfileHash'],
-        prerequisites: [['RESULT_EVIDENCE', 'PASS']],
-      },
+      SCREENING_ASSESSMENT: ANALYTICAL_PRODUCT,
       REPORT_EVIDENCE: {
         parentKeys: [
           'sourceHash', 'canonicalModelHash', 'executionHash',

@@ -126,6 +126,12 @@ export {
   registerLafeaLifecycleProducerBatch,
 } from './lafea-lifecycle-producers.js';
 export {
+  LAFEA_ANALYTICAL_PRODUCT_BATCH_SCHEMA,
+  LAFEA_ANALYTICAL_PRODUCT_PRODUCER_REVISION,
+  createLafeaAnalyticalProductBatch,
+  registerLafeaAnalyticalProductBatch,
+} from './lafea-analytical-product-producers.js';
+export {
   LAFEA_SOURCE_PRIMITIVE_KINDS,
   LAFEA_SOURCE_PRIMITIVE_SCHEMA,
   LAFEA_SOURCE_RENDER_REQUEST_SCHEMA,

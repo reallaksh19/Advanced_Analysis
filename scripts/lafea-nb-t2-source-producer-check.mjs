@@ -76,7 +76,8 @@ assert.equal(screeningStage.lifecycleReadiness.codeState, 'CODE_NOT_READY');
 assert.equal(screeningStage.lifecycleReadiness.releaseState, 'RELEASE_NOT_QUALIFIED');
 assert.equal(screeningStage.lifecycle.artifacts.ANALYSIS_MESH, undefined);
 assert.equal(screeningStage.lifecycle.artifacts.RECOVERY, undefined);
-assert.equal(screeningStage.lifecycle.artifacts.SCREENING_ASSESSMENT.status, 'CURRENT');
+assert.equal(screeningStage.lifecycle.artifacts.SCREENING_ASSESSMENT.status, 'ABSENT');
+assert.equal(screeningStage.lifecycleReadiness.assessmentReady, false);
 screeningStore.destroy();
 
 for (const stageId of ['LAFEA.3', 'LAFEA.4', 'LAFEA.5']) {
@@ -197,6 +198,7 @@ console.log(JSON.stringify({
   undoRedoResurrectsEvidence: false,
   acceptedCalculationEqualsReleaseQualified: false,
   analyticalMeshRequired: false,
+  screeningApplicabilitySynthesized: false,
   feaSourceMeshAuthority: 'CALLER_AUTHORED_SOURCE_MESH_ONLY',
   convergenceSynthesized: false,
   codeAssessmentSynthesized: false,
