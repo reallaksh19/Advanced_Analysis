@@ -75,6 +75,34 @@
       ]
     },
     {
+      "sourcePath": "contracts/command-envelope.js",
+      "gitBlobSha": "0878ed7101fec563086b07c9d3fa5a9bf78bce59",
+      "treatment": "REFERENCE_ONLY",
+      "semanticContracts": [
+        "immutable command envelope",
+        "command basis and origin authority"
+      ]
+    },
+    {
+      "sourcePath": "contracts/command-journal.js",
+      "gitBlobSha": "0300a622c6b0b12507ccc448fe394b6eec6abcd7",
+      "treatment": "REFERENCE_ONLY",
+      "semanticContracts": [
+        "append-only accepted command history",
+        "active and redo projections",
+        "deterministic replay"
+      ]
+    },
+    {
+      "sourcePath": "tabs/topology-trace-validator/topology-sequential-split-edge-request.js",
+      "gitBlobSha": "c186eda605fcef23d5f5b1857791f8704abadac1",
+      "treatment": "REFERENCE_ONLY",
+      "semanticContracts": [
+        "SPLIT_EDGE strict fraction authority",
+        "canonical endpoint evidence"
+      ]
+    },
+    {
       "sourcePath": "tabs/topology-trace-validator/topology-edit-persistence-actions.js",
       "gitBlobSha": "7a21269f48778fbe066a513880a7a83a3a611dd0",
       "treatment": "REFERENCE_ONLY",
@@ -163,12 +191,14 @@
       "id": "native-command-vocabulary",
       "treatment": "REFERENCE_ONLY",
       "targetPaths": [
+        "src/workspace/topology-edit/topology-edit-command-contract.js",
         "src/workspace/topology-edit/topology-edit-command-journal.js",
         "src/workspace/topology-edit/topology-edit-tools-controller.js"
       ],
       "sourcePaths": [
         "tabs/topology-trace-validator/topology-edit-session-draft.js",
-        "tabs/topology-trace-validator/topology-edit-capability-registry.js"
+        "tabs/topology-trace-validator/topology-edit-capability-registry.js",
+        "contracts/command-envelope.js"
       ],
       "contractAuthority": "Wave1CertifiedEditingKernel"
     },
@@ -176,13 +206,20 @@
       "id": "journal-and-replay",
       "treatment": "FORKED",
       "targetPaths": [
-        "src/workspace/topology-edit/topology-edit-command-journal.js"
+        "src/workspace/topology-edit/topology-edit-canonical-state.js",
+        "src/workspace/topology-edit/topology-edit-command-contract.js",
+        "src/workspace/topology-edit/topology-edit-command-resolver.js",
+        "src/workspace/topology-edit/topology-edit-command-journal.js",
+        "src/workspace/topology-edit/topology-edit-pure-reducer.js"
       ],
       "sourcePaths": [
-        "tabs/topology-trace-validator/topology-edit-session-draft.js"
+        "tabs/topology-trace-validator/topology-edit-session-draft.js",
+        "contracts/command-envelope.js",
+        "contracts/command-journal.js",
+        "tabs/topology-trace-validator/topology-sequential-split-edge-request.js"
       ],
       "contractAuthority": "P2_EDIT_SESSION_AUTHORITY",
-      "status": "PHASE_ONE_RETAINED_NOT_CERTIFIED"
+      "status": "W1_1_PURE_KERNEL_FOUNDATION"
     },
     {
       "id": "checker-and-fix-suggestions",
