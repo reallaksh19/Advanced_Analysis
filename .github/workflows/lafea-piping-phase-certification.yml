@@ -1,0 +1,169 @@
+name: LFEA Piping Phase Certification
+
+on:
+  pull_request:
+    paths:
+      - 'audit-baseline.json'
+      - 'release-evidence/lfea-piping-release-evidence.json'
+      - 'reports/lfea-piping-phase-findings-ledger.json'
+      - 'reports/lfea-piping-phase2b-inputxml-binding.json'
+      - 'reports/lfea-piping-phase2c-analysis-context.json'
+      - 'reports/lfea-piping-phase2d-inputxml-context.json'
+      - 'reports/lfea-piping-phase2e-multicase-application.json'
+      - 'reports/lfea-piping-phase2f-unit-normalization.json'
+      - 'reports/lfea-piping-phase5b-workspace-integration.json'
+      - 'reports/lfea-piping-phase6b-external-evidence-package.json'
+      - 'reports/lfea-piping-phase6i-aggregate-anti-drift.json'
+      - 'docs/LFEA_PIPING_100_PERCENT_CLOSURE_POLICY.md'
+      - 'docs/LFEA_PIPING_PHASE_STATUS.md'
+      - 'docs/LFEA_PIPING_PHASE6_EVIDENCE_REQUIREMENTS.md'
+      - 'docs/LFEA_PIPING_PHASE6I_ANTI_DRIFT.md'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'scripts/lfea-piping-a0-baseline-check.mjs'
+      - 'scripts/lfea-piping-internal-release-evidence-check.mjs'
+      - 'scripts/lfea-piping-release-readiness-check.mjs'
+      - 'scripts/lfea-piping-phase-findings-check.mjs'
+      - 'scripts/lfea-piping-phase6d-anti-drift-check.mjs'
+      - 'scripts/lfea-piping-phase6i-*.mjs'
+      - 'scripts/lfea-b2.5-*.mjs'
+      - 'scripts/lfea-b4.0-source-guard.mjs'
+      - 'scripts/linear-piping-analysis-consumer-*.mjs'
+      - 'scripts/linear-piping-inputxml-source-binding-check.mjs'
+      - 'scripts/linear-piping-inputxml-unit-normalization-check.mjs'
+      - 'scripts/linear-piping-source-analysis-context-check.mjs'
+      - 'scripts/linear-piping-inputxml-analysis-context-check.mjs'
+      - 'scripts/linear-piping-multicase-application-*.mjs'
+      - 'scripts/linear-piping-interface-*.mjs'
+      - 'scripts/linear-piping-nozzle-interface-check.mjs'
+      - 'scripts/linear-piping-code-application-*.mjs'
+      - 'scripts/linear-piping-presentation-*.mjs'
+      - 'scripts/linear-piping-workspace-integration-check.mjs'
+      - 'scripts/linear-piping-project-qualification-*.mjs'
+      - 'scripts/linear-piping-external-evidence-package-check.mjs'
+      - 'e2e/linear-piping-results-workspace.spec.js'
+      - 'src/main.js'
+      - 'src/core/linear-fea-model-compiler/**'
+      - 'src/core/linear-piping-analysis-consumer/**'
+      - 'src/core/linear-piping-multicase-application/**'
+      - 'src/core/linear-piping-interface/**'
+      - 'src/core/linear-piping-code-application/**'
+      - 'src/core/linear-piping-presentation/**'
+      - 'src/core/linear-piping-project-qualification/**'
+      - 'src/workspace/linear-piping-results-view.js'
+      - 'src/workspace/linear-piping-results-workbench.js'
+      - 'src/workspace/linear-piping-results-workbench.css'
+      - '.github/workflows/lafea-piping-phase-certification.yml'
+      - '.github/workflows/lafea-piping-phase6i-certification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lfea-piping-phase-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  certify-phase-a0:
+    name: Certify exact-head piping phase
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Install pinned Chromium
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: '0'
+        run: npx playwright install chromium --with-deps
+
+      - name: Validate fail-closed release policy and simulated qualification harness
+        run: node scripts/lfea-piping-release-readiness-check.mjs
+
+      - name: Validate Phase 6I aggregate anti-drift controls directly
+        run: npm run check:lfea-piping-phase6i-anti-drift
+
+      - name: Validate Phase 6A qualification harness directly
+        run: node scripts/linear-piping-project-qualification-check.mjs
+
+      - name: Validate Phase 6B external evidence eligibility directly
+        run: |
+          node scripts/linear-piping-external-evidence-package-check.mjs
+          node scripts/linear-piping-project-qualification-anti-drift-check.mjs
+
+      - name: Validate phase-to-finding ledger
+        run: node scripts/lfea-piping-phase-findings-check.mjs
+
+      - name: Capture exact-head baseline
+        run: >-
+          node scripts/lfea-piping-a0-baseline-check.mjs
+          --release
+          --emit=${RUNNER_TEMP}/audit-baseline.runtime.json
+
+      - name: Verify T0 and source orchestration
+        run: npm run check:linear-piping-analysis-consumer
+
+      - name: Verify B-2.5 node and element ancestry authority
+        run: npm run check:lfea-b2.5
+
+      - name: Verify InputXML source and topology binding directly
+        run: node scripts/linear-piping-inputxml-source-binding-check.mjs
+
+      - name: Verify governed InputXML length normalization directly
+        run: node scripts/linear-piping-inputxml-unit-normalization-check.mjs
+
+      - name: Verify retained B-2.5 B-3.0 T0 context directly
+        run: node scripts/linear-piping-source-analysis-context-check.mjs
+
+      - name: Verify InputXML provenance and retained context directly
+        run: node scripts/linear-piping-inputxml-analysis-context-check.mjs
+
+      - name: Verify complete multicase application orchestration directly
+        run: |
+          node scripts/linear-piping-multicase-application-check.mjs
+          node scripts/linear-piping-multicase-application-anti-drift-check.mjs
+
+      - name: Verify governed interfaces and recovery
+        run: npm run check:lfea-interfaces
+
+      - name: Verify configured nozzle and B31 application results
+        run: npm run check:lfea-code-application
+
+      - name: Verify current-only presentation and deterministic exports
+        run: npm run check:lfea-presentation-export
+
+      - name: Verify active workspace controller directly
+        run: node scripts/linear-piping-workspace-integration-check.mjs
+
+      - name: Verify active workspace browser controls
+        run: node scripts/run-playwright.mjs e2e/linear-piping-results-workspace.spec.js
+
+      - name: Run full repository gate
+        run: npm run gate
+
+      - name: Verify clean exact-head checkout
+        shell: bash
+        run: |
+          git diff --check
+          test -z "$(git status --short)"
+
+      - name: Upload exact-head baseline evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lfea-piping-phase-${{ github.sha }}
+          path: ${{ runner.temp }}/audit-baseline.runtime.json
+          if-no-files-found: error
+          retention-days: 90
