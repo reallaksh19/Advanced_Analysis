@@ -52,6 +52,83 @@ async function walkJavaScript(directory) {
   return files;
 }
 
+/**
+ * Remove comments before prohibited executable-pattern checks. This prevents
+ * policy statements such as "never Math.random()" from being mistaken for a
+ * call while preserving strings, template literals, and line positions.
+ */
+function stripComments(source) {
+  let result = '';
+  let state = 'code';
+  let escaped = false;
+
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index];
+    const next = source[index + 1];
+
+    if (state === 'line-comment') {
+      if (character === '\n') {
+        state = 'code';
+        result += '\n';
+      } else {
+        result += ' ';
+      }
+      continue;
+    }
+
+    if (state === 'block-comment') {
+      if (character === '*' && next === '/') {
+        result += '  ';
+        index += 1;
+        state = 'code';
+      } else {
+        result += character === '\n' ? '\n' : ' ';
+      }
+      continue;
+    }
+
+    if (state === 'single-quote' || state === 'double-quote' || state === 'template') {
+      result += character;
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (character === '\\') {
+        escaped = true;
+        continue;
+      }
+      if (
+        (state === 'single-quote' && character === "'") ||
+        (state === 'double-quote' && character === '"') ||
+        (state === 'template' && character === '`')
+      ) {
+        state = 'code';
+      }
+      continue;
+    }
+
+    if (character === '/' && next === '/') {
+      result += '  ';
+      index += 1;
+      state = 'line-comment';
+      continue;
+    }
+    if (character === '/' && next === '*') {
+      result += '  ';
+      index += 1;
+      state = 'block-comment';
+      continue;
+    }
+    if (character === "'") state = 'single-quote';
+    else if (character === '"') state = 'double-quote';
+    else if (character === '`') state = 'template';
+
+    result += character;
+  }
+
+  return result;
+}
+
 function importSpecifiers(source) {
   const specifiers = new Set();
   const staticImport =
@@ -106,7 +183,7 @@ async function buildImportGraph() {
   for (const file of files) {
     const source = await readFile(file, 'utf8');
     const dependencies = [];
-    for (const specifier of importSpecifiers(source)) {
+    for (const specifier of importSpecifiers(stripComments(source))) {
       const resolved = await resolveRelativeModule(file, specifier);
       if (resolved) dependencies.push(resolved);
     }
@@ -220,16 +297,17 @@ export async function verifyTopologyEditImportBoundaries() {
 
   for (const module of disposition.modules) {
     const source = await readFile(path.join(ROOT, module.targetPath), 'utf8');
+    const executableSource = stripComments(source);
 
     for (const prohibited of PROHIBITED_SOURCE_PATTERNS) {
       assert.ok(
-        !prohibited.pattern.test(source),
+        !prohibited.pattern.test(executableSource),
         `${module.targetPath} contains ${prohibited.name}`,
       );
     }
 
     if (
-      /\bWorkspaceState\.loadDataset\s*\(/.test(source) &&
+      /\bWorkspaceState\.loadDataset\s*\(/.test(executableSource) &&
       !LOAD_DATASET_ALLOWLIST.has(module.targetPath)
     ) {
       throw new Error(
