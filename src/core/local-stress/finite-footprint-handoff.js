@@ -1,5 +1,5 @@
 import { createValidatedLafeaAnalyticalHandoff } from '../lafea-analytical-handoff.js';
-import { validateFiniteFootprintDistribution } from './finite-footprint.js';
+import { validateFiniteFootprintDistribution } from './finite-footprint-contract.js';
 
 export function createFiniteFootprintHandoff(input) {
   const row = exactRecord(input, [
