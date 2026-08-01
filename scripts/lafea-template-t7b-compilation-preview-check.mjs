@@ -36,6 +36,57 @@ import {
   mountLafeaT7bCompilationWizard,
 } from '../src/workspace/lafea-templates/t7b-compilation-preview.js';
 
+// Fake DOM declarations must precede all executable evidence.
+class FakeElement {
+  constructor(tagName, ownerDocument) {
+    this.tagName = tagName.toUpperCase();
+    this.ownerDocument = ownerDocument;
+    this.dataset = {};
+    this.children = [];
+    this.attributes = {};
+    this.className = '';
+    this.hidden = false;
+    this.selected = false;
+    this.style = {};
+    this.textContent = '';
+    this.type = '';
+    this.value = '';
+    this.disabled = false;
+    this.listeners = new Map();
+  }
+
+  append(...nodes) {
+    this.children.push(...nodes);
+  }
+
+  replaceChildren(...nodes) {
+    this.children = [...nodes];
+  }
+
+  setAttribute(name, value) {
+    this.attributes[name] = String(value);
+  }
+
+  addEventListener(name, callback) {
+    this.listeners.set(name, callback);
+  }
+}
+
+class FakeDocument {
+  constructor() {
+    this.head = new FakeElement('head', this);
+    this.body = new FakeElement('body', this);
+  }
+
+  createElement(tagName) {
+    return new FakeElement(tagName, this);
+  }
+
+  querySelector() {
+    return null;
+  }
+}
+
 const T7A_COMPILATION_BLOCKER =
   'Parameter drafting and governed validation are active; compilation, document import and engine execution remain disabled.';
 
@@ -572,54 +623,4 @@ function collectText(node) {
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
-}
-
-class FakeDocument {
-  constructor() {
-    this.head = new FakeElement('head', this);
-    this.body = new FakeElement('body', this);
-  }
-
-  createElement(tagName) {
-    return new FakeElement(tagName, this);
-  }
-
-  querySelector() {
-    return null;
-  }
-}
-
-class FakeElement {
-  constructor(tagName, ownerDocument) {
-    this.tagName = tagName.toUpperCase();
-    this.ownerDocument = ownerDocument;
-    this.dataset = {};
-    this.children = [];
-    this.attributes = {};
-    this.className = '';
-    this.hidden = false;
-    this.selected = false;
-    this.style = {};
-    this.textContent = '';
-    this.type = '';
-    this.value = '';
-    this.disabled = false;
-    this.listeners = new Map();
-  }
-
-  append(...nodes) {
-    this.children.push(...nodes);
-  }
-
-  replaceChildren(...nodes) {
-    this.children = [...nodes];
-  }
-
-  setAttribute(name, value) {
-    this.attributes[name] = String(value);
-  }
-
-  addEventListener(name, callback) {
-    this.listeners.set(name, callback);
-  }
 }
