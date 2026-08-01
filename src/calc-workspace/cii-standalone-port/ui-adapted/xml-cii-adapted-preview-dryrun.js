@@ -36,3 +36,19 @@ export function xmlCiiDryRunPreview(xmlText, config, stagedJsonText) {
     result: wallResult,
   });
 }
+
+function _rowTextHelper(row, keys) {
+  if (!row || typeof row !== 'object') return '';
+  for (const k of keys) {
+    const value = row[k] ?? row._raw?.[k];
+    if (value !== undefined && value !== null && String(value).trim()) return String(value).trim();
+  }
+  return '';
+}
+
+export function _xmlCiiLineListKeys(config) {
+  const rows = Array.isArray(config?.linelist?.masterRows) ? config.linelist.masterRows : [];
+  return [...new Set(rows.map((r) => _rowTextHelper(r, ['lineNoKey', 'lineNo', 'lineKey', 'LineNo', 'Line No', 'Line Number', 'PipelineReference', 'lineSeqNo'])).filter(Boolean))]
+    .sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
+}
+
