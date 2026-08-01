@@ -19,6 +19,6 @@ export {
   FINITE_FOOTPRINT_REQUEST_SCHEMA,
   FINITE_FOOTPRINT_RESULT_SCHEMA,
   FINITE_FOOTPRINT_TYPES,
-  compileFiniteFootprintDistribution,
   validateFiniteFootprintDistribution,
-} from './finite-footprint.js';
+} from './finite-footprint-contract.js';
+export { compileFiniteFootprintDistribution } from './finite-footprint.js';
