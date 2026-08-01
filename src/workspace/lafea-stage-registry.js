@@ -1,4 +1,4 @@
-export const LAFEA_STAGE_REGISTRY_SCHEMA = 'lafea-stage-registry/v1';
+export const LAFEA_STAGE_REGISTRY_SCHEMA = 'lafea-stage-registry/v2';
 
 export const LAFEA_STAGE_CATEGORIES = Object.freeze([
   'FOUNDATION_LOAD_TRANSFER',
@@ -22,6 +22,24 @@ export const LAFEA_PREVIEW_POLICIES = Object.freeze([
   'EXPLICIT_SOURCE_GEOMETRY_DISPLAY_ONLY',
 ]);
 
+export const LAFEA_STAGE_RELEASE_STATES = Object.freeze([
+  'RELEASE_NOT_QUALIFIED',
+  'RELEASE_QUALIFIED',
+]);
+
+export const LAFEA_STAGE_RELEASE_GATE_POLICIES = Object.freeze([
+  'ALL_REQUIRED_BENCHMARK_AND_ANTI_DRIFT_GATES_PASS',
+  'ENGINE_NOT_IMPLEMENTED_BLOCKS_RELEASE',
+]);
+
+export const LAFEA_COMPONENT_ROLES = Object.freeze([
+  'sourceNormalizer',
+  'canonicalInputAdapter',
+  'calculator',
+  'resultAcceptance',
+  'lifecycleProducer',
+]);
+
 export const LAFEA_STAGE_REGISTRY = Object.freeze([
   entry({
     stageId: 'LAFEA.1',
@@ -43,6 +61,12 @@ export const LAFEA_STAGE_REGISTRY = Object.freeze([
       editable: false,
     },
     collectionPaths: ['materials', 'pressureDefinitions', 'loadReferencePoints', 'loadCases'],
+    compositionRootId: 'LAFEA.1/CURRENT_CORE_COMPOSITION/V1',
+    componentIds: componentIds('LAFEA.1', 'local-stress'),
+    lifecycleProfileId: 'ANALYTICAL_FOUNDATION_V1',
+    benchmarkManifestId: 'LAFEA.1/CURRENT_CORE_BENCHMARK_MANIFEST/V1',
+    releaseState: 'RELEASE_NOT_QUALIFIED',
+    releaseGatePolicy: 'ALL_REQUIRED_BENCHMARK_AND_ANTI_DRIFT_GATES_PASS',
     limitations: [
       'No finite-element analysis or local attachment stress.',
       'No shell bending, weld stress, contact or code assessment.',
@@ -68,6 +92,12 @@ export const LAFEA_STAGE_REGISTRY = Object.freeze([
       editable: false,
     },
     collectionPaths: ['screeningCases', 'evaluationLocations'],
+    compositionRootId: 'LAFEA.2/CURRENT_CORE_COMPOSITION/V1',
+    componentIds: componentIds('LAFEA.2', 'local-attachment-screening'),
+    lifecycleProfileId: 'ANALYTICAL_SCREENING_V1',
+    benchmarkManifestId: 'LAFEA.2/CURRENT_CORE_BENCHMARK_MANIFEST/V1',
+    releaseState: 'RELEASE_NOT_QUALIFIED',
+    releaseGatePolicy: 'ALL_REQUIRED_BENCHMARK_AND_ANTI_DRIFT_GATES_PASS',
     limitations: [
       'No local discontinuity or attachment stress.',
       'No transverse-shear recovery, shell analysis, weld analysis or code assessment.',
@@ -93,6 +123,12 @@ export const LAFEA_STAGE_REGISTRY = Object.freeze([
       editable: true,
     },
     collectionPaths: ['materials', 'nodes', 'elements', 'constraints', 'loadCases'],
+    compositionRootId: 'LAFEA.3/CURRENT_CORE_COMPOSITION/V1',
+    componentIds: componentIds('LAFEA.3', 'local-continuum'),
+    lifecycleProfileId: 'FEA_MESH_RECOVERY_V1',
+    benchmarkManifestId: 'LAFEA.3/CURRENT_CORE_BENCHMARK_MANIFEST/V1',
+    releaseState: 'RELEASE_NOT_QUALIFIED',
+    releaseGatePolicy: 'ALL_REQUIRED_BENCHMARK_AND_ANTI_DRIFT_GATES_PASS',
     limitations: [
       'Integration-point stress is authoritative for T6/Q8; nodal projection is display-only.',
       'Production geometry-to-mesh-to-convergence orchestration is not complete.',
@@ -118,6 +154,12 @@ export const LAFEA_STAGE_REGISTRY = Object.freeze([
       editable: true,
     },
     collectionPaths: ['materials', 'nodes', 'elements', 'constraints', 'loadCases'],
+    compositionRootId: 'LAFEA.4/CURRENT_CORE_COMPOSITION/V1',
+    componentIds: componentIds('LAFEA.4', 'local-shell'),
+    lifecycleProfileId: 'FEA_MESH_RECOVERY_V1',
+    benchmarkManifestId: 'LAFEA.4/CURRENT_CORE_BENCHMARK_MANIFEST/V1',
+    releaseState: 'RELEASE_NOT_QUALIFIED',
+    releaseGatePolicy: 'ALL_REQUIRED_BENCHMARK_AND_ANTI_DRIFT_GATES_PASS',
     limitations: [
       'Current production dispatch is the legacy five-DOF triangular thin-shell path.',
       'No production MITC4/MITC3 claim, drilling DOF, thick-shell claim, weld stress or code assessment.',
@@ -150,6 +192,12 @@ export const LAFEA_STAGE_REGISTRY = Object.freeze([
       'loadCaseMappings',
       'assessmentRegions',
     ],
+    compositionRootId: 'LAFEA.5/CURRENT_CORE_COMPOSITION/V1',
+    componentIds: componentIds('LAFEA.5', 'local-trunnion-footprint'),
+    lifecycleProfileId: 'FEA_MESH_RECOVERY_V1',
+    benchmarkManifestId: 'LAFEA.5/CURRENT_CORE_BENCHMARK_MANIFEST/V1',
+    releaseState: 'RELEASE_NOT_QUALIFIED',
+    releaseGatePolicy: 'ALL_REQUIRED_BENCHMARK_AND_ANTI_DRIFT_GATES_PASS',
     limitations: [
       'No generated trunnion stiffness, weld, contact or pressure superposition.',
       'No code assessment; footprint-adjacent peaks remain load-introduction-sensitive.',
@@ -175,6 +223,12 @@ export const LAFEA_STAGE_REGISTRY = Object.freeze([
       editable: false,
     },
     collectionPaths: ['nodes', 'elements', 'materials', 'loadCases'],
+    compositionRootId: 'LAFEA.6/UNSUPPORTED_STAGE_COMPOSITION/V1',
+    componentIds: unsupportedComponentIds(),
+    lifecycleProfileId: 'UNSUPPORTED_STAGE_V1',
+    benchmarkManifestId: null,
+    releaseState: 'RELEASE_NOT_QUALIFIED',
+    releaseGatePolicy: 'ENGINE_NOT_IMPLEMENTED_BLOCKS_RELEASE',
     limitations: [
       'Calculation is disabled.',
       'No qualified weld schema, calculator, result validator or benchmark manifest is registered.',
@@ -215,7 +269,57 @@ export function lafeaRegisteredPreviewSource(stageId) {
   return requireLafeaStageRegistryEntry(stageId).previewSource;
 }
 
+export function lafeaRegisteredCompositionRootId(stageId) {
+  return requireLafeaStageRegistryEntry(stageId).compositionRootId;
+}
+
+export function lafeaRegisteredComponentIds(stageId) {
+  return requireLafeaStageRegistryEntry(stageId).componentIds;
+}
+
+export function lafeaRegisteredLifecycleProfileId(stageId) {
+  return requireLafeaStageRegistryEntry(stageId).lifecycleProfileId;
+}
+
+export function lafeaRegisteredBenchmarkManifestId(stageId) {
+  return requireLafeaStageRegistryEntry(stageId).benchmarkManifestId;
+}
+
+export function lafeaRegisteredReleaseState(stageId) {
+  return requireLafeaStageRegistryEntry(stageId).releaseState;
+}
+
+function componentIds(stageId, enginePackage) {
+  return {
+    sourceNormalizer: `${stageId}/${enginePackage}/SOURCE_NORMALIZER/V1`,
+    canonicalInputAdapter: `${stageId}/${enginePackage}/CANONICAL_INPUT_ADAPTER/V1`,
+    calculator: `${stageId}/${enginePackage}/CALCULATOR/V1`,
+    resultAcceptance: `${stageId}/${enginePackage}/RESULT_ACCEPTANCE/V1`,
+    lifecycleProducer: `NB-T2/${stageId}/${enginePackage}`,
+  };
+}
+
+function unsupportedComponentIds() {
+  return {
+    sourceNormalizer: 'LAFEA.6/UNSUPPORTED_SOURCE_PASSTHROUGH/V1',
+    canonicalInputAdapter: null,
+    calculator: null,
+    resultAcceptance: null,
+    lifecycleProducer: null,
+  };
+}
+
 function entry(value) {
+  const componentKeys = Object.keys(value.componentIds ?? {}).sort();
+  if (JSON.stringify(componentKeys) !== JSON.stringify([...LAFEA_COMPONENT_ROLES].sort())) {
+    throw new TypeError(`LAFEA registry component roles are invalid for ${value.stageId}.`);
+  }
+  if (!LAFEA_STAGE_RELEASE_STATES.includes(value.releaseState)) {
+    throw new TypeError(`LAFEA registry release state is invalid for ${value.stageId}.`);
+  }
+  if (!LAFEA_STAGE_RELEASE_GATE_POLICIES.includes(value.releaseGatePolicy)) {
+    throw new TypeError(`LAFEA registry release gate policy is invalid for ${value.stageId}.`);
+  }
   return deepFreeze({
     schema: LAFEA_STAGE_REGISTRY_SCHEMA,
     ...value,
