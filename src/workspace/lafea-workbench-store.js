@@ -16,10 +16,10 @@ import {
   executeLafeaStage,
   normalizeLafeaStageDocument,
 } from './lafea-workbench-model.js';
+import { createLafeaWorkbenchHistoryActions } from './lafea-workbench-store-history.js';
 import { requireLafeaInputDescriptor } from './lafea-stage-input-descriptors.js';
 import { requireLafeaStageRegistryEntry } from './lafea-stage-registry.js';
 import {
-  HISTORY_LIMIT,
   assertStage,
   commandError,
   commitDocument,
@@ -56,6 +56,11 @@ export function createLafeaWorkbenchStore(options) {
     listeners.forEach((listener) => listener(state));
     return state;
   }
+
+  const { undo, redo } = createLafeaWorkbenchHistoryActions({
+    getState: () => state,
+    publish,
+  });
 
   function selectStage(stageId) {
     assertStage(stageId);
@@ -234,40 +239,6 @@ export function createLafeaWorkbenchStore(options) {
       stages: { ...state.stages, [state.activeStageId]: freeze(stage) },
       diagnostics: execution.diagnostics,
     });
-  }
-
-  function undo() {
-    const stage = currentStage(state);
-    if (!stage.past.length) return state;
-    const document = stage.past.at(-1);
-    const nextStage = {
-      ...stage,
-      document,
-      execution: null,
-      lastEditResult: null,
-      past: stage.past.slice(0, -1),
-      future: [stage.document, ...stage.future]
-        .filter(Boolean)
-        .slice(0, HISTORY_LIMIT),
-    };
-    return publish(withCurrentStage(state, nextStage, 'READY', []));
-  }
-
-  function redo() {
-    const stage = currentStage(state);
-    if (!stage.future.length) return state;
-    const document = stage.future[0];
-    const nextStage = {
-      ...stage,
-      document,
-      execution: null,
-      lastEditResult: null,
-      past: [...stage.past, stage.document]
-        .filter(Boolean)
-        .slice(-HISTORY_LIMIT),
-      future: stage.future.slice(1),
-    };
-    return publish(withCurrentStage(state, nextStage, 'READY', []));
   }
 
   function exportDocument() {
