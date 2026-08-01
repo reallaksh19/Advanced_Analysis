@@ -13,3 +13,13 @@ export {
   calculateLocalStressFoundation,
   reconstructResultHashes,
 } from './calculate.js';
+export {
+  FINITE_FOOTPRINT_DISTRIBUTION_RULE,
+  FINITE_FOOTPRINT_LIMITATIONS,
+  FINITE_FOOTPRINT_REQUEST_SCHEMA,
+  FINITE_FOOTPRINT_RESULT_SCHEMA,
+  FINITE_FOOTPRINT_TYPES,
+  compileFiniteFootprintDistribution,
+  validateFiniteFootprintDistribution,
+} from './finite-footprint.js';
+export { createFiniteFootprintHandoff } from './finite-footprint-handoff.js';
