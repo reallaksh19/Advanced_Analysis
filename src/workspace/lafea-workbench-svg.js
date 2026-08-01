@@ -27,7 +27,7 @@ export function renderLafeaWorkbenchSvg(host, geometry, handlers, viewport = nul
   svg.setAttribute('viewBox', `0 0 ${dimensions.width} ${dimensions.height}`);
   svg.setAttribute('role', geometry.nodePath ? 'group' : 'img');
   svg.setAttribute('aria-label', 'LAFEA editable geometry preview');
-  const transform = viewportTransform(geometry.nodes);
+  const transform = viewportTransform(geometry.nodes, viewport, dimensions);
   bindGlobalHighlight(svg);
   renderElements(svg, geometry, transform);
   renderNodes(svg, geometry, transform, handlers);
@@ -154,6 +154,13 @@ function rendererDimensions(viewport) {
     throw new TypeError('LAFEA_SVG_VIEWPORT_DIMENSIONS_INVALID');
   }
   return { width, height };
+}
+
+function viewportTransform(nodes, viewport = null, dimensions = { width: WIDTH, height: HEIGHT }) {
+  if (viewport && viewport.worldBounds) {
+    return governedViewportTransform(viewport, dimensions);
+  }
+  return legacyViewportTransform(nodes, dimensions);
 }
 
 function governedViewportTransform(viewport, dimensions) {
