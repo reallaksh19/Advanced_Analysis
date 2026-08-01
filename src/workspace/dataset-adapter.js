@@ -15,7 +15,7 @@ import {
 export const WORKSPACE_DATASET_SCHEMA = 'analysis-workspace-dataset/v1';
 const MANAGED_STAGE_SCHEMA = 'inputxml-managed-stage/v1';
 
-export function normalizeWorkspaceDataset(rawPackage, sourceName = '') {
+export function normalizeWorkspaceDataset(rawPackage, sourceName = '', sourceEvidence = null) {
   const packageJson = normalizePackageRoot(rawPackage);
   const sourceSchema = stringValue(packageJson.schema) || inferSourceSchema(packageJson);
   const datasetId = deterministicDatasetId(packageJson, sourceName);
@@ -23,6 +23,7 @@ export function normalizeWorkspaceDataset(rawPackage, sourceName = '') {
     datasetId,
     sourceSchema,
     sourcePackage: packageJson,
+    sourceBytes: sourceEvidence?.sourceBytes ?? null,
   });
   const indexed = indexWorkspaceSourcePackage(sourceSnapshot.sourcePackage, sourceSchema, { sourceSnapshot });
   const entities = normalizeEntities(indexed.entries, indexed.model);
@@ -33,6 +34,7 @@ export function normalizeWorkspaceDataset(rawPackage, sourceName = '') {
     sourceSchema,
     sourceName: stringValue(sourceName),
     sourceSnapshot,
+    sourceSha256: stringValue(sourceEvidence?.sourceSha256).toLowerCase() || null,
     sourceModel: indexed.model,
     entities,
     hierarchy: buildDatasetHierarchy(entities),
@@ -44,6 +46,24 @@ export function normalizeWorkspaceDataset(rawPackage, sourceName = '') {
     ...baseDataset,
     sharedModel: buildSharedPipingModelFromWorkspaceDataset(baseDataset),
   });
+}
+
+/** Rebuilds immutable hierarchy, summary, and shared-model derivatives after an edit. */
+export function rebuildWorkspaceDataset(dataset, entities, editAudit) {
+  if (!dataset || dataset.schema !== WORKSPACE_DATASET_SCHEMA || !Array.isArray(entities)) {
+    throw new TypeError(`Dataset rebuild requires ${WORKSPACE_DATASET_SCHEMA} and an entity array.`);
+  }
+  assertUniqueEntityIds(entities);
+  const baseDataset = freezeDeep({
+    ...clonePlain(dataset),
+    entities,
+    hierarchy: buildDatasetHierarchy(entities),
+    summary: summarizeEntities(entities, dataset.sourceModel),
+    version: Number(dataset.version || 0) + 1,
+    editAudit: clonePlain(editAudit),
+    calculationFreshness: 'STALE',
+  });
+  return freezeDeep({ ...baseDataset, sharedModel: buildSharedPipingModelFromWorkspaceDataset(baseDataset) });
 }
 
 function normalizePackageRoot(rawPackage) {
@@ -79,6 +99,15 @@ function normalizeEntity({ item, node }, sourceIdIndex) {
     jsonPointer: node.jsonPointer,
     lineId: node.lineId,
     branchId: node.branchId,
+    branchOwner: stringValue(item.attributes?.OWNER) || node.branchId,
+    lineKey: node.lineKey || node.lineId,
+    lineNumber: node.lineNumber || '',
+    service: node.service || '',
+    pipingClass: node.pipingClass || '',
+    nominalDiameterMm: node.nominalDiameterMm || null,
+    insulationCode: node.insulationCode || '',
+    branchSuffix: node.branchSuffix || '',
+    componentReference: stringValue(item.attributes?.REF || item.attributes?.NAME),
     systemId: node.systemId,
     zoneId: node.zoneId,
     sourceNodeId: node.sourceNodeKey,

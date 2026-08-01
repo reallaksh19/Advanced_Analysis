@@ -2,6 +2,8 @@ import { EventBus } from './event-bus.js';
 import { EVENT_TOPICS } from './event-topics.js';
 import { renderPropertiesContent } from './properties-view.js';
 import { WorkspaceState } from './workspace-state.js';
+import { engineeringModelStore } from './engineering-model-store.js';
+import { ENGINEERING_MODEL_EVENTS } from './engineering-model-controller.js';
 
 export class PropertiesPanel {
   constructor(rootElement, eventBus = EventBus, workspaceState = WorkspaceState) {
@@ -45,11 +47,12 @@ export class PropertiesPanel {
       this.eventBus.subscribe(EVENT_TOPICS.ANALYSIS_EXPORT_COMPLETED, ({ artifact }) => this.handleExportCompleted(artifact)),
       this.eventBus.subscribe(EVENT_TOPICS.ANALYSIS_EXPORT_FAILED, (payload) => this.handleExportFailed(payload)),
       this.eventBus.subscribe(EVENT_TOPICS.DATASET_CLEARED, () => this.renderEmpty()),
+      this.eventBus.subscribe(ENGINEERING_MODEL_EVENTS.CHANGED, () => { if (this.selection?.entityId) this.renderSelection({ entityId: this.selection.entityId }); }),
     ];
   }
 
   renderSelection(payload = {}) {
-    const stateEntity = this.workspaceState.getEntity(payload.entityId);
+    const stateEntity = engineeringModelStore.decorateEntity(this.workspaceState.getEntity(payload.entityId));
     const selection = stateEntity ? {
       entityId: stateEntity.entityId,
       name: stateEntity.name || stateEntity.entityId,

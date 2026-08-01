@@ -5,8 +5,8 @@ const STAGED_PACKAGE={schema:'inputxml-managed-stage/v1',packageHash:'W10.8-BROW
   {id:'PIPES',name:'Pipes',type:'BRANCH',children:[pipe('PIPE-A',[0,0,0],[1000,0,0]),pipe('PIPE-B',[1000,0,0],[2000,0,0])]},
   {id:'SUPPORTS',name:'Supports',type:'GROUP',children:[support('SUP-START',[0,0,0],'PIPE-A:port:start'),support('SUP-END',[2000,0,0],'PIPE-B:port:end')]},
 ]};
-const NAVIGATION=['Home','Workspace','Load Calc','PCF','Sketcher','3D Calc','Pipe Solver','Local FEA','Reports','QA','Settings','Debug'];
-const UNAVAILABLE=['Load Calc','3D Calc','Pipe Solver','Reports','Debug'];
+const NAVIGATION=['Home','Workspace','Edit, Topo fix and Load Calc','PCF','Sketcher','3D Calc','Pipe Solver','Local FEA','Reports','QA','Settings','Debug'];
+const UNAVAILABLE=['Edit, Topo fix and Load Calc','3D Calc','Pipe Solver','Reports','Debug'];
 
 test.beforeEach(async({page})=>{await page.addInitScript(()=>{
   globalThis.__WORKSPACE_VIEWPORT_BACKEND__='canvas2d';globalThis.__w108UrlAudit={created:0,revoked:0};
@@ -40,7 +40,7 @@ test('adopts archived W10.7 evidence with accessible deterministic navigation',a
   await page.keyboard.press('End');await expect(nav.getByRole('button',{name:'Debug',exact:true})).toBeFocused();
   await page.keyboard.press('Home');await expect(home).toBeFocused();
   await page.keyboard.press('ArrowLeft');await expect(nav.getByRole('button',{name:'Debug',exact:true})).toBeFocused();
-  await nav.getByRole('button',{name:'Load Calc',exact:true}).focus();await page.keyboard.press('Enter');
+  await nav.getByRole('button',{name:'Edit, Topo fix and Load Calc',exact:true}).focus();await page.keyboard.press('Enter');
   expect((await eventCounts(page)).viewFailures).toBe(2);
   expect(await page.evaluate(()=>AnalysisWorkspace.getApplicationViewState())).toEqual(initialState);
   await page.evaluate(()=>AnalysisWorkspace.activateApplicationView('PIPE_SOLVER'));

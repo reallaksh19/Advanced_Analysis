@@ -126,7 +126,24 @@ export function buildHeaderToolbar(doc, options = {}) {
   select.addEventListener('change', (e) => { if (onBranchSelect) onBranchSelect(e.target.value); });
   branchGroup.append(select);
 
-  // Group 3: Navigation & Load Font Size Scaling (Fit View, +, -, Grid, Reactions, Load Font A+/A-)
+  // Group 3: Topology Primitives Quick-Icons
+  const topoGroup = createGroup(doc);
+  [
+    { label: '📍 Node', title: 'Add/Select Pipe Node' },
+    { label: '⭕ Elbow', title: 'Elbow Fitting' },
+    { label: '🔀 Tee', title: 'Branch Tee Fitting' },
+    { label: '⚓ Anchor', title: 'Rigid Anchor Boundary' },
+    { label: '🪝 Hanger', title: 'Spring Hanger Support' },
+    { label: '🛡️ Restraint', title: 'Guide/Restraint Support' },
+  ].forEach((item) => {
+    const btn = createBtn(doc, item.label, () => {
+      window.dispatchEvent(new CustomEvent('topology-primitive-selected', { detail: { type: item.label } }));
+    });
+    btn.title = item.title;
+    topoGroup.append(btn);
+  });
+
+  // Group 4: Navigation & Load Font Size Scaling
   const showReactions = options.showReactions !== false;
   const navGroup = createGroup(doc);
   navGroup.append(
@@ -139,7 +156,7 @@ export function buildHeaderToolbar(doc, options = {}) {
     createBtn(doc, '🏷️ Load A+', () => { if (onIncreaseLoadFont) onIncreaseLoadFont(); })
   );
 
-  controls.append(projGroup, branchGroup, navGroup);
+  controls.append(projGroup, branchGroup, topoGroup, navGroup);
   header.append(controls);
 
   return header;

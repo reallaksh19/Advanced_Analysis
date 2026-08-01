@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const NAVIGATION = ['Home','Workspace','Load Calc','PCF','Sketcher','3D Calc','Pipe Solver','Reports','QA','Settings','Debug'];
+const NAVIGATION = ['Home','Workspace','Edit, Topo fix and Load Calc','PCF','Sketcher','3D Calc','Pipe Solver','Reports','QA','Settings','Debug'];
 const WORKSPACE_FIXTURE = {
   schema: 'inputxml-managed-stage/v1',
   units: { length: 'mm' },

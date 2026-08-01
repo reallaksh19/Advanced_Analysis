@@ -5,7 +5,7 @@ import * as THREE from 'three';
 
 export function fitThreeView(backend, targetBox) {
   if (!backend.camera || !backend.controls) return;
-  const box = targetBox ?? modelBoundsBox(backend.model);
+  const box = targetBox ?? sceneBoundsBox(backend);
   if (!box || box.isEmpty()) return;
   const center = new THREE.Vector3();
   box.getCenter(center);
@@ -16,15 +16,17 @@ export function fitThreeView(backend, targetBox) {
   );
   const distanceY = (bounds.height / 2) / Math.tan(fovY / 2);
   const distanceX = (bounds.width / 2) / Math.tan(fovX / 2);
-  const distance = Math.max(Math.max(distanceX, distanceY) * 1.1, 1);
+  const margin = backend.model?.webglNavigation?.cameraFitMargin;
+  if (!Number.isFinite(margin) || margin <= 0) throw new Error('WebGL camera fit requires an approved cameraFitMargin.');
+  const distance = Math.max(Math.max(distanceX, distanceY) * margin, Number.EPSILON);
   const forward = new THREE.Vector3();
   backend.camera.getWorldDirection(forward);
   backend.camera.position.copy(center).addScaledVector(forward, -distance);
   backend.controls.target.copy(center);
   if (backend.model) {
-    const radius = backend.model.bounds.radius;
-    backend.camera.near = Math.max(distance / 1000, 0.01);
-    backend.camera.far = Math.max(distance + radius * 2, 1000);
+    const radius = Math.max(bounds.width, bounds.height);
+    backend.camera.near = backend.model.webglNavigation.cameraNearMm;
+    backend.camera.far = backend.model.webglNavigation.cameraFarMm;
   }
   backend.camera.updateProjectionMatrix();
   backend.controls.update();
@@ -66,6 +68,9 @@ export function setThreeStandardView(backend, preset) {
     top: new THREE.Vector3(0, 1, 0),
     front: new THREE.Vector3(0, 0, 1),
     right: new THREE.Vector3(1, 0, 0),
+    bottom: new THREE.Vector3(0, -1, 0),
+    back: new THREE.Vector3(0, 0, -1),
+    left: new THREE.Vector3(-1, 0, 0),
   };
   const identity = preset.toLowerCase();
   const direction = directions[identity] ?? directions.iso;
@@ -81,20 +86,12 @@ export function setThreeStandardView(backend, preset) {
   backend.renderOnce();
 }
 
-function modelBoundsBox(model) {
-  if (!model) return null;
+function sceneBoundsBox(backend) {
   const box = new THREE.Box3();
-  const { center, radius } = model.bounds;
-  box.expandByPoint(new THREE.Vector3(
-    center.x - radius,
-    center.y - radius,
-    center.z - radius,
-  ));
-  box.expandByPoint(new THREE.Vector3(
-    center.x + radius,
-    center.y + radius,
-    center.z + radius,
-  ));
+  [...backend.objects.values()].flat().forEach((object) => {
+    const objectBox = new THREE.Box3().setFromObject(object);
+    if (!objectBox.isEmpty()) box.union(objectBox);
+  });
   return box;
 }
 

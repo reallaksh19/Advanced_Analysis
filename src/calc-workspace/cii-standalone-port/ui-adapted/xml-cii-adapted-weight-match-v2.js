@@ -1,4 +1,3 @@
-import { DEFAULT_WEIGHT_MASTER_ROWS } from '../core/default-weight-master-rows.js';
 import {
   saveMasterContextToLocalStorage,
   xmlCiiEnrichedConfigFromState,
@@ -24,9 +23,8 @@ function hasWeightRows(config) {
 function ensureWeightRows(config, masterContext) {
   const out = config && typeof config === 'object' && !Array.isArray(config) ? config : {};
   if (hasWeightRows(out)) return out;
-  const rows = Array.isArray(masterContext?.weightMasterRows) && masterContext.weightMasterRows.length
-    ? masterContext.weightMasterRows
-    : DEFAULT_WEIGHT_MASTER_ROWS;
+  const rows = Array.isArray(masterContext?.weightMasterRows) ? masterContext.weightMasterRows : [];
+  if (!rows.length) throw new Error('Component-weight master is required; import the authoritative master in Master Data.');
   out.weight = out.weight && typeof out.weight === 'object' && !Array.isArray(out.weight)
     ? { ...out.weight }
     : {};

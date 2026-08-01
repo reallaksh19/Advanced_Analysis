@@ -29,9 +29,10 @@ export class ViewportRenderer {
     } catch (error) {
       this.lastError = error;
       this.backend?.destroy?.();
-      this.backend = null;
-      this.mountCanvasBackend();
-      hostElement.dataset.viewportFallback = 'true';
+      this.backend = new BlockedWebGlBackend(error);
+      this.backend.mount(hostElement);
+      this.backendName = 'webgl-blocked';
+      hostElement.dataset.viewportBlocked = 'true';
     }
   }
 
@@ -63,6 +64,8 @@ export class ViewportRenderer {
     this.requireBackend().fitSelection?.();
   }
 
+  pivotSelection() { this.requireBackend().pivotSelection?.(); }
+
   home() {
     this.requireBackend().home?.();
   }
@@ -70,6 +73,10 @@ export class ViewportRenderer {
   setStandardView(preset) {
     this.requireBackend().setStandardView?.(preset);
   }
+
+  previousView() { this.requireBackend().previousView?.(); }
+
+  toggleProjection() { this.requireBackend().toggleProjection?.(); }
 
   setInteractionContext(mode) {
     this.requireBackend().setInteractionContext?.(mode);
@@ -98,7 +105,7 @@ export class ViewportRenderer {
     this.backendName = 'destroyed';
     this.selectionRequestHandler = null;
     if (this.hostElement) {
-      delete this.hostElement.dataset.viewportFallback;
+      delete this.hostElement.dataset.viewportBlocked;
       this.hostElement.replaceChildren();
     }
     this.hostElement = null;
@@ -116,4 +123,16 @@ export class ViewportRenderer {
     if (!this.backend) throw new Error('ViewportRenderer is not mounted.');
     return this.backend;
   }
+}
+
+class BlockedWebGlBackend {
+  constructor(error) { this.message = `WebGL BLOCKED: ${error instanceof Error ? error.message : String(error)}`; this.hostElement = null; }
+  mount(hostElement) { this.hostElement = hostElement; this.hostElement.textContent = this.message; }
+  renderModel() { throw new Error(this.message); }
+  clear() { if (this.hostElement) this.hostElement.textContent = this.message; }
+  setSelectionRequestHandler() {}
+  setSelection() {}
+  getCapabilities() { return { select: false, orbit: false, pan: false, fitAll: false, fitSelection: false, pivot: false, home: false, orthographic: false, standardViews: false }; }
+  resize() {}
+  destroy() { this.hostElement?.replaceChildren(); this.hostElement = null; }
 }

@@ -193,7 +193,17 @@ export class ApplicationShellView {
     this.navElement?.querySelectorAll('[data-application-nav]').forEach((button) => {
       this.updateButton(button, state, byId.get(button.dataset.applicationNav));
     });
-    this.views.forEach((element, id) => setViewVisibility(element, state?.activeViewId === id));
+
+    const activeViewId = state?.activeViewId;
+    this.views.forEach((element, id) => {
+      if (id === 'WORKSPACE' || id === 'LOAD_CALC') {
+        const isUnifiedView = activeViewId === 'WORKSPACE' || activeViewId === 'LOAD_CALC';
+        setViewVisibility(element, id === 'WORKSPACE' ? isUnifiedView : false);
+      } else {
+        setViewVisibility(element, activeViewId === id);
+      }
+    });
+
     if (this.statusElement) this.statusElement.textContent = '';
   }
 

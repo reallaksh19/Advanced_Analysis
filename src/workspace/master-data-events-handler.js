@@ -18,16 +18,30 @@ export async function parseMasterFile(fileOrBuffer, fileName, masterKey) {
     throw new Error('Invalid file format');
   }
 
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  const sourceHash = await sha256(bytes);
+  const sourceMetadata = { sourceHash, byteLength: bytes.byteLength };
   const isXlsx = /\.(xlsx|xlsm|xlsb|xls|ods)$/i.test(fileName);
 
   if (isXlsx) {
     if (!XLSX) throw new Error('XLSX module is unavailable.');
-    const data = new Uint8Array(buffer);
-    const workbook = XLSX.read(data, { type: 'array', cellDates: false, raw: false });
+    const workbook = XLSX.read(bytes, { type: 'array', cellDates: false, raw: false });
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
-    const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
-    return { rawRows, fileName, sheetName };
+    const rawRows = masterKey === 'lineList'
+      ? parseThreeRowLineList(sheet, sheetName)
+      : XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false }).map((row, index) => ({ ...row, _sourceRowNumber: index + 2, _sourceSheet: sheetName }));
+    return { rawRows, fileName, sheetName, sourceMetadata };
+  }
+
+  if (/\.json$/i.test(fileName)) {
+    const parsed = JSON.parse(new TextDecoder('utf-8').decode(buffer));
+    if (!Array.isArray(parsed)) throw new Error('JSON master must contain one top-level row array.');
+    const rawRows = parsed.map((row, index) => {
+      if (!row || typeof row !== 'object' || Array.isArray(row)) throw new Error(`JSON master row ${index + 1} must be an object.`);
+      return { ...row, _sourceRowNumber: index + 1, _sourceSheet: 'JSON' };
+    });
+    return { rawRows, fileName, sheetName: 'JSON', sourceMetadata };
   }
 
   // Handle TXT / CSV
@@ -46,12 +60,49 @@ export async function parseMasterFile(fileOrBuffer, fileName, masterKey) {
       skipEmptyLines: true
     });
     if (parsed.errors.length) {
-      console.warn('CSV Parse Errors:', parsed.errors);
+      throw new Error(`CSV master parsing failed: ${parsed.errors.map((error) => `${error.code} at row ${error.row ?? 'unknown'}: ${error.message}`).join('; ')}`);
     }
     rawRows = parsed.data;
   }
 
-  return { rawRows, fileName, sheetName: 'Sheet1' };
+  return { rawRows: rawRows.map((row, index) => ({ ...row, _sourceRowNumber: index + 2, _sourceSheet: 'Sheet1' })), fileName, sheetName: 'Sheet1', sourceMetadata };
+}
+
+export function parseThreeRowLineList(sheet, sheetName) {
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
+  const headerStart = rows.findIndex((row) => row.some((cell) => String(cell).trim().toLowerCase() === 'line number'));
+  if (headerStart < 0 || rows.length <= headerStart + 3) {
+    throw new Error('Line-list workbook must contain the three-row header beginning with "Line number".');
+  }
+  const headers = combineHeaders(rows.slice(headerStart, headerStart + 3));
+  return rows.slice(headerStart + 3).map((values, index) => {
+    const row = Object.fromEntries(headers.map((header, column) => [header, values[column] ?? '']));
+    row._sourceRowNumber = headerStart + 4 + index;
+    row._sourceSheet = sheetName;
+    return row;
+  }).filter((row) => headers.some((header) => String(row[header]).trim() !== ''));
+}
+
+function combineHeaders(headerRows) {
+  const width = Math.max(...headerRows.map((row) => row.length));
+  let group = '';
+  const counts = new Map();
+  return Array.from({ length: width }, (_, column) => {
+    const top = String(headerRows[0][column] || '').trim();
+    if (top) group = top;
+    const parts = [top || group, headerRows[1][column], headerRows[2][column]]
+      .map((value) => String(value || '').trim()).filter(Boolean);
+    const base = parts.join(' | ') || `Column ${column + 1}`;
+    const count = (counts.get(base) || 0) + 1;
+    counts.set(base, count);
+    return count === 1 ? base : `${base} (${count})`;
+  });
+}
+
+async function sha256(bytes) {
+  if (!globalThis.crypto?.subtle) throw new Error('SHA-256 is unavailable in this runtime.');
+  const hash = await globalThis.crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(hash)].map((value) => value.toString(16).padStart(2, '0')).join('');
 }
 
 function headersFromRows(rows) {
@@ -75,6 +126,9 @@ export function autoMapMasterColumns(rawRows, masterKey, currentMap = {}, config
 
   const lineListMap = detectLineListFieldMap(rawRows, currentMap || {}, config?.linelist || config || null);
   const mergedMap = { ...fuzzyMap, ...lineListMap };
+  if (headers.includes('Phase')) mergedMap.phase = 'Phase';
+  if (headers.includes('From')) mergedMap.from = 'From';
+  if (headers.includes('To')) mergedMap.to = 'To';
 
   // Keep dynamic standalone-only fields that the core XML->CII line-list detector
   // intentionally does not own yet, such as From/To equipment columns.

@@ -1,43 +1,18 @@
-import { renderAdaptedConfigPanel } from '../calc-workspace/cii-standalone-port/ui-adapted/xml-cii-adapted-config-tabs.js';
 import { createXmlCiiAdaptedWorkflowState } from '../calc-workspace/cii-standalone-port/ui-adapted/xml-cii-adapted-state.js';
 import { deriveXmlCiiServiceFromBranchName } from '../calc-workspace/cii-standalone-port/core/service-process-fallback.js';
 import { analyzeTopologyOverlaps } from '../calc-workspace/cii-standalone-port/core/topology-autofix.js';
 import { mountAutofixLog } from './topology-autofix-log.js';
 import { masterDataController } from './master-data-controller.js';
 import { deriveLineKeyFromBranchName } from '../calc-workspace/cii-standalone-port/core/regex-line-key.js';
+import { renderProjectDataView } from './project-data/project-data-view.js';
+import { projectDataValue } from './project-data/project-data-contract.js';
+import { projectDataStore } from './project-data/project-data-store.js';
 
-export function deriveWallThicknessFromDtxr(boreMm, pipingClass = '', dtxrAttr = {}) {
-  const b = parseFloat(boreMm) || 150;
-  
-  // 1. Explicit WT / WALL_THICKNESS / THK in DTXR attributes
+export function deriveWallThicknessFromDtxr(boreMm, pipingClass, dtxrAttr) {
+  if (!Number.isFinite(Number.parseFloat(boreMm)) || !dtxrAttr || typeof dtxrAttr !== 'object') return null;
   const explicitWt = parseFloat(dtxrAttr.WT || dtxrAttr.WALL_THICKNESS || dtxrAttr.WALLTHK || dtxrAttr.THK || dtxrAttr.THICKNESS);
   if (Number.isFinite(explicitWt) && explicitWt > 0) return explicitWt;
-
-  // 2. Schedule parsing (SCH 40, SCH 80, SCH 160, STD, XS)
-  const schStr = String(dtxrAttr.SCH || dtxrAttr.SCHEDULE || pipingClass || '').toUpperCase();
-  if (schStr.includes('SCH 80') || schStr.includes('SCH80') || schStr.includes('XS')) {
-    if (b <= 50) return 5.54;
-    if (b <= 100) return 8.56;
-    if (b <= 150) return 10.97;
-    if (b <= 200) return 12.70;
-    return 12.70;
-  }
-  if (schStr.includes('SCH 160') || schStr.includes('SCH160')) {
-    if (b <= 150) return 18.26;
-    return 23.01;
-  }
-  
-  // 3. Standard Schedule 40 / 91261M7 / Default Nominal Wall Thickness Table (ASME B36.10M)
-  if (b <= 25) return 3.38;
-  if (b <= 40) return 3.68;
-  if (b <= 50) return 3.91;
-  if (b <= 80) return 5.49;
-  if (b <= 100) return 6.02;
-  if (b <= 150) return 7.11; // Standard 6" Sch 40
-  if (b <= 200) return 8.18; // Standard 8" Sch 40
-  if (b <= 250) return 9.27; // Standard 10" Sch 40
-  if (b <= 300) return 10.31; // Standard 12" Sch 40
-  return 9.52; // Default Standard Wall
+  return null;
 }
 
 let activeState = createXmlCiiAdaptedWorkflowState();
@@ -47,19 +22,13 @@ export function getPreflightStateRef() {
 
 let loadedProcessOverrides = null;
 
+function numberOrNull(value) {
+  const number = Number(value);
+  return value !== '' && value !== null && value !== undefined && Number.isFinite(number) ? number : null;
+}
+
 export function renderProjectConfiguration(container, renderCallback) {
-  container.innerHTML = '';
-  const card = document.createElement('div');
-  card.style.cssText = 'padding: 20px; color: #e2e8f0; width: 100%; height: 100%; box-sizing: border-box; background: #0b1121; overflow: auto;';
-  
-  const stateRef = getPreflightStateRef();
-  const internalRender = () => {
-    card.innerHTML = '';
-    renderAdaptedConfigPanel(card, stateRef, internalRender);
-  };
-  
-  internalRender();
-  container.appendChild(card);
+  renderProjectDataView(container, renderCallback);
 }
 
 export function renderPreflightGrid(container, model, renderCallback) {
@@ -120,21 +89,23 @@ export function renderPreflightGrid(container, model, renderCallback) {
         const lkRow = input.closest('tr[data-tree-id]');
         if (!lkRow) return;
         const lkId = lkRow.dataset.treeId;
-        const boreTd = lkRow.children[2]?.textContent || '150';
+        const boreTd = lkRow.children[2]?.textContent || '';
         const clsTd = lkRow.children[1]?.textContent || '';
-        const wt = deriveWallThicknessFromDtxr(boreTd, clsTd);
-        input.value = wt;
+        const wt = deriveWallThicknessFromDtxr(boreTd, clsTd, {});
+        input.value = wt ?? '';
         
         const statusCell = lkRow.querySelector('.lk-status-cell');
         if (statusCell) {
-          statusCell.innerHTML = '<span style="color:#a855f7; font-weight:bold;">⚡ DTXR Derived</span>';
+          statusCell.innerHTML = wt === null
+            ? '<span class="val-error">BLOCKED: no explicit wall thickness evidence</span>'
+            : '<span style="color:#a855f7; font-weight:bold;">DTXR explicit thickness</span>';
         }
 
         if (lkId) {
           const leafRows = tableContainer.querySelectorAll(`tr[data-parent-id="${lkId}"]`);
           leafRows.forEach(leaf => {
             const leafSpan = leaf.querySelector('.leaf-wallThickness');
-            if (leafSpan) leafSpan.textContent = wt;
+            if (leafSpan) leafSpan.textContent = wt ?? 'BLOCKED';
           });
         }
       });
@@ -164,6 +135,7 @@ export function renderPreflightGrid(container, model, renderCallback) {
   const btnAutofix = wrap.querySelector('#btn-topology-autofix');
   if (btnAutofix) {
     btnAutofix.addEventListener('click', () => {
+      const approvedToleranceMm = projectDataValue(projectDataStore.getProfile(), 'topology.supportSiteGroupingToleranceMm');
       // Create Modal
       const overlay = document.createElement('div');
       overlay.style.cssText = 'position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.8); display: flex; align-items: center; justify-content: center; z-index: 1000;';
@@ -177,7 +149,7 @@ export function renderPreflightGrid(container, model, renderCallback) {
         
         <div style="margin-bottom: 16px;">
           <label style="display: block; color: #cbd5e1; font-size: 12px; margin-bottom: 8px;">Spatial Tolerance (mm)</label>
-          <input type="number" id="autofix-tolerance" value="1.0" step="0.1" style="width: 100%; background: #0f172a; border: 1px solid #475569; color: white; padding: 8px; border-radius: 4px; font-size: 14px;">
+          <input type="number" id="autofix-tolerance" value="${Number.isFinite(approvedToleranceMm) ? approvedToleranceMm : ''}" step="0.1" style="width: 100%; background: #0f172a; border: 1px solid #475569; color: white; padding: 8px; border-radius: 4px; font-size: 14px;">
         </div>
         
         <div style="margin-bottom: 24px;">
@@ -199,8 +171,10 @@ export function renderPreflightGrid(container, model, renderCallback) {
       
       modal.querySelector('#autofix-cancel').addEventListener('click', () => overlay.remove());
       modal.querySelector('#autofix-analyze').addEventListener('click', () => {
+        const toleranceInput = modal.querySelector('#autofix-tolerance');
+        const tolerance = Number.parseFloat(toleranceInput.value);
+        if (!Number.isFinite(tolerance) || tolerance < 0) { toleranceInput.setCustomValidity('Approved Project Data topology tolerance is required.'); toleranceInput.reportValidity(); return; }
         overlay.remove();
-        const tolerance = parseFloat(modal.querySelector('#autofix-tolerance').value) || 1.0;
         
         // Dispatch event to application shell to run the autofix visualization
         const event = new CustomEvent('topology:autofix-visualize', {
@@ -214,18 +188,12 @@ export function renderPreflightGrid(container, model, renderCallback) {
 
   // Listen to the analyze event
   wrap.addEventListener('topology:autofix-visualize', async (e) => {
-    const tolerance = e.detail.tolerance || 1.0;
+    const tolerance = e.detail.tolerance;
+    if (!Number.isFinite(tolerance) || tolerance < 0) throw new Error('Topology overlap analysis requires an approved Project Data tolerance.');
     
-    // Use the compiled sharedModel supports directly or fallback to demo supports
-    let elements = model?._context?.contracts?.sharedModel?.supports;
+    const elements = model?._context?.contracts?.sharedModel?.supports;
     if (!elements || elements.length === 0) {
-      elements = [
-        { supportKey: 'ROUTE-SUPP-1', name: 'ROUTE-SUPP-1', type: 'SUPPORT', position: { x: 500, y: 0, z: 0 }, supportEvidence: { SUPPORT_TYPE: 'REST' } },
-        { supportKey: 'ROUTE-SUPP-1-SREF', name: 'ROUTE-SUPP-1/SREF', type: 'SUPPORT', position: { x: 500, y: 0, z: 0 }, supportEvidence: { SUPPORT_TYPE: 'SREF' } },
-        { supportKey: 'ROUTE-SUPP-2', name: 'ROUTE-SUPP-2', type: 'SUPPORT', position: { x: 2000, y: 3000, z: -1500 }, supportEvidence: { SUPPORT_TYPE: 'LINESTOP' } },
-        { supportKey: 'ROUTE-SUPP-2-SREF', name: 'ROUTE-SUPP-2/SREF', type: 'SUPPORT', position: { x: 2000, y: 3000, z: -1500 }, supportEvidence: { SUPPORT_TYPE: 'SREF' } },
-        { supportKey: 'ROUTE-SUPP-3', name: 'ROUTE-SUPP-3', type: 'SUPPORT', position: { x: 3000, y: 1000, z: -2500 }, supportEvidence: { SUPPORT_TYPE: 'ANCHOR' } },
-      ];
+      throw new Error('Topology overlap analysis is blocked because the active shared model has no source supports.');
     }
     
     const results = analyzeTopologyOverlaps(elements, tolerance);
@@ -343,19 +311,12 @@ async function loadAndRenderTreeGrid(container, model, processLineRows = null) {
       const service = deriveXmlCiiServiceFromBranchName(cleanFullName, {}) || 'UNKNOWN';
       let cls = item.attributes?.SPEC || 'UNKNOWN_SPEC';
       let rating = item.attributes?.RATING || 'UNKNOWN_RATING';
-      let bore = item.boreMm || item._boreValue || item.bore || 150;
-      if (typeof bore === 'string') bore = parseFloat(bore) || 150;
+      let bore = item.boreMm || item._boreValue || item.bore || null;
+      if (typeof bore === 'string') bore = Number.parseFloat(bore) || null;
 
       const parts = cleanFullName.split('-');
       if (parts.length > 3) {
         if (cls === 'UNKNOWN_SPEC') cls = parts[4] || parts[3] || cls;
-        if (rating === 'UNKNOWN_RATING') {
-          if (cls.startsWith('9')) rating = '900#';
-          else if (cls.startsWith('3')) rating = '300#';
-          else if (cls.startsWith('15')) rating = '1500#';
-          else if (cls.startsWith('1')) rating = '150#';
-          else if (cls.startsWith('6')) rating = '600#';
-        }
       }
 
       const itemName = item.name || item.id || item.supportKey || item.type || 'ITEM';
@@ -391,10 +352,10 @@ async function loadAndRenderTreeGrid(container, model, processLineRows = null) {
           cls: item.cls,
           bore: item.bore,
           items: [],
-          p1: 0, t1: 0, t2: 0, t3: 0,
-          phase: 'L',
-          fluidDensity: 1000,
-          metalDensity: 7850,
+          p1: null, t1: null, t2: null, t3: null,
+          phase: null,
+          fluidDensity: null,
+          metalDensity: null,
           isProcessMatched: false
         };
       }
@@ -437,12 +398,12 @@ async function loadAndRenderTreeGrid(container, model, processLineRows = null) {
 
               if (matchedRow) {
                 lkObj.isProcessMatched = true;
-                lkObj.p1 = Number(matchedRow.p1 || matchedRow.hydroPressure || 0);
-                lkObj.t1 = Number(matchedRow.t1 || 0);
-                lkObj.t2 = Number(matchedRow.t2 || 0);
-                lkObj.t3 = Number(matchedRow.t3 || 0);
-                lkObj.phase = matchedRow.phase || 'L';
-                lkObj.fluidDensity = Number(matchedRow.density || matchedRow.densityMixed || 1000);
+                lkObj.p1 = numberOrNull(matchedRow.p1 || matchedRow.hydroPressure);
+                lkObj.t1 = numberOrNull(matchedRow.t1);
+                lkObj.t2 = numberOrNull(matchedRow.t2);
+                lkObj.t3 = numberOrNull(matchedRow.t3);
+                lkObj.phase = matchedRow.phase || null;
+                lkObj.fluidDensity = numberOrNull(matchedRow.density || matchedRow.densityMixed);
                 if (matchedRow.pipingClass) lkObj.cls = matchedRow.pipingClass;
                 if (matchedRow.rating) lkObj.rating = matchedRow.rating;
               }
@@ -499,9 +460,9 @@ async function loadAndRenderTreeGrid(container, model, processLineRows = null) {
           <td><input type="text" class="preflight-input srv-val-input" data-srv-id="${srvId}" data-field="t1" value="${firstLk.t1 || ''}" placeholder="Srv T1"></td>
           <td><input type="text" class="preflight-input srv-val-input" data-srv-id="${srvId}" data-field="t2" value="${firstLk.t2 || ''}" placeholder="Srv T2"></td>
           <td><input type="text" class="preflight-input srv-val-input" data-srv-id="${srvId}" data-field="t3" value="${firstLk.t3 || ''}" placeholder="Srv T3"></td>
-          <td><input type="text" class="preflight-input srv-val-input" data-srv-id="${srvId}" data-field="phase" value="${firstLk.phase || 'L'}" placeholder="Phase" style="width: 35px;"></td>
-          <td><input type="text" class="preflight-input srv-val-input" data-srv-id="${srvId}" data-field="fluidDensity" value="${firstLk.fluidDensity || '1000'}" placeholder="Density" style="width: 50px;"></td>
-          <td>${firstLk.metalDensity || 7850}</td>
+          <td><input type="text" class="preflight-input srv-val-input" data-srv-id="${srvId}" data-field="phase" value="${firstLk.phase || ''}" placeholder="Required" style="width: 55px;"></td>
+          <td><input type="text" class="preflight-input srv-val-input" data-srv-id="${srvId}" data-field="fluidDensity" value="${firstLk.fluidDensity ?? ''}" placeholder="Required" style="width: 70px;"></td>
+          <td>${firstLk.metalDensity ?? 'BLOCKED'}</td>
           <td><span style="color:#34d399; font-size:10px;">Service Fill-Down</span></td>
         </tr>
       `;
@@ -531,9 +492,9 @@ async function loadAndRenderTreeGrid(container, model, processLineRows = null) {
               <td><input type="text" class="preflight-input cls-val-input" data-cls-id="${clsId}" data-field="t1" value="${firstClsLk.t1 || ''}" placeholder="Class T1"></td>
               <td><input type="text" class="preflight-input cls-val-input" data-cls-id="${clsId}" data-field="t2" value="${firstClsLk.t2 || ''}" placeholder="Class T2"></td>
               <td><input type="text" class="preflight-input cls-val-input" data-cls-id="${clsId}" data-field="t3" value="${firstClsLk.t3 || ''}" placeholder="Class T3"></td>
-              <td><input type="text" class="preflight-input cls-val-input" data-cls-id="${clsId}" data-field="phase" value="${firstClsLk.phase || 'L'}" placeholder="Phase" style="width: 35px;"></td>
-              <td><input type="text" class="preflight-input cls-val-input" data-cls-id="${clsId}" data-field="fluidDensity" value="${firstClsLk.fluidDensity || '1000'}" placeholder="Density" style="width: 50px;"></td>
-              <td>${firstClsLk.metalDensity || 7850}</td>
+              <td><input type="text" class="preflight-input cls-val-input" data-cls-id="${clsId}" data-field="phase" value="${firstClsLk.phase || ''}" placeholder="Required" style="width: 55px;"></td>
+              <td><input type="text" class="preflight-input cls-val-input" data-cls-id="${clsId}" data-field="fluidDensity" value="${firstClsLk.fluidDensity ?? ''}" placeholder="Required" style="width: 70px;"></td>
+              <td>${firstClsLk.metalDensity ?? 'BLOCKED'}</td>
               <td><span style="color:#7dd3fc; font-size:10px;">Class Fill-Down</span></td>
             </tr>
           `;
@@ -553,15 +514,15 @@ async function loadAndRenderTreeGrid(container, model, processLineRows = null) {
                   <span style="color:#94a3b8; font-size:10px; font-weight:normal; margin-left:6px;">(${lkObj.fullLineKeyName} &bull; ${lkObj.items.length} items)</span>
                 </td>
                 <td>${lkObj.cls}</td>
-                <td>${lkObj.bore || 150}</td>
-                <td><input type="text" class="preflight-input lk-val-input" data-lk-id="${lkId}" data-field="wallThickness" value="${lkObj.wallThickness || derivedWt}" style="width: 55px;"></td>
+                <td>${lkObj.bore ?? 'BLOCKED'}</td>
+                <td><input type="text" class="preflight-input lk-val-input" data-lk-id="${lkId}" data-field="wallThickness" value="${lkObj.wallThickness || derivedWt || ''}" placeholder="Required" style="width: 65px;"></td>
                 <td><input type="text" class="preflight-input lk-val-input" data-lk-id="${lkId}" data-field="p1" value="${lkObj.p1 || ''}"></td>
                 <td><input type="text" class="preflight-input lk-val-input" data-lk-id="${lkId}" data-field="t1" value="${lkObj.t1 || ''}"></td>
                 <td><input type="text" class="preflight-input lk-val-input" data-lk-id="${lkId}" data-field="t2" value="${lkObj.t2 || ''}"></td>
                 <td><input type="text" class="preflight-input lk-val-input" data-lk-id="${lkId}" data-field="t3" value="${lkObj.t3 || ''}"></td>
-                <td><input type="text" class="preflight-input lk-val-input" data-lk-id="${lkId}" data-field="phase" value="${lkObj.phase || 'L'}" style="width: 35px;"></td>
-                <td><input type="text" class="preflight-input lk-val-input" data-lk-id="${lkId}" data-field="fluidDensity" value="${lkObj.fluidDensity || '1000'}" style="width: 50px;"></td>
-                <td>${lkObj.metalDensity}</td>
+                <td><input type="text" class="preflight-input lk-val-input" data-lk-id="${lkId}" data-field="phase" value="${lkObj.phase || ''}" placeholder="Required" style="width: 55px;"></td>
+                <td><input type="text" class="preflight-input lk-val-input" data-lk-id="${lkId}" data-field="fluidDensity" value="${lkObj.fluidDensity ?? ''}" placeholder="Required" style="width: 70px;"></td>
+                <td>${lkObj.metalDensity ?? 'BLOCKED'}</td>
                 <td class="lk-status-cell">${lkObj.isProcessMatched ? '<span style="color:#34d399; font-weight:bold;">✅ Line Key Matched</span>' : (lkObj.bore > 600 ? '<span class="val-error">🛑 Verify > 24"</span>' : '<span class="val-deduced">⚠️ Deduced</span>')}</td>
               </tr>
             `;
@@ -572,8 +533,8 @@ async function loadAndRenderTreeGrid(container, model, processLineRows = null) {
                 <tr class="preflight-leaf" data-parent-id="${lkId}" style="display: none; color: #cbd5e1; font-size: 11px;">
                   <td style="padding-left: 64px;">↳ ${item.itemType} ${item.itemName}</td>
                   <td>${lkObj.cls}</td>
-                  <td>${item.bore || lkObj.bore || 150}</td>
-                  <td><span class="leaf-wallThickness">${derivedWt}</span></td>
+                  <td>${item.bore || lkObj.bore || 'BLOCKED'}</td>
+                  <td><span class="leaf-wallThickness">${derivedWt || 'BLOCKED'}</span></td>
                   <td><span class="leaf-p1">${lkObj.p1 || '-'}</span></td>
                   <td><span class="leaf-t1">${lkObj.t1 || '-'}</span></td>
                   <td><span class="leaf-t2">${lkObj.t2 || '-'}</span></td>

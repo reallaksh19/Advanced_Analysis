@@ -29,6 +29,8 @@ function normalizeRows(masterKey, rawRows, fieldMap) {
   return rawRows.map((rawRow, index) => {
     const canonical = {
       _sourceRowIndex: index,
+      _sourceRowNumber: rawRow._sourceRowNumber ?? null,
+      _sourceSheet: rawRow._sourceSheet || '',
       _sourceProvenance: rawRow
     };
     

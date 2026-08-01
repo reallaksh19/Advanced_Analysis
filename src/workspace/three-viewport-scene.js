@@ -5,13 +5,14 @@ import { createThreePrimitive } from './three-primitive-factory.js';
 import { disposeThreeEngineeringObject } from './three-object-disposal.js';
 import { assertViewportRenderModel } from './viewport-render-model.js';
 
-export function renderThreeModel(backend, model) {
+export function renderThreeModel(backend, model, options = {}) {
   assertViewportRenderModel(model);
+  backend.applyModelConfiguration(model);
+  const isFirstLoad = !backend.hasFittedFirstModel || options.resetCamera === true;
+
   clearThreeSceneObjects(backend);
   backend.model = model;
   backend.selectedEntityId = '';
-  backend.raycaster.params.Line.threshold =
-    Math.max(model.bounds.radius * 0.015, 0.5);
   projectPrimitives(
     backend,
     model.physicalPrimitives ?? [],
@@ -28,12 +29,19 @@ export function renderThreeModel(backend, model) {
     backend.diagnosticGroup,
   );
   updateThreeHostMetadata(backend);
-  backend.fitView();
-  backend.initialCameraState = {
-    position: backend.camera.position.clone(),
-    target: backend.controls.target.clone(),
-    zoom: backend.camera.zoom,
-  };
+
+  // Only perform expensive camera fitView on initial model load, not on every single incremental edit click
+  if (isFirstLoad) {
+    backend.fitView();
+    backend.hasFittedFirstModel = true;
+    backend.initialCameraState = {
+      position: backend.camera.position.clone(),
+      target: backend.controls.target.clone(),
+      zoom: backend.camera.zoom,
+    };
+  } else if (backend.controls) {
+    backend.controls.update();
+  }
 }
 
 export function clearThreeSceneObjects(backend) {

@@ -1,6 +1,7 @@
 import { createDiagnostic, DIAGNOSTIC_SEVERITY, sortDiagnostics } from '../core/shared-piping-model/diagnostics.js';
 import { deepFreeze, isPlainRecord, stringValue } from '../core/shared-piping-model/immutable.js';
 import { validateStagedModelIndexContract } from './shared-model-index-validation.js';
+import { inheritedSjsonBranchIdentity, parseSjsonBranchIdentity } from './source-line-identity.js';
 
 export const STAGED_MODEL_INDEX_SCHEMA = 'staged-model-index/v2';
 const SELECTED_PACKAGE_SCHEMA = 'rvm-selected-geometry-workspace-package/v1';
@@ -67,13 +68,14 @@ function createNode(descriptor, state) {
   const sourceEntityId = readSourceEntityId(descriptor.item);
   const sourceNodeKey = `source-node:${descriptor.jsonPointer}`;
   const identity = inheritedIdentity(descriptor.item, descriptor.parent);
+  const branchIdentity = inheritedSjsonBranchIdentity(descriptor.item, descriptor.parent, sourceType(descriptor.item));
   const node = {
     sourceNodeKey, sourceEntityId, jsonPointer: descriptor.jsonPointer,
     parentSourceNodeKey: descriptor.parent?.sourceNodeKey || '', childSourceNodeKeys: [],
     childIndex: descriptor.childIndex, depth: descriptor.depth, rootGroup: descriptor.rootGroup,
     type: sourceType(descriptor.item), name: sourceName(descriptor.item, sourceEntityId, sourceNodeKey),
     sourcePath: sourcePathFor(descriptor.item, descriptor.parent?.sourcePath, sourceEntityId),
-    ...identity, diagnostics: [],
+    ...identity, ...branchIdentity, diagnostics: [],
   };
   addCompatibilityAliases(node);
   if (!sourceEntityId) recordMissingIdentity(node, state);
@@ -88,10 +90,16 @@ function addCompatibilityAliases(node) {
 }
 
 function inheritedIdentity(item, parent) {
-  return Object.fromEntries(Object.entries(IDENTITY_ALIASES).map(([field, aliases]) => [
+  const identity = Object.fromEntries(Object.entries(IDENTITY_ALIASES).map(([field, aliases]) => [
     field,
     firstSourceValue(item, aliases) || parent?.[field] || '',
   ]));
+  if (sourceType(item) === 'BRANCH') {
+    const branch = stringValue(item.name || item.attributes?.NAME);
+    identity.branchId = branch;
+    identity.lineId = parseSjsonBranchIdentity(branch).lineKey;
+  }
+  return identity;
 }
 
 function addDuplicateIdentityDiagnostics(state) {
@@ -158,7 +166,12 @@ function selectedItemRoots(selected) {
 }
 
 function readSourceEntityId(item) {
-  return stringValue(item.sourceId || item.id || item.nodeId || item.sourceAttributes?.ID || item.attributes?.ID) || null;
+  const sourceNameIdentity = sourceType(item) === 'BRANCH' || String(item.attributes?.AUTO_GENERATED_PIPE).toLowerCase() === 'true';
+  return stringValue(
+    item.sourceId || item.id || item.nodeId || item.sourceAttributes?.ID
+    || item.attributes?.ID || item.attributes?.REF || item.attributes?.NAME
+    || (sourceNameIdentity ? item.name : ''),
+  ) || null;
 }
 
 function sourceName(item, sourceEntityId, sourceNodeKey) {
@@ -278,9 +291,7 @@ function groupBy(rows, field) {
   }, {});
 }
 
-function normalizeKey(value) {
-  return String(value || '').replace(/[^a-z0-9]/gi, '').toUpperCase();
-}
+function normalizeKey(value) { return String(value || '').replace(/[^a-z0-9]/gi, '').toUpperCase(); }
 
 function isSupportType(type) {
   return /^(ATTA|SUPPORT|REST|GUIDE|LINESTOP|LINE_STOP|LIMIT|LIM|ANCHOR|SPRING)$/i.test(type);

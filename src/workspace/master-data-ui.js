@@ -1,12 +1,25 @@
-import { renderAdaptedConfigPanel } from '../calc-workspace/cii-standalone-port/ui-adapted/xml-cii-adapted-config-tabs.js';
 import { renderStandaloneImportMastersPanel } from '../calc-workspace/cii-standalone-port/ui-adapted/xml-cii-adapted-import-masters.js';
 import { parseMasterFile, autoMapMasterColumns } from './master-data-events-handler.js';
 import { masterDataController } from './master-data-controller.js';
 import { normalizeLineList, normalizePipingClass, normalizeWeight, normalizeMaterialMap } from './master-data-normalizers.js';
 import { saveMappingForFile, getSavedMappingsForMaster } from '../calc-workspace/cii-standalone-port/ui-adapted/xml-cii-adapted-state.js';
 
-export function renderMasterDataUI() {
-  const container = document.createElement('div');
+/**
+ * Normalizes an imported master using its explicit type and user-visible mapping.
+ * Inputs are the master key, parsed source rows, and selected column mapping; the
+ * output is the validated canonical row list. Unknown keys fail without fallback.
+ */
+function normalizeMasterRows(masterKey, rawRows, mapping) {
+  if (masterKey === 'lineList') return normalizeLineList(rawRows, mapping);
+  if (masterKey === 'pipingClass') return normalizePipingClass(rawRows, mapping);
+  if (masterKey === 'weight') return normalizeWeight(rawRows, mapping);
+  if (masterKey === 'materialMap') return normalizeMaterialMap(rawRows, mapping);
+  throw new RangeError(`Unsupported master type: ${masterKey}`);
+}
+
+export function renderMasterDataUI(documentRef) {
+  if (!documentRef) throw new TypeError('Master Data UI requires a document.');
+  const container = documentRef.createElement('div');
   container.className = 'master-data-ui';
   container.style.cssText = 'display:flex; flex-direction:column; height:100%; overflow:hidden; background:#0b1120; color:#e2e8f0; padding:0;';
 
@@ -14,8 +27,7 @@ export function renderMasterDataUI() {
     current: {
       masterContext: null,
       supportConfigJson: '{}',
-      activeMainTab: 'lineList', // 'lineList', 'pipingClass', 'weight', 'materialMap', 'settings'
-      configActiveSubTabId: 'general',
+      activeMainTab: 'lineList',
       importMastersLoading: false,
       importMastersWriteBackStatus: ''
     }
@@ -29,19 +41,18 @@ export function renderMasterDataUI() {
     stateRef.current.supportConfigJson = JSON.stringify(stateRef.current.masterContext.config || {});
     
     // Top Navigation Tabs Bar
-    const header = document.createElement('div');
+    const header = documentRef.createElement('div');
     header.style.cssText = 'display:flex; gap:12px; align-items:center; background:#0f172a; padding:12px 20px; border-bottom:1px solid #1e293b; flex:none; flex-wrap:wrap;';
     
     const tabs = [
       { id: 'lineList', label: 'Line List' },
       { id: 'pipingClass', label: 'Piping Classes' },
       { id: 'weight', label: 'Weights' },
-      { id: 'materialMap', label: 'Material Map' },
-      { id: 'settings', label: '⚙️ Rules & Settings' }
+      { id: 'materialMap', label: 'Material Map' }
     ];
     
     tabs.forEach(tab => {
-      const btn = document.createElement('button');
+      const btn = documentRef.createElement('button');
       btn.textContent = tab.label;
       const isActive = stateRef.current.activeMainTab === tab.id;
       btn.style.cssText = `
@@ -58,87 +69,17 @@ export function renderMasterDataUI() {
     });
 
     // Action buttons
-    const actionsRight = document.createElement('div');
+    const actionsRight = documentRef.createElement('div');
     actionsRight.style.cssText = 'margin-left:auto; display:flex; gap:10px; align-items:center;';
-
-    const loadTestMastersBtn = document.createElement('button');
-    loadTestMastersBtn.textContent = '🧪 Load Test Master Files';
-    loadTestMastersBtn.style.cssText = 'background:#854d0e; color:#fef08a; border:1px solid #ca8a04; border-radius:4px; padding:6px 12px; font-weight:bold; font-size:12px; cursor:pointer;';
-    loadTestMastersBtn.title = 'Loads pre-configured test master files from disk';
-    loadTestMastersBtn.addEventListener('click', async () => {
-      stateRef.current.importMastersLoading = true;
-      stateRef.current.importMastersWriteBackStatus = 'Loading test masters from disk...';
-      render();
-
-      try {
-        const files = [
-          { key: 'lineList', path: '/fixtures/AML-91-PDFEED-PX-2345-00001-0000 BC4.xlsx' },
-          { key: 'pipingClass', path: '/fixtures/Piping class master.xlsx' },
-          { key: 'weight', path: '/fixtures/wtValveweights.xlsx' },
-          { key: 'materialMap', path: '/fixtures/PCF_MAT_MAP.TXT' }
-        ];
-
-        for (const f of files) {
-          try {
-            const res = await fetch(f.path);
-            if (!res.ok) throw new Error(`Status ${res.status}`);
-            const buffer = await res.arrayBuffer();
-            const fileName = f.path.split('/').pop();
-            const { rawRows, sheetName } = await parseMasterFile(buffer, fileName, f.key);
-            
-            if (rawRows && rawRows.length > 0) {
-              masterDataController.setRawRows(f.key, rawRows, fileName, sheetName);
-              const mapping = autoMapMasterColumns(rawRows, f.key);
-              if (mapping) {
-                masterDataController.setFieldMap(f.key, mapping);
-                try {
-                  if (f.key === 'lineList') masterDataController.setNormalizedRows(f.key, normalizeLineList(rawRows, mapping));
-                  else if (f.key === 'pipingClass') masterDataController.setNormalizedRows(f.key, normalizePipingClass(rawRows, mapping));
-                  else if (f.key === 'weight') masterDataController.setNormalizedRows(f.key, normalizeWeight(rawRows, mapping));
-                  else if (f.key === 'materialMap') masterDataController.setNormalizedRows(f.key, normalizeMaterialMap(rawRows, mapping));
-                } catch(e) {
-                  console.warn(`Validation failed for test master ${f.key}:`, e.message);
-                }
-              }
-            }
-          } catch (err) {
-            console.warn(`Failed to fetch test master ${f.path}:`, err);
-          }
-        }
-        stateRef.current.importMastersWriteBackStatus = '✅ Test Master Files Loaded Successfully!';
-      } catch (e) {
-        stateRef.current.importMastersWriteBackStatus = `❌ Error loading test masters: ${e.message}`;
-      } finally {
-        stateRef.current.importMastersLoading = false;
-        render();
-      }
-    });
-    actionsRight.appendChild(loadTestMastersBtn);
-
-    const applyBtn = document.createElement('button');
-    applyBtn.textContent = 'Apply Overrides to Workspace';
-    applyBtn.style.cssText = 'background:#10b981; color:#fff; border:none; border-radius:4px; padding:8px 16px; font-weight:bold; font-size:12px; cursor:pointer;';
-    applyBtn.addEventListener('click', () => {
-      // Stub for now, will be implemented with WorkspaceMutationService
-      alert('Workspace mutation service pending P2 Implementation');
-    });
-    if (window.__ENABLE_EXPERIMENTAL_MASTER_DATA_OVERRIDES) {
-      actionsRight.appendChild(applyBtn);
-    }
 
     header.appendChild(actionsRight);
     container.appendChild(header);
 
     // Body Container
-    const body = document.createElement('div');
+    const body = documentRef.createElement('div');
     body.style.cssText = 'flex:1; overflow-y:auto; padding:20px;';
 
-    if (stateRef.current.activeMainTab === 'settings') {
-      renderAdaptedConfigPanel(body, stateRef, render);
-    } else {
-      // Render standard 4-Master Cards with upload, column mapping, and searchable table preview!
-      renderStandaloneImportMastersPanel(body, stateRef.current, stateRef.current.activeMainTab);
-    }
+    renderStandaloneImportMastersPanel(body, stateRef.current, stateRef.current.activeMainTab);
 
     // Attach master action events (Upload File, Auto-Map, Save Mapping)
     body.addEventListener('click', async (e) => {
@@ -166,7 +107,7 @@ export function renderMasterDataUI() {
         }
       } else if (action === 'save-master-mapping') {
         const masterKey = target.dataset.masterKey;
-        const selects = document.querySelectorAll(`select[data-master-field-map][data-master-key="${masterKey}"]`);
+        const selects = container.querySelectorAll(`select[data-master-field-map][data-master-key="${masterKey}"]`);
         const mapping = {};
         selects.forEach(s => {
           if (s.value) mapping[s.dataset.masterFieldMap] = s.value;
@@ -175,16 +116,16 @@ export function renderMasterDataUI() {
         const rawRows = masterDataController.getMasterData()[masterKey]?.rawRows || [];
         masterDataController.setFieldMap(masterKey, mapping);
         
-        const fileName = masterDataController.getMasterData()[masterKey]?.fileName || 'default-template';
+        const fileName = masterDataController.getMasterData()[masterKey]?.fileName;
+        if (!fileName) {
+          stateRef.current.importMastersWriteBackStatus = `Cannot save ${masterKey} mapping before an authoritative file is loaded.`;
+          render();
+          return;
+        }
         saveMappingForFile(masterKey, fileName, mapping);
         
         try {
-            let normalizedRows = [];
-            if (masterKey === 'lineList') normalizedRows = normalizeLineList(rawRows, mapping);
-            else if (masterKey === 'pipingClass') normalizedRows = normalizePipingClass(rawRows, mapping);
-            else if (masterKey === 'weight') normalizedRows = normalizeWeight(rawRows, mapping);
-            else if (masterKey === 'materialMap') normalizedRows = normalizeMaterialMap(rawRows, mapping);
-            
+            const normalizedRows = normalizeMasterRows(masterKey, rawRows, mapping);
             masterDataController.setNormalizedRows(masterKey, normalizedRows);
             masterDataController.getMasterData()[masterKey].diagnostics = [{ code: 'VALID', message: 'Mapping validated and applied successfully.' }];
             stateRef.current.importMastersWriteBackStatus = `Mapping saved as "${fileName}" and applied successfully for ${masterKey}.`;
@@ -208,11 +149,16 @@ export function renderMasterDataUI() {
           if (mapping) {
             masterDataController.setFieldMap(masterKey, mapping);
             const rawRows = masterDataController.getMasterData()[masterKey]?.rawRows || [];
-            if (rawRows.length && masterKey === 'lineList') {
+            if (rawRows.length) {
               try {
-                const norm = normalizeLineList(rawRows, mapping);
+                const norm = normalizeMasterRows(masterKey, rawRows, mapping);
                 masterDataController.setNormalizedRows(masterKey, norm);
-              } catch (_) {}
+              } catch (error) {
+                masterDataController.setNormalizedRows(masterKey, []);
+                stateRef.current.importMastersWriteBackStatus = `Saved mapping is invalid for ${masterKey}: ${error instanceof Error ? error.message : String(error)}`;
+                render();
+                return;
+              }
             }
             stateRef.current.importMastersWriteBackStatus = `Applied saved mapping "${selectedMappingName}" for ${masterKey}.`;
             render();
@@ -231,11 +177,14 @@ export function renderMasterDataUI() {
         masterDataController.setFieldMap(masterKey, currentMap);
         
         const rawRows = masterDataController.getMasterData()[masterKey]?.rawRows || [];
-        if (rawRows.length && masterKey === 'lineList') {
+        if (rawRows.length) {
           try {
-            const norm = normalizeLineList(rawRows, currentMap);
+            const norm = normalizeMasterRows(masterKey, rawRows, currentMap);
             masterDataController.setNormalizedRows(masterKey, norm);
-          } catch (_) {}
+          } catch (error) {
+            masterDataController.setNormalizedRows(masterKey, []);
+            stateRef.current.importMastersWriteBackStatus = `Mapping is invalid for ${masterKey}: ${error instanceof Error ? error.message : String(error)}`;
+          }
         }
         render();
         return;
@@ -246,22 +195,26 @@ export function renderMasterDataUI() {
         const file = fileInput.files[0];
         const masterKey = fileInput.dataset.masterFile;
         try {
-          const { rawRows, sheetName } = await parseMasterFile(file, file.name, masterKey);
-          masterDataController.setRawRows(masterKey, rawRows, file.name, sheetName);
+          const { rawRows, sheetName, sourceMetadata } = await parseMasterFile(file, file.name, masterKey);
+          masterDataController.setRawRows(masterKey, rawRows, file.name, sheetName, sourceMetadata);
           
-          // Auto-map automatically on upload (as requested, replicating baseline behavior)
+          // Apply the visible auto-mapping to every supported real master type.
           const mapping = autoMapMasterColumns(rawRows, masterKey);
           if (mapping && Object.keys(mapping).length > 0) {
-             masterDataController.setFieldMap(masterKey, mapping);
-             if (masterKey === 'lineList') {
-               try {
-                 const norm = normalizeLineList(rawRows, mapping);
-                 masterDataController.setNormalizedRows(masterKey, norm);
-               } catch (_) {}
-             }
-             stateRef.current.importMastersWriteBackStatus = `Successfully uploaded and auto-mapped ${rawRows.length} rows for ${masterKey}.`;
+            masterDataController.setFieldMap(masterKey, mapping);
+            try {
+              const normalizedRows = normalizeMasterRows(masterKey, rawRows, mapping);
+              masterDataController.setNormalizedRows(masterKey, normalizedRows);
+              masterDataController.getMasterData()[masterKey].diagnostics = [{ code: 'VALID', message: 'Auto-mapping validated and applied successfully.' }];
+              stateRef.current.importMastersWriteBackStatus = `Successfully uploaded, auto-mapped, and validated ${normalizedRows.length} rows for ${masterKey}.`;
+            } catch (error) {
+              masterDataController.setNormalizedRows(masterKey, []);
+              masterDataController.getMasterData()[masterKey].diagnostics = [{ code: 'INVALID_MAPPING', message: error instanceof Error ? error.message : String(error) }];
+              stateRef.current.importMastersWriteBackStatus = `Uploaded ${rawRows.length} rows, but mapping validation failed for ${masterKey}: ${error instanceof Error ? error.message : String(error)}`;
+            }
           } else {
-             stateRef.current.importMastersWriteBackStatus = `Successfully uploaded ${rawRows.length} rows for ${masterKey}.`;
+            masterDataController.setNormalizedRows(masterKey, []);
+            stateRef.current.importMastersWriteBackStatus = `Uploaded ${rawRows.length} rows for ${masterKey}; no authoritative field mapping was found.`;
           }
           render();
         } catch (err) {

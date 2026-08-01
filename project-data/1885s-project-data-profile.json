@@ -1,0 +1,112 @@
+{
+  "schema": "project-data-profile/v1",
+  "projectId": "1885S",
+  "revision": 2,
+  "updatedAt": "2026-08-01T00:00:00.000Z",
+  "sourcesAndUnits": {
+    "lengthUnit": {
+      "value": "mm",
+      "evidence": { "source": "Sjson.json coordinate and DTXR units", "sourceKey": "dataset", "sourceHash": "6b2c8b01ab0ba6ec8e9e7c42eb4a719668ffd2dc4dbe4790d27cf426a1f60288", "locator": "attributes APOS/LPOS and unit-bearing dimensions" },
+      "approved": true
+    },
+    "sourceUpAxis": {
+      "value": "Z",
+      "evidence": { "source": "Sjson.json POSI/ABOP/LBOP directional evidence", "sourceKey": "dataset", "sourceHash": "6b2c8b01ab0ba6ec8e9e7c42eb4a719668ffd2dc4dbe4790d27cf426a1f60288", "locator": "U coordinate corresponds to source z" },
+      "approved": true
+    },
+    "coordinateTransform": {
+      "value": { "boundary": "rendering-only", "source": ["x", "y", "z"], "threeJs": ["x", "z", "-y"] },
+      "evidence": { "source": "1885S implementation plan", "locator": "Source Z-up to Three.js Y-up rendering boundary" },
+      "approved": true
+    },
+    "datasetSource": {
+      "value": { "path": "F:\\CODE-5-SS\\3D_Converters\\Benchmarks\\1885Sjson\\Sjson.json", "sha256": "6b2c8b01ab0ba6ec8e9e7c42eb4a719668ffd2dc4dbe4790d27cf426a1f60288" },
+      "evidence": { "source": "Supplied SJSON", "sourceKey": "dataset", "sourceHash": "6b2c8b01ab0ba6ec8e9e7c42eb4a719668ffd2dc4dbe4790d27cf426a1f60288", "locator": "whole file" },
+      "approved": true
+    },
+    "lineListSource": {
+      "value": { "path": "D:\\Code3\\EF\\AML-91-PDFEED-PX-2345-00001-0000 BC4.xlsx", "sheet": "LineList", "row": 316, "sha256": "723518a16b1a744c9328539f1a25fe15ea246757930970603a89d3cea46e3f41" },
+      "evidence": { "source": "Supplied line-list master", "sourceKey": "lineList", "sourceHash": "723518a16b1a744c9328539f1a25fe15ea246757930970603a89d3cea46e3f41", "locator": "LineList!316" },
+      "approved": true
+    },
+    "pipingClassSource": {
+      "value": { "path": "F:\\CODE-4-SS\\SS2\\3D_Viewer_github_clone\\docs\\Masters\\Piping class master.xlsx", "sha256": "bea1c45f3f7dcf51340a6d625cfcc23cfc5926be3413d697183b607e2ccab82c" },
+      "evidence": { "source": "Supplied piping-class master", "sourceKey": "pipingClass", "sourceHash": "bea1c45f3f7dcf51340a6d625cfcc23cfc5926be3413d697183b607e2ccab82c", "locator": "class 91261, NPS 6, rating 900" },
+      "approved": true
+    },
+    "componentWeightSource": {
+      "value": { "path": "F:\\CODE-6\\XML_Compare_Utilities\\docs\\Masters\\wtValveweights.json", "sha256": "72e266002256e2ac0b0c0c9c722dde2bb65e93deec2075d209c7ab78d219cda2" },
+      "evidence": { "source": "Topo Validator component-weight master", "sourceKey": "componentWeight", "sourceHash": "72e266002256e2ac0b0c0c9c722dde2bb65e93deec2075d209c7ab78d219cda2", "locator": "whole file" },
+      "approved": true
+    }
+  },
+  "topology": {
+    "portMatchToleranceMm": { "value": 1, "evidence": { "source": "Topo Validator sequential construction tolerance policy", "sourceKey": "topoValidatorTolerancePolicy", "sourceHash": "209f8e1ddcceca158a251d7e99fad9db94b25f02c05bd94923f98f45f1b6ac0e", "locator": "exactEquivalence.fittingPortMm" }, "approved": true },
+    "supportSiteGroupingToleranceMm": { "value": 0.1, "evidence": { "source": "Topo Validator canonical topology policy", "sourceKey": "topoValidatorCheckerPolicy", "sourceHash": "1350383dba12eb4faa707e0733a53bc3a72538d9f30c65c9870e4cca3b31bfe4", "locator": "thresholds.toleranceMm and originToleranceMm" }, "approved": true },
+    "autoCarrierCoincidenceToleranceMm": { "value": 1, "evidence": { "source": "Topo Validator sequential construction tolerance policy", "sourceKey": "topoValidatorTolerancePolicy", "sourceHash": "209f8e1ddcceca158a251d7e99fad9db94b25f02c05bd94923f98f45f1b6ac0e", "locator": "exactEquivalence.fittingPortMm" }, "approved": true },
+    "routeJoiningRules": { "value": { "partition": "branch-scoped-connected-components", "chainage": "exact-port-topology", "sourceOrderAllowed": false, "degreeAboveTwo": "BLOCKED" }, "evidence": { "source": "1885S implementation plan", "locator": "Route-partitioned chainage from exact port topology" }, "approved": true },
+    "supportTypeCapabilities": { "value": { "REST": { "vertical": true }, "GUIDE": { "vertical": false }, "LINESTOP": { "vertical": false } }, "evidence": { "source": "Topo Validator restraint family mapping and 1885S vertical-gravity scope", "sourceKey": "topoValidatorVisualModel", "sourceHash": "d48ffe688c5dc785e1b7ece6caf236c58180c7fbdb4437838b6d2e80f9bb390b", "locator": "topology-3d-visual-model.js REST/GUIDE/LINE_STOP families" }, "approved": true },
+    "pipingClassMappings": {
+      "value": { "91261M7": { "masterClass": "91261", "requiredChecks": ["NPS", "rating", "material"], "validation": { "npsIn": 6, "ratingClass": 900, "lineListMaterialCode": "CSS", "masterMaterialCategory": "Carbon steel", "approved": true } } },
+      "evidence": { "source": "1885S implementation plan", "locator": "Approved 91261M7 to 91261 mapping" },
+      "approved": true
+    }
+  },
+  "editing": {
+    "snapToleranceMm": { "value": 25, "evidence": { "source": "Topo Validator canonical checker policy", "sourceKey": "topoValidatorCheckerPolicy", "sourceHash": "1350383dba12eb4faa707e0733a53bc3a72538d9f30c65c9870e4cca3b31bfe4", "locator": "thresholds.snapToleranceMm" }, "approved": true },
+    "connectionToleranceMm": { "value": 1, "evidence": { "source": "Topo Validator sequential construction tolerance policy", "sourceKey": "topoValidatorTolerancePolicy", "sourceHash": "209f8e1ddcceca158a251d7e99fad9db94b25f02c05bd94923f98f45f1b6ac0e", "locator": "exactEquivalence.fittingPortMm" }, "approved": true },
+    "dimensionSourcePrecedence": {
+      "value": ["componentWeightMaster", "sourceDTXR", "sourceGeometry"],
+      "evidence": { "source": "1885S implementation plan", "locator": "Catalog dimensions and DTXR Sch 80 authority" },
+      "approved": true
+    },
+    "componentCatalogSelection": {
+      "value": {
+        "target": "/88-UZV-11951",
+        "valve": { "catalogKey": "VLV3|DN150|CLASS900|REDUCED_BORE", "componentType": "VLV3", "description": "reduced-bore ball valve", "dnMm": 150, "ratingClass": 900, "lengthMm": 610, "massKg": 263 },
+        "flange": { "catalogKey": "WN_FLANGE|DN150|CLASS900", "componentType": "weld-neck flange", "dnMm": 150, "ratingClass": 900, "lengthMm": 147, "massKg": 59, "scheduleSource": "DTXR Sch 80" },
+        "retireSourceRefs": ["/51248", "/51256", "/88-UZV-11951"],
+        "retainSourceRefs": ["/51249", "/51255", "/51254", "PIPE AUTO /ASIM-1885-6\"-S8811951-91261M7-HC-01/B2 7"]
+      },
+      "evidence": { "source": "1885S implementation plan and Topo Validator catalog match", "sourceKey": "componentWeight", "sourceHash": "72e266002256e2ac0b0c0c9c722dde2bb65e93deec2075d209c7ab78d219cda2", "locator": "VLV3 DN150 Class 900 and WN flange DN150 Class 900 rows" },
+      "approved": true
+    }
+  },
+  "loadCalculation": {
+    "gravityMPerS2": { "value": null, "evidence": null, "approved": false },
+    "loadFactor": { "value": null, "evidence": null, "approved": false },
+    "materialDensitiesKgPerM3": { "value": null, "evidence": null, "approved": false },
+    "pipeSectionProperties": { "value": null, "evidence": null, "approved": false },
+    "operatingFluidDensitiesKgPerM3": { "value": { "S8811951": { "selected": 67, "phase": "MIXED", "mixed": 67, "gas": 53.3, "liquid": 693 } }, "evidence": { "source": "Supplied line-list master", "sourceKey": "lineList", "sourceHash": "723518a16b1a744c9328539f1a25fe15ea246757930970603a89d3cea46e3f41", "locator": "LineList!316 Phase=M, Mixed=67 kg/m3" }, "approved": true },
+    "hydroFluidDensitiesKgPerM3": { "value": null, "evidence": null, "approved": false },
+    "insulationDensitiesKgPerM3": { "value": null, "evidence": null, "approved": false },
+    "componentWeightsKg": {
+      "value": { "VLV3|DN150|CLASS900|REDUCED_BORE": 263, "WN_FLANGE|DN150|CLASS900": 59 },
+      "evidence": { "source": "Topo Validator component-weight master", "sourceKey": "componentWeight", "sourceHash": "72e266002256e2ac0b0c0c9c722dde2bb65e93deec2075d209c7ab78d219cda2", "locator": "selected valve and flange catalog rows" },
+      "approved": true
+    },
+    "equilibriumTolerances": { "value": null, "evidence": null, "approved": false },
+    "activeLoadCases": { "value": ["EMPTY", "OPE", "HYD"], "evidence": { "source": "1885S implementation plan", "locator": "Empirical support loads" }, "approved": true }
+  },
+  "webglNavigation": {
+    "supportMarkerSize": { "value": 70, "evidence": { "source": "Topo Validator canonical support marker", "sourceKey": "topoValidatorVisualModel", "sourceHash": "d48ffe688c5dc785e1b7ece6caf236c58180c7fbdb4437838b6d2e80f9bb390b", "locator": "topology-3d-visual-model.js support size 28 × approved support scale 2.5" }, "approved": true },
+    "pickingRadius": { "value": 28, "evidence": { "source": "Topo Validator canonical node pick size", "sourceKey": "topoValidatorVisualModel", "sourceHash": "d48ffe688c5dc785e1b7ece6caf236c58180c7fbdb4437838b6d2e80f9bb390b", "locator": "topology-3d-visual-model.js:243 pickSizeMm" }, "approved": true },
+    "cameraFitMargin": { "value": 1.25, "evidence": { "source": "Topo Validator viewer camera fit padding", "sourceKey": "topoValidatorViewerDefaults", "sourceHash": "068a588c78f234c32a88656515d3457b0955ee06d647d6defe357ac8287f2838", "locator": "viewer-3d-defaults.js camera.fitPadding=0.8; distance multiplier is reciprocal 1/0.8" }, "approved": true },
+    "clickTimingMs": { "value": 300, "evidence": { "source": "Topo Validator workbench click/double-click implementation", "sourceKey": "topoValidatorWorkbenchViewer", "sourceHash": "4d1357ff535ebf761cee012c7156379c24d9e081b77ca44622b520d10751c874", "locator": "workbench-viewer.js:1077-1129 immediate click with 300 ms double-click window" }, "approved": true },
+    "doubleClickTimingMs": { "value": 300, "evidence": { "source": "Topo Validator workbench double-click implementation", "sourceKey": "topoValidatorWorkbenchViewer", "sourceHash": "4d1357ff535ebf761cee012c7156379c24d9e081b77ca44622b520d10751c874", "locator": "workbench-viewer.js:1123" }, "approved": true },
+    "clickTravelTolerancePx": { "value": 5, "evidence": { "source": "Topo Validator workbench drag/click arbitration", "sourceKey": "topoValidatorWorkbenchViewer", "sourceHash": "4d1357ff535ebf761cee012c7156379c24d9e081b77ca44622b520d10751c874", "locator": "workbench-viewer.js:1079-1082" }, "approved": true },
+    "zoomRate": { "value": 1, "evidence": { "source": "Topo Validator 3D navigation defaults", "sourceKey": "topoValidatorViewerDefaults", "sourceHash": "068a588c78f234c32a88656515d3457b0955ee06d647d6defe357ac8287f2838", "locator": "viewer-3d-defaults.js controls.zoomSpeed" }, "approved": true },
+    "navigationSensitivity": { "value": 1, "evidence": { "source": "Topo Validator 3D navigation defaults", "sourceKey": "topoValidatorViewerDefaults", "sourceHash": "068a588c78f234c32a88656515d3457b0955ee06d647d6defe357ac8287f2838", "locator": "viewer-3d-defaults.js controls.rotateSpeed and panSpeed" }, "approved": true },
+    "perspectiveFovDeg": { "value": 55, "evidence": { "source": "Topo Validator workbench viewer camera", "sourceKey": "topoValidatorWorkbenchViewer", "sourceHash": "4d1357ff535ebf761cee012c7156379c24d9e081b77ca44622b520d10751c874", "locator": "workbench-viewer.js:146" }, "approved": true },
+    "meshRadialSegments": { "value": 12, "evidence": { "source": "Topo Validator fine LOD for datasets below 3000 drawables", "sourceKey": "topoValidatorSceneRuntime", "sourceHash": "6c6c4f0affca5c20850e182cc3f7e2a60863ec330c169c892966a9aaea1b24f4", "locator": "scene-runtime.js deriveLod fine nodeSegments" }, "approved": true },
+    "cameraNearMm": { "value": 1, "evidence": { "source": "Topo Validator workbench viewer camera", "sourceKey": "topoValidatorWorkbenchViewer", "sourceHash": "4d1357ff535ebf761cee012c7156379c24d9e081b77ca44622b520d10751c874", "locator": "workbench-viewer.js:146 perspective near plane" }, "approved": true },
+    "cameraFarMm": { "value": 10000000, "evidence": { "source": "Topo Validator workbench viewer camera", "sourceKey": "topoValidatorWorkbenchViewer", "sourceHash": "4d1357ff535ebf761cee012c7156379c24d9e081b77ca44622b520d10751c874", "locator": "workbench-viewer.js:146 perspective far plane" }, "approved": true }
+  },
+  "benchmark": {
+    "targetBrowsers": { "value": ["Chrome", "Edge"], "evidence": { "source": "1885S implementation plan", "locator": "Benchmark target browsers" }, "approved": true },
+    "webglReadyMaxMs": { "value": 3000, "evidence": { "source": "1885S implementation plan", "locator": "Approved WebGL threshold" }, "approved": true },
+    "selectionP95MaxMs": { "value": 100, "evidence": { "source": "1885S implementation plan", "locator": "Approved selection threshold" }, "approved": true },
+    "editCommitMaxMs": { "value": 500, "evidence": { "source": "1885S implementation plan", "locator": "Approved edit threshold" }, "approved": true },
+    "navigationMinFps": { "value": 30, "evidence": { "source": "1885S implementation plan", "locator": "Approved navigation threshold" }, "approved": true }
+  }
+}

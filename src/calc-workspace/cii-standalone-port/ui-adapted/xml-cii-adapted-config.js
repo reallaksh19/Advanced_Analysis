@@ -1,7 +1,15 @@
 import { createElement } from './xml-cii-adapted-dom.js';
-const validateSupportConfigJson = (cfg) => ({ ok: true, isValid: true, errors: [], error: '' });
+const validateSupportConfigJson = (value) => {
+  const errors = [];
+  let config = value;
+  try { if (typeof value === 'string') config = JSON.parse(value); }
+  catch (error) { errors.push(error instanceof Error ? error.message : String(error)); }
+  if (!config || typeof config !== 'object' || Array.isArray(config)) errors.push('Configuration must be a JSON object.');
+  if (config?.schema !== 'project-data-profile/v1') errors.push('Configuration must use project-data-profile/v1.');
+  return { ok: errors.length === 0, isValid: errors.length === 0, errors, error: errors.join(' ') };
+};
 import { saveMasterContextToLocalStorage } from './xml-cii-adapted-state.js';
-import { DEFAULT_RESTRAINT_TYPE_MUTATION_ROWS, RESTRAINT_TYPE_MUTATION_INFO, normalizeRestraintTypeMutationRows } from '../core/restraint-type-mutation.js';
+import { RESTRAINT_TYPE_MUTATION_INFO, normalizeRestraintTypeMutationRows } from '../core/restraint-type-mutation.js';
 let _xmlMaskEnabled = false;
 const isXmlMaskEnabled = () => _xmlMaskEnabled;
 const setXmlMaskEnabled = (v) => _xmlMaskEnabled = v;
@@ -89,8 +97,8 @@ function makeTextInput(parent, labelText, value, onChange) {
 
 function ensureRestraintTypeMutationConfig(configObj) {
   const current = configObj.inputXmlRestraintTypeMutation || configObj.restraintTypeMutation || {};
-  const rows = normalizeRestraintTypeMutationRows(Array.isArray(current.rows) ? current.rows : DEFAULT_RESTRAINT_TYPE_MUTATION_ROWS);
-  configObj.inputXmlRestraintTypeMutation = { enabled: current.enabled !== false, rows };
+  const rows = normalizeRestraintTypeMutationRows(Array.isArray(current.rows) ? current.rows : []);
+  configObj.inputXmlRestraintTypeMutation = { enabled: current.enabled === true, rows };
   return configObj.inputXmlRestraintTypeMutation;
 }
 
@@ -236,7 +244,7 @@ function _renderProcessCard(configObj, syncJsonText, controls) {
   card.style.cssText = 'background:#1e293b;border:1px solid #334155;border-radius:8px;padding:12px 16px;';
   card.innerHTML = '<h3 style="margin:0 0 10px;font-size:14px;color:#38bdf8;">🗺️ Process Fallbacks (Line List)</h3>';
   if (!configObj.processDefaults || typeof configObj.processDefaults !== 'object') {
-    configObj.processDefaults = { p1: '700', t1: '120', t2: '60', t3: '-5', density: '100' };
+    configObj.processDefaults = { p1: '', t1: '', t2: '', t3: '', density: '' };
   }
   controls.p1Input = makeTextInput(card, 'Design Pressure (p1)', configObj.processDefaults.p1, (val) => {
     configObj.processDefaults.p1 = val;

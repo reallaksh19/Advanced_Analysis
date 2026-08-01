@@ -21,7 +21,8 @@ const gateway = new SequentialCommandGateway(mockWorkspaceState, null);
 
 // T01: Add Straight Pipe
 const initialCount = currentDataset.entities.length;
-const addRes = gateway.execute({ op: 'ADD_STRAIGHT', lengthMm: 1500, direction: 'X' });
+const addTarget = currentDataset.entities.find((entity) => entity.entityType === 'PIPE');
+const addRes = gateway.execute({ op: 'ADD_STRAIGHT', targetEntityId: addTarget.entityId, lengthMm: 1500, direction: 'X' });
 if (addRes.status !== 'applied' || currentDataset.entities.length !== initialCount + 1) {
   console.error('FAIL T01: ADD_STRAIGHT failed.');
   process.exit(1);
@@ -57,7 +58,7 @@ console.log('SEQUENTIAL-EDIT-T04 PASS ROTATE_COMPONENT updated angle.');
 
 // T05: Move Support
 const supportTarget = currentDataset.entities.find((e) => e.entityType === 'SUPPORT');
-const supportRes = gateway.execute({ op: 'MOVE_SUPPORT', targetEntityId: supportTarget.entityId, offsetMm: 200 });
+const supportRes = gateway.execute({ op: 'MOVE_SUPPORT', targetEntityId: supportTarget.entityId, offset: { x: 0, y: 0, z: 200 } });
 if (supportRes.status !== 'applied') {
   console.error('FAIL T05: MOVE_SUPPORT failed.');
   process.exit(1);

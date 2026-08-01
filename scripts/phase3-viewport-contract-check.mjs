@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,55 +8,41 @@ import {
   buildViewportRenderModel,
   VIEWPORT_RENDER_MODEL_SCHEMA,
 } from '../src/workspace/viewport-render-model.js';
+import { buildResolvedEngineeringGeometry } from '../src/workspace/resolved-engineering-geometry.js';
+import { buildSupportSiteModel } from '../src/workspace/support-sites/support-site-model.js';
+import { projectDataStore } from '../src/workspace/project-data/project-data-store.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const rawPackage = {
-  schema: 'inputxml-managed-stage/v1',
-  packageHash: 'phase3-fixture',
-  objects: [
-    {
-      id: 'PIPE-A',
-      type: 'PIPE',
-      sourcePath: '/AREA-1/LINE-1/PIPE-A',
-      nativeParams: { startPoint: [0, 0, 0], endPoint: [100, 0, 0] },
-    },
-    {
-      id: 'SUP-A',
-      type: 'SUPPORT',
-      sourcePath: '/AREA-1/LINE-1/SUP-A',
-      sourceAttributes: { CENTER: '50 20 10' },
-    },
-    {
-      id: 'PIPE-DELTA',
-      type: 'PIPE',
-      sourcePath: '/AREA-1/LINE-2/PIPE-DELTA',
-      attributes: { APOS: '100 0 0', DX: 0, DY: 80, DZ: 0 },
-    },
-    {
-      id: 'NO-GEOMETRY',
-      type: 'VALVE',
-      sourcePath: '/AREA-1/LINE-2/NO-GEOMETRY',
-    },
-  ],
-};
-
-const dataset = normalizeWorkspaceDataset(rawPackage, 'phase3.json');
-const model = buildViewportRenderModel(dataset);
+const sourceBytes = await readFile(path.join(root, 'benchmarks/Sjson.json'));
+const rawPackage = JSON.parse(sourceBytes.toString('utf8'));
+const projectData = JSON.parse(await readFile(path.join(root, 'project-data/1885s-project-data-profile.json'), 'utf8'));
+assert.equal(projectDataStore.getOrigin().source, 'project-data/1885s-project-data-profile.json');
+assert.equal(projectDataStore.validate('webgl', null).valid, true);
+assert.equal(projectDataStore.validate('webgl', { dataset: projectData.sourcesAndUnits.datasetSource.value.sha256 }).valid, true, 'WebGL validation must not depend on unrelated masters.');
+for (const key of ['supportMarkerSize', 'pickingRadius', 'cameraFitMargin', 'clickTimingMs', 'doubleClickTimingMs', 'clickTravelTolerancePx', 'zoomRate', 'navigationSensitivity', 'perspectiveFovDeg', 'meshRadialSegments', 'cameraNearMm', 'cameraFarMm']) {
+  assert.equal(projectDataStore.getProfile().webglNavigation[key].value, projectData.webglNavigation[key].value, `Bundled Project Data mismatch for ${key}.`);
+}
+const dataset = normalizeWorkspaceDataset(rawPackage, 'benchmarks/Sjson.json', { sourceBytes, sourceSha256: createHash('sha256').update(sourceBytes).digest('hex') });
+const supportSites = buildSupportSiteModel(dataset, projectData);
+const resolved = buildResolvedEngineeringGeometry(dataset, projectData, supportSites);
+const model = buildViewportRenderModel(resolved);
 assert.equal(model.schema, VIEWPORT_RENDER_MODEL_SCHEMA);
-assert.equal(model.datasetId, 'phase3-fixture');
-assert.equal(model.summary.renderableCount, 3);
-assert.equal(model.summary.segmentCount, 2);
-assert.equal(model.summary.pointCount, 1);
-assert.equal(model.summary.skippedCount, 1);
-assert.deepEqual(model.skippedEntityIds, ['NO-GEOMETRY']);
+assert.equal(dataset.summary.nodeCount, 279);
+assert.equal(supportSites.summary.sourceSupportRecordCount, 139);
+assert.equal(supportSites.summary.supportAssemblyCount, 38);
+assert.equal(supportSites.summary.physicalLocationCount, 37);
+assert.equal(model.summary.renderableCount, 150);
+assert.equal(model.summary.segmentCount, 116);
+assert.equal(model.summary.pointCount, 37);
+assert.equal(model.summary.skippedCount, 27);
 const items = [
   ...model.physicalPrimitives,
   ...model.supportOverlayPrimitives,
   ...model.diagnosticPrimitives,
 ];
-assert.deepEqual(items.find((item) => item.objectId === 'PIPE-A').end, { x: 100, y: 0, z: 0 });
-assert.deepEqual(items.find((item) => item.objectId === 'SUP-A').center, { x: 50, y: 20, z: 10 });
-assert.deepEqual(items.find((item) => item.objectId === 'PIPE-DELTA').end, { x: 100, y: 80, z: 0 });
+assert.equal(model.supportOverlayPrimitives.length, 37);
+assert.equal(model.diagnosticPrimitives.length, 0);
+assert.equal(items.some((item) => item.objectId === '=1006649732/51250'), true);
 assert.ok(model.bounds.radius > 0);
 assert.ok(Object.isFrozen(model));
 assert.ok(Object.isFrozen(items[0]));

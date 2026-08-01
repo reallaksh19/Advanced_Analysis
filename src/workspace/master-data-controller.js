@@ -1,18 +1,13 @@
 import { EventBus } from './event-bus.js';
-import { EVENT_TOPICS } from './event-topics.js';
 import { WorkspaceState } from './workspace-state.js';
-
-import { DEFAULT_WEIGHT_MASTER_ROWS } from '../calc-workspace/cii-standalone-port/core/default-weight-master-rows.js';
-import { DEFAULT_MATERIAL_MAP_ROWS } from '../calc-workspace/cii-standalone-port/core/default-material-map-rows.js';
-
 export const MasterDataConfigV1 = {
   createDefault() {
     return {
       version: 1,
       lineList: { rawRows: [], fieldMap: {}, normalizedRows: [], diagnostics: [] },
       pipingClass: { rawRows: [], fieldMap: {}, normalizedRows: [], diagnostics: [] },
-      weight: { rawRows: DEFAULT_WEIGHT_MASTER_ROWS, fieldMap: { bore: 'Bore', rating: 'Rating', length: 'Length', valveType: 'Valve Type', weight: 'Weight' }, normalizedRows: DEFAULT_WEIGHT_MASTER_ROWS, diagnostics: [{ code: 'DEFAULT', message: 'Using built-in embedded valve weight master.' }], fileName: 'Embedded App Default (wtValveweights)' },
-      materialMap: { rawRows: DEFAULT_MATERIAL_MAP_ROWS, fieldMap: { code: 'code', material: 'material' }, normalizedRows: DEFAULT_MATERIAL_MAP_ROWS, diagnostics: [{ code: 'DEFAULT', message: 'Using built-in embedded material map master.' }], fileName: 'Embedded App Default (PCF_MAT_MAP)' },
+      weight: { rawRows: [], fieldMap: {}, normalizedRows: [], diagnostics: [] },
+      materialMap: { rawRows: [], fieldMap: {}, normalizedRows: [], diagnostics: [] },
       config: {}
     };
   }
@@ -34,9 +29,6 @@ export class MasterDataController {
       const def = MasterDataConfigV1.createDefault();
       
       if (parsed.lineList?.fieldMap) def.lineList.fieldMap = parsed.lineList.fieldMap;
-      if (parsed.lineList?.rawRows) def.lineList.rawRows = parsed.lineList.rawRows;
-      if (parsed.lineList?.normalizedRows) def.lineList.normalizedRows = parsed.lineList.normalizedRows;
-      if (parsed.lineList?.fileName) def.lineList.fileName = parsed.lineList.fileName;
 
       if (parsed.pipingClass?.fieldMap) def.pipingClass.fieldMap = parsed.pipingClass.fieldMap;
       if (parsed.weight?.fieldMap) def.weight.fieldMap = parsed.weight.fieldMap;
@@ -55,12 +47,7 @@ export class MasterDataController {
     try {
       const stateToSave = {
         version: this.masterData.version,
-        lineList: {
-          fieldMap: this.masterData.lineList.fieldMap,
-          rawRows: this.masterData.lineList.rawRows,
-          normalizedRows: this.masterData.lineList.normalizedRows,
-          fileName: this.masterData.lineList.fileName
-        },
+        lineList: { fieldMap: this.masterData.lineList.fieldMap },
         pipingClass: { fieldMap: this.masterData.pipingClass.fieldMap },
         weight: { fieldMap: this.masterData.weight.fieldMap },
         materialMap: { fieldMap: this.masterData.materialMap.fieldMap },
@@ -76,24 +63,26 @@ export class MasterDataController {
     return this.masterData;
   }
 
-  setRawRows(masterKey, rawRows, fileName, sheetName) {
-    if (!this.masterData[masterKey]) return;
+  setRawRows(masterKey, rawRows, fileName, sheetName, sourceMetadata) {
+    if (!this.masterData[masterKey]) throw new RangeError(`Unknown master-data key: ${masterKey}.`);
     this.masterData[masterKey].rawRows = rawRows;
     this.masterData[masterKey].fileName = fileName;
     this.masterData[masterKey].sheetName = sheetName;
+    this.masterData[masterKey].sourceHash = sourceMetadata?.sourceHash || '';
+    this.masterData[masterKey].byteLength = sourceMetadata?.byteLength || null;
     this.persistState();
     this.eventBus.publish('MASTER_DATA_UPDATED', { masterKey, action: 'raw_upload' });
   }
 
   setFieldMap(masterKey, fieldMap) {
-    if (!this.masterData[masterKey]) return;
+    if (!this.masterData[masterKey]) throw new RangeError(`Unknown master-data key: ${masterKey}.`);
     this.masterData[masterKey].fieldMap = fieldMap;
     this.persistState();
     this.eventBus.publish('MASTER_DATA_UPDATED', { masterKey, action: 'mapping_update' });
   }
 
   setNormalizedRows(masterKey, normalizedRows, diagnostics = []) {
-    if (!this.masterData[masterKey]) return;
+    if (!this.masterData[masterKey]) throw new RangeError(`Unknown master-data key: ${masterKey}.`);
     this.masterData[masterKey].normalizedRows = normalizedRows;
     this.masterData[masterKey].diagnostics = diagnostics;
     this.persistState();
@@ -132,8 +121,8 @@ export class MasterDataController {
       sourceMetadata: {
         lineList: { source: this.masterData.lineList.fileName || 'not-loaded', sourceType: 'file', status: this.masterData.lineList.rawRows.length ? 'loaded' : 'pending' },
         pipingClass: { source: this.masterData.pipingClass.fileName || 'not-loaded', sourceType: 'file', status: this.masterData.pipingClass.rawRows.length ? 'loaded' : 'pending' },
-        weight: { source: this.masterData.weight.fileName || 'Embedded App Default (wtValveweights)', sourceType: 'default', status: 'loaded' },
-        materialMap: { source: this.masterData.materialMap.fileName || 'Embedded App Default (PCF_MAT_MAP)', sourceType: 'default', status: 'loaded' }
+        weight: { source: this.masterData.weight.fileName || 'not-loaded', sourceType: 'file', status: this.masterData.weight.rawRows.length ? 'loaded' : 'pending', sourceHash: this.masterData.weight.sourceHash || '' },
+        materialMap: { source: this.masterData.materialMap.fileName || 'not-loaded', sourceType: 'file', status: this.masterData.materialMap.rawRows.length ? 'loaded' : 'pending', sourceHash: this.masterData.materialMap.sourceHash || '' }
       },
       diagnostics: {
         lineList: this.masterData.lineList.diagnostics,
