@@ -1,6 +1,4 @@
-/**
- * Public integration surface for the standalone LAFEA calculation workbench.
- */
+/** Public integration surface for the standalone LAFEA calculation workbench. */
 import { LafeaWorkbenchController } from './lafea-workbench-controller.js';
 import { LAFEA_WORKBENCH_STYLES, lafeaWorkbenchStyles } from './lafea-workbench-styles.js';
 
@@ -82,11 +80,36 @@ export {
   registerLafeaArtifact,
 } from './lafea-lifecycle.js';
 export {
+  LAFEA_CALCULATION_STATES,
+  LAFEA_CODE_STATES,
   LAFEA_LIFECYCLE_BINDING_SCHEMA,
   LAFEA_LIFECYCLE_BINDING_STATUSES,
+  LAFEA_RELEASE_STATES,
+  LAFEA_RESULT_STATES,
   LAFEA_WORKBENCH_STATE_SCHEMA,
   createLafeaWorkbenchStore,
 } from './lafea-lifecycle-workbench-store.js';
+export {
+  LAFEA_CANONICAL_SHA256_PROFILE,
+  canonicalLafeaJson,
+  canonicalLafeaSha256,
+} from './lafea-canonical-sha256.js';
+export {
+  LAFEA_SOURCE_AUTHORITY_EVENT_SCHEMA,
+  LAFEA_SOURCE_AUTHORITY_ROLE,
+  LAFEA_SOURCE_AUTHORITY_SCHEMA,
+  createLafeaSourceAuthorityEvent,
+  issueLafeaSourceAuthority,
+  sourceAuthorityDocument,
+  validateLafeaSourceAuthority,
+  validateLafeaSourceAuthorityEvent,
+} from './lafea-source-authority.js';
+export {
+  LAFEA_PRODUCER_BATCH_SCHEMA,
+  LAFEA_PRODUCER_REVISION,
+  createLafeaLifecycleProducerBatch,
+  registerLafeaLifecycleProducerBatch,
+} from './lafea-lifecycle-producers.js';
 export {
   LAFEA_SOURCE_PRIMITIVE_KINDS,
   LAFEA_SOURCE_PRIMITIVE_SCHEMA,
