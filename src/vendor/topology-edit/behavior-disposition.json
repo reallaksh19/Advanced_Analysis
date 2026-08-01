@@ -40,6 +40,12 @@
       "status": "GOVERNANCE"
     },
     {
+      "targetPath": "src/workspace/topology-edit/topology-edit-canonical-state.js",
+      "classification": "FORKED",
+      "authority": "Wave1 canonical normalization and hash authority",
+      "status": "W1_1_PURE_KERNEL_FOUNDATION"
+    },
+    {
       "targetPath": "src/workspace/topology-edit/topology-edit-canvas-callout.js",
       "classification": "WRAPPED",
       "authority": "Source canvas/navigation UX contract",
@@ -52,10 +58,22 @@
       "status": "PHASE_ONE_SUBSET"
     },
     {
+      "targetPath": "src/workspace/topology-edit/topology-edit-command-contract.js",
+      "classification": "FORKED",
+      "authority": "Wave1 native command request authority",
+      "status": "W1_1_PURE_KERNEL_FOUNDATION"
+    },
+    {
       "targetPath": "src/workspace/topology-edit/topology-edit-command-journal.js",
       "classification": "FORKED",
       "authority": "P2/Wave1 certifying journal contract",
       "status": "BLOCKING_NOT_CERTIFIED"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-command-resolver.js",
+      "classification": "FORKED",
+      "authority": "Wave1 canonical target resolution authority",
+      "status": "W1_1_PURE_KERNEL_FOUNDATION"
     },
     {
       "targetPath": "src/workspace/topology-edit/topology-edit-commit-service.js",
@@ -92,6 +110,12 @@
       "classification": "FORKED",
       "authority": "Wave2 canonical picking identity contract",
       "status": "PHASE_ONE_RETAINED"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-pure-reducer.js",
+      "classification": "FORKED",
+      "authority": "Wave1 deterministic topology reduction authority",
+      "status": "W1_1_PURE_KERNEL_FOUNDATION"
     },
     {
       "targetPath": "src/workspace/topology-edit/topology-edit-render-model.js",
@@ -149,9 +173,10 @@
     }
   ],
   "deferredBehavior": [
-    "The existing command journal is retained as phase-one behavior and is not certifying authority.",
+    "The retained phase-one command journal remains non-certifying until W1.3 replaces its acceptance and replay authority.",
+    "The W1.1 pure kernel is isolated from the UI and WorkspaceState until candidate certification and session integration close.",
     "The existing support overlay is retained as visual evidence and is not restraint-semantic authority.",
-    "Workspace commit remains outside Wave 0 and is not qualified by this disposition.",
+    "Workspace commit remains outside Wave 1 and is not qualified by this disposition.",
     "Large-model scaffolding is not performance qualification."
   ]
 }
