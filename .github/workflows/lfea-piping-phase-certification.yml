@@ -27,6 +27,7 @@ on:
       - 'scripts/lfea-piping-phase6d-anti-drift-check.mjs'
       - 'scripts/lfea-piping-phase6i-*.mjs'
       - 'scripts/lfea-b2.5-*.mjs'
+      - 'scripts/lfea-b4.0-source-guard.mjs'
       - 'scripts/linear-piping-analysis-consumer-*.mjs'
       - 'scripts/linear-piping-inputxml-source-binding-check.mjs'
       - 'scripts/linear-piping-inputxml-unit-normalization-check.mjs'
