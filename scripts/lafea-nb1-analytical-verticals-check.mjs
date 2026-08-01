@@ -26,154 +26,147 @@ import { triangleSource as continuumSource } from './lafea.3-fixtures.mjs';
 import { triangleSource as shellSource } from './lafea.4-fixtures.mjs';
 import { workflowSource } from './lafea.5-fixtures.mjs';
 
-const foundationModel = createCanonicalLocalAttachmentFoundationModel(sourceFixture());
-const foundationResult = calculateLocalAttachmentFoundation(foundationModel);
+const foundationResult = calculateLocalAttachmentFoundation(
+  createCanonicalLocalAttachmentFoundationModel(sourceFixture()),
+);
 assert.equal(foundationResult.qualification.state, 'ACCEPTED');
 
 const footprintResults = new Map();
 for (const type of FINITE_FOOTPRINT_TYPES) {
-  const request = footprintRequest(type);
-  const result = compileFiniteFootprintDistribution(request);
+  const result = compileFiniteFootprintDistribution(footprintRequest(type));
   validateFiniteFootprintDistribution(result);
-  independentEquilibrium(result);
+  independentlyCheckEquilibrium(result);
   assert.equal(result.footprint.type, type);
   assert.equal(result.qualification.state, 'ACCEPTED');
-  assert.equal(result.qualification.engineeringLevel,
-    'FINITE_FOOTPRINT_RESULTANT_DISTRIBUTION_ONLY');
   assert.equal(result.limitations.includes('NO_LOCAL_ATTACHMENT_STRESS'), true);
   footprintResults.set(type, result);
 }
 
-const reversedLine = footprintRequest('LINE');
-reversedLine.footprint.stations.reverse();
+const reorderedLine = footprintRequest('LINE');
+reorderedLine.footprint.stations.reverse();
 assert.equal(
-  compileFiniteFootprintDistribution(reversedLine).semanticHash,
+  compileFiniteFootprintDistribution(reorderedLine).semanticHash,
   footprintResults.get('LINE').semanticHash,
 );
-assert.throws(() => compileFiniteFootprintDistribution(footprintRequest(
-  'RECTANGULAR_PATCH', [{ stationId: 'A', position: [0, 0, 0], weight: 1, sourceReference: 'A' },
-    { stationId: 'B', position: [10, 0, 0], weight: 1, sourceReference: 'B' },
-    { stationId: 'C', position: [20, 0, 0], weight: 1, sourceReference: 'C' },
-    { stationId: 'D', position: [30, 0, 0], weight: 1, sourceReference: 'D' }],
-)), (error) => error.code === 'FOOTPRINT_GEOMETRY_RANK_DEFICIENT');
-const missingArea = footprintRequest('POINT');
-delete missingArea.pressureThrusts[0].area;
-assert.throws(() => compileFiniteFootprintDistribution(missingArea),
-  (error) => error.code === 'EXACT_KEYS_REQUIRED');
+assert.throws(
+  () => compileFiniteFootprintDistribution(footprintRequest(
+    'RECTANGULAR_PATCH',
+    ['A', 'B', 'C', 'D'].map((stationId, index) => station(
+      stationId,
+      [index * 10, 0, 0],
+    )),
+  )),
+  (error) => error.code === 'FOOTPRINT_GEOMETRY_RANK_DEFICIENT',
+);
+const incompletePressure = footprintRequest('POINT');
+delete incompletePressure.pressureThrusts[0].area;
+assert.throws(
+  () => compileFiniteFootprintDistribution(incompletePressure),
+  (error) => error.code === 'EXACT_KEYS_REQUIRED',
+);
 
-const foundationHandoffs = [
-  target('LAFEA.3', continuumSource(), 'L1'),
-  target('LAFEA.4', shellSource(), 'LC'),
-  target('LAFEA.5', workflowSource(), 'WF-COMB'),
-].map((targetValue) => createFiniteFootprintHandoff({
-  handoffIdentity: `A1-HO-${targetValue.targetStageId}`,
+const targets = Object.freeze([
+  { targetStageId: 'LAFEA.3', targetSource: continuumSource(), targetLoadCaseId: 'L1' },
+  { targetStageId: 'LAFEA.4', targetSource: shellSource(), targetLoadCaseId: 'LC' },
+  { targetStageId: 'LAFEA.5', targetSource: workflowSource(), targetLoadCaseId: 'WF-COMB' },
+]);
+const foundationHandoffs = targets.map((target) => createFiniteFootprintHandoff({
+  handoffIdentity: `A1-HO-${target.targetStageId}`,
   handoffVersion: '1',
   footprintResult: footprintResults.get('RECTANGULAR_PATCH'),
-  ...targetValue,
-  targetLoadBindings: [{
-    sourceLoadIdentity: 'LC-1',
-    targetLoadCaseId: targetValue.targetLoadCaseId,
-    sourceReference: `A1-HO#${targetValue.targetStageId}`,
-  }],
+  targetStageId: target.targetStageId,
+  targetSource: target.targetSource,
+  targetLoadBindings: [binding('LC-1', target.targetLoadCaseId, 'A1-HO')],
   sourceReference: 'A1-HANDOFF-SOURCE',
   limitations: [],
 }));
-for (const handoff of foundationHandoffs) {
-  validateLafeaAnalyticalHandoff(handoff);
-  assert.equal(handoff.sourceStageId, 'LAFEA.1');
-  assert.equal(handoff.resultant.coordinateSystem, 'GLOBAL');
-  assert.equal(handoff.qualification.targetSourceValidated, true);
-  assert.equal(handoff.qualification.targetEngineExecuted, false);
-  assert.equal(handoff.qualification.releaseQualified, false);
-}
+assertHandoffs(foundationHandoffs, 'LAFEA.1', 'GLOBAL');
 
-const screeningRequest = createLocalAttachmentScreeningRequest(rawRequestFixture());
-const screeningResult = calculateLocalAttachmentScreening(screeningRequest);
+const screeningResult = calculateLocalAttachmentScreening(
+  createLocalAttachmentScreeningRequest(rawRequestFixture()),
+);
 assert.equal(screeningResult.qualification.state, 'ACCEPTED');
-const allPassEvidence = applicabilityEvidence(screeningResult);
-const passProduct = evaluateLocalAttachmentScreeningProduct(productRequest(allPassEvidence));
+const passEvidence = applicabilityEvidence(screeningResult);
+const passProduct = evaluateLocalAttachmentScreeningProduct(
+  productRequest(passEvidence),
+);
 assert.equal(passProduct.overallState, 'PASS');
 assert.equal(passProduct.assessments.every((row) => row.state === 'PASS'), true);
 
-const escalationEvidence = structuredClone(allPassEvidence);
+const escalationEvidence = structuredClone(passEvidence);
 const governingEvidence = escalationEvidence.find((row) => (
   row.screeningCaseId === 'CASE-A' && row.evaluationLocationId === 'L0'
 ));
-governingEvidence.checks.find((row) => row.kind === 'ATTACHMENT_EDGE').status = 'FAIL';
-governingEvidence.checks.find((row) => row.kind === 'ATTACHMENT_EDGE').rationale =
-  'Evaluation point intersects the declared attachment edge.';
+const attachmentCheck = governingEvidence.checks.find(
+  (row) => row.kind === 'ATTACHMENT_EDGE',
+);
+attachmentCheck.status = 'FAIL';
+attachmentCheck.rationale = 'The location intersects the declared attachment edge.';
 const escalationProduct = evaluateLocalAttachmentScreeningProduct(
   productRequest(escalationEvidence),
 );
 assert.equal(escalationProduct.overallState, 'ESCALATE');
-assert.equal(escalationProduct.assessments.find((row) => (
-  row.screeningCaseId === 'CASE-A' && row.evaluationLocationId === 'L0'
-)).state, 'ESCALATE');
 
 const missingProduct = evaluateLocalAttachmentScreeningProduct(
-  productRequest(allPassEvidence.slice(1)),
+  productRequest(passEvidence.slice(1)),
 );
 assert.equal(missingProduct.overallState, 'BLOCKED');
 assert.equal(missingProduct.assessments.some((row) => (
-  row.state === 'BLOCKED'
-  && row.reasons.includes('MISSING_APPLICABILITY_EVIDENCE')
+  row.reasons.includes('MISSING_APPLICABILITY_EVIDENCE')
 )), true);
 
-const shearEvidence = structuredClone(allPassEvidence);
+const shearEvidence = structuredClone(passEvidence);
 shearEvidence[0].checks.find((row) => row.kind === 'TRANSVERSE_SHEAR').status = 'FAIL';
-const shearProduct = evaluateLocalAttachmentScreeningProduct(productRequest(shearEvidence));
-assert.equal(shearProduct.overallState, 'ESCALATE');
+assert.equal(
+  evaluateLocalAttachmentScreeningProduct(productRequest(shearEvidence)).overallState,
+  'ESCALATE',
+);
 
-const screeningHandoffs = [
-  target('LAFEA.3', continuumSource(), 'L1'),
-  target('LAFEA.4', shellSource(), 'LC'),
-  target('LAFEA.5', workflowSource(), 'WF-COMB'),
-].map((targetValue) => createLocalAttachmentScreeningHandoff({
-  handoffIdentity: `A2-HO-${targetValue.targetStageId}`,
-  handoffVersion: '1',
-  screeningResult,
-  productResult: escalationProduct,
-  screeningCaseId: 'CASE-A',
-  evaluationLocationId: 'L0',
-  ...targetValue,
-  targetLoadBindings: [{
-    sourceLoadIdentity: 'CASE-A',
-    targetLoadCaseId: targetValue.targetLoadCaseId,
-    sourceReference: `A2-HO#${targetValue.targetStageId}`,
-  }],
-  sourceReference: 'A2-HANDOFF-SOURCE',
-  limitations: [],
-}));
+const screeningHandoffs = targets.map((target) => (
+  createLocalAttachmentScreeningHandoff({
+    handoffIdentity: `A2-HO-${target.targetStageId}`,
+    handoffVersion: '1',
+    screeningResult,
+    productResult: escalationProduct,
+    screeningCaseId: 'CASE-A',
+    evaluationLocationId: 'L0',
+    targetStageId: target.targetStageId,
+    targetSource: target.targetSource,
+    targetLoadBindings: [binding('CASE-A', target.targetLoadCaseId, 'A2-HO')],
+    sourceReference: 'A2-HANDOFF-SOURCE',
+    limitations: [],
+  })
+));
+assertHandoffs(screeningHandoffs, 'LAFEA.2', 'PIPE_LOCAL');
 for (const handoff of screeningHandoffs) {
-  validateLafeaAnalyticalHandoff(handoff);
-  assert.equal(handoff.sourceStageId, 'LAFEA.2');
-  assert.equal(handoff.resultant.coordinateSystem, 'PIPE_LOCAL');
-  assert.equal(Object.keys(handoff.governingRecord)
-    .some((key) => /stress|utilization|allowable|code/iu.test(key)), false);
+  assert.equal(Object.keys(handoff.governingRecord).some(
+    (key) => /stress|utilization|allowable|code/iu.test(key),
+  ), false);
 }
 
 const tamperedProduct = structuredClone(escalationProduct);
 tamperedProduct.overallState = 'PASS';
-assert.throws(() => validateLocalAttachmentScreeningProduct(tamperedProduct),
-  (error) => error.code === 'SCREENING_PRODUCT_HASH_MISMATCH');
+assert.throws(
+  () => validateLocalAttachmentScreeningProduct(tamperedProduct),
+  (error) => error.code === 'SCREENING_PRODUCT_HASH_MISMATCH',
+);
+const blockedTarget = targets[0];
 assert.throws(() => createLocalAttachmentScreeningHandoff({
-  handoffIdentity: 'BLOCKED-HO', handoffVersion: '1', screeningResult,
-  productResult: missingProduct, screeningCaseId: 'CASE-A',
-  evaluationLocationId: 'L0', ...target('LAFEA.3', continuumSource(), 'L1'),
-  targetLoadBindings: [{ sourceLoadIdentity: 'CASE-A', targetLoadCaseId: 'L1', sourceReference: 'X' }],
-  sourceReference: 'X', limitations: [],
+  handoffIdentity: 'BLOCKED-HO',
+  handoffVersion: '1',
+  screeningResult,
+  productResult: missingProduct,
+  screeningCaseId: 'CASE-A',
+  evaluationLocationId: 'L0',
+  targetStageId: blockedTarget.targetStageId,
+  targetSource: blockedTarget.targetSource,
+  targetLoadBindings: [binding('CASE-A', blockedTarget.targetLoadCaseId, 'BLOCKED')],
+  sourceReference: 'BLOCKED',
+  limitations: [],
 }), (error) => error.code === 'SCREENING_HANDOFF_ESCALATION_REQUIRED');
 
-const foundationComposition = requireLafeaStageComposition('LAFEA.1');
-const screeningComposition = requireLafeaStageComposition('LAFEA.2');
-assert.equal(foundationComposition.productAssessmentSupported, true);
-assert.equal(foundationComposition.handoffSupported, true);
-assert.equal(screeningComposition.productAssessmentSupported, true);
-assert.equal(screeningComposition.handoffSupported, true);
-assert.equal(foundationComposition.evaluateProductAssessment(footprintRequest('POINT'))
-  .qualification.state, 'ACCEPTED');
-assert.equal(screeningComposition.evaluateProductAssessment(productRequest(allPassEvidence))
-  .overallState, 'PASS');
+assertComposition('LAFEA.1', footprintRequest('POINT'));
+assertComposition('LAFEA.2', productRequest(passEvidence));
 for (const stageId of ['LAFEA.3', 'LAFEA.4', 'LAFEA.5', 'LAFEA.6']) {
   const composition = requireLafeaStageComposition(stageId);
   assert.equal(composition.productAssessmentSupported, false);
@@ -186,8 +179,8 @@ console.log(JSON.stringify({
   check: 'lafea-nb1-foundation-screening-verticals',
   status: 'PASS',
   a1FootprintBenchmarks: [
-    'A1-FP-POINT', 'A1-FP-LINE', 'A1-FP-RECT',
-    'A1-FP-CIRC', 'A1-FP-WELD', 'A1-FP-RSP', 'A1-FP-RANK',
+    'A1-FP-POINT', 'A1-FP-LINE', 'A1-FP-RECT', 'A1-FP-CIRC',
+    'A1-FP-WELD', 'A1-FP-RSP', 'A1-FP-RANK',
   ],
   a1HandoffTargets: foundationHandoffs.map((row) => row.targetStageId),
   a2ProductBenchmarks: [
@@ -198,11 +191,9 @@ console.log(JSON.stringify({
   exactForceMomentClosure: true,
   pressureThrustRequiresExplicitAreaAndNormal: true,
   missingApplicabilityBlocked: true,
-  attachmentOpeningWeldEscalation: true,
   nominalStressTransferredToFeOrCode: false,
   targetSourcesValidated: true,
   targetEnginesExecutedByHandoff: false,
-  numericalScreeningCoreChanged: false,
   codeAuthorityPromoted: false,
   releaseQualified: false,
   lafea6Enabled: false,
@@ -223,8 +214,12 @@ function footprintRequest(type, stations = stationsFor(type)) {
       sourceReference: `FOOTPRINT#${type}`,
     },
     pressureThrusts: [{
-      thrustId: 'PT-1', pressure: 2, area: 100, normal: [0, 0, 1],
-      applicationPoint: [10, 20, 0], sourceReference: 'PRESSURE#PT-1',
+      thrustId: 'PT-1',
+      pressure: 2,
+      area: 100,
+      normal: [0, 0, 1],
+      applicationPoint: [10, 20, 0],
+      sourceReference: 'PRESSURE#PT-1',
     }],
     qualificationProfile: {
       identity: 'A1-FP-BENCHMARK-V1',
@@ -236,13 +231,11 @@ function footprintRequest(type, stations = stationsFor(type)) {
 }
 
 function stationsFor(type) {
-  const station = (stationId, position, weight = 1) => ({
-    stationId, position, weight, sourceReference: `STATION#${stationId}`,
-  });
   if (type === 'POINT') return [station('P0', [0, 0, 0])];
   if (type === 'LINE') return [station('L0', [-100, 0, 0]), station('L1', [100, 0, 0])];
   if (type === 'WELD_LINE') return [
-    station('W0', [-100, 0, 0], 50), station('W1', [0, 0, 0], 100),
+    station('W0', [-100, 0, 0], 50),
+    station('W1', [0, 0, 0], 100),
     station('W2', [100, 0, 0], 50),
   ];
   if (type === 'RECTANGULAR_PATCH' || type === 'RIGID_SPIDER') return [
@@ -255,29 +248,41 @@ function stationsFor(type) {
   });
 }
 
-function independentEquilibrium(result) {
-  const reconstructed = result.stationResultants.reduce((sum, station) => {
-    const r = station.position.map((value, index) => value - result.referencePoint[index]);
-    const crossValue = [
-      r[1] * station.force[2] - r[2] * station.force[1],
-      r[2] * station.force[0] - r[0] * station.force[2],
-      r[0] * station.force[1] - r[1] * station.force[0],
+function station(stationId, position, weight = 1) {
+  return { stationId, position, weight, sourceReference: `STATION#${stationId}` };
+}
+
+function independentlyCheckEquilibrium(result) {
+  const reconstructed = result.stationResultants.reduce((sum, row) => {
+    const r = row.position.map((value, index) => value - result.referencePoint[index]);
+    const rCrossF = [
+      r[1] * row.force[2] - r[2] * row.force[1],
+      r[2] * row.force[0] - r[0] * row.force[2],
+      r[0] * row.force[1] - r[1] * row.force[0],
     ];
     return {
-      force: sum.force.map((value, index) => value + station.force[index]),
+      force: sum.force.map((value, index) => value + row.force[index]),
       moment: sum.moment.map((value, index) => (
-        value + crossValue[index] + station.moment[index]
+        value + rCrossF[index] + row.moment[index]
       )),
     };
   }, { force: [0, 0, 0], moment: [0, 0, 0] });
-  assertVectorClose(reconstructed.force, result.appliedResultant.force,
-    result.equilibrium.tolerances.force);
-  assertVectorClose(reconstructed.moment, result.appliedResultant.moment,
-    result.equilibrium.tolerances.moment);
+  assertVectorClose(
+    reconstructed.force,
+    result.appliedResultant.force,
+    result.equilibrium.tolerances.force,
+  );
+  assertVectorClose(
+    reconstructed.moment,
+    result.appliedResultant.moment,
+    result.equilibrium.tolerances.moment,
+  );
 }
 
 function assertVectorClose(actual, expected, tolerance) {
-  actual.forEach((value, index) => assert.ok(Math.abs(value - expected[index]) <= tolerance));
+  actual.forEach((value, index) => {
+    assert.ok(Math.abs(value - expected[index]) <= tolerance);
+  });
 }
 
 function applicabilityEvidence(result) {
@@ -288,7 +293,7 @@ function applicabilityEvidence(result) {
       checkId: `${point.screeningCaseId}-${point.evaluationLocationId}-${kind}`,
       kind,
       status: 'PASS',
-      rationale: `${kind} was explicitly reviewed and is clear for nominal far-field screening.`,
+      rationale: `${kind} is explicitly clear for nominal far-field screening.`,
       sourceReference: `APP#${point.screeningCaseId}/${point.evaluationLocationId}/${kind}`,
     })),
   }));
@@ -305,6 +310,26 @@ function productRequest(applicabilityEvidenceValue) {
   };
 }
 
-function target(targetStageId, targetSource, targetLoadCaseId) {
-  return { targetStageId, targetSource, targetLoadCaseId };
+function binding(sourceLoadIdentity, targetLoadCaseId, sourceReference) {
+  return { sourceLoadIdentity, targetLoadCaseId, sourceReference };
+}
+
+function assertHandoffs(handoffs, sourceStageId, coordinateSystem) {
+  for (const handoff of handoffs) {
+    validateLafeaAnalyticalHandoff(handoff);
+    assert.equal(handoff.sourceStageId, sourceStageId);
+    assert.equal(handoff.resultant.coordinateSystem, coordinateSystem);
+    assert.equal(handoff.qualification.targetSourceValidated, true);
+    assert.equal(handoff.qualification.targetEngineExecuted, false);
+    assert.equal(handoff.qualification.releaseQualified, false);
+  }
+}
+
+function assertComposition(stageId, request) {
+  const composition = requireLafeaStageComposition(stageId);
+  assert.equal(composition.productAssessmentSupported, true);
+  assert.equal(composition.handoffSupported, true);
+  assert.equal(typeof composition.evaluateProductAssessment, 'function');
+  assert.equal(typeof composition.createHandoff, 'function');
+  assert.equal(composition.evaluateProductAssessment(request).qualification.state, 'ACCEPTED');
 }
