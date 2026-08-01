@@ -9,7 +9,6 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const CHECKS = Object.freeze([
   Object.freeze({ scope: 'NB-T0', path: 'scripts/lafea-nonbucket-scope-guard.mjs' }),
-  Object.freeze({ scope: 'U0', path: 'scripts/lafea-p0-ui-containment-check.mjs' }),
   Object.freeze({ scope: 'U1', path: 'scripts/lafea-u1-stage-registry-check.mjs' }),
   Object.freeze({ scope: 'U1', path: 'scripts/lafea-u1b-registry-consumer-check.mjs' }),
   Object.freeze({ scope: 'U2', path: 'scripts/lafea-u2a-input-command-check.mjs' }),
@@ -39,7 +38,7 @@ const CHECKS = Object.freeze([
   Object.freeze({ scope: 'U4', path: 'scripts/lafea-u4j-diagnostic-field-check.mjs' }),
   Object.freeze({ scope: 'U4', path: 'scripts/lafea-u4j-source-guard.mjs' }),
   Object.freeze({ scope: 'WORKBENCH', path: 'scripts/lafea-canvas-contract-check.mjs' }),
-  Object.freeze({ scope: 'WORKBENCH', path: 'scripts/lafea-workbench-check.mjs' }),
+  Object.freeze({ scope: 'U0_WORKBENCH', path: 'scripts/lafea-workbench-check.mjs' }),
 ]);
 
 const FORBIDDEN_CHECK_PATHS = Object.freeze([
