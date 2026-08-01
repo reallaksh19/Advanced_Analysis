@@ -22,6 +22,9 @@ function run() {
   assert.equal(Object.isFrozen(initial), true);
   assert.deepEqual(launcher.init(), initial);
   assert.equal(fixture.actionHost.querySelectorAll(
+    '[data-role="first-cut-workbench-action-bar"]',
+  ).length, 1);
+  assert.equal(fixture.actionHost.querySelectorAll(
     '[data-role="first-cut-workbench-launcher"]',
   ).length, 1);
 
@@ -65,6 +68,9 @@ function run() {
   launcher.destroy();
   launcher.destroy();
   assert.equal(fixture.actionHost.querySelectorAll(
+    '[data-role="first-cut-workbench-action-bar"]',
+  ).length, 0);
+  assert.equal(fixture.actionHost.querySelectorAll(
     '[data-role="first-cut-workbench-launcher"]',
   ).length, 0);
   assert.strictEqual(fixture.root.querySelector(
@@ -91,6 +97,7 @@ function run() {
     status: 'PASS',
     launcherSchema: FIRST_CUT_WORKBENCH_LAUNCHER_SCHEMA,
     actionBarMountCount: 1,
+    actionBarVisibleAcrossViewportModes: true,
     focusCount: 1,
     popoutCount: 1,
     hostIdentityRetained: true,
@@ -106,8 +113,8 @@ function createFixture() {
   const root = documentRef.createElement('main');
   const shell = documentRef.createElement('section');
   shell.classList.add('workspace-shell', 'properties-collapsed');
-  const actionHost = documentRef.createElement('div');
-  actionHost.dataset.role = 'viewport-edit-bar';
+  const actionHost = documentRef.createElement('section');
+  actionHost.dataset.panel = 'viewport';
 
   const toggle = documentRef.createElement('button');
   toggle.dataset.action = 'toggle-properties-collapse';
@@ -161,6 +168,7 @@ class FakeElement {
     this.className = '';
     this.classList = new FakeClassList(this);
     this.listeners = new Map();
+    this.style = {};
     this.textContent = '';
     this.title = '';
     this.type = '';
