@@ -26,6 +26,41 @@ function expectCode(body, expectedCode) {
   });
 }
 
+class FakeDocument {
+  createElement(tagName) {
+    return new FakeElement(tagName, this);
+  }
+}
+
+class FakeElement {
+  constructor(tagName, ownerDocument) {
+    this.tagName = tagName;
+    this.ownerDocument = ownerDocument;
+    this.children = [];
+    this.dataset = {};
+    this.className = '';
+    this.textContent = '';
+    this.scope = '';
+    this.colSpan = 1;
+  }
+
+  append(...children) {
+    this.children.push(...children);
+  }
+
+  replaceChildren(...children) {
+    this.children = [...children];
+  }
+
+  get childElementCount() {
+    return this.children.length;
+  }
+}
+
+function flattenText(node) {
+  return [node.textContent, ...node.children.map(flattenText)].join(' ');
+}
+
 const fixture = buildQualifiedPresentationFixture();
 const presentation = compileLinearPipingPresentation(fixture);
 
@@ -157,38 +192,3 @@ test('P5-UI-01', 'Workspace renderer consumes the sealed current presentation wi
 });
 
 console.log('Linear piping Phase 5 presentation and export checks PASS');
-
-class FakeDocument {
-  createElement(tagName) {
-    return new FakeElement(tagName, this);
-  }
-}
-
-class FakeElement {
-  constructor(tagName, ownerDocument) {
-    this.tagName = tagName;
-    this.ownerDocument = ownerDocument;
-    this.children = [];
-    this.dataset = {};
-    this.className = '';
-    this.textContent = '';
-    this.scope = '';
-    this.colSpan = 1;
-  }
-
-  append(...children) {
-    this.children.push(...children);
-  }
-
-  replaceChildren(...children) {
-    this.children = [...children];
-  }
-
-  get childElementCount() {
-    return this.children.length;
-  }
-}
-
-function flattenText(node) {
-  return [node.textContent, ...node.children.map(flattenText)].join(' ');
-}
