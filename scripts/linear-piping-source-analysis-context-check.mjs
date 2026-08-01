@@ -75,6 +75,8 @@ function sourceRequest(overrides = {}) {
 
 function interfaceSetFromContext(context) {
   const node = context.compilation.model.nodes.find((row) => row.nodeId === 'N-000120');
+  assert.deepEqual(node.sourceAncestry.sourceComponentIds, ['PIPINGELEMENT-14']);
+  const sourceEntityId = 'PIPINGELEMENT-14';
   const dofMappings = context.compilation.model.constraints
     .filter((row) => row.nodeId === node.nodeId)
     .map((row) => ({
@@ -91,7 +93,7 @@ function interfaceSetFromContext(context) {
       interfaceId: 'IF-CONTEXT-NOZZLE-01',
       interfaceKind: 'NOZZLE',
       nodeId: node.nodeId,
-      sourceEntityId: 'CONTEXT-EQUIPMENT-01',
+      sourceEntityId,
       supportBinding: null,
       basis: {
         origin: node.position,
