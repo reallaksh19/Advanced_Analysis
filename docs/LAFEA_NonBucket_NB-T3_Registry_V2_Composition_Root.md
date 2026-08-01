@@ -23,7 +23,7 @@
 - the exact NB-T1 lifecycle profile ID;
 - a fail-closed release-state binding.
 
-LAFEA.6 remains an unsupported registered path. It has no benchmark-manifest binding and cannot execute a qualified calculation.
+The existing public workbench registry surface exposes these bindings through the immutable registry entries. LAFEA.6 remains an unsupported registered path. It has no benchmark-manifest binding and cannot execute a qualified calculation.
 
 ## Composition root
 
@@ -33,8 +33,8 @@ The composition root:
 
 - verifies registry/lifecycle-profile agreement during module composition;
 - verifies all executable component IDs resolve;
-- returns the registered authority-path identity with each execution;
-- exposes metadata summaries without exposing component functions;
+- retains the registered authority-path identity in composition metadata while preserving the existing public execution-result contract;
+- exposes internal metadata summaries without exposing component functions through the public workbench facade;
 - cannot register lifecycle artifacts or producer batches;
 - cannot promote code or release qualification.
 
@@ -63,6 +63,8 @@ Supported stages require separately governed release evidence. LAFEA.6 is bound 
 - `src/workspace/lafea-stage-composition.js`
 - `src/workspace/lafea-workbench-model.js`
 - `scripts/lafea-u1-stage-registry-check.mjs`
+- `scripts/lafea-u3a-public-surface-check.mjs`
+- `scripts/lafea-workbench-check.mjs`
 - `scripts/lafea-nb-t3-registry-composition-check.mjs`
 - `scripts/lafea-nonbucket-stack-check.mjs`
 - `scripts/lafea-nonbucket-scope-guard.mjs`
