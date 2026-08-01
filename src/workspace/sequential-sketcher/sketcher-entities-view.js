@@ -66,7 +66,7 @@ export function renderEntities(doc, svg, entityProjected, options = {}) {
       else if ((type === 'SUPPORT' || entity.category === 'support') && (p1 || p2)) {
         const p = p1 || p2;
         const supportType = entity.properties?.supportType || entity.properties?.SUPPORT_TYPE || 'REST';
-        const callouts = supportPresenter ? supportPresenter.getResultCallouts(entity) : [];
+        const callouts = (options.showReactions !== false && supportPresenter) ? supportPresenter.getResultCallouts(entity) : [];
         const symbol = symbolFactory.createSupportSymbol(doc, p, supportType, isSelected, baseStroke, supportSize, callouts, loadScale);
         symbol.style.cursor = 'pointer';
         symbol.addEventListener('click', clickHandler);

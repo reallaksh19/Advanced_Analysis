@@ -12,6 +12,7 @@
     "benchmark:tabs": "node scripts/run-advanced-tab-benchmarks.mjs",
     "build": "node scripts/advanced-shell-contract-check.mjs && vite build && node scripts/bundle-chunk-check.mjs",
     "check:advanced-shell": "node scripts/advanced-shell-contract-check.mjs",
+    "check:master-data-containment": "node scripts/master-data-containment-check.mjs",
     "check:core-fea": "node scripts/run-core-fea-checks.mjs",
     "check:doc-drift": "node scripts/doc-drift-check.mjs",
     "check:fea-ui-upgrade": "node scripts/fea-ui-upgrade-check.mjs",
@@ -78,7 +79,9 @@
     "test": "npm run check:advanced-shell && npm run check:lafea-workbench && npm run check:lfea-workbench && npm run check:lfea-svg && npm run check:sequential-sketcher"
   },
   "dependencies": {
-    "three": "^0.170.0"
+    "papaparse": "^5.5.4",
+    "three": "^0.170.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@babel/parser": "^7.29.0",

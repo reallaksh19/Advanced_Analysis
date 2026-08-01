@@ -8,6 +8,7 @@ const ACTION_REASONS = Object.freeze({
 
 import { renderProjectConfiguration, renderPreflightGrid } from './lfea-preflight-ui.js';
 import { renderMasterDataUI } from './master-data-ui.js';
+import { WorkspaceState } from './workspace-state.js';
 
 export function renderLoadCalcConsumer(documentRef, model, status = {}, actionAvailability = {}, missingContracts = null, uiState = {}) {
   const section = documentRef.createElement('section');
@@ -31,21 +32,21 @@ export function renderLoadCalcConsumer(documentRef, model, status = {}, actionAv
     <div class="load-calc-consumer__top-bar">
       <div class="load-calc-tabs" role="tablist" aria-label="Workbench tabs">
         <button type="button" data-action="tab-main" data-tab="load-cases" class="${(!uiState.activeTab || uiState.activeTab === 'load-cases') ? 'is-active' : ''}">Load Evaluation</button>
-      <button type="button" data-action="tab-main" data-tab="preflight" class="${uiState.activeTab === 'preflight' ? 'is-active' : ''}">Pre-Flight Grid</button>
-      <button type="button" data-action="tab-main" data-tab="project-config" class="${uiState.activeTab === 'project-config' ? 'is-active' : ''}">Project Data</button>
-      <button type="button" data-action="tab-main" data-tab="master-data" class="${uiState.activeTab === 'master-data' ? 'is-active' : ''}">Master Data</button>
-      <button type="button" data-action="tab-main" data-tab="json-trace" class="${uiState.activeTab === 'json-trace' ? 'is-active' : ''}">JSON Trace</button>
-    </div>
+        <button type="button" data-action="tab-main" data-tab="preflight" class="${uiState.activeTab === 'preflight' ? 'is-active' : ''}">Pre-Flight Grid <span class="tab-close-icon" data-action="close-tab" data-tab="preflight" title="Close tab & return to canvas" style="display:inline-flex; align-items:center; justify-content:center; margin-left:6px; width:14px; height:14px; border-radius:50%; font-size:10px; opacity:0.7; transition:all 0.15s;">✕</span></button>
+        <button type="button" data-action="tab-main" data-tab="project-config" class="${uiState.activeTab === 'project-config' ? 'is-active' : ''}">Project Data <span class="tab-close-icon" data-action="close-tab" data-tab="project-config" title="Close tab & return to canvas" style="display:inline-flex; align-items:center; justify-content:center; margin-left:6px; width:14px; height:14px; border-radius:50%; font-size:10px; opacity:0.7; transition:all 0.15s;">✕</span></button>
+        <button type="button" data-action="tab-main" data-tab="master-data" class="${uiState.activeTab === 'master-data' ? 'is-active' : ''}">Master Data <span class="tab-close-icon" data-action="close-tab" data-tab="master-data" title="Close tab & return to canvas" style="display:inline-flex; align-items:center; justify-content:center; margin-left:6px; width:14px; height:14px; border-radius:50%; font-size:10px; opacity:0.7; transition:all 0.15s;">✕</span></button>
+        <button type="button" data-action="tab-main" data-tab="json-trace" class="${uiState.activeTab === 'json-trace' ? 'is-active' : ''}">JSON Trace <span class="tab-close-icon" data-action="close-tab" data-tab="json-trace" title="Close tab & return to canvas" style="display:inline-flex; align-items:center; justify-content:center; margin-left:6px; width:14px; height:14px; border-radius:50%; font-size:10px; opacity:0.7; transition:all 0.15s;">✕</span></button>
+      </div>
       <div class="load-calc-tabs" style="margin-left: 12px; border-left: 1px solid #334155; padding-left: 12px; display: ${(!uiState.activeTab || uiState.activeTab === 'load-cases') ? 'flex' : 'none'}">
         ${cases.map(c => `<button type="button" data-action="tab-load-case" data-case="${escapeHtml(c.loadCaseId)}" aria-selected="${c.loadCaseId === activeCaseId}">${escapeHtml(c.loadCaseId)}</button>`).join('')}
       </div>
       <section class="load-calc-consumer__controls" aria-label="Load Calc actions">
         ${mockAction()}
-        ${action('rebuild-model-loads','Rebuild Model Loads',actionAvailability.rebuildModelLoads,ACTION_REASONS.rebuildModelLoads)}
-        ${action('export-model-loads','Export Model Loads',actionAvailability.exportModelLoads,ACTION_REASONS.exportModelLoads)}
-        ${action('rebuild-paths','Rebuild Vertical Load Paths',actionAvailability.rebuildPaths,ACTION_REASONS.rebuildPaths)}
-        ${action('run-screening','Run Tributary Screening',actionAvailability.runScreening,ACTION_REASONS.runScreening)}
-        ${action('export-screening','Export Tributary Screening',actionAvailability.exportScreening,ACTION_REASONS.exportScreening)}
+        ${action('rebuild-model-loads','⚡ 1. Calculate Model Loads', true, '')}
+        ${action('rebuild-paths','📐 2. Build Load Paths', true, '')}
+        ${action('run-screening','🎯 3. Run Support Screening', true, '')}
+        ${action('export-model-loads','📥 Export Loads', true, '')}
+        ${action('export-screening','📥 Export Support Report', true, '')}
       </section>
     </div>
     

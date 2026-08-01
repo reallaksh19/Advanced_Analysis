@@ -66,6 +66,8 @@ export class SequentialSketcherView {
 
     // Header Toolbar
     const isEmbedded = Boolean(this.rootElement.closest('.viewport-panel') || this.rootElement.closest('.application-shell'));
+    container.style.overflow = isEmbedded ? 'hidden' : 'auto';
+
     const header = buildHeaderToolbar(this.rootElement.ownerDocument, {
       titleText: `Sequential Engineering SVG — ${this.currentDataset?.sourceName || this.currentDataset?.datasetId || 'No Dataset Loaded'}`,
       hideTitle: isEmbedded,
@@ -113,7 +115,9 @@ export class SequentialSketcherView {
 
     const svgHost = this.rootElement.ownerDocument.createElement('div');
     svgHost.className = 'sequential-sketcher-svg-host';
-    svgHost.style.minHeight = '450px';
+    svgHost.style.minHeight = isEmbedded ? '100px' : '450px';
+    svgHost.style.height = '100%';
+    svgHost.style.flex = '1';
     svgHost.style.background = '#030712';
     svgHost.style.borderRadius = '6px';
     svgHost.style.border = '1px solid #1e293b';
@@ -134,12 +138,12 @@ export class SequentialSketcherView {
     bodyLayout.append(svgHost);
     container.append(bodyLayout);
 
-    // Reactive Topology Table Panel (Zustand-like Bi-directional Synchronized Data Grid)
-    if (this.tableView) {
+    // Reactive Topology Table Panel (Only rendered when standalone, not when embedded in main workspace viewport)
+    if (this.tableView && !isEmbedded) {
       const tableHost = this.rootElement.ownerDocument.createElement('div');
       tableHost.className = 'sequential-sketcher-table-host';
       this.tableView.rootElement = tableHost;
-      this.tableView.mount();
+      this.tableView.render(this.currentDataset);
       container.append(tableHost);
     }
 

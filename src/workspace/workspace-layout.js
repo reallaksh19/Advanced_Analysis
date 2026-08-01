@@ -66,7 +66,7 @@ function qualificationBanner(tabId) {
 }
 
 function workspaceView() {
-  return `<main class="workspace-shell" aria-label="Analysis Workspace" style="display:flex; flex:1; width:100%; height:100%; min-height:0; overflow:hidden;">
+  return `<main class="workspace-shell" aria-label="Analysis Workspace">
     <aside class="workspace-panel tree-panel" data-panel="tree" aria-label="Dataset tree and layers">
       <header class="panel-header">
         <div class="panel-header__title">
@@ -78,7 +78,12 @@ function workspaceView() {
       </header>
       <div class="panel-collapsible-content">
         <section class="dataset-toolbar" aria-label="Dataset actions">
-          <div class="dataset-toolbar__actions"><button type="button" data-action="load-mock-dataset" data-mock-data="true">[SIMULATED] Load Mock Data</button><button type="button" data-action="load-staggered-mock" data-mock-data="true">🧊 Routed 3D Mock</button><button type="button" data-action="import-dataset">Import JSON</button><button type="button" data-action="clear-dataset" disabled>Clear</button></div>
+          <div class="dataset-toolbar__actions">
+            <button type="button" data-action="load-mock-dataset" data-mock-data="true">⚡ Load Mock</button>
+            <button type="button" data-action="load-staggered-mock" data-mock-data="true">🧊 Routed 3D</button>
+            <button type="button" data-action="import-dataset">📥 Import JSON</button>
+            <button type="button" data-action="clear-dataset" disabled>🗑️ Clear</button>
+          </div>
           <div class="panel-search-container"><input type="search" data-role="tree-search" class="panel-search-input" placeholder="Search entities..."></div>
           <input data-role="dataset-file" type="file" accept=".json,application/json" hidden>
           <output data-role="tree-status">No dataset loaded</output>
@@ -122,18 +127,19 @@ function workspaceView() {
       </header>
       <div class="viewport-edit-bar" data-role="viewport-edit-bar" style="padding:4px 8px; background:#091322; border-bottom:1px solid #1e293b; display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-height:34px;"></div>
       <div class="viewport-content-wrapper" style="display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden; position:relative;">
-        <div class="webgl-load-prompt" data-role="webgl-load-prompt" style="position:absolute; inset:0; z-index:40; background:rgba(2,6,23,0.92); backdrop-filter:blur(4px); display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px; padding:20px;">
-          <div style="font-size:32px;">🖥️⚡</div>
-          <span style="font-size:15px; font-weight:700; color:#f8fafc;">3D WebGL Geometry Loading Deferred</span>
-          <p style="font-size:12px; color:#94a3b8; max-width:400px; text-align:center; margin:0;">To preserve memory and maintain peak FPS on complex piping networks, high-density 3D meshes load on demand.</p>
-          <button type="button" data-action="load-webgl-geometry" style="padding:8px 18px; border-radius:6px; background:#0284c7; color:#fff; font-weight:700; font-size:13px; border:1px solid #38bdf8; cursor:pointer; display:flex; align-items:center; gap:6px; box-shadow:0 0 18px rgba(56,189,248,0.4);">⚡ Load 3D Geometry Now</button>
+        <div class="viewport-stage" data-webgl-host data-role="viewport-render-host" aria-label="Read-only model viewport" style="display:none; height:0; min-height:0; flex:none; position:relative;">
+          <div class="webgl-load-prompt" data-role="webgl-load-prompt" style="position:absolute; inset:0; z-index:40; background:rgba(2,6,23,0.92); backdrop-filter:blur(4px); display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px; padding:20px;">
+            <div style="font-size:32px;">🖥️⚡</div>
+            <span style="font-size:15px; font-weight:700; color:#f8fafc;">3D WebGL Geometry Loading Deferred</span>
+            <p style="font-size:12px; color:#94a3b8; max-width:400px; text-align:center; margin:0;">To preserve memory and maintain peak FPS on complex piping networks, high-density 3D meshes load on demand.</p>
+            <button type="button" data-action="load-webgl-geometry" style="padding:8px 18px; border-radius:6px; background:#0284c7; color:#fff; font-weight:700; font-size:13px; border:1px solid #38bdf8; cursor:pointer; display:flex; align-items:center; gap:6px; box-shadow:0 0 18px rgba(56,189,248,0.4);">⚡ Load 3D Geometry Now</button>
+          </div>
         </div>
-        <div class="viewport-stage" data-webgl-host data-role="viewport-render-host" aria-label="Read-only model viewport" style="display:none; height:0; min-height:0; flex:none;"></div>
-        <div class="viewport-table-dock" data-role="viewport-table-dock" style="display:none; height:200px; border-top:1px solid #1e293b; background:#091322; overflow:auto;"></div>
-        <div class="panel-resizer panel-resizer--vertical" data-action="resize-viewport-vertical" aria-label="Resize Viewport Height" title="Drag up/down to adjust WebGL vs SVG Viewport height" style="display:none; height:12px; cursor:row-resize; background:#0f172a; border-top:2px solid #38bdf8; border-bottom:2px solid #38bdf8; align-items:center; justify-content:center; margin:2px 0; user-select:none; z-index:50;">
+        <div data-role="sequential-sketcher-root" style="display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden;"></div>
+        <div class="panel-resizer panel-resizer--vertical" data-action="resize-viewport-vertical" aria-label="Resize Viewport Height" title="Drag up/down to adjust Viewport vs Data Table height" style="display:none; height:12px; cursor:row-resize; background:#0f172a; border-top:2px solid #38bdf8; border-bottom:2px solid #38bdf8; align-items:center; justify-content:center; margin:2px 0; user-select:none; z-index:50;">
           <span style="width:50px; height:4px; background:#38bdf8; border-radius:2px; box-shadow:0 0 8px #38bdf8;"></span>
         </div>
-        <div data-role="sequential-sketcher-root" style="display:flex; flex-direction:column; flex:1; height:100%; min-height:0; overflow:hidden;"></div>
+        <div class="viewport-table-dock" data-role="viewport-table-dock" style="display:none; flex:0 0 220px; min-height:80px; border-top:1px solid #1e293b; background:#091322; overflow:auto;"></div>
       </div>
       <footer class="viewport-footer" style="display:none;">
         <output data-role="viewport-status">No dataset loaded</output>
@@ -151,47 +157,69 @@ function workspaceView() {
         </div>
         <button type="button" class="panel-collapse-btn" data-action="toggle-properties-collapse" aria-label="Toggle Properties Panel" title="Collapse Properties">▶</button>
       </header>
+      <div class="right-panel-sub-nav" style="display:flex; background:#020617; border-bottom:1px solid #1e293b; padding:4px; gap:4px; flex:none;">
+        <button type="button" data-action="switch-right-tab" data-tab="inspector" class="right-tab-btn right-tab-btn--active" style="flex:1; min-width:0; padding:6px 2px; border:none; border-radius:4px; background:#0284c7; color:#ffffff; font-weight:700; font-size:10px; cursor:pointer; text-align:center; transition:all 0.15s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Inspector">🔍 Inspector</button>
+        <button type="button" data-action="switch-right-tab" data-tab="health" class="right-tab-btn" style="flex:1; min-width:0; padding:6px 2px; border:none; border-radius:4px; background:transparent; color:#94a3b8; font-weight:700; font-size:10px; cursor:pointer; text-align:center; transition:all 0.15s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Health">🩺 Health</button>
+        <button type="button" data-action="switch-right-tab" data-tab="loadcalc" class="right-tab-btn" style="flex:1; min-width:0; padding:6px 2px; border:none; border-radius:4px; background:transparent; color:#94a3b8; font-weight:700; font-size:10px; cursor:pointer; text-align:center; transition:all 0.15s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Load Calc">⚡ Load Calc</button>
+        <button type="button" data-action="switch-right-tab" data-tab="overrides" class="right-tab-btn" style="flex:1; min-width:0; padding:6px 2px; border:none; border-radius:4px; background:transparent; color:#94a3b8; font-weight:700; font-size:10px; cursor:pointer; text-align:center; transition:all 0.15s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Overrides">📝 Overrides</button>
+      </div>
       <div class="panel-collapsible-content" style="display:flex; flex-direction:column; flex:1; min-height:0; overflow-y:auto; gap:10px; padding:10px;">
         <div class="panel-search-container properties-search-container" style="flex:none;"><input type="search" data-role="properties-search" class="panel-search-input" placeholder="Filter properties..."></div>
-        <div class="properties-accordion-section" data-section-id="inspector">
-          <header class="accordion-section-header"><span class="accordion-section-title">Selected Entity Inspector</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
-          <div class="accordion-section-body"><div class="properties-content" data-role="properties-content"><p class="panel-empty">Select an entity to inspect its properties.</p></div></div>
+        
+        <!-- Tab 1: Inspector -->
+        <div data-tab-group="inspector" style="display:flex; flex-direction:column; gap:10px;">
+          <div class="properties-accordion-section" data-section-id="inspector">
+            <header class="accordion-section-header"><span class="accordion-section-title">Selected Entity Inspector</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
+            <div class="accordion-section-body"><div class="properties-content" data-role="properties-content"><p class="panel-empty">Select an entity to inspect its properties.</p></div></div>
+          </div>
         </div>
-        <div class="properties-accordion-section accordion-collapsed" data-section-id="shared-model">
-          <header class="accordion-section-header"><span class="accordion-section-title">Shared Piping Model</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▶</span></div></header>
-          <div class="accordion-section-body"><div data-role="shared-model-summary"></div></div>
+
+        <!-- Tab 2: Health -->
+        <div data-tab-group="health" style="display:none; flex-direction:column; gap:10px;">
+          <div class="properties-accordion-section" data-section-id="shared-model">
+            <header class="accordion-section-header"><span class="accordion-section-title">Shared Piping Model</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
+            <div class="accordion-section-body"><div data-role="shared-model-summary"></div></div>
+          </div>
+          <div class="properties-accordion-section" data-section-id="topology">
+            <header class="accordion-section-header"><span class="accordion-section-title">Topology Health</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
+            <div class="accordion-section-body"><div data-role="topology-summary"></div></div>
+          </div>
+          <div class="properties-accordion-section" data-section-id="supports">
+            <header class="accordion-section-header"><span class="accordion-section-title">Support &amp; Restraint Health</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
+            <div class="accordion-section-body"><div data-role="support-restraint-summary"></div></div>
+          </div>
         </div>
-        <div class="properties-accordion-section accordion-collapsed" data-section-id="topology">
-          <header class="accordion-section-header"><span class="accordion-section-title">Topology Health</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▶</span></div></header>
-          <div class="accordion-section-body"><div data-role="topology-summary"></div></div>
+
+        <!-- Tab 3: Load Calc & FEA Solvers -->
+        <div data-tab-group="loadcalc" style="display:none; flex-direction:column; gap:10px;">
+          <div class="properties-accordion-section" data-section-id="loads">
+            <header class="accordion-section-header"><span class="accordion-section-title">Model Loads</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
+            <div class="accordion-section-body"><div data-role="model-load-summary"></div></div>
+          </div>
+          <div class="properties-accordion-section" data-section-id="screening">
+            <header class="accordion-section-header"><span class="accordion-section-title">Support Load Screening</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
+            <div class="accordion-section-body"><div data-role="support-load-screening-summary"></div></div>
+          </div>
+          <div class="properties-accordion-section" data-section-id="beam">
+            <header class="accordion-section-header"><span class="accordion-section-title">Vertical Beam Solver</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
+            <div class="accordion-section-body"><div data-role="vertical-beam-summary"></div></div>
+          </div>
+          <div class="properties-accordion-section" data-section-id="calculation">
+            <header class="accordion-section-header"><span class="accordion-section-title">Model Calculation Package</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
+            <div class="accordion-section-body"><div data-role="model-calculation-summary"></div></div>
+          </div>
+          <div class="properties-accordion-section" data-section-id="whole-model-loads">
+            <header class="accordion-section-header"><span class="accordion-section-title">Whole-Model Support Load</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
+            <div class="accordion-section-body"><div data-role="model-support-load-summary"></div></div>
+          </div>
         </div>
-        <div class="properties-accordion-section accordion-collapsed" data-section-id="supports">
-          <header class="accordion-section-header"><span class="accordion-section-title">Support &amp; Restraint Health</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▶</span></div></header>
-          <div class="accordion-section-body"><div data-role="support-restraint-summary"></div></div>
-        </div>
-        <div class="properties-accordion-section accordion-collapsed" data-section-id="first-cut">
-          <header class="accordion-section-header"><span class="accordion-section-title">First-Cut Load Enrichment</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▶</span></div></header>
-          <div class="accordion-section-body" data-first-cut-section="true"><div data-role="first-cut-workbench-root"></div></div>
-        </div>
-        <div class="properties-accordion-section accordion-collapsed" data-section-id="loads">
-          <header class="accordion-section-header"><span class="accordion-section-title">Model Loads</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▶</span></div></header>
-          <div class="accordion-section-body"><div data-role="model-load-summary"></div></div>
-        </div>
-        <div class="properties-accordion-section accordion-collapsed" data-section-id="screening">
-          <header class="accordion-section-header"><span class="accordion-section-title">Support Load Screening</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▶</span></div></header>
-          <div class="accordion-section-body"><div data-role="support-load-screening-summary"></div></div>
-        </div>
-        <div class="properties-accordion-section accordion-collapsed" data-section-id="beam">
-          <header class="accordion-section-header"><span class="accordion-section-title">Vertical Beam Solver</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▶</span></div></header>
-          <div class="accordion-section-body"><div data-role="vertical-beam-summary"></div></div>
-        </div>
-        <div class="properties-accordion-section accordion-collapsed" data-section-id="calculation">
-          <header class="accordion-section-header"><span class="accordion-section-title">Model Calculation Package</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▶</span></div></header>
-          <div class="accordion-section-body"><div data-role="model-calculation-summary"></div></div>
-        </div>
-        <div class="properties-accordion-section accordion-collapsed" data-section-id="whole-model-loads">
-          <header class="accordion-section-header"><span class="accordion-section-title">Whole-Model Support Load</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▶</span></div></header>
-          <div class="accordion-section-body"><div data-role="model-support-load-summary"></div></div>
+
+        <!-- Tab 4: Overrides & Sidecars -->
+        <div data-tab-group="overrides" style="display:none; flex-direction:column; gap:10px;">
+          <div class="properties-accordion-section" data-section-id="first-cut">
+            <header class="accordion-section-header"><span class="accordion-section-title">First-Cut Load Enrichment</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
+            <div class="accordion-section-body" data-first-cut-section="true"><div data-role="first-cut-workbench-root"></div></div>
+          </div>
         </div>
       </div>
     </aside>

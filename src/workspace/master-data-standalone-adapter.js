@@ -26,7 +26,7 @@ export const MasterDataStandaloneAdapter = {
       { key: 'lineList', path: '/fixtures/AML-91-PDFEED-PX-2345-00001-0000 BC4.xlsx' },
       { key: 'pipingClass', path: '/fixtures/Piping class master.xlsx' },
       { key: 'weight', path: '/fixtures/wtValveweights.xlsx' },
-      { key: 'material', path: '/fixtures/PCF_MAT_MAP.TXT' }
+      { key: 'materialMap', path: '/fixtures/PCF_MAT_MAP.TXT' }
     ];
 
     let context = loadMasterContextFromLocalStorage() || await prepareXmlCiiMasterContext();

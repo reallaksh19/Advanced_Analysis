@@ -27,25 +27,27 @@ export function renderLafeaWorkbenchSvg(host, geometry, handlers, viewport = nul
   svg.setAttribute('viewBox', `0 0 ${dimensions.width} ${dimensions.height}`);
   svg.setAttribute('role', geometry.nodePath ? 'group' : 'img');
   svg.setAttribute('aria-label', 'LAFEA editable geometry preview');
-  const transform = viewport
-    ? governedViewportTransform(viewport, dimensions)
-    : legacyViewportTransform(geometry.nodes, dimensions);
+  const transform = viewportTransform(geometry.nodes);
+  bindGlobalHighlight(svg);
   renderElements(svg, geometry, transform);
   renderNodes(svg, geometry, transform, handlers);
   if (!geometry.nodes.length) renderEmpty(svg, documentRef, dimensions);
   host.append(svg);
 }
 
-function bindHighlight(svg, el, id) {
-  el.addEventListener('click', (event) => {
+function bindGlobalHighlight(svg) {
+  svg.addEventListener('click', (event) => {
+    const target = event.target.closest('[data-element-id], [data-node-id]');
+    if (!target) return;
     event.stopPropagation();
+    const id = target.dataset.elementId || target.dataset.nodeId;
     svg.ownerDocument.querySelectorAll('.lafea-svg-highlighted').forEach((node) => node.classList.remove('lafea-svg-highlighted'));
-    el.classList.add('lafea-svg-highlighted');
+    target.classList.add('lafea-svg-highlighted');
     const tr = svg.ownerDocument.querySelector(`tr[data-row-id="${id}"]`);
     if (tr) {
       svg.ownerDocument.querySelectorAll('tr.lafea-row-selected').forEach((row) => row.classList.remove('lafea-row-selected'));
       tr.classList.add('lafea-row-selected');
-      tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      tr.scrollIntoView({ behavior: 'auto', block: 'nearest' });
     }
   });
 }
@@ -59,7 +61,6 @@ function renderElements(svg, geometry, transform) {
     polygon.setAttribute('points', points.map((point) => screenPoint(point, transform).join(',')).join(' '));
     polygon.setAttribute('class', 'lafea-workbench-svg__element');
     polygon.dataset.elementId = element.elementId;
-    bindHighlight(svg, polygon, element.elementId);
     svg.append(polygon);
   }
 }
@@ -87,8 +88,7 @@ function renderNodes(svg, geometry, transform, handlers) {
     label.setAttribute('y', String(y - 8));
     label.textContent = node.nodeId;
     group.append(marker, label);
-    bindHighlight(svg, group, node.nodeId);
-    if (geometry.nodePath && typeof handlers?.onMoveNode === 'function') {
+    if (geometry.nodePath) {
       bindDrag(svg, marker, node, geometry.nodePath, transform, handlers);
       bindKeyboard(marker, node, geometry.nodePath, handlers);
     }

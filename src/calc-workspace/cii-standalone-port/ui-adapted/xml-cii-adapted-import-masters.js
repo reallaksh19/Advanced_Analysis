@@ -38,6 +38,8 @@ function configFor(state) {
 
 function fieldMapFor(masterKey, state) {
   const configKey = MASTER_FIELDS[masterKey]?.configKey;
+  const contextMap = state.masterContext?.config?.[configKey]?.fieldMap;
+  if (contextMap && Object.keys(contextMap).length > 0) return contextMap;
   return configFor(state)[configKey]?.fieldMap || {};
 }
 
@@ -63,7 +65,7 @@ function previewColumns(rows, masterKey, state) {
     for (const key of Object.keys(row || {})) {
       if (
         key !== '_rowIndex'
-        && !key.startsWith('_')
+        && (!key.startsWith('_') || key.startsWith('__EMPTY'))
         && !extraKeys.includes(key)
         && !fieldNames.includes(key)
         && !standardExtra.includes(key)
@@ -74,7 +76,7 @@ function previewColumns(rows, masterKey, state) {
       }
     }
   }
-  for (const key of extraKeys) if (!sortedKeys.includes(key) && sortedKeys.length < 30) sortedKeys.push(key);
+  for (const key of extraKeys) if (!sortedKeys.includes(key) && sortedKeys.length < 50) sortedKeys.push(key);
   if (masterKey === 'lineList' && !sortedKeys.includes('densitySource')) sortedKeys.push('densitySource');
   return sortedKeys;
 }
@@ -99,11 +101,18 @@ function tableHead(columns, masterKey, state) {
   return thead;
 }
 
-function tableBody(columns, rows) {
+function tableBody(columns, rows, masterKey, state) {
   const body = createElement('tbody');
+  const fieldMap = fieldMapFor(masterKey, state);
   for (const item of rows) {
     const tr = createElement('tr');
-    for (const col of columns) tr.appendChild(createElement('td', text(item?.[col])));
+    for (const col of columns) {
+      let val = item?.[col];
+      if (val === undefined && fieldMap[col]) {
+        val = item?.[fieldMap[col]];
+      }
+      tr.appendChild(createElement('td', text(val)));
+    }
     body.appendChild(tr);
   }
   return body;
@@ -129,7 +138,7 @@ function appendPreview(parent, master, state) {
   const columns = previewColumns(rows, masterKey, state);
   const tableEl = createElement('table', '', 'xml-cii-master-preview-table');
   tableEl.append(tableHead(columns, masterKey, state));
-  const tbodyEl = tableBody(columns, rows);
+  const tbodyEl = tableBody(columns, rows, masterKey, state);
   tableEl.appendChild(tbodyEl);
 
   const scrollContainer = style(createElement('div'), { maxHeight: '350px', overflowY: 'auto', border: '1px solid rgba(148, 163, 184, 0.12)', borderRadius: '6px' });
@@ -140,9 +149,14 @@ function appendPreview(parent, master, state) {
     const q = searchInput.value.toLowerCase().trim();
     const filtered = q ? allRows.filter((row) => previewSearchText(row).includes(q)) : allRows;
     tbodyEl.innerHTML = '';
+    const fieldMap = fieldMapFor(masterKey, state);
     for (const item of filtered.slice(0, 150)) {
       const tr = createElement('tr');
-      for (const col of columns) tr.appendChild(createElement('td', text(item?.[col])));
+      for (const col of columns) {
+        let val = item?.[col];
+        if (val === undefined && fieldMap[col]) val = item?.[fieldMap[col]];
+        tr.appendChild(createElement('td', text(val)));
+      }
       tbodyEl.appendChild(tr);
     }
   });
@@ -199,11 +213,16 @@ function renderMappingHealth(masterKey, fields, fieldMap) {
 function renderColumnMapping(master, state) {
   const masterKey = master.key;
   const fields = MASTER_FIELDS[masterKey]?.fields || [];
-  const rawRows = state.masterContext?.rawRows?.[masterKey] || [];
+  const rawRows = (state.masterContext?.rawRows && Array.isArray(state.masterContext.rawRows[masterKey])) ? state.masterContext.rawRows[masterKey] : [];
   if (!rawRows.length) return createElement('div', 'Import rows/file to configure field mapping.', 'xml-cii-phase-help');
 
   const headers = [];
-  for (const k of Object.keys(rawRows[0] || {})) if (k !== '_rowIndex' && !headers.includes(k)) headers.push(k);
+  for (const row of rawRows) {
+    for (const key of Object.keys(row || {})) {
+      if (key !== '_rowIndex' && !headers.includes(key)) headers.push(key);
+    }
+    if (headers.length >= 30) break;
+  }
   const previewMap = buildColumnPreviewMap(rawRows, headers);
   const fieldMap = fieldMapFor(masterKey, state);
 

@@ -1,0 +1,25 @@
+{
+  "project": "Advanced_Analysis",
+  "auditBaseline": "8f1ef82bb6fc31dbd7524c0ea736747ce562bfdb",
+  "comparator": {
+    "repository": "reallaksh19/3D_Converters",
+    "commit": "69f69e951937f6370359fd6eed0611ce0ebdf8b6",
+    "status": "frozen_for_audit_remediation"
+  },
+  "modules": [
+    {
+      "name": "Master Data UI",
+      "targetPath": "src/workspace/master-data-ui.js",
+      "sourcePath": "tabs/xml-cii-2019-standalone/ui-adapted/xml-cii-adapted-master-events.js",
+      "parityStatus": "drifted",
+      "action": "Needs schema normalization and shared model integration."
+    },
+    {
+      "name": "JSON Trace UI",
+      "targetPath": "src/workspace/json-trace-ui.js",
+      "sourcePath": "tabs/xml-cii-2019-standalone/xml-cii-resolver-json-trace.js",
+      "parityStatus": "mocked",
+      "action": "Restore real resolver ledger adapter."
+    }
+  ]
+}

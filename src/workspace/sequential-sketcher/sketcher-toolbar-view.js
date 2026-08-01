@@ -126,13 +126,15 @@ export function buildHeaderToolbar(doc, options = {}) {
   select.addEventListener('change', (e) => { if (onBranchSelect) onBranchSelect(e.target.value); });
   branchGroup.append(select);
 
-  // Group 3: Navigation & Load Font Size Scaling (Fit View, +, -, Load Font A+/A-)
+  // Group 3: Navigation & Load Font Size Scaling (Fit View, +, -, Grid, Reactions, Load Font A+/A-)
+  const showReactions = options.showReactions !== false;
   const navGroup = createGroup(doc);
   navGroup.append(
     createBtn(doc, '🔍 Fit View', () => { if (onFitView) onFitView(); }),
     createBtn(doc, '+', () => { if (onZoomIn) onZoomIn(); }),
     createBtn(doc, '-', () => { if (onZoomOut) onZoomOut(); }),
     createBtn(doc, showGrid ? '🌐 Grid: ON' : '🌐 Grid: OFF', () => { if (onToggleGrid) onToggleGrid(); }, showGrid),
+    createBtn(doc, showReactions ? '⚡ Reactions: ON' : '⚡ Reactions: OFF', () => { if (options.onToggleReactions) options.onToggleReactions(); }, showReactions),
     createBtn(doc, '🏷️ Load A-', () => { if (onDecreaseLoadFont) onDecreaseLoadFont(); }),
     createBtn(doc, '🏷️ Load A+', () => { if (onIncreaseLoadFont) onIncreaseLoadFont(); })
   );
