@@ -28,7 +28,7 @@ export class WorkspaceShellController {
     this.shellElement.addEventListener('pointerdown', this.handlePointerDown);
     this.shellElement.addEventListener('click', this.handleClick);
     
-    // Update dataset name in topbar and auto-popup zone selector on dataset load
+    // Update dataset name in topbar, auto-popup zone selector on dataset load, and switch panel sub-views
     this.unsubscribeCallbacks = [
       EventBus.subscribe(EVENT_TOPICS.WORKSPACE_SNAPSHOT_CHANGED, ({ snapshot }) => {
         const el = this.shellElement.querySelector('[data-role="topbar-dataset"]');
@@ -40,8 +40,25 @@ export class WorkspaceShellController {
             window.dispatchEvent(new CustomEvent('workspace-zone-filter-changed', { detail: { selectedZones, qualities } }));
           });
         }
+      }),
+      EventBus.subscribe(APPLICATION_EVENTS.CHANGED, ({ activeViewId }) => {
+        this.switchWorkbenchView(activeViewId);
       })
     ];
+  }
+
+  switchWorkbenchView(viewId) {
+    const activeView = (viewId === 'LOAD_CALC') ? 'loadcalc' : 'workspace';
+    const leftViews = this.shellElement.querySelectorAll('[data-left-view]');
+    const rightViews = this.shellElement.querySelectorAll('[data-right-view]');
+
+    leftViews.forEach(el => {
+      el.style.display = el.dataset.leftView === activeView ? 'flex' : 'none';
+    });
+
+    rightViews.forEach(el => {
+      el.style.display = el.dataset.rightView === activeView ? 'flex' : 'none';
+    });
   }
 
   loadState() {

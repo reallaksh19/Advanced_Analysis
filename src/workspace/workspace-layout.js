@@ -68,29 +68,47 @@ function qualificationBanner(tabId) {
 function workspaceView() {
   return `<main class="workspace-shell" aria-label="Analysis Workspace">
     <aside class="workspace-panel tree-panel" data-panel="tree" aria-label="Dataset tree and layers">
-      <header class="panel-header">
-        <div class="panel-header__title">
-          <span class="panel-eyebrow">Analysis Workspace</span>
-          <h1>Dataset Tree</h1>
-        </div>
-        <button type="button" class="panel-collapse-btn" data-action="toggle-tree-collapse" aria-label="Toggle Tree Panel" title="Collapse Tree">◀</button>
-        <button type="button" class="panel-expand-btn" data-action="toggle-tree-collapse" aria-label="Expand Tree Panel" title="Expand Tree">▶</button>
-      </header>
-      <div class="panel-collapsible-content">
-        <section class="dataset-toolbar" aria-label="Dataset actions">
-          <div class="dataset-toolbar__actions">
-            <button type="button" data-action="load-mock-dataset" data-mock-data="true">⚡ Load Mock</button>
-            <button type="button" data-action="load-staggered-mock" data-mock-data="true">🧊 Routed 3D</button>
-            <button type="button" data-action="import-dataset">📥 Import JSON</button>
-            <button type="button" data-action="clear-dataset" disabled>🗑️ Clear</button>
+      <!-- Left Sub-View 1: Workspace Dataset Tree -->
+      <div data-left-view="workspace" style="display:flex; flex-direction:column; height:100%; min-height:0;">
+        <header class="panel-header">
+          <div class="panel-header__title">
+            <span class="panel-eyebrow">Analysis Workspace</span>
+            <h1>Dataset Tree</h1>
           </div>
-          <div class="panel-search-container"><input type="search" data-role="tree-search" class="panel-search-input" placeholder="Search entities..."></div>
-          <input data-role="dataset-file" type="file" accept=".json,application/json" hidden>
-          <output data-role="tree-status">No dataset loaded</output>
-          <p class="dataset-error" data-role="tree-error" hidden></p>
-        </section>
-        <section class="layer-summary" aria-label="Dataset summary"><span data-role="summary-pipes">Pipes 0</span><span data-role="summary-supports">Supports 0</span></section>
-        <div class="tree-list" data-role="tree-list"><p class="panel-empty">Import a supported workspace JSON package.</p></div>
+          <button type="button" class="panel-collapse-btn" data-action="toggle-tree-collapse" aria-label="Toggle Tree Panel" title="Collapse Tree">◀</button>
+          <button type="button" class="panel-expand-btn" data-action="toggle-tree-collapse" aria-label="Expand Tree Panel" title="Expand Tree">▶</button>
+        </header>
+        <div class="panel-collapsible-content">
+          <section class="dataset-toolbar" aria-label="Dataset actions">
+            <div class="dataset-toolbar__actions">
+              <button type="button" data-action="load-mock-dataset" data-mock-data="true">⚡ Load Mock</button>
+              <button type="button" data-action="load-staggered-mock" data-mock-data="true">🧊 Routed 3D</button>
+              <button type="button" data-action="import-dataset">📥 Import JSON</button>
+              <button type="button" data-action="clear-dataset" disabled>🗑️ Clear</button>
+            </div>
+            <div class="panel-search-container"><input type="search" data-role="tree-search" class="panel-search-input" placeholder="Search entities..."></div>
+            <input data-role="dataset-file" type="file" accept=".json,application/json" hidden>
+            <output data-role="tree-status">No dataset loaded</output>
+            <p class="dataset-error" data-role="tree-error" hidden></p>
+          </section>
+          <section class="layer-summary" aria-label="Dataset summary"><span data-role="summary-pipes">Pipes 0</span><span data-role="summary-supports">Supports 0</span></section>
+          <div class="tree-list" data-role="tree-list"><p class="panel-empty">Import a supported workspace JSON package.</p></div>
+        </div>
+      </div>
+
+      <!-- Left Sub-View 2: Load Calc Topology -->
+      <div data-left-view="loadcalc" style="display:none; flex-direction:column; height:100%; min-height:0;">
+        <header class="panel-header">
+          <div class="panel-header__title">
+            <span class="panel-eyebrow">Load Calc Workbench</span>
+            <h1>Topology &amp; Evidence</h1>
+          </div>
+          <button type="button" class="panel-collapse-btn" data-action="toggle-tree-collapse" aria-label="Toggle Tree Panel" title="Collapse Tree">◀</button>
+          <button type="button" class="panel-expand-btn" data-action="toggle-tree-collapse" aria-label="Expand Tree Panel" title="Expand Tree">▶</button>
+        </header>
+        <div class="panel-collapsible-content" data-role="load-calc-left-host" style="display:flex; flex-direction:column; flex:1; min-height:0; padding:10px; overflow-y:auto;">
+          <p class="panel-empty">Load Calc Topology Summary</p>
+        </div>
       </div>
     </aside>
     <div class="panel-resizer panel-resizer--left" data-action="resize-left" aria-label="Resize Left Panel"></div>
@@ -149,77 +167,95 @@ function workspaceView() {
     </section>
     <div class="panel-resizer panel-resizer--right" data-action="resize-right" aria-label="Resize Right Panel"></div>
     <aside class="workspace-panel properties-panel" data-panel="properties" aria-label="Properties and analysis actions" style="display:flex; flex-direction:column; min-width:0; height:100%; overflow:hidden;">
-      <header class="panel-header" style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:#0f172a; border-bottom:1px solid #1e293b; flex:none;">
-        <button type="button" class="panel-expand-btn" data-action="toggle-properties-collapse" aria-label="Expand Properties Panel" title="Expand Properties">◀</button>
-        <div class="panel-header__title">
-          <span class="panel-eyebrow" style="font-size:10px; color:#38bdf8; font-weight:700; text-transform:uppercase;">Model &amp; Contextual Workflow</span>
-          <h2 style="font-size:14px; font-weight:700; color:#f8fafc; margin:0;">Properties &amp; Actions</h2>
+      <!-- Right Sub-View 1: Workspace 4-Tab Dashboard -->
+      <div data-right-view="workspace" style="display:flex; flex-direction:column; height:100%; min-height:0;">
+        <header class="panel-header" style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:#0f172a; border-bottom:1px solid #1e293b; flex:none;">
+          <button type="button" class="panel-expand-btn" data-action="toggle-properties-collapse" aria-label="Expand Properties Panel" title="Expand Properties">◀</button>
+          <div class="panel-header__title">
+            <span class="panel-eyebrow" style="font-size:10px; color:#38bdf8; font-weight:700; text-transform:uppercase;">Model &amp; Contextual Workflow</span>
+            <h2 style="font-size:14px; font-weight:700; color:#f8fafc; margin:0;">Properties &amp; Actions</h2>
+          </div>
+          <button type="button" class="panel-collapse-btn" data-action="toggle-properties-collapse" aria-label="Toggle Properties Panel" title="Collapse Properties">▶</button>
+        </header>
+        <div class="right-panel-sub-nav" style="display:flex; background:#020617; border-bottom:1px solid #1e293b; padding:4px; gap:4px; flex:none;">
+          <button type="button" data-action="switch-right-tab" data-tab="inspector" class="right-tab-btn right-tab-btn--active" style="flex:1; min-width:0; padding:6px 2px; border:none; border-radius:4px; background:#0284c7; color:#ffffff; font-weight:700; font-size:10px; cursor:pointer; text-align:center; transition:all 0.15s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Inspector">🔍 Inspector</button>
+          <button type="button" data-action="switch-right-tab" data-tab="health" class="right-tab-btn" style="flex:1; min-width:0; padding:6px 2px; border:none; border-radius:4px; background:transparent; color:#94a3b8; font-weight:700; font-size:10px; cursor:pointer; text-align:center; transition:all 0.15s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Health">🩺 Health</button>
+          <button type="button" data-action="switch-right-tab" data-tab="loadcalc" class="right-tab-btn" style="flex:1; min-width:0; padding:6px 2px; border:none; border-radius:4px; background:transparent; color:#94a3b8; font-weight:700; font-size:10px; cursor:pointer; text-align:center; transition:all 0.15s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Load Calc">⚡ Load Calc</button>
+          <button type="button" data-action="switch-right-tab" data-tab="overrides" class="right-tab-btn" style="flex:1; min-width:0; padding:6px 2px; border:none; border-radius:4px; background:transparent; color:#94a3b8; font-weight:700; font-size:10px; cursor:pointer; text-align:center; transition:all 0.15s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Overrides">📝 Overrides</button>
         </div>
-        <button type="button" class="panel-collapse-btn" data-action="toggle-properties-collapse" aria-label="Toggle Properties Panel" title="Collapse Properties">▶</button>
-      </header>
-      <div class="right-panel-sub-nav" style="display:flex; background:#020617; border-bottom:1px solid #1e293b; padding:4px; gap:4px; flex:none;">
-        <button type="button" data-action="switch-right-tab" data-tab="inspector" class="right-tab-btn right-tab-btn--active" style="flex:1; min-width:0; padding:6px 2px; border:none; border-radius:4px; background:#0284c7; color:#ffffff; font-weight:700; font-size:10px; cursor:pointer; text-align:center; transition:all 0.15s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Inspector">🔍 Inspector</button>
-        <button type="button" data-action="switch-right-tab" data-tab="health" class="right-tab-btn" style="flex:1; min-width:0; padding:6px 2px; border:none; border-radius:4px; background:transparent; color:#94a3b8; font-weight:700; font-size:10px; cursor:pointer; text-align:center; transition:all 0.15s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Health">🩺 Health</button>
-        <button type="button" data-action="switch-right-tab" data-tab="loadcalc" class="right-tab-btn" style="flex:1; min-width:0; padding:6px 2px; border:none; border-radius:4px; background:transparent; color:#94a3b8; font-weight:700; font-size:10px; cursor:pointer; text-align:center; transition:all 0.15s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Load Calc">⚡ Load Calc</button>
-        <button type="button" data-action="switch-right-tab" data-tab="overrides" class="right-tab-btn" style="flex:1; min-width:0; padding:6px 2px; border:none; border-radius:4px; background:transparent; color:#94a3b8; font-weight:700; font-size:10px; cursor:pointer; text-align:center; transition:all 0.15s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Overrides">📝 Overrides</button>
+        <div class="panel-collapsible-content" style="display:flex; flex-direction:column; flex:1; min-height:0; overflow-y:auto; gap:10px; padding:10px;">
+          <div class="panel-search-container properties-search-container" style="flex:none;"><input type="search" data-role="properties-search" class="panel-search-input" placeholder="Filter properties..."></div>
+          
+          <!-- Tab 1: Inspector -->
+          <div data-tab-group="inspector" style="display:flex; flex-direction:column; gap:10px;">
+            <div class="properties-accordion-section" data-section-id="inspector">
+              <header class="accordion-section-header"><span class="accordion-section-title">Selected Entity Inspector</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
+              <div class="accordion-section-body"><div class="properties-content" data-role="properties-content"><p class="panel-empty">Select an entity to inspect its properties.</p></div></div>
+            </div>
+          </div>
+
+          <!-- Tab 2: Health -->
+          <div data-tab-group="health" style="display:none; flex-direction:column; gap:10px;">
+            <div class="properties-accordion-section" data-section-id="shared-model">
+              <header class="accordion-section-header"><span class="accordion-section-title">Shared Piping Model</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
+              <div class="accordion-section-body"><div data-role="shared-model-summary"></div></div>
+            </div>
+            <div class="properties-accordion-section" data-section-id="topology">
+              <header class="accordion-section-header"><span class="accordion-section-title">Topology Health</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
+              <div class="accordion-section-body"><div data-role="topology-summary"></div></div>
+            </div>
+            <div class="properties-accordion-section" data-section-id="supports">
+              <header class="accordion-section-header"><span class="accordion-section-title">Support &amp; Restraint Health</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
+              <div class="accordion-section-body"><div data-role="support-restraint-summary"></div></div>
+            </div>
+          </div>
+
+          <!-- Tab 3: Load Calc & FEA Solvers -->
+          <div data-tab-group="loadcalc" style="display:none; flex-direction:column; gap:10px;">
+            <div class="properties-accordion-section" data-section-id="loads">
+              <header class="accordion-section-header"><span class="accordion-section-title">Model Loads</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
+              <div class="accordion-section-body"><div data-role="model-load-summary"></div></div>
+            </div>
+            <div class="properties-accordion-section" data-section-id="screening">
+              <header class="accordion-section-header"><span class="accordion-section-title">Support Load Screening</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
+              <div class="accordion-section-body"><div data-role="support-load-screening-summary"></div></div>
+            </div>
+            <div class="properties-accordion-section" data-section-id="beam">
+              <header class="accordion-section-header"><span class="accordion-section-title">Vertical Beam Solver</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
+              <div class="accordion-section-body"><div data-role="vertical-beam-summary"></div></div>
+            </div>
+            <div class="properties-accordion-section" data-section-id="calculation">
+              <header class="accordion-section-header"><span class="accordion-section-title">Model Calculation Package</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
+              <div class="accordion-section-body"><div data-role="model-calculation-summary"></div></div>
+            </div>
+            <div class="properties-accordion-section" data-section-id="whole-model-loads">
+              <header class="accordion-section-header"><span class="accordion-section-title">Whole-Model Support Load</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
+              <div class="accordion-section-body"><div data-role="model-support-load-summary"></div></div>
+            </div>
+          </div>
+
+          <!-- Tab 4: Overrides & Sidecars -->
+          <div data-tab-group="overrides" style="display:none; flex-direction:column; gap:10px;">
+            <div class="properties-accordion-section" data-section-id="first-cut">
+              <header class="accordion-section-header"><span class="accordion-section-title">First-Cut Load Enrichment</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
+              <div class="accordion-section-body" data-first-cut-section="true"><div data-role="first-cut-workbench-root"></div></div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="panel-collapsible-content" style="display:flex; flex-direction:column; flex:1; min-height:0; overflow-y:auto; gap:10px; padding:10px;">
-        <div class="panel-search-container properties-search-container" style="flex:none;"><input type="search" data-role="properties-search" class="panel-search-input" placeholder="Filter properties..."></div>
-        
-        <!-- Tab 1: Inspector -->
-        <div data-tab-group="inspector" style="display:flex; flex-direction:column; gap:10px;">
-          <div class="properties-accordion-section" data-section-id="inspector">
-            <header class="accordion-section-header"><span class="accordion-section-title">Selected Entity Inspector</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
-            <div class="accordion-section-body"><div class="properties-content" data-role="properties-content"><p class="panel-empty">Select an entity to inspect its properties.</p></div></div>
-          </div>
-        </div>
 
-        <!-- Tab 2: Health -->
-        <div data-tab-group="health" style="display:none; flex-direction:column; gap:10px;">
-          <div class="properties-accordion-section" data-section-id="shared-model">
-            <header class="accordion-section-header"><span class="accordion-section-title">Shared Piping Model</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
-            <div class="accordion-section-body"><div data-role="shared-model-summary"></div></div>
+      <!-- Right Sub-View 2: Load Calc Solvers & Evaluation -->
+      <div data-right-view="loadcalc" style="display:none; flex-direction:column; height:100%; min-height:0;">
+        <header class="panel-header" style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:#0f172a; border-bottom:1px solid #1e293b; flex:none;">
+          <button type="button" class="panel-expand-btn" data-action="toggle-properties-collapse" aria-label="Expand Properties Panel" title="Expand Properties">◀</button>
+          <div class="panel-header__title">
+            <span class="panel-eyebrow" style="font-size:10px; color:#38bdf8; font-weight:700; text-transform:uppercase;">Load Calc FEA Solvers</span>
+            <h2 style="font-size:14px; font-weight:700; color:#f8fafc; margin:0;">Evaluation &amp; Screening</h2>
           </div>
-          <div class="properties-accordion-section" data-section-id="topology">
-            <header class="accordion-section-header"><span class="accordion-section-title">Topology Health</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
-            <div class="accordion-section-body"><div data-role="topology-summary"></div></div>
-          </div>
-          <div class="properties-accordion-section" data-section-id="supports">
-            <header class="accordion-section-header"><span class="accordion-section-title">Support &amp; Restraint Health</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
-            <div class="accordion-section-body"><div data-role="support-restraint-summary"></div></div>
-          </div>
-        </div>
-
-        <!-- Tab 3: Load Calc & FEA Solvers -->
-        <div data-tab-group="loadcalc" style="display:none; flex-direction:column; gap:10px;">
-          <div class="properties-accordion-section" data-section-id="loads">
-            <header class="accordion-section-header"><span class="accordion-section-title">Model Loads</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
-            <div class="accordion-section-body"><div data-role="model-load-summary"></div></div>
-          </div>
-          <div class="properties-accordion-section" data-section-id="screening">
-            <header class="accordion-section-header"><span class="accordion-section-title">Support Load Screening</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
-            <div class="accordion-section-body"><div data-role="support-load-screening-summary"></div></div>
-          </div>
-          <div class="properties-accordion-section" data-section-id="beam">
-            <header class="accordion-section-header"><span class="accordion-section-title">Vertical Beam Solver</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
-            <div class="accordion-section-body"><div data-role="vertical-beam-summary"></div></div>
-          </div>
-          <div class="properties-accordion-section" data-section-id="calculation">
-            <header class="accordion-section-header"><span class="accordion-section-title">Model Calculation Package</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
-            <div class="accordion-section-body"><div data-role="model-calculation-summary"></div></div>
-          </div>
-          <div class="properties-accordion-section" data-section-id="whole-model-loads">
-            <header class="accordion-section-header"><span class="accordion-section-title">Whole-Model Support Load</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
-            <div class="accordion-section-body"><div data-role="model-support-load-summary"></div></div>
-          </div>
-        </div>
-
-        <!-- Tab 4: Overrides & Sidecars -->
-        <div data-tab-group="overrides" style="display:none; flex-direction:column; gap:10px;">
-          <div class="properties-accordion-section" data-section-id="first-cut">
-            <header class="accordion-section-header"><span class="accordion-section-title">First-Cut Load Enrichment</span><div class="accordion-header-actions"><button type="button" class="accordion-popout-btn" title="Pop out to window">⤢</button><span class="accordion-toggle-icon">▼</span></div></header>
-            <div class="accordion-section-body" data-first-cut-section="true"><div data-role="first-cut-workbench-root"></div></div>
-          </div>
+          <button type="button" class="panel-collapse-btn" data-action="toggle-properties-collapse" aria-label="Toggle Properties Panel" title="Collapse Properties">▶</button>
+        </header>
+        <div class="panel-collapsible-content" id="load-calc-properties-host" style="display:flex; flex-direction:column; flex:1; min-height:0; overflow-y:auto; padding:10px;">
+          <div data-role="properties-content" style="flex:1;"></div>
         </div>
       </div>
     </aside>

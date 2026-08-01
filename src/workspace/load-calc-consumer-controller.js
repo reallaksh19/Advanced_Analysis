@@ -123,42 +123,11 @@ export class LoadCalcConsumerController {
       }
     }
     
-    // Instantiate Canvas Preview
-    const canvasHost = view.querySelector('#load-calc-canvas-host');
-    if (canvasHost) {
-      if (!this.sketcherView) {
-         this.sketcherView = new SequentialSketcherView(canvasHost, null);
-      }
-      this.sketcherView.rootElement = canvasHost;
-      
-      const snapshot = WorkspaceState.getSnapshot();
-      let dataset = snapshot?.dataset || null;
-      
-      // If we have parsed supports from context, overlay them on the raw dataset
-      // so they show up in the preview without mutating the global state yet.
-      if (dataset && this.context?.contracts?.supportAttachmentModel?.supports) {
-          const supports = this.context.contracts.supportAttachmentModel.supports.map(supp => ({
-              entityId: supp.id || supp.supportId,
-              entityType: 'SUPPORT',
-              category: 'support',
-              name: supp.id || supp.supportId,
-              properties: {
-                  supportType: supp.type || 'REST',
-                  attributes: {
-                      center: supp.position || supp.point,
-                  }
-              }
-          }));
-          
-          // Merge supports, avoiding duplicates by entityId
-          const existingIds = new Set(dataset.entities.map(e => e.entityId));
-          const newSupports = supports.filter(s => !existingIds.has(s.entityId));
-          
-          if (newSupports.length > 0) {
-              dataset = { ...dataset, entities: [...dataset.entities, ...newSupports] };
-          }
-      }
-      this.sketcherView.render(dataset);
+    // Render Topology & Evidence summary into the Left Panel load-calc host
+    const leftHost = this.rootElement.querySelector('[data-role="load-calc-left-host"]');
+    if (leftHost) {
+      const activeCase = (this.reviewModel?.loadCases || []).find(c => c.loadCaseId === this.uiState.activeLoadCase) || (this.reviewModel?.loadCases || [])[0];
+      leftHost.innerHTML = renderSidebarSummary(activeCase, this.reviewModel);
     }
 
     bind(view, 'load-mock-data', () => this.loadMockData());
