@@ -19,10 +19,11 @@ assert.deepEqual(
   ],
 );
 
-const implemented = new Set(['HC-UI-01', 'HC-UI-02', 'HC-UI-04', 'HC-UI-06']);
+const implemented = new Set([
+  'HC-UI-01', 'HC-UI-02', 'HC-UI-04', 'HC-UI-05', 'HC-UI-06',
+]);
 const blocked = new Map([
   ['HC-UI-03', 'BLOCKED_DEPENDENCY'],
-  ['HC-UI-05', 'BLOCKED_DEPENDENCY'],
   ['HC-UI-07', 'BLOCKED_PHASE_4'],
   ['HC-REAL-01', 'BLOCKED_USER_EVIDENCE'],
 ]);
@@ -45,7 +46,7 @@ for (const entry of matrix.cases) {
     assert.doesNotMatch(
       spec,
       new RegExp(`test\\([^\\n]*${entry.testId}`, 'u'),
-      `${entry.testId} must not be registered as an executable PASS path before its dependency exists.`,
+      `${entry.testId} must not be registered as executable before its dependency exists.`,
     );
   }
   assert.notEqual(entry.implementationStatus, 'PASS');
@@ -59,8 +60,14 @@ assert.match(spec, /data-result-renderer/u);
 assert.match(spec, /data-gpu-pick-status/u);
 assert.match(spec, /Selected Entity: E1 \(ELEMENT\)/u);
 assert.match(spec, /new MouseEvent\('click'/u);
+assert.match(spec, /mountHcDiagnosticResult/u);
+assert.match(spec, /data-diagnostic-vertex-count/u);
+assert.match(spec, /LAFEA-UNRECOVERED-VERTEX-MAGENTA-V1/u);
+assert.match(spec, /sha256:lafea-u4j-unrecovered-magenta-v1/u);
 assert.match(spec, /triggerHcWebglLoss/u);
 assert.match(fixture, /webglcontextlost/u);
+assert.match(fixture, /Number\.NaN/u);
+assert.match(fixture, /DIAGNOSTIC_VERTEX_FIELD/u);
 assert.doesNotMatch(spec, /test\.skip|test\.fixme|\.only\(/u);
 assert.doesNotMatch(spec, /setContent\(/u);
 assert.doesNotMatch(
@@ -119,6 +126,7 @@ console.log(JSON.stringify({
   implementedCases: [...implemented],
   blockedCases: [...blocked.keys()],
   gpuPickBrowserCaseRegistered: true,
+  diagnosticBrowserCaseRegistered: true,
   projectLocalBrowserInstall: true,
   browserExecutionClaimed: false,
   realProjectEvidencePresent: false,

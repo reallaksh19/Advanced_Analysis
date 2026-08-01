@@ -21,11 +21,15 @@ const DISPLAY_GEOMETRY_HASH = 'sha256:hc-ui-display-geometry';
 const RENDER_PROFILE_HASH = 'sha256:hc-ui-render-profile';
 
 export function mountHcSourceAuthoring(rootElement) {
-  return mountScenario(rootElement, false);
+  return mountScenario(rootElement, 'SOURCE_AUTHORING');
 }
 
 export function mountHcQualifiedResult(rootElement) {
-  return mountScenario(rootElement, true);
+  return mountScenario(rootElement, 'QUALIFIED_RESULT');
+}
+
+export function mountHcDiagnosticResult(rootElement) {
+  return mountScenario(rootElement, 'DIAGNOSTIC_RESULT');
 }
 
 export function triggerHcWebglLoss(controller) {
@@ -35,18 +39,20 @@ export function triggerHcWebglLoss(controller) {
   return controller.getDisplayViewportContext();
 }
 
-function mountScenario(rootElement, qualified) {
+function mountScenario(rootElement, scenario) {
   if (!rootElement) throw new TypeError('HC_UI_ROOT_REQUIRED');
   const controller = mountLafeaWorkbench(rootElement, {
     initialStage: 'LAFEA.3',
     initialDocument: triangleSource(),
     THREE,
   });
-  if (qualified) qualifyAndBind(controller);
+  if (scenario !== 'SOURCE_AUTHORING') {
+    qualifyAndBind(controller, scenario === 'DIAGNOSTIC_RESULT');
+  }
   const context = controller.getDisplayViewportContext();
   const fixture = Object.freeze({
     schema: HC_BROWSER_FIXTURE_SCHEMA,
-    scenario: qualified ? 'QUALIFIED_RESULT' : 'SOURCE_AUTHORING',
+    scenario,
     controller,
     context,
   });
@@ -54,7 +60,7 @@ function mountScenario(rootElement, qualified) {
   return fixture;
 }
 
-function qualifyAndBind(controller) {
+function qualifyAndBind(controller, diagnostic) {
   controller.initializeLifecycle(SOURCE_HASH, 'HC-UI-SIMULATED');
   register(controller, 'CANONICAL_MODEL', MODEL_HASH, {
     sourceHash: SOURCE_HASH,
@@ -97,7 +103,7 @@ function qualifyAndBind(controller) {
   if (!context || context.sourceSemanticHash !== SOURCE_HASH) {
     throw new TypeError('HC_UI_QUALIFIED_SOURCE_CONTEXT_INVALID');
   }
-  controller.setDisplayRenderPacket(renderPacket(context.sceneRevision));
+  controller.setDisplayRenderPacket(renderPacket(context.sceneRevision, diagnostic));
   const ready = controller.getDisplayViewportContext();
   if (ready?.mode !== 'QUALIFIED_RESULT' || ready.status !== 'READY') {
     throw new TypeError('HC_UI_QUALIFIED_RESULT_NOT_READY');
@@ -116,7 +122,7 @@ function register(controller, kind, artifactHash, parentHashes, registrationId) 
   }), registrationId);
 }
 
-function renderPacket(sceneRevision) {
+function renderPacket(sceneRevision, diagnostic) {
   return {
     schema: LAFEA_RENDER_PACKET_V2_SCHEMA,
     sceneRevision,
@@ -131,23 +137,9 @@ function renderPacket(sceneRevision) {
     drawTriangleIndices: new Uint32Array([0, 1, 2]),
     drawTriangleElementIndices: new Uint32Array([0]),
     sourceElementIds: ['E1'],
-    fieldValues: new Float32Array([10, 20, 30]),
-    qualityFlags: new Uint8Array([0, 0, 0]),
-    field: {
-      schema: LAFEA_RENDER_FIELD_SCHEMA,
-      fieldId: 'HC-UI-FIELD',
-      kind: 'PROJECTED_NODAL',
-      units: 'MPa',
-      sourcePath: 'qualifiedRecovery.displayFields.HC-UI-FIELD',
-      valueRole: 'PRODUCER_PROJECTED_DISPLAY_ONLY',
-      bounds: {
-        minimum: 10,
-        maximum: 30,
-        source: 'QUALIFIED_RECOVERY_FIELD_BOUNDS',
-        semanticHash: 'sha256:hc-ui-field-bounds',
-      },
-      colorMapId: 'COOL_WARM',
-    },
+    fieldValues: new Float32Array(diagnostic ? [10, Number.NaN, 30] : [10, 20, 30]),
+    qualityFlags: new Uint8Array(diagnostic ? [0, 1, 0] : [0, 0, 0]),
+    field: diagnostic ? diagnosticField() : qualifiedField(),
     pickMap: {
       schema: 'LafeaPickMap.v1',
       sceneRevision,
@@ -171,5 +163,41 @@ function renderPacket(sceneRevision) {
       renderProfileHash: RENDER_PROFILE_HASH,
       producerRef: 'HC-UI-SIMULATED-PRODUCER',
     },
+  };
+}
+
+function qualifiedField() {
+  return {
+    schema: LAFEA_RENDER_FIELD_SCHEMA,
+    fieldId: 'HC-UI-FIELD',
+    kind: 'PROJECTED_NODAL',
+    units: 'MPa',
+    sourcePath: 'qualifiedRecovery.displayFields.HC-UI-FIELD',
+    valueRole: 'PRODUCER_PROJECTED_DISPLAY_ONLY',
+    bounds: {
+      minimum: 10,
+      maximum: 30,
+      source: 'QUALIFIED_RECOVERY_FIELD_BOUNDS',
+      semanticHash: 'sha256:hc-ui-field-bounds',
+    },
+    colorMapId: 'COOL_WARM',
+  };
+}
+
+function diagnosticField() {
+  return {
+    schema: LAFEA_RENDER_FIELD_SCHEMA,
+    fieldId: 'HC-UI-DIAGNOSTIC-FIELD',
+    kind: 'MESH_QUALITY',
+    units: 'FLAG',
+    sourcePath: 'qualifiedRecovery.displayFields.HC-UI-DIAGNOSTIC-FIELD',
+    valueRole: 'DIAGNOSTIC_VERTEX_FIELD',
+    bounds: {
+      minimum: 10,
+      maximum: 30,
+      source: 'QUALIFIED_RECOVERY_FINITE_FIELD_BOUNDS',
+      semanticHash: 'sha256:hc-ui-diagnostic-finite-bounds',
+    },
+    colorMapId: 'COOL_WARM',
   };
 }

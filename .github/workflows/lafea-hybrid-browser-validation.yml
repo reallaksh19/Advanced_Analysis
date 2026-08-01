@@ -12,6 +12,8 @@ on:
       - 'e2e/lafea-hybrid-validation-matrix.json'
       - 'scripts/lafea-u4g-*.mjs'
       - 'scripts/lafea-u4h-*.mjs'
+      - 'scripts/lafea-u4i-*.mjs'
+      - 'scripts/lafea-u4j-*.mjs'
       - 'scripts/run-playwright.mjs'
       - 'docs/LAFEA_Hybrid_Canvas_Remediation_Implementation_Plan.md'
       - '.github/workflows/lafea-hybrid-browser-validation.yml'
@@ -44,12 +46,17 @@ jobs:
         run: |
           set -o pipefail
           node scripts/lafea-u4h-browser-source-guard.mjs 2>&1 | tee lafea-u4h-source-guard.log
+          node scripts/lafea-u4j-source-guard.mjs 2>&1 | tee lafea-u4j-source-guard.log
       - name: Recheck live viewport contracts
         run: |
           set -o pipefail
           node scripts/lafea-u4g-live-workbench-viewport-check.mjs 2>&1 | tee lafea-u4g-live-viewport.log
           node scripts/lafea-u4g-controller-render-evidence-check.mjs 2>&1 | tee lafea-u4g-controller-evidence.log
           node scripts/lafea-u4g-source-guard.mjs 2>&1 | tee lafea-u4g-source-guard.log
+          node scripts/lafea-u4i-primitive-picker-check.mjs 2>&1 | tee lafea-u4i-primitive-picker.log
+          node scripts/lafea-u4i-result-selection-check.mjs 2>&1 | tee lafea-u4i-result-selection.log
+          node scripts/lafea-u4i-source-guard.mjs 2>&1 | tee lafea-u4i-source-guard.log
+          node scripts/lafea-u4j-diagnostic-field-check.mjs 2>&1 | tee lafea-u4j-diagnostic-field.log
       - name: Run scoped Chromium validation
         run: |
           set -o pipefail
@@ -62,6 +69,8 @@ jobs:
           path: |
             lafea-u4g-*.log
             lafea-u4h-*.log
+            lafea-u4i-*.log
+            lafea-u4j-*.log
             playwright-report/
             test-results/
           if-no-files-found: ignore

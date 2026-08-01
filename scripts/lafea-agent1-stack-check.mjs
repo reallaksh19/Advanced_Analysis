@@ -33,6 +33,8 @@ const CHECKS = Object.freeze([
   'scripts/lafea-u4i-primitive-picker-check.mjs',
   'scripts/lafea-u4i-result-selection-check.mjs',
   'scripts/lafea-u4i-source-guard.mjs',
+  'scripts/lafea-u4j-diagnostic-field-check.mjs',
+  'scripts/lafea-u4j-source-guard.mjs',
   'scripts/lafea-accessory-panel-contract-check.mjs',
   'scripts/lafea-accessory-panel-integration-check.mjs',
   'scripts/lafea-accessory-panel-controller-lifecycle-check.mjs',

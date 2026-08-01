@@ -2,7 +2,8 @@
  * Build one exact result-render request from U4D READY intake.
  *
  * This contract does not choose a fallback renderer, create a render packet,
- * or alter engineering evidence. It authorizes only finite stress-contour draw.
+ * recover a field, or alter engineering evidence. It admits only producer
+ * values plus an explicitly authorized U4J diagnostic display field.
  */
 import {
   SCHEMAS,
@@ -13,6 +14,9 @@ import {
   requireFiniteNumber,
   requireSchema,
 } from './contracts.js';
+import {
+  createLafeaDiagnosticDisplay,
+} from './diagnostic-field-display.js';
 import {
   LAFEA_RENDER_EVIDENCE_INTAKE_SCHEMA,
 } from '../lafea-render-evidence-intake.js';
@@ -31,7 +35,7 @@ const INTAKE_KEYS = Object.freeze([
 ]);
 const REQUEST_KEYS = Object.freeze([
   'schema', 'stageId', 'sceneRevision', 'mode', 'displayedPrimitiveCount',
-  'viewport', 'renderPacket',
+  'viewport', 'renderPacket', 'diagnosticDisplay',
 ]);
 const DISPLAY_KEYS = Object.freeze([
   'sourceAuthoring', 'wireframe', 'fieldBounds', 'colorMapId',
@@ -43,7 +47,7 @@ const BOUNDS_KEYS = Object.freeze([
 const WORLD_BOUNDS_KEYS = Object.freeze(['minimum', 'maximum']);
 const VECTOR_KEYS = Object.freeze(['x', 'y', 'z']);
 
-/** Return one immutable request accepted by the U4E standalone renderer. */
+/** Return one immutable request accepted by the U4E/U4J renderer. */
 export function createLafeaResultRenderRequest(input) {
   assertExactKeys(input, INPUT_KEYS, 'LAFEA_RESULT_RENDER_INPUT_KEYS_INVALID');
   const intake = requireReadyIntake(input.intake);
@@ -53,10 +57,8 @@ export function createLafeaResultRenderRequest(input) {
     throw contractError('LAFEA_RESULT_RENDER_MODE_UNSUPPORTED', { mode });
   }
   const viewport = requireResultViewport(input.viewport, packet);
-  if ([...packet.qualityFlags].some((value) => value !== 0)
-    || [...packet.fieldValues].some((value) => !Number.isFinite(value))) {
-    throw contractError('LAFEA_RESULT_RENDER_DIAGNOSTIC_FIELD_UNSUPPORTED');
-  }
+  const diagnosticDisplay = createLafeaDiagnosticDisplay(packet);
+  requireDiagnosticAuthority(packet, diagnosticDisplay);
   const request = {
     schema: LAFEA_RESULT_RENDER_REQUEST_SCHEMA,
     stageId: intake.stageId,
@@ -65,6 +67,7 @@ export function createLafeaResultRenderRequest(input) {
     displayedPrimitiveCount: packet.drawTriangleIndices.length / 3,
     viewport,
     renderPacket: packet,
+    diagnosticDisplay,
   };
   assertExactKeys(request, REQUEST_KEYS, 'LAFEA_RESULT_RENDER_REQUEST_KEYS_INVALID');
   return deepFreeze(request);
@@ -87,11 +90,23 @@ export function requireLafeaResultRenderRequest(value) {
     throw contractError('LAFEA_RESULT_RENDER_PRIMITIVE_COUNT_INVALID');
   }
   requireResultViewport(value.viewport, packet);
-  if ([...packet.qualityFlags].some((flag) => flag !== 0)
-    || [...packet.fieldValues].some((fieldValue) => !Number.isFinite(fieldValue))) {
-    throw contractError('LAFEA_RESULT_RENDER_DIAGNOSTIC_FIELD_UNSUPPORTED');
+  const expectedDiagnosticDisplay = createLafeaDiagnosticDisplay(packet);
+  requireDiagnosticAuthority(packet, expectedDiagnosticDisplay);
+  if (JSON.stringify(value.diagnosticDisplay)
+    !== JSON.stringify(expectedDiagnosticDisplay)) {
+    throw contractError('LAFEA_RESULT_DIAGNOSTIC_DISPLAY_MISMATCH');
   }
   return value;
+}
+
+function requireDiagnosticAuthority(packet, display) {
+  const diagnosticRole = packet.field.valueRole === 'DIAGNOSTIC_VERTEX_FIELD';
+  if (display.diagnosticVertexCount > 0 && !diagnosticRole) {
+    throw contractError('LAFEA_RESULT_RENDER_DIAGNOSTIC_FIELD_UNSUPPORTED');
+  }
+  if (display.diagnosticVertexCount === 0 && diagnosticRole) {
+    throw contractError('LAFEA_RESULT_RENDER_DIAGNOSTIC_FLAG_REQUIRED');
+  }
 }
 
 function requireReadyIntake(value) {
