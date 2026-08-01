@@ -120,7 +120,27 @@ const releasePolicy = fs.readFileSync(
 );
 assert.match(releasePolicy, /linear-piping-project-qualification-check\.mjs/u);
 assert.match(releasePolicy, /linear-piping-project-qualification-anti-drift-check\.mjs/u);
-assert.match(releasePolicy, /SIMULATED_FIXTURES_ONLY/u);
+assert.match(releasePolicy, /parseReleaseInvocation\(process\.argv\.slice\(2\), process\.cwd\(\)\)/u);
+assert.match(releasePolicy, /releaseMode: invocation\.releaseMode/u);
+assert.match(releasePolicy, /expectedHead: invocation\.expectedHead/u);
+assert.match(releasePolicy, /policyRunner: runPolicyChecks/u);
+
+const releaseOrchestrator = fs.readFileSync(
+  'scripts/lfea-piping-release-orchestrator.mjs',
+  'utf8',
+);
+assert.match(releaseOrchestrator, /const releaseMode = args\.includes\('--release'\)/u);
+assert.match(releaseOrchestrator, /if \(!releaseMode && options\.size > 0\)/u);
+assert.match(releaseOrchestrator, /releaseMode: false/u);
+assert.match(releaseOrchestrator, /if \(!releaseMode\) \{/u);
+assert.match(releaseOrchestrator, /evidence\.programDisposition !== 'BLOCKED'/u);
+assert.match(releaseOrchestrator, /await policyRunner\(\)/u);
+assert.match(releaseOrchestrator, /mode: 'POLICY'/u);
+assert.match(releaseOrchestrator, /validateReleaseCandidate\(evidence, expectedHead\)/u);
+assert.match(releaseOrchestrator, /mode: 'RELEASE'/u);
+assert.match(releaseOrchestrator, /status !== 'VERIFIED'/u);
+assert.match(releaseOrchestrator, /LFEA_RELEASE_ARTIFACTS_MISSING/u);
+assert.match(releaseOrchestrator, /evidence\.programDisposition !== 'QUALIFIED'/u);
 
 const index = source['index.js'];
 assert.match(index, /compileLinearPipingExternalQualificationPackage/u);
@@ -134,7 +154,7 @@ assert.equal(
   'node scripts/lfea-piping-release-readiness-check.mjs',
 );
 assert.match(packageValue.scripts.gate, /check:lfea-piping-release-policy/u);
-assert.doesNotMatch(packageValue.scripts['check:lfea-core'], /project-qualification/u);
+assert.doesNotMatch(packageValue.scripts['check:lafea-core'], /project-qualification/u);
 
 await import('./linear-piping-external-evidence-package-check.mjs');
 
