@@ -16,11 +16,14 @@ const bindings = read('../src/workspace/lafea-stage-composition-bindings.js');
 const compositionRoot = read('../src/workspace/lafea-stage-composition-root.js');
 const workbenchModel = read('../src/workspace/lafea-workbench-model.js');
 const presenterIndex = read('../src/workspace/lafea-result-presenters/index.js');
+const footprint = read('../src/core/local-stress/finite-footprint.js');
+const screeningProduct = read('../src/core/local-attachment-screening/product-escalation.js');
+const analyticalHandoff = read('../src/core/lafea-analytical-handoff.js');
 
 const registeredChecks = [...aggregator.matchAll(/['"](scripts\/[A-Za-z0-9._-]+\.mjs)['"]/gu)]
   .map((match) => match[1]);
-assert.ok(registeredChecks.length >= 33,
-  'The non-bucket aggregate must retain the complete NB-T0 through NB-T3 and U0-U4 boundary.');
+assert.ok(registeredChecks.length >= 34,
+  'The non-bucket aggregate must retain NB-T0 through NB-T3, NB1 and U0-U4.');
 assert.equal(new Set(registeredChecks).size, registeredChecks.length,
   'The non-bucket aggregate cannot register duplicate checks.');
 
@@ -29,6 +32,7 @@ for (const required of [
   'scripts/lafea-nonbucket-lifecycle-profiles-check.mjs',
   'scripts/lafea-nb-t2-source-producer-check.mjs',
   'scripts/lafea-nb-t3-composition-root-check.mjs',
+  'scripts/lafea-nb1-analytical-verticals-check.mjs',
   'scripts/lafea-u1-stage-registry-check.mjs',
   'scripts/lafea-u1b-registry-consumer-check.mjs',
   'scripts/lafea-u2a-input-command-check.mjs',
@@ -92,17 +96,31 @@ assert.doesNotMatch(lifecycleStore, /RELEASE_QUALIFIED'\s*:/u);
 assert.match(registry, /lafea-stage-registry\/v2/u);
 assert.match(registry, /lafeaRegisteredComposition/u);
 assert.match(bindings, /lafea-stage-composition-binding\/v1/u);
+assert.match(bindings, /PRODUCT_ASSESSMENT/u);
+assert.match(bindings, /HANDOFF/u);
 assert.match(bindings, /CONT-PATCH-01/u);
 assert.match(bindings, /SHELL-PATCH-01/u);
 assert.match(bindings, /releaseStateBinding:\s*'RELEASE_NOT_QUALIFIED'/u);
 assert.doesNotMatch(bindings, /releaseStateBinding:\s*'RELEASE_QUALIFIED'/u);
-assert.match(compositionRoot, /lafea-stage-composition\/v1/u);
-assert.match(compositionRoot, /requireLafeaTechnicalComponent/u);
-assert.match(compositionRoot, /requireLafeaLifecycleProfileForStage/u);
+assert.match(compositionRoot, /evaluateProductAssessment/u);
+assert.match(compositionRoot, /createHandoff/u);
 assert.match(workbenchModel, /requireLafeaStageComposition/u);
 assert.doesNotMatch(workbenchModel, /calculateLocal(?:Attachment|Continuum|Shell|Trunnion)/u);
 assert.match(presenterIndex, /requireLafeaStageComposition/u);
 assert.doesNotMatch(presenterIndex, /PRESENTERS_BY_ROLE|UNIT_RESOLVERS_BY_ROLE/u);
+
+assert.match(footprint, /lafea-load-foundation-footprint-request\/v2/u);
+assert.match(footprint, /POINT.*LINE.*RECTANGULAR_PATCH.*CIRCULAR_PATCH.*WELD_LINE.*RIGID_SPIDER/su);
+assert.match(footprint, /pressure.*area/isu);
+assert.match(footprint, /FOOTPRINT_GEOMETRY_RANK_DEFICIENT/u);
+assert.match(footprint, /NO_LOCAL_ATTACHMENT_STRESS/u);
+assert.match(screeningProduct, /PASS.*ESCALATE.*BLOCKED/su);
+assert.match(screeningProduct, /MISSING_APPLICABILITY_EVIDENCE/u);
+assert.match(screeningProduct, /NO_MATERIAL_ALLOWABLE_OR_CODE_UTILIZATION/u);
+assert.match(analyticalHandoff, /TARGET_SOURCE_VALIDATION_ONLY/u);
+assert.match(analyticalHandoff, /NO_FE_OR_CODE_STRESS_TRANSFER/u);
+assert.match(analyticalHandoff, /targetEngineExecuted:\s*false/u);
+assert.match(analyticalHandoff, /releaseQualified:\s*false/u);
 
 assert.match(legacyAggregate, /lafea-template-t1-contract-check\.mjs/u);
 assert.match(legacyAggregate, /sequential-sketcher-authoring-bridge-check\.mjs/u);
@@ -121,6 +139,9 @@ console.log(JSON.stringify({
   typedSourceEvents: true,
   registryV2Implemented: true,
   compositionRootIntegrated: true,
+  analyticalProductVerticalsIntegrated: true,
+  finiteFootprintTypes: 6,
+  screeningStates: ['PASS', 'ESCALATE', 'BLOCKED'],
   releaseStateBinding: 'RELEASE_NOT_QUALIFIED',
   browserScope: 'e2e/lafea-hybrid-workbench.spec.js',
   legacyAggregateRetainedForAttributionOnly: true,
@@ -129,7 +150,6 @@ console.log(JSON.stringify({
   sequentialSketcherIncluded: false,
   firstCutIncluded: false,
   accessoryPanelsIncluded: false,
-  numericalAuthorityChanged: false,
   shellAuthorityChanged: false,
   codeAuthorityPromoted: false,
   releaseQualified: false,
