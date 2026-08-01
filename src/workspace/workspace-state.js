@@ -2,10 +2,17 @@ import { freezeDeep, stringValue } from './dataset-utils.js';
 import { WORKSPACE_DATASET_SCHEMA } from './dataset-adapter.js';
 
 export class WorkspaceStateStore {
-  #snapshot = emptySnapshot(0);
+  #snapshot = null;
   #entities = new Map();
 
+  #ensureInit() {
+    if (!this.#snapshot) {
+      this.#snapshot = emptySnapshot(0);
+    }
+  }
+
   loadDataset(dataset) {
+    this.#ensureInit();
     assertDataset(dataset);
     this.#entities = new Map(dataset.entities.map((entity) => [entity.entityId, entity]));
     this.#snapshot = freezeDeep({
@@ -18,12 +25,14 @@ export class WorkspaceStateStore {
   }
 
   clearDataset() {
+    this.#ensureInit();
     this.#entities = new Map();
     this.#snapshot = emptySnapshot(this.#snapshot.version + 1);
     return this.#snapshot;
   }
 
   patchSharedModel(sharedModel) {
+    this.#ensureInit();
     if (this.#snapshot.status !== 'ready') return null;
     const newDataset = { ...this.#snapshot.dataset, sharedModel };
     this.#snapshot = freezeDeep({
@@ -35,6 +44,7 @@ export class WorkspaceStateStore {
   }
 
   selectEntity(entityId) {
+    this.#ensureInit();
     const normalizedId = stringValue(entityId);
     const entity = this.#entities.get(normalizedId) || null;
     if (!entity) return null;
@@ -50,10 +60,12 @@ export class WorkspaceStateStore {
   }
 
   getSnapshot() {
+    this.#ensureInit();
     return this.#snapshot;
   }
 
   getEntity(entityId) {
+    this.#ensureInit();
     return this.#entities.get(stringValue(entityId)) || null;
   }
 }

@@ -9,15 +9,24 @@ import {
 
 /** In-memory authority for visible, source-backed Project Data. */
 export class ProjectDataStore {
-  #profile = approvedProfile();
-  #origin = bundledOrigin(this.#profile);
+  #profile = null;
+  #origin = null;
   #listeners = new Set();
 
+  #ensureInit() {
+    if (!this.#profile) {
+      this.#profile = approvedProfile();
+      this.#origin = bundledOrigin(this.#profile);
+    }
+  }
+
   getProfile() {
+    this.#ensureInit();
     return this.#profile;
   }
 
   getOrigin() {
+    this.#ensureInit();
     return this.#origin;
   }
 
@@ -41,6 +50,7 @@ export class ProjectDataStore {
   }
 
   update(path, value, evidence, approved) {
+    this.#ensureInit();
     this.#profile = replaceProjectDataValue(this.#profile, path, value, evidence, approved);
     this.#publish('updated');
     return this.#profile;
@@ -54,16 +64,19 @@ export class ProjectDataStore {
   }
 
   validate(workflow, activeHashes) {
+    this.#ensureInit();
     return validateProjectDataProfile(this.#profile, workflow, activeHashes);
   }
 
   subscribe(listener) {
+    this.#ensureInit();
     if (typeof listener !== 'function') throw new TypeError('Project Data listener must be a function.');
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);
   }
 
   #publish(reason) {
+    this.#ensureInit();
     this.#listeners.forEach((listener) => listener({ reason, profile: this.#profile }));
   }
 }

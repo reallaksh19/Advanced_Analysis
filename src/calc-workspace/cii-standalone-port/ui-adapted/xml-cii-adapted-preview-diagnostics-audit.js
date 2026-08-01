@@ -1,6 +1,7 @@
 import { createElement } from './xml-cii-adapted-dom.js';
 import { xmlCiiRenderPreviewPhase, xmlCiiBuildAndRenderPreview } from './xml-cii-adapted-preview-renderer.js';
 import { saveMasterContextToLocalStorage, xmlCiiEnrichedConfigFromState } from './xml-cii-adapted-state.js';
+import { _xmlCiiLineListKeys } from './xml-cii-adapted-preview-dryrun.js';
 
 function rows(value) { return Array.isArray(value) ? value : []; }
 function text(value) { return String(value ?? ''); }
@@ -81,11 +82,6 @@ function _xmlCiiKnownClasses(config) {
     .sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
 }
 
-export function _xmlCiiLineListKeys(config) {
-  const rows = Array.isArray(config.linelist?.masterRows) ? config.linelist.masterRows : [];
-  return [...new Set(rows.map((r) => _rowText(r, ['lineNoKey', 'lineNo', 'lineKey', 'LineNo', 'Line No', 'Line Number', 'PipelineReference', 'lineSeqNo'])).filter(Boolean))]
-    .sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
-}
 
 function _esc(value) {
   return String(value ?? '')

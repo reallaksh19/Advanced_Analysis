@@ -14,9 +14,21 @@ export const MasterDataConfigV1 = {
 };
 
 export class MasterDataController {
-  constructor(eventBus = EventBus, workspaceState = WorkspaceState) {
-    this.eventBus = eventBus;
-    this.workspaceState = workspaceState;
+  get eventBus() {
+    return this._eventBus || EventBus;
+  }
+  set eventBus(val) {
+    this._eventBus = val;
+  }
+  get workspaceState() {
+    return this._workspaceState || WorkspaceState;
+  }
+  set workspaceState(val) {
+    this._workspaceState = val;
+  }
+  constructor(eventBus = null, workspaceState = null) {
+    if (eventBus) this._eventBus = eventBus;
+    if (workspaceState) this._workspaceState = workspaceState;
     this.masterData = this.loadPersistedState() || MasterDataConfigV1.createDefault();
   }
 
