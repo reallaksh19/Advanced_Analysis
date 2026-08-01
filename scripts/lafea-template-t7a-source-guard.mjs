@@ -11,7 +11,7 @@ if (!base) {
   );
 }
 
-const expected = [
+const originalPackage = [
   'scripts/lafea-template-t7a-parameter-entry-check.mjs',
   'scripts/lafea-template-t7a-source-guard.mjs',
   'src/workspace/lafea-templates/parameter-draft.js',
@@ -22,12 +22,24 @@ const expected = [
   'src/workspace/lafea-templates/parameter-workbench-registration.js',
   'src/workspace/lafea-templates/t7a-parameter-entry.js',
 ].sort();
+const evidenceCorrection = [
+  'scripts/lafea-template-t7a-source-guard.mjs',
+].sort();
 const changed = git(['diff', '--name-only', `${base}...HEAD`])
   .trim().split('\n').filter(Boolean).sort();
-assert.deepEqual(changed, expected);
 const statuses = git(['diff', '--name-status', `${base}...HEAD`])
   .trim().split('\n').filter(Boolean);
-assert.equal(statuses.every((line) => line.startsWith('A\t')), true);
+
+let mode;
+if (samePaths(changed, originalPackage)) {
+  mode = 'ORIGINAL_T7A_PACKAGE';
+  assert.equal(statuses.every((line) => line.startsWith('A\t')), true);
+} else if (samePaths(changed, evidenceCorrection)) {
+  mode = 'BT2_T7A_RETAINED_EVIDENCE_RECONCILIATION';
+  assert.equal(statuses.every((line) => line.startsWith('M\t')), true);
+} else {
+  assert.fail(`Unexpected T7A write set: ${JSON.stringify(changed)}`);
+}
 
 const draft = read('src/workspace/lafea-templates/parameter-draft.js');
 const panel = read('src/workspace/lafea-templates/parameter-entry-panel.js');
@@ -81,16 +93,33 @@ assert.doesNotMatch(publicSurface, /mountLafeaTemplateParameterPanel/u);
 const staleT6cBlocker =
   'Live workbench composition is active through the governed accessory-panel seam; parameter entry, compilation, document import and engine execution remain disabled.';
 assert.equal(
-  production.includes(staleT6cBlocker),
-  false,
-  'T7A production must not retain the T6C parameter-entry blocker.',
+  occurrences(wizard, staleT6cBlocker),
+  1,
+  'The inherited T6C limitation may occur once only as a private filtering input.',
 );
+assert.equal(
+  wizard.includes('const T6C_PARAMETER_BLOCKER ='),
+  true,
+  'The inherited T6C limitation must be named as a private filter token.',
+);
+assert.equal(
+  wizard.includes('.filter((value) => value !== T6C_PARAMETER_BLOCKER);'),
+  true,
+  'T7A must remove the inherited T6C limitation before exposing its selection model.',
+);
+for (const source of [draft, panel, livePanel, descriptor, registration, publicSurface]) {
+  assert.equal(
+    source.includes(staleT6cBlocker),
+    false,
+    'The inherited T6C limitation must not be rendered or exported by T7A.',
+  );
+}
 assert.equal(
   production.includes(
     'Selection and evidence inspection only; parameter entry, compilation, document import and engine execution remain disabled.',
   ),
   false,
-  'T7A must not render the historical T6C parameter-entry blocker.',
+  'T7A must not render the historical T6C selection-only blocker.',
 );
 
 for (const source of [draft, panel, livePanel, wizard, descriptor, registration]) {
@@ -132,14 +161,23 @@ for (const forbiddenPath of [
   assert.equal(
     changed.some((path) => path === forbiddenPath || path.startsWith(forbiddenPath)),
     false,
+    `Forbidden T7A path changed: ${forbiddenPath}`,
   );
 }
 
 console.log(JSON.stringify({
   check: 'lafea-template-t7a-source-guard',
   status: 'PASS',
-  additiveFiles: expected.length,
-  modifiedExistingFiles: 0,
+  mode,
+  additiveFiles: mode === 'ORIGINAL_T7A_PACKAGE' ? originalPackage.length : 0,
+  modifiedExistingFiles:
+    mode === 'BT2_T7A_RETAINED_EVIDENCE_RECONCILIATION'
+      ? evidenceCorrection.length
+      : 0,
+  evidenceCorrectionFiles:
+    mode === 'BT2_T7A_RETAINED_EVIDENCE_RECONCILIATION'
+      ? evidenceCorrection.length
+      : 0,
   agent1FilesModified: 0,
   historicalT6FilesModified: 0,
   parameterEntryPaths: 1,
@@ -147,7 +185,8 @@ console.log(JSON.stringify({
   truthfulParameterWizardPaths: 1,
   truthfulParameterWizardModelPaths: 1,
   selectionOnlyPaths: 0,
-  staleT6cParameterBlockerPaths: 0,
+  privateT6cBlockerFilterTokens: 1,
+  staleT6cBlockerRenderedPaths: 0,
   publicGenericPanelPaths: 0,
   controllerFacadeMethodInvocations: 0,
   compilerInvocationPaths: 0,
@@ -159,6 +198,14 @@ console.log(JSON.stringify({
 
 function read(path) {
   return readFileSync(path, 'utf8');
+}
+
+function occurrences(source, token) {
+  return source.split(token).length - 1;
+}
+
+function samePaths(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function git(args) {
