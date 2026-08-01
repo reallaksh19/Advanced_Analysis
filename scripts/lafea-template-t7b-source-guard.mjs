@@ -11,7 +11,7 @@ if (!base) {
   );
 }
 
-const expected = [
+const originalPackage = [
   'scripts/lafea-template-t7b-compilation-preview-check.mjs',
   'scripts/lafea-template-t7b-source-guard.mjs',
   'scripts/lafea-template-t7b-validation-parent-check.mjs',
@@ -22,12 +22,25 @@ const expected = [
   'src/workspace/lafea-templates/compilation-preview.js',
   'src/workspace/lafea-templates/t7b-compilation-preview.js',
 ].sort();
+const evidenceCorrection = [
+  'scripts/lafea-template-t7b-compilation-preview-check.mjs',
+  'scripts/lafea-template-t7b-source-guard.mjs',
+].sort();
 const changed = git(['diff', '--name-only', `${base}...HEAD`])
   .trim().split('\n').filter(Boolean).sort();
-assert.deepEqual(changed, expected);
 const statuses = git(['diff', '--name-status', `${base}...HEAD`])
   .trim().split('\n').filter(Boolean);
-assert.equal(statuses.every((line) => line.startsWith('A\t')), true);
+
+let mode;
+if (samePaths(changed, originalPackage)) {
+  mode = 'ORIGINAL_T7B_PACKAGE';
+  assert.equal(statuses.every((line) => line.startsWith('A\t')), true);
+} else if (samePaths(changed, evidenceCorrection)) {
+  mode = 'ISSUE_94_EVIDENCE_CORRECTION';
+  assert.equal(statuses.every((line) => line.startsWith('M\t')), true);
+} else {
+  assert.fail(`Unexpected T7B write set: ${JSON.stringify(changed)}`);
+}
 
 const preview = read('src/workspace/lafea-templates/compilation-preview.js');
 const wizard = read('src/workspace/lafea-templates/compilation-preview-wizard.js');
@@ -39,6 +52,7 @@ const registration = read(
   'src/workspace/lafea-templates/compilation-preview-workbench-registration.js',
 );
 const publicSurface = read('src/workspace/lafea-templates/t7b-compilation-preview.js');
+const checkSource = read('scripts/lafea-template-t7b-compilation-preview-check.mjs');
 const production = `${preview}\n${wizard}\n${panel}\n${descriptor}\n${registration}\n${publicSurface}`;
 
 for (const required of [
@@ -121,6 +135,27 @@ assert.match(publicSurface, /mountLafeaT7bCompilationWorkbench/u);
 assert.doesNotMatch(publicSurface, /mountLafeaT7aParameterPanel/u);
 assert.doesNotMatch(publicSurface, /mountLafeaTemplateParameterPanel/u);
 
+const fakeElementDeclaration = checkSource.indexOf('class FakeElement');
+const fakeDocumentDeclaration = checkSource.indexOf('class FakeDocument');
+const firstFakeElementConstruction = checkSource.indexOf('new FakeElement(');
+const firstFakeDocumentConstruction = checkSource.indexOf('new FakeDocument(');
+assert.ok(fakeElementDeclaration >= 0, 'FakeElement declaration is required.');
+assert.ok(fakeDocumentDeclaration >= 0, 'FakeDocument declaration is required.');
+assert.ok(firstFakeElementConstruction >= 0, 'FakeElement construction evidence is required.');
+assert.ok(firstFakeDocumentConstruction >= 0, 'FakeDocument construction evidence is required.');
+assert.ok(
+  fakeElementDeclaration < firstFakeElementConstruction,
+  'FakeElement must be initialized before first construction.',
+);
+assert.ok(
+  fakeDocumentDeclaration < firstFakeDocumentConstruction,
+  'FakeDocument must be initialized before first construction.',
+);
+assert.equal(
+  checkSource.includes('Fake DOM declarations must precede all executable evidence.'),
+  true,
+);
+
 for (const forbiddenPath of [
   'package.json',
   '.github/workflows/',
@@ -141,6 +176,9 @@ for (const forbiddenPath of [
   'src/workspace/lafea-templates/t7a-parameter-entry.js',
   'src/workspace/lafea-templates/live-wizard.js',
   'src/workspace/lafea-templates/t6c-live-registration.js',
+  'src/workspace/lafea-templates/workbench-import',
+  'src/workspace/lafea-templates/t7c-workbench-import.js',
+  'scripts/lafea-template-t7c-',
 ]) {
   assert.equal(
     changed.some((path) => path === forbiddenPath || path.startsWith(forbiddenPath)),
@@ -152,12 +190,16 @@ for (const forbiddenPath of [
 console.log(JSON.stringify({
   check: 'lafea-template-t7b-source-guard',
   status: 'PASS',
-  additiveFiles: expected.length,
-  modifiedExistingFiles: 0,
+  mode,
+  additiveFiles: mode === 'ORIGINAL_T7B_PACKAGE' ? originalPackage.length : 0,
+  modifiedExistingFiles: mode === 'ISSUE_94_EVIDENCE_CORRECTION' ? evidenceCorrection.length : 0,
+  evidenceCorrectionFiles: mode === 'ISSUE_94_EVIDENCE_CORRECTION' ? evidenceCorrection.length : 0,
   agent1FilesModified: 0,
   historicalT6FilesModified: 0,
   t7aFilesModified: 0,
+  t7cFilesModified: 0,
   coreCompilerFilesModified: 0,
+  fakeDomInitializedBeforeUse: true,
   validationParentHashChecks: 1,
   validationParentContractChecks: 1,
   compilerInvocationPaths: 2,
@@ -175,6 +217,10 @@ function read(path) {
 
 function occurrences(source, token) {
   return source.split(token).length - 1;
+}
+
+function samePaths(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function git(args) {
