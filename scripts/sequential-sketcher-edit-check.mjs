@@ -1,91 +1,143 @@
 /**
- * Automated Verification Check for Sequential Sketcher Editing Operations
+ * Automated Verification Check for Sequential Sketcher Editing Operations.
+ * Uses an explicit repository-local synthetic dataset; no developer-machine
+ * benchmark path is part of this executable check.
  */
-import fs from 'node:fs';
-import { normalizeWorkspaceDataset } from '../src/workspace/dataset-adapter.js';
+import assert from 'node:assert/strict';
 import { SequentialCommandGateway } from '../src/workspace/sequential-sketcher/sequential-command-gateway.js';
 
 console.log('=== VERIFYING SEQUENTIAL SKETCHER EDITING OPERATIONS ===');
 
-const fileContent = fs.readFileSync('F:/CODE-5-SS/3D_Converters/Benchmarks/1885Sjson/Sjson.json', 'utf8');
-const rawPackage = JSON.parse(fileContent);
-const initialDataset = normalizeWorkspaceDataset(rawPackage, 'Sjson.json');
-
-let currentDataset = initialDataset;
+let currentDataset = syntheticDataset();
 const mockWorkspaceState = {
   getSnapshot: () => ({ dataset: currentDataset }),
-  loadDataset: (d) => { currentDataset = d; return { dataset: d, status: 'ready' }; },
+  loadDataset: (dataset) => {
+    currentDataset = dataset;
+    return { dataset, status: 'ready' };
+  },
 };
-
 const gateway = new SequentialCommandGateway(mockWorkspaceState, null);
 
-// T01: Add Straight Pipe
 const initialCount = currentDataset.entities.length;
 const addRes = gateway.execute({ op: 'ADD_STRAIGHT', lengthMm: 1500, direction: 'X' });
-if (addRes.status !== 'applied' || currentDataset.entities.length !== initialCount + 1) {
-  console.error('FAIL T01: ADD_STRAIGHT failed.');
-  process.exit(1);
-}
+assert.equal(addRes.status, 'applied', 'T01 ADD_STRAIGHT must apply.');
+assert.equal(currentDataset.entities.length, initialCount + 1);
 console.log('SEQUENTIAL-EDIT-T01 PASS ADD_STRAIGHT extended pipe segment.');
 
-// T02: Split Pipe
-const pipeTarget = currentDataset.entities.find((e) => e.entityType === 'PIPE');
+const pipeTarget = currentDataset.entities.find((entity) => entity.entityType === 'PIPE');
 const splitRes = gateway.execute({ op: 'SPLIT_PIPE', targetEntityId: pipeTarget.entityId });
-if (splitRes.status !== 'applied') {
-  console.error('FAIL T02: SPLIT_PIPE failed.');
-  process.exit(1);
-}
+assert.equal(splitRes.status, 'applied', 'T02 SPLIT_PIPE must apply.');
+assert.ok(currentDataset.entities.some((entity) => entity.name === 'JUNCTION SPLIT NODE'));
 console.log('SEQUENTIAL-EDIT-T02 PASS SPLIT_PIPE inserted junction node.');
 
-// T03: Stretch Node
-const nodeTarget = currentDataset.entities[0];
-const stretchRes = gateway.execute({ op: 'STRETCH_NODE', targetEntityId: nodeTarget.entityId, offset: { x: 100, y: 50, z: 0 } });
-if (stretchRes.status !== 'applied') {
-  console.error('FAIL T03: STRETCH_NODE failed.');
-  process.exit(1);
-}
+const stretchTarget = currentDataset.entities[0];
+const stretchBefore = structuredClone(stretchTarget.properties.geometry.center);
+const stretchRes = gateway.execute({
+  op: 'STRETCH_NODE',
+  targetEntityId: stretchTarget.entityId,
+  offset: { x: 100, y: 50, z: 0 },
+});
+assert.equal(stretchRes.status, 'applied', 'T03 STRETCH_NODE must apply.');
+const stretched = currentDataset.entities.find((entity) => entity.entityId === stretchTarget.entityId);
+assert.deepEqual(stretched.properties.geometry.center, {
+  x: stretchBefore.x + 100,
+  y: stretchBefore.y + 50,
+  z: stretchBefore.z,
+});
 console.log('SEQUENTIAL-EDIT-T03 PASS STRETCH_NODE updated coordinates.');
 
-// T04: Rotate Component
-const elboTarget = currentDataset.entities.find((e) => e.entityType === 'ELBO');
-const rotateRes = gateway.execute({ op: 'ROTATE_COMPONENT', targetEntityId: elboTarget.entityId, angleDeg: 45 });
-if (rotateRes.status !== 'applied') {
-  console.error('FAIL T04: ROTATE_COMPONENT failed.');
-  process.exit(1);
-}
+const elbowTarget = currentDataset.entities.find((entity) => entity.entityType === 'ELBO');
+const rotateRes = gateway.execute({
+  op: 'ROTATE_COMPONENT',
+  targetEntityId: elbowTarget.entityId,
+  angleDeg: 45,
+});
+assert.equal(rotateRes.status, 'applied', 'T04 ROTATE_COMPONENT must apply.');
+assert.equal(
+  currentDataset.entities.find((entity) => entity.entityId === elbowTarget.entityId)
+    .properties.attributes.ROTATION,
+  '45deg',
+);
 console.log('SEQUENTIAL-EDIT-T04 PASS ROTATE_COMPONENT updated angle.');
 
-// T05: Move Support
-const supportTarget = currentDataset.entities.find((e) => e.entityType === 'SUPPORT');
-const supportRes = gateway.execute({ op: 'MOVE_SUPPORT', targetEntityId: supportTarget.entityId, offsetMm: 200 });
-if (supportRes.status !== 'applied') {
-  console.error('FAIL T05: MOVE_SUPPORT failed.');
-  process.exit(1);
-}
+const supportTarget = currentDataset.entities.find((entity) => entity.entityType === 'SUPPORT');
+const supportBefore = supportTarget.properties.geometry.center.x;
+const supportRes = gateway.execute({
+  op: 'MOVE_SUPPORT',
+  targetEntityId: supportTarget.entityId,
+  offsetMm: 200,
+});
+assert.equal(supportRes.status, 'applied', 'T05 MOVE_SUPPORT must apply.');
+assert.equal(
+  currentDataset.entities.find((entity) => entity.entityId === supportTarget.entityId)
+    .properties.geometry.center.x,
+  supportBefore + 200,
+);
 console.log('SEQUENTIAL-EDIT-T05 PASS MOVE_SUPPORT updated position.');
 
-// T06: Retire Component
-const deleteTarget = currentDataset.entities[currentDataset.entities.length - 1];
-const deleteRes = gateway.execute({ op: 'RETIRE_COMPONENT', targetEntityId: deleteTarget.entityId });
-if (deleteRes.status !== 'applied') {
-  console.error('FAIL T06: RETIRE_COMPONENT failed.');
-  process.exit(1);
-}
+const deleteTarget = currentDataset.entities.at(-1);
+const deleteRes = gateway.execute({
+  op: 'RETIRE_COMPONENT',
+  targetEntityId: deleteTarget.entityId,
+});
+assert.equal(deleteRes.status, 'applied', 'T06 RETIRE_COMPONENT must apply.');
+assert.equal(
+  currentDataset.entities.some((entity) => entity.entityId === deleteTarget.entityId),
+  false,
+);
 console.log('SEQUENTIAL-EDIT-T06 PASS RETIRE_COMPONENT removed entity.');
 
-// T07: Undo & Redo
-const undoOk = gateway.undo();
-if (!undoOk) {
-  console.error('FAIL T07: UNDO failed.');
-  process.exit(1);
-}
+assert.equal(gateway.undo(), true, 'T07 UNDO must restore the retired entity.');
+assert.equal(
+  currentDataset.entities.some((entity) => entity.entityId === deleteTarget.entityId),
+  true,
+);
 console.log('SEQUENTIAL-EDIT-T07 PASS UNDO restored previous dataset state.');
 
-const redoOk = gateway.redo();
-if (!redoOk) {
-  console.error('FAIL T07: REDO failed.');
-  process.exit(1);
-}
+assert.equal(gateway.redo(), true, 'T07 REDO must reapply retirement.');
+assert.equal(
+  currentDataset.entities.some((entity) => entity.entityId === deleteTarget.entityId),
+  false,
+);
 console.log('SEQUENTIAL-EDIT-T07 PASS REDO reapplied operation.');
 
-console.log('\n🎉 ALL SEQUENTIAL EDITING CHECKS PASSED SUCCESSFULLY!');
+console.log('ALL SEQUENTIAL EDITING CHECKS PASSED SUCCESSFULLY');
+
+function syntheticDataset() {
+  return {
+    schema: 'analysis-workspace-dataset/v1',
+    datasetId: 'SEQUENTIAL-EDIT-SYNTHETIC-V1',
+    version: 1,
+    entities: [
+      entity('PIPE-EDIT-1', 'PIPE', 'pipe', point(0, 0, 0), point(1000, 0, 0)),
+      entity('ELBO-EDIT-1', 'ELBO', 'component', point(1000, 0, 0), point(1000, 500, 0)),
+      entity('SUPPORT-EDIT-1', 'SUPPORT', 'support', point(500, 0, 0), point(500, 0, 0)),
+    ],
+  };
+}
+
+function entity(entityId, entityType, category, start, end) {
+  return {
+    entityId,
+    name: entityId,
+    entityType,
+    category,
+    properties: {
+      identity: { entityId, name: entityId, entityType },
+      geometry: {
+        start,
+        end,
+        center: point(
+          (start.x + end.x) / 2,
+          (start.y + end.y) / 2,
+          (start.z + end.z) / 2,
+        ),
+      },
+      attributes: { TYPE: entityType },
+    },
+  };
+}
+
+function point(x, y, z) {
+  return { x, y, z };
+}
