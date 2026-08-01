@@ -73,6 +73,21 @@ for (const stageId of ['LAFEA.1', 'LAFEA.2', 'LAFEA.3', 'LAFEA.4', 'LAFEA.5']) {
   assert.equal(result.stageId, stageId);
 }
 
+for (const stageId of ['LAFEA.1', 'LAFEA.2']) {
+  const composition = requireLafeaStageComposition(stageId);
+  assert.equal(composition.productAssessmentSupported, true);
+  assert.equal(composition.handoffSupported, true);
+  assert.equal(typeof composition.evaluateProductAssessment, 'function');
+  assert.equal(typeof composition.createHandoff, 'function');
+}
+for (const stageId of ['LAFEA.3', 'LAFEA.4', 'LAFEA.5', 'LAFEA.6']) {
+  const composition = requireLafeaStageComposition(stageId);
+  assert.equal(composition.productAssessmentSupported, false);
+  assert.equal(composition.handoffSupported, false);
+  assert.equal(composition.evaluateProductAssessment, null);
+  assert.equal(composition.createHandoff, null);
+}
+
 const unsupportedComposition = requireLafeaStageComposition('LAFEA.6');
 assert.equal(unsupportedComposition.executionSupported, false);
 assert.equal(unsupportedComposition.calculate, null);
@@ -103,6 +118,7 @@ console.log(JSON.stringify({
   stageCount: LAFEA_STAGE_REGISTRY.length,
   compositionRootCount: LAFEA_STAGE_COMPOSITION_BINDINGS.length,
   retainedQualifiedRoutes: 5,
+  analyticalProductRoutes: ['LAFEA.1', 'LAFEA.2'],
   unsupportedStages: ['LAFEA.6'],
   benchmarkManifestBindings: {
     'LAFEA.3': ['CONT-PATCH-01', 'CONT-CYL-01', 'CONT-HOLE-01'],
@@ -126,11 +142,14 @@ function assertComponents(entry) {
     acceptance: 'ACCEPTANCE',
     presenter: 'PRESENTER',
     unitResolver: 'UNIT_RESOLVER',
+    productAssessment: 'PRODUCT_ASSESSMENT',
+    handoff: 'HANDOFF',
   });
   assert.deepEqual(Object.values(kindsByKey), LAFEA_TECHNICAL_COMPONENT_KINDS);
   for (const [key, kind] of Object.entries(kindsByKey)) {
     const componentId = componentIds[key];
     if (componentId === null) {
+      if (['productAssessment', 'handoff'].includes(key)) continue;
       assert.equal(entry.engineState, 'ENGINE_NOT_IMPLEMENTED');
       continue;
     }
