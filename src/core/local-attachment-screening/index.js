@@ -7,3 +7,14 @@ export { createLocalAttachmentScreeningRequest, validateLocalAttachmentScreening
 export { calculateLocalAttachmentScreening, reconstructScreeningResultHashes } from './calculate.js';
 export { calculateSectionProperties } from './section-properties.js';
 export { principalStresses, vonMisesStress } from './invariants.js';
+export {
+  SCREENING_APPLICABILITY_KINDS,
+  SCREENING_APPLICABILITY_STATUSES,
+  SCREENING_PRODUCT_LIMITATIONS,
+  SCREENING_PRODUCT_REQUEST_SCHEMA,
+  SCREENING_PRODUCT_RESULT_SCHEMA,
+  SCREENING_PRODUCT_STATES,
+  createLocalAttachmentScreeningHandoff,
+  evaluateLocalAttachmentScreeningProduct,
+  validateLocalAttachmentScreeningProduct,
+} from './product-escalation.js';
