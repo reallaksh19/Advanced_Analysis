@@ -1,6 +1,7 @@
 /** Standalone U4E Three.js adapter for exact U4D/U4C result requests. */
 import { contractError, deepFreeze } from './contracts.js';
 import { requireLafeaResultRenderRequest } from './result-render-request.js';
+import { createThreePrimitivePicker } from './three-primitive-picker.js';
 
 export const LAFEA_THREE_RENDER_RESULT_SCHEMA = 'LafeaThreeRenderResult.v1';
 
@@ -9,6 +10,8 @@ export function createThreeMeshRendererV2(THREE, canvas) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   const scene = new THREE.Scene();
   let currentObjects = [];
+  let currentCamera = null;
+  let picker = null;
   let destroyed = false;
   let contextLost = false;
 
@@ -38,37 +41,36 @@ export function createThreeMeshRendererV2(THREE, canvas) {
     geometry.setIndex(new THREE.BufferAttribute(packet.drawTriangleIndices, 1));
     geometry.setAttribute('resultValue', new THREE.BufferAttribute(packet.fieldValues, 1));
     geometry.setAttribute('qualityFlag', new THREE.BufferAttribute(packet.qualityFlags, 1));
-    geometry.setAttribute(
-      'color',
-      new THREE.BufferAttribute(vertexColors(packet), 3),
-    );
+    geometry.setAttribute('color', new THREE.BufferAttribute(vertexColors(packet), 3));
     const material = new THREE.MeshBasicMaterial({
-      vertexColors: true,
-      wireframe: false,
-      side: THREE.DoubleSide,
+      vertexColors: true, wireframe: false, side: THREE.DoubleSide,
     });
     const mesh = new THREE.Mesh(geometry, material);
     scene.add(mesh);
     currentObjects.push(mesh);
 
-    const camera = new THREE.Camera();
-    camera.matrixAutoUpdate = false;
-    camera.matrixWorldInverse.fromArray(request.viewport.viewMatrix);
-    camera.matrixWorld.copy(camera.matrixWorldInverse).invert();
-    camera.projectionMatrix.fromArray(request.viewport.projectionMatrix);
-    camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
-    renderer.setPixelRatio(request.viewport.devicePixelRatio);
-    renderer.setSize(
-      request.viewport.cssWidth,
-      request.viewport.cssHeight,
-      false,
+    const CameraType = typeof THREE.OrthographicCamera === 'function'
+      ? THREE.OrthographicCamera : THREE.Camera;
+    currentCamera = new CameraType();
+    currentCamera.isOrthographicCamera = true;
+    [currentCamera.near, currentCamera.far] = orthographicDepth(
+      request.viewport.projectionMatrix,
     );
-    renderer.render(scene, camera);
-    canvas.dataset.ready = 'true';
-    canvas.dataset.renderer = 'THREE_WEBGL';
-    canvas.dataset.stageId = request.stageId;
-    canvas.dataset.sceneRevision = String(request.sceneRevision);
-    canvas.dataset.fieldId = packet.field.fieldId;
+    currentCamera.matrixAutoUpdate = false;
+    currentCamera.matrixWorldInverse.fromArray(request.viewport.viewMatrix);
+    currentCamera.matrixWorld.copy(currentCamera.matrixWorldInverse).invert();
+    currentCamera.projectionMatrix.fromArray(request.viewport.projectionMatrix);
+    currentCamera.projectionMatrixInverse.copy(currentCamera.projectionMatrix).invert();
+    renderer.setPixelRatio(request.viewport.devicePixelRatio);
+    renderer.setSize(request.viewport.cssWidth, request.viewport.cssHeight, false);
+    renderer.render(scene, currentCamera);
+    Object.assign(canvas.dataset, {
+      ready: 'true',
+      renderer: 'THREE_WEBGL',
+      stageId: request.stageId,
+      sceneRevision: String(request.sceneRevision),
+      fieldId: packet.field.fieldId,
+    });
 
     return deepFreeze({
       schema: LAFEA_THREE_RENDER_RESULT_SCHEMA,
@@ -83,6 +85,17 @@ export function createThreeMeshRendererV2(THREE, canvas) {
     });
   }
 
+  function pickClientPoint(value) {
+    if (destroyed) throw contractError('LAFEA_V2_RENDERER_DESTROYED');
+    if (contextLost) throw contractError('LAFEA_V2_WEBGL_CONTEXT_LOST');
+    picker ??= createThreePrimitivePicker(THREE, canvas, () => ({
+      ready: canvas.dataset.ready === 'true',
+      objects: currentObjects,
+      camera: currentCamera,
+    }));
+    return picker.pickClientPoint(value);
+  }
+
   function disposeCurrent() {
     for (const object of currentObjects) {
       object.geometry?.dispose();
@@ -90,24 +103,22 @@ export function createThreeMeshRendererV2(THREE, canvas) {
       scene.remove(object);
     }
     currentObjects = [];
+    currentCamera = null;
   }
 
   function markNotReady() {
     canvas.dataset.ready = 'false';
-    delete canvas.dataset.renderer;
-    delete canvas.dataset.stageId;
-    delete canvas.dataset.sceneRevision;
-    delete canvas.dataset.fieldId;
+    for (const key of ['renderer', 'stageId', 'sceneRevision', 'fieldId']) {
+      delete canvas.dataset[key];
+    }
   }
 
   return Object.freeze({
     isAvailable: () => !destroyed && !contextLost
       && renderer.capabilities.isWebGL2 === true,
     render,
-    clearCurrentScene() {
-      disposeCurrent();
-      markNotReady();
-    },
+    pickClientPoint,
+    clearCurrentScene() { disposeCurrent(); markNotReady(); },
     setVisible(visible) {
       if (typeof visible !== 'boolean') {
         throw contractError('LAFEA_V2_RENDERER_VISIBILITY_INVALID');
@@ -118,11 +129,24 @@ export function createThreeMeshRendererV2(THREE, canvas) {
       if (destroyed) return;
       destroyed = true;
       disposeCurrent();
+      picker = null;
       renderer.dispose();
       renderer.forceContextLoss?.();
       markNotReady();
     },
   });
+}
+
+function orthographicDepth(matrix) {
+  const scale = matrix[10];
+  const offset = matrix[14];
+  const near = (offset + 1) / scale;
+  const far = (offset - 1) / scale;
+  if (![scale, offset, near, far].every(Number.isFinite)
+    || scale === 0 || near === far) {
+    throw contractError('LAFEA_V2_ORTHOGRAPHIC_DEPTH_INVALID');
+  }
+  return [near, far];
 }
 
 function vertexColors(packet) {
@@ -170,9 +194,6 @@ function requireThreeAdapter(THREE, canvas) {
 }
 
 function disposeMaterial(material) {
-  if (Array.isArray(material)) {
-    material.forEach(disposeMaterial);
-    return;
-  }
-  material?.dispose?.();
+  if (Array.isArray(material)) material.forEach(disposeMaterial);
+  else material?.dispose?.();
 }

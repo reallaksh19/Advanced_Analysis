@@ -20,7 +20,13 @@ export const LAFEA_LIVE_WORKBENCH_VIEWPORT_MODES = Object.freeze([
 
 export function createLafeaLiveWorkbenchViewportModel(input) {
   if (!isRecord(input)) throw liveViewportError('LAFEA_LIVE_VIEWPORT_INPUT_REQUIRED');
-  const sourceModel = createLafeaSourceWorkbenchViewportModel(sourceInput(input));
+  const sourceSelection = projectSelectionForSource(
+    input.selection ?? null,
+    input.sceneRevision,
+  );
+  const sourceModel = createLafeaSourceWorkbenchViewportModel(
+    sourceInput(input, sourceSelection),
+  );
   const intake = evaluateLafeaRenderEvidenceIntake({
     stageId: sourceModel.registryEntry.stageId,
     sceneRevision: sourceModel.scene.sceneRevision,
@@ -67,7 +73,7 @@ export function mountLafeaLiveWorkbenchViewport(root, input) {
     mounted = mountLafeaSourceWorkbenchViewportModel(
       viewportHost,
       model.sourceModel,
-      sourceInput(input),
+      sourceInput(input, model.sourceModel.request.selection),
     );
     blockedStatus = renderBlockedStatus(root, model.intake.blockingReasons);
   }
@@ -125,14 +131,14 @@ export function mountLafeaLiveWorkbenchViewport(root, input) {
   });
 }
 
-function sourceInput(input) {
+function sourceInput(input, selection = input.selection ?? null) {
   return {
     stageId: input.stageId,
     document: input.document,
     lifecycle: input.lifecycle ?? null,
     lifecycleBinding: input.lifecycleBinding ?? null,
     sceneRevision: input.sceneRevision,
-    selection: input.selection ?? null,
+    selection,
     cssWidth: input.cssWidth,
     cssHeight: input.cssHeight,
     devicePixelRatio: input.devicePixelRatio,
@@ -140,6 +146,19 @@ function sourceInput(input) {
     policy: input.policy,
     onMoveNode: input.onMoveNode,
     onSelectionChange: input.onSelectionChange,
+  };
+}
+
+function projectSelectionForSource(value, sceneRevision) {
+  if (!isRecord(value) || value.sourceEntityId === null
+    || value.meshEntityId === null || value.sceneRevision !== sceneRevision) {
+    return value;
+  }
+  return {
+    sceneRevision,
+    sourceEntityId: value.sourceEntityId,
+    meshEntityId: null,
+    entityRole: 'SOURCE',
   };
 }
 

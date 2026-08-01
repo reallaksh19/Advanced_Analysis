@@ -157,10 +157,11 @@ function rendererDimensions(viewport) {
 }
 
 function governedViewportTransform(viewport, dimensions) {
-  const minimumX = viewport?.worldBounds?.minimum?.x;
-  const maximumX = viewport?.worldBounds?.maximum?.x;
-  const minimumY = viewport?.worldBounds?.minimum?.y;
-  const maximumY = viewport?.worldBounds?.maximum?.y;
+  const worldBounds = viewport.worldBounds;
+  const minimumX = worldBounds?.minimum?.x;
+  const maximumX = worldBounds?.maximum?.x;
+  const minimumY = worldBounds?.minimum?.y;
+  const maximumY = worldBounds?.maximum?.y;
   if (![minimumX, maximumX, minimumY, maximumY].every(Number.isFinite)
     || maximumX <= minimumX || maximumY <= minimumY) {
     throw new TypeError('LAFEA_SVG_WORLD_BOUNDS_INVALID');

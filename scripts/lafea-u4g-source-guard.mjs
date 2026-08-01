@@ -42,7 +42,11 @@ assert.doesNotMatch(
   `${live}\n${registry}`,
   /initializeLifecycle|registerLifecycleArtifact|applyLifecycleEvent|createLafeaArtifactRecord/u,
 );
-assert.doesNotMatch(registry, /THREE|WebGL|createHybridViewport|stage\.execution/u);
+assert.doesNotMatch(registry, /WebGL|createHybridViewport|stage\.execution/u);
+assert.match(registry, /initializeLafeaWorkbenchRenderEvidence\(controller, THREE = null\)/u);
+assert.match(registry, /THREE: THREE \?\? null/u);
+assert.match(registry, /lafeaWorkbenchThreeNamespace/u);
+assert.doesNotMatch(registry, /new THREE\.|THREE\.WebGLRenderer|THREE\.Scene/u);
 assert.match(registry, /sealRenderPacketV2/u);
 assert.match(registry, /const CONTROLLER_STATE = new WeakMap\(\)/u);
 assert.match(registry, /packets: new Map\(\)/u);
@@ -87,6 +91,8 @@ console.log(JSON.stringify({
   viewDependenciesPrivate: true,
   packetDerivedFromExecution: false,
   packetRegistryPrivate: true,
+  threeNamespaceStoredPrivately: true,
+  rendererConstructedInRegistry: false,
   lifecycleMutationPaths: 0,
   numericalImports: 0,
   templateImports: 0,

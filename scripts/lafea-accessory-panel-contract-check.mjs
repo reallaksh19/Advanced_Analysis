@@ -7,6 +7,26 @@ import {
   validateLafeaAccessoryPanelDescriptor,
 } from '../src/workspace/lafea-workbench-accessory-panels.js';
 
+class FakeDocument {
+  createElement(tagName) { return new FakeElement(tagName, this); }
+}
+
+class FakeElement {
+  constructor(tagName, ownerDocument) {
+    this.tagName = tagName.toUpperCase();
+    this.ownerDocument = ownerDocument;
+    this.dataset = {};
+    this.children = [];
+    this.attributes = {};
+    this.hidden = false;
+    this.textContent = '';
+  }
+
+  append(...nodes) { this.children.push(...nodes); }
+  replaceChildren(...nodes) { this.children = [...nodes]; }
+  setAttribute(name, value) { this.attributes[name] = String(value); }
+}
+
 const valid = descriptor('PANEL_VALID', 'Valid panel', 10, () => ({ destroy() {} }));
 const validated = validateLafeaAccessoryPanelDescriptor(valid);
 assert.ok(Object.isFrozen(validated));
@@ -177,24 +197,4 @@ function codedError(code) {
   const error = new Error(code);
   error.code = code;
   return error;
-}
-
-class FakeDocument {
-  createElement(tagName) { return new FakeElement(tagName, this); }
-}
-
-class FakeElement {
-  constructor(tagName, ownerDocument) {
-    this.tagName = tagName.toUpperCase();
-    this.ownerDocument = ownerDocument;
-    this.dataset = {};
-    this.children = [];
-    this.attributes = {};
-    this.hidden = false;
-    this.textContent = '';
-  }
-
-  append(...nodes) { this.children.push(...nodes); }
-  replaceChildren(...nodes) { this.children = [...nodes]; }
-  setAttribute(name, value) { this.attributes[name] = String(value); }
 }

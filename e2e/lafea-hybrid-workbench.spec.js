@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const FIXTURE_URL = '/e2e/fixtures/lafea-hybrid-workbench-fixture.js';
+const FIXTURE_URL = '/Advanced_Analysis/e2e/fixtures/lafea-hybrid-workbench-fixture.js';
 
 test.describe('LAFEA hybrid workbench Phase 6 browser validation', () => {
   test.afterEach(async ({ page }) => {
@@ -61,6 +61,36 @@ test.describe('LAFEA hybrid workbench Phase 6 browser validation', () => {
     await expect(resultRoot.locator('[data-role="lafea-result-display-status"]')).toContainText(
       'Result display READY: HC-UI-FIELD',
     );
+  });
+
+  test('HC-UI-04: simulated GPU pick resolves exact engineering identity', async ({ page }) => {
+    await mountScenario(page, 'mountHcQualifiedResult');
+    const resultRoot = page.locator(
+      '[data-live-viewport-mode="QUALIFIED_RESULT"] .lafea-viewport',
+    );
+    await expect(resultRoot).toHaveAttribute('data-result-status', 'READY');
+
+    await resultRoot.evaluate((root) => {
+      const rect = root.getBoundingClientRect();
+      root.dispatchEvent(new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        clientX: rect.left + rect.width * 0.25,
+        clientY: rect.top + rect.height * 0.75,
+      }));
+    });
+
+    await expect(resultRoot).toHaveAttribute('data-gpu-pick-status', 'SELECTED');
+    await expect(resultRoot).not.toHaveAttribute('data-gpu-pick-reason', /.+/u);
+    await expect(resultRoot.locator('[data-element-id="E1"]')).toHaveAttribute(
+      'data-selected',
+      'true',
+    );
+    await expect(resultRoot.locator('[data-layer="accessible-inspector"]')).toContainText(
+      'Selected Entity: E1 (ELEMENT)',
+    );
+    await expect(resultRoot).toHaveAttribute('data-result-status', 'READY');
+    await expect(resultRoot).toHaveAttribute('data-result-renderer', 'THREE_WEBGL');
   });
 
   test('HC-UI-06: simulated WebGL loss enters explicit blocked SVG state', async ({ page }) => {

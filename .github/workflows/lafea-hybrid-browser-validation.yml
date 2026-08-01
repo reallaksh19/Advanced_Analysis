@@ -37,6 +37,8 @@ jobs:
       - name: Install repository dependencies
         run: npm ci
       - name: Install pinned Chromium
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: '0'
         run: npx playwright install chromium --with-deps
       - name: Guard Phase 6 browser scope
         run: |
