@@ -177,8 +177,21 @@ export { lafeaPreviewGeometry } from './lafea-stage-preview.js';
 /**
  * Mount and initialize a LAFEA workbench in an existing shell root.
  *
- * Accessory panels are UI composition extensions only. Optional THREE is used
- * only for producer-supplied V2 result packets with current qualified lineage.
+ * `accessoryPanels` is an optional array of exact
+ * `lafea-workbench-accessory-panel/v1` descriptors. Panels are UI composition
+ * extensions only and receive a frozen facade containing `getState` and
+ * `importDocument`.
+ *
+ * `THREE` is an optional injected Three.js namespace. It is used only after a
+ * producer supplies a V2 render packet whose scene revision and complete U3
+ * engineering/display lineage evaluate as current and qualified. Producers use
+ * `getDisplayViewportContext()`, `setDisplayRenderPacket(packet)` and
+ * `clearDisplayRenderPacket(stageId)` on the returned controller. These methods
+ * do not register lifecycle evidence or expose retained packet buffers.
+ *
+ * @param {Element} rootElement Workbench host.
+ * @param {{initialStage?:string,initialDocument?:unknown,initialSourceHash?:string,accessoryPanels?:unknown[],THREE?:unknown}|undefined} options Explicit initial state, optional accessory panels and optional Three.js dependency.
+ * @returns {LafeaWorkbenchController} Initialized controller.
  */
 export function mountLafeaWorkbench(rootElement, options) {
   if (!rootElement) throw new TypeError('LAFEA workbench root is required.');
