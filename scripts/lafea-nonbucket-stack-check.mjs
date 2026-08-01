@@ -9,6 +9,7 @@ const CHECKS = Object.freeze([
   { scope: 'NB-T0', path: 'scripts/lafea-nonbucket-scope-guard.mjs' },
   { scope: 'NB-T1', path: 'scripts/lafea-nonbucket-lifecycle-profiles-check.mjs' },
   { scope: 'NB-T2', path: 'scripts/lafea-nb-t2-source-producer-check.mjs' },
+  { scope: 'NB-T3', path: 'scripts/lafea-nb-t3-registry-composition-check.mjs' },
   { scope: 'U1', path: 'scripts/lafea-u1-stage-registry-check.mjs' },
   { scope: 'U1', path: 'scripts/lafea-u1b-registry-consumer-check.mjs' },
   { scope: 'U2', path: 'scripts/lafea-u2a-input-command-check.mjs' },
@@ -78,7 +79,7 @@ for (const row of CHECKS) {
 }
 
 const report = Object.freeze({
-  schema: 'lafea-nonbucket-stack-report/v2',
+  schema: 'lafea-nonbucket-stack-report/v3',
   check: 'lafea-nonbucket-stack-certification',
   status: failures.length ? 'FAIL' : 'PASS',
   exactHead: gitHead(),
@@ -96,9 +97,12 @@ const report = Object.freeze({
   }),
   sourceAuthorityIntegrated: true,
   currentCoreProducerAdaptersIntegrated: true,
+  registryV2Implemented: true,
+  compositionRootRouteCount: 6,
+  duplicateDispatchMaps: 0,
+  benchmarkManifestCount: 5,
   numericalAuthorityChanged: false,
-  lifecycleSemanticsChanged: true,
-  registryV2Implemented: false,
+  lifecycleSemanticsChanged: false,
   shellAuthorityChanged: false,
   codeAuthorityPromoted: false,
   releaseQualified: false,
