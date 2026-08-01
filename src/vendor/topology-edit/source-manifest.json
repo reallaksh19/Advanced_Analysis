@@ -211,10 +211,13 @@
         "src/workspace/topology-edit/topology-edit-candidate-validator.js",
         "src/workspace/topology-edit/topology-edit-canonical-state.js",
         "src/workspace/topology-edit/topology-edit-certification-service.js",
+        "src/workspace/topology-edit/topology-edit-certified-journal.js",
         "src/workspace/topology-edit/topology-edit-command-contract.js",
-        "src/workspace/topology-edit/topology-edit-command-resolver.js",
         "src/workspace/topology-edit/topology-edit-command-journal.js",
-        "src/workspace/topology-edit/topology-edit-pure-reducer.js"
+        "src/workspace/topology-edit/topology-edit-command-resolver.js",
+        "src/workspace/topology-edit/topology-edit-journal-service.js",
+        "src/workspace/topology-edit/topology-edit-pure-reducer.js",
+        "src/workspace/topology-edit/topology-edit-replay-service.js"
       ],
       "sourcePaths": [
         "tabs/topology-trace-validator/topology-edit-session-draft.js",
@@ -223,7 +226,7 @@
         "tabs/topology-trace-validator/topology-sequential-split-edge-request.js"
       ],
       "contractAuthority": "P2_EDIT_SESSION_AUTHORITY",
-      "status": "W1_2_CANDIDATE_CERTIFICATION"
+      "status": "W1_3_JOURNAL_REPLAY_AUTHORITY"
     },
     {
       "id": "checker-and-fix-suggestions",
