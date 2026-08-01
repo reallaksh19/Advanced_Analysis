@@ -1,6 +1,4 @@
-/**
- * Public integration surface for the standalone LAFEA calculation workbench.
- */
+/** Public integration surface for the standalone LAFEA calculation workbench. */
 import { LafeaWorkbenchController } from './lafea-workbench-controller.js';
 import { LAFEA_WORKBENCH_STYLES, lafeaWorkbenchStyles } from './lafea-workbench-styles.js';
 
@@ -82,11 +80,36 @@ export {
   registerLafeaArtifact,
 } from './lafea-lifecycle.js';
 export {
+  LAFEA_CALCULATION_STATES,
+  LAFEA_CODE_STATES,
   LAFEA_LIFECYCLE_BINDING_SCHEMA,
   LAFEA_LIFECYCLE_BINDING_STATUSES,
+  LAFEA_RELEASE_STATES,
+  LAFEA_RESULT_STATES,
   LAFEA_WORKBENCH_STATE_SCHEMA,
   createLafeaWorkbenchStore,
 } from './lafea-lifecycle-workbench-store.js';
+export {
+  LAFEA_CANONICAL_SHA256_PROFILE,
+  canonicalLafeaJson,
+  canonicalLafeaSha256,
+} from './lafea-canonical-sha256.js';
+export {
+  LAFEA_SOURCE_AUTHORITY_EVENT_SCHEMA,
+  LAFEA_SOURCE_AUTHORITY_ROLE,
+  LAFEA_SOURCE_AUTHORITY_SCHEMA,
+  createLafeaSourceAuthorityEvent,
+  issueLafeaSourceAuthority,
+  sourceAuthorityDocument,
+  validateLafeaSourceAuthority,
+  validateLafeaSourceAuthorityEvent,
+} from './lafea-source-authority.js';
+export {
+  LAFEA_PRODUCER_BATCH_SCHEMA,
+  LAFEA_PRODUCER_REVISION,
+  createLafeaLifecycleProducerBatch,
+  registerLafeaLifecycleProducerBatch,
+} from './lafea-lifecycle-producers.js';
 export {
   LAFEA_SOURCE_PRIMITIVE_KINDS,
   LAFEA_SOURCE_PRIMITIVE_SCHEMA,
@@ -154,21 +177,8 @@ export { lafeaPreviewGeometry } from './lafea-stage-preview.js';
 /**
  * Mount and initialize a LAFEA workbench in an existing shell root.
  *
- * `accessoryPanels` is an optional array of exact
- * `lafea-workbench-accessory-panel/v1` descriptors. Panels are UI composition
- * extensions only and receive a frozen facade containing `getState` and
- * `importDocument`.
- *
- * `THREE` is an optional injected Three.js namespace. It is used only after a
- * producer supplies a V2 render packet whose scene revision and complete U3
- * engineering/display lineage evaluate as current and qualified. Producers use
- * `getDisplayViewportContext()`, `setDisplayRenderPacket(packet)` and
- * `clearDisplayRenderPacket(stageId)` on the returned controller. These methods
- * do not register lifecycle evidence or expose retained packet buffers.
- *
- * @param {Element} rootElement Workbench host.
- * @param {{initialStage?:string,initialDocument?:unknown,initialSourceHash?:string,accessoryPanels?:unknown[],THREE?:unknown}|undefined} options Explicit initial state, optional accessory panels and optional Three.js dependency.
- * @returns {LafeaWorkbenchController} Initialized controller.
+ * Accessory panels are UI composition extensions only. Optional THREE is used
+ * only for producer-supplied V2 result packets with current qualified lineage.
  */
 export function mountLafeaWorkbench(rootElement, options) {
   if (!rootElement) throw new TypeError('LAFEA workbench root is required.');
