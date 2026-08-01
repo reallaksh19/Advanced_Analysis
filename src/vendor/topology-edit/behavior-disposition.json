@@ -76,6 +76,12 @@
       "status": "W1_2_CANDIDATE_CERTIFICATION"
     },
     {
+      "targetPath": "src/workspace/topology-edit/topology-edit-certified-journal.js",
+      "classification": "FORKED",
+      "authority": "Wave1 append-only accepted-command journal authority",
+      "status": "W1_3_JOURNAL_REPLAY_AUTHORITY"
+    },
+    {
       "targetPath": "src/workspace/topology-edit/topology-edit-checker.js",
       "classification": "FORKED",
       "authority": "Wave3 checker authority",
@@ -118,6 +124,12 @@
       "status": "PHASE_ONE_RETAINED"
     },
     {
+      "targetPath": "src/workspace/topology-edit/topology-edit-journal-service.js",
+      "classification": "FORKED",
+      "authority": "Wave1 atomic journal transition authority",
+      "status": "W1_3_JOURNAL_REPLAY_AUTHORITY"
+    },
+    {
       "targetPath": "src/workspace/topology-edit/topology-edit-large-model-controller.js",
       "classification": "FORKED",
       "authority": "Wave5 qualification authority",
@@ -146,6 +158,12 @@
       "classification": "FORKED",
       "authority": "Wave2 pure visual geometry authority",
       "status": "PHASE_ONE_VISUAL_SUBSET"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-replay-service.js",
+      "classification": "FORKED",
+      "authority": "Wave1 deterministic replay and integrity authority",
+      "status": "W1_3_JOURNAL_REPLAY_AUTHORITY"
     },
     {
       "targetPath": "src/workspace/topology-edit/topology-edit-scope-contract.js",
@@ -197,9 +215,9 @@
     }
   ],
   "deferredBehavior": [
-    "The retained phase-one command journal remains non-certifying until W1.3 replaces its acceptance and replay authority.",
-    "W1.2 certifies exact candidates and receipts but does not append them to a journal or alter active/redo projections.",
-    "The W1.1/W1.2 kernel remains isolated from the UI and WorkspaceState until W1.4.",
+    "The retained phase-one command journal remains in place for the UI until W1.4 routes the seven tools through the certified journal service.",
+    "W1.3 accepted history, replay, undo, redo, cancellation, and journal reload remain isolated from WorkspaceState.",
+    "The W1.1-W1.3 kernel remains isolated from rendered object identity and Three.js.",
     "The existing support overlay is retained as visual evidence and is not restraint-semantic authority.",
     "Workspace commit remains outside Wave 1 and is not qualified by this disposition.",
     "Large-model scaffolding is not performance qualification."
