@@ -204,33 +204,29 @@ function collectText(node) {
     .join(' ');
 }
 
-class FakeDocument {
-  constructor() {
-    this.head = new FakeElement('head', this);
-    this.body = new FakeElement('body', this);
-  }
-  createElement(tagName) { return new FakeElement(tagName, this); }
-  querySelector() { return null; }
+function FakeDocument() {
+  this.head = new FakeElement('head', this);
+  this.body = new FakeElement('body', this);
+  this.createElement = (tagName) => new FakeElement(tagName, this);
+  this.querySelector = () => null;
 }
 
-class FakeElement {
-  constructor(tagName, ownerDocument) {
-    this.tagName = tagName.toUpperCase();
-    this.ownerDocument = ownerDocument;
-    this.dataset = {};
-    this.children = [];
-    this.attributes = {};
-    this.className = '';
-    this.hidden = false;
-    this.selected = false;
-    this.style = {};
-    this.textContent = '';
-    this.type = '';
-    this.value = '';
-    this.listeners = new Map();
-  }
-  append(...nodes) { this.children.push(...nodes); }
-  replaceChildren(...nodes) { this.children = [...nodes]; }
-  setAttribute(name, value) { this.attributes[name] = String(value); }
-  addEventListener(name, callback) { this.listeners.set(name, callback); }
+function FakeElement(tagName, ownerDocument) {
+  this.tagName = tagName.toUpperCase();
+  this.ownerDocument = ownerDocument;
+  this.dataset = {};
+  this.children = [];
+  this.attributes = {};
+  this.className = '';
+  this.hidden = false;
+  this.selected = false;
+  this.style = {};
+  this.textContent = '';
+  this.type = '';
+  this.value = '';
+  this.listeners = new Map();
+  this.append = (...nodes) => { this.children.push(...nodes); };
+  this.replaceChildren = (...nodes) => { this.children = [...nodes]; };
+  this.setAttribute = (name, value) => { this.attributes[name] = String(value); };
+  this.addEventListener = (name, callback) => { this.listeners.set(name, callback); };
 }
