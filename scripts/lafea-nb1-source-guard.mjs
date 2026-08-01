@@ -11,7 +11,6 @@ if (!base) {
 
 const expected = Object.freeze([
   '.github/workflows/lafea-nb1-foundation-screening-verticals.yml',
-  '.github/workflows/lafea-nonbucket-stack.yml',
   'docs/LAFEA_NonBucket_NB1_Foundation_Screening_Verticals.md',
   'scripts/lafea-nb-t3-composition-root-check.mjs',
   'scripts/lafea-nb1-analytical-verticals-check.mjs',
