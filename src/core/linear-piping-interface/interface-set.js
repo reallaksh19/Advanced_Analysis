@@ -22,6 +22,7 @@ import {
   failInterface,
   requireArray,
   requireHash,
+  requireNullableHash,
   requireRecord,
   sealInterfaceProfile,
 } from './contracts.js';
@@ -325,8 +326,8 @@ export function requireLinearPipingInterfaceSet(record) {
   requireHash(record.profileSemanticHash, 'interfaceSet.profileSemanticHash');
   requireHash(record.mechanicalModelSemanticHash, 'interfaceSet.mechanicalModelSemanticHash');
   requireHash(record.stiffnessStateHash, 'interfaceSet.stiffnessStateHash');
-  requireHash(record.supportAttachmentModelSemanticHash, 'interfaceSet.supportAttachmentModelSemanticHash', true);
-  requireHash(record.restraintCapabilityModelSemanticHash, 'interfaceSet.restraintCapabilityModelSemanticHash', true);
+  requireNullableHash(record.supportAttachmentModelSemanticHash, 'interfaceSet.supportAttachmentModelSemanticHash');
+  requireNullableHash(record.restraintCapabilityModelSemanticHash, 'interfaceSet.restraintCapabilityModelSemanticHash');
   requireArray(record.interfaces, 'interfaceSet.interfaces');
   for (const [index, definition] of record.interfaces.entries()) {
     exactKeys(definition, INTERFACE_DEFINITION_KEYS, `interfaceSet.interfaces[${index}]`);
