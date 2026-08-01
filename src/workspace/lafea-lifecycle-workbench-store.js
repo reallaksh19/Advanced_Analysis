@@ -15,6 +15,7 @@ import {
   createLafeaSourceAuthorityEvent,
   issueLafeaSourceAuthority,
 } from './lafea-source-authority.js';
+import { lafeaStageInputDescriptors } from './lafea-stage-input-descriptors.js';
 import {
   LAFEA_LIFECYCLE_BINDING_SCHEMA,
   LAFEA_LIFECYCLE_BINDING_STATUSES,
@@ -141,10 +142,21 @@ export function createLafeaWorkbenchStore(options) {
 
   function resolveChangeClass(stageId, beforeDigest, afterDigest, stage, explicitClass) {
     if (SOURCE_CHANGE_CLASSES.has(explicitClass)) return explicitClass;
-    const descriptorClass = stage.lastEditResult?.descriptor?.invalidation?.invalidationClass;
+    const descriptorClass = changeClassFromDescriptorDigest(
+      stageId,
+      stage.lastEditResult?.audit?.descriptorDigest,
+    );
     if (SOURCE_CHANGE_CLASSES.has(descriptorClass)) return descriptorClass;
     const remembered = transitionClasses[stageId].get(`${beforeDigest}->${afterDigest}`);
     return SOURCE_CHANGE_CLASSES.has(remembered) ? remembered : 'GEOMETRY';
+  }
+
+  function changeClassFromDescriptorDigest(stageId, descriptorDigest) {
+    if (typeof descriptorDigest !== 'string') return null;
+    const descriptor = lafeaStageInputDescriptors(stageId).find(
+      (candidate) => lafeaDocumentDigest(candidate) === descriptorDigest,
+    );
+    return descriptor?.invalidation?.invalidationClass ?? null;
   }
 
   function rememberTransition(stageId, beforeDigest, afterDigest, changeClass) {
