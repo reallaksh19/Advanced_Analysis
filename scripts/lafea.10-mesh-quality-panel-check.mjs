@@ -74,7 +74,7 @@ assert.equal(shellPanel.rows.length, 2);
 // than rendered as if it had been understood and gated. ---
 assert.throws(
   () => buildMeshQualityPanel([{ metric: 'INVENTED_METRIC', value: 1, status: 'OK' }], { stageId: 'LAFEA.3', meshProfileIdentity: 'P' }),
-  /not a known .*gate metric/,
+  /not a known mesh-quality metric/,
 );
 assert.throws(
   () => buildMeshQualityPanel([{ metric: 'ASPECT_RATIO', value: Number.NaN, status: 'OK' }], { stageId: 'LAFEA.3', meshProfileIdentity: 'P' }),
