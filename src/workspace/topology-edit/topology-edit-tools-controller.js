@@ -19,6 +19,16 @@ export const EDIT_TOOLS = Object.freeze({
   SPLIT_EDGE: 'split-edge',
   ROTATE_SUBGRAPH: 'rotate-subgraph',
   BRIDGE_GAP: 'bridge-gap',
+  DELETE_ENTITY: 'delete-entity',
+  MEASURE: 'measure',
+  RUN_AUTOFIX: 'run-autofix',
+  ADD_NODE: 'add-node',
+  ADD_ELBOW: 'add-elbow',
+  ADD_TEE: 'add-tee',
+  ADD_VALVE: 'add-valve',
+  ADD_ANCHOR: 'add-anchor',
+  ADD_HANGER: 'add-hanger',
+  ADD_RESTRAINT: 'add-restraint',
 });
 
 export class TopologyEditToolsController {

@@ -55,13 +55,30 @@ export class ThreeViewportBackend {
 
   mount(hostElement) {
     if (!hostElement) throw new TypeError('Three viewport requires a host element.');
+    if (this.renderer) {
+      this.destroy();
+    }
     this.hostElement = hostElement;
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio || 1, 2));
     this.renderer.setClearColor(0x020711, 1);
     this.renderer.domElement.className = 'viewport-canvas';
     this.renderer.domElement.dataset.viewportBackend = 'webgl';
     this.renderer.domElement.setAttribute('aria-label', 'Read-only WebGL model viewport');
+
+    // WebGL Context Lost & Restored Event Handlers
+    this.renderer.domElement.addEventListener('webglcontextlost', (event) => {
+      event.preventDefault();
+      if (this.animationFrame) cancelAnimationFrame(this.animationFrame);
+      this.animationFrame = 0;
+      console.warn('⚠️ ThreeViewportBackend: WebGL Context Lost. Pausing frame loop.');
+    }, false);
+
+    this.renderer.domElement.addEventListener('webglcontextrestored', () => {
+      console.log('⚡ ThreeViewportBackend: WebGL Context Restored. Rebuilding scene.');
+      if (this.model) this.renderModel(this.model);
+      this.startAnimation();
+    }, false);
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10000);

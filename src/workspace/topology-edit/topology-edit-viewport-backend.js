@@ -65,10 +65,22 @@ export class TopologyEditViewportBackend {
     const width = host.clientWidth || 800;
     const height = host.clientHeight || 500;
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.setClearColor(0x020617, 1);
+
+    this.renderer.domElement.addEventListener('webglcontextlost', (event) => {
+      event.preventDefault();
+      if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+      console.warn('⚠️ TopologyEditViewportBackend: WebGL Context Lost. Pausing animation loop.');
+    }, false);
+
+    this.renderer.domElement.addEventListener('webglcontextrestored', () => {
+      console.log('⚡ TopologyEditViewportBackend: WebGL Context Restored. Resuming render loop.');
+      this.startRenderLoop();
+    }, false);
 
     host.replaceChildren(this.renderer.domElement);
     this.camera.aspect = width / height;
