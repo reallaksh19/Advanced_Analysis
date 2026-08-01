@@ -3,6 +3,7 @@ name: LFEA Piping Phase 6F Certification
 on:
   pull_request:
     paths:
+      - 'scripts/lfea-piping-internal-evidence-plan.mjs'
       - 'scripts/lfea-piping-internal-evidence-collector.mjs'
       - 'scripts/lfea-piping-internal-evidence-collector-check.mjs'
       - 'scripts/lfea-piping-phase6f-anti-drift-check.mjs'
