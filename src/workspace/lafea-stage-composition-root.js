@@ -16,6 +16,9 @@ export function requireLafeaStageComposition(stageId) {
   }
   const executionSupported = entry.engineState === 'QUALIFIED_ROUTE_REGISTERED';
   validateExecutionBinding(stageId, binding.componentIds, executionSupported);
+  const productAssessmentSupported =
+    typeof binding.componentIds.productAssessment === 'string';
+  const handoffSupported = typeof binding.componentIds.handoff === 'string';
   return Object.freeze({
     schema: LAFEA_STAGE_COMPOSITION_SCHEMA,
     stageId,
@@ -27,6 +30,8 @@ export function requireLafeaStageComposition(stageId) {
     releaseStateBinding: binding.releaseStateBinding,
     previewSource: entry.previewSource,
     executionSupported,
+    productAssessmentSupported,
+    handoffSupported,
     normalizeDocument: (input) => component('NORMALIZER', binding.componentIds.normalizer)(input, 'document'),
     normalizeEdit: (input) => component('NORMALIZER', binding.componentIds.normalizer)(input, 'edit'),
     canonicalize: executionSupported
@@ -46,6 +51,13 @@ export function requireLafeaStageComposition(stageId) {
         stageId,
         component('UNIT_RESOLVER', binding.componentIds.unitResolver)(documentValue),
       )
+      : null,
+    evaluateProductAssessment: productAssessmentSupported
+      ? (input) => component('PRODUCT_ASSESSMENT',
+        binding.componentIds.productAssessment)(input)
+      : null,
+    createHandoff: handoffSupported
+      ? (input) => component('HANDOFF', binding.componentIds.handoff)(input)
       : null,
   });
 }
@@ -74,6 +86,15 @@ function validateExecutionBinding(stageId, componentIds, executionSupported) {
         throw new TypeError(`${stageId} unsupported composition must not bind ${key}.`);
       }
     }
+  }
+  for (const key of ['productAssessment', 'handoff']) {
+    if (componentIds[key] !== null
+      && (typeof componentIds[key] !== 'string' || !componentIds[key])) {
+      throw new TypeError(`${stageId} composition has invalid optional ${key}.`);
+    }
+  }
+  if ((componentIds.productAssessment === null) !== (componentIds.handoff === null)) {
+    throw new TypeError(`${stageId} product assessment and handoff bindings must be paired.`);
   }
 }
 
