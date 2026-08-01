@@ -157,7 +157,10 @@ function run() {
     /LAFEA_RENDER_LIFECYCLE_RESULT_NOT_READY/u,
   );
 
-  assert.equal(publicSurface.mountLafeaHybridResultViewport, mountLafeaHybridResultViewport);
+  assert.notStrictEqual(
+    publicSurface.mountLafeaHybridResultViewport,
+    mountLafeaHybridResultViewport,
+  );
   const coordinatorSource = fs.readFileSync(
     path.join(ROOT, 'src/workspace/lafea-hybrid-result-viewport.js'),
     'utf8',
@@ -204,6 +207,7 @@ function run() {
     blockedRenderer: 'SVG',
     sourceOverlayAlwaysVisible: true,
     exactSourceSelection: true,
+    publicFacadeIsolated: true,
     webglFallbackUsed: false,
     contextRestoreRequiresRefresh: true,
     liveWorkbenchMounted: false,
