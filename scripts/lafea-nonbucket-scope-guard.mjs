@@ -69,7 +69,8 @@ assert.match(lifecycleProfiles, /ANALYTICAL_FOUNDATION_V1/u);
 assert.match(lifecycleProfiles, /FEA_MESH_RECOVERY_V1/u);
 assert.match(lifecycle, /lafea-analysis-lifecycle\/v2/u);
 assert.match(sourceAuthority, /lafea-source-authority\/v1/u);
-assert.match(sourceAuthority, /LAFEA_CANONICAL_JSON_SHA256_V1/u);
+assert.match(sourceAuthority,
+  /canonicalizationProfile:\s*LAFEA_CANONICAL_SHA256_PROFILE/u);
 assert.match(sourceAuthority, /sourceAuthorityDocument/u);
 assert.doesNotMatch(sourceAuthority, /sourceHash:\s*lafeaDocumentDigest/u);
 assert.match(producers, /lafea-lifecycle-producer-batch\/v1/u);
