@@ -1,0 +1,157 @@
+{
+  "schema": "TopologyEditBehaviorDisposition.v1",
+  "sourceRepository": "reallaksh19/XML_Compare_Utilities",
+  "sourceCommit": "c20bb037566d52ba5b789712594b754a5fb94651",
+  "targetRepository": "reallaksh19/Advanced_Analysis",
+  "baselineTargetCommit": "5b0dad3d1e5566a73d8e2f37420269476eaf15e9",
+  "classificationValues": [
+    "AS_IS",
+    "WRAPPED",
+    "FORKED",
+    "REFERENCE_ONLY"
+  ],
+  "scopeRoots": [
+    "src/workspace/topology-edit",
+    "src/workspace/topology-edit-3d-view-controller.js"
+  ],
+  "modules": [
+    {
+      "targetPath": "src/workspace/topology-edit-3d-view-controller.js",
+      "classification": "FORKED",
+      "authority": "Wave0 retained phase-one controller; Wave1/Wave4 replacement authority",
+      "status": "PHASE_ONE_RETAINED_NOT_CERTIFIED"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-autofix-controller.js",
+      "classification": "FORKED",
+      "authority": "Wave3 checker/ghost/autofix authority",
+      "status": "PHASE_ONE_SUBSET"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-autofix-grouper.js",
+      "classification": "FORKED",
+      "authority": "Wave3 checker/ghost/autofix authority",
+      "status": "PHASE_ONE_SUBSET"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-baseline-manifest.js",
+      "classification": "REFERENCE_ONLY",
+      "authority": "Wave0 governance evidence",
+      "status": "GOVERNANCE"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-canvas-callout.js",
+      "classification": "WRAPPED",
+      "authority": "Source canvas/navigation UX contract",
+      "status": "PHASE_ONE_RETAINED"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-checker.js",
+      "classification": "FORKED",
+      "authority": "Wave3 checker authority",
+      "status": "PHASE_ONE_SUBSET"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-command-journal.js",
+      "classification": "FORKED",
+      "authority": "P2/Wave1 certifying journal contract",
+      "status": "BLOCKING_NOT_CERTIFIED"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-commit-service.js",
+      "classification": "FORKED",
+      "authority": "Wave4 prepared StagedJSON commit contract",
+      "status": "PHASE_ONE_NOT_CERTIFIED"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-export.js",
+      "classification": "FORKED",
+      "authority": "Wave4 prepared export contract",
+      "status": "SCAFFOLDING"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-gesture-handler.js",
+      "classification": "WRAPPED",
+      "authority": "Source gesture semantics",
+      "status": "PHASE_ONE_RETAINED"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-large-model-controller.js",
+      "classification": "FORKED",
+      "authority": "Wave5 qualification authority",
+      "status": "SCAFFOLDING"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-persistence.js",
+      "classification": "FORKED",
+      "authority": "Wave4 source-bound draft contract",
+      "status": "SCAFFOLDING"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-picking-contract.js",
+      "classification": "FORKED",
+      "authority": "Wave2 canonical picking identity contract",
+      "status": "PHASE_ONE_RETAINED"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-render-model.js",
+      "classification": "FORKED",
+      "authority": "Wave2 pure visual geometry authority",
+      "status": "PHASE_ONE_VISUAL_SUBSET"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-scope-contract.js",
+      "classification": "FORKED",
+      "authority": "Wave5 full-model/scoped-projection authority",
+      "status": "SCAFFOLDING"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-source-adapter.js",
+      "classification": "FORKED",
+      "authority": "P2 source adapter and identity crosswalk authority",
+      "status": "PHASE_ONE_RETAINED"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-support-overlay.js",
+      "classification": "FORKED",
+      "authority": "P3A/Wave2 restraint-semantic overlay authority",
+      "status": "VISUAL_SUBSET_NOT_SEMANTIC_AUTHORITY"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-tools-controller.js",
+      "classification": "FORKED",
+      "authority": "Source capability registry plus target UI adapter",
+      "status": "PHASE_ONE_RETAINED"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-view-state.js",
+      "classification": "FORKED",
+      "authority": "Target UI-state contract; never canonical authority",
+      "status": "PHASE_ONE_RETAINED"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-viewport-backend.js",
+      "classification": "WRAPPED",
+      "authority": "Source canvas and visual-model contracts",
+      "status": "PHASE_ONE_RETAINED"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-worker-client.js",
+      "classification": "FORKED",
+      "authority": "Wave5 worker cancellation/stale-result authority",
+      "status": "SCAFFOLDING"
+    },
+    {
+      "targetPath": "src/workspace/topology-edit/topology-edit-worker.js",
+      "classification": "FORKED",
+      "authority": "Wave5 worker execution authority",
+      "status": "SCAFFOLDING"
+    }
+  ],
+  "deferredBehavior": [
+    "The existing command journal is retained as phase-one behavior and is not certifying authority.",
+    "The existing support overlay is retained as visual evidence and is not restraint-semantic authority.",
+    "Workspace commit remains outside Wave 0 and is not qualified by this disposition.",
+    "Large-model scaffolding is not performance qualification."
+  ]
+}
