@@ -50,7 +50,8 @@ jobs:
 
       - name: Confirm workflow-only bootstrap scope
         if: steps.correction.outputs.present != 'true'
-        run: echo 'Workflow bootstrap only; issue #93 behavior is not qualified on this head.'
+        run: |
+          echo 'Workflow bootstrap only; issue #93 behavior is not qualified on this head.'
 
       - name: Install repository dependencies
         if: steps.correction.outputs.present == 'true'
