@@ -84,9 +84,11 @@ for (const stageId of ['LAFEA.3', 'LAFEA.4', 'LAFEA.5']) {
   const store = createLafeaWorkbenchStore({ initialStage: stageId, initialDocument: document });
   store.run();
   const stage = store.getState().stages[stageId];
+  const meshRecord = stage.lifecycle.artifacts.ANALYSIS_MESH;
   assert.equal(stage.execution.status, 'QUALIFIED');
-  assert.equal(stage.lifecycle.artifacts.ANALYSIS_MESH.authority,
-    'CALLER_AUTHORED_SOURCE_MESH_ONLY');
+  assert.equal(meshRecord.status, 'CURRENT');
+  assert.match(meshRecord.parentHashes.meshProfileHash, /^sha256:[0-9a-f]{64}$/u);
+  assert.match(meshRecord.producerRef, /^NB-T2\//u);
   assert.equal(stage.lifecycle.artifacts.RECOVERY.status, 'CURRENT');
   assert.equal(stage.lifecycle.artifacts.CONVERGENCE, undefined);
   assert.equal(stage.lifecycleReadiness.resultState, 'RESULT_READY');
