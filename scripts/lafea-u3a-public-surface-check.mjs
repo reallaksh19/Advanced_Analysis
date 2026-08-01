@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
+import * as analyticalHandoff from '../src/core/lafea-analytical-handoff.js';
+import * as screeningProduct from '../src/core/local-attachment-screening/index.js';
+import * as foundationProduct from '../src/core/local-stress/index.js';
+import * as foundationHandoff from '../src/core/local-stress/finite-footprint-handoff.js';
 import * as compositionBindings from '../src/workspace/lafea-stage-composition-bindings.js';
 import * as compositionRoot from '../src/workspace/lafea-stage-composition-root.js';
 import * as hash from '../src/workspace/lafea-canonical-sha256.js';
@@ -25,6 +29,26 @@ const groups = Object.freeze([
   [compositionRoot, [
     'LAFEA_STAGE_COMPOSITION_SCHEMA', 'lafeaStageCompositionIdentity',
     'requireLafeaStageComposition',
+  ]],
+  [analyticalHandoff, [
+    'LAFEA_ANALYTICAL_HANDOFF_LIMITATIONS', 'LAFEA_ANALYTICAL_HANDOFF_SCHEMA',
+    'LAFEA_ANALYTICAL_HANDOFF_TARGETS', 'createValidatedLafeaAnalyticalHandoff',
+    'validateLafeaAnalyticalHandoff',
+  ]],
+  [foundationProduct, [
+    'FINITE_FOOTPRINT_DISTRIBUTION_RULE', 'FINITE_FOOTPRINT_LIMITATIONS',
+    'FINITE_FOOTPRINT_REQUEST_SCHEMA', 'FINITE_FOOTPRINT_RESULT_SCHEMA',
+    'FINITE_FOOTPRINT_TYPES', 'compileFiniteFootprintDistribution',
+    'validateFiniteFootprintDistribution',
+  ]],
+  [foundationHandoff, ['createFiniteFootprintHandoff']],
+  [screeningProduct, [
+    'SCREENING_APPLICABILITY_KINDS', 'SCREENING_APPLICABILITY_STATUSES',
+    'SCREENING_PRODUCT_LIMITATIONS', 'SCREENING_PRODUCT_REQUEST_SCHEMA',
+    'SCREENING_PRODUCT_RESULT_SCHEMA', 'SCREENING_PRODUCT_STATES',
+    'createLocalAttachmentScreeningHandoff',
+    'evaluateLocalAttachmentScreeningProduct',
+    'validateLocalAttachmentScreeningProduct',
   ]],
   [lifecycle, [
     'LAFEA_ARTIFACT_KINDS', 'LAFEA_ARTIFACT_RECORD_SCHEMA',
@@ -69,7 +93,11 @@ for (const [module, names] of groups) {
   for (const name of names) {
     assert.ok(name in module, `Authority module is missing ${name}.`);
     assert.ok(name in publicApi, `Public workbench surface is missing ${name}.`);
-    assert.strictEqual(publicApi[name], module[name], `${name} must be re-exported without wrapping.`);
+    assert.strictEqual(
+      publicApi[name],
+      module[name],
+      `${name} must be re-exported without wrapping.`,
+    );
     exported.push(name);
   }
 }
@@ -84,6 +112,9 @@ assert.equal(publicApi.LAFEA_PRODUCER_BATCH_SCHEMA, 'lafea-lifecycle-producer-ba
 assert.equal(publicApi.LAFEA_WORKBENCH_STATE_SCHEMA, 'lafea-workbench-state/v2');
 assert.equal(publicApi.requireLafeaStageComposition('LAFEA.1').releaseStateBinding,
   'RELEASE_NOT_QUALIFIED');
+assert.equal(publicApi.requireLafeaStageComposition('LAFEA.1').productAssessmentSupported,
+  true);
+assert.equal(publicApi.requireLafeaStageComposition('LAFEA.2').handoffSupported, true);
 assert.deepEqual(publicApi.lafeaLifecycleArtifactKinds('LAFEA.1'), [
   'CANONICAL_MODEL', 'EXECUTION', 'RESULT_EVIDENCE', 'REPORT_EVIDENCE',
 ]);
@@ -95,6 +126,7 @@ console.log(JSON.stringify({
   exportedContracts: exported,
   sourceAuthorityPublic: true,
   producerAdaptersPublic: true,
+  analyticalProductVerticalsPublic: true,
   calculationResultCodeReleaseStatesPublic: true,
   stageCorrectProfilesPublic: true,
   registryV2Implemented: true,
