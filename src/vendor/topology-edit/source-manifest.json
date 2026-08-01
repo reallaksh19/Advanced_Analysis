@@ -206,7 +206,11 @@
       "id": "journal-and-replay",
       "treatment": "FORKED",
       "targetPaths": [
+        "src/workspace/topology-edit/topology-edit-authority-receipt.js",
+        "src/workspace/topology-edit/topology-edit-candidate-builder.js",
+        "src/workspace/topology-edit/topology-edit-candidate-validator.js",
         "src/workspace/topology-edit/topology-edit-canonical-state.js",
+        "src/workspace/topology-edit/topology-edit-certification-service.js",
         "src/workspace/topology-edit/topology-edit-command-contract.js",
         "src/workspace/topology-edit/topology-edit-command-resolver.js",
         "src/workspace/topology-edit/topology-edit-command-journal.js",
@@ -219,7 +223,7 @@
         "tabs/topology-trace-validator/topology-sequential-split-edge-request.js"
       ],
       "contractAuthority": "P2_EDIT_SESSION_AUTHORITY",
-      "status": "W1_1_PURE_KERNEL_FOUNDATION"
+      "status": "W1_2_CANDIDATE_CERTIFICATION"
     },
     {
       "id": "checker-and-fix-suggestions",
