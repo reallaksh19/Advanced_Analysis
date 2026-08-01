@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
-import { WORKSPACE_DATASET_SCHEMA } from '../src/workspace/dataset-adapter.js';
+import { normalizeWorkspaceDataset } from '../src/workspace/dataset-adapter.js';
 import { WorkspaceStateStore } from '../src/workspace/workspace-state.js';
 import { SequentialCommandGateway } from '../src/workspace/sequential-sketcher/sequential-command-gateway.js';
 import {
@@ -79,7 +79,7 @@ assert.equal(bridge.getState().status, 'IDLE');
 assert.equal(bridge.getState().preview, null);
 assert.equal(previews.at(-1), null);
 assert.deepEqual(
-  workspaceState.getSnapshot().dataset.entities[0].properties.geometry,
+  primaryGeometry(workspaceState.getSnapshot().dataset.entities[0]),
   {
     start: { x: 25, y: -10, z: 5 },
     end: { x: 125, y: -10, z: 5 },
@@ -169,40 +169,41 @@ function begin(targetBridge, gestureId, pointerId) {
 }
 
 function dataset(datasetId, version) {
-  return {
-    schema: WORKSPACE_DATASET_SCHEMA,
-    datasetId,
-    version,
-    sourceSchema: 'SIMULATED',
-    sourceName: '[SIMULATED] sequential authoring bridge',
-    entities: [
-      entity('PIPE-1', 'PIPE', 'pipe', {
-        start: { x: 0, y: 0, z: 0 },
-        end: { x: 100, y: 0, z: 0 },
-        center: { x: 50, y: 0, z: 0 },
+  const normalized = normalizeWorkspaceDataset({
+    schema: 'inputxml-managed-stage/v1',
+    packageHash: datasetId,
+    unit: 'mm',
+    project: { name: `${datasetId} sequential authoring bridge` },
+    objects: [
+      sourceEntity('PIPE-1', 'PIPE', {
+        startPoint: [0, 0, 0],
+        endPoint: [100, 0, 0],
+        center: [50, 0, 0],
       }),
-      entity('SUPPORT-1', 'SUPP', 'support', {
-        start: { x: 50, y: 0, z: 0 },
-        end: { x: 50, y: 0, z: 0 },
-        center: { x: 50, y: 0, z: 0 },
+      sourceEntity('SUPPORT-1', 'SUPP', {
+        startPoint: [50, 0, 0],
+        endPoint: [50, 0, 0],
+        center: [50, 0, 0],
       }),
     ],
+  }, `[SIMULATED] ${datasetId} sequential authoring bridge`);
+  return Object.freeze({ ...normalized, version });
+}
+
+function sourceEntity(id, type, nativeParams) {
+  return {
+    id,
+    name: id,
+    type,
+    sourcePath: `/${id}`,
+    nativeParams,
+    attributes: { TYPE: type },
   };
 }
 
-function entity(entityId, entityType, category, geometry) {
-  return {
-    entityId,
-    sourceEntityId: entityId,
-    name: entityId,
-    entityType,
-    category,
-    properties: {
-      identity: { entityId, name: entityId, entityType },
-      geometry,
-      attributes: {},
-    },
-  };
+function primaryGeometry(entity) {
+  const { start, end, center } = entity.properties.geometry;
+  return structuredClone({ start, end, center });
 }
 
 function createFakeEventTarget() {

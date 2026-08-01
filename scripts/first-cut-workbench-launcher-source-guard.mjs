@@ -13,12 +13,15 @@ assert.match(launcher, /first-cut-workbench-launcher\/v1/u);
 assert.match(launcher, /\[data-section-id="first-cut"\]/u);
 assert.match(launcher, /\[data-role="first-cut-workbench-root"\]/u);
 assert.match(launcher, /\[data-panel="viewport"\]/u);
-assert.match(launcher, /\[data-action="switch-right-tab"\]\[data-tab="overrides"\]/u);
-assert.match(launcher, /\[data-tab-group="overrides"\]/u);
-assert.match(launcher, /ensureOverridesVisible\(\)/u);
-assert.match(launcher, /FIRST_CUT_LAUNCHER_OVERRIDES_NOT_ACTIVATED/u);
+assert.match(launcher, /\.properties-panel/u);
+assert.match(launcher, /\[data-action="toggle-properties-collapse"\]/u);
+assert.match(launcher, /workspace-panel--collapsed/u);
+assert.match(launcher, /ensurePropertiesVisible\(\)/u);
+assert.match(launcher, /FIRST_CUT_LAUNCHER_PROPERTIES_NOT_EXPANDED/u);
+assert.doesNotMatch(launcher, /switch-right-tab|data-tab-group="overrides"/u);
+assert.doesNotMatch(launcher, /properties-collapsed/u);
 assert.match(launcher, /first-cut-workbench-action-bar/u);
-assert.match(launcher, /viewportPanel\.append\(this\.actionBar\)/u);
+assert.match(launcher, /viewport\.append\(this\.actionBar\)/u);
 assert.match(launcher, /display: 'flex'/u);
 assert.match(launcher, /flex: 'none'/u);
 assert.doesNotMatch(launcher, /viewport-edit-bar/u);
@@ -26,13 +29,21 @@ assert.doesNotMatch(launcher, /queueMicrotask|requestAnimationFrame|setTimeout/u
 assert.doesNotMatch(launcher, /const (?:TOOLBAR|ACTION_BAR)_SELECTOR = '\.viewport-toolbar'/u);
 assert.match(launcher, /\[data-role="first-cut-workbench-focus"\]/u);
 assert.match(launcher, /\[data-role="first-cut-workbench-popout"\]/u);
-assert.match(launcher, /accordion-section-header/u);
 assert.match(launcher, /accordion-popout-btn/u);
+assert.match(launcher, /handleSectionPopout/u);
+assert.match(launcher, /openPopup\(\)/u);
+assert.match(launcher, /dockWorkbench\(\)/u);
+assert.match(launcher, /panel-popup-overlay/u);
+assert.match(launcher, /panel-popup-window/u);
+assert.match(launcher, /panel-popup-body/u);
+assert.match(launcher, /popup-dock/u);
+assert.match(launcher, /this\.section\.append\(this\.sectionBody\)/u);
 assert.match(launcher, /hostIdentityRetained/u);
 assert.match(launcher, /scrollIntoView/u);
 assert.match(launcher, /focus\?\./u);
 assert.match(launcher, /FIRST_CUT_LAUNCHER_UNIQUE_TARGET_REQUIRED/u);
 assert.match(launcher, /FIRST_CUT_LAUNCHER_ACTION_BAR_ALREADY_PRESENT/u);
+assert.doesNotMatch(launcher, /FIRST_CUT_LAUNCHER_POPOUT_NOT_ACTIVATED/u);
 assert.doesNotMatch(
   launcher,
   /FirstCutWorkbenchController|FirstCutWorkbenchStore|FirstCutResultStore/u,
@@ -103,11 +114,13 @@ console.log(JSON.stringify({
   enrichmentControllerCount: 1,
   launcherOwnedActionBand: true,
   actionBarVisibleAcrossViewportModes: true,
-  owningPropertiesTabActivated: true,
-  hiddenPropertiesGroupFocused: false,
+  currentPropertiesPanelContract: true,
+  governedPopupOwned: true,
+  sectionPopoutBound: true,
+  dockRestorationBound: true,
+  obsoleteRightTabContractRetained: false,
   timingWorkaroundUsed: false,
   hiddenViewportEditBarUsed: false,
-  heightCappedViewportToolbarUsed: false,
   hostReused: true,
   secondOverrideStoreCreated: false,
   calculationAuthorityImported: false,

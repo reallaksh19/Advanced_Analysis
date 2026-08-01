@@ -10,15 +10,7 @@ function run() {
   const fixture = createFixture();
   const launcher = new FirstCutWorkbenchLauncherController(fixture.root);
   const initial = launcher.init();
-  assert.deepEqual(initial, {
-    schema: FIRST_CUT_WORKBENCH_LAUNCHER_SCHEMA,
-    status: 'READY',
-    focusCount: 0,
-    popoutCount: 0,
-    lastMode: null,
-    hostIdentityRetained: true,
-    poppedOut: false,
-  });
+  assert.deepEqual(initial, state('READY', 0, 0, null, false));
   assert.equal(Object.isFrozen(initial), true);
   assert.deepEqual(launcher.init(), initial);
   assert.equal(fixture.actionHost.querySelectorAll(
@@ -27,57 +19,51 @@ function run() {
   assert.equal(fixture.actionHost.querySelectorAll(
     '[data-role="first-cut-workbench-launcher"]',
   ).length, 1);
-  assert.equal(fixture.overridesGroup.style.display, 'none');
+  assert.equal(
+    fixture.propertiesPanel.classList.contains('workspace-panel--collapsed'),
+    true,
+  );
 
   const originalHost = fixture.host;
   fixture.focusButton().click();
-  assert.equal(fixture.shell.classList.contains('properties-collapsed'), false);
-  assert.equal(fixture.overridesGroup.style.display, 'flex');
+  assert.equal(
+    fixture.propertiesPanel.classList.contains('workspace-panel--collapsed'),
+    false,
+  );
   assert.equal(fixture.section.classList.contains('accordion-collapsed'), false);
-  assert.strictEqual(fixture.root.querySelector(
-    '[data-role="first-cut-workbench-root"]',
-  ), originalHost);
+  assert.strictEqual(fixture.root.querySelector(HOST), originalHost);
   assert.equal(originalHost.focusCount, 1);
   assert.equal(originalHost.scrollCount, 1);
   assert.equal(originalHost.getAttribute('tabindex'), '-1');
-  assert.deepEqual(launcher.getState(), {
-    schema: FIRST_CUT_WORKBENCH_LAUNCHER_SCHEMA,
-    status: 'READY',
-    focusCount: 1,
-    popoutCount: 0,
-    lastMode: 'FOCUS',
-    hostIdentityRetained: true,
-    poppedOut: false,
-  });
+  assert.deepEqual(launcher.getState(), state('READY', 1, 0, 'FOCUS', false));
 
   fixture.popoutButton().click();
   assert.equal(fixture.section.classList.contains('is-popped-out'), true);
-  assert.strictEqual(fixture.root.querySelector(
-    '[data-role="first-cut-workbench-root"]',
-  ), originalHost);
+  assert.equal(fixture.root.querySelectorAll(POPUP).length, 1);
+  assert.equal(fixture.root.querySelector(POPUP).style.display, 'flex');
+  assert.strictEqual(fixture.root.querySelector(HOST), originalHost);
+  assert.equal(fixture.root.querySelector(BODY).contains(originalHost), true);
   assert.equal(originalHost.focusCount, 2);
   assert.equal(originalHost.scrollCount, 2);
-  assert.deepEqual(launcher.getState(), {
-    schema: FIRST_CUT_WORKBENCH_LAUNCHER_SCHEMA,
-    status: 'READY',
-    focusCount: 1,
-    popoutCount: 1,
-    lastMode: 'POPOUT',
-    hostIdentityRetained: true,
-    poppedOut: true,
-  });
+  assert.deepEqual(launcher.getState(), state('READY', 1, 1, 'POPOUT', true));
+
+  fixture.dockButton().click();
+  assert.equal(fixture.root.querySelectorAll(POPUP).length, 0);
+  assert.equal(fixture.section.classList.contains('is-popped-out'), false);
+  assert.equal(fixture.section.contains(originalHost), true);
+  assert.deepEqual(launcher.getState(), state('READY', 1, 1, 'POPOUT', false));
+
+  fixture.sectionPopout.click();
+  assert.equal(fixture.root.querySelectorAll(POPUP).length, 1);
+  assert.deepEqual(launcher.getState(), state('READY', 1, 2, 'POPOUT', true));
 
   launcher.destroy();
   launcher.destroy();
   assert.equal(fixture.actionHost.querySelectorAll(
     '[data-role="first-cut-workbench-action-bar"]',
   ).length, 0);
-  assert.equal(fixture.actionHost.querySelectorAll(
-    '[data-role="first-cut-workbench-launcher"]',
-  ).length, 0);
-  assert.strictEqual(fixture.root.querySelector(
-    '[data-role="first-cut-workbench-root"]',
-  ), originalHost);
+  assert.equal(fixture.root.querySelectorAll(POPUP).length, 0);
+  assert.strictEqual(fixture.root.querySelector(HOST), originalHost);
   assert.equal(launcher.getState().status, 'DESTROYED');
   assert.throws(
     () => launcher.focusWorkbench(),
@@ -90,7 +76,7 @@ function run() {
   assert.throws(
     () => new FirstCutWorkbenchLauncherController(duplicateFixture.root).init(),
     (error) => error.code === 'FIRST_CUT_LAUNCHER_UNIQUE_TARGET_REQUIRED'
-      && error.evidence.selector === '[data-role="first-cut-workbench-root"]'
+      && error.evidence.selector === HOST
       && error.evidence.count === 2,
   );
 
@@ -100,9 +86,12 @@ function run() {
     launcherSchema: FIRST_CUT_WORKBENCH_LAUNCHER_SCHEMA,
     actionBarMountCount: 1,
     actionBarVisibleAcrossViewportModes: true,
-    owningPropertiesTabActivated: true,
+    currentPropertiesPanelExpanded: true,
     focusCount: 1,
-    popoutCount: 1,
+    popoutCount: 2,
+    toolbarPopoutProven: true,
+    sectionPopoutProven: true,
+    dockRestoreProven: true,
     hostIdentityRetained: true,
     duplicateHostRejected: true,
     launcherDestroyIdempotent: true,
@@ -111,57 +100,66 @@ function run() {
   }));
 }
 
+const HOST = '[data-role="first-cut-workbench-root"]';
+const POPUP = '[data-role="panel-popup-overlay"]';
+const BODY = '[data-role="panel-popup-body"]';
+
+function state(status, focusCount, popoutCount, lastMode, poppedOut) {
+  return {
+    schema: FIRST_CUT_WORKBENCH_LAUNCHER_SCHEMA,
+    status,
+    focusCount,
+    popoutCount,
+    lastMode,
+    hostIdentityRetained: status !== 'DESTROYED',
+    poppedOut,
+  };
+}
+
 function createFixture() {
   const documentRef = new FakeDocument();
   const root = documentRef.createElement('main');
   const shell = documentRef.createElement('section');
-  shell.classList.add('workspace-shell', 'properties-collapsed');
+  shell.classList.add('workspace-shell');
   const actionHost = documentRef.createElement('section');
   actionHost.dataset.panel = 'viewport';
 
+  const propertiesPanel = documentRef.createElement('aside');
+  propertiesPanel.classList.add('properties-panel', 'workspace-panel--collapsed');
   const toggle = documentRef.createElement('button');
   toggle.dataset.action = 'toggle-properties-collapse';
-  toggle.onClick = () => shell.classList.remove('properties-collapsed');
-
-  const overridesTab = documentRef.createElement('button');
-  overridesTab.dataset.action = 'switch-right-tab';
-  overridesTab.dataset.tab = 'overrides';
-  const overridesGroup = documentRef.createElement('div');
-  overridesGroup.dataset.tabGroup = 'overrides';
-  overridesGroup.style.display = 'none';
-  overridesTab.onClick = () => { overridesGroup.style.display = 'flex'; };
+  toggle.onClick = () => propertiesPanel.classList.remove('workspace-panel--collapsed');
 
   const section = documentRef.createElement('section');
   section.dataset.sectionId = 'first-cut';
   section.classList.add('properties-accordion-section', 'accordion-collapsed');
   const header = documentRef.createElement('header');
   header.classList.add('accordion-section-header');
-  header.onClick = () => section.classList.remove('accordion-collapsed');
-  const popout = documentRef.createElement('button');
-  popout.classList.add('accordion-popout-btn');
-  popout.onClick = () => section.classList.add('is-popped-out');
-  header.append(popout);
+  const sectionPopout = documentRef.createElement('button');
+  sectionPopout.classList.add('accordion-popout-btn');
+  header.append(sectionPopout);
   const body = documentRef.createElement('div');
   body.classList.add('accordion-section-body');
   const host = documentRef.createElement('div');
   host.dataset.role = 'first-cut-workbench-root';
   body.append(host);
   section.append(header, body);
-  overridesGroup.append(section);
-  shell.append(actionHost, toggle, overridesTab, overridesGroup);
+  propertiesPanel.append(toggle, section);
+  shell.append(actionHost, propertiesPanel);
   root.append(shell);
   documentRef.connect(root);
 
   return {
     document: documentRef,
     root,
-    shell,
     actionHost,
-    overridesGroup,
+    propertiesPanel,
     section,
+    sectionPopout,
     host,
     focusButton: () => root.querySelector('[data-role="first-cut-workbench-focus"]'),
     popoutButton: () => root.querySelector('[data-role="first-cut-workbench-popout"]'),
+    dockButton: () => root.querySelector('[data-action="popup-dock"]'),
   };
 }
 
@@ -190,7 +188,6 @@ class FakeElement {
     this.scrollCount = 0;
     this.onClick = null;
   }
-  get firstElementChild() { return this.children[0] ?? null; }
   append(...nodes) {
     nodes.forEach((node) => {
       if (node.parentElement) node.remove();
@@ -220,7 +217,7 @@ class FakeElement {
   click() {
     this.onClick?.();
     for (const listener of [...(this.listeners.get('click') ?? [])]) {
-      listener({ target: this, currentTarget: this });
+      listener({ target: this, currentTarget: this, stopPropagation() {} });
     }
   }
   focus() { this.focusCount += 1; }

@@ -81,8 +81,8 @@ export function getFirstCutLauncherBrowserState(rootElement) {
       '[data-role="first-cut-workbench-launcher"]',
     ).length,
     sectionCollapsed: section.classList.contains('accordion-collapsed'),
-    propertiesCollapsed: rootElement.querySelector('.workspace-shell')
-      ?.classList.contains('properties-collapsed') ?? null,
+    propertiesCollapsed: rootElement.querySelector('.properties-panel')
+      ?.classList.contains('workspace-panel--collapsed') ?? null,
     poppedOut: section.classList.contains('is-popped-out'),
     popupVisible: rootElement.querySelector('[data-role="panel-popup-overlay"]')
       ?.style.display === 'flex',
