@@ -1,11 +1,6 @@
 #!/usr/bin/env node
 
-/**
- * Automated verification for sequential-sketcher editing operations.
- *
- * The check is repository-portable: it uses the governed workspace dataset
- * normalizer rather than an external developer-machine benchmark path.
- */
+/** Repository-portable sequential-sketcher editing verification. */
 import assert from 'node:assert/strict';
 import { normalizeWorkspaceDataset } from '../src/workspace/dataset-adapter.js';
 import { SequentialCommandGateway } from '../src/workspace/sequential-sketcher/sequential-command-gateway.js';
@@ -13,119 +8,88 @@ import { SequentialCommandGateway } from '../src/workspace/sequential-sketcher/s
 console.log('=== VERIFYING SEQUENTIAL SKETCHER EDITING OPERATIONS ===');
 
 let currentDataset = canonicalFixture();
-const mockWorkspaceState = {
+const workspaceState = {
   getSnapshot: () => ({ dataset: currentDataset }),
   loadDataset(dataset) {
     currentDataset = dataset;
     return { dataset, status: 'ready' };
   },
 };
-const gateway = new SequentialCommandGateway(mockWorkspaceState, null);
+const gateway = new SequentialCommandGateway(workspaceState, null);
 
 assert.equal(currentDataset.schema, 'analysis-workspace-dataset/v1');
-assert.ok(currentDataset.sourceSnapshot, 'Canonical source snapshot is required.');
-assert.ok(currentDataset.sourceModel, 'Canonical source model is required.');
-assert.ok(currentDataset.sharedModel, 'Canonical shared model is required.');
+assert.ok(currentDataset.sourceSnapshot);
+assert.ok(currentDataset.sourceModel);
+assert.ok(currentDataset.sharedModel);
 
-// T01: Add Straight Pipe
 const initialCount = currentDataset.entities.length;
-const addTarget = requireEntity((entity) => entity.entityType === 'PIPE', 'PIPE');
-const addResult = gateway.execute({
+const originalPipe = requireEntity((row) => row.entityType === 'PIPE', 'PIPE');
+apply('T01', {
   op: 'ADD_STRAIGHT',
-  targetEntityId: addTarget.entityId,
+  targetEntityId: originalPipe.entityId,
   lengthMm: 1500,
   direction: 'X',
 });
-assert.equal(addResult.status, 'applied', addResult.reason);
 assert.equal(currentDataset.entities.length, initialCount + 1);
-console.log('SEQUENTIAL-EDIT-T01 PASS ADD_STRAIGHT extended pipe segment.');
 
-// T02: Split Pipe
-const splitTarget = requireEntity(
-  (entity) => entity.entityType === 'PIPE' && entity.entityId === addTarget.entityId,
-  'original PIPE',
-);
-const splitResult = gateway.execute({
+apply('T02', {
   op: 'SPLIT_PIPE',
-  targetEntityId: splitTarget.entityId,
+  targetEntityId: originalPipe.entityId,
 });
-assert.equal(splitResult.status, 'applied', splitResult.reason);
-console.log('SEQUENTIAL-EDIT-T02 PASS SPLIT_PIPE inserted junction node.');
 
-// T03: Stretch Node
-const stretchTarget = requireEntity((entity) => entity.entityType === 'PIPE', 'split PIPE');
+const stretchTarget = requireEntity((row) => row.entityType === 'PIPE', 'split PIPE');
 const beforeStretch = structuredClone(stretchTarget.properties.geometry.start);
-const stretchResult = gateway.execute({
+apply('T03', {
   op: 'STRETCH_NODE',
   targetEntityId: stretchTarget.entityId,
   offset: { x: 100, y: 50, z: 0 },
 });
-assert.equal(stretchResult.status, 'applied', stretchResult.reason);
-const afterStretch = requireEntity(
-  (entity) => entity.entityId === stretchTarget.entityId,
-  'stretched PIPE',
-).properties.geometry.start;
-assert.deepEqual(afterStretch, {
-  x: beforeStretch.x + 100,
-  y: beforeStretch.y + 50,
-  z: beforeStretch.z,
-});
-console.log('SEQUENTIAL-EDIT-T03 PASS STRETCH_NODE updated coordinates.');
+assert.deepEqual(
+  requireEntity((row) => row.entityId === stretchTarget.entityId, 'stretched PIPE')
+    .properties.geometry.start,
+  { x: beforeStretch.x + 100, y: beforeStretch.y + 50, z: beforeStretch.z },
+);
 
-// T04: Rotate Component
-const elbowTarget = requireEntity((entity) => entity.entityType === 'ELBO', 'ELBO');
-const rotateResult = gateway.execute({
+const elbow = requireEntity((row) => row.entityType === 'ELBO', 'ELBO');
+apply('T04', {
   op: 'ROTATE_COMPONENT',
-  targetEntityId: elbowTarget.entityId,
+  targetEntityId: elbow.entityId,
   angleDeg: 45,
 });
-assert.equal(rotateResult.status, 'applied', rotateResult.reason);
 assert.equal(
-  requireEntity((entity) => entity.entityId === elbowTarget.entityId, 'rotated ELBO')
+  requireEntity((row) => row.entityId === elbow.entityId, 'rotated ELBO')
     .properties.attributes.ANGL,
   '45degree',
 );
-console.log('SEQUENTIAL-EDIT-T04 PASS ROTATE_COMPONENT updated angle.');
 
-// T05: Move Support
-const supportTarget = requireEntity((entity) => entity.category === 'support', 'SUPPORT');
-const supportBefore = structuredClone(supportTarget.properties.geometry.center);
-const supportResult = gateway.execute({
+const support = requireEntity((row) => row.category === 'support', 'SUPPORT');
+const supportBefore = structuredClone(support.properties.geometry.center);
+apply('T05', {
   op: 'MOVE_SUPPORT',
-  targetEntityId: supportTarget.entityId,
+  targetEntityId: support.entityId,
   offset: { x: 0, y: 0, z: 200 },
 });
-assert.equal(supportResult.status, 'applied', supportResult.reason);
-const supportAfter = requireEntity(
-  (entity) => entity.entityId === supportTarget.entityId,
-  'moved SUPPORT',
-).properties.geometry.center;
-assert.equal(supportAfter.z, supportBefore.z + 200);
-console.log('SEQUENTIAL-EDIT-T05 PASS MOVE_SUPPORT updated position.');
+assert.equal(
+  requireEntity((row) => row.entityId === support.entityId, 'moved SUPPORT')
+    .properties.geometry.center.z,
+  supportBefore.z + 200,
+);
 
-// T06: Retire Component
 const retireTarget = [...currentDataset.entities]
   .reverse()
-  .find((entity) => entity.category !== 'support');
-assert.ok(retireTarget, 'A retire target is required.');
+  .find((row) => row.category !== 'support');
+assert.ok(retireTarget);
 const countBeforeRetire = currentDataset.entities.length;
-const retireResult = gateway.execute({
+apply('T06', {
   op: 'RETIRE_COMPONENT',
   targetEntityId: retireTarget.entityId,
 });
-assert.equal(retireResult.status, 'applied', retireResult.reason);
 assert.equal(currentDataset.entities.length, countBeforeRetire - 1);
-assert.equal(
-  currentDataset.entities.some((entity) => entity.entityId === retireTarget.entityId),
-  false,
-);
-console.log('SEQUENTIAL-EDIT-T06 PASS RETIRE_COMPONENT removed entity.');
+assert.equal(currentDataset.entities.some((row) => row.entityId === retireTarget.entityId), false);
 
-// T07: Undo & Redo
 assert.equal(gateway.undo(), true);
 assert.equal(currentDataset.entities.length, countBeforeRetire);
 console.log('SEQUENTIAL-EDIT-T07 PASS UNDO restored previous dataset state.');
-
 assert.equal(gateway.redo(), true);
 assert.equal(currentDataset.entities.length, countBeforeRetire - 1);
 console.log('SEQUENTIAL-EDIT-T07 PASS REDO reapplied operation.');
@@ -146,6 +110,12 @@ console.log(JSON.stringify({
   canonicalLineageRetained: true,
 }));
 
+function apply(caseId, command) {
+  const result = gateway.execute(command);
+  assert.equal(result.status, 'applied', result.reason);
+  console.log(`SEQUENTIAL-EDIT-${caseId} PASS ${command.op}.`);
+}
+
 function canonicalFixture() {
   const normalized = normalizeWorkspaceDataset({
     schema: 'inputxml-managed-stage/v1',
@@ -153,35 +123,35 @@ function canonicalFixture() {
     unit: 'mm',
     project: { name: 'Sequential edit canonical fixture' },
     objects: [
-      sourceObject('PIPE-1', 'PIPE', {
-        startPoint: [0, 0, 0],
-        endPoint: [1000, 0, 0],
-        center: [500, 0, 0],
-      }, { CUTLENGTH: '1000mm' }),
-      sourceObject('ELBO-1', 'ELBO', {
-        startPoint: [1000, 0, 0],
-        endPoint: [1000, 500, 0],
-        center: [1000, 0, 0],
-      }, { ANGL: '90degree' }),
-      sourceObject('SUPPORT-1', 'SUPP', {
-        startPoint: [500, 0, 0],
-        endPoint: [500, 0, 0],
-        center: [500, 0, 0],
+      sourceObject('PIPE-1', 'PIPE', [0, 0, 0], [1000, 0, 0], {
+        CUTLENGTH: '1000mm',
       }),
+      sourceObject('ELBO-1', 'ELBO', [1000, 0, 0], [1000, 500, 0], {
+        ANGL: '90degree',
+      }),
+      sourceObject('SUPPORT-1', 'SUPPORT', [500, 0, 0], [500, 0, 0]),
     ],
   }, '[SIMULATED] sequential editing verification fixture');
   return Object.freeze({ ...normalized, version: 1 });
 }
 
-function sourceObject(id, type, nativeParams, extraAttributes = {}) {
+function sourceObject(id, type, startPoint, endPoint, attributes = {}) {
   return {
     id,
     name: id,
     type,
     sourcePath: `/${id}`,
-    nativeParams,
-    attributes: { TYPE: type, ...extraAttributes },
+    nativeParams: {
+      startPoint,
+      endPoint,
+      center: midpoint(startPoint, endPoint),
+    },
+    attributes: { TYPE: type, ...attributes },
   };
+}
+
+function midpoint(start, end) {
+  return start.map((value, index) => (value + end[index]) / 2);
 }
 
 function requireEntity(predicate, label) {
