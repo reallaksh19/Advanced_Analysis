@@ -2,12 +2,16 @@
  * Automated Verification Check for Sequential Sketcher Editing Operations
  */
 import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { normalizeWorkspaceDataset } from '../src/workspace/dataset-adapter.js';
 import { SequentialCommandGateway } from '../src/workspace/sequential-sketcher/sequential-command-gateway.js';
 
 console.log('=== VERIFYING SEQUENTIAL SKETCHER EDITING OPERATIONS ===');
 
-const fileContent = fs.readFileSync('F:/CODE-5-SS/3D_Converters/Benchmarks/1885Sjson/Sjson.json', 'utf8');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const benchmarkPath = path.join(root, 'benchmarks', 'Sjson.json');
+const fileContent = fs.readFileSync(benchmarkPath, 'utf8');
 const rawPackage = JSON.parse(fileContent);
 const initialDataset = normalizeWorkspaceDataset(rawPackage, 'Sjson.json');
 
