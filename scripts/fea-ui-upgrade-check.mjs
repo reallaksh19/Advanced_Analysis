@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import { calculateLocalContinuum, createCanonicalLocalContinuumModel } from '../src/core/local-continuum/index.js';
 import { createLafeaMockDocument } from '../src/workspace/advanced-mock-data.js';
 import { presentLafeaResult, resolveLafeaUnits } from '../src/workspace/lafea-result-presenters/index.js';
-import { selectShellSurfaceField } from '../src/workspace/lfea-field-adapter.js';
+import { selectShellSurfaceField } from '../src/workspace/lafea-field-adapter.js';
 import { buildConvergenceStudy } from '../src/workspace/lfea-convergence-model.js';
 import { QUALITY_METRICS, selectQualityField } from '../src/workspace/lfea-quality-adapter.js';
 import { createLfeaWorkerClient } from '../src/workspace/lfea-worker-client.js';
@@ -53,6 +53,16 @@ const presenterRows = {};
 for (const stageId of stageIds) {
   const documentValue = createLafeaMockDocument(stageId);
   const execution = executeLafeaStage(stageId, documentValue);
+  if (stageId === 'LAFEA.6') {
+    assert.equal(execution.status, 'FAILED', 'LAFEA.6 must remain unsupported and fail closed.');
+    assert.equal(execution.result, null);
+    assert.deepEqual(
+      execution.diagnostics.map((diagnostic) => diagnostic.code),
+      ['UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED'],
+    );
+    presenterRows[stageId] = 0;
+    continue;
+  }
   assert.equal(execution.status, 'QUALIFIED', `${stageId} must qualify.`);
   const units = resolveLafeaUnits(stageId, documentValue);
   const presentation = presentLafeaResult(stageId, execution.result, units);
