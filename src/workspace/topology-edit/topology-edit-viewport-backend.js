@@ -104,7 +104,9 @@ export class TopologyEditViewportBackend {
     }
   }
 
-  buildMeshGroup(group, elements, colorHex, opacity = 1.0) {
+  buildMeshGroup(group, elements = [], colorHex = 0x0284c7, opacity = 1.0) {
+    if (!elements || elements.length === 0) return;
+
     const material = new THREE.MeshStandardMaterial({
       color: colorHex,
       roughness: 0.3,
@@ -112,13 +114,27 @@ export class TopologyEditViewportBackend {
       transparent: opacity < 1.0,
       opacity: opacity,
     });
+    const geometry = new THREE.CylinderGeometry(0.2, 0.2, 5, 12);
 
-    elements.forEach(el => {
-      const geometry = new THREE.CylinderGeometry(0.2, 0.2, 5, 12);
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.userData = { canonicalId: el.id || el.entityId, type: el.type };
-      group.add(mesh);
-    });
+    if (elements.length >= 500) {
+      const instancedMesh = new THREE.InstancedMesh(geometry, material, elements.length);
+      const dummy = new THREE.Object3D();
+
+      elements.forEach((el, idx) => {
+        dummy.position.set(el.x || (idx * 2) % 50, el.y || 0, el.z || Math.floor(idx / 25) * 2);
+        dummy.updateMatrix();
+        instancedMesh.setMatrixAt(idx, dummy.matrix);
+      });
+
+      instancedMesh.instanceMatrix.needsUpdate = true;
+      group.add(instancedMesh);
+    } else {
+      elements.forEach(el => {
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.userData = { canonicalId: el.id || el.entityId, type: el.type };
+        group.add(mesh);
+      });
+    }
   }
 
   clearGroup(group) {

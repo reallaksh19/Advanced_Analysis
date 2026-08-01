@@ -1,0 +1,21 @@
+{
+  "schema": "VendoredTopologyEditSource.v1",
+  "sourceRepository": "reallaksh19/XML_Compare_Utilities",
+  "sourceCommit": "c20bb037566d52ba5b789712594b754a5fb94651",
+  "generatedAt": "2026-08-01T10:41:00.000Z",
+  "files": [
+    {
+      "sourcePath": "tabs/topology-trace-validator/topology-edit-capability-registry.js",
+      "targetPath": "src/vendor/topology-edit/source/topology-edit-capability-registry.js",
+      "gitBlobSha": "e6a91eb431bcbaba4f1ebf3ea58f07e9e65eab36",
+      "treatment": "AS_IS"
+    },
+    {
+      "sourcePath": "tabs/topology-trace-validator/topology-edit-3d-canvas.js",
+      "targetPath": "src/vendor/topology-edit/source/topology-edit-3d-canvas.js",
+      "gitBlobSha": "96a8b99b6fd63c12f04b4ee1fe5bdeabfd9039de",
+      "treatment": "WRAPPED"
+    }
+  ],
+  "waivers": []
+}
