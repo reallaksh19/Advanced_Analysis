@@ -1,21 +1,16 @@
 /**
  * Topology Edit Draft — Phase 3 Dedicated 3D Edit Viewport Backend
  *
- * Implements a high-performance Three.js rendering backend with 9 isolated scene groups:
- * 1. sourceGroup    (Immutable source visual geometry)
- * 2. draftGroup     (Accepted draft topology)
- * 3. ghostGroup     (Proposal preview ghosts)
- * 4. connectorGroup (Node connection snap handles)
- * 5. transientGroup (Active drag gesture preview)
- * 6. measurementGroup (Distance/dimension callouts)
- * 7. issueGroup     (Topology rule violation markers)
- * 8. supportGroup   (Directional piping restraint 3D symbols)
- * 9. selectionGroup (Active selection bounding boxes/highlights)
+ * Implements a high-performance Three.js rendering backend with isolated scene groups.
  */
 
 import * as THREE from 'three';
 import { createTopologyEditPick } from './topology-edit-picking-contract.js';
 import { createTopologyEditViewState } from './topology-edit-view-state.js';
+import {
+  createTopologyEditSectionPlaneEquations,
+  isEngineeringPointInsideSectionPlanes,
+} from '../viewport-presentation/topology-edit-section-model.js';
 
 const STANDARD_VIEW_DIRECTIONS = Object.freeze({
   TOP: new THREE.Vector3(0, 1, 0.001).normalize(),
@@ -59,17 +54,14 @@ export class TopologyEditViewportBackend {
   constructor(options = {}) {
     this.hostElement = null;
     this.scene = new THREE.Scene();
-    // Far plane and marker sizes are scaled from real scene bounds (renderSession),
-    // not fixed unit-scale constants — piping models are typically thousands of mm
-    // across, so a 2000-unit far plane / 0.2-unit marker (the original constants
-    // here) leaves the actual geometry invisible or clipped.
     this.camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000000);
     this.orthoCamera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 1000000);
     this.activeCamera = this.camera;
     this.renderer = null;
     this.hasFitOnce = false;
+    this.presentationSectionPlanes = Object.freeze([]);
+    this.presentationClippingPlanes = Object.freeze([]);
 
-    // 9 Isolated Scene Groups
     this.groups = Object.freeze({
       sourceGroup: new THREE.Group(),
       draftGroup: new THREE.Group(),
@@ -82,8 +74,7 @@ export class TopologyEditViewportBackend {
       selectionGroup: new THREE.Group(),
     });
 
-    Object.values(this.groups).forEach(g => this.scene.add(g));
-
+    Object.values(this.groups).forEach((group) => this.scene.add(group));
     this.viewState = createTopologyEditViewState(options.viewState);
     this.animationFrameId = null;
     this.isMounted = false;
@@ -96,14 +87,12 @@ export class TopologyEditViewportBackend {
     dirLight1.position.set(100, 200, 150);
     const dirLight2 = new THREE.DirectionalLight(0x38bdf8, 0.4);
     dirLight2.position.set(-100, -100, -100);
-
     this.scene.add(ambientLight, dirLight1, dirLight2);
   }
 
   mount(host) {
     if (!host) throw new TypeError('TopologyEditViewportBackend: Invalid host element.');
-    this.destroy(); // Clear existing mount
-
+    this.destroy();
     this.hostElement = host;
     const width = host.clientWidth || 800;
     const height = host.clientHeight || 500;
@@ -112,6 +101,7 @@ export class TopologyEditViewportBackend {
     this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.setClearColor(0x020617, 1);
+    this.renderer.localClippingEnabled = this.presentationClippingPlanes.length > 0;
 
     this.renderer.domElement.addEventListener('webglcontextlost', (event) => {
       event.preventDefault();
@@ -128,10 +118,8 @@ export class TopologyEditViewportBackend {
     host.replaceChildren(this.renderer.domElement);
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
-
     this.camera.position.set(20, 20, 20);
     this.camera.lookAt(0, 0, 0);
-
     this.isMounted = true;
     this.startLoop();
   }
@@ -155,8 +143,6 @@ export class TopologyEditViewportBackend {
     this.lastBounds = computeElementBounds(allElements, allSegments);
     const markerSize = markerSizeForBounds(this.lastBounds);
 
-    // Build source & draft visual meshes — segments (pipe runs) first so node
-    // markers render on top at each segment's endpoints/junctions.
     if (model.source) {
       this.buildSegmentGroup(this.groups.sourceGroup, model.source.segments, 0x38bdf8, 0.4, markerSize);
       this.buildMeshGroup(this.groups.sourceGroup, model.source.elements, 0x38bdf8, 0.4, markerSize);
@@ -166,19 +152,13 @@ export class TopologyEditViewportBackend {
       this.buildMeshGroup(this.groups.draftGroup, model.draft.elements, 0x0284c7, 1.0, markerSize);
     }
 
+    this.applyPresentationClippingToGroups();
     if (!this.hasFitOnce && (allElements.length || allSegments.length)) {
       this.hasFitOnce = true;
       this.fitAll();
     }
   }
 
-  /**
-   * Renders real oriented pipe-run cylinders between each segment's actual
-   * two endpoints (radius from source bore data where available), replacing
-   * the earlier placeholder of one fixed-size, fixed-orientation cylinder
-   * per element. Full per-type fitting shapes (valve/flange/tee/OLET/elbow)
-   * are a later phase — see futureplan.md item 1.
-   */
   buildSegmentGroup(group, segments = [], colorHex = 0x0284c7, opacity = 1.0, fallbackMarkerSize = 10) {
     if (!segments || segments.length === 0) return;
     const material = new THREE.MeshStandardMaterial({
@@ -208,44 +188,53 @@ export class TopologyEditViewportBackend {
 
   buildMeshGroup(group, elements = [], colorHex = 0x0284c7, opacity = 1.0, markerSize = 10) {
     if (!elements || elements.length === 0) return;
-
     const material = new THREE.MeshStandardMaterial({
       color: colorHex,
       roughness: 0.3,
       metalness: 0.2,
       transparent: opacity < 1.0,
-      opacity: opacity,
+      opacity,
     });
-    // Real elbow/valve/flange/OLET shapes are a later phase (see futureplan.md);
-    // for now every element renders as a sphere marker sized relative to the
-    // scene's real coordinate range, not a fixed unit-scale constant.
     const geometry = new THREE.SphereGeometry(markerSize, 12, 10);
 
     if (elements.length >= 500) {
       const instancedMesh = new THREE.InstancedMesh(geometry, material, elements.length);
       const dummy = new THREE.Object3D();
-      // Pick-ID table: InstancedMesh hits report an instanceId, not userData,
-      // so pickAt() needs an explicit instanceId -> canonicalId lookup — the
-      // prior version never built one, so every pick on an instanced scene
-      // silently returned the literal string 'primitive-hit'.
       instancedMesh.userData.pickTable = elements.map((el) => el.id ?? el.entityId ?? null);
-
-      elements.forEach((el, idx) => {
+      elements.forEach((el, index) => {
         dummy.position.set(finiteOr(el.x, 0), finiteOr(el.y, 0), finiteOr(el.z, 0));
         dummy.updateMatrix();
-        instancedMesh.setMatrixAt(idx, dummy.matrix);
+        instancedMesh.setMatrixAt(index, dummy.matrix);
       });
-
       instancedMesh.instanceMatrix.needsUpdate = true;
       group.add(instancedMesh);
-    } else {
-      elements.forEach(el => {
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.position.set(finiteOr(el.x, 0), finiteOr(el.y, 0), finiteOr(el.z, 0));
-        mesh.userData = { canonicalId: el.id || el.entityId, type: el.type };
-        group.add(mesh);
-      });
+      return;
     }
+
+    elements.forEach((el) => {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(finiteOr(el.x, 0), finiteOr(el.y, 0), finiteOr(el.z, 0));
+      mesh.userData = { canonicalId: el.id || el.entityId, type: el.type };
+      group.add(mesh);
+    });
+  }
+
+  setPresentationSectionPlanes(planeEquations = []) {
+    this.presentationSectionPlanes = createTopologyEditSectionPlaneEquations(planeEquations);
+    this.presentationClippingPlanes = Object.freeze(
+      this.presentationSectionPlanes.map(({ normal, constant }) => (
+        new THREE.Plane(new THREE.Vector3(normal.x, normal.y, normal.z), constant)
+      )),
+    );
+    if (this.renderer) this.renderer.localClippingEnabled = this.presentationClippingPlanes.length > 0;
+    this.applyPresentationClippingToGroups();
+    return this.presentationSectionPlanes.length;
+  }
+
+  applyPresentationClippingToGroups() {
+    [this.groups.sourceGroup, this.groups.draftGroup].forEach((group) => {
+      group.traverse((object) => applyObjectClipping(object, this.presentationClippingPlanes));
+    });
   }
 
   clearGroup(group) {
@@ -253,7 +242,7 @@ export class TopologyEditViewportBackend {
       const obj = group.children.pop();
       if (obj.geometry) obj.geometry.dispose();
       if (obj.material) {
-        if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+        if (Array.isArray(obj.material)) obj.material.forEach((material) => material.dispose());
         else obj.material.dispose();
       }
     }
@@ -273,7 +262,11 @@ export class TopologyEditViewportBackend {
 
   fitAll() {
     const bounds = this.lastBounds && !this.lastBounds.isEmpty() ? this.lastBounds : new THREE.Box3().setFromObject(this.scene);
-    if (bounds.isEmpty()) { this.camera.position.set(25, 25, 25); this.camera.lookAt(0, 0, 0); return; }
+    if (bounds.isEmpty()) {
+      this.camera.position.set(25, 25, 25);
+      this.camera.lookAt(0, 0, 0);
+      return;
+    }
     this.lastBounds = bounds;
     this.setStandardView('ISO');
   }
@@ -283,22 +276,20 @@ export class TopologyEditViewportBackend {
     const rect = this.hostElement.getBoundingClientRect();
     const x = ((clientX - rect.left) / rect.width) * 2 - 1;
     const y = -((clientY - rect.top) / rect.height) * 2 + 1;
-
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(new THREE.Vector2(x, y), this.activeCamera);
     const intersects = raycaster.intersectObjects(this.scene.children, true);
-
-    if (intersects.length > 0) {
-      const hit = intersects[0];
-      const objectId = hit.instanceId !== undefined
-        ? (hit.object.userData?.pickTable?.[hit.instanceId] ?? 'primitive-hit')
-        : (hit.object.userData?.canonicalId || 'primitive-hit');
-      return createTopologyEditPick({
-        objectId,
-        point: { x: hit.point.x, y: hit.point.y, z: hit.point.z },
-      });
-    }
-    return null;
+    const hit = intersects.find((candidate) => (
+      isEngineeringPointInsideSectionPlanes(candidate.point, this.presentationSectionPlanes)
+    ));
+    if (!hit) return null;
+    const objectId = hit.instanceId !== undefined
+      ? (hit.object.userData?.pickTable?.[hit.instanceId] ?? 'primitive-hit')
+      : (hit.object.userData?.canonicalId || 'primitive-hit');
+    return createTopologyEditPick({
+      objectId,
+      point: { x: hit.point.x, y: hit.point.y, z: hit.point.z },
+    });
   }
 
   destroy() {
@@ -307,13 +298,25 @@ export class TopologyEditViewportBackend {
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;
     }
-    Object.values(this.groups).forEach(g => this.clearGroup(g));
+    this.setPresentationSectionPlanes([]);
+    Object.values(this.groups).forEach((group) => this.clearGroup(group));
     if (this.renderer) {
       this.renderer.dispose();
-      if (this.renderer.domElement && this.renderer.domElement.parentElement) {
+      if (this.renderer.domElement?.parentElement) {
         this.renderer.domElement.parentElement.removeChild(this.renderer.domElement);
       }
       this.renderer = null;
     }
+    this.hostElement = null;
   }
+}
+
+function applyObjectClipping(object, clippingPlanes) {
+  if (!object?.material) return;
+  const materials = Array.isArray(object.material) ? object.material : [object.material];
+  materials.forEach((material) => {
+    material.clippingPlanes = clippingPlanes;
+    material.clipIntersection = false;
+    material.needsUpdate = true;
+  });
 }

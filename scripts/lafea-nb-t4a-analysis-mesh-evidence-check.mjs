@@ -187,7 +187,10 @@ const evidenceSource = fs.readFileSync(
 const contractSource = fs.readFileSync(
   'src/workspace/lafea-analysis-mesh-contract.js', 'utf8',
 );
-const productionSource = `${contractSource}\n${evidenceSource}`;
+const qualitySource = fs.readFileSync(
+  'src/workspace/lafea-analysis-mesh-quality.js', 'utf8',
+);
+const productionSource = `${contractSource}\n${qualitySource}\n${evidenceSource}`;
 assert.doesNotMatch(productionSource,
   /from ['"][^'"]*(?:local-continuum|local-shell|lafea-canvas|render-packet)[^'"]*['"]/u);
 assert.doesNotMatch(productionSource,

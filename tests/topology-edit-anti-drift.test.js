@@ -1,16 +1,18 @@
 /**
- * Topology Edit Draft — bounded phase-one smoke contracts.
+ * Topology Edit — bounded retained smoke contracts.
  *
- * These checks preserve the currently delivered shell. They do not certify
- * full source parity, command authority, support semantics, persistence,
- * commit/rollback, browser qualification, or large-model performance.
+ * These checks preserve retained phase-one visual/export scaffolding while
+ * exercising the Wave 1 certified session for command history and replay.
+ * They do not certify later-wave geometry, autofix, persistence, commit,
+ * rollback, browser qualification, or large-model performance.
  */
 
 import assert from 'node:assert';
 import { TOPOLOGY_EDIT_BASELINE_MANIFEST } from '../src/workspace/topology-edit/topology-edit-baseline-manifest.js';
 import { createTopologyEditRenderModel } from '../src/workspace/topology-edit/topology-edit-render-model.js';
 import { createTopologyEditPick } from '../src/workspace/topology-edit/topology-edit-picking-contract.js';
-import { TopologyEditCommandJournal } from '../src/workspace/topology-edit/topology-edit-command-journal.js';
+import { finalizeCanonicalTopology } from '../src/workspace/topology-edit/topology-edit-canonical-state.js';
+import { TopologyEditCertifiedSession } from '../src/workspace/topology-edit/topology-edit-certified-session.js';
 import { TopologyEditAutofixGrouper } from '../src/workspace/topology-edit/topology-edit-autofix-grouper.js';
 import { buildSealedAuditPackage } from '../src/workspace/topology-edit/topology-edit-export.js';
 
@@ -31,53 +33,76 @@ assert.strictEqual(renderModel.units, 'MM');
 assert.strictEqual(renderModel.visibility.source, true);
 
 const pick = createTopologyEditPick({
-  objectId: 'node-101',
+  objectId: 'node:101',
   point: { x: 5, y: 10, z: 15 },
 });
-assert.strictEqual(pick.objectId, 'node-101');
+assert.strictEqual(pick.objectId, 'node:101');
 assert.strictEqual(pick.point.x, 5);
 
-const journal = new TopologyEditCommandJournal();
-journal.applyCommand({
-  type: 'MOVE_NODE',
-  payload: { nodeId: 'N101', delta: { x: 1, y: 0, z: 0 } },
+const baseTopology = finalizeCanonicalTopology({
+  schema: 'topology-edit-canonical-topology/v1',
+  datasetId: 'smoke-dataset',
+  datasetVersion: 0,
+  sourceHash: 'source:smoke',
+  topologyGraphHash: 'graph:smoke',
+  nodes: [
+    { id: 'node:100', position: { x: 0, y: 0, z: 0 }, portKeys: ['P1:port:start'] },
+    { id: 'node:101', position: { x: 100, y: 0, z: 0 }, portKeys: ['P1:port:end'] },
+  ],
+  edges: [
+    {
+      id: 'edge:100',
+      componentKey: 'P1',
+      fromNodeId: 'node:100',
+      toNodeId: 'node:101',
+      diameterMm: 100,
+      entityType: 'PIPE',
+      sourcePath: '$[0]',
+    },
+  ],
+  junctions: [],
+  supports: [],
+  boundaries: [],
+  rigids: [],
 });
-assert.strictEqual(journal.getActiveJournal().length, 1);
-assert.strictEqual(journal.canUndo(), true);
-journal.undo();
-assert.strictEqual(journal.getActiveJournal().length, 0);
-journal.redo();
-assert.strictEqual(journal.getActiveJournal().length, 1);
+const session = new TopologyEditCertifiedSession(baseTopology);
+const accepted = session.execute('MOVE_NODE', {
+  nodeId: 'node:101',
+  position: { x: 110, y: 0, z: 0 },
+});
+assert.strictEqual(accepted.disposition, 'ACCEPTED');
+assert.strictEqual(session.journal.activeCommandIds.length, 1);
+assert.strictEqual(session.canUndo(), true);
+session.undo();
+assert.strictEqual(session.journal.activeCommandIds.length, 0);
+session.redo();
+assert.strictEqual(session.journal.activeCommandIds.length, 1);
 
-const mockIssues = [
+const retainedIssues = [
   {
     id: '1',
     kind: 'SNAP_GAP',
     distanceMm: 2.4,
-    nodeIds: ['N101', 'N100'],
+    nodeIds: ['node:101', 'node:100'],
     suggestedAutofix: 'MERGE_NODES',
   },
   {
     id: '2',
     kind: 'SNAP_GAP',
     distanceMm: 14.5,
-    nodeIds: ['N210', 'N208'],
+    nodeIds: ['node:210', 'node:208'],
     suggestedAutofix: 'MERGE_NODES',
   },
   {
     id: '3',
     kind: 'ZERO_LENGTH_ELEMENT',
     distanceMm: 0,
-    elementId: 'P109',
+    elementId: 'edge:109',
     suggestedAutofix: null,
   },
 ];
 
-const grouped = TopologyEditAutofixGrouper.groupIssues(
-  mockIssues,
-  6,
-  25,
-);
+const grouped = TopologyEditAutofixGrouper.groupIssues(retainedIssues, 6, 25);
 assert.strictEqual(grouped.buckets.exactMerges.length, 1);
 assert.strictEqual(grouped.buckets.exactMerges[0].checked, true);
 assert.strictEqual(grouped.buckets.nearMatches.length, 1);
@@ -85,14 +110,17 @@ assert.strictEqual(grouped.buckets.nearMatches[0].checked, false);
 assert.strictEqual(grouped.buckets.structuralIssues.length, 1);
 assert.strictEqual(grouped.buckets.structuralIssues[0].checked, false);
 
+const journalPackage = {
+  schema: 'TopologyEditCertifiedJournalPackage.v1',
+  entriesCount: session.journal.history.length,
+  journalHash: session.journal.journalHash,
+  serializedJournal: session.serializeJournal(),
+};
 const auditPackage = buildSealedAuditPackage(
-  journal.exportJournalPackage(),
-  [{ id: 'N101', x: 1, y: 0, z: 0 }],
+  journalPackage,
+  [{ id: 'node:101', x: 110, y: 0, z: 0 }],
 );
-assert.strictEqual(
-  auditPackage.schema,
-  'advanced-topology-edit-audit-package/v1',
-);
+assert.strictEqual(auditPackage.schema, 'advanced-topology-edit-audit-package/v1');
 assert.strictEqual(auditPackage.summary.totalCommands, 1);
 
 console.log('TOPOLOGY EDIT PHASE-ONE SMOKE CONTRACTS PASSED');

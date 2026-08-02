@@ -1,0 +1,133 @@
+name: Topology Edit Wave 1
+
+on:
+  push:
+    branches:
+      - 'agent/track-a-wave1-*'
+    paths:
+      - 'src/workspace/topology-edit/**'
+      - 'src/workspace/topology-edit-3d-view-controller.js'
+      - 'src/vendor/topology-edit/**'
+      - 'scripts/topology-edit-*.mjs'
+      - 'tests/topology-edit-*.js'
+      - 'tests/topology-edit-*.mjs'
+      - '.github/workflows/topology-edit-wave1.yml'
+  pull_request:
+    paths:
+      - 'src/workspace/topology-edit/**'
+      - 'src/workspace/topology-edit-3d-view-controller.js'
+      - 'src/vendor/topology-edit/**'
+      - 'scripts/topology-edit-*.mjs'
+      - 'tests/topology-edit-*.js'
+      - 'tests/topology-edit-*.mjs'
+      - '.github/workflows/topology-edit-wave1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  certified-kernel:
+    name: W1.Q certified production authority
+    runs-on: ubuntu-24.04
+    env:
+      TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      TOPOLOGY_EDIT_SOURCE_COMPARATOR: c20bb037566d52ba5b789712594b754a5fb94651
+
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify exact checkout
+        run: test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+
+      - name: Source authority drift
+        run: node scripts/topology-edit-source-drift-check.mjs
+
+      - name: API and behavior disposition drift
+        run: node scripts/topology-edit-api-drift-check.mjs
+
+      - name: Coding rules
+        run: node scripts/topology-edit-wave1-coding-rules-check.mjs
+
+      - name: Prohibited imports and circularity
+        run: node scripts/topology-edit-prohibited-imports.mjs
+
+      - name: Syntax
+        run: |
+          node --check src/workspace/topology-edit-3d-view-controller.js
+          node --check src/workspace/topology-edit/topology-edit-authority-receipt.js
+          node --check src/workspace/topology-edit/topology-edit-candidate-builder.js
+          node --check src/workspace/topology-edit/topology-edit-candidate-validator.js
+          node --check src/workspace/topology-edit/topology-edit-canonical-state.js
+          node --check src/workspace/topology-edit/topology-edit-certification-service.js
+          node --check src/workspace/topology-edit/topology-edit-certified-journal.js
+          node --check src/workspace/topology-edit/topology-edit-certified-session.js
+          node --check src/workspace/topology-edit/topology-edit-command-contract.js
+          node --check src/workspace/topology-edit/topology-edit-command-effect-validator.js
+          node --check src/workspace/topology-edit/topology-edit-command-resolver.js
+          node --check src/workspace/topology-edit/topology-edit-command-ui.js
+          node --check src/workspace/topology-edit/topology-edit-journal-service.js
+          node --check src/workspace/topology-edit/topology-edit-pure-reducer.js
+          node --check src/workspace/topology-edit/topology-edit-render-packet.js
+          node --check src/workspace/topology-edit/topology-edit-replay-service.js
+
+      - name: W1.1 pure kernel contracts
+        run: node --test tests/topology-edit-wave1-pure-kernel.test.mjs
+
+      - name: W1.2 candidate certification contracts
+        run: node --test tests/topology-edit-wave1-candidate-certification.test.mjs
+
+      - name: W1.3 journal replay contracts
+        run: node --test tests/topology-edit-wave1-journal-replay.test.mjs
+
+      - name: W1.4 production integration contracts
+        run: node --test tests/topology-edit-wave1-production-integration.test.mjs
+
+      - name: Bounded phase-one smoke contracts
+        run: node tests/topology-edit-anti-drift.test.js
+
+      - name: Write exact-head qualification evidence
+        run: |
+          mkdir -p reports/qualification
+          node --input-type=module <<'NODE'
+          import { writeFile } from 'node:fs/promises';
+          const evidence = {
+            schema: 'TopologyEditWave1QualificationEvidence.v1',
+            wave: 'W1.Q',
+            repository: process.env.GITHUB_REPOSITORY,
+            commit: process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA,
+            sourceCommit: process.env.TOPOLOGY_EDIT_SOURCE_COMPARATOR,
+            status: 'PASS',
+            checks: [
+              'source-authority-drift',
+              'api-and-disposition-drift',
+              'coding-rules',
+              'prohibited-imports-and-cycles',
+              'seven-command-pure-kernel-contracts',
+              'candidate-certification-contracts',
+              'append-only-journal-and-replay',
+              'undo-redo-and-stale-authority',
+              'production-certified-session-consumer',
+              'workspace-mutation-bypass-absent',
+              'bounded-phase-one-smoke',
+            ],
+          };
+          await writeFile('reports/qualification/topology-edit-wave1-qualification.json', `${JSON.stringify(evidence, null, 2)}\n`);
+          NODE
+
+      - name: Upload exact-head qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-wave1-qualification-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          path: reports/qualification/topology-edit-wave1-qualification.json
+          if-no-files-found: error
+          retention-days: 30
