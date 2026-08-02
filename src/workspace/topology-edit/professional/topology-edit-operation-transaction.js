@@ -16,6 +16,9 @@ import {
 import {
   assertTopologyEditOperationPlan,
 } from './topology-edit-operation-plan.js';
+import {
+  assertNoTopologyEditBlockingDiagnostics,
+} from './topology-edit-validation-blocking.js';
 
 export const TOPOLOGY_EDIT_OPERATION_TRANSACTION_PREVIEW_SCHEMA =
   'TopologyEditOperationTransactionPreview.v2';
@@ -213,13 +216,10 @@ function readyValidation(value, plan, candidate, blockingInput) {
   if (mismatches.length) {
     fail(`validation differs from certified candidate: ${mismatches.join(', ')}.`, RangeError);
   }
-  const blocking = new Set(normalizeSeverities(blockingInput ?? ['HIGH']));
-  const issue = receipt.finalDiagnostics.find((row) => blocking.has(
-    stringValue(row?.severity).toUpperCase() || 'UNKNOWN',
-  ));
-  if (issue) {
-    fail(`validation contains blocking issue ${issue.id || semanticHash(issue)}.`, RangeError);
-  }
+  assertNoTopologyEditBlockingDiagnostics(
+    receipt,
+    blockingInput ?? ['HIGH'],
+  );
   return receipt;
 }
 
@@ -267,15 +267,6 @@ function assertSession(value) {
   value.assertUsable();
   return value;
 }
-function normalizeSeverities(value) {
-  if (!Array.isArray(value) || !value.length) {
-    fail('blockingSeverities must be a non-empty array.');
-  }
-  return [...new Set(value.map((row, index) => requiredText(
-    row,
-    `blockingSeverities[${index}]`,
-  ).toUpperCase()))].sort(compareText);
-}
 function sameList(left, right) {
   return Array.isArray(left)
     && Array.isArray(right)
@@ -287,7 +278,6 @@ function requiredText(value, label) {
   if (!text) fail(`${label} is required.`);
   return text;
 }
-function compareText(left, right) { return left.localeCompare(right); }
 function fail(message, Constructor = TypeError) {
   throw new Constructor(`TopologyEditOperationTransaction: ${message}`);
 }
