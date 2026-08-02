@@ -8,7 +8,6 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const REPORT_DIR = path.resolve(ROOT, 'reports/qualification');
 const B7E_REPORT_PATH = resolveOutputPath(
   process.env.B7E_REPORT_PATH,
   'reports/qualification/lafea-b7e-b7-gate-closure.json',
@@ -26,6 +25,15 @@ const LOG_PATH = resolveOutputPath(
   'reports/qualification/lafea-b7g-portable-qualification.log',
 );
 const MAX_CAPTURE_BYTES = 64 * 1024 * 1024;
+const REQUIRED_FALSE_AUTHORITY = Object.freeze([
+  'generalT7dAuthorized',
+  'additionalContinuumTemplatesAuthorized',
+  'shellAuthorized',
+  'assessmentReady',
+  'codeReady',
+  'reportAuthority',
+  'releaseQualified',
+]);
 const AUTHORITY = Object.freeze({
   generalT7dAuthorized: false,
   additionalContinuumTemplatesAuthorized: false,
@@ -57,7 +65,6 @@ record('B7F_SCRIPT_PRESENT',
     'scripts/lafea-template-b7f-current-main-qualification-check.mjs')),
   'The retained B7F aggregate script must exist.');
 
-fs.mkdirSync(REPORT_DIR, { recursive: true });
 const child = spawnSync(process.execPath, [
   'scripts/lafea-template-b7f-current-main-qualification-check.mjs',
 ], {
@@ -111,26 +118,8 @@ const b7fReport = readJsonEvidence(
   'lafea-b7f-current-main-qualification-report/v1',
 );
 
-if (b7eReport) {
-  record('B7E_PASS', b7eReport.status === 'PASS',
-    `B7E status is ${String(b7eReport.status)}.`);
-  record('B7E_EXACT_HEAD', b7eReport.exactHead === exactHead,
-    `B7E head is ${String(b7eReport.exactHead)}.`);
-  record('B7E_EXPECTED_HEAD', b7eReport.expectedHead === exactHead,
-    `B7E expected head is ${String(b7eReport.expectedHead)}.`);
-  record('B7E_AUTHORITY_RETAINED', authorityRetained(b7eReport.authority),
-    'B7E authority flags must remain false.');
-}
-if (b7fReport) {
-  record('B7F_PASS', b7fReport.status === 'PASS',
-    `B7F status is ${String(b7fReport.status)}.`);
-  record('B7F_EXACT_HEAD', b7fReport.exactHead === exactHead,
-    `B7F head is ${String(b7fReport.exactHead)}.`);
-  record('B7F_EXPECTED_HEAD', b7fReport.expectedHead === exactHead,
-    `B7F expected head is ${String(b7fReport.expectedHead)}.`);
-  record('B7F_AUTHORITY_RETAINED', authorityRetained(b7fReport.authority),
-    'B7F authority flags must remain false.');
-}
+if (b7eReport) validateReport('B7E', b7eReport);
+if (b7fReport) validateReport('B7F', b7fReport);
 
 const trackedAfter = git(['status', '--porcelain=v1', '--untracked-files=no']);
 record('TRACKED_TREE_CLEAN_AFTER', trackedAfter === '',
@@ -192,6 +181,17 @@ fs.writeFileSync(BUNDLE_PATH, `${JSON.stringify(bundle, null, 2)}\n`);
 console.log(JSON.stringify(bundle));
 if (status !== 'PASS') process.exit(1);
 
+function validateReport(id, report) {
+  record(`${id}_PASS`, report.status === 'PASS',
+    `${id} status is ${String(report.status)}.`);
+  record(`${id}_EXACT_HEAD`, report.exactHead === exactHead,
+    `${id} head is ${String(report.exactHead)}.`);
+  record(`${id}_EXPECTED_HEAD`, report.expectedHead === exactHead,
+    `${id} expected head is ${String(report.expectedHead)}.`);
+  record(`${id}_AUTHORITY_RETAINED`, authorityRetained(report.authority),
+    `${id} authority flags must remain false.`);
+}
+
 function readJsonEvidence(id, filePath, schema) {
   record(`${id}_PRESENT`, fs.existsSync(filePath),
     `Expected ${relative(filePath)}.`);
@@ -231,8 +231,10 @@ function fileEvidence(filePath, parsed = null) {
 }
 
 function authorityRetained(value) {
-  return value && Object.entries(AUTHORITY)
-    .every(([key, expected]) => value[key] === expected);
+  return value && typeof value === 'object'
+    && REQUIRED_FALSE_AUTHORITY.every((key) => value[key] === false)
+    && Object.values(value).every((entry) =>
+      typeof entry !== 'boolean' || entry === false);
 }
 
 function executionContext() {
