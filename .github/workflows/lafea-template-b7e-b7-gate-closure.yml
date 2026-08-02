@@ -1,0 +1,110 @@
+name: LAFEA B7E B7 Gate Closure
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/lafea-template-b7e-b7-gate-closure.yml'
+      - 'scripts/lafea-template-b7e-b7-gate-closure-check.mjs'
+      - 'docs/LAFEA_Bucket_B7E_B7_Gate_Closure.md'
+      - '.github/workflows/lafea-template-b7d-controlled-continuum-controller.yml'
+      - 'scripts/lafea-template-b7d-controlled-continuum-controller-check.mjs'
+      - 'src/workspace/lafea-controlled-continuum-controller.js'
+      - 'src/workspace/lafea-controlled-continuum-stage-route.js'
+      - 'src/workspace/lafea-controlled-continuum-public.js'
+      - 'src/core/lafea-application-templates/controlled-continuum-pilot-contract.js'
+      - 'src/core/lafea-application-templates/continuum-benchmark-convergence.js'
+      - 'src/core/lafea-application-templates/continuum-application-mapping-evidence.js'
+      - 'src/workspace/lafea-lug-pinhole-mapping-evidence.js'
+      - 'src/workspace/lafea-template-caller-mesh-binding.js'
+      - 'src/workspace/lafea-analysis-mesh-evidence.js'
+      - 'src/workspace/lafea-lifecycle.js'
+      - 'src/workspace/lafea-source-authority.js'
+      - 'src/workspace/lafea-workbench-model.js'
+      - 'src/core/local-continuum/**'
+      - 'package.json'
+      - 'package-lock.json'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/lafea-template-b7e-b7-gate-closure.yml'
+      - 'scripts/lafea-template-b7e-b7-gate-closure-check.mjs'
+      - 'docs/LAFEA_Bucket_B7E_B7_Gate_Closure.md'
+      - '.github/workflows/lafea-template-b7d-controlled-continuum-controller.yml'
+      - 'scripts/lafea-template-b7d-controlled-continuum-controller-check.mjs'
+      - 'src/workspace/lafea-controlled-continuum-controller.js'
+      - 'src/workspace/lafea-controlled-continuum-stage-route.js'
+      - 'src/workspace/lafea-controlled-continuum-public.js'
+      - 'src/core/lafea-application-templates/**'
+      - 'src/workspace/lafea-lug-pinhole-mapping-evidence.js'
+      - 'src/workspace/lafea-template-caller-mesh-binding.js'
+      - 'src/workspace/lafea-analysis-mesh-evidence.js'
+      - 'src/workspace/lafea-lifecycle.js'
+      - 'src/workspace/lafea-source-authority.js'
+      - 'src/workspace/lafea-workbench-model.js'
+      - 'src/core/local-continuum/**'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lafea-b7e-b7-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: B7E exact-head B7 qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || '4ea645b91c8b74fae3d2e8af31278d52505cac84' }}
+      B7E_REPORT_PATH: reports/qualification/lafea-b7e-b7-gate-closure.json
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Assert exact checkout and B7D ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          git merge-base --is-ancestor \
+            4ea645b91c8b74fae3d2e8af31278d52505cac84 \
+            "$EXPECTED_HEAD_SHA"
+          git merge-base --is-ancestor "$PR_BASE_SHA" "$EXPECTED_HEAD_SHA"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Execute B7E aggregate gate
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/lafea-template-b7e-b7-gate-closure-check.mjs \
+            2>&1 | tee lafea-b7e-b7-gate-closure.log
+
+      - name: Upload exact-head B7E evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-b7e-b7-gate-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            lafea-b7e-b7-gate-closure.log
+            reports/qualification/lafea-b7e-b7-gate-closure.json
+          if-no-files-found: error
+          retention-days: 30
