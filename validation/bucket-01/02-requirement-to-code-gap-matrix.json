@@ -1,6 +1,6 @@
 {
   "schema": "lafea-bucket-01-gap-matrix/v7",
-  "audited_baseline_sha": "36a5fcb82c3f4ac841df12af0d77974bb37541d6",
+  "audited_baseline_sha": "3c069f80e36788d6a3097f6be027890020c5f894",
   "superseded_baselines": [
     "a7144e02598f3e9db0826f10cefe0b5254fa953e",
     "27fb14ddccb07081904d54c1bae161c87372dbdd",
@@ -11,14 +11,15 @@
     "2d2e22288ad040c882638100c662debbdae38663",
     "7c83060087f6c286c9efa7a84eee546d57a34a83",
     "192a3513061a634e9dc995cf6740374e6afbc1de",
-    "40404b51d39b29a6c7c2ab7095480099d1cc1fe4"
+    "40404b51d39b29a6c7c2ab7095480099d1cc1fe4",
+    "36a5fcb82c3f4ac841df12af0d77974bb37541d6"
   ],
   "superseded_baseline_disposition": "STALE_NOT_QUALIFICATION_EVIDENCE",
   "mainline_delta_review": {
     "continuum_bucket_files_changed": false,
     "qualification_parent_refreshed": true,
-    "latest_reviewed_main_commit": "36a5fcb82c3f4ac841df12af0d77974bb37541d6",
-    "changes_confined_to_separate_enriched_staged_json_qualification_files": true
+    "latest_reviewed_main_commit": "3c069f80e36788d6a3097f6be027890020c5f894",
+    "changes_confined_to_separate_common_enriched_candidate_assembly_files": true
   },
   "execution_policy": {
     "hosted_workflow_in_scope": false,
