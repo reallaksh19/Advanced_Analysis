@@ -10,6 +10,7 @@ on:
       - "src/workspace/topology-edit/topology-edit-worker.js"
       - "tests/topology-edit-track-c.test.mjs"
       - "tests/fixtures/topology-edit/large-model/**"
+      - "tests/fixtures/topology-edit/1885s/prerequisite-manifest.json"
       - "scripts/topology-edit-write-track-c-evidence.mjs"
   workflow_dispatch:
 
