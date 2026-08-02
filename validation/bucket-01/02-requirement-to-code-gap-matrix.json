@@ -1,0 +1,93 @@
+{
+  "schema": "lafea-bucket-01-gap-matrix/v2",
+  "audited_baseline_sha": "42c9f96e9baffb52232b4b7ed7f04611c6337961",
+  "superseded_baselines": [
+    "a7144e02598f3e9db0826f10cefe0b5254fa953e",
+    "27fb14ddccb07081904d54c1bae161c87372dbdd"
+  ],
+  "superseded_baseline_disposition": "STALE_NOT_QUALIFICATION_EVIDENCE",
+  "mainline_delta_review": {
+    "continuum_bucket_files_changed": false,
+    "changes_confined_to_separate_piping_qualification_files": true,
+    "qualification_parent_refreshed": true
+  },
+  "bucket_id": "LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE",
+  "findings": [
+    {
+      "id": "G1-EXACT-HEAD",
+      "status": "BLOCKED_PENDING_EXECUTION",
+      "finding": "Exact-head workflow and report route are required for the final candidate."
+    },
+    {
+      "id": "G2-PRODUCTION-MESH",
+      "status": "REPAIR_INFRASTRUCTURE_IMPLEMENTED",
+      "finding": "Existing annular T6 generator is evaluated independently for mapped area, radius, centre, ligament, perimeter, boundary deviation, midside placement, rotational symmetry, dense Jacobians, connectivity, shared edges, duplicates and feature sets."
+    },
+    {
+      "id": "G2-MAPPING-COVERAGE",
+      "status": "BLOCKED_PENDING_PRODUCTION_RECEIPT",
+      "finding": "Material, load and restraint coverage must remain separate from pure mesh geometry qualification."
+    },
+    {
+      "id": "G3-T6-PATCH",
+      "status": "EXISTING_STRONG_REGRESSION",
+      "finding": "The retained T6 patch covers distorted geometry, rigid motions, scaling, rotation and Jacobian rejection."
+    },
+    {
+      "id": "G3-T3-PATCH",
+      "status": "PARTIAL",
+      "finding": "Existing assembled T3 evidence is not yet a frozen Bucket-01 governed receipt at the manifest tolerance."
+    },
+    {
+      "id": "G3-PURE-SHEAR",
+      "status": "PARTIAL",
+      "finding": "Existing shear and energy checks require a named frozen independent Bucket-01 oracle."
+    },
+    {
+      "id": "G3-CANTILEVER-PANEL",
+      "status": "MISSING",
+      "finding": "No dedicated three-level manufactured panel or cantilever benchmark was identified."
+    },
+    {
+      "id": "G3-LOAD-DRIVEN",
+      "status": "EXISTING_PARTIAL",
+      "finding": "NB-T6D proves free DOFs, deterministic Cholesky and force closure, but production moment and energy convergence are not retained."
+    },
+    {
+      "id": "G4-STRESS-AUTHORITY",
+      "status": "REPAIR_INFRASTRUCTURE_IMPLEMENTED",
+      "finding": "Fixed element-local probes reconstruct tensor components from retained T6 integration points with no nodal projection or cross-element averaging."
+    },
+    {
+      "id": "G4-CONVERGENCE",
+      "status": "REPAIR_INFRASTRUCTURE_IMPLEMENTED",
+      "finding": "New evaluator provides observed order, Richardson extrapolation, GCI, asymptotic-range checks and oscillatory/non-monotonic blocking."
+    },
+    {
+      "id": "G4-PRODUCTION-STRESS",
+      "status": "BLOCKED_PENDING_EXECUTION",
+      "finding": "Production Kirsch and lug fixed-coordinate receipts are not yet generated."
+    },
+    {
+      "id": "G4-CODE",
+      "status": "BLOCKED_CODE_BASIS_NOT_FROZEN",
+      "finding": "No governing code, edition, allowable source, classification or independent code oracle is frozen."
+    },
+    {
+      "id": "G5-REPLAY",
+      "status": "BLOCKED_PENDING_THREE_REPLAYS",
+      "finding": "The final exact candidate requires three clean deterministic executions with retained report-data hashes."
+    }
+  ],
+  "qualification_states": {
+    "IMPLEMENTED": "PARTIAL_REPAIR_INFRASTRUCTURE",
+    "CONTRACT_VERIFIED": false,
+    "MESH_VERIFIED": false,
+    "SOLVER_VERIFIED": false,
+    "STRESS_VERIFIED": false,
+    "CODE_VERIFIED": false,
+    "INTEGRATION_VERIFIED": false,
+    "BUCKET_QUALIFIED": false
+  },
+  "final_disposition": "NOT_QUALIFIED"
+}
