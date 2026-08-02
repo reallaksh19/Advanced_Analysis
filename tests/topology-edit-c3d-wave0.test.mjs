@@ -106,13 +106,14 @@ test('layer presentation supports material arrays', () => {
   });
 });
 
-test('production controller consumes toolbar, runtime and explicit unavailable bases', async () => {
+test('production controller consumes presentation authority and explicit basis states', async () => {
   const controller = await readFile(new URL('../src/workspace/topology-edit-3d-view-controller.js', import.meta.url), 'utf8');
   const toolbar = await readFile(new URL('../src/workspace/viewport-presentation/topology-edit-presentation-toolbar.js', import.meta.url), 'utf8');
   assert.match(controller, /new TopologyEditPresentationToolbar/);
   assert.match(controller, /new TopologyEditPresentationRuntime/);
   assert.match(controller, /presentationRuntime\?\.apply\(this\.presentationState\)/);
-  assert.match(controller, /visualModelHash: null/);
+  assert.match(controller, /this\.visualModelHash = null/);
+  assert.match(controller, /visualModelHash: this\.visualModelHash/);
   assert.match(controller, /scopeHash: null/);
   assert.match(toolbar, /Presentation policy information/);
   assert.match(toolbar, /state\.policy\.disclosure/);
