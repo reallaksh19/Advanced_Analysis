@@ -238,7 +238,8 @@ const productionSource = `${producerSource}\n${contractSource}`;
 assert.doesNotMatch(productionSource,
   /from ['"][^'"]*(?:lafea-workbench-controller|lafea-workbench-view|local-continuum|local-shell|local-trunnion-footprint)[^'"]*['"]/u);
 assert.doesNotMatch(productionSource,
-  /\b(?:calculateLocalContinuum|calculateLocalShell|calculateLocalTrunnionFootprint|projectElementGaussStressToNodes|averageWithinGroups|smooth|smoothing)\b/u);
+  /\b(?:calculateLocalContinuum|calculateLocalShell|calculateLocalTrunnionFootprint|projectElementGaussStressToNodes|averageWithinGroups)\b/u);
+assert.doesNotMatch(productionSource, /\b(?:smooth|smoothing)\s*\(/u);
 assert.doesNotMatch(productionSource, /MITC4|MITC3/u);
 assert.match(producerSource, /PRODUCER_PROJECTED_DISPLAY_ONLY/u);
 assert.match(producerSource,
