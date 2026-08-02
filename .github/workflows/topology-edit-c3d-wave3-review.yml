@@ -1,0 +1,69 @@
+name: C3D Wave 3 Review Completion
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/topology-edit-c3d-wave3-review.yml'
+      - 'src/workspace/topology-edit-3d-inspection-controller.js'
+      - 'src/workspace/viewport-productivity/topology-edit-review-*.js'
+      - 'src/workspace/viewport-productivity/topology-edit-provenance-model.js'
+      - 'tests/topology-edit-c3d-wave3-review.test.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  review-completion:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_HEAD_SHA }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: |
+          test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
+          git merge-base --is-ancestor "$PR_BASE_SHA" "$TARGET_HEAD_SHA"
+      - run: npm ci
+      - name: Syntax and module boundaries
+        run: |
+          node --check src/workspace/topology-edit-3d-inspection-controller.js
+          node --check src/workspace/viewport-productivity/topology-edit-review-bookmark.js
+          node --check src/workspace/viewport-productivity/topology-edit-provenance-model.js
+          node --check src/workspace/viewport-productivity/topology-edit-review-panel.js
+          for file in \
+            src/workspace/topology-edit-3d-inspection-controller.js \
+            src/workspace/viewport-productivity/topology-edit-review-bookmark.js \
+            src/workspace/viewport-productivity/topology-edit-provenance-model.js \
+            src/workspace/viewport-productivity/topology-edit-review-panel.js; do
+            test "$(wc -l < "$file")" -le 300
+          done
+      - name: Focused review qualification
+        run: node --test tests/topology-edit-c3d-wave3-review.test.mjs
+      - name: Retain C3D review and inspection chain
+        run: |
+          node --test tests/topology-edit-c3d-wave2-search.test.mjs
+          node --test tests/topology-edit-c3d-wave4-issue-review.test.mjs
+          node --test tests/topology-edit-c3d-wave5-inspection-measurement.test.mjs
+      - name: Retain Track B authority
+        run: |
+          node --test tests/topology-edit-wave3c-autofix-ui.test.mjs
+          node --test tests/topology-edit-wave4a-persistence-export.test.mjs
+          node --test tests/topology-edit-wave4b-commit-rollback.test.mjs
+          node --test tests/topology-edit-wave4c-lifecycle-ui.test.mjs
+      - name: Governance and build
+        run: |
+          node scripts/topology-edit-source-drift-check.mjs
+          node scripts/topology-edit-api-drift-check.mjs
+          node scripts/topology-edit-prohibited-imports.mjs
+          npm run build
+          git diff --check "$PR_BASE_SHA...HEAD"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
