@@ -1,0 +1,92 @@
+name: LAFEA B7H Self-Hosted Gate Closure
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lafea-b7h-self-hosted-main
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    name: B7H self-hosted exact-current-main qualification
+    runs-on: [self-hosted, linux, x64, lafea]
+    timeout-minutes: 240
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.sha }}
+      B7E_REPORT_PATH: reports/qualification/lafea-b7e-b7-gate-closure.json
+      B7F_REPORT_PATH: reports/qualification/lafea-b7f-current-main-qualification.json
+      B7G_BUNDLE_PATH: reports/qualification/lafea-b7g-portable-qualification-bundle.json
+      B7G_LOG_PATH: reports/qualification/lafea-b7g-portable-qualification.log
+      B7H_REPORT_PATH: reports/qualification/lafea-b7h-self-hosted-gate-closure.json
+
+    steps:
+      - name: Check out dispatched exact main head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Assert exact current main and required ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_EVENT_NAME}" = "workflow_dispatch"
+          test "${GITHUB_REF}" = "refs/heads/main"
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD_SHA}"
+          git fetch --no-tags --prune origin main
+          test "$(git rev-parse refs/remotes/origin/main)" = "${EXPECTED_HEAD_SHA}"
+          git merge-base --is-ancestor \
+            c4d4af771eee0cfb51a6776ee1da9813bb5c5e47 \
+            "${EXPECTED_HEAD_SHA}"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Produce exact-current-main B7G evidence
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/lafea-template-b7g-portable-qualification-bundle.mjs \
+            2>&1 | tee lafea-b7h-self-hosted-execution.log
+
+      - name: Independently verify B7G evidence
+        run: >-
+          node scripts/lafea-template-b7g-portable-qualification-verify.mjs
+          "$B7G_BUNDLE_PATH"
+
+      - name: Evaluate B7H gate closure contract
+        run: node scripts/lafea-template-b7h-self-hosted-gate-closure-check.mjs
+
+      - name: Verify exact-head hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check HEAD^
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Upload retained B7H evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-b7h-self-hosted-${{ github.sha }}
+          path: |
+            lafea-b7h-self-hosted-execution.log
+            reports/qualification/lafea-b7e-b7-gate-closure.json
+            reports/qualification/lafea-b7f-current-main-qualification.json
+            reports/qualification/lafea-b7g-portable-qualification-bundle.json
+            reports/qualification/lafea-b7g-portable-qualification.log
+            reports/qualification/lafea-b7h-self-hosted-gate-closure.json
+          if-no-files-found: error
+          retention-days: 90
