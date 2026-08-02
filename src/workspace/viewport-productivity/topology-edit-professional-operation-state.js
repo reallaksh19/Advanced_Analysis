@@ -83,6 +83,13 @@ export function renderTopologyEditProfessionalRuntime(runtime) {
 export function updateTopologyEditProfessionalEvidence(runtime) {
   const host = runtime.controller.hostElement;
   if (!host) return;
+  const session = runtime.controller.session;
+  host.dataset.topologyEditCanonicalHash = session?.currentTopology()?.canonicalTopologyHash ?? '';
+  host.dataset.topologyEditJournalHash = session?.journal?.journalHash ?? '';
+  host.dataset.topologyEditSessionVersion = String(session?.journal?.sessionVersion ?? '');
+  host.dataset.topologyEditActiveCommandCount = String(
+    session?.journal?.activeCommandIds?.length ?? 0,
+  );
   host.dataset.topologyEditProfessionalCatalogueHash = runtime.catalogue?.catalogueHash ?? '';
   host.dataset.topologyEditProfessionalPlanHash = runtime.plan?.planHash ?? '';
   host.dataset.topologyEditProfessionalCandidateHash = runtime.candidate?.candidateHash ?? '';
