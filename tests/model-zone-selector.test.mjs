@@ -8,6 +8,7 @@ import {
   createModelZoneSelection,
   filterResolvedGeometryForModelZone,
   projectDatasetForModelZone,
+  reconcileModelZoneSelection,
 } from '../src/workspace/model-zone-selector.js';
 import { RESOLVED_ENGINEERING_GEOMETRY_SCHEMA } from '../src/workspace/resolved-engineering-geometry.js';
 
@@ -47,15 +48,25 @@ test('zone catalog is source-backed, deterministic, and naturally sorted', () =>
   assert.equal(Object.isFrozen(catalog), true);
 });
 
-test('selection resets to All zones for each newly loaded dataset', () => {
-  const first = buildModelZoneCatalog(dataset('dataset:first'));
-  const selected = createModelZoneSelection(first, 'ZONE-2');
-  assert.equal(selected.zoneId, 'ZONE-2');
-  const second = buildModelZoneCatalog(dataset('dataset:second'));
-  const reset = createModelZoneSelection(second);
+test('selection resets for a newly loaded dataset and survives same-dataset edits', () => {
+  const initial = buildModelZoneCatalog(dataset('dataset:first'));
+  const selected = createModelZoneSelection(initial, 'ZONE-2');
+  const edited = buildModelZoneCatalog(dataset('dataset:first'));
+  assert.equal(reconcileModelZoneSelection(edited, selected).zoneId, 'ZONE-2');
+  const nextModel = buildModelZoneCatalog(dataset('dataset:second'));
+  const reset = reconcileModelZoneSelection(nextModel, selected);
   assert.equal(reset.datasetId, 'dataset:second');
   assert.equal(reset.zoneId, '');
   assert.equal(reset.label, 'All zones');
+});
+
+test('selection falls back to All zones when an edited dataset removes its zone', () => {
+  const initial = buildModelZoneCatalog(dataset());
+  const selected = createModelZoneSelection(initial, 'ZONE-2');
+  const changed = dataset();
+  changed.entities = changed.entities.filter((row) => row.zoneId !== 'ZONE-2');
+  const reconciled = reconcileModelZoneSelection(buildModelZoneCatalog(changed), selected);
+  assert.equal(reconciled.zoneId, '');
 });
 
 test('dataset projection filters tree entities without mutating source authority', () => {
@@ -114,6 +125,7 @@ test('production tree and viewport consume the selector without workspace mutati
   assert.match(events, /MODEL_ZONE_EVENTS\.CHANGED/);
   assert.match(viewport, /filterResolvedGeometryForModelZone/);
   assert.match(viewport, /projectDatasetForModelZone/);
+  assert.match(selector, /reconcileModelZoneSelection/);
   for (const prohibited of ['WorkspaceState.loadDataset', 'WorkspaceState.clearDataset', 'rebuildWorkspaceDataset']) {
     assert.equal(selector.includes(prohibited), false, `selector must not use ${prohibited}`);
   }
