@@ -130,10 +130,11 @@ export class TopologyEditInteractionControllerRuntime {
   }
 
   destroy() {
-    this.viewport?.destroy();
+    const viewport = this.viewport;
     this.viewport = null;
     this.gizmo = null;
     this.activeMode = null;
+    viewport?.destroy();
   }
 }
 
