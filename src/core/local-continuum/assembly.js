@@ -17,7 +17,7 @@ export function assembleMesh(model, elementEvidence) {
   ]);
   const dofIndex = new Map(dofOrdering.map((id, index) => [id, index]));
   const sparse = dofOrdering.length > DENSE_STIFFNESS_DOF_LIMIT;
-  let globalStiffnessMatrix = null;
+  let denseStiffness = null;
   let globalStiffnessCsr = null;
   if (sparse) {
     globalStiffnessCsr = assembleSymmetricCsr(
@@ -26,16 +26,16 @@ export function assembleMesh(model, elementEvidence) {
       dofIndex,
     );
   } else {
-    globalStiffnessMatrix = zeros(dofOrdering.length, dofOrdering.length);
+    denseStiffness = zeros(dofOrdering.length, dofOrdering.length);
     elementEvidence.forEach((element) =>
-      assembleDenseElement(globalStiffnessMatrix, element, dofIndex));
+      assembleDenseElement(denseStiffness, element, dofIndex));
   }
   const residual = sparse
     ? sparseSymmetryResidual(globalStiffnessCsr)
-    : symmetryResidual(globalStiffnessMatrix);
+    : symmetryResidual(denseStiffness);
   const scale = sparse
     ? sparseMatrixScale(globalStiffnessCsr)
-    : matrixScale(globalStiffnessMatrix);
+    : matrixScale(denseStiffness);
   const limit = tolerance(model.qualificationProfile, 'stiffnessSymmetry', scale);
   if (residual > limit) {
     throw numericalError(
@@ -47,8 +47,10 @@ export function assembleMesh(model, elementEvidence) {
   const boundaryEdges = buildBoundaryEdges(model.elements);
   return {
     dofOrdering,
-    globalStiffnessMatrix: globalStiffnessMatrix?.map((row) =>
-      row.map((value) => canonicalNumber(value, 'global stiffness'))),
+    globalStiffnessMatrix: sparse
+      ? globalStiffnessCsr
+      : denseStiffness.map((row) => row.map((value) =>
+        canonicalNumber(value, 'global stiffness'))),
     globalStiffnessCsr,
     globalStiffnessStorage: sparse ? SPARSE_STIFFNESS_STORAGE : 'DENSE',
     globalStiffnessSymmetry: {
