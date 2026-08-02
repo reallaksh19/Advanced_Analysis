@@ -1,17 +1,18 @@
 {
   "schema": "lafea-bucket-01-gap-matrix/v5",
-  "audited_baseline_sha": "6763f73697c9e8f4ec59feaa306edf8d296861b1",
+  "audited_baseline_sha": "7c49c20c0b4d83f764bc351865dc3d1ae3fabf92",
   "superseded_baselines": [
     "a7144e02598f3e9db0826f10cefe0b5254fa953e",
     "27fb14ddccb07081904d54c1bae161c87372dbdd",
     "42c9f96e9baffb52232b4b7ed7f04611c6337961",
-    "cbd4d3e7397a3d64869d9be1c360af7d1d4ecdc8"
+    "cbd4d3e7397a3d64869d9be1c360af7d1d4ecdc8",
+    "6763f73697c9e8f4ec59feaa306edf8d296861b1"
   ],
   "superseded_baseline_disposition": "STALE_NOT_QUALIFICATION_EVIDENCE",
   "mainline_delta_review": {
     "continuum_bucket_files_changed": false,
     "qualification_parent_refreshed": true,
-    "latest_reviewed_main_commit": "6763f73697c9e8f4ec59feaa306edf8d296861b1",
+    "latest_reviewed_main_commit": "7c49c20c0b4d83f764bc351865dc3d1ae3fabf92",
     "changes_confined_to_separate_piping_governance_and_common_enrichment_files": true
   },
   "execution_policy": {
@@ -49,7 +50,7 @@
     {
       "id": "G3-PURE-SHEAR",
       "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION",
-      "finding": "A frozen closed-form pure-shear oracle and governed T3 receipt now cover plane stress and plane strain, exact affine displacement, engineering shear strain, tau_xy, principal and von Mises stress, strain energy, four-edge traction-to-nodal parity, prescribed-displacement parity, nontrivial nodal boundary-force reconstruction, force and moment equilibrium, and three deterministic replays at 1e-8 normalized tolerances."
+      "finding": "A frozen closed-form pure-shear oracle and governed T3 receipt now cover plane stress and plane strain, exact affine displacement, engineering shear strain, tau_xy, principal and von Mises stress, strain energy, four-edge traction-to-nodal parity, prescribed-displacement parity through a separate fully imposed model, nontrivial nodal boundary-force reconstruction, force and moment equilibrium, and three deterministic replays at 1e-8 normalized tolerances."
     },
     {
       "id": "G3-CANTILEVER-PANEL",
