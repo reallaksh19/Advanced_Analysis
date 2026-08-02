@@ -15,4 +15,5 @@ export * from './publication.js';
 export * from './publication-orchestration.js';
 export * from './consumer-readiness-evaluation.js';
 export * from './consumer-handoff.js';
+export * from './consumer-projection.js';
 export * from './consumer-readiness.js';
