@@ -29,7 +29,7 @@ jobs:
         shell: bash
         run: |
           test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
-          git merge-base --is-ancestor 27fb14ddccb07081904d54c1bae161c87372dbdd "$CANDIDATE_SHA"
+          git merge-base --is-ancestor 42c9f96e9baffb52232b4b7ed7f04611c6337961 "$CANDIDATE_SHA"
 
       - name: Install locked dependencies
         run: npm ci
