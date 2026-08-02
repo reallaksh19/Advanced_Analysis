@@ -1,5 +1,5 @@
 {
-  "schema": "lafea-bucket-01-benchmark-manifest/v2",
+  "schema": "lafea-bucket-01-benchmark-manifest/v3",
   "manifest_status": "BASELINE_FROZEN_WITH_UNRESOLVED_GATES",
   "repository": "reallaksh19/Advanced_Analysis",
   "baseline_main_sha": "42c9f96e9baffb52232b4b7ed7f04611c6337961",
@@ -52,7 +52,7 @@
     "C2D-PATCH-T3-01",
     "C2D-PATCH-T6-01",
     "C2D-PATCH-PURE-SHEAR-01",
-    "C2D-CANTILEVER-PLANE-STRESS-01",
+    "C2D-PURE-BENDING-PANEL-T6-01",
     "C2D-KIRSCH-HOLE-01",
     "C2D-LUG-PINHOLE-01"
   ],
@@ -96,8 +96,27 @@
     "production_output_may_generate_expected_values": false,
     "independent_oracle_required": true,
     "failed_benchmarks_must_be_retained": true,
+    "frozen_oracle_status": "PARTIAL_PACKAGE",
+    "frozen_oracle_files": [
+      "validation/bucket-01/03-pure-bending-panel-oracle.json",
+      "validation/bucket-01/04-t3-patch-oracle.json"
+    ],
     "expected_value_package_hash": "UNRESOLVED_GATE"
   },
+  "governed_receipts": [
+    {
+      "benchmark_id": "C2D-PATCH-T3-01",
+      "script": "scripts/lafea-bucket-01-t3-patch-check.mjs",
+      "oracle": "validation/bucket-01/04-t3-patch-oracle.json",
+      "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION"
+    },
+    {
+      "benchmark_id": "C2D-PURE-BENDING-PANEL-T6-01",
+      "script": "scripts/lafea-bucket-01-pure-bending-panel-check.mjs",
+      "oracle": "validation/bucket-01/03-pure-bending-panel-oracle.json",
+      "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION"
+    }
+  ],
   "code_basis": {
     "status": "UNRESOLVED_GATE",
     "governing_code": null,
