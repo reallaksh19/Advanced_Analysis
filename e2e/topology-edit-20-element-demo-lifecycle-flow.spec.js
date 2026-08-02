@@ -27,6 +27,7 @@ test('repaired demo saves, reloads, exports, commits, and reopens exactly', asyn
   expect(repaired.activeCommandCount).toBe(4);
 
   const selectedNodeId = await selectPort(page, 'P-004:port:start', false);
+  expect(selectedNodeId).toMatch(/^node:/u);
   await page.locator('[data-action="hide-selected"]').click();
   await expect(page.locator('[data-role="presentation-visibility-status"]'))
     .toHaveText('Hidden: 1');
@@ -109,8 +110,15 @@ test('repaired demo saves, reloads, exports, commits, and reopens exactly', asyn
   await expect(targetedOverlapIssue(page)).toHaveCount(0);
   await attachScreenshot(page, testInfo, 'workspace-commit-verified');
 
-  await page.getByRole('button', { name: 'Dataset Table', exact: true }).click();
-  await page.getByRole('button', { name: '3D Edit', exact: true }).click();
+  const webglTab = page.locator(
+    '[data-action="switch-viewport-tab"][data-tab="webgl"]',
+  );
+  const topologyEditTab = page.locator(
+    '[data-action="switch-viewport-tab"][data-tab="topology-edit"]',
+  );
+  await webglTab.click();
+  await expect(host).toBeHidden();
+  await topologyEditTab.click();
   const reopenedHost = page.locator('[data-role="topology-edit-render-host"]');
   await expect(reopenedHost).toBeVisible();
   await expect(reopenedHost).toHaveAttribute('data-topology-edit-active-command-count', '0');
