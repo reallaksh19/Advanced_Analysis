@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as analyticalProducts from '../src/workspace/lafea-analytical-product-producers.js';
 import * as meshEvidence from '../src/workspace/lafea-analysis-mesh-evidence.js';
 import * as recoveryRender from '../src/workspace/lafea-recovery-render-producer.js';
+import * as continuumPilot from '../src/workspace/lafea-controlled-continuum-pilot-controller.js';
 import * as compositionBindings from '../src/workspace/lafea-stage-composition-bindings.js';
 import * as compositionRoot from '../src/workspace/lafea-stage-composition-root.js';
 import * as hash from '../src/workspace/lafea-canonical-sha256.js';
@@ -97,6 +98,14 @@ const groups = Object.freeze([
     'lafeaRecoveryRenderProfileHash',
     'registerLafeaRecoveryRenderPackage',
   ]],
+  [continuumPilot, [
+    'LAFEA_CONTROLLED_CONTINUUM_CONVERGENCE_PROFILE_SCHEMA',
+    'LAFEA_CONTROLLED_CONTINUUM_CONTROLLER_RESULT_SCHEMA',
+    'LAFEA_CONTROLLED_CONTINUUM_CONTROLLER_REVISION',
+    'LAFEA_CONTROLLED_CONTINUUM_RECOVERY_PROFILE_SCHEMA',
+    'LAFEA_CONTROLLED_CONTINUUM_RECOVERY_QUANTITIES',
+    'executeControlledLafeaContinuumPilot',
+  ]],
   [store, [
     'LAFEA_CALCULATION_STATES', 'LAFEA_CODE_STATES',
     'LAFEA_LIFECYCLE_BINDING_SCHEMA', 'LAFEA_LIFECYCLE_BINDING_STATUSES',
@@ -137,6 +146,12 @@ assert.equal(publicApi.LAFEA_RECOVERY_RENDER_INTAKE_SCHEMA,
   'lafea-recovery-render-intake/v1');
 assert.equal(publicApi.LAFEA_RECOVERY_RENDER_PACKAGE_SCHEMA,
   'lafea-recovery-render-package/v1');
+assert.equal(publicApi.LAFEA_CONTROLLED_CONTINUUM_CONTROLLER_RESULT_SCHEMA,
+  'lafea-controlled-continuum-controller-result/v1');
+assert.equal(publicApi.LAFEA_CONTROLLED_CONTINUUM_RECOVERY_PROFILE_SCHEMA,
+  'lafea-controlled-continuum-recovery-profile/v1');
+assert.equal(publicApi.LAFEA_CONTROLLED_CONTINUUM_CONVERGENCE_PROFILE_SCHEMA,
+  'lafea-controlled-continuum-convergence-profile/v1');
 assert.equal(publicApi.LAFEA_WORKBENCH_STATE_SCHEMA, 'lafea-workbench-state/v2');
 assert.equal(publicApi.LAFEA_TEMPLATE_EXECUTION_CONTROLLER_RESULT_SCHEMA,
   'lafea-template-execution-controller-result/v1');
@@ -163,6 +178,7 @@ console.log(JSON.stringify({
   analyticalProductProducersPublic: true,
   analysisMeshEvidencePublic: true,
   recoveryRenderProducerPublic: true,
+  controlledContinuumPilotPublic: true,
   analyticalPilotControllerPublic: true,
   calculationResultCodeReleaseStatesPublic: true,
   stageCorrectProfilesPublic: true,
