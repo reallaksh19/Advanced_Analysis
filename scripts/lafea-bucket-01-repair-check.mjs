@@ -14,6 +14,10 @@ const REPORT_PATH = path.resolve(
 
 const checkDefinitions = [
   {
+    id: 'PRODUCTION_T6_MESH_QUALIFICATION',
+    script: 'scripts/lafea-bucket-01-mesh-qualification-check.mjs',
+  },
+  {
     id: 'THREE_LEVEL_GCI_EVALUATOR',
     script: 'scripts/lafea-bucket-01-convergence-check.mjs',
   },
@@ -29,14 +33,16 @@ const checkDefinitions = [
 
 const checks = checkDefinitions.map((definition) => runNodeCheck(definition));
 const failed = checks.filter((check) => check.status !== 'PASS');
+const repairChecksPass = failed.length === 0;
 const report = {
   schema: 'lafea-bucket-01-repair-check-report/v1',
-  status: failed.length === 0 ? 'REPAIR_CHECKS_PASS' : 'REPAIR_CHECKS_FAIL',
+  status: repairChecksPass ? 'REPAIR_CHECKS_PASS' : 'REPAIR_CHECKS_FAIL',
   bucketId: 'LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE',
   target: 'C2D-LUG-PINHOLE -> LAFEA.3',
   checks,
   blockingCheckIds: failed.map((check) => check.id),
   evidenceState: {
+    productionMeshQualificationEvidenceGenerated: repairChecksPass,
     productionProbeEvidenceGenerated: false,
     independentOracleFrozen: false,
     exactHeadRepositoryExecutionProven: false,
@@ -52,8 +58,9 @@ const report = {
     bucketQualified: false,
   },
   authority: {
-    fixedPhysicalProbeInfrastructureImplemented: failed.length === 0,
-    asymptoticGciInfrastructureImplemented: failed.length === 0,
+    meshQualificationInfrastructureImplemented: repairChecksPass,
+    fixedPhysicalProbeInfrastructureImplemented: repairChecksPass,
+    asymptoticGciInfrastructureImplemented: repairChecksPass,
     movingMaximumAcceptanceAuthorized: false,
     nodalProjectionAcceptanceAuthorized: false,
     arbitraryGeometryAuthorized: false,
@@ -62,7 +69,7 @@ const report = {
     reportAuthority: false,
     releaseQualified: false,
   },
-  disposition: failed.length === 0
+  disposition: repairChecksPass
     ? 'REPAIR_INFRASTRUCTURE_ACCEPTED_BUCKET_NOT_QUALIFIED'
     : 'REPAIR_INFRASTRUCTURE_FAILED_BUCKET_NOT_QUALIFIED',
 };
@@ -70,7 +77,7 @@ const report = {
 fs.mkdirSync(path.dirname(REPORT_PATH), { recursive: true });
 fs.writeFileSync(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 console.log(JSON.stringify(report));
-if (failed.length !== 0) process.exit(1);
+if (!repairChecksPass) process.exit(1);
 
 function runNodeCheck(definition) {
   const result = spawnSync(process.execPath, [definition.script], {
