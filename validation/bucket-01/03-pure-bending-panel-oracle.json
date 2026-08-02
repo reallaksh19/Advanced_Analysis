@@ -1,0 +1,58 @@
+{
+  "schema": "lafea-bucket-01-pure-bending-oracle/v1",
+  "oracleId": "B01-PURE-BENDING-PANEL-CLOSED-FORM-01",
+  "formulation": "PLANE_STRESS",
+  "units": {
+    "length": "mm",
+    "force": "N",
+    "stress": "MPa",
+    "modulus": "MPa"
+  },
+  "geometry": {
+    "length": 100,
+    "height": 20,
+    "thickness": 10
+  },
+  "material": {
+    "elasticModulus": 200000,
+    "poissonRatio": 0.3
+  },
+  "loading": {
+    "endMoment": 100000
+  },
+  "meshLevels": [
+    { "levelId": "L1", "nx": 2, "ny": 2 },
+    { "levelId": "L2", "nx": 4, "ny": 4 },
+    { "levelId": "L3", "nx": 8, "ny": 8 }
+  ],
+  "expected": {
+    "secondMomentArea": 6666.666666666667,
+    "curvature": 0.000075,
+    "tipCenterlineUy": 0.375,
+    "strainEnergy": 375,
+    "maxAbsSigmaX": 150,
+    "appliedForceResultant": { "x": 0, "y": 0 },
+    "appliedMomentZ": 100000
+  },
+  "tolerances": {
+    "normalizedDisplacement": 1e-8,
+    "normalizedStress": 1e-8,
+    "relativeEnergy": 1e-8,
+    "relativeForceEquilibrium": 1e-8,
+    "relativeMomentEquilibrium": 1e-8
+  },
+  "equations": [
+    "I = thickness * height^3 / 12",
+    "kappa = M / (E * I)",
+    "u_x(x,y) = -kappa * x * y",
+    "u_y(x,y) = kappa * (x^2 + nu * y^2) / 2",
+    "sigma_x(y) = -M * y / I",
+    "sigma_y = tau_xy = sigma_z = 0",
+    "U = M^2 * length / (2 * E * I)"
+  ],
+  "authority": {
+    "source": "CLOSED_FORM_2D_PLANE_STRESS_PURE_BENDING",
+    "productionOutputUsed": false,
+    "smoothedStressUsed": false
+  }
+}
