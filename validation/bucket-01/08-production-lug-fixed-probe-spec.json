@@ -1,0 +1,131 @@
+{
+  "schema": "lafea-bucket-01-production-lug-probe-spec/v1",
+  "specId": "B01-PRODUCTION-LUG-FIXED-STRESS-01",
+  "benchmarkId": "C2D-LUG-PINHOLE-01",
+  "stageId": "LAFEA.3",
+  "formulation": "PLANE_STRESS",
+  "units": {
+    "length": "mm",
+    "stress": "MPa"
+  },
+  "geometry": {
+    "center": {
+      "x": 0,
+      "y": 0
+    },
+    "holeRadius": 20,
+    "outerRadius": 100
+  },
+  "loadCaseId": "LC1",
+  "meshLadder": [
+    {
+      "ordinal": 1,
+      "elementCount": 64,
+      "meshSize": 0.0625,
+      "radialDivisions": 2,
+      "circumferentialDivisions": 16
+    },
+    {
+      "ordinal": 2,
+      "elementCount": 256,
+      "meshSize": 0.03125,
+      "radialDivisions": 4,
+      "circumferentialDivisions": 32
+    },
+    {
+      "ordinal": 3,
+      "elementCount": 1024,
+      "meshSize": 0.015625,
+      "radialDivisions": 8,
+      "circumferentialDivisions": 64
+    }
+  ],
+  "probes": [
+    {
+      "probeId": "LUG_NEAR_HOLE_PMAX",
+      "radius": 27,
+      "angleDegrees": 83,
+      "x": 3.2904722719389823,
+      "y": 26.798746094315693,
+      "component": "PRINCIPAL_MAXIMUM",
+      "units": "MPa",
+      "zone": "HIGH_GRADIENT"
+    },
+    {
+      "probeId": "LUG_LOAD_SIDE_VM",
+      "radius": 33,
+      "angleDegrees": 17,
+      "x": 31.55805694678017,
+      "y": 9.648266255850313,
+      "component": "VON_MISES",
+      "units": "MPa",
+      "zone": "HIGH_GRADIENT"
+    }
+  ],
+  "paths": [
+    {
+      "pathId": "LUG_RADIAL_PATH_THETA_67",
+      "angleDegrees": 67,
+      "component": "VON_MISES",
+      "units": "MPa",
+      "stations": [
+        {
+          "stationId": "R27",
+          "radius": 27,
+          "x": 10.54974046921039,
+          "y": 24.85363104321589,
+          "zone": "HIGH_GRADIENT"
+        },
+        {
+          "stationId": "R33",
+          "radius": 33,
+          "x": 12.894127240146032,
+          "y": 30.37666016393053,
+          "zone": "HIGH_GRADIENT"
+        },
+        {
+          "stationId": "R47",
+          "radius": 47,
+          "x": 18.364363038995865,
+          "y": 43.2637281122647,
+          "zone": "NON_SINGULAR"
+        },
+        {
+          "stationId": "R73",
+          "radius": 73,
+          "x": 28.52337237971698,
+          "y": 67.19685430202814,
+          "zone": "NON_SINGULAR"
+        },
+        {
+          "stationId": "R87",
+          "radius": 87,
+          "x": 33.99360817856682,
+          "y": 80.0839222503623,
+          "zone": "NON_SINGULAR"
+        }
+      ]
+    }
+  ],
+  "tolerances": {
+    "highGradientGciMax": 0.05,
+    "nonSingularGciMax": 0.03,
+    "minimumObservedOrder": null,
+    "asymptoticRatioBounds": {
+      "minimum": 0.5,
+      "maximum": 1.5
+    },
+    "mappingResidualMax": 1e-8,
+    "naturalCoordinateMarginMin": 0.0001
+  },
+  "authority": {
+    "coordinatesFrozenBeforeProductionStressObservation": true,
+    "productionOutputUsedToSelectCoordinates": false,
+    "productionOutputUsedToSetTolerances": false,
+    "movingMaximumUsed": false,
+    "nodalProjectionUsed": false,
+    "crossElementAveragingUsed": false,
+    "acceptance": "THREE_LEVEL_GCI_AT_FIXED_PHYSICAL_COORDINATES"
+  },
+  "currentDisposition": "FROZEN_SPEC_PENDING_RETAINED_PRODUCTION_EXECUTION"
+}
