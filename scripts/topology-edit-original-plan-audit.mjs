@@ -10,11 +10,19 @@ const OUTPUT = path.join(
   'reports/qualification/topology-edit-original-plan-audit.json',
 );
 const WORKFLOW_PATH = '.github/workflows/topology-edit-wave5.yml';
+const PROFESSIONAL_WORKFLOW_PATH =
+  '.github/workflows/topology-edit-professional-integration.yml';
 const DEMO_WORKFLOW_PATH = '.github/workflows/topology-edit-demo-walkthrough.yml';
 const DEMO_SPEC_PATH = 'e2e/topology-edit-20-element-demo-edit-flow.spec.js';
 const REPAIR_SPEC_PATH = 'e2e/topology-edit-20-element-demo-repair-flow.spec.js';
 const LIFECYCLE_SPEC_PATH = 'e2e/topology-edit-20-element-demo-lifecycle-flow.spec.js';
+const PROFESSIONAL_INTERACTION_SPEC =
+  'e2e/topology-edit-professional-interaction-flow.spec.js';
+const PROFESSIONAL_INTEGRATION_SPEC =
+  'e2e/topology-edit-professional-integration-flow.spec.js';
 const DEMO_FIXTURE_PATH = 'public/fixtures/topology-edit-20-element-demo.staged.json';
+const PROFESSIONAL_CATALOGUE_PATH =
+  'public/fixtures/topology-edit-professional-spec-catalog.json';
 const PREREQUISITE_PATH = 'tests/fixtures/topology-edit/1885s/prerequisite-manifest.json';
 
 const waves = Object.freeze([
@@ -111,11 +119,43 @@ const additiveC3d = Object.freeze({
   ]),
 });
 
+const professionalIntegration = Object.freeze({
+  scopeId: 'PROFESSIONAL_3D_EDIT_INTEGRATION',
+  workflowPath: PROFESSIONAL_WORKFLOW_PATH,
+  browserSpecifications: Object.freeze([
+    PROFESSIONAL_INTERACTION_SPEC,
+    PROFESSIONAL_INTEGRATION_SPEC,
+  ]),
+  requiredFiles: Object.freeze([
+    PROFESSIONAL_WORKFLOW_PATH,
+    PROFESSIONAL_INTERACTION_SPEC,
+    PROFESSIONAL_INTEGRATION_SPEC,
+    PROFESSIONAL_CATALOGUE_PATH,
+    'src/workspace/topology-edit-3d-interaction-controller.js',
+    'src/workspace/topology-edit-3d-professional-controller.js',
+    'src/workspace/topology-edit/professional/topology-edit-canonical-id.js',
+    'src/workspace/topology-edit/professional/topology-edit-operation-candidate.js',
+    'src/workspace/topology-edit/professional/topology-edit-operation-transaction.js',
+    'src/workspace/topology-edit/professional/topology-edit-validation-blocking.js',
+    'src/workspace/topology-edit/professional/topology-edit-validation-worker.js',
+    'src/workspace/topology-edit/professional/topology-edit-validation-worker-client.js',
+    'src/workspace/viewport-productivity/topology-edit-professional-operation-actions.js',
+    'src/workspace/viewport-productivity/topology-edit-professional-operation-panel.js',
+    'src/workspace/viewport-productivity/topology-edit-professional-operation-runtime.js',
+    'src/workspace/viewport-productivity/topology-edit-professional-operation-state.js',
+    'tests/topology-edit-professional-engineering-authority-hardening.test.mjs',
+    'tests/topology-edit-professional-operation-transaction.test.mjs',
+    'tests/topology-edit-professional-validation-worker-client.test.mjs',
+    'tests/topology-edit-professional-integration-controller.test.mjs',
+  ]),
+});
+
 const requiredFiles = unique([
   'docs/TOPOLOGY_EDIT_ORIGINAL_PLAN_CLOSURE_AUDIT.md',
   'scripts/topology-edit-original-plan-audit.mjs',
   ...waves.flatMap((entry) => entry.requiredFiles),
   ...additiveC3d.requiredFiles,
+  ...professionalIntegration.requiredFiles,
 ]);
 await assertFilesExist(requiredFiles);
 
@@ -123,14 +163,20 @@ const workflow = await readFile(path.join(ROOT, WORKFLOW_PATH), 'utf8');
 const workflowCoverage = unique([
   ...waves.slice(1, 5).flatMap((entry) => entry.requiredFiles),
   ...additiveC3d.requiredFiles.filter((file) => file.startsWith('tests/')),
+  ...professionalIntegration.requiredFiles.filter((file) => (
+    file.startsWith('tests/') || file.startsWith('e2e/')
+  )),
 ]);
 for (const file of workflowCoverage) {
   assert.match(workflow, new RegExp(escapeRegExp(file)), `Wave 5 must execute ${file}.`);
 }
 for (const trigger of [
   "'src/workspace/topology-edit-3d-*.js'",
+  "'src/workspace/viewport-interaction/**'",
   "'src/workspace/viewport-productivity/**'",
   "'tests/topology-edit-c3d-*.test.mjs'",
+  "'tests/topology-edit-professional-*.test.mjs'",
+  "'e2e/topology-edit-professional-*.spec.js'",
   `'${DEMO_SPEC_PATH}'`,
   `'${REPAIR_SPEC_PATH}'`,
   `'${LIFECYCLE_SPEC_PATH}'`,
@@ -141,21 +187,43 @@ for (const commandEvidence of [
   DEMO_SPEC_PATH,
   REPAIR_SPEC_PATH,
   LIFECYCLE_SPEC_PATH,
+  PROFESSIONAL_INTERACTION_SPEC,
+  PROFESSIONAL_INTEGRATION_SPEC,
   'tests/topology-edit-20-element-demo-loader.test.mjs',
   'tests/topology-edit-20-element-demo-repairs.test.mjs',
   'tests/topology-edit-lifecycle-view-state.test.mjs',
   'tests/topology-edit-search-composition.test.mjs',
   'tests/topology-edit-wave3-exact-gap-modes.test.mjs',
+  'tests/topology-edit-professional-operation-transaction.test.mjs',
 ]) {
   assert.ok(
     workflow.includes(commandEvidence),
-    `Wave 5 must execute the real demo dependency ${commandEvidence}.`,
+    `Wave 5 must execute ${commandEvidence}.`,
   );
 }
 assert.ok(
   workflow.includes('node scripts/topology-edit-original-plan-audit.mjs'),
   'Wave 5 must execute the original-plan audit.',
 );
+
+const professionalWorkflow = await readFile(
+  path.join(ROOT, PROFESSIONAL_WORKFLOW_PATH),
+  'utf8',
+);
+for (const evidence of [
+  'PASS_TRACK_A_VISIBLE_INTERACTION',
+  'PASS_PROFESSIONAL_3D_INTEGRATION',
+  PROFESSIONAL_INTERACTION_SPEC,
+  PROFESSIONAL_INTEGRATION_SPEC,
+  'topology-edit-professional-interaction.json',
+  'topology-edit-professional-integration.json',
+  'TOPOLOGY_EDIT_TARGET_HEAD_SHA',
+]) {
+  assert.ok(
+    professionalWorkflow.includes(evidence),
+    `Professional workflow is missing ${evidence}.`,
+  );
+}
 
 const demoWorkflow = await readFile(path.join(ROOT, DEMO_WORKFLOW_PATH), 'utf8');
 for (const qualifiedPath of [
@@ -206,21 +274,25 @@ for (const entry of prerequisiteManifest.prerequisites) {
 const candidateHead = git(['rev-parse', 'HEAD']);
 const expectedHead = process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA || candidateHead;
 assert.equal(candidateHead, expectedHead, 'Original-plan audit must bind to the exact candidate head.');
-const exactHeadStatus = normalizeExactHeadStatus(
+const exactHeadStatus = normalizeStatus(
   process.env.TOPOLOGY_EDIT_WAVE5_EXACT_HEAD_STATUS,
 );
-const finalStatus = exactHeadStatus === 'PASS'
+const professionalStatus = normalizeStatus(
+  process.env.TOPOLOGY_EDIT_PROFESSIONAL_INTEGRATION_STATUS,
+);
+const fullyExecuted = exactHeadStatus === 'PASS' && professionalStatus === 'PASS';
+const finalStatus = fullyExecuted
   ? 'PASS_ORIGINAL_PLAN_CLOSURE'
   : 'PASS_IMPLEMENTATION_AUDIT';
 const report = {
-  schema: 'TopologyEditOriginalPlanAudit.v1',
+  schema: 'TopologyEditOriginalPlanAudit.v2',
   status: finalStatus,
   candidateHead,
   expectedHead,
   originalPlanPackages: waves.map((entry) => ({
     waveId: entry.waveId,
     packageIds: entry.packageIds,
-    disposition: entry.waveId === 'W5' && exactHeadStatus !== 'PASS'
+    disposition: entry.waveId === 'W5' && !fullyExecuted
       ? 'IMPLEMENTED_EXACT_HEAD_EXECUTION_PENDING'
       : 'PASS_IMPLEMENTED_AND_COVERED',
     requiredFiles: entry.requiredFiles,
@@ -229,6 +301,17 @@ const report = {
   additiveC3d: {
     ...additiveC3d,
     disposition: 'PASS_IMPLEMENTED_AND_COVERED',
+  },
+  professionalIntegration: {
+    ...professionalIntegration,
+    exactHeadStatus: professionalStatus,
+    productionRoute: 'topology-edit-3d-professional-controller.js',
+    candidateValidation: 'CERTIFIED_SANDBOX_CANDIDATE',
+    transactionAuthority: 'ATOMIC_CERTIFIED_COMMAND_GROUP',
+    workerAuthority: 'CANCELLABLE_MODULE_WORKER',
+    disposition: professionalStatus === 'PASS'
+      ? 'PASS_EXECUTED_EXACT_HEAD'
+      : 'IMPLEMENTED_EXACT_HEAD_EXECUTION_PENDING',
   },
   userWalkthrough: {
     workflowPath: DEMO_WORKFLOW_PATH,
@@ -245,15 +328,23 @@ const report = {
       : 'IMPLEMENTED_EXACT_HEAD_EXECUTION_PENDING',
   },
   exactHeadStatus,
-  deferredBehavior: exactHeadStatus === 'PASS' ? [] : [{
-    code: 'EXACT_HEAD_EXECUTION_REQUIRED',
-    message: 'A clean runner must execute the final Wave 5 workflow before PASS_RELEASE may be claimed.',
-  }],
+  professionalStatus,
+  deferredBehavior: fullyExecuted ? [] : [
+    ...(exactHeadStatus === 'PASS' ? [] : [{
+      code: 'EXACT_HEAD_EXECUTION_REQUIRED',
+      message: 'A clean runner must execute the final Wave 5 workflow before PASS_RELEASE may be claimed.',
+    }]),
+    ...(professionalStatus === 'PASS' ? [] : [{
+      code: 'PROFESSIONAL_INTEGRATION_EXECUTION_REQUIRED',
+      message: 'The exact-head professional standalone and production integration browser evidence must pass.',
+    }]),
+  ],
   authorityBoundary: {
-    productionBehaviorChanged: false,
+    productionBehaviorChanged: true,
+    productionRouteChanged: true,
     commandAuthorityChanged: false,
     persistenceAuthorityChanged: false,
-    releaseQualified: exactHeadStatus === 'PASS',
+    releaseQualified: fullyExecuted,
   },
   qualifiedFiles: requiredFiles,
 };
@@ -274,7 +365,7 @@ async function assertFilesExist(files) {
     assert.ok(value.isFile(), `${repositoryPath} must be a file.`);
   }
 }
-function normalizeExactHeadStatus(value) {
+function normalizeStatus(value) {
   return String(value ?? 'PRECHECK').toUpperCase() === 'PASS' ? 'PASS' : 'PRECHECK';
 }
 function git(args) {
