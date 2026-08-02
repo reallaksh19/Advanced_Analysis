@@ -13,6 +13,8 @@ const MODULES = [
   '../src/workspace/topology-edit/professional/topology-edit-validation-scope.js',
   '../src/workspace/topology-edit/professional/topology-edit-validation-diagnostics.js',
   '../src/workspace/topology-edit/professional/topology-edit-incremental-validation.js',
+  '../src/workspace/topology-edit/professional/topology-edit-validation-worker-contract.js',
+  '../src/workspace/topology-edit/professional/topology-edit-validation-worker-state.js',
 ];
 
 const PROHIBITED = [

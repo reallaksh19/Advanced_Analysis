@@ -18,9 +18,9 @@ concurrency:
 
 jobs:
   qualify:
-    name: P5 incremental validation and full fallback
+    name: P5B validation worker stale-response authority
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 75
     env:
       EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       PR_BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
@@ -61,6 +61,8 @@ jobs:
           node --check src/workspace/topology-edit/professional/topology-edit-validation-scope.js
           node --check src/workspace/topology-edit/professional/topology-edit-validation-diagnostics.js
           node --check src/workspace/topology-edit/professional/topology-edit-incremental-validation.js
+          node --check src/workspace/topology-edit/professional/topology-edit-validation-worker-contract.js
+          node --check src/workspace/topology-edit/professional/topology-edit-validation-worker-state.js
 
       - name: Run focused professional engineering tests
         run: |
@@ -71,16 +73,25 @@ jobs:
             tests/topology-edit-professional-engineering-catalog.test.mjs \
             tests/topology-edit-professional-engineering-compatibility.test.mjs \
             tests/topology-edit-professional-engineering-incremental-validation.test.mjs \
+            tests/topology-edit-professional-engineering-worker.test.mjs \
             tests/topology-edit-professional-engineering-containment.test.mjs
 
-      - name: Run retained checker, command, and journal authority tests
+      - name: Run retained checker, autofix, command, and journal authority tests
         run: |
           node --test \
             tests/topology-edit-wave1-pure-kernel.test.mjs \
             tests/topology-edit-wave1-candidate-certification.test.mjs \
             tests/topology-edit-wave1-journal-replay.test.mjs \
             tests/topology-edit-wave3-commands.test.mjs \
-            tests/topology-edit-wave3a-checker.test.mjs
+            tests/topology-edit-wave3a-checker.test.mjs \
+            tests/topology-edit-wave3b-autofix.test.mjs
+
+      - name: Run retained fixture and lifecycle authority tests
+        run: |
+          node --test \
+            tests/topology-edit-20-element-demo-repairs.test.mjs \
+            tests/topology-edit-wave4a-persistence-export.test.mjs \
+            tests/topology-edit-wave4b-commit-rollback.test.mjs
 
       - name: Run repository anti-drift gates
         run: |
