@@ -13,10 +13,12 @@ import {
 } from '../src/workspace/lafea-general-continuum-execution-public.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const controllerSource = fs.readFileSync(path.join(
-  ROOT, 'src/workspace/lafea-general-continuum-controller.js'), 'utf8');
-const publicSource = fs.readFileSync(path.join(
-  ROOT, 'src/workspace/lafea-general-continuum-execution-public.js'), 'utf8');
+const controllerPath = path.join(
+  ROOT, 'src/workspace/lafea-general-continuum-controller.js');
+const publicPath = path.join(
+  ROOT, 'src/workspace/lafea-general-continuum-execution-public.js');
+const controllerSource = fs.readFileSync(controllerPath, 'utf8');
+const publicSource = fs.readFileSync(publicPath, 'utf8');
 const contractSource = fs.readFileSync(path.join(
   ROOT, 'src/core/lafea-application-templates/general-continuum-execution-contract.js'), 'utf8');
 const sha = (label) => `sha256:${Buffer.from(label).toString('hex').padEnd(64, '0').slice(0, 64)}`;
@@ -158,13 +160,14 @@ assert.match(contractSource, /compilerGeneratedMesh: false/);
 assert.match(contractSource, /arbitraryGeometryMesher: false/);
 assert.match(contractSource, /releaseQualified: false/);
 assert.doesNotMatch(contractSource, /workspace\//);
+assertNoControllerBypass();
 
 console.log(JSON.stringify({
   schema: 'lafea-nb-t6h-general-continuum-controller-check/v1',
   status: 'PASS',
   templateCount: accepted.length,
   accepted,
-  negativeChecks: 7,
+  negativeChecks: 8,
   authority: {
     registeredTemplateCallerMeshExecution: true,
     b6BoundMappingRequired: true,
@@ -184,6 +187,27 @@ console.log(JSON.stringify({
   },
 }, null, 2));
 
+function assertNoControllerBypass() {
+  const sourceFiles = listJavaScriptFiles(path.join(ROOT, 'src'));
+  const rawImport = /(?:from\s+|import\s*\()['"][^'"]*lafea-general-continuum-controller\.js['"]/u;
+  const publicImport = /(?:from\s+|import\s*\()['"][^'"]*lafea-general-continuum-execution-public\.js['"]/u;
+  const rawConsumers = sourceFiles.filter((filePath) =>
+    rawImport.test(fs.readFileSync(filePath, 'utf8')));
+  assert.deepEqual(rawConsumers.map(relative).sort(), [relative(publicPath)]);
+  const publicConsumers = sourceFiles.filter((filePath) =>
+    filePath !== publicPath && publicImport.test(fs.readFileSync(filePath, 'utf8')));
+  assert.deepEqual(publicConsumers.map(relative).sort(), []);
+}
+function listJavaScriptFiles(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const target = path.join(directory, entry.name);
+    if (entry.isDirectory()) return listJavaScriptFiles(target);
+    return /\.(?:js|mjs)$/u.test(entry.name) ? [target] : [];
+  });
+}
+function relative(filePath) {
+  return path.relative(ROOT, filePath).split(path.sep).join('/');
+}
 function requestInput(templateId) {
   return {
     requestId: `NB-T6H-REQUEST-${templateId}`,
