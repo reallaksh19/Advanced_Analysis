@@ -3,6 +3,11 @@ name: LFEA Piping Runtime Release Certification
 on:
   workflow_dispatch:
     inputs:
+      candidate_sha:
+        description: Immutable Phase 6I candidate SHA bound by the runtime bundle
+        required: true
+        default: 617f7c2be0c65196a44bc88b6a2bb5ad3b5f1b54
+        type: string
       evidence_run_id:
         description: Workflow run ID containing the retained release evidence bundle
         required: true
@@ -12,7 +17,7 @@ on:
         required: true
         type: string
       manifest_path:
-        description: Repository-relative path to the runtime manifest inside the bundle
+        description: Relative path to the runtime manifest inside the bundle
         required: true
         default: release-evidence.json
         type: string
@@ -22,20 +27,31 @@ permissions:
   contents: read
 
 concurrency:
-  group: lfea-piping-runtime-release-${{ github.ref }}
+  group: lfea-piping-runtime-release-${{ github.ref }}-${{ inputs.candidate_sha }}
   cancel-in-progress: false
 
 jobs:
   certify-runtime-release-bundle:
-    name: Certify supplied runtime release bundle
+    name: Validate WP3 custody and certify supplied runtime release bundle
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
     steps:
-      - name: Checkout selected exact head
+      - name: Checkout qualification tooling head
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Verify immutable candidate identity
+        shell: bash
+        env:
+          CANDIDATE_REF: refs/remotes/origin/release/lfea-piping-phase6i-617f7c2
+          EXPECTED_HEAD: ${{ inputs.candidate_sha }}
+          TOOLING_HEAD: ${{ github.sha }}
+        run: |
+          test "$TOOLING_HEAD" = "$(git rev-parse HEAD)"
+          test "$EXPECTED_HEAD" = "617f7c2be0c65196a44bc88b6a2bb5ad3b5f1b54"
+          test "$EXPECTED_HEAD" = "$(git rev-parse "$CANDIDATE_REF^{commit}")"
 
       - name: Use Node.js 22
         uses: actions/setup-node@v4
@@ -57,25 +73,41 @@ jobs:
           name: ${{ inputs.evidence_artifact_name }}
           path: ${{ runner.temp }}/lfea-release-bundle
 
-      - name: Validate runtime release bundle against selected checkout
+      - name: Validate WP3 custody after bundle download
         shell: bash
         env:
           EVIDENCE_ROOT: ${{ runner.temp }}/lfea-release-bundle
           MANIFEST_PATH: ${{ inputs.manifest_path }}
-          EXPECTED_HEAD: ${{ github.sha }}
-          VALIDATION_OUTPUT: ${{ runner.temp }}/lfea-runtime-release-validation.json
+          EXPECTED_HEAD: ${{ inputs.candidate_sha }}
+          VALIDATION_ROOT: ${{ runner.temp }}/lfea-runtime-release-validation
+        run: |
+          mkdir -p "$VALIDATION_ROOT"
+          node scripts/lfea-piping-wp3-runtime-bundle-intake.mjs \
+            --evidence-root="$EVIDENCE_ROOT" \
+            --manifest="$MANIFEST_PATH" \
+            --summary="bundle/assembly-summary.json" \
+            --output="$VALIDATION_ROOT/wp3-bundle-intake.json" \
+            --expected-head="$EXPECTED_HEAD"
+
+      - name: Validate runtime release bundle against immutable candidate
+        shell: bash
+        env:
+          EVIDENCE_ROOT: ${{ runner.temp }}/lfea-release-bundle
+          MANIFEST_PATH: ${{ inputs.manifest_path }}
+          EXPECTED_HEAD: ${{ inputs.candidate_sha }}
+          VALIDATION_ROOT: ${{ runner.temp }}/lfea-runtime-release-validation
         run: |
           set -o pipefail
           npm run check:lfea-piping-release -- \
             --evidence-root="$EVIDENCE_ROOT" \
             --manifest="$MANIFEST_PATH" \
             --expected-head="$EXPECTED_HEAD" \
-            | tee "$VALIDATION_OUTPUT"
+            | tee "$VALIDATION_ROOT/release-validation.json"
 
-      - name: Upload runtime release validation result
+      - name: Upload runtime release validation results
         uses: actions/upload-artifact@v4
         with:
-          name: lfea-runtime-release-validation-${{ github.sha }}
-          path: ${{ runner.temp }}/lfea-runtime-release-validation.json
+          name: lfea-runtime-release-validation-${{ inputs.candidate_sha }}
+          path: ${{ runner.temp }}/lfea-runtime-release-validation
           if-no-files-found: error
           retention-days: 90
