@@ -77,12 +77,9 @@ export class TreePanel {
     renderVisibleItems(this);
   }
 
-  applyZoneSelection(selection) {
+  applyZoneSelection(selection, dataset) {
     this.zoneSelection = selection;
-    if (this.sourceDataset
-      && selection?.datasetId === this.sourceDataset.datasetId) {
-      this.renderDataset(this.sourceDataset);
-    }
+    if (this.sourceDataset === dataset) this.renderDataset(dataset);
   }
 
   renderDataset(dataset) {
