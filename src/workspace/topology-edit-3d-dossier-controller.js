@@ -62,8 +62,8 @@ export class TopologyEdit3DViewController extends RouteController {
     this.clearReviewDossier(false);
   }
 
-  activateSearchResult(result) {
-    super.activateSearchResult(result);
+  activateSearchResult(result, options = {}) {
+    super.activateSearchResult(result, options);
     this.clearReviewDossier(false);
   }
 

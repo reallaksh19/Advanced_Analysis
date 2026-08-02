@@ -79,8 +79,8 @@ export class TopologyEdit3DViewController extends IssueReviewController {
     this.refreshReview();
   }
 
-  activateSearchResult(result) {
-    super.activateSearchResult(result);
+  activateSearchResult(result, options = {}) {
+    super.activateSearchResult(result, options);
     this.refreshInspection();
     this.refreshReview();
   }

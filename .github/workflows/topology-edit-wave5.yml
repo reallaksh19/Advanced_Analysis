@@ -8,13 +8,15 @@ on:
       - '.github/workflows/topology-edit-demo-walkthrough.yml'
       - 'docs/TOPOLOGY_EDIT_ORIGINAL_PLAN_CLOSURE_AUDIT.md'
       - 'e2e/topology-edit-20-element-demo-edit-flow.spec.js'
+      - 'e2e/topology-edit-20-element-demo-repair-flow.spec.js'
       - 'public/fixtures/topology-edit-20-element-demo.staged.json'
       - 'scripts/1885s-empirical-qualification.mjs'
       - 'scripts/run-playwright.mjs'
       - 'scripts/topology-edit-original-plan-audit.mjs'
       - 'scripts/topology-edit-wave5-*.mjs'
       - 'scripts/topology-edit-write-wave5-evidence.mjs'
-      - 'tests/topology-edit-20-element-demo-loader.test.mjs'
+      - 'tests/topology-edit-20-element-demo-*.test.mjs'
+      - 'tests/topology-edit-search-composition.test.mjs'
       - 'tests/topology-edit-wave*.mjs'
       - 'tests/topology-edit-c3d-*.test.mjs'
       - 'tests/topology-edit-track-c.test.mjs'
@@ -80,6 +82,7 @@ jobs:
         run: >-
           node --test
           tests/topology-edit-20-element-demo-loader.test.mjs
+          tests/topology-edit-20-element-demo-repairs.test.mjs
           tests/topology-edit-wave1-pure-kernel.test.mjs
           tests/topology-edit-wave1-candidate-certification.test.mjs
           tests/topology-edit-wave1-journal-replay.test.mjs
@@ -103,6 +106,7 @@ jobs:
           tests/topology-edit-c3d-wave1-visibility.test.mjs
           tests/topology-edit-c3d-wave1-sectioning.test.mjs
           tests/topology-edit-c3d-wave2-search.test.mjs
+          tests/topology-edit-search-composition.test.mjs
           tests/topology-edit-c3d-wave3-gpu-picking.test.mjs
           tests/topology-edit-c3d-wave3-review.test.mjs
           tests/topology-edit-c3d-wave4-issue-review.test.mjs
@@ -113,8 +117,11 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Walk the real 20-object user flow
+      - name: Walk exact-gap user repairs
         run: node scripts/run-playwright.mjs e2e/topology-edit-20-element-demo-edit-flow.spec.js
+
+      - name: Walk bridge and trim user repairs
+        run: node scripts/run-playwright.mjs e2e/topology-edit-20-element-demo-repair-flow.spec.js
 
       - name: Measure exact-head browser performance and lifecycle
         run: node --test tests/topology-edit-wave5-browser.spec.mjs
@@ -147,6 +154,7 @@ jobs:
           name: topology-edit-wave5-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
           path: |
             reports/qualification/topology-edit-demo-walkthrough.json
+            reports/qualification/topology-edit-demo-repairs.json
             reports/qualification/topology-edit-original-plan-audit.json
             reports/qualification/topology-edit-wave5-browser.json
             reports/qualification/topology-edit-wave5-fixtures.json

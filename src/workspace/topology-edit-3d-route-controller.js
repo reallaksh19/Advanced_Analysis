@@ -57,8 +57,8 @@ export class TopologyEdit3DViewController extends ComparisonController {
     this.clearRouteTrace(false);
   }
 
-  activateSearchResult(result) {
-    super.activateSearchResult(result);
+  activateSearchResult(result, options = {}) {
+    super.activateSearchResult(result, options);
     this.clearRouteTrace(false);
   }
 
