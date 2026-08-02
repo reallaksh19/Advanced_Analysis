@@ -1,0 +1,133 @@
+{
+  "schema": "lafea-bucket-01-kirsch-fixed-probe-oracle/v1",
+  "oracleId": "B01-KIRSCH-FIXED-PROBES-01",
+  "benchmarkId": "C2D-KIRSCH-HOLE-01",
+  "authority": {
+    "source": "CLASSICAL_KIRSCH_CLOSED_FORM_INFINITE_PLATE",
+    "productionOutputUsed": false,
+    "smoothedStressUsed": false,
+    "movingMaximumUsed": false,
+    "outerBoundaryLoad": "EXACT_KIRSCH_TRACTION_GAUSS_INTEGRATED_TO_T6_NODES"
+  },
+  "geometry": {
+    "holeRadius": 10,
+    "outerRadius": 100,
+    "quarterAngleDegrees": 90
+  },
+  "material": {
+    "elasticModulus": 200000,
+    "poissonRatio": 0.3,
+    "thickness": 5
+  },
+  "loading": {
+    "remoteSigmaX": 50,
+    "loadCaseId": "REMOTE_TENSION"
+  },
+  "meshLadder": [
+    {
+      "ordinal": 1,
+      "radialDivisions": 4,
+      "circumferentialDivisions": 32,
+      "quarterElementCount": 64,
+      "meshSize": 0.125
+    },
+    {
+      "ordinal": 2,
+      "radialDivisions": 8,
+      "circumferentialDivisions": 64,
+      "quarterElementCount": 256,
+      "meshSize": 0.0625
+    },
+    {
+      "ordinal": 3,
+      "radialDivisions": 16,
+      "circumferentialDivisions": 128,
+      "quarterElementCount": 1024,
+      "meshSize": 0.03125
+    }
+  ],
+  "probes": [
+    {
+      "probeId": "KIRSCH_NEAR_CROWN_PMAX",
+      "radius": 12.5,
+      "angleDegrees": 80,
+      "zone": "HIGH_GRADIENT",
+      "component": "PRINCIPAL_MAXIMUM",
+      "units": "MPa",
+      "x": 2.17060222083663,
+      "y": 12.3100969126526,
+      "polar": {
+        "sigmaRadial": 16.780654900107326,
+        "sigmaHoop": 93.35967283019082,
+        "tauRadialTangential": -8.988289366598579
+      },
+      "global": {
+        "sigmaX": 94.1247089105313,
+        "sigmaY": 16.01561881976683,
+        "tauXY": -4.64955415281193
+      },
+      "principalMaximum": 94.4005063823675,
+      "principalMinimum": 15.739821347930622,
+      "vonMises": 87.59766250134493
+    },
+    {
+      "probeId": "KIRSCH_MIDFIELD_PMAX",
+      "radius": 20.5,
+      "angleDegrees": 37,
+      "zone": "NON_SINGULAR",
+      "component": "PRINCIPAL_MAXIMUM",
+      "units": "MPa",
+      "x": 16.372027955969504,
+      "y": 12.33720797461699,
+      "polar": {
+        "sigmaRadial": 20.55373746043595,
+        "sigmaHoop": 22.88737245468602,
+        "tauRadialTangential": -31.38619053260182
+      },
+      "global": {
+        "sigmaX": 51.56927920834446,
+        "sigmaY": -8.128169293222491,
+        "tauXY": -9.772823533711813
+      },
+      "principalMaximum": 53.128426888342624,
+      "principalMinimum": -9.687316973220653,
+      "vonMises": 58.57598283704312
+    },
+    {
+      "probeId": "KIRSCH_FARFIELD_PMAX",
+      "radius": 40,
+      "angleDegrees": 23,
+      "zone": "NON_SINGULAR",
+      "component": "PRINCIPAL_MAXIMUM",
+      "units": "MPa",
+      "x": 36.82019413809761,
+      "y": 15.629245139570951,
+      "polar": {
+        "sigmaRadial": 36.665857640576604,
+        "sigmaHoop": 8.99252754405466,
+        "tauRadialTangential": -20.020687802394097
+      },
+      "global": {
+        "sigmaX": 46.8426253537442,
+        "sigmaY": -1.184240169112936,
+        "tauXY": -3.954274491110567
+      },
+      "principalMaximum": 47.1660214682949,
+      "principalMinimum": -1.507636283663647,
+      "vonMises": 47.93762357098164
+    }
+  ],
+  "tolerances": {
+    "highGradientFineRelativeErrorMax": 0.05,
+    "nonSingularFineRelativeErrorMax": 0.03,
+    "highGradientGciMax": 0.05,
+    "nonSingularGciMax": 0.03,
+    "minimumObservedOrder": null,
+    "asymptoticRatioBounds": {
+      "minimum": 0.5,
+      "maximum": 1.5
+    },
+    "mappingResidualMax": 1e-8
+  },
+  "currentDisposition": "FROZEN_ORACLE_PENDING_EXECUTION"
+}
