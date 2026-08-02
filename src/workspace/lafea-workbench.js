@@ -146,24 +146,6 @@ export {
   registerLafeaAnalysisMeshEvidence,
 } from './lafea-analysis-mesh-evidence.js';
 export {
-  LAFEA_RECOVERY_RENDER_DISPLAY_FIELD_SCHEMA,
-  LAFEA_RECOVERY_RENDER_FEA_STAGES,
-  LAFEA_RECOVERY_RENDER_FIELD_REQUEST_SCHEMA,
-  LAFEA_RECOVERY_RENDER_INTAKE_SCHEMA,
-  LAFEA_RECOVERY_RENDER_LOCATION_KINDS,
-  LAFEA_RECOVERY_RENDER_LOCATION_SCHEMA,
-  LAFEA_RECOVERY_RENDER_PACKAGE_SCHEMA,
-  LAFEA_RECOVERY_RENDER_PRODUCER_REVISION,
-  LAFEA_RECOVERY_RENDER_QUANTITIES,
-  LAFEA_RECOVERY_RENDER_SHELL_SURFACES,
-  LAFEA_RECOVERY_RENDER_TESSELLATION_POLICY,
-  createLafeaRecoveryRenderPackage,
-  lafeaRecoveryRenderDisplayGeometryHash,
-  lafeaRecoveryRenderPackageHash,
-  lafeaRecoveryRenderProfileHash,
-  registerLafeaRecoveryRenderPackage,
-} from './lafea-recovery-render-producer.js';
-export {
   LAFEA_SOURCE_PRIMITIVE_KINDS,
   LAFEA_SOURCE_PRIMITIVE_SCHEMA,
   LAFEA_SOURCE_RENDER_REQUEST_SCHEMA,
@@ -225,6 +207,11 @@ export {
   normalizeLafeaStageEdit,
   normalizeLafeaStageDocument,
 } from './lafea-workbench-model.js';
+export {
+  LAFEA_TEMPLATE_EXECUTION_CONTROLLER_RESULT_SCHEMA,
+  LAFEA_TEMPLATE_EXECUTION_CONTROLLER_REVISION,
+  executeControlledLafeaAnalyticalPilot,
+} from './lafea-template-execution-public.js';
 export { lafeaPreviewGeometry } from './lafea-stage-preview.js';
 
 /**
