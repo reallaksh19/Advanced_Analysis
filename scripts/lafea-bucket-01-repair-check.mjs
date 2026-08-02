@@ -18,6 +18,10 @@ const checkDefinitions = [
     script: 'scripts/lafea-bucket-01-mesh-qualification-check.mjs',
   },
   {
+    id: 'GOVERNED_T3_PATCH_RECEIPT',
+    script: 'scripts/lafea-bucket-01-t3-patch-check.mjs',
+  },
+  {
     id: 'MANUFACTURED_PURE_BENDING_PANEL',
     script: 'scripts/lafea-bucket-01-pure-bending-panel-check.mjs',
   },
@@ -39,7 +43,7 @@ const checks = checkDefinitions.map((definition) => runNodeCheck(definition));
 const failed = checks.filter((check) => check.status !== 'PASS');
 const repairChecksPass = failed.length === 0;
 const report = {
-  schema: 'lafea-bucket-01-repair-check-report/v3',
+  schema: 'lafea-bucket-01-repair-check-report/v4',
   status: repairChecksPass ? 'REPAIR_CHECKS_PASS' : 'REPAIR_CHECKS_FAIL',
   bucketId: 'LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE',
   target: 'C2D-LUG-PINHOLE -> LAFEA.3',
@@ -47,6 +51,8 @@ const report = {
   blockingCheckIds: failed.map((check) => check.id),
   evidenceState: {
     productionMeshQualificationEvidenceGenerated: repairChecksPass,
+    governedT3PatchOracleFrozen: true,
+    governedT3PatchEvidenceGenerated: repairChecksPass,
     manufacturedPanelOracleFrozen: true,
     manufacturedPanelEvidenceGenerated: repairChecksPass,
     productionProbeEvidenceGenerated: false,
@@ -65,6 +71,7 @@ const report = {
   },
   authority: {
     meshQualificationInfrastructureImplemented: repairChecksPass,
+    governedT3PatchBenchmarkImplemented: repairChecksPass,
     manufacturedPanelBenchmarkImplemented: repairChecksPass,
     fixedPhysicalProbeInfrastructureImplemented: repairChecksPass,
     asymptoticGciInfrastructureImplemented: repairChecksPass,
