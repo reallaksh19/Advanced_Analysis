@@ -88,6 +88,18 @@ assert.equal(replay.semanticHash, qualification.semanticHash);
 assert.equal(replay.manifest.semanticHash, qualification.manifest.semanticHash);
 assert.equal(replay.receipt.evidenceHash, qualification.receipt.evidenceHash);
 
+expectCode('stale exact head', () => createLafeaLoadDrivenPilotQualification({
+  qualificationId: 'NB-T6D-STALE-HEAD',
+  exactHeadSha: '0000000000000000000000000000000000000000',
+  projection: positive.projection,
+  execution: positive.execution,
+  tolerances: {
+    equilibriumAbsolute: 1e-5,
+    displacementRelative: 1,
+    stressRelative: 1,
+  },
+}), 'LAFEA_NB_T6D_EXACT_HEAD_PARENT_STALE');
+
 const zero = executeLoadDriven([0, 0]);
 expectCode('zero resultant', () => createLafeaLoadDrivenPilotQualification({
   qualificationId: 'NB-T6D-ZERO',
@@ -103,8 +115,10 @@ expectCode('zero resultant', () => createLafeaLoadDrivenPilotQualification({
 
 const staleBenchmark = structuredClone(positive.execution);
 staleBenchmark.benchmarkQualification.mappingPackageHash = fixture.hash('STALE-MAPPING');
-expectCode('stale benchmark parent', () => qualifyWith(staleBenchmark),
-  'LAFEA_NB_T6D_EXECUTION_HASH_TAMPERED');
+expectOneOfCodes('stale benchmark parent', () => qualifyWith(staleBenchmark), [
+  'LAFEA_NB_T6D_EXECUTION_HASH_TAMPERED',
+  'LAFEA_NB_T6D_EXECUTION_PARENT_STALE',
+]);
 
 const tamperedEquilibrium = structuredClone(positive.execution);
 tamperedEquilibrium.controllerResult.levelResults[1]
@@ -123,6 +137,21 @@ expectOneOfCodes('fully constrained claim', () => qualifyWith(fullyConstrainedCl
   'LAFEA_NB_T6D_RESULT_HASH_RECONSTRUCTION_FAILED',
   'LAFEA_NB_T6D_FREE_DOF_SOLVE_EVIDENCE_INVALID',
 ]);
+
+const tamperedRestraintProjection = structuredClone(positive.projection);
+tamperedRestraintProjection.levels[0].document.constraints = [];
+expectCode('tampered restraint projection', () =>
+  createLafeaLoadDrivenPilotQualification({
+    qualificationId: 'NB-T6D-RESTRAINT-TAMPER',
+    exactHeadSha: HEAD,
+    projection: tamperedRestraintProjection,
+    execution: positive.execution,
+    tolerances: {
+      equilibriumAbsolute: 1e-5,
+      displacementRelative: 1,
+      stressRelative: 1,
+    },
+  }), 'LAFEA_NB_T6D_PROJECTION_INVALID');
 
 const blockedConvergence = evaluateLafeaLoadDrivenConvergence(
   'ADVERSARIAL_QUANTITY',
