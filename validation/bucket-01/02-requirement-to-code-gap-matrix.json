@@ -1,5 +1,5 @@
 {
-  "schema": "lafea-bucket-01-gap-matrix/v3",
+  "schema": "lafea-bucket-01-gap-matrix/v4",
   "audited_baseline_sha": "42c9f96e9baffb52232b4b7ed7f04611c6337961",
   "superseded_baselines": [
     "a7144e02598f3e9db0826f10cefe0b5254fa953e",
@@ -40,8 +40,8 @@
     },
     {
       "id": "G3-T3-PATCH",
-      "status": "PARTIAL",
-      "finding": "Existing assembled T3 evidence is not yet a frozen Bucket-01 governed receipt at the manifest tolerance."
+      "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION",
+      "finding": "A frozen closed-form affine uniaxial-stress oracle and governed T3 receipt now cover plane stress and plane strain, exact nodal displacement, constant element strain and stress, traction-to-nodal load parity, strain energy, force and moment equilibrium, and three deterministic replays at the manifest 1e-8 normalized tolerance."
     },
     {
       "id": "G3-PURE-SHEAR",
