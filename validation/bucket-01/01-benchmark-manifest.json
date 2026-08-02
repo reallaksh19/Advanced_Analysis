@@ -1,5 +1,5 @@
 {
-  "schema": "lafea-bucket-01-benchmark-manifest/v6",
+  "schema": "lafea-bucket-01-benchmark-manifest/v7",
   "manifest_status": "BASELINE_FROZEN_WITH_UNRESOLVED_GATES",
   "repository": "reallaksh19/Advanced_Analysis",
   "baseline_main_sha": "3c069f80e36788d6a3097f6be027890020c5f894",
@@ -16,7 +16,7 @@
     "27fb14ddccb07081904d54c1bae161c87372dbdd",
     "a7144e02598f3e9db0826f10cefe0b5254fa953e"
   ],
-  "qualification_branch": "bucket-01-lafea3-scalable-solver",
+  "qualification_branch": "bucket-01-lafea3-kirsch-fixed-probes",
   "qualification_candidate_sha": "RESOLVED_ONLY_BY_EXACT_HEAD_EXECUTION",
   "bucket_id": "LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE",
   "target": "C2D-LUG-PINHOLE -> LAFEA.3",
@@ -144,7 +144,8 @@
     "frozen_oracle_files": [
       "validation/bucket-01/03-pure-bending-panel-oracle.json",
       "validation/bucket-01/04-t3-patch-oracle.json",
-      "validation/bucket-01/05-pure-shear-oracle.json"
+      "validation/bucket-01/05-pure-shear-oracle.json",
+      "validation/bucket-01/07-kirsch-fixed-probe-oracle.json"
     ],
     "expected_value_package_hash": "UNRESOLVED_GATE"
   },
@@ -168,12 +169,29 @@
       "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION"
     },
     {
+      "benchmark_id": "C2D-KIRSCH-HOLE-01",
+      "script": "scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs",
+      "oracle": "validation/bucket-01/07-kirsch-fixed-probe-oracle.json",
+      "status": "T6_FIXED_PROBE_TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION"
+    },
+    {
       "benchmark_id": "C2D-LUG-PINHOLE-01",
       "script": "scripts/lafea-bucket-01-production-response-receipt.mjs",
       "spec": "validation/bucket-01/06-production-response-convergence-spec.json",
       "status": "SCALABLE_TECHNICAL_ROUTE_IMPLEMENTED_PENDING_EXACT_PRODUCTION_EXECUTION"
     }
   ],
+  "kirsch_fixed_probe_benchmark": {
+    "oracle": "validation/bucket-01/07-kirsch-fixed-probe-oracle.json",
+    "receipt": "scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs",
+    "mesh_ladder": [64, 256, 1024],
+    "element_type": "T6",
+    "outer_load": "EXACT_KIRSCH_TRACTION_GAUSS_INTEGRATED_TO_T6_BOUNDARY_NODES",
+    "probe_authority": "ELEMENT_LOCAL_INTEGRATION_POINT_RECONSTRUCTION",
+    "convergence": "THREE_LEVEL_RICHARDSON_GCI_AT_FIXED_PHYSICAL_COORDINATES",
+    "moving_maximum_used": false,
+    "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION"
+  },
   "production_response_convergence": {
     "spec": "validation/bucket-01/06-production-response-convergence-spec.json",
     "evaluator": "src/workspace/lafea-bucket-01-production-response.js",
