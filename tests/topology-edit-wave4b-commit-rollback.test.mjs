@@ -160,17 +160,19 @@ test('read-back mismatch rolls back exact prior dataset and publishes only rollb
 test('reentrant commit is locked and forces rollback without a commit event', () => {
   const { plan, snapshot } = fixture();
   const state = adapterFor(snapshot, {
-    onSwap({ dataset, current, setCurrent, adapter }) {
+    onSwap({ dataset, swaps, current, setCurrent, adapter }) {
       const changed = Object.freeze({ status: 'ready', dataset, selectedEntityId: '', version: current.version + 1 });
       setCurrent(changed);
-      commitTopologyEditWorkspace({ plan, adapter });
+      if (swaps === 1) commitTopologyEditWorkspace({ plan, adapter });
       return changed;
     },
   });
   const receipt = commitTopologyEditWorkspace({ plan, adapter: state.adapter });
   assert.equal(receipt.disposition, 'ROLLED_BACK');
   assert.match(receipt.rollback.reason, /another topology edit commit is active/);
+  assert.equal(state.getSwapCount(), 2);
   assert.equal(state.events.length, 1);
+  assert.deepEqual(state.getSnapshot().dataset, snapshot.dataset);
 });
 
 test('publication failure invokes publish once and does not emit contradictory rollback', () => {
