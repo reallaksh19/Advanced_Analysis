@@ -5,7 +5,10 @@
  * modules so this controller remains an explicit state and coordination owner.
  */
 import { EventBus } from './event-bus.js';
-import { ModelZoneSelectorController, projectDatasetForModelZone } from './model-zone-selector.js';
+import {
+  ModelZoneSelectorController,
+  projectDatasetForModelZone,
+} from './model-zone-selector.js';
 import {
   destroyTreePanel,
   handleTreeChange,
@@ -22,7 +25,9 @@ import {
 
 export class TreePanel {
   constructor(rootElement, eventBus = EventBus) {
-    if (!rootElement) throw new TypeError('TreePanel requires a root element.');
+    if (!rootElement) {
+      throw new TypeError('TreePanel requires a root element.');
+    }
     this.rootElement = rootElement;
     this.eventBus = eventBus;
     this.dataset = null;
@@ -41,14 +46,20 @@ export class TreePanel {
     this.handleChange = (event) => handleTreeChange(this, event);
     this.handleScroll = () => renderVisibleItems(this);
     this.handleKeyDown = (event) => handleTreeKeyDown(this, event);
-    this.handleSearchInput = (event) => filterTree(this, event.target.value);
+    this.handleSearchInput = (event) =>
+      filterTree(this, event.target.value);
   }
 
-  init() { this.zoneSelector.init(); initializeTreePanel(this); }
+  init() {
+    this.zoneSelector.init();
+    initializeTreePanel(this);
+  }
 
   requireElement(selector) {
     const value = this.rootElement.querySelector(selector);
-    if (!value) throw new Error(`TreePanel element is missing: ${selector}`);
+    if (!value) {
+      throw new Error(`TreePanel element is missing: ${selector}`);
+    }
     return value;
   }
 
@@ -57,7 +68,9 @@ export class TreePanel {
       this.renderEmpty();
       return;
     }
-    if (this.sourceDataset !== snapshot.dataset) this.renderDataset(snapshot.dataset);
+    if (this.sourceDataset !== snapshot.dataset) {
+      this.renderDataset(snapshot.dataset);
+    }
     if (this.selectedEntityId === snapshot.selectedEntityId) return;
     this.selectedEntityId = String(snapshot.selectedEntityId || '');
     revealSelectionId(this, this.selectedEntityId);
@@ -66,9 +79,9 @@ export class TreePanel {
 
   applyZoneSelection(selection) {
     this.zoneSelection = selection;
-    if (this.sourceDataset && selection?.datasetId === this.sourceDataset.datasetId) {
+    if (this.sourceDataset
+      && selection?.datasetId === this.sourceDataset.datasetId) {
       this.renderDataset(this.sourceDataset);
-      renderVisibleItems(this);
     }
   }
 
@@ -76,15 +89,19 @@ export class TreePanel {
     this.sourceDataset = dataset;
     const view = projectDatasetForModelZone(dataset, this.zoneSelection);
     this.dataset = view;
-    this.entities = new Map(view.entities.map((entity) => [entity.entityId, entity]));
+    this.entities = new Map(
+      view.entities.map((entity) => [entity.entityId, entity]),
+    );
     this.expandedBranches.clear();
     view.hierarchy.forEach((node) => {
       this.expandedBranches.add(node.id);
-      node.children.forEach((child) => this.expandedBranches.add(child.id));
+      node.children.forEach((child) =>
+        this.expandedBranches.add(child.id));
     });
     this.statusElement.textContent = datasetStatus(dataset, view);
     this.pipesElement.textContent = `Pipes ${view.summary.pipes}`;
-    this.supportsElement.textContent = `Supports ${view.summary.supports}`;
+    this.supportsElement.textContent =
+      `Supports ${view.summary.supports}`;
     this.clearButton.disabled = false;
     this.clearError();
     updateFlattenedNodes(this);
@@ -122,10 +139,15 @@ export class TreePanel {
     this.listElement.replaceChildren(empty);
   }
 
-  destroy() { destroyTreePanel(this); this.zoneSelector.destroy(); }
+  destroy() {
+    destroyTreePanel(this);
+    this.zoneSelector.destroy();
+  }
 }
 
 function datasetStatus(dataset, view) {
-  if (!view.zoneId) return `${dataset.datasetId} · ${view.summary.nodeCount} entities`;
+  if (!view.zoneId) {
+    return `${dataset.datasetId} · ${view.summary.nodeCount} entities`;
+  }
   return `${dataset.datasetId} · Zone ${view.label} · ${view.summary.nodeCount} of ${view.totalEntityCount} entities`;
 }
