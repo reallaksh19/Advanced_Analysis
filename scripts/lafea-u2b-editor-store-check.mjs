@@ -103,7 +103,11 @@ assert.ok(staleState.diagnostics.some((row) => row.code === 'LAFEA_STALE_DOCUMEN
 
 assert.notEqual(lafeaDocumentDigest(store.getState().stages['LAFEA.3'].document), initialDigest);
 
-const editorSource = read('lafea-document-table.js');
+const editorSource = [
+  read('lafea-document-table.js'),
+  read('lafea-document-table-form.js'),
+  read('lafea-document-table-support.js'),
+].join('\n');
 const storeSource = read('lafea-workbench-store.js');
 const controllerSource = read('lafea-workbench-controller.js');
 const viewSource = read('lafea-workbench-view.js');
