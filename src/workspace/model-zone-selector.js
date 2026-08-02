@@ -55,6 +55,17 @@ export function createModelZoneSelection(catalog, zoneId = '') {
   });
 }
 
+export function reconcileModelZoneSelection(catalog, previousSelection = null) {
+  assertCatalog(catalog);
+  const sameDataset = previousSelection?.schema === MODEL_ZONE_SELECTION_SCHEMA
+    && previousSelection.datasetId === catalog.datasetId;
+  const retainedZoneId = sameDataset
+    && catalog.zones.some((zone) => zone.zoneId === previousSelection.zoneId)
+    ? previousSelection.zoneId
+    : '';
+  return createModelZoneSelection(catalog, retainedZoneId);
+}
+
 export function projectDatasetForModelZone(dataset, selection = null) {
   assertDataset(dataset);
   const zoneId = selectedZoneId(dataset, selection);
@@ -133,7 +144,7 @@ export class ModelZoneSelectorController {
     if (this.dataset === snapshot.dataset) return;
     this.dataset = snapshot.dataset;
     this.catalog = buildModelZoneCatalog(snapshot.dataset);
-    this.selection = createModelZoneSelection(this.catalog);
+    this.selection = reconcileModelZoneSelection(this.catalog, this.selection);
     this.renderOptions();
     this.publish();
   }
@@ -152,7 +163,7 @@ export class ModelZoneSelectorController {
     }
     this.selectElement.replaceChildren(...options);
     this.selectElement.disabled = this.catalog.zones.length === 0;
-    this.selectElement.value = '';
+    this.selectElement.value = this.selection.zoneId;
     this.renderStatus();
   }
 
