@@ -1,4 +1,3 @@
-import { deepFreeze } from '../../core/shared-piping-model/index.js';
 import {
   createTopologyEditSnapCandidate,
   normalizeTopologyEditSnapCandidates,
@@ -7,6 +6,7 @@ import {
 import { resolveTopologyEditSnap } from './topology-edit-snap-resolver.js';
 import {
   finiteTopologyEditPoint,
+  nonNegativeTopologyEditNumber,
   positiveTopologyEditNumber,
   requiredTopologyEditText,
 } from './topology-edit-interaction-values.js';
@@ -77,7 +77,7 @@ export function resolveTopologyEditSceneSnap(input = {}) {
     input.pointerPoint,
     'pointerPoint',
   );
-  const toleranceMm = positiveTopologyEditNumber(
+  const toleranceMm = nonNegativeTopologyEditNumber(
     input.toleranceMm ?? 25,
     'toleranceMm',
   );
