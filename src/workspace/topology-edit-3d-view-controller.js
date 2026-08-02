@@ -130,6 +130,7 @@ export class TopologyEdit3DViewController {
     });
     this.presentationToolbar = new TopologyEditPresentationToolbar({
       onAction: (action) => this.applyPresentationAction(action),
+      getSelectedCanonicalIds: () => this.selectedCanonicalIds(),
     });
     this.presentationToolbar.mount(this.presentationMount, this.presentationState);
   }
@@ -151,6 +152,21 @@ export class TopologyEdit3DViewController {
     this.applyPresentationAction({ type: PRESENTATION_ACTIONS.REBASE, basis });
   }
 
+  reconcilePresentationVisibility(canonical) {
+    const canonicalIds = [
+      ...canonical.nodes.map((node) => node.id),
+      ...canonical.edges.map((edge) => edge.id),
+    ];
+    this.applyPresentationAction({
+      type: PRESENTATION_ACTIONS.RECONCILE_IDS,
+      canonicalIds,
+    });
+  }
+
+  selectedCanonicalIds() {
+    return this.selectedNodeId ? [this.selectedNodeId] : [];
+  }
+
   handleHostClick(event) {
     if (event.target.closest('[data-action="nudge-selected"]')) return this.nudgeSelectedNode();
     if (event.target.closest('[data-action="run-autofix"]')) return this.runAutofix();
@@ -170,6 +186,7 @@ export class TopologyEdit3DViewController {
     if (workspaceEntityIds.length) {
       this.eventBus.publish(EVENT_TOPICS.VIEWPORT_SELECTION_REQUESTED, { entityId: workspaceEntityIds[0], source: 'topology-edit-3d' });
     }
+    this.presentationToolbar?.update(this.presentationState);
     this.setStatus(`Selected node ${nodeId}${workspaceEntityIds.length ? ` (${workspaceEntityIds.length} attached entities)` : ''}.`);
   }
 
@@ -200,6 +217,7 @@ export class TopologyEdit3DViewController {
         this.baseCanonicalTopology = canonical;
       }
       this.updatePresentationBasis(canonical);
+      this.reconcilePresentationVisibility(canonical);
       this.renderScene(canonical);
       this.runChecker();
       this.setStatus(`${canonical.nodes.length} nodes, ${canonical.edges.length} edges, ${canonical.supports.length} supports.`);
@@ -237,6 +255,7 @@ export class TopologyEdit3DViewController {
     const result = TopologyEditAutofixController.applyAutofix(this.canonicalTopology, fixable);
     this.canonicalTopology = result.finalTopology;
     this.updatePresentationBasis(this.canonicalTopology);
+    this.reconcilePresentationVisibility(this.canonicalTopology);
     this.renderScene(this.canonicalTopology);
     this.runChecker();
     this.setStatus(`Autofix: ${result.applied.length} applied, ${result.rejected.length} rejected (draft, not committed).`);
@@ -273,6 +292,7 @@ export class TopologyEdit3DViewController {
     ));
     this.canonicalTopology = { ...this.canonicalTopology, nodes };
     this.updatePresentationBasis(this.canonicalTopology);
+    this.reconcilePresentationVisibility(this.canonicalTopology);
     this.renderScene(this.canonicalTopology);
     this.runChecker();
     this.setStatus(`Node ${this.selectedNodeId} moved +Z 100mm (draft, not committed).`);
