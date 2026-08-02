@@ -1,0 +1,114 @@
+{
+  "schema": "lafea-bucket-01-t3-patch-oracle/v1",
+  "oracleId": "B01-T3-AFFINE-PATCH-CLOSED-FORM-01",
+  "benchmarkId": "C2D-PATCH-T3-01",
+  "units": {
+    "length": "mm",
+    "force": "N",
+    "stress": "MPa",
+    "modulus": "MPa"
+  },
+  "geometry": {
+    "length": 100,
+    "height": 50,
+    "thickness": 10
+  },
+  "material": {
+    "elasticModulus": 200000,
+    "poissonRatio": 0.3
+  },
+  "loading": {
+    "uniformSigmaX": 10
+  },
+  "nodeCoordinates": {
+    "A": { "x": 0, "y": 0 },
+    "B": { "x": 100, "y": 0 },
+    "C": { "x": 100, "y": 50 },
+    "D": { "x": 0, "y": 50 }
+  },
+  "expectedResultants": {
+    "appliedForce": { "x": 5000, "y": 0 },
+    "appliedMomentZ": -125000,
+    "reactionForce": { "x": -5000, "y": 0 },
+    "reactionMomentZ": 125000
+  },
+  "expectedByFormulation": {
+    "PLANE_STRESS": {
+      "formulation": "PLANE_STRESS",
+      "strain": {
+        "epsilonX": 0.00005,
+        "epsilonY": -0.000015,
+        "gammaXY": 0
+      },
+      "stress": {
+        "sigmaX": 10,
+        "sigmaY": 0,
+        "sigmaZ": 0,
+        "tauXY": 0
+      },
+      "nodalDisplacements": [
+        { "nodeId": "A", "ux": 0, "uy": 0 },
+        { "nodeId": "B", "ux": 0.005, "uy": 0 },
+        { "nodeId": "C", "ux": 0.005, "uy": -0.00075 },
+        { "nodeId": "D", "ux": 0, "uy": -0.00075 }
+      ],
+      "totalStrainEnergy": 12.5,
+      "scales": {
+        "displacement": 0.005,
+        "strain": 0.00005,
+        "stress": 10,
+        "energy": 12.5,
+        "force": 5000,
+        "moment": 125000
+      }
+    },
+    "PLANE_STRAIN": {
+      "formulation": "PLANE_STRAIN",
+      "strain": {
+        "epsilonX": 0.0000455,
+        "epsilonY": -0.0000195,
+        "gammaXY": 0
+      },
+      "stress": {
+        "sigmaX": 10,
+        "sigmaY": 0,
+        "sigmaZ": 3,
+        "tauXY": 0
+      },
+      "nodalDisplacements": [
+        { "nodeId": "A", "ux": 0, "uy": 0 },
+        { "nodeId": "B", "ux": 0.00455, "uy": 0 },
+        { "nodeId": "C", "ux": 0.00455, "uy": -0.000975 },
+        { "nodeId": "D", "ux": 0, "uy": -0.000975 }
+      ],
+      "totalStrainEnergy": 11.375,
+      "scales": {
+        "displacement": 0.00455,
+        "strain": 0.0000455,
+        "stress": 10,
+        "energy": 11.375,
+        "force": 5000,
+        "moment": 125000
+      }
+    }
+  },
+  "tolerances": {
+    "normalizedErrorMax": 1e-8
+  },
+  "equations": [
+    "F_x = sigma_x * height * thickness",
+    "M_z,applied = -F_x * height / 2",
+    "PLANE_STRESS: epsilon_x = sigma_x / E",
+    "PLANE_STRESS: epsilon_y = -nu * sigma_x / E",
+    "PLANE_STRAIN: epsilon_x = (1 - nu^2) * sigma_x / E",
+    "PLANE_STRAIN: epsilon_y = -nu * (1 + nu) * sigma_x / E",
+    "u_x = epsilon_x * x",
+    "u_y = epsilon_y * y",
+    "U = 0.5 * sigma_x * epsilon_x * length * height * thickness"
+  ],
+  "authority": {
+    "source": "CLOSED_FORM_AFFINE_UNIAXIAL_STRESS",
+    "productionOutputUsed": false,
+    "smoothedStressUsed": false
+  }
+}
