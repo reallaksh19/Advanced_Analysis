@@ -13,7 +13,10 @@ import { selectShellSurfaceField } from '../src/workspace/lfea-field-adapter.js'
 import { buildConvergenceStudy } from '../src/workspace/lfea-convergence-model.js';
 import { QUALITY_METRICS, selectQualityField } from '../src/workspace/lfea-quality-adapter.js';
 import { createLfeaWorkerClient } from '../src/workspace/lfea-worker-client.js';
-import { executeLafeaStage } from '../src/workspace/lafea-workbench-model.js';
+import {
+  executeLafeaStage,
+  lafeaStageExecutionSupported,
+} from '../src/workspace/lafea-workbench-model.js';
 import {
   createLfeaWorkbenchAdapterProfile,
   createLfeaWorkbenchReviewProfile,
@@ -48,9 +51,10 @@ class FakeWorker {
   }
 }
 
-const stageIds = ['LAFEA.1', 'LAFEA.2', 'LAFEA.3', 'LAFEA.4', 'LAFEA.5', 'LAFEA.6'];
+const supportedStageIds = ['LAFEA.1', 'LAFEA.2', 'LAFEA.3', 'LAFEA.4', 'LAFEA.5'];
 const presenterRows = {};
-for (const stageId of stageIds) {
+for (const stageId of supportedStageIds) {
+  assert.equal(lafeaStageExecutionSupported(stageId), true, `${stageId} execution must remain supported.`);
   const documentValue = createLafeaMockDocument(stageId);
   const execution = executeLafeaStage(stageId, documentValue);
   assert.equal(execution.status, 'QUALIFIED', `${stageId} must qualify.`);
@@ -65,6 +69,25 @@ for (const stageId of stageIds) {
     assert.equal(field.authority, 'AUTHORITATIVE_RAW_ELEMENT_OR_INTEGRATION_POINT_STRESS');
   }
 }
+
+const blockedStageId = 'LAFEA.6';
+assert.equal(lafeaStageExecutionSupported(blockedStageId), false, 'LAFEA.6 execution must remain blocked.');
+const blockedStageExecution = executeLafeaStage(
+  blockedStageId,
+  createLafeaMockDocument(blockedStageId),
+);
+assert.equal(blockedStageExecution.status, 'FAILED');
+assert.equal(blockedStageExecution.source, null);
+assert.equal(blockedStageExecution.canonicalInput, null);
+assert.equal(blockedStageExecution.result, null);
+assert.deepEqual(
+  blockedStageExecution.diagnostics.map(({ severity, code, path }) => ({ severity, code, path })),
+  [{
+    severity: 'ERROR',
+    code: 'UNSUPPORTED_STAGE_ENGINE_NOT_IMPLEMENTED',
+    path: 'stageId',
+  }],
+);
 
 const convergence = buildConvergenceStudy(convergenceStudy());
 assert.equal(convergence.interpretation.status, 'QUALIFIED_INTERPRETATION_EVIDENCE');
@@ -131,6 +154,12 @@ console.log(JSON.stringify({
   status: 'PASS',
   waves: ['UI-0', 'UI-1', 'UI-2', 'UI-3', 'UI-4', 'UI-5', 'UI-6', 'UI-7', 'UI-8'],
   presenterRows,
+  blockedStages: [{
+    stageId: blockedStageId,
+    executionSupported: false,
+    status: blockedStageExecution.status,
+    diagnosticCode: blockedStageExecution.diagnostics[0].code,
+  }],
   crossKernel,
   workerLifecycle: 'IDENTIFIED_PROGRESS_AND_TERMINATING_CANCEL',
   incrementalWorkbenchShells: true,
