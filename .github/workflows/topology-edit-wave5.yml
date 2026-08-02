@@ -4,14 +4,21 @@ on:
   pull_request:
     paths:
       - '.github/workflows/topology-edit-wave5.yml'
+      - '.github/workflows/topology-edit-c3d-*.yml'
+      - 'docs/TOPOLOGY_EDIT_ORIGINAL_PLAN_CLOSURE_AUDIT.md'
       - 'scripts/1885s-empirical-qualification.mjs'
+      - 'scripts/topology-edit-original-plan-audit.mjs'
       - 'scripts/topology-edit-wave5-*.mjs'
       - 'scripts/topology-edit-write-wave5-evidence.mjs'
       - 'tests/topology-edit-wave*.mjs'
+      - 'tests/topology-edit-c3d-*.test.mjs'
       - 'tests/topology-edit-track-c.test.mjs'
       - 'tests/topology-edit-wave5-browser-harness.js'
       - 'tests/fixtures/topology-edit/1885s/**'
-      - 'src/workspace/topology-edit-3d-view-controller*.js'
+      - 'src/workspace/load-calc-consumer-controller.js'
+      - 'src/workspace/topology-edit-3d-*.js'
+      - 'src/workspace/viewport-productivity/**'
+      - 'src/workspace/viewport-presentation/**'
       - 'src/workspace/topology-edit/**'
   workflow_dispatch:
 
@@ -20,9 +27,9 @@ permissions:
 
 jobs:
   qualify-wave5-release:
-    name: Exact-head integrated Track B release qualification
+    name: Exact-head integrated topology-edit release qualification
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       CI: 'true'
       TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -64,7 +71,7 @@ jobs:
             tests/topology-edit-wave5-track-b-closure.test.mjs
           node scripts/topology-edit-wave5-fixture-check.mjs
 
-      - name: Run integrated Wave 1 through Wave 4 operation matrix
+      - name: Run original Wave 1 through Wave 4 operation matrix
         run: >-
           node --test
           tests/topology-edit-wave1-pure-kernel.test.mjs
@@ -75,11 +82,26 @@ jobs:
           tests/topology-edit-fitting-support-geometry.test.mjs
           tests/topology-edit-fitting-support-integration.test.mjs
           tests/topology-edit-wave3a-checker.test.mjs
+          tests/topology-edit-wave3-commands.test.mjs
           tests/topology-edit-wave3b-autofix.test.mjs
           tests/topology-edit-wave3c-autofix-ui.test.mjs
           tests/topology-edit-wave4a-persistence-export.test.mjs
           tests/topology-edit-wave4b-commit-rollback.test.mjs
           tests/topology-edit-wave4c-lifecycle-ui.test.mjs
+
+      - name: Run complete additive C3D review matrix
+        run: >-
+          node --test
+          tests/topology-edit-c3d-wave0.test.mjs
+          tests/topology-edit-c3d-wave1-visibility.test.mjs
+          tests/topology-edit-c3d-wave1-sectioning.test.mjs
+          tests/topology-edit-c3d-wave2-search.test.mjs
+          tests/topology-edit-c3d-wave3-gpu-picking.test.mjs
+          tests/topology-edit-c3d-wave3-review.test.mjs
+          tests/topology-edit-c3d-wave4-issue-review.test.mjs
+          tests/topology-edit-c3d-wave4-comparison.test.mjs
+          tests/topology-edit-c3d-wave5-inspection-measurement.test.mjs
+          tests/topology-edit-c3d-wave6-route-trace.test.mjs
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
@@ -87,8 +109,16 @@ jobs:
       - name: Measure exact-head browser performance and lifecycle
         run: node --test tests/topology-edit-wave5-browser.spec.mjs
 
+      - name: Verify development and production startup
+        run: node --test tests/production-startup.spec.mjs
+
       - name: Verify production bundle
         run: npm run build
+
+      - name: Audit original W0.1 through W5.5 closure
+        env:
+          TOPOLOGY_EDIT_WAVE5_EXACT_HEAD_STATUS: PASS
+        run: node scripts/topology-edit-original-plan-audit.mjs
 
       - name: Write exact-head PASS_RELEASE evidence
         env:
@@ -106,6 +136,7 @@ jobs:
         with:
           name: topology-edit-wave5-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
           path: |
+            reports/qualification/topology-edit-original-plan-audit.json
             reports/qualification/topology-edit-wave5-browser.json
             reports/qualification/topology-edit-wave5-fixtures.json
             reports/qualification/topology-edit-wave5-evidence.json

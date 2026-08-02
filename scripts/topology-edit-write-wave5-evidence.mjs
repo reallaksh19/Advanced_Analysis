@@ -10,13 +10,19 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUTPUT = path.join(ROOT, 'reports/qualification/topology-edit-wave5-evidence.json');
 const BROWSER_PATH = path.join(ROOT, 'reports/qualification/topology-edit-wave5-browser.json');
 const FIXTURE_PATH = path.join(ROOT, 'reports/qualification/topology-edit-wave5-fixtures.json');
+const AUDIT_PATH = path.join(
+  ROOT,
+  'reports/qualification/topology-edit-original-plan-audit.json',
+);
 const PREREQUISITE_PATH = path.join(
   ROOT,
   'tests/fixtures/topology-edit/1885s/prerequisite-manifest.json',
 );
 const QUALIFIED_FILES = Object.freeze([
   '.github/workflows/topology-edit-wave5.yml',
+  'docs/TOPOLOGY_EDIT_ORIGINAL_PLAN_CLOSURE_AUDIT.md',
   'scripts/1885s-empirical-qualification.mjs',
+  'scripts/topology-edit-original-plan-audit.mjs',
   'scripts/topology-edit-wave5-contract.mjs',
   'scripts/topology-edit-wave5-fixture-check.mjs',
   'scripts/topology-edit-write-wave5-evidence.mjs',
@@ -50,6 +56,15 @@ const prerequisites = prerequisiteManifest.prerequisites.map((row) => {
 });
 const browserEvidence = await readJsonOrBlocked(BROWSER_PATH, 'BROWSER_EVIDENCE_NOT_RUN');
 const fixtureEvidence = await readJsonOrBlocked(FIXTURE_PATH, 'FIXTURE_EVIDENCE_NOT_RUN');
+const originalPlanAudit = await readJsonOrBlocked(AUDIT_PATH, 'ORIGINAL_PLAN_AUDIT_NOT_RUN');
+assert.equal(
+  originalPlanAudit.status,
+  'PASS_ORIGINAL_PLAN_CLOSURE',
+  JSON.stringify(originalPlanAudit, null, 2),
+);
+assert.equal(originalPlanAudit.candidateHead, candidateHead);
+assert.equal(originalPlanAudit.expectedHead, expectedHead);
+
 const operationsStatus = normalizeStatus(
   process.env.TOPOLOGY_EDIT_WAVE5_OPERATIONS_STATUS || 'BLOCKED_NOT_RUN',
 );
@@ -66,6 +81,7 @@ const performanceEvidence = {
     'PREPARED_STAGED_JSON_EXPORT',
     'WORKSPACE_COMMIT_READBACK',
     'ROLLBACK_AND_INVALIDATION',
+    'C3D_PRESENTATION_SEARCH_REVIEW_COMPARISON_ROUTE',
   ],
   browserMetrics: browserStatus === 'PASS' ? {
     firstValidFrameMs: browserEvidence.firstValidFrameMs,
@@ -87,20 +103,28 @@ const releaseReceipt = createTopologyEditWave5ReleaseReceipt({
 });
 assert.equal(releaseReceipt.status, 'PASS_RELEASE', JSON.stringify(releaseReceipt, null, 2));
 
+const qualifiedFiles = unique([
+  ...QUALIFIED_FILES,
+  ...(Array.isArray(originalPlanAudit.qualifiedFiles)
+    ? originalPlanAudit.qualifiedFiles
+    : []),
+]);
 const fileHashes = {};
-for (const repositoryPath of QUALIFIED_FILES) {
+for (const repositoryPath of qualifiedFiles) {
   fileHashes[repositoryPath] = sha256(await readFile(path.join(ROOT, repositoryPath)));
 }
 const evidenceBase = {
-  schema: 'TopologyEditWave5QualificationEvidence.v2',
+  schema: 'TopologyEditWave5QualificationEvidence.v3',
   status: 'PASS_RELEASE',
   candidateHead,
   expectedHead,
   releaseReceipt,
+  originalPlanAudit,
   browserEvidence,
   fixtureEvidence,
   performanceEvidence,
   driftEvidence,
+  qualifiedFiles,
   fileHashes,
 };
 const evidence = {
@@ -127,6 +151,9 @@ function git(args) {
 function gitStatus(args) {
   try { execFileSync('git', args, { cwd: ROOT, stdio: 'ignore' }); return true; }
   catch { return false; }
+}
+function unique(values) {
+  return [...new Set(values)].sort();
 }
 function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
