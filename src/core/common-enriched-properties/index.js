@@ -12,4 +12,5 @@ export * from './component-weight-resolution.js';
 export * from './candidate.js';
 export * from './candidate-assembly.js';
 export * from './publication.js';
+export * from './publication-orchestration.js';
 export * from './consumer-readiness.js';
