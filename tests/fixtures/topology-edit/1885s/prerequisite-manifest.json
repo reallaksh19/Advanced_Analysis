@@ -1,5 +1,5 @@
 {
-  "schema": "TopologyEditWave5PrerequisiteManifest.v1",
+  "schema": "TopologyEditWave5PrerequisiteManifest.v2",
   "prerequisites": [
     {
       "waveId": "WAVE_0",
@@ -16,18 +16,20 @@
     {
       "waveId": "WAVE_2",
       "status": "PASS_MERGED",
-      "pullRequest": 249,
-      "mergeCommit": "e3619a0c8dce03241f343ba4bea67cc0daefe581"
+      "pullRequest": 250,
+      "mergeCommit": "fa87d3dfda15eb8df6c3a5005e3de34ad1639a42"
     },
     {
       "waveId": "WAVE_3",
-      "status": "BLOCKED_NOT_IMPLEMENTED",
-      "reason": "Ghost-preview acceptance and governed autofix receipts are not present."
+      "status": "PASS_MERGED",
+      "pullRequests": [267, 271, 272],
+      "mergeCommit": "4dc7e7ca0ec7677d7616dd2e128fe63cfe3432d6"
     },
     {
       "waveId": "WAVE_4",
-      "status": "BLOCKED_NOT_IMPLEMENTED",
-      "reason": "Prepared export, persistence, live commit, save/reload, and rollback receipts are not present."
+      "status": "PASS_MERGED",
+      "pullRequests": [273, 274, 275],
+      "mergeCommit": "cbd5b29aa3f131a6072f9d6bdb5e308f007b5691"
     }
   ]
 }
