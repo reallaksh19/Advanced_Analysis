@@ -21,6 +21,7 @@ jobs:
     timeout-minutes: 30
     env:
       TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      BASE_REF: ${{ github.event.pull_request.base.sha || github.event.repository.default_branch }}
 
     steps:
       - name: Check out exact candidate head
@@ -68,4 +69,4 @@ jobs:
         run: npm run build
 
       - name: Patch hygiene
-        run: git diff --check HEAD^
+        run: git diff --check "$BASE_REF...HEAD"
