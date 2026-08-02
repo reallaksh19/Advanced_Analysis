@@ -28,7 +28,7 @@ export function buildModelZoneCatalog(dataset) {
     label: zoneId,
     entityCount: entityIds.length,
     entityIds: [...entityIds].sort(),
-  })).sort((left, right) => left.label.localeCompare(right.label, undefined, { numeric: true }));
+  })).sort((left, right) => compareZoneLabels(left.label, right.label));
   return freezeDeep({
     schema: MODEL_ZONE_CATALOG_SCHEMA,
     datasetId: dataset.datasetId,
@@ -134,6 +134,7 @@ export class ModelZoneSelectorController {
     this.selectElement.addEventListener('change', this.handleChange);
     this.unsubscribers = [
       this.eventBus.subscribe(EVENT_TOPICS.WORKSPACE_SNAPSHOT_CHANGED, ({ snapshot }) => this.renderSnapshot(snapshot)),
+      this.eventBus.subscribe(EVENT_TOPICS.DATASET_LOADED, ({ datasetId }) => this.resetLoadedDataset(datasetId)),
       this.eventBus.subscribe(EVENT_TOPICS.DATASET_CLEARED, () => this.clear()),
     ];
     this.clear();
@@ -145,6 +146,13 @@ export class ModelZoneSelectorController {
     this.dataset = snapshot.dataset;
     this.catalog = buildModelZoneCatalog(snapshot.dataset);
     this.selection = reconcileModelZoneSelection(this.catalog, this.selection);
+    this.renderOptions();
+    this.publish();
+  }
+
+  resetLoadedDataset(datasetId) {
+    if (this.catalog?.datasetId !== datasetId || !this.selection?.zoneId) return;
+    this.selection = createModelZoneSelection(this.catalog);
     this.renderOptions();
     this.publish();
   }
@@ -175,7 +183,10 @@ export class ModelZoneSelectorController {
   }
 
   publish() {
-    this.eventBus.publish(MODEL_ZONE_EVENTS.CHANGED, { selection: this.selection });
+    this.eventBus.publish(MODEL_ZONE_EVENTS.CHANGED, Object.freeze({
+      selection: this.selection,
+      dataset: this.dataset,
+    }));
   }
 
   clear() {
@@ -233,6 +244,10 @@ function selectedZoneId(dataset, selection) {
   if (!selection || selection.schema !== MODEL_ZONE_SELECTION_SCHEMA
     || selection.datasetId !== dataset.datasetId) return '';
   return stringValue(selection.zoneId);
+}
+
+function compareZoneLabels(left, right) {
+  return String(left).localeCompare(String(right), 'en', { numeric: true, sensitivity: 'variant' });
 }
 
 function assertDataset(dataset) {
