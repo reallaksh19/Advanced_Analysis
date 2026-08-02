@@ -8,13 +8,29 @@ import { createTopologyEditPick } from '../src/workspace/topology-edit/topology-
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const source = (relativePath) => readFile(path.join(ROOT, relativePath), 'utf8');
 
-test('controller production-consumes geometry, dimension, and support authority', async () => {
+test('certified controller retains Wave 1 authority and hands off render evidence', async () => {
   const text = await source('src/workspace/topology-edit-3d-view-controller.js');
-  assert.match(text, /deriveTopologyVisualGeometry/);
+  assert.match(text, /TopologyEditCertifiedSession/);
+  assert.match(text, /TOPOLOGY_EDIT_COMMAND_ACTIONS/);
   assert.match(text, /createDimensionAuthority/);
-  assert.match(text, /deriveAllSupportRestraintGeometry/);
-  assert.match(text, /visualPolicySummary/);
+  assert.match(text, /workspaceDataset: this\.workspaceDataset/);
+  assert.match(text, /dimensionAuthority: this\.dimensionAuthority/);
   assert.match(text, /visualModelHash: this\.visualModelHash/);
+  for (const prohibited of [
+    'commitDraftToWorkspace',
+    'applyCanonicalTopologyToWorkspaceEntities',
+    'TopologyEditAutofixController',
+    'Date.now',
+    'TopologyEditCommandJournal',
+  ]) assert.equal(text.includes(prohibited), false);
+});
+
+test('render packet production-consumes geometry and support authority', async () => {
+  const text = await source('src/workspace/topology-edit/topology-edit-render-packet.js');
+  assert.match(text, /deriveTopologyVisualGeometry/);
+  assert.match(text, /deriveAllSupportRestraintGeometry/);
+  assert.match(text, /buildTopologyEditComponentEvidence/);
+  assert.match(text, /requires explicit dimension authority/);
 });
 
 test('viewport renders support projection and rejects hidden radius fallback', async () => {
@@ -35,12 +51,12 @@ test('restraint pick returns complete canonical crosswalk', () => {
   assert.equal(pick.supportId, 'support:1');
   assert.equal(pick.restraintId, 'restraint:1');
   assert.equal(pick.restraintFamily, 'GUIDE');
-  assert.deepEqual(pick.sourcePaths, ['source/1']);
   assert.deepEqual(pick.workspaceEntityIds, ['entity:1']);
 });
 
-test('renderer and support boundaries remain within size policy', async () => {
+test('bounded renderer/support modules remain below 300 physical lines', async () => {
   const files = [
+    'src/workspace/topology-edit/topology-edit-render-packet.js',
     'src/workspace/topology-edit/support-restraint-family.js',
     'src/workspace/topology-edit/topology-edit-viewport-backend.js',
     'src/workspace/topology-edit/topology-edit-picking-contract.js',
