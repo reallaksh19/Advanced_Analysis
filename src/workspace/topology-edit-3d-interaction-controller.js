@@ -5,6 +5,12 @@ import {
   TopologyEditInteractionRuntime,
 } from './viewport-interaction/topology-edit-interaction-runtime.js';
 import {
+  projectTopologyEditInteractionEvidence,
+  topologyEditInteractionAxisDirection,
+  topologyEditInteractionIsTextControl,
+  topologyEditInteractionPointsEqual,
+} from './viewport-productivity/topology-edit-interaction-controller-helpers.js';
+import {
   assertCurrentTopologyEditInteractionRuntime,
   selectedTopologyEditNodeContext,
   verifyTopologyEditInteractionAcceptance,
@@ -71,12 +77,13 @@ export class TopologyEdit3DViewController extends ReviewResponseController {
       this.cancelInteractionPreview();
       return;
     }
-    if (event.key === 'Enter' && preview && !isTextControl(event.target)) {
+    if (event.key === 'Enter' && preview
+        && !topologyEditInteractionIsTextControl(event.target)) {
       event.preventDefault();
       this.applyInteractionPreview();
       return;
     }
-    if (isTextControl(event.target)) return;
+    if (topologyEditInteractionIsTextControl(event.target)) return;
     const axis = String(event.key ?? '').toUpperCase();
     if (!['X', 'Y', 'Z'].includes(axis) || event.ctrlKey || event.metaKey || event.altKey) return;
     event.preventDefault();
@@ -96,7 +103,7 @@ export class TopologyEdit3DViewController extends ReviewResponseController {
           z: this.control('interaction-value-z')?.value,
         },
         magnitudeMm: this.control('interaction-magnitude')?.value,
-        direction: axisDirection(axis),
+        direction: topologyEditInteractionAxisDirection(axis),
         mode: entryMode === 'MAGNITUDE' ? `AXIS_${axis}` : 'FREE',
       });
       this.acceptRuntimeState(state, 'Numeric interaction preview created');
@@ -110,11 +117,7 @@ export class TopologyEdit3DViewController extends ReviewResponseController {
       this.syncInteractionRuntime(true);
       const increment = this.control('interaction-nudge-increment')?.value
         ?? this.nudgeIncrementMm;
-      const state = this.interactionRuntime.nudge({
-        axis,
-        direction,
-        incrementMm: increment,
-      });
+      const state = this.interactionRuntime.nudge({ axis, direction, incrementMm: increment });
       this.nudgeIncrementMm = Number(increment);
       this.acceptRuntimeState(
         state,
@@ -195,7 +198,7 @@ export class TopologyEdit3DViewController extends ReviewResponseController {
     if (state.status !== 'READY'
         || state.nodeId !== context.nodeId
         || state.basisHash !== context.basisHash
-        || !samePoint(state.anchorPosition, context.anchorPosition)) {
+        || !topologyEditInteractionPointsEqual(state.anchorPosition, context.anchorPosition)) {
       this.interactionRuntime.rebase({ ...context, mode: 'AXIS_X' });
     }
     return context;
@@ -289,32 +292,14 @@ export class TopologyEdit3DViewController extends ReviewResponseController {
   }
 
   updateInteractionEvidence() {
-    if (!this.hostElement) return;
-    const state = this.interactionRuntime.snapshot();
-    this.hostElement.dataset.topologyEditInteractionRuntimeHash = state.runtimeHash;
-    this.hostElement.dataset.topologyEditInteractionPreviewHash = state.preview?.previewHash ?? '';
-    this.hostElement.dataset.topologyEditInteractionIntentHash = state.intent?.intentHash ?? '';
-    this.hostElement.dataset.topologyEditInteractionBasisHash = state.basisHash ?? '';
-    this.hostElement.dataset.topologyEditInteractionAcceptanceHash =
-      this.interactionAcceptance?.acceptanceHash ?? '';
-    this.hostElement.dataset.topologyEditInteractionCertificationHash =
-      this.interactionAcceptance?.certificationHash ?? '';
+    projectTopologyEditInteractionEvidence(
+      this.hostElement,
+      this.interactionRuntime.snapshot(),
+      this.interactionAcceptance,
+    );
   }
 
   control(role) {
     return this.interactionElement?.querySelector(`[data-role="${role}"]`) ?? null;
   }
-}
-
-function axisDirection(axisInput) {
-  const axis = String(axisInput ?? '').trim().toUpperCase();
-  if (!['X', 'Y', 'Z'].includes(axis)) throw new RangeError('Axis must be X, Y or Z.');
-  return { x: axis === 'X' ? 1 : 0, y: axis === 'Y' ? 1 : 0, z: axis === 'Z' ? 1 : 0 };
-}
-function samePoint(left, right) {
-  return ['x', 'y', 'z'].every((key) => Number(left?.[key]) === Number(right?.[key]));
-}
-function isTextControl(target) {
-  const name = String(target?.tagName ?? '').toUpperCase();
-  return target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(name);
 }
