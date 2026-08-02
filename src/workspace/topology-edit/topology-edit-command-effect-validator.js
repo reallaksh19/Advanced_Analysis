@@ -1,17 +1,142 @@
 /** Pure command-specific candidate delta validation. */
 import { semanticHash } from '../../core/shared-piping-model/index.js';
-function finding(code,message,targetIds=[]){return{code,message,targetIds:[...targetIds].sort()};}
-function recordChanges(delta){return[...delta.addedIds,...delta.removedIds,...delta.changedIds].sort();}
-function sameIds(actual,expected){return semanticHash([...actual].sort())===semanticHash([...expected].sort());}
-function effectContext(candidate){const delta=candidate.topologyDelta;const additionsByCommand=['nodes','edges','junctions','supports','boundaries','rigids'].flatMap((key)=>candidate.canonicalTopology[key]??[]).filter((record)=>record.createdByCommandId===candidate.commandId).map((record)=>record.id);return{candidate,delta,additionsByCommand,nodeChanges:recordChanges(delta.nodes),edgeChanges:recordChanges(delta.edges),junctionChanges:recordChanges(delta.junctions),otherChanges:[delta.supports,delta.boundaries,delta.rigids].flatMap(recordChanges)};}
-function validateMove(c){const valid=c.delta.nodes.changedIds.length===1&&c.delta.nodes.addedIds.length===0&&c.delta.nodes.removedIds.length===0&&c.edgeChanges.length===0&&c.junctionChanges.length===0&&c.otherChanges.length===0;return valid?[]:[finding('MOVE_NODE_DELTA_INVALID','MOVE_NODE must change exactly one existing node and no other record.',c.nodeChanges)];}
-function validateMerge(c){const valid=c.delta.nodes.removedIds.length===1&&c.delta.nodes.addedIds.length===0&&c.delta.edges.addedIds.length===0&&c.delta.edges.removedIds.length===0;return valid?[]:[finding('MERGE_NODES_DELTA_INVALID','MERGE_NODES must remove exactly one node without adding or removing edges.',[...c.nodeChanges,...c.edgeChanges])];}
-function validateAddedEdge(c){const findings=[];const valid=c.delta.edges.addedIds.length===1&&c.delta.edges.removedIds.length===0&&c.delta.nodes.addedIds.length===0&&c.junctionChanges.length===0&&c.otherChanges.length===0;if(!valid)findings.push(finding('ADD_EDGE_DELTA_INVALID',`${c.candidate.commandType} must add exactly one edge.`,[...c.nodeChanges,...c.edgeChanges]));if(!sameIds(c.additionsByCommand,c.delta.edges.addedIds))findings.push(finding('ADD_EDGE_PROVENANCE_INVALID','Added edge provenance does not match command identity.',c.additionsByCommand));return findings;}
-function validateSplit(c){const findings=[];const valid=c.delta.nodes.addedIds.length===1&&c.delta.edges.addedIds.length===2&&c.delta.edges.removedIds.length===1&&c.junctionChanges.length===0&&c.otherChanges.length===0;if(!valid)findings.push(finding('SPLIT_EDGE_DELTA_INVALID','SPLIT_EDGE must add one node, replace one edge, and add two edges.',[...c.nodeChanges,...c.edgeChanges]));if(!sameIds(c.additionsByCommand,[...c.delta.nodes.addedIds,...c.delta.edges.addedIds]))findings.push(finding('SPLIT_EDGE_PROVENANCE_INVALID','Split additions do not carry exact command provenance.',c.additionsByCommand));return findings;}
-function validateDisconnect(c){const findings=[];const valid=c.delta.nodes.addedIds.length===1&&c.delta.edges.changedIds.length===1&&c.delta.edges.addedIds.length===0&&c.delta.edges.removedIds.length===0&&c.junctionChanges.length===0&&c.otherChanges.length===0;if(!valid)findings.push(finding('DISCONNECT_ENDPOINT_DELTA_INVALID','DISCONNECT_ENDPOINT must add one node and change one edge.',[...c.nodeChanges,...c.edgeChanges]));if(!sameIds(c.additionsByCommand,c.delta.nodes.addedIds))findings.push(finding('DISCONNECT_PROVENANCE_INVALID','Disconnected node provenance does not match command identity.',c.additionsByCommand));return findings;}
-function validateDelete(c){const valid=c.delta.edges.removedIds.length===1&&c.delta.edges.addedIds.length===0&&c.delta.nodes.addedIds.length===0&&c.delta.nodes.removedIds.length===0&&c.junctionChanges.length===0&&c.otherChanges.length===0;return valid?[]:[finding('DELETE_EDGE_DELTA_INVALID','DELETE_EDGE must remove exactly one edge and no other record.',[...c.nodeChanges,...c.edgeChanges])];}
-function validateBend(c){const expected=(c.candidate.canonicalTopology.edges??[]).filter((edge)=>edge.bendDefinition?.createdByCommandId===c.candidate.commandId).map((edge)=>edge.id);const valid=c.delta.edges.changedIds.length===2&&sameIds(c.delta.edges.changedIds,expected)&&c.nodeChanges.length===0&&c.junctionChanges.length===0&&c.otherChanges.length===0;return valid?[]:[finding('ADD_BEND_DEFINITION_DELTA_INVALID','ADD_BEND_DEFINITION must change exactly the two resolved incident edges.',[...c.nodeChanges,...c.edgeChanges,...c.junctionChanges])];}
-function validateJunction(c){const valid=c.delta.junctions.addedIds.length===1&&c.nodeChanges.length===0&&c.edgeChanges.length===0&&c.otherChanges.length===0;const findings=valid?[]:[finding('ADD_JUNCTION_DEFINITION_DELTA_INVALID','ADD_JUNCTION_DEFINITION must add exactly one canonical junction.',c.junctionChanges)];if(!sameIds(c.additionsByCommand,c.delta.junctions.addedIds))findings.push(finding('ADD_JUNCTION_PROVENANCE_INVALID','Added junction provenance does not match command identity.',c.additionsByCommand));return findings;}
-function validateTrim(c){const valid=c.delta.nodes.changedIds.length===1&&c.delta.nodes.addedIds.length===0&&c.delta.nodes.removedIds.length===0&&c.edgeChanges.length===0&&c.junctionChanges.length===0&&c.otherChanges.length===0;return valid?[]:[finding('TRIM_EDGE_DELTA_INVALID','TRIM_EDGE must move exactly one isolated endpoint node.',[...c.nodeChanges,...c.edgeChanges])];}
-const VALIDATORS=Object.freeze({MOVE_NODE:validateMove,MERGE_NODES:validateMerge,BRIDGE_GAP:validateAddedEdge,ADD_STRAIGHT_ELEMENT:validateAddedEdge,SPLIT_EDGE:validateSplit,DISCONNECT_ENDPOINT:validateDisconnect,DELETE_EDGE:validateDelete,ADD_BEND_DEFINITION:validateBend,ADD_JUNCTION_DEFINITION:validateJunction,TRIM_EDGE:validateTrim});
-export function validateTopologyEditCommandEffect(candidate){const validator=VALIDATORS[candidate.commandType];if(!validator)return[finding('COMMAND_TYPE_UNSUPPORTED',`Unsupported command type ${candidate.commandType}.`,[candidate.commandType])];return validator(effectContext(candidate));}
+
+function finding(code, message, targetIds = []) {
+  return { code, message, targetIds: [...targetIds].sort() };
+}
+function recordChanges(delta) {
+  return [...delta.addedIds, ...delta.removedIds, ...delta.changedIds].sort();
+}
+function sameIds(actual, expected) {
+  return semanticHash([...actual].sort()) === semanticHash([...expected].sort());
+}
+function effectContext(candidate) {
+  const delta = candidate.topologyDelta;
+  const additionsByCommand = [
+    ...(candidate.canonicalTopology.nodes ?? []),
+    ...(candidate.canonicalTopology.edges ?? []),
+  ].filter((record) => record.createdByCommandId === candidate.commandId).map((record) => record.id);
+  return {
+    candidate, delta, additionsByCommand,
+    nodeChanges: recordChanges(delta.nodes), edgeChanges: recordChanges(delta.edges),
+    otherChanges: [delta.junctions, delta.supports, delta.boundaries, delta.rigids]
+      .flatMap(recordChanges),
+  };
+}
+function validateMove(context) {
+  const { delta, nodeChanges, edgeChanges, otherChanges } = context;
+  const valid = delta.nodes.changedIds.length === 1
+    && delta.nodes.addedIds.length === 0 && delta.nodes.removedIds.length === 0
+    && edgeChanges.length === 0 && otherChanges.length === 0;
+  return valid ? [] : [finding('MOVE_NODE_DELTA_INVALID',
+    'MOVE_NODE must change exactly one existing node and no other record.', nodeChanges)];
+}
+function validateMerge(context) {
+  const { delta, nodeChanges, edgeChanges } = context;
+  const valid = delta.nodes.removedIds.length === 1 && delta.nodes.addedIds.length === 0
+    && delta.edges.addedIds.length === 0 && delta.edges.removedIds.length === 0;
+  return valid ? [] : [finding('MERGE_NODES_DELTA_INVALID',
+    'MERGE_NODES must remove exactly one node without adding or removing edges.',
+    [...nodeChanges, ...edgeChanges])];
+}
+function validateAddedEdge(context) {
+  const { candidate, delta, additionsByCommand, nodeChanges, edgeChanges, otherChanges } = context;
+  const findings = [];
+  const valid = delta.edges.addedIds.length === 1 && delta.edges.removedIds.length === 0
+    && delta.nodes.addedIds.length === 0 && otherChanges.length === 0;
+  if (!valid) findings.push(finding('ADD_EDGE_DELTA_INVALID',
+    `${candidate.commandType} must add exactly one edge.`, [...nodeChanges, ...edgeChanges]));
+  if (!sameIds(additionsByCommand, delta.edges.addedIds)) findings.push(finding(
+    'ADD_EDGE_PROVENANCE_INVALID', 'Added edge provenance does not match command identity.',
+    additionsByCommand));
+  return findings;
+}
+function validateSplit(context) {
+  const { delta, additionsByCommand, nodeChanges, edgeChanges, otherChanges } = context;
+  const findings = [];
+  const valid = delta.nodes.addedIds.length === 1 && delta.edges.addedIds.length === 2
+    && delta.edges.removedIds.length === 1 && otherChanges.length === 0;
+  if (!valid) findings.push(finding('SPLIT_EDGE_DELTA_INVALID',
+    'SPLIT_EDGE must add one node, replace one edge, and add two edges.',
+    [...nodeChanges, ...edgeChanges]));
+  if (!sameIds(additionsByCommand, [...delta.nodes.addedIds, ...delta.edges.addedIds])) {
+    findings.push(finding('SPLIT_EDGE_PROVENANCE_INVALID',
+      'Split additions do not carry exact command provenance.', additionsByCommand));
+  }
+  return findings;
+}
+function validateDisconnect(context) {
+  const { delta, additionsByCommand, nodeChanges, edgeChanges, otherChanges } = context;
+  const findings = [];
+  const valid = delta.nodes.addedIds.length === 1 && delta.edges.changedIds.length === 1
+    && delta.edges.addedIds.length === 0 && delta.edges.removedIds.length === 0
+    && otherChanges.length === 0;
+  if (!valid) findings.push(finding('DISCONNECT_ENDPOINT_DELTA_INVALID',
+    'DISCONNECT_ENDPOINT must add one node and change one edge.',
+    [...nodeChanges, ...edgeChanges]));
+  if (!sameIds(additionsByCommand, delta.nodes.addedIds)) findings.push(finding(
+    'DISCONNECT_PROVENANCE_INVALID', 'Disconnected node provenance does not match command identity.',
+    additionsByCommand));
+  return findings;
+}
+function validateDelete(context) {
+  const { delta, nodeChanges, edgeChanges, otherChanges } = context;
+  const valid = delta.edges.removedIds.length === 1 && delta.edges.addedIds.length === 0
+    && delta.nodes.addedIds.length === 0 && delta.nodes.removedIds.length === 0
+    && otherChanges.length === 0;
+  return valid ? [] : [finding('DELETE_EDGE_DELTA_INVALID',
+    'DELETE_EDGE must remove exactly one edge and no other record.',
+    [...nodeChanges, ...edgeChanges])];
+}
+
+function changes(delta = {}) {
+  return [...(delta.addedIds ?? []), ...(delta.removedIds ?? []), ...(delta.changedIds ?? [])];
+}
+function noChanges(delta, keys) {
+  return keys.every((key) => changes(delta[key]).length === 0);
+}
+function validateBendDefinition(candidate) {
+  const delta = candidate.topologyDelta; const ids = delta.bends?.addedIds ?? [];
+  const bend = candidate.canonicalTopology.bends?.find((row) => row.id === ids[0]);
+  const valid = ids.length === 1 && delta.edges.changedIds.length === 2
+    && (bend?.edgeIds ?? []).every((id) => delta.edges.changedIds.includes(id))
+    && bend?.createdByCommandId === candidate.commandId
+    && noChanges(delta, ['nodes', 'junctions', 'supports', 'boundaries', 'rigids']);
+  return valid ? [] : [finding('ADD_BEND_DEFINITION_DELTA_INVALID',
+    'ADD_BEND_DEFINITION must add one bend and cross-reference exactly two existing arm edges.',
+    [...ids, ...delta.edges.changedIds])];
+}
+function validateJunctionDefinition(candidate) {
+  const delta = candidate.topologyDelta; const ids = delta.junctions.addedIds;
+  const row = candidate.canonicalTopology.junctions.find((item) => item.id === ids[0]);
+  const valid = ids.length === 1 && delta.junctions.removedIds.length === 0
+    && delta.junctions.changedIds.length === 0
+    && row?.createdByCommandId === candidate.commandId
+    && noChanges(delta, ['nodes', 'edges', 'supports', 'boundaries', 'rigids', 'bends']);
+  return valid ? [] : [finding('ADD_JUNCTION_DEFINITION_DELTA_INVALID',
+    'ADD_JUNCTION_DEFINITION must add exactly one junction definition.', ids)];
+}
+function validateTrim(candidate) {
+  const delta = candidate.topologyDelta;
+  const valid = delta.nodes.changedIds.length === 1 && delta.edges.changedIds.length === 1
+    && delta.nodes.addedIds.length === 0 && delta.nodes.removedIds.length === 0
+    && delta.edges.addedIds.length === 0 && delta.edges.removedIds.length === 0
+    && noChanges(delta, ['junctions', 'supports', 'boundaries', 'rigids', 'bends']);
+  return valid ? [] : [finding('TRIM_EDGE_DELTA_INVALID',
+    'TRIM_EDGE must change exactly one graph-open endpoint node and its existing edge.',
+    [...changes(delta.nodes), ...changes(delta.edges)])];
+}
+const VALIDATORS = Object.freeze({
+  MOVE_NODE: validateMove, MERGE_NODES: validateMerge,
+  BRIDGE_GAP: validateAddedEdge, ADD_STRAIGHT_ELEMENT: validateAddedEdge,
+  SPLIT_EDGE: validateSplit, DISCONNECT_ENDPOINT: validateDisconnect,
+  DELETE_EDGE: validateDelete, ADD_BEND_DEFINITION: validateBendDefinition,
+  ADD_JUNCTION_DEFINITION: validateJunctionDefinition, TRIM_EDGE: validateTrim,
+});
+export function validateTopologyEditCommandEffect(candidate) {
+  const validator = VALIDATORS[candidate.commandType];
+  if (!validator) return [finding('COMMAND_TYPE_UNSUPPORTED',
+    `Unsupported command type ${candidate.commandType}.`, [candidate.commandType])];
+  return ['ADD_BEND_DEFINITION', 'ADD_JUNCTION_DEFINITION', 'TRIM_EDGE'].includes(candidate.commandType)
+    ? validator(candidate) : validator(effectContext(candidate));
+}
