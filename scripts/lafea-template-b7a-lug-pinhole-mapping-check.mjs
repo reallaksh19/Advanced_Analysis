@@ -1,16 +1,9 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {
-  PROFILE_KINDS,
-  canonicalProfile,
-} from '../src/core/lafea-profile-contract/index.js';
-import {
-  createTemplateCallerMeshBinding,
-} from '../src/core/lafea-application-templates/caller-mesh-binding.js';
-import {
-  validateLafeaLugPinholeMappingPackage,
-} from '../src/core/lafea-application-templates/continuum-application-mapping-evidence.js';
+import { PROFILE_KINDS, canonicalProfile } from '../src/core/lafea-profile-contract/index.js';
+import { createTemplateCallerMeshBinding } from '../src/core/lafea-application-templates/caller-mesh-binding.js';
+import { validateLafeaLugPinholeMappingPackage } from '../src/core/lafea-application-templates/continuum-application-mapping-evidence.js';
 import {
   LAFEA_ANALYSIS_MESH_AUTHORITY_SCHEMA,
   LAFEA_ANALYSIS_MESH_INTAKE_SCHEMA,
@@ -46,10 +39,7 @@ assert.equal(qualified.materialRegionEvidence.qualification, 'PASS');
 assert.equal(qualified.loadEdgeEvidence.qualification, 'PASS');
 assert.equal(qualified.boundaryEdgeEvidence.qualification, 'PASS');
 assert.equal(qualified.boundBinding.status, 'BOUND');
-assert.deepEqual(
-  qualified.loadEdgeEvidence.metrics.observedResultant,
-  [1000, 0],
-);
+assert.deepEqual(qualified.loadEdgeEvidence.metrics.observedResultant, [1000, 0]);
 assert.deepEqual(qualified.loadEdgeEvidence.metrics.residual, [0, 0]);
 assert.equal(qualified.loadEdgeEvidence.metrics.closureAccepted, true);
 assert.equal(qualified.boundaryEdgeEvidence.metrics.rigidBodyRank, 3);
@@ -73,7 +63,7 @@ assert.equal(incompleteMaterial.materialRegionEvidence.reasons
   .includes('MATERIAL_REGION_INCOMPLETE'), true);
 
 const wrongLoadEdge = produce({
-  declarationMutator(value) { value.loadEdge.edgeNodeIds = ['A', 'AB', 'B']; },
+  declarationMutator(value) { value.loadEdge.edgeNodeIds = ['C', 'CA', 'A']; },
 });
 assert.equal(wrongLoadEdge.status, 'MAPPING_EVIDENCE_BLOCKED');
 assert.equal(wrongLoadEdge.loadEdgeEvidence.reasons
@@ -113,7 +103,9 @@ negativeCode('wrong template binding', () => produce({
 }), 'LAFEA_B7A_PENDING_BINDING_STATE_INVALID');
 
 negativeCode('stage source connectivity changed', () => produce({
-  sourceMutator(value) { value.elements[0].nodeIds = ['A', 'C', 'B', 'CA', 'BC', 'AB']; },
+  sourceMutator(value) {
+    value.elements[0].nodeIds = ['A', 'C', 'B', 'CA', 'BC', 'AB'];
+  },
 }), 'LAFEA_B7A_STAGE_SOURCE_MESH_CONNECTIVITY_MISMATCH');
 
 negativeCode('stage source coordinate changed', () => produce({
@@ -170,7 +162,7 @@ function produce(options = {}) {
 }
 
 function pendingBinding(overrides = {}) {
-  const input = {
+  return createTemplateCallerMeshBinding({
     templateId: 'C2D-LUG-PINHOLE',
     templateSemanticHash: 'fnv1a64:0123456789abcdef',
     compilationHash: 'fnv1a64:1111111111111111',
@@ -190,8 +182,7 @@ function pendingBinding(overrides = {}) {
     loadEdgeEvidence: pendingMapping(),
     boundaryEdgeEvidence: pendingMapping(),
     ...overrides,
-  };
-  return createTemplateCallerMeshBinding(input);
+  });
 }
 
 function pendingMapping() {
@@ -233,10 +224,7 @@ function stageSource() {
     },
     units: { length: 'mm', force: 'N', stress: 'MPa', modulus: 'MPa' },
     formulation: 'PLANE_STRESS',
-    materials: [{
-      materialId: 'MAT', elasticModulus: 200000, poissonRatio: 0.3,
-      sourceReference: 'MATERIAL#MAT',
-    }],
+    materials: [{ materialId: 'MAT', elasticModulus: 200000, poissonRatio: 0.3 }],
     nodes: [
       sourceNode('A', 0, 0), sourceNode('B', 100, 0), sourceNode('C', 0, 100),
       sourceNode('AB', 50, 0), sourceNode('BC', 50, 50), sourceNode('CA', 0, 50),
@@ -244,28 +232,16 @@ function stageSource() {
     elements: [{
       elementId: 'E1', elementType: 'T6',
       nodeIds: ['A', 'B', 'C', 'AB', 'BC', 'CA'],
-      materialId: 'MAT', thickness: 10, sourceReference: 'ELEMENT#E1',
+      materialId: 'MAT', thickness: 10,
     }],
-    elementTypePolicy: {
-      allowT3Fallback: false, sourceReference: 'PRODUCTION_T6_REQUIRED',
-    },
     constraints: [
       constraint('C1', 'A', 'UX'), constraint('C2', 'A', 'UY'),
       constraint('C3', 'B', 'UY'),
     ],
     loadCases: [{
       loadCaseId: 'LC1',
-      nodalForces: [{
-        loadId: 'F1', nodeId: 'B', fx: 1000, fy: 0,
-        sourceReference: 'FORCE#F1',
-      }],
-      edgeTractions: [], pressureLoads: [], bodyForces: [],
-      temperatureLoads: [], imposedDisplacements: [],
-      sourceReference: 'CASE#LC1',
+      nodalForces: [{ loadId: 'F1', nodeId: 'B', fx: 1000, fy: 0 }],
     }],
-    resultRequests: { loadCaseIds: ['LC1'] },
-    qualificationProfile: { schema: 'fixture', identity: 'B7A' },
-    limitations: [],
   };
 }
 
@@ -329,16 +305,10 @@ function t6Mesh() {
   };
 }
 
-function sourceNode(nodeId, x, y) {
-  return { nodeId, x, y, sourceReference: `NODE#${nodeId}` };
-}
-
-function meshNode(nodeId, x, y) {
-  return { nodeId, x, y, z: 0 };
-}
-
+function sourceNode(nodeId, x, y) { return { nodeId, x, y }; }
+function meshNode(nodeId, x, y) { return { nodeId, x, y, z: 0 }; }
 function constraint(constraintId, nodeId, dof) {
-  return { constraintId, nodeId, dof, value: 0, sourceReference: `CONSTRAINT#${constraintId}` };
+  return { constraintId, nodeId, dof, value: 0 };
 }
 
 function sourceGuards() {
