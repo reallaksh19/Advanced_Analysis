@@ -9,8 +9,7 @@ const ROOT = path.resolve(SCRIPT_DIR, '..');
 const MANIFEST_PATH = path.join(ROOT, 'src/vendor/topology-edit/source-manifest.json');
 const DISPOSITION_PATH = path.join(ROOT, 'src/vendor/topology-edit/behavior-disposition.json');
 
-export const EXPECTED_DISPOSITION_SHA256 = '4f02fc17d2a8bcebade4886c9e77ed35decbbdfebabef414c0d7073683200d5e';
-
+export const EXPECTED_DISPOSITION_SHA256 = '21bfda3d71218f83ec337fcced88160cff257198e9795393ec0c08e4fb0a7b11';
 export const EXPECTED_NATIVE_COMMANDS = Object.freeze([
   'MOVE_NODE',
   'MERGE_NODES',
@@ -20,7 +19,6 @@ export const EXPECTED_NATIVE_COMMANDS = Object.freeze([
   'DISCONNECT_ENDPOINT',
   'DELETE_EDGE',
 ]);
-
 export const EXPECTED_CORE_FUNCTIONS = Object.freeze([
   'buildComponentTopologyArtifacts',
   'buildEditedComponentTopologyArtifacts',
@@ -33,7 +31,6 @@ export const EXPECTED_CORE_FUNCTIONS = Object.freeze([
   'runTopologyChecks',
   'buildTopologyFixSuggestions',
 ]);
-
 export const EXPECTED_CAPABILITY_IDS = Object.freeze([
   'tool.select',
   'tool.move',
@@ -55,7 +52,6 @@ export const EXPECTED_CAPABILITY_IDS = Object.freeze([
   'scene.next',
   'scene.focus',
 ]);
-
 const CLASSIFICATIONS = new Set([
   'AS_IS',
   'WRAPPED',
@@ -74,7 +70,6 @@ function sorted(values) {
 async function walkJavaScript(targetPath) {
   const info = await stat(targetPath);
   if (info.isFile()) return /\.(?:js|mjs)$/.test(targetPath) ? [targetPath] : [];
-
   const files = [];
   for (const entry of await readdir(targetPath, { withFileTypes: true })) {
     const child = path.join(targetPath, entry.name);
@@ -91,7 +86,6 @@ function repositoryPath(absolutePath) {
 export async function verifyTopologyEditApiAuthority() {
   const manifest = JSON.parse(await readFile(MANIFEST_PATH, 'utf8'));
   const dispositionBytes = await readFile(DISPOSITION_PATH);
-
   assert.equal(
     sha256(dispositionBytes),
     EXPECTED_DISPOSITION_SHA256,
@@ -103,7 +97,6 @@ export async function verifyTopologyEditApiAuthority() {
   assert.equal(disposition.sourceCommit, manifest.sourceCommit);
   assert.equal(disposition.targetRepository, manifest.targetRepository);
   assert.equal(disposition.baselineTargetCommit, manifest.baselineTargetCommit);
-
   assert.deepEqual(
     manifest.publicApi.nativeCommands,
     EXPECTED_NATIVE_COMMANDS,
@@ -137,7 +130,6 @@ export async function verifyTopologyEditApiAuthority() {
   }
   const actual = sorted(new Set(actualFiles.map(repositoryPath)));
   const expected = sorted(declared.keys());
-
   assert.deepEqual(
     actual,
     expected,
@@ -154,8 +146,10 @@ export async function verifyTopologyEditApiAuthority() {
     );
   }
 
-  const smokePath = path.join(ROOT, 'tests/topology-edit-anti-drift.test.js');
-  const smokeSource = await readFile(smokePath, 'utf8');
+  const smokeSource = await readFile(
+    path.join(ROOT, 'tests/topology-edit-anti-drift.test.js'),
+    'utf8',
+  );
   assert.ok(
     !smokeSource.includes('100% SUCCESS'),
     'Phase-one smoke suite still claims unbounded 100% success',
