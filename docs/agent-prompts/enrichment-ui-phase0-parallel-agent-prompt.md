@@ -1,8 +1,14 @@
 # Parallel Agent Prompt — Enrichment UI Phase 0 Inventory and Fixtures
 
-1. Can you confirm you will modify only UI inventory, benchmark fixtures, and qualification evidence—not enrichment contracts, publication logic, consumers, solvers, or Project Data authority?
-2. Can you confirm your branch will start from current `main`, remain independent of PR #390 and the Phase 1 core-contract PR, and avoid cherry-picking either branch unless explicitly instructed?
-3. Can you confirm you will run every required local check, report exact commands and outputs, and make no release-qualified, engineering-approved, or solver-authorized claim?
+## Technical qualification gate — answer before editing
+
+Do not begin implementation until you have answered all three questions with a concrete design, pseudocode, complexity analysis, and an executable test matrix. Generic confirmations are not acceptable.
+
+1. **Duplicate-safe bulk indexing and virtualization:** Assume 100,000 line records, 1,000,000 component records, duplicate normalized line keys, multiple source locators per line, and 40 engineering columns. Design the canonical in-memory indexes and viewport data flow for the preflight workbench. Define stable target identities, index schemas, lookup and update complexity, duplicate-preservation rules, and the mechanism that proves the UI never creates render-all DOM rows. Explain precisely why `Map<string, Row>` is unsafe here and what data structure replaces it.
+2. **Executable side-effect containment:** The current preflight path can touch DOM state, `localStorage`, Project Data, the shared model, and topology events. Design a qualification harness that proves fixture generation, inventory analysis, and benchmark execution cannot mutate any of those authorities. Specify before/after semantic-hash checks, deep-freeze or proxy strategy, storage spies, event interception, import-boundary checks, and adversarial negative tests. State the machine-readable failure codes you would emit.
+3. **Deterministic performance and anti-drift qualification:** Design a deterministic suite that independently measures fixture generation, indexing, grouping, filtering, exception-queue construction, and viewport materialization. Define fixed seeds, pinned manifests, repeated-run equality checks, structural anti-drift assertions, and benchmark evidence fields. Explain how the suite detects duplicate overwrite, first-found containment resolution, hidden clocks/random IDs, accidental production imports, and large-fixture DOM expansion without relying on timing thresholds as the sole correctness gate.
+
+Your answers will be reviewed before work is accepted. A strong answer must identify trade-offs, failure modes, and testable invariants—not merely restate the assignment.
 
 ## Assignment
 
@@ -107,6 +113,7 @@ Open a draft PR titled:
 test(enrichment-ui): inventory preflight and add bulk fixtures
 ```
 
-In the PR body include scope, explicit non-goals, files changed, exact test
-commands/results, fixture sizes, anti-drift coverage, known limitations, and a
-statement that the PR creates no engineering approval or production authority.
+In the PR body include the three qualification answers, scope, explicit non-goals,
+files changed, exact test commands/results, fixture sizes, anti-drift coverage,
+known limitations, and a statement that the PR creates no engineering approval
+or production authority.
