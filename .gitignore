@@ -16,6 +16,9 @@ dist-ssr
 playwright-report/
 test-results/
 
+# Claude Code harness-internal state (agent worktrees, session scratch)
+.claude/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
