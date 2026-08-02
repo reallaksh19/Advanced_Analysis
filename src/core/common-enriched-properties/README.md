@@ -67,7 +67,18 @@ Phase 7 adds exact-only insulation-register resolution over an immutable `INSULA
 - missing and type-conflicting insulation properties remain explicit blockers;
 - default thickness, service inference, first-row selection, aliases, fuzzy matching, and fallback are prohibited.
 
-This module does **not** perform weight resolution; engineering fallback; engineering approval; Project Data persistence;
+Phase 8 adds exact-only component-weight resolution over an immutable `COMPONENT_WEIGHT_MASTER` snapshot:
+
+- component targets are resolved only through configured `ENTITY`, `CATALOG_KEY`, or `COMPONENT_TYPE_BORE` selectors;
+- entity and catalog selectors use exact shared-model identities;
+- component-type/bore selectors require an approved `RESOLVED_EXACT` bore from line-list resolution;
+- source rows are indexed into duplicate-preserving exact selector buckets;
+- zero matching rows remain `BLOCKED_MISSING`;
+- multiple exact rows remain `BLOCKED_AMBIGUOUS`, even when weights agree;
+- only one exact row may resolve a positive finite `component.weightKg` value;
+- geometry-derived, density-derived, generic, and first-found weight fallbacks are prohibited.
+
+This module does **not** perform engineering fallback; engineering approval; Project Data persistence;
 empirical calculations; LFEA binding; stagedJson mutation; topology validation;
 or solver work.
 
@@ -101,6 +112,10 @@ or solver work.
 24. Insulation-register key inputs must be approved `RESOLVED_EXACT` insulation codes.
 25. Exact insulation-code buckets preserve every duplicate row and never select the first record.
 26. Insulation resolution never applies default thickness, service inference, aliases, fuzzy matching, or fallback.
+27. Component-weight selectors are closed to `ENTITY`, `CATALOG_KEY`, and `COMPONENT_TYPE_BORE`.
+28. Bore-dependent weight selectors require exact approved line-list evidence.
+29. Exact component-weight selector buckets preserve every duplicate row and never select the first record.
+30. Component weight is never calculated from geometry, volume, material density, or a generic default.
 
 ## Qualification
 
@@ -112,4 +127,5 @@ node scripts/run-common-enriched-exact-piping-class-checks.mjs
 node scripts/run-common-enriched-exact-material-register-checks.mjs
 node scripts/run-common-enriched-exact-fluid-register-checks.mjs
 node scripts/run-common-enriched-exact-insulation-register-checks.mjs
+node scripts/run-common-enriched-exact-component-weight-checks.mjs
 ```
