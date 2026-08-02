@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import * as analyticalProducts from '../src/workspace/lafea-analytical-product-producers.js';
 import * as meshEvidence from '../src/workspace/lafea-analysis-mesh-evidence.js';
+import * as recoveryRender from '../src/workspace/lafea-recovery-render-producer.js';
 import * as compositionBindings from '../src/workspace/lafea-stage-composition-bindings.js';
 import * as compositionRoot from '../src/workspace/lafea-stage-composition-root.js';
 import * as hash from '../src/workspace/lafea-canonical-sha256.js';
@@ -78,6 +79,24 @@ const groups = Object.freeze([
     'lafeaAnalysisMeshContentHash',
     'registerLafeaAnalysisMeshEvidence',
   ]],
+  [recoveryRender, [
+    'LAFEA_RECOVERY_RENDER_DISPLAY_FIELD_SCHEMA',
+    'LAFEA_RECOVERY_RENDER_FEA_STAGES',
+    'LAFEA_RECOVERY_RENDER_FIELD_REQUEST_SCHEMA',
+    'LAFEA_RECOVERY_RENDER_INTAKE_SCHEMA',
+    'LAFEA_RECOVERY_RENDER_LOCATION_KINDS',
+    'LAFEA_RECOVERY_RENDER_LOCATION_SCHEMA',
+    'LAFEA_RECOVERY_RENDER_PACKAGE_SCHEMA',
+    'LAFEA_RECOVERY_RENDER_PRODUCER_REVISION',
+    'LAFEA_RECOVERY_RENDER_QUANTITIES',
+    'LAFEA_RECOVERY_RENDER_SHELL_SURFACES',
+    'LAFEA_RECOVERY_RENDER_TESSELLATION_POLICY',
+    'createLafeaRecoveryRenderPackage',
+    'lafeaRecoveryRenderDisplayGeometryHash',
+    'lafeaRecoveryRenderPackageHash',
+    'lafeaRecoveryRenderProfileHash',
+    'registerLafeaRecoveryRenderPackage',
+  ]],
   [store, [
     'LAFEA_CALCULATION_STATES', 'LAFEA_CODE_STATES',
     'LAFEA_LIFECYCLE_BINDING_SCHEMA', 'LAFEA_LIFECYCLE_BINDING_STATUSES',
@@ -114,6 +133,10 @@ assert.equal(publicApi.LAFEA_ANALYSIS_MESH_INTAKE_SCHEMA,
   'lafea-analysis-mesh-intake/v1');
 assert.equal(publicApi.LAFEA_ANALYSIS_MESH_EVIDENCE_SCHEMA,
   'lafea-analysis-mesh-evidence/v1');
+assert.equal(publicApi.LAFEA_RECOVERY_RENDER_INTAKE_SCHEMA,
+  'lafea-recovery-render-intake/v1');
+assert.equal(publicApi.LAFEA_RECOVERY_RENDER_PACKAGE_SCHEMA,
+  'lafea-recovery-render-package/v1');
 assert.equal(publicApi.LAFEA_WORKBENCH_STATE_SCHEMA, 'lafea-workbench-state/v2');
 assert.equal(publicApi.LAFEA_TEMPLATE_EXECUTION_CONTROLLER_RESULT_SCHEMA,
   'lafea-template-execution-controller-result/v1');
@@ -122,6 +145,8 @@ assert.equal(publicApi.requireLafeaStageComposition('LAFEA.1').releaseStateBindi
 assert.equal(publicApi.requireLafeaStageComposition('LAFEA.1').productSupported, true);
 assert.equal(publicApi.requireLafeaStageComposition('LAFEA.2').productSupported, true);
 assert.deepEqual(publicApi.LAFEA_ANALYSIS_MESH_FEA_STAGES,
+  ['LAFEA.3', 'LAFEA.4', 'LAFEA.5']);
+assert.deepEqual(publicApi.LAFEA_RECOVERY_RENDER_FEA_STAGES,
   ['LAFEA.3', 'LAFEA.4', 'LAFEA.5']);
 assert.deepEqual(publicApi.lafeaLifecycleArtifactKinds('LAFEA.1'), [
   'CANONICAL_MODEL', 'EXECUTION', 'RESULT_EVIDENCE',
@@ -137,6 +162,7 @@ console.log(JSON.stringify({
   producerAdaptersPublic: true,
   analyticalProductProducersPublic: true,
   analysisMeshEvidencePublic: true,
+  recoveryRenderProducerPublic: true,
   analyticalPilotControllerPublic: true,
   calculationResultCodeReleaseStatesPublic: true,
   stageCorrectProfilesPublic: true,
