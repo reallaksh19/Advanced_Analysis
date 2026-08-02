@@ -1,0 +1,107 @@
+name: LAFEA B7D Controlled Continuum Controller
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/lafea-template-b7d-controlled-continuum-controller.yml'
+      - 'src/workspace/lafea-controlled-continuum-controller.js'
+      - 'src/workspace/lafea-controlled-continuum-stage-route.js'
+      - 'src/workspace/lafea-controlled-continuum-public.js'
+      - 'src/workspace/lafea-workbench.js'
+      - 'scripts/lafea-template-b7d-controlled-continuum-controller-check.mjs'
+      - 'docs/LAFEA_Bucket_B7D_Controlled_Continuum_Controller.md'
+      - 'src/core/lafea-application-templates/controlled-continuum-pilot-contract.js'
+      - 'src/core/lafea-application-templates/continuum-benchmark-convergence.js'
+      - 'src/core/lafea-application-templates/continuum-application-mapping-evidence.js'
+      - 'src/workspace/lafea-analysis-mesh-evidence.js'
+      - 'src/workspace/lafea-lifecycle.js'
+      - 'src/workspace/lafea-source-authority.js'
+      - 'src/workspace/lafea-workbench-model.js'
+      - 'src/core/local-continuum/**'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lafea-b7d-controlled-continuum-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: B7D bounded continuum controller qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Assert exact checkout and ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          git merge-base --is-ancestor "$PR_BASE_SHA" "$EXPECTED_HEAD_SHA"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run B7D controller qualification
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/lafea-template-b7d-controlled-continuum-controller-check.mjs \
+            2>&1 | tee lafea-b7d-controlled-continuum.log
+
+      - name: Run retained B7C contracts
+        run: node scripts/lafea-template-b7c-controlled-continuum-contract-check.mjs
+
+      - name: Run retained B7B benchmark contracts
+        run: node scripts/lafea-template-b7b-continuum-benchmark-convergence-check.mjs
+
+      - name: Run retained B7A mapping checks
+        run: node scripts/lafea-template-b7a-lug-pinhole-mapping-check.mjs
+
+      - name: Run retained B6 caller-mesh checks
+        run: node scripts/lafea-template-b6-caller-mesh-binding-check.mjs
+
+      - name: Run strict syntax checks
+        run: npm run syntax:strict
+
+      - name: Run import checks
+        run: npm run check:imports
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Verify patch hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check "$PR_BASE_SHA...HEAD"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Upload exact-head B7D evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-b7d-controlled-continuum-${{ github.event.pull_request.head.sha || github.sha }}
+          path: lafea-b7d-controlled-continuum.log
+          if-no-files-found: error
+          retention-days: 30
