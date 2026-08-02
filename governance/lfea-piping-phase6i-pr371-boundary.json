@@ -1,0 +1,29 @@
+{
+  "schema": "lfea-piping-phase6i-external-program-boundary/v1",
+  "phase6iProgram": "LFEA_PIPING_PHASE6I",
+  "externalProgram": "PR_371_LOAD_CALC_ENRICHMENT",
+  "relationship": "NON_DEPENDENT_SHADOW_PRODUCER_ONLY",
+  "frozenCandidate": "617f7c2be0c65196a44bc88b6a2bb5ad3b5f1b54",
+  "immutableRef": "release/lfea-piping-phase6i-617f7c2",
+  "projectAuthorityOwner": "WP_2_PROJECT_AUTHORITY_INDEX",
+  "permittedExternalOutputs": [
+    "PROVENANCE_BOUND_PROPOSALS",
+    "SHADOW_IMPACT_EVIDENCE"
+  ],
+  "prohibitedUses": [
+    "DIRECT_LFEA_INPUT",
+    "PROJECT_AUTHORITY_CREATION",
+    "CURRENT_CANDIDATE_MUTATION",
+    "RELEASE_EVIDENCE_SUBSTITUTION",
+    "BASELINE_APPROVAL",
+    "RESULT_ACCEPTANCE"
+  ],
+  "futureAdoptionRequires": [
+    "FIELD_LEVEL_ENGINEERING_APPROVAL",
+    "APPROVED_PRECEDENCE_AND_DERIVATION_POLICY",
+    "NEW_IMMUTABLE_LFEA_CANDIDATE",
+    "AFFECTED_EVIDENCE_CHAIN_REEXECUTION"
+  ],
+  "currentCandidateConsumptionAllowed": false,
+  "externalProgramAuthorityAllowed": false
+}
