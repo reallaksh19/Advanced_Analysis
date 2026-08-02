@@ -1,0 +1,80 @@
+{
+  "schema": "benchmark-a-1885-enriched-sjson-evidence/v1",
+  "source": {
+    "repository": "reallaksh19/3D_Converters",
+    "commit": "05ed229abe0299ccdfeeb04afd3e3402585d83c1",
+    "path": "Benchmarks/1885Sjson/EnrichedSjson",
+    "mirroredAt": "benchmarks/1885Sjson/EnrichedSjson",
+    "byteLength": 1785455,
+    "sha256": "e9a51723444e9490f5dff9c1ff4a5c56191873033d11a289946746ff1072c5da"
+  },
+  "disputedBriefFacts": {
+    "note": "A prior task brief stated different facts for this exact repo/commit/path; they do not match any file found there and are superseded by direct verification plus repository-owner confirmation.",
+    "stated": {
+      "byteLength": 148627,
+      "sha256": "77e64a27d185afc8dbedde41f43383c63650c62a2ae75face5eac1356f5d07d3",
+      "nodes": 12,
+      "pipes": 10,
+      "components": 9,
+      "loads": 0,
+      "supports": 0
+    }
+  },
+  "topology": {
+    "nodeCount": 279,
+    "sourceRootCount": 13,
+    "typeCounts": {
+      "BRANCH": 13,
+      "ELBO": 14,
+      "PIPE": 43,
+      "OLET": 10,
+      "SUPPORT": 139,
+      "FLAN": 22,
+      "GASK": 22,
+      "VALV": 4,
+      "INST": 5,
+      "REDU": 4,
+      "TEE": 3
+    },
+    "adapterCategorySummary": {
+      "nodeCount": 279,
+      "sourceNodeCount": 279,
+      "sourceRootCount": 13,
+      "pipes": 127,
+      "supports": 139,
+      "components": 13
+    }
+  },
+  "duplicateSourceIds": [],
+  "unresolved": {
+    "entitiesWithDiagnostics": 83,
+    "totalDiagnosticEntries": 208,
+    "severityCounts": {
+      "BLOCKED": 208
+    },
+    "categoryCounts": {
+      "MISSING_ATTRIBUTE": 208
+    },
+    "fieldCounts": {
+      "lineNo": 83,
+      "pipingClass": 83,
+      "fluidDensityOpeKgM3": 42
+    },
+    "branchOwnersWithDiagnostics": [
+      "/ASIM-1885-6\"-S8810111-91261M7-HC-01",
+      "/ASIM-1885-6\"-S8810111-91261M7-HC-01/B1",
+      "/ASIM-1885-6\"-S8810111-91261M7-HC-01/B2",
+      "/ASIM-1885-6\"-S8810112-91261M7-HC-01",
+      "/ASIM-1885-6\"-S8810112-91261M7-HC-01/B6",
+      "/ASIM-1885-6\"-S8811951-91261M7-HC-01",
+      "/ASIM-1885-6\"-S8811951-91261M7-HC-01/B2",
+      "/ASIM-1885-6\"-S8811951-91261M7-HC-01/B7"
+    ]
+  },
+  "importErrors": [],
+  "canonicalModel": {
+    "hash": "fnv1a64:8aff6bdf7854d003",
+    "repeatable": true
+  },
+  "semanticHash": "fnv1a64:9d660b72309b6f99"
+}
