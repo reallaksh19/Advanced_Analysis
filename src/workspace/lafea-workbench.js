@@ -212,6 +212,13 @@ export {
   LAFEA_TEMPLATE_EXECUTION_CONTROLLER_REVISION,
   executeControlledLafeaAnalyticalPilot,
 } from './lafea-template-execution-public.js';
+export {
+  LAFEA_CONTROLLED_CONTINUUM_CONTROLLER_RESULT_SCHEMA,
+  LAFEA_CONTROLLED_CONTINUUM_CONTROLLER_REVISION,
+  LAFEA_CONTROLLED_CONTINUUM_STAGE_ID,
+  LAFEA_CONTROLLED_CONTINUUM_STAGE_ROUTE_SCHEMA,
+  executeControlledLafeaContinuumPilot,
+} from './lafea-controlled-continuum-public.js';
 export { lafeaPreviewGeometry } from './lafea-stage-preview.js';
 
 /**
