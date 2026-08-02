@@ -4,7 +4,6 @@ import {
   TopologyEdit3DViewController as SearchController,
 } from './topology-edit-3d-search-controller.js';
 import {
-  createTopologyEditSelection,
   topologyEditSelectionDescription,
   updateTopologyEditSelection,
 } from './topology-edit/topology-edit-command-ui.js';
@@ -238,8 +237,4 @@ function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[char]));
-}
-
-export function resetTopologyEditIssueSelection() {
-  return createTopologyEditSelection();
 }
