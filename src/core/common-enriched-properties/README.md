@@ -9,7 +9,16 @@ Phase 1 provides closed, immutable, deterministic contracts for:
 - externally authorized immutable baselines;
 - consumer-readiness records.
 
-This module does **not** perform source matching, fallback, engineering approval,
+Phase 2 adds an exact-only target inventory over `shared-piping-model/v1`:
+
+- every source component receives a stable component target;
+- components sharing one exact model `identity.lineId` are retained in a duplicate-safe line bucket;
+- line keys are canonicalized only by trim and uppercase;
+- missing model line identity remains `BLOCKED_MISSING`;
+- branch-name tokens, regex, containment, fuzzy matching, and service inference are not used;
+- stale shared-model hashes are rejected before inventory creation.
+
+This module does **not** perform master matching, fallback, engineering approval,
 Project Data persistence, empirical calculations, LFEA binding, stagedJson
 mutation, topology validation, or solver work.
 
@@ -27,9 +36,12 @@ mutation, topology validation, or solver work.
    candidate semantic hash.
 9. Published baselines are deeply frozen and never modified in place.
 10. Consumer readiness is separate from baseline publication.
+11. Exact target inventory never derives a line identity from names or paths.
+12. One line key maps to an ordered array of component targets, never one overwritten row.
 
 ## Qualification
 
 ```bash
 node scripts/run-common-enriched-properties-checks.mjs
+node scripts/run-common-enriched-target-inventory-checks.mjs
 ```
