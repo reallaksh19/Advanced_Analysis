@@ -17,6 +17,24 @@ import {
 export const TOPOLOGY_EDIT_INTERACTION_ACCEPTANCE_SCHEMA =
   'TopologyEditInteractionAcceptance.v1';
 
+export function createTopologyEditDragSessionPreview(input = {}) {
+  const context = selectedNodeContext(input.topology, input.selection);
+  const intent = createTopologyEditTransformIntent({
+    nodeId: context.nodeId,
+    basisHash: context.basisHash,
+    source: 'DRAG',
+    mode: input.transformMode,
+    anchorPosition: context.anchorPosition,
+    targetPosition: input.targetPosition,
+    snapResolutionHash: input.snapResolution?.resolutionHash ?? null,
+    units: 'MM',
+  });
+  return createTopologyEditInteractionPreview({
+    intent,
+    snapResolution: input.snapResolution ?? null,
+  });
+}
+
 export function createTopologyEditNumericSessionPreview(input = {}) {
   const context = selectedNodeContext(input.topology, input.selection);
   const numericEntry = createTopologyEditNumericEntry({
