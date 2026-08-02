@@ -14,9 +14,9 @@ const SOURCE_KEYS = Object.freeze([
 ]);
 const REQUEST_INPUT_KEYS = Object.freeze([
   'requestId', 'templateId', 'releaseRecordHash', 'compatibilityReceiptHash',
-  'documentRevisionDigest', 'sourceAuthorityRequest', 'canonicalModelHash',
-  'analysisGeometryHash', 'meshArtifactHash', 'meshHash', 'meshProfileHash',
-  'elementTypes',
+  'compilationHash', 'documentRevisionDigest', 'sourceAuthorityRequest',
+  'canonicalModelHash', 'analysisGeometryHash', 'meshArtifactHash', 'meshHash',
+  'meshProfileHash', 'elementTypes',
 ]);
 const REQUEST_KEYS = Object.freeze([
   'schema', ...REQUEST_INPUT_KEYS, 'stageId', 'executionMode', 'authority', 'semanticHash',
@@ -37,8 +37,9 @@ export function createGeneralContinuumExecutionRequest(input) {
   requireText(input.requestId, 'requestId');
   const template = requireGeneralContinuumTemplate(input.templateId);
   [
-    'releaseRecordHash', 'compatibilityReceiptHash', 'canonicalModelHash',
-    'analysisGeometryHash', 'meshArtifactHash', 'meshHash', 'meshProfileHash',
+    'releaseRecordHash', 'compatibilityReceiptHash', 'compilationHash',
+    'canonicalModelHash', 'analysisGeometryHash', 'meshArtifactHash', 'meshHash',
+    'meshProfileHash',
   ].forEach((key) => requireSha(input[key], key));
   if (!REVISION.test(input.documentRevisionDigest)) {
     throw new TypeError('documentRevisionDigest must be FNV-1a 64.');
@@ -53,6 +54,7 @@ export function createGeneralContinuumExecutionRequest(input) {
     templateId: template.templateId,
     releaseRecordHash: input.releaseRecordHash,
     compatibilityReceiptHash: input.compatibilityReceiptHash,
+    compilationHash: input.compilationHash,
     documentRevisionDigest: input.documentRevisionDigest,
     sourceAuthorityRequest,
     canonicalModelHash: input.canonicalModelHash,
