@@ -28,9 +28,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  runner-preflight:
+    name: B7F runner allocation preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Record hosted runner allocation
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'runner_os=%s\nrunner_arch=%s\nevent=%s\nref=%s\nsha=%s\n' \
+            "$RUNNER_OS" "$RUNNER_ARCH" "$GITHUB_EVENT_NAME" "$GITHUB_REF" "$GITHUB_SHA"
+
   qualify:
     name: B7F exact-head current-main qualification
-    runs-on: ubuntu-24.04
+    needs: runner-preflight
+    runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
       EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
