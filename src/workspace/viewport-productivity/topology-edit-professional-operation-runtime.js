@@ -3,7 +3,6 @@ import {
   topologyEditProfessionalOperationDefaults,
 } from '../topology-edit/professional/topology-edit-professional-operation-session.js';
 import {
-  assertTopologyEditOperationTransactionReceipt,
   executeTopologyEditOperationTransaction,
   previewTopologyEditOperationTransaction,
   redoTopologyEditOperationTransaction,
@@ -17,18 +16,24 @@ import {
 } from '../topology-edit/professional/topology-edit-validation-worker-client.js';
 import {
   readTopologyEditProfessionalOperationValues,
-  renderTopologyEditProfessionalOperationPanel,
 } from './topology-edit-professional-operation-panel.js';
+import {
+  createTopologyEditProfessionalInitialValues,
+  createTopologyEditProfessionalViewState,
+  reconcileTopologyEditProfessionalReceipts,
+  renderTopologyEditProfessionalRuntime,
+  restoreTopologyEditProfessionalViewState,
+  updateTopologyEditProfessionalEvidence,
+} from './topology-edit-professional-operation-state.js';
 
 const CATALOGUE_URL = 'fixtures/topology-edit-professional-spec-catalog.json';
-const VIEW_STATE_SCHEMA = 'TopologyEditProfessionalOperationViewState.v1';
 
 export class TopologyEditProfessionalOperationRuntime {
   constructor(controller) {
     this.controller = controller;
     this.element = null;
     this.catalogue = null;
-    this.values = initialValues();
+    this.values = createTopologyEditProfessionalInitialValues();
     this.plan = null;
     this.validation = null;
     this.validationPending = false;
@@ -82,6 +87,7 @@ export class TopologyEditProfessionalOperationRuntime {
       this.clear(false, false);
       this.message = 'Professional plan cleared because its canonical basis changed.';
     }
+    reconcileTopologyEditProfessionalReceipts(this, canonical);
     this.render();
     this.updateEvidence();
   }
@@ -110,8 +116,6 @@ export class TopologyEditProfessionalOperationRuntime {
       });
       this.validation = null;
       this.transactionPreview = null;
-      this.transaction = null;
-      this.redoTransaction = null;
       this.error = null;
       this.message = this.plan.status === 'PLANNED'
         ? `Plan ${this.plan.planHash.slice(0, 18)} created with ${this.plan.commandIntents.length} governed command(s).`
@@ -254,59 +258,30 @@ export class TopologyEditProfessionalOperationRuntime {
     }
     this.render();
     this.updateEvidence();
-    if (announce) this.controller.setStatus(
-      'Professional operation state cleared; no canonical change occurred.',
-    );
+    if (announce) {
+      this.controller.setStatus(
+        'Professional operation state cleared; no canonical change occurred.',
+      );
+    }
     return true;
   }
 
   viewState() {
-    return {
-      schema: VIEW_STATE_SCHEMA,
-      values: this.values,
-      transaction: this.transaction,
-      redoTransaction: this.redoTransaction,
-    };
+    return createTopologyEditProfessionalViewState(this);
   }
 
   restoreViewState(value) {
-    if (value?.schema !== VIEW_STATE_SCHEMA) return;
-    this.values = value.values && typeof value.values === 'object'
-      ? { ...initialValues(), ...value.values }
-      : initialValues();
-    const currentHash = this.controller.session?.currentTopology()?.canonicalTopologyHash;
-    this.transaction = restoreReceipt(value.transaction, 'resultingCanonicalHash', currentHash);
-    this.redoTransaction = restoreReceipt(value.redoTransaction, 'priorCanonicalHash', currentHash);
+    restoreTopologyEditProfessionalViewState(this, value);
     this.render();
     this.updateEvidence();
   }
 
   render() {
-    if (!this.element) return;
-    const currentHash = this.controller.session?.currentTopology()?.canonicalTopologyHash;
-    renderTopologyEditProfessionalOperationPanel(this.element, {
-      values: this.values,
-      catalogue: this.catalogue,
-      plan: this.plan,
-      validation: this.validation,
-      validationPending: this.validationPending,
-      transactionPreview: this.transactionPreview,
-      transaction: this.transaction,
-      canUndoTransaction: this.transaction?.resultingCanonicalHash === currentHash,
-      canRedoTransaction: this.redoTransaction?.priorCanonicalHash === currentHash,
-      message: this.message,
-      error: this.error,
-    });
+    renderTopologyEditProfessionalRuntime(this);
   }
 
   updateEvidence() {
-    const host = this.controller.hostElement;
-    if (!host) return;
-    host.dataset.topologyEditProfessionalCatalogueHash = this.catalogue?.catalogueHash ?? '';
-    host.dataset.topologyEditProfessionalPlanHash = this.plan?.planHash ?? '';
-    host.dataset.topologyEditProfessionalValidationHash = this.validation?.validationHash ?? '';
-    host.dataset.topologyEditProfessionalTransactionPreviewHash = this.transactionPreview?.previewHash ?? '';
-    host.dataset.topologyEditProfessionalTransactionHash = this.transaction?.transactionHash ?? '';
+    updateTopologyEditProfessionalEvidence(this);
   }
 
   publishState() {
@@ -322,24 +297,12 @@ export class TopologyEditProfessionalOperationRuntime {
   }
 
   destroy() {
+    this.clear(false, true);
     this.validationClient.destroy();
     this.element = null;
-    this.clear(false, true);
   }
 }
 
-function restoreReceipt(value, hashField, currentHash) {
-  if (!value || value[hashField] !== currentHash) return null;
-  try { return assertTopologyEditOperationTransactionReceipt(value); }
-  catch { return null; }
-}
-function initialValues() {
-  return {
-    operationType: 'EXTEND_EDGE', endpoint: 'TO', distanceMm: 100,
-    diameterMm: 100, entityType: 'PIPE', deltaX: 0, deltaY: 0, deltaZ: 0,
-    riseMm: 1, runMm: 100, direction: 'ASCENDING',
-  };
-}
 function errorMessage(error) {
   return error instanceof Error ? error.message : String(error);
 }
