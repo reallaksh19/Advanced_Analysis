@@ -1,13 +1,26 @@
-/** Three.js rendering adapter for disposable topology-edit visual projections. */
+/** Three.js adapter for governed visual projections and display-only sectioning. */
 import * as THREE from 'three';
 import { createTopologyEditPick } from './topology-edit-picking-contract.js';
 import { createTopologyEditViewState } from './topology-edit-view-state.js';
-
-const STANDARD_VIEW_DIRECTIONS = Object.freeze({
-  TOP: new THREE.Vector3(0, 1, 0.001).normalize(), BOTTOM: new THREE.Vector3(0, -1, 0.001).normalize(),
-  FRONT: new THREE.Vector3(0, 0, 1), BACK: new THREE.Vector3(0, 0, -1),
-  LEFT: new THREE.Vector3(-1, 0, 0), RIGHT: new THREE.Vector3(1, 0, 0), ISO: new THREE.Vector3(1, 1, 1).normalize(),
-});
+import {
+  createTopologyEditSectionPlaneEquations,
+  isEngineeringPointInsideSectionPlanes,
+} from '../viewport-presentation/topology-edit-section-model.js';
+import {
+  STANDARD_VIEW_DIRECTIONS,
+  applyObjectClipping,
+  cachedViewportMaterial,
+  computeProjectionBounds,
+  createViewportMaterial,
+  disposeViewportGroup,
+  fallbackPick,
+  finiteElement,
+  isFinitePoint,
+  markerSizeForBounds,
+  pickUserData,
+  positiveNumber,
+  segmentGeometry,
+} from './topology-edit-viewport-renderer.js';
 
 export class TopologyEditViewportBackend {
   constructor(options = {}) {
@@ -18,12 +31,9 @@ export class TopologyEditViewportBackend {
     this.activeCamera = this.camera;
     this.renderer = null;
     this.hasFitOnce = false;
-    this.groups = Object.freeze({
-      sourceGroup: new THREE.Group(), draftGroup: new THREE.Group(), ghostGroup: new THREE.Group(),
-      connectorGroup: new THREE.Group(), transientGroup: new THREE.Group(), measurementGroup: new THREE.Group(),
-      issueGroup: new THREE.Group(), supportGroup: new THREE.Group(), selectionGroup: new THREE.Group(),
-    });
-    Object.values(this.groups).forEach((group) => this.scene.add(group));
+    this.presentationSectionPlanes = Object.freeze([]);
+    this.presentationClippingPlanes = Object.freeze([]);
+    this.groups = createGroups(this.scene);
     this.viewState = createTopologyEditViewState(options.viewState);
     this.animationFrameId = null;
     this.isMounted = false;
@@ -31,12 +41,12 @@ export class TopologyEditViewportBackend {
   }
 
   setupLights() {
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
     const primary = new THREE.DirectionalLight(0xffffff, 0.8);
     const secondary = new THREE.DirectionalLight(0x38bdf8, 0.4);
     primary.position.set(100, 200, 150);
     secondary.position.set(-100, -100, -100);
-    this.scene.add(ambientLight, primary, secondary);
+    this.scene.add(ambient, primary, secondary);
   }
 
   mount(host) {
@@ -45,10 +55,7 @@ export class TopologyEditViewportBackend {
     this.hostElement = host;
     const width = host.clientWidth || 800;
     const height = host.clientHeight || 500;
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
-    this.renderer.setSize(width, height);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.renderer.setClearColor(0x020617, 1);
+    this.renderer = createRenderer(width, height, this.presentationClippingPlanes.length > 0);
     this.renderer.domElement.addEventListener('webglcontextlost', (event) => this.handleContextLost(event), false);
     this.renderer.domElement.addEventListener('webglcontextrestored', () => this.startLoop(), false);
     host.replaceChildren(this.renderer.domElement);
@@ -69,7 +76,10 @@ export class TopologyEditViewportBackend {
   startLoop() {
     if (this.animationFrameId || !this.isMounted || !this.renderer) return;
     const animate = () => {
-      if (!this.isMounted || !this.renderer) { this.animationFrameId = null; return; }
+      if (!this.isMounted || !this.renderer) {
+        this.animationFrameId = null;
+        return;
+      }
       this.renderer.render(this.scene, this.activeCamera);
       this.animationFrameId = requestAnimationFrame(animate);
     };
@@ -78,40 +88,44 @@ export class TopologyEditViewportBackend {
 
   renderSession(model) {
     if (!model) return;
-    this.clearGroup(this.groups.sourceGroup);
-    this.clearGroup(this.groups.draftGroup);
-    this.clearGroup(this.groups.supportGroup);
+    this.clearVisualGroups();
     const projections = [model.source, model.draft, model.supports].filter(Boolean);
     const allElements = projections.flatMap((row) => row.elements || []);
     const allSegments = projections.flatMap((row) => row.segments || []);
-    this.lastBounds = computeBounds(allElements, allSegments);
+    this.lastBounds = computeProjectionBounds(allElements, allSegments);
     const markerSize = markerSizeForBounds(this.lastBounds);
     this.renderProjection(this.groups.sourceGroup, model.source, 0x38bdf8, 0.4, markerSize);
     this.renderProjection(this.groups.draftGroup, model.draft, 0x0284c7, 1, markerSize);
     this.renderProjection(this.groups.supportGroup, model.supports, 0x22d3ee, 1, markerSize);
+    this.applyPresentationClippingToGroups();
     if (!this.hasFitOnce && (allElements.length || allSegments.length)) {
       this.hasFitOnce = true;
       this.fitAll();
     }
   }
 
-  renderProjection(group, projection, colorHex, opacity, markerSize) {
+  clearVisualGroups() {
+    disposeViewportGroup(this.groups.sourceGroup);
+    disposeViewportGroup(this.groups.draftGroup);
+    disposeViewportGroup(this.groups.supportGroup);
+  }
+
+  renderProjection(group, projection, color, opacity, markerSize) {
     if (!projection) return;
-    this.buildSegmentGroup(group, projection.segments, colorHex, opacity);
-    this.buildMeshGroup(group, projection.elements, colorHex, opacity, markerSize);
+    this.buildSegmentGroup(group, projection.segments, color, opacity);
+    this.buildMeshGroup(group, projection.elements, color, opacity, markerSize);
   }
 
   buildSegmentGroup(group, segments = [], colorHex = 0x0284c7, opacity = 1) {
     const materials = new Map();
     for (const segment of segments || []) {
       if (!isFinitePoint(segment.start) || !isFinitePoint(segment.end)) continue;
-      const radius = positive(segment.radiusMm);
+      const radius = positiveNumber(segment.radiusMm);
       if (radius === null) continue;
       const color = Number.isInteger(segment.colorInt) ? segment.colorInt : colorHex;
-      const material = cachedMaterial(materials, color, opacity);
       const geometry = segmentGeometry(segment, radius);
       if (!geometry) continue;
-      const mesh = new THREE.Mesh(geometry.geometry, material);
+      const mesh = new THREE.Mesh(geometry.geometry, cachedViewportMaterial(materials, color, opacity));
       if (geometry.position) mesh.position.copy(geometry.position);
       if (geometry.quaternion) mesh.quaternion.copy(geometry.quaternion);
       mesh.userData = pickUserData(segment);
@@ -120,18 +134,20 @@ export class TopologyEditViewportBackend {
   }
 
   buildMeshGroup(group, elements = [], colorHex = 0x0284c7, opacity = 1, markerSize = 10) {
-    const valid = (elements || []).filter((element) => finiteElement(element));
+    const valid = (elements || []).filter(finiteElement);
     if (!valid.length) return;
-    const material = createMaterial(colorHex, opacity);
+    const material = createViewportMaterial(colorHex, opacity);
     const geometry = new THREE.SphereGeometry(markerSize, 12, 10);
-    if (valid.length >= 500 && valid.every((element) => !positive(element.sizeMm))) {
+    if (valid.length >= 500 && valid.every((element) => !positiveNumber(element.sizeMm))) {
       this.buildInstancedMarkers(group, valid, geometry, material);
       return;
     }
     for (const element of valid) {
-      const size = positive(element.sizeMm);
-      const elementGeometry = size ? new THREE.SphereGeometry(size, 12, 10) : geometry;
-      const mesh = new THREE.Mesh(elementGeometry, material);
+      const size = positiveNumber(element.sizeMm);
+      const mesh = new THREE.Mesh(
+        size ? new THREE.SphereGeometry(size, 12, 10) : geometry,
+        material,
+      );
       mesh.position.set(element.x, element.y, element.z);
       mesh.userData = pickUserData(element);
       group.add(mesh);
@@ -151,24 +167,28 @@ export class TopologyEditViewportBackend {
     group.add(mesh);
   }
 
-  clearGroup(group) {
-    const geometries = new Set();
-    const materials = new Set();
-    group.traverse((object) => {
-      if (object.geometry) geometries.add(object.geometry);
-      const rows = Array.isArray(object.material) ? object.material : [object.material];
-      rows.filter(Boolean).forEach((material) => materials.add(material));
+  setPresentationSectionPlanes(planeEquations = []) {
+    this.presentationSectionPlanes = createTopologyEditSectionPlaneEquations(planeEquations);
+    this.presentationClippingPlanes = Object.freeze(this.presentationSectionPlanes.map(({ normal, constant }) => (
+      new THREE.Plane(new THREE.Vector3(normal.x, normal.y, normal.z), constant)
+    )));
+    if (this.renderer) this.renderer.localClippingEnabled = this.presentationClippingPlanes.length > 0;
+    this.applyPresentationClippingToGroups();
+    return this.presentationSectionPlanes.length;
+  }
+
+  applyPresentationClippingToGroups() {
+    [this.groups.sourceGroup, this.groups.draftGroup, this.groups.supportGroup].forEach((group) => {
+      group.traverse((object) => applyObjectClipping(object, this.presentationClippingPlanes));
     });
-    while (group.children.length) group.remove(group.children[0]);
-    geometries.forEach((geometry) => geometry.dispose());
-    materials.forEach((material) => material.dispose());
   }
 
   setStandardView(viewName) {
     const bounds = this.lastBounds;
-    const center = bounds ? bounds.getCenter(new THREE.Vector3()) : new THREE.Vector3(0, 0, 0);
+    const center = bounds ? bounds.getCenter(new THREE.Vector3()) : new THREE.Vector3();
     const distance = bounds ? Math.max(bounds.getSize(new THREE.Vector3()).length(), 10) : 30;
-    const direction = STANDARD_VIEW_DIRECTIONS[String(viewName).toUpperCase()] || STANDARD_VIEW_DIRECTIONS.ISO;
+    const direction = STANDARD_VIEW_DIRECTIONS[String(viewName).toUpperCase()]
+      || STANDARD_VIEW_DIRECTIONS.ISO;
     this.camera.position.copy(center).addScaledVector(direction, distance);
     this.camera.lookAt(center);
     this.camera.near = Math.max(distance / 1000, 0.01);
@@ -198,7 +218,10 @@ export class TopologyEditViewportBackend {
     );
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(pointer, this.activeCamera);
-    const hit = raycaster.intersectObjects(this.scene.children, true)[0];
+    const intersects = raycaster.intersectObjects(this.scene.children, true);
+    const hit = intersects.find((candidate) => (
+      isEngineeringPointInsideSectionPlanes(candidate.point, this.presentationSectionPlanes)
+    ));
     if (!hit) return null;
     const target = hit.instanceId !== undefined
       ? hit.object.userData?.pickTable?.[hit.instanceId]
@@ -214,95 +237,42 @@ export class TopologyEditViewportBackend {
     this.isMounted = false;
     if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
     this.animationFrameId = null;
-    Object.values(this.groups).forEach((group) => this.clearGroup(group));
+    this.setPresentationSectionPlanes([]);
+    Object.values(this.groups).forEach(disposeViewportGroup);
     if (this.renderer) {
       this.renderer.dispose();
       this.renderer.domElement?.parentElement?.removeChild(this.renderer.domElement);
       this.renderer = null;
     }
+    this.hostElement = null;
   }
 }
 
-function segmentGeometry(segment, radius) {
-  if (Array.isArray(segment.points) && segment.points.length >= 2) {
-    const points = segment.points.filter(isFinitePoint)
-      .map((point) => new THREE.Vector3(point.x, point.y, point.z));
-    if (points.length < 2) return null;
-    const curve = new THREE.CatmullRomCurve3(points, false, 'centripetal');
-    return {
-      geometry: new THREE.TubeGeometry(
-        curve,
-        Math.max(points.length - 1, 1),
-        radius,
-        12,
-        false,
-      ),
-    };
-  }
-  const start = new THREE.Vector3(segment.start.x, segment.start.y, segment.start.z);
-  const end = new THREE.Vector3(segment.end.x, segment.end.y, segment.end.z);
-  const direction = new THREE.Vector3().subVectors(end, start);
-  const length = direction.length();
-  if (length < 1e-6) return null;
-  const endRadius = positive(segment.endRadiusMm) || radius;
-  const geometry = new THREE.CylinderGeometry(endRadius, radius, length, 12);
-  const position = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
-  const quaternion = new THREE.Quaternion().setFromUnitVectors(
-    new THREE.Vector3(0, 1, 0),
-    direction.normalize(),
-  );
-  return { geometry, position, quaternion };
+function createGroups(scene) {
+  const groups = Object.freeze({
+    sourceGroup: new THREE.Group(),
+    draftGroup: new THREE.Group(),
+    ghostGroup: new THREE.Group(),
+    connectorGroup: new THREE.Group(),
+    transientGroup: new THREE.Group(),
+    measurementGroup: new THREE.Group(),
+    issueGroup: new THREE.Group(),
+    supportGroup: new THREE.Group(),
+    selectionGroup: new THREE.Group(),
+  });
+  Object.values(groups).forEach((group) => scene.add(group));
+  return groups;
 }
 
-function computeBounds(elements, segments) {
-  const bounds = new THREE.Box3();
-  elements.forEach((element) => {
-    if (finiteElement(element)) {
-      bounds.expandByPoint(new THREE.Vector3(element.x, element.y, element.z));
-    }
+function createRenderer(width, height, clippingEnabled) {
+  const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    alpha: true,
+    powerPreference: 'high-performance',
   });
-  segments.forEach((segment) => {
-    (segment.points || [segment.start, segment.end])
-      .filter(isFinitePoint)
-      .forEach((point) => bounds.expandByPoint(new THREE.Vector3(point.x, point.y, point.z)));
-  });
-  return bounds;
-}
-
-function markerSizeForBounds(bounds) {
-  if (!bounds || bounds.isEmpty()) return 10;
-  return Math.max(bounds.getSize(new THREE.Vector3()).length() * 0.008, 5);
-}
-function isFinitePoint(point) { return point && [point.x, point.y, point.z].every(Number.isFinite); }
-function finiteElement(element) { return element && [element.x, element.y, element.z].every(Number.isFinite); }
-function positive(value) {
-  return Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : null;
-}
-function createMaterial(color, opacity) {
-  return new THREE.MeshStandardMaterial({
-    color,
-    roughness: 0.3,
-    metalness: 0.2,
-    transparent: opacity < 1,
-    opacity,
-  });
-}
-function cachedMaterial(cache, color, opacity) {
-  const key = `${color}:${opacity}`;
-  if (!cache.has(key)) cache.set(key, createMaterial(color, opacity));
-  return cache.get(key);
-}
-function fallbackPick(value) {
-  return {
-    objectKind: value.type === 'node' ? 'node' : 'component',
-    objectId: value.entityId || value.id,
-    nodeId: value.type === 'node' ? value.entityId || value.id : '',
-  };
-}
-function pickUserData(value) {
-  return {
-    canonicalId: value.entityId || value.id,
-    type: value.type,
-    pickTarget: value.pickTarget || fallbackPick(value),
-  };
+  renderer.setSize(width, height);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setClearColor(0x020617, 1);
+  renderer.localClippingEnabled = clippingEnabled;
+  return renderer;
 }
