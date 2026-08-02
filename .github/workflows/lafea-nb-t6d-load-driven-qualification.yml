@@ -1,0 +1,123 @@
+name: LAFEA NB-T6D Load-Driven Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/lafea-nb-t6d-load-driven-qualification.yml'
+      - 'src/workspace/lafea-load-driven-pilot-qualification.js'
+      - 'src/workspace/lafea-controlled-continuum-public.js'
+      - 'src/workspace/lafea-lug-pinhole-physical-problem-*.js'
+      - 'src/workspace/lafea-controlled-continuum-*.js'
+      - 'src/core/local-continuum/**'
+      - 'src/core/lafea-application-templates/controlled-continuum-pilot-contract.js'
+      - 'scripts/lafea-nb-t6d-load-driven-qualification-check.mjs'
+      - 'scripts/lafea-nb-t6c-fixture.mjs'
+      - 'scripts/lafea-nb-t6c-physical-problem-batch-check.mjs'
+      - 'scripts/lafea-template-b7d-controlled-continuum-controller-check.mjs'
+      - 'scripts/lafea-nonbucket-stack-check.mjs'
+      - 'docs/LAFEA_NonBucket_NB-T6D_Load_Driven_Qualification.md'
+      - 'package.json'
+      - 'package-lock.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/lafea-nb-t6d-load-driven-qualification.yml'
+      - 'src/workspace/lafea-load-driven-pilot-qualification.js'
+      - 'src/workspace/lafea-controlled-continuum-public.js'
+      - 'src/workspace/lafea-lug-pinhole-physical-problem-*.js'
+      - 'src/workspace/lafea-controlled-continuum-*.js'
+      - 'src/core/local-continuum/**'
+      - 'scripts/lafea-nb-t6d-load-driven-qualification-check.mjs'
+      - 'scripts/lafea-nb-t6c-fixture.mjs'
+      - 'scripts/lafea-nonbucket-stack-check.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lafea-nb-t6d-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: NB-T6D load-driven selected-pilot qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Assert exact checkout and base ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git merge-base --is-ancestor "$PR_BASE_SHA" "$EXPECTED_HEAD_SHA"
+          fi
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run NB-T6D load-driven qualification
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/lafea-nb-t6d-load-driven-qualification-check.mjs \
+            2>&1 | tee lafea-nb-t6d-load-driven-qualification.log
+
+      - name: Run retained NB-T6C batch qualification
+        run: node scripts/lafea-nb-t6c-physical-problem-batch-check.mjs
+
+      - name: Run retained B7D controller qualification
+        run: node scripts/lafea-template-b7d-controlled-continuum-controller-check.mjs
+
+      - name: Run retained partitioned-solver qualification
+        run: node scripts/lafea.3-solver-check.mjs
+
+      - name: Run non-bucket aggregate
+        run: npm run check:lafea-nonbucket-stack
+
+      - name: Run strict syntax checks
+        run: npm run syntax:strict
+
+      - name: Run import checks
+        run: npm run check:imports
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Verify patch hygiene and clean tracked tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git diff --check "$PR_BASE_SHA...HEAD"
+          else
+            git diff --check HEAD^
+          fi
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Upload exact-head NB-T6D evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nb-t6d-${{ github.event.pull_request.head.sha || github.sha }}
+          path: lafea-nb-t6d-load-driven-qualification.log
+          if-no-files-found: error
+          retention-days: 30
