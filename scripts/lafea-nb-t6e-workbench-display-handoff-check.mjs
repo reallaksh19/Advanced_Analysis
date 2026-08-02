@@ -73,6 +73,7 @@ const bridge = createLafeaB7dRecoveryRenderBridge({
 });
 
 const live = createLiveController(projection, executionPackage, bridge);
+const rendersBeforeHandoff = live.renderCount();
 const handoff = installLafeaB7dWorkbenchDisplay({
   schema: LAFEA_B7D_WORKBENCH_DISPLAY_HANDOFF_INTAKE_SCHEMA,
   controller: live.controller,
@@ -114,7 +115,7 @@ assert.equal(retained.lineage.recoveryHash, bridge.recoveryHash);
 assert.equal(retained.field.fieldId, bridge.fieldRequest.fieldId);
 assert.notStrictEqual(retained, bridge.renderPacket);
 assert.notStrictEqual(retained.positions, bridge.renderPacket.positions);
-assert.equal(live.renderCount(), 2);
+assert.equal(live.renderCount(), rendersBeforeHandoff + 1);
 
 const repeated = installLafeaB7dWorkbenchDisplay({
   schema: LAFEA_B7D_WORKBENCH_DISPLAY_HANDOFF_INTAKE_SCHEMA,
@@ -122,7 +123,7 @@ const repeated = installLafeaB7dWorkbenchDisplay({
   bridge,
 });
 assert.equal(repeated.handoffHash, handoff.handoffHash);
-assert.equal(live.renderCount(), 3);
+assert.equal(live.renderCount(), rendersBeforeHandoff + 2);
 
 expectCode('missing viewport', () => install(withController(live.controller, {
   getDisplayViewportContext: () => null,
