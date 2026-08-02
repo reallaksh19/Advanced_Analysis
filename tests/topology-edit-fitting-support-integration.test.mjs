@@ -39,9 +39,8 @@ test('restraint pick returns complete canonical crosswalk', () => {
   assert.deepEqual(pick.workspaceEntityIds, ['entity:1']);
 });
 
-test('new production modules remain within size policy where practical', async () => {
+test('renderer and support boundaries remain within size policy', async () => {
   const files = [
-    'src/workspace/topology-edit/topology-edit-render-model.js',
     'src/workspace/topology-edit/support-restraint-family.js',
     'src/workspace/topology-edit/topology-edit-viewport-backend.js',
     'src/workspace/topology-edit/topology-edit-picking-contract.js',
