@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 export const EXPECTED_SOURCE_REPOSITORY = 'reallaksh19/XML_Compare_Utilities';
 export const EXPECTED_SOURCE_COMMIT = 'c20bb037566d52ba5b789712594b754a5fb94651';
 export const EXPECTED_TARGET_REPOSITORY = 'reallaksh19/Advanced_Analysis';
-export const EXPECTED_MANIFEST_SHA256 = '2d80305bca7a66d8972bf7d70b1a09b11822668ccbd52e87a44ecd4f1dbeecab';
+export const EXPECTED_MANIFEST_SHA256 = '91f555d771ade3bf5d0285dd73ef98501e3808e50cf77f97d7a1d08d7a2c871f';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = path.resolve(SCRIPT_DIR, '..');
@@ -59,7 +59,6 @@ export async function verifySourceManifest({
 } = {}) {
   const bytes = await readFile(manifestPath);
   const actualManifestSha256 = sha256(bytes);
-
   assert.equal(
     actualManifestSha256,
     expectedManifestSha256,
@@ -73,7 +72,6 @@ export async function verifySourceManifest({
   assert.equal(manifest.targetRepository, EXPECTED_TARGET_REPOSITORY);
   assertHex(manifest.sourceCommit, 40, 'sourceCommit');
   assertHex(manifest.baselineTargetCommit, 40, 'baselineTargetCommit');
-
   assert.deepEqual(
     [...manifest.allowedTreatments].sort(),
     [...ALLOWED_TREATMENTS].sort(),
@@ -82,12 +80,10 @@ export async function verifySourceManifest({
 
   assert.ok(Array.isArray(manifest.files) && manifest.files.length > 0);
   const sourcePaths = new Set();
-
   for (const entry of manifest.files) {
     assert.ok(entry.sourcePath, 'Manifest entry is missing sourcePath');
     assert.ok(!sourcePaths.has(entry.sourcePath), `Duplicate sourcePath: ${entry.sourcePath}`);
     sourcePaths.add(entry.sourcePath);
-
     assert.ok(
       ALLOWED_TREATMENTS.has(entry.treatment),
       `Unsupported treatment ${entry.treatment} for ${entry.sourcePath}`,
@@ -97,17 +93,14 @@ export async function verifySourceManifest({
       Array.isArray(entry.semanticContracts) && entry.semanticContracts.length > 0,
       `${entry.sourcePath} must name at least one semantic contract`,
     );
-
     if (entry.snapshotPath) {
-      const snapshotPath = path.resolve(repositoryRoot, entry.snapshotPath);
-      const snapshotBytes = await readFile(snapshotPath);
+      const snapshotBytes = await readFile(path.resolve(repositoryRoot, entry.snapshotPath));
       assert.equal(
         gitBlobSha(snapshotBytes),
         entry.gitBlobSha,
         `Source snapshot drift: ${entry.snapshotPath}`,
       );
     }
-
     if (entry.treatment === 'AS_IS') {
       assert.ok(
         entry.snapshotPath,
@@ -131,7 +124,6 @@ export async function verifySourceManifest({
   }
 
   for (const waiver of manifest.waivers ?? []) validateWaiver(waiver);
-
   return Object.freeze({
     sourceRepository: manifest.sourceRepository,
     sourceCommit: manifest.sourceCommit,
