@@ -1,0 +1,99 @@
+name: LAFEA B5 Selected Pilot Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/lafea-template-b5-selected-pilot-qualification.yml'
+      - 'src/core/lafea-application-templates/index.js'
+      - 'src/core/lafea-application-templates/selected-pilot-qualification.js'
+      - 'scripts/lafea-template-b4-analytical-pilot-check.mjs'
+      - 'scripts/lafea-template-b5-selected-pilot-qualification-check.mjs'
+      - 'src/workspace/lafea-template-execution-controller.js'
+      - 'docs/LAFEA_Bucket_B5_Selected_Pilot_Qualification.md'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lafea-b5-selected-pilot-qualification-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: B5 independent selected-pilot evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Assert exact checkout and base ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          git merge-base --is-ancestor "$PR_BASE_SHA" "$EXPECTED_HEAD_SHA"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run B5 independent qualification
+        shell: bash
+        run: |
+          set -o pipefail
+          LAFEA_B5_REPORT_PATH=lafea-b5-selected-pilot-report.json \
+            node scripts/lafea-template-b5-selected-pilot-qualification-check.mjs \
+            2>&1 | tee lafea-b5-selected-pilot-check.log
+
+      - name: Run retained B3 contract checks
+        run: node scripts/lafea-template-b3-analytical-execution-contract-check.mjs
+
+      - name: Run retained B2 compatibility checks
+        run: node scripts/lafea-template-b2-target-compatibility-check.mjs
+
+      - name: Run retained B1 release/readiness checks
+        run: node scripts/lafea-template-b1-release-record-v2-check.mjs
+
+      - name: Run strict syntax checks
+        run: npm run syntax:strict
+
+      - name: Run import checks
+        run: npm run check:imports
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Verify patch hygiene and clean tracked tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check "$PR_BASE_SHA...HEAD"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Upload exact-head B5 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-b5-selected-pilot-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            lafea-b5-selected-pilot-report.json
+            lafea-b5-selected-pilot-check.log
+          if-no-files-found: error
+          retention-days: 30
