@@ -1,6 +1,7 @@
 /** Three.js rendering adapter for disposable topology-edit visual projections. */
 import * as THREE from 'three';
 import { TopologyEditGpuPicker } from './topology-edit-gpu-picker.js';
+import { TopologyEditIssueRenderer } from './topology-edit-issue-renderer.js';
 import { createTopologyEditPick } from './topology-edit-picking-contract.js';
 import { createTopologyEditViewState } from './topology-edit-view-state.js';
 
@@ -19,6 +20,7 @@ export class TopologyEditViewportBackend {
     this.activeCamera = this.camera;
     this.renderer = null;
     this.gpuPicker = null;
+    this.issueRenderer = null;
     this.pickRaycaster = new THREE.Raycaster();
     this.hasFitOnce = false;
     this.groups = Object.freeze({
@@ -52,6 +54,7 @@ export class TopologyEditViewportBackend {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.setClearColor(0x020617, 1);
     this.gpuPicker = new TopologyEditGpuPicker({ renderer: this.renderer, scene: this.scene });
+    this.issueRenderer = new TopologyEditIssueRenderer(this.groups.issueGroup);
     this.renderer.domElement.addEventListener('webglcontextlost', (event) => this.handleContextLost(event), false);
     this.renderer.domElement.addEventListener('webglcontextrestored', () => this.startLoop(), false);
     host.replaceChildren(this.renderer.domElement);
@@ -98,6 +101,8 @@ export class TopologyEditViewportBackend {
     this.renderProjection(this.groups.ghostGroup, projection, 0xf59e0b, 0.38, markerSize * 1.2);
   }
   clearGhost() { this.clearGroup(this.groups.ghostGroup); }
+  renderIssues(overlay) { return this.issueRenderer?.render(overlay, this.lastBounds) ?? 0; }
+  clearIssues() { this.issueRenderer?.clear(); }
 
   renderProjection(group, projection, colorHex, opacity, markerSize) {
     if (!projection) return;
@@ -161,18 +166,8 @@ export class TopologyEditViewportBackend {
   pickAt(clientX, clientY) {
     const context = this.pickContext(clientX, clientY);
     if (!context) return null;
-    const gpuHit = this.gpuPicker?.pick({
-      clientX,
-      clientY,
-      rect: context.rect,
-      camera: this.activeCamera,
-    });
-    if (gpuHit) {
-      return this.pickReceipt(
-        gpuHit.target,
-        this.resolveGpuPickPoint(gpuHit, context.pointer),
-      );
-    }
+    const gpuHit = this.gpuPicker?.pick({ clientX, clientY, rect: context.rect, camera: this.activeCamera });
+    if (gpuHit) return this.pickReceipt(gpuHit.target, this.resolveGpuPickPoint(gpuHit, context.pointer));
     return this.pickWithRaycaster(context.pointer);
   }
 
@@ -180,28 +175,20 @@ export class TopologyEditViewportBackend {
     if (!this.hostElement || !this.renderer) return null;
     const rect = this.hostElement.getBoundingClientRect();
     if (!rect.width || !rect.height) return null;
-    const pointer = new THREE.Vector2(
-      ((clientX - rect.left) / rect.width) * 2 - 1,
-      -((clientY - rect.top) / rect.height) * 2 + 1,
-    );
+    const pointer = new THREE.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
     return { rect, pointer };
   }
 
   pickWithRaycaster(pointer) {
     this.pickRaycaster.setFromCamera(pointer, this.activeCamera);
-    const hit = this.pickRaycaster
-      .intersectObjects(this.scene.children, true)
-      .find((row) => !hasNonPickableAncestor(row.object));
+    const hit = this.pickRaycaster.intersectObjects(this.scene.children, true).find((row) => !hasNonPickableAncestor(row.object));
     if (!hit) return null;
     return this.pickReceipt(resolveHitTarget(hit), hit.point);
   }
 
   resolveGpuPickPoint(gpuHit, pointer) {
     this.pickRaycaster.setFromCamera(pointer, this.activeCamera);
-    const hit = this.pickRaycaster
-      .intersectObject(gpuHit.object, true)
-      .find((row) => gpuHit.instanceId === null
-        || row.instanceId === gpuHit.instanceId);
+    const hit = this.pickRaycaster.intersectObject(gpuHit.object, true).find((row) => gpuHit.instanceId === null || row.instanceId === gpuHit.instanceId);
     if (hit?.point) return hit.point;
     if (gpuHit.instanceId !== null && gpuHit.object?.getMatrixAt) {
       const matrix = new THREE.Matrix4();
@@ -209,21 +196,18 @@ export class TopologyEditViewportBackend {
       matrix.premultiply(gpuHit.object.matrixWorld);
       return new THREE.Vector3().setFromMatrixPosition(matrix);
     }
-    return gpuHit.object?.getWorldPosition?.(new THREE.Vector3())
-      ?? new THREE.Vector3();
+    return gpuHit.object?.getWorldPosition?.(new THREE.Vector3()) ?? new THREE.Vector3();
   }
 
   pickReceipt(target, point) {
     if (!target?.objectId) return null;
-    return createTopologyEditPick({
-      ...target,
-      point: { x: point.x, y: point.y, z: point.z },
-    });
+    return createTopologyEditPick({ ...target, point: { x: point.x, y: point.y, z: point.z } });
   }
 
   destroy() {
     this.isMounted = false; if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId); this.animationFrameId = null;
     this.gpuPicker?.dispose(); this.gpuPicker = null;
+    this.issueRenderer?.destroy(); this.issueRenderer = null;
     Object.values(this.groups).forEach((group) => this.clearGroup(group));
     if (this.renderer) { this.renderer.dispose(); this.renderer.domElement?.parentElement?.removeChild(this.renderer.domElement); this.renderer = null; }
   }
