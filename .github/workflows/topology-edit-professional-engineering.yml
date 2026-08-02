@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   qualify:
-    name: P4A specification catalogue authority
+    name: P4B exact compatibility and plan gating
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
@@ -57,6 +57,7 @@ jobs:
           node --check src/workspace/topology-edit/professional/topology-edit-route-operations.js
           node --check src/workspace/topology-edit/professional/topology-edit-slope-operation.js
           node --check src/workspace/topology-edit/professional/topology-edit-spec-catalog.js
+          node --check src/workspace/topology-edit/professional/topology-edit-compatibility.js
 
       - name: Run focused professional engineering tests
         run: |
@@ -65,6 +66,7 @@ jobs:
             tests/topology-edit-professional-engineering-plan.test.mjs \
             tests/topology-edit-professional-engineering-route-operations.test.mjs \
             tests/topology-edit-professional-engineering-catalog.test.mjs \
+            tests/topology-edit-professional-engineering-compatibility.test.mjs \
             tests/topology-edit-professional-engineering-containment.test.mjs
 
       - name: Run retained command and journal authority tests
