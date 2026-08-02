@@ -1,0 +1,113 @@
+name: Topology Edit Demo Walkthrough
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/topology-edit-demo-walkthrough.yml'
+      - 'e2e/topology-edit-20-element-demo-edit-flow.spec.js'
+      - 'public/fixtures/topology-edit-20-element-demo.staged.json'
+      - 'src/workspace/tree-panel-events.js'
+      - 'src/workspace/topology-edit-3d-*.js'
+      - 'src/workspace/topology-edit/**'
+      - 'src/workspace/viewport-productivity/topology-edit-search-*.js'
+      - 'tests/topology-edit-20-element-demo-loader.test.mjs'
+      - 'tests/topology-edit-wave3-exact-gap-modes.test.mjs'
+      - 'tests/topology-edit-c3d-wave2-search.test.mjs'
+      - 'scripts/run-playwright.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  demo-walkthrough:
+    name: Exact-head 20-object topology edit walkthrough
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CI: 'true'
+      TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Verify exact checkout
+        run: test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Qualify search, fixture, and exact-gap contracts
+        run: |
+          node --check src/workspace/topology-edit-3d-search-controller.js
+          node --check src/workspace/viewport-productivity/topology-edit-search-panel.js
+          node --check e2e/topology-edit-20-element-demo-edit-flow.spec.js
+          node --test \
+            tests/topology-edit-c3d-wave2-search.test.mjs \
+            tests/topology-edit-20-element-demo-loader.test.mjs \
+            tests/topology-edit-wave3-exact-gap-modes.test.mjs
+
+      - name: Retain certified command and autofix authority
+        run: >-
+          node --test
+          tests/topology-edit-wave1-pure-kernel.test.mjs
+          tests/topology-edit-wave1-candidate-certification.test.mjs
+          tests/topology-edit-wave1-journal-replay.test.mjs
+          tests/topology-edit-wave3a-checker.test.mjs
+          tests/topology-edit-wave3b-autofix.test.mjs
+          tests/topology-edit-wave3c-autofix-ui.test.mjs
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Walk the real user flow
+        run: node scripts/run-playwright.mjs e2e/topology-edit-20-element-demo-edit-flow.spec.js
+
+      - name: Verify walkthrough evidence
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const report = JSON.parse(readFileSync(
+            'reports/qualification/topology-edit-demo-walkthrough.json',
+            'utf8',
+          ));
+          if (report.status !== 'PASS_EXACT_GAP_USER_WALKTHROUGH') {
+            throw new Error(`Unexpected walkthrough status ${report.status}.`);
+          }
+          if (report.candidateHead !== process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA) {
+            throw new Error('Walkthrough evidence is not bound to the exact candidate head.');
+          }
+          if (report.cases?.length !== 2
+              || report.cases[0].requestedGapMm !== 3
+              || report.cases[1].requestedGapMm !== 20) {
+            throw new Error('Walkthrough evidence is missing the 3 mm or 20 mm case.');
+          }
+          NODE
+
+      - name: Verify production bundle
+        run: npm run build
+
+      - name: Verify patch hygiene
+        run: |
+          git diff --check "${{ github.event.pull_request.base.sha || github.sha }}...HEAD"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Upload walkthrough evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-demo-walkthrough-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          path: |
+            reports/qualification/topology-edit-demo-walkthrough.json
+            test-results/**
+          if-no-files-found: error
+          retention-days: 30

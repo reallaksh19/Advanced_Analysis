@@ -1,7 +1,10 @@
 /** Read-only canonical search and exact-focus composition for the Topology Edit 3D view. */
 import { EVENT_TOPICS } from './event-topics.js';
 import { TopologyEdit3DViewController as LifecycleController } from './topology-edit-3d-view-controller.js';
-import { updateTopologyEditSelection } from './topology-edit/topology-edit-command-ui.js';
+import {
+  topologyEditSelectionDescription,
+  updateTopologyEditSelection,
+} from './topology-edit/topology-edit-command-ui.js';
 import {
   isTopologyEditCanonicalIdVisible,
 } from './viewport-presentation/topology-edit-visibility-model.js';
@@ -23,7 +26,7 @@ export class TopologyEdit3DViewController extends LifecycleController {
     super(eventBus, lifecycleOptions);
     this.searchIndex = null;
     this.searchPanel = new TopologyEditSearchPanel({
-      onActivate: (result) => this.activateSearchResult(result),
+      onActivate: (result, options) => this.activateSearchResult(result, options),
       isCanonicalIdVisible: (canonicalId) => this.isSearchResultVisible(canonicalId),
     });
   }
@@ -54,6 +57,22 @@ export class TopologyEdit3DViewController extends LifecycleController {
       diagnostics: this.visualDiagnostics,
     });
     this.searchPanel.updateIndex(this.searchIndex);
+    this.updateReviewEvidence(canonical);
+  }
+
+  previewAutofix(suggestionHash) {
+    super.previewAutofix(suggestionHash);
+    this.updateReviewEvidence(this.session?.currentTopology());
+  }
+
+  acceptAutofix() {
+    super.acceptAutofix();
+    this.updateReviewEvidence(this.session?.currentTopology());
+  }
+
+  cancelAutofix(silent = false) {
+    super.cancelAutofix(silent);
+    this.updateReviewEvidence(this.session?.currentTopology());
   }
 
   applyPresentationAction(action) {
@@ -68,7 +87,7 @@ export class TopologyEdit3DViewController extends LifecycleController {
       : true;
   }
 
-  activateSearchResult(result) {
+  activateSearchResult(result, options = {}) {
     if (!this.searchIndex || result?.searchIndexHash !== this.searchIndex.searchIndexHash) {
       this.setStatus('Search result is stale; run the search again.');
       return;
@@ -88,11 +107,12 @@ export class TopologyEdit3DViewController extends LifecycleController {
       );
       return;
     }
+    const additive = Boolean(options.additive);
     if (result.objectKind === 'node' || result.objectKind === 'edge') {
       this.selection = updateTopologyEditSelection(
         this.selection,
         result.canonicalId,
-        false,
+        additive,
       );
       this.presentationToolbar?.update(this.presentationState);
     }
@@ -105,7 +125,32 @@ export class TopologyEdit3DViewController extends LifecycleController {
     this.updateActionButtons();
     this.setStatus(
       `${wasHidden ? 'Presentation visibility reset; ' : ''}`
-      + `focused ${result.canonicalId} by exact canonical identity.`,
+      + `focused ${result.canonicalId} by exact canonical identity. `
+      + topologyEditSelectionDescription(this.selection),
+    );
+  }
+
+  updateReviewEvidence(canonical) {
+    if (!this.hostElement || !canonical) return;
+    const preview = this.autofixPreview;
+    this.hostElement.dataset.topologyEditCanonicalHash = String(
+      canonical.canonicalTopologyHash ?? '',
+    );
+    this.hostElement.dataset.topologyEditSourceHash = String(canonical.sourceHash ?? '');
+    this.hostElement.dataset.topologyEditJournalHash = String(
+      this.session?.journal?.journalHash ?? '',
+    );
+    this.hostElement.dataset.topologyEditSessionVersion = String(
+      this.session?.journal?.sessionVersion ?? 0,
+    );
+    this.hostElement.dataset.topologyEditActiveCommandCount = String(
+      this.session?.journal?.activeCommandIds?.length ?? 0,
+    );
+    this.hostElement.dataset.topologyEditPreviewHash = String(
+      preview?.candidateDraftHash ?? '',
+    );
+    this.hostElement.dataset.topologyEditPreviewCertificationHash = String(
+      preview?.certification?.certificationHash ?? preview?.certificationHash ?? '',
     );
   }
 }

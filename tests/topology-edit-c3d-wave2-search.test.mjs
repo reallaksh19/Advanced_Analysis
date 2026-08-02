@@ -142,21 +142,56 @@ test('renderer focus uses exact canonical pick identities', () => {
   assert.ok(camera.position.x > 0);
 });
 
-test('production search activation remains read-only', async () => {
+test('search panel exposes exact identities and forwards Shift activation', async () => {
+  const source = await readFile(
+    new URL('../src/workspace/viewport-productivity/topology-edit-search-panel.js', import.meta.url),
+    'utf8',
+  );
+  assert.match(source, /data\.searchCanonicalId = result\.canonicalId/);
+  assert.match(source, /data\.searchObjectKind = result\.objectKind/);
+  assert.match(source, /additive: event\.shiftKey/);
+  assert.match(source, /Shift-activate a node to add it to the current selection/);
+});
+
+test('production search activation remains read-only and supports additive selection', async () => {
   const source = await readFile(
     new URL('../src/workspace/topology-edit-3d-search-controller.js', import.meta.url),
     'utf8',
   );
-  const method = source.match(/activateSearchResult\(result\) \{([\s\S]*?)\n  \}\n\}/);
+  const method = source.match(
+    /activateSearchResult\(result, options = \{\}\) \{([\s\S]*?)\n  \}\n\n  updateReviewEvidence/,
+  );
   assert.ok(method);
   assert.match(method[1], /focusTopologyEditCanonicalIds/);
+  assert.match(method[1], /Boolean\(options\.additive\)/);
+  assert.match(method[1], /topologyEditSelectionDescription/);
   assert.doesNotMatch(method[1], /\.execute\(|commitDraft|acceptAutofix|WorkspaceState/);
 });
 
-test('load-calc 3D tab consumes the search-enabled controller', async () => {
+test('search controller publishes read-only exact-head review metadata', async () => {
+  const source = await readFile(
+    new URL('../src/workspace/topology-edit-3d-search-controller.js', import.meta.url),
+    'utf8',
+  );
+  for (const key of [
+    'topologyEditCanonicalHash',
+    'topologyEditSourceHash',
+    'topologyEditJournalHash',
+    'topologyEditSessionVersion',
+    'topologyEditActiveCommandCount',
+    'topologyEditPreviewHash',
+    'topologyEditPreviewCertificationHash',
+  ]) assert.match(source, new RegExp(key));
+  assert.doesNotMatch(source, /WorkspaceState\.|localStorage\.|sessionStorage\./);
+});
+
+test('load-calc 3D tab consumes a controller chain that retains search', async () => {
   const source = await readFile(
     new URL('../src/workspace/load-calc-consumer-controller.js', import.meta.url),
     'utf8',
   );
-  assert.match(source, /import\('\.\/topology-edit-3d-search-controller\.js'\)/);
+  assert.match(
+    source,
+    /import\('\.\/topology-edit-3d-(?:dossier-intake|review-response)-controller\.js'\)/,
+  );
 });

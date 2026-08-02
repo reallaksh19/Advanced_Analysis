@@ -88,7 +88,9 @@ export class TopologyEditSearchPanel {
   handleClick(event) {
     const button = event.target.closest('[data-search-result-index]');
     if (!button) return;
-    this.activate(Number(button.dataset.searchResultIndex));
+    this.activate(Number(button.dataset.searchResultIndex), {
+      additive: event.shiftKey,
+    });
   }
 
   handleKey(event) {
@@ -103,19 +105,19 @@ export class TopologyEditSearchPanel {
       this.renderResults();
     } else if (event.key === 'Enter') {
       event.preventDefault();
-      this.activate(this.activeIndex);
+      this.activate(this.activeIndex, { additive: event.shiftKey });
     } else if (event.key === 'Escape') {
       this.input.value = '';
       this.runQuery();
     }
   }
 
-  activate(index) {
+  activate(index, options = {}) {
     const result = this.results[index];
     if (!result) return;
     this.activeIndex = index;
     this.renderResults();
-    this.onActivate(result);
+    this.onActivate(result, { additive: Boolean(options.additive) });
   }
 
   renderResults() {
@@ -127,7 +129,7 @@ export class TopologyEditSearchPanel {
         : 'Search unavailable until canonical data is current.';
       return;
     }
-    this.statusElement.textContent = `${this.results.length} result(s).`;
+    this.statusElement.textContent = `${this.results.length} result(s). Shift-activate a node to add it to the current selection.`;
     this.results.forEach((result, index) => {
       this.resultsElement.append(this.resultButton(result, index));
     });
@@ -137,12 +139,15 @@ export class TopologyEditSearchPanel {
     const button = globalThis.document.createElement('button');
     button.type = 'button';
     button.dataset.searchResultIndex = String(index);
+    button.dataset.searchCanonicalId = result.canonicalId;
+    button.dataset.searchObjectKind = result.objectKind;
     button.role = 'option';
     button.ariaSelected = String(index === this.activeIndex);
+    button.setAttribute('aria-keyshortcuts', 'Enter Shift+Enter');
     button.className = 'topology-edit-search__result';
     const hidden = !this.isCanonicalIdVisible(result.canonicalId);
     button.textContent = hidden ? `${result.label} · hidden (reveal and focus)` : result.label;
-    button.title = resultDetails(result);
+    button.title = `${resultDetails(result)}\nShift-activate to add this node or edge to the current selection.`;
     return button;
   }
 }
