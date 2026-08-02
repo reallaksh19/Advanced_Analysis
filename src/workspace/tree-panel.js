@@ -6,6 +6,10 @@
  */
 import { EventBus } from './event-bus.js';
 import {
+  ModelZoneSelectorController,
+  projectDatasetForModelZone,
+} from './model-zone-selector.js';
+import {
   destroyTreePanel,
   handleTreeChange,
   handleTreeClick,
@@ -27,6 +31,9 @@ export class TreePanel {
     this.rootElement = rootElement;
     this.eventBus = eventBus;
     this.dataset = null;
+    this.sourceDataset = null;
+    this.zoneSelection = null;
+    this.zoneSelector = new ModelZoneSelectorController(rootElement, eventBus);
     this.entities = new Map();
     this.expandedBranches = new Set();
     this.flattenedNodes = [];
@@ -44,6 +51,7 @@ export class TreePanel {
   }
 
   init() {
+    this.zoneSelector.init();
     initializeTreePanel(this);
   }
 
@@ -60,7 +68,7 @@ export class TreePanel {
       this.renderEmpty();
       return;
     }
-    if (this.dataset !== snapshot.dataset) {
+    if (this.sourceDataset !== snapshot.dataset) {
       this.renderDataset(snapshot.dataset);
     }
     if (this.selectedEntityId === snapshot.selectedEntityId) return;
@@ -69,22 +77,28 @@ export class TreePanel {
     renderVisibleItems(this);
   }
 
+  applyZoneSelection(selection, dataset) {
+    this.zoneSelection = selection;
+    if (this.sourceDataset === dataset) this.renderDataset(dataset);
+  }
+
   renderDataset(dataset) {
-    this.dataset = dataset;
+    this.sourceDataset = dataset;
+    const view = projectDatasetForModelZone(dataset, this.zoneSelection);
+    this.dataset = view;
     this.entities = new Map(
-      dataset.entities.map((entity) => [entity.entityId, entity]),
+      view.entities.map((entity) => [entity.entityId, entity]),
     );
     this.expandedBranches.clear();
-    dataset.hierarchy.forEach((node) => {
+    view.hierarchy.forEach((node) => {
       this.expandedBranches.add(node.id);
       node.children.forEach((child) =>
         this.expandedBranches.add(child.id));
     });
-    this.statusElement.textContent =
-      `${dataset.datasetId} · ${dataset.summary.nodeCount} entities`;
-    this.pipesElement.textContent = `Pipes ${dataset.summary.pipes}`;
+    this.statusElement.textContent = datasetStatus(dataset, view);
+    this.pipesElement.textContent = `Pipes ${view.summary.pipes}`;
     this.supportsElement.textContent =
-      `Supports ${dataset.summary.supports}`;
+      `Supports ${view.summary.supports}`;
     this.clearButton.disabled = false;
     this.clearError();
     updateFlattenedNodes(this);
@@ -105,6 +119,8 @@ export class TreePanel {
 
   renderEmpty() {
     this.dataset = null;
+    this.sourceDataset = null;
+    this.zoneSelection = null;
     this.entities.clear();
     this.expandedBranches.clear();
     this.flattenedNodes = [];
@@ -122,5 +138,13 @@ export class TreePanel {
 
   destroy() {
     destroyTreePanel(this);
+    this.zoneSelector.destroy();
   }
+}
+
+function datasetStatus(dataset, view) {
+  if (!view.zoneId) {
+    return `${dataset.datasetId} · ${view.summary.nodeCount} entities`;
+  }
+  return `${dataset.datasetId} · Zone ${view.label} · ${view.summary.nodeCount} of ${view.totalEntityCount} entities`;
 }
