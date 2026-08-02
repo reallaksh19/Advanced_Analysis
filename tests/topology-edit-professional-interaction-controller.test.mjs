@@ -38,6 +38,20 @@ test('interaction controller extends current composition without production rout
   assert.doesNotMatch(loadCalc, /topology-edit-3d-interaction-controller\.js/);
 });
 
+test('keyboard nudges use axis direction and Shift changes increment only', async () => {
+  const source = await sources();
+  const controller = source[FILES[0]];
+  const runtime = source[FILES[3]];
+  assert.match(runtime, /ArrowLeft:.*axis: 'X'.*directionSign: -1/);
+  assert.match(runtime, /ArrowRight:.*axis: 'X'.*directionSign: 1/);
+  assert.match(runtime, /ArrowDown:.*axis: 'Y'.*directionSign: -1/);
+  assert.match(runtime, /ArrowUp:.*axis: 'Y'.*directionSign: 1/);
+  assert.match(runtime, /PageDown:.*axis: 'Z'.*directionSign: -1/);
+  assert.match(runtime, /PageUp:.*axis: 'Z'.*directionSign: 1/);
+  assert.match(controller, /event\.shiftKey \? 10 : 1/);
+  assert.doesNotMatch(controller, /event\.shiftKey \? -1 : 1/);
+});
+
 test('gizmo adapter owns explicit capture, release and non-pickable overlay lifecycle', async () => {
   const source = await sources();
   const adapter = source[FILES[2]];
