@@ -9,7 +9,7 @@ export const LAFEA_BUCKET_01_PRODUCTION_RESPONSE_INPUT_SCHEMA =
 export const LAFEA_BUCKET_01_PRODUCTION_RESPONSE_EVIDENCE_SCHEMA =
   'lafea-bucket-01-production-response-evidence/v1';
 export const LAFEA_BUCKET_01_PRODUCTION_RESPONSE_REVISION =
-  'B01-PRODUCTION-RESPONSE.1';
+  'B01-PRODUCTION-RESPONSE.2';
 
 const INPUT_KEYS = Object.freeze([
   'schema', 'exactHeadSha', 'specHash', 'locationDefinitionHash',
@@ -30,6 +30,11 @@ const TOLERANCE_KEYS = Object.freeze([
 ]);
 const ASYMPTOTIC_KEYS = Object.freeze(['minimum', 'maximum']);
 const EXPECTED_ELEMENT_COUNTS = Object.freeze([64, 256, 1024]);
+const EXPECTED_SOLVER_METHODS = Object.freeze([
+  'DETERMINISTIC_CHOLESKY',
+  'DETERMINISTIC_CHOLESKY',
+  'DETERMINISTIC_JACOBI_PCG',
+]);
 
 export function evaluateLafeaBucket01ProductionResponse(inputValue) {
   exactKeys(inputValue, INPUT_KEYS, 'production-response input');
@@ -135,6 +140,7 @@ export function evaluateLafeaBucket01ProductionResponse(inputValue) {
     reasons: [...new Set(reasons)].sort(),
     authority: {
       fixedProductionMeshLadder: true,
+      fixedProductionSolverPolicy: true,
       forceAndMomentComputedFromRetainedNodalVectors: true,
       strainEnergyFromAuthoritativeSolverResult: true,
       externalWorkReconstructedIndependently: true,
@@ -215,7 +221,7 @@ function qualifyLevel(level, expectedForce, expectedMoment, forceScale,
     level.totalStrainEnergy - level.halfExternalWork,
   ) / Math.max(1, Math.abs(level.totalStrainEnergy));
   const prefix = `LEVEL_${level.ordinal}`;
-  if (level.solverMethod !== 'DETERMINISTIC_CHOLESKY' || level.freeDofCount < 1) {
+  if (level.freeDofCount < 1) {
     reasons.push(`${prefix}_FREE_DOF_SOLVER_EVIDENCE_INVALID`);
   }
   if (!level.energyQualificationAccepted || !(level.totalStrainEnergy > 0)) {
@@ -260,6 +266,10 @@ function normalizeLevels(value) {
       if (ordinal !== index + 1 || elementCount !== EXPECTED_ELEMENT_COUNTS[index]) {
         throw responseError('LAFEA_B01_PRODUCTION_RESPONSE_LADDER_INVALID');
       }
+      const solverMethod = text(row.solverMethod, 'solverMethod');
+      if (solverMethod !== EXPECTED_SOLVER_METHODS[index]) {
+        throw responseError('LAFEA_B01_PRODUCTION_RESPONSE_SOLVER_POLICY_INVALID');
+      }
       return deepFreeze({
         ordinal,
         elementCount,
@@ -267,7 +277,7 @@ function normalizeLevels(value) {
         meshHash: sha256(row.meshHash, 'meshHash'),
         recoveryHash: sha256(row.recoveryHash, 'recoveryHash'),
         resultHash: sha256(row.resultHash, 'resultHash'),
-        solverMethod: text(row.solverMethod, 'solverMethod'),
+        solverMethod,
         freeDofCount: positiveInteger(row.freeDofCount, 'freeDofCount'),
         appliedForce: vector(row.appliedForce, 'appliedForce'),
         reactionForce: vector(row.reactionForce, 'reactionForce'),
@@ -319,6 +329,7 @@ function vector(value, label) {
     y: finite(value.y, `${label}.y`),
   });
 }
+
 function exactKeys(value, keys, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)
     || Object.getPrototypeOf(value) !== Object.prototype) {
@@ -328,30 +339,35 @@ function exactKeys(value, keys, label) {
     throw responseError('LAFEA_B01_PRODUCTION_RESPONSE_EXACT_KEYS_INVALID', label);
   }
 }
+
 function text(value, label) {
   if (typeof value !== 'string' || !value.trim()) {
     throw responseError('LAFEA_B01_PRODUCTION_RESPONSE_TEXT_REQUIRED', label);
   }
   return value;
 }
+
 function gitSha(value) {
   if (typeof value !== 'string' || !/^[0-9a-f]{40}$/u.test(value)) {
     throw responseError('LAFEA_B01_PRODUCTION_RESPONSE_EXACT_HEAD_INVALID');
   }
   return value;
 }
+
 function sha256(value, label) {
   if (typeof value !== 'string' || !/^sha256:[0-9a-f]{64}$/u.test(value)) {
     throw responseError('LAFEA_B01_PRODUCTION_RESPONSE_SHA256_REQUIRED', label);
   }
   return value;
 }
+
 function finite(value, label) {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     throw responseError('LAFEA_B01_PRODUCTION_RESPONSE_FINITE_REQUIRED', label);
   }
   return Object.is(value, -0) ? 0 : value;
 }
+
 function positive(value, label) {
   const normalized = finite(value, label);
   if (!(normalized > 0)) {
@@ -359,6 +375,7 @@ function positive(value, label) {
   }
   return normalized;
 }
+
 function nonNegative(value, label) {
   const normalized = finite(value, label);
   if (normalized < 0) {
@@ -366,28 +383,33 @@ function nonNegative(value, label) {
   }
   return normalized;
 }
+
 function positiveInteger(value, label) {
   if (!Number.isInteger(value) || value < 1) {
     throw responseError('LAFEA_B01_PRODUCTION_RESPONSE_POSITIVE_INTEGER_REQUIRED', label);
   }
   return value;
 }
+
 function boolean(value, label) {
   if (typeof value !== 'boolean') {
     throw responseError('LAFEA_B01_PRODUCTION_RESPONSE_BOOLEAN_REQUIRED', label);
   }
   return value;
 }
+
 function responseError(code, message = code) {
   const error = new TypeError(message);
   error.code = code;
   return error;
 }
+
 function deepFreeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   Object.values(value).forEach(deepFreeze);
   return Object.freeze(value);
 }
+
 function isDeepFrozen(value) {
   if (!value || typeof value !== 'object') return true;
   return Object.isFrozen(value) && Object.values(value).every(isDeepFrozen);
