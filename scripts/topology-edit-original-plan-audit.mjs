@@ -12,6 +12,7 @@ const OUTPUT = path.join(
 const WORKFLOW_PATH = '.github/workflows/topology-edit-wave5.yml';
 const DEMO_WORKFLOW_PATH = '.github/workflows/topology-edit-demo-walkthrough.yml';
 const DEMO_SPEC_PATH = 'e2e/topology-edit-20-element-demo-edit-flow.spec.js';
+const REPAIR_SPEC_PATH = 'e2e/topology-edit-20-element-demo-repair-flow.spec.js';
 const DEMO_FIXTURE_PATH = 'public/fixtures/topology-edit-20-element-demo.staged.json';
 const PREREQUISITE_PATH = 'tests/fixtures/topology-edit/1885s/prerequisite-manifest.json';
 
@@ -52,11 +53,14 @@ const waves = Object.freeze([
     WORKFLOW_PATH,
     DEMO_WORKFLOW_PATH,
     DEMO_SPEC_PATH,
+    REPAIR_SPEC_PATH,
     DEMO_FIXTURE_PATH,
     'scripts/topology-edit-wave5-contract.mjs',
     'scripts/topology-edit-wave5-fixture-check.mjs',
     'scripts/topology-edit-write-wave5-evidence.mjs',
     'tests/topology-edit-20-element-demo-loader.test.mjs',
+    'tests/topology-edit-20-element-demo-repairs.test.mjs',
+    'tests/topology-edit-search-composition.test.mjs',
     'tests/topology-edit-track-c.test.mjs',
     'tests/topology-edit-wave5.test.mjs',
     'tests/topology-edit-wave5-track-b-closure.test.mjs',
@@ -75,10 +79,12 @@ const additiveC3d = Object.freeze({
     'src/workspace/topology-edit-3d-inspection-controller.js',
     'src/workspace/topology-edit-3d-comparison-controller.js',
     'src/workspace/topology-edit-3d-route-controller.js',
+    'src/workspace/topology-edit-3d-dossier-controller.js',
     'tests/topology-edit-c3d-wave0.test.mjs',
     'tests/topology-edit-c3d-wave1-visibility.test.mjs',
     'tests/topology-edit-c3d-wave1-sectioning.test.mjs',
     'tests/topology-edit-c3d-wave2-search.test.mjs',
+    'tests/topology-edit-search-composition.test.mjs',
     'tests/topology-edit-c3d-wave3-gpu-picking.test.mjs',
     'tests/topology-edit-c3d-wave3-review.test.mjs',
     'tests/topology-edit-c3d-wave4-issue-review.test.mjs',
@@ -109,12 +115,16 @@ for (const trigger of [
   "'src/workspace/viewport-productivity/**'",
   "'tests/topology-edit-c3d-*.test.mjs'",
   `'${DEMO_SPEC_PATH}'`,
+  `'${REPAIR_SPEC_PATH}'`,
 ]) {
   assert.ok(workflow.includes(trigger), `Wave 5 path coverage is missing ${trigger}.`);
 }
 for (const commandEvidence of [
   DEMO_SPEC_PATH,
+  REPAIR_SPEC_PATH,
   'tests/topology-edit-20-element-demo-loader.test.mjs',
+  'tests/topology-edit-20-element-demo-repairs.test.mjs',
+  'tests/topology-edit-search-composition.test.mjs',
   'tests/topology-edit-wave3-exact-gap-modes.test.mjs',
 ]) {
   assert.ok(
@@ -130,8 +140,11 @@ assert.ok(
 const demoWorkflow = await readFile(path.join(ROOT, DEMO_WORKFLOW_PATH), 'utf8');
 for (const qualifiedPath of [
   DEMO_SPEC_PATH,
+  REPAIR_SPEC_PATH,
   DEMO_FIXTURE_PATH,
   'tests/topology-edit-20-element-demo-loader.test.mjs',
+  'tests/topology-edit-20-element-demo-repairs.test.mjs',
+  'tests/topology-edit-search-composition.test.mjs',
   'tests/topology-edit-wave3-exact-gap-modes.test.mjs',
   'tests/topology-edit-c3d-wave2-search.test.mjs',
 ]) {
@@ -142,8 +155,10 @@ for (const qualifiedPath of [
 }
 for (const exactEvidence of [
   'PASS_EXACT_GAP_USER_WALKTHROUGH',
+  'PASS_BRIDGE_AND_TRIM_USER_WALKTHROUGH',
   'TOPOLOGY_EDIT_TARGET_HEAD_SHA',
   'topology-edit-demo-walkthrough.json',
+  'topology-edit-demo-repairs.json',
 ]) {
   assert.ok(
     demoWorkflow.includes(exactEvidence),
@@ -193,9 +208,11 @@ const report = {
   },
   userWalkthrough: {
     workflowPath: DEMO_WORKFLOW_PATH,
-    specificationPath: DEMO_SPEC_PATH,
+    specificationPaths: [DEMO_SPEC_PATH, REPAIR_SPEC_PATH],
     fixturePath: DEMO_FIXTURE_PATH,
     requestedGapModesMm: [3, 20],
+    manualBridgeGapMm: 250,
+    sourceBackedTrimOverlapMm: 150,
     disposition: exactHeadStatus === 'PASS'
       ? 'PASS_EXECUTED_EXACT_HEAD'
       : 'IMPLEMENTED_EXACT_HEAD_EXECUTION_PENDING',
