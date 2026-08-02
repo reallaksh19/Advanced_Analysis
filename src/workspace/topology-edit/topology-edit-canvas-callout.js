@@ -121,6 +121,7 @@ function positionCard(card, container, screenX, screenY) {
   card.style.top = `${top}px`;
   card.style.zIndex = '1000';
   card.style.width = 'min(290px, calc(100% - 16px))';
+  card.style.pointerEvents = 'auto';
 }
 
 function applyCardStyle(card, severity) {
