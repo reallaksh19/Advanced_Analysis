@@ -105,7 +105,8 @@ export function topologyEditExactGapContext(selection, topology) {
 export function canRunTopologyEditAction(actionId, selection, topology = null) {
   if (actionId === 'move-positive-z') return selection.nodeIds.length === 1;
   if (Object.hasOwn(TOPOLOGY_EDIT_EXACT_GAP_MM, actionId)) {
-    return Boolean(topologyEditExactGapContext(selection, topology));
+    return topology ? Boolean(topologyEditExactGapContext(selection, topology))
+      : selection.nodeIds.length === 2;
   }
   if (NODE_ACTIONS.has(actionId)) return selection.nodeIds.length === 2;
   if (EDGE_ACTIONS.has(actionId)) return Boolean(selection.edgeId);
