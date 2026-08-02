@@ -6,5 +6,6 @@ export * from './refinement-fields.js';
 export * from './quality-gates.js';
 export * from './mesh-convergence-framework.js';
 export * from './constrained-delaunay-t6.js';
+export * from './lug-pinhole-t6.js';
 export * from './q8-recombination.js';
 export * from './mapped-mitc-mesh.js';
