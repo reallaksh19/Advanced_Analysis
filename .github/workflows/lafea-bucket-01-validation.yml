@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - bucket-01-lafea3-validation
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
