@@ -82,9 +82,11 @@ export function visualPrimitiveId(canonicalEntityId, partRole, policyVersion) {
 const PLACEMENT_PARAMETER_KEYS = new Set([
   'start',
   'end',
+  'sourceEnd',
   'center',
   'position',
   'axis',
+  'arcPoints',
   'bendPlaneNormal',
   'eccentricOffsetDirection',
   'runDirections',
