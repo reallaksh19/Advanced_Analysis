@@ -88,7 +88,7 @@ export function destroyTreePanel(panel) {
 
 function subscriptions(panel) {
   return [
-    panel.eventBus.subscribe(MODEL_ZONE_EVENTS.CHANGED, ({ selection }) => panel.applyZoneSelection(selection)),
+    panel.eventBus.subscribe(MODEL_ZONE_EVENTS.CHANGED, ({ selection, dataset }) => panel.applyZoneSelection(selection, dataset)),
     panel.eventBus.subscribe(EVENT_TOPICS.WORKSPACE_SNAPSHOT_CHANGED, ({ snapshot }) => requestAnimationFrame(() => panel.renderSnapshot(snapshot))),
     panel.eventBus.subscribe(EVENT_TOPICS.DATASET_LOAD_FAILED, ({ message }) => panel.renderError(message)),
     panel.eventBus.subscribe(EVENT_TOPICS.DATASET_CLEARED, () => panel.renderEmpty()),
