@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { access, readdir, readFile, stat } from 'node:fs/promises';
+import { access, readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -158,9 +158,14 @@ function assertKernelContainment(file, source) {
 
 async function assertProductionConsumption() {
   const controller = await readRepositoryFile(CONTROLLER);
-  for (const token of ['TopologyEditCertifiedSession', 'TOPOLOGY_EDIT_COMMAND_ACTIONS', 'buildTopologyEditRenderPacket']) {
+  for (const token of ['TopologyEditCertifiedSession', 'TOPOLOGY_EDIT_COMMAND_ACTIONS']) {
     assert.ok(controller.includes(token), `Production controller must consume ${token}.`);
   }
+  assert.ok(
+    controller.includes('buildTopologyEditRenderPacket')
+      || controller.includes('buildTopologyEditVisualSession'),
+    'Production controller must consume a governed canonical-to-viewport projection.',
+  );
   for (const token of ['commitDraftToWorkspace', 'TopologyEditAutofixController', 'TopologyEditCommandJournal', 'Date.now']) {
     assert.equal(controller.includes(token), false, `Production controller must not reference ${token}.`);
   }
