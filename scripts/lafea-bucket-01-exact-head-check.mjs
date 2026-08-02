@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const BASELINE_SHA = '34a074b34d3e61b0b231ae2bf028fcc67b202671';
+const BASELINE_SHA = 'eaac7e0532c114ef306d2d928f1d9f74348193cd';
 const REPORT_PATH = path.resolve(
   ROOT,
   process.env.LAFEA_BUCKET_01_EXACT_HEAD_REPORT_PATH
@@ -28,6 +28,7 @@ for (const check of [
   nodeCheck('GOVERNED_T6_KIRSCH_FIXED_PROBES', 'scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs'),
   nodeCheck('PRODUCTION_LUG_FIXED_PROBE_LOCATION_CONTRACT', 'scripts/lafea-bucket-01-production-lug-probe-contract-check.mjs'),
   nodeCheck('CODE_BASIS_INTAKE_CONTRACT', 'scripts/lafea-bucket-01-code-basis-check.mjs'),
+  nodeCheck('THREE_REPLAY_CUSTODY_CONTRACT', 'scripts/lafea-bucket-01-replay-custody-check.mjs'),
   nodeCheck('GOVERNED_T3_PATCH', 'scripts/lafea-bucket-01-t3-patch-check.mjs'),
   nodeCheck('GOVERNED_PURE_SHEAR', 'scripts/lafea-bucket-01-pure-shear-check.mjs'),
   nodeCheck('T6_PATCH', 'scripts/lafea.3-t6-patch-check.mjs'),
@@ -44,7 +45,7 @@ recordAssertion('TRACKED_WORKTREE_CLEAN', trackedStatus === '', trackedStatus ||
 const failures = checks.filter((check) => check.status !== 'PASS');
 const executableEvidencePass = failures.length === 0;
 const report = {
-  schema: 'lafea-bucket-01-exact-head-report/v9',
+  schema: 'lafea-bucket-01-exact-head-report/v10',
   status: executableEvidencePass ? 'EXACT_HEAD_REPAIR_EVIDENCE_PASS' : 'EXACT_HEAD_REPAIR_EVIDENCE_BLOCKED',
   exactHead,
   expectedHead,
@@ -60,7 +61,7 @@ const report = {
     'EXACT_1024_ELEMENT_PRODUCTION_RESPONSE_EXECUTION_NOT_RETAINED',
     'PRODUCTION_LUG_FIXED_PROBE_RETAINED_RECEIPT_NOT_PRODUCED',
     'APPROVED_CODE_BASIS_AUTHORITY_NOT_SUPPLIED',
-    'THREE_CLEAN_EXACT_HEAD_REPLAYS_NOT_RETAINED',
+    'THREE_EXTERNAL_REPLAY_BUNDLES_NOT_SUPPLIED',
   ],
   qualificationStates: {
     implemented: true,
@@ -79,7 +80,10 @@ const report = {
     governedKirschFixedProbeRouteImplemented: true,
     productionLugFixedProbeContractImplemented: true,
     codeBasisIntakeContractImplemented: true,
+    threeReplayCustodyContractImplemented: true,
     governingCodeSelected: false,
+    externalReplayBundlesSupplied: false,
+    replayPassClaimedForRepositoryCandidate: false,
     productionResponseExecutionRetained: false,
     productionLugFixedProbeExecutionRetained: false,
     movingMaximumAcceptanceAuthorized: false,
