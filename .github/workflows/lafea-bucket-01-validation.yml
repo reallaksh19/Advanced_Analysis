@@ -1,0 +1,45 @@
+name: LAFEA Bucket-01 exact-head validation
+
+on:
+  push:
+    branches:
+      - bucket-01-lafea3-validation
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bucket-01-exact-head:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify checkout identity
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git merge-base --is-ancestor a7144e02598f3e9db0826f10cefe0b5254fa953e "$GITHUB_SHA"
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Execute Bucket-01 exact-head gate
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        run: node scripts/lafea-bucket-01-exact-head-check.mjs
+
+      - name: Upload retained Bucket-01 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-bucket-01-${{ github.sha }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            reports/qualification/lafea-bucket-01-*.json
+            validation/bucket-01/*.json
