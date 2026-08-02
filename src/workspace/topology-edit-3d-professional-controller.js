@@ -4,6 +4,9 @@ import {
 import {
   TopologyEditProfessionalOperationRuntime,
 } from './viewport-productivity/topology-edit-professional-operation-runtime.js';
+import {
+  ensureTopologyEditProfessionalOperationStyles,
+} from './viewport-productivity/topology-edit-professional-operation-styles.js';
 
 export class TopologyEdit3DViewController extends InteractionController {
   constructor(eventBus, lifecycleOptions = {}) {
@@ -24,6 +27,7 @@ export class TopologyEdit3DViewController extends InteractionController {
 
   buildShell() {
     super.buildShell();
+    ensureTopologyEditProfessionalOperationStyles(this.hostElement?.ownerDocument);
     const section = this.hostElement?.ownerDocument.createElement('section');
     if (!section || !this.checkerElement) {
       throw new Error('TopologyEditProfessionalController: panel host is unavailable.');
