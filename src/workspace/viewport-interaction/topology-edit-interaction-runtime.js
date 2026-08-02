@@ -39,6 +39,7 @@ export class TopologyEditInteractionRuntime {
         'anchorPosition',
       ),
       mode: normalizeTopologyEditTransformMode(input.mode ?? 'AXIS_X'),
+      intent: null,
       preview: null,
       units: 'MM',
     };
@@ -56,6 +57,7 @@ export class TopologyEditInteractionRuntime {
     this.state = finalize({
       ...runtimeMaterial(this.state),
       mode: normalizeTopologyEditTransformMode(mode),
+      intent: null,
       preview: null,
     });
     return this.state;
@@ -63,6 +65,7 @@ export class TopologyEditInteractionRuntime {
 
   previewTarget(input = {}) {
     assertReady(this.state);
+    const snapResolution = input.snapResolution ?? null;
     const intent = createTopologyEditTransformIntent({
       nodeId: this.state.nodeId,
       basisHash: this.state.basisHash,
@@ -70,16 +73,17 @@ export class TopologyEditInteractionRuntime {
       mode: input.mode ?? this.state.mode,
       anchorPosition: this.state.anchorPosition,
       targetPosition: input.targetPosition,
-      snapResolutionHash: input.snapResolutionHash,
+      snapResolutionHash: snapResolution?.resolutionHash ?? null,
       units: 'MM',
     });
     const preview = createTopologyEditInteractionPreview({
       intent,
-      snapResult: input.snapResult ?? null,
+      snapResolution,
     });
     this.state = finalize({
       ...runtimeMaterial(this.state),
       mode: intent.mode,
+      intent,
       preview,
     });
     return this.state;
@@ -111,7 +115,7 @@ export class TopologyEditInteractionRuntime {
       input.incrementMm,
       'incrementMm',
     );
-    const base = this.state.preview?.intent?.targetPosition
+    const base = this.state.preview?.targetPosition
       ?? this.state.anchorPosition;
     const vector = AXIS_VECTORS[axis];
     return this.previewTarget({
@@ -129,6 +133,7 @@ export class TopologyEditInteractionRuntime {
     if (this.state.status !== 'READY') return this.state;
     this.state = finalize({
       ...runtimeMaterial(this.state),
+      intent: null,
       preview: null,
     });
     return this.state;
@@ -136,18 +141,20 @@ export class TopologyEditInteractionRuntime {
 
   compileApply() {
     assertReady(this.state);
+    const intent = this.state.intent;
     const preview = this.state.preview;
-    if (!preview?.canApply || !preview.intent?.hasMovement) {
+    if (!intent?.hasMovement || !preview?.canApply) {
       throw new RangeError('A current moving interaction preview is required.');
     }
-    if (preview.intent.basisHash !== this.state.basisHash) {
+    if (intent.basisHash !== this.state.basisHash
+      || preview.basisHash !== this.state.basisHash) {
       throw new RangeError('Interaction preview has a stale basis.');
     }
     return deepFreeze({
       runtimeHash: this.state.runtimeHash,
-      intent: preview.intent,
+      intent,
       preview,
-      payload: compileTopologyEditMoveNodePayload(preview.intent),
+      payload: compileTopologyEditMoveNodePayload(intent),
     });
   }
 
@@ -164,6 +171,7 @@ function idleState() {
     basisHash: null,
     anchorPosition: null,
     mode: 'AXIS_X',
+    intent: null,
     preview: null,
     units: 'MM',
   });
@@ -177,6 +185,7 @@ function runtimeMaterial(state) {
     basisHash: state.basisHash,
     anchorPosition: state.anchorPosition,
     mode: state.mode,
+    intent: state.intent,
     preview: state.preview,
     units: state.units,
   };
