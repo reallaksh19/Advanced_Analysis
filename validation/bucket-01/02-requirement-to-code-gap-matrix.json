@@ -1,5 +1,5 @@
 {
-  "schema": "lafea-bucket-01-gap-matrix/v7",
+  "schema": "lafea-bucket-01-gap-matrix/v8",
   "audited_baseline_sha": "3c069f80e36788d6a3097f6be027890020c5f894",
   "superseded_baselines": [
     "a7144e02598f3e9db0826f10cefe0b5254fa953e",
@@ -71,7 +71,7 @@
     {
       "id": "G3-PRODUCTION-SCALABILITY",
       "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXACT_1024_EXECUTION",
-      "finding": "The production continuum route now preserves dense Cholesky below 1536 DOFs and uses deterministic full-symmetric CSR assembly with Jacobi-preconditioned conjugate gradients above that threshold. The solver recomputes the exact free-DOF residual, retains sparse storage and iterative evidence in the authoritative result hash, and has an end-to-end manufactured continuum scalability check. The exact 1024-element lug execution has not yet been retained."
+      "finding": "The production continuum route preserves dense Cholesky below 1536 DOFs and uses deterministic full-symmetric CSR assembly with Jacobi-preconditioned conjugate gradients above that threshold. Exact 1024-element lug execution has not yet been retained."
     },
     {
       "id": "G4-STRESS-AUTHORITY",
@@ -84,9 +84,14 @@
       "finding": "Evaluators provide observed order, Richardson extrapolation, GCI, asymptotic checks, oracle-bound invariant resultants and oscillatory/non-monotonic blocking."
     },
     {
+      "id": "G4-KIRSCH-FIXED-PROBES",
+      "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION",
+      "finding": "A frozen classical Kirsch oracle now defines three off-boundary physical probe coordinates. A governed T6 quarter-annulus receipt integrates the exact Kirsch outer traction to quadratic boundary nodes, reconstructs unrounded tensor stress from retained T6 integration points, evaluates principal stress against the oracle, and applies three-level GCI without moving maxima, nodal projection or cross-element averaging."
+    },
+    {
       "id": "G4-PRODUCTION-STRESS",
-      "status": "BLOCKED_PENDING_EXECUTION",
-      "finding": "Production Kirsch and lug fixed-coordinate receipts are not yet generated."
+      "status": "BLOCKED_PENDING_LUG_PROBE_EXECUTION",
+      "finding": "The governed Kirsch fixed-coordinate route is implemented. Production lug fixed-coordinate probe and path evidence remains ungenerated."
     },
     {
       "id": "G4-CODE",
