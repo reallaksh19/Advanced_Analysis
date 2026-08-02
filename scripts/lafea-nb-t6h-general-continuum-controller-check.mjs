@@ -7,17 +7,18 @@ import {
   LAFEA_GENERAL_CONTINUUM_TEMPLATE_IDS,
   createGeneralContinuumExecutionRequest,
   createGeneralContinuumExecutionReceipt,
+  executeGeneralLafeaContinuum,
   validateGeneralContinuumExecutionRequest,
   validateGeneralContinuumExecutionReceipt,
 } from '../src/workspace/lafea-general-continuum-execution-public.js';
-import { executeGeneralLafeaContinuum } from '../src/workspace/lafea-general-continuum-controller.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const controllerPath = path.join(ROOT, 'src/workspace/lafea-general-continuum-controller.js');
-const contractPath = path.join(ROOT,
-  'src/core/lafea-application-templates/general-continuum-execution-contract.js');
-const controllerSource = fs.readFileSync(controllerPath, 'utf8');
-const contractSource = fs.readFileSync(contractPath, 'utf8');
+const controllerSource = fs.readFileSync(path.join(
+  ROOT, 'src/workspace/lafea-general-continuum-controller.js'), 'utf8');
+const publicSource = fs.readFileSync(path.join(
+  ROOT, 'src/workspace/lafea-general-continuum-execution-public.js'), 'utf8');
+const contractSource = fs.readFileSync(path.join(
+  ROOT, 'src/core/lafea-application-templates/general-continuum-execution-contract.js'), 'utf8');
 const sha = (label) => `sha256:${Buffer.from(label).toString('hex').padEnd(64, '0').slice(0, 64)}`;
 const revision = 'fnv1a64:0123456789abcdef';
 const accepted = [];
@@ -108,19 +109,21 @@ assert.throws(() => createGeneralContinuumExecutionRequest({
 const tampered = structuredClone(
   createGeneralContinuumExecutionRequest(requestInput('C2D-BRACKET-GUSSET')),
 );
-tampered.meshHash = sha('TAMPERED');
-Object.values(tampered).forEach((row) => {
-  if (row && typeof row === 'object') Object.freeze(row);
-});
-Object.freeze(tampered);
+tampered.compilationHash = sha('TAMPERED-COMPILATION');
+deepFreeze(tampered);
 assert.equal(validateGeneralContinuumExecutionRequest(tampered).ok, false);
 
 const failClosed = executeGeneralLafeaContinuum({
-  request: null, releaseRecord: null, compatibilityReceipt: null,
-  document: null, meshEvidence: null,
+  request: null,
+  releaseRecord: null,
+  compatibilityReceipt: null,
+  compilation: null,
+  document: null,
+  meshEvidence: null,
 });
 assert.equal(failClosed.status, 'BLOCKED');
 assert.equal(failClosed.accepted, false);
+assert.equal(failClosed.diagnostics.includes('LAFEA_NB_T6H_COMPILATION_IDENTITY_INVALID'), true);
 assert.equal(failClosed.authority.compilerGeneratedMesh, false);
 assert.equal(failClosed.authority.arbitraryGeometryMesher, false);
 assert.equal(failClosed.authority.shell, false);
@@ -133,9 +136,14 @@ assert.match(controllerSource, /registerLafeaAnalysisMeshEvidence/);
 assert.match(controllerSource, /reconstructControlledContinuumResultHashes/);
 assert.match(controllerSource, /INTEGRATION_POINT/);
 assert.match(controllerSource, /convergenceReady !== false/);
+assert.match(publicSource, /LAFEA_TEMPLATE_COMPILATION_SCHEMA/);
+assert.match(publicSource, /validateTemplateGeometryResult/);
+assert.match(publicSource, /DOCUMENT_NOT_COMPILED_HANDOFF/);
+assert.match(contractSource, /compilationHash/);
 assert.match(contractSource, /compilerGeneratedMesh: false/);
 assert.match(contractSource, /arbitraryGeometryMesher: false/);
 assert.match(contractSource, /releaseQualified: false/);
+assert.doesNotMatch(contractSource, /workspace\//);
 
 console.log(JSON.stringify({
   schema: 'lafea-nb-t6h-general-continuum-controller-check/v1',
@@ -166,6 +174,7 @@ function requestInput(templateId) {
     templateId,
     releaseRecordHash: sha(`${templateId}-RELEASE`),
     compatibilityReceiptHash: sha(`${templateId}-COMPATIBILITY`),
+    compilationHash: sha(`${templateId}-COMPILATION`),
     documentRevisionDigest: revision,
     sourceAuthorityRequest: {
       originRef: `NB-T6H/${templateId}`,
@@ -180,4 +189,9 @@ function requestInput(templateId) {
     meshProfileHash: sha(`${templateId}-MESH-PROFILE`),
     elementTypes: ['T6'],
   };
+}
+function deepFreeze(value) {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+  Object.values(value).forEach(deepFreeze);
+  return Object.freeze(value);
 }
