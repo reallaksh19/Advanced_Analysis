@@ -16,6 +16,7 @@ const CHECKS = Object.freeze([
   { scope: 'NB-T6C', path: 'scripts/lafea-nb-t6c-physical-problem-batch-check.mjs' },
   { scope: 'NB-T6D-LOAD', path: 'scripts/lafea-nb-t6d-load-driven-qualification-check.mjs' },
   { scope: 'NB-T6D-RENDER', path: 'scripts/lafea-nb-t6d-b7d-recovery-render-bridge-check.mjs' },
+  { scope: 'NB-T6E', path: 'scripts/lafea-nb-t6e-evidence-handoff-review-check.mjs' },
   { scope: 'PR-NB1-A', path: 'scripts/lafea-nb1-analytical-verticals-check.mjs' },
   { scope: 'U1', path: 'scripts/lafea-u1-stage-registry-check.mjs' },
   { scope: 'U1', path: 'scripts/lafea-u1b-registry-consumer-check.mjs' },
@@ -86,7 +87,7 @@ for (const row of CHECKS) {
 }
 
 const report = Object.freeze({
-  schema: 'lafea-nonbucket-stack-report/v10',
+  schema: 'lafea-nonbucket-stack-report/v11',
   check: 'lafea-nonbucket-stack-certification',
   status: failures.length ? 'FAIL' : 'PASS',
   exactHead: gitHead(),
@@ -121,6 +122,13 @@ const report = Object.freeze({
   b7dExistingExecutionRecoveryLineageRetained: true,
   b7dNewEngineeringRecoveryComputed: false,
   b7dLifecycleArtifactsRegisteredByBridge: false,
+  selectedPilotReviewHandoffIntegrated: true,
+  portableAuditHandoffIntegrated: true,
+  existingRenderBridgeConsumedByReviewHandoff: true,
+  newDisplayProjectionProducedByReviewHandoff: false,
+  reviewHandoffDisplayValuesIncluded: true,
+  reviewHandoffDisplayValuesAuthoritative: false,
+  selectedPilotQualificationChangedByReviewHandoff: false,
   arbitraryOuterProfileMeshingIntegrated: false,
   arbitraryHoleTopologyMeshingIntegrated: false,
   displayTessellationAcceptedAsMeshEvidence: false,
@@ -134,6 +142,7 @@ const report = Object.freeze({
   lifecycleSemanticsChanged: true,
   shellAuthorityChanged: false,
   codeAuthorityPromoted: false,
+  reportAuthorityPromoted: false,
   generalT7dAuthorized: false,
   releaseQualified: false,
   lafea6Enabled: false,
