@@ -6,10 +6,11 @@ import {
 } from '../../../core/shared-piping-model/index.js';
 
 export const TOPOLOGY_EDIT_SPEC_CATALOGUE_SCHEMA =
-  'TopologyEditSpecificationCatalogue.v1';
+  'TopologyEditSpecificationCatalogue.v2';
 export const TOPOLOGY_EDIT_SPEC_RECORD_SCHEMA =
-  'TopologyEditSpecificationRecord.v1';
+  'TopologyEditSpecificationRecord.v2';
 
+const SHA256 = /^sha256:[a-f0-9]{64}$/u;
 const COMPONENT_TYPES = new Set([
   'PIPE', 'ELBOW', 'REDUCER', 'VALVE', 'FLANGE', 'TEE', 'OLET',
 ]);
@@ -17,20 +18,37 @@ const REDUCER_TYPES = new Set(['CONCENTRIC', 'ECCENTRIC']);
 const REDUCER_ORIENTATIONS = new Set([
   'CONCENTRIC', 'FLAT_TOP', 'FLAT_BOTTOM', 'FLAT_LEFT', 'FLAT_RIGHT',
 ]);
+const VALVE_TYPES = new Set([
+  'BALL', 'BUTTERFLY', 'CHECK', 'CONTROL', 'GATE', 'GLOBE', 'NEEDLE', 'PLUG',
+]);
+const OLET_TYPES = new Set([
+  'ELBOLET', 'LATROLET', 'NIPOLET', 'SOCKOLET', 'SWEEPOLET', 'THREDOLET', 'WELDOLET',
+]);
+const HOST_COMPONENT_TYPES = new Set(['PIPE', 'ELBOW', 'TEE']);
 const FIELDS = Object.freeze([
   'nominalSizeMm',
   'outsideDiameterMm',
   'secondaryNominalSizeMm',
   'secondaryOutsideDiameterMm',
+  'branchNominalSizeMm',
+  'branchOutsideDiameterMm',
   'schedule',
   'wallThicknessMm',
   'elbowRadiusMm',
   'elbowAngleDeg',
   'reducerType',
   'reducerOrientation',
+  'valveType',
   'valveFaceToFaceMm',
   'flangeClass',
   'flangeFacing',
+  'branchAngleDeg',
+  'centerToRunMm',
+  'centerToBranchMm',
+  'branchConnection',
+  'oletType',
+  'hostComponentType',
+  'projectionMm',
   'endConnectionFrom',
   'endConnectionTo',
   'pipingClass',
@@ -69,30 +87,27 @@ export function createTopologyEditSpecificationRecord(input = {}) {
     componentType,
     nominalSizeMm: positiveNumber(input.nominalSizeMm, 'nominalSizeMm'),
     outsideDiameterMm: positiveNumber(input.outsideDiameterMm, 'outsideDiameterMm'),
-    secondaryNominalSizeMm: optionalPositiveNumber(
-      input.secondaryNominalSizeMm,
-      'secondaryNominalSizeMm',
-    ),
-    secondaryOutsideDiameterMm: optionalPositiveNumber(
-      input.secondaryOutsideDiameterMm,
-      'secondaryOutsideDiameterMm',
-    ),
+    secondaryNominalSizeMm: optionalPositiveNumber(input.secondaryNominalSizeMm, 'secondaryNominalSizeMm'),
+    secondaryOutsideDiameterMm: optionalPositiveNumber(input.secondaryOutsideDiameterMm, 'secondaryOutsideDiameterMm'),
+    branchNominalSizeMm: optionalPositiveNumber(input.branchNominalSizeMm, 'branchNominalSizeMm'),
+    branchOutsideDiameterMm: optionalPositiveNumber(input.branchOutsideDiameterMm, 'branchOutsideDiameterMm'),
     schedule: optionalText(input.schedule, true),
     wallThicknessMm: optionalPositiveNumber(input.wallThicknessMm, 'wallThicknessMm'),
     elbowRadiusMm: optionalPositiveNumber(input.elbowRadiusMm, 'elbowRadiusMm'),
-    elbowAngleDeg: optionalAngle(input.elbowAngleDeg),
+    elbowAngleDeg: optionalAngle(input.elbowAngleDeg, 'elbowAngleDeg'),
     reducerType: optionalEnum(input.reducerType, REDUCER_TYPES, 'reducerType'),
-    reducerOrientation: optionalEnum(
-      input.reducerOrientation,
-      REDUCER_ORIENTATIONS,
-      'reducerOrientation',
-    ),
-    valveFaceToFaceMm: optionalPositiveNumber(
-      input.valveFaceToFaceMm,
-      'valveFaceToFaceMm',
-    ),
+    reducerOrientation: optionalEnum(input.reducerOrientation, REDUCER_ORIENTATIONS, 'reducerOrientation'),
+    valveType: optionalEnum(input.valveType, VALVE_TYPES, 'valveType'),
+    valveFaceToFaceMm: optionalPositiveNumber(input.valveFaceToFaceMm, 'valveFaceToFaceMm'),
     flangeClass: optionalText(input.flangeClass, true),
     flangeFacing: optionalText(input.flangeFacing, true),
+    branchAngleDeg: optionalAngle(input.branchAngleDeg, 'branchAngleDeg'),
+    centerToRunMm: optionalPositiveNumber(input.centerToRunMm, 'centerToRunMm'),
+    centerToBranchMm: optionalPositiveNumber(input.centerToBranchMm, 'centerToBranchMm'),
+    branchConnection: optionalText(input.branchConnection, true),
+    oletType: optionalEnum(input.oletType, OLET_TYPES, 'oletType'),
+    hostComponentType: optionalEnum(input.hostComponentType, HOST_COMPONENT_TYPES, 'hostComponentType'),
+    projectionMm: optionalPositiveNumber(input.projectionMm, 'projectionMm'),
     endConnectionFrom: requiredText(input.endConnectionFrom, 'endConnectionFrom').toUpperCase(),
     endConnectionTo: requiredText(input.endConnectionTo, 'endConnectionTo').toUpperCase(),
     pipingClass: requiredText(input.pipingClass, 'pipingClass').toUpperCase(),
@@ -124,9 +139,7 @@ export function topologyEditSpecificationRecordKey(recordInput) {
 }
 
 function normalizeRecords(value) {
-  if (!Array.isArray(value) || value.length === 0) {
-    fail('records must be a non-empty array.');
-  }
+  if (!Array.isArray(value) || value.length === 0) fail('records must be a non-empty array.');
   const records = value.map((row) => createTopologyEditSpecificationRecord(row))
     .sort((left, right) => left.recordId.localeCompare(right.recordId));
   const ids = records.map((record) => record.recordId);
@@ -136,10 +149,14 @@ function normalizeRecords(value) {
 
 function normalizeAuthority(value) {
   if (!isPlainRecord(value)) fail('authority must be an object.');
+  const sourceHash = requiredText(value.sourceHash, 'authority.sourceHash').toLowerCase();
+  if (!SHA256.test(sourceHash)) {
+    fail('authority.sourceHash must be an exact sha256:<64 lowercase hex> digest.', RangeError);
+  }
   return {
     sourceId: requiredText(value.sourceId, 'authority.sourceId'),
     sourceVersion: requiredText(value.sourceVersion, 'authority.sourceVersion'),
-    sourceHash: requiredText(value.sourceHash, 'authority.sourceHash'),
+    sourceHash,
   };
 }
 
@@ -156,29 +173,45 @@ function assertComponentEvidence(record) {
   const requiredByType = {
     PIPE: ['schedule', 'wallThicknessMm'],
     ELBOW: ['elbowRadiusMm', 'elbowAngleDeg'],
-    REDUCER: [
-      'secondaryNominalSizeMm', 'secondaryOutsideDiameterMm',
-      'reducerType', 'reducerOrientation',
-    ],
-    VALVE: ['valveFaceToFaceMm'],
+    REDUCER: ['secondaryNominalSizeMm', 'secondaryOutsideDiameterMm', 'reducerType', 'reducerOrientation'],
+    VALVE: ['valveType', 'valveFaceToFaceMm'],
     FLANGE: ['flangeClass', 'flangeFacing'],
+    TEE: [
+      'branchNominalSizeMm', 'branchOutsideDiameterMm', 'branchAngleDeg',
+      'centerToRunMm', 'centerToBranchMm', 'branchConnection',
+    ],
+    OLET: [
+      'branchNominalSizeMm', 'branchOutsideDiameterMm', 'branchAngleDeg',
+      'branchConnection', 'oletType', 'hostComponentType', 'projectionMm',
+    ],
   };
-  (requiredByType[record.componentType] || []).forEach((field) => {
+  requiredByType[record.componentType].forEach((field) => {
     if (record[field] === null) fail(`${record.componentType}.${field} is required.`, RangeError);
   });
-  if (record.componentType !== 'REDUCER' && (
-    record.secondaryNominalSizeMm !== null
-    || record.secondaryOutsideDiameterMm !== null
-    || record.reducerType !== null
-    || record.reducerOrientation !== null
-  )) fail('reducer-only fields require componentType REDUCER.', RangeError);
+  rejectForeignFields(record, 'REDUCER', [
+    'secondaryNominalSizeMm', 'secondaryOutsideDiameterMm', 'reducerType', 'reducerOrientation',
+  ]);
+  rejectForeignFields(record, 'VALVE', ['valveType', 'valveFaceToFaceMm']);
+  rejectForeignFields(record, 'FLANGE', ['flangeClass', 'flangeFacing']);
+  rejectForeignFields(record, ['TEE', 'OLET'], [
+    'branchNominalSizeMm', 'branchOutsideDiameterMm', 'branchAngleDeg', 'branchConnection',
+  ]);
+  rejectForeignFields(record, 'TEE', ['centerToRunMm', 'centerToBranchMm']);
+  rejectForeignFields(record, 'OLET', ['oletType', 'hostComponentType', 'projectionMm']);
 }
 
-function optionalAngle(value) {
+function rejectForeignFields(record, allowedTypes, fields) {
+  const allowed = new Set(Array.isArray(allowedTypes) ? allowedTypes : [allowedTypes]);
+  if (allowed.has(record.componentType)) return;
+  const foreign = fields.find((field) => record[field] !== null);
+  if (foreign) fail(`${foreign} is not valid for componentType ${record.componentType}.`, RangeError);
+}
+
+function optionalAngle(value, label) {
   if (empty(value)) return null;
   const angle = Number(value);
   if (!Number.isFinite(angle) || angle <= 0 || angle >= 180) {
-    fail('elbowAngleDeg must be strictly between 0 and 180.', RangeError);
+    fail(`${label} must be strictly between 0 and 180 degrees.`, RangeError);
   }
   return angle;
 }
