@@ -5,24 +5,23 @@ export const RESTRAINT_FAMILY_MAPPING = Object.freeze({
   GUIDE: 'GUIDE', GUI: 'GUIDE', LINESTOP: 'LINE_STOP', LINE_STOP: 'LINE_STOP',
   LIMIT: 'LIMIT', LIM: 'LIMIT', CAN: 'CAN', SPRING: 'SPRING_WARNING',
   'SPRING CAN': 'SPRING_WARNING', 'CAN SPRING': 'SPRING_WARNING', U_BOLT: 'U_BOLT',
-  SHOE: 'SHOE', TRUNNION: 'TRUNNION', HANGER: 'HANGER', SPRING_HANGER: 'SPRING_HANGER', ANCHOR: 'ANCHOR',
+  SHOE: 'SHOE', TRUNNION: 'TRUNNION', HANGER: 'HANGER',
+  SPRING_HANGER: 'SPRING_HANGER', ANCHOR: 'ANCHOR',
 });
-
 export const RESTRAINT_FAMILY_COLORS = Object.freeze({
   REST: 0x22d3ee, SHOE: 0x22d3ee, TRUNNION: 0x22d3ee, HANGER: 0x22d3ee,
   GUIDE: 0x4ade80, LINE_STOP: 0xf59e0b, LIMIT: 0xf59e0b, ANCHOR: 0xef4444,
-  HOLDOWN: 0xa78bfa, U_BOLT: 0xa78bfa, SPRING_WARNING: 0xfacc15, SPRING_HANGER: 0xfacc15, CAN: 0xfacc15,
+  HOLDOWN: 0xa78bfa, U_BOLT: 0xa78bfa, SPRING_WARNING: 0xfacc15,
+  SPRING_HANGER: 0xfacc15, CAN: 0xfacc15,
 });
 
 export function restraintFamily(restraint = {}) {
-  const rawKind = stringValue(restraint.kind || restraint.family || restraint.type).toUpperCase();
-  return RESTRAINT_FAMILY_MAPPING[rawKind] || rawKind;
+  const raw = stringValue(restraint.kind || restraint.family || restraint.type).toUpperCase();
+  return RESTRAINT_FAMILY_MAPPING[raw] || raw;
 }
-
 export function restraintColor(family) {
   return RESTRAINT_FAMILY_COLORS[stringValue(family).toUpperCase()] ?? 0x22d3ee;
 }
-
 export function stableRestraintId(support = {}, restraint = {}, index = 0) {
   const explicit = stringValue(restraint.id || restraint.restraintId);
   const supportId = stringValue(support.id || support.supportId);
@@ -30,17 +29,14 @@ export function stableRestraintId(support = {}, restraint = {}, index = 0) {
   if (!supportId) throw new TypeError('Stable restraint identity requires a support ID.');
   return `${supportId}:restraint:${Number(index)}`;
 }
-
 export function normalizeSupportScale(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Math.min(6, Math.max(0.25, parsed)) : 2.5;
 }
-
 export function normalizeGapMm(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
-
 export function normalizeRestraintEvidence(support, restraint, index) {
   return deepFreeze({
     restraintId: stableRestraintId(support, restraint, index),
@@ -57,7 +53,9 @@ export function normalizeRestraintEvidence(support, restraint, index) {
 export function deriveSupportRestraintGeometry(input = {}) {
   const topology = input.canonicalTopology;
   const support = input.support;
-  if (!topology?.nodes || !topology?.edges) throw new TypeError('Support geometry requires canonical topology.');
+  if (!topology?.nodes || !topology?.edges) {
+    throw new TypeError('Support geometry requires canonical topology.');
+  }
   if (!support?.id) throw new TypeError('Support geometry requires stable support identity.');
   const nodes = new Map(topology.nodes.map((node) => [stringValue(node.id), finitePoint(node.position)]));
   const origin = nodes.get(stringValue(support.nodeId)) || finitePoint(support.origin);
@@ -66,7 +64,9 @@ export function deriveSupportRestraintGeometry(input = {}) {
   const diagnostics = [];
   if (!origin) diagnostics.push(diag('SUPPORT_ORIGIN_UNRESOLVED', 'Support origin is unresolved.'));
   if (!host) diagnostics.push(diag('SUPPORT_HOST_UNRESOLVED', 'Support host edge is missing or ambiguous.'));
-  if (host && !frame) diagnostics.push(diag('SUPPORT_LOCAL_FRAME_UNRESOLVED', 'Support host local frame cannot be established.'));
+  if (host && !frame) {
+    diagnostics.push(diag('SUPPORT_LOCAL_FRAME_UNRESOLVED', 'Support host local frame cannot be established.'));
+  }
   const restraints = restraintRows(support).map((restraint, index) => deriveRestraint({
     support, restraint, index, origin, host, frame,
   }));
@@ -79,13 +79,11 @@ export function deriveSupportRestraintGeometry(input = {}) {
     diagnostics,
   });
 }
-
 export function deriveAllSupportRestraintGeometry(input = {}) {
   const supports = [...(input.canonicalTopology?.supports || [])]
     .sort((left, right) => stringValue(left.id).localeCompare(stringValue(right.id)));
   return Object.freeze(supports.map((support) => deriveSupportRestraintGeometry({ ...input, support })));
 }
-
 export function projectSupportGeometryToViewport(overlays, policy = {}) {
   const arrowLengthMm = positive(policy.arrowLengthMm) || 80;
   const arrowRadiusMm = positive(policy.arrowRadiusMm) || 5;
@@ -96,13 +94,12 @@ export function projectSupportGeometryToViewport(overlays, policy = {}) {
     if (overlay.origin) elements.push(supportMarker(overlay, markerSizeMm));
     for (const restraint of overlay.restraints) {
       if (!overlay.origin || !restraint.direction) continue;
-      const end = add(overlay.origin, scale(restraint.direction, arrowLengthMm));
       segments.push({
         id: `${restraint.restraintId}:direction`,
         entityId: restraint.restraintId,
         type: 'RESTRAINT_DIRECTION',
         start: overlay.origin,
-        end,
+        end: add(overlay.origin, scale(restraint.direction, arrowLengthMm)),
         radiusMm: arrowRadiusMm,
         colorInt: restraintColor(restraint.family),
         pickTarget: restraintPick(overlay, restraint),
@@ -138,16 +135,16 @@ function deriveRestraint(context) {
     diagnostics,
   });
 }
-
 function resolveHostEdge(edges, support) {
   const explicit = stringValue(support.hostEntityId || support.edgeId || support.attachedEdgeId);
   if (explicit) {
     return edges.find((edge) => [edge.id, edge.componentKey].map(stringValue).includes(explicit)) || null;
   }
-  const incident = edges.filter((edge) => edge.fromNodeId === support.nodeId || edge.toNodeId === support.nodeId);
+  const incident = edges.filter((edge) => (
+    edge.fromNodeId === support.nodeId || edge.toNodeId === support.nodeId
+  ));
   return incident.length === 1 ? incident[0] : null;
 }
-
 function hostFrame(edge, nodes, verticalAxis) {
   const start = nodes.get(stringValue(edge.fromNodeId));
   const end = nodes.get(stringValue(edge.toNodeId));
@@ -157,21 +154,16 @@ function hostFrame(edge, nodes, verticalAxis) {
   const z = x && y ? unit(cross(x, y)) : null;
   return x && y && z ? Object.freeze({ x, y, z, up }) : null;
 }
-
 function restraintDirection(evidence, frame) {
   const explicit = explicitDirection(evidence.directionToken, frame);
   if (explicit) return explicit;
   if (evidence.family === 'GUIDE') return frame?.y || null;
   if (['LINE_STOP', 'LIMIT'].includes(evidence.family)) return frame?.x || null;
-  if (['REST', 'SHOE', 'TRUNNION', 'HANGER', 'HOLDOWN', 'U_BOLT', 'SPRING_HANGER'].includes(evidence.family)) {
-    return frame?.up || null;
-  }
-  return null;
+  const verticalFamilies = ['REST', 'SHOE', 'TRUNNION', 'HANGER', 'HOLDOWN', 'U_BOLT', 'SPRING_HANGER'];
+  return verticalFamilies.includes(evidence.family) ? frame?.up || null : null;
 }
-
 function restraintGaps(evidence) {
-  const bilateral = ['GUIDE', 'LINE_STOP', 'LIMIT', 'U_BOLT'].includes(evidence.family);
-  if (bilateral) {
+  if (['GUIDE', 'LINE_STOP', 'LIMIT', 'U_BOLT'].includes(evidence.family)) {
     return {
       required: true,
       positive: evidence.positiveGapMm ?? evidence.gapMm,
@@ -186,7 +178,6 @@ function restraintGaps(evidence) {
   }
   return { required: false, positive: evidence.positiveGapMm, negative: evidence.negativeGapMm };
 }
-
 function contactPoints(origin, host, direction, family, gaps) {
   const diagnostics = [];
   if (!origin || !direction) return { positive: null, negative: null, diagnostics };
@@ -198,20 +189,18 @@ function contactPoints(origin, host, direction, family, gaps) {
       'Radial restraint contact requires authoritative host outside diameter.',
     ));
   }
-  const positive = gaps.positive !== null && radius !== null
-    ? add(origin, scale(direction, radius + gaps.positive))
-    : null;
-  const negative = gaps.negative !== null && radius !== null
-    ? add(origin, scale(direction, -(radius + gaps.negative)))
-    : null;
-  return { positive, negative, diagnostics };
+  return {
+    positive: gaps.positive !== null && radius !== null
+      ? add(origin, scale(direction, radius + gaps.positive)) : null,
+    negative: gaps.negative !== null && radius !== null
+      ? add(origin, scale(direction, -(radius + gaps.negative))) : null,
+    diagnostics,
+  };
 }
-
 function hostOutsideRadius(host) {
   const diameter = positive(host?.outsideDiameterMm);
   return diameter === null ? null : diameter / 2;
 }
-
 function explicitDirection(token, frame) {
   const global = {
     '+X': { x: 1, y: 0, z: 0 }, '-X': { x: -1, y: 0, z: 0 },
@@ -222,16 +211,13 @@ function explicitDirection(token, frame) {
   if (token === 'LOCAL_X') return frame?.x || null;
   if (token === 'LOCAL_Y') return frame?.y || null;
   if (token === 'LOCAL_Z') return frame?.z || null;
-  if (token === 'GLOBAL_VERTICAL') return frame?.up || null;
-  return null;
+  return token === 'GLOBAL_VERTICAL' ? frame?.up || null : null;
 }
-
 function restraintRows(support) {
   if (Array.isArray(support.restraints)) return support.restraints;
   if (Array.isArray(support.restraint?.restraints)) return support.restraint.restraints;
   return support.restraint ? [support.restraint] : [];
 }
-
 function supportMarker(overlay, sizeMm) {
   return {
     id: overlay.supportId,
@@ -244,7 +230,6 @@ function supportMarker(overlay, sizeMm) {
     pickTarget: { objectKind: 'support', objectId: overlay.supportId, supportId: overlay.supportId },
   };
 }
-
 function restraintPick(overlay, restraint) {
   return {
     objectKind: 'restraint',
@@ -255,7 +240,6 @@ function restraintPick(overlay, restraint) {
     sourcePaths: restraint.sourcePaths,
   };
 }
-
 function sourcePaths(support, restraint) {
   return Object.freeze([...new Set([
     ...(support?.sourcePaths || []), support?.sourcePath,
@@ -263,22 +247,28 @@ function sourcePaths(support, restraint) {
   ].map(stringValue).filter(Boolean))].sort());
 }
 function statusFor(diagnostics, restraints) {
-  return diagnostics.length || restraints.some((row) => row.status !== 'RESOLVED') ? 'PARTIAL' : 'RESOLVED';
+  return diagnostics.length || restraints.some((row) => row.status !== 'RESOLVED')
+    ? 'PARTIAL' : 'RESOLVED';
 }
 function diag(code, message) { return Object.freeze({ code, severity: 'ERROR', message }); }
-function globalVertical(axis) { return String(axis).toUpperCase() === 'Y' ? { x: 0, y: 1, z: 0 } : { x: 0, y: 0, z: 1 }; }
+function globalVertical(axis) {
+  return String(axis).toUpperCase() === 'Y' ? { x: 0, y: 1, z: 0 } : { x: 0, y: 0, z: 1 };
+}
 function canonicalDirection(value) {
   const normalized = unit(value);
   if (!normalized) return null;
-  const first = [normalized.x, normalized.y, normalized.z].find((row) => Math.abs(row) > 1e-12);
+  const first = [normalized.x, normalized.y, normalized.z]
+    .find((row) => Math.abs(row) > 1e-12);
   return first < 0 ? scale(normalized, -1) : normalized;
 }
 function finitePoint(value) {
   return value && [value.x, value.y, value.z].every((row) => Number.isFinite(Number(row)))
-    ? Object.freeze({ x: Number(value.x), y: Number(value.y), z: Number(value.z) })
-    : null;
+    ? Object.freeze({ x: Number(value.x), y: Number(value.y), z: Number(value.z) }) : null;
 }
-function positive(value) { const number = Number(value); return Number.isFinite(number) && number > 0 ? number : null; }
+function positive(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
 function vector(a, b) { return { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z }; }
 function add(a, b) { return { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }; }
 function scale(value, scalar) {
@@ -288,8 +278,7 @@ function unit(value) {
   if (!value) return null;
   const length = Math.hypot(value.x, value.y, value.z);
   return length > 1e-12
-    ? cleanVector({ x: value.x / length, y: value.y / length, z: value.z / length })
-    : null;
+    ? cleanVector({ x: value.x / length, y: value.y / length, z: value.z / length }) : null;
 }
 function cross(a, b) {
   return cleanVector({
