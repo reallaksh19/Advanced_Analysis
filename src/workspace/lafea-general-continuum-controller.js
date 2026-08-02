@@ -148,14 +148,13 @@ function issueSource(c) {
 
 function bindCallerMesh(c) {
   const binding = bindLafeaContinuumTemplateCallerMesh({
-    templateId: c.request.templateId,
     releaseRecord: c.releaseRecord,
     compatibilityReceipt: c.compatibilityReceipt,
-    sourceAuthorityHash: c.sourceAuthorityHash,
     meshEvidence: c.meshEvidence,
-    materialRegionMapping: c.request.materialRegionEvidence,
-    loadEdgeMapping: c.request.loadEdgeEvidence,
-    boundaryEdgeMapping: c.request.boundaryEdgeEvidence,
+    sourceAuthorityHash: c.sourceAuthorityHash,
+    materialRegionEvidence: c.request.materialRegionEvidence,
+    loadEdgeEvidence: c.request.loadEdgeEvidence,
+    boundaryEdgeEvidence: c.request.boundaryEdgeEvidence,
   });
   if (binding.status !== 'BOUND' || binding.reasons.length !== 0
     || binding.templateId !== c.request.templateId
