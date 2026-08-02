@@ -26,16 +26,17 @@ const REPORT_PATH = path.resolve(
 const exactHead = git(['rev-parse', 'HEAD']);
 const expectedHead = process.env.EXPECTED_HEAD_SHA?.trim() || exactHead;
 const diffBase = resolveDiffBase(exactHead);
-const context = process.env.GITHUB_EVENT_NAME === 'push'
-  && process.env.GITHUB_REF === 'refs/heads/main'
-  ? 'CURRENT_MAIN'
-  : 'CANDIDATE_HEAD';
+const mainHead = resolveMainHead();
+const context = resolveContext({ exactHead, mainHead });
 const checks = [];
 
 recordAssertion('EXACT_HEAD', exactHead === expectedHead,
   `Expected ${expectedHead}; checked out ${exactHead}.`);
 recordAssertion('DIFF_BASE_IN_ANCESTRY', isAncestor(diffBase, exactHead),
   `Diff base ${diffBase} is not in exact-head ancestry.`);
+recordAssertion('CURRENT_MAIN_CONTEXT_VERIFIED',
+  context !== 'CURRENT_MAIN' || mainHead === exactHead,
+  `Current-main context requires exact head ${exactHead} to match origin/main ${String(mainHead)}.`);
 for (const [id, sha] of Object.entries(REQUIRED_MERGES)) {
   recordAssertion(`${id.toUpperCase()}_MERGE_IN_ANCESTRY`, isAncestor(sha, exactHead),
     `Required merge ${sha} is not in exact-head ancestry.`);
@@ -103,6 +104,7 @@ const report = Object.freeze({
   exactHead,
   expectedHead,
   diffBase,
+  mainHead,
   requiredMerges: REQUIRED_MERGES,
   b7eReportSha256,
   checks: Object.freeze(checks.map((entry) => Object.freeze({ ...entry }))),
@@ -154,6 +156,36 @@ function recordAssertion(id, passed, details) {
     status: passed ? 'PASS' : 'BLOCKED',
     details,
   }));
+}
+
+function resolveContext({ exactHead: head, mainHead: remoteMain }) {
+  const event = process.env.GITHUB_EVENT_NAME;
+  const ref = process.env.GITHUB_REF;
+  const exactCurrentMain = ref === 'refs/heads/main'
+    && remoteMain !== null
+    && remoteMain === head;
+  if (exactCurrentMain && (event === 'push' || event === 'workflow_dispatch')) {
+    return 'CURRENT_MAIN';
+  }
+  return 'CANDIDATE_HEAD';
+}
+
+function resolveMainHead() {
+  const candidates = [
+    ['rev-parse', 'refs/remotes/origin/main'],
+    ['rev-parse', 'refs/heads/main'],
+  ];
+  for (const args of candidates) {
+    const result = spawnSync('git', args, {
+      cwd: ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    if (result.status === 0 && /^[0-9a-f]{40}$/u.test(result.stdout.trim())) {
+      return result.stdout.trim();
+    }
+  }
+  return null;
 }
 
 function resolveDiffBase(head) {
