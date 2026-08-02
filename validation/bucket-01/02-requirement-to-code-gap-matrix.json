@@ -1,19 +1,20 @@
 {
   "schema": "lafea-bucket-01-gap-matrix/v6",
-  "audited_baseline_sha": "2d2e22288ad040c882638100c662debbdae38663",
+  "audited_baseline_sha": "7c83060087f6c286c9efa7a84eee546d57a34a83",
   "superseded_baselines": [
     "a7144e02598f3e9db0826f10cefe0b5254fa953e",
     "27fb14ddccb07081904d54c1bae161c87372dbdd",
     "42c9f96e9baffb52232b4b7ed7f04611c6337961",
     "cbd4d3e7397a3d64869d9be1c360af7d1d4ecdc8",
     "6763f73697c9e8f4ec59feaa306edf8d296861b1",
-    "7c49c20c0b4d83f764bc351865dc3d1ae3fabf92"
+    "7c49c20c0b4d83f764bc351865dc3d1ae3fabf92",
+    "2d2e22288ad040c882638100c662debbdae38663"
   ],
   "superseded_baseline_disposition": "STALE_NOT_QUALIFICATION_EVIDENCE",
   "mainline_delta_review": {
     "continuum_bucket_files_changed": false,
     "qualification_parent_refreshed": true,
-    "latest_reviewed_main_commit": "2d2e22288ad040c882638100c662debbdae38663",
+    "latest_reviewed_main_commit": "7c83060087f6c286c9efa7a84eee546d57a34a83",
     "changes_confined_to_separate_piping_governance_and_common_enrichment_files": true
   },
   "execution_policy": {
