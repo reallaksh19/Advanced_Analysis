@@ -1,18 +1,19 @@
 {
   "schema": "lafea-bucket-01-gap-matrix/v5",
-  "audited_baseline_sha": "7c49c20c0b4d83f764bc351865dc3d1ae3fabf92",
+  "audited_baseline_sha": "2d2e22288ad040c882638100c662debbdae38663",
   "superseded_baselines": [
     "a7144e02598f3e9db0826f10cefe0b5254fa953e",
     "27fb14ddccb07081904d54c1bae161c87372dbdd",
     "42c9f96e9baffb52232b4b7ed7f04611c6337961",
     "cbd4d3e7397a3d64869d9be1c360af7d1d4ecdc8",
-    "6763f73697c9e8f4ec59feaa306edf8d296861b1"
+    "6763f73697c9e8f4ec59feaa306edf8d296861b1",
+    "7c49c20c0b4d83f764bc351865dc3d1ae3fabf92"
   ],
   "superseded_baseline_disposition": "STALE_NOT_QUALIFICATION_EVIDENCE",
   "mainline_delta_review": {
     "continuum_bucket_files_changed": false,
     "qualification_parent_refreshed": true,
-    "latest_reviewed_main_commit": "7c49c20c0b4d83f764bc351865dc3d1ae3fabf92",
+    "latest_reviewed_main_commit": "2d2e22288ad040c882638100c662debbdae38663",
     "changes_confined_to_separate_piping_governance_and_common_enrichment_files": true
   },
   "execution_policy": {
@@ -22,71 +23,19 @@
   },
   "bucket_id": "LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE",
   "findings": [
-    {
-      "id": "G1-EXACT-HEAD",
-      "status": "BLOCKED_PENDING_EXTERNAL_EXECUTION",
-      "finding": "The PR contains no hosted Bucket-01 workflow. Exact-head execution and retained reports must be supplied separately without changing the technical benchmark definitions."
-    },
-    {
-      "id": "G2-PRODUCTION-MESH",
-      "status": "REPAIR_INFRASTRUCTURE_IMPLEMENTED",
-      "finding": "Existing annular T6 generator is evaluated independently for mapped area, radius, centre, ligament, perimeter, boundary deviation, midside placement, rotational symmetry, dense Jacobians, connectivity, shared edges, duplicates and feature sets."
-    },
-    {
-      "id": "G2-MAPPING-COVERAGE",
-      "status": "BLOCKED_PENDING_PRODUCTION_RECEIPT",
-      "finding": "Material, load and restraint coverage must remain separate from pure mesh geometry qualification."
-    },
-    {
-      "id": "G3-T6-PATCH",
-      "status": "EXISTING_STRONG_REGRESSION",
-      "finding": "The retained T6 patch covers distorted geometry, rigid motions, scaling, rotation and Jacobian rejection."
-    },
-    {
-      "id": "G3-T3-PATCH",
-      "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION",
-      "finding": "A frozen closed-form affine uniaxial-stress oracle and governed T3 receipt now cover plane stress and plane strain, exact nodal displacement, constant element strain and stress, traction-to-nodal load parity, strain energy, force and moment equilibrium, and three deterministic replays at the manifest 1e-8 normalized tolerance."
-    },
-    {
-      "id": "G3-PURE-SHEAR",
-      "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION",
-      "finding": "A frozen closed-form pure-shear oracle and governed T3 receipt now cover plane stress and plane strain, exact affine displacement, engineering shear strain, tau_xy, principal and von Mises stress, strain energy, four-edge traction-to-nodal parity, prescribed-displacement parity through a separate fully imposed model, nontrivial nodal boundary-force reconstruction, force and moment equilibrium, and three deterministic replays at 1e-8 normalized tolerances."
-    },
-    {
-      "id": "G3-CANTILEVER-PANEL",
-      "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION",
-      "finding": "A frozen closed-form plane-stress pure-bending panel oracle and 8/32/128-element T6 benchmark now verify quadratic displacement, linear integration-point stress, deterministic replay, strain energy, zero force resultant and applied/reaction moment equilibrium without smoothed stress."
-    },
-    {
-      "id": "G3-LOAD-DRIVEN",
-      "status": "EXISTING_PARTIAL",
-      "finding": "NB-T6D proves free DOFs, deterministic Cholesky and force closure, but production moment and energy convergence are not retained."
-    },
-    {
-      "id": "G4-STRESS-AUTHORITY",
-      "status": "REPAIR_INFRASTRUCTURE_IMPLEMENTED",
-      "finding": "Fixed element-local probes reconstruct tensor components from retained T6 integration points with no nodal projection or cross-element averaging."
-    },
-    {
-      "id": "G4-CONVERGENCE",
-      "status": "REPAIR_INFRASTRUCTURE_IMPLEMENTED",
-      "finding": "New evaluator provides observed order, Richardson extrapolation, GCI, asymptotic-range checks and oscillatory/non-monotonic blocking."
-    },
-    {
-      "id": "G4-PRODUCTION-STRESS",
-      "status": "BLOCKED_PENDING_EXECUTION",
-      "finding": "Production Kirsch and lug fixed-coordinate receipts are not yet generated."
-    },
-    {
-      "id": "G4-CODE",
-      "status": "BLOCKED_CODE_BASIS_NOT_FROZEN",
-      "finding": "No governing code, edition, allowable source, classification or independent code oracle is frozen."
-    },
-    {
-      "id": "G5-REPLAY",
-      "status": "BLOCKED_PENDING_THREE_REPLAYS",
-      "finding": "The final exact candidate requires three clean deterministic executions with retained report-data hashes."
-    }
+    { "id": "G1-EXACT-HEAD", "status": "BLOCKED_PENDING_EXTERNAL_EXECUTION", "finding": "The PR contains no hosted Bucket-01 workflow. Exact-head execution and retained reports must be supplied separately without changing the technical benchmark definitions." },
+    { "id": "G2-PRODUCTION-MESH", "status": "REPAIR_INFRASTRUCTURE_IMPLEMENTED", "finding": "Existing annular T6 generator is evaluated independently for mapped area, radius, centre, ligament, perimeter, boundary deviation, midside placement, rotational symmetry, dense Jacobians, connectivity, shared edges, duplicates and feature sets." },
+    { "id": "G2-MAPPING-COVERAGE", "status": "BLOCKED_PENDING_PRODUCTION_RECEIPT", "finding": "Material, load and restraint coverage must remain separate from pure mesh geometry qualification." },
+    { "id": "G3-T6-PATCH", "status": "EXISTING_STRONG_REGRESSION", "finding": "The retained T6 patch covers distorted geometry, rigid motions, scaling, rotation and Jacobian rejection." },
+    { "id": "G3-T3-PATCH", "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION", "finding": "A frozen closed-form affine uniaxial-stress oracle and governed T3 receipt now cover plane stress and plane strain, exact nodal displacement, constant element strain and stress, traction-to-nodal load parity, strain energy, force and moment equilibrium, and three deterministic replays at the manifest 1e-8 normalized tolerance." },
+    { "id": "G3-PURE-SHEAR", "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION", "finding": "A frozen closed-form pure-shear oracle and governed T3 receipt now cover plane stress and plane strain, exact affine displacement, engineering shear strain, tau_xy, principal and von Mises stress, strain energy, four-edge traction-to-nodal parity, prescribed-displacement parity through a separate fully imposed model, nontrivial nodal boundary-force reconstruction, force and moment equilibrium, and three deterministic replays at 1e-8 normalized tolerances." },
+    { "id": "G3-CANTILEVER-PANEL", "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION", "finding": "A frozen closed-form plane-stress pure-bending panel oracle and 8/32/128-element T6 benchmark now verify quadratic displacement, linear integration-point stress, deterministic replay, strain energy, zero force resultant and applied/reaction moment equilibrium without smoothed stress." },
+    { "id": "G3-LOAD-DRIVEN", "status": "EXISTING_PARTIAL", "finding": "NB-T6D proves free DOFs, deterministic Cholesky and force closure, but production moment and energy convergence are not retained." },
+    { "id": "G4-STRESS-AUTHORITY", "status": "REPAIR_INFRASTRUCTURE_IMPLEMENTED", "finding": "Fixed element-local probes reconstruct tensor components from retained T6 integration points with no nodal projection or cross-element averaging." },
+    { "id": "G4-CONVERGENCE", "status": "REPAIR_INFRASTRUCTURE_IMPLEMENTED", "finding": "New evaluator provides observed order, Richardson extrapolation, GCI, asymptotic-range checks and oscillatory/non-monotonic blocking." },
+    { "id": "G4-PRODUCTION-STRESS", "status": "BLOCKED_PENDING_EXECUTION", "finding": "Production Kirsch and lug fixed-coordinate receipts are not yet generated." },
+    { "id": "G4-CODE", "status": "BLOCKED_CODE_BASIS_NOT_FROZEN", "finding": "No governing code, edition, allowable source, classification or independent code oracle is frozen." },
+    { "id": "G5-REPLAY", "status": "BLOCKED_PENDING_THREE_REPLAYS", "finding": "The final exact candidate requires three clean deterministic executions with retained report-data hashes." }
   ],
   "qualification_states": {
     "IMPLEMENTED": "PARTIAL_REPAIR_INFRASTRUCTURE",
