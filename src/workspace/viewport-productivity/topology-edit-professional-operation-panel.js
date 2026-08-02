@@ -22,9 +22,7 @@ export function renderTopologyEditProfessionalOperationPanel(element, state = {}
     `<option value="${value}"${value === (values.operationType ?? 'EXTEND_EDGE') ? ' selected' : ''}>${label}</option>`
   )).join('');
   const unresolved = plan?.unresolvedEvidence?.map((row) => row.code).join(', ') || '';
-  const blocking = validation?.finalDiagnostics?.filter((row) => (
-    String(row.severity).toUpperCase() === 'HIGH'
-  )).length ?? 0;
+  const blocking = Number(state.blockingIssueCount ?? 0);
 
   element.innerHTML = `
     <header class="topology-edit-professional-operation__header">
@@ -72,7 +70,7 @@ export function renderTopologyEditProfessionalOperationPanel(element, state = {}
       <div><dt>Candidate topology</dt><dd>${html(candidate?.resultingCanonicalHash ?? 'none')}</dd></div>
       <div><dt>Validation</dt><dd>${html(validation?.validationHash ?? (state.validationPending ? 'running' : 'none'))}</dd></div>
       <div><dt>Validation status</dt><dd>${html(validation?.status ?? 'none')}</dd></div>
-      <div><dt>Blocking findings</dt><dd>${blocking}</dd></div>
+      <div><dt>In-scope blocking findings</dt><dd>${blocking}</dd></div>
       <div><dt>Transaction preview</dt><dd>${html(state.transactionPreview?.previewHash ?? 'none')}</dd></div>
       <div><dt>Transaction</dt><dd>${html(transaction?.transactionHash ?? 'none')}</dd></div>
     </dl>`;
