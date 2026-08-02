@@ -1,15 +1,17 @@
 import { deepFreeze, semanticHash, stringValue } from '../../core/shared-piping-model/index.js';
+import {
+  DIMENSION_STATUS,
+  candidate,
+  catalogEntry,
+  explicitCandidates,
+  finitePositive,
+  resolveCandidates,
+} from './dimension-authority-internal.js';
 
 export const TOPOLOGY_EDIT_DIMENSION_AUTHORITY = 'TopologyEditDimensionAuthority.v1';
-export const DIMENSION_STATUS = Object.freeze({
-  RESOLVED: 'RESOLVED',
-  MISSING: 'MISSING',
-  CONFLICTING: 'CONFLICTING',
-});
+export { DIMENSION_STATUS };
 
 const DEFAULT_TOLERANCE_MM = 1e-6;
-
-import { candidate, catalogEntry, explicitCandidates, finitePositive, resolveCandidates } from './dimension-authority-internal.js';
 
 export function createDimensionAuthority(options = {}) {
   const toleranceMm = finitePositive(options.toleranceMm) || DEFAULT_TOLERANCE_MM;
