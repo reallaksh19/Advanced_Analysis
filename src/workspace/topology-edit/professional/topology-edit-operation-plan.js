@@ -146,6 +146,7 @@ function assertTargetsDeclared(targetIds, changedScope) {
     ...changedScope.junctionIds,
     ...changedScope.supportIds,
     ...changedScope.boundaryIds,
+    ...changedScope.validationNeighbourhoodIds,
   ]);
   const missing = targetIds.filter((id) => !declared.has(id));
   if (missing.length) fail(`target IDs are absent from changedScope: ${missing.join(', ')}.`, RangeError);
@@ -174,7 +175,6 @@ function assertNotActive(value, active, path) {
 function requiredText(value, label) {
   const text = stringValue(value);
   if (!text) fail(`${label} is required.`);
-  return text;
 }
 function fail(message, Constructor = TypeError) {
   throw new Constructor(`TopologyEditOperationPlan: ${message}`);
