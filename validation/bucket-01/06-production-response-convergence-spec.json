@@ -1,0 +1,83 @@
+{
+  "schema": "lafea-bucket-01-production-response-spec/v1",
+  "specId": "B01-PRODUCTION-LUG-RESPONSE-CONVERGENCE-01",
+  "benchmarkId": "C2D-LUG-PINHOLE-01",
+  "stageId": "LAFEA.3",
+  "formulation": "PLANE_STRESS",
+  "units": {
+    "length": "mm",
+    "force": "N",
+    "moment": "N*mm",
+    "energy": "N*mm"
+  },
+  "geometry": {
+    "center": { "x": 0, "y": 0 },
+    "holeRadius": 20,
+    "outerRadius": 100,
+    "startAngleDegrees": 0
+  },
+  "material": {
+    "elasticModulus": 200000,
+    "poissonRatio": 0.3,
+    "thickness": 10
+  },
+  "meshLadder": [
+    { "ordinal": 1, "radialDivisions": 2, "circumferentialDivisions": 16, "elementCount": 64, "meshSize": 0.0625 },
+    { "ordinal": 2, "radialDivisions": 4, "circumferentialDivisions": 32, "elementCount": 256, "meshSize": 0.03125 },
+    { "ordinal": 3, "radialDivisions": 8, "circumferentialDivisions": 64, "elementCount": 1024, "meshSize": 0.015625 }
+  ],
+  "load": {
+    "loadCaseId": "LC1",
+    "resultant": { "x": 1000, "y": 250 },
+    "featureRole": "RADIAL_QUARTER_0",
+    "baseStartEdge": 0,
+    "baseEdgeCount": 1,
+    "selectedBaseRadialDivisions": 2,
+    "selectedSegmentRadiusStart": 20,
+    "selectedSegmentRadiusEnd": 60,
+    "lineOfAction": { "x": 40, "y": 0 },
+    "expectedMomentAboutCenter": 10000
+  },
+  "restraint": {
+    "featureRole": "RADIAL_QUARTER_2",
+    "baseStartEdge": 0,
+    "baseEdgeCount": 1,
+    "kinematics": "BOUNDARY_ZERO"
+  },
+  "responseAuthority": {
+    "force": "RETAINED_ASSEMBLED_NODAL_FORCE_VECTOR",
+    "reaction": "RETAINED_SUPPORT_REACTION_VECTOR",
+    "moment": "NODAL_FORCE_CROSS_POSITION_ABOUT_FROZEN_CENTER",
+    "energy": "AUTHORITATIVE_TOTAL_STRAIN_ENERGY",
+    "energyCrossCheck": "HALF_APPLIED_FORCE_DOT_NODAL_DISPLACEMENT",
+    "stressSmoothingUsed": false,
+    "movingMaximumUsed": false
+  },
+  "convergence": {
+    "strainEnergy": {
+      "method": "THREE_LEVEL_RICHARDSON_GCI",
+      "gciTolerance": 0.02,
+      "minimumObservedOrder": null,
+      "asymptoticRatioBounds": { "minimum": 0.85, "maximum": 1.15 }
+    },
+    "moment": {
+      "method": "ORACLE_BOUND_MESH_INVARIANT",
+      "expectedReactionMomentAboutCenter": -10000
+    }
+  },
+  "tolerances": {
+    "loadResultantRelative": 1e-8,
+    "forceEquilibriumRelative": 1e-4,
+    "loadMomentRelative": 1e-8,
+    "momentEquilibriumRelative": 1e-4,
+    "energyReconstructionRelative": 1e-8,
+    "strainEnergyGci": 0.02
+  },
+  "authority": {
+    "expectedForceAndMomentSource": "FROZEN_LOAD_DEFINITION_AND_LINE_OF_ACTION",
+    "productionOutputUsedToGenerateExpectedForceOrMoment": false,
+    "productionEnergyExpectedValueRequired": false,
+    "productionEnergyAcceptedByConvergenceOnly": true
+  },
+  "currentDisposition": "TECHNICAL_EVALUATOR_FROZEN_PENDING_PRODUCTION_EXECUTION"
+}
