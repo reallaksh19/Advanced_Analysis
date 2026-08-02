@@ -20,9 +20,16 @@ const QUALIFIED_FILES = Object.freeze([
   'scripts/topology-edit-wave5-contract.mjs',
   'scripts/topology-edit-wave5-fixture-check.mjs',
   'scripts/topology-edit-write-wave5-evidence.mjs',
+  'src/workspace/topology-edit-3d-view-controller.js',
+  'src/workspace/topology-edit/topology-edit-autofix-controller.js',
+  'src/workspace/topology-edit/topology-edit-persistence.js',
+  'src/workspace/topology-edit/topology-edit-export.js',
+  'src/workspace/topology-edit/topology-edit-commit-service.js',
+  'src/workspace/topology-edit/topology-edit-lifecycle-controller.js',
   'tests/topology-edit-wave5.test.mjs',
   'tests/topology-edit-wave5-browser-harness.js',
   'tests/topology-edit-wave5-browser.spec.mjs',
+  'tests/topology-edit-wave4c-lifecycle-ui.test.mjs',
   'tests/fixtures/topology-edit/1885s/fixture-manifest.json',
   'tests/fixtures/topology-edit/1885s/prerequisite-manifest.json',
 ]);
@@ -33,27 +40,41 @@ assert.equal(candidateHead, expectedHead, 'Wave 5 evidence must bind to the exac
 
 const prerequisiteManifest = JSON.parse(await readFile(PREREQUISITE_PATH, 'utf8'));
 const prerequisites = prerequisiteManifest.prerequisites.map((row) => {
-  if (!row.mergeCommit) return row;
-  const ancestor = gitStatus(['merge-base', '--is-ancestor', row.mergeCommit, candidateHead]);
+  const ancestor = Boolean(row.mergeCommit)
+    && gitStatus(['merge-base', '--is-ancestor', row.mergeCommit, candidateHead]);
   return {
     ...row,
     status: ancestor ? 'PASS' : 'FAIL',
-    reason: ancestor ? null : `Merge commit ${row.mergeCommit} is not an ancestor of ${candidateHead}.`,
+    reason: ancestor ? null : `Merge commit ${row.mergeCommit ?? '<missing>'} is not an ancestor of ${candidateHead}.`,
   };
 });
 const browserEvidence = await readJsonOrBlocked(BROWSER_PATH, 'BROWSER_EVIDENCE_NOT_RUN');
 const fixtureEvidence = await readJsonOrBlocked(FIXTURE_PATH, 'FIXTURE_EVIDENCE_NOT_RUN');
+const operationsStatus = normalizeStatus(
+  process.env.TOPOLOGY_EDIT_WAVE5_OPERATIONS_STATUS || 'BLOCKED_NOT_RUN',
+);
+const browserStatus = normalizeStatus(browserEvidence.status);
 const performanceEvidence = {
-  status: 'BLOCKED_INCOMPLETE_OPERATIONS',
-  reason: 'Wave 3 checker/ghost operations and Wave 4 save, commit, reload, and rollback operations are not available for final latency qualification.',
-  browserMetrics: browserEvidence.status?.startsWith('PASS') ? {
+  status: operationsStatus === 'PASS' && browserStatus === 'PASS'
+    ? 'PASS'
+    : `BLOCKED_OPERATIONS_${operationsStatus}_BROWSER_${browserStatus}`,
+  operationCoverage: [
+    'CHECKER_DETECTION',
+    'CERTIFIED_AUTOFIX_PREVIEW_ACCEPT_CANCEL',
+    'JOURNAL_UNDO_REDO_REPLAY',
+    'DRAFT_SAVE_RELOAD',
+    'PREPARED_STAGED_JSON_EXPORT',
+    'WORKSPACE_COMMIT_READBACK',
+    'ROLLBACK_AND_INVALIDATION',
+  ],
+  browserMetrics: browserStatus === 'PASS' ? {
     firstValidFrameMs: browserEvidence.firstValidFrameMs,
     pickP95Ms: browserEvidence.pick?.p95 ?? null,
     frameP95Ms: browserEvidence.navigationFrame?.p95 ?? null,
   } : null,
 };
 const driftEvidence = {
-  status: process.env.TOPOLOGY_EDIT_WAVE5_DRIFT_STATUS || 'BLOCKED_NOT_RUN',
+  status: normalizeStatus(process.env.TOPOLOGY_EDIT_WAVE5_DRIFT_STATUS || 'BLOCKED_NOT_RUN'),
 };
 const releaseReceipt = createTopologyEditWave5ReleaseReceipt({
   candidateHead,
@@ -64,22 +85,20 @@ const releaseReceipt = createTopologyEditWave5ReleaseReceipt({
   fixtureEvidence,
   driftEvidence,
 });
-assert.notEqual(releaseReceipt.status, 'PASS_RELEASE', 'Wave 5 must not pass before Waves 3 and 4 close.');
-assert.notEqual(releaseReceipt.status, 'FAIL', JSON.stringify(releaseReceipt, null, 2));
+assert.equal(releaseReceipt.status, 'PASS_RELEASE', JSON.stringify(releaseReceipt, null, 2));
 
 const fileHashes = {};
 for (const repositoryPath of QUALIFIED_FILES) {
   fileHashes[repositoryPath] = sha256(await readFile(path.join(ROOT, repositoryPath)));
 }
 const evidenceBase = {
-  schema: 'TopologyEditWave5QualificationEvidence.v1',
-  status: 'PASS_INFRASTRUCTURE_BLOCKED_FINAL_RELEASE',
+  schema: 'TopologyEditWave5QualificationEvidence.v2',
+  status: 'PASS_RELEASE',
   candidateHead,
   expectedHead,
-  generatedAt: new Date().toISOString(),
   releaseReceipt,
   browserEvidence,
-  fixtureEidence,
+  fixtureEvidence,
   performanceEvidence,
   driftEvidence,
   fileHashes,
@@ -93,30 +112,25 @@ await writeFile(OUTPUT, `${JSON.stringify(evidence, null, 2)}\n`);
 console.log(`Topology Edit Wave 5 evidence written for ${candidateHead}: ${evidence.status}.`);
 
 async function readJsonOrBlocked(filePath, reason) {
-  try {
-    return JSON.parse(await readFile(filePath, 'utf8'));
-  } catch {
-    return { status: `BLOCKED_${reason}` };
-  }
+  try { return JSON.parse(await readFile(filePath, 'utf8')); }
+  catch { return { status: `BLOCKED_${reason}` }; }
 }
-
+function normalizeStatus(value) {
+  const status = String(value ?? 'BLOCKED').toUpperCase();
+  if (status.startsWith('PASS')) return 'PASS';
+  if (status.startsWith('FAIL')) return 'FAIL';
+  return 'BLOCKED';
+}
 function git(args) {
   return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim();
 }
-
 function gitStatus(args) {
-  try {
-    execFileSync('git', args, { cwd: ROOT, stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
+  try { execFileSync('git', args, { cwd: ROOT, stdio: 'ignore' }); return true; }
+  catch { return false; }
 }
-
 function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
 }
-
 function canonicalize(value) {
   if (Array.isArray(value)) return value.map(canonicalize);
   if (!value || typeof value !== 'object') return value;
