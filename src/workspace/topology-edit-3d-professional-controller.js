@@ -62,34 +62,40 @@ export class TopologyEdit3DViewController extends InteractionController {
   }
 
   undo() {
-    if (this.professionalRuntime.transaction) {
+    const receipt = this.professionalRuntime.transaction;
+    if (receipt?.resultingCanonicalHash
+      === this.session?.currentTopology()?.canonicalTopologyHash) {
       return this.professionalRuntime.undoOperation();
     }
+    this.professionalRuntime.transaction = null;
     this.professionalRuntime.redoTransaction = null;
     return super.undo();
   }
 
   redo() {
-    if (this.professionalRuntime.redoTransaction) {
+    const receipt = this.professionalRuntime.redoTransaction;
+    if (receipt?.priorCanonicalHash
+      === this.session?.currentTopology()?.canonicalTopologyHash) {
       return this.professionalRuntime.redoOperation();
     }
     this.professionalRuntime.transaction = null;
+    this.professionalRuntime.redoTransaction = null;
     return super.redo();
   }
 
   runCommandAction(actionId) {
-    this.professionalRuntime.clear(false, false);
+    this.professionalRuntime.clear(false, true);
     return super.runCommandAction(actionId);
   }
 
-  acceptAutofix() {
-    this.professionalRuntime.clear(false, false);
-    return super.acceptAutofix();
+  applyInteractionPreview() {
+    this.professionalRuntime.clear(false, true);
+    return super.applyInteractionPreview();
   }
 
-  commitDraft() {
+  acceptAutofix() {
     this.professionalRuntime.clear(false, true);
-    return super.commitDraft();
+    return super.acceptAutofix();
   }
 
   restoreDisplayState(viewState = {}) {
