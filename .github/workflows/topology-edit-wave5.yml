@@ -1,0 +1,78 @@
+name: Topology Edit Wave 5 Qualification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/topology-edit-wave5.yml"
+      - "scripts/1885s-empirical-qualification.mjs"
+      - "scripts/topology-edit-wave5-*.mjs"
+      - "scripts/topology-edit-write-wave5-evidence.mjs"
+      - "tests/topology-edit-wave5*.mjs"
+      - "tests/topology-edit-wave5-browser-harness.js"
+      - "tests/fixtures/topology-edit/1885s/**"
+      - "src/workspace/topology-edit/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-wave5-infrastructure:
+    name: Exact-head large-model, fixture, browser, and release-gate qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      CI: "true"
+      TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Retain source, API, and import authority
+        run: |
+          node scripts/topology-edit-source-drift-check.mjs
+          node scripts/topology-edit-api-drift-check.mjs
+          node scripts/topology-edit-prohibited-imports.mjs
+
+      - name: Qualify scope, worker, fixture, and release contracts
+        run: |
+          node --test tests/topology-edit-track-c.test.mjs tests/topology-edit-wave5.test.mjs
+          node scripts/topology-edit-wave5-fixture-check.mjs
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Measure exact-head browser performance and lifecycle
+        run: node --test tests/topology-edit-wave5-browser.spec.mjs
+
+      - name: Verify production bundle
+        run: npm run build
+
+      - name: Write exact-head Wave 5 evidence
+        env:
+          TOPOLOGY_EDIT_WAVE5_DRIFT_STATUS: PASS
+        run: node scripts/topology-edit-write-wave5-evidence.mjs
+
+      - name: Upload Wave 5 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-wave5-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          path: |
+            reports/qualification/topology-edit-wave5-browser.json
+            reports/qualification/topology-edit-wave5-fixtures.json
+            reports/qualification/topology-edit-wave5-evidence.json
+          if-no-files-found: error
+          retention-days: 30
