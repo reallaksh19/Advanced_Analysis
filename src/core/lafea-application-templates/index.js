@@ -179,3 +179,19 @@ export {
   validateContinuumBenchmarkObservation,
   validateLafeaContinuumBenchmarkQualification,
 } from './continuum-benchmark-convergence.js';
+
+export {
+  LAFEA_CONTROLLED_CONTINUUM_CONTROLLER_BOUNDARY,
+  LAFEA_CONTROLLED_CONTINUUM_LEVEL_EVIDENCE_SCHEMA,
+  LAFEA_CONTROLLED_CONTINUUM_LEVEL_STATUSES,
+  LAFEA_CONTROLLED_CONTINUUM_PILOT_ID,
+  LAFEA_CONTROLLED_CONTINUUM_RECEIPT_SCHEMA,
+  LAFEA_CONTROLLED_CONTINUUM_RECEIPT_STATUSES,
+  LAFEA_CONTROLLED_CONTINUUM_REQUEST_SCHEMA,
+  createControlledContinuumExecutionReceipt,
+  createControlledContinuumExecutionRequest,
+  createControlledContinuumLevelEvidence,
+  validateControlledContinuumExecutionReceipt,
+  validateControlledContinuumExecutionRequest,
+  validateControlledContinuumLevelEvidence,
+} from './controlled-continuum-pilot-contract.js';
