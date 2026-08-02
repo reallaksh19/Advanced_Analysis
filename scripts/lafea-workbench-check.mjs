@@ -135,7 +135,11 @@ const read = (relativePath) => fs.readFileSync(path.join(workspace, relativePath
 const modelSource = read('lafea-workbench-model.js');
 const viewSource = read('lafea-workbench-view.js');
 const storeSource = read('lafea-workbench-store.js');
-const documentTableSource = read('lafea-document-table.js');
+const documentTableSource = [
+  read('lafea-document-table.js'),
+  read('lafea-document-table-form.js'),
+  read('lafea-document-table-support.js'),
+].join('\n');
 const previewSource = read('lafea-stage-preview.js');
 const meshPanelSource = read('lafea-mesh-quality-panel.js');
 const resultsSource = read('lafea-results-view.js');
