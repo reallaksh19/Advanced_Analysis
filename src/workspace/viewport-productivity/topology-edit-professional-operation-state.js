@@ -68,6 +68,7 @@ export function renderTopologyEditProfessionalRuntime(runtime) {
     values: runtime.values,
     catalogue: runtime.catalogue,
     plan: runtime.plan,
+    candidate: runtime.candidate,
     validation: runtime.validation,
     validationPending: runtime.validationPending,
     transactionPreview: runtime.transactionPreview,
@@ -84,6 +85,8 @@ export function updateTopologyEditProfessionalEvidence(runtime) {
   if (!host) return;
   host.dataset.topologyEditProfessionalCatalogueHash = runtime.catalogue?.catalogueHash ?? '';
   host.dataset.topologyEditProfessionalPlanHash = runtime.plan?.planHash ?? '';
+  host.dataset.topologyEditProfessionalCandidateHash = runtime.candidate?.candidateHash ?? '';
+  host.dataset.topologyEditProfessionalCandidateTopologyHash = runtime.candidate?.resultingCanonicalHash ?? '';
   host.dataset.topologyEditProfessionalValidationHash = runtime.validation?.validationHash ?? '';
   host.dataset.topologyEditProfessionalTransactionPreviewHash = runtime.transactionPreview?.previewHash ?? '';
   host.dataset.topologyEditProfessionalTransactionHash = runtime.transaction?.transactionHash ?? '';
