@@ -8,7 +8,10 @@ import {
 
 const input = {
   schema: LAFEA_BUCKET_01_CONVERGENCE_INPUT_SCHEMA,
-  quantityId: 'FIXED_PROBE_SIGMA_YY',
+  quantityId: 'SIGMA_YY',
+  samplingAuthority: 'FIXED_PHYSICAL_PROBE',
+  locationId: 'KIRSCH_THETA_90_R_OVER_R_1_05',
+  locationDefinitionHash: `sha256:${'a'.repeat(64)}`,
   units: 'MPa',
   meshSizes: [0.4, 0.2, 0.1],
   observations: [10.16, 10.04, 10.01],
@@ -38,6 +41,17 @@ const invariantEvidence = evaluateLafeaBucket01Convergence({
 });
 assert.equal(invariantEvidence.status, 'BLOCKED');
 assert.equal(invariantEvidence.classification, 'MESH_INSENSITIVE_OR_EXACT');
+
+let movingMaximumRejected = false;
+try {
+  evaluateLafeaBucket01Convergence({
+    ...input,
+    samplingAuthority: 'MOVING_GLOBAL_MAXIMUM',
+  });
+} catch (error) {
+  movingMaximumRejected = error.code === 'LAFEA_B01_SAMPLING_AUTHORITY_INVALID';
+}
+assert.equal(movingMaximumRejected, true);
 
 const alteredEvidence = structuredClone(passEvidence);
 alteredEvidence.fineGridGci = 0;
