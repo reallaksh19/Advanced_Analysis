@@ -142,7 +142,7 @@ function issueSource(c) {
 }
 
 function buildLifecycle(c) {
-  let lifecycle = createLafeaLifecycle(STAGE, { sourceHash: c.sourceAuthority.sourceHash });
+  let lifecycle = createLafeaLifecycle(STAGE, c.sourceAuthority.sourceHash);
   lifecycle = registerBase(lifecycle, 'CANONICAL_MODEL', c.request.canonicalModelHash,
     c.sourceAuthority.sourceHash);
   lifecycle = registerBase(lifecycle, 'ANALYSIS_GEOMETRY', c.request.analysisGeometryHash,
@@ -152,20 +152,21 @@ function buildLifecycle(c) {
 }
 
 function executeStage(c) {
-  const execution = executeControlledContinuumStageRoute(c.normalized, {
-    expectedSourceHash: c.sourceAuthority.sourceHash,
-    expectedMeshArtifactHash: c.meshEvidence.artifactHash,
-  });
-  if (execution.stageId !== STAGE
-    || execution.sourceHash !== c.sourceAuthority.sourceHash
-    || execution.meshArtifactHash !== c.meshEvidence.artifactHash) {
-    throw err('LAFEA_NB_T6H_EXECUTION_PARENT_MISMATCH');
+  const execution = executeControlledContinuumStageRoute(c.normalized);
+  if (execution.status !== 'QUALIFIED'
+    || execution.result?.schema !== 'local-continuum-result/v1'
+    || execution.result?.qualification?.state !== 'ACCEPTED') {
+    throw err('LAFEA_NB_T6H_STAGE_CALCULATION_NOT_ACCEPTED');
   }
+  c.execution = execution;
   const rebuilt = reconstructControlledContinuumResultHashes(execution.result);
-  if (rebuilt.resultHash !== execution.result.resultHash
-    || rebuilt.meshEvidenceHash !== execution.result.meshEvidenceHash) {
+  if (JSON.stringify(rebuilt) !== JSON.stringify(execution.result.semanticHashes)) {
     throw err('LAFEA_NB_T6H_RESULT_HASH_RECONSTRUCTION_FAILED');
   }
+  const resultHash = canonicalLafeaSha256({
+    schema: 'lafea-nb-t6h-result-hash-evidence/v1',
+    reconstructed: rebuilt,
+  });
   assertResultMesh(execution.result, c.meshEvidence);
   const retained = retainIntegrationPoints(execution.result, c.request.elementTypes);
   const integrationPointResultHash = canonicalLafeaSha256(retained);
@@ -175,24 +176,21 @@ function executeStage(c) {
     sourceAuthorityHash: c.sourceAuthorityHash,
     sourceHash: c.sourceAuthority.sourceHash,
     meshArtifactHash: c.meshEvidence.artifactHash,
-    resultHash: execution.result.resultHash,
+    resultHash,
   });
-  const executionRecord = artifact('EXECUTION', executionHash,
-    c.meshEvidence.artifactHash, c.sourceAuthority.sourceHash);
-  c.lifecycle = register(c.lifecycle, executionRecord);
+  c.lifecycle = register(c.lifecycle, executionRecord(c, executionHash));
   const recoveryHash = canonicalLafeaSha256({
     schema: 'lafea-nb-t6h-recovery/v1', executionHash,
-    resultHash: execution.result.resultHash, integrationPointResultHash,
+    resultHash, integrationPointResultHash,
   });
-  const recoveryRecord = artifact('RECOVERY', recoveryHash,
-    executionHash, c.sourceAuthority.sourceHash);
-  c.lifecycle = register(c.lifecycle, recoveryRecord);
+  c.lifecycle = register(c.lifecycle, recoveryRecord(c, recoveryHash, executionHash));
   c.readiness = lafeaLifecycleReadiness(c.lifecycle);
   if (c.readiness.resultReady !== true || c.readiness.convergenceReady !== false
-    || c.readiness.codeReady !== false || c.readiness.releaseQualified !== false) {
+    || c.readiness.codeReady !== false || c.readiness.assessmentReady !== false
+    || c.readiness.reportQualified !== false) {
     throw err('LAFEA_NB_T6H_READINESS_INVALID');
   }
-  c.execution = { ...execution, executionHash, recoveryHash, integrationPointResultHash };
+  c.execution = { ...execution, resultHash, executionHash, recoveryHash, integrationPointResultHash };
 }
 
 function createReceipt(c, accepted) {
@@ -202,7 +200,7 @@ function createReceipt(c, accepted) {
     sourceAuthorityHash: c.sourceAuthorityHash,
     sourceHash: c.sourceAuthority.sourceHash,
     executionHash: accepted ? c.execution.executionHash : null,
-    resultHash: accepted ? c.execution.result.resultHash : null,
+    resultHash: accepted ? c.execution.resultHash : null,
     recoveryHash: accepted ? c.execution.recoveryHash : null,
     integrationPointResultHash: accepted ? c.execution.integrationPointResultHash : null,
     calculationAccepted: accepted,
@@ -316,32 +314,79 @@ function retainIntegrationPoints(result, allowedTypes) {
   }));
 }
 function registerBase(lifecycle, kind, hash, parentHash) {
+  const parentHashes = kind === 'CANONICAL_MODEL'
+    ? { sourceHash: parentHash }
+    : { sourceHash: lifecycle.source.sourceHash, canonicalModelHash: parentHash };
   const record = createLafeaArtifactRecord({
-    artifactKind: kind, stageId: STAGE, artifactHash: hash,
-    parentArtifactHash: parentHash, sourceHash: lifecycle.sourceHash,
-    producerRef: PRODUCER, qualification: 'PASS',
+    stageId: STAGE,
+    kind,
+    status: 'CURRENT',
+    artifactHash: hash,
+    parentHashes,
+    qualification: 'PASS',
+    producerRef: PRODUCER,
+    diagnostics: [],
   });
-  return registerLafeaArtifact(lifecycle, {
-    registrationId: `NB-T6H-${kind}-${hash.slice(7, 23).toUpperCase()}`,
-    artifact: record,
-    expectedParentArtifactHash: parentHash,
-    expectedSourceHash: lifecycle.sourceHash,
-  }).lifecycle;
+  return registerLafeaArtifact(
+    lifecycle, record,
+    `NB-T6H-${kind}-${hash.slice(7, 23).toUpperCase()}`,
+  );
 }
-function artifact(kind, hash, parentHash, sourceHash) {
+function executionRecord(c, hash) {
+  const physicalLoadCaseHash = canonicalLafeaSha256({
+    schema: 'lafea-nb-t6h-physical-load-cases/v1',
+    loadCases: c.execution.canonicalInput.loadCases,
+    resultRequests: c.execution.canonicalInput.resultRequests,
+  });
+  const solverProfileHash = canonicalLafeaSha256({
+    schema: 'lafea-nb-t6h-solver-profile/v1',
+    stageId: STAGE,
+    qualificationProfile: c.execution.canonicalInput.qualificationProfile,
+    formulation: c.normalized.formulation,
+    elementTypes: c.request.elementTypes,
+  });
   return createLafeaArtifactRecord({
-    artifactKind: kind, stageId: STAGE, artifactHash: hash,
-    parentArtifactHash: parentHash, sourceHash,
-    producerRef: PRODUCER, qualification: 'PASS',
+    stageId: STAGE,
+    kind: 'EXECUTION',
+    status: 'CURRENT',
+    artifactHash: hash,
+    parentHashes: {
+      canonicalModelHash: c.request.canonicalModelHash,
+      meshHash: c.meshEvidence.artifactHash,
+      physicalLoadCaseHash,
+      solverProfileHash,
+    },
+    qualification: 'PASS',
+    producerRef: PRODUCER,
+    diagnostics: [],
+  });
+}
+function recoveryRecord(c, hash, executionHash) {
+  const recoveryProfileHash = canonicalLafeaSha256({
+    schema: 'lafea-nb-t6h-recovery-profile/v1',
+    recoveryLayer: 'INTEGRATION_POINT',
+    elementTypes: c.request.elementTypes,
+  });
+  return createLafeaArtifactRecord({
+    stageId: STAGE,
+    kind: 'RECOVERY',
+    status: 'CURRENT',
+    artifactHash: hash,
+    parentHashes: {
+      executionHash,
+      meshHash: c.meshEvidence.artifactHash,
+      recoveryProfileHash,
+    },
+    qualification: 'PASS',
+    producerRef: PRODUCER,
+    diagnostics: [],
   });
 }
 function register(lifecycle, record) {
-  return registerLafeaArtifact(lifecycle, {
-    registrationId: `NB-T6H-${record.artifactKind}-${record.artifactHash.slice(7, 23).toUpperCase()}`,
-    artifact: record,
-    expectedParentArtifactHash: record.parentArtifactHash,
-    expectedSourceHash: lifecycle.sourceHash,
-  }).lifecycle;
+  return registerLafeaArtifact(
+    lifecycle, record,
+    `NB-T6H-${record.kind}-${record.artifactHash.slice(7, 23).toUpperCase()}`,
+  );
 }
 function receiptId(c) {
   const digest = canonicalLafeaSha256({ requestHash: c.request.semanticHash,
