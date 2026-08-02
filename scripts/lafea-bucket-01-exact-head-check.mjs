@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const BASELINE_SHA = 'cbd4d3e7397a3d64869d9be1c360af7d1d4ecdc8';
+const BASELINE_SHA = '6763f73697c9e8f4ec59feaa306edf8d296861b1';
 const REPORT_PATH = path.resolve(
   ROOT,
   process.env.LAFEA_BUCKET_01_EXACT_HEAD_REPORT_PATH
