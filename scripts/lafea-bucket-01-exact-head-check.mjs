@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const BASELINE_SHA = '192a3513061a634e9dc995cf6740374e6afbc1de';
+const BASELINE_SHA = '40404b51d39b29a6c7c2ab7095480099d1cc1fe4';
 const REPORT_PATH = path.resolve(
   ROOT,
   process.env.LAFEA_BUCKET_01_EXACT_HEAD_REPORT_PATH
@@ -24,6 +24,7 @@ recordAssertion('BASELINE_IN_ANCESTRY', isAncestor(BASELINE_SHA, exactHead), `Ba
 for (const check of [
   nodeCheck('BUCKET_01_REPAIR', 'scripts/lafea-bucket-01-repair-check.mjs'),
   nodeCheck('PRODUCTION_RESPONSE_CONVERGENCE_CONTRACT', 'scripts/lafea-bucket-01-production-response-check.mjs'),
+  nodeCheck('SCALABLE_SPARSE_CONTINUUM_SOLVER', 'scripts/lafea-bucket-01-scalable-solver-check.mjs'),
   nodeCheck('GOVERNED_T3_PATCH', 'scripts/lafea-bucket-01-t3-patch-check.mjs'),
   nodeCheck('GOVERNED_PURE_SHEAR', 'scripts/lafea-bucket-01-pure-shear-check.mjs'),
   nodeCheck('T6_PATCH', 'scripts/lafea.3-t6-patch-check.mjs'),
@@ -41,7 +42,7 @@ recordAssertion('TRACKED_WORKTREE_CLEAN', trackedStatus === '', trackedStatus ||
 const failures = checks.filter((check) => check.status !== 'PASS');
 const executableEvidencePass = failures.length === 0;
 const report = {
-  schema: 'lafea-bucket-01-exact-head-report/v5',
+  schema: 'lafea-bucket-01-exact-head-report/v6',
   status: executableEvidencePass ? 'EXACT_HEAD_REPAIR_EVIDENCE_PASS' : 'EXACT_HEAD_REPAIR_EVIDENCE_BLOCKED',
   exactHead,
   expectedHead,
@@ -54,7 +55,7 @@ const report = {
   blockingCheckIds: failures.map((check) => check.id),
   unresolvedQualificationGates: [
     'FULL_INDEPENDENT_EXPECTED_VALUE_PACKAGE_NOT_FROZEN',
-    'PRODUCTION_RESPONSE_EXECUTION_AND_RECEIPT_NOT_RETAINED',
+    'EXACT_1024_ELEMENT_PRODUCTION_RESPONSE_EXECUTION_NOT_RETAINED',
     'T6_KIRSCH_FIXED_PROBE_EXECUTION_NOT_PRODUCED',
     'PRODUCTION_LUG_FIXED_PROBE_EVIDENCE_NOT_PRODUCED',
     'GOVERNING_CODE_BASIS_NOT_FROZEN',
@@ -73,6 +74,7 @@ const report = {
   authority: {
     exactHeadRepairExecutableEvidence: executableEvidencePass,
     selectedRepairInfrastructureReady: executableEvidencePass,
+    scalableSparseSolverRouteImplemented: true,
     productionResponseExecutionRetained: false,
     movingMaximumAcceptanceAuthorized: false,
     nodalProjectionAcceptanceAuthorized: false,
