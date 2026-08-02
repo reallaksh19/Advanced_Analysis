@@ -31,7 +31,7 @@ recordAssertion(
 
 for (const check of [
   nodeCheck('BUCKET_01_REPAIR', 'scripts/lafea-bucket-01-repair-check.mjs'),
-  nodeCheck('T3_PATCH', 'scripts/lafea.3-patch-check.mjs'),
+  nodeCheck('GOVERNED_T3_PATCH', 'scripts/lafea-bucket-01-t3-patch-check.mjs'),
   nodeCheck('T6_PATCH', 'scripts/lafea.3-t6-patch-check.mjs'),
   nodeCheck('PURE_SHEAR_AND_ENERGY', 'scripts/lafea.3-stress-energy-check.mjs'),
   nodeCheck(
@@ -67,7 +67,7 @@ recordAssertion(
 const failures = checks.filter((check) => check.status !== 'PASS');
 const executableEvidencePass = failures.length === 0;
 const report = {
-  schema: 'lafea-bucket-01-exact-head-report/v2',
+  schema: 'lafea-bucket-01-exact-head-report/v3',
   status: executableEvidencePass
     ? 'EXACT_HEAD_REPAIR_EVIDENCE_PASS'
     : 'EXACT_HEAD_REPAIR_EVIDENCE_BLOCKED',
@@ -85,9 +85,7 @@ const report = {
   checks,
   blockingCheckIds: failures.map((check) => check.id),
   unresolvedQualificationGates: [
-    'INDEPENDENT_EXPECTED_VALUE_PACKAGE_NOT_FROZEN',
-    'GOVERNED_T3_PATCH_RECEIPT_NOT_PRODUCED',
-    'MANUFACTURED_PANEL_OR_CANTILEVER_BENCHMARK_MISSING',
+    'FULL_INDEPENDENT_EXPECTED_VALUE_PACKAGE_NOT_FROZEN',
     'PRODUCTION_MOMENT_AND_ENERGY_CONVERGENCE_NOT_PRODUCED',
     'T6_KIRSCH_FIXED_PROBE_EXECUTION_NOT_PRODUCED',
     'PRODUCTION_LUG_FIXED_PROBE_EVIDENCE_NOT_PRODUCED',
