@@ -4,11 +4,14 @@ export const LAFEA_BUCKET_01_CONVERGENCE_INPUT_SCHEMA =
   'lafea-bucket-01-convergence-input/v1';
 export const LAFEA_BUCKET_01_CONVERGENCE_EVIDENCE_SCHEMA =
   'lafea-bucket-01-convergence-evidence/v1';
-export const LAFEA_BUCKET_01_CONVERGENCE_REVISION = 'B01-CONV.1';
+export const LAFEA_BUCKET_01_CONVERGENCE_REVISION = 'B01-CONV.2';
 
 const INPUT_KEYS = Object.freeze([
   'schema',
   'quantityId',
+  'samplingAuthority',
+  'locationId',
+  'locationDefinitionHash',
   'units',
   'meshSizes',
   'observations',
@@ -17,6 +20,12 @@ const INPUT_KEYS = Object.freeze([
   'asymptoticRatioBounds',
 ]);
 const ASYMPTOTIC_KEYS = Object.freeze(['minimum', 'maximum']);
+const SAMPLING_AUTHORITIES = Object.freeze(new Set([
+  'FIXED_PHYSICAL_PROBE',
+  'FIXED_STRESS_PATH',
+  'FIXED_GLOBAL_RESPONSE',
+  'FIXED_SECTION_RESULTANT',
+]));
 const SAFETY_FACTOR = 1.25;
 const REFINEMENT_RATIO_RELATIVE_TOLERANCE = 1e-10;
 const RELATIVE_ZERO_THRESHOLD = 1e-12;
@@ -33,6 +42,18 @@ export function evaluateLafeaBucket01Convergence(inputValue) {
   );
 
   const quantityId = text(inputValue.quantityId, 'quantityId');
+  const samplingAuthority = text(
+    inputValue.samplingAuthority,
+    'samplingAuthority',
+  );
+  if (!SAMPLING_AUTHORITIES.has(samplingAuthority)) {
+    throw convergenceError('LAFEA_B01_SAMPLING_AUTHORITY_INVALID');
+  }
+  const locationId = text(inputValue.locationId, 'locationId');
+  const locationDefinitionHash = sha256(
+    inputValue.locationDefinitionHash,
+    'locationDefinitionHash',
+  );
   const units = text(inputValue.units, 'units');
   const meshSizes = positiveTriple(inputValue.meshSizes, 'meshSizes');
   const observations = finiteTriple(inputValue.observations, 'observations');
@@ -144,6 +165,9 @@ export function evaluateLafeaBucket01Convergence(inputValue) {
     schema: LAFEA_BUCKET_01_CONVERGENCE_EVIDENCE_SCHEMA,
     producerRevision: LAFEA_BUCKET_01_CONVERGENCE_REVISION,
     quantityId,
+    samplingAuthority,
+    locationId,
+    locationDefinitionHash,
     units,
     meshSizes,
     observations,
@@ -180,6 +204,9 @@ export function validateLafeaBucket01ConvergenceEvidence(value) {
     const rebuilt = evaluateLafeaBucket01Convergence({
       schema: LAFEA_BUCKET_01_CONVERGENCE_INPUT_SCHEMA,
       quantityId: value.quantityId,
+      samplingAuthority: value.samplingAuthority,
+      locationId: value.locationId,
+      locationDefinitionHash: value.locationDefinitionHash,
       units: value.units,
       meshSizes: value.meshSizes,
       observations: value.observations,
@@ -234,6 +261,13 @@ function exactKeys(value, expected, label) {
 function text(value, label) {
   if (typeof value !== 'string' || !value.trim()) {
     throw convergenceError('LAFEA_B01_TEXT_REQUIRED', `${label} required.`);
+  }
+  return value;
+}
+
+function sha256(value, label) {
+  if (typeof value !== 'string' || !/^sha256:[0-9a-f]{64}$/u.test(value)) {
+    throw convergenceError('LAFEA_B01_SHA256_REQUIRED', `${label} invalid.`);
   }
   return value;
 }
