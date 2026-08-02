@@ -1,0 +1,149 @@
+name: C3D Wave 6 Route Trace and Continuity
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/topology-edit-c3d-wave6-route-trace.yml'
+      - 'src/workspace/load-calc-consumer-controller.js'
+      - 'src/workspace/topology-edit-3d-route-controller.js'
+      - 'src/workspace/topology-edit/topology-edit-route-graph.js'
+      - 'src/workspace/topology-edit/topology-edit-route-trace-model.js'
+      - 'src/workspace/topology-edit/topology-edit-route-trace-panel.js'
+      - 'src/workspace/topology-edit/topology-edit-route-trace-renderer.js'
+      - 'tests/topology-edit-c3d-wave6-route-trace.test.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  route-trace-continuity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      BASE_REF: ${{ github.event.pull_request.base.sha || github.event.repository.default_branch }}
+
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Verify exact checkout
+        run: test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Enforce syntax and bounded modules
+        run: |
+          node --check src/workspace/topology-edit/topology-edit-route-graph.js
+          node --check src/workspace/topology-edit/topology-edit-route-trace-model.js
+          node --check src/workspace/topology-edit/topology-edit-route-trace-panel.js
+          node --check src/workspace/topology-edit/topology-edit-route-trace-renderer.js
+          node --check src/workspace/topology-edit-3d-route-controller.js
+          node --check src/workspace/load-calc-consumer-controller.js
+          test "$(wc -l < src/workspace/topology-edit/topology-edit-route-graph.js)" -le 300
+          test "$(wc -l < src/workspace/topology-edit/topology-edit-route-trace-model.js)" -le 300
+          test "$(wc -l < src/workspace/topology-edit/topology-edit-route-trace-panel.js)" -le 300
+          test "$(wc -l < src/workspace/topology-edit/topology-edit-route-trace-renderer.js)" -le 300
+          test "$(wc -l < src/workspace/topology-edit-3d-route-controller.js)" -le 300
+          test "$(wc -l < src/workspace/load-calc-consumer-controller.js)" -le 300
+          ! grep -R "export default" \
+            src/workspace/topology-edit/topology-edit-route-graph.js \
+            src/workspace/topology-edit/topology-edit-route-trace-model.js \
+            src/workspace/topology-edit/topology-edit-route-trace-panel.js \
+            src/workspace/topology-edit/topology-edit-route-trace-renderer.js \
+            src/workspace/topology-edit-3d-route-controller.js
+
+      - name: Qualify canonical route trace and continuity review
+        run: node --test tests/topology-edit-c3d-wave6-route-trace.test.mjs
+
+      - name: Retain C3D review stack through comparison
+        run: |
+          node --test tests/topology-edit-c3d-wave0.test.mjs
+          node --test tests/topology-edit-c3d-wave1-visibility.test.mjs
+          node --test tests/topology-edit-c3d-wave1-sectioning.test.mjs
+          node --test tests/topology-edit-c3d-wave2-search.test.mjs
+          node --test tests/topology-edit-c3d-wave3-gpu-picking.test.mjs
+          node --test tests/topology-edit-c3d-wave4-issue-review.test.mjs
+          node --test tests/topology-edit-c3d-wave4-comparison.test.mjs
+          node --test tests/topology-edit-c3d-wave5-inspection-measurement.test.mjs
+
+      - name: Retain Track B lifecycle authority
+        run: |
+          node --test tests/topology-edit-wave3b-autofix.test.mjs
+          node --test tests/topology-edit-wave3c-autofix-ui.test.mjs
+          node --test tests/topology-edit-wave4a-persistence-export.test.mjs
+          node --test tests/topology-edit-wave4b-commit-rollback.test.mjs
+          node --test tests/topology-edit-wave4c-lifecycle-ui.test.mjs
+
+      - name: Retain governance and production build
+        run: |
+          node scripts/topology-edit-source-drift-check.mjs
+          node scripts/topology-edit-api-drift-check.mjs
+          node scripts/topology-edit-prohibited-imports.mjs
+          npm run build
+
+      - name: Write exact-head evidence
+        run: |
+          mkdir -p reports/qualification
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { execFileSync } from 'node:child_process';
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const commit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          if (commit !== process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA) throw new Error('Exact-head mismatch.');
+          const paths = [
+            'src/workspace/load-calc-consumer-controller.js',
+            'src/workspace/topology-edit-3d-route-controller.js',
+            'src/workspace/topology-edit/topology-edit-route-graph.js',
+            'src/workspace/topology-edit/topology-edit-route-trace-model.js',
+            'src/workspace/topology-edit/topology-edit-route-trace-panel.js',
+            'src/workspace/topology-edit/topology-edit-route-trace-renderer.js',
+            'tests/topology-edit-c3d-wave6-route-trace.test.mjs',
+          ];
+          const evidence = {
+            schema: 'TopologyEditC3DWave6RouteTraceEvidence.v1',
+            repository: process.env.GITHUB_REPOSITORY,
+            commit,
+            status: 'PASS_CANONICAL_ROUTE_TRACE_AND_CONTINUITY',
+            graphAuthority: 'EXACT_CANONICAL_NODE_EDGE_INCIDENCE_ONLY',
+            lengthAuthority: 'EXACT_CANONICAL_ENGINEERING_COORDINATES_ONLY',
+            ambiguousPathPolicy: 'REJECT_EQUAL_MINIMUM_ALTERNATIVES',
+            comparisonWorkflowRetained: true,
+            commandAuthorityChanged: false,
+            checkerAuthorityChanged: false,
+            autofixQualificationChanged: false,
+            persistenceAuthorityChanged: false,
+            workspaceAuthorityChanged: false,
+            releaseQualified: false,
+            files: Object.fromEntries(paths.map((file) => [
+              file,
+              createHash('sha256').update(readFileSync(file)).digest('hex'),
+            ])),
+          };
+          writeFileSync(
+            'reports/qualification/topology-edit-c3d-wave6-route-trace.json',
+            `${JSON.stringify(evidence, null, 2)}\n`,
+          );
+          NODE
+
+      - name: Upload exact-head evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-c3d-wave6-route-trace-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          path: reports/qualification/topology-edit-c3d-wave6-route-trace.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Verify full batch patch hygiene
+        run: git diff --check "$BASE_REF...HEAD"
