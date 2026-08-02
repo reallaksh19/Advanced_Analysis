@@ -50,7 +50,7 @@ export class ViewportPanel {
     this.renderer.setSelectionRequestHandler(this.handleSelectionRequest);
     this.renderer.mount(this.hostElement);
     this.unsubscribers = [
-      this.eventBus.subscribe(MODEL_ZONE_EVENTS.CHANGED, ({ selection }) => this.zoneChanged(selection)),
+      this.eventBus.subscribe(MODEL_ZONE_EVENTS.CHANGED, ({ selection, dataset }) => this.zoneChanged(selection, dataset)),
       this.eventBus.subscribe(EVENT_TOPICS.WORKSPACE_SNAPSHOT_CHANGED, ({ snapshot }) => this.renderSnapshot(snapshot)),
       this.eventBus.subscribe(EVENT_TOPICS.DATASET_LOAD_FAILED, ({ message }) => this.importFailure(message)),
       this.eventBus.subscribe(EVENT_TOPICS.DATASET_CLEARED, () => this.clear()),
@@ -89,10 +89,9 @@ export class ViewportPanel {
     }
   }
 
-  zoneChanged(selection) {
+  zoneChanged(selection, dataset) {
     this.zoneSelection = selection;
-    const dataset = WorkspaceState.getSnapshot()?.dataset;
-    if (dataset && selection?.datasetId === dataset.datasetId) this.renderDataset(dataset, false);
+    if (this.datasetReference === dataset) this.renderDataset(dataset, false);
   }
 
   editAction({ action, selectedEntityId }) {
