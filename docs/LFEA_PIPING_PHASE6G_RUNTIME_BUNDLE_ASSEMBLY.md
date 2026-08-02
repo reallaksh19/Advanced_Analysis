@@ -6,7 +6,7 @@ Program disposition remains `BLOCKED` in the committed repository template.
 
 Phase 6F can produce the retained G0–G7 internal artifact set. Phase 6B defines the independently supplied G8–G10 external qualification package. Phase 6E validates a complete runtime release bundle.
 
-Phase 6G provides the missing governed assembly step between those authorities.
+Phase 6G provides the governed assembly step between those authorities.
 
 It copies and path-binds already sealed evidence. It does not execute engineering programs, create comparison values, sign a disposition, change the committed release template or certify a release.
 
@@ -16,10 +16,12 @@ The assembler requires:
 
 - a successful Phase 6F internal evidence root;
 - the exact Phase 6F internal manifest path, defaulting to `internal/exact-head-manifest.json`;
-- a governed Phase 6B external evidence root;
-- the explicit relative path to `linear-piping-external-qualification-package/v1`;
+- a governed Phase 6H external evidence root;
+- the explicit relative path to `linear-piping-external-qualification-package/v2`;
 - one exact 40-character repository head;
 - a new output path whose parent already exists.
+
+The v2 external package contains the complete approved WP-2 Project Authority Index and binds its semantic and evidence hashes into the package identities. Phase 6G therefore carries the authority record downstream by copying the sealed package; it does not re-approve, reinterpret or separately infer project authority.
 
 The internal and external roots must be real, distinct, non-symbolic-link directories. The output must not exist and must not overlap the repository or either input root.
 
@@ -28,7 +30,7 @@ The internal and external roots must be real, distinct, non-symbolic-link direct
 Before copying, Phase 6G requires:
 
 1. The internal manifest to pass `requireInternalExactHeadManifest`.
-2. The external package to pass `requireLinearPipingExternalQualificationPackage`.
+2. The external package to pass `requireLinearPipingExternalQualificationPackage`, including its embedded approved WP-2 authority index.
 3. Both sealed inputs to identify the requested exact head.
 4. The Phase 6F collection summary to identify ten commands, seven artifact roles and the same manifest hashes.
 5. The Phase 6F A0 runtime baseline to identify the same exact head, a clean checkout and `EXACT_HEAD_BASELINE_CAPTURED`.
@@ -41,8 +43,10 @@ Only referenced files are copied:
 - the internal exact-head manifest;
 - seven internal Phase 6D artifact roles;
 - the Phase 6F collection summary and A0 runtime baseline;
-- the external qualification package;
+- the v2 external qualification package, including the embedded WP-2 authority index;
 - five external Phase 6C artifact roles.
+
+The separate `external/project-authority-index.json` materialized by Phase 6H remains a source-artifact custody copy. The complete validated authority record is also embedded in the external package, and that package is the authoritative downstream binding.
 
 Relative paths are preserved so existing manifest/package references remain authoritative. Absolute paths, drive-qualified paths, traversal, empty segments, symbolic links, non-files and script/test/fixture/mock roots are rejected.
 
@@ -114,12 +118,13 @@ The committed check is marked:
 [SIMULATED][INELIGIBLE_FOR_RELEASE_EVIDENCE][NO_ENGINEERING_COMMAND_EXECUTION]
 ```
 
-It uses synthetic files and injected intake validators. It proves assembly mechanics, exact-head binding, deterministic output, collision and traversal rejection, atomic cleanup and release-evaluator routing. It does not represent real G0–G10 evidence.
+It uses synthetic files and injected intake validators. It proves assembly mechanics, exact-head binding, deterministic output, collision and traversal rejection, atomic cleanup, v2 package carriage and release-evaluator routing. It does not represent real WP-2 or G0–G10 evidence.
 
 ## Remaining conditions
 
+- Produce and approve the candidate-bound WP-2 Project Authority Index.
 - Run Phase 6F successfully on the selected exact head.
-- Supply a complete non-fictional Phase 6B external package for that same head.
+- Supply a complete non-fictional Phase 6H external package for that same head.
 - Run Phase 6G and retain the assembled bundle artifact.
 - Run the Phase 6E runtime release-certification workflow against that bundle.
 - Retain successful full-gate, assembly, runtime-validation and signed-disposition evidence.
