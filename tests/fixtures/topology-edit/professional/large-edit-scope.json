@@ -1,0 +1,13 @@
+{
+  "schema": "TopologyEditLargeValidationFixture.v1",
+  "segmentCount": 240,
+  "segmentLengthMm": 100,
+  "shortenedFinalLengthMm": 5,
+  "shortElementThresholdMm": 6,
+  "snapGapToleranceMm": 25,
+  "performancePolicy": {
+    "fastPathBudgetMs": 60,
+    "warningBudgetMs": 100,
+    "hysteresisMs": 10
+  }
+}

@@ -18,9 +18,9 @@ concurrency:
 
 jobs:
   qualify:
-    name: P4B exact compatibility and plan gating
+    name: P5 incremental validation and full fallback
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       PR_BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
@@ -58,6 +58,9 @@ jobs:
           node --check src/workspace/topology-edit/professional/topology-edit-slope-operation.js
           node --check src/workspace/topology-edit/professional/topology-edit-spec-catalog.js
           node --check src/workspace/topology-edit/professional/topology-edit-compatibility.js
+          node --check src/workspace/topology-edit/professional/topology-edit-validation-scope.js
+          node --check src/workspace/topology-edit/professional/topology-edit-validation-diagnostics.js
+          node --check src/workspace/topology-edit/professional/topology-edit-incremental-validation.js
 
       - name: Run focused professional engineering tests
         run: |
@@ -67,15 +70,17 @@ jobs:
             tests/topology-edit-professional-engineering-route-operations.test.mjs \
             tests/topology-edit-professional-engineering-catalog.test.mjs \
             tests/topology-edit-professional-engineering-compatibility.test.mjs \
+            tests/topology-edit-professional-engineering-incremental-validation.test.mjs \
             tests/topology-edit-professional-engineering-containment.test.mjs
 
-      - name: Run retained command and journal authority tests
+      - name: Run retained checker, command, and journal authority tests
         run: |
           node --test \
             tests/topology-edit-wave1-pure-kernel.test.mjs \
             tests/topology-edit-wave1-candidate-certification.test.mjs \
             tests/topology-edit-wave1-journal-replay.test.mjs \
-            tests/topology-edit-wave3-commands.test.mjs
+            tests/topology-edit-wave3-commands.test.mjs \
+            tests/topology-edit-wave3a-checker.test.mjs
 
       - name: Run repository anti-drift gates
         run: |
