@@ -83,6 +83,21 @@ test('endpoint evidence outranks closer lower-authority evidence', () => {
   assert.equal(result.candidate.targetCanonicalId, 'node:b');
 });
 
+test('zero tolerance resolves only an exact candidate position', () => {
+  const exact = resolve({
+    pointerPoint: { x: 100, y: 0, z: 0 },
+    toleranceMm: 0,
+  });
+  assert.equal(exact.status, 'RESOLVED');
+  assert.equal(exact.candidate.targetCanonicalId, 'node:b');
+
+  const outside = resolve({
+    pointerPoint: { x: 99.999, y: 0, z: 0 },
+    toleranceMm: 0,
+  });
+  assert.equal(outside.status, 'UNAVAILABLE');
+});
+
 test('midpoint and centerline resolve without self-ambiguity', () => {
   const midpoint = resolve({ pointerPoint: { x: 50, y: 0, z: 0 } });
   assert.equal(midpoint.status, 'RESOLVED');
