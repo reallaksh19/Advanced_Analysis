@@ -10,7 +10,10 @@ import {
   reconcileTopologyEditReviewResponse,
 } from './topology-edit-review-response-intake.js';
 import {
+  assertTopologyEditReviewLedgerContext as assertCreationContext,
   assertTopologyEditReviewLedgerCurrentContext as assertCurrentContext,
+  assertTopologyEditReviewLedgerEmbeddedIntake as assertEmbeddedIntake,
+  createTopologyEditReviewLedgerContext as createCreationContext,
   topologyEditReviewLedgerAuthorityFlags as authorityFlags,
   topologyEditReviewLedgerNonNegativeInteger as nonNegativeInteger,
   topologyEditReviewLedgerNormalizedIds as normalizedIds,
@@ -37,6 +40,7 @@ export function createTopologyEditReviewResponseLedger({
       `Review ledger exceeds ${TOPOLOGY_EDIT_REVIEW_RESPONSE_LEDGER_MAX_PACKAGES} packages.`,
     );
   }
+  const creationContext = createCreationContext(currentBasis, canonicalTopology);
   const seen = new Set();
   const packages = responses.map((response) => {
     assertTopologyEditReviewResponse(response);
@@ -64,6 +68,7 @@ export function createTopologyEditReviewResponseLedger({
     schema: TOPOLOGY_EDIT_REVIEW_RESPONSE_LEDGER_SCHEMA,
     sourceDossierHash: dossier.dossierHash,
     sourceIssueOverlayHash: token(dossier.issueOverlay?.overlayHash),
+    creationContext,
     dossierIssues,
     packages,
     issueMatrix,
@@ -99,6 +104,7 @@ export function assertTopologyEditReviewResponseLedger(value) {
     );
   }
   if (!token(value.sourceDossierHash)) throw new TypeError('Ledger source dossier hash is required.');
+  const creationContext = assertCreationContext(value.creationContext);
   if (value.authority !== 'DISPLAY_REVIEW_RESPONSE_LEDGER_ONLY'
       || value.releaseQualified !== false) {
     throw new Error('Review ledger authority or release disposition is invalid.');
@@ -132,6 +138,14 @@ export function assertTopologyEditReviewResponseLedger(value) {
     throw new Error('Review ledger dossier issues are not normalized.');
   }
   assertPackageIssueBindings(dossierIssues, value.packages);
+  for (const entry of value.packages) {
+    assertEmbeddedIntake({
+      response: entry.response,
+      intake: entry.intake,
+      dossierIssues,
+      creationContext,
+    });
+  }
   const issueMatrix = buildIssueMatrix(dossierIssues, value.packages);
   if (semanticHash(issueMatrix) !== semanticHash(value.issueMatrix)) {
     throw new Error('Review ledger issue matrix does not match packages.');
