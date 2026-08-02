@@ -2,8 +2,9 @@
   "schema": "lafea-bucket-01-benchmark-manifest/v4",
   "manifest_status": "BASELINE_FROZEN_WITH_UNRESOLVED_GATES",
   "repository": "reallaksh19/Advanced_Analysis",
-  "baseline_main_sha": "6763f73697c9e8f4ec59feaa306edf8d296861b1",
+  "baseline_main_sha": "7c49c20c0b4d83f764bc351865dc3d1ae3fabf92",
   "prior_baseline_main_shas": [
+    "6763f73697c9e8f4ec59feaa306edf8d296861b1",
     "cbd4d3e7397a3d64869d9be1c360af7d1d4ecdc8",
     "42c9f96e9baffb52232b4b7ed7f04611c6337961",
     "27fb14ddccb07081904d54c1bae161c87372dbdd",
@@ -63,24 +64,9 @@
     "C2D-LUG-PINHOLE-01"
   ],
   "production_mesh_levels": [
-    {
-      "level": "L1",
-      "radial_divisions": 2,
-      "circumferential_divisions": 16,
-      "t6_elements": 64
-    },
-    {
-      "level": "L2",
-      "radial_divisions": 4,
-      "circumferential_divisions": 32,
-      "t6_elements": 256
-    },
-    {
-      "level": "L3",
-      "radial_divisions": 8,
-      "circumferential_divisions": 64,
-      "t6_elements": 1024
-    }
+    { "level": "L1", "radial_divisions": 2, "circumferential_divisions": 16, "t6_elements": 64 },
+    { "level": "L2", "radial_divisions": 4, "circumferential_divisions": 32, "t6_elements": 256 },
+    { "level": "L3", "radial_divisions": 8, "circumferential_divisions": 64, "t6_elements": 1024 }
   ],
   "tolerances": {
     "patch_normalized_error_max": 1e-8,
