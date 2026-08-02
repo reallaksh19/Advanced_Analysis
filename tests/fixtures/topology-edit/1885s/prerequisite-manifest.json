@@ -22,8 +22,8 @@
     {
       "waveId": "WAVE_3",
       "status": "PASS_MERGED",
-      "pullRequests": [267, 271, 272],
-      "mergeCommit": "4dc7e7ca0ec7677d7616dd2e128fe63cfe3432d6"
+      "pullRequests": [267, 271, 272, 277],
+      "mergeCommit": "2d4fc3596a5bc0057740945c769c71be1efec296"
     },
     {
       "waveId": "WAVE_4",
