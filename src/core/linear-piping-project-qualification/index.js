@@ -71,6 +71,22 @@ export {
 } from './external-evidence-handoff.js';
 
 export {
+  PHASE6I_ANTI_DRIFT_IDS,
+  PHASE6I_ANTI_DRIFT_REVIEW_SCHEMA,
+  PHASE6I_BENCHMARK_IDS,
+  PHASE6I_BENCHMARK_REVIEW_SCHEMA,
+  PHASE6I_GATE_IDS,
+  PHASE6I_INDEPENDENT_CLOSURE_REVIEW_SCHEMA,
+  Phase6iIndependentClosureReviewError,
+  buildPhase6iAntiDriftReviewManifest,
+  buildPhase6iBenchmarkReviewManifest,
+  buildPhase6iIndependentClosureReview,
+  requirePhase6iAntiDriftReviewManifest,
+  requirePhase6iBenchmarkReviewManifest,
+  requirePhase6iIndependentClosureReview,
+} from './independent-closure-review.js';
+
+export {
   requirePerformanceEvidence,
   sealPerformanceEvidence,
 } from './performance-evidence.js';
