@@ -1,0 +1,90 @@
+name: Topology Edit Wave 2
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/topology-edit-wave2.yml"
+      - "src/workspace/topology-edit/**"
+      - "src/workspace/topology-edit-3d-view-controller.js"
+      - "tests/topology-edit-dimension-authority.test.mjs"
+      - "tests/topology-edit-fitting-support-*.test.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  geometry-support:
+    name: Geometry, support, picking, and build qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: "true"
+      TOPOLOGY_EDIT_SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      TOPOLOGY_EDIT_MERGE_CANDIDATE_SHA: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+
+    steps:
+      - name: Check out exact merge candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Geometry and support contracts
+        run: >-
+          node --test
+          tests/topology-edit-dimension-authority.test.mjs
+          tests/topology-edit-fitting-support-geometry.test.mjs
+          tests/topology-edit-fitting-support-integration.test.mjs
+
+      - name: Source, API, and import authority
+        run: |
+          node scripts/topology-edit-source-drift-check.mjs
+          node scripts/topology-edit-api-drift-check.mjs
+          node scripts/topology-edit-prohibited-imports.mjs
+
+      - name: Production build
+        run: npm run build
+
+      - name: Write exact-candidate Wave 2 evidence
+        run: |
+          mkdir -p reports/qualification
+          node --input-type=module - <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { writeFileSync } from 'node:fs';
+          const actualCandidate = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          if (actualCandidate !== process.env.TOPOLOGY_EDIT_MERGE_CANDIDATE_SHA) {
+            throw new Error(`Merge candidate mismatch: expected ${process.env.TOPOLOGY_EDIT_MERGE_CANDIDATE_SHA}, received ${actualCandidate}.`);
+          }
+          const evidence = {
+            schema: 'TopologyEditWave2Evidence.v1',
+            sourceHead: process.env.TOPOLOGY_EDIT_SOURCE_HEAD_SHA,
+            mergeCandidate: actualCandidate,
+            nodeVersion: process.version,
+            commands: [
+              'dimension-authority-tests',
+              'fitting-support-geometry-tests',
+              'production-integration-tests',
+              'source-api-import-drift',
+              'production-build',
+            ],
+          };
+          writeFileSync('reports/qualification/topology-edit-wave2-evidence.json', `${JSON.stringify(evidence, null, 2)}\n`);
+          NODE
+
+      - name: Upload exact-candidate evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-wave2-${{ env.TOPOLOGY_EDIT_MERGE_CANDIDATE_SHA }}
+          path: reports/qualification/topology-edit-wave2-evidence.json
+          if-no-files-found: error
+          retention-days: 30
