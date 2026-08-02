@@ -1,0 +1,65 @@
+{
+  "schema": "lafea-bucket-01-code-basis-intake-template/v1",
+  "templateId": "B01-CODE-BASIS-INTAKE-01",
+  "benchmarkId": "C2D-LUG-PINHOLE-01",
+  "target": "C2D-LUG-PINHOLE -> LAFEA.3",
+  "status": "UNRESOLVED_GATE",
+  "requiredFields": {
+    "basisId": null,
+    "exactHeadSha": null,
+    "probeSpecHash": null,
+    "governingCode": {
+      "organization": null,
+      "documentId": null,
+      "title": null,
+      "edition": null,
+      "addenda": null,
+      "jurisdiction": null,
+      "sourceDocumentHash": null
+    },
+    "allowable": {
+      "allowableId": null,
+      "value": null,
+      "units": "MPa",
+      "temperature": null,
+      "temperatureUnits": "degC",
+      "materialScope": null,
+      "sourceSection": null,
+      "sourceTable": null,
+      "interpolationPolicy": null
+    },
+    "stressClassification": {
+      "classificationId": null,
+      "method": null,
+      "sourceSection": null,
+      "locationIds": [],
+      "stressQuantity": null,
+      "extractionAuthority": "RETAINED_INTEGRATION_POINT_FIXED_PROBES_AND_PATHS",
+      "singularityTreatment": "EXCLUDE_UNCLASSIFIED_SINGULAR_PEAKS"
+    },
+    "loadCombination": {
+      "combinationId": null,
+      "sourceSection": null,
+      "terms": []
+    },
+    "authority": {
+      "approvalStatus": "UNAPPROVED",
+      "approvalId": null,
+      "authoritySource": "EXTERNAL_ENGINEERING_AUTHORITY",
+      "issuer": null,
+      "approver": null,
+      "approverRole": null,
+      "approvedAt": null,
+      "approvalRecordHash": null
+    }
+  },
+  "prohibitedDefaults": [
+    "infer governing code from repository or geography",
+    "select latest edition automatically",
+    "invent allowable stress or material scope",
+    "classify stress from moving maxima or display contours",
+    "invent load factors or combinations",
+    "treat a synthetic fixture as engineering approval"
+  ],
+  "currentDisposition": "CODE_BASIS_AUTHORITY_NOT_SUPPLIED"
+}
