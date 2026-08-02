@@ -113,7 +113,7 @@ test('viewport projection recomputes selected-zone bounds and summary', () => {
   assert.equal(Object.isFrozen(scoped), true);
 });
 
-test('production tree and viewport consume the selector without workspace mutation', async () => {
+test('production tree and viewport consume exact-dataset selection without mutation', async () => {
   const files = await Promise.all([
     'src/workspace/model-zone-selector.js',
     'src/workspace/tree-panel.js',
@@ -123,9 +123,13 @@ test('production tree and viewport consume the selector without workspace mutati
   const [selector, tree, events, viewport] = files;
   assert.match(tree, /new ModelZoneSelectorController/);
   assert.match(events, /MODEL_ZONE_EVENTS\.CHANGED/);
+  assert.match(events, /\{ selection, dataset \}/);
   assert.match(viewport, /filterResolvedGeometryForModelZone/);
   assert.match(viewport, /projectDatasetForModelZone/);
+  assert.match(viewport, /this\.datasetReference === dataset/);
   assert.match(selector, /reconcileModelZoneSelection/);
+  assert.match(selector, /EVENT_TOPICS\.DATASET_LOADED/);
+  assert.match(selector, /dataset: this\.dataset/);
   for (const prohibited of ['WorkspaceState.loadDataset', 'WorkspaceState.clearDataset', 'rebuildWorkspaceDataset']) {
     assert.equal(selector.includes(prohibited), false, `selector must not use ${prohibited}`);
   }
