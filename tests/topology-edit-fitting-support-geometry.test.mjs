@@ -137,3 +137,52 @@ test('restraint projection retains restraint-level pick identity', () => {
   assert.equal(projected.segments[0].pickTarget.restraintId, 'guide');
   assert.equal(projected.segments[0].pickTarget.restraintFamily, 'GUIDE');
 });
+
+test('visually identical instances retain distinct projected pick identities', () => {
+  const canonical = topology({
+    edges: [
+      { id: 'edge:a', componentKey: 'A', fromNodeId: 'n0', toNodeId: 'n1', entityType: 'PIPE' },
+      { id: 'edge:b', componentKey: 'B', fromNodeId: 'n2', toNodeId: 'n3', entityType: 'PIPE' },
+    ],
+  });
+  const model = deriveTopologyVisualGeometry({
+    canonicalTopology: canonical,
+    componentEvidence: { A: { outsideDiameterMm: 100 }, B: { outsideDiameterMm: 100 } },
+    dimensionAuthority,
+  });
+  const projected = projectVisualGeometryToViewport(model, canonical);
+  const picks = projected.segments.map((row) => row.pickTarget.objectId).sort();
+  assert.deepEqual(picks, ['edge:a', 'edge:b']);
+  assert.equal(model.components[0].visualSignature, model.components[1].visualSignature);
+});
+
+test('camera, visibility, and support-scale changes cannot mutate canonical state', () => {
+  const canonical = topology({
+    edges: [{ id: 'edge:p', componentKey: 'P', fromNodeId: 'n0', toNodeId: 'n1', entityType: 'PIPE', outsideDiameterMm: 100 }],
+  });
+  const support = { id: 'support:1', nodeId: 'n0', hostEntityId: 'P', restraints: [{ id: 'guide', kind: 'GUIDE', gapMm: 5 }] };
+  const before = structuredClone(canonical);
+  const evidence = { P: { outsideDiameterMm: 100 } };
+  const first = deriveTopologyVisualGeometry({
+    canonicalTopology: canonical,
+    componentEvidence: evidence,
+    dimensionAuthority,
+    cameraState: { position: { x: 1, y: 2, z: 3 } },
+    visibility: { draft: false },
+    visualPolicy: { radialSegments: 8 },
+  });
+  const second = deriveTopologyVisualGeometry({
+    canonicalTopology: canonical,
+    componentEvidence: evidence,
+    dimensionAuthority,
+    cameraState: { position: { x: 900, y: 800, z: 700 } },
+    visibility: { draft: true },
+    visualPolicy: { radialSegments: 24 },
+  });
+  const overlay = deriveSupportRestraintGeometry({ canonicalTopology: canonical, support });
+  const shortProjection = projectSupportGeometryToViewport([overlay], { arrowLengthMm: 20 });
+  const longProjection = projectSupportGeometryToViewport([overlay], { arrowLengthMm: 200 });
+  assert.notEqual(first.visualGeometryHash, second.visualGeometryHash);
+  assert.notDeepEqual(shortProjection, longProjection);
+  assert.deepEqual(canonical, before);
+});
