@@ -12,6 +12,7 @@ const CHECKS = Object.freeze([
   { scope: 'NB-T3', path: 'scripts/lafea-nb-t3-composition-root-check.mjs' },
   { scope: 'NB-T4A', path: 'scripts/lafea-nb-t4a-analysis-mesh-evidence-check.mjs' },
   { scope: 'NB-T4B', path: 'scripts/lafea-nb-t4b-recovery-render-check.mjs' },
+  { scope: 'NB-T6A', path: 'scripts/lafea-nb-t6a-controlled-continuum-pilot-check.mjs' },
   { scope: 'PR-NB1-A', path: 'scripts/lafea-nb1-analytical-verticals-check.mjs' },
   { scope: 'U1', path: 'scripts/lafea-u1-stage-registry-check.mjs' },
   { scope: 'U1', path: 'scripts/lafea-u1b-registry-consumer-check.mjs' },
@@ -82,7 +83,7 @@ for (const row of CHECKS) {
 }
 
 const report = Object.freeze({
-  schema: 'lafea-nonbucket-stack-report/v6',
+  schema: 'lafea-nonbucket-stack-report/v7',
   check: 'lafea-nonbucket-stack-certification',
   status: failures.length ? 'FAIL' : 'PASS',
   exactHead: gitHead(),
@@ -105,6 +106,7 @@ const report = Object.freeze({
   analyticalProductEvidenceIntegrated: true,
   analysisMeshEvidenceIntegrated: true,
   recoveryRenderEvidenceIntegrated: true,
+  controlledContinuumPilotIntegrated: true,
   productionMeshGenerationIntegrated: false,
   displayTessellationAcceptedAsMeshEvidence: false,
   displayValuesAuthoritative: false,
