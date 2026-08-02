@@ -1,4 +1,5 @@
 import {
+  deepFreeze,
   semanticHash,
   stringValue,
 } from '../../../core/shared-piping-model/index.js';
@@ -6,18 +7,25 @@ import {
   topologyEditDiagnosticTargetIds,
 } from './topology-edit-validation-diagnostics.js';
 
-export function assertNoTopologyEditBlockingDiagnostics(
+export function topologyEditBlockingDiagnostics(
   receipt,
   blockingSeverities = ['HIGH'],
 ) {
   const blocking = new Set(normalizeSeverities(blockingSeverities));
   const scope = validationScopeIds(receipt?.validationScope?.ids);
-  const issue = (receipt?.finalDiagnostics ?? []).find((row) => {
+  return deepFreeze((receipt?.finalDiagnostics ?? []).filter((row) => {
     const severity = stringValue(row?.severity).toUpperCase() || 'UNKNOWN';
     if (!blocking.has(severity)) return false;
     const targetIds = topologyEditDiagnosticTargetIds(row);
     return targetIds.length === 0 || targetIds.some((id) => scope.has(id));
-  });
+  }));
+}
+
+export function assertNoTopologyEditBlockingDiagnostics(
+  receipt,
+  blockingSeverities = ['HIGH'],
+) {
+  const issue = topologyEditBlockingDiagnostics(receipt, blockingSeverities)[0];
   if (issue) {
     throw new RangeError(
       `TopologyEditValidationBlocking: validation contains in-scope blocking issue ${issue.id || semanticHash(issue)}.`,
