@@ -46,14 +46,22 @@ export function assertTopologyEditValidationWorkerRequest(value) {
   if (value.schema !== TOPOLOGY_EDIT_VALIDATION_WORKER_REQUEST_SCHEMA) {
     fail(`request must use ${TOPOLOGY_EDIT_VALIDATION_WORKER_REQUEST_SCHEMA}.`);
   }
+  requiredText(value.basisHash, 'basisHash');
+  requiredText(value.planHash, 'planHash');
+  requiredText(value.changedScopeHash, 'changedScopeHash');
+  requiredText(value.validatedTopologyHash, 'validatedTopologyHash');
+  requiredText(value.previousIssueHash, 'previousIssueHash');
+  normalizeRecord(value.checkerOptions, 'checkerOptions');
+  normalizePerformancePolicy(value.performancePolicy);
+  const severities = normalizeSeverities(value.blockingSeverities);
+  if (!sameList(severities, value.blockingSeverities)) {
+    fail('blockingSeverities must be sorted and unique.', RangeError);
+  }
   const material = { ...value };
   delete material.requestId;
   if (value.requestId !== `validation-request:${semanticHash(material)}`) {
     fail('requestId does not match request authority.', RangeError);
   }
-  normalizeRecord(value.checkerOptions, 'checkerOptions');
-  normalizePerformancePolicy(value.performancePolicy);
-  normalizeSeverities(value.blockingSeverities);
   return value;
 }
 
@@ -77,11 +85,7 @@ export function createTopologyEditValidationWorkerResponse(input = {}) {
   const request = assertTopologyEditValidationWorkerRequest(input.request);
   const receipt = assertTopologyEditIncrementalValidationReceipt(input.receipt);
   assertReceiptMatchesRequest(receipt, request);
-  const issueRows = receipt.finalDiagnostics.map((row) => ({
-    id: issueId(row),
-    severity: stringValue(row.severity).toUpperCase() || 'UNKNOWN',
-  }));
-  const blocking = new Set(request.blockingSeverities);
+  const partitions = issuePartitions(receipt.finalDiagnostics, request.blockingSeverities);
   const material = {
     schema: TOPOLOGY_EDIT_VALIDATION_WORKER_RESPONSE_SCHEMA,
     requestId: request.requestId,
@@ -90,11 +94,8 @@ export function createTopologyEditValidationWorkerResponse(input = {}) {
     changedScopeHash: request.changedScopeHash,
     validatedTopologyHash: request.validatedTopologyHash,
     validationHash: receipt.validationHash,
-    issueIds: issueRows.map((row) => row.id).sort(compareText),
-    blockingIssueIds: issueRows.filter((row) => blocking.has(row.severity))
-      .map((row) => row.id).sort(compareText),
-    warningIssueIds: issueRows.filter((row) => !blocking.has(row.severity))
-      .map((row) => row.id).sort(compareText),
+    blockingSeverities: request.blockingSeverities,
+    ...partitions,
     receipt,
   };
   return deepFreeze({
@@ -108,6 +109,16 @@ export function assertTopologyEditValidationWorkerResponse(value) {
   if (value.schema !== TOPOLOGY_EDIT_VALIDATION_WORKER_RESPONSE_SCHEMA) {
     fail(`response must use ${TOPOLOGY_EDIT_VALIDATION_WORKER_RESPONSE_SCHEMA}.`);
   }
+  requiredText(value.requestId, 'requestId');
+  requiredText(value.basisHash, 'basisHash');
+  requiredText(value.planHash, 'planHash');
+  requiredText(value.changedScopeHash, 'changedScopeHash');
+  requiredText(value.validatedTopologyHash, 'validatedTopologyHash');
+  requiredText(value.validationHash, 'validationHash');
+  const severities = normalizeSeverities(value.blockingSeverities);
+  if (!sameList(severities, value.blockingSeverities)) {
+    fail('blockingSeverities must be sorted and unique.', RangeError);
+  }
   const material = { ...value };
   delete material.responseHash;
   if (value.responseHash !== semanticHash(material)) {
@@ -117,9 +128,13 @@ export function assertTopologyEditValidationWorkerResponse(value) {
   if (value.validationHash !== value.receipt.validationHash) {
     fail('response validationHash differs from receipt.', RangeError);
   }
-  assertSortedUnique(value.issueIds, 'issueIds');
-  assertSortedUnique(value.blockingIssueIds, 'blockingIssueIds');
-  assertSortedUnique(value.warningIssueIds, 'warningIssueIds');
+  const expected = issuePartitions(value.receipt.finalDiagnostics, severities);
+  for (const field of ['issueIds', 'blockingIssueIds', 'warningIssueIds']) {
+    assertSortedUnique(value[field], field);
+    if (!sameList(value[field], expected[field])) {
+      fail(`${field} differs from receipt diagnostics.`, RangeError);
+    }
+  }
   return value;
 }
 
@@ -150,6 +165,21 @@ function assertReceiptMatchesRequest(receipt, request) {
     receipt[receiptField] !== request[requestField]
   )).map(([field]) => field);
   if (mismatches.length) fail(`receipt differs from request: ${mismatches.join(', ')}.`, RangeError);
+}
+
+function issuePartitions(diagnostics, blockingSeverities) {
+  const blocking = new Set(blockingSeverities);
+  const rows = diagnostics.map((row) => ({
+    id: issueId(row),
+    severity: stringValue(row.severity).toUpperCase() || 'UNKNOWN',
+  }));
+  return {
+    issueIds: rows.map((row) => row.id).sort(compareText),
+    blockingIssueIds: rows.filter((row) => blocking.has(row.severity))
+      .map((row) => row.id).sort(compareText),
+    warningIssueIds: rows.filter((row) => !blocking.has(row.severity))
+      .map((row) => row.id).sort(compareText),
+  };
 }
 
 function normalizePerformancePolicy(value) {
@@ -199,9 +229,15 @@ function issueId(value) {
 function assertSortedUnique(value, label) {
   if (!Array.isArray(value)) fail(`${label} must be an array.`);
   const normalized = value.map((row, index) => requiredText(row, `${label}[${index}]`));
-  if (new Set(normalized).size !== normalized.length || normalized.some((row, index) => row !== [...normalized].sort(compareText)[index])) {
+  if (!sameList(normalized, [...new Set(normalized)].sort(compareText))) {
     fail(`${label} must be sorted and unique.`, RangeError);
   }
+}
+function sameList(left, right) {
+  return Array.isArray(left)
+    && Array.isArray(right)
+    && left.length === right.length
+    && left.every((row, index) => row === right[index]);
 }
 function positive(value, label) {
   const number = Number(value);
