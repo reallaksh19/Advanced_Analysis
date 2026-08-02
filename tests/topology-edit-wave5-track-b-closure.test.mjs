@@ -75,3 +75,12 @@ test('Wave 5 evidence writer is deterministic and no longer hard-blocked', async
   assert.doesNotMatch(writer, /new Date/);
   assert.doesNotMatch(writer, /BLOCKED_INCOMPLETE_OPERATIONS/);
 });
+
+test('content-addressed fixture fallback requires exact retained evidence hashes', async () => {
+  const checker = await source('scripts/topology-edit-wave5-fixture-check.mjs');
+  assert.match(checker, /CONTENT_ADDRESSED_RETAINED_EVIDENCE_VERIFIED/);
+  assert.match(checker, /retained empirical evidence hash mismatch/);
+  assert.match(checker, /retainedEvidenceSha256/);
+  assert.match(checker, /rawAssetsMaterialized/);
+  assert.doesNotMatch(checker, /CONTENT_ADDRESSED_NOT_MATERIALIZED/);
+});
