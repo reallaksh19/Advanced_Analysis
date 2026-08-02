@@ -1,0 +1,138 @@
+name: Topology Edit Wave 2
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/topology-edit-wave2.yml"
+      - "src/workspace/topology-edit/**"
+      - "src/workspace/topology-edit-3d-view-controller.js"
+      - "src/workspace/viewport-presentation/**"
+      - "tests/topology-edit-dimension-authority.test.mjs"
+      - "tests/topology-edit-fitting-support-*.test.mjs"
+      - "tests/topology-edit-c3d-*.test.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  geometry-support:
+    name: Geometry, support, picking, and Wave 2 qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: "true"
+      TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      TOPOLOGY_EDIT_WAVE2_QUALIFICATION_COMMAND: >-
+        dimension-authority; fitting-support-geometry; production-integration;
+        c3d-wave0; c3d-wave1-visibility; c3d-wave1-sectioning;
+        source-drift; api-drift; prohibited-imports; production-startup; production-build
+
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Geometry and support contracts
+        run: >-
+          node --test
+          tests/topology-edit-dimension-authority.test.mjs
+          tests/topology-edit-fitting-support-geometry.test.mjs
+          tests/topology-edit-fitting-support-integration.test.mjs
+
+      - name: Retain C3D Wave 0 and Wave 1 presentation authority
+        run: >-
+          node --test
+          tests/topology-edit-c3d-wave0.test.mjs
+          tests/topology-edit-c3d-wave1-visibility.test.mjs
+          tests/topology-edit-c3d-wave1-sectioning.test.mjs
+
+      - name: Source, API, and import authority
+        run: |
+          node scripts/topology-edit-source-drift-check.mjs
+          node scripts/topology-edit-api-drift-check.mjs
+          node scripts/topology-edit-prohibited-imports.mjs
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Development and production startup
+        run: node --test tests/production-startup.spec.mjs
+
+      - name: Production build
+        run: npm run build
+
+      - name: Write exact-head Wave 2 evidence
+        run: |
+          mkdir -p reports/qualification
+          node --input-type=module - <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { execFileSync } from 'node:child_process';
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const actualHead = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          if (actualHead !== process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA) {
+            throw new Error(`Qualification head mismatch: expected ${process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA}, received ${actualHead}.`);
+          }
+          const qualifiedFiles = [
+            'src/workspace/topology-edit-3d-view-controller.js',
+            'src/workspace/topology-edit/support-restraint-family.js',
+            'src/workspace/topology-edit/topology-edit-picking-contract.js',
+            'src/workspace/topology-edit/topology-edit-render-model.js',
+            'src/workspace/topology-edit/topology-edit-viewport-backend.js',
+            'src/workspace/topology-edit/visual-geometry-contract.js',
+            'tests/topology-edit-fitting-support-geometry.test.mjs',
+            'tests/topology-edit-fitting-support-integration.test.mjs',
+          ];
+          const files = Object.fromEntries(qualifiedFiles.map((path) => {
+            const bytes = readFileSync(path);
+            return [path, { sha256: createHash('sha256').update(bytes).digest('hex'), byteLength: bytes.byteLength }];
+          }));
+          const evidenceBase = {
+            schema: 'TopologyEditWave2Evidence.v2',
+            repository: 'reallaksh19/Advanced_Analysis',
+            targetHead: actualHead,
+            generatedAt: new Date().toISOString(),
+            qualification: {
+              status: 'PASSED_WAVE2_COMPLETE',
+              command: process.env.TOPOLOGY_EDIT_WAVE2_QUALIFICATION_COMMAND,
+              authorityBoundary: 'VISUAL_DERIVATION_ONLY_NO_WORKSPACE_OR_COMMAND_AUTHORITY_PROMOTION',
+              contracts: [
+                'SOURCE_BACKED_DIMENSIONS',
+                'MISSING_EVIDENCE_DIAGNOSTICS',
+                'CANONICAL_ID_PICKING',
+                'DISTINCT_INSTANCE_PICK_IDENTITY',
+                'DIRECTIONAL_RESTRAINT_SEMANTICS',
+                'MULTIPLE_RESTRAINT_SELECTABILITY',
+                'Y_UP_Z_UP_EQUIVALENCE',
+                'CANONICAL_IMMUTABILITY_UNDER_VISUAL_POLICY',
+                'WAVE1_PRESENTATION_AND_SECTIONING_PRESERVED',
+              ],
+            },
+            nodeVersion: process.version,
+            files,
+          };
+          const evidence = {
+            ...evidenceBase,
+            evidenceSha256: createHash('sha256').update(JSON.stringify(evidenceBase)).digest('hex'),
+          };
+          writeFileSync('reports/qualification/topology-edit-wave2-evidence.json', `${JSON.stringify(evidence, null, 2)}\n`);
+          NODE
+
+      - name: Upload exact-head evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-wave2-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          path: reports/qualification/topology-edit-wave2-evidence.json
+          if-no-files-found: error
+          retention-days: 30

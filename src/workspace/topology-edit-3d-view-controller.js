@@ -1,12 +1,23 @@
-/** Certified Topology Edit controller with display-only presentation controls. */
+/** Certified Topology Edit controller with governed Wave 2 visual derivation. */
 import { WorkspaceState } from './workspace-state.js';
 import { TopologyStore } from './topology-store.js';
 import { SupportRestraintStore } from './support-restraint-store.js';
 import { EVENT_TOPICS, APPLICATION_EVENTS } from './event-topics.js';
+import { semanticHash } from '../core/shared-piping-model/index.js';
 import { TopologyEditViewportBackend } from './topology-edit/topology-edit-viewport-backend.js';
 import { buildCanonicalTopologyFromWorkspaceDataset } from './topology-edit/topology-edit-source-adapter.js';
 import { finalizeCanonicalTopology } from './topology-edit/topology-edit-canonical-state.js';
 import { TopologyEditCertifiedSession } from './topology-edit/topology-edit-certified-session.js';
+import { createDimensionAuthority } from './topology-edit/dimension-authority.js';
+import {
+  deriveAllSupportRestraintGeometry,
+  projectSupportGeometryToViewport,
+} from './topology-edit/support-restraint-family.js';
+import {
+  deriveTopologyVisualGeometry,
+  projectVisualGeometryToViewport,
+  visualPolicySummary,
+} from './topology-edit/topology-edit-render-model.js';
 import { checkCanonicalTopology } from './topology-edit/topology-edit-checker.js';
 import {
   TOPOLOGY_EDIT_COMMAND_ACTIONS,
@@ -30,6 +41,17 @@ import { TopologyEditPresentationRuntime } from './viewport-presentation/topolog
 import { TopologyEditPresentationToolbar } from './viewport-presentation/topology-edit-presentation-toolbar.js';
 
 const PRESENTATION_ACTIONS = topologyEditPresentationActions();
+const DIMENSION_AUTHORITY = createDimensionAuthority({
+  branchInheritance: { enabled: true, allowedComponentTypes: ['TEE', 'OLET'] },
+});
+const VISUAL_POLICY = Object.freeze({
+  chordErrorMm: 1,
+  minimumArcSegments: 6,
+  maximumArcSegments: 256,
+  diagnosticRadiusMm: 2,
+  radialSegments: 16,
+  modelRole: 'DRAFT',
+});
 
 export class TopologyEdit3DViewController {
   constructor(eventBus) {
@@ -44,6 +66,9 @@ export class TopologyEdit3DViewController {
     this.statusElement = null;
     this.checkerElement = null;
     this.session = null;
+    this.workspaceDataset = null;
+    this.visualModelHash = null;
+    this.visualDiagnostics = [];
     this.selection = createTopologyEditSelection();
     this.issues = [];
     this.unsubscribers = [];
@@ -92,6 +117,9 @@ export class TopologyEdit3DViewController {
     this.statusElement = null;
     this.checkerElement = null;
     this.session = null;
+    this.workspaceDataset = null;
+    this.visualModelHash = null;
+    this.visualDiagnostics = [];
     this.selection = createTopologyEditSelection();
     this.eventBus.publish(EVENT_TOPICS.TOPOLOGY_EDIT_3D_MODE_CHANGED, { active: false });
   }
@@ -116,7 +144,7 @@ export class TopologyEdit3DViewController {
         <output data-role="topology-edit-status" aria-live="polite">Loading topology…</output>
         <div class="topology-edit-3d-toolbar__actions">
           <button type="button" disabled title="Deferred to Wave 3; no uncertified autofix path is enabled.">Autofix (Wave 3)</button>
-          <button type="button" disabled title="Deferred to Wave 4; WorkspaceState remains unchanged in Wave 1.">Commit (Wave 4)</button>
+          <button type="button" disabled title="Deferred to Wave 4; WorkspaceState remains unchanged in Wave 2.">Commit (Wave 4)</button>
         </div>
       </header>
       <div data-role="topology-edit-checker" class="topology-edit-3d-checker" aria-live="polite"></div>
@@ -150,7 +178,7 @@ export class TopologyEdit3DViewController {
       sourceHash: canonical.sourceHash,
       baseCanonicalHash: this.session?.baseCanonicalTopology?.canonicalTopologyHash ?? null,
       draftCanonicalHash: canonical.canonicalTopologyHash,
-      visualModelHash: null,
+      visualModelHash: this.visualModelHash,
       scopeHash: null,
     });
     this.applyPresentationAction({ type: PRESENTATION_ACTIONS.REBASE, basis });
@@ -160,11 +188,10 @@ export class TopologyEdit3DViewController {
     const canonicalIds = [
       ...(canonical.nodes ?? []).map((node) => node.id),
       ...(canonical.edges ?? []).map((edge) => edge.id),
+      ...(canonical.junctions ?? []).map((junction) => junction.id),
+      ...(canonical.supports ?? []).map((support) => support.id),
     ];
-    this.applyPresentationAction({
-      type: PRESENTATION_ACTIONS.RECONCILE_IDS,
-      canonicalIds,
-    });
+    this.applyPresentationAction({ type: PRESENTATION_ACTIONS.RECONCILE_IDS, canonicalIds });
   }
 
   selectedCanonicalIds() {
@@ -184,8 +211,12 @@ export class TopologyEdit3DViewController {
   handleCanvasPointer(event) {
     const pick = this.viewportBackend?.pickAt(event.clientX, event.clientY);
     if (!pick?.objectId || !this.session) return;
-    this.selection = updateTopologyEditSelection(this.selection, pick.objectId, event.shiftKey);
-    const entityIds = topologyEditEntityIdsForObject(this.session.currentTopology(), pick.objectId);
+    if (pick.objectKind === 'node' || pick.objectKind === 'component') {
+      this.selection = updateTopologyEditSelection(this.selection, pick.objectId, event.shiftKey);
+    }
+    const entityIds = pick.workspaceEntityIds?.length
+      ? pick.workspaceEntityIds
+      : topologyEditEntityIdsForObject(this.session.currentTopology(), pick.objectId);
     if (entityIds.length) {
       this.eventBus.publish(EVENT_TOPICS.VIEWPORT_SELECTION_REQUESTED, {
         entityId: entityIds[0],
@@ -193,7 +224,7 @@ export class TopologyEdit3DViewController {
       });
     }
     this.presentationToolbar?.update(this.presentationState);
-    this.setStatus(topologyEditSelectionDescription(this.selection));
+    this.setStatus(selectionMessage(pick, this.selection));
     this.updateActionButtons();
   }
 
@@ -203,6 +234,7 @@ export class TopologyEdit3DViewController {
     if (!dataset) return this.setStatus('No dataset loaded.');
     if (!graph) return this.setStatus('Topology graph not available yet.');
     try {
+      this.workspaceDataset = dataset;
       const canonical = this.buildWorkspaceCanonical(dataset, graph);
       const disposition = this.reconcileSession(canonical);
       this.refreshView(this.session.currentTopology());
@@ -240,7 +272,8 @@ export class TopologyEdit3DViewController {
     }
     this.setStatus(
       `${topology.nodes.length} nodes, ${topology.edges.length} edges, ${topology.supports.length} supports; `
-      + `${this.session.journal.activeCommandIds.length} accepted command(s).`,
+      + `${this.session.journal.activeCommandIds.length} accepted command(s); `
+      + `${this.visualDiagnostics.length} visual diagnostic(s).`,
     );
   }
 
@@ -289,28 +322,66 @@ export class TopologyEdit3DViewController {
   }
 
   refreshView(canonical) {
+    const base = this.session.baseCanonicalTopology;
+    const certifiedPacket = buildTopologyEditRenderPacket(base, canonical);
+    const sourceVisual = this.deriveVisual(base, 'SOURCE');
+    const draftVisual = this.deriveVisual(canonical, 'DRAFT');
+    const supportOverlays = deriveAllSupportRestraintGeometry({
+      canonicalTopology: canonical,
+      verticalAxis: 'Z',
+    });
+    const supportProjection = projectSupportGeometryToViewport(supportOverlays);
+    this.visualDiagnostics = [
+      ...(draftVisual.model.diagnostics ?? []),
+      ...supportOverlays.flatMap((row) => row.diagnostics ?? []),
+      ...supportOverlays.flatMap((row) => (
+        row.restraints.flatMap((restraint) => restraint.diagnostics ?? [])
+      )),
+    ];
+    this.visualModelHash = semanticHash({
+      draftVisualGeometryHash: draftVisual.model.visualGeometryHash,
+      supportProjection,
+    });
+    if (this.statusElement) this.statusElement.title = visualPolicySummary(VISUAL_POLICY);
     this.updatePresentationBasis(canonical);
     this.reconcilePresentationVisibility(canonical);
-    this.viewportBackend?.renderSession(buildTopologyEditRenderPacket(
-      this.session.baseCanonicalTopology,
-      canonical,
-    ));
+    this.viewportBackend?.renderSession({
+      ...certifiedPacket,
+      source: sourceVisual.projection,
+      draft: draftVisual.projection,
+      supports: supportProjection,
+    });
     this.presentationRuntime?.apply(this.presentationState);
     this.issues = checkCanonicalTopology(canonical);
     this.renderCheckerPanel();
     this.updateActionButtons();
   }
 
+  deriveVisual(canonical, modelRole) {
+    const model = deriveTopologyVisualGeometry({
+      canonicalTopology: canonical,
+      componentEvidence: buildComponentEvidence(this.workspaceDataset),
+      dimensionAuthority: DIMENSION_AUTHORITY,
+      visualPolicy: { ...VISUAL_POLICY, modelRole },
+    });
+    return Object.freeze({
+      model,
+      projection: projectVisualGeometryToViewport(model, canonical),
+    });
+  }
+
   renderCheckerPanel() {
     if (!this.checkerElement) return;
-    if (!this.issues.length) {
-      this.checkerElement.textContent = 'No topology issues detected.';
+    const visualIssues = this.visualDiagnostics.map((row) => ({ kind: row.code, message: row.message }));
+    const issues = [...this.issues, ...visualIssues];
+    if (!issues.length) {
+      this.checkerElement.textContent = 'No topology or visual-evidence issues detected.';
       return;
     }
-    const rows = this.issues.slice(0, 20).map((issue) => (
+    const rows = issues.slice(0, 20).map((issue) => (
       `<li data-issue-kind="${issue.kind}">${issue.kind}: ${issue.message}</li>`
     )).join('');
-    this.checkerElement.innerHTML = `<strong>${this.issues.length} topology issue(s)</strong><ul>${rows}</ul>`;
+    this.checkerElement.innerHTML = `<strong>${issues.length} issue(s)</strong><ul>${rows}</ul>`;
   }
 
   updateActionButtons() {
@@ -327,4 +398,77 @@ export class TopologyEdit3DViewController {
   setStatus(message) {
     if (this.statusElement) this.statusElement.textContent = message;
   }
+}
+
+function buildComponentEvidence(dataset) {
+  const evidence = {};
+  for (const entity of dataset?.entities ?? []) {
+    const attributes = {
+      ...(entity.properties?.sourceAttributes ?? {}),
+      ...(entity.properties?.attributes ?? {}),
+      ...(entity.properties?.nativeParams ?? {}),
+    };
+    evidence[entity.entityId] = {
+      workspaceEntityIds: [entity.entityId],
+      sourcePath: entity.sourcePath,
+      outsideDiameterMm: firstFinite(
+        entity.outsideDiameterMm,
+        attributes.outsideDiameterMm,
+        attributes.OUTSIDE_DIAMETER,
+      ),
+      boreMm: firstFinite(entity.boreMm, attributes.boreMm, attributes.BORE),
+      wallThicknessMm: firstFinite(
+        entity.wallThicknessMm,
+        attributes.wallThicknessMm,
+        attributes.WALL_THICKNESS,
+      ),
+      centerlineRadiusMm: firstFinite(
+        attributes.centerlineRadiusMm,
+        attributes.CENTERLINE_RADIUS,
+        attributes.BEND_RADIUS,
+      ),
+      center: finitePoint(entity.properties?.geometry?.center),
+      reducerType: attributes.reducerType ?? attributes.REDUCER_TYPE,
+      startOutsideDiameterMm: firstFinite(
+        attributes.startOutsideDiameterMm,
+        attributes.START_OUTSIDE_DIAMETER,
+      ),
+      endOutsideDiameterMm: firstFinite(
+        attributes.endOutsideDiameterMm,
+        attributes.END_OUTSIDE_DIAMETER,
+      ),
+      eccentricOffsetDirection: finitePoint(attributes.eccentricOffsetDirection),
+      branchOutsideDiameterMm: firstFinite(
+        attributes.branchOutsideDiameterMm,
+        attributes.BRANCH_OUTSIDE_DIAMETER,
+      ),
+      hostEntityId: attributes.hostEntityId ?? attributes.HOST_ENTITY_ID,
+      branchNodeId: attributes.branchNodeId ?? attributes.BRANCH_NODE_ID,
+      runNodeIds: Array.isArray(attributes.runNodeIds) ? attributes.runNodeIds : undefined,
+    };
+  }
+  return evidence;
+}
+
+function selectionMessage(pick, selection) {
+  if (pick.objectKind === 'restraint') {
+    return `Selected ${pick.restraintFamily || 'restraint'} ${pick.restraintId} on support ${pick.supportId}.`;
+  }
+  if (pick.objectKind === 'support') return `Selected support ${pick.supportId || pick.objectId}.`;
+  return topologyEditSelectionDescription(selection);
+}
+
+function firstFinite(...values) {
+  for (const value of values) {
+    const number = Number(value);
+    if (Number.isFinite(number)) return number;
+  }
+  return undefined;
+}
+
+function finitePoint(value) {
+  if (!value || ![value.x, value.y, value.z].every((row) => Number.isFinite(Number(row)))) {
+    return undefined;
+  }
+  return { x: Number(value.x), y: Number(value.y), z: Number(value.z) };
 }
