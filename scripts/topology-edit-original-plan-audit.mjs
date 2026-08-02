@@ -10,6 +10,9 @@ const OUTPUT = path.join(
   'reports/qualification/topology-edit-original-plan-audit.json',
 );
 const WORKFLOW_PATH = '.github/workflows/topology-edit-wave5.yml';
+const DEMO_WORKFLOW_PATH = '.github/workflows/topology-edit-demo-walkthrough.yml';
+const DEMO_SPEC_PATH = 'e2e/topology-edit-20-element-demo-edit-flow.spec.js';
+const DEMO_FIXTURE_PATH = 'public/fixtures/topology-edit-20-element-demo.staged.json';
 const PREREQUISITE_PATH = 'tests/fixtures/topology-edit/1885s/prerequisite-manifest.json';
 
 const waves = Object.freeze([
@@ -47,9 +50,13 @@ const waves = Object.freeze([
   ]),
   wave('W5', ['W5.1', 'W5.2', 'W5.3', 'W5.4', 'W5.5'], [
     WORKFLOW_PATH,
+    DEMO_WORKFLOW_PATH,
+    DEMO_SPEC_PATH,
+    DEMO_FIXTURE_PATH,
     'scripts/topology-edit-wave5-contract.mjs',
     'scripts/topology-edit-wave5-fixture-check.mjs',
     'scripts/topology-edit-write-wave5-evidence.mjs',
+    'tests/topology-edit-20-element-demo-loader.test.mjs',
     'tests/topology-edit-track-c.test.mjs',
     'tests/topology-edit-wave5.test.mjs',
     'tests/topology-edit-wave5-track-b-closure.test.mjs',
@@ -101,13 +108,48 @@ for (const trigger of [
   "'src/workspace/topology-edit-3d-*.js'",
   "'src/workspace/viewport-productivity/**'",
   "'tests/topology-edit-c3d-*.test.mjs'",
+  `'${DEMO_SPEC_PATH}'`,
 ]) {
   assert.ok(workflow.includes(trigger), `Wave 5 path coverage is missing ${trigger}.`);
+}
+for (const commandEvidence of [
+  DEMO_SPEC_PATH,
+  'tests/topology-edit-20-element-demo-loader.test.mjs',
+  'tests/topology-edit-wave3-exact-gap-modes.test.mjs',
+]) {
+  assert.ok(
+    workflow.includes(commandEvidence),
+    `Wave 5 must execute the real demo dependency ${commandEvidence}.`,
+  );
 }
 assert.ok(
   workflow.includes('node scripts/topology-edit-original-plan-audit.mjs'),
   'Wave 5 must execute the original-plan audit.',
 );
+
+const demoWorkflow = await readFile(path.join(ROOT, DEMO_WORKFLOW_PATH), 'utf8');
+for (const qualifiedPath of [
+  DEMO_SPEC_PATH,
+  DEMO_FIXTURE_PATH,
+  'tests/topology-edit-20-element-demo-loader.test.mjs',
+  'tests/topology-edit-wave3-exact-gap-modes.test.mjs',
+  'tests/topology-edit-c3d-wave2-search.test.mjs',
+]) {
+  assert.ok(
+    demoWorkflow.includes(qualifiedPath),
+    `Demo walkthrough workflow must bind ${qualifiedPath}.`,
+  );
+}
+for (const exactEvidence of [
+  'PASS_EXACT_GAP_USER_WALKTHROUGH',
+  'TOPOLOGY_EDIT_TARGET_HEAD_SHA',
+  'topology-edit-demo-walkthrough.json',
+]) {
+  assert.ok(
+    demoWorkflow.includes(exactEvidence),
+    `Demo walkthrough workflow is missing ${exactEvidence}.`,
+  );
+}
 
 const prerequisiteManifest = JSON.parse(
   await readFile(path.join(ROOT, PREREQUISITE_PATH), 'utf8'),
@@ -148,6 +190,15 @@ const report = {
   additiveC3d: {
     ...additiveC3d,
     disposition: 'PASS_IMPLEMENTED_AND_COVERED',
+  },
+  userWalkthrough: {
+    workflowPath: DEMO_WORKFLOW_PATH,
+    specificationPath: DEMO_SPEC_PATH,
+    fixturePath: DEMO_FIXTURE_PATH,
+    requestedGapModesMm: [3, 20],
+    disposition: exactHeadStatus === 'PASS'
+      ? 'PASS_EXECUTED_EXACT_HEAD'
+      : 'IMPLEMENTED_EXACT_HEAD_EXECUTION_PENDING',
   },
   exactHeadStatus,
   deferredBehavior: exactHeadStatus === 'PASS' ? [] : [{
