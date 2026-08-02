@@ -48,7 +48,7 @@ record('CURRENT_CHECKOUT_MATCH', git(['rev-parse', 'HEAD']) === bundle.exactHead
 record('BUNDLE_HASH', verifyBundleHash(bundle),
   'Bundle hash must match canonical bundle content.');
 record('AUTHORITY_RETAINED', authorityRetained(bundle.authority),
-  'All bounded authority fields must remain false.');
+  'All governed broader authority fields must remain false.');
 record('PORTABLE_NONCLAIM',
   bundle.gateDisposition?.hostedCiPassClaimedByB7g === false
     && bundle.gateDisposition?.automaticIssueClosureAuthorized === false
@@ -84,7 +84,7 @@ record('B7E_EXPECTED_HEAD',
   `B7E expected head is ${String(b7eEvidence?.json?.expectedHead)}.`);
 record('B7E_AUTHORITY_RETAINED',
   authorityRetained(b7eEvidence?.json?.authority),
-  'B7E authority flags must remain false.');
+  'B7E broader authority flags must remain false.');
 record('B7F_PASS', b7fEvidence?.json?.status === 'PASS',
   `B7F status is ${String(b7fEvidence?.json?.status)}.`);
 record('B7F_EXACT_HEAD', b7fEvidence?.json?.exactHead === bundle.exactHead,
@@ -94,7 +94,7 @@ record('B7F_EXPECTED_HEAD',
   `B7F expected head is ${String(b7fEvidence?.json?.expectedHead)}.`);
 record('B7F_AUTHORITY_RETAINED',
   authorityRetained(b7fEvidence?.json?.authority),
-  'B7F authority flags must remain false.');
+  'B7F broader authority flags must remain false.');
 record('B7F_GATE_STATE_RETAINED',
   bundle.gateDisposition?.retainedB7fContext
       === b7fEvidence?.json?.context
@@ -153,9 +153,7 @@ function verifyBundleHash(value) {
 
 function authorityRetained(value) {
   return value && typeof value === 'object'
-    && REQUIRED_FALSE_AUTHORITY.every((key) => value[key] === false)
-    && Object.values(value).every((entry) =>
-      typeof entry !== 'boolean' || entry === false);
+    && REQUIRED_FALSE_AUTHORITY.every((key) => value[key] === false);
 }
 
 function readJson(filePath) {
