@@ -207,6 +207,11 @@ export {
   normalizeLafeaStageEdit,
   normalizeLafeaStageDocument,
 } from './lafea-workbench-model.js';
+export {
+  LAFEA_TEMPLATE_EXECUTION_CONTROLLER_RESULT_SCHEMA,
+  LAFEA_TEMPLATE_EXECUTION_CONTROLLER_REVISION,
+  executeControlledLafeaAnalyticalPilot,
+} from './lafea-template-execution-public.js';
 export { lafeaPreviewGeometry } from './lafea-stage-preview.js';
 
 /**
