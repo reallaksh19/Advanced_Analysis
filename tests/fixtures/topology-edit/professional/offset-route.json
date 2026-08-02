@@ -1,0 +1,25 @@
+{
+  "canonicalTopologyHash": "fnv1a64:offset-basis",
+  "nodes": [
+    { "id": "node:left-anchor", "position": { "x": -100, "y": 0, "z": 0 }, "portKeys": [] },
+    { "id": "node:from", "position": { "x": 0, "y": 0, "z": 0 }, "portKeys": [] },
+    { "id": "node:corner", "position": { "x": 100, "y": 0, "z": 0 }, "portKeys": [] },
+    { "id": "node:to", "position": { "x": 100, "y": 100, "z": 0 }, "portKeys": [] },
+    { "id": "node:right-anchor", "position": { "x": 200, "y": 100, "z": 0 }, "portKeys": [] }
+  ],
+  "edges": [
+    { "id": "edge:left", "componentKey": "P-LEFT", "fromNodeId": "node:left-anchor", "toNodeId": "node:from", "diameterMm": 100, "entityType": "PIPE" },
+    { "id": "edge:right", "componentKey": "P-RIGHT", "fromNodeId": "node:to", "toNodeId": "node:right-anchor", "diameterMm": 100, "entityType": "PIPE" }
+  ],
+  "junctions": [],
+  "supports": [],
+  "boundaries": [],
+  "rigids": [],
+  "bends": [],
+  "crosswalk": {
+    "nodeIdToPortKeys": {},
+    "edgeIdToComponentKey": { "edge:left": "P-LEFT", "edge:right": "P-RIGHT" },
+    "junctionIdToComponentKey": {},
+    "supportIdToEntityId": {}
+  }
+}

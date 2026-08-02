@@ -5,6 +5,9 @@ import test from 'node:test';
 const MODULES = [
   '../src/workspace/topology-edit/professional/topology-edit-change-scope.js',
   '../src/workspace/topology-edit/professional/topology-edit-operation-plan.js',
+  '../src/workspace/topology-edit/professional/topology-edit-route-operation-helpers.js',
+  '../src/workspace/topology-edit/professional/topology-edit-route-operations.js',
+  '../src/workspace/topology-edit/professional/topology-edit-slope-operation.js',
 ];
 
 const PROHIBITED = [
