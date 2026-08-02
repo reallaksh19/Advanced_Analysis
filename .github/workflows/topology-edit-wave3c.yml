@@ -5,8 +5,11 @@ on:
     paths:
       - '.github/workflows/topology-edit-wave3c.yml'
       - 'src/workspace/topology-edit-3d-view-controller.js'
+      - 'src/workspace/topology-edit-3d-view-controller-core.js'
       - 'src/workspace/topology-edit/topology-edit-certified-session.js'
+      - 'src/workspace/topology-edit/topology-edit-command-ui.js'
       - 'src/workspace/topology-edit/topology-edit-viewport-backend.js'
+      - 'tests/topology-edit-wave3-exact-gap-modes.test.mjs'
       - 'tests/topology-edit-wave3c-autofix-ui.test.mjs'
       - 'tests/topology-edit-wave3b-autofix.test.mjs'
       - 'tests/topology-edit-wave1-*.test.mjs'
@@ -47,9 +50,13 @@ jobs:
       - name: Syntax and Wave 3C contracts
         run: |
           node --check src/workspace/topology-edit-3d-view-controller.js
+          node --check src/workspace/topology-edit-3d-view-controller-core.js
           node --check src/workspace/topology-edit/topology-edit-certified-session.js
+          node --check src/workspace/topology-edit/topology-edit-command-ui.js
           node --check src/workspace/topology-edit/topology-edit-viewport-backend.js
-          node --test tests/topology-edit-wave3c-autofix-ui.test.mjs
+          node --test \
+            tests/topology-edit-wave3c-autofix-ui.test.mjs \
+            tests/topology-edit-wave3-exact-gap-modes.test.mjs
 
       - name: Retain Wave 3B certification authority
         run: node --test tests/topology-edit-wave3b-autofix.test.mjs
@@ -85,8 +92,11 @@ jobs:
           if (head !== process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA) throw new Error('Exact-head mismatch.');
           const paths = [
             'src/workspace/topology-edit-3d-view-controller.js',
+            'src/workspace/topology-edit-3d-view-controller-core.js',
             'src/workspace/topology-edit/topology-edit-certified-session.js',
+            'src/workspace/topology-edit/topology-edit-command-ui.js',
             'src/workspace/topology-edit/topology-edit-viewport-backend.js',
+            'tests/topology-edit-wave3-exact-gap-modes.test.mjs',
             'tests/topology-edit-wave3c-autofix-ui.test.mjs',
           ];
           const files = Object.fromEntries(paths.map((path) => [
@@ -94,7 +104,7 @@ jobs:
             createHash('sha256').update(readFileSync(path)).digest('hex'),
           ]));
           const evidence = {
-            schema: 'TopologyEditWave3CAutofixUiEvidence.v1',
+            schema: 'TopologyEditWave3CAutofixUiEvidence.v2',
             repository: process.env.GITHUB_REPOSITORY,
             commit: head,
             status: 'PASS_CERTIFIED_AUTOFIX_UI',
@@ -102,6 +112,10 @@ jobs:
             ghostNonPickable: true,
             previewCancellationOnStateChange: true,
             exactCandidateAcceptance: true,
+            exactGapMoveModesMm: [3, 20],
+            snapGapToleranceMm: 25,
+            exactGapCommandType: 'MOVE_NODE',
+            snapRepairCommandType: 'MERGE_NODES',
             workspaceMutationAuthorized: false,
             files,
           };
