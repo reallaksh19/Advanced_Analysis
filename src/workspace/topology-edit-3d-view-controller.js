@@ -134,6 +134,7 @@ export class TopologyEdit3DViewController {
     });
     this.presentationToolbar = new TopologyEditPresentationToolbar({
       onAction: (action) => this.applyPresentationAction(action),
+      getSelectedCanonicalIds: () => this.selectedCanonicalIds(),
     });
     this.presentationToolbar.mount(this.presentationMount, this.presentationState);
   }
@@ -155,6 +156,24 @@ export class TopologyEdit3DViewController {
     this.applyPresentationAction({ type: PRESENTATION_ACTIONS.REBASE, basis });
   }
 
+  reconcilePresentationVisibility(canonical) {
+    const canonicalIds = [
+      ...(canonical.nodes ?? []).map((node) => node.id),
+      ...(canonical.edges ?? []).map((edge) => edge.id),
+    ];
+    this.applyPresentationAction({
+      type: PRESENTATION_ACTIONS.RECONCILE_IDS,
+      canonicalIds,
+    });
+  }
+
+  selectedCanonicalIds() {
+    return [
+      ...(this.selection.nodeIds ?? []),
+      ...(this.selection.edgeId ? [this.selection.edgeId] : []),
+    ];
+  }
+
   handleHostClick(event) {
     const commandButton = event.target.closest('[data-command-action]');
     if (commandButton) return this.runCommandAction(commandButton.dataset.commandAction);
@@ -173,6 +192,7 @@ export class TopologyEdit3DViewController {
         source: 'topology-edit-3d',
       });
     }
+    this.presentationToolbar?.update(this.presentationState);
     this.setStatus(topologyEditSelectionDescription(this.selection));
     this.updateActionButtons();
   }
@@ -270,6 +290,7 @@ export class TopologyEdit3DViewController {
 
   refreshView(canonical) {
     this.updatePresentationBasis(canonical);
+    this.reconcilePresentationVisibility(canonical);
     this.viewportBackend?.renderSession(buildTopologyEditRenderPacket(
       this.session.baseCanonicalTopology,
       canonical,
