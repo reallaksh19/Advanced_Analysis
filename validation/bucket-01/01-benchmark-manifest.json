@@ -2,7 +2,7 @@
   "schema": "lafea-bucket-01-benchmark-manifest/v2",
   "manifest_status": "BASELINE_FROZEN_WITH_UNRESOLVED_GATES",
   "repository": "reallaksh19/Advanced_Analysis",
-  "baseline_main_sha": "27fb14ddccb07081904d54c1bae161c87372dbdd",
+  "baseline_main_sha": "42c9f96e9baffb52232b4b7ed7f04611c6337961",
   "qualification_branch": "bucket-01-lafea3-validation-v2",
   "qualification_candidate_sha": "RESOLVED_ONLY_BY_EXACT_HEAD_EXECUTION",
   "bucket_id": "LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE",
