@@ -23,7 +23,7 @@ The merge followed explicit owner instruction. The PR workflow and its single re
 Therefore the post-merge starting state is:
 
 ```text
-B7D_IMPLEMENTATION_MERGED     = true
+B7D_IMPLEMENTATION_MERGED      = true
 EXACT_HEAD_EXECUTABLE_EVIDENCE = unresolved
 B7_GATE_QUALIFIED              = false
 GENERAL_T7D_AUTHORIZED         = false
@@ -142,13 +142,13 @@ Even after an aggregate PASS, B7E authorizes only the bounded pilot evidence rep
 The report therefore retains:
 
 ```text
-generalT7dAuthorized               = false
+generalT7dAuthorized                    = false
 additionalContinuumTemplatesAuthorized = false
-shellAuthorized                    = false
-assessmentReady                    = false
-codeReady                          = false
-reportAuthority                    = false
-releaseQualified                   = false
+shellAuthorized                         = false
+assessmentReady                         = false
+codeReady                               = false
+reportAuthority                         = false
+releaseQualified                        = false
 ```
 
 ## 9. Gate closure rule
@@ -168,3 +168,15 @@ Until then, the correct disposition is:
 ```text
 B7 IMPLEMENTATION MERGED / EXACT-HEAD QUALIFICATION UNRESOLVED / GATE OPEN
 ```
+
+## 10. Current-main requalification trigger
+
+The evidence-only requalification branch was cut from exact current `main`:
+
+```text
+350a272f3a06c00da86650c40b12e60aa0358476
+```
+
+The 21 commits between the NB-T6G merge and this head are outside the LAFEA write set. This documentation-only change exists solely to trigger the path-filtered B7E pull-request workflow against the current repository head.
+
+It changes no production source, numerical formula, tolerance, benchmark expectation, mesh authority, lifecycle rule, UI execution route, shell route, assessment rule, code rule, report rule, or release state. A zero-step job remains infrastructure evidence only and cannot qualify B7.
