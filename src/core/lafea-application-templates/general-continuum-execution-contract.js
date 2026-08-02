@@ -12,19 +12,21 @@ const REVISION = /^fnv1a64:[0-9a-f]{16}$/u;
 const SOURCE_KEYS = Object.freeze([
   'originRef', 'expectedStageId', 'expectedDocumentRevisionDigest', 'requestedRole',
 ]);
+const MAPPING_KEYS = Object.freeze(['applicability', 'evidenceHash', 'qualification']);
 const REQUEST_INPUT_KEYS = Object.freeze([
   'requestId', 'templateId', 'releaseRecordHash', 'compatibilityReceiptHash',
   'compilationHash', 'documentRevisionDigest', 'sourceAuthorityRequest',
   'canonicalModelHash', 'analysisGeometryHash', 'meshArtifactHash', 'meshHash',
-  'meshProfileHash', 'elementTypes',
+  'meshProfileHash', 'elementTypes', 'materialRegionEvidence', 'loadEdgeEvidence',
+  'boundaryEdgeEvidence',
 ]);
 const REQUEST_KEYS = Object.freeze([
   'schema', ...REQUEST_INPUT_KEYS, 'stageId', 'executionMode', 'authority', 'semanticHash',
 ]);
 const RECEIPT_INPUT_KEYS = Object.freeze([
-  'receiptId', 'request', 'sourceAuthorityHash', 'sourceHash', 'executionHash',
-  'resultHash', 'recoveryHash', 'integrationPointResultHash', 'calculationAccepted',
-  'diagnostics',
+  'receiptId', 'request', 'sourceAuthorityHash', 'sourceHash', 'callerMeshBindingHash',
+  'executionHash', 'resultHash', 'recoveryHash', 'integrationPointResultHash',
+  'calculationAccepted', 'diagnostics',
 ]);
 const RECEIPT_KEYS = Object.freeze([
   'schema', ...RECEIPT_INPUT_KEYS, 'requestHash', 'recoveryReady', 'resultReady',
@@ -48,6 +50,9 @@ export function createGeneralContinuumExecutionRequest(input) {
     input.sourceAuthorityRequest, input.documentRevisionDigest,
   );
   const elementTypes = normalizeElementTypes(input.elementTypes);
+  const materialRegionEvidence = normalizeMapping(input.materialRegionEvidence, 'materialRegionEvidence');
+  const loadEdgeEvidence = normalizeMapping(input.loadEdgeEvidence, 'loadEdgeEvidence');
+  const boundaryEdgeEvidence = normalizeMapping(input.boundaryEdgeEvidence, 'boundaryEdgeEvidence');
   const base = {
     schema: LAFEA_GENERAL_CONTINUUM_REQUEST_SCHEMA,
     requestId: input.requestId,
@@ -63,9 +68,12 @@ export function createGeneralContinuumExecutionRequest(input) {
     meshHash: input.meshHash,
     meshProfileHash: input.meshProfileHash,
     elementTypes,
+    materialRegionEvidence,
+    loadEdgeEvidence,
+    boundaryEdgeEvidence,
     stageId: 'LAFEA.3',
     executionMode: 'CALLER_SUPPLIED_ANALYSIS_MESH',
-    authority: authority(elementTypes),
+    authority: authority(),
   };
   return freeze({ ...base, semanticHash: templateReleaseSha256(base) });
 }
@@ -79,7 +87,8 @@ export function createGeneralContinuumExecutionReceipt(input) {
   exact(input, RECEIPT_INPUT_KEYS, 'general continuum receipt input');
   requireValid(validateGeneralContinuumExecutionRequest(input.request), 'request is invalid');
   requireText(input.receiptId, 'receiptId');
-  ['sourceAuthorityHash', 'sourceHash'].forEach((key) => requireSha(input[key], key));
+  ['sourceAuthorityHash', 'sourceHash', 'callerMeshBindingHash']
+    .forEach((key) => requireSha(input[key], key));
   ['executionHash', 'resultHash', 'recoveryHash', 'integrationPointResultHash']
     .forEach((key) => nullableSha(input[key], key));
   if (typeof input.calculationAccepted !== 'boolean') {
@@ -98,6 +107,7 @@ export function createGeneralContinuumExecutionReceipt(input) {
     requestHash: input.request.semanticHash,
     sourceAuthorityHash: input.sourceAuthorityHash,
     sourceHash: input.sourceHash,
+    callerMeshBindingHash: input.callerMeshBindingHash,
     executionHash: input.executionHash,
     resultHash: input.resultHash,
     recoveryHash: input.recoveryHash,
@@ -112,7 +122,7 @@ export function createGeneralContinuumExecutionReceipt(input) {
     releaseQualified: false,
     status: resultReady ? 'ACCEPTED' : 'BLOCKED',
     diagnostics,
-    authority: authority(input.request.elementTypes),
+    authority: authority(),
   };
   const semanticBasis = { ...base };
   delete semanticBasis.diagnostics;
@@ -149,12 +159,18 @@ function normalizeSourceRequest(value, revision) {
   return freeze({ ...value });
 }
 function normalizeElementTypes(value) {
-  if (!Array.isArray(value) || value.length === 0) throw new TypeError('elementTypes required.');
-  const result = [...new Set(value)].sort();
-  if (result.some((row) => !['T6', 'Q8'].includes(row))) {
-    throw new TypeError('Only T6 and Q8 are authorized.');
+  if (!Array.isArray(value) || value.length !== 1 || value[0] !== 'T6') {
+    throw new TypeError('NB-T6H requires exactly the governed T6 element type.');
   }
-  return freeze(result);
+  return freeze(['T6']);
+}
+function normalizeMapping(value, label) {
+  exact(value, MAPPING_KEYS, label);
+  if (value.applicability !== 'REQUIRED' || value.qualification !== 'PASS') {
+    throw new TypeError(`${label} must be REQUIRED and PASS.`);
+  }
+  requireSha(value.evidenceHash, `${label}.evidenceHash`);
+  return freeze({ applicability: 'REQUIRED', evidenceHash: value.evidenceHash, qualification: 'PASS' });
 }
 function normalizeDiagnostics(value) {
   if (!Array.isArray(value) || value.some((row) => typeof row !== 'string' || !row)) {
@@ -162,10 +178,11 @@ function normalizeDiagnostics(value) {
   }
   return freeze([...new Set(value)].sort());
 }
-function authority(elementTypes) {
+function authority() {
   return freeze({
     registeredTemplateCallerMesh: true,
-    elementTypes,
+    elementTypes: freeze(['T6']),
+    b6BoundMappingRequired: true,
     compilerGeneratedMesh: false,
     arbitraryGeometryMesher: false,
     axisymmetricContinuum: false,
