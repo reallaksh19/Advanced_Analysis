@@ -163,3 +163,19 @@ export {
   validateContinuumApplicationMappingEvidence,
   validateLafeaLugPinholeMappingPackage,
 } from './continuum-application-mapping-evidence.js';
+
+export {
+  LAFEA_CONTINUUM_BENCHMARK_KINDS,
+  LAFEA_CONTINUUM_BENCHMARK_MANIFEST_SCHEMA,
+  LAFEA_CONTINUUM_BENCHMARK_OBSERVATION_SCHEMA,
+  LAFEA_CONTINUUM_BENCHMARK_OBSERVATION_STATUSES,
+  LAFEA_CONTINUUM_BENCHMARK_QUALIFICATION_SCHEMA,
+  LAFEA_CONTINUUM_BENCHMARK_QUALIFICATION_STATUSES,
+  LAFEA_CONVERGENCE_LIFECYCLE_PARENT_PROPOSAL_SCHEMA,
+  createContinuumBenchmarkManifest,
+  createContinuumBenchmarkObservation,
+  createLafeaContinuumBenchmarkQualification,
+  validateContinuumBenchmarkManifest,
+  validateContinuumBenchmarkObservation,
+  validateLafeaContinuumBenchmarkQualification,
+} from './continuum-benchmark-convergence.js';
