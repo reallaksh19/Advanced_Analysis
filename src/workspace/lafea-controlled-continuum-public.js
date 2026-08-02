@@ -70,3 +70,9 @@ export {
   serializeLafeaSelectedPilotReviewSession,
   validateLafeaSelectedPilotReviewSession,
 } from './lafea-selected-pilot-review-session.js';
+export {
+  LAFEA_SELECTED_PILOT_REVIEW_PANEL_PRODUCER_REVISION,
+  LAFEA_SELECTED_PILOT_REVIEW_PANEL_RECEIPT_SCHEMA,
+  mountLafeaSelectedPilotReviewPanel,
+  validateLafeaSelectedPilotReviewPanelReceipt,
+} from './lafea-selected-pilot-review-panel.js';
