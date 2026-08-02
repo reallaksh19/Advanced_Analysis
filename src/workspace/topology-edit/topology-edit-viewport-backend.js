@@ -1,6 +1,7 @@
 /** Three.js rendering adapter for disposable topology-edit visual projections. */
 import * as THREE from 'three';
 import { TopologyEditGpuPicker } from './topology-edit-gpu-picker.js';
+import { TopologyEditInspectionRenderer } from './topology-edit-inspection-renderer.js';
 import { TopologyEditIssueRenderer } from './topology-edit-issue-renderer.js';
 import { createTopologyEditPick } from './topology-edit-picking-contract.js';
 import { createTopologyEditViewState } from './topology-edit-view-state.js';
@@ -20,6 +21,7 @@ export class TopologyEditViewportBackend {
     this.activeCamera = this.camera;
     this.renderer = null;
     this.gpuPicker = null;
+    this.inspectionRenderer = null;
     this.issueRenderer = null;
     this.pickRaycaster = new THREE.Raycaster();
     this.hasFitOnce = false;
@@ -55,6 +57,10 @@ export class TopologyEditViewportBackend {
     this.renderer.setClearColor(0x020617, 1);
     this.gpuPicker = new TopologyEditGpuPicker({ renderer: this.renderer, scene: this.scene });
     this.issueRenderer = new TopologyEditIssueRenderer(this.groups.issueGroup);
+    this.inspectionRenderer = new TopologyEditInspectionRenderer({
+      selectionGroup: this.groups.selectionGroup,
+      measurementGroup: this.groups.measurementGroup,
+    });
     this.renderer.domElement.addEventListener('webglcontextlost', (event) => this.handleContextLost(event), false);
     this.renderer.domElement.addEventListener('webglcontextrestored', () => this.startLoop(), false);
     host.replaceChildren(this.renderer.domElement);
@@ -103,6 +109,8 @@ export class TopologyEditViewportBackend {
   clearGhost() { this.clearGroup(this.groups.ghostGroup); }
   renderIssues(overlay) { return this.issueRenderer?.render(overlay, this.lastBounds) ?? 0; }
   clearIssues() { this.issueRenderer?.clear(); }
+  renderInspection(model) { return this.inspectionRenderer?.render(model, this.lastBounds) ?? null; }
+  clearInspection() { this.inspectionRenderer?.clear(); }
 
   renderProjection(group, projection, colorHex, opacity, markerSize) {
     if (!projection) return;
@@ -207,6 +215,7 @@ export class TopologyEditViewportBackend {
   destroy() {
     this.isMounted = false; if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId); this.animationFrameId = null;
     this.gpuPicker?.dispose(); this.gpuPicker = null;
+    this.inspectionRenderer?.destroy(); this.inspectionRenderer = null;
     this.issueRenderer?.destroy(); this.issueRenderer = null;
     Object.values(this.groups).forEach((group) => this.clearGroup(group));
     if (this.renderer) { this.renderer.dispose(); this.renderer.domElement?.parentElement?.removeChild(this.renderer.domElement); this.renderer = null; }
