@@ -2,6 +2,9 @@ import {
   assertTopologyEditOperationTransactionReceipt,
 } from '../topology-edit/professional/topology-edit-operation-transaction.js';
 import {
+  topologyEditBlockingDiagnostics,
+} from '../topology-edit/professional/topology-edit-validation-blocking.js';
+import {
   renderTopologyEditProfessionalOperationPanel,
 } from './topology-edit-professional-operation-panel.js';
 
@@ -70,6 +73,9 @@ export function renderTopologyEditProfessionalRuntime(runtime) {
     plan: runtime.plan,
     candidate: runtime.candidate,
     validation: runtime.validation,
+    blockingIssueCount: runtime.validation
+      ? topologyEditBlockingDiagnostics(runtime.validation, ['HIGH']).length
+      : 0,
     validationPending: runtime.validationPending,
     transactionPreview: runtime.transactionPreview,
     transaction: runtime.transaction,
