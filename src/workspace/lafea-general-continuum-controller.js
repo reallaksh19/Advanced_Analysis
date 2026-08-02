@@ -14,6 +14,7 @@ import {
   createLafeaAnalysisMeshEvidence,
   registerLafeaAnalysisMeshEvidence,
 } from './lafea-analysis-mesh-evidence.js';
+import { bindLafeaContinuumTemplateCallerMesh } from './lafea-template-caller-mesh-binding.js';
 import { canonicalLafeaSha256 } from './lafea-canonical-sha256.js';
 import { lafeaDocumentDigest } from './lafea-edit-command.js';
 import {
@@ -45,13 +46,16 @@ export function executeGeneralLafeaContinuum(options) {
     validateReleaseAndCompatibility(context);
     normalizeAndBind(context);
     issueSource(context);
+    bindCallerMesh(context);
     buildLifecycle(context);
     executeStage(context);
     createReceipt(context, true);
     return result(context, 'ACCEPTED');
   } catch (error) {
     context.diagnostics.push(code(error, 'LAFEA_NB_T6H_CONTROLLER_BLOCKED'));
-    if (context.request && context.sourceAuthority) createReceipt(context, false);
+    if (context.request && context.sourceAuthority && context.callerMeshBinding) {
+      createReceipt(context, false);
+    }
     return result(context, 'BLOCKED');
   }
 }
@@ -75,6 +79,7 @@ function baseContext(options) {
     normalized: null,
     sourceAuthority: null,
     sourceAuthorityHash: null,
+    callerMeshBinding: null,
     lifecycle: null,
     execution: null,
     receipt: null,
@@ -141,6 +146,33 @@ function issueSource(c) {
   }
 }
 
+function bindCallerMesh(c) {
+  const binding = bindLafeaContinuumTemplateCallerMesh({
+    templateId: c.request.templateId,
+    releaseRecord: c.releaseRecord,
+    compatibilityReceipt: c.compatibilityReceipt,
+    sourceAuthorityHash: c.sourceAuthorityHash,
+    meshEvidence: c.meshEvidence,
+    materialRegionMapping: c.request.materialRegionEvidence,
+    loadEdgeMapping: c.request.loadEdgeEvidence,
+    boundaryEdgeMapping: c.request.boundaryEdgeEvidence,
+  });
+  if (binding.status !== 'BOUND' || binding.reasons.length !== 0
+    || binding.templateId !== c.request.templateId
+    || binding.targetStageId !== STAGE
+    || binding.compilationHash !== c.request.compilationHash
+    || binding.compatibilityReceiptHash !== c.request.compatibilityReceiptHash
+    || binding.sourceAuthorityHash !== c.sourceAuthorityHash
+    || binding.sourceHash !== c.sourceAuthority.sourceHash
+    || binding.canonicalModelHash !== c.request.canonicalModelHash
+    || binding.analysisGeometryHash !== c.request.analysisGeometryHash
+    || binding.meshProfileHash !== c.request.meshProfileHash
+    || binding.meshHash !== c.request.meshHash) {
+    throw err('LAFEA_NB_T6H_B6_CALLER_MESH_BINDING_INVALID');
+  }
+  c.callerMeshBinding = binding;
+}
+
 function buildLifecycle(c) {
   let lifecycle = createLafeaLifecycle(STAGE, c.sourceAuthority.sourceHash);
   lifecycle = registerBase(lifecycle, 'CANONICAL_MODEL', c.request.canonicalModelHash,
@@ -173,6 +205,7 @@ function executeStage(c) {
   const executionHash = canonicalLafeaSha256({
     schema: 'lafea-nb-t6h-execution/v1',
     requestHash: c.request.semanticHash,
+    callerMeshBindingHash: c.callerMeshBinding.semanticHash,
     sourceAuthorityHash: c.sourceAuthorityHash,
     sourceHash: c.sourceAuthority.sourceHash,
     meshArtifactHash: c.meshEvidence.artifactHash,
@@ -199,6 +232,7 @@ function createReceipt(c, accepted) {
     request: c.request,
     sourceAuthorityHash: c.sourceAuthorityHash,
     sourceHash: c.sourceAuthority.sourceHash,
+    callerMeshBindingHash: c.callerMeshBinding.semanticHash,
     executionHash: accepted ? c.execution.executionHash : null,
     resultHash: accepted ? c.execution.resultHash : null,
     recoveryHash: accepted ? c.execution.recoveryHash : null,
@@ -217,6 +251,7 @@ function result(c, status) {
     stageId: STAGE,
     request: c.request,
     sourceAuthority: c.sourceAuthority,
+    callerMeshBinding: c.callerMeshBinding,
     meshEvidence: c.meshEvidence,
     execution: c.execution,
     receipt: c.receipt,
@@ -225,6 +260,7 @@ function result(c, status) {
     diagnostics: freeze([...new Set(c.diagnostics)].sort()),
     authority: freeze({
       registeredTemplateCallerMeshExecution: status === 'ACCEPTED',
+      b6BoundMapping: status === 'ACCEPTED',
       compilerGeneratedMesh: false,
       arbitraryGeometryMesher: false,
       axisymmetricContinuum: false,
@@ -390,6 +426,7 @@ function register(lifecycle, record) {
 }
 function receiptId(c) {
   const digest = canonicalLafeaSha256({ requestHash: c.request.semanticHash,
+    callerMeshBindingHash: c.callerMeshBinding.semanticHash,
     sourceHash: c.sourceAuthority.sourceHash, meshHash: c.meshEvidence.meshHash });
   return `NB-T6H-${c.request.templateId}-${digest.slice(7, 31).toUpperCase()}`;
 }
