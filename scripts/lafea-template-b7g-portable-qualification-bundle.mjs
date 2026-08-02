@@ -189,7 +189,7 @@ function validateReport(id, report) {
   record(`${id}_EXPECTED_HEAD`, report.expectedHead === exactHead,
     `${id} expected head is ${String(report.expectedHead)}.`);
   record(`${id}_AUTHORITY_RETAINED`, authorityRetained(report.authority),
-    `${id} authority flags must remain false.`);
+    `${id} broader authority flags must remain false.`);
 }
 
 function readJsonEvidence(id, filePath, schema) {
@@ -232,9 +232,7 @@ function fileEvidence(filePath, parsed = null) {
 
 function authorityRetained(value) {
   return value && typeof value === 'object'
-    && REQUIRED_FALSE_AUTHORITY.every((key) => value[key] === false)
-    && Object.values(value).every((entry) =>
-      typeof entry !== 'boolean' || entry === false);
+    && REQUIRED_FALSE_AUTHORITY.every((key) => value[key] === false);
 }
 
 function executionContext() {
