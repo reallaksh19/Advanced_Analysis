@@ -12,6 +12,7 @@ const FILES = [
   'src/workspace/viewport-interaction/topology-edit-numeric-entry.js',
   'src/workspace/viewport-interaction/topology-edit-snap-candidates.js',
   'src/workspace/viewport-interaction/topology-edit-snap-resolver.js',
+  'src/workspace/viewport-interaction/topology-edit-snap-collector.js',
   'src/workspace/viewport-interaction/topology-edit-interaction-preview.js',
   'src/workspace/viewport-interaction/topology-edit-gizmo-model.js',
 ];
