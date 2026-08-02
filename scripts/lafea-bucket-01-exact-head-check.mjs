@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const BASELINE_SHA = '292184e8ae374e24a98cdd59d79e648046e60943';
+const BASELINE_SHA = '863c9d8c8b323457a1ad92849160187ba78a3837';
 const REPORT_PATH = path.resolve(
   ROOT,
   process.env.LAFEA_BUCKET_01_EXACT_HEAD_REPORT_PATH
@@ -26,6 +26,7 @@ for (const check of [
   nodeCheck('PRODUCTION_RESPONSE_CONVERGENCE_CONTRACT', 'scripts/lafea-bucket-01-production-response-check.mjs'),
   nodeCheck('SCALABLE_SPARSE_CONTINUUM_SOLVER', 'scripts/lafea-bucket-01-scalable-solver-check.mjs'),
   nodeCheck('GOVERNED_T6_KIRSCH_FIXED_PROBES', 'scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs'),
+  nodeCheck('PRODUCTION_LUG_FIXED_PROBE_LOCATION_CONTRACT', 'scripts/lafea-bucket-01-production-lug-probe-contract-check.mjs'),
   nodeCheck('GOVERNED_T3_PATCH', 'scripts/lafea-bucket-01-t3-patch-check.mjs'),
   nodeCheck('GOVERNED_PURE_SHEAR', 'scripts/lafea-bucket-01-pure-shear-check.mjs'),
   nodeCheck('T6_PATCH', 'scripts/lafea.3-t6-patch-check.mjs'),
@@ -42,7 +43,7 @@ recordAssertion('TRACKED_WORKTREE_CLEAN', trackedStatus === '', trackedStatus ||
 const failures = checks.filter((check) => check.status !== 'PASS');
 const executableEvidencePass = failures.length === 0;
 const report = {
-  schema: 'lafea-bucket-01-exact-head-report/v7',
+  schema: 'lafea-bucket-01-exact-head-report/v8',
   status: executableEvidencePass ? 'EXACT_HEAD_REPAIR_EVIDENCE_PASS' : 'EXACT_HEAD_REPAIR_EVIDENCE_BLOCKED',
   exactHead,
   expectedHead,
@@ -56,7 +57,7 @@ const report = {
   unresolvedQualificationGates: [
     'FULL_INDEPENDENT_EXPECTED_VALUE_PACKAGE_NOT_FROZEN',
     'EXACT_1024_ELEMENT_PRODUCTION_RESPONSE_EXECUTION_NOT_RETAINED',
-    'PRODUCTION_LUG_FIXED_PROBE_EVIDENCE_NOT_PRODUCED',
+    'PRODUCTION_LUG_FIXED_PROBE_RETAINED_RECEIPT_NOT_PRODUCED',
     'GOVERNING_CODE_BASIS_NOT_FROZEN',
     'THREE_CLEAN_EXACT_HEAD_REPLAYS_NOT_RETAINED',
   ],
@@ -75,6 +76,7 @@ const report = {
     selectedRepairInfrastructureReady: executableEvidencePass,
     scalableSparseSolverRouteImplemented: true,
     governedKirschFixedProbeRouteImplemented: true,
+    productionLugFixedProbeContractImplemented: true,
     productionResponseExecutionRetained: false,
     productionLugFixedProbeExecutionRetained: false,
     movingMaximumAcceptanceAuthorized: false,

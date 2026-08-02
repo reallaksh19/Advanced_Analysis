@@ -30,6 +30,10 @@ const checkDefinitions = [
     script: 'scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs',
   },
   {
+    id: 'PRODUCTION_LUG_FIXED_PROBE_LOCATION_CONTRACT',
+    script: 'scripts/lafea-bucket-01-production-lug-probe-contract-check.mjs',
+  },
+  {
     id: 'GOVERNED_T3_PATCH_RECEIPT',
     script: 'scripts/lafea-bucket-01-t3-patch-check.mjs',
   },
@@ -59,7 +63,7 @@ const checks = checkDefinitions.map((definition) => runNodeCheck(definition));
 const failed = checks.filter((check) => check.status !== 'PASS');
 const repairChecksPass = failed.length === 0;
 const report = {
-  schema: 'lafea-bucket-01-repair-check-report/v8',
+  schema: 'lafea-bucket-01-repair-check-report/v9',
   status: repairChecksPass ? 'REPAIR_CHECKS_PASS' : 'REPAIR_CHECKS_FAIL',
   bucketId: 'LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE',
   target: 'C2D-LUG-PINHOLE -> LAFEA.3',
@@ -73,13 +77,15 @@ const report = {
     productionResponseExecutionEvidenceGenerated: false,
     kirschFixedProbeOracleFrozen: true,
     kirschFixedProbeEvidenceGenerated: repairChecksPass,
+    productionLugProbeSpecFrozen: true,
+    productionLugProbeLocationContractVerified: repairChecksPass,
+    productionLugProbeEvidenceGenerated: false,
     governedT3PatchOracleFrozen: true,
     governedT3PatchEvidenceGenerated: repairChecksPass,
     governedPureShearOracleFrozen: true,
     governedPureShearEvidenceGenerated: repairChecksPass,
     manufacturedPanelOracleFrozen: true,
     manufacturedPanelEvidenceGenerated: repairChecksPass,
-    productionLugProbeEvidenceGenerated: false,
     fullIndependentOraclePackageFrozen: false,
     exactHeadRepositoryExecutionProven: false,
   },
@@ -98,6 +104,7 @@ const report = {
     productionResponseConvergenceInfrastructureImplemented: repairChecksPass,
     scalableSparseSolverInfrastructureImplemented: repairChecksPass,
     governedKirschFixedProbeBenchmarkImplemented: repairChecksPass,
+    productionLugFixedProbeContractImplemented: repairChecksPass,
     governedT3PatchBenchmarkImplemented: repairChecksPass,
     governedPureShearBenchmarkImplemented: repairChecksPass,
     manufacturedPanelBenchmarkImplemented: repairChecksPass,
