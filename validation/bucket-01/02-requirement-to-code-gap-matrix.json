@@ -1,12 +1,15 @@
 {
   "schema": "lafea-bucket-01-gap-matrix/v2",
-  "audited_baseline_sha": "27fb14ddccb07081904d54c1bae161c87372dbdd",
-  "prior_baseline_sha": "a7144e02598f3e9db0826f10cefe0b5254fa953e",
-  "prior_baseline_disposition": "STALE_SUPERSEDED_NOT_QUALIFICATION_EVIDENCE",
+  "audited_baseline_sha": "42c9f96e9baffb52232b4b7ed7f04611c6337961",
+  "superseded_baselines": [
+    "a7144e02598f3e9db0826f10cefe0b5254fa953e",
+    "27fb14ddccb07081904d54c1bae161c87372dbdd"
+  ],
+  "superseded_baseline_disposition": "STALE_NOT_QUALIFICATION_EVIDENCE",
   "mainline_delta_review": {
-    "commit_count": 3,
     "continuum_bucket_files_changed": false,
-    "qualification_parent_refresh_required": true
+    "changes_confined_to_separate_piping_qualification_files": true,
+    "qualification_parent_refreshed": true
   },
   "bucket_id": "LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE",
   "findings": [
