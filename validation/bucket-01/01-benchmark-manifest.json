@@ -2,8 +2,9 @@
   "schema": "lafea-bucket-01-benchmark-manifest/v5",
   "manifest_status": "BASELINE_FROZEN_WITH_UNRESOLVED_GATES",
   "repository": "reallaksh19/Advanced_Analysis",
-  "baseline_main_sha": "7c83060087f6c286c9efa7a84eee546d57a34a83",
+  "baseline_main_sha": "192a3513061a634e9dc995cf6740374e6afbc1de",
   "prior_baseline_main_shas": [
+    "7c83060087f6c286c9efa7a84eee546d57a34a83",
     "2d2e22288ad040c882638100c662debbdae38663",
     "7c49c20c0b4d83f764bc351865dc3d1ae3fabf92",
     "6763f73697c9e8f4ec59feaa306edf8d296861b1",
