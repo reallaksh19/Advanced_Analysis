@@ -3,6 +3,9 @@ import { EVENT_TOPICS } from './event-topics.js';
 import { MODEL_ZONE_EVENTS } from './model-zone-selector.js';
 import { filterTree, focusTreeIndex, renderVisibleItems, scrollToTreeIndex, updateFlattenedNodes } from './tree-panel-tree.js';
 
+export const TOPOLOGY_EDIT_DEMO_FIXTURE_PATH = 'fixtures/topology-edit-20-element-demo.staged.json';
+const TOPOLOGY_EDIT_DEMO_SOURCE_NAME = 'topology-edit-20-element-demo.staged.json';
+
 export function initializeTreePanel(panel) {
   if (panel.initialized) return;
   panel.listElement = panel.requireElement('[data-role="tree-list"]');
@@ -10,6 +13,7 @@ export function initializeTreePanel(panel) {
   panel.statusElement = panel.requireElement('[data-role="tree-status"]');
   panel.errorElement = panel.requireElement('[data-role="tree-error"]');
   panel.clearButton = panel.requireElement('[data-action="clear-dataset"]');
+  panel.demoButton = ensureTopologyEditDemoButton(panel);
   panel.searchElement = panel.requireElement('[data-role="tree-search"]');
   panel.pipesElement = panel.requireElement('[data-role="summary-pipes"]');
   panel.supportsElement = panel.requireElement('[data-role="summary-supports"]');
@@ -33,6 +37,7 @@ export function handleTreeClick(panel, event) {
   const trigger = event.target?.closest?.('[data-action], [data-entity-id], [data-branch-id]');
   if (!trigger || !panel.rootElement.contains(trigger)) return;
   if (trigger.dataset.action === 'import-dataset') { panel.fileElement.click(); return; }
+  if (trigger.dataset.action === 'load-topology-edit-demo') { void loadTopologyEditDemo(panel); return; }
   if (trigger.dataset.action === 'clear-dataset') { panel.eventBus.publish(EVENT_TOPICS.DATASET_CLEAR_REQUESTED); return; }
   selectTreeTrigger(panel, trigger);
 }
@@ -43,14 +48,97 @@ export async function handleTreeChange(panel, event) {
   if (!file) return;
   try {
     const sourceBytes = new Uint8Array(await file.arrayBuffer());
-    const rawPackage = JSON.parse(new TextDecoder('utf-8').decode(sourceBytes));
-    const sourceSha256 = await sha256(sourceBytes);
     panel.clearError();
     panel.statusElement.textContent = `Loading ${file.name}…`;
-    panel.eventBus.publish(EVENT_TOPICS.DATASET_LOAD_REQUESTED, { rawPackage, sourceName: file.name, sourceBytes, sourceSha256 });
+    await publishDatasetLoad(panel, file.name, sourceBytes);
   } catch (error) {
-    panel.eventBus.publish(EVENT_TOPICS.DATASET_LOAD_FAILED, { message: error instanceof Error ? error.message : String(error), sourceName: file.name });
+    publishLoadFailure(panel, file.name, error);
   } finally { panel.fileElement.value = ''; }
+}
+
+export async function loadTopologyEditDemo(panel, options = {}) {
+  const fixtureUrl = options.fixtureUrl ?? topologyEditDemoUrl(panel);
+  const fetchFn = options.fetchFn ?? browserFetch(panel);
+  panel.demoButton.disabled = true;
+  panel.clearError();
+  panel.statusElement.textContent = 'Loading 20-element 3D Edit demo…';
+  try {
+    const response = await fetchFn(fixtureUrl, { cache: 'no-store' });
+    if (!response?.ok) throw new Error(`Demo fixture request failed (${response?.status ?? 'no response'}).`);
+    const sourceBytes = new Uint8Array(await response.arrayBuffer());
+    const rawPackage = parseJsonBytes(sourceBytes);
+    assertTopologyEditDemoPackage(rawPackage);
+    await publishDatasetLoad(panel, TOPOLOGY_EDIT_DEMO_SOURCE_NAME, sourceBytes, rawPackage);
+  } catch (error) {
+    publishLoadFailure(panel, TOPOLOGY_EDIT_DEMO_SOURCE_NAME, error);
+  } finally {
+    panel.demoButton.disabled = false;
+  }
+}
+
+async function publishDatasetLoad(panel, sourceName, sourceBytes, parsedPackage = null) {
+  const rawPackage = parsedPackage ?? parseJsonBytes(sourceBytes);
+  const sourceSha256 = await sha256(sourceBytes);
+  panel.eventBus.publish(EVENT_TOPICS.DATASET_LOAD_REQUESTED, {
+    rawPackage,
+    sourceName,
+    sourceBytes,
+    sourceSha256,
+  });
+}
+
+function parseJsonBytes(sourceBytes) {
+  return JSON.parse(new TextDecoder('utf-8').decode(sourceBytes));
+}
+
+function publishLoadFailure(panel, sourceName, error) {
+  panel.eventBus.publish(EVENT_TOPICS.DATASET_LOAD_FAILED, {
+    message: error instanceof Error ? error.message : String(error),
+    sourceName,
+  });
+}
+
+function assertTopologyEditDemoPackage(value) {
+  if (value?.schema !== 'inputxml-managed-stage/v1') {
+    throw new TypeError('3D Edit demo fixture has an unsupported staged JSON schema.');
+  }
+  if (!Array.isArray(value.objects) || value.objects.length !== 20) {
+    throw new TypeError('3D Edit demo fixture must contain exactly 20 objects.');
+  }
+  const ids = value.objects.map((row) => String(row?.id || ''));
+  if (ids.some((id) => !id) || new Set(ids).size !== ids.length) {
+    throw new TypeError('3D Edit demo fixture object IDs must be present and unique.');
+  }
+}
+
+function ensureTopologyEditDemoButton(panel) {
+  const existing = panel.rootElement.querySelector('[data-action="load-topology-edit-demo"]');
+  if (existing) return existing;
+  const actions = panel.requireElement('.dataset-toolbar__actions');
+  const button = panel.rootElement.ownerDocument.createElement('button');
+  button.type = 'button';
+  button.className = 'dataset-toolbar__demo-button';
+  button.dataset.action = 'load-topology-edit-demo';
+  button.title = 'Load the 20-element staged JSON fixture for 3D Edit testing';
+  button.setAttribute('aria-label', 'Load 20-element 3D Edit demo');
+  button.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <path d="M4 7h8m-8 5h5m-5 5h8M15 5l4 2.3v4.6l-4 2.3-4-2.3V7.3L15 5Zm0 9.2V19m-4-7.1-3 1.8" />
+  </svg><span>3D Demo</span><span class="dataset-toolbar__demo-count">20</span>`;
+  actions.append(button);
+  return button;
+}
+
+function topologyEditDemoUrl(panel) {
+  const baseUrl = String(import.meta.env?.BASE_URL || '/');
+  const root = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+  return new URL(`${root}${TOPOLOGY_EDIT_DEMO_FIXTURE_PATH}`, panel.rootElement.ownerDocument.baseURI).href;
+}
+
+function browserFetch(panel) {
+  const browserWindow = panel.rootElement.ownerDocument.defaultView;
+  const fetchFn = browserWindow?.fetch ?? globalThis.fetch;
+  if (typeof fetchFn !== 'function') throw new Error('Fetch is unavailable; the 3D Edit demo cannot be loaded.');
+  return fetchFn.bind(browserWindow ?? globalThis);
 }
 
 async function sha256(sourceBytes) {
@@ -83,6 +171,7 @@ export function destroyTreePanel(panel) {
   panel.unsubscribeCallbacks = [];
   panel.dataset = null;
   panel.sourceDataset = null;
+  panel.demoButton = null;
   panel.initialized = false;
 }
 
