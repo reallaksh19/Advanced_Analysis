@@ -47,11 +47,12 @@ const checks = [];
 const exactHead = git(['rev-parse', 'HEAD']);
 const expectedHead = process.env.EXPECTED_HEAD_SHA?.trim() || exactHead;
 const mainHead = resolveMainHead();
+const runnerEnvironment = resolveRunnerEnvironment();
 
 record('GITHUB_ACTIONS', process.env.GITHUB_ACTIONS === 'true',
   'B7H requires GitHub Actions execution.');
-record('SELF_HOSTED_RUNNER', process.env.RUNNER_ENVIRONMENT === 'self-hosted',
-  `Runner environment is ${String(process.env.RUNNER_ENVIRONMENT)}.`);
+record('SELF_HOSTED_RUNNER', runnerEnvironment === 'self-hosted',
+  `Runner environment is ${String(runnerEnvironment)}.`);
 record('WORKFLOW_DISPATCH', process.env.GITHUB_EVENT_NAME === 'workflow_dispatch',
   `Event is ${String(process.env.GITHUB_EVENT_NAME)}.`);
 record('MAIN_REF', process.env.GITHUB_REF === 'refs/heads/main',
@@ -128,7 +129,7 @@ const report = Object.freeze({
     context: 'GITHUB_ACTIONS_SELF_HOSTED',
     event: process.env.GITHUB_EVENT_NAME ?? null,
     ref: process.env.GITHUB_REF ?? null,
-    runnerEnvironment: process.env.RUNNER_ENVIRONMENT ?? null,
+    runnerEnvironment,
     runnerName: process.env.RUNNER_NAME ?? null,
   }),
   requiredMerges: REQUIRED_MERGES,
@@ -203,6 +204,12 @@ function evidence(filePath, parsed) {
     status: parsed?.status ?? null,
     exactHead: parsed?.exactHead ?? null,
   });
+}
+
+function resolveRunnerEnvironment() {
+  const dedicated = process.env.LAFEA_RUNNER_ENVIRONMENT?.trim();
+  if (dedicated) return dedicated;
+  return process.env.RUNNER_ENVIRONMENT?.trim() || null;
 }
 
 function resolveMainHead() {

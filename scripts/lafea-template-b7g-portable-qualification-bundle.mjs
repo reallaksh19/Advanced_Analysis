@@ -55,6 +55,7 @@ const expectedHead = process.env.EXPECTED_HEAD_SHA?.trim() || exactHead;
 const diffBase = resolveDiffBase(exactHead);
 const trackedBefore = git(['status', '--porcelain=v1', '--untracked-files=no']);
 const checks = [];
+const runnerEnvironment = resolveRunnerEnvironment();
 
 record('EXACT_HEAD', exactHead === expectedHead,
   `Expected ${expectedHead}; checked out ${exactHead}.`);
@@ -137,7 +138,7 @@ const payload = Object.freeze({
   execution: Object.freeze({
     context: executionContext(),
     githubActions: process.env.GITHUB_ACTIONS === 'true',
-    runnerEnvironment: process.env.RUNNER_ENVIRONMENT ?? null,
+    runnerEnvironment,
     node: process.version,
     platform: process.platform,
     arch: process.arch,
@@ -235,9 +236,15 @@ function authorityRetained(value) {
     && REQUIRED_FALSE_AUTHORITY.every((key) => value[key] === false);
 }
 
+function resolveRunnerEnvironment() {
+  const dedicated = process.env.LAFEA_RUNNER_ENVIRONMENT?.trim();
+  if (dedicated) return dedicated;
+  return process.env.RUNNER_ENVIRONMENT?.trim() || null;
+}
+
 function executionContext() {
   if (process.env.GITHUB_ACTIONS !== 'true') return 'LOCAL_OPERATOR';
-  return process.env.RUNNER_ENVIRONMENT === 'self-hosted'
+  return runnerEnvironment === 'self-hosted'
     ? 'GITHUB_ACTIONS_SELF_HOSTED'
     : 'GITHUB_ACTIONS_HOSTED';
 }
