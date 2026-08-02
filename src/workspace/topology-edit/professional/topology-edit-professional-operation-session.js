@@ -58,15 +58,15 @@ export function topologyEditProfessionalOperationDefaults(selectionInput = {}) {
 function operationParameters(operationType, values, selection) {
   const edgeId = optionalCanonical(values.edgeId || selection.edgeId, 'edgeId', 'edge');
   const nodeIds = ids(values.nodeIds || selection.nodeIds, 'nodeIds', 'node');
-  const commonEdge = {
+  const commonEdge = () => ({
     edgeId: requiredValue(edgeId, 'edgeId'),
     endpoint: requiredText(values.endpoint ?? 'TO', 'endpoint').toUpperCase(),
     distanceMm: finitePositive(values.distanceMm, 'distanceMm'),
-  };
+  });
   const operations = {
-    EXTEND_EDGE: () => commonEdge,
-    SHORTEN_EDGE: () => commonEdge,
-    SPLIT_EDGE_FROM_DISTANCE: () => commonEdge,
+    EXTEND_EDGE: commonEdge,
+    SHORTEN_EDGE: commonEdge,
+    SPLIT_EDGE_FROM_DISTANCE: commonEdge,
     RECONNECT_ENDPOINTS: () => ({
       fromNodeId: requiredCanonical(
         values.fromNodeId || nodeIds[0],
