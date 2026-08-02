@@ -4,11 +4,11 @@ Program disposition remains `BLOCKED` in the committed repository template.
 
 ## Purpose
 
-Phase 6B defines the external qualification package and the independent G8–G10 evidence contracts. Phase 6C validates the persisted legacy package and its five governed external records. Phase 6G consumes only a WP-2-bound governed external artifact.
+Phase 6B defines the external qualification package and the independent G8–G10 evidence contracts. Phase 6C validates the persisted package and its five governed external records. Phase 6G consumes only a WP-2-bound governed external artifact.
 
-Phase 6H converts caller-supplied, already sealed source records and an approved Project Authority Index into the standalone artifact consumed by Phase 6G.
+Phase 6H converts a caller-controlled WP-3 source artifact containing an accepted handoff, an approved Project Authority Index and seven already sealed source records into the standalone artifact consumed by Phase 6G.
 
-Phase 6H derives package, artifact-reference and binding metadata only. It does not create engineering values, run a commercial program, approve WP-2, seal supplied source records, sign a disposition or promote any release gate.
+Phase 6H derives handoff-acceptance, package, artifact-reference and binding metadata only. It does not create engineering values, run a commercial program, approve WP-2 or WP-3, seal supplied source records, sign a disposition or promote any release gate.
 
 ## Candidate and tooling identities
 
@@ -19,7 +19,68 @@ CANDIDATE_SHA: 617f7c2be0c65196a44bc88b6a2bb5ad3b5f1b54
 CANDIDATE_REF: release/lfea-piping-phase6i-617f7c2
 ```
 
-The workflow may execute qualification tooling from a later reviewed tooling head, but `github.sha` is never substituted for the candidate identity. The workflow verifies both the tooling checkout and the immutable candidate ref before materialization. Every request, WP-2 index, source record, package and uploaded artifact remains bound to the immutable candidate SHA.
+The workflow may execute qualification tooling from a later reviewed tooling head, but `github.sha` is never substituted for the candidate identity. The workflow verifies both the tooling checkout and the immutable candidate ref before handoff validation or materialization. Every handoff, request, WP-2 index, source record, package and uploaded artifact remains bound to the immutable candidate SHA.
+
+## Required WP-3 source layout
+
+The caller-controlled source artifact must contain, at minimum:
+
+```text
+request/external-evidence-handoff.json
+request/external-materialization-request.json
+records/project-authority-index.json
+records/application-result.json
+records/presentation.json
+records/real-model-reconciliation.json
+records/commercial-corroboration.json
+records/performance-evidence.json
+records/rollback-evidence.json
+records/signed-disposition.json
+```
+
+All paths must be safe relative JSON paths inside the downloaded artifact. Absolute paths, drive-qualified paths, traversal, empty segments, symbolic links, non-files and script/test/fixture/mock roots are rejected.
+
+## WP-3 source handoff
+
+Before Phase 6H reads any source record for package compilation, it requires:
+
+```json
+{
+  "schema": "lfea-piping-phase6i-external-evidence-handoff/v1",
+  "candidateSha": "617f7c2be0c65196a44bc88b6a2bb5ad3b5f1b54",
+  "candidateRef": "release/lfea-piping-phase6i-617f7c2",
+  "wp2Status": "WP2_COMPLETE",
+  "wp3Status": "WP3_COMPLETE",
+  "g8G9Independence": "CONFIRMED",
+  "sourceRunId": "<exact workflow run ID>",
+  "sourceArtifactName": "<exact artifact name>",
+  "requestPath": "request/external-materialization-request.json",
+  "recordCount": 7,
+  "unresolvedAuthorities": [],
+  "projectAuthorityIndexSemanticHash": "<current hash>",
+  "projectAuthorityIndexEvidenceHash": "<current hash>",
+  "requestContentHash": "<canonical request hash>",
+  "releaseQualified": false,
+  "semanticHash": "<current handoff hash>",
+  "evidenceHash": "<current handoff evidence hash>"
+}
+```
+
+The handoff is accepted only when:
+
+- the candidate SHA and immutable ref are exact;
+- WP-2 and WP-3 are explicitly complete;
+- G8/G9 authority separation is explicitly confirmed;
+- the workflow run ID and artifact name equal the dispatch inputs;
+- the request path equals the dispatch request path;
+- the request bytes reconstruct `requestContentHash`;
+- the request identifies exactly seven source records;
+- the approved WP-2 index reconstructs the handoff authority hashes;
+- every source record exists as a regular JSON file and exposes semantic/evidence identity;
+- unresolved authorities are empty;
+- `releaseQualified` remains false.
+
+Acceptance produces `lfea-piping-phase6i-external-evidence-handoff-acceptance/v1` with status `HANDOFF_ACCEPTED_FOR_PHASE6H`. Acceptance is permission to enter Phase 6H only. It is not gate promotion, result acceptance or release approval.
 
 ## Materialization request
 
@@ -45,7 +106,7 @@ The input artifact must contain one request record:
 
 The request contains paths only. It cannot embed or override engineering values.
 
-The Project Authority Index path and all seven record paths must be unique relative `.json` paths inside the supplied input root. Absolute paths, drive-qualified paths, traversal, empty segments, symbolic links, non-files and script/test/fixture/mock roots are rejected.
+The handoff path, request path, Project Authority Index path and all seven record paths must be unique under case-insensitive comparison.
 
 ## WP-2 authority requirement
 
@@ -59,12 +120,13 @@ The supplied Project Authority Index must:
 - reconstruct its semantic and evidence hashes exactly;
 - remain `releaseQualified: false`.
 
-The Phase 6H materializer validates the index but does not create or approve it.
+The handoff validator and Phase 6H materializer validate the index but do not create or approve it.
 
 ## Supplied source authorities
 
 The caller supplies:
 
+- one accepted WP-3 source handoff;
 - one approved Project Authority Index;
 - one fully qualified current application result;
 - its current presentation;
@@ -74,13 +136,13 @@ The caller supplies:
 - one exact-head rollback-evidence record;
 - one signed release-review disposition.
 
-The existing external-package compiler validates the seven records, current application/presentation identity, selector coverage, authority independence, performance envelope, rollback state and signed-disposition head. Package schema v2 also embeds the approved WP-2 index as a mandatory parent.
+The external-package compiler validates the seven records, current application/presentation identity, selector coverage, authority independence, performance envelope, rollback state and signed-disposition head. Package schema v2 embeds the approved WP-2 index as a mandatory parent.
 
 Phase 6H does not call evidence sealing functions. Every supplied record must already carry its current semantic and evidence hashes.
 
-## Derived artifact references
+## Derived and retained records
 
-For the five retained external evidence roles, Phase 6H derives only:
+For the five governed external evidence roles, Phase 6H derives only:
 
 - the fixed governed output path;
 - `application/json` media type;
@@ -88,7 +150,7 @@ For the five retained external evidence roles, Phase 6H derives only:
 - record semantic hash;
 - record evidence hash.
 
-The governed output paths are:
+The governed evidence paths are:
 
 - `external/real-model-reconciliation.json`;
 - `external/commercial-corroboration.json`;
@@ -96,15 +158,25 @@ The governed output paths are:
 - `external/rollback-evidence.json`;
 - `external/signed-disposition.json`.
 
-The approved WP-2 record is separately retained as:
+The approved WP-2 record is retained as:
 
 ```text
 external/project-authority-index.json
 ```
 
+The WP-3 custody chain is retained byte-for-byte as:
+
+```text
+external/source-handoff.json
+external/source-materialization-request.json
+external/source-handoff-acceptance.json
+```
+
 ## Atomic materialization and WP-2 binding
 
-Materialization occurs in a new sibling staging directory. Phase 6H writes the approved Project Authority Index, the five governed supplied records and the compiled v2 external package, then runs the existing Phase 6C persisted external-evidence intake in release mode.
+The handoff validator runs before the materializer. A failed handoff creates no Phase 6H output.
+
+Materialization occurs in a new sibling staging directory. Phase 6H writes the approved Project Authority Index, the five governed supplied records and the compiled v2 external package, then runs the Phase 6C persisted external-evidence intake in release mode.
 
 Publication of the materialized package requires:
 
@@ -114,7 +186,7 @@ Publication of the materialized package requires:
 - all content and record hashes current;
 - G8, G9 and G10 intake accepted by the existing validator.
 
-After materialization, the WP-2 binder:
+After materialization, the workflow retains the accepted handoff, exact request and acceptance record. It then invokes the WP-2 binder, which:
 
 - compares the retained Project Authority Index byte-semantically with the package-embedded index;
 - requires the WP-2 candidate SHA to equal the package exact head;
@@ -127,14 +199,30 @@ On success, the output contains:
 
 - the five governed evidence records;
 - `external/project-authority-index.json`;
+- `external/source-handoff.json`;
+- `external/source-materialization-request.json`;
+- `external/source-handoff-acceptance.json`;
 - `external/external-qualification-package.json`;
 - `external/project-authority-bound-package.json`;
 - `external/materialization-summary.json`;
 - `external/project-authority-binding-summary.json`.
 
-The materializer staging directory is atomically renamed to the requested output path. Binder outputs use create-only writes. Failure cannot overwrite an existing requested output.
+The materializer staging directory is atomically renamed to the requested output path. Handoff custody and binder files use create-only destination checks. A failed workflow is not eligible for Phase 6G.
 
 ## CLI
+
+Validate WP-3 handoff:
+
+```bash
+node scripts/lfea-piping-phase6i-external-handoff-validator.mjs \
+  --input-root=/path/to/caller-supplied-source \
+  --handoff=request/external-evidence-handoff.json \
+  --request=request/external-materialization-request.json \
+  --output=/path/to/new/handoff-acceptance.json \
+  --expected-head=617f7c2be0c65196a44bc88b6a2bb5ad3b5f1b54 \
+  --source-run-id=<exact run ID> \
+  --source-artifact-name=<exact artifact name>
+```
 
 Materialize:
 
@@ -157,24 +245,25 @@ node scripts/lfea-piping-phase6h-project-authority-binder.mjs \
   --exact-head=617f7c2be0c65196a44bc88b6a2bb5ad3b5f1b54
 ```
 
-The materializer output path must not exist and must not overlap the repository or input root.
+The validator acceptance path and materializer output path must not exist. Neither may overlap the caller-controlled input root.
 
 ## Manual workflow
 
 `.github/workflows/lfea-piping-external-evidence-materialization.yml` accepts:
 
 - the immutable candidate SHA;
-- the workflow run ID containing the caller-supplied source artifact;
-- the source artifact name;
+- the workflow run ID containing the caller-controlled source artifact;
+- the exact source artifact name;
+- the handoff path inside that artifact;
 - the request path inside that artifact.
 
-The workflow checks out the selected qualification-tooling head, verifies that the immutable candidate ref resolves to the supplied candidate SHA, downloads the source artifact, materializes the v2 package, binds WP-2, and uploads:
+The workflow checks out the qualification-tooling head, verifies that the immutable candidate ref resolves to the supplied candidate SHA, downloads the source artifact, validates the WP-3 handoff, materializes the v2 package, retains the custody records, binds WP-2, and uploads:
 
 ```text
 lfea-piping-external-evidence-${{ inputs.candidate_sha }}
 ```
 
-That artifact is the only eligible external input to the Phase 6G WP-2 runtime-bundle assembly workflow.
+That artifact is the external input to the Phase 6G runtime-bundle assembly workflow. The current Phase 6G wrapper does not yet promote the WP-3 custody records into the final runtime bundle; that is the next governed integration step.
 
 ## Qualification boundary
 
@@ -184,14 +273,15 @@ The committed checks are marked:
 [SIMULATED][INELIGIBLE_FOR_PROJECT_EVIDENCE][NO_ENGINEERING_COMMAND_EXECUTION]
 ```
 
-They use synthetic records and injected compiler/intake seams. They prove request/path handling, WP-2 validation, candidate/head binding, artifact-reference derivation, canonical record persistence, retained-record equality, deterministic hashes, collision rejection, exact-head rejection and atomic cleanup. They do not prove any project, commercial, performance, rollback, approval or signature claim.
+They use synthetic records and injected authority/compiler/intake seams. They prove handoff hashing, dispatch identity binding, request-byte binding, seven-record presence, WP-2 identity binding, request/path handling, package derivation, canonical record persistence, retained-record equality, deterministic hashes, collision rejection, exact-head rejection and atomic cleanup. They do not prove any project, commercial, performance, rollback, approval or signature claim.
 
 ## Remaining conditions
 
 - Populate and approve the real candidate-bound WP-2 index.
 - Produce the seven non-fictional sealed source records for the immutable candidate.
-- Retain them as a caller-controlled source artifact.
-- Run Phase 6H and retain the governed WP-2-bound external artifact.
+- Create and retain the current-hash WP-3 handoff in the same source artifact.
+- Run Phase 6H and retain the governed WP-2-bound external artifact and custody chain.
+- Bind the retained WP-3 custody records through Phase 6G into the runtime bundle.
 - Run Phase 6F for the same candidate.
 - Run Phase 6G assembly and Phase 6E runtime certification.
 - Retain successful workflow logs and complete independent Section 9 review.

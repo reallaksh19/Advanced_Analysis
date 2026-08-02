@@ -13,8 +13,13 @@ on:
         required: true
         type: string
       source_artifact_name:
-        description: Artifact name containing the materialization request and source records
+        description: Artifact name containing the WP3 handoff, request and source records
         required: true
+        type: string
+      handoff_path:
+        description: Relative path to lfea-piping-phase6i-external-evidence-handoff/v1
+        required: true
+        default: request/external-evidence-handoff.json
         type: string
       request_path:
         description: Relative path to lfea-piping-external-materialization-request/v2
@@ -32,7 +37,7 @@ concurrency:
 
 jobs:
   materialize-external-evidence:
-    name: Materialize supplied external qualification evidence
+    name: Validate WP3 handoff and materialize external qualification evidence
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -70,6 +75,26 @@ jobs:
           name: ${{ inputs.source_artifact_name }}
           path: ${{ runner.temp }}/lfea-external-source
 
+      - name: Validate candidate-bound WP3 source handoff
+        shell: bash
+        env:
+          INPUT_ROOT: ${{ runner.temp }}/lfea-external-source
+          HANDOFF_PATH: ${{ inputs.handoff_path }}
+          REQUEST_PATH: ${{ inputs.request_path }}
+          ACCEPTANCE_PATH: ${{ runner.temp }}/lfea-wp3-handoff-acceptance.json
+          EXPECTED_HEAD: ${{ inputs.candidate_sha }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          SOURCE_ARTIFACT_NAME: ${{ inputs.source_artifact_name }}
+        run: |
+          node scripts/lfea-piping-phase6i-external-handoff-validator.mjs \
+            --input-root="$INPUT_ROOT" \
+            --handoff="$HANDOFF_PATH" \
+            --request="$REQUEST_PATH" \
+            --output="$ACCEPTANCE_PATH" \
+            --expected-head="$EXPECTED_HEAD" \
+            --source-run-id="$SOURCE_RUN_ID" \
+            --source-artifact-name="$SOURCE_ARTIFACT_NAME"
+
       - name: Materialize governed external evidence package
         shell: bash
         env:
@@ -83,6 +108,25 @@ jobs:
             --request="$REQUEST_PATH" \
             --output="$OUTPUT_ROOT" \
             --exact-head="$EXPECTED_HEAD"
+
+      - name: Retain WP3 source custody records
+        shell: bash
+        env:
+          INPUT_ROOT: ${{ runner.temp }}/lfea-external-source
+          HANDOFF_PATH: ${{ inputs.handoff_path }}
+          REQUEST_PATH: ${{ inputs.request_path }}
+          ACCEPTANCE_PATH: ${{ runner.temp }}/lfea-wp3-handoff-acceptance.json
+          OUTPUT_ROOT: ${{ runner.temp }}/lfea-external-evidence
+        run: |
+          test ! -e "$OUTPUT_ROOT/external/source-handoff.json"
+          test ! -e "$OUTPUT_ROOT/external/source-materialization-request.json"
+          test ! -e "$OUTPUT_ROOT/external/source-handoff-acceptance.json"
+          cp -- "$INPUT_ROOT/$HANDOFF_PATH" \
+            "$OUTPUT_ROOT/external/source-handoff.json"
+          cp -- "$INPUT_ROOT/$REQUEST_PATH" \
+            "$OUTPUT_ROOT/external/source-materialization-request.json"
+          cp -- "$ACCEPTANCE_PATH" \
+            "$OUTPUT_ROOT/external/source-handoff-acceptance.json"
 
       - name: Bind approved WP2 authority to retained package
         shell: bash

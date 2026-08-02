@@ -12,10 +12,13 @@ on:
       - 'docs/LFEA_PIPING_PHASE_STATUS.md'
       - 'docs/lfea/LFEA_Phase6I_PR371_Boundary_Contract_Rev1.md'
       - 'docs/lfea/LFEA_Phase6I_WP2_Project_Authority_Index_Contract_Rev1.md'
+      - 'src/core/linear-piping-project-qualification/external-evidence-handoff.js'
+      - 'src/core/linear-piping-project-qualification/index.js'
       - 'scripts/lfea-piping-internal-release-evidence-check.mjs'
       - 'scripts/lfea-piping-phase6d-anti-drift-check.mjs'
       - 'scripts/lfea-piping-release-readiness-check.mjs'
       - 'scripts/lfea-piping-phase6i-*.mjs'
+      - 'scripts/linear-piping-project-qualification-anti-drift-check.mjs'
       - '.github/workflows/lfea-piping-phase6i-certification.yml'
   workflow_dispatch:
 
