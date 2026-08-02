@@ -87,3 +87,26 @@ export {
   LAFEA_INITIAL_TEMPLATE_BENCHMARK_MANIFESTS,
   requireInitialTemplateBenchmarkManifest,
 } from './benchmark-manifests/initial-manifests.js';
+
+export {
+  LAFEA_TEMPLATE_APPLICABILITY,
+  LAFEA_TEMPLATE_AUTHORITY_STATES,
+  LAFEA_TEMPLATE_CHANGE_KINDS,
+  LAFEA_TEMPLATE_RECORD_VALIDITIES,
+  LAFEA_TEMPLATE_RELEASE_RECORD_V2_SCHEMA,
+  assertTemplateReleaseTransition,
+  classifyTemplateReleaseInvalidation,
+  createTemplateReleaseRecordV2,
+  semanticTemplateReleaseBasis,
+  validateTemplateReleaseRecordV2,
+} from './release-record-v2.js';
+
+export {
+  LAFEA_TEMPLATE_RELEASE_HASH_PROFILE,
+  canonicalTemplateReleaseJson,
+  templateReleaseSha256,
+} from './release-record-v2-hash.js';
+
+export {
+  migrateTemplateReleaseRecordV1ToV2,
+} from './release-record-v2-migration.js';
