@@ -6,11 +6,15 @@ import { fileURLToPath } from 'node:url';
 import {
   buildModelZoneCatalog,
   createModelZoneSelection,
-  filterResolvedGeometryForModelZone,
   projectDatasetForModelZone,
   reconcileModelZoneSelection,
 } from '../src/workspace/model-zone-selector.js';
+import {
+  filterResolvedGeometryForModelZone,
+  projectSupportSiteModelForModelZone,
+} from '../src/workspace/model-zone-viewport-projection.js';
 import { RESOLVED_ENGINEERING_GEOMETRY_SCHEMA } from '../src/workspace/resolved-engineering-geometry.js';
+import { SUPPORT_SITE_MODEL_SCHEMA } from '../src/workspace/support-sites/support-site-model.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -88,21 +92,11 @@ test('viewport projection recomputes selected-zone bounds and summary', () => {
   const source = dataset();
   const selection = createModelZoneSelection(buildModelZoneCatalog(source), 'ZONE-2');
   const projection = projectDatasetForModelZone(source, selection);
-  const resolved = {
-    schema: RESOLVED_ENGINEERING_GEOMETRY_SCHEMA,
-    datasetId: source.datasetId,
-    coordinateTransform: null,
-    webglNavigation: {},
-    items: [
-      resolvedItem('pipe:a', 0, 10),
-      resolvedItem('support:a', 10, 20, 'SUPPORT'),
-      resolvedItem('valve:a', 1000, 1010),
-    ],
-    skipped: [{ entityId: 'unassigned:a', componentKind: 'VALVE', resolutionStatus: 'skipped' }],
-    skippedEntityIds: ['unassigned:a'],
-    bounds: {},
-    summary: {},
-  };
+  const resolved = resolvedModel(source.datasetId, [
+    resolvedItem('pipe:a', 0, 10),
+    resolvedItem('support:a', 10, 20, 'SUPPORT'),
+    resolvedItem('valve:a', 1000, 1010),
+  ], [{ entityId: 'unassigned:a', componentKind: 'VALVE', resolutionStatus: 'skipped' }]);
   assert.equal(Object.isFrozen(resolved.items[0]), false);
   const scoped = filterResolvedGeometryForModelZone(resolved, projection);
   assert.deepEqual(scoped.items.map((item) => item.entityId), ['pipe:a', 'support:a']);
@@ -113,27 +107,92 @@ test('viewport projection recomputes selected-zone bounds and summary', () => {
   assert.equal(Object.isFrozen(scoped), true);
 });
 
+test('selected zone retains a physical support site with any exact member in scope', () => {
+  const source = dataset();
+  source.entities.push(entity('support:b', 'ZONE-1', 'support'));
+  const selection = createModelZoneSelection(buildModelZoneCatalog(source), 'ZONE-2');
+  const projection = projectDatasetForModelZone(source, selection);
+  const supportModel = crossZoneSupportModel(source.datasetId);
+  const projectedSupports = projectSupportSiteModelForModelZone(supportModel, projection);
+  assert.deepEqual(projectedSupports.sites.map((site) => site.siteId), ['site:shared']);
+  assert.deepEqual(projectedSupports.members.map((member) => member.entityId), ['support:a', 'support:b']);
+  assert.equal(Object.isFrozen(supportModel.members[0]), false);
+  const resolved = resolvedModel(source.datasetId, [
+    resolvedItem('support:b', 10, 20, 'SUPPORT'),
+    resolvedItem('valve:a', 1000, 1010),
+  ]);
+  const scoped = filterResolvedGeometryForModelZone(
+    resolved,
+    projection,
+    projectedSupports,
+  );
+  assert.deepEqual(scoped.items.map((item) => item.entityId), ['support:b']);
+});
+
 test('production tree and viewport consume exact-dataset selection without mutation', async () => {
   const files = await Promise.all([
     'src/workspace/model-zone-selector.js',
+    'src/workspace/model-zone-viewport-projection.js',
     'src/workspace/tree-panel.js',
     'src/workspace/tree-panel-events.js',
     'src/workspace/viewport-panel.js',
   ].map((file) => readFile(path.join(ROOT, file), 'utf8')));
-  const [selector, tree, events, viewport] = files;
+  const [selector, viewportProjection, tree, events, viewport] = files;
   assert.match(tree, /new ModelZoneSelectorController/);
   assert.match(events, /MODEL_ZONE_EVENTS\.CHANGED/);
   assert.match(events, /\{ selection, dataset \}/);
   assert.match(viewport, /filterResolvedGeometryForModelZone/);
   assert.match(viewport, /projectDatasetForModelZone/);
+  assert.match(viewport, /projectSupportSiteModelForModelZone/);
   assert.match(viewport, /this\.datasetReference === dataset/);
   assert.match(selector, /reconcileModelZoneSelection/);
   assert.match(selector, /EVENT_TOPICS\.DATASET_LOADED/);
   assert.match(selector, /dataset: this\.dataset/);
+  assert.match(viewportProjection, /site\.memberEntityIds\.some/);
   for (const prohibited of ['WorkspaceState.loadDataset', 'WorkspaceState.clearDataset', 'rebuildWorkspaceDataset']) {
-    assert.equal(selector.includes(prohibited), false, `selector must not use ${prohibited}`);
+    assert.equal(`${selector}\n${viewportProjection}`.includes(prohibited), false, `zone modules must not use ${prohibited}`);
   }
 });
+
+function resolvedModel(datasetId, items, skipped = []) {
+  return {
+    schema: RESOLVED_ENGINEERING_GEOMETRY_SCHEMA,
+    datasetId,
+    coordinateTransform: null,
+    webglNavigation: {},
+    items,
+    skipped,
+    skippedEntityIds: skipped.map((item) => item.entityId),
+    bounds: {},
+    summary: {},
+  };
+}
+
+function crossZoneSupportModel(datasetId) {
+  const members = [{ entityId: 'support:a' }, { entityId: 'support:b' }];
+  const assemblies = [
+    { assemblyId: 'assembly:a', memberEntityIds: ['support:a'] },
+    { assemblyId: 'assembly:b', memberEntityIds: ['support:b'] },
+  ];
+  const sites = [{
+    siteId: 'site:shared',
+    memberEntityIds: ['support:b', 'support:a'],
+    assemblyIds: ['assembly:b', 'assembly:a'],
+    primaryEntityId: 'support:b',
+  }];
+  return {
+    schema: SUPPORT_SITE_MODEL_SCHEMA,
+    datasetId,
+    members,
+    assemblies,
+    sites,
+    summary: {
+      sourceSupportRecordCount: 2,
+      supportAssemblyCount: 2,
+      physicalLocationCount: 1,
+    },
+  };
+}
 
 function resolvedItem(entityId, startX, endX, componentKind = 'PIPE') {
   return {
