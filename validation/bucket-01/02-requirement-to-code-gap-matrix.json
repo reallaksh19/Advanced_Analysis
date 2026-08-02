@@ -1,15 +1,17 @@
 {
-  "schema": "lafea-bucket-01-gap-matrix/v4",
-  "audited_baseline_sha": "42c9f96e9baffb52232b4b7ed7f04611c6337961",
+  "schema": "lafea-bucket-01-gap-matrix/v5",
+  "audited_baseline_sha": "cbd4d3e7397a3d64869d9be1c360af7d1d4ecdc8",
   "superseded_baselines": [
     "a7144e02598f3e9db0826f10cefe0b5254fa953e",
-    "27fb14ddccb07081904d54c1bae161c87372dbdd"
+    "27fb14ddccb07081904d54c1bae161c87372dbdd",
+    "42c9f96e9baffb52232b4b7ed7f04611c6337961"
   ],
   "superseded_baseline_disposition": "STALE_NOT_QUALIFICATION_EVIDENCE",
   "mainline_delta_review": {
     "continuum_bucket_files_changed": false,
-    "changes_confined_to_separate_piping_qualification_files": true,
-    "qualification_parent_refreshed": true
+    "changes_confined_to_separate_piping_governance_files": true,
+    "qualification_parent_refreshed": true,
+    "latest_reviewed_main_commit": "cbd4d3e7397a3d64869d9be1c360af7d1d4ecdc8"
   },
   "execution_policy": {
     "hosted_workflow_in_scope": false,
@@ -45,8 +47,8 @@
     },
     {
       "id": "G3-PURE-SHEAR",
-      "status": "PARTIAL",
-      "finding": "Existing shear and energy checks require a named frozen independent Bucket-01 oracle."
+      "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION",
+      "finding": "A frozen closed-form pure-shear oracle and governed T3 receipt now cover plane stress and plane strain, exact affine displacement, engineering shear strain, tau_xy, principal and von Mises stress, strain energy, four-edge traction-to-nodal parity, prescribed-displacement parity, nontrivial nodal boundary-force reconstruction, force and moment equilibrium, and three deterministic replays at 1e-8 normalized tolerances."
     },
     {
       "id": "G3-CANTILEVER-PANEL",
