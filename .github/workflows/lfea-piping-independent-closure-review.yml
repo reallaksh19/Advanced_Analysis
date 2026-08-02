@@ -1,0 +1,130 @@
+name: LFEA Piping Independent Closure Review
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Immutable Phase 6I candidate SHA reviewed for closure
+        required: true
+        default: 617f7c2be0c65196a44bc88b6a2bb5ad3b5f1b54
+        type: string
+      certification_run_id:
+        description: Phase 6E workflow run containing retained runtime validation results
+        required: true
+        type: string
+      certification_artifact_name:
+        description: Phase 6E runtime validation artifact name
+        required: true
+        type: string
+      review_run_id:
+        description: Independent reviewer workflow run containing the signed WP8 package
+        required: true
+        type: string
+      review_artifact_name:
+        description: Independent reviewer artifact name
+        required: true
+        type: string
+      review_path:
+        description: Relative path to the signed independent closure review
+        required: true
+        default: review/independent-closure-review.json
+        type: string
+      benchmark_manifest_path:
+        description: Relative path to the BM-01 through BM-22 review manifest
+        required: true
+        default: review/benchmark-manifest.json
+        type: string
+      anti_drift_manifest_path:
+        description: Relative path to the AD-01 through AD-25 review manifest
+        required: true
+        default: review/anti-drift-manifest.json
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: lfea-piping-independent-closure-${{ github.ref }}-${{ inputs.candidate_sha }}
+  cancel-in-progress: false
+
+jobs:
+  validate-independent-closure:
+    name: Validate independent A7 and G0-G10 closure recommendation
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout qualification tooling head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify immutable candidate identity
+        shell: bash
+        env:
+          CANDIDATE_REF: refs/remotes/origin/release/lfea-piping-phase6i-617f7c2
+          EXPECTED_HEAD: ${{ inputs.candidate_sha }}
+          TOOLING_HEAD: ${{ github.sha }}
+        run: |
+          test "$TOOLING_HEAD" = "$(git rev-parse HEAD)"
+          test "$EXPECTED_HEAD" = "617f7c2be0c65196a44bc88b6a2bb5ad3b5f1b54"
+          test "$EXPECTED_HEAD" = "$(git rev-parse "$CANDIDATE_REF^{commit}")"
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run repository policy gate
+        run: npm run gate
+
+      - name: Download Phase 6E runtime validation results
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.certification_run_id }}
+          name: ${{ inputs.certification_artifact_name }}
+          path: ${{ runner.temp }}/lfea-runtime-certification
+
+      - name: Download independent reviewer package
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.review_run_id }}
+          name: ${{ inputs.review_artifact_name }}
+          path: ${{ runner.temp }}/lfea-independent-review
+
+      - name: Validate independent closure recommendation
+        shell: bash
+        env:
+          CERTIFICATION_ROOT: ${{ runner.temp }}/lfea-runtime-certification
+          REVIEW_ROOT: ${{ runner.temp }}/lfea-independent-review
+          OUTPUT_ROOT: ${{ runner.temp }}/lfea-independent-closure-acceptance
+          EXPECTED_HEAD: ${{ inputs.candidate_sha }}
+        run: |
+          mkdir -p "$OUTPUT_ROOT"
+          node scripts/lfea-piping-phase6i-independent-closure-validator.mjs \
+            --certification-root="$CERTIFICATION_ROOT" \
+            --review-root="$REVIEW_ROOT" \
+            --review="${{ inputs.review_path }}" \
+            --benchmarks="${{ inputs.benchmark_manifest_path }}" \
+            --anti-drift="${{ inputs.anti_drift_manifest_path }}" \
+            --output="$OUTPUT_ROOT/independent-closure-acceptance.json" \
+            --expected-head="$EXPECTED_HEAD" \
+            --certification-run-id="${{ inputs.certification_run_id }}" \
+            --certification-artifact-name="${{ inputs.certification_artifact_name }}" \
+            --review-run-id="${{ inputs.review_run_id }}" \
+            --review-artifact-name="${{ inputs.review_artifact_name }}"
+
+      - name: Upload independent closure acceptance record
+        uses: actions/upload-artifact@v4
+        with:
+          name: lfea-independent-closure-acceptance-${{ inputs.candidate_sha }}
+          path: ${{ runner.temp }}/lfea-independent-closure-acceptance
+          if-no-files-found: error
+          retention-days: 90
