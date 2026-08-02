@@ -27,7 +27,10 @@ import {
   topologyEditSelectionDescription,
   updateTopologyEditSelection,
 } from './topology-edit/topology-edit-command-ui.js';
-import { topologyEditEntityIdsForObject } from './topology-edit/topology-edit-render-packet.js';
+import {
+  buildTopologyEditRenderPacket,
+  topologyEditEntityIdsForObject,
+} from './topology-edit/topology-edit-render-packet.js';
 import {
   createTopologyEditPresentationBasis,
   createTopologyEditPresentationState,
@@ -319,11 +322,10 @@ export class TopologyEdit3DViewController {
   }
 
   refreshView(canonical) {
-    const draftVisual = this.deriveVisual(canonical, 'DRAFT');
     const base = this.session.baseCanonicalTopology;
-    const sourceVisual = base.canonicalTopologyHash === canonical.canonicalTopologyHash
-      ? this.deriveVisual(base, 'SOURCE')
-      : this.deriveVisual(base, 'SOURCE');
+    const certifiedPacket = buildTopologyEditRenderPacket(base, canonical);
+    const sourceVisual = this.deriveVisual(base, 'SOURCE');
+    const draftVisual = this.deriveVisual(canonical, 'DRAFT');
     const supportOverlays = deriveAllSupportRestraintGeometry({
       canonicalTopology: canonical,
       verticalAxis: 'Z',
@@ -344,6 +346,7 @@ export class TopologyEdit3DViewController {
     this.updatePresentationBasis(canonical);
     this.reconcilePresentationVisibility(canonical);
     this.viewportBackend?.renderSession({
+      ...certifiedPacket,
       source: sourceVisual.projection,
       draft: draftVisual.projection,
       supports: supportProjection,
