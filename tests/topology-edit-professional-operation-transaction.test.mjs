@@ -49,7 +49,7 @@ function operationPlan(topology) {
     topology,
     nodeIds: ['node:b', 'node:c'],
     boundaryNodeIds: ['node:a', 'node:d'],
-    deltaMm: { x: 0, y: 50, z: 0 },
+    deltaMm: { x: 10, y: 0, z: 0 },
   });
 }
 
@@ -108,8 +108,8 @@ test('atomic apply commits the exact command group and grouped undo redo reprodu
   assert.deepEqual(session.journal.activeCommandIds.slice(-2), transaction.commandIds);
   assert.equal(session.currentTopology().canonicalTopologyHash, transaction.resultingCanonicalHash);
   assert.equal(
-    session.currentTopology().nodes.find((node) => node.id === 'node:b').position.y,
-    50,
+    session.currentTopology().nodes.find((node) => node.id === 'node:b').position.x,
+    110,
   );
 
   undoTopologyEditOperationTransaction(session, transaction);
@@ -132,7 +132,7 @@ test('a rejected later command leaves the live session completely unchanged', ()
         commandType: 'MOVE_NODE',
         payload: {
           nodeId: 'node:missing',
-          position: { x: 200, y: 50, z: 0 },
+          position: { x: 210, y: 0, z: 0 },
         },
       },
     ],
