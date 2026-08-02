@@ -110,3 +110,13 @@ export {
 export {
   migrateTemplateReleaseRecordV1ToV2,
 } from './release-record-v2-migration.js';
+
+export {
+  LAFEA_TEMPLATE_COMPATIBILITY_STATUSES,
+  LAFEA_TEMPLATE_TARGET_COMPATIBILITY_SCHEMA,
+  LAFEA_TEMPLATE_TARGET_SNAPSHOT_SCHEMA,
+  createTemplateTargetAuthoritySnapshot,
+  evaluateTemplateTargetCompatibility,
+  validateTemplateTargetAuthoritySnapshot,
+  validateTemplateTargetCompatibilityReceipt,
+} from './target-compatibility.js';
