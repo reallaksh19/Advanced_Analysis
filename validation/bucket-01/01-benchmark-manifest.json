@@ -1,5 +1,5 @@
 {
-  "schema": "lafea-bucket-01-benchmark-manifest/v4",
+  "schema": "lafea-bucket-01-benchmark-manifest/v5",
   "manifest_status": "BASELINE_FROZEN_WITH_UNRESOLVED_GATES",
   "repository": "reallaksh19/Advanced_Analysis",
   "baseline_main_sha": "2d2e22288ad040c882638100c662debbdae38663",
@@ -81,8 +81,19 @@
   "governed_receipts": [
     { "benchmark_id": "C2D-PATCH-T3-01", "script": "scripts/lafea-bucket-01-t3-patch-check.mjs", "oracle": "validation/bucket-01/04-t3-patch-oracle.json", "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION" },
     { "benchmark_id": "C2D-PATCH-PURE-SHEAR-01", "script": "scripts/lafea-bucket-01-pure-shear-check.mjs", "oracle": "validation/bucket-01/05-pure-shear-oracle.json", "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION" },
-    { "benchmark_id": "C2D-PURE-BENDING-PANEL-T6-01", "script": "scripts/lafea-bucket-01-pure-bending-panel-check.mjs", "oracle": "validation/bucket-01/03-pure-bending-panel-oracle.json", "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION" }
+    { "benchmark_id": "C2D-PURE-BENDING-PANEL-T6-01", "script": "scripts/lafea-bucket-01-pure-bending-panel-check.mjs", "oracle": "validation/bucket-01/03-pure-bending-panel-oracle.json", "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION" },
+    { "benchmark_id": "C2D-LUG-PINHOLE-01", "script": "scripts/lafea-bucket-01-production-response-receipt.mjs", "spec": "validation/bucket-01/06-production-response-convergence-spec.json", "status": "TECHNICAL_EVALUATOR_IMPLEMENTED_PENDING_PRODUCTION_EXECUTION" }
   ],
+  "production_response_convergence": {
+    "spec": "validation/bucket-01/06-production-response-convergence-spec.json",
+    "evaluator": "src/workspace/lafea-bucket-01-production-response.js",
+    "contract_check": "scripts/lafea-bucket-01-production-response-check.mjs",
+    "execution_runner": "scripts/lafea-bucket-01-production-response-runner.mjs",
+    "retained_receipt": "scripts/lafea-bucket-01-production-response-receipt.mjs",
+    "force_and_moment_oracle": "FROZEN_LOAD_RESULTANT_AND_LINE_OF_ACTION",
+    "energy_acceptance": "THREE_LEVEL_RICHARDSON_GCI",
+    "status": "TECHNICAL_INFRASTRUCTURE_IMPLEMENTED_EXECUTION_NOT_RETAINED"
+  },
   "code_basis": { "status": "UNRESOLVED_GATE", "governing_code": null, "edition": null, "allowable_source": null, "stress_classification": null, "load_combination": null },
   "automatic_stop_conditions": [
     "exact head or parent mismatch",
