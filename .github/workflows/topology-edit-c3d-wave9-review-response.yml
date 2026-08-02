@@ -1,0 +1,179 @@
+name: C3D Wave 9 Review Response Round Trip
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/topology-edit-c3d-wave9-review-response.yml'
+      - '.github/workflows/topology-edit-wave5.yml'
+      - 'docs/TOPOLOGY_EDIT_ORIGINAL_PLAN_CLOSURE_AUDIT.md'
+      - 'scripts/topology-edit-original-plan-audit.mjs'
+      - 'scripts/topology-edit-write-wave5-evidence.mjs'
+      - 'src/workspace/load-calc-consumer-controller.js'
+      - 'src/workspace/topology-edit-3d-review-response-controller.js'
+      - 'src/workspace/viewport-productivity/topology-edit-review-response*.js'
+      - 'tests/topology-edit-c3d-wave9-review-response.test.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  review-response-round-trip:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    env:
+      TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      BASE_REF: ${{ github.event.pull_request.base.sha || github.event.repository.default_branch }}
+
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Verify exact checkout and ancestry
+        run: |
+          test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+          git merge-base --is-ancestor "$BASE_REF" HEAD
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Enforce syntax and bounded production modules
+        run: |
+          for file in \
+            src/workspace/topology-edit-3d-review-response-controller.js \
+            src/workspace/viewport-productivity/topology-edit-review-response.js \
+            src/workspace/viewport-productivity/topology-edit-review-response-intake.js \
+            src/workspace/viewport-productivity/topology-edit-review-response-io.js \
+            src/workspace/viewport-productivity/topology-edit-review-response-panel.js \
+            src/workspace/load-calc-consumer-controller.js; do
+            node --check "$file"
+            test "$(wc -l < "$file")" -le 300
+          done
+          ! grep -R "export default" \
+            src/workspace/topology-edit-3d-review-response-controller.js \
+            src/workspace/viewport-productivity/topology-edit-review-response*.js
+
+      - name: Qualify Wave 9 review response round trip
+        run: node --test tests/topology-edit-c3d-wave9-review-response.test.mjs
+
+      - name: Retain dossier handoff and intake
+        run: |
+          node --test tests/topology-edit-c3d-wave7-review-dossier.test.mjs
+          node --test tests/topology-edit-c3d-wave8-dossier-intake.test.mjs
+
+      - name: Retain C3D Waves 0 through 6
+        run: |
+          node --test tests/topology-edit-c3d-wave0.test.mjs
+          node --test tests/topology-edit-c3d-wave1-visibility.test.mjs
+          node --test tests/topology-edit-c3d-wave1-sectioning.test.mjs
+          node --test tests/topology-edit-c3d-wave2-search.test.mjs
+          node --test tests/topology-edit-c3d-wave3-review.test.mjs
+          node --test tests/topology-edit-c3d-wave3-gpu-picking.test.mjs
+          node --test tests/topology-edit-c3d-wave4-issue-review.test.mjs
+          node --test tests/topology-edit-c3d-wave4-comparison.test.mjs
+          node --test tests/topology-edit-c3d-wave5-inspection-measurement.test.mjs
+          node --test tests/topology-edit-c3d-wave6-route-trace.test.mjs
+
+      - name: Retain command and Track B lifecycle authority
+        run: |
+          node --test tests/topology-edit-wave3-commands.test.mjs
+          node --test tests/topology-edit-wave3b-autofix.test.mjs
+          node --test tests/topology-edit-wave3c-autofix-ui.test.mjs
+          node --test tests/topology-edit-wave4a-persistence-export.test.mjs
+          node --test tests/topology-edit-wave4b-commit-rollback.test.mjs
+          node --test tests/topology-edit-wave4c-lifecycle-ui.test.mjs
+
+      - name: Retain governance and production build
+        run: |
+          node scripts/topology-edit-source-drift-check.mjs
+          node scripts/topology-edit-api-drift-check.mjs
+          node scripts/topology-edit-prohibited-imports.mjs
+          npm run build
+
+      - name: Verify implementation audit covers Waves 0 through 9
+        run: |
+          node scripts/topology-edit-original-plan-audit.mjs
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFile } from 'node:fs/promises';
+          const audit = JSON.parse(await readFile('reports/qualification/topology-edit-original-plan-audit.json', 'utf8'));
+          assert.equal(audit.status, 'PASS_IMPLEMENTATION_AUDIT');
+          assert.equal(audit.exactHeadStatus, 'PRECHECK');
+          assert.equal(audit.authorityBoundary.releaseQualified, false);
+          for (const file of [
+            'tests/topology-edit-c3d-wave7-review-dossier.test.mjs',
+            'tests/topology-edit-c3d-wave8-dossier-intake.test.mjs',
+            'tests/topology-edit-c3d-wave9-review-response.test.mjs',
+          ]) assert.ok(audit.qualifiedFiles.includes(file), file);
+          NODE
+
+      - name: Write exact-head Wave 9 evidence
+        run: |
+          mkdir -p reports/qualification
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { execFileSync } from 'node:child_process';
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const commit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          if (commit !== process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA) throw new Error('Exact-head mismatch.');
+          const files = [
+            'src/workspace/load-calc-consumer-controller.js',
+            'src/workspace/topology-edit-3d-review-response-controller.js',
+            'src/workspace/viewport-productivity/topology-edit-review-response.js',
+            'src/workspace/viewport-productivity/topology-edit-review-response-intake.js',
+            'src/workspace/viewport-productivity/topology-edit-review-response-io.js',
+            'src/workspace/viewport-productivity/topology-edit-review-response-panel.js',
+            'tests/topology-edit-c3d-wave9-review-response.test.mjs',
+            '.github/workflows/topology-edit-wave5.yml',
+            'scripts/topology-edit-original-plan-audit.mjs',
+            'docs/TOPOLOGY_EDIT_ORIGINAL_PLAN_CLOSURE_AUDIT.md',
+          ];
+          const evidence = {
+            schema: 'TopologyEditC3DWave9ReviewResponseEvidence.v1',
+            repository: process.env.GITHUB_REPOSITORY,
+            commit,
+            status: 'PASS_REVIEW_RESPONSE_ROUND_TRIP',
+            responseAuthority: 'DISPLAY_REVIEW_RESPONSE_ONLY',
+            identityAuthority: 'EXACT_DOSSIER_ISSUE_AND_CANONICAL_IDS',
+            originalPlanAuditStatus: 'PASS_IMPLEMENTATION_AUDIT',
+            checkerAuthorityChanged: false,
+            autofixAuthorityChanged: false,
+            persistenceAuthorityChanged: false,
+            auditExportAuthorityChanged: false,
+            workspaceAuthorityChanged: false,
+            calculationAuthorityChanged: false,
+            releaseQualified: false,
+            files: Object.fromEntries(files.map((file) => [
+              file,
+              createHash('sha256').update(readFileSync(file)).digest('hex'),
+            ])),
+          };
+          writeFileSync(
+            'reports/qualification/topology-edit-c3d-wave9-review-response.json',
+            `${JSON.stringify(evidence, null, 2)}\n`,
+          );
+          NODE
+
+      - name: Upload exact-head evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-c3d-wave9-review-response-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          path: |
+            reports/qualification/topology-edit-c3d-wave9-review-response.json
+            reports/qualification/topology-edit-original-plan-audit.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Verify full batch patch hygiene
+        run: |
+          git diff --check "$BASE_REF...HEAD"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
