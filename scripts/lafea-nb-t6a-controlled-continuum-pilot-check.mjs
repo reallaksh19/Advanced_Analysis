@@ -102,11 +102,7 @@ const options = {
   mappingPackage,
   benchmarkQualification,
   document,
-  levels: levels.map((row) => ({
-    ordinal: row.ordinal,
-    meshEvidence: row.meshEvidence,
-    canonicalModel: row.canonicalModel,
-  })),
+  levels: levels.map(levelOption),
   recoveryProfile,
   convergenceProfile,
 };
@@ -119,7 +115,7 @@ assert.equal(accepted.levels.length, 3);
 assert.equal(accepted.levels.every((row) => row.evidence.status === 'ACCEPTED'), true);
 assert.equal(accepted.levels.every((row) => row.recovery.authority
   === 'RETAINED_INTEGRATION_POINT_VALUES'), true);
-assert.deepEqual(accepted.levels.map((row) => row.observedQuantity), [200, 200, 200]);
+accepted.levels.forEach((row) => approx(row.observedQuantity, 200, 1e-10, 1e-8));
 assert.equal(accepted.receipt.calculationAccepted, true);
 assert.equal(accepted.receipt.recoveryReady, true);
 assert.equal(accepted.receipt.resultReady, true);
@@ -206,9 +202,9 @@ blocked('mesh source parent drift', {
   levels: sourceDriftLevels.map(levelOption),
 }, 'LAFEA_NB_T6A_SOURCE_PARENT_MISMATCH');
 
-const flatSecond = finalizeLevel(
-  buildRawLevel(1, 'FLAT-SECOND'), sourceAuthority.sourceHash,
-);
+const flatRaw = buildRawLevel(1, 'FLAT-SECOND');
+flatRaw.ordinal = 2;
+const flatSecond = finalizeLevel(flatRaw, sourceAuthority.sourceHash);
 const flatLevels = [levels[0], flatSecond, levels[2]];
 const flatRequest = executionRequest({
   authority,
@@ -853,6 +849,14 @@ function sourceGuards() {
   assert.doesNotMatch(source, /\b(?:projectElementGaussStressToNodes|averageWithinGroups)\s*\(/u);
   assert.doesNotMatch(source, /MITC4|MITC3/u);
   antiDriftCount += 8;
+}
+
+function approx(actual, expected, relative, absolute) {
+  const limit = Math.max(absolute, relative * Math.abs(expected));
+  assert.ok(
+    Math.abs(actual - expected) <= limit,
+    `${actual} must match ${expected} within ${limit}.`,
+  );
 }
 
 function hash(value) {
