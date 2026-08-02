@@ -17,3 +17,11 @@ export {
   lafeaLugPinholeAnalysisGeometryHash,
   validateLafeaLugPinholeMeshLadder,
 } from './lafea-lug-pinhole-mesh-ladder.js';
+export {
+  LAFEA_LUG_PINHOLE_PHYSICAL_PROJECTION_INTAKE_SCHEMA,
+  LAFEA_LUG_PINHOLE_PHYSICAL_PROJECTION_LEVEL_SCHEMA,
+  LAFEA_LUG_PINHOLE_PHYSICAL_PROJECTION_PRODUCER_REVISION,
+  LAFEA_LUG_PINHOLE_PHYSICAL_PROJECTION_SCHEMA,
+  createLafeaLugPinholePhysicalProjection,
+  validateLafeaLugPinholePhysicalProjection,
+} from './lafea-lug-pinhole-physical-projection.js';
