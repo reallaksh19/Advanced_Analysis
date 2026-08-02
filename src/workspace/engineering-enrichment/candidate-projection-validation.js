@@ -54,8 +54,16 @@ function validateRow(row, index) {
   const registry = SHADOW_NONSTRUCTURAL_FIELD_REGISTRY[row.fieldId];
   if (!registry) fail(`rows[${index}] fieldId is not nonstructural.`, RangeError);
   if (row.unit !== registry.canonicalUnit) fail(`rows[${index}] unit is invalid.`);
-  if (row.proposedValue !== null && !Number.isFinite(row.proposedValue)) {
-    fail(`rows[${index}].proposedValue must be finite or null.`);
+  if (row.authorityLevel !== 'AUTHORIZED_MASTER_CANDIDATE') {
+    fail(`rows[${index}].authorityLevel is invalid.`, RangeError);
+  }
+  if (row.proposedValue !== null
+    && (!Number.isFinite(row.proposedValue) || row.proposedValue <= 0)) {
+    fail(`rows[${index}].proposedValue must be null or a positive finite number.`);
+  }
+  if ((row.targetKind === null) !== (row.targetId === null)
+    || (row.targetKind !== null && !['COMPONENT', 'SUPPORT'].includes(row.targetKind))) {
+    fail(`rows[${index}] target identity is invalid.`, RangeError);
   }
   if (!CANDIDATE_DISPOSITIONS.includes(row.disposition)) {
     fail(`rows[${index}] disposition is invalid.`);
@@ -68,11 +76,20 @@ function validateRow(row, index) {
   const projected = row.disposition === 'SHADOW_CANDIDATE_VALUE';
   if (projected) {
     if (row.targetKind !== registry.targetKind || !text(row.targetId, 'targetId')
-      || blockers.length !== 0 || !Number.isFinite(row.proposedValue)) {
+      || blockers.length !== 0 || !Number.isFinite(row.proposedValue)
+      || row.existingExplicitEvidence !== null) {
       fail(`rows[${index}] projected field evidence is invalid.`, RangeError);
     }
   } else if (blockers.length === 0) {
     fail(`rows[${index}] blocked disposition requires blockers.`, RangeError);
+  }
+  if (row.disposition === 'NOT_PROJECTED_UNRESOLVED'
+    && (row.targetKind !== null || row.targetId !== null)) {
+    fail(`rows[${index}] unresolved row must not select a target.`, RangeError);
+  }
+  if (row.disposition === 'BLOCKED_EXPLICIT_SOURCE_PRECEDENCE'
+    && row.existingExplicitEvidence === null) {
+    fail(`rows[${index}] explicit-source blocker requires evidence.`, RangeError);
   }
   return {
     proposalId,
@@ -102,6 +119,7 @@ function canonicalRecords(value) {
   if (!Array.isArray(value)) fail('blockers must be an array.');
   const rows = value.map((row) => {
     if (!isPlainRecord(row)) fail('blocker must be an object.');
+    text(row.code, 'blocker.code');
     return canonicalizeJson(row);
   });
   rows.sort((left, right) => ascii(semanticHash(left), semanticHash(right))

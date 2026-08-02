@@ -38,7 +38,7 @@ const EXPECTED_FUTURE_REQUIREMENTS = Object.freeze([
 export const PR371_BOUNDARY_RULES = Object.freeze([
   Object.freeze({
     id: 'ENGINEERING_ENRICHMENT_IMPORT',
-    pattern: /(?:from\s+|import\s*\(|require\s*\()\s*['"][^'"]*engineering-enrichment[^'"]*['"]/u,
+    pattern: /(?:from\s+|import\s+|import\s*\(|require\s*\()\s*['"][^'"]*engineering-enrichment[^'"]*['"]/u,
   }),
   Object.freeze({
     id: 'ENGINEERING_ENRICHMENT_PATH',

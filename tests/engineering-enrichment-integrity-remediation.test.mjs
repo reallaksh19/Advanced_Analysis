@@ -93,6 +93,22 @@ test('candidate validation rejects a rehashed structural field injection', () =>
   );
 });
 
+test('candidate validation rejects rehashed authority and value promotion', () => {
+  const setup = buildPipeline();
+  for (const mutate of [
+    (row) => { row.authorityLevel = 'AUTHORIZED_MASTER'; },
+    (row) => { row.proposedValue = -1; },
+  ]) {
+    const candidate = structuredClone(setup.candidateProjection);
+    mutate(candidate.rows[0]);
+    rehash(candidate, 'projectionHash');
+    assert.throws(
+      () => assertEngineeringEnrichmentCandidateProjection(candidate),
+      /authorityLevel is invalid|positive finite number/u,
+    );
+  }
+});
+
 test('result validation rejects rehashed non-numeric and duplicate metrics', () => {
   const setup = buildPipeline();
   const nonNumeric = structuredClone(setup.candidateResult);
