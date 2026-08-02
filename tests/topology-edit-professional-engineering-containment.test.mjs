@@ -10,13 +10,16 @@ const MODULES = [
   '../src/workspace/topology-edit/professional/topology-edit-slope-operation.js',
   '../src/workspace/topology-edit/professional/topology-edit-spec-catalog.js',
   '../src/workspace/topology-edit/professional/topology-edit-compatibility.js',
+  '../src/workspace/topology-edit/professional/topology-edit-validation-scope.js',
+  '../src/workspace/topology-edit/professional/topology-edit-validation-diagnostics.js',
+  '../src/workspace/topology-edit/professional/topology-edit-incremental-validation.js',
 ];
 
 const PROHIBITED = [
   /\b(?:document|window|localStorage|sessionStorage)\b/u,
   /\b(?:THREE|WebGL|renderer)\b/u,
   /WorkspaceState/u,
-  /(?:Date\.now|new Date|Math\.random|crypto\.randomUUID)/u,
+  /(?:Date\.now|new Date|performance\.now|Math\.random|crypto\.randomUUID)/u,
   /(?:mesh\.name|nearestObject|closestObject|nearest|closest)/u,
   /(?:topology-edit-persistence|topology-edit-export|topology-edit-commit-service)/u,
   /(?:commitPreparedTopologyEditExport|loadDataset|saveDraft|reloadDraft)/u,
