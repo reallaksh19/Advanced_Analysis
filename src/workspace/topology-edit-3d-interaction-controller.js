@@ -1,23 +1,14 @@
+import { TopologyEdit3DViewController as ReviewResponseController } from './topology-edit-3d-review-response-controller.js';
+import { TopologyEditInteractionRuntime } from './viewport-interaction/topology-edit-interaction-runtime.js';
 import {
-  TopologyEdit3DViewController as ReviewResponseController,
-} from './topology-edit-3d-review-response-controller.js';
-import {
-  TopologyEditInteractionRuntime,
-} from './viewport-interaction/topology-edit-interaction-runtime.js';
-import {
-  projectTopologyEditInteractionEvidence,
-  topologyEditInteractionAxisDirection,
-  topologyEditInteractionIsTextControl,
-  topologyEditInteractionPointsEqual,
+  projectTopologyEditInteractionEvidence, topologyEditInteractionAxisDirection,
+  topologyEditInteractionIsTextControl, topologyEditInteractionPointsEqual,
 } from './viewport-productivity/topology-edit-interaction-controller-helpers.js';
 import {
-  assertCurrentTopologyEditInteractionRuntime,
-  selectedTopologyEditNodeContext,
+  assertCurrentTopologyEditInteractionRuntime, selectedTopologyEditNodeContext,
   verifyTopologyEditInteractionAcceptance,
 } from './viewport-productivity/topology-edit-interaction-session.js';
-import {
-  renderTopologyEditInteractionPanel,
-} from './viewport-productivity/topology-edit-interaction-panel.js';
+import { renderTopologyEditInteractionPanel } from './viewport-productivity/topology-edit-interaction-panel.js';
 
 export class TopologyEdit3DViewController extends ReviewResponseController {
   constructor(eventBus, lifecycleOptions = {}) {
