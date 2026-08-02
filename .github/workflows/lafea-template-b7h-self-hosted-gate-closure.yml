@@ -17,6 +17,7 @@ jobs:
     timeout-minutes: 240
     env:
       EXPECTED_HEAD_SHA: ${{ github.sha }}
+      LAFEA_RUNNER_ENVIRONMENT: ${{ runner.environment }}
       B7E_REPORT_PATH: reports/qualification/lafea-b7e-b7-gate-closure.json
       B7F_REPORT_PATH: reports/qualification/lafea-b7f-current-main-qualification.json
       B7G_BUNDLE_PATH: reports/qualification/lafea-b7g-portable-qualification-bundle.json
@@ -37,6 +38,7 @@ jobs:
           set -euo pipefail
           test "${GITHUB_EVENT_NAME}" = "workflow_dispatch"
           test "${GITHUB_REF}" = "refs/heads/main"
+          test "${LAFEA_RUNNER_ENVIRONMENT}" = "self-hosted"
           test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD_SHA}"
           git fetch --no-tags --prune origin main
           test "$(git rev-parse refs/remotes/origin/main)" = "${EXPECTED_HEAD_SHA}"
@@ -58,7 +60,8 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          node scripts/lafea-template-b7g-portable-qualification-bundle.mjs \
+          RUNNER_ENVIRONMENT="${LAFEA_RUNNER_ENVIRONMENT}" \
+            node scripts/lafea-template-b7g-portable-qualification-bundle.mjs \
             2>&1 | tee lafea-b7h-self-hosted-execution.log
 
       - name: Independently verify B7G evidence
@@ -67,7 +70,10 @@ jobs:
           "$B7G_BUNDLE_PATH"
 
       - name: Evaluate B7H gate closure contract
-        run: node scripts/lafea-template-b7h-self-hosted-gate-closure-check.mjs
+        shell: bash
+        run: >-
+          RUNNER_ENVIRONMENT="${LAFEA_RUNNER_ENVIRONMENT}"
+          node scripts/lafea-template-b7h-self-hosted-gate-closure-check.mjs
 
       - name: Verify exact-head hygiene
         shell: bash
