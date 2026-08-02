@@ -83,6 +83,7 @@ jobs:
           tests/topology-edit-fitting-support-integration.test.mjs
           tests/topology-edit-wave3a-checker.test.mjs
           tests/topology-edit-wave3-commands.test.mjs
+          tests/topology-edit-wave3-exact-gap-modes.test.mjs
           tests/topology-edit-wave3b-autofix.test.mjs
           tests/topology-edit-wave3c-autofix-ui.test.mjs
           tests/topology-edit-wave4a-persistence-export.test.mjs
