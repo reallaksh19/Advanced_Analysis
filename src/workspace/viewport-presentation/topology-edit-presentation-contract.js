@@ -1,4 +1,9 @@
 import { semanticHash } from '../../core/shared-piping-model/index.js';
+import {
+  CANONICAL_VISIBILITY_ACTIONS,
+  createTopologyEditCanonicalVisibility,
+  reduceTopologyEditCanonicalVisibility,
+} from './topology-edit-visibility-model.js';
 
 export const TOPOLOGY_EDIT_PRESENTATION_SCHEMA = 'TopologyEditViewportPresentation.v1';
 export const TOPOLOGY_EDIT_PRESENTATION_POLICY_SCHEMA = 'TopologyEditPresentationPolicy.v1';
@@ -16,7 +21,7 @@ export const DEFAULT_TOPOLOGY_EDIT_PRESENTATION_POLICY = Object.freeze({
   sourceVisible: true,
   draftVisible: true,
   authority: 'DISPLAY_ONLY_DEFAULT',
-  disclosure: 'Source and draft visibility and opacity are display-only preferences. They do not modify canonical topology, engineering geometry, command authority, or exported data.',
+  disclosure: 'Source and draft visibility, opacity, hide, and isolate controls are display-only preferences. They do not modify canonical topology, engineering geometry, command authority, edit scope, or exported data.',
 });
 
 const ACTIONS = Object.freeze({
@@ -24,6 +29,10 @@ const ACTIONS = Object.freeze({
   RESET: 'RESET_PRESENTATION',
   VISIBILITY: 'SET_LAYER_VISIBILITY',
   OPACITY: 'SET_LAYER_OPACITY',
+  HIDE_IDS: CANONICAL_VISIBILITY_ACTIONS.HIDE,
+  ISOLATE_IDS: CANONICAL_VISIBILITY_ACTIONS.ISOLATE,
+  SHOW_ALL_IDS: CANONICAL_VISIBILITY_ACTIONS.SHOW_ALL,
+  RECONCILE_IDS: CANONICAL_VISIBILITY_ACTIONS.RECONCILE,
 });
 
 export function createTopologyEditPresentationPolicy(input = DEFAULT_TOPOLOGY_EDIT_PRESENTATION_POLICY) {
@@ -64,6 +73,7 @@ export function createTopologyEditPresentationState(input = {}) {
     draftVisible: input.draftVisible ?? policy.draftVisible,
     sourceOpacity: normalizedOpacity(input.sourceOpacity ?? policy.sourceOpacity, 'sourceOpacity'),
     draftOpacity: normalizedOpacity(input.draftOpacity ?? policy.draftOpacity, 'draftOpacity'),
+    canonicalVisibility: createTopologyEditCanonicalVisibility(input.canonicalVisibility),
   };
   return finalizeState(state);
 }
@@ -79,6 +89,11 @@ export function reduceTopologyEditPresentationState(state, action = {}) {
       return setLayerVisibility(state, action.layer, action.visible);
     case ACTIONS.OPACITY:
       return setLayerOpacity(state, action.layer, action.opacity);
+    case ACTIONS.HIDE_IDS:
+    case ACTIONS.ISOLATE_IDS:
+    case ACTIONS.SHOW_ALL_IDS:
+    case ACTIONS.RECONCILE_IDS:
+      return updateCanonicalVisibility(state, action);
     default:
       throw new Error(`Unknown topology-edit presentation action "${String(action.type)}".`);
   }
@@ -107,6 +122,7 @@ function resetState(state) {
     draftVisible: state.policy.draftVisible,
     sourceOpacity: state.policy.sourceOpacity,
     draftOpacity: state.policy.draftOpacity,
+    canonicalVisibility: createTopologyEditCanonicalVisibility(),
   });
 }
 
@@ -118,6 +134,14 @@ function setLayerVisibility(state, layer, visible) {
 function setLayerOpacity(state, layer, opacity) {
   const key = layerKey(layer, 'Opacity');
   return finalizeState({ ...state, [key]: normalizedOpacity(opacity, key) });
+}
+
+function updateCanonicalVisibility(state, action) {
+  const canonicalVisibility = reduceTopologyEditCanonicalVisibility(
+    state.canonicalVisibility,
+    action,
+  );
+  return finalizeState({ ...state, canonicalVisibility });
 }
 
 function layerKey(layer, suffix) {
@@ -135,6 +159,7 @@ function finalizeState(state) {
     draftVisible: state.draftVisible,
     sourceOpacity: state.sourceOpacity,
     draftOpacity: state.draftOpacity,
+    canonicalVisibility: state.canonicalVisibility,
   };
   return deepFreeze({ ...state, presentationHash: semanticHash(serializable) });
 }
