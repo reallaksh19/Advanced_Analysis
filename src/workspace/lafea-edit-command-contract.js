@@ -1,12 +1,10 @@
 /**
- * Private StageEditCommand/v2 and StageEditResult/v2 contract implementation.
+ * Private StageEditCommand/v2 and StageEditResult/v2 contracts.
  *
- * This module owns exact keys, command construction and numeric lexical
- * classification. It does not apply edits to a stage document.
+ * This module owns exact keys and construction only. It does not apply edits.
  */
 import {
   LAFEA_INPUT_DESCRIPTOR_REVISION,
-  LAFEA_VALUE_STATES,
 } from './lafea-stage-input-descriptors.js';
 import {
   deepFreeze,
@@ -65,7 +63,6 @@ const INPUT_KEYS = Object.freeze([
   'jsonValue',
 ]);
 const ORIGIN_KEYS = Object.freeze(['surface', 'sessionId', 'sequence']);
-const DECIMAL_GRAMMAR = /^[+-]?(?:(?:0|[1-9][0-9]*)(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$/u;
 
 export function createLafeaSetScalarCommand(options) {
   return command({
@@ -142,60 +139,6 @@ export function createLafeaDeleteEntityCommand(options) {
       jsonValue: null,
     },
   });
-}
-
-export function classifyLafeaNumericInput(input, descriptor) {
-  exactKeys(input, INPUT_KEYS, 'StageEditCommand/v2.input');
-  if (input.presence === 'DELETE') {
-    return parsed('MISSING', null, null, null);
-  }
-  if (input.presence !== 'PRESENT') {
-    return parsed('INVALID_NUMBER', null, null, 'INVALID_PRESENCE');
-  }
-
-  if (input.encoding === 'JSON') {
-    if (input.jsonValue === null) {
-      return parsed('PRESENT_NULL', null, 'null', null);
-    }
-    if (typeof input.jsonValue !== 'number'
-      || !Number.isFinite(input.jsonValue)) {
-      return parsed(
-        'INVALID_NUMBER',
-        null,
-        null,
-        'JSON_VALUE_NOT_FINITE_NUMBER',
-      );
-    }
-    return boundedNumeric(
-      input.jsonValue,
-      JSON.stringify(input.jsonValue),
-      descriptor,
-    );
-  }
-
-  if (input.encoding !== 'TEXT' || typeof input.rawText !== 'string') {
-    return parsed('INVALID_NUMBER', null, null, 'TEXT_INPUT_REQUIRED');
-  }
-  const trimmed = input.rawText.trim();
-  if (!trimmed) return parsed('EMPTY_TEXT', null, input.rawText, null);
-  if (!DECIMAL_GRAMMAR.test(trimmed)) {
-    return parsed(
-      'INVALID_NUMBER',
-      null,
-      input.rawText,
-      'INVALID_DECIMAL_LEXEME',
-    );
-  }
-  const value = Number(trimmed);
-  if (!Number.isFinite(value)) {
-    return parsed(
-      'INVALID_NUMBER',
-      null,
-      input.rawText,
-      'NUMBER_OUT_OF_RANGE',
-    );
-  }
-  return boundedNumeric(value, input.rawText, descriptor);
 }
 
 export function validateLafeaEditCommand(commandValue) {
@@ -335,53 +278,4 @@ function validateOperationInput(commandValue) {
     && (input.presence !== 'PRESENT' || input.encoding !== 'JSON')) {
     throw new TypeError('REPLACE_DOCUMENT requires PRESENT JSON input.');
   }
-}
-
-function boundedNumeric(value, rawLexeme, descriptor) {
-  const normalized = Object.is(value, -0) ? 0 : value;
-  const contract = descriptor.valueContract;
-  if (contract.minimum !== null) {
-    const invalid = contract.minimumExclusive
-      ? normalized <= contract.minimum
-      : normalized < contract.minimum;
-    if (invalid) {
-      return parsed(
-        'INVALID_NUMBER',
-        null,
-        rawLexeme,
-        'NUMBER_BELOW_MINIMUM',
-      );
-    }
-  }
-  if (contract.maximum !== null) {
-    const invalid = contract.maximumExclusive
-      ? normalized >= contract.maximum
-      : normalized > contract.maximum;
-    if (invalid) {
-      return parsed(
-        'INVALID_NUMBER',
-        null,
-        rawLexeme,
-        'NUMBER_ABOVE_MAXIMUM',
-      );
-    }
-  }
-  return parsed(
-    normalized === 0 ? 'EXPLICIT_ZERO' : 'FINITE_NUMBER',
-    normalized,
-    rawLexeme,
-    null,
-  );
-}
-
-function parsed(state, value, rawLexeme, diagnosticCode) {
-  if (!LAFEA_VALUE_STATES.includes(state)) {
-    throw new TypeError(`Unknown value state: ${state}.`);
-  }
-  return deepFreeze({
-    state,
-    value,
-    rawLexeme,
-    diagnostic: diagnosticCode,
-  });
 }
