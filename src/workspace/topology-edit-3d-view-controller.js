@@ -7,6 +7,13 @@ import { TopologyEditLifecycleController } from './topology-edit/topology-edit-l
 
 export { buildAutofixPolicy } from './topology-edit-3d-view-controller-core.js';
 
+const CANONICAL_NODE_ID_PATTERN = /^node:[^\s]+$/;
+const CANONICAL_EDGE_ID_PATTERN = /^edge:[^\s]+$/;
+const EMPTY_TOPOLOGY_EDIT_VIEW_SELECTION = Object.freeze({
+  nodeIds: Object.freeze([]),
+  edgeId: null,
+});
+
 export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCore {
   constructor(eventBus, lifecycleOptions = {}) {
     super(eventBus);
@@ -135,8 +142,8 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
       this.presentationToolbar?.update(this.presentationState);
       this.presentationRuntime?.apply(this.presentationState);
     }
-    const restoredSelection = restoreTopologyEditViewSelection(viewState.selection);
-    if (restoredSelection) this.selection = restoredSelection;
+    this.selection = restoreTopologyEditViewSelection(viewState.selection)
+      ?? EMPTY_TOPOLOGY_EDIT_VIEW_SELECTION;
   }
 
   exportDraft() {
@@ -215,12 +222,17 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
 export function restoreTopologyEditViewSelection(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   if (!Array.isArray(value.nodeIds) || value.nodeIds.length > 2) return null;
-  const nodeIds = value.nodeIds.map((id) => String(id ?? '').trim());
-  if (nodeIds.some((id) => !id.startsWith('node:'))
-      || new Set(nodeIds).size !== nodeIds.length) return null;
+  if (!value.nodeIds.every((id) => (
+    typeof id === 'string' && CANONICAL_NODE_ID_PATTERN.test(id)
+  ))) return null;
+  const nodeIds = [...value.nodeIds];
+  if (new Set(nodeIds).size !== nodeIds.length) return null;
   const edgeId = value.edgeId === null || value.edgeId === undefined
-    ? null : String(value.edgeId).trim();
-  if (edgeId !== null && !edgeId.startsWith('edge:')) return null;
+    ? null
+    : value.edgeId;
+  if (edgeId !== null && (
+    typeof edgeId !== 'string' || !CANONICAL_EDGE_ID_PATTERN.test(edgeId)
+  )) return null;
   if (edgeId && nodeIds.length) return null;
   return Object.freeze({
     nodeIds: Object.freeze(nodeIds),

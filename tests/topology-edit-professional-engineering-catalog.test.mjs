@@ -24,9 +24,10 @@ test('catalogue is versioned, content-addressed, immutable, and reorder stable',
   });
 
   assert.deepEqual(left, right);
-  assert.equal(left.schema, 'TopologyEditSpecificationCatalogue.v1');
+  assert.equal(left.schema, 'TopologyEditSpecificationCatalogue.v2');
   assert.equal(left.catalogueVersion, '2026.08.02');
-  assert.equal(left.records.length, 7);
+  assert.equal(left.records.length, 8);
+  assert.match(left.authority.sourceHash, /^sha256:[a-f0-9]{64}$/u);
   assert.equal(Object.isFrozen(left), true);
   assert.equal(Object.isFrozen(left.records), true);
   assert.equal(Object.isFrozen(left.records[0]), true);
@@ -42,9 +43,12 @@ test('catalogue records retain exact component-specific engineering evidence', a
   assert.equal(byId.get('ELBOW-DN100-LR90-A').elbowAngleDeg, 90);
   assert.equal(byId.get('REDUCER-DN150-DN100-CONC-A').secondaryNominalSizeMm, 100);
   assert.equal(byId.get('REDUCER-DN150-DN100-CONC-A').reducerOrientation, 'CONCENTRIC');
+  assert.equal(byId.get('VALVE-DN100-GATE-600-A').valveType, 'GATE');
   assert.equal(byId.get('VALVE-DN100-GATE-600-A').valveFaceToFaceMm, 600);
   assert.equal(byId.get('FLANGE-DN100-600-RF-A').flangeClass, '600');
   assert.equal(byId.get('FLANGE-DN100-600-RF-A').flangeFacing, 'RF');
+  assert.equal(byId.get('TEE-DN100-DN50-BW-A').centerToBranchMm, 64);
+  assert.equal(byId.get('OLET-DN100-DN25-WELDOLET-A').oletType, 'WELDOLET');
   assert.deepEqual(
     topologyEditSpecificationRecordKey(byId.get('PIPE-DN100-SCH40-A')),
     {
@@ -53,15 +57,25 @@ test('catalogue records retain exact component-specific engineering evidence', a
       outsideDiameterMm: 114.3,
       secondaryNominalSizeMm: null,
       secondaryOutsideDiameterMm: null,
+      branchNominalSizeMm: null,
+      branchOutsideDiameterMm: null,
       schedule: 'SCH40',
       wallThicknessMm: 6.02,
       elbowRadiusMm: null,
       elbowAngleDeg: null,
       reducerType: null,
       reducerOrientation: null,
+      valveType: null,
       valveFaceToFaceMm: null,
       flangeClass: null,
       flangeFacing: null,
+      branchAngleDeg: null,
+      centerToRunMm: null,
+      centerToBranchMm: null,
+      branchConnection: null,
+      oletType: null,
+      hostComponentType: null,
+      projectionMm: null,
       endConnectionFrom: 'BW',
       endConnectionTo: 'BW',
       pipingClass: 'DEMO-150',
@@ -117,7 +131,7 @@ test('catalogue fails closed on duplicate identity and content/version drift', a
   }), /immutable content authority|record differs/i);
 });
 
-test('catalogue does not accept hidden nearest-size or reducer-field fallback', () => {
+test('catalogue does not accept hidden nearest-size or component-field fallback', () => {
   assert.throws(() => createTopologyEditSpecificationRecord({
     recordId: 'PIPE-BAD',
     componentType: 'PIPE',
@@ -142,5 +156,5 @@ test('catalogue does not accept hidden nearest-size or reducer-field fallback', 
     endConnectionTo: 'BW',
     pipingClass: 'DEMO',
     sourceReference: { documentId: 'S', revision: '1', path: '/pipe/bad' },
-  }), /reducer-only fields/i);
+  }), /secondaryNominalSizeMm is not valid for componentType PIPE/i);
 });

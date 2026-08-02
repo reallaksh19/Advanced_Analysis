@@ -21,9 +21,13 @@ async function sources() {
   return Object.fromEntries(FILES.map((file, index) => [file, rows[index]]));
 }
 
-test('interaction controller extends current composition without production routing', async () => {
+test('interaction controller retains review composition and is production-routed through professional integration', async () => {
   const source = await sources();
   const controller = source[FILES[0]];
+  const professional = await readFile(
+    path.join(ROOT, 'src/workspace/topology-edit-3d-professional-controller.js'),
+    'utf8',
+  );
   const loadCalc = await readFile(
     path.join(ROOT, 'src/workspace/load-calc-consumer-controller.js'),
     'utf8',
@@ -34,8 +38,9 @@ test('interaction controller extends current composition without production rout
   assert.match(controller, /TopologyEditInteractionControllerRuntime/);
   assert.match(controller, /interactionControllerRuntime\.mount\(\)/);
   assert.match(controller, /interactionControllerRuntime\.destroy\(\)/);
-  assert.match(loadCalc, /topology-edit-3d-review-response-controller\.js/);
-  assert.doesNotMatch(loadCalc, /topology-edit-3d-interaction-controller\.js/);
+  assert.match(professional, /topology-edit-3d-interaction-controller\.js/);
+  assert.match(loadCalc, /topology-edit-3d-professional-controller\.js/);
+  assert.doesNotMatch(loadCalc, /topology-edit-3d-review-response-controller\.js/);
 });
 
 test('keyboard nudges use axis direction and Shift changes increment only', async () => {

@@ -3,6 +3,9 @@ import {
   createTopologyEditGizmoModel,
 } from '../viewport-interaction/topology-edit-gizmo-model.js';
 import {
+  resolveTopologyEditSceneSnap,
+} from '../viewport-interaction/topology-edit-snap-collector.js';
+import {
   TopologyEditInteractionViewportAdapter,
 } from '../viewport-interaction/topology-edit-interaction-viewport-adapter.js';
 import {
@@ -20,9 +23,11 @@ const KEYBOARD_NUDGES = Object.freeze({
 });
 
 export class TopologyEditInteractionControllerRuntime {
-  constructor(controller) {
+  constructor(controller, options = {}) {
     if (!controller) throw new TypeError('Interaction controller runtime requires a controller.');
     this.controller = controller;
+    this.snapToleranceMm = positive(options.snapToleranceMm ?? 25, 'snapToleranceMm');
+    this.gridSizeMm = positive(options.gridSizeMm ?? 25, 'gridSizeMm');
     this.viewport = null;
     this.gizmo = null;
     this.activeMode = null;
@@ -50,6 +55,7 @@ export class TopologyEditInteractionControllerRuntime {
     if (!context) {
       this.gizmo = null;
       this.viewport.render(null);
+      this.syncEvidence();
       return;
     }
     const backend = this.controller.viewportBackend;
@@ -58,6 +64,7 @@ export class TopologyEditInteractionControllerRuntime {
     if (!camera || !canvas) {
       this.gizmo = null;
       this.viewport.render(null);
+      this.syncEvidence();
       return;
     }
     const anchor = new THREE.Vector3(
@@ -75,6 +82,7 @@ export class TopologyEditInteractionControllerRuntime {
       perspectiveFovDeg: camera.isPerspectiveCamera ? camera.fov : 45,
     });
     this.viewport.render(this.gizmo, this.controller.interactionPreview);
+    this.syncEvidence();
   }
 
   beginDrag(mode) {
@@ -85,15 +93,34 @@ export class TopologyEditInteractionControllerRuntime {
 
   previewDrag(mode, targetPosition, announce) {
     try {
+      const topology = this.controller.session?.currentTopology();
+      const context = selectedTopologyEditNodeContext(
+        topology,
+        this.controller.selection,
+      );
+      const snapResolution = resolveTopologyEditSceneSnap({
+        topology,
+        basisHash: context.basisHash,
+        nodeId: context.nodeId,
+        anchorPosition: context.anchorPosition,
+        pointerPoint: targetPosition,
+        transformMode: mode,
+        toleranceMm: this.snapToleranceMm,
+        gridSizeMm: this.gridSizeMm,
+      });
       const preview = createTopologyEditDragSessionPreview({
-        topology: this.controller.session?.currentTopology(),
+        topology,
         selection: this.controller.selection,
         transformMode: mode,
         targetPosition,
+        snapResolution,
       });
+      const snap = snapResolution.status === 'RESOLVED'
+        ? `${snapResolution.candidate.evidenceType} ${snapResolution.candidate.targetCanonicalId ?? ''}`.trim()
+        : snapResolution.status;
       this.controller.retainInteractionPreview(
         preview,
-        `${mode} gizmo preview updated`,
+        `${mode} gizmo preview updated; snap ${snap}`,
         announce,
       );
     } catch (error) {
@@ -129,12 +156,27 @@ export class TopologyEditInteractionControllerRuntime {
     }
   }
 
+  syncEvidence() {
+    this.controller.updateInteractionEvidence?.();
+    const host = this.controller.hostElement;
+    if (!host) return;
+    const preview = this.controller.interactionPreview;
+    host.dataset.topologyEditGizmoHandleCount = String(
+      this.gizmo?.handles?.length ?? 0,
+    );
+    host.dataset.topologyEditInteractionSnapStatus = preview?.snapStatus ?? '';
+    host.dataset.topologyEditInteractionSnapEvidence = preview?.snapEvidenceType ?? '';
+    host.dataset.topologyEditInteractionSnapTarget = preview?.snapTargetCanonicalId ?? '';
+    host.dataset.topologyEditInteractionSnapCandidateHash = preview?.snapCandidateHash ?? '';
+  }
+
   destroy() {
     const viewport = this.viewport;
     this.viewport = null;
     this.gizmo = null;
     this.activeMode = null;
     viewport?.destroy();
+    this.syncEvidence();
   }
 }
 
@@ -160,4 +202,12 @@ export function isTopologyEditTextControl(target) {
     target?.isContentEditable
     || ['INPUT', 'TEXTAREA', 'SELECT'].includes(name),
   );
+}
+
+function positive(value, label) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) {
+    throw new RangeError(`${label} must be positive.`);
+  }
+  return number;
 }
