@@ -27,10 +27,20 @@ Phase 3 adds exact-only line-list resolution over an immutable `LINE_LIST` snaps
 - missing and type-conflicting source fields remain explicit blockers;
 - every output binds the inventory, snapshot, field-binding set, target records, summary, and semantic hash.
 
-This module does **not** perform piping-class, material, density, insulation, or
-weight resolution; engineering fallback; engineering approval; Project Data
-persistence; empirical calculations; LFEA binding; stagedJson mutation;
-topology validation; or solver work.
+Phase 4 adds exact-only piping-class resolution over an immutable `PIPING_CLASS` snapshot:
+
+- class and bore are mandatory exact key inputs from the line-list resolution;
+- schedule is an explicit optional key dimension, never an inferred default;
+- source rows are indexed into duplicate-preserving class/bore[/schedule] buckets;
+- zero matching rows remain `BLOCKED_MISSING`;
+- multiple exact rows remain `BLOCKED_AMBIGUOUS`, even when values agree;
+- only one exact row may resolve dimensions, wall, schedule-bound data, or material codes;
+- missing and type-conflicting source fields remain explicit blockers.
+
+This module does **not** perform material-register, density, insulation, or weight
+resolution; engineering fallback; engineering approval; Project Data persistence;
+empirical calculations; LFEA binding; stagedJson mutation; topology validation;
+or solver work.
 
 ## Invariants
 
@@ -50,6 +60,9 @@ topology validation; or solver work.
 12. One line key maps to an ordered array of component targets, never one overwritten row.
 13. Exact line-list matching preserves duplicate source rows as ambiguity.
 14. Line-list resolution never uses regex, containment, fuzzy matching, service consensus, or fallback.
+15. Piping-class key inputs must be `RESOLVED_EXACT`; derived or proposed keys are blocked.
+16. Omitting schedule broadens the exact key and may create ambiguity; no schedule is selected by default.
+17. Piping-class resolution never uses standard-wall, first-row, containment, or material fallback.
 
 ## Qualification
 
@@ -57,4 +70,5 @@ topology validation; or solver work.
 node scripts/run-common-enriched-properties-checks.mjs
 node scripts/run-common-enriched-target-inventory-checks.mjs
 node scripts/run-common-enriched-exact-line-list-checks.mjs
+node scripts/run-common-enriched-exact-piping-class-checks.mjs
 ```
