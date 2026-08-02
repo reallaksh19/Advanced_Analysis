@@ -6,7 +6,7 @@ on:
       - '.github/workflows/topology-edit-c3d-wave10-review-ledger.yml'
       - 'src/workspace/topology-edit-3d-review-ledger-controller.js'
       - 'src/workspace/viewport-productivity/topology-edit-review-response-ledger*.js'
-      - 'tests/topology-edit-c3d-wave10-review-ledger.test.mjs'
+      - 'tests/topology-edit-c3d-wave10-review-ledger*.test.mjs'
   workflow_dispatch:
 
 permissions:
@@ -58,7 +58,10 @@ jobs:
             src/workspace/viewport-productivity/topology-edit-review-response-ledger*.js
 
       - name: Qualify Wave 10 multi-response ledger
-        run: node --test tests/topology-edit-c3d-wave10-review-ledger.test.mjs
+        run: |
+          node --test \
+            tests/topology-edit-c3d-wave10-review-ledger.test.mjs \
+            tests/topology-edit-c3d-wave10-review-ledger-integrity.test.mjs
 
       - name: Retain Waves 7 through 9 review collaboration
         run: |
@@ -113,6 +116,7 @@ jobs:
             'src/workspace/viewport-productivity/topology-edit-review-response-ledger-panel.js',
             'src/workspace/viewport-productivity/topology-edit-review-response-ledger-validation.js',
             'tests/topology-edit-c3d-wave10-review-ledger.test.mjs',
+            'tests/topology-edit-c3d-wave10-review-ledger-integrity.test.mjs',
           ];
           const evidence = {
             schema: 'TopologyEditC3DWave10ReviewLedgerEvidence.v1',
