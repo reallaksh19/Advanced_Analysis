@@ -46,6 +46,15 @@ export {
   validateLafeaB7dRecoveryRenderBridge,
 } from './lafea-b7d-recovery-render-bridge.js';
 export {
+  LAFEA_SELECTED_PILOT_AUDIT_RECEIPT_SCHEMA,
+  LAFEA_SELECTED_PILOT_REVIEW_HANDOFF_SCHEMA,
+  LAFEA_SELECTED_PILOT_REVIEW_PACKET_SCHEMA,
+  LAFEA_SELECTED_PILOT_REVIEW_PRODUCER_REVISION,
+  createLafeaSelectedPilotReviewHandoff,
+  parseLafeaSelectedPilotReviewHandoff,
+  serializeLafeaSelectedPilotReviewHandoff,
+  validateLafeaSelectedPilotReviewHandoff,
+} from './lafea-selected-pilot-evidence-handoff.js';
   LAFEA_B7D_WORKBENCH_DISPLAY_HANDOFF_INTAKE_SCHEMA,
   LAFEA_B7D_WORKBENCH_DISPLAY_HANDOFF_PRODUCER_REVISION,
   LAFEA_B7D_WORKBENCH_DISPLAY_HANDOFF_SCHEMA,
