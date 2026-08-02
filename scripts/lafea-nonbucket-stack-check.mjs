@@ -18,6 +18,7 @@ const CHECKS = Object.freeze([
   { scope: 'NB-T6D-RENDER', path: 'scripts/lafea-nb-t6d-b7d-recovery-render-bridge-check.mjs' },
   { scope: 'NB-T6E', path: 'scripts/lafea-nb-t6e-evidence-handoff-review-check.mjs' },
   { scope: 'NB-T6E', path: 'scripts/lafea-nb-t6e-workbench-display-handoff-check.mjs' },
+  { scope: 'NB-T6F', path: 'scripts/lafea-nb-t6f-read-only-review-session-check.mjs' },
   { scope: 'PR-NB1-A', path: 'scripts/lafea-nb1-analytical-verticals-check.mjs' },
   { scope: 'U1', path: 'scripts/lafea-u1-stage-registry-check.mjs' },
   { scope: 'U1', path: 'scripts/lafea-u1b-registry-consumer-check.mjs' },
@@ -88,7 +89,7 @@ for (const row of CHECKS) {
 }
 
 const report = Object.freeze({
-  schema: 'lafea-nonbucket-stack-report/v11',
+  schema: 'lafea-nonbucket-stack-report/v12',
   check: 'lafea-nonbucket-stack-certification',
   status: failures.length ? 'FAIL' : 'PASS',
   exactHead: gitHead(),
@@ -134,6 +135,12 @@ const report = Object.freeze({
   b7dWorkbenchRenderEvidenceIntakeRequired: true,
   b7dWorkbenchTypedArraysExposedByReceipt: false,
   b7dWorkbenchEngineeringEvidenceChanged: false,
+  publicContinuumFacadeRepaired: true,
+  selectedPilotReadOnlyReviewSessionIntegrated: true,
+  portableAuditAndLiveDisplayParentsBound: true,
+  reviewSessionPacketBuffersIncluded: false,
+  reviewSessionDisplayValuesAuthoritative: false,
+  reviewSessionEngineeringEvidenceChanged: false,
   arbitraryOuterProfileMeshingIntegrated: false,
   arbitraryHoleTopologyMeshingIntegrated: false,
   displayTessellationAcceptedAsMeshEvidence: false,
