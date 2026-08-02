@@ -9,6 +9,7 @@ on:
       - 'docs/TOPOLOGY_EDIT_ORIGINAL_PLAN_CLOSURE_AUDIT.md'
       - 'e2e/topology-edit-20-element-demo-edit-flow.spec.js'
       - 'e2e/topology-edit-20-element-demo-repair-flow.spec.js'
+      - 'e2e/topology-edit-20-element-demo-lifecycle-flow.spec.js'
       - 'public/fixtures/topology-edit-20-element-demo.staged.json'
       - 'scripts/1885s-empirical-qualification.mjs'
       - 'scripts/run-playwright.mjs'
@@ -16,6 +17,7 @@ on:
       - 'scripts/topology-edit-wave5-*.mjs'
       - 'scripts/topology-edit-write-wave5-evidence.mjs'
       - 'tests/topology-edit-20-element-demo-*.test.mjs'
+      - 'tests/topology-edit-lifecycle-view-state.test.mjs'
       - 'tests/topology-edit-search-composition.test.mjs'
       - 'tests/topology-edit-wave*.mjs'
       - 'tests/topology-edit-c3d-*.test.mjs'
@@ -36,7 +38,7 @@ jobs:
   qualify-wave5-release:
     name: Exact-head integrated topology-edit release qualification
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 75
     env:
       CI: 'true'
       TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -83,6 +85,7 @@ jobs:
           node --test
           tests/topology-edit-20-element-demo-loader.test.mjs
           tests/topology-edit-20-element-demo-repairs.test.mjs
+          tests/topology-edit-lifecycle-view-state.test.mjs
           tests/topology-edit-wave1-pure-kernel.test.mjs
           tests/topology-edit-wave1-candidate-certification.test.mjs
           tests/topology-edit-wave1-journal-replay.test.mjs
@@ -123,6 +126,9 @@ jobs:
       - name: Walk bridge and trim user repairs
         run: node scripts/run-playwright.mjs e2e/topology-edit-20-element-demo-repair-flow.spec.js
 
+      - name: Walk repaired demo lifecycle
+        run: node scripts/run-playwright.mjs e2e/topology-edit-20-element-demo-lifecycle-flow.spec.js
+
       - name: Measure exact-head browser performance and lifecycle
         run: node --test tests/topology-edit-wave5-browser.spec.mjs
 
@@ -155,6 +161,7 @@ jobs:
           path: |
             reports/qualification/topology-edit-demo-walkthrough.json
             reports/qualification/topology-edit-demo-repairs.json
+            reports/qualification/topology-edit-demo-lifecycle.json
             reports/qualification/topology-edit-original-plan-audit.json
             reports/qualification/topology-edit-wave5-browser.json
             reports/qualification/topology-edit-wave5-fixtures.json
