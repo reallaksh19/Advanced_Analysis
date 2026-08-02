@@ -1,0 +1,254 @@
+{
+  "schema": "lafea-bucket-01-gap-matrix/v1",
+  "audit_status": "READ_ONLY_BASELINE_AUDIT_COMPLETE",
+  "audited_baseline_sha": "a7144e02598f3e9db0826f10cefe0b5254fa953e",
+  "manifest_commit_sha": "64b4dfb63a0b8a3fd60670a623a92dc145ba4224",
+  "bucket_id": "LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE",
+  "target": "C2D-LUG-PINHOLE -> LAFEA.3",
+  "qualification_claimed": false,
+  "findings": [
+    {
+      "id": "B01-G1-001",
+      "gate": "G1_CONTRACT_AND_AUTHORITY",
+      "requirement": "Exact source, parent lineage and bounded public stage route",
+      "status": "IMPLEMENTED_NEEDS_BUCKET_AGGREGATION",
+      "evidence_paths": [
+        "src/workspace/lafea-controlled-continuum-stage-route.js",
+        "src/workspace/lafea-controlled-continuum-controller.js",
+        "scripts/lafea-template-b7e-b7-gate-closure-check.mjs",
+        "docs/LAFEA_Bucket_B7D_Controlled_Continuum_Controller.md",
+        "docs/LAFEA_Bucket_B7E_B7_Gate_Closure.md"
+      ],
+      "finding": "The bounded controller validates current authority parents, invokes the retained LAFEA.3 stage boundary and registers mesh/execution/recovery/convergence lineage. Bucket-01 still needs one aggregate report exposing the required explicit qualification states rather than only an aggregate PASS/BLOCKED result.",
+      "disposition": "REUSE_AND_EXTEND_EVIDENCE_ONLY"
+    },
+    {
+      "id": "B01-G1-002",
+      "gate": "G1_CONTRACT_AND_AUTHORITY",
+      "requirement": "Exact-current-main executable evidence",
+      "status": "BLOCKED",
+      "evidence_paths": [
+        "docs/LAFEA_Bucket_B7E_B7_Gate_Closure.md",
+        "docs/LAFEA_Bucket_B7F_Current_Main_Qualification.md",
+        "docs/LAFEA_Bucket_B7G_Portable_Qualification_Bundle.md",
+        "GitHub issue #269"
+      ],
+      "finding": "The repository retains exact-head gate infrastructure, but issue #269 records exact-current-main executable PASS as false. Connector inspection is not executable qualification evidence.",
+      "disposition": "UNRESOLVED_GATE_EXECUTABLE_RUN_REQUIRED"
+    },
+    {
+      "id": "B01-G2-001",
+      "gate": "G2_MESH_QUALIFICATION",
+      "requirement": "Deterministic bounded production T6 mesh ladder",
+      "status": "IMPLEMENTED",
+      "evidence_paths": [
+        "src/core/lafea-meshing/lug-pinhole-t6.js",
+        "src/workspace/lafea-lug-pinhole-mesh-ladder.js",
+        "scripts/lafea-nb-t6b-lug-pinhole-mesh-ladder-check.mjs",
+        "docs/LAFEA_NonBucket_NB-T6B_Lug_Pinhole_Mesh_Ladder.md"
+      ],
+      "finding": "The selected concentric annular geometry has deterministic L1/L2/L3 T6 generation, analytic circumferential midside placement, shared edge identities, counter-clockwise elements, feature sets and distinct mesh hashes.",
+      "disposition": "RETAIN_SCOPE_BOUNDARY"
+    },
+    {
+      "id": "B01-G2-002",
+      "gate": "G2_MESH_QUALIFICATION",
+      "requirement": "Complete geometry-fidelity metric set",
+      "status": "PARTIAL",
+      "evidence_paths": [
+        "src/core/lafea-meshing/lug-pinhole-t6.js"
+      ],
+      "finding": "Current generated quality records area error and boundary-node radius error. Bucket-01 additionally requires perimeter error, full mapped-boundary deviation, reconstructed hole-centre error, critical-ligament error, symmetry error and explicit quadratic midside deviation evidence.",
+      "disposition": "ADD_QUALIFICATION_METRICS_WITHOUT_CHANGING_MESH"
+    },
+    {
+      "id": "B01-G2-003",
+      "gate": "G2_MESH_QUALIFICATION",
+      "requirement": "Element validity at corners, integration points and mapped-edge sampling",
+      "status": "PARTIAL",
+      "evidence_paths": [
+        "src/core/lafea-meshing/lug-pinhole-t6.js",
+        "src/core/lafea-meshing/element-geometry.js",
+        "src/core/lafea-meshing/quality-gates.js"
+      ],
+      "finding": "Positive scaled Jacobian and integration-point determinant checks exist, with rejection of non-counter-clockwise generation. Dense mapped-element sampling, explicit disconnected-region checks, duplicate-coordinate checks and qualification receipts for coverage must be added or proven by existing contracts.",
+      "disposition": "EXTEND_VALIDATION_EVIDENCE"
+    },
+    {
+      "id": "B01-G3-001",
+      "gate": "G3_NUMERICAL_SOLUTION",
+      "requirement": "T6 constant-strain and rigid-body patch",
+      "status": "IMPLEMENTED_STRONG",
+      "evidence_paths": [
+        "scripts/lafea.3-t6-patch-check.mjs",
+        "src/core/local-continuum/t6-element.js"
+      ],
+      "finding": "The T6 element check covers axis-aligned, distorted and obtuse elements, rotation, translation and scaling invariance, plane stress/plane strain and non-positive Jacobian rejection at a 1e-10 relative criterion.",
+      "disposition": "WRAP_IN_BUCKET_MANIFEST_AND_RETAIN_RAW_RESULTS"
+    },
+    {
+      "id": "B01-G3-002",
+      "gate": "G3_NUMERICAL_SOLUTION",
+      "requirement": "T3 assembled patch through governed route",
+      "status": "PARTIAL",
+      "evidence_paths": [
+        "scripts/lafea.3-patch-check.mjs",
+        "scripts/lafea.3-fixtures.mjs"
+      ],
+      "finding": "An assembled two-triangle patch verifies traction/nodal parity, sign reversal, scaling, stress and equilibrium, but uses a 1e-7 scaled comparison and directly invokes the local continuum core. Bucket-01 requires frozen 1e-8 authority, every integration point, strain energy, orientation/node-order anti-drift and retained public-route evidence.",
+      "disposition": "ADD_GOVERNED_T3_BENCHMARK"
+    },
+    {
+      "id": "B01-G3-003",
+      "gate": "G3_NUMERICAL_SOLUTION",
+      "requirement": "Independent pure-shear benchmark",
+      "status": "PARTIAL",
+      "evidence_paths": [
+        "docs/local-continuum/LAFEA3_DETERMINISTIC_2D_CONTINUUM.md",
+        "scripts/lafea.3-stress-energy-check.mjs"
+      ],
+      "finding": "The core certification states pure-shear, principal and von Mises coverage, but Bucket-01 needs a separately identified frozen benchmark proving engineering-versus-tensor shear convention and local/global orientation through the governed evidence route.",
+      "disposition": "ADD_NAMED_PURE_SHEAR_ORACLE_AND_RECEIPT"
+    },
+    {
+      "id": "B01-G3-004",
+      "gate": "G3_NUMERICAL_SOLUTION",
+      "requirement": "Plane-stress cantilever or manufactured panel with three-level convergence",
+      "status": "MISSING",
+      "evidence_paths": [],
+      "finding": "No dedicated LAFEA.3 cantilever or manufactured rectangular-panel benchmark was identified in the current exact-head script set.",
+      "disposition": "ADD_INDEPENDENT_BENCHMARK_BEFORE_PRODUCTION_ACCEPTANCE"
+    },
+    {
+      "id": "B01-G3-005",
+      "gate": "G3_NUMERICAL_SOLUTION",
+      "requirement": "Load-driven free-DOF solve and force equilibrium",
+      "status": "IMPLEMENTED",
+      "evidence_paths": [
+        "src/workspace/lafea-load-driven-pilot-qualification.js",
+        "scripts/lafea-nb-t6d-load-driven-qualification-check.mjs",
+        "docs/LAFEA_NonBucket_NB-T6D_Load_Driven_Qualification.md"
+      ],
+      "finding": "NB-T6D requires nonzero resultant, BOUNDARY_ZERO restraints, deterministic Cholesky, free DOFs, pivots, retained reactions and force-equilibrium closure.",
+      "disposition": "REUSE"
+    },
+    {
+      "id": "B01-G3-006",
+      "gate": "G3_NUMERICAL_SOLUTION",
+      "requirement": "Moment equilibrium and strain-energy convergence in production qualification",
+      "status": "MISSING_FROM_NB_T6D_RECEIPT",
+      "evidence_paths": [
+        "src/workspace/lafea-load-driven-pilot-qualification.js"
+      ],
+      "finding": "NB-T6D independently recomputes only force resultants. Its level evidence does not retain moment equilibrium, strain energy, external work or their three-level convergence, despite lower-level solver energy evidence existing elsewhere.",
+      "disposition": "EXTEND_PRODUCTION_QUALIFICATION_RECEIPT"
+    },
+    {
+      "id": "B01-G4-001",
+      "gate": "G4_STRESS_AND_CODE",
+      "requirement": "Integration-point stress authority separated from display",
+      "status": "IMPLEMENTED_STRONG",
+      "evidence_paths": [
+        "src/workspace/lafea-controlled-continuum-controller.js",
+        "src/workspace/lafea-load-driven-pilot-qualification.js",
+        "docs/LAFEA_Bucket_B7D_Controlled_Continuum_Controller.md",
+        "docs/LAFEA_NonBucket_NB-T6D_Load_Driven_Qualification.md"
+      ],
+      "finding": "The bounded controller retains non-empty T6 Gauss-point recovery and explicitly requires projectedDisplayHash=null and projectedDisplayRole=NOT_PRODUCED for numerical qualification.",
+      "disposition": "REUSE_WITH_EXPLICIT_STATE_MAPPING"
+    },
+    {
+      "id": "B01-G4-002",
+      "gate": "G4_STRESS_AND_CODE",
+      "requirement": "Location-aware physical stress convergence",
+      "status": "FAILS_BUCKET_CONTRACT",
+      "evidence_paths": [
+        "src/workspace/lafea-load-driven-pilot-qualification.js"
+      ],
+      "finding": "Current engineering stress convergence uses the moving maximum of all retained integration-point von Mises values. It does not bind fixed physical coordinates, angular stations, stress paths or component frames, so mesh movement can change the compared location.",
+      "disposition": "REPAIR_REQUIRED_BEFORE_STRESS_VERIFIED"
+    },
+    {
+      "id": "B01-G4-003",
+      "gate": "G4_STRESS_AND_CODE",
+      "requirement": "Dimensionally valid and asymptotic three-level convergence",
+      "status": "FAILS_BUCKET_CONTRACT",
+      "evidence_paths": [
+        "src/workspace/lafea-load-driven-pilot-qualification.js"
+      ],
+      "finding": "evaluateLafeaLoadDrivenConvergence divides successive differences by max(1, abs(fine observation)), which introduces a unit-dependent floor. It accepts fine-level change against a tolerance without observed order, Richardson extrapolation, GCI, monotonic/oscillatory classification or asymptotic-range validation.",
+      "disposition": "REPLACE_ONLY_IN_NEW_GOVERNED_BUCKET_EVALUATOR; DO_NOT_RETROACTIVELY_CHANGE_EXISTING_NB_T6D_AUTHORITY"
+    },
+    {
+      "id": "B01-G4-004",
+      "gate": "G4_STRESS_AND_CODE",
+      "requirement": "T6 Kirsch benchmark matching production recovery route",
+      "status": "PARTIAL",
+      "evidence_paths": [
+        "scripts/lafea.3-benchmark-cont-hole-01-check.mjs",
+        "src/core/lafea-application-templates/continuum-benchmark-convergence.js",
+        "docs/LAFEA_Bucket_B7B_Continuum_Benchmark_Convergence.md"
+      ],
+      "finding": "The retained B7B Kirsch authority is a Q8 quarter-annulus with exact Kirsch traction and contract-only observations. It is valuable independent evidence but does not qualify the production T6 mesh/recovery path at fixed angular and radial probes.",
+      "disposition": "ADD_T6_KIRSCH_EXECUTION_BENCHMARK; RETAIN_Q8_AS_DISSIMILAR_REFERENCE"
+    },
+    {
+      "id": "B01-G4-005",
+      "gate": "G4_STRESS_AND_CODE",
+      "requirement": "Frozen governing code and independent code oracle",
+      "status": "BLOCKED",
+      "evidence_paths": [
+        "docs/LAFEA_NonBucket_NB-T6D_Load_Driven_Qualification.md"
+      ],
+      "finding": "Current bounded authority intentionally retains assessmentReady=false and codeReady=false. No governing code, edition, allowable source, stress classification or benchmark oracle is frozen.",
+      "disposition": "UNRESOLVED_GATE_CODE_VERIFIED_AND_FULL_BUCKET_QUALIFICATION_PROHIBITED"
+    },
+    {
+      "id": "B01-G5-001",
+      "gate": "G5_INTEGRATION_AND_REPRODUCIBILITY",
+      "requirement": "Deterministic hashes and replay",
+      "status": "IMPLEMENTED_NEEDS_EXECUTABLE_PROOF",
+      "evidence_paths": [
+        "src/workspace/lafea-load-driven-pilot-qualification.js",
+        "scripts/lafea-template-b7e-b7-gate-closure-check.mjs",
+        "scripts/lafea-template-b7f-current-main-qualification-check.mjs",
+        "docs/LAFEA_Bucket_B7G_Portable_Qualification_Bundle.md"
+      ],
+      "finding": "Canonical hashes, frozen receipts, replay checks and portable evidence structures exist. No executable exact-current-main PASS is available to this audit, and Bucket-01 additionally requires three clean replay observations and one report-data hash covering the new benchmark suite.",
+      "disposition": "EXECUTE_AFTER_REPAIR_AND_ORACLE_FREEZE"
+    },
+    {
+      "id": "B01-G5-002",
+      "gate": "G5_INTEGRATION_AND_REPRODUCIBILITY",
+      "requirement": "Complete Bucket-01 report and disposition states",
+      "status": "MISSING",
+      "evidence_paths": [],
+      "finding": "The requested 13-file Bucket-01 bundle and explicit IMPLEMENTED through BUCKET_QUALIFIED state ledger do not yet exist as one exact-head package.",
+      "disposition": "ADD_AFTER_NUMERICAL_GATES"
+    }
+  ],
+  "repair_order": [
+    "freeze independent expected-value package",
+    "add governed T3 and pure-shear benchmark receipts",
+    "add manufactured panel or cantilever benchmark",
+    "add missing mesh geometry and validity metrics",
+    "add production moment and energy evidence",
+    "add fixed-coordinate T6 Kirsch and lug stress probes",
+    "add asymptotic convergence and GCI evaluator",
+    "add anti-drift suite",
+    "execute exact-head replay",
+    "freeze and verify code basis only when supplied"
+  ],
+  "automatic_fail_triggered_by_audit": false,
+  "current_gate_states": {
+    "IMPLEMENTED": "PASS_FOR_BOUNDED_EXISTING_VERTICAL",
+    "CONTRACT_VERIFIED": "PARTIAL_NEW_BUCKET_AGGREGATION_MISSING",
+    "MESH_VERIFIED": "BLOCKED_COMPLETE_GEOMETRY_METRICS_MISSING",
+    "SOLVER_VERIFIED": "BLOCKED_CANTILEVER_OR_PANEL_AND_PRODUCTION_MOMENT_ENERGY_GATES_MISSING",
+    "STRESS_VERIFIED": "BLOCKED_FIXED_LOCATION_AND_ASYMPTOTIC_CONVERGENCE_MISSING",
+    "CODE_VERIFIED": "BLOCKED_CODE_BASIS_NOT_FROZEN",
+    "INTEGRATION_VERIFIED": "BLOCKED_EXACT_HEAD_EXECUTABLE_EVIDENCE_MISSING",
+    "BUCKET_QUALIFIED": "NO"
+  },
+  "final_disposition": "NOT_QUALIFIED_REPAIR_REQUIRED"
+}
