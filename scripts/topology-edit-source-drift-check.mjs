@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 export const EXPECTED_SOURCE_REPOSITORY = 'reallaksh19/XML_Compare_Utilities';
 export const EXPECTED_SOURCE_COMMIT = 'c20bb037566d52ba5b789712594b754a5fb94651';
 export const EXPECTED_TARGET_REPOSITORY = 'reallaksh19/Advanced_Analysis';
-export const EXPECTED_MANIFEST_SHA256 = 'be0a561f799439d6edeee18ce72511f51106bcd54f8bfec0ee09d6c80295c3ed';
+export const EXPECTED_MANIFEST_SHA256 = '2d80305bca7a66d8972bf7d70b1a09b11822668ccbd52e87a44ecd4f1dbeecab';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = path.resolve(SCRIPT_DIR, '..');
