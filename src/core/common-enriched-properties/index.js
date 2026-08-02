@@ -14,4 +14,5 @@ export * from './candidate-assembly.js';
 export * from './publication.js';
 export * from './publication-orchestration.js';
 export * from './consumer-readiness-evaluation.js';
+export * from './consumer-handoff.js';
 export * from './consumer-readiness.js';
