@@ -39,13 +39,13 @@ function baseTopology() {
   });
 }
 
-function validationInput() {
+function validationInput(distanceMm = 10) {
   const session = new TopologyEditCertifiedSession(baseTopology());
   const operationPlan = planExtendEdge({
     topology: session.currentTopology(),
     edgeId: 'edge:e1',
     endpoint: 'TO',
-    distanceMm: 10,
+    distanceMm,
   });
   const candidate = prepareTopologyEditOperationCandidate({
     session,
@@ -111,12 +111,13 @@ test('worker client accepts exact response authority and terminates the worker',
     WorkerCtor: ExecutingWorker,
     workerUrl: new URL('file:///professional-worker.js'),
   });
-  const result = await client.validate(validationInput());
+  const input = validationInput();
+  const result = await client.validate(input);
 
   assert.equal(result.disposition.status, 'ACCEPTED');
   assert.equal(
     result.receipt.validatedTopologyHash,
-    validationInput().canonicalTopology.canonicalTopologyHash,
+    input.canonicalTopology.canonicalTopologyHash,
   );
   assert.equal(ExecutingWorker.instances[0].terminated, true);
   assert.equal(client.snapshot().activeRequest, null);
@@ -144,9 +145,9 @@ test('a newer request supersedes and terminates the prior worker', async () => {
     WorkerCtor: SilentWorker,
     workerUrl: new URL('file:///professional-worker.js'),
   });
-  const first = client.validate(validationInput());
+  const first = client.validate(validationInput(10));
   const firstId = client.snapshot().activeRequest.requestId;
-  const second = client.validate(validationInput());
+  const second = client.validate(validationInput(20));
 
   await assert.rejects(first, { name: 'AbortError' });
   assert.equal(SilentWorker.instances[0].terminated, true);
