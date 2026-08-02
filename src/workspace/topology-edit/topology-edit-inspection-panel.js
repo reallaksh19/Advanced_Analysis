@@ -79,6 +79,7 @@ function measurementMarkup(measurement) {
   return `
     <section data-inspection-measurement="${escapeHtml(measurement.kind)}">
       <h4>${label}</h4>
+      <p><strong>CANONICAL COORDINATE MEASUREMENT — NOT ENGINEERING AUTHORITY</strong></p>
       <dl>
         ${evidence('FROM', measurement.fromId)}
         ${evidence('TO', measurement.toId)}
