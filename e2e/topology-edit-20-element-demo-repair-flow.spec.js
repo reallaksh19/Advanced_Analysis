@@ -72,8 +72,8 @@ async function runBridgeScenario(page, testInfo) {
   await traceButton.click();
   const routePanel = page.locator('[data-role="topology-edit-route-trace"]');
   await expect(routePanel).toContainText('Point-to-point route');
-  await expect(routePanel).toContainText('250 mm');
-  await expect(routePanel).toContainText('Edges1');
+  expect(await routeValue(page, 'Edges')).toBe('1');
+  expect(await routeValue(page, 'Total length')).toBe('250 mm');
   await attachScreenshot(page, testInfo, '250mm-bridge-route-trace');
 
   await page.locator('[data-action="undo"]').click();
@@ -205,8 +205,15 @@ function overlapIssue(page) {
 }
 
 async function comparisonValue(page, label) {
-  const term = page.locator('[data-role="topology-edit-comparison"] dt')
-    .filter({ hasText: new RegExp(`^${label}$`) });
+  return definitionValue(page.locator('[data-role="topology-edit-comparison"]'), label);
+}
+
+async function routeValue(page, label) {
+  return definitionValue(page.locator('[data-role="topology-edit-route-trace"]'), label);
+}
+
+async function definitionValue(root, label) {
+  const term = root.locator('dt').filter({ hasText: new RegExp(`^${label}$`) });
   await expect(term).toHaveCount(1);
   return term.evaluate((element) => element.nextElementSibling?.textContent?.trim() || '');
 }
