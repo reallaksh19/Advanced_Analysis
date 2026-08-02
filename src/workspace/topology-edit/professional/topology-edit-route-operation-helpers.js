@@ -2,6 +2,10 @@ import {
   isPlainRecord,
   stringValue,
 } from '../../../core/shared-piping-model/index.js';
+import {
+  normalizeTopologyEditCanonicalId,
+  normalizeTopologyEditCanonicalIds,
+} from './topology-edit-canonical-id.js';
 
 const EPSILON_MM = 1e-9;
 
@@ -65,14 +69,17 @@ export function assertGraphOpenEndpoint(context, nodeId, edgeId) {
 }
 
 export function incidentEdges(context, nodeId) {
+  const exactNodeId = normalizeTopologyEditCanonicalId(nodeId, 'nodeId', 'node');
   return [...context.edges.values()].filter((edge) => (
-    edge.fromNodeId === nodeId || edge.toNodeId === nodeId
+    edge.fromNodeId === exactNodeId || edge.toNodeId === exactNodeId
   )).sort((left, right) => left.id.localeCompare(right.id));
 }
 
 export function assertNoEdgePair(context, leftNodeId, rightNodeId) {
-  if (leftNodeId === rightNodeId) fail('edge endpoints must be different.', RangeError);
-  const pair = pairKey(leftNodeId, rightNodeId);
+  const leftId = normalizeTopologyEditCanonicalId(leftNodeId, 'leftNodeId', 'node');
+  const rightId = normalizeTopologyEditCanonicalId(rightNodeId, 'rightNodeId', 'node');
+  if (leftId === rightId) fail('edge endpoints must be different.', RangeError);
+  const pair = pairKey(leftId, rightId);
   const existing = [...context.edges.values()].find((edge) => (
     pairKey(edge.fromNodeId, edge.toNodeId) === pair
   ));
@@ -101,9 +108,13 @@ export function connectedSelectedNodes(context, nodeIdsInput) {
 }
 
 export function exactExternalBoundaryNodes(context, selectedNodeIds) {
-  const selected = new Set(selectedNodeIds);
+  const selected = new Set(normalizeTopologyEditCanonicalIds(
+    selectedNodeIds,
+    'selectedNodeIds',
+    'node',
+  ));
   const boundaries = new Set();
-  selectedNodeIds.forEach((nodeId) => {
+  selected.forEach((nodeId) => {
     incidentEdges(context, nodeId).forEach((edge) => {
       const peer = edge.fromNodeId === nodeId ? edge.toNodeId : edge.fromNodeId;
       if (!selected.has(peer)) boundaries.add(peer);
@@ -205,9 +216,11 @@ export function normalizeEndpoint(value) {
   return endpoint;
 }
 export function normalizeCanonicalIds(value, label, prefix) {
-  if (!Array.isArray(value)) fail(`${label} must be an array.`);
-  return [...new Set(value.map((row, index) => requiredCanonicalId(row, `${label}[${index}]`, prefix)))]
-    .sort((left, right) => left.localeCompare(right));
+  return normalizeTopologyEditCanonicalIds(
+    value,
+    label,
+    canonicalKindFromPrefix(prefix),
+  );
 }
 export function requiredText(value, label) {
   const text = stringValue(value);
@@ -220,22 +233,31 @@ function indexRows(rows, label) {
   const result = new Map();
   rows.forEach((row, index) => {
     if (!isPlainRecord(row)) fail(`topology.${label}[${index}] must be an object.`);
-    const id = requiredCanonicalId(row.id, `topology.${label}[${index}].id`, `${label.slice(0, -1)}:`);
+    const kind = label.slice(0, -1);
+    const id = normalizeTopologyEditCanonicalId(
+      row.id,
+      `topology.${label}[${index}].id`,
+      kind,
+    );
     if (result.has(id)) fail(`topology.${label} contains duplicate ID ${id}.`, RangeError);
     result.set(id, row);
   });
   return result;
 }
 function exactRecord(index, idInput, label) {
-  const id = requiredCanonicalId(idInput, `${label}Id`, `${label}:`);
+  const id = normalizeTopologyEditCanonicalId(idInput, `${label}Id`, label);
   const record = index.get(id);
   if (!record) fail(`${label} ${id} was not found.`, RangeError);
   return record;
 }
 function requiredCanonicalId(value, label, prefix) {
-  const id = requiredText(value, label);
-  if (!id.startsWith(prefix)) fail(`${label} must be an exact ${prefix.slice(0, -1)} canonical ID.`, RangeError);
-  return id;
+  return normalizeTopologyEditCanonicalId(value, label, canonicalKindFromPrefix(prefix));
+}
+function canonicalKindFromPrefix(prefix) {
+  if (typeof prefix !== 'string' || !prefix.endsWith(':')) {
+    fail('canonical prefix must end with a colon.');
+  }
+  return prefix.slice(0, -1);
 }
 function referencesNode(record, nodeId) {
   return ['nodeId', 'fromNodeId', 'toNodeId'].some((key) => record?.[key] === nodeId)

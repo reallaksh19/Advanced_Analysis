@@ -9,23 +9,29 @@ import {
   createTopologyEditOperationPlan,
 } from './topology-edit-operation-plan.js';
 import {
+  normalizeTopologyEditCanonicalIds,
+} from './topology-edit-canonical-id.js';
+import {
   assertTopologyEditSpecificationCatalogue,
   createTopologyEditSpecificationRecord,
   topologyEditSpecificationRecordKey,
 } from './topology-edit-spec-catalog.js';
 
 export const TOPOLOGY_EDIT_SPEC_QUERY_SCHEMA =
-  'TopologyEditSpecificationQuery.v1';
+  'TopologyEditSpecificationQuery.v2';
 export const TOPOLOGY_EDIT_COMPATIBILITY_SCHEMA =
-  'TopologyEditSpecificationCompatibility.v1';
+  'TopologyEditSpecificationCompatibility.v2';
 export const TOPOLOGY_EDIT_COMPATIBILITY_STATUSES = Object.freeze([
   'COMPATIBLE', 'UNAVAILABLE', 'AMBIGUOUS', 'INCOMPATIBLE',
 ]);
 
 const STATUSES = new Set(TOPOLOGY_EDIT_COMPATIBILITY_STATUSES);
-const CANONICAL_ID = /^(node|edge|junction|support|boundary|rigid):\S+$/u;
 const IDENTITY_FIELDS = Object.freeze([
-  'componentType', 'nominalSizeMm', 'secondaryNominalSizeMm', 'pipingClass',
+  'componentType',
+  'nominalSizeMm',
+  'secondaryNominalSizeMm',
+  'branchNominalSizeMm',
+  'pipingClass',
 ]);
 
 export function createTopologyEditSpecificationQuery(input = {}) {
@@ -84,6 +90,7 @@ export function resolveTopologyEditSpecificationCompatibility(input = {}) {
     catalogueId: catalogue.catalogueId,
     catalogueVersion: catalogue.catalogueVersion,
     catalogueHash: catalogue.catalogueHash,
+    catalogueAuthority: catalogue.authority,
     query,
     selectedRecordId: status === 'COMPATIBLE' ? candidates[0].recordId : null,
     candidates,
@@ -131,6 +138,7 @@ export function bindTopologyEditCompatibilityToPlan(planInput, resultInput) {
       field: 'specificationCompatibility',
       details: {
         catalogueHash: result.catalogueHash,
+        sourceHash: result.catalogueAuthority.sourceHash,
         queryHash: result.query.queryHash,
         compatibilityHash: result.compatibilityHash,
         candidateRecordIds: result.candidates.map((row) => row.recordId),
@@ -144,6 +152,7 @@ export function bindTopologyEditCompatibilityToPlan(planInput, resultInput) {
       catalogueCompatibility: {
         status: result.status,
         catalogueHash: result.catalogueHash,
+        sourceHash: result.catalogueAuthority.sourceHash,
         queryHash: result.query.queryHash,
         compatibilityHash: result.compatibilityHash,
         selectedRecordId: result.selectedRecordId,
@@ -199,12 +208,12 @@ function diagnostics(status, candidates) {
   }];
 }
 function normalizeTargetIds(value) {
-  if (!Array.isArray(value) || value.length === 0) fail('targetIds must be a non-empty array.');
-  const ids = value.map((row, index) => requiredText(row, `targetIds[${index}]`));
-  if (ids.some((id) => !CANONICAL_ID.test(id))) {
-    fail('targetIds must contain exact canonical identities.', RangeError);
-  }
-  return [...new Set(ids)].sort((left, right) => left.localeCompare(right));
+  return normalizeTopologyEditCanonicalIds(
+    value,
+    'targetIds',
+    null,
+    { allowEmpty: false },
+  );
 }
 function requiredText(value, label) {
   const text = stringValue(value);

@@ -24,6 +24,13 @@ export function createTopologyEditInteractionPreview(input = {}) {
   }
   const snapped = snapResolution?.status
     === TOPOLOGY_EDIT_SNAP_STATUSES.RESOLVED;
+  const blockedBySnap = Boolean(
+    snapResolution
+    && ![
+      TOPOLOGY_EDIT_SNAP_STATUSES.RESOLVED,
+      TOPOLOGY_EDIT_SNAP_STATUSES.UNAVAILABLE,
+    ].includes(snapResolution.status),
+  );
   const targetPosition = snapped
     ? snapResolution.candidate.position
     : intent.targetPosition;
@@ -36,6 +43,15 @@ export function createTopologyEditInteractionPreview(input = {}) {
     snapStatus:
       snapResolution?.status
       ?? TOPOLOGY_EDIT_SNAP_STATUSES.UNAVAILABLE,
+    snapEvidenceType: snapped
+      ? snapResolution.candidate.evidenceType
+      : null,
+    snapTargetCanonicalId: snapped
+      ? snapResolution.candidate.targetCanonicalId
+      : null,
+    snapCandidateHash: snapped
+      ? snapResolution.candidate.candidateHash
+      : null,
     anchorPosition: intent.anchorPosition,
     targetPosition,
     delta: subtractTopologyEditPoints(
@@ -47,7 +63,8 @@ export function createTopologyEditInteractionPreview(input = {}) {
       position: targetPosition,
     }),
     canApply:
-      topologyEditPointDistance(intent.anchorPosition, targetPosition) > 0,
+      !blockedBySnap
+      && topologyEditPointDistance(intent.anchorPosition, targetPosition) > 0,
     displayOnly: true,
     pickable: false,
     authority: 'DISPLAY_ONLY_PREVIEW',

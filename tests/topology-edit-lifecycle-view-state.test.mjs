@@ -36,6 +36,13 @@ test('malformed, ambiguous, duplicate, and over-wide selections fail closed', ()
     { nodeIds: ['edge:e1'], edgeId: null },
     { nodeIds: ['node:a'], edgeId: 'edge:e1' },
     { nodeIds: [], edgeId: 'node:a' },
+    { nodeIds: ['node:'], edgeId: null },
+    { nodeIds: ['node:a b'], edgeId: null },
+    { nodeIds: [' node:a'], edgeId: null },
+    { nodeIds: [{ toString: () => 'node:a' }], edgeId: null },
+    { nodeIds: [], edgeId: 'edge:' },
+    { nodeIds: [], edgeId: 'edge:e 1' },
+    { nodeIds: [], edgeId: { toString: () => 'edge:e1' } },
   ]) assert.equal(restoreTopologyEditViewSelection(value), null);
 });
 
@@ -45,7 +52,14 @@ test('production lifecycle restores the plain selection contract and publishes r
     'utf8',
   );
   assert.match(source, /restoreTopologyEditViewSelection\(viewState\.selection\)/);
+  assert.match(
+    source,
+    /restoreTopologyEditViewSelection\(viewState\.selection\)\s*\?\? EMPTY_TOPOLOGY_EDIT_VIEW_SELECTION/,
+  );
   assert.doesNotMatch(source, /viewState\.selection\?\.schema/);
+  assert.match(source, /CANONICAL_NODE_ID_PATTERN/);
+  assert.match(source, /CANONICAL_EDGE_ID_PATTERN/);
+  assert.match(source, /EMPTY_TOPOLOGY_EDIT_VIEW_SELECTION/);
   for (const key of [
     'topologyEditDraftPackageHash',
     'topologyEditExportSealedHash',

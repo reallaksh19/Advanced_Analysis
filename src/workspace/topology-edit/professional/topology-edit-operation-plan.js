@@ -9,6 +9,9 @@ import {
   assertTopologyEditChangedScope,
   TOPOLOGY_EDIT_CHANGED_SCOPE_SCHEMA,
 } from './topology-edit-change-scope.js';
+import {
+  normalizeTopologyEditCanonicalIds,
+} from './topology-edit-canonical-id.js';
 
 export const TOPOLOGY_EDIT_OPERATION_PLAN_SCHEMA = 'TopologyEditOperationPlan.v1';
 export const TOPOLOGY_EDIT_OPERATION_RESULT_SCHEMA = 'TopologyEditOperationPlanningResult.v1';
@@ -24,14 +27,13 @@ export const TOPOLOGY_EDIT_OPERATION_TYPES = Object.freeze([
 
 const OPERATION_TYPES = new Set(TOPOLOGY_EDIT_OPERATION_TYPES);
 const COMMAND_TYPES = new Set(TOPOLOGY_EDIT_GOVERNED_COMMANDS);
-const CANONICAL_ID = /^(node|edge|junction|support|boundary|rigid):\S+$/u;
 const UNRESOLVED_STATUSES = new Set(['UNAVAILABLE', 'AMBIGUOUS', 'INCOMPATIBLE', 'UNRESOLVED']);
 
 export function createTopologyEditOperationPlan(input = {}) {
   const basisHash = requiredText(input.basisHash, 'basisHash');
   const changedScope = assertTopologyEditChangedScope(input.changedScope);
   if (changedScope.basisHash !== basisHash) fail('changedScope basisHash does not match plan basisHash.', RangeError);
-  const targetIds = normalizeCanonicalIds(input.targetIds, 'targetIds');
+  const targetIds = normalizeTopologyEditCanonicalIds(input.targetIds, 'targetIds');
   assertTargetsDeclared(targetIds, changedScope);
   const material = {
     schema: TOPOLOGY_EDIT_OPERATION_PLAN_SCHEMA,
@@ -67,7 +69,7 @@ export function createUnrepresentableTopologyEditOperationResult(input = {}) {
     status: 'UNREPRESENTABLE_WITH_CURRENT_COMMANDS',
     operationType: normalizeOperationType(input.operationType),
     basisHash: requiredText(input.basisHash, 'basisHash'),
-    targetIds: normalizeCanonicalIds(input.targetIds, 'targetIds'),
+    targetIds: normalizeTopologyEditCanonicalIds(input.targetIds, 'targetIds'),
     reasonCode: requiredText(input.reasonCode, 'reasonCode').toUpperCase(),
     reason: requiredText(input.reason, 'reason'),
   };
@@ -100,8 +102,13 @@ function normalizeUnresolvedEvidence(value) {
     return {
       code: requiredText(row.code, `unresolvedEvidence[${index}].code`).toUpperCase(),
       status,
-      targetIds: normalizeCanonicalIds(row.targetIds ?? [], `unresolvedEvidence[${index}].targetIds`),
-      field: row.field === undefined || row.field === null ? null : requiredText(row.field, `unresolvedEvidence[${index}].field`),
+      targetIds: normalizeTopologyEditCanonicalIds(
+        row.targetIds ?? [],
+        `unresolvedEvidence[${index}].targetIds`,
+      ),
+      field: row.field === undefined || row.field === null
+        ? null
+        : requiredText(row.field, `unresolvedEvidence[${index}].field`),
       details: normalizeJsonRecord(row.details ?? {}, `unresolvedEvidence[${index}].details`),
     };
   });
@@ -152,15 +159,6 @@ function assertTargetsDeclared(targetIds, changedScope) {
   if (missing.length) fail(`target IDs are absent from changedScope: ${missing.join(', ')}.`, RangeError);
 }
 
-function normalizeCanonicalIds(value, label) {
-  if (!Array.isArray(value)) fail(`${label} must be an array.`);
-  const ids = value.map((row, index) => requiredText(row, `${label}[${index}]`));
-  if (ids.some((id) => !CANONICAL_ID.test(id))) {
-    fail(`${label} must contain exact canonical IDs.`, RangeError);
-  }
-  return [...new Set(ids)].sort((left, right) => left.localeCompare(right));
-}
-
 function normalizeOperationType(value) {
   const operationType = requiredText(value, 'operationType').toUpperCase();
   if (!OPERATION_TYPES.has(operationType)) fail(`unsupported operation type ${operationType}.`, RangeError);
@@ -175,6 +173,7 @@ function assertNotActive(value, active, path) {
 function requiredText(value, label) {
   const text = stringValue(value);
   if (!text) fail(`${label} is required.`);
+  return text;
 }
 function fail(message, Constructor = TypeError) {
   throw new Constructor(`TopologyEditOperationPlan: ${message}`);

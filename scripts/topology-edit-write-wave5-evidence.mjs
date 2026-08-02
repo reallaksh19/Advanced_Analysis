@@ -15,6 +15,14 @@ const AUDIT_PATH = path.join(REPORT_ROOT, 'topology-edit-original-plan-audit.jso
 const DEMO_GAP_PATH = path.join(REPORT_ROOT, 'topology-edit-demo-walkthrough.json');
 const DEMO_REPAIRS_PATH = path.join(REPORT_ROOT, 'topology-edit-demo-repairs.json');
 const DEMO_LIFECYCLE_PATH = path.join(REPORT_ROOT, 'topology-edit-demo-lifecycle.json');
+const PROFESSIONAL_INTERACTION_PATH = path.join(
+  REPORT_ROOT,
+  'topology-edit-professional-interaction.json',
+);
+const PROFESSIONAL_INTEGRATION_PATH = path.join(
+  REPORT_ROOT,
+  'topology-edit-professional-integration.json',
+);
 const PREREQUISITE_PATH = path.join(
   ROOT,
   'tests/fixtures/topology-edit/1885s/prerequisite-manifest.json',
@@ -22,24 +30,46 @@ const PREREQUISITE_PATH = path.join(
 const QUALIFIED_FILES = Object.freeze([
   '.github/workflows/topology-edit-wave5.yml',
   '.github/workflows/topology-edit-demo-walkthrough.yml',
+  '.github/workflows/topology-edit-professional-integration.yml',
   'docs/TOPOLOGY_EDIT_ORIGINAL_PLAN_CLOSURE_AUDIT.md',
   'e2e/topology-edit-20-element-demo-edit-flow.spec.js',
   'e2e/topology-edit-20-element-demo-repair-flow.spec.js',
   'e2e/topology-edit-20-element-demo-lifecycle-flow.spec.js',
+  'e2e/topology-edit-professional-interaction-flow.spec.js',
+  'e2e/topology-edit-professional-integration-flow.spec.js',
+  'public/fixtures/topology-edit-professional-spec-catalog.json',
   'scripts/1885s-empirical-qualification.mjs',
   'scripts/topology-edit-original-plan-audit.mjs',
   'scripts/topology-edit-wave5-contract.mjs',
   'scripts/topology-edit-wave5-fixture-check.mjs',
   'scripts/topology-edit-write-wave5-evidence.mjs',
+  'src/workspace/load-calc-consumer-controller.js',
   'src/workspace/topology-edit-3d-view-controller.js',
+  'src/workspace/topology-edit-3d-interaction-controller.js',
+  'src/workspace/topology-edit-3d-professional-controller.js',
+  'src/workspace/topology-edit/professional/topology-edit-canonical-id.js',
+  'src/workspace/topology-edit/professional/topology-edit-operation-candidate.js',
+  'src/workspace/topology-edit/professional/topology-edit-operation-transaction.js',
+  'src/workspace/topology-edit/professional/topology-edit-spec-catalog.js',
+  'src/workspace/topology-edit/professional/topology-edit-validation-blocking.js',
+  'src/workspace/topology-edit/professional/topology-edit-validation-worker.js',
+  'src/workspace/topology-edit/professional/topology-edit-validation-worker-client.js',
   'src/workspace/topology-edit/topology-edit-autofix-controller.js',
   'src/workspace/topology-edit/topology-edit-persistence.js',
   'src/workspace/topology-edit/topology-edit-export.js',
   'src/workspace/topology-edit/topology-edit-commit-service.js',
   'src/workspace/topology-edit/topology-edit-lifecycle-controller.js',
+  'src/workspace/viewport-productivity/topology-edit-professional-operation-actions.js',
+  'src/workspace/viewport-productivity/topology-edit-professional-operation-panel.js',
+  'src/workspace/viewport-productivity/topology-edit-professional-operation-runtime.js',
+  'src/workspace/viewport-productivity/topology-edit-professional-operation-state.js',
   'tests/topology-edit-20-element-demo-loader.test.mjs',
   'tests/topology-edit-20-element-demo-repairs.test.mjs',
   'tests/topology-edit-lifecycle-view-state.test.mjs',
+  'tests/topology-edit-professional-engineering-authority-hardening.test.mjs',
+  'tests/topology-edit-professional-operation-transaction.test.mjs',
+  'tests/topology-edit-professional-validation-worker-client.test.mjs',
+  'tests/topology-edit-professional-integration-controller.test.mjs',
   'tests/topology-edit-wave5.test.mjs',
   'tests/topology-edit-wave5-browser-harness.js',
   'tests/topology-edit-wave5-browser.spec.mjs',
@@ -51,6 +81,11 @@ const QUALIFIED_FILES = Object.freeze([
 const candidateHead = git(['rev-parse', 'HEAD']);
 const expectedHead = process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA || candidateHead;
 assert.equal(candidateHead, expectedHead, 'Wave 5 evidence must bind to the exact candidate head.');
+assert.equal(
+  normalizeStatus(process.env.TOPOLOGY_EDIT_PROFESSIONAL_INTEGRATION_STATUS),
+  'PASS',
+  'Professional integration status must be PASS before release evidence is written.',
+);
 
 const prerequisiteManifest = JSON.parse(await readFile(PREREQUISITE_PATH, 'utf8'));
 const prerequisites = prerequisiteManifest.prerequisites.map((row) => {
@@ -65,6 +100,18 @@ const prerequisites = prerequisiteManifest.prerequisites.map((row) => {
 const browserEvidence = await readJsonOrBlocked(BROWSER_PATH, 'BROWSER_EVIDENCE_NOT_RUN');
 const fixtureEvidence = await readJsonOrBlocked(FIXTURE_PATH, 'FIXTURE_EVIDENCE_NOT_RUN');
 const originalPlanAudit = await readJsonOrBlocked(AUDIT_PATH, 'ORIGINAL_PLAN_AUDIT_NOT_RUN');
+const professionalEvidence = {
+  interaction: await readRequiredWalkthrough(
+    PROFESSIONAL_INTERACTION_PATH,
+    'PASS_TRACK_A_VISIBLE_INTERACTION',
+    candidateHead,
+  ),
+  integration: await readRequiredWalkthrough(
+    PROFESSIONAL_INTEGRATION_PATH,
+    'PASS_PROFESSIONAL_3D_INTEGRATION',
+    candidateHead,
+  ),
+};
 const userWalkthroughEvidence = {
   exactGap: await readRequiredWalkthrough(
     DEMO_GAP_PATH,
@@ -82,6 +129,7 @@ const userWalkthroughEvidence = {
     candidateHead,
   ),
 };
+assert.equal(originalPlanAudit.schema, 'TopologyEditOriginalPlanAudit.v2');
 assert.equal(
   originalPlanAudit.status,
   'PASS_ORIGINAL_PLAN_CLOSURE',
@@ -89,6 +137,13 @@ assert.equal(
 );
 assert.equal(originalPlanAudit.candidateHead, candidateHead);
 assert.equal(originalPlanAudit.expectedHead, expectedHead);
+assert.equal(originalPlanAudit.professionalStatus, 'PASS');
+assert.equal(
+  originalPlanAudit.professionalIntegration?.disposition,
+  'PASS_EXECUTED_EXACT_HEAD',
+);
+assert.equal(originalPlanAudit.professionalIntegration?.productionRoute,
+  'topology-edit-3d-professional-controller.js');
 assert.equal(userWalkthroughEvidence.exactGap.cases?.length, 2);
 assert.equal(userWalkthroughEvidence.repairs.bridge?.gapMm, 250);
 assert.equal(userWalkthroughEvidence.repairs.trim?.overlapRemovedMm, 150);
@@ -97,6 +152,15 @@ assert.equal(userWalkthroughEvidence.lifecycle.committedDatasetVersion, 1);
 assert.equal(userWalkthroughEvidence.lifecycle.committedEntityCount, 21);
 assert.equal(userWalkthroughEvidence.lifecycle.persistedDraftCleared, true);
 assert.equal(userWalkthroughEvidence.lifecycle.reopenedRouteLengthMm, 250);
+assert.equal(professionalEvidence.interaction.scenarios?.length, 2);
+assert.deepEqual(
+  professionalEvidence.interaction.scenarios.map((row) => row.gapMm),
+  [3, 20],
+);
+assert.equal(professionalEvidence.integration.productionIntegrated, true);
+assert.ok(professionalEvidence.integration.previewHash);
+assert.ok(professionalEvidence.integration.transactionHash);
+assert.equal(professionalEvidence.integration.persistenceRestored, true);
 
 const operationsStatus = normalizeStatus(
   process.env.TOPOLOGY_EDIT_WAVE5_OPERATIONS_STATUS || 'BLOCKED_NOT_RUN',
@@ -113,6 +177,13 @@ const performanceEvidence = {
     'REAL_DEMO_EXACT_GAP_3_20',
     'REAL_DEMO_BRIDGE_250',
     'REAL_DEMO_SOURCE_BACKED_TRIM_150',
+    'PROFESSIONAL_VIEWPORT_INTERACTION',
+    'PROFESSIONAL_CATALOGUE_AUTHORITY',
+    'CERTIFIED_OPERATION_CANDIDATE',
+    'CANCELLABLE_VALIDATION_WORKER',
+    'ATOMIC_OPERATION_TRANSACTION',
+    'GROUPED_OPERATION_UNDO_REDO',
+    'PROFESSIONAL_DRAFT_RESTORE',
     'DRAFT_SAVE_RELOAD',
     'PREPARED_STAGED_JSON_EXPORT',
     'WORKSPACE_COMMIT_READBACK',
@@ -151,7 +222,7 @@ for (const repositoryPath of qualifiedFiles) {
   fileHashes[repositoryPath] = sha256(await readFile(path.join(ROOT, repositoryPath)));
 }
 const evidenceBase = {
-  schema: 'TopologyEditWave5QualificationEvidence.v4',
+  schema: 'TopologyEditWave5QualificationEvidence.v5',
   status: 'PASS_RELEASE',
   candidateHead,
   expectedHead,
@@ -160,6 +231,7 @@ const evidenceBase = {
   browserEvidence,
   fixtureEvidence,
   userWalkthroughEvidence,
+  professionalEvidence,
   performanceEvidence,
   driftEvidence,
   qualifiedFiles,

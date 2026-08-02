@@ -6,11 +6,12 @@ on:
       - '.github/workflows/topology-edit-wave5.yml'
       - '.github/workflows/topology-edit-c3d-*.yml'
       - '.github/workflows/topology-edit-demo-walkthrough.yml'
+      - '.github/workflows/topology-edit-professional-*.yml'
       - 'docs/TOPOLOGY_EDIT_ORIGINAL_PLAN_CLOSURE_AUDIT.md'
-      - 'e2e/topology-edit-20-element-demo-edit-flow.spec.js'
-      - 'e2e/topology-edit-20-element-demo-repair-flow.spec.js'
-      - 'e2e/topology-edit-20-element-demo-lifecycle-flow.spec.js'
+      - 'e2e/topology-edit-20-element-demo-*.spec.js'
+      - 'e2e/topology-edit-professional-*.spec.js'
       - 'public/fixtures/topology-edit-20-element-demo.staged.json'
+      - 'public/fixtures/topology-edit-professional-spec-catalog.json'
       - 'scripts/1885s-empirical-qualification.mjs'
       - 'scripts/run-playwright.mjs'
       - 'scripts/topology-edit-original-plan-audit.mjs'
@@ -18,14 +19,17 @@ on:
       - 'scripts/topology-edit-write-wave5-evidence.mjs'
       - 'tests/topology-edit-20-element-demo-*.test.mjs'
       - 'tests/topology-edit-lifecycle-view-state.test.mjs'
+      - 'tests/topology-edit-professional-*.test.mjs'
       - 'tests/topology-edit-search-composition.test.mjs'
       - 'tests/topology-edit-wave*.mjs'
       - 'tests/topology-edit-c3d-*.test.mjs'
       - 'tests/topology-edit-track-c.test.mjs'
       - 'tests/topology-edit-wave5-browser-harness.js'
       - 'tests/fixtures/topology-edit/1885s/**'
+      - 'tests/fixtures/topology-edit/professional/**'
       - 'src/workspace/load-calc-consumer-controller.js'
       - 'src/workspace/topology-edit-3d-*.js'
+      - 'src/workspace/viewport-interaction/**'
       - 'src/workspace/viewport-productivity/**'
       - 'src/workspace/viewport-presentation/**'
       - 'src/workspace/topology-edit/**'
@@ -38,7 +42,7 @@ jobs:
   qualify-wave5-release:
     name: Exact-head integrated topology-edit release qualification
     runs-on: ubuntu-24.04
-    timeout-minutes: 75
+    timeout-minutes: 100
     env:
       CI: 'true'
       TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -120,6 +124,29 @@ jobs:
           tests/topology-edit-c3d-wave8-dossier-intake.test.mjs
           tests/topology-edit-c3d-wave9-review-response.test.mjs
 
+      - name: Run professional Track A Track B and integration matrix
+        run: >-
+          node --test
+          tests/topology-edit-professional-interaction-contracts.test.mjs
+          tests/topology-edit-professional-snap-resolver.test.mjs
+          tests/topology-edit-professional-snap-collector.test.mjs
+          tests/topology-edit-professional-interaction-containment.test.mjs
+          tests/topology-edit-professional-interaction-session.test.mjs
+          tests/topology-edit-professional-interaction-viewport.test.mjs
+          tests/topology-edit-professional-interaction-controller.test.mjs
+          tests/topology-edit-professional-engineering-scope.test.mjs
+          tests/topology-edit-professional-engineering-plan.test.mjs
+          tests/topology-edit-professional-engineering-route-operations.test.mjs
+          tests/topology-edit-professional-engineering-catalog.test.mjs
+          tests/topology-edit-professional-engineering-compatibility.test.mjs
+          tests/topology-edit-professional-engineering-incremental-validation.test.mjs
+          tests/topology-edit-professional-engineering-worker.test.mjs
+          tests/topology-edit-professional-engineering-containment.test.mjs
+          tests/topology-edit-professional-engineering-authority-hardening.test.mjs
+          tests/topology-edit-professional-operation-transaction.test.mjs
+          tests/topology-edit-professional-validation-worker-client.test.mjs
+          tests/topology-edit-professional-integration-controller.test.mjs
+
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
@@ -132,6 +159,11 @@ jobs:
       - name: Walk repaired demo lifecycle
         run: node scripts/run-playwright.mjs e2e/topology-edit-20-element-demo-lifecycle-flow.spec.js
 
+      - name: Walk professional standalone and production integration
+        run: |
+          node scripts/run-playwright.mjs e2e/topology-edit-professional-interaction-flow.spec.js
+          node scripts/run-playwright.mjs e2e/topology-edit-professional-integration-flow.spec.js
+
       - name: Measure exact-head browser performance and lifecycle
         run: node --test tests/topology-edit-wave5-browser.spec.mjs
 
@@ -141,15 +173,17 @@ jobs:
       - name: Verify production bundle
         run: npm run build
 
-      - name: Audit original W0.1 through W5.5 closure
+      - name: Audit original and professional closure
         env:
           TOPOLOGY_EDIT_WAVE5_EXACT_HEAD_STATUS: PASS
+          TOPOLOGY_EDIT_PROFESSIONAL_INTEGRATION_STATUS: PASS
         run: node scripts/topology-edit-original-plan-audit.mjs
 
       - name: Write exact-head PASS_RELEASE evidence
         env:
           TOPOLOGY_EDIT_WAVE5_OPERATIONS_STATUS: PASS
           TOPOLOGY_EDIT_WAVE5_DRIFT_STATUS: PASS
+          TOPOLOGY_EDIT_PROFESSIONAL_INTEGRATION_STATUS: PASS
         run: node scripts/topology-edit-write-wave5-evidence.mjs
 
       - name: Verify patch hygiene
@@ -165,6 +199,8 @@ jobs:
             reports/qualification/topology-edit-demo-walkthrough.json
             reports/qualification/topology-edit-demo-repairs.json
             reports/qualification/topology-edit-demo-lifecycle.json
+            reports/qualification/topology-edit-professional-interaction.json
+            reports/qualification/topology-edit-professional-integration.json
             reports/qualification/topology-edit-original-plan-audit.json
             reports/qualification/topology-edit-wave5-browser.json
             reports/qualification/topology-edit-wave5-fixtures.json

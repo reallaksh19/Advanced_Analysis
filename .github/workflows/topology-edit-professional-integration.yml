@@ -1,0 +1,200 @@
+name: Topology Edit Professional Integration
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/topology-edit-professional-integration.yml'
+      - 'src/workspace/load-calc-consumer-controller.js'
+      - 'src/workspace/topology-edit-3d-professional-controller.js'
+      - 'src/workspace/topology-edit-3d-interaction-controller.js'
+      - 'src/workspace/topology-edit-3d-view-controller.js'
+      - 'src/workspace/topology-edit/professional/**'
+      - 'src/workspace/viewport-interaction/**'
+      - 'src/workspace/viewport-productivity/topology-edit-interaction-*.js'
+      - 'src/workspace/viewport-productivity/topology-edit-professional-*.js'
+      - 'public/fixtures/topology-edit-professional-spec-catalog.json'
+      - 'tests/topology-edit-professional-*.test.mjs'
+      - 'tests/topology-edit-lifecycle-view-state.test.mjs'
+      - 'tests/fixtures/topology-edit/professional/**'
+      - 'e2e/topology-edit-professional-*.spec.js'
+      - 'scripts/run-playwright.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: topology-edit-professional-integration-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Exact-head professional 3D Edit integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CI: 'true'
+      TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      BASE_REF: ${{ github.event.pull_request.base.sha || github.sha }}
+
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Assert exact checkout and ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+          git merge-base --is-ancestor "$BASE_REF" "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Check syntax and production module bounds
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            src/workspace/topology-edit-3d-professional-controller.js
+            src/workspace/topology-edit-3d-interaction-controller.js
+            src/workspace/topology-edit/professional/topology-edit-canonical-id.js
+            src/workspace/topology-edit/professional/topology-edit-operation-candidate.js
+            src/workspace/topology-edit/professional/topology-edit-operation-transaction.js
+            src/workspace/topology-edit/professional/topology-edit-professional-operation-session.js
+            src/workspace/topology-edit/professional/topology-edit-validation-blocking.js
+            src/workspace/topology-edit/professional/topology-edit-validation-worker.js
+            src/workspace/topology-edit/professional/topology-edit-validation-worker-client.js
+            src/workspace/viewport-productivity/topology-edit-professional-operation-actions.js
+            src/workspace/viewport-productivity/topology-edit-professional-operation-panel.js
+            src/workspace/viewport-productivity/topology-edit-professional-operation-runtime.js
+            src/workspace/viewport-productivity/topology-edit-professional-operation-state.js
+            src/workspace/viewport-productivity/topology-edit-professional-operation-styles.js
+          )
+          for file in "${files[@]}"; do
+            node --check "$file"
+            test "$(wc -l < "$file")" -le 300
+          done
+          for file in src/workspace/viewport-interaction/*.js; do
+            node --check "$file"
+            test "$(wc -l < "$file")" -le 300
+          done
+          node --check e2e/topology-edit-professional-interaction-flow.spec.js
+          node --check e2e/topology-edit-professional-integration-flow.spec.js
+
+      - name: Run complete Track A qualification
+        run: |
+          node --test \
+            tests/topology-edit-professional-interaction-contracts.test.mjs \
+            tests/topology-edit-professional-snap-resolver.test.mjs \
+            tests/topology-edit-professional-snap-collector.test.mjs \
+            tests/topology-edit-professional-interaction-containment.test.mjs \
+            tests/topology-edit-professional-interaction-session.test.mjs \
+            tests/topology-edit-professional-interaction-viewport.test.mjs \
+            tests/topology-edit-professional-interaction-controller.test.mjs
+
+      - name: Run complete Track B and integration qualification
+        run: |
+          node --test \
+            tests/topology-edit-professional-engineering-scope.test.mjs \
+            tests/topology-edit-professional-engineering-plan.test.mjs \
+            tests/topology-edit-professional-engineering-route-operations.test.mjs \
+            tests/topology-edit-professional-engineering-catalog.test.mjs \
+            tests/topology-edit-professional-engineering-compatibility.test.mjs \
+            tests/topology-edit-professional-engineering-incremental-validation.test.mjs \
+            tests/topology-edit-professional-engineering-worker.test.mjs \
+            tests/topology-edit-professional-engineering-containment.test.mjs \
+            tests/topology-edit-professional-engineering-authority-hardening.test.mjs \
+            tests/topology-edit-professional-operation-transaction.test.mjs \
+            tests/topology-edit-professional-validation-blocking.test.mjs \
+            tests/topology-edit-professional-validation-worker-client.test.mjs \
+            tests/topology-edit-professional-integration-controller.test.mjs \
+            tests/topology-edit-lifecycle-view-state.test.mjs
+
+      - name: Retain certified command checker lifecycle authority
+        run: |
+          node --test \
+            tests/topology-edit-wave1-pure-kernel.test.mjs \
+            tests/topology-edit-wave1-candidate-certification.test.mjs \
+            tests/topology-edit-wave1-journal-replay.test.mjs \
+            tests/topology-edit-wave3-commands.test.mjs \
+            tests/topology-edit-wave3a-checker.test.mjs \
+            tests/topology-edit-wave3b-autofix.test.mjs \
+            tests/topology-edit-wave3-exact-gap-modes.test.mjs \
+            tests/topology-edit-20-element-demo-repairs.test.mjs \
+            tests/topology-edit-wave4a-persistence-export.test.mjs \
+            tests/topology-edit-wave4b-commit-rollback.test.mjs
+
+      - name: Run anti-drift gates and production build
+        run: |
+          npm run syntax:strict
+          npm run check:imports
+          node scripts/topology-edit-source-drift-check.mjs
+          node scripts/topology-edit-api-drift-check.mjs
+          node scripts/topology-edit-prohibited-imports.mjs
+          npm run build
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run standalone and production browser qualification
+        run: |
+          node scripts/run-playwright.mjs e2e/topology-edit-professional-interaction-flow.spec.js
+          node scripts/run-playwright.mjs e2e/topology-edit-professional-integration-flow.spec.js
+
+      - name: Verify exact-head browser evidence
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const expectedHead = process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA;
+          const interaction = JSON.parse(readFileSync(
+            'reports/qualification/topology-edit-professional-interaction.json',
+            'utf8',
+          ));
+          const integration = JSON.parse(readFileSync(
+            'reports/qualification/topology-edit-professional-integration.json',
+            'utf8',
+          ));
+          if (interaction.status !== 'PASS_TRACK_A_VISIBLE_INTERACTION'
+              || interaction.candidateHead !== expectedHead
+              || interaction.scenarios?.length !== 2) {
+            throw new Error('Track A browser evidence is incomplete or stale.');
+          }
+          if (integration.status !== 'PASS_PROFESSIONAL_3D_INTEGRATION'
+              || integration.candidateHead !== expectedHead
+              || integration.productionIntegrated !== true
+              || !integration.previewHash
+              || !integration.transactionHash
+              || integration.persistenceRestored !== true) {
+            throw new Error('Professional integration evidence is incomplete or stale.');
+          }
+          NODE
+
+      - name: Verify patch hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check "$BASE_REF...HEAD"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Upload exact-head evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-professional-integration-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          path: |
+            reports/qualification/topology-edit-professional-interaction.json
+            reports/qualification/topology-edit-professional-integration.json
+            test-results/**
+          if-no-files-found: error
+          retention-days: 30

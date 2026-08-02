@@ -50,9 +50,11 @@ test('complete Track B evidence can issue PASS_RELEASE', async () => {
   assert.deepEqual(receipt.failures, []);
 });
 
-test('production controller consumes checker, autofix, persistence, export, and commit authority', async () => {
+test('production controller consumes checker, autofix, lifecycle, interaction, and professional authority', async () => {
   const controller = await source('src/workspace/topology-edit-3d-view-controller.js');
   const core = await source('src/workspace/topology-edit-3d-view-controller-core.js');
+  const professional = await source('src/workspace/topology-edit-3d-professional-controller.js');
+  const loadCalc = await source('src/workspace/load-calc-consumer-controller.js');
   const lifecycle = await source('src/workspace/topology-edit/topology-edit-lifecycle-controller.js');
   const commit = await source('src/workspace/topology-edit/topology-edit-commit-service.js');
   assert.match(core, /checkCanonicalTopology/);
@@ -61,6 +63,9 @@ test('production controller consumes checker, autofix, persistence, export, and 
   assert.match(controller, /reloadDraft/);
   assert.match(controller, /exportDraft/);
   assert.match(controller, /commitDraft/);
+  assert.match(professional, /topology-edit-3d-interaction-controller\.js/);
+  assert.match(professional, /TopologyEditProfessionalOperationRuntime/);
+  assert.match(loadCalc, /topology-edit-3d-professional-controller\.js/);
   assert.match(lifecycle, /createTopologyEditDraftPackage/);
   assert.match(lifecycle, /prepareTopologyEditExport/);
   assert.match(lifecycle, /commitPreparedTopologyEditExport/);
@@ -68,14 +73,30 @@ test('production controller consumes checker, autofix, persistence, export, and 
   assert.match(commit, /ROLLED_BACK/);
 });
 
-test('Wave 5 evidence writer is deterministic and no longer hard-blocked', async () => {
+test('Wave 5 evidence writer requires exact professional integration evidence', async () => {
   const writer = await source('scripts/topology-edit-write-wave5-evidence.mjs');
   assert.match(writer, /assert\.equal\(releaseReceipt\.status, 'PASS_RELEASE'/);
+  assert.match(writer, /TopologyEditWave5QualificationEvidence\.v5/);
+  assert.match(writer, /PASS_TRACK_A_VISIBLE_INTERACTION/);
+  assert.match(writer, /PASS_PROFESSIONAL_3D_INTEGRATION/);
+  assert.match(writer, /professionalEvidence/);
+  assert.match(writer, /transactionHash/);
+  assert.match(writer, /persistenceRestored/);
   assert.match(writer, /fixtureEvidence/);
   assert.doesNotMatch(writer, /fixtureEidence/);
   assert.doesNotMatch(writer, /generatedAt/);
   assert.doesNotMatch(writer, /new Date/);
   assert.doesNotMatch(writer, /BLOCKED_INCOMPLETE_OPERATIONS/);
+});
+
+test('original-plan audit requires professional exact-head closure', async () => {
+  const audit = await source('scripts/topology-edit-original-plan-audit.mjs');
+  assert.match(audit, /TopologyEditOriginalPlanAudit\.v2/);
+  assert.match(audit, /PROFESSIONAL_3D_EDIT_INTEGRATION/);
+  assert.match(audit, /PASS_EXECUTED_EXACT_HEAD/);
+  assert.match(audit, /ATOMIC_CERTIFIED_COMMAND_GROUP/);
+  assert.match(audit, /CANCELLABLE_MODULE_WORKER/);
+  assert.match(audit, /productionBehaviorChanged: true/);
 });
 
 test('content-addressed fixture fallback requires exact retained evidence hashes', async () => {
