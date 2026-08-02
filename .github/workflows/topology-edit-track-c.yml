@@ -9,6 +9,7 @@ on:
       - "src/workspace/topology-edit/topology-edit-worker-client.js"
       - "src/workspace/topology-edit/topology-edit-worker.js"
       - "tests/topology-edit-track-c.test.mjs"
+      - "tests/topology-edit-track-c-evidence.test.mjs"
       - "tests/fixtures/topology-edit/large-model/**"
       - "tests/fixtures/topology-edit/1885s/prerequisite-manifest.json"
       - "scripts/topology-edit-write-track-c-evidence.mjs"
@@ -51,7 +52,10 @@ jobs:
           node scripts/topology-edit-prohibited-imports.mjs
 
       - name: Run portable Track C qualification
-        run: node --test tests/topology-edit-track-c.test.mjs
+        run: >-
+          node --test
+          tests/topology-edit-track-c.test.mjs
+          tests/topology-edit-track-c-evidence.test.mjs
 
       - name: Write exact-head Track C evidence
         run: node scripts/topology-edit-write-track-c-evidence.mjs
