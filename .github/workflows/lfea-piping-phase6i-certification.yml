@@ -10,6 +10,7 @@ on:
       - 'reports/lfea-piping-phase6i-aggregate-anti-drift.json'
       - 'docs/LFEA_PIPING_PHASE6I_ANTI_DRIFT.md'
       - 'docs/LFEA_PIPING_PHASE_STATUS.md'
+      - 'docs/LFEA_PIPING_PHASE6E_RUNTIME_RELEASE_BUNDLE.md'
       - 'docs/LFEA_PIPING_PHASE6G_RUNTIME_BUNDLE_ASSEMBLY.md'
       - 'docs/lfea/LFEA_Phase6I_PR371_Boundary_Contract_Rev1.md'
       - 'docs/lfea/LFEA_Phase6I_WP2_Project_Authority_Index_Contract_Rev1.md'
@@ -22,6 +23,7 @@ on:
       - 'scripts/lfea-piping-wp3-*.mjs'
       - 'scripts/linear-piping-project-qualification-anti-drift-check.mjs'
       - '.github/workflows/lfea-piping-runtime-bundle-assembly.yml'
+      - '.github/workflows/lfea-piping-runtime-release-certification.yml'
       - '.github/workflows/lfea-piping-phase6i-certification.yml'
   workflow_dispatch:
 
