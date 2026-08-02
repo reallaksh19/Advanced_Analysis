@@ -45,14 +45,17 @@ export class TopologyEditValidationWorkerClient {
       blockingSeverities: input.blockingSeverities ?? ['HIGH'],
     });
 
-    if (this.active) this.cancel(this.active.request.requestId, 'SUPERSEDED');
+    const prior = this.active;
+    this.state = beginTopologyEditValidationWorkerRequest(this.state, request);
+    if (prior) {
+      this.cleanupActive(prior);
+      prior.reject(cancellationError('SUPERSEDED', prior.request.requestId));
+    }
 
     const worker = new this.WorkerCtor(this.workerUrl, {
       type: 'module',
       name: 'topology-edit-professional-validation',
     });
-    this.state = beginTopologyEditValidationWorkerRequest(this.state, request);
-
     return new Promise((resolve, reject) => {
       const active = {
         request,
