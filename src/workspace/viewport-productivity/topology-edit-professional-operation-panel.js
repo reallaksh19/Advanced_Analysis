@@ -12,6 +12,7 @@ export function renderTopologyEditProfessionalOperationPanel(element, state = {}
   if (!element) throw new TypeError('TopologyEditProfessionalOperationPanel: element is required.');
   const values = state.values ?? {};
   const plan = state.plan;
+  const candidate = state.candidate;
   const validation = state.validation;
   const transaction = state.transaction;
   const catalogueOptions = (state.catalogue?.records ?? []).map((record) => (
@@ -29,7 +30,7 @@ export function renderTopologyEditProfessionalOperationPanel(element, state = {}
     <header class="topology-edit-professional-operation__header">
       <div>
         <strong>Professional engineering operation</strong>
-        <p>Plans are exact-ID, catalogue-bound, worker-validated, and applied atomically.</p>
+        <p>Plans are exact-ID, catalogue-bound, candidate-certified, worker-validated, and applied atomically.</p>
       </div>
       <output aria-live="polite">${html(state.error || state.message || 'Ready.')}</output>
     </header>
@@ -56,7 +57,7 @@ export function renderTopologyEditProfessionalOperationPanel(element, state = {}
     </div>
     <div class="topology-edit-professional-operation__actions" role="toolbar" aria-label="Professional engineering operation actions">
       <button type="button" data-action="plan-professional-operation"${state.catalogue ? '' : ' disabled'}>Plan</button>
-      <button type="button" data-action="validate-professional-operation"${plan?.status === 'PLANNED' && !unresolved && !state.validationPending ? '' : ' disabled'}>Validate</button>
+      <button type="button" data-action="validate-professional-operation"${candidate && !unresolved && !state.validationPending ? '' : ' disabled'}>Validate candidate</button>
       <button type="button" data-action="cancel-professional-validation"${state.validationPending ? '' : ' disabled'}>Cancel validation</button>
       <button type="button" data-action="apply-professional-operation"${validation && !blocking && state.transactionPreview ? '' : ' disabled'}>Apply atomically</button>
       <button type="button" data-action="clear-professional-operation"${plan || validation ? '' : ' disabled'}>Clear</button>
@@ -67,6 +68,8 @@ export function renderTopologyEditProfessionalOperationPanel(element, state = {}
       <div><dt>Catalogue</dt><dd>${html(state.catalogue?.catalogueHash ?? 'unavailable')}</dd></div>
       <div><dt>Plan</dt><dd>${html(plan?.planHash ?? plan?.resultHash ?? 'none')}</dd></div>
       <div><dt>Unresolved</dt><dd>${html(unresolved || 'none')}</dd></div>
+      <div><dt>Certified candidate</dt><dd>${html(candidate?.candidateHash ?? 'none')}</dd></div>
+      <div><dt>Candidate topology</dt><dd>${html(candidate?.resultingCanonicalHash ?? 'none')}</dd></div>
       <div><dt>Validation</dt><dd>${html(validation?.validationHash ?? (state.validationPending ? 'running' : 'none'))}</dd></div>
       <div><dt>Validation status</dt><dd>${html(validation?.status ?? 'none')}</dd></div>
       <div><dt>Blocking findings</dt><dd>${blocking}</dd></div>
