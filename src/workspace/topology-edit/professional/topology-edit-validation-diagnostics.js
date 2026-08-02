@@ -6,11 +6,13 @@ import {
 } from '../../../core/shared-piping-model/index.js';
 
 const TIME_ONLY_KEY = /^(?:timestamp|startedAt|completedAt|timing|timings)$|(?:duration|elapsed)(?:Ms)?$/iu;
+const SORTED_ID_LIST_PATH = /\.(?:nodeIds|edgeIds|junctionIds|supportIds|restraintIds|rigidIds|targetIds|candidateRecordIds)$/u;
 const TARGET_FIELDS = Object.freeze([
   'nodeId', 'edgeId', 'junctionId', 'supportId', 'restraintId', 'rigidId',
 ]);
 const TARGET_LIST_FIELDS = Object.freeze([
   'nodeIds', 'edgeIds', 'junctionIds', 'supportIds', 'restraintIds', 'rigidIds',
+  'targetIds',
 ]);
 
 export function normalizeTopologyEditDiagnostics(value) {
@@ -114,7 +116,7 @@ function normalizeValue(value, path) {
   }
   if (Array.isArray(value)) {
     const rows = value.map((child, index) => normalizeValue(child, `${path}[${index}]`));
-    return rows.every((row) => typeof row === 'string')
+    return SORTED_ID_LIST_PATH.test(path) && rows.every((row) => typeof row === 'string')
       ? [...new Set(rows)].sort((left, right) => left.localeCompare(right))
       : rows;
   }
