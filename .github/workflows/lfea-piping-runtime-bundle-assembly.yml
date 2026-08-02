@@ -40,7 +40,7 @@ concurrency:
 
 jobs:
   assemble-runtime-bundle:
-    name: Assemble supplied internal and WP2-bound external evidence
+    name: Assemble internal evidence and WP2/WP3-bound external custody
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -86,7 +86,7 @@ jobs:
           name: ${{ inputs.external_artifact_name }}
           path: ${{ runner.temp }}/lfea-external-evidence
 
-      - name: Assemble WP2-bound runtime release bundle
+      - name: Assemble WP3-custodied runtime release bundle
         shell: bash
         env:
           INTERNAL_ROOT: ${{ runner.temp }}/lfea-internal-evidence
@@ -95,10 +95,13 @@ jobs:
           OUTPUT_ROOT: ${{ runner.temp }}/lfea-runtime-release-bundle
           EXPECTED_HEAD: ${{ inputs.candidate_sha }}
         run: |
-          node scripts/lfea-piping-wp2-runtime-bundle-assembler.mjs \
+          node scripts/lfea-piping-wp3-runtime-bundle-assembler.mjs \
             --internal-root="$INTERNAL_ROOT" \
             --external-root="$EXTERNAL_ROOT" \
             --bound-package="$BOUND_PACKAGE" \
+            --handoff="external/source-handoff.json" \
+            --source-request="external/source-materialization-request.json" \
+            --handoff-acceptance="external/source-handoff-acceptance.json" \
             --output="$OUTPUT_ROOT" \
             --exact-head="$EXPECTED_HEAD"
 
