@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const BASELINE_SHA = '3c069f80e36788d6a3097f6be027890020c5f894';
+const BASELINE_SHA = '292184e8ae374e24a98cdd59d79e648046e60943';
 const REPORT_PATH = path.resolve(
   ROOT,
   process.env.LAFEA_BUCKET_01_EXACT_HEAD_REPORT_PATH
@@ -25,10 +25,10 @@ for (const check of [
   nodeCheck('BUCKET_01_REPAIR', 'scripts/lafea-bucket-01-repair-check.mjs'),
   nodeCheck('PRODUCTION_RESPONSE_CONVERGENCE_CONTRACT', 'scripts/lafea-bucket-01-production-response-check.mjs'),
   nodeCheck('SCALABLE_SPARSE_CONTINUUM_SOLVER', 'scripts/lafea-bucket-01-scalable-solver-check.mjs'),
+  nodeCheck('GOVERNED_T6_KIRSCH_FIXED_PROBES', 'scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs'),
   nodeCheck('GOVERNED_T3_PATCH', 'scripts/lafea-bucket-01-t3-patch-check.mjs'),
   nodeCheck('GOVERNED_PURE_SHEAR', 'scripts/lafea-bucket-01-pure-shear-check.mjs'),
   nodeCheck('T6_PATCH', 'scripts/lafea.3-t6-patch-check.mjs'),
-  nodeCheck('RETAINED_KIRSCH_REFERENCE', 'scripts/lafea.3-benchmark-cont-hole-01-check.mjs'),
   nodeCheck('PRODUCTION_T6_MESH_LADDER', 'scripts/lafea-nb-t6b-lug-pinhole-mesh-ladder-check.mjs'),
   nodeCheck('LOAD_DRIVEN_FREE_DOF_PILOT', 'scripts/lafea-nb-t6d-load-driven-qualification-check.mjs'),
   npmCheck('STRICT_SYNTAX', 'syntax:strict'),
@@ -42,7 +42,7 @@ recordAssertion('TRACKED_WORKTREE_CLEAN', trackedStatus === '', trackedStatus ||
 const failures = checks.filter((check) => check.status !== 'PASS');
 const executableEvidencePass = failures.length === 0;
 const report = {
-  schema: 'lafea-bucket-01-exact-head-report/v6',
+  schema: 'lafea-bucket-01-exact-head-report/v7',
   status: executableEvidencePass ? 'EXACT_HEAD_REPAIR_EVIDENCE_PASS' : 'EXACT_HEAD_REPAIR_EVIDENCE_BLOCKED',
   exactHead,
   expectedHead,
@@ -56,7 +56,6 @@ const report = {
   unresolvedQualificationGates: [
     'FULL_INDEPENDENT_EXPECTED_VALUE_PACKAGE_NOT_FROZEN',
     'EXACT_1024_ELEMENT_PRODUCTION_RESPONSE_EXECUTION_NOT_RETAINED',
-    'T6_KIRSCH_FIXED_PROBE_EXECUTION_NOT_PRODUCED',
     'PRODUCTION_LUG_FIXED_PROBE_EVIDENCE_NOT_PRODUCED',
     'GOVERNING_CODE_BASIS_NOT_FROZEN',
     'THREE_CLEAN_EXACT_HEAD_REPLAYS_NOT_RETAINED',
@@ -75,7 +74,9 @@ const report = {
     exactHeadRepairExecutableEvidence: executableEvidencePass,
     selectedRepairInfrastructureReady: executableEvidencePass,
     scalableSparseSolverRouteImplemented: true,
+    governedKirschFixedProbeRouteImplemented: true,
     productionResponseExecutionRetained: false,
+    productionLugFixedProbeExecutionRetained: false,
     movingMaximumAcceptanceAuthorized: false,
     nodalProjectionAcceptanceAuthorized: false,
     arbitraryGeometryAuthorized: false,
