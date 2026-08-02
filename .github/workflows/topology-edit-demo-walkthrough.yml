@@ -5,12 +5,14 @@ on:
     paths:
       - '.github/workflows/topology-edit-demo-walkthrough.yml'
       - 'e2e/topology-edit-20-element-demo-edit-flow.spec.js'
+      - 'e2e/topology-edit-20-element-demo-repair-flow.spec.js'
       - 'public/fixtures/topology-edit-20-element-demo.staged.json'
       - 'src/workspace/tree-panel-events.js'
       - 'src/workspace/topology-edit-3d-*.js'
       - 'src/workspace/topology-edit/**'
       - 'src/workspace/viewport-productivity/topology-edit-search-*.js'
-      - 'tests/topology-edit-20-element-demo-loader.test.mjs'
+      - 'tests/topology-edit-20-element-demo-*.test.mjs'
+      - 'tests/topology-edit-search-composition.test.mjs'
       - 'tests/topology-edit-wave3-exact-gap-modes.test.mjs'
       - 'tests/topology-edit-c3d-wave2-search.test.mjs'
       - 'scripts/run-playwright.mjs'
@@ -47,14 +49,20 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Qualify search, fixture, and exact-gap contracts
+      - name: Qualify search, fixture, exact-gap, bridge, and trim contracts
         run: |
           node --check src/workspace/topology-edit-3d-search-controller.js
+          node --check src/workspace/topology-edit-3d-inspection-controller.js
+          node --check src/workspace/topology-edit-3d-route-controller.js
+          node --check src/workspace/topology-edit-3d-dossier-controller.js
           node --check src/workspace/viewport-productivity/topology-edit-search-panel.js
           node --check e2e/topology-edit-20-element-demo-edit-flow.spec.js
+          node --check e2e/topology-edit-20-element-demo-repair-flow.spec.js
           node --test \
             tests/topology-edit-c3d-wave2-search.test.mjs \
+            tests/topology-edit-search-composition.test.mjs \
             tests/topology-edit-20-element-demo-loader.test.mjs \
+            tests/topology-edit-20-element-demo-repairs.test.mjs \
             tests/topology-edit-wave3-exact-gap-modes.test.mjs
 
       - name: Retain certified command and autofix authority
@@ -64,33 +72,51 @@ jobs:
           tests/topology-edit-wave1-candidate-certification.test.mjs
           tests/topology-edit-wave1-journal-replay.test.mjs
           tests/topology-edit-wave3a-checker.test.mjs
+          tests/topology-edit-wave3-commands.test.mjs
           tests/topology-edit-wave3b-autofix.test.mjs
           tests/topology-edit-wave3c-autofix-ui.test.mjs
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Walk the real user flow
+      - name: Walk exact-gap repairs
         run: node scripts/run-playwright.mjs e2e/topology-edit-20-element-demo-edit-flow.spec.js
+
+      - name: Walk bridge and trim repairs
+        run: node scripts/run-playwright.mjs e2e/topology-edit-20-element-demo-repair-flow.spec.js
 
       - name: Verify walkthrough evidence
         run: |
           node --input-type=module <<'NODE'
           import { readFileSync } from 'node:fs';
-          const report = JSON.parse(readFileSync(
+          const exactGap = JSON.parse(readFileSync(
             'reports/qualification/topology-edit-demo-walkthrough.json',
             'utf8',
           ));
-          if (report.status !== 'PASS_EXACT_GAP_USER_WALKTHROUGH') {
-            throw new Error(`Unexpected walkthrough status ${report.status}.`);
+          const repairs = JSON.parse(readFileSync(
+            'reports/qualification/topology-edit-demo-repairs.json',
+            'utf8',
+          ));
+          if (exactGap.status !== 'PASS_EXACT_GAP_USER_WALKTHROUGH') {
+            throw new Error(`Unexpected exact-gap status ${exactGap.status}.`);
           }
-          if (report.candidateHead !== process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA) {
-            throw new Error('Walkthrough evidence is not bound to the exact candidate head.');
+          if (repairs.status !== 'PASS_BRIDGE_AND_TRIM_USER_WALKTHROUGH') {
+            throw new Error(`Unexpected repair status ${repairs.status}.`);
           }
-          if (report.cases?.length !== 2
-              || report.cases[0].requestedGapMm !== 3
-              || report.cases[1].requestedGapMm !== 20) {
-            throw new Error('Walkthrough evidence is missing the 3 mm or 20 mm case.');
+          for (const report of [exactGap, repairs]) {
+            if (report.candidateHead !== process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA) {
+              throw new Error('Walkthrough evidence is not bound to the exact candidate head.');
+            }
+          }
+          if (exactGap.cases?.length !== 2
+              || exactGap.cases[0].requestedGapMm !== 3
+              || exactGap.cases[1].requestedGapMm !== 20) {
+            throw new Error('Exact-gap evidence is missing the 3 mm or 20 mm case.');
+          }
+          if (repairs.bridge?.gapMm !== 250
+              || repairs.trim?.overlapRemovedMm !== 150
+              || repairs.trim?.targetEdge !== 'edge:F-001') {
+            throw new Error('Bridge or trim evidence is incomplete.');
           }
           NODE
 
@@ -108,6 +134,7 @@ jobs:
           name: topology-edit-demo-walkthrough-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
           path: |
             reports/qualification/topology-edit-demo-walkthrough.json
+            reports/qualification/topology-edit-demo-repairs.json
             test-results/**
           if-no-files-found: error
           retention-days: 30
