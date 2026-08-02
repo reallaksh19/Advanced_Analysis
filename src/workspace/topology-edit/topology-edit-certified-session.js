@@ -1,11 +1,12 @@
 /**
- * Production-owned mutable boundary for the Wave 1 certified editing kernel.
+ * Production-owned mutable boundary for the certified editing kernel.
  * All topology authority remains in immutable journal/replay values.
  */
 import { deepFreeze, semanticHash } from '../../core/shared-piping-model/index.js';
 import { assertCanonicalTopologyHash } from './topology-edit-canonical-state.js';
 import { createTopologyEditCommandRequest } from './topology-edit-command-contract.js';
 import { serializeTopologyEditCertifiedJournal } from './topology-edit-certified-journal.js';
+import { TopologyEditAutofixController } from './topology-edit-autofix-controller.js';
 import {
   acceptTopologyEditCommand,
   cancelTopologyEditCommandPreparation,
@@ -25,14 +26,12 @@ function baseAuthority(topology) {
     baseCanonicalHash: topology.canonicalTopologyHash,
   };
 }
-
 function authorityMatches(left, right) {
   return left.datasetId === right.datasetId
     && left.datasetVersion === right.datasetVersion
     && left.sourceHash === right.sourceHash
     && left.baseCanonicalHash === right.baseCanonicalHash;
 }
-
 function commandIdentity(journal, commandType, payload) {
   const digest = semanticHash({
     baseCanonicalHash: journal.basis.baseCanonicalHash,
@@ -43,7 +42,6 @@ function commandIdentity(journal, commandType, payload) {
   }).split(':').at(-1);
   return `command:${journal.history.length}:${digest}`;
 }
-
 function sessionSnapshot(session) {
   const material = {
     schema: TOPOLOGY_EDIT_CERTIFIED_SESSION_SCHEMA,
@@ -79,30 +77,16 @@ export class TopologyEditCertifiedSession {
     return this.snapshot();
   }
 
-  snapshot() {
-    return sessionSnapshot(this);
-  }
-
-  currentTopology() {
-    return this.replay.activeCanonicalTopology;
-  }
-
-  canUndo() {
-    return this.journal.activeCommandIds.length > 0 && !this.staleReason;
-  }
-
-  canRedo() {
-    return this.journal.redoCommandIds.length > 0 && !this.staleReason;
-  }
+  snapshot() { return sessionSnapshot(this); }
+  currentTopology() { return this.replay.activeCanonicalTopology; }
+  canUndo() { return this.journal.activeCommandIds.length > 0 && !this.staleReason; }
+  canRedo() { return this.journal.redoCommandIds.length > 0 && !this.staleReason; }
 
   reconcileBase(nextBaseCanonicalTopology) {
     assertCanonicalTopologyHash(nextBaseCanonicalTopology);
     const nextAuthority = baseAuthority(nextBaseCanonicalTopology);
     if (authorityMatches(this.baseAuthority, nextAuthority)) return 'UNCHANGED';
-    if (this.journal.history.length === 0) {
-      this.reset(nextBaseCanonicalTopology);
-      return 'RESET';
-    }
+    if (this.journal.history.length === 0) { this.reset(nextBaseCanonicalTopology); return 'RESET'; }
     this.staleReason = 'Workspace source or base topology changed during the active edit session.';
     return 'STALE';
   }
@@ -126,6 +110,19 @@ export class TopologyEditCertifiedSession {
     return transition;
   }
 
+  autofixSuggestions(issues, policy = {}) {
+    this.assertUsable();
+    return TopologyEditAutofixController.suggestions(this.currentTopology(), issues, policy);
+  }
+  previewAutofix(suggestion) {
+    this.assertUsable();
+    return TopologyEditAutofixController.preview(this, suggestion);
+  }
+  acceptAutofix(preview) {
+    this.assertUsable();
+    return TopologyEditAutofixController.accept(this, preview);
+  }
+
   cancelPreparation() {
     this.assertUsable();
     return cancelTopologyEditCommandPreparation({
@@ -134,7 +131,6 @@ export class TopologyEditCertifiedSession {
       expectedSessionVersion: this.journal.sessionVersion,
     });
   }
-
   undo() {
     this.assertUsable();
     const transition = undoTopologyEditCommandByReplay({
@@ -145,7 +141,6 @@ export class TopologyEditCertifiedSession {
     this.applyTransition(transition);
     return transition;
   }
-
   redo() {
     this.assertUsable();
     const transition = redoTopologyEditCommandByReplay({
@@ -157,10 +152,7 @@ export class TopologyEditCertifiedSession {
     return transition;
   }
 
-  serializeJournal() {
-    return serializeTopologyEditCertifiedJournal(this.journal);
-  }
-
+  serializeJournal() { return serializeTopologyEditCertifiedJournal(this.journal); }
   reloadJournal(serializedJournal) {
     this.assertUsable();
     const loaded = reloadTopologyEditJournal({
@@ -171,7 +163,6 @@ export class TopologyEditCertifiedSession {
     this.replay = loaded.replay;
     return loaded;
   }
-
   commandBasis() {
     return {
       sourceHash: this.baseAuthority.sourceHash,
@@ -180,13 +171,6 @@ export class TopologyEditCertifiedSession {
       sessionVersion: this.journal.sessionVersion,
     };
   }
-
-  applyTransition(transition) {
-    this.journal = transition.journal;
-    this.replay = transition.replay;
-  }
-
-  assertUsable() {
-    if (this.staleReason) throw new Error(`TopologyEditCertifiedSession: ${this.staleReason}`);
-  }
+  applyTransition(transition) { this.journal = transition.journal; this.replay = transition.replay; }
+  assertUsable() { if (this.staleReason) throw new Error(`TopologyEditCertifiedSession: ${this.staleReason}`); }
 }
