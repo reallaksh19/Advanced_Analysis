@@ -143,3 +143,11 @@ export {
   createSelectedPilotQualification,
   validateSelectedPilotQualification,
 } from './selected-pilot-qualification.js';
+
+export {
+  LAFEA_T6_CALLER_MESH_TEMPLATE_IDS,
+  LAFEA_TEMPLATE_CALLER_MESH_BINDING_SCHEMA,
+  LAFEA_TEMPLATE_CALLER_MESH_BINDING_STATUSES,
+  createTemplateCallerMeshBinding,
+  validateTemplateCallerMeshBinding,
+} from './caller-mesh-binding.js';
