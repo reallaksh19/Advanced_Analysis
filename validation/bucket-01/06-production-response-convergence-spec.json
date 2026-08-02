@@ -1,5 +1,5 @@
 {
-  "schema": "lafea-bucket-01-production-response-spec/v1",
+  "schema": "lafea-bucket-01-production-response-spec/v2",
   "specId": "B01-PRODUCTION-LUG-RESPONSE-CONVERGENCE-01",
   "benchmarkId": "C2D-LUG-PINHOLE-01",
   "stageId": "LAFEA.3",
@@ -22,10 +22,44 @@
     "thickness": 10
   },
   "meshLadder": [
-    { "ordinal": 1, "radialDivisions": 2, "circumferentialDivisions": 16, "elementCount": 64, "meshSize": 0.0625 },
-    { "ordinal": 2, "radialDivisions": 4, "circumferentialDivisions": 32, "elementCount": 256, "meshSize": 0.03125 },
-    { "ordinal": 3, "radialDivisions": 8, "circumferentialDivisions": 64, "elementCount": 1024, "meshSize": 0.015625 }
+    {
+      "ordinal": 1,
+      "radialDivisions": 2,
+      "circumferentialDivisions": 16,
+      "elementCount": 64,
+      "meshSize": 0.0625,
+      "stiffnessStorage": "DENSE",
+      "solverMethod": "DETERMINISTIC_CHOLESKY"
+    },
+    {
+      "ordinal": 2,
+      "radialDivisions": 4,
+      "circumferentialDivisions": 32,
+      "elementCount": 256,
+      "meshSize": 0.03125,
+      "stiffnessStorage": "DENSE",
+      "solverMethod": "DETERMINISTIC_CHOLESKY"
+    },
+    {
+      "ordinal": 3,
+      "radialDivisions": 8,
+      "circumferentialDivisions": 64,
+      "elementCount": 1024,
+      "meshSize": 0.015625,
+      "stiffnessStorage": "CSR_FULL_SYMMETRIC",
+      "solverMethod": "DETERMINISTIC_JACOBI_PCG"
+    }
   ],
+  "solverPolicy": {
+    "denseDofLimit": 1536,
+    "largeSystemStorage": "CSR_FULL_SYMMETRIC",
+    "largeSystemMethod": "DETERMINISTIC_JACOBI_PCG",
+    "preconditioner": "JACOBI",
+    "residualAuthority": "EXACT_RECOMPUTED_FREE_DOF_RESIDUAL",
+    "maximumIterations": "min(50000,max(500,8*freeDofCount))",
+    "smallSystemMethodUnchanged": true,
+    "testOnlySolverSubstitutionAllowed": false
+  },
   "load": {
     "loadCaseId": "LC1",
     "resultant": { "x": 1000, "y": 250 },
@@ -79,5 +113,5 @@
     "productionEnergyExpectedValueRequired": false,
     "productionEnergyAcceptedByConvergenceOnly": true
   },
-  "currentDisposition": "TECHNICAL_EVALUATOR_FROZEN_PENDING_PRODUCTION_EXECUTION"
+  "currentDisposition": "SCALABLE_PRODUCTION_SOLVER_POLICY_FROZEN_PENDING_EXECUTION"
 }
