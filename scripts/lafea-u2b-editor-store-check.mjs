@@ -78,9 +78,9 @@ const beforeMove = store.getState().stages['LAFEA.3'].document;
 const nodeB = beforeMove.nodes.find((row) => row.nodeId === 'B');
 const moved = store.moveNode('nodes', 'B', nodeB.x + 7, nodeB.y + 3);
 assert.equal(moved.status, 'READY');
-assert.equal(moved.stages['LAFEA.3'].document.nodes.find((row) => row.nodeId === 'B').x, nodeB.x + 7);
-assert.equal(moved.stages['LAFEA.3'].document.nodes.find((row) => row.nodeId === 'B').y, nodeB.y + 3);
-assert.equal(moved.stages['LAFEA.3'].past.length >= 1, true);
+assert.equal(store.getState().stages['LAFEA.3'].document.nodes.find((row) => row.nodeId === 'B').x, nodeB.x + 7);
+assert.equal(store.getState().stages['LAFEA.3'].document.nodes.find((row) => row.nodeId === 'B').y, nodeB.y + 3);
+assert.equal(store.getState().stages['LAFEA.3'].past.length >= 1, true);
 
 const wrongPath = store.moveNode('elements', 'B', 1, 2);
 assert.equal(wrongPath.status, 'FAILED');
@@ -103,7 +103,11 @@ assert.ok(staleState.diagnostics.some((row) => row.code === 'LAFEA_STALE_DOCUMEN
 
 assert.notEqual(lafeaDocumentDigest(store.getState().stages['LAFEA.3'].document), initialDigest);
 
-const editorSource = read('lafea-document-table.js');
+const editorSource = [
+  read('lafea-document-table.js'),
+  read('lafea-document-table-renderers.js'),
+  read('lafea-document-table-support.js'),
+].join('\n');
 const storeSource = read('lafea-workbench-store.js');
 const controllerSource = read('lafea-workbench-controller.js');
 const viewSource = read('lafea-workbench-view.js');
