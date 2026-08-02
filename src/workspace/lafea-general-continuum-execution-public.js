@@ -107,6 +107,7 @@ function blocked(request, diagnostic) {
     stageId: 'LAFEA.3',
     request,
     sourceAuthority: null,
+    callerMeshBinding: null,
     meshEvidence: null,
     execution: null,
     receipt: null,
@@ -115,6 +116,7 @@ function blocked(request, diagnostic) {
     diagnostics: [diagnostic],
     authority: {
       registeredTemplateCallerMeshExecution: false,
+      b6BoundMapping: false,
       compilerGeneratedMesh: false,
       arbitraryGeometryMesher: false,
       axisymmetricContinuum: false,
