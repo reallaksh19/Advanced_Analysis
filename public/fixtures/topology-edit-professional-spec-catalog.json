@@ -1,0 +1,118 @@
+{
+  "catalogueId": "DEMO-PIPING-CATALOGUE",
+  "catalogueVersion": "2026.08.02",
+  "authority": {
+    "sourceId": "SPEC-DEMO",
+    "sourceVersion": "7",
+    "sourceHash": "sha256:6961552d0273fbc4efe9b6125363405055ed8e9fdf1dbd996cf05300d1a8562e"
+  },
+  "records": [
+    {
+      "recordId": "PIPE-DN100-SCH40-A",
+      "componentType": "PIPE",
+      "nominalSizeMm": 100,
+      "outsideDiameterMm": 114.3,
+      "schedule": "SCH40",
+      "wallThicknessMm": 6.02,
+      "endConnectionFrom": "BW",
+      "endConnectionTo": "BW",
+      "pipingClass": "DEMO-150",
+      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/pipe/dn100/sch40" }
+    },
+    {
+      "recordId": "ELBOW-DN100-LR90-A",
+      "componentType": "ELBOW",
+      "nominalSizeMm": 100,
+      "outsideDiameterMm": 114.3,
+      "elbowRadiusMm": 152.4,
+      "elbowAngleDeg": 90,
+      "endConnectionFrom": "BW",
+      "endConnectionTo": "BW",
+      "pipingClass": "DEMO-150",
+      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/elbow/dn100/lr90" }
+    },
+    {
+      "recordId": "REDUCER-DN150-DN100-CONC-A",
+      "componentType": "REDUCER",
+      "nominalSizeMm": 150,
+      "outsideDiameterMm": 168.3,
+      "secondaryNominalSizeMm": 100,
+      "secondaryOutsideDiameterMm": 114.3,
+      "reducerType": "CONCENTRIC",
+      "reducerOrientation": "CONCENTRIC",
+      "endConnectionFrom": "BW",
+      "endConnectionTo": "BW",
+      "pipingClass": "DEMO-150",
+      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/reducer/dn150-dn100/concentric" }
+    },
+    {
+      "recordId": "VALVE-DN100-GATE-600-A",
+      "componentType": "VALVE",
+      "nominalSizeMm": 100,
+      "outsideDiameterMm": 114.3,
+      "valveType": "GATE",
+      "valveFaceToFaceMm": 600,
+      "endConnectionFrom": "FLANGED_RF",
+      "endConnectionTo": "FLANGED_RF",
+      "pipingClass": "DEMO-600",
+      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/valve/dn100/gate/class600" }
+    },
+    {
+      "recordId": "FLANGE-DN100-600-RF-A",
+      "componentType": "FLANGE",
+      "nominalSizeMm": 100,
+      "outsideDiameterMm": 114.3,
+      "flangeClass": "600",
+      "flangeFacing": "RF",
+      "endConnectionFrom": "BW",
+      "endConnectionTo": "FLANGED_RF",
+      "pipingClass": "DEMO-600",
+      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/flange/dn100/600/rf/a" }
+    },
+    {
+      "recordId": "FLANGE-DN100-600-RF-B",
+      "componentType": "FLANGE",
+      "nominalSizeMm": 100,
+      "outsideDiameterMm": 114.3,
+      "flangeClass": "600",
+      "flangeFacing": "RF",
+      "endConnectionFrom": "BW",
+      "endConnectionTo": "FLANGED_RF",
+      "pipingClass": "DEMO-600",
+      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/flange/dn100/600/rf/b" }
+    },
+    {
+      "recordId": "TEE-DN100-DN50-BW-A",
+      "componentType": "TEE",
+      "nominalSizeMm": 100,
+      "outsideDiameterMm": 114.3,
+      "branchNominalSizeMm": 50,
+      "branchOutsideDiameterMm": 60.3,
+      "branchAngleDeg": 90,
+      "centerToRunMm": 86,
+      "centerToBranchMm": 64,
+      "branchConnection": "BW",
+      "endConnectionFrom": "BW",
+      "endConnectionTo": "BW",
+      "pipingClass": "DEMO-150",
+      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/tee/dn100-dn50/reducing" }
+    },
+    {
+      "recordId": "OLET-DN100-DN25-WELDOLET-A",
+      "componentType": "OLET",
+      "nominalSizeMm": 100,
+      "outsideDiameterMm": 114.3,
+      "branchNominalSizeMm": 25,
+      "branchOutsideDiameterMm": 33.4,
+      "branchAngleDeg": 90,
+      "branchConnection": "SW",
+      "oletType": "WELDOLET",
+      "hostComponentType": "PIPE",
+      "projectionMm": 44,
+      "endConnectionFrom": "HOST_WELD",
+      "endConnectionTo": "SW",
+      "pipingClass": "DEMO-150",
+      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/olet/dn100-dn25/weldolet" }
+    }
+  ]
+}
