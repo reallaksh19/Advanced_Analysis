@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/model-zone-selector.yml'
       - 'src/workspace/model-zone-selector.js'
+      - 'src/workspace/model-zone-viewport-projection.js'
       - 'src/workspace/tree-panel.js'
       - 'src/workspace/tree-panel-events.js'
       - 'src/workspace/viewport-panel.js'
@@ -45,6 +46,7 @@ jobs:
       - name: Syntax and focused contracts
         run: |
           node --check src/workspace/model-zone-selector.js
+          node --check src/workspace/model-zone-viewport-projection.js
           node --check src/workspace/tree-panel.js
           node --check src/workspace/tree-panel-events.js
           node --check src/workspace/viewport-panel.js
@@ -59,11 +61,12 @@ jobs:
       - name: Enforce bounded modules and display-only authority
         run: |
           test "$(wc -l < src/workspace/model-zone-selector.js)" -le 300
+          test "$(wc -l < src/workspace/model-zone-viewport-projection.js)" -le 300
           test "$(wc -l < src/workspace/tree-panel.js)" -le 300
           test "$(wc -l < src/workspace/tree-panel-events.js)" -le 300
           test "$(wc -l < src/workspace/viewport-panel.js)" -le 300
-          ! grep -E "WorkspaceState\.(loadDataset|clearDataset)|rebuildWorkspaceDataset" src/workspace/model-zone-selector.js
-          ! grep -R "export default" src/workspace/model-zone-selector.js src/workspace/tree-panel.js src/workspace/tree-panel-events.js src/workspace/viewport-panel.js
+          ! grep -E "WorkspaceState\.(loadDataset|clearDataset)|rebuildWorkspaceDataset" src/workspace/model-zone-selector.js src/workspace/model-zone-viewport-projection.js
+          ! grep -R "export default" src/workspace/model-zone-selector.js src/workspace/model-zone-viewport-projection.js src/workspace/tree-panel.js src/workspace/tree-panel-events.js src/workspace/viewport-panel.js
 
       - name: Production build
         run: npm run build
