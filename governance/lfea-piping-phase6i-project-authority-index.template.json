@@ -1,0 +1,115 @@
+{
+  "schema": "lfea-piping-phase6i-project-authority-index-template/v1",
+  "repository": "reallaksh19/Advanced_Analysis",
+  "candidate": {
+    "sha": "617f7c2be0c65196a44bc88b6a2bb5ad3b5f1b54",
+    "ref": "release/lfea-piping-phase6i-617f7c2"
+  },
+  "indexId": "WP2-PROJECT-AUTHORITY-INDEX",
+  "revision": "DRAFT",
+  "preparedAtUtc": "2026-08-02T12:25:00Z",
+  "preparedBy": {
+    "name": "UNASSIGNED",
+    "role": "PIPING_STRESS_AUTHORITY",
+    "organization": "UNASSIGNED"
+  },
+  "authorityGroups": [
+    {
+      "groupId": "CANONICAL_UNITS_AND_NORMALIZATION",
+      "applicability": "UNRESOLVED",
+      "resolution": "UNRESOLVED_GATE",
+      "scopeDescription": "Canonical unit basis and governed source-unit normalization profile.",
+      "source": null,
+      "approvalStatus": "NOT_APPROVED"
+    },
+    {
+      "groupId": "MATERIAL_ASSIGNMENTS",
+      "applicability": "UNRESOLVED",
+      "resolution": "UNRESOLVED_GATE",
+      "scopeDescription": "Material assignments with source documents, revisions, owners and approval status.",
+      "source": null,
+      "approvalStatus": "NOT_APPROVED"
+    },
+    {
+      "groupId": "PIPE_AND_SECTION_PROPERTIES",
+      "applicability": "UNRESOLVED",
+      "resolution": "UNRESOLVED_GATE",
+      "scopeDescription": "Pipe and section-property assignments with dimensional basis.",
+      "source": null,
+      "approvalStatus": "NOT_APPROVED"
+    },
+    {
+      "groupId": "LOCAL_AXES_AND_REFERENCE_VECTORS",
+      "applicability": "UNRESOLVED",
+      "resolution": "UNRESOLVED_GATE",
+      "scopeDescription": "Local-axis and reference-vector authority for elements and interfaces.",
+      "source": null,
+      "approvalStatus": "NOT_APPROVED"
+    },
+    {
+      "groupId": "RESTRAINTS_SPRINGS_AND_PRESCRIBED_MOVEMENTS",
+      "applicability": "UNRESOLVED",
+      "resolution": "UNRESOLVED_GATE",
+      "scopeDescription": "Restraint, spring and prescribed-movement definitions.",
+      "source": null,
+      "approvalStatus": "NOT_APPROVED"
+    },
+    {
+      "groupId": "PHYSICAL_LOAD_CASES_AND_COMBINATIONS",
+      "applicability": "UNRESOLVED",
+      "resolution": "UNRESOLVED_GATE",
+      "scopeDescription": "Physical load cases, signs, combinations and governing basis.",
+      "source": null,
+      "approvalStatus": "NOT_APPROVED"
+    },
+    {
+      "groupId": "SUPPORT_ANCHOR_INTERFACE_AND_NOZZLE_DEFINITIONS",
+      "applicability": "UNRESOLVED",
+      "resolution": "UNRESOLVED_GATE",
+      "scopeDescription": "Support, anchor, interface and nozzle definitions, frames and reference points.",
+      "source": null,
+      "approvalStatus": "NOT_APPROVED"
+    },
+    {
+      "groupId": "NOZZLE_ALLOWABLE_PROFILES",
+      "applicability": "UNRESOLVED",
+      "resolution": "UNRESOLVED_GATE",
+      "scopeDescription": "Caller-supplied approved nozzle allowable profiles.",
+      "source": null,
+      "approvalStatus": "NOT_APPROVED"
+    },
+    {
+      "groupId": "B31_3_AUTHORITY",
+      "applicability": "UNRESOLVED",
+      "resolution": "UNRESOLVED_GATE",
+      "scopeDescription": "B31.3 edition, governed datasets, case classifications and ordered displacement pairs.",
+      "source": null,
+      "approvalStatus": "NOT_APPROVED"
+    },
+    {
+      "groupId": "REPRESENTATIVE_REAL_PROJECT_MODEL",
+      "applicability": "UNRESOLVED",
+      "resolution": "UNRESOLVED_GATE",
+      "scopeDescription": "Selected representative real-project model and exact scope boundary.",
+      "source": null,
+      "approvalStatus": "NOT_APPROVED"
+    },
+    {
+      "groupId": "NONLINEAR_EXCLUSIONS_AND_ESCALATION",
+      "applicability": "UNRESOLVED",
+      "resolution": "UNRESOLVED_GATE",
+      "scopeDescription": "Explicit gap, lift-off, contact and friction exclusions with escalation route.",
+      "source": null,
+      "approvalStatus": "NOT_APPROVED"
+    }
+  ],
+  "engineeringApproval": {
+    "status": "NOT_APPROVED",
+    "approverName": null,
+    "approverRole": null,
+    "organization": null,
+    "approvedAtUtc": null,
+    "evidenceReference": null,
+    "evidenceHash": null
+  }
+}
