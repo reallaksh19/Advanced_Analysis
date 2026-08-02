@@ -105,12 +105,16 @@ export class TopologyEdit3DViewController extends ReviewResponseController {
       this.applyInteractionPreview();
       return;
     }
-    if (isTopologyEditTextControl(event.target)) return;
-    const axis = String(event.key ?? '').toUpperCase();
-    if (!['X', 'Y', 'Z'].includes(axis)
+    if (isTopologyEditTextControl(event.target)
       || event.ctrlKey || event.metaKey || event.altKey) return;
+    const nudge = keyboardNudge(event.key);
+    if (!nudge) return;
     event.preventDefault();
-    this.nudgeInteraction(axis, event.shiftKey ? -1 : 1);
+    this.nudgeInteraction(
+      nudge.axis,
+      nudge.directionSign,
+      event.shiftKey ? 10 : 1,
+    );
   }
 
   previewNumericInteraction() {
@@ -136,22 +140,26 @@ export class TopologyEdit3DViewController extends ReviewResponseController {
     }
   }
 
-  nudgeInteraction(axis, directionSign) {
+  nudgeInteraction(axis, directionSign, incrementMultiplier = 1) {
     try {
-      const increment = this.control('interaction-nudge-increment')?.value
-        ?? this.nudgeIncrementMm;
+      const baseIncrement = Number(
+        this.control('interaction-nudge-increment')?.value
+        ?? this.nudgeIncrementMm,
+      );
+      const multiplier = Number(incrementMultiplier);
       const preview = createTopologyEditNudgeSessionPreview({
         topology: this.session?.currentTopology(),
         selection: this.selection,
         preview: this.interactionPreview,
         axis,
         directionSign,
-        incrementMm: increment,
+        incrementMm: baseIncrement * multiplier,
       });
-      this.nudgeIncrementMm = Number(increment);
+      this.nudgeIncrementMm = baseIncrement;
+      const prefix = multiplier === 1 ? '' : `${multiplier}× `;
       this.retainInteractionPreview(
         preview,
-        `${directionSign < 0 ? 'Negative' : 'Positive'} ${axis} nudge preview created`,
+        `${prefix}${directionSign < 0 ? 'negative' : 'positive'} ${axis} nudge preview created`,
       );
     } catch (error) {
       this.rejectInteraction(error);
@@ -274,6 +282,18 @@ export class TopologyEdit3DViewController extends ReviewResponseController {
   control(role) {
     return this.interactionElement?.querySelector(`[data-role="${role}"]`) ?? null;
   }
+}
+
+function keyboardNudge(key) {
+  const mapping = {
+    ArrowLeft: { axis: 'X', directionSign: -1 },
+    ArrowRight: { axis: 'X', directionSign: 1 },
+    ArrowDown: { axis: 'Y', directionSign: -1 },
+    ArrowUp: { axis: 'Y', directionSign: 1 },
+    PageDown: { axis: 'Z', directionSign: -1 },
+    PageUp: { axis: 'Z', directionSign: 1 },
+  };
+  return mapping[key] ?? null;
 }
 
 function selectionKey(selection) {
