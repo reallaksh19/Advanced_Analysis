@@ -1,0 +1,113 @@
+{
+  "schema": "lafea-bucket-01-benchmark-manifest/v5",
+  "manifest_status": "BASELINE_FROZEN_WITH_UNRESOLVED_GATES",
+  "repository": "reallaksh19/Advanced_Analysis",
+  "baseline_main_sha": "192a3513061a634e9dc995cf6740374e6afbc1de",
+  "prior_baseline_main_shas": [
+    "7c83060087f6c286c9efa7a84eee546d57a34a83",
+    "2d2e22288ad040c882638100c662debbdae38663",
+    "7c49c20c0b4d83f764bc351865dc3d1ae3fabf92",
+    "6763f73697c9e8f4ec59feaa306edf8d296861b1",
+    "cbd4d3e7397a3d64869d9be1c360af7d1d4ecdc8",
+    "42c9f96e9baffb52232b4b7ed7f04611c6337961",
+    "27fb14ddccb07081904d54c1bae161c87372dbdd",
+    "a7144e02598f3e9db0826f10cefe0b5254fa953e"
+  ],
+  "qualification_branch": "bucket-01-lafea3-validation-v2",
+  "qualification_candidate_sha": "RESOLVED_ONLY_BY_EXACT_HEAD_EXECUTION",
+  "bucket_id": "LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE",
+  "target": "C2D-LUG-PINHOLE -> LAFEA.3",
+  "stage_id": "LAFEA.3",
+  "formulation": "PLANE_STRESS",
+  "units": { "length": "mm", "force": "N", "stress": "MPa", "strain": "dimensionless" },
+  "scope": {
+    "in_scope": [
+      "bounded concentric annular lug-pinhole geometry",
+      "T3 and T6 verification",
+      "production T6 mesh levels 64, 256 and 1024 elements",
+      "free-DOF linear-elastic solution",
+      "force, moment and energy evidence",
+      "integration-point stress recovery",
+      "fixed physical probes and paths",
+      "three-level convergence",
+      "exact-head deterministic evidence"
+    ],
+    "out_of_scope": [
+      "arbitrary outer profiles",
+      "eccentric or multiple holes",
+      "contact, plasticity or nonlinear response",
+      "shell formulations",
+      "general T7D authority",
+      "application release qualification"
+    ]
+  },
+  "authority_chain": ["SOURCE", "NORMALIZED_MODEL", "ANALYSIS_GEOMETRY", "ANALYSIS_MESH", "EXECUTION", "RECOVERY", "CONVERGENCE", "CODE_ASSESSMENT", "REPORT", "BUCKET_DISPOSITION"],
+  "benchmark_ladder": ["C2D-PATCH-T3-01", "C2D-PATCH-T6-01", "C2D-PATCH-PURE-SHEAR-01", "C2D-PURE-BENDING-PANEL-T6-01", "C2D-KIRSCH-HOLE-01", "C2D-LUG-PINHOLE-01"],
+  "production_mesh_levels": [
+    { "level": "L1", "radial_divisions": 2, "circumferential_divisions": 16, "t6_elements": 64 },
+    { "level": "L2", "radial_divisions": 4, "circumferential_divisions": 32, "t6_elements": 256 },
+    { "level": "L3", "radial_divisions": 8, "circumferential_divisions": 64, "t6_elements": 1024 }
+  ],
+  "tolerances": {
+    "patch_normalized_error_max": 1e-8,
+    "force_equilibrium_relative_max": 1e-4,
+    "moment_equilibrium_relative_max": 1e-4,
+    "fine_area_relative_max": 0.005,
+    "fine_hole_radius_relative_max": 0.001,
+    "fine_hole_center_over_radius_max": 0.001,
+    "fine_ligament_relative_max": 0.0025,
+    "global_displacement_gci_max": 0.01,
+    "strain_energy_gci_max": 0.02,
+    "reaction_resultant_gci_max": 0.001,
+    "non_singular_stress_gci_max": 0.03,
+    "high_gradient_stress_gci_max": 0.05
+  },
+  "stress_authority": {
+    "primary": "RETAINED_INTEGRATION_POINT_COMPONENTS",
+    "permitted": ["principal and von Mises from unrounded tensor components", "element-local fixed physical probes", "fixed stress paths"],
+    "prohibited_as_sole_acceptance_basis": ["moving global maximum", "smoothed contour", "nodal average", "display interpolation", "screen-picked value", "unclassified singular peak"]
+  },
+  "expected_value_policy": {
+    "authority": "FROZEN_BEFORE_OBSERVED_PRODUCTION_EVIDENCE",
+    "production_output_may_generate_expected_values": false,
+    "independent_oracle_required": true,
+    "failed_benchmarks_must_be_retained": true,
+    "frozen_oracle_status": "PARTIAL_PACKAGE",
+    "frozen_oracle_files": [
+      "validation/bucket-01/03-pure-bending-panel-oracle.json",
+      "validation/bucket-01/04-t3-patch-oracle.json",
+      "validation/bucket-01/05-pure-shear-oracle.json"
+    ],
+    "expected_value_package_hash": "UNRESOLVED_GATE"
+  },
+  "governed_receipts": [
+    { "benchmark_id": "C2D-PATCH-T3-01", "script": "scripts/lafea-bucket-01-t3-patch-check.mjs", "oracle": "validation/bucket-01/04-t3-patch-oracle.json", "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION" },
+    { "benchmark_id": "C2D-PATCH-PURE-SHEAR-01", "script": "scripts/lafea-bucket-01-pure-shear-check.mjs", "oracle": "validation/bucket-01/05-pure-shear-oracle.json", "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION" },
+    { "benchmark_id": "C2D-PURE-BENDING-PANEL-T6-01", "script": "scripts/lafea-bucket-01-pure-bending-panel-check.mjs", "oracle": "validation/bucket-01/03-pure-bending-panel-oracle.json", "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION" },
+    { "benchmark_id": "C2D-LUG-PINHOLE-01", "script": "scripts/lafea-bucket-01-production-response-receipt.mjs", "spec": "validation/bucket-01/06-production-response-convergence-spec.json", "status": "TECHNICAL_EVALUATOR_IMPLEMENTED_PENDING_PRODUCTION_EXECUTION" }
+  ],
+  "production_response_convergence": {
+    "spec": "validation/bucket-01/06-production-response-convergence-spec.json",
+    "evaluator": "src/workspace/lafea-bucket-01-production-response.js",
+    "contract_check": "scripts/lafea-bucket-01-production-response-check.mjs",
+    "execution_runner": "scripts/lafea-bucket-01-production-response-runner.mjs",
+    "retained_receipt": "scripts/lafea-bucket-01-production-response-receipt.mjs",
+    "force_and_moment_oracle": "FROZEN_LOAD_RESULTANT_AND_LINE_OF_ACTION",
+    "energy_acceptance": "THREE_LEVEL_RICHARDSON_GCI",
+    "status": "TECHNICAL_INFRASTRUCTURE_IMPLEMENTED_EXECUTION_NOT_RETAINED"
+  },
+  "code_basis": { "status": "UNRESOLVED_GATE", "governing_code": null, "edition": null, "allowable_source": null, "stress_classification": null, "load_combination": null },
+  "automatic_stop_conditions": [
+    "exact head or parent mismatch",
+    "tolerance changed after observation",
+    "expected value derived from production output",
+    "non-positive Jacobian",
+    "required benchmark failure",
+    "failed force or moment equilibrium",
+    "failed authoritative stress convergence",
+    "display stress substituted for integration-point authority",
+    "missing code authority when code qualification is claimed",
+    "failed benchmark omitted or hidden"
+  ],
+  "current_disposition": "NOT_QUALIFIED"
+}
