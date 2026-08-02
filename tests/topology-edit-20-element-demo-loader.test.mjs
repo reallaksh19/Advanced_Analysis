@@ -148,7 +148,7 @@ test('demo control remains an accessible icon and has no direct workspace mutati
     'utf8',
   );
   assert.equal(TOPOLOGY_EDIT_DEMO_FIXTURE_PATH, 'fixtures/topology-edit-20-element-demo.staged.json');
-  assert.match(source, /data-action=\\"load-topology-edit-demo\\"/u);
+  assert.match(source, /data-action="load-topology-edit-demo"/u);
   assert.match(source, /aria-label', 'Load 20-element 3D Edit demo'/u);
   assert.match(source, /<svg viewBox=/u);
   assert.match(source, /EVENT_TOPICS\.DATASET_LOAD_REQUESTED/u);
