@@ -1,0 +1,87 @@
+name: Topology Edit Professional Engineering
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/topology-edit-professional-engineering.yml'
+      - 'src/workspace/topology-edit/professional/**'
+      - 'tests/topology-edit-professional-engineering-*.test.mjs'
+      - 'tests/fixtures/topology-edit/professional/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: topology-edit-professional-engineering-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: P0A engineering contracts and containment
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Assert exact checkout and ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          git merge-base --is-ancestor "$PR_BASE_SHA" "$EXPECTED_HEAD_SHA"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Check professional engineering module syntax
+        run: |
+          node --check src/workspace/topology-edit/professional/topology-edit-change-scope.js
+          node --check src/workspace/topology-edit/professional/topology-edit-operation-plan.js
+
+      - name: Run focused professional engineering contract tests
+        run: |
+          node --test \
+            tests/topology-edit-professional-engineering-scope.test.mjs \
+            tests/topology-edit-professional-engineering-plan.test.mjs \
+            tests/topology-edit-professional-engineering-containment.test.mjs
+
+      - name: Run retained command and journal authority tests
+        run: |
+          node --test \
+            tests/topology-edit-wave1-pure-kernel.test.mjs \
+            tests/topology-edit-wave1-candidate-certification.test.mjs \
+            tests/topology-edit-wave1-journal-replay.test.mjs
+
+      - name: Run repository anti-drift gates
+        run: |
+          npm run syntax:strict
+          npm run check:imports
+          node scripts/topology-edit-source-drift-check.mjs
+          node scripts/topology-edit-api-drift-check.mjs
+          node scripts/topology-edit-prohibited-imports.mjs
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Verify patch hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check "$PR_BASE_SHA...HEAD"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
