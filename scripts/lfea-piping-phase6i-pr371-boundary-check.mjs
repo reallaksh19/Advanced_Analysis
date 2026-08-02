@@ -62,6 +62,7 @@ const DECLARATION_FILES = Object.freeze([
   'scripts/lfea-piping-phase6i-pr371-boundary-check.mjs',
   'scripts/lfea-piping-phase6i-project-authority-index.mjs',
   'scripts/lfea-piping-phase6i-project-authority-index-check.mjs',
+  'src/core/linear-piping-project-qualification/project-authority-index.js',
 ]);
 const DECLARATION_ONLY_RULES = new Set([
   'ENGINEERING_ENRICHMENT_PATH',

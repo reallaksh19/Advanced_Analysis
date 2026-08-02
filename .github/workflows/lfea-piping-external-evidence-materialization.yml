@@ -3,6 +3,11 @@ name: LFEA Piping External Evidence Materialization
 on:
   workflow_dispatch:
     inputs:
+      candidate_sha:
+        description: Immutable Phase 6I candidate SHA bound by WP2 and all seven source records
+        required: true
+        default: 617f7c2be0c65196a44bc88b6a2bb5ad3b5f1b54
+        type: string
       source_run_id:
         description: Workflow run ID containing caller-supplied sealed external evidence records
         required: true
@@ -12,7 +17,7 @@ on:
         required: true
         type: string
       request_path:
-        description: Relative path to lfea-piping-external-materialization-request/v1
+        description: Relative path to lfea-piping-external-materialization-request/v2
         required: true
         default: request/external-materialization-request.json
         type: string
@@ -22,7 +27,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: lfea-piping-external-materialization-${{ github.ref }}
+  group: lfea-piping-external-materialization-${{ github.ref }}-${{ inputs.candidate_sha }}
   cancel-in-progress: false
 
 jobs:
@@ -32,10 +37,21 @@ jobs:
     timeout-minutes: 45
 
     steps:
-      - name: Checkout selected exact head
+      - name: Checkout qualification tooling head
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Verify immutable candidate identity
+        shell: bash
+        env:
+          CANDIDATE_REF: refs/remotes/origin/release/lfea-piping-phase6i-617f7c2
+          EXPECTED_HEAD: ${{ inputs.candidate_sha }}
+          TOOLING_HEAD: ${{ github.sha }}
+        run: |
+          test "$TOOLING_HEAD" = "$(git rev-parse HEAD)"
+          test "$EXPECTED_HEAD" = "617f7c2be0c65196a44bc88b6a2bb5ad3b5f1b54"
+          test "$EXPECTED_HEAD" = "$(git rev-parse "$CANDIDATE_REF^{commit}")"
 
       - name: Use Node.js 22
         uses: actions/setup-node@v4
@@ -60,7 +76,7 @@ jobs:
           INPUT_ROOT: ${{ runner.temp }}/lfea-external-source
           REQUEST_PATH: ${{ inputs.request_path }}
           OUTPUT_ROOT: ${{ runner.temp }}/lfea-external-evidence
-          EXPECTED_HEAD: ${{ github.sha }}
+          EXPECTED_HEAD: ${{ inputs.candidate_sha }}
         run: |
           node scripts/lfea-piping-external-evidence-materializer.mjs \
             --input-root="$INPUT_ROOT" \
@@ -68,10 +84,23 @@ jobs:
             --output="$OUTPUT_ROOT" \
             --exact-head="$EXPECTED_HEAD"
 
+      - name: Bind approved WP2 authority to retained package
+        shell: bash
+        env:
+          OUTPUT_ROOT: ${{ runner.temp }}/lfea-external-evidence
+          EXPECTED_HEAD: ${{ inputs.candidate_sha }}
+        run: |
+          node scripts/lfea-piping-phase6h-project-authority-binder.mjs \
+            --root="$OUTPUT_ROOT" \
+            --package="external/external-qualification-package.json" \
+            --authority-index="external/project-authority-index.json" \
+            --output="external/project-authority-bound-package.json" \
+            --exact-head="$EXPECTED_HEAD"
+
       - name: Upload governed external evidence artifact
         uses: actions/upload-artifact@v4
         with:
-          name: lfea-piping-external-evidence-${{ github.sha }}
+          name: lfea-piping-external-evidence-${{ inputs.candidate_sha }}
           path: ${{ runner.temp }}/lfea-external-evidence
           if-no-files-found: error
           retention-days: 90

@@ -3,6 +3,11 @@ name: LFEA Piping Runtime Bundle Assembly
 on:
   workflow_dispatch:
     inputs:
+      candidate_sha:
+        description: Immutable Phase 6I candidate SHA shared by internal and external evidence
+        required: true
+        default: 617f7c2be0c65196a44bc88b6a2bb5ad3b5f1b54
+        type: string
       internal_run_id:
         description: Workflow run ID containing the successful Phase 6F internal evidence artifact
         required: true
@@ -12,17 +17,17 @@ on:
         required: true
         type: string
       external_run_id:
-        description: Workflow run ID containing the governed Phase 6B external evidence artifact
+        description: Workflow run ID containing the governed Phase 6H external evidence artifact
         required: true
         type: string
       external_artifact_name:
-        description: Governed Phase 6B external evidence artifact name
+        description: Governed Phase 6H external evidence artifact name
         required: true
         type: string
-      external_package_path:
-        description: Relative path to the sealed external qualification package in its artifact
+      bound_package_path:
+        description: Relative path to the WP2-bound external qualification package
         required: true
-        default: external/external-qualification-package.json
+        default: external/project-authority-bound-package.json
         type: string
 
 permissions:
@@ -30,20 +35,31 @@ permissions:
   contents: read
 
 concurrency:
-  group: lfea-piping-runtime-bundle-assembly-${{ github.ref }}
+  group: lfea-piping-runtime-bundle-assembly-${{ github.ref }}-${{ inputs.candidate_sha }}
   cancel-in-progress: false
 
 jobs:
   assemble-runtime-bundle:
-    name: Assemble supplied internal and external evidence
+    name: Assemble supplied internal and WP2-bound external evidence
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
     steps:
-      - name: Checkout selected exact head
+      - name: Checkout qualification tooling head
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Verify immutable candidate identity
+        shell: bash
+        env:
+          CANDIDATE_REF: refs/remotes/origin/release/lfea-piping-phase6i-617f7c2
+          EXPECTED_HEAD: ${{ inputs.candidate_sha }}
+          TOOLING_HEAD: ${{ github.sha }}
+        run: |
+          test "$TOOLING_HEAD" = "$(git rev-parse HEAD)"
+          test "$EXPECTED_HEAD" = "617f7c2be0c65196a44bc88b6a2bb5ad3b5f1b54"
+          test "$EXPECTED_HEAD" = "$(git rev-parse "$CANDIDATE_REF^{commit}")"
 
       - name: Use Node.js 22
         uses: actions/setup-node@v4
@@ -70,19 +86,19 @@ jobs:
           name: ${{ inputs.external_artifact_name }}
           path: ${{ runner.temp }}/lfea-external-evidence
 
-      - name: Assemble runtime release bundle
+      - name: Assemble WP2-bound runtime release bundle
         shell: bash
         env:
           INTERNAL_ROOT: ${{ runner.temp }}/lfea-internal-evidence
           EXTERNAL_ROOT: ${{ runner.temp }}/lfea-external-evidence
-          EXTERNAL_PACKAGE: ${{ inputs.external_package_path }}
+          BOUND_PACKAGE: ${{ inputs.bound_package_path }}
           OUTPUT_ROOT: ${{ runner.temp }}/lfea-runtime-release-bundle
-          EXPECTED_HEAD: ${{ github.sha }}
+          EXPECTED_HEAD: ${{ inputs.candidate_sha }}
         run: |
-          node scripts/lfea-piping-runtime-bundle-assembler.mjs \
+          node scripts/lfea-piping-wp2-runtime-bundle-assembler.mjs \
             --internal-root="$INTERNAL_ROOT" \
             --external-root="$EXTERNAL_ROOT" \
-            --external-package="$EXTERNAL_PACKAGE" \
+            --bound-package="$BOUND_PACKAGE" \
             --output="$OUTPUT_ROOT" \
             --exact-head="$EXPECTED_HEAD"
 
@@ -90,7 +106,7 @@ jobs:
         shell: bash
         env:
           EVIDENCE_ROOT: ${{ runner.temp }}/lfea-runtime-release-bundle
-          EXPECTED_HEAD: ${{ github.sha }}
+          EXPECTED_HEAD: ${{ inputs.candidate_sha }}
         run: |
           npm run check:lfea-piping-release -- \
             --evidence-root="$EVIDENCE_ROOT" \
@@ -100,7 +116,7 @@ jobs:
       - name: Upload assembled runtime release bundle
         uses: actions/upload-artifact@v4
         with:
-          name: lfea-piping-runtime-release-bundle-${{ github.sha }}
+          name: lfea-piping-runtime-release-bundle-${{ inputs.candidate_sha }}
           path: ${{ runner.temp }}/lfea-runtime-release-bundle
           if-no-files-found: error
           retention-days: 90
