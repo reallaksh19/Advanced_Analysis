@@ -9,6 +9,11 @@ const MODULE_PATH = fileURLToPath(import.meta.url);
 const ROOT = path.resolve(path.dirname(MODULE_PATH), '..');
 const CONTRACT_PATH = 'governance/lfea-piping-phase6i-pr371-boundary.json';
 const RELEASE_LEDGER_PATH = 'release-evidence/lfea-piping-release-evidence.json';
+const ENFORCEMENT_FILES = new Set([
+  'scripts/lfea-piping-phase6i-pr371-boundary-check.mjs',
+  'scripts/lfea-piping-phase6i-project-authority-index.mjs',
+  'scripts/lfea-piping-phase6i-project-authority-index-check.mjs',
+]);
 const CONTRACT_KEYS = Object.freeze([
   'schema',
   'phase6iProgram',
@@ -78,7 +83,7 @@ assert.equal(contract.externalProgramAuthorityAllowed, false);
 const governedFiles = discoverGovernedFiles();
 assert.ok(governedFiles.length > 0, 'No governed LFEA Phase 6I files were discovered.');
 for (const relativePath of governedFiles) {
-  if (relativePath === 'scripts/lfea-piping-phase6i-pr371-boundary-check.mjs') continue;
+  if (ENFORCEMENT_FILES.has(relativePath)) continue;
   const source = fs.readFileSync(path.join(ROOT, ...relativePath.split('/')), 'utf8');
   for (const rule of FORBIDDEN_SOURCE_PATTERNS) {
     assert.equal(
@@ -99,6 +104,7 @@ console.log(JSON.stringify({
   schema: 'lfea-piping-phase6i-pr371-boundary-check-result/v1',
   status: 'PASS',
   governedFileCount: governedFiles.length,
+  enforcementFileCount: ENFORCEMENT_FILES.size,
   relationship: contract.relationship,
   currentCandidateConsumptionAllowed: false,
   externalProgramAuthorityAllowed: false,
