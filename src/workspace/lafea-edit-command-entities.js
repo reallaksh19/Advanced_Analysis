@@ -26,7 +26,13 @@ export function allocateLafeaEntityIdentity(
   recordValue,
 ) {
   requireLafeaStageRegistryEntry(stageId);
-  requireEntityDescriptor(descriptor, stageId);
+  if (descriptor.stageId !== stageId
+    || descriptor.valueContract.domainType !== 'ENTITY') {
+    throw contractError(
+      'LAFEA_ENTITY_DESCRIPTOR_REQUIRED',
+      'Entity allocation requires a matching ENTITY descriptor.',
+    );
+  }
   const rows = getAtPath(documentValue, descriptor.target.collectionPath);
   if (!Array.isArray(rows)) {
     throw contractError(
@@ -214,14 +220,11 @@ export function applyLafeaDeleteEntity(currentDocument, command, descriptor) {
   };
 }
 
-function requireEntityDescriptor(descriptor, stageId = descriptor.stageId) {
-  if (descriptor.stageId !== stageId
-    || descriptor.valueContract.domainType !== 'ENTITY') {
+function requireEntityDescriptor(descriptor) {
+  if (descriptor.valueContract.domainType !== 'ENTITY') {
     throw contractError(
       'LAFEA_ENTITY_DESCRIPTOR_REQUIRED',
-      stageId === descriptor.stageId
-        ? `${descriptor.descriptorId} is not an entity descriptor.`
-        : 'Entity allocation requires a matching ENTITY descriptor.',
+      `${descriptor.descriptorId} is not an entity descriptor.`,
     );
   }
 }
