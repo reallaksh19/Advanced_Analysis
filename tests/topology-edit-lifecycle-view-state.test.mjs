@@ -52,9 +52,14 @@ test('production lifecycle restores the plain selection contract and publishes r
     'utf8',
   );
   assert.match(source, /restoreTopologyEditViewSelection\(viewState\.selection\)/);
+  assert.match(
+    source,
+    /restoreTopologyEditViewSelection\(viewState\.selection\)\s*\?\? EMPTY_TOPOLOGY_EDIT_VIEW_SELECTION/,
+  );
   assert.doesNotMatch(source, /viewState\.selection\?\.schema/);
   assert.match(source, /CANONICAL_NODE_ID_PATTERN/);
   assert.match(source, /CANONICAL_EDGE_ID_PATTERN/);
+  assert.match(source, /EMPTY_TOPOLOGY_EDIT_VIEW_SELECTION/);
   for (const key of [
     'topologyEditDraftPackageHash',
     'topologyEditExportSealedHash',
