@@ -1,5 +1,10 @@
 import { deepFreeze, stringValue } from '../../core/shared-piping-model/index.js';
-import { DIMENSION_STATUS } from './dimension-authority.js';
+
+export const DIMENSION_STATUS = Object.freeze({
+  RESOLVED: 'RESOLVED',
+  MISSING: 'MISSING',
+  CONFLICTING: 'CONFLICTING',
+});
 
 export function finitePositive(value) {
   const number = Number(value);
@@ -110,4 +115,3 @@ export function catalogEntry(catalog, evidence) {
   );
   return reference && catalog && typeof catalog === 'object' ? catalog[reference] || null : null;
 }
-
