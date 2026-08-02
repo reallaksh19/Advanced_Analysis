@@ -1,5 +1,6 @@
 /** Event lifecycle and keyboard behavior for the real Workspace dataset tree. */
 import { EVENT_TOPICS } from './event-topics.js';
+import { MODEL_ZONE_EVENTS } from './model-zone-selector.js';
 import { filterTree, focusTreeIndex, renderVisibleItems, scrollToTreeIndex, updateFlattenedNodes } from './tree-panel-tree.js';
 
 export function initializeTreePanel(panel) {
@@ -81,11 +82,13 @@ export function destroyTreePanel(panel) {
   panel.unsubscribeCallbacks.forEach((unsubscribe) => unsubscribe());
   panel.unsubscribeCallbacks = [];
   panel.dataset = null;
+  panel.sourceDataset = null;
   panel.initialized = false;
 }
 
 function subscriptions(panel) {
   return [
+    panel.eventBus.subscribe(MODEL_ZONE_EVENTS.CHANGED, ({ selection }) => panel.applyZoneSelection(selection)),
     panel.eventBus.subscribe(EVENT_TOPICS.WORKSPACE_SNAPSHOT_CHANGED, ({ snapshot }) => requestAnimationFrame(() => panel.renderSnapshot(snapshot))),
     panel.eventBus.subscribe(EVENT_TOPICS.DATASET_LOAD_FAILED, ({ message }) => panel.renderError(message)),
     panel.eventBus.subscribe(EVENT_TOPICS.DATASET_CLEARED, () => panel.renderEmpty()),
