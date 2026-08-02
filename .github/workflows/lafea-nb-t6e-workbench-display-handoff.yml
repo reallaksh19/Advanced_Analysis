@@ -1,0 +1,121 @@
+name: LAFEA NB-T6E Workbench Display Handoff
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/lafea-nb-t6e-workbench-display-handoff.yml'
+      - 'src/workspace/lafea-b7d-workbench-display-handoff.js'
+      - 'src/workspace/lafea-b7d-recovery-render-bridge.js'
+      - 'src/workspace/lafea-controlled-continuum-public.js'
+      - 'src/workspace/lafea-workbench-controller.js'
+      - 'src/workspace/lafea-workbench-render-evidence.js'
+      - 'src/workspace/lafea-render-evidence-intake.js'
+      - 'src/workspace/lafea-canvas/render-packet-v2-contract.js'
+      - 'scripts/lafea-nb-t6e-workbench-display-handoff-check.mjs'
+      - 'scripts/lafea-nb-t6d-b7d-recovery-render-bridge-check.mjs'
+      - 'scripts/lafea-nonbucket-stack-check.mjs'
+      - 'docs/LAFEA_NonBucket_NB-T6E_Workbench_Display_Handoff.md'
+      - 'package.json'
+      - 'package-lock.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/lafea-nb-t6e-workbench-display-handoff.yml'
+      - 'src/workspace/lafea-b7d-workbench-display-handoff.js'
+      - 'src/workspace/lafea-b7d-recovery-render-bridge.js'
+      - 'src/workspace/lafea-controlled-continuum-public.js'
+      - 'src/workspace/lafea-workbench-controller.js'
+      - 'src/workspace/lafea-workbench-render-evidence.js'
+      - 'src/workspace/lafea-render-evidence-intake.js'
+      - 'scripts/lafea-nb-t6e-workbench-display-handoff-check.mjs'
+      - 'scripts/lafea-nonbucket-stack-check.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lafea-nb-t6e-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: NB-T6E exact-head workbench display handoff
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Assert exact checkout and ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git merge-base --is-ancestor "$PR_BASE_SHA" "$EXPECTED_HEAD_SHA"
+          fi
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run NB-T6E workbench display handoff qualification
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/lafea-nb-t6e-workbench-display-handoff-check.mjs \
+            2>&1 | tee lafea-nb-t6e-workbench-display-handoff.log
+
+      - name: Run retained NB-T6D recovery-render qualification
+        run: node scripts/lafea-nb-t6d-b7d-recovery-render-bridge-check.mjs
+
+      - name: Run retained render-intake and controller qualifications
+        run: |
+          node scripts/lafea-u4d-render-evidence-intake-check.mjs
+          node scripts/lafea-u4g-controller-render-evidence-check.mjs
+
+      - name: Run non-bucket aggregate
+        run: npm run check:lafea-nonbucket-stack
+
+      - name: Run strict syntax checks
+        run: npm run syntax:strict
+
+      - name: Run import checks
+        run: npm run check:imports
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Verify patch hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git diff --check "$PR_BASE_SHA...HEAD"
+          else
+            git diff --check HEAD^
+          fi
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Upload exact-head NB-T6E evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nb-t6e-${{ github.event.pull_request.head.sha || github.sha }}
+          path: lafea-nb-t6e-workbench-display-handoff.log
+          if-no-files-found: error
+          retention-days: 30

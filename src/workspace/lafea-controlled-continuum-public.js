@@ -55,3 +55,9 @@ export {
   serializeLafeaSelectedPilotReviewHandoff,
   validateLafeaSelectedPilotReviewHandoff,
 } from './lafea-selected-pilot-evidence-handoff.js';
+  LAFEA_B7D_WORKBENCH_DISPLAY_HANDOFF_INTAKE_SCHEMA,
+  LAFEA_B7D_WORKBENCH_DISPLAY_HANDOFF_PRODUCER_REVISION,
+  LAFEA_B7D_WORKBENCH_DISPLAY_HANDOFF_SCHEMA,
+  installLafeaB7dWorkbenchDisplay,
+  validateLafeaB7dWorkbenchDisplayHandoff,
+} from './lafea-b7d-workbench-display-handoff.js';
