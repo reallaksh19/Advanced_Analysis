@@ -1,4 +1,4 @@
-# LFEA Phase 6I WP-2 Project Authority Index Contract — Rev 1
+# LFEA Phase 6I WP-2 Project Authority Index Contract — Rev 2
 
 **Candidate:** `617f7c2be0c65196a44bc88b6a2bb5ad3b5f1b54`  
 **Immutable ref:** `release/lfea-piping-phase6i-617f7c2`  
@@ -10,9 +10,14 @@ This contract provides a deterministic, fail-closed structure for the caller-app
 
 ## Files
 
-- Contract and validator: `scripts/lfea-piping-phase6i-project-authority-index.mjs`
-- Contract checks: `scripts/lfea-piping-phase6i-project-authority-index-check.mjs`
-- Unresolved preparation template: `governance/lfea-piping-phase6i-project-authority-index.template.json`
+- Reusable core contract and validator:  
+  `src/core/linear-piping-project-qualification/project-authority-index.js`
+- Compatibility export used by existing Phase 6I checks:  
+  `scripts/lfea-piping-phase6i-project-authority-index.mjs`
+- Contract checks:  
+  `scripts/lfea-piping-phase6i-project-authority-index-check.mjs`
+- Unresolved preparation template:  
+  `governance/lfea-piping-phase6i-project-authority-index.template.json`
 
 The committed template is intentionally unresolved and unsigned. It is not project evidence and cannot close WP-2.
 
@@ -64,7 +69,7 @@ Each resolved group retains document identity, title, revision, owner, retained 
 
 ## Prohibited authority sources
 
-The contract rejects PR #371 or engineering-enrichment proposals, shadow candidate values, proposal-only states and authorized-master-candidate tokens. It also rejects production/commercial-output labels, filename/default-value inference, unknown source classes, candidate mismatch, missing or duplicate groups, premature approval, unsupported non-applicability, invalid hashes, invalid timestamps and record tampering.
+The contract rejects engineering-enrichment proposals, shadow candidate values, proposal-only states and authorized-master-candidate tokens. It also rejects production/commercial-output labels, filename/default-value inference, unknown source classes, candidate mismatch, missing or duplicate groups, premature approval, unsupported non-applicability, invalid hashes, invalid timestamps and record tampering.
 
 The same screening applies to the final responsible-engineer approval evidence reference. Production output, commercial output, filenames, defaults and magnitude-based inference remain ineligible as project authority.
 
@@ -74,9 +79,22 @@ The semantic hash identifies the candidate-bound authority content and approval 
 
 The evidence hash includes timestamped custody metadata. Therefore, timestamp-only changes preserve the semantic hash but change the evidence hash.
 
+## Phase 6H binding
+
+The Phase 6H materialization request schema is `lfea-piping-external-materialization-request/v2`.
+
+The request must name a safe relative JSON path for an approved Project Authority Index. Phase 6H validates this record before reading the seven external records. The validated authority record is:
+
+- retained as `external/project-authority-index.json`;
+- embedded in `linear-piping-external-qualification-package/v2`;
+- included in the external package semantic and evidence hashes;
+- carried into Phase 6G and Phase 6E through the already-governed external package identity.
+
+A legacy v1 materialization request or an unresolved/unsigned authority index fails closed.
+
 ## Current disposition
 
-This implementation creates the WP-2 contract and validation route only. The committed template remains:
+The committed template remains:
 
 ```text
 WP2_STATUS: WP2_INPUT_REQUIRED
@@ -85,4 +103,4 @@ UNRESOLVED_AUTHORITIES: 11
 RELEASE_QUALIFIED: FALSE
 ```
 
-The responsible piping/stress authority must populate and approve a real candidate-bound index before WP-2 may be declared complete.
+The responsible piping/stress authority must populate and approve a real candidate-bound index before Phase 6H can materialize external qualification evidence.

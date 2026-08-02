@@ -14,24 +14,27 @@ import {
   requireReleaseReviewDisposition,
 } from './external-evidence-contracts.js';
 import { requirePerformanceEvidence } from './performance-evidence.js';
+import { requireApprovedProjectAuthorityIndex } from './project-authority-index.js';
 import { requireRollbackEvidence } from './rollback-evidence.js';
 
 export const EXTERNAL_QUALIFICATION_PACKAGE_REQUEST_SCHEMA =
-  'linear-piping-external-qualification-package-request/v1';
+  'linear-piping-external-qualification-package-request/v2';
 export const EXTERNAL_QUALIFICATION_PACKAGE_SCHEMA =
-  'linear-piping-external-qualification-package/v1';
+  'linear-piping-external-qualification-package/v2';
 export const EXTERNAL_PACKAGE_STATUS = 'ELIGIBLE_FOR_RELEASE_REVIEW';
 export const EXTERNAL_PACKAGE_INPUT_KEYS = Object.freeze([
   'schema', 'packageId', 'exactHead', 'applicationResult', 'presentation',
-  'realModelReconciliation', 'commercialCorroboration', 'performanceEvidence',
-  'rollbackEvidence', 'reviewDisposition', 'artifactReferences',
+  'projectAuthorityIndex', 'realModelReconciliation', 'commercialCorroboration',
+  'performanceEvidence', 'rollbackEvidence', 'reviewDisposition',
+  'artifactReferences',
 ]);
 export const EXTERNAL_PACKAGE_KEYS = Object.freeze([
   'schema', 'packageId', 'exactHead', 'applicationResultSemanticHash',
   'applicationResultEvidenceHash', 'presentationSemanticHash',
-  'presentationEvidenceHash', 'requiredSelectorKinds', 'realModelReconciliation',
-  'commercialCorroboration', 'performanceEvidence', 'rollbackEvidence',
-  'reviewDisposition', 'artifactReferences', 'status', 'semanticHash', 'evidenceHash',
+  'presentationEvidenceHash', 'projectAuthorityIndex', 'requiredSelectorKinds',
+  'realModelReconciliation', 'commercialCorroboration', 'performanceEvidence',
+  'rollbackEvidence', 'reviewDisposition', 'artifactReferences', 'status',
+  'semanticHash', 'evidenceHash',
 ]);
 export const EXTERNAL_ARTIFACT_MAP_KEYS = Object.freeze([
   'realModelReconciliation', 'commercialCorroboration', 'performanceEvidence',
@@ -46,6 +49,9 @@ export function compileLinearPipingExternalQualificationPackage(input) {
   const exactHead = requireHead(input.exactHead, 'externalQualificationPackageInput.exactHead');
   const applicationResult = requireLinearPipingQualifiedApplicationResult(input.applicationResult);
   const presentation = requireCurrentLinearPipingPresentation(input.presentation, applicationResult);
+  const projectAuthorityIndex = requireApprovedProjectAuthorityIndex(
+    input.projectAuthorityIndex,
+  );
   const realModelReconciliation = requireComparison(
     input.realModelReconciliation,
     'REAL_MODEL_RECONCILIATION',
@@ -89,6 +95,7 @@ export function compileLinearPipingExternalQualificationPackage(input) {
     packageId: requireExternalText(input.packageId, 'externalQualificationPackageInput.packageId'),
     exactHead,
     ...parents,
+    projectAuthorityIndex,
     requiredSelectorKinds,
     realModelReconciliation,
     commercialCorroboration,
@@ -117,6 +124,9 @@ export function requireLinearPipingExternalQualificationPackage(record) {
     'applicationResultSemanticHash', 'applicationResultEvidenceHash',
     'presentationSemanticHash', 'presentationEvidenceHash', 'semanticHash', 'evidenceHash',
   ]) requireHash(record[field], `externalQualificationPackage.${field}`);
+  const projectAuthorityIndex = requireApprovedProjectAuthorityIndex(
+    record.projectAuthorityIndex,
+  );
   const requiredSelectorKinds = requireSelectorKindArray(record.requiredSelectorKinds);
   const realModelReconciliation = requireLinearPipingQualificationComparison(record.realModelReconciliation);
   const commercialCorroboration = requireLinearPipingQualificationComparison(record.commercialCorroboration);
@@ -148,6 +158,7 @@ export function requireLinearPipingExternalQualificationPackage(record) {
   });
   const accepted = {
     ...record,
+    projectAuthorityIndex,
     requiredSelectorKinds,
     realModelReconciliation,
     commercialCorroboration,
@@ -303,6 +314,7 @@ export function externalPackageSemanticProjection(record) {
     applicationResultEvidenceHash: record.applicationResultEvidenceHash,
     presentationSemanticHash: record.presentationSemanticHash,
     presentationEvidenceHash: record.presentationEvidenceHash,
+    projectAuthorityIndexSemanticHash: record.projectAuthorityIndex.semanticHash,
     requiredSelectorKinds: record.requiredSelectorKinds,
     realModelReconciliationSemanticHash: record.realModelReconciliation.semanticHash,
     commercialCorroborationSemanticHash: record.commercialCorroboration.semanticHash,
@@ -318,6 +330,7 @@ export function computeExternalPackageEvidenceHash(record) {
   return semanticHash({
     semanticHash: record.semanticHash,
     evidenceHashes: [
+      record.projectAuthorityIndex.evidenceHash,
       record.realModelReconciliation.evidenceHash,
       record.commercialCorroboration.evidenceHash,
       record.performanceEvidence.evidenceHash,

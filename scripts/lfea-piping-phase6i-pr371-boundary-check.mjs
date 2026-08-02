@@ -13,6 +13,7 @@ const ENFORCEMENT_FILES = new Set([
   'scripts/lfea-piping-phase6i-pr371-boundary-check.mjs',
   'scripts/lfea-piping-phase6i-project-authority-index.mjs',
   'scripts/lfea-piping-phase6i-project-authority-index-check.mjs',
+  'src/core/linear-piping-project-qualification/project-authority-index.js',
 ]);
 const CONTRACT_KEYS = Object.freeze([
   'schema',

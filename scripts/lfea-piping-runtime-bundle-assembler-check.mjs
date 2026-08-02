@@ -211,8 +211,14 @@ function fixture(root) {
     return [role, { path: file }];
   }));
   const externalPackage = {
-    schema: 'linear-piping-external-qualification-package/v1', exactHead: HEAD,
+    schema: 'linear-piping-external-qualification-package/v2', exactHead: HEAD,
     status: 'ELIGIBLE_FOR_RELEASE_REVIEW',
+    projectAuthorityIndex: {
+      schema: 'lfea-piping-phase6i-project-authority-index/v1',
+      semanticHash: 'fnv1a64:6666666666666666',
+      evidenceHash: 'fnv1a64:7777777777777777',
+      wp2Status: 'WP2_COMPLETE',
+    },
     semanticHash: 'fnv1a64:4444444444444444',
     evidenceHash: 'fnv1a64:5555555555555555',
     artifactReferences: externalReferences,

@@ -12,7 +12,7 @@ on:
         required: true
         type: string
       request_path:
-        description: Relative path to lfea-piping-external-materialization-request/v1
+        description: Relative path to lfea-piping-external-materialization-request/v2
         required: true
         default: request/external-materialization-request.json
         type: string

@@ -78,9 +78,22 @@ assert.match(rollback, /preservedProjectData/u);
 assert.match(rollback, /postRollbackChecks/u);
 assert.doesNotMatch(rollback, /requireExternalText\(source\.commandText/u);
 
+const projectAuthority = source['project-authority-index.js'];
+assert.match(projectAuthority, /lfea-piping-phase6i-project-authority-index\/v1/u);
+assert.match(projectAuthority, /WP2_INPUT_REQUIRED/u);
+assert.match(projectAuthority, /WP2_APPROVAL_REQUIRED/u);
+assert.match(projectAuthority, /WP2_COMPLETE/u);
+assert.match(projectAuthority, /requireApprovedProjectAuthorityIndex/u);
+assert.match(projectAuthority, /LFEA_WP2_SHADOW_SOURCE_PROHIBITED/u);
+assert.match(projectAuthority, /releaseQualified:\s*false/u);
+
 const externalPackage = source['external-evidence-package.js'];
+assert.match(externalPackage, /linear-piping-external-qualification-package-request\/v2/u);
+assert.match(externalPackage, /linear-piping-external-qualification-package\/v2/u);
 assert.match(externalPackage, /ELIGIBLE_FOR_RELEASE_REVIEW/u);
 assert.match(externalPackage, /requireCurrentLinearPipingPresentation/u);
+assert.match(externalPackage, /requireApprovedProjectAuthorityIndex/u);
+assert.match(externalPackage, /projectAuthorityIndexSemanticHash/u);
 assert.match(externalPackage, /INTERFACE_FORCE_LOCAL/u);
 assert.match(externalPackage, /INTERFACE_MOMENT_REFERENCE_LOCAL/u);
 assert.match(externalPackage, /NOZZLE_UTILIZATION/u);
@@ -101,6 +114,7 @@ const externalFixture = fs.readFileSync(
 );
 assert.match(externalFixture, /\[SIMULATED\]\[INELIGIBLE_FOR_PROJECT_EVIDENCE\]/u);
 assert.match(externalFixture, /PIPING_EXTERNAL_EVIDENCE_INELIGIBLE/u);
+assert.match(externalFixture, /LFEA_WP2_INDEX_NOT_APPROVED/u);
 
 const releaseEvidence = JSON.parse(
   fs.readFileSync('release-evidence/lfea-piping-release-evidence.json', 'utf8'),
@@ -144,6 +158,8 @@ assert.match(releaseOrchestrator, /evidence\.programDisposition !== 'QUALIFIED'/
 
 const index = source['index.js'];
 assert.match(index, /compileLinearPipingExternalQualificationPackage/u);
+assert.match(index, /requireApprovedProjectAuthorityIndex/u);
+assert.match(index, /buildProjectAuthorityIndex/u);
 assert.match(index, /sealPerformanceEvidence/u);
 assert.match(index, /sealRollbackEvidence/u);
 assert.match(index, /sealReleaseReviewDisposition/u);
