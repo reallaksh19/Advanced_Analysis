@@ -1,5 +1,5 @@
 {
-  "schema": "lafea-bucket-01-gap-matrix/v2",
+  "schema": "lafea-bucket-01-gap-matrix/v3",
   "audited_baseline_sha": "42c9f96e9baffb52232b4b7ed7f04611c6337961",
   "superseded_baselines": [
     "a7144e02598f3e9db0826f10cefe0b5254fa953e",
@@ -11,12 +11,17 @@
     "changes_confined_to_separate_piping_qualification_files": true,
     "qualification_parent_refreshed": true
   },
+  "execution_policy": {
+    "hosted_workflow_in_scope": false,
+    "technical_repairs_only": true,
+    "execution_evidence_must_be_supplied_separately": true
+  },
   "bucket_id": "LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE",
   "findings": [
     {
       "id": "G1-EXACT-HEAD",
-      "status": "BLOCKED_PENDING_EXECUTION",
-      "finding": "Exact-head workflow and report route are required for the final candidate."
+      "status": "BLOCKED_PENDING_EXTERNAL_EXECUTION",
+      "finding": "The PR contains no hosted Bucket-01 workflow. Exact-head execution and retained reports must be supplied separately without changing the technical benchmark definitions."
     },
     {
       "id": "G2-PRODUCTION-MESH",
@@ -45,8 +50,8 @@
     },
     {
       "id": "G3-CANTILEVER-PANEL",
-      "status": "MISSING",
-      "finding": "No dedicated three-level manufactured panel or cantilever benchmark was identified."
+      "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION",
+      "finding": "A frozen closed-form plane-stress pure-bending panel oracle and 8/32/128-element T6 benchmark now verify quadratic displacement, linear integration-point stress, deterministic replay, strain energy, zero force resultant and applied/reaction moment equilibrium without smoothed stress."
     },
     {
       "id": "G3-LOAD-DRIVEN",
