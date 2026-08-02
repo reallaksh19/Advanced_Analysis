@@ -1,16 +1,6 @@
 import {
-  createTopologyEditProfessionalOperationPlan,
   topologyEditProfessionalOperationDefaults,
 } from '../topology-edit/professional/topology-edit-professional-operation-session.js';
-import {
-  prepareTopologyEditOperationCandidate,
-} from '../topology-edit/professional/topology-edit-operation-candidate.js';
-import {
-  executeTopologyEditOperationTransaction,
-  previewTopologyEditOperationTransaction,
-  redoTopologyEditOperationTransaction,
-  undoTopologyEditOperationTransaction,
-} from '../topology-edit/professional/topology-edit-operation-transaction.js';
 import {
   createTopologyEditSpecificationCatalogue,
 } from '../topology-edit/professional/topology-edit-spec-catalog.js';
@@ -18,8 +8,12 @@ import {
   TopologyEditValidationWorkerClient,
 } from '../topology-edit/professional/topology-edit-validation-worker-client.js';
 import {
-  readTopologyEditProfessionalOperationValues,
-} from './topology-edit-professional-operation-panel.js';
+  applyTopologyEditProfessionalOperation,
+  planTopologyEditProfessionalOperation,
+  redoTopologyEditProfessionalOperation,
+  undoTopologyEditProfessionalOperation,
+  validateTopologyEditProfessionalOperation,
+} from './topology-edit-professional-operation-actions.js';
 import {
   createTopologyEditProfessionalInitialValues,
   createTopologyEditProfessionalViewState,
@@ -108,84 +102,23 @@ export class TopologyEditProfessionalOperationRuntime {
   }
 
   planOperation() {
-    const session = this.controller.session;
-    if (!session) return true;
-    try {
-      this.values = readTopologyEditProfessionalOperationValues(this.element);
-      this.plan = createTopologyEditProfessionalOperationPlan({
-        topology: session.currentTopology(),
-        selection: this.controller.selection,
-        values: this.values,
-        catalogue: this.catalogue,
-      });
-      this.candidate = this.plan.status === 'PLANNED'
-        && this.plan.unresolvedEvidence.length === 0
-        ? prepareTopologyEditOperationCandidate({
-          session,
-          operationPlan: this.plan,
-        })
-        : null;
-      this.validation = null;
-      this.transactionPreview = null;
-      this.error = null;
-      this.message = this.candidate
-        ? `Plan ${this.plan.planHash.slice(0, 18)} certified candidate ${this.candidate.resultingCanonicalHash}.`
-        : this.plan.reason ?? `Plan blocked by ${this.plan.unresolvedEvidence[0]?.code}.`;
-      this.publishState();
-    } catch (error) {
-      this.reject(error);
-    }
-    return true;
+    return planTopologyEditProfessionalOperation(this);
   }
 
-  async validateOperation() {
-    const session = this.controller.session;
-    if (!session || !this.plan || !this.candidate) return true;
-    const plan = this.plan;
-    const candidate = this.candidate;
-    this.validationPending = true;
-    this.validation = null;
-    this.transactionPreview = null;
-    this.error = null;
-    this.message = 'Validating the exact certified candidate in a cancellable module worker…';
-    this.render();
-    try {
-      const result = await this.validationClient.validate({
-        operationPlan: plan,
-        canonicalTopology: candidate.canonicalTopology,
-        previousDiagnostics: this.controller.issues ?? [],
-        performancePolicy: {
-          fastPathBudgetMs: 16,
-          warningBudgetMs: 100,
-          hysteresisMs: 4,
-        },
-        blockingSeverities: ['HIGH'],
-      });
-      if (!this.controller.session
-        || this.plan?.planHash !== plan.planHash
-        || this.candidate?.candidateHash !== candidate.candidateHash
-        || this.controller.session.currentTopology().canonicalTopologyHash
-          !== candidate.priorCanonicalHash) {
-        throw new RangeError('Validation completed against a stale professional candidate.');
-      }
-      this.validation = result.receipt;
-      this.transactionPreview = previewTopologyEditOperationTransaction({
-        session: this.controller.session,
-        operationPlan: plan,
-        candidate,
-        validationReceipt: result.receipt,
-      });
-      this.message = `Validation ${result.receipt.status}; atomic preview ${this.transactionPreview.previewHash.slice(0, 18)} ready.`;
-    } catch (error) {
-      if (error?.name !== 'AbortError') this.error = errorMessage(error);
-      this.message = error?.name === 'AbortError'
-        ? 'Professional validation cancelled.'
-        : 'Professional validation blocked.';
-    } finally {
-      this.validationPending = false;
-      this.publishState();
-    }
-    return true;
+  validateOperation() {
+    return validateTopologyEditProfessionalOperation(this);
+  }
+
+  applyOperation() {
+    return applyTopologyEditProfessionalOperation(this);
+  }
+
+  undoOperation() {
+    return undoTopologyEditProfessionalOperation(this);
+  }
+
+  redoOperation() {
+    return redoTopologyEditProfessionalOperation(this);
   }
 
   cancelValidation() {
@@ -194,71 +127,6 @@ export class TopologyEditProfessionalOperationRuntime {
     this.validationPending = false;
     this.message = 'Professional validation cancelled by terminating its worker.';
     this.render();
-    return true;
-  }
-
-  applyOperation() {
-    const session = this.controller.session;
-    if (!session || !this.plan || !this.candidate
-      || !this.validation || !this.transactionPreview) return true;
-    const priorVersion = session.journal.sessionVersion;
-    try {
-      this.transaction = executeTopologyEditOperationTransaction({
-        session,
-        operationPlan: this.plan,
-        candidate: this.candidate,
-        validationReceipt: this.validation,
-        preview: this.transactionPreview,
-      });
-      this.redoTransaction = null;
-      this.plan = null;
-      this.candidate = null;
-      this.validation = null;
-      this.transactionPreview = null;
-      this.error = null;
-      this.controller.refreshView(session.currentTopology());
-      this.controller.autosaveAfterTransition?.(priorVersion);
-      this.message = `Atomic operation accepted: ${this.transaction.commandCount} command(s), ${this.transaction.transactionHash.slice(0, 18)}.`;
-      this.publishState();
-    } catch (error) {
-      this.reject(error);
-    }
-    return true;
-  }
-
-  undoOperation() {
-    const session = this.controller.session;
-    if (!session || !this.transaction) return true;
-    const priorVersion = session.journal.sessionVersion;
-    try {
-      undoTopologyEditOperationTransaction(session, this.transaction);
-      this.redoTransaction = this.transaction;
-      this.transaction = null;
-      this.controller.refreshView(session.currentTopology());
-      this.controller.autosaveAfterTransition?.(priorVersion);
-      this.message = 'Professional operation undone as one exact command group.';
-      this.publishState();
-    } catch (error) {
-      this.reject(error);
-    }
-    return true;
-  }
-
-  redoOperation() {
-    const session = this.controller.session;
-    if (!session || !this.redoTransaction) return true;
-    const priorVersion = session.journal.sessionVersion;
-    try {
-      redoTopologyEditOperationTransaction(session, this.redoTransaction);
-      this.transaction = this.redoTransaction;
-      this.redoTransaction = null;
-      this.controller.refreshView(session.currentTopology());
-      this.controller.autosaveAfterTransition?.(priorVersion);
-      this.message = 'Professional operation redone as one exact command group.';
-      this.publishState();
-    } catch (error) {
-      this.reject(error);
-    }
     return true;
   }
 
