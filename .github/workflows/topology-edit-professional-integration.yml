@@ -117,6 +117,7 @@ jobs:
             tests/topology-edit-professional-engineering-containment.test.mjs \
             tests/topology-edit-professional-engineering-authority-hardening.test.mjs \
             tests/topology-edit-professional-operation-transaction.test.mjs \
+            tests/topology-edit-professional-validation-blocking.test.mjs \
             tests/topology-edit-professional-validation-worker-client.test.mjs \
             tests/topology-edit-professional-integration-controller.test.mjs \
             tests/topology-edit-lifecycle-view-state.test.mjs
