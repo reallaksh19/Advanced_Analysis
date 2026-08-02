@@ -302,7 +302,8 @@ function rebuildMeshEvidence(value) {
     mesh: value.mesh,
     authority: value.authority,
   });
-  if (JSON.stringify(rebuilt) !== JSON.stringify(value)) {
+  if (JSON.stringify(rebuilt) !== JSON.stringify(value)
+    || !isDeepFrozen(value)) {
     throw controllerError('LAFEA_NB_T6A_MESH_EVIDENCE_TAMPERED');
   }
   return rebuilt;
@@ -579,8 +580,7 @@ function receiptId(context) {
 }
 
 function controllerResult(context) {
-  const status = context.receipt?.status
-    ?? (context.sourceAuthority ? 'FAILED' : 'BLOCKED');
+  const status = context.receipt?.status ?? 'BLOCKED';
   const diagnostics = [...new Set([
     ...context.diagnostics,
     ...(context.receipt?.diagnostics ?? []),
@@ -683,4 +683,9 @@ function deepFreeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   Object.values(value).forEach(deepFreeze);
   return Object.freeze(value);
+}
+
+function isDeepFrozen(value) {
+  if (!value || typeof value !== 'object') return true;
+  return Object.isFrozen(value) && Object.values(value).every(isDeepFrozen);
 }
