@@ -10,6 +10,8 @@ const OUTPUT = path.join(
   ROOT,
   'reports/qualification/topology-edit-track-c-evidence.json',
 );
+const TRACK_B_PREREQUISITE_PATH =
+  'tests/fixtures/topology-edit/1885s/prerequisite-manifest.json';
 const FILES = Object.freeze([
   'src/workspace/topology-edit/topology-edit-scope-contract.js',
   'src/workspace/topology-edit/topology-edit-large-model-controller.js',
@@ -17,6 +19,7 @@ const FILES = Object.freeze([
   'src/workspace/topology-edit/topology-edit-worker.js',
   'tests/topology-edit-track-c.test.mjs',
   'tests/fixtures/topology-edit/large-model/fixture-manifest.json',
+  TRACK_B_PREREQUISITE_PATH,
 ]);
 
 const startedAt = process.env.TOPOLOGY_EDIT_QUALIFICATION_STARTED_AT ||
@@ -47,10 +50,20 @@ const fixtureManifestPath =
 const fixtureManifest = JSON.parse(
   await readFile(path.join(ROOT, fixtureManifestPath), 'utf8'),
 );
+const trackBPrerequisiteManifest = JSON.parse(
+  await readFile(path.join(ROOT, TRACK_B_PREREQUISITE_PATH), 'utf8'),
+);
+const trackBPrerequisitesMerged = trackBPrerequisiteManifest.prerequisites
+  .every((row) => row.status === 'PASS_MERGED');
+const correctedWave3 = trackBPrerequisiteManifest.prerequisites
+  .find((row) => row.waveId === 'WAVE_3');
+assert.ok(correctedWave3, 'Track C evidence requires a Wave 3 prerequisite row.');
 
 const evidenceBase = {
   schema: 'TopologyEditTrackCQualificationEvidence.v1',
-  status: 'PASS_FOUNDATION_NOT_FINAL_RELEASE',
+  status: trackBPrerequisitesMerged
+    ? 'PASS_FOUNDATION_TRACK_B_MERGED_EXECUTION_BLOCKED'
+    : 'PASS_FOUNDATION_TRACK_B_INCOMPLETE',
   repository: sourceManifest.targetRepository,
   commit: gitHead,
   sourceRepository: sourceManifest.sourceRepository,
@@ -72,17 +85,32 @@ const evidenceBase = {
     absolutePathDependencies:
       fixtureManifest.expected.absolutePathDependencies,
   },
+  trackBClosure: {
+    status: trackBPrerequisitesMerged
+      ? 'MERGED_LINEAGE_READY_EXECUTION_BLOCKED'
+      : 'INCOMPLETE_LINEAGE_BLOCKED',
+    prerequisiteManifestPath: TRACK_B_PREREQUISITE_PATH,
+    prerequisiteManifestSha256: fileHashes[TRACK_B_PREREQUISITE_PATH],
+    allPrerequisitesMerged: trackBPrerequisitesMerged,
+    correctedWave3: {
+      pullRequests: [...(correctedWave3.pullRequests ?? [])],
+      mergeCommit: correctedWave3.mergeCommit ?? null,
+    },
+    releaseQualified: false,
+  },
   contracts: {
     deterministicScopeHash: 'PASSED',
     canonicalSpatialIndex: 'PASSED',
     staleWorkerResponseRejection: 'PASSED',
     percentileBudgetGate: 'PASSED',
     exactHead: 'PASSED',
+    trackBPrerequisiteLineage:
+      trackBPrerequisitesMerged ? 'PASSED' : 'BLOCKED',
   },
   deferred: [
-    'Browser/GPU timing requires an exact-head browser qualification run.',
-    'The legacy 1885 empirical package still requires separate fixture packaging.',
-    'Final release qualification waits for Waves 1 through 4.',
+    'Exact-head integrated Wave 5 qualification must execute and retain logs/artifacts.',
+    'Browser/GPU timing requires an executable exact-head browser qualification run.',
+    'Pre-step infrastructure failures with no executable steps or logs are not release evidence.',
   ],
   fileHashes,
 };
