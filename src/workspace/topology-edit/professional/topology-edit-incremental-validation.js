@@ -128,11 +128,11 @@ export function assertTopologyEditIncrementalValidationReceipt(value) {
   if (value.validationHash !== semanticHash(authority)) {
     fail('validation hash does not match semantic authority.', RangeError);
   }
-  if (value.finalIssueCount !== value.finalDiagnostics?.length) {
-    fail('final issue count differs from final diagnostics.', RangeError);
-  }
   if (value.finalIssueHash !== topologyEditDiagnosticsHash(value.finalDiagnostics)) {
     fail('final diagnostics differ from receipt authority.', RangeError);
+  }
+  if (value.finalIssueCount !== value.finalDiagnostics?.length) {
+    fail('final issue count differs from final diagnostics.', RangeError);
   }
   const performance = performanceRecord({
     policy: value.performanceEvidence?.policy,
