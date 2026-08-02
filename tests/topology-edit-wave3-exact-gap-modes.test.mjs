@@ -94,6 +94,8 @@ test('3 mm and 20 mm controls are additive MOVE_NODE modes with explicit labels'
   const labels = new Map(TOPOLOGY_EDIT_COMMAND_ACTIONS.map((row) => [row.id, row.label]));
   assert.equal(labels.get('set-gap-3'), 'Set gap 3 mm');
   assert.equal(labels.get('set-gap-20'), 'Set gap 20 mm');
+  assert.equal(canRunTopologyEditAction('set-gap-3', selection), true,
+    'the production toolbar enables after two-node selection before guarded intent creation');
 });
 
 test('exact-gap controls require graph-open endpoints in different components', () => {
