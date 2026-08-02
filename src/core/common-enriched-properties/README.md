@@ -37,8 +37,17 @@ Phase 4 adds exact-only piping-class resolution over an immutable `PIPING_CLASS`
 - only one exact row may resolve dimensions, wall, schedule-bound data, or material codes;
 - missing and type-conflicting source fields remain explicit blockers.
 
-This module does **not** perform material-register, density, insulation, or weight
-resolution; engineering fallback; engineering approval; Project Data persistence;
+Phase 5 adds exact-only material-register resolution over an immutable `MATERIAL_REGISTER` snapshot:
+
+- the material code must be an approved `RESOLVED_EXACT` field from piping-class resolution;
+- source rows are indexed into duplicate-preserving exact material-code buckets;
+- zero matching rows remain `BLOCKED_MISSING`;
+- multiple exact rows remain `BLOCKED_AMBIGUOUS`, even when candidate properties agree;
+- only one exact source row may resolve material description, density, elastic data, or other bound fields;
+- missing and type-conflicting material properties remain explicit blockers;
+- generic steel density, first-row selection, aliases, fuzzy matching, and fallback are prohibited.
+
+This module does **not** perform fluid, insulation, or weight resolution; engineering fallback; engineering approval; Project Data persistence;
 empirical calculations; LFEA binding; stagedJson mutation; topology validation;
 or solver work.
 
@@ -63,6 +72,9 @@ or solver work.
 15. Piping-class key inputs must be `RESOLVED_EXACT`; derived or proposed keys are blocked.
 16. Omitting schedule broadens the exact key and may create ambiguity; no schedule is selected by default.
 17. Piping-class resolution never uses standard-wall, first-row, containment, or material fallback.
+18. Material-register key inputs must be approved `RESOLVED_EXACT` material codes.
+19. Exact material-code buckets preserve every duplicate row and never select the first record.
+20. Material resolution never applies generic density, steel defaults, aliases, fuzzy matching, or fallback.
 
 ## Qualification
 
@@ -71,4 +83,5 @@ node scripts/run-common-enriched-properties-checks.mjs
 node scripts/run-common-enriched-target-inventory-checks.mjs
 node scripts/run-common-enriched-exact-line-list-checks.mjs
 node scripts/run-common-enriched-exact-piping-class-checks.mjs
+node scripts/run-common-enriched-exact-material-register-checks.mjs
 ```
