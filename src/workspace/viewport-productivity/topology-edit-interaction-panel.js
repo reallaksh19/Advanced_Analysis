@@ -63,7 +63,7 @@ export function topologyEditInteractionPanelMarkup({
           ${nudgeButton('−Y', 'Y', -1)}${nudgeButton('+Y', 'Y', 1)}
           ${nudgeButton('−Z', 'Z', -1)}${nudgeButton('+Z', 'Z', 1)}
         </div>
-        <p class="topology-edit-interaction__hint">Keyboard: X, Y or Z nudges positive; hold Shift to reverse. Escape cancels. Enter applies a current preview.</p>
+        <p class="topology-edit-interaction__hint">Keyboard: Left/Right nudges X, Down/Up nudges Y, Page Down/Page Up nudges Z. Shift uses 10× the stated increment. Escape cancels. Enter applies a current preview.</p>
       </fieldset>
       ${previewMarkup(preview)}
       <div class="topology-edit-interaction__actions">
