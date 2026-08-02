@@ -1,0 +1,45 @@
+{
+  "schema": "TopologyEditPortableFixtureManifest.v1",
+  "fixtureId": "topology-edit-1885s-empirical-v1",
+  "projectId": "1885S",
+  "description": "Repository-owned dataset plus content-addressed master-data sources for the 1885S empirical topology-edit qualification.",
+  "cacheEnvironmentVariable": "TOPOLOGY_EDIT_FIXTURE_CACHE",
+  "sources": [
+    {
+      "sourceId": "dataset",
+      "repositoryPath": "benchmarks/Sjson.json",
+      "sha256": "6b2c8b01ab0ba6ec8e9e7c42eb4a719668ffd2dc4dbe4790d27cf426a1f60288",
+      "mediaType": "application/json",
+      "required": true
+    },
+    {
+      "sourceId": "lineList",
+      "contentAddress": "sha256:723518a16b1a744c9328539f1a25fe15ea246757930970603a89d3cea46e3f41",
+      "sha256": "723518a16b1a744c9328539f1a25fe15ea246757930970603a89d3cea46e3f41",
+      "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "required": true
+    },
+    {
+      "sourceId": "pipingClass",
+      "contentAddress": "sha256:bea1c45f3f7dcf51340a6d625cfcc23cfc5926be3413d697183b607e2ccab82c",
+      "sha256": "bea1c45f3f7dcf51340a6d625cfcc23cfc5926be3413d697183b607e2ccab82c",
+      "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "required": true
+    },
+    {
+      "sourceId": "componentWeight",
+      "contentAddress": "sha256:72e266002256e2ac0b0c0c9c722dde2bb65e93deec2075d209c7ab78d219cda2",
+      "sha256": "72e266002256e2ac0b0c0c9c722dde2bb65e93deec2075d209c7ab78d219cda2",
+      "mediaType": "application/json",
+      "required": true
+    }
+  ],
+  "expected": {
+    "nodeCount": 279,
+    "sourceSupportRecordCount": 139,
+    "supportAssemblyCount": 38,
+    "physicalLocationCount": 37,
+    "routeCount": 13,
+    "renderableCount": 150
+  }
+}
