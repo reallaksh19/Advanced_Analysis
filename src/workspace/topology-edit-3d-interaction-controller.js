@@ -4,6 +4,7 @@ import {
 import {
   axisDirection,
   isTopologyEditTextControl,
+  topologyEditKeyboardNudge,
   TopologyEditInteractionControllerRuntime,
 } from './viewport-productivity/topology-edit-interaction-controller-runtime.js';
 import {
@@ -107,7 +108,7 @@ export class TopologyEdit3DViewController extends ReviewResponseController {
     }
     if (isTopologyEditTextControl(event.target)
       || event.ctrlKey || event.metaKey || event.altKey) return;
-    const nudge = keyboardNudge(event.key);
+    const nudge = topologyEditKeyboardNudge(event.key);
     if (!nudge) return;
     event.preventDefault();
     this.nudgeInteraction(
@@ -282,18 +283,6 @@ export class TopologyEdit3DViewController extends ReviewResponseController {
   control(role) {
     return this.interactionElement?.querySelector(`[data-role="${role}"]`) ?? null;
   }
-}
-
-function keyboardNudge(key) {
-  const mapping = {
-    ArrowLeft: { axis: 'X', directionSign: -1 },
-    ArrowRight: { axis: 'X', directionSign: 1 },
-    ArrowDown: { axis: 'Y', directionSign: -1 },
-    ArrowUp: { axis: 'Y', directionSign: 1 },
-    PageDown: { axis: 'Z', directionSign: -1 },
-    PageUp: { axis: 'Z', directionSign: 1 },
-  };
-  return mapping[key] ?? null;
 }
 
 function selectionKey(selection) {
