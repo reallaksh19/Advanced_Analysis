@@ -1,7 +1,9 @@
 {
-  "schema": "lafea-bucket-01-gap-matrix/v9",
-  "audited_baseline_sha": "863c9d8c8b323457a1ad92849160187ba78a3837",
+  "schema": "lafea-bucket-01-gap-matrix/v10",
+  "audited_baseline_sha": "34a074b34d3e61b0b231ae2bf028fcc67b202671",
   "superseded_baselines": [
+    "863c9d8c8b323457a1ad92849160187ba78a3837",
+    "1d425008d721018dd3e9784390385ddc391b248a",
     "4a5c4506e2d0069d20bf54ff08cc74de60e412e7",
     "292184e8ae374e24a98cdd59d79e648046e60943",
     "efa1bab4250e8a99ec63977899b4d0b27354fce8",
@@ -22,8 +24,8 @@
   "mainline_delta_review": {
     "continuum_bucket_files_changed": false,
     "qualification_parent_refreshed": true,
-    "latest_reviewed_main_commit": "863c9d8c8b323457a1ad92849160187ba78a3837",
-    "changes_confined_to_separate_common_enriched_consumer_readiness_files": true
+    "latest_reviewed_main_commit": "34a074b34d3e61b0b231ae2bf028fcc67b202671",
+    "changes_confined_to_separate_common_enriched_consumer_handoff_files": true
   },
   "execution_policy": {
     "hosted_workflow_in_scope": false,
@@ -104,8 +106,8 @@
     },
     {
       "id": "G4-CODE",
-      "status": "BLOCKED_CODE_BASIS_NOT_FROZEN",
-      "finding": "No governing code, edition, allowable source, stress classification or load-combination authority is frozen."
+      "status": "TECHNICAL_INFRASTRUCTURE_IMPLEMENTED_AUTHORITY_NOT_SUPPLIED",
+      "finding": "A fail-closed code-basis intake contract now requires an externally approved governing code and edition, source-document hash, allowable and temperature basis, fixed-location stress classification, explicit load-combination terms and approval-record hash. The committed template remains UNRESOLVED_GATE; no code, allowable, classification or combination is selected or inferred."
     },
     {
       "id": "G5-REPLAY",

@@ -1,9 +1,11 @@
 {
-  "schema": "lafea-bucket-01-benchmark-manifest/v8",
+  "schema": "lafea-bucket-01-benchmark-manifest/v9",
   "manifest_status": "BASELINE_FROZEN_WITH_UNRESOLVED_GATES",
   "repository": "reallaksh19/Advanced_Analysis",
-  "baseline_main_sha": "863c9d8c8b323457a1ad92849160187ba78a3837",
+  "baseline_main_sha": "34a074b34d3e61b0b231ae2bf028fcc67b202671",
   "prior_baseline_main_shas": [
+    "863c9d8c8b323457a1ad92849160187ba78a3837",
+    "1d425008d721018dd3e9784390385ddc391b248a",
     "4a5c4506e2d0069d20bf54ff08cc74de60e412e7",
     "292184e8ae374e24a98cdd59d79e648046e60943",
     "efa1bab4250e8a99ec63977899b4d0b27354fce8",
@@ -20,7 +22,7 @@
     "27fb14ddccb07081904d54c1bae161c87372dbdd",
     "a7144e02598f3e9db0826f10cefe0b5254fa953e"
   ],
-  "qualification_branch": "bucket-01-lafea3-production-lug-probes",
+  "qualification_branch": "bucket-01-lafea3-code-basis-contract",
   "qualification_candidate_sha": "RESOLVED_ONLY_BY_EXACT_HEAD_EXECUTION",
   "bucket_id": "LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE",
   "target": "C2D-LUG-PINHOLE -> LAFEA.3",
@@ -226,12 +228,20 @@
     "status": "SCALABLE_TECHNICAL_INFRASTRUCTURE_IMPLEMENTED_EXECUTION_NOT_RETAINED"
   },
   "code_basis": {
-    "status": "UNRESOLVED_GATE",
+    "status": "INTAKE_CONTRACT_IMPLEMENTED_AUTHORITY_NOT_SUPPLIED",
+    "module": "src/workspace/lafea-bucket-01-code-basis.js",
+    "contract_check": "scripts/lafea-bucket-01-code-basis-check.mjs",
+    "intake_template": "validation/bucket-01/09-code-basis-intake-template.json",
     "governing_code": null,
     "edition": null,
     "allowable_source": null,
     "stress_classification": null,
-    "load_combination": null
+    "load_combination": null,
+    "external_engineering_approval_required": true,
+    "repository_may_infer_or_select_code": false,
+    "synthetic_fixture_eligible_for_engineering_use": false,
+    "code_assessment_performed": false,
+    "code_verified": false
   },
   "automatic_stop_conditions": [
     "exact head or parent mismatch",

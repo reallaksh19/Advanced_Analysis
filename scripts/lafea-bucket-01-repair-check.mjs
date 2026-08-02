@@ -13,57 +13,25 @@ const REPORT_PATH = path.resolve(
 );
 
 const checkDefinitions = [
-  {
-    id: 'PRODUCTION_T6_MESH_QUALIFICATION',
-    script: 'scripts/lafea-bucket-01-mesh-qualification-check.mjs',
-  },
-  {
-    id: 'PRODUCTION_RESPONSE_CONVERGENCE_CONTRACT',
-    script: 'scripts/lafea-bucket-01-production-response-check.mjs',
-  },
-  {
-    id: 'SCALABLE_SPARSE_CONTINUUM_SOLVER',
-    script: 'scripts/lafea-bucket-01-scalable-solver-check.mjs',
-  },
-  {
-    id: 'GOVERNED_T6_KIRSCH_FIXED_PROBES',
-    script: 'scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs',
-  },
-  {
-    id: 'PRODUCTION_LUG_FIXED_PROBE_LOCATION_CONTRACT',
-    script: 'scripts/lafea-bucket-01-production-lug-probe-contract-check.mjs',
-  },
-  {
-    id: 'GOVERNED_T3_PATCH_RECEIPT',
-    script: 'scripts/lafea-bucket-01-t3-patch-check.mjs',
-  },
-  {
-    id: 'GOVERNED_PURE_SHEAR_RECEIPT',
-    script: 'scripts/lafea-bucket-01-pure-shear-check.mjs',
-  },
-  {
-    id: 'MANUFACTURED_PURE_BENDING_PANEL',
-    script: 'scripts/lafea-bucket-01-pure-bending-panel-check.mjs',
-  },
-  {
-    id: 'THREE_LEVEL_GCI_EVALUATOR',
-    script: 'scripts/lafea-bucket-01-convergence-check.mjs',
-  },
-  {
-    id: 'FIXED_PHYSICAL_PROBE_RECOVERY',
-    script: 'scripts/lafea-bucket-01-fixed-probe-check.mjs',
-  },
-  {
-    id: 'FIXED_PROBE_STRESS_CONVERGENCE',
-    script: 'scripts/lafea-bucket-01-stress-convergence-check.mjs',
-  },
+  { id: 'PRODUCTION_T6_MESH_QUALIFICATION', script: 'scripts/lafea-bucket-01-mesh-qualification-check.mjs' },
+  { id: 'PRODUCTION_RESPONSE_CONVERGENCE_CONTRACT', script: 'scripts/lafea-bucket-01-production-response-check.mjs' },
+  { id: 'SCALABLE_SPARSE_CONTINUUM_SOLVER', script: 'scripts/lafea-bucket-01-scalable-solver-check.mjs' },
+  { id: 'GOVERNED_T6_KIRSCH_FIXED_PROBES', script: 'scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs' },
+  { id: 'PRODUCTION_LUG_FIXED_PROBE_LOCATION_CONTRACT', script: 'scripts/lafea-bucket-01-production-lug-probe-contract-check.mjs' },
+  { id: 'CODE_BASIS_INTAKE_CONTRACT', script: 'scripts/lafea-bucket-01-code-basis-check.mjs' },
+  { id: 'GOVERNED_T3_PATCH_RECEIPT', script: 'scripts/lafea-bucket-01-t3-patch-check.mjs' },
+  { id: 'GOVERNED_PURE_SHEAR_RECEIPT', script: 'scripts/lafea-bucket-01-pure-shear-check.mjs' },
+  { id: 'MANUFACTURED_PURE_BENDING_PANEL', script: 'scripts/lafea-bucket-01-pure-bending-panel-check.mjs' },
+  { id: 'THREE_LEVEL_GCI_EVALUATOR', script: 'scripts/lafea-bucket-01-convergence-check.mjs' },
+  { id: 'FIXED_PHYSICAL_PROBE_RECOVERY', script: 'scripts/lafea-bucket-01-fixed-probe-check.mjs' },
+  { id: 'FIXED_PROBE_STRESS_CONVERGENCE', script: 'scripts/lafea-bucket-01-stress-convergence-check.mjs' },
 ];
 
 const checks = checkDefinitions.map((definition) => runNodeCheck(definition));
 const failed = checks.filter((check) => check.status !== 'PASS');
 const repairChecksPass = failed.length === 0;
 const report = {
-  schema: 'lafea-bucket-01-repair-check-report/v9',
+  schema: 'lafea-bucket-01-repair-check-report/v10',
   status: repairChecksPass ? 'REPAIR_CHECKS_PASS' : 'REPAIR_CHECKS_FAIL',
   bucketId: 'LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE',
   target: 'C2D-LUG-PINHOLE -> LAFEA.3',
@@ -80,6 +48,8 @@ const report = {
     productionLugProbeSpecFrozen: true,
     productionLugProbeLocationContractVerified: repairChecksPass,
     productionLugProbeEvidenceGenerated: false,
+    codeBasisIntakeContractVerified: repairChecksPass,
+    codeBasisAuthoritySupplied: false,
     governedT3PatchOracleFrozen: true,
     governedT3PatchEvidenceGenerated: repairChecksPass,
     governedPureShearOracleFrozen: true,
@@ -105,6 +75,8 @@ const report = {
     scalableSparseSolverInfrastructureImplemented: repairChecksPass,
     governedKirschFixedProbeBenchmarkImplemented: repairChecksPass,
     productionLugFixedProbeContractImplemented: repairChecksPass,
+    codeBasisIntakeContractImplemented: repairChecksPass,
+    governingCodeSelected: false,
     governedT3PatchBenchmarkImplemented: repairChecksPass,
     governedPureShearBenchmarkImplemented: repairChecksPass,
     manufacturedPanelBenchmarkImplemented: repairChecksPass,
