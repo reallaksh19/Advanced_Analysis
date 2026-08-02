@@ -1,0 +1,23 @@
+{
+  "canonicalTopologyHash": "fnv1a64:slope-basis",
+  "nodes": [
+    { "id": "node:s1", "position": { "x": 0, "y": 0, "z": 0 }, "portKeys": [] },
+    { "id": "node:s2", "position": { "x": 1000, "y": 0, "z": 0 }, "portKeys": [] },
+    { "id": "node:s3", "position": { "x": 2000, "y": 0, "z": 0 }, "portKeys": [] }
+  ],
+  "edges": [
+    { "id": "edge:s1", "componentKey": "P-S1", "fromNodeId": "node:s1", "toNodeId": "node:s2", "diameterMm": 100, "entityType": "PIPE" },
+    { "id": "edge:s2", "componentKey": "P-S2", "fromNodeId": "node:s2", "toNodeId": "node:s3", "diameterMm": 100, "entityType": "PIPE" }
+  ],
+  "junctions": [],
+  "supports": [],
+  "boundaries": [],
+  "rigids": [],
+  "bends": [],
+  "crosswalk": {
+    "nodeIdToPortKeys": {},
+    "edgeIdToComponentKey": { "edge:s1": "P-S1", "edge:s2": "P-S2" },
+    "junctionIdToComponentKey": {},
+    "supportIdToEntityId": {}
+  }
+}

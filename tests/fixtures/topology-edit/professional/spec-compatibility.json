@@ -1,0 +1,94 @@
+{
+  "catalogueId": "DEMO-PIPING-CATALOGUE",
+  "catalogueVersion": "2026.08.02",
+  "authority": {
+    "sourceId": "SPEC-DEMO",
+    "sourceVersion": "7",
+    "sourceHash": "sha256:demo-spec-authority"
+  },
+  "records": [
+    {
+      "recordId": "PIPE-DN100-SCH40-A",
+      "componentType": "PIPE",
+      "nominalSizeMm": 100,
+      "outsideDiameterMm": 114.3,
+      "schedule": "SCH40",
+      "wallThicknessMm": 6.02,
+      "endConnectionFrom": "BW",
+      "endConnectionTo": "BW",
+      "pipingClass": "DEMO-150",
+      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/pipe/dn100/sch40" }
+    },
+    {
+      "recordId": "ELBOW-DN100-LR90-A",
+      "componentType": "ELBOW",
+      "nominalSizeMm": 100,
+      "outsideDiameterMm": 114.3,
+      "elbowRadiusMm": 152.4,
+      "elbowAngleDeg": 90,
+      "endConnectionFrom": "BW",
+      "endConnectionTo": "BW",
+      "pipingClass": "DEMO-150",
+      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/elbow/dn100/lr90" }
+    },
+    {
+      "recordId": "REDUCER-DN150-DN100-CONC-A",
+      "componentType": "REDUCER",
+      "nominalSizeMm": 150,
+      "outsideDiameterMm": 168.3,
+      "secondaryNominalSizeMm": 100,
+      "secondaryOutsideDiameterMm": 114.3,
+      "reducerType": "CONCENTRIC",
+      "reducerOrientation": "CONCENTRIC",
+      "endConnectionFrom": "BW",
+      "endConnectionTo": "BW",
+      "pipingClass": "DEMO-150",
+      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/reducer/dn150-dn100/concentric" }
+    },
+    {
+      "recordId": "VALVE-DN100-GATE-600-A",
+      "componentType": "VALVE",
+      "nominalSizeMm": 100,
+      "outsideDiameterMm": 114.3,
+      "valveFaceToFaceMm": 600,
+      "endConnectionFrom": "FLANGED_RF",
+      "endConnectionTo": "FLANGED_RF",
+      "pipingClass": "DEMO-600",
+      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/valve/dn100/gate/class600" }
+    },
+    {
+      "recordId": "FLANGE-DN100-600-RF-A",
+      "componentType": "FLANGE",
+      "nominalSizeMm": 100,
+      "outsideDiameterMm": 114.3,
+      "flangeClass": "600",
+      "flangeFacing": "RF",
+      "endConnectionFrom": "BW",
+      "endConnectionTo": "FLANGED_RF",
+      "pipingClass": "DEMO-600",
+      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/flange/dn100/600/rf/a" }
+    },
+    {
+      "recordId": "FLANGE-DN100-600-RF-B",
+      "componentType": "FLANGE",
+      "nominalSizeMm": 100,
+      "outsideDiameterMm": 114.3,
+      "flangeClass": "600",
+      "flangeFacing": "RF",
+      "endConnectionFrom": "BW",
+      "endConnectionTo": "FLANGED_RF",
+      "pipingClass": "DEMO-600",
+      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/flange/dn100/600/rf/b" }
+    },
+    {
+      "recordId": "TEE-DN100-BW-A",
+      "componentType": "TEE",
+      "nominalSizeMm": 100,
+      "outsideDiameterMm": 114.3,
+      "endConnectionFrom": "BW",
+      "endConnectionTo": "BW",
+      "pipingClass": "DEMO-150",
+      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/tee/dn100/equal" }
+    }
+  ]
+}

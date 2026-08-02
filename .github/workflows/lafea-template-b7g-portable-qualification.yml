@@ -1,0 +1,103 @@
+name: LAFEA B7G Portable Qualification Bundle
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/lafea-template-b7g-portable-qualification.yml'
+      - 'scripts/lafea-template-b7g-portable-qualification-*.mjs'
+      - 'docs/LAFEA_Bucket_B7G_Portable_Qualification_Bundle.md'
+      - '.github/workflows/lafea-template-b7f-current-main-qualification.yml'
+      - 'scripts/lafea-template-b7f-current-main-qualification-check.mjs'
+      - '.github/workflows/lafea-template-b7e-b7-gate-closure.yml'
+      - 'scripts/lafea-template-b7e-b7-gate-closure-check.mjs'
+      - 'scripts/lafea-nonbucket-stack-check.mjs'
+      - 'scripts/lafea-nb-t6*.mjs'
+      - 'src/workspace/lafea-*.js'
+      - 'src/core/local-continuum/**'
+      - 'package.json'
+      - 'package-lock.json'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lafea-b7g-portable-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: B7G portable exact-head qualification bundle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+      B7E_REPORT_PATH: reports/qualification/lafea-b7e-b7-gate-closure.json
+      B7F_REPORT_PATH: reports/qualification/lafea-b7f-current-main-qualification.json
+      B7G_BUNDLE_PATH: reports/qualification/lafea-b7g-portable-qualification-bundle.json
+      B7G_LOG_PATH: reports/qualification/lafea-b7g-portable-qualification.log
+
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Assert exact checkout and ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git merge-base --is-ancestor "$PR_BASE_SHA" "$EXPECTED_HEAD_SHA"
+          fi
+          git merge-base --is-ancestor \
+            13792e342fe5b9fb494a8103e6d8936245bd05ff \
+            "$EXPECTED_HEAD_SHA"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Produce portable B7G evidence
+        run: node scripts/lafea-template-b7g-portable-qualification-bundle.mjs
+
+      - name: Independently verify portable B7G evidence
+        run: >-
+          node scripts/lafea-template-b7g-portable-qualification-verify.mjs
+          "$B7G_BUNDLE_PATH"
+
+      - name: Verify patch hygiene and clean tracked tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git diff --check "$PR_BASE_SHA...HEAD"
+          else
+            git diff --check HEAD^
+          fi
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Upload exact-head portable evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-b7g-portable-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            reports/qualification/lafea-b7g-portable-qualification-bundle.json
+            reports/qualification/lafea-b7g-portable-qualification.log
+            reports/qualification/lafea-b7f-current-main-qualification.json
+            reports/qualification/lafea-b7e-b7-gate-closure.json
+          if-no-files-found: error
+          retention-days: 30

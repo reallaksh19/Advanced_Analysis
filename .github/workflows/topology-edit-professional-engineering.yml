@@ -1,0 +1,112 @@
+name: Topology Edit Professional Engineering
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/topology-edit-professional-engineering.yml'
+      - 'src/workspace/topology-edit/professional/**'
+      - 'tests/topology-edit-professional-engineering-*.test.mjs'
+      - 'tests/fixtures/topology-edit/professional/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: topology-edit-professional-engineering-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: P5B validation worker stale-response authority
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Assert exact checkout and ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          git merge-base --is-ancestor "$PR_BASE_SHA" "$EXPECTED_HEAD_SHA"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Check professional engineering module syntax
+        run: |
+          node --check src/workspace/topology-edit/professional/topology-edit-change-scope.js
+          node --check src/workspace/topology-edit/professional/topology-edit-operation-plan.js
+          node --check src/workspace/topology-edit/professional/topology-edit-route-operation-helpers.js
+          node --check src/workspace/topology-edit/professional/topology-edit-route-operations.js
+          node --check src/workspace/topology-edit/professional/topology-edit-slope-operation.js
+          node --check src/workspace/topology-edit/professional/topology-edit-spec-catalog.js
+          node --check src/workspace/topology-edit/professional/topology-edit-compatibility.js
+          node --check src/workspace/topology-edit/professional/topology-edit-validation-scope.js
+          node --check src/workspace/topology-edit/professional/topology-edit-validation-diagnostics.js
+          node --check src/workspace/topology-edit/professional/topology-edit-incremental-validation.js
+          node --check src/workspace/topology-edit/professional/topology-edit-validation-worker-contract.js
+          node --check src/workspace/topology-edit/professional/topology-edit-validation-worker-state.js
+
+      - name: Run focused professional engineering tests
+        run: |
+          node --test \
+            tests/topology-edit-professional-engineering-scope.test.mjs \
+            tests/topology-edit-professional-engineering-plan.test.mjs \
+            tests/topology-edit-professional-engineering-route-operations.test.mjs \
+            tests/topology-edit-professional-engineering-catalog.test.mjs \
+            tests/topology-edit-professional-engineering-compatibility.test.mjs \
+            tests/topology-edit-professional-engineering-incremental-validation.test.mjs \
+            tests/topology-edit-professional-engineering-worker.test.mjs \
+            tests/topology-edit-professional-engineering-containment.test.mjs
+
+      - name: Run retained checker, autofix, command, and journal authority tests
+        run: |
+          node --test \
+            tests/topology-edit-wave1-pure-kernel.test.mjs \
+            tests/topology-edit-wave1-candidate-certification.test.mjs \
+            tests/topology-edit-wave1-journal-replay.test.mjs \
+            tests/topology-edit-wave3-commands.test.mjs \
+            tests/topology-edit-wave3a-checker.test.mjs \
+            tests/topology-edit-wave3b-autofix.test.mjs
+
+      - name: Run retained fixture and lifecycle authority tests
+        run: |
+          node --test \
+            tests/topology-edit-20-element-demo-repairs.test.mjs \
+            tests/topology-edit-wave4a-persistence-export.test.mjs \
+            tests/topology-edit-wave4b-commit-rollback.test.mjs
+
+      - name: Run repository anti-drift gates
+        run: |
+          npm run syntax:strict
+          npm run check:imports
+          node scripts/topology-edit-source-drift-check.mjs
+          node scripts/topology-edit-api-drift-check.mjs
+          node scripts/topology-edit-prohibited-imports.mjs
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Verify patch hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check "$PR_BASE_SHA...HEAD"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"

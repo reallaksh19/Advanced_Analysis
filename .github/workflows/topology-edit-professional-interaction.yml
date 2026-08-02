@@ -1,0 +1,90 @@
+name: Topology Edit Professional Interaction
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/topology-edit-professional-interaction.yml'
+      - 'src/workspace/topology-edit-3d-interaction-controller.js'
+      - 'src/workspace/viewport-interaction/**'
+      - 'src/workspace/viewport-productivity/topology-edit-interaction-*.js'
+      - 'tests/topology-edit-professional-interaction-*.test.mjs'
+      - 'tests/topology-edit-professional-snap-resolver.test.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  professional-interaction:
+    name: Agent 1 interaction controller and gizmo qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      BASE_REF: ${{ github.event.pull_request.base.sha || github.event.repository.default_branch }}
+
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Verify exact checkout
+        run: test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax and module bounds
+        run: |
+          for file in src/workspace/viewport-interaction/*.js; do
+            node --check "$file"
+            test "$(wc -l < "$file")" -le 300
+          done
+          node --check src/workspace/topology-edit-3d-interaction-controller.js
+          test "$(wc -l < src/workspace/topology-edit-3d-interaction-controller.js)" -le 300
+          for file in src/workspace/viewport-productivity/topology-edit-interaction-*.js; do
+            node --check "$file"
+            test "$(wc -l < "$file")" -le 300
+          done
+
+      - name: Focused interaction qualification
+        run: |
+          node --test \
+            tests/topology-edit-professional-interaction-contracts.test.mjs \
+            tests/topology-edit-professional-snap-resolver.test.mjs \
+            tests/topology-edit-professional-interaction-containment.test.mjs \
+            tests/topology-edit-professional-interaction-session.test.mjs \
+            tests/topology-edit-professional-interaction-viewport.test.mjs \
+            tests/topology-edit-professional-interaction-controller.test.mjs
+
+      - name: Retain certified topology foundations
+        run: |
+          node --test \
+            tests/topology-edit-wave1-pure-kernel.test.mjs \
+            tests/topology-edit-wave1-candidate-certification.test.mjs \
+            tests/topology-edit-wave1-journal-replay.test.mjs \
+            tests/topology-edit-wave3a-checker.test.mjs \
+            tests/topology-edit-wave3b-autofix.test.mjs \
+            tests/topology-edit-wave3-exact-gap-modes.test.mjs
+
+      - name: Anti-drift and production build
+        run: |
+          npm run syntax:strict
+          npm run check:imports
+          node scripts/topology-edit-source-drift-check.mjs
+          node scripts/topology-edit-api-drift-check.mjs
+          node scripts/topology-edit-prohibited-imports.mjs
+          npm run build
+
+      - name: Patch hygiene
+        run: |
+          git diff --check "$BASE_REF...HEAD"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
