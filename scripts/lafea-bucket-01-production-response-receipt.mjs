@@ -53,6 +53,7 @@ const locationDefinitionHash = canonicalLafeaSha256({
   load: spec.load,
   restraint: spec.restraint,
   responseAuthority: spec.responseAuthority,
+  solverPolicy: spec.solverPolicy,
 });
 const evidence = evaluateLafeaBucket01ProductionResponse({
   schema: LAFEA_BUCKET_01_PRODUCTION_RESPONSE_INPUT_SCHEMA,
@@ -103,12 +104,14 @@ function extractLevel(definition, projected, controlled, specValue) {
   const result = controlled.execution.result;
   assert.equal(result.schema, 'local-continuum-result/v1');
   assert.equal(result.qualification.state, 'ACCEPTED');
+  assertStiffnessStorage(result.meshEvidence, definition);
   const row = result.loadCaseResults.find(
     (candidate) => candidate.loadCaseId === specValue.load.loadCaseId,
   );
   assert.ok(row, `missing load case ${specValue.load.loadCaseId}`);
   assert.equal(row.equilibrium.accepted, true);
   assert.equal(row.energyQualification.accepted, true);
+  assertSolverEvidence(row.solverEvidence, definition);
   const coordinates = new Map(projected.document.nodes.map(
     (node) => [node.nodeId, { x: node.x, y: node.y }],
   ));
@@ -137,6 +140,55 @@ function extractLevel(definition, projected, controlled, specValue) {
     halfExternalWork: halfExternalWork(applied, displacementByNode),
     energyQualificationAccepted: row.energyQualification.accepted,
   };
+}
+
+function assertStiffnessStorage(meshEvidence, definition) {
+  if (definition.stiffnessStorage === 'DENSE') {
+    assert.ok(Array.isArray(meshEvidence.globalStiffnessMatrix));
+    assert.equal('globalStiffnessCsr' in meshEvidence, false);
+    assert.equal('globalStiffnessStorage' in meshEvidence, false);
+    return;
+  }
+  assert.equal(definition.stiffnessStorage, 'CSR_FULL_SYMMETRIC');
+  assert.equal(meshEvidence.globalStiffnessMatrix, null);
+  assert.equal(meshEvidence.globalStiffnessStorage, 'CSR_FULL_SYMMETRIC');
+  assert.equal(
+    meshEvidence.globalStiffnessCsr.schema,
+    'local-continuum-symmetric-csr/v1',
+  );
+  assert.equal(meshEvidence.globalStiffnessCsr.storage, 'CSR_FULL_SYMMETRIC');
+  assert.equal(
+    meshEvidence.globalStiffnessCsr.size,
+    meshEvidence.dofOrdering.length,
+  );
+  assert.ok(meshEvidence.globalStiffnessCsr.nonzeroCount > 0);
+  assert.ok(
+    meshEvidence.globalStiffnessCsr.nonzeroCount
+      < meshEvidence.globalStiffnessCsr.size ** 2,
+  );
+}
+
+function assertSolverEvidence(solverEvidence, definition) {
+  assert.equal(solverEvidence.method, definition.solverMethod);
+  assert.equal(solverEvidence.accepted, true);
+  assert.ok(Array.isArray(solverEvidence.freeDofIdentities));
+  assert.ok(solverEvidence.freeDofIdentities.length > 0);
+  if (definition.solverMethod === 'DETERMINISTIC_CHOLESKY') {
+    assert.ok(Array.isArray(solverEvidence.pivots));
+    assert.ok(solverEvidence.pivots.length > 0);
+    assert.equal(solverEvidence.minimumPivot > 0, true);
+    return;
+  }
+  assert.equal(definition.solverMethod, 'DETERMINISTIC_JACOBI_PCG');
+  assert.equal(solverEvidence.preconditioner, 'JACOBI');
+  assert.ok(Number.isInteger(solverEvidence.iterations));
+  assert.ok(solverEvidence.iterations > 0);
+  assert.ok(solverEvidence.iterations <= solverEvidence.iterationLimit);
+  assert.ok(solverEvidence.minimumDiagonal > solverEvidence.diagonalTolerance);
+  assert.ok(
+    solverEvidence.finalResidualInfinity <= solverEvidence.residualTolerance,
+  );
+  assert.deepEqual(solverEvidence.pivots, []);
 }
 
 function vectorFromForceVector(dofOrdering, forceVector) {
