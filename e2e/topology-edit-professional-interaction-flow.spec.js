@@ -41,7 +41,7 @@ async function runGapScenario(page, testInfo, gapMm) {
   const host = await openStandaloneInteractionDemo(page);
   const initial = await controllerEvidence(page);
   expect(initial.activeCommandCount).toBe(0);
-  const target = await gapContext(page, 'P-001:port:end', 'E-001:port:start', gapMm);
+  const target = await gapContext(page, 'E-001:port:start', 'P-001:port:end', gapMm);
 
   await clickCanonicalNodeInViewport(page, target.movingNodeId);
   await expect.poll(() => selectedNodeId(page)).toBe(target.movingNodeId);
@@ -138,6 +138,10 @@ async function openStandaloneInteractionDemo(page) {
   await page.getByRole('button', { name: '3D Edit', exact: true }).click();
   await expect(page.locator('[data-role="topology-edit-render-host"]')).toBeVisible();
   await page.evaluate(async () => {
+    const { APPLICATION_EVENTS } = await import('/src/workspace/event-topics.js');
+    globalThis.EventBus.publish(APPLICATION_EVENTS.CHANGED, {
+      state: { activeViewId: 'TRACK_A_QUALIFICATION' },
+    });
     const { TopologyEdit3DViewController } = await import(
       '/src/workspace/topology-edit-3d-interaction-controller.js'
     );
