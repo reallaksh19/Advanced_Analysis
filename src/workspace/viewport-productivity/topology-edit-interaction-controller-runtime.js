@@ -10,6 +10,15 @@ import {
   selectedTopologyEditNodeContext,
 } from './topology-edit-interaction-session.js';
 
+const KEYBOARD_NUDGES = Object.freeze({
+  ArrowLeft: Object.freeze({ axis: 'X', directionSign: -1 }),
+  ArrowRight: Object.freeze({ axis: 'X', directionSign: 1 }),
+  ArrowDown: Object.freeze({ axis: 'Y', directionSign: -1 }),
+  ArrowUp: Object.freeze({ axis: 'Y', directionSign: 1 }),
+  PageDown: Object.freeze({ axis: 'Z', directionSign: -1 }),
+  PageUp: Object.freeze({ axis: 'Z', directionSign: 1 }),
+});
+
 export class TopologyEditInteractionControllerRuntime {
   constructor(controller) {
     if (!controller) throw new TypeError('Interaction controller runtime requires a controller.');
@@ -138,6 +147,10 @@ export function axisDirection(axisInput) {
     y: axis === 'Y' ? 1 : 0,
     z: axis === 'Z' ? 1 : 0,
   };
+}
+
+export function topologyEditKeyboardNudge(key) {
+  return KEYBOARD_NUDGES[String(key ?? '')] ?? null;
 }
 
 export function isTopologyEditTextControl(target) {
