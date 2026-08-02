@@ -1,4 +1,5 @@
 import { TOPOLOGY_EDIT_PRESENTATION_SCHEMA } from './topology-edit-presentation-contract.js';
+import { topologyEditSectionBoxToPlaneEquations } from './topology-edit-section-model.js';
 import { isTopologyEditCanonicalIdVisible } from './topology-edit-visibility-model.js';
 
 const MATRIX_SIZE = 16;
@@ -15,18 +16,15 @@ export class TopologyEditPresentationRuntime {
     this.state = state;
     applyLayer(this.viewportBackend.groups.sourceGroup, state.sourceVisible, state.sourceOpacity);
     applyLayer(this.viewportBackend.groups.draftGroup, state.draftVisible, state.draftOpacity);
-    applyTopologyEditCanonicalVisibility(
-      this.viewportBackend.groups.sourceGroup,
-      state.canonicalVisibility,
-    );
-    applyTopologyEditCanonicalVisibility(
-      this.viewportBackend.groups.draftGroup,
-      state.canonicalVisibility,
-    );
+    applyTopologyEditCanonicalVisibility(this.viewportBackend.groups.sourceGroup, state.canonicalVisibility);
+    applyTopologyEditCanonicalVisibility(this.viewportBackend.groups.draftGroup, state.canonicalVisibility);
+    applyTopologyEditSectionPresentation(this.viewportBackend, state.section);
     return state.presentationHash;
   }
 
   destroy() {
+    if (!this.viewportBackend) return;
+    clearTopologyEditSectionPresentation(this.viewportBackend);
     this.viewportBackend = null;
     this.state = null;
   }
@@ -40,6 +38,19 @@ export function applyTopologyEditLayerPresentation(group, options) {
 export function applyTopologyEditCanonicalVisibility(group, visibilityState) {
   if (!group) throw new TypeError('A renderer group is required.');
   group.traverse?.((object) => applyObjectVisibility(object, visibilityState));
+}
+
+export function applyTopologyEditSectionPresentation(viewportBackend, sectionState) {
+  const planes = topologyEditSectionBoxToPlaneEquations(sectionState);
+  if (typeof viewportBackend?.setPresentationSectionPlanes !== 'function') {
+    if (planes.length) throw new TypeError('Viewport backend does not support section planes.');
+    return 0;
+  }
+  return viewportBackend.setPresentationSectionPlanes(planes);
+}
+
+function clearTopologyEditSectionPresentation(viewportBackend) {
+  viewportBackend.setPresentationSectionPlanes?.([]);
 }
 
 function applyLayer(group, visible, opacity) {
@@ -70,8 +81,7 @@ function applyObjectVisibility(object, visibilityState) {
 }
 
 function isInstancedObject(object) {
-  return Array.isArray(object?.userData?.pickTable) &&
-    object?.instanceMatrix?.array;
+  return Array.isArray(object?.userData?.pickTable) && object?.instanceMatrix?.array;
 }
 
 function applyInstancedVisibility(object, visibilityState) {
@@ -81,10 +91,7 @@ function applyInstancedVisibility(object, visibilityState) {
   const count = Math.min(pickTable.length, Math.floor(current.length / MATRIX_SIZE));
   for (let index = 0; index < count; index += 1) {
     const offset = index * MATRIX_SIZE;
-    const visible = isTopologyEditCanonicalIdVisible(
-      visibilityState,
-      pickTable[index],
-    );
+    const visible = isTopologyEditCanonicalIdVisible(visibilityState, pickTable[index]);
     writeInstanceMatrix(current, base, offset, visible);
   }
   object.instanceMatrix.needsUpdate = true;
@@ -100,9 +107,7 @@ function ensureBaseInstanceMatrices(object, current) {
 }
 
 function writeInstanceMatrix(current, base, offset, visible) {
-  for (let index = 0; index < MATRIX_SIZE; index += 1) {
-    current[offset + index] = base[offset + index];
-  }
+  for (let index = 0; index < MATRIX_SIZE; index += 1) current[offset + index] = base[offset + index];
   if (visible) return;
   [0, 1, 2, 4, 5, 6, 8, 9, 10].forEach((index) => {
     current[offset + index] = 0;
