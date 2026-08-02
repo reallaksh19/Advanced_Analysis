@@ -31,8 +31,8 @@ const formulationEvidence = [
 ].map(evaluateFormulation);
 
 const base = {
-  schema: 'lafea-bucket-01-pure-shear-evidence/v1',
-  producerRevision: 'B01-PURE-SHEAR.1',
+  schema: 'lafea-bucket-01-pure-shear-evidence/v2',
+  producerRevision: 'B01-PURE-SHEAR.2',
   benchmarkId: oracle.benchmarkId,
   oracleId: oracle.oracleId,
   oracleHash: canonicalLafeaSha256(oracle),
@@ -65,37 +65,49 @@ fs.writeFileSync(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 console.log(JSON.stringify(report));
 
 function evaluateFormulation(formulation) {
-  const runs = Array.from({ length: REPLAYS }, () => calculateLocalContinuum(
-    createCanonicalLocalContinuumModel(source(formulation)),
+  const loadDrivenRuns = Array.from({ length: REPLAYS }, () => calculateLocalContinuum(
+    createCanonicalLocalContinuumModel(loadDrivenSource(formulation)),
   ));
-  runs.forEach((result) => {
+  const prescribedRuns = Array.from({ length: REPLAYS }, () => calculateLocalContinuum(
+    createCanonicalLocalContinuumModel(prescribedSource(formulation)),
+  ));
+  [...loadDrivenRuns, ...prescribedRuns].forEach((result) => {
     assert.equal(result.qualification.state, QUALIFICATION_STATES.ACCEPTED);
     assert.equal('nodalStress' in result, false);
     assert.equal('averagedStress' in result, false);
   });
-  runs.slice(1).forEach((result) => {
-    assert.deepEqual(result.semanticHashes, runs[0].semanticHashes);
+  loadDrivenRuns.slice(1).forEach((result) => {
+    assert.deepEqual(result.semanticHashes, loadDrivenRuns[0].semanticHashes);
+  });
+  prescribedRuns.slice(1).forEach((result) => {
+    assert.deepEqual(result.semanticHashes, prescribedRuns[0].semanticHashes);
   });
 
-  const result = runs[0];
-  const traction = byCase(result, 'TRACTION');
-  const nodal = byCase(result, 'NODAL_EQUIVALENT');
-  const prescribed = byCase(result, 'PRESCRIBED_AFFINE');
+  const loadDriven = loadDrivenRuns[0];
+  const prescribedResult = prescribedRuns[0];
+  const traction = byCase(loadDriven, 'TRACTION');
+  const nodal = byCase(loadDriven, 'NODAL_EQUIVALENT');
+  const prescribed = byCase(prescribedResult, 'PRESCRIBED_AFFINE');
   const evidence = {
-    TRACTION: checkCase(result, traction, 'LOAD_DRIVEN'),
-    NODAL_EQUIVALENT: checkCase(result, nodal, 'LOAD_DRIVEN'),
-    PRESCRIBED_AFFINE: checkCase(result, prescribed, 'PRESCRIBED'),
+    TRACTION: checkCase(loadDriven, traction, 'LOAD_DRIVEN'),
+    NODAL_EQUIVALENT: checkCase(loadDriven, nodal, 'LOAD_DRIVEN'),
+    PRESCRIBED_AFFINE: checkCase(prescribedResult, prescribed, 'PRESCRIBED'),
   };
   const parity = {
-    tractionToNodal: compareCases(result, traction, nodal, true),
-    tractionToPrescribed: compareCases(result, traction, prescribed, false),
+    tractionToNodal: compareCases(loadDriven, traction, loadDriven, nodal, true),
+    tractionToPrescribed: compareCases(
+      loadDriven, traction, prescribedResult, prescribed, false,
+    ),
   };
   Object.entries(parity).forEach(([id, metrics]) => {
     within(maxMetric(metrics), oracle.tolerances.loadPathParity, `${formulation} ${id}`);
   });
   return {
     formulation,
-    replaySemanticHashes: runs.map((result) => result.semanticHashes),
+    loadDrivenReplaySemanticHashes:
+      loadDrivenRuns.map((result) => result.semanticHashes),
+    prescribedReplaySemanticHashes:
+      prescribedRuns.map((result) => result.semanticHashes),
     loadCases: evidence,
     parity,
   };
@@ -215,7 +227,9 @@ function fieldMetrics(row) {
   };
 }
 
-function compareCases(result, left, right, compareForce) {
+function compareCases(
+  leftResult, left, rightResult, right, compareForce,
+) {
   const displacementScale = oracle.expected.maximumUx;
   const stressScale = Math.abs(oracle.expected.tauXY);
   let displacement = 0;
@@ -242,8 +256,8 @@ function compareCases(result, left, right, compareForce) {
   });
   const force = compareForce
     ? vectorError(
-      vectorFromForce(result, left.forceEvidence.forceVector),
-      vectorFromForce(result, right.forceEvidence.forceVector),
+      vectorFromForce(leftResult, left.forceEvidence.forceVector),
+      vectorFromForce(rightResult, right.forceEvidence.forceVector),
     )
     : 0;
   return {
@@ -258,20 +272,17 @@ function compareCases(result, left, right, compareForce) {
   };
 }
 
-function source(formulation) {
+function commonSource(formulation) {
   const { length, height, thickness } = oracle.geometry;
-  const gamma = oracle.kinematics.engineeringShearStrain;
-  const tau = oracle.expected.tauXY;
-  const boundary = oracle.expected.nodalBoundaryForces;
   return {
     schema: MODEL_SCHEMA,
     modelIdentity: `B01_T3_PURE_SHEAR_${formulation}`,
-    modelVersion: '1',
+    modelVersion: '2',
     sourceAncestry: {
       sourceModelIdentity: oracle.benchmarkId,
       sourceVersion: '1',
       adapterIdentity: 'LAFEA3_BUCKET_01_GOVERNED_BENCHMARK',
-      adapterVersion: '1',
+      adapterVersion: '2',
     },
     units: { length: 'mm', force: 'N', stress: 'MPa', modulus: 'MPa' },
     formulation,
@@ -295,6 +306,17 @@ function source(formulation) {
       allowT3Fallback: true,
       sourceReference: 'ORACLE#GOVERNED_T3',
     },
+    qualificationProfile: JSON.parse(JSON.stringify(QUALIFICATION_PROFILE)),
+    limitations: [],
+  };
+}
+
+function loadDrivenSource(formulation) {
+  const source = commonSource(formulation);
+  const tau = oracle.expected.tauXY;
+  const boundary = oracle.expected.nodalBoundaryForces;
+  return {
+    ...source,
     constraints: [
       constraint('C1', 'A', 'UX'),
       constraint('C2', 'A', 'UY'),
@@ -313,19 +335,28 @@ function source(formulation) {
         force('F-C', 'C', boundary.C),
         force('F-D', 'D', boundary.D),
       ], [], []),
-      loadCase('PRESCRIBED_AFFINE', [], [], [
-        imposed('D-B-UX', 'B', 'UX', 0),
-        imposed('D-C-UX', 'C', 'UX', gamma * height),
-        imposed('D-C-UY', 'C', 'UY', 0),
-        imposed('D-D-UX', 'D', 'UX', gamma * height),
-        imposed('D-D-UY', 'D', 'UY', 0),
-      ]),
     ],
-    resultRequests: {
-      loadCaseIds: ['TRACTION', 'NODAL_EQUIVALENT', 'PRESCRIBED_AFFINE'],
-    },
-    qualificationProfile: JSON.parse(JSON.stringify(QUALIFICATION_PROFILE)),
-    limitations: [],
+    resultRequests: { loadCaseIds: ['TRACTION', 'NODAL_EQUIVALENT'] },
+  };
+}
+
+function prescribedSource(formulation) {
+  const source = commonSource(formulation);
+  const gamma = oracle.kinematics.engineeringShearStrain;
+  return {
+    ...source,
+    constraints: [],
+    loadCases: [loadCase('PRESCRIBED_AFFINE', [], [], [
+      imposed('D-A-UX', 'A', 'UX', 0),
+      imposed('D-A-UY', 'A', 'UY', 0),
+      imposed('D-B-UX', 'B', 'UX', 0),
+      imposed('D-B-UY', 'B', 'UY', 0),
+      imposed('D-C-UX', 'C', 'UX', gamma * oracle.geometry.height),
+      imposed('D-C-UY', 'C', 'UY', 0),
+      imposed('D-D-UX', 'D', 'UX', gamma * oracle.geometry.height),
+      imposed('D-D-UY', 'D', 'UY', 0),
+    ])],
+    resultRequests: { loadCaseIds: ['PRESCRIBED_AFFINE'] },
   };
 }
 
