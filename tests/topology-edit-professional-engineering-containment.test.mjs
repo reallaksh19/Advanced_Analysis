@@ -8,6 +8,7 @@ const MODULES = [
   '../src/workspace/topology-edit/professional/topology-edit-route-operation-helpers.js',
   '../src/workspace/topology-edit/professional/topology-edit-route-operations.js',
   '../src/workspace/topology-edit/professional/topology-edit-slope-operation.js',
+  '../src/workspace/topology-edit/professional/topology-edit-spec-catalog.js',
 ];
 
 const PROHIBITED = [
