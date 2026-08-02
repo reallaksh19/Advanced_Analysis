@@ -1,29 +1,27 @@
-/**
- * Topology Edit Draft — Phase 5 Governed Autofix Controller
- *
- * Thin orchestration layer over topology-edit-checker.js's pure
- * checkCanonicalTopology / planSafeAutofix functions: applies one candidate
- * at a time against the real canonical topology and only keeps a fix if it
- * doesn't create a new or worse issue (see planSafeAutofix's doc comment).
- */
-
+/** Governed checker suggestion, candidate ghost, and certified acceptance boundary. */
+import { deepFreeze, semanticHash } from '../../core/shared-piping-model/index.js';
 import { checkCanonicalTopology, planSafeAutofix } from './topology-edit-checker.js';
-
-export class TopologyEditAutofixController {
-  /** Runs the checker and returns the current issue list for a canonical topology. */
-  static check(canonical, options) {
-    return checkCanonicalTopology(canonical, options);
-  }
-
-  /**
-   * Applies autofixes for the given issues (a subset of check()'s output),
-   * one at a time, rejecting any that don't actually resolve or that worsen
-   * overall topology health. Returns the resulting topology plus applied/rejected receipts.
-   */
-  static applyAutofix(canonical, issues, options) {
-    if (!canonical || !Array.isArray(issues)) {
-      throw new TypeError('TopologyEditAutofixController: Invalid canonical topology or issue list.');
-    }
-    return planSafeAutofix(canonical, issues, options);
-  }
+import { createTopologyEditCommandRequest } from './topology-edit-command-contract.js';
+import { certifyTopologyEditCommand } from './topology-edit-certification-service.js';
+import { acceptTopologyEditCommand } from './topology-edit-journal-service.js';
+import { buildTopologyEditGhostPacket } from './topology-edit-render-packet.js';
+export const TOPOLOGY_EDIT_FIX_SUGGESTION_SCHEMA='TopologyEditFixSuggestion.v1';
+export const TOPOLOGY_EDIT_AUTOFIX_PREVIEW_SCHEMA='TopologyEditAutofixPreview.v1';
+function positive(value){const number=Number(value);return Number.isFinite(number)&&number>0?number:null;}
+function requiredText(value){const text=String(value??'').trim().toUpperCase();return text||null;}
+function suggestion(issue,commandType,payload,evidence){const material={schema:TOPOLOGY_EDIT_FIX_SUGGESTION_SCHEMA,issueId:issue.id,issueKind:issue.kind,commandType,payload,confidence:'EXPLICIT_EVIDENCE',risk:'CANDIDATE_CERTIFICATION_REQUIRED',evidence};return deepFreeze({...material,suggestionHash:semanticHash(material)});}
+function bendSuggestion(issue,policy){const nodeId=issue.nodeIds?.[0];const radiusMm=positive(policy.bendRadiusByNodeId?.[nodeId]);if(!nodeId||issue.edgeIds?.length!==2||radiusMm===null)return null;return suggestion(issue,'ADD_BEND_DEFINITION',{nodeId,edgeIds:[...issue.edgeIds],radiusMm,bendType:requiredText(policy.bendTypeByNodeId?.[nodeId])||'LONG_RADIUS'},{radiusSource:'POLICY_BY_NODE',nodeId});}
+function junctionSuggestion(issue,policy){const nodeId=issue.nodeIds?.[0];const junctionType=requiredText(policy.junctionTypeByNodeId?.[nodeId]);if(!nodeId||issue.edgeIds?.length<3||!['TEE','OLET'].includes(junctionType))return null;return suggestion(issue,'ADD_JUNCTION_DEFINITION',{nodeId,edgeIds:[...issue.edgeIds],junctionType},{junctionTypeSource:'POLICY_BY_NODE',nodeId});}
+function trimSuggestion(issue,policy){const plan=policy.trimPlanByIssueId?.[issue.id];if(!plan)return null;const fraction=Number(plan.fraction);const endpoint=requiredText(plan.endpoint);if(!issue.edgeIds?.includes(plan.edgeId)||!['FROM','TO'].includes(endpoint)||!Number.isFinite(fraction)||fraction<=0||fraction>=1)return null;return suggestion(issue,'TRIM_EDGE',{edgeId:plan.edgeId,endpoint,fraction},{trimPlanSource:'POLICY_BY_ISSUE',issueId:issue.id});}
+function mergeSuggestion(issue){if(issue.nodeIds?.length!==2)return null;return suggestion(issue,'MERGE_NODES',{sourceNodeId:issue.nodeIds[1],targetNodeId:issue.nodeIds[0]},{source:'SNAP_GAP_EXACT_ENDPOINT_PAIR'});}
+function suggestionFor(issue,policy){if(issue.kind==='SNAP_GAP')return mergeSuggestion(issue);if(['RIGHT_ANGLE_WITHOUT_BEND','UNDEFINED_KINK'].includes(issue.kind))return bendSuggestion(issue,policy);if(issue.kind==='MULTIWAY_WITHOUT_JUNCTION')return junctionSuggestion(issue,policy);if(['OVERLAPPING_ELEMENTS','PIPE_BACKTRACK'].includes(issue.kind))return trimSuggestion(issue,policy);return null;}
+function commandIdentity(session,suggestionRow){const digest=semanticHash({baseCanonicalHash:session.journal.basis.baseCanonicalHash,activeLedgerHash:session.journal.activeLedgerHash,sequence:session.journal.history.length,issueId:suggestionRow.issueId,commandType:suggestionRow.commandType,payload:suggestionRow.payload}).split(':').at(-1);return`autofix:${session.journal.history.length}:${digest}`;}
+function assertSuggestion(value){if(value?.schema!==TOPOLOGY_EDIT_FIX_SUGGESTION_SCHEMA)throw new TypeError('TopologyEditAutofixController: invalid fix suggestion.');const material={...value};delete material.suggestionHash;if(value.suggestionHash!==semanticHash(material))throw new Error('TopologyEditAutofixController: suggestion hash mismatch.');return value;}
+function assertPreview(value){if(value?.schema!==TOPOLOGY_EDIT_AUTOFIX_PREVIEW_SCHEMA)throw new TypeError('TopologyEditAutofixController: invalid autofix preview.');const material={...value};delete material.previewHash;delete material.request;delete material.certification;delete material.ghost;if(value.previewHash!==semanticHash(material))throw new Error('TopologyEditAutofixController: preview hash mismatch.');return value;}
+export class TopologyEditAutofixController{
+  static check(canonical,options){return checkCanonicalTopology(canonical,options);}
+  static suggestions(canonical,issues=checkCanonicalTopology(canonical),policy={}){return Object.freeze(issues.map((issue)=>suggestionFor(issue,policy)).filter(Boolean).sort((left,right)=>left.issueId.localeCompare(right.issueId)));}
+  static preview(session,suggestionInput){const row=assertSuggestion(suggestionInput);session.assertUsable();const request=createTopologyEditCommandRequest({commandId:commandIdentity(session,row),commandType:row.commandType,payload:row.payload,basis:session.commandBasis()});const certification=certifyTopologyEditCommand({request,canonicalTopology:session.currentTopology(),baseCanonicalTopology:session.baseCanonicalTopology,authority:request.basis,checkerPolicy:session.checkerPolicy??undefined});const resolved=certification.candidate?.checkerDelta?.resolvedIssues?.some((issue)=>issue.id===row.issueId)===true;const introduced=certification.candidate?.checkerDelta?.introducedIssues??[];const autofixGuard=certification.disposition==='ACCEPTED'&&resolved&&introduced.length===0;const disposition=certification.disposition==='ACCEPTED'&&!autofixGuard?'REJECTED_AUTOFIX_GUARD':certification.disposition;const guardReasons=certification.disposition==='ACCEPTED'&&!resolved?['TARGET_ISSUE_NOT_RESOLVED']:introduced.map((issue)=>`INTRODUCED_${issue.kind}`);const ghost=autofixGuard?buildTopologyEditGhostPacket(session.currentTopology(),certification.candidate.canonicalTopology,certification.candidate.candidateDraftHash):null;const material={schema:TOPOLOGY_EDIT_AUTOFIX_PREVIEW_SCHEMA,issueId:row.issueId,suggestionHash:row.suggestionHash,requestHash:request.requestHash,certificationHash:certification.certificationHash,candidateDraftHash:certification.candidate?.candidateDraftHash??null,ghostHash:ghost?.ghostHash??null,disposition,guardReasons:Object.freeze(guardReasons),sessionVersion:session.journal.sessionVersion,priorDraftHash:session.currentTopology().canonicalTopologyHash};return deepFreeze({...material,previewHash:semanticHash(material),request,certification,ghost});}
+  static accept(session,previewInput){const preview=assertPreview(previewInput);session.assertUsable();if(preview.disposition!=='ACCEPTED')throw new Error('TopologyEditAutofixController: rejected preview cannot be accepted.');if(preview.sessionVersion!==session.journal.sessionVersion||preview.priorDraftHash!==session.currentTopology().canonicalTopologyHash)throw new Error('TopologyEditAutofixController: preview is stale.');const transition=acceptTopologyEditCommand({journal:session.journal,baseCanonicalTopology:session.baseCanonicalTopology,request:preview.request,checkerPolicy:session.checkerPolicy??undefined});if(transition.disposition!=='ACCEPTED')return transition;if(transition.certification.certificationHash!==preview.certificationHash||transition.certification.candidate.candidateDraftHash!==preview.candidateDraftHash)throw new Error('TopologyEditAutofixController: accepted candidate differs from preview.');session.applyTransition(transition);return transition;}
+  static applyAutofix(canonical,issues,options){if(!canonical||!Array.isArray(issues))throw new TypeError('TopologyEditAutofixController: Invalid canonical topology or issue list.');return planSafeAutofix(canonical,issues,options);}
 }
