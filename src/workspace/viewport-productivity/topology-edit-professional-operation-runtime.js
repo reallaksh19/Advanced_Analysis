@@ -3,6 +3,9 @@ import {
   topologyEditProfessionalOperationDefaults,
 } from '../topology-edit/professional/topology-edit-professional-operation-session.js';
 import {
+  prepareTopologyEditOperationCandidate,
+} from '../topology-edit/professional/topology-edit-operation-candidate.js';
+import {
   executeTopologyEditOperationTransaction,
   previewTopologyEditOperationTransaction,
   redoTopologyEditOperationTransaction,
@@ -35,6 +38,7 @@ export class TopologyEditProfessionalOperationRuntime {
     this.catalogue = null;
     this.values = createTopologyEditProfessionalInitialValues();
     this.plan = null;
+    this.candidate = null;
     this.validation = null;
     this.validationPending = false;
     this.transactionPreview = null;
@@ -114,12 +118,19 @@ export class TopologyEditProfessionalOperationRuntime {
         values: this.values,
         catalogue: this.catalogue,
       });
+      this.candidate = this.plan.status === 'PLANNED'
+        && this.plan.unresolvedEvidence.length === 0
+        ? prepareTopologyEditOperationCandidate({
+          session,
+          operationPlan: this.plan,
+        })
+        : null;
       this.validation = null;
       this.transactionPreview = null;
       this.error = null;
-      this.message = this.plan.status === 'PLANNED'
-        ? `Plan ${this.plan.planHash.slice(0, 18)} created with ${this.plan.commandIntents.length} governed command(s).`
-        : this.plan.reason;
+      this.message = this.candidate
+        ? `Plan ${this.plan.planHash.slice(0, 18)} certified candidate ${this.candidate.resultingCanonicalHash}.`
+        : this.plan.reason ?? `Plan blocked by ${this.plan.unresolvedEvidence[0]?.code}.`;
       this.publishState();
     } catch (error) {
       this.reject(error);
@@ -129,19 +140,19 @@ export class TopologyEditProfessionalOperationRuntime {
 
   async validateOperation() {
     const session = this.controller.session;
-    if (!session || this.plan?.status !== 'PLANNED') return true;
+    if (!session || !this.plan || !this.candidate) return true;
     const plan = this.plan;
-    const topology = session.currentTopology();
+    const candidate = this.candidate;
     this.validationPending = true;
     this.validation = null;
     this.transactionPreview = null;
     this.error = null;
-    this.message = 'Validating changed scope in a cancellable module worker…';
+    this.message = 'Validating the exact certified candidate in a cancellable module worker…';
     this.render();
     try {
       const result = await this.validationClient.validate({
         operationPlan: plan,
-        canonicalTopology: topology,
+        canonicalTopology: candidate.canonicalTopology,
         previousDiagnostics: this.controller.issues ?? [],
         performancePolicy: {
           fastPathBudgetMs: 16,
@@ -151,15 +162,17 @@ export class TopologyEditProfessionalOperationRuntime {
         blockingSeverities: ['HIGH'],
       });
       if (!this.controller.session
+        || this.plan?.planHash !== plan.planHash
+        || this.candidate?.candidateHash !== candidate.candidateHash
         || this.controller.session.currentTopology().canonicalTopologyHash
-          !== topology.canonicalTopologyHash
-        || this.plan?.planHash !== plan.planHash) {
-        throw new RangeError('Validation completed against a stale professional plan.');
+          !== candidate.priorCanonicalHash) {
+        throw new RangeError('Validation completed against a stale professional candidate.');
       }
       this.validation = result.receipt;
       this.transactionPreview = previewTopologyEditOperationTransaction({
         session: this.controller.session,
         operationPlan: plan,
+        candidate,
         validationReceipt: result.receipt,
       });
       this.message = `Validation ${result.receipt.status}; atomic preview ${this.transactionPreview.previewHash.slice(0, 18)} ready.`;
@@ -186,17 +199,20 @@ export class TopologyEditProfessionalOperationRuntime {
 
   applyOperation() {
     const session = this.controller.session;
-    if (!session || !this.plan || !this.validation || !this.transactionPreview) return true;
+    if (!session || !this.plan || !this.candidate
+      || !this.validation || !this.transactionPreview) return true;
     const priorVersion = session.journal.sessionVersion;
     try {
       this.transaction = executeTopologyEditOperationTransaction({
         session,
         operationPlan: this.plan,
+        candidate: this.candidate,
         validationReceipt: this.validation,
         preview: this.transactionPreview,
       });
       this.redoTransaction = null;
       this.plan = null;
+      this.candidate = null;
       this.validation = null;
       this.transactionPreview = null;
       this.error = null;
@@ -249,6 +265,7 @@ export class TopologyEditProfessionalOperationRuntime {
   clear(announce = false, clearTransaction = false) {
     this.cancelValidation();
     this.plan = null;
+    this.candidate = null;
     this.validation = null;
     this.transactionPreview = null;
     this.error = null;
