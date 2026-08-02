@@ -57,7 +57,17 @@ Phase 6 adds exact-only fluid-register resolution over an immutable `FLUID_REGIS
 - missing and type-conflicting fluid properties remain explicit blockers;
 - water-density defaults, first-row selection, aliases, fuzzy matching, and fallback are prohibited.
 
-This module does **not** perform insulation or weight resolution; engineering fallback; engineering approval; Project Data persistence;
+Phase 7 adds exact-only insulation-register resolution over an immutable `INSULATION_REGISTER` snapshot:
+
+- the insulation code must be an approved `RESOLVED_EXACT` field from line-list resolution;
+- source rows are indexed into duplicate-preserving exact insulation-code buckets;
+- zero matching rows remain `BLOCKED_MISSING`;
+- multiple exact rows remain `BLOCKED_AMBIGUOUS`, even when candidate properties agree;
+- only one exact source row may resolve insulation material, density, thickness, or other bound fields;
+- missing and type-conflicting insulation properties remain explicit blockers;
+- default thickness, service inference, first-row selection, aliases, fuzzy matching, and fallback are prohibited.
+
+This module does **not** perform weight resolution; engineering fallback; engineering approval; Project Data persistence;
 empirical calculations; LFEA binding; stagedJson mutation; topology validation;
 or solver work.
 
@@ -88,6 +98,9 @@ or solver work.
 21. Fluid-register key inputs must be approved `RESOLVED_EXACT` fluid codes.
 22. Exact fluid-code buckets preserve every duplicate row and never select the first record.
 23. Fluid resolution never applies water-density, viscosity, alias, fuzzy-match, or other fallback values.
+24. Insulation-register key inputs must be approved `RESOLVED_EXACT` insulation codes.
+25. Exact insulation-code buckets preserve every duplicate row and never select the first record.
+26. Insulation resolution never applies default thickness, service inference, aliases, fuzzy matching, or fallback.
 
 ## Qualification
 
@@ -98,4 +111,5 @@ node scripts/run-common-enriched-exact-line-list-checks.mjs
 node scripts/run-common-enriched-exact-piping-class-checks.mjs
 node scripts/run-common-enriched-exact-material-register-checks.mjs
 node scripts/run-common-enriched-exact-fluid-register-checks.mjs
+node scripts/run-common-enriched-exact-insulation-register-checks.mjs
 ```
