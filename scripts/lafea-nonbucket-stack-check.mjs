@@ -13,6 +13,7 @@ const CHECKS = Object.freeze([
   { scope: 'NB-T4A', path: 'scripts/lafea-nb-t4a-analysis-mesh-evidence-check.mjs' },
   { scope: 'NB-T4B', path: 'scripts/lafea-nb-t4b-recovery-render-check.mjs' },
   { scope: 'NB-T6B', path: 'scripts/lafea-nb-t6b-lug-pinhole-mesh-ladder-check.mjs' },
+  { scope: 'NB-T6C', path: 'scripts/lafea-nb-t6c-physical-problem-batch-check.mjs' },
   { scope: 'PR-NB1-A', path: 'scripts/lafea-nb1-analytical-verticals-check.mjs' },
   { scope: 'U1', path: 'scripts/lafea-u1-stage-registry-check.mjs' },
   { scope: 'U1', path: 'scripts/lafea-u1b-registry-consumer-check.mjs' },
@@ -83,7 +84,7 @@ for (const row of CHECKS) {
 }
 
 const report = Object.freeze({
-  schema: 'lafea-nonbucket-stack-report/v7',
+  schema: 'lafea-nonbucket-stack-report/v8',
   check: 'lafea-nonbucket-stack-certification',
   status: failures.length ? 'FAIL' : 'PASS',
   exactHead: gitHead(),
@@ -108,6 +109,9 @@ const report = Object.freeze({
   recoveryRenderEvidenceIntegrated: true,
   productionMeshGenerationIntegrated: true,
   productionMeshGeometryClass: 'CONCENTRIC_ANNULAR_LUG_PINHOLE',
+  physicalProblemProjectionIntegrated: true,
+  controlledPilotBatchSurfaceIntegrated: true,
+  stageDocumentGenerationIntegrated: true,
   arbitraryOuterProfileMeshingIntegrated: false,
   arbitraryHoleTopologyMeshingIntegrated: false,
   displayTessellationAcceptedAsMeshEvidence: false,
@@ -121,6 +125,7 @@ const report = Object.freeze({
   lifecycleSemanticsChanged: true,
   shellAuthorityChanged: false,
   codeAuthorityPromoted: false,
+  generalT7dAuthorized: false,
   releaseQualified: false,
   lafea6Enabled: false,
 });
