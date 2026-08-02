@@ -151,3 +151,15 @@ export {
   createTemplateCallerMeshBinding,
   validateTemplateCallerMeshBinding,
 } from './caller-mesh-binding.js';
+
+export {
+  LAFEA_CONTINUUM_MAPPING_EVIDENCE_SCHEMA,
+  LAFEA_CONTINUUM_MAPPING_KINDS,
+  LAFEA_CONTINUUM_MAPPING_QUALIFICATIONS,
+  LAFEA_LUG_PINHOLE_MAPPING_PACKAGE_SCHEMA,
+  LAFEA_LUG_PINHOLE_MAPPING_PACKAGE_STATUSES,
+  createContinuumApplicationMappingEvidence,
+  createLafeaLugPinholeMappingPackage,
+  validateContinuumApplicationMappingEvidence,
+  validateLafeaLugPinholeMappingPackage,
+} from './continuum-application-mapping-evidence.js';
