@@ -105,6 +105,14 @@ class SilentWorker extends ExecutingWorker {
   postMessage() {}
 }
 
+class BrokenPostWorker extends ExecutingWorker {
+  postMessage() { throw new Error('structured clone failed'); }
+}
+
+class BrokenConstructorWorker {
+  constructor() { throw new Error('worker unavailable'); }
+}
+
 test('worker client accepts exact response authority and terminates the worker', async () => {
   ExecutingWorker.instances.length = 0;
   const client = new TopologyEditValidationWorkerClient({
@@ -154,6 +162,34 @@ test('a newer request supersedes and terminates the prior worker', async () => {
   assert.ok(client.snapshot().supersededRequestIds.includes(firstId));
   client.cancel();
   await assert.rejects(second, { name: 'AbortError' });
+});
+
+test('constructor failure leaves worker state unchanged and inactive', () => {
+  const client = new TopologyEditValidationWorkerClient({
+    WorkerCtor: BrokenConstructorWorker,
+    workerUrl: new URL('file:///professional-worker.js'),
+  });
+  assert.throws(
+    () => client.validate(validationInput()),
+    /worker startup failed: worker unavailable/i,
+  );
+  assert.equal(client.snapshot().activeRequest, null);
+  assert.equal(client.active, null);
+});
+
+test('postMessage failure terminates the worker and clears the active request', async () => {
+  BrokenPostWorker.instances.length = 0;
+  const client = new TopologyEditValidationWorkerClient({
+    WorkerCtor: BrokenPostWorker,
+    workerUrl: new URL('file:///professional-worker.js'),
+  });
+  await assert.rejects(
+    client.validate(validationInput()),
+    /worker startup failed: structured clone failed/i,
+  );
+  assert.equal(BrokenPostWorker.instances.at(-1).terminated, true);
+  assert.equal(client.snapshot().activeRequest, null);
+  assert.equal(client.active, null);
 });
 
 function clock(values) {
