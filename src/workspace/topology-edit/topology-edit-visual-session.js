@@ -1,6 +1,5 @@
 /** Complete pure visual derivation for one certified canonical topology snapshot. */
 import { deepFreeze } from '../../core/shared-piping-model/index.js';
-import { createDimensionAuthority } from './dimension-authority.js';
 import { buildTopologyEditComponentEvidence } from './topology-edit-component-evidence.js';
 import {
   deriveTopologyVisualGeometry,
@@ -13,10 +12,13 @@ import { projectSupportGeometryToViewport } from './support-restraint-projector.
 export function buildTopologyEditVisualSession({
   canonicalTopology,
   workspaceDataset,
-  dimensionAuthority = createDimensionAuthority(),
+  dimensionAuthority,
   visualPolicy,
   verticalAxis = 'Z',
 } = {}) {
+  if (!dimensionAuthority) {
+    throw new TypeError('Topology edit visual session requires explicit dimension authority.');
+  }
   const componentEvidence = buildTopologyEditComponentEvidence(workspaceDataset);
   const visualModel = deriveTopologyVisualGeometry({
     canonicalTopology,
