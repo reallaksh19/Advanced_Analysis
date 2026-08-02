@@ -44,7 +44,7 @@ export class TopologyEditValidationWorkerClient {
       performancePolicy: input.performancePolicy ?? DEFAULT_POLICY,
       blockingSeverities: input.blockingSeverities ?? ['HIGH'],
     });
-
+    const worker = this.createWorker();
     const prior = this.active;
     this.state = beginTopologyEditValidationWorkerRequest(this.state, request);
     if (prior) {
@@ -52,10 +52,6 @@ export class TopologyEditValidationWorkerClient {
       prior.reject(cancellationError('SUPERSEDED', prior.request.requestId));
     }
 
-    const worker = new this.WorkerCtor(this.workerUrl, {
-      type: 'module',
-      name: 'topology-edit-professional-validation',
-    });
     return new Promise((resolve, reject) => {
       const active = {
         request,
@@ -67,15 +63,24 @@ export class TopologyEditValidationWorkerClient {
         onError: (event) => this.handleWorkerError(event),
       };
       this.active = active;
-      worker.addEventListener('message', active.onMessage);
-      worker.addEventListener('error', active.onError);
-      worker.postMessage({
-        type: 'VALIDATE',
-        request,
-        operationPlan: plan,
-        canonicalTopology,
-        previousDiagnostics,
-      });
+      try {
+        worker.addEventListener('message', active.onMessage);
+        worker.addEventListener('error', active.onError);
+        worker.postMessage({
+          type: 'VALIDATE',
+          request,
+          operationPlan: plan,
+          canonicalTopology,
+          previousDiagnostics,
+        });
+      } catch (error) {
+        this.state = cancelTopologyEditValidationWorkerRequest(
+          this.state,
+          request.requestId,
+        );
+        this.cleanupActive(active);
+        reject(workerStartupFailure(error));
+      }
     });
   }
 
@@ -144,10 +149,21 @@ export class TopologyEditValidationWorkerClient {
   cleanupActive(active) {
     if (active.settled) return;
     active.settled = true;
-    active.worker.removeEventListener('message', active.onMessage);
-    active.worker.removeEventListener('error', active.onError);
-    active.worker.terminate();
+    active.worker.removeEventListener?.('message', active.onMessage);
+    active.worker.removeEventListener?.('error', active.onError);
+    active.worker.terminate?.();
     if (this.active === active) this.active = null;
+  }
+
+  createWorker() {
+    try {
+      return new this.WorkerCtor(this.workerUrl, {
+        type: 'module',
+        name: 'topology-edit-professional-validation',
+      });
+    } catch (error) {
+      throw workerStartupFailure(error);
+    }
   }
 
   assertAvailable() {
@@ -173,5 +189,15 @@ function workerFailure(value) {
     `TopologyEditValidationWorkerClient: ${value?.message || 'validation failed'}.`,
   );
   error.name = value?.name || 'Error';
+  return error;
+}
+
+function workerStartupFailure(value) {
+  const error = new Error(
+    `TopologyEditValidationWorkerClient: worker startup failed: ${
+      value instanceof Error ? value.message : String(value)
+    }.` ,
+  );
+  error.name = value instanceof Error ? value.name : 'Error';
   return error;
 }
