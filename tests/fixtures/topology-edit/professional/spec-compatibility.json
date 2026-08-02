@@ -4,7 +4,7 @@
   "authority": {
     "sourceId": "SPEC-DEMO",
     "sourceVersion": "7",
-    "sourceHash": "sha256:demo-spec-authority"
+    "sourceHash": "sha256:6961552d0273fbc4efe9b6125363405055ed8e9fdf1dbd996cf05300d1a8562e"
   },
   "records": [
     {
@@ -50,6 +50,7 @@
       "componentType": "VALVE",
       "nominalSizeMm": 100,
       "outsideDiameterMm": 114.3,
+      "valveType": "GATE",
       "valveFaceToFaceMm": 600,
       "endConnectionFrom": "FLANGED_RF",
       "endConnectionTo": "FLANGED_RF",
@@ -81,14 +82,37 @@
       "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/flange/dn100/600/rf/b" }
     },
     {
-      "recordId": "TEE-DN100-BW-A",
+      "recordId": "TEE-DN100-DN50-BW-A",
       "componentType": "TEE",
       "nominalSizeMm": 100,
       "outsideDiameterMm": 114.3,
+      "branchNominalSizeMm": 50,
+      "branchOutsideDiameterMm": 60.3,
+      "branchAngleDeg": 90,
+      "centerToRunMm": 86,
+      "centerToBranchMm": 64,
+      "branchConnection": "BW",
       "endConnectionFrom": "BW",
       "endConnectionTo": "BW",
       "pipingClass": "DEMO-150",
-      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/tee/dn100/equal" }
+      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/tee/dn100-dn50/reducing" }
+    },
+    {
+      "recordId": "OLET-DN100-DN25-WELDOLET-A",
+      "componentType": "OLET",
+      "nominalSizeMm": 100,
+      "outsideDiameterMm": 114.3,
+      "branchNominalSizeMm": 25,
+      "branchOutsideDiameterMm": 33.4,
+      "branchAngleDeg": 90,
+      "branchConnection": "SW",
+      "oletType": "WELDOLET",
+      "hostComponentType": "PIPE",
+      "projectionMm": 44,
+      "endConnectionFrom": "HOST_WELD",
+      "endConnectionTo": "SW",
+      "pipingClass": "DEMO-150",
+      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/olet/dn100-dn25/weldolet" }
     }
   ]
 }
