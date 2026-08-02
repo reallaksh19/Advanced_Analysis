@@ -1,9 +1,6 @@
 import { buildDatasetHierarchy } from './dataset-hierarchy.js';
 import { EVENT_TOPICS } from './event-topics.js';
 import { freezeDeep, stringValue } from './dataset-utils.js';
-import { calculatePrimitiveBounds } from './engineering-geometry-math.js';
-import { summarizeGeometry } from './resolved-engineering-outcomes.js';
-import { RESOLVED_ENGINEERING_GEOMETRY_SCHEMA } from './resolved-engineering-geometry.js';
 
 export const MODEL_ZONE_CATALOG_SCHEMA = 'model-zone-catalog/v1';
 export const MODEL_ZONE_SELECTION_SCHEMA = 'model-zone-selection/v1';
@@ -89,28 +86,6 @@ export function projectDatasetForModelZone(dataset, selection = null) {
     entityIds: Object.freeze(entities.map((entity) => entity.entityId)),
     hierarchy: buildDatasetHierarchy(entities),
     summary,
-  });
-}
-
-export function filterResolvedGeometryForModelZone(model, projection) {
-  if (model?.schema !== RESOLVED_ENGINEERING_GEOMETRY_SCHEMA) {
-    throw new TypeError(`Zone filtering requires ${RESOLVED_ENGINEERING_GEOMETRY_SCHEMA}.`);
-  }
-  if (!projection || projection.schema !== MODEL_ZONE_PROJECTION_SCHEMA
-    || projection.datasetId !== model.datasetId) {
-    throw new TypeError('Zone filtering requires a matching model-zone projection.');
-  }
-  if (!projection.zoneId) return model;
-  const allowed = new Set(projection.entityIds);
-  const items = model.items.filter((item) => allowed.has(item.entityId));
-  const skipped = model.skipped.filter((item) => allowed.has(item.entityId));
-  return Object.freeze({
-    ...model,
-    items: Object.freeze([...items]),
-    skipped: Object.freeze([...skipped]),
-    skippedEntityIds: Object.freeze(skipped.map((item) => item.entityId)),
-    bounds: calculatePrimitiveBounds(items),
-    summary: summarizeGeometry(items, skipped),
   });
 }
 
