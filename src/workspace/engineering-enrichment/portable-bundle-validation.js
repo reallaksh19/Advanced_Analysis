@@ -5,6 +5,22 @@ import {
   serializeEnrichmentPortableBundle as serializePortableBundleBase,
   verifyEngineeringEnrichmentPortableBundle as verifyPortableBundleBase,
 } from './portable-bundle.js';
+import {
+  assertEngineeringEnrichmentCandidateProjection,
+} from './candidate-projection.js';
+import {
+  assertEngineeringEnrichmentProposalAuthority,
+} from './master-adapters.js';
+import {
+  assertEngineeringEnrichmentNumericalImpactAuthority,
+  assertEnrichmentEngineDescriptor,
+  assertEnrichmentShadowCalculationRequest,
+  assertEnrichmentShadowCalculationResultAuthority,
+} from './numerical-impact-validation.js';
+import { semanticHash } from '../../core/shared-piping-model/canonical-json.js';
+import {
+  assertEngineeringEnrichmentStructuralImpact,
+} from './structural-impact.js';
 
 export {
   ENRICHMENT_PORTABLE_BUNDLE_SCHEMA,
@@ -13,15 +29,11 @@ export {
 } from './portable-bundle.js';
 
 export function buildEnrichmentPortableBundle(input) {
-  const bundle = buildPortableBundleBase(input);
-  assertPortableBundleChainAuthority(bundle);
-  return bundle;
+  return assertPortableAuthority(buildPortableBundleBase(input));
 }
 
 export function assertEngineeringEnrichmentPortableBundle(value) {
-  const bundle = assertPortableBundleBase(value);
-  assertPortableBundleChainAuthority(bundle);
-  return bundle;
+  return assertPortableAuthority(assertPortableBundleBase(value));
 }
 
 export function serializeEnrichmentPortableBundle(value) {
@@ -39,63 +51,85 @@ export function verifyEngineeringEnrichmentPortableBundle(value, options) {
 
 export function parseAndVerifyEnrichmentPortableBundle(text) {
   const parsed = parsePortableBundleBase(text);
-  assertPortableBundleChainAuthority(parsed.bundle);
+  assertPortableAuthority(parsed.bundle);
   return parsed;
 }
 
-function assertPortableBundleChainAuthority(bundle) {
-  const {
+function assertPortableAuthority(bundle) {
+  const artifacts = bundle.artifacts;
+  artifacts.proposals.forEach((proposal) => {
+    assertEngineeringEnrichmentProposalAuthority({
+      proposal,
+      masterSnapshots: artifacts.masterSnapshots,
+    });
+  });
+  const candidate = assertEngineeringEnrichmentCandidateProjection(
+    artifacts.candidateProjection,
+  );
+  const structural = assertEngineeringEnrichmentStructuralImpact(
+    artifacts.structuralImpact,
+  );
+  if (structural.candidateProjectionHash !== candidate.projectionHash
+    || structural.sourceSharedModelHash !== candidate.sourceSharedModelHash
+    || structural.sourceStructuralHash !== candidate.sourceStructuralHash) {
+    fail('candidate/structural identity mismatch.');
+  }
+  const fieldScope = candidate.rows.map((row) => ({
+    proposalId: row.proposalId,
+    targetKind: row.targetKind,
+    targetId: row.targetId,
+    fieldId: row.fieldId,
+    unit: row.unit,
+    disposition: row.disposition,
+  }));
+  const fieldIds = [...new Set(candidate.rows.map((row) => row.fieldId))].sort();
+  if (structural.fieldScopeHash !== semanticHash(fieldScope)
+    || JSON.stringify(structural.verifiedNonstructuralFieldIds) !== JSON.stringify(fieldIds)) {
+    fail('structural field-scope evidence differs from candidate.');
+  }
+  const descriptor = assertEnrichmentEngineDescriptor(artifacts.engineDescriptor);
+  const baselineRequest = assertEnrichmentShadowCalculationRequest(
+    artifacts.baselineRequest,
+  );
+  const candidateRequest = assertEnrichmentShadowCalculationRequest(
+    artifacts.candidateRequest,
+  );
+  const baselineResult = assertEnrichmentShadowCalculationResultAuthority({
+    descriptor,
+    request: baselineRequest,
+    result: artifacts.baselineResult,
+  });
+  const candidateResult = assertEnrichmentShadowCalculationResultAuthority({
+    descriptor,
+    request: candidateRequest,
+    result: artifacts.candidateResult,
+  });
+  assertEngineeringEnrichmentNumericalImpactAuthority({
     candidateProjection: candidate,
     structuralImpact: structural,
-    baselineRequest,
-    candidateRequest,
     baselineResult,
     candidateResult,
-  } = bundle.artifacts;
-
-  const requestChecks = [
-    [candidate.sourceDatasetHash, baselineRequest.sourceDatasetHash,
-      'baseline request source dataset'],
-    [candidate.sourceDatasetHash, candidateRequest.sourceDatasetHash,
-      'candidate request source dataset'],
-    [candidate.sourceSharedModelHash, baselineRequest.sourceSharedModelHash,
-      'baseline request shared model'],
-    [candidate.sourceSharedModelHash, candidateRequest.sourceSharedModelHash,
-      'candidate request shared model'],
-    [candidate.sourceStructuralHash, baselineRequest.sourceStructuralHash,
-      'baseline request structural authority'],
-    [candidate.sourceStructuralHash, candidateRequest.sourceStructuralHash,
-      'candidate request structural authority'],
-    [structural.impactHash, baselineRequest.structuralImpactHash,
-      'baseline request structural impact'],
-    [structural.impactHash, candidateRequest.structuralImpactHash,
-      'candidate request structural impact'],
-  ];
-  requestChecks.forEach(([expected, actual, label]) => {
-    if (actual !== expected) fail(`${label} identity mismatch.`);
+    numericalImpact: artifacts.numericalImpact,
   });
-
-  assertRequestResultAuthority(baselineRequest, baselineResult, 'baseline');
-  assertRequestResultAuthority(candidateRequest, candidateResult, 'candidate');
+  if (artifacts.repeatedCandidateResult !== null) {
+    assertEnrichmentShadowCalculationResultAuthority({
+      descriptor,
+      request: candidateRequest,
+      result: artifacts.repeatedCandidateResult,
+    });
+  }
+  assertRequestCandidateAuthority(candidate, baselineRequest, 'baseline');
+  assertRequestCandidateAuthority(candidate, candidateRequest, 'candidate');
+  return bundle;
 }
 
-function assertRequestResultAuthority(request, result, label) {
-  const fields = [
-    'descriptorHash',
-    'variant',
-    'sourceDatasetHash',
-    'sourceSharedModelHash',
-    'sourceStructuralHash',
-    'structuralImpactHash',
-    'comparisonCandidateProjectionHash',
-    'appliedCandidateProjectionHash',
-    'baselineReferenceHash',
-  ];
-  fields.forEach((field) => {
-    if (request[field] !== result[field]) {
-      fail(`${label} request/result differs at ${field}.`);
-    }
-  });
+function assertRequestCandidateAuthority(candidate, request, label) {
+  if (request.sourceDatasetHash !== candidate.sourceDatasetHash
+    || request.sourceSharedModelHash !== candidate.sourceSharedModelHash
+    || request.sourceStructuralHash !== candidate.sourceStructuralHash
+    || request.comparisonCandidateProjectionHash !== candidate.projectionHash) {
+    fail(`${label} request differs from candidate authority.`);
+  }
 }
 
 function fail(message) {

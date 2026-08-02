@@ -9,24 +9,12 @@ const MODULE_PATH = fileURLToPath(import.meta.url);
 const ROOT = path.resolve(path.dirname(MODULE_PATH), '..');
 const CONTRACT_PATH = 'governance/lfea-piping-phase6i-pr371-boundary.json';
 const RELEASE_LEDGER_PATH = 'release-evidence/lfea-piping-release-evidence.json';
-const ENFORCEMENT_FILES = new Set([
-  'scripts/lfea-piping-phase6i-pr371-boundary-check.mjs',
-  'scripts/lfea-piping-phase6i-project-authority-index.mjs',
-  'scripts/lfea-piping-phase6i-project-authority-index-check.mjs',
-]);
+
 const CONTRACT_KEYS = Object.freeze([
-  'schema',
-  'phase6iProgram',
-  'externalProgram',
-  'relationship',
-  'frozenCandidate',
-  'immutableRef',
-  'projectAuthorityOwner',
-  'permittedExternalOutputs',
-  'prohibitedUses',
-  'futureAdoptionRequires',
-  'currentCandidateConsumptionAllowed',
-  'externalProgramAuthorityAllowed',
+  'schema', 'phase6iProgram', 'externalProgram', 'relationship',
+  'frozenCandidate', 'immutableRef', 'projectAuthorityOwner',
+  'permittedExternalOutputs', 'prohibitedUses', 'futureAdoptionRequires',
+  'currentCandidateConsumptionAllowed', 'externalProgramAuthorityAllowed',
 ]);
 const EXPECTED_PERMITTED_OUTPUTS = Object.freeze([
   'PROVENANCE_BOUND_PROPOSALS',
@@ -46,7 +34,12 @@ const EXPECTED_FUTURE_REQUIREMENTS = Object.freeze([
   'NEW_IMMUTABLE_LFEA_CANDIDATE',
   'AFFECTED_EVIDENCE_CHAIN_REEXECUTION',
 ]);
-const FORBIDDEN_SOURCE_PATTERNS = Object.freeze([
+
+export const PR371_BOUNDARY_RULES = Object.freeze([
+  Object.freeze({
+    id: 'ENGINEERING_ENRICHMENT_IMPORT',
+    pattern: /(?:from\s+|import\s*\(|require\s*\()\s*['"][^'"]*engineering-enrichment[^'"]*['"]/u,
+  }),
   Object.freeze({
     id: 'ENGINEERING_ENRICHMENT_PATH',
     pattern: /(?:src\/workspace\/engineering-enrichment|engineering-enrichment\/)/u,
@@ -64,6 +57,34 @@ const FORBIDDEN_SOURCE_PATTERNS = Object.freeze([
     pattern: /check:1885s-empirical/u,
   }),
 ]);
+
+const DECLARATION_FILES = Object.freeze([
+  'scripts/lfea-piping-phase6i-pr371-boundary-check.mjs',
+  'scripts/lfea-piping-phase6i-project-authority-index.mjs',
+  'scripts/lfea-piping-phase6i-project-authority-index-check.mjs',
+]);
+const DECLARATION_ONLY_RULES = new Set([
+  'ENGINEERING_ENRICHMENT_PATH',
+  'ENGINEERING_ENRICHMENT_CONTRACT',
+  'SHADOW_AUTHORITY_TOKEN',
+]);
+const RULE_EXEMPTIONS = new Map([
+  [
+    'scripts/lfea-piping-phase6i-pr371-boundary-check.mjs',
+    new Set(PR371_BOUNDARY_RULES.map((rule) => rule.id)),
+  ],
+  ...DECLARATION_FILES.slice(1).map((relativePath) => [
+    relativePath,
+    new Set(DECLARATION_ONLY_RULES),
+  ]),
+]);
+
+export function findPr371BoundaryViolations(relativePath, source) {
+  const exemptions = RULE_EXEMPTIONS.get(relativePath) || new Set();
+  return PR371_BOUNDARY_RULES
+    .filter((rule) => !exemptions.has(rule.id) && rule.pattern.test(source))
+    .map((rule) => rule.id);
+}
 
 const contract = readJson(CONTRACT_PATH);
 requireExactKeys(contract, CONTRACT_KEYS, 'Phase 6I / PR #371 boundary contract');
@@ -83,15 +104,23 @@ assert.equal(contract.externalProgramAuthorityAllowed, false);
 const governedFiles = discoverGovernedFiles();
 assert.ok(governedFiles.length > 0, 'No governed LFEA Phase 6I files were discovered.');
 for (const relativePath of governedFiles) {
-  if (ENFORCEMENT_FILES.has(relativePath)) continue;
   const source = fs.readFileSync(path.join(ROOT, ...relativePath.split('/')), 'utf8');
-  for (const rule of FORBIDDEN_SOURCE_PATTERNS) {
-    assert.equal(
-      rule.pattern.test(source),
-      false,
-      `${rule.id}: ${relativePath} imports or promotes PR #371 shadow enrichment.`,
-    );
-  }
+  const violations = findPr371BoundaryViolations(relativePath, source);
+  assert.deepEqual(
+    violations,
+    [],
+    `${violations.join(', ')}: ${relativePath} imports or promotes PR #371 shadow enrichment.`,
+  );
+}
+
+for (const relativePath of DECLARATION_FILES.slice(1)) {
+  const injected = `${fs.readFileSync(path.join(ROOT, relativePath), 'utf8')}
+import '../src/workspace/engineering-enrichment/index.js';`;
+  assert.ok(
+    findPr371BoundaryViolations(relativePath, injected)
+      .includes('ENGINEERING_ENRICHMENT_IMPORT'),
+    `Injected enrichment import was not rejected for ${relativePath}.`,
+  );
 }
 
 const release = readJson(RELEASE_LEDGER_PATH);
@@ -101,10 +130,10 @@ assert.ok(Object.values(release.gates ?? {}).every((status) => status !== 'VERIF
 assert.ok(Object.values(release.artifacts ?? {}).every((value) => value === null));
 
 console.log(JSON.stringify({
-  schema: 'lfea-piping-phase6i-pr371-boundary-check-result/v1',
+  schema: 'lfea-piping-phase6i-pr371-boundary-check-result/v2',
   status: 'PASS',
   governedFileCount: governedFiles.length,
-  enforcementFileCount: ENFORCEMENT_FILES.size,
+  declarationFileCount: DECLARATION_FILES.length,
   relationship: contract.relationship,
   currentCandidateConsumptionAllowed: false,
   externalProgramAuthorityAllowed: false,
@@ -118,20 +147,15 @@ function discoverGovernedFiles() {
   });
   return files.sort(compareAscii);
 }
-
 function walk(directory, visitor) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
     if (entry.name === '.git' || entry.name === 'node_modules') continue;
     const absolutePath = path.join(directory, entry.name);
     const relativePath = path.relative(ROOT, absolutePath).replaceAll('\\', '/');
-    if (entry.isDirectory()) {
-      walk(absolutePath, visitor);
-    } else if (entry.isFile()) {
-      visitor(relativePath);
-    }
+    if (entry.isDirectory()) walk(absolutePath, visitor);
+    else if (entry.isFile()) visitor(relativePath);
   }
 }
-
 function isGovernedPath(relativePath) {
   return /^scripts\/(?:lfea-piping|linear-piping)-.*\.mjs$/u.test(relativePath)
     || /^src\/core\/(?:linear-fea|linear-piping)-/u.test(relativePath)
@@ -139,18 +163,14 @@ function isGovernedPath(relativePath) {
     || /^\.github\/workflows\/lfea-piping-.*\.ya?ml$/u.test(relativePath)
     || relativePath === RELEASE_LEDGER_PATH;
 }
-
 function readJson(relativePath) {
   const absolutePath = path.join(ROOT, ...relativePath.split('/'));
   assert.equal(fs.existsSync(absolutePath), true, `Missing required file: ${relativePath}`);
   return JSON.parse(fs.readFileSync(absolutePath, 'utf8'));
 }
-
 function requireExactKeys(value, expected, label) {
-  assert.ok(value && typeof value === 'object' && !Array.isArray(value), `${label} must be an object.`);
+  assert.ok(value && typeof value === 'object' && !Array.isArray(value),
+    `${label} must be an object.`);
   assert.deepEqual(Object.keys(value).sort(compareAscii), [...expected].sort(compareAscii));
 }
-
-function compareAscii(left, right) {
-  return left < right ? -1 : left > right ? 1 : 0;
-}
+function compareAscii(left, right) { return left < right ? -1 : left > right ? 1 : 0; }

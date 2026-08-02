@@ -1,25 +1,33 @@
-import { canonicalizeJson, semanticHash } from '../../core/shared-piping-model/canonical-json.js';
+import {
+  canonicalStringify,
+  canonicalizeJson,
+  semanticHash,
+} from '../../core/shared-piping-model/canonical-json.js';
 import { deepFreeze, isPlainRecord } from '../../core/shared-piping-model/immutable.js';
-import { assertEngineeringEnrichmentProposal } from './master-adapters.js';
+import {
+  assertEngineeringEnrichmentProposal,
+  assertEngineeringEnrichmentProposalAuthority,
+} from './master-adapters.js';
 import { assertMasterDataSnapshot } from './master-snapshot.js';
 import { assertExactSelector, exactSelectorIdentity } from './selectors.js';
 
-export const ENRICHMENT_TARGET_SCHEMA = 'EngineeringEnrichmentTarget.v1';
-export const ENRICHMENT_RESOLUTION_SCHEMA = 'EngineeringEnrichmentResolution.v1';
+export const ENRICHMENT_TARGET_SCHEMA = 'EngineeringEnrichmentTarget.v2';
+export const ENRICHMENT_RESOLUTION_SCHEMA = 'EngineeringEnrichmentResolution.v2';
+export const ENRICHMENT_TARGET_KINDS = Object.freeze(['COMPONENT', 'SUPPORT']);
 
-const TARGET_KEYS = Object.freeze(['schema', 'targetId', 'selector']);
+const TARGET_KEYS = Object.freeze(['schema', 'targetKind', 'targetId', 'selector']);
 const INPUT_KEYS = Object.freeze([
-  'sourceDatasetHash',
-  'sourceSharedModelHash',
-  'masterSnapshots',
-  'proposals',
+  'sourceDatasetHash', 'sourceSharedModelHash', 'masterSnapshots', 'proposals',
   'targets',
 ]);
 
 export function resolveExactEnrichmentProposals(input) {
   assertExactKeys(input, INPUT_KEYS, 'Enrichment resolution input');
   const sourceDatasetHash = requireSha256(input.sourceDatasetHash, 'sourceDatasetHash');
-  const sourceSharedModelHash = requiredText(input.sourceSharedModelHash, 'sourceSharedModelHash');
+  const sourceSharedModelHash = requiredText(
+    input.sourceSharedModelHash,
+    'sourceSharedModelHash',
+  );
   const masterSnapshots = validateSnapshots(input.masterSnapshots);
   const proposals = validateProposals(input.proposals, masterSnapshots);
   const targets = validateTargets(input.targets);
@@ -41,9 +49,15 @@ export function resolveExactEnrichmentProposals(input) {
 }
 
 export function buildEnrichmentTarget(input) {
-  assertExactKeys(input, ['targetId', 'selector'], 'Enrichment target input');
+  const keys = Object.keys(input ?? {}).sort(compareAscii);
+  const legacy = canonicalStringify(keys) === canonicalStringify(['selector', 'targetId']);
+  if (!legacy) {
+    assertExactKeys(input, ['targetKind', 'targetId', 'selector'], 'Enrichment target input');
+  }
+  const targetKind = requireTargetKind(legacy ? 'COMPONENT' : input.targetKind);
   return deepFreeze({
     schema: ENRICHMENT_TARGET_SCHEMA,
+    targetKind,
     targetId: requiredText(input.targetId, 'targetId'),
     selector: assertExactSelector(input.selector),
   });
@@ -51,50 +65,46 @@ export function buildEnrichmentTarget(input) {
 
 function resolveProposal(proposal, targetIndex) {
   if (proposal.status === 'BLOCKED' || !proposal.selector) {
-    return deepFreeze({
-      proposalId: proposal.proposalId,
-      disposition: 'BLOCKED_PROPOSAL',
-      targetIds: [],
-      selectedTargetId: null,
-      bindingCreated: false,
-      blockers: proposal.blockers,
-    });
+    return resolutionRow(proposal, 'BLOCKED_PROPOSAL', [], null, proposal.blockers);
   }
   const matches = targetIndex.get(exactSelectorIdentity(proposal.selector)) || [];
   if (matches.length === 0) {
-    return resolutionRow(proposal, 'NO_MATCH', [], null, [{ code: 'NO_EXACT_TARGET_MATCH' }]);
+    return resolutionRow(proposal, 'NO_MATCH', [], null, [
+      { code: 'NO_EXACT_TARGET_MATCH' },
+    ]);
   }
   if (matches.length > 1) {
-    return resolutionRow(
-      proposal,
-      'AMBIGUOUS_MATCH',
-      matches.map((row) => row.targetId),
-      null,
-      [{ code: 'MULTIPLE_EXACT_TARGETS' }],
-    );
+    return resolutionRow(proposal, 'AMBIGUOUS_MATCH', matches, null, [
+      { code: 'MULTIPLE_EXACT_TARGETS' },
+    ]);
   }
   return resolutionRow(
     proposal,
     'EXACT_MATCH_PROPOSAL_ONLY',
-    [matches[0].targetId],
-    matches[0].targetId,
+    matches,
+    targetReference(matches[0]),
     [],
   );
 }
 
-function resolutionRow(proposal, disposition, targetIds, selectedTargetId, blockers) {
+function resolutionRow(proposal, disposition, targets, selectedTargetRef, blockers) {
+  const targetRefs = targets.map(targetReference).sort(compareTargetRefs);
   return deepFreeze({
     proposalId: proposal.proposalId,
     disposition,
-    targetIds: [...targetIds].sort(compareAscii),
-    selectedTargetId,
+    targetIds: deepFreeze(targetRefs.map((row) => row.targetId)),
+    targetRefs: deepFreeze(targetRefs),
+    selectedTargetId: selectedTargetRef?.targetId ?? null,
+    selectedTargetRef,
     bindingCreated: false,
-    blockers: canonicalizeJson(blockers),
+    blockers: canonicalRecords(blockers),
   });
 }
 
 function validateSnapshots(value) {
-  if (!Array.isArray(value) || value.length === 0) fail('masterSnapshots must be a non-empty array.');
+  if (!Array.isArray(value) || value.length === 0) {
+    fail('masterSnapshots must be a non-empty array.');
+  }
   const snapshots = value.map(assertMasterDataSnapshot);
   assertUnique(snapshots.map((row) => row.snapshotHash), 'snapshotHash');
   return snapshots;
@@ -102,12 +112,12 @@ function validateSnapshots(value) {
 
 function validateProposals(value, snapshots) {
   if (!Array.isArray(value)) fail('proposals must be an array.');
-  const knownSnapshots = new Set(snapshots.map((row) => row.snapshotHash));
-  const proposals = value.map(assertEngineeringEnrichmentProposal);
-  proposals.forEach((proposal) => {
-    if (!knownSnapshots.has(proposal.sourceSnapshotHash)) {
-      fail(`proposal ${proposal.proposalId} references an unknown snapshot.`, RangeError);
-    }
+  const proposals = value.map((proposal) => {
+    assertEngineeringEnrichmentProposal(proposal);
+    return assertEngineeringEnrichmentProposalAuthority({
+      proposal,
+      masterSnapshots: snapshots,
+    });
   });
   assertUnique(proposals.map((row) => row.proposalId), 'proposalId');
   return proposals;
@@ -117,12 +127,15 @@ function validateTargets(value) {
   if (!Array.isArray(value)) fail('targets must be an array.');
   const targets = value.map((row) => {
     assertExactKeys(row, TARGET_KEYS, 'Enrichment target');
-    if (row.schema !== ENRICHMENT_TARGET_SCHEMA) fail(`target schema must be ${ENRICHMENT_TARGET_SCHEMA}.`);
+    if (row.schema !== ENRICHMENT_TARGET_SCHEMA) {
+      fail(`target schema must be ${ENRICHMENT_TARGET_SCHEMA}.`);
+    }
+    requireTargetKind(row.targetKind);
     requiredText(row.targetId, 'target.targetId');
     assertExactSelector(row.selector);
     return row;
   });
-  assertUnique(targets.map((row) => row.targetId), 'targetId');
+  assertUnique(targets.map(targetIdentity), 'target identity');
   return targets;
 }
 
@@ -133,38 +146,71 @@ function indexTargets(targets) {
     if (!index.has(key)) index.set(key, []);
     index.get(key).push(target);
   });
-  for (const rows of index.values()) rows.sort((left, right) => compareAscii(left.targetId, right.targetId));
+  for (const rows of index.values()) rows.sort(compareTargets);
   return index;
 }
 
 function summarize(rows) {
-  const counts = {};
-  rows.forEach((row) => { counts[row.disposition] = (counts[row.disposition] || 0) + 1; });
+  const dispositions = {};
+  rows.forEach((row) => {
+    dispositions[row.disposition] = (dispositions[row.disposition] || 0) + 1;
+  });
+  const exactMatchCount = dispositions.EXACT_MATCH_PROPOSAL_ONLY || 0;
   return deepFreeze({
     proposalCount: rows.length,
-    exactMatchCount: counts.EXACT_MATCH_PROPOSAL_ONLY || 0,
-    unresolvedCount: rows.length - (counts.EXACT_MATCH_PROPOSAL_ONLY || 0),
-    dispositions: canonicalizeJson(counts),
+    exactMatchCount,
+    unresolvedCount: rows.length - exactMatchCount,
+    dispositions: canonicalizeJson(dispositions),
     status: rows.every((row) => row.disposition === 'EXACT_MATCH_PROPOSAL_ONLY')
       ? 'READY_FOR_REVIEW'
       : 'BLOCKED',
   });
 }
 
-function requireSha256(value, label) {
-  const text = requiredText(value, label).toLowerCase();
-  if (!/^[a-f0-9]{64}$/u.test(text)) fail(`${label} must be 64 hexadecimal characters.`, RangeError);
-  return text;
-}
-
-function assertUnique(values, label) {
-  const seen = new Set();
-  values.forEach((value) => {
-    if (seen.has(value)) fail(`duplicate ${label}: ${value}.`, RangeError);
-    seen.add(value);
+function targetReference(target) {
+  return deepFreeze({
+    targetKind: requireTargetKind(target.targetKind),
+    targetId: requiredText(target.targetId, 'targetId'),
   });
 }
-
+function targetIdentity(target) {
+  return `${target.targetKind}\u0000${target.targetId}`;
+}
+function compareTargets(left, right) {
+  return compareAscii(left.targetKind, right.targetKind)
+    || compareAscii(left.targetId, right.targetId);
+}
+function compareTargetRefs(left, right) {
+  return compareAscii(left.targetKind, right.targetKind)
+    || compareAscii(left.targetId, right.targetId);
+}
+function requireTargetKind(value) {
+  const kind = String(value ?? '');
+  if (!ENRICHMENT_TARGET_KINDS.includes(kind)) {
+    fail(`unsupported targetKind: ${kind || '<empty>'}.`, RangeError);
+  }
+  return kind;
+}
+function requireSha256(value, label) {
+  const text = requiredText(value, label).toLowerCase();
+  if (!/^[a-f0-9]{64}$/u.test(text)) {
+    fail(`${label} must be 64 hexadecimal characters.`, RangeError);
+  }
+  return text;
+}
+function canonicalRecords(value) {
+  if (!Array.isArray(value)) fail('blockers must be an array.');
+  const rows = value.map((row, index) => {
+    if (!isPlainRecord(row)) fail(`blockers[${index}] must be an object.`);
+    return deepFreeze(canonicalizeJson(row));
+  });
+  rows.sort((left, right) => compareAscii(semanticHash(left), semanticHash(right))
+    || compareAscii(canonicalStringify(left), canonicalStringify(right)));
+  return deepFreeze(rows);
+}
+function assertUnique(values, label) {
+  if (new Set(values).size !== values.length) fail(`duplicate ${label}.`, RangeError);
+}
 function assertExactKeys(value, expected, label) {
   if (!isPlainRecord(value)) fail(`${label} must be an object.`);
   const actual = Object.keys(value).sort(compareAscii);
@@ -173,7 +219,6 @@ function assertExactKeys(value, expected, label) {
     fail(`${label} keys must be exactly: ${wanted.join(', ')}.`);
   }
 }
-
 function requiredText(value, label) {
   const text = String(value ?? '').trim();
   if (!text) fail(`${label} is required.`);

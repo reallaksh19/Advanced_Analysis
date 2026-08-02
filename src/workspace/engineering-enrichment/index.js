@@ -8,7 +8,9 @@ export {
   COMPONENT_WEIGHT_POLICY_SCHEMA,
   ENRICHMENT_PROPOSAL_SCHEMA,
   assertEngineeringEnrichmentProposal,
+  assertEngineeringEnrichmentProposalAuthority,
   buildComponentWeightProposals,
+  validateComponentWeightPolicy,
 } from './master-adapters.js';
 export {
   EXACT_SELECTOR_KINDS,
@@ -19,6 +21,7 @@ export {
 } from './selectors.js';
 export {
   ENRICHMENT_RESOLUTION_SCHEMA,
+  ENRICHMENT_TARGET_KINDS,
   ENRICHMENT_TARGET_SCHEMA,
   buildEnrichmentTarget,
   resolveExactEnrichmentProposals,
@@ -31,6 +34,7 @@ export {
 } from './structural-authority.js';
 export {
   ENRICHMENT_CANDIDATE_PROJECTION_SCHEMA,
+  SHADOW_NONSTRUCTURAL_FIELD_REGISTRY,
   assertEngineeringEnrichmentCandidateProjection,
   buildShadowCandidateProjection,
 } from './candidate-projection.js';
@@ -46,16 +50,18 @@ export {
   ENRICHMENT_SHADOW_REQUEST_SCHEMA,
   ENRICHMENT_SHADOW_RESULT_SCHEMA,
   assertEngineeringEnrichmentNumericalImpact,
+  assertEngineeringEnrichmentNumericalImpactAuthority,
   assertEnrichmentBaselineReference,
   assertEnrichmentEngineDescriptor,
   assertEnrichmentShadowCalculationRequest,
   assertEnrichmentShadowCalculationResult,
+  assertEnrichmentShadowCalculationResultAuthority,
   buildEnrichmentBaselineReference,
   buildEnrichmentEngineDescriptor,
   buildEnrichmentNumericalImpactReport,
   buildEnrichmentShadowCalculationRequest,
   executeEnrichmentShadowCalculation,
-} from './numerical-impact.js';
+} from './numerical-impact-validation.js';
 export {
   ENRICHMENT_OBSERVED_AUTHORITY_SCHEMA,
   ENRICHMENT_REPRODUCIBILITY_RECEIPT_SCHEMA,
@@ -69,7 +75,7 @@ export {
   buildEnrichmentReviewPacket,
   buildEnrichmentShadowReproducibilityReceipt,
   buildEnrichmentStalenessReport,
-} from './review-package.js';
+} from './review-package-validation.js';
 export {
   ENRICHMENT_PORTABLE_BUNDLE_SCHEMA,
   ENRICHMENT_PORTABLE_VERIFICATION_SCHEMA,
