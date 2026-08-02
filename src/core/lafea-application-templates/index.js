@@ -134,3 +134,12 @@ export {
   validateTemplateExecutionReceipt,
   validateTemplateExecutionRequest,
 } from './analytical-execution-contract.js';
+
+export {
+  LAFEA_SELECTED_PILOT_BENCHMARK_MANIFESTS,
+  LAFEA_SELECTED_PILOT_QUALIFICATION_SCHEMA,
+  LAFEA_SELECTED_PILOT_QUALIFICATION_STATUS,
+  LAFEA_SELECTED_PILOT_RELEASE_DISPOSITION,
+  createSelectedPilotQualification,
+  validateSelectedPilotQualification,
+} from './selected-pilot-qualification.js';

@@ -11,6 +11,7 @@ import * as profiles from '../src/workspace/lafea-lifecycle-profiles.js';
 import * as registry from '../src/workspace/lafea-stage-registry.js';
 import * as sourceAuthority from '../src/workspace/lafea-source-authority.js';
 import * as store from '../src/workspace/lafea-lifecycle-workbench-store.js';
+import * as pilotController from '../src/workspace/lafea-template-execution-public.js';
 import * as publicApi from '../src/workspace/lafea-workbench.js';
 
 const groups = Object.freeze([
@@ -83,6 +84,11 @@ const groups = Object.freeze([
     'LAFEA_RELEASE_STATES', 'LAFEA_RESULT_STATES',
     'LAFEA_WORKBENCH_STATE_SCHEMA', 'createLafeaWorkbenchStore',
   ]],
+  [pilotController, [
+    'LAFEA_TEMPLATE_EXECUTION_CONTROLLER_RESULT_SCHEMA',
+    'LAFEA_TEMPLATE_EXECUTION_CONTROLLER_REVISION',
+    'executeControlledLafeaAnalyticalPilot',
+  ]],
 ]);
 
 const exported = [];
@@ -109,6 +115,8 @@ assert.equal(publicApi.LAFEA_ANALYSIS_MESH_INTAKE_SCHEMA,
 assert.equal(publicApi.LAFEA_ANALYSIS_MESH_EVIDENCE_SCHEMA,
   'lafea-analysis-mesh-evidence/v1');
 assert.equal(publicApi.LAFEA_WORKBENCH_STATE_SCHEMA, 'lafea-workbench-state/v2');
+assert.equal(publicApi.LAFEA_TEMPLATE_EXECUTION_CONTROLLER_RESULT_SCHEMA,
+  'lafea-template-execution-controller-result/v1');
 assert.equal(publicApi.requireLafeaStageComposition('LAFEA.1').releaseStateBinding,
   'RELEASE_NOT_QUALIFIED');
 assert.equal(publicApi.requireLafeaStageComposition('LAFEA.1').productSupported, true);
@@ -129,6 +137,7 @@ console.log(JSON.stringify({
   producerAdaptersPublic: true,
   analyticalProductProducersPublic: true,
   analysisMeshEvidencePublic: true,
+  analyticalPilotControllerPublic: true,
   calculationResultCodeReleaseStatesPublic: true,
   stageCorrectProfilesPublic: true,
   registryV2Implemented: true,
