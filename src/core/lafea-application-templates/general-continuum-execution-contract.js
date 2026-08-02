@@ -1,4 +1,4 @@
-import { canonicalLafeaSha256 } from '../../workspace/lafea-canonical-sha256.js';
+import { templateReleaseSha256 } from './release-record-v2-hash.js';
 import { requireLafeaApplicationTemplate } from './template-registry.js';
 
 export const LAFEA_GENERAL_CONTINUUM_REQUEST_SCHEMA = 'lafea-general-continuum-request/v1';
@@ -65,7 +65,7 @@ export function createGeneralContinuumExecutionRequest(input) {
     executionMode: 'CALLER_SUPPLIED_ANALYSIS_MESH',
     authority: authority(elementTypes),
   };
-  return freeze({ ...base, semanticHash: canonicalLafeaSha256(base) });
+  return freeze({ ...base, semanticHash: templateReleaseSha256(base) });
 }
 
 export function validateGeneralContinuumExecutionRequest(value) {
@@ -114,8 +114,8 @@ export function createGeneralContinuumExecutionReceipt(input) {
   };
   const semanticBasis = { ...base };
   delete semanticBasis.diagnostics;
-  const semanticHash = canonicalLafeaSha256(semanticBasis);
-  const evidenceHash = canonicalLafeaSha256({ semanticHash, diagnostics });
+  const semanticHash = templateReleaseSha256(semanticBasis);
+  const evidenceHash = templateReleaseSha256({ semanticHash, diagnostics });
   return freeze({ ...base, semanticHash, evidenceHash });
 }
 
