@@ -4,7 +4,9 @@ on:
   pull_request:
     paths:
       - '.github/workflows/topology-edit-professional-interaction.yml'
+      - 'src/workspace/topology-edit-3d-interaction-controller.js'
       - 'src/workspace/viewport-interaction/**'
+      - 'src/workspace/viewport-productivity/topology-edit-interaction-*.js'
       - 'tests/topology-edit-professional-interaction-*.test.mjs'
       - 'tests/topology-edit-professional-snap-resolver.test.mjs'
   workflow_dispatch:
@@ -14,9 +16,9 @@ permissions:
 
 jobs:
   professional-interaction:
-    name: Agent 1 pure interaction qualification
+    name: Agent 1 interaction controller and gizmo qualification
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 35
     env:
       TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       BASE_REF: ${{ github.event.pull_request.base.sha || github.event.repository.default_branch }}
@@ -40,15 +42,28 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Syntax and focused interaction contracts
+      - name: Syntax and module bounds
         run: |
           for file in src/workspace/viewport-interaction/*.js; do
             node --check "$file"
+            test "$(wc -l < "$file")" -le 300
           done
+          node --check src/workspace/topology-edit-3d-interaction-controller.js
+          test "$(wc -l < src/workspace/topology-edit-3d-interaction-controller.js)" -le 300
+          for file in src/workspace/viewport-productivity/topology-edit-interaction-*.js; do
+            node --check "$file"
+            test "$(wc -l < "$file")" -le 300
+          done
+
+      - name: Focused interaction qualification
+        run: |
           node --test \
             tests/topology-edit-professional-interaction-contracts.test.mjs \
             tests/topology-edit-professional-snap-resolver.test.mjs \
-            tests/topology-edit-professional-interaction-containment.test.mjs
+            tests/topology-edit-professional-interaction-containment.test.mjs \
+            tests/topology-edit-professional-interaction-session.test.mjs \
+            tests/topology-edit-professional-interaction-viewport.test.mjs \
+            tests/topology-edit-professional-interaction-controller.test.mjs
 
       - name: Retain certified topology foundations
         run: |
@@ -70,4 +85,6 @@ jobs:
           npm run build
 
       - name: Patch hygiene
-        run: git diff --check "$BASE_REF...HEAD"
+        run: |
+          git diff --check "$BASE_REF...HEAD"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
