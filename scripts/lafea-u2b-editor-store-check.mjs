@@ -78,9 +78,9 @@ const beforeMove = store.getState().stages['LAFEA.3'].document;
 const nodeB = beforeMove.nodes.find((row) => row.nodeId === 'B');
 const moved = store.moveNode('nodes', 'B', nodeB.x + 7, nodeB.y + 3);
 assert.equal(moved.status, 'READY');
-assert.equal(store.getState().stages['LAFEA.3'].document.nodes.find((row) => row.nodeId === 'B').x, nodeB.x + 7);
-assert.equal(store.getState().stages['LAFEA.3'].document.nodes.find((row) => row.nodeId === 'B').y, nodeB.y + 3);
-assert.equal(store.getState().stages['LAFEA.3'].past.length >= 1, true);
+assert.equal(moved.stages['LAFEA.3'].document.nodes.find((row) => row.nodeId === 'B').x, nodeB.x + 7);
+assert.equal(moved.stages['LAFEA.3'].document.nodes.find((row) => row.nodeId === 'B').y, nodeB.y + 3);
+assert.equal(moved.stages['LAFEA.3'].past.length >= 1, true);
 
 const wrongPath = store.moveNode('elements', 'B', 1, 2);
 assert.equal(wrongPath.status, 'FAILED');
