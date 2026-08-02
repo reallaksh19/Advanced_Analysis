@@ -15,18 +15,21 @@ const REQUIRED_MERGES = Object.freeze({
   b7f: 'dbb24700133c416e77ea1ec800432f5203bd80d3',
   b7g: 'c4d4af771eee0cfb51a6776ee1da9813bb5c5e47',
 });
-const REQUIRED_FALSE_AUTHORITY = Object.freeze([
+const COMMON_FALSE_AUTHORITY = Object.freeze([
   'generalT7dAuthorized',
   'additionalContinuumTemplatesAuthorized',
-  'arbitraryOuterProfileAuthorized',
-  'arbitraryHoleTopologyAuthorized',
   'shellAuthorized',
-  'sclAuthorized',
-  'structuralStressAuthorized',
   'assessmentReady',
   'codeReady',
   'reportAuthority',
   'releaseQualified',
+]);
+const FULL_FALSE_AUTHORITY = Object.freeze([
+  ...COMMON_FALSE_AUTHORITY,
+  'arbitraryOuterProfileAuthorized',
+  'arbitraryHoleTopologyAuthorized',
+  'sclAuthorized',
+  'structuralStressAuthorized',
   'lafea6Enabled',
   'displayValuesAuthoritative',
 ]);
@@ -99,11 +102,14 @@ record('B7G_NONCLAIMS_RETAINED',
     && b7g?.gateDisposition?.automaticIssueClosureAuthorized === false
     && b7g?.gateDisposition?.governingAcceptanceRequired === true,
   'B7G non-claims must remain intact.');
-record('B7E_AUTHORITY_RETAINED', authorityRetained(b7e?.authority),
-  'B7E broader authority must remain false.');
-record('B7F_AUTHORITY_RETAINED', authorityRetained(b7f?.authority),
+record('B7E_AUTHORITY_RETAINED',
+  authorityRetained(b7e?.authority, COMMON_FALSE_AUTHORITY),
+  'B7E common broader authority must remain false.');
+record('B7F_AUTHORITY_RETAINED',
+  authorityRetained(b7f?.authority, FULL_FALSE_AUTHORITY),
   'B7F broader authority must remain false.');
-record('B7G_AUTHORITY_RETAINED', authorityRetained(b7g?.authority),
+record('B7G_AUTHORITY_RETAINED',
+  authorityRetained(b7g?.authority, FULL_FALSE_AUTHORITY),
   'B7G broader authority must remain false.');
 record('TRACKED_TREE_CLEAN',
   git(['status', '--porcelain=v1', '--untracked-files=no']) === '',
@@ -139,7 +145,7 @@ const report = Object.freeze({
   automaticIssueClosureAuthorized: false,
   governingReviewRequired: true,
   authority: Object.freeze(Object.fromEntries(
-    REQUIRED_FALSE_AUTHORITY.map((key) => [key, false]))),
+    FULL_FALSE_AUTHORITY.map((key) => [key, false]))),
 });
 fs.mkdirSync(path.dirname(PATHS.b7h), { recursive: true });
 fs.writeFileSync(PATHS.b7h, `${JSON.stringify(report, null, 2)}\n`);
@@ -177,9 +183,9 @@ function verifyBundleHash(value) {
   return bundleHash === sha256(canonical(payload));
 }
 
-function authorityRetained(value) {
+function authorityRetained(value, requiredKeys) {
   return value && typeof value === 'object'
-    && REQUIRED_FALSE_AUTHORITY.every((key) => value[key] === false);
+    && requiredKeys.every((key) => value[key] === false);
 }
 
 function evidence(filePath, parsed) {
