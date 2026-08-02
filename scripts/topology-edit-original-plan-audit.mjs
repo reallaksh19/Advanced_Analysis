@@ -13,6 +13,7 @@ const WORKFLOW_PATH = '.github/workflows/topology-edit-wave5.yml';
 const DEMO_WORKFLOW_PATH = '.github/workflows/topology-edit-demo-walkthrough.yml';
 const DEMO_SPEC_PATH = 'e2e/topology-edit-20-element-demo-edit-flow.spec.js';
 const REPAIR_SPEC_PATH = 'e2e/topology-edit-20-element-demo-repair-flow.spec.js';
+const LIFECYCLE_SPEC_PATH = 'e2e/topology-edit-20-element-demo-lifecycle-flow.spec.js';
 const DEMO_FIXTURE_PATH = 'public/fixtures/topology-edit-20-element-demo.staged.json';
 const PREREQUISITE_PATH = 'tests/fixtures/topology-edit/1885s/prerequisite-manifest.json';
 
@@ -48,12 +49,14 @@ const waves = Object.freeze([
     'tests/topology-edit-wave4a-persistence-export.test.mjs',
     'tests/topology-edit-wave4b-commit-rollback.test.mjs',
     'tests/topology-edit-wave4c-lifecycle-ui.test.mjs',
+    'tests/topology-edit-lifecycle-view-state.test.mjs',
   ]),
   wave('W5', ['W5.1', 'W5.2', 'W5.3', 'W5.4', 'W5.5'], [
     WORKFLOW_PATH,
     DEMO_WORKFLOW_PATH,
     DEMO_SPEC_PATH,
     REPAIR_SPEC_PATH,
+    LIFECYCLE_SPEC_PATH,
     DEMO_FIXTURE_PATH,
     'scripts/topology-edit-wave5-contract.mjs',
     'scripts/topology-edit-wave5-fixture-check.mjs',
@@ -130,14 +133,17 @@ for (const trigger of [
   "'tests/topology-edit-c3d-*.test.mjs'",
   `'${DEMO_SPEC_PATH}'`,
   `'${REPAIR_SPEC_PATH}'`,
+  `'${LIFECYCLE_SPEC_PATH}'`,
 ]) {
   assert.ok(workflow.includes(trigger), `Wave 5 path coverage is missing ${trigger}.`);
 }
 for (const commandEvidence of [
   DEMO_SPEC_PATH,
   REPAIR_SPEC_PATH,
+  LIFECYCLE_SPEC_PATH,
   'tests/topology-edit-20-element-demo-loader.test.mjs',
   'tests/topology-edit-20-element-demo-repairs.test.mjs',
+  'tests/topology-edit-lifecycle-view-state.test.mjs',
   'tests/topology-edit-search-composition.test.mjs',
   'tests/topology-edit-wave3-exact-gap-modes.test.mjs',
 ]) {
@@ -155,9 +161,11 @@ const demoWorkflow = await readFile(path.join(ROOT, DEMO_WORKFLOW_PATH), 'utf8')
 for (const qualifiedPath of [
   DEMO_SPEC_PATH,
   REPAIR_SPEC_PATH,
+  LIFECYCLE_SPEC_PATH,
   DEMO_FIXTURE_PATH,
   'tests/topology-edit-20-element-demo-loader.test.mjs',
   'tests/topology-edit-20-element-demo-repairs.test.mjs',
+  'tests/topology-edit-lifecycle-view-state.test.mjs',
   'tests/topology-edit-search-composition.test.mjs',
   'tests/topology-edit-wave3-exact-gap-modes.test.mjs',
   'tests/topology-edit-c3d-wave2-search.test.mjs',
@@ -170,9 +178,11 @@ for (const qualifiedPath of [
 for (const exactEvidence of [
   'PASS_EXACT_GAP_USER_WALKTHROUGH',
   'PASS_BRIDGE_AND_TRIM_USER_WALKTHROUGH',
+  'PASS_REPAIRED_DEMO_LIFECYCLE',
   'TOPOLOGY_EDIT_TARGET_HEAD_SHA',
   'topology-edit-demo-walkthrough.json',
   'topology-edit-demo-repairs.json',
+  'topology-edit-demo-lifecycle.json',
 ]) {
   assert.ok(
     demoWorkflow.includes(exactEvidence),
@@ -222,11 +232,14 @@ const report = {
   },
   userWalkthrough: {
     workflowPath: DEMO_WORKFLOW_PATH,
-    specificationPaths: [DEMO_SPEC_PATH, REPAIR_SPEC_PATH],
+    specificationPaths: [DEMO_SPEC_PATH, REPAIR_SPEC_PATH, LIFECYCLE_SPEC_PATH],
     fixturePath: DEMO_FIXTURE_PATH,
     requestedGapModesMm: [3, 20],
     manualBridgeGapMm: 250,
     sourceBackedTrimOverlapMm: 150,
+    lifecycleOperations: ['SAVE', 'RELOAD', 'EXPORT', 'COMMIT', 'REOPEN'],
+    expectedCommittedDatasetVersion: 1,
+    expectedCommittedEntityCount: 21,
     disposition: exactHeadStatus === 'PASS'
       ? 'PASS_EXECUTED_EXACT_HEAD'
       : 'IMPLEMENTED_EXACT_HEAD_EXECUTION_PENDING',

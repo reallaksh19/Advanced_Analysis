@@ -7,20 +7,25 @@ import { fileURLToPath } from 'node:url';
 import { createTopologyEditWave5ReleaseReceipt } from './topology-edit-wave5-contract.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const OUTPUT = path.join(ROOT, 'reports/qualification/topology-edit-wave5-evidence.json');
-const BROWSER_PATH = path.join(ROOT, 'reports/qualification/topology-edit-wave5-browser.json');
-const FIXTURE_PATH = path.join(ROOT, 'reports/qualification/topology-edit-wave5-fixtures.json');
-const AUDIT_PATH = path.join(
-  ROOT,
-  'reports/qualification/topology-edit-original-plan-audit.json',
-);
+const REPORT_ROOT = path.join(ROOT, 'reports/qualification');
+const OUTPUT = path.join(REPORT_ROOT, 'topology-edit-wave5-evidence.json');
+const BROWSER_PATH = path.join(REPORT_ROOT, 'topology-edit-wave5-browser.json');
+const FIXTURE_PATH = path.join(REPORT_ROOT, 'topology-edit-wave5-fixtures.json');
+const AUDIT_PATH = path.join(REPORT_ROOT, 'topology-edit-original-plan-audit.json');
+const DEMO_GAP_PATH = path.join(REPORT_ROOT, 'topology-edit-demo-walkthrough.json');
+const DEMO_REPAIRS_PATH = path.join(REPORT_ROOT, 'topology-edit-demo-repairs.json');
+const DEMO_LIFECYCLE_PATH = path.join(REPORT_ROOT, 'topology-edit-demo-lifecycle.json');
 const PREREQUISITE_PATH = path.join(
   ROOT,
   'tests/fixtures/topology-edit/1885s/prerequisite-manifest.json',
 );
 const QUALIFIED_FILES = Object.freeze([
   '.github/workflows/topology-edit-wave5.yml',
+  '.github/workflows/topology-edit-demo-walkthrough.yml',
   'docs/TOPOLOGY_EDIT_ORIGINAL_PLAN_CLOSURE_AUDIT.md',
+  'e2e/topology-edit-20-element-demo-edit-flow.spec.js',
+  'e2e/topology-edit-20-element-demo-repair-flow.spec.js',
+  'e2e/topology-edit-20-element-demo-lifecycle-flow.spec.js',
   'scripts/1885s-empirical-qualification.mjs',
   'scripts/topology-edit-original-plan-audit.mjs',
   'scripts/topology-edit-wave5-contract.mjs',
@@ -32,6 +37,9 @@ const QUALIFIED_FILES = Object.freeze([
   'src/workspace/topology-edit/topology-edit-export.js',
   'src/workspace/topology-edit/topology-edit-commit-service.js',
   'src/workspace/topology-edit/topology-edit-lifecycle-controller.js',
+  'tests/topology-edit-20-element-demo-loader.test.mjs',
+  'tests/topology-edit-20-element-demo-repairs.test.mjs',
+  'tests/topology-edit-lifecycle-view-state.test.mjs',
   'tests/topology-edit-wave5.test.mjs',
   'tests/topology-edit-wave5-browser-harness.js',
   'tests/topology-edit-wave5-browser.spec.mjs',
@@ -57,6 +65,23 @@ const prerequisites = prerequisiteManifest.prerequisites.map((row) => {
 const browserEvidence = await readJsonOrBlocked(BROWSER_PATH, 'BROWSER_EVIDENCE_NOT_RUN');
 const fixtureEvidence = await readJsonOrBlocked(FIXTURE_PATH, 'FIXTURE_EVIDENCE_NOT_RUN');
 const originalPlanAudit = await readJsonOrBlocked(AUDIT_PATH, 'ORIGINAL_PLAN_AUDIT_NOT_RUN');
+const userWalkthroughEvidence = {
+  exactGap: await readRequiredWalkthrough(
+    DEMO_GAP_PATH,
+    'PASS_EXACT_GAP_USER_WALKTHROUGH',
+    candidateHead,
+  ),
+  repairs: await readRequiredWalkthrough(
+    DEMO_REPAIRS_PATH,
+    'PASS_BRIDGE_AND_TRIM_USER_WALKTHROUGH',
+    candidateHead,
+  ),
+  lifecycle: await readRequiredWalkthrough(
+    DEMO_LIFECYCLE_PATH,
+    'PASS_REPAIRED_DEMO_LIFECYCLE',
+    candidateHead,
+  ),
+};
 assert.equal(
   originalPlanAudit.status,
   'PASS_ORIGINAL_PLAN_CLOSURE',
@@ -64,6 +89,14 @@ assert.equal(
 );
 assert.equal(originalPlanAudit.candidateHead, candidateHead);
 assert.equal(originalPlanAudit.expectedHead, expectedHead);
+assert.equal(userWalkthroughEvidence.exactGap.cases?.length, 2);
+assert.equal(userWalkthroughEvidence.repairs.bridge?.gapMm, 250);
+assert.equal(userWalkthroughEvidence.repairs.trim?.overlapRemovedMm, 150);
+assert.equal(userWalkthroughEvidence.lifecycle.activeCommandCount, 4);
+assert.equal(userWalkthroughEvidence.lifecycle.committedDatasetVersion, 1);
+assert.equal(userWalkthroughEvidence.lifecycle.committedEntityCount, 21);
+assert.equal(userWalkthroughEvidence.lifecycle.persistedDraftCleared, true);
+assert.equal(userWalkthroughEvidence.lifecycle.reopenedRouteLengthMm, 250);
 
 const operationsStatus = normalizeStatus(
   process.env.TOPOLOGY_EDIT_WAVE5_OPERATIONS_STATUS || 'BLOCKED_NOT_RUN',
@@ -77,9 +110,13 @@ const performanceEvidence = {
     'CHECKER_DETECTION',
     'CERTIFIED_AUTOFIX_PREVIEW_ACCEPT_CANCEL',
     'JOURNAL_UNDO_REDO_REPLAY',
+    'REAL_DEMO_EXACT_GAP_3_20',
+    'REAL_DEMO_BRIDGE_250',
+    'REAL_DEMO_SOURCE_BACKED_TRIM_150',
     'DRAFT_SAVE_RELOAD',
     'PREPARED_STAGED_JSON_EXPORT',
     'WORKSPACE_COMMIT_READBACK',
+    'WORKSPACE_REOPEN_ROUTE_TRACE',
     'ROLLBACK_AND_INVALIDATION',
     'C3D_PRESENTATION_SEARCH_REVIEW_COMPARISON_ROUTE_DOSSIER_INTAKE_RESPONSE',
   ],
@@ -114,7 +151,7 @@ for (const repositoryPath of qualifiedFiles) {
   fileHashes[repositoryPath] = sha256(await readFile(path.join(ROOT, repositoryPath)));
 }
 const evidenceBase = {
-  schema: 'TopologyEditWave5QualificationEvidence.v3',
+  schema: 'TopologyEditWave5QualificationEvidence.v4',
   status: 'PASS_RELEASE',
   candidateHead,
   expectedHead,
@@ -122,6 +159,7 @@ const evidenceBase = {
   originalPlanAudit,
   browserEvidence,
   fixtureEvidence,
+  userWalkthroughEvidence,
   performanceEvidence,
   driftEvidence,
   qualifiedFiles,
@@ -138,6 +176,12 @@ console.log(`Topology Edit Wave 5 evidence written for ${candidateHead}: ${evide
 async function readJsonOrBlocked(filePath, reason) {
   try { return JSON.parse(await readFile(filePath, 'utf8')); }
   catch { return { status: `BLOCKED_${reason}` }; }
+}
+async function readRequiredWalkthrough(filePath, status, head) {
+  const report = JSON.parse(await readFile(filePath, 'utf8'));
+  assert.equal(report.status, status, JSON.stringify(report, null, 2));
+  assert.equal(report.candidateHead, head, `${path.basename(filePath)} is not exact-head bound.`);
+  return report;
 }
 function normalizeStatus(value) {
   const status = String(value ?? 'BLOCKED').toUpperCase();
