@@ -1,0 +1,108 @@
+{
+  "schema": "lafea-bucket-01-pure-shear-oracle/v1",
+  "oracleId": "B01-PURE-SHEAR-CLOSED-FORM-01",
+  "benchmarkId": "C2D-PATCH-PURE-SHEAR-01",
+  "units": {
+    "length": "mm",
+    "force": "N",
+    "stress": "MPa",
+    "modulus": "MPa"
+  },
+  "geometry": {
+    "length": 100,
+    "height": 50,
+    "thickness": 10
+  },
+  "material": {
+    "elasticModulus": 200000,
+    "poissonRatio": 0.3
+  },
+  "kinematics": {
+    "engineeringShearStrain": 0.001,
+    "ux": "gammaXY * y",
+    "uy": "0"
+  },
+  "expected": {
+    "shearModulus": 76923.07692307692,
+    "tauXY": 76.92307692307692,
+    "principalMaximum": 76.92307692307692,
+    "principalMinimum": -76.92307692307692,
+    "vonMises": 133.23467750529824,
+    "strainEnergy": 1923.076923076923,
+    "maximumUx": 0.05,
+    "appliedForceResultant": {
+      "x": 0,
+      "y": 0
+    },
+    "appliedMomentZ": 0,
+    "nodalBoundaryForces": {
+      "A": {
+        "fx": -38461.53846153846,
+        "fy": -19230.76923076923
+      },
+      "B": {
+        "fx": -38461.53846153846,
+        "fy": 19230.76923076923
+      },
+      "C": {
+        "fx": 38461.53846153846,
+        "fy": 19230.76923076923
+      },
+      "D": {
+        "fx": 38461.53846153846,
+        "fy": -19230.76923076923
+      }
+    },
+    "nodalDisplacements": {
+      "A": {
+        "ux": 0,
+        "uy": 0
+      },
+      "B": {
+        "ux": 0,
+        "uy": 0
+      },
+      "C": {
+        "ux": 0.05,
+        "uy": 0
+      },
+      "D": {
+        "ux": 0.05,
+        "uy": 0
+      }
+    }
+  },
+  "tolerances": {
+    "normalizedDisplacement": 1e-8,
+    "normalizedStrain": 1e-8,
+    "normalizedStress": 1e-8,
+    "relativeEnergy": 1e-8,
+    "normalizedNodalForce": 1e-8,
+    "relativeForceEquilibrium": 1e-8,
+    "relativeMomentEquilibrium": 1e-8,
+    "loadPathParity": 1e-8
+  },
+  "equations": [
+    "G = E / (2 * (1 + nu))",
+    "tau_xy = G * gamma_xy",
+    "u_x(x,y) = gamma_xy * y",
+    "u_y(x,y) = 0",
+    "sigma_1 = tau_xy",
+    "sigma_2 = -tau_xy",
+    "sigma_vm = sqrt(3) * abs(tau_xy)",
+    "U = 0.5 * tau_xy * gamma_xy * length * height * thickness",
+    "sum(F) = 0",
+    "sum(M_z) = 0"
+  ],
+  "loadPaths": {
+    "traction": "uniform global boundary tractions on all four exterior edges",
+    "nodalEquivalent": "closed-form consistent nodal forces from the same boundary tractions",
+    "prescribed": "exact affine displacement imposed on all otherwise-free DOFs"
+  },
+  "authority": {
+    "source": "CLOSED_FORM_ISOTROPIC_LINEAR_ELASTIC_PURE_SHEAR",
+    "productionOutputUsed": false,
+    "smoothedStressUsed": false,
+    "movingMaximumUsed": false
+  }
+}
