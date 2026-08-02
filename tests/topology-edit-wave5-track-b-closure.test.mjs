@@ -22,9 +22,11 @@ test('Track B prerequisite manifest binds every completed wave', async () => {
     'WAVE_0', 'WAVE_1', 'WAVE_2', 'WAVE_3', 'WAVE_4',
   ]);
   assert.equal(manifest.prerequisites.every((row) => row.status === 'PASS_MERGED'), true);
+  const wave3 = manifest.prerequisites.find((row) => row.waveId === 'WAVE_3');
+  assert.deepEqual(wave3.pullRequests, [267, 271, 272, 277]);
   assert.equal(
-    manifest.prerequisites.find((row) => row.waveId === 'WAVE_3').mergeCommit,
-    '4dc7e7ca0ec7677d7616dd2e128fe63cfe3432d6',
+    wave3.mergeCommit,
+    '2d4fc3596a5bc0057740945c769c71be1efec296',
   );
   assert.equal(
     manifest.prerequisites.find((row) => row.waveId === 'WAVE_4').mergeCommit,
