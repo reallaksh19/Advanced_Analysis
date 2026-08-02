@@ -5,8 +5,13 @@ on:
     paths:
       - 'scripts/lfea-piping-runtime-bundle-assembler.mjs'
       - 'scripts/lfea-piping-runtime-bundle-assembler-check.mjs'
+      - 'scripts/lfea-piping-wp2-runtime-bundle-assembler.mjs'
+      - 'scripts/lfea-piping-wp2-runtime-bundle-assembler-check.mjs'
+      - 'scripts/lfea-piping-wp3-runtime-bundle-assembler.mjs'
+      - 'scripts/lfea-piping-wp3-runtime-bundle-assembler-check.mjs'
       - 'scripts/lfea-piping-phase6g-anti-drift-check.mjs'
       - 'scripts/lfea-piping-release-readiness-check.mjs'
+      - 'src/core/linear-piping-project-qualification/external-evidence-handoff.js'
       - 'docs/LFEA_PIPING_PHASE6G_RUNTIME_BUNDLE_ASSEMBLY.md'
       - 'docs/LFEA_PIPING_PHASE_STATUS.md'
       - 'reports/lfea-piping-phase6g-runtime-bundle-assembly.json'
