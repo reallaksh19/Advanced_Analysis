@@ -81,7 +81,7 @@ const performanceEvidence = {
     'PREPARED_STAGED_JSON_EXPORT',
     'WORKSPACE_COMMIT_READBACK',
     'ROLLBACK_AND_INVALIDATION',
-    'C3D_PRESENTATION_SEARCH_REVIEW_COMPARISON_ROUTE',
+    'C3D_PRESENTATION_SEARCH_REVIEW_COMPARISON_ROUTE_DOSSIER_INTAKE_RESPONSE',
   ],
   browserMetrics: browserStatus === 'PASS' ? {
     firstValidFrameMs: browserEvidence.firstValidFrameMs,

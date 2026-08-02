@@ -28,7 +28,7 @@ This closing package changes qualification coverage only. It does not change can
 | W2.5 Visual parity and regression suite | Implemented through geometry/support integration and canonical immutability tests. | Re-executed at exact head. |
 | W3.1 Pair-geometry and fitting checker rules | Implemented through the Wave 3A checker package. | Checker fixtures are re-executed at exact head. |
 | W3.2 Attachment checker rules | Implemented in the same detection authority with known-bad fixtures. | Re-executed at exact head. |
-| W3.3 Bend, junction, and trim commands | Implemented and source-contract reconciled. | The dedicated command test is now included in the final matrix. |
+| W3.3 Bend, junction, and trim commands | Implemented and source-contract reconciled. | The dedicated command test is included in the final matrix. |
 | W3.4 Candidate-regenerated ghost preview | Implemented through the governed ghost/autofix controller. | Ghost and UI tests are re-executed at exact head. |
 | W3.5 Reviewed and safe autofix authority | Implemented with stale/tamper/regression rejection and atomic journal acceptance. | Autofix tests are re-executed at exact head. |
 | W4.1 Source-bound session draft and writer lock | Implemented through persistence/export authority. | Persistence tests are re-executed at exact head. |
@@ -44,7 +44,7 @@ This closing package changes qualification coverage only. It does not change can
 
 ## Additive C3D review stack
 
-The later C3D productivity packages are additive to the original Wave 0–5 process and must not escape final qualification. The final gate therefore also executes:
+The later C3D productivity packages are additive to the original Wave 0–5 process and must not escape final qualification. The final gate therefore executes the complete Wave 0–9 focused matrix covering:
 
 - presentation authority, visibility, sectioning, picking, and lifecycle;
 - canonical search and exact focus;
@@ -53,18 +53,22 @@ The later C3D productivity packages are additive to the original Wave 0–5 proc
 - spatial issue review and certified callouts;
 - canonical inspection and coordinate measurement;
 - deterministic source-versus-draft comparison;
-- canonical route trace and continuity review.
+- canonical route trace and continuity review;
+- deterministic portable review dossier creation and download;
+- bounded dossier intake, integrity reconstruction, basis reconciliation, and guarded viewpoint replay;
+- exact-issue review response authoring, deterministic response export/import, and round-trip reconciliation.
 
-All measurement and comparison evidence remains explicitly non-authoritative. These packages do not alter the original command, persistence, commit, rollback, calculation, or release authority.
+All measurement, comparison, dossier, intake, and response evidence remains explicitly non-authoritative. These packages do not alter the original command, checker-resolution, autofix, persistence, commit, rollback, calculation, engineering-approval, or release authority.
 
 ## Audit findings closed by this package
 
-1. The final Wave 5 path filter previously matched `topology-edit-3d-view-controller*.js` but not the newer search, issue, inspection, comparison, and route controllers.
+1. The final Wave 5 path filter previously matched `topology-edit-3d-view-controller*.js` but not the newer search, issue, inspection, comparison, route, dossier, intake, and response controllers.
 2. The final operation matrix did not execute `tests/topology-edit-wave3-commands.test.mjs`, the source-contract reconciliation test for bend, junction, and trim commands.
-3. The final operation matrix did not execute the later C3D Wave 0–6 focused suites.
-4. The evidence writer did not hash the original-plan audit or the completed production review-controller chain.
+3. The final operation matrix originally omitted the additive C3D focused suites.
+4. The evidence writer did not originally hash the original-plan audit or completed production review-controller chain.
+5. After dossier export and intake were merged, the integrated matrix and additive required-file set still stopped at Wave 6; the final gate now includes Waves 7–9 and their complete controller/model chain.
 
-These are qualification-coverage defects only; no product behavior is changed by their correction.
+These are qualification-coverage findings; the Wave 9 product behavior is separately bounded as display-review communication only.
 
 ## Closure rule
 
@@ -72,7 +76,7 @@ The original process is closed only when all of the following are true on one ex
 
 - Waves 0–4 prerequisite merge commits are ancestors of the candidate;
 - every original Wave 1–4 operation suite passes;
-- every additive C3D focused suite passes;
+- every additive C3D Wave 0–9 focused suite passes;
 - source, API, syntax, circularity, and prohibited-import gates pass;
 - portable fixture checks pass;
 - Chromium performance and lifecycle evidence passes;
