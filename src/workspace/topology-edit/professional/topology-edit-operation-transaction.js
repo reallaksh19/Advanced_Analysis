@@ -9,43 +9,51 @@ import {
   assertTopologyEditIncrementalValidationReceipt,
 } from './topology-edit-incremental-validation.js';
 import {
+  assertCurrentTopologyEditOperationCandidate,
+  prepareTopologyEditOperationCandidate,
+  recreateTopologyEditOperationCandidate,
+} from './topology-edit-operation-candidate.js';
+import {
   assertTopologyEditOperationPlan,
 } from './topology-edit-operation-plan.js';
 
 export const TOPOLOGY_EDIT_OPERATION_TRANSACTION_PREVIEW_SCHEMA =
-  'TopologyEditOperationTransactionPreview.v1';
+  'TopologyEditOperationTransactionPreview.v2';
 export const TOPOLOGY_EDIT_OPERATION_TRANSACTION_RECEIPT_SCHEMA =
-  'TopologyEditOperationTransactionReceipt.v1';
+  'TopologyEditOperationTransactionReceipt.v2';
 
 export function previewTopologyEditOperationTransaction(input = {}) {
   const session = assertSession(input.session);
   const plan = readyPlan(input.operationPlan);
+  const candidate = assertCurrentTopologyEditOperationCandidate(
+    input.candidate ?? prepareTopologyEditOperationCandidate({
+      session,
+      operationPlan: plan,
+    }),
+    session,
+    plan,
+  );
   const validation = readyValidation(
     input.validationReceipt,
     plan,
-    session.currentTopology(),
+    candidate,
     input.blockingSeverities,
-  );
-  const sandbox = sandboxFromSession(session);
-  const transitions = executePlanInSandbox(sandbox, plan);
-  const appendedCommandIds = appendedIds(
-    session.journal.activeCommandIds,
-    sandbox.journal.activeCommandIds,
   );
   const authority = {
     schema: TOPOLOGY_EDIT_OPERATION_TRANSACTION_PREVIEW_SCHEMA,
+    candidateHash: candidate.candidateHash,
     planHash: plan.planHash,
     validationHash: validation.validationHash,
-    priorSessionVersion: session.journal.sessionVersion,
-    priorJournalHash: session.journal.journalHash,
-    priorCanonicalHash: session.currentTopology().canonicalTopologyHash,
-    commandCount: transitions.length,
-    commandIds: appendedCommandIds,
-    certificationHashes: transitions.map((row) => row.certification.certificationHash),
-    candidateDraftHashes: transitions.map((row) => row.certification.candidateDraftHash),
-    resultingSessionVersion: sandbox.journal.sessionVersion,
-    resultingJournalHash: sandbox.journal.journalHash,
-    resultingCanonicalHash: sandbox.currentTopology().canonicalTopologyHash,
+    priorSessionVersion: candidate.priorSessionVersion,
+    priorJournalHash: candidate.priorJournalHash,
+    priorCanonicalHash: candidate.priorCanonicalHash,
+    commandCount: candidate.commandCount,
+    commandIds: candidate.commandIds,
+    certificationHashes: candidate.certificationHashes,
+    candidateDraftHashes: candidate.candidateDraftHashes,
+    resultingSessionVersion: candidate.resultingSessionVersion,
+    resultingJournalHash: candidate.resultingJournalHash,
+    resultingCanonicalHash: candidate.resultingCanonicalHash,
   };
   return deepFreeze({
     ...authority,
@@ -55,33 +63,55 @@ export function previewTopologyEditOperationTransaction(input = {}) {
 
 export function executeTopologyEditOperationTransaction(input = {}) {
   const session = assertSession(input.session);
+  const plan = readyPlan(input.operationPlan);
   const preview = assertCurrentPreview(
     input.preview ?? previewTopologyEditOperationTransaction(input),
     session,
+    plan,
   );
-  const plan = readyPlan(input.operationPlan);
-  if (preview.planHash !== plan.planHash) {
-    fail('preview planHash differs from the supplied operation plan.', RangeError);
+  const candidate = recreateTopologyEditOperationCandidate(
+    session,
+    plan,
+    input.candidate ?? prepareTopologyEditOperationCandidate({
+      session,
+      operationPlan: plan,
+    }),
+  );
+  if (preview.candidateHash !== candidate.candidateHash) {
+    fail('preview candidateHash differs from re-certified candidate.', RangeError);
   }
   const validation = readyValidation(
     input.validationReceipt,
     plan,
-    session.currentTopology(),
+    candidate,
     input.blockingSeverities,
   );
   if (preview.validationHash !== validation.validationHash) {
     fail('preview validationHash differs from the supplied receipt.', RangeError);
   }
-  const sandbox = sandboxFromSession(session);
-  const transitions = executePlanInSandbox(sandbox, plan);
-  assertSandboxMatchesPreview(sandbox, transitions, preview);
 
+  const sandbox = new TopologyEditCertifiedSession(
+    session.baseCanonicalTopology,
+    { checkerPolicy: session.checkerPolicy },
+  );
+  sandbox.reloadJournal(session.serializeJournal());
+  for (const intent of plan.commandIntents) {
+    const transition = sandbox.execute(intent.commandType, intent.payload);
+    if (transition.disposition !== 'ACCEPTED') {
+      fail(`${intent.commandType} failed during final transaction commit.`, RangeError);
+    }
+  }
+  if (sandbox.journal.journalHash !== candidate.resultingJournalHash
+    || sandbox.currentTopology().canonicalTopologyHash !== candidate.resultingCanonicalHash) {
+    fail('final transaction sandbox differs from certified candidate.', RangeError);
+  }
   session.journal = sandbox.journal;
   session.replay = sandbox.replay;
 
   const authority = {
     schema: TOPOLOGY_EDIT_OPERATION_TRANSACTION_RECEIPT_SCHEMA,
     previewHash: preview.previewHash,
+    candidateHash: candidate.candidateHash,
     planHash: plan.planHash,
     validationHash: validation.validationHash,
     priorSessionVersion: preview.priorSessionVersion,
@@ -90,6 +120,7 @@ export function executeTopologyEditOperationTransaction(input = {}) {
     commandCount: preview.commandCount,
     commandIds: preview.commandIds,
     certificationHashes: preview.certificationHashes,
+    candidateDraftHashes: preview.candidateDraftHashes,
     resultingSessionVersion: session.journal.sessionVersion,
     resultingJournalHash: session.journal.journalHash,
     resultingCanonicalHash: session.currentTopology().canonicalTopologyHash,
@@ -168,76 +199,43 @@ function readyPlan(value) {
   return plan;
 }
 
-function readyValidation(value, plan, topology, blockingInput) {
+function readyValidation(value, plan, candidate, blockingInput) {
   const receipt = assertTopologyEditIncrementalValidationReceipt(value);
   const mismatches = [];
   if (receipt.planHash !== plan.planHash) mismatches.push('planHash');
-  if (receipt.changedScopeHash !== plan.changedScope.changedScopeHash) mismatches.push('changedScopeHash');
+  if (receipt.changedScopeHash !== plan.changedScope.changedScopeHash) {
+    mismatches.push('changedScopeHash');
+  }
   if (receipt.priorBasisHash !== plan.basisHash) mismatches.push('priorBasisHash');
-  if (receipt.validatedTopologyHash !== topology.canonicalTopologyHash) mismatches.push('validatedTopologyHash');
-  if (mismatches.length) fail(`validation differs from current operation authority: ${mismatches.join(', ')}.`, RangeError);
+  if (receipt.validatedTopologyHash !== candidate.resultingCanonicalHash) {
+    mismatches.push('validatedTopologyHash');
+  }
+  if (mismatches.length) {
+    fail(`validation differs from certified candidate: ${mismatches.join(', ')}.`, RangeError);
+  }
   const blocking = new Set(normalizeSeverities(blockingInput ?? ['HIGH']));
   const issue = receipt.finalDiagnostics.find((row) => blocking.has(
     stringValue(row?.severity).toUpperCase() || 'UNKNOWN',
   ));
-  if (issue) fail(`validation contains blocking issue ${issue.id || semanticHash(issue)}.`, RangeError);
+  if (issue) {
+    fail(`validation contains blocking issue ${issue.id || semanticHash(issue)}.`, RangeError);
+  }
   return receipt;
 }
 
-function sandboxFromSession(session) {
-  const sandbox = new TopologyEditCertifiedSession(
-    session.baseCanonicalTopology,
-    { checkerPolicy: session.checkerPolicy },
-  );
-  sandbox.reloadJournal(session.serializeJournal());
-  return sandbox;
-}
-
-function executePlanInSandbox(sandbox, plan) {
-  return plan.commandIntents.map((intent) => {
-    const transition = sandbox.execute(intent.commandType, intent.payload);
-    if (transition.disposition !== 'ACCEPTED') {
-      fail(
-        `${intent.commandType} rejected during atomic certification: ${transition.reason || transition.disposition}.`,
-        RangeError,
-      );
-    }
-    return transition;
-  });
-}
-
-function assertCurrentPreview(value, session) {
+function assertCurrentPreview(value, session, plan) {
   const preview = assertTopologyEditOperationTransactionPreview(value);
   const mismatches = [];
+  if (preview.planHash !== plan.planHash) mismatches.push('planHash');
   if (preview.priorSessionVersion !== session.journal.sessionVersion) mismatches.push('sessionVersion');
   if (preview.priorJournalHash !== session.journal.journalHash) mismatches.push('journalHash');
-  if (preview.priorCanonicalHash !== session.currentTopology().canonicalTopologyHash) mismatches.push('canonicalHash');
-  if (mismatches.length) fail(`transaction preview is stale: ${mismatches.join(', ')}.`, RangeError);
+  if (preview.priorCanonicalHash !== session.currentTopology().canonicalTopologyHash) {
+    mismatches.push('canonicalHash');
+  }
+  if (mismatches.length) {
+    fail(`transaction preview is stale: ${mismatches.join(', ')}.`, RangeError);
+  }
   return preview;
-}
-
-function assertSandboxMatchesPreview(sandbox, transitions, preview) {
-  const actual = {
-    commandCount: transitions.length,
-    commandIds: appendedIds([], sandbox.journal.activeCommandIds).slice(-transitions.length),
-    certificationHashes: transitions.map((row) => row.certification.certificationHash),
-    resultingSessionVersion: sandbox.journal.sessionVersion,
-    resultingJournalHash: sandbox.journal.journalHash,
-    resultingCanonicalHash: sandbox.currentTopology().canonicalTopologyHash,
-  };
-  for (const field of Object.keys(actual)) {
-    if (Array.isArray(actual[field]) ? !sameList(actual[field], preview[field]) : actual[field] !== preview[field]) {
-      fail(`transaction re-certification differs at ${field}.`, RangeError);
-    }
-  }
-}
-
-function appendedIds(priorIds, nextIds) {
-  if (!Array.isArray(priorIds) || !Array.isArray(nextIds)) fail('journal command IDs must be arrays.');
-  if (!sameList(priorIds, nextIds.slice(0, priorIds.length))) {
-    fail('sandbox command history does not preserve the prior journal prefix.', RangeError);
-  }
-  return nextIds.slice(priorIds.length);
 }
 
 function assertCommandSuffix(activeIds, commandIds) {
@@ -247,16 +245,18 @@ function assertCommandSuffix(activeIds, commandIds) {
 }
 
 function assertReceiptShape(value, label) {
-  requiredText(value.planHash, `${label}.planHash`);
-  requiredText(value.validationHash, `${label}.validationHash`);
-  requiredText(value.priorJournalHash, `${label}.priorJournalHash`);
-  requiredText(value.priorCanonicalHash, `${label}.priorCanonicalHash`);
-  requiredText(value.resultingJournalHash, `${label}.resultingJournalHash`);
-  requiredText(value.resultingCanonicalHash, `${label}.resultingCanonicalHash`);
+  for (const field of [
+    'candidateHash', 'planHash', 'validationHash', 'priorJournalHash',
+    'priorCanonicalHash', 'resultingJournalHash', 'resultingCanonicalHash',
+  ]) requiredText(value[field], `${label}.${field}`);
   const count = Number(value.commandCount);
-  if (!Number.isInteger(count) || count <= 0) fail(`${label}.commandCount must be a positive integer.`, RangeError);
-  if (!Array.isArray(value.commandIds) || value.commandIds.length !== count) {
-    fail(`${label}.commandIds must match commandCount.`, RangeError);
+  if (!Number.isInteger(count) || count <= 0) {
+    fail(`${label}.commandCount must be a positive integer.`, RangeError);
+  }
+  for (const field of ['commandIds', 'certificationHashes', 'candidateDraftHashes']) {
+    if (!Array.isArray(value[field]) || value[field].length !== count) {
+      fail(`${label}.${field} must match commandCount.`, RangeError);
+    }
   }
 }
 
@@ -268,7 +268,9 @@ function assertSession(value) {
   return value;
 }
 function normalizeSeverities(value) {
-  if (!Array.isArray(value) || !value.length) fail('blockingSeverities must be a non-empty array.');
+  if (!Array.isArray(value) || !value.length) {
+    fail('blockingSeverities must be a non-empty array.');
+  }
   return [...new Set(value.map((row, index) => requiredText(
     row,
     `blockingSeverities[${index}]`,
