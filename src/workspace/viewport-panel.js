@@ -3,6 +3,11 @@ import { engineeringModelStore } from './engineering-model-store.js';
 import { EventBus } from './event-bus.js';
 import { EVENT_TOPICS } from './event-topics.js';
 import { masterDataController } from './master-data-controller.js';
+import {
+  filterResolvedGeometryForModelZone,
+  MODEL_ZONE_EVENTS,
+  projectDatasetForModelZone,
+} from './model-zone-selector.js';
 import { projectDataStore } from './project-data/project-data-store.js';
 import { buildResolvedEngineeringGeometry } from './resolved-engineering-geometry.js';
 import { SequentialCommandGateway } from './sequential-sketcher/sequential-command-gateway.js';
@@ -24,6 +29,7 @@ export class ViewportPanel {
     this.tableStore = new SequentialTableStore(WorkspaceState, this.gateway, this.eventBus);
     this.unsubscribers = [];
     this.datasetReference = null;
+    this.zoneSelection = null;
     this.handleClick = (event) => this.click(event);
     this.handleSelectionRequest = (entityId) => this.selectionRequested(entityId);
     this.handleToolSelected = (event) => this.toolSelected(event);
@@ -44,6 +50,7 @@ export class ViewportPanel {
     this.renderer.setSelectionRequestHandler(this.handleSelectionRequest);
     this.renderer.mount(this.hostElement);
     this.unsubscribers = [
+      this.eventBus.subscribe(MODEL_ZONE_EVENTS.CHANGED, ({ selection, dataset }) => this.zoneChanged(selection, dataset)),
       this.eventBus.subscribe(EVENT_TOPICS.WORKSPACE_SNAPSHOT_CHANGED, ({ snapshot }) => this.renderSnapshot(snapshot)),
       this.eventBus.subscribe(EVENT_TOPICS.DATASET_LOAD_FAILED, ({ message }) => this.importFailure(message)),
       this.eventBus.subscribe(EVENT_TOPICS.DATASET_CLEARED, () => this.clear()),
@@ -57,20 +64,34 @@ export class ViewportPanel {
 
   renderSnapshot(snapshot) {
     if (snapshot.status !== 'ready' || !snapshot.dataset) return;
-    if (snapshot.dataset !== this.datasetReference) { this.datasetReference = snapshot.dataset; this.renderDataset(snapshot.dataset, false); }
+    if (snapshot.dataset !== this.datasetReference) {
+      this.datasetReference = snapshot.dataset;
+      this.renderDataset(snapshot.dataset, false);
+    }
     this.renderSelection(snapshot.selectedEntityId);
   }
 
   renderDataset(dataset, preview) {
     try {
-      const resolved = buildResolvedEngineeringGeometry(dataset, projectDataStore.getProfile(), engineeringModelStore.getSupportSiteModel());
-      const renderModel = buildViewportRenderModel(resolved);
+      const projection = projectDatasetForModelZone(dataset, this.zoneSelection);
+      const resolved = buildResolvedEngineeringGeometry(
+        dataset,
+        projectDataStore.getProfile(),
+        engineeringModelStore.getSupportSiteModel(),
+      );
+      const scoped = filterResolvedGeometryForModelZone(resolved, projection);
+      const renderModel = buildViewportRenderModel(scoped);
       this.renderer.renderModel(renderModel);
       this.renderModel = renderModel;
-      this.statusElement.textContent = `${preview ? 'PREVIEW · ' : ''}${dataset.datasetId} · ${renderModel.summary.renderableCount} source-backed items rendered`;
+      this.statusElement.textContent = viewportStatus(dataset, projection, renderModel, preview);
     } catch (error) {
       this.statusElement.textContent = error instanceof Error ? error.message : String(error);
     }
+  }
+
+  zoneChanged(selection, dataset) {
+    this.zoneSelection = selection;
+    if (this.datasetReference === dataset) this.renderDataset(dataset, false);
   }
 
   editAction({ action, selectedEntityId }) {
@@ -132,8 +153,14 @@ export class ViewportPanel {
 
   importFailure(message) { this.statusElement.textContent = `Import failed: ${message}`; }
   requireElement(selector) { const element = this.rootElement.querySelector(selector); if (!element) throw new Error(`ViewportPanel element is missing: ${selector}`); return element; }
-  clear() { this.datasetReference = null; this.renderModel = null; this.gateway.cancelPreview(); this.renderer.clear(); this.statusElement.textContent = 'No dataset loaded'; this.selectionElement.textContent = 'Selection: none'; this.editPanel.render(null); }
+  clear() { this.datasetReference = null; this.zoneSelection = null; this.renderModel = null; this.gateway.cancelPreview(); this.renderer.clear(); this.statusElement.textContent = 'No dataset loaded'; this.selectionElement.textContent = 'Selection: none'; this.editPanel.render(null); }
   destroy() { this.rootElement.removeEventListener('click', this.handleClick); globalThis.removeEventListener?.('topology-edit-tool-selected', this.handleToolSelected); this.unsubscribers.forEach((unsubscribe) => unsubscribe()); this.unsubscribers = []; this.renderer.setSelectionRequestHandler(null); this.renderer.destroy(); this.datasetReference = null; }
+}
+
+function viewportStatus(dataset, projection, renderModel, preview) {
+  const prefix = preview ? 'PREVIEW · ' : '';
+  const zone = projection.zoneId ? ` · Zone ${projection.label}` : '';
+  return `${prefix}${dataset.datasetId}${zone} · ${renderModel.summary.renderableCount} source-backed items rendered`;
 }
 
 function capabilityFor(action, capabilities) {
