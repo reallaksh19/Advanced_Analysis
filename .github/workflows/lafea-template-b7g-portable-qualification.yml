@@ -30,7 +30,7 @@ concurrency:
 jobs:
   runner-preflight:
     name: B7G runner allocation preflight
-    runs-on: macos-latest
+    runs-on: ubuntu-slim
     timeout-minutes: 10
     steps:
       - name: Record hosted runner allocation
@@ -43,8 +43,8 @@ jobs:
   qualify:
     name: B7G portable exact-head qualification bundle
     needs: runner-preflight
-    runs-on: macos-latest
-    timeout-minutes: 180
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
     env:
       EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       PR_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
