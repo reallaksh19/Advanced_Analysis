@@ -4,7 +4,9 @@ on:
   pull_request:
     paths:
       - '.github/workflows/topology-edit-professional-interaction.yml'
+      - 'src/workspace/topology-edit-3d-interaction-controller.js'
       - 'src/workspace/viewport-interaction/**'
+      - 'src/workspace/viewport-productivity/topology-edit-interaction-*.js'
       - 'tests/topology-edit-professional-interaction-*.test.mjs'
       - 'tests/topology-edit-professional-snap-resolver.test.mjs'
   workflow_dispatch:
@@ -14,9 +16,9 @@ permissions:
 
 jobs:
   professional-interaction:
-    name: Agent 1 pure interaction qualification
+    name: P0/P1B interaction runtime and certified delegation
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       BASE_REF: ${{ github.event.pull_request.base.sha || github.event.repository.default_branch }}
@@ -34,21 +36,38 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Verify exact checkout
-        run: test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
+      - name: Verify exact checkout and ancestry
+        run: |
+          test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
+          git merge-base --is-ancestor "$BASE_REF" HEAD
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Syntax and focused interaction contracts
+      - name: Enforce syntax and bounded production modules
         run: |
-          for file in src/workspace/viewport-interaction/*.js; do
+          files=(
+            src/workspace/topology-edit-3d-interaction-controller.js
+            src/workspace/viewport-interaction/topology-edit-interaction-runtime.js
+            src/workspace/viewport-productivity/topology-edit-interaction-controller-helpers.js
+            src/workspace/viewport-productivity/topology-edit-interaction-panel.js
+            src/workspace/viewport-productivity/topology-edit-interaction-session.js
+          )
+          for file in "${files[@]}"; do
             node --check "$file"
+            test "$(wc -l < "$file")" -le 300
           done
+          ! grep -R "export default" "${files[@]}"
+
+      - name: Run P0 and P1B professional interaction tests
+        run: |
           node --test \
             tests/topology-edit-professional-interaction-contracts.test.mjs \
             tests/topology-edit-professional-snap-resolver.test.mjs \
-            tests/topology-edit-professional-interaction-containment.test.mjs
+            tests/topology-edit-professional-interaction-containment.test.mjs \
+            tests/topology-edit-professional-interaction-runtime.test.mjs \
+            tests/topology-edit-professional-interaction-controller.test.mjs
 
       - name: Retain certified topology foundations
         run: |
@@ -58,7 +77,34 @@ jobs:
             tests/topology-edit-wave1-journal-replay.test.mjs \
             tests/topology-edit-wave3a-checker.test.mjs \
             tests/topology-edit-wave3b-autofix.test.mjs \
-            tests/topology-edit-wave3-exact-gap-modes.test.mjs
+            tests/topology-edit-wave3-exact-gap-modes.test.mjs \
+            tests/topology-edit-wave4a-persistence-export.test.mjs \
+            tests/topology-edit-wave4b-commit-rollback.test.mjs \
+            tests/topology-edit-wave4c-lifecycle-ui.test.mjs
+
+      - name: Enforce parallel ownership and production-routing containment
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed="$(git diff --name-only "$BASE_REF...HEAD")"
+          for prohibited in \
+            src/workspace/load-calc-consumer-controller.js \
+            src/workspace/topology-edit-3d-view-controller.js \
+            src/workspace/topology-edit-3d-view-controller-core.js \
+            src/workspace/topology-edit/topology-edit-command-contract.js \
+            src/workspace/topology-edit/topology-edit-certified-session.js \
+            src/workspace/topology-edit/topology-edit-persistence.js \
+            src/workspace/topology-edit/topology-edit-export.js \
+            src/workspace/topology-edit/topology-edit-commit-service.js \
+            .github/workflows/topology-edit-wave5.yml \
+            scripts/topology-edit-original-plan-audit.mjs \
+            scripts/topology-edit-write-wave5-evidence.mjs; do
+            ! grep -Fxq "$prohibited" <<<"$changed"
+          done
+          grep -q "topology-edit-3d-review-response-controller.js" \
+            src/workspace/load-calc-consumer-controller.js
+          ! grep -q "topology-edit-3d-interaction-controller.js" \
+            src/workspace/load-calc-consumer-controller.js
 
       - name: Anti-drift and production build
         run: |
@@ -69,5 +115,59 @@ jobs:
           node scripts/topology-edit-prohibited-imports.mjs
           npm run build
 
+      - name: Write exact-head standalone evidence
+        run: |
+          mkdir -p reports/qualification
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { execFileSync } from 'node:child_process';
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const commit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          if (commit !== process.env.TARGET_HEAD_SHA) throw new Error('Exact-head mismatch.');
+          const files = [
+            'src/workspace/topology-edit-3d-interaction-controller.js',
+            'src/workspace/viewport-interaction/topology-edit-interaction-runtime.js',
+            'src/workspace/viewport-productivity/topology-edit-interaction-controller-helpers.js',
+            'src/workspace/viewport-productivity/topology-edit-interaction-panel.js',
+            'src/workspace/viewport-productivity/topology-edit-interaction-session.js',
+            'tests/topology-edit-professional-interaction-runtime.test.mjs',
+            'tests/topology-edit-professional-interaction-controller.test.mjs',
+          ];
+          const evidence = {
+            schema: 'TopologyEditProfessionalInteractionP1BEvidence.v1',
+            repository: process.env.GITHUB_REPOSITORY,
+            commit,
+            status: 'PASS_STANDALONE_INTERACTION_CONTROLLER',
+            previewAuthority: 'DISPLAY_ONLY_PREVIEW',
+            acceptanceAuthority: 'CERTIFIED_SESSION_DELEGATION',
+            productionIntegrated: false,
+            pointerDragImplemented: false,
+            sceneGizmoImplemented: false,
+            commandAuthorityChanged: false,
+            persistenceAuthorityChanged: false,
+            workspaceAuthorityChanged: false,
+            calculationAuthorityChanged: false,
+            releaseQualified: false,
+            files: Object.fromEntries(files.map((file) => [
+              file,
+              createHash('sha256').update(readFileSync(file)).digest('hex'),
+            ])),
+          };
+          writeFileSync(
+            'reports/qualification/topology-edit-professional-interaction-p1b.json',
+            `${JSON.stringify(evidence, null, 2)}\n`,
+          );
+          NODE
+
+      - name: Upload exact-head standalone evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-professional-interaction-p1b-${{ env.TARGET_HEAD_SHA }}
+          path: reports/qualification/topology-edit-professional-interaction-p1b.json
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Patch hygiene
-        run: git diff --check "$BASE_REF...HEAD"
+        run: |
+          git diff --check "$BASE_REF...HEAD"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
