@@ -64,17 +64,25 @@ function ledgerMarkup(ledger, intake, fileName, selected, canRemove) {
       ${summaryRow('Issue evidence', intake?.issueSetStatus ?? 'LOCAL')}
       ${summaryRow('Coverage', intake?.coverageStatus ?? 'LOCAL')}
     </dl>
-    ${packageControls(ledger, selected, canRemove)}
+    ${packageControls(ledger, selected, canRemove, intake)}
     ${intakeAlerts(intake)}
     ${issueTable(ledger)}
     <p class="topology-edit-review-ledger__disclosure">${escapeHtml(ledger.disclosure)}</p>`;
 }
 
-function packageControls(ledger, selected, canRemove) {
-  const options = ledger.packages.map(({ response, intake }) => `
+function packageControls(ledger, selected, canRemove, currentIntake) {
+  const currentByHash = new Map(
+    (currentIntake?.packageComparisons ?? [])
+      .map((row) => [row.responseHash, row]),
+  );
+  const options = ledger.packages.map(({ response, intake }) => {
+    const current = currentByHash.get(response.responseHash);
+    const basisStatus = current?.basisStatus ?? intake.basisStatus;
+    return `
     <option value="${escapeHtml(response.responseHash)}"${response.responseHash === selected ? ' selected' : ''}>
-      ${escapeHtml(`${response.responseHash.slice(0, 16)} — ${response.summary.responseCount} row(s) — ${intake.basisStatus}`)}
-    </option>`).join('');
+      ${escapeHtml(`${response.responseHash.slice(0, 16)} — ${response.summary.responseCount} row(s) — ${basisStatus}`)}
+    </option>`;
+  }).join('');
   return `
     <div class="topology-edit-review-ledger__packages">
       <label>Ledger response
