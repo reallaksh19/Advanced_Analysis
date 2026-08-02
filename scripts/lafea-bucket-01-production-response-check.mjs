@@ -14,9 +14,9 @@ const baseInput = {
   expectedAppliedForce: { x: 1000, y: 250 },
   expectedAppliedMomentZ: 10000,
   levels: [
-    level(1, 64, 1 / 16, 96, '1'),
-    level(2, 256, 1 / 32, 99, '2'),
-    level(3, 1024, 1 / 64, 99.75, '3'),
+    level(1, 64, 1 / 16, 96, '1', 'DETERMINISTIC_CHOLESKY'),
+    level(2, 256, 1 / 32, 99, '2', 'DETERMINISTIC_CHOLESKY'),
+    level(3, 1024, 1 / 64, 99.75, '3', 'DETERMINISTIC_JACOBI_PCG'),
   ],
   tolerances: {
     loadResultantRelative: 1e-8,
@@ -43,6 +43,14 @@ assert.deepEqual(
   evidence.levelEvidence.map((row) => row.elementCount),
   [64, 256, 1024],
 );
+assert.deepEqual(
+  evidence.levelEvidence.map((row) => row.solverMethod),
+  [
+    'DETERMINISTIC_CHOLESKY',
+    'DETERMINISTIC_CHOLESKY',
+    'DETERMINISTIC_JACOBI_PCG',
+  ],
+);
 assert.equal(
   evidence.levelEvidence.every((row) => row.status === 'PASS'),
   true,
@@ -52,9 +60,9 @@ assert.equal(validateLafeaBucket01ProductionResponseEvidence(evidence).ok, true)
 const oscillatory = evaluateLafeaBucket01ProductionResponse({
   ...baseInput,
   levels: [
-    level(1, 64, 1 / 16, 96, '4'),
-    level(2, 256, 1 / 32, 100, '5'),
-    level(3, 1024, 1 / 64, 99.75, '6'),
+    level(1, 64, 1 / 16, 96, '4', 'DETERMINISTIC_CHOLESKY'),
+    level(2, 256, 1 / 32, 100, '5', 'DETERMINISTIC_CHOLESKY'),
+    level(3, 1024, 1 / 64, 99.75, '6', 'DETERMINISTIC_JACOBI_PCG'),
   ],
 });
 assert.equal(oscillatory.status, 'BLOCKED');
@@ -69,6 +77,17 @@ const momentFailure = evaluateLafeaBucket01ProductionResponse({
 assert.equal(momentFailure.status, 'BLOCKED');
 assert.ok(momentFailure.reasons.includes('LEVEL_3_MOMENT_EQUILIBRIUM_FAILED'));
 
+assert.throws(
+  () => evaluateLafeaBucket01ProductionResponse({
+    ...baseInput,
+    levels: baseInput.levels.map((row, index) => index === 2
+      ? { ...row, solverMethod: 'DETERMINISTIC_CHOLESKY' }
+      : row),
+  }),
+  (error) => error?.code
+    === 'LAFEA_B01_PRODUCTION_RESPONSE_SOLVER_POLICY_INVALID',
+);
+
 const tampered = structuredClone(evidence);
 tampered.levelEvidence[2].totalStrainEnergy = 1;
 assert.equal(
@@ -76,9 +95,16 @@ assert.equal(
   false,
 );
 
-console.log('Bucket-01 production force, moment and strain-energy convergence contract checks passed.');
+console.log('Bucket-01 production force, moment, solver-policy and strain-energy convergence contract checks passed.');
 
-function level(ordinal, elementCount, meshSize, energy, digit) {
+function level(
+  ordinal,
+  elementCount,
+  meshSize,
+  energy,
+  digit,
+  solverMethod,
+) {
   return {
     ordinal,
     elementCount,
@@ -86,7 +112,7 @@ function level(ordinal, elementCount, meshSize, energy, digit) {
     meshHash: `sha256:${digit.repeat(64)}`,
     recoveryHash: `sha256:${String(Number(digit) + 3).repeat(64)}`,
     resultHash: `sha256:${digit.repeat(64)}`,
-    solverMethod: 'DETERMINISTIC_CHOLESKY',
+    solverMethod,
     freeDofCount: elementCount,
     appliedForce: { x: 1000, y: 250 },
     reactionForce: { x: -1000, y: -250 },
