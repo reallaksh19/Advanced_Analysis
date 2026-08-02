@@ -2,6 +2,7 @@
 import {
   TopologyEdit3DViewController as TopologyEdit3DViewControllerCore,
 } from './topology-edit-3d-view-controller-core.js';
+import { canRunTopologyEditAction } from './topology-edit/topology-edit-command-ui.js';
 import { TopologyEditLifecycleController } from './topology-edit/topology-edit-lifecycle-controller.js';
 
 export { buildAutofixPolicy } from './topology-edit-3d-view-controller-core.js';
@@ -151,6 +152,15 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
   updateActionButtons() {
     super.updateActionButtons();
     const blocked = !this.session || Boolean(this.session.staleReason);
+    const topology = this.session?.currentTopology();
+    for (const actionId of ['set-gap-3', 'set-gap-20']) {
+      const button = this.hostElement?.querySelector(`[data-command-action="${actionId}"]`);
+      if (button) {
+        button.disabled = blocked || !canRunTopologyEditAction(
+          actionId, this.selection, topology,
+        );
+      }
+    }
     const hasCommands = Boolean(this.session?.journal.activeCommandIds.length);
     const buttons = {
       save: this.hostElement?.querySelector('[data-action="save-draft"]'),

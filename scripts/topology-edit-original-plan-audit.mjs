@@ -36,6 +36,7 @@ const waves = Object.freeze([
   wave('W3', ['W3.1', 'W3.2', 'W3.3', 'W3.4', 'W3.5'], [
     'tests/topology-edit-wave3a-checker.test.mjs',
     'tests/topology-edit-wave3-commands.test.mjs',
+    'tests/topology-edit-wave3-exact-gap-modes.test.mjs',
     'tests/topology-edit-wave3b-autofix.test.mjs',
     'tests/topology-edit-wave3c-autofix-ui.test.mjs',
   ]),
