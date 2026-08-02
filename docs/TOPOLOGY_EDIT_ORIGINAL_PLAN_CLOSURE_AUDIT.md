@@ -1,88 +1,157 @@
-# Topology Edit Original Plan Closure Audit
+# Topology Edit Original Plan and Professional Upgrade Closure Audit
 
 ## Purpose
 
-This audit maps the repository implementation back to the original Wave 0 through Wave 5 process and its suggested packages W0.1 through W5.5.
+This audit maps the repository implementation to:
 
-The document is a disposition record, not a release receipt. Final closure requires the generated `TopologyEditOriginalPlanAudit.v1` artifact and `TopologyEditWave5QualificationEvidence.v2` or later artifact from the exact candidate head. A workflow that allocates no executable steps or produces no logs is not a pass.
+1. the original Wave 0 through Wave 5 process and packages W0.1 through W5.5; and
+2. the later two-track professional 3D Edit upgrade:
+   - Track A — professional viewport interaction;
+   - Track B — engineering operation planning, catalogue authority, changed-scope validation, and worker execution;
+   - shared production integration and release qualification.
+
+This document is a disposition record, not a release receipt. Final closure requires exact-head artifacts using:
+
+```text
+TopologyEditOriginalPlanAudit.v2
+TopologyEditWave5QualificationEvidence.v5
+```
+
+A workflow that allocates no executable steps, produces no logs, or omits either professional browser report is not a pass.
 
 ## Authority boundary
 
-This closing package changes qualification coverage only. It does not change canonical topology, geometry derivation, command behavior, checker rules, autofix authority, journal/replay, persistence, prepared export, workspace commit, rollback, downstream invalidation, calculation, or production release behavior.
+The professional integration package intentionally changes the production 3D Edit route:
+
+```text
+load-calc-consumer-controller.js
+→ topology-edit-3d-professional-controller.js
+→ topology-edit-3d-interaction-controller.js
+→ topology-edit-3d-review-response-controller.js
+→ retained C3D review stack
+→ retained lifecycle/core controller
+```
+
+The production route now exposes both professional interaction and engineering-operation authoring. It does **not** replace or bypass the retained command, certified session, journal, checker, autofix, persistence, export, commit, rollback, or review authorities.
+
+Professional engineering acceptance follows:
+
+```text
+exact user inputs and canonical IDs
+→ immutable operation plan
+→ exact source-backed catalogue compatibility
+→ sandbox-certified candidate topology
+→ changed-scope validation in a cancellable module Worker
+→ deterministic transaction preview
+→ exact sandbox re-certification
+→ all-or-nothing journal commit
+→ grouped undo / redo
+```
+
+No preview, candidate, catalogue query, Worker request, or operation panel directly mutates canonical topology or WorkspaceState.
 
 ## Original package disposition
 
 | Original package | Repository disposition | Final Wave 5 evidence |
 | --- | --- | --- |
-| W0.1 Production startup and circular-import gate | Implemented through the Wave 0 workflow, production startup test, strict syntax/import checks, and prohibited-import/circularity gate. | Re-executed at exact head. |
-| W0.2 Source manifest and behavioral disposition | Implemented through the baseline manifest, source comparator, and qualification schema. | Source drift is re-executed at exact head. |
+| W0.1 Production startup and circular-import gate | Implemented through Wave 0 workflow, production startup, strict syntax/import, and prohibited-import gates. | Re-executed at exact head. |
+| W0.2 Source manifest and behavioral disposition | Implemented through baseline manifest, source comparator, and qualification schema. | Source drift re-executed at exact head. |
 | W0.3 API, semantic, and prohibited-import drift gates | Implemented through API drift and prohibited-import gates. | Re-executed at exact head. |
-| W1.1 Pure command reducer and target resolution | Implemented and covered by the pure-kernel suite. | Re-executed at exact head. |
+| W1.1 Pure command reducer and target resolution | Implemented and covered by pure-kernel tests. | Re-executed at exact head. |
 | W1.2 Candidate regeneration and certification | Implemented and covered by candidate-certification tests. | Re-executed at exact head. |
 | W1.3 Journal replay, undo, redo, and stale-authority protection | Implemented and covered by journal/replay tests. | Re-executed at exact head. |
-| W1.4 Integrate the seven existing tools with the certified journal | Implemented and covered by production-integration tests. | Re-executed at exact head. |
-| W2.1 Pure fitting-geometry catalog | Implemented in the source-backed fitting geometry package. | Geometry tests are re-executed at exact head. |
-| W2.2 Bore, diameter, and branch-inheritance authority | Implemented through dimension authority and diagnostic geometry. | Dimension tests are re-executed at exact head. |
-| W2.3 Canonical support/restraint geometry | Implemented with directional, gap-preserving restraint overlays. | Support geometry tests are re-executed at exact head. |
-| W2.4 Instanced rendering and restraint-level picking | Implemented with exact canonical and restraint identities. | Integration and C3D picking tests are re-executed at exact head. |
-| W2.5 Visual parity and regression suite | Implemented through geometry/support integration and canonical immutability tests. | Re-executed at exact head. |
-| W3.1 Pair-geometry and fitting checker rules | Implemented through the Wave 3A checker package. | Checker fixtures are re-executed at exact head. |
-| W3.2 Attachment checker rules | Implemented in the same detection authority with known-bad fixtures. | Re-executed at exact head. |
-| W3.3 Bend, junction, and trim commands | Implemented and source-contract reconciled. | The dedicated command test is included in the final matrix. |
-| W3.4 Candidate-regenerated ghost preview | Implemented through the governed ghost/autofix controller. | Ghost and UI tests are re-executed at exact head. |
-| W3.5 Reviewed and safe autofix authority | Implemented with stale/tamper/regression rejection and atomic journal acceptance. | Autofix tests are re-executed at exact head. |
-| W4.1 Source-bound session draft and writer lock | Implemented through persistence/export authority. | Persistence tests are re-executed at exact head. |
-| W4.2 Recovery and migration | Implemented in the persistence package and lifecycle UI. | Re-executed at exact head. |
-| W4.3 Prepared export plan and exact bundle | Implemented through byte-stable prepared export. | Export tests are re-executed at exact head. |
-| W4.4 Edited-StagedJSON commit and receipt | Implemented through exact prepared-output commit. | Commit/readback tests are re-executed at exact head. |
-| W4.5 Rollback and downstream invalidation | Implemented with exact rollback and downstream disposition. | Rollback/lifecycle tests are re-executed at exact head. |
-| W5.1 Branch scope tree and scope authority | Implemented in Track C/Wave 5 contracts. | Re-executed at exact head. |
-| W5.2 Real spatial index and worker execution | Implemented with cancellation and stale-response rejection. | Re-executed at exact head. |
-| W5.3 GPU picking and rendering performance | Implemented with exact disposable color IDs and CPU fallback. | C3D GPU tests and measured browser evidence are included. |
-| W5.4 Portable fixture qualification | Implemented with repository-relative/content-addressed fixture receipts. | Fixture hashes and path checks are included. |
-| W5.5 Exact-head release gate and evidence package | Implemented by the final Wave 5 workflow and evidence writer. | Passes only when the clean runner executes every retained gate and uploads exact-head evidence. |
+| W1.4 Existing tools through the certified journal | Implemented and covered by production integration tests. | Re-executed at exact head. |
+| W2.1–W2.5 Geometry, dimension, support, picking, and parity | Implemented through source-backed geometry, dimension authority, restraint projection, exact identities, and integration tests. | Re-executed at exact head. |
+| W3.1–W3.5 Checker, commands, ghost, and safe autofix | Implemented with exact command reconciliation, source-backed autofix, stale/tamper rejection, and journal acceptance. | Re-executed at exact head. |
+| W4.1–W4.5 Draft, recovery, export, commit, rollback, and invalidation | Implemented with deterministic persistence, prepared export, read-back commit, rollback, and lifecycle UI. | Re-executed at exact head. |
+| W5.1–W5.4 Scope, index/worker, GPU picking, and portable fixtures | Implemented with deterministic contracts, cancellation/stale rejection, exact disposable IDs, and content-addressed fixtures. | Re-executed at exact head. |
+| W5.5 Exact-head release gate and evidence package | Implemented by the final Wave 5 workflow, audit, and evidence writer. | Passes only when every retained and professional gate executes on one exact head. |
 
 ## Additive C3D review stack
 
-The later C3D productivity packages are additive to the original Wave 0–5 process and must not escape final qualification. The final gate therefore executes the complete Wave 0–9 focused matrix covering:
+The final gate retains the complete C3D Wave 0–9 matrix covering presentation, search, picking, review bookmarks, issue review, inspection, measurement, comparison, route trace, dossier export/intake, and review response.
 
-- presentation authority, visibility, sectioning, picking, and lifecycle;
-- canonical search and exact focus;
-- GPU color-ID picking;
-- session review bookmarks and provenance;
-- spatial issue review and certified callouts;
-- canonical inspection and coordinate measurement;
-- deterministic source-versus-draft comparison;
-- canonical route trace and continuity review;
-- deterministic portable review dossier creation and download;
-- bounded dossier intake, integrity reconstruction, basis reconciliation, and guarded viewpoint replay;
-- exact-issue review response authoring, deterministic response export/import, and round-trip reconciliation.
+These capabilities remain display/review authority. They do not resolve checker findings, accept engineering, mutate topology, write persistence, commit workspace state, change calculation scope, or grant release authority.
 
-All measurement, comparison, dossier, intake, and response evidence remains explicitly non-authoritative. These packages do not alter the original command, checker-resolution, autofix, persistence, commit, rollback, calculation, engineering-approval, or release authority.
+## Professional Track A disposition
 
-## Audit findings closed by this package
+Track A provides:
 
-1. The final Wave 5 path filter previously matched `topology-edit-3d-view-controller*.js` but not the newer search, issue, inspection, comparison, route, dossier, intake, and response controllers.
-2. The final operation matrix did not execute `tests/topology-edit-wave3-commands.test.mjs`, the source-contract reconciliation test for bend, junction, and trim commands.
-3. The final operation matrix originally omitted the additive C3D focused suites.
-4. The evidence writer did not originally hash the original-plan audit or completed production review-controller chain.
-5. After dossier export and intake were merged, the integrated matrix and additive required-file set still stopped at Wave 6; the final gate now includes Waves 7–9 and their complete controller/model chain.
+- exact canonical viewport selection;
+- X/Y/Z and XY/YZ/XZ transform gizmo handles;
+- numeric absolute, delta, and magnitude entry;
+- deterministic endpoint, datum, projection, midpoint, centerline, and grid snapping;
+- pointer capture and disposal;
+- Escape cancellation and Enter/Apply acceptance;
+- keyboard nudging with explicit millimetre increments;
+- exact `MOVE_NODE` delegation through the existing certified session;
+- 3 mm and 20 mm visible browser flows with cancel, apply, merge, undo, and redo evidence.
 
-These are qualification-coverage findings; the Wave 9 product behavior is separately bounded as display-review communication only.
+Track A is now part of the production controller inheritance chain. Its standalone browser flow is retained as focused evidence, while the professional integration browser flow proves normal Load Calc routing.
 
-## Closure rule
+## Professional Track B disposition
 
-The original process is closed only when all of the following are true on one exact candidate head:
+Track B provides:
+
+- strict canonical-ID validation shared by planners and compatibility contracts;
+- deterministic changed-scope and operation-plan contracts;
+- extend, shorten, split, reconnect, bounded-run move, orthogonal offset, and declared-slope planners;
+- a source-backed specification catalogue requiring an exact `sha256:<64 lowercase hex>` source digest;
+- complete valve, tee, and olet construction evidence;
+- exact `COMPATIBLE`, `UNAVAILABLE`, `AMBIGUOUS`, and `INCOMPATIBLE` catalogue outcomes;
+- candidate topology certification in an isolated certified session;
+- changed-scope validation with exact full-check fallback;
+- a real module Worker client with computation termination, cancellation, supersession, and stale-response rejection;
+- in-scope/global blocking semantics that do not let unrelated legacy findings block an independent operation;
+- all-or-nothing transaction commit and exact grouped undo/redo receipts.
+
+The catalogue binds engineering evidence to the plan; the existing governed commands remain the only topology mutation vocabulary.
+
+## Professional lifecycle evidence
+
+Accepted transaction receipts are stored only as deterministic lifecycle `viewState` evidence. Restore accepts a receipt only when:
+
+- its schema and transaction hash validate; and
+- its expected prior or resulting canonical hash matches the reloaded session.
+
+Malformed, tampered, missing, or stale transaction metadata is discarded. The underlying command journal remains the canonical edit authority.
+
+## Findings closed by the professional integration package
+
+1. Track A live scene snapping and visible 3 mm/20 mm qualification were previously isolated in an unmerged draft.
+2. Production Load Calc routing previously stopped at the review-response controller and did not expose Track A or Track B.
+3. Track B canonical target validation accepted prefix-like malformed IDs.
+4. Catalogue source provenance accepted arbitrary non-empty text rather than a real SHA-256 syntax.
+5. Valve, tee, and olet records could lack construction-critical evidence.
+6. Validation Worker contracts existed without a real Worker execution and termination boundary.
+7. Multi-command operation plans lacked an atomic executor and grouped undo/redo evidence.
+8. Validation initially risked checking the pre-operation topology; it now checks the exact sandbox-certified candidate topology.
+9. Unrelated pre-existing high findings could block independent edits; blocking is now global or changed-scope specific.
+10. Professional transaction rationale was not retained across draft save/reload.
+11. Final Wave 5 audit and evidence did not require the professional standalone and production browser reports.
+12. Lifecycle selection restore accepted malformed prefix-like identities and retained stale selection when persisted state was invalid.
+
+## Exact-head closure rule
+
+The program is closed only when all of the following are true on one candidate head:
 
 - Waves 0–4 prerequisite merge commits are ancestors of the candidate;
 - every original Wave 1–4 operation suite passes;
 - every additive C3D Wave 0–9 focused suite passes;
-- source, API, syntax, circularity, and prohibited-import gates pass;
-- portable fixture checks pass;
+- every Track A, Track B, transaction, Worker, lifecycle, and integration suite passes;
+- source, API, syntax, import, circularity, and prohibited-import gates pass;
+- all governed production modules satisfy the 300-line rule;
+- portable fixture and catalogue checks pass;
+- Chromium executes both the standalone Track A flow and normal production integration flow;
+- professional integration evidence proves candidate certification, Worker validation, atomic apply, grouped undo/redo, and draft restore;
 - Chromium performance and lifecycle evidence passes;
 - the production build passes;
 - the generated audit status is `PASS_ORIGINAL_PLAN_CLOSURE`;
 - the generated release evidence status is `PASS_RELEASE`;
-- both artifacts identify the exact candidate head.
+- every retained artifact identifies the exact candidate head.
 
-No “100% port” or release-qualified claim is valid without those retained artifacts.
+Until those executable exact-head artifacts exist, the correct disposition is:
+
+```text
+IMPLEMENTATION COMPLETE / EXACT-HEAD QUALIFICATION PENDING / RELEASE NOT CLAIMED
+```
