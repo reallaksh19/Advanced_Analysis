@@ -1,0 +1,158 @@
+name: C3D Wave 10 Review Response Ledger
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/topology-edit-c3d-wave10-review-ledger.yml'
+      - 'src/workspace/topology-edit-3d-review-ledger-controller.js'
+      - 'src/workspace/viewport-productivity/topology-edit-review-response-ledger*.js'
+      - 'tests/topology-edit-c3d-wave10-review-ledger.test.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  review-response-ledger:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      BASE_REF: ${{ github.event.pull_request.base.sha || github.event.repository.default_branch }}
+
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Verify exact checkout and ancestry
+        run: |
+          test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+          git merge-base --is-ancestor "$BASE_REF" HEAD
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Enforce syntax and bounded production modules
+        run: |
+          for file in \
+            src/workspace/topology-edit-3d-review-ledger-controller.js \
+            src/workspace/viewport-productivity/topology-edit-review-response-ledger.js \
+            src/workspace/viewport-productivity/topology-edit-review-response-ledger-intake.js \
+            src/workspace/viewport-productivity/topology-edit-review-response-ledger-io.js \
+            src/workspace/viewport-productivity/topology-edit-review-response-ledger-panel.js \
+            src/workspace/viewport-productivity/topology-edit-review-response-ledger-validation.js; do
+            node --check "$file"
+            test "$(wc -l < "$file")" -le 300
+          done
+          ! grep -R "export default" \
+            src/workspace/topology-edit-3d-review-ledger-controller.js \
+            src/workspace/viewport-productivity/topology-edit-review-response-ledger*.js
+
+      - name: Qualify Wave 10 multi-response ledger
+        run: node --test tests/topology-edit-c3d-wave10-review-ledger.test.mjs
+
+      - name: Retain Waves 7 through 9 review collaboration
+        run: |
+          node --test tests/topology-edit-c3d-wave7-review-dossier.test.mjs
+          node --test tests/topology-edit-c3d-wave8-dossier-intake.test.mjs
+          node --test tests/topology-edit-c3d-wave9-review-response.test.mjs
+
+      - name: Retain C3D Waves 0 through 6
+        run: |
+          node --test tests/topology-edit-c3d-wave0.test.mjs
+          node --test tests/topology-edit-c3d-wave1-visibility.test.mjs
+          node --test tests/topology-edit-c3d-wave1-sectioning.test.mjs
+          node --test tests/topology-edit-c3d-wave2-search.test.mjs
+          node --test tests/topology-edit-c3d-wave3-review.test.mjs
+          node --test tests/topology-edit-c3d-wave3-gpu-picking.test.mjs
+          node --test tests/topology-edit-c3d-wave4-issue-review.test.mjs
+          node --test tests/topology-edit-c3d-wave4-comparison.test.mjs
+          node --test tests/topology-edit-c3d-wave5-inspection-measurement.test.mjs
+          node --test tests/topology-edit-c3d-wave6-route-trace.test.mjs
+
+      - name: Retain command and lifecycle authority
+        run: |
+          node --test tests/topology-edit-wave3-commands.test.mjs
+          node --test tests/topology-edit-wave3b-autofix.test.mjs
+          node --test tests/topology-edit-wave3c-autofix-ui.test.mjs
+          node --test tests/topology-edit-wave4a-persistence-export.test.mjs
+          node --test tests/topology-edit-wave4b-commit-rollback.test.mjs
+          node --test tests/topology-edit-wave4c-lifecycle-ui.test.mjs
+          node --test tests/topology-edit-lifecycle-view-state.test.mjs
+
+      - name: Retain governance and production build
+        run: |
+          node scripts/topology-edit-source-drift-check.mjs
+          node scripts/topology-edit-api-drift-check.mjs
+          node scripts/topology-edit-prohibited-imports.mjs
+          npm run build
+
+      - name: Write exact-head standalone Wave 10 evidence
+        run: |
+          mkdir -p reports/qualification
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { execFileSync } from 'node:child_process';
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const commit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          if (commit !== process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA) throw new Error('Exact-head mismatch.');
+          const files = [
+            'src/workspace/topology-edit-3d-review-ledger-controller.js',
+            'src/workspace/viewport-productivity/topology-edit-review-response-ledger.js',
+            'src/workspace/viewport-productivity/topology-edit-review-response-ledger-intake.js',
+            'src/workspace/viewport-productivity/topology-edit-review-response-ledger-io.js',
+            'src/workspace/viewport-productivity/topology-edit-review-response-ledger-panel.js',
+            'src/workspace/viewport-productivity/topology-edit-review-response-ledger-validation.js',
+            'tests/topology-edit-c3d-wave10-review-ledger.test.mjs',
+          ];
+          const evidence = {
+            schema: 'TopologyEditC3DWave10ReviewLedgerEvidence.v1',
+            repository: process.env.GITHUB_REPOSITORY,
+            commit,
+            status: 'PASS_STANDALONE_MULTI_RESPONSE_REVIEW_LEDGER',
+            integrationStatus: 'DEFERRED_TO_PROFESSIONAL_INTEGRATION',
+            ledgerAuthority: 'DISPLAY_REVIEW_RESPONSE_LEDGER_ONLY',
+            identityAuthority: 'EXACT_DOSSIER_RESPONSE_ISSUE_AND_CANONICAL_IDS',
+            checkerAuthorityChanged: false,
+            autofixAuthorityChanged: false,
+            persistenceAuthorityChanged: false,
+            auditExportAuthorityChanged: false,
+            workspaceAuthorityChanged: false,
+            calculationAuthorityChanged: false,
+            engineeringApprovalAuthorityChanged: false,
+            productionRoutingChanged: false,
+            integratedReleaseMatrixChanged: false,
+            releaseQualified: false,
+            files: Object.fromEntries(files.map((file) => [
+              file,
+              createHash('sha256').update(readFileSync(file)).digest('hex'),
+            ])),
+          };
+          writeFileSync(
+            'reports/qualification/topology-edit-c3d-wave10-review-ledger.json',
+            `${JSON.stringify(evidence, null, 2)}\n`,
+          );
+          NODE
+
+      - name: Upload exact-head evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-c3d-wave10-review-ledger-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          path: reports/qualification/topology-edit-c3d-wave10-review-ledger.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Verify parallel ownership and patch hygiene
+        run: |
+          test -z "$(git diff --name-only "$BASE_REF...HEAD" | grep -E '^(src/workspace/load-calc-consumer-controller.js|\.github/workflows/topology-edit-wave5.yml|scripts/topology-edit-original-plan-audit.mjs|scripts/topology-edit-write-wave5-evidence.mjs)$')"
+          git diff --check "$BASE_REF...HEAD"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
