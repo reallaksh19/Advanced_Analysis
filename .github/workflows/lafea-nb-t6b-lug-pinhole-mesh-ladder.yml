@@ -10,6 +10,7 @@ on:
       - 'src/workspace/lafea-controlled-continuum-public.js'
       - 'src/workspace/lafea-analysis-mesh-*.js'
       - 'scripts/lafea-nb-t6b-lug-pinhole-mesh-ladder-check.mjs'
+      - 'scripts/lafea-nb-t6b-public-surface-check.mjs'
       - 'scripts/lafea-nonbucket-stack-check.mjs'
       - 'docs/LAFEA_NonBucket_NB-T6B_Lug_Pinhole_Mesh_Ladder.md'
       - 'package.json'
@@ -62,6 +63,9 @@ jobs:
           set -o pipefail
           node scripts/lafea-nb-t6b-lug-pinhole-mesh-ladder-check.mjs \
             2>&1 | tee lafea-nb-t6b-lug-pinhole-mesh-ladder.log
+
+      - name: Run NB-T6B public-surface qualification
+        run: node scripts/lafea-nb-t6b-public-surface-check.mjs
 
       - name: Run retained T6 meshing qualification
         run: node scripts/lafea.10-t6-generation-check.mjs
