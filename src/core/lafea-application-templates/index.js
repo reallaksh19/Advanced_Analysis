@@ -120,3 +120,17 @@ export {
   validateTemplateTargetAuthoritySnapshot,
   validateTemplateTargetCompatibilityReceipt,
 } from './target-compatibility.js';
+
+export {
+  LAFEA_ANALYTICAL_EXECUTION_CONTROLLER_BOUNDARY,
+  LAFEA_ANALYTICAL_EXECUTION_PILOTS,
+  LAFEA_TEMPLATE_ASSESSMENT_APPLICABILITY,
+  LAFEA_TEMPLATE_EXECUTION_MODE,
+  LAFEA_TEMPLATE_EXECUTION_RECEIPT_SCHEMA,
+  LAFEA_TEMPLATE_EXECUTION_REQUEST_SCHEMA,
+  LAFEA_TEMPLATE_EXECUTION_STATUSES,
+  createTemplateExecutionReceipt,
+  createTemplateExecutionRequest,
+  validateTemplateExecutionReceipt,
+  validateTemplateExecutionRequest,
+} from './analytical-execution-contract.js';
