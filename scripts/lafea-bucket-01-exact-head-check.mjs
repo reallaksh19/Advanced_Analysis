@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const BASELINE_SHA = '42c9f96e9baffb52232b4b7ed7f04611c6337961';
+const BASELINE_SHA = 'cbd4d3e7397a3d64869d9be1c360af7d1d4ecdc8';
 const REPORT_PATH = path.resolve(
   ROOT,
   process.env.LAFEA_BUCKET_01_EXACT_HEAD_REPORT_PATH
@@ -32,8 +32,8 @@ recordAssertion(
 for (const check of [
   nodeCheck('BUCKET_01_REPAIR', 'scripts/lafea-bucket-01-repair-check.mjs'),
   nodeCheck('GOVERNED_T3_PATCH', 'scripts/lafea-bucket-01-t3-patch-check.mjs'),
+  nodeCheck('GOVERNED_PURE_SHEAR', 'scripts/lafea-bucket-01-pure-shear-check.mjs'),
   nodeCheck('T6_PATCH', 'scripts/lafea.3-t6-patch-check.mjs'),
-  nodeCheck('PURE_SHEAR_AND_ENERGY', 'scripts/lafea.3-stress-energy-check.mjs'),
   nodeCheck(
     'RETAINED_KIRSCH_REFERENCE',
     'scripts/lafea.3-benchmark-cont-hole-01-check.mjs',
@@ -67,7 +67,7 @@ recordAssertion(
 const failures = checks.filter((check) => check.status !== 'PASS');
 const executableEvidencePass = failures.length === 0;
 const report = {
-  schema: 'lafea-bucket-01-exact-head-report/v3',
+  schema: 'lafea-bucket-01-exact-head-report/v4',
   status: executableEvidencePass
     ? 'EXACT_HEAD_REPAIR_EVIDENCE_PASS'
     : 'EXACT_HEAD_REPAIR_EVIDENCE_BLOCKED',
