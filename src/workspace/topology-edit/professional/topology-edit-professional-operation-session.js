@@ -34,6 +34,7 @@ export function createTopologyEditProfessionalOperationPlan(input = {}) {
   const recordId = requiredText(values.catalogueRecordId, 'catalogueRecordId');
   const record = catalogue.records.find((row) => row.recordId === recordId);
   if (!record) fail(`catalogue record ${recordId} was not found.`, RangeError);
+  assertRecordMatchesPlan(record, planned);
   const compatibility = resolveTopologyEditSpecificationCompatibility({
     catalogue,
     request: {
@@ -114,6 +115,23 @@ function operationParameters(operationType, values, selection) {
   return builder();
 }
 
+function assertRecordMatchesPlan(record, plan) {
+  const expectedType = stringValue(plan.parameters.entityType).toUpperCase();
+  if (expectedType && record.componentType !== expectedType) {
+    fail(
+      `catalogue record ${record.recordId} is ${record.componentType}; operation requires ${expectedType}.`,
+      RangeError,
+    );
+  }
+  const diameterMm = Number(plan.parameters.diameterMm);
+  if (Number.isFinite(diameterMm) && record.nominalSizeMm !== diameterMm) {
+    fail(
+      `catalogue record ${record.recordId} nominal size ${record.nominalSizeMm} mm differs from operation diameter ${diameterMm} mm.`,
+      RangeError,
+    );
+  }
+}
+
 function normalizeSelection(value) {
   const nodeIds = ids(value?.nodeIds, 'selection.nodeIds', 'node');
   const edgeId = value?.edgeId
@@ -127,9 +145,7 @@ function ids(value, label, kind, allowEmpty = true) {
     return normalizeTopologyEditCanonicalIds(value, label, kind, { allowEmpty });
   }
   const text = stringValue(value);
-  const rows = text
-    ? text.split(/[\s,]+/u).filter(Boolean)
-    : [];
+  const rows = text ? text.split(/[\s,]+/u).filter(Boolean) : [];
   return normalizeTopologyEditCanonicalIds(rows, label, kind, { allowEmpty });
 }
 function requireIds(value, label, minimum = 1) {
