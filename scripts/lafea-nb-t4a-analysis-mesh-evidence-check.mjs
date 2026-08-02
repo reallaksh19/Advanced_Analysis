@@ -187,12 +187,17 @@ const evidenceSource = fs.readFileSync(
 const contractSource = fs.readFileSync(
   'src/workspace/lafea-analysis-mesh-contract.js', 'utf8',
 );
-const productionSource = `${contractSource}\n${evidenceSource}`;
+const qualitySource = fs.readFileSync(
+  'src/workspace/lafea-analysis-mesh-quality-internal.js', 'utf8',
+);
+const productionSource = `${contractSource}\n${qualitySource}\n${evidenceSource}`;
 assert.doesNotMatch(productionSource,
   /from ['"][^'"]*(?:local-continuum|local-shell|lafea-canvas|render-packet)[^'"]*['"]/u);
 assert.doesNotMatch(productionSource,
   /\b(?:calculateLocalContinuum|calculateLocalShell|executeLafeaStage|sealRenderPacketV2|generateMesh)\b/u);
 assert.match(contractSource, /LAFEA_ANALYSIS_MESH_EXACT_KEYS_INVALID/u);
+assert.match(contractSource, /lafea-analysis-mesh-quality-internal\.js/u);
+assert.match(qualitySource, /qualifyScaledJacobian/u);
 assert.match(evidenceSource, /RELEASE_NOT_QUALIFIED/u);
 assert.match(evidenceSource, /convergenceProduced:\s*false/u);
 assert.match(evidenceSource, /codeAssessmentProduced:\s*false/u);
@@ -208,6 +213,7 @@ console.log(JSON.stringify({
   displayTessellationAccepted: false,
   meshConfigAccepted: false,
   blockedQualityRegistersBlockedEvidence: true,
+  qualityImplementationGuarded: true,
   releaseQualified: false,
 }));
 
