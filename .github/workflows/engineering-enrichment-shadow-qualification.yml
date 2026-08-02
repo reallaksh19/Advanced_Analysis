@@ -1,0 +1,91 @@
+name: Engineering Enrichment Shadow Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/engineering-enrichment-shadow-qualification.yml'
+      - 'docs/loadcaseenrichment*.md'
+      - 'src/workspace/engineering-enrichment/**'
+      - 'tests/engineering-enrichment-*.mjs'
+      - 'scripts/lfea-piping-phase6i-pr371-boundary-check.mjs'
+      - 'governance/lfea-piping-phase6i-pr371-boundary.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engineering-enrichment-shadow-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Exact-head shadow evidence and Phase 6I boundary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_HEAD_SHA }}
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Verify exact head and ancestry
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
+          git merge-base --is-ancestor "$BASE_SHA" "$TARGET_HEAD_SHA"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Check remediation syntax and module bounds
+        run: |
+          set -euo pipefail
+          files=(
+            src/workspace/engineering-enrichment/master-adapters.js
+            src/workspace/engineering-enrichment/resolution.js
+            src/workspace/engineering-enrichment/resolution-validation.js
+            src/workspace/engineering-enrichment/candidate-projection.js
+            src/workspace/engineering-enrichment/candidate-projection-contract.js
+            src/workspace/engineering-enrichment/candidate-projection-validation.js
+            src/workspace/engineering-enrichment/structural-impact.js
+            src/workspace/engineering-enrichment/numerical-impact-validation.js
+            src/workspace/engineering-enrichment/portable-bundle-validation.js
+            src/workspace/engineering-enrichment/review-package-validation.js
+            scripts/lfea-piping-phase6i-pr371-boundary-check.mjs
+            tests/engineering-enrichment-integrity-remediation.test.mjs
+          )
+          for file in "${files[@]}"; do
+            node --check "$file"
+            test "$(wc -l < "$file")" -le 300
+          done
+
+      - name: Run complete engineering-enrichment qualification
+        run: |
+          node --test tests/engineering-enrichment-*.test.mjs
+
+      - name: Re-run Phase 6I boundary and repository gates
+        run: |
+          node scripts/lfea-piping-phase6i-pr371-boundary-check.mjs
+          npm run syntax:strict
+          npm run check:imports
+          npm run build
+
+      - name: Verify patch hygiene
+        run: |
+          set -euo pipefail
+          git diff --check "$BASE_SHA...HEAD"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
