@@ -54,6 +54,23 @@ export {
 } from './external-evidence-contracts.js';
 
 export {
+  EXTERNAL_EVIDENCE_HANDOFF_ACCEPTANCE_KEYS,
+  EXTERNAL_EVIDENCE_HANDOFF_ACCEPTANCE_SCHEMA,
+  EXTERNAL_EVIDENCE_HANDOFF_ACCEPTANCE_STATUS,
+  EXTERNAL_EVIDENCE_HANDOFF_KEYS,
+  EXTERNAL_EVIDENCE_HANDOFF_RECORD_COUNT,
+  EXTERNAL_EVIDENCE_HANDOFF_SCHEMA,
+  compilePhase6iExternalEvidenceHandoffAcceptance,
+  computeExternalEvidenceHandoffAcceptanceEvidenceHash,
+  computeExternalEvidenceHandoffEvidenceHash,
+  externalEvidenceHandoffAcceptanceSemanticProjection,
+  externalEvidenceHandoffSemanticProjection,
+  requirePhase6iExternalEvidenceHandoff,
+  requirePhase6iExternalEvidenceHandoffAcceptance,
+  sealPhase6iExternalEvidenceHandoff,
+} from './external-evidence-handoff.js';
+
+export {
   requirePerformanceEvidence,
   sealPerformanceEvidence,
 } from './performance-evidence.js';

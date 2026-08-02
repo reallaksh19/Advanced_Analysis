@@ -3,9 +3,14 @@ name: LFEA Piping Phase 6H Certification
 on:
   pull_request:
     paths:
+      - 'src/core/linear-piping-project-qualification/external-evidence-handoff.js'
+      - 'src/core/linear-piping-project-qualification/index.js'
+      - 'scripts/lfea-piping-phase6i-external-handoff-validator.mjs'
+      - 'scripts/lfea-piping-phase6i-external-handoff-validator-check.mjs'
       - 'scripts/lfea-piping-external-evidence-materializer.mjs'
       - 'scripts/lfea-piping-external-evidence-materializer-check.mjs'
       - 'scripts/lfea-piping-phase6h-anti-drift-check.mjs'
+      - 'scripts/linear-piping-project-qualification-anti-drift-check.mjs'
       - 'scripts/lfea-piping-release-readiness-check.mjs'
       - 'docs/LFEA_PIPING_PHASE6H_EXTERNAL_EVIDENCE_MATERIALIZATION.md'
       - 'docs/LFEA_PIPING_PHASE_STATUS.md'
