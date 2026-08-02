@@ -33,25 +33,32 @@ for (const templateId of LAFEA_GENERAL_CONTINUUM_TEMPLATE_IDS) {
   assert.equal(request.templateId, templateId);
   assert.equal(request.stageId, 'LAFEA.3');
   assert.equal(request.executionMode, 'CALLER_SUPPLIED_ANALYSIS_MESH');
+  assert.deepEqual(request.elementTypes, ['T6']);
   assert.equal(request.authority.registeredTemplateCallerMesh, true);
+  assert.equal(request.authority.b6BoundMappingRequired, true);
+  assert.equal(request.materialRegionEvidence.qualification, 'PASS');
+  assert.equal(request.loadEdgeEvidence.qualification, 'PASS');
+  assert.equal(request.boundaryEdgeEvidence.qualification, 'PASS');
   assert.equal(request.authority.compilerGeneratedMesh, false);
   assert.equal(request.authority.arbitraryGeometryMesher, false);
   assert.equal(request.authority.shell, false);
   assert.equal(request.authority.code, false);
   assert.equal(request.authority.releaseQualified, false);
   assert.equal(Object.isFrozen(request), true);
-  const receipt = createGeneralContinuumExecutionReceipt({
+  const receiptInput = {
     receiptId: `NB-T6H-RECEIPT-${templateId}`,
     request,
     sourceAuthorityHash: sha(`${templateId}-AUTHORITY`),
     sourceHash: sha(`${templateId}-SOURCE`),
+    callerMeshBindingHash: sha(`${templateId}-B6-BINDING`),
     executionHash: sha(`${templateId}-EXECUTION`),
     resultHash: sha(`${templateId}-RESULT`),
     recoveryHash: sha(`${templateId}-RECOVERY`),
     integrationPointResultHash: sha(`${templateId}-IP`),
     calculationAccepted: true,
     diagnostics: [],
-  });
+  };
+  const receipt = createGeneralContinuumExecutionReceipt(receiptInput);
   assert.equal(validateGeneralContinuumExecutionReceipt(receipt).ok, true);
   assert.equal(receipt.status, 'ACCEPTED');
   assert.equal(receipt.resultReady, true);
@@ -59,18 +66,7 @@ for (const templateId of LAFEA_GENERAL_CONTINUUM_TEMPLATE_IDS) {
   assert.equal(receipt.codeReady, false);
   assert.equal(receipt.reportReady, false);
   assert.equal(receipt.releaseQualified, false);
-  const repeated = createGeneralContinuumExecutionReceipt({
-    receiptId: `NB-T6H-RECEIPT-${templateId}`,
-    request,
-    sourceAuthorityHash: sha(`${templateId}-AUTHORITY`),
-    sourceHash: sha(`${templateId}-SOURCE`),
-    executionHash: sha(`${templateId}-EXECUTION`),
-    resultHash: sha(`${templateId}-RESULT`),
-    recoveryHash: sha(`${templateId}-RECOVERY`),
-    integrationPointResultHash: sha(`${templateId}-IP`),
-    calculationAccepted: true,
-    diagnostics: [],
-  });
+  const repeated = createGeneralContinuumExecutionReceipt(receiptInput);
   assert.equal(repeated.semanticHash, receipt.semanticHash);
   assert.equal(repeated.evidenceHash, receipt.evidenceHash);
   accepted.push({ templateId, requestHash: request.semanticHash, receiptHash: receipt.evidenceHash });
@@ -81,6 +77,7 @@ const blockedReceipt = createGeneralContinuumExecutionReceipt({
   request: createGeneralContinuumExecutionRequest(requestInput('C2D-BRACKET-GUSSET')),
   sourceAuthorityHash: sha('AUTHORITY'),
   sourceHash: sha('SOURCE'),
+  callerMeshBindingHash: sha('B6-BINDING'),
   executionHash: null,
   resultHash: null,
   recoveryHash: null,
@@ -98,7 +95,16 @@ assert.throws(() => createGeneralContinuumExecutionRequest({
 }), /Unsupported registered continuum template/);
 assert.throws(() => createGeneralContinuumExecutionRequest({
   ...requestInput('C2D-BRACKET-GUSSET'), elementTypes: ['T3'],
-}), /Only T6 and Q8/);
+}), /governed T6/);
+assert.throws(() => createGeneralContinuumExecutionRequest({
+  ...requestInput('C2D-BRACKET-GUSSET'), elementTypes: ['Q8'],
+}), /governed T6/);
+assert.throws(() => createGeneralContinuumExecutionRequest({
+  ...requestInput('C2D-BRACKET-GUSSET'),
+  materialRegionEvidence: {
+    applicability: 'REQUIRED', evidenceHash: sha('MATERIAL-PENDING'), qualification: 'PENDING',
+  },
+}), /must be REQUIRED and PASS/);
 assert.throws(() => createGeneralContinuumExecutionRequest({
   ...requestInput('C2D-BRACKET-GUSSET'),
   sourceAuthorityRequest: {
@@ -124,6 +130,7 @@ const failClosed = executeGeneralLafeaContinuum({
 assert.equal(failClosed.status, 'BLOCKED');
 assert.equal(failClosed.accepted, false);
 assert.equal(failClosed.diagnostics.includes('LAFEA_NB_T6H_COMPILATION_IDENTITY_INVALID'), true);
+assert.equal(failClosed.authority.b6BoundMapping, false);
 assert.equal(failClosed.authority.compilerGeneratedMesh, false);
 assert.equal(failClosed.authority.arbitraryGeometryMesher, false);
 assert.equal(failClosed.authority.shell, false);
@@ -132,6 +139,9 @@ assert.equal(failClosed.authority.releaseQualified, false);
 
 assert.doesNotMatch(controllerSource, /core\/local-continuum|executeLafeaStage/);
 assert.match(controllerSource, /executeControlledContinuumStageRoute/);
+assert.match(controllerSource, /bindLafeaContinuumTemplateCallerMesh/);
+assert.match(controllerSource, /B6_CALLER_MESH_BINDING_INVALID/);
+assert.match(controllerSource, /callerMeshBindingHash/);
 assert.match(controllerSource, /registerLafeaAnalysisMeshEvidence/);
 assert.match(controllerSource, /reconstructControlledContinuumResultHashes/);
 assert.match(controllerSource, /INTEGRATION_POINT/);
@@ -140,6 +150,10 @@ assert.match(publicSource, /LAFEA_TEMPLATE_COMPILATION_SCHEMA/);
 assert.match(publicSource, /validateTemplateGeometryResult/);
 assert.match(publicSource, /DOCUMENT_NOT_COMPILED_HANDOFF/);
 assert.match(contractSource, /compilationHash/);
+assert.match(contractSource, /materialRegionEvidence/);
+assert.match(contractSource, /loadEdgeEvidence/);
+assert.match(contractSource, /boundaryEdgeEvidence/);
+assert.match(contractSource, /b6BoundMappingRequired: true/);
 assert.match(contractSource, /compilerGeneratedMesh: false/);
 assert.match(contractSource, /arbitraryGeometryMesher: false/);
 assert.match(contractSource, /releaseQualified: false/);
@@ -150,9 +164,11 @@ console.log(JSON.stringify({
   status: 'PASS',
   templateCount: accepted.length,
   accepted,
-  negativeChecks: 5,
+  negativeChecks: 7,
   authority: {
     registeredTemplateCallerMeshExecution: true,
+    b6BoundMappingRequired: true,
+    elementType: 'T6',
     compilerGeneratedMesh: false,
     arbitraryGeometryMesher: false,
     axisymmetricContinuum: false,
@@ -188,7 +204,13 @@ function requestInput(templateId) {
     meshHash: sha(`${templateId}-MESH`),
     meshProfileHash: sha(`${templateId}-MESH-PROFILE`),
     elementTypes: ['T6'],
+    materialRegionEvidence: mapping(`${templateId}-MATERIAL`),
+    loadEdgeEvidence: mapping(`${templateId}-LOAD`),
+    boundaryEdgeEvidence: mapping(`${templateId}-BOUNDARY`),
   };
+}
+function mapping(label) {
+  return { applicability: 'REQUIRED', evidenceHash: sha(label), qualification: 'PASS' };
 }
 function deepFreeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
