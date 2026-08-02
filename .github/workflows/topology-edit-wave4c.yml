@@ -1,0 +1,79 @@
+name: Topology Edit Wave 4C
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/topology-edit-wave4c.yml'
+      - 'src/workspace/topology-edit-3d-view-controller.js'
+      - 'src/workspace/topology-edit-3d-view-controller-core.js'
+      - 'src/workspace/topology-edit/topology-edit-lifecycle-controller.js'
+      - 'src/workspace/topology-edit/topology-edit-baseline-manifest.js'
+      - 'tests/topology-edit-wave4c-lifecycle-ui.test.mjs'
+      - 'tests/topology-edit-fitting-support-integration.test.mjs'
+      - 'tests/topology-edit-wave4*.test.mjs'
+      - 'tests/topology-edit-wave3*.test.mjs'
+      - 'tests/topology-edit-wave1-*.test.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lifecycle-ui:
+    name: W4C production persistence, export, and commit UI
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Verify exact checkout
+        run: test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run Wave 4C lifecycle UI contracts
+        run: node --test tests/topology-edit-wave4c-lifecycle-ui.test.mjs
+
+      - name: Retain Wave 4 persistence and transaction authority
+        run: >-
+          node --test
+          tests/topology-edit-wave4a-persistence-export.test.mjs
+          tests/topology-edit-wave4b-commit-rollback.test.mjs
+
+      - name: Retain Wave 3 and certified-kernel authority
+        run: >-
+          node --test
+          tests/topology-edit-wave3b-autofix.test.mjs
+          tests/topology-edit-wave3c-autofix-ui.test.mjs
+          tests/topology-edit-wave1-pure-kernel.test.mjs
+          tests/topology-edit-wave1-candidate-certification.test.mjs
+          tests/topology-edit-wave1-journal-replay.test.mjs
+          tests/topology-edit-wave1-production-integration.test.mjs
+
+      - name: Retain geometry, source, API, and import authority
+        run: |
+          node --test tests/topology-edit-fitting-support-integration.test.mjs
+          node scripts/topology-edit-source-drift-check.mjs
+          node scripts/topology-edit-api-drift-check.mjs
+          node scripts/topology-edit-prohibited-imports.mjs
+
+      - name: Production build
+        run: npm run build
+
+      - name: Verify patch hygiene
+        run: |
+          git diff --check "${{ github.event.pull_request.base.sha || github.sha }}...HEAD"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
