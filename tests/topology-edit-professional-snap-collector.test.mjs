@@ -84,7 +84,15 @@ test('endpoint evidence outranks closer lower-authority evidence', () => {
 });
 
 test('zero tolerance resolves only an exact candidate position', () => {
+  const endpointOnly = topology({
+    nodes: [
+      { id: 'node:a', position: { x: 0, y: 0, z: 0 } },
+      { id: 'node:b', position: { x: 100, y: 0, z: 0 } },
+    ],
+    edges: [],
+  });
   const exact = resolve({
+    topology: endpointOnly,
     pointerPoint: { x: 100, y: 0, z: 0 },
     toleranceMm: 0,
   });
@@ -92,6 +100,7 @@ test('zero tolerance resolves only an exact candidate position', () => {
   assert.equal(exact.candidate.targetCanonicalId, 'node:b');
 
   const outside = resolve({
+    topology: endpointOnly,
     pointerPoint: { x: 99.999, y: 0, z: 0 },
     toleranceMm: 0,
   });
