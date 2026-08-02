@@ -113,6 +113,9 @@ jobs:
           tests/topology-edit-c3d-wave4-comparison.test.mjs
           tests/topology-edit-c3d-wave5-inspection-measurement.test.mjs
           tests/topology-edit-c3d-wave6-route-trace.test.mjs
+          tests/topology-edit-c3d-wave7-review-dossier.test.mjs
+          tests/topology-edit-c3d-wave8-dossier-intake.test.mjs
+          tests/topology-edit-c3d-wave9-review-response.test.mjs
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
