@@ -25,7 +25,9 @@ function finitePoint(point) {
 }
 
 function normalizePoint(point) {
-  if (!finitePoint(point)) throw new TypeError('Visual geometry point must contain finite x, y, and z coordinates.');
+  if (!finitePoint(point)) {
+    throw new TypeError('Visual geometry point must contain finite x, y, and z coordinates.');
+  }
   return Object.freeze({ x: Number(point.x), y: Number(point.y), z: Number(point.z) });
 }
 
@@ -53,11 +55,11 @@ export function createVisualPrimitive(input = {}) {
   const canonicalEntityId = stringValue(input.canonicalEntityId);
   const kind = stringValue(input.kind).toUpperCase();
   const partRole = stringValue(input.partRole || 'body');
-
   if (!primitiveId) throw new TypeError('Visual primitive requires primitiveId.');
   if (!canonicalEntityId) throw new TypeError('Visual primitive requires canonicalEntityId.');
-  if (!PRIMITIVE_KINDS.has(kind)) throw new TypeError(`Unsupported visual primitive kind: ${kind}`);
-
+  if (!PRIMITIVE_KINDS.has(kind)) {
+    throw new TypeError(`Unsupported visual primitive kind: ${kind}`);
+  }
   return deepFreeze({
     primitiveId,
     canonicalEntityId,
@@ -68,7 +70,9 @@ export function createVisualPrimitive(input = {}) {
     kind,
     sourcePaths: normalizeSourcePaths(input.sourcePaths),
     workspaceEntityIds: normalizeSourcePaths(input.workspaceEntityIds),
-    parameters: input.parameters && typeof input.parameters === 'object' ? { ...input.parameters } : {},
+    parameters: input.parameters && typeof input.parameters === 'object'
+      ? { ...input.parameters }
+      : {},
   });
 }
 
@@ -82,9 +86,11 @@ export function visualPrimitiveId(canonicalEntityId, partRole, policyVersion) {
 const PLACEMENT_PARAMETER_KEYS = new Set([
   'start',
   'end',
+  'sourceEnd',
   'center',
   'position',
   'axis',
+  'arcPoints',
   'bendPlaneNormal',
   'eccentricOffsetDirection',
   'runDirections',
@@ -120,7 +126,6 @@ export function visualSignature(primitives) {
 export function createVisualComponent(input = {}) {
   const canonicalEntityId = stringValue(input.canonicalEntityId);
   if (!canonicalEntityId) throw new TypeError('Visual component requires canonicalEntityId.');
-
   const primitives = Object.freeze([...(input.primitives || [])]
     .map(createVisualPrimitive)
     .sort((left, right) => left.primitiveId.localeCompare(right.primitiveId)));
@@ -128,7 +133,6 @@ export function createVisualComponent(input = {}) {
     .map(createVisualDiagnostic)
     .sort((left, right) => left.code.localeCompare(right.code)
       || left.canonicalEntityId.localeCompare(right.canonicalEntityId)));
-
   return deepFreeze({
     canonicalEntityId,
     canonicalType: stringValue(input.canonicalType).toUpperCase(),
@@ -143,9 +147,12 @@ export function createVisualComponent(input = {}) {
 export function createTopologyVisualGeometryModel(input = {}) {
   const canonicalTopologyHash = stringValue(input.canonicalTopologyHash);
   const geometryPolicyHash = stringValue(input.geometryPolicyHash);
-  if (!canonicalTopologyHash) throw new TypeError('Visual geometry model requires canonicalTopologyHash.');
-  if (!geometryPolicyHash) throw new TypeError('Visual geometry model requires geometryPolicyHash.');
-
+  if (!canonicalTopologyHash) {
+    throw new TypeError('Visual geometry model requires canonicalTopologyHash.');
+  }
+  if (!geometryPolicyHash) {
+    throw new TypeError('Visual geometry model requires geometryPolicyHash.');
+  }
   const components = Object.freeze([...(input.components || [])]
     .map(createVisualComponent)
     .sort((left, right) => left.canonicalEntityId.localeCompare(right.canonicalEntityId)));
@@ -154,9 +161,7 @@ export function createTopologyVisualGeometryModel(input = {}) {
     ...components.flatMap((component) => component.diagnostics),
   ].map(createVisualDiagnostic).sort((left, right) =>
     left.code.localeCompare(right.code)
-      || left.canonicalEntityId.localeCompare(right.canonicalEntityId)
-  ));
-
+      || left.canonicalEntityId.localeCompare(right.canonicalEntityId)));
   const base = {
     schema: TOPOLOGY_EDIT_VISUAL_GEOMETRY,
     canonicalTopologyHash,
@@ -165,7 +170,6 @@ export function createTopologyVisualGeometryModel(input = {}) {
     components,
     diagnostics,
   };
-
   return deepFreeze({ ...base, visualGeometryHash: semanticHash(base) });
 }
 
