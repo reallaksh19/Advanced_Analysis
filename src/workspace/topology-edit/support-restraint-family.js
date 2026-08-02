@@ -62,25 +62,35 @@ export function normalizeSupportScale(value) {
 }
 
 export function normalizeGapMm(value) {
+  if (value === null || value === undefined || value === '') return null;
   const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
 export function normalizeRestraintEvidence(support, restraint, index) {
-  const family = restraintFamily(restraint);
   return deepFreeze({
     restraintId: stableRestraintId(support, restraint, index),
     originalKind: stringValue(restraint?.kind || restraint?.type || restraint?.family),
-    family,
+    family: restraintFamily(restraint),
     gapMm: normalizeGapMm(restraint?.gapMm ?? restraint?.gap),
-    directionToken: stringValue(restraint?.direction || restraint?.axis || restraint?.type).toUpperCase(),
-    sourcePaths: Object.freeze(
-      [...new Set([
-        ...(support?.sourcePaths || []),
-        support?.sourcePath,
-        ...(restraint?.sourcePaths || []),
-        restraint?.sourcePath,
-      ].map(stringValue).filter(Boolean))].sort(),
-    ),
+    positiveGapMm: normalizeGapMm(restraint?.positiveGapMm),
+    negativeGapMm: normalizeGapMm(restraint?.negativeGapMm),
+    directionToken: stringValue(restraint?.direction || restraint?.axis).toUpperCase(),
+    sourcePaths: normalizeSourcePaths(support, restraint),
   });
+}
+
+export function supportRestraintRows(support = {}) {
+  if (Array.isArray(support.restraints)) return support.restraints;
+  if (Array.isArray(support.restraint?.restraints)) return support.restraint.restraints;
+  return support.restraint ? [support.restraint] : [];
+}
+
+function normalizeSourcePaths(support, restraint) {
+  return Object.freeze([...new Set([
+    ...(support?.sourcePaths || []),
+    support?.sourcePath,
+    ...(restraint?.sourcePaths || []),
+    restraint?.sourcePath,
+  ].map(stringValue).filter(Boolean))].sort());
 }
