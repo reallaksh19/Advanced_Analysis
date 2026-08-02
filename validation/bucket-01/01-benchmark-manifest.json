@@ -1,8 +1,13 @@
 {
-  "schema": "lafea-bucket-01-benchmark-manifest/v3",
+  "schema": "lafea-bucket-01-benchmark-manifest/v4",
   "manifest_status": "BASELINE_FROZEN_WITH_UNRESOLVED_GATES",
   "repository": "reallaksh19/Advanced_Analysis",
-  "baseline_main_sha": "42c9f96e9baffb52232b4b7ed7f04611c6337961",
+  "baseline_main_sha": "cbd4d3e7397a3d64869d9be1c360af7d1d4ecdc8",
+  "prior_baseline_main_shas": [
+    "42c9f96e9baffb52232b4b7ed7f04611c6337961",
+    "27fb14ddccb07081904d54c1bae161c87372dbdd",
+    "a7144e02598f3e9db0826f10cefe0b5254fa953e"
+  ],
   "qualification_branch": "bucket-01-lafea3-validation-v2",
   "qualification_candidate_sha": "RESOLVED_ONLY_BY_EXACT_HEAD_EXECUTION",
   "bucket_id": "LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE",
@@ -57,9 +62,24 @@
     "C2D-LUG-PINHOLE-01"
   ],
   "production_mesh_levels": [
-    { "level": "L1", "radial_divisions": 2, "circumferential_divisions": 16, "t6_elements": 64 },
-    { "level": "L2", "radial_divisions": 4, "circumferential_divisions": 32, "t6_elements": 256 },
-    { "level": "L3", "radial_divisions": 8, "circumferential_divisions": 64, "t6_elements": 1024 }
+    {
+      "level": "L1",
+      "radial_divisions": 2,
+      "circumferential_divisions": 16,
+      "t6_elements": 64
+    },
+    {
+      "level": "L2",
+      "radial_divisions": 4,
+      "circumferential_divisions": 32,
+      "t6_elements": 256
+    },
+    {
+      "level": "L3",
+      "radial_divisions": 8,
+      "circumferential_divisions": 64,
+      "t6_elements": 1024
+    }
   ],
   "tolerances": {
     "patch_normalized_error_max": 1e-8,
@@ -99,7 +119,8 @@
     "frozen_oracle_status": "PARTIAL_PACKAGE",
     "frozen_oracle_files": [
       "validation/bucket-01/03-pure-bending-panel-oracle.json",
-      "validation/bucket-01/04-t3-patch-oracle.json"
+      "validation/bucket-01/04-t3-patch-oracle.json",
+      "validation/bucket-01/05-pure-shear-oracle.json"
     ],
     "expected_value_package_hash": "UNRESOLVED_GATE"
   },
@@ -108,6 +129,12 @@
       "benchmark_id": "C2D-PATCH-T3-01",
       "script": "scripts/lafea-bucket-01-t3-patch-check.mjs",
       "oracle": "validation/bucket-01/04-t3-patch-oracle.json",
+      "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION"
+    },
+    {
+      "benchmark_id": "C2D-PATCH-PURE-SHEAR-01",
+      "script": "scripts/lafea-bucket-01-pure-shear-check.mjs",
+      "oracle": "validation/bucket-01/05-pure-shear-oracle.json",
       "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION"
     },
     {
