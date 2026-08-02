@@ -14,6 +14,7 @@ const CHECKS = Object.freeze([
   { scope: 'NB-T4B', path: 'scripts/lafea-nb-t4b-recovery-render-check.mjs' },
   { scope: 'NB-T6B', path: 'scripts/lafea-nb-t6b-lug-pinhole-mesh-ladder-check.mjs' },
   { scope: 'NB-T6C', path: 'scripts/lafea-nb-t6c-physical-problem-batch-check.mjs' },
+  { scope: 'NB-T6D', path: 'scripts/lafea-nb-t6d-load-driven-qualification-check.mjs' },
   { scope: 'PR-NB1-A', path: 'scripts/lafea-nb1-analytical-verticals-check.mjs' },
   { scope: 'U1', path: 'scripts/lafea-u1-stage-registry-check.mjs' },
   { scope: 'U1', path: 'scripts/lafea-u1b-registry-consumer-check.mjs' },
@@ -84,7 +85,7 @@ for (const row of CHECKS) {
 }
 
 const report = Object.freeze({
-  schema: 'lafea-nonbucket-stack-report/v8',
+  schema: 'lafea-nonbucket-stack-report/v9',
   check: 'lafea-nonbucket-stack-certification',
   status: failures.length ? 'FAIL' : 'PASS',
   exactHead: gitHead(),
@@ -112,6 +113,9 @@ const report = Object.freeze({
   physicalProblemProjectionIntegrated: true,
   controlledPilotBatchSurfaceIntegrated: true,
   stageDocumentGenerationIntegrated: true,
+  loadDrivenSelectedPilotQualificationIntegrated: true,
+  loadDrivenFreeDofSolveIntegrated: true,
+  loadDrivenReactionEquilibriumIntegrated: true,
   arbitraryOuterProfileMeshingIntegrated: false,
   arbitraryHoleTopologyMeshingIntegrated: false,
   displayTessellationAcceptedAsMeshEvidence: false,
