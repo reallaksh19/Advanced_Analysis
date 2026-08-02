@@ -9,6 +9,10 @@ export { buildAutofixPolicy } from './topology-edit-3d-view-controller-core.js';
 
 const CANONICAL_NODE_ID_PATTERN = /^node:[^\s]+$/;
 const CANONICAL_EDGE_ID_PATTERN = /^edge:[^\s]+$/;
+const EMPTY_TOPOLOGY_EDIT_VIEW_SELECTION = Object.freeze({
+  nodeIds: Object.freeze([]),
+  edgeId: null,
+});
 
 export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCore {
   constructor(eventBus, lifecycleOptions = {}) {
@@ -138,8 +142,8 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
       this.presentationToolbar?.update(this.presentationState);
       this.presentationRuntime?.apply(this.presentationState);
     }
-    const restoredSelection = restoreTopologyEditViewSelection(viewState.selection);
-    if (restoredSelection) this.selection = restoredSelection;
+    this.selection = restoreTopologyEditViewSelection(viewState.selection)
+      ?? EMPTY_TOPOLOGY_EDIT_VIEW_SELECTION;
   }
 
   exportDraft() {
