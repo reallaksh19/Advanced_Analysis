@@ -71,6 +71,15 @@ export {
 } from './external-evidence-handoff.js';
 
 export {
+  PHASE6I_GOVERNANCE_CLOSURE_DECISION_SCHEMA,
+  PHASE6I_INDEPENDENT_CLOSURE_ACCEPTANCE_SCHEMA,
+  Phase6iGovernanceRecordingError,
+  buildPhase6iGovernanceClosureDecision,
+  requirePhase6iGovernanceClosureDecision,
+  requirePhase6iIndependentClosureAcceptance,
+} from './governance-recording.js';
+
+export {
   PHASE6I_ANTI_DRIFT_IDS,
   PHASE6I_ANTI_DRIFT_REVIEW_SCHEMA,
   PHASE6I_BENCHMARK_IDS,

@@ -1,0 +1,133 @@
+name: LFEA Piping Governance Recording Preparation
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Immutable Phase 6I candidate approved for governance recording
+        required: true
+        default: 617f7c2be0c65196a44bc88b6a2bb5ad3b5f1b54
+        type: string
+      acceptance_run_id:
+        description: WP8 workflow run containing the independent closure acceptance
+        required: true
+        type: string
+      acceptance_artifact_name:
+        description: WP8 independent closure acceptance artifact name
+        required: true
+        type: string
+      acceptance_path:
+        description: Relative path to the WP8 acceptance JSON
+        required: true
+        default: independent-closure-acceptance.json
+        type: string
+      governance_run_id:
+        description: Separate governance workflow run containing the signed decision
+        required: true
+        type: string
+      governance_artifact_name:
+        description: Signed governance decision artifact name
+        required: true
+        type: string
+      governance_decision_path:
+        description: Relative path to the signed governance decision JSON
+        required: true
+        default: governance/governance-decision.json
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: lfea-piping-governance-recording-${{ github.ref }}-${{ inputs.candidate_sha }}
+  cancel-in-progress: false
+
+jobs:
+  prepare-governance-recording:
+    name: Prepare non-applying A7 governance recording plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout qualification tooling head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify immutable candidate identity
+        shell: bash
+        env:
+          CANDIDATE_REF: refs/remotes/origin/release/lfea-piping-phase6i-617f7c2
+          EXPECTED_HEAD: ${{ inputs.candidate_sha }}
+          TOOLING_HEAD: ${{ github.sha }}
+          ACCEPTANCE_RUN_ID: ${{ inputs.acceptance_run_id }}
+          GOVERNANCE_RUN_ID: ${{ inputs.governance_run_id }}
+        run: |
+          test "$TOOLING_HEAD" = "$(git rev-parse HEAD)"
+          test "$EXPECTED_HEAD" = "617f7c2be0c65196a44bc88b6a2bb5ad3b5f1b54"
+          test "$EXPECTED_HEAD" = "$(git rev-parse "$CANDIDATE_REF^{commit}")"
+          test "$ACCEPTANCE_RUN_ID" != "$GOVERNANCE_RUN_ID"
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run repository policy gate
+        run: npm run gate
+
+      - name: Download WP8 acceptance artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.acceptance_run_id }}
+          name: ${{ inputs.acceptance_artifact_name }}
+          path: ${{ runner.temp }}/lfea-wp8-acceptance
+
+      - name: Download signed governance decision artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.governance_run_id }}
+          name: ${{ inputs.governance_artifact_name }}
+          path: ${{ runner.temp }}/lfea-governance-decision
+
+      - name: Prepare governance recording plan
+        shell: bash
+        env:
+          ACCEPTANCE_ROOT: ${{ runner.temp }}/lfea-wp8-acceptance
+          ACCEPTANCE_PATH: ${{ inputs.acceptance_path }}
+          ACCEPTANCE_RUN_ID: ${{ inputs.acceptance_run_id }}
+          ACCEPTANCE_ARTIFACT_NAME: ${{ inputs.acceptance_artifact_name }}
+          DECISION_ROOT: ${{ runner.temp }}/lfea-governance-decision
+          DECISION_PATH: ${{ inputs.governance_decision_path }}
+          DECISION_RUN_ID: ${{ inputs.governance_run_id }}
+          DECISION_ARTIFACT_NAME: ${{ inputs.governance_artifact_name }}
+          OUTPUT_ROOT: ${{ runner.temp }}/lfea-governance-recording-plan
+          EXPECTED_HEAD: ${{ inputs.candidate_sha }}
+        run: |
+          mkdir -p "$OUTPUT_ROOT"
+          node scripts/lfea-piping-phase6i-governance-recording-validator.mjs \
+            --acceptance-root="$ACCEPTANCE_ROOT" \
+            --acceptance="$ACCEPTANCE_PATH" \
+            --acceptance-run-id="$ACCEPTANCE_RUN_ID" \
+            --acceptance-artifact-name="$ACCEPTANCE_ARTIFACT_NAME" \
+            --decision-root="$DECISION_ROOT" \
+            --decision="$DECISION_PATH" \
+            --decision-run-id="$DECISION_RUN_ID" \
+            --decision-artifact-name="$DECISION_ARTIFACT_NAME" \
+            --expected-head="$EXPECTED_HEAD" \
+            --output="$OUTPUT_ROOT/governance-recording-plan.json"
+
+      - name: Upload non-applying governance recording plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: lfea-governance-recording-plan-${{ inputs.candidate_sha }}
+          path: ${{ runner.temp }}/lfea-governance-recording-plan
+          if-no-files-found: error
+          retention-days: 90

@@ -92,6 +92,7 @@ await import('./lfea-piping-phase6i-evidence-policy-check.mjs');
 await import('./lfea-piping-phase6i-pr371-boundary-check.mjs');
 await import('./lfea-piping-phase6i-project-authority-index-check.mjs');
 await import('./lfea-piping-phase6i-independent-closure-anti-drift-check.mjs');
+await import('./lfea-piping-phase6i-governance-recording-anti-drift-check.mjs');
 await import('./linear-piping-project-qualification-anti-drift-check.mjs');
 await import('./lfea-piping-phase6c-anti-drift-check.mjs');
 await import('./lfea-piping-phase6d-anti-drift-check.mjs');
