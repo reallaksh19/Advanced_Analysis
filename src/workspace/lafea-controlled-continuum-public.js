@@ -29,3 +29,12 @@ export {
   executeLafeaLugPinholePhysicalProblemBatch,
   validateLafeaLugPinholePhysicalProblemProjection,
 } from './lafea-lug-pinhole-physical-problem-batch.js';
+export {
+  LAFEA_LOAD_DRIVEN_PILOT_MANIFEST_SCHEMA,
+  LAFEA_LOAD_DRIVEN_PILOT_PRODUCER_REVISION,
+  LAFEA_LOAD_DRIVEN_PILOT_QUALIFICATION_SCHEMA,
+  LAFEA_LOAD_DRIVEN_PILOT_RECEIPT_SCHEMA,
+  createLafeaLoadDrivenPilotQualification,
+  evaluateLafeaLoadDrivenConvergence,
+  validateLafeaLoadDrivenPilotQualification,
+} from './lafea-load-driven-pilot-qualification.js';
