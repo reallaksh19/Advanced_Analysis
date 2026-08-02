@@ -7,11 +7,15 @@ import {
   EVIDENCE_ARTIFACT_REFERENCE_SCHEMA,
   EXTERNAL_QUALIFICATION_PACKAGE_REQUEST_SCHEMA,
   PERFORMANCE_EVIDENCE_SCHEMA,
+  PHASE6I_FROZEN_CANDIDATE,
+  PHASE6I_IMMUTABLE_REF,
+  PROJECT_AUTHORITY_GROUP_IDS,
   QUALIFICATION_PROFILE_SCHEMA,
   QUALIFICATION_REQUEST_SCHEMA,
   RELEASE_REVIEW_DECISION,
   RELEASE_REVIEW_DISPOSITION_SCHEMA,
   ROLLBACK_EVIDENCE_SCHEMA,
+  buildProjectAuthorityIndex,
   compileLinearPipingExternalQualificationPackage,
   compileLinearPipingQualificationComparison,
   requireLinearPipingExternalQualificationPackage,
@@ -23,7 +27,7 @@ import {
 import { compileLinearPipingPresentation } from '../src/core/linear-piping-presentation/index.js';
 import { buildQualifiedPresentationFixture } from './linear-piping-presentation-fixtures.mjs';
 
-const EXACT_HEAD = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const EXACT_HEAD = PHASE6I_FROZEN_CANDIDATE;
 const ROLLBACK_TARGET = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
 function test(id, name, body) {
@@ -300,6 +304,61 @@ function disposition(overrides = {}) {
   });
 }
 
+function projectAuthority(approved = true) {
+  return buildProjectAuthorityIndex({
+    repository: 'reallaksh19/Advanced_Analysis',
+    candidate: {
+      sha: PHASE6I_FROZEN_CANDIDATE,
+      ref: PHASE6I_IMMUTABLE_REF,
+    },
+    indexId: 'WP2-PROJECT-AUTHORITY-INDEX',
+    revision: 'REV-1',
+    preparedAtUtc: '2026-07-31T10:49:00Z',
+    preparedBy: {
+      name: 'RESPONSIBLE-ENGINEER',
+      role: 'PIPING-STRESS-ENGINEER',
+      organization: 'PROJECT-ENGINEERING',
+    },
+    authorityGroups: PROJECT_AUTHORITY_GROUP_IDS.map((groupId, index) => ({
+      groupId,
+      applicability: 'APPLICABLE',
+      resolution: 'RESOLVED',
+      scopeDescription: `Controlled authority for ${groupId}.`,
+      source: {
+        sourceType: groupId === 'REPRESENTATIVE_REAL_PROJECT_MODEL'
+          ? 'CONTROLLED_MODEL'
+          : 'PROJECT_DOCUMENT',
+        documentId: `WP2-SOURCE-${String(index + 1).padStart(2, '0')}`,
+        title: `Controlled source for ${groupId}`,
+        revision: 'REV-1',
+        owner: 'PROJECT-ENGINEERING',
+        retainedReference: `records/wp2/source-${String(index + 1).padStart(2, '0')}.json`,
+        sourceHash: `fnv1a64:${(index + 1).toString(16).padStart(16, '0')}`,
+      },
+      approvalStatus: approved ? 'APPROVED' : 'NOT_APPROVED',
+    })),
+    engineeringApproval: approved
+      ? {
+        status: 'APPROVED',
+        approverName: 'RESPONSIBLE-PIPING-AUTHORITY',
+        approverRole: 'LEAD-PIPING-STRESS-ENGINEER',
+        organization: 'PROJECT-ENGINEERING',
+        approvedAtUtc: '2026-07-31T10:49:30Z',
+        evidenceReference: 'records/wp2/engineering-approval.json',
+        evidenceHash: 'fnv1a64:aaaaaaaaaaaaaaaa',
+      }
+      : {
+        status: 'NOT_APPROVED',
+        approverName: null,
+        approverRole: null,
+        organization: null,
+        approvedAtUtc: null,
+        evidenceReference: null,
+        evidenceHash: null,
+      },
+  });
+}
+
 function artifact(path, record, contentHash) {
   return {
     schema: EVIDENCE_ARTIFACT_REFERENCE_SCHEMA,
@@ -312,6 +371,7 @@ function artifact(path, record, contentHash) {
 }
 
 function packageRequest(overrides = {}) {
+  const projectAuthorityIndex = projectAuthority();
   const realModelReconciliation = comparison('REAL_MODEL_RECONCILIATION');
   const commercialCorroboration = comparison('COMMERCIAL_CORROBORATION');
   const performanceEvidence = performance();
@@ -323,6 +383,7 @@ function packageRequest(overrides = {}) {
     exactHead: EXACT_HEAD,
     applicationResult: fixture.applicationResult,
     presentation,
+    projectAuthorityIndex,
     realModelReconciliation,
     commercialCorroboration,
     performanceEvidence,
@@ -363,7 +424,10 @@ console.log('\n--- [SIMULATED][INELIGIBLE_FOR_PROJECT_EVIDENCE] Phase 6B externa
 const packageValue = compileLinearPipingExternalQualificationPackage(packageRequest());
 
 test('P6B-EXT-01', 'Complete external records compile only to release-review eligibility', () => {
+  assert.equal(packageValue.schema, 'linear-piping-external-qualification-package/v2');
   assert.equal(packageValue.status, 'ELIGIBLE_FOR_RELEASE_REVIEW');
+  assert.equal(packageValue.projectAuthorityIndex.wp2Status, 'WP2_COMPLETE');
+  assert.equal(packageValue.exactHead, PHASE6I_FROZEN_CANDIDATE);
   assert.deepEqual(packageValue.requiredSelectorKinds, [
     'B31_CALCULATED_STRESS',
     'B31_UTILIZATION',
@@ -472,6 +536,33 @@ test('P6B-EXT-08', 'Tampered package evidence is rejected independently', () => 
   expectCode(
     () => requireLinearPipingExternalQualificationPackage(tampered),
     'PIPING_EXTERNAL_PACKAGE_HASH_MISMATCH',
+  );
+});
+
+test('P6B-EXT-09', 'Unapproved WP-2 authority blocks external package compilation', () => {
+  const request = packageRequest({ projectAuthorityIndex: projectAuthority(false) });
+  expectCode(
+    () => compileLinearPipingExternalQualificationPackage(request),
+    'LFEA_WP2_INDEX_NOT_APPROVED',
+  );
+});
+
+test('P6B-EXT-10', 'WP-2 authority identity is bound into package hashes', () => {
+  const tampered = clone(packageValue);
+  tampered.projectAuthorityIndex.evidenceHash = 'fnv1a64:0000000000000000';
+  expectCode(
+    () => requireLinearPipingExternalQualificationPackage(tampered),
+    'LFEA_WP2_INDEX_CANONICAL_MISMATCH',
+  );
+});
+
+test('P6B-EXT-11', 'WP-2 candidate and package exact head cannot diverge', () => {
+  const request = packageRequest({
+    exactHead: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+  expectCode(
+    () => compileLinearPipingExternalQualificationPackage(request),
+    'PIPING_EXTERNAL_PACKAGE_PROJECT_AUTHORITY_HEAD_MISMATCH',
   );
 });
 

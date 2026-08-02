@@ -4,22 +4,35 @@ Program disposition remains `BLOCKED` in the committed repository template.
 
 ## Purpose
 
-Phase 6F can produce the retained G0–G7 internal artifact set. Phase 6B defines the independently supplied G8–G10 external qualification package. Phase 6E validates a complete runtime release bundle.
+Phase 6F produces the retained G0–G7 internal artifact set. Phase 6H produces the independently supplied G8–G10 external package and binds it to the approved WP-2 Project Authority Index. Phase 6E validates a complete runtime release bundle.
 
-Phase 6G provides the missing governed assembly step between those authorities.
+Phase 6G provides the governed assembly step between those authorities.
 
-It copies and path-binds already sealed evidence. It does not execute engineering programs, create comparison values, sign a disposition, change the committed release template or certify a release.
+It copies and path-binds already sealed evidence. It does not execute engineering programs, create comparison values, approve WP-2, sign a disposition, change the committed release template or certify a release.
+
+## Candidate and tooling identities
+
+The only eligible evidence candidate is:
+
+```text
+CANDIDATE_SHA: 617f7c2be0c65196a44bc88b6a2bb5ad3b5f1b54
+CANDIDATE_REF: release/lfea-piping-phase6i-617f7c2
+```
+
+The workflow may execute reviewed assembly tooling from a later tooling head. It verifies the tooling checkout and the immutable candidate ref separately. `github.sha` identifies the tooling checkout only and is never substituted for the evidence candidate.
 
 ## Inputs
 
-The assembler requires:
+The WP-2 assembler requires:
 
 - a successful Phase 6F internal evidence root;
 - the exact Phase 6F internal manifest path, defaulting to `internal/exact-head-manifest.json`;
-- a governed Phase 6B external evidence root;
-- the explicit relative path to `linear-piping-external-qualification-package/v1`;
-- one exact 40-character repository head;
+- a governed Phase 6H external evidence root;
+- the explicit relative path to `linear-piping-project-authority-bound-external-package/v1`;
+- the immutable candidate SHA;
 - a new output path whose parent already exists.
+
+The bound package contains the validated v2 external qualification package and the artifact reference for the retained approved Project Authority Index.
 
 The internal and external roots must be real, distinct, non-symbolic-link directories. The output must not exist and must not overlap the repository or either input root.
 
@@ -27,100 +40,118 @@ The internal and external roots must be real, distinct, non-symbolic-link direct
 
 Before copying, Phase 6G requires:
 
-1. The internal manifest to pass `requireInternalExactHeadManifest`.
-2. The external package to pass `requireLinearPipingExternalQualificationPackage`.
-3. Both sealed inputs to identify the requested exact head.
-4. The Phase 6F collection summary to identify ten commands, seven artifact roles and the same manifest hashes.
-5. The Phase 6F A0 runtime baseline to identify the same exact head, a clean checkout and `EXACT_HEAD_BASELINE_CAPTURED`.
-6. The baseline canonical content hash to match the Phase 6F collection summary.
+1. The bound external package to pass `requireProjectAuthorityBoundExternalPackage`.
+2. The bound package, embedded external package and WP-2 candidate to identify the requested immutable candidate SHA.
+3. The retained `external/project-authority-index.json` to be canonically identical to the package-embedded index.
+4. The retained WP-2 content, semantic and evidence hashes to match its artifact reference.
+5. The bound-package path, WP-2 path and five external evidence paths to be unique.
+6. The internal manifest to pass `requireInternalExactHeadManifest` through the existing assembler.
+7. The Phase 6F collection summary to identify ten commands, seven artifact roles and the same manifest hashes.
+8. The Phase 6F A0 runtime baseline to identify the same candidate, a clean checkout and `EXACT_HEAD_BASELINE_CAPTURED`.
+9. The baseline canonical content hash to match the Phase 6F collection summary.
+
+## Delegated legacy assembly
+
+After the WP-2 checks pass, the wrapper creates a private temporary external root containing only:
+
+- the validated v2 external qualification package;
+- the five package-referenced external records.
+
+It then delegates to the existing `assembleRuntimeReleaseBundle` authority. The existing internal/external validators and release-readiness evaluator remain unchanged.
+
+This preserves the public `lfea-piping-release-evidence/v1` schema and its exact artifact-key set. WP-2 retention does not add keys to `release-evidence.json`.
 
 ## Copy boundary
 
-Only referenced files are copied:
+The existing assembler copies:
 
 - the internal exact-head manifest;
 - seven internal Phase 6D artifact roles;
 - the Phase 6F collection summary and A0 runtime baseline;
-- the external qualification package;
+- the v2 external qualification package;
 - five external Phase 6C artifact roles.
 
-Relative paths are preserved so existing manifest/package references remain authoritative. Absolute paths, drive-qualified paths, traversal, empty segments, symbolic links, non-files and script/test/fixture/mock roots are rejected.
+After the delegated assembly succeeds, the WP-2 wrapper additionally copies:
 
-All destination paths must be unique under case-insensitive comparison. The runtime manifest and assembly-summary paths are reserved.
+- `external/project-authority-index.json`;
+- `external/project-authority-bound-package.json`.
+
+Relative paths are preserved. Absolute paths, drive-qualified paths, traversal, empty segments, symbolic links, non-files and script/test/fixture/mock roots are rejected.
+
+All source and destination paths must be unique under case-insensitive comparison. The runtime manifest and assembly-summary paths remain reserved by the existing assembler.
 
 ## Atomic publication
 
-Assembly occurs in a new sibling staging directory.
+The existing assembler first builds and validates a private legacy-compatible runtime bundle. It constructs a runtime-only `lfea-piping-release-evidence/v1` candidate containing:
 
-After copying, Phase 6G constructs a runtime-only `lfea-piping-release-evidence/v1` candidate containing:
-
-- the exact requested head;
+- the immutable candidate SHA;
 - all G0–G10 gates set to `VERIFIED`;
-- all fourteen required artifact paths;
+- the existing required artifact paths;
 - `programDisposition: QUALIFIED`.
 
-That candidate is not published immediately. It is first passed through the existing Phase 6E evaluator with the real Phase 6D internal and Phase 6C external validators in release mode.
+That candidate is passed through the existing Phase 6E evaluator with the real Phase 6D internal and Phase 6C external validators in release mode.
 
-Publication occurs only when the evaluator returns:
+The WP-2 wrapper accepts the delegated output only when it contains a valid legacy assembly summary and qualified release manifest for the same candidate. It then copies the delegated output and the two WP-2 artifacts into its own new staging directory.
 
-- `mode: RELEASE`;
-- `releaseEligible: true`;
-- the same exact head;
-- eleven verified gates;
-- `programDisposition: QUALIFIED`.
+`bundle/assembly-summary.json` is replaced with `lfea-piping-wp2-runtime-bundle-assembly/v1`, which binds:
 
-On success, the staging directory receives:
+- the existing internal manifest identities;
+- the v2 external package identities;
+- the Project Authority Index path and identities;
+- the project-authority-bound package path and identities.
 
-- `release-evidence.json`;
-- `bundle/assembly-summary.json`;
-
-and is renamed atomically to the requested output path.
-
-On any failure, the assembler removes only its own staging directory and leaves the requested output path absent.
+The exact public release-manifest schema remains unchanged. On success, the WP-2 staging directory is renamed atomically to the requested output path. On failure, only agent-created temporary and staging directories are removed.
 
 ## CLI
 
 ```bash
-node scripts/lfea-piping-runtime-bundle-assembler.mjs \
+node scripts/lfea-piping-wp2-runtime-bundle-assembler.mjs \
   --internal-root=/path/to/internal-artifact \
-  --external-root=/path/to/external-artifact \
-  --external-package=external/external-qualification-package.json \
+  --external-root=/path/to/phase6h-external-artifact \
+  --bound-package=external/project-authority-bound-package.json \
   --output=/path/to/new/runtime-bundle \
-  --exact-head=<selected checkout SHA>
+  --exact-head=617f7c2be0c65196a44bc88b6a2bb5ad3b5f1b54
 ```
 
 An alternate internal manifest path may be supplied with `--internal-manifest=`.
 
 ## Manual workflow
 
-`.github/workflows/lfea-piping-runtime-bundle-assembly.yml` accepts the run ID and artifact name for both inputs plus the external package path.
+`.github/workflows/lfea-piping-runtime-bundle-assembly.yml` accepts:
+
+- the immutable candidate SHA;
+- the run ID and artifact name for the successful Phase 6F internal input;
+- the run ID and artifact name for the governed Phase 6H external input;
+- the bound-package path.
 
 The workflow:
 
-1. Checks out the selected exact head.
-2. Downloads the successful internal artifact.
-3. Downloads the governed external artifact.
-4. Runs the Phase 6G assembler with `${{ github.sha }}`.
-5. Revalidates the assembled bundle through `npm run check:lfea-piping-release`.
-6. Uploads `lfea-piping-runtime-release-bundle-${{ github.sha }}`.
+1. Checks out the selected qualification-tooling head.
+2. Verifies the tooling checkout and immutable candidate ref separately.
+3. Downloads the successful internal artifact.
+4. Downloads the WP-2-bound external artifact.
+5. Runs the WP-2 Phase 6G assembler with `${{ inputs.candidate_sha }}`.
+6. Revalidates the unchanged release manifest through `npm run check:lfea-piping-release` using the candidate SHA.
+7. Uploads `lfea-piping-runtime-release-bundle-${{ inputs.candidate_sha }}`.
 
-The resulting artifact is an input to the Phase 6E runtime release-certification workflow. It is not a substitute for retaining successful certification logs.
+The resulting artifact is an input to Phase 6E runtime release certification. It is not a substitute for successful certification logs or independent review.
 
 ## Qualification boundary
 
-The committed check is marked:
+The committed checks are marked:
 
 ```text
-[SIMULATED][INELIGIBLE_FOR_RELEASE_EVIDENCE][NO_ENGINEERING_COMMAND_EXECUTION]
+[SIMULATED][INELIGIBLE_FOR_PROJECT_EVIDENCE][NO_ENGINEERING_COMMAND_EXECUTION]
 ```
 
-It uses synthetic files and injected intake validators. It proves assembly mechanics, exact-head binding, deterministic output, collision and traversal rejection, atomic cleanup and release-evaluator routing. It does not represent real G0–G10 evidence.
+They use synthetic files and injected validators/assembler seams. They prove bound-package validation, retained-authority equality, candidate/head binding, deterministic summary identity, path-collision rejection, exact release-manifest compatibility, atomic cleanup and delegation to the existing release-evaluator route. They do not represent real G0–G10 evidence.
 
 ## Remaining conditions
 
-- Run Phase 6F successfully on the selected exact head.
-- Supply a complete non-fictional Phase 6B external package for that same head.
+- Approve and retain the real candidate-bound WP-2 index.
+- Run Phase 6F successfully for the immutable candidate.
+- Supply a complete non-fictional Phase 6H WP-2-bound external artifact for the same candidate.
 - Run Phase 6G and retain the assembled bundle artifact.
 - Run the Phase 6E runtime release-certification workflow against that bundle.
-- Retain successful full-gate, assembly, runtime-validation and signed-disposition evidence.
+- Retain successful full-gate, materialization, binding, assembly, runtime-validation and signed-disposition evidence.
 - Close `AUD-A7-001` only through independent evidence review.

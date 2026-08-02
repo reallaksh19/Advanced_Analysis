@@ -78,7 +78,24 @@ assert.match(rollback, /preservedProjectData/u);
 assert.match(rollback, /postRollbackChecks/u);
 assert.doesNotMatch(rollback, /requireExternalText\(source\.commandText/u);
 
+const projectAuthority = source['project-authority-index.js'];
+assert.match(projectAuthority, /lfea-piping-phase6i-project-authority-index\/v1/u);
+assert.match(projectAuthority, /WP2_INPUT_REQUIRED/u);
+assert.match(projectAuthority, /WP2_APPROVAL_REQUIRED/u);
+assert.match(projectAuthority, /WP2_COMPLETE/u);
+assert.match(projectAuthority, /requireApprovedProjectAuthorityIndex/u);
+assert.match(projectAuthority, /LFEA_WP2_SHADOW_SOURCE_PROHIBITED/u);
+assert.match(projectAuthority, /617f7c2be0c65196a44bc88b6a2bb5ad3b5f1b54/u);
+assert.match(projectAuthority, /release\/lfea-piping-phase6i-617f7c2/u);
+assert.match(projectAuthority, /releaseQualified:\s*false/u);
+assert.doesNotMatch(projectAuthority, /releaseQualified:\s*true/u);
+
 const externalPackage = source['external-evidence-package.js'];
+assert.match(externalPackage, /linear-piping-external-qualification-package-request\/v2/u);
+assert.match(externalPackage, /linear-piping-external-qualification-package\/v2/u);
+assert.match(externalPackage, /PIPING_EXTERNAL_PACKAGE_REQUEST_INVALID/u);
+assert.match(externalPackage, /projectAuthorityIndex/u);
+assert.match(externalPackage, /requireApprovedProjectAuthorityIndex/u);
 assert.match(externalPackage, /ELIGIBLE_FOR_RELEASE_REVIEW/u);
 assert.match(externalPackage, /requireCurrentLinearPipingPresentation/u);
 assert.match(externalPackage, /INTERFACE_FORCE_LOCAL/u);
@@ -92,6 +109,19 @@ assert.match(externalPackage, /PIPING_EXTERNAL_PACKAGE_ROLLBACK_INVALID/u);
 assert.match(externalPackage, /PIPING_EVIDENCE_ARTIFACT_REFERENCE_MISMATCH/u);
 assert.doesNotMatch(externalPackage, /['"](?:VERIFIED|QUALIFIED)['"]/u);
 
+const boundPackage = source['project-authority-bound-external-package.js'];
+assert.match(boundPackage, /linear-piping-project-authority-bound-external-package-request\/v1/u);
+assert.match(boundPackage, /linear-piping-project-authority-bound-external-package\/v1/u);
+assert.match(boundPackage, /ELIGIBLE_FOR_PHASE6G_ASSEMBLY/u);
+assert.match(boundPackage, /requireApprovedProjectAuthorityIndex/u);
+assert.match(boundPackage, /requireLinearPipingExternalQualificationPackage/u);
+assert.match(boundPackage, /PIPING_PROJECT_AUTHORITY_HEAD_MISMATCH/u);
+assert.match(boundPackage, /PIPING_PROJECT_AUTHORITY_ARTIFACT_MISMATCH/u);
+assert.match(boundPackage, /PIPING_PROJECT_AUTHORITY_ARTIFACT_PATH_DUPLICATE/u);
+assert.match(boundPackage, /projectAuthorityBoundPackageSemanticProjection/u);
+assert.match(boundPackage, /computeProjectAuthorityBoundPackageEvidenceHash/u);
+assert.doesNotMatch(boundPackage, /['"](?:VERIFIED|QUALIFIED)['"]/u);
+
 const fixture = fs.readFileSync('scripts/linear-piping-project-qualification-check.mjs', 'utf8');
 assert.match(fixture, /FICTIONAL-QUALIFICATION-LAB-NOT-PROJECT-EVIDENCE/u);
 assert.match(fixture, /FICTIONAL-COMMERCIAL-PIPE-STRESS-PROGRAM/u);
@@ -100,7 +130,10 @@ const externalFixture = fs.readFileSync(
   'utf8',
 );
 assert.match(externalFixture, /\[SIMULATED\]\[INELIGIBLE_FOR_PROJECT_EVIDENCE\]/u);
+assert.match(externalFixture, /linear-piping-external-qualification-package\/v2/u);
 assert.match(externalFixture, /PIPING_EXTERNAL_EVIDENCE_INELIGIBLE/u);
+assert.match(externalFixture, /projectAuthorityIndex/u);
+assert.match(externalFixture, /LFEA_WP2_INDEX_NOT_APPROVED/u);
 
 const releaseEvidence = JSON.parse(
   fs.readFileSync('release-evidence/lfea-piping-release-evidence.json', 'utf8'),
@@ -144,6 +177,9 @@ assert.match(releaseOrchestrator, /evidence\.programDisposition !== 'QUALIFIED'/
 
 const index = source['index.js'];
 assert.match(index, /compileLinearPipingExternalQualificationPackage/u);
+assert.match(index, /requireApprovedProjectAuthorityIndex/u);
+assert.match(index, /compileProjectAuthorityBoundExternalPackage/u);
+assert.match(index, /requireProjectAuthorityBoundExternalPackage/u);
 assert.match(index, /sealPerformanceEvidence/u);
 assert.match(index, /sealRollbackEvidence/u);
 assert.match(index, /sealReleaseReviewDisposition/u);

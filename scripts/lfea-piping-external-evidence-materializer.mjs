@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { semanticHash } from '../src/core/shared-piping-model/canonical-json.js';
 import {
   compileLinearPipingExternalQualificationPackage,
+  requireApprovedProjectAuthorityIndex,
   requireLinearPipingExternalQualificationPackage,
 } from '../src/core/linear-piping-project-qualification/index.js';
 import {
@@ -15,16 +16,23 @@ import {
 
 const MODULE_PATH = fileURLToPath(import.meta.url);
 const REPOSITORY_ROOT = path.resolve(path.dirname(MODULE_PATH), '..');
-const REQUEST_SCHEMA = 'lfea-piping-external-materialization-request/v1';
-const SUMMARY_SCHEMA = 'lfea-piping-external-materialization-summary/v1';
-const PACKAGE_REQUEST_SCHEMA = 'linear-piping-external-qualification-package-request/v1';
+const REQUEST_SCHEMA = 'lfea-piping-external-materialization-request/v2';
+const SUMMARY_SCHEMA = 'lfea-piping-external-materialization-summary/v2';
+const PACKAGE_REQUEST_SCHEMA = 'linear-piping-external-qualification-package-request/v2';
 const ARTIFACT_REFERENCE_SCHEMA = 'linear-piping-evidence-artifact-reference/v1';
 const RELEASE_SCHEMA = 'lfea-piping-release-evidence/v1';
 const RELEASE_PROGRAM = 'PRIORITY_2_LINEAR_PIPING_FEA_APPLICATION_CHAIN';
 const PACKAGE_PATH = 'external/external-qualification-package.json';
+const AUTHORITY_INDEX_PATH = 'external/project-authority-index.json';
 const SUMMARY_PATH = 'external/materialization-summary.json';
 const HEAD_PATTERN = /^[0-9a-f]{40}$/u;
-const REQUEST_KEYS = Object.freeze(['schema', 'packageId', 'exactHead', 'records']);
+const REQUEST_KEYS = Object.freeze([
+  'schema',
+  'packageId',
+  'exactHead',
+  'projectAuthorityIndex',
+  'records',
+]);
 const RECORD_KEYS = Object.freeze([
   'applicationResult',
   'presentation',
@@ -96,6 +104,7 @@ export function materializeExternalQualificationEvidence({
   requestPath,
   outputRoot,
   expectedHead,
+  authorityValidator = requireApprovedProjectAuthorityIndex,
   packageCompiler = compileLinearPipingExternalQualificationPackage,
   packageValidator = requireLinearPipingExternalQualificationPackage,
   intakeValidator = validateExternalReleaseEvidence,
@@ -122,6 +131,16 @@ export function materializeExternalQualificationEvidence({
     });
   }
 
+  const projectAuthorityIndex = authorityValidator(readJson(
+    resolveSourceFile(input, request.projectAuthorityIndex),
+    'LFEA_EXTERNAL_MATERIALIZATION_AUTHORITY_INDEX_JSON_INVALID',
+  ));
+  if (projectAuthorityIndex.candidate?.sha !== expectedHead) {
+    fail('LFEA_EXTERNAL_MATERIALIZATION_AUTHORITY_HEAD_MISMATCH', {
+      expectedHead,
+      authorityHead: projectAuthorityIndex.candidate?.sha ?? null,
+    });
+  }
   const records = Object.fromEntries(RECORD_KEYS.map((key) => [
     key,
     readJson(
@@ -136,6 +155,7 @@ export function materializeExternalQualificationEvidence({
     exactHead: request.exactHead,
     applicationResult: records.applicationResult,
     presentation: records.presentation,
+    projectAuthorityIndex,
     realModelReconciliation: records.realModelReconciliation,
     commercialCorroboration: records.commercialCorroboration,
     performanceEvidence: records.performanceEvidence,
@@ -145,13 +165,17 @@ export function materializeExternalQualificationEvidence({
   });
   const packageRecord = packageValidator(compiled);
   if (packageRecord.exactHead !== expectedHead
-    || packageRecord.status !== 'ELIGIBLE_FOR_RELEASE_REVIEW') {
+    || packageRecord.status !== 'ELIGIBLE_FOR_RELEASE_REVIEW'
+    || packageRecord.projectAuthorityIndex.candidate.sha !== expectedHead
+    || packageRecord.projectAuthorityIndex.semanticHash !== projectAuthorityIndex.semanticHash
+    || packageRecord.projectAuthorityIndex.evidenceHash !== projectAuthorityIndex.evidenceHash) {
     fail('LFEA_EXTERNAL_MATERIALIZATION_PACKAGE_INVALID');
   }
 
   const staging = `${output}.staging-${process.pid}-${Date.now()}`;
   fs.mkdirSync(staging, { recursive: false });
   try {
+    writeJson(staging, AUTHORITY_INDEX_PATH, projectAuthorityIndex);
     for (const key of Object.keys(OUTPUT_RECORDS)) {
       writeJson(staging, OUTPUT_RECORDS[key], records[key]);
     }
@@ -164,11 +188,14 @@ export function materializeExternalQualificationEvidence({
     requireEligibleIntake(intake, expectedHead, packageRecord);
     const summary = Object.freeze({
       schema: SUMMARY_SCHEMA,
-      status: 'ELIGIBLE_FOR_PHASE6G_ASSEMBLY',
+      status: 'ELIGIBLE_FOR_WP2_BINDING',
       exactHead: expectedHead,
       packagePath: PACKAGE_PATH,
-      evidenceRecordCount: Object.keys(OUTPUT_RECORDS).length,
+      projectAuthorityIndexPath: AUTHORITY_INDEX_PATH,
+      evidenceRecordCount: Object.keys(OUTPUT_RECORDS).length + 1,
       requestContentHash: semanticHash(request),
+      projectAuthorityIndexSemanticHash: projectAuthorityIndex.semanticHash,
+      projectAuthorityIndexEvidenceHash: projectAuthorityIndex.evidenceHash,
       applicationResultSemanticHash: packageRecord.applicationResultSemanticHash,
       applicationResultEvidenceHash: packageRecord.applicationResultEvidenceHash,
       presentationSemanticHash: packageRecord.presentationSemanticHash,
@@ -192,6 +219,10 @@ function requireMaterializationRequest(value) {
     fail('LFEA_EXTERNAL_MATERIALIZATION_REQUEST_INVALID');
   }
   requireHead(value.exactHead);
+  const projectAuthorityIndex = requireSafeRelativeJsonPath(
+    value.projectAuthorityIndex,
+    'LFEA_EXTERNAL_MATERIALIZATION_AUTHORITY_INDEX_PATH_INVALID',
+  );
   requireExactKeys(
     value.records,
     RECORD_KEYS,
@@ -204,7 +235,8 @@ function requireMaterializationRequest(value) {
       'LFEA_EXTERNAL_MATERIALIZATION_RECORD_PATH_INVALID',
     ),
   ]));
-  const paths = Object.values(records).map((entry) => entry.toLowerCase());
+  const paths = [projectAuthorityIndex, ...Object.values(records)]
+    .map((entry) => entry.toLowerCase());
   if (new Set(paths).size !== paths.length) {
     fail('LFEA_EXTERNAL_MATERIALIZATION_RECORD_PATH_DUPLICATE');
   }
@@ -212,6 +244,7 @@ function requireMaterializationRequest(value) {
     schema: value.schema,
     packageId: value.packageId,
     exactHead: value.exactHead,
+    projectAuthorityIndex,
     records: Object.freeze(records),
   });
 }

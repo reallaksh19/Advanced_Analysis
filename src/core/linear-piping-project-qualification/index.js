@@ -59,6 +59,29 @@ export {
 } from './performance-evidence.js';
 
 export {
+  PHASE6I_FROZEN_CANDIDATE,
+  PHASE6I_IMMUTABLE_REF,
+  PROJECT_AUTHORITY_GROUP_IDS,
+  PROJECT_AUTHORITY_INDEX_SCHEMA,
+  PROJECT_AUTHORITY_INDEX_STATUS,
+  PROJECT_AUTHORITY_INDEX_TEMPLATE_SCHEMA,
+  ProjectAuthorityIndexError,
+  assertProjectAuthorityIndex,
+  buildProjectAuthorityIndex,
+  requireApprovedProjectAuthorityIndex,
+} from './project-authority-index.js';
+
+export {
+  PROJECT_AUTHORITY_BOUND_PACKAGE_REQUEST_SCHEMA,
+  PROJECT_AUTHORITY_BOUND_PACKAGE_SCHEMA,
+  PROJECT_AUTHORITY_BOUND_PACKAGE_STATUS,
+  compileProjectAuthorityBoundExternalPackage,
+  computeProjectAuthorityBoundPackageEvidenceHash,
+  projectAuthorityBoundPackageSemanticProjection,
+  requireProjectAuthorityBoundExternalPackage,
+} from './project-authority-bound-external-package.js';
+
+export {
   requireRollbackEvidence,
   sealRollbackEvidence,
 } from './rollback-evidence.js';
