@@ -87,3 +87,95 @@ export {
   LAFEA_INITIAL_TEMPLATE_BENCHMARK_MANIFESTS,
   requireInitialTemplateBenchmarkManifest,
 } from './benchmark-manifests/initial-manifests.js';
+
+export {
+  LAFEA_TEMPLATE_APPLICABILITY,
+  LAFEA_TEMPLATE_AUTHORITY_STATES,
+  LAFEA_TEMPLATE_CHANGE_KINDS,
+  LAFEA_TEMPLATE_RECORD_VALIDITIES,
+  LAFEA_TEMPLATE_RELEASE_RECORD_V2_SCHEMA,
+  assertTemplateReleaseTransition,
+  classifyTemplateReleaseInvalidation,
+  createTemplateReleaseRecordV2,
+  semanticTemplateReleaseBasis,
+  validateTemplateReleaseRecordV2,
+} from './release-record-v2.js';
+
+export {
+  LAFEA_TEMPLATE_RELEASE_HASH_PROFILE,
+  canonicalTemplateReleaseJson,
+  templateReleaseSha256,
+} from './release-record-v2-hash.js';
+
+export {
+  migrateTemplateReleaseRecordV1ToV2,
+} from './release-record-v2-migration.js';
+
+export {
+  LAFEA_TEMPLATE_COMPATIBILITY_STATUSES,
+  LAFEA_TEMPLATE_TARGET_COMPATIBILITY_SCHEMA,
+  LAFEA_TEMPLATE_TARGET_SNAPSHOT_SCHEMA,
+  createTemplateTargetAuthoritySnapshot,
+  evaluateTemplateTargetCompatibility,
+  validateTemplateTargetAuthoritySnapshot,
+  validateTemplateTargetCompatibilityReceipt,
+} from './target-compatibility.js';
+
+export {
+  LAFEA_ANALYTICAL_EXECUTION_CONTROLLER_BOUNDARY,
+  LAFEA_ANALYTICAL_EXECUTION_PILOTS,
+  LAFEA_TEMPLATE_ASSESSMENT_APPLICABILITY,
+  LAFEA_TEMPLATE_EXECUTION_MODE,
+  LAFEA_TEMPLATE_EXECUTION_RECEIPT_SCHEMA,
+  LAFEA_TEMPLATE_EXECUTION_REQUEST_SCHEMA,
+  LAFEA_TEMPLATE_EXECUTION_STATUSES,
+  createTemplateExecutionReceipt,
+  createTemplateExecutionRequest,
+  validateTemplateExecutionReceipt,
+  validateTemplateExecutionRequest,
+} from './analytical-execution-contract.js';
+
+export {
+  LAFEA_SELECTED_PILOT_BENCHMARK_MANIFESTS,
+  LAFEA_SELECTED_PILOT_QUALIFICATION_SCHEMA,
+  LAFEA_SELECTED_PILOT_QUALIFICATION_STATUS,
+  LAFEA_SELECTED_PILOT_RELEASE_DISPOSITION,
+  createSelectedPilotQualification,
+  validateSelectedPilotQualification,
+} from './selected-pilot-qualification.js';
+
+export {
+  LAFEA_T6_CALLER_MESH_TEMPLATE_IDS,
+  LAFEA_TEMPLATE_CALLER_MESH_BINDING_SCHEMA,
+  LAFEA_TEMPLATE_CALLER_MESH_BINDING_STATUSES,
+  createTemplateCallerMeshBinding,
+  validateTemplateCallerMeshBinding,
+} from './caller-mesh-binding.js';
+
+export {
+  LAFEA_CONTINUUM_MAPPING_EVIDENCE_SCHEMA,
+  LAFEA_CONTINUUM_MAPPING_KINDS,
+  LAFEA_CONTINUUM_MAPPING_QUALIFICATIONS,
+  LAFEA_LUG_PINHOLE_MAPPING_PACKAGE_SCHEMA,
+  LAFEA_LUG_PINHOLE_MAPPING_PACKAGE_STATUSES,
+  createContinuumApplicationMappingEvidence,
+  createLafeaLugPinholeMappingPackage,
+  validateContinuumApplicationMappingEvidence,
+  validateLafeaLugPinholeMappingPackage,
+} from './continuum-application-mapping-evidence.js';
+
+export {
+  LAFEA_CONTINUUM_BENCHMARK_KINDS,
+  LAFEA_CONTINUUM_BENCHMARK_MANIFEST_SCHEMA,
+  LAFEA_CONTINUUM_BENCHMARK_OBSERVATION_SCHEMA,
+  LAFEA_CONTINUUM_BENCHMARK_OBSERVATION_STATUSES,
+  LAFEA_CONTINUUM_BENCHMARK_QUALIFICATION_SCHEMA,
+  LAFEA_CONTINUUM_BENCHMARK_QUALIFICATION_STATUSES,
+  LAFEA_CONVERGENCE_LIFECYCLE_PARENT_PROPOSAL_SCHEMA,
+  createContinuumBenchmarkManifest,
+  createContinuumBenchmarkObservation,
+  createLafeaContinuumBenchmarkQualification,
+  validateContinuumBenchmarkManifest,
+  validateContinuumBenchmarkObservation,
+  validateLafeaContinuumBenchmarkQualification,
+} from './continuum-benchmark-convergence.js';

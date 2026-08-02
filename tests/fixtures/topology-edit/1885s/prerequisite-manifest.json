@@ -1,0 +1,35 @@
+{
+  "schema": "TopologyEditWave5PrerequisiteManifest.v2",
+  "prerequisites": [
+    {
+      "waveId": "WAVE_0",
+      "status": "PASS_MERGED",
+      "pullRequest": 160,
+      "mergeCommit": "aceddd26e8826a4aa6e894bcf9c6579c7aac1e0d"
+    },
+    {
+      "waveId": "WAVE_1",
+      "status": "PASS_MERGED",
+      "pullRequest": 220,
+      "mergeCommit": "e7dcb2ed5fc72c3faa01470575f66a6528ef9e3f"
+    },
+    {
+      "waveId": "WAVE_2",
+      "status": "PASS_MERGED",
+      "pullRequest": 250,
+      "mergeCommit": "fa87d3dfda15eb8df6c3a5005e3de34ad1639a42"
+    },
+    {
+      "waveId": "WAVE_3",
+      "status": "PASS_MERGED",
+      "pullRequests": [267, 271, 272, 277],
+      "mergeCommit": "2d4fc3596a5bc0057740945c769c71be1efec296"
+    },
+    {
+      "waveId": "WAVE_4",
+      "status": "PASS_MERGED",
+      "pullRequests": [273, 274, 275],
+      "mergeCommit": "cbd5b29aa3f131a6072f9d6bdb5e308f007b5691"
+    }
+  ]
+}
