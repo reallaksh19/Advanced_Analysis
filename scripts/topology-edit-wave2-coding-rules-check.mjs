@@ -11,6 +11,8 @@ const MODULES = Object.freeze([
   'src/workspace/topology-edit/topology-edit-geometry-math.js',
   'src/workspace/topology-edit/topology-edit-picking-contract.js',
   'src/workspace/topology-edit/topology-edit-render-model.js',
+  'src/workspace/topology-edit/topology-edit-viewport-backend.js',
+  'src/workspace/topology-edit/topology-edit-viewport-renderer.js',
   'src/workspace/topology-edit/topology-edit-visual-policy.js',
   'src/workspace/topology-edit/topology-edit-visual-projector.js',
   'src/workspace/topology-edit/topology-edit-visual-session.js',
@@ -19,8 +21,12 @@ const MODULES = Object.freeze([
   'src/workspace/topology-edit/support-restraint-projector.js',
   'src/workspace/topology-edit/visual-geometry-contract.js',
 ]);
+const RENDERER_MODULES = new Set([
+  'src/workspace/topology-edit/topology-edit-viewport-backend.js',
+  'src/workspace/topology-edit/topology-edit-viewport-renderer.js',
+]);
 const PURE_MODULES = MODULES.filter((file) => (
-  !file.endsWith('topology-edit-picking-contract.js')
+  !file.endsWith('topology-edit-picking-contract.js') && !RENDERER_MODULES.has(file)
 ));
 
 async function source(file) {
@@ -127,7 +133,10 @@ async function assertProductionConsumption() {
   for (const token of ['deriveTopologyVisualGeometry', 'deriveAllSupportRestraintGeometry', 'projectSupportGeometryToViewport']) {
     assert.ok(visualSession.includes(token), `Visual session must consume ${token}.`);
   }
-  await access(path.join(ROOT, 'src/workspace/topology-edit/topology-edit-viewport-backend.js'));
+  const backend = await source('src/workspace/topology-edit/topology-edit-viewport-backend.js');
+  assert.ok(backend.includes('segmentGeometry'), 'Viewport backend must consume renderer helpers.');
+  assert.ok(backend.includes('setPresentationSectionPlanes'), 'Viewport backend must preserve section-plane authority.');
+  await access(path.join(ROOT, 'src/workspace/topology-edit/topology-edit-viewport-renderer.js'));
 }
 
 export async function verifyTopologyEditWave2CodingRules() {
