@@ -45,6 +45,7 @@ export function renderThreeModel(backend, model, options = {}) {
 }
 
 export function clearThreeSceneObjects(backend) {
+  backend.sceneBoundsCache = null;
   [
     backend.physicalGroup,
     backend.supportGroup,

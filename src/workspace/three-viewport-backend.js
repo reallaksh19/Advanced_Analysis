@@ -5,6 +5,7 @@ import { ThreeInteractionArbiter } from './three-interaction-arbiter.js';
 import { ThreeSelectionOverlay } from './three-selection-overlay.js';
 import { fitThreeSelection, fitThreeView, restoreThreeHome, setThreeStandardView } from './three-viewport-camera.js';
 import { clearThreeHostMetadata, clearThreeSceneObjects, renderThreeModel, resolveThreeEntityId, updateThreeHostMetadata } from './three-viewport-scene.js';
+import { ViewportAxisHUD } from './viewport-axis-hud.js';
 
 /** One lifecycle-safe Three.js viewport shared by Workspace and Load Calc. */
 export class ThreeViewportBackend {
@@ -16,6 +17,9 @@ export class ThreeViewportBackend {
     this.controls = null;
     this.groups = [];
     this.objects = new Map();
+    /** Full-scene world bounds; scene-object replacement is the invalidation boundary. */
+    this.sceneBoundsCache = null;
+    this.axisHud = null;
     this.model = null;
     this.selectedEntityId = '';
     this.selectionRequestHandler = null;
@@ -56,6 +60,7 @@ export class ThreeViewportBackend {
     const light = new THREE.DirectionalLight(0xffffff, 1.5);
     light.position.set(1, 2, 3);
     this.scene.add(light);
+    this.axisHud = new ViewportAxisHUD();
     hostElement.replaceChildren(this.renderer.domElement);
     hostElement.dataset.viewportBackend = 'webgl';
     if (typeof ResizeObserver === 'function') { this.resizeObserver = new ResizeObserver(() => this.resize()); this.resizeObserver.observe(hostElement); }
@@ -163,6 +168,11 @@ export class ThreeViewportBackend {
     const width = Math.max(this.hostElement.clientWidth, 1); const height = Math.max(this.hostElement.clientHeight, 1);
     this.renderer.setSize(width, height, false);
     if (this.camera?.isPerspectiveCamera) this.camera.aspect = width / height;
+    else if (this.camera?.isOrthographicCamera) {
+      const halfHeight = Math.max((this.camera.top - this.camera.bottom) / 2, Number.EPSILON);
+      const halfWidth = halfHeight * (width / height);
+      this.camera.left = -halfWidth; this.camera.right = halfWidth;
+    }
     if (this.camera) this.camera.updateProjectionMatrix();
     this.renderDirty = true;
   }
@@ -190,18 +200,29 @@ export class ThreeViewportBackend {
   }
 
   stopAnimation() { if (this.animationFrame) cancelAnimationFrame(this.animationFrame); this.animationFrame = 0; }
-  renderOnce() { if (this.renderer && this.scene && this.camera && this.hostElement.clientWidth > 0 && this.hostElement.clientHeight > 0) this.renderer.render(this.scene, this.camera); }
+  renderOnce() {
+    if (!this.renderer || !this.scene || !this.camera || !this.hostElement
+      || this.hostElement.clientWidth <= 0 || this.hostElement.clientHeight <= 0) return;
+    const width = this.hostElement.clientWidth;
+    const height = this.hostElement.clientHeight;
+    this.renderer.render(this.scene, this.camera);
+    if (this.axisHud) {
+      this.axisHud.updateOrientation(this.camera);
+      this.axisHud.render(this.renderer, width, height);
+    }
+  }
   clearSceneObjects() { clearThreeSceneObjects(this); }
   updateHostMetadata() { updateThreeHostMetadata(this); }
 
   destroy() {
     this.stopAnimation(); this.resizeObserver?.disconnect(); this.resizeObserver = null;
     this.arbiter?.dispose(); this.arbiter = null; this.selectionOverlay?.dispose(); this.selectionOverlay = null;
+    this.axisHud?.dispose(); this.axisHud = null;
     if (this.controls) { this.controls.removeEventListener('change', this.controlsChangeHandler); this.controls.dispose(); }
     clearThreeSceneObjects(this);
     if (this.renderer) { this.renderer.domElement.removeEventListener('webglcontextlost', this.contextLostHandler); this.renderer.domElement.removeEventListener('webglcontextrestored', this.contextRestoredHandler); this.renderer.dispose(); this.renderer.forceContextLoss?.(); }
     if (this.hostElement) clearThreeHostMetadata(this.hostElement);
-    this.hostElement = null; this.renderer = null; this.scene = null; this.camera = null; this.controls = null; this.groups = []; this.objects.clear(); this.model = null; this.selectionRequestHandler = null;
+    this.hostElement = null; this.renderer = null; this.scene = null; this.camera = null; this.controls = null; this.groups = []; this.objects.clear(); this.sceneBoundsCache = null; this.model = null; this.selectionRequestHandler = null;
   }
 }
 
