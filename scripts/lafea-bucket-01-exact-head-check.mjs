@@ -24,10 +24,10 @@ recordAssertion('BASELINE_IN_ANCESTRY', isAncestor(BASELINE_SHA, exactHead), `Ba
 for (const check of [
   nodeCheck('MANDATORY_BENCHMARK_LADDER', 'scripts/lafea-bucket-01-benchmark-ladder-check.mjs'),
   nodeCheck('BUCKET_01_REPAIR', 'scripts/lafea-bucket-01-repair-check.mjs'),
-  nodeCheck('PRODUCTION_RESPONSE_CONVERGENCE_CONTRACT', 'scripts/lafea-bucket-01-production-response-check.mjs'),
+  nodeCheck('GOVERNED_4096_PRODUCTION_RESPONSE_CONVERGENCE_CONTRACT', 'scripts/lafea-bucket-01-production-response-check.mjs'),
   nodeCheck('SCALABLE_SPARSE_CONTINUUM_SOLVER', 'scripts/lafea-bucket-01-scalable-solver-check.mjs'),
   nodeCheck('GOVERNED_T6_KIRSCH_FIXED_PROBES', 'scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs'),
-  nodeCheck('PRODUCTION_LUG_FIXED_PROBE_LOCATION_CONTRACT', 'scripts/lafea-bucket-01-production-lug-probe-contract-check.mjs'),
+  nodeCheck('GOVERNED_4096_DIRECT_POINT_LOCATION_CONTRACT', 'scripts/lafea-bucket-01-production-lug-probe-contract-check.mjs'),
   nodeCheck('EXPECTED_VALUE_DEFINITION_SET', 'scripts/lafea-bucket-01-expected-value-registry-check.mjs'),
   nodeCheck('CODE_BASIS_INTAKE_CONTRACT', 'scripts/lafea-bucket-01-code-basis-check.mjs'),
   nodeCheck('THREE_REPLAY_CUSTODY_CONTRACT', 'scripts/lafea-bucket-01-replay-custody-check.mjs'),
@@ -48,7 +48,7 @@ recordAssertion('TRACKED_WORKTREE_CLEAN', trackedStatus === '', trackedStatus ||
 const failures = checks.filter((check) => check.status !== 'PASS');
 const executableEvidencePass = failures.length === 0;
 const report = {
-  schema: 'lafea-bucket-01-exact-head-report/v12',
+  schema: 'lafea-bucket-01-exact-head-report/v13',
   status: executableEvidencePass ? 'EXACT_HEAD_REPAIR_EVIDENCE_PASS' : 'EXACT_HEAD_REPAIR_EVIDENCE_BLOCKED',
   exactHead,
   expectedHead,
@@ -60,8 +60,8 @@ const report = {
   checks,
   blockingCheckIds: failures.map((check) => check.id),
   unresolvedQualificationGates: [
-    'EXACT_1024_ELEMENT_PRODUCTION_RESPONSE_EXECUTION_NOT_RETAINED',
-    'PRODUCTION_LUG_FIXED_PROBE_RETAINED_RECEIPT_NOT_PRODUCED',
+    'GOVERNED_4096_PRODUCTION_RESPONSE_EXECUTION_NOT_RETAINED',
+    'GOVERNED_4096_DIRECT_POINT_STRESS_RECEIPT_NOT_PRODUCED',
     'APPROVED_CODE_BASIS_AUTHORITY_NOT_SUPPLIED',
     'THREE_EXTERNAL_REPLAY_BUNDLES_NOT_SUPPLIED',
   ],
@@ -81,7 +81,8 @@ const report = {
     mandatoryBenchmarkLadderImplemented: true,
     governedCantileverRouteImplemented: true,
     scalableSparseSolverRouteImplemented: true,
-    governedKirschFixedProbeRouteImplemented: true,
+    governed4096ProductionResponseRouteImplemented: true,
+    governedDirectPointStressRouteImplemented: true,
     productionLugFixedProbeContractImplemented: true,
     expectedValueDefinitionSetImplemented: true,
     codeBasisIntakeContractImplemented: true,
@@ -93,6 +94,7 @@ const report = {
     productionLugFixedProbeExecutionRetained: false,
     movingMaximumAcceptanceAuthorized: false,
     nodalProjectionAcceptanceAuthorized: false,
+    integrationPointExtrapolationAcceptanceAuthorized: false,
     arbitraryGeometryAuthorized: false,
     shellAuthorized: false,
     codeAssessmentAuthorized: false,
