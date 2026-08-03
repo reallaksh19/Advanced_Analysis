@@ -13,6 +13,7 @@ const REPORT_PATH = path.resolve(
 );
 
 const checkDefinitions = [
+  { id: 'MANDATORY_BENCHMARK_LADDER', script: 'scripts/lafea-bucket-01-benchmark-ladder-check.mjs' },
   { id: 'PRODUCTION_T6_MESH_QUALIFICATION', script: 'scripts/lafea-bucket-01-mesh-qualification-check.mjs' },
   { id: 'PRODUCTION_RESPONSE_CONVERGENCE_CONTRACT', script: 'scripts/lafea-bucket-01-production-response-check.mjs' },
   { id: 'SCALABLE_SPARSE_CONTINUUM_SOLVER', script: 'scripts/lafea-bucket-01-scalable-solver-check.mjs' },
@@ -34,13 +35,14 @@ const checks = checkDefinitions.map((definition) => runNodeCheck(definition));
 const failed = checks.filter((check) => check.status !== 'PASS');
 const repairChecksPass = failed.length === 0;
 const report = {
-  schema: 'lafea-bucket-01-repair-check-report/v13',
+  schema: 'lafea-bucket-01-repair-check-report/v14',
   status: repairChecksPass ? 'REPAIR_CHECKS_PASS' : 'REPAIR_CHECKS_FAIL',
   bucketId: 'LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE',
   target: 'C2D-LUG-PINHOLE -> LAFEA.3',
   checks,
   blockingCheckIds: failed.map((check) => check.id),
   evidenceState: {
+    mandatoryBenchmarkLadderVerified: repairChecksPass,
     productionMeshQualificationEvidenceGenerated: repairChecksPass,
     productionResponseSpecFrozen: true,
     productionResponseEvaluatorContractVerified: repairChecksPass,
@@ -77,6 +79,7 @@ const report = {
     bucketQualified: false,
   },
   authority: {
+    benchmarkLadderContractImplemented: repairChecksPass,
     meshQualificationInfrastructureImplemented: repairChecksPass,
     productionResponseConvergenceInfrastructureImplemented: repairChecksPass,
     scalableSparseSolverInfrastructureImplemented: repairChecksPass,
