@@ -7,12 +7,12 @@
 This audit is the P0 read-only execution record for the programme defined by [`docs/Nonfeaplan.md`](./Nonfeaplan.md). It does not authorize P1–P7 production edits and does not claim an executed baseline from the connector environment.
 
 - Original plan-preparation snapshot: `0bad5b4200a8e24a358e76b1ea8372da33485c87`
-- Latest synchronized P0 current-main base: `7a6cfadb2c898ddac8cb2dba09b7d400ff800696`
+- Latest synchronized P0 current-main base: `e7eebe4a911050d1cb64d3a57fac33e53752795e`
 - Programme branch: `orchestrator/non-fea-workspace-hardening`
 - P1 delegated qualification Work Pack: [issue #541](https://github.com/reallaksh19/Advanced_Analysis/issues/541)
 - Production files authored by P0: **none**
 
-The P0 branch was synchronized with current `main` after M003 bounds stabilization, M019, M004, and M005 merged. Those incoming production files are merge ancestry, not P0-authored scope. The runner derives the current-main merge base from Git at execution time rather than trusting this narrative SHA.
+The P0 branch was synchronized with current `main` after M003 bounds stabilization, M019, and M004–M006 merged. Those incoming production files are merge ancestry, not P0-authored scope. The runner derives the current-main merge base from Git at execution time rather than trusting this narrative SHA.
 
 ## Implemented P0 evidence path
 
@@ -41,7 +41,7 @@ The runner also records the registered command ladder and retains failures inste
 6. Ordinary `renderThreeModel()` clears all engineering scene objects, recreates primitives, rebuilds the exact object map, and fits the first model.
 7. Selection flattens all object arrays for raycasting on each qualified pick.
 8. The topology-edit route is separate and uses canonical topology plus a certified immutable journal/replay boundary.
-9. M005 pooling/instancing is now current production ancestry and must be measured by P1; its merge does not substitute for exact-head browser and identity qualification.
+9. M005 pooling/instancing and M006 orientation presentation are now current production ancestry and must be measured by P1/P4; their merge narratives do not substitute for exact-head browser and identity qualification.
 10. Authorized enrichment and empirical execution exist, but the production bypass inventory remains open.
 11. `SupportLoadPresenter` enforces qualified LFEA, current empirical OPE, then sealed first-cut priority. Ordinary WebGL support-load callouts remain an open P7 gap.
 
