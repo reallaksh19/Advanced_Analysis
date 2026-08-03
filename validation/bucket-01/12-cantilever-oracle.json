@@ -1,0 +1,44 @@
+{
+  "schema": "lafea-bucket-01-cantilever-oracle/v1",
+  "oracleId": "B01-CANTILEVER-TIMOSHENKO-01",
+  "benchmarkId": "C2D-CANTILEVER-PLANE-STRESS-01",
+  "authority": {
+    "type": "ENGINEERING_THEORY",
+    "source": "Timoshenko beam: delta = P L^3/(3 E I) + P L/(kappa G A)",
+    "productionOutputUsed": false,
+    "observedResultUsedToSelectTolerance": false
+  },
+  "formulation": "PLANE_STRESS",
+  "elementType": "Q4_FULL_INTEGRATION",
+  "material": {
+    "elasticModulus": 200000,
+    "poissonRatio": 0.3,
+    "units": "MPa"
+  },
+  "geometry": {
+    "length": 100,
+    "depth": 10,
+    "thickness": 1,
+    "units": "mm"
+  },
+  "load": {
+    "resultant": 100,
+    "type": "DISTRIBUTED_NODAL_END_RESULTANT",
+    "units": "N"
+  },
+  "shearCorrectionFactor": 0.8333333333333334,
+  "meshes": [
+    { "nx": 4, "ny": 1 },
+    { "nx": 8, "ny": 2 },
+    { "nx": 16, "ny": 4 },
+    { "nx": 32, "ny": 8 }
+  ],
+  "tolerances": {
+    "monotonicSlack": 1e-12,
+    "finestDeflectionRatioAbsoluteError": 0.05,
+    "orientationDeflectionRelativeDifference": 1e-10,
+    "forceEquilibriumRelative": 1e-9,
+    "momentEquilibriumRelative": 1e-9,
+    "energyRelative": 1e-9
+  }
+}
