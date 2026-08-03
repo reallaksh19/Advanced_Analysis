@@ -31,6 +31,7 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
     this.lastCommitReceiptHash = null;
     this.lastCommitDisposition = null;
     this.viewportSelectionHandler = (pick, event) => this.handleViewportSelection(pick, event);
+    this.sharedNavigationHandler = (event) => this.handleSharedNavigation(event);
     this.lifecycle = new TopologyEditLifecycleController({
       getSession: () => this.session,
       getViewState: () => ({
@@ -45,6 +46,11 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
     await super.activate();
     this.canvasMount?.removeEventListener('pointerdown', this.pointerHandler);
     this.viewportBackend?.setSelectionRequestHandler(this.viewportSelectionHandler);
+    this.hostElement?.ownerDocument?.addEventListener(
+      'click',
+      this.sharedNavigationHandler,
+      true,
+    );
     this.setNavigationMode('select', true);
   }
 
@@ -66,6 +72,11 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
   }
 
   deactivate() {
+    this.hostElement?.ownerDocument?.removeEventListener(
+      'click',
+      this.sharedNavigationHandler,
+      true,
+    );
     this.viewportBackend?.setSelectionRequestHandler(null);
     super.deactivate();
     this.lastPersistenceError = null;
@@ -87,6 +98,38 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
     if (event.target.closest('[data-action="export-draft"]')) return this.exportDraft();
     if (event.target.closest('[data-action="commit-draft"]')) return this.commitDraft();
     return super.handleHostClick(event);
+  }
+
+  handleSharedNavigation(event) {
+    const trigger = event.target?.closest?.('[data-viewport-action]');
+    const workspaceShell = this.hostElement?.closest('.workspace-shell');
+    if (!trigger || !workspaceShell?.contains(trigger) || trigger.disabled) return;
+    const action = String(trigger.dataset.viewportAction || '');
+    if (!action) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (action.startsWith('mode-')) {
+      this.setNavigationMode(action.slice('mode-'.length));
+      return;
+    }
+    if (action.startsWith('view-')) {
+      this.runStandardView(action.slice('view-'.length));
+      return;
+    }
+    const aliases = {
+      fit: 'fit',
+      'fit-selection': 'fit-selection',
+      'pivot-selection': 'pivot-selection',
+      home: 'home',
+      reset: 'home',
+      'previous-view': 'previous',
+      'toggle-projection': 'projection',
+    };
+    const localAction = aliases[action];
+    if (!localAction) {
+      throw new TypeError(`Unsupported shared topology edit navigation action: ${action}`);
+    }
+    this.runNavigationAction(localAction);
   }
 
   handleViewportSelection(pick, event) {
