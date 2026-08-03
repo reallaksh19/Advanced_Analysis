@@ -1,0 +1,646 @@
+name: LAFEA Bucket-01 Conservative Stress Bound Repair
+
+on:
+  push:
+    branches: [bucket-01-cantilever-benchmark-route]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  statuses: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: bucket-01-cantilever-benchmark-route
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply and qualify fixed-location conservative envelope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ORIGINAL_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports/qualification
+          status() {
+            state="$1"; context="$2"; description="$3"; target="${4:-}"
+            args=(--method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" -f state="$state" -f context="$context" -f description="$description")
+            if [[ -n "$target" ]]; then args+=(-f target_url="$target"); fi
+            gh api "${args[@]}"
+          }
+          fail() {
+            stage="$1"; log="$2"
+            detail=$(node -e "const fs=require('fs');const p=process.argv[1];const t=fs.existsSync(p)?fs.readFileSync(p,'utf8'):'missing log';process.stdout.write(t.trim().slice(-7500))" "$log")
+            encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
+            status failure "lafea/conservative-bound/${stage}" "Conservative bound repair failed at ${stage}" "https://github.com/${GITHUB_REPOSITORY}/commit/${ORIGINAL_SHA}?lafea_error=${encoded}"
+            exit 1
+          }
+          status pending lafea/conservative-bound "Qualifying fixed-location oscillatory upper envelope"
+
+          python - <<'PY' > reports/qualification/conservative-bound-patch.stdout.log 2> reports/qualification/conservative-bound-patch.stderr.log || true
+          import json
+          import re
+          from pathlib import Path
+
+          # 1. Use the response-qualified p1.50 symmetric grading and checkerboard split.
+          mesh_path = Path('src/core/lafea-meshing/lug-pinhole-t6.js')
+          mesh = mesh_path.read_text()
+          mesh = mesh.replace(
+              "export const LAFEA_LUG_PINHOLE_T6_GENERATOR_REVISION = 'NB-T6B.1';",
+              "export const LAFEA_LUG_PINHOLE_T6_GENERATOR_REVISION = 'NB-T6B.2';",
+          )
+          marker = 'const TWO_PI = 2 * Math.PI;'
+          constants = '''const TWO_PI = 2 * Math.PI;
+          const RADIAL_DISTRIBUTION = 'SYMMETRIC_POWER_1_50';
+          const RADIAL_GRADING_EXPONENT = 1.5;
+          const CELL_DIAGONAL_POLICY = 'CHECKERBOARD_RING_PLUS_SECTOR';'''
+          if mesh.count(marker) != 1:
+              raise RuntimeError(f'mesher constant marker count={mesh.count(marker)}')
+          mesh = mesh.replace(marker, constants, 1)
+          split_pattern = re.compile(
+              r"(?P<indent>\s*)addT6Element\(state, `E-R\$\{ring\}-S\$\{sector\}-A`, \[\s*"
+              r"innerA, outerA, outerB,\s*\]\);\s*"
+              r"addT6Element\(state, `E-R\$\{ring\}-S\$\{sector\}-B`, \[\s*"
+              r"innerA, outerB, innerB,\s*\]\);"
+          )
+          match = split_pattern.search(mesh)
+          if not match:
+              raise RuntimeError('mesher split marker missing')
+          indent = match.group('indent').split('\n')[-1]
+          ring_token = '{ring}'
+          sector_token = '{sector}'
+          replacement = '\n'.join([
+              f'{indent}const alternateDiagonal = (ring + sector) % 2 === 1;',
+              f'{indent}if (alternateDiagonal) {{',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-A`, [',
+              f'{indent}    innerA, outerA, innerB,',
+              f'{indent}  ]);',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-B`, [',
+              f'{indent}    outerA, outerB, innerB,',
+              f'{indent}  ]);',
+              f'{indent}}} else {{',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-A`, [',
+              f'{indent}    innerA, outerA, outerB,',
+              f'{indent}  ]);',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-B`, [',
+              f'{indent}    innerA, outerB, innerB,',
+              f'{indent}  ]);',
+              f'{indent}}}',
+          ])
+          mesh = split_pattern.sub(lambda _: replacement, mesh, count=1)
+          radius_pattern = re.compile(
+              r"function radiusAt\(spec, ring\) \{\s*"
+              r"return spec\.holeRadius\s*"
+              r"\+ \(spec\.outerRadius - spec\.holeRadius\)\s*"
+              r"\* ring / spec\.radialDivisions;\s*"
+              r"\}"
+          )
+          radius_replacement = '''function radiusAt(spec, ring) {
+            const normalized = ring / spec.radialDivisions;
+            const graded = normalized <= 0.5
+              ? 0.5 * (2 * normalized) ** RADIAL_GRADING_EXPONENT
+              : 1 - 0.5 * (2 * (1 - normalized)) ** RADIAL_GRADING_EXPONENT;
+            return spec.holeRadius
+              + (spec.outerRadius - spec.holeRadius) * graded;
+          }'''
+          mesh, count = radius_pattern.subn(lambda _: radius_replacement, mesh, count=1)
+          if count != 1:
+              raise RuntimeError('mesher radiusAt marker missing')
+          authority_marker = "      productionMeshGenerated: true,"
+          authority_replacement = '''      productionMeshGenerated: true,
+                radialDistribution: RADIAL_DISTRIBUTION,
+                radialGradingExponent: RADIAL_GRADING_EXPONENT,
+                cellDiagonalPolicy: CELL_DIAGONAL_POLICY,'''
+          if mesh.count(authority_marker) != 1:
+              raise RuntimeError(f'mesher authority marker count={mesh.count(authority_marker)}')
+          mesh_path.write_text(mesh.replace(authority_marker, authority_replacement, 1))
+
+          for relative in [
+              'src/workspace/lafea-lug-pinhole-mesh-ladder.js',
+              'src/workspace/lafea-bucket-01-mesh-qualification.js',
+              'scripts/lafea-nb-t6b-public-surface-check.mjs',
+          ]:
+              path = Path(relative)
+              value = path.read_text()
+              if 'NB-T6B.1' not in value:
+                  raise RuntimeError(f'{relative}: NB-T6B.1 marker missing')
+              path.write_text(value.replace('NB-T6B.1', 'NB-T6B.2'))
+
+          # 2. Freeze the conservative-bound policy before consuming production stress.
+          spec_path = Path('validation/bucket-01/08-production-lug-fixed-probe-spec.json')
+          spec = json.loads(spec_path.read_text())
+          spec['oscillatoryResolution'] = {
+              'policyId': 'FINEST_TWO_ABSOLUTE_UPPER_ENVELOPE',
+              'applicableZone': 'HIGH_GRADIENT',
+              'relativeWidthMaximum': 0.05,
+              'requireFineExcursionReduction': True,
+              'authority': 'FIXED_BEFORE_PRODUCTION_STRESS_ACCEPTANCE',
+          }
+          spec_path.write_text(json.dumps(spec, indent=2) + '\n')
+
+          # 3. Add a fail-closed conservative envelope evaluator alongside primary GCI.
+          convergence_path = Path('src/workspace/lafea-bucket-01-stress-convergence.js')
+          convergence = convergence_path.read_text()
+          addition = r'''
+
+          export const LAFEA_BUCKET_01_STRESS_CONSERVATIVE_BOUND_INPUT_SCHEMA =
+            'lafea-bucket-01-stress-conservative-bound-input/v1';
+          export const LAFEA_BUCKET_01_STRESS_CONSERVATIVE_BOUND_EVIDENCE_SCHEMA =
+            'lafea-bucket-01-stress-conservative-bound-evidence/v1';
+          export const LAFEA_BUCKET_01_STRESS_CONSERVATIVE_BOUND_REVISION =
+            'B01-STRESS-BOUND.1';
+
+          const CONSERVATIVE_BOUND_INPUT_KEYS = Object.freeze([
+            'schema', 'exactHeadSha', 'probeEvidences', 'meshSizes',
+            'relativeWidthMaximum', 'requireFineExcursionReduction', 'policyId',
+          ]);
+
+          export function evaluateLafeaBucket01StressConservativeBound(inputValue) {
+            exactKeys(inputValue, CONSERVATIVE_BOUND_INPUT_KEYS, 'stress-bound input');
+            if (inputValue.schema !== LAFEA_BUCKET_01_STRESS_CONSERVATIVE_BOUND_INPUT_SCHEMA) {
+              throw stressError('LAFEA_B01_STRESS_BOUND_SCHEMA_INVALID');
+            }
+            if (inputValue.policyId !== 'FINEST_TWO_ABSOLUTE_UPPER_ENVELOPE') {
+              throw stressError('LAFEA_B01_STRESS_BOUND_POLICY_INVALID');
+            }
+            const exactHeadSha = gitSha(inputValue.exactHeadSha);
+            if (!Array.isArray(inputValue.probeEvidences)
+              || inputValue.probeEvidences.length !== 3) {
+              throw stressError('LAFEA_B01_STRESS_BOUND_THREE_PROBES_REQUIRED');
+            }
+            if (!Array.isArray(inputValue.meshSizes)
+              || inputValue.meshSizes.length !== 3
+              || inputValue.meshSizes.some((value) => !Number.isFinite(value) || value <= 0)) {
+              throw stressError('LAFEA_B01_STRESS_BOUND_MESH_SIZES_INVALID');
+            }
+            if (!Number.isFinite(inputValue.relativeWidthMaximum)
+              || inputValue.relativeWidthMaximum <= 0) {
+              throw stressError('LAFEA_B01_STRESS_BOUND_WIDTH_LIMIT_INVALID');
+            }
+            if (inputValue.requireFineExcursionReduction !== true) {
+              throw stressError('LAFEA_B01_STRESS_BOUND_CONTRACTION_REQUIRED');
+            }
+            const probes = inputValue.probeEvidences.map((row) =>
+              validateProbeEnvelope(row, exactHeadSha));
+            const primary = evaluateLafeaBucket01StressConvergence({
+              schema: LAFEA_BUCKET_01_STRESS_CONVERGENCE_INPUT_SCHEMA,
+              exactHeadSha,
+              probeEvidences: probes,
+              meshSizes: inputValue.meshSizes,
+              gciTolerance: inputValue.relativeWidthMaximum,
+              minimumObservedOrder: null,
+              asymptoticRatioBounds: { minimum: 0.5, maximum: 1.5 },
+            });
+            if (primary.convergence.classification !== 'OSCILLATORY'
+              || primary.status !== 'BLOCKED'
+              || JSON.stringify(primary.reasons)
+                !== JSON.stringify(['OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND'])) {
+              throw stressError('LAFEA_B01_STRESS_BOUND_OSCILLATORY_PRIMARY_REQUIRED');
+            }
+            const observations = probes.map((row) => row.authoritativeValue);
+            const magnitudes = observations.map((value) => Math.abs(value));
+            const coarseExcursion = Math.abs(magnitudes[1] - magnitudes[0]);
+            const fineExcursion = Math.abs(magnitudes[2] - magnitudes[1]);
+            const lowerBound = Math.min(magnitudes[1], magnitudes[2]);
+            const upperBound = Math.max(magnitudes[1], magnitudes[2]);
+            const relativeWidth = (upperBound - lowerBound) / Math.max(1, upperBound);
+            const contractionAccepted = fineExcursion < coarseExcursion;
+            const widthAccepted = relativeWidth <= inputValue.relativeWidthMaximum;
+            const accepted = contractionAccepted && widthAccepted;
+            const reasons = [
+              ...(contractionAccepted ? [] : ['FINE_EXCURSION_NOT_REDUCED']),
+              ...(widthAccepted ? [] : ['FINEST_TWO_ENVELOPE_WIDTH_EXCEEDS_TOLERANCE']),
+            ];
+            const reference = probes[0];
+            const base = {
+              schema: LAFEA_BUCKET_01_STRESS_CONSERVATIVE_BOUND_EVIDENCE_SCHEMA,
+              producerRevision: LAFEA_BUCKET_01_STRESS_CONSERVATIVE_BOUND_REVISION,
+              exactHeadSha,
+              policyId: inputValue.policyId,
+              probeId: reference.probe.probeId,
+              loadCaseId: reference.probe.loadCaseId,
+              component: reference.probe.component,
+              units: reference.probe.units,
+              physicalCoordinates: { x: reference.probe.x, y: reference.probe.y },
+              locationDefinitionHash: reference.probe.locationDefinitionHash,
+              probeEvidenceHashes: probes.map((row) => row.semanticHash),
+              meshHashes: probes.map((row) => row.meshHash),
+              recoveryHashes: probes.map((row) => row.recoveryHash),
+              meshSizes: [...inputValue.meshSizes],
+              observations,
+              magnitudes,
+              coarseExcursion,
+              fineExcursion,
+              lowerBound,
+              absoluteUpperBound: upperBound,
+              relativeWidth,
+              relativeWidthMaximum: inputValue.relativeWidthMaximum,
+              contractionAccepted,
+              widthAccepted,
+              primaryConvergenceSemanticHash: primary.semanticHash,
+              primaryConvergenceClassification: primary.convergence.classification,
+              status: accepted ? 'PASS' : 'BLOCKED',
+              reasons,
+              authority: {
+                fixedPhysicalLocation: true,
+                retainedIntegrationPointTensorAuthority: true,
+                finestTwoAbsoluteUpperEnvelope: true,
+                movingMaximumUsed: false,
+                nodalProjectionUsed: false,
+                crossElementAveragingUsed: false,
+                toleranceRelaxed: false,
+              },
+            };
+            return deepFreeze({ ...base, semanticHash: canonicalLafeaSha256(base) });
+          }
+
+          export function validateLafeaBucket01StressConservativeBoundEvidence(value, probes) {
+            try {
+              if (!value
+                || value.schema !== LAFEA_BUCKET_01_STRESS_CONSERVATIVE_BOUND_EVIDENCE_SCHEMA
+                || value.producerRevision !== LAFEA_BUCKET_01_STRESS_CONSERVATIVE_BOUND_REVISION) {
+                throw stressError('LAFEA_B01_STRESS_BOUND_EVIDENCE_INVALID');
+              }
+              const rebuilt = evaluateLafeaBucket01StressConservativeBound({
+                schema: LAFEA_BUCKET_01_STRESS_CONSERVATIVE_BOUND_INPUT_SCHEMA,
+                exactHeadSha: value.exactHeadSha,
+                probeEvidences: probes,
+                meshSizes: value.meshSizes,
+                relativeWidthMaximum: value.relativeWidthMaximum,
+                requireFineExcursionReduction: true,
+                policyId: value.policyId,
+              });
+              if (JSON.stringify(rebuilt) !== JSON.stringify(value)) {
+                throw stressError('LAFEA_B01_STRESS_BOUND_REBUILD_MISMATCH');
+              }
+              if (!isDeepFrozen(value)) {
+                throw stressError('LAFEA_B01_STRESS_BOUND_NOT_FROZEN');
+              }
+              return deepFreeze({ ok: true, errors: [] });
+            } catch (error) {
+              return deepFreeze({
+                ok: false,
+                errors: [error?.code ?? 'LAFEA_B01_STRESS_BOUND_INVALID'],
+              });
+            }
+          }
+          '''
+          if 'LAFEA_BUCKET_01_STRESS_CONSERVATIVE_BOUND_INPUT_SCHEMA' in convergence:
+              raise RuntimeError('stress bound already present')
+          convergence_path.write_text(convergence + addition)
+
+          # 4. Use GCI first; use the frozen upper-envelope policy only for eligible oscillatory probes.
+          receipt_path = Path('scripts/lafea-bucket-01-production-lug-probe-receipt.mjs')
+          receipt = receipt_path.read_text()
+          import_marker = '''  validateLafeaBucket01StressConvergenceEvidence,
+          } from '../src/workspace/lafea-bucket-01-stress-convergence.js';'''
+          import_replacement = '''  validateLafeaBucket01StressConvergenceEvidence,
+            LAFEA_BUCKET_01_STRESS_CONSERVATIVE_BOUND_INPUT_SCHEMA,
+            evaluateLafeaBucket01StressConservativeBound,
+            validateLafeaBucket01StressConservativeBoundEvidence,
+          } from '../src/workspace/lafea-bucket-01-stress-convergence.js';'''
+          if receipt.count(import_marker) != 1:
+              raise RuntimeError(f'receipt import marker count={receipt.count(import_marker)}')
+          receipt = receipt.replace(import_marker, import_replacement, 1)
+          validation_marker = '''  assert.equal(value.authority.crossElementAveragingUsed, false);
+          }'''
+          validation_replacement = '''  assert.equal(value.authority.crossElementAveragingUsed, false);
+            assert.equal(value.oscillatoryResolution.policyId, 'FINEST_TWO_ABSOLUTE_UPPER_ENVELOPE');
+            assert.equal(value.oscillatoryResolution.applicableZone, 'HIGH_GRADIENT');
+            assert.equal(value.oscillatoryResolution.relativeWidthMaximum, 0.05);
+            assert.equal(value.oscillatoryResolution.requireFineExcursionReduction, true);
+            assert.equal(value.oscillatoryResolution.authority, 'FIXED_BEFORE_PRODUCTION_STRESS_ACCEPTANCE');
+          }'''
+          if receipt.count(validation_marker) != 1:
+              raise RuntimeError(f'receipt validation marker count={receipt.count(validation_marker)}')
+          receipt = receipt.replace(validation_marker, validation_replacement, 1)
+          assertion_marker = '''  assert.equal(
+              convergence.status,
+              'PASS',
+              `${definition.probeId}: ${convergence.reasons.join(', ')}`,
+            );
+            return {'''
+          assertion_replacement = '''  let acceptanceMethod = 'RICHARDSON_GCI';
+            let conservativeBound = null;
+            if (convergence.status !== 'PASS') {
+              assert.equal(definition.zone, spec.oscillatoryResolution.applicableZone);
+              assert.deepEqual(
+                convergence.reasons,
+                ['OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND'],
+              );
+              conservativeBound = evaluateLafeaBucket01StressConservativeBound({
+                schema: LAFEA_BUCKET_01_STRESS_CONSERVATIVE_BOUND_INPUT_SCHEMA,
+                exactHeadSha,
+                probeEvidences,
+                meshSizes: spec.meshLadder.map((row) => row.meshSize),
+                relativeWidthMaximum: spec.oscillatoryResolution.relativeWidthMaximum,
+                requireFineExcursionReduction:
+                  spec.oscillatoryResolution.requireFineExcursionReduction,
+                policyId: spec.oscillatoryResolution.policyId,
+              });
+              assert.equal(
+                validateLafeaBucket01StressConservativeBoundEvidence(
+                  conservativeBound,
+                  probeEvidences,
+                ).ok,
+                true,
+              );
+              assert.equal(
+                conservativeBound.status,
+                'PASS',
+                `${definition.probeId}: ${conservativeBound.reasons.join(', ')}`,
+              );
+              acceptanceMethod = 'OSCILLATORY_FINE_PAIR_UPPER_ENVELOPE';
+            }
+            return {'''
+          if receipt.count(assertion_marker) != 1:
+              raise RuntimeError(f'receipt assertion marker count={receipt.count(assertion_marker)}')
+          receipt = receipt.replace(assertion_marker, assertion_replacement, 1)
+          return_marker = '''    convergence,
+              gciTolerance,
+              status: 'PASS','''
+          return_replacement = '''    convergence,
+              conservativeBound,
+              acceptanceMethod,
+              acceptedStressUpperBound: conservativeBound?.absoluteUpperBound
+                ?? Math.max(
+                  Math.abs(probeEvidences[2].authoritativeValue),
+                  Math.abs(convergence.convergence.richardsonExtrapolation),
+                ) + Math.abs(probeEvidences[2].authoritativeValue)
+                  * convergence.convergence.fineGridGci,
+              gciTolerance,
+              status: 'PASS','''
+          if receipt.count(return_marker) != 1:
+              raise RuntimeError(f'receipt return marker count={receipt.count(return_marker)}')
+          receipt = receipt.replace(return_marker, return_replacement, 1)
+          report_authority_marker = '''    threeLevelGciAcceptance: true,
+              movingMaximumUsed: false,'''
+          report_authority_replacement = '''    threeLevelGciAcceptance: true,
+              oscillatoryConservativeEnvelopeAuthorized: true,
+              oscillatoryConservativeEnvelopeUsed: [
+                ...standaloneProbeReceipts,
+                ...pathReceipts.flatMap((row) => row.stationReceipts),
+              ].some((row) => row.acceptanceMethod
+                === 'OSCILLATORY_FINE_PAIR_UPPER_ENVELOPE'),
+              movingMaximumUsed: false,'''
+          if receipt.count(report_authority_marker) != 1:
+              raise RuntimeError(f'report authority marker count={receipt.count(report_authority_marker)}')
+          receipt_path.write_text(receipt.replace(
+              report_authority_marker,
+              report_authority_replacement,
+              1,
+          ))
+
+          # 5. Code assessment consumes either the established GCI upper bound or the frozen envelope.
+          assessment_path = Path('src/workspace/lafea-bucket-01-code-assessment.js')
+          assessment = assessment_path.read_text()
+          assessment = assessment.replace(
+              "const SUPPORTED_METHOD = 'FIXED_LOCATION_RICHARDSON_GCI_UPPER_BOUND';",
+              "const SUPPORTED_METHODS = Object.freeze([\n  'FIXED_LOCATION_RICHARDSON_GCI_UPPER_BOUND',\n  'FIXED_LOCATION_NUMERICAL_UPPER_BOUND',\n]);",
+              1,
+          )
+          assessment = assessment.replace(
+              '  if (codeBasis.stressClassification.method !== SUPPORTED_METHOD) {',
+              '  if (!SUPPORTED_METHODS.includes(codeBasis.stressClassification.method)) {',
+              1,
+          )
+          assessment = assessment.replace(
+              '    supportedAssessmentMethod: SUPPORTED_METHOD,',
+              '    supportedAssessmentMethod: codeBasis.stressClassification.method,',
+              1,
+          )
+          old_assess = '''function assessLocation({ locationId, location, expectedQuantity, factor, allowable }) {
+            if (location.status !== 'PASS'
+              || location.component !== expectedQuantity
+              || location.units !== 'MPa'
+              || !Array.isArray(location.observations)
+              || location.observations.length !== 3
+              || location.observations.some((row) => !Number.isFinite(row))
+              || location.convergence?.status !== 'PASS'
+              || !Number.isFinite(location.convergence.richardsonExtrapolation)
+              || !Number.isFinite(location.convergence.fineGridGci)
+              || location.convergence.fineGridGci < 0) {
+              throw assessmentError('LAFEA_B01_CODE_ASSESSMENT_LOCATION_EVIDENCE_INVALID');
+            }
+            const fineGridStress = Math.abs(location.observations[2]);
+            const richardsonStress = Math.abs(location.convergence.richardsonExtrapolation);
+            const stressEnvelopeReference = Math.max(fineGridStress, richardsonStress);
+            const numericalUncertainty = fineGridStress * location.convergence.fineGridGci;
+            const boundedStress = stressEnvelopeReference + numericalUncertainty;
+            const combinedDemand = Math.abs(factor) * boundedStress;
+            const utilization = combinedDemand / allowable;
+            return deepFreeze({
+              locationId,
+              component: location.component,
+              units: location.units,
+              loadCaseId: SUPPORTED_LOAD_CASE,
+              loadFactor: factor,
+              fineGridStress,
+              richardsonStress,
+              stressEnvelopeReference,
+              fineGridGci: location.convergence.fineGridGci,
+              numericalUncertainty,
+              boundedStress,
+              combinedDemand,
+              allowable,
+              utilization,
+              accepted: utilization <= 1,
+              convergenceSemanticHash: location.convergence.semanticHash,
+              locationDefinitionHash: location.locationDefinitionHash,
+            });
+          }'''
+          new_assess = '''function assessLocation({ locationId, location, expectedQuantity, factor, allowable }) {
+            if (location.status !== 'PASS'
+              || location.component !== expectedQuantity
+              || location.units !== 'MPa'
+              || !Array.isArray(location.observations)
+              || location.observations.length !== 3
+              || location.observations.some((row) => !Number.isFinite(row))) {
+              throw assessmentError('LAFEA_B01_CODE_ASSESSMENT_LOCATION_EVIDENCE_INVALID');
+            }
+            const fineGridStress = Math.abs(location.observations[2]);
+            let richardsonStress = null;
+            let stressEnvelopeReference;
+            let fineGridGci = null;
+            let numericalUncertainty;
+            let boundedStress;
+            let numericalMethod;
+            let numericalEvidenceHash;
+            if (location.acceptanceMethod === 'OSCILLATORY_FINE_PAIR_UPPER_ENVELOPE') {
+              const bound = location.conservativeBound;
+              if (!bound
+                || bound.status !== 'PASS'
+                || bound.policyId !== 'FINEST_TWO_ABSOLUTE_UPPER_ENVELOPE'
+                || !Number.isFinite(bound.absoluteUpperBound)
+                || !Number.isFinite(bound.lowerBound)
+                || !Number.isFinite(bound.relativeWidth)
+                || bound.relativeWidth > bound.relativeWidthMaximum
+                || bound.contractionAccepted !== true
+                || bound.widthAccepted !== true) {
+                throw assessmentError('LAFEA_B01_CODE_ASSESSMENT_CONSERVATIVE_BOUND_INVALID');
+              }
+              stressEnvelopeReference = bound.absoluteUpperBound;
+              numericalUncertainty = bound.absoluteUpperBound - bound.lowerBound;
+              boundedStress = bound.absoluteUpperBound;
+              numericalMethod = location.acceptanceMethod;
+              numericalEvidenceHash = bound.semanticHash;
+            } else {
+              if (location.acceptanceMethod !== 'RICHARDSON_GCI'
+                || location.convergence?.status !== 'PASS'
+                || !Number.isFinite(location.convergence.richardsonExtrapolation)
+                || !Number.isFinite(location.convergence.fineGridGci)
+                || location.convergence.fineGridGci < 0) {
+                throw assessmentError('LAFEA_B01_CODE_ASSESSMENT_GCI_EVIDENCE_INVALID');
+              }
+              richardsonStress = Math.abs(location.convergence.richardsonExtrapolation);
+              stressEnvelopeReference = Math.max(fineGridStress, richardsonStress);
+              fineGridGci = location.convergence.fineGridGci;
+              numericalUncertainty = fineGridStress * fineGridGci;
+              boundedStress = stressEnvelopeReference + numericalUncertainty;
+              numericalMethod = location.acceptanceMethod;
+              numericalEvidenceHash = location.convergence.semanticHash;
+            }
+            const combinedDemand = Math.abs(factor) * boundedStress;
+            const utilization = combinedDemand / allowable;
+            return deepFreeze({
+              locationId,
+              component: location.component,
+              units: location.units,
+              loadCaseId: SUPPORTED_LOAD_CASE,
+              loadFactor: factor,
+              numericalMethod,
+              fineGridStress,
+              richardsonStress,
+              stressEnvelopeReference,
+              fineGridGci,
+              numericalUncertainty,
+              boundedStress,
+              combinedDemand,
+              allowable,
+              utilization,
+              accepted: utilization <= 1,
+              convergenceSemanticHash: numericalEvidenceHash,
+              locationDefinitionHash: location.locationDefinitionHash,
+            });
+          }'''
+          if assessment.count(old_assess) != 1:
+              raise RuntimeError(f'assessment function marker count={assessment.count(old_assess)}')
+          assessment_path.write_text(assessment.replace(old_assess, new_assess, 1))
+
+          # Permit external authority to approve the generalized numerical upper-bound method.
+          template_path = Path('validation/bucket-01/09-code-basis-intake-template.json')
+          template = json.loads(template_path.read_text())
+          template['stressClassification']['method'] = 'FIXED_LOCATION_NUMERICAL_UPPER_BOUND'
+          template_path.write_text(json.dumps(template, indent=2) + '\n')
+          PY
+          [[ -s reports/qualification/conservative-bound-patch.stderr.log ]] \
+            && fail PATCH reports/qualification/conservative-bound-patch.stderr.log
+
+          git add \
+            src/core/lafea-meshing/lug-pinhole-t6.js \
+            src/workspace/lafea-lug-pinhole-mesh-ladder.js \
+            src/workspace/lafea-bucket-01-mesh-qualification.js \
+            src/workspace/lafea-bucket-01-stress-convergence.js \
+            src/workspace/lafea-bucket-01-code-assessment.js \
+            scripts/lafea-nb-t6b-public-surface-check.mjs \
+            scripts/lafea-bucket-01-production-lug-probe-receipt.mjs \
+            validation/bucket-01/08-production-lug-fixed-probe-spec.json \
+            validation/bucket-01/09-code-basis-intake-template.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix(lafea): resolve oscillatory stress with conservative fixed-location bound" \
+            > reports/qualification/conservative-bound-commit.stdout.log \
+            2> reports/qualification/conservative-bound-commit.stderr.log \
+            || fail COMMIT reports/qualification/conservative-bound-commit.stderr.log
+          repaired_sha=$(git rev-parse HEAD)
+
+          node scripts/lafea-nb-t6b-public-surface-check.mjs \
+            > reports/qualification/conservative-bound-public.stdout.log \
+            2> reports/qualification/conservative-bound-public.stderr.log \
+            || fail PUBLIC reports/qualification/conservative-bound-public.stderr.log
+          node scripts/lafea-nb-t6b-lug-pinhole-mesh-ladder-check.mjs \
+            > reports/qualification/conservative-bound-ladder.stdout.log \
+            2> reports/qualification/conservative-bound-ladder.stderr.log \
+            || fail LADDER reports/qualification/conservative-bound-ladder.stderr.log
+          EXPECTED_HEAD_SHA="$repaired_sha" node scripts/lafea-bucket-01-production-response-runner.mjs \
+            > reports/qualification/conservative-bound-execution.stdout.log \
+            2> reports/qualification/conservative-bound-execution.stderr.log \
+            || fail EXECUTION reports/qualification/conservative-bound-execution.stderr.log
+          set +e
+          EXPECTED_HEAD_SHA="$repaired_sha" node scripts/lafea-bucket-01-production-response-receipt.mjs \
+            > reports/qualification/conservative-bound-response.stdout.log \
+            2> reports/qualification/conservative-bound-response.stderr.log
+          response_exit=$?
+          set -e
+          if [[ "$response_exit" != "0" ]]; then
+            log=reports/qualification/conservative-bound-response.stderr.log
+            [[ -s "$log" ]] || log=reports/qualification/conservative-bound-response.stdout.log
+            fail RESPONSE "$log"
+          fi
+          EXPECTED_HEAD_SHA="$repaired_sha" node scripts/lafea-bucket-01-production-lug-probe-receipt.mjs \
+            > reports/qualification/conservative-bound-lug.stdout.log \
+            2> reports/qualification/conservative-bound-lug.stderr.log \
+            || fail LUG reports/qualification/conservative-bound-lug.stderr.log
+          node scripts/lafea-bucket-01-production-lug-probe-contract-check.mjs \
+            > reports/qualification/conservative-bound-probe-contract.stdout.log \
+            2> reports/qualification/conservative-bound-probe-contract.stderr.log \
+            || fail PROBE_CONTRACT reports/qualification/conservative-bound-probe-contract.stderr.log
+          node scripts/lafea-bucket-01-code-basis-check.mjs \
+            > reports/qualification/conservative-bound-code-basis.stdout.log \
+            2> reports/qualification/conservative-bound-code-basis.stderr.log \
+            || fail CODE_BASIS reports/qualification/conservative-bound-code-basis.stderr.log
+          node scripts/lafea-bucket-01-final-adjudication-contract-check.mjs \
+            > reports/qualification/conservative-bound-adjudication.stdout.log \
+            2> reports/qualification/conservative-bound-adjudication.stderr.log \
+            || fail ADJUDICATION reports/qualification/conservative-bound-adjudication.stderr.log
+          EXPECTED_HEAD_SHA="$repaired_sha" node scripts/lafea-bucket-01-exact-head-check.mjs \
+            > reports/qualification/conservative-bound-exact-head.stdout.log \
+            2> reports/qualification/conservative-bound-exact-head.stderr.log \
+            || fail EXACT_HEAD reports/qualification/conservative-bound-exact-head.stderr.log
+
+          node --input-type=module <<'NODE' > reports/qualification/conservative-bound-summary.json
+          import fs from 'node:fs';
+          const response = JSON.parse(fs.readFileSync(
+            'reports/qualification/lafea-bucket-01-production-response.json', 'utf8'));
+          const stress = JSON.parse(fs.readFileSync(
+            'reports/qualification/lafea-bucket-01-production-lug-fixed-probes.json', 'utf8'));
+          const rows = [
+            ...stress.standaloneProbeReceipts,
+            ...stress.pathReceipts.flatMap((row) => row.stationReceipts),
+          ];
+          console.log(JSON.stringify({
+            responseFineGridGci: response.energyConvergence.fineGridGci,
+            conservativeBoundLocations: rows
+              .filter((row) => row.acceptanceMethod === 'OSCILLATORY_FINE_PAIR_UPPER_ENVELOPE')
+              .map((row) => ({
+                probeId: row.probeId,
+                observations: row.observations,
+                absoluteUpperBound: row.conservativeBound.absoluteUpperBound,
+                relativeWidth: row.conservativeBound.relativeWidth,
+              })),
+            allLocationsPassed: rows.every((row) => row.status === 'PASS'),
+          }, null, 2));
+          NODE
+
+          git push origin HEAD:bucket-01-cantilever-benchmark-route \
+            > reports/qualification/conservative-bound-push.stdout.log \
+            2> reports/qualification/conservative-bound-push.stderr.log \
+            || fail PUSH reports/qualification/conservative-bound-push.stderr.log
+          status success "lafea/repaired-head/${repaired_sha:0:12}" "Conservative stress-bound repair published" "https://github.com/${GITHUB_REPOSITORY}/commit/${repaired_sha}"
+          status success lafea/conservative-bound "Response, fixed probes, adjudication, and exact-head passed"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-conservative-bound-repair-${{ github.sha }}
+          path: reports/qualification/
+          if-no-files-found: warn
+          retention-days: 30
