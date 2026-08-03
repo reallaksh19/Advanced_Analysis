@@ -7,13 +7,13 @@ export const LAFEA_BUCKET_01_PROBE_STABLE_CANDIDATE_TOPOLOGY_REPORT_SCHEMA =
 export const LAFEA_BUCKET_01_PROBE_STABLE_CANDIDATE_INTAKE_INPUT_SCHEMA =
   'lafea-bucket-01-probe-stable-candidate-intake-input/v1';
 export const LAFEA_BUCKET_01_PROBE_STABLE_CANDIDATE_INTAKE_EVIDENCE_SCHEMA =
-  'lafea-bucket-01-probe-stable-candidate-intake-evidence/v1';
+  'lafea-bucket-01-probe-stable-candidate-intake-evidence/v2';
 export const LAFEA_BUCKET_01_PROBE_STABLE_CANDIDATE_VALIDATION_EVIDENCE_SCHEMA =
-  'lafea-bucket-01-probe-stable-candidate-validation-evidence/v1';
+  'lafea-bucket-01-probe-stable-candidate-validation-evidence/v2';
 export const LAFEA_BUCKET_01_PROBE_STABLE_TOPOLOGY_VALIDATION_EVIDENCE_SCHEMA =
-  'lafea-bucket-01-probe-stable-topology-validation-evidence/v1';
+  'lafea-bucket-01-probe-stable-topology-validation-evidence/v2';
 export const LAFEA_BUCKET_01_PROBE_STABLE_CANDIDATE_INTAKE_REVISION =
-  'B01-PROBE-STABLE-INTAKE.2';
+  'B01-PROBE-STABLE-INTAKE.3';
 
 const EXPECTED_LEVELS = Object.freeze([
   Object.freeze({
@@ -36,9 +36,9 @@ const EXPECTED_LEVELS = Object.freeze([
   }),
   Object.freeze({
     ordinal: 4,
-    radialCellCount: 53,
+    radialCellCount: 54,
     circumferentialCellCount: 132,
-    elementCount: 13992,
+    elementCount: 14256,
   }),
 ]);
 const EXPECTED_LOCATION_COUNT = 7;
@@ -55,7 +55,7 @@ const PACKAGE_KEYS = Object.freeze([
 const PACKAGE_LEVEL_KEYS = Object.freeze([
   'ordinal', 'radialCellCount', 'circumferentialCellCount', 'elementCount',
   'meshHash', 'radialCoordinateHash', 'circumferentialCoordinateHash',
-  'featureSetHash', 'qualityHash', 'status',
+  'featureSetHash', 'qualityHash', 'mappingWindowHash', 'status',
 ]);
 const TOPOLOGY_KEYS = Object.freeze([
   'schema', 'producerRevision', 'exactHeadSha', 'designHash',
@@ -73,7 +73,8 @@ const CANDIDATE_VALIDATION_KEYS = Object.freeze([
   'schema', 'producerRevision', 'exactHeadSha', 'designHash',
   'candidatePackageHash', 'executed', 'meshPackageRebuilt',
   'coordinateHashesRebuilt', 'featureSetHashesRebuilt',
-  'qualityHashesRebuilt', 'status', 'reasons', 'authority', 'semanticHash',
+  'qualityHashesRebuilt', 'mappingWindowRecomputed',
+  'status', 'reasons', 'authority', 'semanticHash',
 ]);
 const TOPOLOGY_VALIDATION_KEYS = Object.freeze([
   'schema', 'producerRevision', 'exactHeadSha', 'designHash',
@@ -82,9 +83,9 @@ const TOPOLOGY_VALIDATION_KEYS = Object.freeze([
   'status', 'reasons', 'authority', 'semanticHash',
 ]);
 const VALIDATION_AUTHORITY_KEYS = Object.freeze([
-  'independentCheckerExecution', 'productionSwitchApplied',
-  'productionMeshAuthority', 'stressAcceptanceAuthority',
-  'qualificationAuthority', 'bucketQualified',
+  'executedRecomputation', 'independentCheckerExecution',
+  'productionSwitchApplied', 'productionMeshAuthority',
+  'stressAcceptanceAuthority', 'qualificationAuthority', 'bucketQualified',
 ]);
 const CANDIDATE_AUTHORITY_KEYS = Object.freeze([
   'candidateOnly', 'solverExecuted', 'productionSwitchApplied',
@@ -129,6 +130,9 @@ export function evaluateLafeaBucket01ProbeStableCandidateIntake(inputValue) {
     candidatePackage.semanticHash,
     topologyReport.semanticHash,
   );
+  const independentCheckerExecution =
+    candidateValidationEvidence.authority.independentCheckerExecution === true
+      && topologyValidationEvidence.authority.independentCheckerExecution === true;
   const base = {
     schema: LAFEA_BUCKET_01_PROBE_STABLE_CANDIDATE_INTAKE_EVIDENCE_SCHEMA,
     producerRevision: LAFEA_BUCKET_01_PROBE_STABLE_CANDIDATE_INTAKE_REVISION,
@@ -146,6 +150,7 @@ export function evaluateLafeaBucket01ProbeStableCandidateIntake(inputValue) {
       circumferentialCellCount: level.circumferentialCellCount,
       elementCount: level.elementCount,
       meshHash: level.meshHash,
+      mappingWindowHash: level.mappingWindowHash,
       topologyMinimumNaturalMargin:
         topologyReport.levelReports[index].minimumNaturalMargin,
       status: 'PASS',
@@ -157,6 +162,10 @@ export function evaluateLafeaBucket01ProbeStableCandidateIntake(inputValue) {
       topologyProofVerified: true,
       candidateRebuildValidationExecuted: true,
       topologyRecomputationExecuted: true,
+      mappingWindowRecomputed: true,
+      executedRecomputation: true,
+      independentCheckerExecution,
+      independentCheckerRequiredBeforeReplayAdjudication: true,
       exactHeadBound: true,
       designHashBound: true,
       productionSwitchAuthorized: false,
@@ -183,6 +192,15 @@ export function validateLafeaBucket01ProbeStableCandidateIntakeEvidence(value) {
     delete basis.semanticHash;
     if (canonicalLafeaSha256(basis) !== value.semanticHash) {
       throw intakeError('LAFEA_B01_PROBE_STABLE_INTAKE_HASH_TAMPERED');
+    }
+    if (value.authority?.executedRecomputation !== true
+      || value.authority?.independentCheckerRequiredBeforeReplayAdjudication
+        !== true
+      || value.authority?.productionSwitchAuthorized !== false
+      || value.authority?.productionMeshAuthority !== false
+      || value.authority?.qualificationAuthority !== false
+      || value.authority?.bucketQualified !== false) {
+      throw intakeError('LAFEA_B01_PROBE_STABLE_INTAKE_AUTHORITY_INVALID');
     }
     if (!isDeepFrozen(value)) {
       throw intakeError('LAFEA_B01_PROBE_STABLE_INTAKE_NOT_FROZEN');
@@ -249,7 +267,7 @@ function validateCandidatePackage(value, exactHeadSha, designHash) {
     }
     for (const key of [
       'meshHash', 'radialCoordinateHash', 'circumferentialCoordinateHash',
-      'featureSetHash', 'qualityHash',
+      'featureSetHash', 'qualityHash', 'mappingWindowHash',
     ]) {
       sha256(level[key], `candidatePackage.levels.${key}`);
     }
@@ -365,6 +383,7 @@ function validateCandidateValidationEvidence(value, exactHeadSha,
     || value.coordinateHashesRebuilt !== true
     || value.featureSetHashesRebuilt !== true
     || value.qualityHashesRebuilt !== true
+    || value.mappingWindowRecomputed !== true
     || value.status !== 'PASS'
     || !Array.isArray(value.reasons)
     || value.reasons.length !== 0) {
@@ -427,10 +446,13 @@ function validateValidationAuthority(value) {
     'candidate validation authority',
   );
   requireBoolean(
-    value.independentCheckerExecution,
+    value.executedRecomputation,
     true,
-    'LAFEA_B01_PROBE_STABLE_VALIDATION_CHECKER_NOT_EXECUTED',
+    'LAFEA_B01_PROBE_STABLE_VALIDATION_RECOMPUTATION_NOT_EXECUTED',
   );
+  if (typeof value.independentCheckerExecution !== 'boolean') {
+    throw intakeError('LAFEA_B01_PROBE_STABLE_VALIDATION_CHECKER_FLAG_INVALID');
+  }
   for (const key of [
     'productionSwitchApplied', 'productionMeshAuthority',
     'stressAcceptanceAuthority', 'qualificationAuthority', 'bucketQualified',
