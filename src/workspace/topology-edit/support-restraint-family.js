@@ -81,8 +81,8 @@ export function deriveSupportRestraintGeometry(input = {}) {
 }
 export function deriveAllSupportRestraintGeometry(input = {}) {
   const supports = [...(input.canonicalTopology?.supports || [])]
-    .sort((left, right) => stringValue(left.id).localeCompare(stringValue(right.id)));
-  return Object.freeze(supports.map((support) => deriveSupportRestraintGeometry({ ...input, support })));
+    .sort((left, right) => compareCodeUnits(stringValue(left.id), stringValue(right.id)));
+  return deepFreeze(supports.map((support) => deriveSupportRestraintGeometry({ ...input, support })));
 }
 export function projectSupportGeometryToViewport(overlays, policy = {}) {
   const arrowLengthMm = positive(policy.arrowLengthMm) || 80;
@@ -106,7 +106,7 @@ export function projectSupportGeometryToViewport(overlays, policy = {}) {
       });
     }
   }
-  return deepFreeze({ elements, segments });
+  return deepFreeze({ elements, segments, glyphOverlays: overlays || [] });
 }
 
 function deriveRestraint(context) {
@@ -293,4 +293,7 @@ function cleanVector(value) {
     y: Object.is(value.y, -0) ? 0 : value.y,
     z: Object.is(value.z, -0) ? 0 : value.z,
   };
+}
+function compareCodeUnits(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
 }
