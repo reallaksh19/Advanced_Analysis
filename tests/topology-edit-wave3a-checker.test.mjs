@@ -15,6 +15,9 @@ function model({ nodes = [], edges = [], junctions = [], supports = [], rigids =
 }
 function kinds(value, options) { return new Set(checkCanonicalTopology(value, options).map((row) => row.kind)); }
 function assertKind(kind, value, options) { assert.ok(kinds(value, options).has(kind), `${kind} not found`); }
+function assertNoKind(kind, value, options) {
+  assert.equal(kinds(value, options).has(kind), false, `${kind} unexpectedly found`);
+}
 
 test('detects pair geometry rules from canonical source-space segments', () => {
   const overlap = model({ nodes:[p('a',0,0),p('b',10,0),p('c',5,0),p('d',15,0)], edges:[e('e1','a','b'),e('e2','c','d')] });
@@ -35,6 +38,63 @@ test('detects two-way fitting rules', () => {
   assertKind('PIPE_BACKTRACK', model({nodes:[p('n',0,0),p('a',10,0),p('b',20,0)],edges:[e('e1','n','a'),e('e2','n','b')]}));
   assertKind('RIGHT_ANGLE_WITHOUT_BEND', model({nodes:[p('n',0,0),p('a',10,0),p('b',0,10)],edges:[e('e1','n','a'),e('e2','n','b')]}));
   assertKind('UNDEFINED_KINK', model({nodes:[p('n',0,0),p('a',10,0),p('b',10,10)],edges:[e('e1','n','a'),e('e2','n','b')]}));
+});
+
+test('[SIMULATED] recognizes ELBO as an exact bend alias in two-way turns', () => {
+  const fortyFiveDegreeTurn = model({
+    nodes:[p('n',0,0),p('a',10,0),p('b',10,10)],
+    edges:[e('elbo','n','a',{entityType:'ELBO'}),e('pipe','n','b')],
+  });
+  assertNoKind('UNDEFINED_KINK', fortyFiveDegreeTurn);
+
+  const rightAngleTurn = model({
+    nodes:[p('n',0,0),p('a',10,0),p('b',0,10)],
+    edges:[e('elbo','n','a',{entityType:'ELBO'}),e('pipe','n','b')],
+  });
+  assertNoKind('RIGHT_ANGLE_WITHOUT_BEND', rightAngleTurn);
+
+  const lowercaseAlias = model({
+    nodes:[p('n',0,0),p('a',10,0),p('b',10,10)],
+    edges:[e('elbo','n','a',{entityType:'elbo'}),e('pipe','n','b')],
+  });
+  assertNoKind('UNDEFINED_KINK', lowercaseAlias);
+});
+
+test('[SIMULATED] applies ELBO to existing bend fitting rules', () => {
+  assertKind('BEND_WITHOUT_DIRECTION_CHANGE', model({
+    nodes:[p('a',0,0),p('b',10,0)],
+    edges:[e('elbo','a','b',{entityType:'ELBO',bendAngleDeg:0})],
+  }));
+
+  const bendAtJunction = model({
+    nodes:[p('n',0,0),p('a',10,0),p('b',0,10),p('c',-10,0)],
+    edges:[e('elbo','n','a',{entityType:'ELBO'}),e('e2','n','b'),e('e3','n','c')],
+    junctions:[{id:'j1',nodeIds:['n']}],
+  });
+  assertKind('BEND_AT_JUNCTION', bendAtJunction);
+});
+
+test('[SIMULATED] preserves non-bend kinks and existing bend aliases', () => {
+  const nodes = [p('n',0,0),p('a',10,0),p('b',10,10)];
+  assertKind('UNDEFINED_KINK', model({
+    nodes,
+    edges:[e('e1','n','a'),e('e2','n','b')],
+  }));
+  assertKind('UNDEFINED_KINK', model({
+    nodes,
+    edges:[e('elbolet','n','a',{entityType:'ELBOLET'}),e('pipe','n','b')],
+  }));
+  assertKind('UNDEFINED_KINK', model({
+    nodes,
+    edges:[e('pipe','n','a',{entityType:'PIPE',type:'ELBO'}),e('e2','n','b')],
+  }));
+
+  for (const entityType of ['BEND', 'ELBOW']) {
+    assertNoKind('UNDEFINED_KINK', model({
+      nodes,
+      edges:[e('bend','n','a',{entityType}),e('pipe','n','b')],
+    }));
+  }
 });
 
 test('detects bend and junction rules', () => {
