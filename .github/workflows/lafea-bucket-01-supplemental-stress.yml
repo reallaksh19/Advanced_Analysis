@@ -1,0 +1,183 @@
+name: LAFEA Bucket-01 Supplemental Stress Level
+
+on:
+  push:
+    branches: [bucket-01-cantilever-benchmark-route]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  supplemental-stress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Execute p1.10 checkerboard 256/1024/4096 stress sequence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports/qualification
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=pending \
+            -f context=lafea/supplemental-stress-4096 \
+            -f description="Executing fixed probes on 256/1024/4096 elements"
+
+          python - <<'PY' > reports/qualification/supplemental-stress-patch.stdout.log 2> reports/qualification/supplemental-stress-patch.stderr.log
+          import re
+          from pathlib import Path
+
+          mesh_path = Path('src/core/lafea-meshing/lug-pinhole-t6.js')
+          text = mesh_path.read_text()
+          split_pattern = re.compile(
+              r"(?P<indent>\s*)addT6Element\(state, `E-R\$\{ring\}-S\$\{sector\}-A`, \[\s*"
+              r"innerA, outerA, outerB,\s*\]\);\s*"
+              r"addT6Element\(state, `E-R\$\{ring\}-S\$\{sector\}-B`, \[\s*"
+              r"innerA, outerB, innerB,\s*\]\);"
+          )
+          match = split_pattern.search(text)
+          if not match:
+              raise RuntimeError('element split marker missing')
+          indent = match.group('indent').split('\n')[-1]
+          ring_token = '{ring}'
+          sector_token = '{sector}'
+          replacement = '\n'.join([
+              f'{indent}const alternateDiagonal = (ring + sector) % 2 === 1;',
+              f'{indent}if (alternateDiagonal) {{',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-A`, [',
+              f'{indent}    innerA, outerA, innerB,',
+              f'{indent}  ]);',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-B`, [',
+              f'{indent}    outerA, outerB, innerB,',
+              f'{indent}  ]);',
+              f'{indent}}} else {{',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-A`, [',
+              f'{indent}    innerA, outerA, outerB,',
+              f'{indent}  ]);',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-B`, [',
+              f'{indent}    innerA, outerB, innerB,',
+              f'{indent}  ]);',
+              f'{indent}}}',
+          ])
+          text = split_pattern.sub(lambda _: replacement, text, count=1)
+          radius_pattern = re.compile(
+              r"function radiusAt\(spec, ring\) \{\s*"
+              r"return spec\.holeRadius\s*"
+              r"\+ \(spec\.outerRadius - spec\.holeRadius\)\s*"
+              r"\* ring / spec\.radialDivisions;\s*"
+              r"\}"
+          )
+          radius_replacement = '''function radiusAt(spec, ring) {
+            const normalized = ring / spec.radialDivisions;
+            const graded = normalized <= 0.5
+              ? 0.5 * (2 * normalized) ** 1.1
+              : 1 - 0.5 * (2 * (1 - normalized)) ** 1.1;
+            return spec.holeRadius
+              + (spec.outerRadius - spec.holeRadius) * graded;
+          }'''
+          text, count = radius_pattern.subn(lambda _: radius_replacement, text, count=1)
+          if count != 1:
+              raise RuntimeError('radiusAt marker missing')
+          mesh_path.write_text(text)
+
+          runner_path = Path('scripts/lafea-bucket-01-production-response-runner.mjs')
+          runner = runner_path.read_text()
+          runner_marker = "const spec = JSON.parse(fs.readFileSync(SPEC_PATH, 'utf8'));"
+          runner_injection = runner_marker + "\nspec.meshLadder.push({ ordinal: 4, elementCount: 4096, meshSize: 0.0078125, radialDivisions: 16, circumferentialDivisions: 128 });"
+          if runner.count(runner_marker) != 1:
+              raise RuntimeError(f'runner marker count={runner.count(runner_marker)}')
+          runner_path.write_text(runner.replace(runner_marker, runner_injection, 1))
+
+          receipt_path = Path('scripts/lafea-bucket-01-production-lug-probe-receipt.mjs')
+          receipt = receipt_path.read_text()
+          spec_marker = "const spec = JSON.parse(fs.readFileSync(SPEC_PATH, 'utf8'));"
+          spec_injection = spec_marker + "\nspec.meshLadder.push({ ordinal: 4, elementCount: 4096, meshSize: 0.0078125, radialDivisions: 16, circumferentialDivisions: 128 });"
+          if receipt.count(spec_marker) != 1:
+              raise RuntimeError(f'receipt spec marker count={receipt.count(spec_marker)}')
+          receipt = receipt.replace(spec_marker, spec_injection, 1)
+          receipt = receipt.replace(
+              "    [64, 256, 1024],",
+              "    [64, 256, 1024, 4096],",
+              1,
+          )
+          receipt = receipt.replace(
+              "  }, levels));",
+              "  }, levels.slice(-3)));",
+              1,
+          )
+          receipt = receipt.replace(
+              "  }, levels));",
+              "  }, levels.slice(-3)));",
+          )
+          receipt = receipt.replace(
+              "    meshSizes: spec.meshLadder.map((row) => row.meshSize),",
+              "    meshSizes: levelsValue.map((row) => row.definition.meshSize),",
+              1,
+          )
+          assertion = '''  assert.equal(
+              convergence.status,
+              'PASS',
+              `${definition.probeId}: ${convergence.reasons.join(', ')}`,
+            );'''
+          diagnostic = '''  console.error(`SUPPLEMENTAL_STRESS_DETAIL=${JSON.stringify({
+              probeId: definition.probeId,
+              role: definition.role,
+              zone: definition.zone,
+              observations: probeEvidences.map((row) => row.authoritativeValue),
+              meshSizes: levelsValue.map((row) => row.definition.meshSize),
+              naturalCoordinates: probeEvidences.map((row) => row.naturalCoordinates),
+              convergence,
+            })}`);
+            assert.equal(
+              convergence.status,
+              'PASS',
+              `${definition.probeId}: ${convergence.reasons.join(', ')}`,
+            );'''
+          if receipt.count(assertion) != 1:
+              raise RuntimeError(f'assertion marker count={receipt.count(assertion)}')
+          receipt_path.write_text(receipt.replace(assertion, diagnostic, 1))
+          PY
+
+          node scripts/lafea-bucket-01-production-response-runner.mjs \
+            > reports/qualification/supplemental-stress-runner.stdout.log \
+            2> reports/qualification/supplemental-stress-runner.stderr.log
+          set +e
+          node scripts/lafea-bucket-01-production-lug-probe-receipt.mjs \
+            > reports/qualification/supplemental-stress-receipt.stdout.log \
+            2> reports/qualification/supplemental-stress-receipt.stderr.log
+          exit_code=$?
+          set -e
+          details=$(node -e "const fs=require('fs');const t=fs.readFileSync('reports/qualification/supplemental-stress-receipt.stderr.log','utf8');const lines=t.split(/\r?\n/).filter(s=>s.startsWith('SUPPLEMENTAL_STRESS_DETAIL='));process.stdout.write(lines.join('\n').slice(0,12000))")
+          encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$details")
+          if [[ "$exit_code" == "0" ]]; then
+            state=success
+            description="All frozen probes passed on 256/1024/4096"
+          else
+            state=failure
+            description="Supplemental 4096 stress refinement remains blocked"
+          fi
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state="$state" \
+            -f context=lafea/supplemental-stress-4096 \
+            -f description="$description" \
+            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_supplemental=${encoded}"
+          exit "$exit_code"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-supplemental-stress-4096-${{ github.sha }}
+          path: reports/qualification/
+          if-no-files-found: warn
+          retention-days: 30
