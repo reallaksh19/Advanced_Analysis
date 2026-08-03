@@ -271,7 +271,13 @@ export class TopologyEdit3DViewController {
     const sourceVisual = this.deriveVisual(base, 'SOURCE');
     const draftVisual = this.deriveVisual(canonical, 'DRAFT');
     const supportOverlays = deriveAllSupportRestraintGeometry({ canonicalTopology: canonical, verticalAxis: 'Z' });
-    const supportProjection = projectSupportGeometryToViewport(supportOverlays);
+    const supportMarkerSize = Number(this.viewportBackend?.navigationConfiguration?.supportMarkerSize);
+    if (!Number.isFinite(supportMarkerSize) || supportMarkerSize <= 0) {
+      throw new Error('TOPOLOGY_EDIT_SUPPORT_MARKER_POLICY_MISSING: Approved supportMarkerSize is required.');
+    }
+    const supportProjection = projectSupportGeometryToViewport(supportOverlays, {
+      markerSizeMm: supportMarkerSize,
+    });
     this.visualDiagnostics = [
       ...(draftVisual.model.diagnostics ?? []), ...supportOverlays.flatMap((row) => row.diagnostics ?? []),
       ...supportOverlays.flatMap((row) => row.restraints.flatMap((restraint) => restraint.diagnostics ?? [])),

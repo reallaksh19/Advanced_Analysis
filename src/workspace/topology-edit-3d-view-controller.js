@@ -2,8 +2,15 @@
 import {
   TopologyEdit3DViewController as TopologyEdit3DViewControllerCore,
 } from './topology-edit-3d-view-controller-core.js';
-import { canRunTopologyEditAction } from './topology-edit/topology-edit-command-ui.js';
+import { EVENT_TOPICS } from './event-topics.js';
+import {
+  canRunTopologyEditAction,
+  createTopologyEditSelection,
+  topologyEditSelectionDescription,
+  updateTopologyEditSelection,
+} from './topology-edit/topology-edit-command-ui.js';
 import { TopologyEditLifecycleController } from './topology-edit/topology-edit-lifecycle-controller.js';
+import { topologyEditEntityIdsForObject } from './topology-edit/topology-edit-render-packet.js';
 
 export { buildAutofixPolicy } from './topology-edit-3d-view-controller-core.js';
 
@@ -13,6 +20,7 @@ const EMPTY_TOPOLOGY_EDIT_VIEW_SELECTION = Object.freeze({
   nodeIds: Object.freeze([]),
   edgeId: null,
 });
+const NAVIGATION_MODES = new Set(['select', 'orbit', 'pan']);
 
 export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCore {
   constructor(eventBus, lifecycleOptions = {}) {
@@ -22,6 +30,8 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
     this.lastExportSealedHash = null;
     this.lastCommitReceiptHash = null;
     this.lastCommitDisposition = null;
+    this.viewportSelectionHandler = (pick, event) => this.handleViewportSelection(pick, event);
+    this.sharedNavigationHandler = (event) => this.handleSharedNavigation(event);
     this.lifecycle = new TopologyEditLifecycleController({
       getSession: () => this.session,
       getViewState: () => ({
@@ -32,8 +42,23 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
     });
   }
 
+  async activate() {
+    await super.activate();
+    this.canvasMount?.removeEventListener('pointerdown', this.pointerHandler);
+    this.viewportBackend?.setSelectionRequestHandler(this.viewportSelectionHandler);
+    this.hostElement?.ownerDocument?.addEventListener(
+      'click',
+      this.sharedNavigationHandler,
+      true,
+    );
+    this.setNavigationMode('select', true);
+  }
+
   buildShell() {
     super.buildShell();
+    const tools = this.hostElement?.querySelector('[data-role="topology-edit-tools"]');
+    if (!tools) throw new Error('TopologyEdit3DViewController: navigation tool host is missing.');
+    tools.insertAdjacentHTML('beforeend', navigationMarkup());
     const actions = this.hostElement?.querySelector('.topology-edit-3d-toolbar__actions');
     if (!actions) throw new Error('TopologyEdit3DViewController: lifecycle action host is missing.');
     actions.insertAdjacentHTML('beforeend', `
@@ -47,6 +72,12 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
   }
 
   deactivate() {
+    this.hostElement?.ownerDocument?.removeEventListener(
+      'click',
+      this.sharedNavigationHandler,
+      true,
+    );
+    this.viewportBackend?.setSelectionRequestHandler(null);
     super.deactivate();
     this.lastPersistenceError = null;
     this.lastDraftPackageHash = null;
@@ -56,11 +87,113 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
   }
 
   handleHostClick(event) {
+    const navigationMode = event.target.closest('[data-navigation-mode]');
+    if (navigationMode) return this.setNavigationMode(navigationMode.dataset.navigationMode);
+    const navigationAction = event.target.closest('[data-navigation-action]');
+    if (navigationAction) return this.runNavigationAction(navigationAction.dataset.navigationAction);
+    const standardView = event.target.closest('[data-standard-view]');
+    if (standardView) return this.runStandardView(standardView.dataset.standardView);
     if (event.target.closest('[data-action="save-draft"]')) return this.saveDraft();
     if (event.target.closest('[data-action="reload-draft"]')) return this.reloadDraft();
     if (event.target.closest('[data-action="export-draft"]')) return this.exportDraft();
     if (event.target.closest('[data-action="commit-draft"]')) return this.commitDraft();
     return super.handleHostClick(event);
+  }
+
+  handleSharedNavigation(event) {
+    const trigger = event.target?.closest?.('[data-viewport-action]');
+    const workspaceShell = this.hostElement?.closest('.workspace-shell');
+    if (!trigger || !workspaceShell?.contains(trigger) || trigger.disabled) return;
+    const action = String(trigger.dataset.viewportAction || '');
+    if (!action) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (action.startsWith('mode-')) {
+      this.setNavigationMode(action.slice('mode-'.length));
+      return;
+    }
+    if (action.startsWith('view-')) {
+      this.runStandardView(action.slice('view-'.length));
+      return;
+    }
+    const aliases = {
+      fit: 'fit',
+      'fit-selection': 'fit-selection',
+      'pivot-selection': 'pivot-selection',
+      home: 'home',
+      reset: 'home',
+      'previous-view': 'previous',
+      'toggle-projection': 'projection',
+    };
+    const localAction = aliases[action];
+    if (!localAction) {
+      throw new TypeError(`Unsupported shared topology edit navigation action: ${action}`);
+    }
+    this.runNavigationAction(localAction);
+  }
+
+  handleViewportSelection(pick, event) {
+    if (!this.session) return;
+    if (!pick?.objectId) {
+      this.selection = createTopologyEditSelection();
+      this.presentationToolbar?.update(this.presentationState);
+      this.setStatus('Selection cleared.');
+      this.updateActionButtons();
+      return;
+    }
+    if (pick.objectKind === 'node' || pick.objectKind === 'component') {
+      this.selection = updateTopologyEditSelection(
+        this.selection,
+        pick.objectId,
+        event?.shiftKey === true,
+      );
+    }
+    const entityIds = pick.workspaceEntityIds?.length
+      ? pick.workspaceEntityIds
+      : topologyEditEntityIdsForObject(this.session.currentTopology(), pick.objectId);
+    if (entityIds.length) {
+      this.eventBus.publish(EVENT_TOPICS.VIEWPORT_SELECTION_REQUESTED, {
+        entityId: entityIds[0],
+        source: 'topology-edit-3d',
+      });
+    }
+    this.presentationToolbar?.update(this.presentationState);
+    this.setStatus(selectionMessage(pick, this.selection));
+    this.updateActionButtons();
+  }
+
+  setNavigationMode(mode, silent = false) {
+    if (!NAVIGATION_MODES.has(mode)) {
+      throw new TypeError(`Unsupported topology edit navigation mode: ${mode}`);
+    }
+    this.viewportBackend?.setInteractionContext(mode);
+    this.hostElement?.querySelectorAll('[data-navigation-mode]').forEach((button) => {
+      button.setAttribute('aria-pressed', String(button.dataset.navigationMode === mode));
+    });
+    if (this.hostElement) this.hostElement.dataset.topologyEditNavigationMode = mode;
+    if (!silent) this.setStatus(`Navigation mode: ${mode}.`);
+  }
+
+  runNavigationAction(action) {
+    const backend = this.viewportBackend;
+    if (!backend) return;
+    if (action === 'fit') backend.fitAll();
+    else if (action === 'fit-selection') backend.fitSelection();
+    else if (action === 'home') backend.home();
+    else if (action === 'previous') backend.previousView();
+    else if (action === 'pivot-selection') backend.pivotSelection();
+    else if (action === 'projection') {
+      const projection = backend.toggleProjection();
+      if (this.hostElement) this.hostElement.dataset.topologyEditProjection = projection;
+      this.setStatus(`Projection: ${projection}.`);
+      return;
+    } else throw new TypeError(`Unsupported topology edit navigation action: ${action}`);
+    this.setStatus(`View command: ${action}.`);
+  }
+
+  runStandardView(view) {
+    this.viewportBackend?.setStandardView(view);
+    this.setStatus(`Standard view: ${String(view).toUpperCase()}.`);
   }
 
   runCommandAction(actionId) {
@@ -238,4 +371,31 @@ export function restoreTopologyEditViewSelection(value) {
     nodeIds: Object.freeze(nodeIds),
     edgeId,
   });
+}
+
+function navigationMarkup() {
+  return `
+    <span role="group" aria-label="Topology edit navigation">
+      <button type="button" data-navigation-mode="select" aria-pressed="true">Select</button>
+      <button type="button" data-navigation-mode="orbit" aria-pressed="false">Orbit</button>
+      <button type="button" data-navigation-mode="pan" aria-pressed="false">Pan</button>
+      <button type="button" data-navigation-action="fit">Fit</button>
+      <button type="button" data-navigation-action="fit-selection">Fit selection</button>
+      <button type="button" data-navigation-action="home">Home</button>
+      <button type="button" data-navigation-action="previous">Previous</button>
+      <button type="button" data-navigation-action="pivot-selection">Pivot selection</button>
+      <button type="button" data-navigation-action="projection">Projection</button>
+      <button type="button" data-standard-view="iso">Iso</button>
+      <button type="button" data-standard-view="top">Top</button>
+      <button type="button" data-standard-view="front">Front</button>
+      <button type="button" data-standard-view="right">Right</button>
+    </span>`;
+}
+
+function selectionMessage(pick, selection) {
+  if (pick.objectKind === 'restraint') {
+    return `Selected ${pick.restraintFamily || 'restraint'} ${pick.restraintId} on support ${pick.supportId}.`;
+  }
+  if (pick.objectKind === 'support') return `Selected support ${pick.supportId || pick.objectId}.`;
+  return topologyEditSelectionDescription(selection);
 }
