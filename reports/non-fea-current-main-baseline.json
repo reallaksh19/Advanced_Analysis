@@ -1,0 +1,60 @@
+{
+  "schema": "non-fea-current-main-baseline/v1",
+  "status": "IMPLEMENTATION_READY_OWNER_EXECUTION_REQUIRED",
+  "programmeBaseSha": "0bad5b4200a8e24a358e76b1ea8372da33485c87",
+  "exactHeadSha": null,
+  "executionId": null,
+  "generatedAt": null,
+  "fixtureLedger": [
+    {
+      "path": "benchmarks/ATTRIBUTE-AML_ASIM-1835_managed_stage_enriched_stage.json",
+      "sourceSha256": null,
+      "byteLength": null,
+      "declaredUse": ["normalization", "geometry", "render-model"],
+      "realOrSimulated": "REAL_REPOSITORY_FIXTURE_PENDING_HASH",
+      "expectedIdentity": {},
+      "authorityNotes": ["Exact-head runner not executed in connector environment."],
+      "status": "NOT_EXECUTED"
+    },
+    {
+      "path": "benchmarks/Sjson.json",
+      "sourceSha256": null,
+      "byteLength": null,
+      "declaredUse": ["normalization", "support-sites", "route-partition", "empirical-loads"],
+      "realOrSimulated": "REAL_REPOSITORY_FIXTURE_PENDING_HASH",
+      "expectedIdentity": {},
+      "authorityNotes": ["Exact-head runner not executed in connector environment."],
+      "status": "NOT_EXECUTED"
+    },
+    {
+      "path": "benchmarks/1885Sjson/EnrichedSjson",
+      "sourceSha256": null,
+      "byteLength": null,
+      "declaredUse": ["normalization", "topology", "support-sites", "route-partition"],
+      "realOrSimulated": "REAL_REPOSITORY_FIXTURE_PENDING_HASH",
+      "expectedIdentity": {},
+      "authorityNotes": ["Exact-head runner not executed in connector environment."],
+      "status": "NOT_EXECUTED"
+    }
+  ],
+  "fixtureRuns": [],
+  "stageStatistics": [],
+  "commandRuns": [],
+  "failures": [
+    {
+      "classification": "UNRESOLVED_GATE",
+      "code": "P0_EXACT_HEAD_EXECUTION_REQUIRED",
+      "message": "Run scripts/run-non-fea-current-main-baseline.mjs in a complete exact-head checkout and retain browser evidence.",
+      "stageId": null,
+      "details": null
+    }
+  ],
+  "completion": {
+    "P0_IMPLEMENTATION_PRESENT": true,
+    "P0_EXACT_HEAD_NODE_LEDGER_PRESENT": false,
+    "P0_BROWSER_LEDGER_PRESENT": false,
+    "P0_FIXTURE_AUTHORITY_COMPLETE": false,
+    "P0_OWNERSHIP_ACCEPTED": false,
+    "P0_ACCEPTED": false
+  }
+}
