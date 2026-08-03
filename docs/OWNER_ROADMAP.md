@@ -532,3 +532,23 @@ the SIMFLEX-II comparison already used for Example 1.
   `EXPANSION_RANGE_ENVELOPE` prerequisite now (which overlaps heavily with
   the deferred configurability phase's own scope) or defer Example 3
   until that phase naturally arrives.
+
+User decision: scope the prerequisite now, mirroring the M014→M013
+pattern. Dispatched as **M017 (#520)**, directly (no prequalification).
+Grounded by reading the real code, not assumption — found the scope is
+smaller than initially feared: `linear-piping-code-application/
+b31-application.js`'s `resolveAction` already has a real, stiffness-
+consistency-guarded `CASE_RANGE` mechanism that computes exactly the
+resultant difference between two independently recovered code points
+`EXPANSION_RANGE_ENVELOPE` needs — it is gated to `DISPLACEMENT_STRESS_
+RANGE` only by one explicit check, not rebuilt from scratch. The real new
+work is: (1) widening that one gate, (2) a new Eq(1b)-family allowable-
+stress formula (subtracts a sustained-stress term from the existing
+Eq(1a) structure — `categories.js`'s `displacementRangeAllowable` has no
+such path today) which M017 explicitly requires be cited from a real
+ASME B31.3 §302.3.5(d) source rather than guessed, given the Appendix C
+constant mistake earlier this session, and (3) wiring M015's
+`sustainedSectionResolution` into `b31-application.js` for the first
+time (merged in M015 but zero real callers use it).
+M013 (#496) benchmark for Example 3 itself is not yet scoped and depends
+on M017 merging first.
