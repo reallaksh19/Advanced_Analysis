@@ -15,6 +15,7 @@ import {
 } from '../linear-fea-load-case/index.js';
 import { deriveLinearPipingParentSet } from './contracts.js';
 import { runLinearPipingAnalysis } from './consumer.js';
+import { expandPipeWallGravitySourceAuthorities } from './gravity-expansion.js';
 import { sealLinearPipingSourceAnalysisContext } from './source-analysis-context.js';
 import {
   failLinearPipingAnalysis,
@@ -69,10 +70,17 @@ export function runLinearPipingAnalysisFromSourceAuthorities(request, runtime) {
 export function compileLinearPipingSourceAnalysisContext(request, runtime) {
   const accepted = validateLinearPipingSourceAnalysisRequest(request);
   const compilation = compileMechanicalModel(accepted.mechanicalModelInput);
-  const loadCase = compilePhysicalLoadCase({
+  const declaredLoadCase = compilePhysicalLoadCase({
     ...accepted.physicalLoadCaseInput,
     modelReference: modelReferenceFromCompilation(compilation),
   });
+  const expanded = expandPipeWallGravitySourceAuthorities({
+    compilation,
+    loadCase: declaredLoadCase,
+    frameElements: accepted.frameElements,
+    pipingComponents: accepted.pipingComponents,
+  });
+  const loadCase = expanded.loadCase;
   const currentSourceAuthorities = deriveLinearPipingSourceAuthoritySet({
     compilation,
     loadCase,
@@ -84,8 +92,8 @@ export function compileLinearPipingSourceAnalysisContext(request, runtime) {
   const parentInput = {
     compilation,
     loadCase,
-    frameElements: accepted.frameElements,
-    pipingComponents: accepted.pipingComponents,
+    frameElements: expanded.frameElements,
+    pipingComponents: expanded.pipingComponents,
     solverProfile: accepted.solverProfile,
     recoveryProfile: accepted.recoveryProfile,
   };
