@@ -1,0 +1,176 @@
+name: LAFEA Bucket-01 Conservative Bound Rerun
+
+on:
+  push:
+    branches: [bucket-01-cantilever-benchmark-route]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  statuses: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: bucket-01-cantilever-benchmark-route
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Extract corrected candidate patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports/qualification
+          python - <<'PY'
+          import re
+          import textwrap
+          from pathlib import Path
+          source = Path('.github/workflows/lafea-bucket-01-conservative-bound-repair.yml').read_text()
+          match = re.search(
+              r"python - <<'PY'[^\n]*\n(?P<body>.*?)\n          PY",
+              source,
+              re.DOTALL,
+          )
+          if not match:
+              raise RuntimeError('candidate patch body not found')
+          body = textwrap.dedent(match.group('body'))
+          old = "template['stressClassification']['method']"
+          new = "template['requiredFields']['stressClassification']['method']"
+          if body.count(old) != 1:
+              raise RuntimeError(f'intake path marker count={body.count(old)}')
+          Path('/tmp/lafea-conservative-bound-patch.py').write_text(
+              body.replace(old, new, 1),
+          )
+          PY
+      - name: Apply, validate, and publish candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ORIGINAL_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          status() {
+            state="$1"; context="$2"; description="$3"; target="${4:-}"
+            args=(--method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" -f state="$state" -f context="$context" -f description="$description")
+            if [[ -n "$target" ]]; then args+=(-f target_url="$target"); fi
+            gh api "${args[@]}"
+          }
+          fail() {
+            stage="$1"; log="$2"
+            detail=$(node -e "const fs=require('fs');const p=process.argv[1];const t=fs.existsSync(p)?fs.readFileSync(p,'utf8'):'missing log';process.stdout.write(t.trim().slice(-7500))" "$log")
+            encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
+            status failure "lafea/conservative-bound-rerun/${stage}" "Conservative bound rerun failed at ${stage}" "https://github.com/${GITHUB_REPOSITORY}/commit/${ORIGINAL_SHA}?lafea_error=${encoded}"
+            exit 1
+          }
+          status pending lafea/conservative-bound-rerun "Qualifying corrected fixed-location upper envelope"
+          python /tmp/lafea-conservative-bound-patch.py \
+            > reports/qualification/conservative-bound-rerun-patch.stdout.log \
+            2> reports/qualification/conservative-bound-rerun-patch.stderr.log \
+            || fail PATCH reports/qualification/conservative-bound-rerun-patch.stderr.log
+
+          git add \
+            src/core/lafea-meshing/lug-pinhole-t6.js \
+            src/workspace/lafea-lug-pinhole-mesh-ladder.js \
+            src/workspace/lafea-bucket-01-mesh-qualification.js \
+            src/workspace/lafea-bucket-01-stress-convergence.js \
+            src/workspace/lafea-bucket-01-code-assessment.js \
+            scripts/lafea-nb-t6b-public-surface-check.mjs \
+            scripts/lafea-bucket-01-production-lug-probe-receipt.mjs \
+            validation/bucket-01/08-production-lug-fixed-probe-spec.json \
+            validation/bucket-01/09-code-basis-intake-template.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix(lafea): resolve oscillatory stress with conservative fixed-location bound" \
+            > reports/qualification/conservative-bound-rerun-commit.stdout.log \
+            2> reports/qualification/conservative-bound-rerun-commit.stderr.log \
+            || fail COMMIT reports/qualification/conservative-bound-rerun-commit.stderr.log
+          repaired_sha=$(git rev-parse HEAD)
+
+          node scripts/lafea-nb-t6b-public-surface-check.mjs \
+            > reports/qualification/conservative-bound-rerun-public.stdout.log \
+            2> reports/qualification/conservative-bound-rerun-public.stderr.log \
+            || fail PUBLIC reports/qualification/conservative-bound-rerun-public.stderr.log
+          node scripts/lafea-nb-t6b-lug-pinhole-mesh-ladder-check.mjs \
+            > reports/qualification/conservative-bound-rerun-ladder.stdout.log \
+            2> reports/qualification/conservative-bound-rerun-ladder.stderr.log \
+            || fail LADDER reports/qualification/conservative-bound-rerun-ladder.stderr.log
+          EXPECTED_HEAD_SHA="$repaired_sha" node scripts/lafea-bucket-01-production-response-runner.mjs \
+            > reports/qualification/conservative-bound-rerun-execution.stdout.log \
+            2> reports/qualification/conservative-bound-rerun-execution.stderr.log \
+            || fail EXECUTION reports/qualification/conservative-bound-rerun-execution.stderr.log
+          set +e
+          EXPECTED_HEAD_SHA="$repaired_sha" node scripts/lafea-bucket-01-production-response-receipt.mjs \
+            > reports/qualification/conservative-bound-rerun-response.stdout.log \
+            2> reports/qualification/conservative-bound-rerun-response.stderr.log
+          response_exit=$?
+          set -e
+          if [[ "$response_exit" != "0" ]]; then
+            log=reports/qualification/conservative-bound-rerun-response.stderr.log
+            [[ -s "$log" ]] || log=reports/qualification/conservative-bound-rerun-response.stdout.log
+            fail RESPONSE "$log"
+          fi
+          EXPECTED_HEAD_SHA="$repaired_sha" node scripts/lafea-bucket-01-production-lug-probe-receipt.mjs \
+            > reports/qualification/conservative-bound-rerun-lug.stdout.log \
+            2> reports/qualification/conservative-bound-rerun-lug.stderr.log \
+            || fail LUG reports/qualification/conservative-bound-rerun-lug.stderr.log
+          node scripts/lafea-bucket-01-production-lug-probe-contract-check.mjs \
+            > reports/qualification/conservative-bound-rerun-probe-contract.stdout.log \
+            2> reports/qualification/conservative-bound-rerun-probe-contract.stderr.log \
+            || fail PROBE_CONTRACT reports/qualification/conservative-bound-rerun-probe-contract.stderr.log
+          node scripts/lafea-bucket-01-code-basis-check.mjs \
+            > reports/qualification/conservative-bound-rerun-code-basis.stdout.log \
+            2> reports/qualification/conservative-bound-rerun-code-basis.stderr.log \
+            || fail CODE_BASIS reports/qualification/conservative-bound-rerun-code-basis.stderr.log
+          node scripts/lafea-bucket-01-final-adjudication-contract-check.mjs \
+            > reports/qualification/conservative-bound-rerun-adjudication.stdout.log \
+            2> reports/qualification/conservative-bound-rerun-adjudication.stderr.log \
+            || fail ADJUDICATION reports/qualification/conservative-bound-rerun-adjudication.stderr.log
+          EXPECTED_HEAD_SHA="$repaired_sha" node scripts/lafea-bucket-01-exact-head-check.mjs \
+            > reports/qualification/conservative-bound-rerun-exact-head.stdout.log \
+            2> reports/qualification/conservative-bound-rerun-exact-head.stderr.log \
+            || fail EXACT_HEAD reports/qualification/conservative-bound-rerun-exact-head.stderr.log
+
+          node --input-type=module <<'NODE' > reports/qualification/conservative-bound-rerun-summary.json
+          import fs from 'node:fs';
+          const response = JSON.parse(fs.readFileSync(
+            'reports/qualification/lafea-bucket-01-production-response.json', 'utf8'));
+          const stress = JSON.parse(fs.readFileSync(
+            'reports/qualification/lafea-bucket-01-production-lug-fixed-probes.json', 'utf8'));
+          const rows = [
+            ...stress.standaloneProbeReceipts,
+            ...stress.pathReceipts.flatMap((row) => row.stationReceipts),
+          ];
+          console.log(JSON.stringify({
+            responseFineGridGci: response.energyConvergence.fineGridGci,
+            conservativeBoundLocations: rows
+              .filter((row) => row.acceptanceMethod === 'OSCILLATORY_FINE_PAIR_UPPER_ENVELOPE')
+              .map((row) => ({
+                probeId: row.probeId,
+                observations: row.observations,
+                absoluteUpperBound: row.conservativeBound.absoluteUpperBound,
+                relativeWidth: row.conservativeBound.relativeWidth,
+              })),
+            allLocationsPassed: rows.every((row) => row.status === 'PASS'),
+          }, null, 2));
+          NODE
+
+          git push origin HEAD:bucket-01-cantilever-benchmark-route \
+            > reports/qualification/conservative-bound-rerun-push.stdout.log \
+            2> reports/qualification/conservative-bound-rerun-push.stderr.log \
+            || fail PUSH reports/qualification/conservative-bound-rerun-push.stderr.log
+          status success "lafea/repaired-head/${repaired_sha:0:12}" "Conservative stress-bound repair published" "https://github.com/${GITHUB_REPOSITORY}/commit/${repaired_sha}"
+          status success lafea/conservative-bound-rerun "Response, fixed probes, adjudication, and exact-head passed"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-conservative-bound-rerun-${{ github.sha }}
+          path: reports/qualification/
+          if-no-files-found: warn
+          retention-days: 30
