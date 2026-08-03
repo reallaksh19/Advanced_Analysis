@@ -17,7 +17,12 @@ export async function runTopologyEditWave5BrowserHarness(options = {}) {
   await frames(2);
   const firstValidFrameMs = performance.now() - startedAt;
   const target = model.draft.elements[0];
-  const client = project(target, backend.activeCamera, host);
+  const client = project(
+    target,
+    backend.engineeringRoot,
+    backend.activeCamera,
+    backend.renderer.domElement,
+  );
   const picks = [];
   let identityErrorCount = 0;
   for (let index = 0; index < pickCount; index += 1) {
@@ -116,9 +121,12 @@ function largeModel(count) {
   });
 }
 
-function project(point, camera, host) {
-  const value = new THREE.Vector3(point.x, point.y, point.z).project(camera);
-  const rect = host.getBoundingClientRect();
+function project(point, engineeringRoot, camera, canvas) {
+  engineeringRoot.updateMatrixWorld(true);
+  const value = new THREE.Vector3(point.x, point.y, point.z)
+    .applyMatrix4(engineeringRoot.matrixWorld)
+    .project(camera);
+  const rect = canvas.getBoundingClientRect();
   return {
     x: rect.left + ((value.x + 1) / 2) * rect.width,
     y: rect.top + ((1 - value.y) / 2) * rect.height,
