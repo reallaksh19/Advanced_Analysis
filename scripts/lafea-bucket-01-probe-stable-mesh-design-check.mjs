@@ -24,8 +24,9 @@ const probeSpec = JSON.parse(fs.readFileSync(PROBE_SPEC_PATH, 'utf8'));
 
 assert.equal(
   design.schema,
-  'lafea-bucket-01-probe-stable-polar-design/v1',
+  'lafea-bucket-01-probe-stable-polar-design/v2',
 );
+assert.equal(design.designId, 'B01-PROBE-STABLE-POLAR-V2');
 assert.equal(design.benchmarkId, probeSpec.benchmarkId);
 assert.equal(design.sourceProbeSpecId, probeSpec.specId);
 assert.equal(design.authority.frozenProbeCoordinatesChanged, false);
@@ -44,6 +45,45 @@ assert.deepEqual(
   design.topologyPolicy.protectedFeatureLinesDegrees,
   [0, 90, 180, 270],
 );
+assert.equal(
+  design.midsideGeometryPolicy.holeBoundaryCircumferentialEdges,
+  'ANALYTIC_CIRCULAR_ARC',
+);
+assert.equal(
+  design.midsideGeometryPolicy.outerBoundaryCircumferentialEdges,
+  'ANALYTIC_CIRCULAR_ARC',
+);
+assert.equal(
+  design.midsideGeometryPolicy.internalCircumferentialEdges,
+  'STRAIGHT_CHORD',
+);
+assert.equal(design.midsideGeometryPolicy.radialEdges, 'STRAIGHT_CHORD');
+assert.equal(design.midsideGeometryPolicy.diagonalEdges, 'STRAIGHT_CHORD');
+assert.equal(
+  design.midsideGeometryPolicy.physicalBoundaryGeometryPreserved,
+  true,
+);
+assert.equal(
+  design.midsideGeometryPolicy.internalCircularConstraintClaimed,
+  false,
+);
+assert.equal(design.changeControl.previousDesignId, 'B01-PROBE-STABLE-POLAR-V1');
+assert.equal(
+  design.changeControl.trigger,
+  'LEVEL_1_NON_POSITIVE_INTERNAL_CURVED_EDGE_JACOBIAN',
+);
+assert.equal(design.changeControl.controllingElement, 'E-R10-S18-B');
+for (const key of [
+  'axisCoordinatesChanged',
+  'anchorWindowsChanged',
+  'anchorPhasesChanged',
+  'candidateElementCountsChanged',
+  'frozenPhysicalCoordinatesChanged',
+  'governedToleranceChanged',
+  'productionAuthorityChanged',
+]) {
+  assert.equal(design.changeControl[key], false);
+}
 
 const frozenRadii = uniqueSorted([
   ...probeSpec.probes.map((row) => row.radius),
@@ -129,6 +169,20 @@ assert.equal(candidateLevels.every((row, index) =>
   index === 0
     || row.candidateT6ElementCount
       > candidateLevels[index - 1].candidateT6ElementCount), true);
+assert.deepEqual(
+  candidateLevels.map((row) => ({
+    ordinal: row.ordinal,
+    radialCellCount: row.radialCellCount,
+    circumferentialCellCount: row.circumferentialCellCount,
+    candidateT6ElementCount: row.candidateT6ElementCount,
+  })),
+  [
+    { ordinal: 1, radialCellCount: 12, circumferentialCellCount: 20, candidateT6ElementCount: 480 },
+    { ordinal: 2, radialCellCount: 17, circumferentialCellCount: 35, candidateT6ElementCount: 1190 },
+    { ordinal: 3, radialCellCount: 30, circumferentialCellCount: 68, candidateT6ElementCount: 4080 },
+    { ordinal: 4, radialCellCount: 53, circumferentialCellCount: 132, candidateT6ElementCount: 13992 },
+  ],
+);
 
 const tampered = JSON.parse(JSON.stringify(radialPlan));
 tampered.levels[0].anchorCells[0].phase = 0.5;
@@ -138,13 +192,14 @@ assert.equal(
 );
 
 console.log(JSON.stringify({
-  schema: 'lafea-bucket-01-probe-stable-mesh-design-check/v1',
+  schema: 'lafea-bucket-01-probe-stable-mesh-design-check/v2',
   status: 'PASS',
   designId: design.designId,
   radialPlanHash: radialPlan.semanticHash,
   circumferentialPlanHash: circumferentialPlan.semanticHash,
   phaseSeparation,
   candidateLevels,
+  midsideGeometryPolicy: design.midsideGeometryPolicy,
   authority: {
     designContractVerified: true,
     frozenCoordinatesPreserved: true,
@@ -152,6 +207,8 @@ console.log(JSON.stringify({
     stableInteriorAxisPhasesVerified: true,
     exactAnchorCellWidthContractionVerified: true,
     transitionCoordinatesDeterministic: true,
+    physicalCircularBoundariesRemainAnalytic: true,
+    internalCircumferentialEdgesRemainUnconstrained: true,
     productionMeshAuthority: false,
     qualificationAuthority: false,
     bucketQualified: false,
