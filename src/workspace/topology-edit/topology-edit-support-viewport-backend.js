@@ -4,6 +4,16 @@ import { materializeTopologyEditSupportOverlay } from './topology-edit-support-g
 import { TopologyEditTypedViewportBackend } from './topology-edit-typed-viewport-backend.js';
 
 export class TopologyEditSupportViewportBackend extends TopologyEditTypedViewportBackend {
+  renderSession(model) {
+    if (!Array.isArray(model?.supports?.glyphOverlays)) {
+      return super.renderSession(model);
+    }
+    return super.renderSession({
+      ...model,
+      supports: supportEngineeringBoundsProjection(model.supports),
+    });
+  }
+
   renderProjection(group, projection, colorHex, opacity, markerSize) {
     if (group !== this.groups.supportGroup || !Array.isArray(projection?.glyphOverlays)) {
       return super.renderProjection(group, projection, colorHex, opacity, markerSize);
@@ -17,7 +27,6 @@ export class TopologyEditSupportViewportBackend extends TopologyEditTypedViewpor
       this.navigationConfiguration?.supportMarkerSize,
       projection,
     );
-    const bounds = new THREE.Box3();
     const staging = new THREE.Group();
     try {
       for (const overlay of overlays) {
@@ -26,7 +35,6 @@ export class TopologyEditSupportViewportBackend extends TopologyEditTypedViewpor
           radialSegments: this.navigationConfiguration.meshRadialSegments,
         });
         staging.add(result.object);
-        bounds.union(result.bounds);
       }
     } catch (error) {
       disposeStaging(staging);
@@ -34,8 +42,16 @@ export class TopologyEditSupportViewportBackend extends TopologyEditTypedViewpor
     }
     while (staging.children.length) group.add(staging.children[0]);
     this.applySectionPlanesToGroup(group);
-    return bounds;
+    return new THREE.Box3();
   }
+}
+
+export function supportEngineeringBoundsProjection(projection) {
+  return Object.freeze({
+    ...projection,
+    elements: Array.isArray(projection?.elements) ? projection.elements : [],
+    segments: Object.freeze([]),
+  });
 }
 
 function supportMarkerSize(configuredValue, projection) {
