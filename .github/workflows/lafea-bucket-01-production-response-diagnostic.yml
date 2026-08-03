@@ -1,4 +1,4 @@
-name: LAFEA Bucket-01 Graded Lug Probe Diagnostic
+name: LAFEA Bucket-01 Graded Lug Probe Matrix
 
 on:
   push:
@@ -11,8 +11,17 @@ permissions:
 
 jobs:
   lug-probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        candidate:
+          - p105-checkerboard
+          - p110-checkerboard
+          - p125-checkerboard
+          - p150-checkerboard
+          - cosine-checkerboard
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,22 +31,32 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Execute p1.10 checkerboard lug probe diagnostic
+      - name: Execute graded fixed-probe matrix
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_HEAD_SHA: ${{ github.sha }}
+          CANDIDATE: ${{ matrix.candidate }}
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p reports/qualification
+          context="lafea/lug-probes/${CANDIDATE}"
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -f state=pending -f context=lafea/graded-lug-probe-detail \
-            -f description="Recovering fixed probes on p1.10 checkerboard mesh"
+            -f state=pending -f context="$context" \
+            -f description="Testing ${CANDIDATE} fixed stress probes"
 
           python - <<'PY'
+          import os
           import re
           from pathlib import Path
 
+          grading_name, diagonal_name = os.environ['CANDIDATE'].split('-', 1)
+          exponent_by_name = {
+              'p105': 1.05,
+              'p110': 1.10,
+              'p125': 1.25,
+              'p150': 1.50,
+          }
           mesh_path = Path('src/core/lafea-meshing/lug-pinhole-t6.js')
           text = mesh_path.read_text()
           split_pattern = re.compile(
@@ -71,6 +90,7 @@ jobs:
               f'{indent}}}',
           ])
           text = split_pattern.sub(lambda _: replacement, text, count=1)
+
           radius_pattern = re.compile(
               r"function radiusAt\(spec, ring\) \{\s*"
               r"return spec\.holeRadius\s*"
@@ -78,14 +98,23 @@ jobs:
               r"\* ring / spec\.radialDivisions;\s*"
               r"\}"
           )
-          radius_replacement = '''function radiusAt(spec, ring) {
-            const normalized = ring / spec.radialDivisions;
-            const graded = normalized <= 0.5
-              ? 0.5 * (2 * normalized) ** 1.1
-              : 1 - 0.5 * (2 * (1 - normalized)) ** 1.1;
-            return spec.holeRadius
-              + (spec.outerRadius - spec.holeRadius) * graded;
-          }'''
+          if grading_name == 'cosine':
+              graded = '0.5 * (1 - Math.cos(Math.PI * normalized))'
+          else:
+              exponent = exponent_by_name[grading_name]
+              graded = (
+                  'normalized <= 0.5\n'
+                  f'    ? 0.5 * (2 * normalized) ** {exponent}\n'
+                  f'    : 1 - 0.5 * (2 * (1 - normalized)) ** {exponent}'
+              )
+          radius_replacement = '\n'.join([
+              'function radiusAt(spec, ring) {',
+              '  const normalized = ring / spec.radialDivisions;',
+              f'  const graded = {graded};',
+              '  return spec.holeRadius',
+              '    + (spec.outerRadius - spec.holeRadius) * graded;',
+              '}',
+          ])
           text, count = radius_pattern.subn(lambda _: radius_replacement, text, count=1)
           if count != 1:
               raise RuntimeError('radiusAt marker missing')
@@ -99,16 +128,13 @@ jobs:
               `${definition.probeId}: ${convergence.reasons.join(', ')}`,
             );'''
           diagnostic = '''  console.error(`LUG_PROBE_DETAIL=${JSON.stringify({
+              candidate: process.env.CANDIDATE,
               probeId: definition.probeId,
               zone: definition.zone,
               physicalCoordinates: { x: definition.x, y: definition.y },
-              probeEvidences: probeEvidences.map((row) => ({
-                authoritativeValue: row.authoritativeValue,
-                containingElementId: row.containingElementId,
-                naturalCoordinates: row.naturalCoordinates,
-                mappingResidual: row.mappingResidual,
-                integrationPointValues: row.integrationPointValues,
-              })),
+              observations: probeEvidences.map((row) => row.authoritativeValue),
+              naturalCoordinates: probeEvidences.map((row) => row.naturalCoordinates),
+              containingElementIds: probeEvidences.map((row) => row.containingElementId),
               convergence,
             })}`);
             assert.equal(
@@ -122,32 +148,33 @@ jobs:
           PY
 
           node scripts/lafea-bucket-01-production-response-runner.mjs \
-            > reports/qualification/graded-lug-runner.stdout.log \
-            2> reports/qualification/graded-lug-runner.stderr.log
+            > "reports/qualification/${CANDIDATE}-runner.stdout.log" \
+            2> "reports/qualification/${CANDIDATE}-runner.stderr.log"
           set +e
           node scripts/lafea-bucket-01-production-lug-probe-receipt.mjs \
-            > reports/qualification/graded-lug-receipt.stdout.log \
-            2> reports/qualification/graded-lug-receipt.stderr.log
+            > "reports/qualification/${CANDIDATE}-receipt.stdout.log" \
+            2> "reports/qualification/${CANDIDATE}-receipt.stderr.log"
           exit_code=$?
           set -e
-          detail=$(node -e "const fs=require('fs');const t=fs.readFileSync('reports/qualification/graded-lug-receipt.stderr.log','utf8');const line=t.split(/\r?\n/).find(s=>s.startsWith('LUG_PROBE_DETAIL='));process.stdout.write((line||t).slice(0,7000))")
+          detail=$(node -e "const fs=require('fs');const t=fs.readFileSync(process.argv[1],'utf8');const lines=t.split(/\r?\n/).filter(s=>s.startsWith('LUG_PROBE_DETAIL='));process.stdout.write((lines.at(-1)||t).slice(0,7000))" "reports/qualification/${CANDIDATE}-receipt.stderr.log")
           encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
           if [[ "$exit_code" == "0" ]]; then
             state=success
-            description="All graded lug fixed probes passed"
+            description="${CANDIDATE} passed all fixed stress probes"
           else
             state=failure
-            description="Graded lug fixed probe convergence blocked"
+            probe=$(node -e "const s=decodeURIComponent(process.argv[1]).replace(/^LUG_PROBE_DETAIL=/,'');try{process.stdout.write(JSON.parse(s).probeId)}catch{process.stdout.write('unknown')}" "$encoded")
+            description="${CANDIDATE} blocked at ${probe}"
           fi
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -f state="$state" -f context=lafea/graded-lug-probe-detail \
+            -f state="$state" -f context="$context" \
             -f description="$description" \
             -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_probe=${encoded}"
           exit "$exit_code"
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lafea-graded-lug-probe-detail-${{ github.sha }}
+          name: lafea-lug-probe-${{ matrix.candidate }}-${{ github.sha }}
           path: reports/qualification/
           if-no-files-found: warn
           retention-days: 30
