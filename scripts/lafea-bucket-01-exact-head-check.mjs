@@ -29,6 +29,7 @@ for (const check of [
   nodeCheck('GOVERNED_T6_KIRSCH_FIXED_PROBES', 'scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs'),
   nodeCheck('GOVERNED_4096_DIRECT_POINT_LOCATION_CONTRACT', 'scripts/lafea-bucket-01-production-lug-probe-contract-check.mjs'),
   nodeCheck('GOVERNED_PROBE_TOPOLOGY_OBSERVABILITY', 'scripts/lafea-bucket-01-probe-topology-check.mjs'),
+  nodeCheck('PROBE_STABLE_POLAR_MESH_DESIGN', 'scripts/lafea-bucket-01-probe-stable-mesh-design-check.mjs'),
   nodeCheck('EXPECTED_VALUE_DEFINITION_SET', 'scripts/lafea-bucket-01-expected-value-registry-check.mjs'),
   nodeCheck('CODE_BASIS_INTAKE_CONTRACT', 'scripts/lafea-bucket-01-code-basis-check.mjs'),
   nodeCheck('THREE_REPLAY_CUSTODY_CONTRACT', 'scripts/lafea-bucket-01-replay-custody-check.mjs'),
@@ -49,7 +50,7 @@ recordAssertion('TRACKED_WORKTREE_CLEAN', trackedStatus === '', trackedStatus ||
 const failures = checks.filter((check) => check.status !== 'PASS');
 const executableEvidencePass = failures.length === 0;
 const report = {
-  schema: 'lafea-bucket-01-exact-head-report/v13',
+  schema: 'lafea-bucket-01-exact-head-report/v14',
   status: executableEvidencePass ? 'EXACT_HEAD_REPAIR_EVIDENCE_PASS' : 'EXACT_HEAD_REPAIR_EVIDENCE_BLOCKED',
   exactHead,
   expectedHead,
@@ -63,6 +64,7 @@ const report = {
   unresolvedQualificationGates: [
     'GOVERNED_4096_PRODUCTION_RESPONSE_EXECUTION_NOT_RETAINED',
     'GOVERNED_4096_DIRECT_POINT_STRESS_RECEIPT_NOT_PRODUCED',
+    'PROBE_STABLE_CANDIDATE_MESH_NOT_GENERATED_OR_EXECUTED',
     'APPROVED_CODE_BASIS_AUTHORITY_NOT_SUPPLIED',
     'THREE_EXTERNAL_REPLAY_BUNDLES_NOT_SUPPLIED',
   ],
@@ -85,6 +87,8 @@ const report = {
     governed4096ProductionResponseRouteImplemented: true,
     governedDirectPointStressRouteImplemented: true,
     governedProbeTopologyObservabilityImplemented: true,
+    probeStablePolarMeshDesignImplemented: true,
+    probeStablePolarMeshProductionAuthority: false,
     productionLugFixedProbeContractImplemented: true,
     expectedValueDefinitionSetImplemented: true,
     codeBasisIntakeContractImplemented: true,
