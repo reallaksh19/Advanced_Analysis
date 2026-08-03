@@ -118,7 +118,7 @@ test('M002 production backend materializes typed assemblies without generic comp
   const teeHeights = byKind.get('TEE_JUNCTION')
     .map((object) => object.geometry.parameters.height)
     .sort((left, right) => left - right);
-  assert.deepEqual(teeHeights, [Math.sqrt(180000), 300, 300]);
+  assert.deepEqual(teeHeights, [300, 300, Math.sqrt(180000)]);
   const oletBranch = byKind.get('OLET_BRANCH')
     .find((object) => object.geometry.type === 'CylinderGeometry');
   assert.ok(Math.abs(oletBranch.geometry.parameters.height - Math.sqrt(340000)) <= 1e-9);
