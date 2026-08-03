@@ -45,6 +45,8 @@ current source — do not trust the document alone.
 | M008-C | #480 | #488 | Merged | `resolveBranchMaterialSectionAuthority` — real `MTXX`/`DTXR`/`ABORE` parsing → real B-2.2/B-2.3 sealed resolutions (ASTM A234-WPB/A105 as distinct governed materials, NPS8 Sch100 section) for the branch's pipe/fitting entities, with deterministic auto-pipe inheritance and explicit gasket/support skips. No fixes needed; Owner independently cross-checked the cited ASME B36.10 dimensions and material properties |
 | M009 | #464 | #471 | Merged | B-4.0's `calculatedStress` confirmed real, production-wired, and already displayed/exported — not a gap. Broad "implement stress recovery" declined (no mandate text to justify scope beyond what exists); pressure-stress-from-geometry and EditionDataset-import gaps logged but not authorized. Closed-form verification benchmark added at `lfea-b4.1` (#469), Owner-validated including hand-verified arithmetic |
 | M010 | #485 | #491 | Merged | `derivePressureStressContribution`/`resolvePressureStressContribution` — closes M009's logged pressure-stress gap by deriving `S = P·Do/(4·t)` from the real, sealed `PRESSURE` load primitive and wiring it into `linear-piping-code-application`. Owner review found and fixed a real over-broad-blocking bug (one element's unimplemented pressure effect incorrectly blocked every other element's check in the same load case) invisible to the agent's own single-element-per-case tests — see process note below |
+| M012 | #495 | — | Issued | Gravity expansion consumes the already-declared-but-unconsumed `DISTRIBUTED_WEIGHT` primitive for `CONTENTS`/`INSULATION` mass sources; `PIPE_WALL` unchanged. Prerequisite for M013. Cross-checked formula against Appendix S Table S301.3.1's real published combined unit weight before writing the issue (0.03% deviation) |
+| M013 | #496 | — | Issued (depends on M012 merging first) | ASME B31.3 Appendix S Example 1 — real published benchmark against Tables S301.5.1/S301.5.2 (displacements, rotations, reactions). Stiffness/displacement scope only; sustained-stress/displacement-stress-range benchmarking (Tables S301.6/S301.7) deferred to a future Work Pack pending its own code-engine section-modulus investigation |
 
 ### Non-LFEA workstreams (user-directed pivot, 4 parallel read-only audits + direct fixes)
 
@@ -189,6 +191,85 @@ element under check, so one element's unimplemented authorization would
 incorrectly block every other element's clean check in the same load case
 — invisible to the agent's own tests, which only ever exercised one element
 per load case. See the process note below.
+
+**Owner-directed pivot after M010: validate the core solver against ASME
+B31.3 Appendix S before returning to the real 1885 benchmark.** User
+instruction: refine the core FEA solver to 100% first against the
+well-known, industry-standard ASME B31.3 Appendix S verification examples
+(the same examples a commercial vendor, SIMFLEX-II, publishes its own
+independent comparison against), with the real 1885 project benchmark
+explicitly held for last. Two Work Packs scoped (#495, #496), grounded by
+direct investigation of the current repo rather than assumption:
+
+- **M012 (#495)**: gravity `CONTENTS`/`INSULATION` mass sources. Real,
+  confirmed gap — `gravity-expansion.js` implements `PIPE_WALL` only
+  (M007's stated scope); `CONTENTS`/`INSULATION` fail closed. But the
+  investigation found the fix is smaller and lower-risk than a naive
+  "extend the density/geometry formula" approach would be: a
+  `DISTRIBUTED_WEIGHT` load-primitive kind already exists, fully specified
+  in the B-3.0 load-case contract (`elementId`, `weightComponent`, a
+  caller-declared `massPerUnitLength`, `densityEvidence`/`geometryEvidence`)
+  — `grep -rn "DISTRIBUTED_WEIGHT" src/core` shows it is validated and
+  sealable today but has zero consumers anywhere in the tree. M012 makes
+  gravity expansion consume it for `CONTENTS`/`INSULATION` (keeping
+  `PIPE_WALL`'s existing auto-derivation unchanged), reusing
+  `augmentFrameElement`'s existing multi-primitive summation loop as-is.
+  Independently cross-checked the intended formula against real published
+  data before writing the issue: summing density × cross-sectional area
+  for pipe wall (93.08 kg/m) + contents (117.84 kg/m) + insulation
+  (37.46 kg/m) for Appendix S Example 1's actual DN400 Sch30/STD geometry
+  gives 248.38 kg/m, against the code's own published combined unit weight
+  of 248.3 kg/m (Table S301.3.1) — a 0.03% deviation, confirming the
+  formula before any code was written.
+- **M013 (#496)**: the real Appendix S Example 1 system (11-node planar
+  model, two long-radius 90° elbows, gravity + thermal + pressure, operating
+  load case) built and solved through the real production chain, compared
+  against the ASME-published Table S301.5.1 (displacements/rotations) and
+  Table S301.5.2 (reactions). Geometry was reconstructed directly from
+  Table S301.3.2's `Dx`/`Dy` columns and Note 1 (dimensions are measured to
+  each elbow's tangent-*intersection* point, not its actual near/far
+  tangent points — the arc sits inset from the reported corner by the bend
+  radius on each leg). Depends on M012 merging first (its load case needs
+  all three gravity mass sources for an exact match to the published
+  weight). **Deliberately scoped to stiffness/displacement/reaction only**
+  — sustained stress (Table S301.6) and displacement stress range (Table
+  S301.7) are out of scope for this Work Pack; see the process note below
+  for why.
+
+Two things surfaced during this investigation that materially shaped the
+scope and are worth carrying forward:
+
+1. **The elbow flexibility factor could not be responsibly pre-computed by
+   the Owner for this issue.** The classical Appendix D flexibility-
+   characteristic formula recalled from memory (`h = t·R/r_m²`, `k=1.65/h`,
+   `i=0.9/h^(2/3)` in-plane / `0.75/h^(2/3)` out-of-plane) was checked
+   against the SIMFLEX-II vendor paper's own printed SIF values for this
+   exact elbow (`i_i≈1.949`, `i_o≈1.624`) as an independent cross-check —
+   and the hand-recalled formula produced values roughly 2.1× too high, a
+   clear sign the recalled coefficient/exponent is wrong (or missing a
+   term) rather than a rounding artifact. Rather than assert a
+   possibly-wrong numeric formula as ground truth in the M013 issue (the
+   same mistake class as the "illustrative fixture value" lesson below,
+   just for a formula instead of a data value), M013 requires the
+   implementing agent to derive the flexibility factor from the actual
+   Appendix D/B31J text with full shown work and citation, flags it as the
+   single highest-scrutiny number in that PR, and the SIMFLEX SIF values
+   are carried forward only as a non-authoritative sanity cross-check (SIFs
+   affect stress, not stiffness, so they aren't even required for M013's
+   displacement-only scope — only the flexibility factor is).
+2. **Sustained-stress benchmarking (Table S301.6) needs a real code-engine
+   capability that does not exist yet, found by reading, not assumed.**
+   Appendix S Example 1's own stated computer-model options require
+   "nominal less allowances" section properties for sustained stress `S_L`
+   specifically, while stiffness and displacement stress both use nominal
+   thickness. `compileCodeResult`/`sectionMechanicalProperties` in
+   `linear-fea-b31-code-engine/code-engine.js` always derives its section
+   modulus from the frame element's own single retained (nominal-thickness)
+   section — there is no path today to supply a distinct section for one
+   stress category. This is a real, separate gap, not something to
+   approximate inside M013; it's deferred to its own future Work Pack, to
+   be scoped only after dedicated investigation (not from memory) once
+   M012/M013 land.
 
 **M011**: Stack-B UI defect re-verification (renumbered from the earlier
 "M010" slot — that number is now taken by the pressure-stress mission
