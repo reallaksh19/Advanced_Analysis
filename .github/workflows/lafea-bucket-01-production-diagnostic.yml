@@ -180,7 +180,7 @@ jobs:
             } > "$body_file"
             gh api --method POST \
               "repos/${GITHUB_REPOSITORY}/issues/498/comments" \
-              --input "$body_file"
+              -F "body=@${body_file}"
           fi
 
       - if: always()
