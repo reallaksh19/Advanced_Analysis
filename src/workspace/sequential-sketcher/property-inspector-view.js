@@ -18,8 +18,11 @@ export function buildPropertyInspector(documentRef, entity, supportPresenter, on
 
   const sourceAttributes = entity.properties?.attributes || {};
   panel.append(section(documentRef, 'Source attributes', objectRows(sourceAttributes)));
+  const resultKind = supportPresenter?.getResultCallouts?.(entity)?.[0]?.resultKind;
   const qualified = supportPresenter?.formatLoadInspectorProperties?.(entity) || {};
-  if (Object.keys(qualified).length) panel.append(section(documentRef, 'Other qualified results', objectRows(qualified)));
+  if (resultKind !== 'EMPIRICAL_SUPPORT_REACTION' && Object.keys(qualified).length) {
+    panel.append(section(documentRef, 'Other qualified results', objectRows(qualified)));
+  }
   return panel;
 }
 
@@ -76,8 +79,12 @@ function identityRows(entity) {
 
 function loadRows(value) {
   const rows = [];
+  rows.push(['Method', value.method]);
+  rows.push(['Authority', value.authority]);
   rows.push(['Freshness', value.freshness?.status]);
+  rows.push(['Source axis basis', value.sourceAxisBasis]);
   (value.loadCases || []).forEach((loadCase) => {
+    rows.push([`${loadCase.loadCaseId} supportSiteId`, loadCase.supportSiteId]);
     rows.push([`${loadCase.loadCaseId} status`, loadCase.status]);
     rows.push([`${loadCase.loadCaseId} verticalForceN`, loadCase.verticalForceN]);
     rows.push([`${loadCase.loadCaseId} contributors`, loadCase.contributorIds]);
