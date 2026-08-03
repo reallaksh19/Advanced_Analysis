@@ -1,3 +1,4 @@
+import { ENGINEERING_MODEL_EVENTS } from '../engineering-model-controller.js';
 import { EventBus } from '../event-bus.js';
 import { EVENT_TOPICS } from '../event-topics.js';
 import { WorkspaceState } from '../workspace-state.js';
@@ -47,6 +48,9 @@ export class SequentialSketcherController {
       this.eventBus.subscribe(EVENT_TOPICS.WORKSPACE_SNAPSHOT_CHANGED, ({ snapshot }) => this.handleSnapshot(snapshot)),
       this.eventBus.subscribe(EVENT_TOPICS.VIEWPORT_ENTITY_SELECTED, (payload) => this.handleSelection(payload.entityId)),
       this.eventBus.subscribe(EVENT_TOPICS.DATASET_CLEARED, () => this.handleClear()),
+      this.eventBus.subscribe(ENGINEERING_MODEL_EVENTS.CHANGED, () => {
+        if (this.currentDataset) this.view.render(this.currentDataset);
+      }),
     ];
 
     const initialSnapshot = this.workspaceState.getSnapshot();

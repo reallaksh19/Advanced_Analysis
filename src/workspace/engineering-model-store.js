@@ -72,6 +72,7 @@ export class EngineeringModelStore {
       const ledgers = loadCase.contributionLedger.filter((row) => row.allocations.some((allocation) => allocation.siteId === site.siteId));
       return {
         loadCaseId: loadCase.loadCaseId,
+        supportSiteId: site.siteId,
         status: result?.status || loadCase.status,
         verticalForceN: result?.verticalForceN ?? null,
         contributorIds: result?.contributorIds || [],
@@ -79,6 +80,7 @@ export class EngineeringModelStore {
         excludedInputs: loadCase.excludedInputs,
       };
     });
+    const authorizedExecution = engineeringSupportLoadStore.getAuthorizedExecution();
     return freezeDeep({
       ...entity,
       entityId: site.primaryEntityId,
@@ -93,7 +95,17 @@ export class EngineeringModelStore {
           assemblyIds: site.assemblyIds,
           memberEntityIds: site.memberEntityIds,
         },
-        engineeringSupportLoads: distribution ? { freshness: distribution.freshness, sourceAxisBasis: distribution.sourceAxisBasis, loadCases } : { freshness: { status: 'NOT_CALCULATED' }, sourceAxisBasis: 'Z_UP', loadCases: [] },
+        engineeringSupportLoads: distribution ? {
+          method: distribution.method,
+          authority: authorizedExecution ? 'AUTHORIZED_HANDOFF' : 'LEGACY_PROJECT_DATA',
+          freshness: distribution.freshness,
+          sourceAxisBasis: distribution.sourceAxisBasis,
+          loadCases,
+        } : {
+          freshness: { status: 'NOT_CALCULATED' },
+          sourceAxisBasis: 'Z_UP',
+          loadCases: [],
+        },
       },
     });
   }
