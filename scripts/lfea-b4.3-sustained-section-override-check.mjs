@@ -238,7 +238,7 @@ test('B43-T02', 'SUSTAINED override uses its own area and section modulus with i
     expectedBendingRatio,
     'section-modulus ratio',
   );
-  assert.ok(reduced.stressTerms.axial > nominal.stressTerms.axial);
+  assert.ok(Math.abs(reduced.stressTerms.axial) > Math.abs(nominal.stressTerms.axial));
   assert.ok(Math.abs(reduced.stressTerms.inPlaneBending) > Math.abs(nominal.stressTerms.inPlaneBending));
   return {
     nominalArea: nominalProperties.area,
