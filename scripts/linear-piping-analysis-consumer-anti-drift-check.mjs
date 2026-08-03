@@ -114,6 +114,33 @@ for (const token of [
 
 assert.doesNotMatch(combined, /unit\s*\?\?\s*['"]m['"]|unit\s*\|\|\s*['"]m['"]/u);
 
+const gravityExpansion = source['gravity-expansion.js'];
+const massSourceExpansion = source['gravity-expansion-mass-sources.js'];
+const elementAugmentation = source['gravity-expansion-element-augmentation.js'];
+assert.match(gravityExpansion, /GRAVITY_MASS_SOURCES/u, 'M012 must reuse the B-3.0 mass-source registry');
+assert.match(gravityExpansion, /indexDistributedWeightPrimitives/u);
+assert.match(gravityExpansion, /expandDeclaredDistributedWeightSource/u);
+assert.match(massSourceExpansion, /kind\s*===\s*'DISTRIBUTED_WEIGHT'/u);
+assert.match(massSourceExpansion, /massPerUnitLength\s*\*\s*acceleration/u);
+assert.match(massSourceExpansion, /densityEvidence/u);
+assert.match(massSourceExpansion, /geometryEvidence/u);
+assert.match(elementAugmentation, /for\s*\(const primitive of generatedPrimitives\)/u);
+assert.match(
+  elementAugmentation,
+  /generatedLocal\.map\(\(value, index\)\s*=>\s*value\s*\+\s*local\[index\]\)/u,
+  'M012 must reuse augmentFrameElement multi-primitive summation',
+);
+assert.doesNotMatch(
+  `${gravityExpansion}\n${massSourceExpansion}`,
+  /common-enriched-properties/u,
+  'M012 must not depend on non-LFEA fluid or insulation registries',
+);
+assert.doesNotMatch(
+  massSourceExpansion,
+  /Math\.PI|outerDiameter|wallThickness|innerDiameter|insulationThickness|fluidDensity|insulationDensity/u,
+  'M012 must consume declared massPerUnitLength without re-deriving density or geometry',
+);
+
 const packageValue = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 assert.equal(
   packageValue.scripts['check:linear-piping-analysis-consumer'],
@@ -121,6 +148,15 @@ assert.equal(
 );
 assert.match(packageValue.scripts['check:lfea-linear-core'], /check:linear-piping-analysis-consumer/u);
 assert.match(packageValue.scripts.gate, /check:linear-piping-analysis-consumer/u);
+assert.equal(
+  packageValue.scripts['check:lfea-b3.10'],
+  'node scripts/lfea-b3.10-distributed-weight-expansion-check.mjs',
+);
+const linearCore = packageValue.scripts['check:lfea-linear-core'];
+const b39 = linearCore.indexOf('check:lfea-b3.9');
+const b310 = linearCore.indexOf('check:lfea-b3.10');
+const b40 = linearCore.indexOf('check:lfea-b4.0');
+assert.ok(b39 >= 0 && b310 > b39 && b40 > b310, 'check:lfea-b3.10 must run after B3.9 and before B4.0');
 
 await import('./linear-piping-source-orchestration-check.mjs');
 await import('./linear-piping-inputxml-source-binding-check.mjs');
