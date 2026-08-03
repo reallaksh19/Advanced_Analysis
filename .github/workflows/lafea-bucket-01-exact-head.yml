@@ -23,7 +23,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Repair and publish DOF-evidence nesting
+      - name: Repair and publish governed result nesting
         env:
           GH_TOKEN: ${{ github.token }}
           ORIGINAL_SHA: ${{ github.sha }}
@@ -47,7 +47,7 @@ jobs:
             exit 1
           }
 
-          publish pending lafea/load-driven-nesting/PATCH "Repairing solver-evidence nesting"
+          publish pending lafea/load-driven-nesting/PATCH "Repairing governed result nesting"
           python - <<'PY' > reports/qualification/load-driven-nesting-patch.stdout.log 2> reports/qualification/load-driven-nesting-patch.stderr.log || true
           from pathlib import Path
           path = Path('src/workspace/lafea-load-driven-pilot-qualification.js')
@@ -58,6 +58,10 @@ jobs:
                   '    || resultLoadCase.freeDofIdentities.length === 0',
                   '  if (!Array.isArray(resultLoadCase.solverEvidence?.freeDofIdentities)\n'
                   '    || resultLoadCase.solverEvidence.freeDofIdentities.length === 0',
+              ),
+              (
+                  '  const reactionResultant = resultLoadCase.reactions.reduce(',
+                  '  const reactionResultant = resultLoadCase.supportReactions.reduce(',
               ),
               (
                   '    freeDofCount: resultLoadCase.freeDofIdentities.length,',
@@ -77,7 +81,7 @@ jobs:
           PY
           [[ -s reports/qualification/load-driven-nesting-patch.stderr.log ]] \
             && fail PATCH reports/qualification/load-driven-nesting-patch.stderr.log
-          publish success lafea/load-driven-nesting/PATCH "Solver-evidence nesting repaired"
+          publish success lafea/load-driven-nesting/PATCH "Governed result nesting repaired"
 
           publish pending lafea/load-driven-nesting/T6D "Running load-driven pilot qualification"
           node scripts/lafea-nb-t6d-load-driven-qualification-check.mjs \
@@ -100,7 +104,7 @@ jobs:
           git add src/workspace/lafea-load-driven-pilot-qualification.js
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "fix(lafea): read free-DOF identities from solver evidence" \
+          git commit -m "fix(lafea): read governed load-case evidence fields" \
             > reports/qualification/load-driven-nesting-commit.stdout.log \
             2> reports/qualification/load-driven-nesting-commit.stderr.log \
             || fail COMMIT reports/qualification/load-driven-nesting-commit.stderr.log
@@ -112,7 +116,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
             -f state=success \
             -f context="lafea/repaired-head/${repaired_sha:0:12}" \
-            -f description="Load-driven nesting repair published" \
+            -f description="Load-driven governed-result repair published" \
             -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${repaired_sha}"
       - if: always()
         uses: actions/upload-artifact@v4
