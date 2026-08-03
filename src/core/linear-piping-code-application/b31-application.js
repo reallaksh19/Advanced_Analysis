@@ -17,6 +17,7 @@ import {
   requireArray,
   requireHash,
 } from './contracts.js';
+import { resolvePressureStressContribution } from './pressure-stress-derivation.js';
 
 export const B31_APPLICATION_INPUT_KEYS = Object.freeze([
   'schema',
@@ -149,6 +150,14 @@ function compileCheck(source, index, caseIndex, codeProfile, editionDataset) {
   }
   const actionSource = canonicalActionSource(source.actionSource, category, field);
   const resolved = resolveAction(actionSource, source.componentId, source.codePointId, caseIndex);
+  const pressureStressContribution = category === 'DISPLACEMENT_STRESS_RANGE'
+    ? source.pressureStressContribution
+    : resolvePressureStressContribution({
+      loadCase: requireCase(caseIndex, actionSource.caseId).loadCase,
+      frameElementRecord: source.frameElementRecord,
+      sectionResolution: source.sectionResolution,
+      suppliedContribution: source.pressureStressContribution,
+    });
   const codeResult = compileCodeResult({
     codeProfile,
     editionDataset,
@@ -161,7 +170,7 @@ function compileCheck(source, index, caseIndex, codeProfile, editionDataset) {
     sectionResolution: source.sectionResolution,
     materialResolution: source.materialResolution,
     localAction: resolved.localAction,
-    pressureStressContribution: source.pressureStressContribution,
+    pressureStressContribution,
     coldTemperature: source.coldTemperature,
     occasionalCategoryId: source.occasionalCategoryId,
   });

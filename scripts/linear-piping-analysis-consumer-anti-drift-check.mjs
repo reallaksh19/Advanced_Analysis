@@ -114,6 +114,71 @@ for (const token of [
 
 assert.doesNotMatch(combined, /unit\s*\?\?\s*['"]m['"]|unit\s*\|\|\s*['"]m['"]/u);
 
+const gravityExpansion = source['gravity-expansion.js'];
+const massSourceExpansion = source['gravity-expansion-mass-sources.js'];
+const gravityExpansionPrimitives = source['gravity-expansion-primitives.js'];
+const elementAugmentation = source['gravity-expansion-element-augmentation.js'];
+assert.match(gravityExpansion, /GRAVITY_MASS_SOURCES/u, 'M012 must reuse the B-3.0 mass-source registry');
+assert.match(gravityExpansion, /indexDistributedWeightPrimitives/u);
+assert.match(gravityExpansion, /expandDeclaredDistributedWeightSource/u);
+assert.match(massSourceExpansion, /kind\s*===\s*'DISTRIBUTED_WEIGHT'/u);
+assert.match(massSourceExpansion, /massPerUnitLength\s*\*\s*acceleration/u);
+assert.match(
+  gravityExpansionPrimitives,
+  /densityEvidence/u,
+  'M012 derivation record must retain the declared DISTRIBUTED_WEIGHT primitive\'s densityEvidence',
+);
+assert.match(
+  gravityExpansionPrimitives,
+  /geometryEvidence/u,
+  'M012 derivation record must retain the declared DISTRIBUTED_WEIGHT primitive\'s geometryEvidence',
+);
+assert.match(elementAugmentation, /for\s*\(const primitive of generatedPrimitives\)/u);
+assert.match(
+  elementAugmentation,
+  /generatedLocal\.map\(\(value, index\)\s*=>\s*value\s*\+\s*local\[index\]\)/u,
+  'M012 must reuse augmentFrameElement multi-primitive summation',
+);
+assert.doesNotMatch(
+  `${gravityExpansion}\n${massSourceExpansion}`,
+  /common-enriched-properties/u,
+  'M012 must not depend on non-LFEA fluid or insulation registries',
+);
+assert.doesNotMatch(
+  massSourceExpansion,
+  /Math\.PI|outerDiameter|wallThickness|innerDiameter|insulationThickness|fluidDensity|insulationDensity/u,
+  'M012 must consume declared massPerUnitLength without re-deriving density or geometry',
+);
+
+const thermalExpansion = source['thermal-expansion-augmentation.js'];
+const thermalElementAugmentation = source['thermal-expansion-element-augmentation.js'];
+assert.match(thermalExpansion, /primitive\.kind\s*===\s*'TEMPERATURE'/u);
+assert.match(thermalExpansion, /componentElementIds\.has\(primitive\.elementId\)/u);
+assert.match(thermalExpansion, /computePipingComponentSemanticHash/u);
+assert.match(thermalElementAugmentation, /thermalInitialStrainVector/u);
+assert.match(thermalElementAugmentation, /condenseEndConditions/u);
+assert.match(thermalElementAugmentation, /transformLoadToGlobal/u);
+assert.match(thermalElementAugmentation, /frameOffsetMatrix/u);
+assert.match(thermalElementAugmentation, /initialStrainLoadVector/u);
+assert.match(thermalElementAugmentation, /computeFrameElementSemanticHash/u);
+assert.match(thermalElementAugmentation, /operatingTemperature\s*-\s*temperature\.installationTemperature/u);
+assert.match(
+  thermalElementAugmentation,
+  /thermalExpansionCoefficient\s*\*\s*temperatureDifference/u,
+  'M014 must use the retained material coefficient and sealed temperature difference',
+);
+assert.doesNotMatch(
+  thermalElementAugmentation,
+  /elasticModulus\s*\*\s*[^;\n]*area|area\s*\*\s*[^;\n]*elasticModulus|Math\.PI|outerDiameter|wallThickness/u,
+  'M014 must reuse thermalInitialStrainVector instead of reimplementing B-3.1 thermal mechanics',
+);
+assert.doesNotMatch(
+  `${thermalExpansion}\n${thermalElementAugmentation}`,
+  /component-elements\.js|bend-component\.js|common-enriched-properties|linear-fea-b31-code-engine/u,
+  'M014 must remain a component-agnostic consumer and not reach into forbidden packages',
+);
+assert.match(index, /augmentPipingComponentTemperatureAuthorities/u);
+
 const packageValue = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 assert.equal(
   packageValue.scripts['check:linear-piping-analysis-consumer'],
@@ -121,6 +186,23 @@ assert.equal(
 );
 assert.match(packageValue.scripts['check:lfea-linear-core'], /check:linear-piping-analysis-consumer/u);
 assert.match(packageValue.scripts.gate, /check:linear-piping-analysis-consumer/u);
+assert.equal(
+  packageValue.scripts['check:lfea-b3.10'],
+  'node scripts/lfea-b3.10-distributed-weight-expansion-check.mjs',
+);
+assert.equal(
+  packageValue.scripts['check:lfea-b3.11'],
+  'node scripts/lfea-b3.11-thermal-component-augmentation-check.mjs',
+);
+const linearCore = packageValue.scripts['check:lfea-linear-core'];
+const b39 = linearCore.indexOf('check:lfea-b3.9');
+const b310 = linearCore.indexOf('check:lfea-b3.10');
+const b311 = linearCore.indexOf('check:lfea-b3.11');
+const b40 = linearCore.indexOf('check:lfea-b4.0');
+assert.ok(
+  b39 >= 0 && b310 > b39 && b311 > b310 && b40 > b311,
+  'check:lfea-b3.11 must run after B3.10 and before B4.0',
+);
 
 await import('./linear-piping-source-orchestration-check.mjs');
 await import('./linear-piping-inputxml-source-binding-check.mjs');

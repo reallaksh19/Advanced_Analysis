@@ -1,8 +1,10 @@
+import { sparseEntry, sparseMultiply } from '../lafea-linear-solve/sparse-matrix.js';
 import { sparseCholeskySolve } from '../lafea-linear-solve/sparse-cholesky.js';
 import { sparseLdltSolve } from '../lafea-linear-solve/sparse-ldlt.js';
 import { semanticHash } from '../shared-piping-model/canonical-json.js';
 import { deepFreeze } from '../shared-piping-model/immutable.js';
 import { DOF_ORDER } from '../linear-fea-contract/conventions.js';
+import { INACTIVE_ANALYSIS_DOF_BEHAVIOR } from '../linear-fea-contract/model-schema.js';
 import { requireMechanicalModelCompilation } from '../linear-fea-model-compiler/index.js';
 import { requirePhysicalLoadCase } from '../linear-fea-load-case/index.js';
 import { buildDofMap, dofIndexOf } from './dof-map.js';
@@ -104,6 +106,52 @@ function resolvePrescribedValues(constrained, loadCase) {
   return { values, diagnostics };
 }
 
+/**
+ * An inactive analysis DOF is a declared kinematic subspace, not a support.
+ * It may be removed only when it is exactly uncoupled from every retained DOF
+ * and receives no element, nodal or initial-strain load. Any nonzero term
+ * blocks execution rather than silently discarding engineering content.
+ */
+function stiffnessCoupling(assembly, rowIndex, columnIndex) {
+  if (assembly.sparseK !== undefined) return sparseEntry(assembly.sparseK, rowIndex, columnIndex);
+  return assembly.K[rowIndex * assembly.n + columnIndex];
+}
+
+function requireInactiveSubspace(assembly, dofMap, Ffull, prescribedValues) {
+  const inactive = assembly.constrained.filter(
+    (entry) => entry.behavior === INACTIVE_ANALYSIS_DOF_BEHAVIOR,
+  );
+  if (inactive.length === 0) return;
+
+  const nonzeroPrescribed = assembly.constrained.filter(
+    (entry) => entry.behavior !== INACTIVE_ANALYSIS_DOF_BEHAVIOR
+      && prescribedValues.get(entry.globalIndex) !== 0,
+  );
+  for (const entry of inactive) {
+    if (Ffull[entry.globalIndex] !== 0) {
+      fail(
+        `Inactive analysis DOF ${entry.nodeId}:${entry.dof} carries nonzero applied or equivalent load ${Ffull[entry.globalIndex]}; inactive DOFs cannot discard load.`,
+        'SOLVER_INACTIVE_DOF_LOAD_NONZERO',
+      );
+    }
+    const incompatibleIndices = [
+      ...assembly.freeIndices,
+      ...nonzeroPrescribed.map((constraint) => constraint.globalIndex),
+    ];
+    for (const retainedIndex of incompatibleIndices) {
+      const forward = stiffnessCoupling(assembly, entry.globalIndex, retainedIndex);
+      const reverse = stiffnessCoupling(assembly, retainedIndex, entry.globalIndex);
+      if (forward !== 0 || reverse !== 0) {
+        const retained = dofMap.entries[retainedIndex];
+        fail(
+          `Inactive analysis DOF ${entry.nodeId}:${entry.dof} is stiffness-coupled to retained or nonzero-prescribed DOF ${retained.nodeId}:${retained.dof}; the declared kinematic subspace is not exactly separable.`,
+          'SOLVER_INACTIVE_DOF_COUPLING_NONZERO',
+        );
+      }
+    }
+  }
+}
+
 function solveScaledSystem(factorization, rhs) {
   const scaledRhs = applyDiagonalScalingToVector(rhs, factorization.scaling.factors);
   let scaledSolution;
@@ -158,7 +206,12 @@ export function compileSolverExecution({ compilation, elementContributions, load
 
   const model = acceptedCompilation.model;
   const dofMap = buildDofMap(model);
-  const assembly = assembleGlobalSystem({ model, dofMap, elementContributions });
+  const assembly = assembleGlobalSystem({
+    model,
+    dofMap,
+    elementContributions,
+    backend: acceptedProfile.backend,
+  });
 
   const Ffull = [...assembly.elementLoad];
   const nodalDiagnostics = addNodalForcePrimitives(Ffull, dofMap, acceptedLoadCase);
@@ -166,18 +219,25 @@ export function compileSolverExecution({ compilation, elementContributions, load
     assembly.constrained,
     acceptedLoadCase,
   );
+  requireInactiveSubspace(assembly, dofMap, Ffull, prescribedValues);
 
   const Ufull = new Array(dofMap.dofCount).fill(0);
   for (const entry of assembly.constrained) Ufull[entry.globalIndex] = prescribedValues.get(entry.globalIndex);
 
   const constrainedIndices = assembly.constrained.map((entry) => entry.globalIndex);
-  const Kfc = subRectangular(assembly.K, assembly.n, assembly.freeIndices, constrainedIndices);
-  const Uc = constrainedIndices.map((index) => Ufull[index]);
-  const Ffree = assembly.freeIndices.map((index, row) => {
-    let coupling = 0;
-    for (let column = 0; column < constrainedIndices.length; column += 1) coupling += Kfc[row * constrainedIndices.length + column] * Uc[column];
-    return Ffull[index] - coupling;
-  });
+  let Ffree;
+  if (acceptedProfile.backend === SPARSE_DIRECT_BACKEND_ID) {
+    const prescribedCoupling = sparseMultiply(assembly.sparseK, Ufull);
+    Ffree = assembly.freeIndices.map((index) => Ffull[index] - prescribedCoupling[index]);
+  } else {
+    const Kfc = subRectangular(assembly.K, assembly.n, assembly.freeIndices, constrainedIndices);
+    const Uc = constrainedIndices.map((index) => Ufull[index]);
+    Ffree = assembly.freeIndices.map((index, row) => {
+      let coupling = 0;
+      for (let column = 0; column < constrainedIndices.length; column += 1) coupling += Kfc[row * constrainedIndices.length + column] * Uc[column];
+      return Ffull[index] - coupling;
+    });
+  }
 
   const activeCache = cache ?? createFactorizationCache();
   const partitionKey = `${acceptedCompilation.stiffnessStateHash}:${assembly.partitionHash}`;
@@ -197,10 +257,44 @@ export function compileSolverExecution({ compilation, elementContributions, load
   const Uf = solveScaledSystem(factorization, Ffree);
   assembly.freeIndices.forEach((index, row) => { Ufull[index] = Uf[row]; });
 
-  const residual = residualCheck({ Kff: subRectangular(assembly.K, assembly.n, assembly.freeIndices, assembly.freeIndices), m: assembly.freeIndices.length, Uf, Ffree, policies });
-  const forceEquilibrium = forceEquilibriumCheck({ model, dofMap, K: assembly.K, n: assembly.n, Ufull, Ffull, policies });
-  const momentEquilibrium = momentEquilibriumCheck({ model, dofMap, K: assembly.K, n: assembly.n, Ufull, Ffull, policies });
-  const energyBalance = energyBalanceCheck({ K: assembly.K, n: assembly.n, Ufull, Ffull, policies });
+  const residual = residualCheck({
+    Kff: acceptedProfile.backend === SPARSE_DIRECT_BACKEND_ID
+      ? undefined
+      : subRectangular(assembly.K, assembly.n, assembly.freeIndices, assembly.freeIndices),
+    sparseKff: factorization.sparseFreeMatrix,
+    m: assembly.freeIndices.length,
+    Uf,
+    Ffree,
+    policies,
+  });
+  const forceEquilibrium = forceEquilibriumCheck({
+    model,
+    dofMap,
+    K: assembly.K,
+    sparseK: assembly.sparseK,
+    n: assembly.n,
+    Ufull,
+    Ffull,
+    policies,
+  });
+  const momentEquilibrium = momentEquilibriumCheck({
+    model,
+    dofMap,
+    K: assembly.K,
+    sparseK: assembly.sparseK,
+    n: assembly.n,
+    Ufull,
+    Ffull,
+    policies,
+  });
+  const energyBalance = energyBalanceCheck({
+    K: assembly.K,
+    sparseK: assembly.sparseK,
+    n: assembly.n,
+    Ufull,
+    Ffull,
+    policies,
+  });
   const conditioning = conditioningReport(factorization.conditionEstimate, policies);
 
   const overall = worstStatus([residual, forceEquilibrium, momentEquilibrium, energyBalance, conditioning]);
@@ -209,6 +303,10 @@ export function compileSolverExecution({ compilation, elementContributions, load
   const fullResidualVector = assembly.freeIndices.length === Ufull.length
     ? []
     : (() => {
+      if (acceptedProfile.backend === SPARSE_DIRECT_BACKEND_ID) {
+        return sparseMultiply(assembly.sparseK, Ufull)
+          .map((value, index) => value - Ffull[index]);
+      }
       const KU = new Array(dofMap.dofCount).fill(0);
       for (let row = 0; row < dofMap.dofCount; row += 1) {
         let sum = 0;
@@ -219,6 +317,7 @@ export function compileSolverExecution({ compilation, elementContributions, load
     })();
 
   const reactionEntries = assembly.constrained
+    .filter((entry) => entry.behavior !== INACTIVE_ANALYSIS_DOF_BEHAVIOR)
     .map((entry) => ({ nodeId: entry.nodeId, dof: entry.dof, value: fullResidualVector[entry.globalIndex] }))
     .sort((left, right) => compareAscii(`${left.nodeId}:${left.dof}`, `${right.nodeId}:${right.dof}`));
   const displacementEntries = canonicalEntries(Ufull, dofMap, dofMap.nodeOrder);
@@ -226,6 +325,11 @@ export function compileSolverExecution({ compilation, elementContributions, load
   const scaleFactorEntries = assembly.freeIndices
     .map((globalIndex, row) => ({ nodeId: dofMap.entries[globalIndex].nodeId, dof: dofMap.entries[globalIndex].dof, factor: factorization.scaling.factors[row] }))
     .sort((left, right) => compareAscii(`${left.nodeId}:${left.dof}`, `${right.nodeId}:${right.dof}`));
+
+  const inactiveDofCount = assembly.constrained.filter(
+    (entry) => entry.behavior === INACTIVE_ANALYSIS_DOF_BEHAVIOR,
+  ).length;
+  const physicalConstraintCount = assembly.constrained.length - inactiveDofCount;
 
   const draft = {
     schema: EXECUTION_SCHEMA,
@@ -242,7 +346,8 @@ export function compileSolverExecution({ compilation, elementContributions, load
       lowerTriangleNonzeroCount: assembly.lowerTriangleNonzeroCount,
       elementCount: assembly.elementCount,
       springCount: assembly.springCount,
-      constrainedDofCount: assembly.constrained.length,
+      constrainedDofCount: physicalConstraintCount,
+      inactiveDofCount,
       freeDofCount: assembly.freeIndices.length,
       symmetryResidual: assembly.symmetryResidual,
       partitionHash: assembly.partitionHash,

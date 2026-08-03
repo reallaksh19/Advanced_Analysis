@@ -29,7 +29,7 @@ export function prepareTopologyEditOperationCandidate(input = {}) {
     commandCount: transitions.length,
     commandIds,
     certificationHashes: transitions.map((row) => row.certification.certificationHash),
-    candidateDraftHashes: transitions.map((row) => row.certification.candidateDraftHash),
+    candidateDraftHashes: transitions.map((row) => row.certification.candidate.candidateDraftHash),
     resultingSessionVersion: sandbox.journal.sessionVersion,
     resultingJournalHash: sandbox.journal.journalHash,
     resultingCanonicalHash: sandbox.currentTopology().canonicalTopologyHash,

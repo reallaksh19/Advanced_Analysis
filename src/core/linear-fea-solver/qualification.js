@@ -1,3 +1,4 @@
+import { sparseMultiply } from '../lafea-linear-solve/sparse-matrix.js';
 import { DOF_ORDER } from '../linear-fea-contract/conventions.js';
 import { dot, matVec, norm2 } from './linear-algebra.js';
 import { QUALIFICATION_STATUSES } from './solver-contract.js';
@@ -26,12 +27,17 @@ function nodeVectorAt(vector, dofMap, nodeId) {
   };
 }
 
+function multiply({ K, sparseK, n, vector }) {
+  if (sparseK !== undefined) return sparseMultiply(sparseK, vector);
+  return matVec(K, n, vector);
+}
+
 /**
  * Section 8.1 "Algebraic residual": normalized residual of the solved
  * free-free system, `||Kff Uf - Ffree|| / max(||Ffree||, floor)`.
  */
-export function residualCheck({ Kff, m, Uf, Ffree, policies }) {
-  const predicted = matVec(Kff, m, Uf);
+export function residualCheck({ Kff, sparseKff, m, Uf, Ffree, policies }) {
+  const predicted = multiply({ K: Kff, sparseK: sparseKff, n: m, vector: Uf });
   const residual = predicted.map((value, index) => value - Ffree[index]);
   const reference = Math.max(norm2(Ffree), Number.MIN_VALUE);
   const normalizedResidual = norm2(residual) / reference;
@@ -51,8 +57,17 @@ export function residualCheck({ Kff, m, Uf, Ffree, policies }) {
  * over every node is a direct free-body force-balance check, not a restatement
  * of the residual gate above.
  */
-export function forceEquilibriumCheck({ model, dofMap, K, n, Ufull, Ffull, policies }) {
-  const combined = matVec(K, n, Ufull);
+export function forceEquilibriumCheck({
+  model,
+  dofMap,
+  K,
+  sparseK,
+  n,
+  Ufull,
+  Ffull,
+  policies,
+}) {
+  const combined = multiply({ K, sparseK, n, vector: Ufull });
   let sumX = 0;
   let sumY = 0;
   let sumZ = 0;
@@ -76,8 +91,17 @@ export function forceEquilibriumCheck({ model, dofMap, K, n, Ufull, Ffull, polic
  * Section 8.1 "Global moment equilibrium", about the retained reference point
  * (`MOMENT_REFERENCE_RULE`: the first node in canonical ascending order).
  */
-export function momentEquilibriumCheck({ model, dofMap, K, n, Ufull, Ffull, policies }) {
-  const combined = matVec(K, n, Ufull);
+export function momentEquilibriumCheck({
+  model,
+  dofMap,
+  K,
+  sparseK,
+  n,
+  Ufull,
+  Ffull,
+  policies,
+}) {
+  const combined = multiply({ K, sparseK, n, vector: Ufull });
   const referenceNodeId = dofMap.nodeOrder[0];
   const referencePosition = model.nodes.find((node) => node.nodeId === referenceNodeId).position;
 
@@ -118,8 +142,8 @@ export function momentEquilibriumCheck({ model, dofMap, K, n, Ufull, Ffull, poli
  * makes an identity up to solver residual — a second, independently-combined
  * check on the same solved state rather than a restatement of the residual.
  */
-export function energyBalanceCheck({ K, n, Ufull, Ffull, policies }) {
-  const KU = matVec(K, n, Ufull);
+export function energyBalanceCheck({ K, sparseK, n, Ufull, Ffull, policies }) {
+  const KU = multiply({ K, sparseK, n, vector: Ufull });
   const internalEnergy = 0.5 * dot(Ufull, KU);
   const externalWork = 0.5 * dot(Ufull, Ffull) + 0.5 * dot(Ufull, KU.map((value, index) => value - Ffull[index]));
   const reference = Math.max(Math.abs(internalEnergy), Math.abs(externalWork), Number.MIN_VALUE);

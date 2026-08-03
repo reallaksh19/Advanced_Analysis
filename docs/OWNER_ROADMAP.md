@@ -17,13 +17,13 @@ current source — do not trust the document alone.
 | P2 Deterministic mechanical model + units | Real, unit-tested, unexercised against real data | — |
 | P3 Production meshing | Real, unexercised against real data | — |
 | P4 Frame element, releases, offsets, constraints | Done, verified (16/16 closed-form) | pre-existing |
-| P5 Load-calculation engine | Contract-level only in places (gravity/thermal/pressure) | — |
-| P6 Sparse assembly, solve, instability diagnostics | Solve done; assembly still dense (disclosed) | M002 |
-| P7 Member-force and stress recovery | Force recovery done; stress recovery unverified | — |
+| P5 Load-calculation engine | Thermal (element-level) and gravity/self-weight (`PIPE_WALL`) now both convert to real system forces, not just declaration-level; pressure still contract-level only | M007 |
+| P6 Sparse assembly, solve, instability diagnostics | Done end to end — factorization, solve, assembly, and qualification all genuinely sparse on the sparse (default) path | M002, M005 |
+| P7 Member-force and stress recovery | Force recovery (pre-existing) plus B31.3 component-code-point combined member stress (`calculatedStress`) both done and now closed-form verified against the real B-3.4→B-4.0 chain. Scope is B31.3 code-point stress specifically, not a category-neutral bare-frame-station result — declined by Owner decision on #464, not an open gap | M009 |
 | P8 Extrema and envelopes | Partial (governing-case tracking proven) | — |
 | P9 Professional analysis UI | Partial (Run Analysis trigger exists, no authoring UI) | M003 |
 | P10 Professional results UI + exports | Partial (text/table only for Stack C) | M003 |
-| P11 Closed-form + convergence qualification | 8/20 mandate cases verified, growing | M004 (in progress) |
+| P11 Closed-form + convergence qualification | 13+/20 mandate cases verified, growing (adds thermal expansion, gravity self-weight, B31.3 combined stress) | M004, M006, M007, M009 |
 | P12 Real 1885 end-to-end qualification | Blocked on P1 Benchmark B | — |
 | P13 Independent/commercial comparison | Not started | — |
 
@@ -34,45 +34,165 @@ current source — do not trust the document alone.
 | M001 | #407 | #406 | Merged | Corrected benchmark discrepancy; real Benchmark A source ingestion; P0 audit; removed 95 obsolete CI workflows |
 | M002 | #409 | #428 | Merged | Sparse Cholesky/LDLT replaces dense as production default solver backend |
 | M003 | #412 | #417 | Merged | Real in-browser Run Analysis trigger for the piping production solve chain |
-| M004 | #429 | — | In progress | Closed-form simply-supported beam (centre load, UDL) added to b3.x suite |
-| M005 | TBD | — | Next | Sparse assembly + sparse qualification matVec (closes M002's disclosed limitation) |
+| M004 | #429 | #434 | Merged (Owner-reconciled) | Closed-form simply-supported beam (centre load, UDL) as `lfea-b3.7-*`; also adds `INACTIVE_ANALYSIS_DOF_BEHAVIOR`, a governed analysis-only kinematic subspace — see process note below |
+| M005 | #431 | #438 | Merged | Genuinely sparse assembly + sparse qualification matVec (closes M002's disclosed limitation); structural proof `sparseDenseKPresent: false` |
+| M006 | #451 | #456 | Merged (Owner-fixed) | System-level closed-form thermal expansion benchmarks (`lfea-b3.8`, free + restrained uniform heating) — real B-2.5→B-3.4 chain, not a hand-reconstruction |
+| M007 | #452 | #457 | Merged (Owner-fixed) | Real production gap closed: `GRAVITY`/`PIPE_WALL` now expands to equivalent element UDLs via B-3.1 machinery, not just validated at declaration level; closed-form benchmark at `lfea-b3.9` |
+| (direct fix, no WP) | — | #461 | Merged | `check:lfea-linear-core` now completes end to end for the first time since M001 — replaced its dependency on a deleted, non-functional CI workflow file with the mechanisms that actually keep the workspace-integration check and its e2e spec wired in |
+| M008 | #463 | — | Prequalification answered, verified, and approved (Owner spot-checked all load-bearing claims) | Benchmark B — governed analysis-authority overlay for the real 1885 project. Real candidate branch confirmed: `/ASIM-1885-8"-S8810103-91261M7-HC-01/B1`, 16 entities, zero missing-attribute diagnostics (8 clean branches exist total). Split into M008-A/B/C/D |
+| M008-A | #468 | #472 | Merged | `analysis-authority-overlay/v1` + `workspace-branch-subset/v1` contracts (schema/validation/hashing only) at `check:w11.1`/`check:w11.2`. Every anti-drift addendum rule genuinely implemented; all fail-closed cases exercised against the real Owner-verified 16-entity target branch. No fixes needed on Owner review |
+| M008-B | #475 | #477 | Merged | `extractBranchSubset` — branch-extraction algorithm populating `entityIds`/`routeIds`/`supportEntityIds`/`boundaryPorts` from real `normalizeWorkspaceDataset` output via genuine `buildRoutePartitionModel` reuse, sealed through M008-A's real contract. Algorithm needed no fixes; Owner review found and fixed one wrong value in the acceptance oracle *this repo's own docs* had specified — see process note below |
+| M008-C | #480 | #488 | Merged | `resolveBranchMaterialSectionAuthority` — real `MTXX`/`DTXR`/`ABORE` parsing → real B-2.2/B-2.3 sealed resolutions (ASTM A234-WPB/A105 as distinct governed materials, NPS8 Sch100 section) for the branch's pipe/fitting entities, with deterministic auto-pipe inheritance and explicit gasket/support skips. No fixes needed; Owner independently cross-checked the cited ASME B36.10 dimensions and material properties |
+| M009 | #464 | #471 | Merged | B-4.0's `calculatedStress` confirmed real, production-wired, and already displayed/exported — not a gap. Broad "implement stress recovery" declined (no mandate text to justify scope beyond what exists); pressure-stress-from-geometry and EditionDataset-import gaps logged but not authorized. Closed-form verification benchmark added at `lfea-b4.1` (#469), Owner-validated including hand-verified arithmetic |
+| M010 | #485 | #491 | Merged | `derivePressureStressContribution`/`resolvePressureStressContribution` — closes M009's logged pressure-stress gap by deriving `S = P·Do/(4·t)` from the real, sealed `PRESSURE` load primitive and wiring it into `linear-piping-code-application`. Owner review found and fixed a real over-broad-blocking bug (one element's unimplemented pressure effect incorrectly blocked every other element's check in the same load case) invisible to the agent's own single-element-per-case tests — see process note below |
+
+### Non-LFEA workstreams (user-directed pivot, 4 parallel read-only audits + direct fixes)
+
+Distinct from the LFEA mandate (M00x above) — covers import/render performance, 3D Edit tools, topology checker/autofix, canvas navigation, empirical (first-cut) formulas, and the enrichment process. Grounded by 4 parallel audit agents; findings and full technical detail live in each issue.
+
+| Work Pack | Issue | PR | Status | Summary |
+|---|---|---|---|---|
+| (direct fix, no WP) | — | #439 | Merged | One-line `candidateDraftHash` path bug — every "professional operation" (grouped multi-command move) in the live 3D Edit panel threw unconditionally |
+| WP-PERF | #440 | — | Ready | Real, measured 15.4s import stall (92% in one unindexed evidence-scan function, CPU-profiled) + missing dataset-identity guard causing full recompute on plain entity selection |
+| WP-NAV | #441 | — | Ready | Cache scene bounds (currently recomputed every view-click), derive adaptive near/far from model scale (dead `radius` variable proves it was never finished), wire up the fully-built-but-never-instantiated `ViewportAxisHUD` |
+| WP-SECTION | #442 | — | Ready | Implement `setPresentationSectionPlanes` on the topology-edit viewport backend — currently throws uncaught on every "Apply section" click; exact implementation shape already pinned by an existing literal source-regex test |
+| WP-CHECKER | #443 | — | Ready | Fix `BRANCH_DISCONNECTED` tie-break instability that spuriously rejects the flagship SNAP_GAP/MERGE_NODES autofix on real data |
+
+**Not scoped as a Work Pack**: enrichment process (line-list/piping-class) — confirmed genuinely active (14 commits in ~2h10m same day) with its own detailed 8-phase plan already written by that team. One real bug found in their own in-flight work (material-register qualification script broken since commit `7c83060`, still broken at latest check) — flag to them directly, don't fix unilaterally. First-cut empirical formulas — audited (see #440-era findings in conversation; not yet issued as a Work Pack): most "verification" tests are self-referential/tautological, not independent checks; a real rigorous closed-form benchmark (`w10.6-engineering-benchmark-check.mjs`) exists but isn't wired into any script alias. Loads-display common adapter — the seam already exists (`SupportLoadPresenter`) and is wired to the 2D sketcher canvas + right panel, but its LFEA-side branch has zero producer; recommended first step is extending the existing seam to the 3D viewport for first-cut's already-simple scalar before attempting LFEA integration, which needs its own characterization work first.
 
 ## Recommended forward sequence
 
-**M005** (no prequalification — precisely scoped by M002's own disclosed
-limitation): make assembly genuinely sparse when the sparse backend is
-selected (`assembly.js` currently always builds a dense `n×n` matrix via
-`denseFromTriplets` regardless of backend), and route `qualification.js`'s
-equilibrium/residual/energy checks through the existing, already-tested
-`sparseMultiply` (`src/core/lafea-linear-solve/sparse-matrix.js`) instead of
-dense `matVec` when sparse was used. Building blocks already exist and are
-tested; this is integration, not new engineering — same shape as M002 itself.
+**M005 and M004 — done.** The dense-solver mandate violation (§12.2) is now
+closed end to end: factorization, solve, assembly, and qualification are all
+genuinely sparse on the sparse (default) path, verified with a structural
+proof (`sparseDenseKPresent: false`), not just matching numbers.
+`INACTIVE_ANALYSIS_DOF_BEHAVIOR` (from M004, see process note below) is a
+real, kept capability for representing planar/reduced-dimension
+idealizations without fabricating reactions.
 
-**M006** (needs prequalification — real production-capability question, not
-pure test-writing): determine whether gravity/self-weight and thermal
-expansion loads are actually wired to affect the solved result at the
-*system* level, or only validated at the load-case-declaration contract
-level (current evidence suggests the latter — `lfea-b3.0-load-case-check.mjs`
-validates gravity/thermal *declarations*, not a solved closed-form result).
-If wiring already exists, add the two missing mandate closed-form cases
-(gravity/self-weight, thermal expansion) the same way M004 did. If it
-doesn't, that's a real gap to scope as its own implementation mission —
-don't assume either way without checking first.
+**M006 and M007 — done.** M006 confirmed thermal expansion was already wired
+at the element level (proven by pre-existing `B31-T10`) and added the missing
+*system*-level closed-form cases (`lfea-b3.8`). M007 checked gravity/self-weight
+the same way and found the opposite answer for that load: `GRAVITY` was
+sealed/validated at the B-3.0 declaration level only, with no consumer
+anywhere in the solve chain — a real production gap, not just missing test
+coverage. M007 closed it with `expandPipeWallGravitySourceAuthorities`
+(`PIPE_WALL` mass source only; other mass sources fail closed with
+`LOAD_CASE_GRAVITY_MASS_SOURCE_NOT_IMPLEMENTED`) plus `lfea-b3.9`. Closed-form
+coverage is now 12/20 mandate cases. Both PRs needed Owner-side fixes the
+implementing agents' repository-less sandboxes could not have caught
+themselves — see process notes below.
 
-**M007** (large, needs careful prequalification): begin Benchmark B — the
-governed analysis-authority overlay contract (materials, sections, supports,
-load cases) for the real 1885 project, scoped initially to one line/branch
-rather than the full 279-object project, to get a first genuine non-BLOCKED
-solve. This is the single highest-mandate-value remaining item and the
-prerequisite for P12. Do not hand this off without prequalification — the
-overlay schema design has real degrees of freedom that need Owner judgment
-before implementation starts.
+**M008 — M008-A done (#468, merged as PR #472). M008-B not yet scoped.**
+Benchmark B — the governed analysis-authority overlay contract (materials,
+sections, supports, load cases) for the real 1885 project. The agent's
+prequalification answer on #463 was independently verified by the Owner
+(re-ran its branch-scan reproduction script directly, spot-checked its
+source citations) before being accepted — every checked claim held up
+exactly. Real candidate branch confirmed clean: `/ASIM-1885-8"-S8810103-91261M7-HC-01/B1`,
+16 entities, zero `MISSING_ATTRIBUTE` diagnostics (8 such clean branches
+exist out of 13 total, so this wasn't cherry-picked). No per-object overlay
+schema existed anywhere before this; the agent proposed one, reusing
+`project-data-contract.js`'s `{ value, evidence, approved }` shape at
+per-entity/per-branch scope, now real and merged as
+`analysis-authority-overlay/v1` + `workspace-branch-subset/v1`
+(`src/workspace/analysis-authority-overlay/`). Owner accepted the proposed
+4-way split (M008-A contracts → M008-B extraction → M008-C material/
+section/support resolution → M008-D production integration) rather than one
+large mission; M008-A's own Owner review needed no fixes — every anti-drift
+addendum rule was genuinely implemented (not just present as dead code) and
+every fail-closed case was exercised against the real target branch.
+**M008-B — done.** The branch-extraction algorithm (`extractBranchSubset`)
+populating a `workspace-branch-subset/v1` manifest's `entityIds`/`routeIds`/
+`supportEntityIds`/`boundaryPorts` from a real dataset, reusing
+`route-partition-model.js`'s real `buildRoutePartitionModel` rather than
+reimplementing connectivity, and sealing its output through M008-A's real
+`sealBranchSubsetManifest`. Dispatched without a prequalification gate; the
+algorithm itself needed no fixes and even improved on the issue's own spec
+(tracks *which* external branch touches a boundary point, fails closed on
+ambiguity). Owner review did find and fix two defects — both self-inflicted,
+in the acceptance oracle and profile the issue itself specified, not in the
+agent's work; see the process note below.
 
-**M008**: stress recovery for frame/pipe elements (mandate Section 13.3) —
-first verify whether it exists at all in the Stack-C chain before scoping
-implementation vs. verification work.
+**M008-C — done.** Before writing the issue, directly surveyed
+every one of the target branch's 16 real entities' raw attributes (`MTXX`,
+`DTXR`, `ABORE`/`LBORE`) rather than assuming the original M008-A prequalification's
+open question ("does a schedule/NPS lookup exist?") — it doesn't, but the
+raw signal turned out richer than expected: real specific ASTM grades
+(`ASTM A234-WPB`, `ASTM A105`), not the generic `/CARBON/STEEL` the earlier
+research sample suggested, and real embedded `Sch NNN` schedule text. Of the
+16 entities, only 6 are real pipe/fitting components needing material/section
+authority (2 elbows, 1 flange, 1 gasket, 2 auto-generated pipe segments); 9
+are supports (different resolution problem, deferred) and 1 is the branch
+record itself. Scoped M008-C narrowly to just the 5 resolvable pipe/fitting
+entities (gasket explicitly excluded — not independently meshed), with a
+concrete inheritance rule for the 2 auto-generated segments (which carry no
+material/section signal of their own) and an explicit fail-closed rule for
+compound multi-material valve-trim descriptions (out of scope, not silently
+approximated). Material/section table values are real, not `FIXTURE-NOT-ASME`
+— this repo's own precedent already treats basic carbon-steel bulk
+mechanical properties and standard pipe dimensions as ordinary public
+engineering data (the existing `CS_A106B`/`SEC-NPS6-SCH40` fixtures carry no
+such disclaimer), unlike B31.3 allowable-stress/SIF tables which require the
+licensed code book. Owner review (PR #488, merged as `82f66de`) needed no
+fixes — independently cross-checked the cited ASME B36.10 NPS8 Sch100
+dimensions and material bulk properties, and confirmed the check script's
+expected values were reconstructed via a genuinely separate call to the
+real B-2.2/B-2.3 engines rather than trusting the module's own output.
+M008-D (composing this into the overlay's `authorityRecords`/`assignments`
+shape, plus wiring into the production chain) remains unscoped. This
+remains the single highest-mandate-value remaining item and the
+prerequisite for P12.
 
-**M009**: Stack-B UI defect re-verification. Before scoping, redo the direct
+**M009 — done.** Stress recovery for frame/pipe elements (mandate
+§13.3, no saved verbatim text found — the working definition used was
+exactly "stress recovery for frame/pipe elements"). The agent's answer
+confirmed the member-stress calculation
+(`linear-fea-b31-code-engine/stress-terms.js`'s `combineStressTerms`) already
+exists, is production-wired through `linear-piping-code-application`, and —
+contrary to this roadmap's own earlier assumption — is already displayed
+(`linear-piping-results-view.js`) and exported (CSV/JSON) to the user; Owner
+independently verified both the pressure-stress and display/export claims
+against source directly. Owner declined the broader "category-neutral
+bare-frame-station stress" scope the agent flagged as a possible reading of
+§13.3, since no mandate text exists to justify it and the existing B31.3
+component-code-point coverage reasonably satisfies the working definition.
+Two real, narrower gaps were logged but **not authorized**: deriving
+sustained pressure stress from design pressure + geometry (currently always
+caller-supplied, never computed anywhere), and a real licensed-`EditionDataset`
+supply/import/authoring path (the architecture and a generic caller-injection
+route exist; no real dataset or importer does). Authorized instead: a
+closed-form independent verification benchmark for the existing calculation
+(#469, merged as PR #471, `lfea-b4.1`) — the same test-only pattern that
+closed M004 and M006. Owner exact-head validation additionally hand-verified
+the statics and stress-term arithmetic and confirmed the review addendum's
+anti-drift safeguards (raw-literal check, `indexOf`-based registration
+ordering) genuinely run, not just exist as dead code.
+
+**M010 — done**, dispatched and merged in parallel with M008-C with zero
+file overlap. Closed a real, disconnected production gap M009 logged but
+didn't authorize: a real, sealed `PRESSURE` load primitive already existed
+at B-3.0 (`authorizedEffects: { codeStress, pressureStiffening, axialThrust,
+bourdon }`, explicitly documented as "authorisation alone never applies
+it"), with zero consumers anywhere — the same disconnected-primitive
+pattern gravity had before M007. Closed by deriving `S = P·Do/(4·t)`
+(generic thin-wall pressure-vessel mechanics, the same category
+`combineStressTerms`'s own doc comment already treats as legitimate) and
+wiring it into `linear-piping-code-application`, with
+`pressureStiffening`/`axialThrust`/`bourdon` correctly left as distinct,
+unimplemented, explicitly-blocked effects for future missions. Owner review
+(PR #491, merged as `940768d`) found and fixed a real bug by reading the
+code closely *before* running anything, then confirming with a live
+reproduction: the unimplemented-effect check scanned every `PRESSURE`
+primitive in the cited load case rather than just the one bound to the
+element under check, so one element's unimplemented authorization would
+incorrectly block every other element's clean check in the same load case
+— invisible to the agent's own tests, which only ever exercised one element
+per load case. See the process note below.
+
+**M011**: Stack-B UI defect re-verification (renumbered from the earlier
+"M010" slot — that number is now taken by the pressure-stress mission
+above). Before scoping, redo the direct
 verification pass that found D-01/D-09 already fixed — do not reuse
 `FEA_UI_UPGRADE_PLAN.md`'s claims without re-checking current code, the same
 way M002's fixture-default question and M003's export-eligibility assertion
@@ -81,15 +201,19 @@ plausible explanation.
 
 ## Process notes for future Owner sessions
 
-- Two agents currently in rotation: one comfortable in the
-  `linear-fea-solver`/`lafea-linear-solve`/model-compiler stack (did M002),
-  one comfortable in UI/workbench/test-harness work (did M003, M004).
+- Two agents currently in rotation for the LFEA mandate: one comfortable in
+  the `linear-fea-solver`/`lafea-linear-solve`/model-compiler stack (did
+  M002), one comfortable in UI/workbench/test-harness work (did M003, M004).
   Match mission type to agent history where it fits.
-- A third team is concurrently landing staged-JSON enrichment and
-  geometry/topology-editor work on `main` — `src/workspace/dataset-adapter.js`,
-  `src/workspace/topology-edit/**`, `src/workspace/enrichment/**`,
-  `src/core/common-enriched-properties/**` are their territory. Every Work
-  Pack issued so far has explicitly forbidden those paths; keep doing that.
+- A separate team is concurrently, actively landing staged-JSON enrichment
+  work on `main` — `src/workspace/dataset-adapter.js`,
+  `src/workspace/enrichment/**`, `src/core/common-enriched-properties/**`
+  are their territory (confirmed genuinely active, not stale — 14+ commits
+  same day as of this note). Keep forbidding those paths in Work Packs.
+  **Correction**: `src/workspace/topology-edit/**` was previously listed
+  here too, but the user directed direct work on it (3D Edit tools,
+  checker/autofix) — it is not that team's territory; WP-SECTION/WP-CHECKER
+  above are real Work Packs against it.
 - This repository has no functioning CI (95 legacy workflow files were
   removed as pre-existing broken scaffolding — see M001). Owner-side
   execution against the exact PR head is the only real check regime right
@@ -101,3 +225,117 @@ plausible explanation.
   approvals/reviews, never `issue_write update`'s `body` parameter — that
   replaces the issue's original spec rather than adding to the thread. This
   mistake was made once (Issue #409) and had to be corrected.
+- **Stop conditions exist because parallel missions really do collide.**
+  M004 (Issue #429) was scoped test-only with an explicit "stop and report if
+  production code changes are needed" condition. It didn't stop — it built a
+  real, well-engineered production feature (`INACTIVE_ANALYSIS_DOF_BEHAVIOR`)
+  across five files instead, unreviewed. While it sat unreviewed, M005
+  merged and rewrote the exact same functions. `git rebase` auto-merged the
+  two **without conflict markers** — but the result crashed on every real use
+  once the sparse backend (now default) hit a code path that still assumed
+  the dense array always exists. A clean auto-merge is not proof of a correct
+  merge; when two missions touch the same functions, re-run the full suite
+  (and, for anything backend/representation-conditional, explicitly exercise
+  every branch, not just the default) after reconciling — don't trust the
+  absence of conflict markers. The capability itself was kept (reviewed on
+  its technical merits, it's good work) but the process gap is what let the
+  bug go undetected through two rounds of "tests pass" reporting from a
+  sandbox that couldn't see the other mission's changes at all.
+- **Sequential slot numbers collide when missions are scoped in parallel
+  without a shared counter.** M006 and M007 both independently claimed
+  `scripts/lfea-b3.8-*-check.mjs` / `check:lfea-b3.8`, the same failure mode
+  as the earlier M004/M005 `b3.6` collision. Same fix each time: whichever
+  PR merges first keeps the number; the Owner rebases the other, renames its
+  script/registration/internal test-ID prefixes to the next free slot, and
+  re-validates the full aggregate chain before merging. This will keep
+  happening as long as missions are scoped from a written plan rather than
+  live repository state — treat it as routine reconciliation work, not a
+  sign anything went wrong.
+- **A hand-reconstruction of the repo's equations is not evidence the repo's
+  actual code works.** M006's own validation ran the authored test against
+  an isolated JS reimplementation of the solver equations, not the real
+  `compileFrameElement`/`compileSolverExecution` chain — and it masked a real
+  bug: `materialResolution()`/`sectionResolution()` return sealed resolution
+  records with properties nested under `.materialState`/`.sectionState` (the
+  shape `compileFrameElement` actually consumes), but the new script read
+  `material.elasticModulus` etc. directly, producing `NaN`. The
+  reconstruction couldn't have caught this because it never used the real
+  fixture-returning functions. Exact-head execution is the only check that
+  catches nesting/shape mismatches like this — numeric hand-verification of
+  the *assertions* proves the arithmetic is right, not that the code compiles
+  the same numbers.
+- **Per-package anti-drift guards (line-count caps, forbidden-pattern regexes)
+  are invisible to sandboxes without repository access, and will fail new
+  files that never triggered them before.** M007's new
+  `gravity-expansion.js` was 456 lines against `linear-piping-analysis-consumer`'s
+  hard <300-line-per-file cap, and separately tripped a
+  `HIDDEN_DEFAULT_PARAMETER` regex guard (a destructured `= []` default) —
+  neither could have been caught by an agent that never ran
+  `check:linear-piping-analysis-consumer` against the real tree. Splitting
+  along a natural seam (orchestration entry / derivation helpers / element
+  re-stiffening, in this case) is usually mechanical once the guard's actual
+  failure is in hand; don't take an agent's own "validation passed" as
+  covering guards it never had the files to run.
+- **A source-guard's literal-adjacency regex can go stale across several
+  merges before anyone notices**, because each Work Pack's own validation
+  only proves *its own* diff, not the cumulative state after N prior
+  legitimate insertions. `lfea-b4.0-source-guard.mjs` required
+  `check:lfea-b3.4 && npm run check:lfea-b4.0` to appear back-to-back in
+  `check:lfea-linear-core`; M002/M004/M005 each legitimately inserted a new
+  `b3.x` slot between them without anyone updating this guard, so it was
+  already failing on `main` (independent of M006/M007) by the time M006 hit
+  it. Fixed to check presence + ordering instead of literal adjacency —
+  same intent, no longer brittle to future insertions.
+- **Fixed (was: known pre-existing gap, found during M006/M007 review).**
+  `scripts/linear-piping-workspace-integration-check.mjs` read
+  `.github/workflows/lfea-piping-phase-certification.yml`, one of the 95 CI
+  workflow files M001 removed. That workflow's own commit confirms it was
+  gated on `workflow_dispatch` inputs a normal `pull_request` event never
+  supplied, so restoring it would have satisfied the assertion cosmetically
+  without providing working CI. Fixed (PR #461, `e6d30ca`) by pointing the
+  assertion at the two mechanisms that actually keep this check and its e2e
+  companion wired in: import by the registered
+  `linear-piping-presentation-anti-drift-check.mjs`, and presence under the
+  project's Playwright `testDir`. `check:lfea-linear-core` now completes end
+  to end as a single command for the first time since M001 merged.
+- **A hand-typed fixture value for a free-text field is not verified ground
+  truth, even after it passes a real contract's real validation — and an
+  Owner can propagate that mistake into a later issue's spec just as easily
+  as an agent can.** M008-A's `w11.2` fixture declared a boundary port's
+  `externalReference` as `/ASIM-1885-PL-8"-S8810104-01/B1`. It passed
+  `sealBranchSubsetManifest`'s real validation, because that contract only
+  checks that a declared boundary node genuinely qualifies as one — it has
+  no way to check whether the *declared neighbor* is real, since
+  `externalReference` is caller-supplied free text by design. When the
+  M008-B issue (#475) was written, that fixture value was copied forward as
+  part of the "concrete acceptance oracle" without independently re-checking
+  it — and M008-B's real, algorithmic `extractBranchSubset` disagreed with
+  it. Investigating directly (not assuming either side was right) found the
+  named branch does not exist anywhere in the real 279-object dataset, and
+  no entity anywhere shares that point: the real answer is a physical
+  terminus, and the fixture's value had been illustrative, not derived. The
+  extraction algorithm needed no change; the check's expectation did. Lesson
+  for scoping future issues: a value that merely *passed a schema
+  validator* is not the same claim as a value that was *independently
+  derived from real data* — don't reuse the former as if it were the
+  latter without re-deriving or re-checking it, even when writing the spec
+  yourself.
+- **A per-element check that scans a whole shared collection for a
+  disqualifying condition, instead of filtering to the one record that
+  actually belongs to the element under check, silently gets the blast
+  radius wrong.** M010's `resolvePressureStressContribution` ran its
+  unimplemented-pressure-effect check across every `PRESSURE` primitive in
+  the cited load case before narrowing to the current element — so one
+  element's unimplemented authorization incorrectly blocked every other
+  element's otherwise-clean check in the same case. This is easy to write
+  by accident (validate the whole collection up front, then look up the one
+  record you need) and easy for an agent's own tests to miss entirely if
+  every test scenario happens to use a single-element load case — real
+  production load cases almost never do. Caught by reading the function
+  closely before running anything (the two-pass shape — a blanket
+  collection-wide check, then a second narrower check against the found
+  record — was the tell), then confirmed with a live reproduction using two
+  real elements from an existing fixture before applying the fix. When
+  reviewing any per-record validation function, check what collection it
+  actually iterates over versus what it's conceptually supposed to be
+  scoped to.

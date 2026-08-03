@@ -1,11 +1,13 @@
 import { createDiagnostic, DIAGNOSTIC_SEVERITY, sortDiagnostics } from './diagnostics.js';
-import { deepFreeze, finiteNumber, isPlainRecord, stringValue } from './immutable.js';
+import { createEvidenceIndex, findAllIndexedEvidence } from './evidence-index.js';
+import { deepFreeze, finiteNumber, stringValue } from './immutable.js';
 
-export function collectSupportEvidence(specs, roots, scope) {
+export function collectSupportEvidence(specs, roots, scope, evidenceIndex) {
+  const index = evidenceIndex || createEvidenceIndex(roots);
   const values = {};
   const diagnostics = [];
   Object.entries(specs).forEach(([field, spec]) => {
-    const found = findAllByAliases(roots, spec.aliases);
+    const found = findAllByAliases(index, spec.aliases);
     const normalized = normalizeFound(found, spec, field, scope, diagnostics);
     if (normalized.length) values[field] = normalized;
     const distinct = new Set(normalized.map((row) => canonicalValue(row.value)));
@@ -14,30 +16,16 @@ export function collectSupportEvidence(specs, roots, scope) {
   return deepFreeze({ values, diagnostics: sortDiagnostics(diagnostics) });
 }
 
-function findAllByAliases(roots, aliases) {
-  const found = [];
-  aliases.forEach((alias) => {
-    const wanted = normalizeKey(alias);
-    roots.forEach(([rootPath, root]) => findKeys(root, wanted, rootPath, 0, found));
-  });
+function findAllByAliases(index, aliases) {
+  const found = findAllIndexedEvidence(index, aliases).flatMap((row) => (
+    flattenValue(row.value).map((value) => ({
+      value,
+      sourcePath: row.sourcePath,
+      sourceKind: rootKind(row.rootPath),
+    }))
+  ));
   const unique = new Map(found.map((row) => [`${row.sourcePath}|${canonicalValue(row.value)}`, row]));
   return [...unique.values()].sort(foundOrder);
-}
-
-function findKeys(value, wanted, path, depth, found) {
-  if (!isPlainRecord(value) || depth > 5) return;
-  const entries = Object.entries(value).sort(([left], [right]) => left.localeCompare(right));
-  entries.forEach(([key, child]) => {
-    const childPath = `${path}.${key}`;
-    if (normalizeKey(key) === wanted) {
-      flattenValue(child).forEach((item) => found.push({
-        value: item,
-        sourcePath: childPath,
-        sourceKind: rootKind(path),
-      }));
-    }
-  });
-  entries.forEach(([key, child]) => findKeys(child, wanted, `${path}.${key}`, depth + 1, found));
 }
 
 function normalizeFound(found, spec, field, scope, diagnostics) {
@@ -102,10 +90,6 @@ function rootKind(path) {
 
 function canonicalValue(value) {
   return typeof value === 'number' ? String(value) : stringValue(value).toUpperCase();
-}
-
-function normalizeKey(value) {
-  return String(value || '').replace(/[^a-z0-9]/gi, '').toUpperCase();
 }
 
 function foundOrder(left, right) {

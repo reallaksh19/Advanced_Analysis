@@ -1,8 +1,16 @@
+import { assembleSparseSymmetric } from '../lafea-linear-solve/sparse-matrix.js';
 import { semanticHash } from '../shared-piping-model/canonical-json.js';
 import { ELEMENT_DOF_ORDER } from '../linear-fea-contract/conventions.js';
+import { INACTIVE_ANALYSIS_DOF_BEHAVIOR } from '../linear-fea-contract/model-schema.js';
 import { dofIndexOf } from './dof-map.js';
 import { requireElementContribution } from './element-contributions.js';
-import { compareAscii, fail, requirePositive } from './solver-contract.js';
+import {
+  DENSE_DIRECT_BACKEND_ID,
+  SPARSE_DIRECT_BACKEND_ID,
+  compareAscii,
+  fail,
+  requirePositive,
+} from './solver-contract.js';
 
 const CODE = 'SOLVER_ASSEMBLY_INVALID';
 
@@ -111,7 +119,30 @@ function denseFromTriplets(n, triplets) {
   return K;
 }
 
-function assertSymmetric(K, n) {
+function sparseFromTriplets(n, triplets) {
+  const contributions = [];
+  for (const triplet of triplets) {
+    if (triplet.row < triplet.col || triplet.value === 0) continue;
+    if (triplet.row === triplet.col) {
+      contributions.push({ indices: [triplet.row], localMatrix: [[triplet.value]] });
+    } else {
+      contributions.push({
+        indices: [triplet.row, triplet.col],
+        localMatrix: [
+          [0, triplet.value],
+          [triplet.value, 0],
+        ],
+      });
+    }
+  }
+  const assembled = assembleSparseSymmetric(n, contributions);
+  const rows = assembled.rows.map((row) => Object.freeze(new Map(
+    [...row].filter((entry) => entry[1] !== 0),
+  )));
+  return Object.freeze({ size: assembled.size, rows: Object.freeze(rows) });
+}
+
+function assertSymmetricDense(K, n) {
   let worst = 0;
   for (let row = 0; row < n; row += 1) {
     for (let column = row + 1; column < n; column += 1) {
@@ -121,23 +152,43 @@ function assertSymmetric(K, n) {
       worst = Math.max(worst, Math.abs(a - b) / scale);
     }
   }
+  assertSymmetryResidual(worst);
+  return worst;
+}
+
+function assertSymmetricSparse(triplets) {
+  const entries = new Map(triplets.map((triplet) => [`${triplet.row}:${triplet.col}`, triplet.value]));
+  let worst = 0;
+  for (const triplet of triplets) {
+    if (triplet.row === triplet.col) continue;
+    const reflected = entries.get(`${triplet.col}:${triplet.row}`);
+    const reflectedValue = reflected === undefined ? 0 : reflected;
+    const scale = Math.max(Math.abs(triplet.value), Math.abs(reflectedValue), 1);
+    worst = Math.max(worst, Math.abs(triplet.value - reflectedValue) / scale);
+  }
+  assertSymmetryResidual(worst);
+  return worst;
+}
+
+function assertSymmetryResidual(worst) {
   if (worst > 1e-9) {
     fail(
       `Assembled global stiffness is not symmetric within tolerance (worst normalized asymmetry ${worst}); duplicate contributions must sum to a symmetric system.`,
       'SOLVER_ASSEMBLY_ASYMMETRIC',
     );
   }
-  return worst;
 }
 
 /**
- * Partition the DOF set into free, constrained (FIXED or PRESCRIBED_SLOT,
- * eliminated identically per section 7.2) and springs (which stay free but
- * add stiffness). Section 8 Boundary conditions.
+ * Partition the DOF set into free, physical constraints (FIXED or
+ * PRESCRIBED_SLOT), analysis-only inactive DOFs, and springs (which stay free
+ * but add stiffness). Section 8 Boundary conditions.
  */
 function partitionDofs(model, dofMap) {
   const constrained = model.constraints
-    .filter((constraint) => constraint.behavior === 'FIXED' || constraint.behavior === 'PRESCRIBED_SLOT')
+    .filter((constraint) => constraint.behavior === 'FIXED'
+      || constraint.behavior === 'PRESCRIBED_SLOT'
+      || constraint.behavior === INACTIVE_ANALYSIS_DOF_BEHAVIOR)
     .map((constraint) => ({
       constraintId: constraint.constraintId,
       nodeId: constraint.nodeId,
@@ -152,32 +203,54 @@ function partitionDofs(model, dofMap) {
     if (!constrainedIndices.has(index)) freeIndices.push(index);
   }
   const partitionHash = semanticHash({
-    constrained: constrained.map((entry) => ({ nodeId: entry.nodeId, dof: entry.dof })),
+    eliminated: constrained.map((entry) => ({
+      nodeId: entry.nodeId,
+      dof: entry.dof,
+      role: entry.behavior === INACTIVE_ANALYSIS_DOF_BEHAVIOR ? 'INACTIVE' : 'CONSTRAINED',
+    })),
   });
   return { constrained, freeIndices, partitionHash };
 }
 
 /**
- * Assemble the global system for one bound mechanical model. The canonical,
- * deduplicated coordinate entries are retained for sparse factorization. A
- * dense copy is also retained only for the existing qualification, reaction
- * and energy-evidence layer; it is not the production factorization input
- * when the sparse backend is selected.
+ * Assemble the global system for one bound mechanical model. The declared
+ * backend selects exactly one retained matrix representation: dense row-major
+ * `K` for the dense reference backend, or lower-triangle Map-backed `sparseK`
+ * for the sparse production backend. Sparse solves therefore never allocate
+ * the dense `n x n` array.
  *
  * @param {object} args
  * @param {Readonly<object>} args.model Sealed `fea-linear-model/v1`.
  * @param {Readonly<object>} args.dofMap Section 8 DOF map for this model.
  * @param {Array<object>} args.elementContributions Normalized contributions, one per model element.
- * @returns {Readonly<object>} Assembly evidence, canonical triplets, dense qualification `K` and load arrays.
+ * @param {string} [args.backend] Declared backend; omitted direct callers retain the historical dense representation.
+ * @returns {Readonly<object>} Assembly evidence, canonical triplets, selected matrix representation and load arrays.
  */
-export function assembleGlobalSystem({ model, dofMap, elementContributions }) {
+export function assembleGlobalSystem({
+  model,
+  dofMap,
+  elementContributions,
+  backend = DENSE_DIRECT_BACKEND_ID,
+}) {
   const n = dofMap.dofCount;
   const elementResult = buildElementTriplets(model, dofMap, elementContributions);
   const springResult = buildSpringTriplets(model, dofMap);
   const allTriplets = [...elementResult.triplets, ...springResult.triplets];
   const summed = sortAndSumTriplets(allTriplets);
-  const K = denseFromTriplets(n, summed);
-  const symmetryResidual = assertSymmetric(K, n);
+
+  let matrixRepresentation;
+  let symmetryResidual;
+  if (backend === DENSE_DIRECT_BACKEND_ID) {
+    const K = denseFromTriplets(n, summed);
+    symmetryResidual = assertSymmetricDense(K, n);
+    matrixRepresentation = { K };
+  } else if (backend === SPARSE_DIRECT_BACKEND_ID) {
+    symmetryResidual = assertSymmetricSparse(summed);
+    matrixRepresentation = { sparseK: sparseFromTriplets(n, summed) };
+  } else {
+    fail(`Solver backend ${backend} is not supported by assembleGlobalSystem.`, 'SOLVER_BACKEND_UNSUPPORTED');
+  }
+
   const partition = partitionDofs(model, dofMap);
   const retainedTriplets = Object.freeze(summed.map((triplet) => Object.freeze({ ...triplet })));
   const lowerTriangleNonzeroCount = retainedTriplets
@@ -186,7 +259,7 @@ export function assembleGlobalSystem({ model, dofMap, elementContributions }) {
 
   return Object.freeze({
     n,
-    K,
+    ...matrixRepresentation,
     triplets: retainedTriplets,
     elementLoad: elementResult.elementLoad,
     tripletCount: retainedTriplets.length,

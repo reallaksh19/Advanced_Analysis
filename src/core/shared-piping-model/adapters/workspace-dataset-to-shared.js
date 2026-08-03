@@ -1,5 +1,6 @@
 import { createDiagnostic, DIAGNOSTIC_SEVERITY, normalizeDiagnosticRows } from '../diagnostics.js';
 import { collectEvidence, normalizeGeometryEvidence, normalizePoint } from '../evidence.js';
+import { createEvidenceIndex } from '../evidence-index.js';
 import { deepFreeze, isPlainRecord, stringValue } from '../immutable.js';
 import {
   COMPATIBILITY_EVIDENCE_SPECS,
@@ -102,14 +103,15 @@ function supportPosition(entity, geometry) {
 
 function collectEntityEvidence(entity) {
   const roots = entityRoots(entity);
-  const engineering = collectEvidence(ENGINEERING_PROPERTY_SPECS, roots, entity.entityId);
-  const compatibility = collectEvidence(COMPATIBILITY_EVIDENCE_SPECS, roots, entity.entityId);
+  const evidenceIndex = createEvidenceIndex(roots);
+  const engineering = collectEvidence(ENGINEERING_PROPERTY_SPECS, roots, entity.entityId, evidenceIndex);
+  const compatibility = collectEvidence(COMPATIBILITY_EVIDENCE_SPECS, roots, entity.entityId, evidenceIndex);
   const support = entity.category === 'support'
-    ? collectSupportEvidence(SUPPORT_EVIDENCE_SPECS, roots, entity.entityId)
+    ? collectSupportEvidence(SUPPORT_EVIDENCE_SPECS, roots, entity.entityId, evidenceIndex)
     : deepFreeze({ values: {}, diagnostics: [] });
   const load = entity.category === 'support'
     ? deepFreeze({ values: {}, diagnostics: [] })
-    : collectEvidence(LOAD_EVIDENCE_SPECS, roots, entity.entityId);
+    : collectEvidence(LOAD_EVIDENCE_SPECS, roots, entity.entityId, evidenceIndex);
   const diagnostics = [
     ...engineering.diagnostics,
     ...compatibility.diagnostics,

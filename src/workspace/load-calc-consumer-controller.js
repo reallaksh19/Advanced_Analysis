@@ -74,12 +74,19 @@ export class LoadCalcConsumerController {
       activeTab: this.activeTab,
       message: this.message,
       distribution: engineeringModelStore.getDistribution(),
+      authorizedExecution: engineeringModelStore.getAuthorizedExecution(),
       supportSiteModel: engineeringModelStore.getSupportSiteModel(),
       routePartitionModel: engineeringModelStore.getRoutePartitionModel(),
     });
     this.rootElement.replaceChildren(view);
     const pane = view.querySelector('[data-load-calc-pane]');
-    if (this.activeTab === 'loads') renderEngineeringLoadPane(pane, engineeringModelStore.getDistribution(), engineeringModelStore.getSupportSiteModel(), engineeringModelStore.getRoutePartitionModel());
+    if (this.activeTab === 'loads') renderEngineeringLoadPane(
+      pane,
+      engineeringModelStore.getDistribution(),
+      engineeringModelStore.getSupportSiteModel(),
+      engineeringModelStore.getRoutePartitionModel(),
+      engineeringModelStore.getAuthorizedExecution(),
+    );
     else this.renderDeferredPane(this.activeTab, pane, revision);
   }
 

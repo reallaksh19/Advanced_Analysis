@@ -34,6 +34,10 @@ function reject(pattern, message) {
 
 /* Executable text only: comments may and must explain the maths. */
 const executable = combined.replace(/\/\*[\s\S]*?\*\//gu, '').replace(/(^|[^:])\/\/.*$/gmu, '$1');
+const codeEngineSource = source['src/core/linear-fea-b31-code-engine/code-engine.js'];
+const codeEngineExecutable = codeEngineSource
+  .replace(/\/\*[\s\S]*?\*\//gu, '')
+  .replace(/(^|[^:])\/\/.*$/gmu, '$1');
 
 function rejectCode(pattern, message) {
   assert.equal(pattern.test(executable), false, message);
@@ -63,10 +67,40 @@ for (const path of [
 /* Upstream authorities are consumed through their own validators, never
  * re-derived: B-3.1 frame elements, B-2.3 section resolutions and B-2.2
  * material resolutions are all re-accepted, not trusted or rebuilt. */
-assert.match(source['src/core/linear-fea-b31-code-engine/code-engine.js'], /requireFrameElement/u, 'the B-3.1 frame element must arrive through its own validator');
-assert.match(source['src/core/linear-fea-b31-code-engine/code-engine.js'], /requirePipeSectionResolution/u, 'the B-2.3 section resolution must arrive through its own validator');
-assert.match(source['src/core/linear-fea-b31-code-engine/code-engine.js'], /requireMaterialResolutionResult/u, 'the B-2.2 material resolution must arrive through its own validator');
-assert.match(source['src/core/linear-fea-b31-code-engine/code-engine.js'], /requireFactorApplicability/u, 'B-3.2 applicability/override machinery must be reused directly, not reimplemented');
+assert.match(codeEngineSource, /requireFrameElement/u, 'the B-3.1 frame element must arrive through its own validator');
+assert.match(codeEngineSource, /requirePipeSectionResolution/u, 'the B-2.3 section resolution must arrive through its own validator');
+assert.match(codeEngineSource, /requireMaterialResolutionResult/u, 'the B-2.2 material resolution must arrive through its own validator');
+assert.match(codeEngineSource, /requireFactorApplicability/u, 'B-3.2 applicability/override machinery must be reused directly, not reimplemented');
+
+/* M015: the alternate SUSTAINED section is a second real B-2.3 authority.
+ * The primary section mismatch refusal remains intact, the override is
+ * re-accepted independently, and sectionMechanicalProperties receives the
+ * override's own sectionState rather than a nominal/reduced mixture. */
+assert.match(
+  codeEngineSource,
+  /if \(acceptedSection\.semanticHash !== element\.section\.resolutionSemanticHash\)[\s\S]*?'CODE_ENGINE_SECTION_MISMATCH'/u,
+  'the primary sectionResolution mismatch guard must remain unchanged and fail closed',
+);
+assert.match(
+  codeEngineSource,
+  /requirePipeSectionResolution\(sustainedSectionResolution\)/u,
+  'M015 must validate the sustained override through B-2.3 requirePipeSectionResolution',
+);
+assert.match(
+  codeEngineSource,
+  /sectionMechanicalProperties\(element\.section, acceptedSection\)/u,
+  'M015 must preserve the nominal default sectionMechanicalProperties path',
+);
+assert.match(
+  codeEngineSource,
+  /sectionMechanicalProperties\(acceptedSustainedSection\.sectionState, acceptedSustainedSection\)/u,
+  'M015 must use the override section own area/inertia and dimensions together',
+);
+assert.doesNotMatch(
+  codeEngineExecutable,
+  /Math\.PI|calculateCircularAnnulusProperties|\bwallThickness\b|\binnerDiameter\b/u,
+  'M015 must not reproduce annulus-area or section-property formulas in code-engine.js',
+);
 
 /* This package computes no stiffness, no B-3.2 flexibility factor and no
  * B31J factor value: every index/SIF/allowable/coefficient is caller-declared
@@ -134,7 +168,7 @@ for (const path of [
 /* The code-result/profile/dataset/factor-set hashes must not be
  * self-referential. */
 assert.match(
-  source['src/core/linear-fea-b31-code-engine/code-engine.js'],
+  codeEngineSource,
   /key === 'semanticHash' \|\| key === 'evidenceHash'/u,
   'codeResultSemanticProjection must exclude semanticHash/evidenceHash from its own hash input',
 );
@@ -155,9 +189,9 @@ assert.match(
 /* SUSTAINED/OCCASIONAL and DISPLACEMENT_STRESS_RANGE must draw their indices
  * from distinct declared factor-set groups (section 15.5: never cross-apply
  * displacement SIFs to sustained stress or vice versa). */
-assert.match(source['src/core/linear-fea-b31-code-engine/code-engine.js'], /factorSet\.sustainedIndices/u, 'SUSTAINED must read sustainedIndices');
-assert.match(source['src/core/linear-fea-b31-code-engine/code-engine.js'], /factorSet\.occasionalIndices/u, 'OCCASIONAL must read occasionalIndices');
-assert.match(source['src/core/linear-fea-b31-code-engine/code-engine.js'], /factorSet\.displacementSifs/u, 'DISPLACEMENT_STRESS_RANGE must read displacementSifs');
+assert.match(codeEngineSource, /factorSet\.sustainedIndices/u, 'SUSTAINED must read sustainedIndices');
+assert.match(codeEngineSource, /factorSet\.occasionalIndices/u, 'OCCASIONAL must read occasionalIndices');
+assert.match(codeEngineSource, /factorSet\.displacementSifs/u, 'DISPLACEMENT_STRESS_RANGE must read displacementSifs');
 
 /* Mechanism/failure reporting names a dedicated code, never a generic error. */
 for (const code of [
@@ -172,6 +206,8 @@ for (const code of [
   'CODE_ENGINE_COMPONENT_MISMATCH',
   'CODE_ENGINE_MATERIAL_MISMATCH',
   'CODE_ENGINE_SECTION_MISMATCH',
+  'CODE_ENGINE_SUSTAINED_SECTION_OVERRIDE_CATEGORY_MISMATCH',
+  'CODE_ENGINE_SUSTAINED_SECTION_OVERRIDE_GEOMETRY_MISMATCH',
   'CODE_ENGINE_HASH_MISMATCH',
   'CODE_ENGINE_USER_OVERRIDE_INCOMPLETE',
 ]) {
@@ -193,10 +229,29 @@ assert.equal(
   'node scripts/lfea-b4.0-code-engine-check.mjs && node scripts/lfea-b4.0-reviewer-check.mjs && node scripts/lfea-b4.0-source-guard.mjs',
   'check:lfea-b4.0 registration is missing',
 );
+assert.equal(
+  packageJson.scripts['check:lfea-b4.3'],
+  'node scripts/lfea-b4.3-sustained-section-override-check.mjs',
+  'check:lfea-b4.3 registration is missing',
+);
+const linearCoreScript = packageJson.scripts['check:lfea-linear-core'];
 assert.match(
-  packageJson.scripts['check:lfea-linear-core'],
-  /npm run check:lfea-b3\.4 && npm run check:lfea-b4\.0/u,
-  'check:lfea-b4.0 must run inside check:lfea-linear-core, directly after check:lfea-b3.4',
+  linearCoreScript,
+  /npm run check:lfea-b4\.0/u,
+  'check:lfea-b4.0 must run inside check:lfea-linear-core',
+);
+const b34Index = linearCoreScript.indexOf('check:lfea-b3.4');
+const b40Index = linearCoreScript.indexOf('check:lfea-b4.0');
+const b42Index = linearCoreScript.indexOf('check:lfea-b4.2');
+const b43Index = linearCoreScript.indexOf('check:lfea-b4.3');
+const consumerIndex = linearCoreScript.indexOf('check:linear-piping-analysis-consumer');
+assert.ok(
+  b34Index !== -1 && b40Index !== -1 && b34Index < b40Index,
+  'check:lfea-b4.0 must run inside check:lfea-linear-core, after check:lfea-b3.4',
+);
+assert.ok(
+  b42Index !== -1 && b43Index > b42Index && consumerIndex > b43Index,
+  'check:lfea-b4.3 must run after B4.2 and before linear-piping-analysis-consumer',
 );
 assert.match(
   packageJson.scripts.gate,
