@@ -211,6 +211,12 @@ assert.equal(derived.execution.status, 'QUALIFIED');
 assert.equal(derived.compilation.model.elements.length, 10);
 assert.equal(derived.compilation.model.nodes.length, 11);
 assert.equal(derived.generatedGravityPrimitives.length, 30);
+derived.generatedGravityPrimitives.forEach((primitive) => {
+  assert.equal(primitive.startIntensity.fx, 0);
+  assert.ok(primitive.startIntensity.fy < 0, `${primitive.primitiveId} must act downward`);
+  assert.equal(primitive.startIntensity.fz, 0);
+  assert.deepEqual(primitive.endIntensity, primitive.startIntensity);
+});
 assert.equal(derived.gravityDerivations.length, 30);
 assert.equal(derived.thermalBindings.length, 4);
 assert.equal(derived.pipingComponents.length, 2);
