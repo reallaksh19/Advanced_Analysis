@@ -27,12 +27,13 @@ const points = allPoints(spec);
 const levels = spec.meshLadder.map((definition) =>
   qualifyLevel(definition, points));
 const reportBase = {
-  schema: 'lafea-bucket-01-production-lug-probe-contract-evidence/v1',
-  producerRevision: 'B01-LUG-PROBE-CONTRACT.1',
+  schema: 'lafea-bucket-01-production-lug-probe-contract-evidence/v2',
+  producerRevision: 'B01-LUG-PROBE-CONTRACT.2',
   specId: spec.specId,
   specHash: canonicalLafeaSha256(spec),
   levels,
   pointCount: points.length,
+  convergenceWindow: spec.convergenceWindow,
   authority: spec.authority,
   status: 'PASS',
 };
@@ -42,15 +43,27 @@ fs.writeFileSync(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 console.log(JSON.stringify(report));
 
 function validateSpec(value) {
-  assert.equal(value.schema, 'lafea-bucket-01-production-lug-probe-spec/v1');
+  assert.equal(value.schema, 'lafea-bucket-01-production-lug-probe-spec/v2');
   assert.equal(value.benchmarkId, 'C2D-LUG-PINHOLE-01');
   assert.equal(value.stageId, 'LAFEA.3');
   assert.equal(value.formulation, 'PLANE_STRESS');
-  assert.deepEqual(value.meshLadder.map((row) => row.elementCount), [64, 256, 1024]);
-  assert.deepEqual(value.meshLadder.map((row) => row.radialDivisions), [2, 4, 8]);
+  assert.deepEqual(
+    value.meshLadder.map((row) => row.elementCount),
+    [64, 256, 1024, 4096],
+  );
+  assert.deepEqual(
+    value.meshLadder.map((row) => row.radialDivisions),
+    [2, 4, 8, 16],
+  );
   assert.deepEqual(
     value.meshLadder.map((row) => row.circumferentialDivisions),
-    [16, 32, 64],
+    [16, 32, 64, 128],
+  );
+  assert.deepEqual(value.convergenceWindow.governedLevelOrdinals, [1, 2, 3, 4]);
+  assert.deepEqual(value.convergenceWindow.evaluatedLevelOrdinals, [2, 3, 4]);
+  assert.equal(
+    value.convergenceWindow.policy,
+    'FINEST_THREE_OF_GOVERNED_FOUR_LEVEL_LADDER',
   );
   assert.equal(value.authority.coordinatesFrozenBeforeProductionStressObservation, true);
   assert.equal(value.authority.productionOutputUsedToSelectCoordinates, false);
@@ -58,6 +71,11 @@ function validateSpec(value) {
   assert.equal(value.authority.movingMaximumUsed, false);
   assert.equal(value.authority.nodalProjectionUsed, false);
   assert.equal(value.authority.crossElementAveragingUsed, false);
+  assert.equal(value.authority.integrationPointExtrapolationUsed, false);
+  assert.equal(
+    value.authority.recovery,
+    'DIRECT_T6_B_MATRIX_AT_FIXED_PHYSICAL_COORDINATE',
+  );
   assert.ok(value.tolerances.highGradientGciMax > 0);
   assert.ok(value.tolerances.nonSingularGciMax > 0);
   const ids = allPoints(value).map((row) => row.probeId);
