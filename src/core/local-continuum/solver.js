@@ -285,17 +285,6 @@ function conjugateGradientSolve(matrix, rightHandSide, profile) {
         residual = exactResidual(matrix, rightHandSide, solution);
         finalResidualInfinity = maxAbs(residual);
         if (finalResidualInfinity <= residualTolerance) break;
-        preconditioned = applyJacobi(matrix.diagonal, residual);
-        direction = [...preconditioned];
-        rho = dotVector(residual, preconditioned);
-        if (!(rho > 0)) {
-          throw singularError(
-            'UNDER_CONSTRAINED_OR_SINGULAR_SYSTEM',
-            'solver',
-            'Sparse PCG restarted with a non-positive residual product.',
-          );
-        }
-        continue;
       }
       preconditioned = applyJacobi(matrix.diagonal, residual);
       const nextRho = dotVector(residual, preconditioned);
