@@ -43,7 +43,7 @@ const basis = createLafeaBucket01CodeBasis({
   stressClassification: {
     classificationId: 'TEST', method: 'FIXED_LOCATION_RICHARDSON_GCI_UPPER_BOUND',
     sourceSection: 'TEST', locationIds: ['P1'], stressQuantity: 'VON_MISES',
-    extractionAuthority: 'RETAINED_INTEGRATION_POINT_FIXED_PROBES_AND_PATHS',
+    extractionAuthority: 'RETAINED_DIRECT_T6_FIXED_PROBES_AND_PATHS',
     singularityTreatment: 'EXCLUDE_UNCLASSIFIED_SINGULAR_PEAKS',
   },
   loadCombination: {
@@ -60,20 +60,29 @@ const basis = createLafeaBucket01CodeBasis({
 });
 const location = {
   probeId: 'P1', status: 'PASS', component: 'VON_MISES', units: 'MPa',
-  observations: [80, 70, 65], locationDefinitionHash: `sha256:${'e'.repeat(64)}`,
+  governedLevelOrdinals: [1, 2, 3, 4],
+  evaluatedLevelOrdinals: [2, 3, 4],
+  governedObservations: [90, 80, 70, 65],
+  observations: [80, 70, 65],
+  locationDefinitionHash: `sha256:${'e'.repeat(64)}`,
   convergence: {
     status: 'PASS', richardsonExtrapolation: 60, fineGridGci: 0.05,
     semanticHash: `sha256:${'f'.repeat(64)}`,
   },
 };
 const stressBase = {
-  schema: 'lafea-bucket-01-production-lug-fixed-probe-evidence/v1',
+  schema: 'lafea-bucket-01-production-lug-fixed-probe-evidence/v2',
   exactHeadSha: head,
+  governedLevelOrdinals: [1, 2, 3, 4],
+  evaluatedLevelOrdinals: [2, 3, 4],
   status: 'PASS',
   standaloneProbeReceipts: [location],
   pathReceipts: [],
   authority: {
-    retainedIntegrationPointTensorAuthority: true,
+    directElementPointRecovery: true,
+    retainedNodalDisplacementAuthority: true,
+    retainedConstitutiveMatrixAuthority: true,
+    integrationPointExtrapolationUsed: false,
     movingMaximumUsed: false,
     nodalProjectionUsed: false,
     crossElementAveragingUsed: false,
@@ -89,6 +98,8 @@ const assessment = evaluateLafeaBucket01CodeAssessment({
 });
 assert.equal(validateLafeaBucket01CodeAssessment(assessment).ok, true);
 assert.equal(assessment.status, 'CODE_ASSESSMENT_BLOCKED');
+assert.equal(assessment.authority.directElementPointRecoveryConsumed, true);
+assert.equal(assessment.authority.integrationPointExtrapolationConsumed, false);
 assert.equal(assessment.locationAssessments[0].fineGridStress, 65);
 assert.equal(assessment.locationAssessments[0].richardsonStress, 60);
 assert.equal(assessment.locationAssessments[0].stressEnvelopeReference, 65);
@@ -145,8 +156,23 @@ const hashMismatchKirsch = structuredClone(validInput);
 hashMismatchKirsch.replays[0].reportHashes.kirschStress = `sha256:${'4'.repeat(64)}`;
 assertBlocked(hashMismatchKirsch, 'Kirsch stress hash mismatch');
 
+const productionReplaySource = fs.readFileSync(
+  path.join(ROOT, 'scripts/lafea-bucket-01-production-replay.mjs'),
+  'utf8',
+);
+for (const token of [
+  '[64, 256, 1024, 4096]',
+  'energyConvergenceElementCounts, [256, 1024, 4096]',
+  'governedLevelOrdinals, [1, 2, 3, 4]',
+  'evaluatedLevelOrdinals, [2, 3, 4]',
+  'directElementPointRecovery',
+  'integrationPointExtrapolationUsed',
+]) {
+  assert.ok(productionReplaySource.includes(token), `production replay missing ${token}`);
+}
+
 console.log(JSON.stringify({
-  schema: 'lafea-bucket-01-patch-v2-regression/v1',
+  schema: 'lafea-bucket-01-patch-v2-regression/v2',
   status: 'PASS',
   conservativeAssessment: {
     fineGridStress: 65,
@@ -155,6 +181,12 @@ console.log(JSON.stringify({
     allowable: 66,
     boundedDemand: 68.25,
     disposition: 'BLOCK',
+  },
+  governedReplayContract: {
+    governedElementCounts: [64, 256, 1024, 4096],
+    evaluatedElementCounts: [256, 1024, 4096],
+    directPointStressRequired: true,
+    integrationPointExtrapolationAccepted: false,
   },
   replayCustodyV2: {
     positiveReceiptAccepted: true,
