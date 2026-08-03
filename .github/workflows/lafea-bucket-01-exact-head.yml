@@ -59,8 +59,21 @@ jobs:
 
           solver = Path('src/core/local-continuum/solver.js')
           text = solver.read_text()
+          old = """  const totals = equilibriumTotals(dofs, constrained, force, residual);
+            const equilibriumLimit = tolerance(
+          """
+          new = """  const freeTotals = { UX: 0, UY: 0 };
+            free.forEach((index) => {
+              freeTotals[dofAxis(dofs[index])] += residual[index];
+            });
+            const totals = equilibriumTotals(dofs, constrained, force, residual);
+            const equilibriumLimit = tolerance(
+          """
+          if text.count(old) != 1:
+              raise SystemExit(f'expected one equilibrium totals block, found {text.count(old)}')
+          text = text.replace(old, new)
           old = "      'Reaction equilibrium did not qualify.',"
-          new = "      `Reaction equilibrium did not qualify: UX=${totals.UX}, UY=${totals.UY}, limit=${equilibriumLimit}, scale=${scale}.`,"
+          new = "      `Reaction equilibrium did not qualify: freeMaximum=${freeMaximum}, freeLimit=${freeLimit}, freeUX=${freeTotals.UX}, freeUY=${freeTotals.UY}, UX=${totals.UX}, UY=${totals.UY}, limit=${equilibriumLimit}, scale=${scale}.`,"
           if text.count(old) != 1:
               raise SystemExit(f'expected one reaction-equilibrium message, found {text.count(old)}')
           solver.write_text(text.replace(old, new))
@@ -86,7 +99,7 @@ jobs:
               -f description="Kirsch fixed-probe check passed"
             exit 0
           fi
-          detail=$(node -e "const fs=require('fs');const p='reports/qualification/lafea-bucket-01-kirsch.stderr.log';const t=fs.existsSync(p)?fs.readFileSync(p,'utf8'):'no stderr';const lines=t.split(/\r?\n/).map(s=>s.trim()).filter(s=>s&&!/^at\s/.test(s)&&!/^node:/.test(s));process.stdout.write(lines.slice(0,16).join(' | ').slice(0,1300))")
+          detail=$(node -e "const fs=require('fs');const p='reports/qualification/lafea-bucket-01-kirsch.stderr.log';const t=fs.existsSync(p)?fs.readFileSync(p,'utf8'):'no stderr';const lines=t.split(/\r?\n/).map(s=>s.trim()).filter(s=>s&&!/^at\s/.test(s)&&!/^node:/.test(s));process.stdout.write(lines.slice(0,16).join(' | ').slice(0,1600))")
           encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
           safe=$(printf '%s' "$detail" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-48)
           gh api --method POST \
