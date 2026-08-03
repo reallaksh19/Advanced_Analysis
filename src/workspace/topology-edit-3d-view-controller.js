@@ -12,10 +12,8 @@ import {
 } from './topology-edit/topology-edit-command-ui.js';
 import { TopologyEditLifecycleController } from './topology-edit/topology-edit-lifecycle-controller.js';
 import { topologyEditEntityIdsForObject } from './topology-edit/topology-edit-render-packet.js';
-import {
-  TopologyEditTypedViewportBackend,
-  retainTypedTopologyEditPrimitives,
-} from './topology-edit/topology-edit-typed-viewport-backend.js';
+import { retainTypedTopologyEditPrimitives } from './topology-edit/topology-edit-typed-viewport-backend.js';
+import { TopologyEditSupportViewportBackend } from './topology-edit/topology-edit-support-viewport-backend.js';
 
 export { buildAutofixPolicy } from './topology-edit-3d-view-controller-core.js';
 
@@ -48,7 +46,7 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
   }
 
   createViewportBackend() {
-    return new TopologyEditTypedViewportBackend();
+    return new TopologyEditSupportViewportBackend();
   }
 
   async activate() {
@@ -65,9 +63,9 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
   }
 
   installTypedViewportBackend() {
-    if (!(this.viewportBackend instanceof TopologyEditTypedViewportBackend)) {
+    if (!(this.viewportBackend instanceof TopologyEditSupportViewportBackend)) {
       throw new Error(
-        'TOPOLOGY_EDIT_TYPED_BACKEND_FACTORY_MISMATCH: Activation must mount the typed backend directly.',
+        'TOPOLOGY_EDIT_SUPPORT_BACKEND_FACTORY_MISMATCH: Activation must mount the support-glyph backend directly.',
       );
     }
   }
