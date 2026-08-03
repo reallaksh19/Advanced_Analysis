@@ -110,7 +110,9 @@ function factorizeDenseFreePartition({ model, dofMap, assembly, policies, m }) {
 }
 
 function factorizeSparseFreePartition({ model, dofMap, assembly, policies, m }) {
-  const matrix = sparseMatrixFromTriplets(assembly.n, assembly.triplets);
+  const matrix = assembly.sparseK === undefined
+    ? sparseMatrixFromTriplets(assembly.n, assembly.triplets)
+    : assembly.sparseK;
   const prescribed = new Map(assembly.constrained.map((entry) => [entry.globalIndex, 0]));
   const partitioned = partitionSparseSystem(matrix, new Array(assembly.n).fill(0), prescribed);
   assertSameFreePartition(assembly.freeIndices, partitioned.freeIndices);
@@ -132,6 +134,7 @@ function factorizeSparseFreePartition({ model, dofMap, assembly, policies, m }) 
       L: null,
       D: null,
       sparseFactor: factor,
+      sparseFreeMatrix: partitioned.freeMatrix,
       scaling,
       pivotStatistics,
       conditionEstimate: conditionEstimateEvidence.conditionEstimate,
@@ -177,6 +180,7 @@ function factorizeSparseFreePartition({ model, dofMap, assembly, policies, m }) 
     L: null,
     D: null,
     sparseFactor: factor,
+    sparseFreeMatrix: partitioned.freeMatrix,
     scaling,
     pivotStatistics,
     conditionEstimate: conditionEstimateEvidence.conditionEstimate,
