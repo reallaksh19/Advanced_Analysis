@@ -4,6 +4,7 @@ import {
 } from '../shared-piping-model/canonical-json.js';
 import { canonicalizeLinearFeaModel } from './model-canonicalization.js';
 import { canonicalDiagnosticEvidence } from './model-diagnostics.js';
+import { INACTIVE_ANALYSIS_DOF_BEHAVIOR } from './model-schema.js';
 
 export function computeValidationProfileSemanticHash(profile) {
   return hashCanonicalValue({
@@ -29,7 +30,9 @@ function stiffnessConstraintProjection(constraint) {
     nodeId: constraint.nodeId,
     dof: constraint.dof,
     basis: constraint.basis,
-    partition: 'CONSTRAINED',
+    partition: constraint.behavior === INACTIVE_ANALYSIS_DOF_BEHAVIOR
+      ? 'INACTIVE'
+      : 'CONSTRAINED',
   };
 }
 

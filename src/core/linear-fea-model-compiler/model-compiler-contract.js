@@ -3,6 +3,7 @@ import { requireDeclaredValue } from '../shared-analysis-contract/declared-value
 import { deepFreeze, isPlainRecord } from '../shared-piping-model/immutable.js';
 import { semanticHash } from '../shared-piping-model/canonical-json.js';
 import { requireCanonicalNodeId } from '../linear-fea-contract/identifiers.js';
+import { INACTIVE_ANALYSIS_DOF_BEHAVIOR } from '../linear-fea-contract/model-schema.js';
 
 export const MECHANICAL_MODEL_COMPILER_PROFILE_SCHEMA =
   'fea-linear-model-compiler-profile/v1';
@@ -64,7 +65,11 @@ export const REPRESENTABLE_CONSTRAINT_KINDS = Object.freeze([
   'PARTIAL_RELEASE_SPRING',
 ]);
 
-export const NODAL_RESTRAINT_BEHAVIORS = Object.freeze(['FIXED', 'PRESCRIBED_SLOT']);
+export const NODAL_RESTRAINT_BEHAVIORS = Object.freeze([
+  'FIXED',
+  INACTIVE_ANALYSIS_DOF_BEHAVIOR,
+  'PRESCRIBED_SLOT',
+]);
 
 export const ELEMENT_ENDS = Object.freeze(['I', 'J']);
 

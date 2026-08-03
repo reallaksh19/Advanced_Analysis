@@ -15,8 +15,17 @@ export const SUPPORTED_FORMULATIONS = Object.freeze({
   'PIPE-LINEAR-R1': Object.freeze(['PIPE_FRAME3D_LINEAR_V1']),
 });
 
+/**
+ * Analysis-only kinematic state. This removes a DOF from the solved partition
+ * without creating a physical support reaction. The solver accepts it only
+ * when the inactive DOF is exactly uncoupled from every retained DOF and
+ * carries no applied load.
+ */
+export const INACTIVE_ANALYSIS_DOF_BEHAVIOR = 'INACTIVE_ANALYSIS_DOF';
+
 export const SUPPORTED_CONSTRAINT_BEHAVIORS = Object.freeze([
   'FIXED',
+  INACTIVE_ANALYSIS_DOF_BEHAVIOR,
   'LINEAR_SPRING',
   'PRESCRIBED_SLOT',
 ]);
