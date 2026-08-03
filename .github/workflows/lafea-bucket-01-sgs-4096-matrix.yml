@@ -1,0 +1,231 @@
+name: LAFEA Bucket-01 SGS 4096 Grading Matrix
+
+on:
+  push:
+    branches: [bucket-01-sgs-4096-matrix]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  stress:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: p175
+            mode: power
+            exponent: '1.75'
+          - label: p200
+            mode: power
+            exponent: '2.00'
+          - label: p225
+            mode: power
+            exponent: '2.25'
+          - label: p250
+            mode: power
+            exponent: '2.50'
+          - label: p300
+            mode: power
+            exponent: '3.00'
+          - label: cosine
+            mode: cosine
+            exponent: '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Execute constant-ratio 4096 grading candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+          CANDIDATE: ${{ matrix.label }}
+          GRADING_MODE: ${{ matrix.mode }}
+          GRADING_EXPONENT: ${{ matrix.exponent }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports/qualification
+          context="lafea/sgs-4096-matrix/${CANDIDATE}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=pending -f context="$context" \
+            -f description="Testing ${CANDIDATE} on 256/1024/4096 SGS triad"
+
+          python - <<'PY'
+          import os, re, textwrap
+          from pathlib import Path
+          source = Path('.github/workflows/lafea-bucket-01-sgs-lab.yml').read_text()
+          blocks = re.findall(r"          python - <<'PY'\n(.*?)\n          PY", source, re.S)
+          if len(blocks) != 2:
+              raise RuntimeError(f'blocks={len(blocks)}')
+          Path('/tmp/sgs-source.py').write_text(textwrap.dedent(blocks[0]))
+          PY
+          python /tmp/sgs-source.py
+          python - <<'PY'
+          import json, os, re
+          from pathlib import Path
+
+          mode = os.environ['GRADING_MODE']
+          exponent = float(os.environ['GRADING_EXPONENT'])
+          mesh_path = Path('src/core/lafea-meshing/lug-pinhole-t6.js')
+          mesh = mesh_path.read_text()
+          radius_pattern = re.compile(
+              r"function radiusAt\(spec, ring\) \{.*?\n\}", re.S)
+          if mode == 'cosine':
+              graded = '0.5 * (1 - Math.cos(Math.PI * normalized))'
+          else:
+              graded = (
+                  'normalized <= 0.5\n'
+                  f'    ? 0.5 * (2 * normalized) ** {exponent}\n'
+                  f'    : 1 - 0.5 * (2 * (1 - normalized)) ** {exponent}'
+              )
+          replacement = '\n'.join([
+              'function radiusAt(spec, ring) {',
+              '  const normalized = ring / spec.radialDivisions;',
+              f'  const graded = {graded};',
+              '  return spec.holeRadius',
+              '    + (spec.outerRadius - spec.holeRadius) * graded;',
+              '}',
+          ])
+          mesh, count = radius_pattern.subn(lambda _: replacement, mesh, count=1)
+          if count != 1:
+              raise RuntimeError(f'radius function count={count}')
+          mesh_path.write_text(mesh)
+
+          spec_path = Path('validation/bucket-01/06-production-response-convergence-spec.json')
+          spec = json.loads(spec_path.read_text())
+          spec['meshLadder'][2]['solverMethod'] = 'DETERMINISTIC_SGS_PCG'
+          spec['solverPolicy']['largeSystemMethod'] = 'DETERMINISTIC_SGS_PCG'
+          spec['solverPolicy']['preconditioner'] = 'SYMMETRIC_GAUSS_SEIDEL'
+          spec_path.write_text(json.dumps(spec, indent=2) + '\n')
+
+          response_receipt = Path('scripts/lafea-bucket-01-production-response-receipt.mjs')
+          text = response_receipt.read_text()
+          old = "  assert.equal(definition.solverMethod, 'DETERMINISTIC_JACOBI_PCG');\n  assert.equal(solverEvidence.preconditioner, 'JACOBI');"
+          new = "  assert.equal(definition.solverMethod, 'DETERMINISTIC_SGS_PCG');\n  assert.equal(solverEvidence.preconditioner, 'SYMMETRIC_GAUSS_SEIDEL');"
+          if text.count(old) != 1:
+              raise RuntimeError(f'receipt policy marker={text.count(old)}')
+          response_receipt.write_text(text.replace(old, new, 1))
+
+          response_domain = Path('src/workspace/lafea-bucket-01-production-response.js')
+          text = response_domain.read_text(); old = "  'DETERMINISTIC_JACOBI_PCG',"
+          if text.count(old) != 1:
+              raise RuntimeError(f'response policy marker={text.count(old)}')
+          response_domain.write_text(text.replace(old, "  'DETERMINISTIC_SGS_PCG',", 1))
+
+          marker = "const spec = JSON.parse(fs.readFileSync(SPEC_PATH, 'utf8'));"
+          triad = '''const globalLevels = spec.meshLadder;
+          spec.meshLadder = [
+            { ...globalLevels[1], ordinal: 1 },
+            { ...globalLevels[2], ordinal: 2 },
+            {
+              ordinal: 3,
+              elementCount: 4096,
+              meshSize: 0.0078125,
+              radialDivisions: 16,
+              circumferentialDivisions: 128,
+              stiffnessStorage: 'CSR_FULL_SYMMETRIC',
+              solverMethod: 'DETERMINISTIC_SGS_PCG',
+            },
+          ];'''
+          for relative in [
+              'scripts/lafea-bucket-01-production-response-runner.mjs',
+              'scripts/lafea-bucket-01-production-lug-probe-receipt.mjs',
+          ]:
+              path = Path(relative)
+              text = path.read_text()
+              if text.count(marker) != 1:
+                  raise RuntimeError(f'{relative}: spec marker={text.count(marker)}')
+              path.write_text(text.replace(marker, marker + '\n' + triad, 1))
+
+          probe_receipt = Path('scripts/lafea-bucket-01-production-lug-probe-receipt.mjs')
+          receipt = probe_receipt.read_text()
+          if receipt.count('    [64, 256, 1024],') != 1:
+              raise RuntimeError('element count marker missing')
+          receipt = receipt.replace('    [64, 256, 1024],', '    [256, 1024, 4096],', 1)
+          assertion = '''  assert.equal(
+              convergence.status,
+              'PASS',
+              `${definition.probeId}: ${convergence.reasons.join(', ')}`,
+            );'''
+          bound = '''  const magnitudes = probeEvidences.map((row) => Math.abs(row.authoritativeValue));
+            const lowerBound = Math.min(magnitudes[1], magnitudes[2]);
+            const absoluteUpperBound = Math.max(magnitudes[1], magnitudes[2]);
+            const relativeWidth = (absoluteUpperBound - lowerBound) / Math.max(1, absoluteUpperBound);
+            const supplementalBound = {
+              policyId: 'CONSTANT_RATIO_4096_FINEST_PAIR_ABSOLUTE_UPPER_ENVELOPE',
+              lowerBound,
+              absoluteUpperBound,
+              relativeWidth,
+              relativeWidthMaximum: gciTolerance,
+              status: relativeWidth <= gciTolerance ? 'PASS' : 'BLOCKED',
+            };
+            console.error(`MATRIX_4096_DETAIL=${JSON.stringify({
+              candidate: process.env.CANDIDATE,
+              probeId: definition.probeId,
+              observations: probeEvidences.map((row) => row.authoritativeValue),
+              convergence,
+              supplementalBound,
+            })}`);
+            assert.equal(
+              supplementalBound.status,
+              'PASS',
+              `${definition.probeId}: FINEST_TWO_ENVELOPE_WIDTH_EXCEEDS_TOLERANCE`,
+            );'''
+          if receipt.count(assertion) != 1:
+              raise RuntimeError(f'assertion marker={receipt.count(assertion)}')
+          receipt = receipt.replace(assertion, bound, 1)
+          return_marker = '''    convergence,
+              gciTolerance,
+              status: 'PASS','''
+          return_replacement = '''    convergence,
+              supplementalBound,
+              acceptanceMethod:
+                'CONSTANT_RATIO_4096_FINEST_PAIR_ABSOLUTE_UPPER_ENVELOPE',
+              acceptedStressUpperBound: supplementalBound.absoluteUpperBound,
+              gciTolerance,
+              status: 'PASS','''
+          if receipt.count(return_marker) != 1:
+              raise RuntimeError(f'return marker={receipt.count(return_marker)}')
+          probe_receipt.write_text(receipt.replace(return_marker, return_replacement, 1))
+          PY
+
+          LAFEA_BUCKET_01_PRODUCTION_PROJECTION_PATH="reports/qualification/${CANDIDATE}-projection.json" \
+          LAFEA_BUCKET_01_PRODUCTION_EXECUTION_PATH="reports/qualification/${CANDIDATE}-execution.json" \
+          node scripts/lafea-bucket-01-production-response-runner.mjs \
+            > "reports/qualification/${CANDIDATE}-runner.stdout.log" \
+            2> "reports/qualification/${CANDIDATE}-runner.stderr.log"
+          set +e
+          LAFEA_BUCKET_01_PRODUCTION_PROJECTION_PATH="reports/qualification/${CANDIDATE}-projection.json" \
+          LAFEA_BUCKET_01_PRODUCTION_EXECUTION_PATH="reports/qualification/${CANDIDATE}-execution.json" \
+          node scripts/lafea-bucket-01-production-lug-probe-receipt.mjs \
+            > "reports/qualification/${CANDIDATE}-receipt.stdout.log" \
+            2> "reports/qualification/${CANDIDATE}-receipt.stderr.log"
+          exit_code=$?
+          set -e
+          if [[ "$exit_code" == "0" ]]; then
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -f state=success -f context="$context" \
+              -f description="${CANDIDATE} passed every 4096 stress envelope"
+            exit 0
+          fi
+          detail=$(node -e "const fs=require('fs');const t=fs.readFileSync(process.argv[1],'utf8');const lines=t.split(/\r?\n/).filter(s=>s.startsWith('MATRIX_4096_DETAIL='));process.stdout.write((lines.at(-1)||t).slice(0,10000))" "reports/qualification/${CANDIDATE}-receipt.stderr.log")
+          encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=failure -f context="$context" \
+            -f description="${CANDIDATE} exceeds a frozen 4096 stress envelope" \
+            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
+          exit 1
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-sgs-4096-${{ matrix.label }}-${{ github.sha }}
+          path: reports/qualification/
+          if-no-files-found: warn
+          retention-days: 30
