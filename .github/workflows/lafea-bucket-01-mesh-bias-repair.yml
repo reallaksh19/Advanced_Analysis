@@ -1,4 +1,4 @@
-name: LAFEA Bucket-01 Radial Grading Diagnostic
+name: LAFEA Bucket-01 Graded Mesher Repair
 
 on:
   push:
@@ -6,61 +6,100 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   statuses: write
 
 jobs:
-  grading:
-    strategy:
-      fail-fast: false
-      matrix:
-        candidate:
-          - p105-checkerboard
-          - p110-checkerboard
-          - p125-checkerboard
-          - p150-checkerboard
-          - cosine-checkerboard
-          - p110-original
+  repair:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: bucket-01-cantilever-benchmark-route
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Execute symmetric radial-grading experiment
+      - name: Apply, qualify, and publish graded checkerboard mesher
         env:
           GH_TOKEN: ${{ github.token }}
-          EXPECTED_HEAD_SHA: ${{ github.sha }}
-          CANDIDATE: ${{ matrix.candidate }}
+          ORIGINAL_SHA: ${{ github.sha }}
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p reports/qualification
-          context="lafea/radial-grading/${CANDIDATE}"
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -f state=pending -f context="$context" \
-            -f description="Executing ${CANDIDATE} mesh grading"
+          status() {
+            state="$1"; context="$2"; description="$3"; target="${4:-}"
+            args=(--method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" -f state="$state" -f context="$context" -f description="$description")
+            if [[ -n "$target" ]]; then args+=(-f target_url="$target"); fi
+            gh api "${args[@]}"
+          }
+          fail() {
+            stage="$1"; log="$2"
+            detail=$(node -e "const fs=require('fs');const p=process.argv[1];const t=fs.existsSync(p)?fs.readFileSync(p,'utf8'):'missing log';process.stdout.write(t.trim().slice(-7000))" "$log")
+            encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
+            status failure "lafea/graded-mesher/${stage}" "Graded mesher failed at ${stage}" "https://github.com/${GITHUB_REPOSITORY}/commit/${ORIGINAL_SHA}?lafea_error=${encoded}"
+            exit 1
+          }
+          status pending lafea/graded-mesher "Qualifying symmetric p1.10 checkerboard mesher"
+          if grep -q "SYMMETRIC_POWER_1_10" src/core/lafea-meshing/lug-pinhole-t6.js; then
+            status success lafea/graded-mesher "Graded checkerboard mesher already applied"
+            exit 0
+          fi
 
-          python - <<'PY'
-          import os
+          python - <<'PY' > reports/qualification/graded-mesher-patch.stdout.log 2> reports/qualification/graded-mesher-patch.stderr.log || true
           import re
           from pathlib import Path
 
-          candidate = os.environ['CANDIDATE']
-          grading_name, diagonal_name = candidate.split('-', 1)
-          exponent_by_name = {
-              'p105': 1.05,
-              'p110': 1.10,
-              'p125': 1.25,
-              'p150': 1.50,
-          }
           source_path = Path('src/core/lafea-meshing/lug-pinhole-t6.js')
           text = source_path.read_text()
+          text = text.replace(
+              "export const LAFEA_LUG_PINHOLE_T6_GENERATOR_REVISION = 'NB-T6B.1';",
+              "export const LAFEA_LUG_PINHOLE_T6_GENERATOR_REVISION = 'NB-T6B.2';",
+          )
+          constants_marker = 'const TWO_PI = 2 * Math.PI;'
+          constants = '''const TWO_PI = 2 * Math.PI;
+          const RADIAL_DISTRIBUTION = 'SYMMETRIC_POWER_1_10';
+          const RADIAL_GRADING_EXPONENT = 1.1;
+          const CELL_DIAGONAL_POLICY = 'CHECKERBOARD_RING_PLUS_SECTOR';'''
+          if text.count(constants_marker) != 1:
+              raise RuntimeError(f'constant marker count={text.count(constants_marker)}')
+          text = text.replace(constants_marker, constants, 1)
+
+          split_pattern = re.compile(
+              r"(?P<indent>\s*)addT6Element\(state, `E-R\$\{ring\}-S\$\{sector\}-A`, \[\s*"
+              r"innerA, outerA, outerB,\s*\]\);\s*"
+              r"addT6Element\(state, `E-R\$\{ring\}-S\$\{sector\}-B`, \[\s*"
+              r"innerA, outerB, innerB,\s*\]\);"
+          )
+          matches = list(split_pattern.finditer(text))
+          if len(matches) != 1:
+              raise RuntimeError(f'element split structural match count={len(matches)}')
+          indent = matches[0].group('indent').split('\n')[-1]
+          ring_token = '{ring}'
+          sector_token = '{sector}'
+          split_replacement = '\n'.join([
+              f'{indent}const alternateDiagonal = (ring + sector) % 2 === 1;',
+              f'{indent}if (alternateDiagonal) {{',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-A`, [',
+              f'{indent}    innerA, outerA, innerB,',
+              f'{indent}  ]);',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-B`, [',
+              f'{indent}    outerA, outerB, innerB,',
+              f'{indent}  ]);',
+              f'{indent}}} else {{',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-A`, [',
+              f'{indent}    innerA, outerA, outerB,',
+              f'{indent}  ]);',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-B`, [',
+              f'{indent}    innerA, outerB, innerB,',
+              f'{indent}  ]);',
+              f'{indent}}}',
+          ])
+          text = split_pattern.sub(lambda _: split_replacement, text, count=1)
 
           radius_pattern = re.compile(
               r"function radiusAt\(spec, ring\) \{\s*"
@@ -71,104 +110,100 @@ jobs:
           )
           if len(list(radius_pattern.finditer(text))) != 1:
               raise RuntimeError('radiusAt structural match failed')
-          if grading_name == 'cosine':
-              graded_expression = '0.5 * (1 - Math.cos(Math.PI * normalized))'
-          else:
-              exponent = exponent_by_name[grading_name]
-              graded_expression = (
-                  'normalized <= 0.5\n'
-                  f'    ? 0.5 * (2 * normalized) ** {exponent}\n'
-                  f'    : 1 - 0.5 * (2 * (1 - normalized)) ** {exponent}'
-              )
-          radius_replacement = '\n'.join([
-              'function radiusAt(spec, ring) {',
-              '  const normalized = ring / spec.radialDivisions;',
-              f'  const graded = {graded_expression};',
-              '  return spec.holeRadius',
-              '    + (spec.outerRadius - spec.holeRadius) * graded;',
-              '}',
-          ])
+          radius_replacement = '''function radiusAt(spec, ring) {
+            const normalized = ring / spec.radialDivisions;
+            const graded = normalized <= 0.5
+              ? 0.5 * (2 * normalized) ** RADIAL_GRADING_EXPONENT
+              : 1 - 0.5 * (2 * (1 - normalized)) ** RADIAL_GRADING_EXPONENT;
+            return spec.holeRadius
+              + (spec.outerRadius - spec.holeRadius) * graded;
+          }'''
           text = radius_pattern.sub(lambda _: radius_replacement, text, count=1)
 
-          if diagonal_name == 'checkerboard':
-              split_pattern = re.compile(
-                  r"(?P<indent>\s*)addT6Element\(state, `E-R\$\{ring\}-S\$\{sector\}-A`, \[\s*"
-                  r"innerA, outerA, outerB,\s*\]\);\s*"
-                  r"addT6Element\(state, `E-R\$\{ring\}-S\$\{sector\}-B`, \[\s*"
-                  r"innerA, outerB, innerB,\s*\]\);"
-              )
-              matches = list(split_pattern.finditer(text))
-              if len(matches) != 1:
-                  raise RuntimeError(f'element split structural match count={len(matches)}')
-              indent = matches[0].group('indent').split('\n')[-1]
-              ring_token = '{ring}'
-              sector_token = '{sector}'
-              replacement = '\n'.join([
-                  f'{indent}const alternateDiagonal = (ring + sector) % 2 === 1;',
-                  f'{indent}if (alternateDiagonal) {{',
-                  f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-A`, [',
-                  f'{indent}    innerA, outerA, innerB,',
-                  f'{indent}  ]);',
-                  f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-B`, [',
-                  f'{indent}    outerA, outerB, innerB,',
-                  f'{indent}  ]);',
-                  f'{indent}}} else {{',
-                  f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-A`, [',
-                  f'{indent}    innerA, outerA, outerB,',
-                  f'{indent}  ]);',
-                  f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-B`, [',
-                  f'{indent}    innerA, outerB, innerB,',
-                  f'{indent}  ]);',
-                  f'{indent}}}',
-              ])
-              text = split_pattern.sub(lambda _: replacement, text, count=1)
+          authority_marker = "      productionMeshGenerated: true,"
+          authority_replacement = '''      productionMeshGenerated: true,
+                radialDistribution: RADIAL_DISTRIBUTION,
+                radialGradingExponent: RADIAL_GRADING_EXPONENT,
+                cellDiagonalPolicy: CELL_DIAGONAL_POLICY,'''
+          if text.count(authority_marker) != 1:
+              raise RuntimeError(f'authority marker count={text.count(authority_marker)}')
+          text = text.replace(authority_marker, authority_replacement, 1)
           source_path.write_text(text)
-          PY
 
-          node scripts/lafea-bucket-01-production-response-runner.mjs \
-            > "reports/qualification/${CANDIDATE}-runner.stdout.log" \
-            2> "reports/qualification/${CANDIDATE}-runner.stderr.log"
+          revision_paths = [
+              Path('src/workspace/lafea-lug-pinhole-mesh-ladder.js'),
+              Path('src/workspace/lafea-bucket-01-mesh-qualification.js'),
+              Path('scripts/lafea-nb-t6b-public-surface-check.mjs'),
+          ]
+          for path in revision_paths:
+              value = path.read_text()
+              count = value.count('NB-T6B.1')
+              if count < 1:
+                  raise RuntimeError(f'{path}: NB-T6B.1 marker count={count}')
+              path.write_text(value.replace('NB-T6B.1', 'NB-T6B.2'))
+          PY
+          [[ -s reports/qualification/graded-mesher-patch.stderr.log ]] \
+            && fail PATCH reports/qualification/graded-mesher-patch.stderr.log
+
+          git add \
+            src/core/lafea-meshing/lug-pinhole-t6.js \
+            src/workspace/lafea-lug-pinhole-mesh-ladder.js \
+            src/workspace/lafea-bucket-01-mesh-qualification.js \
+            scripts/lafea-nb-t6b-public-surface-check.mjs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix(lafea): grade annular mesh and alternate cell diagonals" \
+            > reports/qualification/graded-mesher-commit.stdout.log \
+            2> reports/qualification/graded-mesher-commit.stderr.log \
+            || fail COMMIT reports/qualification/graded-mesher-commit.stderr.log
+          repaired_sha=$(git rev-parse HEAD)
+
+          node scripts/lafea-nb-t6b-public-surface-check.mjs \
+            > reports/qualification/graded-mesher-public.stdout.log \
+            2> reports/qualification/graded-mesher-public.stderr.log \
+            || fail PUBLIC reports/qualification/graded-mesher-public.stderr.log
+          node scripts/lafea-nb-t6b-lug-pinhole-mesh-ladder-check.mjs \
+            > reports/qualification/graded-mesher-ladder.stdout.log \
+            2> reports/qualification/graded-mesher-ladder.stderr.log \
+            || fail LADDER reports/qualification/graded-mesher-ladder.stderr.log
+          EXPECTED_HEAD_SHA="$repaired_sha" node scripts/lafea-bucket-01-production-response-runner.mjs \
+            > reports/qualification/graded-mesher-execution.stdout.log \
+            2> reports/qualification/graded-mesher-execution.stderr.log \
+            || fail EXECUTION reports/qualification/graded-mesher-execution.stderr.log
           set +e
-          node scripts/lafea-bucket-01-production-response-receipt.mjs \
-            > "reports/qualification/${CANDIDATE}-receipt.stdout.log" \
-            2> "reports/qualification/${CANDIDATE}-receipt.stderr.log"
-          receipt_exit=$?
+          EXPECTED_HEAD_SHA="$repaired_sha" node scripts/lafea-bucket-01-production-response-receipt.mjs \
+            > reports/qualification/graded-mesher-response.stdout.log \
+            2> reports/qualification/graded-mesher-response.stderr.log
+          response_exit=$?
           set -e
-          summary=$(node --input-type=module <<'NODE'
-          import fs from 'node:fs';
-          const report = JSON.parse(fs.readFileSync(
-            'reports/qualification/lafea-bucket-01-production-response.json',
-            'utf8',
-          ));
-          process.stdout.write(JSON.stringify({
-            candidate: process.env.CANDIDATE,
-            status: report.status,
-            fineGridGci: report.energyConvergence.fineGridGci,
-            observedOrder: report.energyConvergence.observedOrder,
-            energies: report.energyConvergence.observations,
-            momentStatus: report.momentConvergence.status,
-            reasons: report.reasons,
-          }));
-          NODE
-          )
-          gci=$(node -e "const r=JSON.parse(process.argv[1]);process.stdout.write(String(r.fineGridGci))" "$summary")
-          encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$summary")
-          if [[ "$receipt_exit" == "0" ]]; then
-            state=success
-            description="${CANDIDATE} passed; fine-grid GCI ${gci}"
-          else
-            state=failure
-            description="${CANDIDATE} blocked; fine-grid GCI ${gci}"
+          if [[ "$response_exit" != "0" ]]; then
+            log=reports/qualification/graded-mesher-response.stderr.log
+            [[ -s "$log" ]] || log=reports/qualification/graded-mesher-response.stdout.log
+            fail RESPONSE "$log"
           fi
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -f state="$state" -f context="$context" \
-            -f description="$description" \
-            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_grading=${encoded}"
-          exit "$receipt_exit"
+          EXPECTED_HEAD_SHA="$repaired_sha" node scripts/lafea-bucket-01-production-lug-probe-receipt.mjs \
+            > reports/qualification/graded-mesher-lug.stdout.log \
+            2> reports/qualification/graded-mesher-lug.stderr.log \
+            || fail LUG reports/qualification/graded-mesher-lug.stderr.log
+          node scripts/lafea-bucket-01-production-lug-probe-contract-check.mjs \
+            > reports/qualification/graded-mesher-probe-contract.stdout.log \
+            2> reports/qualification/graded-mesher-probe-contract.stderr.log \
+            || fail PROBE_CONTRACT reports/qualification/graded-mesher-probe-contract.stderr.log
+          EXPECTED_HEAD_SHA="$repaired_sha" node scripts/lafea-bucket-01-exact-head-check.mjs \
+            > reports/qualification/graded-mesher-exact-head.stdout.log \
+            2> reports/qualification/graded-mesher-exact-head.stderr.log \
+            || fail EXACT_HEAD reports/qualification/graded-mesher-exact-head.stderr.log
+
+          git push origin HEAD:bucket-01-cantilever-benchmark-route \
+            > reports/qualification/graded-mesher-push.stdout.log \
+            2> reports/qualification/graded-mesher-push.stderr.log \
+            || fail PUSH reports/qualification/graded-mesher-push.stderr.log
+          status success "lafea/repaired-head/${repaired_sha:0:12}" "Qualified graded mesher published" "https://github.com/${GITHUB_REPOSITORY}/commit/${repaired_sha}"
+          status success lafea/graded-mesher "Response, lug probes, mesh, and exact-head gates passed"
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lafea-radial-grading-${{ matrix.candidate }}-${{ github.sha }}
+          name: lafea-graded-mesher-repair-${{ github.sha }}
           path: reports/qualification/
           if-no-files-found: warn
           retention-days: 30
