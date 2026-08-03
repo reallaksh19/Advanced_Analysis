@@ -552,3 +552,35 @@ constant mistake earlier this session, and (3) wiring M015's
 time (merged in M015 but zero real callers use it).
 M013 (#496) benchmark for Example 3 itself is not yet scoped and depends
 on M017 merging first.
+
+**Both M016 and M017 hit real fail-closed stops on real errors in the
+Owner's own issue text — verified and corrected, not worked around.**
+
+- M016 (#517): the issue's Loads section correctly stated Example 2's
+  real operating pressure (`3795 kPa`, Table S302.1) but then separately
+  said "reuse M013's exact flexibility factor... same pressure" — wrong,
+  M013's `k=9.506141774188135` was derived at Example 1's `3450 kPa`. The
+  issue also carried over Example 1's operating temperature (260°C)
+  instead of Example 2's real one (288°C/550°F). Independently
+  recomputed the corrected flexibility factor and got an *exact* match
+  to the agent's own reported value (`9.36566184176338`) before posting
+  the correction — same discipline as verifying any other load-bearing
+  number, applied to the Owner's own mistake this time, not an agent's.
+- M017 (#520): rule 3 said `coldTemperature` must be `null` for
+  `EXPANSION_RANGE_ENVELOPE`, reasoning only about where the *resultant*
+  comes from (the two `CASE_RANGE` cases) — but the Eq (1b) allowable
+  formula separately needs a cold-temperature lookup for `Sc`, and
+  `coldTemperature` is the only mechanism that exists for that. Two
+  different uses of "cold temperature" got conflated into one wrong
+  rule. Corrected to *require* it (same gating as `DISPLACEMENT_STRESS_
+  RANGE`), with its narrower meaning (`Sc` lookup only, not a range
+  endpoint) made explicit for the implementer to document.
+
+**Process lesson**: a good implementing agent stopping on an internal
+contradiction in the Owner's own issue is exactly the outcome the
+stop-and-report discipline is for — it isn't only a defense against
+agent mistakes. Both stops were real, both were verified independently
+before being accepted (not just trusted because the agent sounded
+confident), and both were fixed with a superseding comment rather than
+silently editing the issue body, preserving the mistake-and-correction
+trail for anyone reading the thread later.
