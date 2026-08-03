@@ -1,4 +1,4 @@
-name: LAFEA Bucket-01 Load-Driven Nesting Repair
+name: LAFEA Bucket-01 Exact Head
 
 on:
   push:
@@ -6,112 +6,77 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   statuses: write
 
 jobs:
-  repair:
+  exact-head:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
+      - name: Publish runner-started status
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh api --method POST
+          "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}"
+          -f state=pending
+          -f context=lafea/bucket-01-exact-head
+          -f description="Exact-head runner started"
       - uses: actions/checkout@v4
         with:
-          ref: bucket-01-cantilever-benchmark-route
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Repair, verify, and publish governed result nesting
+      - name: Run Bucket-01 exact-head gate
+        id: gate
         env:
-          GH_TOKEN: ${{ github.token }}
-          ORIGINAL_SHA: ${{ github.sha }}
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
         shell: bash
         run: |
-          set -euo pipefail
           mkdir -p reports/qualification
-          fail() {
-            stage="$1"; log="$2"
-            detail=$(node -e "const fs=require('fs');const p=process.argv[1];const t=fs.existsSync(p)?fs.readFileSync(p,'utf8'):'missing log';process.stdout.write(t.split(/\r?\n/).map(s=>s.trim()).filter(Boolean).slice(0,20).join(' | ').slice(0,3000))" "$log")
-            encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
-              -f state=failure -f context="lafea/load-driven-publish/${stage}" \
-              -f description="Load-driven source publish failed at ${stage}" \
-              -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${ORIGINAL_SHA}?lafea_error=${encoded}"
-            exit 1
-          }
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
-            -f state=pending -f context=lafea/load-driven-publish \
-            -f description="Publishing verified T6D nesting repair"
-
-          python - <<'PY' > reports/qualification/load-driven-patch.stdout.log 2> reports/qualification/load-driven-patch.stderr.log || true
-          from pathlib import Path
-          path = Path('src/workspace/lafea-load-driven-pilot-qualification.js')
-          text = path.read_text()
-          replacements = [
-              (
-                  '  if (!Array.isArray(resultLoadCase.freeDofIdentities)\n'
-                  '    || resultLoadCase.freeDofIdentities.length === 0',
-                  '  if (!Array.isArray(resultLoadCase.solverEvidence?.freeDofIdentities)\n'
-                  '    || resultLoadCase.solverEvidence.freeDofIdentities.length === 0',
-              ),
-              (
-                  '  const reactionResultant = resultLoadCase.reactions.reduce(',
-                  '  const reactionResultant = resultLoadCase.supportReactions.reduce(',
-              ),
-              (
-                  '    freeDofCount: resultLoadCase.freeDofIdentities.length,',
-                  '    freeDofCount: resultLoadCase.solverEvidence.freeDofIdentities.length,',
-              ),
-              (
-                  '    constrainedDofCount: resultLoadCase.constrainedDofIdentities.length,',
-                  '    constrainedDofCount: resultLoadCase.solverEvidence.constrainedDofIdentities.length,',
-              ),
-          ]
-          for old, new in replacements:
-              count = text.count(old)
-              if count != 1:
-                  raise RuntimeError(f'marker count={count}: {old[:80]}')
-              text = text.replace(old, new, 1)
-          path.write_text(text)
-          PY
-          [[ -s reports/qualification/load-driven-patch.stderr.log ]] \
-            && fail PATCH reports/qualification/load-driven-patch.stderr.log
-
-          node scripts/lafea-nb-t6d-load-driven-qualification-check.mjs \
-            > reports/qualification/load-driven-t6d.stdout.log \
-            2> reports/qualification/load-driven-t6d.stderr.log \
-            || fail T6D reports/qualification/load-driven-t6d.stderr.log
-          npm run syntax:strict \
-            > reports/qualification/load-driven-syntax.stdout.log \
-            2> reports/qualification/load-driven-syntax.stderr.log \
-            || fail SYNTAX reports/qualification/load-driven-syntax.stderr.log
-
-          git add src/workspace/lafea-load-driven-pilot-qualification.js
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "fix(lafea): read governed load-case evidence fields" \
-            > reports/qualification/load-driven-commit.stdout.log \
-            2> reports/qualification/load-driven-commit.stderr.log \
-            || fail COMMIT reports/qualification/load-driven-commit.stderr.log
-          repaired_sha=$(git rev-parse HEAD)
-          git push origin HEAD:bucket-01-cantilever-benchmark-route \
-            > reports/qualification/load-driven-push.stdout.log \
-            2> reports/qualification/load-driven-push.stderr.log \
-            || fail PUSH reports/qualification/load-driven-push.stderr.log
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
-            -f state=success \
-            -f context="lafea/repaired-head/${repaired_sha:0:12}" \
-            -f description="Verified T6D nesting repair published" \
-            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${repaired_sha}"
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
-            -f state=success -f context=lafea/load-driven-publish \
-            -f description="T6D nesting repair passed and published"
+          set +e
+          node scripts/lafea-bucket-01-exact-head-check.mjs \
+            > reports/qualification/lafea-bucket-01-exact-head.stdout.log \
+            2> reports/qualification/lafea-bucket-01-exact-head.stderr.log
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Publish exact-head result
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXIT_CODE: ${{ steps.gate.outputs.exit_code }}
+        shell: bash
+        run: |
+          blocker=$(node -e "const fs=require('fs');const p='reports/qualification/lafea-bucket-01-exact-head.json';let t='UNKNOWN';if(fs.existsSync(p)){const r=JSON.parse(fs.readFileSync(p,'utf8'));if(r.blockingCheckIds?.[0])t=r.blockingCheckIds[0]}process.stdout.write(t)")
+          repair_blocker=$(node -e "const fs=require('fs');const p='reports/qualification/lafea-bucket-01-repair-check.json';let t='NONE';if(fs.existsSync(p)){const r=JSON.parse(fs.readFileSync(p,'utf8'));if(r.blockingCheckIds?.[0])t=r.blockingCheckIds[0]}process.stdout.write(t)")
+          if [[ "$EXIT_CODE" == "0" ]]; then
+            state=success
+            description="Bucket-01 exact-head executable gate passed"
+          else
+            state=failure
+            description="First blocker: ${blocker}"
+            safe=$(printf '%s' "$blocker" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-60)
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -f state=failure -f context="lafea/blocker/${safe}" \
+              -f description="$description"
+            if [[ "$repair_blocker" != "NONE" ]]; then
+              nested=$(printf '%s' "$repair_blocker" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-52)
+              gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+                -f state=failure -f context="lafea/repair-blocker/${nested}" \
+                -f description="Repair blocker: ${repair_blocker}"
+            fi
+          fi
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state="$state" -f context=lafea/bucket-01-exact-head \
+            -f description="$description"
+          exit "$EXIT_CODE"
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lafea-load-driven-publish-${{ github.sha }}
+          name: lafea-bucket-01-exact-head-${{ github.sha }}
           path: reports/qualification/
           if-no-files-found: warn
           retention-days: 30
