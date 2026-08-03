@@ -1,6 +1,6 @@
 {
-  "schema": "lafea-bucket-01-probe-stable-polar-design/v2",
-  "designId": "B01-PROBE-STABLE-POLAR-V2",
+  "schema": "lafea-bucket-01-probe-stable-polar-design/v3",
+  "designId": "B01-PROBE-STABLE-POLAR-V3",
   "benchmarkId": "C2D-LUG-PINHOLE-01",
   "sourceProbeSpecId": "B01-PRODUCTION-LUG-FIXED-STRESS-01",
   "geometry": {
@@ -21,7 +21,7 @@
       { "anchorId": "R73", "value": 73 },
       { "anchorId": "R87", "value": 87 }
     ],
-    "protectedBreakpoints": [],
+    "protectedBreakpoints": [60],
     "targetPhase": 0.35,
     "backgroundBaseDivisions": 6,
     "windowClearanceFraction": 0.3
@@ -48,6 +48,14 @@
     "physicalBoundaryGeometryPreserved": true,
     "internalCircularConstraintClaimed": false
   },
+  "productionMappingPolicy": {
+    "loadFeatureRole": "RADIAL_QUARTER_0",
+    "restraintFeatureRole": "RADIAL_QUARTER_2",
+    "radialWindowStart": 20,
+    "radialWindowEnd": 60,
+    "windowEndpointsRequiredAtEveryLevel": true,
+    "edgeSelectionAuthority": "EXACT_PHYSICAL_COORDINATE_WINDOW_NOT_INDEX_SCALING"
+  },
   "topologyPolicy": {
     "elementFamily": "ANNULAR_T6_TWO_TRIANGLE_CELL",
     "triangleOrientation": "COUNTER_CLOCKWISE_INVARIANT",
@@ -61,15 +69,15 @@
     "anchorCellSelfSimilarityRequired": true
   },
   "changeControl": {
-    "previousDesignId": "B01-PROBE-STABLE-POLAR-V1",
-    "trigger": "LEVEL_1_NON_POSITIVE_INTERNAL_CURVED_EDGE_JACOBIAN",
-    "controllingElement": "E-R10-S18-B",
-    "previousMinimumScaledJacobian": -0.02456338158182484,
-    "previousMinimumDenseSampledJacobian": -28.859125475953192,
-    "axisCoordinatesChanged": false,
+    "previousDesignId": "B01-PROBE-STABLE-POLAR-V2",
+    "trigger": "EXACT_20_TO_60_MM_PRODUCTION_MAPPING_WINDOW_NOT_RETAINED",
+    "requiredRadialBreakpoint": 60,
+    "previousLevel4RadialCellCount": 53,
+    "newLevel4RadialCellCount": 54,
+    "axisCoordinatesChanged": true,
     "anchorWindowsChanged": false,
     "anchorPhasesChanged": false,
-    "candidateElementCountsChanged": false,
+    "candidateElementCountsChanged": true,
     "frozenPhysicalCoordinatesChanged": false,
     "governedToleranceChanged": false,
     "productionAuthorityChanged": false
@@ -78,11 +86,12 @@
     "frozenProbeCoordinatesChanged": false,
     "stressTolerancesChanged": false,
     "loadsChanged": false,
+    "supportsChanged": false,
     "solverCriteriaChanged": false,
     "codeBasisBoundaryChanged": false,
     "productionMeshAuthority": false,
     "qualificationAuthority": false,
     "bucketQualified": false
   },
-  "currentDisposition": "PHASE_2_DESIGN_V2_PENDING_CANDIDATE_GENERATOR_REPLAY_AND_EXACT_HEAD_VALIDATION"
+  "currentDisposition": "PHASE_3_DESIGN_V3_PENDING_COMPLETE_CHECKOUT_CANDIDATE_REBUILD_AND_INTAKE"
 }
