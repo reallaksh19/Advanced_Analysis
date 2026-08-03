@@ -25,6 +25,8 @@ export async function runTopologyEditWave5BrowserHarness(options = {}) {
   await frames(2);
   const firstValidFrameMs = performance.now() - startedAt;
   const optimizationEvidence = backend.renderOptimizationEvidence;
+  const initialCubeCount = host.querySelectorAll('[data-role="topology-edit-orientation-cube"]').length;
+  const initialOrientationStatus = host.querySelector('[data-role="orientation-status"]')?.textContent ?? '';
   const client = project(
     fixture.target,
     backend.engineeringRoot,
@@ -46,6 +48,13 @@ export async function runTopologyEditWave5BrowserHarness(options = {}) {
     backend.renderFrame();
     frameTimes.push(performance.now() - start);
   }
+  backend.setStandardView('top');
+  await frames(2);
+  const topFaceActive = host.querySelector('[data-orientation-action="top"]')
+    ?.getAttribute('aria-current') === 'true';
+  backend.toggleProjection();
+  await frames(2);
+  const projectionStatus = host.querySelector('[data-role="orientation-status"]')?.textContent ?? '';
   const renderer = backend.renderer;
   const pick = summary(picks);
   const navigationFrame = summary(frameTimes);
@@ -64,6 +73,7 @@ export async function runTopologyEditWave5BrowserHarness(options = {}) {
     renderCalls: renderer.info.render.calls,
     groupChildren: children(backend),
     hostChildren: host.childElementCount,
+    orientationCubeCount: initialCubeCount,
   };
   const pickingDecision = selectTopologyEditPickingMode({
     componentCount,
@@ -76,7 +86,9 @@ export async function runTopologyEditWave5BrowserHarness(options = {}) {
     animationFrameReleased: !backend.animationFrameId,
     mountedStateReleased: backend.isMounted === false,
     axisHudReleased: backend.axisHud === null,
+    orientationCubeReleased: backend.orientationCube === null,
     optimizationEvidenceReleased: backend.renderOptimizationEvidence === null,
+    orientationRootsAfterDestroy: host.querySelectorAll('[data-role="topology-edit-orientation-cube"]').length,
     hostChildrenAfterDestroy: host.childElementCount,
     groupChildrenAfterDestroy: children(backend),
   };
@@ -100,13 +112,18 @@ export async function runTopologyEditWave5BrowserHarness(options = {}) {
   if (m005GeometryReuseCount < optimizerProbeCount - 1) {
     failures.push('M005_GEOMETRY_POOLING_MISSING');
   }
+  if (initialCubeCount !== 1) failures.push('ORIENTATION_CUBE_COUNT');
+  if (!initialOrientationStatus.includes('Engineering Z-up')) failures.push('ORIENTATION_STATUS_MISSING');
+  if (!topFaceActive) failures.push('ORIENTATION_TOP_SYNC');
+  if (!projectionStatus.startsWith('Orthographic')) failures.push('ORIENTATION_PROJECTION_SYNC');
   if (!lifecycle.rendererReleased || !lifecycle.animationFrameReleased
       || !lifecycle.mountedStateReleased || !lifecycle.axisHudReleased
-      || !lifecycle.optimizationEvidenceReleased || lifecycle.hostChildrenAfterDestroy
+      || !lifecycle.orientationCubeReleased || !lifecycle.optimizationEvidenceReleased
+      || lifecycle.orientationRootsAfterDestroy || lifecycle.hostChildrenAfterDestroy
       || lifecycle.groupChildrenAfterDestroy) failures.push('LIFECYCLE_CLEANUP');
   const context = renderer?.getContext();
   return {
-    schema: 'TopologyEditWave5BrowserEvidence.v2',
+    schema: 'TopologyEditWave5BrowserEvidence.v3',
     status: failures.length ? 'FAIL' : 'PASS_BROWSER_INFRASTRUCTURE',
     componentCount,
     optimizerProbeCount,
@@ -118,6 +135,12 @@ export async function runTopologyEditWave5BrowserHarness(options = {}) {
     identityErrorCount,
     pickingDecision,
     optimizationEvidence,
+    orientationEvidence: {
+      initialCubeCount,
+      initialOrientationStatus,
+      topFaceActive,
+      projectionStatus,
+    },
     resourcesBeforeDestroy,
     lifecycle,
     failures,
