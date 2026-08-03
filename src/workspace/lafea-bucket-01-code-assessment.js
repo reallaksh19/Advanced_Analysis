@@ -9,7 +9,7 @@ export const LAFEA_BUCKET_01_CODE_ASSESSMENT_INPUT_SCHEMA =
 export const LAFEA_BUCKET_01_CODE_ASSESSMENT_PACKAGE_SCHEMA =
   'lafea-bucket-01-code-assessment-package/v1';
 export const LAFEA_BUCKET_01_CODE_ASSESSMENT_REVISION =
-  'B01-CODE-ASSESSMENT.2';
+  'B01-CODE-ASSESSMENT.3';
 
 const INPUT_KEYS = Object.freeze([
   'schema', 'assessmentId', 'exactHeadSha', 'codeBasisPackage',
@@ -90,6 +90,8 @@ export function evaluateLafeaBucket01CodeAssessment(inputValue) {
     authority: {
       externallyApprovedCodeBasisConsumed: true,
       retainedFixedLocationStressConsumed: true,
+      directElementPointRecoveryConsumed: true,
+      integrationPointExtrapolationConsumed: false,
       movingMaximumUsed: false,
       displayStressUsed: false,
       codeAssessmentPerformed: true,
@@ -174,10 +176,13 @@ function rebuildCodeBasis(value) {
 
 function validateStressEvidence(value, exactHeadSha) {
   if (!value
-    || value.schema !== 'lafea-bucket-01-production-lug-fixed-probe-evidence/v1'
+    || value.schema !== 'lafea-bucket-01-production-lug-fixed-probe-evidence/v2'
     || value.status !== 'PASS'
     || value.exactHeadSha !== exactHeadSha
-    || value.authority?.retainedIntegrationPointTensorAuthority !== true
+    || value.authority?.directElementPointRecovery !== true
+    || value.authority?.retainedNodalDisplacementAuthority !== true
+    || value.authority?.retainedConstitutiveMatrixAuthority !== true
+    || value.authority?.integrationPointExtrapolationUsed !== false
     || value.authority?.movingMaximumUsed !== false
     || value.authority?.nodalProjectionUsed !== false
     || value.authority?.crossElementAveragingUsed !== false) {
