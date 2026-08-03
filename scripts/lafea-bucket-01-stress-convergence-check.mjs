@@ -69,6 +69,17 @@ const input = {
 const evidence = evaluateLafeaBucket01StressConvergence(input);
 assert.equal(evidence.status, 'PASS');
 assert.equal(evidence.convergence.classification, 'MONOTONIC');
+assert.equal(evidence.classification, evidence.convergence.classification);
+assert.equal(evidence.observedOrder, evidence.convergence.observedOrder);
+assert.equal(evidence.fineGridGci, evidence.convergence.fineGridGci);
+assert.doesNotThrow(() => canonicalLafeaSha256({
+  failingLocations: [{
+    probeId: evidence.probeId,
+    fineGridGci: evidence.fineGridGci,
+    observedOrder: evidence.observedOrder,
+    classification: evidence.classification,
+  }],
+}));
 assert.equal(evidence.authority.directElementPointRecovery, true);
 assert.equal(evidence.authority.integrationPointExtrapolationUsed, false);
 assert.equal(evidence.authority.fixedPhysicalLocation, true);
