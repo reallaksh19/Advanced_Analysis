@@ -1,4 +1,4 @@
-name: LAFEA Bucket-01 Cosine Conservative Bound
+name: LAFEA Bucket-01 Strong Grading Scan
 
 on:
   push:
@@ -10,9 +10,25 @@ permissions:
   statuses: write
 
 jobs:
-  diagnostic:
+  grading:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: p160
+            exponent: '1.60'
+          - label: p175
+            exponent: '1.75'
+          - label: p200
+            exponent: '2.00'
+          - label: p225
+            exponent: '2.25'
+          - label: p250
+            exponent: '2.50'
+          - label: p300
+            exponent: '3.00'
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 100
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,22 +38,27 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Apply cosine candidate and test all fixed locations
+      - name: Test strong symmetric grading against response and all probes
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_HEAD_SHA: ${{ github.sha }}
+          GRADING_LABEL: ${{ matrix.label }}
+          GRADING_EXPONENT: ${{ matrix.exponent }}
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p reports/qualification
+          context="lafea/strong-grading/${GRADING_LABEL}"
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -f state=pending -f context=lafea/cosine-conservative-bound \
-            -f description="Testing cosine mesh and fixed-location upper envelope"
+            -f state=pending -f context="$context" \
+            -f description="Testing symmetric power ${GRADING_EXPONENT}"
 
           python - <<'PY'
+          import os
           import re
           import textwrap
           from pathlib import Path
+
           source = Path('.github/workflows/lafea-bucket-01-conservative-bound-repair.yml').read_text()
           match = re.search(
               r"python - <<'PY'[^\n]*\n(?P<body>.*?)\n          PY",
@@ -45,94 +66,100 @@ jobs:
               re.DOTALL,
           )
           if not match:
-              raise RuntimeError('candidate patch body not found')
+              raise RuntimeError('conservative-bound candidate patch body not found')
           body = textwrap.dedent(match.group('body'))
+          old_path = "template['stressClassification']['method']"
+          new_path = "template['requiredFields']['stressClassification']['method']"
+          if body.count(old_path) != 1:
+              raise RuntimeError(f'intake path marker count={body.count(old_path)}')
+          body = body.replace(old_path, new_path, 1)
+          exponent = float(os.environ['GRADING_EXPONENT'])
+          distribution = f"SYMMETRIC_POWER_{int(round(exponent * 100)):03d}"
+          if body.count("'SYMMETRIC_POWER_1_50'") != 1:
+              raise RuntimeError('distribution marker missing')
+          if body.count('const RADIAL_GRADING_EXPONENT = 1.5;') != 1:
+              raise RuntimeError('exponent marker missing')
+          body = body.replace("'SYMMETRIC_POWER_1_50'", repr(distribution), 1)
           body = body.replace(
-              "template['stressClassification']['method']",
-              "template['requiredFields']['stressClassification']['method']",
+              'const RADIAL_GRADING_EXPONENT = 1.5;',
+              f'const RADIAL_GRADING_EXPONENT = {exponent};',
               1,
           )
-          Path('/tmp/lafea-conservative-bound-patch.py').write_text(body)
+          Path('/tmp/lafea-strong-grading-patch.py').write_text(body)
           PY
-          python /tmp/lafea-conservative-bound-patch.py \
-            > reports/qualification/cosine-bound-patch.stdout.log \
-            2> reports/qualification/cosine-bound-patch.stderr.log
-          python - <<'PY'
-          from pathlib import Path
-          path = Path('src/core/lafea-meshing/lug-pinhole-t6.js')
-          text = path.read_text()
-          text = text.replace("'SYMMETRIC_POWER_1_50'", "'SYMMETRIC_COSINE'")
-          text = text.replace(
-              'const RADIAL_GRADING_EXPONENT = 1.5;',
-              'const RADIAL_GRADING_EXPONENT = null;',
-          )
-          old = '''  const graded = normalized <= 0.5
-              ? 0.5 * (2 * normalized) ** RADIAL_GRADING_EXPONENT
-              : 1 - 0.5 * (2 * (1 - normalized)) ** RADIAL_GRADING_EXPONENT;'''
-          new = '''  const graded = 0.5 * (1 - Math.cos(Math.PI * normalized));'''
-          if text.count(old) != 1:
-              raise RuntimeError(f'graded function marker count={text.count(old)}')
-          path.write_text(text.replace(old, new, 1))
-          PY
+          python /tmp/lafea-strong-grading-patch.py \
+            > "reports/qualification/${GRADING_LABEL}-patch.stdout.log" \
+            2> "reports/qualification/${GRADING_LABEL}-patch.stderr.log"
 
           node scripts/lafea-bucket-01-production-response-runner.mjs \
-            > reports/qualification/cosine-bound-execution.stdout.log \
-            2> reports/qualification/cosine-bound-execution.stderr.log
+            > "reports/qualification/${GRADING_LABEL}-execution.stdout.log" \
+            2> "reports/qualification/${GRADING_LABEL}-execution.stderr.log"
           set +e
           node scripts/lafea-bucket-01-production-response-receipt.mjs \
-            > reports/qualification/cosine-bound-response.stdout.log \
-            2> reports/qualification/cosine-bound-response.stderr.log
+            > "reports/qualification/${GRADING_LABEL}-response.stdout.log" \
+            2> "reports/qualification/${GRADING_LABEL}-response.stderr.log"
           response_exit=$?
           node scripts/lafea-bucket-01-production-lug-probe-receipt.mjs \
-            > reports/qualification/cosine-bound-lug.stdout.log \
-            2> reports/qualification/cosine-bound-lug.stderr.log
+            > "reports/qualification/${GRADING_LABEL}-lug.stdout.log" \
+            2> "reports/qualification/${GRADING_LABEL}-lug.stderr.log"
           lug_exit=$?
           set -e
 
-          node --input-type=module <<'NODE' > reports/qualification/cosine-bound-summary.json
+          node --input-type=module <<'NODE' > "reports/qualification/${GRADING_LABEL}-summary.json"
           import fs from 'node:fs';
-          const summary = {};
-          for (const [key, file] of [
-            ['response', 'reports/qualification/lafea-bucket-01-production-response.json'],
-            ['stress', 'reports/qualification/lafea-bucket-01-production-lug-fixed-probes.json'],
-          ]) {
-            if (fs.existsSync(file)) summary[key] = JSON.parse(fs.readFileSync(file, 'utf8'));
-          }
-          const rows = summary.stress ? [
-            ...summary.stress.standaloneProbeReceipts,
-            ...summary.stress.pathReceipts.flatMap((row) => row.stationReceipts),
+          const read = (file) => fs.existsSync(file)
+            ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;
+          const response = read('reports/qualification/lafea-bucket-01-production-response.json');
+          const stress = read('reports/qualification/lafea-bucket-01-production-lug-fixed-probes.json');
+          const rows = stress ? [
+            ...stress.standaloneProbeReceipts,
+            ...stress.pathReceipts.flatMap((row) => row.stationReceipts),
           ] : [];
           console.log(JSON.stringify({
-            responseStatus: summary.response?.status ?? null,
-            responseFineGridGci: summary.response?.energyConvergence?.fineGridGci ?? null,
-            stressStatus: summary.stress?.status ?? null,
-            rows: rows.map((row) => ({
-              probeId: row.probeId,
-              acceptanceMethod: row.acceptanceMethod,
-              observations: row.observations,
-              upperBound: row.acceptedStressUpperBound,
-              relativeWidth: row.conservativeBound?.relativeWidth ?? null,
-            })),
+            label: process.env.GRADING_LABEL,
+            exponent: Number(process.env.GRADING_EXPONENT),
+            responseStatus: response?.status ?? null,
+            responseFineGridGci: response?.energyConvergence?.fineGridGci ?? null,
+            stressStatus: stress?.status ?? null,
+            conservativeBoundLocations: rows
+              .filter((row) => row.acceptanceMethod === 'OSCILLATORY_FINE_PAIR_UPPER_ENVELOPE')
+              .map((row) => ({
+                probeId: row.probeId,
+                observations: row.observations,
+                relativeWidth: row.conservativeBound.relativeWidth,
+                upperBound: row.conservativeBound.absoluteUpperBound,
+              })),
+            allLocationsPassed: rows.length > 0 && rows.every((row) => row.status === 'PASS'),
           }, null, 2));
           NODE
 
           if [[ "$response_exit" == "0" && "$lug_exit" == "0" ]]; then
+            gci=$(node -e "const r=require('./reports/qualification/${GRADING_LABEL}-summary.json');process.stdout.write(String(r.responseFineGridGci))")
             gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-              -f state=success -f context=lafea/cosine-conservative-bound \
-              -f description="Cosine mesh passed response and all fixed stress locations"
+              -f state=success -f context="$context" \
+              -f description="${GRADING_LABEL} passed all gates; response GCI ${gci}"
             exit 0
           fi
-          detail=$(node -e "const fs=require('fs');const files=process.argv.slice(1);const text=files.filter(fs.existsSync).map(p=>fs.readFileSync(p,'utf8')).join('\n');process.stdout.write(text.trim().slice(-7500))" reports/qualification/cosine-bound-lug.stderr.log reports/qualification/cosine-bound-lug.stdout.log reports/qualification/cosine-bound-response.stderr.log reports/qualification/cosine-bound-response.stdout.log)
+          detail=$(node -e "const fs=require('fs');const files=process.argv.slice(1);const text=files.filter(fs.existsSync).map(p=>fs.readFileSync(p,'utf8')).join('\n');process.stdout.write(text.trim().slice(-7500))" \
+            "reports/qualification/${GRADING_LABEL}-lug.stderr.log" \
+            "reports/qualification/${GRADING_LABEL}-lug.stdout.log" \
+            "reports/qualification/${GRADING_LABEL}-response.stderr.log" \
+            "reports/qualification/${GRADING_LABEL}-response.stdout.log")
           encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
+          if [[ "$response_exit" != "0" ]]; then
+            description="${GRADING_LABEL} blocked by global response"
+          else
+            description="${GRADING_LABEL} blocked by fixed stress evidence"
+          fi
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -f state=failure -f context=lafea/cosine-conservative-bound \
-            -f description="Cosine conservative-bound candidate remains blocked" \
+            -f state=failure -f context="$context" \
+            -f description="$description" \
             -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
           exit 1
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lafea-cosine-conservative-bound-${{ github.sha }}
+          name: lafea-strong-grading-${{ matrix.label }}-${{ github.sha }}
           path: reports/qualification/
           if-no-files-found: warn
           retention-days: 30
