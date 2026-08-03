@@ -18,11 +18,11 @@ import {
 } from '../src/core/linear-fea-load-case/index.js';
 import { compileMechanicalModel } from '../src/core/linear-fea-model-compiler/index.js';
 import {
-  GRAVITY_MASS_SOURCE_NOT_IMPLEMENTED_CODE,
   compileLinearPipingSourceAnalysisContext,
   deriveLinearPipingSourceAuthoritySet,
   expandPipeWallGravitySourceAuthorities,
 } from '../src/core/linear-piping-analysis-consumer/index.js';
+import { GRAVITY_DISTRIBUTED_WEIGHT_MISSING_CODE } from '../src/core/linear-piping-analysis-consumer/gravity-expansion-mass-sources.js';
 import { compilerInput } from './lfea-b2.5-model-compiler-fixtures.mjs';
 import {
   frameElements,
@@ -277,7 +277,7 @@ test('B39-T02', 'Gravity expansion is deterministic and provenance-bound', () =>
   };
 });
 
-test('B39-T03', 'Unsupported gravity mass source fails closed without partial PIPE_WALL application', () => {
+test('B39-T03', 'Missing declared CONTENTS weight fails closed without partial PIPE_WALL application', () => {
   const declared = compileDeclaredLoadCase(
     previewCompilation,
     [gravityPrimitive(['PIPE_WALL', 'CONTENTS'])],
@@ -290,13 +290,13 @@ test('B39-T03', 'Unsupported gravity mass source fails closed without partial PI
       frameElements: frameElements(),
       pipingComponents: [],
     }),
-    (error) => error?.code === GRAVITY_MASS_SOURCE_NOT_IMPLEMENTED_CODE,
+    (error) => error?.code === GRAVITY_DISTRIBUTED_WEIGHT_MISSING_CODE,
   );
   assert.deepEqual(
     frameElements().map((entry) => entry.equivalentLoadVector.global),
     originalVectors,
   );
-  return { errorCode: GRAVITY_MASS_SOURCE_NOT_IMPLEMENTED_CODE };
+  return { errorCode: GRAVITY_DISTRIBUTED_WEIGHT_MISSING_CODE };
 });
 
 test('B39-T04', 'No PIPE_WALL gravity declaration produces exactly zero gravity contribution', () => {
