@@ -39,7 +39,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Apply solver headroom and quadratic ring grading
+      - name: Apply solver headroom and physical-coordinate recovery
         shell: bash
         run: |
           python - <<'PY'
@@ -61,21 +61,53 @@ jobs:
           block = block.replace(evidence, '      convergenceTarget: canonicalNumber(convergenceTarget),\n' + evidence)
           solver.write_text(text[:start] + block + text[end:])
 
-          mesh = Path('src/core/lafea-meshing/lug-pinhole-t6.js')
-          text = mesh.read_text()
-          old = """function radiusAt(spec, ring) {
-            return spec.holeRadius
-              + (spec.outerRadius - spec.holeRadius)
-                * ring / spec.radialDivisions;
-          }"""
-          new = """function radiusAt(spec, ring) {
-            const fraction = ring / spec.radialDivisions;
-            return spec.holeRadius
-              + (spec.outerRadius - spec.holeRadius) * fraction ** 2;
-          }"""
-          if text.count(old) != 1:
-              raise SystemExit(f'radiusAt marker count={text.count(old)}')
-          mesh.write_text(text.replace(old, new))
+          probe = Path('src/workspace/lafea-bucket-01-fixed-probe.js')
+          text = probe.read_text()
+          old_call = """  const components = reconstructTensor(
+            elementResult.gaussPointResults,
+            candidate.natural.xi,
+            candidate.natural.eta,
+          );"""
+          new_call = """  const components = reconstructTensor(
+            elementResult.gaussPointResults,
+            candidate.nodes,
+            probe.x,
+            probe.y,
+          );"""
+          if text.count(old_call) != 1:
+              raise SystemExit(f'reconstructTensor call count={text.count(old_call)}')
+          text = text.replace(old_call, new_call)
+          text = text.replace(
+              "'T6_THREE_POINT_LINEAR_NATURAL_COORDINATE_RECONSTRUCTION_V1'",
+              "'T6_THREE_POINT_LINEAR_PHYSICAL_COORDINATE_RECONSTRUCTION_V2'",
+          )
+          start = text.index('function reconstructTensor(')
+          end = text.index('\nfunction solve3(', start)
+          old_block = text[start:end]
+          new_block = """function reconstructTensor(points, nodes, x, y) {
+            return deepFreeze({
+              sigmaX: reconstruct(points, nodes, x, y, (point) => point.stress?.sigmaX),
+              sigmaY: reconstruct(points, nodes, x, y, (point) => point.stress?.sigmaY),
+              sigmaZ: reconstruct(points, nodes, x, y, (point) => point.stress?.sigmaZ),
+              tauXY: reconstruct(points, nodes, x, y, (point) => point.stress?.tauXY),
+            });
+          }
+
+          function reconstruct(points, nodes, x, y, selector) {
+            const matrix = points.map((point) => {
+              const physical = mapT6(nodes, point.xi, point.eta);
+              return [1, physical.x, physical.y];
+            });
+            const values = points.map(selector);
+            if (values.some((value) => typeof value !== 'number' || !Number.isFinite(value))) {
+              throw probeError('LAFEA_B01_PROBE_STRESS_COMPONENT_INVALID');
+            }
+            const coefficients = solve3(matrix, values);
+            return normalizeZero(coefficients[0] + coefficients[1] * x + coefficients[2] * y);
+          }
+          """
+          text = text[:start] + new_block + text[end:]
+          probe.write_text(text)
 
           kirsch = Path('scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs')
           text = kirsch.read_text()
@@ -86,8 +118,8 @@ jobs:
           kirsch.write_text(text.replace(old, new))
           PY
 
-      - name: Validate annular mesh qualification
-        run: node scripts/lafea-bucket-01-mesh-qualification-check.mjs
+      - name: Validate fixed-probe contract
+        run: node scripts/lafea-bucket-01-fixed-probe-check.mjs
 
       - name: Validate scalable sparse solver
         run: node scripts/lafea-bucket-01-scalable-solver-check.mjs
@@ -106,7 +138,7 @@ jobs:
           echo "exit_code=$?" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Publish quadratic grading result
+      - name: Publish physical-coordinate recovery result
         env:
           GH_TOKEN: ${{ github.token }}
           EXIT_CODE: ${{ steps.kirsch.outputs.exit_code }}
@@ -116,8 +148,8 @@ jobs:
             gh api --method POST \
               "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
               -f state=success \
-              -f context="lafea/quadratic-ring-grading" \
-              -f description="Mesh, solver and Kirsch qualification passed"
+              -f context="lafea/physical-probe-recovery" \
+              -f description="Fixed-probe and Kirsch qualification passed"
             exit 0
           fi
           detail=$(node -e "const fs=require('fs');const t=fs.readFileSync('reports/qualification/kirsch.stderr.log','utf8');const lines=t.split(/\r?\n/).map(s=>s.trim()).filter(s=>s&&!/^at\s/.test(s)&&!/^node:/.test(s));process.stdout.write(lines.slice(0,12).join(' | ').slice(0,3000))")
@@ -125,8 +157,8 @@ jobs:
           gh api --method POST \
             "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=failure \
-            -f context="lafea/quadratic-grading-detail" \
-            -f description="Quadratic ring grading Kirsch result" \
+            -f context="lafea/physical-recovery-detail" \
+            -f description="Physical-coordinate recovery Kirsch result" \
             -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
           exit "$EXIT_CODE"
 
@@ -134,7 +166,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lafea-bucket-01-quadratic-grading-${{ github.sha }}
+          name: lafea-bucket-01-physical-recovery-${{ github.sha }}
           path: reports/qualification/
           if-no-files-found: warn
           retention-days: 30
