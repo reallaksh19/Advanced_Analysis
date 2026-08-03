@@ -4,18 +4,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { solveContinuumModel } from '../src/core/element-fea/index.js';
 import {
-  continuumModel,
-  denseProfile,
-  mElement,
-  mLoadCase,
-  mMaterial,
-  mNode,
-  mNodalForce,
-  mRestraint,
-  q4Grid,
-} from '../src/core/fea-benchmarks/builders.js';
+  calculateLocalContinuum,
+  createCanonicalLocalContinuumModel,
+  FORMULATIONS,
+  MODEL_SCHEMA,
+  QUALIFICATION_PROFILE,
+  QUALIFICATION_STATES,
+} from '../src/core/local-continuum/index.js';
 import { canonicalLafeaSha256 } from '../src/workspace/lafea-canonical-sha256.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -26,57 +22,47 @@ const REPORT_PATH = path.resolve(
     ?? 'reports/qualification/lafea-bucket-01-cantilever.json',
 );
 const oracle = Object.freeze(JSON.parse(fs.readFileSync(ORACLE_PATH, 'utf8')));
+const IN_PROCESS_REPLAY_COUNT = 3;
 
 validateOracle();
-const oracleHash = canonicalLafeaSha256(oracle);
-const replayCount = 3;
-const horizontalReplays = Array.from(
-  { length: replayCount },
-  () => executeOrientation('HORIZONTAL'),
+const levels = oracle.meshes.map(evaluateLevel);
+assert.deepEqual(
+  levels.map((row) => row.elementCount),
+  oracle.meshes.map((row) => row.elementCount),
 );
-const verticalReplays = Array.from(
-  { length: replayCount },
-  () => executeOrientation('VERTICAL_CCW_90'),
-);
-
-assertReplayDeterminism(horizontalReplays, 'horizontal');
-assertReplayDeterminism(verticalReplays, 'vertical');
-
-const horizontal = horizontalReplays[0];
-const vertical = verticalReplays[0];
-const orientationDifference = relativeDifference(
-  horizontal.history.at(-1).tipDeflection,
-  vertical.history.at(-1).tipDeflection,
-  referenceDeflection(),
-);
-assert.ok(
-  orientationDifference <= oracle.tolerances.orientationDeflectionRelativeDifference,
-  `orientation deflection difference ${orientationDifference} exceeds tolerance`,
-);
+assertConvergence(levels, 'horizontal');
+assertConvergence(levels, 'vertical');
 
 const baseReport = {
-  schema: 'lafea-bucket-01-cantilever-evidence/v2',
-  producerRevision: 'B01-CANTILEVER.2',
+  schema: 'lafea-bucket-01-cantilever-evidence/v3',
+  producerRevision: 'B01-CANTILEVER.3',
   benchmarkId: oracle.benchmarkId,
   oracleId: oracle.oracleId,
   oraclePath: path.relative(ROOT, ORACLE_PATH).split(path.sep).join('/'),
-  oracleHash,
-  expectedValueDefinitionHash: oracleHash,
-  replayCount,
+  oracleHash: canonicalLafeaSha256(oracle),
+  expectedValueDefinitionHash: canonicalLafeaSha256(oracle),
+  formulation: oracle.formulation,
+  elementType: oracle.elementType,
+  inProcessReplayCount: IN_PROCESS_REPLAY_COUNT,
   referenceDeflection: referenceDeflection(),
-  horizontal,
-  vertical,
-  orientationRelativeDifference: orientationDifference,
+  levels,
   authority: {
-    productionRouteExecuted: true,
+    productionElementRouteExecuted: true,
+    localContinuumKernelExecuted: true,
     expectedValuesReadFromFrozenRegistryFile: true,
     expectedValuesFrozenBeforeExecution: true,
     productionOutputGeneratedExpectedValues: false,
+    positiveIntegrationPointJacobiansRequired: true,
+    reactionsRetained: true,
     forceEquilibriumRetained: true,
     momentEquilibriumRetained: true,
     strainEnergyAndExternalWorkRetained: true,
     orientationSensitivityRetained: true,
     monotonicRefinementRetained: true,
+    integrationPointRecoveryRetained: true,
+    nodalProjectionUsedAsAuthority: false,
+    smoothedStressUsedAsAuthority: false,
+    cleanExternalReplayCustodySatisfied: false,
   },
   qualificationStates: {
     implemented: true,
@@ -90,10 +76,381 @@ const baseReport = {
   },
   disposition: 'BENCHMARK_ROUTE_IMPLEMENTED_PENDING_INDEPENDENT_RETAINED_EXECUTION',
 };
-const report = { ...baseReport, evidenceHash: canonicalLafeaSha256(baseReport) };
+const report = Object.freeze({
+  ...baseReport,
+  evidenceHash: canonicalLafeaSha256(baseReport),
+});
 fs.mkdirSync(path.dirname(REPORT_PATH), { recursive: true });
 fs.writeFileSync(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 console.log(JSON.stringify(report));
+
+function evaluateLevel(level) {
+  validateLevel(level);
+  const horizontal = evaluateOrientation(level, 'HORIZONTAL');
+  const vertical = evaluateOrientation(level, 'VERTICAL_CCW_90');
+  const orientationRelativeDifference = relativeDifference(
+    horizontal.tipDeflection,
+    vertical.tipDeflection,
+    referenceDeflection(),
+  );
+  within(
+    orientationRelativeDifference,
+    oracle.tolerances.orientationDeflectionRelativeDifference,
+    `${level.levelId} orientation sensitivity`,
+  );
+  return Object.freeze({
+    schema: 'lafea-bucket-01-cantilever-level-evidence/v1',
+    levelId: level.levelId,
+    nx: level.nx,
+    ny: level.ny,
+    elementCount: level.elementCount,
+    orientationRelativeDifference,
+    horizontal,
+    vertical,
+    semanticHash: canonicalLafeaSha256({
+      levelId: level.levelId,
+      horizontal,
+      vertical,
+      orientationRelativeDifference,
+    }),
+  });
+}
+
+function evaluateOrientation(level, orientation) {
+  const model = createCanonicalLocalContinuumModel(buildSource(level, orientation));
+  const replays = Array.from(
+    { length: IN_PROCESS_REPLAY_COUNT },
+    () => calculateLocalContinuum(model),
+  );
+  const serialized = replays.map((row) => JSON.stringify(row));
+  assert.ok(serialized.every((row) => row === serialized[0]), `${level.levelId} ${orientation} replays differ`);
+
+  const result = replays[0];
+  assert.equal(result.qualification?.state, QUALIFICATION_STATES.ACCEPTED, firstDiagnostic(result));
+  const loadCase = byCase(result, oracle.load.loadCaseId);
+  assert.equal(loadCase.solverEvidence.accepted, true);
+  assert.equal(loadCase.solverEvidence.method, level.solverMethod);
+  assert.equal(loadCase.equilibrium.accepted, true);
+  assert.equal(loadCase.energyQualification.accepted, true);
+  assert.equal(model.elements.length, level.elementCount);
+
+  const elementEvidence = result.meshEvidence.elementEvidence;
+  assert.equal(elementEvidence.length, level.elementCount);
+  assert.ok(elementEvidence.every((row) => row.elementType === 'T6'));
+  assert.ok(elementEvidence.every((row) => row.stiffnessSymmetry.accepted));
+  assert.ok(elementEvidence.every((row) => row.rigidBodyQualification.accepted));
+  assert.ok(elementEvidence.every((row) => row.affinePatchQualification.accepted));
+  const jacobians = elementEvidence.flatMap((row) =>
+    row.gaussEvidence.map((point) => point.jacobianDeterminant));
+  const minimumJacobian = Math.min(...jacobians);
+  assert.ok(minimumJacobian > 0, `${level.levelId} ${orientation} has a non-positive Jacobian`);
+
+  const integrationPointResults = loadCase.elementResults.flatMap((row) => {
+    assert.equal(row.elementType, 'T6');
+    assert.equal(row.recoveryLayer, 'INTEGRATION_POINT');
+    return row.gaussPointResults;
+  });
+  assert.equal(integrationPointResults.length, level.elementCount * 3);
+  assert.ok(integrationPointResults.every((row) => row.jacobianDeterminant > 0));
+
+  const nodeById = new Map(model.nodes.map((node) => [node.nodeId, node]));
+  const appliedVector = vectorFromForce(result, loadCase.forceEvidence.forceVector, nodeById);
+  const reactionVector = vectorFromReactions(loadCase.supportReactions, nodeById);
+  const applied = resultant(appliedVector, nodeById);
+  const reaction = resultant(reactionVector, nodeById);
+  const total = {
+    forceX: applied.forceX + reaction.forceX,
+    forceY: applied.forceY + reaction.forceY,
+    momentZ: applied.momentZ + reaction.momentZ,
+  };
+  const expectedForce = orientation === 'HORIZONTAL'
+    ? oracle.expected.horizontalAppliedForce
+    : oracle.expected.verticalAppliedForce;
+  const forceScale = oracle.load.resultant;
+  const momentScale = oracle.load.resultant * oracle.geometry.length;
+  const appliedForceRelativeError = Math.hypot(
+    applied.forceX - expectedForce.x,
+    applied.forceY - expectedForce.y,
+  ) / forceScale;
+  const appliedMomentRelativeError = Math.abs(
+    applied.momentZ - oracle.expected.appliedMomentZ,
+  ) / momentScale;
+  const totalForceRelativeResidual = Math.hypot(total.forceX, total.forceY) / forceScale;
+  const totalMomentRelativeResidual = Math.abs(total.momentZ) / momentScale;
+
+  within(appliedForceRelativeError, oracle.tolerances.forceEquilibriumRelative, `${level.levelId} ${orientation} applied force`);
+  within(appliedMomentRelativeError, oracle.tolerances.momentEquilibriumRelative, `${level.levelId} ${orientation} applied moment`);
+  within(totalForceRelativeResidual, oracle.tolerances.forceEquilibriumRelative, `${level.levelId} ${orientation} force equilibrium`);
+  within(totalMomentRelativeResidual, oracle.tolerances.momentEquilibriumRelative, `${level.levelId} ${orientation} moment equilibrium`);
+
+  const tip = findTipDisplacement(model, loadCase, orientation);
+  const externalWork = externalWorkFromForceVector(result, loadCase);
+  const relativeExternalWorkError = relativeDifference(
+    loadCase.totalStrainEnergy,
+    externalWork,
+    loadCase.totalStrainEnergy,
+  );
+  within(
+    relativeExternalWorkError,
+    oracle.tolerances.energyRelative,
+    `${level.levelId} ${orientation} external work`,
+  );
+
+  const base = {
+    orientation,
+    canonicalModelHash: model.semanticHash,
+    resultSemanticHashes: result.semanticHashes,
+    replayResultHash: canonicalLafeaSha256(result),
+    nodeCount: model.nodes.length,
+    elementCount: model.elements.length,
+    freeDofCount: loadCase.solverEvidence.freeDofIdentities.length,
+    constrainedDofCount: loadCase.solverEvidence.constrainedDofIdentities.length,
+    solverMethod: loadCase.solverEvidence.method,
+    solverAccepted: loadCase.solverEvidence.accepted,
+    minimumPivot: loadCase.solverEvidence.minimumPivot ?? null,
+    pivotRatio: loadCase.solverEvidence.pivotRatio ?? null,
+    iterationCount: loadCase.solverEvidence.iterationCount ?? null,
+    minimumJacobian,
+    integrationPointCount: integrationPointResults.length,
+    tipNodeId: tip.nodeId,
+    tipDeflection: tip.value,
+    deflectionRatio: tip.value / referenceDeflection(),
+    applied,
+    reaction,
+    total,
+    appliedForceRelativeError,
+    appliedMomentRelativeError,
+    totalForceRelativeResidual,
+    totalMomentRelativeResidual,
+    strainEnergy: loadCase.totalStrainEnergy,
+    externalWork,
+    relativeExternalWorkError,
+    elementEnergySum: loadCase.energyQualification.elementEnergySum,
+    energyReconstructionResidual: loadCase.energyQualification.residual,
+    globalResultHash: canonicalLafeaSha256(result),
+  };
+  return Object.freeze({ ...base, semanticHash: canonicalLafeaSha256(base) });
+}
+
+function buildSource(level, orientation) {
+  const registry = nodeRegistry();
+  const elements = [];
+  const loadedEdges = [];
+  const dx = oracle.geometry.length / level.nx;
+  const dy = oracle.geometry.depth / level.ny;
+  const yMin = -oracle.geometry.depth / 2;
+
+  for (let ix = 0; ix < level.nx; ix += 1) {
+    const x0 = ix * dx;
+    const x1 = (ix + 1) * dx;
+    for (let iy = 0; iy < level.ny; iy += 1) {
+      const y0 = yMin + iy * dy;
+      const y1 = y0 + dy;
+      const first = addT6(elements, registry, [[x0, y0], [x1, y0], [x1, y1]]);
+      addT6(elements, registry, [[x0, y0], [x1, y1], [x0, y1]]);
+      if (ix === level.nx - 1) {
+        loadedEdges.push({
+          elementId: first.elementId,
+          edgeNodeIds: [first.nodeIds[1], first.nodeIds[4], first.nodeIds[2]],
+        });
+      }
+    }
+  }
+
+  const localNodes = registry.rows();
+  const nodes = localNodes.map((node) => {
+    const point = transformPoint(node.x, node.y, orientation);
+    return {
+      nodeId: node.nodeId,
+      x: point.x,
+      y: point.y,
+      sourceReference: `CANTILEVER_NODE#${node.nodeId}`,
+    };
+  });
+  const constraints = localNodes
+    .filter((node) => node.x === 0)
+    .flatMap((node) => [
+      restraint(`${node.nodeId}-UX`, node.nodeId, 'UX'),
+      restraint(`${node.nodeId}-UY`, node.nodeId, 'UY'),
+    ]);
+  const tractionMagnitude = oracle.load.resultant
+    / (oracle.geometry.depth * oracle.geometry.thickness);
+  const tractionVector = transformVector(0, -tractionMagnitude, orientation);
+  const edgeTractions = loadedEdges.map((edge, index) => ({
+    tractionId: `T-${String(index + 1).padStart(4, '0')}`,
+    elementId: edge.elementId,
+    edgeNodeIds: edge.edgeNodeIds,
+    tx: tractionVector.x,
+    ty: tractionVector.y,
+    sourceReference: `CANTILEVER_TRACTION#${edge.elementId}`,
+  }));
+
+  return {
+    schema: MODEL_SCHEMA,
+    modelIdentity: `B01_CANTILEVER_${level.levelId}_${orientation}`,
+    modelVersion: '1',
+    sourceAncestry: {
+      sourceModelIdentity: oracle.oracleId,
+      sourceVersion: '1',
+      adapterIdentity: 'LAFEA_BUCKET_01_T6_CANTILEVER',
+      adapterVersion: 'B01-CANTILEVER.3',
+    },
+    units: oracle.units,
+    formulation: FORMULATIONS.PLANE_STRESS,
+    materials: [{
+      materialId: 'MAT',
+      elasticModulus: oracle.material.elasticModulus,
+      poissonRatio: oracle.material.poissonRatio,
+      sourceReference: `${oracle.oracleId}#MATERIAL`,
+    }],
+    nodes,
+    elements,
+    elementTypePolicy: {
+      allowT3Fallback: false,
+      sourceReference: `${oracle.oracleId}#T6_ONLY`,
+    },
+    constraints,
+    loadCases: [{
+      loadCaseId: oracle.load.loadCaseId,
+      nodalForces: [],
+      edgeTractions,
+      pressureLoads: [],
+      bodyForces: [],
+      temperatureLoads: [],
+      imposedDisplacements: [],
+      sourceReference: `${oracle.oracleId}#${orientation}`,
+    }],
+    resultRequests: { loadCaseIds: [oracle.load.loadCaseId] },
+    qualificationProfile: JSON.parse(JSON.stringify(QUALIFICATION_PROFILE)),
+    limitations: ['BUCKET_01_ELEMENTARY_T6_CANTILEVER_ONLY'],
+  };
+}
+
+function addT6(elements, registry, [a, b, c]) {
+  const elementId = `E${String(elements.length + 1).padStart(5, '0')}`;
+  const nodeIds = [
+    registry.get(...a),
+    registry.get(...b),
+    registry.get(...c),
+    registry.get((a[0] + b[0]) / 2, (a[1] + b[1]) / 2),
+    registry.get((b[0] + c[0]) / 2, (b[1] + c[1]) / 2),
+    registry.get((c[0] + a[0]) / 2, (c[1] + a[1]) / 2),
+  ];
+  const element = {
+    elementId,
+    elementType: 'T6',
+    nodeIds,
+    materialId: 'MAT',
+    thickness: oracle.geometry.thickness,
+    sourceReference: `CANTILEVER_ELEMENT#${elementId}`,
+  };
+  elements.push(element);
+  return element;
+}
+
+function nodeRegistry() {
+  const nodeByCoordinate = new Map();
+  const nodes = [];
+  const key = (x, y) => `${clean(x).toFixed(12)}:${clean(y).toFixed(12)}`;
+  return {
+    get(x, y) {
+      const coordinateKey = key(x, y);
+      if (!nodeByCoordinate.has(coordinateKey)) {
+        const nodeId = `N${String(nodes.length + 1).padStart(5, '0')}`;
+        nodeByCoordinate.set(coordinateKey, nodeId);
+        nodes.push({ nodeId, x: clean(x), y: clean(y) });
+      }
+      return nodeByCoordinate.get(coordinateKey);
+    },
+    rows() {
+      return nodes.map((row) => ({ ...row }));
+    },
+  };
+}
+
+function restraint(constraintId, nodeId, dof) {
+  return {
+    constraintId,
+    nodeId,
+    dof,
+    value: 0,
+    sourceReference: `CANTILEVER_CONSTRAINT#${constraintId}`,
+  };
+}
+
+function vectorFromForce(result, values, nodeById) {
+  const vector = new Map([...nodeById.keys()].map((nodeId) => [nodeId, { fx: 0, fy: 0 }]));
+  result.meshEvidence.dofOrdering.forEach((identity, index) => {
+    const separator = identity.lastIndexOf(':');
+    const nodeId = identity.slice(0, separator);
+    const dof = identity.slice(separator + 1);
+    vector.get(nodeId)[dof === 'UX' ? 'fx' : 'fy'] = values[index];
+  });
+  return vector;
+}
+
+function vectorFromReactions(rows, nodeById) {
+  const vector = new Map([...nodeById.keys()].map((nodeId) => [nodeId, { fx: 0, fy: 0 }]));
+  rows.forEach((row) => {
+    const separator = row.dofIdentity.lastIndexOf(':');
+    const nodeId = row.dofIdentity.slice(0, separator);
+    const dof = row.dofIdentity.slice(separator + 1);
+    vector.get(nodeId)[dof === 'UX' ? 'fx' : 'fy'] = row.value;
+  });
+  return vector;
+}
+
+function resultant(vector, nodeById) {
+  let forceX = 0;
+  let forceY = 0;
+  let momentZ = 0;
+  for (const [nodeId, force] of vector) {
+    const node = nodeById.get(nodeId);
+    forceX += force.fx;
+    forceY += force.fy;
+    momentZ += node.x * force.fy - node.y * force.fx;
+  }
+  return Object.freeze({ forceX, forceY, momentZ });
+}
+
+function findTipDisplacement(model, loadCase, orientation) {
+  const target = transformPoint(oracle.geometry.length, 0, orientation);
+  const node = model.nodes.find((row) => (
+    Math.abs(row.x - target.x) <= 1e-12 && Math.abs(row.y - target.y) <= 1e-12
+  ));
+  assert.ok(node, `missing ${orientation} centerline tip node`);
+  const displacement = loadCase.nodalDisplacements.find((row) => row.nodeId === node.nodeId);
+  assert.ok(displacement, `missing ${orientation} centerline tip displacement`);
+  const direction = transformVector(0, -1, orientation);
+  const value = displacement.ux * direction.x + displacement.uy * direction.y;
+  assert.ok(Number.isFinite(value) && value > 0, `${orientation} tip deflection is invalid`);
+  return { nodeId: node.nodeId, value };
+}
+
+function externalWorkFromForceVector(result, loadCase) {
+  const displacementByDof = new Map();
+  loadCase.nodalDisplacements.forEach((row) => {
+    displacementByDof.set(`${row.nodeId}:UX`, row.ux);
+    displacementByDof.set(`${row.nodeId}:UY`, row.uy);
+  });
+  return 0.5 * result.meshEvidence.dofOrdering.reduce((sum, identity, index) => (
+    sum + loadCase.forceEvidence.forceVector[index] * displacementByDof.get(identity)
+  ), 0);
+}
+
+function assertConvergence(rows, orientationKey) {
+  const errors = rows.map((row) => Math.abs(row[orientationKey].deflectionRatio - 1));
+  const monotonic = errors.every((value, index) => (
+    index === 0 || value <= errors[index - 1] + oracle.tolerances.monotonicSlack
+  ));
+  assert.equal(monotonic, true, `${orientationKey} deflection errors are not monotonic: ${errors.join(', ')}`);
+  const finest = rows.at(-1)[orientationKey];
+  within(
+    Math.abs(finest.deflectionRatio - 1),
+    oracle.tolerances.finestDeflectionRatioAbsoluteError,
+    `${orientationKey} finest deflection`,
+  );
+}
 
 function validateOracle() {
   assert.equal(oracle.schema, 'lafea-bucket-01-cantilever-oracle/v1');
@@ -103,174 +460,28 @@ function validateOracle() {
   assert.match(oracle.authority.source, /Timoshenko|beam/iu);
   assert.equal(oracle.authority.productionOutputUsed, false);
   assert.equal(oracle.authority.observedResultUsedToSelectTolerance, false);
-  assert.equal(oracle.formulation, 'PLANE_STRESS');
-  assert.equal(oracle.elementType, 'Q4_FULL_INTEGRATION');
-  assert.ok(Array.isArray(oracle.meshes) && oracle.meshes.length >= 3);
-  oracle.meshes.forEach(({ nx, ny }) => {
-    assert.ok(Number.isInteger(nx) && nx > 0, 'nx must be a positive integer');
-    assert.ok(Number.isInteger(ny) && ny > 0, 'ny must be a positive integer');
-  });
+  assert.equal(oracle.authority.smoothedStressUsed, false);
+  assert.equal(oracle.formulation, FORMULATIONS.PLANE_STRESS);
+  assert.equal(oracle.elementType, 'T6');
+  assert.equal(oracle.load.type, 'UNIFORM_END_EDGE_TRACTION');
+  assert.deepEqual(
+    oracle.meshes.map((row) => row.elementCount),
+    oracle.meshes.map((row) => 2 * row.nx * row.ny),
+  );
+  close(oracle.expected.referenceDeflection, referenceDeflection(), 'reference deflection');
+  close(oracle.expected.appliedMomentZ, -oracle.load.resultant * oracle.geometry.length, 'applied moment');
+  assert.deepEqual(oracle.expected.horizontalAppliedForce, { x: 0, y: -oracle.load.resultant });
+  assert.deepEqual(oracle.expected.verticalAppliedForce, { x: oracle.load.resultant, y: 0 });
   for (const [name, value] of Object.entries(oracle.tolerances)) {
     assert.ok(Number.isFinite(value) && value >= 0, `${name} must be finite and non-negative`);
   }
 }
 
-function executeOrientation(orientation) {
-  const history = oracle.meshes.map(({ nx, ny }) => solveLevel(nx, ny, orientation));
-  const ratios = history.map((row) => row.deflectionRatio);
-  const monotonic = ratios.every((value, index) => (
-    index === 0 || value >= ratios[index - 1] - oracle.tolerances.monotonicSlack
-  ));
-  assert.equal(
-    monotonic,
-    true,
-    `${orientation} deflection refinement is not monotonic: ${ratios.join(', ')}`,
-  );
-  const finest = history.at(-1);
-  assert.ok(
-    Math.abs(finest.deflectionRatio - 1)
-      <= oracle.tolerances.finestDeflectionRatioAbsoluteError,
-    `${orientation} finest deflection ratio ${finest.deflectionRatio} is outside tolerance`,
-  );
-  return {
-    orientation,
-    monotonic,
-    history,
-    semanticHash: canonicalLafeaSha256({ orientation, monotonic, history }),
-  };
-}
-
-function solveLevel(nx, ny, orientation) {
-  const { length, depth, thickness } = oracle.geometry;
-  const grid = q4Grid({ width: length, height: depth, nx, ny });
-  const nodes = orientation === 'HORIZONTAL'
-    ? grid.nodes
-    : grid.nodes.map((row) => mNode(row.nodeId, -row.y, row.x));
-  const restraints = [];
-  for (let j = 0; j <= ny; j += 1) {
-    restraints.push(mRestraint(`RX-${j}`, grid.nodeId(0, j), 'UX'));
-    restraints.push(mRestraint(`RY-${j}`, grid.nodeId(0, j), 'UY'));
-  }
-  const tipNodeIds = Array.from({ length: ny + 1 }, (_, j) => grid.nodeId(nx, j));
-  const forceShare = oracle.load.resultant / tipNodeIds.length;
-  const loads = tipNodeIds.map((nodeId, index) => (
-    orientation === 'HORIZONTAL'
-      ? mNodalForce(`F-${index}`, nodeId, 0, -forceShare)
-      : mNodalForce(`F-${index}`, nodeId, forceShare, 0)
-  ));
-  const model = continuumModel({
-    modelIdentity: `${oracle.benchmarkId}-${orientation}-${nx}x${ny}`,
-    solverProfile: denseProfile(oracle.formulation),
-    nodes,
-    materials: [mMaterial(
-      'MAT1',
-      oracle.material.elasticModulus,
-      oracle.material.poissonRatio,
-    )],
-    elements: grid.elements.map((element) => mElement(
-      element.elementId,
-      element.type,
-      element.nodeIds,
-      'MAT1',
-      thickness,
-    )),
-    restraints,
-    loadCases: [mLoadCase('LC1', loads)],
-  });
-  const result = solveContinuumModel(model, 'LC1');
-  assert.equal(result.status, 'QUALIFIED', firstDiagnostic(result));
-
-  const tipDeflection = averageTipDisplacement(result, tipNodeIds, orientation);
-  const reference = referenceDeflection();
-  const forceScale = oracle.load.resultant;
-  const momentScale = forceScale * length;
-  const forceError = Math.hypot(
-    result.equilibriumTotals.fx,
-    result.equilibriumTotals.fy,
-  ) / forceScale;
-  const momentError = Math.abs(result.equilibriumTotals.mz) / momentScale;
-  const externalWork = externalWorkFromTipLoads(
-    result,
-    tipNodeIds,
-    forceShare,
-    orientation,
-  );
-  const energyError = relativeDifference(
-    result.strainEnergy,
-    externalWork,
-    Math.abs(externalWork),
-  );
-  const elementEnergyError = relativeDifference(
-    result.strainEnergy,
-    result.energyConsistency.elementEnergyTotal,
-    Math.abs(result.strainEnergy),
-  );
-
-  assert.ok(
-    forceError <= oracle.tolerances.forceEquilibriumRelative,
-    `${orientation} ${nx}x${ny} force equilibrium error ${forceError} exceeds tolerance`,
-  );
-  assert.ok(
-    momentError <= oracle.tolerances.momentEquilibriumRelative,
-    `${orientation} ${nx}x${ny} moment equilibrium error ${momentError} exceeds tolerance`,
-  );
-  assert.ok(
-    energyError <= oracle.tolerances.energyRelative,
-    `${orientation} ${nx}x${ny} external-work error ${energyError} exceeds tolerance`,
-  );
-  assert.ok(
-    elementEnergyError <= oracle.tolerances.energyRelative,
-    `${orientation} ${nx}x${ny} element-energy error ${elementEnergyError} exceeds tolerance`,
-  );
-
-  return {
-    mesh: `${nx}x${ny}`,
-    elementCount: nx * ny,
-    nodeCount: nodes.length,
-    freeDofCount: result.constraintPartition.freeEquations.length,
-    restrainedDofCount: result.constraintPartition.constrainedEquations.length,
-    solverMethod: result.backendTrace.backendIdentity,
-    tipDeflection,
-    deflectionRatio: tipDeflection / reference,
-    appliedLoadTotals: result.appliedLoadTotals,
-    reactionTotals: result.reactionTotals,
-    equilibriumTotals: result.equilibriumTotals,
-    relativeForceEquilibriumError: forceError,
-    relativeMomentEquilibriumError: momentError,
-    strainEnergy: result.strainEnergy,
-    externalWork,
-    relativeExternalWorkError: energyError,
-    elementEnergyTotal: result.energyConsistency.elementEnergyTotal,
-    relativeElementEnergyError: elementEnergyError,
-    residualInfinityNorm: result.globalResidual.infinityNorm,
-  };
-}
-
-function averageTipDisplacement(result, nodeIds, orientation) {
-  const component = orientation === 'HORIZONTAL' ? 'UY' : 'UX';
-  const sign = orientation === 'HORIZONTAL' ? -1 : 1;
-  const byIdentity = new Map(
-    result.nodalDisplacements.map((row) => [`${row.nodeId}:${row.component}`, row.value]),
-  );
-  const values = nodeIds.map((nodeId) => {
-    const value = byIdentity.get(`${nodeId}:${component}`);
-    assert.ok(Number.isFinite(value), `missing tip displacement ${nodeId}:${component}`);
-    return sign * value;
-  });
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function externalWorkFromTipLoads(result, nodeIds, forceShare, orientation) {
-  const component = orientation === 'HORIZONTAL' ? 'UY' : 'UX';
-  const signedForce = orientation === 'HORIZONTAL' ? -forceShare : forceShare;
-  const byIdentity = new Map(
-    result.nodalDisplacements.map((row) => [`${row.nodeId}:${row.component}`, row.value]),
-  );
-  return 0.5 * nodeIds.reduce((sum, nodeId) => {
-    const displacement = byIdentity.get(`${nodeId}:${component}`);
-    assert.ok(Number.isFinite(displacement), `missing work displacement ${nodeId}:${component}`);
-    return sum + signedForce * displacement;
-  }, 0);
+function validateLevel(level) {
+  assert.ok(Number.isInteger(level.nx) && level.nx > 0);
+  assert.ok(Number.isInteger(level.ny) && level.ny > 0);
+  assert.equal(level.elementCount, 2 * level.nx * level.ny);
+  assert.ok(['DETERMINISTIC_CHOLESKY', 'DETERMINISTIC_JACOBI_PCG'].includes(level.solverMethod));
 }
 
 function referenceDeflection() {
@@ -284,17 +495,42 @@ function referenceDeflection() {
     + load * length / (oracle.shearCorrectionFactor * shearModulus * area);
 }
 
-function assertReplayDeterminism(replays, label) {
-  const hashes = replays.map((row) => row.semanticHash);
-  assert.equal(new Set(hashes).size, 1, `${label} replay hashes differ: ${hashes.join(', ')}`);
+function transformPoint(x, y, orientation) {
+  return orientation === 'HORIZONTAL'
+    ? { x: clean(x), y: clean(y) }
+    : { x: clean(-y), y: clean(x) };
+}
+
+function transformVector(x, y, orientation) {
+  return orientation === 'HORIZONTAL'
+    ? { x: clean(x), y: clean(y) }
+    : { x: clean(-y), y: clean(x) };
+}
+
+function byCase(result, id) {
+  const row = result.loadCaseResults.find((item) => item.loadCaseId === id);
+  assert.ok(row, `missing load case ${id}`);
+  return row;
 }
 
 function relativeDifference(left, right, scale) {
-  const denominator = Math.max(Math.abs(scale), Number.EPSILON);
-  return Math.abs(left - right) / denominator;
+  return Math.abs(left - right) / Math.max(Math.abs(scale), 1e-30);
+}
+
+function close(actual, expected, label) {
+  const scale = Math.max(Math.abs(actual), Math.abs(expected), 1e-30);
+  assert.ok(Math.abs(actual - expected) / scale <= 1e-14, `${label}: ${actual} != ${expected}`);
+}
+
+function within(value, limit, label) {
+  assert.ok(Number.isFinite(value) && value <= limit, `${label}: ${value} > ${limit}`);
+}
+
+function clean(value) {
+  return Object.is(value, -0) || Math.abs(value) < 1e-15 ? 0 : value;
 }
 
 function firstDiagnostic(result) {
   const diagnostic = result.diagnostics?.[0];
-  return diagnostic ? `${diagnostic.code}: ${diagnostic.message}` : `status=${result.status}`;
+  return diagnostic ? `${diagnostic.code}: ${diagnostic.message}` : `state=${result.qualification?.state}`;
 }
