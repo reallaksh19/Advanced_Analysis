@@ -69,14 +69,14 @@ for (const [replayKey, dataKey] of Object.entries(replayMap)) {
   assert.equal(data.replay.deterministicReportHashes[replayKey], rawHash(paths[dataKey]));
 }
 
-const expectedElementCounts = [64, 256, 1024];
-assert.equal(data.projection.levels.length, 3);
+const expectedElementCounts = [64, 256, 1024, 4096];
+assert.equal(data.projection.levels.length, expectedElementCounts.length);
 const projectedElementCounts = data.projection.levels.map(
   (level) => level.meshEvidence.mesh.elements.length,
 );
 assert.deepEqual(projectedElementCounts, expectedElementCounts);
 const levelResults = data.execution.controllerResult.levelResults;
-assert.equal(levelResults.length, 3);
+assert.equal(levelResults.length, expectedElementCounts.length);
 const levelVerification = levelResults.map((level, index) => {
   const projected = data.projection.levels[index];
   const result = level.execution?.result;
@@ -120,13 +120,18 @@ const qualificationStates = {
 qualificationStates.bucketQualified = Object.values(qualificationStates).every(Boolean);
 const base = {
   schema: 'lafea-bucket-01-final-qualification/v1',
-  producerRevision: 'B01-FINAL-QUALIFICATION.2',
+  producerRevision: 'B01-FINAL-QUALIFICATION.3',
   exactHeadSha,
   definitionSetHash: data.definition.definitionSetHash,
+  governedElementCounts: expectedElementCounts,
+  evaluatedResponseElementCounts: [256, 1024, 4096],
   levelVerification,
   qualificationStates,
   status: qualificationStates.bucketQualified ? 'BUCKET_01_QUALIFIED' : 'BUCKET_01_NOT_QUALIFIED',
   authority: {
+    governed4096ProductionLevelRetained: true,
+    directFixedPointStressAuthorityRequired: true,
+    integrationPointExtrapolationAccepted: false,
     bucket01ContinuumLugPinholeQualified: qualificationStates.bucketQualified,
     broaderReleaseQualified: false,
   },
