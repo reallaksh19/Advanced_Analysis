@@ -129,9 +129,7 @@ export class TopologyEditViewportBackend {
     if (!Array.isArray(planes)) {
       throw new TypeError('TopologyEditViewportBackend: Section planes must be an array.');
     }
-    if (planes.length !== 0 && planes.length !== 6) {
-      throw new RangeError('TopologyEditViewportBackend: Section planes must contain zero or six equations.');
-    }
+    if (planes.length !== 0 && planes.length !== 6) throw new RangeError('TopologyEditViewportBackend: Section planes must contain zero or six equations.');
     const equations = createTopologyEditSectionPlaneEquations(planes);
     this.activeSectionPlaneEquations = equations;
     this.activeSectionPlanes = Object.freeze(equations.map(({ normal, constant }) => (
@@ -142,14 +140,7 @@ export class TopologyEditViewportBackend {
     return equations.length;
   }
 
-  sectionedGroups() {
-    return [
-      this.groups.sourceGroup,
-      this.groups.draftGroup,
-      this.groups.supportGroup,
-      this.groups.ghostGroup,
-    ];
-  }
+  sectionedGroups() { return [this.groups.sourceGroup, this.groups.draftGroup, this.groups.supportGroup, this.groups.ghostGroup]; }
 
   applySectionPlanesToGroup(group) {
     const materials = new Set();
@@ -236,12 +227,9 @@ export class TopologyEditViewportBackend {
 
   pickWithRaycaster(pointer) {
     this.pickRaycaster.setFromCamera(pointer, this.activeCamera);
-    const hit = this.pickRaycaster.intersectObjects(this.scene.children, true).find((candidate) => (
-      !hasNonPickableAncestor(candidate.object)
-      && (
-        !hasAncestorInGroups(candidate.object, this.sectionedGroups())
-        || isEngineeringPointInsideSectionPlanes(candidate.point, this.activeSectionPlaneEquations)
-      )
+    const hit = this.pickRaycaster.intersectObjects(this.scene.children, true).find((candidate) => !hasNonPickableAncestor(candidate.object) && (
+      !hasAncestorInGroups(candidate.object, this.sectionedGroups())
+      || isEngineeringPointInsideSectionPlanes(candidate.point, this.activeSectionPlaneEquations)
     ));
     if (!hit) return null;
     return this.pickReceipt(resolveHitTarget(hit), hit.point);
