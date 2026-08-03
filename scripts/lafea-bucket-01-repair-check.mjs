@@ -23,6 +23,7 @@ const checkDefinitions = [
   { id: 'THREE_REPLAY_CUSTODY_CONTRACT', script: 'scripts/lafea-bucket-01-replay-custody-check.mjs' },
   { id: 'GOVERNED_T3_PATCH_RECEIPT', script: 'scripts/lafea-bucket-01-t3-patch-check.mjs' },
   { id: 'GOVERNED_PURE_SHEAR_RECEIPT', script: 'scripts/lafea-bucket-01-pure-shear-check.mjs' },
+  { id: 'GOVERNED_PLANE_STRESS_CANTILEVER', script: 'scripts/lafea-bucket-01-cantilever-check.mjs' },
   { id: 'MANUFACTURED_PURE_BENDING_PANEL', script: 'scripts/lafea-bucket-01-pure-bending-panel-check.mjs' },
   { id: 'THREE_LEVEL_GCI_EVALUATOR', script: 'scripts/lafea-bucket-01-convergence-check.mjs' },
   { id: 'FIXED_PHYSICAL_PROBE_RECOVERY', script: 'scripts/lafea-bucket-01-fixed-probe-check.mjs' },
@@ -33,7 +34,7 @@ const checks = checkDefinitions.map((definition) => runNodeCheck(definition));
 const failed = checks.filter((check) => check.status !== 'PASS');
 const repairChecksPass = failed.length === 0;
 const report = {
-  schema: 'lafea-bucket-01-repair-check-report/v12',
+  schema: 'lafea-bucket-01-repair-check-report/v13',
   status: repairChecksPass ? 'REPAIR_CHECKS_PASS' : 'REPAIR_CHECKS_FAIL',
   bucketId: 'LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE',
   target: 'C2D-LUG-PINHOLE -> LAFEA.3',
@@ -59,6 +60,8 @@ const report = {
     governedT3PatchEvidenceGenerated: repairChecksPass,
     governedPureShearOracleFrozen: true,
     governedPureShearEvidenceGenerated: repairChecksPass,
+    governedCantileverExpectedValuesFrozen: true,
+    governedCantileverEvidenceGenerated: repairChecksPass,
     manufacturedPanelOracleFrozen: true,
     manufacturedPanelEvidenceGenerated: repairChecksPass,
     exactHeadRepositoryExecutionProven: false,
@@ -86,6 +89,7 @@ const report = {
     replayPassClaimedForRepositoryCandidate: false,
     governedT3PatchBenchmarkImplemented: repairChecksPass,
     governedPureShearBenchmarkImplemented: repairChecksPass,
+    governedCantileverBenchmarkImplemented: repairChecksPass,
     manufacturedPanelBenchmarkImplemented: repairChecksPass,
     fixedPhysicalProbeInfrastructureImplemented: repairChecksPass,
     asymptoticGciInfrastructureImplemented: repairChecksPass,
