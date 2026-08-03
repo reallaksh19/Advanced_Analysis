@@ -396,7 +396,7 @@ function buildParentCellLineage(radialDivisions, circumferentialDivisions,
       cellId: `C-R${Math.floor(ring / factor)}-S${Math.floor(sector / factor)}`,
     }));
     if (currentRadial % 2 !== 0 || currentCircumferential % 2 !== 0
-      || currentRadial < 2 || currentCircumferential < 16) break;
+      || currentRadial <= 2 || currentCircumferential <= 16) break;
     currentRadial /= 2;
     currentCircumferential /= 2;
     factor *= 2;
