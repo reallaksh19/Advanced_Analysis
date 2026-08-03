@@ -21,6 +21,7 @@
       { "anchorId": "R73", "value": 73 },
       { "anchorId": "R87", "value": 87 }
     ],
+    "protectedBreakpoints": [],
     "targetPhase": 0.35,
     "backgroundBaseDivisions": 6,
     "windowClearanceFraction": 0.3
@@ -33,6 +34,7 @@
       { "anchorId": "THETA_67", "value": 67 },
       { "anchorId": "THETA_83", "value": 83 }
     ],
+    "protectedBreakpoints": [90, 180, 270],
     "targetPhase": 0.65,
     "backgroundBaseDivisions": 16,
     "windowClearanceFraction": 0.3
@@ -45,6 +47,7 @@
     "minimumParametricDiagonalSeparation": 0.3,
     "anchorCellWidthContraction": "EXACT_FACTOR_TWO_PER_LEVEL",
     "transitionCellPolicy": "DETERMINISTIC_BACKGROUND_GAP_PARTITION",
+    "protectedFeatureLinesDegrees": [0, 90, 180, 270],
     "globalCoordinateNestingRequired": false,
     "anchorCellSelfSimilarityRequired": true
   },
