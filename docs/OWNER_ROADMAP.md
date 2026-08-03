@@ -584,3 +584,67 @@ before being accepted (not just trusted because the agent sounded
 confident), and both were fixed with a superseding comment rather than
 silently editing the issue body, preserving the mistake-and-correction
 trail for anyone reading the thread later.
+
+### M016 and M017 — reviewed and merged
+
+Both corrected Work Packs came back as draft PRs with an explicit note
+that the required real-repository commands had **not** been run in the
+agent's environment. Full independent Owner review performed on both
+before merge — real clone into an isolated worktree, every changed file
+read in full, every required command actually executed, load-bearing
+arithmetic hand-verified.
+
+- **M016 (#517) → PR #521, merged as `5db5cda3d8ae6d152815fd3bbe10680f2a3abfa9`.**
+  Read both new files in full
+  (`lfea-b3.13-appendix-s-example2-fixtures.mjs`,
+  `lfea-b3.13-appendix-s-example2-check.mjs`). Confirmed only the 3
+  allowed files changed (`package.json` + the two B3.13 files) via
+  `git diff cb9e2a2 33082b6 --name-only`. Ran `check:lfea-b3.13` for
+  real: exit 0, solver diagnostics excellent (`residual≈1e-14`,
+  `forceEquilibrium≈1.6e-15`, `energyBalance=0` exactly), worst
+  published-reaction deviation 4.7% (node 10 Mz) against the 10%
+  tolerance ceiling. Verified the lift-off mechanism structurally (node
+  50's `UY` constraint checked as genuinely absent from
+  `compilation.model.constraints` in the governing case, not just
+  numerically absent) and the "attached" sanity solve showing a clear
+  tension reaction (< -1000 N) proving lift-off is physically necessary.
+  Full `check:lfea-linear-core` aggregate passed.
+
+- **M017 (#520) → PR #525, merged (squash) as
+  `1bc45736c507f537dbaccc287cc4e18682a567ce`.** A diff against the
+  PR's reported `base.sha` initially looked scope-violating
+  (unrelated `topology-edit` files appeared changed) — resolved by
+  finding the true fork point with `git merge-base` (`cb9e2a2`, not the
+  reported base tip) rather than trusting GitHub's reported base SHA;
+  re-diffing against the real merge-base confirmed exactly the 11 files
+  and line counts the PR described, no scope violation. Read all 4
+  production file diffs
+  (`categories.js`, `code-engine.js`, `code-engine-contract.js`,
+  `b31-application.js`) plus the new 566-line `lfea-b4.4-expansion-
+  range-envelope-check.mjs` in full. Hand-verified the Eq. (1b)
+  arithmetic independently: `0.85 * (1.25*(100e6+90e6) - 20e6) =
+  184,875,000`, exact match to the check script's own fixture. Ran
+  every individually-required command for real
+  (`check:lfea-b3.13`, `check:lfea-b4.0`, `check:lfea-b4.1`,
+  `check:lfea-b4.3`, `check:lfea-b4.4`, `check:lfea-code-application`)
+  plus the full `check:lfea-linear-core` aggregate — all exit 0.
+  Merging M016 first produced the anticipated `package.json`
+  `check:lfea-linear-core` aggregate-string conflict (both Work Packs
+  extended the same script from the same base commit — the same
+  recurring pattern as M014/M015). Resolved by rebasing the M017
+  worktree onto the new `main`, manually reconciling the conflict to
+  include both `check:lfea-b3.13` and `check:lfea-b4.4` in correct
+  relative order, re-running every required command plus the full
+  aggregate against the rebased head (all exit 0 again), then
+  force-with-lease pushing the rebased branch before merging.
+
+- **Post-merge sanity check on real `main`**: fresh worktree cloned
+  from `origin/main` at `1bc4573`, `npm install`, full
+  `check:lfea-linear-core` aggregate run end to end — exit 0, every
+  assertion `PASS`. Both `/tmp/m016-review` and `/tmp/m017-review`
+  worktrees removed after verification.
+
+Both M016 and M017 are closed out. The Example 3 (moment reversal)
+benchmark itself — the actual reason M017 was built — is not yet
+scoped and is the next Work Pack to dispatch, mirroring the M014→M013
+pattern this whole sequence has followed.
