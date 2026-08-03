@@ -1,0 +1,187 @@
+name: LAFEA Bucket-01 Production Qualification
+
+on:
+  push:
+    branches: [bucket-01-cantilever-benchmark-route]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  retained-production-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Execute retained production evidence
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports/qualification
+          node scripts/lafea-bucket-01-exact-head-check.mjs \
+            > reports/qualification/production-preflight-exact-head.stdout.log \
+            2> reports/qualification/production-preflight-exact-head.stderr.log
+          node scripts/lafea-bucket-01-expected-value-registry-check.mjs \
+            > reports/qualification/production-preflight-definitions.stdout.log \
+            2> reports/qualification/production-preflight-definitions.stderr.log
+          node scripts/lafea-bucket-01-production-response-runner.mjs \
+            > reports/qualification/production-preflight-execution.stdout.log \
+            2> reports/qualification/production-preflight-execution.stderr.log
+          node scripts/lafea-bucket-01-production-response-receipt.mjs \
+            > reports/qualification/production-preflight-response.stdout.log \
+            2> reports/qualification/production-preflight-response.stderr.log
+          node scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs \
+            > reports/qualification/production-preflight-kirsch.stdout.log \
+            2> reports/qualification/production-preflight-kirsch.stderr.log
+          node scripts/lafea-bucket-01-production-lug-probe-receipt.mjs \
+            > reports/qualification/production-preflight-lug.stdout.log \
+            2> reports/qualification/production-preflight-lug.stderr.log
+          node scripts/lafea-bucket-01-final-adjudication-contract-check.mjs \
+            > reports/qualification/production-preflight-adjudication.stdout.log \
+            2> reports/qualification/production-preflight-adjudication.stderr.log
+      - name: Emit external authority request
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE' \
+            > reports/qualification/lafea-bucket-01-code-basis-authority-request.json
+          import fs from 'node:fs';
+          import { canonicalLafeaSha256 } from './src/workspace/lafea-canonical-sha256.js';
+          const template = JSON.parse(fs.readFileSync('validation/bucket-01/09-code-basis-intake-template.json', 'utf8'));
+          const probeSpec = JSON.parse(fs.readFileSync('validation/bucket-01/08-production-lug-fixed-probe-spec.json', 'utf8'));
+          const base = {
+            schema: 'lafea-bucket-01-code-basis-authority-request/v1',
+            exactHeadSha: process.env.EXPECTED_HEAD_SHA,
+            benchmarkId: 'C2D-LUG-PINHOLE-01',
+            target: 'C2D-LUG-PINHOLE -> LAFEA.3',
+            probeSpecHash: canonicalLafeaSha256(probeSpec),
+            intakeTemplateHash: canonicalLafeaSha256(template),
+            requiredSecretName: 'LAFEA_BUCKET_01_APPROVED_CODE_BASIS_JSON',
+            requiredAuthoritySource: 'EXTERNAL_ENGINEERING_AUTHORITY',
+            status: 'APPROVED_CODE_BASIS_REQUIRED',
+          };
+          console.log(JSON.stringify({ ...base, evidenceHash: canonicalLafeaSha256(base) }, null, 2));
+          NODE
+      - name: Publish retained-evidence status
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=success \
+            -f context=lafea/bucket-01-retained-production-evidence \
+            -f description="1024-element response and fixed lug probes retained"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-bucket-01-retained-production-${{ github.sha }}
+          path: reports/qualification/
+          if-no-files-found: error
+          retention-days: 90
+
+  qualification-replay:
+    if: github.event_name == 'workflow_dispatch'
+    needs: retained-production-evidence
+    strategy:
+      fail-fast: false
+      matrix:
+        replay_id: [REPLAY-01, REPLAY-02, REPLAY-03]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Materialize approved code-basis input
+        env:
+          APPROVED_CODE_BASIS_JSON: ${{ secrets.LAFEA_BUCKET_01_APPROVED_CODE_BASIS_JSON }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${APPROVED_CODE_BASIS_JSON}" ]]; then
+            echo "Repository secret LAFEA_BUCKET_01_APPROVED_CODE_BASIS_JSON is required." >&2
+            exit 78
+          fi
+          mkdir -p external/qualification
+          printf '%s' "${APPROVED_CODE_BASIS_JSON}" \
+            > external/qualification/lafea-bucket-01-approved-code-basis-input.json
+          node -e "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'))" \
+            external/qualification/lafea-bucket-01-approved-code-basis-input.json
+      - name: Run isolated production replay
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+          LAFEA_BUCKET_01_REPLAY_ID: ${{ matrix.replay_id }}
+          LAFEA_BUCKET_01_CODE_BASIS_INPUT_PATH: external/qualification/lafea-bucket-01-approved-code-basis-input.json
+        run: node scripts/lafea-bucket-01-production-replay.mjs
+      - name: Stage replay bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p replay-bundle/reports
+          cp -R reports/qualification replay-bundle/reports/
+          cp reports/qualification/lafea-bucket-01-replay-row.json replay-bundle/
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-bucket-01-replay-${{ matrix.replay_id }}-${{ github.sha }}
+          path: replay-bundle/
+          if-no-files-found: error
+          retention-days: 90
+
+  finalize-production-qualification:
+    if: github.event_name == 'workflow_dispatch'
+    needs: qualification-replay
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: lafea-bucket-01-replay-*-${{ github.sha }}
+          path: external/qualification/replays
+          merge-multiple: false
+      - name: Assemble final replay custody and qualification
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+          LAFEA_BUCKET_01_REPLAY_BUNDLE_ROOT: external/qualification/replays
+        run: node scripts/lafea-bucket-01-finalize-production-qualification.mjs
+      - name: Publish production-ready status
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=success \
+            -f context=lafea/bucket-01-production-ready \
+            -f description="Bucket-01 qualified with code authority and three isolated replays"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-bucket-01-final-qualification-${{ github.sha }}
+          path: reports/qualification/
+          if-no-files-found: error
+          retention-days: 90
