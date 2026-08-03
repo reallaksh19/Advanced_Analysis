@@ -2,10 +2,11 @@
  * B7D bounded controller for C2D-LUG-PINHOLE -> LAFEA.3.
  *
  * The controller revalidates B1/B2/B7A/B7B/B7C authority, issues one exact
- * source authority, executes three governed T6 meshes through the retained
- * public stage route, retains integration-point recovery and registers the
- * stage-correct lifecycle. It does not expose a UI callback, project stress,
- * assess code, authorize shell work, qualify release or authorize general T7D.
+ * source authority, executes three or four governed T6 meshes through the
+ * retained public stage route, retains integration-point recovery and
+ * registers the stage-correct lifecycle. It does not expose a UI callback,
+ * project stress, assess code, authorize shell work, qualify release or
+ * authorize general T7D.
  */
 import {
   createControlledContinuumExecutionReceipt,
@@ -56,6 +57,7 @@ const STAGE_ID = 'LAFEA.3';
 const TEMPLATE_ID = 'C2D-LUG-PINHOLE';
 const PILOT_ID = 'C2D-LUG-PINHOLE->LAFEA.3/B7C';
 const PRODUCER_REF = 'B7D/C2D-LUG-PINHOLE/LAFEA.3/B7D.1';
+const SUPPORTED_LEVEL_COUNTS = Object.freeze(new Set([3, 4]));
 const INPUT_KEYS = Object.freeze([
   'request', 'releaseRecord', 'compatibilityReceipt', 'mappingPackage',
   'benchmarkQualification', 'document', 'levels', 'convergenceRequest',
@@ -666,13 +668,17 @@ function controllerResult(context, status) {
 }
 
 function normalizeControllerLevels(value) {
-  if (!Array.isArray(value) || value.length !== 3) {
-    throw new TypeError('Controlled continuum controller requires three levels.');
+  if (!Array.isArray(value) || !SUPPORTED_LEVEL_COUNTS.has(value.length)) {
+    throw new TypeError(
+      'Controlled continuum controller requires three or four levels.',
+    );
   }
   const levels = [...value].sort((left, right) => left.ordinal - right.ordinal)
     .map((row) => {
       exactKeys(row, LEVEL_INPUT_KEYS, 'Controlled continuum level input');
-      if (![1, 2, 3].includes(row.ordinal)) {
+      if (!Number.isInteger(row.ordinal)
+        || row.ordinal < 1
+        || row.ordinal > value.length) {
         throw new TypeError('Controlled continuum level ordinal is invalid.');
       }
       requirePlainRecord(row.document, 'level.document');
@@ -684,7 +690,9 @@ function normalizeControllerLevels(value) {
       });
     });
   if (levels.some((row, index) => row.ordinal !== index + 1)) {
-    throw new TypeError('Controlled continuum levels must be ordinal 1, 2 and 3.');
+    throw new TypeError(
+      'Controlled continuum levels must use contiguous ordinals.',
+    );
   }
   return levels;
 }
