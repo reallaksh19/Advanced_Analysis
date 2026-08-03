@@ -94,10 +94,10 @@ assert.ok(
   phaseSeparation
     >= design.topologyPolicy.minimumParametricDiagonalSeparation,
 );
-assert.equal(
-  phaseSeparation,
-  design.topologyPolicy.minimumParametricDiagonalSeparation,
-);
+assert.ok(Math.abs(
+  phaseSeparation
+    - design.topologyPolicy.minimumParametricDiagonalSeparation,
+) <= 1e-12);
 
 const candidateLevels = radialPlan.levels.map((radialLevel, index) => {
   const circumferentialLevel = circumferentialPlan.levels[index];
