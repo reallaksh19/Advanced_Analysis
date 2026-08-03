@@ -3,6 +3,7 @@ import { projectDataStore } from './project-data/project-data-store.js';
 import { buildRoutePartitionModel } from './routes/route-partition-model.js';
 import { buildSupportSiteModel, findSupportSiteByEntityId } from './support-sites/support-site-model.js';
 import { engineeringSupportLoadStore } from './engineering-loads/engineering-support-load-store.js';
+import { AUTHORIZED_EMPIRICAL_LOAD_EXECUTION_REQUEST_SCHEMA } from './engineering-loads/authorized-empirical-load-execution.js';
 
 /**
  * Holds canonical support sites and route partitions for the active dataset and
@@ -26,9 +27,7 @@ export class EngineeringModelStore {
   }
 
   calculate(masterData) {
-    if (!this.#dataset || !this.#supportSiteModel || !this.#routePartitionModel) {
-      throw new Error('Load calculation requires an active normalized dataset.');
-    }
+    this.#requireActiveModels();
     return engineeringSupportLoadStore.calculate({
       dataset: this.#dataset,
       profile: projectDataStore.getProfile(),
@@ -36,6 +35,27 @@ export class EngineeringModelStore {
       routePartitionModel: this.#routePartitionModel,
       masterData,
     });
+  }
+
+  calculateAuthorized({ executionId, executedAt, authorizedInput, masterData }) {
+    this.#requireActiveModels();
+    return engineeringSupportLoadStore.calculateAuthorized({
+      schema: AUTHORIZED_EMPIRICAL_LOAD_EXECUTION_REQUEST_SCHEMA,
+      executionId,
+      executedAt,
+      authorizedInput,
+      dataset: this.#dataset,
+      profile: projectDataStore.getProfile(),
+      supportSiteModel: this.#supportSiteModel,
+      routePartitionModel: this.#routePartitionModel,
+      masterData,
+    });
+  }
+
+  #requireActiveModels() {
+    if (!this.#dataset || !this.#supportSiteModel || !this.#routePartitionModel) {
+      throw new Error('Load calculation requires an active normalized dataset.');
+    }
   }
 
   canonicalEntityId(entityId) {
@@ -81,6 +101,7 @@ export class EngineeringModelStore {
   getSupportSiteModel() { return this.#supportSiteModel; }
   getRoutePartitionModel() { return this.#routePartitionModel; }
   getDistribution() { return engineeringSupportLoadStore.getDistribution(); }
+  getAuthorizedExecution() { return engineeringSupportLoadStore.getAuthorizedExecution(); }
   clear() { this.rebuild(null); engineeringSupportLoadStore.clear(); }
 }
 
