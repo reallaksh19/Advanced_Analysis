@@ -19,11 +19,11 @@ current source — do not trust the document alone.
 | P4 Frame element, releases, offsets, constraints | Done, verified (16/16 closed-form) | pre-existing |
 | P5 Load-calculation engine | Thermal (element-level) and gravity/self-weight (`PIPE_WALL`) now both convert to real system forces, not just declaration-level; pressure still contract-level only | M007 |
 | P6 Sparse assembly, solve, instability diagnostics | Done end to end — factorization, solve, assembly, and qualification all genuinely sparse on the sparse (default) path | M002, M005 |
-| P7 Member-force and stress recovery | Force recovery done; stress recovery unverified | — |
+| P7 Member-force and stress recovery | Force recovery (pre-existing) plus B31.3 component-code-point combined member stress (`calculatedStress`) both done and now closed-form verified against the real B-3.4→B-4.0 chain. Scope is B31.3 code-point stress specifically, not a category-neutral bare-frame-station result — declined by Owner decision on #464, not an open gap | M009 |
 | P8 Extrema and envelopes | Partial (governing-case tracking proven) | — |
 | P9 Professional analysis UI | Partial (Run Analysis trigger exists, no authoring UI) | M003 |
 | P10 Professional results UI + exports | Partial (text/table only for Stack C) | M003 |
-| P11 Closed-form + convergence qualification | 12/20 mandate cases verified, growing (adds thermal expansion + gravity self-weight) | M004, M006, M007 |
+| P11 Closed-form + convergence qualification | 13+/20 mandate cases verified, growing (adds thermal expansion, gravity self-weight, B31.3 combined stress) | M004, M006, M007, M009 |
 | P12 Real 1885 end-to-end qualification | Blocked on P1 Benchmark B | — |
 | P13 Independent/commercial comparison | Not started | — |
 
@@ -41,8 +41,7 @@ current source — do not trust the document alone.
 | (direct fix, no WP) | — | #461 | Merged | `check:lfea-linear-core` now completes end to end for the first time since M001 — replaced its dependency on a deleted, non-functional CI workflow file with the mechanisms that actually keep the workspace-integration check and its e2e spec wired in |
 | M008 | #463 | — | Prequalification answered, verified, and approved (Owner spot-checked all load-bearing claims) | Benchmark B — governed analysis-authority overlay for the real 1885 project. Real candidate branch confirmed: `/ASIM-1885-8"-S8810103-91261M7-HC-01/B1`, 16 entities, zero missing-attribute diagnostics (8 clean branches exist total). Split into M008-A/B/C/D; M008-A now live as #468 |
 | M008-A | #468 | — | Ready | Overlay + branch-subset contracts only (schema/validation/hashing, no extraction algorithm, no solver wiring) — first slice of the M008 split |
-| M009 | #464 | — | Prequalification answered, verified, and scope decided (Owner spot-checked all load-bearing claims) | B-4.0's `calculatedStress` confirmed real, production-wired, and already displayed/exported — not a gap. Broad "implement stress recovery" declined (no mandate text to justify scope beyond what exists); pressure-stress-from-geometry and EditionDataset-import gaps logged but not authorized. Verification-only benchmark now live as #469 |
-| M009 (verification benchmark) | #469 | — | Ready | Closed-form independent verification of `combineStressTerms` against the real B-3.4→B-4.0 chain (`lfea-b4.1`) |
+| M009 | #464 | #471 | Merged | B-4.0's `calculatedStress` confirmed real, production-wired, and already displayed/exported — not a gap. Broad "implement stress recovery" declined (no mandate text to justify scope beyond what exists); pressure-stress-from-geometry and EditionDataset-import gaps logged but not authorized. Closed-form verification benchmark added at `lfea-b4.1` (#469), Owner-validated including hand-verified arithmetic |
 
 ### Non-LFEA workstreams (user-directed pivot, 4 parallel read-only audits + direct fixes)
 
@@ -99,8 +98,7 @@ and authorized only M008-A so far — each subsequent slice gets its own
 Work Pack once the prior one merges and is Owner-validated. This remains the
 single highest-mandate-value remaining item and the prerequisite for P12.
 
-**M009 — prequalification complete, verified, scope decided. Verification
-benchmark ready (#469).** Stress recovery for frame/pipe elements (mandate
+**M009 — done.** Stress recovery for frame/pipe elements (mandate
 §13.3, no saved verbatim text found — the working definition used was
 exactly "stress recovery for frame/pipe elements"). The agent's answer
 confirmed the member-stress calculation
@@ -119,7 +117,11 @@ caller-supplied, never computed anywhere), and a real licensed-`EditionDataset`
 supply/import/authoring path (the architecture and a generic caller-injection
 route exist; no real dataset or importer does). Authorized instead: a
 closed-form independent verification benchmark for the existing calculation
-(#469, `lfea-b4.1`) — the same test-only pattern that closed M004 and M006.
+(#469, merged as PR #471, `lfea-b4.1`) — the same test-only pattern that
+closed M004 and M006. Owner exact-head validation additionally hand-verified
+the statics and stress-term arithmetic and confirmed the review addendum's
+anti-drift safeguards (raw-literal check, `indexOf`-based registration
+ordering) genuinely run, not just exist as dead code.
 
 **M010**: Stack-B UI defect re-verification. Before scoping, redo the direct
 verification pass that found D-01/D-09 already fixed — do not reuse
