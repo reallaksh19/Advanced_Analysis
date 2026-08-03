@@ -14,6 +14,9 @@ function headerMarkup(state) {
   const supportSummary = state.supportSiteModel?.summary;
   const routeSummary = state.routePartitionModel?.summary;
   const freshness = state.distribution?.freshness?.status || 'NOT_CALCULATED';
+  const authority = state.authorizedExecution
+    ? 'AUTHORIZED_HANDOFF'
+    : state.distribution ? 'LEGACY_PROJECT_DATA' : 'NOT_CALCULATED';
   return `<header class="empirical-load-calc__header">
     <div><span class="panel-eyebrow">CHAINAGE_TRIBUTARY_SPAN_V2</span><h1>Empirical Support Loads</h1></div>
     <div class="empirical-load-calc__facts">
@@ -21,6 +24,7 @@ function headerMarkup(state) {
       <span>Sites: ${integer(supportSummary?.physicalLocationCount)}</span>
       <span>Routes: ${integer(routeSummary?.routeCount)}</span>
       <span>Freshness: ${escapeHtml(freshness)}</span>
+      <span>Authority: ${escapeHtml(authority)}</span>
     </div>
     <nav class="empirical-load-calc__tabs" aria-label="Load calculation views">
       ${tab('loads', 'Load Evaluation', state.activeTab)}${tab('preflight', 'Pre-flight', state.activeTab)}${tab('project-data', 'Project Data', state.activeTab)}${tab('masters', 'Masters', state.activeTab)}${tab('json-trace', 'JSON Trace', state.activeTab)}
@@ -37,19 +41,52 @@ function tab(id, label, activeTab) {
   return `<button type="button" data-load-calc-tab="${id}" aria-selected="${selected}" class="${selected ? 'is-active' : ''}">${label}</button>`;
 }
 
-export function renderEngineeringLoadPane(container, distribution, supportSiteModel, routePartitionModel) {
+export function renderEngineeringLoadPane(
+  container,
+  distribution,
+  supportSiteModel,
+  routePartitionModel,
+  authorizedExecution = null,
+) {
   if (!container) return;
-  container.innerHTML = `${contractSummary(distribution, supportSiteModel, routePartitionModel)}${caseMarkup(distribution, supportSiteModel)}`;
+  container.innerHTML = `${contractSummary(
+    distribution,
+    supportSiteModel,
+    routePartitionModel,
+    authorizedExecution,
+  )}${caseMarkup(distribution, supportSiteModel)}`;
 }
 
-function contractSummary(distribution, supportSiteModel, routePartitionModel) {
+function contractSummary(distribution, supportSiteModel, routePartitionModel, authorizedExecution) {
   const siteStatus = supportSiteModel?.status || 'NOT_AVAILABLE';
   const routeStatus = routePartitionModel?.status || 'NOT_AVAILABLE';
   const status = distribution?.status || 'NOT_CALCULATED';
   return `<section class="load-contract-summary"><h2>Calculation authority</h2>
     <dl><dt>Support sites</dt><dd>${escapeHtml(siteStatus)}</dd><dt>Route partitions</dt><dd>${escapeHtml(routeStatus)}</dd><dt>Distribution</dt><dd>${escapeHtml(status)}</dd></dl>
+    ${authorizationMarkup(authorizedExecution, distribution)}
     ${blockerMarkup(distribution?.blockers || [...(supportSiteModel?.blockers || []), ...(routePartitionModel?.blockers || [])])}
   </section>`;
+}
+
+function authorizationMarkup(execution, distribution) {
+  if (!execution) {
+    const authority = distribution ? 'LEGACY_PROJECT_DATA' : 'NOT_CALCULATED';
+    return `<p data-empirical-authority="${authority}">Authority: ${authority}. No authorized execution receipt is active.</p>`;
+  }
+  return `<details open data-empirical-authority="AUTHORIZED_HANDOFF">
+    <summary>Authorized execution receipt: ${escapeHtml(execution.executionId)}</summary>
+    <dl>
+      <dt>Status</dt><dd>${escapeHtml(execution.status)}</dd>
+      <dt>Executed</dt><dd>${escapeHtml(execution.executedAt)}</dd>
+      <dt>Project</dt><dd>${escapeHtml(execution.projectId)}</dd>
+      <dt>Baseline</dt><dd><code>${escapeHtml(execution.baselineSemanticHash)}</code></dd>
+      <dt>Handoff</dt><dd><code>${escapeHtml(execution.handoffSemanticHash)}</code></dd>
+      <dt>Projection</dt><dd><code>${escapeHtml(execution.projectionPayloadSemanticHash)}</code></dd>
+      <dt>Input</dt><dd><code>${escapeHtml(execution.authorizedInputSemanticHash)}</code></dd>
+      <dt>Distribution</dt><dd><code>${escapeHtml(execution.distributionSemanticHash)}</code></dd>
+      <dt>Receipt</dt><dd><code>${escapeHtml(execution.semanticHash)}</code></dd>
+    </dl>
+  </details>`;
 }
 
 function caseMarkup(distribution, supportSiteModel) {
