@@ -39,23 +39,25 @@
     {
       "entryId": "PRODUCTION_RESPONSE_CONVERGENCE_DEFINITION",
       "path": "validation/bucket-01/06-production-response-convergence-spec.json",
-      "schema": "lafea-bucket-01-production-response-spec/v2",
+      "schema": "lafea-bucket-01-production-response-spec/v3",
       "role": "FROZEN_PRODUCTION_CONVERGENCE_DEFINITION"
     },
     {
       "entryId": "PRODUCTION_LUG_STRESS_LOCATION_DEFINITION",
       "path": "validation/bucket-01/08-production-lug-fixed-probe-spec.json",
-      "schema": "lafea-bucket-01-production-lug-probe-spec/v1",
+      "schema": "lafea-bucket-01-production-lug-probe-spec/v2",
       "role": "FROZEN_PRODUCTION_STRESS_LOCATION_DEFINITION"
     }
   ],
   "acceptancePolicy": {
     "closedFormBenchmarksRequireIndependentExpectedValues": true,
     "engineeringTheoryBenchmarksRequireFrozenExpectedValues": true,
-    "productionEnergyAcceptedByThreeLevelConvergence": true,
-    "productionStressAcceptedByFixedCoordinateThreeLevelConvergence": true,
+    "productionResponseGovernedByFourLevels": true,
+    "productionEnergyAcceptedByFinestThreeLevelConvergence": true,
+    "productionStressAcceptedByDirectFixedCoordinateFinestThreeLevelConvergence": true,
+    "integrationPointExtrapolationAcceptanceAuthorized": false,
     "movingMaximumAcceptanceAuthorized": false,
     "productionOutputUsedToSelectCoordinatesOrTolerances": false
   },
-  "currentDisposition": "DEFINITION_SET_FROZEN_EXECUTION_EVIDENCE_SEPARATE"
+  "currentDisposition": "GOVERNED_4096_DIRECT_POINT_DEFINITION_SET_FROZEN_EXECUTION_EVIDENCE_SEPARATE"
 }
