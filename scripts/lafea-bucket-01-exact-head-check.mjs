@@ -39,6 +39,7 @@ for (const check of [
   nodeCheck('GOVERNED_PROBE_TOPOLOGY_OBSERVABILITY', 'scripts/lafea-bucket-01-probe-topology-check.mjs'),
   nodeCheck('PROBE_STABLE_POLAR_MESH_DESIGN', 'scripts/lafea-bucket-01-probe-stable-mesh-design-check.mjs'),
   nodeCheck('PROBE_STABLE_CANDIDATE_INTAKE_CONTRACT', 'scripts/lafea-bucket-01-probe-stable-candidate-intake-contract-check.mjs'),
+  nodeCheck('PROBE_STABLE_CANDIDATE_V2_INTAKE_REPLAY', 'scripts/lafea-bucket-01-probe-stable-candidate-v2-check.mjs'),
   nodeCheck('EXPECTED_VALUE_DEFINITION_SET', 'scripts/lafea-bucket-01-expected-value-registry-check.mjs'),
   nodeCheck('CODE_BASIS_INTAKE_CONTRACT', 'scripts/lafea-bucket-01-code-basis-check.mjs'),
   nodeCheck('THREE_REPLAY_CUSTODY_CONTRACT', 'scripts/lafea-bucket-01-replay-custody-check.mjs'),
@@ -69,7 +70,7 @@ recordAssertion(
 const failures = checks.filter((check) => check.status !== 'PASS');
 const executableEvidencePass = failures.length === 0;
 const report = {
-  schema: 'lafea-bucket-01-exact-head-report/v15',
+  schema: 'lafea-bucket-01-exact-head-report/v16',
   status: executableEvidencePass
     ? 'EXACT_HEAD_REPAIR_EVIDENCE_PASS'
     : 'EXACT_HEAD_REPAIR_EVIDENCE_BLOCKED',
@@ -89,7 +90,7 @@ const report = {
   unresolvedQualificationGates: [
     'GOVERNED_4096_PRODUCTION_RESPONSE_EXECUTION_NOT_RETAINED',
     'GOVERNED_4096_DIRECT_POINT_STRESS_RECEIPT_NOT_PRODUCED',
-    'PROBE_STABLE_CANDIDATE_MESH_NOT_GENERATED_OR_EXECUTED',
+    'PROBE_STABLE_CANDIDATE_PRODUCTION_SWITCH_NOT_AUTHORIZED',
     'APPROVED_CODE_BASIS_AUTHORITY_NOT_SUPPLIED',
     'THREE_EXTERNAL_REPLAY_BUNDLES_NOT_SUPPLIED',
   ],
@@ -114,6 +115,7 @@ const report = {
     governedProbeTopologyObservabilityImplemented: true,
     probeStablePolarMeshDesignImplemented: true,
     probeStableCandidateIntakeContractImplemented: true,
+    probeStableCandidateV2IntakeReplayExecuted: executableEvidencePass,
     probeStablePolarMeshProductionAuthority: false,
     probeStableCandidateProductionSwitchAuthorized: false,
     productionLugFixedProbeContractImplemented: true,
