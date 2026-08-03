@@ -18,6 +18,7 @@ const checkDefinitions = [
   { id: 'SCALABLE_SPARSE_CONTINUUM_SOLVER', script: 'scripts/lafea-bucket-01-scalable-solver-check.mjs' },
   { id: 'GOVERNED_T6_KIRSCH_FIXED_PROBES', script: 'scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs' },
   { id: 'PRODUCTION_LUG_FIXED_PROBE_LOCATION_CONTRACT', script: 'scripts/lafea-bucket-01-production-lug-probe-contract-check.mjs' },
+  { id: 'EXPECTED_VALUE_DEFINITION_SET', script: 'scripts/lafea-bucket-01-expected-value-registry-check.mjs' },
   { id: 'CODE_BASIS_INTAKE_CONTRACT', script: 'scripts/lafea-bucket-01-code-basis-check.mjs' },
   { id: 'THREE_REPLAY_CUSTODY_CONTRACT', script: 'scripts/lafea-bucket-01-replay-custody-check.mjs' },
   { id: 'GOVERNED_T3_PATCH_RECEIPT', script: 'scripts/lafea-bucket-01-t3-patch-check.mjs' },
@@ -32,7 +33,7 @@ const checks = checkDefinitions.map((definition) => runNodeCheck(definition));
 const failed = checks.filter((check) => check.status !== 'PASS');
 const repairChecksPass = failed.length === 0;
 const report = {
-  schema: 'lafea-bucket-01-repair-check-report/v11',
+  schema: 'lafea-bucket-01-repair-check-report/v12',
   status: repairChecksPass ? 'REPAIR_CHECKS_PASS' : 'REPAIR_CHECKS_FAIL',
   bucketId: 'LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE',
   target: 'C2D-LUG-PINHOLE -> LAFEA.3',
@@ -49,6 +50,7 @@ const report = {
     productionLugProbeSpecFrozen: true,
     productionLugProbeLocationContractVerified: repairChecksPass,
     productionLugProbeEvidenceGenerated: false,
+    expectedValueDefinitionSetVerified: repairChecksPass,
     codeBasisIntakeContractVerified: repairChecksPass,
     codeBasisAuthoritySupplied: false,
     threeReplayCustodyContractVerified: repairChecksPass,
@@ -59,7 +61,6 @@ const report = {
     governedPureShearEvidenceGenerated: repairChecksPass,
     manufacturedPanelOracleFrozen: true,
     manufacturedPanelEvidenceGenerated: repairChecksPass,
-    fullIndependentOraclePackageFrozen: false,
     exactHeadRepositoryExecutionProven: false,
   },
   qualificationStates: {
@@ -78,6 +79,7 @@ const report = {
     scalableSparseSolverInfrastructureImplemented: repairChecksPass,
     governedKirschFixedProbeBenchmarkImplemented: repairChecksPass,
     productionLugFixedProbeContractImplemented: repairChecksPass,
+    expectedValueDefinitionSetImplemented: repairChecksPass,
     codeBasisIntakeContractImplemented: repairChecksPass,
     threeReplayCustodyContractImplemented: repairChecksPass,
     governingCodeSelected: false,
