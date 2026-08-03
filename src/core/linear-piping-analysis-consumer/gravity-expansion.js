@@ -1,32 +1,26 @@
 import { semanticHash } from '../shared-piping-model/canonical-json.js';
 import { deepFreeze } from '../shared-piping-model/immutable.js';
-import {
-  computeFrameElementSemanticHash,
-  distributedLoadLocalVector,
-  frameLocalStiffness,
-  frameOffsetMatrix,
-  requireFrameElement,
-  transformLoadToGlobal,
-} from '../linear-fea-frame-element/index.js';
-import { condenseEndConditions, cleanVector } from '../linear-fea-frame-element/frame-element-stiffness.js';
-import { elementDofIndex } from '../linear-fea-contract/conventions.js';
+import { requireFrameElement } from '../linear-fea-frame-element/index.js';
 import {
   PhysicalLoadCaseError,
-  computeLoadCaseEvidenceHash,
-  computeLoadCaseSemanticHash,
-  computePhysicalLoadCaseHash,
   computePrimitiveSemanticHash,
   requireLoadPrimitive,
   requirePhysicalLoadCase,
 } from '../linear-fea-load-case/index.js';
 import { requireMechanicalModelCompilation } from '../linear-fea-model-compiler/index.js';
-import {
-  computePipingComponentSemanticHash,
-  requirePipingComponent,
-} from '../linear-fea-piping-components/index.js';
+import { requirePipingComponent } from '../linear-fea-piping-components/index.js';
 import { compareAscii, failLinearPipingAnalysis } from './validation.js';
+import { augmentFrameElement, augmentPipingComponent } from './gravity-expansion-element-augmentation.js';
+import {
+  GRAVITY_PIPE_WALL_EXPANSION_ID,
+  gravityDerivation,
+  expandLoadCase,
+  groupByElement,
+  requirePositiveFinite,
+  cleanNumber,
+} from './gravity-expansion-primitives.js';
 
-export const GRAVITY_PIPE_WALL_EXPANSION_ID = 'LFEA-M007-GRAVITY-PIPE-WALL-UDL-V1';
+export { GRAVITY_PIPE_WALL_EXPANSION_ID };
 export const GRAVITY_MASS_SOURCE_NOT_IMPLEMENTED_CODE =
   'LOAD_CASE_GRAVITY_MASS_SOURCE_NOT_IMPLEMENTED';
 
@@ -50,12 +44,12 @@ export function expandPipeWallGravitySourceAuthorities({
   compilation,
   loadCase,
   frameElements,
-  pipingComponents = [],
+  pipingComponents,
 }) {
   const acceptedCompilation = requireMechanicalModelCompilation(compilation);
   const acceptedLoadCase = requirePhysicalLoadCase(loadCase);
   const acceptedFrameElements = frameElements.map(requireFrameElement);
-  const acceptedComponents = pipingComponents.map(requirePipingComponent);
+  const acceptedComponents = (pipingComponents ?? []).map(requirePipingComponent);
 
   const gravityPrimitives = acceptedLoadCase.primitives
     .filter((primitive) => primitive.kind === 'GRAVITY')
@@ -205,251 +199,4 @@ function requireImplementedMassSources(gravity) {
 
 function generatedPrimitiveId(gravityPrimitiveId, elementId) {
   return `LP-M007-${gravityPrimitiveId}-${elementId}`;
-}
-
-function gravityDerivation({
-  acceptedCompilation,
-  gravity,
-  element,
-  material,
-  section,
-  density,
-  area,
-  acceleration,
-  lineWeight,
-  intensity,
-}) {
-  return {
-    schema: 'lfea-m007-gravity-pipe-wall-derivation/v1',
-    expansionId: GRAVITY_PIPE_WALL_EXPANSION_ID,
-    compilationSemanticHash: acceptedCompilation.semanticHash,
-    mechanicalModelSemanticHash: acceptedCompilation.mechanicalModelSemanticHash,
-    gravity: {
-      primitiveId: gravity.primitiveId,
-      semanticHash: gravity.semanticHash,
-      sourceEvidence: gravity.sourceEvidence,
-      direction: gravity.direction,
-      accelerationMagnitude: gravity.accelerationMagnitude,
-    },
-    element: {
-      elementId: element.elementId,
-      materialStateId: element.materialStateId,
-      sectionStateId: element.sectionStateId,
-      sourceAncestry: element.sourceAncestry,
-    },
-    material: {
-      materialStateId: material.materialStateId,
-      massDensity: density,
-      sourceEvidence: material.sourceEvidence,
-    },
-    section: {
-      sectionStateId: section.sectionStateId,
-      area,
-      sourceEvidence: section.sourceEvidence,
-    },
-    lineWeight,
-    intensity,
-  };
-}
-
-function expandLoadCase(loadCase, generatedPrimitives) {
-  const primitives = [...loadCase.primitives, ...generatedPrimitives]
-    .sort((left, right) => compareAscii(left.primitiveId, right.primitiveId));
-  const diagnostics = [
-    ...loadCase.diagnostics,
-    ...generatedPrimitives.map((primitive) => ({
-      severity: 'INFO',
-      code: 'LOAD_CASE_GRAVITY_PIPE_WALL_EXPANDED',
-      entityType: 'LOAD_PRIMITIVE',
-      entityId: primitive.primitiveId,
-      message: `PIPE_WALL gravity expanded deterministically to a uniform distributed load on element ${primitive.elementId}.`,
-      evidence: [{
-        evidenceId: 'GRAVITY-PIPE-WALL-DERIVATION',
-        sourceId: primitive.sourceEvidence.sourceId,
-        sourceRevision: primitive.sourceEvidence.sourceRevision,
-        sourceSemanticHash: primitive.sourceEvidence.sourceSemanticHash,
-      }],
-      qualificationEvidenceIds: ['LFEA-M007'],
-    })),
-  ].sort((left, right) => {
-    const entity = compareAscii(left.entityId, right.entityId);
-    return entity !== 0 ? entity : compareAscii(left.code, right.code);
-  });
-  const draft = {
-    ...loadCase,
-    primitives,
-    diagnostics,
-    physicalLoadCaseHash: '',
-    semanticHash: '',
-    evidenceHash: '',
-  };
-  draft.physicalLoadCaseHash = computePhysicalLoadCaseHash(draft);
-  draft.semanticHash = computeLoadCaseSemanticHash(draft);
-  draft.evidenceHash = computeLoadCaseEvidenceHash(draft);
-  return requirePhysicalLoadCase(draft);
-}
-
-function groupByElement(primitives) {
-  const result = new Map();
-  for (const primitive of primitives) {
-    const entries = result.get(primitive.elementId) ?? [];
-    entries.push(primitive);
-    result.set(primitive.elementId, entries);
-  }
-  for (const entries of result.values()) {
-    entries.sort((left, right) => compareAscii(left.primitiveId, right.primitiveId));
-  }
-  return result;
-}
-
-function augmentFrameElement(frameElement, generatedPrimitives, modelElement) {
-  if (generatedPrimitives.length === 0) return frameElement;
-  if (modelElement === undefined
-    || frameElement.material.materialStateId !== modelElement.materialStateId
-    || frameElement.section.sectionStateId !== modelElement.sectionStateId) {
-    failLinearPipingAnalysis(
-      `Element ${frameElement.elementId} does not cite the compiled material/section binding used to derive PIPE_WALL mass.`,
-      'PIPING_ANALYSIS_GRAVITY_ELEMENT_BINDING_MISMATCH',
-      {
-        elementId: frameElement.elementId,
-        compiledMaterialStateId: modelElement?.materialStateId,
-        frameMaterialStateId: frameElement.material.materialStateId,
-        compiledSectionStateId: modelElement?.sectionStateId,
-        frameSectionStateId: frameElement.section.sectionStateId,
-      },
-    );
-  }
-  const properties = {
-    elasticModulus: frameElement.material.elasticModulus,
-    shearModulus: frameElement.material.shearModulus,
-    area: frameElement.section.area,
-    secondMomentY: frameElement.section.secondMomentY,
-    secondMomentZ: frameElement.section.secondMomentZ,
-    polarMoment: frameElement.section.polarMoment,
-    length: frameElement.geometry.length,
-    shearDeformation: frameElement.shearDeformation,
-    shearCorrectionFactorY: frameElement.shearCorrection?.y.value,
-    shearCorrectionFactorZ: frameElement.shearCorrection?.z.value,
-  };
-  const base = frameLocalStiffness(properties);
-  const endConditionEntries = [
-    ...frameElement.endConditions.releases.map((entry) => ({
-      index: elementDofIndex(entry.end, entry.dof),
-      stiffness: 0,
-    })),
-    ...frameElement.endConditions.springs.map((entry) => ({
-      index: elementDofIndex(entry.end, entry.dof),
-      stiffness: entry.stiffness,
-    })),
-  ].sort((left, right) => left.index - right.index);
-
-  let generatedLocal = new Array(12).fill(0);
-  for (const primitive of generatedPrimitives) {
-    const local = distributedLoadLocalVector({
-      primitive,
-      axes: frameElement.localAxes.axes,
-      length: frameElement.geometry.length,
-      phiXY: base.phiXY,
-      phiXZ: base.phiXZ,
-    });
-    generatedLocal = cleanVector(generatedLocal.map((value, index) => value + local[index]));
-  }
-  const condensed = condenseEndConditions(
-    base.matrix,
-    [generatedLocal],
-    endConditionEntries,
-    0,
-  );
-  assertSameVectorOrMatrix(
-    condensed.matrix,
-    frameElement.localStiffness,
-    frameElement.elementId,
-    'local stiffness',
-  );
-  let generatedGlobal = transformLoadToGlobal(
-    condensed.vectors[0],
-    frameElement.transformation.matrix,
-  );
-  if (frameElement.rigidOffsets.I !== null || frameElement.rigidOffsets.J !== null) {
-    generatedGlobal = transformLoadToGlobal(
-      generatedGlobal,
-      frameOffsetMatrix(frameElement.rigidOffsets),
-    );
-  }
-
-  const appliedLoads = [
-    ...frameElement.appliedLoads,
-    ...generatedPrimitives.map((primitive) => ({
-      primitiveId: primitive.primitiveId,
-      kind: primitive.kind,
-      semanticHash: primitive.semanticHash,
-    })),
-  ].sort((left, right) => compareAscii(left.primitiveId, right.primitiveId));
-  const draft = {
-    ...frameElement,
-    equivalentLoadVector: {
-      local: cleanVector(frameElement.equivalentLoadVector.local
-        .map((value, index) => value + condensed.vectors[0][index])),
-      global: cleanVector(frameElement.equivalentLoadVector.global
-        .map((value, index) => value + generatedGlobal[index])),
-    },
-    appliedLoads,
-    semanticHash: '',
-  };
-  draft.semanticHash = computeFrameElementSemanticHash(draft);
-  return requireFrameElement(draft);
-}
-
-function augmentPipingComponent(component, generatedByElement, modelElementsById) {
-  let changed = false;
-  const elements = component.elements.map((entry) => {
-    const generated = generatedByElement.get(entry.elementId) ?? [];
-    if (generated.length === 0) return entry;
-    changed = true;
-    return {
-      ...entry,
-      frameElement: augmentFrameElement(
-        entry.frameElement,
-        generated,
-        modelElementsById.get(entry.elementId),
-      ),
-    };
-  });
-  if (!changed) return component;
-  const draft = { ...component, elements, semanticHash: '' };
-  draft.semanticHash = computePipingComponentSemanticHash(draft);
-  return requirePipingComponent(draft);
-}
-
-function assertSameVectorOrMatrix(actual, expected, elementId, field) {
-  if (actual.length !== expected.length
-    || actual.some((value, index) => !Object.is(value, expected[index]))) {
-    failLinearPipingAnalysis(
-      `Gravity expansion could not reproduce element ${elementId} ${field} from its retained B-3.1 evidence; expansion stops rather than changing the formulation.`,
-      'PIPING_ANALYSIS_GRAVITY_ELEMENT_EVIDENCE_MISMATCH',
-      { elementId, field },
-    );
-  }
-}
-
-function requirePositiveFinite(value, field) {
-  if (typeof value !== 'number' || !Number.isFinite(value) || !(value > 0)) {
-    failLinearPipingAnalysis(
-      `${field} must be positive and finite for PIPE_WALL gravity expansion.`,
-      'PIPING_ANALYSIS_GRAVITY_PROPERTY_INVALID',
-      { field, value },
-    );
-  }
-  return value;
-}
-
-function cleanNumber(value) {
-  if (!Number.isFinite(value)) {
-    failLinearPipingAnalysis(
-      'PIPE_WALL gravity intensity is not finite.',
-      'PIPING_ANALYSIS_GRAVITY_INTENSITY_INVALID',
-      { value },
-    );
-  }
-  return Object.is(value, -0) ? 0 : value;
 }
