@@ -1,0 +1,218 @@
+name: LAFEA Bucket-01 Uniform 16384 Envelope Diagnostic
+
+on:
+  push:
+    branches: [bucket-01-cantilever-benchmark-route]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  envelope-16384:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Execute five-level response and fixed-location envelope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports/qualification
+          context=lafea/uniform-16384-envelope
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=pending -f context="$context" \
+            -f description="Executing fifth uniform qualification level"
+
+          python - <<'PY'
+          from pathlib import Path
+
+          # Reuse the already verified four-level governed-chain and envelope
+          # diagnostic patch, then extend that temporary model by one true 2x
+          # characteristic refinement. No repository source is modified here.
+          workflow = Path('.github/workflows/lafea-bucket-01-uniform-4096-envelope.yml')
+          lines = workflow.read_text().splitlines()
+          start = next(i for i, line in enumerate(lines) if line.strip() == "python - <<'PY'")
+          end = next(i for i in range(start + 1, len(lines)) if lines[i].strip() == 'PY')
+          source = '\n'.join(line[10:] if line.startswith('          ') else line for line in lines[start + 1:end])
+          exec(compile(source, str(workflow), 'exec'))
+
+          def replace_once(path_name, old, new, label):
+              path = Path(path_name)
+              text = path.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f'{label}: marker count={count}: {old[:100]}')
+              path.write_text(text.replace(old, new, 1))
+
+          level5 = (
+              "spec.meshLadder.push({ ordinal: 5, elementCount: 16384, "
+              "meshSize: 0.00390625, radialDivisions: 32, "
+              "circumferentialDivisions: 256, "
+              "solverMethod: 'DETERMINISTIC_JACOBI_PCG', "
+              "stiffnessStorage: 'CSR_FULL_SYMMETRIC' });"
+          )
+          level4_marker = (
+              "spec.meshLadder.push({ ordinal: 4, elementCount: 4096, "
+              "meshSize: 0.0078125, radialDivisions: 16, "
+              "circumferentialDivisions: 128, "
+              "solverMethod: 'DETERMINISTIC_JACOBI_PCG', "
+              "stiffnessStorage: 'CSR_FULL_SYMMETRIC' });"
+          )
+          for name in [
+              'scripts/lafea-bucket-01-production-response-runner.mjs',
+              'scripts/lafea-bucket-01-production-response-receipt.mjs',
+              'scripts/lafea-bucket-01-production-lug-probe-receipt.mjs',
+          ]:
+              replace_once(name, level4_marker, level4_marker + '\n' + level5,
+                           f'{name}: append fifth level')
+
+          replacements = {
+            'src/workspace/lafea-lug-pinhole-physical-problem-contract.js': [
+              ("value.length !== 4", "value.length !== 5", 'physical count'),
+              ("LAFEA_NB_T6C_FOUR_LEVELS_REQUIRED", "LAFEA_NB_T6C_FIVE_LEVELS_REQUIRED", 'physical error'),
+            ],
+            'src/workspace/lafea-lug-pinhole-mesh-ladder.js': [
+              ("intakeValue.levels.length !== 4", "intakeValue.levels.length !== 5", 'ladder count'),
+              ("LAFEA_LUG_PINHOLE_MESH_LADDER_FOUR_LEVELS_REQUIRED", "LAFEA_LUG_PINHOLE_MESH_LADDER_FIVE_LEVELS_REQUIRED", 'ladder error'),
+              ("    && elementCounts[2] < elementCounts[3]))", "    && elementCounts[2] < elementCounts[3]\n    && elementCounts[3] < elementCounts[4]))", 'ladder refine'),
+              ("new Set(meshHashes).size !== 4", "new Set(meshHashes).size !== 5", 'ladder hashes'),
+              ("    && errors[3] <= errors[2]))", "    && errors[3] <= errors[2]\n    && errors[4] <= errors[3]))", 'ladder error monotonic'),
+            ],
+            'src/workspace/lafea-lug-pinhole-physical-problem-batch.js': [
+              ("value.levels.length !== 4", "value.levels.length !== 5", 'projection count'),
+              ("LAFEA_NB_T6C_PROJECTION_FOUR_LEVELS_REQUIRED", "LAFEA_NB_T6C_PROJECTION_FIVE_LEVELS_REQUIRED", 'projection error'),
+            ],
+            'src/core/lafea-application-templates/controlled-continuum-pilot-contract.js': [
+              ("[1, 2, 3, 4].includes(input.ordinal)", "[1, 2, 3, 4, 5].includes(input.ordinal)", 'evidence ordinal'),
+              ("Level ordinal must be 1, 2, 3 or 4.", "Level ordinal must be 1, 2, 3, 4 or 5.", 'evidence ordinal text'),
+              ("value.length !== 4", "value.length !== 5", 'request count'),
+              ("exactly four mesh levels", "exactly five mesh levels", 'request count text'),
+              ("[1, 2, 3, 4].includes(level.ordinal)", "[1, 2, 3, 4, 5].includes(level.ordinal)", 'request ordinal'),
+              ("Mesh level ordinal must be 1, 2, 3 or 4.", "Mesh level ordinal must be 1, 2, 3, 4 or 5.", 'request ordinal text'),
+              ("ordinal 1, 2, 3 and 4.", "ordinal 1, 2, 3, 4 and 5.", 'ordinal sequence'),
+              ("size !== 4\n    || new Set(levels.map((row) => row.meshProfileHash)).size !== 4", "size !== 5\n    || new Set(levels.map((row) => row.meshProfileHash)).size !== 5", 'distinct hashes'),
+              ("exactly four level records", "exactly five level records", 'receipt count text'),
+              ("recoveryHash: levelEvidence[3].recoveryHash", "recoveryHash: levelEvidence[4].recoveryHash", 'finest recovery'),
+              ("exactly four levels", "exactly five levels", 'pilot count text'),
+              ("relativeChanges[3] > normalizedInput.tolerance", "relativeChanges[4] > normalizedInput.tolerance", 'pilot finest'),
+              ("relativeChanges[3] > relativeChanges[2]", "relativeChanges[4] > relativeChanges[3]", 'pilot improvement'),
+            ],
+            'src/workspace/lafea-controlled-continuum-controller.js': [
+              ("value.length !== 4", "value.length !== 5", 'controller count'),
+              ("requires four levels", "requires five levels", 'controller text'),
+              ("[1, 2, 3, 4].includes(row.ordinal)", "[1, 2, 3, 4, 5].includes(row.ordinal)", 'controller ordinal'),
+              ("ordinal 1, 2, 3 and 4.", "ordinal 1, 2, 3, 4 and 5.", 'controller ordinal text'),
+            ],
+            'src/workspace/lafea-bucket-01-production-response.js': [
+              ("[64, 256, 1024, 4096]", "[64, 256, 1024, 4096, 16384]", 'response counts'),
+              ("  'DETERMINISTIC_JACOBI_PCG',\n]);", "  'DETERMINISTIC_JACOBI_PCG',\n  'DETERMINISTIC_JACOBI_PCG',\n]);", 'response solvers'),
+              ("value.length !== 4", "value.length !== 5", 'response count'),
+              ("LAFEA_B01_PRODUCTION_RESPONSE_FOUR_LEVELS_REQUIRED", "LAFEA_B01_PRODUCTION_RESPONSE_FIVE_LEVELS_REQUIRED", 'response error'),
+              ("    && levels[2].meshSize > levels[3].meshSize))", "    && levels[2].meshSize > levels[3].meshSize\n    && levels[3].meshSize > levels[4].meshSize))", 'response mesh order'),
+            ],
+            'scripts/lafea-bucket-01-production-response-receipt.mjs': [
+              ("projectionValue.levels.length, 4", "projectionValue.levels.length, 5", 'response receipt projection'),
+              ("executionValue.controllerResult.levelResults.length, 4", "executionValue.controllerResult.levelResults.length, 5", 'response receipt execution'),
+            ],
+            'scripts/lafea-bucket-01-production-lug-probe-receipt.mjs': [
+              ("[64, 256, 1024, 4096]", "[64, 256, 1024, 4096, 16384]", 'lug counts'),
+              ("projectionValue.levels.length, 4", "projectionValue.levels.length, 5", 'lug projection'),
+              ("executionValue.controllerResult.levelResults.length, 4", "executionValue.controllerResult.levelResults.length, 5", 'lug execution'),
+            ],
+          }
+          for path_name, rows in replacements.items():
+              for old, new, label in rows:
+                  replace_once(path_name, old, new, label)
+          PY
+
+          set +e
+          node scripts/lafea-bucket-01-production-response-runner.mjs \
+            > reports/qualification/16384-runner.stdout.log \
+            2> reports/qualification/16384-runner.stderr.log
+          runner_exit=$?
+          if [[ "$runner_exit" == "0" ]]; then
+            node scripts/lafea-bucket-01-production-response-receipt.mjs \
+              > reports/qualification/16384-response.stdout.log \
+              2> reports/qualification/16384-response.stderr.log
+            response_exit=$?
+            node scripts/lafea-bucket-01-production-lug-probe-receipt.mjs \
+              > reports/qualification/16384-lug.stdout.log \
+              2> reports/qualification/16384-lug.stderr.log
+            lug_exit=$?
+          else
+            response_exit=99
+            lug_exit=99
+          fi
+          set -e
+
+          detail=$(node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const read = (path) => fs.existsSync(path) ? fs.readFileSync(path, 'utf8') : '';
+          const json = (path) => fs.existsSync(path) ? JSON.parse(fs.readFileSync(path, 'utf8')) : null;
+          const response = json('reports/qualification/lafea-bucket-01-production-response.json');
+          const lug = json('reports/qualification/lafea-bucket-01-production-lug-fixed-probes.json');
+          const locations = lug ? [
+            ...lug.standaloneProbeReceipts,
+            ...lug.pathReceipts.flatMap((row) => row.stationReceipts),
+          ] : [];
+          process.stdout.write(JSON.stringify({
+            response: response ? {
+              status: response.status,
+              energies: response.levelEvidence.map((row) => row.totalStrainEnergy),
+              observedOrder: response.energyConvergence.observedOrder,
+              fineGridGci: response.energyConvergence.fineGridGci,
+            } : null,
+            lugStatus: lug?.status ?? null,
+            blockedLocationIds: lug?.blockedLocationIds ?? [],
+            locations: locations.map((row) => ({
+              probeId: row.probeId,
+              zone: row.zone,
+              observations: row.observations,
+              primaryStatus: row.convergence.status,
+              primaryReasons: row.convergence.reasons,
+              envelopeStatus: row.conservativeBound.status,
+              relativeWidth: row.conservativeBound.relativeWidth,
+              relativeWidthMaximum: row.conservativeBound.relativeWidthMaximum,
+              fineExcursionReduced: row.conservativeBound.fineExcursionReduced,
+              status: row.status,
+            })),
+            runnerStderr: read('reports/qualification/16384-runner.stderr.log').slice(-5000),
+            responseStderr: read('reports/qualification/16384-response.stderr.log').slice(-5000),
+            lugStderr: read('reports/qualification/16384-lug.stderr.log').slice(-10000),
+          }));
+          NODE
+          )
+          encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1].slice(0,7500)))" "$detail")
+          if [[ "$runner_exit" == "0" && "$response_exit" == "0" && "$lug_exit" == "0" ]]; then
+            state=success
+            description="16384 response and all fixed locations passed"
+          else
+            state=failure
+            description="16384 fifth-level gate blocked; inspect metrics"
+          fi
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state="$state" -f context="$context" \
+            -f description="$description" \
+            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_16384=${encoded}"
+          if [[ "$runner_exit" != "0" ]]; then exit "$runner_exit"; fi
+          if [[ "$response_exit" != "0" ]]; then exit "$response_exit"; fi
+          exit "$lug_exit"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-uniform-16384-envelope-${{ github.sha }}
+          path: reports/qualification/
+          if-no-files-found: warn
+          retention-days: 30
