@@ -3,62 +3,28 @@ import {
   LAFEA_BUCKET_01_CONTROLLED_CANDIDATE_REPLAY_EVIDENCE_SCHEMA,
   validateLafeaBucket01ControlledCandidateReplayEvidence,
 } from './lafea-bucket-01-controlled-candidate-replay-proposal.js';
+import {
+  LAFEA_BUCKET_01_CONTROLLED_REPLAY_RESULT_SCHEMA,
+  validateLafeaBucket01ControlledReplayResult,
+} from './lafea-bucket-01-controlled-replay-result.js';
 
 export const LAFEA_BUCKET_01_CANDIDATE_REPLAY_ADJUDICATION_INPUT_SCHEMA =
-  'lafea-bucket-01-candidate-replay-adjudication-input/v1';
+  'lafea-bucket-01-candidate-replay-adjudication-input/v2';
 export const LAFEA_BUCKET_01_CANDIDATE_REPLAY_ADJUDICATION_EVIDENCE_SCHEMA =
-  'lafea-bucket-01-candidate-replay-adjudication-evidence/v1';
+  'lafea-bucket-01-candidate-replay-adjudication-evidence/v2';
 export const LAFEA_BUCKET_01_CANDIDATE_REPLAY_ADJUDICATION_REVISION =
-  'B01-CANDIDATE-REPLAY-ADJUDICATION.1';
+  'B01-CANDIDATE-REPLAY-ADJUDICATION.2';
 
 const INPUT_KEYS = Object.freeze([
-  'schema',
-  'exactHeadSha',
-  'designHash',
-  'proposalEvidence',
-  'referenceReplay',
-  'candidateReplay',
+  'schema', 'exactHeadSha', 'designHash', 'proposalEvidence',
+  'referenceReplay', 'candidateReplay',
 ]);
-const REPLAY_KEYS = Object.freeze([
-  'schema',
-  'routeId',
-  'exactHeadSha',
-  'designHash',
-  'frozenInputHashes',
-  'checks',
-  'status',
-  'reasons',
-  'semanticHash',
-]);
-const FROZEN_HASH_KEYS = Object.freeze([
-  'coordinates',
-  'stressTolerances',
-  'loads',
-  'supports',
-  'material',
-  'solverPolicy',
-  'codeBasisBoundary',
-]);
-const CHECK_KEYS = Object.freeze([
-  'meshQuality',
-  'solverAndEquilibrium',
-  'globalResponseConvergence',
-  'kirschFixedProbes',
-  'productionLugStress',
-  'probeTopologyAudit',
-  'repositoryGate',
-]);
-const CHECK_STATUSES = Object.freeze(new Set(['PASS', 'BLOCKED']));
 const HARD_REJECTION_CHECKS = Object.freeze([
-  'meshQuality',
-  'solverAndEquilibrium',
-  'kirschFixedProbes',
-  'probeTopologyAudit',
-  'repositoryGate',
+  'meshQuality', 'solverAndEquilibrium', 'kirschFixedProbes',
+  'probeTopologyAudit', 'repositoryGate',
 ]);
 const DIAGNOSTIC_ONLY_CHECKS = Object.freeze([
-  'globalResponseConvergence',
-  'productionLugStress',
+  'globalResponseConvergence', 'productionLugStress',
 ]);
 
 export function evaluateLafeaBucket01CandidateReplayAdjudication(input) {
@@ -77,6 +43,7 @@ export function evaluateLafeaBucket01CandidateReplayAdjudication(input) {
   const referenceReplay = validateReplay(
     input.referenceReplay,
     proposal.referenceProductionRoute.routeId,
+    'REFERENCE',
     exactHeadSha,
     designHash,
     'reference replay',
@@ -84,6 +51,7 @@ export function evaluateLafeaBucket01CandidateReplayAdjudication(input) {
   const candidateReplay = validateReplay(
     input.candidateReplay,
     proposal.candidateReplayRoute.routeId,
+    'CANDIDATE',
     exactHeadSha,
     designHash,
     'candidate replay',
@@ -91,11 +59,41 @@ export function evaluateLafeaBucket01CandidateReplayAdjudication(input) {
   if (referenceReplay.status !== 'PASS') {
     throw adjudicationError('LAFEA_B01_REFERENCE_REPLAY_NOT_PASS');
   }
-  const frozenInputsMatch = FROZEN_HASH_KEYS.every((key) =>
+  if (referenceReplay.codeRevisionHash !== candidateReplay.codeRevisionHash) {
+    throw adjudicationError('LAFEA_B01_REPLAY_CODE_REVISION_MISMATCH');
+  }
+  if (referenceReplay.candidatePackageHash !== proposal.candidatePackageHash
+    || candidateReplay.candidatePackageHash !== proposal.candidatePackageHash
+    || referenceReplay.candidateIntakeEvidenceHash
+      !== proposal.candidateIntakeEvidenceHash
+    || candidateReplay.candidateIntakeEvidenceHash
+      !== proposal.candidateIntakeEvidenceHash) {
+    throw adjudicationError('LAFEA_B01_REPLAY_CANDIDATE_CUSTODY_MISMATCH');
+  }
+  if (candidateReplay.authority?.independentCheckerExecution !== true
+    || candidateReplay.independentCheckerEvidenceHash === null) {
+    throw adjudicationError('LAFEA_B01_REPLAY_INDEPENDENT_CHECKER_REQUIRED');
+  }
+  const frozenInputKeys = proposal.requiredFrozenInputHashes;
+  const frozenInputsMatch = frozenInputKeys.every((key) =>
     referenceReplay.frozenInputHashes[key]
       === candidateReplay.frozenInputHashes[key]);
   if (!frozenInputsMatch) {
     throw adjudicationError('LAFEA_B01_REPLAY_FROZEN_INPUT_HASH_MISMATCH');
+  }
+  const environmentKeys = [
+    'packageLockHash', 'nodeVersion', 'npmVersion', 'platform', 'architecture',
+    'allowlistedEnvironmentHash',
+  ];
+  const executionEnvironmentCompatible = environmentKeys.every((key) =>
+    referenceReplay.executionEnvironment[key]
+      === candidateReplay.executionEnvironment[key]);
+  if (!executionEnvironmentCompatible) {
+    throw adjudicationError('LAFEA_B01_REPLAY_EXECUTION_ENVIRONMENT_MISMATCH');
+  }
+  if (referenceReplay.executionEnvironment.isolatedOutputNamespace
+    === candidateReplay.executionEnvironment.isolatedOutputNamespace) {
+    throw adjudicationError('LAFEA_B01_REPLAY_OUTPUT_NAMESPACE_NOT_ISOLATED');
   }
 
   const hardBlockingChecks = HARD_REJECTION_CHECKS.filter(
@@ -105,9 +103,7 @@ export function evaluateLafeaBucket01CandidateReplayAdjudication(input) {
     (key) => candidateReplay.checks[key] !== 'PASS',
   );
   let disposition;
-  if (hardBlockingChecks.length > 0
-    || candidateReplay.status !== 'PASS'
-      && candidateReplay.status !== 'BLOCKED') {
+  if (hardBlockingChecks.length > 0) {
     disposition = 'REJECT_CANDIDATE_MESH_FAMILY';
   } else if (diagnosticBlockingChecks.length > 0
     || candidateReplay.status !== 'PASS') {
@@ -121,10 +117,20 @@ export function evaluateLafeaBucket01CandidateReplayAdjudication(input) {
     producerRevision: LAFEA_BUCKET_01_CANDIDATE_REPLAY_ADJUDICATION_REVISION,
     exactHeadSha,
     designHash,
+    codeRevisionHash: candidateReplay.codeRevisionHash,
     proposalEvidenceHash: proposal.semanticHash,
+    candidatePackageHash: proposal.candidatePackageHash,
+    candidateIntakeEvidenceHash: proposal.candidateIntakeEvidenceHash,
+    independentCheckerEvidenceHash:
+      candidateReplay.independentCheckerEvidenceHash,
     referenceReplayHash: referenceReplay.semanticHash,
     candidateReplayHash: candidateReplay.semanticHash,
+    referenceArtifactManifestHash: referenceReplay.artifactManifestHash,
+    candidateArtifactManifestHash: candidateReplay.artifactManifestHash,
     frozenInputsMatch,
+    executionEnvironmentCompatible,
+    isolatedOutputNamespacesVerified: true,
+    statusesDerivedFromArtifacts: true,
     hardBlockingChecks,
     diagnosticBlockingChecks,
     disposition,
@@ -134,7 +140,11 @@ export function evaluateLafeaBucket01CandidateReplayAdjudication(input) {
     ],
     authority: {
       comparisonExecuted: true,
+      artifactCustodyCompared: true,
       frozenInputsVerified: true,
+      codeRevisionParityVerified: true,
+      independentCheckerVerified: true,
+      executionIsolationVerified: true,
       candidateEligibleForProductionSwitchReview:
         disposition === 'ELIGIBLE_FOR_PRODUCTION_SWITCH_REVIEW',
       productionSwitchAuthorized: false,
@@ -162,7 +172,10 @@ export function validateLafeaBucket01CandidateReplayAdjudicationEvidence(value) 
     if (canonicalLafeaSha256(basis) !== value.semanticHash) {
       throw adjudicationError('LAFEA_B01_REPLAY_ADJUDICATION_HASH_TAMPERED');
     }
-    if (value.authority?.productionSwitchAuthorized !== false
+    if (value.statusesDerivedFromArtifacts !== true
+      || value.authority?.artifactCustodyCompared !== true
+      || value.authority?.independentCheckerVerified !== true
+      || value.authority?.productionSwitchAuthorized !== false
       || value.authority?.productionSwitchApplied !== false
       || value.authority?.productionMeshAuthority !== false
       || value.authority?.stressAcceptanceAuthority !== false
@@ -192,7 +205,10 @@ function validateProposal(value, exactHeadSha, designHash) {
   }
   if (value.exactHeadSha !== exactHeadSha
     || value.designHash !== designHash
+    || value.designId !== 'B01-PROBE-STABLE-POLAR-V3'
     || value.status !== 'CONTROLLED_CANDIDATE_REPLAY_PROPOSAL_READY'
+    || value.authority?.artifactDerivedStatusesRequired !== true
+    || value.authority?.independentCheckerRequiredBeforeAdjudication !== true
     || value.authority?.productionSwitchAuthorized !== false
     || value.authority?.productionSwitchApplied !== false
     || value.authority?.productionMeshAuthority !== false
@@ -203,45 +219,26 @@ function validateProposal(value, exactHeadSha, designHash) {
   return value;
 }
 
-function validateReplay(value, expectedRouteId, exactHeadSha, designHash, label) {
-  exactKeys(value, REPLAY_KEYS, label);
-  if (value.schema !== 'lafea-bucket-01-controlled-replay-result/v1'
-    || value.routeId !== expectedRouteId
+function validateReplay(value, expectedRouteId, expectedRouteKind,
+  exactHeadSha, designHash, label) {
+  if (!value
+    || value.schema !== LAFEA_BUCKET_01_CONTROLLED_REPLAY_RESULT_SCHEMA
+    || validateLafeaBucket01ControlledReplayResult(value).ok !== true) {
+    throw adjudicationError('LAFEA_B01_REPLAY_RESULT_INVALID', label);
+  }
+  if (value.routeId !== expectedRouteId
+    || value.routeKind !== expectedRouteKind
     || value.exactHeadSha !== exactHeadSha
-    || value.designHash !== designHash) {
+    || value.designHash !== designHash
+    || value.authority?.artifactCustodyValidated !== true
+    || value.authority?.statusesDerivedFromArtifacts !== true
+    || value.authority?.productionSwitchAuthorized !== false
+    || value.authority?.productionMeshAuthority !== false
+    || value.authority?.qualificationAuthority !== false
+    || value.authority?.bucketQualified !== false) {
     throw adjudicationError('LAFEA_B01_REPLAY_RESULT_CUSTODY_INVALID', label);
   }
-  exactKeys(value.frozenInputHashes, FROZEN_HASH_KEYS, `${label} hashes`);
-  for (const key of FROZEN_HASH_KEYS) {
-    sha256(value.frozenInputHashes[key], `${label}.${key}`);
-  }
-  exactKeys(value.checks, CHECK_KEYS, `${label} checks`);
-  for (const key of CHECK_KEYS) {
-    if (!CHECK_STATUSES.has(value.checks[key])) {
-      throw adjudicationError('LAFEA_B01_REPLAY_CHECK_STATUS_INVALID', key);
-    }
-  }
-  if (!['PASS', 'BLOCKED'].includes(value.status)
-    || !Array.isArray(value.reasons)) {
-    throw adjudicationError('LAFEA_B01_REPLAY_RESULT_STATUS_INVALID', label);
-  }
-  const expectedStatus = CHECK_KEYS.every((key) => value.checks[key] === 'PASS')
-    ? 'PASS' : 'BLOCKED';
-  if (value.status !== expectedStatus
-    || (value.status === 'PASS' && value.reasons.length !== 0)
-    || (value.status === 'BLOCKED' && value.reasons.length === 0)) {
-    throw adjudicationError('LAFEA_B01_REPLAY_RESULT_STATUS_INCONSISTENT', label);
-  }
-  verifySemanticHash(value, 'LAFEA_B01_REPLAY_RESULT_HASH_TAMPERED');
   return value;
-}
-
-function verifySemanticHash(value, code) {
-  const basis = { ...value };
-  delete basis.semanticHash;
-  if (canonicalLafeaSha256(basis) !== value.semanticHash) {
-    throw adjudicationError(code);
-  }
 }
 
 function exactKeys(value, expected, label) {
@@ -252,33 +249,28 @@ function exactKeys(value, expected, label) {
     throw adjudicationError('LAFEA_B01_REPLAY_ADJUDICATION_EXACT_KEYS_INVALID', label);
   }
 }
-
 function gitSha(value) {
   if (typeof value !== 'string' || !/^[0-9a-f]{40}$/u.test(value)) {
     throw adjudicationError('LAFEA_B01_REPLAY_ADJUDICATION_HEAD_INVALID');
   }
   return value;
 }
-
 function sha256(value, label) {
   if (typeof value !== 'string' || !/^sha256:[0-9a-f]{64}$/u.test(value)) {
     throw adjudicationError('LAFEA_B01_REPLAY_ADJUDICATION_HASH_INVALID', label);
   }
   return value;
 }
-
 function adjudicationError(code, message = code) {
   const error = new TypeError(message);
   error.code = code;
   return error;
 }
-
 function deepFreeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   Object.values(value).forEach(deepFreeze);
   return Object.freeze(value);
 }
-
 function isDeepFrozen(value) {
   if (!value || typeof value !== 'object') return true;
   return Object.isFrozen(value) && Object.values(value).every(isDeepFrozen);
