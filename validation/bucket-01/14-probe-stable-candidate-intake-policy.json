@@ -2,11 +2,18 @@
   "schema": "lafea-bucket-01-probe-stable-candidate-intake-policy/v2",
   "policyId": "B01-PROBE-STABLE-CANDIDATE-INTAKE-01",
   "benchmarkId": "C2D-LUG-PINHOLE-01",
-  "sourceDesignId": "B01-PROBE-STABLE-POLAR-V1",
+  "sourceDesignId": "B01-PROBE-STABLE-POLAR-V2",
   "candidatePackageSchema": "lafea-bucket-01-probe-stable-candidate-mesh-package/v1",
   "candidateTopologyReportSchema": "lafea-bucket-01-probe-stable-candidate-topology-report/v1",
   "candidateValidationEvidenceSchema": "lafea-bucket-01-probe-stable-candidate-validation-evidence/v1",
   "topologyValidationEvidenceSchema": "lafea-bucket-01-probe-stable-topology-validation-evidence/v1",
+  "requiredMidsideGeometryPolicy": {
+    "holeBoundaryCircumferentialEdges": "ANALYTIC_CIRCULAR_ARC",
+    "outerBoundaryCircumferentialEdges": "ANALYTIC_CIRCULAR_ARC",
+    "internalCircumferentialEdges": "STRAIGHT_CHORD",
+    "radialEdges": "STRAIGHT_CHORD",
+    "diagonalEdges": "STRAIGHT_CHORD"
+  },
   "expectedLocationCount": 7,
   "minimumCandidateNaturalMargin": 0.05,
   "expectedLevels": [
@@ -46,9 +53,18 @@
     "NO_LOCATION_ON_NODE_EDGE_FEATURE_LINE_OR_DIAGONAL",
     "NATURAL_COORDINATE_DRIFT_REPORTED"
   ],
+  "requiredMeshGeometryAssertions": [
+    "ANALYTIC_ARC_MIDSIDES_ONLY_ON_PHYSICAL_CIRCULAR_BOUNDARIES",
+    "INTERNAL_CIRCUMFERENTIAL_MIDSIDES_ARE_EXACT_CHORD_MIDPOINTS",
+    "RADIAL_AND_DIAGONAL_MIDSIDES_ARE_EXACT_CHORD_MIDPOINTS",
+    "ALL_CORNER_SCALED_JACOBIANS_POSITIVE",
+    "ALL_INTEGRATION_POINT_JACOBIANS_POSITIVE",
+    "ALL_DENSE_SAMPLED_JACOBIANS_POSITIVE"
+  ],
   "requiredExecutedValidation": [
     "CANDIDATE_MESH_PACKAGE_REBUILT",
     "RADIAL_AND_CIRCUMFERENTIAL_COORDINATE_HASHES_REBUILT",
+    "MIDSIDE_GEOMETRY_POLICY_REBUILT",
     "FEATURE_SET_HASHES_REBUILT",
     "QUALITY_HASHES_REBUILT",
     "LOCATION_RECORDS_REBUILT",
@@ -65,5 +81,5 @@
     "bucketQualified": false
   },
   "acceptedDisposition": "CANDIDATE_ACCEPTED_FOR_PHASE_2C_INTEGRATION_REVIEW",
-  "currentDisposition": "POLICY_FROZEN_PENDING_PHASE_2B_CANDIDATE_AND_REBUILD_EVIDENCE"
+  "currentDisposition": "POLICY_BOUND_TO_DESIGN_V2_PENDING_PHASE_2B_CANDIDATE_AND_REBUILD_EVIDENCE"
 }
