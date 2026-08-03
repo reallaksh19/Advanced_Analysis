@@ -116,14 +116,23 @@ assert.doesNotMatch(combined, /unit\s*\?\?\s*['"]m['"]|unit\s*\|\|\s*['"]m['"]/u
 
 const gravityExpansion = source['gravity-expansion.js'];
 const massSourceExpansion = source['gravity-expansion-mass-sources.js'];
+const gravityExpansionPrimitives = source['gravity-expansion-primitives.js'];
 const elementAugmentation = source['gravity-expansion-element-augmentation.js'];
 assert.match(gravityExpansion, /GRAVITY_MASS_SOURCES/u, 'M012 must reuse the B-3.0 mass-source registry');
 assert.match(gravityExpansion, /indexDistributedWeightPrimitives/u);
 assert.match(gravityExpansion, /expandDeclaredDistributedWeightSource/u);
 assert.match(massSourceExpansion, /kind\s*===\s*'DISTRIBUTED_WEIGHT'/u);
 assert.match(massSourceExpansion, /massPerUnitLength\s*\*\s*acceleration/u);
-assert.match(massSourceExpansion, /densityEvidence/u);
-assert.match(massSourceExpansion, /geometryEvidence/u);
+assert.match(
+  gravityExpansionPrimitives,
+  /densityEvidence/u,
+  'M012 derivation record must retain the declared DISTRIBUTED_WEIGHT primitive\'s densityEvidence',
+);
+assert.match(
+  gravityExpansionPrimitives,
+  /geometryEvidence/u,
+  'M012 derivation record must retain the declared DISTRIBUTED_WEIGHT primitive\'s geometryEvidence',
+);
 assert.match(elementAugmentation, /for\s*\(const primitive of generatedPrimitives\)/u);
 assert.match(
   elementAugmentation,
