@@ -51,12 +51,19 @@ jobs:
             > reports/qualification/lafea-bucket-01-exact-head.stdout.log \
             2> reports/qualification/lafea-bucket-01-exact-head.stderr.log
           exit_code=$?
+          blocker=$(node -e "const fs=require('fs');const p='reports/qualification/lafea-bucket-01-exact-head.json';let t='UNKNOWN';if(fs.existsSync(p)){const r=JSON.parse(fs.readFileSync(p,'utf8'));if(r.blockingCheckIds&&r.blockingCheckIds[0])t=r.blockingCheckIds[0]}process.stdout.write(t)")
           if [[ "$exit_code" == "0" ]]; then
             state=success
             description="Bucket-01 exact-head executable gate passed"
           else
             state=failure
-            description=$(node -e "const fs=require('fs');const p='reports/qualification/lafea-bucket-01-exact-head.json';let t='Bucket-01 exact-head gate failed';if(fs.existsSync(p)){const r=JSON.parse(fs.readFileSync(p,'utf8'));if(r.blockingCheckIds&&r.blockingCheckIds[0])t='First blocker: '+r.blockingCheckIds[0]}process.stdout.write(t.slice(0,140))")
+            description="First blocker: ${blocker}"
+            safe_blocker=$(printf '%s' "$blocker" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-60)
+            gh api --method POST \
+              "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -f state=failure \
+              -f context="lafea/blocker/${safe_blocker}" \
+              -f description="$description"
           fi
           gh api --method POST \
             "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
