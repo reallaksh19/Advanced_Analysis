@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   statuses: write
 
 jobs:
@@ -25,9 +25,10 @@ jobs:
           -f context=lafea/bucket-01-exact-head
           -f description="Runner started"
 
-      - name: Checkout exact candidate
+      - name: Checkout repair branch
         uses: actions/checkout@v4
         with:
+          ref: bucket-01-cantilever-benchmark-route
           fetch-depth: 0
 
       - name: Set up Node.js
@@ -39,87 +40,153 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Retain rejected Kirsch and equilibrium diagnostics
+      - name: Apply bounded PCG convergence-headroom repair
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          kirsch = Path('scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs')
-          text = kirsch.read_text()
-          old = "  assert.equal(result.qualification.state, QUALIFICATION_STATES.ACCEPTED);"
-          new = """  assert.equal(
-            result.qualification.state,
-            QUALIFICATION_STATES.ACCEPTED,
-            `Kirsch level ${definition.ordinal} rejected: ${JSON.stringify(result.diagnostics ?? [])}`,
-          );"""
-          if text.count(old) != 1:
-              raise SystemExit(f'expected one Kirsch qualification assertion, found {text.count(old)}')
-          kirsch.write_text(text.replace(old, new))
+          path = Path('src/core/local-continuum/solver.js')
+          text = path.read_text()
+          start = text.index('function conjugateGradientSolve(')
+          end = text.index('\nfunction applyJacobi(', start)
+          block = text[start:end]
 
-          solver = Path('src/core/local-continuum/solver.js')
-          text = solver.read_text()
-          old = """  const totals = equilibriumTotals(dofs, constrained, force, residual);
-            const equilibriumLimit = tolerance(
+          tolerance_block = """  const residualTolerance = tolerance(
+            profile,
+            'freeDofResidual',
+            residualScale,
+          );
           """
-          new = """  const freeTotals = { UX: 0, UY: 0 };
-            free.forEach((index) => {
-              freeTotals[dofAxis(dofs[index])] += residual[index];
-            });
-            const totals = equilibriumTotals(dofs, constrained, force, residual);
-            const equilibriumLimit = tolerance(
-          """
-          if text.count(old) != 1:
-              raise SystemExit(f'expected one equilibrium totals block, found {text.count(old)}')
-          text = text.replace(old, new)
-          old = "      'Reaction equilibrium did not qualify.',"
-          new = "      `Reaction equilibrium did not qualify: freeMaximum=${freeMaximum}, freeLimit=${freeLimit}, freeUX=${freeTotals.UX}, freeUY=${freeTotals.UY}, UX=${totals.UX}, UY=${totals.UY}, limit=${equilibriumLimit}, scale=${scale}.`,"
-          if text.count(old) != 1:
-              raise SystemExit(f'expected one reaction-equilibrium message, found {text.count(old)}')
-          solver.write_text(text.replace(old, new))
+          replacement = tolerance_block + "  const convergenceTarget = residualTolerance / 10;\n"
+          if block.count(tolerance_block) != 1:
+              raise SystemExit('PCG residual tolerance block was not found exactly once')
+          block = block.replace(tolerance_block, replacement)
+
+          if block.count('finalResidualInfinity > residualTolerance') != 2:
+              raise SystemExit('unexpected number of PCG upper-target comparisons')
+          block = block.replace(
+              'finalResidualInfinity > residualTolerance',
+              'finalResidualInfinity > convergenceTarget',
+          )
+          if block.count('finalResidualInfinity <= residualTolerance') != 2:
+              raise SystemExit('unexpected number of PCG lower-target comparisons')
+          block = block.replace(
+              'finalResidualInfinity <= residualTolerance',
+              'finalResidualInfinity <= convergenceTarget',
+          )
+          old_message = '`Sparse PCG residual ${finalResidualInfinity} exceeds ${residualTolerance} after ${iterations} iterations.`'
+          new_message = '`Sparse PCG residual ${finalResidualInfinity} exceeds internal target ${convergenceTarget} (acceptance gate ${residualTolerance}) after ${iterations} iterations.`'
+          if block.count(old_message) != 1:
+              raise SystemExit('PCG non-convergence message was not found exactly once')
+          block = block.replace(old_message, new_message)
+
+          evidence_line = '      residualTolerance: canonicalNumber(residualTolerance),\n'
+          if block.count(evidence_line) != 1:
+              raise SystemExit('PCG residual evidence field was not found exactly once')
+          block = block.replace(
+              evidence_line,
+              '      convergenceTarget: canonicalNumber(convergenceTarget),\n' + evidence_line,
+          )
+
+          path.write_text(text[:start] + block + text[end:])
           PY
 
-      - name: Diagnose governed Kirsch fixed probes
+      - name: Validate scalable sparse solver
+        run: node scripts/lafea-bucket-01-scalable-solver-check.mjs
+
+      - name: Validate governed Kirsch fixed probes
         env:
           EXPECTED_HEAD_SHA: ${{ github.sha }}
-          GH_TOKEN: ${{ github.token }}
+        run: node scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs
+
+      - name: Commit validated solver convergence repair
+        id: commit
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/core/local-continuum/solver.js
+          git commit -m "fix(lafea): add PCG convergence headroom for equilibrium"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Run full exact-head gate on repaired commit
+        id: exact
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.commit.outputs.sha }}
         shell: bash
         run: |
           mkdir -p reports/qualification
           set +e
-          node scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs \
-            > reports/qualification/lafea-bucket-01-kirsch.stdout.log \
-            2> reports/qualification/lafea-bucket-01-kirsch.stderr.log
-          exit_code=$?
-          if [[ "$exit_code" == "0" ]]; then
+          node scripts/lafea-bucket-01-exact-head-check.mjs \
+            > reports/qualification/lafea-bucket-01-exact-head.stdout.log \
+            2> reports/qualification/lafea-bucket-01-exact-head.stderr.log
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Push validated repair commit
+        run: git push origin HEAD:bucket-01-cantilever-benchmark-route
+
+      - name: Publish repaired-head result
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ORIGINAL_SHA: ${{ github.sha }}
+          REPAIRED_SHA: ${{ steps.commit.outputs.sha }}
+          EXIT_CODE: ${{ steps.exact.outputs.exit_code }}
+        shell: bash
+        run: |
+          blocker=$(node -e "const fs=require('fs');const p='reports/qualification/lafea-bucket-01-exact-head.json';let t='UNKNOWN';if(fs.existsSync(p)){const r=JSON.parse(fs.readFileSync(p,'utf8'));if(r.blockingCheckIds&&r.blockingCheckIds[0])t=r.blockingCheckIds[0]}process.stdout.write(t)")
+          repair_blocker=$(node -e "const fs=require('fs');const p='reports/qualification/lafea-bucket-01-repair-check.json';let t='NONE';if(fs.existsSync(p)){const r=JSON.parse(fs.readFileSync(p,'utf8'));if(r.blockingCheckIds&&r.blockingCheckIds[0])t=r.blockingCheckIds[0]}process.stdout.write(t)")
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
+            -f state=success \
+            -f context="lafea/repaired-head/${REPAIRED_SHA:0:12}" \
+            -f description="Validated PCG equilibrium repair committed" \
+            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${REPAIRED_SHA}"
+          if [[ "$EXIT_CODE" == "0" ]]; then
+            state=success
+            description="Bucket-01 exact-head executable gate passed"
+          else
+            state=failure
+            description="First blocker: ${blocker}"
+            safe_blocker=$(printf '%s' "$blocker" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-60)
             gh api --method POST \
-              "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-              -f state=success \
-              -f context="lafea/kirsch-fixed-probes" \
-              -f description="Kirsch fixed-probe check passed"
-            exit 0
+              "repos/${GITHUB_REPOSITORY}/statuses/${REPAIRED_SHA}" \
+              -f state=failure \
+              -f context="lafea/blocker/${safe_blocker}" \
+              -f description="$description"
+            if [[ "$repair_blocker" != "NONE" ]]; then
+              safe_repair_blocker=$(printf '%s' "$repair_blocker" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-52)
+              gh api --method POST \
+                "repos/${GITHUB_REPOSITORY}/statuses/${REPAIRED_SHA}" \
+                -f state=failure \
+                -f context="lafea/repair-blocker/${safe_repair_blocker}" \
+                -f description="Repair blocker: ${repair_blocker}"
+            fi
           fi
-          detail=$(node -e "const fs=require('fs');const p='reports/qualification/lafea-bucket-01-kirsch.stderr.log';const t=fs.existsSync(p)?fs.readFileSync(p,'utf8'):'no stderr';const lines=t.split(/\r?\n/).map(s=>s.trim()).filter(s=>s&&!/^at\s/.test(s)&&!/^node:/.test(s));process.stdout.write(lines.slice(0,16).join(' | ').slice(0,1600))")
-          encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
-          safe=$(printf '%s' "$detail" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-48)
           gh api --method POST \
-            "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -f state=failure \
-            -f context="lafea/kirsch-detail/${safe}" \
-            -f description="Kirsch fixed-probe assertion" \
-            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
-          gh api --method POST \
-            "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -f state=failure \
+            "repos/${GITHUB_REPOSITORY}/statuses/${REPAIRED_SHA}" \
+            -f state="$state" \
             -f context="lafea/bucket-01-exact-head" \
-            -f description="Kirsch diagnostic failed"
-          exit "$exit_code"
+            -f description="$description"
+          exit "$EXIT_CODE"
+
+      - name: Publish workflow failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh api --method POST
+          "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}"
+          -f state=failure
+          -f context=lafea/workflow-failure
+          -f description="PCG equilibrium repair workflow stopped before commit"
 
       - name: Retain qualification reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lafea-bucket-01-kirsch-${{ github.sha }}
+          name: lafea-bucket-01-exact-head-${{ steps.commit.outputs.sha || github.sha }}
           path: reports/qualification/
           if-no-files-found: warn
           retention-days: 30
