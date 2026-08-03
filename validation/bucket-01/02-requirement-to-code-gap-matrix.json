@@ -9,31 +9,31 @@
     "changes_confined_to_separate_common_enriched_consumer_projection_files": true
   },
   "execution_policy": {
-    "hosted_workflow_in_scope": false,
-    "technical_repairs_only": true,
-    "execution_evidence_must_be_supplied_separately": true
+    "hosted_exact_head_workflow_in_scope": true,
+    "technical_repairs_only": false,
+    "retained_production_execution_evidence_must_be_supplied_separately": true
   },
   "bucket_id": "LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE",
   "findings": [
     {
       "id": "G1-EXACT-HEAD",
-      "status": "BLOCKED_PENDING_EXTERNAL_EXECUTION",
-      "finding": "No hosted Bucket-01 workflow is included. Exact-head execution and retained reports must be supplied separately."
+      "status": "TECHNICAL_GATE_IMPLEMENTED",
+      "finding": "One exact-head workflow executes the benchmark, solver, contract, syntax, import, build and hygiene gates. Retained production response, stress, external code authority and replay evidence remain separate qualification inputs."
     },
     {
       "id": "G1-BENCHMARK-LADDER",
       "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXACT_HEAD_EXECUTION",
-      "finding": "An executable anti-drift gate requires T3, T6, pure shear, plane-stress cantilever, Kirsch and production lug in that exact order. The pure-bending panel is retained only as supplemental evidence and cannot substitute for the cantilever."
+      "finding": "An executable anti-drift gate requires T3, T6, pure shear, plane-stress cantilever, Kirsch and production lug in that exact order. The pure-bending panel remains supplemental and cannot substitute for the cantilever."
     },
     {
       "id": "G1-EXPECTED-VALUE-DEFINITION-SET",
       "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXACT_HEAD_EXECUTION",
-      "finding": "One exact-head registry binds four independent closed-form benchmark oracles, one independent engineering-theory cantilever oracle and two frozen production convergence/location definitions by Git blob SHA, raw SHA-256 and canonical JSON hash. Production output is prohibited from generating expected values, selecting coordinates or setting tolerances."
+      "finding": "One exact-head registry binds four independent closed-form benchmark oracles, one independent engineering-theory cantilever oracle and two frozen production convergence/location definitions. Production output cannot generate expected values, select coordinates or set tolerances."
     },
     {
       "id": "G2-PRODUCTION-MESH",
-      "status": "REPAIR_INFRASTRUCTURE_IMPLEMENTED",
-      "finding": "The production annular T6 ladder is independently checked for geometry, Jacobians, midside placement, symmetry, connectivity and feature sets."
+      "status": "GOVERNED_4096_REPAIR_INFRASTRUCTURE_IMPLEMENTED",
+      "finding": "The governed 64/256/1024/4096 annular T6 ladder is checked for geometry, Jacobians, midside placement, symmetry, connectivity and feature sets."
     },
     {
       "id": "G2-MAPPING-COVERAGE",
@@ -58,27 +58,27 @@
     {
       "id": "G3-CANTILEVER",
       "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION",
-      "finding": "The governed plane-stress cantilever consumes a frozen Timoshenko-beam oracle and retains four-level displacement convergence, reactions, force equilibrium, moment equilibrium, strain energy, external work, orientation sensitivity and three deterministic in-process replays."
+      "finding": "The governed plane-stress cantilever consumes a frozen Timoshenko-beam oracle and retains four-level displacement convergence, reactions, equilibrium, strain energy, external work, orientation sensitivity and deterministic replays."
     },
     {
       "id": "G3-PURE-BENDING-PANEL-SUPPLEMENTAL",
       "status": "SUPPLEMENTAL_TECHNICAL_ROUTE_IMPLEMENTED_PENDING_EXECUTION",
-      "finding": "The T6 pure-bending panel remains supplemental formulation evidence for quadratic displacement, linear integration-point stress, energy and moment equilibrium; it is not a cantilever substitute."
+      "finding": "The T6 pure-bending panel remains supplemental formulation evidence and is not a cantilever substitute."
     },
     {
       "id": "G3-LOAD-DRIVEN",
-      "status": "REPAIR_INFRASTRUCTURE_IMPLEMENTED_PENDING_PRODUCTION_EXECUTION",
-      "finding": "The 64/256/1024 production ladder has frozen force, moment and strain-energy convergence contracts plus retained-result receipts."
+      "status": "GOVERNED_4096_ROUTE_IMPLEMENTED_PENDING_RETAINED_EXECUTION",
+      "finding": "The 64/256/1024/4096 production ladder has frozen force, moment and strain-energy contracts. Global convergence is evaluated on the finest three governed levels, 256/1024/4096, while the 64-element result is retained for trend audit."
     },
     {
       "id": "G3-PRODUCTION-SCALABILITY",
-      "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXACT_1024_EXECUTION",
-      "finding": "Dense Cholesky is retained for small systems and deterministic CSR/Jacobi-PCG is used above 1536 DOFs. The exact 1024-element production run is not retained."
+      "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXACT_4096_EXECUTION",
+      "finding": "Dense Cholesky is retained for small systems and deterministic CSR/Jacobi-PCG is used above 1536 DOFs. The governed 4096-element production run is not yet retained at the final exact-head SHA."
     },
     {
       "id": "G4-STRESS-AUTHORITY",
-      "status": "REPAIR_INFRASTRUCTURE_IMPLEMENTED",
-      "finding": "Element-local probes reconstruct unrounded tensors from retained T6 integration points without nodal projection or cross-element averaging."
+      "status": "DIRECT_POINT_REPAIR_INFRASTRUCTURE_IMPLEMENTED",
+      "finding": "Element-local probes now evaluate the T6 displacement gradient directly at each frozen coordinate using retained nodal displacements and the retained element constitutive matrix. Integration-point extrapolation, nodal projection and cross-element averaging are prohibited."
     },
     {
       "id": "G4-KIRSCH-FIXED-PROBES",
@@ -87,18 +87,18 @@
     },
     {
       "id": "G4-PRODUCTION-LUG-LOCATIONS",
-      "status": "TECHNICAL_FIX_IMPLEMENTED",
-      "finding": "Two standalone lug probes and a five-station radial path are frozen before stress observation and map uniquely at all production levels."
+      "status": "GOVERNED_4096_TECHNICAL_FIX_IMPLEMENTED",
+      "finding": "Two standalone lug probes and a five-station radial path remain frozen before stress observation and map uniquely at all four production levels."
     },
     {
       "id": "G4-PRODUCTION-STRESS",
       "status": "TECHNICAL_INFRASTRUCTURE_IMPLEMENTED_PENDING_RETAINED_EXECUTION",
-      "finding": "The production stress receipt requires zone-specific three-level GCI at every frozen coordinate. No production stress PASS is claimed."
+      "finding": "The production stress receipt requires zone-specific GCI over the finest three governed levels at every frozen coordinate using direct T6 point recovery. No production stress PASS is claimed until retained execution proves every location."
     },
     {
       "id": "G4-CODE",
       "status": "TECHNICAL_INFRASTRUCTURE_IMPLEMENTED_AUTHORITY_NOT_SUPPLIED",
-      "finding": "The fail-closed code-basis contract is implemented, but no externally approved governing code, edition, allowable, classification or load combination is supplied."
+      "finding": "The fail-closed code-basis contract consumes direct-point stress evidence, but no externally approved governing code, edition, allowable, classification or load combination is supplied."
     },
     {
       "id": "G5-REPLAY",
@@ -107,14 +107,13 @@
     }
   ],
   "remaining_external_blockers": [
-    "exact-head execution of the mandatory benchmark ladder",
-    "exact 64/256/1024 production execution and retained response receipt",
-    "production lug fixed-probe and path retained stress receipt",
+    "retained exact-head 64/256/1024/4096 production response execution and receipt",
+    "retained exact-head direct-point production lug stress receipt with every frozen location passing",
     "externally approved code-basis package",
     "three deterministic exact-head replay bundles"
   ],
   "qualification_states": {
-    "IMPLEMENTED": "TECHNICAL_CONTRACT_SET_COMPLETE_EXTERNAL_EVIDENCE_OPEN",
+    "IMPLEMENTED": "GOVERNED_4096_DIRECT_POINT_CONTRACT_SET_COMPLETE_EXTERNAL_EVIDENCE_OPEN",
     "CONTRACT_VERIFIED": false,
     "MESH_VERIFIED": false,
     "SOLVER_VERIFIED": false,
