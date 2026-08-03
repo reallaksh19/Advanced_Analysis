@@ -1,13 +1,15 @@
-/** M004 axis HUD layered on the stabilized M003 support-glyph viewport. */
+/** M004 engineering-axis HUD plus M005 reuse/instancing over stabilized M003. */
 import * as THREE from 'three';
 import { ViewportAxisHUD } from '../viewport-axis-hud.js';
 import { ENGINEERING_TO_RENDER_MATRIX4_ELEMENTS } from './topology-edit-coordinate-transform.js';
+import { optimizeTopologyEditRenderGroups } from './topology-edit-render-optimizer.js';
 import { TopologyEditSupportViewportBackend } from './topology-edit-support-viewport-backend.js';
 
 export class TopologyEditNavigationHudViewportBackend extends TopologyEditSupportViewportBackend {
   constructor(options = {}) {
     super(options);
     this.axisHud = null;
+    this.renderOptimizationEvidence = null;
   }
 
   mount(host) {
@@ -15,6 +17,14 @@ export class TopologyEditNavigationHudViewportBackend extends TopologyEditSuppor
     this.axisHud = new ViewportAxisHUD({ basisQuaternion: engineeringBasisQuaternion() });
     this.renderer.domElement.tabIndex = 0;
     this.invalidate('axis-hud-mount');
+  }
+
+  renderSession(model) {
+    this.renderOptimizationEvidence = null;
+    super.renderSession(model);
+    this.renderOptimizationEvidence = optimizeTopologyEditRenderGroups(this.groups);
+    this.engineeringRoot.updateMatrixWorld(true);
+    this.invalidate('render-resource-optimization');
   }
 
   renderFrame() {
@@ -32,6 +42,7 @@ export class TopologyEditNavigationHudViewportBackend extends TopologyEditSuppor
   destroy() {
     this.axisHud?.dispose();
     this.axisHud = null;
+    this.renderOptimizationEvidence = null;
     super.destroy();
   }
 }
