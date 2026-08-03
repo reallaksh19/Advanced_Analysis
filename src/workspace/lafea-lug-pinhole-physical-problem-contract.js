@@ -21,6 +21,7 @@ const FEATURE_ROLES = Object.freeze([
   'RADIAL_QUARTER_0', 'RADIAL_QUARTER_1',
   'RADIAL_QUARTER_2', 'RADIAL_QUARTER_3',
 ]);
+const SUPPORTED_LEVEL_COUNTS = Object.freeze(new Set([3, 4]));
 
 export function canonicalProjectionInput(value) {
   exactKeys(value, [
@@ -170,7 +171,7 @@ function canonicalGeometry(value) {
 }
 
 function canonicalLevels(value) {
-  if (!Array.isArray(value) || value.length !== 3) {
+  if (!Array.isArray(value) || !SUPPORTED_LEVEL_COUNTS.has(value.length)) {
     throw batchError('LAFEA_NB_T6C_THREE_LEVELS_REQUIRED');
   }
   return deepFreeze([...value].sort((a, b) => a.ordinal - b.ordinal)
