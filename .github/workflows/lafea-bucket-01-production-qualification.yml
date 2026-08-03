@@ -38,34 +38,30 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p reports/qualification
-          node scripts/lafea-bucket-01-exact-head-check.mjs \
-            > reports/qualification/production-preflight-exact-head.stdout.log \
-            2> reports/qualification/production-preflight-exact-head.stderr.log
-          node scripts/lafea-bucket-01-expected-value-registry-check.mjs \
-            > reports/qualification/production-preflight-definitions.stdout.log \
-            2> reports/qualification/production-preflight-definitions.stderr.log
-          node scripts/lafea-bucket-01-production-response-runner.mjs \
-            > reports/qualification/production-preflight-execution.stdout.log \
-            2> reports/qualification/production-preflight-execution.stderr.log
-          node scripts/lafea-bucket-01-production-response-receipt.mjs \
-            > reports/qualification/production-preflight-response.stdout.log \
-            2> reports/qualification/production-preflight-response.stderr.log
-          node scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs \
-            > reports/qualification/production-preflight-kirsch.stdout.log \
-            2> reports/qualification/production-preflight-kirsch.stderr.log
-          node scripts/lafea-bucket-01-production-lug-probe-receipt.mjs \
-            > reports/qualification/production-preflight-lug.stdout.log \
-            2> reports/qualification/production-preflight-lug.stderr.log
-          node scripts/lafea-bucket-01-final-adjudication-contract-check.mjs \
-            > reports/qualification/production-preflight-adjudication.stdout.log \
-            2> reports/qualification/production-preflight-adjudication.stderr.log
+          run_stage() {
+            stage="$1"
+            script="$2"
+            printf '%s' "$stage" > reports/qualification/retained-current-stage.txt
+            node "$script" \
+              > "reports/qualification/retained-${stage}.stdout.log" \
+              2> "reports/qualification/retained-${stage}.stderr.log"
+          }
+          run_stage exact-head scripts/lafea-bucket-01-exact-head-check.mjs
+          run_stage expected-values scripts/lafea-bucket-01-expected-value-registry-check.mjs
+          run_stage production-execution scripts/lafea-bucket-01-production-response-runner.mjs
+          run_stage production-response scripts/lafea-bucket-01-production-response-receipt.mjs
+          run_stage kirsch-stress scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs
+          run_stage production-lug-stress scripts/lafea-bucket-01-production-lug-probe-receipt.mjs
+          run_stage final-adjudication-contract scripts/lafea-bucket-01-final-adjudication-contract-check.mjs
       - name: Emit external authority request
         env:
           EXPECTED_HEAD_SHA: ${{ github.sha }}
         shell: bash
         run: |
+          printf '%s' authority-request > reports/qualification/retained-current-stage.txt
           node --input-type=module \
-            > reports/qualification/lafea-bucket-01-code-basis-authority-request.json <<'NODE'
+            > reports/qualification/lafea-bucket-01-code-basis-authority-request.json \
+            2> reports/qualification/retained-authority-request.stderr.log <<'NODE'
           import fs from 'node:fs';
           import { canonicalLafeaSha256 } from './src/workspace/lafea-canonical-sha256.js';
           const template = JSON.parse(fs.readFileSync('validation/bucket-01/09-code-basis-intake-template.json', 'utf8'));
@@ -98,10 +94,23 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          stage=$(cat reports/qualification/retained-current-stage.txt 2>/dev/null || printf unknown)
+          log="reports/qualification/retained-${stage}.stderr.log"
+          if [[ ! -f "$log" ]]; then
+            log="reports/qualification/retained-${stage}.stdout.log"
+          fi
+          detail=$(node -e "const fs=require('fs');const p=process.argv[1];const t=fs.existsSync(p)?fs.readFileSync(p,'utf8'):'missing diagnostic log';process.stdout.write(t.split(/\r?\n/).map(s=>s.trim()).filter(Boolean).slice(-20).join(' | ').slice(0,3500))" "$log")
+          encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
+          safe=$(printf '%s' "$stage" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-45)
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=failure \
+            -f context="lafea/retained-failure/${safe}" \
+            -f description="Retained production evidence failed at ${stage}" \
+            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=failure \
             -f context=lafea/bucket-01-retained-production-evidence \
-            -f description="Retained production evidence failed"
+            -f description="Retained production evidence failed at ${stage}"
       - if: always()
         uses: actions/upload-artifact@v4
         with:
