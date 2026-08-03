@@ -482,3 +482,53 @@ plausible explanation.
   ASME B31.3 Appendix C Table C-1 took a few minutes and settled it
   definitively; guessing from memory (as nearly happened earlier this
   session with an Appendix D SIF formula, off by ~2.1x) would not have.
+
+## Appendix S Examples 2 and 3 — user-directed extension after Example 1
+
+User request: benchmark 2+ more real cases before moving to the deferred
+"configurable prototype" phase (converting hardcoded engineering defaults —
+Appendix D SIFs/flexibility, thermal coefficients, flexibility-matrix
+options, pressure-correction options — into configurable/disclosed items;
+explicitly **not next**, only after these benchmarks). User supplied a
+ROHR2 (SIGMA Ingenieurgesellschaft) verification-manual link as a research
+source. Investigating it directly turned up something valuable: **R011,
+R012, R013 in that manual are ROHR2's own independent verification of
+ASME B31.3 Appendix S Examples 1, 2, and 3 respectively** — a second real
+commercial-vendor cross-check for exactly this document family, on top of
+the SIMFLEX-II comparison already used for Example 1.
+
+- **Example 2 ("Anticipated Sustained Conditions Considering Pipe
+  Lift-Off")** — scoped and dispatched directly as **M016 (#517)**. Real
+  investigation (reading ASME §S302 directly, cross-checked against R012)
+  found it needs **zero new production capability**: the lift-off support
+  is handled by the same technique M013 already used (omit a `UY`
+  restraint from `constraintDeclarations` for the governing case, not a
+  nonlinear/gap-element analysis) — confirmed directly from ROHR2's own
+  documented approach to this exact example. Geometry reconstructed from
+  Table S302.3 as a mirror-symmetric extension of Example 1's own model,
+  converging on a shared node 50 that is a single-acting Y+ support here
+  (not an anchor, as it was in Example 1). Reference table: S302.5.1.
+- **Example 3 ("Moment Reversal")** — **not scoped as a Work Pack yet.**
+  Reading ASME §S303 directly, and reading ROHR2's own R013 comparison
+  document in full (13 pages, every result table), found that unlike
+  Examples 1 and 2, **there is no published displacement/reaction table
+  for this example at all** — ASME's own text says the operating load
+  case's "output is not included," and every real result ROHR2 published
+  for cross-check (`S_L`, `S_E` for two separate alternating branch-hot
+  conditions, then a *combined* range across those two conditions) is a
+  stress quantity. Two real, distinct capability gaps found by direct
+  code inspection, not assumption: (1) `S_L` sustained stress needs
+  #502/M015's section override wired into a real caller — merged as a
+  capability, never connected; (2) the combined stress *range between two
+  different operating conditions* (not the existing install-vs-operating
+  `DISPLACEMENT_STRESS_RANGE`, which is already implemented) is exactly
+  the `EXPANSION_RANGE_ENVELOPE` category already named in
+  `code-engine-contract.js`'s `STRESS_CATEGORIES` but explicitly listed
+  outside `IMPLEMENTED_STRESS_CATEGORIES`. Individually-computed `S_E` for
+  each single branch-hot condition may already be achievable with the
+  existing `DISPLACEMENT_STRESS_RANGE` category run twice — not yet
+  confirmed. Reported to the user rather than scoped a possibly-wrong
+  Work Pack; awaiting a decision on whether to invest in the
+  `EXPANSION_RANGE_ENVELOPE` prerequisite now (which overlaps heavily with
+  the deferred configurability phase's own scope) or defer Example 3
+  until that phase naturally arrives.
