@@ -1,8 +1,9 @@
-/** M002 typed-component materialization layered on the certified M001 viewport lifecycle. */
+/** M002 typed-component and M003 support-glyph materialization over M001 lifecycle. */
 import * as THREE from 'three';
 import { deepFreeze } from '../../core/shared-piping-model/index.js';
 import { engineeringBoundsToRender } from './topology-edit-coordinate-transform.js';
 import { materializeTopologyEditPrimitive } from './topology-edit-primitive-geometry.js';
+import { materializeTopologyEditSupportOverlay } from './topology-edit-support-glyph-geometry.js';
 import { TopologyEditViewportBackend } from './topology-edit-viewport-backend.js';
 
 export function retainTypedTopologyEditPrimitives(model, projection) {
@@ -41,7 +42,9 @@ export class TopologyEditTypedViewportBackend extends TopologyEditViewportBacken
       (sum, row) => sum + (Array.isArray(row.primitives) ? row.primitives.length : 0),
       0,
     );
-    if (!this.hasFitOnce && (elements.length || segments.length || typedCount)) {
+    const supportGlyphCount = Array.isArray(model.supports?.glyphOverlays)
+      ? model.supports.glyphOverlays.length : 0;
+    if (!this.hasFitOnce && (elements.length || segments.length || typedCount || supportGlyphCount)) {
       this.hasFitOnce = true;
       this.fitAll({ remember: false });
       if (this.controls) this.initialCameraState = this.captureCameraState();
@@ -50,6 +53,9 @@ export class TopologyEditTypedViewportBackend extends TopologyEditViewportBacken
 
   renderProjection(group, projection, colorHex, opacity, markerSize) {
     if (!projection) return new THREE.Box3();
+    if (group === this.groups.supportGroup && Array.isArray(projection.glyphOverlays)) {
+      return this.buildSupportGlyphGroup(group, projection);
+    }
     const primitives = Array.isArray(projection.primitives) ? projection.primitives : [];
     const bounds = primitives.length
       ? this.buildTypedPrimitiveGroup(group, primitives, colorHex, opacity, markerSize)
@@ -83,11 +89,33 @@ export class TopologyEditTypedViewportBackend extends TopologyEditViewportBacken
         bounds.union(result.bounds);
       }
     } catch (error) {
-      disposeObjectGeometry(staging);
+      disposeObjectResources(staging);
       material.dispose();
       throw error;
     }
     while (staging.children.length) group.add(staging.children[0]);
+    return bounds;
+  }
+
+  buildSupportGlyphGroup(group, projection) {
+    const markerSize = supportMarkerSize(projection);
+    const staging = new THREE.Group();
+    const bounds = new THREE.Box3();
+    try {
+      for (const overlay of projection.glyphOverlays) {
+        const result = materializeTopologyEditSupportOverlay(overlay, {
+          markerSize,
+          radialSegments: this.navigationConfiguration.meshRadialSegments,
+        });
+        staging.add(result.object);
+        bounds.union(result.bounds);
+      }
+    } catch (error) {
+      disposeObjectResources(staging);
+      throw error;
+    }
+    while (staging.children.length) group.add(staging.children[0]);
+    this.applySectionPlanesToGroup(group);
     return bounds;
   }
 }
@@ -119,6 +147,20 @@ function typedPrimitivePickUserData(primitive) {
       partRole: primitive.partRole,
     },
   };
+}
+
+function supportMarkerSize(projection) {
+  if (projection.glyphOverlays.length === 0) return 1;
+  const sizes = [...new Set((projection.elements || [])
+    .filter((row) => row?.type === 'SUPPORT')
+    .map((row) => Number(row.sizeMm))
+    .filter((value) => Number.isFinite(value) && value > 0))];
+  if (sizes.length !== 1) {
+    throw new Error(
+      'TOPOLOGY_EDIT_SUPPORT_MARKER_POLICY_CONFLICT: Exactly one approved support marker size is required.',
+    );
+  }
+  return sizes[0];
 }
 
 function projectedBounds(elements, segments) {
@@ -168,12 +210,16 @@ function createMaterial(color, opacity) {
   });
 }
 
-function disposeObjectGeometry(root) {
+function disposeObjectResources(root) {
   const geometries = new Set();
+  const materials = new Set();
   root.traverse((object) => {
     if (object.geometry) geometries.add(object.geometry);
+    const rows = Array.isArray(object.material) ? object.material : [object.material];
+    rows.filter(Boolean).forEach((material) => materials.add(material));
   });
   geometries.forEach((geometry) => geometry.dispose());
+  materials.forEach((material) => material.dispose());
 }
 
 function finiteElement(value) {
