@@ -119,12 +119,8 @@ export function resolvePressureStressContribution({
 }) {
   const acceptedLoadCase = requirePhysicalLoadCase(loadCase);
   const element = requireFrameElement(frameElementRecord);
-  const pressurePrimitives = acceptedLoadCase.primitives.filter(
-    (primitive) => primitive.kind === 'PRESSURE',
-  );
-  pressurePrimitives.forEach(requireNoUnsupportedEffects);
-  const pressurePrimitive = pressurePrimitives.find(
-    (primitive) => primitive.elementId === element.elementId,
+  const pressurePrimitive = acceptedLoadCase.primitives.find(
+    (primitive) => primitive.kind === 'PRESSURE' && primitive.elementId === element.elementId,
   );
   if (pressurePrimitive === undefined) return suppliedContribution;
 
