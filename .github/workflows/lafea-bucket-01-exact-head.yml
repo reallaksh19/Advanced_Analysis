@@ -1,4 +1,4 @@
-name: LAFEA Bucket-01 Exact Head
+name: LAFEA Bucket-01 Production Build Diagnostic
 
 on:
   push:
@@ -10,19 +10,10 @@ permissions:
   statuses: write
 
 jobs:
-  exact-head:
+  build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
-      - name: Publish runner-started status
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh api --method POST
-          "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}"
-          -f state=pending
-          -f context=lafea/bucket-01-exact-head
-          -f description="Exact-head runner started"
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -31,52 +22,35 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Run Bucket-01 exact-head gate
-        id: gate
+      - name: Run production build
         env:
-          EXPECTED_HEAD_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           mkdir -p reports/qualification
           set +e
-          node scripts/lafea-bucket-01-exact-head-check.mjs \
-            > reports/qualification/lafea-bucket-01-exact-head.stdout.log \
-            2> reports/qualification/lafea-bucket-01-exact-head.stderr.log
-          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
-          exit 0
-      - name: Publish exact-head result
-        env:
-          GH_TOKEN: ${{ github.token }}
-          EXIT_CODE: ${{ steps.gate.outputs.exit_code }}
-        shell: bash
-        run: |
-          blocker=$(node -e "const fs=require('fs');const p='reports/qualification/lafea-bucket-01-exact-head.json';let t='UNKNOWN';if(fs.existsSync(p)){const r=JSON.parse(fs.readFileSync(p,'utf8'));if(r.blockingCheckIds?.[0])t=r.blockingCheckIds[0]}process.stdout.write(t)")
-          repair_blocker=$(node -e "const fs=require('fs');const p='reports/qualification/lafea-bucket-01-repair-check.json';let t='NONE';if(fs.existsSync(p)){const r=JSON.parse(fs.readFileSync(p,'utf8'));if(r.blockingCheckIds?.[0])t=r.blockingCheckIds[0]}process.stdout.write(t)")
-          if [[ "$EXIT_CODE" == "0" ]]; then
-            state=success
-            description="Bucket-01 exact-head executable gate passed"
-          else
-            state=failure
-            description="First blocker: ${blocker}"
-            safe=$(printf '%s' "$blocker" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-60)
+          npm run build \
+            > reports/qualification/production-build.stdout.log \
+            2> reports/qualification/production-build.stderr.log
+          exit_code=$?
+          if [[ "$exit_code" == "0" ]]; then
             gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-              -f state=failure -f context="lafea/blocker/${safe}" \
-              -f description="$description"
-            if [[ "$repair_blocker" != "NONE" ]]; then
-              nested=$(printf '%s' "$repair_blocker" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-52)
-              gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-                -f state=failure -f context="lafea/repair-blocker/${nested}" \
-                -f description="Repair blocker: ${repair_blocker}"
-            fi
+              -f state=success -f context=lafea/production-build/PASS \
+              -f description="Production build passed"
+          else
+            detail=$(node -e "const fs=require('fs');const out=fs.readFileSync('reports/qualification/production-build.stdout.log','utf8');const err=fs.readFileSync('reports/qualification/production-build.stderr.log','utf8');const text=(out+'\n'+err).split(/\r?\n/).map(s=>s.trim()).filter(Boolean).slice(-30).join(' | ').slice(0,5000);process.stdout.write(text)")
+            encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
+            context=$(printf '%s' "$detail" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-62)
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -f state=failure -f context="lafea/production-build/${context}" \
+              -f description="Production build failed" \
+              -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
           fi
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -f state="$state" -f context=lafea/bucket-01-exact-head \
-            -f description="$description"
-          exit "$EXIT_CODE"
+          exit "$exit_code"
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lafea-bucket-01-exact-head-${{ github.sha }}
+          name: lafea-production-build-${{ github.sha }}
           path: reports/qualification/
           if-no-files-found: warn
           retention-days: 30
