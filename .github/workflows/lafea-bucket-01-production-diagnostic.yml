@@ -7,7 +7,6 @@ on:
 permissions:
   contents: read
   statuses: write
-  issues: write
 
 jobs:
   production-diagnostic:
@@ -165,22 +164,52 @@ jobs:
             -f description="$description"
 
           if [[ -f reports/qualification/lafea-bucket-01-production-diagnostic.json ]]; then
-            body_file=$(mktemp)
-            {
-              echo '<!-- lafea-bucket-01-production-diagnostic -->'
-              echo '### Bucket-01 governed production diagnostic'
-              echo
-              echo "Head: \`${GITHUB_SHA}\`"
-              echo
-              echo '```json'
-              cat reports/qualification/lafea-bucket-01-production-diagnostic.json
-              echo '```'
-              echo
-              echo '_This is a non-blocking diagnostic. Qualification remains fail-closed._'
-            } > "$body_file"
-            gh api --method POST \
-              "repos/${GITHUB_REPOSITORY}/issues/498/comments" \
-              -F "body=@${body_file}"
+            node --input-type=module <<'NODE' > /tmp/lafea-diagnostic-contexts.txt
+            import fs from 'node:fs';
+            const report = JSON.parse(fs.readFileSync(
+              'reports/qualification/lafea-bucket-01-production-diagnostic.json',
+              'utf8',
+            ));
+            const safe = (value) => String(value ?? 'UNKNOWN')
+              .replace(/[^A-Za-z0-9._-]+/gu, '-')
+              .replace(/^-+|-+$/gu, '')
+              .slice(0, 58) || 'UNKNOWN';
+            const rows = [];
+            rows.push([
+              `lafea/diagnostic/result-${safe(report.status)}-${safe(report.firstFailure ?? 'NONE')}`,
+              `Overall ${report.status}; first ${report.firstFailure ?? 'NONE'}`,
+            ]);
+            rows.push([
+              `lafea/diagnostic/response-${safe(report.response?.status ?? 'MISSING')}`,
+              `Response ${report.response?.status ?? 'MISSING'}`,
+            ]);
+            rows.push([
+              `lafea/diagnostic/kirsch-${safe(report.kirsch?.status ?? 'MISSING')}`,
+              `Kirsch ${report.kirsch?.status ?? 'MISSING'}`,
+            ]);
+            rows.push([
+              `lafea/diagnostic/lug-${safe(report.lugStress?.status ?? 'MISSING')}`,
+              `Lug stress ${report.lugStress?.status ?? 'MISSING'}`,
+            ]);
+            for (const location of report.lugStress?.failingLocations ?? []) {
+              const reason = location.reasons?.[0] ?? location.status ?? 'BLOCKED';
+              rows.push([
+                `lafea/diagnostic/stress-${safe(location.probeId)}-${safe(reason)}`,
+                `${location.probeId}: ${reason}`.slice(0, 140),
+              ]);
+            }
+            for (const [context, detail] of rows) {
+              process.stdout.write(`${context}\t${detail}\n`);
+            }
+            NODE
+
+            while IFS=$'\t' read -r context detail; do
+              gh api --method POST \
+                "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+                -f state=success \
+                -f context="$context" \
+                -f description="$detail"
+            done < /tmp/lafea-diagnostic-contexts.txt
           fi
 
       - if: always()
