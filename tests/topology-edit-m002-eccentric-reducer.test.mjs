@@ -86,3 +86,35 @@ function node(id, x, y, z) {
 function edge(id, componentKey, fromNodeId, toNodeId) {
   return { id, componentKey, fromNodeId, toNodeId, entityType: 'REDUCER' };
 }
+
+test('M002 source typed picks preserve the source model role', () => {
+  const backend = new TopologyEditTypedViewportBackend({ navigationConfiguration: CONFIGURATION });
+  backend.renderSession({
+    source: {
+      elements: [],
+      segments: [],
+      primitives: [{
+        primitiveId: 'visual:source-pipe',
+        canonicalEntityId: 'edge:source-pipe',
+        canonicalType: 'PIPE',
+        modelRole: 'SOURCE',
+        partRole: 'body',
+        kind: 'PIPE_CYLINDER',
+        sourcePaths: ['/source/pipe'],
+        workspaceEntityIds: ['workspace:pipe'],
+        parameters: {
+          start: { x: 0, y: 0, z: 0 },
+          end: { x: 100, y: 0, z: 0 },
+          outsideDiameterMm: 20,
+        },
+      }],
+    },
+  });
+  let sourceMesh = null;
+  backend.groups.sourceGroup.traverse((object) => {
+    if (object.isMesh && object.userData?.primitiveId === 'visual:source-pipe') sourceMesh = object;
+  });
+  assert.equal(sourceMesh.userData.pickTarget.modelRole, 'SOURCE');
+  assert.equal(sourceMesh.userData.pickTarget.objectId, 'edge:source-pipe');
+  backend.destroy();
+});
