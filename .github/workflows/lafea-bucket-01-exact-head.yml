@@ -1,4 +1,4 @@
-name: LAFEA Bucket-01 Cantilever Diagnostic
+name: LAFEA Bucket-01 PCG Repair
 
 on:
   push:
@@ -6,51 +6,153 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   statuses: write
 
 jobs:
-  cantilever:
+  repair:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: bucket-01-cantilever-benchmark-route
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Run governed T6 cantilever
+      - name: Repair PCG reliable residual update
         env:
           GH_TOKEN: ${{ github.token }}
+          ORIGINAL_SHA: ${{ github.sha }}
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p reports/qualification
-          set +e
-          node scripts/lafea-bucket-01-cantilever-check.mjs \
-            > reports/qualification/cantilever.stdout.log \
-            2> reports/qualification/cantilever.stderr.log
-          exit_code=$?
-          if [[ "$exit_code" == "0" ]]; then
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-              -f state=success -f context=lafea/cantilever-detail/PASS \
-              -f description="Governed T6 cantilever passed"
-          else
-            detail=$(node -e "const fs=require('fs');const t=fs.readFileSync('reports/qualification/cantilever.stderr.log','utf8');process.stdout.write(t.split(/\r?\n/).map(s=>s.trim()).filter(s=>s&&!/^at\s/.test(s)&&!/^node:/.test(s)).slice(0,20).join(' | ').slice(0,3000))")
+          fail() {
+            stage="$1"; log="$2"
+            detail=$(node -e "const fs=require('fs');const p=process.argv[1];const t=fs.existsSync(p)?fs.readFileSync(p,'utf8'):'missing log';process.stdout.write(t.split(/\r?\n/).map(s=>s.trim()).filter(Boolean).slice(0,20).join(' | ').slice(0,3000))" "$log")
             encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
-            context=$(printf '%s' "$detail" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-68)
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-              -f state=failure -f context="lafea/cantilever-detail/${context}" \
-              -f description="Governed T6 cantilever failed" \
-              -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
+              -f state=failure -f context="lafea/pcg-repair-${stage}" \
+              -f description="PCG repair failed at ${stage}" \
+              -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${ORIGINAL_SHA}?lafea_error=${encoded}"
+            exit 1
+          }
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
+            -f state=pending -f context=lafea/pcg-repair \
+            -f description="Repairing reliable residual update"
+
+          python - <<'PY' > reports/qualification/pcg-patch.stdout.log 2> reports/qualification/pcg-patch.stderr.log || exit 91
+          from pathlib import Path
+          path = Path('src/core/local-continuum/solver.js')
+          text = path.read_text()
+          old_limit = """  const iterationLimit = Math.min(
+              50000,
+              Math.max(500, matrix.size * 8),
+            );"""
+          new_limit = """  const iterationLimit = Math.min(
+              50000,
+              Math.max(1000, matrix.size * 16),
+            );"""
+          if text.count(old_limit) != 1:
+              raise RuntimeError(f'iteration-limit marker count={text.count(old_limit)}')
+          text = text.replace(old_limit, new_limit)
+          old_update = """      iterations += 1;
+              finalResidualInfinity = maxAbs(residual);
+              if (finalResidualInfinity <= convergenceTarget || iterations % 50 === 0) {
+                residual = exactResidual(matrix, rightHandSide, solution);
+                finalResidualInfinity = maxAbs(residual);
+                if (finalResidualInfinity <= convergenceTarget) break;
+              }
+              preconditioned = applyJacobi(matrix.diagonal, residual);"""
+          new_update = """      iterations += 1;
+              const recursiveResidualInfinity = maxAbs(residual);
+              finalResidualInfinity = recursiveResidualInfinity;
+              if (recursiveResidualInfinity <= convergenceTarget || iterations % 100 === 0) {
+                const reliableResidual = exactResidual(matrix, rightHandSide, solution);
+                const reliableResidualInfinity = maxAbs(reliableResidual);
+                finalResidualInfinity = reliableResidualInfinity;
+                if (reliableResidualInfinity <= convergenceTarget) {
+                  residual = reliableResidual;
+                  break;
+                }
+                if (recursiveResidualInfinity <= convergenceTarget) {
+                  residual = reliableResidual;
+                  preconditioned = applyJacobi(matrix.diagonal, residual);
+                  direction = [...preconditioned];
+                  rho = dotVector(residual, preconditioned);
+                  if (!(rho > 0) || !Number.isFinite(rho)) {
+                    throw singularError(
+                      'UNDER_CONSTRAINED_OR_SINGULAR_SYSTEM',
+                      'solver',
+                      'Sparse PCG reliable-update residual product is not positive.',
+                    );
+                  }
+                  continue;
+                }
+              }
+              preconditioned = applyJacobi(matrix.diagonal, residual);"""
+          if text.count(old_update) != 1:
+              raise RuntimeError(f'residual-update marker count={text.count(old_update)}')
+          path.write_text(text.replace(old_update, new_update))
+          PY
+          [[ $? == 0 ]] || fail PATCH reports/qualification/pcg-patch.stderr.log
+
+          node scripts/lafea-bucket-01-scalable-solver-check.mjs \
+            > reports/qualification/pcg-scalable.stdout.log \
+            2> reports/qualification/pcg-scalable.stderr.log \
+            || fail SCALABLE reports/qualification/pcg-scalable.stderr.log
+          node scripts/lafea-bucket-01-cantilever-check.mjs \
+            > reports/qualification/pcg-cantilever.stdout.log \
+            2> reports/qualification/pcg-cantilever.stderr.log \
+            || fail CANTILEVER reports/qualification/pcg-cantilever.stderr.log
+          node scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs \
+            > reports/qualification/pcg-kirsch.stdout.log \
+            2> reports/qualification/pcg-kirsch.stderr.log \
+            || fail KIRSCH reports/qualification/pcg-kirsch.stderr.log
+
+          git add src/core/local-continuum/solver.js
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix(lafea): preserve PCG conjugacy during residual checks" \
+            > reports/qualification/pcg-commit.stdout.log \
+            2> reports/qualification/pcg-commit.stderr.log \
+            || fail COMMIT reports/qualification/pcg-commit.stderr.log
+          repaired_sha=$(git rev-parse HEAD)
+
+          set +e
+          EXPECTED_HEAD_SHA="$repaired_sha" node scripts/lafea-bucket-01-exact-head-check.mjs \
+            > reports/qualification/lafea-bucket-01-exact-head.stdout.log \
+            2> reports/qualification/lafea-bucket-01-exact-head.stderr.log
+          gate_exit=$?
+          set -e
+
+          git push origin HEAD:bucket-01-cantilever-benchmark-route \
+            > reports/qualification/pcg-push.stdout.log \
+            2> reports/qualification/pcg-push.stderr.log \
+            || fail PUSH reports/qualification/pcg-push.stderr.log
+
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
+            -f state=success -f context="lafea/repaired-head/${repaired_sha:0:12}" \
+            -f description="PCG source repair published" \
+            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${repaired_sha}"
+          blocker=$(node -e "const fs=require('fs');const p='reports/qualification/lafea-bucket-01-exact-head.json';let t='UNKNOWN';if(fs.existsSync(p)){const r=JSON.parse(fs.readFileSync(p,'utf8'));if(r.blockingCheckIds?.[0])t=r.blockingCheckIds[0]}process.stdout.write(t)")
+          if [[ "$gate_exit" == "0" ]]; then
+            state=success; description="PCG repair exact-head gate passed"
+          else
+            state=failure; description="PCG repair first blocker: ${blocker}"
           fi
-          exit "$exit_code"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
+            -f state="$state" -f context=lafea/pcg-repair \
+            -f description="$description"
+          exit "$gate_exit"
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lafea-cantilever-diagnostic-${{ github.sha }}
+          name: lafea-pcg-repair-${{ github.sha }}
           path: reports/qualification/
           if-no-files-found: warn
           retention-days: 30
