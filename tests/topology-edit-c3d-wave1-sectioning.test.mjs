@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import * as THREE from 'three';
+import { TopologyEditViewportBackend } from '../src/workspace/topology-edit/topology-edit-viewport-backend.js';
 import {
   createTopologyEditPresentationState,
   parseTopologyEditPresentationState,
@@ -130,16 +132,123 @@ test('runtime fails closed when an active section lacks backend support', () => 
   );
 });
 
-test('production backend filters clipped hits before resolving canonical identity', async () => {
-  const source = await readFile(
-    new URL('../src/workspace/topology-edit/topology-edit-viewport-backend.js', import.meta.url),
-    'utf8',
+test('[SIMULATED] production backend clips only engineering groups and clears deterministically', () => {
+  const backend = new TopologyEditViewportBackend();
+  const renderer = { localClippingEnabled: false };
+  backend.renderer = renderer;
+
+  const sectionedMaterials = [
+    ...addMaterialFixture(backend.groups.sourceGroup, false),
+    ...addMaterialFixture(backend.groups.draftGroup, true),
+    ...addMaterialFixture(backend.groups.supportGroup, false),
+    ...addMaterialFixture(backend.groups.ghostGroup, false),
+  ];
+  const overlayMaterials = [
+    ...addMaterialFixture(backend.groups.connectorGroup, false),
+    ...addMaterialFixture(backend.groups.transientGroup, false),
+    ...addMaterialFixture(backend.groups.selectionGroup, false),
+    ...addMaterialFixture(backend.groups.measurementGroup, false),
+    ...addMaterialFixture(backend.groups.issueGroup, false),
+  ];
+  const planes = topologyEditSectionBoxToPlaneEquations(createTopologyEditSectionState({ box }));
+
+  assert.throws(() => backend.setPresentationSectionPlanes({}), /must be an array/);
+  assert.throws(
+    () => backend.setPresentationSectionPlanes(planes.slice(0, 1)),
+    /must contain zero or six equations/,
   );
-  assert.match(source, /intersects\.find/);
-  assert.match(source, /isEngineeringPointInsideSectionPlanes\(candidate\.point/);
-  assert.match(source, /pickTable\?\.\[hit\.instanceId\]/);
-  assert.match(source, /renderer\.localClippingEnabled/);
-  assert.match(source, /setPresentationSectionPlanes\(\[\]\)/);
+  assert.equal(backend.setPresentationSectionPlanes(planes), 6);
+  assert.equal(renderer.localClippingEnabled, true);
+  sectionedMaterials.forEach((material) => {
+    assert.equal(material.clippingPlanes.length, 6);
+    assert.equal(material.clippingPlanes.every((plane) => plane instanceof THREE.Plane), true);
+  });
+  overlayMaterials.forEach((material) => assert.equal(material.clippingPlanes, null));
+
+  assert.equal(backend.setPresentationSectionPlanes([]), 0);
+  assert.equal(renderer.localClippingEnabled, false);
+  sectionedMaterials.forEach((material) => assert.equal(material.clippingPlanes, null));
+  overlayMaterials.forEach((material) => assert.equal(material.clippingPlanes, null));
+
+  backend.renderer = null;
+  backend.destroy();
+});
+
+test('[SIMULATED] active clipping is applied to late session and ghost materials', () => {
+  const backend = new TopologyEditViewportBackend();
+  const planes = topologyEditSectionBoxToPlaneEquations(createTopologyEditSectionState({ box }));
+  backend.setPresentationSectionPlanes(planes);
+  backend.renderSession({
+    source: projection('source', 0),
+    draft: projection('draft', 1),
+    supports: projection('support', 2),
+    ghost: projection('ghost', 3),
+  });
+
+  [
+    backend.groups.sourceGroup,
+    backend.groups.draftGroup,
+    backend.groups.supportGroup,
+    backend.groups.ghostGroup,
+  ].forEach((group) => {
+    const materials = groupMaterials(group);
+    assert.ok(materials.length > 0);
+    materials.forEach((material) => assert.equal(material.clippingPlanes.length, 6));
+  });
+
+  backend.setPresentationSectionPlanes([]);
+  backend.renderGhost(projection('later-ghost', 4));
+  groupMaterials(backend.groups.ghostGroup)
+    .forEach((material) => assert.equal(material.clippingPlanes, null));
+  backend.destroy();
+});
+
+test('[SIMULATED] ray fallback skips clipped hits, preserves instanced identity, and clear restores picks', () => {
+  const backend = new TopologyEditViewportBackend();
+  const planes = topologyEditSectionBoxToPlaneEquations(createTopologyEditSectionState({ box }));
+  const outside = pickObject({ objectId: 'outside', nodeId: 'outside' });
+  const inside = pickObject({ objectId: 'inside', nodeId: 'inside' });
+  backend.groups.sourceGroup.add(outside);
+  backend.groups.draftGroup.add(inside);
+
+  backend.pickRaycaster = raycasterSpy([
+    { object: outside, point: new THREE.Vector3(50, 0, 0) },
+    { object: inside, point: new THREE.Vector3(0, 0, 0) },
+  ]);
+  backend.setPresentationSectionPlanes(planes);
+  assert.equal(backend.pickWithRaycaster(new THREE.Vector2()).objectId, 'inside');
+
+  backend.pickRaycaster = raycasterSpy([
+    { object: outside, point: new THREE.Vector3(50, 0, 0) },
+  ]);
+  assert.equal(backend.pickWithRaycaster(new THREE.Vector2()), null);
+
+  const instanced = new THREE.Object3D();
+  instanced.userData.pickTable = [
+    { objectKind: 'node', objectId: 'instance-0', nodeId: 'instance-0' },
+    { objectKind: 'node', objectId: 'instance-1', nodeId: 'instance-1' },
+  ];
+  backend.groups.supportGroup.add(instanced);
+  backend.pickRaycaster = raycasterSpy([
+    { object: instanced, instanceId: 1, point: new THREE.Vector3(0, 0, 0) },
+  ]);
+  assert.equal(backend.pickWithRaycaster(new THREE.Vector2()).objectId, 'instance-1');
+
+  backend.setPresentationSectionPlanes([]);
+  backend.pickRaycaster = raycasterSpy([
+    { object: outside, point: new THREE.Vector3(50, 0, 0) },
+  ]);
+  assert.equal(backend.pickWithRaycaster(new THREE.Vector2()).objectId, 'outside');
+
+  const outsideOverlay = pickObject({ objectId: 'outside-overlay', nodeId: 'outside-overlay' });
+  backend.groups.issueGroup.add(outsideOverlay);
+  backend.setPresentationSectionPlanes(planes);
+  backend.pickRaycaster = raycasterSpy([
+    { object: outside, point: new THREE.Vector3(50, 0, 0) },
+    { object: outsideOverlay, point: new THREE.Vector3(50, 0, 0) },
+  ]);
+  assert.equal(backend.pickWithRaycaster(new THREE.Vector2()).objectId, 'outside-overlay');
+  backend.destroy();
 });
 
 test('toolbar requires explicit six-axis bounds and discloses display-only authority', async () => {
@@ -161,4 +270,55 @@ function fakeBackend(setPresentationSectionPlanes) {
   };
   if (setPresentationSectionPlanes) backend.setPresentationSectionPlanes = setPresentationSectionPlanes;
   return backend;
+}
+
+function addMaterialFixture(group, materialArray) {
+  const materials = [
+    new THREE.MeshBasicMaterial(),
+    ...(materialArray ? [new THREE.MeshBasicMaterial()] : []),
+  ];
+  materials.forEach((material) => { material.clippingPlanes = null; });
+  const object = new THREE.Mesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    materialArray ? materials : materials[0],
+  );
+  group.add(object);
+  return materials;
+}
+
+function projection(id, x) {
+  return {
+    elements: [{
+      id,
+      entityId: id,
+      type: 'node',
+      x,
+      y: 0,
+      z: 0,
+      pickTarget: { objectKind: 'node', objectId: id, nodeId: id },
+    }],
+    segments: [],
+  };
+}
+
+function groupMaterials(group) {
+  const materials = new Set();
+  group.traverse((object) => {
+    const rows = Array.isArray(object.material) ? object.material : [object.material];
+    rows.filter(Boolean).forEach((material) => materials.add(material));
+  });
+  return [...materials];
+}
+
+function pickObject(target) {
+  const object = new THREE.Object3D();
+  object.userData.pickTarget = { objectKind: 'node', ...target };
+  return object;
+}
+
+function raycasterSpy(hits) {
+  return {
+    setFromCamera() {},
+    intersectObjects() { return hits; },
+  };
 }
