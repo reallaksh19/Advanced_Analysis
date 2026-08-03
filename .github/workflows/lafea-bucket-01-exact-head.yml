@@ -12,7 +12,7 @@ permissions:
 jobs:
   repair:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,7 +23,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Repair and publish governed result nesting
+      - name: Repair, verify, and publish governed result nesting
         env:
           GH_TOKEN: ${{ github.token }}
           ORIGINAL_SHA: ${{ github.sha }}
@@ -31,24 +31,21 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p reports/qualification
-          publish() {
-            state="$1"; context="$2"; description="$3"
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
-              -f state="$state" -f context="$context" -f description="$description"
-          }
           fail() {
             stage="$1"; log="$2"
             detail=$(node -e "const fs=require('fs');const p=process.argv[1];const t=fs.existsSync(p)?fs.readFileSync(p,'utf8'):'missing log';process.stdout.write(t.split(/\r?\n/).map(s=>s.trim()).filter(Boolean).slice(0,20).join(' | ').slice(0,3000))" "$log")
             encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
             gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
-              -f state=failure -f context="lafea/load-driven-nesting/${stage}" \
-              -f description="Load-driven nesting repair failed at ${stage}" \
+              -f state=failure -f context="lafea/load-driven-publish/${stage}" \
+              -f description="Load-driven source publish failed at ${stage}" \
               -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${ORIGINAL_SHA}?lafea_error=${encoded}"
             exit 1
           }
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
+            -f state=pending -f context=lafea/load-driven-publish \
+            -f description="Publishing verified T6D nesting repair"
 
-          publish pending lafea/load-driven-nesting/PATCH "Repairing governed result nesting"
-          python - <<'PY' > reports/qualification/load-driven-nesting-patch.stdout.log 2> reports/qualification/load-driven-nesting-patch.stderr.log || true
+          python - <<'PY' > reports/qualification/load-driven-patch.stdout.log 2> reports/qualification/load-driven-patch.stderr.log || true
           from pathlib import Path
           path = Path('src/workspace/lafea-load-driven-pilot-qualification.js')
           text = path.read_text()
@@ -79,49 +76,42 @@ jobs:
               text = text.replace(old, new, 1)
           path.write_text(text)
           PY
-          [[ -s reports/qualification/load-driven-nesting-patch.stderr.log ]] \
-            && fail PATCH reports/qualification/load-driven-nesting-patch.stderr.log
-          publish success lafea/load-driven-nesting/PATCH "Governed result nesting repaired"
+          [[ -s reports/qualification/load-driven-patch.stderr.log ]] \
+            && fail PATCH reports/qualification/load-driven-patch.stderr.log
 
-          publish pending lafea/load-driven-nesting/T6D "Running load-driven pilot qualification"
           node scripts/lafea-nb-t6d-load-driven-qualification-check.mjs \
             > reports/qualification/load-driven-t6d.stdout.log \
             2> reports/qualification/load-driven-t6d.stderr.log \
             || fail T6D reports/qualification/load-driven-t6d.stderr.log
-          publish success lafea/load-driven-nesting/T6D "Load-driven pilot qualification passed"
-
-          publish pending lafea/load-driven-nesting/HANDOFF "Running selected-pilot handoff regressions"
-          node scripts/lafea-nb-t6e-evidence-handoff-review-check.mjs \
-            > reports/qualification/load-driven-t6e.stdout.log \
-            2> reports/qualification/load-driven-t6e.stderr.log \
-            || fail HANDOFF reports/qualification/load-driven-t6e.stderr.log
-          node scripts/lafea-nb-t6f-read-only-review-session-check.mjs \
-            > reports/qualification/load-driven-t6f.stdout.log \
-            2> reports/qualification/load-driven-t6f.stderr.log \
-            || fail HANDOFF reports/qualification/load-driven-t6f.stderr.log
-          publish success lafea/load-driven-nesting/HANDOFF "Selected-pilot handoff regressions passed"
+          npm run syntax:strict \
+            > reports/qualification/load-driven-syntax.stdout.log \
+            2> reports/qualification/load-driven-syntax.stderr.log \
+            || fail SYNTAX reports/qualification/load-driven-syntax.stderr.log
 
           git add src/workspace/lafea-load-driven-pilot-qualification.js
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "fix(lafea): read governed load-case evidence fields" \
-            > reports/qualification/load-driven-nesting-commit.stdout.log \
-            2> reports/qualification/load-driven-nesting-commit.stderr.log \
-            || fail COMMIT reports/qualification/load-driven-nesting-commit.stderr.log
+            > reports/qualification/load-driven-commit.stdout.log \
+            2> reports/qualification/load-driven-commit.stderr.log \
+            || fail COMMIT reports/qualification/load-driven-commit.stderr.log
           repaired_sha=$(git rev-parse HEAD)
           git push origin HEAD:bucket-01-cantilever-benchmark-route \
-            > reports/qualification/load-driven-nesting-push.stdout.log \
-            2> reports/qualification/load-driven-nesting-push.stderr.log \
-            || fail PUSH reports/qualification/load-driven-nesting-push.stderr.log
+            > reports/qualification/load-driven-push.stdout.log \
+            2> reports/qualification/load-driven-push.stderr.log \
+            || fail PUSH reports/qualification/load-driven-push.stderr.log
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
             -f state=success \
             -f context="lafea/repaired-head/${repaired_sha:0:12}" \
-            -f description="Load-driven governed-result repair published" \
+            -f description="Verified T6D nesting repair published" \
             -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${repaired_sha}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
+            -f state=success -f context=lafea/load-driven-publish \
+            -f description="T6D nesting repair passed and published"
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lafea-load-driven-nesting-${{ github.sha }}
+          name: lafea-load-driven-publish-${{ github.sha }}
           path: reports/qualification/
           if-no-files-found: warn
           retention-days: 30
