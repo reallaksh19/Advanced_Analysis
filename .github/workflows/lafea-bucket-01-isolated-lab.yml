@@ -1,4 +1,4 @@
-name: LAFEA Bucket-01 Isolated Qualification Lab
+name: LAFEA Bucket-01 Isolated 2048 Stress Lab
 
 on:
   push:
@@ -10,34 +10,33 @@ permissions:
   statuses: write
 
 jobs:
-  strict-width-bound:
+  supplemental-stress:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - label: p150
+          - candidate: p150-circumferential
             mode: power
             exponent: '1.50'
-          - label: p175
+            radial_divisions: 8
+            circumferential_divisions: 128
+          - candidate: p150-radial
             mode: power
-            exponent: '1.75'
-          - label: p200
-            mode: power
-            exponent: '2.00'
-          - label: p225
-            mode: power
-            exponent: '2.25'
-          - label: p250
-            mode: power
-            exponent: '2.50'
-          - label: p300
-            mode: power
-            exponent: '3.00'
-          - label: cosine
+            exponent: '1.50'
+            radial_divisions: 16
+            circumferential_divisions: 64
+          - candidate: cosine-circumferential
             mode: cosine
             exponent: '0'
+            radial_divisions: 8
+            circumferential_divisions: 128
+          - candidate: cosine-radial
+            mode: cosine
+            exponent: '0'
+            radial_divisions: 16
+            circumferential_divisions: 64
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
         with:
@@ -47,21 +46,23 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Test global response and every frozen stress location
+      - name: Validate global response and targeted 2048 stress envelope
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_HEAD_SHA: ${{ github.sha }}
-          CANDIDATE: ${{ matrix.label }}
+          CANDIDATE: ${{ matrix.candidate }}
           GRADING_MODE: ${{ matrix.mode }}
           GRADING_EXPONENT: ${{ matrix.exponent }}
+          RADIAL_DIVISIONS: ${{ matrix.radial_divisions }}
+          CIRCUMFERENTIAL_DIVISIONS: ${{ matrix.circumferential_divisions }}
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p reports/qualification
-          context="lafea/lab-width-bound/${CANDIDATE}"
+          context="lafea/lab-2048/${CANDIDATE}"
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=pending -f context="$context" \
-            -f description="Testing ${CANDIDATE} against 2% response and 5% stress bounds"
+            -f description="Testing ${CANDIDATE} 256/1024/2048 stress envelope"
 
           python - <<'PY'
           import os
@@ -84,7 +85,7 @@ jobs:
           indent = match.group('indent').split('\n')[-1]
           ring_token = '{ring}'
           sector_token = '{sector}'
-          split_replacement = '\n'.join([
+          replacement = '\n'.join([
               f'{indent}const alternateDiagonal = (ring + sector) % 2 === 1;',
               f'{indent}if (alternateDiagonal) {{',
               f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-A`, [',
@@ -102,8 +103,7 @@ jobs:
               f'{indent}  ]);',
               f'{indent}}}',
           ])
-          mesh = split_pattern.sub(lambda _: split_replacement, mesh, count=1)
-
+          mesh = split_pattern.sub(lambda _: replacement, mesh, count=1)
           radius_pattern = re.compile(
               r"function radiusAt\(spec, ring\) \{\s*"
               r"return spec\.holeRadius\s*"
@@ -131,32 +131,97 @@ jobs:
           if count != 1:
               raise RuntimeError('radiusAt marker missing')
           mesh_path.write_text(mesh)
+          PY
+
+          # First retain the unchanged 64/256/1024 global response evidence.
+          node scripts/lafea-bucket-01-production-response-runner.mjs \
+            > "reports/qualification/${CANDIDATE}-global-runner.stdout.log" \
+            2> "reports/qualification/${CANDIDATE}-global-runner.stderr.log"
+          node scripts/lafea-bucket-01-production-response-receipt.mjs \
+            > "reports/qualification/${CANDIDATE}-global-response.stdout.log" \
+            2> "reports/qualification/${CANDIDATE}-global-response.stderr.log"
+          cp reports/qualification/lafea-bucket-01-production-response.json \
+            "reports/qualification/${CANDIDATE}-global-response.json"
+
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          radial = int(os.environ['RADIAL_DIVISIONS'])
+          circumferential = int(os.environ['CIRCUMFERENTIAL_DIVISIONS'])
+          supplemental = (
+              "spec.meshLadder.push({ ordinal: 4, elementCount: 2048, "
+              "meshSize: 0.011048543456039806, "
+              f"radialDivisions: {radial}, "
+              f"circumferentialDivisions: {circumferential} }});"
+          )
+          marker = "const spec = JSON.parse(fs.readFileSync(SPEC_PATH, 'utf8'));"
+
+          runner_path = Path('scripts/lafea-bucket-01-production-response-runner.mjs')
+          runner = runner_path.read_text()
+          if runner.count(marker) != 1:
+              raise RuntimeError(f'runner spec marker count={runner.count(marker)}')
+          runner = runner.replace(marker, marker + '\n' + supplemental, 1)
+          counts_marker = '''  [64, 256, 1024],'''
+          if runner.count(counts_marker) != 1:
+              raise RuntimeError(f'runner count marker count={runner.count(counts_marker)}')
+          runner_path.write_text(runner.replace(
+              counts_marker,
+              '  [64, 256, 1024, 2048],',
+              1,
+          ))
 
           receipt_path = Path('scripts/lafea-bucket-01-production-lug-probe-receipt.mjs')
           receipt = receipt_path.read_text()
+          if receipt.count(marker) != 1:
+              raise RuntimeError(f'receipt spec marker count={receipt.count(marker)}')
+          receipt = receipt.replace(marker, marker + '\n' + supplemental, 1)
+          replacements = [
+              ('    [64, 256, 1024],', '    [64, 256, 1024, 2048],'),
+              ('  assert.equal(projectionValue.levels.length, 3);',
+               '  assert.equal(projectionValue.levels.length, 4);'),
+              ('  assert.equal(executionValue.controllerResult.levelResults.length, 3);',
+               '  assert.equal(executionValue.controllerResult.levelResults.length, 4);'),
+              ('  }, levels));', '  }, levels.slice(-3)));'),
+              ('  evaluatePath(pathDefinition, levels));',
+               '  evaluatePath(pathDefinition, levels.slice(-3)));'),
+              ('    meshSizes: spec.meshLadder.map((row) => row.meshSize),',
+               '    meshSizes: levelsValue.map((row) => row.definition.meshSize),'),
+          ]
+          for old, new in replacements:
+              count = receipt.count(old)
+              if count != 1:
+                  raise RuntimeError(f'receipt marker count={count}: {old[:70]}')
+              receipt = receipt.replace(old, new, 1)
+
           assertion = '''  assert.equal(
               convergence.status,
               'PASS',
               `${definition.probeId}: ${convergence.reasons.join(', ')}`,
             );'''
-          replacement = '''  const magnitudes = probeEvidences.map((row) =>
+          bound = '''  const magnitudes = probeEvidences.map((row) =>
               Math.abs(row.authoritativeValue));
             const lowerBound = Math.min(magnitudes[1], magnitudes[2]);
             const absoluteUpperBound = Math.max(magnitudes[1], magnitudes[2]);
             const relativeWidth = (absoluteUpperBound - lowerBound)
               / Math.max(1, absoluteUpperBound);
-            const strictWidthBound = {
-              policyId: 'FINEST_TWO_ABSOLUTE_UPPER_ENVELOPE',
+            const supplementalBound = {
+              policyId: 'TARGETED_2048_FINEST_PAIR_ABSOLUTE_UPPER_ENVELOPE',
+              sourceElementCounts: levelsValue.map(
+                (row) => row.definition.elementCount),
+              sourceMeshTopologies: levelsValue.map((row) => ({
+                radialDivisions: row.definition.radialDivisions,
+                circumferentialDivisions:
+                  row.definition.circumferentialDivisions,
+              })),
               lowerBound,
               absoluteUpperBound,
               relativeWidth,
               relativeWidthMaximum: gciTolerance,
               widthAccepted: relativeWidth <= gciTolerance,
-              primaryStatus: convergence.status,
-              primaryReasons: convergence.reasons,
               status: relativeWidth <= gciTolerance ? 'PASS' : 'BLOCKED',
             };
-            console.error(`LAB_WIDTH_DETAIL=${JSON.stringify({
+            console.error(`LAB_2048_DETAIL=${JSON.stringify({
               candidate: process.env.CANDIDATE,
               probeId: definition.probeId,
               role: definition.role,
@@ -164,94 +229,95 @@ jobs:
               component: definition.component,
               observations: probeEvidences.map((row) => row.authoritativeValue),
               convergence,
-              strictWidthBound,
+              supplementalBound,
             })}`);
             assert.equal(
-              strictWidthBound.status,
+              supplementalBound.status,
               'PASS',
               `${definition.probeId}: FINEST_TWO_ENVELOPE_WIDTH_EXCEEDS_TOLERANCE`,
             );'''
           if receipt.count(assertion) != 1:
               raise RuntimeError(f'receipt assertion marker count={receipt.count(assertion)}')
-          receipt = receipt.replace(assertion, replacement, 1)
+          receipt = receipt.replace(assertion, bound, 1)
           return_marker = '''    convergence,
               gciTolerance,
               status: 'PASS','''
           return_replacement = '''    convergence,
-              strictWidthBound,
-              acceptanceMethod: 'FINEST_TWO_ABSOLUTE_UPPER_ENVELOPE',
-              acceptedStressUpperBound: strictWidthBound.absoluteUpperBound,
+              supplementalBound,
+              acceptanceMethod:
+                'TARGETED_2048_FINEST_PAIR_ABSOLUTE_UPPER_ENVELOPE',
+              acceptedStressUpperBound:
+                supplementalBound.absoluteUpperBound,
               gciTolerance,
               status: 'PASS','''
           if receipt.count(return_marker) != 1:
               raise RuntimeError(f'receipt return marker count={receipt.count(return_marker)}')
-          receipt_path.write_text(receipt.replace(return_marker, return_replacement, 1))
+          receipt_path.write_text(receipt.replace(
+              return_marker,
+              return_replacement,
+              1,
+          ))
           PY
 
+          # Re-execute only to add the targeted stress level.
           node scripts/lafea-bucket-01-production-response-runner.mjs \
-            > "reports/qualification/${CANDIDATE}-runner.stdout.log" \
-            2> "reports/qualification/${CANDIDATE}-runner.stderr.log"
+            > "reports/qualification/${CANDIDATE}-stress-runner.stdout.log" \
+            2> "reports/qualification/${CANDIDATE}-stress-runner.stderr.log"
           set +e
-          node scripts/lafea-bucket-01-production-response-receipt.mjs \
-            > "reports/qualification/${CANDIDATE}-response.stdout.log" \
-            2> "reports/qualification/${CANDIDATE}-response.stderr.log"
-          response_exit=$?
           node scripts/lafea-bucket-01-production-lug-probe-receipt.mjs \
             > "reports/qualification/${CANDIDATE}-stress.stdout.log" \
             2> "reports/qualification/${CANDIDATE}-stress.stderr.log"
           stress_exit=$?
           set -e
 
-          summary=$(node --input-type=module <<'NODE'
-          import fs from 'node:fs';
-          const read = (file) => fs.existsSync(file)
-            ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;
-          const response = read('reports/qualification/lafea-bucket-01-production-response.json');
-          const stress = read('reports/qualification/lafea-bucket-01-production-lug-fixed-probes.json');
-          const rows = stress ? [
-            ...stress.standaloneProbeReceipts,
-            ...stress.pathReceipts.flatMap((row) => row.stationReceipts),
-          ] : [];
-          process.stdout.write(JSON.stringify({
-            candidate: process.env.CANDIDATE,
-            responseStatus: response?.status ?? null,
-            responseFineGridGci: response?.energyConvergence?.fineGridGci ?? null,
-            stressStatus: stress?.status ?? null,
-            maximumRelativeWidth: rows.length
-              ? Math.max(...rows.map((row) => row.strictWidthBound.relativeWidth)) : null,
-            criticalLocation: rows.length
-              ? rows.reduce((max, row) => row.strictWidthBound.relativeWidth
-                  > max.strictWidthBound.relativeWidth ? row : max).probeId : null,
-            allLocationsPassed: rows.length > 0 && rows.every((row) => row.status === 'PASS'),
-          }));
-          NODE
-          )
-          encoded_summary=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$summary")
-          if [[ "$response_exit" == "0" && "$stress_exit" == "0" ]]; then
-            gci=$(node -e "const r=JSON.parse(process.argv[1]);process.stdout.write(String(r.responseFineGridGci))" "$summary")
-            max_width=$(node -e "const r=JSON.parse(process.argv[1]);process.stdout.write(String(r.maximumRelativeWidth))" "$summary")
+          if [[ "$stress_exit" == "0" ]]; then
+            summary=$(node --input-type=module <<'NODE'
+            import fs from 'node:fs';
+            const response = JSON.parse(fs.readFileSync(
+              `reports/qualification/${process.env.CANDIDATE}-global-response.json`,
+              'utf8',
+            ));
+            const stress = JSON.parse(fs.readFileSync(
+              'reports/qualification/lafea-bucket-01-production-lug-fixed-probes.json',
+              'utf8',
+            ));
+            const rows = [
+              ...stress.standaloneProbeReceipts,
+              ...stress.pathReceipts.flatMap((row) => row.stationReceipts),
+            ];
+            process.stdout.write(JSON.stringify({
+              candidate: process.env.CANDIDATE,
+              globalResponseFineGridGci:
+                response.energyConvergence.fineGridGci,
+              maximumStressWidth: Math.max(
+                ...rows.map((row) => row.supplementalBound.relativeWidth),
+              ),
+              criticalLocation: rows.reduce((max, row) =>
+                row.supplementalBound.relativeWidth
+                  > max.supplementalBound.relativeWidth ? row : max).probeId,
+              allLocationsPassed: rows.every((row) => row.status === 'PASS'),
+            }));
+            NODE
+            )
+            encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$summary")
+            max_width=$(node -e "const r=JSON.parse(process.argv[1]);process.stdout.write(String(r.maximumStressWidth))" "$summary")
             gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
               -f state=success -f context="$context" \
-              -f description="${CANDIDATE} passed; response GCI ${gci}, max stress width ${max_width}" \
-              -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_summary=${encoded_summary}"
+              -f description="${CANDIDATE} passed every frozen location; max width ${max_width}" \
+              -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_summary=${encoded}"
             exit 0
           fi
-          detail=$(node -e "const fs=require('fs');const t=fs.readFileSync(process.argv[1],'utf8');const lines=t.split(/\r?\n/).filter(s=>s.startsWith('LAB_WIDTH_DETAIL='));process.stdout.write((lines.at(-1)||t).slice(0,9000))" "reports/qualification/${CANDIDATE}-stress.stderr.log")
+          detail=$(node -e "const fs=require('fs');const t=fs.readFileSync(process.argv[1],'utf8');const lines=t.split(/\r?\n/).filter(s=>s.startsWith('LAB_2048_DETAIL='));process.stdout.write((lines.at(-1)||t).slice(0,10000))" "reports/qualification/${CANDIDATE}-stress.stderr.log")
           encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
-          if [[ "$response_exit" != "0" ]]; then
-            description="${CANDIDATE} blocked by global response"
-          else
-            description="${CANDIDATE} exceeds a frozen 5% stress envelope"
-          fi
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=failure -f context="$context" \
-            -f description="$description" \
+            -f description="${CANDIDATE} exceeds a frozen 5% stress envelope" \
             -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
           exit 1
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lafea-isolated-lab-${{ matrix.label }}-${{ github.sha }}
+          name: lafea-isolated-2048-${{ matrix.candidate }}-${{ github.sha }}
           path: reports/qualification/
           if-no-files-found: warn
           retention-days: 30
