@@ -54,17 +54,21 @@ export const CONTENTS_MASS_PER_LENGTH = 117.841;
 export const INSULATION_MASS_PER_LENGTH = 37.456;
 
 /*
- * ASME B31.3-2006 Appendix C, Table C-1, Group 1 carbon/low-alloy
- * steel gives total thermal expansion from 70°F to 500°F as 3.7 in
- * per 100 ft. The B-3.1 uniform-alpha formulation consumes one mean
- * coefficient, so the declared coefficient is the published total
- * strain divided by this benchmark's 21°C -> 260°C temperature rise:
+ * ASME B31.3 Appendix C, Table C-1 ("Total Thermal Expansion, U.S. Units,
+ * for Metals"): Carbon Steel at 500°F gives total linear thermal expansion
+ * from 70°F as 3.62 in per 100 ft (verified directly against a reproduction
+ * of the real table; 3.7 was an uncited transcription error that produced a
+ * ~2.2% high thermal-expansion coefficient and a systematic, distance-
+ * proportional over-prediction of every displacement in this benchmark).
+ * The B-3.1 uniform-alpha formulation consumes one mean coefficient, so the
+ * declared coefficient is the published total strain divided by this
+ * benchmark's 21°C -> 260°C temperature rise:
  *
- *   epsilon = 3.7 in / (100 ft * 12 in/ft) = 0.0030833333333333333
+ *   epsilon = 3.62 in / (100 ft * 12 in/ft) = 0.0030166666666666666
  *   deltaT  = 260 - 21 = 239 K
- *   alpha   = epsilon / deltaT = 1.2900976290097629e-5 1/K
+ *   alpha   = epsilon / deltaT = 1.2622036262203627e-5 1/K
  */
-export const PUBLISHED_TOTAL_EXPANSION_IN_PER_100FT = 3.7;
+export const PUBLISHED_TOTAL_EXPANSION_IN_PER_100FT = 3.62;
 export const THERMAL_EXPANSION_COEFFICIENT =
   (PUBLISHED_TOTAL_EXPANSION_IN_PER_100FT / 1200)
   / (OPERATING_TEMPERATURE - INSTALLATION_TEMPERATURE);
