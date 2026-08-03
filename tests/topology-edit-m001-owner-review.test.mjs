@@ -49,11 +49,13 @@ test('active 3D Edit captures the shared viewport toolbar and releases it on dea
   assert.match(source, /'toggle-projection': 'projection'/);
 });
 
-test('large-model browser harness retains executable projection and released-frame checks', async () => {
+test('large-model browser harness projects engineering probes through the render root', async () => {
   const source = await readFile(
     new URL('./topology-edit-wave5-browser-harness.js', import.meta.url),
     'utf8',
   );
+  assert.match(source, /applyMatrix4\(engineeringRoot\.matrixWorld\)/);
+  assert.match(source, /backend\.renderer\.domElement/);
   assert.match(source, /\.project\(camera\)/);
   assert.doesNotMatch(source, /\.project\(camer\)/);
   assert.match(source, /animationFrameReleased: !backend\.animationFrameId/);
