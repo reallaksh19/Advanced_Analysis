@@ -10,31 +10,74 @@
       "path": "benchmarks/ATTRIBUTE-AML_ASIM-1835_managed_stage_enriched_stage.json",
       "sourceSha256": null,
       "byteLength": null,
-      "declaredUse": ["normalization", "geometry", "render-model"],
+      "declaredUse": [
+        "normalization",
+        "geometry",
+        "render-model"
+      ],
       "realOrSimulated": "REAL_REPOSITORY_FIXTURE_PENDING_HASH",
       "expectedIdentity": {},
-      "authorityNotes": ["Exact-head runner not executed in connector environment."],
+      "authorityNotes": [
+        "Exact-head runner not executed in connector environment."
+      ],
       "status": "NOT_EXECUTED"
     },
     {
       "path": "benchmarks/Sjson.json",
       "sourceSha256": null,
       "byteLength": null,
-      "declaredUse": ["normalization", "support-sites", "route-partition", "empirical-loads"],
+      "declaredUse": [
+        "normalization",
+        "support-sites",
+        "route-partition",
+        "empirical-loads"
+      ],
       "realOrSimulated": "REAL_REPOSITORY_FIXTURE_PENDING_HASH",
       "expectedIdentity": {},
-      "authorityNotes": ["Exact-head runner not executed in connector environment."],
+      "authorityNotes": [
+        "Exact-head runner not executed in connector environment."
+      ],
       "status": "NOT_EXECUTED"
     },
     {
       "path": "benchmarks/1885Sjson/EnrichedSjson",
       "sourceSha256": null,
       "byteLength": null,
-      "declaredUse": ["normalization", "topology", "support-sites", "route-partition"],
+      "declaredUse": [
+        "normalization",
+        "topology",
+        "support-sites",
+        "route-partition"
+      ],
       "realOrSimulated": "REAL_REPOSITORY_FIXTURE_PENDING_HASH",
       "expectedIdentity": {},
-      "authorityNotes": ["Exact-head runner not executed in connector environment."],
+      "authorityNotes": [
+        "Exact-head runner not executed in connector environment."
+      ],
       "status": "NOT_EXECUTED"
+    }
+  ],
+  "fixtureRoleBindings": [
+    {
+      "role": "TOPOLOGY_EDIT_20_OBJECT",
+      "path": null,
+      "sourceSha256": null,
+      "expectedIdentity": {},
+      "status": "MISSING_AUTHORITY"
+    },
+    {
+      "role": "LARGE_MODEL_4884_ENTITY",
+      "path": null,
+      "sourceSha256": null,
+      "expectedIdentity": {},
+      "status": "MISSING_AUTHORITY"
+    },
+    {
+      "role": "REAL_1885_SUPPORT_BRANCH",
+      "path": null,
+      "sourceSha256": null,
+      "expectedIdentity": {},
+      "status": "MISSING_AUTHORITY"
     }
   ],
   "fixtureRuns": [],
