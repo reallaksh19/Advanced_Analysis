@@ -1,0 +1,29 @@
+{
+  "schema": "lafea-bucket-01-production-diagnostic/v1",
+  "exactHeadSha": "b7abe5de3677cc6cf1c1e0dfe7b0537c305b7cec",
+  "exits": {
+    "productionRunner": 0,
+    "productionResponse": 0,
+    "productionLugStress": 1,
+    "kirsch": 0
+  },
+  "response": {
+    "status": "PASS",
+    "reasons": [],
+    "energyConvergenceElementCounts": [
+      256,
+      1024,
+      4096
+    ],
+    "energyConvergenceStatus": "PASS",
+    "fineGridGci": 0.005660248564111084,
+    "observedOrder": 1.5922867946983605
+  },
+  "lugStress": null,
+  "kirsch": {
+    "status": "PASS",
+    "reasons": []
+  },
+  "firstFailure": "productionLugStress",
+  "status": "BLOCKED"
+}
