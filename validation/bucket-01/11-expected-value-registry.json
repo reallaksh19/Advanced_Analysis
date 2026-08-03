@@ -39,7 +39,7 @@
     {
       "entryId": "PRODUCTION_RESPONSE_CONVERGENCE_DEFINITION",
       "path": "validation/bucket-01/06-production-response-convergence-spec.json",
-      "schema": "lafea-bucket-01-production-response-spec/v1",
+      "schema": "lafea-bucket-01-production-response-spec/v2",
       "role": "FROZEN_PRODUCTION_CONVERGENCE_DEFINITION"
     },
     {
