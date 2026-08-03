@@ -1,0 +1,62 @@
+{
+  "schema": "lafea-bucket-01-probe-stable-polar-design/v1",
+  "designId": "B01-PROBE-STABLE-POLAR-V1",
+  "benchmarkId": "C2D-LUG-PINHOLE-01",
+  "sourceProbeSpecId": "B01-PRODUCTION-LUG-FIXED-STRESS-01",
+  "geometry": {
+    "holeRadius": 20,
+    "outerRadius": 100,
+    "startAngleDegrees": 0,
+    "endAngleDegrees": 360
+  },
+  "refinementRatio": 2,
+  "levelCount": 4,
+  "radialAxis": {
+    "axisId": "B01-PROBE-STABLE-RADIAL",
+    "axisKind": "RADIAL_LENGTH",
+    "anchors": [
+      { "anchorId": "R27", "value": 27 },
+      { "anchorId": "R33", "value": 33 },
+      { "anchorId": "R47", "value": 47 },
+      { "anchorId": "R73", "value": 73 },
+      { "anchorId": "R87", "value": 87 }
+    ],
+    "targetPhase": 0.35,
+    "backgroundBaseDivisions": 6,
+    "windowClearanceFraction": 0.3
+  },
+  "circumferentialAxis": {
+    "axisId": "B01-PROBE-STABLE-CIRCUMFERENTIAL",
+    "axisKind": "POLAR_ANGLE_DEGREES",
+    "anchors": [
+      { "anchorId": "THETA_17", "value": 17 },
+      { "anchorId": "THETA_67", "value": 67 },
+      { "anchorId": "THETA_83", "value": 83 }
+    ],
+    "targetPhase": 0.65,
+    "backgroundBaseDivisions": 16,
+    "windowClearanceFraction": 0.3
+  },
+  "topologyPolicy": {
+    "elementFamily": "ANNULAR_T6_TWO_TRIANGLE_CELL",
+    "triangleOrientation": "COUNTER_CLOCKWISE_INVARIANT",
+    "radialAnchorPhase": 0.35,
+    "circumferentialAnchorPhase": 0.65,
+    "minimumParametricDiagonalSeparation": 0.3,
+    "anchorCellWidthContraction": "EXACT_FACTOR_TWO_PER_LEVEL",
+    "transitionCellPolicy": "DETERMINISTIC_BACKGROUND_GAP_PARTITION",
+    "globalCoordinateNestingRequired": false,
+    "anchorCellSelfSimilarityRequired": true
+  },
+  "authority": {
+    "frozenProbeCoordinatesChanged": false,
+    "stressTolerancesChanged": false,
+    "loadsChanged": false,
+    "solverCriteriaChanged": false,
+    "codeBasisBoundaryChanged": false,
+    "productionMeshAuthority": false,
+    "qualificationAuthority": false,
+    "bucketQualified": false
+  },
+  "currentDisposition": "PHASE_2_DESIGN_CONTRACT_ONLY_PENDING_CANDIDATE_MESH_GENERATOR_AND_EXACT_HEAD_REPLAY"
+}
