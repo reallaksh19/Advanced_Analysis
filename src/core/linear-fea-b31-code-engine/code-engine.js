@@ -12,6 +12,7 @@ import {
   CODE_RESULT_SCHEMA,
   CODE_RESULT_STATUSES,
   DISPLACEMENT_STRESS_RANGE,
+  EXPANSION_RANGE_ENVELOPE,
   FACTOR_KEYS,
   OCCASIONAL,
   RESULTANT_KEYS,
@@ -53,7 +54,7 @@ import {
  * @param {Readonly<object>} args.codeProfile Sealed `fea-b31-code-profile/v1`.
  * @param {Readonly<object>} args.editionDataset Sealed `fea-b31-edition-dataset/v1`.
  * @param {Readonly<object>} args.stressFactorSet Sealed `fea-b31-stress-factor-set/v1`.
- * @param {'SUSTAINED'|'OCCASIONAL'|'DISPLACEMENT_STRESS_RANGE'} args.category
+ * @param {'SUSTAINED'|'OCCASIONAL'|'DISPLACEMENT_STRESS_RANGE'|'EXPANSION_RANGE_ENVELOPE'} args.category
  * @param {string} args.codePointId Canonical identity of the physical code point (section 9.1).
  * @param {string} args.componentId Canonical identity of the owning B-3.2 component; must match `stressFactorSet.componentId`.
  * @param {string} args.combinationId Canonical identity of the physical case (or case pair) this check is built from.
@@ -62,8 +63,9 @@ import {
  * @param {Readonly<object>|null} args.sustainedSectionResolution Optional sealed nominal-less-allowances section used only for SUSTAINED stress terms.
  * @param {Readonly<object>} args.materialResolution Sealed `fea-linear-material-resolution/v1` cited by `frameElementRecord.material` (for material identity; evaluation temperature is read off the frame element's own retained material).
  * @param {{fx:number,fy:number,fz:number,mx:number,my:number,mz:number}} args.localAction B-3.4 recovered local action at this code point.
- * @param {{value:number, source:string}|null} args.pressureStressContribution Required (non-null) for SUSTAINED/OCCASIONAL; must be null for DISPLACEMENT_STRESS_RANGE.
- * @param {{value:number, source:string}|null} args.coldTemperature Required only for DISPLACEMENT_STRESS_RANGE (the hot temperature is cited from the element's own resolved material state); must be null otherwise.
+ * @param {{value:number, source:string}|null} args.pressureStressContribution Required (non-null) for SUSTAINED/OCCASIONAL; must be null for both range categories.
+ * @param {{value:number, source:string}|null} args.coldTemperature Required for both range categories. For EXPANSION_RANGE_ENVELOPE it supplies only the Eq. (1b) `Sc` lookup and does not identify either CASE_RANGE endpoint.
+ * @param {{value:number, source:string}|null} args.sustainedStress Required only for EXPANSION_RANGE_ENVELOPE as the Eq. (1b) `SL` term.
  * @param {string|null} args.occasionalCategoryId Required for OCCASIONAL, matching one `profile.occasionalDurationFactors` entry; must be null otherwise.
  * @returns {Readonly<object>} Sealed `lfea-b31-code-result/v1`.
  */
@@ -82,6 +84,7 @@ export function compileCodeResult({
   localAction,
   pressureStressContribution,
   coldTemperature,
+  sustainedStress = null,
   occasionalCategoryId,
 }) {
   const CODE = 'CODE_ENGINE_INVALID';
@@ -153,21 +156,51 @@ export function compileCodeResult({
 
   /*
    * The hot/operating evaluation temperature is cited from the element's own
-   * already-resolved material state (section 10.5 "material identity ...
-   * temperature ... are explicit inputs" — resolved once at B-2.2, never
-   * re-declared or recomputed here). Only the cold/installation temperature,
-   * which no upstream package resolves, is a fresh declared input.
+   * already-resolved material state. Both range categories also require one
+   * caller-declared cold/reference temperature for the `Sc` allowable lookup.
+   * For EXPANSION_RANGE_ENVELOPE that declaration is allowable evidence only:
+   * it does not select, order, or otherwise affect the two CASE_RANGE actions.
    */
   const hotTemperature = element.material.evaluationTemperature;
   let acceptedColdTemperature = null;
-  if (category === DISPLACEMENT_STRESS_RANGE) {
+  const isRangeCategory = category === DISPLACEMENT_STRESS_RANGE
+    || category === EXPANSION_RANGE_ENVELOPE;
+  if (isRangeCategory) {
     if (coldTemperature === null) {
-      fail('coldTemperature is required for DISPLACEMENT_STRESS_RANGE (section 10.5 cold/hot allowable combination).', 'CODE_ENGINE_DISPLACEMENT_RANGE_COLD_TEMPERATURE_REQUIRED');
+      const code = category === EXPANSION_RANGE_ENVELOPE
+        ? 'CODE_ENGINE_EXPANSION_RANGE_COLD_TEMPERATURE_REQUIRED'
+        : 'CODE_ENGINE_DISPLACEMENT_RANGE_COLD_TEMPERATURE_REQUIRED';
+      fail(`coldTemperature is required for ${category} to resolve the declared Sc allowable.`, code);
     }
-    requireTraceableDeclaredValue(requireDeclaredValue({ coldTemperature }, 'coldTemperature', {}), 'coldTemperature', 'CODE_ENGINE_SOURCE_NOT_TRACEABLE');
+    requireTraceableDeclaredValue(
+      requireDeclaredValue({ coldTemperature }, 'coldTemperature', {}),
+      'coldTemperature',
+      'CODE_ENGINE_SOURCE_NOT_TRACEABLE',
+    );
     acceptedColdTemperature = coldTemperature.value;
   } else if (coldTemperature !== null) {
-    fail('coldTemperature must be null outside DISPLACEMENT_STRESS_RANGE.', CODE);
+    fail('coldTemperature must be null outside range categories.', CODE);
+  }
+
+  let acceptedSustainedStress = null;
+  if (category === EXPANSION_RANGE_ENVELOPE) {
+    if (sustainedStress === null) {
+      fail(
+        'sustainedStress is required for EXPANSION_RANGE_ENVELOPE as the ASME B31.3-2006 para. 302.3.5(d) Eq. (1b) SL term.',
+        'CODE_ENGINE_EXPANSION_RANGE_SUSTAINED_STRESS_REQUIRED',
+      );
+    }
+    requireTraceableDeclaredValue(
+      requireDeclaredValue({ sustainedStress }, 'sustainedStress', { minimum: 0 }),
+      'sustainedStress',
+      'CODE_ENGINE_SOURCE_NOT_TRACEABLE',
+    );
+    acceptedSustainedStress = sustainedStress.value;
+  } else if (sustainedStress !== null) {
+    fail(
+      'sustainedStress must be null outside EXPANSION_RANGE_ENVELOPE.',
+      'CODE_ENGINE_EXPANSION_RANGE_SUSTAINED_STRESS_CATEGORY_MISMATCH',
+    );
   }
 
   if (category === OCCASIONAL) {
@@ -176,9 +209,9 @@ export function compileCodeResult({
     fail('occasionalCategoryId must be null outside OCCASIONAL.', CODE);
   }
 
-  if (category === DISPLACEMENT_STRESS_RANGE) {
+  if (isRangeCategory) {
     if (pressureStressContribution !== null) {
-      fail('pressureStressContribution must be null for DISPLACEMENT_STRESS_RANGE; displacement range is a secondary-stress range and excludes the sustained pressure/primary term.', CODE);
+      fail('pressureStressContribution must be null for range categories; a secondary-stress range excludes the sustained pressure/primary term.', CODE);
     }
   } else if (pressureStressContribution === null) {
     fail(`pressureStressContribution is required for ${category}.`, CODE);
@@ -207,7 +240,13 @@ export function compileCodeResult({
     allowableLimitations = resolved.limitations;
   } else {
     declaredIndices = factorSet.displacementSifs;
-    const resolved = displacementRangeAllowable({ profile, dataset, hotTemperature, coldTemperature: acceptedColdTemperature });
+    const resolved = displacementRangeAllowable({
+      profile,
+      dataset,
+      hotTemperature,
+      coldTemperature: acceptedColdTemperature,
+      sustainedStress: acceptedSustainedStress,
+    });
     allowableStress = resolved.allowableStress;
     allowableLimitations = resolved.limitations;
   }
@@ -221,7 +260,7 @@ export function compileCodeResult({
     outOfPlaneBending: declaredIndices.outOfPlaneBending.value,
   };
 
-  const pressureValue = category === DISPLACEMENT_STRESS_RANGE ? 0 : pressureStressContribution.value;
+  const pressureValue = isRangeCategory ? 0 : pressureStressContribution.value;
   const { stressTerms, calculatedStress } = combineStressTerms(resultants, mechanicalProperties, indices, pressureValue);
 
   const factors = {
@@ -329,7 +368,12 @@ export function requireCodeResult(record) {
   requireIdentity(record.codePointId, 'codeResult.codePointId', CODE);
   requireIdentity(record.componentId, 'codeResult.componentId', CODE);
   requireText(record.combinationId, 'codeResult.combinationId', CODE);
-  requireMember(record.category, ['SUSTAINED', 'OCCASIONAL', 'DISPLACEMENT_STRESS_RANGE'], 'codeResult.category', CODE);
+  requireMember(
+    record.category,
+    ['SUSTAINED', 'OCCASIONAL', 'DISPLACEMENT_STRESS_RANGE', 'EXPANSION_RANGE_ENVELOPE'],
+    'codeResult.category',
+    CODE,
+  );
   requireMember(record.status, CODE_RESULT_STATUSES, 'codeResult.status', CODE);
   requireResultants(record.resultants, 'codeResult.resultants');
   requireFactors(record.factors, 'codeResult.factors');
