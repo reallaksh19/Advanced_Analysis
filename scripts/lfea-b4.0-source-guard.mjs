@@ -4,12 +4,14 @@
  * LFEA B-4.0 source guard.
  *
  * Reads the B31.3 code-engine package as text and refuses the shapes a
- * review cannot reliably catch by running it: a real ASME numeric value
- * embedded in source, a numeric policy written as a literal, a second hash
- * implementation, a locale-dependent comparator, a re-derived stiffness or
- * resultant, a nested `Object.freeze` that would block the final `deepFreeze`
- * from recursing, a self-referential hash projection, and a flexibility
- * factor computed here rather than consumed from B-3.2.
+ * review cannot reliably catch by running it: a real ASME table value
+ * embedded in source, an uncited numeric policy, a second hash implementation,
+ * a locale-dependent comparator, a re-derived stiffness or resultant, a nested
+ * `Object.freeze` that would block the final `deepFreeze` from recursing, a
+ * self-referential hash projection, and a flexibility factor computed here
+ * rather than consumed from B-3.2. The one code-formula coefficient now present
+ * is positively guarded against its ASME B31.3-2006 para. 302.3.5(d) Eq. (1b)
+ * citation and caller-declared Sc/Sh/SL/f operands.
  */
 
 import assert from 'node:assert/strict';
@@ -38,6 +40,7 @@ const codeEngineSource = source['src/core/linear-fea-b31-code-engine/code-engine
 const codeEngineExecutable = codeEngineSource
   .replace(/\/\*[\s\S]*?\*\//gu, '')
   .replace(/(^|[^:])\/\/.*$/gmu, '$1');
+const categoriesSource = source['src/core/linear-fea-b31-code-engine/categories.js'];
 
 function rejectCode(pattern, message) {
   assert.equal(pattern.test(executable), false, message);
@@ -120,7 +123,14 @@ rejectCode(
  * standing in for a table entry. Weld-joint/duration-factor/coefficient
  * fields in particular must never carry an inline default. */
 rejectCode(/\?\?\s*-?\d|\|\|\s*-?\d(?!\d*\s*\))/u, 'a numeric fallback default is prohibited');
-for (const field of ['weldJointFactor', 'liberalAllowableUpliftFactor', 'allowableStress', 'durationFactor']) {
+for (const field of [
+  'weldJointFactor',
+  'liberalAllowableUpliftFactor',
+  'allowableStress',
+  'durationFactor',
+  'coldTemperature',
+  'sustainedStress',
+]) {
   assert.match(
     combined,
     new RegExp(`requireDeclaredValue\\([^)]*'${field}'`, 'u'),
@@ -146,15 +156,30 @@ for (const keys of ['DISPLACEMENT_RANGE_COEFFICIENT_KEYS', 'DIRECTIONAL_FACTOR_K
   assert.match(combined, new RegExp(`for \\(const key of ${keys}\\)`, 'u'), `${keys} must be validated by iterating its own frozen key list`);
 }
 
+/* M017: Eq. (1b) is the one licensed-code formula structure implemented here.
+ * Guard the exact citation and arithmetic while proving every variable operand
+ * remains caller-authorized rather than embedded table data. */
+assert.match(
+  categoriesSource,
+  /ASME B31\.3-2006[\s\S]*para\. 302\.3\.5\(d\), Eq\. \(1b\)/u,
+  'Eq. (1b) must carry the exact ASME B31.3-2006 para. 302.3.5(d) citation',
+);
+assert.match(
+  categoriesSource,
+  /cycleReductionFactor\.value\s*\*\s*\(1\.25\s*\*\s*\(coldAllowable\.value\s*\+\s*hotAllowable\.value\)\s*-\s*acceptedSustainedStress\)/u,
+  'Eq. (1b) must remain f [1.25 (Sc + Sh) - SL] using resolved/caller-declared operands',
+);
+assert.doesNotMatch(
+  categoriesSource,
+  /sustainedStress\s*=\s*\d/u,
+  'Eq. (1b) SL must never receive a numeric default',
+);
+
 /* Every draft object this package builds is a plain object/array literal
  * until the single top-level deepFreeze call in requireCodeProfile /
  * requireEditionDataset / requireStressFactorSet / requireCodeResult. A
  * nested Object.freeze on a sub-object before that seal would silently leave
- * that sub-object's own children unfrozen forever (the historical B-3.4
- * defect this convention guards against repository-wide). This applies to the
- * builder modules only — `code-engine-contract.js` legitimately
- * `Object.freeze`s its own static key-list constants, exactly as every other
- * LFEA `*-contract.js` module does. */
+ * that sub-object's own children unfrozen forever. */
 for (const path of [
   'src/core/linear-fea-b31-code-engine/allowable-resolution.js',
   'src/core/linear-fea-b31-code-engine/stress-terms.js',
@@ -186,21 +211,30 @@ assert.match(
   'temperature extrapolation must remain a dedicated, unconditional refusal',
 );
 
-/* SUSTAINED/OCCASIONAL and DISPLACEMENT_STRESS_RANGE must draw their indices
- * from distinct declared factor-set groups (section 15.5: never cross-apply
+/* SUSTAINED/OCCASIONAL and both range categories must draw their indices from
+ * distinct declared factor-set groups (section 15.5: never cross-apply
  * displacement SIFs to sustained stress or vice versa). */
 assert.match(codeEngineSource, /factorSet\.sustainedIndices/u, 'SUSTAINED must read sustainedIndices');
 assert.match(codeEngineSource, /factorSet\.occasionalIndices/u, 'OCCASIONAL must read occasionalIndices');
-assert.match(codeEngineSource, /factorSet\.displacementSifs/u, 'DISPLACEMENT_STRESS_RANGE must read displacementSifs');
+assert.match(codeEngineSource, /factorSet\.displacementSifs/u, 'both range categories must read displacementSifs');
+assert.match(
+  codeEngineSource,
+  /category === DISPLACEMENT_STRESS_RANGE\s*\|\| category === EXPANSION_RANGE_ENVELOPE/u,
+  'range-category gating must include exactly the existing displacement range and M017 expansion range',
+);
 
 /* Mechanism/failure reporting names a dedicated code, never a generic error. */
 for (const code of [
   'CODE_ENGINE_SCOPE_NOT_IMPLEMENTED',
   'CODE_ENGINE_OPERATING_NOT_A_COMPLIANCE_CATEGORY',
   'CODE_ENGINE_USER_PROJECT_CHECK_NOT_A_COMPLIANCE_CATEGORY',
-  'CODE_ENGINE_EXPANSION_RANGE_ENVELOPE_NOT_IMPLEMENTED',
   'CODE_ENGINE_OCCASIONAL_FACTOR_NOT_DECLARED',
   'CODE_ENGINE_DISPLACEMENT_RANGE_COLD_TEMPERATURE_REQUIRED',
+  'CODE_ENGINE_EXPANSION_RANGE_COLD_TEMPERATURE_REQUIRED',
+  'CODE_ENGINE_EXPANSION_RANGE_SUSTAINED_STRESS_REQUIRED',
+  'CODE_ENGINE_EXPANSION_RANGE_SUSTAINED_STRESS_CATEGORY_MISMATCH',
+  'CODE_ENGINE_EXPANSION_RANGE_SUSTAINED_STRESS_INVALID',
+  'CODE_ENGINE_EXPANSION_RANGE_ALLOWABLE_NONPOSITIVE',
   'CODE_ENGINE_TEMPERATURE_NOT_EXACT_MATCH',
   'CODE_ENGINE_ALLOWABLE_TEMPERATURE_EXTRAPOLATION_PROHIBITED',
   'CODE_ENGINE_COMPONENT_MISMATCH',
@@ -234,6 +268,11 @@ assert.equal(
   'node scripts/lfea-b4.3-sustained-section-override-check.mjs',
   'check:lfea-b4.3 registration is missing',
 );
+assert.equal(
+  packageJson.scripts['check:lfea-b4.4'],
+  'node scripts/lfea-b4.4-expansion-range-envelope-check.mjs',
+  'check:lfea-b4.4 registration is missing',
+);
 const linearCoreScript = packageJson.scripts['check:lfea-linear-core'];
 assert.match(
   linearCoreScript,
@@ -244,14 +283,15 @@ const b34Index = linearCoreScript.indexOf('check:lfea-b3.4');
 const b40Index = linearCoreScript.indexOf('check:lfea-b4.0');
 const b42Index = linearCoreScript.indexOf('check:lfea-b4.2');
 const b43Index = linearCoreScript.indexOf('check:lfea-b4.3');
+const b44Index = linearCoreScript.indexOf('check:lfea-b4.4');
 const consumerIndex = linearCoreScript.indexOf('check:linear-piping-analysis-consumer');
 assert.ok(
   b34Index !== -1 && b40Index !== -1 && b34Index < b40Index,
   'check:lfea-b4.0 must run inside check:lfea-linear-core, after check:lfea-b3.4',
 );
 assert.ok(
-  b42Index !== -1 && b43Index > b42Index && consumerIndex > b43Index,
-  'check:lfea-b4.3 must run after B4.2 and before linear-piping-analysis-consumer',
+  b42Index !== -1 && b43Index > b42Index && b44Index > b43Index && consumerIndex > b44Index,
+  'check:lfea-b4.4 must run after B4.3 and before linear-piping-analysis-consumer',
 );
 assert.match(
   packageJson.scripts.gate,

@@ -400,7 +400,6 @@ test('B41-T04', 'Non-compliance categories retain their documented refusal codes
   const refusals = Object.freeze({
     OPERATING: 'CODE_ENGINE_OPERATING_NOT_A_COMPLIANCE_CATEGORY',
     USER_PROJECT_CHECK: 'CODE_ENGINE_USER_PROJECT_CHECK_NOT_A_COMPLIANCE_CATEGORY',
-    EXPANSION_RANGE_ENVELOPE: 'CODE_ENGINE_EXPANSION_RANGE_ENVELOPE_NOT_IMPLEMENTED',
   });
   for (const [category, expectedCode] of Object.entries(refusals)) {
     assert.throws(

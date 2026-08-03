@@ -48,8 +48,31 @@ assert.doesNotMatch(nozzle, /compileSolverExecution|compileResultRecovery/u);
 const b31 = fs.readFileSync(path.join(ROOT, 'b31-application.js'), 'utf8');
 assert.match(b31, /requireResultRecovery/u);
 assert.match(b31, /compileCodeResult/u);
-assert.match(b31, /toPoint\.local\[field\]\s*-\s*fromPoint\.local\[field\]/u);
-assert.match(b31, /DISPLACEMENT_STRESS_RANGE requires an explicit ordered case pair/u);
+const subtractionMatches = b31.match(/toPoint\.local\[field\]\s*-\s*fromPoint\.local\[field\]/gu) ?? [];
+assert.equal(
+  subtractionMatches.length,
+  1,
+  'CASE_RANGE resultant subtraction must have one implementation and be reused by both range categories.',
+);
+assert.match(
+  b31,
+  /const RANGE_CATEGORIES = Object\.freeze\(\[\s*'DISPLACEMENT_STRESS_RANGE',\s*'EXPANSION_RANGE_ENVELOPE',\s*\]\);/u,
+  'CASE_RANGE must admit exactly DISPLACEMENT_STRESS_RANGE and EXPANSION_RANGE_ENVELOPE.',
+);
+assert.match(
+  b31,
+  /CASE_RANGE is only valid for DISPLACEMENT_STRESS_RANGE or EXPANSION_RANGE_ENVELOPE/u,
+);
+assert.match(
+  b31,
+  /sustainedSectionResolution:\s*acceptedSource\.sustainedSectionResolution/u,
+  'M015 sustainedSectionResolution must be wired from the application check into compileCodeResult.',
+);
+assert.match(
+  b31,
+  /sustainedStress:\s*acceptedSource\.sustainedStress/u,
+  'EXPANSION_RANGE_ENVELOPE sustainedStress must be wired into compileCodeResult.',
+);
 assert.match(b31, /recoveryEvidenceHash/u);
 assert.match(b31, /computeB31ApplicationEvidenceHash/u);
 assert.doesNotMatch(

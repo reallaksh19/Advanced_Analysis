@@ -37,10 +37,12 @@ export const B31_CHECK_KEYS = Object.freeze([
   'actionSource',
   'frameElementRecord',
   'sectionResolution',
+  'sustainedSectionResolution',
   'materialResolution',
   'stressFactorSet',
   'pressureStressContribution',
   'coldTemperature',
+  'sustainedStress',
   'occasionalCategoryId',
 ]);
 export const B31_APPLICATION_KEYS = Object.freeze([
@@ -77,6 +79,11 @@ const IMPLEMENTED_CATEGORIES = Object.freeze([
   'SUSTAINED',
   'OCCASIONAL',
   'DISPLACEMENT_STRESS_RANGE',
+  'EXPANSION_RANGE_ENVELOPE',
+]);
+const RANGE_CATEGORIES = Object.freeze([
+  'DISPLACEMENT_STRESS_RANGE',
+  'EXPANSION_RANGE_ENVELOPE',
 ]);
 
 export function compileLinearPipingB31Application(input) {
@@ -142,37 +149,49 @@ function canonicalCases(source) {
 
 function compileCheck(source, index, caseIndex, codeProfile, editionDataset) {
   const field = `b31ApplicationInput.checks[${index}]`;
-  exactKeys(source, B31_CHECK_KEYS, field);
-  const checkId = nonEmptyString(source.checkId, `${field}.checkId`);
-  const category = source.category;
+  const acceptedSource = {
+    sustainedSectionResolution: null,
+    sustainedStress: null,
+    ...source,
+  };
+  exactKeys(acceptedSource, B31_CHECK_KEYS, field);
+  const checkId = nonEmptyString(acceptedSource.checkId, `${field}.checkId`);
+  const category = acceptedSource.category;
   if (!IMPLEMENTED_CATEGORIES.includes(category)) {
     failCodeApplication(`${field}.category is unsupported.`, 'PIPING_B31_CATEGORY_UNSUPPORTED');
   }
-  const actionSource = canonicalActionSource(source.actionSource, category, field);
-  const resolved = resolveAction(actionSource, source.componentId, source.codePointId, caseIndex);
-  const pressureStressContribution = category === 'DISPLACEMENT_STRESS_RANGE'
-    ? source.pressureStressContribution
+  const actionSource = canonicalActionSource(acceptedSource.actionSource, category, field);
+  const resolved = resolveAction(
+    actionSource,
+    acceptedSource.componentId,
+    acceptedSource.codePointId,
+    caseIndex,
+  );
+  const pressureStressContribution = RANGE_CATEGORIES.includes(category)
+    ? acceptedSource.pressureStressContribution
     : resolvePressureStressContribution({
       loadCase: requireCase(caseIndex, actionSource.caseId).loadCase,
-      frameElementRecord: source.frameElementRecord,
-      sectionResolution: source.sectionResolution,
-      suppliedContribution: source.pressureStressContribution,
+      frameElementRecord: acceptedSource.frameElementRecord,
+      sectionResolution: acceptedSource.sectionResolution,
+      suppliedContribution: acceptedSource.pressureStressContribution,
     });
   const codeResult = compileCodeResult({
     codeProfile,
     editionDataset,
-    stressFactorSet: source.stressFactorSet,
+    stressFactorSet: acceptedSource.stressFactorSet,
     category,
-    codePointId: nonEmptyString(source.codePointId, `${field}.codePointId`),
-    componentId: nonEmptyString(source.componentId, `${field}.componentId`),
-    combinationId: nonEmptyString(source.combinationId, `${field}.combinationId`),
-    frameElementRecord: source.frameElementRecord,
-    sectionResolution: source.sectionResolution,
-    materialResolution: source.materialResolution,
+    codePointId: nonEmptyString(acceptedSource.codePointId, `${field}.codePointId`),
+    componentId: nonEmptyString(acceptedSource.componentId, `${field}.componentId`),
+    combinationId: nonEmptyString(acceptedSource.combinationId, `${field}.combinationId`),
+    frameElementRecord: acceptedSource.frameElementRecord,
+    sectionResolution: acceptedSource.sectionResolution,
+    sustainedSectionResolution: acceptedSource.sustainedSectionResolution,
+    materialResolution: acceptedSource.materialResolution,
     localAction: resolved.localAction,
     pressureStressContribution,
-    coldTemperature: source.coldTemperature,
-    occasionalCategoryId: source.occasionalCategoryId,
+    coldTemperature: acceptedSource.coldTemperature,
+    sustainedStress: acceptedSource.sustainedStress,
+    occasionalCategoryId: acceptedSource.occasionalCategoryId,
   });
   return deepFreeze({
     checkId,
@@ -188,9 +207,9 @@ function canonicalActionSource(source, category, field) {
   }
   if (source.kind === 'SINGLE_CASE') {
     exactKeys(source, SINGLE_CASE_SOURCE_KEYS, `${field}.actionSource`);
-    if (category === 'DISPLACEMENT_STRESS_RANGE') {
+    if (RANGE_CATEGORIES.includes(category)) {
       failCodeApplication(
-        'DISPLACEMENT_STRESS_RANGE requires an explicit ordered case pair.',
+        `${category} requires an explicit ordered case pair.`,
         'PIPING_B31_RANGE_SOURCE_REQUIRED',
       );
     }
@@ -201,9 +220,9 @@ function canonicalActionSource(source, category, field) {
   }
   if (source.kind === 'CASE_RANGE') {
     exactKeys(source, RANGE_SOURCE_KEYS, `${field}.actionSource`);
-    if (category !== 'DISPLACEMENT_STRESS_RANGE') {
+    if (!RANGE_CATEGORIES.includes(category)) {
       failCodeApplication(
-        'CASE_RANGE is only valid for DISPLACEMENT_STRESS_RANGE.',
+        'CASE_RANGE is only valid for DISPLACEMENT_STRESS_RANGE or EXPANSION_RANGE_ENVELOPE.',
         'PIPING_B31_RANGE_CATEGORY_INVALID',
       );
     }
