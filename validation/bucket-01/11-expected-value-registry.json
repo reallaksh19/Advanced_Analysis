@@ -1,5 +1,5 @@
 {
-  "schema": "lafea-bucket-01-expected-value-registry/v1",
+  "schema": "lafea-bucket-01-expected-value-registry/v2",
   "registryId": "B01-EXPECTED-VALUE-DEFINITION-SET-01",
   "bucketId": "LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE",
   "target": "C2D-LUG-PINHOLE -> LAFEA.3",
@@ -25,6 +25,12 @@
       "role": "INDEPENDENT_CLOSED_FORM_ORACLE"
     },
     {
+      "entryId": "CANTILEVER_ORACLE",
+      "path": "validation/bucket-01/12-cantilever-oracle.json",
+      "schema": "lafea-bucket-01-cantilever-oracle/v1",
+      "role": "INDEPENDENT_ENGINEERING_THEORY_ORACLE"
+    },
+    {
       "entryId": "KIRSCH_FIXED_PROBE_ORACLE",
       "path": "validation/bucket-01/07-kirsch-fixed-probe-oracle.json",
       "schema": "lafea-bucket-01-kirsch-fixed-probe-oracle/v1",
@@ -45,6 +51,7 @@
   ],
   "acceptancePolicy": {
     "closedFormBenchmarksRequireIndependentExpectedValues": true,
+    "engineeringTheoryBenchmarksRequireFrozenExpectedValues": true,
     "productionEnergyAcceptedByThreeLevelConvergence": true,
     "productionStressAcceptedByFixedCoordinateThreeLevelConvergence": true,
     "movingMaximumAcceptanceAuthorized": false,
