@@ -1,72 +1,112 @@
 # B31.3 code engine
 
-This package evaluates one ASME B31.3-2024 code point — SUSTAINED, OCCASIONAL or DISPLACEMENT_STRESS_RANGE — from a sealed B-3.4 recovered local action, a sealed B-3.1 frame element (for section/material identity citation), and three caller-supplied edition-profile artifacts, into an immutable `lfea-b31-code-result/v1` record. It is the LFEA-B4.0 exit boundary (sections 10, 11, 15.2 B31-SUS-01/B31-EXP-01/B31-OCC-01).
+This package evaluates one ASME B31.3 code point — `SUSTAINED`, `OCCASIONAL`, `DISPLACEMENT_STRESS_RANGE`, or `EXPANSION_RANGE_ENVELOPE` — from a sealed B-3.4 recovered local action, a sealed B-3.1 frame element, and caller-supplied edition/profile authorities into an immutable `lfea-b31-code-result/v1` record. It is the LFEA-B4.0 exit boundary for code-stress evaluation.
 
-**Legal/spec boundary (section 10 banner, section 1.2).** ASME B31.3 allowable-stress tables, temperature-interpolated allowable values and ASME B31J SIF/flexibility tables are copyrighted publications. Nothing in this package or its fixtures transcribes a real ASME table value. Every allowable stress, weld/joint factor, occasional duration factor, displacement-range coefficient and B31J index/SIF arrives as a caller-declared `{value, source}` entry inside a caller-supplied `fea-b31-edition-dataset/v1` or `fea-b31-stress-factor-set/v1` record. This package implements only the generic combination arithmetic (F/A, M/Z, a weighted cold/hot range, an SRSS bending+torsion fold) under a symbolic named rule ID — never a licensed formula's actual coefficients. Every fixture value is a clearly fictional, round, illustrative number, and every fixture `source` string is literally `FIXTURE-EDITION-DATASET-NOT-ASME` or `FIXTURE-B31J-FACTOR-SET-NOT-ASME`, so nobody could mistake it for real ASME data. A real deployment plugs a licensed, user-authorized edition dataset into exactly these same fields.
+**Legal/spec boundary.** ASME B31.3 allowable-stress tables, temperature-dependent allowable values, and ASME B31J SIF/flexibility tables are copyrighted publications. Nothing in this package or its fixtures transcribes a real table value. Every allowable stress, weld/joint factor, occasional duration factor, displacement-range factor, sustained stress, and B31J index/SIF arrives as a caller-declared `{value, source}` authority. The package implements generic beam-stress arithmetic and the published ASME B31.3-2006 para. 302.3.5(d), Eq. (1b) combination structure; it embeds no licensed table data.
 
-It does not assemble, solve or recover any finite-element quantity: the local action at a code point is exactly what B-3.4 already recovered, and the section/material are exactly the records B-2.2/B-2.3 already resolved and B-3.1 already retained. It never touches stiffness or a B-3.2 flexibility factor — section 10.4 Ownership belongs to B-3.2, and this package only ever reads its `requireFactorApplicability` verdict.
+It does not assemble, solve, or recover finite-element quantities. The local action is exactly what B-3.4 recovered, and section/material records are the B-2.2/B-2.3 authorities already cited by B-3.1. It never modifies stiffness or recomputes a B-3.2 flexibility factor.
 
 ## Inputs
 
 ```text
-codeProfile         fea-b31-code-profile/v1          (sealed via sealCodeProfile)
-editionDataset       fea-b31-edition-dataset/v1        (sealed via sealEditionDataset, caller-supplied)
-stressFactorSet      fea-b31-stress-factor-set/v1      (sealed via sealStressFactorSet, caller-supplied)
-category             SUSTAINED | OCCASIONAL | DISPLACEMENT_STRESS_RANGE
-codePointId          canonical kernel identity (section 9.1 physical code point)
-componentId          canonical kernel identity; must match stressFactorSet.componentId
-combinationId        canonical case (or case-pair) identity
-frameElementRecord    sealed fea-linear-frame-element/v1 (B-3.1 validator)
-sectionResolution     sealed fea-linear-pipe-section-resolution/v1 (B-2.3 validator; for outer diameter)
-materialResolution    sealed fea-linear-material-resolution/v1 (B-2.2 validator; for material identity)
-localAction           {fx,fy,fz,mx,my,mz} — the B-3.4 recovered local action at this code point
-pressureStressContribution  {value, source} — required for SUSTAINED/OCCASIONAL, null for DISPLACEMENT_STRESS_RANGE
-coldTemperature       {value, source} | null — required only for DISPLACEMENT_STRESS_RANGE
-occasionalCategoryId  text | null — required only for OCCASIONAL, matching a profile.occasionalDurationFactors entry
+codeProfile                  fea-b31-code-profile/v1
+editionDataset               fea-b31-edition-dataset/v1
+stressFactorSet              fea-b31-stress-factor-set/v1
+category                     SUSTAINED | OCCASIONAL |
+                             DISPLACEMENT_STRESS_RANGE |
+                             EXPANSION_RANGE_ENVELOPE
+codePointId                  canonical physical code-point identity
+componentId                  must match stressFactorSet.componentId
+combinationId                physical case or ordered case-pair identity
+frameElementRecord           sealed fea-linear-frame-element/v1
+sectionResolution            sealed nominal B-2.3 section resolution
+sustainedSectionResolution   optional B-2.3 nominal-less-allowances section;
+                             SUSTAINED only, null otherwise
+materialResolution           sealed B-2.2 material resolution
+localAction                  {fx,fy,fz,mx,my,mz} recovered by B-3.4
+pressureStressContribution   required for SUSTAINED/OCCASIONAL;
+                             null for both range categories
+coldTemperature              required for both range categories to resolve Sc;
+                             null for SUSTAINED/OCCASIONAL
+sustainedStress              required for EXPANSION_RANGE_ENVELOPE as Eq. (1b) SL;
+                             null for every other category
+occasionalCategoryId         required for OCCASIONAL; null otherwise
 ```
 
-The hot/operating evaluation temperature is never re-declared: it is cited from `frameElementRecord.material.evaluationTemperature`, the exact value B-2.2 already resolved for this element. `sectionResolution`/`materialResolution` are cross-checked against the frame element's own retained `resolutionSemanticHash`/`materialStateId` (`CODE_ENGINE_SECTION_MISMATCH`/`CODE_ENGINE_MATERIAL_MISMATCH`) — the frame element retains only `sectionStateId`/`area`/`secondMomentY`/`secondMomentZ`/`polarMoment` (no outer diameter) and only `materialStateId`/`evaluationTemperature` (no materialId), so the full resolutions are cited alongside it rather than re-derived.
+The hot allowable `Sh` is resolved at `frameElementRecord.material.evaluationTemperature`. For `EXPANSION_RANGE_ENVELOPE`, `coldTemperature` is only the declared authority used to resolve `Sc`; it does not identify, order, or otherwise alter the two recovered `CASE_RANGE` endpoints.
 
-## Code profile (section 10.1)
+`sectionResolution` and `materialResolution` are cross-checked against the frame element’s retained identities. A supplied `sustainedSectionResolution` is independently revalidated through B-2.3 and may replace area/inertia only for a `SUSTAINED` stress calculation. Its outer diameter must exactly match the nominal section.
 
-`fea-b31-code-profile/v1` declares: `scope` (blocked with `CODE_ENGINE_SCOPE_NOT_IMPLEMENTED` for `CHAPTER_IX_HIGH_PRESSURE_PIPING`/`K_SERVICE_PIPING`/`NONMETALLIC_PIPING`/`DETAILED_FATIGUE_ANALYSIS`); `editionStandard`/`flexibilitySource` (frozen to `ASME_B31_3_2024`/`ASME_B31J_2023`, or `flexibilitySource: null` where not applicable); `temperatureInterpolationPolicy` (`EXACT_MATCH_ONLY_V1` or `LINEAR_BRACKET_INTERPOLATION_V1` — the method is generic and declared, the underlying values are never embedded); `displacementRangeCombinationRuleId` (the one generic weighted-combination rule this package implements); `occasionalDurationFactors` (an array of declared, per-category duration/occurrence factors — never a global multiplier); `liberalAllowableUse` (an explicit boolean switch, default-refusing any non-null uplift factor when false) and `liberalAllowableUpliftFactor` (required, declared, only when the switch is true).
+## Code profile and edition dataset
 
-## Edition dataset (section 10.5) and stress factor set (section 10.4)
+The code profile declares the implemented metallic-process-piping scope, edition identity, interpolation policy, occasional duration factors, and the existing displacement-range combination policy. Unsupported scopes fail closed.
 
-`fea-b31-edition-dataset/v1` carries `allowablePoints` (strictly increasing temperature/allowable-stress pairs), `displacementRangeCoefficients` (`coldWeight`/`hotWeight`/`cycleReductionFactor`) and `weldJointFactor` — every one a declared `{value, source}` entry with a traceable (non-hidden-default) source.
+The edition dataset carries strictly increasing temperature/allowable-stress points, caller-declared displacement-range coefficients, and the weld/joint factor. Every numeric authority is traceable and extrapolation is prohibited.
 
-`fea-b31-stress-factor-set/v1` is this package's own caller-supplied B31J-derived factor record — distinct from B-3.2's stiffness-only flexibility factor set, since B31J also produces stress indices/SIFs that never touch stiffness. It carries `applicability` (reusing B-3.2's `FACTOR_APPLICABILITY_STATUSES`/`requireFactorApplicability` directly — `OUTSIDE_RANGE` blocks, `USER_FACTOR_REQUIRED` blocks unless a complete `userOverride` with reason/source/revision/approver is supplied), `momentDirectionMapping` (which of the recovered `my`/`mz` fields is in-plane vs out-of-plane — never collapsed into one scalar), and three distinct directional-index groups: `sustainedIndices`, `occasionalIndices`, `displacementSifs`. SUSTAINED reads only `sustainedIndices`, OCCASIONAL only `occasionalIndices`, DISPLACEMENT_STRESS_RANGE only `displacementSifs` — proved never to cross-apply by `lfea-b4.0-reviewer-check.mjs`.
+The stress factor set carries three distinct directional-factor groups:
 
-## Stress combination (section 10.3)
+- `sustainedIndices` for `SUSTAINED`
+- `occasionalIndices` for `OCCASIONAL`
+- `displacementSifs` for both range categories
 
-`STRESS_COMBINATION_METHOD = DIRECT_PLUS_SRSS_BENDING_TORSION_V1`: generic beam mechanics, symbolically named, never a licensed table.
+Applicability and user-override behavior reuse B-3.2’s authority; no factor is derived or clamped here.
+
+## Recovered stress combination
+
+`STRESS_COMBINATION_METHOD = DIRECT_PLUS_SRSS_BENDING_TORSION_V1`:
 
 ```text
 axial            = (axialForce / area) * axialIndex
 torsional         = (torsion / polarSectionModulus) * torsionalIndex
 inPlaneBending    = (inPlaneMoment / sectionModulus) * inPlaneSif
 outOfPlaneBending = (outOfPlaneMoment / sectionModulus) * outOfPlaneSif
-calculatedStress  = |axial + pressure| + sqrt(inPlaneBending^2 + outOfPlaneBending^2 + torsional^2)
+calculatedStress  = |axial + pressure|
+                  + sqrt(inPlaneBending^2 + outOfPlaneBending^2 + torsional^2)
 ```
 
-Every numerator term is retained on the record (`stressTerms`) before combination, per section 10.3's reviewer-reproducibility requirement. `area`/`sectionModulus`/`polarSectionModulus` come from the frame element's own retained section and the cited `sectionResolution.dimensions.outerDiameter` — generic beam geometry, never a licensed value.
+Every numerator term is retained in `stressTerms`. Mechanical properties come from the selected sealed B-2.3 section authority; they are not recomputed from wall dimensions in this package.
 
-Allowable construction: SUSTAINED/OCCASIONAL compare against the hot allowable (resolved at the element's own evaluation temperature) scaled by the declared weld/joint factor, further scaled by the category's declared duration factor for OCCASIONAL. DISPLACEMENT_STRESS_RANGE compares against `(coldWeight * coldAllowable + hotWeight * hotAllowable) * cycleReductionFactor`, optionally uplifted by the declared liberal-allowable factor when the profile's switch is on (default off) — every coefficient a caller-declared edition-dataset/profile value, never a numeric table embedded here.
+## Allowables
 
-## Categories not evaluated (section 10.2)
+`SUSTAINED` and `OCCASIONAL` use the resolved hot allowable multiplied by the declared weld/joint factor. `OCCASIONAL` additionally uses its declared duration factor.
 
-OPERATING and USER_PROJECT_CHECK are refused with dedicated codes (`CODE_ENGINE_OPERATING_NOT_A_COMPLIANCE_CATEGORY`, `CODE_ENGINE_USER_PROJECT_CHECK_NOT_A_COMPLIANCE_CATEGORY`) rather than silently treated as a compliance check — section 10.2 is explicit that neither is automatically B31.3 acceptance. EXPANSION_RANGE_ENVELOPE (`CODE_ENGINE_EXPANSION_RANGE_ENVELOPE_NOT_IMPLEMENTED`) is not implemented this phase — a case-pair identity and difference formula are not invented here to cover a shallow implementation.
+`DISPLACEMENT_STRESS_RANGE` preserves the existing generic caller-declared weighted cold/hot allowable and cycle-reduction path. When the optional profile uplift switch is off or absent, no uplift is applied. M017 does not alter this category’s output.
 
-## Record and identity (section 10.6)
+`EXPANSION_RANGE_ENVELOPE` implements ASME B31.3-2006 para. 302.3.5(d), Eq. (1b):
 
-`lfea-b31-code-result/v1` mirrors the spec's exact schema (`codeProfileId`, `codePointId`, `componentId`, `combinationId`, `category`, `resultants`, `factors`, `stressTerms`, `calculatedStress`, `allowableStress`, `utilization`, `governingRuleId`, `limitations`, `semanticHash`, `evidenceHash`) plus a `status` field carrying exactly the section 10.7 vocabulary (`QUALIFIED UNDER CONFIGURED PROFILE` / `CONDITIONAL`; this package never returns `BLOCKED` — every blocking condition is a thrown fail-closed refusal instead, the same discipline every other LFEA package applies). `governingRuleId` folds a fragment of both the code-profile's and the edition-dataset's own semantic hashes into its identity string, so a code profile or edition-dataset change invalidates a prior code result's hash even if a caller reuses the same human-readable `codeProfileId` (section 15.5). `semanticHash` is computed by `shared-piping-model/canonical-json.js` over everything but `semanticHash`/`evidenceHash`; `requireCodeResult` re-accepts a record by exact keys, structural completeness and hash, refusing a stale one with `CODE_ENGINE_HASH_MISMATCH`.
+```text
+SA = f [1.25 (Sc + Sh) - SL]
+```
+
+`Sc` and `Sh` are resolved from the caller-supplied edition dataset, `SL` is the caller-declared traceable `sustainedStress`, and `f` is the caller-declared cycle-reduction factor. Missing `coldTemperature` or `sustainedStress`, a nonpositive computed allowable, or any hidden source fails closed. The profile’s separate uplift mechanism is not applied to Eq. (1b), because Eq. (1b) is already the selected liberal-allowable formula.
+
+## Application-layer case sources
+
+`linear-piping-code-application/b31-application.js` resolves actions from sealed B-3.4 recoveries:
+
+- `SINGLE_CASE` is valid for `SUSTAINED` and `OCCASIONAL`.
+- `CASE_RANGE` is valid only for `DISPLACEMENT_STRESS_RANGE` and `EXPANSION_RANGE_ENVELOPE`.
+
+Both range categories reuse the same single componentwise subtraction implementation after proving that the two recoveries share one mechanical model and stiffness state. No second envelope or subtraction implementation exists.
+
+The application layer also passes an optional `sustainedSectionResolution` through to `compileCodeResult` for `SUSTAINED`, making M015’s nominal-less-allowances section override available to a real production caller.
+
+## Categories not evaluated
+
+`OPERATING` and `USER_PROJECT_CHECK` remain explicitly refused with dedicated error codes. They are not automatically treated as B31.3 compliance categories.
+
+## Record and identity
+
+`lfea-b31-code-result/v1` retains the profile, code point, component, combination, category, resultants, factors, stress terms, calculated stress, allowable stress, utilization, governing rule, limitations, status, semantic hash, and evidence hash. Profile/dataset changes alter the governing identity and invalidate prior results. Blocking input defects throw fail-closed errors rather than returning a generic compliance badge.
 
 ## Checks
 
 ```text
 npm run check:lfea-b4.0
+npm run check:lfea-b4.1
+npm run check:lfea-b4.3
+npm run check:lfea-b4.4
+npm run check:lfea-code-application
 ```
 
-`scripts/lfea-b4.0-code-engine-check.mjs` holds the contract check and the section 15.2 benchmarks (B31-SUS-01 sustained stress/allowable hand calculation, B31-OCC-01 category-traceable duration factor, B31-EXP-01 cold/hot weighted displacement range) against the B-3.4 REDUCER-01 fixture's recovered code points, plus every fail-closed refusal. `scripts/lfea-b4.0-reviewer-check.mjs` holds the permanent deliberate regressions (section 15.5: self-referential hash projection, displacement-SIF/sustained-index cross-application, profile/dataset-change hash invalidation, silently-clamped B31J applicability, deepFreeze recursion). `scripts/lfea-b4.0-source-guard.mjs` reads the package as text. The check runs inside `check:lfea-core` and therefore inside `gate`.
-
-Before trusting the check script, a SUSTAINED calculation was hand-verified with a one-off `node --input-type=module` script against the fixture's fictional round numbers: axial 0 + pressure 5,000,000 direct, bending `400 / sectionModulus ≈ 2,872,937.50` (section modulus computed from the actual B-2.3-resolved area moment of inertia and outer radius), combined stress ≈ 7,872,937.50 against an allowable of `90,000,000 * 0.9 = 81,000,000`, utilization ≈ 0.0972 — matching the module's own output exactly.
+B4.0 retains the original category, hash, applicability, and displacement-range regressions. B4.4 proves the real two-recovery `CASE_RANGE` subtraction, independently evaluates Eq. (1b), proves use of `displacementSifs`, verifies required negative cases, demonstrates byte-identical existing `DISPLACEMENT_STRESS_RANGE` output, and exercises M015’s sustained-section override through the application layer.
