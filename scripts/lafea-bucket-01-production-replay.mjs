@@ -70,16 +70,26 @@ assert.equal(reports.productionProjection.status, 'PROJECTION_READY');
 assert.equal(reports.productionProjection.releaseRecord.candidateHeadSha, exactHeadSha);
 assert.deepEqual(
   reports.productionProjection.levels.map((row) => row.meshEvidence.mesh.elements.length),
-  [64, 256, 1024],
+  [64, 256, 1024, 4096],
 );
 assert.equal(reports.productionExecution.status, 'ACCEPTED');
 assert.equal(reports.productionExecution.accepted, true);
+assert.equal(reports.productionExecution.controllerResult.levelResults.length, 4);
 assert.equal(reports.productionResponse.status, 'PASS');
 assert.equal(reports.productionResponse.exactHeadSha, exactHeadSha);
+assert.deepEqual(reports.productionResponse.energyConvergenceElementCounts, [256, 1024, 4096]);
 assert.equal(reports.kirschStress.status, 'PASS');
 assert.equal(reports.kirschStress.exactHeadSha, exactHeadSha);
 assert.equal(reports.productionLugStress.status, 'PASS');
 assert.equal(reports.productionLugStress.exactHeadSha, exactHeadSha);
+assert.equal(
+  reports.productionLugStress.schema,
+  'lafea-bucket-01-production-lug-fixed-probe-evidence/v2',
+);
+assert.deepEqual(reports.productionLugStress.governedLevelOrdinals, [1, 2, 3, 4]);
+assert.deepEqual(reports.productionLugStress.evaluatedLevelOrdinals, [2, 3, 4]);
+assert.equal(reports.productionLugStress.authority.directElementPointRecovery, true);
+assert.equal(reports.productionLugStress.authority.integrationPointExtrapolationUsed, false);
 assert.equal(reports.codeBasisPackage.status, 'CODE_BASIS_FROZEN');
 assert.equal(reports.codeBasisPackage.exactHeadSha, exactHeadSha);
 assert.equal(reports.codeAssessment.status, 'CODE_ASSESSMENT_PASS');
@@ -92,9 +102,12 @@ const reportHashes = Object.fromEntries(
   Object.entries(reportPaths).map(([key, relative]) => [key, rawHash(relative)]),
 );
 const canonicalStdout = `${JSON.stringify({
-  schema: 'lafea-bucket-01-production-replay-summary/v1',
+  schema: 'lafea-bucket-01-production-replay-summary/v2',
   exactHeadSha,
   definitionSetHash: reports.expectedValueDefinition.definitionSetHash,
+  governedElementCounts: [64, 256, 1024, 4096],
+  evaluatedElementCounts: [256, 1024, 4096],
+  directPointStressRecovery: true,
   reportHashes,
   status: 'PASS',
 })}\n`;
