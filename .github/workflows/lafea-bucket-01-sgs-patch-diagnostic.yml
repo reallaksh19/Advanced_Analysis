@@ -1,4 +1,4 @@
-name: LAFEA Bucket-01 SGS Patch Diagnostic
+name: LAFEA Bucket-01 SGS Qualification Diagnostic
 
 on:
   push:
@@ -9,60 +9,155 @@ permissions:
   contents: read
 
 jobs:
-  patch:
+  qualify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
       - uses: actions/setup-node@v4
-        with: { node-version: 22 }
-      - name: Diagnose patch stages
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Execute governed SGS stages
         env:
           GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p reports/qualification
           post() {
             gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-              -f state="$1" -f context="lafea/sgs-patch/$2" -f description="$3"
+              -f state="$1" -f context="lafea/sgs-final/$2" -f description="$3"
           }
-          post pending EXTRACT "Extracting SGS source patches"
+          fail() {
+            stage="$1"; log="$2"
+            detail=$(node -e "const fs=require('fs');const p=process.argv[1];const t=fs.existsSync(p)?fs.readFileSync(p,'utf8'):'missing log';process.stdout.write(t.trim().slice(-8000))" "$log")
+            encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -f state=failure -f context="lafea/sgs-final/${stage}" \
+              -f description="SGS qualification failed at ${stage}" \
+              -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
+            exit 1
+          }
+
+          post pending PATCH "Applying governed SGS source and policy"
           python - <<'PY'
           import re, textwrap
           from pathlib import Path
-          s=Path('.github/workflows/lafea-bucket-01-sgs-lab.yml').read_text()
-          b=re.findall(r"          python - <<'PY'\n(.*?)\n          PY",s,re.S)
-          if len(b)!=2: raise RuntimeError(f'blocks={len(b)}')
-          Path('/tmp/sgs1.py').write_text(textwrap.dedent(b[0]))
-          Path('/tmp/sgs2.py').write_text(textwrap.dedent(b[1]))
+          source = Path('.github/workflows/lafea-bucket-01-sgs-lab.yml').read_text()
+          blocks = re.findall(r"          python - <<'PY'\n(.*?)\n          PY", source, re.S)
+          if len(blocks) != 2:
+              raise RuntimeError(f'blocks={len(blocks)}')
+          Path('/tmp/sgs1.py').write_text(textwrap.dedent(blocks[0]))
+          patch2 = textwrap.dedent(blocks[1])
+          old = (
+              '"meshSize: 0.011048543456039806, radialDivisions: 8, "\n'
+              '    "circumferentialDivisions: 128 });"'
+          )
+          new = (
+              '"meshSize: 0.011048543456039806, radialDivisions: 8, "\n'
+              '    "circumferentialDivisions: 128, "\n'
+              '    "stiffnessStorage: \'CSR_FULL_SYMMETRIC\', "\n'
+              '    "solverMethod: \'DETERMINISTIC_SGS_PCG\' });"'
+          )
+          if patch2.count(old) != 1:
+              raise RuntimeError(f'supplemental marker={patch2.count(old)}')
+          Path('/tmp/sgs2.py').write_text(patch2.replace(old, new, 1))
           PY
-          post success EXTRACT "SGS patches extracted"
-          post pending SOURCE "Applying solver and mesher source patch"
-          python /tmp/sgs1.py
-          post success SOURCE "Solver and mesher patch applied"
-          post pending POLICY "Applying SGS policy bindings"
-          python - <<'PY'
+          python /tmp/sgs1.py \
+            > reports/qualification/sgs-final-source.stdout.log \
+            2> reports/qualification/sgs-final-source.stderr.log \
+            || fail PATCH reports/qualification/sgs-final-source.stderr.log
+          python - <<'PY' \
+            > reports/qualification/sgs-final-policy.stdout.log \
+            2> reports/qualification/sgs-final-policy.stderr.log
           import json
           from pathlib import Path
-          p=Path('validation/bucket-01/06-production-response-convergence-spec.json')
-          s=json.loads(p.read_text())
-          s['meshLadder'][2]['solverMethod']='DETERMINISTIC_SGS_PCG'
-          s['solverPolicy']['largeSystemMethod']='DETERMINISTIC_SGS_PCG'
-          s['solverPolicy']['preconditioner']='SYMMETRIC_GAUSS_SEIDEL'
-          p.write_text(json.dumps(s,indent=2)+'\n')
-          p=Path('scripts/lafea-bucket-01-production-response-receipt.mjs')
-          t=p.read_text()
-          old="  assert.equal(definition.solverMethod, 'DETERMINISTIC_JACOBI_PCG');\n  assert.equal(solverEvidence.preconditioner, 'JACOBI');"
-          new="  assert.equal(definition.solverMethod, 'DETERMINISTIC_SGS_PCG');\n  assert.equal(solverEvidence.preconditioner, 'SYMMETRIC_GAUSS_SEIDEL');"
-          if t.count(old)!=1: raise RuntimeError(f'receipt={t.count(old)}')
-          p.write_text(t.replace(old,new,1))
-          p=Path('src/workspace/lafea-bucket-01-production-response.js')
-          t=p.read_text(); old="  'DETERMINISTIC_JACOBI_PCG',"; new="  'DETERMINISTIC_SGS_PCG',"
-          if t.count(old)!=1: raise RuntimeError(f'response={t.count(old)}')
-          p.write_text(t.replace(old,new,1))
+          path = Path('validation/bucket-01/06-production-response-convergence-spec.json')
+          spec = json.loads(path.read_text())
+          spec['meshLadder'][2]['solverMethod'] = 'DETERMINISTIC_SGS_PCG'
+          spec['solverPolicy']['largeSystemMethod'] = 'DETERMINISTIC_SGS_PCG'
+          spec['solverPolicy']['preconditioner'] = 'SYMMETRIC_GAUSS_SEIDEL'
+          spec['solverPolicy']['maximumIterations'] = 'min(50000,max(1000,16*freeDofCount))'
+          path.write_text(json.dumps(spec, indent=2) + '\n')
+          path = Path('scripts/lafea-bucket-01-production-response-receipt.mjs')
+          text = path.read_text()
+          old = "  assert.equal(definition.solverMethod, 'DETERMINISTIC_JACOBI_PCG');\n  assert.equal(solverEvidence.preconditioner, 'JACOBI');"
+          new = "  assert.equal(definition.solverMethod, 'DETERMINISTIC_SGS_PCG');\n  assert.equal(solverEvidence.preconditioner, 'SYMMETRIC_GAUSS_SEIDEL');"
+          if text.count(old) != 1:
+              raise RuntimeError(f'receipt marker={text.count(old)}')
+          path.write_text(text.replace(old, new, 1))
+          path = Path('src/workspace/lafea-bucket-01-production-response.js')
+          text = path.read_text()
+          old = "  'DETERMINISTIC_JACOBI_PCG',"
+          if text.count(old) != 1:
+              raise RuntimeError(f'response marker={text.count(old)}')
+          path.write_text(text.replace(old, "  'DETERMINISTIC_SGS_PCG',", 1))
           PY
-          post success POLICY "SGS policy bindings applied"
-          node --check src/core/local-continuum/solver.js
-          node --check scripts/lafea-bucket-01-production-response-receipt.mjs
-          node --check src/workspace/lafea-bucket-01-production-response.js
-          post success COMPLETE "SGS patch and policy syntax passed"
+          post success PATCH "Governed SGS source and policy applied"
+
+          post pending GLOBAL_1024 "Executing 64/256/1024 response"
+          node scripts/lafea-bucket-01-production-response-runner.mjs \
+            > reports/qualification/sgs-final-global-runner.stdout.log \
+            2> reports/qualification/sgs-final-global-runner.stderr.log \
+            || fail GLOBAL_1024 reports/qualification/sgs-final-global-runner.stderr.log
+          node scripts/lafea-bucket-01-production-response-receipt.mjs \
+            > reports/qualification/sgs-final-global-response.stdout.log \
+            2> reports/qualification/sgs-final-global-response.stderr.log \
+            || fail GLOBAL_RESPONSE reports/qualification/sgs-final-global-response.stderr.log
+          cp reports/qualification/lafea-bucket-01-production-response.json \
+            reports/qualification/sgs-final-global-response.json
+          post success GLOBAL_1024 "Global SGS response passed"
+
+          post pending STRESS_PATCH "Adding stress-only 2048 level"
+          python /tmp/sgs2.py \
+            > reports/qualification/sgs-final-stress-patch.stdout.log \
+            2> reports/qualification/sgs-final-stress-patch.stderr.log \
+            || fail STRESS_PATCH reports/qualification/sgs-final-stress-patch.stderr.log
+          post success STRESS_PATCH "Stress-only 2048 level applied"
+
+          post pending STRESS_2048 "Executing 2048 SGS solve"
+          node scripts/lafea-bucket-01-production-response-runner.mjs \
+            > reports/qualification/sgs-final-stress-runner.stdout.log \
+            2> reports/qualification/sgs-final-stress-runner.stderr.log \
+            || fail STRESS_2048 reports/qualification/sgs-final-stress-runner.stderr.log
+          post success STRESS_2048 "2048 SGS solve completed"
+
+          post pending STRESS_RECEIPT "Recovering all frozen stress locations"
+          set +e
+          node scripts/lafea-bucket-01-production-lug-probe-receipt.mjs \
+            > reports/qualification/sgs-final-stress.stdout.log \
+            2> reports/qualification/sgs-final-stress.stderr.log
+          stress_exit=$?
+          set -e
+          if [[ "$stress_exit" != "0" ]]; then
+            log=reports/qualification/sgs-final-stress.stderr.log
+            [[ -s "$log" ]] || log=reports/qualification/sgs-final-stress.stdout.log
+            fail STRESS_RECEIPT "$log"
+          fi
+          summary=$(node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const response = JSON.parse(fs.readFileSync('reports/qualification/sgs-final-global-response.json','utf8'));
+          const stress = JSON.parse(fs.readFileSync('reports/qualification/lafea-bucket-01-production-lug-fixed-probes.json','utf8'));
+          const rows = [...stress.standaloneProbeReceipts, ...stress.pathReceipts.flatMap((row) => row.stationReceipts)];
+          process.stdout.write(JSON.stringify({
+            responseFineGridGci: response.energyConvergence.fineGridGci,
+            maximumStressWidth: Math.max(...rows.map((row) => row.supplementalBound.relativeWidth)),
+            criticalLocation: rows.reduce((max,row)=>row.supplementalBound.relativeWidth>max.supplementalBound.relativeWidth?row:max).probeId,
+            allLocationsPassed: rows.every((row)=>row.status==='PASS'),
+          }));
+          NODE
+          )
+          encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$summary")
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=success -f context=lafea/sgs-final/COMPLETE \
+            -f description="SGS global response and 2048 stress receipt passed" \
+            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_summary=${encoded}"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-sgs-final-${{ github.sha }}
+          path: reports/qualification/
+          if-no-files-found: warn
+          retention-days: 30
