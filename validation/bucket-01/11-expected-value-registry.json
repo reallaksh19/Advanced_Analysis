@@ -9,7 +9,7 @@
     {
       "entryId": "PURE_BENDING_PANEL_ORACLE",
       "path": "validation/bucket-01/03-pure-bending-panel-oracle.json",
-      "schema": "lafea-bucket-01-pure-bending-panel-oracle/v1",
+      "schema": "lafea-bucket-01-pure-bending-oracle/v1",
       "role": "INDEPENDENT_CLOSED_FORM_ORACLE"
     },
     {
