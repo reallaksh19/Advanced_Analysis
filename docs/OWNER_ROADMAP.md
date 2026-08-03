@@ -785,9 +785,54 @@ acknowledged directly on #531 (comment posted) — mirroring the
 established prerequisite-Work-Pack pattern used for M014→M013 and
 M017→M016.
 
+### M019 (#535) → PR #540, merged as `18e6d8814df69a6eff041eecb4357a6d2aa21acb`
+
+Reviewed in full: cloned the exact PR head into an isolated worktree,
+confirmed via `git diff $(git merge-base origin/main HEAD) HEAD
+--name-only` that only the claimed 4 files changed, read both
+production diffs (`stress-terms.js`, `code-engine.js`) and both proof
+files in full before running anything.
+
+The fix mirrors the existing `pressureValue`/`isRangeCategory` pattern
+exactly, as required: `combineStressTerms` now takes a caller-resolved
+`axialStressValue` instead of computing it internally; `code-engine.js`
+resolves it to `0` for both range categories and to the original
+expression for `SUSTAINED`/`OCCASIONAL`, unchanged. `resultants.
+axialForce` and `factors.axialIndex` are untouched, exactly as
+specified — confirmed directly in the check output (`B41-T03`:
+`resultants.axialForce` stays at its genuinely nonzero fixture value
+while `stressTerms.axial` reads `0`).
+
+Both real-authority reproduction proofs (new `B41-T04`/`B41-T05` in
+`lfea-b4.1`) push real Table S303.7.1 resultants and real Appendix D
+SIFs through the actual `compileCodeResult` path — not a bypass — and
+reproduce the Owner's own independently-derived numbers exactly:
+NPS20 branch pipe `25,143,042.26 Pa` vs. published `25,155,000 Pa`
+(`-0.0475%`); NPS24 tee `189,806,355.67 Pa` vs. published
+`189,945,000 Pa` (`-0.073%`). `B41-T04` additionally asserts the old
+axial-inclusive formula would have overshot by `>20%`, directly
+regression-locking the bug this Work Pack fixes.
+
+Found and fixed one small, unrelated defect directly during review: a
+comment in `code-engine.js` had been accidentally mangled to "folds a
+fragment of both semantic hashes into itself identity string" (should
+read "into the identity string") — comment-only, no behavioral impact,
+corrected and pushed before merge.
+
+Ran every required command for real on the corrected head: `check:
+lfea-b4.0` through `b4.4` individually (all exit 0), full `check:
+lfea-linear-core` (exit 0, 529 assertions). Post-merge sanity check on
+fresh `main` at `18e6d88` also passed end to end. Both worktrees
+cleaned up.
+
+**M018 (#531) is unparked** — the prerequisite fix is merged and
+independently verified; the Example 3 benchmark itself can now
+resume on `feat/m018-appendix-s-example3` with the corrected formula
+in place.
+
 This closes out the full Appendix S benchmarking arc the user asked
 for on 2026-08-03 ("benchmark another 2 or more cases before we move
-to a configurable prototype") down to one remaining real gate: Examples
-1 and 2 are merged; Example 3 is fully scoped with cross-validated
-ground truth but is genuinely blocked on a real, now-fixed-in-flight
-production defect the benchmarking effort itself just found.
+to a configurable prototype") down to Example 3's own implementation,
+now unblocked — Examples 1 and 2 are merged; the formula defect the
+benchmarking effort itself found is fixed and verified; Example 3 is
+fully scoped with cross-validated ground truth and ready to resume.
