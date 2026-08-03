@@ -39,7 +39,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Apply solver headroom and geometric ring grading
+      - name: Apply solver headroom and quadratic ring grading
         shell: bash
         run: |
           python - <<'PY'
@@ -71,7 +71,7 @@ jobs:
           new = """function radiusAt(spec, ring) {
             const fraction = ring / spec.radialDivisions;
             return spec.holeRadius
-              * (spec.outerRadius / spec.holeRadius) ** fraction;
+              + (spec.outerRadius - spec.holeRadius) * fraction ** 2;
           }"""
           if text.count(old) != 1:
               raise SystemExit(f'radiusAt marker count={text.count(old)}')
@@ -106,7 +106,7 @@ jobs:
           echo "exit_code=$?" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Publish geometric grading result
+      - name: Publish quadratic grading result
         env:
           GH_TOKEN: ${{ github.token }}
           EXIT_CODE: ${{ steps.kirsch.outputs.exit_code }}
@@ -116,7 +116,7 @@ jobs:
             gh api --method POST \
               "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
               -f state=success \
-              -f context="lafea/geometric-ring-grading" \
+              -f context="lafea/quadratic-ring-grading" \
               -f description="Mesh, solver and Kirsch qualification passed"
             exit 0
           fi
@@ -125,8 +125,8 @@ jobs:
           gh api --method POST \
             "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=failure \
-            -f context="lafea/geometric-grading-detail" \
-            -f description="Geometric ring grading Kirsch result" \
+            -f context="lafea/quadratic-grading-detail" \
+            -f description="Quadratic ring grading Kirsch result" \
             -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
           exit "$EXIT_CODE"
 
@@ -134,7 +134,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lafea-bucket-01-geometric-grading-${{ github.sha }}
+          name: lafea-bucket-01-quadratic-grading-${{ github.sha }}
           path: reports/qualification/
           if-no-files-found: warn
           retention-days: 30
