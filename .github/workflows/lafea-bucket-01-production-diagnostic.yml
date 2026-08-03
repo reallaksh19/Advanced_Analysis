@@ -1,8 +1,6 @@
 name: LAFEA Bucket-01 Production Diagnostic
 
 on:
-  push:
-    branches: [bucket-01-cantilever-benchmark-route]
   workflow_dispatch:
 
 permissions:
@@ -11,7 +9,6 @@ permissions:
 
 jobs:
   production-diagnostic:
-    if: ${{ github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[skip diagnostic]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
