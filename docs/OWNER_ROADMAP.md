@@ -39,6 +39,8 @@ current source — do not trust the document alone.
 | M006 | #451 | #456 | Merged (Owner-fixed) | System-level closed-form thermal expansion benchmarks (`lfea-b3.8`, free + restrained uniform heating) — real B-2.5→B-3.4 chain, not a hand-reconstruction |
 | M007 | #452 | #457 | Merged (Owner-fixed) | Real production gap closed: `GRAVITY`/`PIPE_WALL` now expands to equivalent element UDLs via B-3.1 machinery, not just validated at declaration level; closed-form benchmark at `lfea-b3.9` |
 | (direct fix, no WP) | — | #461 | Merged | `check:lfea-linear-core` now completes end to end for the first time since M001 — replaced its dependency on a deleted, non-functional CI workflow file with the mechanisms that actually keep the workspace-integration check and its e2e spec wired in |
+| M008 | #463 | — | Prequalification posted, awaiting Owner review | Benchmark B — governed analysis-authority overlay for the real 1885 project, scoped to one line/branch. Real degrees of freedom (overlay schema shape, 83/279 objects with missing lineNo/pipingClass, no branch-extraction utility exists yet) — see issue for grounded findings |
+| M009 | #464 | — | Prequalification posted, awaiting Owner review | Stress recovery scope confirmation (mandate §13.3) — B-4.0's `calculatedStress` already exists and is wired into `linear-piping-code-application`; open questions are narrower (pressure-stress term, real-vs-fixture exercise, EditionDataset supply path, display/export reach), not "does it exist at all" |
 
 ### Non-LFEA workstreams (user-directed pivot, 4 parallel read-only audits + direct fixes)
 
@@ -77,19 +79,29 @@ coverage is now 12/20 mandate cases. Both PRs needed Owner-side fixes the
 implementing agents' repository-less sandboxes could not have caught
 themselves — see process notes below.
 
-**M008** (large, needs careful prequalification, renumbered from the earlier
-"M007" slot — that number is now taken by the gravity-self-weight mission
-above): begin Benchmark B — the governed analysis-authority overlay contract
-(materials, sections, supports, load cases) for the real 1885 project, scoped
-initially to one line/branch rather than the full 279-object project, to get
-a first genuine non-BLOCKED solve. This is the single highest-mandate-value
-remaining item and the prerequisite for P12. Do not hand this off without
-prequalification — the overlay schema design has real degrees of freedom
-that need Owner judgment before implementation starts.
+**M008 — prequalification issue posted (#463), awaiting agent answers.**
+Benchmark B — the governed analysis-authority overlay contract (materials,
+sections, supports, load cases) for the real 1885 project, scoped initially
+to one line/branch rather than the full 279-object project, to get a first
+genuine non-BLOCKED solve. Owner-side investigation before the issue was
+opened already found this is a real gap with real design freedom, not a
+settled build: no per-object overlay schema exists anywhere yet (the closest
+analog, `project-data-contract.js`, is project-scalar only); the real project
+is blocked with `BLOCKED_PROJECT_DATA_INCOMPLETE`; 83/279 entities have
+`MISSING_ATTRIBUTE` diagnostics on `lineNo`/`pipingClass`; no single-branch
+extraction utility exists. Full findings are in the issue. This is the
+single highest-mandate-value remaining item and the prerequisite for P12 —
+do not authorize implementation until the questionnaire answers are reviewed.
 
-**M009**: stress recovery for frame/pipe elements (mandate Section 13.3) —
-first verify whether it exists at all in the Stack-C chain before scoping
-implementation vs. verification work.
+**M009 — prequalification issue posted (#464), awaiting agent answers.**
+Stress recovery for frame/pipe elements (mandate §13.3). Owner-side
+investigation before the issue was opened found the member-stress
+calculation likely already exists (`linear-fea-b31-code-engine/stress-terms.js`'s
+`combineStressTerms`, wired into `linear-piping-code-application/b31-application.js`)
+— so this is probably scope-confirmation plus a possible narrow gap
+(the `pressureStressValue` term appears to always be caller-supplied, never
+computed from geometry+pressure by anything found so far) rather than a
+missing capability. Full findings are in the issue.
 
 **M010**: Stack-B UI defect re-verification. Before scoping, redo the direct
 verification pass that found D-01/D-09 already fixed — do not reuse
