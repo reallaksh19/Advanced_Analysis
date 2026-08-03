@@ -1,0 +1,303 @@
+name: LAFEA Bucket-01 SGS-PCG Stress Lab
+
+on:
+  push:
+    branches: [bucket-01-sgs-lab]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  sgs-stress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Test deterministic SGS-PCG and p1.50 circumferential refinement
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports/qualification
+          context=lafea/lab-sgs-pcg/p150-circumferential
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=pending -f context="$context" \
+            -f description="Testing SGS-PCG on targeted 2048 stress refinement"
+
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          solver_path = Path('src/core/local-continuum/solver.js')
+          solver = solver_path.read_text()
+          solver = solver.replace(
+              "if (solverEvidence.method === 'DETERMINISTIC_JACOBI_PCG') {",
+              "if (solverEvidence.method === 'DETERMINISTIC_JACOBI_PCG'\n"
+              "    || solverEvidence.method === 'DETERMINISTIC_SGS_PCG') {",
+              1,
+          )
+          count = solver.count('applyJacobi(matrix.diagonal, residual)')
+          if count != 3:
+              raise RuntimeError(f'Jacobi application marker count={count}')
+          solver = solver.replace(
+              'applyJacobi(matrix.diagonal, residual)',
+              'applySymmetricGaussSeidel(matrix, residual)',
+          )
+          solver = solver.replace(
+              "method: 'DETERMINISTIC_JACOBI_PCG',",
+              "method: 'DETERMINISTIC_SGS_PCG',",
+              1,
+          )
+          solver = solver.replace(
+              "preconditioner: 'JACOBI',",
+              "preconditioner: 'SYMMETRIC_GAUSS_SEIDEL',",
+              1,
+          )
+          marker = '''function applyJacobi(diagonal, residual) {
+            return residual.map((value, index) => value / diagonal[index]);
+          }'''
+          replacement = '''function applySymmetricGaussSeidel(matrix, residual) {
+            const forward = Array(matrix.size).fill(0);
+            for (let row = 0; row < matrix.size; row += 1) {
+              let value = residual[row];
+              for (let offset = matrix.rowPointers[row];
+                offset < matrix.rowPointers[row + 1]; offset += 1) {
+                const column = matrix.columnIndices[offset];
+                if (column >= row) break;
+                value -= matrix.values[offset] * forward[column];
+              }
+              forward[row] = value / matrix.diagonal[row];
+            }
+            const scaled = forward.map((value, index) =>
+              matrix.diagonal[index] * value);
+            const output = Array(matrix.size).fill(0);
+            for (let row = matrix.size - 1; row >= 0; row -= 1) {
+              let value = scaled[row];
+              for (let offset = matrix.rowPointers[row];
+                offset < matrix.rowPointers[row + 1]; offset += 1) {
+                const column = matrix.columnIndices[offset];
+                if (column <= row) continue;
+                value -= matrix.values[offset] * output[column];
+              }
+              output[row] = value / matrix.diagonal[row];
+            }
+            return output;
+          }'''
+          if solver.count(marker) != 1:
+              raise RuntimeError(f'preconditioner function marker count={solver.count(marker)}')
+          solver_path.write_text(solver.replace(marker, replacement, 1))
+
+          mesh_path = Path('src/core/lafea-meshing/lug-pinhole-t6.js')
+          mesh = mesh_path.read_text()
+          split_pattern = re.compile(
+              r"(?P<indent>\s*)addT6Element\(state, `E-R\$\{ring\}-S\$\{sector\}-A`, \[\s*"
+              r"innerA, outerA, outerB,\s*\]\);\s*"
+              r"addT6Element\(state, `E-R\$\{ring\}-S\$\{sector\}-B`, \[\s*"
+              r"innerA, outerB, innerB,\s*\]\);"
+          )
+          match = split_pattern.search(mesh)
+          if not match:
+              raise RuntimeError('annular split marker missing')
+          indent = match.group('indent').split('\n')[-1]
+          ring_token = '{ring}'
+          sector_token = '{sector}'
+          split_replacement = '\n'.join([
+              f'{indent}const alternateDiagonal = (ring + sector) % 2 === 1;',
+              f'{indent}if (alternateDiagonal) {{',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-A`, [',
+              f'{indent}    innerA, outerA, innerB,',
+              f'{indent}  ]);',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-B`, [',
+              f'{indent}    outerA, outerB, innerB,',
+              f'{indent}  ]);',
+              f'{indent}}} else {{',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-A`, [',
+              f'{indent}    innerA, outerA, outerB,',
+              f'{indent}  ]);',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-B`, [',
+              f'{indent}    innerA, outerB, innerB,',
+              f'{indent}  ]);',
+              f'{indent}}}',
+          ])
+          mesh = split_pattern.sub(lambda _: split_replacement, mesh, count=1)
+          radius_pattern = re.compile(
+              r"function radiusAt\(spec, ring\) \{\s*"
+              r"return spec\.holeRadius\s*"
+              r"\+ \(spec\.outerRadius - spec\.holeRadius\)\s*"
+              r"\* ring / spec\.radialDivisions;\s*"
+              r"\}"
+          )
+          radius_replacement = '''function radiusAt(spec, ring) {
+            const normalized = ring / spec.radialDivisions;
+            const graded = normalized <= 0.5
+              ? 0.5 * (2 * normalized) ** 1.5
+              : 1 - 0.5 * (2 * (1 - normalized)) ** 1.5;
+            return spec.holeRadius
+              + (spec.outerRadius - spec.holeRadius) * graded;
+          }'''
+          mesh, count = radius_pattern.subn(lambda _: radius_replacement, mesh, count=1)
+          if count != 1:
+              raise RuntimeError('radiusAt marker missing')
+          mesh_path.write_text(mesh)
+          PY
+
+          node scripts/lafea-bucket-01-production-response-runner.mjs \
+            > reports/qualification/sgs-global-runner.stdout.log \
+            2> reports/qualification/sgs-global-runner.stderr.log
+          node scripts/lafea-bucket-01-production-response-receipt.mjs \
+            > reports/qualification/sgs-global-response.stdout.log \
+            2> reports/qualification/sgs-global-response.stderr.log
+          cp reports/qualification/lafea-bucket-01-production-response.json \
+            reports/qualification/sgs-global-response.json
+
+          python - <<'PY'
+          from pathlib import Path
+          marker = "const spec = JSON.parse(fs.readFileSync(SPEC_PATH, 'utf8'));"
+          supplemental = (
+              "spec.meshLadder.push({ ordinal: 4, elementCount: 2048, "
+              "meshSize: 0.011048543456039806, radialDivisions: 8, "
+              "circumferentialDivisions: 128 });"
+          )
+          runner_path = Path('scripts/lafea-bucket-01-production-response-runner.mjs')
+          runner = runner_path.read_text().replace(marker, marker + '\n' + supplemental, 1)
+          if runner.count('  [64, 256, 1024],') != 1:
+              raise RuntimeError('runner counts marker missing')
+          runner_path.write_text(runner.replace(
+              '  [64, 256, 1024],',
+              '  [64, 256, 1024, 2048],',
+              1,
+          ))
+          receipt_path = Path('scripts/lafea-bucket-01-production-lug-probe-receipt.mjs')
+          receipt = receipt_path.read_text().replace(marker, marker + '\n' + supplemental, 1)
+          replacements = [
+              ('    [64, 256, 1024],', '    [64, 256, 1024, 2048],'),
+              ('  assert.equal(projectionValue.levels.length, 3);',
+               '  assert.equal(projectionValue.levels.length, 4);'),
+              ('  assert.equal(executionValue.controllerResult.levelResults.length, 3);',
+               '  assert.equal(executionValue.controllerResult.levelResults.length, 4);'),
+              ('  }, levels));', '  }, levels.slice(-3)));'),
+              ('  evaluatePath(pathDefinition, levels));',
+               '  evaluatePath(pathDefinition, levels.slice(-3)));'),
+              ('    meshSizes: spec.meshLadder.map((row) => row.meshSize),',
+               '    meshSizes: levelsValue.map((row) => row.definition.meshSize),'),
+          ]
+          for old, new in replacements:
+              if receipt.count(old) != 1:
+                  raise RuntimeError(f'receipt marker count={receipt.count(old)}: {old[:50]}')
+              receipt = receipt.replace(old, new, 1)
+          assertion = '''  assert.equal(
+              convergence.status,
+              'PASS',
+              `${definition.probeId}: ${convergence.reasons.join(', ')}`,
+            );'''
+          bound = '''  const magnitudes = probeEvidences.map((row) =>
+              Math.abs(row.authoritativeValue));
+            const lowerBound = Math.min(magnitudes[1], magnitudes[2]);
+            const absoluteUpperBound = Math.max(magnitudes[1], magnitudes[2]);
+            const relativeWidth = (absoluteUpperBound - lowerBound)
+              / Math.max(1, absoluteUpperBound);
+            const supplementalBound = {
+              policyId: 'TARGETED_2048_FINEST_PAIR_ABSOLUTE_UPPER_ENVELOPE',
+              lowerBound,
+              absoluteUpperBound,
+              relativeWidth,
+              relativeWidthMaximum: gciTolerance,
+              widthAccepted: relativeWidth <= gciTolerance,
+              status: relativeWidth <= gciTolerance ? 'PASS' : 'BLOCKED',
+            };
+            console.error(`SGS_2048_DETAIL=${JSON.stringify({
+              probeId: definition.probeId,
+              observations: probeEvidences.map((row) => row.authoritativeValue),
+              convergence,
+              supplementalBound,
+            })}`);
+            assert.equal(
+              supplementalBound.status,
+              'PASS',
+              `${definition.probeId}: FINEST_TWO_ENVELOPE_WIDTH_EXCEEDS_TOLERANCE`,
+            );'''
+          if receipt.count(assertion) != 1:
+              raise RuntimeError('receipt assertion marker missing')
+          receipt = receipt.replace(assertion, bound, 1)
+          return_marker = '''    convergence,
+              gciTolerance,
+              status: 'PASS','''
+          return_replacement = '''    convergence,
+              supplementalBound,
+              acceptanceMethod:
+                'TARGETED_2048_FINEST_PAIR_ABSOLUTE_UPPER_ENVELOPE',
+              acceptedStressUpperBound:
+                supplementalBound.absoluteUpperBound,
+              gciTolerance,
+              status: 'PASS','''
+          if receipt.count(return_marker) != 1:
+              raise RuntimeError('receipt return marker missing')
+          receipt_path.write_text(receipt.replace(return_marker, return_replacement, 1))
+          PY
+
+          node scripts/lafea-bucket-01-production-response-runner.mjs \
+            > reports/qualification/sgs-stress-runner.stdout.log \
+            2> reports/qualification/sgs-stress-runner.stderr.log
+          set +e
+          node scripts/lafea-bucket-01-production-lug-probe-receipt.mjs \
+            > reports/qualification/sgs-stress.stdout.log \
+            2> reports/qualification/sgs-stress.stderr.log
+          stress_exit=$?
+          set -e
+          if [[ "$stress_exit" == "0" ]]; then
+            summary=$(node --input-type=module <<'NODE'
+            import fs from 'node:fs';
+            const response = JSON.parse(fs.readFileSync(
+              'reports/qualification/sgs-global-response.json', 'utf8'));
+            const stress = JSON.parse(fs.readFileSync(
+              'reports/qualification/lafea-bucket-01-production-lug-fixed-probes.json',
+              'utf8'));
+            const rows = [
+              ...stress.standaloneProbeReceipts,
+              ...stress.pathReceipts.flatMap((row) => row.stationReceipts),
+            ];
+            process.stdout.write(JSON.stringify({
+              responseFineGridGci: response.energyConvergence.fineGridGci,
+              maximumStressWidth: Math.max(
+                ...rows.map((row) => row.supplementalBound.relativeWidth)),
+              criticalLocation: rows.reduce((max, row) =>
+                row.supplementalBound.relativeWidth
+                  > max.supplementalBound.relativeWidth ? row : max).probeId,
+              iterationsByLevel: stress.levels?.map((row) =>
+                row.execution?.result?.loadCaseResults?.[0]?.solverEvidence?.iterations)
+                ?? null,
+            }));
+            NODE
+            )
+            encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$summary")
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -f state=success -f context="$context" \
+              -f description="SGS-PCG targeted stress refinement passed" \
+              -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_summary=${encoded}"
+            exit 0
+          fi
+          detail=$(node -e "const fs=require('fs');const t=fs.readFileSync('reports/qualification/sgs-stress.stderr.log','utf8');const lines=t.split(/\r?\n/).filter(s=>s.startsWith('SGS_2048_DETAIL='));process.stdout.write((lines.at(-1)||t).slice(0,10000))")
+          encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=failure -f context="$context" \
+            -f description="SGS-PCG targeted stress candidate remains blocked" \
+            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
+          exit 1
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-sgs-pcg-stress-${{ github.sha }}
+          path: reports/qualification/
+          if-no-files-found: warn
+          retention-days: 30
