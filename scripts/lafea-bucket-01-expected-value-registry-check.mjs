@@ -13,30 +13,36 @@ const REPORT_PATH = path.resolve(ROOT, process.env.LAFEA_BUCKET_01_EXPECTED_VALU
   ?? 'reports/qualification/lafea-bucket-01-expected-value-registry.json');
 const registry = JSON.parse(fs.readFileSync(REGISTRY_PATH, 'utf8'));
 
-assert.equal(registry.schema, 'lafea-bucket-01-expected-value-registry/v1');
+assert.equal(registry.schema, 'lafea-bucket-01-expected-value-registry/v2');
 assert.equal(registry.freezeAuthority, 'EXACT_GIT_HEAD_FILE_SET');
 assert.equal(registry.productionOutputMayGenerateExpectedValues, false);
-assert.equal(registry.entries.length, 6);
-assert.equal(new Set(registry.entries.map((row) => row.entryId)).size, 6);
-assert.equal(new Set(registry.entries.map((row) => row.path)).size, 6);
+assert.equal(registry.entries.length, 7);
+assert.equal(new Set(registry.entries.map((row) => row.entryId)).size, 7);
+assert.equal(new Set(registry.entries.map((row) => row.path)).size, 7);
 
 const entries = registry.entries.map((definition) => inspect(definition));
 const definitionSetBase = {
-  schema: 'lafea-bucket-01-expected-value-definition-set/v1',
+  schema: 'lafea-bucket-01-expected-value-definition-set/v2',
   registryHash: canonicalLafeaSha256(registry),
   entries,
 };
 const definitionSetHash = canonicalLafeaSha256(definitionSetBase);
 const reportBase = {
-  schema: 'lafea-bucket-01-expected-value-registry-evidence/v1',
-  producerRevision: 'B01-EXPECTED-VALUE-REGISTRY.1',
+  schema: 'lafea-bucket-01-expected-value-registry-evidence/v2',
+  producerRevision: 'B01-EXPECTED-VALUE-REGISTRY.2',
   registryHash: definitionSetBase.registryHash,
   definitionSetHash,
   entries,
   authority: {
     exactHeadFileSetFrozen: true,
-    independentClosedFormOracleCount: entries.filter((row) => row.role === 'INDEPENDENT_CLOSED_FORM_ORACLE').length,
-    productionConvergenceDefinitionCount: entries.filter((row) => row.role !== 'INDEPENDENT_CLOSED_FORM_ORACLE').length,
+    independentClosedFormOracleCount:
+      entries.filter((row) => row.role === 'INDEPENDENT_CLOSED_FORM_ORACLE').length,
+    independentEngineeringTheoryOracleCount:
+      entries.filter((row) => row.role === 'INDEPENDENT_ENGINEERING_THEORY_ORACLE').length,
+    productionConvergenceDefinitionCount: entries.filter((row) => (
+      row.role === 'FROZEN_PRODUCTION_CONVERGENCE_DEFINITION'
+      || row.role === 'FROZEN_PRODUCTION_STRESS_LOCATION_DEFINITION'
+    )).length,
     productionOutputUsedToGenerateExpectedValues: false,
     productionOutputUsedToSelectLocationsOrTolerances: false,
     movingMaximumAcceptanceAuthorized: false,
@@ -51,12 +57,20 @@ fs.writeFileSync(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 console.log(JSON.stringify(report));
 
 function inspect(definition) {
-  assert.ok(['INDEPENDENT_CLOSED_FORM_ORACLE', 'FROZEN_PRODUCTION_CONVERGENCE_DEFINITION', 'FROZEN_PRODUCTION_STRESS_LOCATION_DEFINITION'].includes(definition.role));
+  assert.ok([
+    'INDEPENDENT_CLOSED_FORM_ORACLE',
+    'INDEPENDENT_ENGINEERING_THEORY_ORACLE',
+    'FROZEN_PRODUCTION_CONVERGENCE_DEFINITION',
+    'FROZEN_PRODUCTION_STRESS_LOCATION_DEFINITION',
+  ].includes(definition.role));
   const absolute = path.join(ROOT, definition.path);
   const raw = fs.readFileSync(absolute);
   const value = JSON.parse(raw.toString('utf8'));
   assert.equal(value.schema, definition.schema, definition.path);
   if (definition.role === 'INDEPENDENT_CLOSED_FORM_ORACLE') verifyClosedForm(value, definition.path);
+  if (definition.role === 'INDEPENDENT_ENGINEERING_THEORY_ORACLE') {
+    verifyEngineeringTheory(value, definition.path);
+  }
   if (definition.role === 'FROZEN_PRODUCTION_CONVERGENCE_DEFINITION') verifyProductionResponse(value);
   if (definition.role === 'FROZEN_PRODUCTION_STRESS_LOCATION_DEFINITION') verifyProductionStress(value);
   return {
@@ -70,10 +84,28 @@ function inspect(definition) {
 function verifyClosedForm(value, label) {
   const text = JSON.stringify(value);
   assert.match(text, /CLOSED_FORM|KIRSCH|ANALYTICAL/u, `${label} lacks independent analytical source marker`);
+  verifyNoProductionDerivedExpectedValues(value, label);
+}
+
+function verifyEngineeringTheory(value, label) {
+  assert.equal(value.authority?.type, 'ENGINEERING_THEORY', `${label} lacks engineering-theory authority`);
+  assert.match(value.authority?.source ?? '', /Timoshenko|beam/iu, `${label} lacks theory source`);
+  assert.equal(value.formulation, 'PLANE_STRESS');
+  assert.equal(value.benchmarkId, 'C2D-CANTILEVER-PLANE-STRESS-01');
+  assert.ok(Array.isArray(value.meshes) && value.meshes.length >= 3, `${label} lacks refinement ladder`);
+  assert.ok(value.tolerances?.finestDeflectionRatioAbsoluteError > 0);
+  assert.ok(value.tolerances?.forceEquilibriumRelative > 0);
+  assert.ok(value.tolerances?.momentEquilibriumRelative > 0);
+  assert.ok(value.tolerances?.energyRelative > 0);
+  verifyNoProductionDerivedExpectedValues(value, label);
+}
+
+function verifyNoProductionDerivedExpectedValues(value, label) {
   const markers = collectProductionMarkers(value);
   assert.ok(markers.length > 0, `${label} lacks production-output authority marker`);
   assert.equal(markers.every((row) => row.value === false), true, `${label} permits production-derived expected values`);
 }
+
 function verifyProductionResponse(value) {
   assert.equal(value.authority.productionOutputUsedToGenerateExpectedForceOrMoment, false);
   assert.equal(value.authority.productionEnergyExpectedValueRequired, false);
