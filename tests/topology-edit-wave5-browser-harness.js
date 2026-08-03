@@ -1,24 +1,32 @@
 import * as THREE from 'three';
-import { TopologyEditViewportBackend } from '../src/workspace/topology-edit/topology-edit-viewport-backend.js';
+import { TopologyEditNavigationHudViewportBackend } from '../src/workspace/topology-edit/topology-edit-navigation-hud-viewport-backend.js';
 import { selectTopologyEditPickingMode } from '../scripts/topology-edit-wave5-contract.mjs';
 
 export async function runTopologyEditWave5BrowserHarness(options = {}) {
   const componentCount = Number(options.componentCount ?? 25_600);
+  if (!Number.isSafeInteger(componentCount) || componentCount < 8) {
+    throw new TypeError('Wave 5 browser componentCount must be an integer of at least 8.');
+  }
+  const requestedProbeCount = Number(options.optimizerProbeCount ?? 256);
+  if (!Number.isSafeInteger(requestedProbeCount) || requestedProbeCount < 4) {
+    throw new TypeError('Wave 5 optimizerProbeCount must be an integer of at least 4.');
+  }
+  const optimizerProbeCount = Math.min(componentCount - 1, requestedProbeCount);
   const pickCount = Number(options.pickSampleCount ?? 40);
   const frameCount = Number(options.frameSampleCount ?? 40);
   const host = document.createElement('div');
   host.style.cssText = 'position:fixed;left:0;top:0;width:1000px;height:700px;overflow:hidden';
   document.body.append(host);
-  const backend = new TopologyEditViewportBackend();
+  const backend = new TopologyEditNavigationHudViewportBackend();
   const startedAt = performance.now();
   backend.mount(host);
-  const model = largeModel(componentCount);
-  backend.renderSession(model);
+  const fixture = largeModel(componentCount, optimizerProbeCount);
+  backend.renderSession(fixture.model);
   await frames(2);
   const firstValidFrameMs = performance.now() - startedAt;
-  const target = model.draft.elements[0];
+  const optimizationEvidence = backend.renderOptimizationEvidence;
   const client = project(
-    target,
+    fixture.target,
     backend.engineeringRoot,
     backend.activeCamera,
     backend.renderer.domElement,
@@ -29,17 +37,26 @@ export async function runTopologyEditWave5BrowserHarness(options = {}) {
     const start = performance.now();
     const hit = backend.pickAt(client.x, client.y);
     picks.push(performance.now() - start);
-    if (hit?.objectId !== target.id) identityErrorCount += 1;
+    if (hit?.objectId !== fixture.target.id) identityErrorCount += 1;
   }
   const frameTimes = [];
   for (let index = 0; index < frameCount; index += 1) {
     const start = performance.now();
-    backend.renderer.render(backend.scene, backend.activeCamera);
+    backend.renderDirty = true;
+    backend.renderFrame();
     frameTimes.push(performance.now() - start);
   }
   const renderer = backend.renderer;
   const pick = summary(picks);
   const navigationFrame = summary(frameTimes);
+  const m005CreatedInstanceCount = (optimizationEvidence?.layers || []).reduce(
+    (sum, layer) => sum + (layer.instancing?.newInstanceCount || 0),
+    0,
+  );
+  const m005GeometryReuseCount = (optimizationEvidence?.layers || []).reduce(
+    (sum, layer) => sum + (layer.pooling?.geometryReuseCount || 0),
+    0,
+  );
   const resourcesBeforeDestroy = {
     geometries: renderer.info.memory.geometries,
     textures: renderer.info.memory.textures,
@@ -58,6 +75,8 @@ export async function runTopologyEditWave5BrowserHarness(options = {}) {
     rendererReleased: backend.renderer === null,
     animationFrameReleased: !backend.animationFrameId,
     mountedStateReleased: backend.isMounted === false,
+    axisHudReleased: backend.axisHud === null,
+    optimizationEvidenceReleased: backend.renderOptimizationEvidence === null,
     hostChildrenAfterDestroy: host.childElementCount,
     groupChildrenAfterDestroy: children(backend),
   };
@@ -68,19 +87,37 @@ export async function runTopologyEditWave5BrowserHarness(options = {}) {
   if (pick.p95 > 100) failures.push('PICK_P95_BUDGET');
   if (navigationFrame.p95 > 33.3) failures.push('FRAME_P95_BUDGET');
   if (identityErrorCount) failures.push('PICK_IDENTITY_MISMATCH');
+  if (!optimizationEvidence) failures.push('RENDER_OPTIMIZATION_EVIDENCE_MISSING');
+  if (optimizationEvidence?.totals?.exactPickIdentityCount !== componentCount) {
+    failures.push('OPTIMIZED_IDENTITY_COUNT_MISMATCH');
+  }
+  if ((optimizationEvidence?.totals?.instanceCountAfter ?? 0) < componentCount) {
+    failures.push('LARGE_MODEL_INSTANCING_MISSING');
+  }
+  if (m005CreatedInstanceCount < optimizerProbeCount) {
+    failures.push('M005_INSTANCE_CONVERSION_MISSING');
+  }
+  if (m005GeometryReuseCount < optimizerProbeCount - 1) {
+    failures.push('M005_GEOMETRY_POOLING_MISSING');
+  }
   if (!lifecycle.rendererReleased || !lifecycle.animationFrameReleased
-      || !lifecycle.mountedStateReleased || lifecycle.hostChildrenAfterDestroy
+      || !lifecycle.mountedStateReleased || !lifecycle.axisHudReleased
+      || !lifecycle.optimizationEvidenceReleased || lifecycle.hostChildrenAfterDestroy
       || lifecycle.groupChildrenAfterDestroy) failures.push('LIFECYCLE_CLEANUP');
   const context = renderer?.getContext();
   return {
-    schema: 'TopologyEditWave5BrowserEvidence.v1',
+    schema: 'TopologyEditWave5BrowserEvidence.v2',
     status: failures.length ? 'FAIL' : 'PASS_BROWSER_INFRASTRUCTURE',
     componentCount,
+    optimizerProbeCount,
+    m005CreatedInstanceCount,
+    m005GeometryReuseCount,
     firstValidFrameMs: round(firstValidFrameMs),
     pick,
     navigationFrame,
     identityErrorCount,
     pickingDecision,
+    optimizationEvidence,
     resourcesBeforeDestroy,
     lifecycle,
     failures,
@@ -89,7 +126,8 @@ export async function runTopologyEditWave5BrowserHarness(options = {}) {
   };
 }
 
-function largeModel(count) {
+function largeModel(count, optimizerProbeCount) {
+  const genericCount = count - optimizerProbeCount;
   const elements = [{
     id: 'probe-target',
     entityId: 'probe-target',
@@ -99,7 +137,7 @@ function largeModel(count) {
     z: 0,
     pickTarget: { objectKind: 'component', objectId: 'probe-target' },
   }];
-  const remaining = Math.max(0, count - 1);
+  const remaining = Math.max(0, genericCount - 1);
   const side = Math.ceil(Math.sqrt(remaining));
   for (let index = 0; index < remaining; index += 1) {
     const id = `component-${String(index).padStart(6, '0')}`;
@@ -113,12 +151,38 @@ function largeModel(count) {
       pickTarget: { objectKind: 'component', objectId: id },
     });
   }
-  const empty = Object.freeze({ elements: Object.freeze([]), segments: Object.freeze([]) });
-  return Object.freeze({
-    source: empty,
-    draft: Object.freeze({ elements: Object.freeze(elements), segments: Object.freeze([]) }),
-    supports: empty,
+  const primitives = Array.from({ length: optimizerProbeCount }, (_, index) => {
+    const id = `m005-probe-${String(index).padStart(4, '0')}`;
+    return {
+      primitiveId: `primitive:${id}`,
+      canonicalEntityId: id,
+      partRole: 'body',
+      kind: 'JUNCTION_MARKER',
+      modelRole: 'draft',
+      sourcePaths: [`/m005-probes/${index}`],
+      workspaceEntityIds: [`entity:${id}`],
+      parameters: {
+        position: {
+          x: 20_000 + ((index % 32) * 100),
+          y: Math.floor(index / 32) * 100,
+          z: 0,
+        },
+      },
+    };
   });
+  const empty = Object.freeze({ elements: Object.freeze([]), segments: Object.freeze([]) });
+  return {
+    target: elements[0],
+    model: Object.freeze({
+      source: Object.freeze({ elements: Object.freeze(elements), segments: Object.freeze([]) }),
+      draft: Object.freeze({
+        elements: Object.freeze([]),
+        segments: Object.freeze([]),
+        primitives: Object.freeze(primitives),
+      }),
+      supports: empty,
+    }),
+  };
 }
 
 function project(point, engineeringRoot, camera, canvas) {
