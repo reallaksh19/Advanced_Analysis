@@ -51,43 +51,51 @@ jobs:
           fi
 
           python - <<'PY' > reports/qualification/mesh-bias-patch.stdout.log 2> reports/qualification/mesh-bias-patch.stderr.log || true
+          import re
           from pathlib import Path
+
           source_path = Path('src/core/lafea-meshing/lug-pinhole-t6.js')
           text = source_path.read_text()
-          old = '''      addT6Element(state, `E-R${ring}-S${sector}-A`, [
-                innerA, outerA, outerB,
-              ]);
-              addT6Element(state, `E-R${ring}-S${sector}-B`, [
-                innerA, outerB, innerB,
-              ]);'''
-          new = '''      const alternateDiagonal = (ring + sector) % 2 === 1;
-              if (alternateDiagonal) {
-                addT6Element(state, `E-R${ring}-S${sector}-A`, [
-                  innerA, outerA, innerB,
-                ]);
-                addT6Element(state, `E-R${ring}-S${sector}-B`, [
-                  outerA, outerB, innerB,
-                ]);
-              } else {
-                addT6Element(state, `E-R${ring}-S${sector}-A`, [
-                  innerA, outerA, outerB,
-                ]);
-                addT6Element(state, `E-R${ring}-S${sector}-B`, [
-                  innerA, outerB, innerB,
-                ]);
-              }'''
-          if text.count(old) != 1:
-              raise RuntimeError(f'element split marker count={text.count(old)}')
-          source_path.write_text(text.replace(old, new, 1))
+          pattern = re.compile(
+              r"(?P<indent>\s*)addT6Element\(state, `E-R\$\{ring\}-S\$\{sector\}-A`, \[\s*"
+              r"innerA, outerA, outerB,\s*\]\);\s*"
+              r"addT6Element\(state, `E-R\$\{ring\}-S\$\{sector\}-B`, \[\s*"
+              r"innerA, outerB, innerB,\s*\]\);"
+          )
+          matches = list(pattern.finditer(text))
+          if len(matches) != 1:
+              raise RuntimeError(f'element split structural match count={len(matches)}')
+          indent = matches[0].group('indent').split('\n')[-1]
+          replacement = '\n'.join([
+              f'{indent}const alternateDiagonal = (ring + sector) % 2 === 1;',
+              f'{indent}if (alternateDiagonal) {{',
+              f'{indent}  addT6Element(state, `E-R${{ring}}-S${{sector}}-A`, [',
+              f'{indent}    innerA, outerA, innerB,',
+              f'{indent}  ]);',
+              f'{indent}  addT6Element(state, `E-R${{ring}}-S${{sector}}-B`, [',
+              f'{indent}    outerA, outerB, innerB,',
+              f'{indent}  ]);',
+              f'{indent}}} else {{',
+              f'{indent}  addT6Element(state, `E-R${{ring}}-S${{sector}}-A`, [',
+              f'{indent}    innerA, outerA, outerB,',
+              f'{indent}  ]);',
+              f'{indent}  addT6Element(state, `E-R${{ring}}-S${{sector}}-B`, [',
+              f'{indent}    innerA, outerB, innerB,',
+              f'{indent}  ]);',
+              f'{indent}}}',
+          ])
+          source_path.write_text(pattern.sub(lambda _: replacement, text, count=1))
+
           revision_files = []
-          for path in Path('.').rglob('*.js'):
-              if any(part in {'.git', 'node_modules', 'dist'} for part in path.parts):
-                  continue
-              value = path.read_text()
-              if 'NB-T6B.1' in value:
-                  path.write_text(value.replace('NB-T6B.1', 'NB-T6B.2'))
-                  revision_files.append(str(path))
-          print('\n'.join(revision_files))
+          for suffix in ('*.js', '*.mjs'):
+              for path in Path('.').rglob(suffix):
+                  if any(part in {'.git', 'node_modules', 'dist'} for part in path.parts):
+                      continue
+                  value = path.read_text()
+                  if 'NB-T6B.1' in value:
+                      path.write_text(value.replace('NB-T6B.1', 'NB-T6B.2'))
+                      revision_files.append(str(path))
+          print('\n'.join(sorted(set(revision_files))))
           PY
           [[ -s reports/qualification/mesh-bias-patch.stderr.log ]] \
             && fail PATCH reports/qualification/mesh-bias-patch.stderr.log
