@@ -52,7 +52,7 @@ def patch_probe() -> None:
         raise RuntimeError(f'recovery method count={text.count(old_method)}')
     text = text.replace(
         old_method,
-        "'T6_DIRECT_ELEMENT_FIELD_AT_FIXED_PROBE_V1'",
+        "'T6_DIRECT_ELEMENT_FIELD_WITH_GAUSS_FALLBACK_V1'",
     )
     insertion = text.index('function reconstructTensor(')
     helper = """function recoverTensorAtProbe(result, loadCase, candidate, elementResult) {
@@ -60,7 +60,11 @@ def patch_probe() -> None:
     (row) => row.elementId === candidate.element.elementId,
   );
   if (!retained || !Array.isArray(retained.dMatrix)) {
-    throw probeError('LAFEA_B01_PROBE_ELEMENT_EVIDENCE_MISSING');
+    return reconstructTensor(
+      elementResult.gaussPointResults,
+      candidate.natural.xi,
+      candidate.natural.eta,
+    );
   }
   const displacementByNode = new Map(
     loadCase.nodalDisplacements.map((row) => [row.nodeId, row]),
