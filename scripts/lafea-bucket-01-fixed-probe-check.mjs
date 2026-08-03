@@ -18,30 +18,24 @@ const mesh = {
   schema: 'lafea-analysis-mesh/v1', meshIdentity: 'PROBE_TEST',
   nodes, elements: [element],
 };
-const gaussPointResults = [
-  ['GP1', 1 / 6, 1 / 6],
-  ['GP2', 2 / 3, 1 / 6],
-  ['GP3', 1 / 6, 2 / 3],
-].map(([pointId, xi, eta]) => ({
-  pointId, xi, eta, weight: 1 / 6, jacobianDeterminant: 1,
-  stress: {
-    sigmaX: 100 + 10 * xi + 20 * eta,
-    sigmaY: 50 - 5 * xi + 4 * eta,
-    sigmaZ: 0,
-    tauXY: 3 + 2 * xi - eta,
-  },
+const strain = { epsilonX: 100, epsilonY: 50, gammaXY: 3 };
+const nodalDisplacements = nodes.map((node) => ({
+  nodeId: node.nodeId,
+  ux: strain.epsilonX * node.x + 0.5 * strain.gammaXY * node.y,
+  uy: strain.epsilonY * node.y + 0.5 * strain.gammaXY * node.x,
 }));
+const retainedElement = {
+  ...element,
+  dMatrix: [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+};
 const result = {
   schema: 'local-continuum-result/v1',
   qualification: { state: 'ACCEPTED' },
-  meshEvidence: { elementEvidence: [element] },
-  loadCaseResults: [{
-    loadCaseId: 'LC1',
-    elementResults: [{
-      elementId: 'E1', elementType: 'T6',
-      recoveryLayer: 'INTEGRATION_POINT', gaussPointResults,
-    }],
-  }],
+  meshEvidence: {
+    formulation: 'PLANE_STRESS',
+    elementEvidence: [retainedElement],
+  },
+  loadCaseResults: [{ loadCaseId: 'LC1', nodalDisplacements }],
 };
 const input = {
   schema: LAFEA_BUCKET_01_FIXED_PROBE_INPUT_SCHEMA,
@@ -59,9 +53,17 @@ const input = {
 const evidence = recoverLafeaBucket01FixedProbe(input);
 assert.equal(evidence.status, 'PASS');
 assert.equal(evidence.elementId, 'E1');
+assert.equal(
+  evidence.recoveryAuthority,
+  'ELEMENT_LOCAL_DIRECT_DISPLACEMENT_GRADIENT',
+);
+assert.equal(evidence.retainedIntegrationPointExtrapolationUsed, false);
 assert.ok(Math.abs(evidence.naturalCoordinates.xi - 0.2) <= 1e-12);
 assert.ok(Math.abs(evidence.naturalCoordinates.eta - 0.3) <= 1e-12);
-assert.ok(Math.abs(evidence.authoritativeValue - 108) <= 1e-12);
+assert.ok(Math.abs(evidence.strain.epsilonX - 100) <= 1e-10);
+assert.ok(Math.abs(evidence.strain.epsilonY - 50) <= 1e-10);
+assert.ok(Math.abs(evidence.strain.gammaXY - 3) <= 1e-10);
+assert.ok(Math.abs(evidence.authoritativeValue - 100) <= 1e-10);
 assert.equal(evidence.crossElementAveragingUsed, false);
 assert.equal(evidence.nodalProjectionUsed, false);
 assert.equal(
@@ -73,22 +75,18 @@ const invariantEvidence = recoverLafeaBucket01FixedProbe({
   ...input,
   probe: { ...input.probe, component: 'VON_MISES' },
 });
-const sigmaX = 108; const sigmaY = 50.2; const tauXY = 3.1;
 const expected = Math.sqrt(
-  sigmaX ** 2 - sigmaX * sigmaY + sigmaY ** 2 + 3 * tauXY ** 2,
+  100 ** 2 - 100 * 50 + 50 ** 2 + 3 * 3 ** 2,
 );
-assert.ok(Math.abs(invariantEvidence.authoritativeValue - expected) <= 1e-12);
+assert.ok(Math.abs(invariantEvidence.authoritativeValue - expected) <= 1e-10);
 
-let outsideMeshBlocked = false;
-try {
-  recoverLafeaBucket01FixedProbe({
+assert.throws(
+  () => recoverLafeaBucket01FixedProbe({
     ...input,
     probe: { ...input.probe, x: 2, y: 2 },
-  });
-} catch (error) {
-  outsideMeshBlocked = error.code === 'LAFEA_B01_PROBE_OUTSIDE_MESH';
-}
-assert.equal(outsideMeshBlocked, true);
+  }),
+  (error) => error?.code === 'LAFEA_B01_PROBE_OUTSIDE_MESH',
+);
 
 const altered = structuredClone(evidence);
 altered.authoritativeValue = 0;
@@ -97,4 +95,4 @@ assert.equal(
   false,
 );
 
-console.log('Bucket-01 fixed physical probe recovery checks passed.');
+console.log('Bucket-01 direct T6 fixed physical probe recovery checks passed.');
