@@ -36,6 +36,14 @@ assert.equal(design.authority.codeBasisBoundaryChanged, false);
 assert.equal(design.authority.productionMeshAuthority, false);
 assert.equal(design.authority.qualificationAuthority, false);
 assert.equal(design.authority.bucketQualified, false);
+assert.deepEqual(
+  design.circumferentialAxis.protectedBreakpoints,
+  [90, 180, 270],
+);
+assert.deepEqual(
+  design.topologyPolicy.protectedFeatureLinesDegrees,
+  [0, 90, 180, 270],
+);
 
 const frozenRadii = uniqueSorted([
   ...probeSpec.probes.map((row) => row.radius),
@@ -78,6 +86,11 @@ assert.equal(radialPlan.status, 'DESIGN_READY_NOT_PRODUCTION');
 assert.equal(circumferentialPlan.status, 'DESIGN_READY_NOT_PRODUCTION');
 assert.equal(radialPlan.authority.anchorCellsSelfSimilarAcrossLevels, true);
 assert.equal(circumferentialPlan.authority.anchorCellsSelfSimilarAcrossLevels, true);
+assert.equal(radialPlan.authority.protectedFeatureBreakpointsPreserved, true);
+assert.equal(
+  circumferentialPlan.authority.protectedFeatureBreakpointsPreserved,
+  true,
+);
 assert.equal(radialPlan.authority.transitionRemeshingRequired, true);
 assert.equal(circumferentialPlan.authority.transitionRemeshingRequired, true);
 assert.equal(radialPlan.authority.productionMeshAuthority, false);
@@ -135,6 +148,7 @@ console.log(JSON.stringify({
   authority: {
     designContractVerified: true,
     frozenCoordinatesPreserved: true,
+    protectedFeatureLinesPreserved: true,
     stableInteriorAxisPhasesVerified: true,
     exactAnchorCellWidthContractionVerified: true,
     transitionCoordinatesDeterministic: true,
@@ -152,6 +166,7 @@ function axisInput(axis, domainStart, domainEnd) {
     domainStart,
     domainEnd,
     anchors: axis.anchors,
+    protectedBreakpoints: axis.protectedBreakpoints,
     targetPhase: axis.targetPhase,
     refinementRatio: design.refinementRatio,
     levelCount: design.levelCount,
@@ -165,6 +180,17 @@ function verifyAxisPlan(plan, targetPhase) {
     assert.equal(level.status, 'DESIGN_READY');
     assert.ok(level.cellCount > level.anchorCellCount);
     assert.equal(level.anchorCellCount, plan.sourceInput.anchors.length);
+    assert.equal(
+      level.protectedBreakpointCount,
+      plan.sourceInput.protectedBreakpoints.length,
+    );
+    assert.deepEqual(
+      level.protectedBreakpoints,
+      plan.sourceInput.protectedBreakpoints,
+    );
+    for (const breakpoint of plan.sourceInput.protectedBreakpoints) {
+      assert.equal(level.coordinates.includes(breakpoint), true);
+    }
     assert.ok(
       level.maximumBackgroundCellWidth
         <= level.targetBackgroundCellWidth * (1 + 1e-12),
