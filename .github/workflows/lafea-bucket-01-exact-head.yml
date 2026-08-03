@@ -1,4 +1,4 @@
-name: LAFEA Bucket-01 Load-Driven Pilot Repair
+name: LAFEA Bucket-01 Load-Driven Evidence Diagnostic
 
 on:
   push:
@@ -6,209 +6,55 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   statuses: write
 
 jobs:
-  repair:
+  diagnostic:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: bucket-01-cantilever-benchmark-route
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Apply and verify method-specific free-DOF evidence
+      - name: Capture production solver evidence
         env:
           GH_TOKEN: ${{ github.token }}
-          ORIGINAL_SHA: ${{ github.sha }}
         shell: bash
         run: |
-          set -euo pipefail
           mkdir -p reports/qualification
-          publish() {
-            state="$1"; context="$2"; description="$3"
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
-              -f state="$state" -f context="$context" -f description="$description"
-          }
-          fail() {
-            stage="$1"; log="$2"
-            detail=$(node -e "const fs=require('fs');const p=process.argv[1];const t=fs.existsSync(p)?fs.readFileSync(p,'utf8'):'missing log';process.stdout.write(t.split(/\r?\n/).map(s=>s.trim()).filter(Boolean).slice(0,20).join(' | ').slice(0,3000))" "$log")
-            encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
-              -f state=failure -f context="lafea/load-driven-repair/${stage}" \
-              -f description="Load-driven repair failed at ${stage}" \
-              -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${ORIGINAL_SHA}?lafea_error=${encoded}"
-            exit 1
-          }
-
-          publish pending lafea/load-driven-repair/PATCH "Applying solver-evidence contract repair"
-          python - <<'PY' > reports/qualification/load-driven-patch.stdout.log 2> reports/qualification/load-driven-patch.stderr.log || true
+          python - <<'PY'
           from pathlib import Path
-
-          qualification_path = Path('src/workspace/lafea-load-driven-pilot-qualification.js')
-          text = qualification_path.read_text()
-          text = text.replace(
-              "      'DETERMINISTIC_CHOLESKY_FREE_DOF_SOLVE',",
-              "      'DETERMINISTIC_QUALIFIED_FREE_DOF_SOLVE',",
-              1,
-          )
-          old_guard = '\n'.join([
-              '  if (!Array.isArray(resultLoadCase.freeDofIdentities)',
-              '    || resultLoadCase.freeDofIdentities.length === 0',
-              "    || resultLoadCase.solverEvidence?.method !== 'DETERMINISTIC_CHOLESKY'",
-              '    || resultLoadCase.solverEvidence?.accepted !== true',
-              '    || !Array.isArray(resultLoadCase.solverEvidence?.pivots)',
-              '    || resultLoadCase.solverEvidence.pivots.length === 0',
-              '    || resultLoadCase.equilibrium?.accepted !== true) {',
-              "    throw qualificationError('LAFEA_NB_T6D_FREE_DOF_SOLVE_EVIDENCE_INVALID');",
-              '  }',
-          ])
-          new_guard = '\n'.join([
-              '  if (!Array.isArray(resultLoadCase.freeDofIdentities)',
-              '    || resultLoadCase.freeDofIdentities.length === 0',
-              '    || !freeDofSolverEvidenceAccepted(resultLoadCase.solverEvidence)',
-              '    || resultLoadCase.equilibrium?.accepted !== true) {',
-              "    throw qualificationError('LAFEA_NB_T6D_FREE_DOF_SOLVE_EVIDENCE_INVALID');",
-              '  }',
-          ])
-          helper_marker = 'export function evaluateLafeaLoadDrivenConvergence('
-          helper = '''function freeDofSolverEvidenceAccepted(evidence) {
-            if (!evidence || evidence.accepted !== true) return false;
-            if (evidence.method === 'DETERMINISTIC_CHOLESKY') {
-              return Array.isArray(evidence.pivots)
-                && evidence.pivots.length > 0
-                && evidence.pivots.every((value) => Number.isFinite(value) && value > 0)
-                && Number.isFinite(evidence.minimumPivot)
-                && evidence.minimumPivot > 0
-                && Number.isFinite(evidence.pivotRatio)
-                && evidence.pivotRatio > 0;
-            }
-            if (evidence.method === 'DETERMINISTIC_JACOBI_PCG') {
-              return evidence.preconditioner === 'JACOBI'
-                && Array.isArray(evidence.pivots)
-                && evidence.pivots.length === 0
-                && evidence.minimumPivot === null
-                && evidence.pivotRatio === null
-                && Number.isInteger(evidence.iterations)
-                && evidence.iterations > 0
-                && Number.isInteger(evidence.iterationLimit)
-                && evidence.iterationLimit >= evidence.iterations
-                && Number.isFinite(evidence.initialResidualInfinity)
-                && evidence.initialResidualInfinity > 0
-                && Number.isFinite(evidence.finalResidualInfinity)
-                && evidence.finalResidualInfinity >= 0
-                && Number.isFinite(evidence.convergenceTarget)
-                && evidence.convergenceTarget > 0
-                && Number.isFinite(evidence.residualTolerance)
-                && evidence.residualTolerance >= evidence.convergenceTarget
-                && evidence.finalResidualInfinity <= evidence.convergenceTarget
-                && Number.isFinite(evidence.minimumDiagonal)
-                && evidence.minimumDiagonal > 0
-                && Number.isFinite(evidence.diagonalRatio)
-                && evidence.diagonalRatio > 0;
-            }
-            return false;
-          }
-
-          '''
-          if text.count(old_guard) != 1:
-              raise RuntimeError(f'qualification guard count={text.count(old_guard)}')
-          if text.count(helper_marker) != 1:
-              raise RuntimeError(f'helper marker count={text.count(helper_marker)}')
-          if "'DETERMINISTIC_QUALIFIED_FREE_DOF_SOLVE'" not in text:
-              raise RuntimeError('required evidence replacement failed')
-          text = text.replace(old_guard, new_guard, 1)
-          text = text.replace(helper_marker, helper + helper_marker, 1)
-          qualification_path.write_text(text)
-
-          check_path = Path('scripts/lafea-nb-t6d-load-driven-qualification-check.mjs')
-          check = check_path.read_text()
-          import_marker = "import { createNbT6cFixture } from './lafea-nb-t6c-fixture.mjs';"
-          import_replacement = '\n'.join([
-              "import { DENSE_STIFFNESS_DOF_LIMIT } from '../src/core/local-continuum/sparse-matrix.js';",
-              import_marker,
-          ])
-          old_assertion = '''assert.equal(qualification.receipt.levelEvidence.every((row) =>
-            row.status === 'PASS'
-            && row.freeDofCount > 0
-            && row.solverMethod === 'DETERMINISTIC_CHOLESKY'
-            && row.maximumDisplacementMagnitude > 0
-            && row.maximumRetainedVonMises > 0), true);'''
-          new_assertion = '''assert.equal(qualification.receipt.levelEvidence.every((row) => {
-            const totalDofCount = row.freeDofCount + row.constrainedDofCount;
-            const expectedSolverMethod = totalDofCount > DENSE_STIFFNESS_DOF_LIMIT
-              ? 'DETERMINISTIC_JACOBI_PCG'
-              : 'DETERMINISTIC_CHOLESKY';
-            return row.status === 'PASS'
-              && row.freeDofCount > 0
-              && row.solverMethod === expectedSolverMethod
-              && row.maximumDisplacementMagnitude > 0
-              && row.maximumRetainedVonMises > 0;
-          }), true);
-          assert.equal(
-            qualification.manifest.requiredEvidence.includes(
-              'DETERMINISTIC_QUALIFIED_FREE_DOF_SOLVE',
-            ),
-            true,
-          );'''
-          if check.count(import_marker) != 1:
-              raise RuntimeError(f'import marker count={check.count(import_marker)}')
-          if check.count(old_assertion) != 1:
-              raise RuntimeError(f'check assertion count={check.count(old_assertion)}')
-          check = check.replace(import_marker, import_replacement, 1)
-          check = check.replace(old_assertion, new_assertion, 1)
-          check_path.write_text(check)
+          path = Path('scripts/lafea-nb-t6d-load-driven-qualification-check.mjs')
+          text = path.read_text()
+          marker = 'const positive = executeLoadDriven([1000, 250]);'
+          injection = marker + "\nconsole.error('SOLVER_EVIDENCE=' + JSON.stringify(positive.execution.controllerResult.levelResults.map((row) => row.execution.result.loadCaseResults[0].solverEvidence)));"
+          if text.count(marker) != 1:
+              raise RuntimeError(f'marker count={text.count(marker)}')
+          path.write_text(text.replace(marker, injection, 1))
           PY
-          [[ -s reports/qualification/load-driven-patch.stderr.log ]] \
-            && fail PATCH reports/qualification/load-driven-patch.stderr.log
-          publish success lafea/load-driven-repair/PATCH "Solver-evidence contract repair applied"
-
-          publish pending lafea/load-driven-repair/PILOT "Running load-driven free-DOF pilot"
+          set +e
           node scripts/lafea-nb-t6d-load-driven-qualification-check.mjs \
-            > reports/qualification/load-driven-pilot.stdout.log \
-            2> reports/qualification/load-driven-pilot.stderr.log \
-            || fail PILOT reports/qualification/load-driven-pilot.stderr.log
-          publish success lafea/load-driven-repair/PILOT "Load-driven free-DOF pilot passed"
-
-          publish pending lafea/load-driven-repair/CORE "Running scalable and continuum regressions"
-          node scripts/lafea-bucket-01-scalable-solver-check.mjs \
-            > reports/qualification/load-driven-scalable.stdout.log \
-            2> reports/qualification/load-driven-scalable.stderr.log \
-            || fail CORE reports/qualification/load-driven-scalable.stderr.log
-          node scripts/lafea-bucket-01-cantilever-check.mjs \
-            > reports/qualification/load-driven-cantilever.stdout.log \
-            2> reports/qualification/load-driven-cantilever.stderr.log \
-            || fail CORE reports/qualification/load-driven-cantilever.stderr.log
-          publish success lafea/load-driven-repair/CORE "Continuum solver regressions passed"
-
-          git add src/workspace/lafea-load-driven-pilot-qualification.js \
-            scripts/lafea-nb-t6d-load-driven-qualification-check.mjs
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "fix(lafea): accept qualified sparse free-DOF evidence" \
-            > reports/qualification/load-driven-commit.stdout.log \
-            2> reports/qualification/load-driven-commit.stderr.log \
-            || fail COMMIT reports/qualification/load-driven-commit.stderr.log
-          repaired_sha=$(git rev-parse HEAD)
-          git push origin HEAD:bucket-01-cantilever-benchmark-route \
-            > reports/qualification/load-driven-push.stdout.log \
-            2> reports/qualification/load-driven-push.stderr.log \
-            || fail PUSH reports/qualification/load-driven-push.stderr.log
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
-            -f state=success \
-            -f context="lafea/repaired-head/${repaired_sha:0:12}" \
-            -f description="Load-driven solver-evidence repair published" \
-            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${repaired_sha}"
+            > reports/qualification/load-driven-evidence.stdout.log \
+            2> reports/qualification/load-driven-evidence.stderr.log
+          exit_code=$?
+          detail=$(node -e "const fs=require('fs');const t=fs.readFileSync('reports/qualification/load-driven-evidence.stderr.log','utf8');const line=t.split(/\r?\n/).find(s=>s.startsWith('SOLVER_EVIDENCE='))||t.slice(0,3000);process.stdout.write(line.slice(0,7000))")
+          encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=failure \
+            -f context=lafea/load-driven-evidence/DETAIL \
+            -f description="Captured load-driven solver evidence" \
+            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
+          exit "$exit_code"
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lafea-load-driven-repair-${{ github.sha }}
+          name: lafea-load-driven-evidence-${{ github.sha }}
           path: reports/qualification/
           if-no-files-found: warn
           retention-days: 30
