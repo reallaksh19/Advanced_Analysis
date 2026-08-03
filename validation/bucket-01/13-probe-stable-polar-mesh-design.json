@@ -1,6 +1,6 @@
 {
-  "schema": "lafea-bucket-01-probe-stable-polar-design/v1",
-  "designId": "B01-PROBE-STABLE-POLAR-V1",
+  "schema": "lafea-bucket-01-probe-stable-polar-design/v2",
+  "designId": "B01-PROBE-STABLE-POLAR-V2",
   "benchmarkId": "C2D-LUG-PINHOLE-01",
   "sourceProbeSpecId": "B01-PRODUCTION-LUG-FIXED-STRESS-01",
   "geometry": {
@@ -39,6 +39,15 @@
     "backgroundBaseDivisions": 16,
     "windowClearanceFraction": 0.3
   },
+  "midsideGeometryPolicy": {
+    "holeBoundaryCircumferentialEdges": "ANALYTIC_CIRCULAR_ARC",
+    "outerBoundaryCircumferentialEdges": "ANALYTIC_CIRCULAR_ARC",
+    "internalCircumferentialEdges": "STRAIGHT_CHORD",
+    "radialEdges": "STRAIGHT_CHORD",
+    "diagonalEdges": "STRAIGHT_CHORD",
+    "physicalBoundaryGeometryPreserved": true,
+    "internalCircularConstraintClaimed": false
+  },
   "topologyPolicy": {
     "elementFamily": "ANNULAR_T6_TWO_TRIANGLE_CELL",
     "triangleOrientation": "COUNTER_CLOCKWISE_INVARIANT",
@@ -51,6 +60,20 @@
     "globalCoordinateNestingRequired": false,
     "anchorCellSelfSimilarityRequired": true
   },
+  "changeControl": {
+    "previousDesignId": "B01-PROBE-STABLE-POLAR-V1",
+    "trigger": "LEVEL_1_NON_POSITIVE_INTERNAL_CURVED_EDGE_JACOBIAN",
+    "controllingElement": "E-R10-S18-B",
+    "previousMinimumScaledJacobian": -0.02456338158182484,
+    "previousMinimumDenseSampledJacobian": -28.859125475953192,
+    "axisCoordinatesChanged": false,
+    "anchorWindowsChanged": false,
+    "anchorPhasesChanged": false,
+    "candidateElementCountsChanged": false,
+    "frozenPhysicalCoordinatesChanged": false,
+    "governedToleranceChanged": false,
+    "productionAuthorityChanged": false
+  },
   "authority": {
     "frozenProbeCoordinatesChanged": false,
     "stressTolerancesChanged": false,
@@ -61,5 +84,5 @@
     "qualificationAuthority": false,
     "bucketQualified": false
   },
-  "currentDisposition": "PHASE_2_DESIGN_CONTRACT_ONLY_PENDING_CANDIDATE_MESH_GENERATOR_AND_EXACT_HEAD_REPLAY"
+  "currentDisposition": "PHASE_2_DESIGN_V2_PENDING_CANDIDATE_GENERATOR_REPLAY_AND_EXACT_HEAD_VALIDATION"
 }
