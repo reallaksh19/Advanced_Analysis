@@ -1,5 +1,7 @@
+import * as THREE from 'three';
+
 /**
- * Separates immediate selection from OrbitControls navigation. Timing and
+ * Separates exact click selection from OrbitControls navigation. Timing and
  * pointer travel limits are supplied by approved Project Data.
  */
 export class ThreeInteractionArbiter {
@@ -30,16 +32,34 @@ export class ThreeInteractionArbiter {
     this.ownerDocument.addEventListener('keydown', this.handleKeyDown);
     this.ownerDocument.addEventListener('visibilitychange', this.handleVisibilityChange);
     controls.enabled = true;
-    this.setMode('select');
+    this.applyMode('select');
   }
 
   setMode(mode) {
-    if (!['select', 'orbit', 'pan'].includes(mode)) throw new TypeError(`Unsupported WebGL interaction mode: ${mode}`);
+    if (!['select', 'orbit', 'pan'].includes(mode)) {
+      throw new TypeError(`Unsupported WebGL interaction mode: ${mode}`);
+    }
     this.cancelPointer();
+    if (this.mode !== mode) this.lastClickAt = null;
+    this.applyMode(mode);
+  }
+
+  applyMode(mode) {
     this.mode = mode;
-    this.controls.enableRotate = mode === 'orbit';
-    this.controls.enablePan = mode === 'pan';
+    this.controls.enableRotate = true;
+    this.controls.enablePan = true;
     this.controls.enableZoom = true;
+    this.controls.mouseButtons = mode === 'pan'
+      ? {
+        LEFT: THREE.MOUSE.PAN,
+        MIDDLE: THREE.MOUSE.PAN,
+        RIGHT: THREE.MOUSE.ROTATE,
+      }
+      : {
+        LEFT: THREE.MOUSE.ROTATE,
+        MIDDLE: THREE.MOUSE.PAN,
+        RIGHT: THREE.MOUSE.PAN,
+      };
   }
 
   updateConfiguration(configuration) {
@@ -48,16 +68,15 @@ export class ThreeInteractionArbiter {
   }
 
   pointerDown(event) {
-    if (event.button !== 0) return;
+    if (event.button !== 0 || event.isPrimary === false) return;
     if (this.pointerStart && this.pointerStart.pointerId !== event.pointerId) {
       this.cancelPointer();
     }
-    const startedAt = performance.now();
     this.pointerStart = {
       pointerId: event.pointerId,
       x: event.clientX,
       y: event.clientY,
-      startedAt,
+      startedAt: performance.now(),
       maximumTravelSquared: 0,
     };
     this.canvas.setPointerCapture?.(event.pointerId);
@@ -66,8 +85,10 @@ export class ThreeInteractionArbiter {
   pointerMove(event) {
     const start = this.pointerStart;
     if (!start || start.pointerId !== event.pointerId) return;
-    const travelSquared = squaredTravel(start, event);
-    start.maximumTravelSquared = Math.max(start.maximumTravelSquared, travelSquared);
+    start.maximumTravelSquared = Math.max(
+      start.maximumTravelSquared,
+      squaredTravel(start, event),
+    );
   }
 
   pointerUp(event) {
@@ -79,13 +100,17 @@ export class ThreeInteractionArbiter {
     if (this.mode !== 'select') return;
     const elapsed = performance.now() - start.startedAt;
     const toleranceSquared = this.configuration.clickTravelTolerancePx ** 2;
-    if (start.maximumTravelSquared > toleranceSquared || elapsed > this.configuration.clickTimingMs) return;
+    if (start.maximumTravelSquared > toleranceSquared
+      || elapsed > this.configuration.clickTimingMs) return;
     const clickedAt = performance.now();
     this.callbacks.onSelect?.(event);
-    if (this.lastClickAt !== null && clickedAt - this.lastClickAt <= this.configuration.doubleClickTimingMs) {
+    if (this.lastClickAt !== null
+      && clickedAt - this.lastClickAt <= this.configuration.doubleClickTimingMs) {
       this.callbacks.onFitSelection?.(event);
       this.lastClickAt = null;
-    } else this.lastClickAt = clickedAt;
+    } else {
+      this.lastClickAt = clickedAt;
+    }
   }
 
   lostPointerCapture(event) {
@@ -100,11 +125,15 @@ export class ThreeInteractionArbiter {
   }
 
   releasePointerCapture(pointerId) {
-    if (this.canvas.hasPointerCapture?.(pointerId)) this.canvas.releasePointerCapture(pointerId);
+    if (this.canvas.hasPointerCapture?.(pointerId)) {
+      this.canvas.releasePointerCapture(pointerId);
+    }
   }
 
   keyDown(event) {
-    if (this.ownerDocument.activeElement?.matches?.('input, textarea, [contenteditable]')) return;
+    if (this.ownerDocument.activeElement?.matches?.(
+      'input, textarea, select, [contenteditable]',
+    )) return;
     if (event.key === 'Escape') {
       this.setMode('select');
       this.callbacks.onClearSelection?.();
@@ -131,5 +160,13 @@ function squaredTravel(start, event) {
 }
 
 function assertConfiguration(value) {
-  if (!value || !Number.isFinite(value.clickTravelTolerancePx) || value.clickTravelTolerancePx <= 0 || !Number.isFinite(value.clickTimingMs) || value.clickTimingMs <= 0 || !Number.isFinite(value.doubleClickTimingMs) || value.doubleClickTimingMs <= 0) throw new TypeError('WebGL interaction requires approved click travel and timing values.');
+  if (!value
+    || !Number.isFinite(value.clickTravelTolerancePx)
+    || value.clickTravelTolerancePx <= 0
+    || !Number.isFinite(value.clickTimingMs)
+    || value.clickTimingMs <= 0
+    || !Number.isFinite(value.doubleClickTimingMs)
+    || value.doubleClickTimingMs <= 0) {
+    throw new TypeError('WebGL interaction requires approved click travel and timing values.');
+  }
 }
