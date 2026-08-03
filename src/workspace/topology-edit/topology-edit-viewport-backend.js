@@ -5,6 +5,10 @@ import { TopologyEditInspectionRenderer } from './topology-edit-inspection-rende
 import { TopologyEditIssueRenderer } from './topology-edit-issue-renderer.js';
 import { createTopologyEditPick } from './topology-edit-picking-contract.js';
 import { createTopologyEditViewState } from './topology-edit-view-state.js';
+import {
+  createTopologyEditSectionPlaneEquations,
+  isEngineeringPointInsideSectionPlanes,
+} from '../viewport-presentation/topology-edit-section-model.js';
 
 const STANDARD_VIEW_DIRECTIONS = Object.freeze({
   TOP: new THREE.Vector3(0, 1, 0.001).normalize(), BOTTOM: new THREE.Vector3(0, -1, 0.001).normalize(),
@@ -24,6 +28,8 @@ export class TopologyEditViewportBackend {
     this.inspectionRenderer = null;
     this.issueRenderer = null;
     this.pickRaycaster = new THREE.Raycaster();
+    this.activeSectionPlaneEquations = Object.freeze([]);
+    this.activeSectionPlanes = Object.freeze([]);
     this.hasFitOnce = false;
     this.groups = Object.freeze({
       sourceGroup: new THREE.Group(), draftGroup: new THREE.Group(), ghostGroup: new THREE.Group(),
@@ -116,6 +122,44 @@ export class TopologyEditViewportBackend {
     if (!projection) return;
     this.buildSegmentGroup(group, projection.segments, colorHex, opacity);
     this.buildMeshGroup(group, projection.elements, colorHex, opacity, markerSize);
+    this.applySectionPlanesToGroup(group);
+  }
+
+  setPresentationSectionPlanes(planes = []) {
+    if (!Array.isArray(planes)) {
+      throw new TypeError('TopologyEditViewportBackend: Section planes must be an array.');
+    }
+    const equations = createTopologyEditSectionPlaneEquations(planes);
+    this.activeSectionPlaneEquations = equations;
+    this.activeSectionPlanes = Object.freeze(equations.map(({ normal, constant }) => (
+      new THREE.Plane(new THREE.Vector3(normal.x, normal.y, normal.z), constant)
+    )));
+    if (this.renderer) this.renderer.localClippingEnabled = equations.length > 0;
+    this.sectionedGroups().forEach((group) => this.applySectionPlanesToGroup(group));
+    return equations.length;
+  }
+
+  sectionedGroups() {
+    return [
+      this.groups.sourceGroup,
+      this.groups.draftGroup,
+      this.groups.supportGroup,
+      this.groups.ghostGroup,
+    ];
+  }
+
+  applySectionPlanesToGroup(group) {
+    const materials = new Set();
+    group.traverse((object) => {
+      const rows = Array.isArray(object.material) ? object.material : [object.material];
+      rows.filter(Boolean).forEach((material) => materials.add(material));
+    });
+    materials.forEach((material) => {
+      material.clippingPlanes = this.activeSectionPlanes.length
+        ? this.activeSectionPlanes.map((plane) => plane.clone())
+        : null;
+      material.needsUpdate = true;
+    });
   }
 
   buildSegmentGroup(group, segments = [], colorHex = 0x0284c7, opacity = 1) {
@@ -189,7 +233,10 @@ export class TopologyEditViewportBackend {
 
   pickWithRaycaster(pointer) {
     this.pickRaycaster.setFromCamera(pointer, this.activeCamera);
-    const hit = this.pickRaycaster.intersectObjects(this.scene.children, true).find((row) => !hasNonPickableAncestor(row.object));
+    const hit = this.pickRaycaster.intersectObjects(this.scene.children, true).find((candidate) => (
+      !hasNonPickableAncestor(candidate.object)
+      && isEngineeringPointInsideSectionPlanes(candidate.point, this.activeSectionPlaneEquations)
+    ));
     if (!hit) return null;
     return this.pickReceipt(resolveHitTarget(hit), hit.point);
   }
@@ -213,6 +260,7 @@ export class TopologyEditViewportBackend {
   }
 
   destroy() {
+    this.setPresentationSectionPlanes([]);
     this.isMounted = false; if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId); this.animationFrameId = null;
     this.gpuPicker?.dispose(); this.gpuPicker = null;
     this.inspectionRenderer?.destroy(); this.inspectionRenderer = null;
