@@ -35,7 +35,21 @@ current source — do not trust the document alone.
 | M002 | #409 | #428 | Merged | Sparse Cholesky/LDLT replaces dense as production default solver backend |
 | M003 | #412 | #417 | Merged | Real in-browser Run Analysis trigger for the piping production solve chain |
 | M004 | #429 | — | In progress | Closed-form simply-supported beam (centre load, UDL) added to b3.x suite |
-| M005 | TBD | — | Next | Sparse assembly + sparse qualification matVec (closes M002's disclosed limitation) |
+| M005 | #431 | — | Ready, no prequal | Genuinely sparse assembly + sparse qualification matVec (closes M002's disclosed limitation) |
+
+### Non-LFEA workstreams (user-directed pivot, 4 parallel read-only audits + direct fixes)
+
+Distinct from the LFEA mandate (M00x above) — covers import/render performance, 3D Edit tools, topology checker/autofix, canvas navigation, empirical (first-cut) formulas, and the enrichment process. Grounded by 4 parallel audit agents; findings and full technical detail live in each issue.
+
+| Work Pack | Issue | PR | Status | Summary |
+|---|---|---|---|---|
+| (direct fix, no WP) | — | #439 | Merged | One-line `candidateDraftHash` path bug — every "professional operation" (grouped multi-command move) in the live 3D Edit panel threw unconditionally |
+| WP-PERF | #440 | — | Ready | Real, measured 15.4s import stall (92% in one unindexed evidence-scan function, CPU-profiled) + missing dataset-identity guard causing full recompute on plain entity selection |
+| WP-NAV | #441 | — | Ready | Cache scene bounds (currently recomputed every view-click), derive adaptive near/far from model scale (dead `radius` variable proves it was never finished), wire up the fully-built-but-never-instantiated `ViewportAxisHUD` |
+| WP-SECTION | #442 | — | Ready | Implement `setPresentationSectionPlanes` on the topology-edit viewport backend — currently throws uncaught on every "Apply section" click; exact implementation shape already pinned by an existing literal source-regex test |
+| WP-CHECKER | #443 | — | Ready | Fix `BRANCH_DISCONNECTED` tie-break instability that spuriously rejects the flagship SNAP_GAP/MERGE_NODES autofix on real data |
+
+**Not scoped as a Work Pack**: enrichment process (line-list/piping-class) — confirmed genuinely active (14 commits in ~2h10m same day) with its own detailed 8-phase plan already written by that team. One real bug found in their own in-flight work (material-register qualification script broken since commit `7c83060`, still broken at latest check) — flag to them directly, don't fix unilaterally. First-cut empirical formulas — audited (see #440-era findings in conversation; not yet issued as a Work Pack): most "verification" tests are self-referential/tautological, not independent checks; a real rigorous closed-form benchmark (`w10.6-engineering-benchmark-check.mjs`) exists but isn't wired into any script alias. Loads-display common adapter — the seam already exists (`SupportLoadPresenter`) and is wired to the 2D sketcher canvas + right panel, but its LFEA-side branch has zero producer; recommended first step is extending the existing seam to the 3D viewport for first-cut's already-simple scalar before attempting LFEA integration, which needs its own characterization work first.
 
 ## Recommended forward sequence
 
@@ -81,15 +95,19 @@ plausible explanation.
 
 ## Process notes for future Owner sessions
 
-- Two agents currently in rotation: one comfortable in the
-  `linear-fea-solver`/`lafea-linear-solve`/model-compiler stack (did M002),
-  one comfortable in UI/workbench/test-harness work (did M003, M004).
+- Two agents currently in rotation for the LFEA mandate: one comfortable in
+  the `linear-fea-solver`/`lafea-linear-solve`/model-compiler stack (did
+  M002), one comfortable in UI/workbench/test-harness work (did M003, M004).
   Match mission type to agent history where it fits.
-- A third team is concurrently landing staged-JSON enrichment and
-  geometry/topology-editor work on `main` — `src/workspace/dataset-adapter.js`,
-  `src/workspace/topology-edit/**`, `src/workspace/enrichment/**`,
-  `src/core/common-enriched-properties/**` are their territory. Every Work
-  Pack issued so far has explicitly forbidden those paths; keep doing that.
+- A separate team is concurrently, actively landing staged-JSON enrichment
+  work on `main` — `src/workspace/dataset-adapter.js`,
+  `src/workspace/enrichment/**`, `src/core/common-enriched-properties/**`
+  are their territory (confirmed genuinely active, not stale — 14+ commits
+  same day as of this note). Keep forbidding those paths in Work Packs.
+  **Correction**: `src/workspace/topology-edit/**` was previously listed
+  here too, but the user directed direct work on it (3D Edit tools,
+  checker/autofix) — it is not that team's territory; WP-SECTION/WP-CHECKER
+  above are real Work Packs against it.
 - This repository has no functioning CI (95 legacy workflow files were
   removed as pre-existing broken scaffolding — see M001). Owner-side
   execution against the exact PR head is the only real check regime right
