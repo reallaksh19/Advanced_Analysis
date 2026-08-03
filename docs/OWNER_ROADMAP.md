@@ -18,12 +18,12 @@ current source — do not trust the document alone.
 | P3 Production meshing | Real, unexercised against real data | — |
 | P4 Frame element, releases, offsets, constraints | Done, verified (16/16 closed-form) | pre-existing |
 | P5 Load-calculation engine | Contract-level only in places (gravity/thermal/pressure) | — |
-| P6 Sparse assembly, solve, instability diagnostics | Solve done; assembly still dense (disclosed) | M002 |
+| P6 Sparse assembly, solve, instability diagnostics | Done end to end — factorization, solve, assembly, and qualification all genuinely sparse on the sparse (default) path | M002, M005 |
 | P7 Member-force and stress recovery | Force recovery done; stress recovery unverified | — |
 | P8 Extrema and envelopes | Partial (governing-case tracking proven) | — |
 | P9 Professional analysis UI | Partial (Run Analysis trigger exists, no authoring UI) | M003 |
 | P10 Professional results UI + exports | Partial (text/table only for Stack C) | M003 |
-| P11 Closed-form + convergence qualification | 8/20 mandate cases verified, growing | M004 (in progress) |
+| P11 Closed-form + convergence qualification | 10/20 mandate cases verified, growing | M004 |
 | P12 Real 1885 end-to-end qualification | Blocked on P1 Benchmark B | — |
 | P13 Independent/commercial comparison | Not started | — |
 
@@ -34,8 +34,8 @@ current source — do not trust the document alone.
 | M001 | #407 | #406 | Merged | Corrected benchmark discrepancy; real Benchmark A source ingestion; P0 audit; removed 95 obsolete CI workflows |
 | M002 | #409 | #428 | Merged | Sparse Cholesky/LDLT replaces dense as production default solver backend |
 | M003 | #412 | #417 | Merged | Real in-browser Run Analysis trigger for the piping production solve chain |
-| M004 | #429 | — | In progress | Closed-form simply-supported beam (centre load, UDL) added to b3.x suite |
-| M005 | #431 | — | Ready, no prequal | Genuinely sparse assembly + sparse qualification matVec (closes M002's disclosed limitation) |
+| M004 | #429 | #434 | Merged (Owner-reconciled) | Closed-form simply-supported beam (centre load, UDL) as `lfea-b3.7-*`; also adds `INACTIVE_ANALYSIS_DOF_BEHAVIOR`, a governed analysis-only kinematic subspace — see process note below |
+| M005 | #431 | #438 | Merged | Genuinely sparse assembly + sparse qualification matVec (closes M002's disclosed limitation); structural proof `sparseDenseKPresent: false` |
 
 ### Non-LFEA workstreams (user-directed pivot, 4 parallel read-only audits + direct fixes)
 
@@ -53,14 +53,13 @@ Distinct from the LFEA mandate (M00x above) — covers import/render performance
 
 ## Recommended forward sequence
 
-**M005** (no prequalification — precisely scoped by M002's own disclosed
-limitation): make assembly genuinely sparse when the sparse backend is
-selected (`assembly.js` currently always builds a dense `n×n` matrix via
-`denseFromTriplets` regardless of backend), and route `qualification.js`'s
-equilibrium/residual/energy checks through the existing, already-tested
-`sparseMultiply` (`src/core/lafea-linear-solve/sparse-matrix.js`) instead of
-dense `matVec` when sparse was used. Building blocks already exist and are
-tested; this is integration, not new engineering — same shape as M002 itself.
+**M005 and M004 — done.** The dense-solver mandate violation (§12.2) is now
+closed end to end: factorization, solve, assembly, and qualification are all
+genuinely sparse on the sparse (default) path, verified with a structural
+proof (`sparseDenseKPresent: false`), not just matching numbers. Closed-form
+coverage is at 10/20 mandate cases. `INACTIVE_ANALYSIS_DOF_BEHAVIOR` (from
+M004, see process note below) is a real, kept capability for representing
+planar/reduced-dimension idealizations without fabricating reactions.
 
 **M006** (needs prequalification — real production-capability question, not
 pure test-writing): determine whether gravity/self-weight and thermal
@@ -119,3 +118,19 @@ plausible explanation.
   approvals/reviews, never `issue_write update`'s `body` parameter — that
   replaces the issue's original spec rather than adding to the thread. This
   mistake was made once (Issue #409) and had to be corrected.
+- **Stop conditions exist because parallel missions really do collide.**
+  M004 (Issue #429) was scoped test-only with an explicit "stop and report if
+  production code changes are needed" condition. It didn't stop — it built a
+  real, well-engineered production feature (`INACTIVE_ANALYSIS_DOF_BEHAVIOR`)
+  across five files instead, unreviewed. While it sat unreviewed, M005
+  merged and rewrote the exact same functions. `git rebase` auto-merged the
+  two **without conflict markers** — but the result crashed on every real use
+  once the sparse backend (now default) hit a code path that still assumed
+  the dense array always exists. A clean auto-merge is not proof of a correct
+  merge; when two missions touch the same functions, re-run the full suite
+  (and, for anything backend/representation-conditional, explicitly exercise
+  every branch, not just the default) after reconciling — don't trust the
+  absence of conflict markers. The capability itself was kept (reviewed on
+  its technical merits, it's good work) but the process gap is what let the
+  bug go undetected through two rounds of "tests pass" reporting from a
+  sandbox that couldn't see the other mission's changes at all.
