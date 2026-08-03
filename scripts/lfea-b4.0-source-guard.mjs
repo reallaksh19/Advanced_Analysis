@@ -193,10 +193,17 @@ assert.equal(
   'node scripts/lfea-b4.0-code-engine-check.mjs && node scripts/lfea-b4.0-reviewer-check.mjs && node scripts/lfea-b4.0-source-guard.mjs',
   'check:lfea-b4.0 registration is missing',
 );
+const linearCoreScript = packageJson.scripts['check:lfea-linear-core'];
 assert.match(
-  packageJson.scripts['check:lfea-linear-core'],
-  /npm run check:lfea-b3\.4 && npm run check:lfea-b4\.0/u,
-  'check:lfea-b4.0 must run inside check:lfea-linear-core, directly after check:lfea-b3.4',
+  linearCoreScript,
+  /npm run check:lfea-b4\.0/u,
+  'check:lfea-b4.0 must run inside check:lfea-linear-core',
+);
+const b34Index = linearCoreScript.indexOf('check:lfea-b3.4');
+const b40Index = linearCoreScript.indexOf('check:lfea-b4.0');
+assert.ok(
+  b34Index !== -1 && b40Index !== -1 && b34Index < b40Index,
+  'check:lfea-b4.0 must run inside check:lfea-linear-core, after check:lfea-b3.4',
 );
 assert.match(
   packageJson.scripts.gate,

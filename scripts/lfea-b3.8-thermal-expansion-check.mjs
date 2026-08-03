@@ -215,9 +215,9 @@ function midpointAxialForce(recovery, elementId) {
 
 const material = materialResolution();
 const section = sectionResolution();
-const elasticModulus = material.elasticModulus;
-const area = section.area;
-const thermalExpansionCoefficient = material.thermalExpansionCoefficient;
+const elasticModulus = material.materialState.elasticModulus;
+const area = section.sectionState.area;
+const thermalExpansionCoefficient = material.materialState.thermalExpansionCoefficient;
 const thermalStrain = thermalExpansionCoefficient * TEMPERATURE_DIFFERENCE;
 const expectedFreeExtension = thermalStrain * MEMBER_LENGTH;
 const expectedThermalForce = thermalStrain * elasticModulus * area;
