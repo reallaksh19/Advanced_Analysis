@@ -44,6 +44,8 @@ import {
   mappingDeclaration,
 } from './lafea-lug-pinhole-stage-projector.js';
 
+const SUPPORTED_LEVEL_COUNTS = Object.freeze(new Set([3, 4]));
+
 export {
   LAFEA_LUG_PINHOLE_EXECUTION_INTAKE_SCHEMA,
   LAFEA_LUG_PINHOLE_EXECUTION_SCHEMA,
@@ -299,8 +301,12 @@ function requireProjection(value) {
     || value.mappingPackage.boundBinding.status !== 'BOUND') {
     throw batchError('LAFEA_NB_T6C_PROJECTION_PARENT_MISMATCH');
   }
-  if (!Array.isArray(value.levels) || value.levels.length !== 3) {
+  if (!Array.isArray(value.levels)
+    || !SUPPORTED_LEVEL_COUNTS.has(value.levels.length)) {
     throw batchError('LAFEA_NB_T6C_PROJECTION_THREE_LEVELS_REQUIRED');
+  }
+  if (value.levels.length !== value.ladder.levels.length) {
+    throw batchError('LAFEA_NB_T6C_PROJECTION_LEVEL_COUNT_MISMATCH');
   }
   value.levels.forEach((level, index) => {
     if (level.ordinal !== index + 1
