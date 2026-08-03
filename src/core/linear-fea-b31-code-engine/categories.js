@@ -8,16 +8,16 @@ import {
   USER_PROJECT_CHECK,
   SUSTAINED,
   fail,
+  requireFinite,
   requireMember,
 } from './code-engine-contract.js';
 
 /**
  * Section 10.2 required code stress categories. This module builds the
  * per-category allowable stress and limitation (section 11) disclosures.
- * SUSTAINED, OCCASIONAL and DISPLACEMENT_STRESS_RANGE are evaluated;
- * OPERATING, EXPANSION_RANGE_ENVELOPE and USER_PROJECT_CHECK are refused
- * explicitly rather than shallow-implemented — a clean refusal is better
- * than a category that quietly behaves like a compliance check it is not.
+ * SUSTAINED, OCCASIONAL, DISPLACEMENT_STRESS_RANGE and
+ * EXPANSION_RANGE_ENVELOPE are evaluated; OPERATING and USER_PROJECT_CHECK
+ * are refused explicitly rather than shallow-implemented.
  */
 
 function limitation(code, register, status, disclosure, details = {}) {
@@ -27,9 +27,8 @@ function limitation(code, register, status, disclosure, details = {}) {
 
 /**
  * Refuse categories the spec explicitly forbids treating as a compliance
- * check (section 10.2 OPERATING, USER_PROJECT_CHECK) and the one this phase
- * has not implemented (EXPANSION_RANGE_ENVELOPE), before any of the
- * SUSTAINED/OCCASIONAL/DISPLACEMENT_STRESS_RANGE machinery runs.
+ * check (section 10.2 OPERATING, USER_PROJECT_CHECK) before any implemented
+ * SUSTAINED/OCCASIONAL/range machinery runs.
  */
 export function requireImplementedCategory(category) {
   if (category === OPERATING) {
@@ -44,13 +43,10 @@ export function requireImplementedCategory(category) {
       'CODE_ENGINE_USER_PROJECT_CHECK_NOT_A_COMPLIANCE_CATEGORY',
     );
   }
-  if (category === EXPANSION_RANGE_ENVELOPE) {
-    fail(
-      'category EXPANSION_RANGE_ENVELOPE (the difference between declared operating state pairs) is not implemented this phase; it is refused rather than shallow-implemented against an un-declared case-pair identity.',
-      'CODE_ENGINE_EXPANSION_RANGE_ENVELOPE_NOT_IMPLEMENTED',
-    );
-  }
-  if (category !== SUSTAINED && category !== OCCASIONAL && category !== DISPLACEMENT_STRESS_RANGE) {
+  if (category !== SUSTAINED
+    && category !== OCCASIONAL
+    && category !== DISPLACEMENT_STRESS_RANGE
+    && category !== EXPANSION_RANGE_ENVELOPE) {
     fail(`category ${category} is not a recognised B31.3 code-result category.`, 'CODE_ENGINE_CATEGORY_UNSUPPORTED');
   }
 }
@@ -90,13 +86,29 @@ export function sustainedOrOccasionalAllowable({
 }
 
 /**
- * Section 10.5: displacement stress-range allowable is the edition profile's
- * generic combination of the declared cold/hot allowables and cycle-reduction
- * data (`DISPLACEMENT_RANGE_COLD_HOT_CYCLE_REDUCTION_LINEAR_V1` — a weighted
- * sum then a reduction factor, never a specific ASME numeric table), with an
- * optional, visible, evidence-carrying liberal-allowable uplift (default OFF).
+ * Section 10.5 displacement-range allowable. With `sustainedStress === null`,
+ * this is the existing caller-declared weighted cold/hot combination followed
+ * by the caller-declared cycle-reduction factor; that path is intentionally
+ * unchanged.
+ *
+ * When `sustainedStress` is supplied, this evaluates ASME B31.3-2006
+ * para. 302.3.5(d), Eq. (1b), the liberal allowable used by
+ * EXPANSION_RANGE_ENVELOPE:
+ *
+ *   S_A = f [1.25 (S_c + S_h) - S_L]
+ *
+ * `S_c`, `S_h`, `S_L`, and `f` remain caller-authorized values. Only the
+ * published Eq. (1b) combination arithmetic is implemented here. The profile's
+ * separate approximation uplift is not applied to this path because Eq. (1b)
+ * is already the declared liberal-allowable formula.
  */
-export function displacementRangeAllowable({ profile, dataset, hotTemperature, coldTemperature }) {
+export function displacementRangeAllowable({
+  profile,
+  dataset,
+  hotTemperature,
+  coldTemperature,
+  sustainedStress = null,
+}) {
   const hotAllowable = resolveAllowableAtTemperature(dataset.allowablePoints, hotTemperature, profile.temperatureInterpolationPolicy);
   const coldAllowable = resolveAllowableAtTemperature(dataset.allowablePoints, coldTemperature, profile.temperatureInterpolationPolicy);
   const limitations = [];
@@ -112,16 +124,39 @@ export function displacementRangeAllowable({ profile, dataset, hotTemperature, c
     }
   }
   const { coldWeight, hotWeight, cycleReductionFactor } = dataset.displacementRangeCoefficients;
-  let allowableStress = (coldWeight.value * coldAllowable.value + hotWeight.value * hotAllowable.value) * cycleReductionFactor.value;
-  if (profile.liberalAllowableUse) {
-    allowableStress *= 1 + profile.liberalAllowableUpliftFactor.value;
-    limitations.push(limitation(
-      'CODE_ENGINE_APPROXIMATION_LIBERAL_ALLOWABLE_USE',
-      'section-11',
-      'CONDITIONAL',
-      'Displacement stress-range allowable increased by the declared liberal-allowable uplift factor; section 10.5 requires this visible switch (default OFF) to carry complete calculation evidence and user verification.',
-      { upliftFactor: profile.liberalAllowableUpliftFactor.value, upliftSource: profile.liberalAllowableUpliftFactor.source },
-    ));
+  let allowableStress;
+  if (sustainedStress === null) {
+    allowableStress = (coldWeight.value * coldAllowable.value + hotWeight.value * hotAllowable.value) * cycleReductionFactor.value;
+    if (profile.liberalAllowableUse) {
+      allowableStress *= 1 + profile.liberalAllowableUpliftFactor.value;
+      limitations.push(limitation(
+        'CODE_ENGINE_APPROXIMATION_LIBERAL_ALLOWABLE_USE',
+        'section-11',
+        'CONDITIONAL',
+        'Displacement stress-range allowable increased by the declared liberal-allowable uplift factor; section 10.5 requires this visible switch (default OFF) to carry complete calculation evidence and user verification.',
+        { upliftFactor: profile.liberalAllowableUpliftFactor.value, upliftSource: profile.liberalAllowableUpliftFactor.source },
+      ));
+    }
+  } else {
+    const acceptedSustainedStress = requireFinite(
+      sustainedStress,
+      'sustainedStress',
+      'CODE_ENGINE_EXPANSION_RANGE_SUSTAINED_STRESS_INVALID',
+    );
+    if (acceptedSustainedStress < 0) {
+      fail(
+        'sustainedStress must be non-negative for EXPANSION_RANGE_ENVELOPE.',
+        'CODE_ENGINE_EXPANSION_RANGE_SUSTAINED_STRESS_INVALID',
+      );
+    }
+    allowableStress = cycleReductionFactor.value
+      * (1.25 * (coldAllowable.value + hotAllowable.value) - acceptedSustainedStress);
+    if (!(allowableStress > 0)) {
+      fail(
+        'ASME B31.3-2006 para. 302.3.5(d) Eq. (1b) produced a non-positive allowable stress.',
+        'CODE_ENGINE_EXPANSION_RANGE_ALLOWABLE_NONPOSITIVE',
+      );
+    }
   }
   return { allowableStress, limitations, hotAllowable, coldAllowable };
 }
