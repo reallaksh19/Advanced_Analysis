@@ -3,6 +3,7 @@ import {
   TopologyEdit3DViewController as TopologyEdit3DViewControllerCore,
 } from './topology-edit-3d-view-controller-core.js';
 import { EVENT_TOPICS } from './event-topics.js';
+import { deepFreeze } from '../core/shared-piping-model/index.js';
 import {
   canRunTopologyEditAction,
   createTopologyEditSelection,
@@ -11,6 +12,10 @@ import {
 } from './topology-edit/topology-edit-command-ui.js';
 import { TopologyEditLifecycleController } from './topology-edit/topology-edit-lifecycle-controller.js';
 import { topologyEditEntityIdsForObject } from './topology-edit/topology-edit-render-packet.js';
+import {
+  TopologyEditTypedViewportBackend,
+  retainTypedTopologyEditPrimitives,
+} from './topology-edit/topology-edit-typed-viewport-backend.js';
 
 export { buildAutofixPolicy } from './topology-edit-3d-view-controller-core.js';
 
@@ -42,8 +47,13 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
     });
   }
 
+  createViewportBackend() {
+    return new TopologyEditTypedViewportBackend();
+  }
+
   async activate() {
     await super.activate();
+    this.installTypedViewportBackend();
     this.canvasMount?.removeEventListener('pointerdown', this.pointerHandler);
     this.viewportBackend?.setSelectionRequestHandler(this.viewportSelectionHandler);
     this.hostElement?.ownerDocument?.addEventListener(
@@ -52,6 +62,22 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
       true,
     );
     this.setNavigationMode('select', true);
+  }
+
+  installTypedViewportBackend() {
+    if (!(this.viewportBackend instanceof TopologyEditTypedViewportBackend)) {
+      throw new Error(
+        'TOPOLOGY_EDIT_TYPED_BACKEND_FACTORY_MISMATCH: Activation must mount the typed backend directly.',
+      );
+    }
+  }
+
+  deriveVisual(canonical, modelRole) {
+    const result = super.deriveVisual(canonical, modelRole);
+    return deepFreeze({
+      model: result.model,
+      projection: retainTypedTopologyEditPrimitives(result.model, result.projection),
+    });
   }
 
   buildShell() {
