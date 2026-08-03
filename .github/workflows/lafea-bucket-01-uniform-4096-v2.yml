@@ -1,4 +1,4 @@
-name: LAFEA Bucket-01 Uniform 4096 Diagnostic V2
+name: LAFEA Bucket-01 Uniform 4096 Diagnostic V3
 
 on:
   push:
@@ -10,9 +10,9 @@ permissions:
   statuses: write
 
 jobs:
-  uniform-4096-v2:
+  uniform-4096-v3:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,7 +22,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Execute complete four-level diagnostic
+      - name: Execute complete governed four-level diagnostic
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_HEAD_SHA: ${{ github.sha }}
@@ -30,13 +30,21 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p reports/qualification
-          context=lafea/uniform-4096-v2
+          context=lafea/uniform-4096-v3
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=pending -f context="$context" \
-            -f description="Executing complete uniform 4096 diagnostic"
+            -f description="Executing governed uniform 4096 diagnostic"
 
           python - <<'PY'
           from pathlib import Path
+
+          def replace_once(path_name, old, new, label):
+              path = Path(path_name)
+              text = path.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f'{label}: marker count={count}: {old[:100]}')
+              path.write_text(text.replace(old, new, 1))
 
           supplemental = (
               "spec.meshLadder.push({ ordinal: 4, elementCount: 4096, "
@@ -51,79 +59,191 @@ jobs:
               'scripts/lafea-bucket-01-production-response-receipt.mjs',
               'scripts/lafea-bucket-01-production-lug-probe-receipt.mjs',
           ]:
-              path = Path(name)
-              text = path.read_text()
-              if text.count(spec_marker) != 1:
-                  raise RuntimeError(f'{name}: spec marker count={text.count(spec_marker)}')
-              path.write_text(text.replace(spec_marker, spec_marker + '\n' + supplemental, 1))
+              replace_once(name, spec_marker, spec_marker + '\n' + supplemental,
+                           f'{name}: append fourth level')
 
-          contract_path = Path('src/workspace/lafea-lug-pinhole-physical-problem-contract.js')
-          contract = contract_path.read_text()
-          contract_replacements = [
+          replace_once(
+              'src/workspace/lafea-lug-pinhole-physical-problem-contract.js',
+              "  if (!Array.isArray(value) || value.length !== 3) {\n    throw batchError('LAFEA_NB_T6C_THREE_LEVELS_REQUIRED');",
+              "  if (!Array.isArray(value) || value.length !== 4) {\n    throw batchError('LAFEA_NB_T6C_FOUR_LEVELS_REQUIRED');",
+              'physical-problem canonical levels',
+          )
+
+          ladder_path = 'src/workspace/lafea-lug-pinhole-mesh-ladder.js'
+          ladder_replacements = [
               (
-                  "  if (!Array.isArray(value) || value.length !== 3) {\n    throw batchError('LAFEA_NB_T6C_THREE_LEVELS_REQUIRED');",
-                  "  if (!Array.isArray(value) || value.length !== 4) {\n    throw batchError('LAFEA_NB_T6C_FOUR_LEVELS_REQUIRED');",
+                  "  if (!Array.isArray(intakeValue.levels) || intakeValue.levels.length !== 3) {\n    throw ladderError('LAFEA_LUG_PINHOLE_MESH_LADDER_THREE_LEVELS_REQUIRED');\n  }",
+                  "  if (!Array.isArray(intakeValue.levels) || intakeValue.levels.length !== 4) {\n    throw ladderError('LAFEA_LUG_PINHOLE_MESH_LADDER_FOUR_LEVELS_REQUIRED');\n  }",
+                  'mesh ladder count',
+              ),
+              (
+                  "  if (!(elementCounts[0] < elementCounts[1]\n    && elementCounts[1] < elementCounts[2])) {",
+                  "  if (!(elementCounts[0] < elementCounts[1]\n    && elementCounts[1] < elementCounts[2]\n    && elementCounts[2] < elementCounts[3])) {",
+                  'mesh ladder refinement',
+              ),
+              (
+                  "  if (new Set(meshHashes).size !== 3) {",
+                  "  if (new Set(meshHashes).size !== 4) {",
+                  'mesh ladder distinct hashes',
+              ),
+              (
+                  "  if (!(errors[1] <= errors[0] && errors[2] <= errors[1])) {",
+                  "  if (!(errors[1] <= errors[0] && errors[2] <= errors[1]\n    && errors[3] <= errors[2])) {",
+                  'mesh ladder geometry error',
               ),
           ]
-          for old, new in contract_replacements:
-              count = contract.count(old)
-              if count != 1:
-                  raise RuntimeError(f'physical contract marker count={count}')
-              contract = contract.replace(old, new, 1)
-          contract_path.write_text(contract)
+          for old, new, label in ladder_replacements:
+              replace_once(ladder_path, old, new, label)
 
-          response_path = Path('src/workspace/lafea-bucket-01-production-response.js')
-          response = response_path.read_text()
+          replace_once(
+              'src/workspace/lafea-lug-pinhole-physical-problem-batch.js',
+              "  if (!Array.isArray(value.levels) || value.levels.length !== 3) {\n    throw batchError('LAFEA_NB_T6C_PROJECTION_THREE_LEVELS_REQUIRED');\n  }",
+              "  if (!Array.isArray(value.levels) || value.levels.length !== 4) {\n    throw batchError('LAFEA_NB_T6C_PROJECTION_FOUR_LEVELS_REQUIRED');\n  }",
+              'projection level count',
+          )
+
+          controlled_path = 'src/core/lafea-application-templates/controlled-continuum-pilot-contract.js'
+          controlled_replacements = [
+              (
+                  "  if (![1, 2, 3].includes(input.ordinal)) {\n    throw new TypeError('Level ordinal must be 1, 2 or 3.');\n  }",
+                  "  if (![1, 2, 3, 4].includes(input.ordinal)) {\n    throw new TypeError('Level ordinal must be 1, 2, 3 or 4.');\n  }",
+                  'level evidence ordinal',
+              ),
+              (
+                  "  if (!Array.isArray(value) || value.length !== 3) {\n    throw new TypeError('Controlled continuum request requires exactly three mesh levels.');\n  }",
+                  "  if (!Array.isArray(value) || value.length !== 4) {\n    throw new TypeError('Controlled continuum request requires exactly four mesh levels.');\n  }",
+                  'controlled request count',
+              ),
+              (
+                  "      if (![1, 2, 3].includes(level.ordinal)) {\n        throw new TypeError('Mesh level ordinal must be 1, 2 or 3.');\n      }",
+                  "      if (![1, 2, 3, 4].includes(level.ordinal)) {\n        throw new TypeError('Mesh level ordinal must be 1, 2, 3 or 4.');\n      }",
+                  'controlled request ordinal',
+              ),
+              (
+                  "    throw new TypeError('Controlled continuum mesh levels must be ordinal 1, 2 and 3.');",
+                  "    throw new TypeError('Controlled continuum mesh levels must be ordinal 1, 2, 3 and 4.');",
+                  'controlled request ordinal sequence',
+              ),
+              (
+                  "  if (new Set(levels.map((row) => row.meshHash)).size !== 3\n    || new Set(levels.map((row) => row.meshProfileHash)).size !== 3) {",
+                  "  if (new Set(levels.map((row) => row.meshHash)).size !== 4\n    || new Set(levels.map((row) => row.meshProfileHash)).size !== 4) {",
+                  'controlled request distinct hashes',
+              ),
+              (
+                  "  if (!Array.isArray(value) || value.length !== 3) {\n    throw new TypeError('Controlled continuum receipt requires exactly three level records.');\n  }",
+                  "  if (!Array.isArray(value) || value.length !== 4) {\n    throw new TypeError('Controlled continuum receipt requires exactly four level records.');\n  }",
+                  'controlled receipt count',
+              ),
+              (
+                  "    recoveryHash: levelEvidence[2].recoveryHash,",
+                  "    recoveryHash: levelEvidence[3].recoveryHash,",
+                  'controlled receipt finest recovery',
+              ),
+              (
+                  "  if (!Array.isArray(normalizedInput.levels) || normalizedInput.levels.length !== 3) {\n    throw new TypeError('Pilot convergence requires exactly three levels.');\n  }",
+                  "  if (!Array.isArray(normalizedInput.levels) || normalizedInput.levels.length !== 4) {\n    throw new TypeError('Pilot convergence requires exactly four levels.');\n  }",
+                  'pilot convergence count',
+              ),
+              (
+                  "  if (relativeChanges[2] > normalizedInput.tolerance) {",
+                  "  if (relativeChanges[3] > normalizedInput.tolerance) {",
+                  'pilot finest change',
+              ),
+              (
+                  "  if (relativeChanges[2] > relativeChanges[1]) {",
+                  "  if (relativeChanges[3] > relativeChanges[2]) {",
+                  'pilot improvement',
+              ),
+          ]
+          for old, new, label in controlled_replacements:
+              replace_once(controlled_path, old, new, label)
+
+          controller_path = 'src/workspace/lafea-controlled-continuum-controller.js'
+          controller_replacements = [
+              (
+                  "  if (!Array.isArray(value) || value.length !== 3) {\n    throw new TypeError('Controlled continuum controller requires three levels.');\n  }",
+                  "  if (!Array.isArray(value) || value.length !== 4) {\n    throw new TypeError('Controlled continuum controller requires four levels.');\n  }",
+                  'controller count',
+              ),
+              (
+                  "      if (![1, 2, 3].includes(row.ordinal)) {",
+                  "      if (![1, 2, 3, 4].includes(row.ordinal)) {",
+                  'controller ordinal',
+              ),
+              (
+                  "    throw new TypeError('Controlled continuum levels must be ordinal 1, 2 and 3.');",
+                  "    throw new TypeError('Controlled continuum levels must be ordinal 1, 2, 3 and 4.');",
+                  'controller ordinal sequence',
+              ),
+          ]
+          for old, new, label in controller_replacements:
+              replace_once(controller_path, old, new, label)
+
+          response_path = 'src/workspace/lafea-bucket-01-production-response.js'
           response_replacements = [
               (
                   "const EXPECTED_ELEMENT_COUNTS = Object.freeze([64, 256, 1024]);",
                   "const EXPECTED_ELEMENT_COUNTS = Object.freeze([64, 256, 1024, 4096]);",
+                  'response element counts',
               ),
               (
                   "  'DETERMINISTIC_JACOBI_PCG',\n]);",
                   "  'DETERMINISTIC_JACOBI_PCG',\n  'DETERMINISTIC_JACOBI_PCG',\n]);",
+                  'response solver policy',
               ),
               (
                   "    meshSizes: levels.map((row) => row.meshSize),\n    observations: levels.map((row) => row.totalStrainEnergy),",
                   "    meshSizes: levels.slice(-3).map((row) => row.meshSize),\n    observations: levels.slice(-3).map((row) => row.totalStrainEnergy),",
+                  'response finest-three convergence',
               ),
               (
                   "  if (!Array.isArray(value) || value.length !== 3) {\n    throw responseError('LAFEA_B01_PRODUCTION_RESPONSE_THREE_LEVELS_REQUIRED');",
                   "  if (!Array.isArray(value) || value.length !== 4) {\n    throw responseError('LAFEA_B01_PRODUCTION_RESPONSE_FOUR_LEVELS_REQUIRED');",
+                  'response level count',
               ),
               (
                   "  if (!(levels[0].meshSize > levels[1].meshSize\n    && levels[1].meshSize > levels[2].meshSize)) {",
                   "  if (!(levels[0].meshSize > levels[1].meshSize\n    && levels[1].meshSize > levels[2].meshSize\n    && levels[2].meshSize > levels[3].meshSize)) {",
+                  'response mesh-size order',
               ),
           ]
-          for old, new in response_replacements:
-              count = response.count(old)
-              if count != 1:
-                  raise RuntimeError(f'response marker count={count}: {old[:60]}')
-              response = response.replace(old, new, 1)
-          response_path.write_text(response)
+          for old, new, label in response_replacements:
+              replace_once(response_path, old, new, label)
 
-          lug_path = Path('scripts/lafea-bucket-01-production-lug-probe-receipt.mjs')
-          lug = lug_path.read_text()
-          lug_replacements = [
-              ("    [64, 256, 1024],", "    [64, 256, 1024, 4096],"),
-              ("  assert.equal(projectionValue.levels.length, 3);", "  assert.equal(projectionValue.levels.length, 4);"),
-              ("  assert.equal(executionValue.controllerResult.levelResults.length, 3);", "  assert.equal(executionValue.controllerResult.levelResults.length, 4);"),
-              ("  }, levels));", "  }, levels.slice(-3)));"),
-              ("  evaluatePath(pathDefinition, levels));", "  evaluatePath(pathDefinition, levels.slice(-3)));"),
-              ("    meshSizes: spec.meshLadder.map((row) => row.meshSize),", "    meshSizes: levelsValue.map((row) => row.definition.meshSize),"),
+          response_receipt_path = 'scripts/lafea-bucket-01-production-response-receipt.mjs'
+          response_receipt_replacements = [
+              (
+                  "  assert.equal(projectionValue.levels.length, 3);",
+                  "  assert.equal(projectionValue.levels.length, 4);",
+                  'response receipt projection count',
+              ),
+              (
+                  "  assert.equal(executionValue.controllerResult.levelResults.length, 3);",
+                  "  assert.equal(executionValue.controllerResult.levelResults.length, 4);",
+                  'response receipt execution count',
+              ),
           ]
-          for old, new in lug_replacements:
-              count = lug.count(old)
-              if count != 1:
-                  raise RuntimeError(f'lug marker count={count}: {old[:60]}')
-              lug = lug.replace(old, new, 1)
+          for old, new, label in response_receipt_replacements:
+              replace_once(response_receipt_path, old, new, label)
+
+          lug_path = 'scripts/lafea-bucket-01-production-lug-probe-receipt.mjs'
+          lug_replacements = [
+              ("    [64, 256, 1024],", "    [64, 256, 1024, 4096],", 'lug counts'),
+              ("  assert.equal(projectionValue.levels.length, 3);", "  assert.equal(projectionValue.levels.length, 4);", 'lug projection count'),
+              ("  assert.equal(executionValue.controllerResult.levelResults.length, 3);", "  assert.equal(executionValue.controllerResult.levelResults.length, 4);", 'lug execution count'),
+              ("  }, levels));", "  }, levels.slice(-3)));", 'lug standalone finest-three'),
+              ("  evaluatePath(pathDefinition, levels));", "  evaluatePath(pathDefinition, levels.slice(-3)));", 'lug paths finest-three'),
+              ("    meshSizes: spec.meshLadder.map((row) => row.meshSize),", "    meshSizes: levelsValue.map((row) => row.definition.meshSize),", 'lug mesh sizes'),
+          ]
+          for old, new, label in lug_replacements:
+              replace_once(lug_path, old, new, label)
+
           assertion = '''  assert.equal(
               convergence.status,
               'PASS',
               `${definition.probeId}: ${convergence.reasons.join(', ')}`,
             );'''
-          diagnostic = '''  console.error(`UNIFORM_4096_V2_PROBE=${JSON.stringify({
+          diagnostic = '''  console.error(`UNIFORM_4096_V3_PROBE=${JSON.stringify({
               probeId: definition.probeId,
               role: definition.role,
               zone: definition.zone,
@@ -135,24 +255,22 @@ jobs:
               'PASS',
               `${definition.probeId}: ${convergence.reasons.join(', ')}`,
             );'''
-          if lug.count(assertion) != 1:
-              raise RuntimeError(f'lug assertion marker count={lug.count(assertion)}')
-          lug_path.write_text(lug.replace(assertion, diagnostic, 1))
+          replace_once(lug_path, assertion, diagnostic, 'lug diagnostic')
           PY
 
           set +e
           node scripts/lafea-bucket-01-production-response-runner.mjs \
-            > reports/qualification/uniform-4096-v2-runner.stdout.log \
-            2> reports/qualification/uniform-4096-v2-runner.stderr.log
+            > reports/qualification/uniform-4096-v3-runner.stdout.log \
+            2> reports/qualification/uniform-4096-v3-runner.stderr.log
           runner_exit=$?
           if [[ "$runner_exit" == "0" ]]; then
             node scripts/lafea-bucket-01-production-response-receipt.mjs \
-              > reports/qualification/uniform-4096-v2-response.stdout.log \
-              2> reports/qualification/uniform-4096-v2-response.stderr.log
+              > reports/qualification/uniform-4096-v3-response.stdout.log \
+              2> reports/qualification/uniform-4096-v3-response.stderr.log
             response_exit=$?
             node scripts/lafea-bucket-01-production-lug-probe-receipt.mjs \
-              > reports/qualification/uniform-4096-v2-lug.stdout.log \
-              2> reports/qualification/uniform-4096-v2-lug.stderr.log
+              > reports/qualification/uniform-4096-v3-lug.stdout.log \
+              2> reports/qualification/uniform-4096-v3-lug.stderr.log
             lug_exit=$?
           else
             response_exit=99
@@ -174,32 +292,47 @@ jobs:
               energyConvergence: response.energyConvergence,
               momentConvergence: response.momentConvergence,
             } : null,
-            lugStatus: lug?.status ?? null,
-            runnerStderr: read('reports/qualification/uniform-4096-v2-runner.stderr.log').slice(-4000),
-            responseStderr: read('reports/qualification/uniform-4096-v2-response.stderr.log').slice(-4000),
-            lugStderr: read('reports/qualification/uniform-4096-v2-lug.stderr.log').slice(-9000),
+            lug: lug ? {
+              status: lug.status,
+              probes: lug.standaloneProbeReceipts.map((row) => ({
+                probeId: row.probeId,
+                observations: row.observations,
+                convergence: row.convergence,
+              })),
+              paths: lug.pathReceipts.map((path) => ({
+                pathId: path.pathId,
+                stations: path.stationReceipts.map((row) => ({
+                  probeId: row.probeId,
+                  observations: row.observations,
+                  convergence: row.convergence,
+                })),
+              })),
+            } : null,
+            runnerStderr: read('reports/qualification/uniform-4096-v3-runner.stderr.log').slice(-5000),
+            responseStderr: read('reports/qualification/uniform-4096-v3-response.stderr.log').slice(-5000),
+            lugStderr: read('reports/qualification/uniform-4096-v3-lug.stderr.log').slice(-12000),
           }));
           NODE
           )
-          encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
+          encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1].slice(0,7000)))" "$detail")
           if [[ "$runner_exit" == "0" && "$response_exit" == "0" && "$lug_exit" == "0" ]]; then
             state=success
-            description="Uniform 4096 passed response and frozen stress locations"
+            description="Uniform 4096 passed response and all frozen stress locations"
           else
             state=failure
-            description="Uniform 4096 V2 blocked; inspect retained metrics"
+            description="Uniform 4096 V3 blocked; inspect retained metrics"
           fi
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state="$state" -f context="$context" \
             -f description="$description" \
-            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_4096_v2=${encoded}"
+            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_4096_v3=${encoded}"
           if [[ "$runner_exit" != "0" ]]; then exit "$runner_exit"; fi
           if [[ "$response_exit" != "0" ]]; then exit "$response_exit"; fi
           exit "$lug_exit"
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lafea-uniform-4096-v2-${{ github.sha }}
+          name: lafea-uniform-4096-v3-${{ github.sha }}
           path: reports/qualification/
           if-no-files-found: warn
           retention-days: 30
