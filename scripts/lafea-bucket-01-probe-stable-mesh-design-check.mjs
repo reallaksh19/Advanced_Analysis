@@ -19,24 +19,32 @@ const PROBE_SPEC_PATH = path.join(
   ROOT,
   'validation/bucket-01/08-production-lug-fixed-probe-spec.json',
 );
+const RESPONSE_SPEC_PATH = path.join(
+  ROOT,
+  'validation/bucket-01/06-production-response-convergence-spec.json',
+);
 const design = JSON.parse(fs.readFileSync(DESIGN_PATH, 'utf8'));
 const probeSpec = JSON.parse(fs.readFileSync(PROBE_SPEC_PATH, 'utf8'));
+const responseSpec = JSON.parse(fs.readFileSync(RESPONSE_SPEC_PATH, 'utf8'));
 
 assert.equal(
   design.schema,
-  'lafea-bucket-01-probe-stable-polar-design/v2',
+  'lafea-bucket-01-probe-stable-polar-design/v3',
 );
-assert.equal(design.designId, 'B01-PROBE-STABLE-POLAR-V2');
+assert.equal(design.designId, 'B01-PROBE-STABLE-POLAR-V3');
 assert.equal(design.benchmarkId, probeSpec.benchmarkId);
+assert.equal(design.benchmarkId, responseSpec.benchmarkId);
 assert.equal(design.sourceProbeSpecId, probeSpec.specId);
 assert.equal(design.authority.frozenProbeCoordinatesChanged, false);
 assert.equal(design.authority.stressTolerancesChanged, false);
 assert.equal(design.authority.loadsChanged, false);
+assert.equal(design.authority.supportsChanged, false);
 assert.equal(design.authority.solverCriteriaChanged, false);
 assert.equal(design.authority.codeBasisBoundaryChanged, false);
 assert.equal(design.authority.productionMeshAuthority, false);
 assert.equal(design.authority.qualificationAuthority, false);
 assert.equal(design.authority.bucketQualified, false);
+assert.deepEqual(design.radialAxis.protectedBreakpoints, [60]);
 assert.deepEqual(
   design.circumferentialAxis.protectedBreakpoints,
   [90, 180, 270],
@@ -67,23 +75,52 @@ assert.equal(
   design.midsideGeometryPolicy.internalCircularConstraintClaimed,
   false,
 );
-assert.equal(design.changeControl.previousDesignId, 'B01-PROBE-STABLE-POLAR-V1');
+assert.equal(design.changeControl.previousDesignId, 'B01-PROBE-STABLE-POLAR-V2');
 assert.equal(
   design.changeControl.trigger,
-  'LEVEL_1_NON_POSITIVE_INTERNAL_CURVED_EDGE_JACOBIAN',
+  'EXACT_20_TO_60_MM_PRODUCTION_MAPPING_WINDOW_NOT_RETAINED',
 );
-assert.equal(design.changeControl.controllingElement, 'E-R10-S18-B');
+assert.equal(design.changeControl.requiredRadialBreakpoint, 60);
+assert.equal(design.changeControl.previousLevel4RadialCellCount, 53);
+assert.equal(design.changeControl.newLevel4RadialCellCount, 54);
+assert.equal(design.changeControl.axisCoordinatesChanged, true);
+assert.equal(design.changeControl.candidateElementCountsChanged, true);
 for (const key of [
-  'axisCoordinatesChanged',
   'anchorWindowsChanged',
   'anchorPhasesChanged',
-  'candidateElementCountsChanged',
   'frozenPhysicalCoordinatesChanged',
   'governedToleranceChanged',
   'productionAuthorityChanged',
 ]) {
   assert.equal(design.changeControl[key], false);
 }
+
+assert.equal(
+  design.productionMappingPolicy.radialWindowStart,
+  responseSpec.load.selectedSegmentRadiusStart,
+);
+assert.equal(
+  design.productionMappingPolicy.radialWindowEnd,
+  responseSpec.load.selectedSegmentRadiusEnd,
+);
+assert.equal(design.productionMappingPolicy.radialWindowStart, 20);
+assert.equal(design.productionMappingPolicy.radialWindowEnd, 60);
+assert.equal(
+  design.productionMappingPolicy.windowEndpointsRequiredAtEveryLevel,
+  true,
+);
+assert.equal(
+  design.productionMappingPolicy.edgeSelectionAuthority,
+  'EXACT_PHYSICAL_COORDINATE_WINDOW_NOT_INDEX_SCALING',
+);
+assert.equal(
+  design.productionMappingPolicy.loadFeatureRole,
+  responseSpec.load.featureRole,
+);
+assert.equal(
+  design.productionMappingPolicy.restraintFeatureRole,
+  responseSpec.restraint.featureRole,
+);
 
 const frozenRadii = uniqueSorted([
   ...probeSpec.probes.map((row) => row.radius),
@@ -138,6 +175,16 @@ assert.equal(circumferentialPlan.authority.productionMeshAuthority, false);
 
 verifyAxisPlan(radialPlan, design.radialAxis.targetPhase);
 verifyAxisPlan(circumferentialPlan, design.circumferentialAxis.targetPhase);
+for (const level of radialPlan.levels) {
+  assert.equal(
+    level.coordinates.includes(design.productionMappingPolicy.radialWindowStart),
+    true,
+  );
+  assert.equal(
+    level.coordinates.includes(design.productionMappingPolicy.radialWindowEnd),
+    true,
+  );
+}
 
 const phaseSeparation = Math.abs(
   design.radialAxis.targetPhase
@@ -162,6 +209,12 @@ const candidateLevels = radialPlan.levels.map((radialLevel, index) => {
       2 * radialLevel.cellCount * circumferentialLevel.cellCount,
     radialCoordinateHash: radialLevel.coordinateHash,
     circumferentialCoordinateHash: circumferentialLevel.coordinateHash,
+    mappingWindowStartIndex: radialLevel.coordinates.indexOf(
+      design.productionMappingPolicy.radialWindowStart,
+    ),
+    mappingWindowEndIndex: radialLevel.coordinates.indexOf(
+      design.productionMappingPolicy.radialWindowEnd,
+    ),
   };
 });
 assert.equal(candidateLevels.length, design.levelCount);
@@ -180,9 +233,12 @@ assert.deepEqual(
     { ordinal: 1, radialCellCount: 12, circumferentialCellCount: 20, candidateT6ElementCount: 480 },
     { ordinal: 2, radialCellCount: 17, circumferentialCellCount: 35, candidateT6ElementCount: 1190 },
     { ordinal: 3, radialCellCount: 30, circumferentialCellCount: 68, candidateT6ElementCount: 4080 },
-    { ordinal: 4, radialCellCount: 53, circumferentialCellCount: 132, candidateT6ElementCount: 13992 },
+    { ordinal: 4, radialCellCount: 54, circumferentialCellCount: 132, candidateT6ElementCount: 14256 },
   ],
 );
+assert.equal(candidateLevels.every((row) =>
+  row.mappingWindowStartIndex === 0
+    && row.mappingWindowEndIndex > row.mappingWindowStartIndex), true);
 
 const tampered = JSON.parse(JSON.stringify(radialPlan));
 tampered.levels[0].anchorCells[0].phase = 0.5;
@@ -190,19 +246,33 @@ assert.equal(
   validateLafeaBucket01ProbeStableAxisPlanEvidence(tampered).ok,
   false,
 );
+const missingMappingBreakpoint = JSON.parse(JSON.stringify(design));
+missingMappingBreakpoint.radialAxis.protectedBreakpoints = [];
+const missingPlan = buildLafeaBucket01ProbeStableAxisPlan({
+  ...axisInput(
+    missingMappingBreakpoint.radialAxis,
+    missingMappingBreakpoint.geometry.holeRadius,
+    missingMappingBreakpoint.geometry.outerRadius,
+  ),
+  protectedBreakpoints: [],
+});
+assert.equal(missingPlan.levels.every((level) =>
+  level.coordinates.includes(60)), false);
 
 console.log(JSON.stringify({
-  schema: 'lafea-bucket-01-probe-stable-mesh-design-check/v2',
+  schema: 'lafea-bucket-01-probe-stable-mesh-design-check/v3',
   status: 'PASS',
   designId: design.designId,
   radialPlanHash: radialPlan.semanticHash,
   circumferentialPlanHash: circumferentialPlan.semanticHash,
   phaseSeparation,
   candidateLevels,
+  productionMappingPolicy: design.productionMappingPolicy,
   midsideGeometryPolicy: design.midsideGeometryPolicy,
   authority: {
     designContractVerified: true,
     frozenCoordinatesPreserved: true,
+    exactProductionMappingWindowPreserved: true,
     protectedFeatureLinesPreserved: true,
     stableInteriorAxisPhasesVerified: true,
     exactAnchorCellWidthContractionVerified: true,
