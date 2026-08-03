@@ -1,6 +1,6 @@
 {
   "schema": "lafea-bucket-01-production-diagnostic/v2",
-  "exactHeadSha": "28de88fa17de36fd250146676c425c5ea74282d3",
+  "exactHeadSha": "7e5f416aa3b59575ed2abc61723eeac265746b36",
   "exits": {
     "productionRunner": 0,
     "productionResponse": 0,
@@ -19,7 +19,139 @@
     "fineGridGci": 0.005660248564111084,
     "observedOrder": 1.5922867946983605
   },
-  "lugStress": null,
+  "lugStress": {
+    "status": "BLOCKED",
+    "reasons": [
+      "FIXED_LOCATION_BLOCKED:LUG_NEAR_HOLE_PMAX:OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND",
+      "FIXED_LOCATION_BLOCKED:LUG_RADIAL_PATH_THETA_67:R27:OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND",
+      "FIXED_LOCATION_BLOCKED:LUG_RADIAL_PATH_THETA_67:R33:OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND",
+      "FIXED_LOCATION_BLOCKED:LUG_RADIAL_PATH_THETA_67:R47:OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND",
+      "FIXED_LOCATION_BLOCKED:LUG_RADIAL_PATH_THETA_67:R73:OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND",
+      "FIXED_LOCATION_BLOCKED:LUG_RADIAL_PATH_THETA_67:R87:OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND"
+    ],
+    "governedLevelOrdinals": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "evaluatedLevelOrdinals": [
+      2,
+      3,
+      4
+    ],
+    "directElementPointRecovery": true,
+    "failingLocations": [
+      {
+        "probeId": "LUG_NEAR_HOLE_PMAX",
+        "role": "FIXED_PHYSICAL_PROBE",
+        "pathId": null,
+        "stationId": null,
+        "zone": "HIGH_GRADIENT",
+        "reasons": [
+          "OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND"
+        ],
+        "observations": [
+          1.7605570464013405,
+          2.0519303536803664,
+          2.0287840906975374
+        ],
+        "fineGridGci": null,
+        "observedOrder": null,
+        "classification": "OSCILLATORY"
+      },
+      {
+        "probeId": "LUG_RADIAL_PATH_THETA_67:R27",
+        "role": "FIXED_STRESS_PATH_STATION",
+        "pathId": "LUG_RADIAL_PATH_THETA_67",
+        "stationId": "R27",
+        "zone": "HIGH_GRADIENT",
+        "reasons": [
+          "OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND"
+        ],
+        "observations": [
+          1.783438646634265,
+          1.541664470433054,
+          1.6699643996837905
+        ],
+        "fineGridGci": null,
+        "observedOrder": null,
+        "classification": "OSCILLATORY"
+      },
+      {
+        "probeId": "LUG_RADIAL_PATH_THETA_67:R33",
+        "role": "FIXED_STRESS_PATH_STATION",
+        "pathId": "LUG_RADIAL_PATH_THETA_67",
+        "stationId": "R33",
+        "zone": "HIGH_GRADIENT",
+        "reasons": [
+          "OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND"
+        ],
+        "observations": [
+          1.251015773356692,
+          1.4128553746163197,
+          1.4011042673111866
+        ],
+        "fineGridGci": null,
+        "observedOrder": null,
+        "classification": "OSCILLATORY"
+      },
+      {
+        "probeId": "LUG_RADIAL_PATH_THETA_67:R47",
+        "role": "FIXED_STRESS_PATH_STATION",
+        "pathId": "LUG_RADIAL_PATH_THETA_67",
+        "stationId": "R47",
+        "zone": "NON_SINGULAR",
+        "reasons": [
+          "OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND"
+        ],
+        "observations": [
+          0.971423113514862,
+          0.9706766864529565,
+          0.9915806110940107
+        ],
+        "fineGridGci": null,
+        "observedOrder": null,
+        "classification": "OSCILLATORY"
+      },
+      {
+        "probeId": "LUG_RADIAL_PATH_THETA_67:R73",
+        "role": "FIXED_STRESS_PATH_STATION",
+        "pathId": "LUG_RADIAL_PATH_THETA_67",
+        "stationId": "R73",
+        "zone": "NON_SINGULAR",
+        "reasons": [
+          "OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND"
+        ],
+        "observations": [
+          0.40326178911182914,
+          0.4257384013962911,
+          0.42547775414405203
+        ],
+        "fineGridGci": null,
+        "observedOrder": null,
+        "classification": "OSCILLATORY"
+      },
+      {
+        "probeId": "LUG_RADIAL_PATH_THETA_67:R87",
+        "role": "FIXED_STRESS_PATH_STATION",
+        "pathId": "LUG_RADIAL_PATH_THETA_67",
+        "stationId": "R87",
+        "zone": "NON_SINGULAR",
+        "reasons": [
+          "OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND"
+        ],
+        "observations": [
+          0.24278110441356557,
+          0.24196195510314747,
+          0.2444763295574866
+        ],
+        "fineGridGci": null,
+        "observedOrder": null,
+        "classification": "OSCILLATORY"
+      }
+    ]
+  },
   "kirsch": {
     "status": "PASS",
     "reasons": []
@@ -27,8 +159,8 @@
   "logs": {
     "productionRunnerStderr": null,
     "productionResponseStderr": null,
-    "productionLugStressStdout": null,
-    "productionLugStressStderr": "file:///home/runner/work/Advanced_Analysis/Advanced_Analysis/src/workspace/lafea-canonical-sha256.js:26\n  if (typeof value !== 'object') throw new TypeError(`${path} contains non-JSON data.`);\n                                       ^\n\nTypeError: $.failingLocations[0].classification contains non-JSON data.\n    at stringifyValue (file:///home/runner/work/Advanced_Analysis/Advanced_Analysis/src/workspace/lafea-canonical-sha256.js:26:40)\n    at file:///home/runner/work/Advanced_Analysis/Advanced_Analysis/src/workspace/lafea-canonical-sha256.js:55:40\n    at Array.map (<anonymous>)\n    at stringifyValue (file:///home/runner/work/Advanced_Analysis/Advanced_Analysis/src/workspace/lafea-canonical-sha256.js:52:24)\n    at stringifyValue (file:///home/runner/work/Advanced_Analysis/Advanced_Analysis/src/workspace/lafea-canonical-sha256.js:42:19)\n    at file:///home/runner/work/Advanced_Analysis/Advanced_Analysis/src/workspace/lafea-canonical-sha256.js:55:40\n    at Array.map (<anonymous>)\n    at stringifyValue (file:///home/runner/work/Advanced_Analysis/Advanced_Analysis/src/workspace/lafea-canonical-sha256.js:52:24)\n    at canonicalLafeaJson (file:///home/runner/work/Advanced_Analysis/Advanced_Analysis/src/workspace/lafea-canonical-sha256.js:11:10)\n    at canonicalLafeaSha256 (file:///home/runner/work/Advanced_Analysis/Advanced_Analysis/src/workspace/lafea-canonical-sha256.js:15:40)\n\nNode.js v22.23.1",
+    "productionLugStressStdout": "7316381\",\"sha256:75f3a60869c6a83cae99cd11ca46be37c902d267e83e34151f5a4af26d98e8d1\"],\"fixedProbeEvidenceHashes\":[\"sha256:8e9458f4f762e8af2b681da3936bd35dfa07fde7775ac3187183cebe6528334b\",\"sha256:31f51004226c999c284c8e3ba639112307d94ffeca4d19af75707e6fb7316381\",\"sha256:75f3a60869c6a83cae99cd11ca46be37c902d267e83e34151f5a4af26d98e8d1\"],\"convergence\":{\"schema\":\"lafea-bucket-01-convergence-evidence/v1\",\"producerRevision\":\"B01-CONV.2\",\"quantityId\":\"VON_MISES\",\"samplingAuthority\":\"FIXED_PHYSICAL_PROBE\",\"locationId\":\"LUG_RADIAL_PATH_THETA_67:R87\",\"locationDefinitionHash\":\"sha256:ee694d1132358c9bb10662532539a14cf1c8d97359230f5888edbe3178047739\",\"units\":\"MPa\",\"meshSizes\":[0.03125,0.015625,0.0078125],\"observations\":[0.24278110441356557,0.24196195510314747,0.2444763295574866],\"gciTolerance\":0.03,\"minimumObservedOrder\":null,\"asymptoticRatioBounds\":{\"minimum\":0.5,\"maximum\":1.5},\"safetyFactor\":1.25,\"refinementRatio\":2,\"ratioMismatch\":0,\"successiveDifferences\":[0.0008191493104180991,-0.0025143744543391355],\"classification\":\"OSCILLATORY\",\"observedOrder\":null,\"richardsonExtrapolation\":null,\"fineGridGci\":null,\"coarseGridGci\":null,\"asymptoticRatio\":null,\"asymptoticRangeAccepted\":false,\"status\":\"BLOCKED\",\"reasons\":[\"OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND\"],\"semanticHash\":\"sha256:bed9a3ed5ed67386dc4fe07c8bdb1f79620893c97c860678b18236158e681e19\"},\"stressConvergenceEvidenceHash\":\"sha256:c1dbf64ca0dd70c1d9acdf21237953005f820ad6aa12259b4815f57bb78f5a38\",\"gciTolerance\":0.03,\"status\":\"BLOCKED\",\"reasons\":[\"OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND\"]}],\"stationCount\":5,\"status\":\"BLOCKED\",\"reasons\":[\"STATION_BLOCKED:LUG_RADIAL_PATH_THETA_67:R27\",\"STATION_BLOCKED:LUG_RADIAL_PATH_THETA_67:R33\",\"STATION_BLOCKED:LUG_RADIAL_PATH_THETA_67:R47\",\"STATION_BLOCKED:LUG_RADIAL_PATH_THETA_67:R73\",\"STATION_BLOCKED:LUG_RADIAL_PATH_THETA_67:R87\"],\"authority\":{\"samplingAuthority\":\"FIXED_STRESS_PATH\",\"allStationsFrozenBeforeProductionStressObservation\":true,\"directElementPointRecovery\":true,\"retainedNodalDisplacementAuthority\":true,\"retainedConstitutiveMatrixAuthority\":true,\"integrationPointExtrapolationUsed\":false,\"movingMaximumUsed\":false,\"nodalProjectionUsed\":false,\"crossElementAveragingUsed\":false},\"semanticHash\":\"sha256:fec6c7df9dd42bf417254a58aa870f2db1015ddfce4b8579cd41186abe504593\"}],\"failingLocations\":[{\"probeId\":\"LUG_NEAR_HOLE_PMAX\",\"role\":\"FIXED_PHYSICAL_PROBE\",\"pathId\":null,\"stationId\":null,\"zone\":\"HIGH_GRADIENT\",\"reasons\":[\"OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND\"],\"observations\":[1.7605570464013405,2.0519303536803664,2.0287840906975374],\"fineGridGci\":null,\"observedOrder\":null,\"classification\":\"OSCILLATORY\"},{\"probeId\":\"LUG_RADIAL_PATH_THETA_67:R27\",\"role\":\"FIXED_STRESS_PATH_STATION\",\"pathId\":\"LUG_RADIAL_PATH_THETA_67\",\"stationId\":\"R27\",\"zone\":\"HIGH_GRADIENT\",\"reasons\":[\"OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND\"],\"observations\":[1.783438646634265,1.541664470433054,1.6699643996837905],\"fineGridGci\":null,\"observedOrder\":null,\"classification\":\"OSCILLATORY\"},{\"probeId\":\"LUG_RADIAL_PATH_THETA_67:R33\",\"role\":\"FIXED_STRESS_PATH_STATION\",\"pathId\":\"LUG_RADIAL_PATH_THETA_67\",\"stationId\":\"R33\",\"zone\":\"HIGH_GRADIENT\",\"reasons\":[\"OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND\"],\"observations\":[1.251015773356692,1.4128553746163197,1.4011042673111866],\"fineGridGci\":null,\"observedOrder\":null,\"classification\":\"OSCILLATORY\"},{\"probeId\":\"LUG_RADIAL_PATH_THETA_67:R47\",\"role\":\"FIXED_STRESS_PATH_STATION\",\"pathId\":\"LUG_RADIAL_PATH_THETA_67\",\"stationId\":\"R47\",\"zone\":\"NON_SINGULAR\",\"reasons\":[\"OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND\"],\"observations\":[0.971423113514862,0.9706766864529565,0.9915806110940107],\"fineGridGci\":null,\"observedOrder\":null,\"classification\":\"OSCILLATORY\"},{\"probeId\":\"LUG_RADIAL_PATH_THETA_67:R73\",\"role\":\"FIXED_STRESS_PATH_STATION\",\"pathId\":\"LUG_RADIAL_PATH_THETA_67\",\"stationId\":\"R73\",\"zone\":\"NON_SINGULAR\",\"reasons\":[\"OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND\"],\"observations\":[0.40326178911182914,0.4257384013962911,0.42547775414405203],\"fineGridGci\":null,\"observedOrder\":null,\"classification\":\"OSCILLATORY\"},{\"probeId\":\"LUG_RADIAL_PATH_THETA_67:R87\",\"role\":\"FIXED_STRESS_PATH_STATION\",\"pathId\":\"LUG_RADIAL_PATH_THETA_67\",\"stationId\":\"R87\",\"zone\":\"NON_SINGULAR\",\"reasons\":[\"OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND\"],\"observations\":[0.24278110441356557,0.24196195510314747,0.2444763295574866],\"fineGridGci\":null,\"observedOrder\":null,\"classification\":\"OSCILLATORY\"}],\"status\":\"BLOCKED\",\"reasons\":[\"FIXED_LOCATION_BLOCKED:LUG_NEAR_HOLE_PMAX:OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND\",\"FIXED_LOCATION_BLOCKED:LUG_RADIAL_PATH_THETA_67:R27:OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND\",\"FIXED_LOCATION_BLOCKED:LUG_RADIAL_PATH_THETA_67:R33:OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND\",\"FIXED_LOCATION_BLOCKED:LUG_RADIAL_PATH_THETA_67:R47:OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND\",\"FIXED_LOCATION_BLOCKED:LUG_RADIAL_PATH_THETA_67:R73:OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND\",\"FIXED_LOCATION_BLOCKED:LUG_RADIAL_PATH_THETA_67:R87:OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND\"],\"authority\":{\"fixedPhysicalCoordinatesFrozenBeforeProductionStressObservation\":true,\"directElementPointRecovery\":true,\"retainedNodalDisplacementAuthority\":true,\"retainedConstitutiveMatrixAuthority\":true,\"integrationPointExtrapolationUsed\":false,\"elementLocalReconstruction\":true,\"finestThreeOfGovernedFourGciAcceptance\":true,\"movingMaximumUsed\":false,\"nodalProjectionUsed\":false,\"crossElementAveragingUsed\":false,\"codeAssessmentAuthorized\":false,\"bucketQualified\":false},\"qualificationStates\":{\"implemented\":true,\"productionLugProbeReceiptProduced\":true,\"solverVerified\":true,\"stressVerified\":false,\"codeVerified\":false,\"integrationVerified\":false,\"bucketQualified\":false},\"evidenceHash\":\"sha256:38818a8c5c664c0da405f4f0fdf344fc7f6f9bf97b8cd81070d0de8a2f1d2992\"}",
+    "productionLugStressStderr": null,
     "kirschStderr": null
   },
   "firstFailure": "productionLugStress",
