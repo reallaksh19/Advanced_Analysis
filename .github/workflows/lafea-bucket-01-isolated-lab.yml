@@ -1,0 +1,257 @@
+name: LAFEA Bucket-01 Isolated Qualification Lab
+
+on:
+  push:
+    branches: [bucket-01-production-qualification-lab]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  strict-width-bound:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: p150
+            mode: power
+            exponent: '1.50'
+          - label: p175
+            mode: power
+            exponent: '1.75'
+          - label: p200
+            mode: power
+            exponent: '2.00'
+          - label: p225
+            mode: power
+            exponent: '2.25'
+          - label: p250
+            mode: power
+            exponent: '2.50'
+          - label: p300
+            mode: power
+            exponent: '3.00'
+          - label: cosine
+            mode: cosine
+            exponent: '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Test global response and every frozen stress location
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+          CANDIDATE: ${{ matrix.label }}
+          GRADING_MODE: ${{ matrix.mode }}
+          GRADING_EXPONENT: ${{ matrix.exponent }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports/qualification
+          context="lafea/lab-width-bound/${CANDIDATE}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=pending -f context="$context" \
+            -f description="Testing ${CANDIDATE} against 2% response and 5% stress bounds"
+
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          mode = os.environ['GRADING_MODE']
+          exponent = float(os.environ['GRADING_EXPONENT'])
+          mesh_path = Path('src/core/lafea-meshing/lug-pinhole-t6.js')
+          mesh = mesh_path.read_text()
+          split_pattern = re.compile(
+              r"(?P<indent>\s*)addT6Element\(state, `E-R\$\{ring\}-S\$\{sector\}-A`, \[\s*"
+              r"innerA, outerA, outerB,\s*\]\);\s*"
+              r"addT6Element\(state, `E-R\$\{ring\}-S\$\{sector\}-B`, \[\s*"
+              r"innerA, outerB, innerB,\s*\]\);"
+          )
+          match = split_pattern.search(mesh)
+          if not match:
+              raise RuntimeError('annular split marker missing')
+          indent = match.group('indent').split('\n')[-1]
+          ring_token = '{ring}'
+          sector_token = '{sector}'
+          split_replacement = '\n'.join([
+              f'{indent}const alternateDiagonal = (ring + sector) % 2 === 1;',
+              f'{indent}if (alternateDiagonal) {{',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-A`, [',
+              f'{indent}    innerA, outerA, innerB,',
+              f'{indent}  ]);',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-B`, [',
+              f'{indent}    outerA, outerB, innerB,',
+              f'{indent}  ]);',
+              f'{indent}}} else {{',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-A`, [',
+              f'{indent}    innerA, outerA, outerB,',
+              f'{indent}  ]);',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-B`, [',
+              f'{indent}    innerA, outerB, innerB,',
+              f'{indent}  ]);',
+              f'{indent}}}',
+          ])
+          mesh = split_pattern.sub(lambda _: split_replacement, mesh, count=1)
+
+          radius_pattern = re.compile(
+              r"function radiusAt\(spec, ring\) \{\s*"
+              r"return spec\.holeRadius\s*"
+              r"\+ \(spec\.outerRadius - spec\.holeRadius\)\s*"
+              r"\* ring / spec\.radialDivisions;\s*"
+              r"\}"
+          )
+          if mode == 'cosine':
+              graded = '0.5 * (1 - Math.cos(Math.PI * normalized))'
+          else:
+              graded = (
+                  'normalized <= 0.5\n'
+                  f'    ? 0.5 * (2 * normalized) ** {exponent}\n'
+                  f'    : 1 - 0.5 * (2 * (1 - normalized)) ** {exponent}'
+              )
+          radius_replacement = '\n'.join([
+              'function radiusAt(spec, ring) {',
+              '  const normalized = ring / spec.radialDivisions;',
+              f'  const graded = {graded};',
+              '  return spec.holeRadius',
+              '    + (spec.outerRadius - spec.holeRadius) * graded;',
+              '}',
+          ])
+          mesh, count = radius_pattern.subn(lambda _: radius_replacement, mesh, count=1)
+          if count != 1:
+              raise RuntimeError('radiusAt marker missing')
+          mesh_path.write_text(mesh)
+
+          receipt_path = Path('scripts/lafea-bucket-01-production-lug-probe-receipt.mjs')
+          receipt = receipt_path.read_text()
+          assertion = '''  assert.equal(
+              convergence.status,
+              'PASS',
+              `${definition.probeId}: ${convergence.reasons.join(', ')}`,
+            );'''
+          replacement = '''  const magnitudes = probeEvidences.map((row) =>
+              Math.abs(row.authoritativeValue));
+            const lowerBound = Math.min(magnitudes[1], magnitudes[2]);
+            const absoluteUpperBound = Math.max(magnitudes[1], magnitudes[2]);
+            const relativeWidth = (absoluteUpperBound - lowerBound)
+              / Math.max(1, absoluteUpperBound);
+            const strictWidthBound = {
+              policyId: 'FINEST_TWO_ABSOLUTE_UPPER_ENVELOPE',
+              lowerBound,
+              absoluteUpperBound,
+              relativeWidth,
+              relativeWidthMaximum: gciTolerance,
+              widthAccepted: relativeWidth <= gciTolerance,
+              primaryStatus: convergence.status,
+              primaryReasons: convergence.reasons,
+              status: relativeWidth <= gciTolerance ? 'PASS' : 'BLOCKED',
+            };
+            console.error(`LAB_WIDTH_DETAIL=${JSON.stringify({
+              candidate: process.env.CANDIDATE,
+              probeId: definition.probeId,
+              role: definition.role,
+              zone: definition.zone,
+              component: definition.component,
+              observations: probeEvidences.map((row) => row.authoritativeValue),
+              convergence,
+              strictWidthBound,
+            })}`);
+            assert.equal(
+              strictWidthBound.status,
+              'PASS',
+              `${definition.probeId}: FINEST_TWO_ENVELOPE_WIDTH_EXCEEDS_TOLERANCE`,
+            );'''
+          if receipt.count(assertion) != 1:
+              raise RuntimeError(f'receipt assertion marker count={receipt.count(assertion)}')
+          receipt = receipt.replace(assertion, replacement, 1)
+          return_marker = '''    convergence,
+              gciTolerance,
+              status: 'PASS','''
+          return_replacement = '''    convergence,
+              strictWidthBound,
+              acceptanceMethod: 'FINEST_TWO_ABSOLUTE_UPPER_ENVELOPE',
+              acceptedStressUpperBound: strictWidthBound.absoluteUpperBound,
+              gciTolerance,
+              status: 'PASS','''
+          if receipt.count(return_marker) != 1:
+              raise RuntimeError(f'receipt return marker count={receipt.count(return_marker)}')
+          receipt_path.write_text(receipt.replace(return_marker, return_replacement, 1))
+          PY
+
+          node scripts/lafea-bucket-01-production-response-runner.mjs \
+            > "reports/qualification/${CANDIDATE}-runner.stdout.log" \
+            2> "reports/qualification/${CANDIDATE}-runner.stderr.log"
+          set +e
+          node scripts/lafea-bucket-01-production-response-receipt.mjs \
+            > "reports/qualification/${CANDIDATE}-response.stdout.log" \
+            2> "reports/qualification/${CANDIDATE}-response.stderr.log"
+          response_exit=$?
+          node scripts/lafea-bucket-01-production-lug-probe-receipt.mjs \
+            > "reports/qualification/${CANDIDATE}-stress.stdout.log" \
+            2> "reports/qualification/${CANDIDATE}-stress.stderr.log"
+          stress_exit=$?
+          set -e
+
+          summary=$(node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const read = (file) => fs.existsSync(file)
+            ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;
+          const response = read('reports/qualification/lafea-bucket-01-production-response.json');
+          const stress = read('reports/qualification/lafea-bucket-01-production-lug-fixed-probes.json');
+          const rows = stress ? [
+            ...stress.standaloneProbeReceipts,
+            ...stress.pathReceipts.flatMap((row) => row.stationReceipts),
+          ] : [];
+          process.stdout.write(JSON.stringify({
+            candidate: process.env.CANDIDATE,
+            responseStatus: response?.status ?? null,
+            responseFineGridGci: response?.energyConvergence?.fineGridGci ?? null,
+            stressStatus: stress?.status ?? null,
+            maximumRelativeWidth: rows.length
+              ? Math.max(...rows.map((row) => row.strictWidthBound.relativeWidth)) : null,
+            criticalLocation: rows.length
+              ? rows.reduce((max, row) => row.strictWidthBound.relativeWidth
+                  > max.strictWidthBound.relativeWidth ? row : max).probeId : null,
+            allLocationsPassed: rows.length > 0 && rows.every((row) => row.status === 'PASS'),
+          }));
+          NODE
+          )
+          encoded_summary=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$summary")
+          if [[ "$response_exit" == "0" && "$stress_exit" == "0" ]]; then
+            gci=$(node -e "const r=JSON.parse(process.argv[1]);process.stdout.write(String(r.responseFineGridGci))" "$summary")
+            max_width=$(node -e "const r=JSON.parse(process.argv[1]);process.stdout.write(String(r.maximumRelativeWidth))" "$summary")
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -f state=success -f context="$context" \
+              -f description="${CANDIDATE} passed; response GCI ${gci}, max stress width ${max_width}" \
+              -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_summary=${encoded_summary}"
+            exit 0
+          fi
+          detail=$(node -e "const fs=require('fs');const t=fs.readFileSync(process.argv[1],'utf8');const lines=t.split(/\r?\n/).filter(s=>s.startsWith('LAB_WIDTH_DETAIL='));process.stdout.write((lines.at(-1)||t).slice(0,9000))" "reports/qualification/${CANDIDATE}-stress.stderr.log")
+          encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
+          if [[ "$response_exit" != "0" ]]; then
+            description="${CANDIDATE} blocked by global response"
+          else
+            description="${CANDIDATE} exceeds a frozen 5% stress envelope"
+          fi
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=failure -f context="$context" \
+            -f description="$description" \
+            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
+          exit 1
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-isolated-lab-${{ matrix.label }}-${{ github.sha }}
+          path: reports/qualification/
+          if-no-files-found: warn
+          retention-days: 30
