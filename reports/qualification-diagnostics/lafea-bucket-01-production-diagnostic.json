@@ -1,6 +1,6 @@
 {
-  "schema": "lafea-bucket-01-production-diagnostic/v1",
-  "exactHeadSha": "313b8d86a846eabc5ee51c88b7fa19f5cf7503a0",
+  "schema": "lafea-bucket-01-production-diagnostic/v2",
+  "exactHeadSha": "8a19b6353d9d57fb0b09eb3ccd76816f8499ddde",
   "exits": {
     "productionRunner": 0,
     "productionResponse": 0,
@@ -23,6 +23,13 @@
   "kirsch": {
     "status": "PASS",
     "reasons": []
+  },
+  "logs": {
+    "productionRunnerStderr": null,
+    "productionResponseStderr": null,
+    "productionLugStressStdout": null,
+    "productionLugStressStderr": "file:///home/runner/work/Advanced_Analysis/Advanced_Analysis/src/workspace/lafea-canonical-sha256.js:26\n  if (typeof value !== 'object') throw new TypeError(`${path} contains non-JSON data.`);\n                                       ^\n\nTypeError: $.failingLocations[0].classification contains non-JSON data.\n    at stringifyValue (file:///home/runner/work/Advanced_Analysis/Advanced_Analysis/src/workspace/lafea-canonical-sha256.js:26:40)\n    at file:///home/runner/work/Advanced_Analysis/Advanced_Analysis/src/workspace/lafea-canonical-sha256.js:55:40\n    at Array.map (<anonymous>)\n    at stringifyValue (file:///home/runner/work/Advanced_Analysis/Advanced_Analysis/src/workspace/lafea-canonical-sha256.js:52:24)\n    at stringifyValue (file:///home/runner/work/Advanced_Analysis/Advanced_Analysis/src/workspace/lafea-canonical-sha256.js:42:19)\n    at file:///home/runner/work/Advanced_Analysis/Advanced_Analysis/src/workspace/lafea-canonical-sha256.js:55:40\n    at Array.map (<anonymous>)\n    at stringifyValue (file:///home/runner/work/Advanced_Analysis/Advanced_Analysis/src/workspace/lafea-canonical-sha256.js:52:24)\n    at canonicalLafeaJson (file:///home/runner/work/Advanced_Analysis/Advanced_Analysis/src/workspace/lafea-canonical-sha256.js:11:10)\n    at canonicalLafeaSha256 (file:///home/runner/work/Advanced_Analysis/Advanced_Analysis/src/workspace/lafea-canonical-sha256.js:15:40)\n\nNode.js v22.23.1",
+    "kirschStderr": null
   },
   "firstFailure": "productionLugStress",
   "status": "BLOCKED"
