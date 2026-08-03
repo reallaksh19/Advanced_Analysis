@@ -109,7 +109,8 @@
     "frozen_oracle_status": "COMPLETE_DEFINITION_SET",
     "registry": "validation/bucket-01/11-expected-value-registry.json",
     "contract_check": "scripts/lafea-bucket-01-expected-value-registry-check.mjs",
-    "independent_closed_form_oracle_count": 5,
+    "independent_closed_form_oracle_count": 4,
+    "independent_engineering_theory_oracle_count": 1,
     "frozen_production_convergence_definition_count": 2,
     "hash_authority": [
       "GIT_BLOB_SHA",
@@ -137,7 +138,7 @@
     {
       "benchmark_id": "C2D-CANTILEVER-PLANE-STRESS-01",
       "script": "scripts/lafea-bucket-01-cantilever-check.mjs",
-      "expected_value_definition": "EMBEDDED_FROZEN_DEFINITION_HASHED_IN_RECEIPT"
+      "oracle": "validation/bucket-01/12-cantilever-oracle.json"
     },
     {
       "benchmark_id": "C2D-PURE-BENDING-PANEL-T6-01",
