@@ -1,0 +1,69 @@
+{
+  "schema": "lafea-bucket-01-probe-stable-candidate-intake-policy/v2",
+  "policyId": "B01-PROBE-STABLE-CANDIDATE-INTAKE-01",
+  "benchmarkId": "C2D-LUG-PINHOLE-01",
+  "sourceDesignId": "B01-PROBE-STABLE-POLAR-V1",
+  "candidatePackageSchema": "lafea-bucket-01-probe-stable-candidate-mesh-package/v1",
+  "candidateTopologyReportSchema": "lafea-bucket-01-probe-stable-candidate-topology-report/v1",
+  "candidateValidationEvidenceSchema": "lafea-bucket-01-probe-stable-candidate-validation-evidence/v1",
+  "topologyValidationEvidenceSchema": "lafea-bucket-01-probe-stable-topology-validation-evidence/v1",
+  "expectedLocationCount": 7,
+  "minimumCandidateNaturalMargin": 0.05,
+  "expectedLevels": [
+    {
+      "ordinal": 1,
+      "radialCellCount": 12,
+      "circumferentialCellCount": 20,
+      "elementCount": 480
+    },
+    {
+      "ordinal": 2,
+      "radialCellCount": 17,
+      "circumferentialCellCount": 35,
+      "elementCount": 1190
+    },
+    {
+      "ordinal": 3,
+      "radialCellCount": 30,
+      "circumferentialCellCount": 68,
+      "elementCount": 4080
+    },
+    {
+      "ordinal": 4,
+      "radialCellCount": 53,
+      "circumferentialCellCount": 132,
+      "elementCount": 13992
+    }
+  ],
+  "requiredTopologyAssertions": [
+    "ALL_LOCATIONS_UNIQUE",
+    "ALL_COORDINATES_FROZEN",
+    "EXACTLY_ONE_CONTAINING_ELEMENT_PER_LOCATION",
+    "ALL_POINT_JACOBIANS_POSITIVE",
+    "TRIANGLE_SIDE_STABLE_ACROSS_LEVELS",
+    "ORIENTATION_STABLE_ACROSS_LEVELS",
+    "RADIAL_AND_CIRCUMFERENTIAL_LINEAGE_COMPATIBLE",
+    "NO_LOCATION_ON_NODE_EDGE_FEATURE_LINE_OR_DIAGONAL",
+    "NATURAL_COORDINATE_DRIFT_REPORTED"
+  ],
+  "requiredExecutedValidation": [
+    "CANDIDATE_MESH_PACKAGE_REBUILT",
+    "RADIAL_AND_CIRCUMFERENTIAL_COORDINATE_HASHES_REBUILT",
+    "FEATURE_SET_HASHES_REBUILT",
+    "QUALITY_HASHES_REBUILT",
+    "LOCATION_RECORDS_REBUILT",
+    "TOPOLOGY_ASSERTIONS_RECOMPUTED"
+  ],
+  "authority": {
+    "candidateOnlyRequired": true,
+    "independentCheckerExecutionRequired": true,
+    "solverExecutionRequired": false,
+    "productionSwitchAuthorized": false,
+    "productionMeshAuthority": false,
+    "stressAcceptanceAuthority": false,
+    "qualificationAuthority": false,
+    "bucketQualified": false
+  },
+  "acceptedDisposition": "CANDIDATE_ACCEPTED_FOR_PHASE_2C_INTEGRATION_REVIEW",
+  "currentDisposition": "POLICY_FROZEN_PENDING_PHASE_2B_CANDIDATE_AND_REBUILD_EVIDENCE"
+}

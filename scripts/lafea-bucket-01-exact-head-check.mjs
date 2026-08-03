@@ -18,8 +18,16 @@ const expectedHead = process.env.EXPECTED_HEAD_SHA?.trim()
   || exactHead;
 const checks = [];
 
-recordAssertion('EXACT_HEAD', exactHead === expectedHead, `Expected ${expectedHead}; checked out ${exactHead}.`);
-recordAssertion('BASELINE_IN_ANCESTRY', isAncestor(BASELINE_SHA, exactHead), `Baseline ${BASELINE_SHA} is not in current ancestry.`);
+recordAssertion(
+  'EXACT_HEAD',
+  exactHead === expectedHead,
+  `Expected ${expectedHead}; checked out ${exactHead}.`,
+);
+recordAssertion(
+  'BASELINE_IN_ANCESTRY',
+  isAncestor(BASELINE_SHA, exactHead),
+  `Baseline ${BASELINE_SHA} is not in current ancestry.`,
+);
 
 for (const check of [
   nodeCheck('MANDATORY_BENCHMARK_LADDER', 'scripts/lafea-bucket-01-benchmark-ladder-check.mjs'),
@@ -30,6 +38,7 @@ for (const check of [
   nodeCheck('GOVERNED_4096_DIRECT_POINT_LOCATION_CONTRACT', 'scripts/lafea-bucket-01-production-lug-probe-contract-check.mjs'),
   nodeCheck('GOVERNED_PROBE_TOPOLOGY_OBSERVABILITY', 'scripts/lafea-bucket-01-probe-topology-check.mjs'),
   nodeCheck('PROBE_STABLE_POLAR_MESH_DESIGN', 'scripts/lafea-bucket-01-probe-stable-mesh-design-check.mjs'),
+  nodeCheck('PROBE_STABLE_CANDIDATE_INTAKE_CONTRACT', 'scripts/lafea-bucket-01-probe-stable-candidate-intake-contract-check.mjs'),
   nodeCheck('EXPECTED_VALUE_DEFINITION_SET', 'scripts/lafea-bucket-01-expected-value-registry-check.mjs'),
   nodeCheck('CODE_BASIS_INTAKE_CONTRACT', 'scripts/lafea-bucket-01-code-basis-check.mjs'),
   nodeCheck('THREE_REPLAY_CUSTODY_CONTRACT', 'scripts/lafea-bucket-01-replay-custody-check.mjs'),
@@ -43,22 +52,38 @@ for (const check of [
   npmCheck('IMPORT_BOUNDARIES', 'check:imports'),
   npmCheck('PRODUCTION_BUILD', 'build'),
 ]) runCheck(check);
-runCheck({ id: 'PATCH_HYGIENE', command: 'git', args: ['diff', '--check', `${BASELINE_SHA}...${exactHead}`] });
-const trackedStatus = git(['status', '--porcelain=v1', '--untracked-files=no']);
-recordAssertion('TRACKED_WORKTREE_CLEAN', trackedStatus === '', trackedStatus || 'Tracked worktree is clean.');
+runCheck({
+  id: 'PATCH_HYGIENE',
+  command: 'git',
+  args: ['diff', '--check', `${BASELINE_SHA}...${exactHead}`],
+});
+const trackedStatus = git([
+  'status', '--porcelain=v1', '--untracked-files=no',
+]);
+recordAssertion(
+  'TRACKED_WORKTREE_CLEAN',
+  trackedStatus === '',
+  trackedStatus || 'Tracked worktree is clean.',
+);
 
 const failures = checks.filter((check) => check.status !== 'PASS');
 const executableEvidencePass = failures.length === 0;
 const report = {
-  schema: 'lafea-bucket-01-exact-head-report/v14',
-  status: executableEvidencePass ? 'EXACT_HEAD_REPAIR_EVIDENCE_PASS' : 'EXACT_HEAD_REPAIR_EVIDENCE_BLOCKED',
+  schema: 'lafea-bucket-01-exact-head-report/v15',
+  status: executableEvidencePass
+    ? 'EXACT_HEAD_REPAIR_EVIDENCE_PASS'
+    : 'EXACT_HEAD_REPAIR_EVIDENCE_BLOCKED',
   exactHead,
   expectedHead,
   baselineSha: BASELINE_SHA,
   bucketId: 'LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE',
   target: 'C2D-LUG-PINHOLE -> LAFEA.3',
-  manifestGitBlobSha: git(['hash-object', 'validation/bucket-01/01-benchmark-manifest.json']),
-  gapMatrixGitBlobSha: git(['hash-object', 'validation/bucket-01/02-requirement-to-code-gap-matrix.json']),
+  manifestGitBlobSha: git([
+    'hash-object', 'validation/bucket-01/01-benchmark-manifest.json',
+  ]),
+  gapMatrixGitBlobSha: git([
+    'hash-object', 'validation/bucket-01/02-requirement-to-code-gap-matrix.json',
+  ]),
   checks,
   blockingCheckIds: failures.map((check) => check.id),
   unresolvedQualificationGates: [
@@ -88,7 +113,9 @@ const report = {
     governedDirectPointStressRouteImplemented: true,
     governedProbeTopologyObservabilityImplemented: true,
     probeStablePolarMeshDesignImplemented: true,
+    probeStableCandidateIntakeContractImplemented: true,
     probeStablePolarMeshProductionAuthority: false,
+    probeStableCandidateProductionSwitchAuthorized: false,
     productionLugFixedProbeContractImplemented: true,
     expectedValueDefinitionSetImplemented: true,
     codeBasisIntakeContractImplemented: true,
@@ -117,8 +144,12 @@ fs.writeFileSync(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 console.log(JSON.stringify(report));
 if (!executableEvidencePass) process.exit(1);
 
-function nodeCheck(id, script) { return { id, command: process.execPath, args: [script] }; }
-function npmCheck(id, script) { return { id, command: 'npm', args: ['run', script] }; }
+function nodeCheck(id, script) {
+  return { id, command: process.execPath, args: [script] };
+}
+function npmCheck(id, script) {
+  return { id, command: 'npm', args: ['run', script] };
+}
 function runCheck(check) {
   const result = spawnSync(check.command, check.args, {
     cwd: ROOT,
@@ -139,20 +170,40 @@ function normalizeCapturedOutput(value) {
   if (typeof value !== 'string' || !value.trim()) return null;
   const normalized = value
     .replace(/\u001b\[[0-9;]*m/gu, '')
-    .replace(/\bbuilt in \d+(?:\.\d+)?(?:ms|s)\b/giu, 'built in <duration>')
-    .replace(/\bcompleted in \d+(?:\.\d+)?(?:ms|s)\b/giu, 'completed in <duration>')
+    .replace(
+      /\bbuilt in \d+(?:\.\d+)?(?:ms|s)\b/giu,
+      'built in <duration>',
+    )
+    .replace(
+      /\bcompleted in \d+(?:\.\d+)?(?:ms|s)\b/giu,
+      'completed in <duration>',
+    )
     .replace(/\r\n/gu, '\n')
     .trim();
   return normalized || null;
 }
 function recordAssertion(id, accepted, message) {
-  checks.push({ id, command: null, status: accepted ? 'PASS' : 'FAIL', exitCode: accepted ? 0 : 1, stdout: null, stderr: null, error: accepted ? null : message });
+  checks.push({
+    id,
+    command: null,
+    status: accepted ? 'PASS' : 'FAIL',
+    exitCode: accepted ? 0 : 1,
+    stdout: null,
+    stderr: null,
+    error: accepted ? null : message,
+  });
 }
 function isAncestor(ancestor, descendant) {
-  return spawnSync('git', ['merge-base', '--is-ancestor', ancestor, descendant], { cwd: ROOT, encoding: 'utf8' }).status === 0;
+  return spawnSync(
+    'git',
+    ['merge-base', '--is-ancestor', ancestor, descendant],
+    { cwd: ROOT, encoding: 'utf8' },
+  ).status === 0;
 }
 function git(args) {
   const result = spawnSync('git', args, { cwd: ROOT, encoding: 'utf8' });
-  if (result.status !== 0) throw new Error(result.stderr.trim() || `git ${args.join(' ')} failed.`);
+  if (result.status !== 0) {
+    throw new Error(result.stderr.trim() || `git ${args.join(' ')} failed.`);
+  }
   return result.stdout.trim();
 }
