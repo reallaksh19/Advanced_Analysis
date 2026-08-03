@@ -39,7 +39,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Patch solver and expose Kirsch convergence evidence
+      - name: Apply solver headroom and geometric ring grading
         shell: bash
         run: |
           python - <<'PY'
@@ -53,10 +53,6 @@ jobs:
           declaration = block.index('  const residualTolerance = tolerance(')
           close = block.index('\n  );', declaration) + len('\n  );')
           block = block[:close] + '\n  const convergenceTarget = residualTolerance / 10;' + block[close:]
-          if block.count('finalResidualInfinity > residualTolerance') != 2:
-              raise SystemExit('unexpected upper comparison count')
-          if block.count('finalResidualInfinity <= residualTolerance') != 2:
-              raise SystemExit('unexpected lower comparison count')
           block = block.replace('finalResidualInfinity > residualTolerance', 'finalResidualInfinity > convergenceTarget')
           block = block.replace('finalResidualInfinity <= residualTolerance', 'finalResidualInfinity <= convergenceTarget')
           old = '`Sparse PCG residual ${finalResidualInfinity} exceeds ${residualTolerance} after ${iterations} iterations.`'
@@ -64,6 +60,22 @@ jobs:
           evidence = '      residualTolerance: canonicalNumber(residualTolerance),\n'
           block = block.replace(evidence, '      convergenceTarget: canonicalNumber(convergenceTarget),\n' + evidence)
           solver.write_text(text[:start] + block + text[end:])
+
+          mesh = Path('src/core/lafea-meshing/lug-pinhole-t6.js')
+          text = mesh.read_text()
+          old = """function radiusAt(spec, ring) {
+            return spec.holeRadius
+              + (spec.outerRadius - spec.holeRadius)
+                * ring / spec.radialDivisions;
+          }"""
+          new = """function radiusAt(spec, ring) {
+            const fraction = ring / spec.radialDivisions;
+            return spec.holeRadius
+              * (spec.outerRadius / spec.holeRadius) ** fraction;
+          }"""
+          if text.count(old) != 1:
+              raise SystemExit(f'radiusAt marker count={text.count(old)}')
+          mesh.write_text(text.replace(old, new))
 
           kirsch = Path('scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs')
           text = kirsch.read_text()
@@ -74,13 +86,16 @@ jobs:
           kirsch.write_text(text.replace(old, new))
           PY
 
+      - name: Validate annular mesh qualification
+        run: node scripts/lafea-bucket-01-mesh-qualification-check.mjs
+
       - name: Validate scalable sparse solver
         run: node scripts/lafea-bucket-01-scalable-solver-check.mjs
 
-      - name: Diagnose governed Kirsch fixed probes
+      - name: Run governed Kirsch fixed probes
+        id: kirsch
         env:
           EXPECTED_HEAD_SHA: ${{ github.sha }}
-          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           mkdir -p reports/qualification
@@ -88,13 +103,21 @@ jobs:
           node scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs \
             > reports/qualification/kirsch.stdout.log \
             2> reports/qualification/kirsch.stderr.log
-          exit_code=$?
-          if [[ "$exit_code" == "0" ]]; then
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Publish geometric grading result
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXIT_CODE: ${{ steps.kirsch.outputs.exit_code }}
+        shell: bash
+        run: |
+          if [[ "$EXIT_CODE" == "0" ]]; then
             gh api --method POST \
               "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
               -f state=success \
-              -f context="lafea/pcg-headroom-targeted" \
-              -f description="Scalable solver and Kirsch checks passed"
+              -f context="lafea/geometric-ring-grading" \
+              -f description="Mesh, solver and Kirsch qualification passed"
             exit 0
           fi
           detail=$(node -e "const fs=require('fs');const t=fs.readFileSync('reports/qualification/kirsch.stderr.log','utf8');const lines=t.split(/\r?\n/).map(s=>s.trim()).filter(s=>s&&!/^at\s/.test(s)&&!/^node:/.test(s));process.stdout.write(lines.slice(0,12).join(' | ').slice(0,3000))")
@@ -102,21 +125,16 @@ jobs:
           gh api --method POST \
             "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=failure \
-            -f context="lafea/kirsch-convergence-detail" \
-            -f description="Kirsch convergence evidence retained" \
+            -f context="lafea/geometric-grading-detail" \
+            -f description="Geometric ring grading Kirsch result" \
             -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
-          gh api --method POST \
-            "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -f state=failure \
-            -f context="lafea/bucket-01-exact-head" \
-            -f description="Kirsch convergence blocked"
-          exit "$exit_code"
+          exit "$EXIT_CODE"
 
       - name: Retain qualification reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lafea-bucket-01-kirsch-convergence-${{ github.sha }}
+          name: lafea-bucket-01-geometric-grading-${{ github.sha }}
           path: reports/qualification/
           if-no-files-found: warn
           retention-days: 30
