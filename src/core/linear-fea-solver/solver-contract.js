@@ -7,18 +7,13 @@ import { requireCanonicalNodeId } from '../linear-fea-contract/identifiers.js';
 /**
  * LFEA-B3.3 sparse-assembly-and-solver contracts.
  *
- * Section 8 asks for "sparse Cholesky for qualified positive-definite
- * systems" and this package is honest about what it actually built: assembly
- * is genuinely sparse (deterministic COO triplets, section 8's Assembly row),
- * but the factorization backend below is a direct dense/banded Cholesky-or-
- * LDLT implemented in pure JS for the benchmark and single-system scale this
- * release targets (single-digit to low-hundreds of DOFs). The backend
- * identity below names that plainly — `FEA_DENSE_DIRECT_CHOLESKY_LDLT_V1` —
- * rather than claiming the production sparse-matrix solver the illustrative
- * `solverProfile.backend` string in section 13 names. No numerical gate is
- * weakened by that choice: the qualification thresholds in section 8.1 are
- * enforced exactly as declared, against the real factorization this package
- * performs.
+ * The package exposes two honestly named direct backends. The retained dense
+ * Cholesky/LDLT implementation remains selectable as a numerical reference.
+ * The production default is the existing Map-backed sparse Cholesky/LDLT
+ * implementation from `lafea-linear-solve`. The sealed solver profile names
+ * the backend explicitly, and that declaration participates in the profile's
+ * semantic hash; there is no size heuristic, environment switch or hidden
+ * backend fallback.
  */
 
 export const SOLVER_PROFILE_SCHEMA = 'fea-linear-solver-profile/v1';
@@ -27,9 +22,13 @@ export const EXECUTION_SCHEMA = 'fea-linear-execution/v1';
 
 export const SOLVER_PROFILE_ID = 'LINEAR-SOLVER-R1';
 
-/** Section 8 Factorization / section 13 solverProfile.backend, named honestly (see module doc). */
+/** Section 8 Factorization / section 13 solverProfile.backend, named honestly. */
 export const DENSE_DIRECT_BACKEND_ID = 'FEA_DENSE_DIRECT_CHOLESKY_LDLT_V1';
-export const SUPPORTED_BACKENDS = Object.freeze([DENSE_DIRECT_BACKEND_ID]);
+export const SPARSE_DIRECT_BACKEND_ID = 'FEA_SPARSE_DIRECT_CHOLESKY_LDLT_V1';
+export const SUPPORTED_BACKENDS = Object.freeze([
+  DENSE_DIRECT_BACKEND_ID,
+  SPARSE_DIRECT_BACKEND_ID,
+]);
 
 /** Section 8 Scaling / section 13 solverProfile.scaling. */
 export const DIAGONAL_ENERGY_SCALING_ID = 'DIAGONAL_ENERGY_SCALING_V1';
@@ -92,10 +91,12 @@ export const EXECUTION_RECORD_KEYS = Object.freeze([
 
 export const ASSEMBLY_KEYS = Object.freeze([
   'tripletCount',
+  'lowerTriangleNonzeroCount',
   'elementCount',
   'springCount',
   'constrainedDofCount',
   'freeDofCount',
+  'symmetryResidual',
   'partitionHash',
 ]);
 
@@ -105,7 +106,11 @@ export const FACTORIZATION_KEYS = Object.freeze([
   'cacheKey',
   'reused',
   'kind',
+  'pivotStatistics',
   'conditionEstimate',
+  'conditionEstimateMethod',
+  'conditionEstimateEvidence',
+  'scaleFactors',
 ]);
 
 export const DIAGNOSTICS_KEYS = Object.freeze([

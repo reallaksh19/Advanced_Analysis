@@ -131,7 +131,7 @@ export function solverProfile(overrides = {}) {
   return sealSolverProfile({
     schema: 'fea-linear-solver-profile/v1',
     profileId: 'LINEAR-SOLVER-R1',
-    backend: 'FEA_DENSE_DIRECT_CHOLESKY_LDLT_V1',
+    backend: 'FEA_SPARSE_DIRECT_CHOLESKY_LDLT_V1',
     scaling: 'DIAGONAL_ENERGY_SCALING_V1',
     momentReferenceRule: 'FIRST_CANONICAL_NODE_V1',
     normalizedResidualLimit: { value: 1e-9, source: 'LFEA-B3.3-FIXTURE-PROFILE' },

@@ -1,3 +1,5 @@
+import { sparseCholeskySolve } from '../lafea-linear-solve/sparse-cholesky.js';
+import { sparseLdltSolve } from '../lafea-linear-solve/sparse-ldlt.js';
 import { semanticHash } from '../shared-piping-model/canonical-json.js';
 import { deepFreeze } from '../shared-piping-model/immutable.js';
 import { DOF_ORDER } from '../linear-fea-contract/conventions.js';
@@ -18,11 +20,12 @@ import {
   worstStatus,
 } from './qualification.js';
 import {
-  DENSE_DIRECT_BACKEND_ID,
   EXECUTION_RECORD_KEYS,
   EXECUTION_SCHEMA,
   EXECUTION_STATUSES,
   SOLVER_PROFILE_ID,
+  SPARSE_DIRECT_BACKEND_ID,
+  SUPPORTED_BACKENDS,
   compareAscii,
   fail,
   requireArray,
@@ -103,9 +106,16 @@ function resolvePrescribedValues(constrained, loadCase) {
 
 function solveScaledSystem(factorization, rhs) {
   const scaledRhs = applyDiagonalScalingToVector(rhs, factorization.scaling.factors);
-  const scaledSolution = factorization.kind === 'CHOLESKY'
-    ? solveCholesky(factorization.L, factorization.m, scaledRhs)
-    : solveLdlt(factorization.L, factorization.D, factorization.m, scaledRhs);
+  let scaledSolution;
+  if (factorization.backend === SPARSE_DIRECT_BACKEND_ID) {
+    scaledSolution = factorization.kind === 'CHOLESKY'
+      ? sparseCholeskySolve(factorization.sparseFactor, scaledRhs)
+      : sparseLdltSolve(factorization.sparseFactor, scaledRhs);
+  } else {
+    scaledSolution = factorization.kind === 'CHOLESKY'
+      ? solveCholesky(factorization.L, factorization.m, scaledRhs)
+      : solveLdlt(factorization.L, factorization.D, factorization.m, scaledRhs);
+  }
   return applyDiagonalScalingToVector(scaledSolution, factorization.scaling.factors);
 }
 
@@ -125,11 +135,11 @@ function canonicalEntries(vector, dofMap, nodeIds) {
  * record (sections 8, 8.1, 9 displacement/reaction).
  *
  * Factorization reuse (section 7.2) is keyed by `stiffnessStateHash` and an
- * independently-computed constrained-partition hash; passing the same
- * `cache` across two calls whose model and partition are unchanged reuses the
- * same factorization object (provable by `===` on the returned
- * `factorizationHandle`), and a changed stiffness state or partition always
- * misses the cache.
+ * independently-computed constrained-partition hash; backend variants are
+ * segregated inside that key. Passing the same `cache` across two calls whose
+ * model, partition and declared backend are unchanged reuses the same
+ * factorization object, while a changed stiffness state, partition or backend
+ * always misses the corresponding cache variant.
  *
  * @param {object} args
  * @param {Readonly<object>} args.compilation Sealed `fea-linear-mechanical-model-compilation/v1`.
@@ -171,9 +181,18 @@ export function compileSolverExecution({ compilation, elementContributions, load
 
   const activeCache = cache ?? createFactorizationCache();
   const partitionKey = `${acceptedCompilation.stiffnessStateHash}:${assembly.partitionHash}`;
-  const { factorization, reused } = getOrFactorize(activeCache, partitionKey, () => factorizeFreePartition({
-    model, dofMap, assembly, policies,
-  }));
+  const { factorization, reused } = getOrFactorize(
+    activeCache,
+    partitionKey,
+    acceptedProfile.backend,
+    () => factorizeFreePartition({
+      model,
+      dofMap,
+      assembly,
+      policies,
+      backend: acceptedProfile.backend,
+    }),
+  );
 
   const Uf = solveScaledSystem(factorization, Ffree);
   assembly.freeIndices.forEach((index, row) => { Ufull[index] = Uf[row]; });
@@ -220,10 +239,12 @@ export function compileSolverExecution({ compilation, elementContributions, load
     dofMap,
     assembly: {
       tripletCount: assembly.tripletCount,
+      lowerTriangleNonzeroCount: assembly.lowerTriangleNonzeroCount,
       elementCount: assembly.elementCount,
       springCount: assembly.springCount,
       constrainedDofCount: assembly.constrained.length,
       freeDofCount: assembly.freeIndices.length,
+      symmetryResidual: assembly.symmetryResidual,
       partitionHash: assembly.partitionHash,
     },
     factorization: {
@@ -232,7 +253,10 @@ export function compileSolverExecution({ compilation, elementContributions, load
       cacheKey: partitionKey,
       reused,
       kind: factorization.kind,
+      pivotStatistics: factorization.pivotStatistics,
       conditionEstimate: factorization.conditionEstimate,
+      conditionEstimateMethod: factorization.conditionEstimateMethod,
+      conditionEstimateEvidence: factorization.conditionEstimateEvidence,
       scaleFactors: scaleFactorEntries,
     },
     displacement: displacementEntries,
@@ -306,9 +330,7 @@ export function requireSolverExecution(record) {
   requireArray(record.reactions, 'execution.reactions', CODE);
   record.reactions.forEach((entry, index) => requireVector6(entry, `execution.reactions[${index}]`));
   requireMember(record.status, EXECUTION_STATUSES, 'execution.status', CODE);
-  if (record.factorization.backend !== DENSE_DIRECT_BACKEND_ID) {
-    fail(`execution.factorization.backend must be ${DENSE_DIRECT_BACKEND_ID}.`, CODE);
-  }
+  requireMember(record.factorization.backend, SUPPORTED_BACKENDS, 'execution.factorization.backend', CODE);
   if (record.executionHash !== record.semanticHash) fail('execution.executionHash must equal execution.semanticHash.', CODE);
   if (record.semanticHash !== computeExecutionSemanticHash(record)) fail('execution.semanticHash is stale.', 'SOLVER_HASH_MISMATCH');
   if (record.evidenceHash !== computeExecutionEvidenceHash(record)) fail('execution.evidenceHash is stale.', 'SOLVER_HASH_MISMATCH');

@@ -158,16 +158,17 @@ function partitionDofs(model, dofMap) {
 }
 
 /**
- * Assemble the global system for one bound mechanical model (section 8:
- * DOF indexing, Assembly, Boundary conditions, Scaling identity carried by
- * the caller). Returns the dense global stiffness, the summed physical
- * element load vector, the DOF partition and the assembly evidence.
+ * Assemble the global system for one bound mechanical model. The canonical,
+ * deduplicated coordinate entries are retained for sparse factorization. A
+ * dense copy is also retained only for the existing qualification, reaction
+ * and energy-evidence layer; it is not the production factorization input
+ * when the sparse backend is selected.
  *
  * @param {object} args
  * @param {Readonly<object>} args.model Sealed `fea-linear-model/v1`.
  * @param {Readonly<object>} args.dofMap Section 8 DOF map for this model.
  * @param {Array<object>} args.elementContributions Normalized contributions, one per model element.
- * @returns {Readonly<object>} Assembly evidence plus the dense `K` and `elementLoad` arrays.
+ * @returns {Readonly<object>} Assembly evidence, canonical triplets, dense qualification `K` and load arrays.
  */
 export function assembleGlobalSystem({ model, dofMap, elementContributions }) {
   const n = dofMap.dofCount;
@@ -178,12 +179,18 @@ export function assembleGlobalSystem({ model, dofMap, elementContributions }) {
   const K = denseFromTriplets(n, summed);
   const symmetryResidual = assertSymmetric(K, n);
   const partition = partitionDofs(model, dofMap);
+  const retainedTriplets = Object.freeze(summed.map((triplet) => Object.freeze({ ...triplet })));
+  const lowerTriangleNonzeroCount = retainedTriplets
+    .filter((triplet) => triplet.row >= triplet.col && triplet.value !== 0)
+    .length;
 
   return Object.freeze({
     n,
     K,
+    triplets: retainedTriplets,
     elementLoad: elementResult.elementLoad,
-    tripletCount: summed.length,
+    tripletCount: retainedTriplets.length,
+    lowerTriangleNonzeroCount,
     elementCount: elementResult.elementIds.length,
     springCount: springResult.springs.length,
     symmetryResidual,
