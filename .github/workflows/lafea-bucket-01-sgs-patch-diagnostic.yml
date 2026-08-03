@@ -1,0 +1,68 @@
+name: LAFEA Bucket-01 SGS Patch Diagnostic
+
+on:
+  push:
+    branches: [bucket-01-sgs-patch-lab]
+
+permissions:
+  statuses: write
+  contents: read
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Diagnose patch stages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          post() {
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -f state="$1" -f context="lafea/sgs-patch/$2" -f description="$3"
+          }
+          post pending EXTRACT "Extracting SGS source patches"
+          python - <<'PY'
+          import re, textwrap
+          from pathlib import Path
+          s=Path('.github/workflows/lafea-bucket-01-sgs-lab.yml').read_text()
+          b=re.findall(r"          python - <<'PY'\n(.*?)\n          PY",s,re.S)
+          if len(b)!=2: raise RuntimeError(f'blocks={len(b)}')
+          Path('/tmp/sgs1.py').write_text(textwrap.dedent(b[0]))
+          Path('/tmp/sgs2.py').write_text(textwrap.dedent(b[1]))
+          PY
+          post success EXTRACT "SGS patches extracted"
+          post pending SOURCE "Applying solver and mesher source patch"
+          python /tmp/sgs1.py
+          post success SOURCE "Solver and mesher patch applied"
+          post pending POLICY "Applying SGS policy bindings"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('validation/bucket-01/06-production-response-convergence-spec.json')
+          s=json.loads(p.read_text())
+          s['meshLadder'][2]['solverMethod']='DETERMINISTIC_SGS_PCG'
+          s['solverPolicy']['largeSystemMethod']='DETERMINISTIC_SGS_PCG'
+          s['solverPolicy']['preconditioner']='SYMMETRIC_GAUSS_SEIDEL'
+          p.write_text(json.dumps(s,indent=2)+'\n')
+          p=Path('scripts/lafea-bucket-01-production-response-receipt.mjs')
+          t=p.read_text()
+          old="  assert.equal(definition.solverMethod, 'DETERMINISTIC_JACOBI_PCG');\n  assert.equal(solverEvidence.preconditioner, 'JACOBI');"
+          new="  assert.equal(definition.solverMethod, 'DETERMINISTIC_SGS_PCG');\n  assert.equal(solverEvidence.preconditioner, 'SYMMETRIC_GAUSS_SEIDEL');"
+          if t.count(old)!=1: raise RuntimeError(f'receipt={t.count(old)}')
+          p.write_text(t.replace(old,new,1))
+          p=Path('src/workspace/lafea-bucket-01-production-response.js')
+          t=p.read_text(); old="  'DETERMINISTIC_JACOBI_PCG',"; new="  'DETERMINISTIC_SGS_PCG',"
+          if t.count(old)!=1: raise RuntimeError(f'response={t.count(old)}')
+          p.write_text(t.replace(old,new,1))
+          PY
+          post success POLICY "SGS policy bindings applied"
+          node --check src/core/local-continuum/solver.js
+          node --check scripts/lafea-bucket-01-production-response-receipt.mjs
+          node --check src/workspace/lafea-bucket-01-production-response.js
+          post success COMPLETE "SGS patch and policy syntax passed"
