@@ -22,6 +22,8 @@ const checkDefinitions = [
   { id: 'EXPECTED_VALUE_DEFINITION_SET', script: 'scripts/lafea-bucket-01-expected-value-registry-check.mjs' },
   { id: 'CODE_BASIS_INTAKE_CONTRACT', script: 'scripts/lafea-bucket-01-code-basis-check.mjs' },
   { id: 'THREE_REPLAY_CUSTODY_CONTRACT', script: 'scripts/lafea-bucket-01-replay-custody-check.mjs' },
+  { id: 'FINAL_ADJUDICATION_CONTRACT', script: 'scripts/lafea-bucket-01-final-adjudication-contract-check.mjs' },
+  { id: 'PATCH_V2_REGRESSION', script: 'scripts/lafea-bucket-01-patch-v2-regression-check.mjs' },
   { id: 'GOVERNED_T3_PATCH_RECEIPT', script: 'scripts/lafea-bucket-01-t3-patch-check.mjs' },
   { id: 'GOVERNED_PURE_SHEAR_RECEIPT', script: 'scripts/lafea-bucket-01-pure-shear-check.mjs' },
   { id: 'GOVERNED_PLANE_STRESS_CANTILEVER', script: 'scripts/lafea-bucket-01-cantilever-check.mjs' },
@@ -35,7 +37,7 @@ const checks = checkDefinitions.map((definition) => runNodeCheck(definition));
 const failed = checks.filter((check) => check.status !== 'PASS');
 const repairChecksPass = failed.length === 0;
 const report = {
-  schema: 'lafea-bucket-01-repair-check-report/v15',
+  schema: 'lafea-bucket-01-repair-check-report/v16',
   status: repairChecksPass ? 'REPAIR_CHECKS_PASS' : 'REPAIR_CHECKS_FAIL',
   bucketId: 'LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE',
   target: 'C2D-LUG-PINHOLE -> LAFEA.3',
@@ -57,6 +59,9 @@ const report = {
     codeBasisIntakeContractVerified: repairChecksPass,
     codeBasisAuthoritySupplied: false,
     threeReplayCustodyContractVerified: repairChecksPass,
+    finalAdjudicationContractVerified: repairChecksPass,
+    patchV2RegressionVerified: repairChecksPass,
+    governedFourLevelReplayContractVerified: repairChecksPass,
     externalReplayBundlesSupplied: false,
     governedT3PatchOracleFrozen: true,
     governedT3PatchEvidenceGenerated: repairChecksPass,
@@ -88,6 +93,8 @@ const report = {
     expectedValueDefinitionSetImplemented: repairChecksPass,
     codeBasisIntakeContractImplemented: repairChecksPass,
     threeReplayCustodyContractImplemented: repairChecksPass,
+    finalAdjudicationContractImplemented: repairChecksPass,
+    governedFourLevelReplayContractImplemented: repairChecksPass,
     governingCodeSelected: false,
     replayPassClaimedForRepositoryCandidate: false,
     governedT3PatchBenchmarkImplemented: repairChecksPass,
