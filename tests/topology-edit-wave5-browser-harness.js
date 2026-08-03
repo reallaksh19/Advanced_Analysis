@@ -51,7 +51,7 @@ export async function runTopologyEditWave5BrowserHarness(options = {}) {
   await frames(1);
   const lifecycle = {
     rendererReleased: backend.renderer === null,
-    animationFrameReleased: backend.animationFrameId === null,
+    animationFrameReleased: !backend.animationFrameId,
     mountedStateReleased: backend.isMounted === false,
     hostChildrenAfterDestroy: host.childElementCount,
     groupChildrenAfterDestroy: children(backend),
@@ -63,9 +63,9 @@ export async function runTopologyEditWave5BrowserHarness(options = {}) {
   if (pick.p95 > 100) failures.push('PICK_P95_BUDGET');
   if (navigationFrame.p95 > 33.3) failures.push('FRAME_P95_BUDGET');
   if (identityErrorCount) failures.push('PICK_IDENTITY_MISMATCH');
-  if (!lifecycle.rendererReleased || !lifecycle.animationFrameReleased ||
-      !lifecycle.mountedStateReleased || lifecycle.hostChildrenAfterDestroy ||
-      lifecycle.groupChildrenAfterDestroy) failures.push('LIFECYCLE_CLEANUP');
+  if (!lifecycle.rendererReleased || !lifecycle.animationFrameReleased
+      || !lifecycle.mountedStateReleased || lifecycle.hostChildrenAfterDestroy
+      || lifecycle.groupChildrenAfterDestroy) failures.push('LIFECYCLE_CLEANUP');
   const context = renderer?.getContext();
   return {
     schema: 'TopologyEditWave5BrowserEvidence.v1',
@@ -85,33 +85,78 @@ export async function runTopologyEditWave5BrowserHarness(options = {}) {
 }
 
 function largeModel(count) {
-  const elements = [{ id: 'probe-target', entityId: 'probe-target', type: 'component', x: -1000, y: -1000, z: 0,
-    pickTarget: { objectKind: 'component', objectId: 'probe-target' } }];
+  const elements = [{
+    id: 'probe-target',
+    entityId: 'probe-target',
+    type: 'component',
+    x: -1000,
+    y: -1000,
+    z: 0,
+    pickTarget: { objectKind: 'component', objectId: 'probe-target' },
+  }];
   const remaining = Math.max(0, count - 1);
   const side = Math.ceil(Math.sqrt(remaining));
   for (let index = 0; index < remaining; index += 1) {
     const id = `component-${String(index).padStart(6, '0')}`;
-    elements.push({ id, entityId: id, type: 'component', x: (index % side) * 100,
-      y: Math.floor(index / side) * 100, z: (index % 7) * 5,
-      pickTarget: { objectKind: 'component', objectId: id } });
+    elements.push({
+      id,
+      entityId: id,
+      type: 'component',
+      x: (index % side) * 100,
+      y: Math.floor(index / side) * 100,
+      z: (index % 7) * 5,
+      pickTarget: { objectKind: 'component', objectId: id },
+    });
   }
   const empty = Object.freeze({ elements: Object.freeze([]), segments: Object.freeze([]) });
-  return Object.freeze({ source: empty, draft: Object.freeze({ elements: Object.freeze(elements), segments: Object.freeze([]) }), supports: empty });
+  return Object.freeze({
+    source: empty,
+    draft: Object.freeze({ elements: Object.freeze(elements), segments: Object.freeze([]) }),
+    supports: empty,
+  });
 }
 
 function project(point, camera, host) {
-  const value = new THREE.Vector3(point.x, point.y, point.z).project(camer);
+  const value = new THREE.Vector3(point.x, point.y, point.z).project(camera);
   const rect = host.getBoundingClientRect();
-  return { x: rect.left + ((value.x + 1) / 2) * rect.width,
-    y: rect.top + ((1 - value.y) / 2) * rect.height };
+  return {
+    x: rect.left + ((value.x + 1) / 2) * rect.width,
+    y: rect.top + ((1 - value.y) / 2) * rect.height,
+  };
 }
-function children(backend) { return Object.values(backend.groups).reduce((sum, group) => sum + group.children.length, 0); }
+
+function children(backend) {
+  return Object.values(backend.groups).reduce(
+    (sum, group) => sum + group.children.length,
+    0,
+  );
+}
+
 function summary(values) {
   const sorted = [...values].sort((a, b) => a - b);
-  const at = (p) => sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * p) - 1))] ?? 0;
-  return { count: sorted.length, min: round(sorted[0] ?? 0), max: round(sorted.at(-1) ?? 0),
+  const at = (p) => sorted[
+    Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * p) - 1))
+  ] ?? 0;
+  return {
+    count: sorted.length,
+    min: round(sorted[0] ?? 0),
+    max: round(sorted.at(-1) ?? 0),
     mean: round(sorted.reduce((sum, value) => sum + value, 0) / Math.max(sorted.length, 1)),
-    p50: round(at(0.5)), p95: round(at(0.95)), p99: round(at(0.99)) };
+    p50: round(at(0.5)),
+    p95: round(at(0.95)),
+    p99: round(at(0.99)),
+  };
 }
-function frames(count) { return new Promise((resolve) => { const next = (left) => left <= 0 ? resolve() : requestAnimationFrame(() => next(left - 1)); next(count); }); }
-function round(value) { return Number(Number(value).toFixed(3)); }
+
+function frames(count) {
+  return new Promise((resolve) => {
+    const next = (left) => left <= 0
+      ? resolve()
+      : requestAnimationFrame(() => next(left - 1));
+    next(count);
+  });
+}
+
+function round(value) {
+  return Number(Number(value).toFixed(3));
+}
