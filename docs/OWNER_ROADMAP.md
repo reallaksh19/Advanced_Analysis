@@ -644,7 +644,81 @@ arithmetic hand-verified.
   assertion `PASS`. Both `/tmp/m016-review` and `/tmp/m017-review`
   worktrees removed after verification.
 
-Both M016 and M017 are closed out. The Example 3 (moment reversal)
-benchmark itself — the actual reason M017 was built — is not yet
-scoped and is the next Work Pack to dispatch, mirroring the M014→M013
-pattern this whole sequence has followed.
+Both M016 and M017 are closed out.
+
+### M018 (#531) — Example 3 dispatched with fully cross-validated ground truth
+
+Rather than re-derive Example 3's geometry/loads from memory or from
+the single lossy schematic page used earlier, went back to the actual
+downloaded source material and read it directly: the real ASME
+B31.3-2006 Appendix S text (`scratchpad/appendix-s.pdf`, 33 pages —
+previously only pages 1–20 had been read; pages 21–33 turned out to
+contain the genuine code text, including Table S303.3's geometry and
+the real Tables S303.7.1/7.2/7.3), ROHR2's R013 verification report
+(`R2_Validate_13.pdf`), and the SIMFLEX-II independent reconstruction
+report bundled in the same PDF. All three sources were read in full
+and cross-checked against each other before writing anything into the
+issue — every load-bearing number in #531 has at least two independent
+confirmations:
+
+- **Geometry**: rebuilt node-by-node from Table S303.3's `From/To`/`Dx`/
+  `Dz` connectivity, cross-checked against ROHR2's own mm-dimensioned
+  figure and SIMFLEX-II's independent node list — all three agree
+  exactly. Found a structural fact easy to miss: this system lies in
+  the horizontal X-Z plane (`D_Y = 0` for every element, per the
+  table's own General Note), unlike Examples 1/2's vertical X-Y
+  systems — gravity acts perpendicular to the piping plane here, not
+  within it.
+- **Material**: ASTM A 53 Grade B, not A106 Grade B (Examples 1/2's
+  material) — confirmed directly from the ASME text and independently
+  from ROHR2's model data. Flagged explicitly in the issue since this
+  is exactly the kind of silent copy-paste-from-a-prior-example
+  mistake this mandate exists to catch before it reaches an agent.
+- **Reference results**: the real Tables S303.7.1 (Case 1 range),
+  S303.7.2 (Case 2 range, exact mirror image — the "moment reversal"),
+  and S303.7.3 (combined range, the real target for `EXPANSION_RANGE_
+  ENVELOPE`) transcribed directly from the ASME text, node by node.
+  Independently verified the `CASE_RANGE` sign convention by hand
+  before writing it into the issue: Table S303.7.3's node-30 values
+  equal Case 1 minus Case 2 exactly (`-78485 - 78485 = -156970` ✓,
+  `45900 - (-45900) = 91800` ✓) — so the fixture must declare
+  `fromCaseId` = Case 2, `toCaseId` = Case 1 to reproduce the
+  published table; got this backward once while checking and corrected
+  it before it went into the issue, since a flipped sign here would
+  have silently broken every downstream sign in the acceptance oracle.
+- **Sc/Sh (Eq. 1a/1b allowable inputs)**: no accessible Appendix A
+  Table A-1 was found for A53 Grade B, so back-solved them from the
+  2×2 linear system formed by the two independently-published `S_A`
+  values (Eq. 1a's 248.2 MPa, Eq. 1b's 379.8 MPa) plus the published
+  `S_L` and `f` — got `Sc≈137.86 MPa`, `Sh≈138.05 MPa`, an exact match
+  (within rounding) to ROHR2's independently-stated `Sc=Sh=137.9
+  N/mm²`. Documented the derivation explicitly in the issue and
+  required the agent to reproduce it, not just copy the resulting
+  numbers.
+- **Corrected #520's own earlier speculation**: #520 guessed Example 3
+  would need M015's `sustainedSectionResolution` wired in for a
+  corrosion-allowance-reduced `S_L`. Reading the real text now shows
+  Example 3 has zero corrosion allowance, so nominal section
+  properties already are the sustained properties — that capability,
+  while real and now wired by M017, isn't actually exercised by this
+  benchmark's numbers. Corrected in #531 rather than silently carried
+  forward.
+- **SIFs left for independent derivation**: rather than transcribe an
+  Appendix D welding-tee SIF formula from memory (the exact failure
+  mode that produced the earlier Appendix D/Appendix C mistakes this
+  session), the issue requires the agent to derive it from its own
+  accessible copy of Appendix D, with ROHR2's stated `i_i=3.42`/
+  `i_o=4.22` supplied only as a secondary cross-check, not the primary
+  source.
+
+Confirmed via `git show origin/main:package.json` that `check:lfea-b3.14`
+is the next free slot (after M016's `b3.13`), and via a direct read of
+`branch-component.js` that the TEE/branch junction model is real and
+classifies from direction vectors, not nominal diameter — consistent
+with #520's own claim that it needed no changes.
+
+This closes out the full Appendix S benchmarking arc the user asked
+for on 2026-08-03 ("benchmark another 2 or more cases before we move
+to a configurable prototype") — Examples 1, 2, and 3 are now all
+either merged (1, 2) or dispatched with fully-verified ground truth
+(3, #531).
