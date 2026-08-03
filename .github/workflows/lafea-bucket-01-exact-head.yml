@@ -1,4 +1,4 @@
-name: LAFEA Bucket-01 Production Build Diagnostic
+name: Core Application Chunk Profile
 
 on:
   push:
@@ -10,9 +10,9 @@ permissions:
   statuses: write
 
 jobs:
-  build:
+  profile:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,35 +22,50 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Run production build
+      - name: Profile unassigned core domains
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           mkdir -p reports/qualification
-          set +e
-          npm run build \
-            > reports/qualification/production-build.stdout.log \
-            2> reports/qualification/production-build.stderr.log
-          exit_code=$?
-          if [[ "$exit_code" == "0" ]]; then
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-              -f state=success -f context=lafea/production-build/PASS \
-              -f description="Production build passed"
-          else
-            detail=$(node -e "const fs=require('fs');const out=fs.readFileSync('reports/qualification/production-build.stdout.log','utf8');const err=fs.readFileSync('reports/qualification/production-build.stderr.log','utf8');const text=(out+'\n'+err).split(/\r?\n/).map(s=>s.trim()).filter(Boolean).slice(-30).join(' | ').slice(0,5000);process.stdout.write(text)")
-            encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
-            context=$(printf '%s' "$detail" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-62)
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-              -f state=failure -f context="lafea/production-build/${context}" \
-              -f description="Production build failed" \
-              -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
-          fi
-          exit "$exit_code"
+          node --input-type=module <<'NODE' > reports/qualification/core-chunk-profile.json
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import { manualChunk } from './vite.config.js';
+
+          const root = path.resolve('src/core');
+          const rows = new Map();
+          function walk(directory) {
+            for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+              const target = path.join(directory, entry.name);
+              if (entry.isDirectory()) walk(target);
+              else if (/\.(?:js|mjs|ts)$/u.test(entry.name)) {
+                const chunk = manualChunk(target);
+                if (chunk !== 'core-application') continue;
+                const relative = path.relative(root, target).replaceAll('\\', '/');
+                const domain = relative.includes('/') ? relative.split('/')[0] : '(root)';
+                const row = rows.get(domain) ?? { domain, bytes: 0, files: 0 };
+                row.bytes += fs.statSync(target).size;
+                row.files += 1;
+                rows.set(domain, row);
+              }
+            }
+          }
+          walk(root);
+          const profile = [...rows.values()].sort((a, b) => b.bytes - a.bytes);
+          console.log(JSON.stringify({ totalBytes: profile.reduce((s, r) => s + r.bytes, 0), profile }, null, 2));
+          NODE
+          detail=$(node -e "const p=require('./reports/qualification/core-chunk-profile.json');process.stdout.write(JSON.stringify({totalBytes:p.totalBytes,top:p.profile.slice(0,18)}))")
+          encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=failure \
+            -f context=lafea/core-chunk-profile/DETAIL \
+            -f description="Profiled core-application source domains" \
+            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lafea-production-build-${{ github.sha }}
+          name: core-application-chunk-profile-${{ github.sha }}
           path: reports/qualification/
           if-no-files-found: warn
           retention-days: 30
