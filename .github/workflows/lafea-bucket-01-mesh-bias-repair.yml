@@ -1,4 +1,4 @@
-name: LAFEA Bucket-01 Mesh Bias Repair
+name: LAFEA Bucket-01 Mesh Pattern Diagnostic
 
 on:
   push:
@@ -6,54 +6,60 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   statuses: write
 
 jobs:
-  repair:
+  pattern:
+    strategy:
+      fail-fast: false
+      matrix:
+        pattern:
+          - checkerboard-odd
+          - checkerboard-even
+          - sector-odd
+          - sector-even
+          - ring-odd
+          - ring-even
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: bucket-01-cantilever-benchmark-route
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Patch, validate, and publish alternating cell diagonals
+      - name: Execute deterministic mesh-pattern experiment
         env:
           GH_TOKEN: ${{ github.token }}
-          ORIGINAL_SHA: ${{ github.sha }}
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+          PATTERN: ${{ matrix.pattern }}
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p reports/qualification
-          status() {
-            state="$1"; context="$2"; description="$3"; target="${4:-}"
-            args=(--method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" -f state="$state" -f context="$context" -f description="$description")
-            if [[ -n "$target" ]]; then args+=(-f target_url="$target"); fi
-            gh api "${args[@]}"
-          }
-          fail() {
-            stage="$1"; log="$2"
-            detail=$(node -e "const fs=require('fs');const p=process.argv[1];const t=fs.existsSync(p)?fs.readFileSync(p,'utf8'):'missing log';process.stdout.write(t.trim().slice(-6000))" "$log")
-            encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
-            status failure "lafea/mesh-bias-repair/${stage}" "Mesh bias repair failed at ${stage}" "https://github.com/${GITHUB_REPOSITORY}/commit/${ORIGINAL_SHA}?lafea_error=${encoded}"
-            exit 1
-          }
-          status pending lafea/mesh-bias-repair "Testing alternating annular cell diagonals"
-          if grep -q 'const alternateDiagonal = (ring + sector) % 2 === 1;' src/core/lafea-meshing/lug-pinhole-t6.js; then
-            status success lafea/mesh-bias-repair "Alternating annular diagonals already applied"
-            exit 0
-          fi
+          context="lafea/mesh-pattern/${PATTERN}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=pending -f context="$context" \
+            -f description="Executing ${PATTERN} annular diagonals"
 
-          python - <<'PY' > reports/qualification/mesh-bias-patch.stdout.log 2> reports/qualification/mesh-bias-patch.stderr.log || true
+          python - <<'PY'
+          import os
           import re
           from pathlib import Path
 
+          expressions = {
+              'checkerboard-odd': '(ring + sector) % 2 === 1',
+              'checkerboard-even': '(ring + sector) % 2 === 0',
+              'sector-odd': 'sector % 2 === 1',
+              'sector-even': 'sector % 2 === 0',
+              'ring-odd': 'ring % 2 === 1',
+              'ring-even': 'ring % 2 === 0',
+          }
+          expression = expressions[os.environ['PATTERN']]
           source_path = Path('src/core/lafea-meshing/lug-pinhole-t6.js')
           text = source_path.read_text()
           pattern = re.compile(
@@ -66,93 +72,73 @@ jobs:
           if len(matches) != 1:
               raise RuntimeError(f'element split structural match count={len(matches)}')
           indent = matches[0].group('indent').split('\n')[-1]
-          ring = '{ring}'
-          sector = '{sector}'
+          ring_token = '{ring}'
+          sector_token = '{sector}'
           replacement = '\n'.join([
-              f'{indent}const alternateDiagonal = (ring + sector) % 2 === 1;',
+              f'{indent}const alternateDiagonal = {expression};',
               f'{indent}if (alternateDiagonal) {{',
-              f'{indent}  addT6Element(state, `E-R${ring}-S${sector}-A`, [',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-A`, [',
               f'{indent}    innerA, outerA, innerB,',
               f'{indent}  ]);',
-              f'{indent}  addT6Element(state, `E-R${ring}-S${sector}-B`, [',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-B`, [',
               f'{indent}    outerA, outerB, innerB,',
               f'{indent}  ]);',
               f'{indent}}} else {{',
-              f'{indent}  addT6Element(state, `E-R${ring}-S${sector}-A`, [',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-A`, [',
               f'{indent}    innerA, outerA, outerB,',
               f'{indent}  ]);',
-              f'{indent}  addT6Element(state, `E-R${ring}-S${sector}-B`, [',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-B`, [',
               f'{indent}    innerA, outerB, innerB,',
               f'{indent}  ]);',
               f'{indent}}}',
           ])
           source_path.write_text(pattern.sub(lambda _: replacement, text, count=1))
-
-          revision_files = []
-          for suffix in ('*.js', '*.mjs'):
-              for path in Path('.').rglob(suffix):
-                  if any(part in {'.git', 'node_modules', 'dist'} for part in path.parts):
-                      continue
-                  value = path.read_text()
-                  if 'NB-T6B.1' in value:
-                      path.write_text(value.replace('NB-T6B.1', 'NB-T6B.2'))
-                      revision_files.append(str(path))
-          print('\n'.join(sorted(set(revision_files))))
           PY
-          [[ -s reports/qualification/mesh-bias-patch.stderr.log ]] \
-            && fail PATCH reports/qualification/mesh-bias-patch.stderr.log
 
-          git add src/core/lafea-meshing/lug-pinhole-t6.js src/workspace scripts
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "fix(lafea): alternate annular cell diagonals" \
-            > reports/qualification/mesh-bias-commit.stdout.log \
-            2> reports/qualification/mesh-bias-commit.stderr.log \
-            || fail COMMIT reports/qualification/mesh-bias-commit.stderr.log
-          repaired_sha=$(git rev-parse HEAD)
-
-          EXPECTED_HEAD_SHA="$repaired_sha" node scripts/lafea-bucket-01-production-response-runner.mjs \
-            > reports/qualification/mesh-bias-execution.stdout.log \
-            2> reports/qualification/mesh-bias-execution.stderr.log \
-            || fail EXECUTION reports/qualification/mesh-bias-execution.stderr.log
+          node scripts/lafea-bucket-01-production-response-runner.mjs \
+            > "reports/qualification/${PATTERN}-runner.stdout.log" \
+            2> "reports/qualification/${PATTERN}-runner.stderr.log"
           set +e
-          EXPECTED_HEAD_SHA="$repaired_sha" node scripts/lafea-bucket-01-production-response-receipt.mjs \
-            > reports/qualification/mesh-bias-response.stdout.log \
-            2> reports/qualification/mesh-bias-response.stderr.log
-          response_exit=$?
+          node scripts/lafea-bucket-01-production-response-receipt.mjs \
+            > "reports/qualification/${PATTERN}-receipt.stdout.log" \
+            2> "reports/qualification/${PATTERN}-receipt.stderr.log"
+          receipt_exit=$?
           set -e
-          if [[ "$response_exit" != "0" ]]; then
-            log=reports/qualification/mesh-bias-response.stderr.log
-            [[ -s "$log" ]] || log=reports/qualification/mesh-bias-response.stdout.log
-            fail RESPONSE "$log"
+          summary=$(node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const report = JSON.parse(fs.readFileSync(
+            'reports/qualification/lafea-bucket-01-production-response.json',
+            'utf8',
+          ));
+          const value = {
+            pattern: process.env.PATTERN,
+            status: report.status,
+            fineGridGci: report.energyConvergence.fineGridGci,
+            observedOrder: report.energyConvergence.observedOrder,
+            energies: report.energyConvergence.observations,
+            reasons: report.reasons,
+          };
+          process.stdout.write(JSON.stringify(value));
+          NODE
+          )
+          gci=$(node -e "const r=JSON.parse(process.argv[1]);process.stdout.write(String(r.fineGridGci))" "$summary")
+          encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$summary")
+          if [[ "$receipt_exit" == "0" ]]; then
+            state=success
+            description="${PATTERN} passed; fine-grid GCI ${gci}"
+          else
+            state=failure
+            description="${PATTERN} blocked; fine-grid GCI ${gci}"
           fi
-          EXPECTED_HEAD_SHA="$repaired_sha" node scripts/lafea-bucket-01-production-lug-probe-receipt.mjs \
-            > reports/qualification/mesh-bias-lug.stdout.log \
-            2> reports/qualification/mesh-bias-lug.stderr.log \
-            || fail LUG reports/qualification/mesh-bias-lug.stderr.log
-          node scripts/lafea-nb-t6b-lug-pinhole-mesh-ladder-check.mjs \
-            > reports/qualification/mesh-bias-ladder.stdout.log \
-            2> reports/qualification/mesh-bias-ladder.stderr.log \
-            || fail LADDER reports/qualification/mesh-bias-ladder.stderr.log
-          node scripts/lafea-bucket-01-production-lug-probe-contract-check.mjs \
-            > reports/qualification/mesh-bias-probe-contract.stdout.log \
-            2> reports/qualification/mesh-bias-probe-contract.stderr.log \
-            || fail PROBE_CONTRACT reports/qualification/mesh-bias-probe-contract.stderr.log
-          EXPECTED_HEAD_SHA="$repaired_sha" node scripts/lafea-bucket-01-exact-head-check.mjs \
-            > reports/qualification/mesh-bias-exact-head.stdout.log \
-            2> reports/qualification/mesh-bias-exact-head.stderr.log \
-            || fail EXACT_HEAD reports/qualification/mesh-bias-exact-head.stderr.log
-
-          git push origin HEAD:bucket-01-cantilever-benchmark-route \
-            > reports/qualification/mesh-bias-push.stdout.log \
-            2> reports/qualification/mesh-bias-push.stderr.log \
-            || fail PUSH reports/qualification/mesh-bias-push.stderr.log
-          status success "lafea/repaired-head/${repaired_sha:0:12}" "Alternating annular diagonal repair published" "https://github.com/${GITHUB_REPOSITORY}/commit/${repaired_sha}"
-          status success lafea/mesh-bias-repair "Production response and probe gates passed"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state="$state" -f context="$context" \
+            -f description="$description" \
+            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_pattern=${encoded}"
+          exit "$receipt_exit"
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lafea-mesh-bias-repair-${{ github.sha }}
+          name: lafea-mesh-pattern-${{ matrix.pattern }}-${{ github.sha }}
           path: reports/qualification/
           if-no-files-found: warn
           retention-days: 30
