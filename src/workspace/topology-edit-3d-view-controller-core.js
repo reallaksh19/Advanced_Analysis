@@ -53,6 +53,10 @@ export class TopologyEdit3DViewController {
     this.pointerHandler = (event) => this.handleCanvasPointer(event);
   }
 
+  createViewportBackend() {
+    return new TopologyEditViewportBackend();
+  }
+
   async activate() {
     if (this.hostElement) return;
     this.hostElement = globalThis.document?.querySelector('[data-role="topology-edit-render-host"]');
@@ -60,7 +64,7 @@ export class TopologyEdit3DViewController {
     this.eventBus.publish(EVENT_TOPICS.TOPOLOGY_EDIT_3D_MODE_CHANGED, { active: true });
     this.buildShell();
     this.initializePresentation();
-    this.viewportBackend = new TopologyEditViewportBackend();
+    this.viewportBackend = this.createViewportBackend();
     this.viewportBackend.mount(this.canvasMount);
     this.presentationRuntime = new TopologyEditPresentationRuntime(this.viewportBackend);
     this.presentationRuntime.apply(this.presentationState);
