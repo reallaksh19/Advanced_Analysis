@@ -6,10 +6,13 @@
 
 This audit is the P0 read-only execution record for the programme defined by [`docs/Nonfeaplan.md`](./Nonfeaplan.md). It does not authorize P1–P7 production edits and does not claim an executed baseline from the connector environment.
 
-- Frozen programme base: `0bad5b4200a8e24a358e76b1ea8372da33485c87`
+- Original plan-preparation snapshot: `0bad5b4200a8e24a358e76b1ea8372da33485c87`
+- P0 current-main execution base: `58f0bf6b63f9e8e1b20582cd45a18a101ad75cc1`
 - Programme branch: `orchestrator/non-fea-workspace-hardening`
 - P1 delegated qualification Work Pack: [issue #541](https://github.com/reallaksh19/Advanced_Analysis/issues/541)
 - Production files changed by P0: **none**
+
+The P0 branch was synchronized with current `main` after M003 bounds stabilization, M019, and M004 merged. Those incoming production files are merge ancestry, not P0-authored scope.
 
 ## Implemented P0 evidence path
 
@@ -90,5 +93,5 @@ P0 is accepted only when:
 - stage/command/browser evidence is present;
 - all failures are classified exactly once;
 - the ownership matrix is accepted;
-- no production file changed;
+- no P0-authored production file changed;
 - the Owner explicitly accepts the baseline and authorizes subsequent production Work Packs.
