@@ -22,6 +22,7 @@ export const LAFEA_LUG_PINHOLE_MESH_LADDER_PRODUCER_REVISION = 'NB-T6B.1';
 
 const STAGE_ID = 'LAFEA.3';
 const TEMPLATE_ID = 'C2D-LUG-PINHOLE';
+const SUPPORTED_LEVEL_COUNTS = Object.freeze(new Set([3, 4]));
 const INTAKE_KEYS = Object.freeze([
   'schema', 'stageId', 'templateId', 'sourceHash', 'canonicalModelHash',
   'analysisGeometryHash', 'geometry', 'levels', 'producerRef',
@@ -44,11 +45,13 @@ const OUTPUT_KEYS = Object.freeze([
 ]);
 
 /**
- * Create the selected-pilot, three-level production T6 mesh ladder.
+ * Create the selected-pilot production T6 mesh ladder.
  *
- * The producer creates geometry-to-mesh evidence only. It does not create a
- * stage source, infer material/load/restraint mappings, execute LAFEA.3 or
- * register lifecycle descendants.
+ * The legacy pilot uses three levels. Bucket-01 may retain one additional
+ * governed refinement level while preserving the same geometry and authority
+ * contracts. The producer creates geometry-to-mesh evidence only. It does not
+ * create a stage source, infer mappings, execute LAFEA.3 or register lifecycle
+ * descendants.
  */
 export function createLafeaLugPinholeMeshLadder(intakeValue) {
   exactKeys(intakeValue, INTAKE_KEYS, 'lug-pinhole mesh ladder intake');
@@ -74,7 +77,8 @@ export function createLafeaLugPinholeMeshLadder(intakeValue) {
     throw ladderError('LAFEA_LUG_PINHOLE_ANALYSIS_GEOMETRY_HASH_MISMATCH');
   }
   const producerRef = text(intakeValue.producerRef, 'producerRef');
-  if (!Array.isArray(intakeValue.levels) || intakeValue.levels.length !== 3) {
+  if (!Array.isArray(intakeValue.levels)
+    || !SUPPORTED_LEVEL_COUNTS.has(intakeValue.levels.length)) {
     throw ladderError('LAFEA_LUG_PINHOLE_MESH_LADDER_THREE_LEVELS_REQUIRED');
   }
   const levels = [...intakeValue.levels]
@@ -275,14 +279,15 @@ function assertIncreasingLadder(levels) {
   const meshHashes = levels.map((level) => level.meshEvidence.meshHash);
   const errors = levels.map((level) =>
     level.meshPackage.quality.relativeAreaError);
-  if (!(elementCounts[0] < elementCounts[1]
-    && elementCounts[1] < elementCounts[2])) {
+  if (!elementCounts.every((count, index) =>
+    index === 0 || count > elementCounts[index - 1])) {
     throw ladderError('LAFEA_LUG_PINHOLE_MESH_LADDER_NOT_REFINED');
   }
-  if (new Set(meshHashes).size !== 3) {
+  if (new Set(meshHashes).size !== levels.length) {
     throw ladderError('LAFEA_LUG_PINHOLE_MESH_LADDER_HASH_NOT_DISTINCT');
   }
-  if (!(errors[1] <= errors[0] && errors[2] <= errors[1])) {
+  if (!errors.every((error, index) =>
+    index === 0 || error <= errors[index - 1])) {
     throw ladderError('LAFEA_LUG_PINHOLE_MESH_LADDER_GEOMETRY_ERROR_NOT_IMPROVING');
   }
 }
