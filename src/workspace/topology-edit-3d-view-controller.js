@@ -16,7 +16,6 @@ import {
   TopologyEditTypedViewportBackend,
   retainTypedTopologyEditPrimitives,
 } from './topology-edit/topology-edit-typed-viewport-backend.js';
-import { TopologyEditPresentationRuntime } from './viewport-presentation/topology-edit-presentation-runtime.js';
 
 export { buildAutofixPolicy } from './topology-edit-3d-view-controller-core.js';
 
@@ -48,6 +47,10 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
     });
   }
 
+  createViewportBackend() {
+    return new TopologyEditTypedViewportBackend();
+  }
+
   async activate() {
     await super.activate();
     this.installTypedViewportBackend();
@@ -62,14 +65,11 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
   }
 
   installTypedViewportBackend() {
-    if (this.viewportBackend instanceof TopologyEditTypedViewportBackend) return;
-    this.presentationRuntime?.destroy();
-    this.viewportBackend?.destroy();
-    this.viewportBackend = new TopologyEditTypedViewportBackend();
-    this.viewportBackend.mount(this.canvasMount);
-    this.presentationRuntime = new TopologyEditPresentationRuntime(this.viewportBackend);
-    this.presentationRuntime.apply(this.presentationState);
-    if (this.session) this.refreshView(this.session.currentTopology());
+    if (!(this.viewportBackend instanceof TopologyEditTypedViewportBackend)) {
+      throw new Error(
+        'TOPOLOGY_EDIT_TYPED_BACKEND_FACTORY_MISMATCH: Activation must mount the typed backend directly.',
+      );
+    }
   }
 
   deriveVisual(canonical, modelRole) {
