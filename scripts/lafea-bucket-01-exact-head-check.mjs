@@ -37,9 +37,9 @@ for (const check of [
   nodeCheck('GOVERNED_T6_KIRSCH_FIXED_PROBES', 'scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs'),
   nodeCheck('GOVERNED_4096_DIRECT_POINT_LOCATION_CONTRACT', 'scripts/lafea-bucket-01-production-lug-probe-contract-check.mjs'),
   nodeCheck('GOVERNED_PROBE_TOPOLOGY_OBSERVABILITY', 'scripts/lafea-bucket-01-probe-topology-check.mjs'),
-  nodeCheck('PROBE_STABLE_POLAR_MESH_DESIGN', 'scripts/lafea-bucket-01-probe-stable-mesh-design-check.mjs'),
-  nodeCheck('PROBE_STABLE_CANDIDATE_INTAKE_CONTRACT', 'scripts/lafea-bucket-01-probe-stable-candidate-intake-contract-check.mjs'),
-  nodeCheck('PROBE_STABLE_CANDIDATE_V2_INTAKE_REPLAY', 'scripts/lafea-bucket-01-probe-stable-candidate-v2-check.mjs'),
+  nodeCheck('PROBE_STABLE_POLAR_MESH_DESIGN_V3', 'scripts/lafea-bucket-01-probe-stable-mesh-design-check.mjs'),
+  nodeCheck('PROBE_STABLE_CANDIDATE_INTAKE_CONTRACT_V3', 'scripts/lafea-bucket-01-probe-stable-candidate-intake-contract-check.mjs'),
+  nodeCheck('PROBE_STABLE_CANDIDATE_V3_INTAKE_REPLAY', 'scripts/lafea-bucket-01-probe-stable-candidate-v3-check.mjs'),
   nodeCheck('EXPECTED_VALUE_DEFINITION_SET', 'scripts/lafea-bucket-01-expected-value-registry-check.mjs'),
   nodeCheck('CODE_BASIS_INTAKE_CONTRACT', 'scripts/lafea-bucket-01-code-basis-check.mjs'),
   nodeCheck('THREE_REPLAY_CUSTODY_CONTRACT', 'scripts/lafea-bucket-01-replay-custody-check.mjs'),
@@ -70,7 +70,7 @@ recordAssertion(
 const failures = checks.filter((check) => check.status !== 'PASS');
 const executableEvidencePass = failures.length === 0;
 const report = {
-  schema: 'lafea-bucket-01-exact-head-report/v16',
+  schema: 'lafea-bucket-01-exact-head-report/v17',
   status: executableEvidencePass
     ? 'EXACT_HEAD_REPAIR_EVIDENCE_PASS'
     : 'EXACT_HEAD_REPAIR_EVIDENCE_BLOCKED',
@@ -88,6 +88,8 @@ const report = {
   checks,
   blockingCheckIds: failures.map((check) => check.id),
   unresolvedQualificationGates: [
+    'PHASE_3A_INDEPENDENT_CANDIDATE_CHECKER_NOT_RETAINED',
+    'CANDIDATE_PROJECTION_AND_SOLVER_REPLAY_NOT_IMPLEMENTED',
     'GOVERNED_4096_PRODUCTION_RESPONSE_EXECUTION_NOT_RETAINED',
     'GOVERNED_4096_DIRECT_POINT_STRESS_RECEIPT_NOT_PRODUCED',
     'PROBE_STABLE_CANDIDATE_PRODUCTION_SWITCH_NOT_AUTHORIZED',
@@ -113,9 +115,13 @@ const report = {
     governed4096ProductionResponseRouteImplemented: true,
     governedDirectPointStressRouteImplemented: true,
     governedProbeTopologyObservabilityImplemented: true,
-    probeStablePolarMeshDesignImplemented: true,
-    probeStableCandidateIntakeContractImplemented: true,
-    probeStableCandidateV2IntakeReplayExecuted: executableEvidencePass,
+    probeStablePolarMeshDesignV3Implemented: true,
+    probeStableCandidateIntakeContractV3Implemented: true,
+    probeStableCandidateV3IntakeReplayExecuted: executableEvidencePass,
+    candidateExecutedRecomputation: executableEvidencePass,
+    candidateIndependentCheckerExecution: false,
+    candidateIndependentCheckerRequiredBeforeReplayAdjudication: true,
+    candidateSolverExecuted: false,
     probeStablePolarMeshProductionAuthority: false,
     probeStableCandidateProductionSwitchAuthorized: false,
     productionLugFixedProbeContractImplemented: true,
