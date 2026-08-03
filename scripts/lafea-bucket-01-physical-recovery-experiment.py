@@ -21,33 +21,62 @@ def patch_solver() -> None:
     path.write_text(text[:start] + block + text[end:])
 
 
-def patch_mesh() -> None:
-    path = Path('src/core/lafea-meshing/lug-pinhole-t6.js')
+def patch_t6_quadrature() -> None:
+    path = Path('src/core/local-continuum/t6-element.js')
     text = path.read_text()
-    old = """      addT6Element(state, `E-R${ring}-S${sector}-A`, [
-        innerA, outerA, outerB,
-      ]);
-      addT6Element(state, `E-R${ring}-S${sector}-B`, [
-        innerA, outerB, innerB,
-      ]);"""
-    new = """      const alternate = (ring + sector) % 2 === 1;
-      if (alternate) {
-        addT6Element(state, `E-R${ring}-S${sector}-A`, [
-          innerA, outerA, innerB,
-        ]);
-        addT6Element(state, `E-R${ring}-S${sector}-B`, [
-          outerA, outerB, innerB,
-        ]);
-      } else {
-        addT6Element(state, `E-R${ring}-S${sector}-A`, [
-          innerA, outerA, outerB,
-        ]);
-        addT6Element(state, `E-R${ring}-S${sector}-B`, [
-          innerA, outerB, innerB,
-        ]);
-      }"""
+    start = text.index('export const T6_GAUSS_POINTS = Object.freeze([')
+    end = text.index('\n]);', start) + len('\n]);')
+    rule = """export const T6_GAUSS_POINTS = Object.freeze([
+  Object.freeze({ pointId: 'GP1', xi: 1 / 3, eta: 1 / 3, weight: 0.1125 }),
+  Object.freeze({ pointId: 'GP2', xi: 0.059715871789770, eta: 0.470142064105115, weight: 0.066197076394253 }),
+  Object.freeze({ pointId: 'GP3', xi: 0.470142064105115, eta: 0.059715871789770, weight: 0.066197076394253 }),
+  Object.freeze({ pointId: 'GP4', xi: 0.470142064105115, eta: 0.470142064105115, weight: 0.066197076394253 }),
+  Object.freeze({ pointId: 'GP5', xi: 0.797426985353087, eta: 0.101286507323456, weight: 0.062969590272414 }),
+  Object.freeze({ pointId: 'GP6', xi: 0.101286507323456, eta: 0.797426985353087, weight: 0.062969590272414 }),
+  Object.freeze({ pointId: 'GP7', xi: 0.101286507323456, eta: 0.101286507323456, weight: 0.062969590272414 }),
+]);"""
+    text = text[:start] + rule + text[end:]
+    text = text.replace(
+        "GAUSS_QUADRATURE: 'T6_THREE_POINT_DEGREE_2_GAUSS_QUADRATURE_V1'",
+        "GAUSS_QUADRATURE: 'T6_SEVEN_POINT_DEGREE_5_GAUSS_QUADRATURE_V2'",
+    )
+    path.write_text(text)
+
+
+def patch_probe() -> None:
+    path = Path('src/workspace/lafea-bucket-01-fixed-probe.js')
+    text = path.read_text()
+    text = text.replace('const GAUSS_POINT_COUNT = 3;', 'const MINIMUM_GAUSS_POINT_COUNT = 3;')
+    text = text.replace(
+        '|| elementResult.gaussPointResults.length !== GAUSS_POINT_COUNT)',
+        '|| elementResult.gaussPointResults.length < MINIMUM_GAUSS_POINT_COUNT)',
+    )
+    text = text.replace(
+        "'T6_THREE_POINT_LINEAR_NATURAL_COORDINATE_RECONSTRUCTION_V1'",
+        "'T6_INTEGRATION_POINT_LINEAR_LEAST_SQUARES_RECONSTRUCTION_V2'",
+    )
+    old = """  const matrix = points.map((point) => [1, point.xi, point.eta]);
+  const values = points.map(selector);
+  if (values.some((value) => typeof value !== 'number' || !Number.isFinite(value))) {
+    throw probeError('LAFEA_B01_PROBE_STRESS_COMPONENT_INVALID');
+  }
+  const coefficients = solve3(matrix, values);"""
+    new = """  const rows = points.map((point) => [1, point.xi, point.eta]);
+  const values = points.map(selector);
+  if (values.some((value) => typeof value !== 'number' || !Number.isFinite(value))) {
+    throw probeError('LAFEA_B01_PROBE_STRESS_COMPONENT_INVALID');
+  }
+  const normal = Array.from({ length: 3 }, () => Array(3).fill(0));
+  const rightHandSide = Array(3).fill(0);
+  rows.forEach((row, rowIndex) => {
+    for (let i = 0; i < 3; i += 1) {
+      rightHandSide[i] += row[i] * values[rowIndex];
+      for (let j = 0; j < 3; j += 1) normal[i][j] += row[i] * row[j];
+    }
+  });
+  const coefficients = solve3(normal, rightHandSide);"""
     if text.count(old) != 1:
-        raise RuntimeError(f'cell split count={text.count(old)}')
+        raise RuntimeError(f'reconstruct block count={text.count(old)}')
     path.write_text(text.replace(old, new))
 
 
@@ -62,5 +91,6 @@ def patch_kirsch_diagnostic() -> None:
 
 
 patch_solver()
-patch_mesh()
+patch_t6_quadrature()
+patch_probe()
 patch_kirsch_diagnostic()
