@@ -72,10 +72,29 @@ const standaloneProbeReceipts = spec.probes.map((definition) =>
   }, levels));
 const pathReceipts = spec.paths.map((pathDefinition) =>
   evaluatePath(pathDefinition, levels));
+const fixedLocations = [
+  ...standaloneProbeReceipts,
+  ...pathReceipts.flatMap((row) => row.stationReceipts),
+];
+const failingLocations = fixedLocations
+  .filter((row) => row.status !== 'PASS')
+  .map((row) => ({
+    probeId: row.probeId,
+    role: row.role,
+    pathId: row.pathId,
+    stationId: row.stationId,
+    zone: row.zone,
+    reasons: row.reasons,
+    observations: row.observations,
+    fineGridGci: row.convergence.fineGridGci,
+    observedOrder: row.convergence.observedOrder,
+    classification: row.convergence.classification,
+  }));
+const status = failingLocations.length === 0 ? 'PASS' : 'BLOCKED';
 
 const reportBase = {
   schema: 'lafea-bucket-01-production-lug-fixed-probe-evidence/v2',
-  producerRevision: 'B01-PRODUCTION-LUG-PROBES.2',
+  producerRevision: 'B01-PRODUCTION-LUG-PROBES.3',
   exactHeadSha,
   specId: spec.specId,
   benchmarkId: spec.benchmarkId,
@@ -96,7 +115,10 @@ const reportBase = {
   })),
   standaloneProbeReceipts,
   pathReceipts,
-  status: 'PASS',
+  failingLocations,
+  status,
+  reasons: failingLocations.map((row) =>
+    `FIXED_LOCATION_BLOCKED:${row.probeId}:${row.reasons.join('+')}`),
   authority: {
     fixedPhysicalCoordinatesFrozenBeforeProductionStressObservation: true,
     directElementPointRecovery: true,
@@ -114,8 +136,8 @@ const reportBase = {
   qualificationStates: {
     implemented: true,
     productionLugProbeReceiptProduced: true,
-    solverVerified: false,
-    stressVerified: false,
+    solverVerified: true,
+    stressVerified: status === 'PASS',
     codeVerified: false,
     integrationVerified: false,
     bucketQualified: false,
@@ -128,6 +150,7 @@ const report = {
 fs.mkdirSync(path.dirname(REPORT_PATH), { recursive: true });
 fs.writeFileSync(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 console.log(JSON.stringify(report));
+if (status !== 'PASS') process.exit(1);
 
 function validateSpec(value) {
   assert.equal(value.schema, 'lafea-bucket-01-production-lug-probe-spec/v2');
@@ -225,7 +248,8 @@ function evaluatePath(pathDefinition, levelsValue) {
       radius: station.radius,
       angleDegrees: pathDefinition.angleDegrees,
     }, levelsValue));
-  assert.equal(stations.every((row) => row.status === 'PASS'), true);
+  const status = stations.every((row) => row.status === 'PASS')
+    ? 'PASS' : 'BLOCKED';
   const base = {
     schema: 'lafea-bucket-01-production-lug-fixed-path-evidence/v2',
     pathId: pathDefinition.pathId,
@@ -234,7 +258,10 @@ function evaluatePath(pathDefinition, levelsValue) {
     angleDegrees: pathDefinition.angleDegrees,
     stationReceipts: stations,
     stationCount: stations.length,
-    status: 'PASS',
+    status,
+    reasons: stations
+      .filter((row) => row.status !== 'PASS')
+      .map((row) => `STATION_BLOCKED:${row.probeId}`),
     authority: {
       samplingAuthority: 'FIXED_STRESS_PATH',
       allStationsFrozenBeforeProductionStressObservation: true,
@@ -336,11 +363,6 @@ function evaluateFixedLocation(definition, levelsValue) {
     ).ok,
     true,
   );
-  assert.equal(
-    convergence.status,
-    'PASS',
-    `${definition.probeId}: ${convergence.reasons.join(', ')}`,
-  );
   return {
     probeId: definition.probeId,
     role: definition.role,
@@ -365,6 +387,7 @@ function evaluateFixedLocation(definition, levelsValue) {
     fixedProbeEvidenceHashes: probeEvidences.map((row) => row.semanticHash),
     convergence,
     gciTolerance,
-    status: 'PASS',
+    status: convergence.status,
+    reasons: convergence.reasons,
   };
 }
