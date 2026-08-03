@@ -38,6 +38,7 @@ current source — do not trust the document alone.
 | M005 | #431 | #438 | Merged | Genuinely sparse assembly + sparse qualification matVec (closes M002's disclosed limitation); structural proof `sparseDenseKPresent: false` |
 | M006 | #451 | #456 | Merged (Owner-fixed) | System-level closed-form thermal expansion benchmarks (`lfea-b3.8`, free + restrained uniform heating) — real B-2.5→B-3.4 chain, not a hand-reconstruction |
 | M007 | #452 | #457 | Merged (Owner-fixed) | Real production gap closed: `GRAVITY`/`PIPE_WALL` now expands to equivalent element UDLs via B-3.1 machinery, not just validated at declaration level; closed-form benchmark at `lfea-b3.9` |
+| (direct fix, no WP) | — | #461 | Merged | `check:lfea-linear-core` now completes end to end for the first time since M001 — replaced its dependency on a deleted, non-functional CI workflow file with the mechanisms that actually keep the workspace-integration check and its e2e spec wired in |
 
 ### Non-LFEA workstreams (user-directed pivot, 4 parallel read-only audits + direct fixes)
 
@@ -184,15 +185,15 @@ plausible explanation.
   already failing on `main` (independent of M006/M007) by the time M006 hit
   it. Fixed to check presence + ordering instead of literal adjacency —
   same intent, no longer brittle to future insertions.
-- **Known, currently-unfixed pre-existing gap (found during M006/M007
-  review, not caused by either):** `scripts/linear-piping-workspace-integration-check.mjs`
-  (reached via `check:lfea-presentation-export`, inside `check:lfea-linear-core`)
-  reads `.github/workflows/lfea-piping-phase-certification.yml`, which no
-  longer exists — one of the 95 CI workflow files M001 removed as obsolete
-  scaffolding. This means `check:lfea-linear-core` as a single command cannot
-  currently complete on `main` at all; the individual `check:lfea-b*.x`
-  commands (which is what Owner review actually runs) are unaffected. Whether
-  the right fix is restoring a minimal workflow file or updating the
-  assertion to match the repo's current no-CI reality is a real judgment
-  call — scope it as its own Work Pack rather than deciding unilaterally
-  during an unrelated review.
+- **Fixed (was: known pre-existing gap, found during M006/M007 review).**
+  `scripts/linear-piping-workspace-integration-check.mjs` read
+  `.github/workflows/lfea-piping-phase-certification.yml`, one of the 95 CI
+  workflow files M001 removed. That workflow's own commit confirms it was
+  gated on `workflow_dispatch` inputs a normal `pull_request` event never
+  supplied, so restoring it would have satisfied the assertion cosmetically
+  without providing working CI. Fixed (PR #461, `e6d30ca`) by pointing the
+  assertion at the two mechanisms that actually keep this check and its e2e
+  companion wired in: import by the registered
+  `linear-piping-presentation-anti-drift-check.mjs`, and presence under the
+  project's Playwright `testDir`. `check:lfea-linear-core` now completes end
+  to end as a single command for the first time since M001 merged.
