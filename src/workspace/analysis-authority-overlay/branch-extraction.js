@@ -1,5 +1,8 @@
 import { buildRoutePartitionModel } from '../routes/route-partition-model.js';
-import { WORKSPACE_BRANCH_SUBSET_SCHEMA } from './branch-subset-contract.js';
+import {
+  sealBranchSubsetManifest,
+  WORKSPACE_BRANCH_SUBSET_SCHEMA,
+} from './branch-subset-contract.js';
 
 const PHYSICAL_TERMINUS = 'NONE:PHYSICAL_TERMINUS';
 
@@ -17,7 +20,7 @@ export function extractBranchSubset(dataset, branchId, profile) {
     .map((route) => route.routeId)
     .sort(ascii);
 
-  return {
+  return sealBranchSubsetManifest({
     schema: WORKSPACE_BRANCH_SUBSET_SCHEMA,
     datasetId: dataset.datasetId,
     branchId: targetBranchId,
@@ -29,7 +32,7 @@ export function extractBranchSubset(dataset, branchId, profile) {
     boundaryPorts: deriveBoundaryPorts(dataset, selected, targetBranchId),
     externalDependencies: [],
     diagnostics: [],
-  };
+  }, { dataset });
 }
 
 function deriveBoundaryPorts(dataset, selected, branchId) {
