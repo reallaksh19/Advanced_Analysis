@@ -13,7 +13,12 @@ import {
 import { TopologyEditLifecycleController } from './topology-edit/topology-edit-lifecycle-controller.js';
 import { topologyEditEntityIdsForObject } from './topology-edit/topology-edit-render-packet.js';
 import { retainTypedTopologyEditPrimitives } from './topology-edit/topology-edit-typed-viewport-backend.js';
-import { TopologyEditSupportViewportBackend } from './topology-edit/topology-edit-support-viewport-backend.js';
+import { TopologyEditNavigationHudViewportBackend } from './topology-edit/topology-edit-navigation-hud-viewport-backend.js';
+import {
+  resolveTopologyEditNavigationAction,
+  resolveTopologyEditNavigationShortcut,
+  topologyEditNavigationShortcutManifest,
+} from './topology-edit/topology-edit-navigation-routing.js';
 
 export { buildAutofixPolicy } from './topology-edit-3d-view-controller-core.js';
 
@@ -35,6 +40,7 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
     this.lastCommitDisposition = null;
     this.viewportSelectionHandler = (pick, event) => this.handleViewportSelection(pick, event);
     this.sharedNavigationHandler = (event) => this.handleSharedNavigation(event);
+    this.navigationKeyHandler = (event) => this.handleNavigationShortcut(event);
     this.lifecycle = new TopologyEditLifecycleController({
       getSession: () => this.session,
       getViewState: () => ({
@@ -46,7 +52,7 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
   }
 
   createViewportBackend() {
-    return new TopologyEditSupportViewportBackend();
+    return new TopologyEditNavigationHudViewportBackend();
   }
 
   async activate() {
@@ -59,13 +65,19 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
       this.sharedNavigationHandler,
       true,
     );
+    this.hostElement?.addEventListener('keydown', this.navigationKeyHandler);
+    const shortcutLabels = topologyEditNavigationShortcutManifest()
+      .map((row) => row.label)
+      .join(' ');
+    this.viewportBackend?.renderer?.domElement?.setAttribute('aria-keyshortcuts', shortcutLabels);
+    if (this.hostElement) this.hostElement.dataset.topologyEditNavigationShortcuts = shortcutLabels;
     this.setNavigationMode('select', true);
   }
 
   installTypedViewportBackend() {
-    if (!(this.viewportBackend instanceof TopologyEditSupportViewportBackend)) {
+    if (!(this.viewportBackend instanceof TopologyEditNavigationHudViewportBackend)) {
       throw new Error(
-        'TOPOLOGY_EDIT_SUPPORT_BACKEND_FACTORY_MISMATCH: Activation must mount the support-glyph backend directly.',
+        'TOPOLOGY_EDIT_NAVIGATION_HUD_BACKEND_FACTORY_MISMATCH: Activation must mount the HUD backend directly.',
       );
     }
   }
@@ -101,6 +113,7 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
       this.sharedNavigationHandler,
       true,
     );
+    this.hostElement?.removeEventListener('keydown', this.navigationKeyHandler);
     this.viewportBackend?.setSelectionRequestHandler(null);
     super.deactivate();
     this.lastPersistenceError = null;
@@ -112,11 +125,11 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
 
   handleHostClick(event) {
     const navigationMode = event.target.closest('[data-navigation-mode]');
-    if (navigationMode) return this.setNavigationMode(navigationMode.dataset.navigationMode);
+    if (navigationMode) return this.routeNavigationAction(navigationMode.dataset.navigationMode);
     const navigationAction = event.target.closest('[data-navigation-action]');
-    if (navigationAction) return this.runNavigationAction(navigationAction.dataset.navigationAction);
+    if (navigationAction) return this.routeNavigationAction(navigationAction.dataset.navigationAction);
     const standardView = event.target.closest('[data-standard-view]');
-    if (standardView) return this.runStandardView(standardView.dataset.standardView);
+    if (standardView) return this.routeNavigationAction(standardView.dataset.standardView);
     if (event.target.closest('[data-action="save-draft"]')) return this.saveDraft();
     if (event.target.closest('[data-action="reload-draft"]')) return this.reloadDraft();
     if (event.target.closest('[data-action="export-draft"]')) return this.exportDraft();
@@ -132,28 +145,27 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
     if (!action) return;
     event.preventDefault();
     event.stopPropagation();
-    if (action.startsWith('mode-')) {
-      this.setNavigationMode(action.slice('mode-'.length));
-      return;
-    }
-    if (action.startsWith('view-')) {
-      this.runStandardView(action.slice('view-'.length));
-      return;
-    }
-    const aliases = {
-      fit: 'fit',
-      'fit-selection': 'fit-selection',
-      'pivot-selection': 'pivot-selection',
-      home: 'home',
-      reset: 'home',
-      'previous-view': 'previous',
-      'toggle-projection': 'projection',
-    };
-    const localAction = aliases[action];
-    if (!localAction) {
-      throw new TypeError(`Unsupported shared topology edit navigation action: ${action}`);
-    }
-    this.runNavigationAction(localAction);
+    this.routeNavigationAction(action);
+  }
+
+  handleNavigationShortcut(event) {
+    if (!this.hostElement?.contains(event.target)) return;
+    const intent = resolveTopologyEditNavigationShortcut(event);
+    if (!intent) return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.executeNavigationIntent(intent);
+  }
+
+  routeNavigationAction(action) {
+    return this.executeNavigationIntent(resolveTopologyEditNavigationAction(action));
+  }
+
+  executeNavigationIntent(intent) {
+    if (intent.kind === 'MODE') return this.setNavigationMode(intent.value);
+    if (intent.kind === 'COMMAND') return this.runNavigationAction(intent.value);
+    if (intent.kind === 'STANDARD_VIEW') return this.runStandardView(intent.value);
+    throw new TypeError(`Unsupported topology edit navigation intent: ${String(intent.kind)}.`);
   }
 
   handleViewportSelection(pick, event) {
@@ -400,19 +412,19 @@ export function restoreTopologyEditViewSelection(value) {
 function navigationMarkup() {
   return `
     <span role="group" aria-label="Topology edit navigation">
-      <button type="button" data-navigation-mode="select" aria-pressed="true">Select</button>
-      <button type="button" data-navigation-mode="orbit" aria-pressed="false">Orbit</button>
-      <button type="button" data-navigation-mode="pan" aria-pressed="false">Pan</button>
-      <button type="button" data-navigation-action="fit">Fit</button>
-      <button type="button" data-navigation-action="fit-selection">Fit selection</button>
-      <button type="button" data-navigation-action="home">Home</button>
+      <button type="button" data-navigation-mode="select" aria-keyshortcuts="Q" aria-pressed="true">Select</button>
+      <button type="button" data-navigation-mode="orbit" aria-keyshortcuts="O" aria-pressed="false">Orbit</button>
+      <button type="button" data-navigation-mode="pan" aria-keyshortcuts="P" aria-pressed="false">Pan</button>
+      <button type="button" data-navigation-action="fit" aria-keyshortcuts="F">Fit</button>
+      <button type="button" data-navigation-action="fit-selection" aria-keyshortcuts="Shift+F">Fit selection</button>
+      <button type="button" data-navigation-action="home" aria-keyshortcuts="H">Home</button>
       <button type="button" data-navigation-action="previous">Previous</button>
-      <button type="button" data-navigation-action="pivot-selection">Pivot selection</button>
-      <button type="button" data-navigation-action="projection">Projection</button>
-      <button type="button" data-standard-view="iso">Iso</button>
-      <button type="button" data-standard-view="top">Top</button>
-      <button type="button" data-standard-view="front">Front</button>
-      <button type="button" data-standard-view="right">Right</button>
+      <button type="button" data-navigation-action="pivot-selection" aria-keyshortcuts="C">Pivot selection</button>
+      <button type="button" data-navigation-action="projection" aria-keyshortcuts="5">Projection</button>
+      <button type="button" data-standard-view="iso" aria-keyshortcuts="0">Iso</button>
+      <button type="button" data-standard-view="top" aria-keyshortcuts="7">Top</button>
+      <button type="button" data-standard-view="front" aria-keyshortcuts="1">Front</button>
+      <button type="button" data-standard-view="right" aria-keyshortcuts="3">Right</button>
     </span>`;
 }
 
