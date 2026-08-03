@@ -7,7 +7,6 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { normalizeWorkspaceDataset } from '../src/workspace/dataset-adapter.js';
 import { extractBranchSubset } from '../src/workspace/analysis-authority-overlay/branch-extraction.js';
-import { sealBranchSubsetManifest } from '../src/workspace/analysis-authority-overlay/branch-subset-contract.js';
 import {
   createEmptyProjectDataProfile,
   createEvidenceValue,
@@ -25,13 +24,19 @@ const dataset = normalizeWorkspaceDataset(
   { sourceBytes, sourceSha256 },
 );
 const profile = makeProfile();
-const extracted = extractBranchSubset(dataset, branchId, profile);
+const datasetBefore = JSON.stringify(dataset);
+const profileBefore = JSON.stringify(profile);
+const sealed = extractBranchSubset(dataset, branchId, profile);
 assert.deepEqual(
   extractBranchSubset(dataset, branchId, profile),
-  extracted,
+  sealed,
   'repeated extraction must be deterministic',
 );
-const sealed = sealBranchSubsetManifest(extracted, { dataset });
+assert.equal(JSON.stringify(dataset), datasetBefore, 'branch extraction must not mutate the dataset');
+assert.equal(JSON.stringify(profile), profileBefore, 'branch extraction must not mutate the topology profile');
+assert.equal(Object.isFrozen(sealed), true, 'extractBranchSubset must return a sealed manifest');
+assert.equal(Object.isFrozen(sealed.boundaryPorts), true, 'sealed manifest children must be immutable');
+
 const routePartition = buildRoutePartitionModel(dataset, profile);
 const realRouteIds = routePartition.routes
   .filter((route) => route.branchId === branchId)
@@ -63,8 +68,7 @@ for (const routeId of sealed.routeIds) {
 }
 
 const terminusDataset = makePhysicalTerminusDataset();
-const terminusExtracted = extractBranchSubset(terminusDataset, '/SYNTHETIC/B1', profile);
-const terminusManifest = sealBranchSubsetManifest(terminusExtracted, { dataset: terminusDataset });
+const terminusManifest = extractBranchSubset(terminusDataset, '/SYNTHETIC/B1', profile);
 assert.deepEqual(terminusManifest.boundaryPorts, [
   { nodeId: 'port:0|0|0', externalReference: 'NONE:PHYSICAL_TERMINUS', treatment: 'DECLARED_BOUNDARY' },
   { nodeId: 'port:200|0|0', externalReference: 'NONE:PHYSICAL_TERMINUS', treatment: 'DECLARED_BOUNDARY' },
