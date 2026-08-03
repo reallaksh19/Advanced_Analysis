@@ -23,6 +23,7 @@ const checkDefinitions = [
   { id: 'GOVERNED_PROBE_TOPOLOGY_OBSERVABILITY', script: 'scripts/lafea-bucket-01-probe-topology-check.mjs' },
   { id: 'PROBE_STABLE_POLAR_MESH_DESIGN', script: 'scripts/lafea-bucket-01-probe-stable-mesh-design-check.mjs' },
   { id: 'PROBE_STABLE_CANDIDATE_INTAKE_CONTRACT', script: 'scripts/lafea-bucket-01-probe-stable-candidate-intake-contract-check.mjs' },
+  { id: 'CONTROLLED_CANDIDATE_REPLAY_PROPOSAL_CONTRACT', script: 'scripts/lafea-bucket-01-controlled-candidate-replay-proposal-check.mjs' },
   { id: 'EXPECTED_VALUE_DEFINITION_SET', script: 'scripts/lafea-bucket-01-expected-value-registry-check.mjs' },
   { id: 'CODE_BASIS_INTAKE_CONTRACT', script: 'scripts/lafea-bucket-01-code-basis-check.mjs' },
   { id: 'THREE_REPLAY_CUSTODY_CONTRACT', script: 'scripts/lafea-bucket-01-replay-custody-check.mjs' },
@@ -41,7 +42,7 @@ const checks = checkDefinitions.map((definition) => runNodeCheck(definition));
 const failed = checks.filter((check) => check.status !== 'PASS');
 const repairChecksPass = failed.length === 0;
 const report = {
-  schema: 'lafea-bucket-01-repair-check-report/v19',
+  schema: 'lafea-bucket-01-repair-check-report/v20',
   status: repairChecksPass ? 'REPAIR_CHECKS_PASS' : 'REPAIR_CHECKS_FAIL',
   bucketId: 'LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE',
   target: 'C2D-LUG-PINHOLE -> LAFEA.3',
@@ -62,6 +63,7 @@ const report = {
     probeTopologyObservabilityVerified: repairChecksPass,
     probeStablePolarMeshDesignVerified: repairChecksPass,
     probeStableCandidateIntakeContractVerified: repairChecksPass,
+    controlledCandidateReplayProposalContractVerified: repairChecksPass,
     probeStableCandidateMeshGenerated: false,
     productionLugProbeEvidenceGenerated: false,
     expectedValueDefinitionSetVerified: repairChecksPass,
@@ -103,6 +105,7 @@ const report = {
     governedProbeTopologyObservabilityImplemented: repairChecksPass,
     probeStablePolarMeshDesignImplemented: repairChecksPass,
     probeStableCandidateIntakeContractImplemented: repairChecksPass,
+    controlledCandidateReplayProposalContractImplemented: repairChecksPass,
     probeStablePolarMeshProductionAuthority: false,
     probeStableCandidateProductionSwitchAuthorized: false,
     expectedValueDefinitionSetImplemented: repairChecksPass,
