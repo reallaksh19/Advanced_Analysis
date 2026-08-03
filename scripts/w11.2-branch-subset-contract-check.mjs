@@ -44,7 +44,7 @@ const input = () => ({
 });
 
 const sealed = sealBranchSubsetManifest(input(), { dataset });
-assert.equal(requireBranchSubsetManifest(sealed, { dataset }), sealed);
+assert.deepEqual(requireBranchSubsetManifest(sealed, { dataset }), sealed);
 assert.equal(Object.isFrozen(sealed), true);
 assert.equal(Object.isFrozen(sealed.boundaryPorts[0]), true);
 assert.equal(sealBranchSubsetManifest(input(), { dataset }).semanticHash, sealed.semanticHash);
