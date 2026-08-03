@@ -122,10 +122,20 @@ function runCheck(check) {
     command: [check.command, ...check.args].join(' '),
     status: result.status === 0 && !result.error ? 'PASS' : 'FAIL',
     exitCode: Number.isInteger(result.status) ? result.status : null,
-    stdout: result.stdout?.trim() || null,
-    stderr: result.stderr?.trim() || null,
-    error: result.error?.message ?? null,
+    stdout: normalizeCapturedOutput(result.stdout),
+    stderr: normalizeCapturedOutput(result.stderr),
+    error: normalizeCapturedOutput(result.error?.message),
   });
+}
+function normalizeCapturedOutput(value) {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const normalized = value
+    .replace(/\u001b\[[0-9;]*m/gu, '')
+    .replace(/\bbuilt in \d+(?:\.\d+)?(?:ms|s)\b/giu, 'built in <duration>')
+    .replace(/\bcompleted in \d+(?:\.\d+)?(?:ms|s)\b/giu, 'completed in <duration>')
+    .replace(/\r\n/gu, '\n')
+    .trim();
+  return normalized || null;
 }
 function recordAssertion(id, accepted, message) {
   checks.push({ id, command: null, status: accepted ? 'PASS' : 'FAIL', exitCode: accepted ? 0 : 1, stdout: null, stderr: null, error: accepted ? null : message });
