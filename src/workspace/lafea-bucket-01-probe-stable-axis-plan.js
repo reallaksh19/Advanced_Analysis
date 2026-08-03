@@ -5,7 +5,7 @@ export const LAFEA_BUCKET_01_PROBE_STABLE_AXIS_PLAN_INPUT_SCHEMA =
 export const LAFEA_BUCKET_01_PROBE_STABLE_AXIS_PLAN_EVIDENCE_SCHEMA =
   'lafea-bucket-01-probe-stable-axis-plan-evidence/v1';
 export const LAFEA_BUCKET_01_PROBE_STABLE_AXIS_PLAN_REVISION =
-  'B01-PROBE-STABLE-AXIS.1';
+  'B01-PROBE-STABLE-AXIS.2';
 
 const INPUT_KEYS = Object.freeze([
   'schema',
@@ -14,6 +14,7 @@ const INPUT_KEYS = Object.freeze([
   'domainStart',
   'domainEnd',
   'anchors',
+  'protectedBreakpoints',
   'targetPhase',
   'refinementRatio',
   'levelCount',
@@ -45,6 +46,7 @@ export function buildLafeaBucket01ProbeStableAxisPlan(inputValue) {
     status: 'DESIGN_READY_NOT_PRODUCTION',
     authority: {
       frozenAnchorValuesPreserved: true,
+      protectedFeatureBreakpointsPreserved: true,
       anchorCellsSelfSimilarAcrossLevels: true,
       anchorPhaseInvariantAcrossLevels: true,
       anchorCellWidthsContractByGovernedRatio: true,
@@ -120,6 +122,22 @@ function normalizeInput(value) {
   if (anchors.some((row) => !(row.value > domainStart && row.value < domainEnd))) {
     throw planError('LAFEA_B01_PROBE_STABLE_AXIS_ANCHOR_OUTSIDE_DOMAIN');
   }
+  if (!Array.isArray(value.protectedBreakpoints)) {
+    throw planError('LAFEA_B01_PROBE_STABLE_AXIS_BREAKPOINTS_INVALID');
+  }
+  const protectedBreakpoints = value.protectedBreakpoints
+    .map((row) => finite(row, 'protectedBreakpoint'))
+    .sort((left, right) => left - right);
+  if (new Set(protectedBreakpoints).size !== protectedBreakpoints.length
+    || protectedBreakpoints.some((row) =>
+      !(row > domainStart && row < domainEnd))) {
+    throw planError('LAFEA_B01_PROBE_STABLE_AXIS_BREAKPOINTS_INVALID');
+  }
+  if (protectedBreakpoints.some((breakpoint) =>
+    anchors.some((anchor) => Math.abs(anchor.value - breakpoint)
+      <= NUMERIC_TOLERANCE))) {
+    throw planError('LAFEA_B01_PROBE_STABLE_AXIS_BREAKPOINT_ANCHOR_COLLISION');
+  }
   const targetPhase = finite(value.targetPhase, 'targetPhase');
   if (!(targetPhase > 0.1 && targetPhase < 0.9)) {
     throw planError('LAFEA_B01_PROBE_STABLE_AXIS_PHASE_INVALID');
@@ -153,6 +171,7 @@ function normalizeInput(value) {
     domainStart,
     domainEnd,
     anchors,
+    protectedBreakpoints,
     targetPhase,
     refinementRatio,
     levelCount,
@@ -193,6 +212,12 @@ function buildBaseWindows(input) {
       throw planError('LAFEA_B01_PROBE_STABLE_AXIS_WINDOWS_OVERLAP');
     }
   }
+  if (input.protectedBreakpoints.some((breakpoint) =>
+    windows.some((window) =>
+      breakpoint > window.baseLeft - NUMERIC_TOLERANCE
+        && breakpoint < window.baseRight + NUMERIC_TOLERANCE))) {
+    throw planError('LAFEA_B01_PROBE_STABLE_AXIS_BREAKPOINT_WINDOW_COLLISION');
+  }
   return deepFreeze(windows);
 }
 
@@ -214,11 +239,12 @@ function buildLevel(input, baseWindows, ordinal) {
   const anchorCells = [];
   let cursor = input.domainStart;
   for (const window of windows) {
-    appendUniformGap(
+    appendPartitionedGap(
       coordinates,
       cursor,
       window.left,
       targetBackgroundCellWidth,
+      input.protectedBreakpoints,
     );
     const cellIndex = coordinates.length - 1;
     appendCoordinate(coordinates, window.right);
@@ -239,13 +265,19 @@ function buildLevel(input, baseWindows, ordinal) {
     }));
     cursor = window.right;
   }
-  appendUniformGap(
+  appendPartitionedGap(
     coordinates,
     cursor,
     input.domainEnd,
     targetBackgroundCellWidth,
+    input.protectedBreakpoints,
   );
-  validateCoordinates(coordinates, input.domainStart, input.domainEnd);
+  validateCoordinates(
+    coordinates,
+    input.domainStart,
+    input.domainEnd,
+    input.protectedBreakpoints,
+  );
   const anchorCellIndices = new Set(anchorCells.map((row) => row.cellIndex));
   const cellWidths = coordinates.slice(1).map(
     (coordinate, index) => coordinate - coordinates[index],
@@ -267,6 +299,8 @@ function buildLevel(input, baseWindows, ordinal) {
     coordinateHash,
     cellCount: coordinates.length - 1,
     anchorCellCount: anchorCells.length,
+    protectedBreakpointCount: input.protectedBreakpoints.length,
+    protectedBreakpoints: input.protectedBreakpoints,
     backgroundCellCount: coordinates.length - 1 - anchorCells.length,
     minimumCellWidth: Math.min(...cellWidths),
     maximumCellWidth: Math.max(...cellWidths),
@@ -278,6 +312,18 @@ function buildLevel(input, baseWindows, ordinal) {
     status: 'DESIGN_READY',
   };
   return deepFreeze({ ...base, semanticHash: canonicalLafeaSha256(base) });
+}
+
+function appendPartitionedGap(coordinates, start, end, targetWidth,
+  protectedBreakpoints) {
+  const contained = protectedBreakpoints.filter((breakpoint) =>
+    breakpoint > start + NUMERIC_TOLERANCE
+      && breakpoint < end - NUMERIC_TOLERANCE);
+  let cursor = start;
+  for (const endpoint of [...contained, end]) {
+    appendUniformGap(coordinates, cursor, endpoint, targetWidth);
+    cursor = endpoint;
+  }
 }
 
 function appendUniformGap(coordinates, start, end, targetWidth) {
@@ -303,7 +349,8 @@ function appendCoordinate(coordinates, coordinateValue) {
   coordinates.push(coordinate);
 }
 
-function validateCoordinates(coordinates, domainStart, domainEnd) {
+function validateCoordinates(coordinates, domainStart, domainEnd,
+  protectedBreakpoints) {
   if (coordinates[0] !== domainStart || coordinates.at(-1) !== domainEnd) {
     throw planError('LAFEA_B01_PROBE_STABLE_AXIS_DOMAIN_COVERAGE_INVALID');
   }
@@ -311,6 +358,10 @@ function validateCoordinates(coordinates, domainStart, domainEnd) {
     if (!(coordinates[index] > coordinates[index - 1])) {
       throw planError('LAFEA_B01_PROBE_STABLE_AXIS_COORDINATE_ORDER_INVALID');
     }
+  }
+  if (protectedBreakpoints.some((breakpoint) =>
+    !coordinates.includes(breakpoint))) {
+    throw planError('LAFEA_B01_PROBE_STABLE_AXIS_BREAKPOINT_NOT_RETAINED');
   }
 }
 
