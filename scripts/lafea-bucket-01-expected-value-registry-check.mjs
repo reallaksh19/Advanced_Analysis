@@ -19,6 +19,19 @@ assert.equal(registry.productionOutputMayGenerateExpectedValues, false);
 assert.equal(registry.entries.length, 7);
 assert.equal(new Set(registry.entries.map((row) => row.entryId)).size, 7);
 assert.equal(new Set(registry.entries.map((row) => row.path)).size, 7);
+assert.equal(registry.acceptancePolicy.productionResponseGovernedByFourLevels, true);
+assert.equal(
+  registry.acceptancePolicy.productionEnergyAcceptedByFinestThreeLevelConvergence,
+  true,
+);
+assert.equal(
+  registry.acceptancePolicy.productionStressAcceptedByDirectFixedCoordinateFinestThreeLevelConvergence,
+  true,
+);
+assert.equal(
+  registry.acceptancePolicy.integrationPointExtrapolationAcceptanceAuthorized,
+  false,
+);
 
 const entries = registry.entries.map((definition) => inspect(definition));
 const definitionSetBase = {
@@ -28,8 +41,8 @@ const definitionSetBase = {
 };
 const definitionSetHash = canonicalLafeaSha256(definitionSetBase);
 const reportBase = {
-  schema: 'lafea-bucket-01-expected-value-registry-evidence/v2',
-  producerRevision: 'B01-EXPECTED-VALUE-REGISTRY.2',
+  schema: 'lafea-bucket-01-expected-value-registry-evidence/v3',
+  producerRevision: 'B01-EXPECTED-VALUE-REGISTRY.3',
   registryHash: definitionSetBase.registryHash,
   definitionSetHash,
   entries,
@@ -43,6 +56,9 @@ const reportBase = {
       row.role === 'FROZEN_PRODUCTION_CONVERGENCE_DEFINITION'
       || row.role === 'FROZEN_PRODUCTION_STRESS_LOCATION_DEFINITION'
     )).length,
+    governed4096ResponseDefinitionFrozen: true,
+    directPointStressDefinitionFrozen: true,
+    integrationPointExtrapolationAcceptanceAuthorized: false,
     productionOutputUsedToGenerateExpectedValues: false,
     productionOutputUsedToSelectLocationsOrTolerances: false,
     movingMaximumAcceptanceAuthorized: false,
@@ -133,16 +149,36 @@ function verifyNoProductionDerivedExpectedValues(value, label) {
 }
 
 function verifyProductionResponse(value) {
+  assert.equal(value.schema, 'lafea-bucket-01-production-response-spec/v3');
+  assert.deepEqual(value.meshLadder.map((row) => row.elementCount), [64, 256, 1024, 4096]);
   assert.equal(value.authority.productionOutputUsedToGenerateExpectedForceOrMoment, false);
   assert.equal(value.authority.productionEnergyExpectedValueRequired, false);
   assert.equal(value.authority.productionEnergyAcceptedByConvergenceOnly, true);
-  assert.equal(value.convergence.strainEnergy.method, 'THREE_LEVEL_RICHARDSON_GCI');
+  assert.equal(value.authority.coarseLevelRetainedForTrendAudit, true);
+  assert.equal(
+    value.convergence.strainEnergy.method,
+    'FINEST_THREE_OF_GOVERNED_FOUR_LEVEL_RICHARDSON_GCI',
+  );
+  assert.deepEqual(value.convergence.strainEnergy.governedLevelOrdinals, [1, 2, 3, 4]);
+  assert.deepEqual(value.convergence.strainEnergy.evaluatedLevelOrdinals, [2, 3, 4]);
 }
 function verifyProductionStress(value) {
+  assert.equal(value.schema, 'lafea-bucket-01-production-lug-probe-spec/v2');
+  assert.deepEqual(value.meshLadder.map((row) => row.elementCount), [64, 256, 1024, 4096]);
+  assert.deepEqual(value.convergenceWindow.governedLevelOrdinals, [1, 2, 3, 4]);
+  assert.deepEqual(value.convergenceWindow.evaluatedLevelOrdinals, [2, 3, 4]);
   assert.equal(value.authority.productionOutputUsedToSelectCoordinates, false);
   assert.equal(value.authority.productionOutputUsedToSetTolerances, false);
   assert.equal(value.authority.movingMaximumUsed, false);
-  assert.equal(value.authority.acceptance, 'THREE_LEVEL_GCI_AT_FIXED_PHYSICAL_COORDINATES');
+  assert.equal(value.authority.integrationPointExtrapolationUsed, false);
+  assert.equal(
+    value.authority.recovery,
+    'DIRECT_T6_B_MATRIX_AT_FIXED_PHYSICAL_COORDINATE',
+  );
+  assert.equal(
+    value.authority.acceptance,
+    'FINEST_THREE_OF_GOVERNED_FOUR_LEVEL_GCI_AT_FIXED_PHYSICAL_COORDINATES',
+  );
 }
 function collectProductionMarkers(value, pathValue = '', rows = []) {
   if (!value || typeof value !== 'object') return rows;
