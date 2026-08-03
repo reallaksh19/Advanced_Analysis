@@ -83,6 +83,9 @@ export function evaluateLafeaBucket01StressConvergence(inputValue) {
     meshHashes: probes.map((row) => row.meshHash),
     recoveryHashes: probes.map((row) => row.recoveryHash),
     convergence,
+    fineGridGci: convergence.fineGridGci ?? null,
+    observedOrder: convergence.observedOrder ?? null,
+    classification: convergence.classification ?? null,
     status: convergence.status,
     reasons: convergence.reasons,
     authority: {
