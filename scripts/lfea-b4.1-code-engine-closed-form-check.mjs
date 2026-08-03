@@ -8,6 +8,9 @@
  * actuals always come from compileCodeResult; only the expected values are
  * independently derived from the recovered fixed-end action and the real
  * sectionMechanicalProperties accessor.
+ *
+ * M019 additionally reproduces two independently published Appendix S
+ * Example 3 stress-range rows through the same production code-result path.
  */
 
 import assert from 'node:assert/strict';
@@ -24,6 +27,13 @@ import {
 } from '../src/core/linear-fea-load-case/index.js';
 import { compileMechanicalModel } from '../src/core/linear-fea-model-compiler/index.js';
 import { compileResultRecovery } from '../src/core/linear-fea-result-recovery/index.js';
+import {
+  PIPE_SECTION_FORMULATION_ID,
+  PIPE_SECTION_PROFILE,
+  PIPE_SECTION_REQUEST_SCHEMA,
+  computePipeSectionRequestSemanticHash,
+  resolvePipeSection,
+} from '../src/core/linear-fea-section/index.js';
 import {
   compileSolverExecution,
   elementContributionFromFrameElement,
@@ -48,6 +58,7 @@ import {
 } from './lfea-b4.0-code-engine-fixtures.mjs';
 
 const RELATIVE_TOLERANCE = 1e-8;
+const APPENDIX_S_RELATIVE_TOLERANCE = 1e-3;
 const SPAN_LENGTH = 2.4;
 const ROOT_NODE = 'N-B41-ROOT';
 const TIP_NODE = 'N-B41-TIP';
@@ -61,9 +72,26 @@ const PRESSURE_STRESS_CONTRIBUTION = Object.freeze({
   source: 'no pressure load in this benchmark',
 });
 
+/* ASME B31.3-2006 Appendix S Example 3, Tables S303.3/S303.7.1. */
+const APPENDIX_S_WALL_THICKNESS = 0.00953;
+const APPENDIX_S_NPS20_OUTER_DIAMETER = 0.5080;
+const APPENDIX_S_NPS24_OUTER_DIAMETER = 0.6096;
+const APPENDIX_S_NPS20_RESULTANT = Object.freeze({
+  fx: 78_485, fy: 0, fz: 0, mx: 0, my: 45_900, mz: 0,
+});
+const APPENDIX_S_NPS20_PUBLISHED_STRESS = 25_155_000;
+const APPENDIX_S_TEE_RESULTANT = Object.freeze({
+  fx: 0, fy: 0, fz: 0, mx: 0, my: 147_470, mz: 0,
+});
+const APPENDIX_S_TEE_IN_PLANE_SIF = 3.415546199106908;
+const APPENDIX_S_TEE_OUT_OF_PLANE_SIF = 4.220728265475877;
+const APPENDIX_S_TEE_PUBLISHED_STRESS = 189_945_000;
+
 // LEGAL/SPEC BOUNDARY: the imported EditionDataset values are explicitly
 // FIXTURE-EDITION-DATASET-NOT-ASME. This benchmark verifies only generic
-// mechanical stress-combination arithmetic, never a licensed ASME value.
+// mechanical stress-combination arithmetic. The two M019 resultants, section
+// dimensions, SIF and published comparison values are individually traced to
+// Appendix S/Table S303.7.1 and Appendix D; no allowable-stress table is copied.
 const RAW_FIXTURE_NUMERIC_INPUTS = Object.freeze([
   RELATIVE_TOLERANCE,
   SPAN_LENGTH,
@@ -286,10 +314,12 @@ function packageRegistrationEvidence() {
   return Object.freeze({ b40Index, b41Index, consumerIndex });
 }
 
-function expectedStress(localAction, mechanicalProperties, pressureValue) {
+function expectedStress(category, localAction, mechanicalProperties, pressureValue) {
+  const isRangeCategory = category === 'DISPLACEMENT_STRESS_RANGE'
+    || category === 'EXPANSION_RANGE_ENVELOPE';
   const stressTerms = Object.freeze({
     pressure: pressureValue,
-    axial: localAction.fx / mechanicalProperties.area,
+    axial: isRangeCategory ? 0 : localAction.fx / mechanicalProperties.area,
     torsional: localAction.mx / mechanicalProperties.polarSectionModulus,
     inPlaneBending: localAction.my / mechanicalProperties.sectionModulus,
     outOfPlaneBending: localAction.mz / mechanicalProperties.sectionModulus,
@@ -301,6 +331,92 @@ function expectedStress(localAction, mechanicalProperties, pressureValue) {
       + stressTerms.torsional ** 2,
     );
   return Object.freeze({ stressTerms, calculatedStress });
+}
+
+function appendixSection(sectionStateId, outerDiameter, sourceHash) {
+  const payload = {
+    schema: PIPE_SECTION_REQUEST_SCHEMA,
+    sectionStateId,
+    formulationId: PIPE_SECTION_FORMULATION_ID,
+    outerDiameter,
+    wallThickness: APPENDIX_S_WALL_THICKNESS,
+    sourceEvidence: {
+      sourceId: 'ASME-B31-3-2006-APPENDIX-S-TABLE-S303-3',
+      sourceRevision: `${sectionStateId}-OD-${outerDiameter}-T-${APPENDIX_S_WALL_THICKNESS}`,
+      sourceSemanticHash: sourceHash,
+    },
+  };
+  return resolvePipeSection({
+    request: {
+      ...payload,
+      semanticHash: computePipeSectionRequestSemanticHash(payload),
+    },
+    profile: PIPE_SECTION_PROFILE,
+  });
+}
+
+function appendixFrameElement(elementId, section) {
+  return compileFrameElement({
+    elementId,
+    material: materialResolution(),
+    section,
+    localAxes: {
+      result: axisResult([0, 0, 0], [SPAN_LENGTH, 0, 0]),
+      profile: FRAME_LOCAL_AXIS_PROFILE,
+    },
+    profile: frameElementProfile(),
+    distributedLoads: [],
+    temperature: null,
+    releases: [],
+    endSprings: [],
+    rigidOffsets: null,
+  });
+}
+
+function appendixRangeFactorSet(componentId, inPlaneSif, outOfPlaneSif) {
+  const appendixDSource = 'ASME B31.3-2006 Appendix D Table D300 welding tee';
+  return stressFactorSet({
+    factorSetId: `SF-${componentId}`,
+    componentId,
+    displacementSifs: {
+      axial: { value: 1, source: 'ASME B31.3-2006 para. 319.4.4 Eq. (17); factor retained as declared evidence' },
+      torsional: { value: 1, source: 'ASME B31.3-2006 para. 319.4.4 Eq. (17)' },
+      inPlaneBending: { value: inPlaneSif, source: appendixDSource },
+      outOfPlaneBending: { value: outOfPlaneSif, source: appendixDSource },
+    },
+  });
+}
+
+function compileAppendixRangeResult({
+  componentId,
+  section,
+  localAction,
+  inPlaneSif,
+  outOfPlaneSif,
+}) {
+  const frameElement = appendixFrameElement(`E-${componentId}`, section);
+  return {
+    frameElement,
+    result: compileCodeResult({
+      codeProfile: codeProfile(),
+      editionDataset: editionDataset(),
+      stressFactorSet: appendixRangeFactorSet(componentId, inPlaneSif, outOfPlaneSif),
+      category: 'DISPLACEMENT_STRESS_RANGE',
+      codePointId: `CP-${componentId}`,
+      componentId,
+      combinationId: `APPENDIX-S303-CASE-${componentId}`,
+      frameElementRecord: frameElement,
+      sectionResolution: section,
+      materialResolution: materialResolution(),
+      localAction,
+      pressureStressContribution: null,
+      coldTemperature: {
+        value: COLD_TEMPERATURE,
+        source: 'Fixture allowable lookup only; calculatedStress is independent of this synthetic dataset',
+      },
+      occasionalCategoryId: null,
+    }),
+  };
 }
 
 const solved = solveAndRecover();
@@ -343,7 +459,7 @@ function compileCategory(category) {
 
 function verifyCategory(category, pressureValue) {
   const actual = compileCategory(category);
-  const expected = expectedStress(solved.localAction, mechanicalProperties, pressureValue);
+  const expected = expectedStress(category, solved.localAction, mechanicalProperties, pressureValue);
   const referenceScale = expected.calculatedStress;
   for (const field of Object.keys(expected.stressTerms)) {
     assertClose(
@@ -372,6 +488,7 @@ function verifyCategory(category, pressureValue) {
       my: solved.localAction.my,
       mz: solved.localAction.mz,
     }),
+    resultants: actual.resultants,
     stressTerms: actual.stressTerms,
     expectedStressTerms: expected.stressTerms,
     calculatedStress: actual.calculatedStress,
@@ -390,13 +507,89 @@ test('B41-T02', 'OCCASIONAL combined member stress matches independent closed fo
   verifyCategory('OCCASIONAL', PRESSURE_STRESS_CONTRIBUTION.value)
 ));
 
-test('B41-T03', 'DISPLACEMENT_STRESS_RANGE excludes pressure and matches independent closed form', () => {
+test('B41-T03', 'DISPLACEMENT_STRESS_RANGE retains axial resultant but excludes axial and pressure stress under Eq. (17)', () => {
   const evidence = verifyCategory('DISPLACEMENT_STRESS_RANGE', 0);
+  assert.notEqual(evidence.resultants.axialForce, 0, 'fixture must carry a genuinely nonzero recovered axial force');
+  assert.equal(evidence.stressTerms.axial, 0);
   assert.equal(evidence.stressTerms.pressure, 0);
   return evidence;
 });
 
-test('B41-T04', 'Non-compliance categories retain their documented refusal codes', () => {
+test('B41-T04', 'Appendix S Table S303.7.1 NPS20 pipe row reproduces Eq. (17) without axial stress', () => {
+  const section = appendixSection(
+    'SEC-M019-APP-S3-NPS20-STD',
+    APPENDIX_S_NPS20_OUTER_DIAMETER,
+    'fnv1a64:4190000000000020',
+  );
+  const { frameElement, result } = compileAppendixRangeResult({
+    componentId: 'APP-S3-NPS20-PIPE',
+    section,
+    localAction: APPENDIX_S_NPS20_RESULTANT,
+    inPlaneSif: 1,
+    outOfPlaneSif: 1,
+  });
+  const properties = sectionMechanicalProperties(frameElement.section, section);
+  const bendingOnly = APPENDIX_S_NPS20_RESULTANT.my / properties.sectionModulus;
+  const oldAxialInclusive = Math.abs(APPENDIX_S_NPS20_RESULTANT.fx / properties.area)
+    + Math.abs(bendingOnly);
+  assert.equal(result.resultants.axialForce, APPENDIX_S_NPS20_RESULTANT.fx);
+  assert.equal(result.stressTerms.axial, 0);
+  assertClose(result.calculatedStress, bendingOnly, RELATIVE_TOLERANCE, 'NPS20 corrected Eq. (17) stress');
+  assertClose(
+    result.calculatedStress,
+    APPENDIX_S_NPS20_PUBLISHED_STRESS,
+    APPENDIX_S_RELATIVE_TOLERANCE,
+    'NPS20 Appendix S published S_E',
+  );
+  assert.ok(oldAxialInclusive > APPENDIX_S_NPS20_PUBLISHED_STRESS * 1.2);
+  return {
+    area: properties.area,
+    sectionModulus: properties.sectionModulus,
+    publishedStress: APPENDIX_S_NPS20_PUBLISHED_STRESS,
+    correctedStress: result.calculatedStress,
+    oldAxialInclusiveStress: oldAxialInclusive,
+    relativeDeviation: (result.calculatedStress - APPENDIX_S_NPS20_PUBLISHED_STRESS)
+      / APPENDIX_S_NPS20_PUBLISHED_STRESS,
+  };
+});
+
+test('B41-T05', 'Appendix S Table S303.7.1 NPS24 tee row reproduces the real Appendix D in-plane SIF', () => {
+  const section = appendixSection(
+    'SEC-M019-APP-S3-NPS24-STD',
+    APPENDIX_S_NPS24_OUTER_DIAMETER,
+    'fnv1a64:4190000000000024',
+  );
+  const { frameElement, result } = compileAppendixRangeResult({
+    componentId: 'APP-S3-NPS24-TEE',
+    section,
+    localAction: APPENDIX_S_TEE_RESULTANT,
+    inPlaneSif: APPENDIX_S_TEE_IN_PLANE_SIF,
+    outOfPlaneSif: APPENDIX_S_TEE_OUT_OF_PLANE_SIF,
+  });
+  const properties = sectionMechanicalProperties(frameElement.section, section);
+  const independentlyExpected = APPENDIX_S_TEE_IN_PLANE_SIF
+    * APPENDIX_S_TEE_RESULTANT.my / properties.sectionModulus;
+  assert.equal(result.resultants.axialForce, 0);
+  assert.equal(result.stressTerms.axial, 0);
+  assertClose(result.calculatedStress, independentlyExpected, RELATIVE_TOLERANCE, 'NPS24 tee Eq. (17) stress');
+  assertClose(
+    result.calculatedStress,
+    APPENDIX_S_TEE_PUBLISHED_STRESS,
+    APPENDIX_S_RELATIVE_TOLERANCE,
+    'NPS24 tee Appendix S published S_E',
+  );
+  return {
+    sectionModulus: properties.sectionModulus,
+    inPlaneSif: APPENDIX_S_TEE_IN_PLANE_SIF,
+    publishedStress: APPENDIX_S_TEE_PUBLISHED_STRESS,
+    correctedStress: result.calculatedStress,
+    oldAxialInclusiveStress: result.calculatedStress,
+    relativeDeviation: (result.calculatedStress - APPENDIX_S_TEE_PUBLISHED_STRESS)
+      / APPENDIX_S_TEE_PUBLISHED_STRESS,
+  };
+});
+
+test('B41-T06', 'Non-compliance categories retain their documented refusal codes', () => {
   const refusals = Object.freeze({
     OPERATING: 'CODE_ENGINE_OPERATING_NOT_A_COMPLIANCE_CATEGORY',
     USER_PROJECT_CHECK: 'CODE_ENGINE_USER_PROJECT_CHECK_NOT_A_COMPLIANCE_CATEGORY',
@@ -415,6 +608,7 @@ console.log(JSON.stringify({
   check: 'lfea-b4.1-code-engine-closed-form',
   status: 'PASS',
   tolerance: RELATIVE_TOLERANCE,
+  appendixSRelativeTolerance: APPENDIX_S_RELATIVE_TOLERANCE,
   spanLength: SPAN_LENGTH,
   executionStatus: solved.execution.status,
   mechanicalProperties,
