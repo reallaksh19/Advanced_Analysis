@@ -81,11 +81,28 @@ export function buildTopologyEditCandidateDelta(before, after) {
   }
   return deepFreeze({ ...material, deltaHash: semanticHash(material) });
 }
-function checkerDelta(before, after) {
+/** Recover the component omitted by the pre-checker's primary-component convention. */
+function previousPrimaryNodeIds(topology, before) {
+  const disconnectedNodeIds = new Set(before.issues
+    .filter((issue) => issue.kind === 'BRANCH_DISCONNECTED')
+    .flatMap((issue) => issue.nodeIds));
+  return topology.nodes.map((node) => node.id)
+    .filter((nodeId) => !disconnectedNodeIds.has(nodeId)).sort();
+}
+function hasExactNodeIds(issue, expectedNodeIds) {
+  if (issue.kind !== 'BRANCH_DISCONNECTED') return false;
+  const actualNodeIds = [...issue.nodeIds].sort();
+  return actualNodeIds.length === expectedNodeIds.length
+    && actualNodeIds.every((nodeId, index) => nodeId === expectedNodeIds[index]);
+}
+function checkerDelta(beforeTopology, before, after) {
   const beforeById = new Map(before.issues.map((issue) => [issue.id, issue]));
   const afterById = new Map(after.issues.map((issue) => [issue.id, issue]));
+  const previousPrimary = previousPrimaryNodeIds(beforeTopology, before);
   const material = {
-    introducedIssues: after.issues.filter((issue) => !beforeById.has(issue.id)),
+    introducedIssues: after.issues.filter((issue) => (
+      !beforeById.has(issue.id) && !hasExactNodeIds(issue, previousPrimary)
+    )),
     resolvedIssues: before.issues.filter((issue) => !afterById.has(issue.id)),
     unchangedIssueIds: after.issues.filter((issue) => beforeById.has(issue.id))
       .map((issue) => issue.id).sort(),
@@ -107,7 +124,7 @@ function buildCandidateEvidence(topology, command, policy) {
   return {
     beforeChecker, candidateTopology, afterChecker,
     topologyDelta: buildTopologyEditCandidateDelta(topology, candidateTopology),
-    checkerDelta: checkerDelta(beforeChecker, afterChecker),
+    checkerDelta: checkerDelta(topology, beforeChecker, afterChecker),
   };
 }
 function candidateMaterial(command, currentHash, policy, evidence) {

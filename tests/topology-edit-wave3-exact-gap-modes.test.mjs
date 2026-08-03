@@ -136,6 +136,26 @@ function distanceBetween(topology, leftId, rightId) {
   const left = points.get(leftId); const right = points.get(rightId);
   return Math.hypot(left.x - right.x, left.y - right.y, left.z - right.z);
 }
+function previousPrimaryNodeIds(topology, issues) {
+  const disconnected = new Set(issues
+    .filter((issue) => issue.kind === 'BRANCH_DISCONNECTED')
+    .flatMap((issue) => issue.nodeIds));
+  return topology.nodes.map((node) => node.id)
+    .filter((nodeId) => !disconnected.has(nodeId)).sort();
+}
+function primaryEvidence(topology, nodeIds) {
+  const selected = new Set(nodeIds);
+  return {
+    positions: Object.fromEntries(nodeIds.map((nodeId) => {
+      const node = topology.nodes.find((row) => row.id === nodeId);
+      return [nodeId, node.position];
+    })),
+    incidentEdges: topology.edges.filter((edge) => (
+      selected.has(edge.fromNodeId) || selected.has(edge.toNodeId)
+    )).map((edge) => ({ id: edge.id, fromNodeId: edge.fromNodeId,
+      toNodeId: edge.toNodeId })).sort((left, right) => left.id.localeCompare(right.id)),
+  };
+}
 
 test('exact-gap controls retain MOVE_NODE authority and explicit labels', () => {
   assert.deepEqual(TOPOLOGY_EDIT_EXACT_GAP_MM, { 'set-gap-3': 3, 'set-gap-20': 20 });
@@ -182,7 +202,7 @@ test('250 mm remains outside snap autofix and uses manual bridge', () => {
   );
 });
 
-test('real 20-object fixture qualifies 3 mm, 20 mm, and 250 mm paths', async () => {
+test('[REAL DATA] 20-object fixture qualifies 3 mm, 20 mm, and 250 mm paths', async () => {
   const canonical = await loadDemoCanonical();
   const anchorNodeId = componentEndpoint(canonical, 'P-001', 'TO');
   const movingNodeId = componentEndpoint(canonical, 'E-001', 'FROM');
@@ -199,8 +219,22 @@ test('real 20-object fixture qualifies 3 mm, 20 mm, and 250 mm paths', async () 
     assert.equal(session.execute(intent.commandType, intent.payload).disposition, 'ACCEPTED');
     const issue = snapIssue(session.currentTopology(), [anchorNodeId, movingNodeId]);
     assert.equal(issue.distanceMm, requestedGapMm);
+    const beforeMerge = session.currentTopology();
+    const previousPrimary = previousPrimaryNodeIds(
+      beforeMerge, checkCanonicalTopology(beforeMerge),
+    );
+    const previousPrimaryEvidence = primaryEvidence(beforeMerge, previousPrimary);
     const preview = session.previewAutofix(session.autofixSuggestions([issue])[0]);
     assert.equal(preview.disposition, 'ACCEPTED');
+    const candidate = preview.certification.candidate;
+    assert.deepEqual(candidate.checkerDelta.introducedIssues, []);
+    assert.equal(candidate.afterChecker.issues.some((afterIssue) => (
+      afterIssue.kind === 'BRANCH_DISCONNECTED'
+      && afterIssue.nodeIds.length === previousPrimary.length
+      && afterIssue.nodeIds.every((nodeId, index) => nodeId === previousPrimary[index])
+    )), true);
+    assert.deepEqual(primaryEvidence(candidate.canonicalTopology, previousPrimary),
+      previousPrimaryEvidence);
     assert.equal(session.acceptAutofix(preview).disposition, 'ACCEPTED');
     assert.equal(snapIssue(session.currentTopology(), [anchorNodeId, movingNodeId]), undefined);
     candidateHashes.push(preview.candidateDraftHash);
