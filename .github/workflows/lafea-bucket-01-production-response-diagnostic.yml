@@ -1,0 +1,64 @@
+name: LAFEA Bucket-01 Production Response Diagnostic
+
+on:
+  push:
+    branches: [bucket-01-cantilever-benchmark-route]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  response:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Execute production response and publish receipt detail
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports/qualification
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=pending -f context=lafea/production-response-detail \
+            -f description="Executing 64/256/1024 production response"
+          node scripts/lafea-bucket-01-production-response-runner.mjs \
+            > reports/qualification/response-runner.stdout.log \
+            2> reports/qualification/response-runner.stderr.log
+          set +e
+          node scripts/lafea-bucket-01-production-response-receipt.mjs \
+            > reports/qualification/response-receipt.stdout.log \
+            2> reports/qualification/response-receipt.stderr.log
+          exit_code=$?
+          set -e
+          if [[ "$exit_code" == "0" ]]; then
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -f state=success -f context=lafea/production-response-detail \
+              -f description="Production response convergence passed"
+          else
+            detail=$(node -e "const fs=require('fs');const out=fs.readFileSync('reports/qualification/response-receipt.stdout.log','utf8');const err=fs.readFileSync('reports/qualification/response-receipt.stderr.log','utf8');process.stdout.write((err.trim()||out.trim()).slice(-6000))")
+            encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -f state=failure -f context=lafea/production-response-detail \
+              -f description="Production response convergence blocked" \
+              -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
+          fi
+          exit "$exit_code"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-production-response-detail-${{ github.sha }}
+          path: reports/qualification/
+          if-no-files-found: warn
+          retention-days: 30
