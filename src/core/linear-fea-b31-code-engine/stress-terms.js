@@ -4,8 +4,9 @@ import { LOCAL_ACTION_FIELDS, RESULTANT_KEYS, requireExactKeys, requireFinite } 
  * Section 10.3 stress component requirements: retain axial force, torsional
  * moment, in-plane bending moment and out-of-plane bending moment at the
  * code point (already recovered by B-3.4; never recomputed here), and expose
- * each numerator term before combination so a reviewer can reproduce the
- * utilization.
+ * each stress contribution before combination so a reviewer can reproduce
+ * the utilization. A category may legitimately retain a nonzero raw
+ * resultant while assigning a zero contribution to its governing formula.
  *
  * Section properties (area, section modulus, polar section modulus) are read
  * directly off the B-2.3 `sectionState`/`dimensions` a B-3.1 frame element
@@ -64,24 +65,32 @@ export function extractResultants(localAction, momentDirectionMapping) {
 }
 
 /**
- * Section 10.3 combination (`STRESS_COMBINATION_METHOD =
- * DIRECT_PLUS_SRSS_BENDING_TORSION_V1`): direct-stress terms (axial,
- * pressure) sum algebraically; bending (both directions) and torsion combine
- * by square-root-sum-of-squares. This is generic beam/shell mechanics
- * structure, symbolically named; every coefficient folded in (the indices,
- * the pressure contribution) arrives already declared by the caller.
+ * Category-resolved stress combination. `SUSTAINED`/`OCCASIONAL` supply their
+ * real axial and pressure longitudinal-stress contributions, so the direct
+ * terms sum algebraically before absolute value. ASME B31.3-2006 para.
+ * 319.4.4 Eq. (17) range categories supply zero for both direct terms, leaving
+ * the SIF-weighted bending/torsion SRSS required by that equation. Raw axial
+ * force remains visible in `resultants.axialForce`; only its formula
+ * contribution is category-resolved by the caller.
  *
- * @param {Readonly<{axialForce:number, torsion:number, inPlaneMoment:number, outOfPlaneMoment:number}>} resultants
+ * @param {Readonly<{axialForce:number, torsion:number,inPlaneMoment:number,outOfPlaneMoment:number}>} resultants
  * @param {{area:number, sectionModulus:number, polarSectionModulus:number}} mechanicalProperties
  * @param {Readonly<{axial:number, torsional:number, inPlaneBending:number, outOfPlaneBending:number}>} indices
- * @param {number} pressureStressValue Already-resolved sustained pressure longitudinal stress contribution, or 0.
+ * @param {number} pressureStressValue Category-resolved pressure contribution (zero for range categories).
+ * @param {number} axialStressValue Category-resolved axial contribution (zero for range categories).
  * @returns {{stressTerms: Readonly<object>, calculatedStress:number}}
  */
-export function combineStressTerms(resultants, mechanicalProperties, indices, pressureStressValue) {
-  const { area, sectionModulus, polarSectionModulus } = mechanicalProperties;
+export function combineStressTerms(
+  resultants,
+  mechanicalProperties,
+  indices,
+  pressureStressValue,
+  axialStressValue,
+) {
+  const { sectionModulus, polarSectionModulus } = mechanicalProperties;
   const stressTerms = {
     pressure: pressureStressValue,
-    axial: (resultants.axialForce / area) * indices.axial,
+    axial: axialStressValue,
     torsional: (resultants.torsion / polarSectionModulus) * indices.torsional,
     inPlaneBending: (resultants.inPlaneMoment / sectionModulus) * indices.inPlaneBending,
     outOfPlaneBending: (resultants.outOfPlaneMoment / sectionModulus) * indices.outOfPlaneBending,
