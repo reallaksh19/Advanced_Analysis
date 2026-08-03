@@ -17,6 +17,7 @@ const checkDefinitions = [
   { id: 'GOVERNED_4096_PRODUCTION_T6_MESH_QUALIFICATION', script: 'scripts/lafea-bucket-01-mesh-qualification-check.mjs' },
   { id: 'GOVERNED_4096_PRODUCTION_RESPONSE_CONVERGENCE_CONTRACT', script: 'scripts/lafea-bucket-01-production-response-check.mjs' },
   { id: 'SCALABLE_SPARSE_CONTINUUM_SOLVER', script: 'scripts/lafea-bucket-01-scalable-solver-check.mjs' },
+  { id: 'SPARSE_SOLVER_POLICY_ANTI_DRIFT', script: 'scripts/lafea-bucket-01-solver-policy-contract-check.mjs' },
   { id: 'GOVERNED_T6_KIRSCH_FIXED_PROBES', script: 'scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs' },
   { id: 'GOVERNED_4096_DIRECT_POINT_LOCATION_CONTRACT', script: 'scripts/lafea-bucket-01-production-lug-probe-contract-check.mjs' },
   { id: 'EXPECTED_VALUE_DEFINITION_SET', script: 'scripts/lafea-bucket-01-expected-value-registry-check.mjs' },
@@ -37,7 +38,7 @@ const checks = checkDefinitions.map((definition) => runNodeCheck(definition));
 const failed = checks.filter((check) => check.status !== 'PASS');
 const repairChecksPass = failed.length === 0;
 const report = {
-  schema: 'lafea-bucket-01-repair-check-report/v16',
+  schema: 'lafea-bucket-01-repair-check-report/v17',
   status: repairChecksPass ? 'REPAIR_CHECKS_PASS' : 'REPAIR_CHECKS_FAIL',
   bucketId: 'LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE',
   target: 'C2D-LUG-PINHOLE -> LAFEA.3',
@@ -49,6 +50,7 @@ const report = {
     governed4096ProductionResponseSpecFrozen: true,
     finestThreeResponseConvergenceContractVerified: repairChecksPass,
     scalableSparseSolverRouteVerified: repairChecksPass,
+    sparseSolverPolicyBoundToSource: repairChecksPass,
     productionResponseExecutionEvidenceGenerated: false,
     kirschFixedProbeOracleFrozen: true,
     kirschFixedProbeEvidenceGenerated: repairChecksPass,
@@ -88,6 +90,7 @@ const report = {
     governed4096MeshQualificationInfrastructureImplemented: repairChecksPass,
     governed4096ResponseConvergenceInfrastructureImplemented: repairChecksPass,
     scalableSparseSolverInfrastructureImplemented: repairChecksPass,
+    sparseSolverPolicyAntiDriftImplemented: repairChecksPass,
     governedKirschFixedProbeBenchmarkImplemented: repairChecksPass,
     governedDirectPointLugProbeContractImplemented: repairChecksPass,
     expectedValueDefinitionSetImplemented: repairChecksPass,
