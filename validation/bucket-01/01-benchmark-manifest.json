@@ -1,5 +1,5 @@
 {
-  "schema": "lafea-bucket-01-benchmark-manifest/v11",
+  "schema": "lafea-bucket-01-benchmark-manifest/v12",
   "manifest_status": "DEFINITION_SET_FROZEN_WITH_EXTERNAL_GATES_OPEN",
   "repository": "reallaksh19/Advanced_Analysis",
   "baseline_main_sha": "eaac7e0532c114ef306d2d928f1d9f74348193cd",
@@ -39,9 +39,12 @@
     "C2D-PATCH-T3-01",
     "C2D-PATCH-T6-01",
     "C2D-PATCH-PURE-SHEAR-01",
-    "C2D-PURE-BENDING-PANEL-T6-01",
+    "C2D-CANTILEVER-PLANE-STRESS-01",
     "C2D-KIRSCH-HOLE-01",
     "C2D-LUG-PINHOLE-01"
+  ],
+  "supplemental_benchmarks": [
+    "C2D-PURE-BENDING-PANEL-T6-01"
   ],
   "production_mesh_levels": [
     {
@@ -106,7 +109,7 @@
     "frozen_oracle_status": "COMPLETE_DEFINITION_SET",
     "registry": "validation/bucket-01/11-expected-value-registry.json",
     "contract_check": "scripts/lafea-bucket-01-expected-value-registry-check.mjs",
-    "independent_closed_form_oracle_count": 4,
+    "independent_closed_form_oracle_count": 5,
     "frozen_production_convergence_definition_count": 2,
     "hash_authority": [
       "GIT_BLOB_SHA",
@@ -122,12 +125,23 @@
       "oracle": "validation/bucket-01/04-t3-patch-oracle.json"
     },
     {
+      "benchmark_id": "C2D-PATCH-T6-01",
+      "script": "scripts/lafea.3-t6-patch-check.mjs",
+      "authority": "ELEMENT_FORMULATION_AND_INTEGRATION_POINT_JACOBIAN_CHECK"
+    },
+    {
       "benchmark_id": "C2D-PATCH-PURE-SHEAR-01",
       "script": "scripts/lafea-bucket-01-pure-shear-check.mjs",
       "oracle": "validation/bucket-01/05-pure-shear-oracle.json"
     },
     {
+      "benchmark_id": "C2D-CANTILEVER-PLANE-STRESS-01",
+      "script": "scripts/lafea-bucket-01-cantilever-check.mjs",
+      "expected_value_definition": "EMBEDDED_FROZEN_DEFINITION_HASHED_IN_RECEIPT"
+    },
+    {
       "benchmark_id": "C2D-PURE-BENDING-PANEL-T6-01",
+      "classification": "SUPPLEMENTAL_NOT_A_CANTILEVER_SUBSTITUTE",
       "script": "scripts/lafea-bucket-01-pure-bending-panel-check.mjs",
       "oracle": "validation/bucket-01/03-pure-bending-panel-oracle.json"
     },
@@ -178,6 +192,7 @@
   },
   "automatic_stop_conditions": [
     "exact head or parent mismatch",
+    "mandatory benchmark omitted or substituted",
     "tolerance changed after observation",
     "expected value derived from production output",
     "non-positive Jacobian",
