@@ -44,6 +44,7 @@ current source — do not trust the document alone.
 | M008-B | #475 | #477 | Merged | `extractBranchSubset` — branch-extraction algorithm populating `entityIds`/`routeIds`/`supportEntityIds`/`boundaryPorts` from real `normalizeWorkspaceDataset` output via genuine `buildRoutePartitionModel` reuse, sealed through M008-A's real contract. Algorithm needed no fixes; Owner review found and fixed one wrong value in the acceptance oracle *this repo's own docs* had specified — see process note below |
 | M008-C | #480 | — | Ready | Material/section authority resolution (real `MTXX`/`DTXR`/`ABORE` parsing → real B-2.2/B-2.3 sealed resolutions) for the branch's actual pipe/fitting entities only (ELBO/FLAN/PIPE, incl. auto-generated-pipe inheritance); gaskets, supports, and compound valve-trim materials explicitly deferred. Grounded in a direct real-attribute survey of all 16 target-branch entities before the issue was written |
 | M009 | #464 | #471 | Merged | B-4.0's `calculatedStress` confirmed real, production-wired, and already displayed/exported — not a gap. Broad "implement stress recovery" declined (no mandate text to justify scope beyond what exists); pressure-stress-from-geometry and EditionDataset-import gaps logged but not authorized. Closed-form verification benchmark added at `lfea-b4.1` (#469), Owner-validated including hand-verified arithmetic |
+| M010 | #485 | — | Ready | Closes M009's logged pressure-stress gap: derives `pressureStressContribution` from the real, sealed `PRESSURE` load primitive (zero consumers found anywhere — same disconnected-primitive pattern as gravity before M007) and wires it into `linear-piping-code-application`. Dispatched in parallel with M008-C — disjoint files (solver/code-application stack vs. workspace-layer), no prequalification gate |
 
 ### Non-LFEA workstreams (user-directed pivot, 4 parallel read-only audits + direct fixes)
 
@@ -163,7 +164,28 @@ the statics and stress-term arithmetic and confirmed the review addendum's
 anti-drift safeguards (raw-literal check, `indexOf`-based registration
 ordering) genuinely run, not just exist as dead code.
 
-**M010**: Stack-B UI defect re-verification. Before scoping, redo the direct
+**M010 (#485) is now live**, dispatched in parallel with M008-C — see the
+Work Pack log above. Closes a real, disconnected production gap M009 logged
+but didn't authorize: a real, sealed `PRESSURE` load primitive already
+exists at B-3.0 (`authorizedEffects: { codeStress, pressureStiffening,
+axialThrust, bourdon }`, explicitly documented as "authorisation alone
+never applies it"), and a repo-wide search found zero consumers anywhere —
+the same disconnected-primitive pattern gravity had before M007.
+`pressureStressContribution` in `compileCodeResult` has always been
+caller-supplied; nothing derives it from a real pressure declaration and
+pipe geometry. Scoped to derive it via generic thin-wall pressure-vessel
+mechanics (`P·D/(4·t)`, the same "generic beam/shell mechanics" category
+`combineStressTerms`'s own doc comment already treats as legitimate, not a
+licensed B31.3 coefficient) and wire it into `linear-piping-code-application`
+— `pressureStiffening`/`axialThrust`/`bourdon` explicitly deferred as
+distinct, unimplemented effects requiring their own future missions. Touches
+an entirely different part of the codebase from M008-C (solver/code-application
+stack vs. workspace-layer), so the two can run concurrently without file
+overlap.
+
+**M011**: Stack-B UI defect re-verification (renumbered from the earlier
+"M010" slot — that number is now taken by the pressure-stress mission
+above). Before scoping, redo the direct
 verification pass that found D-01/D-09 already fixed — do not reuse
 `FEA_UI_UPGRADE_PLAN.md`'s claims without re-checking current code, the same
 way M002's fixture-default question and M003's export-eligibility assertion
