@@ -1,0 +1,192 @@
+name: LAFEA Bucket-01 Production Diagnostic
+
+on:
+  push:
+    branches: [bucket-01-cantilever-benchmark-route]
+
+permissions:
+  contents: read
+  statuses: write
+  issues: write
+
+jobs:
+  production-diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Publish diagnostic start
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh api --method POST
+          "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}"
+          -f state=pending
+          -f context=lafea/bucket-01-production-diagnostic
+          -f description="Governed 4096 production diagnostic started"
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Execute governed numerical route
+        id: diagnostic
+        shell: bash
+        run: |
+          mkdir -p reports/qualification
+          set +e
+
+          node scripts/lafea-bucket-01-production-response-runner.mjs \
+            > reports/qualification/production-runner.stdout.log \
+            2> reports/qualification/production-runner.stderr.log
+          runner_exit=$?
+
+          response_exit=99
+          lug_exit=99
+          if [[ "$runner_exit" == "0" ]]; then
+            node scripts/lafea-bucket-01-production-response-receipt.mjs \
+              > reports/qualification/production-response.stdout.log \
+              2> reports/qualification/production-response.stderr.log
+            response_exit=$?
+
+            node scripts/lafea-bucket-01-production-lug-probe-receipt.mjs \
+              > reports/qualification/production-lug-stress.stdout.log \
+              2> reports/qualification/production-lug-stress.stderr.log
+            lug_exit=$?
+          fi
+
+          node scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs \
+            > reports/qualification/kirsch.stdout.log \
+            2> reports/qualification/kirsch.stderr.log
+          kirsch_exit=$?
+
+          RUNNER_EXIT="$runner_exit" \
+          RESPONSE_EXIT="$response_exit" \
+          LUG_EXIT="$lug_exit" \
+          KIRSCH_EXIT="$kirsch_exit" \
+          EXPECTED_HEAD_SHA="$GITHUB_SHA" \
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const read = (path) => {
+            if (!fs.existsSync(path)) return null;
+            try { return JSON.parse(fs.readFileSync(path, 'utf8')); }
+            catch { return null; }
+          };
+          const integer = (name) => Number.parseInt(process.env[name], 10);
+          const exits = {
+            productionRunner: integer('RUNNER_EXIT'),
+            productionResponse: integer('RESPONSE_EXIT'),
+            productionLugStress: integer('LUG_EXIT'),
+            kirsch: integer('KIRSCH_EXIT'),
+          };
+          const response = read('reports/qualification/lafea-bucket-01-production-response.json');
+          const lug = read('reports/qualification/lafea-bucket-01-production-lug-fixed-probes.json');
+          const kirsch = read('reports/qualification/lafea-bucket-01-kirsch-fixed-probes.json');
+          const ordered = Object.entries(exits);
+          const firstFailure = ordered.find(([, value]) => value !== 0)?.[0] ?? null;
+          const report = {
+            schema: 'lafea-bucket-01-production-diagnostic/v1',
+            exactHeadSha: process.env.EXPECTED_HEAD_SHA,
+            exits,
+            response: response ? {
+              status: response.status,
+              reasons: response.reasons ?? [],
+              energyConvergenceElementCounts:
+                response.energyConvergenceElementCounts ?? null,
+              energyConvergenceStatus: response.energyConvergence?.status ?? null,
+              fineGridGci: response.energyConvergence?.fineGridGci ?? null,
+              observedOrder: response.energyConvergence?.observedOrder ?? null,
+            } : null,
+            lugStress: lug ? {
+              status: lug.status,
+              governedLevelOrdinals: lug.governedLevelOrdinals ?? null,
+              evaluatedLevelOrdinals: lug.evaluatedLevelOrdinals ?? null,
+              directElementPointRecovery:
+                lug.authority?.directElementPointRecovery ?? null,
+              failingLocations: [
+                ...(lug.standaloneProbeReceipts ?? []),
+                ...(lug.pathReceipts ?? []).flatMap(
+                  (path) => path.stationReceipts ?? [],
+                ),
+              ].filter((row) => row.status !== 'PASS').map((row) => ({
+                probeId: row.probeId,
+                status: row.status,
+                reasons: row.convergence?.reasons ?? [],
+                observations: row.observations ?? [],
+                fineGridGci: row.convergence?.fineGridGci ?? null,
+                observedOrder: row.convergence?.observedOrder ?? null,
+              })),
+            } : null,
+            kirsch: kirsch ? {
+              status: kirsch.status,
+              reasons: kirsch.reasons ?? [],
+            } : null,
+            firstFailure,
+            status: firstFailure === null ? 'PASS' : 'BLOCKED',
+          };
+          fs.writeFileSync(
+            'reports/qualification/lafea-bucket-01-production-diagnostic.json',
+            `${JSON.stringify(report, null, 2)}\n`,
+          );
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `status=${report.status}\n`);
+          fs.appendFileSync(
+            process.env.GITHUB_OUTPUT,
+            `first_failure=${report.firstFailure ?? 'NONE'}\n`,
+          );
+          NODE
+
+          exit 0
+
+      - name: Publish diagnostic result
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STATUS: ${{ steps.diagnostic.outputs.status }}
+          FIRST_FAILURE: ${{ steps.diagnostic.outputs.first_failure }}
+        shell: bash
+        run: |
+          status="${STATUS:-BLOCKED}"
+          first="${FIRST_FAILURE:-WORKFLOW_FAILURE}"
+          description="Governed diagnostic ${status}"
+          if [[ "$status" != "PASS" ]]; then
+            description="Diagnostic complete; first blocker ${first}"
+          fi
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=success \
+            -f context=lafea/bucket-01-production-diagnostic \
+            -f description="$description"
+
+          if [[ -f reports/qualification/lafea-bucket-01-production-diagnostic.json ]]; then
+            body_file=$(mktemp)
+            {
+              echo '<!-- lafea-bucket-01-production-diagnostic -->'
+              echo '### Bucket-01 governed production diagnostic'
+              echo
+              echo "Head: \`${GITHUB_SHA}\`"
+              echo
+              echo '```json'
+              cat reports/qualification/lafea-bucket-01-production-diagnostic.json
+              echo '```'
+              echo
+              echo '_This is a non-blocking diagnostic. Qualification remains fail-closed._'
+            } > "$body_file"
+            gh api --method POST \
+              "repos/${GITHUB_REPOSITORY}/issues/498/comments" \
+              --input "$body_file"
+          fi
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-bucket-01-production-diagnostic-${{ github.sha }}
+          path: reports/qualification/
+          if-no-files-found: warn
+          retention-days: 30
