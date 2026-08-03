@@ -75,7 +75,7 @@ const input = () => ({
 });
 
 const sealed = sealAnalysisAuthorityOverlay(input(), { dataset });
-assert.equal(requireAnalysisAuthorityOverlay(sealed, { dataset }), sealed);
+assert.deepEqual(requireAnalysisAuthorityOverlay(sealed, { dataset }), sealed);
 assert.equal(Object.isFrozen(sealed), true);
 assert.equal(Object.isFrozen(sealed.assignments.branches[0].material.evidence), true);
 assert.equal(sealAnalysisAuthorityOverlay(input(), { dataset }).semanticHash, sealed.semanticHash);
