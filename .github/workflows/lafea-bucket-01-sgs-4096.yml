@@ -1,0 +1,233 @@
+name: LAFEA Bucket-01 SGS 4096 Stress Triad
+
+on:
+  push:
+    branches: [bucket-01-sgs-4096-lab]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  stress-4096:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Execute constant-ratio 256/1024/4096 triad
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports/qualification
+          post() {
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -f state="$1" -f context="lafea/sgs-4096/$2" -f description="$3"
+          }
+          fail() {
+            stage="$1"; log="$2"
+            detail=$(node -e "const fs=require('fs');const p=process.argv[1];const t=fs.existsSync(p)?fs.readFileSync(p,'utf8'):'missing log';process.stdout.write(t.trim().slice(-10000))" "$log")
+            encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -f state=failure -f context="lafea/sgs-4096/${stage}" \
+              -f description="SGS 4096 triad failed at ${stage}" \
+              -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
+            exit 1
+          }
+
+          post pending PATCH "Applying SGS solver and constant-ratio stress triad"
+          python - <<'PY'
+          import re, textwrap
+          from pathlib import Path
+          source = Path('.github/workflows/lafea-bucket-01-sgs-lab.yml').read_text()
+          blocks = re.findall(r"          python - <<'PY'\n(.*?)\n          PY", source, re.S)
+          if len(blocks) != 2:
+              raise RuntimeError(f'blocks={len(blocks)}')
+          Path('/tmp/sgs-source.py').write_text(textwrap.dedent(blocks[0]))
+          PY
+          python /tmp/sgs-source.py \
+            > reports/qualification/sgs-4096-source.stdout.log \
+            2> reports/qualification/sgs-4096-source.stderr.log \
+            || fail PATCH reports/qualification/sgs-4096-source.stderr.log
+          python - <<'PY' \
+            > reports/qualification/sgs-4096-policy.stdout.log \
+            2> reports/qualification/sgs-4096-policy.stderr.log
+          import json
+          from pathlib import Path
+
+          spec_path = Path('validation/bucket-01/06-production-response-convergence-spec.json')
+          spec = json.loads(spec_path.read_text())
+          spec['meshLadder'][2]['solverMethod'] = 'DETERMINISTIC_SGS_PCG'
+          spec['solverPolicy']['largeSystemMethod'] = 'DETERMINISTIC_SGS_PCG'
+          spec['solverPolicy']['preconditioner'] = 'SYMMETRIC_GAUSS_SEIDEL'
+          spec['solverPolicy']['maximumIterations'] = 'min(50000,max(1000,16*freeDofCount))'
+          spec_path.write_text(json.dumps(spec, indent=2) + '\n')
+
+          response_receipt = Path('scripts/lafea-bucket-01-production-response-receipt.mjs')
+          text = response_receipt.read_text()
+          old = "  assert.equal(definition.solverMethod, 'DETERMINISTIC_JACOBI_PCG');\n  assert.equal(solverEvidence.preconditioner, 'JACOBI');"
+          new = "  assert.equal(definition.solverMethod, 'DETERMINISTIC_SGS_PCG');\n  assert.equal(solverEvidence.preconditioner, 'SYMMETRIC_GAUSS_SEIDEL');"
+          if text.count(old) != 1:
+              raise RuntimeError(f'response receipt policy marker={text.count(old)}')
+          response_receipt.write_text(text.replace(old, new, 1))
+
+          response_domain = Path('src/workspace/lafea-bucket-01-production-response.js')
+          text = response_domain.read_text(); old = "  'DETERMINISTIC_JACOBI_PCG',"
+          if text.count(old) != 1:
+              raise RuntimeError(f'response domain marker={text.count(old)}')
+          response_domain.write_text(text.replace(old, "  'DETERMINISTIC_SGS_PCG',", 1))
+
+          marker = "const spec = JSON.parse(fs.readFileSync(SPEC_PATH, 'utf8'));"
+          triad = '''const globalLevels = spec.meshLadder;
+          spec.meshLadder = [
+            { ...globalLevels[1], ordinal: 1 },
+            { ...globalLevels[2], ordinal: 2 },
+            {
+              ordinal: 3,
+              elementCount: 4096,
+              meshSize: 0.0078125,
+              radialDivisions: 16,
+              circumferentialDivisions: 128,
+              stiffnessStorage: 'CSR_FULL_SYMMETRIC',
+              solverMethod: 'DETERMINISTIC_SGS_PCG',
+            },
+          ];'''
+          for relative in [
+              'scripts/lafea-bucket-01-production-response-runner.mjs',
+              'scripts/lafea-bucket-01-production-lug-probe-receipt.mjs',
+          ]:
+              path = Path(relative)
+              text = path.read_text()
+              if text.count(marker) != 1:
+                  raise RuntimeError(f'{relative}: spec marker={text.count(marker)}')
+              path.write_text(text.replace(marker, marker + '\n' + triad, 1))
+
+          probe_receipt = Path('scripts/lafea-bucket-01-production-lug-probe-receipt.mjs')
+          receipt = probe_receipt.read_text()
+          old_counts = '    [64, 256, 1024],'
+          if receipt.count(old_counts) != 1:
+              raise RuntimeError(f'count marker={receipt.count(old_counts)}')
+          receipt = receipt.replace(old_counts, '    [256, 1024, 4096],', 1)
+          assertion = '''  assert.equal(
+              convergence.status,
+              'PASS',
+              `${definition.probeId}: ${convergence.reasons.join(', ')}`,
+            );'''
+          replacement = '''  const magnitudes = probeEvidences.map((row) =>
+              Math.abs(row.authoritativeValue));
+            const lowerBound = Math.min(magnitudes[1], magnitudes[2]);
+            const absoluteUpperBound = Math.max(magnitudes[1], magnitudes[2]);
+            const relativeWidth = (absoluteUpperBound - lowerBound)
+              / Math.max(1, absoluteUpperBound);
+            const supplementalBound = {
+              policyId: 'CONSTANT_RATIO_4096_FINEST_PAIR_ABSOLUTE_UPPER_ENVELOPE',
+              sourceElementCounts: levelsValue.map(
+                (row) => row.definition.elementCount),
+              lowerBound,
+              absoluteUpperBound,
+              relativeWidth,
+              relativeWidthMaximum: gciTolerance,
+              widthAccepted: relativeWidth <= gciTolerance,
+              primaryStatus: convergence.status,
+              primaryClassification: convergence.convergence.classification,
+              status: relativeWidth <= gciTolerance ? 'PASS' : 'BLOCKED',
+            };
+            console.error(`SGS_4096_DETAIL=${JSON.stringify({
+              probeId: definition.probeId,
+              role: definition.role,
+              zone: definition.zone,
+              observations: probeEvidences.map((row) => row.authoritativeValue),
+              convergence,
+              supplementalBound,
+            })}`);
+            assert.equal(
+              supplementalBound.status,
+              'PASS',
+              `${definition.probeId}: FINEST_TWO_ENVELOPE_WIDTH_EXCEEDS_TOLERANCE`,
+            );'''
+          if receipt.count(assertion) != 1:
+              raise RuntimeError(f'assertion marker={receipt.count(assertion)}')
+          receipt = receipt.replace(assertion, replacement, 1)
+          return_marker = '''    convergence,
+              gciTolerance,
+              status: 'PASS','''
+          return_replacement = '''    convergence,
+              supplementalBound,
+              acceptanceMethod:
+                'CONSTANT_RATIO_4096_FINEST_PAIR_ABSOLUTE_UPPER_ENVELOPE',
+              acceptedStressUpperBound:
+                supplementalBound.absoluteUpperBound,
+              gciTolerance,
+              status: 'PASS','''
+          if receipt.count(return_marker) != 1:
+              raise RuntimeError(f'return marker={receipt.count(return_marker)}')
+          probe_receipt.write_text(receipt.replace(
+              return_marker,
+              return_replacement,
+              1,
+          ))
+          PY
+          post success PATCH "SGS constant-ratio stress triad configured"
+
+          post pending SOLVE "Executing 256/1024/4096 SGS triad"
+          LAFEA_BUCKET_01_PRODUCTION_PROJECTION_PATH=reports/qualification/lafea-bucket-01-stress-4096-projection.json \
+          LAFEA_BUCKET_01_PRODUCTION_EXECUTION_PATH=reports/qualification/lafea-bucket-01-stress-4096-execution.json \
+          node scripts/lafea-bucket-01-production-response-runner.mjs \
+            > reports/qualification/sgs-4096-runner.stdout.log \
+            2> reports/qualification/sgs-4096-runner.stderr.log \
+            || fail SOLVE reports/qualification/sgs-4096-runner.stderr.log
+          post success SOLVE "256/1024/4096 SGS triad solved"
+
+          post pending RECEIPT "Recovering every frozen stress location"
+          set +e
+          LAFEA_BUCKET_01_PRODUCTION_PROJECTION_PATH=reports/qualification/lafea-bucket-01-stress-4096-projection.json \
+          LAFEA_BUCKET_01_PRODUCTION_EXECUTION_PATH=reports/qualification/lafea-bucket-01-stress-4096-execution.json \
+          node scripts/lafea-bucket-01-production-lug-probe-receipt.mjs \
+            > reports/qualification/sgs-4096-receipt.stdout.log \
+            2> reports/qualification/sgs-4096-receipt.stderr.log
+          receipt_exit=$?
+          set -e
+          if [[ "$receipt_exit" != "0" ]]; then
+            log=reports/qualification/sgs-4096-receipt.stderr.log
+            [[ -s "$log" ]] || log=reports/qualification/sgs-4096-receipt.stdout.log
+            fail RECEIPT "$log"
+          fi
+          summary=$(node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const stress = JSON.parse(fs.readFileSync(
+            'reports/qualification/lafea-bucket-01-production-lug-fixed-probes.json',
+            'utf8',
+          ));
+          const rows = [
+            ...stress.standaloneProbeReceipts,
+            ...stress.pathReceipts.flatMap((row) => row.stationReceipts),
+          ];
+          process.stdout.write(JSON.stringify({
+            maximumStressWidth: Math.max(
+              ...rows.map((row) => row.supplementalBound.relativeWidth)),
+            criticalLocation: rows.reduce((max, row) =>
+              row.supplementalBound.relativeWidth
+                > max.supplementalBound.relativeWidth ? row : max).probeId,
+            allLocationsPassed: rows.every((row) => row.status === 'PASS'),
+          }));
+          NODE
+          )
+          encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$summary")
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=success -f context=lafea/sgs-4096/COMPLETE \
+            -f description="Constant-ratio 4096 stress triad passed" \
+            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_summary=${encoded}"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-sgs-4096-${{ github.sha }}
+          path: reports/qualification/
+          if-no-files-found: warn
+          retention-days: 30
