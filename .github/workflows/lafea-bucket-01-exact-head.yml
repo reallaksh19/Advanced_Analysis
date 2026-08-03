@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 concurrency:
   group: lafea-bucket-01-exact-head-${{ github.ref }}
@@ -33,9 +34,50 @@ jobs:
         run: npm ci
 
       - name: Run Bucket-01 exact-head gate
+        id: exact_head
         env:
           EXPECTED_HEAD_SHA: ${{ github.sha }}
-        run: node scripts/lafea-bucket-01-exact-head-check.mjs
+        shell: bash
+        run: |
+          set +e
+          node scripts/lafea-bucket-01-exact-head-check.mjs \
+            > reports/qualification/lafea-bucket-01-exact-head.stdout.log \
+            2> reports/qualification/lafea-bucket-01-exact-head.stderr.log
+          exit_code=$?
+          echo "exit_code=${exit_code}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Publish exact-head commit status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXIT_CODE: ${{ steps.exact_head.outputs.exit_code }}
+        shell: bash
+        run: |
+          set -e
+          if [[ "$EXIT_CODE" == "0" ]]; then
+            state=success
+            description="Bucket-01 exact-head executable gate passed"
+          else
+            state=failure
+            description="$(node - <<'NODE'
+          const fs = require('fs');
+          const path = 'reports/qualification/lafea-bucket-01-exact-head.json';
+          let text = 'Bucket-01 exact-head gate failed';
+          if (fs.existsSync(path)) {
+            const report = JSON.parse(fs.readFileSync(path, 'utf8'));
+            const first = report.blockingCheckIds?.[0];
+            if (first) text = `First blocker: ${first}`;
+          }
+          process.stdout.write(text.slice(0, 140));
+          NODE
+            )"
+          fi
+          gh api \
+            --method POST \
+            "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state="$state" \
+            -f context="lafea/bucket-01-exact-head" \
+            -f description="$description"
 
       - name: Retain qualification reports
         if: always()
@@ -45,3 +87,9 @@ jobs:
           path: reports/qualification/
           if-no-files-found: warn
           retention-days: 30
+
+      - name: Enforce exact-head result
+        if: always()
+        env:
+          EXIT_CODE: ${{ steps.exact_head.outputs.exit_code }}
+        run: exit "$EXIT_CODE"
