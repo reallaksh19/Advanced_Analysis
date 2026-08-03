@@ -8,9 +8,9 @@
 - A complete `BLOCKED` receipt is written before nonzero exit for governed topology, recovery, or stress-convergence failures.
 - The topology check covers exact lineage for `2 × 16`, `4 × 32`, `8 × 64`, and `16 × 128` and includes an anti-drift check for receipt-retention ordering.
 
-## Phase 2A design contract
+## Phase 2A Design V2
 
-A deterministic probe-stable polar-axis planner and frozen design contract are present.
+A deterministic probe-stable polar-axis planner and controlled Design V2 contract are present.
 
 - Radial anchor values: `27, 33, 47, 73, 87 mm`.
 - Angular anchor values: `17°, 67°, 83°`.
@@ -22,7 +22,7 @@ A deterministic probe-stable polar-axis planner and frozen design contract are p
 - Exact feature lines at `0°, 90°, 180°, 270°` are retained.
 - Frozen coordinates, tolerances, loads, solver criteria, and code-basis boundaries remain unchanged.
 
-Candidate design cell counts are:
+Candidate design cell counts remain:
 
 | Level | Radial cells | Circumferential cells | Candidate T6 elements |
 |---:|---:|---:|---:|
@@ -31,13 +31,35 @@ Candidate design cell counts are:
 | 3 | 30 | 68 | 4,080 |
 | 4 | 53 | 132 | 13,992 |
 
-The Phase 2A planner is design-only. It has no production mesh, stress-acceptance, or qualification authority.
+### Design V1 blocker
+
+Phase 2B PR #518 demonstrated that placing analytic circular midsides on every internal radial ring causes a coarse Level-1 curved-edge inversion:
+
+- controlling element: `E-R10-S18-B`;
+- minimum scaled Jacobian: `-0.02456338158182484`;
+- minimum dense-sampled Jacobian: `-28.859125475953192`;
+- non-positive dense samples: `24`;
+- minimum integration-point Jacobian remained positive.
+
+The candidate correctly failed closed. No tolerance or validity rule was relaxed.
+
+### Design V2 correction
+
+Design V2 changes only midside geometry:
+
+- hole and outer physical circular boundaries retain analytic-arc midsides;
+- internal circumferential edges use exact straight-chord midsides;
+- radial and diagonal edges use exact straight-chord midsides.
+
+Internal radial rings are mesh partitions, not physical circular boundaries. Axis coordinates, anchor windows, phases, probe locations, topology policy, and candidate element counts remain unchanged. Production and qualification authority remain false.
+
+Independent preflight reconstruction reproduced the Design V1 reported Jacobian values and predicts that the Design V2 policy removes all non-positive Jacobians at all four candidate levels while preserving counter-clockwise `B` containment for all seven frozen locations. That reconstruction is diagnostic only; the Phase 2B agent must regenerate and retain the authoritative candidate artifacts.
 
 ## Phase 2B execution
 
-Phase 2B is assigned separately under issue #510. Its scope remains candidate-only nonuniform T6 mesh generation, topology proof, mesh-quality evidence, negative cases, and exact artifact custody. It must not switch production execution.
+Phase 2B remains assigned under issue #510 and draft PR #518. The branch must merge the current target branch, bind packages to `B01-PROBE-STABLE-POLAR-V2`, implement the revised midside policy, rerun all candidate checks, and return the four Phase 2C artifacts.
 
-The Phase 2B output must conform to the Phase 2C artifact interface after integration.
+It must not switch production execution.
 
 ## Phase 2C intake preparation
 
@@ -48,7 +70,7 @@ Phase 2C is tracked under issue #511. The following contracts are committed:
 - `scripts/lafea-bucket-01-probe-stable-candidate-intake-contract-check.mjs`
 - `docs/qualification/bucket-01-phase-2c-integration-contract.md`
 
-Phase 2C requires four exact-head, design-bound artifacts:
+Phase 2C requires four exact-head, Design-V2-bound artifacts:
 
 - candidate mesh package;
 - candidate topology report;
