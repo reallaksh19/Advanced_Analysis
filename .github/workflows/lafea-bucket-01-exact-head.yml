@@ -1,8 +1,6 @@
 name: LAFEA Bucket-01 Exact Head
 
 on:
-  push:
-    branches: [bucket-01-cantilever-benchmark-route]
   workflow_dispatch:
 
 permissions:
