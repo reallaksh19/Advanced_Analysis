@@ -12,6 +12,11 @@ import {
   validateLafeaBucket01FixedProbeEvidence,
 } from '../src/workspace/lafea-bucket-01-fixed-probe.js';
 import {
+  LAFEA_BUCKET_01_PROBE_TOPOLOGY_AUDIT_INPUT_SCHEMA,
+  evaluateLafeaBucket01ProbeTopologyAudit,
+  validateLafeaBucket01ProbeTopologyAuditEvidence,
+} from '../src/workspace/lafea-bucket-01-probe-topology.js';
+import {
   LAFEA_BUCKET_01_STRESS_CONVERGENCE_INPUT_SCHEMA,
   evaluateLafeaBucket01StressConvergence,
   validateLafeaBucket01StressConvergenceEvidence,
@@ -86,15 +91,21 @@ const failingLocations = fixedLocations
     zone: row.zone,
     reasons: row.reasons,
     observations: row.observations,
+    governedObservations: row.governedObservations,
     fineGridGci: row.convergence.fineGridGci,
     observedOrder: row.convergence.observedOrder,
     classification: row.convergence.classification,
+    topologyStatus: row.topologyAudit.status,
+    topologyReasons: row.topologyAudit.reasons,
+    topologyDiagnosis: row.topologyAudit.diagnosis,
+    governedTopology: row.topologyAudit.levels,
+    topologyTransitions: row.topologyAudit.transitions,
   }));
 const status = failingLocations.length === 0 ? 'PASS' : 'BLOCKED';
 
 const reportBase = {
   schema: 'lafea-bucket-01-production-lug-fixed-probe-evidence/v2',
-  producerRevision: 'B01-PRODUCTION-LUG-PROBES.3',
+  producerRevision: 'B01-PRODUCTION-LUG-PROBES.4',
   exactHeadSha,
   specId: spec.specId,
   benchmarkId: spec.benchmarkId,
@@ -126,6 +137,13 @@ const reportBase = {
     retainedConstitutiveMatrixAuthority: true,
     integrationPointExtrapolationUsed: false,
     elementLocalReconstruction: true,
+    governedProbeTopologyObserved: true,
+    exactContainingElementRequired: true,
+    annularRingSectorTriangleRecorded: true,
+    naturalCoordinatesAndMarginsRecorded: true,
+    exactQuadraticEdgeDistancesRecorded: true,
+    topologySignatureChangesFailClosed: true,
+    parentCellLineageAudited: true,
     finestThreeOfGovernedFourGciAcceptance: true,
     movingMaximumUsed: false,
     nodalProjectionUsed: false,
@@ -136,6 +154,7 @@ const reportBase = {
   qualificationStates: {
     implemented: true,
     productionLugProbeReceiptProduced: true,
+    probeTopologyObserved: true,
     solverVerified: true,
     stressVerified: status === 'PASS',
     codeVerified: false,
@@ -266,6 +285,8 @@ function evaluatePath(pathDefinition, levelsValue) {
       samplingAuthority: 'FIXED_STRESS_PATH',
       allStationsFrozenBeforeProductionStressObservation: true,
       directElementPointRecovery: true,
+      governedProbeTopologyObserved: true,
+      topologySignatureChangesFailClosed: true,
       retainedNodalDisplacementAuthority: true,
       retainedConstitutiveMatrixAuthority: true,
       integrationPointExtrapolationUsed: false,
@@ -327,21 +348,35 @@ function evaluateFixedLocation(definition, levelsValue) {
       'ELEMENT_LOCAL_DIRECT_DISPLACEMENT_GRADIENT',
     );
     assert.equal(evidence.retainedIntegrationPointExtrapolationUsed, false);
+    assert.equal(evidence.meshTopology.metadataAvailable, true);
+    assert.ok(evidence.jacobianDeterminant > 0);
+    assert.ok(evidence.localElementSize > 0);
+    assert.ok(evidence.minimumPhysicalEdgeDistance > 0);
     assert.ok(
       evidence.mappingResidual <= spec.tolerances.mappingResidualMax,
       `${definition.probeId} level ${level.ordinal} mapping residual`,
     );
-    const naturalMargin = Math.min(
-      evidence.naturalCoordinates.xi,
-      evidence.naturalCoordinates.eta,
-      1 - evidence.naturalCoordinates.xi - evidence.naturalCoordinates.eta,
-    );
     assert.ok(
-      naturalMargin >= spec.tolerances.naturalCoordinateMarginMin,
+      evidence.minimumNaturalMargin
+        >= spec.tolerances.naturalCoordinateMarginMin,
       `${definition.probeId} level ${level.ordinal} natural margin`,
     );
     return evidence;
   });
+  const topologyAudit = evaluateLafeaBucket01ProbeTopologyAudit({
+    schema: LAFEA_BUCKET_01_PROBE_TOPOLOGY_AUDIT_INPUT_SCHEMA,
+    exactHeadSha,
+    governedLevelOrdinals: levelsValue.map((row) => row.ordinal),
+    probeEvidences: governedProbeEvidences,
+    minimumNaturalMargin: spec.tolerances.naturalCoordinateMarginMin,
+  });
+  assert.equal(
+    validateLafeaBucket01ProbeTopologyAuditEvidence(
+      topologyAudit,
+      governedProbeEvidences,
+    ).ok,
+    true,
+  );
   const convergenceLevels = levelsValue.slice(-3);
   const probeEvidences = governedProbeEvidences.slice(-3);
   const gciTolerance = definition.zone === 'HIGH_GRADIENT'
@@ -363,6 +398,13 @@ function evaluateFixedLocation(definition, levelsValue) {
     ).ok,
     true,
   );
+  const reasons = [
+    ...topologyAudit.reasons.map((row) => `TOPOLOGY_${row}`),
+    ...stressConvergenceEvidence.reasons.map((row) => `STRESS_${row}`),
+  ];
+  const status = topologyAudit.status === 'PASS'
+    && stressConvergenceEvidence.status === 'PASS'
+    ? 'PASS' : 'BLOCKED';
   return {
     probeId: definition.probeId,
     role: definition.role,
@@ -385,10 +427,12 @@ function evaluateFixedLocation(definition, levelsValue) {
       (row) => row.semanticHash,
     ),
     fixedProbeEvidenceHashes: probeEvidences.map((row) => row.semanticHash),
+    topologyAudit,
+    topologyAuditEvidenceHash: topologyAudit.semanticHash,
     convergence: stressConvergenceEvidence.convergence,
     stressConvergenceEvidenceHash: stressConvergenceEvidence.semanticHash,
     gciTolerance,
-    status: stressConvergenceEvidence.status,
-    reasons: stressConvergenceEvidence.reasons,
+    status,
+    reasons: [...new Set(reasons)].sort(),
   };
 }
