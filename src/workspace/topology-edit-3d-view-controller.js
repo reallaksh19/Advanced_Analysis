@@ -3,6 +3,7 @@ import {
   TopologyEdit3DViewController as TopologyEdit3DViewControllerCore,
 } from './topology-edit-3d-view-controller-core.js';
 import { EVENT_TOPICS } from './event-topics.js';
+import { deepFreeze } from '../core/shared-piping-model/index.js';
 import {
   canRunTopologyEditAction,
   createTopologyEditSelection,
@@ -11,6 +12,11 @@ import {
 } from './topology-edit/topology-edit-command-ui.js';
 import { TopologyEditLifecycleController } from './topology-edit/topology-edit-lifecycle-controller.js';
 import { topologyEditEntityIdsForObject } from './topology-edit/topology-edit-render-packet.js';
+import {
+  TopologyEditTypedViewportBackend,
+  retainTypedTopologyEditPrimitives,
+} from './topology-edit/topology-edit-typed-viewport-backend.js';
+import { TopologyEditPresentationRuntime } from './viewport-presentation/topology-edit-presentation-runtime.js';
 
 export { buildAutofixPolicy } from './topology-edit-3d-view-controller-core.js';
 
@@ -44,6 +50,7 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
 
   async activate() {
     await super.activate();
+    this.installTypedViewportBackend();
     this.canvasMount?.removeEventListener('pointerdown', this.pointerHandler);
     this.viewportBackend?.setSelectionRequestHandler(this.viewportSelectionHandler);
     this.hostElement?.ownerDocument?.addEventListener(
@@ -52,6 +59,25 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
       true,
     );
     this.setNavigationMode('select', true);
+  }
+
+  installTypedViewportBackend() {
+    if (this.viewportBackend instanceof TopologyEditTypedViewportBackend) return;
+    this.presentationRuntime?.destroy();
+    this.viewportBackend?.destroy();
+    this.viewportBackend = new TopologyEditTypedViewportBackend();
+    this.viewportBackend.mount(this.canvasMount);
+    this.presentationRuntime = new TopologyEditPresentationRuntime(this.viewportBackend);
+    this.presentationRuntime.apply(this.presentationState);
+    if (this.session) this.refreshView(this.session.currentTopology());
+  }
+
+  deriveVisual(canonical, modelRole) {
+    const result = super.deriveVisual(canonical, modelRole);
+    return deepFreeze({
+      model: result.model,
+      projection: retainTypedTopologyEditPrimitives(result.model, result.projection),
+    });
   }
 
   buildShell() {

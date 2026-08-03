@@ -26,13 +26,11 @@ function finitePoint(point) {
 
 function normalizePoint(point) {
   if (!finitePoint(point)) throw new TypeError('Visual geometry point must contain finite x, y, and z coordinates.');
-  return Object.freeze({ x: Number(point.x), y: Number(point.y), z: Number(point.z) });
+  return deepFreeze({ x: Number(point.x), y: Number(point.y), z: Number(point.z) });
 }
 
 function normalizeSourcePaths(sourcePaths) {
-  return Object.freeze(
-    [...new Set((sourcePaths || []).map(stringValue).filter(Boolean))].sort(),
-  );
+  return [...new Set((sourcePaths || []).map(stringValue).filter(Boolean))].sort(compareCodeUnits);
 }
 
 export function createVisualDiagnostic(input = {}) {
@@ -90,7 +88,9 @@ const PLACEMENT_PARAMETER_KEYS = new Set([
   'bendPlaneNormal',
   'eccentricOffsetDirection',
   'runDirections',
+  'runEnds',
   'branchDirection',
+  'branchEnd',
   'runPortIds',
   'branchPortId',
   'hostEntityId',
@@ -123,13 +123,13 @@ export function createVisualComponent(input = {}) {
   const canonicalEntityId = stringValue(input.canonicalEntityId);
   if (!canonicalEntityId) throw new TypeError('Visual component requires canonicalEntityId.');
 
-  const primitives = Object.freeze([...(input.primitives || [])]
+  const primitives = [...(input.primitives || [])]
     .map(createVisualPrimitive)
-    .sort((left, right) => left.primitiveId.localeCompare(right.primitiveId)));
-  const diagnostics = Object.freeze([...(input.diagnostics || [])]
+    .sort((left, right) => compareCodeUnits(left.primitiveId, right.primitiveId));
+  const diagnostics = [...(input.diagnostics || [])]
     .map(createVisualDiagnostic)
-    .sort((left, right) => left.code.localeCompare(right.code)
-      || left.canonicalEntityId.localeCompare(right.canonicalEntityId)));
+    .sort((left, right) => compareCodeUnits(left.code, right.code)
+      || compareCodeUnits(left.canonicalEntityId, right.canonicalEntityId));
 
   return deepFreeze({
     canonicalEntityId,
@@ -148,16 +148,16 @@ export function createTopologyVisualGeometryModel(input = {}) {
   if (!canonicalTopologyHash) throw new TypeError('Visual geometry model requires canonicalTopologyHash.');
   if (!geometryPolicyHash) throw new TypeError('Visual geometry model requires geometryPolicyHash.');
 
-  const components = Object.freeze([...(input.components || [])]
+  const components = [...(input.components || [])]
     .map(createVisualComponent)
-    .sort((left, right) => left.canonicalEntityId.localeCompare(right.canonicalEntityId)));
-  const diagnostics = Object.freeze([
+    .sort((left, right) => compareCodeUnits(left.canonicalEntityId, right.canonicalEntityId));
+  const diagnostics = [
     ...(input.diagnostics || []),
     ...components.flatMap((component) => component.diagnostics),
   ].map(createVisualDiagnostic).sort((left, right) =>
-    left.code.localeCompare(right.code)
-      || left.canonicalEntityId.localeCompare(right.canonicalEntityId)
-  ));
+    compareCodeUnits(left.code, right.code)
+      || compareCodeUnits(left.canonicalEntityId, right.canonicalEntityId)
+  );
 
   const base = {
     schema: TOPOLOGY_EDIT_VISUAL_GEOMETRY,
@@ -173,4 +173,10 @@ export function createTopologyVisualGeometryModel(input = {}) {
 
 export function assertVisualPoint(point) {
   return normalizePoint(point);
+}
+
+function compareCodeUnits(left, right) {
+  const a = String(left);
+  const b = String(right);
+  return a < b ? -1 : a > b ? 1 : 0;
 }
