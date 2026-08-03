@@ -247,7 +247,7 @@ function conjugateGradientSolve(matrix, rightHandSide, profile) {
   const convergenceTarget = residualTolerance / 10;
   const iterationLimit = Math.min(
     50000,
-    Math.max(500, matrix.size * 8),
+    Math.max(1000, matrix.size * 16),
   );
   const solution = Array(matrix.size).fill(0);
   let residual = [...rightHandSide];
@@ -281,11 +281,30 @@ function conjugateGradientSolve(matrix, rightHandSide, profile) {
         residual[index] -= alpha * action[index];
       }
       iterations += 1;
-      finalResidualInfinity = maxAbs(residual);
-      if (finalResidualInfinity <= convergenceTarget || iterations % 50 === 0) {
-        residual = exactResidual(matrix, rightHandSide, solution);
-        finalResidualInfinity = maxAbs(residual);
-        if (finalResidualInfinity <= convergenceTarget) break;
+      const recursiveResidualInfinity = maxAbs(residual);
+      finalResidualInfinity = recursiveResidualInfinity;
+      if (recursiveResidualInfinity <= convergenceTarget || iterations % 100 === 0) {
+        const reliableResidual = exactResidual(matrix, rightHandSide, solution);
+        const reliableResidualInfinity = maxAbs(reliableResidual);
+        finalResidualInfinity = reliableResidualInfinity;
+        if (reliableResidualInfinity <= convergenceTarget) {
+          residual = reliableResidual;
+          break;
+        }
+        if (recursiveResidualInfinity <= convergenceTarget) {
+          residual = reliableResidual;
+          preconditioned = applyJacobi(matrix.diagonal, residual);
+          direction = [...preconditioned];
+          rho = dotVector(residual, preconditioned);
+          if (!(rho > 0) || !Number.isFinite(rho)) {
+            throw singularError(
+              'UNDER_CONSTRAINED_OR_SINGULAR_SYSTEM',
+              'solver',
+              'Sparse PCG reliable-update residual product is not positive.',
+            );
+          }
+          continue;
+        }
       }
       preconditioned = applyJacobi(matrix.diagonal, residual);
       const nextRho = dotVector(residual, preconditioned);
