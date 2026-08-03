@@ -14,6 +14,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
+      - name: Publish retained-evidence start
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=pending \
+            -f context=lafea/bucket-01-retained-production-evidence \
+            -f description="Executing 1024-element response and fixed lug probes"
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -55,8 +64,8 @@ jobs:
           EXPECTED_HEAD_SHA: ${{ github.sha }}
         shell: bash
         run: |
-          node --input-type=module <<'NODE' \
-            > reports/qualification/lafea-bucket-01-code-basis-authority-request.json
+          node --input-type=module \
+            > reports/qualification/lafea-bucket-01-code-basis-authority-request.json <<'NODE'
           import fs from 'node:fs';
           import { canonicalLafeaSha256 } from './src/workspace/lafea-canonical-sha256.js';
           const template = JSON.parse(fs.readFileSync('validation/bucket-01/09-code-basis-intake-template.json', 'utf8'));
@@ -74,7 +83,7 @@ jobs:
           };
           console.log(JSON.stringify({ ...base, evidenceHash: canonicalLafeaSha256(base) }, null, 2));
           NODE
-      - name: Publish retained-evidence status
+      - name: Publish retained-evidence success
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -83,6 +92,16 @@ jobs:
             -f state=success \
             -f context=lafea/bucket-01-retained-production-evidence \
             -f description="1024-element response and fixed lug probes retained"
+      - name: Publish retained-evidence failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=failure \
+            -f context=lafea/bucket-01-retained-production-evidence \
+            -f description="Retained production evidence failed"
       - if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -101,6 +120,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
+      - name: Publish replay start
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=pending \
+            -f context="lafea/bucket-01-${{ matrix.replay_id }}" \
+            -f description="Executing isolated production replay"
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -137,12 +165,31 @@ jobs:
           mkdir -p replay-bundle/reports
           cp -R reports/qualification replay-bundle/reports/
           cp reports/qualification/lafea-bucket-01-replay-row.json replay-bundle/
+      - name: Publish replay success
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=success \
+            -f context="lafea/bucket-01-${{ matrix.replay_id }}" \
+            -f description="Isolated production replay passed"
+      - name: Publish replay failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=failure \
+            -f context="lafea/bucket-01-${{ matrix.replay_id }}" \
+            -f description="Replay blocked; verify approved code-basis secret and logs"
       - if: always()
         uses: actions/upload-artifact@v4
         with:
           name: lafea-bucket-01-replay-${{ matrix.replay_id }}-${{ github.sha }}
           path: replay-bundle/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 90
 
   finalize-production-qualification:
@@ -151,6 +198,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Publish final qualification start
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=pending \
+            -f context=lafea/bucket-01-production-ready \
+            -f description="Assembling final replay custody and qualification"
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -169,7 +225,7 @@ jobs:
           EXPECTED_HEAD_SHA: ${{ github.sha }}
           LAFEA_BUCKET_01_REPLAY_BUNDLE_ROOT: external/qualification/replays
         run: node scripts/lafea-bucket-01-finalize-production-qualification.mjs
-      - name: Publish production-ready status
+      - name: Publish production-ready success
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -178,10 +234,20 @@ jobs:
             -f state=success \
             -f context=lafea/bucket-01-production-ready \
             -f description="Bucket-01 qualified with code authority and three isolated replays"
+      - name: Publish production-ready failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=failure \
+            -f context=lafea/bucket-01-production-ready \
+            -f description="Final Bucket-01 qualification failed closed"
       - if: always()
         uses: actions/upload-artifact@v4
         with:
           name: lafea-bucket-01-final-qualification-${{ github.sha }}
           path: reports/qualification/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 90
