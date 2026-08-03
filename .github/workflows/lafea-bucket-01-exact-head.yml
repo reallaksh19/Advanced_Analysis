@@ -39,10 +39,15 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Apply solver headroom and physical-coordinate recovery
+      - name: Patch and diagnose recovery stages
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          python - <<'PY'
+          mkdir -p reports/qualification
+          set +e
+          python - <<'PY' > reports/qualification/recovery-patch.stdout.log 2> reports/qualification/recovery-patch.stderr.log
           from pathlib import Path
 
           solver = Path('src/core/local-continuum/solver.js')
@@ -77,13 +82,9 @@ jobs:
           if text.count(old_call) != 1:
               raise SystemExit(f'reconstructTensor call count={text.count(old_call)}')
           text = text.replace(old_call, new_call)
-          text = text.replace(
-              "'T6_THREE_POINT_LINEAR_NATURAL_COORDINATE_RECONSTRUCTION_V1'",
-              "'T6_THREE_POINT_LINEAR_PHYSICAL_COORDINATE_RECONSTRUCTION_V2'",
-          )
+          text = text.replace("'T6_THREE_POINT_LINEAR_NATURAL_COORDINATE_RECONSTRUCTION_V1'", "'T6_THREE_POINT_LINEAR_PHYSICAL_COORDINATE_RECONSTRUCTION_V2'")
           start = text.index('function reconstructTensor(')
           end = text.index('\nfunction solve3(', start)
-          old_block = text[start:end]
           new_block = """function reconstructTensor(points, nodes, x, y) {
             return deepFreeze({
               sigmaX: reconstruct(points, nodes, x, y, (point) => point.stress?.sigmaX),
@@ -117,50 +118,60 @@ jobs:
               raise SystemExit(f'Kirsch convergence assertion marker count={text.count(old)}')
           kirsch.write_text(text.replace(old, new))
           PY
-
-      - name: Validate fixed-probe contract
-        run: node scripts/lafea-bucket-01-fixed-probe-check.mjs
-
-      - name: Validate scalable sparse solver
-        run: node scripts/lafea-bucket-01-scalable-solver-check.mjs
-
-      - name: Run governed Kirsch fixed probes
-        id: kirsch
-        env:
-          EXPECTED_HEAD_SHA: ${{ github.sha }}
-        shell: bash
-        run: |
-          mkdir -p reports/qualification
-          set +e
-          node scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs \
-            > reports/qualification/kirsch.stdout.log \
-            2> reports/qualification/kirsch.stderr.log
-          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
-          exit 0
-
-      - name: Publish physical-coordinate recovery result
-        env:
-          GH_TOKEN: ${{ github.token }}
-          EXIT_CODE: ${{ steps.kirsch.outputs.exit_code }}
-        shell: bash
-        run: |
-          if [[ "$EXIT_CODE" == "0" ]]; then
-            gh api --method POST \
-              "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-              -f state=success \
-              -f context="lafea/physical-probe-recovery" \
-              -f description="Fixed-probe and Kirsch qualification passed"
-            exit 0
+          patch_exit=$?
+          if [[ "$patch_exit" != "0" ]]; then
+            stage=PATCH
+            log=reports/qualification/recovery-patch.stderr.log
+          else
+            node scripts/lafea-bucket-01-fixed-probe-check.mjs \
+              > reports/qualification/fixed-probe.stdout.log \
+              2> reports/qualification/fixed-probe.stderr.log
+            fixed_exit=$?
+            if [[ "$fixed_exit" != "0" ]]; then
+              stage=FIXED_PROBE
+              log=reports/qualification/fixed-probe.stderr.log
+            else
+              node scripts/lafea-bucket-01-scalable-solver-check.mjs \
+                > reports/qualification/scalable.stdout.log \
+                2> reports/qualification/scalable.stderr.log
+              scalable_exit=$?
+              if [[ "$scalable_exit" != "0" ]]; then
+                stage=SCALABLE
+                log=reports/qualification/scalable.stderr.log
+              else
+                node scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs \
+                  > reports/qualification/kirsch.stdout.log \
+                  2> reports/qualification/kirsch.stderr.log
+                kirsch_exit=$?
+                if [[ "$kirsch_exit" != "0" ]]; then
+                  stage=KIRSCH
+                  log=reports/qualification/kirsch.stderr.log
+                else
+                  gh api --method POST \
+                    "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+                    -f state=success \
+                    -f context="lafea/physical-probe-recovery" \
+                    -f description="Fixed-probe and Kirsch qualification passed"
+                  exit 0
+                fi
+              fi
+            fi
           fi
-          detail=$(node -e "const fs=require('fs');const t=fs.readFileSync('reports/qualification/kirsch.stderr.log','utf8');const lines=t.split(/\r?\n/).map(s=>s.trim()).filter(s=>s&&!/^at\s/.test(s)&&!/^node:/.test(s));process.stdout.write(lines.slice(0,12).join(' | ').slice(0,3000))")
+          detail=$(node -e "const fs=require('fs');const t=fs.existsSync(process.argv[1])?fs.readFileSync(process.argv[1],'utf8'):'missing log';const lines=t.split(/\r?\n/).map(s=>s.trim()).filter(s=>s&&!/^at\s/.test(s)&&!/^node:/.test(s));process.stdout.write(lines.slice(0,16).join(' | ').slice(0,3000))" "$log")
           encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
+          safe=$(printf '%s' "$detail" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-42)
           gh api --method POST \
             "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=failure \
-            -f context="lafea/physical-recovery-detail" \
-            -f description="Physical-coordinate recovery Kirsch result" \
+            -f context="lafea/physical-${stage}/${safe}" \
+            -f description="Physical recovery failed at ${stage}" \
             -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
-          exit "$EXIT_CODE"
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=failure \
+            -f context="lafea/bucket-01-exact-head" \
+            -f description="Physical recovery diagnostic failed"
+          exit 1
 
       - name: Retain qualification reports
         if: always()
