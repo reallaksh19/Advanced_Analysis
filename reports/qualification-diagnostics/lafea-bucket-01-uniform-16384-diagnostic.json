@@ -1,0 +1,17 @@
+{
+  "schema": "lafea-bucket-01-uniform-16384-diagnostic/v1",
+  "sourceHeadSha": "298d9d660d1a45c360f664a23db14a5a1ed5fe0f",
+  "executionExit": 1,
+  "lugReceiptExit": 99,
+  "lugReceiptStatus": null,
+  "governedLevelOrdinals": null,
+  "evaluatedLevelOrdinals": null,
+  "locations": [],
+  "blockedLocationIds": [],
+  "status": "BLOCKED",
+  "logs": {
+    "runnerStderr": "file:///home/runner/work/Advanced_Analysis/Advanced_Analysis/scripts/lafea-bucket-01-production-response-runner.mjs:112\nfs.writeFileSync(EXECUTION_PATH, `${JSON.stringify(execution, null, 2)}\\n`, 'utf8');\n                                         ^\n\nRangeError: Invalid string length\n    at JSON.stringify (<anonymous>)\n    at file:///home/runner/work/Advanced_Analysis/Advanced_Analysis/scripts/lafea-bucket-01-production-response-runner.mjs:112:42\n    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:681:26)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)\n\nNode.js v22.23.1",
+    "lugStdout": null,
+    "lugStderr": null
+  }
+}
