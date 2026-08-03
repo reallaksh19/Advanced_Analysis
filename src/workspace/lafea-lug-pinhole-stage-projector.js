@@ -36,6 +36,49 @@ export function buildProjectedLevels(input) {
   })));
 }
 
+export function buildProjectedCandidateLevels(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)
+    || !Array.isArray(input.meshPackages)
+    || input.meshPackages.length !== 4) {
+    throw batchError('LAFEA_B01_CANDIDATE_PROJECTOR_INPUT_INVALID');
+  }
+  return deepFreeze(input.meshPackages.map((meshPackage, index) => {
+    const mappingWindow = meshPackage?.mappingWindow;
+    if (!mappingWindow
+      || mappingWindow.ordinal !== index + 1
+      || mappingWindow.radialStart !== 20
+      || mappingWindow.radialEnd !== 60
+      || mappingWindow.exactEndpointNodes !== true
+      || mappingWindow.physicalCoordinateSelection !== true
+      || mappingWindow.indexScaledSelectionUsed !== false
+      || mappingWindow.loadFeatureRole !== input.featureProjection.loadFeature.role
+      || mappingWindow.restraintFeatureRole
+        !== input.featureProjection.boundaryFeature.role) {
+      throw batchError('LAFEA_B01_CANDIDATE_MAPPING_WINDOW_INVALID');
+    }
+    const loadEdges = edgesFromQuadraticPath(mappingWindow.loadNodeIds);
+    const boundaryEdges = edgesFromQuadraticPath(
+      mappingWindow.restraintNodeIds,
+    );
+    return buildLevelFromEdges({
+      ordinal: index + 1,
+      meshPackage,
+      physicalProblem: input.physicalProblem,
+      center: input.center,
+      loadEdges,
+      boundaryEdges,
+      mappingAuthority: {
+        schema: 'lafea-bucket-01-candidate-physical-window-mapping/v1',
+        radialStart: mappingWindow.radialStart,
+        radialEnd: mappingWindow.radialEnd,
+        mappingWindowHash: meshPackage.mappingWindowHash,
+        physicalCoordinateSelection: true,
+        indexScaledSelectionUsed: false,
+      },
+    });
+  }));
+}
+
 export function assertDocumentMatchesMesh(document, meshEvidence) {
   const nodes = new Map(document.nodes.map((row) => [row.nodeId, row]));
   if (nodes.size !== meshEvidence.mesh.nodes.length) {
@@ -104,6 +147,25 @@ function buildLevel({
     featureProjection.boundaryFeature,
     baseCounts,
   );
+  return buildLevelFromEdges({
+    ordinal,
+    meshPackage,
+    physicalProblem,
+    center,
+    loadEdges,
+    boundaryEdges,
+    mappingAuthority: {
+      schema: 'lafea-lug-pinhole-index-refined-feature-mapping/v1',
+      physicalCoordinateSelection: false,
+      indexScaledSelectionUsed: true,
+    },
+  });
+}
+
+function buildLevelFromEdges({
+  ordinal, meshPackage, physicalProblem, center, loadEdges, boundaryEdges,
+  mappingAuthority,
+}) {
   const loadEdgeNodeIds = uniqueNodes(loadEdges);
   const boundaryEdgeNodeIds = uniqueNodes(boundaryEdges);
   if (sameSet(loadEdgeNodeIds, boundaryEdgeNodeIds)) {
@@ -167,6 +229,7 @@ function buildLevel({
     loadEdgeNodeIds,
     boundaryEdgeNodeIds,
     loadResultant: sumForces(nodalForces),
+    mappingAuthority,
   });
 }
 
@@ -201,11 +264,19 @@ function featureEdges(featureSets, role) {
   if (role === 'OUTER_BOUNDARY') return featureSets.outerBoundary.edgeNodeIds;
   const line = featureSets.radialLines.find((row) => row.role === role);
   if (!line) throw batchError('LAFEA_NB_T6C_FEATURE_ROLE_MISSING');
-  const edges = [];
-  for (let index = 0; index + 2 < line.nodeIds.length; index += 2) {
-    edges.push([line.nodeIds[index], line.nodeIds[index + 1], line.nodeIds[index + 2]]);
+  return edgesFromQuadraticPath(line.nodeIds);
+}
+
+function edgesFromQuadraticPath(nodeIds) {
+  if (!Array.isArray(nodeIds) || nodeIds.length < 3
+    || nodeIds.length % 2 !== 1) {
+    throw batchError('LAFEA_B01_CANDIDATE_MAPPING_PATH_INVALID');
   }
-  return edges;
+  const edges = [];
+  for (let index = 0; index + 2 < nodeIds.length; index += 2) {
+    edges.push([nodeIds[index], nodeIds[index + 1], nodeIds[index + 2]]);
+  }
+  return deepFreeze(edges);
 }
 
 function distributeResultant(mesh, edges, loadCase) {
