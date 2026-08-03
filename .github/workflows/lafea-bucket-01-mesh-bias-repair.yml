@@ -66,20 +66,22 @@ jobs:
           if len(matches) != 1:
               raise RuntimeError(f'element split structural match count={len(matches)}')
           indent = matches[0].group('indent').split('\n')[-1]
+          ring = '{ring}'
+          sector = '{sector}'
           replacement = '\n'.join([
               f'{indent}const alternateDiagonal = (ring + sector) % 2 === 1;',
               f'{indent}if (alternateDiagonal) {{',
-              f'{indent}  addT6Element(state, `E-R${{ring}}-S${{sector}}-A`, [',
+              f'{indent}  addT6Element(state, `E-R${ring}-S${sector}-A`, [',
               f'{indent}    innerA, outerA, innerB,',
               f'{indent}  ]);',
-              f'{indent}  addT6Element(state, `E-R${{ring}}-S${{sector}}-B`, [',
+              f'{indent}  addT6Element(state, `E-R${ring}-S${sector}-B`, [',
               f'{indent}    outerA, outerB, innerB,',
               f'{indent}  ]);',
               f'{indent}}} else {{',
-              f'{indent}  addT6Element(state, `E-R${{ring}}-S${{sector}}-A`, [',
+              f'{indent}  addT6Element(state, `E-R${ring}-S${sector}-A`, [',
               f'{indent}    innerA, outerA, outerB,',
               f'{indent}  ]);',
-              f'{indent}  addT6Element(state, `E-R${{ring}}-S${{sector}}-B`, [',
+              f'{indent}  addT6Element(state, `E-R${ring}-S${sector}-B`, [',
               f'{indent}    innerA, outerB, innerB,',
               f'{indent}  ]);',
               f'{indent}}}',
