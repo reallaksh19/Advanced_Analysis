@@ -1,0 +1,138 @@
+name: LAFEA Bucket-01 Cosine Conservative Bound
+
+on:
+  push:
+    branches: [bucket-01-cantilever-benchmark-route]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply cosine candidate and test all fixed locations
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports/qualification
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=pending -f context=lafea/cosine-conservative-bound \
+            -f description="Testing cosine mesh and fixed-location upper envelope"
+
+          python - <<'PY'
+          import re
+          import textwrap
+          from pathlib import Path
+          source = Path('.github/workflows/lafea-bucket-01-conservative-bound-repair.yml').read_text()
+          match = re.search(
+              r"python - <<'PY'[^\n]*\n(?P<body>.*?)\n          PY",
+              source,
+              re.DOTALL,
+          )
+          if not match:
+              raise RuntimeError('candidate patch body not found')
+          body = textwrap.dedent(match.group('body'))
+          body = body.replace(
+              "template['stressClassification']['method']",
+              "template['requiredFields']['stressClassification']['method']",
+              1,
+          )
+          Path('/tmp/lafea-conservative-bound-patch.py').write_text(body)
+          PY
+          python /tmp/lafea-conservative-bound-patch.py \
+            > reports/qualification/cosine-bound-patch.stdout.log \
+            2> reports/qualification/cosine-bound-patch.stderr.log
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/core/lafea-meshing/lug-pinhole-t6.js')
+          text = path.read_text()
+          text = text.replace("'SYMMETRIC_POWER_1_50'", "'SYMMETRIC_COSINE'")
+          text = text.replace(
+              'const RADIAL_GRADING_EXPONENT = 1.5;',
+              'const RADIAL_GRADING_EXPONENT = null;',
+          )
+          old = '''  const graded = normalized <= 0.5
+              ? 0.5 * (2 * normalized) ** RADIAL_GRADING_EXPONENT
+              : 1 - 0.5 * (2 * (1 - normalized)) ** RADIAL_GRADING_EXPONENT;'''
+          new = '''  const graded = 0.5 * (1 - Math.cos(Math.PI * normalized));'''
+          if text.count(old) != 1:
+              raise RuntimeError(f'graded function marker count={text.count(old)}')
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+          node scripts/lafea-bucket-01-production-response-runner.mjs \
+            > reports/qualification/cosine-bound-execution.stdout.log \
+            2> reports/qualification/cosine-bound-execution.stderr.log
+          set +e
+          node scripts/lafea-bucket-01-production-response-receipt.mjs \
+            > reports/qualification/cosine-bound-response.stdout.log \
+            2> reports/qualification/cosine-bound-response.stderr.log
+          response_exit=$?
+          node scripts/lafea-bucket-01-production-lug-probe-receipt.mjs \
+            > reports/qualification/cosine-bound-lug.stdout.log \
+            2> reports/qualification/cosine-bound-lug.stderr.log
+          lug_exit=$?
+          set -e
+
+          node --input-type=module <<'NODE' > reports/qualification/cosine-bound-summary.json
+          import fs from 'node:fs';
+          const summary = {};
+          for (const [key, file] of [
+            ['response', 'reports/qualification/lafea-bucket-01-production-response.json'],
+            ['stress', 'reports/qualification/lafea-bucket-01-production-lug-fixed-probes.json'],
+          ]) {
+            if (fs.existsSync(file)) summary[key] = JSON.parse(fs.readFileSync(file, 'utf8'));
+          }
+          const rows = summary.stress ? [
+            ...summary.stress.standaloneProbeReceipts,
+            ...summary.stress.pathReceipts.flatMap((row) => row.stationReceipts),
+          ] : [];
+          console.log(JSON.stringify({
+            responseStatus: summary.response?.status ?? null,
+            responseFineGridGci: summary.response?.energyConvergence?.fineGridGci ?? null,
+            stressStatus: summary.stress?.status ?? null,
+            rows: rows.map((row) => ({
+              probeId: row.probeId,
+              acceptanceMethod: row.acceptanceMethod,
+              observations: row.observations,
+              upperBound: row.acceptedStressUpperBound,
+              relativeWidth: row.conservativeBound?.relativeWidth ?? null,
+            })),
+          }, null, 2));
+          NODE
+
+          if [[ "$response_exit" == "0" && "$lug_exit" == "0" ]]; then
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -f state=success -f context=lafea/cosine-conservative-bound \
+              -f description="Cosine mesh passed response and all fixed stress locations"
+            exit 0
+          fi
+          detail=$(node -e "const fs=require('fs');const files=process.argv.slice(1);const text=files.filter(fs.existsSync).map(p=>fs.readFileSync(p,'utf8')).join('\n');process.stdout.write(text.trim().slice(-7500))" reports/qualification/cosine-bound-lug.stderr.log reports/qualification/cosine-bound-lug.stdout.log reports/qualification/cosine-bound-response.stderr.log reports/qualification/cosine-bound-response.stdout.log)
+          encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=failure -f context=lafea/cosine-conservative-bound \
+            -f description="Cosine conservative-bound candidate remains blocked" \
+            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
+          exit 1
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-cosine-conservative-bound-${{ github.sha }}
+          path: reports/qualification/
+          if-no-files-found: warn
+          retention-days: 30
