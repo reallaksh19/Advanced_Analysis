@@ -1,10 +1,11 @@
+import { t6BMatrixAt } from '../core/local-continuum/index.js';
 import { canonicalLafeaSha256 } from './lafea-canonical-sha256.js';
 
 export const LAFEA_BUCKET_01_FIXED_PROBE_INPUT_SCHEMA =
   'lafea-bucket-01-fixed-probe-input/v1';
 export const LAFEA_BUCKET_01_FIXED_PROBE_EVIDENCE_SCHEMA =
-  'lafea-bucket-01-fixed-probe-evidence/v1';
-export const LAFEA_BUCKET_01_FIXED_PROBE_REVISION = 'B01-PROBE.1';
+  'lafea-bucket-01-fixed-probe-evidence/v2';
+export const LAFEA_BUCKET_01_FIXED_PROBE_REVISION = 'B01-PROBE.2';
 
 const INPUT_KEYS = Object.freeze([
   'schema', 'exactHeadSha', 'meshHash', 'recoveryHash', 'mesh', 'result', 'probe',
@@ -17,7 +18,6 @@ const COMPONENTS = Object.freeze(new Set([
   'SIGMA_X', 'SIGMA_Y', 'SIGMA_Z', 'TAU_XY',
   'PRINCIPAL_MAXIMUM', 'PRINCIPAL_MINIMUM', 'VON_MISES',
 ]));
-const GAUSS_POINT_COUNT = 3;
 const NATURAL_TOLERANCE = 1e-9;
 const NEWTON_LIMIT = 30;
 
@@ -37,10 +37,17 @@ export function recoverLafeaBucket01FixedProbe(inputValue) {
     (row) => row.loadCaseId === probe.loadCaseId,
   );
   if (!loadCase) throw probeError('LAFEA_B01_PROBE_LOAD_CASE_MISSING');
-  const elementResultById = new Map(
-    loadCase.elementResults.map((row) => [row.elementId, row]),
-  );
+  if (!Array.isArray(loadCase.nodalDisplacements)) {
+    throw probeError('LAFEA_B01_PROBE_NODAL_DISPLACEMENTS_REQUIRED');
+  }
+
   const nodeById = new Map(mesh.nodes.map((row) => [row.nodeId, row]));
+  const displacementById = new Map(
+    loadCase.nodalDisplacements.map((row) => [row.nodeId, row]),
+  );
+  const retainedElementById = new Map(
+    result.meshEvidence.elementEvidence.map((row) => [row.elementId, row]),
+  );
   const candidates = [];
   for (const element of mesh.elements) {
     if (element.elementType !== 'T6' || element.nodeIds.length !== 6) continue;
@@ -59,20 +66,53 @@ export function recoverLafeaBucket01FixedProbe(inputValue) {
   if (candidates.length !== 1) {
     throw probeError('LAFEA_B01_PROBE_ELEMENT_AMBIGUOUS');
   }
+
   const candidate = candidates[0];
-  const elementResult = elementResultById.get(candidate.element.elementId);
-  if (!elementResult
-    || elementResult.elementType !== 'T6'
-    || elementResult.recoveryLayer !== 'INTEGRATION_POINT'
-    || !Array.isArray(elementResult.gaussPointResults)
-    || elementResult.gaussPointResults.length !== GAUSS_POINT_COUNT) {
-    throw probeError('LAFEA_B01_PROBE_INTEGRATION_POINT_RECOVERY_REQUIRED');
+  const retainedElement = retainedElementById.get(candidate.element.elementId);
+  if (!retainedElement
+    || retainedElement.elementType !== 'T6'
+    || !isMatrix(retainedElement.dMatrix, 3, 3)) {
+    throw probeError('LAFEA_B01_PROBE_CONSTITUTIVE_MATRIX_REQUIRED');
   }
-  const components = reconstructTensor(
-    elementResult.gaussPointResults,
+  const supportingNodalDisplacements = candidate.element.nodeIds.map((nodeId) => {
+    const displacement = displacementById.get(nodeId);
+    if (!displacement
+      || !Number.isFinite(displacement.ux)
+      || !Number.isFinite(displacement.uy)) {
+      throw probeError('LAFEA_B01_PROBE_NODAL_DISPLACEMENT_INVALID');
+    }
+    return {
+      nodeId,
+      ux: normalizeZero(displacement.ux),
+      uy: normalizeZero(displacement.uy),
+    };
+  });
+  const localDisplacementVector = supportingNodalDisplacements.flatMap(
+    (row) => [row.ux, row.uy],
+  );
+  const pointKinematics = t6BMatrixAt(
+    candidate.nodes,
     candidate.natural.xi,
     candidate.natural.eta,
   );
+  if (!isMatrix(pointKinematics.B, 3, 12)
+    || !(pointKinematics.jacobianDeterminant > 0)) {
+    throw probeError('LAFEA_B01_PROBE_POINT_KINEMATICS_INVALID');
+  }
+  const strainVector = matrixVector(
+    pointKinematics.B,
+    localDisplacementVector,
+  );
+  const stressVector = matrixVector(
+    retainedElement.dMatrix,
+    strainVector,
+  );
+  const components = deepFreeze({
+    sigmaX: normalizeZero(stressVector[0]),
+    sigmaY: normalizeZero(stressVector[1]),
+    sigmaZ: 0,
+    tauXY: normalizeZero(stressVector[2]),
+  });
   const principal = principalStress(
     components.sigmaX,
     components.sigmaY,
@@ -90,6 +130,12 @@ export function recoverLafeaBucket01FixedProbe(inputValue) {
     candidate.natural.xi,
     candidate.natural.eta,
   );
+  const constitutiveMatrixHash = canonicalLafeaSha256({
+    schema: 'lafea-bucket-01-probe-constitutive-matrix/v1',
+    elementId: candidate.element.elementId,
+    formulation: result.meshEvidence.formulation,
+    dMatrix: retainedElement.dMatrix,
+  });
   const base = {
     schema: LAFEA_BUCKET_01_FIXED_PROBE_EVIDENCE_SCHEMA,
     producerRevision: LAFEA_BUCKET_01_FIXED_PROBE_REVISION,
@@ -98,9 +144,8 @@ export function recoverLafeaBucket01FixedProbe(inputValue) {
     recoveryHash,
     probe,
     samplingAuthority: 'FIXED_PHYSICAL_PROBE',
-    recoveryAuthority: 'ELEMENT_LOCAL_INTEGRATION_POINT_RECONSTRUCTION',
-    reconstructionMethod:
-      'T6_THREE_POINT_LINEAR_NATURAL_COORDINATE_RECONSTRUCTION_V1',
+    recoveryAuthority: 'ELEMENT_LOCAL_DIRECT_DISPLACEMENT_GRADIENT',
+    reconstructionMethod: 'T6_DIRECT_B_MATRIX_AT_FIXED_COORDINATE_V2',
     elementId: candidate.element.elementId,
     naturalCoordinates: {
       xi: normalizeZero(candidate.natural.xi),
@@ -111,19 +156,22 @@ export function recoverLafeaBucket01FixedProbe(inputValue) {
       y: normalizeZero(mapped.y),
     },
     mappingResidual: Math.hypot(mapped.x - probe.x, mapped.y - probe.y),
+    jacobianDeterminant: pointKinematics.jacobianDeterminant,
     tensorFrame: 'GLOBAL_XY',
+    strain: {
+      epsilonX: normalizeZero(strainVector[0]),
+      epsilonY: normalizeZero(strainVector[1]),
+      gammaXY: normalizeZero(strainVector[2]),
+    },
     reconstructedComponents: components,
     principalMaximum: principal.maximum,
     principalMinimum: principal.minimum,
     vonMises,
     authoritativeValue: value,
     units: probe.units,
-    supportingIntegrationPoints: elementResult.gaussPointResults.map((point) => ({
-      pointId: point.pointId,
-      xi: point.xi,
-      eta: point.eta,
-      stress: point.stress,
-    })),
+    constitutiveMatrixHash,
+    supportingNodalDisplacements,
+    retainedIntegrationPointExtrapolationUsed: false,
     crossElementAveragingUsed: false,
     nodalProjectionUsed: false,
     status: 'PASS',
@@ -201,7 +249,8 @@ function requireMesh(value) {
 function requireResult(value, mesh) {
   if (!value || value.schema !== 'local-continuum-result/v1'
     || value.qualification?.state !== 'ACCEPTED'
-    || !Array.isArray(value.loadCaseResults)) {
+    || !Array.isArray(value.loadCaseResults)
+    || value.meshEvidence?.formulation !== 'PLANE_STRESS') {
     throw probeError('LAFEA_B01_PROBE_RESULT_INVALID');
   }
   const retained = value.meshEvidence?.elementEvidence;
@@ -309,65 +358,37 @@ function t6Shape(xi, eta) {
   };
 }
 
-function reconstructTensor(points, xi, eta) {
-  return deepFreeze({
-    sigmaX: reconstruct(points, xi, eta, (point) => point.stress?.sigmaX),
-    sigmaY: reconstruct(points, xi, eta, (point) => point.stress?.sigmaY),
-    sigmaZ: reconstruct(points, xi, eta, (point) => point.stress?.sigmaZ),
-    tauXY: reconstruct(points, xi, eta, (point) => point.stress?.tauXY),
-  });
+function matrixVector(matrix, vector) {
+  return matrix.map((row) => normalizeZero(row.reduce(
+    (sum, value, index) => sum + value * vector[index],
+    0,
+  )));
 }
 
-function reconstruct(points, xi, eta, selector) {
-  const matrix = points.map((point) => [1, point.xi, point.eta]);
-  const values = points.map(selector);
-  if (values.some((value) => typeof value !== 'number' || !Number.isFinite(value))) {
-    throw probeError('LAFEA_B01_PROBE_STRESS_COMPONENT_INVALID');
-  }
-  const coefficients = solve3(matrix, values);
-  return normalizeZero(coefficients[0] + coefficients[1] * xi + coefficients[2] * eta);
-}
-
-function solve3(matrix, vector) {
-  const augmented = matrix.map((row, index) => [...row, vector[index]]);
-  for (let pivot = 0; pivot < 3; pivot += 1) {
-    let best = pivot;
-    for (let row = pivot + 1; row < 3; row += 1) {
-      if (Math.abs(augmented[row][pivot]) > Math.abs(augmented[best][pivot])) {
-        best = row;
-      }
-    }
-    [augmented[pivot], augmented[best]] = [augmented[best], augmented[pivot]];
-    const scale = augmented[pivot][pivot];
-    if (!(Math.abs(scale) > 1e-15)) {
-      throw probeError('LAFEA_B01_PROBE_RECONSTRUCTION_SINGULAR');
-    }
-    for (let column = pivot; column < 4; column += 1) {
-      augmented[pivot][column] /= scale;
-    }
-    for (let row = 0; row < 3; row += 1) {
-      if (row === pivot) continue;
-      const factor = augmented[row][pivot];
-      for (let column = pivot; column < 4; column += 1) {
-        augmented[row][column] -= factor * augmented[pivot][column];
-      }
-    }
-  }
-  return augmented.map((row) => row[3]);
+function isMatrix(value, rows, columns) {
+  return Array.isArray(value)
+    && value.length === rows
+    && value.every((row) => Array.isArray(row)
+      && row.length === columns
+      && row.every((entry) => typeof entry === 'number'
+        && Number.isFinite(entry)));
 }
 
 function principalStress(sigmaX, sigmaY, tauXY) {
   const average = (sigmaX + sigmaY) / 2;
   const radius = Math.hypot((sigmaX - sigmaY) / 2, tauXY);
-  return { maximum: average + radius, minimum: average - radius };
+  return {
+    maximum: normalizeZero(average + radius),
+    minimum: normalizeZero(average - radius),
+  };
 }
 
 function vonMisesStress(sigmaX, sigmaY, sigmaZ, tauXY) {
-  return Math.sqrt(0.5 * (
+  return normalizeZero(Math.sqrt(0.5 * (
     (sigmaX - sigmaY) ** 2
     + (sigmaY - sigmaZ) ** 2
     + (sigmaZ - sigmaX) ** 2
-  ) + 3 * tauXY ** 2);
+  ) + 3 * tauXY ** 2));
 }
 
 function componentValue(component, stress, principal, vonMises) {
