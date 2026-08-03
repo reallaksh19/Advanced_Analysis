@@ -39,40 +39,48 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Diagnose scalable sparse solver
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          mkdir -p reports/qualification
+          set +e
+          node scripts/lafea-bucket-01-scalable-solver-check.mjs \
+            > reports/qualification/lafea-bucket-01-scalable-solver.stdout.log \
+            2> reports/qualification/lafea-bucket-01-scalable-solver.stderr.log
+          exit_code=$?
+          if [[ "$exit_code" != "0" ]]; then
+            detail=$(node -e "const fs=require('fs');const p='reports/qualification/lafea-bucket-01-scalable-solver.stderr.log';const t=fs.existsSync(p)?fs.readFileSync(p,'utf8'):'no stderr';const lines=t.split(/\r?\n/).map(s=>s.trim()).filter(s=>s&&!/^at\s/.test(s)&&!/^node:/.test(s));process.stdout.write(lines.slice(0,8).join(' | ').slice(0,700))")
+            encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
+            safe=$(printf '%s' "$detail" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-48)
+            gh api --method POST \
+              "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -f state=failure \
+              -f context="lafea/scalable-detail/${safe}" \
+              -f description="Scalable solver assertion" \
+              -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
+            exit "$exit_code"
+          fi
+
       - name: Run and publish exact-head result
         env:
           EXPECTED_HEAD_SHA: ${{ github.sha }}
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          mkdir -p reports/qualification
           set +e
           node scripts/lafea-bucket-01-exact-head-check.mjs \
             > reports/qualification/lafea-bucket-01-exact-head.stdout.log \
             2> reports/qualification/lafea-bucket-01-exact-head.stderr.log
           exit_code=$?
           blocker=$(node -e "const fs=require('fs');const p='reports/qualification/lafea-bucket-01-exact-head.json';let t='UNKNOWN';if(fs.existsSync(p)){const r=JSON.parse(fs.readFileSync(p,'utf8'));if(r.blockingCheckIds&&r.blockingCheckIds[0])t=r.blockingCheckIds[0]}process.stdout.write(t)")
-          repair_blocker=$(node -e "const fs=require('fs');const p='reports/qualification/lafea-bucket-01-repair-check.json';let t='NONE';if(fs.existsSync(p)){const r=JSON.parse(fs.readFileSync(p,'utf8'));if(r.blockingCheckIds&&r.blockingCheckIds[0])t=r.blockingCheckIds[0]}process.stdout.write(t)")
           if [[ "$exit_code" == "0" ]]; then
             state=success
             description="Bucket-01 exact-head executable gate passed"
           else
             state=failure
             description="First blocker: ${blocker}"
-            safe_blocker=$(printf '%s' "$blocker" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-60)
-            gh api --method POST \
-              "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-              -f state=failure \
-              -f context="lafea/blocker/${safe_blocker}" \
-              -f description="$description"
-            if [[ "$repair_blocker" != "NONE" ]]; then
-              safe_repair_blocker=$(printf '%s' "$repair_blocker" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-52)
-              gh api --method POST \
-                "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-                -f state=failure \
-                -f context="lafea/repair-blocker/${safe_repair_blocker}" \
-                -f description="Repair blocker: ${repair_blocker}"
-            fi
           fi
           gh api --method POST \
             "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
