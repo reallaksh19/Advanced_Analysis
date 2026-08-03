@@ -27,6 +27,7 @@ for (const check of [
   nodeCheck('SCALABLE_SPARSE_CONTINUUM_SOLVER', 'scripts/lafea-bucket-01-scalable-solver-check.mjs'),
   nodeCheck('GOVERNED_T6_KIRSCH_FIXED_PROBES', 'scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs'),
   nodeCheck('PRODUCTION_LUG_FIXED_PROBE_LOCATION_CONTRACT', 'scripts/lafea-bucket-01-production-lug-probe-contract-check.mjs'),
+  nodeCheck('EXPECTED_VALUE_DEFINITION_SET', 'scripts/lafea-bucket-01-expected-value-registry-check.mjs'),
   nodeCheck('CODE_BASIS_INTAKE_CONTRACT', 'scripts/lafea-bucket-01-code-basis-check.mjs'),
   nodeCheck('THREE_REPLAY_CUSTODY_CONTRACT', 'scripts/lafea-bucket-01-replay-custody-check.mjs'),
   nodeCheck('GOVERNED_T3_PATCH', 'scripts/lafea-bucket-01-t3-patch-check.mjs'),
@@ -45,7 +46,7 @@ recordAssertion('TRACKED_WORKTREE_CLEAN', trackedStatus === '', trackedStatus ||
 const failures = checks.filter((check) => check.status !== 'PASS');
 const executableEvidencePass = failures.length === 0;
 const report = {
-  schema: 'lafea-bucket-01-exact-head-report/v10',
+  schema: 'lafea-bucket-01-exact-head-report/v11',
   status: executableEvidencePass ? 'EXACT_HEAD_REPAIR_EVIDENCE_PASS' : 'EXACT_HEAD_REPAIR_EVIDENCE_BLOCKED',
   exactHead,
   expectedHead,
@@ -57,7 +58,6 @@ const report = {
   checks,
   blockingCheckIds: failures.map((check) => check.id),
   unresolvedQualificationGates: [
-    'FULL_INDEPENDENT_EXPECTED_VALUE_PACKAGE_NOT_FROZEN',
     'EXACT_1024_ELEMENT_PRODUCTION_RESPONSE_EXECUTION_NOT_RETAINED',
     'PRODUCTION_LUG_FIXED_PROBE_RETAINED_RECEIPT_NOT_PRODUCED',
     'APPROVED_CODE_BASIS_AUTHORITY_NOT_SUPPLIED',
@@ -79,6 +79,7 @@ const report = {
     scalableSparseSolverRouteImplemented: true,
     governedKirschFixedProbeRouteImplemented: true,
     productionLugFixedProbeContractImplemented: true,
+    expectedValueDefinitionSetImplemented: true,
     codeBasisIntakeContractImplemented: true,
     threeReplayCustodyContractImplemented: true,
     governingCodeSelected: false,

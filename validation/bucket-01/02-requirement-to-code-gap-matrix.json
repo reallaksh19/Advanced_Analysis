@@ -1,31 +1,12 @@
 {
-  "schema": "lafea-bucket-01-gap-matrix/v10",
-  "audited_baseline_sha": "34a074b34d3e61b0b231ae2bf028fcc67b202671",
-  "superseded_baselines": [
-    "863c9d8c8b323457a1ad92849160187ba78a3837",
-    "1d425008d721018dd3e9784390385ddc391b248a",
-    "4a5c4506e2d0069d20bf54ff08cc74de60e412e7",
-    "292184e8ae374e24a98cdd59d79e648046e60943",
-    "efa1bab4250e8a99ec63977899b4d0b27354fce8",
-    "3c069f80e36788d6a3097f6be027890020c5f894",
-    "36a5fcb82c3f4ac841df12af0d77974bb37541d6",
-    "40404b51d39b29a6c7c2ab7095480099d1cc1fe4",
-    "192a3513061a634e9dc995cf6740374e6afbc1de",
-    "7c83060087f6c286c9efa7a84eee546d57a34a83",
-    "2d2e22288ad040c882638100c662debbdae38663",
-    "7c49c20c0b4d83f764bc351865dc3d1ae3fabf92",
-    "6763f73697c9e8f4ec59feaa306edf8d296861b1",
-    "cbd4d3e7397a3d64869d9be1c360af7d1d4ecdc8",
-    "42c9f96e9baffb52232b4b7ed7f04611c6337961",
-    "27fb14ddccb07081904d54c1bae161c87372dbdd",
-    "a7144e02598f3e9db0826f10cefe0b5254fa953e"
-  ],
+  "schema": "lafea-bucket-01-gap-matrix/v12",
+  "audited_baseline_sha": "eaac7e0532c114ef306d2d928f1d9f74348193cd",
   "superseded_baseline_disposition": "STALE_NOT_QUALIFICATION_EVIDENCE",
   "mainline_delta_review": {
     "continuum_bucket_files_changed": false,
     "qualification_parent_refreshed": true,
-    "latest_reviewed_main_commit": "34a074b34d3e61b0b231ae2bf028fcc67b202671",
-    "changes_confined_to_separate_common_enriched_consumer_handoff_files": true
+    "latest_reviewed_main_commit": "eaac7e0532c114ef306d2d928f1d9f74348193cd",
+    "changes_confined_to_separate_common_enriched_consumer_projection_files": true
   },
   "execution_policy": {
     "hosted_workflow_in_scope": false,
@@ -37,86 +18,92 @@
     {
       "id": "G1-EXACT-HEAD",
       "status": "BLOCKED_PENDING_EXTERNAL_EXECUTION",
-      "finding": "The package contains no hosted Bucket-01 workflow. Exact-head execution and retained reports must be supplied separately without changing technical benchmark definitions."
+      "finding": "No hosted Bucket-01 workflow is included. Exact-head execution and retained reports must be supplied separately."
+    },
+    {
+      "id": "G1-EXPECTED-VALUE-DEFINITION-SET",
+      "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXACT_HEAD_EXECUTION",
+      "finding": "One exact-head registry binds four independent closed-form benchmark oracles and two frozen production convergence/location definitions by Git blob SHA, raw SHA-256 and canonical JSON hash. Production output is prohibited from generating expected values, selecting coordinates or setting tolerances."
     },
     {
       "id": "G2-PRODUCTION-MESH",
       "status": "REPAIR_INFRASTRUCTURE_IMPLEMENTED",
-      "finding": "The annular T6 generator is evaluated independently for geometry, Jacobian, connectivity, midside, symmetry and feature-set requirements."
+      "finding": "The production annular T6 ladder is independently checked for geometry, Jacobians, midside placement, symmetry, connectivity and feature sets."
     },
     {
       "id": "G2-MAPPING-COVERAGE",
       "status": "BLOCKED_PENDING_PRODUCTION_RECEIPT",
-      "finding": "Material, load and restraint coverage remains dependent on retained production execution."
-    },
-    {
-      "id": "G3-T6-PATCH",
-      "status": "EXISTING_STRONG_REGRESSION",
-      "finding": "The retained T6 patch covers distorted geometry, rigid motions, scaling, rotation and Jacobian rejection."
+      "finding": "Material, load and restraint mapping coverage remains dependent on retained production execution."
     },
     {
       "id": "G3-T3-PATCH",
       "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION",
-      "finding": "A frozen affine oracle and governed T3 receipt cover plane stress and plane strain, displacement, stress, energy, equilibrium and deterministic replay."
+      "finding": "The governed T3 patch covers plane stress and plane strain, exact displacement, stress, energy, load parity, equilibrium and deterministic replay."
+    },
+    {
+      "id": "G3-T6-PATCH",
+      "status": "EXISTING_STRONG_REGRESSION",
+      "finding": "The T6 patch covers distorted geometry, rigid motions, scaling, rotation and Jacobian rejection."
     },
     {
       "id": "G3-PURE-SHEAR",
       "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION",
-      "finding": "A frozen pure-shear oracle and governed receipt cover load-path parity, tensor and derived stress, energy, equilibrium and replay."
+      "finding": "The governed pure-shear receipt covers affine displacement, tensor and derived stress, energy, load-path parity, equilibrium and replay."
     },
     {
       "id": "G3-CANTILEVER-PANEL",
       "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION",
-      "finding": "A frozen pure-bending T6 panel benchmark covers quadratic displacement, linear integration-point stress, energy and moment equilibrium."
+      "finding": "The T6 pure-bending panel covers quadratic displacement, linear integration-point stress, energy and moment equilibrium."
     },
     {
       "id": "G3-LOAD-DRIVEN",
       "status": "REPAIR_INFRASTRUCTURE_IMPLEMENTED_PENDING_PRODUCTION_EXECUTION",
-      "finding": "The 64/256/1024 production ladder has force, moment, energy and GCI contracts plus a retained-result receipt."
+      "finding": "The 64/256/1024 production ladder has frozen force, moment and strain-energy convergence contracts plus retained-result receipts."
     },
     {
       "id": "G3-PRODUCTION-SCALABILITY",
       "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXACT_1024_EXECUTION",
-      "finding": "Dense Cholesky is preserved below 1536 DOFs and deterministic CSR/Jacobi-PCG is used above; exact 1024-element lug execution remains unretained."
+      "finding": "Dense Cholesky is retained for small systems and deterministic CSR/Jacobi-PCG is used above 1536 DOFs. The exact 1024-element production run is not retained."
     },
     {
       "id": "G4-STRESS-AUTHORITY",
       "status": "REPAIR_INFRASTRUCTURE_IMPLEMENTED",
-      "finding": "Fixed element-local probes reconstruct tensor components from retained T6 integration points without nodal projection or cross-element averaging."
-    },
-    {
-      "id": "G4-CONVERGENCE",
-      "status": "REPAIR_INFRASTRUCTURE_IMPLEMENTED",
-      "finding": "Observed order, Richardson extrapolation, GCI, asymptotic checks and oscillatory/non-monotonic blocking are implemented."
+      "finding": "Element-local probes reconstruct unrounded tensors from retained T6 integration points without nodal projection or cross-element averaging."
     },
     {
       "id": "G4-KIRSCH-FIXED-PROBES",
       "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION",
-      "finding": "The governed T6 Kirsch benchmark uses frozen off-boundary probes and fixed-coordinate GCI against a closed-form oracle."
+      "finding": "A governed T6 Kirsch benchmark uses frozen off-boundary probes and fixed-coordinate GCI against a closed-form oracle."
     },
     {
       "id": "G4-PRODUCTION-LUG-LOCATIONS",
       "status": "TECHNICAL_FIX_IMPLEMENTED",
-      "finding": "Two standalone production-lug probes and a five-station radial stress path are frozen before stress observation and map uniquely inside one T6 element at every 64/256/1024 level."
+      "finding": "Two standalone lug probes and a five-station radial path are frozen before stress observation and map uniquely at all production levels."
     },
     {
       "id": "G4-PRODUCTION-STRESS",
       "status": "TECHNICAL_INFRASTRUCTURE_IMPLEMENTED_PENDING_RETAINED_EXECUTION",
-      "finding": "A retained-result receipt reconstructs stress at all frozen production-lug locations and requires zone-specific three-level GCI. No production stress values or PASS are claimed until exact execution results are supplied."
+      "finding": "The production stress receipt requires zone-specific three-level GCI at every frozen coordinate. No production stress PASS is claimed."
     },
     {
       "id": "G4-CODE",
       "status": "TECHNICAL_INFRASTRUCTURE_IMPLEMENTED_AUTHORITY_NOT_SUPPLIED",
-      "finding": "A fail-closed code-basis intake contract now requires an externally approved governing code and edition, source-document hash, allowable and temperature basis, fixed-location stress classification, explicit load-combination terms and approval-record hash. The committed template remains UNRESOLVED_GATE; no code, allowable, classification or combination is selected or inferred."
+      "finding": "The fail-closed code-basis contract is implemented, but no externally approved governing code, edition, allowable, classification or load combination is supplied."
     },
     {
       "id": "G5-REPLAY",
-      "status": "BLOCKED_PENDING_THREE_REPLAYS",
-      "finding": "The final exact candidate requires three clean deterministic executions with retained report-data hashes."
+      "status": "TECHNICAL_INFRASTRUCTURE_IMPLEMENTED_EXTERNAL_BUNDLES_NOT_SUPPLIED",
+      "finding": "The custody contract requires exactly three distinct exact-head replay bundles with identical evidence, stdout, stderr and required report hashes. No repository replay PASS is claimed."
     }
   ],
+  "remaining_external_blockers": [
+    "exact 64/256/1024 production execution and retained response receipt",
+    "production lug fixed-probe and path retained stress receipt",
+    "externally approved code-basis package",
+    "three deterministic exact-head replay bundles"
+  ],
   "qualification_states": {
-    "IMPLEMENTED": "PARTIAL_REPAIR_INFRASTRUCTURE",
+    "IMPLEMENTED": "TECHNICAL_CONTRACT_SET_COMPLETE_EXTERNAL_EVIDENCE_OPEN",
     "CONTRACT_VERIFIED": false,
     "MESH_VERIFIED": false,
     "SOLVER_VERIFIED": false,

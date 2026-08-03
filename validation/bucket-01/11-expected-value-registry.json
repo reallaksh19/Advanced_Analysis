@@ -1,0 +1,54 @@
+{
+  "schema": "lafea-bucket-01-expected-value-registry/v1",
+  "registryId": "B01-EXPECTED-VALUE-DEFINITION-SET-01",
+  "bucketId": "LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE",
+  "target": "C2D-LUG-PINHOLE -> LAFEA.3",
+  "freezeAuthority": "EXACT_GIT_HEAD_FILE_SET",
+  "productionOutputMayGenerateExpectedValues": false,
+  "entries": [
+    {
+      "entryId": "PURE_BENDING_PANEL_ORACLE",
+      "path": "validation/bucket-01/03-pure-bending-panel-oracle.json",
+      "schema": "lafea-bucket-01-pure-bending-panel-oracle/v1",
+      "role": "INDEPENDENT_CLOSED_FORM_ORACLE"
+    },
+    {
+      "entryId": "T3_PATCH_ORACLE",
+      "path": "validation/bucket-01/04-t3-patch-oracle.json",
+      "schema": "lafea-bucket-01-t3-patch-oracle/v1",
+      "role": "INDEPENDENT_CLOSED_FORM_ORACLE"
+    },
+    {
+      "entryId": "PURE_SHEAR_ORACLE",
+      "path": "validation/bucket-01/05-pure-shear-oracle.json",
+      "schema": "lafea-bucket-01-pure-shear-oracle/v1",
+      "role": "INDEPENDENT_CLOSED_FORM_ORACLE"
+    },
+    {
+      "entryId": "KIRSCH_FIXED_PROBE_ORACLE",
+      "path": "validation/bucket-01/07-kirsch-fixed-probe-oracle.json",
+      "schema": "lafea-bucket-01-kirsch-fixed-probe-oracle/v1",
+      "role": "INDEPENDENT_CLOSED_FORM_ORACLE"
+    },
+    {
+      "entryId": "PRODUCTION_RESPONSE_CONVERGENCE_DEFINITION",
+      "path": "validation/bucket-01/06-production-response-convergence-spec.json",
+      "schema": "lafea-bucket-01-production-response-spec/v1",
+      "role": "FROZEN_PRODUCTION_CONVERGENCE_DEFINITION"
+    },
+    {
+      "entryId": "PRODUCTION_LUG_STRESS_LOCATION_DEFINITION",
+      "path": "validation/bucket-01/08-production-lug-fixed-probe-spec.json",
+      "schema": "lafea-bucket-01-production-lug-probe-spec/v1",
+      "role": "FROZEN_PRODUCTION_STRESS_LOCATION_DEFINITION"
+    }
+  ],
+  "acceptancePolicy": {
+    "closedFormBenchmarksRequireIndependentExpectedValues": true,
+    "productionEnergyAcceptedByThreeLevelConvergence": true,
+    "productionStressAcceptedByFixedCoordinateThreeLevelConvergence": true,
+    "movingMaximumAcceptanceAuthorized": false,
+    "productionOutputUsedToSelectCoordinatesOrTolerances": false
+  },
+  "currentDisposition": "DEFINITION_SET_FROZEN_EXECUTION_EVIDENCE_SEPARATE"
+}
