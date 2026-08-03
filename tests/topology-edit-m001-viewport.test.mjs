@@ -180,8 +180,9 @@ test('shared interaction arbiter emits selection only after a qualified pointeru
 
     now = 100;
     canvas.emit('pointerdown', pointer(2, 10, 10));
+    canvas.emit('pointermove', pointer(2, 40, 10));
     now = 125;
-    canvas.emit('pointerup', pointer(2, 40, 10));
+    canvas.emit('pointerup', pointer(2, 11, 10));
     assert.equal(selections, 1);
 
     now = 200;
@@ -300,6 +301,8 @@ class EventTargetFixture {
   constructor() {
     this.listeners = new Map();
     this.activeElement = null;
+    this.visibilityState = 'visible';
+    this.captured = new Set();
   }
 
   addEventListener(type, listener) {
@@ -311,6 +314,12 @@ class EventTargetFixture {
   removeEventListener(type, listener) {
     this.listeners.set(type, (this.listeners.get(type) || []).filter((row) => row !== listener));
   }
+
+  setPointerCapture(pointerId) { this.captured.add(pointerId); }
+
+  hasPointerCapture(pointerId) { return this.captured.has(pointerId); }
+
+  releasePointerCapture(pointerId) { this.captured.delete(pointerId); }
 
   emit(type, event) {
     for (const listener of this.listeners.get(type) || []) listener(event);
