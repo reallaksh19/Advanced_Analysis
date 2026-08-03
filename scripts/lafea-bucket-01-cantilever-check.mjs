@@ -19,91 +19,57 @@ import {
 import { canonicalLafeaSha256 } from '../src/workspace/lafea-canonical-sha256.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const ORACLE_PATH = path.join(ROOT, 'validation/bucket-01/12-cantilever-oracle.json');
 const REPORT_PATH = path.resolve(
   ROOT,
   process.env.LAFEA_BUCKET_01_CANTILEVER_REPORT_PATH
     ?? 'reports/qualification/lafea-bucket-01-cantilever.json',
 );
+const oracle = Object.freeze(JSON.parse(fs.readFileSync(ORACLE_PATH, 'utf8')));
 
-const EXPECTED_VALUE_DEFINITION = Object.freeze({
-  schema: 'lafea-bucket-01-cantilever-expected-values/v1',
-  benchmarkId: 'C2D-CANTILEVER-PLANE-STRESS-01',
-  authority: {
-    type: 'ENGINEERING_THEORY',
-    source: 'Timoshenko beam: delta = P L^3/(3 E I) + P L/(kappa G A)',
-    productionOutputUsed: false,
-    observedResultUsedToSelectTolerance: false,
-  },
-  formulation: 'PLANE_STRESS',
-  elementType: 'Q4_FULL_INTEGRATION',
-  material: {
-    elasticModulus: 200000,
-    poissonRatio: 0.3,
-    units: 'MPa',
-  },
-  geometry: {
-    length: 100,
-    depth: 10,
-    thickness: 1,
-    units: 'mm',
-  },
-  load: {
-    resultant: 100,
-    type: 'DISTRIBUTED_NODAL_END_RESULTANT',
-    units: 'N',
-  },
-  shearCorrectionFactor: 5 / 6,
-  meshes: [
-    { nx: 4, ny: 1 },
-    { nx: 8, ny: 2 },
-    { nx: 16, ny: 4 },
-    { nx: 32, ny: 8 },
-  ],
-  tolerances: {
-    monotonicSlack: 1e-12,
-    finestDeflectionRatioAbsoluteError: 0.05,
-    orientationDeflectionRelativeDifference: 1e-10,
-    forceEquilibriumRelative: 1e-9,
-    momentEquilibriumRelative: 1e-9,
-    energyRelative: 1e-9,
-  },
-});
-
-const REPLAY_COUNT = 3;
-const expectedValueDefinitionHash = canonicalLafeaSha256(EXPECTED_VALUE_DEFINITION);
-const horizontalReplays = Array.from({ length: REPLAY_COUNT }, () => executeOrientation('HORIZONTAL'));
-const verticalReplays = Array.from({ length: REPLAY_COUNT }, () => executeOrientation('VERTICAL_CCW_90'));
+validateOracle();
+const oracleHash = canonicalLafeaSha256(oracle);
+const replayCount = 3;
+const horizontalReplays = Array.from(
+  { length: replayCount },
+  () => executeOrientation('HORIZONTAL'),
+);
+const verticalReplays = Array.from(
+  { length: replayCount },
+  () => executeOrientation('VERTICAL_CCW_90'),
+);
 
 assertReplayDeterminism(horizontalReplays, 'horizontal');
 assertReplayDeterminism(verticalReplays, 'vertical');
 
 const horizontal = horizontalReplays[0];
 const vertical = verticalReplays[0];
-const finestHorizontal = horizontal.history.at(-1);
-const finestVertical = vertical.history.at(-1);
 const orientationDifference = relativeDifference(
-  finestHorizontal.tipDeflection,
-  finestVertical.tipDeflection,
+  horizontal.history.at(-1).tipDeflection,
+  vertical.history.at(-1).tipDeflection,
   referenceDeflection(),
 );
 assert.ok(
-  orientationDifference <= EXPECTED_VALUE_DEFINITION.tolerances.orientationDeflectionRelativeDifference,
+  orientationDifference <= oracle.tolerances.orientationDeflectionRelativeDifference,
   `orientation deflection difference ${orientationDifference} exceeds tolerance`,
 );
 
 const baseReport = {
-  schema: 'lafea-bucket-01-cantilever-evidence/v1',
-  producerRevision: 'B01-CANTILEVER.1',
-  benchmarkId: EXPECTED_VALUE_DEFINITION.benchmarkId,
-  expectedValueDefinition: EXPECTED_VALUE_DEFINITION,
-  expectedValueDefinitionHash,
-  replayCount: REPLAY_COUNT,
+  schema: 'lafea-bucket-01-cantilever-evidence/v2',
+  producerRevision: 'B01-CANTILEVER.2',
+  benchmarkId: oracle.benchmarkId,
+  oracleId: oracle.oracleId,
+  oraclePath: path.relative(ROOT, ORACLE_PATH).split(path.sep).join('/'),
+  oracleHash,
+  expectedValueDefinitionHash: oracleHash,
+  replayCount,
   referenceDeflection: referenceDeflection(),
   horizontal,
   vertical,
   orientationRelativeDifference: orientationDifference,
   authority: {
     productionRouteExecuted: true,
+    expectedValuesReadFromFrozenRegistryFile: true,
     expectedValuesFrozenBeforeExecution: true,
     productionOutputGeneratedExpectedValues: false,
     forceEquilibriumRetained: true,
@@ -129,17 +95,41 @@ fs.mkdirSync(path.dirname(REPORT_PATH), { recursive: true });
 fs.writeFileSync(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 console.log(JSON.stringify(report));
 
+function validateOracle() {
+  assert.equal(oracle.schema, 'lafea-bucket-01-cantilever-oracle/v1');
+  assert.equal(oracle.oracleId, 'B01-CANTILEVER-TIMOSHENKO-01');
+  assert.equal(oracle.benchmarkId, 'C2D-CANTILEVER-PLANE-STRESS-01');
+  assert.equal(oracle.authority.type, 'ENGINEERING_THEORY');
+  assert.match(oracle.authority.source, /Timoshenko|beam/iu);
+  assert.equal(oracle.authority.productionOutputUsed, false);
+  assert.equal(oracle.authority.observedResultUsedToSelectTolerance, false);
+  assert.equal(oracle.formulation, 'PLANE_STRESS');
+  assert.equal(oracle.elementType, 'Q4_FULL_INTEGRATION');
+  assert.ok(Array.isArray(oracle.meshes) && oracle.meshes.length >= 3);
+  oracle.meshes.forEach(({ nx, ny }) => {
+    assert.ok(Number.isInteger(nx) && nx > 0, 'nx must be a positive integer');
+    assert.ok(Number.isInteger(ny) && ny > 0, 'ny must be a positive integer');
+  });
+  for (const [name, value] of Object.entries(oracle.tolerances)) {
+    assert.ok(Number.isFinite(value) && value >= 0, `${name} must be finite and non-negative`);
+  }
+}
+
 function executeOrientation(orientation) {
-  const history = EXPECTED_VALUE_DEFINITION.meshes.map(({ nx, ny }) => solveLevel(nx, ny, orientation));
+  const history = oracle.meshes.map(({ nx, ny }) => solveLevel(nx, ny, orientation));
   const ratios = history.map((row) => row.deflectionRatio);
   const monotonic = ratios.every((value, index) => (
-    index === 0 || value >= ratios[index - 1] - EXPECTED_VALUE_DEFINITION.tolerances.monotonicSlack
+    index === 0 || value >= ratios[index - 1] - oracle.tolerances.monotonicSlack
   ));
-  assert.equal(monotonic, true, `${orientation} deflection refinement is not monotonic: ${ratios.join(', ')}`);
+  assert.equal(
+    monotonic,
+    true,
+    `${orientation} deflection refinement is not monotonic: ${ratios.join(', ')}`,
+  );
   const finest = history.at(-1);
   assert.ok(
     Math.abs(finest.deflectionRatio - 1)
-      <= EXPECTED_VALUE_DEFINITION.tolerances.finestDeflectionRatioAbsoluteError,
+      <= oracle.tolerances.finestDeflectionRatioAbsoluteError,
     `${orientation} finest deflection ratio ${finest.deflectionRatio} is outside tolerance`,
   );
   return {
@@ -151,7 +141,7 @@ function executeOrientation(orientation) {
 }
 
 function solveLevel(nx, ny, orientation) {
-  const { length, depth, thickness } = EXPECTED_VALUE_DEFINITION.geometry;
+  const { length, depth, thickness } = oracle.geometry;
   const grid = q4Grid({ width: length, height: depth, nx, ny });
   const nodes = orientation === 'HORIZONTAL'
     ? grid.nodes
@@ -162,20 +152,20 @@ function solveLevel(nx, ny, orientation) {
     restraints.push(mRestraint(`RY-${j}`, grid.nodeId(0, j), 'UY'));
   }
   const tipNodeIds = Array.from({ length: ny + 1 }, (_, j) => grid.nodeId(nx, j));
-  const forceShare = EXPECTED_VALUE_DEFINITION.load.resultant / tipNodeIds.length;
+  const forceShare = oracle.load.resultant / tipNodeIds.length;
   const loads = tipNodeIds.map((nodeId, index) => (
     orientation === 'HORIZONTAL'
       ? mNodalForce(`F-${index}`, nodeId, 0, -forceShare)
       : mNodalForce(`F-${index}`, nodeId, forceShare, 0)
   ));
   const model = continuumModel({
-    modelIdentity: `${EXPECTED_VALUE_DEFINITION.benchmarkId}-${orientation}-${nx}x${ny}`,
-    solverProfile: denseProfile('PLANE_STRESS'),
+    modelIdentity: `${oracle.benchmarkId}-${orientation}-${nx}x${ny}`,
+    solverProfile: denseProfile(oracle.formulation),
     nodes,
     materials: [mMaterial(
       'MAT1',
-      EXPECTED_VALUE_DEFINITION.material.elasticModulus,
-      EXPECTED_VALUE_DEFINITION.material.poissonRatio,
+      oracle.material.elasticModulus,
+      oracle.material.poissonRatio,
     )],
     elements: grid.elements.map((element) => mElement(
       element.elementId,
@@ -192,12 +182,24 @@ function solveLevel(nx, ny, orientation) {
 
   const tipDeflection = averageTipDisplacement(result, tipNodeIds, orientation);
   const reference = referenceDeflection();
-  const forceScale = EXPECTED_VALUE_DEFINITION.load.resultant;
+  const forceScale = oracle.load.resultant;
   const momentScale = forceScale * length;
-  const forceError = Math.hypot(result.equilibriumTotals.fx, result.equilibriumTotals.fy) / forceScale;
+  const forceError = Math.hypot(
+    result.equilibriumTotals.fx,
+    result.equilibriumTotals.fy,
+  ) / forceScale;
   const momentError = Math.abs(result.equilibriumTotals.mz) / momentScale;
-  const externalWork = externalWorkFromTipLoads(result, tipNodeIds, forceShare, orientation);
-  const energyError = relativeDifference(result.strainEnergy, externalWork, Math.abs(externalWork));
+  const externalWork = externalWorkFromTipLoads(
+    result,
+    tipNodeIds,
+    forceShare,
+    orientation,
+  );
+  const energyError = relativeDifference(
+    result.strainEnergy,
+    externalWork,
+    Math.abs(externalWork),
+  );
   const elementEnergyError = relativeDifference(
     result.strainEnergy,
     result.energyConsistency.elementEnergyTotal,
@@ -205,19 +207,19 @@ function solveLevel(nx, ny, orientation) {
   );
 
   assert.ok(
-    forceError <= EXPECTED_VALUE_DEFINITION.tolerances.forceEquilibriumRelative,
+    forceError <= oracle.tolerances.forceEquilibriumRelative,
     `${orientation} ${nx}x${ny} force equilibrium error ${forceError} exceeds tolerance`,
   );
   assert.ok(
-    momentError <= EXPECTED_VALUE_DEFINITION.tolerances.momentEquilibriumRelative,
+    momentError <= oracle.tolerances.momentEquilibriumRelative,
     `${orientation} ${nx}x${ny} moment equilibrium error ${momentError} exceeds tolerance`,
   );
   assert.ok(
-    energyError <= EXPECTED_VALUE_DEFINITION.tolerances.energyRelative,
+    energyError <= oracle.tolerances.energyRelative,
     `${orientation} ${nx}x${ny} external-work error ${energyError} exceeds tolerance`,
   );
   assert.ok(
-    elementEnergyError <= EXPECTED_VALUE_DEFINITION.tolerances.energyRelative,
+    elementEnergyError <= oracle.tolerances.energyRelative,
     `${orientation} ${nx}x${ny} element-energy error ${elementEnergyError} exceeds tolerance`,
   );
 
@@ -272,14 +274,14 @@ function externalWorkFromTipLoads(result, nodeIds, forceShare, orientation) {
 }
 
 function referenceDeflection() {
-  const { length, depth, thickness } = EXPECTED_VALUE_DEFINITION.geometry;
-  const { elasticModulus, poissonRatio } = EXPECTED_VALUE_DEFINITION.material;
-  const load = EXPECTED_VALUE_DEFINITION.load.resultant;
+  const { length, depth, thickness } = oracle.geometry;
+  const { elasticModulus, poissonRatio } = oracle.material;
+  const load = oracle.load.resultant;
   const inertia = thickness * depth ** 3 / 12;
   const area = depth * thickness;
   const shearModulus = elasticModulus / (2 * (1 + poissonRatio));
   return load * length ** 3 / (3 * elasticModulus * inertia)
-    + load * length / (EXPECTED_VALUE_DEFINITION.shearCorrectionFactor * shearModulus * area);
+    + load * length / (oracle.shearCorrectionFactor * shearModulus * area);
 }
 
 function assertReplayDeterminism(replays, label) {
