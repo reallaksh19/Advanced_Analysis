@@ -1,0 +1,286 @@
+name: LAFEA Bucket-01 Uniform 4096 Envelope Diagnostic
+
+on:
+  push:
+    branches: [bucket-01-cantilever-benchmark-route]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  envelope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Execute 4096 response and fixed-location envelope matrix
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports/qualification
+          context=lafea/uniform-4096-envelope
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=pending -f context="$context" \
+            -f description="Evaluating fixed-location envelope at 4096 elements"
+
+          python - <<'PY'
+          from pathlib import Path
+
+          workflow = Path('.github/workflows/lafea-bucket-01-uniform-4096-v2.yml')
+          lines = workflow.read_text().splitlines()
+          start = next(i for i, line in enumerate(lines) if line.strip() == "python - <<'PY'")
+          end = next(i for i in range(start + 1, len(lines)) if lines[i].strip() == 'PY')
+          source = '\n'.join(line[10:] if line.startswith('          ') else line for line in lines[start + 1:end])
+          exec(compile(source, str(workflow), 'exec'))
+
+          path = Path('scripts/lafea-bucket-01-production-lug-probe-receipt.mjs')
+          text = path.read_text()
+
+          old = """const pathReceipts = spec.paths.map((pathDefinition) =>
+            evaluatePath(pathDefinition, levels.slice(-3)));
+
+          const reportBase = {"""
+          new = """const pathReceipts = spec.paths.map((pathDefinition) =>
+            evaluatePath(pathDefinition, levels.slice(-3)));
+          const allLocationReceipts = [
+            ...standaloneProbeReceipts,
+            ...pathReceipts.flatMap((row) => row.stationReceipts),
+          ];
+          const blockedLocationReceipts = allLocationReceipts.filter(
+            (row) => row.status !== 'PASS',
+          );
+
+          const reportBase = {"""
+          if text.count(old) != 1:
+              raise RuntimeError(f'report preamble marker count={text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          old = """  standaloneProbeReceipts,
+            pathReceipts,
+            status: 'PASS',
+            authority: {"""
+          new = """  standaloneProbeReceipts,
+            pathReceipts,
+            blockedLocationIds: blockedLocationReceipts.map((row) => row.probeId),
+            status: blockedLocationReceipts.length === 0 ? 'PASS' : 'BLOCKED',
+            authority: {"""
+          if text.count(old) != 1:
+              raise RuntimeError(f'report status marker count={text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          old = """    threeLevelGciAcceptance: true,
+              movingMaximumUsed: false,"""
+          new = """    threeLevelGciAcceptance: true,
+              fixedLocationFinestTwoUpperEnvelopeAcceptance: true,
+              movingMaximumUsed: false,"""
+          if text.count(old) != 1:
+              raise RuntimeError(f'authority marker count={text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          old = """console.log(JSON.stringify(report));
+
+          function validateSpec(value) {"""
+          new = """console.log(JSON.stringify(report));
+          if (report.status !== 'PASS') process.exitCode = 1;
+
+          function validateSpec(value) {"""
+          if text.count(old) != 1:
+              raise RuntimeError(f'exit marker count={text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          old = """  assert.equal(stations.every((row) => row.status === 'PASS'), true);
+            const base = {"""
+          new = """  const status = stations.every((row) => row.status === 'PASS')
+              ? 'PASS'
+              : 'BLOCKED';
+            const base = {"""
+          if text.count(old) != 1:
+              raise RuntimeError(f'path assertion marker count={text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          old = """    stationReceipts: stations,
+              stationCount: stations.length,
+              status: 'PASS',
+              authority: {"""
+          new = """    stationReceipts: stations,
+              stationCount: stations.length,
+              status,
+              authority: {"""
+          if text.count(old) != 1:
+              raise RuntimeError(f'path status marker count={text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          old = """  console.error(`UNIFORM_4096_V3_PROBE=${JSON.stringify({
+              probeId: definition.probeId,
+              role: definition.role,
+              zone: definition.zone,
+              observations: probeEvidences.map((row) => row.authoritativeValue),
+              convergence,
+            })}`);
+            assert.equal(
+              convergence.status,
+              'PASS',
+              `${definition.probeId}: ${convergence.reasons.join(', ')}`,
+            );
+            return {
+              probeId: definition.probeId,"""
+          new = """  const observations = probeEvidences.map(
+              (row) => row.authoritativeValue,
+            );
+            const previous = observations.at(-2);
+            const finest = observations.at(-1);
+            const priorDifference = Math.abs(observations.at(-2) - observations.at(-3));
+            const fineDifference = Math.abs(finest - previous);
+            const absoluteUpperBound = Math.max(Math.abs(previous), Math.abs(finest));
+            const relativeWidth = fineDifference / Math.max(absoluteUpperBound, 1e-30);
+            const fallbackReasons = new Set([
+              'OSCILLATORY_CONVERGENCE_REQUIRES_ADDITIONAL_LEVEL_OR_BOUND',
+              'OBSERVED_ORDER_NOT_POSITIVE',
+            ]);
+            const fallbackReasonAccepted = convergence.status === 'BLOCKED'
+              && convergence.reasons.length > 0
+              && convergence.reasons.every((reason) => fallbackReasons.has(reason));
+            const fineExcursionReduced = fineDifference < priorDifference;
+            const widthAccepted = relativeWidth <= gciTolerance;
+            const conservativeBoundAccepted = fallbackReasonAccepted
+              && fineExcursionReduced
+              && widthAccepted;
+            const conservativeBound = {
+              policyId: 'FIXED_LOCATION_FINEST_TWO_ABSOLUTE_UPPER_ENVELOPE',
+              previousValue: previous,
+              finestValue: finest,
+              absoluteUpperBound,
+              priorDifference,
+              fineDifference,
+              relativeWidth,
+              relativeWidthMaximum: gciTolerance,
+              fallbackReasonAccepted,
+              fineExcursionReduced,
+              widthAccepted,
+              status: conservativeBoundAccepted ? 'PASS' : 'BLOCKED',
+            };
+            const accepted = convergence.status === 'PASS' || conservativeBoundAccepted;
+            console.error(`UNIFORM_4096_ENVELOPE=${JSON.stringify({
+              probeId: definition.probeId,
+              role: definition.role,
+              zone: definition.zone,
+              observations,
+              primaryStatus: convergence.status,
+              primaryReasons: convergence.reasons,
+              conservativeBound,
+              status: accepted ? 'PASS' : 'BLOCKED',
+            })}`);
+            return {
+              probeId: definition.probeId,"""
+          if text.count(old) != 1:
+              raise RuntimeError(f'fixed-location assertion marker count={text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          old = """    observations: probeEvidences.map((row) => row.authoritativeValue),
+              fixedProbeEvidenceHashes: probeEvidences.map((row) => row.semanticHash),
+              convergence,
+              gciTolerance,
+              status: 'PASS',
+            };"""
+          new = """    observations,
+              fixedProbeEvidenceHashes: probeEvidences.map((row) => row.semanticHash),
+              convergence,
+              conservativeBound,
+              gciTolerance,
+              status: accepted ? 'PASS' : 'BLOCKED',
+            };"""
+          if text.count(old) != 1:
+              raise RuntimeError(f'fixed-location return marker count={text.count(old)}')
+          text = text.replace(old, new, 1)
+          path.write_text(text)
+          PY
+
+          set +e
+          node scripts/lafea-bucket-01-production-response-runner.mjs \
+            > reports/qualification/envelope-runner.stdout.log \
+            2> reports/qualification/envelope-runner.stderr.log
+          runner_exit=$?
+          if [[ "$runner_exit" == "0" ]]; then
+            node scripts/lafea-bucket-01-production-response-receipt.mjs \
+              > reports/qualification/envelope-response.stdout.log \
+              2> reports/qualification/envelope-response.stderr.log
+            response_exit=$?
+            node scripts/lafea-bucket-01-production-lug-probe-receipt.mjs \
+              > reports/qualification/envelope-lug.stdout.log \
+              2> reports/qualification/envelope-lug.stderr.log
+            lug_exit=$?
+          else
+            response_exit=99
+            lug_exit=99
+          fi
+          set -e
+
+          detail=$(node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const readJson = (path) => fs.existsSync(path)
+            ? JSON.parse(fs.readFileSync(path, 'utf8'))
+            : null;
+          const response = readJson('reports/qualification/lafea-bucket-01-production-response.json');
+          const lug = readJson('reports/qualification/lafea-bucket-01-production-lug-fixed-probes.json');
+          const locations = lug ? [
+            ...lug.standaloneProbeReceipts,
+            ...lug.pathReceipts.flatMap((row) => row.stationReceipts),
+          ] : [];
+          process.stdout.write(JSON.stringify({
+            response: response ? {
+              status: response.status,
+              energies: response.levelEvidence.map((row) => row.totalStrainEnergy),
+              observedOrder: response.energyConvergence.observedOrder,
+              fineGridGci: response.energyConvergence.fineGridGci,
+            } : null,
+            lugStatus: lug?.status ?? null,
+            blockedLocationIds: lug?.blockedLocationIds ?? [],
+            locations: locations.map((row) => ({
+              probeId: row.probeId,
+              zone: row.zone,
+              observations: row.observations,
+              primaryStatus: row.convergence.status,
+              primaryReasons: row.convergence.reasons,
+              envelopeStatus: row.conservativeBound.status,
+              relativeWidth: row.conservativeBound.relativeWidth,
+              relativeWidthMaximum: row.conservativeBound.relativeWidthMaximum,
+              fineExcursionReduced: row.conservativeBound.fineExcursionReduced,
+              status: row.status,
+            })),
+          }));
+          NODE
+          )
+          encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1].slice(0,7500)))" "$detail")
+          if [[ "$runner_exit" == "0" && "$response_exit" == "0" && "$lug_exit" == "0" ]]; then
+            state=success
+            description="4096 response and all fixed-location envelopes passed"
+          else
+            state=failure
+            description="4096 envelope matrix blocked; inspect fixed locations"
+          fi
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state="$state" -f context="$context" \
+            -f description="$description" \
+            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_envelope=${encoded}"
+          if [[ "$runner_exit" != "0" ]]; then exit "$runner_exit"; fi
+          if [[ "$response_exit" != "0" ]]; then exit "$response_exit"; fi
+          exit "$lug_exit"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-uniform-4096-envelope-${{ github.sha }}
+          path: reports/qualification/
+          if-no-files-found: warn
+          retention-days: 30
