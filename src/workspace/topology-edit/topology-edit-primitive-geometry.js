@@ -1,20 +1,10 @@
 import * as THREE from 'three';
-import { deepFreeze } from '../../core/shared-piping-model/index.js';
 
 export const TOPOLOGY_EDIT_PRIMITIVE_GEOMETRY_ERROR = 'TOPOLOGY_EDIT_PRIMITIVE_GEOMETRY_INVALID';
-export const TOPOLOGY_EDIT_COMPONENT_SHAPE_PROFILE = deepFreeze({
-  schema: 'TopologyEditComponentShapeProfile.v1',
-  teeRunLengthFactor: 1.25,
-  teeBranchLengthFactor: 1.75,
-  oletLengthFactor: 2,
-  oletTipRadiusFactor: 0.5,
-  valveNeckRadiusFactor: 0.6,
-  instrumentStemRadiusFactor: 0.25,
-});
 
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
-const Z_AXIS = new THREE.Vector3(0, 0, 1);
 const MIN_LENGTH = 1e-9;
+const DIRECTION_TOLERANCE = 1e-9;
 
 export class TopologyEditPrimitiveGeometryError extends Error {
   constructor(message, detailCode) {
@@ -25,8 +15,10 @@ export class TopologyEditPrimitiveGeometryError extends Error {
   }
 }
 
-export function materializeTopologyEditPrimitive(primitive, options = {}) {
-  const kind = requiredToken(primitive?.kind, 'PRIMITIVE_KIND_MISSING');
+export function materializeTopologyEditPrimitive(primitiveValue, options = {}) {
+  const primitive = objectRecord(primitiveValue, 'PRIMITIVE_RECORD_MISSING');
+  const kind = requiredToken(primitive.kind, 'PRIMITIVE_KIND_MISSING');
+  const parameters = objectRecord(primitive.parameters, 'PARAMETERS_MISSING');
   const material = options.material;
   if (!material?.isMaterial) fail('A governed Three.js material is required.', 'MATERIAL_MISSING');
   const radialSegments = integerAtLeast(options.radialSegments, 8, 'RADIAL_SEGMENTS_INVALID');
@@ -40,51 +32,81 @@ export function materializeTopologyEditPrimitive(primitive, options = {}) {
     canonicalEntityId: String(primitive.canonicalEntityId || ''),
     partRole: String(primitive.partRole || 'body'),
   };
-  const context = { group, material, radialSegments, markerSize, pickUserData, primitive };
+  const context = {
+    group,
+    material,
+    radialSegments,
+    markerSize,
+    pickUserData,
+    primitive,
+    parameters,
+  };
   const builder = BUILDERS[kind];
   if (!builder) fail(`Unsupported primitive kind ${kind}.`, 'PRIMITIVE_KIND_UNSUPPORTED');
   builder(context);
   if (!group.children.length) fail(`Primitive ${kind} produced no geometry.`, 'EMPTY_GEOMETRY');
   group.updateMatrixWorld(true);
   const bounds = new THREE.Box3().setFromObject(group);
-  if (bounds.isEmpty() || !finiteBox(bounds)) fail(`Primitive ${kind} produced invalid bounds.`, 'BOUNDS_INVALID');
+  if (bounds.isEmpty() || !finiteBox(bounds)) {
+    fail(`Primitive ${kind} produced invalid bounds.`, 'BOUNDS_INVALID');
+  }
   return { object: group, bounds };
 }
 
 const BUILDERS = {
-  PIPE_CYLINDER: ({ primitive, ...context }) => {
-    const parameters = primitive.parameters;
-    addCylinder(context, point(parameters.start), point(parameters.end), diameter(parameters.outsideDiameterMm) / 2);
-  },
-  ELBOW_ARC: ({ primitive, ...context }) => {
-    const parameters = primitive.parameters;
-    const points = pointArray(parameters.arcPoints, 2);
-    const radius = diameter(parameters.outsideDiameterMm) / 2;
-    const segments = integerAtLeast(parameters.segmentCount, points.length - 1, 'ELBOW_SEGMENT_COUNT_INVALID');
-    const curve = new THREE.CatmullRomCurve3(points, false, 'centripetal');
-    addMesh(context, new THREE.TubeGeometry(curve, segments, radius, context.radialSegments, false));
-  },
-  CONICAL_REDUCER: ({ primitive, ...context }) => addReducer(context, primitive.parameters),
-  ECCENTRIC_REDUCER: ({ primitive, ...context }) => addReducer(context, primitive.parameters),
-  TEE_JUNCTION: ({ primitive, ...context }) => addTee(context, primitive.parameters),
-  OLET_BRANCH: ({ primitive, ...context }) => addOlet(context, primitive.parameters),
-  FLANGE_DISC: ({ primitive, ...context }) => addFlange(context, primitive.parameters),
-  VALVE_BODY: ({ primitive, ...context }) => addValve(context, primitive.parameters),
-  GASKET_DISC: ({ primitive, ...context }) => {
-    const p = primitive.parameters;
+  PIPE_CYLINDER: (context) => {
+    const p = context.parameters;
     addCylinder(context, point(p.start), point(p.end), diameter(p.outsideDiameterMm) / 2);
   },
-  INSTRUMENT_MARKER: ({ primitive, ...context }) => addInstrument(context, primitive.parameters),
-  JUNCTION_MARKER: ({ primitive, ...context }) => {
-    const position = point(primitive.parameters.position);
-    addMesh(context, new THREE.SphereGeometry(context.markerSize, context.radialSegments, Math.max(6, Math.floor(context.radialSegments * 0.75))), position);
+  ELBOW_ARC: (context) => {
+    const p = context.parameters;
+    const points = pointArray(p.arcPoints, 2);
+    const radius = diameter(p.outsideDiameterMm) / 2;
+    const segments = integerAtLeast(p.segmentCount, points.length - 1, 'ELBOW_SEGMENT_COUNT_INVALID');
+    const curve = new THREE.CatmullRomCurve3(points, false, 'centripetal');
+    addMesh(
+      context,
+      new THREE.TubeGeometry(curve, segments, radius, context.radialSegments, false),
+    );
   },
-  DIAGNOSTIC_CENTERLINE: ({ primitive, ...context }) => {
-    const p = primitive.parameters;
+  CONICAL_REDUCER: (context) => addReducer(context, context.parameters),
+  ECCENTRIC_REDUCER: (context) => addReducer(context, context.parameters),
+  TEE_JUNCTION: (context) => addTee(context, context.parameters),
+  OLET_BRANCH: (context) => addOlet(context, context.parameters),
+  FLANGE_DISC: (context) => addFlange(context, context.parameters),
+  VALVE_BODY: (context) => addValve(context, context.parameters),
+  GASKET_DISC: (context) => {
+    const p = context.parameters;
+    addCylinder(context, point(p.start), point(p.end), diameter(p.outsideDiameterMm) / 2);
+  },
+  INSTRUMENT_MARKER: (context) => addInstrument(context, context.parameters),
+  JUNCTION_MARKER: (context) => {
+    const position = point(context.parameters.position);
+    addMesh(
+      context,
+      new THREE.SphereGeometry(
+        context.markerSize,
+        context.radialSegments,
+        Math.max(6, Math.floor(context.radialSegments * 0.75)),
+      ),
+      position,
+    );
+  },
+  DIAGNOSTIC_CENTERLINE: (context) => {
+    const p = context.parameters;
     const radius = positive(p.radiusMm, 'DIAGNOSTIC_RADIUS_INVALID');
     if (Array.isArray(p.arcPoints) && p.arcPoints.length >= 2) {
       const points = pointArray(p.arcPoints, 2);
-      addMesh(context, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points, false, 'centripetal'), points.length - 1, radius, context.radialSegments, false));
+      addMesh(
+        context,
+        new THREE.TubeGeometry(
+          new THREE.CatmullRomCurve3(points, false, 'centripetal'),
+          points.length - 1,
+          radius,
+          context.radialSegments,
+          false,
+        ),
+      );
       return;
     }
     addCylinder(context, point(p.start), point(p.end), radius);
@@ -103,64 +125,49 @@ function addReducer(context, parameters) {
 
 function addTee(context, parameters) {
   const center = point(parameters.center);
-  const runDirections = directionArray(parameters.runDirections, 2);
-  const branchDirection = direction(parameters.branchDirection);
-  const runDiameter = diameter(parameters.runOutsideDiameterMm);
-  const branchDiameter = diameter(parameters.branchOutsideDiameterMm);
-  const runRadius = runDiameter / 2;
-  const branchRadius = branchDiameter / 2;
-  runDirections.forEach((axis) => {
-    addCylinder(
-      context,
-      center,
-      center.clone().addScaledVector(axis, runDiameter * TOPOLOGY_EDIT_COMPONENT_SHAPE_PROFILE.teeRunLengthFactor),
-      runRadius * 1.12,
-    );
-  });
-  addCylinder(
-    context,
-    center,
-    center.clone().addScaledVector(branchDirection, branchDiameter * TOPOLOGY_EDIT_COMPONENT_SHAPE_PROFILE.teeBranchLengthFactor),
-    branchRadius * 1.12,
+  const runEnds = exactPointArray(parameters.runEnds, 2, 'TEE_RUN_ENDS_INVALID');
+  const branchEnd = point(parameters.branchEnd);
+  const runDirections = exactDirectionArray(
+    parameters.runDirections,
+    2,
+    'TEE_RUN_DIRECTIONS_INVALID',
   );
+  const branchDirection = direction(parameters.branchDirection);
+  runEnds.forEach((end, index) => {
+    assertDirection(center, end, runDirections[index], 'TEE_RUN_DIRECTION_MISMATCH');
+  });
+  assertDirection(center, branchEnd, branchDirection, 'TEE_BRANCH_DIRECTION_MISMATCH');
+  const runRadius = diameter(parameters.runOutsideDiameterMm) / 2;
+  const branchRadius = diameter(parameters.branchOutsideDiameterMm) / 2;
+  runEnds.forEach((end) => addCylinder(context, center, end, runRadius));
+  addCylinder(context, center, branchEnd, branchRadius);
 }
 
 function addOlet(context, parameters) {
   const center = point(parameters.center);
+  const branchEnd = point(parameters.branchEnd);
   const branchDirection = direction(parameters.branchDirection);
-  const branchDiameter = diameter(parameters.branchOutsideDiameterMm);
-  const branchRadius = branchDiameter / 2;
-  const end = center.clone().addScaledVector(
-    branchDirection,
-    branchDiameter * TOPOLOGY_EDIT_COMPONENT_SHAPE_PROFILE.oletLengthFactor,
-  );
-  addCylinder(
+  assertDirection(center, branchEnd, branchDirection, 'OLET_BRANCH_DIRECTION_MISMATCH');
+  const branchRadius = diameter(parameters.branchOutsideDiameterMm) / 2;
+  addCylinder(context, center, branchEnd, branchRadius);
+  addMesh(
     context,
+    new THREE.SphereGeometry(
+      branchRadius,
+      context.radialSegments,
+      Math.max(6, Math.floor(context.radialSegments * 0.75)),
+    ),
     center,
-    end,
-    branchRadius,
-    branchRadius * TOPOLOGY_EDIT_COMPONENT_SHAPE_PROFILE.oletTipRadiusFactor,
   );
 }
 
 function addFlange(context, parameters) {
-  const start = point(parameters.start);
-  const end = point(parameters.end);
-  const radius = diameter(parameters.outsideDiameterMm) / 2;
-  const mesh = addCylinder(context, start, end, radius);
-  const length = start.distanceTo(end);
-  const ringTube = Math.min(radius / 6, length / 4);
-  if (ringTube > MIN_LENGTH && radius > ringTube) {
-    const torus = new THREE.Mesh(
-      new THREE.TorusGeometry(radius - ringTube, ringTube, Math.max(6, Math.floor(context.radialSegments / 2)), context.radialSegments),
-      context.material,
-    );
-    torus.position.copy(start).add(end).multiplyScalar(0.5);
-    torus.quaternion.setFromUnitVectors(Z_AXIS, end.clone().sub(start).normalize());
-    applyPick(torus, context);
-    context.group.add(torus);
-  }
-  return mesh;
+  addCylinder(
+    context,
+    point(parameters.start),
+    point(parameters.end),
+    diameter(parameters.outsideDiameterMm) / 2,
+  );
 }
 
 function addValve(context, parameters) {
@@ -168,10 +175,17 @@ function addValve(context, parameters) {
   const end = point(parameters.end);
   const center = point(parameters.center);
   const radius = diameter(parameters.outsideDiameterMm) / 2;
-  const neckRadius = radius * TOPOLOGY_EDIT_COMPONENT_SHAPE_PROFILE.valveNeckRadiusFactor;
-  addCylinder(context, start, center, neckRadius);
-  addCylinder(context, center, end, neckRadius);
-  addMesh(context, new THREE.SphereGeometry(radius, context.radialSegments, Math.max(6, Math.floor(context.radialSegments * 0.75))), center);
+  addCylinder(context, start, center, radius);
+  addCylinder(context, center, end, radius);
+  addMesh(
+    context,
+    new THREE.SphereGeometry(
+      radius,
+      context.radialSegments,
+      Math.max(6, Math.floor(context.radialSegments * 0.75)),
+    ),
+    center,
+  );
 }
 
 function addInstrument(context, parameters) {
@@ -179,17 +193,24 @@ function addInstrument(context, parameters) {
   const end = point(parameters.end);
   const center = point(parameters.center);
   const radius = diameter(parameters.outsideDiameterMm) / 2;
-  addCylinder(context, start, end, radius * TOPOLOGY_EDIT_COMPONENT_SHAPE_PROFILE.instrumentStemRadiusFactor);
+  addCylinder(context, start, end, radius);
   addMesh(context, new THREE.IcosahedronGeometry(radius, 1), center);
 }
 
 function addCylinder(context, start, end, startRadius, endRadius = startRadius) {
-  const direction = end.clone().sub(start);
-  const length = direction.length();
+  const acceptedStartRadius = positive(startRadius, 'START_RADIUS_INVALID');
+  const acceptedEndRadius = positive(endRadius, 'END_RADIUS_INVALID');
+  const axis = end.clone().sub(start);
+  const length = axis.length();
   if (!(length > MIN_LENGTH)) fail('Cylinder endpoints must be distinct.', 'ZERO_LENGTH_AXIS');
-  const geometry = new THREE.CylinderGeometry(endRadius, startRadius, length, context.radialSegments);
+  const geometry = new THREE.CylinderGeometry(
+    acceptedEndRadius,
+    acceptedStartRadius,
+    length,
+    context.radialSegments,
+  );
   const position = start.clone().add(end).multiplyScalar(0.5);
-  const quaternion = new THREE.Quaternion().setFromUnitVectors(Y_AXIS, direction.normalize());
+  const quaternion = new THREE.Quaternion().setFromUnitVectors(Y_AXIS, axis.normalize());
   return addMesh(context, geometry, position, quaternion);
 }
 
@@ -212,12 +233,23 @@ function applyPick(object, context) {
 }
 
 function point(value) {
-  if (!value || ![value.x, value.y, value.z].every(Number.isFinite)) fail('A finite point is required.', 'POINT_INVALID');
+  if (!value || ![value.x, value.y, value.z].every(Number.isFinite)) {
+    fail('A finite point is required.', 'POINT_INVALID');
+  }
   return new THREE.Vector3(value.x, value.y, value.z);
 }
 
 function pointArray(value, minimum) {
-  if (!Array.isArray(value) || value.length < minimum) fail(`At least ${minimum} points are required.`, 'POINT_ARRAY_INVALID');
+  if (!Array.isArray(value) || value.length < minimum) {
+    fail(`At least ${minimum} points are required.`, 'POINT_ARRAY_INVALID');
+  }
+  return value.map(point);
+}
+
+function exactPointArray(value, count, code) {
+  if (!Array.isArray(value) || value.length !== count) {
+    fail(`Exactly ${count} points are required.`, code);
+  }
   return value.map(point);
 }
 
@@ -228,11 +260,21 @@ function direction(value) {
   return vector.multiplyScalar(1 / length);
 }
 
-function directionArray(value, minimum) {
-  if (!Array.isArray(value) || value.length < minimum) {
-    fail(`At least ${minimum} directions are required.`, 'DIRECTION_ARRAY_INVALID');
+function exactDirectionArray(value, count, code) {
+  if (!Array.isArray(value) || value.length !== count) {
+    fail(`Exactly ${count} directions are required.`, code);
   }
   return value.map(direction);
+}
+
+function assertDirection(start, end, declaredDirection, code) {
+  const axis = end.clone().sub(start);
+  const length = axis.length();
+  if (!(length > MIN_LENGTH)) fail('Placement endpoints must be distinct.', 'ZERO_LENGTH_AXIS');
+  const alignment = axis.multiplyScalar(1 / length).dot(declaredDirection);
+  if (Math.abs(1 - alignment) > DIRECTION_TOLERANCE) {
+    fail('Declared direction conflicts with governed placement endpoints.', code);
+  }
 }
 
 function diameter(value) {
@@ -241,13 +283,17 @@ function diameter(value) {
 
 function positive(value, code) {
   const number = Number(value);
-  if (!Number.isFinite(number) || number <= 0) fail('A positive finite value is required.', code);
+  if (!Number.isFinite(number) || number <= 0) {
+    fail('A positive finite value is required.', code);
+  }
   return number;
 }
 
 function integerAtLeast(value, minimum, code = 'INTEGER_INVALID') {
   const number = Number(value);
-  if (!Number.isInteger(number) || number < minimum) fail(`An integer of at least ${minimum} is required.`, code);
+  if (!Number.isInteger(number) || number < minimum) {
+    fail(`An integer of at least ${minimum} is required.`, code);
+  }
   return number;
 }
 
@@ -258,12 +304,21 @@ function requiredToken(value, code) {
 }
 
 function objectRecord(value, code) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) fail('An object record is required.', code);
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    fail('An object record is required.', code);
+  }
   return value;
 }
 
 function finiteBox(box) {
-  return [box.min.x, box.min.y, box.min.z, box.max.x, box.max.y, box.max.z].every(Number.isFinite);
+  return [
+    box.min.x,
+    box.min.y,
+    box.min.z,
+    box.max.x,
+    box.max.y,
+    box.max.z,
+  ].every(Number.isFinite);
 }
 
 function fail(message, code) {
