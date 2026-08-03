@@ -363,16 +363,17 @@ test('B40-T17', 'USER_PROJECT_CHECK is refused as a compliance category', () => 
   })), 'CODE_ENGINE_USER_PROJECT_CHECK_NOT_A_COMPLIANCE_CATEGORY');
 });
 
-test('B40-T18', 'EXPANSION_RANGE_ENVELOPE is refused as not implemented this phase', () => {
+test('B40-T18', 'EXPANSION_RANGE_ENVELOPE fails closed without the required Eq. (1b) sustained stress', () => {
   expectCode(() => compileCodeResult(base({
     category: 'EXPANSION_RANGE_ENVELOPE',
     codePointId: 'CP-X',
-    combinationId: 'LC-X',
-    localAction: n0.local,
-    pressureStressContribution: pressureStressContribution(),
-    coldTemperature: null,
+    combinationId: 'EXP-X',
+    localAction: n1.local,
+    pressureStressContribution: null,
+    coldTemperature: { value: COLD_TEMPERATURE, source: 'FIXTURE-EDITION-DATASET-NOT-ASME' },
+    sustainedStress: null,
     occasionalCategoryId: null,
-  })), 'CODE_ENGINE_EXPANSION_RANGE_ENVELOPE_NOT_IMPLEMENTED');
+  })), 'CODE_ENGINE_EXPANSION_RANGE_SUSTAINED_STRESS_REQUIRED');
 });
 
 /* ---------------------------------------------------------------------- *
