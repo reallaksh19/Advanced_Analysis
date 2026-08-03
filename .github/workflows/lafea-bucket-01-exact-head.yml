@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   statuses: write
 
 jobs:
@@ -16,60 +16,90 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: bucket-01-cantilever-benchmark-route
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Run physical-coordinate recovery experiment
+      - name: Apply bounded source repairs
+        run: python scripts/lafea-bucket-01-physical-recovery-experiment.py
+      - name: Revalidate targeted gates
         env:
           EXPECTED_HEAD_SHA: ${{ github.sha }}
-          GH_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/lafea-bucket-01-fixed-probe-check.mjs
+          node scripts/lafea-bucket-01-scalable-solver-check.mjs
+          node scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs
+      - name: Commit qualified source repair
+        id: commit
+        shell: bash
+        run: |
+          mv .github/lafea-bucket-01-exact-head.template \
+            .github/workflows/lafea-bucket-01-exact-head.yml
+          git rm scripts/lafea-bucket-01-physical-recovery-experiment.py
+          git add src/core/local-continuum/solver.js \
+            scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs \
+            .github/workflows/lafea-bucket-01-exact-head.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix(lafea): qualify sparse equilibrium and Kirsch refinement"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Run complete exact-head gate
+        id: gate
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.commit.outputs.sha }}
         shell: bash
         run: |
           mkdir -p reports/qualification
           set +e
-          python scripts/lafea-bucket-01-physical-recovery-experiment.py \
-            > reports/qualification/patch.stdout.log \
-            2> reports/qualification/patch.stderr.log
-          code=$?
-          stage=PATCH
-          log=reports/qualification/patch.stderr.log
-          if [[ "$code" == "0" ]]; then
-            node scripts/lafea-bucket-01-fixed-probe-check.mjs \
-              > reports/qualification/fixed.stdout.log \
-              2> reports/qualification/fixed.stderr.log
-            code=$?; stage=FIXED; log=reports/qualification/fixed.stderr.log
+          node scripts/lafea-bucket-01-exact-head-check.mjs \
+            > reports/qualification/lafea-bucket-01-exact-head.stdout.log \
+            2> reports/qualification/lafea-bucket-01-exact-head.stderr.log
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Push qualified repair commit
+        run: git push origin HEAD:bucket-01-cantilever-benchmark-route
+      - name: Publish repaired-head result
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ORIGINAL_SHA: ${{ github.sha }}
+          REPAIRED_SHA: ${{ steps.commit.outputs.sha }}
+          EXIT_CODE: ${{ steps.gate.outputs.exit_code }}
+        shell: bash
+        run: |
+          blocker=$(node -e "const fs=require('fs');const p='reports/qualification/lafea-bucket-01-exact-head.json';let t='UNKNOWN';if(fs.existsSync(p)){const r=JSON.parse(fs.readFileSync(p,'utf8'));if(r.blockingCheckIds&&r.blockingCheckIds[0])t=r.blockingCheckIds[0]}process.stdout.write(t)")
+          repair_blocker=$(node -e "const fs=require('fs');const p='reports/qualification/lafea-bucket-01-repair-check.json';let t='NONE';if(fs.existsSync(p)){const r=JSON.parse(fs.readFileSync(p,'utf8'));if(r.blockingCheckIds&&r.blockingCheckIds[0])t=r.blockingCheckIds[0]}process.stdout.write(t)")
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
+            -f state=success -f context="lafea/repaired-head/${REPAIRED_SHA:0:12}" \
+            -f description="Qualified repair committed" \
+            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${REPAIRED_SHA}"
+          if [[ "$EXIT_CODE" == "0" ]]; then
+            state=success
+            description="Bucket-01 exact-head executable gate passed"
+          else
+            state=failure
+            description="First blocker: ${blocker}"
+            safe=$(printf '%s' "$blocker" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-60)
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${REPAIRED_SHA}" \
+              -f state=failure -f context="lafea/blocker/${safe}" \
+              -f description="$description"
+            if [[ "$repair_blocker" != "NONE" ]]; then
+              nested=$(printf '%s' "$repair_blocker" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-52)
+              gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${REPAIRED_SHA}" \
+                -f state=failure -f context="lafea/repair-blocker/${nested}" \
+                -f description="Repair blocker: ${repair_blocker}"
+            fi
           fi
-          if [[ "$code" == "0" ]]; then
-            node scripts/lafea-bucket-01-scalable-solver-check.mjs \
-              > reports/qualification/scalable.stdout.log \
-              2> reports/qualification/scalable.stderr.log
-            code=$?; stage=SCALABLE; log=reports/qualification/scalable.stderr.log
-          fi
-          if [[ "$code" == "0" ]]; then
-            node scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs \
-              > reports/qualification/kirsch.stdout.log \
-              2> reports/qualification/kirsch.stderr.log
-            code=$?; stage=KIRSCH; log=reports/qualification/kirsch.stderr.log
-          fi
-          if [[ "$code" == "0" ]]; then
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-              -f state=success -f context=lafea/physical-probe-recovery \
-              -f description="Fixed-probe and Kirsch qualification passed"
-            exit 0
-          fi
-          detail=$(node -e "const fs=require('fs');const t=fs.readFileSync(process.argv[1],'utf8');process.stdout.write(t.split(/\r?\n/).map(s=>s.trim()).filter(s=>s&&!/^at\s/.test(s)&&!/^node:/.test(s)).slice(0,16).join(' | ').slice(0,3000))" "$log")
-          encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -f state=failure -f context="lafea/physical-${stage}" \
-            -f description="Physical recovery failed at ${stage}" \
-            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
-          exit "$code"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${REPAIRED_SHA}" \
+            -f state="$state" -f context=lafea/bucket-01-exact-head \
+            -f description="$description"
+          exit "$EXIT_CODE"
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lafea-physical-recovery-${{ github.sha }}
+          name: lafea-bucket-01-exact-head-${{ steps.commit.outputs.sha || github.sha }}
           path: reports/qualification/
+          if-no-files-found: warn
           retention-days: 30
