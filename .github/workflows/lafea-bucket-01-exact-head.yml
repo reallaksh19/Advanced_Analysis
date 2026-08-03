@@ -55,25 +55,23 @@ jobs:
           start = text.index('function conjugateGradientSolve(')
           end = text.index('\nfunction applyJacobi(', start)
           block = text[start:end]
-          marker = """  const residualTolerance = tolerance(
-            profile,
-            'freeDofResidual',
-            residualScale,
-          );
-          """
-          if block.count(marker) != 1:
-              raise SystemExit(f'residual tolerance marker count={block.count(marker)}')
-          block = block.replace(marker, marker + '  const convergenceTarget = residualTolerance / 10;\n')
+
+          declaration = block.index('  const residualTolerance = tolerance(')
+          close = block.index('\n  );', declaration) + len('\n  );')
+          block = block[:close] + '\n  const convergenceTarget = residualTolerance / 10;' + block[close:]
+
           upper = block.count('finalResidualInfinity > residualTolerance')
           lower = block.count('finalResidualInfinity <= residualTolerance')
           if upper != 2 or lower != 2:
               raise SystemExit(f'comparison counts upper={upper}, lower={lower}')
           block = block.replace('finalResidualInfinity > residualTolerance', 'finalResidualInfinity > convergenceTarget')
           block = block.replace('finalResidualInfinity <= residualTolerance', 'finalResidualInfinity <= convergenceTarget')
+
           old = '`Sparse PCG residual ${finalResidualInfinity} exceeds ${residualTolerance} after ${iterations} iterations.`'
           if block.count(old) != 1:
               raise SystemExit(f'non-convergence message count={block.count(old)}')
           block = block.replace(old, '`Sparse PCG residual ${finalResidualInfinity} exceeds internal target ${convergenceTarget} (acceptance gate ${residualTolerance}) after ${iterations} iterations.`')
+
           evidence = '      residualTolerance: canonicalNumber(residualTolerance),\n'
           if block.count(evidence) != 1:
               raise SystemExit(f'evidence marker count={block.count(evidence)}')
