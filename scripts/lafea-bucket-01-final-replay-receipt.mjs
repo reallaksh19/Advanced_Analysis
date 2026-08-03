@@ -15,10 +15,11 @@ const exactHeadSha = process.env.EXPECTED_HEAD_SHA?.trim()
   || execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim();
 const input = JSON.parse(fs.readFileSync(INPUT_PATH, 'utf8'));
 const reportKeys = [
-  'exactHeadReport', 'repairReport', 'productionProjection', 'productionExecution',
-  'productionResponse', 'productionLugStress', 'codeBasisPackage', 'codeAssessment',
+  'expectedValueDefinition', 'exactHeadReport', 'repairReport',
+  'productionProjection', 'productionExecution', 'productionResponse',
+  'kirschStress', 'productionLugStress', 'codeBasisPackage', 'codeAssessment',
 ];
-assert.equal(input.schema, 'lafea-bucket-01-final-replay-input/v1');
+assert.equal(input.schema, 'lafea-bucket-01-final-replay-input/v2');
 assert.equal(input.exactHeadSha, exactHeadSha);
 assert.match(input.definitionSetHash, /^sha256:[0-9a-f]{64}$/u);
 assert.equal(input.replays.length, 3);
@@ -33,7 +34,7 @@ const normalized = input.replays.map((row) => {
   assert.match(row.stdoutHash, /^sha256:[0-9a-f]{64}$/u);
   assert.match(row.stderrHash, /^sha256:[0-9a-f]{64}$/u);
   const basis = {
-    schema: 'lafea-bucket-01-final-replay-evidence-set/v1',
+    schema: 'lafea-bucket-01-final-replay-evidence-set/v2',
     exactHeadSha: row.exactHeadSha,
     exitCode: row.exitCode,
     trackedTreeClean: row.trackedTreeClean,
@@ -52,8 +53,8 @@ for (const key of reportKeys) {
   assert.equal(new Set(normalized.map((row) => row.reportHashes[key])).size, 1, `${key} differs`);
 }
 const base = {
-  schema: 'lafea-bucket-01-final-replay-custody/v1',
-  producerRevision: 'B01-FINAL-REPLAY.1',
+  schema: 'lafea-bucket-01-final-replay-custody/v2',
+  producerRevision: 'B01-FINAL-REPLAY.2',
   custodyId: input.custodyId,
   exactHeadSha,
   definitionSetHash: input.definitionSetHash,
@@ -61,7 +62,13 @@ const base = {
   replays: normalized,
   deterministicReportHashes: normalized[0].reportHashes,
   status: 'FINAL_THREE_REPLAY_CUSTODY_PASS',
-  authority: { externalReplaysSupplied: true, codeAssessmentReplayed: true, bucketQualified: false },
+  authority: {
+    externalReplaysSupplied: true,
+    expectedValueDefinitionReplayed: true,
+    kirschStressReplayed: true,
+    codeAssessmentReplayed: true,
+    bucketQualified: false,
+  },
 };
 const report = { ...base, semanticHash: canonicalLafeaSha256(base) };
 fs.mkdirSync(path.dirname(REPORT_PATH), { recursive: true });
