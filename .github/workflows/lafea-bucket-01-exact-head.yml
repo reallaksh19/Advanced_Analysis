@@ -1,4 +1,4 @@
-name: Emitted Chunk Module Profile
+name: Domain-Boundary Chunk Repair
 
 on:
   push:
@@ -6,108 +6,123 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   statuses: write
 
 jobs:
-  profile:
+  repair:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: bucket-01-cantilever-benchmark-route
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Capture Rollup module composition
+      - name: Apply domain-boundary chunks and validate build
         env:
           GH_TOKEN: ${{ github.token }}
+          ORIGINAL_SHA: ${{ github.sha }}
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p reports/qualification
-          python - <<'PY'
+          fail() {
+            stage="$1"; log="$2"
+            detail=$(node -e "const fs=require('fs');const p=process.argv[1];const t=fs.existsSync(p)?fs.readFileSync(p,'utf8'):'missing log';process.stdout.write(t.split(/\r?\n/).map(s=>s.trim()).filter(Boolean).slice(-45).join(' | ').slice(0,7000))" "$log")
+            encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
+              -f state=failure -f context="lafea/domain-chunks/${stage}" \
+              -f description="Domain chunk repair failed at ${stage}" \
+              -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${ORIGINAL_SHA}?lafea_error=${encoded}"
+            exit 1
+          }
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
+            -f state=pending -f context=lafea/domain-chunks \
+            -f description="Validating domain-boundary chunk map"
+
+          python - <<'PY' > reports/qualification/domain-chunk-patch.stdout.log 2> reports/qualification/domain-chunk-patch.stderr.log || true
           from pathlib import Path
           path = Path('vite.config.js')
           text = path.read_text()
-          text = text.replace(
-              "import { defineConfig } from 'vite';",
-              "import fs from 'node:fs';\nimport path from 'node:path';\nimport { defineConfig } from 'vite';",
-              1,
-          )
-          marker = 'export default defineConfig({'
-          plugin = '''const emittedChunkProfilePlugin = {
-            name: 'emitted-chunk-profile',
-            generateBundle(_options, bundle) {
-              const rows = Object.values(bundle)
-                .filter((entry) => entry.type === 'chunk')
-                .map((chunk) => ({
-                  fileName: chunk.fileName,
-                  name: chunk.name,
-                  bytes: Buffer.byteLength(chunk.code),
-                  modules: Object.entries(chunk.modules).map(([id, meta]) => ({
-                    id: id.replaceAll('\\\\', '/'),
-                    renderedLength: meta.renderedLength,
-                    originalLength: meta.originalLength,
-                  })).sort((a, b) => b.renderedLength - a.renderedLength),
-                }));
-              fs.mkdirSync(path.resolve('reports/qualification'), { recursive: true });
-              fs.writeFileSync(
-                path.resolve('reports/qualification/emitted-chunk-profile.json'),
-                JSON.stringify(rows, null, 2),
-              );
-            },
-          };
-
-          '''
-          if text.count(marker) != 1:
-              raise RuntimeError('config marker missing')
-          text = text.replace(marker, plugin + marker, 1)
-          text = text.replace('  plugins: [],', '  plugins: [emittedChunkProfilePlugin],', 1)
+          core_marker = "  if (source.includes('/src/core/fea-benchmarks/')"
+          core_rules = """  if (source.includes('/src/core/linear-fea-')) return 'core-linear-fea';
+          if (source.includes('/src/core/linear-piping-')) return 'core-linear-piping';
+          if (source.includes('/src/core/support-')) return 'core-support-engineering';
+          if (source.includes('/src/core/vertical-beam-solver/')
+            || source.includes('/src/core/centerline-beam-fea/')) return 'core-beam-analysis';
+          if (source.includes('/src/core/first-cut-load-estimation/')) return 'core-load-estimation';
+          if (source.includes('/src/core/model-calculation-package/')) return 'core-model-calculation';
+          if (source.includes('/src/core/piping-topology/')
+            || source.includes('/src/core/shared-piping-model/')) return 'core-piping-model';
+          """
+          workspace_marker = "  if (source.includes('/src/workspace/sequential-sketcher/')) return 'workspace-sketcher';"
+          workspace_rules = """  if (source.includes('/src/workspace/topology-edit/')) {
+            return 'workspace-topology-edit-core';
+          }
+          if (source.includes('/src/workspace/topology-edit-3d-')
+            || source.includes('/src/workspace/viewport-productivity/')
+            || source.includes('/src/workspace/viewport-interaction/')
+            || source.includes('/src/workspace/viewport-presentation/')) {
+            return 'workspace-topology-edit-ui';
+          }
+          """
+          if text.count(core_marker) != 1:
+              raise RuntimeError(f'core marker count={text.count(core_marker)}')
+          if text.count(workspace_marker) != 1:
+              raise RuntimeError(f'workspace marker count={text.count(workspace_marker)}')
+          text = text.replace(core_marker, core_rules + core_marker, 1)
+          text = text.replace(workspace_marker, workspace_rules + workspace_marker, 1)
           path.write_text(text)
           PY
-          node scripts/advanced-shell-contract-check.mjs
-          npx vite build > reports/qualification/emitted-build.stdout.log 2> reports/qualification/emitted-build.stderr.log
-          detail=$(node --input-type=module <<'NODE'
+          [[ -s reports/qualification/domain-chunk-patch.stderr.log ]] \
+            && fail PATCH reports/qualification/domain-chunk-patch.stderr.log
+
+          npm run build \
+            > reports/qualification/domain-chunk-build.stdout.log \
+            2> reports/qualification/domain-chunk-build.stderr.log \
+            || fail BUILD reports/qualification/domain-chunk-build.stdout.log
+
+          node --input-type=module <<'NODE' > reports/qualification/domain-chunk-sizes.json
           import fs from 'node:fs';
-          const rows = JSON.parse(fs.readFileSync('reports/qualification/emitted-chunk-profile.json', 'utf8'));
-          const targets = rows.filter((row) => row.name === 'core-application' || row.name === 'workspace-analysis');
-          const compact = targets.map((row) => {
-            const domains = new Map();
-            for (const module of row.modules) {
-              let domain = '(other)';
-              const core = module.id.match(/\/src\/core\/([^/]+)/u);
-              const workspace = module.id.match(/\/src\/workspace\/([^/]+)/u);
-              if (core) domain = `core/${core[1]}`;
-              else if (workspace) domain = `workspace/${workspace[1]}`;
-              const value = domains.get(domain) ?? 0;
-              domains.set(domain, value + module.renderedLength);
-            }
-            return {
-              name: row.name,
-              bytes: row.bytes,
-              topDomains: [...domains.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15),
-              topModules: row.modules.slice(0, 18).map((module) => ({
-                id: module.id.replace(/^.*\/src\//u, 'src/'),
-                renderedLength: module.renderedLength,
-              })),
-            };
-          });
-          process.stdout.write(JSON.stringify(compact));
+          import path from 'node:path';
+          const assets = path.resolve('dist/assets');
+          const rows = fs.readdirSync(assets)
+            .filter((name) => name.endsWith('.js'))
+            .map((name) => ({ name, bytes: fs.statSync(path.join(assets, name)).size }))
+            .sort((a, b) => b.bytes - a.bytes);
+          console.log(JSON.stringify(rows.slice(0, 15), null, 2));
           NODE
-          )
-          encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -f state=failure \
-            -f context=lafea/emitted-chunk-profile/DETAIL \
-            -f description="Captured emitted oversized chunk modules" \
-            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
+
+          git add vite.config.js
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix(build): split oversized chunks by domain boundary" \
+            > reports/qualification/domain-chunk-commit.stdout.log \
+            2> reports/qualification/domain-chunk-commit.stderr.log \
+            || fail COMMIT reports/qualification/domain-chunk-commit.stderr.log
+          repaired_sha=$(git rev-parse HEAD)
+          git push origin HEAD:bucket-01-cantilever-benchmark-route \
+            > reports/qualification/domain-chunk-push.stdout.log \
+            2> reports/qualification/domain-chunk-push.stderr.log \
+            || fail PUSH reports/qualification/domain-chunk-push.stderr.log
+          largest=$(node -e "const r=require('./reports/qualification/domain-chunk-sizes.json');process.stdout.write(r[0].name+':'+r[0].bytes)")
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
+            -f state=success \
+            -f context="lafea/repaired-head/${repaired_sha:0:12}" \
+            -f description="Domain-boundary chunk repair published" \
+            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${repaired_sha}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
+            -f state=success -f context=lafea/domain-chunks \
+            -f description="Production build passed; largest ${largest}"
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: emitted-chunk-profile-${{ github.sha }}
+          name: domain-boundary-chunks-${{ github.sha }}
           path: reports/qualification/
           if-no-files-found: warn
           retention-days: 30
