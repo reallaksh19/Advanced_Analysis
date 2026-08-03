@@ -99,10 +99,17 @@ function typedPrimitivePickUserData(primitive) {
   if (!canonicalId) {
     throw new Error('TOPOLOGY_EDIT_PICK_IDENTITY_MISSING: Typed primitives require canonicalEntityId.');
   }
+  const modelRole = typeof primitive.modelRole === 'string'
+    ? primitive.modelRole.trim().toUpperCase()
+    : '';
+  if (!['SOURCE', 'DRAFT'].includes(modelRole)) {
+    throw new Error('TOPOLOGY_EDIT_PICK_MODEL_ROLE_INVALID: Typed primitives require SOURCE or DRAFT modelRole.');
+  }
   return {
     canonicalId,
     type: primitive.kind,
     pickTarget: {
+      modelRole,
       objectKind: 'component',
       objectId: canonicalId,
       sourcePaths: Array.isArray(primitive.sourcePaths) ? primitive.sourcePaths : [],
