@@ -10,6 +10,8 @@ import { bootstrapAnalysisWorkspace } from './workspace/bootstrap.js';
 import { AuthorizedEnrichmentConsumerController } from './workspace/enrichment/authorized-enrichment-consumer-controller.js';
 import { createAuthorizedEnrichmentWorkspaceApi } from './workspace/enrichment/authorized-enrichment-workspace-api.js';
 import { engineeringModelStore } from './workspace/engineering-model-store.js';
+import { ENGINEERING_MODEL_EVENTS } from './workspace/engineering-model-controller.js';
+import { EventBus } from './workspace/event-bus.js';
 import { masterDataController } from './workspace/master-data-controller.js';
 import { mountLinearPipingResultsWorkbench } from './workspace/linear-piping-results-workbench.js';
 
@@ -22,6 +24,17 @@ const authorizedEnrichmentController = new AuthorizedEnrichmentConsumerControlle
 const authorizedEnrichmentApi = createAuthorizedEnrichmentWorkspaceApi({
   documentRef: applicationRoot.ownerDocument,
   controller: authorizedEnrichmentController,
+  onEmpiricalChanged(distribution) {
+    EventBus.publish(ENGINEERING_MODEL_EVENTS.CHANGED, {
+      reason: 'calculated',
+      distribution,
+    });
+  },
+  onEmpiricalFailed(error) {
+    EventBus.publish(ENGINEERING_MODEL_EVENTS.FAILED, {
+      message: error instanceof Error ? error.message : String(error),
+    });
+  },
 });
 const linearPipingResults = mountLinearPipingResultsWorkbench(applicationRoot, {
   documentRef: applicationRoot.ownerDocument,
