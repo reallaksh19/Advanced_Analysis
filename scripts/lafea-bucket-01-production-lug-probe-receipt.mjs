@@ -47,7 +47,12 @@ const projection = JSON.parse(fs.readFileSync(PROJECTION_PATH, 'utf8'));
 const execution = JSON.parse(fs.readFileSync(EXECUTION_PATH, 'utf8'));
 
 validateSpec(spec);
-validateEnvelope(projection, execution, exactHeadSha);
+validateEnvelope(
+  projection,
+  execution,
+  exactHeadSha,
+  spec.meshLadder.length,
+);
 const levels = spec.meshLadder.map((definition, index) => normalizeLevel(
   definition,
   projection.levels[index],
@@ -69,14 +74,16 @@ const pathReceipts = spec.paths.map((pathDefinition) =>
   evaluatePath(pathDefinition, levels));
 
 const reportBase = {
-  schema: 'lafea-bucket-01-production-lug-fixed-probe-evidence/v1',
-  producerRevision: 'B01-PRODUCTION-LUG-PROBES.1',
+  schema: 'lafea-bucket-01-production-lug-fixed-probe-evidence/v2',
+  producerRevision: 'B01-PRODUCTION-LUG-PROBES.2',
   exactHeadSha,
   specId: spec.specId,
   benchmarkId: spec.benchmarkId,
   specHash: canonicalLafeaSha256(spec),
   projectionHash: projection.projectionHash,
   executionHash: execution.executionHash,
+  governedLevelOrdinals: spec.convergenceWindow.governedLevelOrdinals,
+  evaluatedLevelOrdinals: spec.convergenceWindow.evaluatedLevelOrdinals,
   levelParents: levels.map((level) => ({
     ordinal: level.ordinal,
     elementCount: level.definition.elementCount,
@@ -92,9 +99,12 @@ const reportBase = {
   status: 'PASS',
   authority: {
     fixedPhysicalCoordinatesFrozenBeforeProductionStressObservation: true,
-    retainedIntegrationPointTensorAuthority: true,
+    directElementPointRecovery: true,
+    retainedNodalDisplacementAuthority: true,
+    retainedConstitutiveMatrixAuthority: true,
+    integrationPointExtrapolationUsed: false,
     elementLocalReconstruction: true,
-    threeLevelGciAcceptance: true,
+    finestThreeOfGovernedFourGciAcceptance: true,
     movingMaximumUsed: false,
     nodalProjectionUsed: false,
     crossElementAveragingUsed: false,
@@ -120,24 +130,31 @@ fs.writeFileSync(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 console.log(JSON.stringify(report));
 
 function validateSpec(value) {
-  assert.equal(value.schema, 'lafea-bucket-01-production-lug-probe-spec/v1');
+  assert.equal(value.schema, 'lafea-bucket-01-production-lug-probe-spec/v2');
   assert.equal(value.benchmarkId, 'C2D-LUG-PINHOLE-01');
   assert.equal(value.stageId, 'LAFEA.3');
   assert.equal(value.formulation, 'PLANE_STRESS');
   assert.equal(value.loadCaseId, 'LC1');
   assert.deepEqual(
     value.meshLadder.map((row) => row.elementCount),
-    [64, 256, 1024],
+    [64, 256, 1024, 4096],
   );
+  assert.deepEqual(value.convergenceWindow.governedLevelOrdinals, [1, 2, 3, 4]);
+  assert.deepEqual(value.convergenceWindow.evaluatedLevelOrdinals, [2, 3, 4]);
   assert.equal(value.authority.coordinatesFrozenBeforeProductionStressObservation, true);
   assert.equal(value.authority.productionOutputUsedToSelectCoordinates, false);
   assert.equal(value.authority.productionOutputUsedToSetTolerances, false);
   assert.equal(value.authority.movingMaximumUsed, false);
   assert.equal(value.authority.nodalProjectionUsed, false);
   assert.equal(value.authority.crossElementAveragingUsed, false);
+  assert.equal(value.authority.integrationPointExtrapolationUsed, false);
+  assert.equal(
+    value.authority.recovery,
+    'DIRECT_T6_B_MATRIX_AT_FIXED_PHYSICAL_COORDINATE',
+  );
 }
 
-function validateEnvelope(projectionValue, executionValue, head) {
+function validateEnvelope(projectionValue, executionValue, head, levelCount) {
   assert.equal(
     projectionValue.schema,
     'lafea-lug-pinhole-physical-problem-projection/v1',
@@ -153,8 +170,8 @@ function validateEnvelope(projectionValue, executionValue, head) {
   assert.equal(executionValue.projectionHash, projectionValue.projectionHash);
   assert.equal(executionValue.controllerResult.status, 'ACCEPTED');
   assert.equal(executionValue.controllerResult.accepted, true);
-  assert.equal(projectionValue.levels.length, 3);
-  assert.equal(executionValue.controllerResult.levelResults.length, 3);
+  assert.equal(projectionValue.levels.length, levelCount);
+  assert.equal(executionValue.controllerResult.levelResults.length, levelCount);
 }
 
 function normalizeLevel(definition, projected, controlled) {
@@ -173,6 +190,7 @@ function normalizeLevel(definition, projected, controlled) {
   const result = controlled.execution.result;
   assert.equal(result.schema, 'local-continuum-result/v1');
   assert.equal(result.qualification.state, 'ACCEPTED');
+  assert.equal(result.meshEvidence.formulation, 'PLANE_STRESS');
   const loadCase = result.loadCaseResults.find(
     (row) => row.loadCaseId === spec.loadCaseId,
   );
@@ -209,7 +227,7 @@ function evaluatePath(pathDefinition, levelsValue) {
     }, levelsValue));
   assert.equal(stations.every((row) => row.status === 'PASS'), true);
   const base = {
-    schema: 'lafea-bucket-01-production-lug-fixed-path-evidence/v1',
+    schema: 'lafea-bucket-01-production-lug-fixed-path-evidence/v2',
     pathId: pathDefinition.pathId,
     component: pathDefinition.component,
     units: pathDefinition.units,
@@ -220,7 +238,10 @@ function evaluatePath(pathDefinition, levelsValue) {
     authority: {
       samplingAuthority: 'FIXED_STRESS_PATH',
       allStationsFrozenBeforeProductionStressObservation: true,
-      integrationPointAuthorityRetained: true,
+      directElementPointRecovery: true,
+      retainedNodalDisplacementAuthority: true,
+      retainedConstitutiveMatrixAuthority: true,
+      integrationPointExtrapolationUsed: false,
       movingMaximumUsed: false,
       nodalProjectionUsed: false,
       crossElementAveragingUsed: false,
@@ -247,7 +268,7 @@ function evaluateFixedLocation(definition, levelsValue) {
     units: definition.units,
     zone: definition.zone,
   });
-  const probeEvidences = levelsValue.map((level) => {
+  const governedProbeEvidences = levelsValue.map((level) => {
     const evidence = recoverLafeaBucket01FixedProbe({
       schema: LAFEA_BUCKET_01_FIXED_PROBE_INPUT_SCHEMA,
       exactHeadSha,
@@ -274,6 +295,11 @@ function evaluateFixedLocation(definition, levelsValue) {
       true,
     );
     assert.equal(evidence.status, 'PASS');
+    assert.equal(
+      evidence.recoveryAuthority,
+      'ELEMENT_LOCAL_DIRECT_DISPLACEMENT_GRADIENT',
+    );
+    assert.equal(evidence.retainedIntegrationPointExtrapolationUsed, false);
     assert.ok(
       evidence.mappingResidual <= spec.tolerances.mappingResidualMax,
       `${definition.probeId} level ${level.ordinal} mapping residual`,
@@ -289,6 +315,8 @@ function evaluateFixedLocation(definition, levelsValue) {
     );
     return evidence;
   });
+  const convergenceLevels = levelsValue.slice(-3);
+  const probeEvidences = governedProbeEvidences.slice(-3);
   const gciTolerance = definition.zone === 'HIGH_GRADIENT'
     ? spec.tolerances.highGradientGciMax
     : spec.tolerances.nonSingularGciMax;
@@ -296,7 +324,7 @@ function evaluateFixedLocation(definition, levelsValue) {
     schema: LAFEA_BUCKET_01_STRESS_CONVERGENCE_INPUT_SCHEMA,
     exactHeadSha,
     probeEvidences,
-    meshSizes: spec.meshLadder.map((row) => row.meshSize),
+    meshSizes: convergenceLevels.map((row) => row.definition.meshSize),
     gciTolerance,
     minimumObservedOrder: spec.tolerances.minimumObservedOrder,
     asymptoticRatioBounds: spec.tolerances.asymptoticRatioBounds,
@@ -325,7 +353,15 @@ function evaluateFixedLocation(definition, levelsValue) {
     radius: definition.radius,
     angleDegrees: definition.angleDegrees,
     locationDefinitionHash,
+    governedLevelOrdinals: levelsValue.map((row) => row.ordinal),
+    evaluatedLevelOrdinals: convergenceLevels.map((row) => row.ordinal),
+    governedObservations: governedProbeEvidences.map(
+      (row) => row.authoritativeValue,
+    ),
     observations: probeEvidences.map((row) => row.authoritativeValue),
+    governedFixedProbeEvidenceHashes: governedProbeEvidences.map(
+      (row) => row.semanticHash,
+    ),
     fixedProbeEvidenceHashes: probeEvidences.map((row) => row.semanticHash),
     convergence,
     gciTolerance,
