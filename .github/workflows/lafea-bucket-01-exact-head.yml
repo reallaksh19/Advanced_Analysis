@@ -1,4 +1,4 @@
-name: LAFEA Bucket-01 Source Repair
+name: LAFEA Bucket-01 Exact Head
 
 on:
   push:
@@ -6,113 +6,68 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   statuses: write
 
 jobs:
-  repair:
+  exact-head:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: bucket-01-cantilever-benchmark-route
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Apply, verify, and publish source-only repair
+      - name: Run Bucket-01 exact-head gate
+        id: gate
         env:
-          GH_TOKEN: ${{ github.token }}
-          ORIGINAL_SHA: ${{ github.sha }}
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
         shell: bash
         run: |
-          set -euo pipefail
           mkdir -p reports/qualification
-          publish_failure() {
-            stage="$1"
-            log="$2"
-            detail=$(node -e "const fs=require('fs');const p=process.argv[1];const t=fs.existsSync(p)?fs.readFileSync(p,'utf8'):'missing log';process.stdout.write(t.split(/\r?\n/).map(s=>s.trim()).filter(Boolean).slice(0,16).join(' | ').slice(0,2500))" "$log")
-            encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
-              -f state=failure -f context="lafea/source-repair-${stage}" \
-              -f description="Source repair failed at ${stage}" \
-              -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${ORIGINAL_SHA}?lafea_error=${encoded}"
-            exit 1
-          }
-
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
-            -f state=pending -f context=lafea/source-repair \
-            -f description="Applying bounded source repair"
-
-          python scripts/lafea-bucket-01-physical-recovery-experiment.py \
-            > reports/qualification/source-repair-patch.stdout.log \
-            2> reports/qualification/source-repair-patch.stderr.log \
-            || publish_failure PATCH reports/qualification/source-repair-patch.stderr.log
-
-          node scripts/lafea-bucket-01-fixed-probe-check.mjs \
-            > reports/qualification/source-repair-fixed.stdout.log \
-            2> reports/qualification/source-repair-fixed.stderr.log \
-            || publish_failure FIXED reports/qualification/source-repair-fixed.stderr.log
-
-          node scripts/lafea-bucket-01-scalable-solver-check.mjs \
-            > reports/qualification/source-repair-scalable.stdout.log \
-            2> reports/qualification/source-repair-scalable.stderr.log \
-            || publish_failure SCALABLE reports/qualification/source-repair-scalable.stderr.log
-
-          node scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs \
-            > reports/qualification/source-repair-kirsch.stdout.log \
-            2> reports/qualification/source-repair-kirsch.stderr.log \
-            || publish_failure KIRSCH reports/qualification/source-repair-kirsch.stderr.log
-
-          git rm scripts/lafea-bucket-01-physical-recovery-experiment.py
-          git rm .github/lafea-bucket-01-exact-head.template
-          git add src/core/local-continuum/solver.js \
-            scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs \
-            scripts/lafea-bucket-01-scalable-solver-check.mjs
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "fix(lafea): qualify sparse equilibrium and Kirsch refinement" \
-            > reports/qualification/source-repair-commit.stdout.log \
-            2> reports/qualification/source-repair-commit.stderr.log \
-            || publish_failure COMMIT reports/qualification/source-repair-commit.stderr.log
-
-          repaired_sha=$(git rev-parse HEAD)
           set +e
-          EXPECTED_HEAD_SHA="$repaired_sha" node scripts/lafea-bucket-01-exact-head-check.mjs \
+          node scripts/lafea-bucket-01-exact-head-check.mjs \
             > reports/qualification/lafea-bucket-01-exact-head.stdout.log \
             2> reports/qualification/lafea-bucket-01-exact-head.stderr.log
-          gate_exit=$?
-          set -e
-
-          git push origin HEAD:bucket-01-cantilever-benchmark-route \
-            > reports/qualification/source-repair-push.stdout.log \
-            2> reports/qualification/source-repair-push.stderr.log \
-            || publish_failure PUSH reports/qualification/source-repair-push.stderr.log
-
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
-            -f state=success -f context="lafea/repaired-head/${repaired_sha:0:12}" \
-            -f description="Source-only repair published" \
-            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${repaired_sha}"
-
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Publish exact-head status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXIT_CODE: ${{ steps.gate.outputs.exit_code }}
+        shell: bash
+        run: |
           blocker=$(node -e "const fs=require('fs');const p='reports/qualification/lafea-bucket-01-exact-head.json';let t='UNKNOWN';if(fs.existsSync(p)){const r=JSON.parse(fs.readFileSync(p,'utf8'));if(r.blockingCheckIds?.[0])t=r.blockingCheckIds[0]}process.stdout.write(t)")
-          if [[ "$gate_exit" == "0" ]]; then
+          repair_blocker=$(node -e "const fs=require('fs');const p='reports/qualification/lafea-bucket-01-repair-check.json';let t='NONE';if(fs.existsSync(p)){const r=JSON.parse(fs.readFileSync(p,'utf8'));if(r.blockingCheckIds?.[0])t=r.blockingCheckIds[0]}process.stdout.write(t)")
+          if [[ "$EXIT_CODE" == "0" ]]; then
             state=success
-            description="Source repair exact-head gate passed"
+            description="Bucket-01 exact-head executable gate passed"
           else
             state=failure
-            description="Source repair first blocker: ${blocker}"
+            description="First blocker: ${blocker}"
+            safe=$(printf '%s' "$blocker" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-60)
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -f state=failure -f context="lafea/blocker/${safe}" \
+              -f description="$description"
+            if [[ "$repair_blocker" != "NONE" ]]; then
+              nested=$(printf '%s' "$repair_blocker" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-52)
+              gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+                -f state=failure -f context="lafea/repair-blocker/${nested}" \
+                -f description="Repair blocker: ${repair_blocker}"
+            fi
           fi
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
-            -f state="$state" -f context=lafea/source-repair \
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state="$state" -f context=lafea/bucket-01-exact-head \
             -f description="$description"
-          exit "$gate_exit"
+          exit "$EXIT_CODE"
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lafea-source-repair-${{ github.sha }}
+          name: lafea-bucket-01-exact-head-${{ github.sha }}
           path: reports/qualification/
           if-no-files-found: warn
           retention-days: 30
