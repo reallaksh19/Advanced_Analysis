@@ -92,7 +92,8 @@ for (const stageId of ['THREE_MATERIALIZATION', 'GPU_SCENE_INSTALL', 'FIT', 'FIR
 const report = {
   schema: NON_FEA_BASELINE_SCHEMA,
   status: failures.length === 0 ? 'PASS' : 'UNRESOLVED_GATE',
-  programmeBaseSha: '0bad5b4200a8e24a358e76b1ea8372da33485c87',
+  planPreparationBaseSha: '0bad5b4200a8e24a358e76b1ea8372da33485c87',
+  programmeBaseSha: '58f0bf6b63f9e8e1b20582cd45a18a101ad75cc1',
   exactHeadSha: exactHeadSha || null,
   dirtyStatus: gitValue(['status', '--short']),
   executionId,
