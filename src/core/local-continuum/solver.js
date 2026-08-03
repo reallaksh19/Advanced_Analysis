@@ -244,6 +244,7 @@ function conjugateGradientSolve(matrix, rightHandSide, profile) {
     'freeDofResidual',
     residualScale,
   );
+  const convergenceTarget = residualTolerance / 10;
   const iterationLimit = Math.min(
     50000,
     Math.max(500, matrix.size * 8),
@@ -253,7 +254,7 @@ function conjugateGradientSolve(matrix, rightHandSide, profile) {
   const initialResidualInfinity = maxAbs(residual);
   let finalResidualInfinity = initialResidualInfinity;
   let iterations = 0;
-  if (finalResidualInfinity > residualTolerance) {
+  if (finalResidualInfinity > convergenceTarget) {
     let preconditioned = applyJacobi(matrix.diagonal, residual);
     let direction = [...preconditioned];
     let rho = dotVector(residual, preconditioned);
@@ -281,10 +282,10 @@ function conjugateGradientSolve(matrix, rightHandSide, profile) {
       }
       iterations += 1;
       finalResidualInfinity = maxAbs(residual);
-      if (finalResidualInfinity <= residualTolerance || iterations % 50 === 0) {
+      if (finalResidualInfinity <= convergenceTarget || iterations % 50 === 0) {
         residual = exactResidual(matrix, rightHandSide, solution);
         finalResidualInfinity = maxAbs(residual);
-        if (finalResidualInfinity <= residualTolerance) break;
+        if (finalResidualInfinity <= convergenceTarget) break;
       }
       preconditioned = applyJacobi(matrix.diagonal, residual);
       const nextRho = dotVector(residual, preconditioned);
@@ -304,11 +305,11 @@ function conjugateGradientSolve(matrix, rightHandSide, profile) {
   }
   residual = exactResidual(matrix, rightHandSide, solution);
   finalResidualInfinity = maxAbs(residual);
-  if (finalResidualInfinity > residualTolerance) {
+  if (finalResidualInfinity > convergenceTarget) {
     throw numericalError(
       'ITERATIVE_SOLVER_DID_NOT_CONVERGE',
       'solver',
-      `Sparse PCG residual ${finalResidualInfinity} exceeds ${residualTolerance} after ${iterations} iterations.`,
+      `Sparse PCG residual ${finalResidualInfinity} exceeds internal target ${convergenceTarget} (acceptance gate ${residualTolerance}) after ${iterations} iterations.`,
     );
   }
   return {
@@ -328,6 +329,7 @@ function conjugateGradientSolve(matrix, rightHandSide, profile) {
       residualScale: canonicalNumber(residualScale),
       initialResidualInfinity: canonicalNumber(initialResidualInfinity),
       finalResidualInfinity: canonicalNumber(finalResidualInfinity),
+      convergenceTarget: canonicalNumber(convergenceTarget),
       residualTolerance: canonicalNumber(residualTolerance),
       diagonalScale: canonicalNumber(diagonalScale),
       diagonalTolerance: canonicalNumber(diagonalTolerance),
