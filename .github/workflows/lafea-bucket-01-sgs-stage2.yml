@@ -1,0 +1,188 @@
+name: LAFEA Bucket-01 SGS-PCG Governed Stage
+
+on:
+  push:
+    branches: [bucket-01-sgs-stage2-lab]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  governed-sgs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Extract SGS candidate patches
+        shell: bash
+        run: |
+          python - <<'PY'
+          import re
+          import textwrap
+          from pathlib import Path
+          source = Path('.github/workflows/lafea-bucket-01-sgs-lab.yml').read_text()
+          blocks = re.findall(
+              r"          python - <<'PY'\n(.*?)\n          PY",
+              source,
+              re.DOTALL,
+          )
+          if len(blocks) != 2:
+              raise RuntimeError(f'expected two Python blocks; found {len(blocks)}')
+          for index, block in enumerate(blocks, start=1):
+              Path(f'/tmp/sgs-patch-{index}.py').write_text(textwrap.dedent(block))
+          PY
+      - name: Run governed SGS qualification
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports/qualification
+          publish() {
+            state="$1"; context="$2"; description="$3"; target="${4:-}"
+            args=(--method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state="$state" -f context="$context" -f description="$description")
+            if [[ -n "$target" ]]; then args+=(-f target_url="$target"); fi
+            gh api "${args[@]}"
+          }
+          fail() {
+            stage="$1"; log="$2"
+            detail=$(node -e "const fs=require('fs');const p=process.argv[1];const t=fs.existsSync(p)?fs.readFileSync(p,'utf8'):'missing log';process.stdout.write(t.trim().slice(-8000))" "$log")
+            encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
+            publish failure "lafea/sgs2/${stage}" "Governed SGS failed at ${stage}" "https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
+            exit 1
+          }
+
+          publish pending lafea/sgs2/PATCH "Applying SGS-PCG, p1.50 checkerboard, and governed policy"
+          python /tmp/sgs-patch-1.py \
+            > reports/qualification/sgs2-patch-1.stdout.log \
+            2> reports/qualification/sgs2-patch-1.stderr.log \
+            || fail PATCH reports/qualification/sgs2-patch-1.stderr.log
+          python - <<'PY' \
+            > reports/qualification/sgs2-policy-patch.stdout.log \
+            2> reports/qualification/sgs2-policy-patch.stderr.log
+          import json
+          from pathlib import Path
+
+          spec_path = Path('validation/bucket-01/06-production-response-convergence-spec.json')
+          spec = json.loads(spec_path.read_text())
+          sparse = [row for row in spec['meshLadder']
+                    if row['stiffnessStorage'] == 'CSR_FULL_SYMMETRIC']
+          if len(sparse) != 1 or sparse[0]['solverMethod'] != 'DETERMINISTIC_JACOBI_PCG':
+              raise RuntimeError('unexpected sparse solver policy')
+          sparse[0]['solverMethod'] = 'DETERMINISTIC_SGS_PCG'
+          policy = spec['solverPolicy']
+          if policy['largeSystemMethod'] != 'DETERMINISTIC_JACOBI_PCG' \
+                  or policy['preconditioner'] != 'JACOBI':
+              raise RuntimeError('unexpected large-system policy')
+          policy['largeSystemMethod'] = 'DETERMINISTIC_SGS_PCG'
+          policy['preconditioner'] = 'SYMMETRIC_GAUSS_SEIDEL'
+          policy['maximumIterations'] = 'min(50000,max(1000,16*freeDofCount))'
+          spec['currentDisposition'] = 'SGS_PCG_PRODUCTION_SOLVER_POLICY_UNDER_QUALIFICATION'
+          spec_path.write_text(json.dumps(spec, indent=2) + '\n')
+
+          receipt_path = Path('scripts/lafea-bucket-01-production-response-receipt.mjs')
+          receipt = receipt_path.read_text()
+          old = """  assert.equal(definition.solverMethod, 'DETERMINISTIC_JACOBI_PCG');
+            assert.equal(solverEvidence.preconditioner, 'JACOBI');"""
+          new = """  assert.equal(definition.solverMethod, 'DETERMINISTIC_SGS_PCG');
+            assert.equal(
+              solverEvidence.preconditioner,
+              'SYMMETRIC_GAUSS_SEIDEL',
+            );"""
+          if receipt.count(old) != 1:
+              raise RuntimeError(f'receipt sparse-method marker count={receipt.count(old)}')
+          receipt_path.write_text(receipt.replace(old, new, 1))
+          PY
+          publish success lafea/sgs2/PATCH "Governed SGS policy applied"
+
+          publish pending lafea/sgs2/GLOBAL_1024 "Executing 64/256/1024 global response"
+          node scripts/lafea-bucket-01-production-response-runner.mjs \
+            > reports/qualification/sgs2-global-runner.stdout.log \
+            2> reports/qualification/sgs2-global-runner.stderr.log \
+            || fail GLOBAL_1024 reports/qualification/sgs2-global-runner.stderr.log
+          node scripts/lafea-bucket-01-production-response-receipt.mjs \
+            > reports/qualification/sgs2-global-response.stdout.log \
+            2> reports/qualification/sgs2-global-response.stderr.log \
+            || fail GLOBAL_RESPONSE reports/qualification/sgs2-global-response.stderr.log
+          cp reports/qualification/lafea-bucket-01-production-response.json \
+            reports/qualification/sgs2-global-response.json
+          publish success lafea/sgs2/GLOBAL_1024 "Global response passed with governed SGS-PCG"
+
+          publish pending lafea/sgs2/STRESS_PATCH "Adding stress-only 2048 circumferential level"
+          python /tmp/sgs-patch-2.py \
+            > reports/qualification/sgs2-patch-2.stdout.log \
+            2> reports/qualification/sgs2-patch-2.stderr.log \
+            || fail STRESS_PATCH reports/qualification/sgs2-patch-2.stderr.log
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          spec_path = Path('validation/bucket-01/06-production-response-convergence-spec.json')
+          spec = json.loads(spec_path.read_text())
+          if len(spec['meshLadder']) != 4:
+              raise RuntimeError('supplemental level missing')
+          spec['meshLadder'][-1]['solverMethod'] = 'DETERMINISTIC_SGS_PCG'
+          spec_path.write_text(json.dumps(spec, indent=2) + '\n')
+          PY
+          publish success lafea/sgs2/STRESS_PATCH "Stress-only 2048 policy applied"
+
+          publish pending lafea/sgs2/STRESS_2048 "Executing targeted 2048 SGS-PCG solve"
+          node scripts/lafea-bucket-01-production-response-runner.mjs \
+            > reports/qualification/sgs2-stress-runner.stdout.log \
+            2> reports/qualification/sgs2-stress-runner.stderr.log \
+            || fail STRESS_2048 reports/qualification/sgs2-stress-runner.stderr.log
+          publish success lafea/sgs2/STRESS_2048 "Targeted 2048 SGS-PCG solve completed"
+
+          publish pending lafea/sgs2/STRESS_RECEIPT "Recovering all frozen stress locations"
+          set +e
+          node scripts/lafea-bucket-01-production-lug-probe-receipt.mjs \
+            > reports/qualification/sgs2-stress.stdout.log \
+            2> reports/qualification/sgs2-stress.stderr.log
+          stress_exit=$?
+          set -e
+          if [[ "$stress_exit" != "0" ]]; then
+            log=reports/qualification/sgs2-stress.stderr.log
+            [[ -s "$log" ]] || log=reports/qualification/sgs2-stress.stdout.log
+            fail STRESS_RECEIPT "$log"
+          fi
+          summary=$(node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const response = JSON.parse(fs.readFileSync(
+            'reports/qualification/sgs2-global-response.json', 'utf8'));
+          const stress = JSON.parse(fs.readFileSync(
+            'reports/qualification/lafea-bucket-01-production-lug-fixed-probes.json',
+            'utf8'));
+          const rows = [
+            ...stress.standaloneProbeReceipts,
+            ...stress.pathReceipts.flatMap((row) => row.stationReceipts),
+          ];
+          process.stdout.write(JSON.stringify({
+            responseFineGridGci: response.energyConvergence.fineGridGci,
+            maximumStressWidth: Math.max(
+              ...rows.map((row) => row.supplementalBound.relativeWidth)),
+            criticalLocation: rows.reduce((max, row) =>
+              row.supplementalBound.relativeWidth
+                > max.supplementalBound.relativeWidth ? row : max).probeId,
+            allLocationsPassed: rows.every((row) => row.status === 'PASS'),
+          }));
+          NODE
+          )
+          encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$summary")
+          publish success lafea/sgs2/STRESS_RECEIPT "All frozen stress locations passed" "https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_summary=${encoded}"
+          publish success lafea/sgs2/COMPLETE "Governed SGS targeted qualification passed" "https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_summary=${encoded}"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-sgs2-${{ github.sha }}
+          path: reports/qualification/
+          if-no-files-found: warn
+          retention-days: 30
