@@ -1,8 +1,7 @@
 name: LAFEA Bucket-01 Production Diagnostic
 
 on:
-  push:
-    branches: [bucket-01-cantilever-benchmark-route]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -10,7 +9,6 @@ permissions:
 
 jobs:
   production-diagnostic:
-    if: ${{ !contains(github.event.head_commit.message, '[skip diagnostic]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -110,7 +108,7 @@ jobs:
               evaluatedLevelOrdinals: lug.evaluatedLevelOrdinals ?? null,
               directElementPointRecovery:
                 lug.authority?.directElementPointRecovery ?? null,
-              failingLocations: [
+              failingLocations: lug.failingLocations ?? [
                 ...(lug.standaloneProbeReceipts ?? []),
                 ...(lug.pathReceipts ?? []).flatMap(
                   (path) => path.stationReceipts ?? [],
@@ -162,14 +160,14 @@ jobs:
           if [[ -n "$existing_sha" ]]; then
             gh api --method PUT \
               "repos/${GITHUB_REPOSITORY}/contents/${target}" \
-              -f message='chore: retain Bucket-01 production diagnostic [skip diagnostic]' \
+              -f message='chore: retain Bucket-01 production diagnostic' \
               -f content="$content" \
               -f sha="$existing_sha" \
               -f branch="$GITHUB_REF_NAME"
           else
             gh api --method PUT \
               "repos/${GITHUB_REPOSITORY}/contents/${target}" \
-              -f message='chore: retain Bucket-01 production diagnostic [skip diagnostic]' \
+              -f message='chore: retain Bucket-01 production diagnostic' \
               -f content="$content" \
               -f branch="$GITHUB_REF_NAME"
           fi
