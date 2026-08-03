@@ -45,37 +45,25 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
           path = Path('src/core/local-continuum/solver.js')
           text = path.read_text()
-          old = """      if (finalResidualInfinity <= residualTolerance || iterations % 50 === 0) {
-                residual = exactResidual(matrix, rightHandSide, solution);
-                finalResidualInfinity = maxAbs(residual);
-                if (finalResidualInfinity <= residualTolerance) break;
-                preconditioned = applyJacobi(matrix.diagonal, residual);
-                direction = [...preconditioned];
-                rho = dotVector(residual, preconditioned);
-                if (!(rho > 0)) {
-                  throw singularError(
-                    'UNDER_CONSTRAINED_OR_SINGULAR_SYSTEM',
-                    'solver',
-                    'Sparse PCG restarted with a non-positive residual product.',
-                  );
-                }
-                continue;
-              }
-          """
-          new = """      if (finalResidualInfinity <= residualTolerance || iterations % 50 === 0) {
-                residual = exactResidual(matrix, rightHandSide, solution);
-                finalResidualInfinity = maxAbs(residual);
-                if (finalResidualInfinity <= residualTolerance) break;
-              }
-          """
-          if old not in text:
-              raise SystemExit('expected PCG restart block was not found exactly once')
-          if text.count(old) != 1:
-              raise SystemExit('expected PCG restart block is duplicated')
-          path.write_text(text.replace(old, new))
+          pattern = re.compile(
+              r"        preconditioned = applyJacobi\(matrix\.diagonal, residual\);\n"
+              r"        direction = \[\.\.\.preconditioned\];\n"
+              r"        rho = dotVector\(residual, preconditioned\);\n"
+              r"        if \(!\(rho > 0\)\) \{\n"
+              r".*?"
+              r"        \}\n"
+              r"        continue;\n",
+              re.DOTALL,
+          )
+          matches = list(pattern.finditer(text))
+          if len(matches) != 1:
+              raise SystemExit(f'expected one PCG restart block, found {len(matches)}')
+          repaired = pattern.sub('', text, count=1)
+          path.write_text(repaired)
           PY
 
       - name: Validate scalable sparse solver repair
@@ -151,6 +139,17 @@ jobs:
             -f context="lafea/bucket-01-exact-head" \
             -f description="$description"
           exit "$EXIT_CODE"
+
+      - name: Publish workflow failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh api --method POST
+          "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}"
+          -f state=failure
+          -f context=lafea/workflow-failure
+          -f description="Repair workflow stopped before publishing repaired head"
 
       - name: Retain qualification reports
         if: always()
