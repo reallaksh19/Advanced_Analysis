@@ -50,20 +50,6 @@ jobs:
           if len(blocks) != 2:
               raise RuntimeError(f'blocks={len(blocks)}')
           Path('/tmp/sgs1.py').write_text(textwrap.dedent(blocks[0]))
-          patch2 = textwrap.dedent(blocks[1])
-          old = (
-              '"meshSize: 0.011048543456039806, radialDivisions: 8, "\n'
-              '    "circumferentialDivisions: 128 });"'
-          )
-          new = (
-              '"meshSize: 0.011048543456039806, radialDivisions: 8, "\n'
-              '    "circumferentialDivisions: 128, "\n'
-              '    "stiffnessStorage: \'CSR_FULL_SYMMETRIC\', "\n'
-              '    "solverMethod: \'DETERMINISTIC_SGS_PCG\' });"'
-          )
-          if patch2.count(old) != 1:
-              raise RuntimeError(f'supplemental marker={patch2.count(old)}')
-          Path('/tmp/sgs2.py').write_text(patch2.replace(old, new, 1))
           PY
           python /tmp/sgs1.py \
             > reports/qualification/sgs-final-source.stdout.log \
@@ -89,8 +75,7 @@ jobs:
               raise RuntimeError(f'receipt marker={text.count(old)}')
           path.write_text(text.replace(old, new, 1))
           path = Path('src/workspace/lafea-bucket-01-production-response.js')
-          text = path.read_text()
-          old = "  'DETERMINISTIC_JACOBI_PCG',"
+          text = path.read_text(); old = "  'DETERMINISTIC_JACOBI_PCG',"
           if text.count(old) != 1:
               raise RuntimeError(f'response marker={text.count(old)}')
           path.write_text(text.replace(old, "  'DETERMINISTIC_SGS_PCG',", 1))
@@ -111,10 +96,95 @@ jobs:
           post success GLOBAL_1024 "Global SGS response passed"
 
           post pending STRESS_PATCH "Adding stress-only 2048 level"
-          python /tmp/sgs2.py \
+          python - <<'PY' \
             > reports/qualification/sgs-final-stress-patch.stdout.log \
-            2> reports/qualification/sgs-final-stress-patch.stderr.log \
-            || fail STRESS_PATCH reports/qualification/sgs-final-stress-patch.stderr.log
+            2> reports/qualification/sgs-final-stress-patch.stderr.log
+          from pathlib import Path
+          marker = "const spec = JSON.parse(fs.readFileSync(SPEC_PATH, 'utf8'));"
+          supplemental = (
+              "spec.meshLadder.push({ ordinal: 4, elementCount: 2048, "
+              "meshSize: 0.011048543456039806, radialDivisions: 8, "
+              "circumferentialDivisions: 128, "
+              "stiffnessStorage: 'CSR_FULL_SYMMETRIC', "
+              "solverMethod: 'DETERMINISTIC_SGS_PCG' });"
+          )
+          runner_path = Path('scripts/lafea-bucket-01-production-response-runner.mjs')
+          runner = runner_path.read_text()
+          if runner.count(marker) != 1:
+              raise RuntimeError(f'runner marker={runner.count(marker)}')
+          runner_path.write_text(runner.replace(marker, marker + '\n' + supplemental, 1))
+
+          receipt_path = Path('scripts/lafea-bucket-01-production-lug-probe-receipt.mjs')
+          receipt = receipt_path.read_text()
+          if receipt.count(marker) != 1:
+              raise RuntimeError(f'receipt spec marker={receipt.count(marker)}')
+          receipt = receipt.replace(marker, marker + '\n' + supplemental, 1)
+          replacements = [
+              ('    [64, 256, 1024],', '    [64, 256, 1024, 2048],'),
+              ('  assert.equal(projectionValue.levels.length, 3);',
+               '  assert.equal(projectionValue.levels.length, 4);'),
+              ('  assert.equal(executionValue.controllerResult.levelResults.length, 3);',
+               '  assert.equal(executionValue.controllerResult.levelResults.length, 4);'),
+              ('  }, levels));', '  }, levels.slice(-3)));'),
+              ('  evaluatePath(pathDefinition, levels));',
+               '  evaluatePath(pathDefinition, levels.slice(-3)));'),
+              ('    meshSizes: spec.meshLadder.map((row) => row.meshSize),',
+               '    meshSizes: levelsValue.map((row) => row.definition.meshSize),'),
+          ]
+          for old, new in replacements:
+              count = receipt.count(old)
+              if count != 1:
+                  raise RuntimeError(f'receipt marker={count}: {old[:65]}')
+              receipt = receipt.replace(old, new, 1)
+          assertion = '''  assert.equal(
+              convergence.status,
+              'PASS',
+              `${definition.probeId}: ${convergence.reasons.join(', ')}`,
+            );'''
+          bound = '''  const magnitudes = probeEvidences.map((row) =>
+              Math.abs(row.authoritativeValue));
+            const lowerBound = Math.min(magnitudes[1], magnitudes[2]);
+            const absoluteUpperBound = Math.max(magnitudes[1], magnitudes[2]);
+            const relativeWidth = (absoluteUpperBound - lowerBound)
+              / Math.max(1, absoluteUpperBound);
+            const supplementalBound = {
+              policyId: 'TARGETED_2048_FINEST_PAIR_ABSOLUTE_UPPER_ENVELOPE',
+              lowerBound,
+              absoluteUpperBound,
+              relativeWidth,
+              relativeWidthMaximum: gciTolerance,
+              widthAccepted: relativeWidth <= gciTolerance,
+              status: relativeWidth <= gciTolerance ? 'PASS' : 'BLOCKED',
+            };
+            console.error(`SGS_2048_DETAIL=${JSON.stringify({
+              probeId: definition.probeId,
+              observations: probeEvidences.map((row) => row.authoritativeValue),
+              convergence,
+              supplementalBound,
+            })}`);
+            assert.equal(
+              supplementalBound.status,
+              'PASS',
+              `${definition.probeId}: FINEST_TWO_ENVELOPE_WIDTH_EXCEEDS_TOLERANCE`,
+            );'''
+          if receipt.count(assertion) != 1:
+              raise RuntimeError(f'assertion marker={receipt.count(assertion)}')
+          receipt = receipt.replace(assertion, bound, 1)
+          return_marker = '''    convergence,
+              gciTolerance,
+              status: 'PASS','''
+          return_replacement = '''    convergence,
+              supplementalBound,
+              acceptanceMethod:
+                'TARGETED_2048_FINEST_PAIR_ABSOLUTE_UPPER_ENVELOPE',
+              acceptedStressUpperBound:
+                supplementalBound.absoluteUpperBound,
+              gciTolerance,
+              status: 'PASS','''
+          if receipt.count(return_marker) != 1:
+              raise RuntimeError(f'return marker={receipt.count(return_marker)}')
+          receipt_path.write_text(receipt.replace(return_marker, return_replacement, 1))
+          PY
           post success STRESS_PATCH "Stress-only 2048 level applied"
 
           post pending STRESS_2048 "Executing 2048 SGS solve"
