@@ -11,8 +11,8 @@ import {
 export const LAFEA_BUCKET_01_STRESS_CONVERGENCE_INPUT_SCHEMA =
   'lafea-bucket-01-stress-convergence-input/v1';
 export const LAFEA_BUCKET_01_STRESS_CONVERGENCE_EVIDENCE_SCHEMA =
-  'lafea-bucket-01-stress-convergence-evidence/v1';
-export const LAFEA_BUCKET_01_STRESS_CONVERGENCE_REVISION = 'B01-STRESS-CONV.1';
+  'lafea-bucket-01-stress-convergence-evidence/v2';
+export const LAFEA_BUCKET_01_STRESS_CONVERGENCE_REVISION = 'B01-STRESS-CONV.2';
 
 const INPUT_KEYS = Object.freeze([
   'schema', 'exactHeadSha', 'probeEvidences', 'meshSizes', 'gciTolerance',
@@ -86,7 +86,10 @@ export function evaluateLafeaBucket01StressConvergence(inputValue) {
     status: convergence.status,
     reasons: convergence.reasons,
     authority: {
-      integrationPointAuthorityRetained: true,
+      directElementPointRecovery: true,
+      retainedNodalDisplacementAuthority: true,
+      retainedConstitutiveMatrixAuthority: true,
+      integrationPointExtrapolationUsed: false,
       fixedPhysicalLocation: true,
       movingMaximumUsed: false,
       nodalProjectionUsed: false,
@@ -135,7 +138,8 @@ function validateProbeEnvelope(value, exactHeadSha) {
     || value.status !== 'PASS'
     || value.samplingAuthority !== 'FIXED_PHYSICAL_PROBE'
     || value.recoveryAuthority
-      !== 'ELEMENT_LOCAL_INTEGRATION_POINT_RECONSTRUCTION'
+      !== 'ELEMENT_LOCAL_DIRECT_DISPLACEMENT_GRADIENT'
+    || value.retainedIntegrationPointExtrapolationUsed !== false
     || value.nodalProjectionUsed !== false
     || value.crossElementAveragingUsed !== false
     || typeof value.authoritativeValue !== 'number'
