@@ -427,7 +427,8 @@ function rigidNodeIds(rigid) {
 }
 
 function isBend(edge) {
-  return /BEND|ELBOW/.test(String(edge.entityType || edge.type || edge.fittingType || '').toUpperCase());
+  const type = String(edge.entityType || edge.type || edge.fittingType || '').toUpperCase();
+  return type === 'BEND' || type === 'ELBOW' || type === 'ELBO';
 }
 
 function isPipe(edge) {
