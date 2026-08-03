@@ -39,7 +39,45 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Patch and diagnose targeted checks
+      - name: Patch solver and expose Kirsch convergence evidence
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          solver = Path('src/core/local-continuum/solver.js')
+          text = solver.read_text()
+          start = text.index('function conjugateGradientSolve(')
+          end = text.index('\nfunction applyJacobi(', start)
+          block = text[start:end]
+          declaration = block.index('  const residualTolerance = tolerance(')
+          close = block.index('\n  );', declaration) + len('\n  );')
+          block = block[:close] + '\n  const convergenceTarget = residualTolerance / 10;' + block[close:]
+          if block.count('finalResidualInfinity > residualTolerance') != 2:
+              raise SystemExit('unexpected upper comparison count')
+          if block.count('finalResidualInfinity <= residualTolerance') != 2:
+              raise SystemExit('unexpected lower comparison count')
+          block = block.replace('finalResidualInfinity > residualTolerance', 'finalResidualInfinity > convergenceTarget')
+          block = block.replace('finalResidualInfinity <= residualTolerance', 'finalResidualInfinity <= convergenceTarget')
+          old = '`Sparse PCG residual ${finalResidualInfinity} exceeds ${residualTolerance} after ${iterations} iterations.`'
+          block = block.replace(old, '`Sparse PCG residual ${finalResidualInfinity} exceeds internal target ${convergenceTarget} (acceptance gate ${residualTolerance}) after ${iterations} iterations.`')
+          evidence = '      residualTolerance: canonicalNumber(residualTolerance),\n'
+          block = block.replace(evidence, '      convergenceTarget: canonicalNumber(convergenceTarget),\n' + evidence)
+          solver.write_text(text[:start] + block + text[end:])
+
+          kirsch = Path('scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs')
+          text = kirsch.read_text()
+          old = "`${definition.probeId}: ${convergence.reasons.join(', ')}`"
+          new = "`${definition.probeId}: ${JSON.stringify(convergence.convergence)}`"
+          if text.count(old) != 1:
+              raise SystemExit(f'Kirsch convergence assertion marker count={text.count(old)}')
+          kirsch.write_text(text.replace(old, new))
+          PY
+
+      - name: Validate scalable sparse solver
+        run: node scripts/lafea-bucket-01-scalable-solver-check.mjs
+
+      - name: Diagnose governed Kirsch fixed probes
         env:
           EXPECTED_HEAD_SHA: ${{ github.sha }}
           GH_TOKEN: ${{ github.token }}
@@ -47,88 +85,38 @@ jobs:
         run: |
           mkdir -p reports/qualification
           set +e
-          python - <<'PY' > reports/qualification/pcg-patch.stdout.log 2> reports/qualification/pcg-patch.stderr.log
-          from pathlib import Path
-
-          path = Path('src/core/local-continuum/solver.js')
-          text = path.read_text()
-          start = text.index('function conjugateGradientSolve(')
-          end = text.index('\nfunction applyJacobi(', start)
-          block = text[start:end]
-
-          declaration = block.index('  const residualTolerance = tolerance(')
-          close = block.index('\n  );', declaration) + len('\n  );')
-          block = block[:close] + '\n  const convergenceTarget = residualTolerance / 10;' + block[close:]
-
-          upper = block.count('finalResidualInfinity > residualTolerance')
-          lower = block.count('finalResidualInfinity <= residualTolerance')
-          if upper != 2 or lower != 2:
-              raise SystemExit(f'comparison counts upper={upper}, lower={lower}')
-          block = block.replace('finalResidualInfinity > residualTolerance', 'finalResidualInfinity > convergenceTarget')
-          block = block.replace('finalResidualInfinity <= residualTolerance', 'finalResidualInfinity <= convergenceTarget')
-
-          old = '`Sparse PCG residual ${finalResidualInfinity} exceeds ${residualTolerance} after ${iterations} iterations.`'
-          if block.count(old) != 1:
-              raise SystemExit(f'non-convergence message count={block.count(old)}')
-          block = block.replace(old, '`Sparse PCG residual ${finalResidualInfinity} exceeds internal target ${convergenceTarget} (acceptance gate ${residualTolerance}) after ${iterations} iterations.`')
-
-          evidence = '      residualTolerance: canonicalNumber(residualTolerance),\n'
-          if block.count(evidence) != 1:
-              raise SystemExit(f'evidence marker count={block.count(evidence)}')
-          block = block.replace(evidence, '      convergenceTarget: canonicalNumber(convergenceTarget),\n' + evidence)
-          path.write_text(text[:start] + block + text[end:])
-          PY
-          patch_exit=$?
-          if [[ "$patch_exit" != "0" ]]; then
-            stage=PATCH
-            log=reports/qualification/pcg-patch.stderr.log
-          else
-            node scripts/lafea-bucket-01-scalable-solver-check.mjs \
-              > reports/qualification/scalable.stdout.log \
-              2> reports/qualification/scalable.stderr.log
-            scalable_exit=$?
-            if [[ "$scalable_exit" != "0" ]]; then
-              stage=SCALABLE
-              log=reports/qualification/scalable.stderr.log
-            else
-              node scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs \
-                > reports/qualification/kirsch.stdout.log \
-                2> reports/qualification/kirsch.stderr.log
-              kirsch_exit=$?
-              if [[ "$kirsch_exit" != "0" ]]; then
-                stage=KIRSCH
-                log=reports/qualification/kirsch.stderr.log
-              else
-                gh api --method POST \
-                  "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-                  -f state=success \
-                  -f context="lafea/pcg-headroom-targeted" \
-                  -f description="Scalable solver and Kirsch checks passed"
-                exit 0
-              fi
-            fi
+          node scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs \
+            > reports/qualification/kirsch.stdout.log \
+            2> reports/qualification/kirsch.stderr.log
+          exit_code=$?
+          if [[ "$exit_code" == "0" ]]; then
+            gh api --method POST \
+              "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -f state=success \
+              -f context="lafea/pcg-headroom-targeted" \
+              -f description="Scalable solver and Kirsch checks passed"
+            exit 0
           fi
-          detail=$(node -e "const fs=require('fs');const t=fs.existsSync(process.argv[1])?fs.readFileSync(process.argv[1],'utf8'):'missing diagnostic log';const lines=t.split(/\r?\n/).map(s=>s.trim()).filter(s=>s&&!/^at\s/.test(s)&&!/^node:/.test(s));process.stdout.write(lines.slice(0,18).join(' | ').slice(0,1600))" "$log")
+          detail=$(node -e "const fs=require('fs');const t=fs.readFileSync('reports/qualification/kirsch.stderr.log','utf8');const lines=t.split(/\r?\n/).map(s=>s.trim()).filter(s=>s&&!/^at\s/.test(s)&&!/^node:/.test(s));process.stdout.write(lines.slice(0,12).join(' | ').slice(0,3000))")
           encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
-          safe=$(printf '%s' "$detail" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-42)
           gh api --method POST \
             "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=failure \
-            -f context="lafea/headroom-${stage}/${safe}" \
-            -f description="PCG headroom validation failed at ${stage}" \
+            -f context="lafea/kirsch-convergence-detail" \
+            -f description="Kirsch convergence evidence retained" \
             -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
           gh api --method POST \
             "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=failure \
             -f context="lafea/bucket-01-exact-head" \
-            -f description="PCG headroom diagnostic failed at ${stage}"
-          exit 1
+            -f description="Kirsch convergence blocked"
+          exit "$exit_code"
 
       - name: Retain qualification reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lafea-bucket-01-headroom-${{ github.sha }}
+          name: lafea-bucket-01-kirsch-convergence-${{ github.sha }}
           path: reports/qualification/
           if-no-files-found: warn
           retention-days: 30
