@@ -20,6 +20,7 @@ import { executeNonFeaFixtureSample } from './non-fea-baseline/fixture-sample-ru
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const options = parseNonFeaBaselineArguments(process.argv.slice(2));
 const exactHeadSha = gitValue(['rev-parse', 'HEAD']);
+const programmeBaseSha = gitValue(['merge-base', 'HEAD', 'main']) || '7a6cfadb2c898ddac8cb2dba09b7d400ff800696';
 const executionId = options.executionId || `p0-${exactHeadSha.slice(0, 12) || 'unknown'}`;
 const failures = [];
 const fixtureRuns = [];
@@ -93,7 +94,7 @@ const report = {
   schema: NON_FEA_BASELINE_SCHEMA,
   status: failures.length === 0 ? 'PASS' : 'UNRESOLVED_GATE',
   planPreparationBaseSha: '0bad5b4200a8e24a358e76b1ea8372da33485c87',
-  programmeBaseSha: '58f0bf6b63f9e8e1b20582cd45a18a101ad75cc1',
+  programmeBaseSha,
   exactHeadSha: exactHeadSha || null,
   dirtyStatus: gitValue(['status', '--short']),
   executionId,
