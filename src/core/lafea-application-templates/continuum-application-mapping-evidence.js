@@ -8,6 +8,8 @@ import {
 
 export const LAFEA_CONTINUUM_MAPPING_EVIDENCE_SCHEMA =
   'lafea-continuum-application-mapping-evidence/v1';
+export const LAFEA_CONTINUUM_PATH_MAPPING_EVIDENCE_SCHEMA =
+  'lafea-continuum-application-path-mapping-evidence/v1';
 export const LAFEA_LUG_PINHOLE_MAPPING_PACKAGE_SCHEMA =
   'lafea-lug-pinhole-mapping-package/v1';
 export const LAFEA_CONTINUUM_MAPPING_KINDS = Object.freeze([
@@ -64,9 +66,63 @@ const METRIC_KEYS = Object.freeze({
     'requiredRank', 'restraintSufficient',
   ]),
 });
+const PATH_METRIC_KEYS = Object.freeze({
+  LOAD_EDGE: Object.freeze([
+    'featureId', 'loadCaseId', 'edgeNodePaths', 'pathNodeIds',
+    'radialStart', 'radialEnd', 'mappingWindowHash', 'loadIds',
+    'expectedResultant', 'observedResultant', 'residual', 'tolerance',
+    'closureAccepted',
+  ]),
+  BOUNDARY_EDGE: Object.freeze([
+    'featureId', 'edgeNodePaths', 'pathNodeIds', 'radialStart',
+    'radialEnd', 'mappingWindowHash', 'constraintIds', 'rigidBodyRank',
+    'requiredRank', 'restraintSufficient',
+  ]),
+});
 
 export function createContinuumApplicationMappingEvidence(input) {
-  exactKeys(input, EVIDENCE_CREATE_KEYS, 'Continuum mapping evidence input');
+  return createMappingEvidence(
+    input,
+    LAFEA_CONTINUUM_MAPPING_EVIDENCE_SCHEMA,
+    normalizeMetrics,
+    'Continuum mapping evidence input',
+  );
+}
+
+export function validateContinuumApplicationMappingEvidence(value) {
+  return validateRebuild(
+    value,
+    EVIDENCE_KEYS,
+    EVIDENCE_CREATE_KEYS,
+    createContinuumApplicationMappingEvidence,
+    'Continuum mapping evidence',
+  );
+}
+
+export function createContinuumApplicationPathMappingEvidence(input) {
+  if (input.kind === 'MATERIAL_REGION') {
+    throw new TypeError('Path mapping evidence is restricted to load and boundary paths.');
+  }
+  return createMappingEvidence(
+    input,
+    LAFEA_CONTINUUM_PATH_MAPPING_EVIDENCE_SCHEMA,
+    normalizePathMetrics,
+    'Continuum path mapping evidence input',
+  );
+}
+
+export function validateContinuumApplicationPathMappingEvidence(value) {
+  return validateRebuild(
+    value,
+    EVIDENCE_KEYS,
+    EVIDENCE_CREATE_KEYS,
+    createContinuumApplicationPathMappingEvidence,
+    'Continuum path mapping evidence',
+  );
+}
+
+function createMappingEvidence(input, schema, normalize, label) {
+  exactKeys(input, EVIDENCE_CREATE_KEYS, label);
   requireIdentity(input.templateId, input.stageId);
   if (!LAFEA_CONTINUUM_MAPPING_KINDS.includes(input.kind)) {
     throw new TypeError(`Unsupported continuum mapping kind: ${input.kind}.`);
@@ -81,9 +137,9 @@ export function createContinuumApplicationMappingEvidence(input) {
   if (input.qualification === 'BLOCK' && reasons.length === 0) {
     throw new TypeError('BLOCK mapping evidence requires at least one reason.');
   }
-  const metrics = normalizeMetrics(input.kind, input.metrics, input.qualification);
+  const metrics = normalize(input.kind, input.metrics, input.qualification);
   const base = {
-    schema: LAFEA_CONTINUUM_MAPPING_EVIDENCE_SCHEMA,
+    schema,
     templateId: input.templateId,
     stageId: input.stageId,
     kind: input.kind,
@@ -94,7 +150,8 @@ export function createContinuumApplicationMappingEvidence(input) {
     meshHash: sha256(input.meshHash, 'meshHash'),
     stageSourceHash: sha256(input.stageSourceHash, 'stageSourceHash'),
     applicationEvidenceHash: sha256(
-      input.applicationEvidenceHash, 'applicationEvidenceHash',
+      input.applicationEvidenceHash,
+      'applicationEvidenceHash',
     ),
     declarationHash: sha256(input.declarationHash, 'declarationHash'),
     qualification: input.qualification,
@@ -103,11 +160,6 @@ export function createContinuumApplicationMappingEvidence(input) {
     hashProfile: LAFEA_TEMPLATE_RELEASE_HASH_PROFILE,
   };
   return deepFreeze({ ...base, semanticHash: templateReleaseSha256(base) });
-}
-
-export function validateContinuumApplicationMappingEvidence(value) {
-  return validateRebuild(value, EVIDENCE_KEYS, EVIDENCE_CREATE_KEYS,
-    createContinuumApplicationMappingEvidence, 'Continuum mapping evidence');
 }
 
 export function createLafeaLugPinholeMappingPackage(input) {
@@ -121,25 +173,35 @@ export function createLafeaLugPinholeMappingPackage(input) {
     meshHash: sha256(input.meshHash, 'meshHash'),
     stageSourceHash: sha256(input.stageSourceHash, 'stageSourceHash'),
     applicationEvidenceHash: sha256(
-      input.applicationEvidenceHash, 'applicationEvidenceHash',
+      input.applicationEvidenceHash,
+      'applicationEvidenceHash',
     ),
     declarationHash: sha256(input.declarationHash, 'declarationHash'),
   };
   const materialRegionEvidence = requireEvidence(
-    input.materialRegionEvidence, 'MATERIAL_REGION', parents,
+    input.materialRegionEvidence,
+    'MATERIAL_REGION',
+    parents,
   );
   const loadEdgeEvidence = requireEvidence(
-    input.loadEdgeEvidence, 'LOAD_EDGE', parents,
+    input.loadEdgeEvidence,
+    'LOAD_EDGE',
+    parents,
   );
   const boundaryEdgeEvidence = requireEvidence(
-    input.boundaryEdgeEvidence, 'BOUNDARY_EDGE', parents,
+    input.boundaryEdgeEvidence,
+    'BOUNDARY_EDGE',
+    parents,
   );
   const validation = validateTemplateCallerMeshBinding(input.boundBinding);
   if (!validation.ok) {
     throw new TypeError(`Bound caller-mesh binding is invalid: ${validation.errors.join(' ')}`);
   }
-  const qualified = [materialRegionEvidence, loadEdgeEvidence, boundaryEdgeEvidence]
-    .every((row) => row.qualification === 'PASS');
+  const qualified = [
+    materialRegionEvidence,
+    loadEdgeEvidence,
+    boundaryEdgeEvidence,
+  ].every((row) => row.qualification === 'PASS');
   const expectedBindingStatus = qualified ? 'BOUND' : 'BLOCKED';
   if (input.boundBinding.templateId !== input.templateId
     || input.boundBinding.targetStageId !== input.stageId
@@ -182,8 +244,13 @@ export function createLafeaLugPinholeMappingPackage(input) {
 }
 
 export function validateLafeaLugPinholeMappingPackage(value) {
-  return validateRebuild(value, PACKAGE_KEYS, PACKAGE_CREATE_KEYS,
-    createLafeaLugPinholeMappingPackage, 'Lug-pinhole mapping package');
+  return validateRebuild(
+    value,
+    PACKAGE_KEYS,
+    PACKAGE_CREATE_KEYS,
+    createLafeaLugPinholeMappingPackage,
+    'Lug-pinhole mapping package',
+  );
 }
 
 function requireIdentity(templateId, stageId) {
@@ -193,12 +260,16 @@ function requireIdentity(templateId, stageId) {
 }
 
 function requireEvidence(value, kind, parents) {
-  const validation = validateContinuumApplicationMappingEvidence(value);
+  const validation = value?.schema === LAFEA_CONTINUUM_PATH_MAPPING_EVIDENCE_SCHEMA
+    ? validateContinuumApplicationPathMappingEvidence(value)
+    : validateContinuumApplicationMappingEvidence(value);
   if (!validation.ok) {
     throw new TypeError(`${kind} evidence is invalid: ${validation.errors.join(' ')}`);
   }
   if (value.kind !== kind || value.templateId !== 'C2D-LUG-PINHOLE'
-    || value.stageId !== 'LAFEA.3') {
+    || value.stageId !== 'LAFEA.3'
+    || (kind === 'MATERIAL_REGION'
+      && value.schema !== LAFEA_CONTINUUM_MAPPING_EVIDENCE_SCHEMA)) {
     throw new TypeError(`${kind} evidence identity is invalid.`);
   }
   for (const [key, expected] of Object.entries(parents)) {
@@ -227,10 +298,20 @@ function normalizeMetrics(kind, value, qualification) {
   if (kind === 'LOAD_EDGE') {
     requireText(value.featureId, 'metrics.featureId');
     requireText(value.loadCaseId, 'metrics.loadCaseId');
-    const edgeNodeIds = exactTextArray(value.edgeNodeIds, 3, 'metrics.edgeNodeIds');
+    const edgeNodeIds = exactTextArray(
+      value.edgeNodeIds,
+      3,
+      'metrics.edgeNodeIds',
+    );
     const loadIds = textArray(value.loadIds, 'metrics.loadIds');
-    const expectedResultant = vector2(value.expectedResultant, 'metrics.expectedResultant');
-    const observedResultant = vector2(value.observedResultant, 'metrics.observedResultant');
+    const expectedResultant = vector2(
+      value.expectedResultant,
+      'metrics.expectedResultant',
+    );
+    const observedResultant = vector2(
+      value.observedResultant,
+      'metrics.observedResultant',
+    );
     const residual = vector2(value.residual, 'metrics.residual');
     finite(value.tolerance, 'metrics.tolerance');
     boolean(value.closureAccepted, 'metrics.closureAccepted');
@@ -238,11 +319,20 @@ function normalizeMetrics(kind, value, qualification) {
       throw new TypeError('PASS load-edge evidence requires accepted resultant closure.');
     }
     return {
-      ...value, edgeNodeIds, loadIds, expectedResultant, observedResultant, residual,
+      ...value,
+      edgeNodeIds,
+      loadIds,
+      expectedResultant,
+      observedResultant,
+      residual,
     };
   }
   requireText(value.featureId, 'metrics.featureId');
-  const edgeNodeIds = exactTextArray(value.edgeNodeIds, 3, 'metrics.edgeNodeIds');
+  const edgeNodeIds = exactTextArray(
+    value.edgeNodeIds,
+    3,
+    'metrics.edgeNodeIds',
+  );
   const constraintIds = textArray(value.constraintIds, 'metrics.constraintIds');
   integer(value.rigidBodyRank, 'metrics.rigidBodyRank');
   integer(value.requiredRank, 'metrics.requiredRank');
@@ -253,6 +343,80 @@ function normalizeMetrics(kind, value, qualification) {
     throw new TypeError('Boundary-edge restraint metrics are inconsistent.');
   }
   return { ...value, edgeNodeIds, constraintIds };
+}
+
+function normalizePathMetrics(kind, value, qualification) {
+  if (!PATH_METRIC_KEYS[kind]) {
+    throw new TypeError(`Path mapping does not support ${kind}.`);
+  }
+  exactKeys(value, PATH_METRIC_KEYS[kind], `${kind} path metrics`);
+  requireText(value.featureId, 'metrics.featureId');
+  const edgeNodePaths = quadraticEdgePath(
+    value.edgeNodePaths,
+    'metrics.edgeNodePaths',
+  );
+  const pathNodeIds = textArray(value.pathNodeIds, 'metrics.pathNodeIds');
+  const expectedPathNodes = [...new Set(edgeNodePaths.flat())];
+  if (JSON.stringify(pathNodeIds) !== JSON.stringify(expectedPathNodes)) {
+    throw new TypeError('Path-node metrics do not match the retained edge path.');
+  }
+  finite(value.radialStart, 'metrics.radialStart');
+  finite(value.radialEnd, 'metrics.radialEnd');
+  if (!(value.radialEnd > value.radialStart)) {
+    throw new TypeError('Path radial window is invalid.');
+  }
+  sha256(value.mappingWindowHash, 'metrics.mappingWindowHash');
+  if (kind === 'LOAD_EDGE') {
+    requireText(value.loadCaseId, 'metrics.loadCaseId');
+    const loadIds = textArray(value.loadIds, 'metrics.loadIds');
+    const expectedResultant = vector2(
+      value.expectedResultant,
+      'metrics.expectedResultant',
+    );
+    const observedResultant = vector2(
+      value.observedResultant,
+      'metrics.observedResultant',
+    );
+    const residual = vector2(value.residual, 'metrics.residual');
+    finite(value.tolerance, 'metrics.tolerance');
+    boolean(value.closureAccepted, 'metrics.closureAccepted');
+    if (qualification === 'PASS' && !value.closureAccepted) {
+      throw new TypeError('PASS load-path evidence requires accepted resultant closure.');
+    }
+    return {
+      ...value,
+      edgeNodePaths,
+      pathNodeIds,
+      loadIds,
+      expectedResultant,
+      observedResultant,
+      residual,
+    };
+  }
+  const constraintIds = textArray(value.constraintIds, 'metrics.constraintIds');
+  integer(value.rigidBodyRank, 'metrics.rigidBodyRank');
+  integer(value.requiredRank, 'metrics.requiredRank');
+  boolean(value.restraintSufficient, 'metrics.restraintSufficient');
+  if (value.requiredRank !== 3 || value.rigidBodyRank > 3
+    || (qualification === 'PASS'
+      && (!value.restraintSufficient || value.rigidBodyRank !== 3))) {
+    throw new TypeError('Boundary-path restraint metrics are inconsistent.');
+  }
+  return { ...value, edgeNodePaths, pathNodeIds, constraintIds };
+}
+
+function quadraticEdgePath(value, label) {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new TypeError(`${label} must be a non-empty edge path.`);
+  }
+  const edges = value.map((edge, index) =>
+    exactTextArray(edge, 3, `${label}[${index}]`));
+  for (let index = 1; index < edges.length; index += 1) {
+    if (edges[index - 1][2] !== edges[index][0]) {
+      throw new TypeError(`${label} must be an ordered connected path.`);
+    }
+  }
+  return edges;
 }
 
 function validateRebuild(value, keys, createKeys, create, label) {
@@ -268,7 +432,9 @@ function validateRebuild(value, keys, createKeys, create, label) {
     if (JSON.stringify(rebuilt) !== JSON.stringify(value)) {
       throw new TypeError(`${label} is stale or tampered.`);
     }
-    if (!isDeepFrozen(value)) throw new TypeError(`${label} must be deeply frozen.`);
+    if (!isDeepFrozen(value)) {
+      throw new TypeError(`${label} must be deeply frozen.`);
+    }
   } catch (error) {
     errors.push(error instanceof Error ? error.message : String(error));
   }
@@ -276,11 +442,12 @@ function validateRebuild(value, keys, createKeys, create, label) {
 }
 
 function normalizeReasons(value) {
-  if (!Array.isArray(value)) throw new TypeError('Mapping reasons must be an array.');
+  if (!Array.isArray(value)) {
+    throw new TypeError('Mapping reasons must be an array.');
+  }
   return [...new Set(value.map((row, index) =>
     requireText(row, `reasons[${index}]`)))].sort();
 }
-
 function exactKeys(value, expected, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)
     || Object.getPrototypeOf(value) !== Object.prototype) {
@@ -292,77 +459,71 @@ function exactKeys(value, expected, label) {
     throw new TypeError(`${label} exact-key contract mismatch.`);
   }
 }
-
 function textArray(value, label) {
   if (!Array.isArray(value) || value.length === 0) {
     throw new TypeError(`${label} must be a non-empty array.`);
   }
-  const result = value.map((row, index) => requireText(row, `${label}[${index}]`));
+  const result = value.map((row, index) =>
+    requireText(row, `${label}[${index}]`));
   if (new Set(result).size !== result.length) {
     throw new TypeError(`${label} must contain unique values.`);
   }
   return result;
 }
-
 function exactTextArray(value, count, label) {
   const result = textArray(value, label);
-  if (result.length !== count) throw new TypeError(`${label} must contain ${count} values.`);
+  if (result.length !== count) {
+    throw new TypeError(`${label} must contain ${count} values.`);
+  }
   return result;
 }
-
 function vector2(value, label) {
   if (!Array.isArray(value) || value.length !== 2) {
     throw new TypeError(`${label} must be a two-component vector.`);
   }
   return value.map((row, index) => finite(row, `${label}[${index}]`));
 }
-
 function requireText(value, label) {
   if (typeof value !== 'string' || !value.trim()) {
     throw new TypeError(`${label} is required.`);
   }
   return value;
 }
-
 function sha256(value, label) {
   if (typeof value !== 'string' || !SHA.test(value)) {
     throw new TypeError(`${label} must be canonical SHA-256.`);
   }
   return value;
 }
-
 function engineeringHash(value, label) {
   if (typeof value !== 'string' || !ENGINEERING_HASH.test(value)) {
     throw new TypeError(`${label} must be an engineering hash.`);
   }
   return value;
 }
-
 function finite(value, label) {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     throw new TypeError(`${label} must be finite.`);
   }
   return Object.is(value, -0) ? 0 : value;
 }
-
 function integer(value, label) {
   if (!Number.isInteger(value) || value < 0) {
     throw new TypeError(`${label} must be a non-negative integer.`);
   }
   return value;
 }
-
 function boolean(value, label) {
-  if (typeof value !== 'boolean') throw new TypeError(`${label} must be boolean.`);
+  if (typeof value !== 'boolean') {
+    throw new TypeError(`${label} must be boolean.`);
+  }
   return value;
 }
-
 function deepFreeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   Object.values(value).forEach(deepFreeze);
   return Object.freeze(value);
 }
-
 function isDeepFrozen(value) {
   if (!value || typeof value !== 'object') return true;
   return Object.isFrozen(value) && Object.values(value).every(isDeepFrozen);
