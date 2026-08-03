@@ -153,6 +153,10 @@ test('[SIMULATED] production backend clips only engineering groups and clears de
   const planes = topologyEditSectionBoxToPlaneEquations(createTopologyEditSectionState({ box }));
 
   assert.throws(() => backend.setPresentationSectionPlanes({}), /must be an array/);
+  assert.throws(
+    () => backend.setPresentationSectionPlanes(planes.slice(0, 1)),
+    /must contain zero or six equations/,
+  );
   assert.equal(backend.setPresentationSectionPlanes(planes), 6);
   assert.equal(renderer.localClippingEnabled, true);
   sectionedMaterials.forEach((material) => {
@@ -204,6 +208,8 @@ test('[SIMULATED] ray fallback skips clipped hits, preserves instanced identity,
   const planes = topologyEditSectionBoxToPlaneEquations(createTopologyEditSectionState({ box }));
   const outside = pickObject({ objectId: 'outside', nodeId: 'outside' });
   const inside = pickObject({ objectId: 'inside', nodeId: 'inside' });
+  backend.groups.sourceGroup.add(outside);
+  backend.groups.draftGroup.add(inside);
 
   backend.pickRaycaster = raycasterSpy([
     { object: outside, point: new THREE.Vector3(50, 0, 0) },
@@ -222,6 +228,7 @@ test('[SIMULATED] ray fallback skips clipped hits, preserves instanced identity,
     { objectKind: 'node', objectId: 'instance-0', nodeId: 'instance-0' },
     { objectKind: 'node', objectId: 'instance-1', nodeId: 'instance-1' },
   ];
+  backend.groups.supportGroup.add(instanced);
   backend.pickRaycaster = raycasterSpy([
     { object: instanced, instanceId: 1, point: new THREE.Vector3(0, 0, 0) },
   ]);
@@ -232,6 +239,15 @@ test('[SIMULATED] ray fallback skips clipped hits, preserves instanced identity,
     { object: outside, point: new THREE.Vector3(50, 0, 0) },
   ]);
   assert.equal(backend.pickWithRaycaster(new THREE.Vector2()).objectId, 'outside');
+
+  const outsideOverlay = pickObject({ objectId: 'outside-overlay', nodeId: 'outside-overlay' });
+  backend.groups.issueGroup.add(outsideOverlay);
+  backend.setPresentationSectionPlanes(planes);
+  backend.pickRaycaster = raycasterSpy([
+    { object: outside, point: new THREE.Vector3(50, 0, 0) },
+    { object: outsideOverlay, point: new THREE.Vector3(50, 0, 0) },
+  ]);
+  assert.equal(backend.pickWithRaycaster(new THREE.Vector2()).objectId, 'outside-overlay');
   backend.destroy();
 });
 

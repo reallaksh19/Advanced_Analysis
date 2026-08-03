@@ -125,9 +125,12 @@ export class TopologyEditViewportBackend {
     this.applySectionPlanesToGroup(group);
   }
 
-  setPresentationSectionPlanes(planes = []) {
+  setPresentationSectionPlanes(planes) {
     if (!Array.isArray(planes)) {
       throw new TypeError('TopologyEditViewportBackend: Section planes must be an array.');
+    }
+    if (planes.length !== 0 && planes.length !== 6) {
+      throw new RangeError('TopologyEditViewportBackend: Section planes must contain zero or six equations.');
     }
     const equations = createTopologyEditSectionPlaneEquations(planes);
     this.activeSectionPlaneEquations = equations;
@@ -235,7 +238,10 @@ export class TopologyEditViewportBackend {
     this.pickRaycaster.setFromCamera(pointer, this.activeCamera);
     const hit = this.pickRaycaster.intersectObjects(this.scene.children, true).find((candidate) => (
       !hasNonPickableAncestor(candidate.object)
-      && isEngineeringPointInsideSectionPlanes(candidate.point, this.activeSectionPlaneEquations)
+      && (
+        !hasAncestorInGroups(candidate.object, this.sectionedGroups())
+        || isEngineeringPointInsideSectionPlanes(candidate.point, this.activeSectionPlaneEquations)
+      )
     ));
     if (!hit) return null;
     return this.pickReceipt(resolveHitTarget(hit), hit.point);
@@ -297,3 +303,4 @@ function fallbackPick(value) { return { objectKind: value.type === 'node' ? 'nod
 function pickUserData(value) { return { canonicalId: value.entityId || value.id, type: value.type, pickTarget: value.pickTarget || fallbackPick(value) }; }
 function resolveHitTarget(hit) { return hit.instanceId !== undefined ? hit.object.userData?.pickTable?.[hit.instanceId] : hit.object.userData?.pickTarget; }
 function hasNonPickableAncestor(object) { let current = object; while (current) { if (current.userData?.nonPickable) return true; current = current.parent; } return false; }
+function hasAncestorInGroups(object, groups) { let current = object; while (current) { if (groups.includes(current)) return true; current = current.parent; } return false; }
