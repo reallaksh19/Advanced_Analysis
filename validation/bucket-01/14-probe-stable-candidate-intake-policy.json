@@ -1,18 +1,27 @@
 {
-  "schema": "lafea-bucket-01-probe-stable-candidate-intake-policy/v2",
+  "schema": "lafea-bucket-01-probe-stable-candidate-intake-policy/v3",
   "policyId": "B01-PROBE-STABLE-CANDIDATE-INTAKE-01",
   "benchmarkId": "C2D-LUG-PINHOLE-01",
-  "sourceDesignId": "B01-PROBE-STABLE-POLAR-V2",
+  "sourceDesignId": "B01-PROBE-STABLE-POLAR-V3",
   "candidatePackageSchema": "lafea-bucket-01-probe-stable-candidate-mesh-package/v1",
   "candidateTopologyReportSchema": "lafea-bucket-01-probe-stable-candidate-topology-report/v1",
-  "candidateValidationEvidenceSchema": "lafea-bucket-01-probe-stable-candidate-validation-evidence/v1",
-  "topologyValidationEvidenceSchema": "lafea-bucket-01-probe-stable-topology-validation-evidence/v1",
+  "candidateValidationEvidenceSchema": "lafea-bucket-01-probe-stable-candidate-validation-evidence/v2",
+  "topologyValidationEvidenceSchema": "lafea-bucket-01-probe-stable-topology-validation-evidence/v2",
   "requiredMidsideGeometryPolicy": {
     "holeBoundaryCircumferentialEdges": "ANALYTIC_CIRCULAR_ARC",
     "outerBoundaryCircumferentialEdges": "ANALYTIC_CIRCULAR_ARC",
     "internalCircumferentialEdges": "STRAIGHT_CHORD",
     "radialEdges": "STRAIGHT_CHORD",
     "diagonalEdges": "STRAIGHT_CHORD"
+  },
+  "requiredProductionMappingWindow": {
+    "radialStart": 20,
+    "radialEnd": 60,
+    "loadFeatureRole": "RADIAL_QUARTER_0",
+    "restraintFeatureRole": "RADIAL_QUARTER_2",
+    "exactEndpointNodesAtEveryLevel": true,
+    "physicalCoordinateSelectionRequired": true,
+    "indexScaledSelectionForbidden": true
   },
   "expectedLocationCount": 7,
   "minimumCandidateNaturalMargin": 0.05,
@@ -37,9 +46,9 @@
     },
     {
       "ordinal": 4,
-      "radialCellCount": 53,
+      "radialCellCount": 54,
       "circumferentialCellCount": 132,
-      "elementCount": 13992
+      "elementCount": 14256
     }
   ],
   "requiredTopologyAssertions": [
@@ -59,7 +68,8 @@
     "RADIAL_AND_DIAGONAL_MIDSIDES_ARE_EXACT_CHORD_MIDPOINTS",
     "ALL_CORNER_SCALED_JACOBIANS_POSITIVE",
     "ALL_INTEGRATION_POINT_JACOBIANS_POSITIVE",
-    "ALL_DENSE_SAMPLED_JACOBIANS_POSITIVE"
+    "ALL_DENSE_SAMPLED_JACOBIANS_POSITIVE",
+    "EXACT_20_TO_60_MM_MAPPING_WINDOW_RETAINED"
   ],
   "requiredExecutedValidation": [
     "CANDIDATE_MESH_PACKAGE_REBUILT",
@@ -68,11 +78,14 @@
     "FEATURE_SET_HASHES_REBUILT",
     "QUALITY_HASHES_REBUILT",
     "LOCATION_RECORDS_REBUILT",
-    "TOPOLOGY_ASSERTIONS_RECOMPUTED"
+    "TOPOLOGY_ASSERTIONS_RECOMPUTED",
+    "PRODUCTION_MAPPING_WINDOW_RECOMPUTED"
   ],
   "authority": {
     "candidateOnlyRequired": true,
-    "independentCheckerExecutionRequired": true,
+    "executedRecomputationRequired": true,
+    "independentCheckerExecutionRequiredForIntake": false,
+    "independentCheckerRequiredBeforeReplayAdjudication": true,
     "solverExecutionRequired": false,
     "productionSwitchAuthorized": false,
     "productionMeshAuthority": false,
@@ -81,5 +94,5 @@
     "bucketQualified": false
   },
   "acceptedDisposition": "CANDIDATE_ACCEPTED_FOR_PHASE_2C_INTEGRATION_REVIEW",
-  "currentDisposition": "POLICY_BOUND_TO_DESIGN_V2_PENDING_PHASE_2B_CANDIDATE_AND_REBUILD_EVIDENCE"
+  "currentDisposition": "POLICY_BOUND_TO_DESIGN_V3_PENDING_COMPLETE_CHECKOUT_REBUILD_AND_PHASE_3A_INDEPENDENT_CHECKER"
 }
