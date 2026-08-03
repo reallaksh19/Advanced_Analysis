@@ -306,7 +306,7 @@ export function compileCodeResult({
   /*
    * Section 15.5: changing the code edition/profile (or the edition dataset)
    * must invalidate a prior code result rather than silently reuse it.
-   * `governingRuleId` folds a fragment of both semantic hashes into itself
+   * `governingRuleId` folds a fragment of both semantic hashes into the
    * identity string it already carries, so it — and therefore the record's
    * own semanticHash — changes whenever the profile or dataset changes, even
    * if a caller reuses the same human-readable codeProfileId by mistake.
