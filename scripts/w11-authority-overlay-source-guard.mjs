@@ -38,6 +38,8 @@ for (const text of [overlay, subset]) {
 assert.match(overlay, /createEvidenceValue[^\n]*from\s*'\.\.\/project-data\/project-data-contract\.js'/u);
 assert.match(branchExtraction, /import\s*\{\s*buildRoutePartitionModel\s*\}\s*from\s*'\.\.\/routes\/route-partition-model\.js'/u);
 assert.match(branchExtraction, /buildRoutePartitionModel\s*\(/u, 'branch extraction must call the production route builder');
+assert.match(branchExtraction, /sealBranchSubsetManifest/u, 'branch extraction must reuse the sealed subset contract');
+assert.match(branchExtraction, /sealBranchSubsetManifest\s*\(/u, 'branch extraction must return a sealed subset manifest');
 for (const code of [
   'AUTHORITY_OVERLAY_DATASET_STALE',
   'AUTHORITY_OVERLAY_SCOPE_UNSUPPORTED',
