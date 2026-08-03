@@ -16,7 +16,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: bucket-01-cantilever-benchmark-route
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
@@ -52,49 +51,47 @@ jobs:
           from pathlib import Path
           path = Path('src/core/local-continuum/solver.js')
           text = path.read_text()
-          old_limit = """  const iterationLimit = Math.min(
-              50000,
-              Math.max(500, matrix.size * 8),
-            );"""
-          new_limit = """  const iterationLimit = Math.min(
-              50000,
-              Math.max(1000, matrix.size * 16),
-            );"""
-          old_update = """      iterations += 1;
-              finalResidualInfinity = maxAbs(residual);
-              if (finalResidualInfinity <= convergenceTarget || iterations % 50 === 0) {
-                residual = exactResidual(matrix, rightHandSide, solution);
-                finalResidualInfinity = maxAbs(residual);
-                if (finalResidualInfinity <= convergenceTarget) break;
-              }
-              preconditioned = applyJacobi(matrix.diagonal, residual);"""
-          new_update = """      iterations += 1;
-              const recursiveResidualInfinity = maxAbs(residual);
-              finalResidualInfinity = recursiveResidualInfinity;
-              if (recursiveResidualInfinity <= convergenceTarget || iterations % 100 === 0) {
-                const reliableResidual = exactResidual(matrix, rightHandSide, solution);
-                const reliableResidualInfinity = maxAbs(reliableResidual);
-                finalResidualInfinity = reliableResidualInfinity;
-                if (reliableResidualInfinity <= convergenceTarget) {
-                  residual = reliableResidual;
-                  break;
-                }
-                if (recursiveResidualInfinity <= convergenceTarget) {
-                  residual = reliableResidual;
-                  preconditioned = applyJacobi(matrix.diagonal, residual);
-                  direction = [...preconditioned];
-                  rho = dotVector(residual, preconditioned);
-                  if (!(rho > 0) || !Number.isFinite(rho)) {
-                    throw singularError(
-                      'UNDER_CONSTRAINED_OR_SINGULAR_SYSTEM',
-                      'solver',
-                      'Sparse PCG reliable-update residual product is not positive.',
-                    );
-                  }
-                  continue;
-                }
-              }
-              preconditioned = applyJacobi(matrix.diagonal, residual);"""
+          old_limit = 'Math.max(500, matrix.size * 8)'
+          new_limit = 'Math.max(1000, matrix.size * 16)'
+          old_update = '\n'.join([
+              '      iterations += 1;',
+              '      finalResidualInfinity = maxAbs(residual);',
+              '      if (finalResidualInfinity <= convergenceTarget || iterations % 50 === 0) {',
+              '        residual = exactResidual(matrix, rightHandSide, solution);',
+              '        finalResidualInfinity = maxAbs(residual);',
+              '        if (finalResidualInfinity <= convergenceTarget) break;',
+              '      }',
+              '      preconditioned = applyJacobi(matrix.diagonal, residual);',
+          ])
+          new_update = '\n'.join([
+              '      iterations += 1;',
+              '      const recursiveResidualInfinity = maxAbs(residual);',
+              '      finalResidualInfinity = recursiveResidualInfinity;',
+              '      if (recursiveResidualInfinity <= convergenceTarget || iterations % 100 === 0) {',
+              '        const reliableResidual = exactResidual(matrix, rightHandSide, solution);',
+              '        const reliableResidualInfinity = maxAbs(reliableResidual);',
+              '        finalResidualInfinity = reliableResidualInfinity;',
+              '        if (reliableResidualInfinity <= convergenceTarget) {',
+              '          residual = reliableResidual;',
+              '          break;',
+              '        }',
+              '        if (recursiveResidualInfinity <= convergenceTarget) {',
+              '          residual = reliableResidual;',
+              '          preconditioned = applyJacobi(matrix.diagonal, residual);',
+              '          direction = [...preconditioned];',
+              '          rho = dotVector(residual, preconditioned);',
+              '          if (!(rho > 0) || !Number.isFinite(rho)) {',
+              '            throw singularError(',
+              "              'UNDER_CONSTRAINED_OR_SINGULAR_SYSTEM',",
+              "              'solver',",
+              "              'Sparse PCG reliable-update residual product is not positive.',",
+              '            );',
+              '          }',
+              '          continue;',
+              '        }',
+              '      }',
+              '      preconditioned = applyJacobi(matrix.diagonal, residual);',
+          ])
           if text.count(old_limit) != 1:
               raise RuntimeError(f'iteration-limit marker count={text.count(old_limit)}')
           if text.count(old_update) != 1:
