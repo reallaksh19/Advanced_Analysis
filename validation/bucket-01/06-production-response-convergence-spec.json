@@ -65,7 +65,10 @@
     "largeSystemMethod": "DETERMINISTIC_JACOBI_PCG",
     "preconditioner": "JACOBI",
     "residualAuthority": "EXACT_RECOMPUTED_FREE_DOF_RESIDUAL",
-    "maximumIterations": "min(50000,max(500,8*freeDofCount))",
+    "internalConvergenceTarget": "residualTolerance/10",
+    "maximumIterations": "min(50000,max(1000,16*freeDofCount))",
+    "exactResidualRefreshInterval": 100,
+    "reliableUpdateOnRecursiveTargetOnly": true,
     "smallSystemMethodUnchanged": true,
     "testOnlySolverSubstitutionAllowed": false
   },
