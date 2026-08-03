@@ -1,9 +1,17 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  LAFEA_LUG_PINHOLE_T6_MESH_SPEC_SCHEMA,
+  generateLafeaLugPinholeT6Mesh,
+} from '../src/core/lafea-meshing/lug-pinhole-t6.js';
 import { canonicalLafeaSha256 } from '../src/workspace/lafea-canonical-sha256.js';
 import {
   LAFEA_BUCKET_01_FIXED_PROBE_EVIDENCE_SCHEMA,
   LAFEA_BUCKET_01_FIXED_PROBE_REVISION,
+  observeLafeaBucket01ProbeTopology,
 } from '../src/workspace/lafea-bucket-01-fixed-probe.js';
 import {
   LAFEA_BUCKET_01_PROBE_TOPOLOGY_AUDIT_INPUT_SCHEMA,
@@ -11,6 +19,7 @@ import {
   validateLafeaBucket01ProbeTopologyAuditEvidence,
 } from '../src/workspace/lafea-bucket-01-probe-topology.js';
 
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const exactHeadSha = 'a'.repeat(40);
 const locationDefinitionHash = `sha256:${'d'.repeat(64)}`;
 const definitions = [
@@ -71,7 +80,93 @@ assert.equal(edgeEvidence.status, 'BLOCKED');
 assert.equal(edgeEvidence.diagnosis.edgeProximity, true);
 assert.ok(edgeEvidence.reasons.includes('LEVEL_4_NATURAL_MARGIN_BELOW_MINIMUM'));
 
+verifyGovernedParentCellLineage();
+verifyProductionReceiptRetainsGovernedFailures();
+
 console.log('Bucket-01 governed probe-topology audit checks passed.');
+
+function verifyGovernedParentCellLineage() {
+  const radius = 27;
+  const angleRadians = 17 * Math.PI / 180;
+  const point = {
+    probeId: 'LINEAGE-PROBE',
+    x: radius * Math.cos(angleRadians),
+    y: radius * Math.sin(angleRadians),
+  };
+  for (const [radialDivisions, circumferentialDivisions] of [
+    [2, 16], [4, 32], [8, 64], [16, 128],
+  ]) {
+    const meshPackage = generateLafeaLugPinholeT6Mesh({
+      schema: LAFEA_LUG_PINHOLE_T6_MESH_SPEC_SCHEMA,
+      meshIdentity: `LINEAGE-${radialDivisions}-${circumferentialDivisions}`,
+      center: { x: 0, y: 0 },
+      holeRadius: 20,
+      outerRadius: 100,
+      radialDivisions,
+      circumferentialDivisions,
+      startAngleDegrees: 0,
+    });
+    const observation = observeLafeaBucket01ProbeTopology(
+      meshPackage.mesh,
+      point,
+    );
+    const expected = [];
+    let radial = radialDivisions;
+    let circumferential = circumferentialDivisions;
+    while (true) {
+      expected.push([radial, circumferential]);
+      if (radial <= 2 || circumferential <= 16) break;
+      radial /= 2;
+      circumferential /= 2;
+    }
+    assert.deepEqual(
+      observation.meshTopology.parentCellLineage.map((row) => [
+        row.radialDivisions,
+        row.circumferentialDivisions,
+      ]),
+      expected,
+    );
+    assert.equal(
+      observation.meshTopology.parentCellLineage.some((row) =>
+        row.radialDivisions === 1 || row.circumferentialDivisions === 8),
+      false,
+    );
+  }
+}
+
+function verifyProductionReceiptRetainsGovernedFailures() {
+  const receiptSource = fs.readFileSync(
+    path.join(ROOT, 'scripts/lafea-bucket-01-production-lug-probe-receipt.mjs'),
+    'utf8',
+  );
+  assert.equal(
+    receiptSource.includes(
+      'assert.equal(evidence.meshTopology.metadataAvailable, true);',
+    ),
+    false,
+  );
+  assert.equal(
+    receiptSource.includes(
+      'evidence.minimumNaturalMargin\n        >= spec.tolerances.naturalCoordinateMarginMin',
+    ),
+    false,
+  );
+  assert.match(
+    receiptSource,
+    /governedAcceptanceFailuresRetainedBeforeExit:\s*true/u,
+  );
+  assert.match(
+    receiptSource,
+    /RECOVERY_LEVEL_\$\{level\.ordinal\}_MAPPING_RESIDUAL_EXCEEDED/u,
+  );
+  const auditIndex = receiptSource.indexOf(
+    'const topologyAudit = evaluateLafeaBucket01ProbeTopologyAudit',
+  );
+  const statusIndex = receiptSource.indexOf(
+    'const status = recoveryReasons.length === 0',
+  );
+  assert.ok(auditIndex >= 0 && statusIndex > auditIndex);
+}
 
 function probeEvidence(ordinal, radialDivisions, circumferentialDivisions,
   ring, sector, side, authoritativeValue, margin = 0.2) {
