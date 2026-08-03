@@ -39,8 +39,10 @@ current source — do not trust the document alone.
 | M006 | #451 | #456 | Merged (Owner-fixed) | System-level closed-form thermal expansion benchmarks (`lfea-b3.8`, free + restrained uniform heating) — real B-2.5→B-3.4 chain, not a hand-reconstruction |
 | M007 | #452 | #457 | Merged (Owner-fixed) | Real production gap closed: `GRAVITY`/`PIPE_WALL` now expands to equivalent element UDLs via B-3.1 machinery, not just validated at declaration level; closed-form benchmark at `lfea-b3.9` |
 | (direct fix, no WP) | — | #461 | Merged | `check:lfea-linear-core` now completes end to end for the first time since M001 — replaced its dependency on a deleted, non-functional CI workflow file with the mechanisms that actually keep the workspace-integration check and its e2e spec wired in |
-| M008 | #463 | — | Prequalification posted, awaiting Owner review | Benchmark B — governed analysis-authority overlay for the real 1885 project, scoped to one line/branch. Real degrees of freedom (overlay schema shape, 83/279 objects with missing lineNo/pipingClass, no branch-extraction utility exists yet) — see issue for grounded findings |
-| M009 | #464 | — | Prequalification posted, awaiting Owner review | Stress recovery scope confirmation (mandate §13.3) — B-4.0's `calculatedStress` already exists and is wired into `linear-piping-code-application`; open questions are narrower (pressure-stress term, real-vs-fixture exercise, EditionDataset supply path, display/export reach), not "does it exist at all" |
+| M008 | #463 | — | Prequalification answered, verified, and approved (Owner spot-checked all load-bearing claims) | Benchmark B — governed analysis-authority overlay for the real 1885 project. Real candidate branch confirmed: `/ASIM-1885-8"-S8810103-91261M7-HC-01/B1`, 16 entities, zero missing-attribute diagnostics (8 clean branches exist total). Split into M008-A/B/C/D; M008-A now live as #468 |
+| M008-A | #468 | — | Ready | Overlay + branch-subset contracts only (schema/validation/hashing, no extraction algorithm, no solver wiring) — first slice of the M008 split |
+| M009 | #464 | — | Prequalification answered, verified, and scope decided (Owner spot-checked all load-bearing claims) | B-4.0's `calculatedStress` confirmed real, production-wired, and already displayed/exported — not a gap. Broad "implement stress recovery" declined (no mandate text to justify scope beyond what exists); pressure-stress-from-geometry and EditionDataset-import gaps logged but not authorized. Verification-only benchmark now live as #469 |
+| M009 (verification benchmark) | #469 | — | Ready | Closed-form independent verification of `combineStressTerms` against the real B-3.4→B-4.0 chain (`lfea-b4.1`) |
 
 ### Non-LFEA workstreams (user-directed pivot, 4 parallel read-only audits + direct fixes)
 
@@ -79,29 +81,45 @@ coverage is now 12/20 mandate cases. Both PRs needed Owner-side fixes the
 implementing agents' repository-less sandboxes could not have caught
 themselves — see process notes below.
 
-**M008 — prequalification issue posted (#463), awaiting agent answers.**
-Benchmark B — the governed analysis-authority overlay contract (materials,
-sections, supports, load cases) for the real 1885 project, scoped initially
-to one line/branch rather than the full 279-object project, to get a first
-genuine non-BLOCKED solve. Owner-side investigation before the issue was
-opened already found this is a real gap with real design freedom, not a
-settled build: no per-object overlay schema exists anywhere yet (the closest
-analog, `project-data-contract.js`, is project-scalar only); the real project
-is blocked with `BLOCKED_PROJECT_DATA_INCOMPLETE`; 83/279 entities have
-`MISSING_ATTRIBUTE` diagnostics on `lineNo`/`pipingClass`; no single-branch
-extraction utility exists. Full findings are in the issue. This is the
-single highest-mandate-value remaining item and the prerequisite for P12 —
-do not authorize implementation until the questionnaire answers are reviewed.
+**M008 — prequalification complete, verified, approved. M008-A ready
+(#468).** Benchmark B — the governed analysis-authority overlay contract
+(materials, sections, supports, load cases) for the real 1885 project. The
+agent's prequalification answer on #463 was independently verified by the
+Owner (re-ran its branch-scan reproduction script directly, spot-checked its
+source citations) before being accepted — every checked claim held up
+exactly. Real candidate branch confirmed clean: `/ASIM-1885-8"-S8810103-91261M7-HC-01/B1`,
+16 entities, zero `MISSING_ATTRIBUTE` diagnostics (8 such clean branches
+exist out of 13 total, so this wasn't cherry-picked). No per-object overlay
+schema existed anywhere before this; the agent proposed one, reusing
+`project-data-contract.js`'s `{ value, evidence, approved }` shape at
+per-entity/per-branch scope. Owner accepted the proposed 4-way split
+(M008-A contracts → M008-B extraction → M008-C material/section/support
+resolution → M008-D production integration) rather than one large mission,
+and authorized only M008-A so far — each subsequent slice gets its own
+Work Pack once the prior one merges and is Owner-validated. This remains the
+single highest-mandate-value remaining item and the prerequisite for P12.
 
-**M009 — prequalification issue posted (#464), awaiting agent answers.**
-Stress recovery for frame/pipe elements (mandate §13.3). Owner-side
-investigation before the issue was opened found the member-stress
-calculation likely already exists (`linear-fea-b31-code-engine/stress-terms.js`'s
-`combineStressTerms`, wired into `linear-piping-code-application/b31-application.js`)
-— so this is probably scope-confirmation plus a possible narrow gap
-(the `pressureStressValue` term appears to always be caller-supplied, never
-computed from geometry+pressure by anything found so far) rather than a
-missing capability. Full findings are in the issue.
+**M009 — prequalification complete, verified, scope decided. Verification
+benchmark ready (#469).** Stress recovery for frame/pipe elements (mandate
+§13.3, no saved verbatim text found — the working definition used was
+exactly "stress recovery for frame/pipe elements"). The agent's answer
+confirmed the member-stress calculation
+(`linear-fea-b31-code-engine/stress-terms.js`'s `combineStressTerms`) already
+exists, is production-wired through `linear-piping-code-application`, and —
+contrary to this roadmap's own earlier assumption — is already displayed
+(`linear-piping-results-view.js`) and exported (CSV/JSON) to the user; Owner
+independently verified both the pressure-stress and display/export claims
+against source directly. Owner declined the broader "category-neutral
+bare-frame-station stress" scope the agent flagged as a possible reading of
+§13.3, since no mandate text exists to justify it and the existing B31.3
+component-code-point coverage reasonably satisfies the working definition.
+Two real, narrower gaps were logged but **not authorized**: deriving
+sustained pressure stress from design pressure + geometry (currently always
+caller-supplied, never computed anywhere), and a real licensed-`EditionDataset`
+supply/import/authoring path (the architecture and a generic caller-injection
+route exist; no real dataset or importer does). Authorized instead: a
+closed-form independent verification benchmark for the existing calculation
+(#469, `lfea-b4.1`) — the same test-only pattern that closed M004 and M006.
 
 **M010**: Stack-B UI defect re-verification. Before scoping, redo the direct
 verification pass that found D-01/D-09 already fixed — do not reuse
