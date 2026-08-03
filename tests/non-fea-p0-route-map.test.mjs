@@ -20,6 +20,9 @@ const REQUIRED_P0_FILES = [
   'scripts/non-fea-baseline/browser-baseline.mjs',
   'scripts/non-fea-baseline/command-ladder.mjs',
   'scripts/non-fea-baseline/statistics.mjs',
+  'scripts/non-fea-baseline/runner-options.mjs',
+  'scripts/non-fea-baseline/fixture-role-bindings.mjs',
+  'scripts/non-fea-baseline/fixture-sample-runner.mjs',
 ];
 
 test('P0 route inventory covers every required stage exactly once', () => {
@@ -47,4 +50,14 @@ test('P0 seed report is explicitly unexecuted and fail-closed', async () => {
   assert.equal(report.status, 'IMPLEMENTATION_READY_OWNER_EXECUTION_REQUIRED');
   assert.equal(report.completion.P0_ACCEPTED, false);
   assert.ok(report.failures.some((row) => row.classification === 'UNRESOLVED_GATE'));
+  assert.equal(report.fixtureRoleBindings.length, 3);
+  assert.ok(report.fixtureRoleBindings.every((row) => row.status === 'MISSING_AUTHORITY'));
+});
+
+test('P0 runner provides explicit exact fixture-role binding', async () => {
+  const source = await readFile('scripts/non-fea-baseline/runner-options.mjs', 'utf8');
+  assert.match(source, /--fixture-role/u);
+  assert.match(source, /ROLE=repository\/path/u);
+  assert.match(source, /Duplicate --fixture-role binding/u);
+  assert.match(source, /NON_FEA_REQUIRED_FIXTURE_ROLES/u);
 });
