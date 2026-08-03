@@ -18,6 +18,7 @@ export class EngineeringModelController {
     this.unsubscribers = [];
     this.datasetId = '';
     this.datasetVersion = null;
+    this.lastRebuiltDataset = null;
   }
 
   init() {
@@ -33,13 +34,21 @@ export class EngineeringModelController {
 
   handleSnapshot(snapshot) {
     const dataset = snapshot?.status === 'ready' ? snapshot.dataset : null;
-    if (!dataset) { engineeringModelStore.clear(); this.datasetId = ''; this.datasetVersion = null; return; }
+    if (!dataset) {
+      engineeringModelStore.clear();
+      this.datasetId = '';
+      this.datasetVersion = null;
+      this.lastRebuiltDataset = null;
+      return;
+    }
     const distribution = engineeringSupportLoadStore.getDistribution();
     if (distribution && distribution.datasetId !== dataset.datasetId) engineeringSupportLoadStore.clear();
     else if (distribution && distribution.datasetVersion !== (dataset.version || null)) engineeringSupportLoadStore.markStale('DATASET_EDITED', dataset.version || null);
     this.datasetId = dataset.datasetId;
     this.datasetVersion = dataset.version || null;
+    if (dataset === this.lastRebuiltDataset) return;
     engineeringModelStore.rebuild(dataset);
+    this.lastRebuiltDataset = dataset;
   }
 
   handleProjectDataChanged() {
@@ -66,5 +75,10 @@ export class EngineeringModelController {
     }
   }
 
-  destroy() { this.unsubscribers.forEach((unsubscribe) => unsubscribe()); this.unsubscribers = []; engineeringModelStore.clear(); }
+  destroy() {
+    this.unsubscribers.forEach((unsubscribe) => unsubscribe());
+    this.unsubscribers = [];
+    this.lastRebuiltDataset = null;
+    engineeringModelStore.clear();
+  }
 }
