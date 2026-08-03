@@ -22,7 +22,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Capture production solver evidence
+      - name: Capture compact production solver evidence
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -33,7 +33,7 @@ jobs:
           path = Path('scripts/lafea-nb-t6d-load-driven-qualification-check.mjs')
           text = path.read_text()
           marker = 'const positive = executeLoadDriven([1000, 250]);'
-          injection = marker + "\nconsole.error('SOLVER_EVIDENCE=' + JSON.stringify(positive.execution.controllerResult.levelResults.map((row) => row.execution.result.loadCaseResults[0].solverEvidence)));"
+          injection = marker + "\nconsole.error('SOLVER_SUMMARY=' + JSON.stringify(positive.execution.controllerResult.levelResults.map((row) => { const loadCase = row.execution.result.loadCaseResults[0]; const evidence = loadCase.solverEvidence; return { method: evidence.method, accepted: evidence.accepted, pivotsLength: Array.isArray(evidence.pivots) ? evidence.pivots.length : null, minimumPivot: evidence.minimumPivot, pivotRatio: evidence.pivotRatio, preconditioner: evidence.preconditioner, iterations: evidence.iterations, iterationLimit: evidence.iterationLimit, initialResidualInfinity: evidence.initialResidualInfinity, finalResidualInfinity: evidence.finalResidualInfinity, convergenceTarget: evidence.convergenceTarget, residualTolerance: evidence.residualTolerance, minimumDiagonal: evidence.minimumDiagonal, diagonalRatio: evidence.diagonalRatio, freeDofCount: loadCase.freeDofIdentities.length, constrainedDofCount: loadCase.constrainedDofIdentities.length }; })));"
           if text.count(marker) != 1:
               raise RuntimeError(f'marker count={text.count(marker)}')
           path.write_text(text.replace(marker, injection, 1))
@@ -43,12 +43,12 @@ jobs:
             > reports/qualification/load-driven-evidence.stdout.log \
             2> reports/qualification/load-driven-evidence.stderr.log
           exit_code=$?
-          detail=$(node -e "const fs=require('fs');const t=fs.readFileSync('reports/qualification/load-driven-evidence.stderr.log','utf8');const line=t.split(/\r?\n/).find(s=>s.startsWith('SOLVER_EVIDENCE='))||t.slice(0,3000);process.stdout.write(line.slice(0,7000))")
+          detail=$(node -e "const fs=require('fs');const t=fs.readFileSync('reports/qualification/load-driven-evidence.stderr.log','utf8');const line=t.split(/\r?\n/).find(s=>s.startsWith('SOLVER_SUMMARY='))||t.slice(0,3000);process.stdout.write(line.slice(0,7000))")
           encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=failure \
-            -f context=lafea/load-driven-evidence/DETAIL \
-            -f description="Captured load-driven solver evidence" \
+            -f context=lafea/load-driven-evidence/SUMMARY \
+            -f description="Captured compact load-driven solver evidence" \
             -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
           exit "$exit_code"
       - if: always()
