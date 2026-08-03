@@ -51,6 +51,48 @@ function junctionBase() {
     { id: 'ED', componentKey: 'P3', fromNodeId: 'C', toNodeId: 'D', entityType: 'PIPE' },
   ] });
 }
+function tieFlipBase(reverseInput) {
+  const nodes = [
+    { id: 'a:1', position: { x: 1000, y: 0, z: 0 }, portKeys: [] },
+    { id: 'a:2', position: { x: 1100, y: 0, z: 0 }, portKeys: [] },
+    { id: 'b:1', position: { x: 2000, y: 0, z: 0 }, portKeys: [] },
+    { id: 'b:2', position: { x: 2100, y: 0, z: 0 }, portKeys: [] },
+    { id: 'z:1', position: { x: 0, y: 1000, z: 0 }, portKeys: [] },
+    { id: 'z:2', position: { x: 100, y: 1000, z: 0 }, portKeys: [] },
+    { id: 'z:3', position: { x: 200, y: 1000, z: 0 }, portKeys: [] },
+  ];
+  const edges = [
+    { id: 'E:A', componentKey: 'A', fromNodeId: 'a:1', toNodeId: 'a:2', entityType: 'PIPE' },
+    { id: 'E:B', componentKey: 'B', fromNodeId: 'b:1', toNodeId: 'b:2', entityType: 'PIPE' },
+    { id: 'E:Z1', componentKey: 'Z1', fromNodeId: 'z:1', toNodeId: 'z:2', entityType: 'PIPE' },
+    { id: 'E:Z2', componentKey: 'Z2', fromNodeId: 'z:2', toNodeId: 'z:3', entityType: 'PIPE' },
+  ];
+  return canonical({ nodes: reverseInput ? nodes.toReversed() : nodes,
+    edges: reverseInput ? edges.toReversed() : edges });
+}
+function lineBase(nodeIds) {
+  return canonical({
+    nodes: nodeIds.map((id, index) => ({ id, position: { x: index * 100, y: 0, z: 0 }, portKeys: [] })),
+    edges: nodeIds.slice(1).map((id, index) => ({ id: `E:${index + 1}`,
+      componentKey: `P:${index + 1}`, fromNodeId: nodeIds[index], toNodeId: id,
+      entityType: 'PIPE' })),
+  });
+}
+function equalSizeReplacementBase() {
+  return canonical({ nodes: [
+    { id: 'a:old', position: { x: 0, y: 0, z: 0 }, portKeys: ['P0:port:start'] },
+    { id: 'z:1', position: { x: 100, y: 0, z: 0 }, portKeys: [] },
+    { id: 'z:2', position: { x: 200, y: 0, z: 0 }, portKeys: [] },
+    { id: 'b:1', position: { x: 0, y: 1000, z: 0 }, portKeys: [] },
+    { id: 'b:2', position: { x: 100, y: 1000, z: 0 }, portKeys: [] },
+    { id: 'b:3', position: { x: 200, y: 1000, z: 0 }, portKeys: [] },
+  ], edges: [
+    { id: 'E:P0', componentKey: 'P0', fromNodeId: 'a:old', toNodeId: 'z:1', entityType: 'PIPE' },
+    { id: 'E:P1', componentKey: 'P1', fromNodeId: 'z:1', toNodeId: 'z:2', entityType: 'PIPE' },
+    { id: 'E:B1', componentKey: 'B1', fromNodeId: 'b:1', toNodeId: 'b:2', entityType: 'PIPE' },
+    { id: 'E:B2', componentKey: 'B2', fromNodeId: 'b:2', toNodeId: 'b:3', entityType: 'PIPE' },
+  ] });
+}
 
 test('Wave 3 adds three governed commands without changing the seven-command public source API', () => {
   assert.equal(TOPOLOGY_EDIT_NATIVE_COMMANDS.length, 7);
@@ -114,4 +156,52 @@ test('autofix emits only explicit source-compatible payloads and never the super
   assert.equal(json.includes('bendType'), false);
   assert.equal(json.includes('junctionType'), false);
   assert.equal(json.includes('fraction'), false);
+});
+
+test('[SIMULATED] exact previous-primary tie flips are continuity, independent of input order', () => {
+  const candidates = [false, true].map((reverseInput) => {
+    const base = tieFlipBase(reverseInput);
+    return buildTopologyEditCandidate({ canonicalTopology: base,
+      resolvedCommand: resolved(base, 'MERGE_NODES', { sourceNodeId: 'a:2', targetNodeId: 'b:1' }) });
+  });
+  const previousPrimary = ['z:1', 'z:2', 'z:3'];
+  for (const candidate of candidates) {
+    assert.equal(candidate.afterChecker.issues.some((issue) => issue.kind === 'BRANCH_DISCONNECTED'
+      && issue.nodeIds.length === previousPrimary.length
+      && issue.nodeIds.every((id, index) => id === previousPrimary[index])), true);
+    assert.deepEqual(candidate.checkerDelta.introducedIssues, []);
+  }
+  assert.equal(candidates[0].checkerDelta.checkerDeltaHash,
+    candidates[1].checkerDelta.checkerDeltaHash);
+  assert.equal(candidates[0].candidateDraftHash, candidates[1].candidateDraftHash);
+});
+
+test('[SIMULATED] deleting an edge keeps a genuine primary subset introduced', () => {
+  const base = lineBase(['n:1', 'n:2', 'n:3', 'n:4']);
+  const candidate = buildTopologyEditCandidate({ canonicalTopology: base,
+    resolvedCommand: resolved(base, 'DELETE_EDGE', { edgeId: 'E:2' }) });
+  const introducedBranch = candidate.checkerDelta.introducedIssues.find((issue) => (
+    issue.kind === 'BRANCH_DISCONNECTED'
+  ));
+  assert.deepEqual(introducedBranch.nodeIds, ['n:3', 'n:4']);
+});
+
+test('[SIMULATED] size-only matches and non-branch findings remain introduced', () => {
+  const base = equalSizeReplacementBase();
+  const candidate = buildTopologyEditCandidate({ canonicalTopology: base,
+    resolvedCommand: resolved(base, 'DISCONNECT_ENDPOINT', { edgeId: 'E:P0', endpoint: 'FROM' }) });
+  const previousPrimary = ['a:old', 'z:1', 'z:2'];
+  const equalSizeBranch = candidate.checkerDelta.introducedIssues.find((issue) => (
+    issue.kind === 'BRANCH_DISCONNECTED' && issue.nodeIds.length === previousPrimary.length
+  ));
+  assert.ok(equalSizeBranch);
+  assert.notDeepEqual(equalSizeBranch.nodeIds, previousPrimary);
+  const afterOrphan = candidate.afterChecker.issues.find((issue) => (
+    issue.kind === 'ORPHAN_NODE' && issue.nodeIds.includes('a:old')
+  ));
+  assert.ok(afterOrphan);
+  const introducedOrphan = candidate.checkerDelta.introducedIssues.find((issue) => (
+    issue.id === afterOrphan.id
+  ));
+  assert.deepEqual(introducedOrphan, afterOrphan);
 });
