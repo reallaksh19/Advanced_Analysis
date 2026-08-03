@@ -1,3 +1,4 @@
+import { INACTIVE_ANALYSIS_DOF_BEHAVIOR } from '../linear-fea-contract/model-schema.js';
 import { compareAscii } from './solver-contract.js';
 
 /**
@@ -5,8 +6,8 @@ import { compareAscii } from './solver-contract.js';
  * conflicting constraints reported by node/DOF and connected component.
  *
  * Two independent detectors feed the same failure report:
- *  - a topological one, here, that finds a whole rigid body with no restraint
- *    of any kind touching any of its nodes (the gross case section 15.5 asks
+ *  - a topological one, here, that finds a whole rigid body with no physical
+ *    restraint touching any of its nodes (the gross case section 15.5 asks
  *    for: "a genuine mechanism ... must be caught and reported by node/DOF");
  *  - a numerical one, in `factorization.js`, that reads the LDLT pivots for a
  *    partial mechanism the topology check cannot see (for example a
@@ -65,15 +66,18 @@ export function connectedComponents(model) {
 }
 
 /**
- * Connected components with zero constraints of any kind (FIXED,
+ * Connected components with zero physical constraints (FIXED,
  * PRESCRIBED_SLOT or LINEAR_SPRING) touching any member node: an
  * unconditional rigid-body mechanism, independent of any numerical pivot.
+ * Analysis-only inactive DOFs do not count as physical restraints.
  *
  * @param {object} model Sealed `fea-linear-model/v1`.
  * @returns {Array<{componentId:string, nodeIds:Array<string>}>}
  */
 export function detectFloatingComponents(model) {
-  const restrainedNodeIds = new Set(model.constraints.map((constraint) => constraint.nodeId));
+  const restrainedNodeIds = new Set(model.constraints
+    .filter((constraint) => constraint.behavior !== INACTIVE_ANALYSIS_DOF_BEHAVIOR)
+    .map((constraint) => constraint.nodeId));
   return connectedComponents(model).filter(
     (component) => !component.nodeIds.some((nodeId) => restrainedNodeIds.has(nodeId)),
   );

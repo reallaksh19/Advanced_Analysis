@@ -95,6 +95,7 @@ export const ASSEMBLY_KEYS = Object.freeze([
   'elementCount',
   'springCount',
   'constrainedDofCount',
+  'inactiveDofCount',
   'freeDofCount',
   'symmetryResidual',
   'partitionHash',

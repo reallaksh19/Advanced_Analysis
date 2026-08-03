@@ -1,6 +1,7 @@
 import { assembleSparseSymmetric } from '../lafea-linear-solve/sparse-matrix.js';
 import { semanticHash } from '../shared-piping-model/canonical-json.js';
 import { ELEMENT_DOF_ORDER } from '../linear-fea-contract/conventions.js';
+import { INACTIVE_ANALYSIS_DOF_BEHAVIOR } from '../linear-fea-contract/model-schema.js';
 import { dofIndexOf } from './dof-map.js';
 import { requireElementContribution } from './element-contributions.js';
 import {
@@ -179,13 +180,15 @@ function assertSymmetryResidual(worst) {
 }
 
 /**
- * Partition the DOF set into free, constrained (FIXED or PRESCRIBED_SLOT,
- * eliminated identically per section 7.2) and springs (which stay free but
- * add stiffness). Section 8 Boundary conditions.
+ * Partition the DOF set into free, physical constraints (FIXED or
+ * PRESCRIBED_SLOT), analysis-only inactive DOFs, and springs (which stay free
+ * but add stiffness). Section 8 Boundary conditions.
  */
 function partitionDofs(model, dofMap) {
   const constrained = model.constraints
-    .filter((constraint) => constraint.behavior === 'FIXED' || constraint.behavior === 'PRESCRIBED_SLOT')
+    .filter((constraint) => constraint.behavior === 'FIXED'
+      || constraint.behavior === 'PRESCRIBED_SLOT'
+      || constraint.behavior === INACTIVE_ANALYSIS_DOF_BEHAVIOR)
     .map((constraint) => ({
       constraintId: constraint.constraintId,
       nodeId: constraint.nodeId,
@@ -200,7 +203,11 @@ function partitionDofs(model, dofMap) {
     if (!constrainedIndices.has(index)) freeIndices.push(index);
   }
   const partitionHash = semanticHash({
-    constrained: constrained.map((entry) => ({ nodeId: entry.nodeId, dof: entry.dof })),
+    eliminated: constrained.map((entry) => ({
+      nodeId: entry.nodeId,
+      dof: entry.dof,
+      role: entry.behavior === INACTIVE_ANALYSIS_DOF_BEHAVIOR ? 'INACTIVE' : 'CONSTRAINED',
+    })),
   });
   return { constrained, freeIndices, partitionHash };
 }
