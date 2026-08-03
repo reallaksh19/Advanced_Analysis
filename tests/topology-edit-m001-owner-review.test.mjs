@@ -61,6 +61,16 @@ test('large-model browser harness projects engineering probes through the render
   assert.match(source, /animationFrameReleased: !backend\.animationFrameId/);
 });
 
+test('support markers consume approved Project Data without local defaulting', async () => {
+  const source = await readFile(
+    new URL('../src/workspace/topology-edit-3d-view-controller-core.js', import.meta.url),
+    'utf8',
+  );
+  assert.match(source, /navigationConfiguration\?\.supportMarkerSize/);
+  assert.match(source, /TOPOLOGY_EDIT_SUPPORT_MARKER_POLICY_MISSING/);
+  assert.match(source, /markerSizeMm: supportMarkerSize/);
+});
+
 class EventTargetFixture {
   constructor() {
     this.listeners = new Map();
