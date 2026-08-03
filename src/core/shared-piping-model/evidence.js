@@ -1,15 +1,18 @@
 import { createDiagnostic, DIAGNOSTIC_SEVERITY, sortDiagnostics } from './diagnostics.js';
+import { createEvidenceIndex, findFirstIndexedEvidence } from './evidence-index.js';
 import { deepFreeze, finiteNumber, isPlainRecord, stringValue } from './immutable.js';
 
-export function collectEvidence(specs, roots, scope) {
+export function collectEvidence(specs, roots, scope, evidenceIndex) {
+  const index = evidenceIndex || createEvidenceIndex(roots);
   const values = {};
   const diagnostics = [];
   Object.entries(specs).forEach(([field, spec]) => {
-    const found = findByAliases(roots, spec.aliases);
+    const found = findFirstIndexedEvidence(index, spec.aliases);
     if (!found) return;
     const normalized = normalizeEvidenceValue(found.value, spec.kind);
-    if (normalized.valid) values[field] = valueEvidence(normalized.value, spec.unit, found);
-    else diagnostics.push(invalidValueDiagnostic(field, found, scope));
+    const sourced = { ...found, sourceKind: rootKind(found.rootPath) };
+    if (normalized.valid) values[field] = valueEvidence(normalized.value, spec.unit, sourced);
+    else diagnostics.push(invalidValueDiagnostic(field, sourced, scope));
   });
   return deepFreeze({ values, diagnostics: sortDiagnostics(diagnostics) });
 }
@@ -46,30 +49,6 @@ export function evidenceValue(evidence) {
   return evidence && Object.prototype.hasOwnProperty.call(evidence, 'value') ? evidence.value : null;
 }
 
-function findByAliases(roots, aliases) {
-  for (const alias of aliases) {
-    const wanted = normalizeKey(alias);
-    for (const [rootPath, root] of roots) {
-      const found = findKey(root, wanted, rootPath, 0);
-      if (found) return found;
-    }
-  }
-  return null;
-}
-
-function findKey(value, wanted, path, depth) {
-  if (!isPlainRecord(value) || depth > 5) return null;
-  const entries = Object.entries(value).sort(([left], [right]) => left.localeCompare(right));
-  for (const [key, child] of entries) {
-    if (normalizeKey(key) === wanted) return { value: child, sourcePath: `${path}.${key}`, sourceKind: rootKind(path) };
-  }
-  for (const [key, child] of entries) {
-    const found = findKey(child, wanted, `${path}.${key}`, depth + 1);
-    if (found) return found;
-  }
-  return null;
-}
-
 function normalizeEvidenceValue(value, kind) {
   if (kind === 'number') {
     const numeric = finiteNumber(value);
@@ -104,8 +83,4 @@ function pointFromValues(xValue, yValue, zValue) {
 
 function rootKind(path) {
   return path.split('.')[0].replace(/^properties\./, '') || 'source';
-}
-
-function normalizeKey(value) {
-  return String(value || '').replace(/[^a-z0-9]/gi, '').toUpperCase();
 }
