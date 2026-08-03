@@ -59,6 +59,7 @@ import {
  * @param {string} args.combinationId Canonical identity of the physical case (or case pair) this check is built from.
  * @param {Readonly<object>} args.frameElementRecord Sealed `fea-linear-frame-element/v1` for the element the code point resolves to.
  * @param {Readonly<object>} args.sectionResolution Sealed `fea-linear-pipe-section-resolution/v1` cited by `frameElementRecord.section` (for outer-diameter geometry only; area/inertia are read off the frame element's own retained section).
+ * @param {Readonly<object>|null} args.sustainedSectionResolution Optional sealed nominal-less-allowances section used only for SUSTAINED stress terms.
  * @param {Readonly<object>} args.materialResolution Sealed `fea-linear-material-resolution/v1` cited by `frameElementRecord.material` (for material identity; evaluation temperature is read off the frame element's own retained material).
  * @param {{fx:number,fy:number,fz:number,mx:number,my:number,mz:number}} args.localAction B-3.4 recovered local action at this code point.
  * @param {{value:number, source:string}|null} args.pressureStressContribution Required (non-null) for SUSTAINED/OCCASIONAL; must be null for DISPLACEMENT_STRESS_RANGE.
@@ -76,6 +77,7 @@ export function compileCodeResult({
   combinationId,
   frameElementRecord,
   sectionResolution,
+  sustainedSectionResolution = null,
   materialResolution,
   localAction,
   pressureStressContribution,
@@ -108,6 +110,25 @@ export function compileCodeResult({
       'CODE_ENGINE_SECTION_MISMATCH',
     );
   }
+
+  let acceptedSustainedSection = null;
+  if (category !== SUSTAINED) {
+    if (sustainedSectionResolution !== null) {
+      fail(
+        'sustainedSectionResolution must be null outside SUSTAINED; nominal-less-allowances properties are not authorised for this category.',
+        'CODE_ENGINE_SUSTAINED_SECTION_OVERRIDE_CATEGORY_MISMATCH',
+      );
+    }
+  } else if (sustainedSectionResolution !== null) {
+    acceptedSustainedSection = requirePipeSectionResolution(sustainedSectionResolution);
+    if (acceptedSustainedSection.dimensions.outerDiameter !== acceptedSection.dimensions.outerDiameter) {
+      fail(
+        'sustainedSectionResolution.dimensions.outerDiameter must exactly match the nominal section outer diameter; an allowance changes wall thickness only.',
+        'CODE_ENGINE_SUSTAINED_SECTION_OVERRIDE_GEOMETRY_MISMATCH',
+      );
+    }
+  }
+
   if (acceptedMaterial.materialState.materialStateId !== element.material.materialStateId) {
     fail(
       'materialResolution.materialState.materialStateId does not match frameElementRecord.material.materialStateId; material identity must be cited from the exact resolution the element was compiled from, never a substitute.',
@@ -169,7 +190,9 @@ export function compileCodeResult({
     );
   }
 
-  const mechanicalProperties = sectionMechanicalProperties(element.section, acceptedSection);
+  const mechanicalProperties = acceptedSustainedSection === null
+    ? sectionMechanicalProperties(element.section, acceptedSection)
+    : sectionMechanicalProperties(acceptedSustainedSection.sectionState, acceptedSustainedSection);
   const resultants = extractResultants(localAction, factorSet.momentDirectionMapping);
 
   let declaredIndices;
