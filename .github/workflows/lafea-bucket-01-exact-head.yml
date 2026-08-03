@@ -1,4 +1,4 @@
-name: Core Application Chunk Profile
+name: Core Application Chunk Repair
 
 on:
   push:
@@ -6,66 +6,105 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   statuses: write
 
 jobs:
-  profile:
+  repair:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: bucket-01-cantilever-benchmark-route
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Profile unassigned core domains
+      - name: Split focused core domains and validate production build
         env:
           GH_TOKEN: ${{ github.token }}
+          ORIGINAL_SHA: ${{ github.sha }}
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p reports/qualification
-          node --input-type=module <<'NODE' > reports/qualification/core-chunk-profile.json
+          fail() {
+            stage="$1"; log="$2"
+            detail=$(node -e "const fs=require('fs');const p=process.argv[1];const t=fs.existsSync(p)?fs.readFileSync(p,'utf8'):'missing log';process.stdout.write(t.split(/\r?\n/).map(s=>s.trim()).filter(Boolean).slice(-35).join(' | ').slice(0,5000))" "$log")
+            encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
+              -f state=failure -f context="lafea/chunk-repair/${stage}" \
+              -f description="Core chunk repair failed at ${stage}" \
+              -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${ORIGINAL_SHA}?lafea_error=${encoded}"
+            exit 1
+          }
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
+            -f state=pending -f context=lafea/chunk-repair \
+            -f description="Validating focused core chunk split"
+
+          python - <<'PY' > reports/qualification/chunk-patch.stdout.log 2> reports/qualification/chunk-patch.stderr.log || true
+          from pathlib import Path
+          path = Path('vite.config.js')
+          text = path.read_text()
+          marker = "  if (source.includes('/src/core/')) return 'core-application';"
+          replacement = """  if (source.includes('/src/core/lafea-application-templates/')) {
+            return 'core-lafea-application-templates';
+          }
+          if (source.includes('/src/core/common-enriched-properties/')) {
+            return 'core-common-enriched-properties';
+          }
+          if (source.includes('/src/core/')) return 'core-application';"""
+          if text.count(marker) != 1:
+              raise RuntimeError(f'marker count={text.count(marker)}')
+          path.write_text(text.replace(marker, replacement, 1))
+          PY
+          [[ -s reports/qualification/chunk-patch.stderr.log ]] \
+            && fail PATCH reports/qualification/chunk-patch.stderr.log
+
+          npm run build \
+            > reports/qualification/chunk-build.stdout.log \
+            2> reports/qualification/chunk-build.stderr.log \
+            || fail BUILD reports/qualification/chunk-build.stdout.log
+
+          node --input-type=module <<'NODE' > reports/qualification/chunk-sizes.json
           import fs from 'node:fs';
           import path from 'node:path';
-          import { manualChunk } from './vite.config.js';
-
-          const root = path.resolve('src/core');
-          const rows = new Map();
-          function walk(directory) {
-            for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-              const target = path.join(directory, entry.name);
-              if (entry.isDirectory()) walk(target);
-              else if (/\.(?:js|mjs|ts)$/u.test(entry.name)) {
-                const chunk = manualChunk(target);
-                if (chunk !== 'core-application') continue;
-                const relative = path.relative(root, target).replaceAll('\\', '/');
-                const domain = relative.includes('/') ? relative.split('/')[0] : '(root)';
-                const row = rows.get(domain) ?? { domain, bytes: 0, files: 0 };
-                row.bytes += fs.statSync(target).size;
-                row.files += 1;
-                rows.set(domain, row);
-              }
-            }
-          }
-          walk(root);
-          const profile = [...rows.values()].sort((a, b) => b.bytes - a.bytes);
-          console.log(JSON.stringify({ totalBytes: profile.reduce((s, r) => s + r.bytes, 0), profile }, null, 2));
+          const assets = path.resolve('dist/assets');
+          const rows = fs.readdirSync(assets)
+            .filter((name) => name.endsWith('.js'))
+            .map((name) => ({ name, bytes: fs.statSync(path.join(assets, name)).size }))
+            .sort((a, b) => b.bytes - a.bytes);
+          console.log(JSON.stringify(rows.slice(0, 12), null, 2));
           NODE
-          detail=$(node -e "const p=require('./reports/qualification/core-chunk-profile.json');process.stdout.write(JSON.stringify({totalBytes:p.totalBytes,top:p.profile.slice(0,18)}))")
-          encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -f state=failure \
-            -f context=lafea/core-chunk-profile/DETAIL \
-            -f description="Profiled core-application source domains" \
-            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
+
+          git add vite.config.js
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix(build): split large core application domains" \
+            > reports/qualification/chunk-commit.stdout.log \
+            2> reports/qualification/chunk-commit.stderr.log \
+            || fail COMMIT reports/qualification/chunk-commit.stderr.log
+          repaired_sha=$(git rev-parse HEAD)
+          git push origin HEAD:bucket-01-cantilever-benchmark-route \
+            > reports/qualification/chunk-push.stdout.log \
+            2> reports/qualification/chunk-push.stderr.log \
+            || fail PUSH reports/qualification/chunk-push.stderr.log
+          largest=$(node -e "const r=require('./reports/qualification/chunk-sizes.json');process.stdout.write(r[0].name+':'+r[0].bytes)")
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
+            -f state=success \
+            -f context="lafea/repaired-head/${repaired_sha:0:12}" \
+            -f description="Focused core chunk split published" \
+            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${repaired_sha}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
+            -f state=success -f context=lafea/chunk-repair \
+            -f description="Production build passed; largest ${largest}"
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: core-application-chunk-profile-${{ github.sha }}
+          name: core-chunk-repair-${{ github.sha }}
           path: reports/qualification/
           if-no-files-found: warn
           retention-days: 30
