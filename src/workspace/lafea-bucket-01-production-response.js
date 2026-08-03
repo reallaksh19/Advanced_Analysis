@@ -7,9 +7,9 @@ import {
 export const LAFEA_BUCKET_01_PRODUCTION_RESPONSE_INPUT_SCHEMA =
   'lafea-bucket-01-production-response-input/v1';
 export const LAFEA_BUCKET_01_PRODUCTION_RESPONSE_EVIDENCE_SCHEMA =
-  'lafea-bucket-01-production-response-evidence/v1';
+  'lafea-bucket-01-production-response-evidence/v2';
 export const LAFEA_BUCKET_01_PRODUCTION_RESPONSE_REVISION =
-  'B01-PRODUCTION-RESPONSE.2';
+  'B01-PRODUCTION-RESPONSE.3';
 
 const INPUT_KEYS = Object.freeze([
   'schema', 'exactHeadSha', 'specHash', 'locationDefinitionHash',
@@ -29,12 +29,14 @@ const TOLERANCE_KEYS = Object.freeze([
   'minimumObservedOrder', 'asymptoticRatioBounds',
 ]);
 const ASYMPTOTIC_KEYS = Object.freeze(['minimum', 'maximum']);
-const EXPECTED_ELEMENT_COUNTS = Object.freeze([64, 256, 1024]);
+const EXPECTED_ELEMENT_COUNTS = Object.freeze([64, 256, 1024, 4096]);
 const EXPECTED_SOLVER_METHODS = Object.freeze([
   'DETERMINISTIC_CHOLESKY',
   'DETERMINISTIC_CHOLESKY',
   'DETERMINISTIC_JACOBI_PCG',
+  'DETERMINISTIC_JACOBI_PCG',
 ]);
+const CONVERGENCE_LEVEL_COUNT = 3;
 
 export function evaluateLafeaBucket01ProductionResponse(inputValue) {
   exactKeys(inputValue, INPUT_KEYS, 'production-response input');
@@ -57,6 +59,7 @@ export function evaluateLafeaBucket01ProductionResponse(inputValue) {
   );
   const tolerances = normalizeTolerances(inputValue.tolerances);
   const levels = normalizeLevels(inputValue.levels);
+  const convergenceLevels = levels.slice(-CONVERGENCE_LEVEL_COUNT);
   const forceScale = Math.max(1, Math.hypot(
     expectedAppliedForce.x,
     expectedAppliedForce.y,
@@ -80,8 +83,8 @@ export function evaluateLafeaBucket01ProductionResponse(inputValue) {
     locationId: 'C2D_LUG_PINHOLE_FULL_MODEL_LC1',
     locationDefinitionHash,
     units: 'N*mm',
-    meshSizes: levels.map((row) => row.meshSize),
-    observations: levels.map((row) => row.totalStrainEnergy),
+    meshSizes: convergenceLevels.map((row) => row.meshSize),
+    observations: convergenceLevels.map((row) => row.totalStrainEnergy),
     gciTolerance: tolerances.strainEnergyGci,
     minimumObservedOrder: tolerances.minimumObservedOrder,
     asymptoticRatioBounds: tolerances.asymptoticRatioBounds,
@@ -134,6 +137,10 @@ export function evaluateLafeaBucket01ProductionResponse(inputValue) {
     momentScale,
     tolerances,
     levelEvidence,
+    energyConvergenceLevelOrdinals: convergenceLevels.map((row) => row.ordinal),
+    energyConvergenceElementCounts: convergenceLevels.map(
+      (row) => row.elementCount,
+    ),
     energyConvergence,
     momentConvergence,
     status,
@@ -141,6 +148,8 @@ export function evaluateLafeaBucket01ProductionResponse(inputValue) {
     authority: {
       fixedProductionMeshLadder: true,
       fixedProductionSolverPolicy: true,
+      finestThreeConvergenceWindow: true,
+      coarseLevelRetainedForTrendAudit: true,
       forceAndMomentComputedFromRetainedNodalVectors: true,
       strainEnergyFromAuthoritativeSolverResult: true,
       externalWorkReconstructedIndependently: true,
@@ -255,8 +264,10 @@ function qualifyLevel(level, expectedForce, expectedMoment, forceScale,
 }
 
 function normalizeLevels(value) {
-  if (!Array.isArray(value) || value.length !== 3) {
-    throw responseError('LAFEA_B01_PRODUCTION_RESPONSE_THREE_LEVELS_REQUIRED');
+  if (!Array.isArray(value) || value.length !== EXPECTED_ELEMENT_COUNTS.length) {
+    throw responseError(
+      'LAFEA_B01_PRODUCTION_RESPONSE_GOVERNED_LADDER_REQUIRED',
+    );
   }
   const levels = [...value].sort((left, right) => left.ordinal - right.ordinal)
     .map((row, index) => {
@@ -289,9 +300,12 @@ function normalizeLevels(value) {
           boolean(row.energyQualificationAccepted, 'energyQualificationAccepted'),
       });
     });
-  if (!(levels[0].meshSize > levels[1].meshSize
-    && levels[1].meshSize > levels[2].meshSize)) {
-    throw responseError('LAFEA_B01_PRODUCTION_RESPONSE_MESH_SIZE_ORDER_INVALID');
+  for (let index = 1; index < levels.length; index += 1) {
+    if (!(levels[index - 1].meshSize > levels[index].meshSize)) {
+      throw responseError(
+        'LAFEA_B01_PRODUCTION_RESPONSE_MESH_SIZE_ORDER_INVALID',
+      );
+    }
   }
   return deepFreeze(levels);
 }
