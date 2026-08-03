@@ -90,13 +90,39 @@ function verifyClosedForm(value, label) {
 function verifyEngineeringTheory(value, label) {
   assert.equal(value.authority?.type, 'ENGINEERING_THEORY', `${label} lacks engineering-theory authority`);
   assert.match(value.authority?.source ?? '', /Timoshenko|beam/iu, `${label} lacks theory source`);
+  assert.equal(value.authority?.smoothedStressUsed, false);
   assert.equal(value.formulation, 'PLANE_STRESS');
+  assert.equal(value.elementType, 'T6');
   assert.equal(value.benchmarkId, 'C2D-CANTILEVER-PLANE-STRESS-01');
+  assert.equal(value.load?.type, 'UNIFORM_END_EDGE_TRACTION');
   assert.ok(Array.isArray(value.meshes) && value.meshes.length >= 3, `${label} lacks refinement ladder`);
+  value.meshes.forEach((row) => {
+    assert.ok(Number.isInteger(row.nx) && row.nx > 0);
+    assert.ok(Number.isInteger(row.ny) && row.ny > 0);
+    assert.equal(row.elementCount, 2 * row.nx * row.ny);
+    assert.ok(['DETERMINISTIC_CHOLESKY', 'DETERMINISTIC_JACOBI_PCG'].includes(row.solverMethod));
+  });
   assert.ok(value.tolerances?.finestDeflectionRatioAbsoluteError > 0);
   assert.ok(value.tolerances?.forceEquilibriumRelative > 0);
   assert.ok(value.tolerances?.momentEquilibriumRelative > 0);
   assert.ok(value.tolerances?.energyRelative > 0);
+
+  const inertia = value.geometry.thickness * value.geometry.depth ** 3 / 12;
+  const area = value.geometry.depth * value.geometry.thickness;
+  const shearModulus = value.material.elasticModulus
+    / (2 * (1 + value.material.poissonRatio));
+  const expectedDeflection = value.load.resultant * value.geometry.length ** 3
+    / (3 * value.material.elasticModulus * inertia)
+    + value.load.resultant * value.geometry.length
+      / (value.shearCorrectionFactor * shearModulus * area);
+  close(value.expected.referenceDeflection, expectedDeflection, `${label} reference deflection`);
+  close(
+    value.expected.appliedMomentZ,
+    -value.load.resultant * value.geometry.length,
+    `${label} applied moment`,
+  );
+  assert.deepEqual(value.expected.horizontalAppliedForce, { x: 0, y: -value.load.resultant });
+  assert.deepEqual(value.expected.verticalAppliedForce, { x: value.load.resultant, y: 0 });
   verifyNoProductionDerivedExpectedValues(value, label);
 }
 
@@ -126,4 +152,8 @@ function collectProductionMarkers(value, pathValue = '', rows = []) {
     collectProductionMarkers(child, current, rows);
   }
   return rows;
+}
+function close(actual, expected, label) {
+  const scale = Math.max(Math.abs(actual), Math.abs(expected), 1e-30);
+  assert.ok(Math.abs(actual - expected) / scale <= 1e-14, `${label}: ${actual} != ${expected}`);
 }
