@@ -27,3 +27,7 @@ test-results/
 *.sln
 *.sw?
 slice-r-final.patch
+
+# Claude Code harness-internal state (e.g. background-agent worktrees under
+# .claude/worktrees/) - not project source.
+.claude/
