@@ -38,6 +38,7 @@ assert.equal(Object.isFrozen(sealed), true, 'extractBranchSubset must return a s
 assert.equal(Object.isFrozen(sealed.boundaryPorts), true, 'sealed manifest children must be immutable');
 
 const routePartition = buildRoutePartitionModel(dataset, profile);
+assert.equal(routePartition.status, 'READY', 'the declared topology profile must not leave route partitioning blocked');
 const realRouteIds = routePartition.routes
   .filter((route) => route.branchId === branchId)
   .map((route) => route.routeId)
@@ -52,8 +53,16 @@ assert.deepEqual(sealed.boundaryPorts, [
     treatment: 'DECLARED_BOUNDARY',
   },
   {
+    // Owner-verified: /ASIM-1885-PL-8"-S8810104-01/B1 does not exist as a
+    // real branch anywhere in this dataset, and no entity anywhere in the
+    // dataset shares this point. The Work Pack issue's acceptance oracle
+    // carried this value forward from M008-A's own hand-constructed
+    // w11.2 fixture, which used it as illustrative free text for a field
+    // the branch-subset contract never validates against real geometry
+    // (only that the node itself qualifies as a boundary). This is a
+    // genuine physical terminus, not a cross-branch connection.
     nodeId: 'port:445580.151|-1165803.2|3209.55',
-    externalReference: '/ASIM-1885-PL-8"-S8810104-01/B1',
+    externalReference: 'NONE:PHYSICAL_TERMINUS',
     treatment: 'DECLARED_BOUNDARY',
   },
 ]);
@@ -92,7 +101,12 @@ function makeProfile() {
       ...empty.topology,
       portMatchToleranceMm: approved(1),
       autoCarrierCoincidenceToleranceMm: approved(1),
-      routeJoiningRules: approved({ mode: 'EXACT' }),
+      routeJoiningRules: approved({
+        partition: 'branch-scoped-connected-components',
+        chainage: 'exact-port-topology',
+        sourceOrderAllowed: false,
+        degreeAboveTwo: 'BLOCKED',
+      }),
     },
   };
 }
