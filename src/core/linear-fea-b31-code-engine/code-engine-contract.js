@@ -25,10 +25,10 @@ import {
  * allowable stress, weld/joint factor, occasional duration factor,
  * displacement-range coefficient and B31J index/SIF arrives as a
  * caller-declared `{value, source}` entry inside a caller-supplied
- * `fea-b31-edition-dataset/v1` or `fea-b31-stress-factor-set/v1` record; this
- * module implements only the generic combination arithmetic (F/A, M/Z, a
- * weighted cold/hot range, an SRSS bending+torsion fold) under a symbolic
- * named rule ID, never a licensed formula's actual coefficients.
+ * `fea-b31-edition-dataset/v1` or `fea-b31-stress-factor-set/v1` record. The
+ * package implements generic beam-stress arithmetic and the published
+ * ASME B31.3-2006 para. 302.3.5(d) Eq. (1b) combination structure; it embeds
+ * no licensed table values and never substitutes caller authorities.
  * ---------------------------------------------------------------------------
  *
  * This module is a pure consumer: it cites B-3.4 recovered resultants and
@@ -102,7 +102,12 @@ export const STRESS_CATEGORIES = Object.freeze([
 ]);
 /** Categories this phase actually evaluates; the rest are explicitly refused
  * (never silently ignored) rather than shallow-implemented. */
-export const IMPLEMENTED_STRESS_CATEGORIES = Object.freeze([SUSTAINED, OCCASIONAL, DISPLACEMENT_STRESS_RANGE]);
+export const IMPLEMENTED_STRESS_CATEGORIES = Object.freeze([
+  SUSTAINED,
+  OCCASIONAL,
+  DISPLACEMENT_STRESS_RANGE,
+  EXPANSION_RANGE_ENVELOPE,
+]);
 
 /** Section 10.7: the exact status vocabulary; never a generic compliance badge. */
 export const STATUS_QUALIFIED = 'QUALIFIED UNDER CONFIGURED PROFILE';
