@@ -347,7 +347,7 @@ function evaluateFixedLocation(definition, levelsValue) {
   const gciTolerance = definition.zone === 'HIGH_GRADIENT'
     ? spec.tolerances.highGradientGciMax
     : spec.tolerances.nonSingularGciMax;
-  const convergence = evaluateLafeaBucket01StressConvergence({
+  const stressConvergenceEvidence = evaluateLafeaBucket01StressConvergence({
     schema: LAFEA_BUCKET_01_STRESS_CONVERGENCE_INPUT_SCHEMA,
     exactHeadSha,
     probeEvidences,
@@ -358,7 +358,7 @@ function evaluateFixedLocation(definition, levelsValue) {
   });
   assert.equal(
     validateLafeaBucket01StressConvergenceEvidence(
-      convergence,
+      stressConvergenceEvidence,
       probeEvidences,
     ).ok,
     true,
@@ -385,9 +385,10 @@ function evaluateFixedLocation(definition, levelsValue) {
       (row) => row.semanticHash,
     ),
     fixedProbeEvidenceHashes: probeEvidences.map((row) => row.semanticHash),
-    convergence,
+    convergence: stressConvergenceEvidence.convergence,
+    stressConvergenceEvidenceHash: stressConvergenceEvidence.semanticHash,
     gciTolerance,
-    status: convergence.status,
-    reasons: convergence.reasons,
+    status: stressConvergenceEvidence.status,
+    reasons: stressConvergenceEvidence.reasons,
   };
 }
