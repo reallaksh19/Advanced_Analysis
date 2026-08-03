@@ -6,7 +6,7 @@ import { normalizeWorkspaceDataset } from '../src/workspace/dataset-adapter.js';
 
 const options = parseArguments(process.argv.slice(2));
 const fixturePath = path.resolve(options.fixture);
-const fixtureName = path.relative(process.cwd(), fixturePath) || path.basename(fixturePath);
+const fixtureName = normalizedPath(path.relative(process.cwd(), fixturePath) || path.basename(fixturePath));
 const sourceBytes = await readFile(fixturePath);
 const sourceText = sourceBytes.toString('utf8');
 const sourceSha256 = sha256(sourceBytes);
@@ -48,6 +48,10 @@ function parseArguments(args) {
     throw new TypeError('--max-normalize-ms must be a positive finite number.');
   }
   return { fixture, maxNormalizeMs };
+}
+
+function normalizedPath(value) {
+  return value.split(path.sep).join('/');
 }
 
 function sha256(value) {
