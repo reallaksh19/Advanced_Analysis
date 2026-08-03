@@ -1,0 +1,47 @@
+name: LAFEA Bucket-01 Exact Head
+
+on:
+  push:
+    branches:
+      - bucket-01-cantilever-benchmark-route
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lafea-bucket-01-exact-head-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  exact-head:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run Bucket-01 exact-head gate
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        run: node scripts/lafea-bucket-01-exact-head-check.mjs
+
+      - name: Retain qualification reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-bucket-01-exact-head-${{ github.sha }}
+          path: reports/qualification/
+          if-no-files-found: warn
+          retention-days: 30
