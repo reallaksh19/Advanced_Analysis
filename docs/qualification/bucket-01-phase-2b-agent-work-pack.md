@@ -2,7 +2,7 @@
 
 ## Objective
 
-Implement and verify a **candidate-only** nonuniform probe-stable T6 annular mesh generator from the frozen Phase 2 design at exact prerequisite head `be956bc8fba59c50c64c2b6f621ecda4e24e4d2b`.
+Implement and verify a **candidate-only** nonuniform probe-stable T6 annular mesh generator from the frozen Phase 2A Design V2.
 
 This work must not replace the governed production mesh, change acceptance criteria, or claim Bucket-01 qualification.
 
@@ -24,6 +24,19 @@ The current Phase 2 design produces these candidate element counts:
 
 These counts are candidate-design evidence, not production acceptance values.
 
+## Design V2 correction
+
+Design V1 placed every circumferential midside on an analytic circular arc. The Level-1 combination of a thin radial cell and a 22.5-degree background sector inverted the curved internal edge of `E-R10-S18-B`.
+
+Design V2 changes only the midside geometry policy:
+
+- hole-boundary circumferential midsides: analytic circular arc;
+- outer-boundary circumferential midsides: analytic circular arc;
+- internal circumferential midsides: straight chord midpoint;
+- radial and diagonal midsides: straight chord midpoint.
+
+Internal radial rings are mesh partitions, not physical circular boundaries. No physical boundary geometry, axis coordinate, anchor window, phase, frozen location, candidate count, tolerance, load, solver criterion, or authority field is changed.
+
 ## Required implementation
 
 Create a bounded generator, preferably:
@@ -36,11 +49,12 @@ The generator must:
 1. Consume the radial and circumferential coordinate arrays produced by the frozen axis planner.
 2. Generate one conforming annular tensor-product cell grid split into the same counter-clockwise T6 `A`/`B` triangles as the current generator.
 3. Share midside nodes by exact edge identity.
-4. Place circumferential midsides on the analytic circular arc and radial/diagonal midsides on straight chords.
+4. Apply the Design V2 midside geometry policy exactly: analytic arc midsides only on the physical hole and outer boundaries; straight-chord midsides on internal circumferential, radial, and diagonal edges.
 5. Preserve exact feature lines at 0°, 90°, 180°, and 270°.
 6. Retain explicit axis-cell metadata, anchor-cell IDs, and parent anchor-cell IDs in a candidate mesh sidecar. Do not infer nonuniform parentage using `floor(fineIndex / ratio)`.
 7. Produce deterministic package and semantic hashes and support exact rebuild validation.
-8. Keep all authority fields explicit:
+8. Bind the package to `B01-PROBE-STABLE-POLAR-V2` and retain the midside geometry policy in semantic custody.
+9. Keep all authority fields explicit:
    - `productionMeshAuthority: false`
    - `stressAcceptanceAuthority: false`
    - `qualificationAuthority: false`
@@ -70,12 +84,15 @@ Use the existing T6 quality utilities and report at every candidate level:
 
 - minimum scaled Jacobian;
 - minimum integration-point Jacobian;
+- minimum dense-sampled Jacobian and non-positive sample count;
 - maximum aspect ratio;
 - minimum corner angle;
 - integrated area and relative area error;
 - hole and outer-boundary radius errors.
 
-Use existing governed quality limits where already defined. Do not introduce a new acceptance threshold merely to pass the candidate.
+Every element must retain positive corner-scaled, integration-point, and dense-sampled Jacobians. Use existing governed quality limits where already defined. Do not introduce a new acceptance threshold merely to pass the candidate.
+
+The candidate check must also prove that analytic circular midsides occur only on the two physical circular boundaries and that internal circumferential midsides equal exact chord midpoints.
 
 ## Required negative cases
 
@@ -88,7 +105,9 @@ The candidate check must reject:
 - a probe anchor emitted as a gridline;
 - overlapping anchor windows;
 - non-positive Jacobian;
-- tampered coordinate or mesh hashes;
+- analytic-arc midside placement on an internal circumferential edge;
+- straight-chord midside placement on the hole or outer physical boundary;
+- tampered coordinate, geometry-policy, or mesh hashes;
 - a candidate package presented as production-authoritative.
 
 ## Scope boundary
@@ -124,4 +143,4 @@ A full exact-head run remains required after integration. No command not actuall
 
 ## Exit gate
 
-Phase 2B is complete only when the candidate mesh package and retained topology report pass all four levels while production authority remains false. The subsequent Phase 2C work will decide whether to integrate the candidate family into governed production execution and will require an exact-head numerical replay.
+Phase 2B is complete only when the Design V2 candidate mesh package, executed rebuild evidence, retained topology report, and topology recomputation evidence pass all four levels while production authority remains false. The subsequent Phase 2C work will decide whether to integrate the candidate family into governed production execution and will require an exact-head numerical replay.
