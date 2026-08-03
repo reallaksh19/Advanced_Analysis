@@ -39,8 +39,8 @@ current source — do not trust the document alone.
 | M006 | #451 | #456 | Merged (Owner-fixed) | System-level closed-form thermal expansion benchmarks (`lfea-b3.8`, free + restrained uniform heating) — real B-2.5→B-3.4 chain, not a hand-reconstruction |
 | M007 | #452 | #457 | Merged (Owner-fixed) | Real production gap closed: `GRAVITY`/`PIPE_WALL` now expands to equivalent element UDLs via B-3.1 machinery, not just validated at declaration level; closed-form benchmark at `lfea-b3.9` |
 | (direct fix, no WP) | — | #461 | Merged | `check:lfea-linear-core` now completes end to end for the first time since M001 — replaced its dependency on a deleted, non-functional CI workflow file with the mechanisms that actually keep the workspace-integration check and its e2e spec wired in |
-| M008 | #463 | — | Prequalification answered, verified, and approved (Owner spot-checked all load-bearing claims) | Benchmark B — governed analysis-authority overlay for the real 1885 project. Real candidate branch confirmed: `/ASIM-1885-8"-S8810103-91261M7-HC-01/B1`, 16 entities, zero missing-attribute diagnostics (8 clean branches exist total). Split into M008-A/B/C/D; M008-A now live as #468 |
-| M008-A | #468 | — | Ready | Overlay + branch-subset contracts only (schema/validation/hashing, no extraction algorithm, no solver wiring) — first slice of the M008 split |
+| M008 | #463 | — | Prequalification answered, verified, and approved (Owner spot-checked all load-bearing claims) | Benchmark B — governed analysis-authority overlay for the real 1885 project. Real candidate branch confirmed: `/ASIM-1885-8"-S8810103-91261M7-HC-01/B1`, 16 entities, zero missing-attribute diagnostics (8 clean branches exist total). Split into M008-A/B/C/D |
+| M008-A | #468 | #472 | Merged | `analysis-authority-overlay/v1` + `workspace-branch-subset/v1` contracts (schema/validation/hashing only) at `check:w11.1`/`check:w11.2`. Every anti-drift addendum rule genuinely implemented; all fail-closed cases exercised against the real Owner-verified 16-entity target branch. No fixes needed on Owner review |
 | M009 | #464 | #471 | Merged | B-4.0's `calculatedStress` confirmed real, production-wired, and already displayed/exported — not a gap. Broad "implement stress recovery" declined (no mandate text to justify scope beyond what exists); pressure-stress-from-geometry and EditionDataset-import gaps logged but not authorized. Closed-form verification benchmark added at `lfea-b4.1` (#469), Owner-validated including hand-verified arithmetic |
 
 ### Non-LFEA workstreams (user-directed pivot, 4 parallel read-only audits + direct fixes)
@@ -80,23 +80,31 @@ coverage is now 12/20 mandate cases. Both PRs needed Owner-side fixes the
 implementing agents' repository-less sandboxes could not have caught
 themselves — see process notes below.
 
-**M008 — prequalification complete, verified, approved. M008-A ready
-(#468).** Benchmark B — the governed analysis-authority overlay contract
-(materials, sections, supports, load cases) for the real 1885 project. The
-agent's prequalification answer on #463 was independently verified by the
-Owner (re-ran its branch-scan reproduction script directly, spot-checked its
+**M008 — M008-A done (#468, merged as PR #472). M008-B not yet scoped.**
+Benchmark B — the governed analysis-authority overlay contract (materials,
+sections, supports, load cases) for the real 1885 project. The agent's
+prequalification answer on #463 was independently verified by the Owner
+(re-ran its branch-scan reproduction script directly, spot-checked its
 source citations) before being accepted — every checked claim held up
 exactly. Real candidate branch confirmed clean: `/ASIM-1885-8"-S8810103-91261M7-HC-01/B1`,
 16 entities, zero `MISSING_ATTRIBUTE` diagnostics (8 such clean branches
 exist out of 13 total, so this wasn't cherry-picked). No per-object overlay
 schema existed anywhere before this; the agent proposed one, reusing
 `project-data-contract.js`'s `{ value, evidence, approved }` shape at
-per-entity/per-branch scope. Owner accepted the proposed 4-way split
-(M008-A contracts → M008-B extraction → M008-C material/section/support
-resolution → M008-D production integration) rather than one large mission,
-and authorized only M008-A so far — each subsequent slice gets its own
-Work Pack once the prior one merges and is Owner-validated. This remains the
-single highest-mandate-value remaining item and the prerequisite for P12.
+per-entity/per-branch scope, now real and merged as
+`analysis-authority-overlay/v1` + `workspace-branch-subset/v1`
+(`src/workspace/analysis-authority-overlay/`). Owner accepted the proposed
+4-way split (M008-A contracts → M008-B extraction → M008-C material/
+section/support resolution → M008-D production integration) rather than one
+large mission; M008-A's own Owner review needed no fixes — every anti-drift
+addendum rule was genuinely implemented (not just present as dead code) and
+every fail-closed case was exercised against the real target branch.
+M008-B (the branch-extraction algorithm populating a `workspace-branch-
+subset/v1` manifest's `entityIds`/`routeIds`/`boundaryPorts` from a real
+dataset, handling the adjacent-branch-boundary edge case the subset
+contract's own validator already anticipates) is the next slice, not yet
+scoped as its own Work Pack issue. This remains the single highest-mandate-
+value remaining item and the prerequisite for P12.
 
 **M009 — done.** Stress recovery for frame/pipe elements (mandate
 §13.3, no saved verbatim text found — the working definition used was
