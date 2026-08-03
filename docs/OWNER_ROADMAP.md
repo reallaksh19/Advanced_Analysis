@@ -42,6 +42,7 @@ current source — do not trust the document alone.
 | M008 | #463 | — | Prequalification answered, verified, and approved (Owner spot-checked all load-bearing claims) | Benchmark B — governed analysis-authority overlay for the real 1885 project. Real candidate branch confirmed: `/ASIM-1885-8"-S8810103-91261M7-HC-01/B1`, 16 entities, zero missing-attribute diagnostics (8 clean branches exist total). Split into M008-A/B/C/D |
 | M008-A | #468 | #472 | Merged | `analysis-authority-overlay/v1` + `workspace-branch-subset/v1` contracts (schema/validation/hashing only) at `check:w11.1`/`check:w11.2`. Every anti-drift addendum rule genuinely implemented; all fail-closed cases exercised against the real Owner-verified 16-entity target branch. No fixes needed on Owner review |
 | M008-B | #475 | #477 | Merged | `extractBranchSubset` — branch-extraction algorithm populating `entityIds`/`routeIds`/`supportEntityIds`/`boundaryPorts` from real `normalizeWorkspaceDataset` output via genuine `buildRoutePartitionModel` reuse, sealed through M008-A's real contract. Algorithm needed no fixes; Owner review found and fixed one wrong value in the acceptance oracle *this repo's own docs* had specified — see process note below |
+| M008-C | #480 | — | Ready | Material/section authority resolution (real `MTXX`/`DTXR`/`ABORE` parsing → real B-2.2/B-2.3 sealed resolutions) for the branch's actual pipe/fitting entities only (ELBO/FLAN/PIPE, incl. auto-generated-pipe inheritance); gaskets, supports, and compound valve-trim materials explicitly deferred. Grounded in a direct real-attribute survey of all 16 target-branch entities before the issue was written |
 | M009 | #464 | #471 | Merged | B-4.0's `calculatedStress` confirmed real, production-wired, and already displayed/exported — not a gap. Broad "implement stress recovery" declined (no mandate text to justify scope beyond what exists); pressure-stress-from-geometry and EditionDataset-import gaps logged but not authorized. Closed-form verification benchmark added at `lfea-b4.1` (#469), Owner-validated including hand-verified arithmetic |
 
 ### Non-LFEA workstreams (user-directed pivot, 4 parallel read-only audits + direct fixes)
@@ -110,9 +111,32 @@ algorithm itself needed no fixes and even improved on the issue's own spec
 (tracks *which* external branch touches a boundary point, fails closed on
 ambiguity). Owner review did find and fix two defects — both self-inflicted,
 in the acceptance oracle and profile the issue itself specified, not in the
-agent's work; see the process note below. M008-C (material/section/support
-raw-evidence resolution) is the next slice, not yet scoped. This remains the
-single highest-mandate-value remaining item and the prerequisite for P12.
+agent's work; see the process note below.
+
+**M008-C (#480) is now live.** Before writing the issue, directly surveyed
+every one of the target branch's 16 real entities' raw attributes (`MTXX`,
+`DTXR`, `ABORE`/`LBORE`) rather than assuming the original M008-A prequalification's
+open question ("does a schedule/NPS lookup exist?") — it doesn't, but the
+raw signal turned out richer than expected: real specific ASTM grades
+(`ASTM A234-WPB`, `ASTM A105`), not the generic `/CARBON/STEEL` the earlier
+research sample suggested, and real embedded `Sch NNN` schedule text. Of the
+16 entities, only 6 are real pipe/fitting components needing material/section
+authority (2 elbows, 1 flange, 1 gasket, 2 auto-generated pipe segments); 9
+are supports (different resolution problem, deferred) and 1 is the branch
+record itself. Scoped M008-C narrowly to just the 5 resolvable pipe/fitting
+entities (gasket explicitly excluded — not independently meshed), with a
+concrete inheritance rule for the 2 auto-generated segments (which carry no
+material/section signal of their own) and an explicit fail-closed rule for
+compound multi-material valve-trim descriptions (out of scope, not silently
+approximated). Material/section table values are real, not `FIXTURE-NOT-ASME`
+— this repo's own precedent already treats basic carbon-steel bulk
+mechanical properties and standard pipe dimensions as ordinary public
+engineering data (the existing `CS_A106B`/`SEC-NPS6-SCH40` fixtures carry no
+such disclaimer), unlike B31.3 allowable-stress/SIF tables which require the
+licensed code book. M008-D (composing this into the overlay's
+`authorityRecords`/`assignments` shape, plus wiring into the production
+chain) remains unscoped. This remains the single highest-mandate-value
+remaining item and the prerequisite for P12.
 
 **M009 — done.** Stress recovery for frame/pipe elements (mandate
 §13.3, no saved verbatim text found — the working definition used was
