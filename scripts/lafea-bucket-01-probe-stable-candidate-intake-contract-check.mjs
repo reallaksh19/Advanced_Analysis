@@ -21,6 +21,8 @@ const design = JSON.parse(fs.readFileSync(
   ),
   'utf8',
 ));
+assert.equal(design.designId, 'B01-PROBE-STABLE-POLAR-V3');
+assert.deepEqual(design.radialAxis.protectedBreakpoints, [60]);
 const designHash = canonicalLafeaSha256(design);
 const candidatePackage = buildCandidatePackage();
 const topologyReport = buildTopologyReport(candidatePackage.semanticHash);
@@ -46,10 +48,18 @@ assert.equal(
   'CANDIDATE_ACCEPTED_FOR_PHASE_2C_INTEGRATION_REVIEW',
 );
 assert.equal(evidence.levels.length, 4);
+assert.equal(evidence.levels[3].elementCount, 14256);
 assert.equal(evidence.expectedLocationCount, 7);
 assert.equal(evidence.minimumCandidateNaturalMargin, 0.05);
 assert.equal(evidence.authority.candidateRebuildValidationExecuted, true);
 assert.equal(evidence.authority.topologyRecomputationExecuted, true);
+assert.equal(evidence.authority.mappingWindowRecomputed, true);
+assert.equal(evidence.authority.executedRecomputation, true);
+assert.equal(evidence.authority.independentCheckerExecution, false);
+assert.equal(
+  evidence.authority.independentCheckerRequiredBeforeReplayAdjudication,
+  true,
+);
 assert.equal(evidence.authority.productionSwitchAuthorized, false);
 assert.equal(evidence.authority.productionSwitchApplied, false);
 assert.equal(evidence.authority.productionMeshAuthority, false);
@@ -72,6 +82,28 @@ assert.throws(
   hasCode('LAFEA_B01_PROBE_STABLE_CANDIDATE_VALIDATION_INCOMPLETE'),
 );
 
+const mappingNotRecomputed = clone(candidateValidationEvidence);
+mappingNotRecomputed.mappingWindowRecomputed = false;
+rehash(mappingNotRecomputed);
+assert.throws(
+  () => evaluateLafeaBucket01ProbeStableCandidateIntake({
+    ...input,
+    candidateValidationEvidence: mappingNotRecomputed,
+  }),
+  hasCode('LAFEA_B01_PROBE_STABLE_CANDIDATE_VALIDATION_INCOMPLETE'),
+);
+
+const recomputationFlagFalse = clone(candidateValidationEvidence);
+recomputationFlagFalse.authority.executedRecomputation = false;
+rehash(recomputationFlagFalse);
+assert.throws(
+  () => evaluateLafeaBucket01ProbeStableCandidateIntake({
+    ...input,
+    candidateValidationEvidence: recomputationFlagFalse,
+  }),
+  hasCode('LAFEA_B01_PROBE_STABLE_VALIDATION_RECOMPUTATION_NOT_EXECUTED'),
+);
+
 const escalated = clone(candidatePackage);
 escalated.authority.productionMeshAuthority = true;
 rehash(escalated);
@@ -84,7 +116,7 @@ assert.throws(
 );
 
 const wrongCount = clone(candidatePackage);
-wrongCount.levels[3].elementCount = 16384;
+wrongCount.levels[3].elementCount = 13992;
 rehash(wrongCount);
 assert.throws(
   () => evaluateLafeaBucket01ProbeStableCandidateIntake({
@@ -92,6 +124,17 @@ assert.throws(
     candidatePackage: wrongCount,
   }),
   hasCode('LAFEA_B01_PROBE_STABLE_PACKAGE_LEVEL_INVALID'),
+);
+
+const invalidMappingHash = clone(candidatePackage);
+invalidMappingHash.levels[0].mappingWindowHash = 'not-a-hash';
+rehash(invalidMappingHash);
+assert.throws(
+  () => evaluateLafeaBucket01ProbeStableCandidateIntake({
+    ...input,
+    candidatePackage: invalidMappingHash,
+  }),
+  hasCode('LAFEA_B01_PROBE_STABLE_INTAKE_HASH_INVALID'),
 );
 
 const lowMargin = clone(topologyReport);
@@ -133,9 +176,9 @@ for (const sourcePath of [
 ]) {
   const source = fs.readFileSync(new URL(sourcePath, import.meta.url), 'utf8');
   assert.equal(
-    source.includes('generateLafeaLugPinholeProbeStableT6Mesh'),
+    source.includes('generateLafeaLugPinholeProbeStableT6MeshV3'),
     false,
-    `${sourcePath} prematurely imports candidate generator`,
+    `${sourcePath} prematurely imports Design V3 candidate generator`,
   );
   assert.equal(
     source.includes(LAFEA_BUCKET_01_PROBE_STABLE_CANDIDATE_PACKAGE_SCHEMA),
@@ -145,7 +188,7 @@ for (const sourcePath of [
 }
 
 console.log(
-  'PASS LAFEA Bucket-01 probe-stable candidate intake contract checks',
+  'PASS LAFEA Bucket-01 Design V3 candidate intake contract checks',
 );
 
 function buildCandidatePackage() {
@@ -153,11 +196,11 @@ function buildCandidatePackage() {
     [1, 12, 20, 480],
     [2, 17, 35, 1190],
     [3, 30, 68, 4080],
-    [4, 53, 132, 13992],
+    [4, 54, 132, 14256],
   ];
   const base = {
     schema: LAFEA_BUCKET_01_PROBE_STABLE_CANDIDATE_PACKAGE_SCHEMA,
-    producerRevision: 'B01-PROBE-STABLE-CANDIDATE.1',
+    producerRevision: 'B01-PROBE-STABLE-CANDIDATE.3',
     exactHeadSha: head,
     designHash,
     levels: counts.map(([
@@ -175,6 +218,7 @@ function buildCandidatePackage() {
       circumferentialCoordinateHash: syntheticHash(`angle-${ordinal}`),
       featureSetHash: syntheticHash(`feature-${ordinal}`),
       qualityHash: syntheticHash(`quality-${ordinal}`),
+      mappingWindowHash: syntheticHash(`mapping-window-${ordinal}`),
       status: 'PASS',
     })),
     status: 'PASS',
@@ -195,7 +239,7 @@ function buildCandidatePackage() {
 function buildTopologyReport(candidatePackageHash) {
   const base = {
     schema: LAFEA_BUCKET_01_PROBE_STABLE_CANDIDATE_TOPOLOGY_REPORT_SCHEMA,
-    producerRevision: 'B01-PROBE-STABLE-TOPOLOGY.1',
+    producerRevision: 'B01-PROBE-STABLE-TOPOLOGY.3',
     exactHeadSha: head,
     designHash,
     candidatePackageHash,
@@ -232,7 +276,7 @@ function buildTopologyReport(candidatePackageHash) {
 function buildCandidateValidationEvidence(candidatePackageHash) {
   const base = {
     schema: LAFEA_BUCKET_01_PROBE_STABLE_CANDIDATE_VALIDATION_EVIDENCE_SCHEMA,
-    producerRevision: 'B01-PROBE-STABLE-CANDIDATE-CHECK.1',
+    producerRevision: 'B01-PROBE-STABLE-CANDIDATE-RECOMPUTATION.3',
     exactHeadSha: head,
     designHash,
     candidatePackageHash,
@@ -241,6 +285,7 @@ function buildCandidateValidationEvidence(candidatePackageHash) {
     coordinateHashesRebuilt: true,
     featureSetHashesRebuilt: true,
     qualityHashesRebuilt: true,
+    mappingWindowRecomputed: true,
     status: 'PASS',
     reasons: [],
     authority: validationAuthority(),
@@ -252,7 +297,7 @@ function buildTopologyValidationEvidence(candidatePackageHash,
   topologyReportHash) {
   const base = {
     schema: LAFEA_BUCKET_01_PROBE_STABLE_TOPOLOGY_VALIDATION_EVIDENCE_SCHEMA,
-    producerRevision: 'B01-PROBE-STABLE-TOPOLOGY-CHECK.1',
+    producerRevision: 'B01-PROBE-STABLE-TOPOLOGY-RECOMPUTATION.3',
     exactHeadSha: head,
     designHash,
     candidatePackageHash,
@@ -269,7 +314,8 @@ function buildTopologyValidationEvidence(candidatePackageHash,
 
 function validationAuthority() {
   return {
-    independentCheckerExecution: true,
+    executedRecomputation: true,
+    independentCheckerExecution: false,
     productionSwitchApplied: false,
     productionMeshAuthority: false,
     stressAcceptanceAuthority: false,
