@@ -10,15 +10,21 @@ permissions:
   contents: read
   statuses: write
 
-concurrency:
-  group: lafea-bucket-01-exact-head-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
   exact-head:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
+      - name: Publish runner-started status
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh api --method POST
+          "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}"
+          -f state=pending
+          -f context=lafea/bucket-01-exact-head
+          -f description="Runner started"
+
       - name: Checkout exact candidate
         uses: actions/checkout@v4
         with:
@@ -33,51 +39,31 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Run Bucket-01 exact-head gate
-        id: exact_head
+      - name: Run and publish exact-head result
         env:
           EXPECTED_HEAD_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          mkdir -p reports/qualification
           set +e
           node scripts/lafea-bucket-01-exact-head-check.mjs \
             > reports/qualification/lafea-bucket-01-exact-head.stdout.log \
             2> reports/qualification/lafea-bucket-01-exact-head.stderr.log
           exit_code=$?
-          echo "exit_code=${exit_code}" >> "$GITHUB_OUTPUT"
-          exit 0
-
-      - name: Publish exact-head commit status
-        env:
-          GH_TOKEN: ${{ github.token }}
-          EXIT_CODE: ${{ steps.exact_head.outputs.exit_code }}
-        shell: bash
-        run: |
-          set -e
-          if [[ "$EXIT_CODE" == "0" ]]; then
+          if [[ "$exit_code" == "0" ]]; then
             state=success
             description="Bucket-01 exact-head executable gate passed"
           else
             state=failure
-            description="$(node - <<'NODE'
-          const fs = require('fs');
-          const path = 'reports/qualification/lafea-bucket-01-exact-head.json';
-          let text = 'Bucket-01 exact-head gate failed';
-          if (fs.existsSync(path)) {
-            const report = JSON.parse(fs.readFileSync(path, 'utf8'));
-            const first = report.blockingCheckIds?.[0];
-            if (first) text = `First blocker: ${first}`;
-          }
-          process.stdout.write(text.slice(0, 140));
-          NODE
-            )"
+            description=$(node -e "const fs=require('fs');const p='reports/qualification/lafea-bucket-01-exact-head.json';let t='Bucket-01 exact-head gate failed';if(fs.existsSync(p)){const r=JSON.parse(fs.readFileSync(p,'utf8'));if(r.blockingCheckIds&&r.blockingCheckIds[0])t='First blocker: '+r.blockingCheckIds[0]}process.stdout.write(t.slice(0,140))")
           fi
-          gh api \
-            --method POST \
+          gh api --method POST \
             "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state="$state" \
             -f context="lafea/bucket-01-exact-head" \
             -f description="$description"
+          exit "$exit_code"
 
       - name: Retain qualification reports
         if: always()
@@ -87,9 +73,3 @@ jobs:
           path: reports/qualification/
           if-no-files-found: warn
           retention-days: 30
-
-      - name: Enforce exact-head result
-        if: always()
-        env:
-          EXIT_CODE: ${{ steps.exact_head.outputs.exit_code }}
-        run: exit "$EXIT_CODE"
