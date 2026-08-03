@@ -63,7 +63,7 @@ The exact repository paths for these roles must be accepted before P0 completion
 - portable 4,884-entity/current equivalent large model;
 - real 1885 support/branch fixture.
 
-A missing path or unclear authority is `MISSING_AUTHORITY`, not an invitation to generate a synthetic replacement.
+Bind each role with repeated `--fixture-role ROLE=repository/path` arguments. The runner validates the role vocabulary, rejects duplicate bindings, rejects absolute/upward-traversing paths, automatically includes bound paths in the executed fixture set, and records the exact SHA-256 and normalized identity. A missing path or unclear authority is `MISSING_AUTHORITY`, not an invitation to generate a synthetic replacement.
 
 ## Required exact-head execution
 
@@ -72,6 +72,9 @@ npm ci
 node --test tests/non-fea-p0-route-map.test.mjs
 node scripts/run-non-fea-current-main-baseline.mjs \
   --warm-samples 5 \
+  --fixture-role TOPOLOGY_EDIT_20_OBJECT=<accepted-repository-path> \
+  --fixture-role LARGE_MODEL_4884_ENTITY=<accepted-repository-path> \
+  --fixture-role REAL_1885_SUPPORT_BRANCH=<accepted-repository-path> \
   --run-commands \
   --fail-on-gate
 ```
