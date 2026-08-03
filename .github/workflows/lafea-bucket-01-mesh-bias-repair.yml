@@ -1,4 +1,4 @@
-name: LAFEA Bucket-01 Mesh Pattern Diagnostic
+name: LAFEA Bucket-01 Radial Grading Diagnostic
 
 on:
   push:
@@ -10,17 +10,17 @@ permissions:
   statuses: write
 
 jobs:
-  pattern:
+  grading:
     strategy:
       fail-fast: false
       matrix:
-        pattern:
-          - checkerboard-odd
-          - checkerboard-even
-          - sector-odd
-          - sector-even
-          - ring-odd
-          - ring-even
+        candidate:
+          - p105-checkerboard
+          - p110-checkerboard
+          - p125-checkerboard
+          - p150-checkerboard
+          - cosine-checkerboard
+          - p110-original
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -32,76 +32,106 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Execute deterministic mesh-pattern experiment
+      - name: Execute symmetric radial-grading experiment
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_HEAD_SHA: ${{ github.sha }}
-          PATTERN: ${{ matrix.pattern }}
+          CANDIDATE: ${{ matrix.candidate }}
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p reports/qualification
-          context="lafea/mesh-pattern/${PATTERN}"
+          context="lafea/radial-grading/${CANDIDATE}"
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=pending -f context="$context" \
-            -f description="Executing ${PATTERN} annular diagonals"
+            -f description="Executing ${CANDIDATE} mesh grading"
 
           python - <<'PY'
           import os
           import re
           from pathlib import Path
 
-          expressions = {
-              'checkerboard-odd': '(ring + sector) % 2 === 1',
-              'checkerboard-even': '(ring + sector) % 2 === 0',
-              'sector-odd': 'sector % 2 === 1',
-              'sector-even': 'sector % 2 === 0',
-              'ring-odd': 'ring % 2 === 1',
-              'ring-even': 'ring % 2 === 0',
+          candidate = os.environ['CANDIDATE']
+          grading_name, diagonal_name = candidate.split('-', 1)
+          exponent_by_name = {
+              'p105': 1.05,
+              'p110': 1.10,
+              'p125': 1.25,
+              'p150': 1.50,
           }
-          expression = expressions[os.environ['PATTERN']]
           source_path = Path('src/core/lafea-meshing/lug-pinhole-t6.js')
           text = source_path.read_text()
-          pattern = re.compile(
-              r"(?P<indent>\s*)addT6Element\(state, `E-R\$\{ring\}-S\$\{sector\}-A`, \[\s*"
-              r"innerA, outerA, outerB,\s*\]\);\s*"
-              r"addT6Element\(state, `E-R\$\{ring\}-S\$\{sector\}-B`, \[\s*"
-              r"innerA, outerB, innerB,\s*\]\);"
+
+          radius_pattern = re.compile(
+              r"function radiusAt\(spec, ring\) \{\s*"
+              r"return spec\.holeRadius\s*"
+              r"\+ \(spec\.outerRadius - spec\.holeRadius\)\s*"
+              r"\* ring / spec\.radialDivisions;\s*"
+              r"\}"
           )
-          matches = list(pattern.finditer(text))
-          if len(matches) != 1:
-              raise RuntimeError(f'element split structural match count={len(matches)}')
-          indent = matches[0].group('indent').split('\n')[-1]
-          ring_token = '{ring}'
-          sector_token = '{sector}'
-          replacement = '\n'.join([
-              f'{indent}const alternateDiagonal = {expression};',
-              f'{indent}if (alternateDiagonal) {{',
-              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-A`, [',
-              f'{indent}    innerA, outerA, innerB,',
-              f'{indent}  ]);',
-              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-B`, [',
-              f'{indent}    outerA, outerB, innerB,',
-              f'{indent}  ]);',
-              f'{indent}}} else {{',
-              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-A`, [',
-              f'{indent}    innerA, outerA, outerB,',
-              f'{indent}  ]);',
-              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-B`, [',
-              f'{indent}    innerA, outerB, innerB,',
-              f'{indent}  ]);',
-              f'{indent}}}',
+          if len(list(radius_pattern.finditer(text))) != 1:
+              raise RuntimeError('radiusAt structural match failed')
+          if grading_name == 'cosine':
+              graded_expression = '0.5 * (1 - Math.cos(Math.PI * normalized))'
+          else:
+              exponent = exponent_by_name[grading_name]
+              graded_expression = (
+                  'normalized <= 0.5\n'
+                  f'    ? 0.5 * (2 * normalized) ** {exponent}\n'
+                  f'    : 1 - 0.5 * (2 * (1 - normalized)) ** {exponent}'
+              )
+          radius_replacement = '\n'.join([
+              'function radiusAt(spec, ring) {',
+              '  const normalized = ring / spec.radialDivisions;',
+              f'  const graded = {graded_expression};',
+              '  return spec.holeRadius',
+              '    + (spec.outerRadius - spec.holeRadius) * graded;',
+              '}',
           ])
-          source_path.write_text(pattern.sub(lambda _: replacement, text, count=1))
+          text = radius_pattern.sub(lambda _: radius_replacement, text, count=1)
+
+          if diagonal_name == 'checkerboard':
+              split_pattern = re.compile(
+                  r"(?P<indent>\s*)addT6Element\(state, `E-R\$\{ring\}-S\$\{sector\}-A`, \[\s*"
+                  r"innerA, outerA, outerB,\s*\]\);\s*"
+                  r"addT6Element\(state, `E-R\$\{ring\}-S\$\{sector\}-B`, \[\s*"
+                  r"innerA, outerB, innerB,\s*\]\);"
+              )
+              matches = list(split_pattern.finditer(text))
+              if len(matches) != 1:
+                  raise RuntimeError(f'element split structural match count={len(matches)}')
+              indent = matches[0].group('indent').split('\n')[-1]
+              ring_token = '{ring}'
+              sector_token = '{sector}'
+              replacement = '\n'.join([
+                  f'{indent}const alternateDiagonal = (ring + sector) % 2 === 1;',
+                  f'{indent}if (alternateDiagonal) {{',
+                  f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-A`, [',
+                  f'{indent}    innerA, outerA, innerB,',
+                  f'{indent}  ]);',
+                  f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-B`, [',
+                  f'{indent}    outerA, outerB, innerB,',
+                  f'{indent}  ]);',
+                  f'{indent}}} else {{',
+                  f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-A`, [',
+                  f'{indent}    innerA, outerA, outerB,',
+                  f'{indent}  ]);',
+                  f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-B`, [',
+                  f'{indent}    innerA, outerB, innerB,',
+                  f'{indent}  ]);',
+                  f'{indent}}}',
+              ])
+              text = split_pattern.sub(lambda _: replacement, text, count=1)
+          source_path.write_text(text)
           PY
 
           node scripts/lafea-bucket-01-production-response-runner.mjs \
-            > "reports/qualification/${PATTERN}-runner.stdout.log" \
-            2> "reports/qualification/${PATTERN}-runner.stderr.log"
+            > "reports/qualification/${CANDIDATE}-runner.stdout.log" \
+            2> "reports/qualification/${CANDIDATE}-runner.stderr.log"
           set +e
           node scripts/lafea-bucket-01-production-response-receipt.mjs \
-            > "reports/qualification/${PATTERN}-receipt.stdout.log" \
-            2> "reports/qualification/${PATTERN}-receipt.stderr.log"
+            > "reports/qualification/${CANDIDATE}-receipt.stdout.log" \
+            2> "reports/qualification/${CANDIDATE}-receipt.stderr.log"
           receipt_exit=$?
           set -e
           summary=$(node --input-type=module <<'NODE'
@@ -110,35 +140,35 @@ jobs:
             'reports/qualification/lafea-bucket-01-production-response.json',
             'utf8',
           ));
-          const value = {
-            pattern: process.env.PATTERN,
+          process.stdout.write(JSON.stringify({
+            candidate: process.env.CANDIDATE,
             status: report.status,
             fineGridGci: report.energyConvergence.fineGridGci,
             observedOrder: report.energyConvergence.observedOrder,
             energies: report.energyConvergence.observations,
+            momentStatus: report.momentConvergence.status,
             reasons: report.reasons,
-          };
-          process.stdout.write(JSON.stringify(value));
+          }));
           NODE
           )
           gci=$(node -e "const r=JSON.parse(process.argv[1]);process.stdout.write(String(r.fineGridGci))" "$summary")
           encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$summary")
           if [[ "$receipt_exit" == "0" ]]; then
             state=success
-            description="${PATTERN} passed; fine-grid GCI ${gci}"
+            description="${CANDIDATE} passed; fine-grid GCI ${gci}"
           else
             state=failure
-            description="${PATTERN} blocked; fine-grid GCI ${gci}"
+            description="${CANDIDATE} blocked; fine-grid GCI ${gci}"
           fi
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state="$state" -f context="$context" \
             -f description="$description" \
-            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_pattern=${encoded}"
+            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_grading=${encoded}"
           exit "$receipt_exit"
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lafea-mesh-pattern-${{ matrix.pattern }}-${{ github.sha }}
+          name: lafea-radial-grading-${{ matrix.candidate }}-${{ github.sha }}
           path: reports/qualification/
           if-no-files-found: warn
           retention-days: 30
