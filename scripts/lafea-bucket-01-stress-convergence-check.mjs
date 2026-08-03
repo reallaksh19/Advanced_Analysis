@@ -26,25 +26,22 @@ const mesh = {
 const exactHeadSha = 'a'.repeat(40);
 const values = [10.16, 10.04, 10.01];
 const probes = values.map((value, index) => {
-  const gaussPointResults = [
-    ['GP1', 1 / 6, 1 / 6],
-    ['GP2', 2 / 3, 1 / 6],
-    ['GP3', 1 / 6, 2 / 3],
-  ].map(([pointId, xi, eta]) => ({
-    pointId, xi, eta, weight: 1 / 6, jacobianDeterminant: 1,
-    stress: { sigmaX: value, sigmaY: 0, sigmaZ: 0, tauXY: 0 },
+  const nodalDisplacements = nodes.map((node) => ({
+    nodeId: node.nodeId,
+    ux: value * node.x,
+    uy: 0,
   }));
   const result = {
     schema: 'local-continuum-result/v1',
     qualification: { state: 'ACCEPTED' },
-    meshEvidence: { elementEvidence: [element] },
-    loadCaseResults: [{
-      loadCaseId: 'LC1',
-      elementResults: [{
-        elementId: 'E1', elementType: 'T6',
-        recoveryLayer: 'INTEGRATION_POINT', gaussPointResults,
+    meshEvidence: {
+      formulation: 'PLANE_STRESS',
+      elementEvidence: [{
+        ...element,
+        dMatrix: [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
       }],
-    }],
+    },
+    loadCaseResults: [{ loadCaseId: 'LC1', nodalDisplacements }],
   };
   return recoverLafeaBucket01FixedProbe({
     schema: LAFEA_BUCKET_01_FIXED_PROBE_INPUT_SCHEMA,
@@ -72,6 +69,8 @@ const input = {
 const evidence = evaluateLafeaBucket01StressConvergence(input);
 assert.equal(evidence.status, 'PASS');
 assert.equal(evidence.convergence.classification, 'MONOTONIC');
+assert.equal(evidence.authority.directElementPointRecovery, true);
+assert.equal(evidence.authority.integrationPointExtrapolationUsed, false);
 assert.equal(evidence.authority.fixedPhysicalLocation, true);
 assert.equal(evidence.authority.movingMaximumUsed, false);
 assert.equal(
@@ -91,12 +90,12 @@ drifted[2] = Object.freeze({
   ...driftedEvidenceBase,
   semanticHash: canonicalLafeaSha256(driftedEvidenceBase),
 });
-let driftBlocked = false;
-try {
-  evaluateLafeaBucket01StressConvergence({ ...input, probeEvidences: drifted });
-} catch (error) {
-  driftBlocked = error.code === 'LAFEA_B01_STRESS_PROBE_IDENTITY_DRIFT';
-}
-assert.equal(driftBlocked, true);
+assert.throws(
+  () => evaluateLafeaBucket01StressConvergence({
+    ...input,
+    probeEvidences: drifted,
+  }),
+  (error) => error?.code === 'LAFEA_B01_STRESS_PROBE_IDENTITY_DRIFT',
+);
 
-console.log('Bucket-01 fixed-probe stress convergence checks passed.');
+console.log('Bucket-01 direct fixed-probe stress convergence checks passed.');
