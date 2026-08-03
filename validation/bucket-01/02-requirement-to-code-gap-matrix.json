@@ -1,5 +1,5 @@
 {
-  "schema": "lafea-bucket-01-gap-matrix/v12",
+  "schema": "lafea-bucket-01-gap-matrix/v13",
   "audited_baseline_sha": "eaac7e0532c114ef306d2d928f1d9f74348193cd",
   "superseded_baseline_disposition": "STALE_NOT_QUALIFICATION_EVIDENCE",
   "mainline_delta_review": {
@@ -21,9 +21,14 @@
       "finding": "No hosted Bucket-01 workflow is included. Exact-head execution and retained reports must be supplied separately."
     },
     {
+      "id": "G1-BENCHMARK-LADDER",
+      "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXACT_HEAD_EXECUTION",
+      "finding": "An executable anti-drift gate requires T3, T6, pure shear, plane-stress cantilever, Kirsch and production lug in that exact order. The pure-bending panel is retained only as supplemental evidence and cannot substitute for the cantilever."
+    },
+    {
       "id": "G1-EXPECTED-VALUE-DEFINITION-SET",
       "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXACT_HEAD_EXECUTION",
-      "finding": "One exact-head registry binds four independent closed-form benchmark oracles and two frozen production convergence/location definitions by Git blob SHA, raw SHA-256 and canonical JSON hash. Production output is prohibited from generating expected values, selecting coordinates or setting tolerances."
+      "finding": "One exact-head registry binds four independent closed-form benchmark oracles, one independent engineering-theory cantilever oracle and two frozen production convergence/location definitions by Git blob SHA, raw SHA-256 and canonical JSON hash. Production output is prohibited from generating expected values, selecting coordinates or setting tolerances."
     },
     {
       "id": "G2-PRODUCTION-MESH",
@@ -51,9 +56,14 @@
       "finding": "The governed pure-shear receipt covers affine displacement, tensor and derived stress, energy, load-path parity, equilibrium and replay."
     },
     {
-      "id": "G3-CANTILEVER-PANEL",
+      "id": "G3-CANTILEVER",
       "status": "TECHNICAL_FIX_IMPLEMENTED_PENDING_EXECUTION",
-      "finding": "The T6 pure-bending panel covers quadratic displacement, linear integration-point stress, energy and moment equilibrium."
+      "finding": "The governed plane-stress cantilever consumes a frozen Timoshenko-beam oracle and retains four-level displacement convergence, reactions, force equilibrium, moment equilibrium, strain energy, external work, orientation sensitivity and three deterministic in-process replays."
+    },
+    {
+      "id": "G3-PURE-BENDING-PANEL-SUPPLEMENTAL",
+      "status": "SUPPLEMENTAL_TECHNICAL_ROUTE_IMPLEMENTED_PENDING_EXECUTION",
+      "finding": "The T6 pure-bending panel remains supplemental formulation evidence for quadratic displacement, linear integration-point stress, energy and moment equilibrium; it is not a cantilever substitute."
     },
     {
       "id": "G3-LOAD-DRIVEN",
@@ -97,6 +107,7 @@
     }
   ],
   "remaining_external_blockers": [
+    "exact-head execution of the mandatory benchmark ladder",
     "exact 64/256/1024 production execution and retained response receipt",
     "production lug fixed-probe and path retained stress receipt",
     "externally approved code-basis package",
