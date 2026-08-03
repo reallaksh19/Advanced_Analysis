@@ -26,6 +26,11 @@ const dataset = normalizeWorkspaceDataset(
 );
 const profile = makeProfile();
 const extracted = extractBranchSubset(dataset, branchId, profile);
+assert.deepEqual(
+  extractBranchSubset(dataset, branchId, profile),
+  extracted,
+  'repeated extraction must be deterministic',
+);
 const sealed = sealBranchSubsetManifest(extracted, { dataset });
 const routePartition = buildRoutePartitionModel(dataset, profile);
 const realRouteIds = routePartition.routes
@@ -47,6 +52,7 @@ assert.deepEqual(sealed.boundaryPorts, [
     treatment: 'DECLARED_BOUNDARY',
   },
 ]);
+assert.ok(sealed.routeIds.length > 0, 'target branch must produce at least one production route');
 assert.deepEqual(sealed.routeIds, realRouteIds, 'manifest routeIds must exactly match production route output');
 for (const routeId of sealed.routeIds) {
   const prefix = `route:${branchId}:`;
