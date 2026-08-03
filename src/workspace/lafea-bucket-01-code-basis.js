@@ -4,7 +4,7 @@ export const LAFEA_BUCKET_01_CODE_BASIS_INPUT_SCHEMA =
   'lafea-bucket-01-code-basis-input/v1';
 export const LAFEA_BUCKET_01_CODE_BASIS_PACKAGE_SCHEMA =
   'lafea-bucket-01-code-basis-package/v1';
-export const LAFEA_BUCKET_01_CODE_BASIS_REVISION = 'B01-CODE-BASIS.1';
+export const LAFEA_BUCKET_01_CODE_BASIS_REVISION = 'B01-CODE-BASIS.2';
 
 const INPUT_KEYS = Object.freeze([
   'schema', 'basisId', 'exactHeadSha', 'benchmarkId', 'target',
@@ -34,7 +34,7 @@ const AUTHORITY_KEYS = Object.freeze([
 const ALLOWED_INTERPOLATION = Object.freeze([
   'NONE', 'LINEAR_AUTHORIZED_BY_SOURCE',
 ]);
-const ALLOWED_EXTRACTION = 'RETAINED_INTEGRATION_POINT_FIXED_PROBES_AND_PATHS';
+const ALLOWED_EXTRACTION = 'RETAINED_DIRECT_T6_FIXED_PROBES_AND_PATHS';
 const ALLOWED_SINGULARITY = 'EXCLUDE_UNCLASSIFIED_SINGULAR_PEAKS';
 
 export function createLafeaBucket01CodeBasis(inputValue) {
