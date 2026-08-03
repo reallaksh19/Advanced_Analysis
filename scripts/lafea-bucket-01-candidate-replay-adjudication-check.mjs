@@ -59,6 +59,18 @@ const rejected = evaluateLafeaBucket01CandidateReplayAdjudication({
 });
 assert.equal(rejected.disposition, 'REJECT_CANDIDATE_MESH_FAMILY');
 
+const referenceBlocked = replay(
+  'UNIFORM_T6_REFERENCE',
+  { ...allPassChecks(), repositoryGate: 'BLOCKED' },
+);
+assert.throws(
+  () => evaluateLafeaBucket01CandidateReplayAdjudication({
+    ...input,
+    referenceReplay: referenceBlocked,
+  }),
+  hasCode('LAFEA_B01_REFERENCE_REPLAY_NOT_PASS'),
+);
+
 const mismatched = clone(candidate);
 mismatched.frozenInputHashes.loads = canonicalLafeaSha256({ changed: true });
 rehash(mismatched);

@@ -88,6 +88,9 @@ export function evaluateLafeaBucket01CandidateReplayAdjudication(input) {
     designHash,
     'candidate replay',
   );
+  if (referenceReplay.status !== 'PASS') {
+    throw adjudicationError('LAFEA_B01_REFERENCE_REPLAY_NOT_PASS');
+  }
   const frozenInputsMatch = FROZEN_HASH_KEYS.every((key) =>
     referenceReplay.frozenInputHashes[key]
       === candidateReplay.frozenInputHashes[key]);
@@ -159,6 +162,14 @@ export function validateLafeaBucket01CandidateReplayAdjudicationEvidence(value) 
     if (canonicalLafeaSha256(basis) !== value.semanticHash) {
       throw adjudicationError('LAFEA_B01_REPLAY_ADJUDICATION_HASH_TAMPERED');
     }
+    if (value.authority?.productionSwitchAuthorized !== false
+      || value.authority?.productionSwitchApplied !== false
+      || value.authority?.productionMeshAuthority !== false
+      || value.authority?.stressAcceptanceAuthority !== false
+      || value.authority?.qualificationAuthority !== false
+      || value.authority?.bucketQualified !== false) {
+      throw adjudicationError('LAFEA_B01_REPLAY_ADJUDICATION_AUTHORITY_INVALID');
+    }
     if (!isDeepFrozen(value)) {
       throw adjudicationError('LAFEA_B01_REPLAY_ADJUDICATION_NOT_FROZEN');
     }
@@ -217,7 +228,8 @@ function validateReplay(value, expectedRouteId, exactHeadSha, designHash, label)
   const expectedStatus = CHECK_KEYS.every((key) => value.checks[key] === 'PASS')
     ? 'PASS' : 'BLOCKED';
   if (value.status !== expectedStatus
-    || (value.status === 'PASS' && value.reasons.length !== 0)) {
+    || (value.status === 'PASS' && value.reasons.length !== 0)
+    || (value.status === 'BLOCKED' && value.reasons.length === 0)) {
     throw adjudicationError('LAFEA_B01_REPLAY_RESULT_STATUS_INCONSISTENT', label);
   }
   verifySemanticHash(value, 'LAFEA_B01_REPLAY_RESULT_HASH_TAMPERED');
