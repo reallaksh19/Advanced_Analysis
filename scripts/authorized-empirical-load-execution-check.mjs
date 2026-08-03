@@ -57,9 +57,14 @@ const request = {
 
 const profileHashBefore = semanticHash(profile);
 const ephemeral = buildAuthorizedEmpiricalLoadProfile(profile, authorizedInput);
+const authorizedSection = projectDataValue(ephemeral, 'loadCalculation.pipeSectionProperties')['L-1'];
+const authorizedInsulationDensities = projectDataValue(ephemeral, 'loadCalculation.insulationDensitiesKgPerM3');
 assert.equal(semanticHash(profile), profileHashBefore, 'base Project Data profile mutated');
 assert.notEqual(ephemeral, profile);
-assert.equal(projectDataValue(ephemeral, 'loadCalculation.pipeSectionProperties')['L-1'].outsideDiameterMm, 100);
+assert.equal(authorizedSection.outsideDiameterMm, 100);
+assert.equal(authorizedSection.insulationCode, 'INS-1');
+assert.equal(authorizedSection.insulationThicknessMm, 10);
+assert.equal(authorizedInsulationDensities['INS-1'], 120);
 assert.equal(projectDataValue(ephemeral, 'loadCalculation.componentWeightsKg')['CV-1'], 10);
 assert.equal(projectDataValue(profile, 'loadCalculation.pipeSectionProperties').LEGACY.outsideDiameterMm, 10);
 assert.equal(ephemeral.loadCalculation.pipeSectionProperties.evidence.source, 'AUTHORIZED_EMPIRICAL_LOAD_INPUT');
@@ -88,8 +93,11 @@ assert.equal(Object.isFrozen(execution.distribution), true);
 
 const pipeContribution = execution.distribution.loadCases[0].contributionLedger.find((row) => row.entityId === 'pipe-1');
 const componentContribution = execution.distribution.loadCases[0].contributionLedger.find((row) => row.entityId === 'valve-1');
+const expectedPipeInsulationKg = Math.PI * ((120 ** 2) - (100 ** 2)) / 4e6 * 1 * 120;
 assert.ok(pipeContribution);
 assert.ok(componentContribution);
+assert.equal(dataset.entities.find((row) => row.entityId === 'pipe-1').insulationCode, 'DATASET-INSULATION-SENTINEL');
+assert.ok(Math.abs(pipeContribution.formula.insulationKg - expectedPipeInsulationKg) < 1e-12);
 assert.equal(pipeContribution.formula.projectDataSources[0].evidence.source, 'AUTHORIZED_EMPIRICAL_LOAD_INPUT');
 assert.equal(componentContribution.formula.projectDataSources[0].evidence.source, 'AUTHORIZED_EMPIRICAL_LOAD_INPUT');
 
@@ -252,7 +260,7 @@ function makeDataset() {
     sourceSha256: HASHES.dataset,
     entities: [
       {
-        entityId: 'pipe-1', entityType: 'PIPE', lineKey: 'L-1',
+        entityId: 'pipe-1', entityType: 'PIPE', lineKey: 'L-1', insulationCode: 'DATASET-INSULATION-SENTINEL',
         sourceEntityId: 'src-line-001', jsonPointer: '/items/0', componentReference: 'PIPE-1', properties: {},
       },
       {
