@@ -116,19 +116,19 @@ function resolveCaseMass(entity, edge, caseId, profile) {
   if (!positive(insideDiameterMm)) return excluded('INVALID_PIPE_INSIDE_DIAMETER', 'loadCalculation.pipeSectionProperties');
   const lengthM = edge.lengthMm / 1000;
   const metalKg = annulusAreaM2(section.outsideDiameterMm, insideDiameterMm) * lengthM * materialDensity;
-  const insulation = insulationMass(section, entity, lengthM, profile);
+  const insulation = insulationMass(section, lengthM, profile);
   if (!insulation.qualified) return insulation;
   const fluid = fluidMass(caseId, section, entity, insideDiameterMm, lengthM, profile);
   if (!fluid.qualified) return fluid;
   return { qualified: true, massKg: metalKg + insulation.massKg + fluid.massKg, formula: { metalKg, insulationKg: insulation.massKg, fluidKg: fluid.massKg, lengthM, outsideDiameterMm: section.outsideDiameterMm, insideDiameterMm, projectDataSources: [sourceRef(profile, 'loadCalculation.pipeSectionProperties'), sourceRef(profile, 'loadCalculation.materialDensitiesKgPerM3'), insulation.source, fluid.source].filter(Boolean) } };
 }
 
-function insulationMass(section, entity, lengthM, profile) {
+function insulationMass(section, lengthM, profile) {
   const thickness = section.insulationThicknessMm;
   if (thickness === 0) return { qualified: true, massKg: 0, source: sourceRef(profile, 'loadCalculation.pipeSectionProperties') };
   if (!positive(thickness)) return excluded('MISSING_INSULATION_THICKNESS', 'loadCalculation.pipeSectionProperties');
   const densities = projectDataValue(profile, 'loadCalculation.insulationDensitiesKgPerM3') || {};
-  const density = densities[entity.insulationCode];
+  const density = densities[section.insulationCode];
   if (!positive(density)) return excluded('MISSING_INSULATION_DENSITY', 'loadCalculation.insulationDensitiesKgPerM3');
   return { qualified: true, massKg: annulusAreaM2(section.outsideDiameterMm + (2 * thickness), section.outsideDiameterMm) * lengthM * density, source: sourceRef(profile, 'loadCalculation.insulationDensitiesKgPerM3') };
 }
