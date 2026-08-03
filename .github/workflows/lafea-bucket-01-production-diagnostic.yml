@@ -1,6 +1,8 @@
 name: LAFEA Bucket-01 Production Diagnostic
 
 on:
+  push:
+    branches: [bucket-01-cantilever-benchmark-route]
   workflow_dispatch:
 
 permissions:
@@ -9,6 +11,7 @@ permissions:
 
 jobs:
   production-diagnostic:
+    if: ${{ github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[skip diagnostic]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -77,6 +80,11 @@ jobs:
             try { return JSON.parse(fs.readFileSync(path, 'utf8')); }
             catch { return null; }
           };
+          const tail = (path, limit = 6000) => {
+            if (!fs.existsSync(path)) return null;
+            const value = fs.readFileSync(path, 'utf8').trim();
+            return value ? value.slice(-limit) : null;
+          };
           const integer = (name) => Number.parseInt(process.env[name], 10);
           const exits = {
             productionRunner: integer('RUNNER_EXIT'),
@@ -90,7 +98,7 @@ jobs:
           const ordered = Object.entries(exits);
           const firstFailure = ordered.find(([, value]) => value !== 0)?.[0] ?? null;
           const report = {
-            schema: 'lafea-bucket-01-production-diagnostic/v1',
+            schema: 'lafea-bucket-01-production-diagnostic/v2',
             exactHeadSha: process.env.EXPECTED_HEAD_SHA,
             exits,
             response: response ? {
@@ -104,6 +112,7 @@ jobs:
             } : null,
             lugStress: lug ? {
               status: lug.status,
+              reasons: lug.reasons ?? [],
               governedLevelOrdinals: lug.governedLevelOrdinals ?? null,
               evaluatedLevelOrdinals: lug.evaluatedLevelOrdinals ?? null,
               directElementPointRecovery:
@@ -116,7 +125,7 @@ jobs:
               ].filter((row) => row.status !== 'PASS').map((row) => ({
                 probeId: row.probeId,
                 status: row.status,
-                reasons: row.convergence?.reasons ?? [],
+                reasons: row.convergence?.reasons ?? row.reasons ?? [],
                 observations: row.observations ?? [],
                 fineGridGci: row.convergence?.fineGridGci ?? null,
                 observedOrder: row.convergence?.observedOrder ?? null,
@@ -126,6 +135,23 @@ jobs:
               status: kirsch.status,
               reasons: kirsch.reasons ?? [],
             } : null,
+            logs: {
+              productionRunnerStderr: tail(
+                'reports/qualification/production-runner.stderr.log',
+              ),
+              productionResponseStderr: tail(
+                'reports/qualification/production-response.stderr.log',
+              ),
+              productionLugStressStdout: tail(
+                'reports/qualification/production-lug-stress.stdout.log',
+              ),
+              productionLugStressStderr: tail(
+                'reports/qualification/production-lug-stress.stderr.log',
+              ),
+              kirschStderr: tail(
+                'reports/qualification/kirsch.stderr.log',
+              ),
+            },
             firstFailure,
             status: firstFailure === null ? 'PASS' : 'BLOCKED',
           };
@@ -160,14 +186,14 @@ jobs:
           if [[ -n "$existing_sha" ]]; then
             gh api --method PUT \
               "repos/${GITHUB_REPOSITORY}/contents/${target}" \
-              -f message='chore: retain Bucket-01 production diagnostic' \
+              -f message='chore: retain Bucket-01 production diagnostic [skip diagnostic]' \
               -f content="$content" \
               -f sha="$existing_sha" \
               -f branch="$GITHUB_REF_NAME"
           else
             gh api --method PUT \
               "repos/${GITHUB_REPOSITORY}/contents/${target}" \
-              -f message='chore: retain Bucket-01 production diagnostic' \
+              -f message='chore: retain Bucket-01 production diagnostic [skip diagnostic]' \
               -f content="$content" \
               -f branch="$GITHUB_REF_NAME"
           fi
