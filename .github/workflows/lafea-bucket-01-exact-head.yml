@@ -2,8 +2,7 @@ name: LAFEA Bucket-01 Exact Head
 
 on:
   push:
-    branches:
-      - bucket-01-cantilever-benchmark-route
+    branches: [bucket-01-cantilever-benchmark-route]
   workflow_dispatch:
 
 permissions:
@@ -15,31 +14,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - name: Publish runner-started status
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh api --method POST
-          "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}"
-          -f state=pending
-          -f context=lafea/bucket-01-exact-head
-          -f description="Runner started"
-
-      - name: Checkout exact candidate
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-
-      - name: Install locked dependencies
-        run: npm ci
-
-      - name: Patch and diagnose recovery stages
+      - run: npm ci
+      - name: Run physical-coordinate recovery experiment
         env:
           EXPECTED_HEAD_SHA: ${{ github.sha }}
           GH_TOKEN: ${{ github.token }}
@@ -47,137 +30,46 @@ jobs:
         run: |
           mkdir -p reports/qualification
           set +e
-          python - <<'PY' > reports/qualification/recovery-patch.stdout.log 2> reports/qualification/recovery-patch.stderr.log
-          from pathlib import Path
-
-          solver = Path('src/core/local-continuum/solver.js')
-          text = solver.read_text()
-          start = text.index('function conjugateGradientSolve(')
-          end = text.index('\nfunction applyJacobi(', start)
-          block = text[start:end]
-          declaration = block.index('  const residualTolerance = tolerance(')
-          close = block.index('\n  );', declaration) + len('\n  );')
-          block = block[:close] + '\n  const convergenceTarget = residualTolerance / 10;' + block[close:]
-          block = block.replace('finalResidualInfinity > residualTolerance', 'finalResidualInfinity > convergenceTarget')
-          block = block.replace('finalResidualInfinity <= residualTolerance', 'finalResidualInfinity <= convergenceTarget')
-          old = '`Sparse PCG residual ${finalResidualInfinity} exceeds ${residualTolerance} after ${iterations} iterations.`'
-          block = block.replace(old, '`Sparse PCG residual ${finalResidualInfinity} exceeds internal target ${convergenceTarget} (acceptance gate ${residualTolerance}) after ${iterations} iterations.`')
-          evidence = '      residualTolerance: canonicalNumber(residualTolerance),\n'
-          block = block.replace(evidence, '      convergenceTarget: canonicalNumber(convergenceTarget),\n' + evidence)
-          solver.write_text(text[:start] + block + text[end:])
-
-          probe = Path('src/workspace/lafea-bucket-01-fixed-probe.js')
-          text = probe.read_text()
-          old_call = """  const components = reconstructTensor(
-            elementResult.gaussPointResults,
-            candidate.natural.xi,
-            candidate.natural.eta,
-          );"""
-          new_call = """  const components = reconstructTensor(
-            elementResult.gaussPointResults,
-            candidate.nodes,
-            probe.x,
-            probe.y,
-          );"""
-          if text.count(old_call) != 1:
-              raise SystemExit(f'reconstructTensor call count={text.count(old_call)}')
-          text = text.replace(old_call, new_call)
-          text = text.replace("'T6_THREE_POINT_LINEAR_NATURAL_COORDINATE_RECONSTRUCTION_V1'", "'T6_THREE_POINT_LINEAR_PHYSICAL_COORDINATE_RECONSTRUCTION_V2'")
-          start = text.index('function reconstructTensor(')
-          end = text.index('\nfunction solve3(', start)
-          new_block = """function reconstructTensor(points, nodes, x, y) {
-            return deepFreeze({
-              sigmaX: reconstruct(points, nodes, x, y, (point) => point.stress?.sigmaX),
-              sigmaY: reconstruct(points, nodes, x, y, (point) => point.stress?.sigmaY),
-              sigmaZ: reconstruct(points, nodes, x, y, (point) => point.stress?.sigmaZ),
-              tauXY: reconstruct(points, nodes, x, y, (point) => point.stress?.tauXY),
-            });
-          }
-
-          function reconstruct(points, nodes, x, y, selector) {
-            const matrix = points.map((point) => {
-              const physical = mapT6(nodes, point.xi, point.eta);
-              return [1, physical.x, physical.y];
-            });
-            const values = points.map(selector);
-            if (values.some((value) => typeof value !== 'number' || !Number.isFinite(value))) {
-              throw probeError('LAFEA_B01_PROBE_STRESS_COMPONENT_INVALID');
-            }
-            const coefficients = solve3(matrix, values);
-            return normalizeZero(coefficients[0] + coefficients[1] * x + coefficients[2] * y);
-          }
-          """
-          text = text[:start] + new_block + text[end:]
-          probe.write_text(text)
-
-          kirsch = Path('scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs')
-          text = kirsch.read_text()
-          old = "`${definition.probeId}: ${convergence.reasons.join(', ')}`"
-          new = "`${definition.probeId}: ${JSON.stringify(convergence.convergence)}`"
-          if text.count(old) != 1:
-              raise SystemExit(f'Kirsch convergence assertion marker count={text.count(old)}')
-          kirsch.write_text(text.replace(old, new))
-          PY
-          patch_exit=$?
-          if [[ "$patch_exit" != "0" ]]; then
-            stage=PATCH
-            log=reports/qualification/recovery-patch.stderr.log
-          else
+          python scripts/lafea-bucket-01-physical-recovery-experiment.py \
+            > reports/qualification/patch.stdout.log \
+            2> reports/qualification/patch.stderr.log
+          code=$?
+          stage=PATCH
+          log=reports/qualification/patch.stderr.log
+          if [[ "$code" == "0" ]]; then
             node scripts/lafea-bucket-01-fixed-probe-check.mjs \
-              > reports/qualification/fixed-probe.stdout.log \
-              2> reports/qualification/fixed-probe.stderr.log
-            fixed_exit=$?
-            if [[ "$fixed_exit" != "0" ]]; then
-              stage=FIXED_PROBE
-              log=reports/qualification/fixed-probe.stderr.log
-            else
-              node scripts/lafea-bucket-01-scalable-solver-check.mjs \
-                > reports/qualification/scalable.stdout.log \
-                2> reports/qualification/scalable.stderr.log
-              scalable_exit=$?
-              if [[ "$scalable_exit" != "0" ]]; then
-                stage=SCALABLE
-                log=reports/qualification/scalable.stderr.log
-              else
-                node scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs \
-                  > reports/qualification/kirsch.stdout.log \
-                  2> reports/qualification/kirsch.stderr.log
-                kirsch_exit=$?
-                if [[ "$kirsch_exit" != "0" ]]; then
-                  stage=KIRSCH
-                  log=reports/qualification/kirsch.stderr.log
-                else
-                  gh api --method POST \
-                    "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-                    -f state=success \
-                    -f context="lafea/physical-probe-recovery" \
-                    -f description="Fixed-probe and Kirsch qualification passed"
-                  exit 0
-                fi
-              fi
-            fi
+              > reports/qualification/fixed.stdout.log \
+              2> reports/qualification/fixed.stderr.log
+            code=$?; stage=FIXED; log=reports/qualification/fixed.stderr.log
           fi
-          detail=$(node -e "const fs=require('fs');const t=fs.existsSync(process.argv[1])?fs.readFileSync(process.argv[1],'utf8'):'missing log';const lines=t.split(/\r?\n/).map(s=>s.trim()).filter(s=>s&&!/^at\s/.test(s)&&!/^node:/.test(s));process.stdout.write(lines.slice(0,16).join(' | ').slice(0,3000))" "$log")
+          if [[ "$code" == "0" ]]; then
+            node scripts/lafea-bucket-01-scalable-solver-check.mjs \
+              > reports/qualification/scalable.stdout.log \
+              2> reports/qualification/scalable.stderr.log
+            code=$?; stage=SCALABLE; log=reports/qualification/scalable.stderr.log
+          fi
+          if [[ "$code" == "0" ]]; then
+            node scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs \
+              > reports/qualification/kirsch.stdout.log \
+              2> reports/qualification/kirsch.stderr.log
+            code=$?; stage=KIRSCH; log=reports/qualification/kirsch.stderr.log
+          fi
+          if [[ "$code" == "0" ]]; then
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -f state=success -f context=lafea/physical-probe-recovery \
+              -f description="Fixed-probe and Kirsch qualification passed"
+            exit 0
+          fi
+          detail=$(node -e "const fs=require('fs');const t=fs.readFileSync(process.argv[1],'utf8');process.stdout.write(t.split(/\r?\n/).map(s=>s.trim()).filter(s=>s&&!/^at\s/.test(s)&&!/^node:/.test(s)).slice(0,16).join(' | ').slice(0,3000))" "$log")
           encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
-          safe=$(printf '%s' "$detail" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-42)
-          gh api --method POST \
-            "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -f state=failure \
-            -f context="lafea/physical-${stage}/${safe}" \
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=failure -f context="lafea/physical-${stage}" \
             -f description="Physical recovery failed at ${stage}" \
             -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
-          gh api --method POST \
-            "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -f state=failure \
-            -f context="lafea/bucket-01-exact-head" \
-            -f description="Physical recovery diagnostic failed"
-          exit 1
-
-      - name: Retain qualification reports
-        if: always()
+          exit "$code"
+      - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lafea-bucket-01-physical-recovery-${{ github.sha }}
+          name: lafea-physical-recovery-${{ github.sha }}
           path: reports/qualification/
-          if-no-files-found: warn
           retention-days: 30
