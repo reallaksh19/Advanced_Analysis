@@ -18,6 +18,12 @@ export {
 export { runLinearPipingAnalysis } from './consumer.js';
 
 export {
+  GRAVITY_MASS_SOURCE_NOT_IMPLEMENTED_CODE,
+  GRAVITY_PIPE_WALL_EXPANSION_ID,
+  expandPipeWallGravitySourceAuthorities,
+} from './gravity-expansion.js';
+
+export {
   LINEAR_PIPING_SOURCE_ANALYSIS_REQUEST_SCHEMA,
   SOURCE_ANALYSIS_REQUEST_KEYS,
   SOURCE_AUTHORITY_KEYS,
