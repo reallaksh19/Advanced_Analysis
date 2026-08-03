@@ -22,6 +22,7 @@ recordAssertion('EXACT_HEAD', exactHead === expectedHead, `Expected ${expectedHe
 recordAssertion('BASELINE_IN_ANCESTRY', isAncestor(BASELINE_SHA, exactHead), `Baseline ${BASELINE_SHA} is not in current ancestry.`);
 
 for (const check of [
+  nodeCheck('MANDATORY_BENCHMARK_LADDER', 'scripts/lafea-bucket-01-benchmark-ladder-check.mjs'),
   nodeCheck('BUCKET_01_REPAIR', 'scripts/lafea-bucket-01-repair-check.mjs'),
   nodeCheck('PRODUCTION_RESPONSE_CONVERGENCE_CONTRACT', 'scripts/lafea-bucket-01-production-response-check.mjs'),
   nodeCheck('SCALABLE_SPARSE_CONTINUUM_SOLVER', 'scripts/lafea-bucket-01-scalable-solver-check.mjs'),
@@ -32,6 +33,7 @@ for (const check of [
   nodeCheck('THREE_REPLAY_CUSTODY_CONTRACT', 'scripts/lafea-bucket-01-replay-custody-check.mjs'),
   nodeCheck('GOVERNED_T3_PATCH', 'scripts/lafea-bucket-01-t3-patch-check.mjs'),
   nodeCheck('GOVERNED_PURE_SHEAR', 'scripts/lafea-bucket-01-pure-shear-check.mjs'),
+  nodeCheck('GOVERNED_PLANE_STRESS_CANTILEVER', 'scripts/lafea-bucket-01-cantilever-check.mjs'),
   nodeCheck('T6_PATCH', 'scripts/lafea.3-t6-patch-check.mjs'),
   nodeCheck('PRODUCTION_T6_MESH_LADDER', 'scripts/lafea-nb-t6b-lug-pinhole-mesh-ladder-check.mjs'),
   nodeCheck('LOAD_DRIVEN_FREE_DOF_PILOT', 'scripts/lafea-nb-t6d-load-driven-qualification-check.mjs'),
@@ -46,7 +48,7 @@ recordAssertion('TRACKED_WORKTREE_CLEAN', trackedStatus === '', trackedStatus ||
 const failures = checks.filter((check) => check.status !== 'PASS');
 const executableEvidencePass = failures.length === 0;
 const report = {
-  schema: 'lafea-bucket-01-exact-head-report/v11',
+  schema: 'lafea-bucket-01-exact-head-report/v12',
   status: executableEvidencePass ? 'EXACT_HEAD_REPAIR_EVIDENCE_PASS' : 'EXACT_HEAD_REPAIR_EVIDENCE_BLOCKED',
   exactHead,
   expectedHead,
@@ -76,6 +78,8 @@ const report = {
   authority: {
     exactHeadRepairExecutableEvidence: executableEvidencePass,
     selectedRepairInfrastructureReady: executableEvidencePass,
+    mandatoryBenchmarkLadderImplemented: true,
+    governedCantileverRouteImplemented: true,
     scalableSparseSolverRouteImplemented: true,
     governedKirschFixedProbeRouteImplemented: true,
     productionLugFixedProbeContractImplemented: true,
