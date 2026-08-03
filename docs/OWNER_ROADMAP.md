@@ -717,8 +717,77 @@ is the next free slot (after M016's `b3.13`), and via a direct read of
 classifies from direction vectors, not nominal diameter — consistent
 with #520's own claim that it needed no changes.
 
+### M018 fail-closed stop → real bug found → M019 (#535) dispatched
+
+M018 did not proceed to implementation. On `feat/m018-appendix-s-example3`
+the agent independently derived every authority the issue asked for
+(`Sc≈137.86 MPa`/`Sh≈138.05 MPa` from the 2×2 system, the Appendix D
+welding-tee SIFs `i_i≈3.4155`/`i_o≈4.2207`, the Appendix C thermal
+coefficient) and then, before committing anything, hand-checked the
+published Table S303.7.1 branch-pipe row against the production
+formula: bending-only (`|My|/Z`) matched the published `S_E` almost
+exactly, while adding the axial term overshot by ~20.9%. It stopped
+fail-closed rather than work around it — comment `5172647100` on
+#531 — correctly refusing every workaround (zeroing recovered `Fx`,
+an epsilon axial factor, computing `S_E` outside the real code path,
+widening tolerance).
+
+**Independently re-verified from scratch before accepting it, not
+trusted because the agent sounded confident:**
+- Recomputed the same NPS20 section properties and reproduced the
+  agent's numbers exactly (bending-only `25.143 MPa` vs. published
+  `25.155 MPa`, `-0.05%`; axial-inclusive `30.402 MPa`, `+20.9%`).
+- Cross-checked a header tee node with the agent's own derived
+  in-plane SIF (`i_i=3.4155`): bending-only `189.806 MPa` vs.
+  published `189.945 MPa`, `-0.07%` — matches this well too.
+- Spot-checked the same signature against Example 1's already-*merged*
+  Table S301.7 (node 50 anchor): bending-only `+0.08%`, axial-inclusive
+  `+2.72%` — same direction, smaller magnitude (that geometry's
+  `Fx/A` is a much smaller fraction of its bending stress, which is
+  exactly why M013 never tripped on this).
+- Confirmed via independent web research that the real ASME §319.4.4
+  Eq. (17) is `S_E=√(Sb²+4·St²)` with no axial term, cross-matching
+  multiple independent secondary sources.
+- Read the true current `origin/main` source directly (not the stale
+  local checkout, which still predated M016/M017 — a reminder to
+  always read `git show origin/main:<path>` for canonical current
+  source, not the primary working tree) and confirmed the defect is
+  real: `combineStressTerms` sums the axial term into `calculatedStress`
+  unconditionally, for every category, with no category-based
+  exclusion the way `pressureValue` already has one.
+
+**Confirmed M013 and M016 are unaffected — checked, not assumed.**
+`grep -c "compileCodeResult\|DISPLACEMENT_STRESS_RANGE\|EXPANSION_RANGE_ENVELOPE"`
+across all four M013/M016 fixture+check files returned zero matches:
+neither already-merged benchmark ever exercises this code path — both
+only validate the raw FEA layer (displacements/reactions/forces)
+against Tables S301.5.x/S302.5.1, never the code-engine's stress
+combination math, and Example 2 has no published displacement-range
+table at all. M018 is the first Work Pack in this mandate to feed real
+published ASME `S_E` numbers through `compileCodeResult` for either
+range category, and it caught a real, previously-invisible bug on
+first contact — the fail-closed discipline working exactly as
+designed, not a regression in already-shipped work.
+
+Fix dispatched directly as **M019 (#535)**: exclude the axial
+contribution from `calculatedStress` for `DISPLACEMENT_STRESS_RANGE`/
+`EXPANSION_RANGE_ENVELOPE` only, mirroring the exact pattern already
+used for `pressureValue`'s range-category exclusion; `SUSTAINED`/
+`OCCASIONAL` (already validated correct via M013's real Table S301.6
+match) must not change at all. Acceptance oracle requires reproducing
+both of the Owner's own verification numbers above as real regression
+proofs (the branch-pipe node and the tee node), plus an audit of the
+existing synthetic B4.0/B4.1/B4.4 fixtures' hand-verified expected
+values (built by the same author under the same wrong assumption,
+never cross-checked against real authority) for any silent
+axial-inclusive mismatch. M018 is blocked on M019 landing first —
+acknowledged directly on #531 (comment posted) — mirroring the
+established prerequisite-Work-Pack pattern used for M014→M013 and
+M017→M016.
+
 This closes out the full Appendix S benchmarking arc the user asked
 for on 2026-08-03 ("benchmark another 2 or more cases before we move
-to a configurable prototype") — Examples 1, 2, and 3 are now all
-either merged (1, 2) or dispatched with fully-verified ground truth
-(3, #531).
+to a configurable prototype") down to one remaining real gate: Examples
+1 and 2 are merged; Example 3 is fully scoped with cross-validated
+ground truth but is genuinely blocked on a real, now-fixed-in-flight
+production defect the benchmarking effort itself just found.
