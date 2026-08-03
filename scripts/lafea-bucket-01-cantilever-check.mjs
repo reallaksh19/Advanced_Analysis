@@ -84,7 +84,7 @@ const finestVertical = vertical.history.at(-1);
 const orientationDifference = relativeDifference(
   finestHorizontal.tipDeflection,
   finestVertical.tipDeflection,
-  EXPECTED_VALUE_DEFINITION.referenceDeflection ?? referenceDeflection(),
+  referenceDeflection(),
 );
 assert.ok(
   orientationDifference <= EXPECTED_VALUE_DEFINITION.tolerances.orientationDeflectionRelativeDifference,
@@ -227,7 +227,7 @@ function solveLevel(nx, ny, orientation) {
     nodeCount: nodes.length,
     freeDofCount: result.constraintPartition.freeEquations.length,
     restrainedDofCount: result.constraintPartition.constrainedEquations.length,
-    solverMethod: result.backendTrace.method,
+    solverMethod: result.backendTrace.backendIdentity,
     tipDeflection,
     deflectionRatio: tipDeflection / reference,
     appliedLoadTotals: result.appliedLoadTotals,
