@@ -172,12 +172,26 @@ test('P5B-GUARD-01', 'Workspace integration remains presentation-only and regist
   assert.equal(phaseRecord.status, 'PARTIALLY_VERIFIED');
   assert.equal(phaseRecord.releaseImpact, 'NONE');
 
-  const workflow = fs.readFileSync(
-    '.github/workflows/lfea-piping-phase-certification.yml',
+  // The dedicated CI workflow this check used to read was removed in M001
+  // along with 94 other files as non-functional CI scaffolding (each was
+  // gated on workflow_dispatch inputs a normal pull_request event never
+  // supplied, so none had ever certified anything on a real PR). This repo
+  // currently has no functioning CI; Owner-side exact-head execution is the
+  // real check regime (see docs/OWNER_ROADMAP.md). The wiring this assertion
+  // protects — that the integration check and its e2e companion stay
+  // reachable, not orphaned — is verified instead against the mechanisms
+  // that actually run today: this file is imported by the anti-drift check
+  // registered in package.json's check:lfea-presentation-export, and the
+  // Playwright spec lives where the configured e2e testDir picks it up.
+  const antiDriftSource = fs.readFileSync(
+    'scripts/linear-piping-presentation-anti-drift-check.mjs',
     'utf8',
   );
-  assert.match(workflow, /linear-piping-workspace-integration-check\.mjs/u);
-  assert.match(workflow, /linear-piping-results-workspace\.spec\.js/u);
+  assert.match(antiDriftSource, /linear-piping-workspace-integration-check\.mjs/u);
+  assert.ok(
+    fs.existsSync('e2e/linear-piping-results-workspace.spec.js'),
+    'the Playwright e2e workspace-integration spec must exist',
+  );
 });
 
 console.log('Linear piping Phase 5B active workspace checks PASS');
