@@ -114,7 +114,7 @@ test('M002 source typed picks preserve the source model role', () => {
   backend.groups.sourceGroup.traverse((object) => {
     if (object.isMesh && object.userData?.primitiveId === 'visual:source-pipe') sourceMesh = object;
   });
-  assert.equal(sourceMesh.userData.pickTarget.modelRole, 'SOURCE');
+  assert.equal(sourceMesh.userData.pickTarget.modelRole, 'source');
   assert.equal(sourceMesh.userData.pickTarget.objectId, 'edge:source-pipe');
   backend.destroy();
 });
