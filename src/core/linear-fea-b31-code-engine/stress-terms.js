@@ -73,7 +73,7 @@ export function extractResultants(localAction, momentDirectionMapping) {
  * force remains visible in `resultants.axialForce`; only its formula
  * contribution is category-resolved by the caller.
  *
- * @param {Readonly<{axialForce:number, torsion:number,inPlaneMoment:number,outOfPlaneMoment:number}>} resultants
+ * @param {Readonly<{axialForce:number, torsion:number, inPlaneMoment:number, outOfPlaneMoment:number}>} resultants
  * @param {{area:number, sectionModulus:number, polarSectionModulus:number}} mechanicalProperties
  * @param {Readonly<{axial:number, torsional:number, inPlaneBending:number, outOfPlaneBending:number}>} indices
  * @param {number} pressureStressValue Category-resolved pressure contribution (zero for range categories).
