@@ -41,7 +41,7 @@ current source — do not trust the document alone.
 | (direct fix, no WP) | — | #461 | Merged | `check:lfea-linear-core` now completes end to end for the first time since M001 — replaced its dependency on a deleted, non-functional CI workflow file with the mechanisms that actually keep the workspace-integration check and its e2e spec wired in |
 | M008 | #463 | — | Prequalification answered, verified, and approved (Owner spot-checked all load-bearing claims) | Benchmark B — governed analysis-authority overlay for the real 1885 project. Real candidate branch confirmed: `/ASIM-1885-8"-S8810103-91261M7-HC-01/B1`, 16 entities, zero missing-attribute diagnostics (8 clean branches exist total). Split into M008-A/B/C/D |
 | M008-A | #468 | #472 | Merged | `analysis-authority-overlay/v1` + `workspace-branch-subset/v1` contracts (schema/validation/hashing only) at `check:w11.1`/`check:w11.2`. Every anti-drift addendum rule genuinely implemented; all fail-closed cases exercised against the real Owner-verified 16-entity target branch. No fixes needed on Owner review |
-| M008-B | #475 | — | Ready | Branch-extraction algorithm populating `entityIds`/`routeIds`/`supportEntityIds`/`boundaryPorts` from real `normalizeWorkspaceDataset` output via `buildRoutePartitionModel` reuse; no prequalification gate — direct build with a concrete acceptance oracle (M008-A's own already-validated `w11.2` fixture values: 16 entities, 9 supports, 2 boundary ports with real node IDs/`externalReference`) |
+| M008-B | #475 | #477 | Merged | `extractBranchSubset` — branch-extraction algorithm populating `entityIds`/`routeIds`/`supportEntityIds`/`boundaryPorts` from real `normalizeWorkspaceDataset` output via genuine `buildRoutePartitionModel` reuse, sealed through M008-A's real contract. Algorithm needed no fixes; Owner review found and fixed one wrong value in the acceptance oracle *this repo's own docs* had specified — see process note below |
 | M009 | #464 | #471 | Merged | B-4.0's `calculatedStress` confirmed real, production-wired, and already displayed/exported — not a gap. Broad "implement stress recovery" declined (no mandate text to justify scope beyond what exists); pressure-stress-from-geometry and EditionDataset-import gaps logged but not authorized. Closed-form verification benchmark added at `lfea-b4.1` (#469), Owner-validated including hand-verified arithmetic |
 
 ### Non-LFEA workstreams (user-directed pivot, 4 parallel read-only audits + direct fixes)
@@ -100,19 +100,19 @@ section/support resolution → M008-D production integration) rather than one
 large mission; M008-A's own Owner review needed no fixes — every anti-drift
 addendum rule was genuinely implemented (not just present as dead code) and
 every fail-closed case was exercised against the real target branch.
-M008-B (#475) is now live: the branch-extraction algorithm populating a
-`workspace-branch-subset/v1` manifest's `entityIds`/`routeIds`/
+**M008-B — done.** The branch-extraction algorithm (`extractBranchSubset`)
+populating a `workspace-branch-subset/v1` manifest's `entityIds`/`routeIds`/
 `supportEntityIds`/`boundaryPorts` from a real dataset, reusing
 `route-partition-model.js`'s real `buildRoutePartitionModel` rather than
 reimplementing connectivity, and sealing its output through M008-A's real
-`sealBranchSubsetManifest`. Dispatched without a prequalification gate —
-the design questions were already resolved during M008/M008-A's review, and
-the issue pins a concrete acceptance oracle: M008-A's own already-validated
-`w11.2` fixture values (16 entities, 9 supports, 2 boundary ports with real
-node IDs and `externalReference` branch citations) are ground truth the
-extraction algorithm must reproduce, not something to adjust to match a new
-result. This remains the single highest-mandate-value remaining item and
-the prerequisite for P12.
+`sealBranchSubsetManifest`. Dispatched without a prequalification gate; the
+algorithm itself needed no fixes and even improved on the issue's own spec
+(tracks *which* external branch touches a boundary point, fails closed on
+ambiguity). Owner review did find and fix two defects — both self-inflicted,
+in the acceptance oracle and profile the issue itself specified, not in the
+agent's work; see the process note below. M008-C (material/section/support
+raw-evidence resolution) is the next slice, not yet scoped. This remains the
+single highest-mandate-value remaining item and the prerequisite for P12.
 
 **M009 — done.** Stress recovery for frame/pipe elements (mandate
 §13.3, no saved verbatim text found — the working definition used was
@@ -245,3 +245,25 @@ plausible explanation.
   `linear-piping-presentation-anti-drift-check.mjs`, and presence under the
   project's Playwright `testDir`. `check:lfea-linear-core` now completes end
   to end as a single command for the first time since M001 merged.
+- **A hand-typed fixture value for a free-text field is not verified ground
+  truth, even after it passes a real contract's real validation — and an
+  Owner can propagate that mistake into a later issue's spec just as easily
+  as an agent can.** M008-A's `w11.2` fixture declared a boundary port's
+  `externalReference` as `/ASIM-1885-PL-8"-S8810104-01/B1`. It passed
+  `sealBranchSubsetManifest`'s real validation, because that contract only
+  checks that a declared boundary node genuinely qualifies as one — it has
+  no way to check whether the *declared neighbor* is real, since
+  `externalReference` is caller-supplied free text by design. When the
+  M008-B issue (#475) was written, that fixture value was copied forward as
+  part of the "concrete acceptance oracle" without independently re-checking
+  it — and M008-B's real, algorithmic `extractBranchSubset` disagreed with
+  it. Investigating directly (not assuming either side was right) found the
+  named branch does not exist anywhere in the real 279-object dataset, and
+  no entity anywhere shares that point: the real answer is a physical
+  terminus, and the fixture's value had been illustrative, not derived. The
+  extraction algorithm needed no change; the check's expectation did. Lesson
+  for scoping future issues: a value that merely *passed a schema
+  validator* is not the same claim as a value that was *independently
+  derived from real data* — don't reuse the former as if it were the
+  latter without re-deriving or re-checking it, even when writing the spec
+  yourself.
