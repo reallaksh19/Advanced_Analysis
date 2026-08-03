@@ -45,8 +45,9 @@ current source — do not trust the document alone.
 | M008-C | #480 | #488 | Merged | `resolveBranchMaterialSectionAuthority` — real `MTXX`/`DTXR`/`ABORE` parsing → real B-2.2/B-2.3 sealed resolutions (ASTM A234-WPB/A105 as distinct governed materials, NPS8 Sch100 section) for the branch's pipe/fitting entities, with deterministic auto-pipe inheritance and explicit gasket/support skips. No fixes needed; Owner independently cross-checked the cited ASME B36.10 dimensions and material properties |
 | M009 | #464 | #471 | Merged | B-4.0's `calculatedStress` confirmed real, production-wired, and already displayed/exported — not a gap. Broad "implement stress recovery" declined (no mandate text to justify scope beyond what exists); pressure-stress-from-geometry and EditionDataset-import gaps logged but not authorized. Closed-form verification benchmark added at `lfea-b4.1` (#469), Owner-validated including hand-verified arithmetic |
 | M010 | #485 | #491 | Merged | `derivePressureStressContribution`/`resolvePressureStressContribution` — closes M009's logged pressure-stress gap by deriving `S = P·Do/(4·t)` from the real, sealed `PRESSURE` load primitive and wiring it into `linear-piping-code-application`. Owner review found and fixed a real over-broad-blocking bug (one element's unimplemented pressure effect incorrectly blocked every other element's check in the same load case) invisible to the agent's own single-element-per-case tests — see process note below |
-| M012 | #495 | — | Issued | Gravity expansion consumes the already-declared-but-unconsumed `DISTRIBUTED_WEIGHT` primitive for `CONTENTS`/`INSULATION` mass sources; `PIPE_WALL` unchanged. Prerequisite for M013. Cross-checked formula against Appendix S Table S301.3.1's real published combined unit weight before writing the issue (0.03% deviation) |
-| M013 | #496 | — | Issued (depends on M012 merging first) | ASME B31.3 Appendix S Example 1 — real published benchmark against Tables S301.5.1/S301.5.2 (displacements, rotations, reactions). Stiffness/displacement scope only; sustained-stress/displacement-stress-range benchmarking (Tables S301.6/S301.7) deferred to a future Work Pack pending its own code-engine section-modulus investigation |
+| M012 | #495 | #499 | Merged (`e4d7392`), hotfixed (#500, `2684fc3`) | Gravity expansion consumes the already-declared-but-unconsumed `DISTRIBUTED_WEIGHT` primitive for `CONTENTS`/`INSULATION` mass sources; `PIPE_WALL` unchanged. Merged by self-audit **without the required proof commands run against the real repository** (PR body said so explicitly). Owner re-verification post-merge found `check:linear-piping-analysis-consumer` red on `main` (anti-drift check asserted `densityEvidence`/`geometryEvidence` against the wrong sibling file after the agent's own file split); fixed and merged as #500. `check:lfea-linear-core` confirmed green end to end after the fix — see process note below |
+| M013 | #496 | — | Blocked — real prerequisite gap found, not yet unblocked | ASME B31.3 Appendix S Example 1 — real published benchmark against Tables S301.5.1/S301.5.2. Correctly stopped at its own explicit stop-and-report condition rather than working around it: piping-component elements (`buildBendComponent`/`generateComponentElement`) hard-code `temperature: null` with no override path, and no production consumer binds `TEMPERATURE` primitives into them — both elbows would silently carry zero thermal strain in the TW-1 comparison. Owner independently verified the claim by reading the cited files directly before accepting it. Now depends on M014 (#501) as well as M012; check-script slot moves to `check:lfea-b3.12` (comment on #496) |
+| M014 | #501 | — | Issued (prerequisite for M013) | Bind sealed `TEMPERATURE` primitives into piping-component elements' initial-strain vectors via a new consumer, structurally parallel to gravity's own post-construction augmentation (M007/M012). Confirmed by direct inspection that everything needed — `thermalInitialStrainVector`, `condenseEndConditions`, `transformLoadToGlobal`, `frameOffsetMatrix` — is already exported from `linear-fea-frame-element` and reusable with zero changes to `component-elements.js`/`bend-component.js` |
 
 ### Non-LFEA workstreams (user-directed pivot, 4 parallel read-only audits + direct fixes)
 
@@ -420,3 +421,29 @@ plausible explanation.
   reviewing any per-record validation function, check what collection it
   actually iterates over versus what it's conceptually supposed to be
   scoped to.
+- **A merge that bypasses the Owner's real-repository verification step is not
+  a shortcut, it's a live outage waiting to be found.** M012 (#499) was
+  merged by self-audit with its own PR body stating plainly that the
+  required proof commands were never run against the real repository — only
+  `node --check` syntax validation and a standalone stub harness, because
+  the implementing sandbox had no repository checkout. That sandbox
+  limitation is normal and expected (it's exactly why the Owner review step
+  exists); what changed this time is that the merge happened *before* that
+  step ran, not after. The result was concrete, not hypothetical:
+  `check:linear-piping-analysis-consumer` was red on `main` for roughly 90
+  minutes (an anti-drift assertion checked `densityEvidence`/
+  `geometryEvidence` against `gravity-expansion-mass-sources.js`, but that
+  citation actually lives in the sibling `gravity-expansion-primitives.js`
+  after the agent's own file split — a one-line grep would have caught it).
+  `gate`/`check:lfea-linear-core` would have failed for anyone who ran them
+  against `main` in that window. Fixed by cloning the exact merged head into
+  an isolated worktree, running every required command for real, finding
+  and fixing the mistargeted assertion, and re-running the full aggregate
+  before pushing the fix (#500). The standing rule this reinforces, not
+  changes: a PR's own "proof status" section is a claim, not a proof, no
+  matter how honestly it's written — the Owner (or whoever holds merge
+  authority) runs the real commands against the real head *before* merging,
+  every time, with no exception for self-audited or time-pressured merges.
+  If a merge happens without that step, treat it exactly like an unreviewed
+  PR that happens to already be on `main`: verify it for real at the first
+  opportunity, not on faith that the description was accurate.
