@@ -1,4 +1,4 @@
-name: Core Application Chunk Repair
+name: Dependency-Aware Chunk Repair
 
 on:
   push:
@@ -23,7 +23,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Split focused core domains and validate production build
+      - name: Validate dependency-aware chunking
         env:
           GH_TOKEN: ${{ github.token }}
           ORIGINAL_SHA: ${{ github.sha }}
@@ -33,19 +33,19 @@ jobs:
           mkdir -p reports/qualification
           fail() {
             stage="$1"; log="$2"
-            detail=$(node -e "const fs=require('fs');const p=process.argv[1];const t=fs.existsSync(p)?fs.readFileSync(p,'utf8'):'missing log';process.stdout.write(t.split(/\r?\n/).map(s=>s.trim()).filter(Boolean).slice(-35).join(' | ').slice(0,5000))" "$log")
+            detail=$(node -e "const fs=require('fs');const p=process.argv[1];const t=fs.existsSync(p)?fs.readFileSync(p,'utf8'):'missing log';process.stdout.write(t.split(/\r?\n/).map(s=>s.trim()).filter(Boolean).slice(-40).join(' | ').slice(0,6000))" "$log")
             encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
             gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
-              -f state=failure -f context="lafea/chunk-repair/${stage}" \
-              -f description="Core chunk repair failed at ${stage}" \
+              -f state=failure -f context="lafea/chunk-aware/${stage}" \
+              -f description="Dependency-aware chunking failed at ${stage}" \
               -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${ORIGINAL_SHA}?lafea_error=${encoded}"
             exit 1
           }
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
-            -f state=pending -f context=lafea/chunk-repair \
-            -f description="Validating focused core chunk split"
+            -f state=pending -f context=lafea/chunk-aware \
+            -f description="Testing dependency-aware manual chunks"
 
-          python - <<'PY' > reports/qualification/chunk-patch.stdout.log 2> reports/qualification/chunk-patch.stderr.log || true
+          python - <<'PY' > reports/qualification/chunk-aware-patch.stdout.log 2> reports/qualification/chunk-aware-patch.stderr.log || true
           from pathlib import Path
           path = Path('vite.config.js')
           text = path.read_text()
@@ -58,18 +58,26 @@ jobs:
           }
           if (source.includes('/src/core/')) return 'core-application';"""
           if text.count(marker) != 1:
-              raise RuntimeError(f'marker count={text.count(marker)}')
-          path.write_text(text.replace(marker, replacement, 1))
+              raise RuntimeError(f'core marker count={text.count(marker)}')
+          if text.count('        onlyExplicitManualChunks: true,') != 1:
+              raise RuntimeError('manual chunk option marker missing')
+          text = text.replace(marker, replacement, 1)
+          text = text.replace(
+              '        onlyExplicitManualChunks: true,',
+              '        onlyExplicitManualChunks: false,',
+              1,
+          )
+          path.write_text(text)
           PY
-          [[ -s reports/qualification/chunk-patch.stderr.log ]] \
-            && fail PATCH reports/qualification/chunk-patch.stderr.log
+          [[ -s reports/qualification/chunk-aware-patch.stderr.log ]] \
+            && fail PATCH reports/qualification/chunk-aware-patch.stderr.log
 
           npm run build \
-            > reports/qualification/chunk-build.stdout.log \
-            2> reports/qualification/chunk-build.stderr.log \
-            || fail BUILD reports/qualification/chunk-build.stdout.log
+            > reports/qualification/chunk-aware-build.stdout.log \
+            2> reports/qualification/chunk-aware-build.stderr.log \
+            || fail BUILD reports/qualification/chunk-aware-build.stdout.log
 
-          node --input-type=module <<'NODE' > reports/qualification/chunk-sizes.json
+          node --input-type=module <<'NODE' > reports/qualification/chunk-aware-sizes.json
           import fs from 'node:fs';
           import path from 'node:path';
           const assets = path.resolve('dist/assets');
@@ -83,28 +91,28 @@ jobs:
           git add vite.config.js
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "fix(build): split large core application domains" \
-            > reports/qualification/chunk-commit.stdout.log \
-            2> reports/qualification/chunk-commit.stderr.log \
-            || fail COMMIT reports/qualification/chunk-commit.stderr.log
+          git commit -m "fix(build): use dependency-aware manual chunks" \
+            > reports/qualification/chunk-aware-commit.stdout.log \
+            2> reports/qualification/chunk-aware-commit.stderr.log \
+            || fail COMMIT reports/qualification/chunk-aware-commit.stderr.log
           repaired_sha=$(git rev-parse HEAD)
           git push origin HEAD:bucket-01-cantilever-benchmark-route \
-            > reports/qualification/chunk-push.stdout.log \
-            2> reports/qualification/chunk-push.stderr.log \
-            || fail PUSH reports/qualification/chunk-push.stderr.log
-          largest=$(node -e "const r=require('./reports/qualification/chunk-sizes.json');process.stdout.write(r[0].name+':'+r[0].bytes)")
+            > reports/qualification/chunk-aware-push.stdout.log \
+            2> reports/qualification/chunk-aware-push.stderr.log \
+            || fail PUSH reports/qualification/chunk-aware-push.stderr.log
+          largest=$(node -e "const r=require('./reports/qualification/chunk-aware-sizes.json');process.stdout.write(r[0].name+':'+r[0].bytes)")
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
             -f state=success \
             -f context="lafea/repaired-head/${repaired_sha:0:12}" \
-            -f description="Focused core chunk split published" \
+            -f description="Dependency-aware chunk repair published" \
             -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${repaired_sha}"
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${ORIGINAL_SHA}" \
-            -f state=success -f context=lafea/chunk-repair \
+            -f state=success -f context=lafea/chunk-aware \
             -f description="Production build passed; largest ${largest}"
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: core-chunk-repair-${{ github.sha }}
+          name: dependency-aware-chunks-${{ github.sha }}
           path: reports/qualification/
           if-no-files-found: warn
           retention-days: 30
