@@ -1,4 +1,4 @@
-name: LAFEA Bucket-01 Production Response Diagnostic
+name: LAFEA Bucket-01 Graded Lug Probe Diagnostic
 
 on:
   push:
@@ -10,9 +10,9 @@ permissions:
   statuses: write
 
 jobs:
-  response:
+  lug-probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,7 +22,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Execute production response and publish receipt detail
+      - name: Execute p1.10 checkerboard lug probe diagnostic
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_HEAD_SHA: ${{ github.sha }}
@@ -31,34 +31,123 @@ jobs:
           set -euo pipefail
           mkdir -p reports/qualification
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -f state=pending -f context=lafea/production-response-detail \
-            -f description="Executing 64/256/1024 production response"
+            -f state=pending -f context=lafea/graded-lug-probe-detail \
+            -f description="Recovering fixed probes on p1.10 checkerboard mesh"
+
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          mesh_path = Path('src/core/lafea-meshing/lug-pinhole-t6.js')
+          text = mesh_path.read_text()
+          split_pattern = re.compile(
+              r"(?P<indent>\s*)addT6Element\(state, `E-R\$\{ring\}-S\$\{sector\}-A`, \[\s*"
+              r"innerA, outerA, outerB,\s*\]\);\s*"
+              r"addT6Element\(state, `E-R\$\{ring\}-S\$\{sector\}-B`, \[\s*"
+              r"innerA, outerB, innerB,\s*\]\);"
+          )
+          match = split_pattern.search(text)
+          if not match:
+              raise RuntimeError('element split marker missing')
+          indent = match.group('indent').split('\n')[-1]
+          ring_token = '{ring}'
+          sector_token = '{sector}'
+          replacement = '\n'.join([
+              f'{indent}const alternateDiagonal = (ring + sector) % 2 === 1;',
+              f'{indent}if (alternateDiagonal) {{',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-A`, [',
+              f'{indent}    innerA, outerA, innerB,',
+              f'{indent}  ]);',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-B`, [',
+              f'{indent}    outerA, outerB, innerB,',
+              f'{indent}  ]);',
+              f'{indent}}} else {{',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-A`, [',
+              f'{indent}    innerA, outerA, outerB,',
+              f'{indent}  ]);',
+              f'{indent}  addT6Element(state, `E-R${ring_token}-S${sector_token}-B`, [',
+              f'{indent}    innerA, outerB, innerB,',
+              f'{indent}  ]);',
+              f'{indent}}}',
+          ])
+          text = split_pattern.sub(lambda _: replacement, text, count=1)
+          radius_pattern = re.compile(
+              r"function radiusAt\(spec, ring\) \{\s*"
+              r"return spec\.holeRadius\s*"
+              r"\+ \(spec\.outerRadius - spec\.holeRadius\)\s*"
+              r"\* ring / spec\.radialDivisions;\s*"
+              r"\}"
+          )
+          radius_replacement = '''function radiusAt(spec, ring) {
+            const normalized = ring / spec.radialDivisions;
+            const graded = normalized <= 0.5
+              ? 0.5 * (2 * normalized) ** 1.1
+              : 1 - 0.5 * (2 * (1 - normalized)) ** 1.1;
+            return spec.holeRadius
+              + (spec.outerRadius - spec.holeRadius) * graded;
+          }'''
+          text, count = radius_pattern.subn(lambda _: radius_replacement, text, count=1)
+          if count != 1:
+              raise RuntimeError('radiusAt marker missing')
+          mesh_path.write_text(text)
+
+          receipt_path = Path('scripts/lafea-bucket-01-production-lug-probe-receipt.mjs')
+          receipt = receipt_path.read_text()
+          marker = '''  assert.equal(
+              convergence.status,
+              'PASS',
+              `${definition.probeId}: ${convergence.reasons.join(', ')}`,
+            );'''
+          diagnostic = '''  console.error(`LUG_PROBE_DETAIL=${JSON.stringify({
+              probeId: definition.probeId,
+              zone: definition.zone,
+              physicalCoordinates: { x: definition.x, y: definition.y },
+              probeEvidences: probeEvidences.map((row) => ({
+                authoritativeValue: row.authoritativeValue,
+                containingElementId: row.containingElementId,
+                naturalCoordinates: row.naturalCoordinates,
+                mappingResidual: row.mappingResidual,
+                integrationPointValues: row.integrationPointValues,
+              })),
+              convergence,
+            })}`);
+            assert.equal(
+              convergence.status,
+              'PASS',
+              `${definition.probeId}: ${convergence.reasons.join(', ')}`,
+            );'''
+          if receipt.count(marker) != 1:
+              raise RuntimeError(f'probe assertion marker count={receipt.count(marker)}')
+          receipt_path.write_text(receipt.replace(marker, diagnostic, 1))
+          PY
+
           node scripts/lafea-bucket-01-production-response-runner.mjs \
-            > reports/qualification/response-runner.stdout.log \
-            2> reports/qualification/response-runner.stderr.log
+            > reports/qualification/graded-lug-runner.stdout.log \
+            2> reports/qualification/graded-lug-runner.stderr.log
           set +e
-          node scripts/lafea-bucket-01-production-response-receipt.mjs \
-            > reports/qualification/response-receipt.stdout.log \
-            2> reports/qualification/response-receipt.stderr.log
+          node scripts/lafea-bucket-01-production-lug-probe-receipt.mjs \
+            > reports/qualification/graded-lug-receipt.stdout.log \
+            2> reports/qualification/graded-lug-receipt.stderr.log
           exit_code=$?
           set -e
+          detail=$(node -e "const fs=require('fs');const t=fs.readFileSync('reports/qualification/graded-lug-receipt.stderr.log','utf8');const line=t.split(/\r?\n/).find(s=>s.startsWith('LUG_PROBE_DETAIL='));process.stdout.write((line||t).slice(0,7000))")
+          encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
           if [[ "$exit_code" == "0" ]]; then
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-              -f state=success -f context=lafea/production-response-detail \
-              -f description="Production response convergence passed"
+            state=success
+            description="All graded lug fixed probes passed"
           else
-            detail=$(node -e "const fs=require('fs');const out=fs.readFileSync('reports/qualification/response-receipt.stdout.log','utf8');const err=fs.readFileSync('reports/qualification/response-receipt.stderr.log','utf8');process.stdout.write((err.trim()||out.trim()).slice(-6000))")
-            encoded=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "$detail")
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-              -f state=failure -f context=lafea/production-response-detail \
-              -f description="Production response convergence blocked" \
-              -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_error=${encoded}"
+            state=failure
+            description="Graded lug fixed probe convergence blocked"
           fi
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state="$state" -f context=lafea/graded-lug-probe-detail \
+            -f description="$description" \
+            -f target_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}?lafea_probe=${encoded}"
           exit "$exit_code"
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lafea-production-response-detail-${{ github.sha }}
+          name: lafea-graded-lug-probe-detail-${{ github.sha }}
           path: reports/qualification/
           if-no-files-found: warn
           retention-days: 30
