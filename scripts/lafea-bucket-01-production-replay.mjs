@@ -93,7 +93,6 @@ const reportHashes = Object.fromEntries(
 );
 const canonicalStdout = `${JSON.stringify({
   schema: 'lafea-bucket-01-production-replay-summary/v1',
-  replayId,
   exactHeadSha,
   definitionSetHash: reports.expectedValueDefinition.definitionSetHash,
   reportHashes,
