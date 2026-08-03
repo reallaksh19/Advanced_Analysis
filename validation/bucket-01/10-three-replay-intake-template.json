@@ -1,0 +1,47 @@
+{
+  "schema": "lafea-bucket-01-three-replay-intake-template/v1",
+  "templateId": "B01-THREE-REPLAY-INTAKE-01",
+  "bucketId": "LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE",
+  "target": "C2D-LUG-PINHOLE -> LAFEA.3",
+  "status": "UNRESOLVED_GATE",
+  "requiredGlobalIdentity": {
+    "custodyId": null,
+    "exactHeadSha": null,
+    "baselineSha": null,
+    "commandHash": null,
+    "toolchainHash": null,
+    "definitionSetHash": null
+  },
+  "requiredReplayCount": 3,
+  "requiredPerReplay": {
+    "replayId": null,
+    "exactHeadSha": null,
+    "exitCode": 0,
+    "trackedTreeClean": true,
+    "exactHeadMatched": true,
+    "baselineAncestorConfirmed": true,
+    "exactHeadReportStatus": "EXACT_HEAD_REPAIR_EVIDENCE_PASS",
+    "reportHashes": {
+      "exactHeadReport": null,
+      "repairReport": null,
+      "productionProjection": null,
+      "productionExecution": null,
+      "productionResponse": null,
+      "productionLugStress": null,
+      "codeBasisPackage": null
+    },
+    "stdoutHash": null,
+    "stderrHash": null,
+    "evidenceSetHash": null
+  },
+  "acceptanceRules": [
+    "exactly three distinct replay IDs",
+    "same exact candidate head for every replay",
+    "zero exit code and clean tracked tree for every replay",
+    "exact-head assertions and baseline ancestry pass for every replay",
+    "all required report hashes are present",
+    "evidence-set, stdout, stderr and every report hash are identical across all three replays",
+    "failed or divergent replay may not be omitted or replaced"
+  ],
+  "currentDisposition": "THREE_EXTERNAL_REPLAY_BUNDLES_NOT_SUPPLIED"
+}

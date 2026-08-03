@@ -19,6 +19,7 @@ const checkDefinitions = [
   { id: 'GOVERNED_T6_KIRSCH_FIXED_PROBES', script: 'scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs' },
   { id: 'PRODUCTION_LUG_FIXED_PROBE_LOCATION_CONTRACT', script: 'scripts/lafea-bucket-01-production-lug-probe-contract-check.mjs' },
   { id: 'CODE_BASIS_INTAKE_CONTRACT', script: 'scripts/lafea-bucket-01-code-basis-check.mjs' },
+  { id: 'THREE_REPLAY_CUSTODY_CONTRACT', script: 'scripts/lafea-bucket-01-replay-custody-check.mjs' },
   { id: 'GOVERNED_T3_PATCH_RECEIPT', script: 'scripts/lafea-bucket-01-t3-patch-check.mjs' },
   { id: 'GOVERNED_PURE_SHEAR_RECEIPT', script: 'scripts/lafea-bucket-01-pure-shear-check.mjs' },
   { id: 'MANUFACTURED_PURE_BENDING_PANEL', script: 'scripts/lafea-bucket-01-pure-bending-panel-check.mjs' },
@@ -31,7 +32,7 @@ const checks = checkDefinitions.map((definition) => runNodeCheck(definition));
 const failed = checks.filter((check) => check.status !== 'PASS');
 const repairChecksPass = failed.length === 0;
 const report = {
-  schema: 'lafea-bucket-01-repair-check-report/v10',
+  schema: 'lafea-bucket-01-repair-check-report/v11',
   status: repairChecksPass ? 'REPAIR_CHECKS_PASS' : 'REPAIR_CHECKS_FAIL',
   bucketId: 'LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE',
   target: 'C2D-LUG-PINHOLE -> LAFEA.3',
@@ -50,6 +51,8 @@ const report = {
     productionLugProbeEvidenceGenerated: false,
     codeBasisIntakeContractVerified: repairChecksPass,
     codeBasisAuthoritySupplied: false,
+    threeReplayCustodyContractVerified: repairChecksPass,
+    externalReplayBundlesSupplied: false,
     governedT3PatchOracleFrozen: true,
     governedT3PatchEvidenceGenerated: repairChecksPass,
     governedPureShearOracleFrozen: true,
@@ -76,7 +79,9 @@ const report = {
     governedKirschFixedProbeBenchmarkImplemented: repairChecksPass,
     productionLugFixedProbeContractImplemented: repairChecksPass,
     codeBasisIntakeContractImplemented: repairChecksPass,
+    threeReplayCustodyContractImplemented: repairChecksPass,
     governingCodeSelected: false,
+    replayPassClaimedForRepositoryCandidate: false,
     governedT3PatchBenchmarkImplemented: repairChecksPass,
     governedPureShearBenchmarkImplemented: repairChecksPass,
     manufacturedPanelBenchmarkImplemented: repairChecksPass,
