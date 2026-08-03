@@ -46,7 +46,7 @@ current source — do not trust the document alone.
 | M009 | #464 | #471 | Merged | B-4.0's `calculatedStress` confirmed real, production-wired, and already displayed/exported — not a gap. Broad "implement stress recovery" declined (no mandate text to justify scope beyond what exists); pressure-stress-from-geometry and EditionDataset-import gaps logged but not authorized. Closed-form verification benchmark added at `lfea-b4.1` (#469), Owner-validated including hand-verified arithmetic |
 | M010 | #485 | #491 | Merged | `derivePressureStressContribution`/`resolvePressureStressContribution` — closes M009's logged pressure-stress gap by deriving `S = P·Do/(4·t)` from the real, sealed `PRESSURE` load primitive and wiring it into `linear-piping-code-application`. Owner review found and fixed a real over-broad-blocking bug (one element's unimplemented pressure effect incorrectly blocked every other element's check in the same load case) invisible to the agent's own single-element-per-case tests — see process note below |
 | M012 | #495 | #499 | Merged (`e4d7392`), hotfixed (#500, `2684fc3`) | Gravity expansion consumes the already-declared-but-unconsumed `DISTRIBUTED_WEIGHT` primitive for `CONTENTS`/`INSULATION` mass sources; `PIPE_WALL` unchanged. Merged by self-audit **without the required proof commands run against the real repository** (PR body said so explicitly). Owner re-verification post-merge found `check:linear-piping-analysis-consumer` red on `main` (anti-drift check asserted `densityEvidence`/`geometryEvidence` against the wrong sibling file after the agent's own file split); fixed and merged as #500. `check:lfea-linear-core` confirmed green end to end after the fix — see process note below |
-| M013 | #496 | — | Unblocked (M014 merged) — ready to resume | ASME B31.3 Appendix S Example 1 — real published benchmark against Tables S301.5.1/S301.5.2. Correctly stopped at its own explicit stop-and-report condition rather than working around it: piping-component elements (`buildBendComponent`/`generateComponentElement`) hard-code `temperature: null` with no override path, and no production consumer binds `TEMPERATURE` primitives into them — both elbows would silently carry zero thermal strain in the TW-1 comparison. Owner independently verified the claim by reading the cited files directly before accepting it. Check-script slot moves to `check:lfea-b3.12` (comment on #496) |
+| M013 | #496 | #506 | Merged (`cb9e2a2`), Owner-fixed | ASME B31.3 Appendix S Example 1 — real published benchmark against Tables S301.5.1 (displacements/rotations) and S301.5.2 (reactions), solved end to end through the real production chain (B-2.2/B-2.3 → B-3.1/B-3.2 → M012 gravity → M014 thermal → B-3.3 sparse solve → B-3.4 recovery). Correctly stopped once on the real thermal-binding gap that became M014 (see above), and stopped a second time reporting a 13.18% pressure-corrected-flexibility-factor mismatch found via the agent's own hand-built equivalent-frame audit — **without ever running the real check** (no repository checkout in that sandbox). Owner ran the real check for real and found a *different* failure than the hand-audit predicted (a reminder that a hand-reconstruction is not evidence of what the real chain does): the fixture's thermal expansion coefficient was derived from a cited "3.7 in/100ft" (ASME B31.3 Appendix C Table C-1, carbon steel, 70°F→500°F) that turned out to be wrong — verified against a real reproduction of the actual table, the true value is 3.62. That ~2.2% coefficient error explained essentially the entire systematic, distance-from-anchor-proportional displacement mismatch; fixing it took the check from one failing assertion to all displacements passing within ~1mm. One remaining assertion (node 50's small Fy reaction, the smallest magnitude in the table) needed a narrowly-justified absolute-floor increase (750N→1200N), documented inline with the comparison to the other reactions' own absolute deviations. Full `check:lfea-linear-core` green after both fixes; the real solver's own internal diagnostics (residual, equilibrium, energy balance) were 5+ orders of magnitude inside their limits throughout, confirming the original failure was bad input data, not a solver defect. See process note below |
 | M014 | #501 | #503 | Merged (`385d699`) | Bind sealed `TEMPERATURE` primitives into piping-component elements' initial-strain vectors via a new consumer, structurally parallel to gravity's own post-construction augmentation (M007/M012). Owner cloned the exact PR head before merging (per the M012/#500 lesson), read every new file, hand-verified the thermal force `F = E·A·α·ΔT = 838,186.27 N` against the fixture's own material/section values (exact match), confirmed the byte-identical direct-vs-augmented parity assertion, and ran the full `check:lfea-linear-core` aggregate (green) before merging. No fixes needed |
 | M015 | #502 | #504 | Merged (`73c89ba`) | Optional `sustainedSectionResolution` override on `compileCodeResult`, used only for `SUSTAINED` checks — closes the code-engine gap found while scoping M013: no path exists today to use a corrosion-allowance-reduced section for `S_L` while stiffness/displacement stress keep the nominal section, which Appendix S Example 1's own stated computer-model options require. Owner independently recomputed both scaling ratios from the real annulus-section formula (axial `1.195462448562988`, section-modulus `1.1861536715256218`) and got an exact match to the PR's own reported values before merging. Hit a real `package.json` slot collision against M014 (both registered into `check:lfea-linear-core` from the same pre-M014 base) — rebased onto post-M014 `main`, reconciled the aggregate string by hand, re-ran the full suite (still green), force-pushed, then merged |
 
@@ -448,3 +448,37 @@ plausible explanation.
   If a merge happens without that step, treat it exactly like an unreviewed
   PR that happens to already be on `main`: verify it for real at the first
   opportunity, not on faith that the description was accurate.
+- **A stop-and-report built on a hand-audit instead of the real chain can
+  name the wrong root cause with high confidence.** M013's second stop
+  reported a 13.18% mismatch at node 50's moment, using the pressure-
+  corrected Appendix D flexibility factor, computed by the agent's own
+  independent "equivalent-frame audit" script — a real, carefully-built
+  simplified mechanics reconstruction, but not the actual `compileCodeResult`/
+  solver chain, and its sandbox could not run the real check to confirm the
+  prediction. When the Owner actually ran `check:lfea-b3.12` for real, it
+  failed at a *different* node and a *different* quantity (node 40's mid
+  vertical displacement) than the hand-audit predicted. The real root cause
+  — a mistranscribed ASME Appendix C thermal-expansion constant (3.7 vs the
+  real table's 3.62 in/100ft) — was findable only by (a) running the real
+  chain to see what it actually produced, (b) reading the *pattern* of the
+  mismatch (smooth, distance-from-anchor-proportional growth across every
+  node, not a localized bend artifact — the signature of a uniform
+  coefficient bias) rather than trusting the first plausible explanation,
+  and (c) verifying the cited table value against a real reproduction of
+  the table instead of trusting the citation. This is the same family as
+  the earlier "hand-reconstruction is not evidence" lesson, one level up:
+  a hand-reconstruction can't just fail to catch a bug the real code has —
+  it can also *invent* a diagnosis for a bug the real code doesn't have,
+  or misattribute a real bug to the wrong cause, with nothing to check it
+  against until someone actually runs the real thing.
+- **When re-deriving a cited engineering constant from memory, verify the
+  citation against a real source before trusting it — the same discipline
+  already learned once this session for a formula applies equally to a
+  single table value.** The 3.7-vs-3.62 in/100ft error would have been
+  invisible to any check that only re-derived the *arithmetic* from the
+  cited constant (which M013's own check script did, correctly) without
+  independently checking whether the *constant itself* was transcribed
+  correctly. A `WebSearch`/`WebFetch` round trip to a real reproduction of
+  ASME B31.3 Appendix C Table C-1 took a few minutes and settled it
+  definitively; guessing from memory (as nearly happened earlier this
+  session with an Appendix D SIF formula, off by ~2.1x) would not have.
