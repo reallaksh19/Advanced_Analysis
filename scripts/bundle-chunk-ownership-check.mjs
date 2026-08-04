@@ -49,7 +49,8 @@ assert.equal(manualChunk('/repo/src/main.js'), undefined);
 assert.equal(viteSource.includes("return 'workspace-"), false);
 assert.equal(viteSource.includes("return 'fea-workbenches'"), false);
 assert.equal(viteSource.includes("if (source.includes('/src/workspace/')) return undefined;"), true);
-assert.equal(viteSource.includes('onlyExplicitManualChunks: true'), true);
+assert.equal(viteSource.includes('onlyExplicitManualChunks: false'), true);
+assert.equal(viteSource.includes('onlyExplicitManualChunks: true'), false);
 assert.equal(viteSource.includes('chunkSizeWarningLimit'), false);
 assert.equal(policySource.includes('const maximumBytes = 500 * 1024;'), true);
 assert.equal(policySource.includes('chunk.bytes <= maximumBytes'), true);
@@ -58,7 +59,8 @@ assert.equal(new Set(expectedOwnership.values()).size >= 8, true);
 console.log(JSON.stringify({
   check: 'bundle-chunk-ownership',
   status: 'PASS',
-  explicitManualChunks: true,
+  explicitManualChunks: false,
+  dependencyAwareManualChunks: true,
   chunkSizePolicyBytes: 500 * 1024,
   ownershipAssertions: expectedOwnership.size,
   automaticWorkspaceOwnershipAssertions: automaticWorkspaceOwnership.length,
