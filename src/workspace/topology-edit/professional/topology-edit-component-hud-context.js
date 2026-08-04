@@ -76,9 +76,14 @@ export function deriveTopologyEditComponentHudContext(input = {}) {
   });
 
   const matches = topology.edges.filter((edge) => edge.id === edgeId);
-  if (matches.length !== 1) {
+  if (!matches.length) return context({
+    status: 'NO_SELECTION',
+    catalogue,
+    topology,
+  });
+  if (matches.length > 1) {
     throw new RangeError(
-      `TopologyEditComponentHudContext: selected edge ${edgeId} must resolve exactly once.`,
+      `TopologyEditComponentHudContext: selected edge ${edgeId} is ambiguous.`,
     );
   }
   const edge = matches[0];
