@@ -87,6 +87,14 @@ function normalizeEntity({ item, node }, sourceIdIndex) {
   const entityType = resolveEntityType(item);
   const entityId = internalEntityId(node, sourceIdIndex);
   const sourcePath = node.sourcePath;
+  const properties = buildEntityProperties(item, {
+    entityId,
+    sourceEntityId: node.sourceEntityId,
+    name: node.name,
+    entityType,
+    sourcePath,
+  });
+  const dimensions = extractEntityDimensions(item);
   return freezeDeep({
     entityId,
     sourceEntityId: node.sourceEntityId,
@@ -104,7 +112,10 @@ function normalizeEntity({ item, node }, sourceIdIndex) {
     lineNumber: node.lineNumber || '',
     service: node.service || '',
     pipingClass: node.pipingClass || '',
-    nominalDiameterMm: node.nominalDiameterMm || null,
+    nominalDiameterMm: node.nominalDiameterMm || dimensions.boreMm || null,
+    outsideDiameterMm: dimensions.outsideDiameterMm,
+    boreMm: dimensions.boreMm,
+    wallThicknessMm: dimensions.wallThicknessMm,
     insulationCode: node.insulationCode || '',
     branchSuffix: node.branchSuffix || '',
     componentReference: stringValue(item.attributes?.REF || item.attributes?.NAME),
@@ -116,7 +127,7 @@ function normalizeEntity({ item, node }, sourceIdIndex) {
     sourceDepth: node.depth,
     sourceRootGroup: node.rootGroup,
     category: isSupportType(entityType) ? 'support' : isPipeType(entityType) ? 'pipe' : 'component',
-    properties: buildEntityProperties(item, { entityId, sourceEntityId: node.sourceEntityId, name: node.name, entityType, sourcePath }),
+    properties,
   });
 }
 
@@ -136,6 +147,64 @@ function buildEntityProperties(item, identity) {
     nativeParams: clonePlain(item.nativeParams || {}),
     diagnostics: clonePlain(Array.isArray(item.diagnostics) ? item.diagnostics : []),
   });
+}
+
+function extractEntityDimensions(item) {
+  const attributes = item?.attributes || {};
+  const enriched = item?.enrichedAttributes || {};
+  const native = item?.nativeParams || {};
+  return {
+    outsideDiameterMm: firstPositiveMillimetres(
+      item?.outsideDiameterMm,
+      native.outsideDiameterMm,
+      native.outerDiameter,
+      attributes.OUTSIDE_DIAMETER_MM,
+      attributes.OUTSIDE_DIAMETER,
+      attributes.OD_MM,
+      attributes.OD,
+      enriched.outsideDiameterMm,
+      enriched.OUTSIDE_DIAMETER_MM,
+      enriched.OUTSIDE_DIAMETER,
+    ),
+    boreMm: firstPositiveMillimetres(
+      item?.boreMm,
+      native.boreMm,
+      native.bore,
+      attributes.BORE_MM,
+      attributes.BORE,
+      attributes.NOMINAL_BORE_MM,
+      attributes.ABORE,
+      attributes.LBORE,
+      enriched.boreMm,
+      enriched.BORE,
+    ),
+    wallThicknessMm: firstPositiveMillimetres(
+      item?.wallThicknessMm,
+      native.wallThicknessMm,
+      native.wallThickness,
+      attributes.WALL_THICKNESS_MM,
+      attributes.WALL_THICKNESS,
+      attributes.WT_MM,
+      enriched.wallThicknessMm,
+      enriched.WALL_THICKNESS_MM,
+    ),
+  };
+}
+
+function firstPositiveMillimetres(...values) {
+  for (const value of values) {
+    const parsed = parseMillimetres(value);
+    if (parsed !== null) return parsed;
+  }
+  return null;
+}
+
+function parseMillimetres(value) {
+  if (Number.isFinite(value) && value > 0) return Number(value);
+  const match = String(value ?? '').trim().match(/^([+]?(?:\d+(?:\.\d*)?|\.\d+))(?:\s*mm)?$/iu);
+  if (!match) return null;
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 function summarizeEntities(entities, sourceModel) {
