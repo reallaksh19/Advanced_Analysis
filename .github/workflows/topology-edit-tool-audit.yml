@@ -68,13 +68,13 @@ jobs:
         run: |
           set -euo pipefail
           npx playwright test e2e/topology-edit-ray-scan.spec.js \
-            --project=chromium --workers=1 --reporter=line
+            --project=chromium --workers=1 --retries=0 --reporter=line
 
       - name: Execute complete 3D tool audit
         run: |
           set -euo pipefail
           npx playwright test e2e/topology-edit-tool-audit.spec.js \
-            --project=chromium --workers=1 --reporter=line
+            --project=chromium --workers=1 --retries=0 --reporter=line
 
       - name: Upload browser evidence
         if: always()
