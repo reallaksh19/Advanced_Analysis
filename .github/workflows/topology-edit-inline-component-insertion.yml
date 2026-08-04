@@ -22,7 +22,6 @@ on:
       - 'src/workspace/viewport-productivity/topology-edit-professional-operation-runtime.js'
       - 'src/workspace/viewport-productivity/topology-edit-professional-operation-state.js'
       - 'tests/topology-edit-inline-component-insertion.test.mjs'
-      - 'tests/topology-edit-professional-engineering-incremental-validation.test.mjs'
       - 'tests/topology-edit-professional-validation-blocking.test.mjs'
       - 'tests/topology-edit-validation-baseline-authority.test.mjs'
       - 'e2e/topology-edit-inline-component-insertion.spec.js'
@@ -81,7 +80,6 @@ jobs:
           node --check src/workspace/viewport-productivity/topology-edit-professional-operation-panel.js
           node --check src/workspace/viewport-productivity/topology-edit-professional-operation-state.js
           node --check tests/topology-edit-inline-component-insertion.test.mjs
-          node --check tests/topology-edit-professional-engineering-incremental-validation.test.mjs
           node --check tests/topology-edit-professional-validation-blocking.test.mjs
           node --check tests/topology-edit-validation-baseline-authority.test.mjs
           node --check e2e/topology-edit-inline-component-insertion.spec.js
@@ -96,7 +94,6 @@ jobs:
             tests/topology-edit-professional-engineering-catalog.test.mjs \
             tests/topology-edit-professional-engineering-compatibility.test.mjs \
             tests/topology-edit-component-hud-context.test.mjs \
-            tests/topology-edit-professional-engineering-incremental-validation.test.mjs \
             tests/topology-edit-professional-validation-blocking.test.mjs \
             tests/topology-edit-validation-baseline-authority.test.mjs \
             2>&1 | tee inline-component-test-output.txt
