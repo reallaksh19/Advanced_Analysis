@@ -89,7 +89,7 @@ function interfaceCsv(presentation) {
     row.referencePointGlobal.x, row.referencePointGlobal.y, row.referencePointGlobal.z,
     row.frameSemanticHash, row.resultSemanticHash, row.recoverySemanticHash, row.recoveryEvidenceHash,
   ]);
-  return csv(headers, rows);
+  return createCsvContent(headers, rows);
 }
 
 function nozzleCsv(presentation) {
@@ -110,7 +110,7 @@ function nozzleCsv(presentation) {
     row.governingTerm.termId, row.governingTerm.value, row.interactionValue,
     row.interactionLimit, row.utilization, row.semanticHash, row.evidenceHash,
   ]);
-  return csv(headers, rows);
+  return createCsvContent(headers, rows);
 }
 
 function codeCsv(presentation) {
@@ -126,10 +126,10 @@ function codeCsv(presentation) {
     row.calculatedStress, row.allowableStress, row.utilization, row.governingRuleId,
     row.sourceRecoveryHashes.join('|'), row.semanticHash, row.evidenceHash,
   ]);
-  return csv(headers, rows);
+  return createCsvContent(headers, rows);
 }
 
-function csv(headers, rows) {
+export function createCsvContent(headers, rows) {
   return `${[headers, ...rows].map((row) => row.map(csvCell).join(',')).join('\n')}\n`;
 }
 
@@ -157,7 +157,7 @@ function safeName(value) {
   return normalized;
 }
 
-function sealExportRecord(input) {
+export function sealExportRecord(input) {
   const contentHash = semanticHash({ mediaType: input.mediaType, content: input.content });
   return deepFreeze({
     schema: EXPORT_RECORD_SCHEMA,
