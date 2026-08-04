@@ -13,6 +13,7 @@ const COLORS = Object.freeze({
   Z: 0x3b82f6,
   ANCHOR: 0xf8fafc,
   TARGET: 0xf59e0b,
+  SNAP: 0x22d3ee,
 });
 
 export function renderTopologyEditGizmoGroup(group, gizmoModel, preview = null) {
@@ -33,6 +34,9 @@ export function renderTopologyEditGizmoGroup(group, gizmoModel, preview = null) 
   }
   if (preview?.targetPosition) {
     group.add(previewMarker(preview.targetPosition, anchor, scale));
+    if (preview.snapStatus === 'RESOLVED') {
+      group.add(snapIndicator(preview.targetPosition, anchor, scale, preview));
+    }
   }
   return Object.freeze({ anchor, scaleMm: scale });
 }
@@ -125,6 +129,55 @@ function previewMarker(targetInput, anchor, scale) {
     target.z - anchor.z,
   );
   return marker;
+}
+
+function snapIndicator(targetInput, anchor, scale, preview) {
+  const target = finiteTopologyEditPoint(
+    targetInput,
+    'preview.snapTargetPosition',
+  );
+  const root = new THREE.Group();
+  root.userData.nonPickable = true;
+  root.userData.snapIndicator = true;
+  root.userData.snapEvidenceType = preview.snapEvidenceType ?? null;
+  root.userData.snapTargetCanonicalId = preview.snapTargetCanonicalId ?? null;
+  root.position.set(
+    target.x - anchor.x,
+    target.y - anchor.y,
+    target.z - anchor.z,
+  );
+  const material = new THREE.MeshBasicMaterial({
+    color: COLORS.SNAP,
+    transparent: true,
+    opacity: 0.95,
+    depthTest: false,
+    depthWrite: false,
+  });
+  const radius = scale * 0.14;
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(radius, scale * 0.018, 8, 32),
+    material,
+  );
+  ring.renderOrder = 10_000;
+  const crossGeometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-radius * 1.25, 0, 0),
+    new THREE.Vector3(radius * 1.25, 0, 0),
+    new THREE.Vector3(0, -radius * 1.25, 0),
+    new THREE.Vector3(0, radius * 1.25, 0),
+  ]);
+  const cross = new THREE.LineSegments(
+    crossGeometry,
+    new THREE.LineBasicMaterial({
+      color: COLORS.SNAP,
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false,
+      depthWrite: false,
+    }),
+  );
+  cross.renderOrder = 10_000;
+  root.add(ring, cross);
+  return root;
 }
 
 function markerMesh(radius, color) {
