@@ -23,6 +23,7 @@ export const FLANGE_HUB_SCL_IDS = Object.freeze([
 
 const PATH_STATION_COUNT = 33;
 const HUB_DIRECTION = unit({ r: 19, z: 60 });
+const MAPPING_SOLVE_TOLERANCE = 1e-11;
 
 export function createFlangeHubPathDefinitions(geometry) {
   requireGeometry(geometry);
@@ -101,6 +102,8 @@ export function recoverFlangeHubLevel({ mesh, result, geometry, pathDefinitions 
     authority: {
       rawGaussPointStressAuthoritative: true,
       fixedCoordinateRecoveryAuthoritative: true,
+      mappingSolveTolerance: MAPPING_SOLVE_TOLERANCE,
+      mappingAcceptanceRule: 'MAX_1E-10_OR_1E-10_TIMES_PROBE_H',
       nearestNodeSubstitutionUsed: false,
       displaySmoothedStressAuthoritative: false,
       diagnosticMaximaGrantQualification: false,
@@ -163,6 +166,7 @@ function recoverPoint({ definition, elementRows, displacementByNode, selectorDir
         point: definition.point,
         gaussPointResults: element.result.gaussPointResults,
         nodalDisplacements: element.nodeIds.map((nodeId) => displacementByNode.get(nodeId)),
+        mappingTolerance: MAPPING_SOLVE_TOLERANCE,
       });
       recoveries.push({ element, recovered });
     } catch (error) {
@@ -176,7 +180,8 @@ function recoverPoint({ definition, elementRows, displacementByNode, selectorDir
   const selected = selectRecovery(expected, definition.point, selectorDirection);
   const cornerNodes = selected.element.nodes.slice(0, 4);
   const probeH = Math.max(...cornerNodes.map((node, index) => distance(node, cornerNodes[(index + 1) % 4])));
-  if (selected.recovered.mappingResidual > Math.max(1e-10, 1e-10 * probeH)) {
+  const mappingAcceptanceTolerance = Math.max(1e-10, 1e-10 * probeH);
+  if (selected.recovered.mappingResidual > mappingAcceptanceTolerance) {
     throw new RangeError(`FH_MAPPING_RESIDUAL_EXCEEDED:${definition.probeId}`);
   }
   return deepFreeze({
@@ -189,6 +194,8 @@ function recoverPoint({ definition, elementRows, displacementByNode, selectorDir
     selectedBlockId: selected.element.blockId,
     naturalCoordinates: selected.recovered.naturalCoordinates,
     mappingResidual: selected.recovered.mappingResidual,
+    mappingSolveTolerance: MAPPING_SOLVE_TOLERANCE,
+    mappingAcceptanceTolerance,
     minimumNaturalCoordinateMargin: selected.recovered.minimumNaturalCoordinateMargin,
     sourceGaussPointIds: selected.recovered.sourceGaussPointIds,
     sourceGaussPoints: selected.recovered.sourceGaussPoints,
