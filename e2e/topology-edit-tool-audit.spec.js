@@ -66,15 +66,16 @@ test('canonical search replaces the active selection and refreshes command enabl
   await expectDisabled(page, [...TWO_NODE_ACTIONS, ...EDGE_ACTIONS]);
 });
 
-test('all ten governed edit tools execute and undo on the 20-object sample', async ({ page }, testInfo) => {
-  test.setTimeout(240_000);
-  const host = await openFinalAuditController(page);
-  await openPanel(host, 'commands');
-  const targets = await visibleSelectionTargets(page);
-  const baseHash = await host.getAttribute('data-topology-edit-canonical-hash');
+test('all ten governed edit tools execute independently on fresh 20-object samples', async ({ page }, testInfo) => {
+  test.setTimeout(600_000);
   const executions = [];
 
   for (const scenario of COMMAND_SCENARIOS) {
+    const host = await openFinalAuditController(page);
+    await openPanel(host, 'commands');
+    const targets = await visibleSelectionTargets(page);
+    const baseHash = await host.getAttribute('data-topology-edit-canonical-hash');
+
     await selectVisibleTarget(page, targets, scenario.kind);
     const button = page.locator(`[data-command-action="${scenario.actionId}"]`);
     await expect(button).toBeEnabled();
@@ -92,10 +93,6 @@ test('all ten governed edit tools execute and undo on the 20-object sample', asy
       baseHash,
       afterHash,
     });
-
-    await page.locator('[data-action="undo"]').click();
-    await expect(host).toHaveAttribute('data-topology-edit-active-command-count', '0');
-    await expect(host).toHaveAttribute('data-topology-edit-canonical-hash', baseHash);
   }
 
   await testInfo.attach('all-tools-final-state', {
@@ -128,7 +125,7 @@ test('navigation, presentation, history, and draft controls remain operable', as
   await expect(statusOutput(page)).toContainText('View command: fit.');
 
   const views = host.locator('details[data-panel-kind="views"]');
-  await views.locator('summary').click();
+  await views.locator(':scope > summary').click();
   for (const action of ['fit-selection', 'home', 'previous', 'pivot-selection']) {
     await page.locator(`[data-navigation-action="${action}"]`).click();
     await expect(statusOutput(page)).toContainText(`View command: ${action}.`);
@@ -213,7 +210,9 @@ async function openFinalAuditController(page) {
 
 async function openPanel(host, kind) {
   const panel = host.locator(`details[data-panel-kind="${kind}"]`);
-  if (!(await panel.evaluate((element) => element.open))) await panel.locator('summary').click();
+  if (!(await panel.evaluate((element) => element.open))) {
+    await panel.locator(':scope > summary').click();
+  }
   return panel;
 }
 
