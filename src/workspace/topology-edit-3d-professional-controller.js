@@ -8,6 +8,16 @@ import {
 import {
   ensureTopologyEditProfessionalOperationStyles,
 } from './viewport-productivity/topology-edit-professional-operation-styles.js';
+import {
+  topologyEditSelectionDescription,
+} from './topology-edit/topology-edit-command-ui.js';
+import { WorkspaceState } from './workspace-state.js';
+import {
+  createTopologyEditEditorStore,
+} from './topology-edit/editor-state/topology-edit-editor-store.js';
+import {
+  TopologyEditSelectionCoordinator,
+} from './topology-edit/editor-state/topology-edit-selection-coordinator.js';
 
 const PRIMARY_NAVIGATION_SELECTORS = Object.freeze([
   '[data-navigation-mode="select"]',
@@ -31,6 +41,24 @@ export class TopologyEdit3DViewController extends InteractionController {
     super(eventBus, lifecycleOptions);
     this.professionalElement = null;
     this.professionalRuntime = new TopologyEditProfessionalOperationRuntime(this);
+    this.editorDatasetObject = null;
+    this.editorDatasetEpoch = 0;
+    const initialLegacySelection = this.selection;
+    this.editorStore = createTopologyEditEditorStore();
+    this.selectionCoordinator = new TopologyEditSelectionCoordinator({
+      store: this.editorStore,
+      eventBus: this.eventBus,
+      getTopology: () => this.session?.currentTopology?.() ?? null,
+      onSelectionChanged: (payload) => this.handleUnifiedSelectionChanged(payload),
+    });
+    delete this.selection;
+    Object.defineProperty(this, 'selection', {
+      configurable: true,
+      enumerable: true,
+      get: () => this.selectionCoordinator.legacySelection(),
+      set: (value) => this.selectionCoordinator.applyLegacySelection(value, 'command'),
+    });
+    this.selection = initialLegacySelection;
     const getBaseViewState = this.lifecycle.getViewState;
     this.lifecycle.getViewState = () => ({
       ...getBaseViewState(),
@@ -39,8 +67,14 @@ export class TopologyEdit3DViewController extends InteractionController {
   }
 
   async activate() {
-    await super.activate();
-    await this.professionalRuntime.loadCatalogue();
+    this.selectionCoordinator.connect();
+    try {
+      await super.activate();
+      await this.professionalRuntime.loadCatalogue();
+    } catch (error) {
+      this.selectionCoordinator.disconnect();
+      throw error;
+    }
   }
 
   buildShell() {
@@ -60,22 +94,39 @@ export class TopologyEdit3DViewController extends InteractionController {
   }
 
   deactivate() {
+    this.selectionCoordinator.disconnect();
     this.professionalRuntime.destroy();
     this.professionalElement = null;
+    this.editorDatasetObject = null;
+    this.editorDatasetEpoch = 0;
     super.deactivate();
   }
 
+  refreshFromWorkspace() {
+    const dataset = WorkspaceState.getSnapshot()?.dataset ?? null;
+    if (dataset !== this.editorDatasetObject) {
+      this.editorDatasetObject = dataset;
+      this.editorDatasetEpoch += 1;
+    }
+    return super.refreshFromWorkspace();
+  }
+
   refreshView(canonical) {
+    this.syncEditorDatasetIdentity(canonical);
+    this.editorStore.getState().actions.updateCanonicalIdentity(
+      canonical.canonicalTopologyHash,
+      canonicalSelectionIds(canonical),
+    );
     super.refreshView(canonical);
     this.professionalRuntime.canonicalChanged(canonical);
   }
 
-  handleCanvasPointer(event) {
-    const before = selectionKey(this.selection);
-    super.handleCanvasPointer(event);
-    if (before !== selectionKey(this.selection)) {
-      this.professionalRuntime.selectionChanged();
-    }
+  handleViewportSelection(pick, event) {
+    if (!this.session) return;
+    this.selectionCoordinator.selectPick(pick, event);
+    this.presentationToolbar?.update(this.presentationState);
+    this.setStatus(topologyEditSelectionDescription(this.selection));
+    this.updateActionButtons();
   }
 
   handleHostClick(event) {
@@ -124,6 +175,43 @@ export class TopologyEdit3DViewController extends InteractionController {
   restoreDisplayState(viewState = {}) {
     super.restoreDisplayState(viewState);
     this.professionalRuntime.restoreViewState(viewState.professionalOperation);
+  }
+
+  reconcileCanonicalSelection(transactionReceipt) {
+    return this.editorStore.getState().actions.reconcileSelection(
+      transactionReceipt,
+      'command',
+    );
+  }
+
+  syncEditorDatasetIdentity(canonical) {
+    this.editorStore.getState().actions.replaceDatasetIdentity({
+      sourceHash: canonical.sourceHash,
+      canonicalHash: canonical.canonicalTopologyHash,
+      sessionVersion: this.editorDatasetEpoch,
+    });
+  }
+
+  handleUnifiedSelectionChanged(payload) {
+    if (this.hostElement) {
+      this.hostElement.dataset.topologyEditSelectionIds =
+        payload.selection.canonicalIds.join(',');
+      this.hostElement.dataset.topologyEditSelectionPrimaryId =
+        payload.selection.primaryId ?? '';
+      this.hostElement.dataset.topologyEditSelectionAnchorId =
+        payload.selection.anchorId ?? '';
+      this.hostElement.dataset.topologyEditSelectionSource =
+        payload.selection.source;
+      this.hostElement.dataset.topologyEditSelectionRevision =
+        String(payload.selection.revision);
+      this.hostElement.dataset.topologyEditSelectionHash =
+        payload.selection.selectionHash;
+    }
+    if (this.professionalElement) this.professionalRuntime.selectionChanged();
+    if (this.interactionPreview) this.clearInteractionState(false, true);
+    this.interactionControllerRuntime?.sync();
+    this.presentationToolbar?.update(this.presentationState);
+    this.updateActionButtons?.();
   }
 }
 
@@ -272,6 +360,13 @@ function humanize(value) {
     .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
-function selectionKey(selection) {
-  return `${(selection?.nodeIds ?? []).join('|')}::${selection?.edgeId ?? ''}`;
+function canonicalSelectionIds(canonical) {
+  return [
+    ...(canonical.nodes ?? []).map((row) => row.id),
+    ...(canonical.edges ?? []).map((row) => row.id),
+    ...(canonical.junctions ?? []).map((row) => row.id),
+    ...(canonical.supports ?? []).map((row) => row.id),
+    ...(canonical.boundaries ?? []).map((row) => row.id),
+    ...(canonical.rigids ?? []).map((row) => row.id),
+  ];
 }
