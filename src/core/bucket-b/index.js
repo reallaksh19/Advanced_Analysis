@@ -9,6 +9,11 @@ export * from './formulation-benchmarks.js';
 export * from './variable-edge-load.js';
 export * from './q8-quality.js';
 export * from './convergence.js';
+export {
+  evaluateConvergence,
+  GLOBAL_DISPLACEMENT_ASYMPTOTIC_TAIL_PROFILE_ID,
+  REFERENCE_BOUND_BOUNDED_OSCILLATION_PROFILE_ID,
+} from './reference-bound-convergence.js';
 export * from './fixed-coordinate-recovery.js';
 export * from './path-and-scl.js';
 export * from './interface-resultants.js';
@@ -16,3 +21,4 @@ export * from './qualification-receipt.js';
 export * from './current-main-baseline.js';
 export * from './bb06-lug-clamp.js';
 export * from './bb07-bracket-gusset.js';
+export * from './bb08-pipe-pad.js';
