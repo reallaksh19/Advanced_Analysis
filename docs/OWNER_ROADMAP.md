@@ -1206,3 +1206,83 @@ field in a reviewable document — `benchmarks/LFEA/BM1/BM1_InputXML.xml`'s
 real `insulationDensity: MISSING` on its first three elements will
 show up structurally for anyone (or any future UI) reading this
 document, not just an Owner who happened to go looking.
+
+## Phase 2 (StagedJSON → canonical unification) — M022-A dispatched and merged
+
+Before dispatch, ran a real qualification screen (5 tough linear-FEA
+technical questions — frame stiffness coupling, bend flexibility
+derivation, why B31.3's `S_E` excludes axial, one-way-restraint
+linearization, hot-vs-cold modulus selection) and required a written
+design proposal before any implementation, mirroring the M008
+prequalification precedent. The proposal argued: extend M008's real
+authority-record architecture (materials/sections/supports/loadCases as
+governed references, not inline overlay payload) rather than either
+bypassing it through the already-dead `shared-to-canonical-geometry.js`
+projector or cramming process data into the overlay contract itself.
+
+Independently verified the proposal's load-bearing claims against the
+real repo before endorsing it — all checked out exactly: EnrichedSjson
+field names, the real branch's numeric values (`designPressureMpa:
+11.6`, `operatingTemperatureC: 309`, etc., confirmed across three
+sampled entities), the real raw-vs-enriched material/section conflict
+(`DTXR`/`MTXX` Sch100/A234-WPB vs. `enrichedAttributes` Sch80/A106-B,
+confirmed the enrichment's own `conflicts: []` field does *not* catch
+it), and the real support field names/`REST`/`LINESTOP` examples.
+Also independently caught that `docs/OWNER_ROADMAP.md` itself was
+stale on `main` (the proposal correctly flagged this and worked around
+it by citing merged PR/issue records directly instead) — a real
+process gap: this doc had been maintained continuously on the Owner's
+own tracking branch but never actually reached `main`. Fixed directly
+after M022-A merged (#578, pure content sync, no data lost).
+
+Raised two concrete gaps back to the proposal before dispatch: (1)
+M008-C's material/section resolver is hard-coded to one exact case
+(NPS 8 Schedule 100, a 2-entry material alias map) — "reuse" alone
+doesn't generalize it; (2) suspected M008-C's material table was
+single-temperature-point (cold only), which would leave no path to a
+real hot modulus for the thermal case. **(2) was based on an
+incomplete read on the Owner's part** — direct re-verification during
+the M022-A review found the real table already has two points
+(293.15 K / 393.15 K) — the real, more precise problem M022-A
+correctly identified itself is that 393.15 K (120°C) falls far short
+of this branch's real 582.15 K/598.15 K operating/design temperatures,
+not that hot data is absent entirely.
+
+### M022-A (#576) → merged as `5ca33d92ef4e61429b963206bde30f974b05631b`
+
+Reviewed in full: cloned the exact PR head into an isolated worktree,
+read all 8 new/changed source and script files end to end before
+running anything. The `DECLARED`/`INHERITED`/`MISSING` field contract
+(`stagedjson-resolution-common.js`) correctly structurally prohibits
+inheritance for every process field (`allowInherited: false`
+throughout `stagedjson-process-authority.js`) — not just documented as
+policy, enforced — and the source guard bans the literal patterns
+(`previousEntity`, `carryForward`, `sourceOrderAllowed: true`) that
+would reintroduce it later. `resolverCapabilities()` detects M008-C's
+hard-coding by regex-inspecting the *real* resolver's own source text
+at runtime rather than asserting a static claim, so the check
+self-updates once M022-B removes it rather than needing manual
+re-verification.
+
+This is the first Work Pack in this mandate delivered with a real,
+passing CI run already attached (a path-scoped exact-head GitHub
+Actions workflow) — re-ran everything independently anyway rather than
+trusting it: `check:m022a` (all 3 sub-checks), the full `check:
+workspace-contracts` aggregate it registers into, and a hand-written
+spot-check script reproducing the real branch's material-table ranges,
+temperature values, and all 6 real source conflicts across all 3
+affected entities directly — all matched exactly. No fix was needed.
+Post-merge sanity check on fresh `main` at `5ca33d92` passed for both
+`check:workspace-contracts` and (unaffected, confirmed) `check:lfea-
+linear-core`. Worktrees cleaned up.
+
+M022-A is explicitly contracts-and-real-fixture-inventory only —
+qualifies the single already-M008-selected branch, makes every real
+gap (missing reference temperature, ungoverned operating pressure,
+undeclared hydrotest-pressure unit, insufficient material-table range,
+hard-coded catalog, unresolved supports) a structured, disclosed
+blocker rather than a silent default. M022-B (catalog-driven material/
+section generalization, hot-state coverage) and M022-C (process/
+support resolution, overlay composition, populated ground-truth
+artifacts) remain ahead before this reaches canonical geometry or the
+solver.
