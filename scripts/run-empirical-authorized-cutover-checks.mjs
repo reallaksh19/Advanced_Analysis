@@ -6,6 +6,7 @@ const checks = [
   ['authorized-execution', ['scripts/authorized-empirical-load-execution-check.mjs']],
   ['authorized-execution-anti-drift', ['scripts/authorized-empirical-load-execution-anti-drift-check.mjs']],
   ['runtime-package-and-state', ['scripts/empirical-authorized-runtime-check.mjs']],
+  ['blocked-case-matrix', ['scripts/empirical-authorized-blocked-cases-check.mjs']],
   ['legacy-authorized-parity', ['scripts/empirical-authorized-parity-check.mjs']],
   ['production-routing', ['scripts/empirical-authorized-cutover-production-check.mjs']],
   ['changed-file-manifest', ['scripts/empirical-authorized-cutover-manifest-check.mjs']],
