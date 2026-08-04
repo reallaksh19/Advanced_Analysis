@@ -368,5 +368,6 @@ function canonicalSelectionIds(canonical) {
     ...(canonical.supports ?? []).map((row) => row.id),
     ...(canonical.boundaries ?? []).map((row) => row.id),
     ...(canonical.rigids ?? []).map((row) => row.id),
+    ...(canonical.bends ?? []).map((row) => row.id),
   ];
 }
