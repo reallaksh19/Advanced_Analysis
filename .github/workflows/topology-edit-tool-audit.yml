@@ -1,0 +1,89 @@
+name: 3D Edit Tool Audit
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/topology-edit-tool-audit.yml'
+      - 'e2e/topology-edit-tool-*.spec.js'
+      - 'e2e/topology-edit-ray-*.spec.js'
+      - 'tests/topology-edit-navigation-pick-fallback.test.mjs'
+      - 'src/workspace/topology-edit-3d-*.js'
+      - 'src/workspace/topology-edit-*.css'
+      - 'src/workspace/topology-edit/**'
+      - 'src/workspace/viewport-interaction/**'
+      - 'src/workspace/viewport-presentation/**'
+      - 'src/workspace/viewport-productivity/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: topology-edit-tool-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chromium-tool-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PLAYWRIGHT_BROWSER_CHANNEL: chromium
+      PLAYWRIGHT_ENABLE_VIDEO: '1'
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies and Chromium
+        run: |
+          set -euo pipefail
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Verify audit sources
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+          node --check src/workspace/topology-edit/topology-edit-navigation-hud-viewport-backend.js
+          node --check src/workspace/topology-edit-3d-professional-controller.js
+          node --check tests/topology-edit-navigation-pick-fallback.test.mjs
+          node --check e2e/topology-edit-tool-audit.spec.js
+          node --check e2e/topology-edit-ray-scan.spec.js
+          git diff --check
+
+      - name: Execute GPU-to-ray fallback unit contract
+        run: node tests/topology-edit-navigation-pick-fallback.test.mjs
+
+      - name: Execute full-canvas pick regression
+        run: |
+          set -euo pipefail
+          npx playwright test e2e/topology-edit-ray-scan.spec.js \
+            --project=chromium --workers=1 --retries=0 --reporter=line
+
+      - name: Execute complete 3D tool audit
+        run: |
+          set -euo pipefail
+          npx playwright test e2e/topology-edit-tool-audit.spec.js \
+            --project=chromium --workers=1 --retries=0 --reporter=line
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-tool-audit-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}-${{ github.run_attempt }}
+          path: |
+            reports/qualification/topology-edit-tool-audit.json
+            playwright-report
+            test-results
+          if-no-files-found: warn
+          retention-days: 30
