@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readdirSync } from 'node:fs';
+import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
@@ -38,6 +38,9 @@ export function nonFeaP0CommandIds() {
 
 export function runNonFeaP0Command([commandId, [command, args]], cwd, options = {}) {
   const started = Date.now();
+  const rawOutputDirectory = options.rawOutputDirectory
+    ?? process.env.NON_FEA_P0_RAW_COMMAND_DIR
+    ?? '';
   try {
     const expandedArgs = expandSimpleGlobs(args, cwd);
     const result = spawnSync(platformCommand(command), expandedArgs, {
@@ -49,18 +52,36 @@ export function runNonFeaP0Command([commandId, [command, args]], cwd, options = 
     });
     const errorText = result.error ? String(result.error.message || result.error) : '';
     const output = `${result.stdout || ''}${result.stderr || ''}${errorText}`;
+    const persistenceError = persistRawCommandOutput(
+      commandId,
+      output,
+      cwd,
+      rawOutputDirectory,
+    );
     return commandEvidence({
       commandId,
       command,
       args: expandedArgs,
-      status: result.error ? 'BLOCKED' : result.status === 0 ? 'PASS' : 'FAIL',
+      status: persistenceError
+        ? 'BLOCKED'
+        : result.error
+          ? 'BLOCKED'
+          : result.status === 0
+            ? 'PASS'
+            : 'FAIL',
       exitCode: result.status,
       durationMs: Date.now() - started,
-      output,
-      error: result.error ? errorText : null,
+      output: persistenceError ? `${output}\n${persistenceError}` : output,
+      error: persistenceError || (result.error ? errorText : null),
     });
   } catch (error) {
     const message = String(error?.message || error);
+    const persistenceError = persistRawCommandOutput(
+      commandId,
+      message,
+      cwd,
+      rawOutputDirectory,
+    );
     return commandEvidence({
       commandId,
       command,
@@ -68,9 +89,32 @@ export function runNonFeaP0Command([commandId, [command, args]], cwd, options = 
       status: 'BLOCKED',
       exitCode: null,
       durationMs: Date.now() - started,
-      output: message,
-      error: message,
+      output: persistenceError ? `${message}\n${persistenceError}` : message,
+      error: persistenceError || message,
     });
+  }
+}
+
+function persistRawCommandOutput(commandId, output, cwd, configuredDirectory) {
+  if (!configuredDirectory) return null;
+  try {
+    if (typeof commandId !== 'string' || !/^[a-z0-9:.-]+$/u.test(commandId)) {
+      throw new TypeError('P0 command ID is invalid for raw evidence custody.');
+    }
+    const root = path.resolve(cwd);
+    const directory = path.resolve(root, configuredDirectory);
+    const relative = path.relative(root, directory);
+    if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
+      throw new TypeError(
+        'P0 raw command output directory must remain below the repository root.',
+      );
+    }
+    mkdirSync(directory, { recursive: true });
+    const fileName = `${commandId.replaceAll(/[.:]/gu, '__')}.log`;
+    writeFileSync(path.join(directory, fileName), output, 'utf8');
+    return null;
+  } catch (error) {
+    return `P0_RAW_COMMAND_OUTPUT_WRITE_FAILED: ${String(error?.message || error)}`;
   }
 }
 

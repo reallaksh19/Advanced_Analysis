@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
 import { requireNonFeaBaselineReport } from '../scripts/non-fea-baseline/baseline-report-validator.mjs';
 import { runNonFeaP0Command } from '../scripts/non-fea-baseline/command-ladder.mjs';
@@ -128,6 +130,25 @@ test('blocked command evidence remains content addressed', () => {
   assert.notEqual(row.status, 'PASS');
   assert.match(row.outputSha256, /^[0-9a-f]{64}$/u);
   assert.ok(row.outputTail.length > 0);
+});
+
+test('command runner retains dotted command IDs and complete raw output', () => {
+  const directory = mkdtempSync(path.join(process.cwd(), '.tmp-non-fea-p0-command-'));
+  try {
+    const relativeDirectory = path.relative(process.cwd(), directory);
+    const row = runNonFeaP0Command(
+      ['raw.output', [process.execPath, ['-e', "process.stdout.write('alpha\\nbeta\\n')"]]],
+      process.cwd(),
+      { rawOutputDirectory: relativeDirectory },
+    );
+    assert.equal(row.status, 'PASS');
+    assert.equal(
+      readFileSync(path.join(directory, 'raw__output.log'), 'utf8'),
+      'alpha\nbeta\n',
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test('command hash validation rejects absent evidence', () => {

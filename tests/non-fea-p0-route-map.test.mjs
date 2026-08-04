@@ -65,7 +65,14 @@ test('P0 seed report is explicitly unexecuted and fail-closed', async () => {
   assert.equal(report.completion.P0_ACCEPTED, false);
   assert.ok(report.failures.some((row) => row.classification === 'UNRESOLVED_GATE'));
   assert.equal(report.fixtureRoleBindings.length, 3);
-  assert.ok(report.fixtureRoleBindings.every((row) => row.status === 'MISSING_AUTHORITY'));
+  assert.deepEqual(
+    Object.fromEntries(report.fixtureRoleBindings.map(({ role, status }) => [role, status])),
+    {
+      LARGE_MODEL_4884_ENTITY: 'UNBOUND',
+      REAL_1885_SUPPORT_BRANCH: 'NOT_EXECUTED',
+      TOPOLOGY_EDIT_20_OBJECT: 'NOT_EXECUTED',
+    },
+  );
 });
 
 test('P0 runner provides explicit exact fixture and browser evidence binding', async () => {
