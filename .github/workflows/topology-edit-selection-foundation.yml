@@ -12,7 +12,7 @@ on:
       - 'src/workspace/tree-panel-events.js'
       - 'src/workspace/tree-panel-tree.js'
       - 'tests/topology-edit-selection-*.test.mjs'
-      - 'e2e/topology-edit-selection-*.spec.js'
+      - 'e2e/topology-edit-selection-foundation.spec.js'
   workflow_dispatch:
 
 permissions:
@@ -65,7 +65,6 @@ jobs:
           node --check src/workspace/tree-panel-events.js
           node --check src/workspace/tree-panel-tree.js
           node --check e2e/topology-edit-selection-foundation.spec.js
-          node --check e2e/topology-edit-selection-trace.spec.js
           git diff --check
 
       - name: Execute selection contracts and integration tests
@@ -79,9 +78,9 @@ jobs:
       - name: Execute existing 3D Edit picking regression
         run: node --test tests/topology-edit-navigation-pick-fallback.test.mjs
 
-      - name: Execute tree projection trace
+      - name: Execute real WebGL selection qualification
         run: |
-          npx playwright test e2e/topology-edit-selection-trace.spec.js \
+          npx playwright test e2e/topology-edit-selection-foundation.spec.js \
             --project=chromium --workers=1 --retries=0 --reporter=line
 
       - name: Upload browser evidence
