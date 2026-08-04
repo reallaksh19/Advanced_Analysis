@@ -75,9 +75,8 @@ test('production WebGL drag uses deterministic snapping without canonical previe
   evidence.pointerCameraEvidence = 'PASS';
   evidence.portSnap = 'PASS';
 
-  const firstCandidateHash = await host.getAttribute(
-    'data-topology-edit-interaction-snap-candidate-hash',
-  );
+  const firstCandidateId = await activeCandidateId(page);
+  expect(firstCandidateId).not.toBe('');
   const exactSequence = Number(
     await host.getAttribute('data-topology-edit-snap-query-sequence'),
   );
@@ -88,18 +87,13 @@ test('production WebGL drag uses deterministic snapping without canonical previe
 
   await page.mouse.move(drag.hysteresis.x, drag.hysteresis.y, { steps: 2 });
   await expect(host).toHaveAttribute('data-topology-edit-snap-retained-by-hysteresis', 'true');
-  await expect(host).toHaveAttribute(
-    'data-topology-edit-interaction-snap-candidate-hash',
-    firstCandidateHash,
-  );
+  await expect.poll(() => activeCandidateId(page)).toBe(firstCandidateId);
   expect(Number(await host.getAttribute('data-topology-edit-snap-query-sequence')))
     .toBeGreaterThan(exactSequence);
   evidence.hysteresis = 'PASS';
 
   await page.keyboard.press('Tab');
-  await expect.poll(async () => host.getAttribute(
-    'data-topology-edit-interaction-snap-candidate-hash',
-  )).not.toBe(firstCandidateHash);
+  await expect.poll(() => activeCandidateId(page)).not.toBe(firstCandidateId);
   await expect(host).toHaveAttribute('data-topology-edit-snap-cycle-index', '1');
   evidence.cycling = 'PASS';
 
@@ -195,6 +189,15 @@ async function hasRealWebGL(page) {
     const context = renderer?.getContext?.();
     return Boolean(context && context.drawingBufferWidth > 0 && context.drawingBufferHeight > 0);
   }, CONTROLLER_KEY);
+}
+
+async function activeCandidateId(page) {
+  return page.evaluate((controllerKey) => (
+    globalThis[controllerKey]
+      ?.interactionControllerRuntime
+      ?.snapResult
+      ?.candidateId ?? ''
+  ), CONTROLLER_KEY);
 }
 
 async function screenResolvedPortDragContext(page) {
