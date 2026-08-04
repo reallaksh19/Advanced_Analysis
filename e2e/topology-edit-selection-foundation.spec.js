@@ -104,32 +104,45 @@ test('tree modifier selection is deterministic and dataset replacement clears it
   await demoButton.click();
 
   await expect.poll(() => page.evaluate(({
+    controllerKey,
     datasetBeforeKey,
     sessionVersionBeforeValue,
   }) => {
     const currentDataset = globalThis.AnalysisWorkspace
       ?.getSnapshot?.()?.dataset ?? null;
-    const currentHost = document.querySelector(
-      '[data-role="topology-edit-render-host"]',
+    const controller = globalThis[controllerKey];
+    const currentHost = controller?.hostElement ?? null;
+    const editorState = controller?.editorStore?.getState?.() ?? null;
+    const hostSessionVersion = Number(
+      currentHost?.dataset.topologyEditDatasetSessionVersion ?? 0,
     );
+    const hostSelectionIds = String(
+      currentHost?.dataset.topologyEditSelectionIds ?? '',
+    ).split(',').filter(Boolean);
     return {
+      liveHost: Boolean(
+        currentHost?.isConnected
+        && currentHost.matches('[data-role="topology-edit-render-host"]')
+      ),
       datasetReplaced: Boolean(
         currentDataset && currentDataset !== globalThis[datasetBeforeKey]
       ),
-      selectionCount: String(
-        currentHost?.dataset.topologyEditSelectionIds ?? '',
-      ).split(',').filter(Boolean).length,
-      epochReconciled: Number(
-        currentHost?.dataset.topologyEditDatasetSessionVersion ?? 0,
-      ) > sessionVersionBeforeValue,
+      selectionCount: editorState?.selection?.canonicalIds?.length ?? -1,
+      epochReconciled: Number(editorState?.dataset?.sessionVersion ?? 0)
+        > sessionVersionBeforeValue,
+      hostMirrorsStore: hostSessionVersion === editorState?.dataset?.sessionVersion
+        && hostSelectionIds.join(',') === editorState?.selection?.canonicalIds?.join(','),
     };
   }, {
+    controllerKey: CONTROLLER_KEY,
     datasetBeforeKey: DATASET_BEFORE_KEY,
     sessionVersionBeforeValue: sessionVersionBefore,
   })).toEqual({
+    liveHost: true,
     datasetReplaced: true,
     selectionCount: 0,
     epochReconciled: true,
+    hostMirrorsStore: true,
   });
 
   evidence.modifiers = 'PASS';
