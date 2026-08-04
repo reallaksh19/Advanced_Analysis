@@ -184,6 +184,12 @@ function normalizeFrozenGeometryInput(input) {
     throw new TypeError('FH_GEOMETRY_ID_OR_UNIT_MISMATCH');
   }
   const required = Object.keys(FLANGE_HUB_FROZEN_INPUT);
+  const supplied = Object.keys(input);
+  const unknown = supplied.filter((key) => !required.includes(key));
+  const missing = required.filter((key) => !Object.prototype.hasOwnProperty.call(input, key));
+  if (unknown.length || missing.length) {
+    throw new TypeError(`FH_GEOMETRY_FIELD_SET_MISMATCH:UNKNOWN=${unknown.join(',')}:MISSING=${missing.join(',')}`);
+  }
   const normalized = {};
   required.forEach((key) => {
     const expected = FLANGE_HUB_FROZEN_INPUT[key];
