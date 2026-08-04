@@ -169,13 +169,31 @@ function deriveInlineSymbol(edge, type, start, end, evidence, authority, policy)
     { componentId: edge.id, componentType: type },
   );
   const diagnostics = diagnosticsFromDimension(edge.id, diameter);
+  const symbolDiameterMm = diameter.status === DIMENSION_STATUS.RESOLVED
+    ? diameter.valueMm
+    : positive(evidence.boreMm);
+  if (diameter.status !== DIMENSION_STATUS.RESOLVED && symbolDiameterMm !== null) {
+    diagnostics.push(warning(
+      edge.id,
+      'VISUAL_SYMBOL_USES_NOMINAL_BORE',
+      `${type} visual symbol uses source nominal bore because outside diameter is unresolved.`,
+      { nominalBoreMm: symbolDiameterMm },
+    ));
+  }
   const kinds = {
     FLANGE: 'FLANGE_DISC', VALVE: 'VALVE_BODY', GASKET: 'GASKET_DISC', INSTRUMENT: 'INSTRUMENT_MARKER',
   };
   const parameters = {
-    start, end, center: midpoint(start, end), axis: unit(vector(start, end)), outsideDiameterMm: diameter.valueMm,
+    start,
+    end,
+    center: midpoint(start, end),
+    axis: unit(vector(start, end)),
+    outsideDiameterMm: symbolDiameterMm,
+    dimensionBasis: diameter.status === DIMENSION_STATUS.RESOLVED
+      ? 'OUTSIDE_DIAMETER'
+      : 'NOMINAL_BORE_VISUAL_PROXY',
   };
-  const primitives = diameter.status === DIMENSION_STATUS.RESOLVED
+  const primitives = symbolDiameterMm !== null
     ? [primitive(edge, type, 'body', kinds[type], parameters, evidence, policy)]
     : [diagnosticLine(edge, type, start, end, evidence, policy, diameter.status)];
   return component(edge, type, evidence, primitives, diagnostics);
@@ -283,6 +301,10 @@ function diagnosticLine(entity, type, start, end, evidence, policy, reason) {
 
 function diagnostic(entityId, code, message, details = {}) {
   return createVisualDiagnostic({ code, severity: 'ERROR', message, canonicalEntityId: entityId, details });
+}
+
+function warning(entityId, code, message, details = {}) {
+  return createVisualDiagnostic({ code, severity: 'WARNING', message, canonicalEntityId: entityId, details });
 }
 
 function diagnosticsFromDimension(entityId, result) {
@@ -398,7 +420,9 @@ function workspaceIds(entity, evidence) {
   ].map(stringValue).filter(Boolean))].sort();
 }
 function authoritativeCanonicalDiameter(edge) {
-  return edge.diameterAuthority === 'OUTSIDE_DIAMETER' ? edge.diameterMm : undefined;
+  return edge.diameterAuthority === 'OUTSIDE_DIAMETER'
+    ? positive(edge.outsideDiameterMm)
+    : undefined;
 }
 function normalizedType(value) {
   const token = stringValue(value).toUpperCase().replace(/[\s/-]+/g, '_');
