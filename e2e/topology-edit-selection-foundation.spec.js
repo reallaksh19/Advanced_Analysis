@@ -111,6 +111,9 @@ test('tree modifier selection is deterministic and dataset replacement clears it
     );
   }, DATASET_BEFORE_KEY)).toBe(true);
 
+  const webGlButton = page.getByRole('button', { name: '3D WebGL', exact: true });
+  await expect(webGlButton).toBeVisible();
+  await webGlButton.click();
   const editButton = page.getByRole('button', { name: '3D Edit', exact: true });
   await expect(editButton).toBeVisible();
   await expect(editButton).toBeEnabled();
