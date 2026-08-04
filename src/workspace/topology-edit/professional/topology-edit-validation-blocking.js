@@ -4,6 +4,7 @@ import {
   stringValue,
 } from '../../../core/shared-piping-model/index.js';
 import {
+  topologyEditDiagnosticFingerprint,
   topologyEditDiagnosticTargetIds,
 } from './topology-edit-validation-diagnostics.js';
 
@@ -13,11 +14,14 @@ export function topologyEditBlockingDiagnostics(
 ) {
   const blocking = new Set(normalizeSeverities(blockingSeverities));
   const scope = validationScopeIds(receipt?.validationScope?.ids);
+  const inherited = inheritedDiagnosticFingerprints(receipt?.baselineDiagnostics);
   return deepFreeze((receipt?.finalDiagnostics ?? []).filter((row) => {
     const severity = stringValue(row?.severity).toUpperCase() || 'UNKNOWN';
     if (!blocking.has(severity)) return false;
     const targetIds = topologyEditDiagnosticTargetIds(row);
-    return targetIds.length === 0 || targetIds.some((id) => scope.has(id));
+    if (targetIds.length === 0) return true;
+    if (!targetIds.some((id) => scope.has(id))) return false;
+    return !inherited.has(topologyEditDiagnosticFingerprint(row));
   }));
 }
 
@@ -32,6 +36,16 @@ export function assertNoTopologyEditBlockingDiagnostics(
     );
   }
   return receipt;
+}
+
+function inheritedDiagnosticFingerprints(value) {
+  if (value === undefined || value === null) return new Set();
+  if (!Array.isArray(value)) {
+    throw new TypeError(
+      'TopologyEditValidationBlocking: baselineDiagnostics must be an array.',
+    );
+  }
+  return new Set(value.map((row) => topologyEditDiagnosticFingerprint(row)));
 }
 
 function validationScopeIds(value) {
