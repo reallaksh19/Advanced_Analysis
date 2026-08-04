@@ -13,6 +13,23 @@ export function evaluateBendApplicability(geometry, profile) {
   if (profile.factorStandard === 'ASME_B31J' && ratio > 100) {
     violations.push({ field: 'outerDiameter/wallThickness', value: ratio, rule: 'D/T <= 100' });
   }
+  if (geometry.smooth90FlexibilityCorrection) {
+    if (profile.factorStandard !== 'ASME_B31J') {
+      violations.push({
+        field: 'smooth90FlexibilityCorrection',
+        value: true,
+        rule: 'B31J Table 1-1 Note (3) is available only for ASME B31J profiles',
+      });
+    }
+    if (geometry.bendAngleDegrees === null
+        || Math.abs(geometry.bendAngleDegrees - 90) > 1e-6) {
+      violations.push({
+        field: 'bendAngleDegrees',
+        value: geometry.bendAngleDegrees,
+        rule: 'smooth-90 correction requires a 90 degree bend within 1e-6 degree',
+      });
+    }
+  }
   return violations.length === 0
     ? verdict('WITHIN_RANGE', `${profile.formulaFamily}_BEND_APPLICABILITY`)
     : verdict('OUTSIDE_RANGE', `${profile.formulaFamily}_BEND_APPLICABILITY`, violations);
