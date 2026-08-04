@@ -55,8 +55,9 @@ assert.equal(
 assert.equal(v3.componentLoadAuthority.status, 'READY_FOR_INTEGRATION_DESIGN');
 assert.equal(v3.componentLoadAuthority.summary.onRouteCogCount, 1);
 
-const pipeMassKg = Math.PI * ((100 ** 2) - (90 ** 2)) / 4e6 * 1 * 7850;
-const pipeForceN = pipeMassKg * 9.81;
+const metalMassKg = Math.PI * ((100 ** 2) - (90 ** 2)) / 4e6 * 1 * 7850;
+const insulationMassKg = Math.PI * ((120 ** 2) - (100 ** 2)) / 4e6 * 1 * 120;
+const pipeForceN = (metalMassKg + insulationMassKg) * 9.81;
 const componentForceN = 10 * 9.81;
 const expectedV2 = [
   pipeForceN / 2 + componentForceN / 2,
@@ -264,13 +265,13 @@ function makeProfile() {
           outsideDiameterMm: 100,
           wallThicknessMm: 5,
           materialCode: 'MAT-1',
-          insulationCode: null,
-          insulationThicknessMm: 0,
+          insulationCode: 'INS-1',
+          insulationThicknessMm: 10,
         },
       }, 'EMP_PROD_03B_SECTION'),
       operatingFluidDensitiesKgPerM3: approved({ 'L-1': 800 }, 'EMP_PROD_03B_FLUID'),
       hydroFluidDensitiesKgPerM3: approved({ 'L-1': 1000 }, 'EMP_PROD_03B_FLUID'),
-      insulationDensitiesKgPerM3: approved({}, 'EMP_PROD_03B_INSULATION'),
+      insulationDensitiesKgPerM3: approved({ 'INS-1': 120 }, 'EMP_PROD_03B_INSULATION'),
       componentWeightsKg: approved({ 'CV-1': 10 }, 'EMP_PROD_03B_COMPONENT'),
       equilibriumTolerances: approved({ forceN: 1e-8, momentNmm: 1e-5 }, 'EMP_PROD_03B_EQUILIBRIUM'),
       activeLoadCases: approved(['EMPTY'], 'EMP_PROD_03B_CASES'),
