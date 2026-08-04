@@ -51,34 +51,41 @@ test('tree, search, HUD, and real WebGL share one canonical selection authority'
   await expect(host).toHaveAttribute('data-topology-edit-selection-ids', 'edge:P-004');
   await expect(page.locator('[data-role="professional-edge-id"]')).toHaveValue('edge:P-004');
 
-  const viewportTarget = await visiblePickPoint(page, 'edge:P-005');
+  const viewportTarget = await visiblePickPoint(page, 'edge:P-001');
   await page.mouse.click(viewportTarget.x, viewportTarget.y);
   await expect(host).toHaveAttribute('data-topology-edit-selection-source', 'viewport');
-  await expect(host).toHaveAttribute('data-topology-edit-selection-ids', 'edge:P-005');
-  await expect(page.locator('[data-role="professional-edge-id"]')).toHaveValue('edge:P-005');
-  await expect(treeEntity(page, 'P-005')).toHaveAttribute('aria-selected', 'true');
+  await expect(host).toHaveAttribute('data-topology-edit-selection-ids', 'edge:P-001');
+  await expect(page.locator('[data-role="professional-edge-id"]')).toHaveValue('edge:P-001');
+  await expect(treeEntity(page, 'P-001')).toHaveAttribute('aria-selected', 'true');
   evidence.selection = { viewport: 'PASS', tree: 'PASS', search: 'PASS', hud: 'PASS' };
 });
 
 test('tree modifier selection is deterministic and dataset replacement clears it', async ({ page }) => {
   const host = await openProductionController(page);
-  await treeEntity(page, 'P-001').click();
+  const rows = page.locator(
+    '[data-role="tree-list"] [data-action="select-entity"]',
+  );
+  await expect.poll(() => rows.count()).toBeGreaterThan(3);
+
+  await rows.nth(0).click();
   const revisionBefore = Number(
     await host.getAttribute('data-topology-edit-selection-revision'),
   );
-  await treeEntity(page, 'P-004').click({ modifiers: ['Shift'] });
-  const selectedIds = String(
-    await host.getAttribute('data-topology-edit-selection-ids') || '',
-  ).split(',').filter(Boolean);
+  await rows.nth(3).click({ modifiers: ['Shift'] });
+  const selectedIds = selectionIds(await host.getAttribute(
+    'data-topology-edit-selection-ids',
+  ));
   const sorted = [...selectedIds].sort((left, right) => left.localeCompare(right));
   expect(selectedIds).toEqual(sorted);
   expect(selectedIds.length).toBeGreaterThan(2);
   expect(Number(await host.getAttribute('data-topology-edit-selection-revision')))
     .toBe(revisionBefore + 1);
 
-  await treeEntity(page, 'P-003').click({ modifiers: ['Control'] });
-  expect(String(await host.getAttribute('data-topology-edit-selection-ids')))
-    .not.toContain('edge:P-003');
+  await rows.nth(1).click({ modifiers: ['Control'] });
+  const toggledIds = selectionIds(await host.getAttribute(
+    'data-topology-edit-selection-ids',
+  ));
+  expect(toggledIds).toHaveLength(selectedIds.length - 1);
 
   await page.locator('[data-action="load-topology-edit-demo"]').click();
   await expect.poll(() => host.getAttribute('data-topology-edit-selection-ids')).toBe('');
@@ -143,6 +150,10 @@ function treeEntity(page, entityId) {
   return page.locator(
     `[data-role="tree-list"] [data-entity-id="${entityId}"][data-action="select-entity"]`,
   );
+}
+
+function selectionIds(value) {
+  return String(value || '').split(',').filter(Boolean);
 }
 
 async function visiblePickPoint(page, canonicalId) {
