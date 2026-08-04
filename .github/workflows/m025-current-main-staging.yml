@@ -21,50 +21,50 @@ jobs:
           ref: agent/m025-current-main-staging
           fetch-depth: 0
 
-      - name: Apply verified M025 commit or publish conflict report
+      - name: Apply verified M025 mechanics and resolve current-main namespace
         shell: bash
         run: |
-          set -uo pipefail
+          set -euo pipefail
           git fetch origin 2fc930e7ed17db699ee63fe761bf96fef491ee3c
           if ! git cherry-pick --no-commit 2fc930e7ed17db699ee63fe761bf96fef491ee3c; then
-            {
-              echo '# M025 current-main cherry-pick conflict report'
-              echo
-              echo 'Source commit: `2fc930e7ed17db699ee63fe761bf96fef491ee3c`'
-              echo
-              echo '## Status'
-              echo '```text'
-              git status --short
-              echo '```'
-              echo
-              echo '## Unmerged paths'
-              echo '```text'
-              git diff --name-only --diff-filter=U
-              echo '```'
-              echo
-              echo '## Combined diff'
-              echo '```diff'
-              git diff --cc
-              echo '```'
-            } > /tmp/M025_CURRENT_MAIN_CONFLICTS.md
-            git cherry-pick --abort || git reset --hard HEAD
-            mkdir -p docs/qualification
-            cp /tmp/M025_CURRENT_MAIN_CONFLICTS.md docs/qualification/M025_CURRENT_MAIN_CONFLICTS.md
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add docs/qualification/M025_CURRENT_MAIN_CONFLICTS.md
-            git commit -m "M025: record current-main transplant conflicts"
-            git push origin HEAD:agent/m025-current-main-staging
-            exit 1
+            conflicts="$(git diff --name-only --diff-filter=U | sort)"
+            expected=$'package.json\nscripts/lfea-b3.19-bm1-friction-check.mjs\nscripts/lfea-b3.19-bm1-friction.mjs'
+            test "$conflicts" = "$expected"
+            git checkout --ours package.json
+            git checkout --theirs scripts/lfea-b3.19-bm1-friction-check.mjs
+            git checkout --theirs scripts/lfea-b3.19-bm1-friction.mjs
+            git add package.json scripts/lfea-b3.19-bm1-friction-check.mjs scripts/lfea-b3.19-bm1-friction.mjs
+            git cherry-pick --quit
           fi
-          set -e
+
+          git mv scripts/lfea-b3.19-bm1-friction.mjs scripts/m025-bm1-friction.mjs
+          git mv scripts/lfea-b3.19-bm1-friction-check.mjs scripts/m025-bm1-friction-check.mjs
+
+          perl -pi -e 's/lfea-b3\.19-bm1-friction/m025-bm1-friction/g' \
+            scripts/m025-bm1-friction-check.mjs \
+            scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs
+
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const file = 'package.json';
+          const packageJson = JSON.parse(readFileSync(file, 'utf8'));
+          packageJson.scripts['check:m025-bm1-friction'] = 'node scripts/m025-bm1-friction-check.mjs';
+          packageJson.scripts['check:m025-bm1-friction:mechanics'] = 'node scripts/m025-bm1-friction-check.mjs --mechanics-only';
+          writeFileSync(file, `${JSON.stringify(packageJson)}\n`);
+          NODE
+
           mkdir -p .github/workflows
           git show 7357437ae060f00c742dba09dd5760b71de90f72:.github/workflows/m025-bm1-friction.yml > .github/workflows/m025-bm1-friction.yml
+          perl -pi -e 's/scripts\/lfea-b3\.19-\*\.mjs/scripts\/m025-bm1-friction*.mjs/g; s/check:lfea-b3\.19:mechanics/check:m025-bm1-friction:mechanics/g; s/check:lfea-b3\.19/check:m025-bm1-friction/g' .github/workflows/m025-bm1-friction.yml
+
+          perl -pi -e 's/check:lfea-b3\.19:mechanics/check:m025-bm1-friction:mechanics/g; s/check:lfea-b3\.19/check:m025-bm1-friction/g; s/lfea-b3\.19-bm1-friction/m025-bm1-friction/g' docs/qualification/M025_COULOMB_FRICTION_ENGINEERING_RECORD.md
+
           rm -f .github/workflows/m025-current-main-staging.yml
           rm -f docs/qualification/M025_CURRENT_MAIN_CONFLICTS.md
           test ! -e scripts/m025-apply-work-pack.mjs
           test ! -e scripts/m025-apply-continuation-patch.mjs
           test ! -e scripts/m025-stabilize-continuation.mjs
+          test "$(node -p "require('./package.json').scripts['check:lfea-b3.19']")" = "node scripts/lfea-b3.19-b31-factor-calculator-check.mjs"
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -80,21 +80,70 @@ jobs:
           npm run check:lfea-b3.2
           npm run check:lfea-b3.3
 
-      - name: Run BM1 prerequisite checks
+      - name: Run current-main and BM1 prerequisite checks
         run: |
           npm run check:lfea-b3.15
           npm run check:lfea-b3.16
           npm run check:lfea-b3.17
           npm run check:lfea-b3.18
+          npm run check:lfea-b3.19
+          npm run check:lfea-b3.20
+          npm run check:lfea-b3.21
           npm run check:lfea-bm1-cii-comparison
 
       - name: Qualify nonlinear mechanics
-        run: npm run check:lfea-b3.19:mechanics
+        run: npm run check:m025-bm1-friction:mechanics
 
       - name: Run unchanged full acceptance oracle
         id: full_oracle
         continue-on-error: true
-        run: npm run check:lfea-b3.19
+        run: npm run check:m025-bm1-friction
+
+      - name: Append exact current-main result to engineering record
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+          const reportPath = 'reports/lfea-bm1-m025-friction-qualification.json';
+          if (!existsSync(reportPath)) throw new Error('M025 qualification report was not produced.');
+          const report = JSON.parse(readFileSync(reportPath, 'utf8'));
+          const summary = report.audit.summary;
+          const sus = report.friction.sustained;
+          const ope = report.friction.operating;
+          const lines = [
+            '',
+            '## Current-main exact-head qualification',
+            '',
+            `Base commit: \`98c556c2b694b12c7657f66eebbb2ef569ac770a\``,
+            '',
+            '```text',
+            `Total comparisons: ${summary.total}`,
+            `Passed:            ${summary.passed}`,
+            `Failed:            ${summary.failed}`,
+            `SUS state:         ${sus.selectedActiveSet}`,
+            `OPE state:         ${ope.selectedActiveSet}`,
+            `SUS residual:      ${sus.residualInfinityNorm} N`,
+            `OPE residual:      ${ope.residualInfinityNorm} N`,
+            '```',
+            '',
+            '| Case | Passed | Failed | Total |',
+            '|---|---:|---:|---:|',
+            ...Object.entries(summary.byCase).map(([name, value]) => `| ${name} | ${value.passed} | ${value.failed} | ${value.total} |`),
+            '',
+            '| Family | Passed | Failed | Total |',
+            '|---|---:|---:|---:|',
+            ...Object.entries(summary.byFamily).map(([name, value]) => `| ${name} | ${value.passed} | ${value.failed} | ${value.total} |`),
+            '',
+            'This current-main result supersedes earlier numerical counts in this record if they differ. The full acceptance oracle remains fail-closed.',
+            '',
+          ];
+          const file = 'docs/qualification/M025_COULOMB_FRICTION_ENGINEERING_RECORD.md';
+          let text = readFileSync(file, 'utf8').replace(/\n## Current-main exact-head qualification[\s\S]*$/u, '');
+          text += `${lines.join('\n')}\n`;
+          writeFileSync(file, text);
+          NODE
 
       - name: Upload current-main evidence
         if: always()
@@ -105,7 +154,7 @@ jobs:
             reports/lfea-bm1-m025-friction-qualification.json
             reports/lfea-bm1-cii-output-comparison.json
             docs/qualification/M025_COULOMB_FRICTION_ENGINEERING_RECORD.md
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 14
 
       - name: Commit current-main candidate
