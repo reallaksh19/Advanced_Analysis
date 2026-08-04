@@ -51,12 +51,12 @@ test('tree, search, HUD, and real WebGL share one canonical selection authority'
   await expect(host).toHaveAttribute('data-topology-edit-selection-ids', 'edge:P-004');
   await expect(page.locator('[data-role="professional-edge-id"]')).toHaveValue('edge:P-004');
 
-  const viewportTarget = await visiblePickPoint(page, 'edge:P-001');
+  const viewportTarget = await visiblePickPoint(page, 'edge:P-004');
   await page.mouse.click(viewportTarget.x, viewportTarget.y);
   await expect(host).toHaveAttribute('data-topology-edit-selection-source', 'viewport');
-  await expect(host).toHaveAttribute('data-topology-edit-selection-ids', 'edge:P-001');
-  await expect(page.locator('[data-role="professional-edge-id"]')).toHaveValue('edge:P-001');
-  await expect(treeEntity(page, 'P-001')).toHaveAttribute('aria-selected', 'true');
+  await expect(host).toHaveAttribute('data-topology-edit-selection-ids', 'edge:P-004');
+  await expect(page.locator('[data-role="professional-edge-id"]')).toHaveValue('edge:P-004');
+  await expect(treeEntity(page, 'P-004')).toHaveAttribute('aria-selected', 'true');
   evidence.selection = { viewport: 'PASS', tree: 'PASS', search: 'PASS', hud: 'PASS' };
 });
 
