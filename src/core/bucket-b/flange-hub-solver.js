@@ -11,11 +11,13 @@ import {
 import { FLANGE_HUB_MATERIAL_PROFILE } from './flange-hub-geometry.js';
 
 export const FLANGE_HUB_SOLVER_POLICY = deepFreeze({
-  solverPolicyId: 'BKT-B-FLANGE-HUB-DETERMINISTIC-JACOBI-PCG-V1',
+  solverPolicyId: 'BKT-B-FLANGE-HUB-DETERMINISTIC-JACOBI-PCG-V2',
   relativeResidualTolerance: 1e-10,
   absoluteResidualTolerance: 1e-8,
   maximumIterationMultiplier: 8,
   minimumMaximumIterations: 2000,
+  residualReplacementInterval: 50,
+  stoppingCriterion: 'EXPLICIT_REDUCED_SYSTEM_RESIDUAL',
   constraintMethod: 'EXACT_ZERO_DISPLACEMENT_ELIMINATION',
 });
 
@@ -74,7 +76,12 @@ export function solveFlangeHubLoadCase({ mesh, loadCaseId } = {}) {
     });
     return result;
   };
-  const solution = pcg({ multiply, rhs, diagonal, policy: FLANGE_HUB_SOLVER_POLICY });
+  const solution = solveJacobiPcg({
+    multiply,
+    rhs,
+    diagonal,
+    policy: FLANGE_HUB_SOLVER_POLICY,
+  });
   const displacement = new Float64Array(dofCount);
   freeDofs.forEach((dof, index) => { displacement[dof] = solution.vector[index]; });
   const internal = multiplySparse(stiffnessRows, displacement);
@@ -156,6 +163,9 @@ export function solveFlangeHubLoadCase({ mesh, loadCaseId } = {}) {
       iterations: solution.iterations,
       residualNorm: solution.residualNorm,
       relativeResidual: solution.relativeResidual,
+      recursiveResidualNorm: solution.recursiveResidualNorm,
+      explicitResidualNorm: solution.explicitResidualNorm,
+      residualReplacementCount: solution.residualReplacementCount,
     },
     loadDefinition,
     loadEvidence,
@@ -281,39 +291,112 @@ function deriveConstrainedDofs({ mesh, loadDefinition, nodeIndex }) {
   return result;
 }
 
-function pcg({ multiply, rhs, diagonal, policy }) {
+export function solveJacobiPcg({
+  multiply,
+  rhs,
+  diagonal,
+  policy = FLANGE_HUB_SOLVER_POLICY,
+} = {}) {
+  if (typeof multiply !== 'function') throw new TypeError('FH_PCG_MULTIPLY_REQUIRED');
+  if (!rhs || !diagonal || rhs.length !== diagonal.length || rhs.length === 0) {
+    throw new TypeError('FH_PCG_VECTOR_SHAPE_MISMATCH');
+  }
   const n = rhs.length;
   const x = new Float64Array(n);
-  const r = Float64Array.from(rhs);
+  let r = Float64Array.from(rhs);
   const z = new Float64Array(n);
-  for (let i = 0; i < n; i += 1) z[i] = r[i] / diagonal[i];
-  const p = Float64Array.from(z);
+  let p;
+  for (let i = 0; i < n; i += 1) {
+    if (!Number.isFinite(diagonal[i]) || !(diagonal[i] > 0)) {
+      throw new RangeError('FH_PCG_NONPOSITIVE_PRECONDITIONER');
+    }
+    z[i] = r[i] / diagonal[i];
+  }
+  p = Float64Array.from(z);
   let rz = dot(r, z);
   const rhsNorm = vectorNorm(rhs);
-  const tolerance = Math.max(policy.absoluteResidualTolerance, policy.relativeResidualTolerance * rhsNorm);
-  let residualNorm = vectorNorm(r);
-  const maximumIterations = Math.max(policy.minimumMaximumIterations, policy.maximumIterationMultiplier * n);
-  if (residualNorm <= tolerance) return { vector: x, iterations: 0, residualNorm, relativeResidual: residualNorm / Math.max(1, rhsNorm) };
+  const denominatorNorm = Math.max(1, rhsNorm);
+  const tolerance = Math.max(
+    policy.absoluteResidualTolerance,
+    policy.relativeResidualTolerance * rhsNorm,
+  );
+  const replacementInterval = Number.isInteger(policy.residualReplacementInterval)
+    && policy.residualReplacementInterval > 0
+    ? policy.residualReplacementInterval
+    : 0;
+  let recursiveResidualNorm = vectorNorm(r);
+  let explicitResidualNorm = recursiveResidualNorm;
+  let residualReplacementCount = 0;
+  const maximumIterations = Math.max(
+    policy.minimumMaximumIterations,
+    policy.maximumIterationMultiplier * n,
+  );
+
+  const explicitResidual = () => {
+    const product = multiply(x);
+    if (!product || product.length !== n) throw new TypeError('FH_PCG_MULTIPLY_SHAPE_MISMATCH');
+    const value = new Float64Array(n);
+    for (let i = 0; i < n; i += 1) value[i] = rhs[i] - product[i];
+    return value;
+  };
+  const replaceResidual = (value) => {
+    r = value;
+    for (let i = 0; i < n; i += 1) z[i] = r[i] / diagonal[i];
+    p = Float64Array.from(z);
+    rz = dot(r, z);
+    residualReplacementCount += 1;
+  };
+  const result = (iterations) => ({
+    vector: x,
+    iterations,
+    residualNorm: explicitResidualNorm,
+    relativeResidual: explicitResidualNorm / denominatorNorm,
+    recursiveResidualNorm,
+    explicitResidualNorm,
+    residualReplacementCount,
+  });
+
+  if (recursiveResidualNorm <= tolerance) {
+    const certified = explicitResidual();
+    explicitResidualNorm = vectorNorm(certified);
+    if (explicitResidualNorm <= tolerance) return result(0);
+    replaceResidual(certified);
+  }
+
   for (let iteration = 1; iteration <= maximumIterations; iteration += 1) {
     const Ap = multiply(p);
-    const denominator = dot(p, Ap);
-    if (!Number.isFinite(denominator) || !(denominator > 0)) throw new RangeError('FH_PCG_NONPOSITIVE_CURVATURE');
-    const alpha = rz / denominator;
+    if (!Ap || Ap.length !== n) throw new TypeError('FH_PCG_MULTIPLY_SHAPE_MISMATCH');
+    const curvature = dot(p, Ap);
+    if (!Number.isFinite(curvature) || !(curvature > 0)) {
+      throw new RangeError('FH_PCG_NONPOSITIVE_CURVATURE');
+    }
+    const alpha = rz / curvature;
     for (let i = 0; i < n; i += 1) {
       x[i] += alpha * p[i];
       r[i] -= alpha * Ap[i];
     }
-    residualNorm = vectorNorm(r);
-    if (residualNorm <= tolerance) {
-      return { vector: x, iterations: iteration, residualNorm, relativeResidual: residualNorm / Math.max(1, rhsNorm) };
+    recursiveResidualNorm = vectorNorm(r);
+    const certificationRequired = recursiveResidualNorm <= tolerance
+      || (replacementInterval > 0 && iteration % replacementInterval === 0);
+    if (certificationRequired) {
+      const certified = explicitResidual();
+      explicitResidualNorm = vectorNorm(certified);
+      if (explicitResidualNorm <= tolerance) return result(iteration);
+      replaceResidual(certified);
+      continue;
     }
     for (let i = 0; i < n; i += 1) z[i] = r[i] / diagonal[i];
     const nextRz = dot(r, z);
+    if (!Number.isFinite(nextRz) || !(nextRz > 0)) {
+      throw new RangeError('FH_PCG_NONPOSITIVE_PRECONDITIONED_RESIDUAL');
+    }
     const beta = nextRz / rz;
     for (let i = 0; i < n; i += 1) p[i] = z[i] + beta * p[i];
     rz = nextRz;
   }
-  throw new RangeError(`FH_PCG_DID_NOT_CONVERGE:${residualNorm / Math.max(1, rhsNorm)}`);
+  const certified = explicitResidual();
+  explicitResidualNorm = vectorNorm(certified);
+  throw new RangeError(`FH_PCG_DID_NOT_CONVERGE:${explicitResidualNorm / denominatorNorm}`);
 }
 
 function multiplySparse(rows, vector) {
