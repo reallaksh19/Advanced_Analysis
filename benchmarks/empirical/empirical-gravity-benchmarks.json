@@ -1,0 +1,144 @@
+{
+  "schema": "empirical-gravity-benchmark-catalog/v1",
+  "method": "CHAINAGE_TRIBUTARY_SPAN_V2",
+  "classification": "INDEPENDENT_CLOSED_FORM_ORACLE",
+  "units": {
+    "length": "mm and m as explicitly named",
+    "mass": "kg",
+    "force": "N",
+    "moment": "N*mm",
+    "density": "kg/m3"
+  },
+  "cases": [
+    {
+      "benchmarkId": "EMP-GRAVITY-SYMMETRIC-001",
+      "title": "One metre insulated pipe plus midpoint component on two symmetric supports",
+      "scope": [
+        "PIPE_INSIDE_DIAMETER",
+        "PIPE_METAL_MASS",
+        "INSULATION_MASS",
+        "FLUID_MASS",
+        "COMPONENT_MASS",
+        "GRAVITY_FORCE",
+        "POINT_REACTION_DISTRIBUTION",
+        "UNIFORM_SEGMENT_EQUIVALENT",
+        "REACTION_ACCUMULATION",
+        "EQUILIBRIUM_CHECK"
+      ],
+      "inputs": {
+        "outsideDiameterMm": 100,
+        "wallThicknessMm": 5,
+        "lengthM": 1,
+        "materialDensityKgPerM3": 7850,
+        "insulationThicknessMm": 10,
+        "insulationDensityKgPerM3": 120,
+        "operatingFluidDensityKgPerM3": 800,
+        "hydroFluidDensityKgPerM3": 1000,
+        "componentMassKg": 10,
+        "gravityMPerS2": 9.81,
+        "loadFactor": 1,
+        "supportChainagesMm": [0, 1000],
+        "componentChainageMm": 500
+      },
+      "expected": {
+        "insideDiameterMm": 90,
+        "metalMassKg": 11.714213607072942,
+        "insulationMassKg": 0.4146902302738527,
+        "operatingFluidMassKg": 5.0893800988154645,
+        "hydroFluidMassKg": 6.361725123519331,
+        "cases": {
+          "EMPTY": {
+            "pipeMassKg": 12.128903837346796,
+            "totalAppliedForceN": 217.0845466443721,
+            "supportReactionsN": [108.54227332218605, 108.54227332218605],
+            "forceResidualN": 0,
+            "momentResidualNmm": 0
+          },
+          "OPE": {
+            "pipeMassKg": 17.21828393616226,
+            "totalAppliedForceN": 267.0113654137518,
+            "supportReactionsN": [133.5056827068759, 133.5056827068759],
+            "forceResidualN": 0,
+            "momentResidualNmm": 0
+          },
+          "HYD": {
+            "pipeMassKg": 18.490628960866125,
+            "totalAppliedForceN": 279.4930701060967,
+            "supportReactionsN": [139.74653505304835, 139.74653505304835],
+            "forceResidualN": 0,
+            "momentResidualNmm": 0
+          }
+        }
+      }
+    },
+    {
+      "benchmarkId": "EMP-POINT-UNEQUAL-001",
+      "title": "Point load at one-quarter span",
+      "scope": [
+        "COMPONENT_MASS",
+        "GRAVITY_FORCE",
+        "POINT_REACTION_DISTRIBUTION",
+        "REACTION_ACCUMULATION",
+        "EQUILIBRIUM_CHECK"
+      ],
+      "inputs": {
+        "forceN": 100,
+        "pointChainageMm": 250,
+        "supportChainagesMm": [0, 1000]
+      },
+      "expected": {
+        "supportReactionsN": [75, 25],
+        "appliedMomentNmm": 25000,
+        "reactionMomentNmm": 25000,
+        "forceResidualN": 0,
+        "momentResidualNmm": 0
+      }
+    },
+    {
+      "benchmarkId": "EMP-POINT-AT-SUPPORT-001",
+      "title": "Point load exactly at a support chainage",
+      "scope": [
+        "POINT_REACTION_DISTRIBUTION",
+        "REACTION_ACCUMULATION",
+        "EQUILIBRIUM_CHECK"
+      ],
+      "inputs": {
+        "forceN": 80,
+        "pointChainageMm": 500,
+        "supportChainagesMm": [0, 500, 1000]
+      },
+      "expected": {
+        "supportReactionsN": [0, 80, 0],
+        "forceResidualN": 0,
+        "momentResidualNmm": 0
+      }
+    },
+    {
+      "benchmarkId": "EMP-UNIFORM-MULTISPAN-001",
+      "title": "Uniform load across unequal adjacent support spans",
+      "scope": [
+        "UNIFORM_SEGMENT_EQUIVALENT",
+        "POINT_REACTION_DISTRIBUTION",
+        "REACTION_ACCUMULATION",
+        "EQUILIBRIUM_CHECK"
+      ],
+      "inputs": {
+        "totalForceN": 300,
+        "startChainageMm": 0,
+        "endChainageMm": 3000,
+        "supportChainagesMm": [0, 1000, 3000]
+      },
+      "expected": {
+        "segments": [
+          { "startMm": 0, "endMm": 1000, "forceN": 100, "centroidMm": 500 },
+          { "startMm": 1000, "endMm": 3000, "forceN": 200, "centroidMm": 2000 }
+        ],
+        "supportReactionsN": [50, 150, 100],
+        "appliedMomentNmm": 450000,
+        "reactionMomentNmm": 450000,
+        "forceResidualN": 0,
+        "momentResidualNmm": 0
+      }
+    }
+  ]
+}
