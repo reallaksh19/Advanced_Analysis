@@ -13,6 +13,8 @@ test('production controller owns one Zustand selection bridge', async () => {
   assert.match(controller, /Object\.defineProperty\(this, 'selection'/);
   assert.match(controller, /handleViewportSelection\(pick, event\)/);
   assert.match(controller, /dataset\.topologyEditSelectionRevision/);
+  assert.match(controller, /WorkspaceState\.getSnapshot\(\)/);
+  assert.match(controller, /topologyEditDatasetSessionVersion/);
 });
 
 test('search dispatches through the canonical selection coordinator', async () => {
@@ -23,10 +25,16 @@ test('search dispatches through the canonical selection coordinator', async () =
 
 test('tree keeps virtualization and publishes governed selection requests', async () => {
   const events = await source('src/workspace/tree-panel-events.js');
+  const panel = await source('src/workspace/tree-panel.js');
   const tree = await source('src/workspace/tree-panel-tree.js');
   assert.match(events, /TOPOLOGY_EDIT_SELECTION_EVENTS\.REQUESTED/);
   assert.match(events, /createTopologyEditSelectionRequest/);
   assert.match(events, /visibleEntityRange/);
+  assert.match(panel, /applyTopologyEditSelection\(payload\)/);
+  assert.doesNotMatch(
+    panel,
+    /applyTopologyEditSelection\(payload\)\s*\{\s*if \(!this\.topologyEditSelectionActive\) return;/,
+  );
   assert.match(tree, /const OVERSCAN = 10/);
   assert.match(tree, /replaceChildren\(fragment\)/);
   assert.match(tree, /aria-selected/);
