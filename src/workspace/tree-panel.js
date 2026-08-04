@@ -86,7 +86,6 @@ export class TreePanel {
   }
 
   applyTopologyEditSelection(payload) {
-    if (!this.topologyEditSelectionActive) return;
     this.selectedEntityIds = new Set(payload.workspaceEntityIds ?? []);
     this.selectedEntityId = String(payload.primaryWorkspaceEntityId || '');
     this.selectionAnchorEntityId = String(
