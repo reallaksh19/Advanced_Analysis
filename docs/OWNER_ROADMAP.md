@@ -1506,3 +1506,60 @@ exactly); it is a narrative-precision note, not a defect, and does not
 block merge. Left as-is in the merged PR text; recorded here so a future
 reader chasing "add real SIFs to close this gap" knows that alone likely
 will not, and the flexibility factor is the more promising next lever.
+
+## M024 (#588) → PR #590, merged as `00a7a0ec9e50ccb0301192f9cbdb5110b39a5e13`
+
+Direct follow-through on the nuance above: dispatched a Work Pack to wire
+BM1's two bends through the real, already-validated B-3.2 `BEND` piping
+component (`src/core/linear-fea-piping-components/bend-component.js`,
+proven by the Appendix S Example 2 benchmark) instead of today's
+whole-chord frame elements — real arc geometry, a real pressure-corrected
+ASME B31.3 Appendix D Table D300 Note (7) flexibility factor, and real
+directional in-plane/out-of-plane SIFs, replacing unity.
+
+Before dispatching, hand-derived BM1's own bend geometry (`R=457.199982
+mm`, `Do=323.850006 mm`, `t=9.525 mm`) through the classic unpressurized
+formula: `i=0.9/h^(2/3)=2.8624` landed within ~7% of CAESAR's real
+reported `SIF_IN_PLANE=2.661139`, and CAESAR's own
+`SIF_OUT_PLANE/SIF_IN_PLANE` ratio was exactly `5/6` — the signature of
+the real split B31J formula pair. That grounding is what made this a
+well-scoped Work Pack rather than a guess.
+
+**Reviewed the exact PR head** (`73bd9fe0644870f7065f41a182b01af8910a8593`)
+in a dedicated worktree, diffed against the PR's real base (not a stale
+local `main` ref, which initially produced a false-positive unrelated
+`docs/3Dagent.md` diff from another parallel workstream — caught and
+corrected before drawing any conclusion from it). Read every one of the
+13 changed files in full, then independently re-ran all five BM1 checks
+(`b3.15`, `b3.16`, `b3.17`, the new `b3.18`, `bm1-cii-comparison`) plus
+the full `check:lfea-linear-core` aggregate — all passed, reproducing
+the PR's own reported numbers exactly, not just a green exit code.
+
+**Independently re-derived both bends' flexibility factor and SIFs from
+raw geometry**, from scratch, before reading the PR's own derivation
+logic in detail — using the real formula (`h=tR/r²`, `k=1.65/h` with the
+real Appendix D Note 7 pressure correction; SIF via `i=0.9/h^(2/3)` and
+`i=0.75/h^(2/3)` with the companion pressure-correction denominator
+`1+3.25(P/E)(r/t)^(5/2)(R/r)^(2/3)`). Both bends' results matched the
+PR's claimed values to the full double-precision digit count (`IX-S5`:
+`k=8.805996977364236`, `ii=2.656692445746295`, `io=2.213910371455246`;
+`IX-S6`: `k=8.81810588982693`, `ii=2.66113953399073`,
+`io=2.217616278325609`) — and `IX-S6`'s SIFs independently reproduce
+CAESAR's real six-decimal `STRESS_REPORT` values. This is a from-scratch
+reproduction, not a check that the PR's code merely runs.
+
+**Real, disclosed result**: all 19 CAESAR stress-report element pairs
+now have an exact compiled counterpart (0 unmatched on either side,
+closing the node/element gap open since M020). EXP-case deviation
+improved substantially (max 32.52→18.15 percentage points, mean
+5.73→3.28) — the governing utilization moved from a straight-run pair
+to a resolved bend station, much closer to CAESAR's own governing
+location. SUS-case *local* deviation got measurably worse (max
+4.87→12.0 points, mean 1.55→2.25) even though the overall governing
+percentage stayed close (46.49% vs. CAESAR's 46.26%) — a real
+redistribution effect from adding bend flexibility, disclosed plainly
+in the PR rather than hidden, and not chased further in this review
+since the primary target (EXP) genuinely improved and both known
+remaining gaps (restraint friction at nodes 70/80, the B31.3-2018 vs.
+2024 edition label) are unchanged, already-disclosed, out-of-scope
+items.
