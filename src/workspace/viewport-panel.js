@@ -15,8 +15,12 @@ import { projectDataStore } from './project-data/project-data-store.js';
 import { buildResolvedEngineeringGeometry } from './resolved-engineering-geometry.js';
 import { SequentialCommandGateway } from './sequential-sketcher/sequential-command-gateway.js';
 import { SequentialEditPanel } from './sequential-sketcher/sequential-edit-panel.js';
+import { SupportLoadPresenter } from './sequential-sketcher/support-load-presenter.js';
 import { SequentialTableStore } from './sequential-sketcher/sequential-table-store.js';
 import { SequentialTopologyTableView } from './sequential-sketcher/sequential-topology-table-view.js';
+import {
+  projectSupportLoadViewportCallouts,
+} from './support-load-viewport-callout-projection.js';
 import { buildViewportRenderModel } from './viewport-render-model.js';
 import { ViewportRenderer } from './viewport-renderer.js';
 import { WorkspaceState } from './workspace-state.js';
@@ -28,6 +32,7 @@ export class ViewportPanel {
     this.rootElement = rootElement;
     this.eventBus = eventBus || EventBus;
     this.renderer = renderer || new ViewportRenderer();
+    this.supportLoadPresenter = new SupportLoadPresenter();
     this.gateway = new SequentialCommandGateway(WorkspaceState, this.eventBus);
     this.tableStore = new SequentialTableStore(WorkspaceState, this.gateway, this.eventBus);
     this.unsubscribers = [];
@@ -92,7 +97,14 @@ export class ViewportPanel {
         supportSites,
       );
       const renderModel = buildViewportRenderModel(scoped);
-      this.renderer.renderModel(renderModel);
+      const supportLoadCallouts = supportSites
+        ? projectSupportLoadViewportCallouts({
+          dataset,
+          supportSiteModel: supportSites,
+          presenter: this.supportLoadPresenter,
+        })
+        : [];
+      this.renderer.renderModel(renderModel, { supportLoadCallouts });
       this.renderModel = renderModel;
       this.statusElement.textContent = viewportStatus(dataset, projection, renderModel, preview);
     } catch (error) {

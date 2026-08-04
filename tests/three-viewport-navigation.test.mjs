@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import * as THREE from 'three';
+import './three-support-load-callout-layer.test.mjs';
 import {
   fitThreeSelection,
   fitThreeView,
@@ -120,7 +122,7 @@ test('[SIMULATED] HUD uses inverse orientation and restores renderer state', () 
   hud.dispose();
 });
 
-test('[SIMULATED] backend renders main scene before HUD and disposes HUD once', () => {
+test('[SIMULATED] backend renders main scene, updates callouts, then HUD and disposes once', () => {
   const backend = new ThreeViewportBackend();
   const renderer = new RendererSpy();
   backend.renderer = renderer;
@@ -128,12 +130,19 @@ test('[SIMULATED] backend renders main scene before HUD and disposes HUD once', 
   backend.camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
   backend.hostElement = { clientWidth: 640, clientHeight: 480, dataset: {} };
   backend.axisHud = new ViewportAxisHUD();
+  backend.supportLoadCallouts = Object.freeze([]);
+  let calloutDisposeCalls = 0;
+  backend.calloutLayer = {
+    update() { renderer.events.push('callout:update'); },
+    destroy() { calloutDisposeCalls += 1; },
+  };
   renderer.mainScene = backend.scene;
   renderer.hudScene = backend.axisHud.scene;
 
   backend.renderOnce();
 
-  assert.ok(renderer.events.indexOf('render:main') < renderer.events.indexOf('clearDepth'));
+  assert.ok(renderer.events.indexOf('render:main') < renderer.events.indexOf('callout:update'));
+  assert.ok(renderer.events.indexOf('callout:update') < renderer.events.indexOf('clearDepth'));
   assert.ok(renderer.events.indexOf('clearDepth') < renderer.events.indexOf('render:hud'));
   backend.camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 100);
   backend.hostElement.clientWidth = 800;
@@ -150,7 +159,35 @@ test('[SIMULATED] backend renders main scene before HUD and disposes HUD once', 
   backend.renderOnce();
   backend.destroy();
   assert.equal(disposeCalls, 1);
+  assert.equal(calloutDisposeCalls, 1);
   assert.equal(renderer.events.filter((event) => event === 'render:hud').length, 1);
+});
+
+test('[SIMULATED] exact-head support-load browser fixture passes with one worker', {
+  timeout: 180_000,
+}, () => {
+  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+  const result = spawnSync(
+    npm,
+    [
+      'exec',
+      'playwright',
+      'test',
+      '--',
+      'e2e/three-support-load-callouts.spec.js',
+    ],
+    {
+      cwd: new URL('..', import.meta.url),
+      encoding: 'utf8',
+      env: { ...process.env, E2E_WORKERS: '1', FORCE_COLOR: '0' },
+      maxBuffer: 20 * 1024 * 1024,
+    },
+  );
+  assert.equal(
+    result.status,
+    0,
+    `support-load browser fixture failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+  );
 });
 
 function perspectiveBackend(objects) {
