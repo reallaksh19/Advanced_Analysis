@@ -1,0 +1,81 @@
+name: M025 BM1 Coulomb Friction Qualification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/m025-bm1-friction.yml"
+      - "package.json"
+      - "benchmarks/LFEA/BM1/BM1_InputXML.xml"
+      - "benchmarks/LFEA/BM1/BM1_CIIOutput.xml"
+      - "reports/lfea-bm1-cii-output-comparison.json"
+      - "reports/lfea-bm1-m025-friction-qualification.json"
+      - "scripts/m025-apply-work-pack.mjs"
+      - "scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs"
+      - "scripts/lfea-b3.15-bm1-inputxml-check.mjs"
+      - "scripts/lfea-b3.16-inputxml-ground-truth-check.mjs"
+      - "scripts/lfea-b3.17-*.mjs"
+      - "scripts/lfea-b3.18-*.mjs"
+      - "scripts/lfea-b3.19-*.mjs"
+      - "scripts/lfea-bm1-cii-output-comparison*.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  qualify-m025:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out exact candidate branch
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          fetch-depth: 0
+
+      - name: Apply M025 integration patch when not committed yet
+        run: |
+          if grep -q "solveBm1CoulombCases" scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs; then
+            echo "M025 integration already present on branch."
+          else
+            node scripts/m025-apply-work-pack.mjs
+          fi
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run focused M025 qualification
+        run: |
+          npm run check:lfea-b3.15
+          npm run check:lfea-b3.16
+          npm run check:lfea-b3.17
+          npm run check:lfea-b3.18
+          npm run check:lfea-b3.19
+          npm run check:lfea-bm1-cii-comparison
+
+      - name: Run complete linear piping core
+        run: npm run check:lfea-linear-core
+
+      - name: Commit validated integration and generated proof
+        if: github.event_name == 'pull_request'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json \
+            scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs \
+            scripts/lfea-bm1-cii-output-comparison.mjs \
+            reports/lfea-bm1-cii-output-comparison.json \
+            reports/lfea-bm1-m025-friction-qualification.json
+          if git diff --cached --quiet; then
+            echo "Validated M025 integration already committed."
+          else
+            git commit -m "M025: integrate validated Coulomb friction solve"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          fi
