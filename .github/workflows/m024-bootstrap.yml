@@ -39,7 +39,7 @@ jobs:
           path = Path('scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs')
           source = path.read_text()
           old = "componentId: `${sourceSegment.id}.${segment.id}`"
-          new = "componentId: segment.id"
+          new = "componentId: sourceSegment.id"
           assert old in source
           path.write_text(source.replace(old, new, 1))
           PY
