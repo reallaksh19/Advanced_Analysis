@@ -19,21 +19,26 @@ export function createTopologyEditProfessionalOperationPlan(input = {}) {
   const values = isPlainRecord(input.values) ? input.values : {};
   const operationType = requiredText(values.operationType, 'operationType').toUpperCase();
   const selection = normalizeSelection(input.selection);
+  let catalogue = null;
+  let record = null;
+  if (operationType === 'INSERT_INLINE_COMPONENT') {
+    ({ catalogue, record } = exactCatalogueRecord(input.catalogue, values.catalogueRecordId));
+  }
   const plannerInput = {
     topology: input.topology,
     basisHash: input.topology.canonicalTopologyHash,
     operationType,
     ...operationParameters(operationType, values, selection),
+    ...(catalogue ? { catalogue, catalogueRecord: record } : {}),
   };
   const planned = planProfessionalOperation(plannerInput);
   if (planned.status === 'UNREPRESENTABLE_WITH_CURRENT_COMMANDS') return planned;
   if (!planned.unresolvedEvidence.some((row) => row.code === 'CATALOGUE_COMPATIBILITY_NOT_EVALUATED')) {
     return planned;
   }
-  const catalogue = assertTopologyEditSpecificationCatalogue(input.catalogue);
-  const recordId = requiredText(values.catalogueRecordId, 'catalogueRecordId');
-  const record = catalogue.records.find((row) => row.recordId === recordId);
-  if (!record) fail(`catalogue record ${recordId} was not found.`, RangeError);
+  if (!catalogue || !record) {
+    ({ catalogue, record } = exactCatalogueRecord(input.catalogue, values.catalogueRecordId));
+  }
   assertRecordMatchesPlan(record, planned);
   const compatibility = resolveTopologyEditSpecificationCompatibility({
     catalogue,
@@ -68,6 +73,21 @@ function operationParameters(operationType, values, selection) {
     EXTEND_EDGE: commonEdge,
     SHORTEN_EDGE: commonEdge,
     SPLIT_EDGE_FROM_DISTANCE: commonEdge,
+    INSERT_INLINE_COMPONENT: () => ({
+      edgeId: requiredValue(edgeId, 'edgeId'),
+      centerDistanceMm: finitePositive(
+        values.centerDistanceMm ?? values.distanceMm,
+        'centerDistanceMm',
+      ),
+      insertionLengthMm: optionalFinitePositive(
+        values.insertionLengthMm,
+        'insertionLengthMm',
+      ),
+      direction: requiredText(
+        values.inlineDirection ?? 'FROM_TO',
+        'inlineDirection',
+      ).toUpperCase(),
+    }),
     RECONNECT_ENDPOINTS: () => ({
       fromNodeId: requiredCanonical(
         values.fromNodeId || nodeIds[0],
@@ -113,6 +133,16 @@ function operationParameters(operationType, values, selection) {
   const builder = operations[operationType];
   if (!builder) fail(`unsupported operation type ${operationType}.`, RangeError);
   return builder();
+}
+
+function exactCatalogueRecord(catalogueInput, recordIdInput) {
+  const catalogue = assertTopologyEditSpecificationCatalogue(catalogueInput);
+  const recordId = requiredText(recordIdInput, 'catalogueRecordId');
+  const matches = catalogue.records.filter((row) => row.recordId === recordId);
+  if (matches.length !== 1) {
+    fail(`catalogue record ${recordId} resolved ${matches.length} records.`, RangeError);
+  }
+  return { catalogue, record: matches[0] };
 }
 
 function assertRecordMatchesPlan(record, plan) {
@@ -161,6 +191,11 @@ function requiredCanonical(value, label, kind) {
 function requiredValue(value, label) {
   if (value === null || value === undefined || value === '') fail(`${label} is required.`);
   return value;
+}
+function optionalFinitePositive(value, label) {
+  return value === null || value === undefined || value === ''
+    ? null
+    : finitePositive(value, label);
 }
 function finitePositive(value, label) {
   const number = finite(value, label);
