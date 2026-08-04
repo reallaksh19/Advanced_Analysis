@@ -45,11 +45,12 @@ test('production WebGL drag uses deterministic snapping without canonical previe
   const canvas = host.locator('canvas');
   await expect(canvas).toBeVisible();
   await expect(host).toHaveAttribute('data-topology-edit-snap-engine', 'DETERMINISTIC_PHASE_B');
+  expect(await hasRealWebGL(page)).toBe(true);
   evidence.realWebGL = 'PASS';
 
   const context = await gapContext(page, 'E-001:port:start', 'P-001:port:end');
   const before = await canonicalEvidence(page);
-  await clickCanonicalNodeInViewport(page, context.movingNodeId);
+  await selectCanonicalNode(page, context.movingNodeId);
   await expect(host).toHaveAttribute('data-topology-edit-selection-ids', context.movingNodeId);
   await expect(host).toHaveAttribute('data-topology-edit-gizmo-handle-count', '6');
 
@@ -104,39 +105,33 @@ test('production WebGL drag uses deterministic snapping without canonical previe
   await expect(host).toHaveAttribute('data-topology-edit-snap-cycle-index', '1');
   evidence.cycling = 'PASS';
 
-  await page.evaluate(({
-    controllerKey,
-    staleResultKey,
-  }) => {
+  await page.evaluate(({ controllerKey, staleResultKey }) => {
     globalThis[staleResultKey] = globalThis[controllerKey]
       ?.interactionControllerRuntime?.snapResult ?? null;
   }, { controllerKey: CONTROLLER_KEY, staleResultKey: STALE_RESULT_KEY });
 
   await page.mouse.up();
   await expect(host).toHaveAttribute('data-topology-edit-interaction-preview-hash', /.+/);
-  const duringPreview = await canonicalEvidence(page);
-  expect(duringPreview).toEqual(before);
+  expect(await canonicalEvidence(page)).toEqual(before);
 
   await page.keyboard.press('Escape');
   await expect(host).toHaveAttribute('data-topology-edit-interaction-preview-hash', '');
   expect(await canonicalEvidence(page)).toEqual(before);
   evidence.cancelZeroCanonicalChange = 'PASS';
 
-  const stale = await page.evaluate(({
-    controllerKey,
-    staleResultKey,
-  }) => {
+  const stale = await page.evaluate(({ controllerKey, staleResultKey }) => {
     const controller = globalThis[controllerKey];
     const result = globalThis[staleResultKey];
-    const store = controller.editorStore;
-    const current = store.getState();
+    const current = controller.editorStore.getState();
     const alternative = controller.session.currentTopology().nodes
       .find((node) => node.id !== current.selection.primaryId);
-    store.getState().actions.replaceSelection(
+    controller.selectionCoordinator.requestCanonical(
+      'REPLACE',
       [alternative.id],
       'command',
+      { primaryId: alternative.id, anchorId: alternative.id },
     );
-    const changed = store.getState();
+    const changed = controller.editorStore.getState();
     return controller.interactionControllerRuntime.snapStore.applyResult(
       result,
       {
@@ -195,11 +190,16 @@ async function openProductionController(page) {
   await expect(host).toBeVisible();
   await expect(host.locator('canvas')).toBeVisible();
   await expect(host).toHaveAttribute('data-topology-edit-clean-shell', 'true');
-  await expect(host).toHaveAttribute(
-    'data-topology-edit-dataset-source-hash',
-    /.+/,
-  );
+  await expect(host).toHaveAttribute('data-topology-edit-dataset-source-hash', /.+/);
   return host;
+}
+
+async function hasRealWebGL(page) {
+  return page.evaluate((controllerKey) => {
+    const renderer = globalThis[controllerKey]?.viewportBackend?.renderer;
+    const context = renderer?.getContext?.();
+    return Boolean(context && context.drawingBufferWidth > 0 && context.drawingBufferHeight > 0);
+  }, CONTROLLER_KEY);
 }
 
 async function gapContext(page, movingPortKey, anchorPortKey) {
@@ -217,11 +217,7 @@ async function gapContext(page, movingPortKey, anchorPortKey) {
     const axis = ['x', 'y', 'z'].sort((left, right) => (
       Math.abs(delta[right]) - Math.abs(delta[left])
     ))[0].toUpperCase();
-    return {
-      movingNodeId: moving.id,
-      anchorNodeId: anchor.id,
-      axis,
-    };
+    return { movingNodeId: moving.id, anchorNodeId: anchor.id, axis };
   }, {
     controllerKey: CONTROLLER_KEY,
     movingKey: movingPortKey,
@@ -229,9 +225,19 @@ async function gapContext(page, movingPortKey, anchorPortKey) {
   });
 }
 
-async function clickCanonicalNodeInViewport(page, nodeId) {
-  const point = await projectedNode(page, nodeId);
-  await page.mouse.click(point.x, point.y);
+async function selectCanonicalNode(page, nodeId) {
+  await page.evaluate(({ controllerKey, id }) => {
+    const controller = globalThis[controllerKey];
+    const result = controller.selectionCoordinator.requestCanonical(
+      'REPLACE',
+      [id],
+      'command',
+      { primaryId: id, anchorId: id },
+    );
+    if (!['CHANGED', 'UNCHANGED'].includes(result.disposition)) {
+      throw new Error(`Canonical selection setup failed: ${result.disposition}.`);
+    }
+  }, { controllerKey: CONTROLLER_KEY, id: nodeId });
 }
 
 async function dragPoints(page, targetNodeId, axis) {
@@ -283,24 +289,6 @@ async function dragPoints(page, targetNodeId, axis) {
       },
     };
   }, { controllerKey: CONTROLLER_KEY, targetId: targetNodeId, axisName: axis });
-}
-
-async function projectedNode(page, nodeId) {
-  return page.evaluate(({ controllerKey, id }) => {
-    const controller = globalThis[controllerKey];
-    const node = controller.session.currentTopology().nodes.find((row) => row.id === id);
-    const camera = controller.viewportBackend.activeCamera;
-    const canvas = controller.viewportBackend.renderer.domElement;
-    if (!node || !camera || !canvas) throw new Error(`Cannot project ${id}.`);
-    const vector = camera.position.clone()
-      .set(node.position.x, node.position.y, node.position.z)
-      .project(camera);
-    const rect = canvas.getBoundingClientRect();
-    return {
-      x: rect.left + ((vector.x + 1) / 2) * rect.width,
-      y: rect.top + ((1 - vector.y) / 2) * rect.height,
-    };
-  }, { controllerKey: CONTROLLER_KEY, id: nodeId });
 }
 
 async function canonicalEvidence(page) {
