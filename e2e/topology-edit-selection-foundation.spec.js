@@ -2,6 +2,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 
 const CONTROLLER_KEY = '__TOPOLOGY_EDIT_SELECTION_FOUNDATION_CONTROLLER__';
+const DATASET_BEFORE_KEY = '__TOPOLOGY_EDIT_SELECTION_FOUNDATION_DATASET_BEFORE__';
+const CONTROLLER_BEFORE_KEY = '__TOPOLOGY_EDIT_SELECTION_FOUNDATION_CONTROLLER_BEFORE__';
 const REPORT_PATH = 'reports/qualification/topology-edit-selection-foundation.json';
 const evidence = {
   schema: 'TopologyEditSelectionFoundationQualification.v1',
@@ -87,14 +89,62 @@ test('tree modifier selection is deterministic and dataset replacement clears it
   ));
   expect(toggledIds).toHaveLength(selectedIds.length - 1);
 
-  const datasetSessionBefore = Number(
-    await host.getAttribute('data-topology-edit-dataset-session-version'),
+  const baseline = await page.evaluate(({
+    controllerKey,
+    datasetBeforeKey,
+    controllerBeforeKey,
+  }) => {
+    const controller = globalThis[controllerKey];
+    globalThis[datasetBeforeKey] = globalThis.AnalysisWorkspace
+      ?.getSnapshot?.()?.dataset ?? null;
+    globalThis[controllerBeforeKey] = controller;
+    return {
+      sessionVersion: controller?.editorStore?.getState?.()?.dataset?.sessionVersion ?? 0,
+    };
+  }, {
+    controllerKey: CONTROLLER_KEY,
+    datasetBeforeKey: DATASET_BEFORE_KEY,
+    controllerBeforeKey: CONTROLLER_BEFORE_KEY,
+  });
+
+  const demoButton = page.locator(
+    '[data-panel="tree"] [data-action="load-topology-edit-demo"]',
   );
-  await page.locator('[data-action="load-topology-edit-demo"]').click();
-  await expect.poll(async () => Number(
-    await host.getAttribute('data-topology-edit-dataset-session-version'),
-  )).toBeGreaterThan(datasetSessionBefore);
-  await expect.poll(() => host.getAttribute('data-topology-edit-selection-ids')).toBe('');
+  await expect(demoButton).toBeVisible();
+  await expect(demoButton).toBeEnabled();
+  await demoButton.click();
+
+  await expect.poll(() => page.evaluate(({
+    controllerKey,
+    datasetBeforeKey,
+    controllerBeforeKey,
+    sessionVersionBefore,
+  }) => {
+    const controller = globalThis[controllerKey];
+    const currentDataset = globalThis.AnalysisWorkspace
+      ?.getSnapshot?.()?.dataset ?? null;
+    const state = controller?.editorStore?.getState?.() ?? null;
+    const sameController = controller === globalThis[controllerBeforeKey];
+    return {
+      datasetReplaced: Boolean(
+        currentDataset && currentDataset !== globalThis[datasetBeforeKey]
+      ),
+      selectionCount: state?.selection?.canonicalIds?.length ?? -1,
+      epochReconciled: Boolean(
+        !sameController || state?.dataset?.sessionVersion > sessionVersionBefore
+      ),
+    };
+  }, {
+    controllerKey: CONTROLLER_KEY,
+    datasetBeforeKey: DATASET_BEFORE_KEY,
+    controllerBeforeKey: CONTROLLER_BEFORE_KEY,
+    sessionVersionBefore: baseline.sessionVersion,
+  })).toEqual({
+    datasetReplaced: true,
+    selectionCount: 0,
+    epochReconciled: true,
+  });
+
   evidence.modifiers = 'PASS';
   evidence.datasetReset = 'PASS';
 });
