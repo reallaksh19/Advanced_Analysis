@@ -38,7 +38,7 @@ assert.equal(requireInputXmlResolvedGroundTruth(first).semanticHash, first.seman
 assert.deepEqual(second, first);
 
 for (const elementId of ['IX-S1', 'IX-S2', 'IX-S3']) {
-  assert.deepEqual(field(elementId, 'insulationDensity'), { status: 'MISSING' });
+  assert.deepEqual(field(elementId, 'insulationDensity'), { status: 'DECLARED', value: 2100 }, `${elementId} now declares its own insulation density (Owner-confirmed fix, 2026-08-04)`);
 }
 assert.deepEqual(field('IX-S4', 'insulationDensity'), {
   status: 'DECLARED',
