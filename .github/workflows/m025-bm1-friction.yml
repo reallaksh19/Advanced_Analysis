@@ -1,0 +1,92 @@
+name: M025 BM1 Coulomb Friction Qualification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/m025-bm1-friction.yml"
+      - "package.json"
+      - "benchmarks/LFEA/BM1/BM1_InputXML.xml"
+      - "benchmarks/LFEA/BM1/BM1_CIIOutput.xml"
+      - "docs/qualification/M025_COULOMB_FRICTION_ENGINEERING_RECORD.md"
+      - "scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs"
+      - "scripts/lfea-b3.19-*.mjs"
+      - "scripts/lfea-bm1-cii-output-comparison*.mjs"
+      - "src/core/linear-fea-piping-components/**"
+      - "src/core/linear-fea-solver/**"
+      - "src/core/linear-piping-analysis-consumer/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-m025:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out exact candidate commit
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify immutable review boundary
+        shell: bash
+        run: |
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          test ! -e scripts/m025-apply-work-pack.mjs
+          test ! -e scripts/m025-apply-continuation-patch.mjs
+          test ! -e scripts/m025-stabilize-continuation.mjs
+          test -z "$(git status --porcelain)"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run component and solver regressions
+        run: |
+          npm run check:lfea-b3.2
+          npm run check:lfea-b3.3
+
+      - name: Run prerequisite BM1 qualification
+        run: |
+          npm run check:lfea-b3.15
+          npm run check:lfea-b3.16
+          npm run check:lfea-b3.17
+          npm run check:lfea-b3.18
+          npm run check:lfea-bm1-cii-comparison
+
+      - name: Qualify Coulomb mechanics
+        run: npm run check:lfea-b3.19:mechanics
+
+      - name: Run complete pointwise acceptance oracle
+        id: pointwise
+        continue-on-error: true
+        run: npm run check:lfea-b3.19
+
+      - name: Upload M025 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m025-bm1-friction-qualification-${{ github.run_attempt }}
+          path: |
+            reports/lfea-bm1-m025-friction-qualification.json
+            reports/lfea-bm1-cii-output-comparison.json
+            docs/qualification/M025_COULOMB_FRICTION_ENGINEERING_RECORD.md
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce unchanged ±10% acceptance bar
+        if: steps.pointwise.outcome != 'success'
+        run: |
+          echo "M025 remains open: the complete 1,224-point ±10% oracle failed."
+          exit 1
