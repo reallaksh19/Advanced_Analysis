@@ -36,23 +36,25 @@ export function installNonFeaBrowserBaseline({
   }
   const prefix = `non-fea:${executionId}:${fixtureRole}`;
   return Object.freeze({
-    mark(stageId) {
-      requireBrowserStage(stageId);
-      performance.mark(`${prefix}:${stageId}`);
+    mark(markerId) {
+      requireMarkerId(markerId);
+      performance.mark(`${prefix}:mark:${markerId}`);
     },
-    measure(stageId, startStageId, endStageId) {
+    measure(stageId, startMarkerId, endMarkerId) {
       requireBrowserStage(stageId);
+      requireMarkerId(startMarkerId);
+      requireMarkerId(endMarkerId);
       return performance.measure(
-        `${prefix}:${stageId}`,
-        `${prefix}:${startStageId}`,
-        `${prefix}:${endStageId}`,
+        `${prefix}:measure:${stageId}`,
+        `${prefix}:mark:${startMarkerId}`,
+        `${prefix}:mark:${endMarkerId}`,
       );
     },
     snapshot(environment = {}) {
       const measures = performance.getEntriesByType('measure')
-        .filter((entry) => entry.name.startsWith(`${prefix}:`))
+        .filter((entry) => entry.name.startsWith(`${prefix}:measure:`))
         .map((entry) => ({
-          stageId: entry.name.slice(prefix.length + 1),
+          stageId: entry.name.slice(`${prefix}:measure:`.length),
           durationMs: roundMilliseconds(entry.duration),
         }));
       return requireNonFeaBrowserEvidence({
@@ -78,15 +80,21 @@ export function installNonFeaBrowserBaseline({
         })),
         stageMeasurements: measures,
         canvasCount: document.querySelectorAll('canvas').length,
-        webglCanvasCount: document.querySelectorAll('canvas[data-viewport-backend="webgl"]').length,
+        webglCanvasCount: document.querySelectorAll(
+          'canvas[data-viewport-backend="webgl"]',
+        ).length,
         renderOwnerCount: environment.renderOwnerCount ?? null,
       });
     },
     destroy() {
       observer?.disconnect();
       observer = null;
-      performance.clearMarks(prefix);
-      performance.clearMeasures(prefix);
+      performance.getEntriesByType('mark')
+        .filter((entry) => entry.name.startsWith(`${prefix}:mark:`))
+        .forEach((entry) => performance.clearMarks(entry.name));
+      performance.getEntriesByType('measure')
+        .filter((entry) => entry.name.startsWith(`${prefix}:measure:`))
+        .forEach((entry) => performance.clearMeasures(entry.name));
     },
   });
 }
@@ -105,26 +113,43 @@ export function requireNonFeaBrowserEvidence(value, expected = {}) {
   requireString(value.fixtureRole, 'fixtureRole');
   requireString(value.fixturePath, 'fixturePath');
   requireSha256(value.sourceSha256, 'sourceSha256');
-  if (expected.executionId && value.executionId !== expected.executionId) fail('P0_BROWSER_EXECUTION_ID_MISMATCH');
-  if (expected.exactHeadSha && value.exactHeadSha !== expected.exactHeadSha) fail('P0_BROWSER_HEAD_SHA_MISMATCH');
-  if (expected.fixtureRole && value.fixtureRole !== expected.fixtureRole) fail('P0_BROWSER_FIXTURE_ROLE_MISMATCH');
-  requireOptionalString(value.browser, 'browser');
-  requireOptionalString(value.os, 'os');
-  if (!Number.isFinite(value.devicePixelRatio) || value.devicePixelRatio <= 0) fail('P0_BROWSER_DPR_INVALID');
+  if (expected.executionId && value.executionId !== expected.executionId) {
+    fail('P0_BROWSER_EXECUTION_ID_MISMATCH');
+  }
+  if (expected.exactHeadSha && value.exactHeadSha !== expected.exactHeadSha) {
+    fail('P0_BROWSER_HEAD_SHA_MISMATCH');
+  }
+  if (expected.fixtureRole && value.fixtureRole !== expected.fixtureRole) {
+    fail('P0_BROWSER_FIXTURE_ROLE_MISMATCH');
+  }
+  requireString(value.browser, 'browser');
+  requireString(value.os, 'os');
+  if (!Number.isFinite(value.devicePixelRatio) || value.devicePixelRatio <= 0) {
+    fail('P0_BROWSER_DPR_INVALID');
+  }
   requireExactKeys(value.viewport, ['width', 'height'], 'browserEvidence.viewport');
   if (!Number.isInteger(value.viewport.width) || value.viewport.width <= 0
       || !Number.isInteger(value.viewport.height) || value.viewport.height <= 0) {
     fail('P0_BROWSER_VIEWPORT_INVALID');
   }
-  if (!Number.isInteger(value.workers) || value.workers !== 1) fail('P0_BROWSER_WORKER_COUNT_INVALID');
-  if (!Array.isArray(value.pageErrors) || value.pageErrors.some((row) => typeof row !== 'string')) {
+  if (!Number.isInteger(value.workers) || value.workers !== 1) {
+    fail('P0_BROWSER_WORKER_COUNT_INVALID');
+  }
+  if (!Array.isArray(value.pageErrors)
+      || value.pageErrors.some((row) => typeof row !== 'string')) {
     fail('P0_BROWSER_PAGE_ERRORS_INVALID');
   }
   if (value.pageErrors.length) fail('P0_BROWSER_PAGE_ERRORS_PRESENT');
-  if (typeof value.longTaskSupport !== 'boolean') fail('P0_BROWSER_LONG_TASK_SUPPORT_INVALID');
-  requireTimingRows(value.longTasks, ['startTimeMs', 'durationMs'], 'P0_BROWSER_LONG_TASK_INVALID');
+  if (value.longTaskSupport !== true) fail('P0_BROWSER_LONG_TASK_SUPPORT_INVALID');
+  requireTimingRows(
+    value.longTasks,
+    ['startTimeMs', 'durationMs'],
+    'P0_BROWSER_LONG_TASK_INVALID',
+  );
   requireStageMeasurements(value.stageMeasurements);
-  if (value.canvasCount !== 1 || value.webglCanvasCount !== 1) fail('P0_BROWSER_CANVAS_COUNT_INVALID');
+  if (value.canvasCount !== 1 || value.webglCanvasCount !== 1) {
+    fail('P0_BROWSER_CANVAS_COUNT_INVALID');
+  }
   if (value.renderOwnerCount !== 1) fail('P0_BROWSER_RENDER_OWNER_COUNT_INVALID');
   return deepFreeze(value);
 }
@@ -140,7 +165,9 @@ function requireStageMeasurements(rows) {
   rows.forEach((row) => {
     requireExactKeys(row, ['stageId', 'durationMs'], 'browserEvidence.stageMeasurement');
     requireBrowserStage(row.stageId);
-    if (!Number.isFinite(row.durationMs) || row.durationMs < 0) fail('P0_BROWSER_STAGE_DURATION_INVALID');
+    if (!Number.isFinite(row.durationMs) || row.durationMs < 0) {
+      fail('P0_BROWSER_STAGE_DURATION_INVALID');
+    }
   });
 }
 
@@ -154,25 +181,39 @@ function requireTimingRows(rows, keys, code) {
   });
 }
 function requireBrowserStage(stageId) {
-  if (!NON_FEA_BROWSER_STAGE_IDS.includes(stageId)) fail('P0_BROWSER_STAGE_ID_INVALID');
+  if (!NON_FEA_BROWSER_STAGE_IDS.includes(stageId)) {
+    fail('P0_BROWSER_STAGE_ID_INVALID');
+  }
+}
+function requireMarkerId(markerId) {
+  if (typeof markerId !== 'string' || !/^[A-Z0-9_-]+$/u.test(markerId)) {
+    fail('P0_BROWSER_MARKER_ID_INVALID');
+  }
 }
 function requireExactKeys(value, expected, label) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) fail('P0_BROWSER_OBJECT_INVALID');
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    fail('P0_BROWSER_OBJECT_INVALID');
+  }
   const actual = Object.keys(value).sort(codeUnitCompare);
   const wanted = [...expected].sort(codeUnitCompare);
-  if (JSON.stringify(actual) !== JSON.stringify(wanted)) fail(`P0_BROWSER_${label.toUpperCase().replaceAll('.', '_')}_KEYS_INVALID`);
+  if (JSON.stringify(actual) !== JSON.stringify(wanted)) {
+    fail(`P0_BROWSER_${label.toUpperCase().replaceAll('.', '_')}_KEYS_INVALID`);
+  }
 }
 function requireString(value, label) {
-  if (typeof value !== 'string' || !value || value.trim() !== value) fail(`P0_BROWSER_${label.toUpperCase()}_INVALID`);
-}
-function requireOptionalString(value, label) {
-  if (value !== null && (typeof value !== 'string' || !value.trim())) fail(`P0_BROWSER_${label.toUpperCase()}_INVALID`);
+  if (typeof value !== 'string' || !value || value.trim() !== value) {
+    fail(`P0_BROWSER_${label.toUpperCase()}_INVALID`);
+  }
 }
 function requireSha1(value, label) {
-  if (typeof value !== 'string' || !/^[0-9a-f]{40}$/u.test(value)) fail(`P0_BROWSER_${label.toUpperCase()}_INVALID`);
+  if (typeof value !== 'string' || !/^[0-9a-f]{40}$/u.test(value)) {
+    fail(`P0_BROWSER_${label.toUpperCase()}_INVALID`);
+  }
 }
 function requireSha256(value, label) {
-  if (typeof value !== 'string' || !/^[0-9a-f]{64}$/u.test(value)) fail(`P0_BROWSER_${label.toUpperCase()}_INVALID`);
+  if (typeof value !== 'string' || !/^[0-9a-f]{64}$/u.test(value)) {
+    fail(`P0_BROWSER_${label.toUpperCase()}_INVALID`);
+  }
 }
 function roundMilliseconds(value) { return Number(Number(value).toFixed(3)); }
 function codeUnitCompare(left, right) { return left < right ? -1 : left > right ? 1 : 0; }
