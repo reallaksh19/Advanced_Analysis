@@ -56,11 +56,13 @@ jobs:
 
       - name: Execute operation feature and deterministic engine contracts
         run: |
+          set -o pipefail
           node --test --test-reporter=tap \
             tests/topology-edit-operation-specific-snap-index.test.mjs \
             tests/topology-edit-deterministic-snap-engine.test.mjs \
             tests/topology-edit-snap-spatial-index.test.mjs \
-            tests/topology-edit-snap-store-controller.test.mjs
+            tests/topology-edit-snap-store-controller.test.mjs \
+            2>&1 | tee operation-snap-test-output.txt
 
       - name: Execute mounted Chromium operation snap qualification
         run: |
@@ -74,6 +76,7 @@ jobs:
         with:
           name: topology-edit-operation-specific-snapping-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}-${{ github.run_attempt }}
           path: |
+            operation-snap-test-output.txt
             playwright-report
             test-results
           if-no-files-found: warn
