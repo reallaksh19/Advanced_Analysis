@@ -16,7 +16,7 @@ const RT = 92.32274598504;
 const STRIP_V = Object.freeze([0, 0.118, (60 - 50) / (RT - 50), (65 - 50) / (RT - 50), 0.5, 0.7, 0.85, 1]);
 const RING_V = Object.freeze([0, (95 - RT) / (120 - RT), 0.125, 0.25, 0.5, 0.75, 1]);
 const BLOCKS = Object.freeze([
-  { id: 'FH-B00', kind: 'STRIP', segment: 'PIPE', nu: 8 },
+  { id: 'FH-B00', kind: 'STRIP', segment: 'PIPE', nu: 16 },
   { id: 'FH-B01', kind: 'STRIP', segment: 'SMALL_ARC', nu: 4 },
   { id: 'FH-B02', kind: 'STRIP', segment: 'HUB_SMALL', nu: 4 },
   { id: 'FH-B03', kind: 'STRIP', segment: 'HUB_MID', nu: 4 },
@@ -43,7 +43,6 @@ export function createFlangeHubMesh(levelId, geometry = createCanonicalFlangeHub
     for (let i = 0; i < us.length - 1; i += 1) for (let j = 0; j < vs.length - 1; j += 1) {
       const u0 = us[i]; const u1 = us[i + 1]; const v0 = vs[j]; const v1 = vs[j + 1];
       const um = (u0 + u1) / 2; const vm = (v0 + v1) / 2;
-      // Registered Q8 order: SW, SE, NE, NW, S-mid, E-mid, N-mid, W-mid.
       const uv = [[u0, v0], [u0, v1], [u1, v1], [u1, v0], [u0, vm], [um, v1], [u1, vm], [um, v0]];
       const keys = uv.map(([u, v]) => registerNode(nodeCandidates, map(u, v), `${block.id}:${num(u)}:${num(v)}`));
       const elementId = `${levelId}-E-${block.id}-I${pad(i)}-J${pad(j)}`;
