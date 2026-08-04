@@ -9,3 +9,4 @@ export * from './path-and-scl.js';
 export * from './interface-resultants.js';
 export * from './qualification-receipt.js';
 export * from './current-main-baseline.js';
+export * from './bb06-lug-clamp.js';
