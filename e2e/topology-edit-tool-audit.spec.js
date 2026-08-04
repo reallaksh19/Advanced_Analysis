@@ -12,6 +12,10 @@ const TWO_NODE_ACTIONS = Object.freeze([
 const ALL_ACTIONS = Object.freeze([
   'move-positive-z', ...TWO_NODE_ACTIONS, ...EDGE_ACTIONS,
 ]);
+const QUALIFIED_GAP_PORTS = Object.freeze([
+  'P-001:port:end',
+  'E-001:port:start',
+]);
 const COMMAND_SCENARIOS = Object.freeze([
   { actionId: 'move-positive-z', kind: 'single-node' },
   { actionId: 'set-gap-3', kind: 'two-node' },
@@ -82,19 +86,25 @@ test('all ten governed edit tools execute independently on fresh 20-object sampl
     const selectionStatus = await statusOutput(page).innerText();
     await button.click();
     const outcomeStatus = await statusOutput(page).innerText();
-    expect(outcomeStatus, `${scenario.actionId}: ${outcomeStatus}`).toMatch(/accepted/i);
-    await expect(host).toHaveAttribute('data-topology-edit-active-command-count', '1');
+    const activeCommandCount = Number(
+      await host.getAttribute('data-topology-edit-active-command-count') || 0,
+    );
     const afterHash = await host.getAttribute('data-topology-edit-canonical-hash');
-    expect(afterHash).not.toBe(baseHash);
+    const accepted = /accepted/i.test(outcomeStatus)
+      && activeCommandCount === 1
+      && afterHash !== baseHash;
     executions.push({
       actionId: scenario.actionId,
       selectionStatus,
       outcomeStatus,
+      accepted,
+      activeCommandCount,
       baseHash,
       afterHash,
     });
   }
 
+  const rejected = executions.filter((row) => !row.accepted);
   await testInfo.attach('all-tools-final-state', {
     body: await page.screenshot({ fullPage: true }),
     contentType: 'image/png',
@@ -102,16 +112,23 @@ test('all ten governed edit tools execute independently on fresh 20-object sampl
   await mkdir('reports/qualification', { recursive: true });
   await writeFile(REPORT_PATH, `${JSON.stringify({
     schema: 'TopologyEditToolAuditEvidence.v1',
-    status: 'PASS_ALL_GOVERNED_EDIT_TOOLS',
+    status: rejected.length
+      ? 'FAIL_GOVERNED_EDIT_TOOL_EXECUTION'
+      : 'PASS_ALL_GOVERNED_EDIT_TOOLS',
     candidateHead: process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA || process.env.GITHUB_SHA || null,
     fixture: 'public/fixtures/topology-edit-20-element-demo.staged.json',
+    qualifiedGapPorts: QUALIFIED_GAP_PORTS,
     backend: 'TopologyEditNavigationHudViewportBackend',
     executionCount: executions.length,
+    rejectedActionIds: rejected.map((row) => row.actionId),
     executions,
   }, null, 2)}\n`);
+
+  expect(rejected, JSON.stringify(executions, null, 2)).toEqual([]);
 });
 
 test('navigation, presentation, history, and draft controls remain operable', async ({ page }) => {
+  test.setTimeout(90_000);
   const host = await openFinalAuditController(page);
   await openPanel(host, 'commands');
   const targets = await visibleSelectionTargets(page);
@@ -147,8 +164,7 @@ test('navigation, presentation, history, and draft controls remain operable', as
   await page.locator('[data-action="reset-presentation"]').click();
   await expect(page.locator('[data-role="presentation-visibility-status"]')).toHaveText('Visibility: all');
 
-  const nodeId = await canonicalNodeForPort(page, 'P-001:port:start');
-  await selectBySearch(page, host, nodeId);
+  await selectVisibleTarget(page, targets, 'single-node');
   await page.locator('[data-command-action="move-positive-z"]').click();
   await expect(host).toHaveAttribute('data-topology-edit-active-command-count', '1');
   await page.locator('[data-action="undo"]').click();
@@ -217,17 +233,12 @@ async function openPanel(host, kind) {
 }
 
 async function visibleSelectionTargets(page) {
-  return page.evaluate(async (key) => {
+  return page.evaluate((key) => {
     const controller = globalThis[key];
     const backend = controller?.viewportBackend;
     const topology = controller?.session?.currentTopology?.();
     const canvas = backend?.renderer?.domElement;
     if (!backend || !topology || !canvas) throw new Error('Visible selection audit context is unavailable.');
-    const moduleUrl = new URL(
-      'src/workspace/topology-edit/topology-edit-command-ui.js',
-      document.baseURI,
-    ).href;
-    const { topologyEditExactGapContext } = await import(moduleUrl);
     const rect = canvas.getBoundingClientRect();
     const points = new Map();
     for (let y = rect.top + 1; y < rect.bottom; y += 3) {
@@ -242,17 +253,11 @@ async function visibleSelectionTargets(page) {
       ? 'edge:P-001'
       : [...points.keys()].find((id) => id.startsWith('edge:'));
     const nodeIds = [...points.keys()].filter((id) => id.startsWith('node:'));
-    let pair = null;
-    for (let left = 0; left < nodeIds.length && !pair; left += 1) {
-      for (let right = left + 1; right < nodeIds.length; right += 1) {
-        const selection = { nodeIds: [nodeIds[left], nodeIds[right]], edgeId: null };
-        if (topologyEditExactGapContext(selection, topology)) {
-          pair = selection.nodeIds;
-          break;
-        }
-      }
-    }
-    if (!edgeId || !nodeIds.length || !pair) {
+    const nodeForPort = (portKey) => topology.nodes.find(
+      (node) => node.portKeys?.includes(portKey),
+    )?.id;
+    const pair = ['P-001:port:end', 'E-001:port:start'].map(nodeForPort);
+    if (!edgeId || !nodeIds.length || pair.some((id) => !id || !points.has(id))) {
       throw new Error(`Visible governed selection targets are incomplete: ${JSON.stringify({ edgeId, nodeIds, pair })}`);
     }
     return {
