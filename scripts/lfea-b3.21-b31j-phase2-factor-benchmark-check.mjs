@@ -2,12 +2,15 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { semanticHash } from '../src/core/shared-piping-model/canonical-json.js';
 import {
   COMPONENT_GEOMETRY_SCHEMA,
   FACTOR_CALCULATION_REQUEST_SCHEMA,
   SUPPLEMENTARY_GEOMETRY_SCHEMA,
+  SUPPLEMENTARY_GEOMETRY_SET_SCHEMA,
   calculateB31Factors,
   calculateB31FactorsFromInputXml,
+  sealSupplementaryGeometrySet,
 } from '../src/core/linear-fea-b31-factor-calculator/index.js';
 
 const FIXTURE_PATH = fileURLToPath(new URL(
@@ -182,7 +185,6 @@ function verifySmooth90PolicyBoundary() {
   assert.ok(legacy.applicability.violations.some((row) => row.field === 'smooth90FlexibilityCorrection'));
 }
 
-
 function verifyInputXmlSmooth90Policy() {
   const bm1Path = fileURLToPath(new URL('../benchmarks/LFEA/BM1/BM1_InputXML.xml', import.meta.url));
   const results = calculateB31FactorsFromInputXml({
@@ -191,15 +193,36 @@ function verifyInputXmlSmooth90Policy() {
     editionProfileId: 'B31_3_2020_B31J_2017',
     momentDirectionMapping: mapping,
     segmentIds: ['IX-S5'],
-    supplementaryGeometryBySegmentId: {
-      'IX-S5': {
+    supplementaryGeometrySet: sealSupplementaryGeometrySet({
+      schema: SUPPLEMENTARY_GEOMETRY_SET_SCHEMA,
+      geometrySetId: 'B31J-PHASE2-BM1-SUPPLEMENT',
+      sourceIdentity: {
+        sourceId: 'B31J-PHASE2-BM1-SUPPLEMENT',
+        sourceRevision: '01',
+        sourceSemanticHash: semanticHash({ source: 'B31J-PHASE2-BM1-SUPPLEMENT', revision: '01' }),
+      },
+      entries: [{
         schema: SUPPLEMENTARY_GEOMETRY_SCHEMA,
+        segmentId: 'IX-S5',
         componentType: 'BEND',
         lengthUnit: 'mm',
-        bendAngleDegrees: 90,
-        smooth90FlexibilityCorrection: true,
-      },
-    },
+        geometry: {
+          outerDiameter: null,
+          wallThickness: null,
+          bendRadius: null,
+          bendAngleDegrees: 90,
+          smooth90FlexibilityCorrection: true,
+          pressure: null,
+          elasticModulus: null,
+        },
+        sourceEvidence: {
+          sourceId: 'B31J-PHASE2-BM1-BEND-POLICY',
+          sourceRevision: '01',
+          sourceSemanticHash: semanticHash({ segmentId: 'IX-S5', angle: 90, correction: true }),
+        },
+      }],
+      semanticHash: '',
+    }),
   });
   assert.equal(results.length, 1);
   assert.equal(results[0].status, 'QUALIFIED');
