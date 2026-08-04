@@ -2,6 +2,7 @@ const OPERATIONS = Object.freeze([
   ['EXTEND_EDGE', 'Extend open edge'],
   ['SHORTEN_EDGE', 'Shorten open edge'],
   ['SPLIT_EDGE_FROM_DISTANCE', 'Split edge by distance'],
+  ['INSERT_INLINE_COMPONENT', 'Insert inline component'],
   ['RECONNECT_ENDPOINTS', 'Reconnect open endpoints'],
   ['MOVE_CONNECTED_RUN', 'Move connected run'],
   ['CREATE_ORTHOGONAL_OFFSET', 'Create orthogonal offset'],
@@ -18,6 +19,7 @@ export function renderTopologyEditProfessionalOperationPanel(element, state = {}
   const catalogueRecords = filteredCatalogueRecords(
     state.catalogue?.records ?? [],
     state.componentContext,
+    values.operationType,
   );
   const catalogueOptions = catalogueRecords.map((record) => (
     `<option value="${attr(record.recordId)}"${record.recordId === values.catalogueRecordId ? ' selected' : ''}>${html(catalogueRecordLabel(record))}</option>`
@@ -42,6 +44,9 @@ export function renderTopologyEditProfessionalOperationPanel(element, state = {}
       ${field('Edge ID', input('professional-edge-id', values.edgeId))}
       ${field('Endpoint', select('professional-endpoint', options(['FROM', 'TO'], values.endpoint ?? 'TO')))}
       ${field('Distance (mm)', input('professional-distance-mm', values.distanceMm ?? 100, 'number'))}
+      ${field('Inline center from FROM (mm)', input('professional-center-distance-mm', values.centerDistanceMm ?? values.distanceMm ?? 100, 'number'))}
+      ${field('Inline component length (mm)', input('professional-insertion-length-mm', values.insertionLengthMm ?? '', 'number', 'Required for flange/reducer'))}
+      ${field('Inline direction', select('professional-inline-direction', options(['FROM_TO', 'TO_FROM'], values.inlineDirection ?? 'FROM_TO')))}
       ${field('Node IDs', input('professional-node-ids', values.nodeIds, 'text', 'node:a, node:b'))}
       ${field('Boundary node IDs', input('professional-boundary-node-ids', values.boundaryNodeIds, 'text', 'node:outside'))}
       ${field('From node ID', input('professional-from-node-id', values.fromNodeId))}
@@ -89,6 +94,9 @@ export function readTopologyEditProfessionalOperationValues(element) {
     edgeId: value('professional-edge-id'),
     endpoint: value('professional-endpoint'),
     distanceMm: value('professional-distance-mm'),
+    centerDistanceMm: value('professional-center-distance-mm'),
+    insertionLengthMm: value('professional-insertion-length-mm'),
+    inlineDirection: value('professional-inline-direction'),
     nodeIds: value('professional-node-ids'),
     boundaryNodeIds: value('professional-boundary-node-ids'),
     fromNodeId: value('professional-from-node-id'),
@@ -129,7 +137,10 @@ function componentHud(context) {
     </section>`;
 }
 
-function filteredCatalogueRecords(records, context) {
+function filteredCatalogueRecords(records, context, operationType) {
+  if (operationType === 'INSERT_INLINE_COMPONENT' && !context?.supported) {
+    return records.filter((record) => ['FLANGE', 'VALVE', 'REDUCER'].includes(record.componentType));
+  }
   if (!context?.supported) return records;
   const ids = new Set(context.candidateRecordIds ?? []);
   return records.filter((record) => ids.has(record.recordId));
