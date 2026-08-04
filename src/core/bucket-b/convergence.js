@@ -257,7 +257,7 @@ function evaluateThree([coarse, medium, fine]) {
   );
   const oscillatory = !plateau && !monotonic;
   const ratio = !fineZero ? deltaCoarse / deltaFine : Number.NaN;
-  const observedOrder = plateau
+  const rawObservedOrder = plateau
     ? Number.POSITIVE_INFINITY
     : monotonic
       ? solveObservedOrder(
@@ -268,18 +268,18 @@ function evaluateThree([coarse, medium, fine]) {
       )
       : Number.NaN;
   const fineRatio = medium.effectiveH / fine.effectiveH;
-  const extrapolated = Number.isFinite(observedOrder)
-    && Math.abs(fineRatio ** observedOrder - 1) > 1e-14
+  const rawExtrapolated = Number.isFinite(rawObservedOrder)
+    && Math.abs(fineRatio ** rawObservedOrder - 1) > 1e-14
     ? fine.value
-      + (fine.value - medium.value) / (fineRatio ** observedOrder - 1)
+      + (fine.value - medium.value) / (fineRatio ** rawObservedOrder - 1)
     : plateau
       ? fine.value
       : Number.NaN;
   const asymptotic = plateau || (
     monotonic
-    && Number.isFinite(observedOrder)
-    && observedOrder >= 0.5
-    && observedOrder <= 8
+    && Number.isFinite(rawObservedOrder)
+    && rawObservedOrder >= 0.5
+    && rawObservedOrder <= 8
   );
   return Object.freeze({
     coarse,
@@ -290,8 +290,12 @@ function evaluateThree([coarse, medium, fine]) {
     monotonic,
     oscillatory,
     plateau,
-    observedOrder,
-    extrapolated,
+    observedOrder: Number.isFinite(rawObservedOrder)
+      ? rawObservedOrder
+      : null,
+    extrapolated: Number.isFinite(rawExtrapolated)
+      ? rawExtrapolated
+      : null,
     asymptotic,
   });
 }
