@@ -103,45 +103,34 @@ test('tree modifier selection is deterministic and dataset replacement clears it
   await expect(demoButton).toBeEnabled();
   await demoButton.click();
 
-  await expect.poll(() => page.evaluate(({
-    datasetBeforeKey,
-    sessionVersionBeforeValue,
-  }) => {
+  await expect.poll(() => page.evaluate((datasetBeforeKey) => {
     const currentDataset = globalThis.AnalysisWorkspace
       ?.getSnapshot?.()?.dataset ?? null;
-    const liveHosts = [...document.querySelectorAll(
-      '[data-role="topology-edit-render-host"]',
-    )].filter((element) => {
-      const style = getComputedStyle(element);
-      return element.isConnected
-        && element.dataset.topologyEditCleanShell === 'true'
-        && element.getClientRects().length > 0
-        && style.display !== 'none'
-        && style.visibility !== 'hidden';
-    });
-    const currentHost = liveHosts[0] ?? null;
-    return {
-      liveHostCount: liveHosts.length,
-      datasetReplaced: Boolean(
-        currentDataset && currentDataset !== globalThis[datasetBeforeKey]
-      ),
-      selectionCount: String(
-        currentHost?.dataset.topologyEditSelectionIds ?? '',
-      ).split(',').filter(Boolean).length,
-      epochReconciled: Number(
-        currentHost?.dataset.topologyEditDatasetSessionVersion ?? 0,
-      ) > sessionVersionBeforeValue,
-      hasLiveWebGlCanvas: Boolean(currentHost?.querySelector('canvas')),
-    };
-  }, {
-    datasetBeforeKey: DATASET_BEFORE_KEY,
-    sessionVersionBeforeValue: sessionVersionBefore,
+    return Boolean(
+      currentDataset && currentDataset !== globalThis[datasetBeforeKey]
+    );
+  }, DATASET_BEFORE_KEY)).toBe(true);
+
+  const editButton = page.getByRole('button', { name: '3D Edit', exact: true });
+  await expect(editButton).toBeVisible();
+  await expect(editButton).toBeEnabled();
+  await editButton.click();
+
+  const replacementHost = page.locator(
+    '[data-role="topology-edit-render-host"][data-topology-edit-clean-shell="true"]',
+  );
+  await expect(replacementHost).toBeVisible();
+  await expect(replacementHost.locator('canvas')).toBeVisible();
+  await expect.poll(async () => ({
+    selectionCount: selectionIds(await replacementHost.getAttribute(
+      'data-topology-edit-selection-ids',
+    )).length,
+    epochReconciled: Number(await replacementHost.getAttribute(
+      'data-topology-edit-dataset-session-version',
+    )) > sessionVersionBefore,
   })).toEqual({
-    liveHostCount: 1,
-    datasetReplaced: true,
     selectionCount: 0,
     epochReconciled: true,
-    hasLiveWebGlCanvas: true,
   });
 
   evidence.modifiers = 'PASS';
