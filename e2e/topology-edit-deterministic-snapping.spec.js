@@ -48,7 +48,7 @@ test('production WebGL drag uses deterministic snapping without canonical previe
   expect(await hasRealWebGL(page)).toBe(true);
   evidence.realWebGL = 'PASS';
 
-  const context = await compatiblePortDragContext(page);
+  const context = await screenResolvedPortDragContext(page);
   evidence.dragFixture = context;
   const before = await canonicalEvidence(page);
   await selectCanonicalNode(page, context.movingNodeId);
@@ -58,7 +58,7 @@ test('production WebGL drag uses deterministic snapping without canonical previe
   const drag = await dragPoints(page, context.anchorNodeId, context.mode);
   await page.mouse.move(drag.start.x, drag.start.y);
   await page.mouse.down();
-  await page.mouse.move(drag.target.x, drag.target.y, { steps: 8 });
+  await page.mouse.move(drag.target.x, drag.target.y, { steps: 12 });
 
   await expect(host).toHaveAttribute('data-topology-edit-interaction-snap-status', 'RESOLVED');
   await expect(host).toHaveAttribute('data-topology-edit-interaction-snap-evidence', 'PORT');
@@ -78,7 +78,7 @@ test('production WebGL drag uses deterministic snapping without canonical previe
   const firstCandidateHash = await host.getAttribute(
     'data-topology-edit-interaction-snap-candidate-hash',
   );
-  const exactQuerySequence = Number(
+  const exactSequence = Number(
     await host.getAttribute('data-topology-edit-snap-query-sequence'),
   );
   const exactStats = await snapStatistics(host);
@@ -87,16 +87,13 @@ test('production WebGL drag uses deterministic snapping without canonical previe
   evidence.boundedQuery = exactStats;
 
   await page.mouse.move(drag.hysteresis.x, drag.hysteresis.y, { steps: 2 });
-  await expect(host).toHaveAttribute(
-    'data-topology-edit-snap-retained-by-hysteresis',
-    'true',
-  );
+  await expect(host).toHaveAttribute('data-topology-edit-snap-retained-by-hysteresis', 'true');
   await expect(host).toHaveAttribute(
     'data-topology-edit-interaction-snap-candidate-hash',
     firstCandidateHash,
   );
   expect(Number(await host.getAttribute('data-topology-edit-snap-query-sequence')))
-    .toBeGreaterThan(exactQuerySequence);
+    .toBeGreaterThan(exactSequence);
   evidence.hysteresis = 'PASS';
 
   await page.keyboard.press('Tab');
@@ -133,18 +130,15 @@ test('production WebGL drag uses deterministic snapping without canonical previe
       { primaryId: alternative.id, anchorId: alternative.id },
     );
     const changed = controller.editorStore.getState();
-    return controller.interactionControllerRuntime.snapStore.applyResult(
-      result,
-      {
-        datasetSourceHash: changed.dataset.sourceHash,
-        basisHash: changed.dataset.canonicalHash,
-        sessionVersion: changed.dataset.sessionVersion,
-        selectionRevision: changed.selection.revision,
-        interactionId: result.interactionId,
-        queryId: result.queryId,
-        querySequence: result.querySequence,
-      },
-    );
+    return controller.interactionControllerRuntime.snapStore.applyResult(result, {
+      datasetSourceHash: changed.dataset.sourceHash,
+      basisHash: changed.dataset.canonicalHash,
+      sessionVersion: changed.dataset.sessionVersion,
+      selectionRevision: changed.selection.revision,
+      interactionId: result.interactionId,
+      queryId: result.queryId,
+      querySequence: result.querySequence,
+    });
   }, { controllerKey: CONTROLLER_KEY, staleResultKey: STALE_RESULT_KEY });
   expect(stale.disposition).toBe('STALE');
   expect(stale.staleFields).toContain('selectionRevision');
@@ -203,10 +197,14 @@ async function hasRealWebGL(page) {
   }, CONTROLLER_KEY);
 }
 
-async function compatiblePortDragContext(page) {
+async function screenResolvedPortDragContext(page) {
   return page.evaluate((controllerKey) => {
     const controller = globalThis[controllerKey];
-    const nodes = controller.session.currentTopology().nodes
+    const topology = controller.session.currentTopology();
+    const camera = controller.viewportBackend.activeCamera;
+    const canvas = controller.viewportBackend.renderer.domElement;
+    const rect = canvas.getBoundingClientRect();
+    const nodes = topology.nodes
       .filter((node) => node.portKeys?.length)
       .sort((left, right) => left.id.localeCompare(right.id));
     const epsilon = 1e-7;
@@ -223,18 +221,37 @@ async function compatiblePortDragContext(page) {
       if (Math.abs(dy) <= epsilon) return 'PLANE_XZ';
       return null;
     };
+    const project = (point) => {
+      const vector = camera.position.clone().set(point.x, point.y, point.z).project(camera);
+      return {
+        x: ((vector.x + 1) / 2) * rect.width,
+        y: ((1 - vector.y) / 2) * rect.height,
+      };
+    };
+    const inside = (point) => (
+      point.x >= 40 && point.x <= rect.width - 40
+      && point.y >= 40 && point.y <= rect.height - 40
+    );
     const candidates = [];
     for (const moving of nodes) {
       for (const anchor of nodes) {
         if (moving.id === anchor.id) continue;
         const mode = modeFor(moving.position, anchor.position);
         if (!mode) continue;
+        const movingScreen = project(moving.position);
+        const anchorScreen = project(anchor.position);
+        const screenDistancePx = Math.hypot(
+          anchorScreen.x - movingScreen.x,
+          anchorScreen.y - movingScreen.y,
+        );
+        if (!inside(movingScreen) || !inside(anchorScreen) || screenDistancePx < 60) continue;
         candidates.push({
           movingNodeId: moving.id,
           anchorNodeId: anchor.id,
           movingPortKey: [...moving.portKeys].sort()[0],
           anchorPortKey: [...anchor.portKeys].sort()[0],
           mode,
+          screenDistancePx,
           distanceMm: Math.hypot(
             anchor.position.x - moving.position.x,
             anchor.position.y - moving.position.y,
@@ -245,12 +262,12 @@ async function compatiblePortDragContext(page) {
     }
     candidates.sort((left, right) => (
       Number(left.mode.startsWith('PLANE_')) - Number(right.mode.startsWith('PLANE_'))
-      || left.distanceMm - right.distanceMm
+      || Math.abs(left.screenDistancePx - 160) - Math.abs(right.screenDistancePx - 160)
       || left.movingNodeId.localeCompare(right.movingNodeId)
       || left.anchorNodeId.localeCompare(right.anchorNodeId)
     ));
     if (!candidates.length) {
-      throw new Error('No constraint-compatible port drag exists in the Phase B fixture.');
+      throw new Error('No screen-resolved constraint-compatible port drag exists.');
     }
     return candidates[0];
   }, CONTROLLER_KEY);
@@ -282,39 +299,31 @@ async function dragPoints(page, targetNodeId, mode) {
     if (!target || !gizmo || !camera || !canvas) {
       throw new Error('Phase B gizmo drag context is unavailable.');
     }
-    const vectors = {
-      X: [1, 0, 0],
-      Y: [0, 1, 0],
-      Z: [0, 0, 1],
-    };
+    const vectors = { X: [1, 0, 0], Y: [0, 1, 0], Z: [0, 0, 1] };
     const anchor = gizmo.anchorPosition;
     let startWorld;
-    let directionVector;
+    let direction;
     if (dragMode.startsWith('AXIS_')) {
-      directionVector = vectors[dragMode.slice(-1)];
+      direction = vectors[dragMode.slice(-1)];
       startWorld = {
-        x: anchor.x + directionVector[0] * gizmo.scaleMm * 0.8,
-        y: anchor.y + directionVector[1] * gizmo.scaleMm * 0.8,
-        z: anchor.z + directionVector[2] * gizmo.scaleMm * 0.8,
+        x: anchor.x + direction[0] * gizmo.scaleMm * 0.8,
+        y: anchor.y + direction[1] * gizmo.scaleMm * 0.8,
+        z: anchor.z + direction[2] * gizmo.scaleMm * 0.8,
       };
     } else {
       const axes = dragMode.slice(-2).split('');
       const first = vectors[axes[0]];
       const second = vectors[axes[1]];
-      directionVector = first;
+      direction = first;
       startWorld = {
         x: anchor.x + (first[0] + second[0]) * gizmo.scaleMm * 0.22,
         y: anchor.y + (first[1] + second[1]) * gizmo.scaleMm * 0.22,
         z: anchor.z + (first[2] + second[2]) * gizmo.scaleMm * 0.22,
       };
     }
-    const project = (position) => {
-      const vector = camera.position.clone().set(
-        position.x,
-        position.y,
-        position.z,
-      ).project(camera);
-      const rect = canvas.getBoundingClientRect();
+    const rect = canvas.getBoundingClientRect();
+    const project = (point) => {
+      const vector = camera.position.clone().set(point.x, point.y, point.z).project(camera);
       return {
         x: rect.left + ((vector.x + 1) / 2) * rect.width,
         y: rect.top + ((1 - vector.y) / 2) * rect.height,
@@ -322,9 +331,9 @@ async function dragPoints(page, targetNodeId, mode) {
     };
     const targetScreen = project(target.position);
     const directionScreen = project({
-      x: target.position.x + directionVector[0] * 100,
-      y: target.position.y + directionVector[1] * 100,
-      z: target.position.z + directionVector[2] * 100,
+      x: target.position.x + direction[0] * 100,
+      y: target.position.y + direction[1] * 100,
+      z: target.position.z + direction[2] * 100,
     });
     const dx = directionScreen.x - targetScreen.x;
     const dy = directionScreen.y - targetScreen.y;
