@@ -175,6 +175,22 @@ test('available but mismatched source evidence is incompatible rather than neare
   assert.equal(context.exactCandidateCount, 0);
 });
 
+test('a selected edge removed by split or delete degrades to no selection without blocking the command', async () => {
+  const context = deriveTopologyEditComponentHudContext({
+    topology: {
+      canonicalTopologyHash: 'sha256:after-command',
+      edges: [],
+    },
+    selection: { nodeIds: [], edgeId: 'edge:P-001' },
+    catalogue: await catalogue(),
+  });
+
+  assert.equal(context.status, 'NO_SELECTION');
+  assert.equal(context.selectedCanonicalId, null);
+  assert.deepEqual(context.candidateRecordIds, []);
+  assert.equal(context.supported, false);
+});
+
 test('context authority is stable under catalogue record reordering', async () => {
   const leftCatalogue = await catalogue();
   const rightCatalogue = createTopologyEditSpecificationCatalogue({
