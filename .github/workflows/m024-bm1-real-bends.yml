@@ -1,0 +1,52 @@
+name: M024 BM1 Real Bends Qualification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/m024-bm1-real-bends.yml"
+      - "package.json"
+      - "benchmarks/LFEA/BM1/BM1_InputXML.xml"
+      - "benchmarks/LFEA/BM1/BM1_CIIOutput.xml"
+      - "scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs"
+      - "scripts/lfea-b3.15-bm1-inputxml-check.mjs"
+      - "scripts/lfea-b3.16-inputxml-ground-truth-check.mjs"
+      - "scripts/lfea-b3.17-*.mjs"
+      - "scripts/lfea-b3.18-*.mjs"
+      - "scripts/lfea-bm1-cii-output-comparison*.mjs"
+      - "src/core/linear-fea-piping-components/**"
+      - "src/core/linear-fea-b31-code-engine/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-m024:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run BM1 bend qualification gates
+        run: |
+          npm run check:lfea-b3.15
+          npm run check:lfea-b3.16
+          npm run check:lfea-b3.17
+          npm run check:lfea-b3.18
+          npm run check:lfea-bm1-cii-comparison
+
+      - name: Run complete linear piping core
+        run: npm run check:lfea-linear-core
