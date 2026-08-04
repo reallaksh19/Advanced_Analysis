@@ -1,0 +1,107 @@
+name: 3D Edit Deterministic Snapping
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/topology-edit-deterministic-snapping.yml'
+      - 'docs/topology-edit-phase-b-deterministic-snapping.md'
+      - 'src/workspace/viewport-interaction/topology-edit-snap-contract.js'
+      - 'src/workspace/viewport-interaction/topology-edit-snap-spatial-index.js'
+      - 'src/workspace/viewport-interaction/topology-edit-deterministic-snap-engine.js'
+      - 'src/workspace/viewport-interaction/topology-edit-interaction-preview.js'
+      - 'src/workspace/viewport-interaction/topology-edit-interaction-viewport-adapter.js'
+      - 'src/workspace/viewport-interaction/topology-edit-gizmo-three-renderer.js'
+      - 'src/workspace/viewport-productivity/topology-edit-interaction-controller-runtime.js'
+      - 'src/workspace/viewport-productivity/topology-edit-interaction-session.js'
+      - 'src/workspace/topology-edit/editor-state/topology-edit-snap-store-controller.js'
+      - 'tests/topology-edit-*snap*.test.mjs'
+      - 'tests/topology-edit-editor-store.test.mjs'
+      - 'e2e/topology-edit-deterministic-snapping.spec.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: topology-edit-deterministic-snapping-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chromium-deterministic-snapping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PLAYWRIGHT_BROWSER_CHANNEL: chromium
+      PLAYWRIGHT_ENABLE_VIDEO: '1'
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies and Chromium
+        run: |
+          set -euo pipefail
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Verify exact source contracts
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+          node --check src/workspace/viewport-interaction/topology-edit-snap-contract.js
+          node --check src/workspace/viewport-interaction/topology-edit-snap-spatial-index.js
+          node --check src/workspace/viewport-interaction/topology-edit-deterministic-snap-engine.js
+          node --check src/workspace/viewport-interaction/topology-edit-interaction-preview.js
+          node --check src/workspace/viewport-interaction/topology-edit-interaction-viewport-adapter.js
+          node --check src/workspace/viewport-interaction/topology-edit-gizmo-three-renderer.js
+          node --check src/workspace/viewport-productivity/topology-edit-interaction-controller-runtime.js
+          node --check src/workspace/viewport-productivity/topology-edit-interaction-session.js
+          node --check src/workspace/topology-edit/editor-state/topology-edit-snap-store-controller.js
+          node --check tests/topology-edit-snap-spatial-index.test.mjs
+          node --check tests/topology-edit-deterministic-snap-engine.test.mjs
+          node --check tests/topology-edit-snap-store-controller.test.mjs
+          node --check e2e/topology-edit-deterministic-snapping.spec.js
+          git diff --check
+
+      - name: Execute deterministic snapping contracts
+        run: |
+          node --test \
+            tests/topology-edit-snap-spatial-index.test.mjs \
+            tests/topology-edit-deterministic-snap-engine.test.mjs \
+            tests/topology-edit-snap-store-controller.test.mjs \
+            tests/topology-edit-professional-snap-resolver.test.mjs \
+            tests/topology-edit-professional-snap-collector.test.mjs \
+            tests/topology-edit-editor-store.test.mjs
+
+      - name: Execute existing interaction and picking regressions
+        run: |
+          node --test \
+            tests/topology-edit-professional-interaction-containment.test.mjs \
+            tests/topology-edit-navigation-pick-fallback.test.mjs
+
+      - name: Execute real WebGL deterministic snapping qualification
+        run: |
+          npx playwright test e2e/topology-edit-deterministic-snapping.spec.js \
+            --project=chromium --workers=1 --retries=0 --reporter=line
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-deterministic-snapping-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}-${{ github.run_attempt }}
+          path: |
+            reports/qualification/topology-edit-deterministic-snapping.json
+            playwright-report
+            test-results
+          if-no-files-found: warn
+          retention-days: 30
