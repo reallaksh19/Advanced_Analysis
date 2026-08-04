@@ -17,7 +17,6 @@ const expectedHead = process.env.EXPECTED_HEAD_SHA?.trim()
   || process.env.GITHUB_SHA?.trim()
   || exactHead;
 const checks = [];
-
 recordAssertion(
   'EXACT_HEAD',
   exactHead === expectedHead,
@@ -28,27 +27,13 @@ recordAssertion(
   isAncestor(BASELINE_SHA, exactHead),
   `Baseline ${BASELINE_SHA} is not in current ancestry.`,
 );
-
 for (const check of [
-  nodeCheck('MANDATORY_BENCHMARK_LADDER', 'scripts/lafea-bucket-01-benchmark-ladder-check.mjs'),
   nodeCheck('BUCKET_01_REPAIR', 'scripts/lafea-bucket-01-repair-check.mjs'),
-  nodeCheck('GOVERNED_4096_PRODUCTION_RESPONSE_CONVERGENCE_CONTRACT', 'scripts/lafea-bucket-01-production-response-check.mjs'),
-  nodeCheck('SCALABLE_SPARSE_CONTINUUM_SOLVER', 'scripts/lafea-bucket-01-scalable-solver-check.mjs'),
-  nodeCheck('GOVERNED_T6_KIRSCH_FIXED_PROBES', 'scripts/lafea-bucket-01-kirsch-fixed-probes-check.mjs'),
-  nodeCheck('GOVERNED_4096_DIRECT_POINT_LOCATION_CONTRACT', 'scripts/lafea-bucket-01-production-lug-probe-contract-check.mjs'),
-  nodeCheck('GOVERNED_PROBE_TOPOLOGY_OBSERVABILITY', 'scripts/lafea-bucket-01-probe-topology-check.mjs'),
-  nodeCheck('PROBE_STABLE_POLAR_MESH_DESIGN_V3', 'scripts/lafea-bucket-01-probe-stable-mesh-design-check.mjs'),
-  nodeCheck('PROBE_STABLE_CANDIDATE_INTAKE_CONTRACT_V3', 'scripts/lafea-bucket-01-probe-stable-candidate-intake-contract-check.mjs'),
-  nodeCheck('PROBE_STABLE_CANDIDATE_V3_INTAKE_REPLAY', 'scripts/lafea-bucket-01-probe-stable-candidate-v3-check.mjs'),
-  nodeCheck('EXPECTED_VALUE_DEFINITION_SET', 'scripts/lafea-bucket-01-expected-value-registry-check.mjs'),
-  nodeCheck('CODE_BASIS_INTAKE_CONTRACT', 'scripts/lafea-bucket-01-code-basis-check.mjs'),
-  nodeCheck('THREE_REPLAY_CUSTODY_CONTRACT', 'scripts/lafea-bucket-01-replay-custody-check.mjs'),
-  nodeCheck('GOVERNED_T3_PATCH', 'scripts/lafea-bucket-01-t3-patch-check.mjs'),
-  nodeCheck('GOVERNED_PURE_SHEAR', 'scripts/lafea-bucket-01-pure-shear-check.mjs'),
-  nodeCheck('GOVERNED_PLANE_STRESS_CANTILEVER', 'scripts/lafea-bucket-01-cantilever-check.mjs'),
-  nodeCheck('T6_PATCH', 'scripts/lafea.3-t6-patch-check.mjs'),
-  nodeCheck('PRODUCTION_T6_MESH_LADDER', 'scripts/lafea-nb-t6b-lug-pinhole-mesh-ladder-check.mjs'),
-  nodeCheck('LOAD_DRIVEN_FREE_DOF_PILOT', 'scripts/lafea-nb-t6d-load-driven-qualification-check.mjs'),
+  nodeCheck('REGISTERED_REPLAY_ARTIFACT_CUSTODY', 'scripts/lafea-bucket-01-replay-artifact-registry-contract-check.mjs'),
+  nodeCheck('CONTROLLED_REPLAY_ENTRYPOINT_ANTI_DRIFT', 'scripts/lafea-bucket-01-controlled-replay-entrypoint-check.mjs'),
+  nodeCheck('INDEPENDENT_CANDIDATE_RECOMPUTATION_CONTRACT', 'scripts/lafea-bucket-01-independent-candidate-verification-contract-check.mjs'),
+  nodeCheck('INDEPENDENT_CHECKER_RECEIPT_CONTRACT', 'scripts/lafea-bucket-01-independent-checker-receipt-contract-check.mjs'),
+  nodeCheck('CANDIDATE_REPLAY_ADJUDICATION_CONTRACT', 'scripts/lafea-bucket-01-candidate-replay-adjudication-check.mjs'),
   npmCheck('STRICT_SYNTAX', 'syntax:strict'),
   npmCheck('IMPORT_BOUNDARIES', 'check:imports'),
   npmCheck('PRODUCTION_BUILD', 'build'),
@@ -66,11 +51,10 @@ recordAssertion(
   trackedStatus === '',
   trackedStatus || 'Tracked worktree is clean.',
 );
-
 const failures = checks.filter((check) => check.status !== 'PASS');
 const executableEvidencePass = failures.length === 0;
 const report = {
-  schema: 'lafea-bucket-01-exact-head-report/v17',
+  schema: 'lafea-bucket-01-exact-head-report/v18',
   status: executableEvidencePass
     ? 'EXACT_HEAD_REPAIR_EVIDENCE_PASS'
     : 'EXACT_HEAD_REPAIR_EVIDENCE_BLOCKED',
@@ -88,17 +72,16 @@ const report = {
   checks,
   blockingCheckIds: failures.map((check) => check.id),
   unresolvedQualificationGates: [
-    'PHASE_3A_INDEPENDENT_CANDIDATE_CHECKER_NOT_RETAINED',
-    'CANDIDATE_PROJECTION_AND_SOLVER_REPLAY_NOT_IMPLEMENTED',
-    'GOVERNED_4096_PRODUCTION_RESPONSE_EXECUTION_NOT_RETAINED',
-    'GOVERNED_4096_DIRECT_POINT_STRESS_RECEIPT_NOT_PRODUCED',
-    'PROBE_STABLE_CANDIDATE_PRODUCTION_SWITCH_NOT_AUTHORIZED',
+    'REFERENCE_CONTROLLED_REPLAY_NOT_RETAINED_AT_FINAL_EXACT_HEAD',
+    'CANDIDATE_CONTROLLED_REPLAY_NOT_RETAINED_AT_FINAL_EXACT_HEAD',
+    'TRIPLICATE_REFERENCE_AND_CANDIDATE_REPLAY_NOT_SUPPLIED',
     'APPROVED_CODE_BASIS_AUTHORITY_NOT_SUPPLIED',
-    'THREE_EXTERNAL_REPLAY_BUNDLES_NOT_SUPPLIED',
+    'PRODUCTION_SWITCH_REVIEW_NOT_COMPLETED',
+    'BUCKET_01_QUALIFICATION_NOT_GRANTED',
   ],
   qualificationStates: {
     implemented: true,
-    contractVerified: false,
+    contractVerified: executableEvidencePass,
     meshVerified: false,
     solverVerified: false,
     stressVerified: false,
@@ -108,45 +91,31 @@ const report = {
   },
   authority: {
     exactHeadRepairExecutableEvidence: executableEvidencePass,
-    selectedRepairInfrastructureReady: executableEvidencePass,
-    mandatoryBenchmarkLadderImplemented: true,
-    governedCantileverRouteImplemented: true,
-    scalableSparseSolverRouteImplemented: true,
-    governed4096ProductionResponseRouteImplemented: true,
-    governedDirectPointStressRouteImplemented: true,
-    governedProbeTopologyObservabilityImplemented: true,
-    probeStablePolarMeshDesignV3Implemented: true,
-    probeStableCandidateIntakeContractV3Implemented: true,
-    probeStableCandidateV3IntakeReplayExecuted: executableEvidencePass,
-    candidateExecutedRecomputation: executableEvidencePass,
-    candidateIndependentCheckerExecution: false,
-    candidateIndependentCheckerRequiredBeforeReplayAdjudication: true,
+    registeredReplayArtifactValidatorsImplemented: true,
+    runtimeReplaySourceRevalidationImplemented: true,
+    referenceControlledReplayEntrypointImplemented: true,
+    candidateControlledReplayEntrypointImplemented: true,
+    independentCandidateCheckerImplemented: true,
+    candidateReplayAdjudicationImplemented: true,
     candidateSolverExecuted: false,
-    probeStablePolarMeshProductionAuthority: false,
-    probeStableCandidateProductionSwitchAuthorized: false,
-    productionLugFixedProbeContractImplemented: true,
-    expectedValueDefinitionSetImplemented: true,
-    codeBasisIntakeContractImplemented: true,
-    threeReplayCustodyContractImplemented: true,
+    referenceControlledReplayRetained: false,
+    candidateControlledReplayRetained: false,
     governingCodeSelected: false,
     externalReplayBundlesSupplied: false,
-    replayPassClaimedForRepositoryCandidate: false,
-    productionResponseExecutionRetained: false,
-    productionLugFixedProbeExecutionRetained: false,
-    movingMaximumAcceptanceAuthorized: false,
-    nodalProjectionAcceptanceAuthorized: false,
-    integrationPointExtrapolationAcceptanceAuthorized: false,
-    arbitraryGeometryAuthorized: false,
-    shellAuthorized: false,
+    productionSwitchAuthorized: false,
+    productionSwitchApplied: false,
+    productionMeshAuthority: false,
+    stressAcceptanceAuthority: false,
     codeAssessmentAuthorized: false,
+    qualificationAuthority: false,
+    bucketQualified: false,
     reportAuthority: false,
     releaseQualified: false,
   },
   disposition: executableEvidencePass
-    ? 'EXACT_HEAD_REPAIR_EVIDENCE_PASS_BUCKET_NOT_QUALIFIED'
-    : 'EXACT_HEAD_REPAIR_EVIDENCE_BLOCKED_BUCKET_NOT_QUALIFIED',
+    ? 'EXACT_HEAD_TECHNICAL_INFRASTRUCTURE_PASS_QUALIFICATION_GATES_OPEN'
+    : 'EXACT_HEAD_TECHNICAL_INFRASTRUCTURE_BLOCKED',
 };
-
 fs.mkdirSync(path.dirname(REPORT_PATH), { recursive: true });
 fs.writeFileSync(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 console.log(JSON.stringify(report));
@@ -162,33 +131,26 @@ function runCheck(check) {
   const result = spawnSync(check.command, check.args, {
     cwd: ROOT,
     encoding: 'utf8',
-    shell: process.platform === 'win32' && check.command === 'npm',
+    env: { ...process.env },
+    maxBuffer: 64 * 1024 * 1024,
   });
   checks.push({
     id: check.id,
     command: [check.command, ...check.args].join(' '),
     status: result.status === 0 && !result.error ? 'PASS' : 'FAIL',
     exitCode: Number.isInteger(result.status) ? result.status : null,
-    stdout: normalizeCapturedOutput(result.stdout),
-    stderr: normalizeCapturedOutput(result.stderr),
-    error: normalizeCapturedOutput(result.error?.message),
+    stdout: normalize(result.stdout),
+    stderr: normalize(result.stderr),
+    error: result.error?.message ?? null,
   });
 }
-function normalizeCapturedOutput(value) {
+function normalize(value) {
   if (typeof value !== 'string' || !value.trim()) return null;
-  const normalized = value
+  return value
     .replace(/\u001b\[[0-9;]*m/gu, '')
-    .replace(
-      /\bbuilt in \d+(?:\.\d+)?(?:ms|s)\b/giu,
-      'built in <duration>',
-    )
-    .replace(
-      /\bcompleted in \d+(?:\.\d+)?(?:ms|s)\b/giu,
-      'completed in <duration>',
-    )
+    .replace(/\bbuilt in \d+(?:\.\d+)?(?:ms|s)\b/giu, 'built in <duration>')
     .replace(/\r\n/gu, '\n')
     .trim();
-  return normalized || null;
 }
 function recordAssertion(id, accepted, message) {
   checks.push({
@@ -210,8 +172,10 @@ function isAncestor(ancestor, descendant) {
 }
 function git(args) {
   const result = spawnSync('git', args, { cwd: ROOT, encoding: 'utf8' });
-  if (result.status !== 0) {
-    throw new Error(result.stderr.trim() || `git ${args.join(' ')} failed.`);
+  if (result.status !== 0 || result.error) {
+    throw new Error(
+      result.stderr?.trim() || result.error?.message || `git ${args.join(' ')} failed.`,
+    );
   }
   return result.stdout.trim();
 }
