@@ -9,6 +9,7 @@ import {
   buildSupportAttachmentModel,
 } from '../src/core/support-restraints/index.js';
 import { normalizeWorkspaceDataset } from '../src/workspace/dataset-adapter.js';
+import { resolveEntityType } from '../src/workspace/dataset-types.js';
 import { createDimensionAuthority } from '../src/workspace/topology-edit/dimension-authority.js';
 import {
   normalizeTopologyEditCanonicalIds,
@@ -169,7 +170,12 @@ test('20-element demo resolves real valve, flange, and support geometry', async 
   assert.equal(projection.glyphOverlays.every((overlay) => overlay.hostEntityId), true);
 });
 
-test('compact staged component codes retain typed visual identity', () => {
+test('compact staged component codes normalize before typed visual derivation', () => {
+  assert.equal(resolveEntityType({ type: 'FLAN' }), 'FLANGE');
+  assert.equal(resolveEntityType({ type: 'VALV' }), 'VALVE');
+  assert.equal(resolveEntityType({ type: 'REDU' }), 'REDUCER');
+  assert.equal(resolveEntityType({ type: 'GASK' }), 'GASKET');
+
   const canonicalTopology = finalizeCanonicalTopology({
     schema: 'topology-edit-canonical-topology/v1',
     datasetId: 'compact-types',
@@ -181,13 +187,15 @@ test('compact staged component codes retain typed visual identity', () => {
     edges: [
       {
         id: 'edge:flan', componentKey: 'FLAN-1', fromNodeId: 'node:a',
-        toNodeId: 'node:b', entityType: 'FLAN', diameterMm: 100,
-        outsideDiameterMm: 114.3, diameterAuthority: 'OUTSIDE_DIAMETER',
+        toNodeId: 'node:b', entityType: resolveEntityType({ type: 'FLAN' }),
+        diameterMm: 100, outsideDiameterMm: 114.3,
+        diameterAuthority: 'OUTSIDE_DIAMETER',
       },
       {
         id: 'edge:valv', componentKey: 'VALV-1', fromNodeId: 'node:b',
-        toNodeId: 'node:c', entityType: 'VALV', diameterMm: 100,
-        outsideDiameterMm: 114.3, diameterAuthority: 'OUTSIDE_DIAMETER',
+        toNodeId: 'node:c', entityType: resolveEntityType({ type: 'VALV' }),
+        diameterMm: 100, outsideDiameterMm: 114.3,
+        diameterAuthority: 'OUTSIDE_DIAMETER',
       },
     ],
     junctions: [], supports: [], boundaries: [], rigids: [],
