@@ -10,14 +10,6 @@ const SUPPORT_TYPES = new Set([
   'LIM', 'ANCHOR', 'SPRING', 'SHOE',
 ]);
 
-const CANONICAL_COMPONENT_TYPES = Object.freeze({
-  FLAN: 'FLANGE',
-  VALV: 'VALVE',
-  REDU: 'REDUCER',
-  GASK: 'GASKET',
-  INST: 'INSTRUMENT',
-});
-
 const NATIVE_ROLE_TYPES = Object.freeze({
   segment: 'PIPE',
   supportshoe: 'SUPPORT',
@@ -41,10 +33,7 @@ export function resolveEntityType(item) {
     || item?.attributes?.TYPE
     || item?.sourceAttributes?.TYPE,
   );
-  if (direct) {
-    const normalized = direct.toUpperCase();
-    return CANONICAL_COMPONENT_TYPES[normalized] || normalized;
-  }
+  if (direct) return direct.toUpperCase();
 
   const nativeRole = stringValue(
     item?.nativeParams?.role
