@@ -830,9 +830,70 @@ independently verified; the Example 3 benchmark itself can now
 resume on `feat/m018-appendix-s-example3` with the corrected formula
 in place.
 
+### M018 (#531) → PR #547, merged as `e531f51871597b9ec48d4f0064213c4326264128`
+
+The agent's implementation itself was structurally excellent — exact
+geometry match to the issue's 20-node table, correct ASTM A53 material
+substitution, correct real-application `CASE_RANGE` usage for tee
+nodes with an internal-consistency proof against a hand-driven direct
+path, correct explicit failure assertions at nodes 20/320, correct
+mirror-symmetry and sustained-scenario-agreement checks, and a
+quantitative forced-unity SIF regression. But it disclosed, honestly,
+that the required commands were never run — and running them for real
+surfaced **three independent, real defects**, none of them
+hypothetical:
+
+1. **Appendix C Table C-1 transcription error.** The 250°F Carbon
+   Steel row is `1.40 in/100 ft`, not the `1.37` the fixture used —
+   verified directly against the same real downloaded 1987-edition
+   table already used for M013/M016 (the 25°F/50°F interpolation
+   endpoints, `-0.32`/`-0.14`, were correct; only the 250°F endpoint
+   was wrong). This is exactly the class of mistake the Appendix
+   C/Appendix D transcription discipline exists to catch — caught by
+   directly re-reading the source table, not by trusting the cited
+   number.
+2. **A pure floating-point defect**, invisible without actually
+   running the code: `compileMeter`'s finite-length guard used strict
+   `!==` against the literal `1.52`, which fails on ordinary IEEE754
+   subtraction (`6.08 - 4.56 = 1.5200000000000005`). This crashed
+   *every* case build before any comparison logic could even run —
+   the exact kind of bug "syntax checks passed" can never catch.
+3. **A real sign-convention bug**, found only once the geometry
+   crash above was fixed and execution reached the first published
+   comparison: `publishedConventionAction` unconditionally negated
+   every recovered `my` before comparing against the published table.
+   Verified empirically, node by node, across every I- and J-end
+   source in the model (10, 20, 110, 120, 140, 210, 220, 310): the
+   *raw* recovered `global.my` already matched the published sign at
+   every single one, and the negation was flipping an already-correct
+   value. The claimed justification ("B-3.4's joint-action convention
+   requires reversal") did not survive contact with the real numbers.
+
+All three fixed directly (small, mechanically clear once diagnosed —
+no re-dispatch to the agent needed), then the entire suite re-run for
+real: `check:lfea-b3.14` passes with every published Case 1/Case 2/
+expansion-range/sustained comparison landing at 2-7% deviation
+(within the declared 10% tolerance), the marginal Eq. (1b) failure at
+nodes 20/320 correctly reproduces (`utilization=1.065`), sustained
+scenarios 1 and 2 agree with each other to 12 significant figures, and
+the forced-unity SIF control fits ~14x worse than the real derivation
+(`0.693` vs `0.0496` RMS relative error, comfortably past the required
+3x margin). `check:lfea-b4.0`/`b4.1`/`b4.4`/`code-application` and the
+full `check:lfea-linear-core` aggregate all pass. Post-merge sanity
+check on fresh `main` at `e531f51` also passed end to end. Both
+worktrees cleaned up.
+
+**Process note**: this is the second Work Pack in a row (after M019)
+where the real, run-for-real numbers caught something the agent's own
+static/theoretical reasoning missed — reinforcing that "syntax checks
+passed" and "the derivation looks right on paper" are categorically
+different from "the exact commands were run against the real repo and
+produced the claimed result." The mandate's insistence on the Owner
+independently running every required command, not just reading the
+diff, is exactly what caught all three defects here.
+
 This closes out the full Appendix S benchmarking arc the user asked
 for on 2026-08-03 ("benchmark another 2 or more cases before we move
-to a configurable prototype") down to Example 3's own implementation,
-now unblocked — Examples 1 and 2 are merged; the formula defect the
-benchmarking effort itself found is fixed and verified; Example 3 is
-fully scoped with cross-validated ground truth and ready to resume.
+to a configurable prototype") — Examples 1, 2, and 3 are all now
+merged and independently verified against their real published ASME
+tables.
