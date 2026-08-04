@@ -31,3 +31,4 @@ export * from './flange-hub-convergence.js';
 export * from './flange-hub-reference.js';
 export * from './flange-hub-independent-oracle.js';
 export * from './flange-hub-authority.js';
+export * from './bb11-flange-hub.js';
