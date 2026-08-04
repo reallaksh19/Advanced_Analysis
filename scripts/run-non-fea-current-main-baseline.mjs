@@ -42,6 +42,25 @@ if (dirtyStatus) failures.push(nonFeaFailure({
   details: { dirtyStatus },
 }));
 
+const commandRuns = options.runCommands
+  ? NON_FEA_P0_COMMANDS.map((row) => runNonFeaP0Command(row, ROOT))
+  : [];
+if (!options.runCommands) failures.push(nonFeaFailure({
+  classification: 'UNRESOLVED_GATE',
+  code: 'P0_COMMAND_LADDER_NOT_EXECUTED',
+  message: 'The exact-head P0 command ladder has not been executed by this run.',
+}));
+for (const command of commandRuns.filter((row) => row.status !== 'PASS')) {
+  failures.push(nonFeaFailure({
+    classification: command.status === 'BLOCKED'
+      ? 'INFRASTRUCTURE_BLOCKER'
+      : 'PRE_EXISTING_CURRENT_MAIN_DEFECT',
+    code: 'P0_COMMAND_FAILED',
+    message: `${command.commandId} did not pass.`,
+    details: { commandId: command.commandId, exitCode: command.exitCode },
+  }));
+}
+
 const fixturePaths = nonFeaFixtureExecutionPaths(options.fixtures, options.fixtureRoles);
 for (const fixture of fixturePaths) {
   const fixturePath = path.resolve(ROOT, fixture);
@@ -112,24 +131,6 @@ const roleResolution = resolveNonFeaFixtureRoleBindings(
   fixtureRuns,
 );
 failures.push(...roleResolution.failures);
-const commandRuns = options.runCommands
-  ? NON_FEA_P0_COMMANDS.map((row) => runNonFeaP0Command(row, ROOT))
-  : [];
-if (!options.runCommands) failures.push(nonFeaFailure({
-  classification: 'UNRESOLVED_GATE',
-  code: 'P0_COMMAND_LADDER_NOT_EXECUTED',
-  message: 'The exact-head P0 command ladder has not been executed by this run.',
-}));
-for (const command of commandRuns.filter((row) => row.status !== 'PASS')) {
-  failures.push(nonFeaFailure({
-    classification: command.status === 'BLOCKED'
-      ? 'INFRASTRUCTURE_BLOCKER'
-      : 'PRE_EXISTING_CURRENT_MAIN_DEFECT',
-    code: 'P0_COMMAND_FAILED',
-    message: `${command.commandId} did not pass.`,
-    details: { commandId: command.commandId, exitCode: command.exitCode },
-  }));
-}
 
 const browserEvidence = await loadBrowserEvidence({
   evidencePath: options.browserEvidence,
