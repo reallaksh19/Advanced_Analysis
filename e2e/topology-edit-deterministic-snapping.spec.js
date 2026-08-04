@@ -293,29 +293,31 @@ async function dragPoints(page, targetNodeId, mode) {
     const controller = globalThis[controllerKey];
     const topology = controller.session.currentTopology();
     const target = topology.nodes.find((node) => node.id === targetId);
-    const gizmo = controller.interactionControllerRuntime.gizmo;
+    const runtime = controller.interactionControllerRuntime;
+    const viewport = runtime.viewport;
+    const gizmo = runtime.gizmo;
     const camera = controller.viewportBackend.activeCamera;
     const canvas = controller.viewportBackend.renderer.domElement;
-    if (!target || !gizmo || !camera || !canvas) {
+    if (!target || !viewport || !gizmo || !camera || !canvas) {
       throw new Error('Phase B gizmo drag context is unavailable.');
     }
     const vectors = { X: [1, 0, 0], Y: [0, 1, 0], Z: [0, 0, 1] };
     const anchor = gizmo.anchorPosition;
-    let startWorld;
+    let nominalStartWorld;
     let direction;
     if (dragMode.startsWith('AXIS_')) {
       direction = vectors[dragMode.slice(-1)];
-      startWorld = {
-        x: anchor.x + direction[0] * gizmo.scaleMm * 0.8,
-        y: anchor.y + direction[1] * gizmo.scaleMm * 0.8,
-        z: anchor.z + direction[2] * gizmo.scaleMm * 0.8,
+      nominalStartWorld = {
+        x: anchor.x + direction[0] * gizmo.scaleMm * 0.7,
+        y: anchor.y + direction[1] * gizmo.scaleMm * 0.7,
+        z: anchor.z + direction[2] * gizmo.scaleMm * 0.7,
       };
     } else {
       const axes = dragMode.slice(-2).split('');
       const first = vectors[axes[0]];
       const second = vectors[axes[1]];
       direction = first;
-      startWorld = {
+      nominalStartWorld = {
         x: anchor.x + (first[0] + second[0]) * gizmo.scaleMm * 0.22,
         y: anchor.y + (first[1] + second[1]) * gizmo.scaleMm * 0.22,
         z: anchor.z + (first[2] + second[2]) * gizmo.scaleMm * 0.22,
@@ -329,6 +331,48 @@ async function dragPoints(page, targetNodeId, mode) {
         y: rect.top + ((1 - vector.y) / 2) * rect.height,
       };
     };
+    const nominalStart = project(nominalStartWorld);
+    const inCanvas = (point) => (
+      point.x >= rect.left && point.x <= rect.right
+      && point.y >= rect.top && point.y <= rect.bottom
+    );
+    const isDesiredHandle = (point) => (
+      inCanvas(point)
+      && viewport.pickHandleMode({ clientX: point.x, clientY: point.y }) === dragMode
+    );
+    let start = null;
+    const offsets = [];
+    for (let dy = -48; dy <= 48; dy += 2) {
+      for (let dx = -48; dx <= 48; dx += 2) {
+        offsets.push({ dx, dy, distance: Math.hypot(dx, dy) });
+      }
+    }
+    offsets.sort((left, right) => left.distance - right.distance || left.dy - right.dy || left.dx - right.dx);
+    for (const offset of offsets) {
+      const point = {
+        x: nominalStart.x + offset.dx,
+        y: nominalStart.y + offset.dy,
+      };
+      if (isDesiredHandle(point)) {
+        start = point;
+        break;
+      }
+    }
+    if (!start) {
+      let best = null;
+      for (let y = rect.top + 2; y < rect.bottom - 2; y += 4) {
+        for (let x = rect.left + 2; x < rect.right - 2; x += 4) {
+          const point = { x, y };
+          if (!isDesiredHandle(point)) continue;
+          const distance = Math.hypot(x - nominalStart.x, y - nominalStart.y);
+          if (!best || distance < best.distance) best = { ...point, distance };
+        }
+      }
+      start = best ? { x: best.x, y: best.y } : null;
+    }
+    if (!start) {
+      throw new Error(`No rendered ${dragMode} gizmo hit point was found.`);
+    }
     const targetScreen = project(target.position);
     const directionScreen = project({
       x: target.position.x + direction[0] * 100,
@@ -340,7 +384,7 @@ async function dragPoints(page, targetNodeId, mode) {
     const length = Math.hypot(dx, dy);
     if (!(length > 0)) throw new Error('Projected drag direction is degenerate.');
     return {
-      start: project(startWorld),
+      start,
       target: targetScreen,
       hysteresis: {
         x: targetScreen.x + (dx / length) * 12,
