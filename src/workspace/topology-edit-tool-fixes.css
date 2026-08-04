@@ -1,0 +1,27 @@
+/* Focused interaction fixes discovered by the independent 3D Edit tool audit. */
+.topology-edit-clean-shell > .topology-edit-3d-toolbar {
+  position: relative;
+  z-index: 100;
+  overflow: visible;
+}
+
+.topology-edit-clean-shell__navigation,
+.topology-edit-clean-shell__navigation > details {
+  position: relative;
+  z-index: 110;
+  overflow: visible;
+}
+
+.topology-edit-clean-shell__navigation > details[open] {
+  z-index: 120;
+}
+
+.topology-edit-clean-shell__navigation > details > .topology-edit-clean-shell__panel-body {
+  z-index: 130;
+  pointer-events: auto;
+}
+
+.topology-edit-clean-shell__workspace {
+  position: relative;
+  z-index: 1;
+}
