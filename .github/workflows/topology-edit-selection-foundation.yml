@@ -6,6 +6,7 @@ on:
       - '.github/workflows/topology-edit-selection-foundation.yml'
       - 'src/vendor/zustand-vanilla.js'
       - 'src/workspace/topology-edit/editor-state/**'
+      - 'src/workspace/topology-edit-3d-view-controller-core.js'
       - 'src/workspace/topology-edit-3d-professional-controller.js'
       - 'src/workspace/topology-edit-3d-search-controller.js'
       - 'src/workspace/tree-panel.js'
@@ -59,6 +60,7 @@ jobs:
           node --check src/workspace/topology-edit/editor-state/topology-edit-editor-store.js
           node --check src/workspace/topology-edit/editor-state/topology-edit-selection-events.js
           node --check src/workspace/topology-edit/editor-state/topology-edit-selection-coordinator.js
+          node --check src/workspace/topology-edit-3d-view-controller-core.js
           node --check src/workspace/topology-edit-3d-professional-controller.js
           node --check src/workspace/topology-edit-3d-search-controller.js
           node --check src/workspace/tree-panel.js
