@@ -18,6 +18,7 @@ const evidence = {
   staleResultRejection: 'NOT_RUN',
   cancelZeroCanonicalChange: 'NOT_RUN',
   boundedQuery: null,
+  dragFixture: null,
   rejectedActionIds: [],
 };
 
@@ -42,19 +43,19 @@ test('production WebGL drag uses deterministic snapping without canonical previe
   });
 
   const host = await openProductionController(page);
-  const canvas = host.locator('canvas');
-  await expect(canvas).toBeVisible();
+  await expect(host.locator('canvas')).toBeVisible();
   await expect(host).toHaveAttribute('data-topology-edit-snap-engine', 'DETERMINISTIC_PHASE_B');
   expect(await hasRealWebGL(page)).toBe(true);
   evidence.realWebGL = 'PASS';
 
-  const context = await gapContext(page, 'E-001:port:start', 'P-001:port:end');
+  const context = await compatiblePortDragContext(page);
+  evidence.dragFixture = context;
   const before = await canonicalEvidence(page);
   await selectCanonicalNode(page, context.movingNodeId);
   await expect(host).toHaveAttribute('data-topology-edit-selection-ids', context.movingNodeId);
   await expect(host).toHaveAttribute('data-topology-edit-gizmo-handle-count', '6');
 
-  const drag = await dragPoints(page, context.anchorNodeId, context.axis);
+  const drag = await dragPoints(page, context.anchorNodeId, context.mode);
   await page.mouse.move(drag.start.x, drag.start.y);
   await page.mouse.down();
   await page.mouse.move(drag.target.x, drag.target.y, { steps: 8 });
@@ -202,27 +203,57 @@ async function hasRealWebGL(page) {
   }, CONTROLLER_KEY);
 }
 
-async function gapContext(page, movingPortKey, anchorPortKey) {
-  return page.evaluate(({ controllerKey, movingKey, anchorKey }) => {
+async function compatiblePortDragContext(page) {
+  return page.evaluate((controllerKey) => {
     const controller = globalThis[controllerKey];
-    const topology = controller.session.currentTopology();
-    const moving = topology.nodes.find((node) => node.portKeys?.includes(movingKey));
-    const anchor = topology.nodes.find((node) => node.portKeys?.includes(anchorKey));
-    if (!moving || !anchor) throw new Error('Exact Phase B fixture ports are unavailable.');
-    const delta = {
-      x: anchor.position.x - moving.position.x,
-      y: anchor.position.y - moving.position.y,
-      z: anchor.position.z - moving.position.z,
+    const nodes = controller.session.currentTopology().nodes
+      .filter((node) => node.portKeys?.length)
+      .sort((left, right) => left.id.localeCompare(right.id));
+    const epsilon = 1e-7;
+    const modeFor = (left, right) => {
+      const dx = right.x - left.x;
+      const dy = right.y - left.y;
+      const dz = right.z - left.z;
+      if (Math.hypot(dx, dy, dz) <= epsilon) return null;
+      if (Math.abs(dy) <= epsilon && Math.abs(dz) <= epsilon) return 'AXIS_X';
+      if (Math.abs(dx) <= epsilon && Math.abs(dz) <= epsilon) return 'AXIS_Y';
+      if (Math.abs(dx) <= epsilon && Math.abs(dy) <= epsilon) return 'AXIS_Z';
+      if (Math.abs(dz) <= epsilon) return 'PLANE_XY';
+      if (Math.abs(dx) <= epsilon) return 'PLANE_YZ';
+      if (Math.abs(dy) <= epsilon) return 'PLANE_XZ';
+      return null;
     };
-    const axis = ['x', 'y', 'z'].sort((left, right) => (
-      Math.abs(delta[right]) - Math.abs(delta[left])
-    ))[0].toUpperCase();
-    return { movingNodeId: moving.id, anchorNodeId: anchor.id, axis };
-  }, {
-    controllerKey: CONTROLLER_KEY,
-    movingKey: movingPortKey,
-    anchorKey: anchorPortKey,
-  });
+    const candidates = [];
+    for (const moving of nodes) {
+      for (const anchor of nodes) {
+        if (moving.id === anchor.id) continue;
+        const mode = modeFor(moving.position, anchor.position);
+        if (!mode) continue;
+        candidates.push({
+          movingNodeId: moving.id,
+          anchorNodeId: anchor.id,
+          movingPortKey: [...moving.portKeys].sort()[0],
+          anchorPortKey: [...anchor.portKeys].sort()[0],
+          mode,
+          distanceMm: Math.hypot(
+            anchor.position.x - moving.position.x,
+            anchor.position.y - moving.position.y,
+            anchor.position.z - moving.position.z,
+          ),
+        });
+      }
+    }
+    candidates.sort((left, right) => (
+      Number(left.mode.startsWith('PLANE_')) - Number(right.mode.startsWith('PLANE_'))
+      || left.distanceMm - right.distanceMm
+      || left.movingNodeId.localeCompare(right.movingNodeId)
+      || left.anchorNodeId.localeCompare(right.anchorNodeId)
+    ));
+    if (!candidates.length) {
+      throw new Error('No constraint-compatible port drag exists in the Phase B fixture.');
+    }
+    return candidates[0];
+  }, CONTROLLER_KEY);
 }
 
 async function selectCanonicalNode(page, nodeId) {
@@ -240,8 +271,8 @@ async function selectCanonicalNode(page, nodeId) {
   }, { controllerKey: CONTROLLER_KEY, id: nodeId });
 }
 
-async function dragPoints(page, targetNodeId, axis) {
-  return page.evaluate(({ controllerKey, targetId, axisName }) => {
+async function dragPoints(page, targetNodeId, mode) {
+  return page.evaluate(({ controllerKey, targetId, dragMode }) => {
     const controller = globalThis[controllerKey];
     const topology = controller.session.currentTopology();
     const target = topology.nodes.find((node) => node.id === targetId);
@@ -251,13 +282,32 @@ async function dragPoints(page, targetNodeId, axis) {
     if (!target || !gizmo || !camera || !canvas) {
       throw new Error('Phase B gizmo drag context is unavailable.');
     }
-    const axisVector = { X: [1, 0, 0], Y: [0, 1, 0], Z: [0, 0, 1] }[axisName];
-    const anchor = gizmo.anchorPosition;
-    const startWorld = {
-      x: anchor.x + axisVector[0] * gizmo.scaleMm * 0.8,
-      y: anchor.y + axisVector[1] * gizmo.scaleMm * 0.8,
-      z: anchor.z + axisVector[2] * gizmo.scaleMm * 0.8,
+    const vectors = {
+      X: [1, 0, 0],
+      Y: [0, 1, 0],
+      Z: [0, 0, 1],
     };
+    const anchor = gizmo.anchorPosition;
+    let startWorld;
+    let directionVector;
+    if (dragMode.startsWith('AXIS_')) {
+      directionVector = vectors[dragMode.slice(-1)];
+      startWorld = {
+        x: anchor.x + directionVector[0] * gizmo.scaleMm * 0.8,
+        y: anchor.y + directionVector[1] * gizmo.scaleMm * 0.8,
+        z: anchor.z + directionVector[2] * gizmo.scaleMm * 0.8,
+      };
+    } else {
+      const axes = dragMode.slice(-2).split('');
+      const first = vectors[axes[0]];
+      const second = vectors[axes[1]];
+      directionVector = first;
+      startWorld = {
+        x: anchor.x + (first[0] + second[0]) * gizmo.scaleMm * 0.22,
+        y: anchor.y + (first[1] + second[1]) * gizmo.scaleMm * 0.22,
+        z: anchor.z + (first[2] + second[2]) * gizmo.scaleMm * 0.22,
+      };
+    }
     const project = (position) => {
       const vector = camera.position.clone().set(
         position.x,
@@ -272,14 +322,14 @@ async function dragPoints(page, targetNodeId, axis) {
     };
     const targetScreen = project(target.position);
     const directionScreen = project({
-      x: target.position.x + axisVector[0] * 100,
-      y: target.position.y + axisVector[1] * 100,
-      z: target.position.z + axisVector[2] * 100,
+      x: target.position.x + directionVector[0] * 100,
+      y: target.position.y + directionVector[1] * 100,
+      z: target.position.z + directionVector[2] * 100,
     });
     const dx = directionScreen.x - targetScreen.x;
     const dy = directionScreen.y - targetScreen.y;
     const length = Math.hypot(dx, dy);
-    if (!(length > 0)) throw new Error('Projected drag axis is degenerate.');
+    if (!(length > 0)) throw new Error('Projected drag direction is degenerate.');
     return {
       start: project(startWorld),
       target: targetScreen,
@@ -288,7 +338,7 @@ async function dragPoints(page, targetNodeId, axis) {
         y: targetScreen.y + (dy / length) * 12,
       },
     };
-  }, { controllerKey: CONTROLLER_KEY, targetId: targetNodeId, axisName: axis });
+  }, { controllerKey: CONTROLLER_KEY, targetId: targetNodeId, dragMode: mode });
 }
 
 async function canonicalEvidence(page) {
