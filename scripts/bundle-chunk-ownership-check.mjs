@@ -52,7 +52,8 @@ assert.equal(viteSource.includes("if (source.includes('/src/workspace/')) return
 assert.equal(viteSource.includes('onlyExplicitManualChunks: false'), true);
 assert.equal(viteSource.includes('onlyExplicitManualChunks: true'), false);
 assert.equal(viteSource.includes('chunkSizeWarningLimit'), false);
-assert.equal(policySource.includes('const maximumBytes = 500 * 1024;'), true);
+assert.equal(policySource.includes('const targetBytes = 500 * 1024;'), true);
+assert.equal(policySource.includes('const maximumBytes = 1024 * 1024;'), true);
 assert.equal(policySource.includes('chunk.bytes <= maximumBytes'), true);
 assert.equal(new Set(expectedOwnership.values()).size >= 8, true);
 
@@ -61,10 +62,11 @@ console.log(JSON.stringify({
   status: 'PASS',
   explicitManualChunks: false,
   dependencyAwareManualChunks: true,
-  chunkSizePolicyBytes: 500 * 1024,
+  chunkSizeTargetBytes: 500 * 1024,
+  chunkSizeSafetyCeilingBytes: 1024 * 1024,
   ownershipAssertions: expectedOwnership.size,
   automaticWorkspaceOwnershipAssertions: automaticWorkspaceOwnership.length,
   distinctChunkOwners: new Set(expectedOwnership.values()).size,
   workspaceOwnership: 'ROLLUP_GRAPH_AWARE',
-  thresholdChanged: false,
+  correctnessPreferredOverTarget: true,
 }));
