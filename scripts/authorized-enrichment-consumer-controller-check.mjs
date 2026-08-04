@@ -11,6 +11,9 @@ import {
   AUTHORIZED_EMPIRICAL_LOAD_EXECUTION_V2_SCHEMA,
 } from '../src/workspace/engineering-loads/authorized-empirical-load-execution-v2.js';
 import {
+  AUTHORIZED_EMPIRICAL_RUNTIME_PACKAGE_V2_SCHEMA,
+} from '../src/workspace/engineering-loads/authorized-empirical-runtime-package-v2.js';
+import {
   AUTHORIZED_EMPIRICAL_RUNTIME_PACKAGE_SCHEMA,
   sealAuthorizedEmpiricalRuntimePackage,
 } from '../src/workspace/engineering-loads/authorized-empirical-runtime-package.js';
@@ -53,6 +56,10 @@ assert.equal(
 assert.equal(
   AUTHORIZED_EMPIRICAL_LOAD_EXECUTION_V2_SCHEMA,
   'authorized-empirical-load-execution/v2',
+);
+assert.equal(
+  AUTHORIZED_EMPIRICAL_RUNTIME_PACKAGE_V2_SCHEMA,
+  'authorized-empirical-runtime-package/v2',
 );
 
 const masterData = Object.freeze({ marker: 'MASTER-DATA-EMP01' });
@@ -138,6 +145,7 @@ console.log(JSON.stringify({
   cogDistributionMethod: EMPIRICAL_LOAD_COG_METHOD,
   methodSelectingRequestSchema: AUTHORIZED_EMPIRICAL_LOAD_EXECUTION_V2_REQUEST_SCHEMA,
   methodSelectingReceiptSchema: AUTHORIZED_EMPIRICAL_LOAD_EXECUTION_V2_SCHEMA,
+  methodBoundRuntimePackageSchema: AUTHORIZED_EMPIRICAL_RUNTIME_PACKAGE_V2_SCHEMA,
 }, null, 2));
 
 function makeRuntimePackage() {
