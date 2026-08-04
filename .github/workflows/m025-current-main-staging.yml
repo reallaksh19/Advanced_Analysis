@@ -21,15 +21,47 @@ jobs:
           ref: agent/m025-current-main-staging
           fetch-depth: 0
 
-      - name: Apply verified M025 commit
+      - name: Apply verified M025 commit or publish conflict report
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
           git fetch origin 2fc930e7ed17db699ee63fe761bf96fef491ee3c
-          git cherry-pick --no-commit 2fc930e7ed17db699ee63fe761bf96fef491ee3c
+          if ! git cherry-pick --no-commit 2fc930e7ed17db699ee63fe761bf96fef491ee3c; then
+            {
+              echo '# M025 current-main cherry-pick conflict report'
+              echo
+              echo 'Source commit: `2fc930e7ed17db699ee63fe761bf96fef491ee3c`'
+              echo
+              echo '## Status'
+              echo '```text'
+              git status --short
+              echo '```'
+              echo
+              echo '## Unmerged paths'
+              echo '```text'
+              git diff --name-only --diff-filter=U
+              echo '```'
+              echo
+              echo '## Combined diff'
+              echo '```diff'
+              git diff --cc
+              echo '```'
+            } > /tmp/M025_CURRENT_MAIN_CONFLICTS.md
+            git cherry-pick --abort || git reset --hard HEAD
+            mkdir -p docs/qualification
+            cp /tmp/M025_CURRENT_MAIN_CONFLICTS.md docs/qualification/M025_CURRENT_MAIN_CONFLICTS.md
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add docs/qualification/M025_CURRENT_MAIN_CONFLICTS.md
+            git commit -m "M025: record current-main transplant conflicts"
+            git push origin HEAD:agent/m025-current-main-staging
+            exit 1
+          fi
+          set -e
           mkdir -p .github/workflows
           git show 7357437ae060f00c742dba09dd5760b71de90f72:.github/workflows/m025-bm1-friction.yml > .github/workflows/m025-bm1-friction.yml
           rm -f .github/workflows/m025-current-main-staging.yml
+          rm -f docs/qualification/M025_CURRENT_MAIN_CONFLICTS.md
           test ! -e scripts/m025-apply-work-pack.mjs
           test ! -e scripts/m025-apply-continuation-patch.mjs
           test ! -e scripts/m025-stabilize-continuation.mjs
