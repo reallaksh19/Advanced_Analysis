@@ -101,16 +101,28 @@ assert.throws(
 const comparison = result.caesarStressComparison;
 assert.equal(comparison.matchingPolicy, 'EXACT_FROM_NODE_TO_NODE_ONLY');
 assert.equal(comparison.cases.length, 2);
+const expectedUnmatchedCaesarPairs = ['45->48', '48->49', '49->50', '50->58', '58->59', '59->60'];
+const expectedUnmatchedCompiledPairs = ['45->50', '50->60'];
 for (const comparisonCase of comparison.cases) {
   assert.equal(comparisonCase.summary.caesarElementCount, 19);
   assert.equal(comparisonCase.summary.compiledElementCount, 15);
-  assert.equal(comparisonCase.summary.matchedElementCount, 12);
-  assert.equal(comparisonCase.summary.unmatchedCaesarElementCount, 7);
-  assert.equal(comparisonCase.summary.unmatchedCompiledElementCount, 3);
+  assert.equal(comparisonCase.summary.matchedElementCount, 13);
+  assert.equal(comparisonCase.summary.unmatchedCaesarElementCount, 6);
+  assert.equal(comparisonCase.summary.unmatchedCompiledElementCount, 2);
   assert.equal(comparisonCase.summary.rigidZeroConventionCodePointCount, 6);
-  assert.equal(comparisonCase.summary.matchedCodePointCount, 18);
+  assert.equal(comparisonCase.summary.matchedCodePointCount, 20);
   assert.equal(comparisonCase.matched.length + comparisonCase.unmatchedCaesar.length, 19, 'every CAESAR pair must be accounted for');
   assert.equal(comparisonCase.matched.length + comparisonCase.unmatchedCompiled.length, 15, 'every compiled pair must be accounted for');
+  assert.deepEqual(
+    comparisonCase.unmatchedCaesar.map((row) => row.pairKey).sort(),
+    expectedUnmatchedCaesarPairs,
+    'only CAESAR internal bend-station splits may remain unmatched',
+  );
+  assert.deepEqual(
+    comparisonCase.unmatchedCompiled.map((row) => row.pairKey).sort(),
+    expectedUnmatchedCompiledPairs,
+    'only the two compiled whole-chord bend elements may remain unmatched',
+  );
   assert.ok(Number.isFinite(comparisonCase.summary.maximumAbsoluteUtilizationDeviationPercentagePoints));
   assert.ok(Number.isFinite(comparisonCase.summary.meanAbsoluteUtilizationDeviationPercentagePoints));
   assert.ok(Number.isFinite(comparisonCase.summary.maximumAbsoluteCalculatedStressDeviationPa));
