@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 
 const CONTROLLER_KEY = '__TOPOLOGY_EDIT_SELECTION_FOUNDATION_CONTROLLER__';
+const PAYLOAD_KEY = '__TOPOLOGY_EDIT_SELECTION_FOUNDATION_PAYLOAD__';
 const REPORT_PATH = 'reports/qualification/topology-edit-selection-foundation.json';
 const evidence = {
   schema: 'TopologyEditSelectionFoundationQualification.v1',
@@ -34,7 +35,14 @@ test('tree, search, HUD, and real WebGL share one canonical selection authority'
   await firstTreeRow.click();
   await expect(host).toHaveAttribute('data-topology-edit-selection-source', 'tree');
   await expect(host).toHaveAttribute('data-topology-edit-selection-ids', 'edge:P-001');
-  await expect(firstTreeRow).toHaveAttribute('aria-selected', 'true');
+  await expect.poll(() => selectionProjectionState(page)).toEqual({
+    payloadWorkspaceIds: ['P-001'],
+    payloadPrimaryWorkspaceId: 'P-001',
+    treeWorkspaceIds: 'P-001',
+    treePrimaryWorkspaceId: 'P-001',
+    treeMultiselectable: 'true',
+    rowSelected: 'true',
+  });
   await openPanel(host, 'topology-edit-professional-operation');
   await expect(page.locator('[data-role="professional-edge-id"]')).toHaveValue('edge:P-001');
 
@@ -108,7 +116,7 @@ async function openProductionController(page) {
     globalThis.AnalysisWorkspace?.getSnapshot?.()?.dataset?.entities?.length ?? 0
   ))).toBe(20);
 
-  await page.evaluate(async (key) => {
+  await page.evaluate(async ({ controllerKey, payloadKey }) => {
     const moduleUrl = new URL(
       'src/workspace/topology-edit-3d-professional-controller.js',
       document.baseURI,
@@ -117,15 +125,20 @@ async function openProductionController(page) {
     const prototype = TopologyEdit3DViewController.prototype;
     if (prototype.__selectionFoundationActivateWrapped) return;
     const activate = prototype.activate;
+    const handleUnifiedSelectionChanged = prototype.handleUnifiedSelectionChanged;
     prototype.activate = async function selectionFoundationActivate(...args) {
-      globalThis[key] = this;
+      globalThis[controllerKey] = this;
       return activate.apply(this, args);
+    };
+    prototype.handleUnifiedSelectionChanged = function selectionFoundationChanged(payload) {
+      globalThis[payloadKey] = payload;
+      return handleUnifiedSelectionChanged.call(this, payload);
     };
     Object.defineProperty(prototype, '__selectionFoundationActivateWrapped', {
       value: true,
       configurable: true,
     });
-  }, CONTROLLER_KEY);
+  }, { controllerKey: CONTROLLER_KEY, payloadKey: PAYLOAD_KEY });
 
   await page.getByRole('button', { name: '3D Edit', exact: true }).click();
   const host = page.locator('[data-role="topology-edit-render-host"]');
@@ -164,6 +177,23 @@ function treeEntity(page, entityId) {
 
 function selectionIds(value) {
   return String(value || '').split(',').filter(Boolean);
+}
+
+async function selectionProjectionState(page) {
+  return page.evaluate(({ payloadKey }) => {
+    const payload = globalThis[payloadKey] ?? null;
+    const tree = document.querySelector('[data-panel="tree"]');
+    const list = tree?.querySelector('[data-role="tree-list"]');
+    const row = list?.querySelector('[data-entity-id="P-001"][data-action="select-entity"]');
+    return {
+      payloadWorkspaceIds: payload?.workspaceEntityIds ?? null,
+      payloadPrimaryWorkspaceId: payload?.primaryWorkspaceEntityId ?? null,
+      treeWorkspaceIds: tree?.dataset.topologyEditSelectionWorkspaceIds ?? null,
+      treePrimaryWorkspaceId: tree?.dataset.topologyEditSelectionPrimaryWorkspaceId ?? null,
+      treeMultiselectable: list?.getAttribute('aria-multiselectable') ?? null,
+      rowSelected: row?.getAttribute('aria-selected') ?? null,
+    };
+  }, { payloadKey: PAYLOAD_KEY });
 }
 
 async function visiblePickPoint(page, canonicalId) {
