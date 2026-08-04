@@ -1,0 +1,40 @@
+name: M022-A StagedJSON Resolution Contracts
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/m022a-stagedjson-resolution.yml"
+      - "package.json"
+      - "benchmarks/1885Sjson/EnrichedSjson"
+      - "src/workspace/dataset-adapter.js"
+      - "src/workspace/analysis-authority-overlay/**"
+      - "scripts/m022a-stagedjson-*.mjs"
+      - "docs/M022A_STAGEDJSON_RESOLUTION_CONTRACTS.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-m022a:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run M022-A contracts and real-fixture inventory
+        run: npm run check:m022a
