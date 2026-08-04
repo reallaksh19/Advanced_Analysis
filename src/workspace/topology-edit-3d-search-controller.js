@@ -1,4 +1,5 @@
 /** Read-only canonical search and exact-focus composition for the Topology Edit 3D view. */
+import './topology-edit-tool-fixes.css';
 import { EVENT_TOPICS } from './event-topics.js';
 import { TopologyEdit3DViewController as LifecycleController } from './topology-edit-3d-view-controller.js';
 import {
@@ -119,7 +120,7 @@ export class TopologyEdit3DViewController extends LifecycleController {
     if (result.workspaceEntityIds.length) {
       this.eventBus.publish(EVENT_TOPICS.VIEWPORT_SELECTION_REQUESTED, {
         entityId: result.workspaceEntityIds[0],
-        source: 'topology-edit-canonical-search',
+        source: 'topology-edit-3d',
       });
     }
     this.updateActionButtons();
