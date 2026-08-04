@@ -7,9 +7,20 @@ import {
 import { EMPIRICAL_FORMULA_REGISTER } from '../src/workspace/engineering-loads/empirical-formula-register.js';
 import { computeAuthorizedEmpiricalLoadInputSemanticHash } from '../src/workspace/engineering-loads/authorized-empirical-load-input.js';
 import {
+  AUTHORIZED_EMPIRICAL_LOAD_EXECUTION_V2_REQUEST_SCHEMA,
+  AUTHORIZED_EMPIRICAL_LOAD_EXECUTION_V2_SCHEMA,
+} from '../src/workspace/engineering-loads/authorized-empirical-load-execution-v2.js';
+import {
+  AUTHORIZED_EMPIRICAL_RUNTIME_PACKAGE_V2_SCHEMA,
+} from '../src/workspace/engineering-loads/authorized-empirical-runtime-package-v2.js';
+import {
   AUTHORIZED_EMPIRICAL_RUNTIME_PACKAGE_SCHEMA,
   sealAuthorizedEmpiricalRuntimePackage,
 } from '../src/workspace/engineering-loads/authorized-empirical-runtime-package.js';
+import {
+  EMPIRICAL_LOAD_COG_METHOD,
+  SUPPORT_LOAD_DISTRIBUTION_COG_SCHEMA,
+} from '../src/workspace/engineering-loads/support-load-distribution-v3.js';
 import {
   AUTHORIZED_EMPIRICAL_CONSUMER_REQUEST_SCHEMA,
   AuthorizedEnrichmentConsumerController,
@@ -35,6 +46,20 @@ assert.equal(EMPIRICAL_FORMULA_REGISTER.validation.detailedAnalysisSubstitution,
 assert.equal(
   EMPIRICAL_COMPONENT_LOAD_AUTHORITY_AUDIT_SCHEMA,
   'empirical-component-load-authority-audit/v1',
+);
+assert.equal(SUPPORT_LOAD_DISTRIBUTION_COG_SCHEMA, 'support-load-distribution/v4');
+assert.equal(EMPIRICAL_LOAD_COG_METHOD, 'CHAINAGE_TRIBUTARY_SPAN_V3_COG');
+assert.equal(
+  AUTHORIZED_EMPIRICAL_LOAD_EXECUTION_V2_REQUEST_SCHEMA,
+  'authorized-empirical-load-execution-request/v2',
+);
+assert.equal(
+  AUTHORIZED_EMPIRICAL_LOAD_EXECUTION_V2_SCHEMA,
+  'authorized-empirical-load-execution/v2',
+);
+assert.equal(
+  AUTHORIZED_EMPIRICAL_RUNTIME_PACKAGE_V2_SCHEMA,
+  'authorized-empirical-runtime-package/v2',
 );
 
 const masterData = Object.freeze({ marker: 'MASTER-DATA-EMP01' });
@@ -116,6 +141,11 @@ console.log(JSON.stringify({
   formulaRegisterMethod: EMPIRICAL_FORMULA_REGISTER.method,
   formulaRegisterSemanticHash: EMPIRICAL_FORMULA_REGISTER.semanticHash,
   componentLoadAuthorityAuditSchema: EMPIRICAL_COMPONENT_LOAD_AUTHORITY_AUDIT_SCHEMA,
+  cogDistributionSchema: SUPPORT_LOAD_DISTRIBUTION_COG_SCHEMA,
+  cogDistributionMethod: EMPIRICAL_LOAD_COG_METHOD,
+  methodSelectingRequestSchema: AUTHORIZED_EMPIRICAL_LOAD_EXECUTION_V2_REQUEST_SCHEMA,
+  methodSelectingReceiptSchema: AUTHORIZED_EMPIRICAL_LOAD_EXECUTION_V2_SCHEMA,
+  methodBoundRuntimePackageSchema: AUTHORIZED_EMPIRICAL_RUNTIME_PACKAGE_V2_SCHEMA,
 }, null, 2));
 
 function makeRuntimePackage() {
