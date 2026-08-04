@@ -61,7 +61,7 @@ test('exact valve insertion applies, renders, undoes, and redoes as one governed
   ), { timeout: 60_000 }).not.toBe('');
   await expect.poll(() => host.getAttribute(
     'data-topology-edit-professional-transaction-preview-hash',
-  )).not.toBe('');
+  ), { timeout: 60_000 }).not.toBe('');
 
   await panel.locator('[data-action="apply-professional-operation"]').click();
   await expect(host).toHaveAttribute('data-topology-edit-canonical-hash', candidateHash);
@@ -177,16 +177,26 @@ async function eligibleHostEdge(page) {
     if (!topology) throw new Error('Canonical topology is unavailable.');
     const nodes = new Map(topology.nodes.map((node) => [node.id, node]));
     const dependentEdgeIds = new Set();
+    const attachmentNodeIds = new Set();
     for (const collection of ['junctions', 'supports', 'boundaries', 'rigids', 'bends']) {
       for (const record of topology[collection] ?? []) {
         if (record.edgeId) dependentEdgeIds.add(record.edgeId);
         for (const edgeId of record.edgeIds ?? []) dependentEdgeIds.add(edgeId);
+        for (const nodeId of [
+          record.nodeId,
+          record.fromNodeId,
+          record.toNodeId,
+          ...(record.nodeIds ?? []),
+        ]) {
+          if (nodeId) attachmentNodeIds.add(nodeId);
+        }
       }
     }
     const candidates = topology.edges.flatMap((edge) => {
       const type = String(edge.entityType ?? '').toUpperCase();
       if (!['PIPE', 'STRAIGHT', 'STRAIGHT_ELEMENT'].includes(type)) return [];
       if (dependentEdgeIds.has(edge.id)) return [];
+      if (attachmentNodeIds.has(edge.fromNodeId) || attachmentNodeIds.has(edge.toNodeId)) return [];
       if (Math.abs(Number(edge.diameterMm) - 100) > 1e-9) return [];
       if (Math.abs(Number(edge.outsideDiameterMm) - 114.3) > 1e-9) return [];
       const from = nodes.get(edge.fromNodeId)?.position;
@@ -196,7 +206,7 @@ async function eligibleHostEdge(page) {
       return lengthMm > 600 ? [{ id: edge.id, lengthMm }] : [];
     }).sort((left, right) => left.id.localeCompare(right.id));
     if (!candidates.length) {
-      throw new Error('No dependency-free DN100 straight host edge can accept a 600 mm valve.');
+      throw new Error('No attachment-free DN100 straight host edge can accept a 600 mm valve.');
     }
     return candidates[0];
   }, CONTROLLER_KEY);
