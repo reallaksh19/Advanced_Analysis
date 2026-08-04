@@ -1,5 +1,9 @@
 import { stringValue } from '../../../core/shared-piping-model/index.js';
 import {
+  assertTopologyEditInlineComponentTarget,
+  normalizeTopologyEditInlineComponentPayload,
+} from '../topology-edit-inline-component-command.js';
+import {
   assertTopologyEditSpecificationCatalogue,
   assertTopologyEditSpecificationRecord,
 } from './topology-edit-spec-catalog.js';
@@ -39,10 +43,15 @@ export function planTopologyEditInlineComponentOperation(input = {}) {
     ? 'CATALOGUE_VALVE_FACE_TO_FACE'
     : 'USER_DECLARED_COMPONENT_LENGTH';
   const centerFraction = centerDistanceMm / edgeLengthMm;
-  const half = insertionLengthMm / 2;
-  if (!(centerDistanceMm - half > 0 && centerDistanceMm + half < edgeLengthMm)) {
-    fail('inline component must fit strictly inside the host edge.', RangeError);
-  }
+  const payload = normalizeTopologyEditInlineComponentPayload({
+    edgeId,
+    centerFraction,
+    insertionLengthMm,
+    lengthAuthority,
+    direction,
+    catalogueBinding: catalogueBinding(catalogue, record),
+  });
+  assertTopologyEditInlineComponentTarget(topology, payload);
   const changedScope = deriveTopologyEditChangedScope(topology, {
     edgeIds: [edgeId],
   });
@@ -53,10 +62,10 @@ export function planTopologyEditInlineComponentOperation(input = {}) {
     parameters: {
       edgeId,
       centerDistanceMm,
-      centerFraction,
-      insertionLengthMm,
-      lengthAuthority,
-      direction,
+      centerFraction: payload.centerFraction,
+      insertionLengthMm: payload.insertionLengthMm,
+      lengthAuthority: payload.lengthAuthority,
+      direction: payload.direction,
       entityType: record.componentType,
       diameterMm: record.nominalSizeMm,
       catalogueRecordId: record.recordId,
@@ -73,14 +82,7 @@ export function planTopologyEditInlineComponentOperation(input = {}) {
     },
     commandIntents: [{
       commandType: 'INSERT_INLINE_COMPONENT',
-      payload: {
-        edgeId,
-        centerFraction,
-        insertionLengthMm,
-        lengthAuthority,
-        direction,
-        catalogueBinding: catalogueBinding(catalogue, record),
-      },
+      payload,
     }],
     changedScope,
     unresolvedEvidence: [],
