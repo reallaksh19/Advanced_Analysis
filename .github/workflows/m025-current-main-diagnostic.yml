@@ -1,0 +1,66 @@
+name: M025 Current-Main Diagnostic
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply and resolve M025 transplant
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin 2fc930e7ed17db699ee63fe761bf96fef491ee3c
+          if ! git cherry-pick --no-commit 2fc930e7ed17db699ee63fe761bf96fef491ee3c; then
+            conflicts="$(git diff --name-only --diff-filter=U | sort)"
+            expected=$'package.json\nscripts/lfea-b3.19-bm1-friction-check.mjs\nscripts/lfea-b3.19-bm1-friction.mjs'
+            test "$conflicts" = "$expected"
+            git checkout --ours package.json
+            git checkout --theirs scripts/lfea-b3.19-bm1-friction-check.mjs
+            git checkout --theirs scripts/lfea-b3.19-bm1-friction.mjs
+            git add package.json scripts/lfea-b3.19-bm1-friction-check.mjs scripts/lfea-b3.19-bm1-friction.mjs
+            git cherry-pick --quit
+          fi
+          git mv scripts/lfea-b3.19-bm1-friction.mjs scripts/m025-bm1-friction.mjs
+          git mv scripts/lfea-b3.19-bm1-friction-check.mjs scripts/m025-bm1-friction-check.mjs
+          perl -pi -e 's/lfea-b3\.19-bm1-friction/m025-bm1-friction/g' scripts/m025-bm1-friction-check.mjs scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const file = 'package.json';
+          const packageJson = JSON.parse(readFileSync(file, 'utf8'));
+          packageJson.scripts['check:m025-bm1-friction'] = 'node scripts/m025-bm1-friction-check.mjs';
+          packageJson.scripts['check:m025-bm1-friction:mechanics'] = 'node scripts/m025-bm1-friction-check.mjs --mechanics-only';
+          writeFileSync(file, `${JSON.stringify(packageJson)}\n`);
+          NODE
+          test "$(node -p "require('./package.json').scripts['check:lfea-b3.19']")" = "node scripts/lfea-b3.19-b31-factor-calculator-check.mjs"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Component and solver checks
+        run: npm run check:lfea-b3.2 && npm run check:lfea-b3.3
+
+      - name: Current-main and BM1 prerequisites
+        run: npm run check:lfea-b3.15 && npm run check:lfea-b3.16 && npm run check:lfea-b3.17 && npm run check:lfea-b3.18 && npm run check:lfea-b3.19 && npm run check:lfea-b3.20 && npm run check:lfea-b3.21 && npm run check:lfea-bm1-cii-comparison
+
+      - name: M025 nonlinear mechanics
+        run: npm run check:m025-bm1-friction:mechanics
+
+      - name: Full M025 oracle, expected red
+        continue-on-error: true
+        run: npm run check:m025-bm1-friction
