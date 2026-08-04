@@ -135,13 +135,46 @@ jobs:
           node --test tests/bucket-b-bb11-flange-hub.test.mjs
 
       - name: Replay BB-00 through BB-05 at exact head
+        id: bb00
+        continue-on-error: true
         env:
           EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
           EXPECTED_BASE_SHA: ${{ steps.refs.outputs.head_sha }}
           EXPECTED_BASE_REF: ${{ steps.refs.outputs.head_sha }}
+          CHANGED_PATHS_JSON: '[]'
           STRICT_REPOSITORY_DIFFERENTIAL: '0'
           REPORT_PATH: reports/bucket-b-bb00-bb05-report.json
-        run: node scripts/bucket-b-bb00-bb05-check.mjs
+        shell: bash
+        run: |
+          set +e
+          mkdir -p reports/bb11-prerequisite-debug
+          node scripts/bucket-b-bb00-bb05-check.mjs \
+            > reports/bb11-prerequisite-debug/bb00-bb05.stdout.log \
+            2> reports/bb11-prerequisite-debug/bb00-bb05.stderr.log
+          status=$?
+          printf '%s\n' "$status" > reports/bb11-prerequisite-debug/bb00-bb05.exit-code.txt
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload BB-00 through BB-05 diagnostic custody
+        if: always()
+        id: bb00_debug
+        uses: actions/upload-artifact@v4
+        with:
+          name: bucket-b-bb11-prerequisite-debug-${{ steps.refs.outputs.head_sha }}-${{ github.run_attempt }}
+          path: |
+            reports/bb11-prerequisite-debug
+            reports/bucket-b-bb00-bb05-report.json
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Enforce BB-00 through BB-05 replay
+        shell: bash
+        env:
+          EXIT_CODE: ${{ steps.bb00.outputs.exit_code }}
+        run: |
+          set -euo pipefail
+          test "$EXIT_CODE" = '0'
 
       - name: Replay BB-06
         env:
