@@ -70,6 +70,7 @@ export function renderTopologyEditProfessionalRuntime(runtime) {
   renderTopologyEditProfessionalOperationPanel(runtime.element, {
     values: runtime.values,
     catalogue: runtime.catalogue,
+    componentContext: runtime.componentContext,
     plan: runtime.plan,
     candidate: runtime.candidate,
     validation: runtime.validation,
@@ -90,6 +91,7 @@ export function updateTopologyEditProfessionalEvidence(runtime) {
   const host = runtime.controller.hostElement;
   if (!host) return;
   const session = runtime.controller.session;
+  const context = runtime.componentContext;
   host.dataset.topologyEditCanonicalHash = session?.currentTopology()?.canonicalTopologyHash ?? '';
   host.dataset.topologyEditJournalHash = session?.journal?.journalHash ?? '';
   host.dataset.topologyEditSessionVersion = String(session?.journal?.sessionVersion ?? '');
@@ -103,6 +105,15 @@ export function updateTopologyEditProfessionalEvidence(runtime) {
   host.dataset.topologyEditProfessionalValidationHash = runtime.validation?.validationHash ?? '';
   host.dataset.topologyEditProfessionalTransactionPreviewHash = runtime.transactionPreview?.previewHash ?? '';
   host.dataset.topologyEditProfessionalTransactionHash = runtime.transaction?.transactionHash ?? '';
+  host.dataset.topologyEditComponentHudStatus = context?.status ?? '';
+  host.dataset.topologyEditComponentHudType = context?.componentType ?? '';
+  host.dataset.topologyEditComponentHudCanonicalId = context?.selectedCanonicalId ?? '';
+  host.dataset.topologyEditComponentHudCandidateCount = String(
+    context?.candidateRecordIds?.length ?? 0,
+  );
+  host.dataset.topologyEditComponentHudRecommendedRecordId =
+    context?.recommendedRecordId ?? '';
+  host.dataset.topologyEditComponentHudContextHash = context?.contextHash ?? '';
 }
 
 function restoreReceipt(value, hashField, currentHash) {
