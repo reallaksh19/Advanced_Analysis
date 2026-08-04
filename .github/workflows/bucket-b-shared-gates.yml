@@ -1,0 +1,64 @@
+name: Bucket B shared Q8 gates
+
+on:
+  pull_request:
+    branches:
+      - agent/bucket-b-c2d-benchmark-record
+    paths:
+      - '.github/workflows/bucket-b-shared-gates.yml'
+      - 'docs/Bucket_B_Two_Dimensional_Continuum_FEA_Benchmark_Record_Rev1.md'
+      - 'scripts/bucket-b-bb00-bb05-check.mjs'
+      - 'src/core/bucket-b/**'
+      - 'src/core/local-continuum/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Exact-head BB-00..BB-05 qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Fetch governed base
+        run: git fetch origin agent/bucket-b-c2d-benchmark-record:refs/remotes/origin/agent/bucket-b-c2d-benchmark-record
+
+      - name: Validate patch whitespace
+        run: git diff --check "${EXPECTED_BASE_SHA}...${EXPECTED_HEAD_SHA}"
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          EXPECTED_BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+
+      - name: Run exact-head shared-gate qualification
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          EXPECTED_BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+          EXPECTED_BASE_REF: origin/agent/bucket-b-c2d-benchmark-record
+          STRICT_REPOSITORY_DIFFERENTIAL: '1'
+          REPORT_PATH: reports/bucket-b-bb00-bb05-exact-head-report.json
+        run: node scripts/bucket-b-bb00-bb05-check.mjs
+
+      - name: Upload qualification report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bucket-b-shared-gate-report-${{ github.run_attempt }}
+          path: reports/bucket-b-bb00-bb05-exact-head-report.json
+          if-no-files-found: error
