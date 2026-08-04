@@ -11,6 +11,7 @@ on:
       - "reports/lfea-bm1-m025-friction-qualification.json"
       - "scripts/m025-apply-work-pack.mjs"
       - "scripts/m025-apply-continuation-patch.mjs"
+      - "scripts/m025-stabilize-continuation.mjs"
       - "scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs"
       - "scripts/lfea-b3.15-bm1-inputxml-check.mjs"
       - "scripts/lfea-b3.16-inputxml-ground-truth-check.mjs"
@@ -46,6 +47,11 @@ jobs:
             echo "M025 thermal continuation already present on branch."
           else
             node scripts/m025-apply-continuation-patch.mjs
+          fi
+          if grep -q "MAX_ITERATIONS_PER_STEP = 240" scripts/lfea-b3.19-bm1-friction.mjs; then
+            echo "M025 continuation stabilization already present on branch."
+          else
+            node scripts/m025-stabilize-continuation.mjs
           fi
 
       - name: Set up Node
@@ -101,6 +107,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add package.json \
             scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs \
+            scripts/lfea-b3.19-bm1-friction.mjs \
             scripts/lfea-bm1-cii-output-comparison.mjs \
             reports/lfea-bm1-cii-output-comparison.json \
             reports/lfea-bm1-m025-friction-qualification.json
