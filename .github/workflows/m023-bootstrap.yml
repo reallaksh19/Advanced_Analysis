@@ -30,6 +30,12 @@ jobs:
           ref: agent/m023-bm1-b31-stress-caesar
           fetch-depth: 0
 
+      - name: Merge current main before qualification
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git merge --no-edit origin/main
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
@@ -109,12 +115,10 @@ jobs:
           if b317 not in package:
               assert b316 in package
               package = package.replace(b316, b316 + b317, 1)
-          old_chain = 'npm run check:lfea-b3.15 && npm run check:lfea-b3.16 && npm run check:lfea-b4.0'
-          new_chain = 'npm run check:lfea-b3.15 && npm run check:lfea-b3.16 && npm run check:lfea-b3.17 && npm run check:lfea-b4.0'
-          if old_chain in package:
-              package = package.replace(old_chain, new_chain, 1)
-          else:
-              assert new_chain in package
+          if 'npm run check:lfea-b3.17' not in package:
+              anchor = 'npm run check:lfea-b3.16 && '
+              assert anchor in package
+              package = package.replace(anchor, anchor + 'npm run check:lfea-b3.17 && ', 1)
           package_path.write_text(package)
 
           Path('.github/workflows/m023-bootstrap.yml').unlink()
@@ -123,7 +127,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Validate M020 M021 and M023
+      - name: Validate M020 M021 Owner comparison and M023
         run: |
           node --check scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs
           node --check scripts/lfea-b3.17-caesar-stress-report.mjs
@@ -131,12 +135,11 @@ jobs:
           node --check scripts/lfea-b3.17-bm1-code-stress-check.mjs
           npm run check:lfea-b3.15
           npm run check:lfea-b3.16
+          npm run check:lfea-bm1-cii-comparison
           npm run check:lfea-b3.17
 
       - name: Commit validated wiring
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "M023: wire BM1 sustained and CAESAR stress comparison"
           git push origin HEAD:agent/m023-bm1-b31-stress-caesar
