@@ -1,6 +1,10 @@
 name: M023 Bootstrap Exact-Head Patch
 
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/m023-bootstrap.yml"
+      - "scripts/lfea-b3.17-*.mjs"
   push:
     branches:
       - agent/m023-bm1-b31-stress-caesar
@@ -10,6 +14,10 @@ on:
 
 permissions:
   contents: write
+
+concurrency:
+  group: m023-bootstrap-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   patch-and-validate:
