@@ -9,6 +9,7 @@ import {
 import { bendGeometry, reducerGeometry, weldingTeeGeometry } from './geometry.js';
 import { calculateB31Factors } from './calculator.js';
 
+
 function sourceLengthToMetres(canonicalGeometry, value, field) {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     fail(`${field} must be a finite source length.`, 'B31_FACTOR_INPUTXML_LENGTH_MISSING');
@@ -83,8 +84,12 @@ function bendFromSegment(canonicalGeometry, segment, supplementary) {
   if (!(typeof bendRadius === 'number' && bendRadius > 0)) {
     fail(`Canonical bend ${segment.id} has no resolved bend radius.`, 'B31_FACTOR_BEND_RADIUS_MISSING');
   }
+  const bendAngleDegrees = supplementary?.bendAngleDegrees ?? segment.meta?.bendAngle1 ?? null;
+  const smooth90FlexibilityCorrection = supplementary?.smooth90FlexibilityCorrection ?? false;
   return bendGeometry({
     lengthUnit: 'm',
+    ...(bendAngleDegrees === null ? {} : { bendAngleDegrees }),
+    smooth90FlexibilityCorrection,
     outerDiameter: supplementary?.outerDiameter === undefined
       ? sourceLengthToMetres(canonicalGeometry, segment.diameter, `${segment.id}.diameter`)
       : supplementaryLengthToMetres(supplementary, supplementary.outerDiameter, `${segment.id}.outerDiameter`),
@@ -203,6 +208,7 @@ export function calculateB31FactorsFromCanonicalGeometry({
   }
   return Object.freeze(results);
 }
+
 
 export function calculateB31FactorsFromInputXml({
   xmlText,
