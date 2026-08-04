@@ -2,16 +2,18 @@
 
 ## Scope
 
-Phase 3A adds a separately implemented Design-V3 candidate verifier and replay-artifact custody gate. The independent checker imports only the canonical hashing utility. It does not import or call the candidate generator, candidate package validator, candidate topology observer, or any midside-transformation helper.
+Phase 3A adds a separately implemented Design-V3 candidate verifier and a validation-receipt producer for the existing controlled replay result v2 contract. It does **not** introduce a second replay-result schema or replay adjudicator.
 
-No radial or angular design value, frozen physical coordinate, load, restraint, tolerance, recovery rule, convergence rule, solver path, uniform production replay, stage-document adapter, or qualification state is changed.
+The independent checker does not import or call the candidate mesh generator, candidate package validator, candidate topology observer, candidate bundle builder, candidate projection adapter, or midside-transformation helpers.
+
+No radial or angular design value, frozen physical coordinate, load, restraint, tolerance, recovery rule, convergence rule, solver path, uniform production replay, stage-document adapter, production-switch authority, or qualification state is changed.
 
 ## Independent candidate reconstruction
 
-The checker consumes retained raw candidate artifacts, the Design-V3 record, candidate intake evidence, a supplied replay artifact manifest, and the frozen response/probe specifications. It independently recomputes:
+The checker consumes retained raw candidate artifacts, the Design-V3 record, candidate intake evidence, a supplied artifact manifest, and the frozen response/probe specifications. It independently recomputes:
 
 - exact-head and candidate-artifact ancestry;
-- raw-file, component, package-semantic, and design hashes;
+- raw-file, component, package-semantic, intake, and design hashes;
 - T6 edge identities and physical-boundary, internal-circumferential, radial, and diagonal classifications;
 - analytic physical-boundary midsides and chordal internal/radial/diagonal midsides;
 - corner-scaled, three-point integration, and dense eight-subdivision Jacobians;
@@ -20,7 +22,7 @@ The checker consumes retained raw candidate artifacts, the Design-V3 record, can
 - exactly-one-element containment for all seven frozen locations;
 - T6 natural coordinates, mapping residuals, natural-coordinate margins, orientation, anchor lineage, and compatible topology signatures.
 
-The contract fixture reconstructs the four current Design-V3 candidate sizes:
+The focused fixture reconstructs the current Design-V3 ladder:
 
 | Level | Radial cells | Circumferential cells | T6 elements |
 |---:|---:|---:|---:|
@@ -29,60 +31,72 @@ The contract fixture reconstructs the four current Design-V3 candidate sizes:
 | 3 | 30 | 68 | 4,080 |
 | 4 | 54 | 132 | 14,256 |
 
-The exact 60 mm radial breakpoint is independently observed at every level for both the 0-degree load line and 180-degree restraint line. All seven fixture locations retain stable `B`-triangle topology and candidate natural-coordinate margins above `0.19`.
+The exact 60 mm radial breakpoint is independently observed at every level for both the 0-degree load line and the 180-degree restraint line. The seven fixture locations retain stable `B`-triangle topology and candidate natural-coordinate margins above `0.19`.
 
-## Typed artifact manifest
+## Controlled replay v2 integration
 
-Each emitted artifact entry retains:
-
-- `artifactId`
-- `artifactScope`
-- `schema`
-- `producerRevision`
-- `routeId`
-- `levelOrdinal`
-- `exactHeadSha`
-- `designHash`
-- `parentArtifactHashes`
-- `semanticHash`
-- `rawFileHash`
-- `relativePath`
-- `validationStatus`
-
-Only the controlled scopes `CANDIDATE_MESH_BOUND`, `REFERENCE_MESH_BOUND`, `REPOSITORY_REGRESSION`, and `EXECUTION_ENVIRONMENT` are accepted.
-
-## Replay custody
-
-Replay check states are derived from typed raw artifacts. A caller-supplied PASS/BLOCKED map is rejected. The custody producer validates and derives:
-
-- frozen-input component hashes;
-- stage-document, mapping-package, and projection ancestry;
-- independent mesh quality;
-- solver and equilibrium evidence;
-- global response convergence;
-- Kirsch probes;
-- production lug fixed-location/path stress;
-- probe topology audit;
-- exact-head repository hygiene.
-
-Raw-file tampering, altered frozen inputs, stale exact-head or design custody, detached stage/mapping ancestry, missing artifact roles, missing tracked-worktree proof, and authority escalation all fail closed.
-
-## Contract validation
-
-Executed in the focused reconstructed harness:
+The independent checker writes three isolated outputs:
 
 ```text
-node --check independent candidate verifier                         PASS
-node --check independent candidate checker script                  PASS
-node --check replay artifact custody module                        PASS
-node --check replay artifact custody checker script                PASS
-independent candidate recomputation contract                       PASS
-replay artifact derivation and tamper contract                     PASS
+independent verification evidence
+independent artifact manifest
+INDEPENDENT_CHECKER_EVIDENCE validation receipt
 ```
 
-The negative suite blocks altered mesh data, curved internal circumferential midsides, chordal physical-boundary midsides, a missing 60 mm breakpoint, an incorrect load-window node chain, stale artifact custody, detached mapping ancestry, frozen-input tampering, submitted PASS maps, and authority escalation.
+The validation receipt conforms to:
 
-A full repository checkout has not executed the raw external artifacts or exact-head gate for this agent branch. No solver replay, production switch, exact-head pass, or qualification claim is made.
+```text
+lafea-bucket-01-replay-artifact-validation-receipt/v1
+```
+
+and is intended for the existing:
+
+```text
+lafea-bucket-01-controlled-replay-result/v2
+```
+
+The receipt binds:
+
+- the verification exact-head SHA;
+- the candidate-artifact head SHA through the evidence payload;
+- the Design-V3 hash;
+- the candidate package hash;
+- the candidate intake evidence hash;
+- the independent evidence semantic hash;
+- the independent evidence raw-file hash;
+- the candidate replay route;
+- `artifactKind = INDEPENDENT_CHECKER_EVIDENCE`;
+- `derivedCheck = probeTopologyAudit`.
+
+The earlier Phase 3A replay-artifact-custody v1 implementation was removed during review because it competed with the already registered replay-result v2 authority and admitted insufficiently validated synthetic PASS payloads.
+
+## Negative cases
+
+The independent verification contract blocks:
+
+- raw-file or semantic-hash tampering;
+- altered mesh data or connectivity custody;
+- curved internal circumferential midsides;
+- chordal physical-boundary midsides;
+- a missing 60 mm breakpoint;
+- incorrect load or restraint window chains;
+- stale exact-head or design custody;
+- detached supplied-manifest ancestry;
+- altered candidate package or intake parent custody;
+- submitted PASS maps;
+- authority escalation.
+
+## Validation boundary
+
+The previously executed focused independent-recomputation contract passed before the review corrections. The review added a dedicated controlled-replay-v2 receipt contract and removed the competing replay-v1 files.
+
+No GitHub status check is attached. A complete exact-head checkout has not rerun the full repository gate or real external replay artifacts after these corrections. Consequently, this record does not claim:
+
+- an exact-head infrastructure pass;
+- a retained candidate solver result;
+- candidate replay adjudication;
+- production-switch eligibility;
+- Bucket-01 qualification.
 
 ## Authority boundary
 
