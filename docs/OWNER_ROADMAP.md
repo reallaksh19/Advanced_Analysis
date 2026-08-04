@@ -1443,3 +1443,66 @@ was wrong, rather than being the thing that revealed a problem
 existed. Two independent signals (an internal sanity check plus an
 external reference) converging on the same one-line fix is stronger
 evidence than either alone.
+
+### (C) M023 (#582) → PR #585, merged as `1df0f7cf5c7b4512a312f127927c95d511cc8c8e`
+
+Reviewed the exact PR head (`6609bc4281dededec798640e5653547b5447a9cb`) in a
+dedicated worktree per standing discipline — read all six changed files
+in full, then independently re-ran every claimed check (`b3.15`, `b3.16`,
+`bm1-cii-comparison`, the new `b3.17`, and the full `check:lfea-linear-
+core`) rather than trusting the PR's own report of green CI. All passed
+with zero regressions.
+
+Delivered: a real `SUSTAINED` code-stress category (30 code points)
+alongside the existing 30 `DISPLACEMENT_STRESS_RANGE` points, wired
+through the exact production path the Work Pack pointed at —
+`resolvePressureStressContribution` (M010) for the pressure term,
+`unityStressFactors`'s already-sealed but previously-unread
+`sustainedIndices`. Replaced the M020 `SCREENING_ALLOWABLE` placeholder
+with a declared ASTM A106 Grade B ASME B31.3-2024 Table A-1 authority
+(20,000 psi at both 293.15 K and 393.15 K — cross-checked against and
+consistent with M008-C's existing hot point). Added a real parser for
+CAESAR's `STRESS_REPORT` (CASE 4 SUS / CASE 5 EXP) and a structured
+exact-`FROM_NODE->TO_NODE` comparison, honestly excluding CAESAR's 6
+internal bend-station splits and this model's 2 whole-chord bend
+elements as unmatched (same 13/6/2 accounting M020/#583 already
+established), and excluding the 6 real CAESAR zero-allowable rigid rows
+from utilization-deviation statistics rather than dividing by zero.
+
+**Independently reproduced, not just re-run.** Beyond executing the
+PR's own checks, hand-verified two separate arithmetic chains from
+scratch against the tool's raw output object (not its summary text):
+(1) the pressure-stress term `S = P·Do/(4t)` for element `IX-S4`
+(40→45, `Do` inherited from element 30-40 = 323.850006 mm, `t` =
+9.525 mm declared, `P` = 2,150 kPa) — hand calc matched the reported
+`18275000.33858268 Pa` exactly; (2) the full `SUSTAINED` combined-
+stress formula (`|axial+pressure| + sqrt(inPlane²+outOfPlane²+
+torsional²)`) at the same code point — hand calc matched the reported
+`65378698.01902817 Pa` and `0.4741189228213427` utilization exactly,
+to the last digit. Also independently re-extracted two raw XML rows
+directly via `awk`/`grep` (element 58→59 EXP, the real CAESAR overall
+maximum at 62.532867%; element 20→30 EXP, this repo's own worst
+deviation) and confirmed the parser's `codeStressPa`/`allowableStressPa`/
+`sifInPlane`/`sifOutOfPlane`/`percentage` fields match the source file
+byte-for-byte after unit conversion — zero parser distortion. Confirmed
+the exact allowable conversion by hand: `20000 × 6894.757293168 =
+137895145.86336` Pa, matching the declared authority precisely.
+
+**One real nuance found in the PR's own disclosure, not in its code.**
+The PR attributes the larger EXP-case deviation (repo 70.48% vs. CAESAR
+49.95% on matched pairs) to "CAESAR uses non-unity bend SIFs." Checked
+this directly against the raw XML at the repo's own worst location
+(20→30, EXP case): CAESAR reports `SIF_IN_PLANE`/`SIF_OUT_PLANE` = 1.0
+there too — unity, same as this model. SIF is therefore not the
+proximate cause at that specific point. The more likely dominant driver
+is the already-disclosed, larger gap: the two BM1 bends are compiled as
+finite straight chords with no B31J flexibility factor, so the whole
+loop is stiffer than the real pipe at the bends, redistributing
+moment/torsion everywhere else in the loop — including at straight runs
+away from the bends — differently than CAESAR's real curved-arc, real-
+flexibility elements would. This does not affect any of the verified
+arithmetic or the comparison's honesty (every number checked out
+exactly); it is a narrative-precision note, not a defect, and does not
+block merge. Left as-is in the merged PR text; recorded here so a future
+reader chasing "add real SIFs to close this gap" knows that alone likely
+will not, and the flexibility factor is the more promising next lever.
