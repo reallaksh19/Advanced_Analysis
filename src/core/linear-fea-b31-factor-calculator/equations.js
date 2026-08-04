@@ -2,8 +2,18 @@
 const minimumOne = (value) => Math.max(1, value);
 const clampReducerSif = (value) => Math.min(2, minimumOne(value));
 
-function pressureCorrectBend({ h, meanRadius, bendRadius, wallThickness, pressure, elasticModulus }) {
-  const baseFlexibility = 1.65 / h;
+function pressureCorrectBend({
+  h,
+  meanRadius,
+  bendRadius,
+  wallThickness,
+  pressure,
+  elasticModulus,
+  flexibilityCoefficient,
+  flexibilityRuleId,
+  smooth90CorrectionApplied,
+}) {
+  const baseFlexibility = flexibilityCoefficient / h;
   const baseInPlaneSif = 0.9 / h ** (2 / 3);
   const baseOutOfPlaneSif = 0.75 / h ** (2 / 3);
   const flexibilityDenominator = 1
@@ -19,6 +29,11 @@ function pressureCorrectBend({ h, meanRadius, bendRadius, wallThickness, pressur
   return {
     flexibilityCharacteristic: h,
     meanCrossSectionRadius: meanRadius,
+    flexibilityRule: {
+      ruleId: flexibilityRuleId,
+      coefficient: flexibilityCoefficient,
+      smooth90CorrectionApplied,
+    },
     unpressurized: {
       flexibility: minimumOne(baseFlexibility),
       inPlaneSif: minimumOne(baseInPlaneSif),
@@ -46,9 +61,17 @@ function pressureCorrectBend({ h, meanRadius, bendRadius, wallThickness, pressur
   };
 }
 
-export function calculateBendFactors(geometry) {
+export function calculateBendFactors(geometry, profile = null) {
   const meanRadius = (geometry.outerDiameter - geometry.wallThickness) / 2;
   const h = geometry.wallThickness * geometry.bendRadius / meanRadius ** 2;
+  const smooth90CorrectionApplied = profile?.factorStandard === 'ASME_B31J'
+    && geometry.smooth90FlexibilityCorrection === true;
+  const flexibilityCoefficient = smooth90CorrectionApplied ? 1.3 : 1.65;
+  const flexibilityRuleId = smooth90CorrectionApplied
+    ? 'B31J_TABLE_1_1_NOTE_3_SMOOTH_90'
+    : profile?.factorStandard === 'ASME_B31J'
+      ? 'B31J_TABLE_1_1_GENERAL_BEND'
+      : 'B31_3_APPENDIX_D_TABLE_D300_BEND';
   return pressureCorrectBend({
     h,
     meanRadius,
@@ -56,6 +79,9 @@ export function calculateBendFactors(geometry) {
     wallThickness: geometry.wallThickness,
     pressure: geometry.pressure,
     elasticModulus: geometry.elasticModulus,
+    flexibilityCoefficient,
+    flexibilityRuleId,
+    smooth90CorrectionApplied,
   });
 }
 
@@ -87,36 +113,72 @@ export function calculateB31JWeldingTeeFactors(geometry) {
   const rt = R / T;
   const q = d / D;
   const tau = t / T;
+  const note6Divisor = geometry.fittingQuality === 'VERIFIED_B16_9' ? 1.26 : 1;
+  const reduced = (value) => minimumOne(value / note6Divisor);
 
-  const kir = 0.18 * rt ** 0.8 * q ** 5;
-  const kor = 1;
-  const ktr = 0.08 * rt ** 0.91 * q ** 5.7;
-  const kib = (1.91 * q - 4.32 * q ** 2 + 2.7 * q ** 3) * rt ** 0.77 * q ** 0.47 * tau;
-  const kob = (0.34 * q - 0.49 * q ** 2 + 0.18 * q ** 3) * rt ** 1.46 * tau;
-  const ktb = (1.08 * q - 2.44 * q ** 2 + 1.52 * q ** 3) * rt ** 0.77 * q ** 1.61 * tau;
-
-  const runOutOfPlane = minimumOne(0.61 * rt ** 0.29 * q ** 1.95 * tau ** -0.53);
+  const rawFlexibility = {
+    run: {
+      inPlane: 0.18 * rt ** 0.8 * q ** 5,
+      outOfPlane: 1,
+      torsional: 0.08 * rt ** 0.91 * q ** 5.7,
+    },
+    branch: {
+      inPlane: (1.91 * q - 4.32 * q ** 2 + 2.7 * q ** 3) * rt ** 0.77 * q ** 0.47 * tau,
+      outOfPlane: (0.34 * q - 0.49 * q ** 2 + 0.18 * q ** 3) * rt ** 1.46 * tau,
+      torsional: (1.08 * q - 2.44 * q ** 2 + 1.52 * q ** 3) * rt ** 0.77 * q ** 1.61 * tau,
+    },
+  };
+  const rawDisplacementSifs = {
+    run: {
+      torsional: 0.34 * rt ** (2 / 3) * q * tau ** -0.5,
+      inPlaneBending: 0.98 * rt ** 0.35 * q ** 0.72 * tau ** -0.52,
+      outOfPlaneBending: 0.61 * rt ** 0.29 * q ** 1.95 * tau ** -0.53,
+    },
+    branch: {
+      torsional: 0.42 * rt ** (2 / 3) * q ** 1.1 * tau ** 1.1,
+      inPlaneBending: 0.33 * rt ** (2 / 3) * q ** 0.18 * tau ** 0.7,
+      outOfPlaneBending: 0.42 * rt ** (2 / 3) * q ** 0.37 * tau ** 0.37,
+    },
+  };
+  const runOutOfPlane = reduced(rawDisplacementSifs.run.outOfPlaneBending);
+  const branchOutOfPlane = reduced(rawDisplacementSifs.branch.outOfPlaneBending);
   const run = {
     // B31J secondary-load axial SIF for a non-bend component follows the
     // component out-of-plane SIF; sustained/occasional axial indices remain 1.
     axial: runOutOfPlane,
-    torsional: minimumOne(0.34 * rt ** (2 / 3) * q * tau ** -0.5),
-    inPlaneBending: minimumOne(0.98 * rt ** 0.35 * q ** 0.72 * tau ** -0.52),
+    torsional: reduced(rawDisplacementSifs.run.torsional),
+    inPlaneBending: reduced(rawDisplacementSifs.run.inPlaneBending),
     outOfPlaneBending: runOutOfPlane,
   };
-  const branchOutOfPlane = minimumOne(0.42 * rt ** (2 / 3) * q ** 0.37 * tau ** 0.37);
   const branch = {
     // Same secondary-load axial convention as the run leg.
     axial: branchOutOfPlane,
-    torsional: minimumOne(0.42 * rt ** (2 / 3) * q ** 1.1 * tau ** 1.1),
-    inPlaneBending: minimumOne(0.33 * rt ** (2 / 3) * q ** 0.18 * tau ** 0.7),
+    torsional: reduced(rawDisplacementSifs.branch.torsional),
+    inPlaneBending: reduced(rawDisplacementSifs.branch.inPlaneBending),
     outOfPlaneBending: branchOutOfPlane,
   };
   return {
     ratios: { runRadiusToThickness: rt, branchToRunMeanDiameter: q, branchToRunThickness: tau },
+    qualityReduction: {
+      applied: note6Divisor !== 1,
+      divisor: note6Divisor,
+      ruleId: note6Divisor !== 1 ? 'B31J_TABLE_1_1_NOTE_6' : null,
+      fittingQuality: geometry.fittingQuality,
+      floorAppliedAfterReduction: true,
+    },
+    rawFlexibility,
+    rawDisplacementSifs,
     flexibility: {
-      run: { inPlane: minimumOne(kir), outOfPlane: minimumOne(kor), torsional: minimumOne(ktr) },
-      branch: { inPlane: minimumOne(kib), outOfPlane: minimumOne(kob), torsional: minimumOne(ktb) },
+      run: {
+        inPlane: reduced(rawFlexibility.run.inPlane),
+        outOfPlane: reduced(rawFlexibility.run.outOfPlane),
+        torsional: reduced(rawFlexibility.run.torsional),
+      },
+      branch: {
+        inPlane: reduced(rawFlexibility.branch.inPlane),
+        outOfPlane: reduced(rawFlexibility.branch.outOfPlane),
+        torsional: reduced(rawFlexibility.branch.torsional),
+      },
     },
     displacementSifs: { run, branch },
   };
