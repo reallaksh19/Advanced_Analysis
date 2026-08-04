@@ -2,12 +2,14 @@
 
 ## Rev 1 — corrected executable shared-gate authority
 
-**Record:** `BKT-B-C2D-BMR-001`  
-**Revision:** `Rev 1 corrective v2`  
-**Specification status:** `SPECIFICATION_READY`  
-**Shared-gate implementation:** `BB-00..BB-05`  
-**Planar application state before a qualified v2 receipt:** `EXECUTION_BLOCKED_PENDING_SHARED_Q8_GATES`  
-**Flange-hub state:** `BLOCKED_PENDING_AXISYMMETRIC_REGISTRATION`
+| Field | Authority |
+|---|---|
+| Record | `BKT-B-C2D-BMR-001` |
+| Revision | `Rev 1 corrective v2` |
+| Specification status | `SPECIFICATION_READY` |
+| Shared-gate implementation | `BB-00..BB-05` |
+| Planar application state before a qualified v2 receipt | `EXECUTION_BLOCKED_PENDING_SHARED_Q8_GATES` |
+| Flange-hub state | `BLOCKED_PENDING_AXISYMMETRIC_REGISTRATION` |
 
 This record governs the shared Q8 prerequisite gates for Bucket B. It does not modify, replace, or adjudicate the active Bucket-01 T6 Phase 3 route.
 
