@@ -28,28 +28,42 @@ export function runNonFeaP0Command([commandId, [command, args]], cwd) {
       maxBuffer: 20 * 1024 * 1024,
     });
     const output = `${result.stdout || ''}${result.stderr || ''}`;
-    return {
+    return commandEvidence({
       commandId,
-      command: [command, ...args].join(' '),
+      command,
+      args,
       status: result.error ? 'BLOCKED' : result.status === 0 ? 'PASS' : 'FAIL',
       exitCode: result.status,
       durationMs: Date.now() - started,
-      outputSha256: sha256(output),
-      outputTail: output.split(/\r?\n/u).slice(-40),
+      output,
       error: result.error ? String(result.error.message || result.error) : null,
-    };
+    });
   } catch (error) {
-    return {
+    const message = String(error?.message || error);
+    return commandEvidence({
       commandId,
-      command: [command, ...args].join(' '),
+      command,
+      args,
       status: 'BLOCKED',
       exitCode: null,
       durationMs: Date.now() - started,
-      outputSha256: null,
-      outputTail: [],
-      error: String(error.message || error),
-    };
+      output: message,
+      error: message,
+    });
   }
+}
+
+function commandEvidence({ commandId, command, args, status, exitCode, durationMs, output, error }) {
+  return Object.freeze({
+    commandId,
+    command: [command, ...args].join(' '),
+    status,
+    exitCode,
+    durationMs,
+    outputSha256: sha256(output),
+    outputTail: output.split(/\r?\n/u).slice(-40),
+    error,
+  });
 }
 
 function sha256(value) {
