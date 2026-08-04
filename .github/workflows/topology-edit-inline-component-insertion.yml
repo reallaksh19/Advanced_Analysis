@@ -14,9 +14,12 @@ on:
       - 'src/workspace/topology-edit/professional/topology-edit-operation-plan.js'
       - 'src/workspace/topology-edit/professional/topology-edit-route-operations.js'
       - 'src/workspace/topology-edit/professional/topology-edit-professional-operation-session.js'
+      - 'src/workspace/viewport-productivity/topology-edit-professional-operation-actions.js'
       - 'src/workspace/viewport-productivity/topology-edit-professional-operation-panel.js'
+      - 'src/workspace/viewport-productivity/topology-edit-professional-operation-runtime.js'
       - 'src/workspace/viewport-productivity/topology-edit-professional-operation-state.js'
       - 'tests/topology-edit-inline-component-insertion.test.mjs'
+      - 'e2e/topology-edit-inline-component-insertion.spec.js'
   workflow_dispatch:
 
 permissions:
@@ -29,9 +32,10 @@ concurrency:
 jobs:
   inline-component-insertion:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PLAYWRIGHT_BROWSER_CHANNEL: chromium
 
     steps:
       - name: Checkout exact head
@@ -46,8 +50,11 @@ jobs:
           node-version: '22'
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install dependencies and Chromium
+        run: |
+          set -euo pipefail
+          npm ci
+          npx playwright install --with-deps chromium
 
       - name: Verify exact source
         run: |
@@ -65,6 +72,7 @@ jobs:
           node --check src/workspace/viewport-productivity/topology-edit-professional-operation-panel.js
           node --check src/workspace/viewport-productivity/topology-edit-professional-operation-state.js
           node --check tests/topology-edit-inline-component-insertion.test.mjs
+          node --check e2e/topology-edit-inline-component-insertion.spec.js
           git diff --check
 
       - name: Execute inline insertion and transaction contracts
@@ -78,11 +86,20 @@ jobs:
             tests/topology-edit-component-hud-context.test.mjs \
             2>&1 | tee inline-component-test-output.txt
 
-      - name: Upload focused test output
+      - name: Execute mounted Chromium insertion qualification
+        run: |
+          npx playwright test \
+            e2e/topology-edit-inline-component-insertion.spec.js \
+            --project=chromium --workers=1 --retries=0 --reporter=line
+
+      - name: Upload qualification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: topology-edit-inline-component-output-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}-${{ github.run_attempt }}
-          path: inline-component-test-output.txt
-          if-no-files-found: error
-          retention-days: 7
+          name: topology-edit-inline-component-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}-${{ github.run_attempt }}
+          path: |
+            inline-component-test-output.txt
+            playwright-report
+            test-results
+          if-no-files-found: warn
+          retention-days: 30
