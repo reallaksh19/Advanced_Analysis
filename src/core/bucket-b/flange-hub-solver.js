@@ -16,7 +16,7 @@ export const FLANGE_HUB_SOLVER_POLICY = deepFreeze({
   absoluteResidualTolerance: 1e-8,
   maximumIterationMultiplier: 8,
   minimumMaximumIterations: 2000,
-  residualReplacementInterval: 50,
+  residualReplacementInterval: 0,
   stoppingCriterion: 'EXPLICIT_REDUCED_SYSTEM_RESIDUAL',
   constraintMethod: 'EXACT_ZERO_DISPLACEMENT_ELIMINATION',
 });
