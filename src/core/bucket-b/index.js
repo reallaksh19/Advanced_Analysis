@@ -7,3 +7,4 @@ export * from './convergence.js';
 export * from './fixed-coordinate-recovery.js';
 export * from './path-and-scl.js';
 export * from './interface-resultants.js';
+export * from './qualification-receipt.js';
