@@ -32,3 +32,7 @@ Out-of-domain geometry produces a `BLOCKED` result with named violations and no 
 ## Source boundary
 
 The implementation contains equation logic and rule identities only. It does not contain allowable-stress tables or bulk copyrighted datasets. Every emitted factor carries a standard, edition, rule, revision, and semantic source identity.
+
+## Supplementary geometry custody
+
+Canonical InputXML currently lacks the branch/run dimensions needed by B31J tee equations and the endpoint/taper geometry needed by reducer equations. Those values are accepted only through a sealed `fea-b31-supplementary-geometry-set/v1` record. Entries are exact-keyed by component type, unit-declared, source-evidenced, deterministically ordered, hash-bound and duplicate-safe. The former unsealed `supplementaryGeometryBySegmentId` map is not a calculation input.
