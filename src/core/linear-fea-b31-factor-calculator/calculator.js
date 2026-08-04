@@ -62,6 +62,7 @@ function blockedResult({ request, profile, geometry, applicability, ruleId }) {
   });
 }
 
+
 function sustainedWithEditionCorrection(profile, baseIndices, outerDiameterToThickness) {
   if (profile.factorEdition !== '2023') {
     return {
@@ -80,7 +81,7 @@ function bendResult(request, profile, geometry) {
   if (applicability.status !== 'WITHIN_RANGE') {
     return blockedResult({ request, profile, geometry, applicability, ruleId });
   }
-  const factors = calculateBendFactors(geometry);
+  const factors = calculateBendFactors(geometry, profile);
   const baseSustainedIndices = profile.factorStandard === 'ASME_B31J'
     ? b31jDirectSustainedIndices(factors.displacementSifs)
     : legacySustainedIndices(factors.displacementSifs);
@@ -118,7 +119,13 @@ function bendResult(request, profile, geometry) {
     componentFactorSet,
     stressFactorSets: [stressFactorSet],
     matchingPipeApplication: null,
-    diagnostics: [],
+    diagnostics: factors.flexibilityRule.smooth90CorrectionApplied
+      ? [{
+          code: 'B31J_SMOOTH_90_BEND_FLEXIBILITY_CORRECTION_APPLIED',
+          severity: 'info',
+          message: 'B31J Table 1-1 Note (3) 1.3/h flexibility was applied by explicit geometry policy.',
+        }]
+      : [],
     semanticHash: '',
   });
 }
@@ -161,11 +168,20 @@ function teeResult(request, profile, geometry) {
     ? null
     : buildLegacyTeeComponentFactorSet({ componentId: request.componentId, profile, applicability });
   const diagnostics = profile.factorStandard === 'ASME_B31J'
-    ? [{
-        code: 'B31J_TEE_DIRECTIONAL_FLEXIBILITY_NOT_SEALED_FOR_B3_2',
-        severity: 'info',
-        message: 'Run/branch directional k-factors are emitted in factors.flexibility but are not collapsed into the scalar B3.2 component-factor-set contract.',
-      }]
+    ? [
+        {
+          code: 'B31J_TEE_DIRECTIONAL_FLEXIBILITY_NOT_SEALED_FOR_B3_2',
+          severity: 'info',
+          message: 'Run/branch directional k-factors are emitted in factors.flexibility but are not collapsed into the scalar B3.2 component-factor-set contract.',
+        },
+        ...(factors.qualityReduction?.applied
+          ? [{
+              code: 'B31J_TEE_NOTE_6_REDUCTION_APPLIED',
+              severity: 'info',
+              message: 'Verified welding-tee flexibility factors and SIFs were divided by 1.26 before the mandatory minimum-one floor.',
+            }]
+          : []),
+      ]
     : [];
   return sealFactorCalculationResult({
     schema: FACTOR_CALCULATION_RESULT_SCHEMA,
