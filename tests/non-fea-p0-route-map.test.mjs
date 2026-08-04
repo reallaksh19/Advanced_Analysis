@@ -27,6 +27,7 @@ const REQUIRED_P0_FILES = [
   'scripts/non-fea-baseline/stage-recorder.mjs',
   'scripts/non-fea-baseline/statistics.mjs',
   'tests/non-fea-p0-report-validator.test.mjs',
+  'tests/non-fea-p0-statistics.test.mjs',
 ];
 
 test('P0 route inventory covers every required stage exactly once', () => {
