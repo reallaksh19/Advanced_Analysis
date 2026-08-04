@@ -36,7 +36,22 @@ assert.equal(v2.status, 'CALCULATED');
 assert.equal(v3.schema, SUPPORT_LOAD_DISTRIBUTION_COG_SCHEMA);
 assert.equal(v3.method, EMPIRICAL_LOAD_COG_METHOD);
 assert.equal(v3.baseMethod, EMPIRICAL_LOAD_METHOD);
-assert.equal(v3.status, 'CALCULATED');
+assert.equal(
+  v3.status,
+  'CALCULATED',
+  `on-route CoG calculation blocked:\n${JSON.stringify({
+    componentLoadAuthority: v3.componentLoadAuthority,
+    loadCases: v3.loadCases.map((row) => ({
+      loadCaseId: row.loadCaseId,
+      status: row.status,
+      excludedInputs: row.excludedInputs,
+      blockers: row.blockers,
+      equilibrium: row.equilibrium,
+      completenessAudit: row.completenessAudit,
+      contributionLedger: row.contributionLedger,
+    })),
+  }, null, 2)}`,
+);
 assert.equal(v3.componentLoadAuthority.status, 'READY_FOR_INTEGRATION_DESIGN');
 assert.equal(v3.componentLoadAuthority.summary.onRouteCogCount, 1);
 
