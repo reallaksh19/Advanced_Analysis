@@ -442,25 +442,35 @@ test('B44-T02', 'Eq. (1b) allowable is independently reproduced from declared Sc
   return { expected, actual: expansionEntry.codeResult.allowableStress };
 });
 
-test('B44-T03', 'Expansion stress uses displacement SIFs and excludes pressure', () => {
+test('B44-T03', 'Expansion stress uses displacement SIFs, retains axial resultant, and excludes axial and pressure terms', () => {
   const factors = expansionEntry.codeResult.factors;
   assert.equal(factors.axialIndex, 2);
   assert.equal(factors.torsionalIndex, 3);
   assert.equal(factors.inPlaneSif, 4);
   assert.equal(factors.outOfPlaneSif, 5);
+  assert.notEqual(expectedLocal.fx, 0, 'CASE_RANGE fixture must retain a genuinely nonzero axial resultant');
+  assert.equal(expansionEntry.codeResult.resultants.axialForce, expectedLocal.fx);
+  assert.equal(expansionEntry.codeResult.stressTerms.axial, 0);
   assert.equal(expansionEntry.codeResult.stressTerms.pressure, 0);
   const frameElement = rangeFixture.component.elements
     .find((entry) => entry.elementId === 'RED-001.E1').frameElement;
   const section = reducerSectionResolutionE1();
   const properties = sectionMechanicalProperties(frameElement.section, section);
-  const expectedAxial = (expectedLocal.fx / properties.area) * 2;
   const expectedTorsion = (expectedLocal.mx / properties.polarSectionModulus) * 3;
   const expectedInPlane = (expectedLocal.my / properties.sectionModulus) * 4;
   const expectedOutOfPlane = (expectedLocal.mz / properties.sectionModulus) * 5;
-  assertClose(expansionEntry.codeResult.stressTerms.axial, expectedAxial, 'axial stress');
+  const expectedCalculated = Math.sqrt(
+    expectedTorsion ** 2 + expectedInPlane ** 2 + expectedOutOfPlane ** 2,
+  );
   assertClose(expansionEntry.codeResult.stressTerms.torsional, expectedTorsion, 'torsional stress');
   assertClose(expansionEntry.codeResult.stressTerms.inPlaneBending, expectedInPlane, 'in-plane stress');
   assertClose(expansionEntry.codeResult.stressTerms.outOfPlaneBending, expectedOutOfPlane, 'out-of-plane stress');
+  assertClose(expansionEntry.codeResult.calculatedStress, expectedCalculated, 'Eq. (17) expansion stress');
+  return {
+    retainedAxialForce: expansionEntry.codeResult.resultants.axialForce,
+    axialStressTerm: expansionEntry.codeResult.stressTerms.axial,
+    expectedCalculated,
+  };
 });
 
 test('B44-T04', 'Existing DISPLACEMENT_STRESS_RANGE output is byte-identical with omitted vs explicit-null sustainedStress', () => {

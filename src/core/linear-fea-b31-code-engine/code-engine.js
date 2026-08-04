@@ -260,8 +260,24 @@ export function compileCodeResult({
     outOfPlaneBending: declaredIndices.outOfPlaneBending.value,
   };
 
+  /*
+   * ASME B31.3-2006 para. 319.4.4 Eq. (17) contains bending and torsion only.
+   * Both range categories therefore zero the axial and pressure stress
+   * contributions while retaining the recovered axial force in `resultants`
+   * and the declared axial factor in `factors`. SUSTAINED/OCCASIONAL evaluate
+   * the same expressions and operation order as before this category split.
+   */
+  const axialValue = isRangeCategory
+    ? 0
+    : (resultants.axialForce / mechanicalProperties.area) * indices.axial;
   const pressureValue = isRangeCategory ? 0 : pressureStressContribution.value;
-  const { stressTerms, calculatedStress } = combineStressTerms(resultants, mechanicalProperties, indices, pressureValue);
+  const { stressTerms, calculatedStress } = combineStressTerms(
+    resultants,
+    mechanicalProperties,
+    indices,
+    pressureValue,
+    axialValue,
+  );
 
   const factors = {
     axialIndex: indices.axial,
