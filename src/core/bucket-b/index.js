@@ -4,6 +4,10 @@ export * from './formulation-benchmarks.js';
 export * from './variable-edge-load.js';
 export * from './q8-quality.js';
 export * from './convergence.js';
+export {
+  evaluateConvergence,
+  REFERENCE_BOUND_BOUNDED_OSCILLATION_PROFILE_ID,
+} from './reference-bound-convergence.js';
 export * from './fixed-coordinate-recovery.js';
 export * from './path-and-scl.js';
 export * from './interface-resultants.js';
