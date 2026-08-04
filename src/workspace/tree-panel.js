@@ -86,11 +86,19 @@ export class TreePanel {
   }
 
   applyTopologyEditSelection(payload) {
+    // The authoritative selection event also establishes the active projection;
+    // it must not depend on relative delivery order with the separate mode event.
+    this.topologyEditSelectionActive = true;
+    this.listElement?.setAttribute('aria-multiselectable', 'true');
     this.selectedEntityIds = new Set(payload.workspaceEntityIds ?? []);
     this.selectedEntityId = String(payload.primaryWorkspaceEntityId || '');
     this.selectionAnchorEntityId = String(
       payload.anchorWorkspaceEntityId || this.selectedEntityId || '',
     );
+    this.rootElement.dataset.topologyEditSelectionWorkspaceIds =
+      [...this.selectedEntityIds].sort().join(',');
+    this.rootElement.dataset.topologyEditSelectionPrimaryWorkspaceId =
+      this.selectedEntityId;
     revealSelectionId(this, this.selectedEntityId);
     renderVisibleItems(this);
   }
