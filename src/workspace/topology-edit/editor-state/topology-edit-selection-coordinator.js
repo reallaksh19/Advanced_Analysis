@@ -126,13 +126,6 @@ export class TopologyEditSelectionCoordinator {
       anchorId,
       orderedCanonicalIds: request.action === 'RANGE' ? canonicalIds : undefined,
     };
-    if (request.action === 'RANGE') {
-      return this.store.getState().actions.replaceSelection(
-        canonicalIds,
-        request.source,
-        { primaryId, anchorId },
-      );
-    }
     return this.store.getState().actions.applySelectionRequest(normalizedRequest);
   }
 
