@@ -85,6 +85,7 @@ export function clearThreeSceneObjects(backend) {
   backend.sceneResourcePool?.dispose();
   backend.sceneResourcePool = null;
   backend.sceneResourceEvidence = null;
+  backend.lastFirstMeaningfulFrameDatasetId = '';
 }
 
 export function updateThreeHostMetadata(backend) {
@@ -151,6 +152,7 @@ function installCompiledThreeModel(backend, model, compiled) {
     [backend.supportGroup, compiled.supportObjects],
     [backend.diagnosticGroup, compiled.diagnosticObjects],
   ];
+  const previousObjects = additions.flatMap(([group]) => [...group.children]);
   const added = [];
   try {
     additions.forEach(([group, objects]) => objects.forEach((object) => {
@@ -162,11 +164,6 @@ function installCompiledThreeModel(backend, model, compiled) {
     throw error;
   }
 
-  const previousObjects = [
-    ...backend.physicalGroup.children.filter((object) => !compiled.physicalObjects.includes(object)),
-    ...backend.supportGroup.children.filter((object) => !compiled.supportObjects.includes(object)),
-    ...backend.diagnosticGroup.children.filter((object) => !compiled.diagnosticObjects.includes(object)),
-  ];
   previousObjects.forEach((object) => {
     object.parent?.remove(object);
     disposeThreeEngineeringObject(object);
