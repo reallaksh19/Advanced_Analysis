@@ -1,11 +1,14 @@
 export const AUTHORIZED_ENRICHMENT_WORKSPACE_API_METHODS = Object.freeze([
+  'configureAuthorizedEmpiricalLoads',
   'executeAuthorizedEmpiricalLoads',
+  'getAuthorizedEmpiricalLoadState',
   'downloadAuthorizedEnrichedStagedJson',
 ]);
 
 export function createAuthorizedEnrichmentWorkspaceApi({
   documentRef,
   controller,
+  onEmpiricalAuthorizationChanged = () => {},
   onEmpiricalChanged,
   onEmpiricalFailed,
 }) {
@@ -15,7 +18,10 @@ export function createAuthorizedEnrichmentWorkspaceApi({
       'AUTHORIZED_ENRICHMENT_WORKSPACE_DOCUMENT_INVALID',
     );
   }
-  if (!controller || typeof controller.executeEmpirical !== 'function') {
+  if (!controller
+      || typeof controller.configureEmpirical !== 'function'
+      || typeof controller.executeEmpirical !== 'function'
+      || typeof controller.getEmpiricalAuthorizationState !== 'function') {
     throw codedTypeError(
       'An authorized empirical consumer controller is required.',
       'AUTHORIZED_ENRICHMENT_WORKSPACE_CONTROLLER_INVALID',
@@ -27,20 +33,41 @@ export function createAuthorizedEnrichmentWorkspaceApi({
       'AUTHORIZED_ENRICHMENT_WORKSPACE_CONTROLLER_INVALID',
     );
   }
+  requireCallback(onEmpiricalAuthorizationChanged, 'onEmpiricalAuthorizationChanged');
   requireCallback(onEmpiricalChanged, 'onEmpiricalChanged');
   requireCallback(onEmpiricalFailed, 'onEmpiricalFailed');
 
+  function configure(request) {
+    let state;
+    try {
+      state = controller.configureEmpirical(request);
+    } catch (error) {
+      onEmpiricalFailed(error);
+      throw error;
+    }
+    onEmpiricalAuthorizationChanged(state);
+    return state;
+  }
+
   return Object.freeze({
-    executeAuthorizedEmpiricalLoads(request) {
+    configureAuthorizedEmpiricalLoads(request) {
+      return configure(request);
+    },
+    executeAuthorizedEmpiricalLoads(request = undefined) {
+      if (request !== undefined) configure(request);
       let result;
       try {
-        result = controller.executeEmpirical(request);
+        result = controller.executeEmpirical();
       } catch (error) {
         onEmpiricalFailed(error);
         throw error;
       }
       onEmpiricalChanged(result);
+      onEmpiricalAuthorizationChanged(controller.getEmpiricalAuthorizationState());
       return result;
+    },
+    getAuthorizedEmpiricalLoadState() {
+      return controller.getEmpiricalAuthorizationState();
     },
     downloadAuthorizedEnrichedStagedJson(request, runtime) {
       return controller.downloadStagedJson(request, documentRef, runtime);
