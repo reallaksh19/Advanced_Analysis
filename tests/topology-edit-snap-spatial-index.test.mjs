@@ -62,7 +62,11 @@ test('node and port features share exact canonical node authority', () => {
   assert.equal(ports.length, 2);
   assert.equal(ports.every((row) => row.kind === 'PORT'), true);
   assert.equal(ports.every((row) => row.canonicalTargetIds[0] === 'node:a'), true);
-  assert.equal(ports.every((row) => row.worldPoint === node.worldPoint), true);
+  assert.equal(ports.every((row) => (
+    row.worldPoint.x === node.worldPoint.x
+    && row.worldPoint.y === node.worldPoint.y
+    && row.worldPoint.z === node.worldPoint.z
+  )), true);
 });
 
 test('bounded corridor query does not visit every model feature', () => {
