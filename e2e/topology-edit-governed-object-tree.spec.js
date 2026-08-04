@@ -40,7 +40,7 @@ test('canonical tree selects every object kind and splits an edge through govern
     const supportRow = tree.locator(`[data-canonical-id="${supportId}"]`);
     await supportRow.locator('[data-object-tree-select]').click();
     await expect(host).toHaveAttribute('data-topology-edit-selection-primary-id', supportId);
-    await expect(host).toHaveAttribute('data-topology-edit-selection-source', 'object-tree');
+    await expect(host).toHaveAttribute('data-topology-edit-selection-source', 'tree');
     await expect(supportRow.locator('[data-object-tree-action]')).toHaveCount(0);
   }
 
@@ -48,7 +48,7 @@ test('canonical tree selects every object kind and splits an edge through govern
   const edgeRow = tree.locator(`[data-canonical-id="${target.id}"]`);
   await edgeRow.locator('[data-object-tree-select]').click();
   await expect(host).toHaveAttribute('data-topology-edit-selection-primary-id', target.id);
-  await expect(host).toHaveAttribute('data-topology-edit-selection-source', 'object-tree');
+  await expect(host).toHaveAttribute('data-topology-edit-selection-source', 'tree');
   await expect(edgeRow.locator('[data-object-tree-action="split-edge-half"]')).toHaveCount(1);
 
   await edgeRow.locator('[data-object-tree-action="split-edge-half"]').click();
