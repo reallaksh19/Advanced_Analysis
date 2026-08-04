@@ -35,14 +35,23 @@ jobs:
           git mv scripts/lfea-b3.19-bm1-friction.mjs scripts/m025-bm1-friction.mjs
           git mv scripts/lfea-b3.19-bm1-friction-check.mjs scripts/m025-bm1-friction-check.mjs
           perl -pi -e 's/lfea-b3\.19-bm1-friction/m025-bm1-friction/g' scripts/m025-bm1-friction-check.mjs scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs
-          node --input-type=module <<'NODE'
+          node --input-type=module <<'CHECKER'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const file = 'scripts/m025-bm1-friction-check.mjs';
+          let text = readFileSync(file, 'utf8');
+          const before = `assert.equal(packageJson.scripts['check:lfea-b3.19'], 'node scripts/m025-bm1-friction-check.mjs');\nassert.equal(packageJson.scripts['check:lfea-b3.19:mechanics'], 'node scripts/m025-bm1-friction-check.mjs --mechanics-only');\nassert.ok(packageJson.scripts['check:lfea-linear-core'].includes('npm run check:lfea-b3.19'));`;
+          const after = `assert.equal(packageJson.scripts['check:m025-bm1-friction'], 'node scripts/m025-bm1-friction-check.mjs');\nassert.equal(packageJson.scripts['check:m025-bm1-friction:mechanics'], 'node scripts/m025-bm1-friction-check.mjs --mechanics-only');\nassert.equal(packageJson.scripts['check:lfea-b3.19'], 'node scripts/lfea-b3.19-b31-factor-calculator-check.mjs');\nassert.ok(!packageJson.scripts['check:lfea-linear-core'].includes('check:m025-bm1-friction'));`;
+          if (!text.includes(before)) throw new Error('M025 checker package assertion block drifted.');
+          writeFileSync(file, text.replace(before, after));
+          CHECKER
+          node --input-type=module <<'PACKAGE'
           import { readFileSync, writeFileSync } from 'node:fs';
           const file = 'package.json';
           const packageJson = JSON.parse(readFileSync(file, 'utf8'));
           packageJson.scripts['check:m025-bm1-friction'] = 'node scripts/m025-bm1-friction-check.mjs';
           packageJson.scripts['check:m025-bm1-friction:mechanics'] = 'node scripts/m025-bm1-friction-check.mjs --mechanics-only';
           writeFileSync(file, `${JSON.stringify(packageJson)}\n`);
-          NODE
+          PACKAGE
           test "$(node -p "require('./package.json').scripts['check:lfea-b3.19']")" = "node scripts/lfea-b3.19-b31-factor-calculator-check.mjs"
 
       - uses: actions/setup-node@v4
