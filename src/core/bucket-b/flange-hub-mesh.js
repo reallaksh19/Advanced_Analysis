@@ -12,18 +12,14 @@ export const FLANGE_HUB_MESH_LEVELS = deepFreeze([
 ]);
 
 const Q = 1e-12;
-const RT = 92.32274598504;
-const STRIP_V = Object.freeze([0, 0.118, (60 - 50) / (RT - 50), (65 - 50) / (RT - 50), 0.5, 0.7, 0.85, 1]);
-const RING_V = Object.freeze([0, (95 - RT) / (120 - RT), 0.125, 0.25, 0.5, 0.75, 1]);
+const LOWER_V = Object.freeze([0, 0.118, 0.25, 0.4, 0.55, 0.7, 0.85, 1]);
+const UPPER_V = Object.freeze([0, 1 / 14, 1 / 7, 3 / 14, 0.35, 0.5, 9 / 14, 0.8, 1]);
 const BLOCKS = Object.freeze([
   { id: 'FH-B00', kind: 'STRIP', segment: 'PIPE', nu: 16 },
   { id: 'FH-B01', kind: 'STRIP', segment: 'SMALL_ARC', nu: 4 },
   { id: 'FH-B02', kind: 'STRIP', segment: 'HUB_SMALL', nu: 4 },
-  { id: 'FH-B03', kind: 'STRIP', segment: 'HUB_MID', nu: 4 },
-  { id: 'FH-B04', kind: 'STRIP', segment: 'HUB_LARGE', nu: 4 },
-  { id: 'FH-B05', kind: 'STRIP', segment: 'LARGE_ARC', nu: 4 },
-  { id: 'FH-B06', kind: 'CORE', nu: 4 },
-  { id: 'FH-B07', kind: 'RING', nu: 4 },
+  { id: 'FH-B03', kind: 'STRIP', segment: 'HUB_MID', nu: 8 },
+  { id: 'FH-B04', kind: 'UPPER_COONS', nu: 32 },
 ]);
 
 export function createFlangeHubMesh(levelId, geometry = createCanonicalFlangeHubGeometry()) {
@@ -37,7 +33,7 @@ export function createFlangeHubMesh(levelId, geometry = createCanonicalFlangeHub
 
   BLOCKS.forEach((block) => {
     const us = uniform(block.nu * level.refinement);
-    const vs = refine(block.kind === 'RING' ? RING_V : STRIP_V, level.refinement);
+    const vs = refine(block.kind === 'UPPER_COONS' ? UPPER_V : LOWER_V, level.refinement);
     const map = blockMap(block, geometry);
     const blockElementIds = [];
     for (let i = 0; i < us.length - 1; i += 1) for (let j = 0; j < vs.length - 1; j += 1) {
@@ -46,13 +42,15 @@ export function createFlangeHubMesh(levelId, geometry = createCanonicalFlangeHub
       const uv = [[u0, v0], [u0, v1], [u1, v1], [u1, v0], [u0, vm], [um, v1], [u1, vm], [um, v0]];
       const keys = uv.map(([u, v]) => registerNode(nodeCandidates, map(u, v), `${block.id}:${num(u)}:${num(v)}`));
       const elementId = `${levelId}-E-${block.id}-I${pad(i)}-J${pad(j)}`;
-      const hotspot = block.id === 'FH-B01' || block.id === 'FH-B05'
+      const midpointOuter = map(um, 1);
+      const hotspot = block.id === 'FH-B01'
         || (block.id === 'FH-B00' && i === us.length - 2)
         || (block.id === 'FH-B02' && i === 0)
-        || (block.id === 'FH-B04' && i === us.length - 2);
+        || (block.id === 'FH-B04' && j === vs.length - 2
+          && midpointOuter.z >= 45 && midpointOuter.z <= 65);
       provisionalElements.push({ elementId, blockId: block.id, keys, hotspot, map, u0, u1, v0, v1, i, j });
       blockElementIds.push(elementId);
-      registerEdges(provisionalEdges, { block, levelId, keys, i, j, lastU: us.length - 2, lastV: vs.length - 2 });
+      registerEdges(provisionalEdges, { block, levelId, keys, i, j, lastU: us.length - 2, lastV: vs.length - 2, map, um, vm });
     }
     blockRows.push({ blockId: block.id, kind: block.kind, longitudinalElementCount: us.length - 1, transverseElementCount: vs.length - 1, elementIds: blockElementIds });
   });
@@ -140,23 +138,66 @@ export function createFlangeHubMeshFamily(geometry = createCanonicalFlangeHubGeo
 }
 
 function blockMap(block, geometry) {
-  if (block.kind === 'CORE') return (u, v) => point(50 + v * (RT - 50), 60 + 30 * u);
-  if (block.kind === 'RING') return (u, v) => point(RT + v * (120 - RT), 60 + 30 * u);
-  const profile = profileFunction(block.segment, geometry);
+  if (block.kind === 'UPPER_COONS') return upperCoonsMap(geometry);
+  const profile = lowerProfile(block.segment, geometry);
   return (u, v) => { const outer = profile(u); return point(50 + v * (outer.r - 50), outer.z); };
 }
-function profileFunction(id, geometry) {
-  const small = geometry.fillets[0]; const large = geometry.fillets[1];
+
+function lowerProfile(id, geometry) {
+  const small = geometry.fillets[0];
   const line = (a, b) => (u) => point(a.r + u * (b.r - a.r), a.z + u * (b.z - a.z));
   const arc = (value) => (u) => { const angle = value.startAngle + value.sweepAngle * u; return point(value.center.r + value.radius * Math.cos(angle), value.center.z + value.radius * Math.sin(angle)); };
   if (id === 'PIPE') return line({ r: 60, z: -100 }, small.firstTangent);
   if (id === 'SMALL_ARC') return arc(small);
   if (id === 'HUB_SMALL') return line(small.secondTangent, { r: 66, z: 0 });
   if (id === 'HUB_MID') return line({ r: 66, z: 0 }, { r: 75.5, z: 30 });
-  if (id === 'HUB_LARGE') return line({ r: 75.5, z: 30 }, large.firstTangent);
-  if (id === 'LARGE_ARC') return arc(large);
-  throw new TypeError(`FH_UNKNOWN_PROFILE:${id}`);
+  throw new TypeError(`FH_UNKNOWN_LOWER_PROFILE:${id}`);
 }
+
+function upperCoonsMap(geometry) {
+  const c00 = point(50, 30);
+  const c01 = point(75.5, 30);
+  const c10 = point(50, 90);
+  const c11 = point(120, 90);
+  const outer = upperOuterBoundary(geometry);
+  const bore = (u) => point(50, 30 + 60 * u);
+  const bottom = (v) => point(50 + 25.5 * v, 30);
+  const top = (v) => point(50 + 70 * v, 90);
+  return (u, v) => {
+    const d0 = bore(u); const d1 = outer(u); const c0 = bottom(v); const c1 = top(v);
+    const bilinearR = (1 - u) * (1 - v) * c00.r + (1 - u) * v * c01.r
+      + u * (1 - v) * c10.r + u * v * c11.r;
+    const bilinearZ = (1 - u) * (1 - v) * c00.z + (1 - u) * v * c01.z
+      + u * (1 - v) * c10.z + u * v * c11.z;
+    return point(
+      (1 - v) * d0.r + v * d1.r + (1 - u) * c0.r + u * c1.r - bilinearR,
+      (1 - v) * d0.z + v * d1.z + (1 - u) * c0.z + u * c1.z - bilinearZ,
+    );
+  };
+}
+
+function upperOuterBoundary(geometry) {
+  const large = geometry.fillets[1];
+  const start = point(75.5, 30);
+  const tangent0 = large.firstTangent;
+  const tangent1 = large.secondTangent;
+  const backEnd = point(120, 60);
+  const topEnd = point(120, 90);
+  const lengths = [distance(start, tangent0), Math.abs(large.sweepAngle) * large.radius, distance(tangent1, backEnd), distance(backEnd, topEnd)];
+  const total = lengths.reduce((sum, value) => sum + value, 0);
+  const cumulative = [0, lengths[0] / total, (lengths[0] + lengths[1]) / total, (lengths[0] + lengths[1] + lengths[2]) / total, 1];
+  return (u) => {
+    if (u <= cumulative[1]) return interpolate(start, tangent0, u / cumulative[1]);
+    if (u <= cumulative[2]) {
+      const local = (u - cumulative[1]) / (cumulative[2] - cumulative[1]);
+      const angle = large.startAngle + large.sweepAngle * local;
+      return point(large.center.r + large.radius * Math.cos(angle), large.center.z + large.radius * Math.sin(angle));
+    }
+    if (u <= cumulative[3]) return interpolate(tangent1, backEnd, (u - cumulative[2]) / (cumulative[3] - cumulative[2]));
+    return interpolate(backEnd, topEnd, (u - cumulative[3]) / (1 - cumulative[3]));
+  };
+}
+
 function registerNode(store, value, owner) {
   const key = keyOf(value);
   const prior = store.get(key);
@@ -164,12 +205,18 @@ function registerNode(store, value, owner) {
   else store.set(key, { r: value.r, z: value.z, owners: new Set([owner]) });
   return key;
 }
-function registerEdges(rows, { block, levelId, keys, i, j, lastU, lastV }) {
-  if (block.kind !== 'RING' && j === 0) rows.push(edge(`${levelId}-${block.id}-BORE-${pad(i)}`, 'FH-BOUNDARY-BORE', [keys[0], keys[7], keys[3]], [-1, 0]));
+function registerEdges(rows, { block, levelId, keys, i, j, lastU, lastV, map, um }) {
+  if (j === 0) rows.push(edge(`${levelId}-${block.id}-BORE-${pad(i)}`, 'FH-BOUNDARY-BORE', [keys[0], keys[7], keys[3]], [-1, 0]));
   if (block.id === 'FH-B00' && i === 0) rows.push(edge(`${levelId}-PIPE-END-${pad(j)}`, 'FH-BOUNDARY-PIPE-END', [keys[0], keys[4], keys[1]], [0, -1]));
-  if ((block.kind === 'CORE' || block.kind === 'RING') && i === lastU) rows.push(edge(`${levelId}-GASKET-${block.id}-${pad(j)}`, 'FH-BOUNDARY-GASKET-FACE', [keys[3], keys[6], keys[2]], [0, 1]));
-  if (block.kind === 'RING' && j === lastV) rows.push(edge(`${levelId}-FLANGE-OD-${pad(i)}`, 'FH-BOUNDARY-FLANGE-OD', [keys[1], keys[5], keys[2]], [1, 0]));
-  if (block.kind === 'STRIP' && j === lastV) rows.push(edge(`${levelId}-${block.id}-OUTER-${pad(i)}`, `FH-BOUNDARY-OUTER-${block.id}`, [keys[1], keys[5], keys[2]], null));
+  if (block.kind === 'UPPER_COONS' && i === lastU) rows.push(edge(`${levelId}-GASKET-${pad(j)}`, 'FH-BOUNDARY-GASKET-FACE', [keys[3], keys[6], keys[2]], [0, 1]));
+  if (j === lastV) {
+    const midpoint = map(um, 1);
+    const boundaryId = block.kind === 'UPPER_COONS' && midpoint.r >= 119.999999 && midpoint.z > 60
+      ? 'FH-BOUNDARY-FLANGE-OD'
+      : `FH-BOUNDARY-OUTER-${block.id}`;
+    const outwardNormal = boundaryId === 'FH-BOUNDARY-FLANGE-OD' ? [1, 0] : null;
+    rows.push(edge(`${levelId}-${block.id}-OUTER-${pad(i)}`, boundaryId, [keys[1], keys[5], keys[2]], outwardNormal));
+  }
 }
 function edge(edgeId, boundaryId, keys, outwardNormal) { return { edgeId, boundaryId, keys, outwardNormal }; }
 function aggregateQuality(rows) {
@@ -191,6 +238,8 @@ function assertConnectivity(elements, nodeById) { elements.forEach((element) => 
 function maxCornerEdge(elements, nodeById) { let result = 0; elements.forEach((element) => { const n = element.nodeIds.slice(0, 4).map((id) => nodeById.get(id)); for (let i = 0; i < 4; i += 1) result = Math.max(result, Math.hypot(n[i].r - n[(i + 1) % 4].r, n[i].z - n[(i + 1) % 4].z)); }); return result; }
 function refine(base, factor) { const result = []; for (let i = 0; i < base.length - 1; i += 1) for (let j = 0; j < factor; j += 1) result.push(base[i] + (base[i + 1] - base[i]) * j / factor); result.push(base.at(-1)); return result; }
 function uniform(count) { return Array.from({ length: count + 1 }, (_, i) => i / count); }
+function interpolate(a, b, t) { return point(a.r + (b.r - a.r) * t, a.z + (b.z - a.z) * t); }
+function distance(a, b) { return Math.hypot(a.r - b.r, a.z - b.z); }
 function point(r, z) { return { r: quantize(r), z: quantize(z) }; }
 function quantize(value) { return Math.round(value / Q) * Q; }
 function keyOf(value) { return `${Math.round(value.r / Q)}:${Math.round(value.z / Q)}`; }
