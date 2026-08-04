@@ -15,8 +15,12 @@ export function renderTopologyEditProfessionalOperationPanel(element, state = {}
   const candidate = state.candidate;
   const validation = state.validation;
   const transaction = state.transaction;
-  const catalogueOptions = (state.catalogue?.records ?? []).map((record) => (
-    `<option value="${attr(record.recordId)}"${record.recordId === values.catalogueRecordId ? ' selected' : ''}>${html(record.recordId)} · ${html(record.componentType)}</option>`
+  const catalogueRecords = filteredCatalogueRecords(
+    state.catalogue?.records ?? [],
+    state.componentContext,
+  );
+  const catalogueOptions = catalogueRecords.map((record) => (
+    `<option value="${attr(record.recordId)}"${record.recordId === values.catalogueRecordId ? ' selected' : ''}>${html(catalogueRecordLabel(record))}</option>`
   )).join('');
   const operationOptions = OPERATIONS.map(([value, label]) => (
     `<option value="${value}"${value === (values.operationType ?? 'EXTEND_EDGE') ? ' selected' : ''}>${label}</option>`
@@ -32,6 +36,7 @@ export function renderTopologyEditProfessionalOperationPanel(element, state = {}
       </div>
       <output aria-live="polite">${html(state.error || state.message || 'Ready.')}</output>
     </header>
+    ${componentHud(state.componentContext)}
     <div class="topology-edit-professional-operation__grid">
       ${field('Operation', select('professional-operation-type', operationOptions))}
       ${field('Edge ID', input('professional-edge-id', values.edgeId))}
@@ -51,7 +56,7 @@ export function renderTopologyEditProfessionalOperationPanel(element, state = {}
       ${field('Slope rise (mm)', input('professional-rise-mm', values.riseMm ?? 1, 'number'))}
       ${field('Slope run (mm)', input('professional-run-mm', values.runMm ?? 100, 'number'))}
       ${field('Slope direction', select('professional-direction', options(['ASCENDING', 'DESCENDING'], values.direction ?? 'ASCENDING')))}
-      ${field('Catalogue record', `<select data-role="professional-catalogue-record"><option value="">Select exact record</option>${catalogueOptions}</select>`)}
+      ${field('Catalogue record', `<select data-role="professional-catalogue-record"${catalogueRecords.length ? '' : ' disabled'}><option value="">${catalogueRecords.length ? 'Select exact record' : 'No matching record'}</option>${catalogueOptions}</select>`)}
     </div>
     <div class="topology-edit-professional-operation__actions" role="toolbar" aria-label="Professional engineering operation actions">
       <button type="button" data-action="plan-professional-operation"${state.catalogue ? '' : ' disabled'}>Plan</button>
@@ -64,6 +69,7 @@ export function renderTopologyEditProfessionalOperationPanel(element, state = {}
     </div>
     <dl class="topology-edit-professional-operation__evidence">
       <div><dt>Catalogue</dt><dd>${html(state.catalogue?.catalogueHash ?? 'unavailable')}</dd></div>
+      <div><dt>Component context</dt><dd>${html(state.componentContext?.contextHash ?? 'none')}</dd></div>
       <div><dt>Plan</dt><dd>${html(plan?.planHash ?? plan?.resultHash ?? 'none')}</dd></div>
       <div><dt>Unresolved</dt><dd>${html(unresolved || 'none')}</dd></div>
       <div><dt>Certified candidate</dt><dd>${html(candidate?.candidateHash ?? 'none')}</dd></div>
@@ -99,6 +105,51 @@ export function readTopologyEditProfessionalOperationValues(element) {
     direction: value('professional-direction'),
     catalogueRecordId: value('professional-catalogue-record'),
   });
+}
+
+function componentHud(context) {
+  if (!context || context.status === 'NO_SELECTION' || context.status === 'UNSUPPORTED') {
+    return '';
+  }
+  const fields = (context.fieldSchema ?? []).map((row) => `
+    <div data-field-key="${attr(row.key)}">
+      <dt>${html(row.label)}</dt>
+      <dd>${html(formatFieldValue(row.value, row.unit))}<small>${html(row.source)}</small></dd>
+    </div>`).join('');
+  const diagnostic = context.diagnostics?.[0]?.message ?? '';
+  return `
+    <section class="topology-edit-component-hud" data-role="topology-edit-component-hud" data-component-type="${attr(context.componentType)}" data-context-status="${attr(context.status)}" aria-label="Selected component engineering context">
+      <header>
+        <div><strong>${html(context.componentType)}</strong><span>${html(context.selectedCanonicalId)}</span></div>
+        <output>${html(context.status)}</output>
+      </header>
+      <p>${html(diagnostic)}</p>
+      <dl>${fields}</dl>
+      <small>${context.candidateRecordIds.length} governed catalogue candidate(s)</small>
+    </section>`;
+}
+
+function filteredCatalogueRecords(records, context) {
+  if (!context?.supported) return records;
+  const ids = new Set(context.candidateRecordIds ?? []);
+  return records.filter((record) => ids.has(record.recordId));
+}
+
+function catalogueRecordLabel(record) {
+  const details = {
+    FLANGE: [record.flangeClass, record.flangeFacing],
+    VALVE: [record.valveType, `${record.valveFaceToFaceMm} mm F2F`],
+    REDUCER: [
+      `${record.nominalSizeMm}→${record.secondaryNominalSizeMm} mm`,
+      record.reducerOrientation,
+    ],
+  }[record.componentType] ?? [record.componentType];
+  return [record.recordId, ...details.filter(Boolean)].join(' · ');
+}
+
+function formatFieldValue(value, unit) {
+  if (value === null || value === undefined || value === '') return 'Unresolved';
+  return unit ? `${value} ${unit}` : String(value);
 }
 
 function field(label, control) {
