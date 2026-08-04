@@ -1110,3 +1110,53 @@ CAESAR II output surfaced it, and doing so also turned two of the
 agent's unverified modeling assumptions (TYPE=0→ANCHOR, the restraint
 mutation table) into independently-confirmed facts rather than
 plausible guesses.
+
+## Canonical FEA input format — Phase 1 dispatched as M021 (#561)
+
+User-directed pivot, 2026-08-04, prompted directly by the M020 review's
+insulation-gap finding above: *"let our FEA has its own input format.
+Inputxml uploaded (from CAESAR export or stagged json import) should be
+resolved to this format. This final input will be ground truth for
+core FEA (like a structured table/xml form which can be shown to
+user)."* Connects directly to already-tracked, still-open phases
+**P1 Staged-JSON canonicalization + overlay** (Benchmark B not started)
+and **P2 Deterministic mechanical model + units** (real, unexercised
+against real data) — not new scope, picking up standing work.
+
+Dispatched a research agent to audit the real current architecture
+before scoping anything (report retained in full in the session
+transcript; key findings, independently significant): the StagedJSON
+side has three separate, half-built M008-A/B/C authority layers with
+zero callers outside their own files anywhere in `src/`, covering
+materials/sections only (never process data — exactly the gap class
+that hit BM1); a schema-compatible bridge
+(`shared-to-canonical-geometry.js`'s `projectSharedPipingModelToCanonical
+Geometry`) already exists targeting the same `canonical-geometry-v1`
+InputXML uses, but has zero callers and ignores the M008 overlay's
+governed resolutions entirely; `linear-fea-model-compiler` (B-2.5) is
+already source-agnostic but in production only reached via the
+InputXML path; a real gap-flagged review UI
+(`src/workspace/lfea-preflight-ui.js`) exists but is orphaned, zero
+importers anywhere. Conclusion: full unification is real, large
+reconciliation work, not a small connecting step.
+
+Given that, proposed a 3-phase split (InputXML-side ground-truth
+document; StagedJSON→canonical unification, tied to the user's own P1
+Benchmark B / P12; an in-app review UI) via `AskUserQuestion` — user
+chose Phase 1 only for now.
+
+Dispatched **M021 (#561)**: package what `inputXmlToCanonicalGeometry`
+already resolves correctly (materials, sections, process conditions,
+restraints — all real, landed in M020) into a genuine, structured,
+gap-flagged review artifact, produced at ingestion time (before any
+solve decision, not entangled with B-3.15's post-solve report) —
+every field explicitly tagged `DECLARED`/`INHERITED` (with source
+element)/`MISSING`, not a bare value beside a prose diagnostics array.
+Acceptance oracle requires BM1's real elements 1–3 to show
+`insulationDensity: MISSING` explicitly — the exact gap an Owner had
+to find by hand this session. Explicitly out of scope: any change to
+solve/gravity behavior (the all-or-nothing insulation policy stays
+exactly as-is — loosening it is a separate, deliberate decision),
+StagedJSON unification (Phase 2), and any in-app UI (Phase 3; JSON/CSV
+export via this repo's existing `sealExportRecord` pattern is the
+"shown to user" surface for this phase).
