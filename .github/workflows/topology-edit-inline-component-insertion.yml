@@ -1,0 +1,77 @@
+name: 3D Edit Inline Component Insertion
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/topology-edit-inline-component-insertion.yml'
+      - 'public/fixtures/topology-edit-professional-spec-catalog.json'
+      - 'src/workspace/topology-edit/topology-edit-command-contract.js'
+      - 'src/workspace/topology-edit/topology-edit-command-resolver.js'
+      - 'src/workspace/topology-edit/topology-edit-pure-reducer.js'
+      - 'src/workspace/topology-edit/topology-edit-command-effect-validator.js'
+      - 'src/workspace/topology-edit/topology-edit-inline-component-command.js'
+      - 'src/workspace/topology-edit/professional/topology-edit-inline-component-operation.js'
+      - 'src/workspace/topology-edit/professional/topology-edit-operation-plan.js'
+      - 'src/workspace/topology-edit/professional/topology-edit-route-operations.js'
+      - 'src/workspace/topology-edit/professional/topology-edit-professional-operation-session.js'
+      - 'src/workspace/viewport-productivity/topology-edit-professional-operation-panel.js'
+      - 'src/workspace/viewport-productivity/topology-edit-professional-operation-state.js'
+      - 'tests/topology-edit-inline-component-insertion.test.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: topology-edit-inline-component-insertion-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inline-component-insertion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify exact source
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+          node --check src/workspace/topology-edit/topology-edit-command-contract.js
+          node --check src/workspace/topology-edit/topology-edit-command-resolver.js
+          node --check src/workspace/topology-edit/topology-edit-pure-reducer.js
+          node --check src/workspace/topology-edit/topology-edit-command-effect-validator.js
+          node --check src/workspace/topology-edit/topology-edit-inline-component-command.js
+          node --check src/workspace/topology-edit/professional/topology-edit-inline-component-operation.js
+          node --check src/workspace/topology-edit/professional/topology-edit-operation-plan.js
+          node --check src/workspace/topology-edit/professional/topology-edit-route-operations.js
+          node --check src/workspace/topology-edit/professional/topology-edit-professional-operation-session.js
+          node --check src/workspace/viewport-productivity/topology-edit-professional-operation-panel.js
+          node --check src/workspace/viewport-productivity/topology-edit-professional-operation-state.js
+          node --check tests/topology-edit-inline-component-insertion.test.mjs
+          git diff --check
+
+      - name: Execute inline insertion and transaction contracts
+        run: |
+          node --test \
+            tests/topology-edit-inline-component-insertion.test.mjs \
+            tests/topology-edit-professional-operation-transaction.test.mjs \
+            tests/topology-edit-professional-engineering-catalog.test.mjs \
+            tests/topology-edit-professional-engineering-compatibility.test.mjs \
+            tests/topology-edit-component-hud-context.test.mjs
