@@ -87,7 +87,13 @@ test('tree modifier selection is deterministic and dataset replacement clears it
   ));
   expect(toggledIds).toHaveLength(selectedIds.length - 1);
 
+  const datasetSessionBefore = Number(
+    await host.getAttribute('data-topology-edit-dataset-session-version'),
+  );
   await page.locator('[data-action="load-topology-edit-demo"]').click();
+  await expect.poll(async () => Number(
+    await host.getAttribute('data-topology-edit-dataset-session-version'),
+  )).toBeGreaterThan(datasetSessionBefore);
   await expect.poll(() => host.getAttribute('data-topology-edit-selection-ids')).toBe('');
   evidence.modifiers = 'PASS';
   evidence.datasetReset = 'PASS';
@@ -126,6 +132,10 @@ async function openProductionController(page) {
   await expect(host).toBeVisible();
   await expect(host).toHaveAttribute('data-topology-edit-clean-shell', 'true');
   await expect(host).toHaveAttribute('data-topology-edit-selection-revision', '0');
+  await expect(host).toHaveAttribute(
+    'data-topology-edit-dataset-session-version',
+    /\d+/,
+  );
   return host;
 }
 
