@@ -17,7 +17,8 @@ The P0 branch was synchronized with current `main` after M003 bounds stabilizati
 ## Implemented P0 evidence path
 
 ```text
-repository fixture bytes
+repository or explicitly bound content-addressed fixture bytes
+  -> governed fixture authority manifest
   -> scripts/run-non-fea-current-main-baseline.mjs
   -> production normalizeWorkspaceDataset
   -> WorkspaceState publication
@@ -26,6 +27,7 @@ repository fixture bytes
   -> model-zone projection
   -> resolved engineering geometry
   -> viewport render model
+  -> exact SHA/identity disposition
   -> reports/non-fea-current-main-baseline.json
 ```
 
@@ -41,7 +43,7 @@ The runner also records the registered command ladder and retains failures inste
 6. Ordinary `renderThreeModel()` clears all engineering scene objects, recreates primitives, rebuilds the exact object map, and fits the first model.
 7. Selection flattens all object arrays for raycasting on each qualified pick.
 8. The topology-edit route is separate and uses canonical topology plus a certified immutable journal/replay boundary.
-9. M005 pooling/instancing and M006 orientation presentation are now current production ancestry and must be measured by P1/P4; their merge narratives do not substitute for exact-head browser and identity qualification.
+9. M005 pooling/instancing and M006 orientation presentation are current production ancestry and must be measured by P1/P4; merge narratives do not substitute for exact-head browser and identity qualification.
 10. Authorized enrichment and empirical execution exist, but the production bypass inventory remains open.
 11. `SupportLoadPresenter` enforces qualified LFEA, current empirical OPE, then sealed first-cut priority. Ordinary WebGL support-load callouts remain an open P7 gap.
 
@@ -53,35 +55,46 @@ The Node runner cannot produce browser-only timings for Three materialization, G
 
 Canonical topology/checker/edit transition proof remains in the registered topology-edit test ladder and must be retained as command evidence. P0 does not reconstruct a second topology path.
 
-## Fixture gate
+## Governed fixture authority
 
-P0 expects these repository fixtures:
+Fixture custody is defined in `scripts/non-fea-baseline/fixture-authority-manifest.mjs`. Repository defaults are executed automatically; a CLI binding overrides a default only for that role. Every bound source is hashed and its production identity is compared field-by-field.
 
-- `benchmarks/ATTRIBUTE-AML_ASIM-1835_managed_stage_enriched_stage.json`
-- `benchmarks/Sjson.json`
-- `benchmarks/1885Sjson/EnrichedSjson`
+### Repository-owned 20-object topology-edit fixture
 
-The exact repository paths for these roles must be accepted before P0 completion:
+- Path: `public/fixtures/topology-edit-20-element-demo.staged.json`
+- Expected identity: 20 normalized entities, 15 piping objects, 5 supports
+- Authority: production Playwright walkthrough and the fixture's own declared demo identity
+- Current gate: exact source SHA-256 is captured by the runner but remains `CAPTURED_PENDING_OWNER_ACCEPTANCE` until frozen in the authority manifest
 
-- 20-object topology-edit fixture;
-- portable 4,884-entity/current equivalent large model;
-- real 1885 support/branch fixture.
+### Repository-owned 1885 support/branch fixture
 
-Bind each role with repeated `--fixture-role ROLE=repository/path` arguments. The runner validates the role vocabulary, rejects duplicate bindings, rejects absolute/upward-traversing paths, automatically includes bound paths in the executed fixture set, and records the exact SHA-256 and normalized identity. A missing path or unclear authority is `MISSING_AUTHORITY`, not an invitation to generate a synthetic replacement.
+- Path: `benchmarks/Sjson.json`
+- Accepted SHA-256: `6b2c8b01ab0ba6ec8e9e7c42eb4a719668ffd2dc4dbe4790d27cf426a1f60288`
+- Expected identity: 279 entities, 139 support source records, 38 support assemblies, 37 physical locations, 13 routes, 150 renderables
+- Authority: `tests/fixtures/topology-edit/1885s/fixture-manifest.json` and accepted M005 production-adapter certification
+
+### External content-addressed 4,884-entity fixture
+
+- Expected SHA-256: `88e62782772d743e9236d13775476826f9649ab06d3161de35dc500baa85a9c6`
+- Expected identity: 4,884 entities, 3,277 pipes, 1,331 supports
+- Authority: accepted real-project benchmark evidence
+- Current gate: source bytes are not repository-owned; bind an exact repository-relative cache path with `--fixture-role LARGE_MODEL_4884_ENTITY=<path>`
+
+The runner raises named failures for unbound authority, missing files, unexecuted bindings, absent accepted SHA, SHA mismatch, and production identity mismatch. It never substitutes a generated fixture for these roles.
 
 ## Required exact-head execution
 
 ```bash
 npm ci
-node --test tests/non-fea-p0-route-map.test.mjs
+node --test tests/non-fea-p0-*.test.mjs
 node scripts/run-non-fea-current-main-baseline.mjs \
   --warm-samples 5 \
-  --fixture-role TOPOLOGY_EDIT_20_OBJECT=<accepted-repository-path> \
-  --fixture-role LARGE_MODEL_4884_ENTITY=<accepted-repository-path> \
-  --fixture-role REAL_1885_SUPPORT_BRANCH=<accepted-repository-path> \
+  --fixture-role LARGE_MODEL_4884_ENTITY=<content-addressed-repository-relative-cache-path> \
   --run-commands \
   --fail-on-gate
 ```
+
+The 20-object and 1885 repository paths are executed automatically. A CLI override remains available for controlled custody testing but must satisfy the same SHA and identity rules.
 
 Run the browser navigation proof with a working system browser and retain the raw Playwright output, browser/channel, worker count, fixture identity, performance marks, long-task entries, one-canvas count, and page errors.
 
@@ -90,8 +103,10 @@ Run the browser navigation proof with a working system browser and retain the ra
 P0 is accepted only when:
 
 - exact head and clean/dirty status are recorded;
-- every required fixture role is bound to an exact path and SHA-256;
-- stage/command/browser evidence is present;
+- the 20-object captured SHA is explicitly accepted and frozen;
+- the external 4,884 source is bound and verifies its accepted SHA/identity;
+- the 1885 source verifies its accepted SHA/identity;
+- stage, command, and browser evidence is present;
 - all failures are classified exactly once;
 - the ownership matrix is accepted;
 - no P0-authored production file changed;

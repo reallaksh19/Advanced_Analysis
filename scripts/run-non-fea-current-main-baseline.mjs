@@ -15,19 +15,23 @@ import { NON_FEA_P0_COMMANDS, runNonFeaP0Command } from './non-fea-baseline/comm
 import { summarizeNonFeaStages } from './non-fea-baseline/statistics.mjs';
 import { parseNonFeaBaselineArguments } from './non-fea-baseline/runner-options.mjs';
 import { resolveNonFeaFixtureRoleBindings } from './non-fea-baseline/fixture-role-bindings.mjs';
+import { nonFeaFixtureExecutionPaths } from './non-fea-baseline/fixture-authority-manifest.mjs';
 import { executeNonFeaFixtureSample } from './non-fea-baseline/fixture-sample-runner.mjs';
+import { createNonFeaEnvironmentEvidence } from './non-fea-baseline/environment-evidence.mjs';
+import { requireNonFeaBaselineReport } from './non-fea-baseline/baseline-report-validator.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const options = parseNonFeaBaselineArguments(process.argv.slice(2));
 const exactHeadSha = gitValue(['rev-parse', 'HEAD']);
-const programmeBaseSha = gitValue(['merge-base', 'HEAD', 'main']) || '7a6cfadb2c898ddac8cb2dba09b7d400ff800696';
+const programmeBaseSha = currentMainMergeBase();
 const executionId = options.executionId || `p0-${exactHeadSha.slice(0, 12) || 'unknown'}`;
 const failures = [];
 const fixtureRuns = [];
 const fixtureLedger = [];
 assertNonFeaRouteInventory();
 
-for (const fixture of options.fixtures) {
+const fixturePaths = nonFeaFixtureExecutionPaths(options.fixtures, options.fixtureRoles);
+for (const fixture of fixturePaths) {
   const fixturePath = path.resolve(ROOT, fixture);
   const repositoryPath = normalizePath(path.relative(ROOT, fixturePath));
   let metadata;
@@ -54,7 +58,7 @@ for (const fixture of options.fixtures) {
     ...metadata,
     sourceSha256: cold.fixture.sourceSha256,
     declaredUse: ['normalization', 'support-sites', 'route-partition', 'resolved-geometry', 'render-model'],
-    realOrSimulated: 'REAL_REPOSITORY_FIXTURE',
+    realOrSimulated: 'REAL_REPOSITORY_OR_EXPLICIT_FIXTURE',
     expectedIdentity: cold.fixture.identity,
     authorityNotes: cold.fixture.authorityNotes,
   });
@@ -65,7 +69,7 @@ for (const fixture of options.fixtures) {
   }
 }
 
-const roleResolution = resolveNonFeaFixtureRoleBindings(options.fixtureRoles, fixtureLedger);
+const roleResolution = resolveNonFeaFixtureRoleBindings(options.fixtureRoles, fixtureLedger, fixtureRuns);
 failures.push(...roleResolution.failures);
 const commandRuns = options.runCommands ? NON_FEA_P0_COMMANDS.map((row) => runNonFeaP0Command(row, ROOT)) : [];
 if (!options.runCommands) failures.push(nonFeaFailure({
@@ -90,29 +94,30 @@ for (const stageId of ['THREE_MATERIALIZATION', 'GPU_SCENE_INSTALL', 'FIT', 'FIR
   }));
 }
 
-const report = {
+const report = requireNonFeaBaselineReport({
   schema: NON_FEA_BASELINE_SCHEMA,
   status: failures.length === 0 ? 'PASS' : 'UNRESOLVED_GATE',
   planPreparationBaseSha: '0bad5b4200a8e24a358e76b1ea8372da33485c87',
   programmeBaseSha,
-  exactHeadSha: exactHeadSha || null,
+  exactHeadSha,
   dirtyStatus: gitValue(['status', '--short']),
   executionId,
   generatedAt: new Date().toISOString(),
+  environment: createNonFeaEnvironmentEvidence(),
   routeInventory: NON_FEA_PRODUCTION_ROUTE_INVENTORY,
   fixtureLedger: fixtureLedger.sort((left, right) => codeUnitCompare(left.path, right.path)),
   fixtureRoleBindings: roleResolution.bindings,
   fixtureRuns,
   stageStatistics: summarizeNonFeaStages(fixtureRuns),
   commandRuns,
-  failures,
+  failures: dedupeFailures(failures),
   observabilityGaps: [
     'SOURCE_SNAPSHOT, SOURCE_INDEX, entity normalization, and SHARED_MODEL are currently measured only inside composite NORMALIZATION.',
     'Browser-only Three materialization, GPU install, fit, first meaningful frame, first pick, orbit/pan, and long tasks require the Playwright ledger.',
     'Canonical topology/checker/edit transactions are exercised by registered tests, not reconstructed from the normalization runner.',
   ],
   sourceMutationDisposition: failures.some((row) => row.code === 'P0_SOURCE_MUTATED') ? 'FAIL' : 'NO_MUTATION_OBSERVED_IN_COMPLETED_SAMPLES',
-};
+});
 
 await mkdir(path.dirname(path.resolve(ROOT, options.output)), { recursive: true });
 await writeFile(path.resolve(ROOT, options.output), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
@@ -120,16 +125,33 @@ console.log(JSON.stringify({
   schema: report.schema,
   status: report.status,
   exactHeadSha: report.exactHeadSha,
+  programmeBaseSha: report.programmeBaseSha,
   executionId: report.executionId,
   fixtureCount: report.fixtureLedger.length,
-  boundFixtureRoleCount: report.fixtureRoleBindings.filter((row) => row.status === 'BOUND').length,
+  verifiedFixtureRoleCount: report.fixtureRoleBindings.filter((row) => row.status === 'VERIFIED').length,
   runCount: report.fixtureRuns.length,
   failureCount: report.failures.length,
   output: options.output,
 }, null, 2));
 if (options.failOnGate && report.status !== 'PASS') process.exitCode = 1;
 
+function currentMainMergeBase() {
+  for (const ref of ['origin/main', 'main']) {
+    const value = gitValue(['merge-base', 'HEAD', ref]);
+    if (value) return value;
+  }
+  return '';
+}
 function gitValue(args) {
   try { return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim(); } catch { return ''; }
 }
 function normalizePath(value) { return value.split(path.sep).join('/'); }
+function dedupeFailures(rows) {
+  const seen = new Set();
+  return rows.filter((row) => {
+    const key = JSON.stringify(row);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}

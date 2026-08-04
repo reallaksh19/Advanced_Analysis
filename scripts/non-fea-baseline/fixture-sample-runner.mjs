@@ -24,6 +24,7 @@ export async function executeNonFeaFixtureSample({ fixturePath, fixture, executi
   let rawBeforeHash = null;
   let rawAfterHash = null;
   let products = {};
+  let identity = {};
   try {
     bytes = await recorder.capture('FILE_READ', () => readFile(fixturePath));
     sourceSha256 = sha256(bytes);
@@ -57,6 +58,20 @@ export async function executeNonFeaFixtureSample({ fixturePath, fixture, executi
       renderModel: semanticHash(renderModel),
       diagnostics: semanticHash({ skippedEntityIds: renderModel.skippedEntityIds, summary: renderModel.summary }),
     };
+    identity = {
+      datasetId: dataset.datasetId,
+      sourceSchema: dataset.sourceSchema,
+      entityCount: dataset.entities.length,
+      pipeCount: dataset.summary.pipes,
+      supportCount: dataset.summary.supports,
+      componentCount: dataset.summary.components,
+      supportSourceRecordCount: supportSites.summary.sourceSupportRecordCount,
+      supportAssemblyCount: supportSites.summary.supportAssemblyCount,
+      supportPhysicalLocationCount: supportSites.summary.physicalLocationCount,
+      routeCount: routes.summary.routeCount,
+      renderableCount: renderModel.summary.renderableCount,
+      diagnosticCount: renderModel.diagnosticPrimitives.length,
+    };
   } catch {
     // The stage recorder owns exact failure evidence; P0 still writes the full ledger.
   } finally {
@@ -65,10 +80,15 @@ export async function executeNonFeaFixtureSample({ fixturePath, fixture, executi
   return Object.freeze({
     fixture: Object.freeze({
       sourceSha256,
-      identity: dataset ? { datasetId: dataset.datasetId, entityCount: dataset.entities.length, sourceSchema: dataset.sourceSchema } : {},
+      identity,
       authorityNotes: dataset ? ['Normalized through production normalizeWorkspaceDataset.'] : ['Production normalization did not complete.'],
     }),
-    run: Object.freeze({ ...recorder.snapshot(), products, sourceHashes: { before: rawBeforeHash, after: rawAfterHash, bytes: sourceSha256 } }),
+    run: Object.freeze({
+      ...recorder.snapshot(),
+      identity: Object.freeze(identity),
+      products,
+      sourceHashes: { before: rawBeforeHash, after: rawAfterHash, bytes: sourceSha256 },
+    }),
   });
 }
 

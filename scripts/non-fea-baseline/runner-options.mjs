@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { NON_FEA_FIXTURE_AUTHORITIES } from './fixture-authority-manifest.mjs';
 
 export const NON_FEA_DEFAULT_FIXTURES = Object.freeze([
   'benchmarks/ATTRIBUTE-AML_ASIM-1835_managed_stage_enriched_stage.json',
@@ -6,11 +7,9 @@ export const NON_FEA_DEFAULT_FIXTURES = Object.freeze([
   'benchmarks/1885Sjson/EnrichedSjson',
 ]);
 
-export const NON_FEA_REQUIRED_FIXTURE_ROLES = Object.freeze([
-  'TOPOLOGY_EDIT_20_OBJECT',
-  'LARGE_MODEL_4884_ENTITY',
-  'REAL_1885_SUPPORT_BRANCH',
-]);
+export const NON_FEA_REQUIRED_FIXTURE_ROLES = Object.freeze(
+  NON_FEA_FIXTURE_AUTHORITIES.map((row) => row.role),
+);
 
 export function parseNonFeaBaselineArguments(args) {
   const fixtures = [];
@@ -39,7 +38,15 @@ export function parseNonFeaBaselineArguments(args) {
   for (const fixturePath of Object.values(fixtureRoles)) {
     if (!selectedFixtures.includes(fixturePath)) selectedFixtures.push(fixturePath);
   }
-  return Object.freeze({ fixtures: selectedFixtures, fixtureRoles, output, warmSamples, executionId, runCommands, failOnGate });
+  return Object.freeze({
+    fixtures: Object.freeze(selectedFixtures),
+    fixtureRoles: Object.freeze({ ...fixtureRoles }),
+    output,
+    warmSamples,
+    executionId,
+    runCommands,
+    failOnGate,
+  });
 }
 
 function parseFixtureRoleBinding(value) {
