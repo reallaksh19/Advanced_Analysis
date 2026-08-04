@@ -95,25 +95,27 @@ async function openFinalAuditController(page) {
     globalThis.AnalysisWorkspace?.getSnapshot?.()?.dataset?.entities?.length ?? 0
   ))).toBe(20);
 
-  await page.getByRole('button', { name: '3D Edit', exact: true }).click();
-  const host = page.locator('[data-role="topology-edit-render-host"]');
-  await expect(host).toBeVisible();
-  await expect(host).toHaveAttribute('data-topology-edit-clean-shell', 'true');
-
   await page.evaluate(async (key) => {
-    const moduleUrl = (path) => new URL(`src/${path}`, document.baseURI).href;
-    const { APPLICATION_EVENTS } = await import(moduleUrl('workspace/event-topics.js'));
-    globalThis.EventBus.publish(APPLICATION_EVENTS.CHANGED, {
-      state: { activeViewId: 'TOPOLOGY_EDIT_TOOL_AUDIT' },
+    const moduleUrl = new URL(
+      'src/workspace/topology-edit-3d-professional-controller.js',
+      document.baseURI,
+    ).href;
+    const { TopologyEdit3DViewController } = await import(moduleUrl);
+    const prototype = TopologyEdit3DViewController.prototype;
+    if (prototype.__toolAuditActivateWrapped) return;
+    const activate = prototype.activate;
+    prototype.activate = async function auditedActivate(...args) {
+      globalThis[key] = this;
+      return activate.apply(this, args);
+    };
+    Object.defineProperty(prototype, '__toolAuditActivateWrapped', {
+      value: true,
+      configurable: true,
     });
-    const { TopologyEdit3DViewController } = await import(
-      moduleUrl('workspace/topology-edit-3d-professional-controller.js')
-    );
-    const controller = new TopologyEdit3DViewController(globalThis.EventBus);
-    globalThis[key] = controller;
-    await controller.activate();
   }, CONTROLLER_KEY);
 
+  await page.getByRole('button', { name: '3D Edit', exact: true }).click();
+  const host = page.locator('[data-role="topology-edit-render-host"]');
   await expect(host).toBeVisible();
   await expect(host).toHaveAttribute('data-topology-edit-clean-shell', 'true');
   await expect(host).toHaveAttribute('data-topology-edit-active-command-count', '0');
