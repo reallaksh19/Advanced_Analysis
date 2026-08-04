@@ -25,8 +25,6 @@ const COMMAND_SCENARIOS = Object.freeze([
   { actionId: 'delete-edge', kind: 'edge' },
 ]);
 
-// This audit intentionally uses the real WebGL backend. Do not replace it with
-// the canvas2d qualification fallback used by older walkthroughs.
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 1050 });
   await page.addInitScript(() => globalThis.localStorage?.clear());
@@ -38,18 +36,17 @@ test('real WebGL picks enable the exact governed edit tools', async ({ page }) =
   await expectDisabled(page, ALL_ACTIONS);
   const targets = await visibleSelectionTargets(page);
 
-  await clickPoint(page, targets.edge.point);
+  await selectVisibleTarget(page, targets, 'edge');
   await expect(statusOutput(page)).toContainText(`Selected edge ${targets.edge.id}.`);
   await expectEnabled(page, EDGE_ACTIONS);
   await expectDisabled(page, ['move-positive-z', ...TWO_NODE_ACTIONS]);
 
-  await clickPoint(page, targets.singleNode.point);
+  await selectVisibleTarget(page, targets, 'single-node');
   await expect(statusOutput(page)).toContainText(`Selected node ${targets.singleNode.id}.`);
   await expectEnabled(page, ['move-positive-z']);
   await expectDisabled(page, [...TWO_NODE_ACTIONS, ...EDGE_ACTIONS]);
 
-  await clickPoint(page, targets.twoNode[0].point);
-  await clickPoint(page, targets.twoNode[1].point, true);
+  await selectVisibleTarget(page, targets, 'two-node');
   await expect(statusOutput(page)).toContainText('Selected nodes 1=');
   await expectEnabled(page, TWO_NODE_ACTIONS);
   await expectDisabled(page, ['move-positive-z', ...EDGE_ACTIONS]);
@@ -58,47 +55,47 @@ test('real WebGL picks enable the exact governed edit tools', async ({ page }) =
 test('canonical search replaces the active selection and refreshes command enablement', async ({ page }) => {
   const host = await openFinalAuditController(page);
   await openPanel(host, 'commands');
-  await selectDirect(page, 'edge');
+  const targets = await visibleSelectionTargets(page);
+  await selectVisibleTarget(page, targets, 'edge');
   await expectEnabled(page, EDGE_ACTIONS);
 
   const nodeId = await canonicalNodeForPort(page, 'P-001:port:start');
-  await openPanel(host, 'topology-edit-canonical-search');
-  const input = page.locator('[data-role="topology-edit-search-input"]');
-  await input.fill(nodeId);
-  const result = page.locator(`[data-search-canonical-id="${nodeId}"]`);
-  await expect(result).toHaveCount(1);
-  await result.click();
-
+  await selectBySearch(page, host, nodeId);
   await expect(statusOutput(page)).toContainText(`Selected node ${nodeId}.`);
   await expectEnabled(page, ['move-positive-z']);
   await expectDisabled(page, [...TWO_NODE_ACTIONS, ...EDGE_ACTIONS]);
 });
 
-test('all ten governed edit tools execute independently on the 20-object sample', async ({ page }, testInfo) => {
-  test.setTimeout(180_000);
+test('all ten governed edit tools execute and undo on the 20-object sample', async ({ page }, testInfo) => {
+  test.setTimeout(240_000);
+  const host = await openFinalAuditController(page);
+  await openPanel(host, 'commands');
+  const targets = await visibleSelectionTargets(page);
+  const baseHash = await host.getAttribute('data-topology-edit-canonical-hash');
   const executions = [];
-  for (const scenario of COMMAND_SCENARIOS) {
-    const host = await openFinalAuditController(page);
-    await openPanel(host, 'commands');
-    await selectDirect(page, scenario.kind);
 
+  for (const scenario of COMMAND_SCENARIOS) {
+    await selectVisibleTarget(page, targets, scenario.kind);
     const button = page.locator(`[data-command-action="${scenario.actionId}"]`);
     await expect(button).toBeEnabled();
-    const selection = await controllerSelection(page);
-    const beforeHash = await host.getAttribute('data-topology-edit-canonical-hash');
+    const selectionStatus = await statusOutput(page).innerText();
     await button.click();
+    const outcomeStatus = await statusOutput(page).innerText();
+    expect(outcomeStatus, `${scenario.actionId}: ${outcomeStatus}`).toMatch(/accepted/i);
     await expect(host).toHaveAttribute('data-topology-edit-active-command-count', '1');
     const afterHash = await host.getAttribute('data-topology-edit-canonical-hash');
-    expect(afterHash).not.toBe(beforeHash);
-    const status = await statusOutput(page).innerText();
-    expect(status).toMatch(/accepted/i);
+    expect(afterHash).not.toBe(baseHash);
     executions.push({
       actionId: scenario.actionId,
-      selection,
-      beforeHash,
+      selectionStatus,
+      outcomeStatus,
+      baseHash,
       afterHash,
-      status,
     });
+
+    await page.locator('[data-action="undo"]').click();
+    await expect(host).toHaveAttribute('data-topology-edit-active-command-count', '0');
+    await expect(host).toHaveAttribute('data-topology-edit-canonical-hash', baseHash);
   }
 
   await testInfo.attach('all-tools-final-state', {
@@ -120,7 +117,8 @@ test('all ten governed edit tools execute independently on the 20-object sample'
 test('navigation, presentation, history, and draft controls remain operable', async ({ page }) => {
   const host = await openFinalAuditController(page);
   await openPanel(host, 'commands');
-  await selectDirect(page, 'edge');
+  const targets = await visibleSelectionTargets(page);
+  await selectVisibleTarget(page, targets, 'edge');
 
   for (const mode of ['select', 'orbit', 'pan', 'select']) {
     await page.locator(`[data-navigation-mode="${mode}"]`).click();
@@ -136,7 +134,7 @@ test('navigation, presentation, history, and draft controls remain operable', as
     await expect(statusOutput(page)).toContainText(`View command: ${action}.`);
   }
   await page.locator('[data-navigation-action="projection"]').click();
-  await expect(host).toHaveAttribute('data-topology-edit-projection', /orthographic|perspective/);
+  await expect(host).toHaveAttribute('data-topology-edit-projection', /orthographic|perspective/i);
   for (const view of ['iso', 'top', 'front', 'right']) {
     await page.locator(`[data-standard-view="${view}"]`).click();
     await expect(statusOutput(page)).toContainText(`Standard view: ${view.toUpperCase()}.`);
@@ -152,7 +150,8 @@ test('navigation, presentation, history, and draft controls remain operable', as
   await page.locator('[data-action="reset-presentation"]').click();
   await expect(page.locator('[data-role="presentation-visibility-status"]')).toHaveText('Visibility: all');
 
-  await selectDirect(page, 'single-node');
+  const nodeId = await canonicalNodeForPort(page, 'P-001:port:start');
+  await selectBySearch(page, host, nodeId);
   await page.locator('[data-command-action="move-positive-z"]').click();
   await expect(host).toHaveAttribute('data-topology-edit-active-command-count', '1');
   await page.locator('[data-action="undo"]').click();
@@ -274,42 +273,26 @@ async function canonicalNodeForPort(page, portKey) {
   }, { key: CONTROLLER_KEY, port: portKey });
 }
 
-async function selectDirect(page, kind) {
-  await page.evaluate(async ({ key, selectionKind }) => {
-    const controller = globalThis[key];
-    const topology = controller?.session?.currentTopology?.();
-    if (!controller || !topology) throw new Error('Direct selection context is unavailable.');
-    if (selectionKind === 'edge') {
-      controller.applyCanonicalPick({
-        objectKind: 'component', objectId: 'edge:P-001', workspaceEntityIds: ['P-001'],
-      }, false);
-      return;
-    }
-    if (selectionKind === 'single-node') {
-      const node = topology.nodes.find((row) => row.portKeys?.includes('P-001:port:start'))
-        ?? topology.nodes[0];
-      controller.applyCanonicalPick({ objectKind: 'node', objectId: node.id, workspaceEntityIds: [] }, false);
-      return;
-    }
-    const moduleUrl = new URL(
-      'src/workspace/topology-edit/topology-edit-command-ui.js',
-      document.baseURI,
-    ).href;
-    const { topologyEditExactGapContext } = await import(moduleUrl);
-    let pair = null;
-    for (let left = 0; left < topology.nodes.length && !pair; left += 1) {
-      for (let right = left + 1; right < topology.nodes.length; right += 1) {
-        const nodeIds = [topology.nodes[left].id, topology.nodes[right].id];
-        if (topologyEditExactGapContext({ nodeIds, edgeId: null }, topology)) {
-          pair = nodeIds;
-          break;
-        }
-      }
-    }
-    if (!pair) throw new Error('No exact-gap node pair is available in the sample.');
-    controller.applyCanonicalPick({ objectKind: 'node', objectId: pair[0], workspaceEntityIds: [] }, false);
-    controller.applyCanonicalPick({ objectKind: 'node', objectId: pair[1], workspaceEntityIds: [] }, true);
-  }, { key: CONTROLLER_KEY, selectionKind: kind });
+async function selectBySearch(page, host, canonicalId) {
+  await openPanel(host, 'topology-edit-canonical-search');
+  const input = page.locator('[data-role="topology-edit-search-input"]');
+  await input.fill(canonicalId);
+  const result = page.locator(`[data-search-canonical-id="${canonicalId}"]`);
+  await expect(result).toHaveCount(1);
+  await result.click();
+}
+
+async function selectVisibleTarget(page, targets, kind) {
+  if (kind === 'edge') {
+    await clickPoint(page, targets.edge.point);
+    return;
+  }
+  if (kind === 'single-node') {
+    await clickPoint(page, targets.singleNode.point);
+    return;
+  }
+  await clickPoint(page, targets.twoNode[0].point);
+  await clickPoint(page, targets.twoNode[1].point, true);
 }
 
 async function clickPoint(page, point, additive = false) {
@@ -320,16 +303,6 @@ async function clickPoint(page, point, additive = false) {
 
 function statusOutput(page) {
   return page.locator('[data-role="topology-edit-status"]');
-}
-
-async function controllerSelection(page) {
-  return page.evaluate((key) => {
-    const selection = globalThis[key]?.selection;
-    return {
-      nodeIds: [...(selection?.nodeIds ?? [])],
-      edgeId: selection?.edgeId ?? null,
-    };
-  }, CONTROLLER_KEY);
 }
 
 async function expectEnabled(page, actionIds) {
