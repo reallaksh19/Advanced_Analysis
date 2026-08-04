@@ -63,6 +63,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Upload runnable exact-head snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: m025-runnable-exact-head-${{ github.run_attempt }}
+          path: |
+            .
+            !.git/**
+          include-hidden-files: true
+          retention-days: 2
+
       - name: Run prerequisite BM1 qualification
         run: |
           npm run check:lfea-b3.15
