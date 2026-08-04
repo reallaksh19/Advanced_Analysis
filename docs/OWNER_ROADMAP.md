@@ -1035,3 +1035,78 @@ real declared thermal/pressure values #552's fixture mostly lacked.
 Explicitly instructed the agent to always read the live file from
 `main` at implementation time, not a snapshot, since the user is still
 actively editing it.
+
+### M020 (#553) → PR #556, merged as `c7e06c4b3f4c377f28269312b75f6b878dff2ac1`
+
+Reviewed in full: cloned the exact PR head into an isolated worktree,
+read all 12 changed files end to end before running anything. The
+implementation is structurally strong — clean re-export refactor
+moving the restraint-mutation authority into `src/core` without a
+core→workspace dependency, a self-contained unit-system parser that
+treats the file's declared `FACTOR` as a redundant consistency check
+rather than the actual scale (a real, correct design choice), and a
+fail-closed "reject any unclassified numeric metadata" pass that
+correctly wholesale-exempts the new `analysis` authority object
+(already canonicalized at ingestion) from double-conversion.
+
+The PR disclosed, honestly, that all 8 required commands were never
+run (no repository checkout in that environment) — running them for
+real found **one small, mechanically clear defect**: `compileCodeResult`
+requires `factorSet.factorSetId`/`componentId` to satisfy
+`requireCanonicalNodeId` (`^[A-Za-z0-9][A-Za-z0-9._-]*$`, no brackets),
+but the fixture passed `entry.segment.sourceComponentUid`
+(`"PIPINGELEMENT[0]"`) directly — crashed on first run. Fixed by
+switching to `entry.segment.id` (`"IX-S1"`, already canonical, already
+used for `codePointId`) — exactly the class of bug "syntax checks
+passed" can never catch, the third Work Pack in a row where a real
+command run surfaced something static reasoning missed (after M018,
+M019).
+
+Went further than re-running the required commands: fetched the real
+CAESAR II output the user linked (`BM1_CIIOutput.xml`, genuine
+`VERSION="14.00.00.0910"` export) and hand-cross-checked B-3.15's
+produced numbers against it, not just the internal self-consistency
+assertions. Two real, load-bearing engineering assumptions the agent
+made were **independently confirmed correct** by this real data: (1)
+`restraintTypeCodeMap: { 0: 'ANCHOR', ... }` — CAESAR's own
+`RESTRAINT_REPORT` shows both TYPE=0 nodes (10 and 150) as
+`"Rigid ANC"`; (2) the `17→14`/`7→8` restraint mutations — CAESAR's
+report shows exactly `"Rigid +Y"`/`"Rigid GUI"` at every mutated node,
+matching exactly. Also found, by direct comparison, a real but
+undocumented convention difference: this repo's `reaction.*` is the
+force applied *by the restraint to the structure* (this repo's
+standard convention throughout the mandate); CAESAR's
+`RESTRAINT_REPORT` exports the equal-and-opposite force *by the pipe
+onto the restraint hardware* — confirmed empirically (CASE 4 SUS):
+every reaction component has the opposite sign at every node, while
+*displacement* signs already agree directly with no negation needed,
+isolating this cleanly to a reporting-convention difference, not a
+geometry or stiffness defect. Documented this directly in the report's
+own `limitations` array so it doesn't read as a broken solve to
+whoever does the final numeric comparison. The remaining real
+magnitude gap (CAESAR's sustained reactions and displacements run
+~1.7–2.6x larger than B-3.15's) traces to the PR's own already-honestly-
+disclosed limitation: `benchmarks/LFEA/BM1/BM1_InputXML.xml`'s first
+element declares `INSUL_THICK` without `INSUL_DENSITY`, which — via
+the established M012 all-or-nothing gravity-consumer design — excludes
+insulation self-weight from the *entire* model, not just that element;
+confirmed insulation is genuinely present (`INSUL_DENSITY="0.002100"`,
+i.e. 2100 kg/m³) on other elements, so this is a real, quantifiable,
+already-disclosed gap, not a hidden one.
+
+Ran every required command for real on the corrected head: all 8
+individually (exit 0 each), full `check:lfea-linear-core` (exit 0, 44
+PASS markers, zero FAIL). Post-merge sanity check on fresh `main` at
+`c7e06c4b` also passed end to end. Both worktrees cleaned up. Issue
+#553 auto-closed on merge.
+
+**Process note**: this Work Pack is the clearest demonstration yet of
+why the mandate requires the Owner to cross-check against real
+external data, not just re-run the agent's own internal assertions —
+the internal self-consistency check (`check:lfea-b3.15`) was fully
+green and would have merged clean without ever revealing the sign-
+convention gap; only fetching and hand-comparing the user's real
+CAESAR II output surfaced it, and doing so also turned two of the
+agent's unverified modeling assumptions (TYPE=0→ANCHOR, the restraint
+mutation table) into independently-confirmed facts rather than
+plausible guesses.
