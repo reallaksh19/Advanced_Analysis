@@ -1,0 +1,99 @@
+name: 3D Edit Selection Foundation
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/topology-edit-selection-foundation.yml'
+      - 'src/vendor/zustand-vanilla.js'
+      - 'src/workspace/topology-edit/editor-state/**'
+      - 'src/workspace/topology-edit-3d-professional-controller.js'
+      - 'src/workspace/topology-edit-3d-search-controller.js'
+      - 'src/workspace/tree-panel.js'
+      - 'src/workspace/tree-panel-events.js'
+      - 'src/workspace/tree-panel-tree.js'
+      - 'tests/topology-edit-selection-*.test.mjs'
+      - 'e2e/topology-edit-selection-foundation.spec.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: topology-edit-selection-foundation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chromium-selection-foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PLAYWRIGHT_BROWSER_CHANNEL: chromium
+      PLAYWRIGHT_ENABLE_VIDEO: '1'
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies and Chromium
+        run: |
+          set -euo pipefail
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Verify exact source contracts
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+          node --check src/vendor/zustand-vanilla.js
+          node --check src/workspace/topology-edit/editor-state/topology-edit-selection-contract.js
+          node --check src/workspace/topology-edit/editor-state/topology-edit-editor-store.js
+          node --check src/workspace/topology-edit/editor-state/topology-edit-selection-events.js
+          node --check src/workspace/topology-edit/editor-state/topology-edit-selection-coordinator.js
+          node --check src/workspace/topology-edit-3d-professional-controller.js
+          node --check src/workspace/topology-edit-3d-search-controller.js
+          node --check src/workspace/tree-panel.js
+          node --check src/workspace/tree-panel-events.js
+          node --check src/workspace/tree-panel-tree.js
+          node --check e2e/topology-edit-selection-foundation.spec.js
+          git diff --check
+
+      - name: Execute selection contracts and integration tests
+        run: |
+          node --test \
+            tests/topology-edit-selection-contract.test.mjs \
+            tests/topology-edit-editor-store.test.mjs \
+            tests/topology-edit-selection-coordinator.test.mjs \
+            tests/topology-edit-selection-foundation-integration.test.mjs
+
+      - name: Execute existing 3D Edit regression contracts
+        run: |
+          node --test \
+            tests/topology-edit-professional-integration-controller.test.mjs \
+            tests/topology-edit-navigation-pick-fallback.test.mjs
+
+      - name: Execute real WebGL selection qualification
+        run: |
+          npx playwright test e2e/topology-edit-selection-foundation.spec.js \
+            --project=chromium --workers=1 --retries=0 --reporter=line
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-selection-foundation-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}-${{ github.run_attempt }}
+          path: |
+            reports/qualification/topology-edit-selection-foundation.json
+            playwright-report
+            test-results
+          if-no-files-found: warn
+          retention-days: 30
