@@ -6,6 +6,7 @@ const base = process.env.EMP01_BASE_SHA || defaultBase;
 const expected = [
   'docs/empirical-mechanical-extension-seams.md',
   'scripts/authorized-empirical-execution-view-anti-drift-check.mjs',
+  'scripts/authorized-empirical-execution-view-check.mjs',
   'scripts/authorized-enrichment-consumer-controller-anti-drift-check.mjs',
   'scripts/authorized-enrichment-consumer-controller-check.mjs',
   'scripts/authorized-enrichment-workspace-api-anti-drift-check.mjs',
