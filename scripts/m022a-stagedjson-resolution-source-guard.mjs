@@ -38,6 +38,8 @@ assert.match(resolved, /temperatureStateRequirements/u);
 assert.match(inventory, /STAGEDJSON_OPERATING_MATERIAL_TABLE_RANGE_INSUFFICIENT/u);
 assert.match(inventory, /STAGEDJSON_MATERIAL_SECTION_CATALOG_GENERALIZATION_REQUIRED/u);
 assert.match(inventory, /STAGEDJSON_SUPPORT_AUTHORITY_UNRESOLVED/u);
+assert.match(inventory, /operatingK\.length\s*>\s*0\s*&&\s*!temperaturesCovered/u, 'operating range blockers require a declared operating temperature');
+assert.match(inventory, /designK\.length\s*>\s*0\s*&&\s*!temperaturesCovered/u, 'design range blockers require a declared design temperature');
 assert.match(inventory, /designPressureMpa/u);
 assert.match(inventory, /operatingTemperatureC/u);
 assert.match(inventory, /hydroPressure/u);
