@@ -1,0 +1,238 @@
+name: Non-FEA P0 Exact-Head Execution
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/non-fea-p0-exact-head.yml'
+      - 'e2e/non-fea-p0-current-main-baseline.spec.js'
+      - 'scripts/non-fea-baseline/**'
+      - 'scripts/run-non-fea-current-main-baseline.mjs'
+      - 'src/workspace/non-fea-p0-observability.js'
+      - 'src/workspace/three-viewport-scene.js'
+      - 'tests/non-fea-p0-*.test.mjs'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/non-fea-p0-exact-head.yml'
+      - 'e2e/non-fea-p0-current-main-baseline.spec.js'
+      - 'scripts/non-fea-baseline/**'
+      - 'scripts/run-non-fea-current-main-baseline.mjs'
+      - 'src/workspace/non-fea-p0-observability.js'
+      - 'src/workspace/three-viewport-scene.js'
+      - 'tests/non-fea-p0-*.test.mjs'
+  workflow_dispatch:
+    inputs:
+      warm_samples:
+        description: Number of warm samples per fixture
+        required: true
+        default: '5'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: non-fea-p0-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-head-p0:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      EXACT_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      EXECUTION_ID: p0-${{ github.run_id }}-${{ github.run_attempt }}
+      EXPECTED_LARGE_MODEL_SHA256: 88e62782772d743e9236d13775476826f9649ab06d3161de35dc500baa85a9c6
+      LARGE_MODEL_PATH: .p0-external/large-model-4884.json
+      BROWSER_EVIDENCE_PATH: artifacts/p0/non-fea-browser-baseline.json
+      REPORT_PATH: artifacts/p0/non-fea-current-main-baseline.json
+      NON_FEA_P0_RAW_COMMAND_DIR: artifacts/p0/commands
+      P0_LARGE_MODEL_URL: ${{ secrets.P0_LARGE_MODEL_URL }}
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXACT_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Freeze evidence paths and verify checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '.p0-external/\nartifacts/p0/\n' >> .git/info/exclude
+          test "$(git rev-parse HEAD)" = "$EXACT_HEAD_SHA"
+          test -z "$(git status --short)"
+          mkdir -p artifacts/p0 .p0-external
+
+      - name: Install dependencies and Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Qualify execution plumbing
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check src/workspace/non-fea-p0-observability.js
+          node --check src/workspace/three-viewport-scene.js
+          node --check e2e/non-fea-p0-current-main-baseline.spec.js
+          node --test tests/non-fea-p0-observability.test.mjs
+          test -z "$(git status --short)"
+
+      - name: Acquire governed external fixture when configured
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${P0_LARGE_MODEL_URL:-}" ]]; then
+            echo 'P0_FIXTURE_PRESENT=false' >> "$GITHUB_ENV"
+            printf '%s\n' \
+              'P0_FIXTURE_AUTHORITY_UNBOUND: repository secret P0_LARGE_MODEL_URL is not configured.' \
+              > artifacts/p0/external-fixture-custody.txt
+            exit 0
+          fi
+          curl --fail --location --silent --show-error \
+            "$P0_LARGE_MODEL_URL" --output "$LARGE_MODEL_PATH"
+          actual_sha="$(sha256sum "$LARGE_MODEL_PATH" | awk '{print $1}')"
+          test "$actual_sha" = "$EXPECTED_LARGE_MODEL_SHA256"
+          echo 'P0_FIXTURE_PRESENT=true' >> "$GITHUB_ENV"
+          printf 'path=%s\nsha256=%s\n' "$LARGE_MODEL_PATH" "$actual_sha" \
+            > artifacts/p0/external-fixture-custody.txt
+
+      - name: Produce exact-head browser ledger when fixture is present
+        shell: bash
+        env:
+          P0_EXECUTION_ID: ${{ env.EXECUTION_ID }}
+          P0_EXACT_HEAD_SHA: ${{ env.EXACT_HEAD_SHA }}
+          P0_FIXTURE_PATH: ${{ env.LARGE_MODEL_PATH }}
+          P0_SOURCE_SHA256: ${{ env.EXPECTED_LARGE_MODEL_SHA256 }}
+          P0_BROWSER_EVIDENCE_OUTPUT: ${{ env.BROWSER_EVIDENCE_PATH }}
+        run: |
+          set -euo pipefail
+          if [[ "${P0_FIXTURE_PRESENT:-false}" != 'true' ]]; then
+            echo 'P0 browser execution skipped: governed 4,884 fixture is not bound.'
+            exit 0
+          fi
+          npx playwright test e2e/non-fea-p0-current-main-baseline.spec.js \
+            --workers=1 --reporter=line
+
+      - name: Execute repository-owned P0 ladder and publish report
+        shell: bash
+        env:
+          WARM_SAMPLES: ${{ inputs.warm_samples || '5' }}
+        run: |
+          set -euo pipefail
+          args=(
+            node scripts/run-non-fea-current-main-baseline.mjs
+            --execution-id "$EXECUTION_ID"
+            --warm-samples "$WARM_SAMPLES"
+            --run-commands
+            --output "$REPORT_PATH"
+          )
+          if [[ "${P0_FIXTURE_PRESENT:-false}" == 'true' ]]; then
+            args+=(
+              --fixture-role "LARGE_MODEL_4884_ENTITY=$LARGE_MODEL_PATH"
+              --browser-evidence "$BROWSER_EVIDENCE_PATH"
+            )
+          fi
+          "${args[@]}" | tee artifacts/p0/runner-console.txt
+          test -f "$REPORT_PATH"
+
+      - name: Verify evidence publication and record baseline disposition
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { readFile, writeFile } from 'node:fs/promises';
+          import path from 'node:path';
+          const report = JSON.parse(await readFile(process.env.REPORT_PATH, 'utf8'));
+          const fixturePresent = process.env.P0_FIXTURE_PRESENT === 'true';
+          if (report.exactHeadSha !== process.env.EXACT_HEAD_SHA) {
+            throw new Error('P0_HEAD_CUSTODY_MISMATCH');
+          }
+          if (report.executionId !== process.env.EXECUTION_ID) {
+            throw new Error('P0_EXECUTION_CUSTODY_MISMATCH');
+          }
+          if (!Array.isArray(report.commandRuns) || report.commandRuns.length === 0) {
+            throw new Error('P0_COMMAND_LEDGER_EMPTY');
+          }
+          for (const command of report.commandRuns) {
+            const fileName = `${command.commandId.replace(/[.:]/gu, '__')}.log`;
+            const rawPath = path.join(process.env.NON_FEA_P0_RAW_COMMAND_DIR, fileName);
+            const raw = await readFile(rawPath);
+            const actual = createHash('sha256').update(raw).digest('hex');
+            if (actual !== command.outputSha256) {
+              throw new Error(`P0_RAW_COMMAND_HASH_MISMATCH:${command.commandId}`);
+            }
+          }
+          const roleMap = new Map(report.fixtureRoleBindings.map((row) => [row.role, row]));
+          for (const role of [
+            'LARGE_MODEL_4884_ENTITY',
+            'REAL_1885_SUPPORT_BRANCH',
+            'TOPOLOGY_EDIT_20_OBJECT',
+          ]) {
+            if (!roleMap.has(role)) throw new Error(`P0_FIXTURE_ROLE_MISSING:${role}`);
+          }
+          if (!fixturePresent) {
+            const codes = new Set(report.failures.map((row) => row.code));
+            if (!codes.has('P0_FIXTURE_AUTHORITY_UNBOUND')) {
+              throw new Error('P0_MISSING_FIXTURE_NOT_REPORTED');
+            }
+            if (report.browserEvidence !== null) {
+              throw new Error('P0_UNBOUND_FIXTURE_HAS_BROWSER_EVIDENCE');
+            }
+            if (report.status === 'PASS') {
+              throw new Error('P0_UNBOUND_FIXTURE_REPORTED_PASS');
+            }
+          }
+          const failedCommands = report.commandRuns
+            .filter((row) => row.status !== 'PASS')
+            .map((row) => ({
+              commandId: row.commandId,
+              status: row.status,
+              exitCode: row.exitCode,
+            }));
+          const summary = {
+            exactHeadSha: report.exactHeadSha,
+            executionId: report.executionId,
+            reportStatus: report.status,
+            p0CandidatePass: fixturePresent && report.status === 'PASS',
+            ownerAcceptanceRequired: true,
+            fixturePresent,
+            commandCount: report.commandRuns.length,
+            failedCommands,
+            fixtureRunCount: report.fixtureRuns.length,
+            fixtureRoleStatuses: Object.fromEntries(
+              report.fixtureRoleBindings.map((row) => [row.role, row.status]),
+            ),
+            failureCodes: [...new Set(report.failures.map((row) => row.code))].sort(),
+          };
+          await writeFile('artifacts/p0/workflow-adjudication.json',
+            `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+          console.log(JSON.stringify(summary, null, 2));
+          NODE
+
+      - name: Verify source checkout remains unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --short)"
+          git diff --check
+
+      - name: Upload P0 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: non-fea-p0-${{ env.EXACT_HEAD_SHA }}-${{ github.run_attempt }}
+          path: artifacts/p0
+          if-no-files-found: error
+          retention-days: 30
