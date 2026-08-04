@@ -22,13 +22,16 @@ test('3D Edit keeps the canvas primary and defers dense controls into inspector 
   await expect(statusbar).toBeVisible();
   await expect(compactDock).toHaveClass(/load-calc-dock--compact/);
 
-  const [canvasBox, sidecarBox] = await Promise.all([
+  const [workspaceBox, canvasBox, sidecarBox] = await Promise.all([
+    workspace.boundingBox(),
     canvas.boundingBox(),
     sidecar.boundingBox(),
   ]);
+  expect(workspaceBox).not.toBeNull();
   expect(canvasBox).not.toBeNull();
   expect(sidecarBox).not.toBeNull();
-  expect(canvasBox.width).toBeGreaterThan(sidecarBox.width * 2);
+  expect(canvasBox.width).toBeGreaterThan(sidecarBox.width * 1.5);
+  expect(canvasBox.width / workspaceBox.width).toBeGreaterThan(0.6);
   expect(canvasBox.height).toBeGreaterThan(650);
 
   await expect(compactDock.locator('.empirical-load-calc__facts')).toBeHidden();

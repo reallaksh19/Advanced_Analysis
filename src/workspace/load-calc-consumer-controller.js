@@ -74,6 +74,7 @@ export class LoadCalcConsumerController {
     if (this.activeTab !== '3d' && this.topologyEdit3DController) {
       this.topologyEdit3DController.deactivate();
       this.topologyEdit3DController = null;
+      resetTopologyEditCleanShell(this.rootElement.ownerDocument);
     }
     this.renderRevision += 1;
     const revision = this.renderRevision;
@@ -117,9 +118,17 @@ export class LoadCalcConsumerController {
       } else if (tab === '3d') {
         const { TopologyEdit3DViewController } = await import('./topology-edit-3d-professional-controller.js');
         if (revision !== this.renderRevision) return;
-        if (!this.topologyEdit3DController) {
-          this.topologyEdit3DController = new TopologyEdit3DViewController(this.eventBus);
-          await this.topologyEdit3DController.activate();
+        if (!this.topologyEdit3DController?.hostElement) {
+          resetTopologyEditCleanShell(this.rootElement.ownerDocument);
+          const controller = new TopologyEdit3DViewController(this.eventBus);
+          this.topologyEdit3DController = controller;
+          await controller.activate();
+          if (revision !== this.renderRevision) {
+            controller.deactivate();
+            if (this.topologyEdit3DController === controller) this.topologyEdit3DController = null;
+            resetTopologyEditCleanShell(this.rootElement.ownerDocument);
+            return;
+          }
         }
         if (revision === this.renderRevision) this.topologyEdit3DController.renderPane(pane);
       } else {
@@ -137,6 +146,7 @@ export class LoadCalcConsumerController {
   destroy() {
     this.topologyEdit3DController?.deactivate();
     this.topologyEdit3DController = null;
+    resetTopologyEditCleanShell(this.rootElement.ownerDocument);
     this.rootElement.removeEventListener('click', this.clickHandler);
     this.unsubscribers.forEach((unsubscribe) => unsubscribe());
     this.unsubscribers = [];
@@ -175,6 +185,15 @@ function availabilityMessage(state) {
     DATASET_REPLACED: 'The active dataset changed; a new authorized empirical package is required.',
   };
   return messages[reason] || `Load calculation is disabled: ${reason}.`;
+}
+
+function resetTopologyEditCleanShell(documentRef) {
+  const host = documentRef?.querySelector('[data-role="topology-edit-render-host"]');
+  if (!host) return;
+  const mountedWorkspace = host.querySelector('[data-role="topology-edit-workspace"]');
+  if (mountedWorkspace?.isConnected) return;
+  delete host.dataset.topologyEditCleanShell;
+  host.classList.remove('topology-edit-clean-shell');
 }
 
 function buildReviewModel(context) {
