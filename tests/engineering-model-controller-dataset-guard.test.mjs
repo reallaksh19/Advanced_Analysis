@@ -58,14 +58,17 @@ test('same dataset reference with selection-only snapshot skips the second rebui
   } finally { state.restore(); }
 });
 
-test('new dataset object with the same identifiers still rebuilds', () => {
+test('semantically equivalent replacement object rebuilds without preemptive stale marking', () => {
   const first = { datasetId: 'dataset:1', version: 4 };
   const second = { datasetId: 'dataset:1', version: 4 };
-  const state = harness(second);
+  const distribution = { datasetId: 'dataset:1', datasetVersion: 4 };
+  const state = harness(second, distribution);
   try {
     state.controller.handleSnapshot(ready(first));
     state.controller.handleSnapshot(ready(second));
     assert.deepEqual(state.calls.rebuild, [first, second]);
+    assert.deepEqual(state.calls.stale, []);
+    assert.equal(state.calls.refresh, 2);
   } finally { state.restore(); }
 });
 
