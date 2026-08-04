@@ -19,8 +19,9 @@ import { compileMechanicalModel } from '../src/core/linear-fea-model-compiler/in
 import { compilePipingComponent } from '../src/core/linear-fea-piping-components/index.js';
 import { compileSolverExecution, elementContributionFromFrameElement, elementContributionsFromPipingComponent } from '../src/core/linear-fea-solver/index.js';
 import { compileResultRecovery } from '../src/core/linear-fea-result-recovery/index.js';
-import { compileCodeResult, sealCodeProfile, sealEditionDataset, sealStressFactorSet } from '../src/core/linear-fea-b31-code-engine/index.js';
+import { compileCodeResult, sealStressFactorSet } from '../src/core/linear-fea-b31-code-engine/index.js';
 import { semanticHash } from '../src/core/shared-piping-model/canonical-json.js';
+import { augmentBm1CodeStress, bm1CodeAuthorities } from './lfea-b3.17-bm1-code-stress-fixtures.mjs';
 import { compilerProfile } from './lfea-b2.5-model-compiler-fixtures.mjs';
 import { eulerBernoulliProfile } from './lfea-b3.1-frame-element-fixtures.mjs';
 import { componentProfile } from './lfea-b3.2-piping-component-fixtures.mjs';
@@ -32,7 +33,6 @@ export const SOURCE_ID = 'CAESAR-II-BM1-LIVE-INPUTXML';
 export const INSTALLATION_TEMPERATURE = 293.15;
 export const THERMAL_EXPANSION_COEFFICIENT = 1.17e-5;
 export const GRAVITY = 9.80665;
-export const SCREENING_ALLOWABLE = 138e6;
 export const CONDITIONING_PROFILE = Object.freeze({
   spanSeedingLimit: { value: 1000, source: 'M020 retain one source span per BM1 PIPINGELEMENT' },
   bendSeedingSegments: { value: 4, source: 'M020 unresolved internal bend stations are not curvature seeded' },
@@ -166,8 +166,10 @@ export function solveBm1InputXml() {
   const authorities = buildBm1InputXmlAuthorities();
   const sustained = analyseCase(authorities, 'BM1-SUSTAINED', false);
   const operating = analyseCase(authorities, 'BM1-OPERATING-T1', true);
-  const code = displacementStressResults(authorities, sustained, operating);
-  return { ...authorities, sustained, operating, code, report: buildReport(authorities, sustained, operating, code) };
+  const codeAuthorities = bm1CodeAuthorities(authorities);
+  const code = displacementStressResults(authorities, sustained, operating, codeAuthorities);
+  const baseResult = { ...authorities, sustained, operating, code, report: buildReport(authorities, sustained, operating, code) };
+  return augmentBm1CodeStress(baseResult, codeAuthorities);
 }
 
 function analyseCase(authorities, loadCaseId, thermal) {
@@ -205,10 +207,8 @@ function compileCase(authorities, loadCaseId, thermal) {
   return compilePhysicalLoadCase({ loadCaseId, loadCaseClass: 'MIXED_PHYSICAL', presentation: { label: loadCaseId, description: 'M020 live BM1 InputXML self-consistency case.' }, modelReference: modelReferenceFromCompilation(authorities.compilation), primitives, profile: loadCaseProfile({ gravitationalAcceleration: { value: GRAVITY, source: 'SI-STANDARD-GRAVITY-EXACT' } }) });
 }
 
-function displacementStressResults(authorities, sustained, operating) {
-  const profile = sealCodeProfile({ schema: 'fea-b31-code-profile/v1', profileId: 'LINEAR-B31-CODE-PROFILE-R1', codeProfileId: 'M020-BM1-SELF-CONSISTENCY', scope: 'METALLIC_PROCESS_PIPING_B31_3', editionStandard: 'ASME_B31_3_2024', flexibilitySource: 'ASME_B31J_2023', temperatureInterpolationPolicy: 'LINEAR_BRACKET_INTERPOLATION_V1', displacementRangeCombinationRuleId: 'DISPLACEMENT_RANGE_COLD_HOT_CYCLE_REDUCTION_LINEAR_V1', occasionalDurationFactors: [], liberalAllowableUse: false, liberalAllowableUpliftFactor: null, semanticHash: '' });
-  const hot = authorities.material.materialState.evaluationTemperature;
-  const dataset = sealEditionDataset({ schema: 'fea-b31-edition-dataset/v1', datasetId: 'M020-BM1-SCREENING-NOT-CAESAR-AUTHORITY', sourceIdentity: { standard: 'M020_SELF_CONSISTENCY', edition: '01', sourceRevision: 'INPUTXML-ALLOWABLES-SENTINEL-ONLY', sourceSemanticHash: semanticHash({ screening: SCREENING_ALLOWABLE }) }, materialId: authorities.material.materialState.materialId, allowablePoints: [{ absoluteTemperature: INSTALLATION_TEMPERATURE, allowableStress: { value: SCREENING_ALLOWABLE, source: 'M020 non-qualification screening value; InputXML allowable fields are sentinel-only' } }, { absoluteTemperature: hot, allowableStress: { value: SCREENING_ALLOWABLE, source: 'M020 non-qualification screening value; InputXML allowable fields are sentinel-only' } }], displacementRangeCoefficients: { coldWeight: { value: 1.25, source: 'M020 generic B31 displacement-range profile' }, hotWeight: { value: 0.25, source: 'M020 generic B31 displacement-range profile' }, cycleReductionFactor: { value: 1, source: 'M020 no cycle authority in InputXML; unity screening only' } }, weldJointFactor: { value: 1, source: 'M020 unity screening factor' }, semanticHash: '' });
+function displacementStressResults(authorities, sustained, operating, codeAuthorities) {
+  const { profile, editionDataset: dataset } = codeAuthorities;
   return authorities.modelEntries.flatMap((entry) => ['I', 'J'].map((end) => {
     const sus = sustained.recovery.elementActions.find((row) => row.elementId === entry.elementId).local[end];
     const ope = operating.recovery.elementActions.find((row) => row.elementId === entry.elementId).local[end];

@@ -32,9 +32,9 @@ const A106_ALLOWABLE_SOURCE = Object.freeze({
   conversion: '1 psi = 6894.757293168 Pa (exact SI conversion used by this repository authority)',
 });
 
-export function augmentBm1CodeStress(baseResult) {
+export function augmentBm1CodeStress(baseResult, suppliedCodeAuthorities = null) {
   requireBaseResult(baseResult);
-  const codeAuthorities = bm1CodeAuthorities(baseResult);
+  const codeAuthorities = suppliedCodeAuthorities ?? bm1CodeAuthorities(baseResult);
   const sustainedCode = sustainedStressResults(baseResult, codeAuthorities);
   const caesarContent = readFileSync(BM1_CII_OUTPUT_PATH, 'utf8');
   const caesarStressReports = parseCaesarStressReports(caesarContent);
