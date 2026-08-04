@@ -13,6 +13,13 @@ import {
   createEvidenceValue,
 } from '../src/workspace/project-data/project-data-contract.js';
 
+const HASHES = Object.freeze({
+  dataset: '1'.repeat(64),
+  lineList: '2'.repeat(64),
+  pipingClass: '3'.repeat(64),
+  componentWeight: '4'.repeat(64),
+});
+
 const onRouteInput = fixture({
   cog: componentCog({ x: 250, y: 0, z: 0 }, 'mm', 'fixture.onRoute250'),
 });
@@ -100,7 +107,7 @@ const outsideInput = fixture({
   cog: componentCog({ x: -100, y: 0, z: 0 }, 'mm', 'fixture.outsideSpan'),
 });
 const outsideV3 = calculateSupportLoadDistributionWithComponentCog(outsideInput);
-assertBlocked(outsideV3, 'UNBRACKETED_ROUTE_LOAD');
+assertBlocked(outsideV3, 'EMPIRICAL_COMPONENT_COG_OFF_ROUTE');
 
 const v2Repeat = calculateSupportLoadDistribution(onRouteInput);
 assert.deepEqual(v2Repeat, v2);
@@ -204,13 +211,6 @@ function fixture({ cog, explicitMomentNm = null, momentAxis = null }) {
     },
   };
 }
-
-const HASHES = Object.freeze({
-  dataset: '1'.repeat(64),
-  lineList: '2'.repeat(64),
-  pipingClass: '3'.repeat(64),
-  componentWeight: '4'.repeat(64),
-});
 
 function makeProfile() {
   const empty = createEmptyProjectDataProfile();
