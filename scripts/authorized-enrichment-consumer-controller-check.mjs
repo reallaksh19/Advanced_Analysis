@@ -11,6 +11,10 @@ import {
   sealAuthorizedEmpiricalRuntimePackage,
 } from '../src/workspace/engineering-loads/authorized-empirical-runtime-package.js';
 import {
+  EMPIRICAL_LOAD_COG_METHOD,
+  SUPPORT_LOAD_DISTRIBUTION_COG_SCHEMA,
+} from '../src/workspace/engineering-loads/support-load-distribution-v3.js';
+import {
   AUTHORIZED_EMPIRICAL_CONSUMER_REQUEST_SCHEMA,
   AuthorizedEnrichmentConsumerController,
 } from '../src/workspace/enrichment/authorized-enrichment-consumer-controller.js';
@@ -36,6 +40,8 @@ assert.equal(
   EMPIRICAL_COMPONENT_LOAD_AUTHORITY_AUDIT_SCHEMA,
   'empirical-component-load-authority-audit/v1',
 );
+assert.equal(SUPPORT_LOAD_DISTRIBUTION_COG_SCHEMA, 'support-load-distribution/v4');
+assert.equal(EMPIRICAL_LOAD_COG_METHOD, 'CHAINAGE_TRIBUTARY_SPAN_V3_COG');
 
 const masterData = Object.freeze({ marker: 'MASTER-DATA-EMP01' });
 const runtimePackage = makeRuntimePackage();
@@ -116,6 +122,8 @@ console.log(JSON.stringify({
   formulaRegisterMethod: EMPIRICAL_FORMULA_REGISTER.method,
   formulaRegisterSemanticHash: EMPIRICAL_FORMULA_REGISTER.semanticHash,
   componentLoadAuthorityAuditSchema: EMPIRICAL_COMPONENT_LOAD_AUTHORITY_AUDIT_SCHEMA,
+  cogDistributionSchema: SUPPORT_LOAD_DISTRIBUTION_COG_SCHEMA,
+  cogDistributionMethod: EMPIRICAL_LOAD_COG_METHOD,
 }, null, 2));
 
 function makeRuntimePackage() {
