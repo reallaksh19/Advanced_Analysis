@@ -6,79 +6,67 @@
   "exactHeadSha": null,
   "executionId": null,
   "generatedAt": null,
-  "fixtureLedger": [
-    {
-      "path": "benchmarks/ATTRIBUTE-AML_ASIM-1835_managed_stage_enriched_stage.json",
-      "sourceSha256": null,
-      "byteLength": null,
-      "declaredUse": [
-        "normalization",
-        "geometry",
-        "render-model"
-      ],
-      "realOrSimulated": "REAL_REPOSITORY_FIXTURE_PENDING_HASH",
-      "expectedIdentity": {},
-      "authorityNotes": [
-        "Exact-head runner not executed in connector environment."
-      ],
-      "status": "NOT_EXECUTED"
-    },
-    {
-      "path": "benchmarks/Sjson.json",
-      "sourceSha256": null,
-      "byteLength": null,
-      "declaredUse": [
-        "normalization",
-        "support-sites",
-        "route-partition",
-        "empirical-loads"
-      ],
-      "realOrSimulated": "REAL_REPOSITORY_FIXTURE_PENDING_HASH",
-      "expectedIdentity": {},
-      "authorityNotes": [
-        "Exact-head runner not executed in connector environment."
-      ],
-      "status": "NOT_EXECUTED"
-    },
-    {
-      "path": "benchmarks/1885Sjson/EnrichedSjson",
-      "sourceSha256": null,
-      "byteLength": null,
-      "declaredUse": [
-        "normalization",
-        "topology",
-        "support-sites",
-        "route-partition"
-      ],
-      "realOrSimulated": "REAL_REPOSITORY_FIXTURE_PENDING_HASH",
-      "expectedIdentity": {},
-      "authorityNotes": [
-        "Exact-head runner not executed in connector environment."
-      ],
-      "status": "NOT_EXECUTED"
-    }
-  ],
+  "fixtureLedger": [],
   "fixtureRoleBindings": [
     {
-      "role": "TOPOLOGY_EDIT_20_OBJECT",
-      "path": null,
-      "sourceSha256": null,
-      "expectedIdentity": {},
-      "status": "MISSING_AUTHORITY"
-    },
-    {
       "role": "LARGE_MODEL_4884_ENTITY",
+      "sourceKind": "EXTERNAL_CONTENT_ADDRESSED_FILE",
       "path": null,
+      "bindingSource": "UNBOUND",
+      "status": "UNBOUND",
       "sourceSha256": null,
-      "expectedIdentity": {},
-      "status": "MISSING_AUTHORITY"
+      "expectedSourceSha256": "88e62782772d743e9236d13775476826f9649ab06d3161de35dc500baa85a9c6",
+      "actualIdentity": {},
+      "expectedIdentity": {
+        "entityCount": 4884,
+        "pipeCount": 3277,
+        "supportCount": 1331
+      },
+      "authoritySource": {
+        "path": "public/qualification/advanced-tab-benchmarks.md",
+        "evidence": "Accepted real-project benchmark; source bytes remain external and must be explicitly bound."
+      }
     },
     {
       "role": "REAL_1885_SUPPORT_BRANCH",
-      "path": null,
+      "sourceKind": "REPOSITORY_FILE",
+      "path": "benchmarks/Sjson.json",
+      "bindingSource": "AUTHORITY_DEFAULT",
+      "status": "NOT_EXECUTED",
       "sourceSha256": null,
-      "expectedIdentity": {},
-      "status": "MISSING_AUTHORITY"
+      "expectedSourceSha256": "6b2c8b01ab0ba6ec8e9e7c42eb4a719668ffd2dc4dbe4790d27cf426a1f60288",
+      "actualIdentity": {},
+      "expectedIdentity": {
+        "entityCount": 279,
+        "supportSourceRecordCount": 139,
+        "supportAssemblyCount": 38,
+        "supportPhysicalLocationCount": 37,
+        "routeCount": 13,
+        "renderableCount": 150
+      },
+      "authoritySource": {
+        "path": "tests/fixtures/topology-edit/1885s/fixture-manifest.json",
+        "evidence": "Accepted M005 repository fixture manifest and production-adapter certification."
+      }
+    },
+    {
+      "role": "TOPOLOGY_EDIT_20_OBJECT",
+      "sourceKind": "REPOSITORY_FILE",
+      "path": "public/fixtures/topology-edit-20-element-demo.staged.json",
+      "bindingSource": "AUTHORITY_DEFAULT",
+      "status": "NOT_EXECUTED",
+      "sourceSha256": null,
+      "expectedSourceSha256": null,
+      "actualIdentity": {},
+      "expectedIdentity": {
+        "entityCount": 20,
+        "pipeCount": 15,
+        "supportCount": 5
+      },
+      "authoritySource": {
+        "path": "e2e/topology-edit-20-element-demo-edit-flow.spec.js",
+        "evidence": "Production UI loads the repository fixture and requires 20 entities, 15 piping objects, and 5 supports."
+      }
     }
   ],
   "fixtureRuns": [],
@@ -91,10 +79,29 @@
       "message": "Run scripts/run-non-fea-current-main-baseline.mjs in a complete exact-head checkout and retain browser evidence.",
       "stageId": null,
       "details": null
+    },
+    {
+      "classification": "UNRESOLVED_GATE",
+      "code": "P0_FIXTURE_SHA_EXPECTATION_MISSING",
+      "message": "Execute and explicitly accept the captured 20-object fixture SHA-256.",
+      "stageId": null,
+      "details": {
+        "role": "TOPOLOGY_EDIT_20_OBJECT"
+      }
+    },
+    {
+      "classification": "MISSING_AUTHORITY",
+      "code": "P0_FIXTURE_AUTHORITY_UNBOUND",
+      "message": "Bind the accepted external 4,884-entity source bytes by repository-relative cache path.",
+      "stageId": null,
+      "details": {
+        "role": "LARGE_MODEL_4884_ENTITY"
+      }
     }
   ],
   "completion": {
     "P0_IMPLEMENTATION_PRESENT": true,
+    "P0_FIXTURE_AUTHORITY_MANIFEST_PRESENT": true,
     "P0_EXACT_HEAD_NODE_LEDGER_PRESENT": false,
     "P0_BROWSER_LEDGER_PRESENT": false,
     "P0_FIXTURE_AUTHORITY_COMPLETE": false,
