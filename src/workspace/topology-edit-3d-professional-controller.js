@@ -3,6 +3,9 @@ import {
   TopologyEdit3DViewController as InteractionController,
 } from './topology-edit-3d-interaction-controller.js';
 import {
+  TopologyEditObjectTreeRuntime,
+} from './viewport-productivity/topology-edit-object-tree-runtime.js';
+import {
   TopologyEditProfessionalOperationRuntime,
 } from './viewport-productivity/topology-edit-professional-operation-runtime.js';
 import {
@@ -28,6 +31,7 @@ const PRIMARY_NAVIGATION_SELECTORS = Object.freeze([
 ]);
 
 const PANEL_LABELS = Object.freeze({
+  'topology-edit-object-tree': 'Object tree',
   'topology-edit-canonical-search': 'Find object',
   'topology-edit-comparison': 'Changes',
   'topology-edit-review': 'Review & provenance',
@@ -43,6 +47,8 @@ let nextEditorDatasetSessionVersion = 1;
 export class TopologyEdit3DViewController extends InteractionController {
   constructor(eventBus, lifecycleOptions = {}) {
     super(eventBus, lifecycleOptions);
+    this.objectTreeElement = null;
+    this.objectTreeRuntime = new TopologyEditObjectTreeRuntime(this);
     this.professionalElement = null;
     this.professionalRuntime = new TopologyEditProfessionalOperationRuntime(this);
     this.editorDatasetObject = null;
@@ -67,6 +73,7 @@ export class TopologyEdit3DViewController extends InteractionController {
     const getBaseViewState = this.lifecycle.getViewState;
     this.lifecycle.getViewState = () => ({
       ...getBaseViewState(),
+      objectTree: this.objectTreeRuntime.viewState(),
       professionalOperation: this.professionalRuntime.viewState(),
     });
   }
@@ -87,22 +94,33 @@ export class TopologyEdit3DViewController extends InteractionController {
   buildShell() {
     super.buildShell();
     ensureTopologyEditProfessionalOperationStyles(this.hostElement?.ownerDocument);
-    const section = this.hostElement?.ownerDocument.createElement('section');
-    if (!section || !this.checkerElement) {
+    const documentRef = this.hostElement?.ownerDocument;
+    const objectTreeSection = documentRef?.createElement('section');
+    const professionalSection = documentRef?.createElement('section');
+    if (!objectTreeSection || !professionalSection || !this.checkerElement) {
       throw new Error('TopologyEditProfessionalController: panel host is unavailable.');
     }
-    section.dataset.role = 'topology-edit-professional-operation';
-    section.className = 'topology-edit-professional-operation';
-    section.setAttribute('aria-label', 'Professional engineering operation');
-    this.checkerElement.before(section);
-    this.professionalElement = section;
-    this.professionalRuntime.mount(section);
+
+    objectTreeSection.dataset.role = 'topology-edit-object-tree';
+    objectTreeSection.setAttribute('aria-label', 'Canonical object tree');
+    this.checkerElement.before(objectTreeSection);
+    this.objectTreeElement = objectTreeSection;
+    this.objectTreeRuntime.mount(objectTreeSection);
+
+    professionalSection.dataset.role = 'topology-edit-professional-operation';
+    professionalSection.className = 'topology-edit-professional-operation';
+    professionalSection.setAttribute('aria-label', 'Professional engineering operation');
+    this.checkerElement.before(professionalSection);
+    this.professionalElement = professionalSection;
+    this.professionalRuntime.mount(professionalSection);
     organizeCleanTopologyEditShell(this.hostElement);
   }
 
   deactivate() {
     this.disconnectEditorDatasetSnapshot();
     this.selectionCoordinator.disconnect();
+    this.objectTreeRuntime.destroy();
+    this.objectTreeElement = null;
     this.professionalRuntime.destroy();
     this.professionalElement = null;
     this.editorDatasetObject = null;
@@ -152,6 +170,7 @@ export class TopologyEdit3DViewController extends InteractionController {
       canonicalSelectionIds(canonical),
     );
     super.refreshView(canonical);
+    this.objectTreeRuntime.refresh(canonical);
     this.professionalRuntime.canonicalChanged(canonical);
   }
 
@@ -208,6 +227,7 @@ export class TopologyEdit3DViewController extends InteractionController {
 
   restoreDisplayState(viewState = {}) {
     super.restoreDisplayState(viewState);
+    this.objectTreeRuntime.restoreViewState(viewState.objectTree);
     this.professionalRuntime.restoreViewState(viewState.professionalOperation);
   }
 
@@ -253,6 +273,7 @@ export class TopologyEdit3DViewController extends InteractionController {
       this.hostElement.dataset.topologyEditSelectionHash =
         payload.selection.selectionHash;
     }
+    if (this.objectTreeElement) this.objectTreeRuntime.selectionChanged();
     if (this.professionalElement) this.professionalRuntime.selectionChanged();
     if (this.interactionPreview) this.clearInteractionState(false, true);
     this.interactionControllerRuntime?.sync();
