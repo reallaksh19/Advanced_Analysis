@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { semanticHash } from '../src/core/shared-piping-model/canonical-json.js';
+import { EMPIRICAL_FORMULA_REGISTER } from '../src/workspace/engineering-loads/empirical-formula-register.js';
 import { computeAuthorizedEmpiricalLoadInputSemanticHash } from '../src/workspace/engineering-loads/authorized-empirical-load-input.js';
 import {
   AUTHORIZED_EMPIRICAL_RUNTIME_PACKAGE_SCHEMA,
@@ -20,6 +21,14 @@ assert.equal(
   false,
   'branch-specific EMP-01 cutover manifest leaked into the shared controller suite',
 );
+assert.equal(
+  sharedRunner.includes('run-authorized-empirical-load-execution-checks.mjs'),
+  true,
+  'shared controller suite no longer qualifies authorized empirical execution',
+);
+assert.equal(EMPIRICAL_FORMULA_REGISTER.schema, 'empirical-formula-register/v1');
+assert.equal(EMPIRICAL_FORMULA_REGISTER.method, 'CHAINAGE_TRIBUTARY_SPAN_V2');
+assert.equal(EMPIRICAL_FORMULA_REGISTER.validation.detailedAnalysisSubstitution, false);
 
 const masterData = Object.freeze({ marker: 'MASTER-DATA-EMP01' });
 const runtimePackage = makeRuntimePackage();
@@ -96,6 +105,9 @@ console.log(JSON.stringify({
   executionId: execution.executionId,
   stagedJsonPathRetained: true,
   sharedSuiteBranchAgnostic: true,
+  formulaRegisterSchema: EMPIRICAL_FORMULA_REGISTER.schema,
+  formulaRegisterMethod: EMPIRICAL_FORMULA_REGISTER.method,
+  formulaRegisterSemanticHash: EMPIRICAL_FORMULA_REGISTER.semanticHash,
 }, null, 2));
 
 function makeRuntimePackage() {

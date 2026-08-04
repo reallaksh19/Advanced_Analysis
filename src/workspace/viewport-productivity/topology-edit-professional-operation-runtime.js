@@ -2,6 +2,10 @@ import {
   topologyEditProfessionalOperationDefaults,
 } from '../topology-edit/professional/topology-edit-professional-operation-session.js';
 import {
+  deriveTopologyEditComponentHudContext,
+  topologyEditComponentHudCandidateRecords,
+} from '../topology-edit/professional/topology-edit-component-hud-context.js';
+import {
   createTopologyEditSpecificationCatalogue,
 } from '../topology-edit/professional/topology-edit-spec-catalog.js';
 import {
@@ -30,6 +34,7 @@ export class TopologyEditProfessionalOperationRuntime {
     this.controller = controller;
     this.element = null;
     this.catalogue = null;
+    this.componentContext = null;
     this.values = createTopologyEditProfessionalInitialValues();
     this.plan = null;
     this.candidate = null;
@@ -62,10 +67,12 @@ export class TopologyEditProfessionalOperationRuntime {
           )?.recordId ?? '',
         };
       }
+      this.reconcileComponentContext();
       this.message = `Catalogue ${this.catalogue.catalogueId} loaded from exact source digest.`;
       this.error = null;
     } catch (error) {
       this.catalogue = null;
+      this.componentContext = null;
       this.error = errorMessage(error);
     }
     this.render();
@@ -77,6 +84,7 @@ export class TopologyEditProfessionalOperationRuntime {
       ...this.values,
       ...topologyEditProfessionalOperationDefaults(this.controller.selection),
     };
+    this.reconcileComponentContext();
     this.clear(false, false);
   }
 
@@ -85,9 +93,39 @@ export class TopologyEditProfessionalOperationRuntime {
       this.clear(false, false);
       this.message = 'Professional plan cleared because its canonical basis changed.';
     }
+    this.reconcileComponentContext(canonical);
     reconcileTopologyEditProfessionalReceipts(this, canonical);
     this.render();
     this.updateEvidence();
+  }
+
+  reconcileComponentContext(canonical = this.controller.session?.currentTopology?.()) {
+    if (!canonical || !this.catalogue) {
+      this.componentContext = null;
+      return null;
+    }
+    this.componentContext = deriveTopologyEditComponentHudContext({
+      topology: canonical,
+      selection: this.controller.selection,
+      catalogue: this.catalogue,
+      workspaceDataset: this.controller.workspaceDataset,
+    });
+    if (!this.componentContext.supported) return this.componentContext;
+    const candidateIds = new Set(
+      topologyEditComponentHudCandidateRecords(this.componentContext, this.catalogue)
+        .map((record) => record.recordId),
+    );
+    const retained = candidateIds.has(this.values.catalogueRecordId)
+      ? this.values.catalogueRecordId
+      : '';
+    this.values = {
+      ...this.values,
+      catalogueRecordId: retained || this.componentContext.recommendedRecordId || '',
+      entityType: this.componentContext.componentType,
+      diameterMm: this.componentContext.sourceEvidence?.nominalSizeMm
+        ?? this.values.diameterMm,
+    };
+    return this.componentContext;
   }
 
   handleAction(action) {
@@ -157,6 +195,7 @@ export class TopologyEditProfessionalOperationRuntime {
 
   restoreViewState(value) {
     restoreTopologyEditProfessionalViewState(this, value);
+    this.reconcileComponentContext();
     this.render();
     this.updateEvidence();
   }
@@ -184,6 +223,7 @@ export class TopologyEditProfessionalOperationRuntime {
   destroy() {
     this.clear(false, true);
     this.validationClient.destroy();
+    this.componentContext = null;
     this.element = null;
   }
 }
