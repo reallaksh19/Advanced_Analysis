@@ -1160,3 +1160,49 @@ exactly as-is — loosening it is a separate, deliberate decision),
 StagedJSON unification (Phase 2), and any in-app UI (Phase 3; JSON/CSV
 export via this repo's existing `sealExportRecord` pattern is the
 "shown to user" surface for this phase).
+
+### M021 (#561) → PR #564, merged as `83544ee9131b0e30f853d70cb83f9d2c762c7177`
+
+Reviewed in full: cloned the exact PR head into an isolated worktree,
+confirmed the claimed 4-file diff against the real declared base, read
+every changed file end to end before running anything.
+
+The implementation is clean and correctly scoped — `resolutionFor`
+cross-references the adapter's own `{LABEL}_INHERITED_FROM_PRIOR_
+ELEMENT` diagnostics rather than re-deriving inheritance logic
+independently (avoids any risk of silently diverging from the real
+adapter behavior), tracks `fromElement` via a `lastDeclared` map
+updated in true document order matching the adapter's own forward-only
+carry-forward semantics, and `validateResolutionRows` enforces real
+structural invariants (a `MISSING` row may carry nothing but `status`;
+an `INHERITED` row must name `fromElement`). Honestly flagged and
+correctly resolved two deviations from the issue's own illustrative
+examples against the live file rather than forcing them: `IX-S2`
+redeclares `MATERIAL_NAME` explicitly (so `DECLARED`, not `INHERITED`
+as the issue guessed), and insulation density has two real declaration
+points (`IX-S4` and `IX-S6`, with the provenance chain correctly
+resetting at `IX-S6`) rather than the issue's assumed single point —
+exactly the "follow the live source over the assumption" discipline
+the mandate requires.
+
+Unlike M020, this PR needed **no fix** — every required command passed
+on the first real run: `check:lfea-b3.16`, `lfea-inputxml-ingest-check`,
+`check:lfea-presentation-export`, and the full `check:lfea-linear-core`
+aggregate (44 PASS markers, zero FAIL). Independently re-verified the
+real numbers by dumping the JSON/CSV output directly: `elasticModulus
+=203395328000 Pa`, `pressure=2100000 Pa`, `operatingTemperature=
+355.15 K` on `IX-S1` all match the Owner's own hand-verified M020
+values exactly; `IX-S1`–`IX-S3` correctly show `insulationDensity:
+MISSING`; `IX-S2` correctly shows `diameter`/`thickness` `INHERITED`
+from `IX-S1` with `MATERIAL_NAME` `DECLARED`; node 45's restraint
+record carries full `17→14` mutation evidence. Post-merge sanity check
+on fresh `main` at `83544ee9` also passed end to end. Both worktrees
+cleaned up.
+
+This closes the loop the M020 review opened: the exact gap an Owner
+had to find by manually reading a diagnostics array and cross-checking
+external CAESAR data by hand is now a first-class, explicitly-flagged
+field in a reviewable document — `benchmarks/LFEA/BM1/BM1_InputXML.xml`'s
+real `insulationDensity: MISSING` on its first three elements will
+show up structurally for anyone (or any future UI) reading this
+document, not just an Owner who happened to go looking.
