@@ -68,12 +68,13 @@ test('demo P-001 split accepts inherited physical-clearance findings through edg
   const transition = session.execute('SPLIT_EDGE', { edgeId: 'edge:P-001', fraction: 0.5 });
 
   assert.equal(transition.disposition, 'ACCEPTED');
-  const children = transition.candidate.canonicalTopology.edges.filter((edge) => (
+  const candidate = transition.certification.candidate;
+  const children = candidate.canonicalTopology.edges.filter((edge) => (
     edge.derivedFromEdgeId === 'edge:P-001'
   ));
   assert.equal(children.length, 2);
   assert.equal(
-    transition.candidate.checkerDelta.introducedIssues.some((issue) => (
+    candidate.checkerDelta.introducedIssues.some((issue) => (
       issue.kind === 'PHYSICAL_CLEARANCE_CLASH'
       && issue.edgeIds.includes('edge:E-001')
     )),
@@ -87,12 +88,13 @@ test('subdividing an already-clashing edge does not fabricate a new high checker
   const transition = session.execute('SPLIT_EDGE', { edgeId: 'edge:a', fraction: 0.5 });
 
   assert.equal(transition.disposition, 'ACCEPTED');
+  const candidate = transition.certification.candidate;
   assert.equal(
-    transition.candidate.beforeChecker.issues.some((issue) => issue.kind === 'PHYSICAL_CLEARANCE_CLASH'),
+    candidate.beforeChecker.issues.some((issue) => issue.kind === 'PHYSICAL_CLEARANCE_CLASH'),
     true,
   );
   assert.equal(
-    transition.candidate.checkerDelta.introducedIssues.some((issue) => issue.kind === 'PHYSICAL_CLEARANCE_CLASH'),
+    candidate.checkerDelta.introducedIssues.some((issue) => issue.kind === 'PHYSICAL_CLEARANCE_CLASH'),
     false,
   );
 });
@@ -106,7 +108,7 @@ test('a genuinely new physical-clearance clash remains blocking', () => {
   });
 
   assert.equal(transition.disposition, 'REJECTED');
-  assert.ok(transition.validationReport.errors.some((row) => (
+  assert.ok(transition.certification.validationReport.errors.some((row) => (
     row.code === 'CHECKER_REGRESSION'
     && row.message.includes('PHYSICAL_CLEARANCE_CLASH')
   )));
