@@ -1,124 +1,85 @@
 import { CANONICAL_GEOMETRY_SCHEMA_VERSION } from '../geometryTypes.js';
 import { validateCanonicalGeometry } from '../validateCanonicalGeometry.js';
-import {
-  attributeValue,
-  findAnyElements,
-  findElements,
-  firstElement,
-} from './inputxml-tag-scanner.js';
+import { attributeValue, findAnyElements, findElements, firstElement } from './inputxml-tag-scanner.js';
 import { checkDeclaredRadius, resolveBendArcCentre } from './inputxml-bend-arc.js';
+import {
+  mutateRestraintType,
+  normalizeRestraintTypeMutationConfig,
+  normalizeRestraintTypeValue,
+} from './inputxml-restraint-type-mutation.js';
+import {
+  convertInputXmlLengthToMetres,
+  convertInputXmlScalar,
+  parseInputXmlUnitSystem,
+} from './inputxml-unit-system.js';
 
 /**
- * CAESAR II InputXML (`<CAESARII><PIPINGMODEL><PIPINGELEMENT>...`) to
- * canonical geometry (`nodes` + `segments`, `schemaVersion: 'canonical-geometry-v1'`).
- *
- * Replaces `pcfToCanonicalGeometry.js` as LFEA's geometry ingestion path.
- * InputXML gives two things PCF never did, both load-bearing for
- * `centerline-beam-fea`: real deflection-based coordinate solving (CAESAR
- * stores relative deltas between nodes, not absolute points, so a route has
- * to be solved, not just read), and a genuine bend radius, which this module
- * turns into an arc centre via `resolveBendArcCentre` — closing the
- * `BEND_ARC_GEOMETRY_NOT_DECLARED` gap LFEA B-1 had to degrade around for
- * every PCF-imported elbow.
- *
- * Ported from the InputXML engine in `reallaksh19/3D_Converters`
- * (`uxml/UxmlInputXmlSchemaMapper.js`), not copied — reimplemented against
- * this repository's `no hidden values, fail closed` rules, which the source
- * engine does not follow in three specific places. Each is a deliberate
- * behavioural change, not an oversight:
- *
- * 1. A disconnected node group is REJECTED (`INPUTXML_DISCONNECTED_NODE_SET`)
- *    instead of silently reseeded at `(0,0,0)` — reseeding an unrelated
- *    routing group at the origin makes it overlap the first group in space.
- *    A caller who genuinely has more than one physical group in one file
- *    supplies `options.componentOrigins` explicitly.
- * 2. Diameter/wall-thickness/material inheritance from the previous element
- *    (a real, common InputXML export convention — CAESAR omits a value that
- *    has not changed) is preserved, but every inheritance is now a
- *    diagnostic (`*_INHERITED_FROM_PRIOR_ELEMENT`), not a silent carry.
- * 3. A restraint's CAESAR `TYPE` numeric code is never guessed into
- *    `ANCHOR`/`GUIDE` — the code table is not standardised enough across
- *    CAESAR II versions to bake in. It classifies as `UNKNOWN` unless the
- *    caller supplies a declared `options.restraintTypeCodeMap`.
- *
- * **Bend arc-centre resolution — verified, and honestly scoped.** The maths
- * in `resolveBendArcCentre` is exact and hand-verified (see its own doc), and
- * `checkDeclaredRadius` refuses to declare a centre the geometry does not
- * support. Run against a real CAESAR II InputXML export (`3D_Converters`
- * benchmark `INLET-SEPARATOR-SKID-C2_INPUT.XML`), most `BEND` elements turned
- * out to be compound, multi-cut miters (two declared angles across one
- * element's FROM/TO span) — correctly refused as `BEND_COMPOUND_MITER_NOT_SUPPORTED`,
- * since a single circle cannot represent two arcs. The one genuinely simple
- * (single-angle) bend in that file still did not pass the radius check,
- * meaning CAESAR's FROM_NODE/TO_NODE convention for an isolated simple bend
- * needs more reverse-engineering than this module attempts — resolving it
- * with more confidence is a scoped-out follow-up, not done here. The
- * load-bearing property is the refusal, not the resolution rate: every
- * bend this module cannot verify stays exactly where PCF left it
- * (`BEND_ARC_GEOMETRY_NOT_DECLARED`, span-seeded only by LFEA B-1), never a
- * silently wrong centre.
- *
- * @param {string} xmlText Raw InputXML text.
- * @param {{unit:string, source?:string, componentOrigins?:Record<string,{x:number,y:number,z:number}>,
- *          restraintTypeCodeMap?:Record<string,'ANCHOR'|'GUIDE'>, bendRadiusTolerance?:number,
- *          fileName?:string}} options
- *        `unit` is required — InputXML does not self-declare length units reliably; guessing
- *        one would be exactly the hidden default this module exists to avoid.
- * @returns {import('../geometryTypes.js').CanonicalGeometry}
+ * CAESAR II InputXML to canonical geometry plus traceable analysis-source
+ * metadata. The file's own <UNITS> declaration is authoritative when present;
+ * `options.unit` remains the fallback for minimal/older files.
  */
 export function inputXmlToCanonicalGeometry(xmlText, options = {}) {
-  if (!options.unit) {
-    throw new TypeError('inputXmlToCanonicalGeometry requires options.unit; InputXML does not declare it reliably.');
-  }
-  const bendRadiusTolerance = options.bendRadiusTolerance ?? 1e-3;
   const diagnostics = [];
+  const unitSystem = parseInputXmlUnitSystem(xmlText, options.unit, diagnostics);
+  if (!unitSystem.lengthUnit) {
+    throw new TypeError(
+      'inputXmlToCanonicalGeometry requires options.unit when InputXML has no supported <UNITS><LENGTH> declaration.',
+    );
+  }
   const source = options.source || 'inputxml';
-
   const pipingModelAttrs = firstElement(xmlText, ['PIPINGMODEL'])?.attributes || {};
   const jobName = attributeValue(pipingModelAttrs, 'JOBNAME');
-
   const elementTags = findElements(xmlText, 'PIPINGELEMENT');
   if (elementTags.length === 0) {
     addDiagnostic(diagnostics, 'warn', 'INPUTXML_NO_PIPINGELEMENT', 'No PIPINGELEMENT tags found; nothing to convert.');
   }
-
   const edges = buildEdges(elementTags, diagnostics);
   const solved = solveNodeCoordinates(edges, options.componentOrigins || {}, diagnostics);
-  const { nodes, segments } = buildNodesAndSegments(edges, solved.nodeCoords, options, diagnostics);
-
+  const { nodes, segments } = buildNodesAndSegments(
+    edges,
+    solved.nodeCoords,
+    { ...options, unitSystem },
+    diagnostics,
+  );
   const geometry = {
     schemaVersion: CANONICAL_GEOMETRY_SCHEMA_VERSION,
     nodes,
     segments,
     source,
-    unit: options.unit,
+    unit: unitSystem.lengthUnit,
     diagnostics: [],
     summary: {
       componentCount: elementTags.length,
       nodeCount: nodes.length,
       segmentCount: segments.length,
       jobName,
+      inputXmlUnitsDeclared: unitSystem.declared,
+      inputXmlLengthUnit: unitSystem.lengthUnit,
     },
   };
-
-  const validation = validateCanonicalGeometry(geometry, { tolerance: options.tolerance, requireKnownUnit: false });
+  const validation = validateCanonicalGeometry(geometry, {
+    tolerance: options.tolerance,
+    requireKnownUnit: false,
+  });
   geometry.diagnostics = [...diagnostics, ...validation.diagnostics];
   geometry.summary = { ...geometry.summary, ...validation.summary, jobName };
-  geometry.valid = validation.ok && solved.disconnectedGroups.length === 0;
-
+  geometry.valid = validation.ok
+    && solved.disconnectedGroups.length === 0
+    && !diagnostics.some((row) => String(row.severity).toLowerCase() === 'error');
   return geometry;
 }
 
 const CAESAR_SENTINEL_VALUE = -1.0101;
+const CAESAR_DOUBLE_SENTINEL_VALUE = -2.0202;
 const CAESAR_SENTINEL_TOLERANCE = 0.001;
-
+const BEND_ANGLE_TOLERANCE = 1e-9;
 const BEND_TAGS = ['BEND', 'BENDS', 'ELBOW', 'ELBOWS'];
 const RIGID_TAGS = ['RIGID', 'RIGIDS'];
 const SIF_TAGS = ['SIF', 'SIFS'];
+const HANGER_TAGS = ['HANGER', 'HANGERS'];
+const ALLOWABLE_STRESS_TAGS = ['ALLOWABLESTRESS'];
 const REDUCER_TAGS = ['REDUCER', 'REDUCERS', 'REDU', 'REDC', 'REDE'];
 const RESTRAINT_TAGS = ['RESTRAINT', 'RESTRAINTS'];
-
-/** Established CAESAR II SIF type codes for branch fittings. */
 const SIF_TYPE_WELDING_TEE = 3;
 const SIF_TYPE_WELDOLET = 5;
 
@@ -128,7 +89,13 @@ function buildEdges(elementTags, diagnostics) {
     const fromNode = cleanNodeId(attributeValue(attrs, 'FROM_NODE', 'FROMNODE', 'FROM'));
     const toNode = cleanNodeId(attributeValue(attrs, 'TO_NODE', 'TONODE', 'TO'));
     if (!fromNode || !toNode) {
-      addDiagnostic(diagnostics, 'error', 'INPUTXML_ELEMENT_NODE_MISSING', `PIPINGELEMENT #${index + 1} is missing FROM_NODE or TO_NODE.`, { index });
+      addDiagnostic(
+        diagnostics,
+        'error',
+        'INPUTXML_ELEMENT_NODE_MISSING',
+        `PIPINGELEMENT #${index + 1} is missing FROM_NODE or TO_NODE.`,
+        { index },
+      );
     }
     return {
       index,
@@ -143,15 +110,6 @@ function buildEdges(elementTags, diagnostics) {
   }).filter((edge) => edge.fromNode && edge.toNode);
 }
 
-/**
- * Solve absolute node coordinates from CAESAR's relative deltas.
- *
- * CAESAR stores `TO = FROM + delta`. Every reachable node is solved by
- * propagating from a seed until no further node can be resolved. Unlike the
- * source engine, an unreachable (disconnected) group is never silently
- * reseeded at the origin — it is reported and left unsolved unless
- * `componentOrigins` declares a seed for it.
- */
 function solveNodeCoordinates(edges, componentOrigins, diagnostics) {
   const nodeCoords = new Map();
   const setNode = (id, point) => {
@@ -169,25 +127,20 @@ function solveNodeCoordinates(edges, componentOrigins, diagnostics) {
     }
     return changed;
   };
-
   for (const [nodeId, point] of Object.entries(componentOrigins)) setNode(cleanNodeId(nodeId), point);
-  // The first element's FROM_NODE anchors the coordinate system at the
-  // origin — standard for a relative-coordinate format, and not a hidden
-  // default since there is no other candidate origin absent a caller-declared
-  // one. `setNode` is a no-op if `componentOrigins` already placed this node,
-  // so this never overrides an explicit origin. Every OTHER disconnected
-  // group still requires an explicit entry in `componentOrigins`.
   if (edges.length > 0) setNode(edges[0].fromNode, { x: 0, y: 0, z: 0 });
-  while (propagate()) { /* until fixed point */ }
-
+  while (propagate()) { /* fixed point */ }
   const unsolved = edges.filter((edge) => !nodeCoords.has(edge.fromNode) || !nodeCoords.has(edge.toNode));
   const disconnectedGroups = groupUnsolvedEdges(unsolved);
   disconnectedGroups.forEach((group, groupIndex) => {
-    addDiagnostic(diagnostics, 'error', 'INPUTXML_DISCONNECTED_NODE_SET',
+    addDiagnostic(
+      diagnostics,
+      'error',
+      'INPUTXML_DISCONNECTED_NODE_SET',
       `Node group ${groupIndex + 1} (nodes ${group.join(', ')}) is not connected to the solved route; supply options.componentOrigins to place it.`,
-      { nodeIds: group });
+      { nodeIds: group },
+    );
   });
-
   return { nodeCoords, disconnectedGroups };
 }
 
@@ -233,25 +186,18 @@ function buildNodesAndSegments(edges, nodeCoords, options, diagnostics) {
     }
     return nodesById.get(nodeId);
   };
-
-  let inheritedDiameter = null;
-  let inheritedThickness = null;
-  let inheritedMaterial = null;
+  const carry = Object.create(null);
   const segments = [];
   const segmentsByFromNode = new Map();
-
+  const mutationConfig = normalizeRestraintTypeMutationConfig(options.restraintTypeMutation);
   edges.forEach((edge) => {
     ensureNode(edge.fromNode);
     ensureNode(edge.toNode);
-    applyRestraints(edge, nodesById, options.restraintTypeCodeMap || {}, diagnostics);
-
-    const diameterResult = resolveInheritedField(edge, ['DIAMETER', 'BORE', 'NOMINAL_DIAMETER'], inheritedDiameter, 'DIAMETER', diagnostics);
-    inheritedDiameter = diameterResult.carryForward;
-    const thicknessResult = resolveInheritedField(edge, ['WALL_THICK', 'THICKNESS'], inheritedThickness, 'WALL_THICK', diagnostics);
-    inheritedThickness = thicknessResult.carryForward;
-    const materialResult = resolveInheritedStringField(edge, ['MATERIAL_NAME'], inheritedMaterial, 'MATERIAL_NAME', diagnostics);
-    inheritedMaterial = materialResult.carryForward;
-
+    applyRestraints(edge, nodesById, options.restraintTypeCodeMap || {}, mutationConfig, diagnostics);
+    const diameter = inheritedSourceField(edge, ['DIAMETER', 'BORE', 'NOMINAL_DIAMETER'], carry, 'diameter', 'DIAMETER', diagnostics);
+    const thickness = inheritedSourceField(edge, ['WALL_THICK', 'THICKNESS'], carry, 'thickness', 'WALL_THICK', diagnostics);
+    const material = inheritedStringField(edge, ['MATERIAL_NAME'], carry, 'material', 'MATERIAL_NAME', diagnostics);
+    const analysis = analysisMetadata(edge, carry, options.unitSystem, diagnostics);
     const type = classifyElementType(edge.tag.inner);
     const segment = {
       id: `IX-S${edge.index + 1}`,
@@ -260,86 +206,252 @@ function buildNodesAndSegments(edges, nodeCoords, options, diagnostics) {
       type,
       sourceComponentUid: `PIPINGELEMENT[${edge.index}]`,
       length: null,
-      diameter: diameterResult.value ?? undefined,
-      thickness: thicknessResult.value ?? undefined,
-      material: materialResult.value ?? undefined,
+      diameter: diameter ?? undefined,
+      thickness: thickness ?? undefined,
+      material: material ?? undefined,
       meta: {
         materialNumber: caesarNumberOrNull(attributeValue(edge.attrs, 'MATERIAL_NUM')),
         sourceType: type,
         sourceIndex: edge.index,
+        analysis,
       },
     };
-    if (type === 'BEND') attachBendGeometry(segment, edge, segmentsByFromNode, nodeCoords, bendToleranceOf(options), diagnostics);
-
+    attachChildEvidence(segment, edge, options.unitSystem, diagnostics);
+    if (type === 'BEND') {
+      attachBendGeometry(segment, edge, bendToleranceOf(options), diagnostics);
+    }
     segments.push(segment);
     if (!segmentsByFromNode.has(edge.fromNode)) segmentsByFromNode.set(edge.fromNode, []);
     segmentsByFromNode.get(edge.fromNode).push(segment);
   });
-
   const segmentsEndingAt = new Map();
   segments.forEach((segment) => {
     if (!segmentsEndingAt.has(segment.endNodeId)) segmentsEndingAt.set(segment.endNodeId, []);
     segmentsEndingAt.get(segment.endNodeId).push(segment);
   });
-  segments.filter((segment) => segment.type === 'BEND' && !segment.meta.bendArcCentre).forEach((segment) => {
-    resolveBendFromPredecessor(segment, segmentsEndingAt, nodeCoords, bendToleranceOf(options), diagnostics);
-  });
-
+  segments.filter((segment) => segment.type === 'BEND' && !segment.meta.bendArcCentre)
+    .forEach((segment) => resolveBendFromPredecessor(
+      segment, segmentsEndingAt, nodeCoords, bendToleranceOf(options), diagnostics,
+    ));
   const nodes = [...nodesById.values()].map((node) => finalizeNode(node, diagnostics));
   segments.forEach((segment) => {
     const start = nodesById.get(segment.startNodeId);
     const end = nodesById.get(segment.endNodeId);
-    if (start.x != null && end.x != null) {
-      segment.length = distance(start, end);
-    }
+    if (start.x != null && end.x != null) segment.length = distance(start, end);
   });
-
   return { nodes, segments };
+}
+
+function inheritedSourceField(edge, names, carry, key, label, diagnostics) {
+  const own = caesarNumberOrNull(attributeValue(edge.attrs, ...names));
+  if (own != null) {
+    carry[key] = own;
+    return own;
+  }
+  if (carry[key] != null) {
+    inheritedDiagnostic(edge, label, carry[key], diagnostics);
+    return carry[key];
+  }
+  return null;
+}
+
+function inheritedStringField(edge, names, carry, key, label, diagnostics) {
+  const own = attributeValue(edge.attrs, ...names) || null;
+  if (own) {
+    carry[key] = own;
+    return own;
+  }
+  if (carry[key]) {
+    inheritedDiagnostic(edge, label, carry[key], diagnostics);
+    return carry[key];
+  }
+  return null;
+}
+
+function inheritedCanonicalField({ edge, names, carry, key, label, diagnostics, declaration, quantity, convert }) {
+  const own = caesarNumberOrNull(attributeValue(edge.attrs, ...names));
+  if (own != null) {
+    let canonical;
+    try {
+      canonical = convert ? convert(own) : convertInputXmlScalar(own, declaration, quantity);
+    } catch (error) {
+      addDiagnostic(
+        diagnostics,
+        'error',
+        'INPUTXML_UNIT_DECLARATION_REQUIRED',
+        error instanceof Error ? error.message : String(error),
+        { elementIndex: edge.index, field: label },
+      );
+      return null;
+    }
+    carry[key] = canonical;
+    return canonical;
+  }
+  if (carry[key] != null) {
+    inheritedDiagnostic(edge, label, carry[key], diagnostics);
+    return carry[key];
+  }
+  return null;
+}
+
+function inheritedDiagnostic(edge, label, value, diagnostics) {
+  addDiagnostic(
+    diagnostics,
+    'info',
+    `${label}_INHERITED_FROM_PRIOR_ELEMENT`,
+    `Element ${edge.index + 1} has no ${label}; inherited ${value} from the prior element.`,
+    { elementIndex: edge.index, value },
+  );
+}
+
+function analysisMetadata(edge, carry, units, diagnostics) {
+  const length = (value) => convertInputXmlLengthToMetres(value, units.lengthUnit);
+  return {
+    elasticModulus: inheritedCanonicalField({ edge, names: ['MODULUS'], carry, key: 'elasticModulus', label: 'MODULUS', diagnostics, declaration: units.elasticModulus, quantity: 'EMOD' }),
+    poissonRatio: inheritedCanonicalField({ edge, names: ['POISSONS'], carry, key: 'poissonRatio', label: 'POISSONS', diagnostics, convert: (value) => value }),
+    operatingTemperature: inheritedCanonicalField({ edge, names: ['TEMP_EXP_C1'], carry, key: 'operatingTemperature', label: 'TEMP_EXP_C1', diagnostics, declaration: units.temperature, quantity: 'TEMP' }),
+    pressure: inheritedCanonicalField({ edge, names: ['PRESSURE1'], carry, key: 'pressure', label: 'PRESSURE1', diagnostics, declaration: units.pressure, quantity: 'PRESSURE' }),
+    hydroPressure: inheritedCanonicalField({ edge, names: ['HYDRO_PRESSURE'], carry, key: 'hydroPressure', label: 'HYDRO_PRESSURE', diagnostics, declaration: units.pressure, quantity: 'PRESSURE' }),
+    fluidDensity: inheritedCanonicalField({ edge, names: ['FLUID_DENSITY', 'FDENSITY'], carry, key: 'fluidDensity', label: 'FLUID_DENSITY', diagnostics, declaration: units.fluidDensity, quantity: 'FDENS' }),
+    pipeDensity: inheritedCanonicalField({ edge, names: ['PIPE_DENSITY', 'PDENSITY'], carry, key: 'pipeDensity', label: 'PIPE_DENSITY', diagnostics, declaration: units.pipeDensity, quantity: 'PDENS' }),
+    insulationThickness: inheritedCanonicalField({ edge, names: ['INSUL_THICK'], carry, key: 'insulationThickness', label: 'INSUL_THICK', diagnostics, convert: length }),
+    insulationDensity: inheritedCanonicalField({ edge, names: ['INSUL_DENSITY', 'IDENSITY'], carry, key: 'insulationDensity', label: 'INSUL_DENSITY', diagnostics, declaration: units.insulationDensity, quantity: 'IDENS' }),
+    corrosionAllowance: inheritedCanonicalField({ edge, names: ['CORR_ALLOW'], carry, key: 'corrosionAllowance', label: 'CORR_ALLOW', diagnostics, convert: length }),
+  };
+}
+
+function attachChildEvidence(segment, edge, units, diagnostics) {
+  const rigid = firstElement(edge.tag.inner, RIGID_TAGS);
+  if (rigid) {
+    const rawWeight = caesarNumberOrNull(attributeValue(rigid.attributes, 'WEIGHT'));
+    segment.meta.analysis.rigid = {
+      type: attributeValue(rigid.attributes, 'TYPE', 'RIGID_TYPE') || null,
+      weight: rawWeight == null ? null : safeConvert(rawWeight, units.force, 'FORCE', edge, diagnostics),
+    };
+  }
+  const sifs = findAnyElements(edge.tag.inner, SIF_TAGS)
+    .map((tag) => ({
+      nodeId: cleanNodeId(attributeValue(tag.attributes, 'NODE')) || null,
+      typeCode: caesarNumberOrNull(attributeValue(tag.attributes, 'TYPE')),
+      inPlane: caesarNumberOrNull(attributeValue(tag.attributes, 'SIF_IN')),
+      outOfPlane: caesarNumberOrNull(attributeValue(tag.attributes, 'SIF_OUT')),
+    }))
+    .filter((row) => row.nodeId !== null);
+  if (sifs.length > 0) {
+    segment.meta.analysis.sifs = sifs;
+    addDiagnostic(
+      diagnostics, 'warn', 'INPUTXML_SIF_PRESENT_NOT_COMPILED',
+      `Element ${edge.index + 1} contains ${sifs.length} active SIF record(s); their evidence is retained but no SIF override is silently applied by geometry ingestion.`,
+      { elementIndex: edge.index, sifs },
+    );
+  }
+  const hangers = findAnyElements(edge.tag.inner, HANGER_TAGS)
+    .map((tag) => ({
+      nodeId: cleanNodeId(attributeValue(tag.attributes, 'NODE')) || null,
+      hangerTable: caesarNumberOrNull(attributeValue(tag.attributes, 'HGR_TABLE')),
+      loadVariation: caesarNumberOrNull(attributeValue(tag.attributes, 'LOAD_VAR')),
+    }))
+    .filter((row) => row.nodeId !== null);
+  if (hangers.length > 0) {
+    segment.meta.analysis.hangers = hangers;
+    addDiagnostic(
+      diagnostics, 'warn', 'INPUTXML_HANGER_PRESENT_NOT_COMPILED',
+      `Element ${edge.index + 1} contains ${hangers.length} active HANGER record(s); they are retained and explicitly reported as unsupported rather than dropped.`,
+      { elementIndex: edge.index, hangers },
+    );
+  }
+  const allowableCount = findAnyElements(edge.tag.inner, ALLOWABLE_STRESS_TAGS).length;
+  if (allowableCount > 0) {
+    segment.meta.analysis.allowableStressRecordCount = allowableCount;
+    addDiagnostic(
+      diagnostics, 'info', 'INPUTXML_ALLOWABLE_STRESS_RECORD_PRESENT',
+      `Element ${edge.index + 1} contains ALLOWABLESTRESS data; geometry ingestion records its presence but B-4 authority remains separately declared.`,
+      { elementIndex: edge.index, recordCount: allowableCount },
+    );
+  }
+}
+
+function safeConvert(value, declaration, quantity, edge, diagnostics) {
+  try {
+    return convertInputXmlScalar(value, declaration, quantity);
+  } catch (error) {
+    addDiagnostic(
+      diagnostics, 'error', 'INPUTXML_UNIT_DECLARATION_REQUIRED',
+      error instanceof Error ? error.message : String(error),
+      { elementIndex: edge.index, quantity },
+    );
+    return null;
+  }
 }
 
 function bendToleranceOf(options) {
   return options.bendRadiusTolerance ?? 1e-3;
 }
 
-/**
- * Resolve a bend's arc centre using its declared RADIUS and the direction
- * arriving from the node's predecessor segment(s), when unambiguous. Left
- * undeclared (with a diagnostic) when the geometry cannot be resolved
- * confidently rather than guessed at — LFEA B-1's node-seeding already
- * degrades gracefully to span-only seeding for a bend with no declared arc.
- */
-function attachBendGeometry(segment, edge, segmentsByFromNode, nodeCoords, tolerance, diagnostics) {
+function attachBendGeometry(segment, edge, _tolerance, diagnostics) {
   const bendTag = firstElement(edge.tag.inner, BEND_TAGS);
-  const declaredRadius = caesarNumberOrNull(attributeValue(bendTag?.attributes || {}, 'RADIUS'));
-  const angle2 = caesarNumberOrNull(attributeValue(bendTag?.attributes || {}, 'ANGLE2'));
-  const numMiter = caesarNumberOrNull(attributeValue(bendTag?.attributes || {}, 'NUM_MITER'));
+  const attrs = bendTag?.attributes || {};
+  const declaredRadius = caesarNumberOrNull(attributeValue(attrs, 'RADIUS'));
+  const rawAngle1 = rawFiniteNumber(attributeValue(attrs, 'ANGLE1'));
+  const rawAngle2 = rawFiniteNumber(attributeValue(attrs, 'ANGLE2'));
+  const angle1 = physicalBendAngle(rawAngle1);
+  const angle2 = physicalBendAngle(rawAngle2);
+  const numMiter = caesarNumberOrNull(attributeValue(attrs, 'NUM_MITER'));
+  const node1 = cleanNodeId(attributeValue(attrs, 'NODE1')) || null;
+  const node2 = cleanNodeId(attributeValue(attrs, 'NODE2')) || null;
+  const internalStationNodes = [node1, node2].filter(
+    (nodeId) => nodeId && nodeId !== segment.startNodeId && nodeId !== segment.endNodeId,
+  );
   segment.meta.bendDeclaredRadius = declaredRadius ?? undefined;
-  segment.meta.bendAngle1 = caesarNumberOrNull(attributeValue(bendTag?.attributes || {}, 'ANGLE1')) ?? undefined;
+  segment.meta.bendAngle1 = angle1 ?? undefined;
   segment.meta.bendAngle2 = angle2 ?? undefined;
   segment.meta.numMiter = numMiter ?? undefined;
-  // A second declared angle (or NUM_MITER > 1) means this element is a
-  // compound, multi-cut miter bend: its FROM_NODE/TO_NODE span more than one
-  // arc, each needing its own incoming direction and radius, which
-  // `resolveBendArcCentre`'s single-circle model cannot represent. Resolving
-  // one circle across a compound span would silently produce a wrong centre
-  // rather than a missing one — say so plainly instead.
-  const isCompound = (angle2 != null) || (numMiter != null && numMiter > 1);
+  segment.meta.bendStationNode1 = node1 ?? undefined;
+  segment.meta.bendStationNode2 = node2 ?? undefined;
+  if (isDoubleSentinel(rawAngle1)) {
+    segment.meta.bendAngle1Automatic = true;
+    addDiagnostic(
+      diagnostics, 'info', 'BEND_ANGLE_AUTOMATIC_SENTINEL_NORMALIZED',
+      `Bend segment ${segment.id} carries ANGLE1=-2.0202 (twice the CAESAR unset sentinel); it is treated as an automatic/unset angle, not a physical -2.0202-degree bend.`,
+      { segmentId: segment.id, rawAngle1 },
+    );
+  }
+  const isCompound = angle2 != null || (numMiter != null && numMiter > 1);
   segment.meta.bendCompoundMiter = isCompound || undefined;
+  segment.meta.bendInternalStations = internalStationNodes.length > 0 || undefined;
   if (declaredRadius == null) {
     addDiagnostic(diagnostics, 'warn', 'BEND_ARC_GEOMETRY_NOT_DECLARED', `Bend segment ${segment.id} has no declared RADIUS.`, { segmentId: segment.id });
   } else if (isCompound) {
-    addDiagnostic(diagnostics, 'warn', 'BEND_COMPOUND_MITER_NOT_SUPPORTED', `Bend segment ${segment.id} is a compound multi-cut miter (more than one declared angle); arc-centre resolution only supports a single simple bend.`, { segmentId: segment.id });
+    addDiagnostic(diagnostics, 'warn', 'BEND_COMPOUND_MITER_NOT_SUPPORTED', `Bend segment ${segment.id} is a compound multi-cut miter; one circle cannot represent it.`, { segmentId: segment.id });
+  } else if (internalStationNodes.length > 0) {
+    addDiagnostic(
+      diagnostics, 'warn', 'BEND_INTERNAL_STATION_GEOMETRY_NOT_SUPPORTED',
+      `Bend segment ${segment.id} declares internal CAESAR bend station node(s) ${internalStationNodes.join(', ')}. The FROM/TO span is not treated as a tangent-to-tangent arc, so no incorrect centre is fitted.`,
+      { segmentId: segment.id, internalStationNodes },
+    );
   }
+}
+
+function physicalBendAngle(value) {
+  if (value == null || Math.abs(value) <= BEND_ANGLE_TOLERANCE || isDoubleSentinel(value)) return null;
+  if (Math.abs(value - CAESAR_SENTINEL_VALUE) < CAESAR_SENTINEL_TOLERANCE) return null;
+  return value;
+}
+
+function isDoubleSentinel(value) {
+  return value != null && Math.abs(value - CAESAR_DOUBLE_SENTINEL_VALUE) < CAESAR_SENTINEL_TOLERANCE;
 }
 
 function resolveBendFromPredecessor(segment, segmentsEndingAt, nodeCoords, tolerance, diagnostics) {
   const declaredRadius = segment.meta.bendDeclaredRadius;
-  if (declaredRadius == null || segment.meta.bendCompoundMiter) return;
+  if (declaredRadius == null || segment.meta.bendCompoundMiter || segment.meta.bendInternalStations) return;
   const predecessors = (segmentsEndingAt.get(segment.startNodeId) || []).filter((candidate) => candidate.id !== segment.id);
   if (predecessors.length !== 1) {
-    addDiagnostic(diagnostics, 'warn', 'BEND_ARC_GEOMETRY_NOT_DECLARED',
+    addDiagnostic(
+      diagnostics, 'warn', 'BEND_ARC_GEOMETRY_NOT_DECLARED',
       `Bend segment ${segment.id} does not have exactly one predecessor sharing node ${segment.startNodeId}; cannot resolve an unambiguous incoming direction.`,
-      { segmentId: segment.id, predecessorCount: predecessors.length });
+      { segmentId: segment.id, predecessorCount: predecessors.length },
+    );
     return;
   }
   const predecessor = predecessors[0];
@@ -361,9 +473,11 @@ function resolveBendFromPredecessor(segment, segmentsEndingAt, nodeCoords, toler
   }
   const check = checkDeclaredRadius(resolved.computedRadius, declaredRadius, tolerance);
   if (!check.accepted) {
-    addDiagnostic(diagnostics, 'warn', 'BEND_ARC_GEOMETRY_NOT_DECLARED',
+    addDiagnostic(
+      diagnostics, 'warn', 'BEND_ARC_GEOMETRY_NOT_DECLARED',
       `Bend segment ${segment.id} computed radius ${resolved.computedRadius} disagrees with declared RADIUS ${declaredRadius} (relative deviation ${check.relativeDeviation}).`,
-      { segmentId: segment.id, ...check });
+      { segmentId: segment.id, ...check },
+    );
     return;
   }
   segment.meta.bendArcCentre = resolved.centre;
@@ -371,28 +485,40 @@ function resolveBendFromPredecessor(segment, segmentsEndingAt, nodeCoords, toler
   addDiagnostic(diagnostics, 'info', 'BEND_ARC_GEOMETRY_RESOLVED', `Bend segment ${segment.id} arc centre resolved from declared radius and incoming direction.`, { segmentId: segment.id });
 }
 
-function applyRestraints(edge, nodesById, restraintTypeCodeMap, diagnostics) {
+function applyRestraints(edge, nodesById, restraintTypeCodeMap, mutationConfig, diagnostics) {
   for (const restraint of findAnyElements(edge.tag.inner, RESTRAINT_TAGS)) {
-    // An unused restraint slot carries the sentinel in NODE, not an empty
-    // string (see the module doc on CAESAR's padding convention) — this is
-    // not a reference to a real node and must not be flagged as one.
     const nodeNumber = caesarNumberOrNull(attributeValue(restraint.attributes, 'NODE'));
     if (nodeNumber == null) continue;
     const nodeRef = cleanNodeId(String(nodeNumber));
     const target = nodeRef === edge.fromNode ? edge.fromNode : nodeRef === edge.toNode ? edge.toNode : null;
     if (!target) {
-      addDiagnostic(diagnostics, 'warn', 'INPUTXML_RESTRAINT_NODE_UNRESOLVED', `Restraint on element ${edge.index + 1} references node ${nodeRef}, which is neither its FROM_NODE nor TO_NODE.`, { elementIndex: edge.index, nodeRef });
+      addDiagnostic(
+        diagnostics, 'warn', 'INPUTXML_RESTRAINT_NODE_UNRESOLVED',
+        `Restraint on element ${edge.index + 1} references node ${nodeRef}, which is neither its FROM_NODE nor TO_NODE.`,
+        { elementIndex: edge.index, nodeRef },
+      );
       continue;
     }
-    const typeCodeNumber = caesarNumberOrNull(attributeValue(restraint.attributes, 'TYPE'));
-    const typeCode = typeCodeNumber == null ? null : String(typeCodeNumber);
+    const rawType = attributeValue(restraint.attributes, 'TYPE');
+    const sourceTypeCode = normalizeRestraintTypeValue(rawType) || null;
+    const typeCode = sourceTypeCode == null ? null : mutateRestraintType(sourceTypeCode, mutationConfig);
+    if (sourceTypeCode !== null && typeCode !== sourceTypeCode) {
+      addDiagnostic(
+        diagnostics, 'info', 'INPUTXML_RESTRAINT_TYPE_MUTATED',
+        `Restraint TYPE ${sourceTypeCode} at node ${target} was mutated to ${typeCode} before classification.`,
+        { elementIndex: edge.index, nodeId: target, sourceTypeCode, typeCode },
+      );
+    }
     const node = nodesById.get(target);
     const restraints = node.meta.restraints || (node.meta.restraints = []);
     restraints.push({
+      sourceTypeCode,
       typeCode,
+      mutationApplied: typeCode !== sourceTypeCode,
       xCosine: caesarNumberOrNull(attributeValue(restraint.attributes, 'XCOSINE')),
       yCosine: caesarNumberOrNull(attributeValue(restraint.attributes, 'YCOSINE')),
       zCosine: caesarNumberOrNull(attributeValue(restraint.attributes, 'ZCOSINE')),
+      frictionCoefficient: caesarNumberOrNull(attributeValue(restraint.attributes, 'FRIC_COEF')),
     });
     const mapped = typeCode == null ? undefined : restraintTypeCodeMap[typeCode];
     if (mapped) node.restraint = mapped;
@@ -404,40 +530,15 @@ function classifyElementType(inner) {
   const rigid = firstElement(inner, RIGID_TAGS);
   const rigidType = (attributeValue(rigid?.attributes || {}, 'TYPE', 'RIGID_TYPE') || '').toUpperCase();
   if (rigidType.includes('VALVE')) return 'VALVE';
-  if (rigidType.includes('FLANGE') || rigidType.includes('BLIND')) return 'FLANGE';
-  if (rigidType.includes('GASK')) return 'FLANGE';
-
-  const reducer = firstElement(inner, REDUCER_TAGS);
-  if (reducer) return 'PIPE';
-
+  if (rigidType.includes('FLANGE') || rigidType.includes('BLIND') || rigidType.includes('GASK')) return 'FLANGE';
+  if (firstElement(inner, REDUCER_TAGS)) return 'PIPE';
   for (const sif of findAnyElements(inner, SIF_TAGS)) {
     const typeCode = caesarNumberOrNull(attributeValue(sif.attributes, 'TYPE'));
     if (typeCode != null && Math.abs(typeCode - SIF_TYPE_WELDING_TEE) < 0.001) return 'TEE';
     if (typeCode != null && Math.abs(typeCode - SIF_TYPE_WELDOLET) < 0.001) return 'TEE';
   }
-
   if (firstElement(inner, BEND_TAGS)) return 'BEND';
   return 'PIPE';
-}
-
-function resolveInheritedField(edge, attributeNames, previousValue, label, diagnostics) {
-  const own = caesarNumberOrNull(attributeValue(edge.attrs, ...attributeNames));
-  if (own != null) return { value: own, carryForward: own };
-  if (previousValue != null) {
-    addDiagnostic(diagnostics, 'info', `${label}_INHERITED_FROM_PRIOR_ELEMENT`, `Element ${edge.index + 1} has no ${label}; inherited ${previousValue} from the prior element.`, { elementIndex: edge.index, value: previousValue });
-    return { value: previousValue, carryForward: previousValue };
-  }
-  return { value: null, carryForward: null };
-}
-
-function resolveInheritedStringField(edge, attributeNames, previousValue, label, diagnostics) {
-  const own = attributeValue(edge.attrs, ...attributeNames) || null;
-  if (own) return { value: own, carryForward: own };
-  if (previousValue) {
-    addDiagnostic(diagnostics, 'info', `${label}_INHERITED_FROM_PRIOR_ELEMENT`, `Element ${edge.index + 1} has no ${label}; inherited "${previousValue}" from the prior element.`, { elementIndex: edge.index, value: previousValue });
-    return { value: previousValue, carryForward: previousValue };
-  }
-  return { value: null, carryForward: null };
 }
 
 function finalizeNode(node, diagnostics) {
@@ -450,31 +551,30 @@ function finalizeNode(node, diagnostics) {
 function translate(point, dx, dy, dz) {
   return { x: point.x + dx, y: point.y + dy, z: point.z + dz };
 }
-
 function distance(a, b) {
   return Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
 }
-
 function cleanNodeId(value) {
   const text = String(value ?? '').trim();
   if (!text) return '';
   const numeric = Number(text);
   return Number.isFinite(numeric) ? String(numeric) : text;
 }
-
-function caesarNumberOrNull(value) {
+function rawFiniteNumber(value) {
   const text = String(value ?? '').trim();
   if (!text) return null;
   const numeric = Number(text);
-  if (!Number.isFinite(numeric)) return null;
+  return Number.isFinite(numeric) ? numeric : null;
+}
+function caesarNumberOrNull(value) {
+  const numeric = rawFiniteNumber(value);
+  if (numeric == null) return null;
   if (Math.abs(numeric - CAESAR_SENTINEL_VALUE) < CAESAR_SENTINEL_TOLERANCE) return null;
   return numeric;
 }
-
 function caesarNumberOrZero(value) {
   return caesarNumberOrNull(value) ?? 0;
 }
-
 function addDiagnostic(diagnostics, severity, code, message, data = {}) {
   diagnostics.push({ severity, code, message, data });
 }
