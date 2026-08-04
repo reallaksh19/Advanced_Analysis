@@ -37,3 +37,36 @@ test('viewport additive selection uses the same store authority',()=>{
   assert.deepEqual(store.getState().selection.canonicalIds,['node:a','node:b']);
   assert.equal(store.getState().selection.revision,2);
 });
+
+test('range requests pass through every stale identity guard',()=>{
+  const store=createTopologyEditEditorStore({dataset:{sourceHash:'s',canonicalHash:'c',sessionVersion:1}});
+  const bus=new Bus();
+  const coordinator=new TopologyEditSelectionCoordinator({store,eventBus:bus,getTopology:()=>topology});
+  store.getState().actions.replaceSelection(['node:a'],'tree',{primaryId:'node:a',anchorId:'node:a'});
+
+  const cases=[
+    {expectedDatasetSessionVersion:2,field:'datasetSessionVersion'},
+    {expectedCanonicalHash:'stale',field:'canonicalHash'},
+    {expectedSelectionRevision:0,field:'selectionRevision'},
+  ];
+  for(const entry of cases){
+    const result=coordinator.handleRequest(createTopologyEditSelectionRequest({
+      action:'RANGE',source:'tree',canonicalIds:['node:a','node:b'],
+      primaryId:'node:b',anchorId:'node:a',...entry,
+    }));
+    assert.equal(result.disposition,'STALE');
+    assert.deepEqual(result.staleFields,[entry.field]);
+    assert.deepEqual(store.getState().selection.canonicalIds,['node:a']);
+  }
+
+  const current=store.getState();
+  const accepted=coordinator.handleRequest(createTopologyEditSelectionRequest({
+    action:'RANGE',source:'tree',canonicalIds:['node:a','node:b'],
+    primaryId:'node:b',anchorId:'node:a',
+    expectedDatasetSessionVersion:current.dataset.sessionVersion,
+    expectedCanonicalHash:current.dataset.canonicalHash,
+    expectedSelectionRevision:current.selection.revision,
+  }));
+  assert.equal(accepted.disposition,'CHANGED');
+  assert.deepEqual(store.getState().selection.canonicalIds,['node:a','node:b']);
+});
