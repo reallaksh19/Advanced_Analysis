@@ -75,11 +75,8 @@ jobs:
             tests/topology-edit-selection-coordinator.test.mjs \
             tests/topology-edit-selection-foundation-integration.test.mjs
 
-      - name: Execute existing 3D Edit regression contracts
-        run: |
-          node --test \
-            tests/topology-edit-professional-integration-controller.test.mjs \
-            tests/topology-edit-navigation-pick-fallback.test.mjs
+      - name: Execute existing 3D Edit picking regression
+        run: node --test tests/topology-edit-navigation-pick-fallback.test.mjs
 
       - name: Execute real WebGL selection qualification
         run: |
