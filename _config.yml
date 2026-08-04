@@ -1,0 +1,9 @@
+theme: jekyll-theme-primer
+
+# GitHub Pages uses Jekyll 3.10, which evaluates Liquid before Markdown and
+# therefore treats JavaScript/JSDoc `{{ ... }}` examples as Liquid variables.
+# These files are internal implementation records, not site content. Keep them
+# in Git while excluding them from the Pages rendering pipeline.
+exclude:
+  - FEA_UI_UPGRADE_PLAN.md
+  - Patch
