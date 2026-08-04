@@ -57,10 +57,15 @@ jobs:
                   'assert.equal(definition.component.flexibility.doubleCountGuard.accepted, true);',
               'assert.equal(definition.component.factorSet.pressureCorrectionApplied, true);':
                   "assert.equal(definition.component.flexibility.pressureStiffeningRule, 'BEND_PRESSURE_STIFFENING_DECLARED_FACTOR_V1');\n  assert.ok(definition.component.flexibility.pressureBasis);",
+              "assert.equal(definition.component.acceptanceState, 'QUALIFIED');":
+                  "assert.equal(definition.component.acceptanceState, 'CONDITIONAL');",
           }
           for old, new in replacements.items():
               assert check.count(old) == 1, old
               check = check.replace(old, new, 1)
+          duplicate = '  close(definition.component.flexibility.factor, expected.k);\n  close(definition.component.flexibility.factor, expected.k);'
+          assert check.count(duplicate) == 1
+          check = check.replace(duplicate, '  close(definition.component.flexibility.factor, expected.k);', 1)
           check_path.write_text(check)
           PY
           rm -rf tmp .m024 .github/workflows/m024-bootstrap.yml
