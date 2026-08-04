@@ -3,6 +3,9 @@ import { deepFreeze } from '../../core/shared-piping-model/index.js';
 import { deterministicTopologyEditId } from './topology-edit-command-contract.js';
 import { assertResolvedTopologyEditCommand } from './topology-edit-command-resolver.js';
 import {
+  applyTopologyEditInlineComponent,
+} from './topology-edit-inline-component-command.js';
+import {
   assertCanonicalTopologyHash,
   canonicalTopologyStateHash,
   finalizeCanonicalTopology,
@@ -234,7 +237,9 @@ function trimEdge(topology, command) {
 const REDUCERS = Object.freeze({
   MOVE_NODE: moveNode, MERGE_NODES: mergeNodes,
   BRIDGE_GAP: addEdge, ADD_STRAIGHT_ELEMENT: addEdge,
-  SPLIT_EDGE: splitEdge, DISCONNECT_ENDPOINT: disconnectEndpoint,
+  SPLIT_EDGE: splitEdge,
+  INSERT_INLINE_COMPONENT: applyTopologyEditInlineComponent,
+  DISCONNECT_ENDPOINT: disconnectEndpoint,
   DELETE_EDGE: deleteEdge, ADD_BEND_DEFINITION: addBendDefinition,
   ADD_JUNCTION_DEFINITION: addJunctionDefinition, TRIM_EDGE: trimEdge,
 });

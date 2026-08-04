@@ -10,13 +10,24 @@ export const TOPOLOGY_EDIT_NATIVE_COMMANDS = Object.freeze([
 export const TOPOLOGY_EDIT_WAVE3_ENGINEERING_COMMANDS = Object.freeze([
   'ADD_BEND_DEFINITION', 'ADD_JUNCTION_DEFINITION', 'TRIM_EDGE',
 ]);
+export const TOPOLOGY_EDIT_PROFESSIONAL_COMMANDS = Object.freeze([
+  'INSERT_INLINE_COMPONENT',
+]);
 // Compatibility alias retained for the merged Wave 3B controller surface.
 export const TOPOLOGY_EDIT_AUTOFIX_COMMANDS = TOPOLOGY_EDIT_WAVE3_ENGINEERING_COMMANDS;
 export const TOPOLOGY_EDIT_GOVERNED_COMMANDS = Object.freeze([
-  ...TOPOLOGY_EDIT_NATIVE_COMMANDS, ...TOPOLOGY_EDIT_WAVE3_ENGINEERING_COMMANDS,
+  ...TOPOLOGY_EDIT_NATIVE_COMMANDS,
+  ...TOPOLOGY_EDIT_WAVE3_ENGINEERING_COMMANDS,
+  ...TOPOLOGY_EDIT_PROFESSIONAL_COMMANDS,
 ]);
 const COMMAND_SET = new Set(TOPOLOGY_EDIT_GOVERNED_COMMANDS);
 const ENDPOINTS = new Set(['FROM', 'TO']);
+const INLINE_COMPONENT_TYPES = new Set(['FLANGE', 'VALVE', 'REDUCER']);
+const INLINE_DIRECTIONS = new Set(['FROM_TO', 'TO_FROM']);
+const INLINE_LENGTH_AUTHORITIES = new Set([
+  'CATALOGUE_VALVE_FACE_TO_FACE',
+  'USER_DECLARED_COMPONENT_LENGTH',
+]);
 
 function fail(message, Constructor = TypeError) {
   throw new Constructor(`TopologyEditCommandRequest: ${message}`);
@@ -25,6 +36,10 @@ function requiredText(value, label) {
   const text = String(value ?? '').trim();
   if (!text) fail(`${label} is required.`);
   return text;
+}
+function optionalText(value, uppercase = false) {
+  const text = String(value ?? '').trim();
+  return text ? (uppercase ? text.toUpperCase() : text) : null;
 }
 function immutableJson(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) fail(`${label} must be an object.`);
@@ -51,6 +66,11 @@ function positiveNumber(value, label) {
 }
 function optionalPositiveNumber(value, label) {
   return value === null || value === undefined || value === '' ? null : positiveNumber(value, label);
+}
+function enumText(value, allowed, label) {
+  const text = requiredText(value, label).toUpperCase();
+  if (!allowed.has(text)) fail(`${label} has unsupported value ${text}.`, RangeError);
+  return text;
 }
 function distinctIds(value, count, label) {
   if (!Array.isArray(value)) fail(`${label} must be an array.`);
@@ -145,12 +165,112 @@ function normalizeTrim(payload) {
     position: finitePoint(payload.position, 'TRIM_EDGE.position'),
   };
 }
+function normalizeInlineSourceReference(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    fail('INSERT_INLINE_COMPONENT.catalogueBinding.sourceReference must be an object.');
+  }
+  return {
+    documentId: requiredText(value.documentId, 'INSERT_INLINE_COMPONENT.catalogueBinding.sourceReference.documentId'),
+    revision: requiredText(value.revision, 'INSERT_INLINE_COMPONENT.catalogueBinding.sourceReference.revision'),
+    path: requiredText(value.path, 'INSERT_INLINE_COMPONENT.catalogueBinding.sourceReference.path'),
+  };
+}
+function normalizeInlineBinding(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    fail('INSERT_INLINE_COMPONENT.catalogueBinding must be an object.');
+  }
+  const componentType = enumText(
+    value.componentType,
+    INLINE_COMPONENT_TYPES,
+    'INSERT_INLINE_COMPONENT.catalogueBinding.componentType',
+  );
+  const secondaryNominalSizeMm = optionalPositiveNumber(
+    value.secondaryNominalSizeMm,
+    'INSERT_INLINE_COMPONENT.catalogueBinding.secondaryNominalSizeMm',
+  );
+  const secondaryOutsideDiameterMm = optionalPositiveNumber(
+    value.secondaryOutsideDiameterMm,
+    'INSERT_INLINE_COMPONENT.catalogueBinding.secondaryOutsideDiameterMm',
+  );
+  const binding = {
+    catalogueHash: requiredText(value.catalogueHash, 'INSERT_INLINE_COMPONENT.catalogueBinding.catalogueHash'),
+    sourceHash: requiredText(value.sourceHash, 'INSERT_INLINE_COMPONENT.catalogueBinding.sourceHash'),
+    recordId: requiredText(value.recordId, 'INSERT_INLINE_COMPONENT.catalogueBinding.recordId'),
+    recordHash: requiredText(value.recordHash, 'INSERT_INLINE_COMPONENT.catalogueBinding.recordHash'),
+    componentType,
+    nominalSizeMm: positiveNumber(value.nominalSizeMm, 'INSERT_INLINE_COMPONENT.catalogueBinding.nominalSizeMm'),
+    outsideDiameterMm: positiveNumber(value.outsideDiameterMm, 'INSERT_INLINE_COMPONENT.catalogueBinding.outsideDiameterMm'),
+    secondaryNominalSizeMm,
+    secondaryOutsideDiameterMm,
+    pipingClass: requiredText(value.pipingClass, 'INSERT_INLINE_COMPONENT.catalogueBinding.pipingClass').toUpperCase(),
+    endConnectionFrom: requiredText(value.endConnectionFrom, 'INSERT_INLINE_COMPONENT.catalogueBinding.endConnectionFrom').toUpperCase(),
+    endConnectionTo: requiredText(value.endConnectionTo, 'INSERT_INLINE_COMPONENT.catalogueBinding.endConnectionTo').toUpperCase(),
+    valveType: optionalText(value.valveType, true),
+    valveFaceToFaceMm: optionalPositiveNumber(value.valveFaceToFaceMm, 'INSERT_INLINE_COMPONENT.catalogueBinding.valveFaceToFaceMm'),
+    flangeClass: optionalText(value.flangeClass, true),
+    flangeFacing: optionalText(value.flangeFacing, true),
+    reducerType: optionalText(value.reducerType, true),
+    reducerOrientation: optionalText(value.reducerOrientation, true),
+    sourceReference: normalizeInlineSourceReference(value.sourceReference),
+  };
+  if (componentType === 'VALVE' && (!binding.valveType || !binding.valveFaceToFaceMm)) {
+    fail('INSERT_INLINE_COMPONENT VALVE requires valveType and valveFaceToFaceMm.', RangeError);
+  }
+  if (componentType === 'FLANGE' && (!binding.flangeClass || !binding.flangeFacing)) {
+    fail('INSERT_INLINE_COMPONENT FLANGE requires flangeClass and flangeFacing.', RangeError);
+  }
+  if (componentType === 'REDUCER') {
+    if (!secondaryNominalSizeMm || !secondaryOutsideDiameterMm
+      || !binding.reducerType || !binding.reducerOrientation) {
+      fail('INSERT_INLINE_COMPONENT REDUCER requires both end sizes, type, and orientation.', RangeError);
+    }
+  } else if (secondaryNominalSizeMm || secondaryOutsideDiameterMm) {
+    fail('INSERT_INLINE_COMPONENT secondary size fields are valid only for REDUCER.', RangeError);
+  }
+  return binding;
+}
+function normalizeInlineComponent(payload) {
+  const centerFraction = Number(payload.centerFraction);
+  if (!Number.isFinite(centerFraction) || centerFraction <= 0 || centerFraction >= 1) {
+    fail('INSERT_INLINE_COMPONENT.centerFraction must be strictly between 0 and 1.', RangeError);
+  }
+  const catalogueBinding = normalizeInlineBinding(payload.catalogueBinding);
+  const insertionLengthMm = positiveNumber(payload.insertionLengthMm, 'INSERT_INLINE_COMPONENT.insertionLengthMm');
+  const lengthAuthority = enumText(
+    payload.lengthAuthority,
+    INLINE_LENGTH_AUTHORITIES,
+    'INSERT_INLINE_COMPONENT.lengthAuthority',
+  );
+  const direction = enumText(
+    payload.direction ?? 'FROM_TO',
+    INLINE_DIRECTIONS,
+    'INSERT_INLINE_COMPONENT.direction',
+  );
+  if (catalogueBinding.componentType === 'VALVE'
+    && lengthAuthority === 'CATALOGUE_VALVE_FACE_TO_FACE'
+    && Math.abs(insertionLengthMm - catalogueBinding.valveFaceToFaceMm) > 1e-9) {
+    fail('INSERT_INLINE_COMPONENT valve length must equal catalogue face-to-face.', RangeError);
+  }
+  if (catalogueBinding.componentType !== 'VALVE'
+    && lengthAuthority === 'CATALOGUE_VALVE_FACE_TO_FACE') {
+    fail('CATALOGUE_VALVE_FACE_TO_FACE is valid only for VALVE.', RangeError);
+  }
+  return {
+    edgeId: requiredText(payload.edgeId, 'INSERT_INLINE_COMPONENT.edgeId'),
+    centerFraction,
+    insertionLengthMm,
+    lengthAuthority,
+    direction,
+    catalogueBinding,
+  };
+}
 const PAYLOAD_NORMALIZERS = Object.freeze({
   MOVE_NODE: normalizeMove, MERGE_NODES: normalizeMerge,
   BRIDGE_GAP: normalizeAddedEdge, ADD_STRAIGHT_ELEMENT: normalizeAddedEdge,
   SPLIT_EDGE: normalizeSplit, DISCONNECT_ENDPOINT: normalizeDisconnect,
   DELETE_EDGE: normalizeDelete, ADD_BEND_DEFINITION: normalizeBend,
   ADD_JUNCTION_DEFINITION: normalizeJunction, TRIM_EDGE: normalizeTrim,
+  INSERT_INLINE_COMPONENT: normalizeInlineComponent,
 });
 function normalizePayload(commandType, value) {
   const payload = immutableJson(value ?? {}, `${commandType} payload`);

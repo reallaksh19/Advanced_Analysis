@@ -26,8 +26,11 @@ import {
   subtract,
 } from './topology-edit-route-operation-helpers.js';
 import { planApplyDeclaredSlope } from './topology-edit-slope-operation.js';
+import {
+  planTopologyEditInlineComponentOperation,
+} from './topology-edit-inline-component-operation.js';
 
-export { planApplyDeclaredSlope };
+export { planApplyDeclaredSlope, planTopologyEditInlineComponentOperation };
 
 const ORTHOGONAL_TOLERANCE = 1e-9;
 
@@ -278,4 +281,5 @@ const PLANNERS = Object.freeze({
   MOVE_CONNECTED_RUN: planMoveConnectedRun,
   CREATE_ORTHOGONAL_OFFSET: planCreateOrthogonalOffset,
   APPLY_DECLARED_SLOPE: planApplyDeclaredSlope,
+  INSERT_INLINE_COMPONENT: planTopologyEditInlineComponentOperation,
 });

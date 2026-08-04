@@ -2,6 +2,9 @@
 import { deepFreeze, semanticHash } from '../../core/shared-piping-model/index.js';
 import { assertTopologyEditCommandRequest, TOPOLOGY_EDIT_RESOLVED_COMMAND_SCHEMA } from './topology-edit-command-contract.js';
 import { assertCanonicalTopologyHash, canonicalTopologyStateHash } from './topology-edit-canonical-state.js';
+import {
+  assertTopologyEditInlineComponentTarget,
+} from './topology-edit-inline-component-command.js';
 
 function requiredText(value, label) {
   const text = String(value ?? '').trim();
@@ -80,6 +83,13 @@ function resolveSplit(topology, request) {
   const edge = edgeTarget(topology, request.payload.edgeId, 'SPLIT');
   const from = nodeTarget(topology, edge.record.fromNodeId, 'FROM'); const to = nodeTarget(topology, edge.record.toNodeId, 'TO');
   assertSplitHasNoAmbiguousDependants(topology, edge.id); return targets([from, to], [edge]);
+}
+function resolveInline(topology, request) {
+  const validated = assertTopologyEditInlineComponentTarget(topology, request.payload);
+  const edge = edgeTarget(topology, validated.edge.id, 'INLINE_HOST');
+  const from = nodeTarget(topology, validated.from.id, 'FROM');
+  const to = nodeTarget(topology, validated.to.id, 'TO');
+  return targets([from, to], [edge]);
 }
 function resolveDisconnect(topology, request) {
   const edge = edgeTarget(topology, request.payload.edgeId, 'DISCONNECT');
@@ -161,6 +171,7 @@ function resolveTrim(topology, request) {
 const TARGET_RESOLVERS = Object.freeze({
   MOVE_NODE: resolveMove, MERGE_NODES: resolveMerge, BRIDGE_GAP: resolveAddedEdge,
   ADD_STRAIGHT_ELEMENT: resolveAddedEdge, SPLIT_EDGE: resolveSplit,
+  INSERT_INLINE_COMPONENT: resolveInline,
   DISCONNECT_ENDPOINT: resolveDisconnect, DELETE_EDGE: resolveDelete,
   ADD_BEND_DEFINITION: resolveBend, ADD_JUNCTION_DEFINITION: resolveJunction,
   TRIM_EDGE: resolveTrim,
