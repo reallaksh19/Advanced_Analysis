@@ -1,6 +1,10 @@
 import { deepFreeze, semanticHash } from '../shared-piping-model/index.js';
 import { evaluateQ8Quality } from './q8-quality.js';
-import { createCanonicalFlangeHubGeometry, FLANGE_HUB_MATERIAL_PROFILE } from './flange-hub-geometry.js';
+import {
+  createCanonicalFlangeHubGeometry,
+  FLANGE_HUB_MATERIAL_PROFILE,
+  hubRadiusAt,
+} from './flange-hub-geometry.js';
 
 export const FLANGE_HUB_MESH_SCHEMA = 'flange-hub-mesh-evidence/v1';
 export const FLANGE_HUB_MESH_FAMILY_ID = 'BKT-B-FLANGE-Q8-MESH-FAMILY-V1';
@@ -12,68 +16,150 @@ export const FLANGE_HUB_MESH_LEVELS = deepFreeze([
 ]);
 
 const Q = 1e-12;
-const LOWER_V = Object.freeze([0, 0.118, 0.25, 0.4, 0.55, 0.7, 0.85, 1]);
-const UPPER_V = Object.freeze([0, 1 / 14, 1 / 7, 3 / 14, 0.35, 0.5, 9 / 14, 0.8, 1]);
+const TRANSITION_START_Z = 35;
+const INTERNAL_INTERFACE_Z = 77;
+const INTERNAL_INTERFACE_OUTER_R = 99;
+const UPPER_FRACTIONS = Object.freeze([
+  0,
+  1 / 14,
+  1 / 7,
+  3 / 14,
+  0.35,
+  0.50,
+  9 / 14,
+  0.80,
+  1,
+]);
+const COMPUTATIONAL_V = Object.freeze(Array.from({ length: 9 }, (_, index) => index / 8));
 const BLOCKS = Object.freeze([
-  { id: 'FH-B00', kind: 'STRIP', segment: 'PIPE', nu: 16 },
-  { id: 'FH-B01', kind: 'STRIP', segment: 'SMALL_ARC', nu: 4 },
-  { id: 'FH-B02', kind: 'STRIP', segment: 'HUB_SMALL', nu: 4 },
-  { id: 'FH-B03', kind: 'STRIP', segment: 'HUB_MID', nu: 8 },
-  { id: 'FH-B04', kind: 'UPPER_COONS', nu: 32 },
+  { id: 'FH-B00', kind: 'STRIP', segment: 'PIPE', baseUCount: 16 },
+  { id: 'FH-B01', kind: 'STRIP', segment: 'SMALL_ARC', baseUCount: 4 },
+  { id: 'FH-B02', kind: 'STRIP', segment: 'HUB_SMALL', baseUCount: 4 },
+  { id: 'FH-B03', kind: 'STRIP', segment: 'HUB_MID', baseUCount: 8 },
+  { id: 'FH-B04', kind: 'GRADING_TRANSITION', baseUCount: 2 },
+  { id: 'FH-B05', kind: 'HUB_FILLET_TRANSITION' },
+  { id: 'FH-B06', kind: 'FLANGE' },
 ]);
 
 export function createFlangeHubMesh(levelId, geometry = createCanonicalFlangeHubGeometry()) {
   const level = FLANGE_HUB_MESH_LEVELS.find((row) => row.levelId === levelId);
   if (!level) throw new TypeError(`FH_UNKNOWN_MESH_LEVEL:${levelId}`);
-  if (geometry?.schema !== 'flange-hub-canonical-geometry/v1') throw new TypeError('FH_CANONICAL_GEOMETRY_REQUIRED');
+  if (geometry?.schema !== 'flange-hub-canonical-geometry/v1') {
+    throw new TypeError('FH_CANONICAL_GEOMETRY_REQUIRED');
+  }
+
   const nodeCandidates = new Map();
   const provisionalElements = [];
   const provisionalEdges = [];
   const blockRows = [];
 
   BLOCKS.forEach((block) => {
-    const us = uniform(block.nu * level.refinement);
-    const vs = refine(block.kind === 'UPPER_COONS' ? UPPER_V : LOWER_V, level.refinement);
+    const baseU = baseUBreakpoints(block, geometry);
+    const us = refineBreakpoints(baseU, level.refinement);
+    const vs = refineBreakpoints(COMPUTATIONAL_V, level.refinement);
     const map = blockMap(block, geometry);
     const blockElementIds = [];
-    for (let i = 0; i < us.length - 1; i += 1) for (let j = 0; j < vs.length - 1; j += 1) {
-      const u0 = us[i]; const u1 = us[i + 1]; const v0 = vs[j]; const v1 = vs[j + 1];
-      const um = (u0 + u1) / 2; const vm = (v0 + v1) / 2;
-      const uv = [[u0, v0], [u0, v1], [u1, v1], [u1, v0], [u0, vm], [um, v1], [u1, vm], [um, v0]];
-      const keys = uv.map(([u, v]) => registerNode(nodeCandidates, map(u, v), `${block.id}:${num(u)}:${num(v)}`));
-      const elementId = `${levelId}-E-${block.id}-I${pad(i)}-J${pad(j)}`;
-      const midpointOuter = map(um, 1);
-      const hotspot = block.id === 'FH-B01'
-        || (block.id === 'FH-B00' && i === us.length - 2)
-        || (block.id === 'FH-B02' && i === 0)
-        || (block.id === 'FH-B04' && j === vs.length - 2
-          && midpointOuter.z >= 45 && midpointOuter.z <= 65);
-      provisionalElements.push({ elementId, blockId: block.id, keys, hotspot, map, u0, u1, v0, v1, i, j });
-      blockElementIds.push(elementId);
-      registerEdges(provisionalEdges, { block, levelId, keys, i, j, lastU: us.length - 2, lastV: vs.length - 2, map, um, vm });
+
+    for (let i = 0; i < us.length - 1; i += 1) {
+      for (let j = 0; j < vs.length - 1; j += 1) {
+        const u0 = us[i];
+        const u1 = us[i + 1];
+        const v0 = vs[j];
+        const v1 = vs[j + 1];
+        const um = (u0 + u1) / 2;
+        const vm = (v0 + v1) / 2;
+        const uv = [
+          [u0, v0],
+          [u0, v1],
+          [u1, v1],
+          [u1, v0],
+          [u0, vm],
+          [um, v1],
+          [u1, vm],
+          [um, v0],
+        ];
+        const keys = uv.map(([u, v]) => registerNode(
+          nodeCandidates,
+          map(u, v),
+          `${block.id}:${formatNumber(u)}:${formatNumber(v)}`,
+        ));
+        const elementId = `${levelId}-E-${block.id}-I${pad(i)}-J${pad(j)}`;
+        const hotspot = isHotspotElement({
+          block,
+          i,
+          j,
+          lastU: us.length - 2,
+          u0,
+          u1,
+          v0,
+          v1,
+          map,
+        });
+        provisionalElements.push({
+          elementId,
+          blockId: block.id,
+          keys,
+          hotspot,
+          map,
+          u0,
+          u1,
+          v0,
+          v1,
+          i,
+          j,
+        });
+        blockElementIds.push(elementId);
+        registerBoundaryEdges(provisionalEdges, {
+          block,
+          levelId,
+          keys,
+          i,
+          j,
+          lastU: us.length - 2,
+          lastV: vs.length - 2,
+          map,
+          um,
+        });
+      }
     }
-    blockRows.push({ blockId: block.id, kind: block.kind, longitudinalElementCount: us.length - 1, transverseElementCount: vs.length - 1, elementIds: blockElementIds });
+
+    blockRows.push({
+      blockId: block.id,
+      kind: block.kind,
+      longitudinalElementCount: us.length - 1,
+      transverseElementCount: vs.length - 1,
+      elementIds: blockElementIds,
+    });
   });
 
-  const sortedNodes = [...nodeCandidates.entries()].map(([key, row]) => ({ key, ...row }))
-    .sort((a, b) => a.z - b.z || a.r - b.r || a.key.localeCompare(b.key));
-  const idByKey = new Map();
+  const sortedNodes = [...nodeCandidates.entries()]
+    .map(([key, row]) => ({ key, ...row }))
+    .sort((left, right) => left.z - right.z
+      || left.r - right.r
+      || left.key.localeCompare(right.key));
+  const nodeIdByKey = new Map();
   const nodes = sortedNodes.map((row, index) => {
     const nodeId = `FH-${levelId}-N${String(index + 1).padStart(6, '0')}`;
-    idByKey.set(row.key, nodeId);
-    return deepFreeze({ nodeId, r: row.r, z: row.z, ownership: [...row.owners].sort() });
+    nodeIdByKey.set(row.key, nodeId);
+    return deepFreeze({
+      nodeId,
+      r: row.r,
+      z: row.z,
+      ownership: [...row.owners].sort(),
+    });
   });
-  const nodeById = new Map(nodes.map((row) => [row.nodeId, row]));
+  const nodesById = new Map(nodes.map((row) => [row.nodeId, row]));
   const elements = provisionalElements.map((row) => deepFreeze({
     elementId: row.elementId,
     blockId: row.blockId,
     localIndices: { i: row.i, j: row.j },
-    nodeIds: row.keys.map((key) => idByKey.get(key)),
+    nodeIds: row.keys.map((key) => nodeIdByKey.get(key)),
     hotspot: row.hotspot,
   }));
+
   const qualityRows = provisionalElements.map((row, index) => {
     const element = elements[index];
-    const elementNodes = element.nodeIds.map((id) => nodeById.get(id));
+    const elementNodes = element.nodeIds.map((nodeId) => nodesById.get(nodeId));
     const quality = evaluateQ8Quality({
       elementId: element.elementId,
       nodes: elementNodes.map((node) => ({ x: node.r, y: node.z })),
@@ -85,23 +171,42 @@ export function createFlangeHubMesh(levelId, geometry = createCanonicalFlangeHub
         3: () => xy(row.map((row.u0 + row.u1) / 2, row.v0)),
       },
     });
-    if (!quality.accepted) throw new RangeError(`FH_MESH_QUALITY_REJECTED:${element.elementId}:${quality.failures.join(',')}`);
+    if (!quality.accepted) {
+      throw new RangeError(
+        `FH_MESH_QUALITY_REJECTED:${element.elementId}:${quality.failures.join(',')}`,
+      );
+    }
     return quality;
   });
-  const boundaryEdges = provisionalEdges.map((row) => deepFreeze({
-    edgeId: row.edgeId,
-    boundaryId: row.boundaryId,
-    nodeIds: row.keys.map((key) => idByKey.get(key)),
-    outwardNormal: row.outwardNormal,
-  })).sort((a, b) => a.edgeId.localeCompare(b.edgeId));
+
+  const boundaryEdges = provisionalEdges
+    .map((row) => deepFreeze({
+      edgeId: row.edgeId,
+      boundaryId: row.boundaryId,
+      nodeIds: row.keys.map((key) => nodeIdByKey.get(key)),
+      outwardNormal: row.outwardNormal,
+    }))
+    .sort((left, right) => left.edgeId.localeCompare(right.edgeId));
+
   assertNoDuplicateCoordinates(nodes);
-  assertConnectivity(elements, nodeById);
+  assertConnectivity(elements, nodesById);
   const quality = aggregateQuality(qualityRows);
-  const meshPayload = { meshFamilyId: FLANGE_HUB_MESH_FAMILY_ID, levelId, nodes, elements, boundaryEdges, blocks: blockRows };
+  const meshPayload = {
+    meshFamilyId: FLANGE_HUB_MESH_FAMILY_ID,
+    levelId,
+    nodes,
+    elements,
+    boundaryEdges,
+    blocks: blockRows,
+  };
   const meshHash = semanticHash(meshPayload);
   const canonicalModelHash = semanticHash({
-    moduleId: 'C2D-FLANGE-HUB', formulationProfile: 'AXISYMMETRIC', elementProfile: 'AXI_Q8_FULL_3X3',
-    geometryHash: geometry.semanticHash, meshHash, materialProfile: FLANGE_HUB_MATERIAL_PROFILE,
+    moduleId: 'C2D-FLANGE-HUB',
+    formulationProfile: 'AXISYMMETRIC',
+    elementProfile: 'AXI_Q8_FULL_3X3',
+    geometryHash: geometry.semanticHash,
+    meshHash,
+    materialProfile: FLANGE_HUB_MATERIAL_PROFILE,
   });
   const payload = {
     schema: FLANGE_HUB_MESH_SCHEMA,
@@ -112,7 +217,7 @@ export function createFlangeHubMesh(levelId, geometry = createCanonicalFlangeHub
     geometryHash: geometry.semanticHash,
     nodeCount: nodes.length,
     elementCount: elements.length,
-    globalH: maxCornerEdge(elements, nodeById),
+    globalH: maximumCornerEdgeLength(elements, nodesById),
     nodes,
     elements,
     boundaryEdges,
@@ -125,8 +230,12 @@ export function createFlangeHubMesh(levelId, geometry = createCanonicalFlangeHub
   return deepFreeze({ ...payload, semanticHash: semanticHash(payload) });
 }
 
-export function createFlangeHubMeshFamily(geometry = createCanonicalFlangeHubGeometry()) {
-  const levels = FLANGE_HUB_MESH_LEVELS.map(({ levelId }) => createFlangeHubMesh(levelId, geometry));
+export function createFlangeHubMeshFamily(
+  geometry = createCanonicalFlangeHubGeometry(),
+) {
+  const levels = FLANGE_HUB_MESH_LEVELS.map(({ levelId }) => (
+    createFlangeHubMesh(levelId, geometry)
+  ));
   const payload = {
     meshFamilyId: FLANGE_HUB_MESH_FAMILY_ID,
     geometryHash: geometry.semanticHash,
@@ -137,88 +246,292 @@ export function createFlangeHubMeshFamily(geometry = createCanonicalFlangeHubGeo
   return deepFreeze({ ...payload, semanticHash: semanticHash(payload) });
 }
 
+function baseUBreakpoints(block, geometry) {
+  if (block.kind === 'HUB_FILLET_TRANSITION') {
+    const largeFillet = geometry.fillets[1];
+    const outerStart = point(
+      hubRadiusAt(geometry.input, TRANSITION_START_Z),
+      TRANSITION_START_Z,
+    );
+    const outerEnd = point(INTERNAL_INTERFACE_OUTER_R, 60);
+    const segmentLengths = [
+      distance(outerStart, largeFillet.firstTangent),
+      Math.abs(largeFillet.sweepAngle) * largeFillet.radius,
+      distance(largeFillet.secondTangent, outerEnd),
+    ];
+    return piecewiseBreakpoints(segmentLengths, [4, 6, 2]);
+  }
+  if (block.kind === 'FLANGE') {
+    const horizontalLength = 120 - INTERNAL_INTERFACE_OUTER_R;
+    const verticalLength = 90 - 60;
+    return piecewiseBreakpoints([horizontalLength, verticalLength], [4, 6]);
+  }
+  return uniformBreakpoints(block.baseUCount);
+}
+
 function blockMap(block, geometry) {
-  if (block.kind === 'UPPER_COONS') return upperCoonsMap(geometry);
+  if (block.kind === 'GRADING_TRANSITION') {
+    return gradingTransitionMap(geometry);
+  }
+  if (block.kind === 'HUB_FILLET_TRANSITION') {
+    return hubFilletTransitionMap(geometry);
+  }
+  if (block.kind === 'FLANGE') {
+    return flangeMap();
+  }
   const profile = lowerProfile(block.segment, geometry);
-  return (u, v) => { const outer = profile(u); return point(50 + v * (outer.r - 50), outer.z); };
-}
-
-function lowerProfile(id, geometry) {
-  const small = geometry.fillets[0];
-  const line = (a, b) => (u) => point(a.r + u * (b.r - a.r), a.z + u * (b.z - a.z));
-  const arc = (value) => (u) => { const angle = value.startAngle + value.sweepAngle * u; return point(value.center.r + value.radius * Math.cos(angle), value.center.z + value.radius * Math.sin(angle)); };
-  if (id === 'PIPE') return line({ r: 60, z: -100 }, small.firstTangent);
-  if (id === 'SMALL_ARC') return arc(small);
-  if (id === 'HUB_SMALL') return line(small.secondTangent, { r: 66, z: 0 });
-  if (id === 'HUB_MID') return line({ r: 66, z: 0 }, { r: 75.5, z: 30 });
-  throw new TypeError(`FH_UNKNOWN_LOWER_PROFILE:${id}`);
-}
-
-function upperCoonsMap(geometry) {
-  const c00 = point(50, 30);
-  const c01 = point(75.5, 30);
-  const c10 = point(50, 90);
-  const c11 = point(120, 90);
-  const outer = upperOuterBoundary(geometry);
-  const bore = (u) => point(50, 30 + 60 * u);
-  const bottom = (v) => point(50 + 25.5 * v, 30);
-  const top = (v) => point(50 + 70 * v, 90);
   return (u, v) => {
-    const d0 = bore(u); const d1 = outer(u); const c0 = bottom(v); const c1 = top(v);
-    const bilinearR = (1 - u) * (1 - v) * c00.r + (1 - u) * v * c01.r
-      + u * (1 - v) * c10.r + u * v * c11.r;
-    const bilinearZ = (1 - u) * (1 - v) * c00.z + (1 - u) * v * c01.z
-      + u * (1 - v) * c10.z + u * v * c11.z;
+    const outer = profile(u);
+    return point(50 + v * (outer.r - 50), outer.z);
+  };
+}
+
+function lowerProfile(segmentId, geometry) {
+  const smallFillet = geometry.fillets[0];
+  const line = (start, end) => (u) => interpolate(start, end, u);
+  const arc = (value) => (u) => {
+    const angle = value.startAngle + value.sweepAngle * u;
     return point(
-      (1 - v) * d0.r + v * d1.r + (1 - u) * c0.r + u * c1.r - bilinearR,
-      (1 - v) * d0.z + v * d1.z + (1 - u) * c0.z + u * c1.z - bilinearZ,
+      value.center.r + value.radius * Math.cos(angle),
+      value.center.z + value.radius * Math.sin(angle),
+    );
+  };
+  if (segmentId === 'PIPE') {
+    return line(point(60, -100), smallFillet.firstTangent);
+  }
+  if (segmentId === 'SMALL_ARC') return arc(smallFillet);
+  if (segmentId === 'HUB_SMALL') {
+    return line(smallFillet.secondTangent, point(66, 0));
+  }
+  if (segmentId === 'HUB_MID') {
+    return line(point(66, 0), point(hubRadiusAt(geometry.input, 30), 30));
+  }
+  throw new TypeError(`FH_UNKNOWN_LOWER_PROFILE:${segmentId}`);
+}
+
+function gradingTransitionMap(geometry) {
+  return (u, v) => {
+    const z = 30 + (TRANSITION_START_Z - 30) * u;
+    const outsideRadius = hubRadiusAt(geometry.input, z);
+    const upperFraction = upperFractionAt(v);
+    const radialFraction = (1 - u) * v + u * upperFraction;
+    return point(50 + radialFraction * (outsideRadius - 50), z);
+  };
+}
+
+function hubFilletTransitionMap(geometry) {
+  const largeFillet = geometry.fillets[1];
+  const innerStart = point(50, TRANSITION_START_Z);
+  const outerStart = point(
+    hubRadiusAt(geometry.input, TRANSITION_START_Z),
+    TRANSITION_START_Z,
+  );
+  const innerEnd = point(50, INTERNAL_INTERFACE_Z);
+  const outerEnd = point(INTERNAL_INTERFACE_OUTER_R, 60);
+  const segmentLengths = [
+    distance(outerStart, largeFillet.firstTangent),
+    Math.abs(largeFillet.sweepAngle) * largeFillet.radius,
+    distance(largeFillet.secondTangent, outerEnd),
+  ];
+  const outer = physicalPathFunction({
+    segmentLengths,
+    segments: [
+      (t) => interpolate(outerStart, largeFillet.firstTangent, t),
+      (t) => {
+        const angle = largeFillet.startAngle + largeFillet.sweepAngle * t;
+        return point(
+          largeFillet.center.r + largeFillet.radius * Math.cos(angle),
+          largeFillet.center.z + largeFillet.radius * Math.sin(angle),
+        );
+      },
+      (t) => interpolate(largeFillet.secondTangent, outerEnd, t),
+    ],
+  });
+  const coons = coonsMap({
+    inner: (u) => interpolate(innerStart, innerEnd, u),
+    outer,
+    start: (v) => interpolate(innerStart, outerStart, v),
+    end: (v) => interpolate(innerEnd, outerEnd, v),
+    innerStart,
+    outerStart,
+    innerEnd,
+    outerEnd,
+  });
+  return (u, v) => coons(u, upperFractionAt(v));
+}
+
+function flangeMap() {
+  const innerStart = point(50, INTERNAL_INTERFACE_Z);
+  const outerStart = point(INTERNAL_INTERFACE_OUTER_R, 60);
+  const innerEnd = point(50, 90);
+  const outerEnd = point(120, 90);
+  const outsideCorner = point(120, 60);
+  const outer = physicalPathFunction({
+    segmentLengths: [
+      distance(outerStart, outsideCorner),
+      distance(outsideCorner, outerEnd),
+    ],
+    segments: [
+      (t) => interpolate(outerStart, outsideCorner, t),
+      (t) => interpolate(outsideCorner, outerEnd, t),
+    ],
+  });
+  const coons = coonsMap({
+    inner: (u) => interpolate(innerStart, innerEnd, u),
+    outer,
+    start: (v) => interpolate(innerStart, outerStart, v),
+    end: (v) => interpolate(innerEnd, outerEnd, v),
+    innerStart,
+    outerStart,
+    innerEnd,
+    outerEnd,
+  });
+  return (u, v) => coons(u, upperFractionAt(v));
+}
+
+function coonsMap({
+  inner,
+  outer,
+  start,
+  end,
+  innerStart,
+  outerStart,
+  innerEnd,
+  outerEnd,
+}) {
+  return (u, v) => {
+    const d0 = inner(u);
+    const d1 = outer(u);
+    const c0 = start(v);
+    const c1 = end(v);
+    const bilinearR = (1 - u) * (1 - v) * innerStart.r
+      + (1 - u) * v * outerStart.r
+      + u * (1 - v) * innerEnd.r
+      + u * v * outerEnd.r;
+    const bilinearZ = (1 - u) * (1 - v) * innerStart.z
+      + (1 - u) * v * outerStart.z
+      + u * (1 - v) * innerEnd.z
+      + u * v * outerEnd.z;
+    return point(
+      (1 - v) * d0.r + v * d1.r
+        + (1 - u) * c0.r + u * c1.r - bilinearR,
+      (1 - v) * d0.z + v * d1.z
+        + (1 - u) * c0.z + u * c1.z - bilinearZ,
     );
   };
 }
 
-function upperOuterBoundary(geometry) {
-  const large = geometry.fillets[1];
-  const start = point(75.5, 30);
-  const tangent0 = large.firstTangent;
-  const tangent1 = large.secondTangent;
-  const backEnd = point(120, 60);
-  const topEnd = point(120, 90);
-  const lengths = [distance(start, tangent0), Math.abs(large.sweepAngle) * large.radius, distance(tangent1, backEnd), distance(backEnd, topEnd)];
-  const total = lengths.reduce((sum, value) => sum + value, 0);
-  const cumulative = [0, lengths[0] / total, (lengths[0] + lengths[1]) / total, (lengths[0] + lengths[1] + lengths[2]) / total, 1];
+function physicalPathFunction({ segmentLengths, segments }) {
+  const total = segmentLengths.reduce((sum, value) => sum + value, 0);
+  const cumulative = [0];
+  segmentLengths.forEach((length) => {
+    cumulative.push(cumulative.at(-1) + length / total);
+  });
   return (u) => {
-    if (u <= cumulative[1]) return interpolate(start, tangent0, u / cumulative[1]);
-    if (u <= cumulative[2]) {
-      const local = (u - cumulative[1]) / (cumulative[2] - cumulative[1]);
-      const angle = large.startAngle + large.sweepAngle * local;
-      return point(large.center.r + large.radius * Math.cos(angle), large.center.z + large.radius * Math.sin(angle));
+    for (let index = 0; index < segments.length; index += 1) {
+      const start = cumulative[index];
+      const end = cumulative[index + 1];
+      if (u <= end || index === segments.length - 1) {
+        const local = end > start ? (u - start) / (end - start) : 0;
+        return segments[index](Math.max(0, Math.min(1, local)));
+      }
     }
-    if (u <= cumulative[3]) return interpolate(tangent1, backEnd, (u - cumulative[2]) / (cumulative[3] - cumulative[2]));
-    return interpolate(backEnd, topEnd, (u - cumulative[3]) / (1 - cumulative[3]));
+    throw new RangeError('FH_PHYSICAL_PATH_PARAMETER_FAILURE');
   };
 }
 
+function upperFractionAt(v) {
+  const value = Math.max(0, Math.min(1, Number(v)));
+  if (value >= 1) return 1;
+  const scaled = value * 8;
+  const index = Math.min(7, Math.floor(scaled));
+  const local = scaled - index;
+  return UPPER_FRACTIONS[index]
+    + local * (UPPER_FRACTIONS[index + 1] - UPPER_FRACTIONS[index]);
+}
+
+function isHotspotElement({ block, i, lastU, v0, v1, map }) {
+  if (block.id === 'FH-B01' || block.id === 'FH-B05') return true;
+  if (block.id === 'FH-B00' && i === lastU) return true;
+  if (block.id === 'FH-B02' && i === 0) return true;
+  if (block.id === 'FH-B06' && i === lastU) {
+    const r0 = map(1, v0).r;
+    const r1 = map(1, v1).r;
+    return [60, 65, 95].some((radius) => (
+      radius >= Math.min(r0, r1) - 1e-10
+      && radius <= Math.max(r0, r1) + 1e-10
+    ));
+  }
+  return false;
+}
+
 function registerNode(store, value, owner) {
-  const key = keyOf(value);
+  const key = coordinateKey(value);
   const prior = store.get(key);
   if (prior) prior.owners.add(owner);
   else store.set(key, { r: value.r, z: value.z, owners: new Set([owner]) });
   return key;
 }
-function registerEdges(rows, { block, levelId, keys, i, j, lastU, lastV, map, um }) {
-  if (j === 0) rows.push(edge(`${levelId}-${block.id}-BORE-${pad(i)}`, 'FH-BOUNDARY-BORE', [keys[0], keys[7], keys[3]], [-1, 0]));
-  if (block.id === 'FH-B00' && i === 0) rows.push(edge(`${levelId}-PIPE-END-${pad(j)}`, 'FH-BOUNDARY-PIPE-END', [keys[0], keys[4], keys[1]], [0, -1]));
-  if (block.kind === 'UPPER_COONS' && i === lastU) rows.push(edge(`${levelId}-GASKET-${pad(j)}`, 'FH-BOUNDARY-GASKET-FACE', [keys[3], keys[6], keys[2]], [0, 1]));
+
+function registerBoundaryEdges(rows, {
+  block,
+  levelId,
+  keys,
+  i,
+  j,
+  lastU,
+  lastV,
+  map,
+  um,
+}) {
+  if (j === 0) {
+    rows.push(edge(
+      `${levelId}-${block.id}-BORE-${pad(i)}`,
+      'FH-BOUNDARY-BORE',
+      [keys[0], keys[7], keys[3]],
+      [-1, 0],
+    ));
+  }
+  if (block.id === 'FH-B00' && i === 0) {
+    rows.push(edge(
+      `${levelId}-PIPE-END-${pad(j)}`,
+      'FH-BOUNDARY-PIPE-END',
+      [keys[0], keys[4], keys[1]],
+      [0, -1],
+    ));
+  }
+  if (block.id === 'FH-B06' && i === lastU) {
+    rows.push(edge(
+      `${levelId}-GASKET-${pad(j)}`,
+      'FH-BOUNDARY-GASKET-FACE',
+      [keys[3], keys[6], keys[2]],
+      [0, 1],
+    ));
+  }
   if (j === lastV) {
     const midpoint = map(um, 1);
-    const boundaryId = block.kind === 'UPPER_COONS' && midpoint.r >= 119.999999 && midpoint.z > 60
-      ? 'FH-BOUNDARY-FLANGE-OD'
-      : `FH-BOUNDARY-OUTER-${block.id}`;
-    const outwardNormal = boundaryId === 'FH-BOUNDARY-FLANGE-OD' ? [1, 0] : null;
-    rows.push(edge(`${levelId}-${block.id}-OUTER-${pad(i)}`, boundaryId, [keys[1], keys[5], keys[2]], outwardNormal));
+    let boundaryId = `FH-BOUNDARY-OUTER-${block.id}`;
+    let outwardNormal = null;
+    if (block.id === 'FH-B06' && midpoint.r >= 120 - 1e-9 && midpoint.z > 60) {
+      boundaryId = 'FH-BOUNDARY-FLANGE-OD';
+      outwardNormal = [1, 0];
+    } else if (block.id === 'FH-B06' && Math.abs(midpoint.z - 60) <= 1e-9) {
+      boundaryId = 'FH-BOUNDARY-FLANGE-BACK';
+      outwardNormal = [0, -1];
+    }
+    rows.push(edge(
+      `${levelId}-${block.id}-OUTER-${pad(i)}`,
+      boundaryId,
+      [keys[1], keys[5], keys[2]],
+      outwardNormal,
+    ));
   }
 }
-function edge(edgeId, boundaryId, keys, outwardNormal) { return { edgeId, boundaryId, keys, outwardNormal }; }
+
+function edge(edgeId, boundaryId, keys, outwardNormal) {
+  return { edgeId, boundaryId, keys, outwardNormal };
+}
+
 function aggregateQuality(rows) {
   return deepFreeze({
     qualityProfileId: rows[0]?.qualityProfileId ?? null,
@@ -227,22 +540,113 @@ function aggregateQuality(rows) {
     qJDeterminantRatio: Math.min(...rows.map((row) => row.qJDeterminantRatio)),
     minimumScaledJacobian: Math.min(...rows.map((row) => row.minimumScaledJacobian)),
     maximumAspectRatio: Math.max(...rows.map((row) => row.aspectRatio)),
-    maximumHotspotAspectRatio: Math.max(0, ...rows.filter((row) => row.limits.maximumAspectRatio === 5).map((row) => row.aspectRatio)),
+    maximumHotspotAspectRatio: Math.max(
+      0,
+      ...rows.filter((row) => row.limits.maximumAspectRatio === 5).map((row) => row.aspectRatio),
+    ),
     midsidePlacementResidual: Math.max(...rows.map((row) => row.midsidePlacementResidual)),
     accepted: rows.every((row) => row.accepted),
     elementQuality: rows,
   });
 }
-function assertNoDuplicateCoordinates(nodes) { const seen = new Set(); nodes.forEach((node) => { const key = keyOf(node); if (seen.has(key)) throw new RangeError('FH_DUPLICATE_INTERFACE_NODE'); seen.add(key); }); }
-function assertConnectivity(elements, nodeById) { elements.forEach((element) => { if (new Set(element.nodeIds).size !== 8) throw new RangeError(`FH_DEGENERATE_ELEMENT:${element.elementId}`); element.nodeIds.forEach((id) => { if (!nodeById.has(id)) throw new RangeError(`FH_ORPHAN_NODE:${id}`); }); }); }
-function maxCornerEdge(elements, nodeById) { let result = 0; elements.forEach((element) => { const n = element.nodeIds.slice(0, 4).map((id) => nodeById.get(id)); for (let i = 0; i < 4; i += 1) result = Math.max(result, Math.hypot(n[i].r - n[(i + 1) % 4].r, n[i].z - n[(i + 1) % 4].z)); }); return result; }
-function refine(base, factor) { const result = []; for (let i = 0; i < base.length - 1; i += 1) for (let j = 0; j < factor; j += 1) result.push(base[i] + (base[i + 1] - base[i]) * j / factor); result.push(base.at(-1)); return result; }
-function uniform(count) { return Array.from({ length: count + 1 }, (_, i) => i / count); }
-function interpolate(a, b, t) { return point(a.r + (b.r - a.r) * t, a.z + (b.z - a.z) * t); }
-function distance(a, b) { return Math.hypot(a.r - b.r, a.z - b.z); }
-function point(r, z) { return { r: quantize(r), z: quantize(z) }; }
-function quantize(value) { return Math.round(value / Q) * Q; }
-function keyOf(value) { return `${Math.round(value.r / Q)}:${Math.round(value.z / Q)}`; }
-function xy(value) { return { x: value.r, y: value.z }; }
-function num(value) { return Number(value).toPrecision(16); }
-function pad(value) { return String(value).padStart(4, '0'); }
+
+function assertNoDuplicateCoordinates(nodes) {
+  const seen = new Set();
+  nodes.forEach((node) => {
+    const key = coordinateKey(node);
+    if (seen.has(key)) throw new RangeError('FH_DUPLICATE_INTERFACE_NODE');
+    seen.add(key);
+  });
+}
+
+function assertConnectivity(elements, nodesById) {
+  elements.forEach((element) => {
+    if (new Set(element.nodeIds).size !== 8) {
+      throw new RangeError(`FH_DEGENERATE_ELEMENT:${element.elementId}`);
+    }
+    element.nodeIds.forEach((nodeId) => {
+      if (!nodesById.has(nodeId)) throw new RangeError(`FH_ORPHAN_NODE:${nodeId}`);
+    });
+  });
+}
+
+function maximumCornerEdgeLength(elements, nodesById) {
+  let maximum = 0;
+  elements.forEach((element) => {
+    const corners = element.nodeIds.slice(0, 4).map((nodeId) => nodesById.get(nodeId));
+    for (let index = 0; index < 4; index += 1) {
+      maximum = Math.max(maximum, distance(corners[index], corners[(index + 1) % 4]));
+    }
+  });
+  return maximum;
+}
+
+function piecewiseBreakpoints(segmentLengths, segmentCounts) {
+  if (segmentLengths.length !== segmentCounts.length) {
+    throw new TypeError('FH_PIECEWISE_BREAKPOINT_DEFINITION_INVALID');
+  }
+  const total = segmentLengths.reduce((sum, value) => sum + value, 0);
+  const result = [];
+  let consumed = 0;
+  segmentLengths.forEach((length, index) => {
+    const start = consumed / total;
+    const end = (consumed + length) / total;
+    const count = segmentCounts[index];
+    for (let sub = 0; sub < count; sub += 1) {
+      result.push(start + (end - start) * sub / count);
+    }
+    consumed += length;
+  });
+  result.push(1);
+  return result;
+}
+
+function refineBreakpoints(base, factor) {
+  const result = [];
+  for (let index = 0; index < base.length - 1; index += 1) {
+    for (let sub = 0; sub < factor; sub += 1) {
+      result.push(base[index] + (base[index + 1] - base[index]) * sub / factor);
+    }
+  }
+  result.push(base.at(-1));
+  return result;
+}
+
+function uniformBreakpoints(count) {
+  return Array.from({ length: count + 1 }, (_, index) => index / count);
+}
+
+function interpolate(start, end, parameter) {
+  return point(
+    start.r + (end.r - start.r) * parameter,
+    start.z + (end.z - start.z) * parameter,
+  );
+}
+
+function distance(left, right) {
+  return Math.hypot(left.r - right.r, left.z - right.z);
+}
+
+function point(r, z) {
+  return { r: quantize(r), z: quantize(z) };
+}
+
+function quantize(value) {
+  return Math.round(value / Q) * Q;
+}
+
+function coordinateKey(value) {
+  return `${Math.round(value.r / Q)}:${Math.round(value.z / Q)}`;
+}
+
+function xy(value) {
+  return { x: value.r, y: value.z };
+}
+
+function formatNumber(value) {
+  return Number(value).toPrecision(16);
+}
+
+function pad(value) {
+  return String(value).padStart(4, '0');
+}
