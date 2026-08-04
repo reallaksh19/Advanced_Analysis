@@ -27,24 +27,29 @@ const HUB_DIRECTION = unit({ r: 19, z: 60 });
 export function createFlangeHubPathDefinitions(geometry) {
   requireGeometry(geometry);
   const smallOuter = add(geometry.fillets[0].secondTangent, scale(HUB_DIRECTION, 3));
-  const largeOuter = add(geometry.fillets[1].firstTangent, scale(HUB_DIRECTION, -5));
   const hubMidOuter = { r: 75.5, z: 30 };
+  const largeOuter = add(geometry.fillets[1].firstTangent, scale(HUB_DIRECTION, -5));
   const paths = [
-    radialPath('SCL-PIPE-REMOTE', -80, 50, 60, 'FH-B00'),
-    hubNormalPath('SCL-HUB-SMALL', smallOuter, 'FH-B02'),
-    hubNormalPath('SCL-HUB-MID', hubMidOuter, 'FH-B03'),
-    hubNormalPath('SCL-HUB-LARGE', largeOuter, 'FH-B04'),
-    axialPath('SCL-FLANGE-INNER', 100, 60, 90, 'FH-B07'),
-    axialPath('SCL-FLANGE-MID', 110, 60, 90, 'FH-B07'),
+    radialPath('SCL-PIPE-REMOTE', -80, 50, 60, ['FH-B00']),
+    hubNormalPath('SCL-HUB-SMALL', smallOuter, ['FH-B02']),
+    hubNormalPath('SCL-HUB-MID', hubMidOuter, ['FH-B04', 'FH-B05']),
+    hubNormalPath('SCL-HUB-LARGE', largeOuter, ['FH-B05']),
+    axialPath('SCL-FLANGE-INNER', 100, 60, 90, ['FH-B06']),
+    axialPath('SCL-FLANGE-MID', 110, 60, 90, ['FH-B06']),
   ];
   const probes = [
     probeFromPath('P-PIPE-REMOTE', paths[0]),
     probeFromPath('P-HUB-SMALL', paths[1]),
-    probeFromPath('P-HUB-MID', paths[2]),
+    {
+      probeId: 'P-HUB-MID',
+      point: { r: 62.75, z: 30 },
+      expectedBlockIds: ['FH-B04'],
+      sideSelectorId: 'POSITIVE_Z_SIDE_OF_Z30_INTERFACE',
+    },
     probeFromPath('P-HUB-LARGE', paths[3]),
-    { probeId: 'P-FLANGE-INNER', point: { r: 100, z: 75 }, expectedBlockId: 'FH-B07' },
-    { probeId: 'P-FLANGE-MID', point: { r: 110, z: 75 }, expectedBlockId: 'FH-B07' },
-    { probeId: 'P-FLANGE-OUTER', point: { r: 115, z: 75 }, expectedBlockId: 'FH-B07' },
+    { probeId: 'P-FLANGE-INNER', point: { r: 100, z: 75 }, expectedBlockIds: ['FH-B06'] },
+    { probeId: 'P-FLANGE-MID', point: { r: 110, z: 75 }, expectedBlockIds: ['FH-B06'] },
+    { probeId: 'P-FLANGE-OUTER', point: { r: 115, z: 75 }, expectedBlockIds: ['FH-B06'] },
   ];
   const payload = {
     pathDefinitionProfileId: FLANGE_HUB_PATH_PROFILE_ID,
@@ -74,17 +79,13 @@ export function recoverFlangeHubLevel({ mesh, result, geometry, pathDefinitions 
 
   const probes = pathDefinitions.probes.map((definition) => recoverPoint({
     definition,
-    mesh,
     elementRows,
     displacementByNode,
-    selectorDirection: null,
+    selectorDirection: definition.sideSelectorId === 'POSITIVE_Z_SIDE_OF_Z30_INTERFACE'
+      ? { r: 0, z: 1 }
+      : null,
   }));
-  const paths = pathDefinitions.paths.map((definition) => recoverPath({
-    definition,
-    mesh,
-    elementRows,
-    displacementByNode,
-  }));
+  const paths = pathDefinitions.paths.map((definition) => recoverPath({ definition, elementRows, displacementByNode }));
   const payload = {
     schema: 'flange-hub-recovery-evidence/v1',
     moduleId: 'C2D-FLANGE-HUB',
@@ -108,14 +109,13 @@ export function recoverFlangeHubLevel({ mesh, result, geometry, pathDefinitions 
   return deepFreeze({ ...payload, semanticHash: semanticHash(payload) });
 }
 
-function recoverPath({ definition, mesh, elementRows, displacementByNode }) {
+function recoverPath({ definition, elementRows, displacementByNode }) {
   const samples = definition.points.map((point, index) => recoverPoint({
     definition: {
       probeId: `${definition.pathId}:S${String(index + 1).padStart(2, '0')}`,
       point,
-      expectedBlockId: definition.expectedBlockId,
+      expectedBlockIds: definition.expectedBlockIds,
     },
-    mesh,
     elementRows,
     displacementByNode,
     selectorDirection: selectorDirection(definition, index),
@@ -135,15 +135,12 @@ function recoverPath({ definition, mesh, elementRows, displacementByNode }) {
       },
     });
   });
-  const scl = linearizeStressComponents(sclSamples, {
-    lineIdentity: definition.pathId,
-    pressureCorrection: null,
-  });
+  const scl = linearizeStressComponents(sclSamples, { lineIdentity: definition.pathId, pressureCorrection: null });
   const section = integrateSection(samples, definition);
   const probeH = Math.max(...samples.map((row) => row.probeH));
   return deepFreeze({
     pathId: definition.pathId,
-    expectedBlockId: definition.expectedBlockId,
+    expectedBlockIds: definition.expectedBlockIds,
     pathType: definition.pathType,
     fixedPhysicalPoints: definition.points,
     throughWallDirection: definition.throughWallDirection,
@@ -155,7 +152,7 @@ function recoverPath({ definition, mesh, elementRows, displacementByNode }) {
   });
 }
 
-function recoverPoint({ definition, mesh, elementRows, displacementByNode, selectorDirection }) {
+function recoverPoint({ definition, elementRows, displacementByNode, selectorDirection }) {
   const candidates = elementRows.filter((element) => inBoundingBox(definition.point, element.nodes));
   const recoveries = [];
   candidates.forEach((element) => {
@@ -173,7 +170,8 @@ function recoverPoint({ definition, mesh, elementRows, displacementByNode, selec
     }
   });
   if (recoveries.length === 0) throw new RangeError(`FH_NO_CONTAINING_ELEMENT:${definition.probeId}`);
-  const expected = recoveries.filter((row) => row.element.blockId === definition.expectedBlockId);
+  const expectedBlockIds = normalizeExpectedBlocks(definition);
+  const expected = recoveries.filter((row) => expectedBlockIds.includes(row.element.blockId));
   if (expected.length === 0) throw new RangeError(`FH_PROBE_BLOCK_OWNERSHIP_MISMATCH:${definition.probeId}`);
   const selected = selectRecovery(expected, definition.point, selectorDirection);
   const cornerNodes = selected.element.nodes.slice(0, 4);
@@ -184,6 +182,7 @@ function recoverPoint({ definition, mesh, elementRows, displacementByNode, selec
   return deepFreeze({
     probeId: definition.probeId,
     physicalCoordinate: definition.point,
+    expectedBlockIds,
     candidateElementIds: recoveries.map((row) => row.element.elementId).sort(),
     candidateBlockIds: [...new Set(recoveries.map((row) => row.element.blockId))].sort(),
     selectedContainingElementId: selected.element.elementId,
@@ -197,7 +196,7 @@ function recoverPoint({ definition, mesh, elementRows, displacementByNode, selec
     displacement: selected.recovered.displacement,
     recoveredTensor: selected.recovered.recoveredTensor,
     probeH,
-    ownershipRuleId: 'BB11_HALF_OPEN_PATH_DIRECTION_SELECTOR_V1',
+    ownershipRuleId: 'BB11_GOVERNED_BLOCK_SET_AND_DIRECTION_SELECTOR_V2',
   });
 }
 
@@ -206,44 +205,67 @@ function selectRecovery(rows, point, direction) {
   if (direction) {
     const scored = rows.map((row) => {
       const centroid = centroidOf(row.element.nodes.slice(0, 4));
-      return { row, score: (centroid.r - point.r) * direction.r + (centroid.z - point.z) * direction.z };
+      return {
+        row,
+        score: (centroid.r - point.r) * direction.r + (centroid.z - point.z) * direction.z,
+      };
     }).filter((entry) => entry.score >= -1e-10)
-      .sort((a, b) => b.score - a.score || a.row.element.elementId.localeCompare(b.row.element.elementId));
+      .sort((left, right) => right.score - left.score || left.row.element.elementId.localeCompare(right.row.element.elementId));
     if (scored.length) return scored[0].row;
   }
-  return [...rows].sort((a, b) => (
-    b.recovered.minimumNaturalCoordinateMargin - a.recovered.minimumNaturalCoordinateMargin
-    || a.element.elementId.localeCompare(b.element.elementId)
+  return [...rows].sort((left, right) => (
+    right.recovered.minimumNaturalCoordinateMargin - left.recovered.minimumNaturalCoordinateMargin
+    || left.element.elementId.localeCompare(right.element.elementId)
   ))[0];
 }
 
-function radialPath(pathId, z, r0, r1, expectedBlockId) {
-  const start = { r: r0, z };
-  const end = { r: r1, z };
-  return pathRecord(pathId, start, end, expectedBlockId, 'RADIAL_PIPE_WALL');
+function radialPath(pathId, z, r0, r1, expectedBlockIds) {
+  return pathRecord(pathId, { r: r0, z }, { r: r1, z }, expectedBlockIds, 'RADIAL_PIPE_WALL');
 }
-function hubNormalPath(pathId, outer, expectedBlockId) {
+function hubNormalPath(pathId, outer, expectedBlockIds) {
   const inward = { r: -HUB_DIRECTION.z, z: HUB_DIRECTION.r };
   const distanceToBore = (outer.r - 50) / (-inward.r);
   const inner = add(outer, scale(inward, distanceToBore));
-  return pathRecord(pathId, inner, outer, expectedBlockId, 'NORMAL_TO_HUB_WALL');
+  return pathRecord(pathId, inner, outer, expectedBlockIds, 'NORMAL_TO_HUB_WALL');
 }
-function axialPath(pathId, r, z0, z1, expectedBlockId) {
-  return pathRecord(pathId, { r, z: z0 }, { r, z: z1 }, expectedBlockId, 'AXIAL_FLANGE_THICKNESS');
+function axialPath(pathId, r, z0, z1, expectedBlockIds) {
+  return pathRecord(pathId, { r, z: z0 }, { r, z: z1 }, expectedBlockIds, 'AXIAL_FLANGE_THICKNESS');
 }
-function pathRecord(pathId, start, end, expectedBlockId, pathType) {
+function pathRecord(pathId, start, end, expectedBlockIds, pathType) {
   const throughWallDirection = unit({ r: end.r - start.r, z: end.z - start.z });
   const surfaceTangent = { r: throughWallDirection.z, z: -throughWallDirection.r };
   const points = Array.from({ length: PATH_STATION_COUNT }, (_, index) => ({
     r: start.r + (end.r - start.r) * index / (PATH_STATION_COUNT - 1),
     z: start.z + (end.z - start.z) * index / (PATH_STATION_COUNT - 1),
   }));
-  return deepFreeze({ pathId, pathType, expectedBlockId, start, end, points, throughWallDirection, surfaceTangent });
+  return deepFreeze({
+    pathId,
+    pathType,
+    expectedBlockIds: [...expectedBlockIds],
+    start,
+    end,
+    points,
+    throughWallDirection,
+    surfaceTangent,
+  });
 }
-function probeFromPath(probeId, path) { return { probeId, point: path.points[(PATH_STATION_COUNT - 1) / 2], expectedBlockId: path.expectedBlockId }; }
+function probeFromPath(probeId, path) {
+  return {
+    probeId,
+    point: path.points[(PATH_STATION_COUNT - 1) / 2],
+    expectedBlockIds: path.expectedBlockIds,
+  };
+}
 function selectorDirection(definition, index) {
   if (index === definition.points.length - 1) return scale(definition.throughWallDirection, -1);
   return definition.throughWallDirection;
+}
+function normalizeExpectedBlocks(definition) {
+  const values = definition.expectedBlockIds ?? (definition.expectedBlockId ? [definition.expectedBlockId] : []);
+  if (!Array.isArray(values) || values.length === 0 || values.some((value) => typeof value !== 'string' || !value)) {
+    throw new TypeError('FH_EXPECTED_BLOCK_CUSTODY_REQUIRED');
+  }
+  return [...new Set(values)].sort();
 }
 
 function rotateTensor(stress, surface, throughWall) {
@@ -265,8 +287,9 @@ function integrateSection(samples, definition) {
     positions.push(positions[index - 1] + distance(samples[index - 1].physicalCoordinate, samples[index].physicalCoordinate));
   }
   const length = positions.at(-1);
-  const centroid = integrateTrapezoid(positions, samples.map((row) => row.physicalCoordinate.r * 2 * Math.PI), (s) => s)
-    / integrateTrapezoid(positions, samples.map((row) => row.physicalCoordinate.r * 2 * Math.PI));
+  const circumferenceWeights = samples.map((row) => row.physicalCoordinate.r * 2 * Math.PI);
+  const centroid = integrateTrapezoid(positions, circumferenceWeights, (position) => position)
+    / integrateTrapezoid(positions, circumferenceWeights);
   const tractions = samples.map((row) => {
     const local = rotateTensor(row.recoveredTensor, definition.surfaceTangent, definition.throughWallDirection);
     return local.sigmaSurface;
@@ -297,15 +320,41 @@ function integrateTrapezoid(x, y, transform = null) {
 function diagnosticGaussPointMaxima(result) {
   const maxima = { sigmaR: 0, sigmaZ: 0, sigmaTheta: 0, tauRZ: 0 };
   result.elementResults.forEach((element) => element.gaussPointResults.forEach((point) => {
-    Object.keys(maxima).forEach((key) => { maxima[key] = Math.max(maxima[key], Math.abs(point.stress[key])); });
+    Object.keys(maxima).forEach((key) => {
+      maxima[key] = Math.max(maxima[key], Math.abs(point.stress[key]));
+    });
   }));
   return deepFreeze({ authority: 'DIAGNOSTIC_ONLY', absoluteComponentMaxima: maxima });
 }
-function centroidOf(nodes) { return { r: nodes.reduce((sum, row) => sum + row.r, 0) / nodes.length, z: nodes.reduce((sum, row) => sum + row.z, 0) / nodes.length }; }
-function inBoundingBox(point, nodes) { const rs = nodes.map((row) => row.r); const zs = nodes.map((row) => row.z); const e = 1e-9; return point.r >= Math.min(...rs) - e && point.r <= Math.max(...rs) + e && point.z >= Math.min(...zs) - e && point.z <= Math.max(...zs) + e; }
-function add(a, b) { return { r: a.r + b.r, z: a.z + b.z }; }
-function scale(a, value) { return { r: a.r * value, z: a.z * value }; }
-function unit(value) { const length = Math.hypot(value.r, value.z); if (!(length > 0)) throw new RangeError('FH_ZERO_DIRECTION'); return { r: value.r / length, z: value.z / length }; }
-function distance(a, b) { return Math.hypot(a.r - b.r, a.z - b.z); }
-function requireGeometry(value) { if (!value || value.schema !== 'flange-hub-canonical-geometry/v1') throw new TypeError('FH_CANONICAL_GEOMETRY_REQUIRED'); }
-function requireMeshAndResult(mesh, result) { if (!mesh || mesh.schema !== 'flange-hub-mesh-evidence/v1') throw new TypeError('FH_MESH_REQUIRED'); if (!result || result.schema !== 'flange-hub-load-case-result/v1' || result.meshHash !== mesh.meshHash) throw new TypeError('FH_MATCHING_RESULT_REQUIRED'); }
+function centroidOf(nodes) {
+  return {
+    r: nodes.reduce((sum, row) => sum + row.r, 0) / nodes.length,
+    z: nodes.reduce((sum, row) => sum + row.z, 0) / nodes.length,
+  };
+}
+function inBoundingBox(point, nodes) {
+  const radii = nodes.map((row) => row.r);
+  const axial = nodes.map((row) => row.z);
+  const tolerance = 1e-9;
+  return point.r >= Math.min(...radii) - tolerance
+    && point.r <= Math.max(...radii) + tolerance
+    && point.z >= Math.min(...axial) - tolerance
+    && point.z <= Math.max(...axial) + tolerance;
+}
+function add(left, right) { return { r: left.r + right.r, z: left.z + right.z }; }
+function scale(value, factor) { return { r: value.r * factor, z: value.z * factor }; }
+function unit(value) {
+  const length = Math.hypot(value.r, value.z);
+  if (!(length > 0)) throw new RangeError('FH_ZERO_DIRECTION');
+  return { r: value.r / length, z: value.z / length };
+}
+function distance(left, right) { return Math.hypot(left.r - right.r, left.z - right.z); }
+function requireGeometry(value) {
+  if (!value || value.schema !== 'flange-hub-canonical-geometry/v1') throw new TypeError('FH_CANONICAL_GEOMETRY_REQUIRED');
+}
+function requireMeshAndResult(mesh, result) {
+  if (!mesh || mesh.schema !== 'flange-hub-mesh-evidence/v1') throw new TypeError('FH_MESH_REQUIRED');
+  if (!result || result.schema !== 'flange-hub-load-case-result/v1' || result.meshHash !== mesh.meshHash) {
+    throw new TypeError('FH_MATCHING_RESULT_REQUIRED');
+  }
+}
