@@ -33,6 +33,29 @@ export class TopologyEditNavigationHudViewportBackend extends TopologyEditSuppor
     }
   }
 
+  /**
+   * Keep the GPU picker as the preferred dense-scene identity source, but do
+   * not allow its pixel-radius candidate to suppress a valid exact ray hit.
+   * A nearby GPU object can legitimately fail exact-point resolution; in that
+   * case the governed raycaster fallback must still decide the selection.
+   */
+  pickAt(clientX, clientY) {
+    if (this.contextLost || this.configurationError) return null;
+    const context = this.pickContext(clientX, clientY);
+    if (!context) return null;
+    const gpuHit = this.gpuPicker?.pick({
+      clientX,
+      clientY,
+      rect: context.rect,
+      camera: this.activeCamera,
+    });
+    if (gpuHit) {
+      const point = this.resolveGpuPickPoint(gpuHit, context.pointer);
+      if (point) return this.pickReceipt(gpuHit.target, point);
+    }
+    return this.pickWithRaycaster(context.pointer);
+  }
+
   renderSession(model) {
     this.renderOptimizationEvidence = null;
     super.renderSession(model);
