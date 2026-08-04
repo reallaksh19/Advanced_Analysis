@@ -44,28 +44,6 @@ assert.throws(
   (error) => error.code === 'EMPIRICAL_FORMULA_REGISTER_HASH_MISMATCH',
 );
 
-checkIndependentClosedFormOracles(catalog);
-const production = checkProductionFixture(catalog);
-
-console.log(JSON.stringify({
-  status: 'PASS',
-  schema: EMPIRICAL_FORMULA_REGISTER.schema,
-  method: EMPIRICAL_FORMULA_REGISTER.method,
-  formulaRegisterSemanticHash: EMPIRICAL_FORMULA_REGISTER.semanticHash,
-  benchmarkCatalogueSemanticHash: semanticHash(catalog),
-  formulaTermCount: EMPIRICAL_FORMULA_REGISTER.terms.length,
-  benchmarkCount: catalog.cases.length,
-  productionDistributionSemanticHash: semanticHash(production),
-  productionCases: production.loadCases.map((row) => ({
-    loadCaseId: row.loadCaseId,
-    status: row.status,
-    reactionsN: row.supportResults.map((result) => result.verticalForceN),
-    forceResidualN: row.equilibrium.forceResidualN,
-    momentResidualNmm: row.equilibrium.momentResidualNmm,
-  })),
-  numericalMethodChanged: false,
-}, null, 2));
-
 function checkIndependentClosedFormOracles(value) {
   const symmetric = benchmark(value, 'EMP-GRAVITY-SYMMETRIC-001');
   const input = symmetric.inputs;
@@ -394,3 +372,25 @@ function supportSite(siteId, x) {
     })]),
   });
 }
+
+checkIndependentClosedFormOracles(catalog);
+const production = checkProductionFixture(catalog);
+
+console.log(JSON.stringify({
+  status: 'PASS',
+  schema: EMPIRICAL_FORMULA_REGISTER.schema,
+  method: EMPIRICAL_FORMULA_REGISTER.method,
+  formulaRegisterSemanticHash: EMPIRICAL_FORMULA_REGISTER.semanticHash,
+  benchmarkCatalogueSemanticHash: semanticHash(catalog),
+  formulaTermCount: EMPIRICAL_FORMULA_REGISTER.terms.length,
+  benchmarkCount: catalog.cases.length,
+  productionDistributionSemanticHash: semanticHash(production),
+  productionCases: production.loadCases.map((row) => ({
+    loadCaseId: row.loadCaseId,
+    status: row.status,
+    reactionsN: row.supportResults.map((result) => result.verticalForceN),
+    forceResidualN: row.equilibrium.forceResidualN,
+    momentResidualNmm: row.equilibrium.momentResidualNmm,
+  })),
+  numericalMethodChanged: false,
+}, null, 2));
