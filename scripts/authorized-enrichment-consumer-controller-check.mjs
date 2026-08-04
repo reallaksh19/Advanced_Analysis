@@ -1,109 +1,69 @@
 import assert from 'node:assert/strict';
 import { semanticHash } from '../src/core/shared-piping-model/canonical-json.js';
+import { computeAuthorizedEmpiricalLoadInputSemanticHash } from '../src/workspace/engineering-loads/authorized-empirical-load-input.js';
 import {
-  computeAuthorizedEmpiricalLoadInputSemanticHash,
-} from '../src/workspace/engineering-loads/authorized-empirical-load-input.js';
-import {
-  AUTHORIZED_STAGED_JSON_ENTRY_SCHEMA,
-  AUTHORIZED_STAGED_JSON_SIDECAR_SCHEMA,
-  computeAuthorizedStagedJsonSidecarSemanticHash,
-  computeStagedJsonSidecarEntrySemanticHash,
-} from '../src/workspace/enrichment/authorized-staged-json-sidecar.js';
-import { sha256Utf8 } from '../src/workspace/enrichment/authorized-staged-json-writer.js';
+  AUTHORIZED_EMPIRICAL_RUNTIME_PACKAGE_SCHEMA,
+  sealAuthorizedEmpiricalRuntimePackage,
+} from '../src/workspace/engineering-loads/authorized-empirical-runtime-package.js';
 import {
   AUTHORIZED_EMPIRICAL_CONSUMER_REQUEST_SCHEMA,
-  AUTHORIZED_STAGED_JSON_CONSUMER_REQUEST_SCHEMA,
   AuthorizedEnrichmentConsumerController,
-  requireAuthorizedStagedJsonConsumerResult,
 } from '../src/workspace/enrichment/authorized-enrichment-consumer-controller.js';
 
-const authorizedInput = makeAuthorizedInput();
-const masterData = { marker: 'MASTER-DATA-P19' };
+const masterData = Object.freeze({ marker: 'MASTER-DATA-EMP01' });
+const runtimePackage = makeRuntimePackage();
+const authorizationState = Object.freeze({ state: 'AUTHORIZED_CURRENT', calculationEligible: true });
 const execution = Object.freeze({
   schema: 'authorized-empirical-load-execution/v1',
-  executionId: 'EXECUTION-P19',
-  semanticHash: 'fnv1a64:9999999999999999',
-  status: 'CALCULATED',
+  executionId: runtimePackage.executionId,
+  distribution: Object.freeze({ status: 'CALCULATED' }),
 });
-const empiricalCalls = [];
-const controller = new AuthorizedEnrichmentConsumerController({
-  engineeringModelStore: {
-    calculateAuthorized(value) {
-      empiricalCalls.push(value);
-      return execution;
-    },
+const calls = [];
+const engineeringModelStore = {
+  configureAuthorizedEmpiricalPackage(value, actualMasterData) {
+    calls.push({ kind: 'CONFIGURE', value, masterData: actualMasterData });
+    return authorizationState;
   },
-  masterDataController: {
-    getMasterData() { return masterData; },
+  executeConfiguredAuthorized(actualMasterData) {
+    calls.push({ kind: 'EXECUTE', masterData: actualMasterData });
+    return execution;
   },
-});
-
-const empiricalResult = controller.executeEmpirical({
-  schema: AUTHORIZED_EMPIRICAL_CONSUMER_REQUEST_SCHEMA,
-  executionId: 'EXECUTION-P19',
-  executedAt: '2026-08-03T01:45:00.000Z',
-  authorizedInput,
-});
-assert.equal(empiricalResult, execution);
-assert.equal(empiricalCalls.length, 1);
-assert.deepEqual(empiricalCalls[0], {
-  executionId: 'EXECUTION-P19',
-  executedAt: '2026-08-03T01:45:00.000Z',
-  authorizedInput,
-  masterData,
-});
-assert.equal(Object.isFrozen(empiricalCalls[0].authorizedInput), true);
-
-assert.throws(
-  () => controller.executeEmpirical({
-    schema: AUTHORIZED_EMPIRICAL_CONSUMER_REQUEST_SCHEMA,
-    executionId: 'EXECUTION-P19-BAD',
-    executedAt: '2026-08-03T01:46:00.000Z',
-    authorizedInput: { ...authorizedInput, projectId: 'TAMPERED' },
-  }),
-  (error) => error.code === 'EMPIRICAL_INPUT_HASH_MISMATCH',
-);
-assert.equal(empiricalCalls.length, 1, 'invalid input reached the empirical store');
-
-const sourceValue = {
-  id: 'S100', targetId: 'LINE:S100', lineKey: 'S100', attributes: {}, children: [],
+  refreshAuthorizedEmpiricalPackage(actualMasterData) {
+    calls.push({ kind: 'REFRESH', masterData: actualMasterData });
+    return authorizationState;
+  },
+  markEmpiricalStale(reason, datasetVersion) {
+    calls.push({ kind: 'STALE', reason, datasetVersion });
+    return Object.freeze({ state: 'AUTHORIZED_STALE', calculationEligible: false, reasonCode: reason });
+  },
+  getEmpiricalAuthorizationState() { return authorizationState; },
 };
-const sourceText = JSON.stringify(sourceValue);
-const runtimeState = makeRuntimeState();
-const sourceSha256 = await sha256Utf8(sourceText);
-const stagedRequest = makeStagedRequest(sourceText, sourceSha256);
-const stagedResult = await controller.downloadStagedJson(
-  stagedRequest,
-  runtimeState.documentRef,
-  runtimeState.runtime,
-);
-assert.deepEqual(requireAuthorizedStagedJsonConsumerResult(stagedResult), stagedResult);
-assert.equal(stagedResult.operationId, 'STAGED-OP-P19');
-assert.equal(stagedResult.projectId, 'PROJECT-P19');
-assert.equal(stagedResult.status, 'TRIGGERED');
-assert.equal(stagedResult.fileName, 'source.enriched.sjson.json');
-assert.equal(stagedResult.sha256, await sha256Utf8(runtimeState.blobs[0].parts[0]));
-assert.equal(
-  stagedResult.byteLength,
-  new TextEncoder().encode(runtimeState.blobs[0].parts[0]).byteLength,
-);
-assert.equal(runtimeState.anchor.clickCount, 1);
-assert.deepEqual(runtimeState.revokedUrls, ['blob:authorized-enrichment-p19']);
-assert.equal(Object.isFrozen(stagedResult), true);
+const controller = new AuthorizedEnrichmentConsumerController({
+  engineeringModelStore,
+  masterDataController: { getMasterData() { return masterData; } },
+});
 
-const repeatedState = makeRuntimeState();
-const repeated = await controller.downloadStagedJson(
-  stagedRequest,
-  repeatedState.documentRef,
-  repeatedState.runtime,
-);
-assert.deepEqual(repeated, stagedResult, 'consumer operation must be deterministic');
+const request = Object.freeze({
+  schema: AUTHORIZED_EMPIRICAL_CONSUMER_REQUEST_SCHEMA,
+  runtimePackage,
+});
+assert.equal(controller.configureEmpirical(request), authorizationState);
+assert.equal(controller.executeEmpirical(), execution);
+assert.equal(controller.refreshEmpirical(), authorizationState);
+assert.equal(controller.getEmpiricalAuthorizationState(), authorizationState);
+assert.equal(controller.markEmpiricalStale('PROJECT_DATA_CHANGED', 8).state, 'AUTHORIZED_STALE');
+assert.deepEqual(calls.map((row) => row.kind), ['CONFIGURE', 'EXECUTE', 'REFRESH', 'STALE']);
+assert.equal(calls[0].value.semanticHash, runtimePackage.semanticHash);
+assert.equal(calls[0].masterData, masterData);
+assert.equal(calls[1].masterData, masterData);
 
-const tampered = { ...stagedResult, fileName: 'tampered.json' };
 assert.throws(
-  () => requireAuthorizedStagedJsonConsumerResult(tampered),
-  (error) => error.code === 'AUTHORIZED_ENRICHMENT_HASH_MISMATCH',
+  () => controller.configureEmpirical({ ...request, runtimePackage: { ...runtimePackage, packageId: 'TAMPERED' } }),
+  (error) => error.code === 'EMPIRICAL_RUNTIME_PACKAGE_HASH_MISMATCH',
 );
+assert.equal(calls.length, 4, 'invalid runtime package reached the engineering store');
+assert.equal(typeof controller.downloadStagedJson, 'function', 'stagedJson authorized path was removed');
+
 assert.throws(
   () => new AuthorizedEnrichmentConsumerController({
     engineeringModelStore: {}, masterDataController: { getMasterData() {} },
@@ -112,183 +72,78 @@ assert.throws(
 );
 assert.throws(
   () => new AuthorizedEnrichmentConsumerController({
-    engineeringModelStore: { calculateAuthorized() {} }, masterDataController: {},
+    engineeringModelStore, masterDataController: {},
   }),
   (error) => error.code === 'AUTHORIZED_ENRICHMENT_MASTER_DATA_INVALID',
 );
 
 console.log(JSON.stringify({
   status: 'PASS',
-  empiricalExecutionId: empiricalResult.executionId,
-  stagedResultSemanticHash: stagedResult.semanticHash,
-  writeArtifactSemanticHash: stagedResult.writeArtifactSemanticHash,
-  downloadReceiptSemanticHash: stagedResult.downloadReceiptSemanticHash,
-  outputSha256: stagedResult.sha256,
-  outputByteLength: stagedResult.byteLength,
+  requestSchema: AUTHORIZED_EMPIRICAL_CONSUMER_REQUEST_SCHEMA,
+  runtimePackageSemanticHash: runtimePackage.semanticHash,
+  configuredState: authorizationState.state,
+  executionId: execution.executionId,
+  stagedJsonPathRetained: true,
 }, null, 2));
 
-function makeRuntimeState() {
-  const state = { blobs: [], revokedUrls: [], anchor: null };
-  class FakeBlob {
-    constructor(parts, options) {
-      this.parts = parts;
-      this.options = options;
-      state.blobs.push(this);
-    }
-  }
-  state.anchor = {
-    href: '',
-    download: '',
-    clickCount: 0,
-    click() { this.clickCount += 1; },
-  };
-  state.documentRef = {
-    createElement(tag) {
-      assert.equal(tag, 'a');
-      return state.anchor;
+function makeRuntimePackage() {
+  const authorizedInput = makeAuthorizedInput();
+  return sealAuthorizedEmpiricalRuntimePackage({
+    schema: AUTHORIZED_EMPIRICAL_RUNTIME_PACKAGE_SCHEMA,
+    packageId: 'PACKAGE-EMP01-CONTROLLER',
+    configuredAt: '2026-08-04T12:30:00.000Z',
+    executionId: 'EXECUTION-EMP01-CONTROLLER',
+    executedAt: '2026-08-04T12:31:00.000Z',
+    authorizedInput,
+    bindings: {
+      projectId: authorizedInput.projectId,
+      datasetId: 'DATASET-EMP01',
+      datasetVersion: 8,
+      sourceDatasetHash: '1'.repeat(64),
+      sharedModelSemanticHash: 'fnv1a64:1111111111111111',
+      supportSiteModelSemanticHash: 'fnv1a64:2222222222222222',
+      routePartitionModelSemanticHash: 'fnv1a64:3333333333333333',
+      projectDataProfileSemanticHash: 'fnv1a64:4444444444444444',
+      masterSourceHashes: {
+        dataset: '1'.repeat(64),
+        lineList: '2'.repeat(64),
+        pipingClass: '3'.repeat(64),
+        componentWeight: '4'.repeat(64),
+      },
     },
-  };
-  state.runtime = {
-    BlobCtor: FakeBlob,
-    createObjectURL() { return 'blob:authorized-enrichment-p19'; },
-    revokeObjectURL(url) { state.revokedUrls.push(url); },
-  };
-  return state;
+  });
 }
 
 function makeAuthorizedInput() {
   const draft = {
     schema: 'authorized-empirical-load-input/v1',
-    intakeId: 'INTAKE-P19',
-    projectId: 'PROJECT-P19',
-    baselineId: 'BASE-P19',
+    intakeId: 'INTAKE-EMP01-CONTROLLER',
+    projectId: 'PROJECT-EMP01',
+    baselineId: 'BASELINE-EMP01',
     baselineRevision: 1,
-    baselineSemanticHash: 'fnv1a64:1111111111111111',
-    readinessEvaluationSemanticHash: 'fnv1a64:2222222222222222',
-    readinessSemanticHash: 'fnv1a64:3333333333333333',
-    handoffSemanticHash: 'fnv1a64:4444444444444444',
-    projectionPayloadSemanticHash: 'fnv1a64:5555555555555555',
+    baselineSemanticHash: 'fnv1a64:5555555555555555',
+    readinessEvaluationSemanticHash: 'fnv1a64:6666666666666666',
+    readinessSemanticHash: 'fnv1a64:7777777777777777',
+    handoffSemanticHash: 'fnv1a64:8888888888888888',
+    projectionPayloadSemanticHash: 'fnv1a64:9999999999999999',
     adapterVersion: 'empirical-adapter/1.0.0',
-    configurationHash: 'fnv1a64:6666666666666666',
-    createdAt: '2026-08-03T01:44:00.000Z',
-    lineBindings: [{
-      targetId: 'line:001',
-      sourceRecordId: 'src-line-001',
-      lineKey: 'L-1',
-      projectionRecordSemanticHash: 'fnv1a64:7777777777777777',
-    }],
-    componentBindings: [{
-      targetId: 'component:001',
-      sourceRecordId: 'src-component-001',
-      lineKey: 'L-1',
-      catalogKey: 'CV-1',
-      projectionRecordSemanticHash: 'fnv1a64:8888888888888888',
-    }],
+    configurationHash: 'fnv1a64:aaaaaaaaaaaaaaaa',
+    createdAt: '2026-08-04T12:29:00.000Z',
+    lineBindings: [{ targetId: 'line:001', sourceRecordId: 'source-line-001', lineKey: 'L-1', projectionRecordSemanticHash: 'fnv1a64:bbbbbbbbbbbbbbbb' }],
+    componentBindings: [{ targetId: 'component:001', sourceRecordId: 'source-component-001', lineKey: 'L-1', catalogKey: 'VALVE-1', projectionRecordSemanticHash: 'fnv1a64:cccccccccccccccc' }],
     loadCalculationOverlay: {
-      pipeSectionProperties: {
-        'L-1': {
-          outsideDiameterMm: 100,
-          wallThicknessMm: 5,
-          materialCode: 'MAT-1',
-          insulationCode: 'INS-1',
-          insulationThicknessMm: 10,
-        },
-      },
+      pipeSectionProperties: { 'L-1': { outsideDiameterMm: 100, wallThicknessMm: 5, materialCode: 'MAT-1', insulationCode: null, insulationThicknessMm: 0 } },
       materialDensitiesKgPerM3: { 'MAT-1': 7850 },
       operatingFluidDensitiesKgPerM3: { 'L-1': 800 },
       hydroFluidDensitiesKgPerM3: { 'L-1': 1000 },
-      insulationDensitiesKgPerM3: { 'INS-1': 120 },
-      componentWeightsKg: { 'CV-1': 10 },
+      insulationDensitiesKgPerM3: {},
+      componentWeightsKg: { 'VALVE-1': 10 },
     },
     overlaySemanticHash: '',
-    summary: {
-      lineCount: 1,
-      componentCount: 1,
-      materialCodeCount: 1,
-      insulationCodeCount: 1,
-      componentCatalogCount: 1,
-    },
+    summary: { lineCount: 1, componentCount: 1, materialCodeCount: 1, insulationCodeCount: 0, componentCatalogCount: 1 },
     semanticHash: 'fnv1a64:0000000000000000',
   };
   draft.overlaySemanticHash = semanticHash(draft.loadCalculationOverlay);
   draft.semanticHash = computeAuthorizedEmpiricalLoadInputSemanticHash(draft);
   return draft;
-}
-
-function makeStagedRequest(text, sourceSha256) {
-  return {
-    schema: AUTHORIZED_STAGED_JSON_CONSUMER_REQUEST_SCHEMA,
-    operationId: 'STAGED-OP-P19',
-    sidecar: makeSidecar(),
-    source: {
-      sourceId: 'SOURCE-P19',
-      fileName: 'source.sjson.json',
-      sha256: sourceSha256,
-      byteLength: new TextEncoder().encode(text).byteLength,
-      text,
-    },
-    mapping: {
-      sourceRecordIdField: 'id',
-      targetIdField: 'targetId',
-      lineKeyField: 'lineKey',
-      attributesField: 'attributes',
-      childrenField: 'children',
-    },
-    formatting: { indent: 2, newline: '\n', terminalNewline: true },
-    outputFileName: 'source.enriched.sjson.json',
-    writeId: 'WRITE-P19',
-    writtenAt: '2026-08-03T01:47:00.000Z',
-    downloadId: 'DOWNLOAD-P19',
-    triggeredAt: '2026-08-03T01:48:00.000Z',
-  };
-}
-
-function makeSidecar() {
-  const entries = [makeEntry({
-    targetId: 'LINE:S100',
-    targetKind: 'LINE',
-    sourceRecordId: 'S100',
-    lineKey: 'S100',
-    attributes: { lineExportLabel: 'LINE-S100' },
-    projectionRecordSemanticHash: 'fnv1a64:7777777777777777',
-  })];
-  const draft = {
-    schema: AUTHORIZED_STAGED_JSON_SIDECAR_SCHEMA,
-    sidecarId: 'SIDECAR-P19',
-    projectId: 'PROJECT-P19',
-    baselineId: 'BASE-P19',
-    baselineRevision: 1,
-    baselineSemanticHash: 'fnv1a64:1111111111111111',
-    readinessEvaluationSemanticHash: 'fnv1a64:2222222222222222',
-    readinessSemanticHash: 'fnv1a64:3333333333333333',
-    handoffSemanticHash: 'fnv1a64:4444444444444444',
-    projectionPayloadSemanticHash: 'fnv1a64:5555555555555555',
-    adapterVersion: 'staged-json-adapter/1.0.0',
-    configurationHash: 'fnv1a64:6666666666666666',
-    createdAt: '2026-08-03T01:44:00.000Z',
-    entries,
-    summary: {
-      entryCount: 1,
-      lineEntryCount: 1,
-      componentEntryCount: 0,
-      attributeCount: 1,
-    },
-    semanticHash: 'fnv1a64:0000000000000000',
-  };
-  return {
-    ...draft,
-    semanticHash: computeAuthorizedStagedJsonSidecarSemanticHash(draft),
-  };
-}
-
-function makeEntry(value) {
-  const draft = {
-    schema: AUTHORIZED_STAGED_JSON_ENTRY_SCHEMA,
-    ...value,
-    semanticHash: 'fnv1a64:0000000000000000',
-  };
-  return {
-    ...draft,
-    semanticHash: computeStagedJsonSidecarEntrySemanticHash(draft),
-  };
 }
