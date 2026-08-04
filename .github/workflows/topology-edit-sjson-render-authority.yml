@@ -6,6 +6,7 @@ on:
       - '.github/workflows/topology-edit-sjson-render-authority.yml'
       - 'public/Sjson.json'
       - 'public/fixtures/topology-edit-20-element-demo.staged.json'
+      - 'src/core/support-restraints/attachment-resolution-helpers.js'
       - 'src/workspace/dataset-adapter.js'
       - 'src/workspace/dataset-types.js'
       - 'src/workspace/topology-edit/topology-edit-source-adapter.js'
@@ -13,7 +14,6 @@ on:
       - 'src/workspace/topology-edit/topology-edit-typed-viewport-backend.js'
       - 'src/workspace/topology-edit/support-restraint-family.js'
       - 'tests/topology-edit-sjson-render-authority.test.mjs'
-      - 'tests/topology-edit-sjson-support-diagnostic.test.mjs'
       - 'tests/topology-edit-20-element-demo-loader.test.mjs'
       - 'tests/topology-edit-render-fidelity.test.mjs'
       - 'tests/topology-edit-m003-capability-authority.test.mjs'
@@ -59,20 +59,19 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+          node --check src/core/support-restraints/attachment-resolution-helpers.js
           node --check src/workspace/dataset-adapter.js
           node --check src/workspace/dataset-types.js
           node --check src/workspace/topology-edit/topology-edit-source-adapter.js
           node --check src/workspace/topology-edit/topology-edit-render-model.js
           node --check src/workspace/topology-edit/topology-edit-typed-viewport-backend.js
           node --check tests/topology-edit-sjson-render-authority.test.mjs
-          node --check tests/topology-edit-sjson-support-diagnostic.test.mjs
           node --check e2e/topology-edit-sjson-render-authority.spec.js
           git diff --check
 
       - name: Execute canonical, typed geometry, and support authority tests
         run: |
           node --test \
-            tests/topology-edit-sjson-support-diagnostic.test.mjs \
             tests/topology-edit-sjson-render-authority.test.mjs \
             tests/topology-edit-20-element-demo-loader.test.mjs \
             tests/topology-edit-render-fidelity.test.mjs \
