@@ -29,7 +29,7 @@ test.beforeEach(async ({ page }) => {
 test('tree, search, HUD, and real WebGL share one canonical selection authority', async ({ page }) => {
   const host = await openProductionController(page);
 
-  const firstTreeRow = page.locator('[data-entity-id="P-001"]');
+  const firstTreeRow = treeEntity(page, 'P-001');
   await expect(firstTreeRow).toBeVisible();
   await firstTreeRow.click();
   await expect(host).toHaveAttribute('data-topology-edit-selection-source', 'tree');
@@ -44,8 +44,8 @@ test('tree, search, HUD, and real WebGL share one canonical selection authority'
     'edge:P-001,edge:P-003',
   );
   await expect(host).toHaveAttribute('data-topology-edit-selection-source', 'search');
-  await expect(page.locator('[data-entity-id="P-001"]')).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('[data-entity-id="P-003"]')).toHaveAttribute('aria-selected', 'true');
+  await expect(treeEntity(page, 'P-001')).toHaveAttribute('aria-selected', 'true');
+  await expect(treeEntity(page, 'P-003')).toHaveAttribute('aria-selected', 'true');
 
   await selectBySearch(page, host, 'edge:P-004');
   await expect(host).toHaveAttribute('data-topology-edit-selection-ids', 'edge:P-004');
@@ -56,17 +56,17 @@ test('tree, search, HUD, and real WebGL share one canonical selection authority'
   await expect(host).toHaveAttribute('data-topology-edit-selection-source', 'viewport');
   await expect(host).toHaveAttribute('data-topology-edit-selection-ids', 'edge:P-005');
   await expect(page.locator('[data-role="professional-edge-id"]')).toHaveValue('edge:P-005');
-  await expect(page.locator('[data-entity-id="P-005"]')).toHaveAttribute('aria-selected', 'true');
+  await expect(treeEntity(page, 'P-005')).toHaveAttribute('aria-selected', 'true');
   evidence.selection = { viewport: 'PASS', tree: 'PASS', search: 'PASS', hud: 'PASS' };
 });
 
 test('tree modifier selection is deterministic and dataset replacement clears it', async ({ page }) => {
   const host = await openProductionController(page);
-  await page.locator('[data-entity-id="P-001"]').click();
+  await treeEntity(page, 'P-001').click();
   const revisionBefore = Number(
     await host.getAttribute('data-topology-edit-selection-revision'),
   );
-  await page.locator('[data-entity-id="P-004"]').click({ modifiers: ['Shift'] });
+  await treeEntity(page, 'P-004').click({ modifiers: ['Shift'] });
   const selectedIds = String(
     await host.getAttribute('data-topology-edit-selection-ids') || '',
   ).split(',').filter(Boolean);
@@ -76,7 +76,7 @@ test('tree modifier selection is deterministic and dataset replacement clears it
   expect(Number(await host.getAttribute('data-topology-edit-selection-revision')))
     .toBe(revisionBefore + 1);
 
-  await page.locator('[data-entity-id="P-003"]').click({ modifiers: ['Control'] });
+  await treeEntity(page, 'P-003').click({ modifiers: ['Control'] });
   expect(String(await host.getAttribute('data-topology-edit-selection-ids')))
     .not.toContain('edge:P-003');
 
@@ -137,6 +137,12 @@ async function selectBySearch(page, host, canonicalId, additive = false) {
   const result = page.locator(`[data-search-canonical-id="${canonicalId}"]`);
   await expect(result).toHaveCount(1);
   await result.click({ modifiers: additive ? ['Shift'] : [] });
+}
+
+function treeEntity(page, entityId) {
+  return page.locator(
+    `[data-role="tree-list"] [data-entity-id="${entityId}"][data-action="select-entity"]`,
+  );
 }
 
 async function visiblePickPoint(page, canonicalId) {
