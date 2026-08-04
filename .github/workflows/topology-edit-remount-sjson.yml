@@ -1,5 +1,6 @@
 name: 3D Edit SJSON Remount
 
+# Exact-head browser qualification for the production upload/remount lifecycle.
 on:
   pull_request:
     paths:
