@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { inputXmlToCanonicalGeometry } from '../src/core/geometry/adapters/inputXmlToCanonicalGeometry.js';
+import { buildBm1InputXmlAuthorities } from './lfea-b3.15-bm1-inputxml-fixtures.mjs';
 import {
   INPUTXML_RESOLVED_GROUND_TRUTH_SCHEMA,
   buildInputXmlResolvedGroundTruth,
@@ -34,6 +35,11 @@ assert.equal(first.summary.nodeCount, 16);
 assert.equal(first.summary.elementCount, 15);
 assert.equal(first.nodes.length, 16);
 assert.equal(first.elements.length, 15);
+const analysisAuthorities = buildBm1InputXmlAuthorities();
+assert.equal(analysisAuthorities.normalized.geometry.nodes.length, 16, 'source ground truth remains 16 source nodes');
+assert.equal(analysisAuthorities.normalized.geometry.segments.length, 15, 'source ground truth remains 15 source elements');
+assert.equal(analysisAuthorities.analysisGeometry.nodes.length, 20, 'M024 analysis topology adds four declared bend stations');
+assert.equal(analysisAuthorities.analysisGeometry.segments.length, 19, 'M024 analysis topology resolves six bend subspans');
 assert.equal(requireInputXmlResolvedGroundTruth(first).semanticHash, first.semanticHash);
 assert.deepEqual(second, first);
 

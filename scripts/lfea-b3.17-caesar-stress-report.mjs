@@ -2,7 +2,7 @@ import { semanticHash } from '../src/core/shared-piping-model/canonical-json.js'
 import { deepFreeze } from '../src/core/shared-piping-model/immutable.js';
 
 export const CAESAR_STRESS_REPORT_SCHEMA = 'caesar-ii-stress-report/v1';
-export const BM1_CODE_STRESS_COMPARISON_SCHEMA = 'm023-bm1-code-stress-comparison/v1';
+export const BM1_CODE_STRESS_COMPARISON_SCHEMA = 'm024-bm1-code-stress-comparison/v1';
 export const CAESAR_SUSTAINED_CASE = 'CASE 4 (SUS) W+P1+H';
 export const CAESAR_EXPANSION_CASE = 'CASE 5 (EXP) L5=L3-L4';
 export const KPA_TO_PA = 1000;
@@ -110,9 +110,9 @@ export function buildBm1CodeStressComparison({
     matchingPolicy: 'EXACT_FROM_NODE_TO_NODE_ONLY',
     cases,
     limitations: [
-      'CAESAR II reports 19 stress elements because both bends include internal station splits; the compiled BM1 model retains 15 finite-chord source elements. Only exact FROM_NODE/TO_NODE pairs are compared.',
+      'M024 resolves the live BM1 bend near, midpoint and far station identities, so all 19 CAESAR stress element pairs have exact compiled counterparts; no nearest-node or synthetic matching is used.',
       'CAESAR II labels the reference output B31.3-2018 while the repository code profile declares ASME_B31_3_2024. This comparison does not silently reconcile the edition labels.',
-      'The BM1 InputXML contains no active SIF records, so repository code results use unity factors. CAESAR II reports non-unity SIFs at internal bend stations that have no one-to-one compiled-element match.',
+      'The InputXML contains no explicit SIF override records. M024 independently derives pressure-corrected welding-elbow directional SIFs from the established Appendix D Table D300 Note (7) authority and applies them only to resolved bend code points.',
       'CAESAR II emits zero code and allowable stress for rigid elements. Repository rigid components remain stiff frame elements and retain their computed code result; zero-allowable CAESAR ends are marked as a rigid convention and excluded from utilization-deviation statistics.',
     ],
     semanticHash: '',
@@ -180,11 +180,12 @@ function parseHighest(body) {
 function compareCase({ report, modelEntries, codeResults, category }) {
   if (!report) fail('BM1_CODE_STRESS_COMPARISON_CASE_MISSING', `Missing parsed report for ${category}.`);
   const compiled = modelEntries.map((entry, index) => ({
-    sourceElementId: entry.segment.id,
+    sourceElementId: entry.sourceSegment.id,
+    analysisElementId: entry.segment.id,
     kernelElementId: entry.elementId,
-    fromNode: normalizeNodeId(entry.segment.startNodeId, `${entry.segment.id}.startNodeId`),
-    toNode: normalizeNodeId(entry.segment.endNodeId, `${entry.segment.id}.endNodeId`),
-    rigid: entry.component !== null,
+    fromNode: normalizeNodeId(entry.referenceFromNode, `${entry.segment.id}.referenceFromNode`),
+    toNode: normalizeNodeId(entry.referenceToNode, `${entry.segment.id}.referenceToNode`),
+    rigid: entry.rigid === true,
     results: codeResults.slice(index * 2, index * 2 + 2),
   }));
   const compiledByPair = new Map(compiled.map((row) => [pairKey(row.fromNode, row.toNode), row]));
