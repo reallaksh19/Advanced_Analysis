@@ -22,7 +22,6 @@ export class TopologyEditSearchPanel {
     this.results = Object.freeze([]);
     this.activeIndex = -1;
     this.inputHandler = () => this.runQuery();
-    this.clickHandler = (event) => this.handleClick(event);
     this.keyHandler = (event) => this.handleKey(event);
   }
 
@@ -47,7 +46,6 @@ export class TopologyEditSearchPanel {
     this.statusElement = host.querySelector('[data-role="topology-edit-search-status"]');
     this.input.addEventListener('input', this.inputHandler);
     this.input.addEventListener('keydown', this.keyHandler);
-    this.resultsElement.addEventListener('click', this.clickHandler);
   }
 
   updateIndex(indexInput) {
@@ -63,7 +61,6 @@ export class TopologyEditSearchPanel {
   destroy() {
     this.input?.removeEventListener('input', this.inputHandler);
     this.input?.removeEventListener('keydown', this.keyHandler);
-    this.resultsElement?.removeEventListener('click', this.clickHandler);
     this.host?.replaceChildren();
     this.host = null;
     this.input = null;
@@ -83,14 +80,6 @@ export class TopologyEditSearchPanel {
     );
     this.activeIndex = this.results.length ? 0 : -1;
     this.renderResults();
-  }
-
-  handleClick(event) {
-    const button = event.target.closest('[data-search-result-index]');
-    if (!button) return;
-    this.activate(Number(button.dataset.searchResultIndex), {
-      additive: event.shiftKey,
-    });
   }
 
   handleKey(event) {
@@ -148,6 +137,9 @@ export class TopologyEditSearchPanel {
     const hidden = !this.isCanonicalIdVisible(result.canonicalId);
     button.textContent = hidden ? `${result.label} · hidden (reveal and focus)` : result.label;
     button.title = `${resultDetails(result)}\nShift-activate to add this node or edge to the current selection.`;
+    button.addEventListener('click', (event) => {
+      this.activate(index, { additive: event.shiftKey });
+    });
     return button;
   }
 }
