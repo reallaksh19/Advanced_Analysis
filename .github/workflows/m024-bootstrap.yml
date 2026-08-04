@@ -1,0 +1,57 @@
+name: M024 Bootstrap Exact-Head Patch
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-validate:
+    if: github.head_ref == 'agent/m024-bm1-real-bends'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out branch head
+        uses: actions/checkout@v4
+        with:
+          ref: agent/m024-bm1-real-bends
+          fetch-depth: 0
+      - name: Merge current main before qualification
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git merge --no-edit origin/main
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Materialize M024 candidate
+        shell: bash
+        run: |
+          cat .m024/chunk* | base64 -d > /tmp/m024.tar.gz
+          tar -xzf /tmp/m024.tar.gz -C .
+          python3 tmp/apply_m024.py
+          rm -rf tmp .m024 .github/workflows/m024-bootstrap.yml
+          node --check scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs
+          node --check scripts/lfea-b3.17-bm1-code-stress-fixtures.mjs
+          node --check scripts/lfea-b3.18-bm1-bend-authorities.mjs
+          node --check scripts/lfea-b3.18-bm1-bend-check.mjs
+      - name: Install dependencies
+        run: npm ci
+      - name: Validate focused M024 gates
+        run: |
+          npm run check:lfea-b3.15
+          npm run check:lfea-b3.16
+          npm run check:lfea-b3.17
+          npm run check:lfea-b3.18
+          npm run check:lfea-bm1-cii-comparison
+      - name: Validate complete linear piping core
+        run: npm run check:lfea-linear-core
+      - name: Commit validated implementation
+        run: |
+          git add -A
+          git commit -m "M024: resolve BM1 bends with real flexibility and SIF"
+          git push origin HEAD:agent/m024-bm1-real-bends
