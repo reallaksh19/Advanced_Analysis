@@ -38,3 +38,13 @@ export {
   calculateB31FactorsFromCanonicalGeometry,
   calculateB31FactorsFromInputXml,
 } from './inputxml.js';
+
+export {
+  SUPPLEMENTARY_GEOMETRY_ENTRY_KEYS,
+  SUPPLEMENTARY_GEOMETRY_SET_KEYS,
+  SUPPLEMENTARY_GEOMETRY_SET_SCHEMA,
+  computeSupplementaryGeometrySetSemanticHash,
+  indexSupplementaryGeometrySet,
+  requireSupplementaryGeometrySet,
+  sealSupplementaryGeometrySet,
+} from './supplementary-geometry.js';

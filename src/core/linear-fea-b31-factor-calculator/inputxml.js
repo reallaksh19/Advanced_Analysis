@@ -2,13 +2,12 @@ import { inputXmlToCanonicalGeometry } from '../geometry/adapters/inputXmlToCano
 import { convertInputXmlLengthToMetres } from '../geometry/adapters/inputxml-unit-system.js';
 import {
   FACTOR_CALCULATION_REQUEST_SCHEMA,
-  SUPPLEMENTARY_GEOMETRY_SCHEMA,
   fail,
   requireRecord,
 } from './contract.js';
 import { bendGeometry, reducerGeometry, weldingTeeGeometry } from './geometry.js';
 import { calculateB31Factors } from './calculator.js';
-
+import { indexSupplementaryGeometrySet } from './supplementary-geometry.js';
 
 function sourceLengthToMetres(canonicalGeometry, value, field) {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
@@ -17,10 +16,7 @@ function sourceLengthToMetres(canonicalGeometry, value, field) {
   try {
     return convertInputXmlLengthToMetres(value, canonicalGeometry.unit);
   } catch (error) {
-    fail(
-      error instanceof Error ? error.message : String(error),
-      'B31_FACTOR_INPUTXML_LENGTH_UNIT_UNSUPPORTED',
-    );
+    fail(error instanceof Error ? error.message : String(error), 'B31_FACTOR_INPUTXML_LENGTH_UNIT_UNSUPPORTED');
   }
 }
 
@@ -31,14 +27,17 @@ function supplementaryLengthToMetres(supplementary, value, field) {
   try {
     return convertInputXmlLengthToMetres(value, supplementary.lengthUnit);
   } catch (error) {
-    fail(
-      error instanceof Error ? error.message : String(error),
-      'B31_FACTOR_SUPPLEMENTARY_LENGTH_UNIT_UNSUPPORTED',
-    );
+    fail(error instanceof Error ? error.message : String(error), 'B31_FACTOR_SUPPLEMENTARY_LENGTH_UNIT_UNSUPPORTED');
   }
 }
 
-function sourceEvidence(canonicalGeometry, segment) {
+function sourceEvidence(canonicalGeometry, segment, supplementary) {
+  if (supplementary !== null) {
+    return {
+      sourceId: `${canonicalGeometry.source}:${segment.sourceComponentUid || segment.id}+${supplementary.sourceEvidence.sourceId}`,
+      sourceRevision: `${canonicalGeometry.summary?.jobName || canonicalGeometry.schemaVersion || 'canonical-geometry'}:${supplementary.sourceEvidence.sourceRevision}`,
+    };
+  }
   return {
     sourceId: `${canonicalGeometry.source}:${segment.sourceComponentUid || segment.id}`,
     sourceRevision: canonicalGeometry.summary?.jobName || canonicalGeometry.schemaVersion || 'canonical-geometry',
@@ -56,99 +55,83 @@ function requireAnalysisValue(segment, field) {
   return value;
 }
 
-function supplementaryFor(segment, supplementaryGeometryBySegmentId) {
-  const entry = supplementaryGeometryBySegmentId[segment.id] ?? null;
-  if (entry === null) return null;
-  requireRecord(entry, `supplementaryGeometryBySegmentId.${segment.id}`, 'B31_FACTOR_SUPPLEMENTARY_GEOMETRY_INVALID');
-  if (entry.schema !== SUPPLEMENTARY_GEOMETRY_SCHEMA) {
-    fail(
-      `Supplementary geometry for ${segment.id} must use ${SUPPLEMENTARY_GEOMETRY_SCHEMA}.`,
-      'B31_FACTOR_SUPPLEMENTARY_GEOMETRY_INVALID',
-    );
-  }
-  if (typeof entry.lengthUnit !== 'string' || entry.lengthUnit.trim().length === 0) {
-    fail(`Supplementary geometry for ${segment.id} must declare lengthUnit.`, 'B31_FACTOR_SUPPLEMENTARY_LENGTH_UNIT_REQUIRED');
-  }
-  if (!['BEND', 'WELDING_TEE', 'REDUCER'].includes(entry.componentType)) {
-    fail(`Supplementary geometry for ${segment.id} must declare a supported componentType.`, 'B31_FACTOR_SUPPLEMENTARY_COMPONENT_TYPE_INVALID');
-  }
-  return entry;
-}
-
 function bendFromSegment(canonicalGeometry, segment, supplementary) {
-  const pressure = supplementary?.pressure ?? requireAnalysisValue(segment, 'pressure');
-  const elasticModulus = supplementary?.elasticModulus ?? requireAnalysisValue(segment, 'elasticModulus');
-  const bendRadius = supplementary?.bendRadius
+  const extra = supplementary?.geometry ?? null;
+  const pressure = extra?.pressure ?? requireAnalysisValue(segment, 'pressure');
+  const elasticModulus = extra?.elasticModulus ?? requireAnalysisValue(segment, 'elasticModulus');
+  const bendRadius = extra?.bendRadius
     ?? segment.meta?.bendDeclaredRadius
     ?? segment.meta?.bendComputedRadius;
   if (!(typeof bendRadius === 'number' && bendRadius > 0)) {
     fail(`Canonical bend ${segment.id} has no resolved bend radius.`, 'B31_FACTOR_BEND_RADIUS_MISSING');
   }
-  const bendAngleDegrees = supplementary?.bendAngleDegrees ?? segment.meta?.bendAngle1 ?? null;
-  const smooth90FlexibilityCorrection = supplementary?.smooth90FlexibilityCorrection ?? false;
+  const bendAngleDegrees = extra?.bendAngleDegrees ?? segment.meta?.bendAngle1 ?? null;
+  const smooth90FlexibilityCorrection = extra?.smooth90FlexibilityCorrection ?? false;
   return bendGeometry({
     lengthUnit: 'm',
     ...(bendAngleDegrees === null ? {} : { bendAngleDegrees }),
     smooth90FlexibilityCorrection,
-    outerDiameter: supplementary?.outerDiameter === undefined
+    outerDiameter: extra?.outerDiameter === null || extra === null
       ? sourceLengthToMetres(canonicalGeometry, segment.diameter, `${segment.id}.diameter`)
-      : supplementaryLengthToMetres(supplementary, supplementary.outerDiameter, `${segment.id}.outerDiameter`),
-    wallThickness: supplementary?.wallThickness === undefined
+      : supplementaryLengthToMetres(supplementary, extra.outerDiameter, `${segment.id}.outerDiameter`),
+    wallThickness: extra?.wallThickness === null || extra === null
       ? sourceLengthToMetres(canonicalGeometry, segment.thickness, `${segment.id}.thickness`)
-      : supplementaryLengthToMetres(supplementary, supplementary.wallThickness, `${segment.id}.wallThickness`),
-    bendRadius: supplementary?.bendRadius === undefined
+      : supplementaryLengthToMetres(supplementary, extra.wallThickness, `${segment.id}.wallThickness`),
+    bendRadius: extra?.bendRadius === null || extra === null
       ? sourceLengthToMetres(canonicalGeometry, bendRadius, `${segment.id}.bendRadius`)
-      : supplementaryLengthToMetres(supplementary, supplementary.bendRadius, `${segment.id}.bendRadius`),
+      : supplementaryLengthToMetres(supplementary, extra.bendRadius, `${segment.id}.bendRadius`),
     pressure,
     elasticModulus,
-    sourceEvidence: sourceEvidence(canonicalGeometry, segment),
+    sourceEvidence: sourceEvidence(canonicalGeometry, segment, supplementary),
   });
 }
 
 function teeFromSegment(canonicalGeometry, segment, supplementary) {
   if (supplementary === null) {
     fail(
-      `Canonical tee ${segment.id} does not carry matching branch diameter/thickness; supplementary geometry is required.`,
+      `Canonical tee ${segment.id} does not carry matching branch diameter/thickness; a sealed supplementary geometry set is required.`,
       'B31_FACTOR_TEE_SUPPLEMENTARY_GEOMETRY_REQUIRED',
     );
   }
+  const extra = supplementary.geometry;
   return weldingTeeGeometry({
     lengthUnit: 'm',
-    runOuterDiameter: supplementary.runOuterDiameter === undefined
+    runOuterDiameter: extra.runOuterDiameter === null
       ? sourceLengthToMetres(canonicalGeometry, segment.diameter, `${segment.id}.runOuterDiameter`)
-      : supplementaryLengthToMetres(supplementary, supplementary.runOuterDiameter, `${segment.id}.runOuterDiameter`),
-    runWallThickness: supplementary.runWallThickness === undefined
+      : supplementaryLengthToMetres(supplementary, extra.runOuterDiameter, `${segment.id}.runOuterDiameter`),
+    runWallThickness: extra.runWallThickness === null
       ? sourceLengthToMetres(canonicalGeometry, segment.thickness, `${segment.id}.runWallThickness`)
-      : supplementaryLengthToMetres(supplementary, supplementary.runWallThickness, `${segment.id}.runWallThickness`),
-    branchOuterDiameter: supplementaryLengthToMetres(supplementary, supplementary.branchOuterDiameter, `${segment.id}.branchOuterDiameter`),
-    branchWallThickness: supplementaryLengthToMetres(supplementary, supplementary.branchWallThickness, `${segment.id}.branchWallThickness`),
-    fittingQuality: supplementary.fittingQuality,
-    sourceEvidence: sourceEvidence(canonicalGeometry, segment),
+      : supplementaryLengthToMetres(supplementary, extra.runWallThickness, `${segment.id}.runWallThickness`),
+    branchOuterDiameter: supplementaryLengthToMetres(supplementary, extra.branchOuterDiameter, `${segment.id}.branchOuterDiameter`),
+    branchWallThickness: supplementaryLengthToMetres(supplementary, extra.branchWallThickness, `${segment.id}.branchWallThickness`),
+    fittingQuality: extra.fittingQuality,
+    sourceEvidence: sourceEvidence(canonicalGeometry, segment, supplementary),
   });
 }
 
 function reducerFromSegment(canonicalGeometry, segment, supplementary) {
   if (supplementary === null) {
     fail(
-      `Reducer ${segment.id} needs endpoint and taper geometry that the canonical InputXML segment does not retain.`,
+      `Reducer ${segment.id} needs endpoint and taper geometry in a sealed supplementary geometry set.`,
       'B31_FACTOR_REDUCER_SUPPLEMENTARY_GEOMETRY_REQUIRED',
     );
   }
+  const extra = supplementary.geometry;
   return reducerGeometry({
     lengthUnit: 'm',
-    largeEndOuterDiameter: supplementary.largeEndOuterDiameter === undefined
+    largeEndOuterDiameter: extra.largeEndOuterDiameter === null
       ? sourceLengthToMetres(canonicalGeometry, segment.diameter, `${segment.id}.largeEndOuterDiameter`)
-      : supplementaryLengthToMetres(supplementary, supplementary.largeEndOuterDiameter, `${segment.id}.largeEndOuterDiameter`),
-    largeEndWallThickness: supplementary.largeEndWallThickness === undefined
+      : supplementaryLengthToMetres(supplementary, extra.largeEndOuterDiameter, `${segment.id}.largeEndOuterDiameter`),
+    largeEndWallThickness: extra.largeEndWallThickness === null
       ? sourceLengthToMetres(canonicalGeometry, segment.thickness, `${segment.id}.largeEndWallThickness`)
-      : supplementaryLengthToMetres(supplementary, supplementary.largeEndWallThickness, `${segment.id}.largeEndWallThickness`),
-    smallEndOuterDiameter: supplementaryLengthToMetres(supplementary, supplementary.smallEndOuterDiameter, `${segment.id}.smallEndOuterDiameter`),
-    smallEndWallThickness: supplementaryLengthToMetres(supplementary, supplementary.smallEndWallThickness, `${segment.id}.smallEndWallThickness`),
-    coneAngleDegrees: supplementary.coneAngleDegrees,
-    smallEndTransitionRadius: supplementaryLengthToMetres(supplementary, supplementary.smallEndTransitionRadius, `${segment.id}.smallEndTransitionRadius`),
-    smallEndCylinderLength: supplementaryLengthToMetres(supplementary, supplementary.smallEndCylinderLength, `${segment.id}.smallEndCylinderLength`),
-    bodyMinimumWallThickness: supplementaryLengthToMetres(supplementary, supplementary.bodyMinimumWallThickness, `${segment.id}.bodyMinimumWallThickness`),
-    sourceEvidence: sourceEvidence(canonicalGeometry, segment),
+      : supplementaryLengthToMetres(supplementary, extra.largeEndWallThickness, `${segment.id}.largeEndWallThickness`),
+    smallEndOuterDiameter: supplementaryLengthToMetres(supplementary, extra.smallEndOuterDiameter, `${segment.id}.smallEndOuterDiameter`),
+    smallEndWallThickness: supplementaryLengthToMetres(supplementary, extra.smallEndWallThickness, `${segment.id}.smallEndWallThickness`),
+    coneAngleDegrees: extra.coneAngleDegrees,
+    smallEndTransitionRadius: supplementaryLengthToMetres(supplementary, extra.smallEndTransitionRadius, `${segment.id}.smallEndTransitionRadius`),
+    smallEndCylinderLength: supplementaryLengthToMetres(supplementary, extra.smallEndCylinderLength, `${segment.id}.smallEndCylinderLength`),
+    bodyMinimumWallThickness: supplementaryLengthToMetres(supplementary, extra.bodyMinimumWallThickness, `${segment.id}.bodyMinimumWallThickness`),
+    sourceEvidence: sourceEvidence(canonicalGeometry, segment, supplementary),
   });
 }
 
@@ -164,19 +147,20 @@ export function calculateB31FactorsFromCanonicalGeometry({
   editionProfileId,
   momentDirectionMapping,
   segmentIds = null,
-  supplementaryGeometryBySegmentId = {},
+  supplementaryGeometrySet = null,
 }) {
   requireRecord(canonicalGeometry, 'canonicalGeometry', 'B31_FACTOR_CANONICAL_GEOMETRY_INVALID');
   if (!Array.isArray(canonicalGeometry.segments)) {
     fail('canonicalGeometry.segments must be an array.', 'B31_FACTOR_CANONICAL_GEOMETRY_INVALID');
   }
+  const supplementaryIndex = indexSupplementaryGeometrySet(supplementaryGeometrySet);
   const selected = segmentIds === null ? null : new Set(segmentIds);
   const found = new Set();
   const results = [];
   for (const segment of canonicalGeometry.segments) {
     if (selected !== null && !selected.has(segment.id)) continue;
     if (selected !== null) found.add(segment.id);
-    const supplementary = supplementaryFor(segment, supplementaryGeometryBySegmentId);
+    const supplementary = supplementaryIndex.get(segment.id) ?? null;
     const componentType = componentTypeFor(segment, supplementary);
     if (componentType === null) {
       if (selected !== null) {
@@ -209,14 +193,13 @@ export function calculateB31FactorsFromCanonicalGeometry({
   return Object.freeze(results);
 }
 
-
 export function calculateB31FactorsFromInputXml({
   xmlText,
   inputXmlOptions = {},
   editionProfileId,
   momentDirectionMapping,
   segmentIds = null,
-  supplementaryGeometryBySegmentId = {},
+  supplementaryGeometrySet = null,
 }) {
   const canonicalGeometry = inputXmlToCanonicalGeometry(xmlText, inputXmlOptions);
   return calculateB31FactorsFromCanonicalGeometry({
@@ -224,6 +207,6 @@ export function calculateB31FactorsFromInputXml({
     editionProfileId,
     momentDirectionMapping,
     segmentIds,
-    supplementaryGeometryBySegmentId,
+    supplementaryGeometrySet,
   });
 }
