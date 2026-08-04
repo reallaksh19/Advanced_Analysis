@@ -74,7 +74,7 @@ jobs:
           check = check.replace(duplicate, '  close(definition.component.flexibility.factor, expected.k);', 1)
           check_path.write_text(check)
           PY
-          rm -rf tmp .m024 .github/workflows/m024-bootstrap.yml
+          rm -rf tmp .m024 .github/workflows/m024-bm1-real-bends.yml
           node --check scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs
           node --check scripts/lfea-b3.17-bm1-code-stress-fixtures.mjs
           node --check scripts/lfea-b3.18-bm1-bend-authorities.mjs
