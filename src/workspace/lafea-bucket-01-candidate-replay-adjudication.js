@@ -7,13 +7,17 @@ import {
   LAFEA_BUCKET_01_CONTROLLED_REPLAY_RESULT_SCHEMA,
   validateLafeaBucket01ControlledReplayResult,
 } from './lafea-bucket-01-controlled-replay-result.js';
+import {
+  LAFEA_BUCKET_01_REPLAY_ARTIFACT_REGISTRY_ID,
+  LAFEA_BUCKET_01_REPLAY_ARTIFACT_REGISTRY_REVISION,
+} from './lafea-bucket-01-replay-artifact-policy.js';
 
 export const LAFEA_BUCKET_01_CANDIDATE_REPLAY_ADJUDICATION_INPUT_SCHEMA =
-  'lafea-bucket-01-candidate-replay-adjudication-input/v2';
+  'lafea-bucket-01-candidate-replay-adjudication-input/v3';
 export const LAFEA_BUCKET_01_CANDIDATE_REPLAY_ADJUDICATION_EVIDENCE_SCHEMA =
-  'lafea-bucket-01-candidate-replay-adjudication-evidence/v2';
+  'lafea-bucket-01-candidate-replay-adjudication-evidence/v3';
 export const LAFEA_BUCKET_01_CANDIDATE_REPLAY_ADJUDICATION_REVISION =
-  'B01-CANDIDATE-REPLAY-ADJUDICATION.2';
+  'B01-CANDIDATE-REPLAY-ADJUDICATION.3';
 
 const INPUT_KEYS = Object.freeze([
   'schema', 'exactHeadSha', 'designHash', 'proposalEvidence',
@@ -127,9 +131,13 @@ export function evaluateLafeaBucket01CandidateReplayAdjudication(input) {
     candidateReplayHash: candidateReplay.semanticHash,
     referenceArtifactManifestHash: referenceReplay.artifactManifestHash,
     candidateArtifactManifestHash: candidateReplay.artifactManifestHash,
+    artifactRegistryId: LAFEA_BUCKET_01_REPLAY_ARTIFACT_REGISTRY_ID,
+    artifactRegistryRevision:
+      LAFEA_BUCKET_01_REPLAY_ARTIFACT_REGISTRY_REVISION,
     frozenInputsMatch,
     executionEnvironmentCompatible,
     isolatedOutputNamespacesVerified: true,
+    statusesDerivedFromValidatedPayloads: true,
     statusesDerivedFromArtifacts: true,
     hardBlockingChecks,
     diagnosticBlockingChecks,
@@ -141,6 +149,8 @@ export function evaluateLafeaBucket01CandidateReplayAdjudication(input) {
     authority: {
       comparisonExecuted: true,
       artifactCustodyCompared: true,
+      registeredArtifactValidatorsExecuted: true,
+      statusesDerivedFromValidatedPayloads: true,
       frozenInputsVerified: true,
       codeRevisionParityVerified: true,
       independentCheckerVerified: true,
@@ -172,8 +182,11 @@ export function validateLafeaBucket01CandidateReplayAdjudicationEvidence(value) 
     if (canonicalLafeaSha256(basis) !== value.semanticHash) {
       throw adjudicationError('LAFEA_B01_REPLAY_ADJUDICATION_HASH_TAMPERED');
     }
-    if (value.statusesDerivedFromArtifacts !== true
+    if (value.statusesDerivedFromValidatedPayloads !== true
+      || value.statusesDerivedFromArtifacts !== true
       || value.authority?.artifactCustodyCompared !== true
+      || value.authority?.registeredArtifactValidatorsExecuted !== true
+      || value.authority?.statusesDerivedFromValidatedPayloads !== true
       || value.authority?.independentCheckerVerified !== true
       || value.authority?.productionSwitchAuthorized !== false
       || value.authority?.productionSwitchApplied !== false
@@ -214,7 +227,9 @@ function validateProposal(value, exactHeadSha, designHash) {
     || value.authority?.productionMeshAuthority !== false
     || value.authority?.qualificationAuthority !== false
     || value.authority?.bucketQualified !== false) {
-    throw adjudicationError('LAFEA_B01_REPLAY_PROPOSAL_CUSTODY_OR_AUTHORITY_INVALID');
+    throw adjudicationError(
+      'LAFEA_B01_REPLAY_PROPOSAL_CUSTODY_OR_AUTHORITY_INVALID',
+    );
   }
   return value;
 }
@@ -230,7 +245,15 @@ function validateReplay(value, expectedRouteId, expectedRouteKind,
     || value.routeKind !== expectedRouteKind
     || value.exactHeadSha !== exactHeadSha
     || value.designHash !== designHash
+    || value.artifactRegistry?.registryId
+      !== LAFEA_BUCKET_01_REPLAY_ARTIFACT_REGISTRY_ID
+    || value.artifactRegistry?.registryRevision
+      !== LAFEA_BUCKET_01_REPLAY_ARTIFACT_REGISTRY_REVISION
+    || value.artifactRegistry?.registeredArtifactValidatorsExecuted !== true
+    || value.artifactRegistry?.validationStatusesDerivedFromPayloads !== true
     || value.authority?.artifactCustodyValidated !== true
+    || value.authority?.registeredArtifactValidatorsExecuted !== true
+    || value.authority?.statusesDerivedFromValidatedPayloads !== true
     || value.authority?.statusesDerivedFromArtifacts !== true
     || value.authority?.productionSwitchAuthorized !== false
     || value.authority?.productionMeshAuthority !== false
@@ -246,7 +269,10 @@ function exactKeys(value, expected, label) {
     || Object.getPrototypeOf(value) !== Object.prototype
     || JSON.stringify(Object.keys(value).sort())
       !== JSON.stringify([...expected].sort())) {
-    throw adjudicationError('LAFEA_B01_REPLAY_ADJUDICATION_EXACT_KEYS_INVALID', label);
+    throw adjudicationError(
+      'LAFEA_B01_REPLAY_ADJUDICATION_EXACT_KEYS_INVALID',
+      label,
+    );
   }
 }
 function gitSha(value) {
