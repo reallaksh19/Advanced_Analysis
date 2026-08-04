@@ -212,7 +212,7 @@ export class TopologyEditObjectTreeRuntime {
         const button = documentRef.createElement('button');
         button.type = 'button';
         button.dataset.objectTreeAction = action.id;
-        button.dataset.canonicalId = item.canonicalId;
+        button.dataset.objectTreeTargetId = item.canonicalId;
         button.textContent = action.label;
         button.title = action.title;
         button.disabled = this.busy;
@@ -244,7 +244,7 @@ export class TopologyEditObjectTreeRuntime {
       event.preventDefault();
       event.stopPropagation();
       await this.executeAction(
-        actionButton.dataset.canonicalId,
+        actionButton.dataset.objectTreeTargetId,
         actionButton.dataset.objectTreeAction,
       );
       return;
@@ -287,7 +287,6 @@ export class TopologyEditObjectTreeRuntime {
       this.controller.setStatus?.(
         `Governed tree action ${actionId} rejected for ${canonicalId}: ${error.message}`,
       );
-      throw error;
     } finally {
       this.busy = false;
       this.refresh();
