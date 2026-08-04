@@ -15,6 +15,7 @@ const expected = [
   'scripts/empirical-authorized-cutover-production-check.mjs',
   'scripts/empirical-authorized-parity-check.mjs',
   'scripts/empirical-authorized-runtime-check.mjs',
+  'scripts/run-authorized-enrichment-consumer-controller-checks.mjs',
   'scripts/run-empirical-authorized-cutover-checks.mjs',
   'src/main.js',
   'src/workspace/engineering-loads/authorized-empirical-runtime-package.js',
