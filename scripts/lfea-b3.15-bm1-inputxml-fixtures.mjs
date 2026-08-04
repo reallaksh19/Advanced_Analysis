@@ -50,12 +50,14 @@ import { eulerBernoulliProfile } from './lfea-b3.1-frame-element-fixtures.mjs';
 import { componentProfile } from './lfea-b3.2-piping-component-fixtures.mjs';
 import { loadCaseProfile, solverProfile } from './lfea-b3.3-solver-fixtures.mjs';
 import { recoveryProfile } from './lfea-b3.4-recovery-fixtures.mjs';
+import { BM1_COULOMB_PROFILE, solveBm1CoulombCases } from './lfea-b3.19-bm1-friction.mjs';
 
 export const BM1_PATH = fileURLToPath(new URL('../benchmarks/LFEA/BM1/BM1_InputXML.xml', import.meta.url));
 export const SOURCE_ID = 'CAESAR-II-BM1-LIVE-INPUTXML';
 export const INSTALLATION_TEMPERATURE = 293.15;
 export const THERMAL_EXPANSION_COEFFICIENT = 1.17e-5;
 export const GRAVITY = 9.80665;
+export const CAESAR_DEFAULT_INSULATION_DENSITY = 184.2;
 export const CONDITIONING_PROFILE = Object.freeze({
   spanSeedingLimit: { value: 1000, source: 'M024 retains one analysis span per resolved straight or bend chord' },
   bendSeedingSegments: { value: 4, source: 'M024 bends are already resolved by B-3.2 before conditioning' },
@@ -70,7 +72,10 @@ export function sourceEvidence(value) {
   };
 }
 
-export function buildBm1InputXmlAuthorities() {
+export function buildBm1InputXmlAuthorities({
+  frictionStates = {},
+  frictionStiffness = BM1_COULOMB_PROFILE.frictionStiffness,
+} = {}) {
   const content = readFileSync(BM1_PATH, 'utf8');
   const source = sealLinearPipingInputXmlSource({
     sourceId: SOURCE_ID,
@@ -102,7 +107,7 @@ export function buildBm1InputXmlAuthorities() {
   const material = materialAuthority(normalized.geometry, source);
   const sections = sectionAuthorities(normalized.geometry, source);
   const frameProfile = eulerBernoulliProfile();
-  const rigidProfile = componentProfile({ valveBodyRule: 'VALVE_RIGID_BODY_V1', convergenceRequired: false });
+  const rigidProfile = componentProfile({ valveBodyRule: 'VALVE_CAESAR_RIGID_BODY_V1', convergenceRequired: false });
   const bendProfile = componentProfile({
     bendPressureStiffeningRule: 'BEND_PRESSURE_STIFFENING_DECLARED_FACTOR_V1',
     convergenceRequired: false,
@@ -160,6 +165,8 @@ export function buildBm1InputXmlAuthorities() {
     frameProfile,
     kernelNodeByReference,
     modelEntries,
+    frictionStates,
+    frictionStiffness,
   });
   return {
     content,
@@ -486,7 +493,17 @@ function buildModelEntries({ analysisGeometry, sourceGeometry, sections, rigidBy
   });
 }
 
-function compileModel({ source, conditioned, analysisGeometry, material, sections, kernelNodeByReference, modelEntries }) {
+function compileModel({
+  source,
+  conditioned,
+  analysisGeometry,
+  material,
+  sections,
+  kernelNodeByReference,
+  modelEntries,
+  frictionStates,
+  frictionStiffness,
+}) {
   const localAxisResults = modelEntries.map((entry) => ({
     evidenceIdentity: `AXIS-${entry.elementId}`,
     result: resolveFrameLocalAxes({
@@ -520,12 +537,22 @@ function compileModel({ source, conditioned, analysisGeometry, material, section
     sectionResolutions: sections.unique,
     localAxisResults,
     localAxisProfile: FRAME_LOCAL_AXIS_PROFILE,
-    constraintDeclarations: constraintDeclarations(analysisGeometry, kernelNodeByReference),
+    constraintDeclarations: constraintDeclarations(
+      analysisGeometry,
+      kernelNodeByReference,
+      frictionStates,
+      frictionStiffness,
+    ),
     profile: compilerProfile(),
   });
 }
 
-function constraintDeclarations(geometry, kernelNodeByReference) {
+function constraintDeclarations(
+  geometry,
+  kernelNodeByReference,
+  frictionStates = {},
+  frictionStiffness = BM1_COULOMB_PROFILE.frictionStiffness,
+) {
   const rows = new Map();
   const add = (referenceNode, dof) => rows.set(`${referenceNode}:${dof}`, {
     declarationId: `BM1-C-${referenceNode}-${dof}`,
@@ -533,6 +560,13 @@ function constraintDeclarations(geometry, kernelNodeByReference) {
     nodeId: kernelNodeByReference.get(referenceNode),
     dof,
     behavior: 'FIXED',
+  });
+  const addSpring = (referenceNode, dof) => rows.set(`${referenceNode}:${dof}`, {
+    declarationId: `BM1-M025-FRICTION-SPRING-${referenceNode}-${dof}`,
+    kind: 'PARTIAL_RELEASE_SPRING',
+    nodeId: kernelNodeByReference.get(referenceNode),
+    dof,
+    stiffness: frictionStiffness,
   });
   for (const node of geometry.nodes) {
     if (node.restraint === 'ANCHOR') {
@@ -551,27 +585,48 @@ function constraintDeclarations(geometry, kernelNodeByReference) {
       }
     }
   }
+  for (const [referenceNode, state] of Object.entries(frictionStates)) {
+    if (state === 'STICK') {
+      addSpring(referenceNode, 'UX');
+      addSpring(referenceNode, 'UZ');
+    } else if (state !== 'SLIP') {
+      throw new Error(`M025 unsupported friction state ${state} at node ${referenceNode}.`);
+    }
+  }
   return [...rows.values()];
 }
 
 export function solveBm1InputXml() {
-  const authorities = buildBm1InputXmlAuthorities();
-  const sustained = analyseCase(authorities, 'BM1-SUSTAINED', false);
-  const operating = analyseCase(authorities, 'BM1-OPERATING-T1', true);
+  const solved = solveBm1CoulombCases({
+    buildAuthorities: (options) => buildBm1InputXmlAuthorities(options),
+    analyseCase,
+  });
+  const { authorities, sustained, operating, friction } = solved;
   const codeAuthorities = bm1CodeAuthorities(authorities);
   const code = displacementStressResults(authorities, sustained, operating, codeAuthorities);
   const baseResult = {
     ...authorities,
+    sustainedAuthorities: friction.sustained,
+    operatingAuthorities: friction.operating,
     sustained,
     operating,
+    friction,
     code,
     report: buildReport(authorities, sustained, operating, code),
   };
   return augmentBm1CodeStress(baseResult, codeAuthorities);
 }
 
-function analyseCase(authorities, loadCaseId, thermal) {
-  const loadCase = compileCase(authorities, loadCaseId, thermal);
+export function analyseCase(
+  authorities,
+  loadCaseId,
+  thermal,
+  frictionForces = [],
+  thermalScale = thermal ? 1 : 0,
+  recoverResults = true,
+  friction = null,
+) {
+  const loadCase = compileCase(authorities, loadCaseId, thermal, frictionForces, thermalScale);
   const temperatureByElement = new Map(
     loadCase.primitives
       .filter((row) => row.kind === 'TEMPERATURE')
@@ -604,6 +659,9 @@ function analyseCase(authorities, loadCaseId, thermal) {
     loadCase,
     frameElements,
     pipingComponents: authorities.pipingComponents,
+    pipeWallExcludedElementIds: authorities.modelEntries
+      .filter((entry) => entry.rigid)
+      .map((entry) => entry.elementId),
   });
   const thermalExpanded = augmentPipingComponentTemperatureAuthorities({
     compilation: authorities.compilation,
@@ -619,6 +677,16 @@ function analyseCase(authorities, loadCaseId, thermal) {
     loadCase: thermalExpanded.loadCase,
     solverProfile: solverProfile(),
   });
+  const baseResult = {
+    loadCase: thermalExpanded.loadCase,
+    frameElements: gravityExpanded.frameElements,
+    pipingComponents: thermalExpanded.pipingComponents,
+    generatedGravityPrimitives: gravityExpanded.generatedPrimitives,
+    execution,
+    friction,
+  };
+  if (!recoverResults) return baseResult;
+
   const recovery = compileResultRecovery({
     compilation: authorities.compilation,
     execution,
@@ -627,21 +695,14 @@ function analyseCase(authorities, loadCaseId, thermal) {
     pipingComponents: thermalExpanded.pipingComponents,
     recoveryProfile: recoveryProfile(),
   });
-  const result = {
-    loadCase: thermalExpanded.loadCase,
-    frameElements: gravityExpanded.frameElements,
-    pipingComponents: thermalExpanded.pipingComponents,
-    generatedGravityPrimitives: gravityExpanded.generatedPrimitives,
-    execution,
-    recovery,
-  };
+  const result = { ...baseResult, recovery };
   return {
     ...result,
     equilibrium: equilibrium(authorities, result, thermalExpanded.loadCase),
   };
 }
 
-function compileCase(authorities, loadCaseId, thermal) {
+function compileCase(authorities, loadCaseId, thermal, frictionForces = [], thermalScale = thermal ? 1 : 0) {
   const primitives = [{
     schema: 'fea-linear-load-primitive/v1',
     primitiveId: `${loadCaseId}-GRAVITY`,
@@ -667,7 +728,8 @@ function compileCase(authorities, loadCaseId, thermal) {
       sourceEvidence: sourceEvidence({ sourceId: `${SOURCE_ID}-CONTENTS`, sourceRevision: entry.segment.id }),
     });
     const insulatedOuterDiameter = entry.section.dimensions.outerDiameter + 2 * analysis.insulationThickness;
-    const insulationMass = analysis.insulationDensity
+    const insulationMass = (entry.rigid ? 1.75 : 1)
+      * bm1InsulationDensity(entry)
       * Math.PI
       * (insulatedOuterDiameter ** 2 - entry.section.dimensions.outerDiameter ** 2)
       / 4;
@@ -678,7 +740,7 @@ function compileCase(authorities, loadCaseId, thermal) {
       elementId: entry.elementId,
       weightComponent: 'INSULATION',
       massPerUnitLength: insulationMass,
-      densityEvidence: sourceEvidence({ sourceId: `${SOURCE_ID}-INSUL_DENSITY`, sourceRevision: `${entry.sourceSegment.id}:${analysis.insulationDensity}` }),
+      densityEvidence: sourceEvidence({ sourceId: `${SOURCE_ID}-INSUL_DENSITY`, sourceRevision: `${entry.sourceSegment.id}:${bm1InsulationDensity(entry)}` }),
       geometryEvidence: sourceEvidence({ sourceId: `${SOURCE_ID}-INSUL_THICK`, sourceRevision: `${entry.sourceSegment.id}:${analysis.insulationThickness}` }),
       sourceEvidence: sourceEvidence({ sourceId: `${SOURCE_ID}-INSULATION`, sourceRevision: entry.segment.id }),
     });
@@ -703,30 +765,49 @@ function compileCase(authorities, loadCaseId, thermal) {
         primitiveId: `${loadCaseId}-TEMPERATURE-${entry.elementId}`,
         kind: 'TEMPERATURE',
         elementId: entry.elementId,
-        operatingTemperature: analysis.operatingTemperature,
+        operatingTemperature: INSTALLATION_TEMPERATURE + thermalScale * (analysis.operatingTemperature - INSTALLATION_TEMPERATURE),
         installationTemperature: INSTALLATION_TEMPERATURE,
         stiffnessEvaluationMaterialStateId: authorities.material.materialState.materialStateId,
         thermalStrainProfileId: 'UNIFORM_TEMPERATURE_ALPHA_DELTA_T_V1',
-        sourceEvidence: sourceEvidence({ sourceId: `${SOURCE_ID}-TEMP_EXP_C1`, sourceRevision: `${entry.segment.id}:${analysis.operatingTemperature}` }),
+        sourceEvidence: sourceEvidence({ sourceId: `${SOURCE_ID}-TEMP_EXP_C1`, sourceRevision: `${entry.segment.id}:${analysis.operatingTemperature}:${thermalScale}` }),
       });
     }
   }
   for (const entry of authorities.modelEntries.filter((row) => row.rigid)) {
-    const half = entry.sourceSegment.meta.analysis.rigid.weight / 2;
-    for (const [suffix, nodeId] of [['I', entry.nodeI], ['J', entry.nodeJ]]) {
-      primitives.push({
-        schema: 'fea-linear-load-primitive/v1',
-        primitiveId: `${loadCaseId}-RIGID-WEIGHT-${entry.sourceSegment.id}-${suffix}`,
-        kind: 'NODAL_FORCE_MOMENT',
-        nodeId,
-        basis: { kind: 'GLOBAL' },
-        force: { fx: 0, fy: -half, fz: 0 },
-        moment: { mx: 0, my: 0, mz: 0 },
-        units: { force: 'N', moment: 'N*m', length: 'm' },
-        signConvention: 'APPLIED_TO_STRUCTURE',
-        sourceEvidence: sourceEvidence({ sourceId: `${SOURCE_ID}-RIGID-WEIGHT`, sourceRevision: `${entry.sourceSegment.id}:${half}` }),
-      });
-    }
+    const weight = entry.sourceSegment.meta.analysis.rigid.weight;
+    const intensity = -weight / entry.segment.length;
+    primitives.push({
+      schema: 'fea-linear-load-primitive/v1',
+      primitiveId: `${loadCaseId}-RIGID-WEIGHT-${entry.sourceSegment.id}`,
+      kind: 'DISTRIBUTED_LOAD',
+      elementId: entry.elementId,
+      basis: 'GLOBAL',
+      variation: 'UNIFORM',
+      startIntensity: { fx: 0, fy: intensity, fz: 0 },
+      endIntensity: { fx: 0, fy: intensity, fz: 0 },
+      units: { distributedForce: 'N/m', length: 'm' },
+      sourceEvidence: sourceEvidence({
+        sourceId: `${SOURCE_ID}-RIGID-WEIGHT`,
+        sourceRevision: `${entry.sourceSegment.id}:${weight}:${entry.segment.length}`,
+      }),
+    });
+  }
+  for (const row of frictionForces) {
+    primitives.push({
+      schema: 'fea-linear-load-primitive/v1',
+      primitiveId: `${loadCaseId}-FRICTION-${row.sourceNodeId}`,
+      kind: 'NODAL_FORCE_MOMENT',
+      nodeId: row.kernelNodeId,
+      basis: { kind: 'GLOBAL' },
+      force: { fx: row.fx, fy: 0, fz: row.fz },
+      moment: { mx: 0, my: 0, mz: 0 },
+      units: { force: 'N', moment: 'N*m', length: 'm' },
+      signConvention: 'APPLIED_TO_STRUCTURE',
+      sourceEvidence: sourceEvidence({
+        sourceId: `${SOURCE_ID}-M025-FRICTION`,
+        sourceRevision: `${loadCaseId}:${row.sourceNodeId}:${row.fx}:${row.fz}`,
+      }),
+    });
   }
   return compilePhysicalLoadCase({
     loadCaseId,
@@ -738,6 +819,15 @@ function compileCase(authorities, loadCaseId, thermal) {
       gravitationalAcceleration: { value: GRAVITY, source: 'SI-STANDARD-GRAVITY-EXACT' },
     }),
   });
+}
+
+function bm1InsulationDensity(entry) {
+  // CAESAR's rigid-weight audit establishes that the inlet flange, reducer,
+  // and valve retain the program default insulation material until the
+  // downstream line property block begins at node 40.
+  return ['IX-S1', 'IX-S2', 'IX-S3'].includes(entry.sourceSegment.id)
+    ? CAESAR_DEFAULT_INSULATION_DENSITY
+    : entry.sourceSegment.meta.analysis.insulationDensity;
 }
 
 function displacementStressResults(authorities, sustained, operating, codeAuthorities) {
@@ -812,7 +902,7 @@ function buildReport(authorities, sustained, operating, code) {
       'M024 expands each CAESAR bend input element into its incoming straight remainder plus two B-3.2 curved-component chords at the declared near, midpoint and far station identities.',
       'M024 derives pressure-corrected elbow flexibility and directional SIFs from the existing ASME B31.3-2006 Appendix D Table D300 Note (7) authority pattern; no value is fitted to CAESAR output.',
       'One-way +Y restraints are represented by their engaged linear fixed-UY state.',
-      'CAESAR restraints at nodes 70 and 80 declare friction coefficient 0.3; restraint friction remains outside this linear benchmark.',
+      'M025 resolves the declared node-70/node-80 friction coefficient 0.3 through an explicit active-set Coulomb outer solve around the unchanged linear kernel; convergence, state and bound evidence are retained per case.',
       'reaction.* values are reactions applied by the restraint to the structure; CAESAR RESTRAINT_REPORT uses the equal-and-opposite hardware convention.',
     ],
     diagnostics: authorities.normalized.geometry.diagnostics.map((row) => row.code),
@@ -857,14 +947,16 @@ function buildReport(authorities, sustained, operating, code) {
       authority: definition.authority,
     })),
     equilibrium: { sustained: sustained.equilibrium, operating: operating.equilibrium },
+    friction: { sustained: sustained.friction, operating: operating.friction },
   });
 }
 
 function nodalResult(analysis, nodeId) {
   const value = (array, dof) => array.find((row) => row.nodeId === nodeId && row.dof === dof)?.value ?? 0;
+  const supplement = analysis.friction?.byKernelNode?.[nodeId]?.reactionSupplement ?? {};
   return {
     displacement: Object.fromEntries(['UX', 'UY', 'UZ', 'RX', 'RY', 'RZ'].map((dof) => [dof, value(analysis.execution.displacement, dof)])),
-    reaction: Object.fromEntries(['UX', 'UY', 'UZ', 'RX', 'RY', 'RZ'].map((dof) => [dof, value(analysis.execution.reactions, dof)])),
+    reaction: Object.fromEntries(['UX', 'UY', 'UZ', 'RX', 'RY', 'RZ'].map((dof) => [dof, value(analysis.execution.reactions, dof) + (supplement[dof] ?? 0)])),
   };
 }
 
@@ -892,6 +984,22 @@ function equilibrium(authorities, analysis, loadCase) {
       },
     );
   }
+  const generatedGravityIds = new Set(analysis.generatedGravityPrimitives.map((row) => row.primitiveId));
+  for (const primitive of loadCase.primitives.filter((row) =>
+    row.kind === 'DISTRIBUTED_LOAD' && !generatedGravityIds.has(row.primitiveId))) {
+    const entry = authorities.modelEntries.find((row) => row.elementId === primitive.elementId);
+    const a = point(authorities.analysisGeometry, entry.referenceFromNode);
+    const b = point(authorities.analysisGeometry, entry.referenceToNode);
+    const length = Math.hypot(...a.map((value, index) => b[index] - value));
+    addForceAt(
+      a.map((value, index) => (value + b[index]) / 2),
+      {
+        fx: (primitive.startIntensity.fx + primitive.endIntensity.fx) * length / 2,
+        fy: (primitive.startIntensity.fy + primitive.endIntensity.fy) * length / 2,
+        fz: (primitive.startIntensity.fz + primitive.endIntensity.fz) * length / 2,
+      },
+    );
+  }
   for (const primitive of loadCase.primitives.filter((row) => row.kind === 'NODAL_FORCE_MOMENT')) {
     const node = authorities.compilation.model.nodes.find((row) => row.nodeId === primitive.nodeId);
     addForceAt([node.position.x, node.position.y, node.position.z], primitive.force, primitive.moment);
@@ -906,6 +1014,12 @@ function equilibrium(authorities, analysis, loadCase) {
   for (const [nodeId, reaction] of reactionByNode) {
     const node = authorities.compilation.model.nodes.find((row) => row.nodeId === nodeId);
     addForceAt([node.position.x, node.position.y, node.position.z], reaction, reaction);
+  }
+  for (const row of analysis.friction?.nodes ?? []) {
+    const supplement = row.equilibriumSupplement;
+    if (!supplement || Object.values(supplement).every((value) => value === 0)) continue;
+    const node = authorities.compilation.model.nodes.find((candidate) => candidate.nodeId === row.kernelNodeId);
+    addForceAt([node.position.x, node.position.y, node.position.z], supplement, supplement);
   }
   const scaleValue = Math.max(
     1,

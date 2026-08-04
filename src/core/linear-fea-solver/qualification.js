@@ -33,6 +33,23 @@ function multiply({ K, sparseK, n, vector }) {
 }
 
 /**
+ * Grounded LINEAR_SPRING constraints are assembled into K, but their force on
+ * the structure is external support action rather than an internal member
+ * force. Remove Kspring*u from K*u before summing the structural free body.
+ */
+function includeGroundSpringSupport({ model, dofMap, Ufull, combined }) {
+  const adjusted = [...combined];
+  const nodeIndex = new Map(dofMap.nodeOrder.map((nodeId, index) => [nodeId, index]));
+  const dofIndex = new Map(DOF_ORDER.map((dof, index) => [dof, index]));
+  for (const constraint of model.constraints) {
+    if (constraint.behavior !== 'LINEAR_SPRING') continue;
+    const globalIndex = nodeIndex.get(constraint.nodeId) * DOF_ORDER.length + dofIndex.get(constraint.dof);
+    adjusted[globalIndex] -= constraint.stiffness * Ufull[globalIndex];
+  }
+  return adjusted;
+}
+
+/**
  * Section 8.1 "Algebraic residual": normalized residual of the solved
  * free-free system, `||Kff Uf - Ffree|| / max(||Ffree||, floor)`.
  */
@@ -51,11 +68,11 @@ export function residualCheck({ Kff, sparseKff, m, Uf, Ffree, policies }) {
 }
 
 /**
- * Section 8.1 "Global force equilibrium": `K U` already equals applied load
- * plus reaction at every DOF up to solver residual (reaction is defined as
- * `K U - F` exactly so this holds), so summing `K U` translational components
- * over every node is a direct free-body force-balance check, not a restatement
- * of the residual gate above.
+ * Section 8.1 "Global force equilibrium": sum the structural free body.
+ * Grounded spring stiffness is assembled into K, so its `Kspring*u` term is
+ * removed from `K*u`; the corresponding `-Kspring*u` is the external support
+ * force. Element forces then cancel internally and the retained sum is applied
+ * load plus fixed and spring support actions.
  */
 export function forceEquilibriumCheck({
   model,
@@ -67,7 +84,12 @@ export function forceEquilibriumCheck({
   Ffull,
   policies,
 }) {
-  const combined = multiply({ K, sparseK, n, vector: Ufull });
+  const combined = includeGroundSpringSupport({
+    model,
+    dofMap,
+    Ufull,
+    combined: multiply({ K, sparseK, n, vector: Ufull }),
+  });
   let sumX = 0;
   let sumY = 0;
   let sumZ = 0;
@@ -101,7 +123,12 @@ export function momentEquilibriumCheck({
   Ffull,
   policies,
 }) {
-  const combined = multiply({ K, sparseK, n, vector: Ufull });
+  const combined = includeGroundSpringSupport({
+    model,
+    dofMap,
+    Ufull,
+    combined: multiply({ K, sparseK, n, vector: Ufull }),
+  });
   const referenceNodeId = dofMap.nodeOrder[0];
   const referencePosition = model.nodes.find((node) => node.nodeId === referenceNodeId).position;
 

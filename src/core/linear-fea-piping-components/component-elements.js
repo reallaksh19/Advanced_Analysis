@@ -149,6 +149,62 @@ export function applyBodyRigidityMultiplier(frameElement, multiplier) {
   });
 }
 
+/**
+ * Reproduce CAESAR II's finite rigid-element stiffness without changing the
+ * physical pipe section carried by gravity, pressure, or code recovery.
+ *
+ * CAESAR retains the entered inside diameter and evaluates the rigid member
+ * with ten times the entered wall thickness.  The resulting annulus controls
+ * axial, torsional, and bending stiffness only; the source section remains the
+ * mass/pressure authority.  This explicit geometry rule avoids the unrelated
+ * scalar multiplier formerly used by the BM1 benchmark.
+ */
+export function applyCaesarRigidSectionCorrection(frameElement, sectionResolution) {
+  const dimensions = sectionResolution?.dimensions;
+  const outerDiameter = requirePositive(
+    dimensions?.outerDiameter,
+    'section.dimensions.outerDiameter',
+    'PIPING_COMPONENT_SECTION_INVALID',
+  );
+  const wallThickness = requirePositive(
+    dimensions?.wallThickness,
+    'section.dimensions.wallThickness',
+    'PIPING_COMPONENT_SECTION_INVALID',
+  );
+  const innerDiameter = outerDiameter - 2 * wallThickness;
+  if (!(innerDiameter > 0)) {
+    fail(
+      'CAESAR rigid-section correction requires a positive retained inside diameter.',
+      'PIPING_COMPONENT_SECTION_INVALID',
+    );
+  }
+  const effectiveWallThickness = 10 * wallThickness;
+  const effectiveOuterDiameter = innerDiameter + 2 * effectiveWallThickness;
+  const area = Math.PI * (effectiveOuterDiameter ** 2 - innerDiameter ** 2) / 4;
+  const secondMoment = Math.PI * (effectiveOuterDiameter ** 4 - innerDiameter ** 4) / 64;
+  const polarMoment = 2 * secondMoment;
+  const matrices = correctedStiffness(frameElement, {
+    area,
+    secondMomentY: secondMoment,
+    secondMomentZ: secondMoment,
+    polarMoment,
+  });
+  return Object.freeze({
+    kind: 'CAESAR_RIGID_SECTION_CORRECTION_V1',
+    rule: 'RETAIN_INSIDE_DIAMETER_TEN_TIMES_WALL_V1',
+    appliedTo: Object.freeze(['AXIAL', 'TORSION', 'BENDING_Y', 'BENDING_Z']),
+    sourceDimensions: Object.freeze({ outerDiameter, innerDiameter, wallThickness }),
+    effectiveDimensions: Object.freeze({
+      outerDiameter: effectiveOuterDiameter,
+      innerDiameter,
+      wallThickness: effectiveWallThickness,
+    }),
+    effectiveSection: Object.freeze({ area, secondMomentY: secondMoment, secondMomentZ: secondMoment, polarMoment }),
+    localStiffness: matrices.local,
+    globalStiffness: matrices.global,
+  });
+}
+
 export function componentElementEntry(index, role, frameElement, stiffnessCorrection) {
   return {
     index,

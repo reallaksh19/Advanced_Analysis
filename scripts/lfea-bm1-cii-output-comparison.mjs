@@ -259,7 +259,7 @@ export function buildBm1CiiComparison() {
     sourceInputXmlSemanticHash: solved.source.semanticHash,
     limitations: [
       'M024 resolves the InputXML bend near/mid/far nodes 48/49/50 and 58/59/60 through real B-3.2 BEND components. All 20 CAESAR displacement nodes and all 19 global-force pairs now join by exact declared identity; no approximate station matching is used.',
-      'CAESAR restraints at nodes 70 and 80 declare a real FRIC_COEF=0.3 (Coulomb friction). This repo\'s BM1 constraint model does not implement restraint friction (a nonlinear, iterative CAESAR feature); the resulting transverse (UX/FZ-direction) reaction/displacement deviation downstream of those two restraints is real and attributable to this gap, not to a solver defect.',
+      'M025 applies the two live FRIC_COEF=0.3 restraints through an active-set Coulomb outer solve. The comparison includes the resulting physical tangential support reactions for both stick and slip states.',
       'reaction.* values in this comparison are the reaction applied BY the restraint TO the structure (this repo\'s standing convention). CAESAR RESTRAINT_REPORT exports the equal-and-opposite force applied BY the pipe TO the restraint hardware; every restraint comparison row negates CAESAR\'s FX/FY/FZ/MX/MY/MZ before differencing. GLOBAL_FORCE_REPORT element-action rows require no such negation (hand-verified via the node-10 anchor / element IX-S1 nodal-equilibrium identity).',
     ],
     cases,

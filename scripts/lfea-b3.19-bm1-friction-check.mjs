@@ -10,6 +10,7 @@ import {
 } from './lfea-bm1-cii-output-comparison.mjs';
 
 const PERCENT_LIMIT = 10;
+const MECHANICS_ONLY = process.argv.includes('--mechanics-only');
 const ZERO_REFERENCE_TOLERANCE = Object.freeze({
   displacementTranslation: 1e-6,
   displacementRotation: 1e-6,
@@ -22,14 +23,18 @@ const ZERO_REFERENCE_TOLERANCE = Object.freeze({
 console.log('\n--- LFEA B-3.19 BM1 Coulomb restraint friction and ±10% closure ---');
 const result = solveBm1InputXml();
 const friction = result.friction;
-assert.equal(friction.schema, 'm025-bm1-coulomb-friction/v1');
+assert.equal(friction.schema, 'm025-bm1-coulomb-friction/v2');
+assert.equal(friction.profile.algorithm, 'SIMULTANEOUS_ACTIVE_SET_ENUMERATION_DAMPED_NEWTON_V2');
 assert.deepEqual(friction.sourceSites.map((row) => row.sourceNodeId), ['70', '80']);
 assert.ok(friction.sourceSites.every((row) => row.coefficient === 0.3));
 
 for (const [label, expectedState] of [['sustained', 'STICK'], ['operating', 'SLIP']]) {
   const solved = friction[label];
   assert.equal(solved.converged, true, `${label} friction convergence`);
-  assert.ok(solved.iterationCount >= 1 && solved.iterationCount <= friction.profile.maximumIterations);
+  assert.ok(solved.iterationCount >= 1 && solved.iterationCount <= friction.profile.maximumNewtonIterations);
+  assert.equal(solved.activeSetCandidateCount, 4);
+  assert.equal(solved.admissibleActiveSetCount, 1);
+  assert.ok(solved.residualInfinityNorm <= solved.forceTolerance);
   assert.deepEqual(solved.nodes.map((row) => row.state), [expectedState, expectedState]);
   for (const node of solved.nodes) {
     const tolerance = 1e-5 + 1e-8 * Math.max(1, node.coulombLimit);
@@ -77,25 +82,31 @@ writeFileSync(
   `${JSON.stringify(report, null, 2)}\n`,
 );
 
-assert.equal(audit.failures.length, 0,
-  `M025 ±10% closure failed for ${audit.failures.length}/${audit.total} comparisons:\n${audit.failures.slice(0, 30).map(formatFailure).join('\n')}`);
 assert.ok(result.report.equilibrium.sustained.normalizedWorst < 1e-5, JSON.stringify(result.report.equilibrium.sustained));
 assert.ok(result.report.equilibrium.operating.normalizedWorst < 1e-5, JSON.stringify(result.report.equilibrium.operating));
 
 const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 assert.equal(packageJson.scripts['check:lfea-b3.19'], 'node scripts/lfea-b3.19-bm1-friction-check.mjs');
+assert.equal(packageJson.scripts['check:lfea-b3.19:mechanics'], 'node scripts/lfea-b3.19-bm1-friction-check.mjs --mechanics-only');
 assert.ok(packageJson.scripts['check:lfea-linear-core'].includes('npm run check:lfea-b3.19'));
+
+if (!MECHANICS_ONLY) {
+  assert.equal(audit.failures.length, 0,
+    `M025 ±10% closure failed for ${audit.failures.length}/${audit.total} comparisons:\n${audit.failures.slice(0, 30).map(formatFailure).join('\n')}`);
+}
 
 console.log(JSON.stringify({
   check: 'lfea-b3.19-bm1-friction',
-  status: 'PASS',
+  status: MECHANICS_ONLY ? 'MECHANICS_PASS_POINTWISE_OPEN' : 'PASS',
   friction: {
     sustained: summaryFriction(friction.sustained),
     operating: summaryFriction(friction.operating),
   },
   comparison: audit.summary,
 }, null, 2));
-console.log('LFEA B-3.19 BM1 Coulomb restraint friction and ±10% closure PASS');
+console.log(MECHANICS_ONLY
+  ? `LFEA B-3.19 Coulomb mechanics PASS; pointwise closure remains ${audit.failures.length}/${audit.total} outside ±${PERCENT_LIMIT}%.`
+  : 'LFEA B-3.19 BM1 Coulomb restraint friction and ±10% closure PASS');
 
 function auditComparison(value) {
   const entries = [];

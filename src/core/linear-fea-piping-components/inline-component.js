@@ -12,6 +12,7 @@ import {
 } from './piping-component-contract.js';
 import {
   applyBodyRigidityMultiplier,
+  applyCaesarRigidSectionCorrection,
   asPoint,
   componentElementEntry,
   dot,
@@ -151,16 +152,17 @@ export function buildValveFlangeComponent(input, context) {
     );
   }
 
-  const rigid = profile.valveBodyRule === 'VALVE_RIGID_BODY_V1';
+  const multiplierRigid = profile.valveBodyRule === 'VALVE_RIGID_BODY_V1';
+  const caesarRigid = profile.valveBodyRule === 'VALVE_CAESAR_RIGID_BODY_V1';
   let multiplier = null;
-  if (rigid) {
+  if (multiplierRigid || caesarRigid) {
     if (input.bodyStiffnessMultiplier !== null) {
       fail(
         'profile.valveBodyRule selects a rigid body, whose stiffness multiplier is the declared profile policy; a component-level multiplier would be a second authority.',
         'PIPING_COMPONENT_BODY_MULTIPLIER_CONFLICT',
       );
     }
-    multiplier = policies.rigidBodyStiffnessMultiplier;
+    multiplier = caesarRigid ? null : policies.rigidBodyStiffnessMultiplier;
   } else {
     multiplier = requireDeclaredValue(input, 'bodyStiffnessMultiplier', { minimum: 1 });
   }
@@ -192,11 +194,14 @@ export function buildValveFlangeComponent(input, context) {
       frameElementProfile: input.frameElementProfile,
       localAxisProfile: input.localAxisProfile,
     });
+    const stiffnessCorrection = caesarRigid
+      ? applyCaesarRigidSectionCorrection(frameElement, input.section)
+      : applyBodyRigidityMultiplier(frameElement, multiplier.value);
     elements.push(componentElementEntry(
       0,
       'VALVE_BODY',
       frameElement,
-      applyBodyRigidityMultiplier(frameElement, multiplier.value),
+      stiffnessCorrection,
     ));
   }
 
@@ -238,12 +243,20 @@ export function buildValveFlangeComponent(input, context) {
       'CONDITIONAL',
       true,
       'The valve/flange body is represented as a stiffened prismatic member; body deformation is neglected, while finite length, mass and centre of gravity are retained and reported.',
-      {
-        rule: profile.valveBodyRule,
-        stiffnessMultiplier: multiplier.value,
-        stiffnessMultiplierSource: multiplier.source,
-        lumped,
-      },
+      caesarRigid
+        ? {
+          rule: profile.valveBodyRule,
+          sectionRule: 'RETAIN_INSIDE_DIAMETER_TEN_TIMES_WALL_V1',
+          stiffnessMultiplier: null,
+          stiffnessMultiplierSource: null,
+          lumped,
+        }
+        : {
+          rule: profile.valveBodyRule,
+          stiffnessMultiplier: multiplier.value,
+          stiffnessMultiplierSource: multiplier.source,
+          lumped,
+        },
     )],
   };
 }

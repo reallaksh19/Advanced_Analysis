@@ -44,6 +44,7 @@ export function expandPipeWallGravitySourceAuthorities({
   loadCase,
   frameElements,
   pipingComponents,
+  pipeWallExcludedElementIds,
 }) {
   const acceptedCompilation = requireMechanicalModelCompilation(compilation);
   const acceptedLoadCase = requirePhysicalLoadCase(loadCase);
@@ -67,6 +68,17 @@ export function expandPipeWallGravitySourceAuthorities({
 
   const modelElements = [...acceptedCompilation.model.elements]
     .sort((left, right) => compareAscii(left.elementId, right.elementId));
+  const modelElementIds = new Set(modelElements.map((entry) => entry.elementId));
+  const pipeWallExclusions = new Set(pipeWallExcludedElementIds ?? []);
+  for (const elementId of [...pipeWallExclusions].sort(compareAscii)) {
+    if (!modelElementIds.has(elementId)) {
+      failLinearPipingAnalysis(
+        `PIPE_WALL gravity exclusion references unknown element ${elementId}.`,
+        'PIPING_ANALYSIS_GRAVITY_EXCLUSION_UNKNOWN_ELEMENT',
+        { elementId },
+      );
+    }
+  }
   const modelElementsById = new Map(modelElements.map((entry) => [entry.elementId, entry]));
   const materialsById = new Map(
     acceptedCompilation.model.materialStates.map((entry) => [entry.materialStateId, entry]),
@@ -86,6 +98,7 @@ export function expandPipeWallGravitySourceAuthorities({
   for (const gravity of gravityPrimitives) {
     if (gravity.includedMassSources.includes(PIPE_WALL_MASS_SOURCE)) {
       for (const element of modelElements) {
+        if (pipeWallExclusions.has(element.elementId)) continue;
         const generated = expandPipeWallSource({
           acceptedCompilation,
           gravity,
@@ -120,7 +133,12 @@ export function expandPipeWallGravitySourceAuthorities({
   generatedPrimitives.sort((left, right) => compareAscii(left.primitiveId, right.primitiveId));
   derivations.sort((left, right) => compareAscii(left.primitiveId, right.primitiveId));
   const expandedLoadCase = expandLoadCase(acceptedLoadCase, generatedPrimitives);
-  const generatedByElement = groupByElement(generatedPrimitives);
+  const declaredDistributedLoads = acceptedLoadCase.primitives
+    .filter((primitive) => primitive.kind === 'DISTRIBUTED_LOAD')
+    .sort((left, right) => compareAscii(left.primitiveId, right.primitiveId));
+  const boundDistributedLoads = [...declaredDistributedLoads, ...generatedPrimitives]
+    .sort((left, right) => compareAscii(left.primitiveId, right.primitiveId));
+  const generatedByElement = groupByElement(boundDistributedLoads);
   const expandedFrameElements = acceptedFrameElements
     .map((frameElement) => augmentFrameElement(
       frameElement,
@@ -137,7 +155,9 @@ export function expandPipeWallGravitySourceAuthorities({
     frameElements: expandedFrameElements,
     pipingComponents: expandedComponents,
     generatedPrimitives,
+    boundDeclaredDistributedLoadPrimitiveIds: declaredDistributedLoads.map((primitive) => primitive.primitiveId),
     derivations,
+    pipeWallExcludedElementIds: [...pipeWallExclusions].sort(compareAscii),
   });
 }
 

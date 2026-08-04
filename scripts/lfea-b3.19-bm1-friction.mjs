@@ -1,67 +1,578 @@
 const STICK = 'STICK';
 const SLIP = 'SLIP';
-const MAX_ITERATIONS_PER_STEP = 80;
-const THERMAL_LOAD_STEPS = 32;
-const FORCE_RELAXATION = 0.55;
-const FORCE_RELATIVE_TOLERANCE = 1e-8;
-const FORCE_ABSOLUTE_TOLERANCE = 1e-5;
-const DISPLACEMENT_DIRECTION_TOLERANCE = 1e-12;
-const ACTIVE_SET_RELATIVE_TOLERANCE = 1e-10;
-const ACTIVE_SET_ABSOLUTE_TOLERANCE = 1e-6;
+
+// CAESAR II's documented default static-friction stiffness is 1.0E+06 lbf/in.
+// The BM1 source uses SI base units, so convert exactly to N/m.
+const POUND_FORCE_TO_NEWTON = 4.4482216152605;
+const INCH_TO_METRE = 0.0254;
+const FRICTION_STIFFNESS = 1.0e6 * POUND_FORCE_TO_NEWTON / INCH_TO_METRE;
+
+const FORCE_ABSOLUTE_TOLERANCE = 1.0e-2;
+const FORCE_RELATIVE_TOLERANCE = 1.0e-8;
+const DIRECTION_COSINE_TOLERANCE = 1.0e-8;
+const MAXIMUM_NEWTON_ITERATIONS = 40;
+const MAXIMUM_LINE_SEARCH_STEPS = 18;
+
+const ACTIVE_SETS = Object.freeze([
+  Object.freeze({ '70': STICK, '80': STICK }),
+  Object.freeze({ '70': STICK, '80': SLIP }),
+  Object.freeze({ '70': SLIP, '80': STICK }),
+  Object.freeze({ '70': SLIP, '80': SLIP }),
+]);
 
 export const BM1_COULOMB_PROFILE = Object.freeze({
-  algorithm: 'THERMAL_CONTINUATION_ACTIVE_SET_RELAXED_FIXED_POINT_V1',
-  maximumIterationsPerStep: MAX_ITERATIONS_PER_STEP,
-  thermalLoadSteps: THERMAL_LOAD_STEPS,
-  maximumIterations: MAX_ITERATIONS_PER_STEP * THERMAL_LOAD_STEPS,
-  forceRelaxation: FORCE_RELAXATION,
-  forceRelativeTolerance: FORCE_RELATIVE_TOLERANCE,
+  schema: 'm025-bm1-coulomb-profile/v2',
+  algorithm: 'SIMULTANEOUS_ACTIVE_SET_ENUMERATION_DAMPED_NEWTON_V2',
+  frictionStiffness: FRICTION_STIFFNESS,
+  frictionStiffnessSource: Object.freeze({
+    value: 1.0e6,
+    units: 'lbf/in',
+    convertedValue: FRICTION_STIFFNESS,
+    convertedUnits: 'N/m',
+    authority: 'CAESAR_II_DEFAULT_STATIC_FRICTION_STIFFNESS',
+  }),
   forceAbsoluteTolerance: FORCE_ABSOLUTE_TOLERANCE,
-  displacementDirectionTolerance: DISPLACEMENT_DIRECTION_TOLERANCE,
-  activeSetRelativeTolerance: ACTIVE_SET_RELATIVE_TOLERANCE,
-  activeSetAbsoluteTolerance: ACTIVE_SET_ABSOLUTE_TOLERANCE,
+  forceRelativeTolerance: FORCE_RELATIVE_TOLERANCE,
+  directionCosineTolerance: DIRECTION_COSINE_TOLERANCE,
+  maximumNewtonIterations: MAXIMUM_NEWTON_ITERATIONS,
+  maximumLineSearchSteps: MAXIMUM_LINE_SEARCH_STEPS,
+  activeSetCandidates: ACTIVE_SETS,
 });
 
+/**
+ * Resolve the two live BM1 friction restraints without modifying the linear
+ * kernel. Each candidate active set is a sealed linear mechanical model:
+ *
+ * - STICK: finite transverse springs with CAESAR's friction stiffness.
+ * - SLIP: transverse springs removed and a bounded support-force vector added.
+ *
+ * All slip-force components are solved simultaneously. Candidate enumeration
+ * removes update-order dependence and makes cycling impossible: exactly one
+ * constitutively admissible candidate must exist for each load case.
+ */
 export function solveBm1CoulombCases({ buildAuthorities, analyseCase }) {
   if (typeof buildAuthorities !== 'function' || typeof analyseCase !== 'function') {
     throw new TypeError('M025 requires buildAuthorities and analyseCase callbacks.');
   }
+
   const sourceAuthorities = buildAuthorities({});
   const sites = frictionSites(sourceAuthorities);
-  if (sites.length !== 2 || sites.map((row) => row.sourceNodeId).join(',') !== '70,80') {
-    throw new Error(`M025 requires exactly the live BM1 friction sites 70 and 80; resolved ${sites.map((row) => row.sourceNodeId).join(',')}.`);
-  }
+  assertBm1Sites(sites);
 
-  const sustained = solveContinuation({
+  const sustained = solveCase({
     caseId: 'BM1-SUSTAINED',
     thermal: false,
-    thermalScales: [0],
     sites,
     buildAuthorities,
     analyseCase,
-    initial: null,
   });
-  const operating = solveContinuation({
+  const operating = solveCase({
     caseId: 'BM1-OPERATING-T1',
     thermal: true,
-    thermalScales: Array.from({ length: THERMAL_LOAD_STEPS }, (_, index) => (index + 1) / THERMAL_LOAD_STEPS),
     sites,
     buildAuthorities,
     analyseCase,
-    initial: continuationState(sustained),
   });
 
   return {
     authorities: operating.authorities,
     sustained: sustained.analysis,
     operating: operating.analysis,
-    friction: {
-      schema: 'm025-bm1-coulomb-friction/v1',
+    friction: Object.freeze({
+      schema: 'm025-bm1-coulomb-friction/v2',
       profile: BM1_COULOMB_PROFILE,
-      sourceSites: sites,
+      sourceSites: Object.freeze(sites),
       sustained: sustained.friction,
       operating: operating.friction,
-    },
+    }),
+  };
+}
+
+function solveCase({ caseId, thermal, sites, buildAuthorities, analyseCase }) {
+  const candidates = ACTIVE_SETS.map((states) => solveCandidate({
+    caseId,
+    thermal,
+    sites,
+    buildAuthorities,
+    analyseCase,
+    states,
+  }));
+  const admissible = candidates.filter((candidate) => candidate.admissible);
+
+  if (admissible.length !== 1) {
+    throw new Error(`M025 ${caseId} requires one admissible simultaneous active set; resolved ${admissible.length}: ${JSON.stringify(candidates.map(candidateSummary))}`);
+  }
+
+  const selected = admissible[0];
+  const finalNodes = Object.freeze(selected.nodeEvidence.map(finalizeNode));
+  const byKernelNode = Object.freeze(Object.fromEntries(
+    finalNodes.map((row) => [row.kernelNodeId, row]),
+  ));
+  const friction = Object.freeze({
+    schema: 'm025-bm1-coulomb-case/v2',
+    caseId,
+    converged: true,
+    selectedActiveSet: Object.freeze({ ...selected.states }),
+    activeSetCandidateCount: candidates.length,
+    admissibleActiveSetCount: admissible.length,
+    iterationCount: selected.iterationCount,
+    residualInfinityNorm: selected.residualInfinityNorm,
+    residualEuclideanNorm: selected.residualEuclideanNorm,
+    forceTolerance: selected.forceTolerance,
+    states: Object.freeze(Object.fromEntries(finalNodes.map((row) => [row.sourceNodeId, row.state]))),
+    nodes: finalNodes,
+    byKernelNode,
+    candidates: Object.freeze(candidates.map(candidateEvidence)),
+    history: Object.freeze(selected.history),
+  });
+  const rawAnalysis = analyseCase(
+    selected.authorities,
+    caseId,
+    thermal,
+    selected.forcePrimitives,
+    thermal ? 1 : 0,
+    true,
+    friction,
+  );
+  const analysis = Object.freeze(rawAnalysis);
+
+  return {
+    authorities: selected.authorities,
+    analysis,
+    friction,
+  };
+}
+
+function solveCandidate({ caseId, thermal, sites, buildAuthorities, analyseCase, states }) {
+  const slipSites = sites.filter((site) => states[site.sourceNodeId] === SLIP);
+  const authorities = buildAuthorities({
+    frictionStates: states,
+    frictionStiffness: FRICTION_STIFFNESS,
+  });
+  const response = buildAffineResponse({
+    caseId,
+    thermal,
+    sites,
+    slipSites,
+    authorities,
+    analyseCase,
+    states,
+  });
+  const zero = Array(2 * slipSites.length).fill(0);
+  const initialEvaluation = response.evaluate(zero);
+  let x = slipSites.flatMap((site) => {
+    const row = initialEvaluation.nodeEvidence.find((candidate) => candidate.sourceNodeId === site.sourceNodeId);
+    return [row.desiredForce.x, row.desiredForce.z];
+  });
+  let current = response.evaluate(x);
+  const history = [];
+
+  if (slipSites.length > 0) {
+    for (let iteration = 1; iteration <= MAXIMUM_NEWTON_ITERATIONS; iteration += 1) {
+      const convergence = convergenceEvidence(current);
+      history.push(Object.freeze({
+        iteration,
+        residualInfinityNorm: convergence.residualInfinityNorm,
+        residualEuclideanNorm: convergence.residualEuclideanNorm,
+        forceTolerance: convergence.forceTolerance,
+        converged: convergence.converged,
+        nodes: Object.freeze(current.nodeEvidence),
+      }));
+      if (convergence.converged) break;
+
+      const jacobian = finiteDifferenceJacobian({
+        x,
+        baseResidual: current.residual,
+        evaluateResidual: (candidateX) => response.evaluate(candidateX).residual,
+      });
+      const step = regularizedLeastSquaresStep(jacobian, current.residual);
+      if (!step) break;
+
+      const accepted = lineSearch({
+        x,
+        step,
+        current,
+        evaluateCandidate: response.evaluate,
+      });
+      if (!accepted) break;
+      x = accepted.x;
+      current = accepted.evaluation;
+    }
+  }
+
+  const convergence = convergenceEvidence(current);
+  if (slipSites.length === 0) {
+    history.push(Object.freeze({
+      iteration: 1,
+      residualInfinityNorm: 0,
+      residualEuclideanNorm: 0,
+      forceTolerance: convergence.forceTolerance,
+      converged: true,
+      nodes: Object.freeze(current.nodeEvidence),
+    }));
+  }
+
+  const nodeAdmissible = current.nodeEvidence.every((row) => row.activeSetAdmissible);
+  const admissible = convergence.converged && nodeAdmissible;
+  return {
+    ...current,
+    authorities,
+    forcePrimitives: forcePrimitivesFromVector({ x, slipSites, authorities }),
+    states: { ...states },
+    history,
+    responseEvidence: response.evidence,
+    iterationCount: history.length,
+    residualInfinityNorm: convergence.residualInfinityNorm,
+    residualEuclideanNorm: convergence.residualEuclideanNorm,
+    forceTolerance: convergence.forceTolerance,
+    converged: convergence.converged,
+    nodeAdmissible,
+    admissible,
+  };
+}
+
+/**
+ * A fixed active set is a linear system. Rather than rerunning the FEA solve
+ * for every Newton residual evaluation, identify the exact affine map from the
+ * active slip-force components to the two support reactions/displacements.
+ * Newton then operates on a four-variable constitutive residual only. This is
+ * both deterministic and substantially more stable/efficient than embedding a
+ * full global solve inside every finite-difference and line-search probe.
+ */
+function buildAffineResponse({ caseId, thermal, sites, slipSites, authorities, analyseCase, states }) {
+  const dimension = 2 * slipSites.length;
+  const baseX = Array(dimension).fill(0);
+  const base = solveTargetState({
+    x: baseX,
+    caseId,
+    thermal,
+    sites,
+    slipSites,
+    authorities,
+    analyseCase,
+  });
+  const columns = [];
+  const probeForce = 1000;
+  for (let column = 0; column < dimension; column += 1) {
+    const x = Array(dimension).fill(0);
+    x[column] = probeForce;
+    const target = solveTargetState({
+      x,
+      caseId,
+      thermal,
+      sites,
+      slipSites,
+      authorities,
+      analyseCase,
+    });
+    columns.push(Object.freeze(Object.fromEntries(sites.map((site) => {
+      const baseRow = base[site.sourceNodeId];
+      const row = target[site.sourceNodeId];
+      return [site.sourceNodeId, Object.freeze({
+        normalReaction: (row.normalReaction - baseRow.normalReaction) / probeForce,
+        ux: (row.ux - baseRow.ux) / probeForce,
+        uz: (row.uz - baseRow.uz) / probeForce,
+      })];
+    }))));
+  }
+
+  const evaluate = (x) => {
+    const target = Object.fromEntries(sites.map((site) => {
+      const baseRow = base[site.sourceNodeId];
+      const row = { ...baseRow };
+      for (let column = 0; column < dimension; column += 1) {
+        const derivative = columns[column][site.sourceNodeId];
+        row.normalReaction += derivative.normalReaction * x[column];
+        row.ux += derivative.ux * x[column];
+        row.uz += derivative.uz * x[column];
+      }
+      return [site.sourceNodeId, row];
+    }));
+    return constitutiveEvaluation({ x, sites, slipSites, states, target });
+  };
+
+  return Object.freeze({
+    evaluate,
+    evidence: Object.freeze({
+      kind: 'FIXED_ACTIVE_SET_AFFINE_RESPONSE_V1',
+      probeForce,
+      slipVariableCount: dimension,
+      globalLinearSolveCount: 1 + dimension,
+      base: Object.freeze(base),
+      columns: Object.freeze(columns),
+    }),
+  });
+}
+
+function solveTargetState({ x, caseId, thermal, sites, slipSites, authorities, analyseCase }) {
+  const forcePrimitives = forcePrimitivesFromVector({ x, slipSites, authorities });
+  const analysis = analyseCase(
+    authorities,
+    caseId,
+    thermal,
+    forcePrimitives,
+    thermal ? 1 : 0,
+    false,
+    null,
+  );
+  return Object.freeze(Object.fromEntries(sites.map((site) => {
+    const kernelNodeId = authorities.kernelNodeByReference.get(site.sourceNodeId);
+    return [site.sourceNodeId, Object.freeze({
+      normalReaction: value(analysis.execution.reactions, kernelNodeId, 'UY'),
+      ux: value(analysis.execution.displacement, kernelNodeId, 'UX'),
+      uz: value(analysis.execution.displacement, kernelNodeId, 'UZ'),
+    })];
+  })));
+}
+
+function forcePrimitivesFromVector({ x, slipSites, authorities }) {
+  return slipSites.map((site, index) => ({
+    sourceNodeId: site.sourceNodeId,
+    kernelNodeId: authorities.kernelNodeByReference.get(site.sourceNodeId),
+    fx: x[2 * index],
+    fz: x[2 * index + 1],
+  }));
+}
+
+function constitutiveEvaluation({ x, sites, slipSites, states, target }) {
+  const slipForces = zeroForces(sites);
+  slipSites.forEach((site, index) => {
+    slipForces[site.sourceNodeId] = vector(x[2 * index], x[2 * index + 1]);
+  });
+  const nodeEvidence = [];
+  const residual = [];
+
+  for (const site of sites) {
+    const sourceNodeId = site.sourceNodeId;
+    const solved = target[sourceNodeId];
+    const normalReaction = solved.normalReaction;
+    const normalMagnitude = Math.abs(normalReaction);
+    const coulombLimit = site.coefficient * normalMagnitude;
+    const displacement = vector(solved.ux, solved.uz);
+    const displacementMagnitude = norm(displacement);
+    const elasticTrialForce = scale(displacement, -FRICTION_STIFFNESS);
+    const elasticTrialMagnitude = norm(elasticTrialForce);
+    const forceTolerance = toleranceFor(coulombLimit);
+    const state = states[sourceNodeId];
+
+    if (state === STICK) {
+      nodeEvidence.push(evidence({
+        site,
+        state,
+        normalReaction,
+        coulombLimit,
+        displacement,
+        elasticTrialForce,
+        tangentialForce: elasticTrialForce,
+        desiredForce: elasticTrialForce,
+        forceResidualVector: vector(0, 0),
+        activeSetAdmissible: elasticTrialMagnitude <= coulombLimit + forceTolerance,
+      }));
+      continue;
+    }
+
+    const currentForce = slipForces[sourceNodeId];
+    const desiredForce = displacementMagnitude > 0
+      ? scale(unit(displacement), -coulombLimit)
+      : vector(0, 0);
+    const forceResidualVector = subtract(currentForce, desiredForce);
+    residual.push(forceResidualVector.x, forceResidualVector.z);
+    const oppositionCosine = cosine(currentForce, displacement);
+    const onSurface = Math.abs(norm(currentForce) - coulombLimit) <= forceTolerance;
+    const beyondBreakaway = elasticTrialMagnitude + forceTolerance >= coulombLimit;
+    const opposing = displacementMagnitude > 0
+      && oppositionCosine <= -1 + DIRECTION_COSINE_TOLERANCE;
+
+    nodeEvidence.push(evidence({
+      site,
+      state,
+      normalReaction,
+      coulombLimit,
+      displacement,
+      elasticTrialForce,
+      tangentialForce: currentForce,
+      desiredForce,
+      forceResidualVector,
+      activeSetAdmissible: onSurface && beyondBreakaway && opposing,
+    }));
+  }
+
+  return { nodeEvidence, residual };
+}
+
+function convergenceEvidence(evaluation) {
+  const residualInfinityNorm = infinityNorm(evaluation.residual);
+  const residualEuclideanNorm = Math.sqrt(squaredNorm(evaluation.residual));
+  const forceTolerance = Math.max(
+    FORCE_ABSOLUTE_TOLERANCE,
+    ...evaluation.nodeEvidence.map((row) => toleranceFor(row.coulombLimit)),
+  );
+  return {
+    residualInfinityNorm,
+    residualEuclideanNorm,
+    forceTolerance,
+    converged: residualInfinityNorm <= forceTolerance,
+  };
+}
+
+function finiteDifferenceJacobian({ x, baseResidual, evaluateResidual }) {
+  const rows = baseResidual.length;
+  const columns = x.length;
+  const jacobian = Array.from({ length: rows }, () => Array(columns).fill(0));
+
+  for (let column = 0; column < columns; column += 1) {
+    const step = Math.max(0.01, 1.0e-5 * Math.max(1, Math.abs(x[column])));
+    const plus = [...x];
+    const minus = [...x];
+    plus[column] += step;
+    minus[column] -= step;
+    const plusResidual = evaluateResidual(plus);
+    const minusResidual = evaluateResidual(minus);
+    for (let row = 0; row < rows; row += 1) {
+      jacobian[row][column] = (plusResidual[row] - minusResidual[row]) / (2 * step);
+    }
+  }
+  return jacobian;
+}
+
+function regularizedLeastSquaresStep(jacobian, residual) {
+  const columns = jacobian[0]?.length ?? 0;
+  if (columns === 0) return [];
+
+  for (const damping of [0, 1.0e-12, 1.0e-10, 1.0e-8, 1.0e-6, 1.0e-4, 1.0e-2, 1, 100]) {
+    const normal = Array.from({ length: columns }, () => Array(columns).fill(0));
+    const rhs = Array(columns).fill(0);
+    for (let row = 0; row < jacobian.length; row += 1) {
+      for (let i = 0; i < columns; i += 1) {
+        rhs[i] -= jacobian[row][i] * residual[row];
+        for (let j = 0; j < columns; j += 1) {
+          normal[i][j] += jacobian[row][i] * jacobian[row][j];
+        }
+      }
+    }
+    for (let i = 0; i < columns; i += 1) {
+      normal[i][i] += damping * Math.max(1, normal[i][i]);
+    }
+    const solved = solveDenseLinearSystem(normal, rhs);
+    if (solved) return solved;
+  }
+  return null;
+}
+
+function lineSearch({ x, step, current, evaluateCandidate }) {
+  const currentObjective = squaredNorm(current.residual);
+  const forceScale = Math.max(
+    1,
+    ...current.nodeEvidence.map((row) => row.coulombLimit),
+    ...x.map(Math.abs),
+  );
+  const limitedStep = limitVectorNorm(step, 2 * forceScale);
+
+  for (let index = 0; index < MAXIMUM_LINE_SEARCH_STEPS; index += 1) {
+    const alpha = 2 ** -index;
+    const candidateX = x.map((value, component) => value + alpha * limitedStep[component]);
+    const evaluation = evaluateCandidate(candidateX);
+    if (squaredNorm(evaluation.residual) < currentObjective) {
+      return { x: candidateX, evaluation };
+    }
+  }
+  return null;
+}
+
+function finalizeNode(row) {
+  const tangentialMagnitude = norm(row.tangentialForce);
+  const forceTolerance = toleranceFor(row.coulombLimit);
+  const reactionSupplement = row.tangentialForce;
+  return Object.freeze({
+    ...row,
+    tangentialMagnitude,
+    mobilization: row.coulombLimit > 0 ? tangentialMagnitude / row.coulombLimit : 0,
+    forceTolerance,
+    boundResidual: tangentialMagnitude - row.coulombLimit,
+    constitutiveResidual: norm(row.forceResidualVector),
+    oppositionCosine: cosine(row.tangentialForce, row.tangentialDisplacementVector),
+    forceAppliedToStructure: Object.freeze({
+      fx: row.tangentialForce.x,
+      fy: 0,
+      fz: row.tangentialForce.z,
+    }),
+    reactionSupplement: Object.freeze({
+      UX: reactionSupplement.x,
+      UY: 0,
+      UZ: reactionSupplement.z,
+      RX: 0,
+      RY: 0,
+      RZ: 0,
+    }),
+    equilibriumSupplement: Object.freeze(row.state === STICK
+      ? { fx: reactionSupplement.x, fy: 0, fz: reactionSupplement.z, mx: 0, my: 0, mz: 0 }
+      : { fx: 0, fy: 0, fz: 0, mx: 0, my: 0, mz: 0 }),
+  });
+}
+
+function evidence({
+  site,
+  state,
+  normalReaction,
+  coulombLimit,
+  displacement,
+  elasticTrialForce,
+  tangentialForce,
+  desiredForce,
+  forceResidualVector,
+  activeSetAdmissible,
+}) {
+  return Object.freeze({
+    sourceNodeId: site.sourceNodeId,
+    kernelNodeId: site.kernelNodeId,
+    coefficient: site.coefficient,
+    state,
+    frictionStiffness: FRICTION_STIFFNESS,
+    normalReaction,
+    normalMagnitude: Math.abs(normalReaction),
+    coulombLimit,
+    tangentialDisplacementVector: Object.freeze({ ...displacement }),
+    tangentialDisplacement: Object.freeze({ ux: displacement.x, uz: displacement.z }),
+    tangentialDisplacementMagnitude: norm(displacement),
+    elasticTrialForce: Object.freeze({ ...elasticTrialForce }),
+    elasticTrialMagnitude: norm(elasticTrialForce),
+    tangentialForce: Object.freeze({ ...tangentialForce }),
+    desiredForce: Object.freeze({ ...desiredForce }),
+    forceResidualVector: Object.freeze({ ...forceResidualVector }),
+    activeSetAdmissible,
+  });
+}
+
+function candidateEvidence(candidate) {
+  return Object.freeze({
+    states: Object.freeze({ ...candidate.states }),
+    converged: candidate.converged,
+    nodeAdmissible: candidate.nodeAdmissible,
+    admissible: candidate.admissible,
+    iterationCount: candidate.iterationCount,
+    residualInfinityNorm: candidate.residualInfinityNorm,
+    residualEuclideanNorm: candidate.residualEuclideanNorm,
+    forceTolerance: candidate.forceTolerance,
+    nodes: Object.freeze(candidate.nodeEvidence),
+  });
+}
+
+function candidateSummary(candidate) {
+  return {
+    states: candidate.states,
+    converged: candidate.converged,
+    nodeAdmissible: candidate.nodeAdmissible,
+    admissible: candidate.admissible,
+    residualInfinityNorm: candidate.residualInfinityNorm,
+    nodes: candidate.nodeEvidence.map((row) => ({
+      node: row.sourceNodeId,
+      state: row.state,
+      normal: Math.abs(row.normalReaction),
+      limit: row.coulombLimit,
+      elasticTrial: norm(row.elasticTrialForce),
+      force: norm(row.tangentialForce),
+      activeSetAdmissible: row.activeSetAdmissible,
+    })),
   };
 }
 
@@ -72,7 +583,9 @@ function frictionSites(authorities) {
       const coefficient = restraint.frictionCoefficient;
       if (!(coefficient > 0)) continue;
       const direction = [restraint.xCosine ?? 0, restraint.yCosine ?? 0, restraint.zCosine ?? 0];
-      if (Math.abs(direction[0]) > 1e-12 || Math.abs(Math.abs(direction[1]) - 1) > 1e-12 || Math.abs(direction[2]) > 1e-12) {
+      if (Math.abs(direction[0]) > 1.0e-12
+        || Math.abs(Math.abs(direction[1]) - 1) > 1.0e-12
+        || Math.abs(direction[2]) > 1.0e-12) {
         throw new Error(`M025 BM1 friction site ${node.id} must be normal to global Y.`);
       }
       sites.push(Object.freeze({
@@ -89,288 +602,71 @@ function frictionSites(authorities) {
   return sites.sort((left, right) => Number(left.sourceNodeId) - Number(right.sourceNodeId));
 }
 
-function solveContinuation({ caseId, thermal, thermalScales, sites, buildAuthorities, analyseCase, initial }) {
-  let states = initial?.states ?? Object.fromEntries(sites.map((site) => [site.sourceNodeId, STICK]));
-  let slipForces = initial?.slipForces ?? Object.fromEntries(sites.map((site) => [site.sourceNodeId, vector(0, 0)]));
-  let previousDisplacements = initial?.displacements ?? Object.fromEntries(sites.map((site) => [site.sourceNodeId, vector(0, 0)]));
-  const steps = [];
-  let final = null;
-
-  for (const [stepIndex, thermalScale] of thermalScales.entries()) {
-    const solved = solveStep({
-      caseId,
-      thermal,
-      thermalScale,
-      stepIndex: stepIndex + 1,
-      stepCount: thermalScales.length,
-      sites,
-      buildAuthorities,
-      analyseCase,
-      states,
-      slipForces,
-      previousDisplacements,
-    });
-    steps.push(solved.stepEvidence);
-    states = solved.states;
-    slipForces = solved.slipForces;
-    previousDisplacements = solved.displacements;
-    final = solved;
+function assertBm1Sites(sites) {
+  if (sites.length !== 2 || sites.map((row) => row.sourceNodeId).join(',') !== '70,80') {
+    throw new Error(`M025 requires exactly the live BM1 friction sites 70 and 80; resolved ${sites.map((row) => row.sourceNodeId).join(',')}.`);
   }
-
-  if (!final) throw new Error(`M025 ${caseId} has no continuation steps.`);
-  const history = steps.flatMap((step) => step.history);
-  const friction = Object.freeze({
-    ...final.friction,
-    iterationCount: history.length,
-    loadStepCount: steps.length,
-    loadSteps: Object.freeze(steps),
-    history: Object.freeze(history),
-  });
-  const analysis = Object.freeze({ ...final.analysis, friction });
-  return { ...final, analysis, friction };
+  if (!sites.every((row) => row.coefficient === 0.3)) {
+    throw new Error(`M025 requires coefficient 0.3 at both live BM1 friction sites: ${JSON.stringify(sites)}`);
+  }
 }
 
-function solveStep({
-  caseId,
-  thermal,
-  thermalScale,
-  stepIndex,
-  stepCount,
-  sites,
-  buildAuthorities,
-  analyseCase,
-  states: initialStates,
-  slipForces: initialSlipForces,
-  previousDisplacements,
-}) {
-  let states = { ...initialStates };
-  let slipForces = cloneVectors(initialSlipForces);
-  const history = [];
-  let last = null;
+function toleranceFor(coulombLimit) {
+  return FORCE_ABSOLUTE_TOLERANCE
+    + FORCE_RELATIVE_TOLERANCE * Math.max(1, coulombLimit);
+}
 
-  for (let iteration = 1; iteration <= MAX_ITERATIONS_PER_STEP; iteration += 1) {
-    const authorities = buildAuthorities({ frictionStates: states });
-    const forcePrimitives = sites
-      .filter((site) => states[site.sourceNodeId] === SLIP)
-      .map((site) => ({
-        sourceNodeId: site.sourceNodeId,
-        kernelNodeId: authorities.kernelNodeByReference.get(site.sourceNodeId),
-        fx: slipForces[site.sourceNodeId].x,
-        fz: slipForces[site.sourceNodeId].z,
-      }));
-    const rawAnalysis = analyseCase(authorities, caseId, thermal, forcePrimitives, thermalScale);
-    const nextStates = { ...states };
-    const nextForces = cloneVectors(slipForces);
-    const nodeEvidence = [];
-    let stateChanged = false;
-    let maximumForceResidual = 0;
+function zeroForces(sites) {
+  return Object.fromEntries(sites.map((site) => [site.sourceNodeId, vector(0, 0)]));
+}
 
-    for (const site of sites) {
-      const sourceNodeId = site.sourceNodeId;
-      const kernelNodeId = authorities.kernelNodeByReference.get(sourceNodeId);
-      const normalReaction = value(rawAnalysis.execution.reactions, kernelNodeId, 'UY');
-      const normalMagnitude = Math.abs(normalReaction);
-      const coulombLimit = site.coefficient * normalMagnitude;
-      const displacement = vector(
-        value(rawAnalysis.execution.displacement, kernelNodeId, 'UX'),
-        value(rawAnalysis.execution.displacement, kernelNodeId, 'UZ'),
-      );
-      const displacementIncrement = subtract(displacement, previousDisplacements[sourceNodeId]);
-      const state = states[sourceNodeId];
-
-      if (state === STICK) {
-        const reaction = vector(
-          value(rawAnalysis.execution.reactions, kernelNodeId, 'UX'),
-          value(rawAnalysis.execution.reactions, kernelNodeId, 'UZ'),
-        );
-        const tangentialMagnitude = norm(reaction);
-        const admissibleLimit = coulombLimit * (1 + ACTIVE_SET_RELATIVE_TOLERANCE) + ACTIVE_SET_ABSOLUTE_TOLERANCE;
-        const admissible = tangentialMagnitude <= admissibleLimit;
-        if (!admissible) {
-          nextStates[sourceNodeId] = SLIP;
-          nextForces[sourceNodeId] = scale(unit(reaction), coulombLimit);
-          stateChanged = true;
-        }
-        nodeEvidence.push(evidence({
-          site,
-          state,
-          normalReaction,
-          coulombLimit,
-          displacement,
-          displacementIncrement,
-          tangentialForce: reaction,
-          desiredForce: admissible ? reaction : nextForces[sourceNodeId],
-          forceResidual: admissible ? 0 : norm(subtract(nextForces[sourceNodeId], reaction)),
-          admissible,
-        }));
-        continue;
-      }
-
-      const currentForce = slipForces[sourceNodeId];
-      const incrementMagnitude = norm(displacementIncrement);
-      const desiredForce = incrementMagnitude > DISPLACEMENT_DIRECTION_TOLERANCE
-        ? scale(unit(displacementIncrement), -coulombLimit)
-        : projectToLimit(currentForce, coulombLimit);
-      const forceResidual = norm(subtract(desiredForce, currentForce));
-      maximumForceResidual = Math.max(maximumForceResidual, forceResidual);
-      const tolerance = forceTolerance(coulombLimit);
-      nextForces[sourceNodeId] = forceResidual <= tolerance
-        ? desiredForce
-        : add(scale(currentForce, 1 - FORCE_RELAXATION), scale(desiredForce, FORCE_RELAXATION));
-      nodeEvidence.push(evidence({
-        site,
-        state,
-        normalReaction,
-        coulombLimit,
-        displacement,
-        displacementIncrement,
-        tangentialForce: currentForce,
-        desiredForce,
-        forceResidual,
-        admissible: norm(currentForce) <= coulombLimit + tolerance,
-      }));
+function solveDenseLinearSystem(matrix, rhs) {
+  const n = rhs.length;
+  const augmented = matrix.map((row, index) => [...row, rhs[index]]);
+  for (let pivot = 0; pivot < n; pivot += 1) {
+    let best = pivot;
+    for (let row = pivot + 1; row < n; row += 1) {
+      if (Math.abs(augmented[row][pivot]) > Math.abs(augmented[best][pivot])) best = row;
     }
-
-    const converged = !stateChanged && nodeEvidence.every((row) => {
-      if (row.state === STICK) return row.admissible;
-      return row.forceResidual <= forceTolerance(row.coulombLimit) && row.admissible;
-    });
-    history.push(Object.freeze({
-      loadStep: stepIndex,
-      loadStepCount: stepCount,
-      thermalScale,
-      iteration,
-      states: Object.freeze({ ...states }),
-      stateChanged,
-      maximumForceResidual,
-      converged,
-      nodes: Object.freeze(nodeEvidence),
-    }));
-
-    last = { authorities, rawAnalysis, nodeEvidence, converged, iteration };
-    states = nextStates;
-    slipForces = nextForces;
-    if (converged) break;
+    if (Math.abs(augmented[best][pivot]) < 1.0e-14) return null;
+    [augmented[pivot], augmented[best]] = [augmented[best], augmented[pivot]];
+    const divisor = augmented[pivot][pivot];
+    for (let column = pivot; column <= n; column += 1) augmented[pivot][column] /= divisor;
+    for (let row = 0; row < n; row += 1) {
+      if (row === pivot) continue;
+      const factor = augmented[row][pivot];
+      for (let column = pivot; column <= n; column += 1) {
+        augmented[row][column] -= factor * augmented[pivot][column];
+      }
+    }
   }
-
-  if (!last?.converged) {
-    throw new Error(`M025 ${caseId} load step ${stepIndex}/${stepCount} did not converge in ${MAX_ITERATIONS_PER_STEP} iterations.`);
-  }
-
-  const finalNodes = finalizeNodes(last.nodeEvidence);
-  const byKernelNode = Object.fromEntries(finalNodes.map((row) => [row.kernelNodeId, row]));
-  const friction = Object.freeze({
-    schema: 'm025-bm1-coulomb-case/v1',
-    caseId,
-    converged: true,
-    iterationCount: last.iteration,
-    loadStepCount: 1,
-    finalThermalScale: thermalScale,
-    states: Object.freeze(Object.fromEntries(finalNodes.map((row) => [row.sourceNodeId, row.state]))),
-    nodes: Object.freeze(finalNodes),
-    byKernelNode: Object.freeze(byKernelNode),
-    history: Object.freeze(history),
-  });
-  const analysis = Object.freeze({ ...last.rawAnalysis, friction });
-  return {
-    authorities: last.authorities,
-    analysis,
-    friction,
-    states: Object.fromEntries(finalNodes.map((row) => [row.sourceNodeId, row.state])),
-    slipForces: Object.fromEntries(finalNodes.map((row) => [row.sourceNodeId, row.state === SLIP ? { ...row.tangentialForce } : vector(0, 0)])),
-    displacements: Object.fromEntries(finalNodes.map((row) => [row.sourceNodeId, vector(row.tangentialDisplacement.ux, row.tangentialDisplacement.uz)])),
-    stepEvidence: Object.freeze({
-      loadStep: stepIndex,
-      loadStepCount: stepCount,
-      thermalScale,
-      iterationCount: last.iteration,
-      states: friction.states,
-      nodes: friction.nodes,
-      history: friction.history,
-    }),
-  };
+  return augmented.map((row) => row[n]);
 }
 
-function finalizeNodes(nodeEvidence) {
-  return nodeEvidence.map((row) => {
-    const physicalForce = row.state === STICK ? row.tangentialForce : row.desiredForce;
-    const reactionSupplement = row.state === SLIP ? physicalForce : vector(0, 0);
-    return Object.freeze({
-      ...row,
-      tangentialForce: Object.freeze({ ...physicalForce }),
-      tangentialMagnitude: norm(physicalForce),
-      mobilization: row.coulombLimit > 0 ? norm(physicalForce) / row.coulombLimit : 0,
-      forceAppliedToStructure: Object.freeze({ fx: physicalForce.x, fy: 0, fz: physicalForce.z }),
-      reactionSupplement: Object.freeze({ UX: reactionSupplement.x, UY: 0, UZ: reactionSupplement.z, RX: 0, RY: 0, RZ: 0 }),
-    });
-  });
-}
-
-function continuationState(result) {
-  return {
-    states: { ...result.friction.states },
-    slipForces: Object.fromEntries(result.friction.nodes.map((row) => [row.sourceNodeId, vector(0, 0)])),
-    displacements: Object.fromEntries(result.friction.nodes.map((row) => [
-      row.sourceNodeId,
-      vector(row.tangentialDisplacement.ux, row.tangentialDisplacement.uz),
-    ])),
-  };
-}
-
-function evidence({
-  site,
-  state,
-  normalReaction,
-  coulombLimit,
-  displacement,
-  displacementIncrement,
-  tangentialForce,
-  desiredForce,
-  forceResidual,
-  admissible,
-}) {
-  return Object.freeze({
-    sourceNodeId: site.sourceNodeId,
-    kernelNodeId: site.kernelNodeId,
-    coefficient: site.coefficient,
-    state,
-    normalReaction,
-    normalMagnitude: Math.abs(normalReaction),
-    coulombLimit,
-    tangentialDisplacement: Object.freeze({ ux: displacement.x, uz: displacement.z }),
-    tangentialDisplacementMagnitude: norm(displacement),
-    tangentialDisplacementIncrement: Object.freeze({ ux: displacementIncrement.x, uz: displacementIncrement.z }),
-    tangentialDisplacementIncrementMagnitude: norm(displacementIncrement),
-    tangentialForce: Object.freeze({ ...tangentialForce }),
-    tangentialMagnitude: norm(tangentialForce),
-    desiredForce: Object.freeze({ ...desiredForce }),
-    desiredMagnitude: norm(desiredForce),
-    forceResidual,
-    boundResidual: norm(tangentialForce) - coulombLimit,
-    admissible,
-  });
-}
-
-function forceTolerance(coulombLimit) {
-  return FORCE_ABSOLUTE_TOLERANCE + FORCE_RELATIVE_TOLERANCE * Math.max(1, coulombLimit);
-}
-function cloneVectors(value) {
-  return Object.fromEntries(Object.entries(value).map(([key, row]) => [key, { ...row }]));
-}
 function value(entries, nodeId, dof) {
   return entries.find((row) => row.nodeId === nodeId && row.dof === dof)?.value ?? 0;
 }
 function vector(x, z) { return { x, z }; }
 function norm(value) { return Math.hypot(value.x, value.z); }
-function add(left, right) { return vector(left.x + right.x, left.z + right.z); }
-function subtract(left, right) { return vector(left.x - right.x, left.z - right.z); }
 function scale(value, factor) { return vector(value.x * factor, value.z * factor); }
+function subtract(left, right) { return vector(left.x - right.x, left.z - right.z); }
 function unit(value) {
   const magnitude = norm(value);
   return magnitude > 0 ? scale(value, 1 / magnitude) : vector(0, 0);
 }
-function projectToLimit(value, limit) {
-  const magnitude = norm(value);
-  if (!(limit > 0) || !(magnitude > 0)) return vector(0, 0);
-  return scale(value, limit / magnitude);
+function cosine(left, right) {
+  const denominator = norm(left) * norm(right);
+  return denominator > 0 ? (left.x * right.x + left.z * right.z) / denominator : 0;
+}
+function infinityNorm(values) {
+  return values.reduce((maximum, current) => Math.max(maximum, Math.abs(current)), 0);
+}
+function squaredNorm(values) {
+  return values.reduce((sum, current) => sum + current * current, 0);
+}
+function limitVectorNorm(values, limit) {
+  const magnitude = Math.sqrt(squaredNorm(values));
+  if (!(magnitude > limit)) return values;
+  const factor = limit / magnitude;
+  return values.map((value) => value * factor);
 }
