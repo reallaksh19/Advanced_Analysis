@@ -190,12 +190,13 @@ function renderVirtualEntity(panel, item, index) {
   value.dataset.entityId = item.id;
   value.dataset.action = 'select-entity';
   positionRow(value, index, item.depth, false);
-  const isSelected = item.id === panel.selectedEntityId;
+  const isSelected = panel.selectedEntityIds?.has(item.id)
+    || item.id === panel.selectedEntityId;
   value.classList.toggle('tree-entity--selected', isSelected);
   value.role = 'treeitem';
   value.setAttribute('aria-level', String(item.depth + 1));
+  value.setAttribute('aria-selected', String(isSelected));
   value.tabIndex = index === panel.focusedIndex ? 0 : -1;
-  if (isSelected) value.setAttribute('aria-selected', 'true');
   const identity = documentRef.createElement('span');
   identity.className = 'tree-entity__identity';
   identity.textContent = item.label;
