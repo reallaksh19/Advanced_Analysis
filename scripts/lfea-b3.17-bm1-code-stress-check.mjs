@@ -85,12 +85,16 @@ assert.equal(exp5859.to.sifOutOfPlane, 2.217616);
 
 const reparsed = parseCaesarStressReports(output);
 assert.deepEqual(reparsed, result.caesarStressReports, 'parser must be deterministic');
+const unsupportedUnitsOutput = output.replace(/STRESS_UNITS="\s*KPa"/u, 'STRESS_UNITS="psi"');
+assert.notEqual(unsupportedUnitsOutput, output, 'unit mutation must affect a stress report');
 assert.throws(
-  () => parseCaesarStressReports(output.replace('STRESS_UNITS=" KPa"', 'STRESS_UNITS=" psi"')),
+  () => parseCaesarStressReports(unsupportedUnitsOutput),
   (error) => error?.code === 'CAESAR_STRESS_REPORT_UNIT_UNSUPPORTED',
 );
+const missingExpansionOutput = output.replaceAll(CAESAR_EXPANSION_CASE, 'CASE 5 REMOVED');
+assert.notEqual(missingExpansionOutput, output, 'case mutation must affect the CAESAR output');
 assert.throws(
-  () => parseCaesarStressReports(output.replace('CASE 5 (EXP) L5=L3-L4', 'CASE 5 REMOVED')),
+  () => parseCaesarStressReports(missingExpansionOutput),
   (error) => error?.code === 'CAESAR_STRESS_REPORT_CASE_MISSING',
 );
 
