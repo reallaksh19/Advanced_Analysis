@@ -145,6 +145,18 @@ export class TopologyEditSnapStoreController {
     return cycleIndex;
   }
 
+  endInteraction() {
+    const state = this.store.getState();
+    this.store.setState({
+      interaction: deepFreeze({
+        ...state.interaction,
+        mode: 'PREVIEW_READY',
+        interactionId: null,
+        pendingRequestId: null,
+      }),
+    });
+  }
+
   clear(mode = 'IDLE') {
     const state = this.store.getState();
     this.store.setState({
