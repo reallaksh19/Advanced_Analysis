@@ -9,7 +9,9 @@ import {
 
 export class NonFeaStageRecorder {
   constructor({ executionId, fixturePath = null, sampleKind = 'COLD', sampleIndex = 0 }) {
-    if (typeof executionId !== 'string' || !executionId) throw new TypeError('executionId is required.');
+    if (typeof executionId !== 'string' || !executionId) {
+      throw new TypeError('executionId is required.');
+    }
     this.executionId = executionId;
     this.fixturePath = fixturePath;
     this.sampleKind = sampleKind;
@@ -20,7 +22,9 @@ export class NonFeaStageRecorder {
 
   async capture(stageId, operation, evidence = {}) {
     if (!NON_FEA_STAGE_IDS.includes(stageId)) throw new RangeError(`Unknown stage ${stageId}.`);
-    if (typeof operation !== 'function') throw new TypeError(`Stage ${stageId} requires an operation.`);
+    if (typeof operation !== 'function') {
+      throw new TypeError(`Stage ${stageId} requires an operation.`);
+    }
     const startedAt = performance.now();
     try {
       const value = await operation();
@@ -64,7 +68,6 @@ export class NonFeaStageRecorder {
       status: 'BLOCKED',
       durationMs: null,
       evidence: deepFreeze({ details }),
-      failure,
     }));
     this.failures.push(failure);
   }
@@ -83,7 +86,10 @@ export class NonFeaStageRecorder {
 }
 
 function classifyError(error) {
-  if (error?.code === 'ENOENT' || error?.code === 'ERR_MODULE_NOT_FOUND') return 'INFRASTRUCTURE_BLOCKER';
-  if (String(error?.code || '').includes('MISSING') || String(error?.message || '').includes('missing')) return 'MISSING_AUTHORITY';
+  if (error?.code === 'ENOENT' || error?.code === 'ERR_MODULE_NOT_FOUND') {
+    return 'INFRASTRUCTURE_BLOCKER';
+  }
+  const code = String(error?.code || '');
+  if (code.includes('MISSING')) return 'MISSING_AUTHORITY';
   return 'PRE_EXISTING_CURRENT_MAIN_DEFECT';
 }
