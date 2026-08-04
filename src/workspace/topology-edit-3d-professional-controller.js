@@ -37,6 +37,9 @@ const PANEL_LABELS = Object.freeze({
   'topology-edit-checker': 'Issues & suggestions',
 });
 
+const EDITOR_DATASET_SESSION_VERSIONS = new WeakMap();
+let nextEditorDatasetSessionVersion = 1;
+
 export class TopologyEdit3DViewController extends InteractionController {
   constructor(eventBus, lifecycleOptions = {}) {
     super(eventBus, lifecycleOptions);
@@ -123,13 +126,17 @@ export class TopologyEdit3DViewController extends InteractionController {
 
   reconcileEditorDatasetSnapshot(snapshot) {
     const dataset = snapshot?.dataset ?? null;
-    if (dataset === this.editorDatasetObject) return;
+    const sessionVersion = editorDatasetSessionVersion(dataset);
+    if (
+      dataset === this.editorDatasetObject
+      && sessionVersion === this.editorDatasetEpoch
+    ) return;
     this.editorDatasetObject = dataset;
-    this.editorDatasetEpoch += 1;
+    this.editorDatasetEpoch = sessionVersion;
     const currentIdentity = this.editorStore.getState().dataset;
     this.applyEditorDatasetIdentity({
       ...currentIdentity,
-      sessionVersion: this.editorDatasetEpoch,
+      sessionVersion,
     });
   }
 
@@ -409,4 +416,15 @@ function canonicalSelectionIds(canonical) {
     ...(canonical.rigids ?? []).map((row) => row.id),
     ...(canonical.bends ?? []).map((row) => row.id),
   ];
+}
+
+function editorDatasetSessionVersion(dataset) {
+  if (!dataset || typeof dataset !== 'object') return 0;
+  let version = EDITOR_DATASET_SESSION_VERSIONS.get(dataset);
+  if (!version) {
+    version = nextEditorDatasetSessionVersion;
+    nextEditorDatasetSessionVersion += 1;
+    EDITOR_DATASET_SESSION_VERSIONS.set(dataset, version);
+  }
+  return version;
 }
