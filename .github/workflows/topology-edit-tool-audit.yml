@@ -5,7 +5,6 @@ on:
     paths:
       - '.github/workflows/topology-edit-tool-audit.yml'
       - 'e2e/topology-edit-tool-*.spec.js'
-      - 'e2e/topology-edit-pick-*.spec.js'
       - 'e2e/topology-edit-ray-*.spec.js'
       - 'src/workspace/topology-edit-3d-*.js'
       - 'src/workspace/topology-edit/**'
@@ -53,26 +52,18 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+          node --check src/workspace/topology-edit/topology-edit-navigation-hud-viewport-backend.js
           node --check e2e/topology-edit-tool-audit.spec.js
-          node --check e2e/topology-edit-pick-diagnostic.spec.js
           node --check e2e/topology-edit-ray-scan.spec.js
           git diff --check
 
-      - name: Execute full-canvas ray scan
+      - name: Execute full-canvas pick regression
         run: |
           set -euo pipefail
           npx playwright test e2e/topology-edit-ray-scan.spec.js \
             --project=chromium --workers=1 --reporter=line
 
-      - name: Execute direct WebGL pick diagnostic
-        if: success()
-        run: |
-          set -euo pipefail
-          npx playwright test e2e/topology-edit-pick-diagnostic.spec.js \
-            --project=chromium --workers=1 --reporter=line
-
-      - name: Execute full WebGL tool audit
-        if: success()
+      - name: Execute complete 3D tool audit
         run: |
           set -euo pipefail
           npx playwright test e2e/topology-edit-tool-audit.spec.js \
