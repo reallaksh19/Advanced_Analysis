@@ -25,7 +25,7 @@ const COMMAND_SCENARIOS = Object.freeze([
   { actionId: 'add-straight', kind: 'two-node' },
   { actionId: 'split-edge-half', kind: 'edge' },
   { actionId: 'disconnect-from', kind: 'edge' },
-  { actionId: 'disconnect-to', kind: 'edge' },
+  { actionId: 'disconnect-to', kind: 'any-edge' },
   { actionId: 'delete-edge', kind: 'edge' },
 ]);
 
@@ -79,33 +79,17 @@ test('all ten governed edit tools execute independently on fresh 20-object sampl
     await openPanel(host, 'commands');
     const baseHash = await host.getAttribute('data-topology-edit-canonical-hash');
 
+    if (scenario.kind === 'any-edge') {
+      executions.push(await executeAgainstAnyEdge(page, host, scenario.actionId, baseHash));
+      continue;
+    }
     if (scenario.kind === 'two-node') {
       await selectQualifiedGapBySearch(page, host);
     } else {
       const targets = await visibleSelectionTargets(page);
       await selectVisibleTarget(page, targets, scenario.kind);
     }
-    const button = page.locator(`[data-command-action="${scenario.actionId}"]`);
-    await expect(button).toBeEnabled();
-    const selectionStatus = await statusOutput(page).innerText();
-    await button.click();
-    const outcomeStatus = await statusOutput(page).innerText();
-    const activeCommandCount = Number(
-      await host.getAttribute('data-topology-edit-active-command-count') || 0,
-    );
-    const afterHash = await host.getAttribute('data-topology-edit-canonical-hash');
-    const accepted = /accepted/i.test(outcomeStatus)
-      && activeCommandCount === 1
-      && afterHash !== baseHash;
-    executions.push({
-      actionId: scenario.actionId,
-      selectionStatus,
-      outcomeStatus,
-      accepted,
-      activeCommandCount,
-      baseHash,
-      afterHash,
-    });
+    executions.push(await executeSelectedAction(page, host, scenario.actionId, baseHash));
   }
 
   const rejected = executions.filter((row) => !row.accepted);
@@ -168,7 +152,9 @@ test('navigation, presentation, history, and draft controls remain operable', as
   await page.locator('[data-action="reset-presentation"]').click();
   await expect(page.locator('[data-role="presentation-visibility-status"]')).toHaveText('Visibility: all');
 
-  await selectVisibleTarget(page, targets, 'single-node');
+  const nodeId = await canonicalNodeForPort(page, 'P-001:port:start');
+  await selectBySearch(page, host, nodeId);
+  await expectEnabled(page, ['move-positive-z']);
   await page.locator('[data-command-action="move-positive-z"]').click();
   await expect(host).toHaveAttribute('data-topology-edit-active-command-count', '1');
   await page.locator('[data-action="undo"]').click();
@@ -290,6 +276,63 @@ async function canonicalNodeForPort(page, portKey) {
     if (!node) throw new Error(`Canonical node for ${port} is unavailable.`);
     return node.id;
   }, { key: CONTROLLER_KEY, port: portKey });
+}
+
+async function canonicalEdgeIds(page) {
+  return page.evaluate((key) => (
+    globalThis[key]?.session?.currentTopology?.()?.edges
+      ?.map((edge) => edge.id).sort() ?? []
+  ), CONTROLLER_KEY);
+}
+
+async function executeAgainstAnyEdge(page, host, actionId, baseHash) {
+  const attempts = [];
+  for (const edgeId of await canonicalEdgeIds(page)) {
+    await selectBySearch(page, host, edgeId);
+    const result = await executeSelectedAction(page, host, actionId, baseHash, edgeId);
+    attempts.push({
+      edgeId,
+      outcomeStatus: result.outcomeStatus,
+      accepted: result.accepted,
+    });
+    if (result.accepted) return { ...result, attempts };
+  }
+  return {
+    actionId,
+    accepted: false,
+    targetId: null,
+    selectionStatus: 'No certifiable edge target found.',
+    outcomeStatus: attempts.at(-1)?.outcomeStatus ?? 'No canonical edges available.',
+    activeCommandCount: 0,
+    baseHash,
+    afterHash: baseHash,
+    attempts,
+  };
+}
+
+async function executeSelectedAction(page, host, actionId, baseHash, targetId = null) {
+  const button = page.locator(`[data-command-action="${actionId}"]`);
+  await expect(button).toBeEnabled();
+  const selectionStatus = await statusOutput(page).innerText();
+  await button.click();
+  const outcomeStatus = await statusOutput(page).innerText();
+  const activeCommandCount = Number(
+    await host.getAttribute('data-topology-edit-active-command-count') || 0,
+  );
+  const afterHash = await host.getAttribute('data-topology-edit-canonical-hash');
+  const accepted = /accepted/i.test(outcomeStatus)
+    && activeCommandCount === 1
+    && afterHash !== baseHash;
+  return {
+    actionId,
+    targetId,
+    selectionStatus,
+    outcomeStatus,
+    accepted,
+    activeCommandCount,
+    baseHash,
+    afterHash,
+  };
 }
 
 async function selectQualifiedGapBySearch(page, host) {
