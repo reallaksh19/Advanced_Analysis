@@ -1,0 +1,140 @@
+name: M025 Isolated Staging Publisher
+
+on:
+  push:
+    branches:
+      - agent/m025-publish-staging
+    paths:
+      - ".github/workflows/m025-publish-staging.yml"
+      - ".m025-publish/**"
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.ref == 'refs/heads/agent/m025-publish-staging'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out isolated staging branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/m025-publish-staging
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Verify and reconstruct reviewed delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/chunks.sha256 <<'EOF'
+          320e77053589fa3026dbc9612a961e8d364356d2c6c5844f1c8773976e0b2193  .m025-publish/chunk-00.b64
+          2467efd5a92469c9b684a4de124a989d81295770031980d382d609a134798798  .m025-publish/chunk-01.b64
+          6c76655fdd2e9186b1cf75c13f6bc305364bbfd29a0b0d2d628de0bd04e9d4bb  .m025-publish/chunk-02.b64
+          b54e66ec347e4681c48c507a5eb508d97863f0621d1241c1a187d568acab42d5  .m025-publish/chunk-03.b64
+          ed4c9d711751e4bb861f1ace7260216a88afda5b01762cb2ef6b79a815e5b2e5  .m025-publish/chunk-04.b64
+          ebf428f202dec5cd6b46c8de8d3216e909b9ed4bde83165ec81f25513af35aea  .m025-publish/chunk-05.b64
+          EOF
+          sha256sum -c /tmp/chunks.sha256
+          cat .m025-publish/chunk-*.b64 > /tmp/m025-delta.patch.gz.b64
+          echo "b3a6de16ff8e5329ed77885c99c1e03144320569ea386e2338104a7cb7c60dd1  /tmp/m025-delta.patch.gz.b64" | sha256sum -c -
+          base64 -d /tmp/m025-delta.patch.gz.b64 | gzip -d > /tmp/m025-delta.patch
+          echo "257f93a8124d9110ccebbd27bff24ca0b550b4510c30e7db40fc962c26836ecb  /tmp/m025-delta.patch" | sha256sum -c -
+
+      - name: Materialize original reviewed work pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/m025-apply-work-pack.mjs
+          node scripts/m025-apply-continuation-patch.mjs
+          node scripts/m025-stabilize-continuation.mjs
+          cat > /tmp/materialized.sha256 <<'EOF'
+          840beaba08aafbfe4b56e0fd608a999e8eeee2018e47bb890dd5a37ec72e6d28  package.json
+          499fd7aeb994ac82069b9f50befa6c5aa1c8f05a10e7c6195a6ed9b9ee16d381  scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs
+          ceb13dee52b6dea6796f220e573d38b4820d5eae78937911949bc54d69ccf490  scripts/lfea-b3.19-bm1-friction.mjs
+          baa6c3766b10681e621b1535937b39075c25ba0c7cdd51822e87f0a510886dfe  scripts/lfea-b3.19-bm1-friction-check.mjs
+          e14fdeebe09ddac35a0101b707c42613041aaf4d69819440ffab3de3056b0674  scripts/lfea-bm1-cii-output-comparison.mjs
+          6fc70fd59ebf1e89207ff62d06fa8b3707e38a0e0cfc78e6cc87b4e79ecb0030  src/core/linear-fea-solver/qualification.js
+          e60453f9c3b17cf2f13875bafceff4d1ad57c20dcb6e827b9a738d98fcbd947e  src/core/linear-fea-piping-components/component-elements.js
+          d67ce622af43964ef5820d8f84bc91789ee2b389b23c0f83c2407f7b99757899  src/core/linear-fea-piping-components/index.js
+          b745ed1852497e5b27e8ac07ce6b25544fc32c1fa06936e02b86d111759347bc  src/core/linear-fea-piping-components/inline-component.js
+          52ec6bba9dfd7b41502263520080f6c5fe4d65ec025bd882961cfd69140771d8  src/core/linear-fea-piping-components/piping-component-contract.js
+          6e60004c5572ff67beb51e27ac934c249236fc33e9ad29338c6b0265144bd950  src/core/linear-piping-analysis-consumer/gravity-expansion.js
+          EOF
+          sha256sum -c /tmp/materialized.sha256
+
+      - name: Apply qualified architectural delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply --check /tmp/m025-delta.patch
+          git apply /tmp/m025-delta.patch
+          rm -f \
+            scripts/m025-apply-work-pack.mjs \
+            scripts/m025-apply-continuation-patch.mjs \
+            scripts/m025-stabilize-continuation.mjs
+          rm -rf .m025-publish
+          rm -f .github/workflows/m025-publish-staging.yml
+
+      - name: Verify exact qualified source bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/final.sha256 <<'EOF'
+          a9f13956968477720931690d28886abe721b22df4f19c01ca06fd593b36f86be  package.json
+          2a4ce1f391629b90ee3a9f44416058f8ed4b42acdcb32fa0f2683a90452506b3  scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs
+          9a65c4dc57bf7986172758da920b606b6d207a67e9ffaed0f080e0472c1f36a2  scripts/lfea-b3.19-bm1-friction.mjs
+          1b1c7b2f8833d44930f1732c222bb9f3fc29a6e2d8321d166da5530b7a6958f4  scripts/lfea-b3.19-bm1-friction-check.mjs
+          e14fdeebe09ddac35a0101b707c42613041aaf4d69819440ffab3de3056b0674  scripts/lfea-bm1-cii-output-comparison.mjs
+          915fa6e00c57b382f74026f58c810f31e6b6dc59b770322b7da7a5a7057be8d7  src/core/linear-fea-solver/qualification.js
+          def81626ba9560bc0e855a6446810482e0bc020f5558c625bed660b34c064546  src/core/linear-fea-piping-components/component-elements.js
+          048866f9c8b719c7e71b6c5b89025731b189f78896641a33afa9611ef30b3763  src/core/linear-fea-piping-components/index.js
+          67082ce18bc57df1588312a3545a6133d9ff028e5b0e07236f7b8a3c5b882598  src/core/linear-fea-piping-components/inline-component.js
+          9e1a39e3823187a55d0b08659f0db49cc77ce6e730f90cfe79c1319f60527fbc  src/core/linear-fea-piping-components/piping-component-contract.js
+          e6e1266db1825c72b62f8abcb479a3f8c7339cbf1f0f38829de587738f3b0b64  src/core/linear-piping-analysis-consumer/gravity-expansion.js
+          EOF
+          sha256sum -c /tmp/final.sha256
+          test "$(git hash-object docs/qualification/M025_COULOMB_FRICTION_ENGINEERING_RECORD.md)" = "178111ef8694b118d857412a54f124196301a66f"
+          test ! -e scripts/m025-apply-work-pack.mjs
+          test ! -e scripts/m025-apply-continuation-patch.mjs
+          test ! -e scripts/m025-stabilize-continuation.mjs
+
+      - name: Enforce final review scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-status 7357437ae060f00c742dba09dd5760b71de90f72 | sort > /tmp/actual-scope
+          cat > /tmp/expected-scope <<'EOF'
+          A	docs/qualification/M025_COULOMB_FRICTION_ENGINEERING_RECORD.md
+          D	scripts/m025-apply-continuation-patch.mjs
+          D	scripts/m025-apply-work-pack.mjs
+          D	scripts/m025-stabilize-continuation.mjs
+          M	package.json
+          M	scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs
+          M	scripts/lfea-b3.19-bm1-friction-check.mjs
+          M	scripts/lfea-b3.19-bm1-friction.mjs
+          M	scripts/lfea-bm1-cii-output-comparison.mjs
+          M	src/core/linear-fea-piping-components/component-elements.js
+          M	src/core/linear-fea-piping-components/index.js
+          M	src/core/linear-fea-piping-components/inline-component.js
+          M	src/core/linear-fea-piping-components/piping-component-contract.js
+          M	src/core/linear-fea-solver/qualification.js
+          M	src/core/linear-piping-analysis-consumer/gravity-expansion.js
+          EOF
+          sort -o /tmp/expected-scope /tmp/expected-scope
+          diff -u /tmp/expected-scope /tmp/actual-scope
+
+      - name: Commit qualified direct integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "M025: integrate qualified Coulomb friction architecture"
+          git push origin HEAD:agent/m025-publish-staging
