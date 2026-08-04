@@ -140,7 +140,19 @@ function authorizationReason(state) {
     DATASET_REBUILT: 'The active dataset model was rebuilt after authorization.',
     DATASET_REPLACED: 'A different dataset is active.',
   };
-  return messages[state.reasonCode] || state.reasonCode || 'Authorized empirical calculation is available.';
+  if (messages[state.reasonCode]) return messages[state.reasonCode];
+  if (state.state === 'NOT_CONFIGURED' || state.state === 'AWAITING_AUTHORIZATION') {
+    return 'An explicitly authorized empirical package is required.';
+  }
+  if (state.state === 'BLOCKED_NOT_READY') {
+    return 'The current empirical inputs are not readiness-qualified.';
+  }
+  if (state.state === 'AUTHORIZED_STALE' || state.state === 'EXECUTED_STALE') {
+    return 'The retained authorized empirical evidence is stale.';
+  }
+  return state.calculationEligible === true
+    ? 'Authorized empirical calculation is available.'
+    : 'Authorized empirical calculation is disabled.';
 }
 
 function force(value, acceptedCurrent) {
@@ -149,5 +161,7 @@ function force(value, acceptedCurrent) {
 }
 function integer(value) { return Number.isInteger(value) ? String(value) : '—'; }
 function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>\"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' })[character]);
+  return String(value ?? '').replace(/[&<>"]/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
+  })[character]);
 }
