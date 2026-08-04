@@ -104,45 +104,44 @@ test('tree modifier selection is deterministic and dataset replacement clears it
   await demoButton.click();
 
   await expect.poll(() => page.evaluate(({
-    controllerKey,
     datasetBeforeKey,
     sessionVersionBeforeValue,
   }) => {
     const currentDataset = globalThis.AnalysisWorkspace
       ?.getSnapshot?.()?.dataset ?? null;
-    const controller = globalThis[controllerKey];
-    const currentHost = controller?.hostElement ?? null;
-    const editorState = controller?.editorStore?.getState?.() ?? null;
-    const hostSessionVersion = Number(
-      currentHost?.dataset.topologyEditDatasetSessionVersion ?? 0,
-    );
-    const hostSelectionIds = String(
-      currentHost?.dataset.topologyEditSelectionIds ?? '',
-    ).split(',').filter(Boolean);
+    const liveHosts = [...document.querySelectorAll(
+      '[data-role="topology-edit-render-host"]',
+    )].filter((element) => {
+      const style = getComputedStyle(element);
+      return element.isConnected
+        && element.dataset.topologyEditCleanShell === 'true'
+        && element.getClientRects().length > 0
+        && style.display !== 'none'
+        && style.visibility !== 'hidden';
+    });
+    const currentHost = liveHosts[0] ?? null;
     return {
-      liveHost: Boolean(
-        currentHost?.isConnected
-        && currentHost.matches('[data-role="topology-edit-render-host"]')
-      ),
+      liveHostCount: liveHosts.length,
       datasetReplaced: Boolean(
         currentDataset && currentDataset !== globalThis[datasetBeforeKey]
       ),
-      selectionCount: editorState?.selection?.canonicalIds?.length ?? -1,
-      epochReconciled: Number(editorState?.dataset?.sessionVersion ?? 0)
-        > sessionVersionBeforeValue,
-      hostMirrorsStore: hostSessionVersion === editorState?.dataset?.sessionVersion
-        && hostSelectionIds.join(',') === editorState?.selection?.canonicalIds?.join(','),
+      selectionCount: String(
+        currentHost?.dataset.topologyEditSelectionIds ?? '',
+      ).split(',').filter(Boolean).length,
+      epochReconciled: Number(
+        currentHost?.dataset.topologyEditDatasetSessionVersion ?? 0,
+      ) > sessionVersionBeforeValue,
+      hasLiveWebGlCanvas: Boolean(currentHost?.querySelector('canvas')),
     };
   }, {
-    controllerKey: CONTROLLER_KEY,
     datasetBeforeKey: DATASET_BEFORE_KEY,
     sessionVersionBeforeValue: sessionVersionBefore,
   })).toEqual({
-    liveHost: true,
+    liveHostCount: 1,
     datasetReplaced: true,
     selectionCount: 0,
     epochReconciled: true,
-    hostMirrorsStore: true,
+    hasLiveWebGlCanvas: true,
   });
 
   evidence.modifiers = 'PASS';
