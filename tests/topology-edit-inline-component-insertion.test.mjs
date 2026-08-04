@@ -265,16 +265,12 @@ test('insertion rejects host dependants, out-of-bounds placement, and valve leng
   );
 
   const dependentTopology = baseTopology({ dependants: true });
-  const plan = operationPlan(
-    dependentTopology,
-    catalogueValue,
-    'VALVE-DN100-GATE-600-A',
-  );
   assert.throws(
-    () => prepareTopologyEditOperationCandidate({
-      session: new TopologyEditCertifiedSession(dependentTopology),
-      operationPlan: plan,
-    }),
+    () => operationPlan(
+      dependentTopology,
+      catalogueValue,
+      'VALVE-DN100-GATE-600-A',
+    ),
     /dependent supports record/i,
   );
 });
