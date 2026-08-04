@@ -9,7 +9,11 @@ import { createTopologyEditOperationPlan } from './topology-edit-operation-plan.
 const COMPONENT_TYPES = new Set(['FLANGE', 'VALVE', 'REDUCER']);
 const DIRECTIONS = new Set(['FROM_TO', 'TO_FROM']);
 
-export function planTopologyEditInlineComponentOperation(topology, input = {}) {
+export function planTopologyEditInlineComponentOperation(input = {}) {
+  const topology = input.topology;
+  if (!topology || typeof topology !== 'object' || Array.isArray(topology)) {
+    fail('topology is required.');
+  }
   const catalogue = assertTopologyEditSpecificationCatalogue(input.catalogue);
   const record = assertTopologyEditSpecificationRecord(input.catalogueRecord);
   if (!COMPONENT_TYPES.has(record.componentType)) {
