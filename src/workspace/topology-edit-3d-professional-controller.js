@@ -103,9 +103,11 @@ export class TopologyEdit3DViewController extends InteractionController {
   }
 
   refreshFromWorkspace() {
-    const snapshot = WorkspaceState.getSnapshot();
-    this.editorDatasetObject = snapshot?.dataset ?? null;
-    this.editorDatasetEpoch = Number(snapshot?.version ?? 0);
+    const dataset = WorkspaceState.getSnapshot()?.dataset ?? null;
+    if (dataset !== this.editorDatasetObject) {
+      this.editorDatasetObject = dataset;
+      this.editorDatasetEpoch += 1;
+    }
     return super.refreshFromWorkspace();
   }
 
