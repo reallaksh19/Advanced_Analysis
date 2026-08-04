@@ -15,6 +15,7 @@ export function parseNonFeaBaselineArguments(args) {
   const fixtures = [];
   const fixtureRoles = {};
   let output = 'reports/non-fea-current-main-baseline.json';
+  let browserEvidence = null;
   let warmSamples = 1;
   let executionId = '';
   let runCommands = false;
@@ -27,21 +28,31 @@ export function parseNonFeaBaselineArguments(args) {
       if (fixtureRoles[binding.role]) throw new TypeError(`Duplicate --fixture-role binding for ${binding.role}.`);
       fixtureRoles[binding.role] = binding.fixturePath;
     } else if (arg === '--output') output = requireValue(args[index += 1], '--output');
-    else if (arg === '--warm-samples') warmSamples = Number(requireValue(args[index += 1], '--warm-samples'));
+    else if (arg === '--browser-evidence') {
+      browserEvidence = requireRepositoryRelativePath(
+        requireValue(args[index += 1], '--browser-evidence'),
+        '--browser-evidence',
+      );
+    } else if (arg === '--warm-samples') warmSamples = Number(requireValue(args[index += 1], '--warm-samples'));
     else if (arg === '--execution-id') executionId = requireValue(args[index += 1], '--execution-id');
     else if (arg === '--run-commands') runCommands = true;
     else if (arg === '--fail-on-gate') failOnGate = true;
     else throw new TypeError(`Unsupported argument: ${arg}.`);
   }
-  if (!Number.isInteger(warmSamples) || warmSamples < 0) throw new TypeError('--warm-samples must be a non-negative integer.');
-  const selectedFixtures = fixtures.length ? fixtures : [...NON_FEA_DEFAULT_FIXTURES];
+  if (!Number.isInteger(warmSamples) || warmSamples < 0) {
+    throw new TypeError('--warm-samples must be a non-negative integer.');
+  }
+  const selectedFixtures = fixtures.length ? fixtures.map((row) => (
+    requireRepositoryRelativePath(row, '--fixture')
+  )) : [...NON_FEA_DEFAULT_FIXTURES];
   for (const fixturePath of Object.values(fixtureRoles)) {
     if (!selectedFixtures.includes(fixturePath)) selectedFixtures.push(fixturePath);
   }
   return Object.freeze({
     fixtures: Object.freeze(selectedFixtures),
     fixtureRoles: Object.freeze({ ...fixtureRoles }),
-    output,
+    output: requireRepositoryRelativePath(output, '--output'),
+    browserEvidence,
     warmSamples,
     executionId,
     runCommands,
@@ -55,16 +66,28 @@ function parseFixtureRoleBinding(value) {
     throw new TypeError('--fixture-role must use ROLE=repository/path syntax.');
   }
   const role = value.slice(0, separator);
-  const fixturePath = value.slice(separator + 1);
-  if (!NON_FEA_REQUIRED_FIXTURE_ROLES.includes(role)) throw new RangeError(`Unsupported P0 fixture role: ${role}.`);
-  if (path.isAbsolute(fixturePath) || fixturePath.split(/[\\/]/u).includes('..')) {
-    throw new TypeError('--fixture-role path must be repository-relative and may not traverse upward.');
+  const fixturePath = requireRepositoryRelativePath(
+    value.slice(separator + 1),
+    '--fixture-role path',
+  );
+  if (!NON_FEA_REQUIRED_FIXTURE_ROLES.includes(role)) {
+    throw new RangeError(`Unsupported P0 fixture role: ${role}.`);
   }
-  return { role, fixturePath: normalizePath(path.normalize(fixturePath)) };
+  return { role, fixturePath };
+}
+
+function requireRepositoryRelativePath(value, option) {
+  if (typeof value !== 'string' || !value || path.isAbsolute(value)
+      || value.split(/[\\/]/u).includes('..')) {
+    throw new TypeError(`${option} must be repository-relative and may not traverse upward.`);
+  }
+  return normalizePath(path.normalize(value));
 }
 
 function requireValue(value, option) {
-  if (typeof value !== 'string' || !value || value.startsWith('--')) throw new TypeError(`${option} requires a value.`);
+  if (typeof value !== 'string' || !value || value.startsWith('--')) {
+    throw new TypeError(`${option} requires a value.`);
+  }
   return value;
 }
 
