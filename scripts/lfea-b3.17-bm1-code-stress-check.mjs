@@ -38,7 +38,7 @@ for (const row of [...result.code, ...result.sustainedCode]) {
 }
 assert.ok(result.sustainedCode.every((row) => row.allowableStress === A106_GRADE_B_ALLOWABLE_PA));
 const expansionAllowable = A106_GRADE_B_ALLOWABLE_PA * 1.5;
-assert.ok(result.code.every((row) => row.allowableStress === expansionAllowable));
+assert.ok(result.code.every((row) => Math.abs(row.allowableStress - expansionAllowable) < 1e-6));
 assert.equal(A106_GRADE_B_ALLOWABLE_PSI, 20000);
 assert.deepEqual(
   result.codeAuthorities.editionDataset.allowablePoints.map((row) => row.absoluteTemperature),
