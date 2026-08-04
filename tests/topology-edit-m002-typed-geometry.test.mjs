@@ -181,7 +181,7 @@ test('section planes are applied to every child mesh in a typed component assemb
   backend.destroy();
 });
 
-test('M002 stable visual ordering avoids locale-dependent hash inputs and installs the typed backend', async () => {
+test('M002 stable visual ordering and production typed-backend inheritance remain explicit', async () => {
   const contractSource = await readFile(
     new URL('../src/workspace/topology-edit/visual-geometry-contract.js', import.meta.url),
     'utf8',
@@ -197,7 +197,11 @@ test('M002 stable visual ordering avoids locale-dependent hash inputs and instal
   assert.doesNotMatch(contractSource, /localeCompare/u);
   assert.match(contractSource, /compareCodeUnits/u);
   assert.match(controllerSource, /installTypedViewportBackend\(\)/u);
-  assert.match(controllerSource, /new TopologyEditTypedViewportBackend\(\)/u);
+  assert.match(controllerSource, /new TopologyEditNavigationHudViewportBackend\(\)/u);
+  assert.match(
+    controllerSource,
+    /retainTypedTopologyEditPrimitives\(result\.model, result\.projection\)/u,
+  );
   assert.doesNotMatch(primitiveSource, /teeRunLengthFactor|oletLengthFactor|valveNeckRadiusFactor|instrumentStemRadiusFactor/u);
   assert.match(primitiveSource, /parameters\.runEnds/u);
   assert.match(primitiveSource, /parameters\.branchEnd/u);

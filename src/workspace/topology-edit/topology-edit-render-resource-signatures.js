@@ -3,6 +3,10 @@ import { topologyEditPickTargetKey } from './topology-edit-gpu-pick-helpers.js';
 export const TOPOLOGY_EDIT_RENDER_RESOURCE_ERROR = 'TOPOLOGY_EDIT_RENDER_RESOURCE_INVALID';
 
 export function topologyEditGeometryReuseKey(geometry, policy) {
+  if (geometry?.userData?.renderReuseDisabled === true
+    || geometry?.userData?.reducerProfile === 'ECCENTRIC_OFFSET_FRUSTUM') {
+    return null;
+  }
   if (!geometry?.isBufferGeometry || !policy?.eligibleGeometryTypes?.includes(geometry.type)) {
     return null;
   }

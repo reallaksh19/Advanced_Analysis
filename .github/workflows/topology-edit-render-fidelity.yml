@@ -1,0 +1,65 @@
+name: 3D Edit Render Fidelity
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/topology-edit-render-fidelity.yml'
+      - 'src/workspace/topology-edit/topology-edit-primitive-geometry.js'
+      - 'src/workspace/topology-edit/topology-edit-render-resource-signatures.js'
+      - 'src/workspace/topology-edit/topology-edit-typed-viewport-backend.js'
+      - 'src/workspace/topology-edit/topology-edit-support-viewport-backend.js'
+      - 'tests/topology-edit-render-fidelity.test.mjs'
+      - 'tests/topology-edit-render-resource-custom-geometry.test.mjs'
+      - 'tests/topology-edit-m002-typed-geometry.test.mjs'
+      - 'tests/topology-edit-m003-support-glyphs.test.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: topology-edit-render-fidelity-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  render-fidelity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify exact source
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+          node --check src/workspace/topology-edit/topology-edit-primitive-geometry.js
+          node --check src/workspace/topology-edit/topology-edit-render-resource-signatures.js
+          node --check src/workspace/topology-edit/topology-edit-typed-viewport-backend.js
+          node --check src/workspace/topology-edit/topology-edit-support-viewport-backend.js
+          node --check tests/topology-edit-render-fidelity.test.mjs
+          node --check tests/topology-edit-render-resource-custom-geometry.test.mjs
+          git diff --check
+
+      - name: Execute render contracts
+        run: |
+          node --test \
+            tests/topology-edit-m002-typed-geometry.test.mjs \
+            tests/topology-edit-m003-support-glyphs.test.mjs \
+            tests/topology-edit-render-fidelity.test.mjs \
+            tests/topology-edit-render-resource-custom-geometry.test.mjs

@@ -28,6 +28,7 @@ export class TopologyEditSupportViewportBackend extends TopologyEditTypedViewpor
       projection,
     );
     const staging = new THREE.Group();
+    const bounds = new THREE.Box3();
     try {
       for (const overlay of overlays) {
         const result = materializeTopologyEditSupportOverlay(overlay, {
@@ -35,6 +36,7 @@ export class TopologyEditSupportViewportBackend extends TopologyEditTypedViewpor
           radialSegments: this.navigationConfiguration.meshRadialSegments,
         });
         staging.add(result.object);
+        bounds.union(result.bounds);
       }
     } catch (error) {
       disposeStaging(staging);
@@ -42,7 +44,7 @@ export class TopologyEditSupportViewportBackend extends TopologyEditTypedViewpor
     }
     while (staging.children.length) group.add(staging.children[0]);
     this.applySectionPlanesToGroup(group);
-    return new THREE.Box3();
+    return bounds;
   }
 }
 
