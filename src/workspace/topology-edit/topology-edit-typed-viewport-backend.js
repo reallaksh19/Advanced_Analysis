@@ -27,6 +27,7 @@ export function retainTypedTopologyEditPrimitives(model, projection) {
 export class TopologyEditTypedViewportBackend extends TopologyEditViewportBackend {
   renderSession(model) {
     if (!model) return;
+    publishRenderAuthorityEvidence(this.hostElement, model);
     this.clearGroup(this.groups.sourceGroup);
     this.clearGroup(this.groups.draftGroup);
     this.clearGroup(this.groups.supportGroup);
@@ -51,6 +52,10 @@ export class TopologyEditTypedViewportBackend extends TopologyEditViewportBacken
     this.renderGhost(model.ghost, markerSize);
     this.engineeringRoot.updateMatrixWorld(true);
     this.typedGeometryDiagnostics = deepFreeze(this.pendingTypedGeometryDiagnostics);
+    if (this.hostElement) {
+      this.hostElement.dataset.topologyEditGeometryDiagnosticCount =
+        String(this.typedGeometryDiagnostics.length);
+    }
     this.pendingTypedGeometryDiagnostics = null;
     this.invalidate('typed-model-replacement');
 
@@ -361,6 +366,26 @@ function disposeObjectGeometry(root) {
     if (object.geometry) geometries.add(object.geometry);
   });
   geometries.forEach((geometry) => geometry.dispose());
+}
+
+function publishRenderAuthorityEvidence(host, model) {
+  if (!host) return;
+  const primitives = Array.isArray(model?.draft?.primitives) ? model.draft.primitives : [];
+  const kindCounts = new Map();
+  primitives.forEach((primitive) => {
+    const kind = String(primitive?.kind || '');
+    kindCounts.set(kind, (kindCounts.get(kind) || 0) + 1);
+  });
+  const supportOverlays = Array.isArray(model?.supports?.glyphOverlays)
+    ? model.supports.glyphOverlays
+    : [];
+  host.dataset.topologyEditTypedPrimitiveCount = String(primitives.length);
+  host.dataset.topologyEditFlangePrimitiveCount = String(kindCounts.get('FLANGE_DISC') || 0);
+  host.dataset.topologyEditValvePrimitiveCount = String(kindCounts.get('VALVE_BODY') || 0);
+  host.dataset.topologyEditSupportOverlayCount = String(supportOverlays.length);
+  host.dataset.topologyEditResolvedSupportOriginCount = String(
+    supportOverlays.filter((overlay) => finitePoint(overlay?.origin)).length,
+  );
 }
 
 function requireNodePosition(nodePositions, nodeId) {
