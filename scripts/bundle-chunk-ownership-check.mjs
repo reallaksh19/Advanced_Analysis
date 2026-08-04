@@ -48,7 +48,7 @@ for (const id of automaticWorkspaceOwnership) {
 assert.equal(manualChunk('/repo/src/main.js'), undefined);
 assert.equal(viteSource.includes("return 'workspace-"), false);
 assert.equal(viteSource.includes("return 'fea-workbenches'"), false);
-assert.equal(viteSource.includes("source.includes('/src/workspace/') return undefined"), true);
+assert.equal(viteSource.includes("if (source.includes('/src/workspace/')) return undefined;"), true);
 assert.equal(viteSource.includes('onlyExplicitManualChunks: true'), true);
 assert.equal(viteSource.includes('chunkSizeWarningLimit'), false);
 assert.equal(policySource.includes('const maximumBytes = 500 * 1024;'), true);
