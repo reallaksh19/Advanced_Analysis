@@ -897,3 +897,79 @@ for on 2026-08-03 ("benchmark another 2 or more cases before we move
 to a configurable prototype") — Examples 1, 2, and 3 are all now
 merged and independently verified against their real published ASME
 tables.
+
+## Independent CAESAR II cross-check — real 1885-project topology
+
+New workstream, user-directed 2026-08-03/04: rather than another ASME
+Appendix example, benchmark this repo's real production solve against
+a **user-run CAESAR II** solve of the same real 1885-project topology.
+User explicitly redirected away from a generic Kleinlogel-frame
+direction ("we will focus on piping problems only") and, after the
+AutoPIPE Acceptance Test Set proved not independently usable (real
+document, but geometry/section-modulus data lives only in unreadable
+embedded raster images or proprietary `.DAT`/`.CMB` files — reported
+honestly rather than proceeding on an incomplete plan), proposed this
+workflow directly: convert the real `benchmarks/1885Sjson/EnrichedSjson`
+(M001 Benchmark A source) to CAESAR-native InputXML, run gravity/
+displacement reactions in this app, and compare against the user's own
+independent CAESAR II run of the same model via CII.
+
+Built the InputXML via `reallaksh19/3D_Converters`'s real topology
+exporter (`scripts/build-component-topology-artifacts.mjs`, documented
+in `reallaksh19/XML_Compare_Utilities`'s topology-trace-validator
+docs) — confirmed via this repo's own adapter doc comment that
+element-based InputXML (not AVEVA's node-based EnrichXML) is the
+correct target schema, matching the user's own stated preference
+("elemental based inputxml... easy and more control on topo"). Two
+deliberate modifications to the source model were required and are
+fully documented in the committed provenance file: 7 zero-length
+external-boundary stub branches at real OLET tap positions (resolving
+8 real `CREF_TARGET_UNRESOLVED` findings the source fixture's own
+`fixture-manifest.json` already documents as expected/out-of-scope —
+no pipe geometry fabricated), and a uniform `E=203,400,000 kPa`/
+`v=0.30` applied where the source declared none (confirmed via
+`AskUserQuestion`, since no unit convention was documented anywhere in
+either repo). 58 of the model's elements have zero process data
+anywhere on their source line; per explicit Owner/user decision these
+were left at CAESAR's native unset sentinel (`-1.0101`) rather than
+inventing an ambient/cold-only case.
+
+Independently verified via this repo's own production
+`inputXmlToCanonicalGeometry` adapter before delivery: 164 nodes, 163
+segments, zero diagnostics. Delivered to the user directly
+(`SendUserFile`) and separately committed to `main` as a real fixture
+via #552 (`benchmarks/1885Sjson/EnrichedSjson.topology.input.xml` +
+`.PROVENANCE.md`) — merged as a pure additive fixture/doc change, no
+production code touched, since the implementing agent has no upload
+access and needs the 406KB file reachable from the branch it works on
+(confirmed `feat/mXXX-*` Work Pack branches are cut from `main`, not
+from this tracking branch).
+
+**Real gap found while scoping the follow-on Work Pack**: direct
+source read of `inputXmlToCanonicalGeometry.js` confirmed its existing
+prior-element inheritance mechanism (`resolveInheritedField`/
+`resolveInheritedStringField`) covers only `DIAMETER`/`WALL_THICK`/
+`MATERIAL_NAME` — `MODULUS`, `POISSONS`, `TEMP_EXP_C1`, `PRESSURE1`,
+`HYDRO_PRESSURE`, `FLUID_DENSITY` are not read by the adapter at all
+today, let alone inherited. User confirmed directly: extend inheritance
+to all six, not just a subset. Also confirmed via `model-compiler.js`'s
+own README that B-2.5 does not resolve materials/sections itself — a
+full gravity-only solve needs real (not hand-typed-fixture) material/
+section resolution derived from the ingested InputXML, unlike the only
+existing full-wiring example (`scripts/m003-live-run-analysis-fixture.mjs`,
+a 2-element toy with hand-authored constants).
+
+Dispatched as **M020 (#553)**: (Part A) extend inheritance to all six
+remaining fields, mirroring the exact existing pattern and diagnostic
+convention; (Part B) wire a real gravity-only solve directly against
+the committed fixture through the same B-1→B-2.5→B-3.0→B-3.3→B-3.4
+chain M013/M018 already exercise, emitting a per-node reactions/
+displacements report keyed by CAESAR node number. Thermal/pressure
+load derivation and any B31.3 code check are explicitly out of scope
+for this Work Pack — gravity-only reactions/displacements first,
+matching the user's own stated sequencing. No published reference
+table exists yet (the user's CAESAR II run is still pending), so the
+acceptance oracle is a real self-consistency proof (global equilibrium
+of recovered reactions vs. applied gravity load, full fixture coverage,
+new inheritance tests) rather than a table match — the actual
+cross-check against CAESAR II happens once the user's results arrive.
