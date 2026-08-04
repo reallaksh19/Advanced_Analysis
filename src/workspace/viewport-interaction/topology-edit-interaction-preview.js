@@ -1,5 +1,8 @@
 import { deepFreeze, semanticHash } from '../../core/shared-piping-model/index.js';
 import {
+  assertTopologyEditSnapResult,
+} from './topology-edit-snap-contract.js';
+import {
   assertTopologyEditSnapResolution,
   TOPOLOGY_EDIT_SNAP_STATUSES,
 } from './topology-edit-snap-resolver.js';
@@ -16,42 +19,75 @@ export const TOPOLOGY_EDIT_INTERACTION_PREVIEW_SCHEMA =
 
 export function createTopologyEditInteractionPreview(input = {}) {
   const intent = assertTopologyEditTransformIntent(input.intent);
-  const snapResolution = input.snapResolution
+  const legacyResolution = input.snapResolution
     ? assertTopologyEditSnapResolution(input.snapResolution)
     : null;
-  if (snapResolution && snapResolution.basisHash !== intent.basisHash) {
+  const snapResult = input.snapResult
+    ? assertTopologyEditSnapResult(input.snapResult)
+    : null;
+  if (legacyResolution && snapResult) {
+    throw new TypeError('Interaction preview accepts one snap authority only.');
+  }
+  if (legacyResolution && legacyResolution.basisHash !== intent.basisHash) {
     throw new RangeError('Snap resolution basis does not match intent basis.');
   }
-  const snapped = snapResolution?.status
+  if (snapResult && snapResult.basisHash !== intent.basisHash) {
+    throw new RangeError('Snap result basis does not match intent basis.');
+  }
+  const deterministicSnapped = snapResult?.status === 'RESOLVED';
+  const legacySnapped = legacyResolution?.status
     === TOPOLOGY_EDIT_SNAP_STATUSES.RESOLVED;
+  const snapped = deterministicSnapped || legacySnapped;
   const blockedBySnap = Boolean(
-    snapResolution
-    && ![
-      TOPOLOGY_EDIT_SNAP_STATUSES.RESOLVED,
-      TOPOLOGY_EDIT_SNAP_STATUSES.UNAVAILABLE,
-    ].includes(snapResolution.status),
+    snapResult?.status === 'STALE'
+    || (
+      legacyResolution
+      && ![
+        TOPOLOGY_EDIT_SNAP_STATUSES.RESOLVED,
+        TOPOLOGY_EDIT_SNAP_STATUSES.UNAVAILABLE,
+      ].includes(legacyResolution.status)
+    ),
   );
-  const targetPosition = snapped
-    ? snapResolution.candidate.position
-    : intent.targetPosition;
+  const targetPosition = deterministicSnapped
+    ? snapResult.snappedWorldPoint
+    : legacySnapped
+      ? legacyResolution.candidate.position
+      : intent.targetPosition;
+  const snapStatus = snapResult?.status
+    ?? legacyResolution?.status
+    ?? TOPOLOGY_EDIT_SNAP_STATUSES.UNAVAILABLE;
   const material = {
     schema: TOPOLOGY_EDIT_INTERACTION_PREVIEW_SCHEMA,
     basisHash: intent.basisHash,
     nodeId: intent.nodeId,
     intentHash: intent.intentHash,
-    snapResolutionHash: snapResolution?.resolutionHash ?? null,
-    snapStatus:
-      snapResolution?.status
-      ?? TOPOLOGY_EDIT_SNAP_STATUSES.UNAVAILABLE,
-    snapEvidenceType: snapped
-      ? snapResolution.candidate.evidenceType
-      : null,
-    snapTargetCanonicalId: snapped
-      ? snapResolution.candidate.targetCanonicalId
-      : null,
-    snapCandidateHash: snapped
-      ? snapResolution.candidate.candidateHash
-      : null,
+    snapResolutionHash:
+      snapResult?.resultHash
+      ?? legacyResolution?.resolutionHash
+      ?? null,
+    snapResultHash: snapResult?.resultHash ?? null,
+    snapStatus,
+    snapEvidenceType: deterministicSnapped
+      ? snapResult.kind
+      : legacySnapped
+        ? legacyResolution.candidate.evidenceType
+        : null,
+    snapTargetCanonicalId: deterministicSnapped
+      ? snapResult.targetIds[0] ?? null
+      : legacySnapped
+        ? legacyResolution.candidate.targetCanonicalId
+        : null,
+    snapCandidateHash: deterministicSnapped
+      ? snapResult.candidate.candidateHash
+      : legacySnapped
+        ? legacyResolution.candidate.candidateHash
+        : null,
+    snapCandidateCount: snapResult?.candidateCount
+      ?? legacyResolution?.candidates?.length
+      ?? 0,
+    snapRetainedByHysteresis: Boolean(
+      snapResult?.retainedByHysteresis,
+    ),
     anchorPosition: intent.anchorPosition,
     targetPosition,
     delta: subtractTopologyEditPoints(

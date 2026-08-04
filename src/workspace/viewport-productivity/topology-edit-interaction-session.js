@@ -26,12 +26,16 @@ export function createTopologyEditDragSessionPreview(input = {}) {
     mode: input.transformMode,
     anchorPosition: context.anchorPosition,
     targetPosition: input.targetPosition,
-    snapResolutionHash: input.snapResolution?.resolutionHash ?? null,
+    snapResolutionHash:
+      input.snapResult?.resultHash
+      ?? input.snapResolution?.resolutionHash
+      ?? null,
     units: 'MM',
   });
   return createTopologyEditInteractionPreview({
     intent,
     snapResolution: input.snapResolution ?? null,
+    snapResult: input.snapResult ?? null,
   });
 }
 

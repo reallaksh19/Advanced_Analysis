@@ -22,8 +22,30 @@ const distribution = {
   blockers: [],
   loadCases: [],
 };
-const supportSiteModel = { status: 'READY', summary: { supportAssemblyCount: 1, physicalLocationCount: 1 }, sites: [] };
+const supportSiteModel = {
+  status: 'READY',
+  summary: { supportAssemblyCount: 1, physicalLocationCount: 1 },
+  sites: [],
+};
 const routePartitionModel = { status: 'READY', summary: { routeCount: 1 } };
+const currentAuthorization = Object.freeze({
+  state: 'EXECUTED_CURRENT',
+  calculationEligible: true,
+  reasonCode: null,
+  details: [],
+  authorizationFreshness: 'CURRENT',
+  executionFreshness: 'CURRENT',
+  packageSemanticHash: 'fnv1a64:7777777777777777',
+});
+const notConfigured = Object.freeze({
+  state: 'NOT_CONFIGURED',
+  calculationEligible: false,
+  reasonCode: 'EMPIRICAL_PACKAGE_REQUIRED',
+  details: [],
+  authorizationFreshness: 'NOT_APPLICABLE',
+  executionFreshness: 'NOT_APPLICABLE',
+  packageSemanticHash: null,
+});
 
 const documentRef = {
   createElement() {
@@ -31,14 +53,27 @@ const documentRef = {
   },
 };
 const authorizedView = renderLoadCalcConsumer(documentRef, {
-  activeTab: 'loads', message: '', distribution, authorizedExecution: execution,
-  supportSiteModel, routePartitionModel,
+  activeTab: 'loads',
+  message: '',
+  distribution,
+  authorizedExecution: execution,
+  authorizationState: currentAuthorization,
+  supportSiteModel,
+  routePartitionModel,
 });
 assert.match(authorizedView.innerHTML, /Authority: AUTHORIZED_HANDOFF/u);
+assert.match(authorizedView.innerHTML, /Recalculate authorized loads/u);
+assert.doesNotMatch(authorizedView.innerHTML, / data-engineering-load-calculate disabled/u);
+assert.match(authorizedView.innerHTML, /aria-disabled="false"/u);
 
 const pane = { innerHTML: '' };
 renderEngineeringLoadPane(
-  pane, distribution, supportSiteModel, routePartitionModel, execution,
+  pane,
+  distribution,
+  supportSiteModel,
+  routePartitionModel,
+  execution,
+  currentAuthorization,
 );
 for (const expected of [
   'data-empirical-authority="AUTHORIZED_HANDOFF"',
@@ -52,14 +87,45 @@ for (const expected of [
 
 const legacyPane = { innerHTML: '' };
 renderEngineeringLoadPane(
-  legacyPane, distribution, supportSiteModel, routePartitionModel, null,
+  legacyPane,
+  distribution,
+  supportSiteModel,
+  routePartitionModel,
+  null,
+  notConfigured,
 );
-assert.match(legacyPane.innerHTML, /data-empirical-authority="LEGACY_PROJECT_DATA"/u);
-assert.match(legacyPane.innerHTML, /No authorized execution receipt is active/u);
+assert.match(legacyPane.innerHTML, /data-empirical-authority="UNAUTHORIZED_LEGACY_RESULT"/u);
+assert.match(legacyPane.innerHTML, /explicitly authorized empirical package is required/u);
+assert.doesNotMatch(legacyPane.innerHTML, /LEGACY_PROJECT_DATA/u);
+
+const emptyView = renderLoadCalcConsumer(documentRef, {
+  activeTab: 'loads',
+  message: '',
+  distribution: null,
+  authorizedExecution: null,
+  authorizationState: notConfigured,
+  supportSiteModel: null,
+  routePartitionModel: null,
+});
+assert.match(emptyView.innerHTML, /disabled/u);
+assert.match(emptyView.innerHTML, /explicitly authorized empirical package is required/u);
+assert.doesNotMatch(emptyView.innerHTML, /calculation is available/u);
 
 const emptyPane = { innerHTML: '' };
-renderEngineeringLoadPane(emptyPane, null, null, null, null);
+renderEngineeringLoadPane(emptyPane, null, null, null, null, notConfigured);
 assert.match(emptyPane.innerHTML, /data-empirical-authority="NOT_CALCULATED"/u);
+
+const quotedBlocker = Object.freeze({
+  ...notConfigured,
+  state: 'BLOCKED_NOT_READY',
+  reasonCode: 'EMPIRICAL_INPUT_NOT_READY',
+  details: [{ code: 'BLOCKED_"QUOTED"', message: 'Value < limit & unresolved' }],
+});
+const blockedPane = { innerHTML: '' };
+renderEngineeringLoadPane(blockedPane, null, null, null, null, quotedBlocker);
+assert.ok(blockedPane.innerHTML.includes('BLOCKED_\\&quot;QUOTED\\&quot;'));
+assert.match(blockedPane.innerHTML, /Value &lt; limit &amp; unresolved/u);
+assert.doesNotMatch(blockedPane.innerHTML, /undefined/u);
 
 console.log('PASS authorized empirical execution view checks');
 console.log(JSON.stringify({
@@ -67,5 +133,6 @@ console.log(JSON.stringify({
   executionId: execution.executionId,
   receiptSemanticHash: execution.semanticHash,
   legacyDistinguished: true,
-  staleReceiptClearedByStoreContract: true,
+  staleReceiptRetainedByRuntimeStore: true,
+  quoteEscapingVerified: true,
 }, null, 2));

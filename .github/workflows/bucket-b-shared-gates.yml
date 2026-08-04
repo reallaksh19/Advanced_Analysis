@@ -120,6 +120,14 @@ jobs:
           BB07_REPORT_PATH: reports/bucket-b-bb07-bracket-gusset-report.json
         run: node src/core/bucket-b/bb07-check.mjs
 
+      - name: Run BB-08 pipe and pad qualification
+        if: ${{ hashFiles('src/core/bucket-b/bb08-check.mjs') != '' }}
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          BB07_REPORT_PATH: reports/bucket-b-bb07-bracket-gusset-report.json
+          BB08_REPORT_PATH: reports/bucket-b-bb08-pipe-pad-report.json
+        run: node src/core/bucket-b/bb08-check.mjs
+
       - name: Upload qualification reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -129,4 +137,5 @@ jobs:
             reports/bucket-b-bb00-bb05-exact-head-report.json
             reports/bucket-b-bb06-lug-clamp-report.json
             reports/bucket-b-bb07-bracket-gusset-report.json
+            reports/bucket-b-bb08-pipe-pad-report.json
           if-no-files-found: error

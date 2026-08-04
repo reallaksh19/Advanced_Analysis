@@ -41,9 +41,10 @@ export class LoadCalcConsumerController {
   }
 
   handleEngineeringChange(reason, distribution) {
-    if (reason === 'calculated') this.message = distribution?.status === 'CALCULATED' ? 'Calculation complete.' : 'Calculation blocked; review the listed inputs.';
-    if (reason === 'project-data-changed') this.message = 'Project Data changed; previous calculations are stale.';
-    if (reason === 'master-data-changed') this.message = 'Master data changed; previous calculations are stale.';
+    if (reason === 'calculated') this.message = distribution?.status === 'CALCULATED' ? 'Authorized calculation complete.' : 'Authorized calculation blocked; review the listed inputs.';
+    if (reason === 'project-data-changed') this.message = 'Project Data changed; authorization and previous calculations are stale.';
+    if (reason === 'master-data-changed') this.message = 'Master data changed; authorization and previous calculations are stale.';
+    if (reason === 'authorization-changed') this.message = availabilityMessage(engineeringModelStore.getEmpiricalAuthorizationState());
     this.render();
   }
 
@@ -58,7 +59,13 @@ export class LoadCalcConsumerController {
     const tab = event.target.closest('[data-load-calc-tab]')?.dataset.loadCalcTab;
     if (tab) { this.activeTab = tab; this.render(); return; }
     if (event.target.closest('[data-engineering-load-calculate]')) {
-      this.message = 'Validating Project Data, topology, and masters…';
+      const authorization = engineeringModelStore.getEmpiricalAuthorizationState();
+      if (!authorization.calculationEligible) {
+        this.message = availabilityMessage(authorization);
+        this.render();
+        return;
+      }
+      this.message = 'Executing current authorized empirical package…';
       this.eventBus.publish(ENGINEERING_MODEL_EVENTS.CALCULATE_REQUESTED, { source: 'load-calc' });
     }
   }
@@ -70,11 +77,13 @@ export class LoadCalcConsumerController {
     }
     this.renderRevision += 1;
     const revision = this.renderRevision;
+    const authorizationState = engineeringModelStore.getEmpiricalAuthorizationState();
     const view = renderLoadCalcConsumer(this.rootElement.ownerDocument, {
       activeTab: this.activeTab,
       message: this.message,
       distribution: engineeringModelStore.getDistribution(),
       authorizedExecution: engineeringModelStore.getAuthorizedExecution(),
+      authorizationState,
       supportSiteModel: engineeringModelStore.getSupportSiteModel(),
       routePartitionModel: engineeringModelStore.getRoutePartitionModel(),
     });
@@ -86,6 +95,7 @@ export class LoadCalcConsumerController {
       engineeringModelStore.getSupportSiteModel(),
       engineeringModelStore.getRoutePartitionModel(),
       engineeringModelStore.getAuthorizedExecution(),
+      authorizationState,
     );
     else this.renderDeferredPane(this.activeTab, pane, revision);
   }
@@ -150,6 +160,21 @@ export function createLoadCalcActionAvailability(context, reviewModel) {
     runScreening: hasPathModel,
     exportScreening: Boolean(reviewModel?.summary.screeningIncluded),
   });
+}
+
+function availabilityMessage(state) {
+  const reason = state?.reasonCode || state?.state || 'EMPIRICAL_PACKAGE_REQUIRED';
+  const messages = {
+    NO_ACTIVE_DATASET: 'Load calculation requires an active normalized dataset.',
+    EMPIRICAL_PACKAGE_REQUIRED: 'Load calculation requires an explicitly authorized empirical package.',
+    AUTHORIZATION_BINDINGS_CHANGED: 'The authorized empirical package is stale; authorize a package for the current dataset and evidence.',
+    PROJECT_DATA_CHANGED: 'Project Data changed; a new authorized empirical package is required.',
+    MASTER_DATA_CHANGED: 'Master data changed; a new authorized empirical package is required.',
+    DATASET_EDITED: 'The dataset changed; a new authorized empirical package is required.',
+    DATASET_REBUILT: 'The dataset model was rebuilt; a new authorized empirical package is required.',
+    DATASET_REPLACED: 'The active dataset changed; a new authorized empirical package is required.',
+  };
+  return messages[reason] || `Load calculation is disabled: ${reason}.`;
 }
 
 function buildReviewModel(context) {

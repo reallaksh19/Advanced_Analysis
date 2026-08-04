@@ -7,6 +7,7 @@ export class EngineeringSupportLoadStore {
   #distribution = null;
   #authorizedExecution = null;
 
+  /** @deprecated Ordinary production callers shall use calculateAuthorized(). */
   calculate(input) {
     this.#authorizedExecution = null;
     this.#distribution = calculateSupportLoadDistribution(input);
@@ -22,6 +23,8 @@ export class EngineeringSupportLoadStore {
 
   markStale(reason, datasetVersion) {
     if (!this.#distribution) return null;
+    // The active store clears its current receipt; the separate runtime store
+    // retains immutable historical receipt evidence and stale authorization state.
     this.#authorizedExecution = null;
     this.#distribution = freezeDeep({
       ...this.#distribution,

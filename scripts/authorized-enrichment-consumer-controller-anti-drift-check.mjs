@@ -15,16 +15,19 @@ for (const [token, label] of [
   ['Date.now', 'hidden clock'],
   ['new Date()', 'hidden clock'],
   ['Math.random', 'random identity'],
+  ['engineeringModelStore.calculate(', 'legacy empirical execution'],
   ['LFEA', 'LFEA coupling'],
   ['solver', 'solver coupling'],
 ]) assert.equal(source.includes(token), false, `forbidden ${label}: ${token}`);
-assert.match(source, /requireAuthorizedEmpiricalLoadInput/u);
-assert.match(source, /calculateAuthorized/u);
-assert.match(source, /getMasterData/u);
-assert.match(source, /requireAuthorizedStagedJsonSidecar/u);
-assert.match(source, /writeAuthorizedStagedJson/u);
-assert.match(source, /createAuthorizedStagedJsonDownloadArtifact/u);
-assert.match(source, /triggerAuthorizedStagedJsonDownload/u);
-assert.match(source, /operationId/u);
-assert.match(source, /downloadReceiptSemanticHash/u);
+for (const required of [
+  'requireAuthorizedEmpiricalRuntimePackage',
+  'configureAuthorizedEmpiricalPackage',
+  'executeConfiguredAuthorized',
+  'refreshAuthorizedEmpiricalPackage',
+  'getEmpiricalAuthorizationState',
+  'requireAuthorizedStagedJsonSidecar',
+  'writeAuthorizedStagedJson',
+  'createAuthorizedStagedJsonDownloadArtifact',
+  'triggerAuthorizedStagedJsonDownload',
+]) assert.ok(source.includes(required), `missing authorized seam: ${required}`);
 console.log('PASS authorized enrichment consumer controller anti-drift checks');
