@@ -54,6 +54,6 @@ export function segmentCount(value) { return Number.isInteger(value) && value >=
 export function acquireGeometry(resourcePool, key, factory) { return resourcePool?.geometry ? resourcePool.geometry(key, factory) : factory(); }
 export function finiteKey(value) {
   if (!Number.isFinite(value)) throw new TypeError('Three pooled geometry key requires a finite number.');
-  return Object.is(value, -0) ? '0' : Number(value).toPrecision(15);
+  return Object.is(value, -0) ? '0' : String(value);
 }
 function positive(value) { return Number.isFinite(value) && value > 0 ? value : null; }
