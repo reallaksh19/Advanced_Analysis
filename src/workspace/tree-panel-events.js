@@ -15,11 +15,13 @@ import {
 
 export const TOPOLOGY_EDIT_DEMO_FIXTURE_PATH = 'fixtures/topology-edit-20-element-demo.staged.json';
 const TOPOLOGY_EDIT_DEMO_SOURCE_NAME = 'topology-edit-20-element-demo.staged.json';
+const DATASET_FILE_ACCEPT = '.sjson,.json,application/json,text/json';
 
 export function initializeTreePanel(panel) {
   if (panel.initialized) return;
   panel.listElement = panel.requireElement('[data-role="tree-list"]');
   panel.fileElement = panel.requireElement('[data-role="dataset-file"]');
+  panel.fileElement.accept = DATASET_FILE_ACCEPT;
   panel.statusElement = panel.requireElement('[data-role="tree-status"]');
   panel.errorElement = panel.requireElement('[data-role="tree-error"]');
   panel.clearButton = panel.requireElement('[data-action="clear-dataset"]');
@@ -99,7 +101,41 @@ async function publishDatasetLoad(panel, sourceName, sourceBytes, parsedPackage 
 }
 
 function parseJsonBytes(sourceBytes) {
-  return JSON.parse(new TextDecoder('utf-8').decode(sourceBytes));
+  const text = decodeJsonBytes(sourceBytes)
+    .replace(/^\uFEFF/u, '')
+    .replace(/\u0000+$/u, '')
+    .trim();
+  if (!text) throw new TypeError('Dataset SJSON/JSON file is empty.');
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new SyntaxError(`Dataset SJSON/JSON is invalid: ${detail}`);
+  }
+}
+
+function decodeJsonBytes(sourceBytes) {
+  let encoding = 'utf-8';
+  let offset = 0;
+  if (sourceBytes[0] === 0xff && sourceBytes[1] === 0xfe) {
+    encoding = 'utf-16le';
+    offset = 2;
+  } else if (sourceBytes[0] === 0xfe && sourceBytes[1] === 0xff) {
+    encoding = 'utf-16be';
+    offset = 2;
+  } else if (
+    sourceBytes[0] === 0xef
+    && sourceBytes[1] === 0xbb
+    && sourceBytes[2] === 0xbf
+  ) {
+    offset = 3;
+  }
+  try {
+    return new TextDecoder(encoding, { fatal: true }).decode(sourceBytes.subarray(offset));
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new TypeError(`Dataset SJSON/JSON text encoding is invalid: ${detail}`);
+  }
 }
 
 function publishLoadFailure(panel, sourceName, error) {
