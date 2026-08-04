@@ -72,13 +72,15 @@ export class TopologyEditTypedViewportBackend extends TopologyEditViewportBacken
       ? this.buildTypedPrimitiveGroup(group, primitives, colorHex, opacity, markerSize)
       : projectedBounds(projection.elements || [], projection.segments || []);
 
-    if (!primitives.length) this.buildSegmentGroup(group, projection.segments, colorHex, opacity);
-    const markers = primitives.length
-      ? (projection.elements || []).filter((element) => element.type === 'node')
-      : projection.elements;
-    this.buildMeshGroup(group, markers, colorHex, opacity, markerSize);
-    for (const marker of markers || []) {
-      if (finiteElement(marker)) bounds.expandByPoint(new THREE.Vector3(marker.x, marker.y, marker.z));
+    if (!primitives.length) {
+      this.buildSegmentGroup(group, projection.segments, colorHex, opacity);
+      this.buildMeshGroup(group, projection.elements, colorHex, opacity, markerSize);
+    } else {
+      this.buildNodePickProxyGroup(
+        group,
+        (projection.elements || []).filter((element) => element.type === 'node'),
+        markerSize,
+      );
     }
     this.applySectionPlanesToGroup(group);
     return bounds;
@@ -119,6 +121,34 @@ export class TopologyEditTypedViewportBackend extends TopologyEditViewportBacken
     }
     while (staging.children.length) group.add(staging.children[0]);
     return bounds;
+  }
+
+  buildNodePickProxyGroup(group, elements, markerSize) {
+    const nodes = (elements || []).filter(finiteElement);
+    if (!nodes.length) return;
+    const radius = Math.max(markerSize * 0.32, 0.5);
+    const geometry = new THREE.SphereGeometry(
+      radius,
+      Math.max(8, this.navigationConfiguration.meshRadialSegments),
+      Math.max(6, Math.floor(this.navigationConfiguration.meshRadialSegments * 0.75)),
+    );
+    const material = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      colorWrite: false,
+    });
+    for (const node of nodes) {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.name = `topology-edit-node-pick-proxy:${node.id || node.entityId || ''}`;
+      mesh.position.set(node.x, node.y, node.z);
+      mesh.userData = {
+        ...nodePickUserData(node),
+        pickProxy: true,
+        renderAuthority: 'CANONICAL_NODE_PICK_PROXY',
+      };
+      group.add(mesh);
+    }
   }
 }
 
@@ -192,6 +222,22 @@ function typedPrimitivePickUserData(primitive) {
   };
 }
 
+function nodePickUserData(node) {
+  const canonicalId = requiredString(
+    node?.entityId || node?.id,
+    'TOPOLOGY_EDIT_NODE_PICK_IDENTITY_MISSING',
+  );
+  return {
+    canonicalId,
+    type: 'node',
+    pickTarget: node.pickTarget || {
+      objectKind: 'node',
+      objectId: canonicalId,
+      nodeId: canonicalId,
+    },
+  };
+}
+
 function materializeTypedGeometryDiagnostic(
   primitive,
   error,
@@ -247,12 +293,30 @@ function diagnosticAnchor(parameters) {
 function projectedBounds(elements, segments) {
   const bounds = new THREE.Box3();
   for (const element of elements || []) {
-    if (finiteElement(element)) bounds.expandByPoint(new THREE.Vector3(element.x, element.y, element.z));
+    if (!finiteElement(element)) continue;
+    const point = new THREE.Vector3(element.x, element.y, element.z);
+    const size = positiveNumber(element.sizeMm);
+    if (size === null) bounds.expandByPoint(point);
+    else bounds.union(new THREE.Box3().setFromCenterAndSize(
+      point,
+      new THREE.Vector3(size * 2, size * 2, size * 2),
+    ));
   }
   for (const segment of segments || []) {
+    const radius = positiveNumber(segment.radiusMm) ?? 0;
     const points = Array.isArray(segment.points) ? segment.points : [segment.start, segment.end];
     for (const point of points) {
-      if (finitePoint(point)) bounds.expandByPoint(new THREE.Vector3(point.x, point.y, point.z));
+      if (!finitePoint(point)) continue;
+      bounds.expandByPoint(new THREE.Vector3(
+        point.x - radius,
+        point.y - radius,
+        point.z - radius,
+      ));
+      bounds.expandByPoint(new THREE.Vector3(
+        point.x + radius,
+        point.y + radius,
+        point.z + radius,
+      ));
     }
   }
   return bounds;
@@ -341,4 +405,9 @@ function finiteElement(value) {
 
 function finitePoint(value) {
   return value && [value.x, value.y, value.z].every(Number.isFinite);
+}
+
+function positiveNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
 }
