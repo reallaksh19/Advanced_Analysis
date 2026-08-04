@@ -1,6 +1,7 @@
 /** Build one complete deterministic candidate from one resolved command. */
 import { deepFreeze, semanticHash } from '../../core/shared-piping-model/index.js';
 import { checkCanonicalTopology } from './topology-edit-checker.js';
+import { topologyEditCheckerIssueLineageEquivalent } from './topology-edit-checker-lineage.js';
 import { assertResolvedTopologyEditCommand } from './topology-edit-command-resolver.js';
 import { applyResolvedTopologyEditCommand } from './topology-edit-pure-reducer.js';
 import { assertCanonicalTopologyHash, canonicalTopologyStateHash } from './topology-edit-canonical-state.js';
@@ -48,6 +49,7 @@ function issueMaterial(issue) {
   return {
     id: issue.id, kind: issue.kind, severity: issue.severity,
     nodeIds: [...(issue.nodeIds ?? [])], edgeId: issue.edgeId ?? null,
+    edgeIds: [...(issue.edgeIds ?? (issue.edgeId ? [issue.edgeId] : []))],
     suggestedAutofix: issue.suggestedAutofix ?? null,
     distanceMm: issue.distanceMm ?? null,
   };
@@ -95,17 +97,39 @@ function hasExactNodeIds(issue, expectedNodeIds) {
   return actualNodeIds.length === expectedNodeIds.length
     && actualNodeIds.every((nodeId, index) => nodeId === expectedNodeIds[index]);
 }
-function checkerDelta(beforeTopology, before, after) {
+function checkerDelta(beforeTopology, afterTopology, before, after) {
   const beforeById = new Map(before.issues.map((issue) => [issue.id, issue]));
   const afterById = new Map(after.issues.map((issue) => [issue.id, issue]));
   const previousPrimary = previousPrimaryNodeIds(beforeTopology, before);
   const material = {
     introducedIssues: after.issues.filter((issue) => (
-      !beforeById.has(issue.id) && !hasExactNodeIds(issue, previousPrimary)
+      !beforeById.has(issue.id)
+      && !hasExactNodeIds(issue, previousPrimary)
+      && !topologyEditCheckerIssueLineageEquivalent(
+        issue,
+        afterTopology,
+        before.issues,
+        beforeTopology,
+      )
     )),
-    resolvedIssues: before.issues.filter((issue) => !afterById.has(issue.id)),
-    unchangedIssueIds: after.issues.filter((issue) => beforeById.has(issue.id))
-      .map((issue) => issue.id).sort(),
+    resolvedIssues: before.issues.filter((issue) => (
+      !afterById.has(issue.id)
+      && !topologyEditCheckerIssueLineageEquivalent(
+        issue,
+        beforeTopology,
+        after.issues,
+        afterTopology,
+      )
+    )),
+    unchangedIssueIds: after.issues.filter((issue) => (
+      beforeById.has(issue.id)
+      || topologyEditCheckerIssueLineageEquivalent(
+        issue,
+        afterTopology,
+        before.issues,
+        beforeTopology,
+      )
+    )).map((issue) => issue.id).sort(),
   };
   return deepFreeze({ ...material, checkerDeltaHash: semanticHash(material) });
 }
@@ -124,7 +148,7 @@ function buildCandidateEvidence(topology, command, policy) {
   return {
     beforeChecker, candidateTopology, afterChecker,
     topologyDelta: buildTopologyEditCandidateDelta(topology, candidateTopology),
-    checkerDelta: checkerDelta(topology, beforeChecker, afterChecker),
+    checkerDelta: checkerDelta(topology, candidateTopology, beforeChecker, afterChecker),
   };
 }
 function candidateMaterial(command, currentHash, policy, evidence) {
