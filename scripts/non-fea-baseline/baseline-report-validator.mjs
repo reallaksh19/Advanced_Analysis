@@ -34,7 +34,7 @@ export function requireNonFeaBaselineReport(value) {
   requireFixtureLedger(value.fixtureLedger);
   requireFixtureBindings(value.fixtureRoleBindings);
   requireFixtureRuns(value.fixtureRuns);
-  requireStageStatistics(value.stageStatistics);
+  requireStageStatistics(value.stageStatistics, value.fixtureRuns);
   requireCommands(value.commandRuns);
   requireFailures(value.failures);
   requireStringArray(value.observabilityGaps, 'OBSERVABILITY_GAPS');
@@ -100,14 +100,26 @@ function requireFixtureRuns(rows) {
   });
 }
 
-function requireStageStatistics(rows) {
+function requireStageStatistics(rows, runs) {
   if (!Array.isArray(rows)) fail('P0_REPORT_STAGE_STATISTICS_INVALID');
-  requireUnique(rows.map((row) => `${row.fixturePath}|${row.sampleKind}|${row.stageId}`), 'P0_REPORT_STAGE_STATISTIC_DUPLICATE');
+  const groupKeys = [...new Set(runs.map((row) => `${row.fixturePath}|${row.sampleKind}`))].sort(codeUnitCompare);
+  const expectedKeys = groupKeys.flatMap((group) => NON_FEA_STAGE_IDS.map((stageId) => `${group}|${stageId}`)).sort(codeUnitCompare);
+  const actualKeys = rows.map((row) => `${row.fixturePath}|${row.sampleKind}|${row.stageId}`).sort(codeUnitCompare);
+  requireUnique(actualKeys, 'P0_REPORT_STAGE_STATISTIC_DUPLICATE');
+  if (JSON.stringify(actualKeys) !== JSON.stringify(expectedKeys)) fail('P0_REPORT_STAGE_STATISTIC_COVERAGE_INVALID');
   rows.forEach((row) => {
+    requireString(row.fixturePath, 'STAGE_STATISTIC_FIXTURE_PATH');
+    if (!['COLD', 'WARM'].includes(row.sampleKind)) fail('P0_REPORT_STAGE_STATISTIC_SAMPLE_KIND_INVALID');
     if (!NON_FEA_STAGE_IDS.includes(row.stageId)) fail('P0_REPORT_STAGE_STATISTIC_ID_INVALID');
-    if (!Number.isInteger(row.sampleCount) || row.sampleCount <= 0) fail('P0_REPORT_STAGE_STATISTIC_VALUE_INVALID');
-    for (const key of ['medianMs', 'p95Ms', 'maxMs']) {
-      if (!Number.isFinite(row[key]) || row[key] < 0) fail('P0_REPORT_STAGE_STATISTIC_VALUE_INVALID');
+    if (!Number.isInteger(row.sampleCount) || row.sampleCount < 0) fail('P0_REPORT_STAGE_STATISTIC_VALUE_INVALID');
+    const timings = [row.medianMs, row.p95Ms, row.maxMs];
+    if (row.sampleCount === 0) {
+      if (timings.some((value) => value !== null)) fail('P0_REPORT_STAGE_STATISTIC_EMPTY_VALUE_INVALID');
+      return;
+    }
+    if (timings.some((value) => !Number.isFinite(value) || value < 0)) fail('P0_REPORT_STAGE_STATISTIC_VALUE_INVALID');
+    if (row.maxMs < row.medianMs || row.p95Ms < row.medianMs || row.maxMs < row.p95Ms) {
+      fail('P0_REPORT_STAGE_STATISTIC_ORDER_INVALID');
     }
   });
 }
