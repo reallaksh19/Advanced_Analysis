@@ -8,6 +8,17 @@ import {
 import {
   ensureTopologyEditProfessionalOperationStyles,
 } from './viewport-productivity/topology-edit-professional-operation-styles.js';
+import {
+  topologyEditSelectionDescription,
+} from './topology-edit/topology-edit-command-ui.js';
+import { WorkspaceState } from './workspace-state.js';
+import { EVENT_TOPICS } from './event-topics.js';
+import {
+  createTopologyEditEditorStore,
+} from './topology-edit/editor-state/topology-edit-editor-store.js';
+import {
+  TopologyEditSelectionCoordinator,
+} from './topology-edit/editor-state/topology-edit-selection-coordinator.js';
 
 const PRIMARY_NAVIGATION_SELECTORS = Object.freeze([
   '[data-navigation-mode="select"]',
@@ -26,11 +37,33 @@ const PANEL_LABELS = Object.freeze({
   'topology-edit-checker': 'Issues & suggestions',
 });
 
+const EDITOR_DATASET_SESSION_VERSIONS = new WeakMap();
+let nextEditorDatasetSessionVersion = 1;
+
 export class TopologyEdit3DViewController extends InteractionController {
   constructor(eventBus, lifecycleOptions = {}) {
     super(eventBus, lifecycleOptions);
     this.professionalElement = null;
     this.professionalRuntime = new TopologyEditProfessionalOperationRuntime(this);
+    this.editorDatasetObject = null;
+    this.editorDatasetEpoch = 0;
+    this.unsubscribeEditorDatasetSnapshot = null;
+    const initialLegacySelection = this.selection;
+    this.editorStore = createTopologyEditEditorStore();
+    this.selectionCoordinator = new TopologyEditSelectionCoordinator({
+      store: this.editorStore,
+      eventBus: this.eventBus,
+      getTopology: () => this.session?.currentTopology?.() ?? null,
+      onSelectionChanged: (payload) => this.handleUnifiedSelectionChanged(payload),
+    });
+    delete this.selection;
+    Object.defineProperty(this, 'selection', {
+      configurable: true,
+      enumerable: true,
+      get: () => this.selectionCoordinator.legacySelection(),
+      set: (value) => this.selectionCoordinator.applyLegacySelection(value, 'command'),
+    });
+    this.selection = initialLegacySelection;
     const getBaseViewState = this.lifecycle.getViewState;
     this.lifecycle.getViewState = () => ({
       ...getBaseViewState(),
@@ -39,8 +72,16 @@ export class TopologyEdit3DViewController extends InteractionController {
   }
 
   async activate() {
-    await super.activate();
-    await this.professionalRuntime.loadCatalogue();
+    this.selectionCoordinator.connect();
+    this.connectEditorDatasetSnapshot();
+    try {
+      await super.activate();
+      await this.professionalRuntime.loadCatalogue();
+    } catch (error) {
+      this.disconnectEditorDatasetSnapshot();
+      this.selectionCoordinator.disconnect();
+      throw error;
+    }
   }
 
   buildShell() {
@@ -60,22 +101,66 @@ export class TopologyEdit3DViewController extends InteractionController {
   }
 
   deactivate() {
+    this.disconnectEditorDatasetSnapshot();
+    this.selectionCoordinator.disconnect();
     this.professionalRuntime.destroy();
     this.professionalElement = null;
+    this.editorDatasetObject = null;
+    this.editorDatasetEpoch = 0;
     super.deactivate();
   }
 
+  connectEditorDatasetSnapshot() {
+    if (this.unsubscribeEditorDatasetSnapshot) return;
+    this.unsubscribeEditorDatasetSnapshot = this.eventBus.subscribe(
+      EVENT_TOPICS.WORKSPACE_SNAPSHOT_CHANGED,
+      ({ snapshot }) => this.reconcileEditorDatasetSnapshot(snapshot),
+    );
+    this.reconcileEditorDatasetSnapshot(WorkspaceState.getSnapshot());
+  }
+
+  disconnectEditorDatasetSnapshot() {
+    this.unsubscribeEditorDatasetSnapshot?.();
+    this.unsubscribeEditorDatasetSnapshot = null;
+  }
+
+  reconcileEditorDatasetSnapshot(snapshot) {
+    const dataset = snapshot?.dataset ?? null;
+    const sessionVersion = editorDatasetSessionVersion(dataset);
+    if (
+      dataset === this.editorDatasetObject
+      && sessionVersion === this.editorDatasetEpoch
+    ) return;
+    this.editorDatasetObject = dataset;
+    this.editorDatasetEpoch = sessionVersion;
+    const currentIdentity = this.editorStore.getState().dataset;
+    this.applyEditorDatasetIdentity({
+      ...currentIdentity,
+      sessionVersion,
+    });
+  }
+
+  refreshFromWorkspace() {
+    this.reconcileEditorDatasetSnapshot(WorkspaceState.getSnapshot());
+    return super.refreshFromWorkspace();
+  }
+
   refreshView(canonical) {
+    this.syncEditorDatasetIdentity(canonical);
+    this.editorStore.getState().actions.updateCanonicalIdentity(
+      canonical.canonicalTopologyHash,
+      canonicalSelectionIds(canonical),
+    );
     super.refreshView(canonical);
     this.professionalRuntime.canonicalChanged(canonical);
   }
 
-  handleCanvasPointer(event) {
-    const before = selectionKey(this.selection);
-    super.handleCanvasPointer(event);
-    if (before !== selectionKey(this.selection)) {
-      this.professionalRuntime.selectionChanged();
-    }
+  handleViewportSelection(pick, event) {
+    if (!this.session) return;
+    this.selectionCoordinator.selectPick(pick, event);
+    this.presentationToolbar?.update(this.presentationState);
+    this.setStatus(topologyEditSelectionDescription(this.selection));
+    this.updateActionButtons();
   }
 
   handleHostClick(event) {
@@ -124,6 +209,55 @@ export class TopologyEdit3DViewController extends InteractionController {
   restoreDisplayState(viewState = {}) {
     super.restoreDisplayState(viewState);
     this.professionalRuntime.restoreViewState(viewState.professionalOperation);
+  }
+
+  reconcileCanonicalSelection(transactionReceipt) {
+    return this.editorStore.getState().actions.reconcileSelection(
+      transactionReceipt,
+      'command',
+    );
+  }
+
+  syncEditorDatasetIdentity(canonical) {
+    this.applyEditorDatasetIdentity({
+      sourceHash: canonical.sourceHash,
+      canonicalHash: canonical.canonicalTopologyHash,
+      sessionVersion: this.editorDatasetEpoch,
+    });
+  }
+
+  applyEditorDatasetIdentity(identity) {
+    this.editorStore.getState().actions.replaceDatasetIdentity(identity);
+    if (this.hostElement) {
+      this.hostElement.dataset.topologyEditDatasetSourceHash =
+        identity.sourceHash ?? '';
+      this.hostElement.dataset.topologyEditDatasetCanonicalHash =
+        identity.canonicalHash ?? '';
+      this.hostElement.dataset.topologyEditDatasetSessionVersion =
+        String(identity.sessionVersion);
+    }
+  }
+
+  handleUnifiedSelectionChanged(payload) {
+    if (this.hostElement) {
+      this.hostElement.dataset.topologyEditSelectionIds =
+        payload.selection.canonicalIds.join(',');
+      this.hostElement.dataset.topologyEditSelectionPrimaryId =
+        payload.selection.primaryId ?? '';
+      this.hostElement.dataset.topologyEditSelectionAnchorId =
+        payload.selection.anchorId ?? '';
+      this.hostElement.dataset.topologyEditSelectionSource =
+        payload.selection.source;
+      this.hostElement.dataset.topologyEditSelectionRevision =
+        String(payload.selection.revision);
+      this.hostElement.dataset.topologyEditSelectionHash =
+        payload.selection.selectionHash;
+    }
+    if (this.professionalElement) this.professionalRuntime.selectionChanged();
+    if (this.interactionPreview) this.clearInteractionState(false, true);
+    this.interactionControllerRuntime?.sync();
+    this.presentationToolbar?.update(this.presentationState);
+    this.updateActionButtons?.();
   }
 }
 
@@ -272,6 +406,25 @@ function humanize(value) {
     .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
-function selectionKey(selection) {
-  return `${(selection?.nodeIds ?? []).join('|')}::${selection?.edgeId ?? ''}`;
+function canonicalSelectionIds(canonical) {
+  return [
+    ...(canonical.nodes ?? []).map((row) => row.id),
+    ...(canonical.edges ?? []).map((row) => row.id),
+    ...(canonical.junctions ?? []).map((row) => row.id),
+    ...(canonical.supports ?? []).map((row) => row.id),
+    ...(canonical.boundaries ?? []).map((row) => row.id),
+    ...(canonical.rigids ?? []).map((row) => row.id),
+    ...(canonical.bends ?? []).map((row) => row.id),
+  ];
+}
+
+function editorDatasetSessionVersion(dataset) {
+  if (!dataset || typeof dataset !== 'object') return 0;
+  let version = EDITOR_DATASET_SESSION_VERSIONS.get(dataset);
+  if (!version) {
+    version = nextEditorDatasetSessionVersion;
+    nextEditorDatasetSessionVersion += 1;
+    EDITOR_DATASET_SESSION_VERSIONS.set(dataset, version);
+  }
+  return version;
 }

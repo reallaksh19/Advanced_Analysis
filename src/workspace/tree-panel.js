@@ -40,6 +40,9 @@ export class TreePanel {
     this.searchQuery = '';
     this.focusedIndex = -1;
     this.selectedEntityId = '';
+    this.selectedEntityIds = new Set();
+    this.selectionAnchorEntityId = '';
+    this.topologyEditSelectionActive = false;
     this.unsubscribeCallbacks = [];
     this.initialized = false;
     this.handleClick = (event) => handleTreeClick(this, event);
@@ -71,10 +74,48 @@ export class TreePanel {
     if (this.sourceDataset !== snapshot.dataset) {
       this.renderDataset(snapshot.dataset);
     }
+    if (this.topologyEditSelectionActive) return;
     if (this.selectedEntityId === snapshot.selectedEntityId) return;
     this.selectedEntityId = String(snapshot.selectedEntityId || '');
+    this.selectedEntityIds = new Set(
+      this.selectedEntityId ? [this.selectedEntityId] : [],
+    );
+    this.selectionAnchorEntityId = this.selectedEntityId;
     revealSelectionId(this, this.selectedEntityId);
     renderVisibleItems(this);
+  }
+
+  applyTopologyEditSelection(payload) {
+    // The authoritative selection event also establishes the active projection;
+    // it must not depend on relative delivery order with the separate mode event.
+    this.topologyEditSelectionActive = true;
+    this.listElement?.setAttribute('aria-multiselectable', 'true');
+    this.selectedEntityIds = new Set(payload.workspaceEntityIds ?? []);
+    this.selectedEntityId = String(payload.primaryWorkspaceEntityId || '');
+    this.selectionAnchorEntityId = String(
+      payload.anchorWorkspaceEntityId || this.selectedEntityId || '',
+    );
+    this.rootElement.dataset.topologyEditSelectionWorkspaceIds =
+      [...this.selectedEntityIds].sort().join(',');
+    this.rootElement.dataset.topologyEditSelectionPrimaryWorkspaceId =
+      this.selectedEntityId;
+    revealSelectionId(this, this.selectedEntityId);
+    renderVisibleItems(this);
+  }
+
+  setTopologyEditSelectionActive(active) {
+    this.topologyEditSelectionActive = Boolean(active);
+    this.listElement?.setAttribute(
+      'aria-multiselectable',
+      String(this.topologyEditSelectionActive),
+    );
+    if (!this.topologyEditSelectionActive) {
+      this.selectedEntityIds = new Set(
+        this.selectedEntityId ? [this.selectedEntityId] : [],
+      );
+      this.selectionAnchorEntityId = this.selectedEntityId;
+      renderVisibleItems(this);
+    }
   }
 
   applyZoneSelection(selection, dataset) {
@@ -95,6 +136,21 @@ export class TreePanel {
       node.children.forEach((child) =>
         this.expandedBranches.add(child.id));
     });
+    if (this.topologyEditSelectionActive) {
+      this.selectedEntityIds = new Set(
+        [...this.selectedEntityIds].filter((entityId) => this.entities.has(entityId)),
+      );
+      if (!this.selectedEntityIds.has(this.selectedEntityId)) {
+        this.selectedEntityId = [...this.selectedEntityIds][0] ?? '';
+      }
+      if (!this.selectedEntityIds.has(this.selectionAnchorEntityId)) {
+        this.selectionAnchorEntityId = this.selectedEntityId;
+      }
+    } else {
+      this.selectedEntityId = '';
+      this.selectedEntityIds.clear();
+      this.selectionAnchorEntityId = '';
+    }
     this.statusElement.textContent = datasetStatus(dataset, view);
     this.pipesElement.textContent = `Pipes ${view.summary.pipes}`;
     this.supportsElement.textContent =
@@ -125,6 +181,9 @@ export class TreePanel {
     this.expandedBranches.clear();
     this.flattenedNodes = [];
     this.focusedIndex = -1;
+    this.selectedEntityId = '';
+    this.selectedEntityIds.clear();
+    this.selectionAnchorEntityId = '';
     this.statusElement.textContent = 'No dataset loaded';
     this.pipesElement.textContent = 'Pipes 0';
     this.supportsElement.textContent = 'Supports 0';

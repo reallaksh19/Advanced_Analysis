@@ -110,14 +110,26 @@ export class TopologyEdit3DViewController extends LifecycleController {
     }
     const additive = Boolean(options.additive);
     if (result.objectKind === 'node' || result.objectKind === 'edge') {
-      this.selection = updateTopologyEditSelection(
-        this.selection,
-        result.canonicalId,
-        additive,
-      );
+      if (this.selectionCoordinator) {
+        this.selectionCoordinator.requestCanonical(
+          additive ? 'ADD' : 'REPLACE',
+          [result.canonicalId],
+          'search',
+          {
+            primaryId: result.canonicalId,
+            anchorId: additive ? undefined : result.canonicalId,
+          },
+        );
+      } else {
+        this.selection = updateTopologyEditSelection(
+          this.selection,
+          result.canonicalId,
+          additive,
+        );
+      }
       this.presentationToolbar?.update(this.presentationState);
     }
-    if (result.workspaceEntityIds.length) {
+    if (!this.selectionCoordinator && result.workspaceEntityIds.length) {
       this.eventBus.publish(EVENT_TOPICS.VIEWPORT_SELECTION_REQUESTED, {
         entityId: result.workspaceEntityIds[0],
         source: 'topology-edit-3d',

@@ -212,27 +212,51 @@ export class TopologyEdit3DViewController {
     this.setStatus(`${topology.nodes.length} nodes, ${topology.edges.length} edges, ${topology.supports.length} supports; ${this.session.journal.activeCommandIds.length} accepted command(s); ${this.autofixSuggestions.length} source-backed fix suggestion(s).`);
   }
 
+  reconcileSelectionAfterTransition(transition) {
+    if (typeof this.reconcileCanonicalSelection === 'function') {
+      this.reconcileCanonicalSelection(selectionIdentityReceipt(transition));
+      return;
+    }
+    this.selection = createTopologyEditSelection();
+  }
+
   runCommandAction(actionId) {
     if (!this.session) return;
     try {
       this.cancelAutofix(true);
       const intent = createTopologyEditCommandIntent(actionId, this.selection, this.session.currentTopology());
       const transition = this.session.execute(intent.commandType, intent.payload);
-      if (transition.disposition !== 'ACCEPTED') return this.setStatus(`Command rejected: ${transition.reason || 'candidate did not certify'}.`);
-      this.selection = createTopologyEditSelection();
+      if (transition.disposition !== 'ACCEPTED') {
+        this.setStatus(`Command rejected: ${transition.reason || 'candidate did not certify'}.`);
+        return transition;
+      }
+      this.reconcileSelectionAfterTransition(transition);
       this.refreshView(this.session.currentTopology());
       this.setStatus(`${intent.commandType} accepted at session version ${this.session.journal.sessionVersion}.`);
+      return transition;
     } catch (error) { this.setStatus(`Command failed: ${error instanceof Error ? error.message : String(error)}`); }
   }
   undo() {
     if (!this.session?.canUndo()) return;
-    try { this.cancelAutofix(true); this.session.undo(); this.selection = createTopologyEditSelection(); this.refreshView(this.session.currentTopology()); this.setStatus(`Undo accepted; ${this.session.journal.activeCommandIds.length} command(s) active.`); }
-    catch (error) { this.setStatus(`Undo failed: ${error instanceof Error ? error.message : String(error)}`); }
+    try {
+      this.cancelAutofix(true);
+      const transition = this.session.undo();
+      this.reconcileSelectionAfterTransition(transition);
+      this.refreshView(this.session.currentTopology());
+      this.setStatus(`Undo accepted; ${this.session.journal.activeCommandIds.length} command(s) active.`);
+      return transition;
+    } catch (error) { this.setStatus(`Undo failed: ${error instanceof Error ? error.message : String(error)}`); }
   }
   redo() {
     if (!this.session?.canRedo()) return;
-    try { this.cancelAutofix(true); this.session.redo(); this.selection = createTopologyEditSelection(); this.refreshView(this.session.currentTopology()); this.setStatus(`Redo accepted; ${this.session.journal.activeCommandIds.length} command(s) active.`); }
-    catch (error) { this.setStatus(`Redo failed: ${error instanceof Error ? error.message : String(error)}`); }
+    try {
+      this.cancelAutofix(true);
+      const transition = this.session.redo();
+      this.reconcileSelectionAfterTransition(transition);
+      this.refreshView(this.session.currentTopology());
+      this.setStatus(`Redo accepted; ${this.session.journal.activeCommandIds.length} command(s) active.`);
+      return transition;
+    } catch (error) { this.setStatus(`Redo failed: ${error instanceof Error ? error.message : String(error)}`); }
   }
 
   previewAutofix(suggestionHash) {
@@ -253,12 +277,16 @@ export class TopologyEdit3DViewController {
     if (!this.autofixPreview || !this.session) return;
     try {
       const transition = this.session.acceptAutofix(this.autofixPreview);
-      if (transition.disposition !== 'ACCEPTED') return this.setStatus(`Autofix rejected: ${transition.reason || transition.disposition}.`);
+      if (transition.disposition !== 'ACCEPTED') {
+        this.setStatus(`Autofix rejected: ${transition.reason || transition.disposition}.`);
+        return transition;
+      }
       const commandType = transition.certification.commandType;
       this.autofixPreview = null;
-      this.selection = createTopologyEditSelection();
+      this.reconcileSelectionAfterTransition(transition);
       this.refreshView(this.session.currentTopology());
       this.setStatus(`${commandType} accepted from the exact certified preview.`);
+      return transition;
     } catch (error) { this.setStatus(`Autofix acceptance failed: ${error instanceof Error ? error.message : String(error)}`); }
   }
   cancelAutofix(silent = false) {
@@ -383,6 +411,22 @@ export function buildAutofixPolicy(dataset, canonical, issues) {
     }
   }
   return Object.freeze(policy);
+}
+function selectionIdentityReceipt(transition) {
+  const candidates = [
+    transition?.transactionReceipt,
+    transition?.receipt,
+    transition?.certification?.transactionReceipt,
+    transition?.certification?.receipt,
+    transition?.certification,
+    transition,
+  ];
+  return candidates.find((candidate) => candidate && typeof candidate === 'object' && (
+    candidate.replacementIdentityMap
+    || candidate.identityMap
+    || candidate.replacedIds
+    || candidate.removedIds
+  )) ?? {};
 }
 function entityAttributes(entity) { return { ...(entity?.properties?.sourceAttributes ?? {}), ...(entity?.properties?.attributes ?? {}), ...(entity?.properties?.nativeParams ?? {}) }; }
 function uniquePositive(values) { const rows = [...new Set(values.map(Number).filter((value) => Number.isFinite(value) && value > 0))]; return rows.length === 1 ? rows[0] : null; }
