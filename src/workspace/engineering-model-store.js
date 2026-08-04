@@ -4,6 +4,7 @@ import { buildRoutePartitionModel } from './routes/route-partition-model.js';
 import { buildSupportSiteModel, findSupportSiteByEntityId } from './support-sites/support-site-model.js';
 import { engineeringSupportLoadStore } from './engineering-loads/engineering-support-load-store.js';
 import { AUTHORIZED_EMPIRICAL_LOAD_EXECUTION_REQUEST_SCHEMA } from './engineering-loads/authorized-empirical-load-execution.js';
+import { markWorkspaceInvocation, measureWorkspaceStage } from './workspace-performance.js';
 
 /**
  * Holds canonical support sites and route partitions for the active dataset and
@@ -15,6 +16,7 @@ export class EngineeringModelStore {
   #routePartitionModel = null;
 
   rebuild(dataset) {
+    markWorkspaceInvocation('engineering-model-rebuild', { datasetId: dataset?.datasetId || null });
     this.#dataset = dataset;
     if (!dataset) {
       this.#supportSiteModel = null;
@@ -22,8 +24,16 @@ export class EngineeringModelStore {
       return;
     }
     const profile = projectDataStore.getProfile();
-    this.#supportSiteModel = buildSupportSiteModel(dataset, profile);
-    this.#routePartitionModel = buildRoutePartitionModel(dataset, profile);
+    this.#supportSiteModel = measureWorkspaceStage(
+      'support-site-construction',
+      () => buildSupportSiteModel(dataset, profile),
+      { datasetId: dataset.datasetId },
+    );
+    this.#routePartitionModel = measureWorkspaceStage(
+      'route-construction',
+      () => buildRoutePartitionModel(dataset, profile),
+      { datasetId: dataset.datasetId },
+    );
   }
 
   calculate(masterData) {

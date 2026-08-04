@@ -3,6 +3,7 @@ import { EventBus } from './event-bus.js';
 import { EVENT_TOPICS } from './event-topics.js';
 import { WorkspaceState } from './workspace-state.js';
 import { engineeringModelStore } from './engineering-model-store.js';
+import { markWorkspaceInvocation, measureWorkspaceStage } from './workspace-performance.js';
 
 export class DatasetController {
   constructor(eventBus = EventBus, workspaceState = WorkspaceState) {
@@ -32,9 +33,18 @@ export class DatasetController {
   }
 
   load({ rawPackage, sourceName = '', sourceBytes = null, sourceSha256 = '' }) {
+    markWorkspaceInvocation('initial-import', { sourceName, sourceSha256 });
     try {
-      const dataset = normalizeWorkspaceDataset(rawPackage, sourceName, { sourceBytes, sourceSha256 });
-      const snapshot = this.workspaceState.loadDataset(dataset);
+      const dataset = measureWorkspaceStage(
+        'normalization',
+        () => normalizeWorkspaceDataset(rawPackage, sourceName, { sourceBytes, sourceSha256 }),
+        { sourceName, sourceSha256 },
+      );
+      const snapshot = measureWorkspaceStage(
+        'workspace-state-publication',
+        () => this.workspaceState.loadDataset(dataset),
+        { datasetId: dataset.datasetId },
+      );
       this.publishSnapshot(snapshot);
       this.eventBus.publish(EVENT_TOPICS.DATASET_LOADED, {
         datasetId: dataset.datasetId,
@@ -49,12 +59,14 @@ export class DatasetController {
   }
 
   clear() {
+    markWorkspaceInvocation('clear-reload');
     const snapshot = this.workspaceState.clearDataset();
     this.publishSnapshot(snapshot);
     this.eventBus.publish(EVENT_TOPICS.DATASET_CLEARED, { version: snapshot.version });
   }
 
   select(entityId, source = 'api', fallbackEntity = null) {
+    markWorkspaceInvocation('selection-only', { entityId, source });
     const canonicalEntityId = engineeringModelStore.canonicalEntityId(entityId);
     const stateEntity = this.workspaceState.selectEntity(canonicalEntityId);
     const entity = stateEntity || fallbackEntity;

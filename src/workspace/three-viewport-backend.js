@@ -6,6 +6,7 @@ import { ThreeSelectionOverlay } from './three-selection-overlay.js';
 import { fitThreeSelection, fitThreeView, restoreThreeHome, setThreeStandardView } from './three-viewport-camera.js';
 import { clearThreeHostMetadata, clearThreeSceneObjects, renderThreeModel, resolveThreeEntityId, updateThreeHostMetadata } from './three-viewport-scene.js';
 import { ViewportAxisHUD } from './viewport-axis-hud.js';
+import { markWorkspaceMilestone } from './workspace-performance.js';
 
 /** One lifecycle-safe Three.js viewport shared by Workspace and Load Calc. */
 export class ThreeViewportBackend {
@@ -30,6 +31,8 @@ export class ThreeViewportBackend {
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
     this.renderDirty = true;
+    this.pendingRenderedFrameMilestone = null;
+    this.lastFirstMeaningfulFrameDatasetId = '';
   }
 
   mount(hostElement) {
@@ -190,7 +193,15 @@ export class ThreeViewportBackend {
   }
 
   handleContextLost(event) { event.preventDefault(); this.contextLost = true; this.stopAnimation(); this.hostElement.dataset.contextStatus = 'LOST'; }
-  handleContextRestored() { this.contextLost = false; this.hostElement.dataset.contextStatus = 'RESTORED'; if (this.model) renderThreeModel(this, this.model, { resetCamera: false }); this.startAnimation(); }
+  handleContextRestored() {
+    this.contextLost = false;
+    this.hostElement.dataset.contextStatus = 'RESTORED';
+    if (this.model) {
+      renderThreeModel(this, this.model, { resetCamera: false, contextRestore: true });
+      this.renderDirty = true;
+    }
+    this.startAnimation();
+  }
   markViewCommand(command) { if (this.hostElement) this.hostElement.dataset.viewCommand = command; }
 
   startAnimation() {
@@ -210,7 +221,22 @@ export class ThreeViewportBackend {
       this.axisHud.updateOrientation(this.camera);
       this.axisHud.render(this.renderer, width, height);
     }
+    this.publishRenderedFrameMilestone();
   }
+
+  publishRenderedFrameMilestone() {
+    const pending = this.pendingRenderedFrameMilestone;
+    if (!pending || this.model?.datasetId !== pending.datasetId || !this.hostElement) return;
+    this.pendingRenderedFrameMilestone = null;
+    if (pending.name === 'first-meaningful-frame') {
+      this.lastFirstMeaningfulFrameDatasetId = pending.datasetId;
+      this.hostElement.dataset.firstMeaningfulFrameDatasetId = pending.datasetId;
+    } else if (pending.name === 'context-restored-frame') {
+      this.hostElement.dataset.contextRestoredFrameDatasetId = pending.datasetId;
+    }
+    markWorkspaceMilestone(pending.name, { datasetId: pending.datasetId });
+  }
+
   clearSceneObjects() { clearThreeSceneObjects(this); }
   updateHostMetadata() { updateThreeHostMetadata(this); }
 
@@ -222,12 +248,12 @@ export class ThreeViewportBackend {
     clearThreeSceneObjects(this);
     if (this.renderer) { this.renderer.domElement.removeEventListener('webglcontextlost', this.contextLostHandler); this.renderer.domElement.removeEventListener('webglcontextrestored', this.contextRestoredHandler); this.renderer.dispose(); this.renderer.forceContextLoss?.(); }
     if (this.hostElement) clearThreeHostMetadata(this.hostElement);
-    this.hostElement = null; this.renderer = null; this.scene = null; this.camera = null; this.controls = null; this.groups = []; this.objects.clear(); this.sceneBoundsCache = null; this.model = null; this.selectionRequestHandler = null;
+    this.hostElement = null; this.renderer = null; this.scene = null; this.camera = null; this.controls = null; this.groups = []; this.objects.clear(); this.sceneBoundsCache = null; this.model = null; this.selectionRequestHandler = null; this.pendingRenderedFrameMilestone = null;
   }
 }
 
 function assertWebglConfiguration(value) {
-    const required = ['pickingRadius', 'cameraFitMargin', 'clickTimingMs', 'doubleClickTimingMs', 'clickTravelTolerancePx', 'zoomRate', 'navigationSensitivity', 'perspectiveFovDeg', 'meshRadialSegments', 'cameraNearMm', 'cameraFarMm'];
+  const required = ['pickingRadius', 'cameraFitMargin', 'clickTimingMs', 'doubleClickTimingMs', 'clickTravelTolerancePx', 'zoomRate', 'navigationSensitivity', 'perspectiveFovDeg', 'meshRadialSegments', 'cameraNearMm', 'cameraFarMm'];
   const missing = required.filter((key) => !Number.isFinite(value?.[key]) || value[key] <= 0);
   if (missing.length) throw new Error(`WebGL BLOCKED: approved Project Data is missing ${missing.join(', ')}.`);
   if (!Number.isInteger(value.meshRadialSegments)) throw new Error('WebGL BLOCKED: meshRadialSegments must be an integer.');

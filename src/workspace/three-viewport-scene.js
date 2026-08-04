@@ -3,36 +3,42 @@
  */
 import { createThreePrimitive } from './three-primitive-factory.js';
 import { disposeThreeEngineeringObject } from './three-object-disposal.js';
+import { ThreeSceneResourcePool } from './three-scene-resource-pool.js';
 import { assertViewportRenderModel } from './viewport-render-model.js';
+import { markWorkspaceInvocation, measureWorkspaceStage } from './workspace-performance.js';
 
 export function renderThreeModel(backend, model, options = {}) {
   assertViewportRenderModel(model);
-  backend.applyModelConfiguration(model);
+  markWorkspaceInvocation('three-render-model', { datasetId: model.datasetId });
   const isFirstLoad = !backend.hasFittedFirstModel || options.resetCamera === true;
+  const compiled = measureWorkspaceStage(
+    'three-materialization',
+    () => compileThreeModel(model),
+    { datasetId: model.datasetId },
+  );
 
-  clearThreeSceneObjects(backend);
-  backend.model = model;
-  backend.selectedEntityId = '';
-  projectPrimitives(
-    backend,
-    model.physicalPrimitives ?? [],
-    backend.physicalGroup,
-  );
-  projectPrimitives(
-    backend,
-    model.supportOverlayPrimitives ?? [],
-    backend.supportGroup,
-  );
-  projectPrimitives(
-    backend,
-    model.diagnosticPrimitives ?? [],
-    backend.diagnosticGroup,
-  );
+  try {
+    measureWorkspaceStage(
+      'model-configuration',
+      () => backend.applyModelConfiguration(model),
+      { datasetId: model.datasetId },
+    );
+    measureWorkspaceStage(
+      'scene-installation',
+      () => installCompiledThreeModel(backend, model, compiled),
+      { datasetId: model.datasetId },
+    );
+  } catch (error) {
+    disposeCompiledThreeModel(compiled);
+    throw error;
+  }
+
   updateThreeHostMetadata(backend);
+  queueRenderedFrameEvidence(backend, model, options);
 
-  // Only perform expensive camera fitView on initial model load, not on every single incremental edit click
+  // Only perform expensive camera fitView on initial model load, not on every single incremental edit click.
   if (isFirstLoad) {
-    backend.fitView();
+    measureWorkspaceStage('fit', () => backend.fitView(), { datasetId: model.datasetId });
     backend.hasFittedFirstModel = true;
     backend.initialCameraState = {
       position: backend.camera.position.clone(),
@@ -41,6 +47,28 @@ export function renderThreeModel(backend, model, options = {}) {
     };
   } else if (backend.controls) {
     backend.controls.update();
+  }
+}
+
+export function compileThreeModel(model) {
+  assertViewportRenderModel(model);
+  const resourcePool = new ThreeSceneResourcePool();
+  const compiled = {
+    resourcePool,
+    physicalObjects: [],
+    supportObjects: [],
+    diagnosticObjects: [],
+    objects: new Map(),
+  };
+  try {
+    projectPrimitives(model.physicalPrimitives ?? [], compiled.physicalObjects, compiled.objects, resourcePool);
+    projectPrimitives(model.supportOverlayPrimitives ?? [], compiled.supportObjects, compiled.objects, resourcePool);
+    projectPrimitives(model.diagnosticPrimitives ?? [], compiled.diagnosticObjects, compiled.objects, resourcePool);
+    compiled.resourceEvidence = resourcePool.evidence();
+    return compiled;
+  } catch (error) {
+    disposeCompiledThreeModel(compiled);
+    throw error;
   }
 }
 
@@ -58,11 +86,17 @@ export function clearThreeSceneObjects(backend) {
     });
   });
   backend.objects.clear();
+  backend.sceneResourcePool?.dispose();
+  backend.sceneResourcePool = null;
+  backend.sceneResourceEvidence = null;
+  backend.pendingRenderedFrameMilestone = null;
+  backend.lastFirstMeaningfulFrameDatasetId = '';
 }
 
 export function updateThreeHostMetadata(backend) {
   if (!backend.hostElement) return;
   const summary = backend.model?.summary ?? {};
+  const resources = backend.sceneResourceEvidence ?? {};
   const data = backend.hostElement.dataset;
   data.renderableCount = String(summary.renderableCount ?? 0);
   data.skippedCount = String(summary.skippedCount ?? 0);
@@ -72,6 +106,10 @@ export function updateThreeHostMetadata(backend) {
     .sort()
     .join(',');
   data.selectedEntityId = backend.selectedEntityId;
+  data.sceneGeometryCount = String(resources.geometryCount ?? 0);
+  data.sceneMaterialCount = String(resources.materialCount ?? 0);
+  data.sceneGeometryReuseCount = String(resources.geometryReuseCount ?? 0);
+  data.sceneMaterialReuseCount = String(resources.materialReuseCount ?? 0);
 }
 
 export function resolveThreeEntityId(object) {
@@ -93,22 +131,82 @@ export function clearThreeHostMetadata(hostElement) {
     'componentKinds',
     'selectedEntityId',
     'lastPickEntityId',
+    'sceneGeometryCount',
+    'sceneMaterialCount',
+    'sceneGeometryReuseCount',
+    'sceneMaterialReuseCount',
+    'firstMeaningfulFrameDatasetId',
+    'contextRestoredFrameDatasetId',
   ].forEach((key) => delete hostElement.dataset[key]);
 }
 
-function projectPrimitives(backend, primitives, group) {
+function queueRenderedFrameEvidence(backend, model, options) {
+  if (options.contextRestore === true) {
+    backend.pendingRenderedFrameMilestone = Object.freeze({
+      name: 'context-restored-frame',
+      datasetId: model.datasetId,
+    });
+    return;
+  }
+  if (backend.lastFirstMeaningfulFrameDatasetId === model.datasetId) return;
+  backend.pendingRenderedFrameMilestone = Object.freeze({
+    name: 'first-meaningful-frame',
+    datasetId: model.datasetId,
+  });
+}
+
+function installCompiledThreeModel(backend, model, compiled) {
+  const additions = [
+    [backend.physicalGroup, compiled.physicalObjects],
+    [backend.supportGroup, compiled.supportObjects],
+    [backend.diagnosticGroup, compiled.diagnosticObjects],
+  ];
+  const previousObjects = additions.flatMap(([group]) => [...group.children]);
+  const added = [];
+  try {
+    additions.forEach(([group, objects]) => objects.forEach((object) => {
+      group.add(object);
+      added.push({ group, object });
+    }));
+  } catch (error) {
+    added.reverse().forEach(({ group, object }) => group.remove(object));
+    throw error;
+  }
+
+  previousObjects.forEach((object) => {
+    object.parent?.remove(object);
+    disposeThreeEngineeringObject(object);
+  });
+  backend.sceneResourcePool?.dispose();
+  backend.sceneResourcePool = compiled.resourcePool;
+  backend.sceneResourceEvidence = compiled.resourceEvidence;
+  backend.sceneBoundsCache = null;
+  backend.model = model;
+  backend.selectedEntityId = '';
+  backend.objects.clear();
+  compiled.objects.forEach((objects, objectId) => backend.objects.set(objectId, objects));
+}
+
+function disposeCompiledThreeModel(compiled) {
+  if (!compiled) return;
+  [compiled.physicalObjects, compiled.supportObjects, compiled.diagnosticObjects]
+    .filter(Array.isArray)
+    .flat()
+    .forEach(disposeThreeEngineeringObject);
+  compiled.resourcePool?.dispose();
+}
+
+function projectPrimitives(primitives, target, objectsById, resourcePool) {
   primitives.forEach((item) => {
-    const object = createThreePrimitive(item);
+    const object = createThreePrimitive(item, resourcePool);
     if (!object) return;
     object.userData.entityId = item.objectId;
     object.traverse((child) => {
-      if (!child.userData.entityId) {
-        child.userData.entityId = item.objectId;
-      }
+      if (!child.userData.entityId) child.userData.entityId = item.objectId;
     });
-    const values = backend.objects.get(item.objectId) ?? [];
+    const values = objectsById.get(item.objectId) ?? [];
     values.push(object);
-    backend.objects.set(item.objectId, values);
-    group.add(object);
+    objectsById.set(item.objectId, values);
+    target.push(object);
   });
 }

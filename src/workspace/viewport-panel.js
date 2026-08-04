@@ -20,6 +20,7 @@ import { SequentialTopologyTableView } from './sequential-sketcher/sequential-to
 import { buildViewportRenderModel } from './viewport-render-model.js';
 import { ViewportRenderer } from './viewport-renderer.js';
 import { WorkspaceState } from './workspace-state.js';
+import { markWorkspaceInvocation, measureWorkspaceStage } from './workspace-performance.js';
 
 /** Owns one mounted renderer, governed edit preview, and cross-view selection. */
 export class ViewportPanel {
@@ -58,7 +59,7 @@ export class ViewportPanel {
       this.eventBus.subscribe(EVENT_TOPICS.DATASET_LOAD_FAILED, ({ message }) => this.importFailure(message)),
       this.eventBus.subscribe(EVENT_TOPICS.DATASET_CLEARED, () => this.clear()),
       this.eventBus.subscribe(EVENT_TOPICS.VIEWPORT_ENTITY_SELECTED, ({ entityId }) => this.renderSelection(entityId)),
-      this.eventBus.subscribe(ENGINEERING_MODEL_EVENTS.CHANGED, () => this.rerenderActiveDataset()),
+      this.eventBus.subscribe(ENGINEERING_MODEL_EVENTS.CHANGED, ({ reason }) => this.engineeringModelChanged(reason)),
     ];
     this.rootElement.addEventListener('click', this.handleClick);
     globalThis.addEventListener?.('topology-edit-tool-selected', this.handleToolSelected);
@@ -75,24 +76,53 @@ export class ViewportPanel {
   }
 
   renderDataset(dataset, preview) {
+    markWorkspaceInvocation('viewport-render-dataset', {
+      datasetId: dataset?.datasetId || null,
+      preview: Boolean(preview),
+      zoneId: this.zoneSelection?.zoneId || null,
+    });
     try {
-      const projection = projectDatasetForModelZone(dataset, this.zoneSelection);
-      const supportSites = projectSupportSiteModelForModelZone(
-        engineeringModelStore.getSupportSiteModel(),
-        projection,
+      const projection = measureWorkspaceStage(
+        'model-zone-projection',
+        () => projectDatasetForModelZone(dataset, this.zoneSelection),
+        { datasetId: dataset.datasetId, zoneId: this.zoneSelection?.zoneId || null },
       );
-      const resolved = buildResolvedEngineeringGeometry(
-        dataset,
-        projectDataStore.getProfile(),
-        supportSites,
+      const supportSites = measureWorkspaceStage(
+        'support-site-projection',
+        () => projectSupportSiteModelForModelZone(
+          engineeringModelStore.getSupportSiteModel(),
+          projection,
+        ),
+        { datasetId: dataset.datasetId, zoneId: projection.zoneId || null },
       );
-      const scoped = filterResolvedGeometryForModelZone(
-        resolved,
-        projection,
-        supportSites,
+      const resolved = measureWorkspaceStage(
+        'resolved-geometry',
+        () => buildResolvedEngineeringGeometry(
+          dataset,
+          projectDataStore.getProfile(),
+          supportSites,
+        ),
+        { datasetId: dataset.datasetId, zoneId: projection.zoneId || null },
       );
-      const renderModel = buildViewportRenderModel(scoped);
-      this.renderer.renderModel(renderModel);
+      const scoped = measureWorkspaceStage(
+        'resolved-geometry-filter',
+        () => filterResolvedGeometryForModelZone(
+          resolved,
+          projection,
+          supportSites,
+        ),
+        { datasetId: dataset.datasetId, zoneId: projection.zoneId || null },
+      );
+      const renderModel = measureWorkspaceStage(
+        'render-model-construction',
+        () => buildViewportRenderModel(scoped),
+        { datasetId: dataset.datasetId, zoneId: projection.zoneId || null },
+      );
+      measureWorkspaceStage(
+        'renderer-install-request',
+        () => this.renderer.renderModel(renderModel),
+        { datasetId: dataset.datasetId, zoneId: projection.zoneId || null },
+      );
       this.renderModel = renderModel;
       this.statusElement.textContent = viewportStatus(dataset, projection, renderModel, preview);
     } catch (error) {
@@ -101,6 +131,7 @@ export class ViewportPanel {
   }
 
   zoneChanged(selection, dataset) {
+    markWorkspaceInvocation('model-zone-change', { datasetId: dataset?.datasetId || null, zoneId: selection?.zoneId || null });
     this.zoneSelection = selection;
     if (this.datasetReference === dataset) this.renderDataset(dataset, false);
   }
@@ -140,7 +171,16 @@ export class ViewportPanel {
     this.eventBus.publish(EVENT_TOPICS.VIEWPORT_SELECTION_REQUESTED, { entityId, source: 'viewport' });
   }
 
-  rerenderActiveDataset() { const dataset = WorkspaceState.getSnapshot()?.dataset; if (dataset) this.renderDataset(dataset, false); }
+  engineeringModelChanged(reason) {
+    markWorkspaceInvocation('engineering-model-changed', { reason: reason || 'unspecified' });
+    if (reason === 'project-data-changed') this.rerenderActiveDataset(reason);
+  }
+
+  rerenderActiveDataset(reason = 'unspecified') {
+    markWorkspaceInvocation('viewport-rerender', { reason });
+    const dataset = WorkspaceState.getSnapshot()?.dataset;
+    if (dataset) this.renderDataset(dataset, false);
+  }
   toolSelected(event) { const toolId = event.detail?.toolId; if (toolId) this.renderer.setInteractionContext(toolId); }
 
   click(event) {
