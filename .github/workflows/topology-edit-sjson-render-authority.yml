@@ -14,6 +14,7 @@ on:
       - 'src/workspace/topology-edit/topology-edit-typed-viewport-backend.js'
       - 'src/workspace/topology-edit/support-restraint-family.js'
       - 'tests/topology-edit-sjson-render-authority.test.mjs'
+      - 'tests/topology-edit-split-diagnostic.test.mjs'
       - 'tests/topology-edit-20-element-demo-loader.test.mjs'
       - 'tests/topology-edit-render-fidelity.test.mjs'
       - 'tests/topology-edit-m003-capability-authority.test.mjs'
@@ -66,12 +67,14 @@ jobs:
           node --check src/workspace/topology-edit/topology-edit-render-model.js
           node --check src/workspace/topology-edit/topology-edit-typed-viewport-backend.js
           node --check tests/topology-edit-sjson-render-authority.test.mjs
+          node --check tests/topology-edit-split-diagnostic.test.mjs
           node --check e2e/topology-edit-sjson-render-authority.spec.js
           git diff --check
 
-      - name: Execute canonical, typed geometry, and support authority tests
+      - name: Execute canonical, typed geometry, support, and split diagnostics
         run: |
           node --test \
+            tests/topology-edit-split-diagnostic.test.mjs \
             tests/topology-edit-sjson-render-authority.test.mjs \
             tests/topology-edit-20-element-demo-loader.test.mjs \
             tests/topology-edit-render-fidelity.test.mjs \
