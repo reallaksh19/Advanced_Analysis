@@ -137,7 +137,10 @@ export class EngineeringModelStore {
 
   deactivate(reason = 'NO_ACTIVE_DATASET') {
     this.rebuild(null);
-    this.markEmpiricalStale(reason, null);
+    engineeringSupportLoadStore.markStale(reason, null);
+    return authorizedEmpiricalRuntimeStore.getPackage()
+      ? authorizedEmpiricalRuntimeStore.markStale(reason, [{ datasetVersion: null }])
+      : authorizedEmpiricalRuntimeStore.refresh(null);
   }
 
   #currentEmpiricalBindings(masterData) {
