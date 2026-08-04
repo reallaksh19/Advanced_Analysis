@@ -113,7 +113,12 @@ export class TopologyEditInteractionViewportAdapter {
       plane: dragPlane(mode, anchor, this.backend.activeCamera),
     };
     this.canvas?.setPointerCapture?.(event.pointerId);
-    this.onDragStart({ mode, pointerId: event.pointerId });
+    this.onDragStart({
+      mode,
+      pointerId: event.pointerId,
+      pointerScreen: pointerScreen(this.canvas, event),
+      cameraSnapshot: topologyEditCameraSnapshot(this.backend, this.canvas),
+    });
   }
 
   handlePointerMove(event) {
@@ -125,6 +130,8 @@ export class TopologyEditInteractionViewportAdapter {
       mode: this.activeDrag.mode,
       pointerId: event.pointerId,
       targetPosition: pointRecord(target),
+      pointerScreen: pointerScreen(this.canvas, event),
+      cameraSnapshot: topologyEditCameraSnapshot(this.backend, this.canvas),
     });
   }
 
@@ -133,12 +140,15 @@ export class TopologyEditInteractionViewportAdapter {
     markHandled(event);
     const active = this.activeDrag;
     const target = this.pointerTarget(event, active);
-    this.releasePointer('COMPLETED');
-    this.onDragEnd({
+    const evidence = {
       mode: active.mode,
       pointerId: event.pointerId,
       targetPosition: target ? pointRecord(target) : null,
-    });
+      pointerScreen: pointerScreen(this.canvas, event),
+      cameraSnapshot: topologyEditCameraSnapshot(this.backend, this.canvas),
+    };
+    this.releasePointer('COMPLETED');
+    this.onDragEnd(evidence);
   }
 
   handlePointerCancel(event) {
@@ -178,6 +188,37 @@ export class TopologyEditInteractionViewportAdapter {
     const distance = point.clone().sub(active.anchor).dot(axis);
     return active.anchor.clone().addScaledVector(axis, distance);
   }
+}
+
+export function topologyEditCameraSnapshot(backend, canvas) {
+  const camera = backend?.activeCamera;
+  if (!camera || !canvas) {
+    throw new TypeError('Camera snapshot requires a live topology-edit camera and canvas.');
+  }
+  camera.updateMatrixWorld?.(true);
+  const position = camera.getWorldPosition(new THREE.Vector3());
+  const forward = camera.getWorldDirection(new THREE.Vector3()).normalize();
+  const viewProjectionMatrix = new THREE.Matrix4()
+    .multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+  const base = {
+    projectionType: camera.isOrthographicCamera ? 'ORTHOGRAPHIC' : 'PERSPECTIVE',
+    position: freezePoint(position),
+    forward: freezePoint(forward),
+    viewportWidthPx: positiveDimension(canvas.clientWidth || canvas.width),
+    viewportHeightPx: positiveDimension(canvas.clientHeight || canvas.height),
+    devicePixelRatio: Number(backend.renderer?.getPixelRatio?.() ?? globalThis.devicePixelRatio ?? 1),
+    viewProjectionMatrix: Object.freeze([...viewProjectionMatrix.elements]),
+  };
+  if (camera.isOrthographicCamera) {
+    return Object.freeze({
+      ...base,
+      orthoHeightMm: Math.abs(camera.top - camera.bottom) / Math.max(camera.zoom || 1, 1e-9),
+    });
+  }
+  return Object.freeze({
+    ...base,
+    fovYDeg: Number(camera.getEffectiveFOV?.() ?? camera.fov),
+  });
 }
 
 function dragPlane(mode, anchor, camera) {
@@ -223,6 +264,17 @@ function pointerContext(canvas, event, target) {
   return target;
 }
 
+function pointerScreen(canvas, event) {
+  const rect = canvas?.getBoundingClientRect?.();
+  if (!rect?.width || !rect?.height) {
+    throw new Error('Pointer screen evidence requires a visible canvas.');
+  }
+  return Object.freeze({
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+  });
+}
+
 function interactionMode(object) {
   let current = object;
   while (current) {
@@ -234,6 +286,15 @@ function interactionMode(object) {
 
 function pointRecord(point) {
   return { x: point.x, y: point.y, z: point.z };
+}
+
+function freezePoint(point) {
+  return Object.freeze({ x: point.x, y: point.y, z: point.z });
+}
+
+function positiveDimension(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : 1;
 }
 
 function markHandled(event) {
