@@ -57,6 +57,15 @@ export function planTopologyEditInlineComponentOperation(topology, input = {}) {
       diameterMm: record.nominalSizeMm,
       catalogueRecordId: record.recordId,
       catalogueRecordHash: record.recordHash,
+      catalogueCompatibility: {
+        status: 'COMPATIBLE',
+        catalogueHash: catalogue.catalogueHash,
+        sourceHash: catalogue.authority.sourceHash,
+        queryHash: null,
+        compatibilityHash: null,
+        selectedRecordId: record.recordId,
+        selectionAuthority: 'EXACT_RECORD_ID_AND_HASH',
+      },
     },
     commandIntents: [{
       commandType: 'INSERT_INLINE_COMPONENT',
@@ -70,18 +79,7 @@ export function planTopologyEditInlineComponentOperation(topology, input = {}) {
       },
     }],
     changedScope,
-    unresolvedEvidence: [{
-      code: 'CATALOGUE_COMPATIBILITY_NOT_EVALUATED',
-      status: 'UNRESOLVED',
-      targetIds: [edgeId],
-      field: 'specificationCompatibility',
-      details: {
-        catalogueHash: catalogue.catalogueHash,
-        sourceHash: catalogue.authority.sourceHash,
-        recordId: record.recordId,
-        recordHash: record.recordHash,
-      },
-    }],
+    unresolvedEvidence: [],
   });
 }
 
