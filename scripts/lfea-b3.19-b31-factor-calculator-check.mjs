@@ -81,10 +81,14 @@ const thinWall2023 = calculateB31Factors(request({
     bendRadius: 0.9,
     pressure: 0,
     elasticModulus: 200e9,
+    bendAngleDegrees: 90,
+    smooth90FlexibilityCorrection: true,
     sourceEvidence,
   },
 }));
 assert.equal(thinWall2023.status, 'QUALIFIED');
+assert.equal(thinWall2023.factors.flexibilityRule.smooth90CorrectionApplied, true);
+approximately(thinWall2023.factors.flexibility.inPlane, 12.570277777777775);
 assert.equal(thinWall2023.factors.sustainedCorrection.applied, true);
 approximately(thinWall2023.factors.sustainedCorrection.denominator, 0.94);
 assert.ok(thinWall2023.factors.sustainedIndices.inPlaneBending
@@ -107,10 +111,12 @@ const tee = calculateB31Factors(request({
 assert.equal(tee.status, 'QUALIFIED');
 assert.equal(tee.componentFactorSet, null);
 assert.equal(tee.stressFactorSets.length, 2);
-approximately(tee.factors.flexibility.run.inPlane, 1.1244011302440957);
-approximately(tee.factors.flexibility.branch.outOfPlane, 7.308143416543065);
-approximately(tee.factors.displacementSifs.run.inPlaneBending, 2.8677973028391186);
-approximately(tee.factors.displacementSifs.branch.inPlaneBending, 3.182232930985084);
+assert.equal(tee.factors.qualityReduction.applied, true);
+approximately(tee.factors.qualityReduction.divisor, 1.26);
+approximately(tee.factors.flexibility.run.inPlane, 1);
+approximately(tee.factors.flexibility.branch.outOfPlane, 5.800113822653225);
+approximately(tee.factors.displacementSifs.run.inPlaneBending, 2.2760296054278717);
+approximately(tee.factors.displacementSifs.branch.inPlaneBending, 2.525581691258003);
 approximately(tee.factors.displacementSifs.run.axial, tee.factors.displacementSifs.run.outOfPlaneBending);
 approximately(tee.factors.displacementSifs.branch.axial, tee.factors.displacementSifs.branch.outOfPlaneBending);
 assert.ok(tee.diagnostics.some(
@@ -164,6 +170,7 @@ assert.equal(reducer.matchingPipeApplication.smallEnd.wallThickness, 0.01);
 assert.ok(reducer.factors.displacementSifs.torsional > 1);
 approximately(reducer.factors.displacementSifs.axial, reducer.factors.displacementSifs.outOfPlaneBending);
 
+
 const equalThicknessReducer = calculateB31Factors({
   ...reducerRequest,
   calculationId: 'B31-CALC-REDUCER-EQUAL-THICKNESS',
@@ -211,6 +218,7 @@ console.log(JSON.stringify({
   status: 'PASS',
   bendK: bend.factors.flexibility.inPlane,
   bendInPlaneSif: bend.factors.displacementSifs.inPlaneBending,
+  teeNote6Divisor: tee.factors.qualityReduction.divisor,
   teeRunInPlaneSif: tee.factors.displacementSifs.run.inPlaneBending,
   teeBranchInPlaneSif: tee.factors.displacementSifs.branch.inPlaneBending,
   reducerTorsionalSif: reducer.factors.displacementSifs.torsional,
