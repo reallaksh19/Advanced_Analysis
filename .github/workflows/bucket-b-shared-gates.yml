@@ -35,9 +35,9 @@ permissions:
 
 jobs:
   qualify:
-    name: Exact-head BB-00..BB-05 qualification
+    name: Exact-head Bucket B qualification
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - name: Resolve exact qualification refs
@@ -105,10 +105,19 @@ jobs:
           REPORT_PATH: reports/bucket-b-bb00-bb05-exact-head-report.json
         run: node scripts/bucket-b-bb00-bb05-check.mjs
 
-      - name: Upload qualification report
+      - name: Run BB-06 lug and clamp qualification
+        if: ${{ hashFiles('src/core/bucket-b/bb06-check.mjs') != '' }}
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          BB06_REPORT_PATH: reports/bucket-b-bb06-lug-clamp-report.json
+        run: node src/core/bucket-b/bb06-check.mjs
+
+      - name: Upload qualification reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bucket-b-shared-gate-report-${{ github.run_id }}-${{ github.run_attempt }}
-          path: reports/bucket-b-bb00-bb05-exact-head-report.json
+          name: bucket-b-qualification-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            reports/bucket-b-bb00-bb05-exact-head-report.json
+            reports/bucket-b-bb06-lug-clamp-report.json
           if-no-files-found: error
