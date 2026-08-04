@@ -17,6 +17,16 @@ test('production controller owns one Zustand selection bridge', async () => {
   assert.match(controller, /topologyEditDatasetSessionVersion/);
 });
 
+test('dataset identity subscribes before the base workspace refresh lifecycle', async () => {
+  const controller = await source('src/workspace/topology-edit-3d-professional-controller.js');
+  assert.match(controller, /connectEditorDatasetSnapshot\(\);\s*try \{\s*await super\.activate\(\)/);
+  assert.match(controller, /EVENT_TOPICS\.WORKSPACE_SNAPSHOT_CHANGED/);
+  assert.match(controller, /reconcileEditorDatasetSnapshot\(snapshot\)/);
+  assert.match(controller, /disconnectEditorDatasetSnapshot\(\);\s*this\.selectionCoordinator\.disconnect\(\)/);
+  assert.match(controller, /dataset === this\.editorDatasetObject/);
+  assert.match(controller, /sessionVersion: this\.editorDatasetEpoch/);
+});
+
 test('search dispatches through the canonical selection coordinator', async () => {
   const search = await source('src/workspace/topology-edit-3d-search-controller.js');
   assert.match(search, /this\.selectionCoordinator\.requestCanonical/);
