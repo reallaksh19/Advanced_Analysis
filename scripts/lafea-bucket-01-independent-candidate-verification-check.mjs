@@ -9,6 +9,9 @@ import {
   evaluateLafeaBucket01IndependentCandidateVerification,
   validateLafeaBucket01IndependentCandidateVerification,
 } from '../src/workspace/lafea-bucket-01-independent-candidate-verification.js';
+import {
+  createLafeaBucket01IndependentCheckerReceipt,
+} from '../src/workspace/lafea-bucket-01-independent-checker-receipt.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const INPUT_PATH = path.resolve(
@@ -25,6 +28,11 @@ const ARTIFACT_MANIFEST_PATH = path.resolve(
   ROOT,
   process.env.LAFEA_BUCKET_01_PHASE_3A_ARTIFACT_MANIFEST_PATH
     ?? 'reports/qualification-diagnostics/lafea-bucket-01-phase-3a-artifact-manifest.json',
+);
+const REPLAY_RECEIPT_PATH = path.resolve(
+  ROOT,
+  process.env.LAFEA_BUCKET_01_PHASE_3A_REPLAY_RECEIPT_PATH
+    ?? 'reports/qualification-diagnostics/lafea-bucket-01-phase-3a-independent-replay-receipt.json',
 );
 const verificationHeadSha = git(['rev-parse', 'HEAD']);
 const expectedHeadSha = process.env.EXPECTED_HEAD_SHA?.trim() || verificationHeadSha;
@@ -49,6 +57,7 @@ const artifacts = definition.artifacts.map(envelopeFromDefinition);
 const byRole = new Map(artifacts.map((row) => [row.role, row]));
 const levelArtifacts = [1, 2, 3, 4].map((ordinal) =>
   requireRole(`CANDIDATE_LEVEL_${ordinal}`));
+const candidateIntakeEvidenceArtifact = requireRole('CANDIDATE_INTAKE_EVIDENCE');
 const result = evaluateLafeaBucket01IndependentCandidateVerification({
   schema: LAFEA_BUCKET_01_INDEPENDENT_CANDIDATE_INPUT_SCHEMA,
   verificationHeadSha,
@@ -56,7 +65,7 @@ const result = evaluateLafeaBucket01IndependentCandidateVerification({
   mergeBaseSha,
   candidateArtifactHeadIsAncestor,
   replayArtifactManifestArtifact: requireRole('REPLAY_ARTIFACT_MANIFEST'),
-  candidateIntakeEvidenceArtifact: requireRole('CANDIDATE_INTAKE_EVIDENCE'),
+  candidateIntakeEvidenceArtifact,
   designArtifact: requireRole('DESIGN'),
   probeSpecArtifact: requireRole('FROZEN_PROBE_SPEC'),
   productionResponseSpecArtifact: requireRole('PRODUCTION_RESPONSE_SPEC'),
@@ -71,14 +80,26 @@ if (!validation.ok) {
 }
 writeJson(REPORT_PATH, result.evidence);
 writeJson(ARTIFACT_MANIFEST_PATH, result.artifactManifest);
+const replayReceipt = createLafeaBucket01IndependentCheckerReceipt({
+  evidence: result.evidence,
+  candidateIntakeEvidence: candidateIntakeEvidenceArtifact.payload,
+  routeId: candidateIntakeEvidenceArtifact.routeId,
+  relativePath: relative(REPORT_PATH),
+  rawFileHash: rawHash(REPORT_PATH),
+});
+writeJson(REPLAY_RECEIPT_PATH, replayReceipt);
 console.log(JSON.stringify({
-  schema: 'lafea-bucket-01-independent-candidate-verification-check-summary/v1',
+  schema: 'lafea-bucket-01-independent-candidate-verification-check-summary/v2',
   status: result.evidence.status,
   exactHeadSha: verificationHeadSha,
   candidateArtifactHeadSha,
   candidateArtifactHeadIsAncestor,
-  reportPath: path.relative(ROOT, REPORT_PATH),
-  artifactManifestPath: path.relative(ROOT, ARTIFACT_MANIFEST_PATH),
+  reportPath: relative(REPORT_PATH),
+  artifactManifestPath: relative(ARTIFACT_MANIFEST_PATH),
+  replayReceiptPath: relative(REPLAY_RECEIPT_PATH),
+  replayReceiptKind: replayReceipt.artifactKind,
+  replayReceiptSemanticHash: replayReceipt.semanticHash,
+  replayReceiptParents: replayReceipt.parentArtifactHashes,
   levelStatuses: result.evidence.levels.map((row) => ({
     ordinal: row.ordinal,
     status: row.status,
@@ -122,6 +143,9 @@ function writeJson(absolutePath, value) {
 }
 function rawHash(absolutePath) {
   return `sha256:${createHash('sha256').update(fs.readFileSync(absolutePath)).digest('hex')}`;
+}
+function relative(absolutePath) {
+  return path.relative(ROOT, absolutePath).split(path.sep).join('/');
 }
 function git(args) {
   const result = spawnSync('git', args, { cwd: ROOT, encoding: 'utf8' });
