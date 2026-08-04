@@ -34,6 +34,7 @@ jobs:
           cat .m024/chunk* | base64 -d > /tmp/m024.tar.gz
           tar -xzf /tmp/m024.tar.gz -C .
           python3 tmp/apply_m024.py
+          grep -n -C 5 "bm1CodeStressFactorSet" scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs scripts/lfea-b3.18-bm1-bend-authorities.mjs
           rm -rf tmp .m024 .github/workflows/m024-bootstrap.yml
           node --check scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs
           node --check scripts/lfea-b3.17-bm1-code-stress-fixtures.mjs
