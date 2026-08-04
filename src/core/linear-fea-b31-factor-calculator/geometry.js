@@ -11,9 +11,12 @@ import {
 } from './contract.js';
 
 const SOURCE_KEYS = Object.freeze(['sourceId', 'sourceRevision']);
-const BEND_KEYS = Object.freeze([
+const BEND_REQUIRED_KEYS = Object.freeze([
   'schema', 'componentType', 'lengthUnit', 'outerDiameter', 'wallThickness', 'bendRadius',
   'pressure', 'elasticModulus', 'sourceEvidence',
+]);
+const BEND_OPTIONAL_KEYS = Object.freeze([
+  'bendAngleDegrees', 'smooth90FlexibilityCorrection',
 ]);
 const TEE_KEYS = Object.freeze([
   'schema', 'componentType', 'lengthUnit', 'runOuterDiameter', 'runWallThickness',
@@ -40,18 +43,48 @@ function requireMetreGeometry(geometry) {
   return geometry.lengthUnit;
 }
 
+function requireRequiredAndOptionalKeys(value, required, optional, field, code) {
+  requireRecord(value, field, code);
+  for (const key of required) {
+    if (!Object.hasOwn(value, key)) fail(`${field} is missing ${key}.`, code);
+  }
+  const allowed = new Set([...required, ...optional]);
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) fail(`${field} contains unexpected field ${key}.`, code);
+  }
+  return value;
+}
+
 function normalizeBendGeometry(geometry) {
-  requireExactKeys(geometry, BEND_KEYS, 'geometry', 'B31_FACTOR_GEOMETRY_INVALID');
+  requireRequiredAndOptionalKeys(
+    geometry,
+    BEND_REQUIRED_KEYS,
+    BEND_OPTIONAL_KEYS,
+    'geometry',
+    'B31_FACTOR_GEOMETRY_INVALID',
+  );
   requireMetreGeometry(geometry);
   const outerDiameter = requirePositive(geometry.outerDiameter, 'geometry.outerDiameter');
   const wallThickness = requirePositive(geometry.wallThickness, 'geometry.wallThickness');
   if (!(2 * wallThickness < outerDiameter)) {
     fail('geometry.wallThickness must leave a positive bore.', 'B31_FACTOR_GEOMETRY_INVALID');
   }
+  const bendAngleDegrees = geometry.bendAngleDegrees === undefined
+    ? null
+    : requirePositive(geometry.bendAngleDegrees, 'geometry.bendAngleDegrees');
+  if (bendAngleDegrees !== null && !(bendAngleDegrees < 180)) {
+    fail('geometry.bendAngleDegrees must be less than 180 degrees.', 'B31_FACTOR_GEOMETRY_INVALID');
+  }
+  const smooth90FlexibilityCorrection = geometry.smooth90FlexibilityCorrection ?? false;
+  if (typeof smooth90FlexibilityCorrection !== 'boolean') {
+    fail('geometry.smooth90FlexibilityCorrection must be boolean.', 'B31_FACTOR_GEOMETRY_INVALID');
+  }
   return {
     ...geometry,
     outerDiameter,
     wallThickness,
+    bendAngleDegrees,
+    smooth90FlexibilityCorrection,
     bendRadius: requirePositive(geometry.bendRadius, 'geometry.bendRadius'),
     pressure: requireNonnegative(geometry.pressure, 'geometry.pressure'),
     elasticModulus: requirePositive(geometry.elasticModulus, 'geometry.elasticModulus'),
