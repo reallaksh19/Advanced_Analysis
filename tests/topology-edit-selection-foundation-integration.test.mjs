@@ -50,6 +50,22 @@ test('tree keeps virtualization and publishes governed selection requests', asyn
   assert.match(tree, /aria-selected/);
 });
 
+test('accepted transitions reconcile selection receipts before canonical refresh', async () => {
+  const core = await source('src/workspace/topology-edit-3d-view-controller-core.js');
+  const professional = await source('src/workspace/topology-edit-3d-professional-controller.js');
+  assert.match(core, /reconcileSelectionAfterTransition\(transition\)/);
+  assert.match(
+    core,
+    /this\.reconcileCanonicalSelection\(selectionIdentityReceipt\(transition\)\)/,
+  );
+  assert.match(
+    core,
+    /this\.reconcileSelectionAfterTransition\(transition\);\s*this\.refreshView\(this\.session\.currentTopology\(\)\)/,
+  );
+  assert.match(core, /transition\?\.certification\?\.transactionReceipt/);
+  assert.match(professional, /reconcileCanonicalSelection\(transactionReceipt\)/);
+});
+
 test('editor store contains UI slices but no canonical topology or journal authority', async () => {
   const store = await source(
     'src/workspace/topology-edit/editor-state/topology-edit-editor-store.js',
