@@ -37,11 +37,12 @@ function topology(edge) {
   };
 }
 
-function derive(edge, catalogueValue) {
+function derive(edge, catalogueValue, workspaceDataset = null) {
   return deriveTopologyEditComponentHudContext({
     topology: topology(edge),
     selection: { nodeIds: [], edgeId: edge.id },
     catalogue: catalogueValue,
+    workspaceDataset,
   });
 }
 
@@ -117,6 +118,47 @@ test('reducer HUD resolves directional reducer evidence without leaking flange o
   );
   assert.equal(fieldKeys(context).includes('flangeFacing'), false);
   assert.equal(fieldKeys(context).includes('valveType'), false);
+});
+
+test('reducer HUD uses explicit FROM and TO source evidence when generic geometry represents the small end', async () => {
+  const context = derive({
+    id: 'edge:R-001',
+    entityType: 'REDUCER',
+    diameterMm: 100,
+    outsideDiameterMm: 114.3,
+  }, await catalogue(), {
+    entities: [{
+      entityId: 'R-001',
+      properties: {
+        attributes: {
+          START_NOMINAL_BORE_MM: 150,
+          END_NOMINAL_BORE_MM: 100,
+          START_OUTSIDE_DIAMETER: 168.3,
+          END_OUTSIDE_DIAMETER: 114.3,
+          REDUCER_TYPE: 'CONCENTRIC',
+        },
+      },
+    }],
+  });
+
+  assert.equal(context.status, 'RESOLVED');
+  assert.equal(context.recommendedRecordId, 'REDUCER-DN150-DN100-CONC-A');
+  assert.deepEqual(context.sourceEvidence, {
+    componentType: 'REDUCER',
+    nominalSizeMm: 150,
+    outsideDiameterMm: 168.3,
+    pipingClass: null,
+    endConnectionFrom: null,
+    endConnectionTo: null,
+    secondaryNominalSizeMm: 100,
+    secondaryOutsideDiameterMm: 114.3,
+    reducerType: 'CONCENTRIC',
+    reducerOrientation: 'CONCENTRIC',
+  });
+  assert.equal(
+    context.fieldSchema.find((row) => row.key === 'nominalSizeMm')?.source,
+    'SOURCE_EVIDENCE',
+  );
 });
 
 test('available but mismatched source evidence is incompatible rather than nearest-size substituted', async () => {
