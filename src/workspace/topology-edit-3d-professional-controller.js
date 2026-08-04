@@ -103,11 +103,9 @@ export class TopologyEdit3DViewController extends InteractionController {
   }
 
   refreshFromWorkspace() {
-    const dataset = WorkspaceState.getSnapshot()?.dataset ?? null;
-    if (dataset !== this.editorDatasetObject) {
-      this.editorDatasetObject = dataset;
-      this.editorDatasetEpoch += 1;
-    }
+    const snapshot = WorkspaceState.getSnapshot();
+    this.editorDatasetObject = snapshot?.dataset ?? null;
+    this.editorDatasetEpoch = Number(snapshot?.version ?? 0);
     return super.refreshFromWorkspace();
   }
 
@@ -185,11 +183,20 @@ export class TopologyEdit3DViewController extends InteractionController {
   }
 
   syncEditorDatasetIdentity(canonical) {
-    this.editorStore.getState().actions.replaceDatasetIdentity({
+    const identity = {
       sourceHash: canonical.sourceHash,
       canonicalHash: canonical.canonicalTopologyHash,
       sessionVersion: this.editorDatasetEpoch,
-    });
+    };
+    this.editorStore.getState().actions.replaceDatasetIdentity(identity);
+    if (this.hostElement) {
+      this.hostElement.dataset.topologyEditDatasetSourceHash =
+        identity.sourceHash ?? '';
+      this.hostElement.dataset.topologyEditDatasetCanonicalHash =
+        identity.canonicalHash ?? '';
+      this.hostElement.dataset.topologyEditDatasetSessionVersion =
+        String(identity.sessionVersion);
+    }
   }
 
   handleUnifiedSelectionChanged(payload) {
