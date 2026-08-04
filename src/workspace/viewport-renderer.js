@@ -44,8 +44,8 @@ export class ViewportRenderer {
     this.backend?.setSelectionRequestHandler(callback);
   }
 
-  renderModel(model) {
-    this.requireBackend().renderModel(model);
+  renderModel(model, presentation = {}) {
+    this.requireBackend().renderModel(model, presentation);
   }
 
   clear() {

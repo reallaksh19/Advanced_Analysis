@@ -88,6 +88,17 @@ export function resolveThreeEntityId(object) {
   return '';
 }
 
+/**
+ * Resolves exactly one Three object for a canonical entity identity. Missing or
+ * multiply materialized identities deliberately return null so presentation
+ * consumers fail closed rather than choosing a first or nearest object.
+ */
+export function resolveUniqueThreeEntityObject(backend, entityId) {
+  if (typeof entityId !== 'string' || entityId.length === 0) return null;
+  const objects = backend?.objects?.get?.(entityId);
+  return Array.isArray(objects) && objects.length === 1 ? objects[0] : null;
+}
+
 export function clearThreeHostMetadata(hostElement) {
   [
     'viewportBackend',
