@@ -1336,3 +1336,110 @@ different) root cause. A quantitative match to real external data
 identified correctly, but not proof the causal story attached to it is
 complete — the only way to know is to test the fix and watch the
 number actually move.
+
+## BM1 next-steps triage — user split into (A)/(B)/(C)
+
+User asked what's next after the insulation fix and offered three
+options: (A) one-to-one OPE/SUS/EXP output comparison against the real
+CAESAR output, (B) add hangers to the benchmark and re-check core FEA,
+(C) B31.3 code stress evaluation for SUS and EXP. Assignment (after a
+self-correction the user explicitly flagged — the first message had
+(B)/(C) reversed): **(C) dispatched to the agent, (A) taken up directly
+by the Owner, (B) explicitly deferred** ("after further benchmarks" —
+not started; reference data already gathered for later: the original
+1001-P example's `HANGER` records at nodes 50/120/130 have no
+pre-computed spring rate, meaning a faithful implementation needs real
+hanger *design* logic, not just consuming a supplied rate, and the
+live `BM1_LEG` fixture currently has zero `HANGER` records at all).
+
+### (C) dispatched as issue #582 — B31.3 SUS/EXP code stress, no questionnaire
+
+Same agent as M020–M022-A; user explicitly waived the qualification
+questionnaire this round. Grounded the Work Pack in real, hand-verified
+numbers pulled directly from `BM1_CIIOutput.xml` before writing it —
+not left to the agent to rediscover: CASE 4 (SUS) `ALLOWABLE_STRESS` is
+a flat 137,895.140625 kPa on every element, exactly 20,000 psi
+(`STRESS_CNVCON=6.894757` kPa/psi); CASE 5 (EXP) `ALLOWABLE_STRESS` is
+206,842.703125 kPa, exactly 30,000 psi = 1.25×20,000+0.25×20,000 — the
+classic non-liberal B31.3 Eq. (1a), which is *already* the exact
+formula `lfea-b3.15-bm1-inputxml-fixtures.mjs`'s `DISPLACEMENT_STRESS_
+RANGE` call uses (`coldWeight=1.25, hotWeight=0.25`). Only the
+placeholder `SCREENING_ALLOWABLE=138e6` (reused for both Sc and Sh)
+needs replacing with a real, disclosed, traceable authority — the
+formula wiring was already right. Also found and cited, unread until
+now: `unityStressFactors()` already seals a `sustainedIndices` block
+nothing ever reads, and M010's `derivePressureStressContribution`/
+`resolvePressureStressContribution` (`linear-piping-code-application/
+pressure-stress-derivation.js`) already compute the real `S=P·Do/(4t)`
+pressure term from the SUS case's own existing `PRESSURE` primitive —
+`SUSTAINED` was never evaluated only because nothing wires these
+together, not because anything is missing. Real gaps also flagged:
+CAESAR's finer bend-station element granularity (already-disclosed
+M020 limitation) has no direct match for the two whole-chord bend
+elements; CAESAR's real per-element `SIF_IN_PLANE`/`SIF_OUT_PLANE` are
+not always 1.0 while this repo currently uses unity SIFs — a real,
+expected source of residual disagreement, not something to force-match.
+
+### (A) implemented and merged directly — PR #583
+
+Built a real parser (`lfea-bm1-cii-output-comparison.mjs`, reusing the
+existing no-dependency `inputxml-tag-scanner.js`) for
+`BM1_CIIOutput.xml`'s `DISPLACEMENT_REPORT`, `RESTRAINT_REPORT` and
+`GLOBAL_FORCE_REPORT` sections across all three real cases, and a
+one-to-one comparison against this repo's own `solveBm1InputXml()`
+results — OPE and SUS directly, EXP built as operating-minus-sustained
+on **both** sides (matching CAESAR's own `CASE 5 (EXP) L5=L3-L4`
+formula), independently. Every CAESAR row with no genuine counterpart
+in the 16-node/15-element compiled model (the 4 internal bend-station
+nodes; the finer bend-span element splits) is listed explicitly as
+unmatched, never dropped or force-matched.
+
+Hand-verified, not assumed, sign/unit conventions before writing any
+comparison logic: displacement mm→m and deg→rad with no sign change
+(already known from the earlier insulation-fix work); restraint
+reactions negated (also already known); element `GLOBAL_FORCE_REPORT`
+end-actions need **no** negation — newly confirmed here via the node-10
+anchor / element `IX-S1` nodal-equilibrium identity (a node with one
+attached element and one direct nodal load — its reaction differs from
+the element's own I-end action by exactly half the rigid component's
+weight, matching to five significant figures).
+
+**Real defect found and fixed while hand-verifying, not merely
+disclosed.** `constraintDeclarations()`'s `GUI`-restraint branch
+restrained the two axes *transverse* to the declared cosine, assuming
+a "double guide" convention. But every real `GUI` restraint in BM1
+(nodes 90, 120) is a **single** declared DOF, paired with a co-located
+`+Y` restraint at the same node covering the other transverse
+direction — confirmed by checking every real `GUI` occurrence in the
+live fixture (all pair 1:1 with a co-located `+Y` record) and by
+CAESAR's own `RESTRAINT_REPORT`, which shows a nonzero reaction on
+exactly the declared-cosine axis and nothing on the other. The prior
+logic left the declared axis completely unrestrained — the actual root
+cause of a >100× displacement blow-up downstream of nodes 60–150 that
+first surfaced as a raw magnitude check while building the comparison,
+before any CAESAR cross-reference was even involved. Fixed as a
+one-line change (single axis from the cosine, not the two transverse
+axes); full `check:lfea-linear-core` re-run afterward with zero
+regressions.
+
+Real numbers after the fix (CASE 4 SUS): node 120's `UY` reaction is
+**0.008%** off real CAESAR; total vertical reaction is **1.538%** off
+(consistent with the already-established insulation-fix number, since
+this fix only touches transverse DOFs); EXP-case total vertical
+reaction is **~0 N on both sides** (gravity does not change between
+OPE and SUS, so this is an independent physics cross-check the
+EXP-as-delta construction was not tuned to hit). Remaining downstream
+deviation is real and disclosed, not silently absorbed: nodes 70/80
+declare a real `FRIC_COEF=0.3` restraint-friction value this
+benchmark's constraint model does not implement — a genuinely
+different, nonlinear feature, correctly left as a stated limitation
+rather than chased into scope.
+
+**Process note**: the >100× displacement anomaly was caught by
+building the comparison tool itself and eyeballing raw magnitudes
+*before* touching CAESAR data at all — the CAESAR cross-check then
+confirmed which specific restraint was at fault and which single line
+was wrong, rather than being the thing that revealed a problem
+existed. Two independent signals (an internal sanity check plus an
+external reference) converging on the same one-line fix is stronger
+evidence than either alone.
