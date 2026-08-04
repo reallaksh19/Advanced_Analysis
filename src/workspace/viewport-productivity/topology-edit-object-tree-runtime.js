@@ -262,7 +262,7 @@ export class TopologyEditObjectTreeRuntime {
     this.controller.selectionCoordinator.requestCanonical(
       action,
       [canonicalId],
-      'object-tree',
+      'tree',
       {
         primaryId: canonicalId,
         anchorId: action === 'REPLACE' ? canonicalId : undefined,
@@ -278,7 +278,7 @@ export class TopologyEditObjectTreeRuntime {
       this.controller.selectionCoordinator.requestCanonical(
         'REPLACE',
         [canonicalId],
-        'object-tree',
+        'tree',
         { primaryId: canonicalId, anchorId: canonicalId },
       );
       await this.controller.runCommandAction(actionId);
