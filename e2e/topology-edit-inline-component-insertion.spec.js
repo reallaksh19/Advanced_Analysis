@@ -86,8 +86,13 @@ test('exact valve insertion applies, renders, undoes, and redoes as one governed
     valveFaceToFaceMm: 600,
     derivedFromEdgeId: target.id,
   });
-  expect(applied.inserted.catalogueRecordHash).toMatch(/^sha256:/u);
-  expect(applied.inserted.catalogueHash).toMatch(/^sha256:/u);
+  const catalogueHash = await host.getAttribute(
+    'data-topology-edit-professional-catalogue-hash',
+  );
+  expect(applied.inserted.catalogueHash).toBe(catalogueHash);
+  expect(applied.inserted.catalogueHash).toMatch(/^(?:fnv1a64|sha256):[0-9a-f]+$/u);
+  expect(applied.inserted.catalogueRecordHash)
+    .toMatch(/^(?:fnv1a64|sha256):[0-9a-f]+$/u);
   await expect.poll(() => integerAttribute(
     canvasHost,
     'data-topology-edit-valve-primitive-count',
