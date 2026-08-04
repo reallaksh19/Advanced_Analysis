@@ -55,6 +55,7 @@ export {
 export {
   applyBendingFlexibilityCorrection,
   applyBodyRigidityMultiplier,
+  applyCaesarRigidSectionCorrection,
   chainUnitLoadCompliance,
   generateComponentElement,
   uniformMomentCompliance,

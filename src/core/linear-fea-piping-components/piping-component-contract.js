@@ -66,6 +66,7 @@ export const REDUCER_RULES = Object.freeze([
 
 export const VALVE_BODY_RULES = Object.freeze([
   'VALVE_RIGID_BODY_V1',
+  'VALVE_CAESAR_RIGID_BODY_V1',
   'VALVE_SEMI_RIGID_BODY_V1',
 ]);
 
