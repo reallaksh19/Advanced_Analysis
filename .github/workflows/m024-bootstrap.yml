@@ -51,11 +51,18 @@ jobs:
 
           check_path = Path('scripts/lfea-b3.18-bm1-bend-check.mjs')
           check = check_path.read_text()
-          old_factor = 'definition.component.factorSet.flexibilityFactor.value'
-          assert check.count(old_factor) == 1
-          check_path.write_text(check.replace(old_factor, 'definition.component.flexibility.factor', 1))
+          replacements = {
+              'definition.component.factorSet.flexibilityFactor.value': 'definition.component.flexibility.factor',
+              "assert.equal(definition.component.flexibility.doubleCountGuard.status, 'PASS');":
+                  'assert.equal(definition.component.flexibility.doubleCountGuard.accepted, true);',
+              'assert.equal(definition.component.factorSet.pressureCorrectionApplied, true);':
+                  "assert.equal(definition.component.flexibility.pressureStiffeningRule, 'BEND_PRESSURE_STIFFENING_DECLARED_FACTOR_V1');\n  assert.ok(definition.component.flexibility.pressureBasis);",
+          }
+          for old, new in replacements.items():
+              assert check.count(old) == 1, old
+              check = check.replace(old, new, 1)
+          check_path.write_text(check)
           PY
-          sed -n '1,220p' scripts/lfea-b3.18-bm1-bend-check.mjs
           rm -rf tmp .m024 .github/workflows/m024-bootstrap.yml
           node --check scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs
           node --check scripts/lfea-b3.17-bm1-code-stress-fixtures.mjs
