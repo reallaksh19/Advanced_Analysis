@@ -9,7 +9,6 @@ import {
   buildSupportAttachmentModel,
 } from '../src/core/support-restraints/index.js';
 import { normalizeWorkspaceDataset } from '../src/workspace/dataset-adapter.js';
-import { resolveEntityType } from '../src/workspace/dataset-types.js';
 import { createDimensionAuthority } from '../src/workspace/topology-edit/dimension-authority.js';
 import {
   normalizeTopologyEditCanonicalIds,
@@ -170,36 +169,48 @@ test('20-element demo resolves real valve, flange, and support geometry', async 
   assert.equal(projection.glyphOverlays.every((overlay) => overlay.hostEntityId), true);
 });
 
-test('compact staged component codes normalize before typed visual derivation', () => {
-  assert.equal(resolveEntityType({ type: 'FLAN' }), 'FLANGE');
-  assert.equal(resolveEntityType({ type: 'VALV' }), 'VALVE');
-  assert.equal(resolveEntityType({ type: 'REDU' }), 'REDUCER');
-  assert.equal(resolveEntityType({ type: 'GASK' }), 'GASKET');
-
-  const canonicalTopology = finalizeCanonicalTopology({
-    schema: 'topology-edit-canonical-topology/v1',
+test('compact staged codes normalize only at the 3D Edit canonical boundary', () => {
+  const dataset = {
     datasetId: 'compact-types',
-    nodes: [
-      { id: 'node:a', position: { x: 0, y: 0, z: 0 }, portKeys: [] },
-      { id: 'node:b', position: { x: 100, y: 0, z: 0 }, portKeys: [] },
-      { id: 'node:c', position: { x: 200, y: 0, z: 0 }, portKeys: [] },
-    ],
-    edges: [
+    version: 0,
+    sourceSnapshot: { sourceSemanticHash: 'source:compact-types' },
+    entities: [
       {
-        id: 'edge:flan', componentKey: 'FLAN-1', fromNodeId: 'node:a',
-        toNodeId: 'node:b', entityType: resolveEntityType({ type: 'FLAN' }),
-        diameterMm: 100, outsideDiameterMm: 114.3,
-        diameterAuthority: 'OUTSIDE_DIAMETER',
+        entityId: 'FLAN-1', entityType: 'FLAN', category: 'pipe',
+        nominalDiameterMm: 100, outsideDiameterMm: 114.3,
+        sourcePath: '/compact/FLAN-1',
       },
       {
-        id: 'edge:valv', componentKey: 'VALV-1', fromNodeId: 'node:b',
-        toNodeId: 'node:c', entityType: resolveEntityType({ type: 'VALV' }),
-        diameterMm: 100, outsideDiameterMm: 114.3,
-        diameterAuthority: 'OUTSIDE_DIAMETER',
+        entityId: 'VALV-1', entityType: 'VALV', category: 'pipe',
+        nominalDiameterMm: 100, outsideDiameterMm: 114.3,
+        sourcePath: '/compact/VALV-1',
       },
     ],
-    junctions: [], supports: [], boundaries: [], rigids: [],
-  });
+  };
+  const topologyGraph = {
+    semanticHash: 'graph:compact-types',
+    components: [
+      { componentKey: 'FLAN-1', portKeys: ['FLAN-1:start', 'FLAN-1:end'] },
+      { componentKey: 'VALV-1', portKeys: ['VALV-1:start', 'VALV-1:end'] },
+    ],
+    ports: [
+      { portKey: 'FLAN-1:start', componentKey: 'FLAN-1', role: 'start', position: { x: 0, y: 0, z: 0 } },
+      { portKey: 'FLAN-1:end', componentKey: 'FLAN-1', role: 'end', position: { x: 100, y: 0, z: 0 } },
+      { portKey: 'VALV-1:start', componentKey: 'VALV-1', role: 'start', position: { x: 100, y: 0, z: 0 } },
+      { portKey: 'VALV-1:end', componentKey: 'VALV-1', role: 'end', position: { x: 200, y: 0, z: 0 } },
+    ],
+    connections: [
+      { portAKey: 'FLAN-1:end', portBKey: 'VALV-1:start' },
+    ],
+  };
+  const canonicalTopology = finalizeCanonicalTopology(
+    buildCanonicalTopologyFromWorkspaceDataset(dataset, topologyGraph),
+  );
+  assert.deepEqual(
+    canonicalTopology.edges.map((edge) => edge.entityType).sort(),
+    ['FLANGE', 'VALVE'],
+  );
+
   const visual = deriveTopologyVisualGeometry({
     canonicalTopology,
     dimensionAuthority: createDimensionAuthority(),
