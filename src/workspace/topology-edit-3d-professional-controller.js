@@ -1,4 +1,5 @@
 import './topology-edit-clean.css';
+import './topology-edit-tool-fixes.css';
 import {
   TopologyEdit3DViewController as InteractionController,
 } from './topology-edit-3d-interaction-controller.js';
