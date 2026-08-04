@@ -12,6 +12,7 @@ on:
       - 'src/workspace/non-fea-p0-observability.js'
       - 'src/workspace/three-viewport-scene.js'
       - 'tests/non-fea-p0-*.test.mjs'
+      - 'tests/topology-edit-c3d-wave1-sectioning.test.mjs'
   push:
     branches: [main]
     paths:
@@ -24,6 +25,7 @@ on:
       - 'src/workspace/non-fea-p0-observability.js'
       - 'src/workspace/three-viewport-scene.js'
       - 'tests/non-fea-p0-*.test.mjs'
+      - 'tests/topology-edit-c3d-wave1-sectioning.test.mjs'
   workflow_dispatch:
     inputs:
       warm_samples:
@@ -92,6 +94,7 @@ jobs:
           node --check src/workspace/three-viewport-scene.js
           node --check e2e/non-fea-p0-current-main-baseline.spec.js
           node --test tests/non-fea-p0-observability.test.mjs
+          node --test tests/topology-edit-c3d-wave1-sectioning.test.mjs
           test -z "$(git status --short)"
 
       - name: Acquire governed external fixture when configured

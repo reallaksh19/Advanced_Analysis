@@ -211,12 +211,17 @@ test('[SIMULATED] ray fallback skips clipped hits, preserves instanced identity,
   backend.groups.sourceGroup.add(outside);
   backend.groups.draftGroup.add(inside);
 
-  backend.pickRaycaster = raycasterSpy([
+  const primaryRaycaster = raycasterSpy([
     { object: outside, point: new THREE.Vector3(50, 0, 0) },
     { object: inside, point: new THREE.Vector3(0, 0, 0) },
   ]);
+  backend.pickRaycaster = primaryRaycaster;
   backend.setPresentationSectionPlanes(planes);
   assert.equal(backend.pickWithRaycaster(new THREE.Vector2()).objectId, 'inside');
+  assert.equal(
+    primaryRaycaster.params.Line.threshold,
+    backend.navigationConfiguration.pickingRadius,
+  );
 
   backend.pickRaycaster = raycasterSpy([
     { object: outside, point: new THREE.Vector3(50, 0, 0) },
@@ -318,6 +323,7 @@ function pickObject(target) {
 
 function raycasterSpy(hits) {
   return {
+    params: { Line: { threshold: null } },
     setFromCamera() {},
     intersectObjects() { return hits; },
   };
