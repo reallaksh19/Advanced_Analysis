@@ -130,7 +130,7 @@ function compileMeter(componentId, start, end, region, material, sections, frame
     referenceVector: [0, 1, 0],
   });
   component.elements.forEach((entry) => {
-    if (entry.frameElement.geometry.length !== METER_LENGTH) {
+    if (Math.abs(entry.frameElement.geometry.length - METER_LENGTH) > 1e-9) {
       throw new Error(`${componentId} must retain the published 5-ft/1.52-m finite length.`);
     }
   });

@@ -97,15 +97,17 @@ function tableSourceAction(analysis, label) {
 }
 
 /*
- * Appendix S's signed My follows the pipe internal-action convention, while
- * B-3.4 reports the joint action applied to each selected element end. The
- * selected Table-S303.3 source ends all use the published From→To direction;
- * the force sign is retained and the reported end moment is reversed under
- * the frozen B-2.0 element-action-on-joint convention.
+ * Owner review correction: the selected Table-S303.3 source ends already
+ * report `my` in the published Appendix S sign convention directly, with no
+ * reversal needed. Verified empirically across every I- and J-end source
+ * (nodes 10, 20, 110, 120, 140, 210, 220, 310): the raw recovered `global.my`
+ * sign matches the published sign at every one of them. The original claim
+ * that B-3.4's joint-action-on-element convention required negation did not
+ * hold up against the real recovered actions and has been removed.
  */
 export function publishedConventionAction(analysis, label) {
   const action = tableSourceAction(analysis, label).global;
-  return { fx: action.fx, my: -action.my };
+  return { fx: action.fx, my: action.my };
 }
 
 function codeSource(analysis, label) {

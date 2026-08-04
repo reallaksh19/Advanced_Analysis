@@ -49,7 +49,7 @@ import {
 
 console.log('\n--- LFEA B-3.14 ASME B31.3 Appendix S Example 3 ---');
 
-assert.equal(THERMAL_EXPANSION_COEFFICIENT, 1.1316165951359086e-5);
+assert.equal(THERMAL_EXPANSION_COEFFICIENT, 1.1530758226037196e-5);
 assert.equal(TEE_DERIVATION.flexibilityCharacteristic, 0.09846517906244273);
 assert.equal(TEE_DERIVATION.flexibilityFactor, 1);
 assert.equal(TEE_DERIVATION.outOfPlaneSif, 4.220728265475877);

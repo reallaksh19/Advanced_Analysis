@@ -68,15 +68,18 @@ export const PUBLISHED_EXPANSION_ALLOWABLE = 379.8e6;
 
 /*
  * ASME B31.3-2006 Appendix C Table C-1, Carbon Steel:
- * 250°F total expansion = 1.37 in/100 ft from the table reference;
+ * 250°F total expansion = 1.40 in/100 ft from the table reference
+ * (Owner-verified directly against the table: the 250°F Carbon Steel row
+ * reads 1.40, not 1.37 -- corrected during Owner review, see M018 PR
+ * discussion);
  * 40°F is linearly interpolated between 25°F (-0.32) and 50°F (-0.14),
  * giving -0.212 in/100 ft. B-3.1 consumes one mean coefficient:
  *
- * epsilon = [1.37 - (-0.212)] / 1200 = 0.0013183333333333335
+ * epsilon = [1.40 - (-0.212)] / 1200 = 0.0013433333333333333
  * alpha   = epsilon / (121°C - 4.5°C)
  */
 export const THERMAL_EXPANSION_COEFFICIENT =
-  ((1.37 - (-0.212)) / 1200)
+  ((1.40 - (-0.212)) / 1200)
   / (OPERATING_TEMPERATURE - INSTALLATION_TEMPERATURE);
 
 /*
