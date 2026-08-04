@@ -1752,3 +1752,89 @@ Posted full findings to the PR, then merged given real formulas, real
 sourcing (with the one disclosed limitation above), zero regressions,
 and real CI green. The `check:lfea-b3.19` collision with PR #594 is no
 longer a merge blocker since #594 remains held, not merging.
+
+## PR #594 update: friction converges, ±10% bar still red — held
+
+The agent reported a materially improved PR #594: production integration
+now committed directly and visible in the diff (the earlier self-committing
+CI patch-script pattern is gone), friction now genuinely converges
+(SUS 70/80 STICK, OPE 70/80 SLIP, both with real residuals), and the
+duplicate-key `package.json` bug from the earlier round is gone. **Noting
+a real discrepancy caught before trusting any of this**: the PR's own
+report cited a "final" commit `55fe08759146364161488417810640228d373252`
+that does not exist anywhere in the fetched repository — the actual head
+of `agent/m025-coulomb-friction` is `2fc930e7ed17db699ee63fe761bf96fef491ee3c`.
+Flagged to the user; not investigated further this round since #594 stays
+deferred either way.
+
+The PR is honest that it does **not** close #592: the complete ±10%
+CAESAR oracle still fails 212 of 1,224 comparisons, traced principally to
+an upstream OPE node-70 vertical load-path discrepancy (repo `635.092N`
+vs. CAESAR `862.995N`, -26.4%) that friction alone cannot repair since
+sliding force is bound by `T=μN`. A reducer-condensation experiment aimed
+at closing that gap was tried, made the result worse (212→231 failures),
+and was correctly reverted and recorded as a falsified hypothesis rather
+than shipped as a fitted correction. Per the Owner's framing this round —
+friction is a genuine nonlinear-optimization item to revisit later, not
+urgent relative to the three-phase stack below — PR #594 remains **held,
+not merged**.
+
+## Three-phase stack: rigid element, reducer condensation, B31 geometry custody
+
+The Owner requested integration of three new, independently-authored PRs
+unrelated to the M025 friction work, stacked `#615 → #618 → #621`. Found
+PR #618 unexpectedly `closed` with no explaining comment when picking
+this up — reopened it and retargeted its base from the feature branch to
+`main` once each predecessor merged, rather than merging through a stale
+base.
+
+**PR #615 (CAESAR rigid-element authority) → merged as
+`16efe2cf9249a88d93185c145ff0d671998be00e`.** Implements the documented
+CAESAR rigid-element rules: stiffness from the original inside diameter
+plus 10× entered wall thickness (an artificial stiffness-only wall);
+entered rigid weight as the sole body-weight authority (no metal weight
+inferred from the artificial wall); real inside-diameter fluid weight;
+1.75× entered-OD insulation weight; a zero entered weight suppressing
+fluid/insulation/refractory/cladding weight too. Hand-verified the
+stiffness-section arithmetic from the check's own case. Independently
+corroborated all three non-obvious rules via web search — including the
+zero-weight suppression rule, which real documentation confirms is a
+deliberate "modeling construct," not an invented simplification. Full
+aggregate zero regressions, real CI green.
+
+**PR #618 (ten-cylinder reducer condensation candidate) → merged as
+`8754ea4f7ff839d5085ceffa845ded9c81557149`.** Ten equal cylindrical spans
+with per-segment interpolated section properties, assembled into an
+eleven-station beam system, nine internal stations statically condensed
+(Guyan reduction) to the original two-node/twelve-DOF interface. Verified
+the condensation math itself is correct via two independent, non-circular
+checks rather than trusting the check's own pass: a **degenerate uniform-
+pipe identity** (condensing ten equal uniform segments must reproduce the
+single-element frame stiffness exactly — verified element-by-element
+across all 144 entries) and a **series-spring cross-check** (condensed
+axial/torsional boundary stiffness equals the reciprocal of the summed
+segment compliances). Both hold. The PR is explicitly honest that this is
+a candidate, not verified CAESAR parity (`parityStatus:
+CANDIDATE_PENDING_SECTION_SAMPLING_VERIFICATION`) because Hexagon's public
+documentation doesn't disclose the exact section-sampling location.
+Web search corroborated the ten-cylinder rule for reducer **weight**, but
+not specifically for **stiffness condensation** — recorded on the PR as a
+sharper version of the open question than the PR's own text states, since
+it's not just sampling location that's unverified but whether ten-segment
+condensation is the right stiffness model at all. Merged anyway as a
+clearly-labeled, additive, non-authoritative candidate (no BM1 usage).
+
+**PR #621 (sealed B31 supplementary geometry custody) → merged as
+`4792dd77a0060ff31827ca15826810971a63b6e5`.** Replaces the B31 factor
+calculator's old unsealed per-segment plain-object map with a versioned,
+hash-bound `fea-b31-supplementary-geometry-set/v1` contract (deterministic
+ordering, duplicate/stale-hash rejection, deep-frozen records). Confirmed
+the old map is genuinely dead, not a silent fallback — the check passes
+it explicitly for a tee case and it's ignored, correctly still failing
+closed. Hand-verified the check's reported bend factor
+(`6.938058224590004` at BM1 geometry, `P=2.15e6`) from scratch. Full
+aggregate zero regressions, real CI green on all three PRs both before
+and after each base retarget.
+
+None of the three touch BM1's production model or existing behavior;
+`check:lfea-linear-core` passed cleanly on each exact head throughout.
