@@ -107,6 +107,11 @@ export class TopologyEdit3DViewController extends InteractionController {
     if (dataset !== this.editorDatasetObject) {
       this.editorDatasetObject = dataset;
       this.editorDatasetEpoch += 1;
+      const currentIdentity = this.editorStore.getState().dataset;
+      this.applyEditorDatasetIdentity({
+        ...currentIdentity,
+        sessionVersion: this.editorDatasetEpoch,
+      });
     }
     return super.refreshFromWorkspace();
   }
@@ -185,11 +190,14 @@ export class TopologyEdit3DViewController extends InteractionController {
   }
 
   syncEditorDatasetIdentity(canonical) {
-    const identity = {
+    this.applyEditorDatasetIdentity({
       sourceHash: canonical.sourceHash,
       canonicalHash: canonical.canonicalTopologyHash,
       sessionVersion: this.editorDatasetEpoch,
-    };
+    });
+  }
+
+  applyEditorDatasetIdentity(identity) {
     this.editorStore.getState().actions.replaceDatasetIdentity(identity);
     if (this.hostElement) {
       this.hostElement.dataset.topologyEditDatasetSourceHash =
