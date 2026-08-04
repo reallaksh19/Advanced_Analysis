@@ -6,7 +6,9 @@ on:
       - '.github/workflows/topology-edit-tool-audit.yml'
       - 'e2e/topology-edit-tool-*.spec.js'
       - 'e2e/topology-edit-ray-*.spec.js'
+      - 'tests/topology-edit-navigation-pick-fallback.test.mjs'
       - 'src/workspace/topology-edit-3d-*.js'
+      - 'src/workspace/topology-edit-*.css'
       - 'src/workspace/topology-edit/**'
       - 'src/workspace/viewport-interaction/**'
       - 'src/workspace/viewport-presentation/**'
@@ -53,9 +55,14 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
           node --check src/workspace/topology-edit/topology-edit-navigation-hud-viewport-backend.js
+          node --check src/workspace/topology-edit-3d-professional-controller.js
+          node --check tests/topology-edit-navigation-pick-fallback.test.mjs
           node --check e2e/topology-edit-tool-audit.spec.js
           node --check e2e/topology-edit-ray-scan.spec.js
           git diff --check
+
+      - name: Execute GPU-to-ray fallback unit contract
+        run: node tests/topology-edit-navigation-pick-fallback.test.mjs
 
       - name: Execute full-canvas pick regression
         run: |
