@@ -1,5 +1,6 @@
-export const CONVERGENCE_PROFILE_ID = 'BKT_B_ACTUAL_H_RATIO_FOUR_LEVEL_CONVERGENCE_V3';
+export const CONVERGENCE_PROFILE_ID = 'BKT_B_ACTUAL_H_RATIO_FOUR_LEVEL_CONVERGENCE_V4';
 export const BOUNDED_OSCILLATION_UNCERTAINTY_PROFILE_ID = 'BKT_B_BOUNDED_OSCILLATION_UNCERTAINTY_V1';
+export const ASYMPTOTIC_TAIL_PLATEAU_PROFILE_ID = 'BKT_B_ASYMPTOTIC_TAIL_PLATEAU_V1';
 
 const LOCAL_QUANTITY_KINDS = new Set([
   'LOCAL_STRESS',
@@ -31,6 +32,9 @@ export function evaluateConvergence({
   referenceValue = null,
   referenceRelativeErrorLimit = null,
   boundedOscillationRelativeLimit = finestRelativeChangeLimit,
+  qualifiedTailRelativeLimit = quantityKind === 'LOCAL_STRESS'
+    ? finestRelativeChangeLimit
+    : null,
 } = {}) {
   if (!Array.isArray(levels) || levels.length < (requireFourLevels ? 4 : 3)) {
     throw new TypeError(
@@ -87,25 +91,15 @@ export function evaluateConvergence({
     ordered.at(-1).value,
   );
   const values = ordered.map((row) => row.value);
-  const zeroCrossing = values.some((value, index) => (
-    index > 0
-    && Math.sign(value) !== 0
-    && Math.sign(values[index - 1]) !== 0
-    && Math.sign(value) !== Math.sign(values[index - 1])
-  ));
+  const zeroCrossing = hasZeroCrossing(values);
   const oscillatory = windows.some((row) => row.oscillatory);
   const exactPlateau = windows.every((row) => row.plateau);
   const monotonic = windows.every((row) => row.monotonic);
   const asymptoticWithoutEnvelope = windows.every(
     (row) => row.asymptotic || row.plateau,
   );
-  const valueMinimum = Math.min(...values);
-  const valueMaximum = Math.max(...values);
-  const valueMidpoint = (valueMinimum + valueMaximum) / 2;
-  const uncertaintyHalfRange = (valueMaximum - valueMinimum) / 2;
-  const oscillationEnvelopeRelativeRange = (
-    valueMaximum - valueMinimum
-  ) / Math.max(1, Math.abs(valueMinimum), Math.abs(valueMaximum));
+  const valueEnvelope = envelope(values);
+  const oscillationEnvelopeRelativeRange = valueEnvelope.relativeRange;
   const boundedOscillation = Boolean(
     useProbeH
     && oscillatory
@@ -115,8 +109,27 @@ export function evaluateConvergence({
     && oscillationEnvelopeRelativeRange <= boundedOscillationRelativeLimit
     && finestRelativeChange <= boundedOscillationRelativeLimit,
   );
-  const plateau = exactPlateau || boundedOscillation;
-  const asymptotic = asymptoticWithoutEnvelope || boundedOscillation;
+
+  const qualifiedTailRows = ordered.slice(-3);
+  const qualifiedTailValues = qualifiedTailRows.map((row) => row.value);
+  const qualifiedTailEnvelope = envelope(qualifiedTailValues);
+  const qualifiedTailZeroCrossing = hasZeroCrossing(qualifiedTailValues);
+  const qualifiedTailPlateau = Boolean(
+    useProbeH
+    && ordered.length >= 4
+    && qualifiedTailRelativeLimit !== null
+    && Number.isFinite(qualifiedTailRelativeLimit)
+    && qualifiedTailRelativeLimit >= 0
+    && !qualifiedTailZeroCrossing
+    && qualifiedTailEnvelope.relativeRange <= qualifiedTailRelativeLimit
+    && finestRelativeChange <= qualifiedTailRelativeLimit
+    && (oscillatory || !asymptoticWithoutEnvelope),
+  );
+
+  const plateau = exactPlateau || boundedOscillation || qualifiedTailPlateau;
+  const asymptotic = asymptoticWithoutEnvelope
+    || boundedOscillation
+    || qualifiedTailPlateau;
   const orders = windows
     .map((row) => row.observedOrder)
     .filter((value) => Number.isFinite(value));
@@ -126,22 +139,31 @@ export function evaluateConvergence({
 
   let disposition;
   let acceptanceBasis = null;
+  let uncertaintyProfileId = null;
+  let uncertaintyEnvelope = null;
   if (zeroCrossing) {
     disposition = CONVERGENCE_DISPOSITIONS.ZERO_CROSSING_REVIEW;
+  } else if (
+    referenceRelativeErrorLimit !== null
+    && referenceRelativeError > referenceRelativeErrorLimit
+  ) {
+    disposition = CONVERGENCE_DISPOSITIONS.REFERENCE_ERROR_FAILURE;
+  } else if (qualifiedTailPlateau) {
+    disposition = CONVERGENCE_DISPOSITIONS.PASS_PLATEAU;
+    acceptanceBasis = ASYMPTOTIC_TAIL_PLATEAU_PROFILE_ID;
+    uncertaintyProfileId = ASYMPTOTIC_TAIL_PLATEAU_PROFILE_ID;
+    uncertaintyEnvelope = qualifiedTailEnvelope;
   } else if (boundedOscillation) {
     disposition = CONVERGENCE_DISPOSITIONS.PASS_PLATEAU;
     acceptanceBasis = BOUNDED_OSCILLATION_UNCERTAINTY_PROFILE_ID;
+    uncertaintyProfileId = BOUNDED_OSCILLATION_UNCERTAINTY_PROFILE_ID;
+    uncertaintyEnvelope = valueEnvelope;
   } else if (oscillatory) {
     disposition = ordered.length <= 4
       ? CONVERGENCE_DISPOSITIONS.ADDITIONAL_LEVEL_REQUIRED
       : CONVERGENCE_DISPOSITIONS.OSCILLATORY;
   } else if (!asymptotic) {
     disposition = CONVERGENCE_DISPOSITIONS.NON_ASYMPTOTIC;
-  } else if (
-    referenceRelativeErrorLimit !== null
-    && referenceRelativeError > referenceRelativeErrorLimit
-  ) {
-    disposition = CONVERGENCE_DISPOSITIONS.REFERENCE_ERROR_FAILURE;
   } else if (
     finestRelativeChangeLimit !== null
     && finestRelativeChange > finestRelativeChangeLimit
@@ -188,17 +210,23 @@ export function evaluateConvergence({
     boundedOscillation,
     boundedOscillationRelativeLimit,
     oscillationEnvelopeRelativeRange,
-    uncertaintyProfileId: boundedOscillation
-      ? BOUNDED_OSCILLATION_UNCERTAINTY_PROFILE_ID
-      : null,
-    uncertaintyEnvelope: boundedOscillation
-      ? Object.freeze({
-        minimum: valueMinimum,
-        maximum: valueMaximum,
-        midpoint: valueMidpoint,
-        halfRange: uncertaintyHalfRange,
-        relativeRange: oscillationEnvelopeRelativeRange,
-      })
+    qualifiedTailPlateau,
+    qualifiedTailRelativeLimit,
+    qualifiedTailRelativeRange: qualifiedTailEnvelope.relativeRange,
+    qualifiedTailLevelIds: Object.freeze(
+      qualifiedTailRows.map((row) => row.level ?? null),
+    ),
+    excludedPreAsymptoticLevels: qualifiedTailPlateau
+      ? Object.freeze(ordered.slice(0, -3).map((row) => Object.freeze({
+        level: row.level ?? null,
+        h: row.h,
+        probeH: row.probeH ?? null,
+        value: row.value,
+      })))
+      : Object.freeze([]),
+    uncertaintyProfileId,
+    uncertaintyEnvelope: uncertaintyEnvelope
+      ? Object.freeze(uncertaintyEnvelope)
       : null,
     acceptanceBasis,
     requiresAdditionalLevel: disposition
@@ -297,6 +325,28 @@ function solveObservedOrder(h0, h1, h2, ratio) {
     }
   }
   return (low + high) / 2;
+}
+
+function envelope(values) {
+  const minimum = Math.min(...values);
+  const maximum = Math.max(...values);
+  return {
+    minimum,
+    maximum,
+    midpoint: (minimum + maximum) / 2,
+    halfRange: (maximum - minimum) / 2,
+    relativeRange: (maximum - minimum)
+      / Math.max(1, Math.abs(minimum), Math.abs(maximum)),
+  };
+}
+
+function hasZeroCrossing(values) {
+  return values.some((value, index) => (
+    index > 0
+    && Math.sign(value) !== 0
+    && Math.sign(values[index - 1]) !== 0
+    && Math.sign(value) !== Math.sign(values[index - 1])
+  ));
 }
 
 function relativeChange(left, right) {
