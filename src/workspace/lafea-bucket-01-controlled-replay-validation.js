@@ -13,6 +13,9 @@ import {
   LAFEA_BUCKET_01_REPLAY_SCOPES,
 } from './lafea-bucket-01-replay-artifact-policy.js';
 
+const LAFEA_BUCKET_01_CHARACTERISTIC_H_SCHEMA =
+  'lafea-bucket-01-characteristic-h-evidence/v1';
+
 const FROZEN_HASH_KEYS = Object.freeze([
   'coordinates', 'stressTolerances', 'loads', 'supports', 'material',
   'solverPolicy', 'codeBasisBoundary', 'physicalProblemDefinition',
