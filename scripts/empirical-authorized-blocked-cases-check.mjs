@@ -109,7 +109,7 @@ for (const [id, field, changedHash] of [
   results.push({ id, status: 'BLOCKED', code: 'EMPIRICAL_INPUT_HASH_MISMATCH', field });
 }
 
-assert.equal(results.length, 15);
+assert.equal(results.length, 16);
 console.log(JSON.stringify({
   status: 'PASS',
   matrix: 'EMP01_FAIL_CLOSED_BLOCKED_CASES',
