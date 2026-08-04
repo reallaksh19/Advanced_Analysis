@@ -13,6 +13,7 @@ const levels = [
   { radialDivisions: 2, circumferentialDivisions: 16 },
   { radialDivisions: 4, circumferentialDivisions: 32 },
   { radialDivisions: 8, circumferentialDivisions: 64 },
+  { radialDivisions: 16, circumferentialDivisions: 128 },
 ];
 const tolerances = {
   areaRelative: 0.005,
@@ -56,16 +57,14 @@ const evidences = levels.map((level, index) => {
 
 assert.deepEqual(
   evidences.map(({ evidence }) => evidence.topology.elementCount),
-  [64, 256, 1024],
+  [64, 256, 1024, 4096],
 );
-assert.ok(
-  evidences[2].evidence.geometry.areaRelativeError
-    < evidences[1].evidence.geometry.areaRelativeError,
-);
-assert.ok(
-  evidences[1].evidence.geometry.areaRelativeError
-    < evidences[0].evidence.geometry.areaRelativeError,
-);
+for (let index = 1; index < evidences.length; index += 1) {
+  assert.ok(
+    evidences[index].evidence.geometry.areaRelativeError
+      < evidences[index - 1].evidence.geometry.areaRelativeError,
+  );
+}
 
 const duplicated = structuredClone(evidences[0].meshPackage);
 duplicated.mesh.nodes[1].x = duplicated.mesh.nodes[0].x;
@@ -91,4 +90,4 @@ assert.equal(
   false,
 );
 
-console.log('Bucket-01 production annular T6 mesh qualification checks passed.');
+console.log('Bucket-01 governed 64/256/1024/4096 annular T6 mesh qualification checks passed.');

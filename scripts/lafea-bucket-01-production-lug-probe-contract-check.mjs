@@ -8,6 +8,9 @@ import {
   generateLafeaLugPinholeT6Mesh,
   LAFEA_LUG_PINHOLE_T6_MESH_SPEC_SCHEMA,
 } from '../src/core/lafea-meshing/lug-pinhole-t6.js';
+import {
+  observeLafeaBucket01ProbeTopology,
+} from '../src/workspace/lafea-bucket-01-fixed-probe.js';
 import { canonicalLafeaSha256 } from '../src/workspace/lafea-canonical-sha256.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -26,15 +29,36 @@ validateSpec(spec);
 const points = allPoints(spec);
 const levels = spec.meshLadder.map((definition) =>
   qualifyLevel(definition, points));
+const topologySequences = points.map((point) =>
+  topologySequence(point, levels));
 const reportBase = {
-  schema: 'lafea-bucket-01-production-lug-probe-contract-evidence/v1',
-  producerRevision: 'B01-LUG-PROBE-CONTRACT.1',
+  schema: 'lafea-bucket-01-production-lug-probe-contract-evidence/v2',
+  producerRevision: 'B01-LUG-PROBE-CONTRACT.3',
   specId: spec.specId,
   specHash: canonicalLafeaSha256(spec),
   levels,
+  topologySequences,
   pointCount: points.length,
-  authority: spec.authority,
+  convergenceWindow: spec.convergenceWindow,
+  authority: {
+    ...spec.authority,
+    containingElementObserved: true,
+    radialRingObserved: true,
+    circumferentialSectorObserved: true,
+    triangleSideObserved: true,
+    naturalCoordinatesObserved: true,
+    naturalMarginObserved: true,
+    pointJacobianObserved: true,
+    localElementSizeObserved: true,
+    exactQuadraticEdgeDistancesObserved: true,
+    topologySignatureObserved: true,
+    parentCellLineageObserved: true,
+    topologyCompatibilityIsQualificationAuthority: false,
+  },
   status: 'PASS',
+  disposition: topologySequences.every((row) => row.topologyCompatible)
+    ? 'TOPOLOGY_OBSERVABILITY_RETAINED_COMPATIBLE'
+    : 'TOPOLOGY_OBSERVABILITY_RETAINED_MESH_REPAIR_REQUIRED',
 };
 const report = { ...reportBase, evidenceHash: canonicalLafeaSha256(reportBase) };
 fs.mkdirSync(path.dirname(REPORT_PATH), { recursive: true });
@@ -42,15 +66,27 @@ fs.writeFileSync(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 console.log(JSON.stringify(report));
 
 function validateSpec(value) {
-  assert.equal(value.schema, 'lafea-bucket-01-production-lug-probe-spec/v1');
+  assert.equal(value.schema, 'lafea-bucket-01-production-lug-probe-spec/v2');
   assert.equal(value.benchmarkId, 'C2D-LUG-PINHOLE-01');
   assert.equal(value.stageId, 'LAFEA.3');
   assert.equal(value.formulation, 'PLANE_STRESS');
-  assert.deepEqual(value.meshLadder.map((row) => row.elementCount), [64, 256, 1024]);
-  assert.deepEqual(value.meshLadder.map((row) => row.radialDivisions), [2, 4, 8]);
+  assert.deepEqual(
+    value.meshLadder.map((row) => row.elementCount),
+    [64, 256, 1024, 4096],
+  );
+  assert.deepEqual(
+    value.meshLadder.map((row) => row.radialDivisions),
+    [2, 4, 8, 16],
+  );
   assert.deepEqual(
     value.meshLadder.map((row) => row.circumferentialDivisions),
-    [16, 32, 64],
+    [16, 32, 64, 128],
+  );
+  assert.deepEqual(value.convergenceWindow.governedLevelOrdinals, [1, 2, 3, 4]);
+  assert.deepEqual(value.convergenceWindow.evaluatedLevelOrdinals, [2, 3, 4]);
+  assert.equal(
+    value.convergenceWindow.policy,
+    'FINEST_THREE_OF_GOVERNED_FOUR_LEVEL_LADDER',
   );
   assert.equal(value.authority.coordinatesFrozenBeforeProductionStressObservation, true);
   assert.equal(value.authority.productionOutputUsedToSelectCoordinates, false);
@@ -58,6 +94,11 @@ function validateSpec(value) {
   assert.equal(value.authority.movingMaximumUsed, false);
   assert.equal(value.authority.nodalProjectionUsed, false);
   assert.equal(value.authority.crossElementAveragingUsed, false);
+  assert.equal(value.authority.integrationPointExtrapolationUsed, false);
+  assert.equal(
+    value.authority.recovery,
+    'DIRECT_T6_B_MATRIX_AT_FIXED_PHYSICAL_COORDINATE',
+  );
   assert.ok(value.tolerances.highGradientGciMax > 0);
   assert.ok(value.tolerances.nonSingularGciMax > 0);
   const ids = allPoints(value).map((row) => row.probeId);
@@ -95,115 +136,115 @@ function qualifyLevel(definition, points) {
     startAngleDegrees: 0,
   });
   assert.equal(packageValue.mesh.elements.length, definition.elementCount);
-  const nodeById = new Map(packageValue.mesh.nodes.map((row) => [row.nodeId, row]));
   const pointEvidence = points.map((point) => {
-    const candidates = [];
-    for (const element of packageValue.mesh.elements) {
-      const nodes = element.nodeIds.map((nodeId) => nodeById.get(nodeId));
-      const natural = invertT6(nodes, point.x, point.y);
-      if (natural && inside(natural.xi, natural.eta)) {
-        candidates.push({ elementId: element.elementId, natural, nodes });
-      }
-    }
-    assert.equal(candidates.length, 1, `${point.probeId} level ${definition.ordinal}`);
-    const candidate = candidates[0];
-    const mapped = mapT6(candidate.nodes, candidate.natural.xi, candidate.natural.eta);
-    const residual = Math.hypot(mapped.x - point.x, mapped.y - point.y);
-    const margin = Math.min(
-      candidate.natural.xi,
-      candidate.natural.eta,
-      1 - candidate.natural.xi - candidate.natural.eta,
+    const observation = observeLafeaBucket01ProbeTopology(
+      packageValue.mesh,
+      point,
     );
-    assert.ok(residual <= spec.tolerances.mappingResidualMax);
-    assert.ok(margin >= spec.tolerances.naturalCoordinateMarginMin);
+    assert.equal(observation.status, 'PASS');
+    assert.equal(observation.containmentCandidateCount, 1);
+    assert.equal(observation.meshTopology.metadataAvailable, true);
+    assert.ok(observation.mappingResidual <= spec.tolerances.mappingResidualMax);
+    assert.ok(
+      observation.minimumNaturalMargin
+        >= spec.tolerances.naturalCoordinateMarginMin,
+    );
+    assert.ok(observation.jacobianDeterminant > 0);
+    assert.ok(observation.localElementSize > 0);
+    assert.ok(observation.minimumPhysicalEdgeDistance > 0);
     return {
       probeId: point.probeId,
       role: point.role,
-      elementId: candidate.elementId,
-      naturalCoordinates: candidate.natural,
-      naturalCoordinateMargin: margin,
-      mappingResidual: residual,
+      elementId: observation.elementId,
+      ring: observation.meshTopology.radialRingIndex,
+      sector: observation.meshTopology.circumferentialSectorIndex,
+      triangleSide: observation.meshTopology.triangleSide,
+      orientation: observation.meshTopology.orientation,
+      xi: observation.naturalCoordinates.xi,
+      eta: observation.naturalCoordinates.eta,
+      lambda1: observation.naturalCoordinates.lambda1,
+      minimumNaturalMargin: observation.minimumNaturalMargin,
+      jacobianDeterminant: observation.jacobianDeterminant,
+      localElementSize: observation.localElementSize,
+      probeToEdgeDistances: observation.probeToEdgeDistances,
+      minimumPhysicalEdgeDistance: observation.minimumPhysicalEdgeDistance,
+      topologySignature: observation.topologySignature,
+      elementPhaseSignature: observation.elementPhaseSignature,
+      parentCellLineage: observation.meshTopology.parentCellLineage,
+      mappingResidual: observation.mappingResidual,
+      topologyObservationHash: observation.semanticHash,
+      status: 'PASS',
     };
   });
   return {
     ordinal: definition.ordinal,
     elementCount: packageValue.mesh.elements.length,
     nodeCount: packageValue.mesh.nodes.length,
+    radialDivisions: definition.radialDivisions,
+    circumferentialDivisions: definition.circumferentialDivisions,
     meshHash: canonicalLafeaSha256(packageValue.mesh),
     pointEvidence,
     status: 'PASS',
   };
 }
 
-function invertT6(nodes, x, y) {
-  const [a, b, c] = nodes;
-  const determinant = (b.x - a.x) * (c.y - a.y)
-    - (c.x - a.x) * (b.y - a.y);
-  if (determinant === 0) return null;
-  let xi = ((x - a.x) * (c.y - a.y)
-    - (c.x - a.x) * (y - a.y)) / determinant;
-  let eta = ((b.x - a.x) * (y - a.y)
-    - (x - a.x) * (b.y - a.y)) / determinant;
-  for (let iteration = 0; iteration < 30; iteration += 1) {
-    const mapped = mapT6WithJacobian(nodes, xi, eta);
-    const rx = mapped.x - x;
-    const ry = mapped.y - y;
-    if (Math.hypot(rx, ry) <= 1e-10) return { xi, eta };
-    if (!(Math.abs(mapped.determinant) > 1e-18)) return null;
-    const dxi = (mapped.dyDeta * rx - mapped.dxDeta * ry) / mapped.determinant;
-    const deta = (-mapped.dyDxi * rx + mapped.dxDxi * ry) / mapped.determinant;
-    xi -= dxi;
-    eta -= deta;
-    if (!Number.isFinite(xi) || !Number.isFinite(eta)) return null;
+function topologySequence(point, levelsValue) {
+  const observations = levelsValue.map((level) => {
+    const row = level.pointEvidence.find((candidate) =>
+      candidate.probeId === point.probeId);
+    assert.ok(row);
+    return { ordinal: level.ordinal, ...row };
+  });
+  const transitions = observations.slice(1).map((fine, index) => {
+    const coarse = observations[index];
+    const coarseLevel = levelsValue[index];
+    const fineLevel = levelsValue[index + 1];
+    const radialRatio = fineLevel.radialDivisions / coarseLevel.radialDivisions;
+    const circumferentialRatio = fineLevel.circumferentialDivisions
+      / coarseLevel.circumferentialDivisions;
+    const radialParentCompatible = Number.isInteger(radialRatio)
+      && Math.floor(fine.ring / radialRatio) === coarse.ring;
+    const circumferentialParentCompatible = Number.isInteger(circumferentialRatio)
+      && Math.floor(fine.sector / circumferentialRatio) === coarse.sector;
+    const topologySignatureStable = fine.topologySignature === coarse.topologySignature;
+    return {
+      coarseOrdinal: coarse.ordinal,
+      fineOrdinal: fine.ordinal,
+      coarseElementId: coarse.elementId,
+      fineElementId: fine.elementId,
+      radialRefinementRatio: radialRatio,
+      circumferentialRefinementRatio: circumferentialRatio,
+      radialParentCompatible,
+      circumferentialParentCompatible,
+      triangleSideStable: fine.triangleSide === coarse.triangleSide,
+      orientationStable: fine.orientation === coarse.orientation,
+      topologySignatureStable,
+      naturalCoordinateDelta: {
+        xi: Math.abs(fine.xi - coarse.xi),
+        eta: Math.abs(fine.eta - coarse.eta),
+        lambda1: Math.abs(fine.lambda1 - coarse.lambda1),
+      },
+      parentElementLineage: `${fine.elementId}->${coarse.elementId}`,
+      compatible: radialParentCompatible
+        && circumferentialParentCompatible
+        && topologySignatureStable
+        && fine.orientation === coarse.orientation,
+    };
+  });
+  const reasons = [];
+  for (const transition of transitions) {
+    if (!transition.radialParentCompatible) reasons.push('RADIAL_CELL_PHASE_MOVEMENT');
+    if (!transition.circumferentialParentCompatible) {
+      reasons.push('CIRCUMFERENTIAL_CELL_PHASE_MOVEMENT');
+    }
+    if (!transition.topologySignatureStable) reasons.push('TOPOLOGY_SIGNATURE_CHANGED');
+    if (!transition.orientationStable) reasons.push('TRIANGLE_ORIENTATION_CHANGED');
   }
-  const mapped = mapT6(nodes, xi, eta);
-  return Math.hypot(mapped.x - x, mapped.y - y) <= 1e-8 ? { xi, eta } : null;
-}
-
-function inside(xi, eta) {
-  return xi >= -1e-9 && eta >= -1e-9 && xi + eta <= 1 + 1e-9;
-}
-
-function mapT6(nodes, xi, eta) {
-  const shape = t6Shape(xi, eta);
   return {
-    x: shape.N.reduce((sum, value, index) => sum + value * nodes[index].x, 0),
-    y: shape.N.reduce((sum, value, index) => sum + value * nodes[index].y, 0),
-  };
-}
-
-function mapT6WithJacobian(nodes, xi, eta) {
-  const shape = t6Shape(xi, eta);
-  let x = 0; let y = 0; let dxDxi = 0; let dyDxi = 0;
-  let dxDeta = 0; let dyDeta = 0;
-  for (let index = 0; index < 6; index += 1) {
-    x += shape.N[index] * nodes[index].x;
-    y += shape.N[index] * nodes[index].y;
-    dxDxi += shape.dNdXi[index] * nodes[index].x;
-    dyDxi += shape.dNdXi[index] * nodes[index].y;
-    dxDeta += shape.dNdEta[index] * nodes[index].x;
-    dyDeta += shape.dNdEta[index] * nodes[index].y;
-  }
-  return {
-    x, y, dxDxi, dyDxi, dxDeta, dyDeta,
-    determinant: dxDxi * dyDeta - dxDeta * dyDxi,
-  };
-}
-
-function t6Shape(xi, eta) {
-  const l1 = 1 - xi - eta; const l2 = xi; const l3 = eta;
-  return {
-    N: [
-      l1 * (2 * l1 - 1), l2 * (2 * l2 - 1), l3 * (2 * l3 - 1),
-      4 * l1 * l2, 4 * l2 * l3, 4 * l3 * l1,
-    ],
-    dNdXi: [
-      4 * xi + 4 * eta - 3, 4 * xi - 1, 0,
-      4 * (1 - 2 * xi - eta), 4 * eta, -4 * eta,
-    ],
-    dNdEta: [
-      4 * xi + 4 * eta - 3, 0, 4 * eta - 1,
-      -4 * xi, 4 * xi, 4 * (1 - xi - 2 * eta),
-    ],
+    probeId: point.probeId,
+    observations,
+    transitions,
+    topologyCompatible: transitions.every((row) => row.compatible),
+    reasons: [...new Set(reasons)].sort(),
   };
 }

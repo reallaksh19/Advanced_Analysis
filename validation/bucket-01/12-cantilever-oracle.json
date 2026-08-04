@@ -1,0 +1,87 @@
+{
+  "schema": "lafea-bucket-01-cantilever-oracle/v1",
+  "oracleId": "B01-CANTILEVER-TIMOSHENKO-01",
+  "benchmarkId": "C2D-CANTILEVER-PLANE-STRESS-01",
+  "authority": {
+    "type": "ENGINEERING_THEORY",
+    "source": "Timoshenko beam: delta = P L^3/(3 E I) + P L/(kappa G A)",
+    "productionOutputUsed": false,
+    "observedResultUsedToSelectTolerance": false,
+    "smoothedStressUsed": false
+  },
+  "formulation": "PLANE_STRESS",
+  "elementType": "T6",
+  "units": {
+    "length": "mm",
+    "force": "N",
+    "stress": "MPa",
+    "modulus": "MPa"
+  },
+  "material": {
+    "elasticModulus": 200000,
+    "poissonRatio": 0.3
+  },
+  "geometry": {
+    "length": 100,
+    "depth": 10,
+    "thickness": 1
+  },
+  "load": {
+    "loadCaseId": "CANTILEVER",
+    "resultant": 100,
+    "type": "UNIFORM_END_EDGE_TRACTION"
+  },
+  "shearCorrectionFactor": 0.8333333333333334,
+  "meshes": [
+    {
+      "levelId": "L1",
+      "nx": 4,
+      "ny": 1,
+      "elementCount": 8,
+      "solverMethod": "DETERMINISTIC_CHOLESKY"
+    },
+    {
+      "levelId": "L2",
+      "nx": 8,
+      "ny": 2,
+      "elementCount": 32,
+      "solverMethod": "DETERMINISTIC_CHOLESKY"
+    },
+    {
+      "levelId": "L3",
+      "nx": 16,
+      "ny": 4,
+      "elementCount": 128,
+      "solverMethod": "DETERMINISTIC_CHOLESKY"
+    },
+    {
+      "levelId": "L4",
+      "nx": 32,
+      "ny": 8,
+      "elementCount": 512,
+      "solverMethod": "DETERMINISTIC_JACOBI_PCG"
+    }
+  ],
+  "expected": {
+    "referenceDeflection": 2.0156,
+    "horizontalAppliedForce": { "x": 0, "y": -100 },
+    "verticalAppliedForce": { "x": 100, "y": 0 },
+    "appliedMomentZ": -10000
+  },
+  "tolerances": {
+    "monotonicSlack": 1e-10,
+    "finestDeflectionRatioAbsoluteError": 0.05,
+    "orientationDeflectionRelativeDifference": 1e-8,
+    "forceEquilibriumRelative": 1e-8,
+    "momentEquilibriumRelative": 1e-8,
+    "energyRelative": 1e-8
+  },
+  "equations": [
+    "I = thickness * depth^3 / 12",
+    "G = E / (2 * (1 + nu))",
+    "A = depth * thickness",
+    "delta = P * length^3 / (3 * E * I) + P * length / (kappa * G * A)",
+    "uniform traction magnitude = P / (depth * thickness)",
+    "linear elastic external work = 0.5 * F^T * u"
+  ]
+}

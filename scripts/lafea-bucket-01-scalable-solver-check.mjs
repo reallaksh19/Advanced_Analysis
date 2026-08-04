@@ -107,7 +107,11 @@ function evaluateGrid(identity, cellsX, cellsY, version) {
   const source = rectangularSource(identity, cellsX, cellsY, version);
   const model = createCanonicalLocalContinuumModel(source);
   const result = calculateLocalContinuum(model);
-  assert.equal(result.qualification.state, QUALIFICATION_STATES.ACCEPTED);
+  assert.equal(
+    result.qualification.state,
+    QUALIFICATION_STATES.ACCEPTED,
+    `${identity} rejected: ${JSON.stringify(result.diagnostics ?? [])}`,
+  );
   const loadCase = result.loadCaseResults[0];
   assert.equal(loadCase.equilibrium.accepted, true);
   assert.equal(loadCase.energyQualification.accepted, true);

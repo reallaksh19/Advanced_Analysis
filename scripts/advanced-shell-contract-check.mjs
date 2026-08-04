@@ -62,7 +62,7 @@ const loadCalcViewSource = await readFile(path.join(root, 'src/workspace/load-ca
 const loadCalcTabs = [...loadCalcViewSource.matchAll(/tab\('([^']+)'/g)].map((match) => match[1]);
 assert.deepEqual(loadCalcTabs, ['loads', 'preflight', 'project-data', 'masters', 'json-trace']);
 const loadCalcControllerSource = await readFile(path.join(root, 'src/workspace/load-calc-consumer-controller.js'), 'utf8');
-for (const requiredView of ['empirical-preflight-view.js', 'project-data/project-data-view.js', 'master-data-ui.js', 'json-trace-ui.js', 'topology-edit-3d-view-controller.js']) {
+for (const requiredView of ['empirical-preflight-view.js', 'project-data/project-data-view.js', 'master-data-ui.js', 'json-trace-ui.js', 'topology-edit-3d-professional-controller.js']) {
   assert.equal(loadCalcControllerSource.includes(requiredView), true, `Load Calc must mount ${requiredView}.`);
 }
 const jsonTraceSource = await readFile(path.join(root, 'src/workspace/json-trace-ui.js'), 'utf8');

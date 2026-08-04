@@ -25,6 +25,7 @@ const validInput = syntheticApprovedInput();
 const packageValue = createLafeaBucket01CodeBasis(validInput);
 assert.equal(validateLafeaBucket01CodeBasis(packageValue).ok, true);
 assert.equal(packageValue.status, 'CODE_BASIS_FROZEN');
+assert.equal(packageValue.producerRevision, 'B01-CODE-BASIS.2');
 assert.equal(packageValue.authorityBoundary.codeAssessmentPerformed, false);
 assert.equal(packageValue.authorityBoundary.codeVerified, false);
 assert.equal(packageValue.authorityBoundary.bucketQualified, false);
@@ -54,6 +55,16 @@ assertRejected(
 assertRejected(
   {
     ...validInput,
+    stressClassification: {
+      ...validInput.stressClassification,
+      extractionAuthority: 'RETAINED_INTEGRATION_POINT_FIXED_PROBES_AND_PATHS',
+    },
+  },
+  'LAFEA_B01_CODE_BASIS_EXTRACTION_AUTHORITY_INVALID',
+);
+assertRejected(
+  {
+    ...validInput,
     loadCombination: {
       ...validInput.loadCombination,
       terms: validInput.loadCombination.terms.map((row) => ({ ...row, factor: 0 })),
@@ -66,17 +77,21 @@ tampered.allowable.value += 1;
 assert.equal(validateLafeaBucket01CodeBasis(tampered).ok, false);
 
 const reportBase = {
-  schema: 'lafea-bucket-01-code-basis-contract-evidence/v1',
-  producerRevision: 'B01-CODE-BASIS-CONTRACT.1',
+  schema: 'lafea-bucket-01-code-basis-contract-evidence/v2',
+  producerRevision: 'B01-CODE-BASIS-CONTRACT.2',
   templateHash: canonicalLafeaSha256(template),
   templateStatus: template.status,
   syntheticFixtureSemanticHash: packageValue.semanticHash,
+  requiredExtractionAuthority: 'RETAINED_DIRECT_T6_FIXED_PROBES_AND_PATHS',
   rejectionCases: [
     'UNAPPROVED_AUTHORITY', 'MISSING_EDITION', 'NONPOSITIVE_ALLOWABLE',
-    'MOVING_MAXIMUM_EXTRACTION', 'ZERO_LOAD_COMBINATION', 'TAMPERED_PACKAGE',
+    'MOVING_MAXIMUM_EXTRACTION', 'INTEGRATION_POINT_EXTRACTION',
+    'ZERO_LOAD_COMBINATION', 'TAMPERED_PACKAGE',
   ],
   authority: {
     contractImplemented: true,
+    directFixedPointStressRequired: true,
+    integrationPointExtrapolationAuthorized: false,
     committedCodeBasisResolved: false,
     syntheticFixtureEligibleForEngineeringUse: false,
     governingCodeSelectedByRepository: false,
@@ -99,6 +114,10 @@ function validateUnresolvedTemplate(value) {
   assert.equal(value.requiredFields.governingCode.edition, null);
   assert.equal(value.requiredFields.allowable.value, null);
   assert.deepEqual(value.requiredFields.stressClassification.locationIds, []);
+  assert.equal(
+    value.requiredFields.stressClassification.extractionAuthority,
+    'RETAINED_DIRECT_T6_FIXED_PROBES_AND_PATHS',
+  );
   assert.deepEqual(value.requiredFields.loadCombination.terms, []);
   assert.equal(value.requiredFields.authority.approvalStatus, 'UNAPPROVED');
   assert.equal(value.requiredFields.authority.approvalRecordHash, null);
@@ -128,7 +147,7 @@ function syntheticApprovedInput() {
       sourceSection: 'TEST-SECTION',
       locationIds: ['LUG_NEAR_HOLE_PMAX', 'LUG_RADIAL_PATH_THETA_67:R47'],
       stressQuantity: 'VON_MISES',
-      extractionAuthority: 'RETAINED_INTEGRATION_POINT_FIXED_PROBES_AND_PATHS',
+      extractionAuthority: 'RETAINED_DIRECT_T6_FIXED_PROBES_AND_PATHS',
       singularityTreatment: 'EXCLUDE_UNCLASSIFIED_SINGULAR_PEAKS',
     },
     loadCombination: {

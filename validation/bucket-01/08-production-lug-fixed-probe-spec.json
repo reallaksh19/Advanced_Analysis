@@ -1,5 +1,5 @@
 {
-  "schema": "lafea-bucket-01-production-lug-probe-spec/v1",
+  "schema": "lafea-bucket-01-production-lug-probe-spec/v2",
   "specId": "B01-PRODUCTION-LUG-FIXED-STRESS-01",
   "benchmarkId": "C2D-LUG-PINHOLE-01",
   "stageId": "LAFEA.3",
@@ -38,8 +38,20 @@
       "meshSize": 0.015625,
       "radialDivisions": 8,
       "circumferentialDivisions": 64
+    },
+    {
+      "ordinal": 4,
+      "elementCount": 4096,
+      "meshSize": 0.0078125,
+      "radialDivisions": 16,
+      "circumferentialDivisions": 128
     }
   ],
+  "convergenceWindow": {
+    "governedLevelOrdinals": [1, 2, 3, 4],
+    "evaluatedLevelOrdinals": [2, 3, 4],
+    "policy": "FINEST_THREE_OF_GOVERNED_FOUR_LEVEL_LADDER"
+  },
   "probes": [
     {
       "probeId": "LUG_NEAR_HOLE_PMAX",
@@ -125,7 +137,9 @@
     "movingMaximumUsed": false,
     "nodalProjectionUsed": false,
     "crossElementAveragingUsed": false,
-    "acceptance": "THREE_LEVEL_GCI_AT_FIXED_PHYSICAL_COORDINATES"
+    "integrationPointExtrapolationUsed": false,
+    "recovery": "DIRECT_T6_B_MATRIX_AT_FIXED_PHYSICAL_COORDINATE",
+    "acceptance": "FINEST_THREE_OF_GOVERNED_FOUR_LEVEL_GCI_AT_FIXED_PHYSICAL_COORDINATES"
   },
-  "currentDisposition": "FROZEN_SPEC_PENDING_RETAINED_PRODUCTION_EXECUTION"
+  "currentDisposition": "GOVERNED_4096_DIRECT_POINT_SPEC_PENDING_RETAINED_PRODUCTION_EXECUTION"
 }

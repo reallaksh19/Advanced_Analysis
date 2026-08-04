@@ -1,0 +1,80 @@
+name: LAFEA Bucket-01 Exact Head
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  exact-head:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Publish runner-started status
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh api --method POST
+          "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}"
+          -f state=pending
+          -f context=lafea/bucket-01-exact-head
+          -f description="Exact-head runner started"
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run Bucket-01 exact-head gate
+        id: gate
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          mkdir -p reports/qualification
+          set +e
+          node scripts/lafea-bucket-01-exact-head-check.mjs \
+            > reports/qualification/lafea-bucket-01-exact-head.stdout.log \
+            2> reports/qualification/lafea-bucket-01-exact-head.stderr.log
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Publish exact-head result
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXIT_CODE: ${{ steps.gate.outputs.exit_code }}
+        shell: bash
+        run: |
+          blocker=$(node -e "const fs=require('fs');const p='reports/qualification/lafea-bucket-01-exact-head.json';let t='UNKNOWN';if(fs.existsSync(p)){const r=JSON.parse(fs.readFileSync(p,'utf8'));if(r.blockingCheckIds?.[0])t=r.blockingCheckIds[0]}process.stdout.write(t)")
+          repair_blocker=$(node -e "const fs=require('fs');const p='reports/qualification/lafea-bucket-01-repair-check.json';let t='NONE';if(fs.existsSync(p)){const r=JSON.parse(fs.readFileSync(p,'utf8'));if(r.blockingCheckIds?.[0])t=r.blockingCheckIds[0]}process.stdout.write(t)")
+          if [[ "$EXIT_CODE" == "0" ]]; then
+            state=success
+            description="Bucket-01 exact-head executable gate passed"
+          else
+            state=failure
+            description="First blocker: ${blocker}"
+            safe=$(printf '%s' "$blocker" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-60)
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -f state=failure -f context="lafea/blocker/${safe}" \
+              -f description="$description"
+            if [[ "$repair_blocker" != "NONE" ]]; then
+              nested=$(printf '%s' "$repair_blocker" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-52)
+              gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+                -f state=failure -f context="lafea/repair-blocker/${nested}" \
+                -f description="Repair blocker: ${repair_blocker}"
+            fi
+          fi
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state="$state" -f context=lafea/bucket-01-exact-head \
+            -f description="$description"
+          exit "$EXIT_CODE"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-bucket-01-exact-head-${{ github.sha }}
+          path: reports/qualification/
+          if-no-files-found: warn
+          retention-days: 30

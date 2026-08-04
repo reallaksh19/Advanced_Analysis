@@ -1,5 +1,5 @@
 {
-  "schema": "lafea-bucket-01-expected-value-registry/v1",
+  "schema": "lafea-bucket-01-expected-value-registry/v2",
   "registryId": "B01-EXPECTED-VALUE-DEFINITION-SET-01",
   "bucketId": "LAFEA-BENCH-B01-CONTINUUM-LUG-PINHOLE",
   "target": "C2D-LUG-PINHOLE -> LAFEA.3",
@@ -9,7 +9,7 @@
     {
       "entryId": "PURE_BENDING_PANEL_ORACLE",
       "path": "validation/bucket-01/03-pure-bending-panel-oracle.json",
-      "schema": "lafea-bucket-01-pure-bending-panel-oracle/v1",
+      "schema": "lafea-bucket-01-pure-bending-oracle/v1",
       "role": "INDEPENDENT_CLOSED_FORM_ORACLE"
     },
     {
@@ -25,6 +25,12 @@
       "role": "INDEPENDENT_CLOSED_FORM_ORACLE"
     },
     {
+      "entryId": "CANTILEVER_ORACLE",
+      "path": "validation/bucket-01/12-cantilever-oracle.json",
+      "schema": "lafea-bucket-01-cantilever-oracle/v1",
+      "role": "INDEPENDENT_ENGINEERING_THEORY_ORACLE"
+    },
+    {
       "entryId": "KIRSCH_FIXED_PROBE_ORACLE",
       "path": "validation/bucket-01/07-kirsch-fixed-probe-oracle.json",
       "schema": "lafea-bucket-01-kirsch-fixed-probe-oracle/v1",
@@ -33,22 +39,25 @@
     {
       "entryId": "PRODUCTION_RESPONSE_CONVERGENCE_DEFINITION",
       "path": "validation/bucket-01/06-production-response-convergence-spec.json",
-      "schema": "lafea-bucket-01-production-response-spec/v1",
+      "schema": "lafea-bucket-01-production-response-spec/v3",
       "role": "FROZEN_PRODUCTION_CONVERGENCE_DEFINITION"
     },
     {
       "entryId": "PRODUCTION_LUG_STRESS_LOCATION_DEFINITION",
       "path": "validation/bucket-01/08-production-lug-fixed-probe-spec.json",
-      "schema": "lafea-bucket-01-production-lug-probe-spec/v1",
+      "schema": "lafea-bucket-01-production-lug-probe-spec/v2",
       "role": "FROZEN_PRODUCTION_STRESS_LOCATION_DEFINITION"
     }
   ],
   "acceptancePolicy": {
     "closedFormBenchmarksRequireIndependentExpectedValues": true,
-    "productionEnergyAcceptedByThreeLevelConvergence": true,
-    "productionStressAcceptedByFixedCoordinateThreeLevelConvergence": true,
+    "engineeringTheoryBenchmarksRequireFrozenExpectedValues": true,
+    "productionResponseGovernedByFourLevels": true,
+    "productionEnergyAcceptedByFinestThreeLevelConvergence": true,
+    "productionStressAcceptedByDirectFixedCoordinateFinestThreeLevelConvergence": true,
+    "integrationPointExtrapolationAcceptanceAuthorized": false,
     "movingMaximumAcceptanceAuthorized": false,
     "productionOutputUsedToSelectCoordinatesOrTolerances": false
   },
-  "currentDisposition": "DEFINITION_SET_FROZEN_EXECUTION_EVIDENCE_SEPARATE"
+  "currentDisposition": "GOVERNED_4096_DIRECT_POINT_DEFINITION_SET_FROZEN_EXECUTION_EVIDENCE_SEPARATE"
 }

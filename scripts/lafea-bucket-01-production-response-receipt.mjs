@@ -40,7 +40,8 @@ const spec = JSON.parse(fs.readFileSync(SPEC_PATH, 'utf8'));
 const projection = JSON.parse(fs.readFileSync(PROJECTION_PATH, 'utf8'));
 const execution = JSON.parse(fs.readFileSync(EXECUTION_PATH, 'utf8'));
 
-validateEnvelope(projection, execution, exactHeadSha);
+validateSpec(spec);
+validateEnvelope(projection, execution, exactHeadSha, spec.meshLadder.length);
 const levels = spec.meshLadder.map((definition, index) => extractLevel(
   definition,
   projection.levels[index],
@@ -70,12 +71,34 @@ const evidence = evaluateLafeaBucket01ProductionResponse({
   },
 });
 assert.equal(validateLafeaBucket01ProductionResponseEvidence(evidence).ok, true);
+assert.deepEqual(evidence.energyConvergenceLevelOrdinals, [2, 3, 4]);
+assert.deepEqual(evidence.energyConvergenceElementCounts, [256, 1024, 4096]);
 fs.mkdirSync(path.dirname(REPORT_PATH), { recursive: true });
 fs.writeFileSync(REPORT_PATH, `${JSON.stringify(evidence, null, 2)}\n`, 'utf8');
 console.log(JSON.stringify(evidence));
 if (evidence.status !== 'PASS') process.exit(1);
 
-function validateEnvelope(projectionValue, executionValue, head) {
+function validateSpec(value) {
+  assert.equal(value.schema, 'lafea-bucket-01-production-response-spec/v3');
+  assert.deepEqual(
+    value.meshLadder.map((row) => row.elementCount),
+    [64, 256, 1024, 4096],
+  );
+  assert.deepEqual(
+    value.convergence.strainEnergy.governedLevelOrdinals,
+    [1, 2, 3, 4],
+  );
+  assert.deepEqual(
+    value.convergence.strainEnergy.evaluatedLevelOrdinals,
+    [2, 3, 4],
+  );
+  assert.equal(
+    value.convergence.strainEnergy.method,
+    'FINEST_THREE_OF_GOVERNED_FOUR_LEVEL_RICHARDSON_GCI',
+  );
+}
+
+function validateEnvelope(projectionValue, executionValue, head, levelCount) {
   assert.equal(projectionValue.schema, 'lafea-lug-pinhole-physical-problem-projection/v1');
   assert.equal(projectionValue.status, 'PROJECTION_READY');
   assert.equal(projectionValue.releaseRecord.candidateHeadSha, head);
@@ -85,8 +108,8 @@ function validateEnvelope(projectionValue, executionValue, head) {
   assert.equal(executionValue.projectionHash, projectionValue.projectionHash);
   assert.equal(executionValue.controllerResult.status, 'ACCEPTED');
   assert.equal(executionValue.controllerResult.accepted, true);
-  assert.equal(projectionValue.levels.length, 3);
-  assert.equal(executionValue.controllerResult.levelResults.length, 3);
+  assert.equal(projectionValue.levels.length, levelCount);
+  assert.equal(executionValue.controllerResult.levelResults.length, levelCount);
 }
 
 function extractLevel(definition, projected, controlled, specValue) {

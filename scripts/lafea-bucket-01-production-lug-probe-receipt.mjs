@@ -12,6 +12,11 @@ import {
   validateLafeaBucket01FixedProbeEvidence,
 } from '../src/workspace/lafea-bucket-01-fixed-probe.js';
 import {
+  LAFEA_BUCKET_01_PROBE_TOPOLOGY_AUDIT_INPUT_SCHEMA,
+  evaluateLafeaBucket01ProbeTopologyAudit,
+  validateLafeaBucket01ProbeTopologyAuditEvidence,
+} from '../src/workspace/lafea-bucket-01-probe-topology.js';
+import {
   LAFEA_BUCKET_01_STRESS_CONVERGENCE_INPUT_SCHEMA,
   evaluateLafeaBucket01StressConvergence,
   validateLafeaBucket01StressConvergenceEvidence,
@@ -47,7 +52,12 @@ const projection = JSON.parse(fs.readFileSync(PROJECTION_PATH, 'utf8'));
 const execution = JSON.parse(fs.readFileSync(EXECUTION_PATH, 'utf8'));
 
 validateSpec(spec);
-validateEnvelope(projection, execution, exactHeadSha);
+validateEnvelope(
+  projection,
+  execution,
+  exactHeadSha,
+  spec.meshLadder.length,
+);
 const levels = spec.meshLadder.map((definition, index) => normalizeLevel(
   definition,
   projection.levels[index],
@@ -67,16 +77,44 @@ const standaloneProbeReceipts = spec.probes.map((definition) =>
   }, levels));
 const pathReceipts = spec.paths.map((pathDefinition) =>
   evaluatePath(pathDefinition, levels));
+const fixedLocations = [
+  ...standaloneProbeReceipts,
+  ...pathReceipts.flatMap((row) => row.stationReceipts),
+];
+const failingLocations = fixedLocations
+  .filter((row) => row.status !== 'PASS')
+  .map((row) => ({
+    probeId: row.probeId,
+    role: row.role,
+    pathId: row.pathId,
+    stationId: row.stationId,
+    zone: row.zone,
+    reasons: row.reasons,
+    recoveryReasons: row.recoveryReasons,
+    observations: row.observations,
+    governedObservations: row.governedObservations,
+    fineGridGci: row.convergence.fineGridGci,
+    observedOrder: row.convergence.observedOrder,
+    classification: row.convergence.classification,
+    topologyStatus: row.topologyAudit.status,
+    topologyReasons: row.topologyAudit.reasons,
+    topologyDiagnosis: row.topologyAudit.diagnosis,
+    governedTopology: row.topologyAudit.levels,
+    topologyTransitions: row.topologyAudit.transitions,
+  }));
+const status = failingLocations.length === 0 ? 'PASS' : 'BLOCKED';
 
 const reportBase = {
-  schema: 'lafea-bucket-01-production-lug-fixed-probe-evidence/v1',
-  producerRevision: 'B01-PRODUCTION-LUG-PROBES.1',
+  schema: 'lafea-bucket-01-production-lug-fixed-probe-evidence/v2',
+  producerRevision: 'B01-PRODUCTION-LUG-PROBES.5',
   exactHeadSha,
   specId: spec.specId,
   benchmarkId: spec.benchmarkId,
   specHash: canonicalLafeaSha256(spec),
   projectionHash: projection.projectionHash,
   executionHash: execution.executionHash,
+  governedLevelOrdinals: spec.convergenceWindow.governedLevelOrdinals,
+  evaluatedLevelOrdinals: spec.convergenceWindow.evaluatedLevelOrdinals,
   levelParents: levels.map((level) => ({
     ordinal: level.ordinal,
     elementCount: level.definition.elementCount,
@@ -89,12 +127,26 @@ const reportBase = {
   })),
   standaloneProbeReceipts,
   pathReceipts,
-  status: 'PASS',
+  failingLocations,
+  status,
+  reasons: failingLocations.map((row) =>
+    `FIXED_LOCATION_BLOCKED:${row.probeId}:${row.reasons.join('+')}`),
   authority: {
     fixedPhysicalCoordinatesFrozenBeforeProductionStressObservation: true,
-    retainedIntegrationPointTensorAuthority: true,
+    directElementPointRecovery: true,
+    retainedNodalDisplacementAuthority: true,
+    retainedConstitutiveMatrixAuthority: true,
+    integrationPointExtrapolationUsed: false,
     elementLocalReconstruction: true,
-    threeLevelGciAcceptance: true,
+    governedProbeTopologyObserved: true,
+    exactContainingElementRequired: true,
+    annularRingSectorTriangleRecorded: true,
+    naturalCoordinatesAndMarginsRecorded: true,
+    exactQuadraticEdgeDistancesRecorded: true,
+    topologySignatureChangesFailClosed: true,
+    parentCellLineageAudited: true,
+    governedAcceptanceFailuresRetainedBeforeExit: true,
+    finestThreeOfGovernedFourGciAcceptance: true,
     movingMaximumUsed: false,
     nodalProjectionUsed: false,
     crossElementAveragingUsed: false,
@@ -104,8 +156,9 @@ const reportBase = {
   qualificationStates: {
     implemented: true,
     productionLugProbeReceiptProduced: true,
-    solverVerified: false,
-    stressVerified: false,
+    probeTopologyObserved: true,
+    solverVerified: true,
+    stressVerified: status === 'PASS',
     codeVerified: false,
     integrationVerified: false,
     bucketQualified: false,
@@ -118,26 +171,34 @@ const report = {
 fs.mkdirSync(path.dirname(REPORT_PATH), { recursive: true });
 fs.writeFileSync(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 console.log(JSON.stringify(report));
+if (status !== 'PASS') process.exit(1);
 
 function validateSpec(value) {
-  assert.equal(value.schema, 'lafea-bucket-01-production-lug-probe-spec/v1');
+  assert.equal(value.schema, 'lafea-bucket-01-production-lug-probe-spec/v2');
   assert.equal(value.benchmarkId, 'C2D-LUG-PINHOLE-01');
   assert.equal(value.stageId, 'LAFEA.3');
   assert.equal(value.formulation, 'PLANE_STRESS');
   assert.equal(value.loadCaseId, 'LC1');
   assert.deepEqual(
     value.meshLadder.map((row) => row.elementCount),
-    [64, 256, 1024],
+    [64, 256, 1024, 4096],
   );
+  assert.deepEqual(value.convergenceWindow.governedLevelOrdinals, [1, 2, 3, 4]);
+  assert.deepEqual(value.convergenceWindow.evaluatedLevelOrdinals, [2, 3, 4]);
   assert.equal(value.authority.coordinatesFrozenBeforeProductionStressObservation, true);
   assert.equal(value.authority.productionOutputUsedToSelectCoordinates, false);
   assert.equal(value.authority.productionOutputUsedToSetTolerances, false);
   assert.equal(value.authority.movingMaximumUsed, false);
   assert.equal(value.authority.nodalProjectionUsed, false);
   assert.equal(value.authority.crossElementAveragingUsed, false);
+  assert.equal(value.authority.integrationPointExtrapolationUsed, false);
+  assert.equal(
+    value.authority.recovery,
+    'DIRECT_T6_B_MATRIX_AT_FIXED_PHYSICAL_COORDINATE',
+  );
 }
 
-function validateEnvelope(projectionValue, executionValue, head) {
+function validateEnvelope(projectionValue, executionValue, head, levelCount) {
   assert.equal(
     projectionValue.schema,
     'lafea-lug-pinhole-physical-problem-projection/v1',
@@ -153,8 +214,8 @@ function validateEnvelope(projectionValue, executionValue, head) {
   assert.equal(executionValue.projectionHash, projectionValue.projectionHash);
   assert.equal(executionValue.controllerResult.status, 'ACCEPTED');
   assert.equal(executionValue.controllerResult.accepted, true);
-  assert.equal(projectionValue.levels.length, 3);
-  assert.equal(executionValue.controllerResult.levelResults.length, 3);
+  assert.equal(projectionValue.levels.length, levelCount);
+  assert.equal(executionValue.controllerResult.levelResults.length, levelCount);
 }
 
 function normalizeLevel(definition, projected, controlled) {
@@ -173,6 +234,7 @@ function normalizeLevel(definition, projected, controlled) {
   const result = controlled.execution.result;
   assert.equal(result.schema, 'local-continuum-result/v1');
   assert.equal(result.qualification.state, 'ACCEPTED');
+  assert.equal(result.meshEvidence.formulation, 'PLANE_STRESS');
   const loadCase = result.loadCaseResults.find(
     (row) => row.loadCaseId === spec.loadCaseId,
   );
@@ -207,20 +269,29 @@ function evaluatePath(pathDefinition, levelsValue) {
       radius: station.radius,
       angleDegrees: pathDefinition.angleDegrees,
     }, levelsValue));
-  assert.equal(stations.every((row) => row.status === 'PASS'), true);
+  const status = stations.every((row) => row.status === 'PASS')
+    ? 'PASS' : 'BLOCKED';
   const base = {
-    schema: 'lafea-bucket-01-production-lug-fixed-path-evidence/v1',
+    schema: 'lafea-bucket-01-production-lug-fixed-path-evidence/v2',
     pathId: pathDefinition.pathId,
     component: pathDefinition.component,
     units: pathDefinition.units,
     angleDegrees: pathDefinition.angleDegrees,
     stationReceipts: stations,
     stationCount: stations.length,
-    status: 'PASS',
+    status,
+    reasons: stations
+      .filter((row) => row.status !== 'PASS')
+      .map((row) => `STATION_BLOCKED:${row.probeId}`),
     authority: {
       samplingAuthority: 'FIXED_STRESS_PATH',
       allStationsFrozenBeforeProductionStressObservation: true,
-      integrationPointAuthorityRetained: true,
+      directElementPointRecovery: true,
+      governedProbeTopologyObserved: true,
+      topologySignatureChangesFailClosed: true,
+      retainedNodalDisplacementAuthority: true,
+      retainedConstitutiveMatrixAuthority: true,
+      integrationPointExtrapolationUsed: false,
       movingMaximumUsed: false,
       nodalProjectionUsed: false,
       crossElementAveragingUsed: false,
@@ -247,7 +318,7 @@ function evaluateFixedLocation(definition, levelsValue) {
     units: definition.units,
     zone: definition.zone,
   });
-  const probeEvidences = levelsValue.map((level) => {
+  const governedProbeEvidences = levelsValue.map((level) => {
     const evidence = recoverLafeaBucket01FixedProbe({
       schema: LAFEA_BUCKET_01_FIXED_PROBE_INPUT_SCHEMA,
       exactHeadSha,
@@ -274,45 +345,68 @@ function evaluateFixedLocation(definition, levelsValue) {
       true,
     );
     assert.equal(evidence.status, 'PASS');
-    assert.ok(
-      evidence.mappingResidual <= spec.tolerances.mappingResidualMax,
-      `${definition.probeId} level ${level.ordinal} mapping residual`,
+    assert.equal(
+      evidence.recoveryAuthority,
+      'ELEMENT_LOCAL_DIRECT_DISPLACEMENT_GRADIENT',
     );
-    const naturalMargin = Math.min(
-      evidence.naturalCoordinates.xi,
-      evidence.naturalCoordinates.eta,
-      1 - evidence.naturalCoordinates.xi - evidence.naturalCoordinates.eta,
-    );
-    assert.ok(
-      naturalMargin >= spec.tolerances.naturalCoordinateMarginMin,
-      `${definition.probeId} level ${level.ordinal} natural margin`,
-    );
+    assert.equal(evidence.retainedIntegrationPointExtrapolationUsed, false);
+    assert.ok(evidence.jacobianDeterminant > 0);
+    assert.ok(evidence.localElementSize > 0);
+    assert.ok(evidence.minimumPhysicalEdgeDistance > 0);
     return evidence;
   });
+  const recoveryReasons = governedProbeEvidences.flatMap((evidence, index) => {
+    const level = levelsValue[index];
+    const reasons = [];
+    if (evidence.mappingResidual > spec.tolerances.mappingResidualMax) {
+      reasons.push(`RECOVERY_LEVEL_${level.ordinal}_MAPPING_RESIDUAL_EXCEEDED`);
+    }
+    return reasons;
+  });
+  const topologyAudit = evaluateLafeaBucket01ProbeTopologyAudit({
+    schema: LAFEA_BUCKET_01_PROBE_TOPOLOGY_AUDIT_INPUT_SCHEMA,
+    exactHeadSha,
+    governedLevelOrdinals: levelsValue.map((row) => row.ordinal),
+    probeEvidences: governedProbeEvidences,
+    minimumNaturalMargin: spec.tolerances.naturalCoordinateMarginMin,
+  });
+  assert.equal(
+    validateLafeaBucket01ProbeTopologyAuditEvidence(
+      topologyAudit,
+      governedProbeEvidences,
+    ).ok,
+    true,
+  );
+  const convergenceLevels = levelsValue.slice(-3);
+  const probeEvidences = governedProbeEvidences.slice(-3);
   const gciTolerance = definition.zone === 'HIGH_GRADIENT'
     ? spec.tolerances.highGradientGciMax
     : spec.tolerances.nonSingularGciMax;
-  const convergence = evaluateLafeaBucket01StressConvergence({
+  const stressConvergenceEvidence = evaluateLafeaBucket01StressConvergence({
     schema: LAFEA_BUCKET_01_STRESS_CONVERGENCE_INPUT_SCHEMA,
     exactHeadSha,
     probeEvidences,
-    meshSizes: spec.meshLadder.map((row) => row.meshSize),
+    meshSizes: convergenceLevels.map((row) => row.definition.meshSize),
     gciTolerance,
     minimumObservedOrder: spec.tolerances.minimumObservedOrder,
     asymptoticRatioBounds: spec.tolerances.asymptoticRatioBounds,
   });
   assert.equal(
     validateLafeaBucket01StressConvergenceEvidence(
-      convergence,
+      stressConvergenceEvidence,
       probeEvidences,
     ).ok,
     true,
   );
-  assert.equal(
-    convergence.status,
-    'PASS',
-    `${definition.probeId}: ${convergence.reasons.join(', ')}`,
-  );
+  const reasons = [
+    ...recoveryReasons,
+    ...topologyAudit.reasons.map((row) => `TOPOLOGY_${row}`),
+    ...stressConvergenceEvidence.reasons.map((row) => `STRESS_${row}`),
+  ];
+  const status = recoveryReasons.length === 0
+    && topologyAudit.status === 'PASS'
+    && stressConvergenceEvidence.status === 'PASS'
+    ? 'PASS' : 'BLOCKED';
   return {
     probeId: definition.probeId,
     role: definition.role,
@@ -325,10 +419,23 @@ function evaluateFixedLocation(definition, levelsValue) {
     radius: definition.radius,
     angleDegrees: definition.angleDegrees,
     locationDefinitionHash,
+    governedLevelOrdinals: levelsValue.map((row) => row.ordinal),
+    evaluatedLevelOrdinals: convergenceLevels.map((row) => row.ordinal),
+    governedObservations: governedProbeEvidences.map(
+      (row) => row.authoritativeValue,
+    ),
     observations: probeEvidences.map((row) => row.authoritativeValue),
+    governedFixedProbeEvidenceHashes: governedProbeEvidences.map(
+      (row) => row.semanticHash,
+    ),
     fixedProbeEvidenceHashes: probeEvidences.map((row) => row.semanticHash),
-    convergence,
+    recoveryReasons,
+    topologyAudit,
+    topologyAuditEvidenceHash: topologyAudit.semanticHash,
+    convergence: stressConvergenceEvidence.convergence,
+    stressConvergenceEvidenceHash: stressConvergenceEvidence.semanticHash,
     gciTolerance,
-    status: 'PASS',
+    status,
+    reasons: [...new Set(reasons)].sort(),
   };
 }

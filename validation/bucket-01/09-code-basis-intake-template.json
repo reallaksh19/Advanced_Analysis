@@ -34,7 +34,7 @@
       "sourceSection": null,
       "locationIds": [],
       "stressQuantity": null,
-      "extractionAuthority": "RETAINED_INTEGRATION_POINT_FIXED_PROBES_AND_PATHS",
+      "extractionAuthority": "RETAINED_DIRECT_T6_FIXED_PROBES_AND_PATHS",
       "singularityTreatment": "EXCLUDE_UNCLASSIFIED_SINGULAR_PEAKS"
     },
     "loadCombination": {
@@ -57,7 +57,7 @@
     "infer governing code from repository or geography",
     "select latest edition automatically",
     "invent allowable stress or material scope",
-    "classify stress from moving maxima or display contours",
+    "classify stress from moving maxima, display contours, nodal averages, or integration-point extrapolation",
     "invent load factors or combinations",
     "treat a synthetic fixture as engineering approval"
   ],

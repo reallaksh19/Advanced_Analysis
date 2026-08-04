@@ -1,0 +1,97 @@
+{
+  "schema": "lafea-bucket-01-probe-stable-polar-design/v3",
+  "designId": "B01-PROBE-STABLE-POLAR-V3",
+  "benchmarkId": "C2D-LUG-PINHOLE-01",
+  "sourceProbeSpecId": "B01-PRODUCTION-LUG-FIXED-STRESS-01",
+  "geometry": {
+    "holeRadius": 20,
+    "outerRadius": 100,
+    "startAngleDegrees": 0,
+    "endAngleDegrees": 360
+  },
+  "refinementRatio": 2,
+  "levelCount": 4,
+  "radialAxis": {
+    "axisId": "B01-PROBE-STABLE-RADIAL",
+    "axisKind": "RADIAL_LENGTH",
+    "anchors": [
+      { "anchorId": "R27", "value": 27 },
+      { "anchorId": "R33", "value": 33 },
+      { "anchorId": "R47", "value": 47 },
+      { "anchorId": "R73", "value": 73 },
+      { "anchorId": "R87", "value": 87 }
+    ],
+    "protectedBreakpoints": [60],
+    "targetPhase": 0.35,
+    "backgroundBaseDivisions": 6,
+    "windowClearanceFraction": 0.3
+  },
+  "circumferentialAxis": {
+    "axisId": "B01-PROBE-STABLE-CIRCUMFERENTIAL",
+    "axisKind": "POLAR_ANGLE_DEGREES",
+    "anchors": [
+      { "anchorId": "THETA_17", "value": 17 },
+      { "anchorId": "THETA_67", "value": 67 },
+      { "anchorId": "THETA_83", "value": 83 }
+    ],
+    "protectedBreakpoints": [90, 180, 270],
+    "targetPhase": 0.65,
+    "backgroundBaseDivisions": 16,
+    "windowClearanceFraction": 0.3
+  },
+  "midsideGeometryPolicy": {
+    "holeBoundaryCircumferentialEdges": "ANALYTIC_CIRCULAR_ARC",
+    "outerBoundaryCircumferentialEdges": "ANALYTIC_CIRCULAR_ARC",
+    "internalCircumferentialEdges": "STRAIGHT_CHORD",
+    "radialEdges": "STRAIGHT_CHORD",
+    "diagonalEdges": "STRAIGHT_CHORD",
+    "physicalBoundaryGeometryPreserved": true,
+    "internalCircularConstraintClaimed": false
+  },
+  "productionMappingPolicy": {
+    "loadFeatureRole": "RADIAL_QUARTER_0",
+    "restraintFeatureRole": "RADIAL_QUARTER_2",
+    "radialWindowStart": 20,
+    "radialWindowEnd": 60,
+    "windowEndpointsRequiredAtEveryLevel": true,
+    "edgeSelectionAuthority": "EXACT_PHYSICAL_COORDINATE_WINDOW_NOT_INDEX_SCALING"
+  },
+  "topologyPolicy": {
+    "elementFamily": "ANNULAR_T6_TWO_TRIANGLE_CELL",
+    "triangleOrientation": "COUNTER_CLOCKWISE_INVARIANT",
+    "radialAnchorPhase": 0.35,
+    "circumferentialAnchorPhase": 0.65,
+    "minimumParametricDiagonalSeparation": 0.3,
+    "anchorCellWidthContraction": "EXACT_FACTOR_TWO_PER_LEVEL",
+    "transitionCellPolicy": "DETERMINISTIC_BACKGROUND_GAP_PARTITION",
+    "protectedFeatureLinesDegrees": [0, 90, 180, 270],
+    "globalCoordinateNestingRequired": false,
+    "anchorCellSelfSimilarityRequired": true
+  },
+  "changeControl": {
+    "previousDesignId": "B01-PROBE-STABLE-POLAR-V2",
+    "trigger": "EXACT_20_TO_60_MM_PRODUCTION_MAPPING_WINDOW_NOT_RETAINED",
+    "requiredRadialBreakpoint": 60,
+    "previousLevel4RadialCellCount": 53,
+    "newLevel4RadialCellCount": 54,
+    "axisCoordinatesChanged": true,
+    "anchorWindowsChanged": false,
+    "anchorPhasesChanged": false,
+    "candidateElementCountsChanged": true,
+    "frozenPhysicalCoordinatesChanged": false,
+    "governedToleranceChanged": false,
+    "productionAuthorityChanged": false
+  },
+  "authority": {
+    "frozenProbeCoordinatesChanged": false,
+    "stressTolerancesChanged": false,
+    "loadsChanged": false,
+    "supportsChanged": false,
+    "solverCriteriaChanged": false,
+    "codeBasisBoundaryChanged": false,
+    "productionMeshAuthority": false,
+    "qualificationAuthority": false,
+    "bucketQualified": false
+  },
+  "currentDisposition": "PHASE_3_DESIGN_V3_PENDING_COMPLETE_CHECKOUT_CANDIDATE_REBUILD_AND_INTAKE"
+}

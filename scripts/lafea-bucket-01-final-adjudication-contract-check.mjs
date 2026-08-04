@@ -13,19 +13,29 @@ const basis = createLafeaBucket01CodeBasis({
   probeSpecHash: `sha256:${'b'.repeat(64)}`,
   governingCode: { organization: 'TEST', documentId: 'TEST', title: 'TEST', edition: 'TEST', addenda: null, jurisdiction: 'TEST', sourceDocumentHash: `sha256:${'c'.repeat(64)}` },
   allowable: { allowableId: 'TEST', value: 100, units: 'MPa', temperature: 20, temperatureUnits: 'degC', materialScope: 'TEST', sourceSection: 'TEST', sourceTable: null, interpolationPolicy: 'NONE' },
-  stressClassification: { classificationId: 'TEST', method: 'FIXED_LOCATION_RICHARDSON_GCI_UPPER_BOUND', sourceSection: 'TEST', locationIds: ['P1'], stressQuantity: 'VON_MISES', extractionAuthority: 'RETAINED_INTEGRATION_POINT_FIXED_PROBES_AND_PATHS', singularityTreatment: 'EXCLUDE_UNCLASSIFIED_SINGULAR_PEAKS' },
+  stressClassification: { classificationId: 'TEST', method: 'FIXED_LOCATION_RICHARDSON_GCI_UPPER_BOUND', sourceSection: 'TEST', locationIds: ['P1'], stressQuantity: 'VON_MISES', extractionAuthority: 'RETAINED_DIRECT_T6_FIXED_PROBES_AND_PATHS', singularityTreatment: 'EXCLUDE_UNCLASSIFIED_SINGULAR_PEAKS' },
   loadCombination: { combinationId: 'TEST', sourceSection: 'TEST', terms: [{ loadCaseId: 'LC1', factor: 1, role: 'TEST' }] },
   authority: { approvalStatus: 'APPROVED', approvalId: 'TEST', authoritySource: 'EXTERNAL_ENGINEERING_AUTHORITY', issuer: 'TEST', approver: 'TEST', approverRole: 'TEST', approvedAt: '2026-08-03T00:00:00.000Z', approvalRecordHash: `sha256:${'d'.repeat(64)}` },
 });
 const location = {
   probeId: 'P1', status: 'PASS', component: 'VON_MISES', units: 'MPa',
-  observations: [80, 70, 65], locationDefinitionHash: `sha256:${'e'.repeat(64)}`,
+  governedLevelOrdinals: [1, 2, 3, 4], evaluatedLevelOrdinals: [2, 3, 4],
+  governedObservations: [90, 80, 70, 65], observations: [80, 70, 65],
+  locationDefinitionHash: `sha256:${'e'.repeat(64)}`,
   convergence: { status: 'PASS', richardsonExtrapolation: 60, fineGridGci: 0.05, semanticHash: `sha256:${'f'.repeat(64)}` },
 };
 const stressBase = {
-  schema: 'lafea-bucket-01-production-lug-fixed-probe-evidence/v1', exactHeadSha: head,
+  schema: 'lafea-bucket-01-production-lug-fixed-probe-evidence/v2', exactHeadSha: head,
   status: 'PASS', standaloneProbeReceipts: [location], pathReceipts: [],
-  authority: { retainedIntegrationPointTensorAuthority: true, movingMaximumUsed: false, nodalProjectionUsed: false, crossElementAveragingUsed: false },
+  authority: {
+    directElementPointRecovery: true,
+    retainedNodalDisplacementAuthority: true,
+    retainedConstitutiveMatrixAuthority: true,
+    integrationPointExtrapolationUsed: false,
+    movingMaximumUsed: false,
+    nodalProjectionUsed: false,
+    crossElementAveragingUsed: false,
+  },
 };
 const stress = { ...stressBase, evidenceHash: canonicalLafeaSha256(stressBase) };
 const assessment = evaluateLafeaBucket01CodeAssessment({
@@ -34,6 +44,8 @@ const assessment = evaluateLafeaBucket01CodeAssessment({
   codeBasisPackage: basis, productionLugStressEvidence: stress,
 });
 assert.equal(assessment.status, 'CODE_ASSESSMENT_PASS');
+assert.equal(assessment.authority.directElementPointRecoveryConsumed, true);
+assert.equal(assessment.authority.integrationPointExtrapolationConsumed, false);
 assert.equal(validateLafeaBucket01CodeAssessment(assessment).ok, true);
 const blockedBasis = createLafeaBucket01CodeBasis({
   schema: LAFEA_BUCKET_01_CODE_BASIS_INPUT_SCHEMA,

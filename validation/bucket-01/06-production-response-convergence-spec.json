@@ -1,5 +1,5 @@
 {
-  "schema": "lafea-bucket-01-production-response-spec/v2",
+  "schema": "lafea-bucket-01-production-response-spec/v3",
   "specId": "B01-PRODUCTION-LUG-RESPONSE-CONVERGENCE-01",
   "benchmarkId": "C2D-LUG-PINHOLE-01",
   "stageId": "LAFEA.3",
@@ -48,6 +48,15 @@
       "meshSize": 0.015625,
       "stiffnessStorage": "CSR_FULL_SYMMETRIC",
       "solverMethod": "DETERMINISTIC_JACOBI_PCG"
+    },
+    {
+      "ordinal": 4,
+      "radialDivisions": 16,
+      "circumferentialDivisions": 128,
+      "elementCount": 4096,
+      "meshSize": 0.0078125,
+      "stiffnessStorage": "CSR_FULL_SYMMETRIC",
+      "solverMethod": "DETERMINISTIC_JACOBI_PCG"
     }
   ],
   "solverPolicy": {
@@ -56,7 +65,10 @@
     "largeSystemMethod": "DETERMINISTIC_JACOBI_PCG",
     "preconditioner": "JACOBI",
     "residualAuthority": "EXACT_RECOMPUTED_FREE_DOF_RESIDUAL",
-    "maximumIterations": "min(50000,max(500,8*freeDofCount))",
+    "internalConvergenceTarget": "residualTolerance/10",
+    "maximumIterations": "min(50000,max(1000,16*freeDofCount))",
+    "exactResidualRefreshInterval": 100,
+    "reliableUpdateOnRecursiveTargetOnly": true,
     "smallSystemMethodUnchanged": true,
     "testOnlySolverSubstitutionAllowed": false
   },
@@ -89,7 +101,9 @@
   },
   "convergence": {
     "strainEnergy": {
-      "method": "THREE_LEVEL_RICHARDSON_GCI",
+      "method": "FINEST_THREE_OF_GOVERNED_FOUR_LEVEL_RICHARDSON_GCI",
+      "governedLevelOrdinals": [1, 2, 3, 4],
+      "evaluatedLevelOrdinals": [2, 3, 4],
       "gciTolerance": 0.02,
       "minimumObservedOrder": null,
       "asymptoticRatioBounds": { "minimum": 0.85, "maximum": 1.15 }
@@ -111,7 +125,9 @@
     "expectedForceAndMomentSource": "FROZEN_LOAD_DEFINITION_AND_LINE_OF_ACTION",
     "productionOutputUsedToGenerateExpectedForceOrMoment": false,
     "productionEnergyExpectedValueRequired": false,
-    "productionEnergyAcceptedByConvergenceOnly": true
+    "productionEnergyAcceptedByConvergenceOnly": true,
+    "coarseLevelRetainedForTrendAudit": true,
+    "finestThreeConvergenceWindowFrozenBeforeRetainedExecution": true
   },
-  "currentDisposition": "SCALABLE_PRODUCTION_SOLVER_POLICY_FROZEN_PENDING_EXECUTION"
+  "currentDisposition": "GOVERNED_4096_PRODUCTION_LADDER_FROZEN_PENDING_RETAINED_EXECUTION"
 }

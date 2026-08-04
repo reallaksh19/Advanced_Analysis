@@ -17,6 +17,7 @@ const baseInput = {
     level(1, 64, 1 / 16, 96, '1', 'DETERMINISTIC_CHOLESKY'),
     level(2, 256, 1 / 32, 99, '2', 'DETERMINISTIC_CHOLESKY'),
     level(3, 1024, 1 / 64, 99.75, '3', 'DETERMINISTIC_JACOBI_PCG'),
+    level(4, 4096, 1 / 128, 99.9375, '4', 'DETERMINISTIC_JACOBI_PCG'),
   ],
   tolerances: {
     loadResultantRelative: 1e-8,
@@ -34,6 +35,9 @@ const evidence = evaluateLafeaBucket01ProductionResponse(baseInput);
 assert.equal(evidence.status, 'PASS');
 assert.equal(evidence.energyConvergence.status, 'PASS');
 assert.equal(evidence.energyConvergence.classification, 'MONOTONIC');
+assert.deepEqual(evidence.energyConvergenceLevelOrdinals, [2, 3, 4]);
+assert.deepEqual(evidence.energyConvergenceElementCounts, [256, 1024, 4096]);
+assert.deepEqual(evidence.energyConvergence.meshSizes, [1 / 32, 1 / 64, 1 / 128]);
 assert.equal(evidence.momentConvergence.status, 'PASS');
 assert.equal(
   evidence.momentConvergence.classification,
@@ -41,13 +45,14 @@ assert.equal(
 );
 assert.deepEqual(
   evidence.levelEvidence.map((row) => row.elementCount),
-  [64, 256, 1024],
+  [64, 256, 1024, 4096],
 );
 assert.deepEqual(
   evidence.levelEvidence.map((row) => row.solverMethod),
   [
     'DETERMINISTIC_CHOLESKY',
     'DETERMINISTIC_CHOLESKY',
+    'DETERMINISTIC_JACOBI_PCG',
     'DETERMINISTIC_JACOBI_PCG',
   ],
 );
@@ -60,9 +65,10 @@ assert.equal(validateLafeaBucket01ProductionResponseEvidence(evidence).ok, true)
 const oscillatory = evaluateLafeaBucket01ProductionResponse({
   ...baseInput,
   levels: [
-    level(1, 64, 1 / 16, 96, '4', 'DETERMINISTIC_CHOLESKY'),
-    level(2, 256, 1 / 32, 100, '5', 'DETERMINISTIC_CHOLESKY'),
-    level(3, 1024, 1 / 64, 99.75, '6', 'DETERMINISTIC_JACOBI_PCG'),
+    level(1, 64, 1 / 16, 96, '5', 'DETERMINISTIC_CHOLESKY'),
+    level(2, 256, 1 / 32, 100, '6', 'DETERMINISTIC_CHOLESKY'),
+    level(3, 1024, 1 / 64, 99.75, '7', 'DETERMINISTIC_JACOBI_PCG'),
+    level(4, 4096, 1 / 128, 100.125, '8', 'DETERMINISTIC_JACOBI_PCG'),
   ],
 });
 assert.equal(oscillatory.status, 'BLOCKED');
@@ -70,17 +76,17 @@ assert.equal(oscillatory.energyConvergence.classification, 'OSCILLATORY');
 
 const momentFailure = evaluateLafeaBucket01ProductionResponse({
   ...baseInput,
-  levels: baseInput.levels.map((row, index) => index === 2
+  levels: baseInput.levels.map((row, index) => index === 3
     ? { ...row, reactionMomentZ: -9980 }
     : row),
 });
 assert.equal(momentFailure.status, 'BLOCKED');
-assert.ok(momentFailure.reasons.includes('LEVEL_3_MOMENT_EQUILIBRIUM_FAILED'));
+assert.ok(momentFailure.reasons.includes('LEVEL_4_MOMENT_EQUILIBRIUM_FAILED'));
 
 assert.throws(
   () => evaluateLafeaBucket01ProductionResponse({
     ...baseInput,
-    levels: baseInput.levels.map((row, index) => index === 2
+    levels: baseInput.levels.map((row, index) => index === 3
       ? { ...row, solverMethod: 'DETERMINISTIC_CHOLESKY' }
       : row),
   }),
@@ -88,14 +94,23 @@ assert.throws(
     === 'LAFEA_B01_PRODUCTION_RESPONSE_SOLVER_POLICY_INVALID',
 );
 
+assert.throws(
+  () => evaluateLafeaBucket01ProductionResponse({
+    ...baseInput,
+    levels: baseInput.levels.slice(0, 3),
+  }),
+  (error) => error?.code
+    === 'LAFEA_B01_PRODUCTION_RESPONSE_GOVERNED_LADDER_REQUIRED',
+);
+
 const tampered = structuredClone(evidence);
-tampered.levelEvidence[2].totalStrainEnergy = 1;
+tampered.levelEvidence[3].totalStrainEnergy = 1;
 assert.equal(
   validateLafeaBucket01ProductionResponseEvidence(tampered).ok,
   false,
 );
 
-console.log('Bucket-01 production force, moment, solver-policy and strain-energy convergence contract checks passed.');
+console.log('Bucket-01 governed four-level force, moment, solver-policy and finest-three strain-energy convergence contract checks passed.');
 
 function level(
   ordinal,
@@ -110,7 +125,7 @@ function level(
     elementCount,
     meshSize,
     meshHash: `sha256:${digit.repeat(64)}`,
-    recoveryHash: `sha256:${String(Number(digit) + 3).repeat(64)}`,
+    recoveryHash: `sha256:${digit.repeat(64)}`,
     resultHash: `sha256:${digit.repeat(64)}`,
     solverMethod,
     freeDofCount: elementCount,

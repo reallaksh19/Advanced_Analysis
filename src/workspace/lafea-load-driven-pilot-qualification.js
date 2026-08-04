@@ -322,8 +322,8 @@ function qualifyLevel({
     equilibriumTolerance,
     'LAFEA_NB_T6D_PROJECTED_RESULTANT_MISMATCH',
   );
-  if (!Array.isArray(resultLoadCase.freeDofIdentities)
-    || resultLoadCase.freeDofIdentities.length === 0
+  if (!Array.isArray(resultLoadCase.solverEvidence?.freeDofIdentities)
+    || resultLoadCase.solverEvidence.freeDofIdentities.length === 0
     || resultLoadCase.solverEvidence?.method !== 'DETERMINISTIC_CHOLESKY'
     || resultLoadCase.solverEvidence?.accepted !== true
     || !Array.isArray(resultLoadCase.solverEvidence?.pivots)
@@ -344,7 +344,7 @@ function qualifyLevel({
     ),
     'LAFEA_NB_T6D_REACTION_EQUILIBRIUM_FAILED',
   );
-  const reactionResultant = resultLoadCase.reactions.reduce(
+  const reactionResultant = resultLoadCase.supportReactions.reduce(
     (sum, row) => {
       const axis = row.dofIdentity.endsWith(':UX') ? 0 : 1;
       sum[axis] += row.value;
@@ -393,8 +393,8 @@ function qualifyLevel({
     projectedResultant,
     reactionResultant,
     equilibriumClosure,
-    freeDofCount: resultLoadCase.freeDofIdentities.length,
-    constrainedDofCount: resultLoadCase.constrainedDofIdentities.length,
+    freeDofCount: resultLoadCase.solverEvidence.freeDofIdentities.length,
+    constrainedDofCount: resultLoadCase.solverEvidence.constrainedDofIdentities.length,
     solverMethod: resultLoadCase.solverEvidence.method,
     minimumPivot: resultLoadCase.solverEvidence.minimumPivot,
     pivotRatio: resultLoadCase.solverEvidence.pivotRatio,

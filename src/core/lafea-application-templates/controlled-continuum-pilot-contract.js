@@ -52,6 +52,7 @@ const ENGINEERING_HASH = /^(?:sha256:[0-9a-f]{64}|fnv1a64:[0-9a-f]{16})$/u;
 const REVISION = /^fnv1a64:[0-9a-f]{16}$/u;
 const TEMPLATE_ID = 'C2D-LUG-PINHOLE';
 const STAGE_ID = 'LAFEA.3';
+const SUPPORTED_LEVEL_COUNTS = Object.freeze(new Set([3, 4]));
 const REQUEST_KEYS = Object.freeze([
   'schema', 'requestId', 'pilotId', 'templateId', 'stageId',
   'releaseRecordHash', 'releaseAuthorityState', 'releaseValidity',
@@ -187,8 +188,8 @@ export function createControlledContinuumLevelEvidence(input) {
   exactKeys(input, LEVEL_CREATE_KEYS, 'Controlled continuum level evidence input');
   requireSha(input.requestHash, 'requestHash');
   integer(input.ordinal, 'ordinal');
-  if (![1, 2, 3].includes(input.ordinal)) {
-    throw new TypeError('Level ordinal must be 1, 2 or 3.');
+  if (![1, 2, 3, 4].includes(input.ordinal)) {
+    throw new TypeError('Level ordinal must be 1, 2, 3 or 4.');
   }
   requireSha(input.meshHash, 'meshHash');
   requireSha(input.sourceAuthorityHash, 'sourceAuthorityHash');
@@ -335,7 +336,7 @@ export function createControlledContinuumExecutionReceipt(input) {
   const lifecycleParents = deepFreeze({
     schema: 'lafea-controlled-continuum-lifecycle-parents/v1',
     stageId: STAGE_ID,
-    recoveryHash: levelEvidence[2].recoveryHash,
+    recoveryHash: levelEvidence.at(-1).recoveryHash,
     recoverySetHash: pilotConvergence.recoverySetHash,
     convergenceProfileHash: input.request.convergenceProfileHash,
     registrationAuthorized: status === 'ACCEPTED',
@@ -404,15 +405,15 @@ function normalizeSourceAuthorityRequest(value, revisionDigest) {
 }
 
 function normalizeMeshLevels(value, canonicalModelHash, analysisGeometryHash) {
-  if (!Array.isArray(value) || value.length !== 3) {
-    throw new TypeError('Controlled continuum request requires exactly three mesh levels.');
+  if (!Array.isArray(value) || !SUPPORTED_LEVEL_COUNTS.has(value.length)) {
+    throw new TypeError('Controlled continuum request requires three or four mesh levels.');
   }
   const levels = [...value].sort((left, right) => left.ordinal - right.ordinal)
     .map((level) => {
       exactKeys(level, MESH_LEVEL_KEYS, 'mesh level');
       integer(level.ordinal, 'meshLevel.ordinal');
-      if (![1, 2, 3].includes(level.ordinal)) {
-        throw new TypeError('Mesh level ordinal must be 1, 2 or 3.');
+      if (level.ordinal < 1 || level.ordinal > value.length) {
+        throw new TypeError('Mesh level ordinal is outside the governed ladder.');
       }
       requireSha(level.meshHash, 'meshLevel.meshHash');
       requireEngineeringHash(level.meshProfileHash, 'meshLevel.meshProfileHash');
@@ -428,18 +429,20 @@ function normalizeMeshLevels(value, canonicalModelHash, analysisGeometryHash) {
       return { ...level };
     });
   if (levels.some((row, index) => row.ordinal !== index + 1)) {
-    throw new TypeError('Controlled continuum mesh levels must be ordinal 1, 2 and 3.');
+    throw new TypeError('Controlled continuum mesh levels must be contiguous ordinals.');
   }
-  if (new Set(levels.map((row) => row.meshHash)).size !== 3
-    || new Set(levels.map((row) => row.meshProfileHash)).size !== 3) {
+  if (new Set(levels.map((row) => row.meshHash)).size !== levels.length
+    || new Set(levels.map((row) => row.meshProfileHash)).size !== levels.length) {
     throw new TypeError('Controlled continuum mesh levels require distinct mesh and profile hashes.');
   }
   return levels;
 }
 
 function normalizeReceiptLevels(value, request, sourceAuthorityHash, exactSourceHash) {
-  if (!Array.isArray(value) || value.length !== 3) {
-    throw new TypeError('Controlled continuum receipt requires exactly three level records.');
+  if (!Array.isArray(value)
+    || value.length !== request.meshLevels.length
+    || !SUPPORTED_LEVEL_COUNTS.has(value.length)) {
+    throw new TypeError('Controlled continuum receipt level count must match its governed request.');
   }
   const levels = [...value].sort((left, right) => left.ordinal - right.ordinal);
   levels.forEach((level, index) => {
@@ -504,8 +507,10 @@ function normalizePilotConvergence(value, request, levels, recoveryReady) {
   requireText(normalizedInput.quantityId, 'pilotConvergence.quantityId');
   requireText(normalizedInput.units, 'pilotConvergence.units');
   positive(normalizedInput.tolerance, 'pilotConvergence.tolerance');
-  if (!Array.isArray(normalizedInput.levels) || normalizedInput.levels.length !== 3) {
-    throw new TypeError('Pilot convergence requires exactly three levels.');
+  if (!Array.isArray(normalizedInput.levels)
+    || normalizedInput.levels.length !== levels.length
+    || !SUPPORTED_LEVEL_COUNTS.has(normalizedInput.levels.length)) {
+    throw new TypeError('Pilot convergence level count must match the governed request.');
   }
   const observations = [...normalizedInput.levels]
     .sort((left, right) => left.ordinal - right.ordinal)
@@ -532,10 +537,12 @@ function normalizePilotConvergence(value, request, levels, recoveryReady) {
     );
   }
   const reasons = [];
-  if (relativeChanges[2] > normalizedInput.tolerance) {
+  const fineChange = relativeChanges.at(-1);
+  const priorChange = relativeChanges.at(-2);
+  if (fineChange > normalizedInput.tolerance) {
     reasons.push('PILOT_FINE_LEVEL_CHANGE_EXCEEDS_TOLERANCE');
   }
-  if (relativeChanges[2] > relativeChanges[1]) {
+  if (fineChange > priorChange) {
     reasons.push('PILOT_CONVERGENCE_NOT_IMPROVING');
   }
   if (levels.some((row) => row.status !== 'ACCEPTED'
