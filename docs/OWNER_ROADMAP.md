@@ -1286,3 +1286,53 @@ section generalization, hot-state coverage) and M022-C (process/
 support resolution, overlay composition, populated ground-truth
 artifacts) remain ahead before this reaches canonical geometry or the
 solver.
+
+## BM1 insulation self-weight — root cause closed (#580)
+
+User asked directly: with the same file and approach, can the next BM1
+benchmark comparison hit zero error? Rather than answer from the
+existing hypothesis, tested it — and the earlier M020-review diagnosis
+turned out to be half right.
+
+Applied the previously-suspected data fix (`INSUL_DENSITY=2100` on
+`BM1_InputXML.xml`'s first three elements) alone, in an ephemeral
+worktree, and re-ran `check:lfea-b3.15`: **zero change in the solve
+output.** That falsified the "all-or-nothing exclusion due to 3
+elements' missing data" hypothesis outright — investigating further
+found the real cause: `compileCase` in `scripts/lfea-b3.15-bm1-
+inputxml-fixtures.mjs` never declared `INSULATION` in the gravity
+primitive's `includedMassSources` and never generated an `INSULATION`
+`DISTRIBUTED_WEIGHT` primitive at all. Insulation self-weight was never
+wired into gravity, regardless of data completeness — a real code gap
+M020 shipped with, not a data-only issue.
+
+Confirmed `'INSULATION'` is already a real, production-supported
+`DISTRIBUTED_WEIGHT_COMPONENTS` enum member (from M012) before writing
+any fix — wired it in by mirroring the existing `CONTENTS` primitive
+pattern exactly. Tested the code fix alone (data still incomplete)
+first: the solve correctly refused outright
+(`PIPING_ANALYSIS_GRAVITY_DISTRIBUTED_WEIGHT_MISSING`) rather than
+silently under-computing — the fail-closed design catching exactly
+this class of gap, as intended. With both fixes together: real
+sustained-case total reaction magnitude moved from **–46% to +1.5%**
+deviation against the user's real CAESAR CASE 4 (SUS) restraint total.
+
+User confirmed 2100 kg/m³ directly (matches every other insulated
+element in the model) before anything was committed to their live
+file. Landed as a direct Owner fix (#580, self-reviewed — already
+fully verified before opening the PR): data fix + code fix + updated
+M021's now-stale `MISSING` assertion (corrected to `DECLARED`) +
+updated the B-3.15 report's `limitations` text. `check:lfea-b3.15`,
+`check:lfea-b3.16`, and the full `check:lfea-linear-core` aggregate all
+pass; confirmed again on fresh `main` post-merge.
+
+**Process note**: the original M020-review diagnosis was a plausible,
+disclosed hypothesis inferred from limitation text and the established
+M012 all-or-nothing precedent — but it was never actually tested by
+applying a fix and re-running. Doing that here, instead of just
+reporting the hypothesis as fact, is what surfaced the real (and
+different) root cause. A quantitative match to real external data
+(here, ~98% of a discrepancy) is strong evidence *something* is
+identified correctly, but not proof the causal story attached to it is
+complete — the only way to know is to test the fix and watch the
+number actually move.
