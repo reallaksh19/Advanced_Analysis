@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { DEFAULT_VIEWPORT_CAPABILITIES } from './viewport-command-contract.js';
 import { ThreeInteractionArbiter } from './three-interaction-arbiter.js';
 import { ThreeSelectionOverlay } from './three-selection-overlay.js';
+import { ThreeSupportLoadCalloutLayer } from './three-support-load-callout-layer.js';
 import { fitThreeSelection, fitThreeView, restoreThreeHome, setThreeStandardView } from './three-viewport-camera.js';
 import { clearThreeHostMetadata, clearThreeSceneObjects, renderThreeModel, resolveThreeEntityId, updateThreeHostMetadata } from './three-viewport-scene.js';
 import { ViewportAxisHUD } from './viewport-axis-hud.js';
@@ -20,6 +21,8 @@ export class ThreeViewportBackend {
     /** Full-scene world bounds; scene-object replacement is the invalidation boundary. */
     this.sceneBoundsCache = null;
     this.axisHud = null;
+    this.calloutLayer = null;
+    this.supportLoadCallouts = Object.freeze([]);
     this.model = null;
     this.selectedEntityId = '';
     this.selectionRequestHandler = null;
@@ -62,6 +65,8 @@ export class ThreeViewportBackend {
     this.scene.add(light);
     this.axisHud = new ViewportAxisHUD();
     hostElement.replaceChildren(this.renderer.domElement);
+    this.calloutLayer = new ThreeSupportLoadCalloutLayer();
+    this.calloutLayer.mount(hostElement);
     hostElement.dataset.viewportBackend = 'webgl';
     if (typeof ResizeObserver === 'function') { this.resizeObserver = new ResizeObserver(() => this.resize()); this.resizeObserver.observe(hostElement); }
     this.resize();
@@ -94,7 +99,14 @@ export class ThreeViewportBackend {
     this.controls.addEventListener('change', this.controlsChangeHandler);
   }
 
-  renderModel(model) { renderThreeModel(this, model); this.renderDirty = true; }
+  renderModel(model, presentation = {}) {
+    const callouts = presentation?.supportLoadCallouts ?? [];
+    if (!Array.isArray(callouts)) throw new TypeError('Support-load callouts must be an array.');
+    renderThreeModel(this, model);
+    this.supportLoadCallouts = Object.freeze([...callouts]);
+    this.calloutLayer?.update(this.supportLoadCallouts, this);
+    this.renderDirty = true;
+  }
   getCapabilities() { return DEFAULT_VIEWPORT_CAPABILITIES; }
   setInteractionContext(mode) { this.arbiter?.setMode(mode === 'mode-select' ? 'select' : mode); }
   setSelectionRequestHandler(callback) { if (callback !== null && typeof callback !== 'function') throw new TypeError('Three viewport selection handler must be a function or null.'); this.selectionRequestHandler = callback; }
@@ -102,6 +114,8 @@ export class ThreeViewportBackend {
   clear() {
     clearThreeSceneObjects(this);
     this.model = null;
+    this.supportLoadCallouts = Object.freeze([]);
+    this.calloutLayer?.clear();
     this.selectedEntityId = '';
     this.hasFittedFirstModel = false;
     this.selectionOverlay?.clear();
@@ -189,8 +203,14 @@ export class ThreeViewportBackend {
     this.selectionRequestHandler?.(entityId || null);
   }
 
-  handleContextLost(event) { event.preventDefault(); this.contextLost = true; this.stopAnimation(); this.hostElement.dataset.contextStatus = 'LOST'; }
-  handleContextRestored() { this.contextLost = false; this.hostElement.dataset.contextStatus = 'RESTORED'; if (this.model) renderThreeModel(this, this.model, { resetCamera: false }); this.startAnimation(); }
+  handleContextLost(event) { event.preventDefault(); this.contextLost = true; this.stopAnimation(); this.calloutLayer?.clear(); this.hostElement.dataset.contextStatus = 'LOST'; }
+  handleContextRestored() {
+    this.contextLost = false;
+    this.hostElement.dataset.contextStatus = 'RESTORED';
+    if (this.model) renderThreeModel(this, this.model, { resetCamera: false });
+    this.calloutLayer?.update(this.supportLoadCallouts, this);
+    this.startAnimation();
+  }
   markViewCommand(command) { if (this.hostElement) this.hostElement.dataset.viewCommand = command; }
 
   startAnimation() {
@@ -206,6 +226,7 @@ export class ThreeViewportBackend {
     const width = this.hostElement.clientWidth;
     const height = this.hostElement.clientHeight;
     this.renderer.render(this.scene, this.camera);
+    this.calloutLayer?.update(this.supportLoadCallouts, this);
     if (this.axisHud) {
       this.axisHud.updateOrientation(this.camera);
       this.axisHud.render(this.renderer, width, height);
@@ -217,6 +238,7 @@ export class ThreeViewportBackend {
   destroy() {
     this.stopAnimation(); this.resizeObserver?.disconnect(); this.resizeObserver = null;
     this.arbiter?.dispose(); this.arbiter = null; this.selectionOverlay?.dispose(); this.selectionOverlay = null;
+    this.calloutLayer?.destroy(); this.calloutLayer = null; this.supportLoadCallouts = Object.freeze([]);
     this.axisHud?.dispose(); this.axisHud = null;
     if (this.controls) { this.controls.removeEventListener('change', this.controlsChangeHandler); this.controls.dispose(); }
     clearThreeSceneObjects(this);
@@ -227,7 +249,7 @@ export class ThreeViewportBackend {
 }
 
 function assertWebglConfiguration(value) {
-    const required = ['pickingRadius', 'cameraFitMargin', 'clickTimingMs', 'doubleClickTimingMs', 'clickTravelTolerancePx', 'zoomRate', 'navigationSensitivity', 'perspectiveFovDeg', 'meshRadialSegments', 'cameraNearMm', 'cameraFarMm'];
+  const required = ['pickingRadius', 'cameraFitMargin', 'clickTimingMs', 'doubleClickTimingMs', 'clickTravelTolerancePx', 'zoomRate', 'navigationSensitivity', 'perspectiveFovDeg', 'meshRadialSegments', 'cameraNearMm', 'cameraFarMm'];
   const missing = required.filter((key) => !Number.isFinite(value?.[key]) || value[key] <= 0);
   if (missing.length) throw new Error(`WebGL BLOCKED: approved Project Data is missing ${missing.join(', ')}.`);
   if (!Number.isInteger(value.meshRadialSegments)) throw new Error('WebGL BLOCKED: meshRadialSegments must be an integer.');
