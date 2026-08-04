@@ -11,14 +11,20 @@ on:
       - 'src/workspace/topology-edit/topology-edit-command-effect-validator.js'
       - 'src/workspace/topology-edit/topology-edit-inline-component-command.js'
       - 'src/workspace/topology-edit/professional/topology-edit-inline-component-operation.js'
+      - 'src/workspace/topology-edit/professional/topology-edit-incremental-validation.js'
       - 'src/workspace/topology-edit/professional/topology-edit-operation-plan.js'
       - 'src/workspace/topology-edit/professional/topology-edit-route-operations.js'
       - 'src/workspace/topology-edit/professional/topology-edit-professional-operation-session.js'
+      - 'src/workspace/topology-edit/professional/topology-edit-validation-blocking.js'
+      - 'src/workspace/topology-edit/professional/topology-edit-validation-diagnostics.js'
       - 'src/workspace/viewport-productivity/topology-edit-professional-operation-actions.js'
       - 'src/workspace/viewport-productivity/topology-edit-professional-operation-panel.js'
       - 'src/workspace/viewport-productivity/topology-edit-professional-operation-runtime.js'
       - 'src/workspace/viewport-productivity/topology-edit-professional-operation-state.js'
       - 'tests/topology-edit-inline-component-insertion.test.mjs'
+      - 'tests/topology-edit-professional-engineering-incremental-validation.test.mjs'
+      - 'tests/topology-edit-professional-validation-blocking.test.mjs'
+      - 'tests/topology-edit-validation-baseline-authority.test.mjs'
       - 'e2e/topology-edit-inline-component-insertion.spec.js'
   workflow_dispatch:
 
@@ -66,12 +72,18 @@ jobs:
           node --check src/workspace/topology-edit/topology-edit-command-effect-validator.js
           node --check src/workspace/topology-edit/topology-edit-inline-component-command.js
           node --check src/workspace/topology-edit/professional/topology-edit-inline-component-operation.js
+          node --check src/workspace/topology-edit/professional/topology-edit-incremental-validation.js
           node --check src/workspace/topology-edit/professional/topology-edit-operation-plan.js
           node --check src/workspace/topology-edit/professional/topology-edit-route-operations.js
           node --check src/workspace/topology-edit/professional/topology-edit-professional-operation-session.js
+          node --check src/workspace/topology-edit/professional/topology-edit-validation-blocking.js
+          node --check src/workspace/topology-edit/professional/topology-edit-validation-diagnostics.js
           node --check src/workspace/viewport-productivity/topology-edit-professional-operation-panel.js
           node --check src/workspace/viewport-productivity/topology-edit-professional-operation-state.js
           node --check tests/topology-edit-inline-component-insertion.test.mjs
+          node --check tests/topology-edit-professional-engineering-incremental-validation.test.mjs
+          node --check tests/topology-edit-professional-validation-blocking.test.mjs
+          node --check tests/topology-edit-validation-baseline-authority.test.mjs
           node --check e2e/topology-edit-inline-component-insertion.spec.js
           git diff --check
 
@@ -84,6 +96,9 @@ jobs:
             tests/topology-edit-professional-engineering-catalog.test.mjs \
             tests/topology-edit-professional-engineering-compatibility.test.mjs \
             tests/topology-edit-component-hud-context.test.mjs \
+            tests/topology-edit-professional-engineering-incremental-validation.test.mjs \
+            tests/topology-edit-professional-validation-blocking.test.mjs \
+            tests/topology-edit-validation-baseline-authority.test.mjs \
             2>&1 | tee inline-component-test-output.txt
 
       - name: Execute mounted Chromium insertion qualification
