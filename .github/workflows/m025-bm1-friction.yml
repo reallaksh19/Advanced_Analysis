@@ -10,6 +10,7 @@ on:
       - "reports/lfea-bm1-cii-output-comparison.json"
       - "reports/lfea-bm1-m025-friction-qualification.json"
       - "scripts/m025-apply-work-pack.mjs"
+      - "scripts/m025-apply-continuation-patch.mjs"
       - "scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs"
       - "scripts/lfea-b3.15-bm1-inputxml-check.mjs"
       - "scripts/lfea-b3.16-inputxml-ground-truth-check.mjs"
@@ -34,12 +35,17 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
           fetch-depth: 0
 
-      - name: Apply M025 integration patch when not committed yet
+      - name: Apply M025 integration patches when not committed yet
         run: |
           if grep -q "solveBm1CoulombCases" scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs; then
-            echo "M025 integration already present on branch."
+            echo "M025 base integration already present on branch."
           else
             node scripts/m025-apply-work-pack.mjs
+          fi
+          if grep -q "thermalScale = thermal" scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs; then
+            echo "M025 thermal continuation already present on branch."
+          else
+            node scripts/m025-apply-continuation-patch.mjs
           fi
 
       - name: Set up Node
