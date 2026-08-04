@@ -31,34 +31,49 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - name: Resolve exact qualification refs
+      - name: Resolve exact qualification head
         id: refs
         shell: bash
         env:
           DISPATCH_HEAD_SHA: ${{ inputs.expected_head_sha }}
-          DISPATCH_BASE_SHA: ${{ inputs.expected_base_sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
           head_sha="${DISPATCH_HEAD_SHA:-${PR_HEAD_SHA:-${GITHUB_SHA}}}"
-          base_sha="${DISPATCH_BASE_SHA:-${PR_BASE_SHA:-}}"
           if [[ ! "$head_sha" =~ ^[0-9a-fA-F]{40}$ ]]; then
             echo "Invalid exact head SHA: $head_sha" >&2
             exit 1
           fi
-          if [[ ! "$base_sha" =~ ^[0-9a-fA-F]{40}$ ]] || [[ "$base_sha" =~ ^0{40}$ ]]; then
-            echo "A valid nonzero 40-character expected base SHA is required." >&2
-            exit 1
-          fi
           echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
-          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
 
       - name: Check out exact qualification head
         uses: actions/checkout@v4
         with:
           ref: ${{ steps.refs.outputs.head_sha }}
           fetch-depth: 0
+
+      - name: Resolve exact qualification base
+        id: exact_base
+        shell: bash
+        env:
+          DISPATCH_BASE_SHA: ${{ inputs.expected_base_sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            base_sha="$DISPATCH_BASE_SHA"
+          else
+            git fetch --no-tags origin main:refs/remotes/origin/main
+            base_sha="$(git merge-base origin/main "$EXPECTED_HEAD_SHA")"
+          fi
+          if [[ ! "$base_sha" =~ ^[0-9a-fA-F]{40}$ ]] || [[ "$base_sha" =~ ^0{40}$ ]]; then
+            echo "A valid nonzero 40-character expected base SHA is required." >&2
+            exit 1
+          fi
+          git cat-file -e "${base_sha}^{commit}"
+          git merge-base --is-ancestor "$base_sha" "$EXPECTED_HEAD_SHA"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -73,7 +88,7 @@ jobs:
         shell: bash
         env:
           EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
-          EXPECTED_BASE_SHA: ${{ steps.refs.outputs.base_sha }}
+          EXPECTED_BASE_SHA: ${{ steps.exact_base.outputs.base_sha }}
         run: |
           set -euo pipefail
           git cat-file -e "${EXPECTED_HEAD_SHA}^{commit}"
@@ -88,7 +103,7 @@ jobs:
         run: |
           set -euo pipefail
           marker_path='src/core/bucket-b/axisymmetric-bb10-shared-gate-anchor.js'
-          marker_commit="$(git log --reverse --diff-filter=A --format=%H -- "$marker_path" | head -n 1)"
+          marker_commit="$(git log -1 --format=%H -- "$marker_path")"
           if [[ ! "$marker_commit" =~ ^[0-9a-fA-F]{40}$ ]]; then
             echo "Unable to resolve the governed BB-10 shared-gate marker." >&2
             exit 1
@@ -124,7 +139,7 @@ jobs:
       - name: Run BB-10 exact-head registration
         env:
           EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
-          EXPECTED_BASE_SHA: ${{ steps.refs.outputs.base_sha }}
+          EXPECTED_BASE_SHA: ${{ steps.exact_base.outputs.base_sha }}
           BB10_SHARED_REPORT_PATH: reports/bucket-b-bb00-bb05-exact-head-report.json
           BB06_REPORT_PATH: reports/bucket-b-bb06-lug-clamp-report.json
           BB07_REPORT_PATH: reports/bucket-b-bb07-bracket-gusset-report.json
@@ -136,7 +151,7 @@ jobs:
       - name: Rerun BB-10 and require byte-identical report
         env:
           EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
-          EXPECTED_BASE_SHA: ${{ steps.refs.outputs.base_sha }}
+          EXPECTED_BASE_SHA: ${{ steps.exact_base.outputs.base_sha }}
           BB10_SHARED_REPORT_PATH: reports/bucket-b-bb00-bb05-exact-head-report.json
           BB06_REPORT_PATH: reports/bucket-b-bb06-lug-clamp-report.json
           BB07_REPORT_PATH: reports/bucket-b-bb07-bracket-gusset-report.json
