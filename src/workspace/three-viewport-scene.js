@@ -5,12 +5,11 @@ import { createThreePrimitive } from './three-primitive-factory.js';
 import { disposeThreeEngineeringObject } from './three-object-disposal.js';
 import { ThreeSceneResourcePool } from './three-scene-resource-pool.js';
 import { assertViewportRenderModel } from './viewport-render-model.js';
-import { markWorkspaceInvocation, markWorkspaceMilestone, measureWorkspaceStage } from './workspace-performance.js';
+import { markWorkspaceInvocation, measureWorkspaceStage } from './workspace-performance.js';
 
 export function renderThreeModel(backend, model, options = {}) {
   assertViewportRenderModel(model);
   markWorkspaceInvocation('three-render-model', { datasetId: model.datasetId });
-  backend.applyModelConfiguration(model);
   const isFirstLoad = !backend.hasFittedFirstModel || options.resetCamera === true;
   const compiled = measureWorkspaceStage(
     'three-materialization',
@@ -19,6 +18,11 @@ export function renderThreeModel(backend, model, options = {}) {
   );
 
   try {
+    measureWorkspaceStage(
+      'model-configuration',
+      () => backend.applyModelConfiguration(model),
+      { datasetId: model.datasetId },
+    );
     measureWorkspaceStage(
       'scene-installation',
       () => installCompiledThreeModel(backend, model, compiled),
@@ -30,7 +34,7 @@ export function renderThreeModel(backend, model, options = {}) {
   }
 
   updateThreeHostMetadata(backend);
-  scheduleFirstMeaningfulFrameEvidence(backend, model);
+  queueRenderedFrameEvidence(backend, model, options);
 
   // Only perform expensive camera fitView on initial model load, not on every single incremental edit click.
   if (isFirstLoad) {
@@ -85,6 +89,7 @@ export function clearThreeSceneObjects(backend) {
   backend.sceneResourcePool?.dispose();
   backend.sceneResourcePool = null;
   backend.sceneResourceEvidence = null;
+  backend.pendingRenderedFrameMilestone = null;
   backend.lastFirstMeaningfulFrameDatasetId = '';
 }
 
@@ -131,18 +136,22 @@ export function clearThreeHostMetadata(hostElement) {
     'sceneGeometryReuseCount',
     'sceneMaterialReuseCount',
     'firstMeaningfulFrameDatasetId',
+    'contextRestoredFrameDatasetId',
   ].forEach((key) => delete hostElement.dataset[key]);
 }
 
-function scheduleFirstMeaningfulFrameEvidence(backend, model) {
+function queueRenderedFrameEvidence(backend, model, options) {
+  if (options.contextRestore === true) {
+    backend.pendingRenderedFrameMilestone = Object.freeze({
+      name: 'context-restored-frame',
+      datasetId: model.datasetId,
+    });
+    return;
+  }
   if (backend.lastFirstMeaningfulFrameDatasetId === model.datasetId) return;
-  const requestFrame = globalThis.requestAnimationFrame;
-  if (typeof requestFrame !== 'function') return;
-  requestFrame(() => {
-    if (backend.model !== model || !backend.hostElement) return;
-    backend.lastFirstMeaningfulFrameDatasetId = model.datasetId;
-    backend.hostElement.dataset.firstMeaningfulFrameDatasetId = model.datasetId;
-    markWorkspaceMilestone('first-meaningful-frame', { datasetId: model.datasetId });
+  backend.pendingRenderedFrameMilestone = Object.freeze({
+    name: 'first-meaningful-frame',
+    datasetId: model.datasetId,
   });
 }
 
