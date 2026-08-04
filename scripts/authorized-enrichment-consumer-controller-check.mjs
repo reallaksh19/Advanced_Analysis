@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { semanticHash } from '../src/core/shared-piping-model/canonical-json.js';
+import {
+  EMPIRICAL_COMPONENT_LOAD_AUTHORITY_AUDIT_SCHEMA,
+} from '../src/workspace/engineering-loads/empirical-component-load-authority.js';
 import { EMPIRICAL_FORMULA_REGISTER } from '../src/workspace/engineering-loads/empirical-formula-register.js';
 import { computeAuthorizedEmpiricalLoadInputSemanticHash } from '../src/workspace/engineering-loads/authorized-empirical-load-input.js';
 import {
@@ -29,6 +32,10 @@ assert.equal(
 assert.equal(EMPIRICAL_FORMULA_REGISTER.schema, 'empirical-formula-register/v1');
 assert.equal(EMPIRICAL_FORMULA_REGISTER.method, 'CHAINAGE_TRIBUTARY_SPAN_V2');
 assert.equal(EMPIRICAL_FORMULA_REGISTER.validation.detailedAnalysisSubstitution, false);
+assert.equal(
+  EMPIRICAL_COMPONENT_LOAD_AUTHORITY_AUDIT_SCHEMA,
+  'empirical-component-load-authority-audit/v1',
+);
 
 const masterData = Object.freeze({ marker: 'MASTER-DATA-EMP01' });
 const runtimePackage = makeRuntimePackage();
@@ -108,6 +115,7 @@ console.log(JSON.stringify({
   formulaRegisterSchema: EMPIRICAL_FORMULA_REGISTER.schema,
   formulaRegisterMethod: EMPIRICAL_FORMULA_REGISTER.method,
   formulaRegisterSemanticHash: EMPIRICAL_FORMULA_REGISTER.semanticHash,
+  componentLoadAuthorityAuditSchema: EMPIRICAL_COMPONENT_LOAD_AUTHORITY_AUDIT_SCHEMA,
 }, null, 2));
 
 function makeRuntimePackage() {
