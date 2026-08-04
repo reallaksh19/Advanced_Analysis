@@ -3,7 +3,6 @@ import { expect, test } from '@playwright/test';
 
 const CONTROLLER_KEY = '__TOPOLOGY_EDIT_SELECTION_FOUNDATION_CONTROLLER__';
 const DATASET_BEFORE_KEY = '__TOPOLOGY_EDIT_SELECTION_FOUNDATION_DATASET_BEFORE__';
-const CONTROLLER_BEFORE_KEY = '__TOPOLOGY_EDIT_SELECTION_FOUNDATION_CONTROLLER_BEFORE__';
 const REPORT_PATH = 'reports/qualification/topology-edit-selection-foundation.json';
 const evidence = {
   schema: 'TopologyEditSelectionFoundationQualification.v1',
@@ -89,23 +88,13 @@ test('tree modifier selection is deterministic and dataset replacement clears it
   ));
   expect(toggledIds).toHaveLength(selectedIds.length - 1);
 
-  const baseline = await page.evaluate(({
-    controllerKey,
-    datasetBeforeKey,
-    controllerBeforeKey,
-  }) => {
-    const controller = globalThis[controllerKey];
+  const sessionVersionBefore = Number(
+    await host.getAttribute('data-topology-edit-dataset-session-version'),
+  );
+  await page.evaluate((datasetBeforeKey) => {
     globalThis[datasetBeforeKey] = globalThis.AnalysisWorkspace
       ?.getSnapshot?.()?.dataset ?? null;
-    globalThis[controllerBeforeKey] = controller;
-    return {
-      sessionVersion: controller?.editorStore?.getState?.()?.dataset?.sessionVersion ?? 0,
-    };
-  }, {
-    controllerKey: CONTROLLER_KEY,
-    datasetBeforeKey: DATASET_BEFORE_KEY,
-    controllerBeforeKey: CONTROLLER_BEFORE_KEY,
-  });
+  }, DATASET_BEFORE_KEY);
 
   const demoButton = page.locator(
     '[data-panel="tree"] [data-action="load-topology-edit-demo"]',
@@ -115,30 +104,28 @@ test('tree modifier selection is deterministic and dataset replacement clears it
   await demoButton.click();
 
   await expect.poll(() => page.evaluate(({
-    controllerKey,
     datasetBeforeKey,
-    controllerBeforeKey,
-    sessionVersionBefore,
+    sessionVersionBeforeValue,
   }) => {
-    const controller = globalThis[controllerKey];
     const currentDataset = globalThis.AnalysisWorkspace
       ?.getSnapshot?.()?.dataset ?? null;
-    const state = controller?.editorStore?.getState?.() ?? null;
-    const sameController = controller === globalThis[controllerBeforeKey];
+    const currentHost = document.querySelector(
+      '[data-role="topology-edit-render-host"]',
+    );
     return {
       datasetReplaced: Boolean(
         currentDataset && currentDataset !== globalThis[datasetBeforeKey]
       ),
-      selectionCount: state?.selection?.canonicalIds?.length ?? -1,
-      epochReconciled: Boolean(
-        !sameController || state?.dataset?.sessionVersion > sessionVersionBefore
-      ),
+      selectionCount: String(
+        currentHost?.dataset.topologyEditSelectionIds ?? '',
+      ).split(',').filter(Boolean).length,
+      epochReconciled: Number(
+        currentHost?.dataset.topologyEditDatasetSessionVersion ?? 0,
+      ) > sessionVersionBeforeValue,
     };
   }, {
-    controllerKey: CONTROLLER_KEY,
     datasetBeforeKey: DATASET_BEFORE_KEY,
-    controllerBeforeKey: CONTROLLER_BEFORE_KEY,
-    sessionVersionBefore: baseline.sessionVersion,
+    sessionVersionBeforeValue: sessionVersionBefore,
   })).toEqual({
     datasetReplaced: true,
     selectionCount: 0,
