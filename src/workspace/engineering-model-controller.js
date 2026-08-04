@@ -64,9 +64,6 @@ export class EngineeringModelController {
     } else if (distribution && distribution.datasetVersion !== (dataset.version || null)) {
       engineeringModelStore.markEmpiricalStale('DATASET_EDITED', dataset.version || null);
       refreshRequired = true;
-    } else if (distribution && dataset !== this.lastRebuiltDataset) {
-      engineeringModelStore.markEmpiricalStale('DATASET_REBUILT', dataset.version || null);
-      refreshRequired = true;
     }
     this.datasetId = dataset.datasetId;
     this.datasetVersion = dataset.version || null;
@@ -75,6 +72,9 @@ export class EngineeringModelController {
       this.lastRebuiltDataset = dataset;
       refreshRequired = true;
     }
+    // A replacement object with unchanged governed bindings is not stale merely
+    // because its JavaScript identity changed. The authorized refresh performs
+    // the semantic binding comparison after the rebuilt models are available.
     if (refreshRequired) this.authorizedConsumerController.refreshEmpirical();
   }
 
