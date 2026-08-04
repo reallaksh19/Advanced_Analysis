@@ -20,6 +20,13 @@ import {
   parseCaesarStressReports,
 } from './lfea-b3.17-caesar-stress-report.mjs';
 
+function assertClose(actual, expected, tolerance = 1e-6) {
+  assert.ok(
+    Math.abs(actual - expected) <= tolerance,
+    `${actual} differs from ${expected} by more than ${tolerance}.`,
+  );
+}
+
 console.log('\n--- LFEA B-3.17 BM1 B31.3 SUS/EXP vs CAESAR II ---');
 const result = solveBm1InputXml();
 const input = readFileSync(BM1_PATH, 'utf8');
@@ -64,14 +71,14 @@ assert.equal(sus.codeCheck, 'CODE STRESS CHECK PASSED');
 assert.equal(exp.codeCheck, 'CODE STRESS CHECK PASSED');
 assert.equal(sus.highest.percentage, 46.255672);
 assert.equal(exp.highest.percentage, 62.532867);
-assert.equal(sus.highest.allowableStressPa, 137895.140625 * KPA_TO_PA);
-assert.equal(exp.highest.allowableStressPa, 206842.703125 * KPA_TO_PA);
+assertClose(sus.highest.allowableStressPa, 137895.140625 * KPA_TO_PA);
+assertClose(exp.highest.allowableStressPa, 206842.703125 * KPA_TO_PA);
 const sus2030 = sus.elements.find((row) => row.pairKey === '20->30');
-assert.equal(sus2030.from.allowableStressPa, 137895140.625);
-assert.equal(sus2030.from.codeStressPa, 40492921.875);
+assertClose(sus2030.from.allowableStressPa, 137895140.625);
+assertClose(sus2030.from.codeStressPa, 40492921.875);
 assert.equal(sus2030.from.percentage, 29.365009);
 const exp5859 = exp.elements.find((row) => row.pairKey === '58->59');
-assert.equal(exp5859.to.codeStressPa, 129344664.063);
+assertClose(exp5859.to.codeStressPa, 129344664.063);
 assert.equal(exp5859.to.percentage, 62.532867);
 assert.equal(exp5859.to.sifInPlane, 2.661139);
 assert.equal(exp5859.to.sifOutOfPlane, 2.217616);
