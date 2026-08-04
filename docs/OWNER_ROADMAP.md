@@ -1692,5 +1692,63 @@ posted this assessment to the PR and agreed both need a primary-source
 citation before the draft flag comes off. Also confirmed, independent of
 either PR's correctness, that `check:lfea-b3.19` is registered by both
 this PR and PR #594 for two unrelated checks — a real script-name
-collision that must be resolved before either merges cleanly. **Held in
-draft per the PR's own disposition and this review — not merged.**
+collision that must be resolved before either merges cleanly. Held in
+draft per the PR's own disposition and this review — not merged at the
+time.
+
+## PR #595 → merged as `1c70960090acef689d489c25e38b87ff5649c023`
+
+Confirmed BM1's real CAESAR run declares `B31.3-2018, Aug 30, 2019` in
+`BM1_CIIOutput.xml` — Appendix D, not B31J — via direct grep of the raw
+XML. This meant the two open questions above are B31J-specific and don't
+gate BM1 work at all. Dispatched issue #601 (M026) as a Work Pack for a
+9-case, independently-sourced Appendix D benchmark record (3 sizes ×
+3 fitting types: bend, welding tee, reducer), with a hard rule against
+fabricated citations — every reference value must be either a real
+published example or an explicitly-labeled hand derivation.
+
+The agent folded #601's benchmark work directly into PR #595 itself
+(18 cases total: 9 Appendix D + 9 B31J phase-2) and used it to dispose
+both open questions rather than leaving them open. The PR's head changed
+substantially (`5b5e82c3`→`93ebd42c`, 13→18 files, no longer draft) —
+re-cloned the new exact head and re-verified from scratch rather than
+trusting the updated description:
+
+- Full `check:lfea-linear-core` aggregate on the new head: exit 0, zero
+  regressions. Manually confirmed all 10 raw `grep` hits for
+  "FAIL/Error" were legitimate fail-closed test names or expected error
+  codes, not real failures. Real CI (`qualify-m022a/m023/m024`) green on
+  `93ebd42c`.
+- **Independently re-derived the new smooth-90 `1.3/h` bend case from
+  scratch**, using BM1's real unrounded geometry and `P=2.1e6`, matching
+  the PR's claimed `k=6.947598579863642`, `ii=2.66113953399073`,
+  `io=2.217616278325609` to full double-precision digit count.
+- **Independently confirmed the Appendix D reducer disposition against a
+  real external source**, not just the PR's own citation: fetched the
+  cited `yumpu.com` mirror of ASME B31.3-2018 Table D300 directly via
+  `WebFetch` — it does show "Butt welded joint, reducer, or weld neck
+  flange" at `k=1`, `i=1.0`, confirming `legacyReducerFactors()`'s unity
+  result is correct for this edition.
+- **Independently confirmed via web search** (not the PR's citation)
+  that both B31J rules invoked are real: Table 1-1 Note (3) does offer
+  `1.3/h` as an alternate to `1.65/h` for 90° bends, and Note (6) does
+  define a verified-tee reduction. Could not independently pin the exact
+  `1.26` constant to a source — the PR's own cited Hexagon CAESAR-II
+  documentation page is a JS-rendered SPA that reset the connection
+  through this session's outbound proxy for every host tested (confirmed
+  general, not URL-specific, via `example.com`/`github.com` control
+  tests), so this one number rests on the PR's own direct citation
+  (with a retained SHA-256 of the reviewed excerpt) rather than my own
+  independent confirmation.
+- **Found one real, minor, non-blocking gap**: B31J Note (3) actually
+  has two conditions for selecting `1.3/h` — 90° bend angle *and* bend
+  wall thickness equal to the matching pipe's. `evaluateBendApplicability`
+  only checks the angle. Inert today since `smooth90FlexibilityCorrection`
+  is an explicit opt-in flag with no current caller anywhere in the repo;
+  flagged on the PR as a follow-up needed before any real caller sets it
+  in production, not a reason to hold.
+
+Posted full findings to the PR, then merged given real formulas, real
+sourcing (with the one disclosed limitation above), zero regressions,
+and real CI green. The `check:lfea-b3.19` collision with PR #594 is no
+longer a merge blocker since #594 remains held, not merging.
