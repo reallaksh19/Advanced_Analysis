@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { semanticHash } from '../src/core/shared-piping-model/canonical-json.js';
 import { computeAuthorizedEmpiricalLoadInputSemanticHash } from '../src/workspace/engineering-loads/authorized-empirical-load-input.js';
 import {
@@ -9,6 +10,16 @@ import {
   AUTHORIZED_EMPIRICAL_CONSUMER_REQUEST_SCHEMA,
   AuthorizedEnrichmentConsumerController,
 } from '../src/workspace/enrichment/authorized-enrichment-consumer-controller.js';
+
+const sharedRunner = await readFile(
+  new URL('./run-authorized-enrichment-consumer-controller-checks.mjs', import.meta.url),
+  'utf8',
+);
+assert.equal(
+  sharedRunner.includes('run-empirical-authorized-cutover-checks.mjs'),
+  false,
+  'branch-specific EMP-01 cutover manifest leaked into the shared controller suite',
+);
 
 const masterData = Object.freeze({ marker: 'MASTER-DATA-EMP01' });
 const runtimePackage = makeRuntimePackage();
@@ -84,6 +95,7 @@ console.log(JSON.stringify({
   configuredState: authorizationState.state,
   executionId: execution.executionId,
   stagedJsonPathRetained: true,
+  sharedSuiteBranchAgnostic: true,
 }, null, 2));
 
 function makeRuntimePackage() {
