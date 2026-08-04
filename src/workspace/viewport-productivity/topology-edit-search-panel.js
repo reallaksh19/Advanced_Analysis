@@ -137,7 +137,13 @@ export class TopologyEditSearchPanel {
     const hidden = !this.isCanonicalIdVisible(result.canonicalId);
     button.textContent = hidden ? `${result.label} · hidden (reveal and focus)` : result.label;
     button.title = `${resultDetails(result)}\nShift-activate to add this node or edge to the current selection.`;
+    button.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      this.activate(index, { additive: event.shiftKey });
+    });
     button.addEventListener('click', (event) => {
+      if (event.detail !== 0) return;
       this.activate(index, { additive: event.shiftKey });
     });
     return button;
