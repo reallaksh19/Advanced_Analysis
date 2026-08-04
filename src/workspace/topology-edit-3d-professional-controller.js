@@ -12,6 +12,7 @@ import {
   topologyEditSelectionDescription,
 } from './topology-edit/topology-edit-command-ui.js';
 import { WorkspaceState } from './workspace-state.js';
+import { EVENT_TOPICS } from './event-topics.js';
 import {
   createTopologyEditEditorStore,
 } from './topology-edit/editor-state/topology-edit-editor-store.js';
@@ -43,6 +44,7 @@ export class TopologyEdit3DViewController extends InteractionController {
     this.professionalRuntime = new TopologyEditProfessionalOperationRuntime(this);
     this.editorDatasetObject = null;
     this.editorDatasetEpoch = 0;
+    this.unsubscribeEditorDatasetSnapshot = null;
     const initialLegacySelection = this.selection;
     this.editorStore = createTopologyEditEditorStore();
     this.selectionCoordinator = new TopologyEditSelectionCoordinator({
@@ -68,10 +70,12 @@ export class TopologyEdit3DViewController extends InteractionController {
 
   async activate() {
     this.selectionCoordinator.connect();
+    this.connectEditorDatasetSnapshot();
     try {
       await super.activate();
       await this.professionalRuntime.loadCatalogue();
     } catch (error) {
+      this.disconnectEditorDatasetSnapshot();
       this.selectionCoordinator.disconnect();
       throw error;
     }
@@ -94,6 +98,7 @@ export class TopologyEdit3DViewController extends InteractionController {
   }
 
   deactivate() {
+    this.disconnectEditorDatasetSnapshot();
     this.selectionCoordinator.disconnect();
     this.professionalRuntime.destroy();
     this.professionalElement = null;
@@ -102,17 +107,34 @@ export class TopologyEdit3DViewController extends InteractionController {
     super.deactivate();
   }
 
+  connectEditorDatasetSnapshot() {
+    if (this.unsubscribeEditorDatasetSnapshot) return;
+    this.unsubscribeEditorDatasetSnapshot = this.eventBus.subscribe(
+      EVENT_TOPICS.WORKSPACE_SNAPSHOT_CHANGED,
+      ({ snapshot }) => this.reconcileEditorDatasetSnapshot(snapshot),
+    );
+    this.reconcileEditorDatasetSnapshot(WorkspaceState.getSnapshot());
+  }
+
+  disconnectEditorDatasetSnapshot() {
+    this.unsubscribeEditorDatasetSnapshot?.();
+    this.unsubscribeEditorDatasetSnapshot = null;
+  }
+
+  reconcileEditorDatasetSnapshot(snapshot) {
+    const dataset = snapshot?.dataset ?? null;
+    if (dataset === this.editorDatasetObject) return;
+    this.editorDatasetObject = dataset;
+    this.editorDatasetEpoch += 1;
+    const currentIdentity = this.editorStore.getState().dataset;
+    this.applyEditorDatasetIdentity({
+      ...currentIdentity,
+      sessionVersion: this.editorDatasetEpoch,
+    });
+  }
+
   refreshFromWorkspace() {
-    const dataset = WorkspaceState.getSnapshot()?.dataset ?? null;
-    if (dataset !== this.editorDatasetObject) {
-      this.editorDatasetObject = dataset;
-      this.editorDatasetEpoch += 1;
-      const currentIdentity = this.editorStore.getState().dataset;
-      this.applyEditorDatasetIdentity({
-        ...currentIdentity,
-        sessionVersion: this.editorDatasetEpoch,
-      });
-    }
+    this.reconcileEditorDatasetSnapshot(WorkspaceState.getSnapshot());
     return super.refreshFromWorkspace();
   }
 
