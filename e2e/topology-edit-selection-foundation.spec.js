@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 
 const CONTROLLER_KEY = '__TOPOLOGY_EDIT_SELECTION_FOUNDATION_CONTROLLER__';
 const PAYLOAD_KEY = '__TOPOLOGY_EDIT_SELECTION_FOUNDATION_PAYLOAD__';
+const TREE_TRACE_KEY = '__TOPOLOGY_EDIT_SELECTION_FOUNDATION_TREE_TRACE__';
 const REPORT_PATH = 'reports/qualification/topology-edit-selection-foundation.json';
 const evidence = {
   schema: 'TopologyEditSelectionFoundationQualification.v1',
@@ -35,7 +36,7 @@ test('tree, search, HUD, and real WebGL share one canonical selection authority'
   await firstTreeRow.click();
   await expect(host).toHaveAttribute('data-topology-edit-selection-source', 'tree');
   await expect(host).toHaveAttribute('data-topology-edit-selection-ids', 'edge:P-001');
-  await expect.poll(() => selectionProjectionState(page)).toEqual({
+  await expect.poll(() => selectionProjectionState(page)).toMatchObject({
     payloadWorkspaceIds: ['P-001'],
     payloadPrimaryWorkspaceId: 'P-001',
     treeWorkspaceIds: 'P-001',
@@ -116,29 +117,70 @@ async function openProductionController(page) {
     globalThis.AnalysisWorkspace?.getSnapshot?.()?.dataset?.entities?.length ?? 0
   ))).toBe(20);
 
-  await page.evaluate(async ({ controllerKey, payloadKey }) => {
-    const moduleUrl = new URL(
+  await page.evaluate(async ({ controllerKey, payloadKey, traceKey }) => {
+    const controllerModuleUrl = new URL(
       'src/workspace/topology-edit-3d-professional-controller.js',
       document.baseURI,
     ).href;
-    const { TopologyEdit3DViewController } = await import(moduleUrl);
+    const treeModuleUrl = new URL(
+      'src/workspace/tree-panel.js',
+      document.baseURI,
+    ).href;
+    const { TopologyEdit3DViewController } = await import(controllerModuleUrl);
+    const { TreePanel } = await import(treeModuleUrl);
     const prototype = TopologyEdit3DViewController.prototype;
-    if (prototype.__selectionFoundationActivateWrapped) return;
-    const activate = prototype.activate;
-    const handleUnifiedSelectionChanged = prototype.handleUnifiedSelectionChanged;
-    prototype.activate = async function selectionFoundationActivate(...args) {
-      globalThis[controllerKey] = this;
-      return activate.apply(this, args);
-    };
-    prototype.handleUnifiedSelectionChanged = function selectionFoundationChanged(payload) {
-      globalThis[payloadKey] = payload;
-      return handleUnifiedSelectionChanged.call(this, payload);
-    };
-    Object.defineProperty(prototype, '__selectionFoundationActivateWrapped', {
-      value: true,
-      configurable: true,
-    });
-  }, { controllerKey: CONTROLLER_KEY, payloadKey: PAYLOAD_KEY });
+    const treePrototype = TreePanel.prototype;
+    globalThis[traceKey] = [];
+
+    if (!treePrototype.__selectionFoundationTraceWrapped) {
+      const applyTopologyEditSelection = treePrototype.applyTopologyEditSelection;
+      const setTopologyEditSelectionActive = treePrototype.setTopologyEditSelectionActive;
+      const destroy = treePrototype.destroy;
+      treePrototype.applyTopologyEditSelection = function tracedTreeSelection(payload) {
+        globalThis[traceKey].push({
+          type: 'selection',
+          ids: payload.workspaceEntityIds ?? [],
+          primaryId: payload.primaryWorkspaceEntityId ?? null,
+          connected: this.rootElement?.isConnected ?? false,
+          currentRoot: this.rootElement === document.querySelector('[data-panel="tree"]'),
+        });
+        return applyTopologyEditSelection.call(this, payload);
+      };
+      treePrototype.setTopologyEditSelectionActive = function tracedTreeMode(active) {
+        globalThis[traceKey].push({ type: 'mode', active });
+        return setTopologyEditSelectionActive.call(this, active);
+      };
+      treePrototype.destroy = function tracedTreeDestroy() {
+        globalThis[traceKey].push({ type: 'destroy' });
+        return destroy.call(this);
+      };
+      Object.defineProperty(treePrototype, '__selectionFoundationTraceWrapped', {
+        value: true,
+        configurable: true,
+      });
+    }
+
+    if (!prototype.__selectionFoundationActivateWrapped) {
+      const activate = prototype.activate;
+      const handleUnifiedSelectionChanged = prototype.handleUnifiedSelectionChanged;
+      prototype.activate = async function selectionFoundationActivate(...args) {
+        globalThis[controllerKey] = this;
+        return activate.apply(this, args);
+      };
+      prototype.handleUnifiedSelectionChanged = function selectionFoundationChanged(payload) {
+        globalThis[payloadKey] = payload;
+        return handleUnifiedSelectionChanged.call(this, payload);
+      };
+      Object.defineProperty(prototype, '__selectionFoundationActivateWrapped', {
+        value: true,
+        configurable: true,
+      });
+    }
+  }, {
+    controllerKey: CONTROLLER_KEY,
+    payloadKey: PAYLOAD_KEY,
+    traceKey: TREE_TRACE_KEY,
+  });
 
   await page.getByRole('button', { name: '3D Edit', exact: true }).click();
   const host = page.locator('[data-role="topology-edit-render-host"]');
@@ -180,7 +222,7 @@ function selectionIds(value) {
 }
 
 async function selectionProjectionState(page) {
-  return page.evaluate(({ payloadKey }) => {
+  return page.evaluate(({ payloadKey, traceKey }) => {
     const payload = globalThis[payloadKey] ?? null;
     const tree = document.querySelector('[data-panel="tree"]');
     const list = tree?.querySelector('[data-role="tree-list"]');
@@ -192,8 +234,13 @@ async function selectionProjectionState(page) {
       treePrimaryWorkspaceId: tree?.dataset.topologyEditSelectionPrimaryWorkspaceId ?? null,
       treeMultiselectable: list?.getAttribute('aria-multiselectable') ?? null,
       rowSelected: row?.getAttribute('aria-selected') ?? null,
+      changedListenerCount: globalThis.EventBus?.listenerCount?.(
+        'topologyEditSelection:changed',
+      ) ?? null,
+      treeTrace: globalThis[traceKey] ?? [],
+      treeRootCount: document.querySelectorAll('[data-panel="tree"]').length,
     };
-  }, { payloadKey: PAYLOAD_KEY });
+  }, { payloadKey: PAYLOAD_KEY, traceKey: TREE_TRACE_KEY });
 }
 
 async function visiblePickPoint(page, canonicalId) {
