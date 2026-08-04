@@ -1,0 +1,88 @@
+name: M025 Current-Main Qualification
+
+on:
+  push:
+    branches:
+      - agent/m025-current-main-staging
+    paths:
+      - ".github/workflows/m025-current-main-staging.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out current-main staging branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/m025-current-main-staging
+          fetch-depth: 0
+
+      - name: Apply verified M025 commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin 2fc930e7ed17db699ee63fe761bf96fef491ee3c
+          git cherry-pick --no-commit 2fc930e7ed17db699ee63fe761bf96fef491ee3c
+          mkdir -p .github/workflows
+          git show 7357437ae060f00c742dba09dd5760b71de90f72:.github/workflows/m025-bm1-friction.yml > .github/workflows/m025-bm1-friction.yml
+          rm -f .github/workflows/m025-current-main-staging.yml
+          test ! -e scripts/m025-apply-work-pack.mjs
+          test ! -e scripts/m025-apply-continuation-patch.mjs
+          test ! -e scripts/m025-stabilize-continuation.mjs
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run focused component and solver checks
+        run: |
+          npm run check:lfea-b3.2
+          npm run check:lfea-b3.3
+
+      - name: Run BM1 prerequisite checks
+        run: |
+          npm run check:lfea-b3.15
+          npm run check:lfea-b3.16
+          npm run check:lfea-b3.17
+          npm run check:lfea-b3.18
+          npm run check:lfea-bm1-cii-comparison
+
+      - name: Qualify nonlinear mechanics
+        run: npm run check:lfea-b3.19:mechanics
+
+      - name: Run unchanged full acceptance oracle
+        id: full_oracle
+        continue-on-error: true
+        run: npm run check:lfea-b3.19
+
+      - name: Upload current-main evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m025-current-main-evidence
+          path: |
+            reports/lfea-bm1-m025-friction-qualification.json
+            reports/lfea-bm1-cii-output-comparison.json
+            docs/qualification/M025_COULOMB_FRICTION_ENGINEERING_RECORD.md
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Commit current-main candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Full oracle outcome: ${{ steps.full_oracle.outcome }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "M025: rebase qualified Coulomb friction onto current main"
+          git push origin HEAD:agent/m025-current-main-staging
