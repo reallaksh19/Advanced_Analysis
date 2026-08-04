@@ -4,7 +4,6 @@ import {
   compileCodeResult,
   sealCodeProfile,
   sealEditionDataset,
-  sealStressFactorSet,
 } from '../src/core/linear-fea-b31-code-engine/index.js';
 import { resolvePressureStressContribution } from '../src/core/linear-piping-code-application/pressure-stress-derivation.js';
 import { semanticHash } from '../src/core/shared-piping-model/canonical-json.js';
@@ -66,7 +65,7 @@ export function bm1CodeAuthorities(baseResult) {
   const profile = sealCodeProfile({
     schema: 'fea-b31-code-profile/v1',
     profileId: 'LINEAR-B31-CODE-PROFILE-R1',
-    codeProfileId: 'M023-BM1-A106B-B31.3-CODE-STRESS',
+    codeProfileId: 'M024-BM1-A106B-B31.3-BEND-CODE-STRESS',
     scope: 'METALLIC_PROCESS_PIPING_B31_3',
     editionStandard: 'ASME_B31_3_2024',
     flexibilitySource: 'ASME_B31J_2023',
@@ -85,7 +84,7 @@ export function bm1CodeAuthorities(baseResult) {
   };
   const editionDataset = sealEditionDataset({
     schema: 'fea-b31-edition-dataset/v1',
-    datasetId: 'M023-ASME-B31.3-2024-A106B-20KSI-293K-393K',
+    datasetId: 'M024-ASME-B31.3-2024-A106B-20KSI-293K-393K',
     sourceIdentity,
     materialId: baseResult.material.materialState.materialId,
     allowablePoints: [
@@ -130,10 +129,10 @@ export function sustainedStressResults(baseResult, codeAuthorities) {
     return compileCodeResult({
       codeProfile: codeAuthorities.profile,
       editionDataset: codeAuthorities.editionDataset,
-      stressFactorSet: unityStressFactors(entry.segment.id),
+      stressFactorSet: entry.stressFactorSet,
       category: 'SUSTAINED',
       codePointId: `${entry.segment.id}.${end}`,
-      componentId: entry.segment.id,
+      componentId: entry.sourceSegment.id,
       combinationId: 'BM1-SUSTAINED-W-P1-H',
       frameElementRecord: frame,
       sectionResolution: entry.section,
@@ -156,55 +155,21 @@ function frameForEntry(analysis, entry) {
   const component = analysis.pipingComponents.find(
     (row) => row.componentId === entry.component.componentId,
   );
-  const frame = component?.elements[0]?.frameElement;
-  if (!frame) throw new Error(`Missing rigid-component frame element ${entry.elementId}.`);
+  const frame = component?.elements[entry.componentElementIndex]?.frameElement;
+  if (!frame) throw new Error(`Missing component frame element ${entry.elementId}.`);
   return frame;
 }
 
-function unityStressFactors(componentId) {
-  const source = 'M023 BM1 InputXML contains no active SIF records; declared unity factor retained for comparison disclosure';
-  const directional = () => ({
-    axial: { value: 1, source },
-    torsional: { value: 1, source },
-    inPlaneBending: { value: 1, source },
-    outOfPlaneBending: { value: 1, source },
-  });
-  return sealStressFactorSet({
-    schema: 'fea-b31-stress-factor-set/v1',
-    factorSetId: `${componentId}.M023.UNITY`,
-    componentId,
-    sourceIdentity: {
-      standard: 'M023_INPUTXML',
-      edition: '01',
-      ruleId: 'NO-ACTIVE-SIF-UNITY',
-      sourceRevision: 'BM1-LIVE',
-      sourceSemanticHash: semanticHash({ componentId, source }),
-    },
-    applicability: {
-      status: 'WITHIN_RANGE',
-      ruleId: 'NO-ACTIVE-SIF',
-      evaluatedBy: 'M023-BM1-CAESAR-STRESS-COMPARISON',
-    },
-    momentDirectionMapping: { inPlaneField: 'my', outOfPlaneField: 'mz' },
-    sustainedIndices: directional(),
-    occasionalIndices: directional(),
-    displacementSifs: directional(),
-    userOverride: null,
-    semanticHash: '',
-  });
-}
-
 function augmentReport(report, sustainedCode, comparison, codeAuthorities) {
-  const limitations = report.limitations
-    .filter((entry) => !entry.includes('ALLOWABLESTRESS values') && !entry.includes('screening allowable'));
+  const limitations = report.limitations.filter((entry) => !entry.includes('ALLOWABLESTRESS values'));
   limitations.push(
-    'M023 uses two declared ASTM A106 Grade B ASME B31.3-2024 Table A-1 points: 20,000 psi at 293.15 K and 393.15 K, converted to Pa with the exact SI psi conversion.',
-    'M023 evaluates SUSTAINED at every compiled code point from the sustained recovery and derives P*Do/(4t) through the existing sealed PRESSURE-primitive code-application authority.',
+    'M023/M024 use two declared ASTM A106 Grade B ASME B31.3-2024 Table A-1 points: 20,000 psi at 293.15 K and 393.15 K, converted to Pa with the exact SI psi conversion.',
+    'SUSTAINED is evaluated at every resolved analysis code point and derives P*Do/(4t) through the sealed PRESSURE-primitive authority.',
     ...comparison.limitations,
   );
   return deepFreeze({
     ...report,
-    schema: 'm023-bm1-inputxml-code-stress-report/v1',
+    schema: 'm024-bm1-inputxml-bend-code-stress-report/v1',
     codeAuthority: {
       codeProfileSemanticHash: codeAuthorities.profile.semanticHash,
       editionDatasetSemanticHash: codeAuthorities.editionDataset.semanticHash,
@@ -224,10 +189,10 @@ function augmentReport(report, sustainedCode, comparison, codeAuthorities) {
 function requireBaseResult(value) {
   if (!value || !Array.isArray(value.modelEntries) || !value.sustained || !value.operating
       || !Array.isArray(value.code) || !value.report) {
-    throw new TypeError('M023 requires the completed M020 BM1 solve result.');
+    throw new TypeError('M024 requires the completed bend-resolved BM1 solve result.');
   }
   if (value.code.length !== value.modelEntries.length * 2
       || !value.code.every((row) => row.category === 'DISPLACEMENT_STRESS_RANGE')) {
-    throw new Error('M023 requires the existing two-ended M020 displacement stress result set.');
+    throw new Error('M024 requires two displacement-range results per resolved analysis element.');
   }
 }

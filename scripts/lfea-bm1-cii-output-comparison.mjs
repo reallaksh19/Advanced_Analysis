@@ -192,7 +192,7 @@ function diffRow(oursRow, ciiRowConverted, fields) {
  * against; list them as unmatched rather than comparing against an
  * arbitrarily chosen sub-span.
  */
-const BEND_PAIR_KEYS_WITHOUT_A_DIRECT_CAESAR_MATCH = new Set(['45-50', '50-60']);
+const BEND_PAIR_KEYS_WITHOUT_A_DIRECT_CAESAR_MATCH = new Set();
 
 /**
  * Build the real one-to-one comparison of this repo's BM1 InputXML solve
@@ -254,11 +254,11 @@ export function buildBm1CiiComparison() {
   }
 
   return Object.freeze({
-    schema: 'lfea-bm1-cii-output-comparison/v1',
+    schema: 'lfea-bm1-cii-output-comparison/v2',
     sourceCiiOutputPath: 'benchmarks/LFEA/BM1/BM1_CIIOutput.xml',
     sourceInputXmlSemanticHash: solved.source.semanticHash,
     limitations: [
-      'CAESAR node/element granularity is finer than this repo\'s compiled 16-node/15-element BM1 model at the two real bend spans (45-50, 50-60): CAESAR reports internal bend-station nodes 48, 49, 58, 59 as separate DISPLACEMENT_REPORT rows and splits GLOBAL_FORCE_REPORT into 45-48/48-49/49-50 and 50-58/58-59/59-60, none of which has a single corresponding element-action row in this model. These are listed as unmatchedCiiNodes (displacement/restraint) or unmatchedPairKeys (globalForce, covering both CAESAR-only and this-model-only pairs), never force-matched.',
+      'M024 resolves the InputXML bend near/mid/far nodes 48/49/50 and 58/59/60 through real B-3.2 BEND components. All 20 CAESAR displacement nodes and all 19 global-force pairs now join by exact declared identity; no approximate station matching is used.',
       'CAESAR restraints at nodes 70 and 80 declare a real FRIC_COEF=0.3 (Coulomb friction). This repo\'s BM1 constraint model does not implement restraint friction (a nonlinear, iterative CAESAR feature); the resulting transverse (UX/FZ-direction) reaction/displacement deviation downstream of those two restraints is real and attributable to this gap, not to a solver defect.',
       'reaction.* values in this comparison are the reaction applied BY the restraint TO the structure (this repo\'s standing convention). CAESAR RESTRAINT_REPORT exports the equal-and-opposite force applied BY the pipe TO the restraint hardware; every restraint comparison row negates CAESAR\'s FX/FY/FZ/MX/MY/MZ before differencing. GLOBAL_FORCE_REPORT element-action rows require no such negation (hand-verified via the node-10 anchor / element IX-S1 nodal-equilibrium identity).',
     ],
