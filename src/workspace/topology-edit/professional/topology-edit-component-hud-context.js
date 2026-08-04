@@ -45,6 +45,25 @@ const TYPE_FIELDS = Object.freeze({
     ['reducerOrientation', 'Orientation', null],
   ]),
 });
+const MATCH_FIELDS = Object.freeze({
+  FLANGE: Object.freeze([
+    ...COMMON_FIELDS.map(([key]) => key),
+    'flangeClass',
+    'flangeFacing',
+  ]),
+  VALVE: Object.freeze([
+    ...COMMON_FIELDS.map(([key]) => key),
+    'valveType',
+    'valveFaceToFaceMm',
+  ]),
+  REDUCER: Object.freeze([
+    ...COMMON_FIELDS.map(([key]) => key),
+    'secondaryNominalSizeMm',
+    'secondaryOutsideDiameterMm',
+    'reducerType',
+    'reducerOrientation',
+  ]),
+});
 
 export function deriveTopologyEditComponentHudContext(input = {}) {
   const topology = requireTopology(input.topology);
@@ -64,7 +83,8 @@ export function deriveTopologyEditComponentHudContext(input = {}) {
   }
   const edge = matches[0];
   const componentType = normalizeComponentType(edge.entityType);
-  const sourceEvidence = componentSourceEvidence(edge, componentType);
+  const workspaceEntity = workspaceEntityForEdge(input.workspaceDataset, edge);
+  const sourceEvidence = componentSourceEvidence(edge, componentType, workspaceEntity);
   if (!SUPPORTED_TYPES.has(componentType)) return context({
     status: 'UNSUPPORTED',
     catalogue,
@@ -77,7 +97,11 @@ export function deriveTopologyEditComponentHudContext(input = {}) {
   const family = catalogue.records.filter((record) => (
     record.componentType === componentType
   ));
-  const candidates = family.filter((record) => evidenceMatches(record, sourceEvidence));
+  const candidates = family.filter((record) => evidenceMatches(
+    record,
+    sourceEvidence,
+    componentType,
+  ));
   const status = candidates.length === 1
     ? 'RESOLVED'
     : candidates.length > 1
@@ -157,17 +181,21 @@ function context({
 
 function fieldSchema(componentType, candidates, sourceEvidence) {
   const fields = [...COMMON_FIELDS, ...(TYPE_FIELDS[componentType] ?? [])];
-  return fields.map(([key, label, unit]) => ({
-    key,
-    label,
-    unit,
-    value: commonCandidateValue(candidates, key) ?? sourceEvidence?.[key] ?? null,
-    source: commonCandidateValue(candidates, key) !== null
-      ? 'CATALOGUE'
-      : sourceEvidence?.[key] !== null && sourceEvidence?.[key] !== undefined
-        ? 'CANONICAL'
-        : 'UNRESOLVED',
-  }));
+  return fields.map(([key, label, unit]) => {
+    const sourceValue = sourceEvidence?.[key] ?? null;
+    const catalogueValue = commonCandidateValue(candidates, key);
+    return {
+      key,
+      label,
+      unit,
+      value: sourceValue ?? catalogueValue,
+      source: sourceValue !== null
+        ? 'SOURCE_EVIDENCE'
+        : catalogueValue !== null
+          ? 'CATALOGUE'
+          : 'UNRESOLVED',
+    };
+  });
 }
 
 function commonCandidateValue(candidates, key) {
@@ -176,8 +204,9 @@ function commonCandidateValue(candidates, key) {
   return values.length === 1 ? values[0] : null;
 }
 
-function componentSourceEvidence(edge, componentType) {
-  return {
+function componentSourceEvidence(edge, componentType, workspaceEntity) {
+  const attributes = mergedAttributes(workspaceEntity);
+  const common = {
     componentType,
     nominalSizeMm: positive(edge.diameterMm),
     outsideDiameterMm: positive(edge.outsideDiameterMm),
@@ -185,28 +214,100 @@ function componentSourceEvidence(edge, componentType) {
     endConnectionFrom: upper(edge.endConnectionFrom),
     endConnectionTo: upper(edge.endConnectionTo),
   };
+  if (componentType === 'FLANGE') return {
+    ...common,
+    flangeClass: textNumber(
+      attributes.FLANGE_CLASS,
+      attributes.RATING_CLASS,
+      attributes.CLASS,
+    ),
+    flangeFacing: upper(
+      attributes.FLANGE_FACING
+      ?? attributes.FACING
+      ?? attributes.FACE,
+    ),
+  };
+  if (componentType === 'VALVE') return {
+    ...common,
+    valveType: upper(attributes.VALVE_TYPE ?? attributes.TYPE_DESCRIPTION),
+    valveFaceToFaceMm: firstPositive(
+      attributes.VALVE_FACE_TO_FACE_MM,
+      attributes.FACE_TO_FACE_MM,
+      attributes.LENGTH_MM,
+    ),
+  };
+  if (componentType === 'REDUCER') {
+    const reducerType = upper(attributes.REDUCER_TYPE ?? attributes.FITTING_TYPE);
+    return {
+      ...common,
+      nominalSizeMm: firstPositive(
+        attributes.START_NOMINAL_BORE_MM,
+        attributes.START_NOMINAL_SIZE_MM,
+        common.nominalSizeMm,
+      ),
+      outsideDiameterMm: firstPositive(
+        attributes.START_OUTSIDE_DIAMETER,
+        attributes.START_OUTSIDE_DIAMETER_MM,
+        common.outsideDiameterMm,
+      ),
+      secondaryNominalSizeMm: firstPositive(
+        attributes.END_NOMINAL_BORE_MM,
+        attributes.END_NOMINAL_SIZE_MM,
+      ),
+      secondaryOutsideDiameterMm: firstPositive(
+        attributes.END_OUTSIDE_DIAMETER,
+        attributes.END_OUTSIDE_DIAMETER_MM,
+      ),
+      reducerType,
+      reducerOrientation: upper(attributes.REDUCER_ORIENTATION)
+        ?? governedReducerOrientation(reducerType),
+    };
+  }
+  return common;
 }
 
-function evidenceMatches(record, evidence) {
-  return [
-    'componentType',
-    'nominalSizeMm',
-    'outsideDiameterMm',
-    'pipingClass',
-    'endConnectionFrom',
-    'endConnectionTo',
-  ].every((field) => (
+function evidenceMatches(record, evidence, componentType) {
+  return (MATCH_FIELDS[componentType] ?? []).every((field) => (
     evidence[field] === null || Object.is(record[field], evidence[field])
   ));
+}
+
+function workspaceEntityForEdge(dataset, edge) {
+  if (!dataset) return null;
+  if (!Array.isArray(dataset.entities)) {
+    throw new TypeError('TopologyEditComponentHudContext: workspaceDataset.entities must be an array.');
+  }
+  const matches = dataset.entities.filter((entity) => entity.entityId === edge.componentKey);
+  if (matches.length > 1) {
+    throw new RangeError(
+      `TopologyEditComponentHudContext: workspace entity ${edge.componentKey} is ambiguous.`,
+    );
+  }
+  return matches[0] ?? null;
+}
+
+function mergedAttributes(entity) {
+  const properties = entity?.properties ?? {};
+  return {
+    ...(properties.sourceAttributes ?? {}),
+    ...(properties.attributes ?? {}),
+    ...(properties.enrichedAttributes ?? {}),
+    ...(properties.nativeParams ?? {}),
+  };
+}
+
+function governedReducerOrientation(reducerType) {
+  if (reducerType === 'CONCENTRIC' || reducerType === 'ECCENTRIC') return reducerType;
+  return null;
 }
 
 function diagnostics(status, componentType, candidateRecordIds) {
   const messages = {
     NO_SELECTION: 'Select one canonical inline component to inspect governed catalogue context.',
     UNSUPPORTED: `${componentType || 'Selected object'} does not use the flange, valve, or reducer HUD schema.`,
-    RESOLVED: 'Exactly one catalogue record matches all available canonical evidence.',
-    AMBIGUOUS: 'Multiple catalogue records match all available canonical evidence; explicit record selection is required.',
-    INCOMPATIBLE: 'Catalogue records exist for this component family, but available canonical size, class, or connection evidence does not match.',
+    RESOLVED: 'Exactly one catalogue record matches all available source-backed component evidence.',
+    AMBIGUOUS: 'Multiple catalogue records match all available source-backed component evidence; explicit record selection is required.',
+    INCOMPATIBLE: 'Catalogue records exist for this component family, but available source-backed size, class, connection, or component evidence does not match.',
     UNAVAILABLE: 'No catalogue records exist for this component family.',
   };
   return [{
@@ -241,7 +342,28 @@ function upper(value) {
   return text ? text.toUpperCase() : null;
 }
 
+function textNumber(...values) {
+  for (const value of values) {
+    const text = stringValue(value);
+    if (text) return text.toUpperCase();
+  }
+  return null;
+}
+
+function firstPositive(...values) {
+  for (const value of values) {
+    const number = positive(value);
+    if (number !== null) return number;
+  }
+  return null;
+}
+
 function positive(value) {
+  if (typeof value === 'string') {
+    const match = value.trim().match(/^([+]?(?:\d+(?:\.\d*)?|\.\d+))(?:\s*mm)?$/iu);
+    if (!match) return null;
+    value = match[1];
+  }
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? number : null;
 }
