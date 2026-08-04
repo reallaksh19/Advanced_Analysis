@@ -19,6 +19,11 @@ const chunks = fs.readdirSync(assets)
   .sort((left, right) => right.bytes - left.bytes);
 
 assert.ok(chunks.length > 1, 'Production output must contain multiple JavaScript chunks.');
+assert.equal(
+  chunks.some((chunk) => chunk.name.startsWith('workspace-sketcher-')),
+  false,
+  'Sequential sketcher must not be emitted as a forced standalone chunk; that boundary creates a runtime TDZ cycle.',
+);
 for (const chunk of chunks) {
   assert.ok(
     chunk.bytes <= maximumBytes,
@@ -32,4 +37,5 @@ console.log(JSON.stringify({
   maximumBytes,
   largest: chunks[0],
   chunkCount: chunks.length,
+  forcedSketcherChunkPresent: false,
 }));
