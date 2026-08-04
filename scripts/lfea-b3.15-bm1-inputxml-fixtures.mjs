@@ -145,10 +145,17 @@ function constraintDeclarations(geometry, kernelNodeBySource) {
     for (const restraint of node.meta.restraints ?? []) {
       if (restraint.typeCode === '14') add(node.id, 'UY');
       if (restraint.typeCode === '8') {
+        // Every real GUI restraint in BM1 is a single declared DOF: it is
+        // co-located with a separate +Y restraint at the same node and its
+        // own cosine names the one axis IT restrains (nodes 90/120 both
+        // declare XCOSINE=1 to cover X, leaving the +Y record to cover Y) —
+        // confirmed against BM1_CIIOutput.xml's real RESTRAINT_REPORT, which
+        // shows a nonzero reaction on exactly that axis and nothing on the
+        // other transverse axis. Restraining the two axes transverse to the
+        // cosine (the prior behaviour) left this axis completely free.
         const direction = [Math.abs(restraint.xCosine ?? 0), Math.abs(restraint.yCosine ?? 0), Math.abs(restraint.zCosine ?? 0)];
         const axis = direction.indexOf(Math.max(...direction));
-        const transverse = axis === 0 ? ['UY', 'UZ'] : axis === 1 ? ['UX', 'UZ'] : ['UX', 'UY'];
-        transverse.forEach((dof) => add(node.id, dof));
+        add(node.id, ['UX', 'UY', 'UZ'][axis]);
       }
     }
   }
