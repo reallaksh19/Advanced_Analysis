@@ -13,7 +13,6 @@ const expectedOwnership = new Map([
   ['/repo/src/vendors/catalog.js', 'vendor-integrations'],
   ['/repo/src/utils/format.js', 'application-support'],
   ['/repo/src/mocks/model.js', 'application-support'],
-  ['/repo/src/workspace/sequential-sketcher/sequential-sketcher-controller.js', 'workspace-sketcher'],
   ['/repo/src/workspace/enrichment/first-cut-workbench-controller.js', 'workspace-enrichment'],
   ['/repo/src/workspace/first-cut-result-store.js', 'workspace-enrichment'],
   ['/repo/src/workspace/linear-piping-results-workbench.js', 'workspace-linear-piping'],
@@ -29,16 +28,29 @@ const expectedOwnership = new Map([
   ['/repo/src/core/local-shell/index.js', 'core-local-shell'],
 ]);
 
+const automaticOwnership = [
+  '/repo/src/workspace/sequential-sketcher/sequential-sketcher-controller.js',
+  '/repo/src/workspace/sequential-sketcher/sequential-sketcher-view.js',
+];
+
 for (const [id, expected] of expectedOwnership) {
   assert.equal(manualChunk(id), expected, `${id} must map to ${expected}`);
 }
+for (const id of automaticOwnership) {
+  assert.equal(
+    manualChunk(id),
+    undefined,
+    `${id} must remain under Rollup automatic ownership to avoid a cyclic sketcher chunk.`,
+  );
+}
 
 assert.equal(manualChunk('/repo/src/main.js'), undefined);
+assert.equal(viteSource.includes("return 'workspace-sketcher'"), false);
 assert.equal(viteSource.includes('onlyExplicitManualChunks: true'), true);
 assert.equal(viteSource.includes('chunkSizeWarningLimit'), false);
 assert.equal(policySource.includes('const maximumBytes = 500 * 1024;'), true);
 assert.equal(policySource.includes('chunk.bytes <= maximumBytes'), true);
-assert.equal(new Set(expectedOwnership.values()).size >= 11, true);
+assert.equal(new Set(expectedOwnership.values()).size >= 10, true);
 
 console.log(JSON.stringify({
   check: 'bundle-chunk-ownership',
@@ -46,6 +58,8 @@ console.log(JSON.stringify({
   explicitManualChunks: true,
   chunkSizePolicyBytes: 500 * 1024,
   ownershipAssertions: expectedOwnership.size,
+  automaticOwnershipAssertions: automaticOwnership.length,
   distinctChunkOwners: new Set(expectedOwnership.values()).size,
+  sequentialSketcherOwnership: 'ROLLUP_AUTOMATIC',
   thresholdChanged: false,
 }));
