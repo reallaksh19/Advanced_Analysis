@@ -7,6 +7,7 @@ on:
       - "package.json"
       - "benchmarks/LFEA/BM1/BM1_InputXML.xml"
       - "benchmarks/LFEA/BM1/BM1_CIIOutput.xml"
+      - "reports/lfea-bm1-cii-output-comparison.json"
       - "scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs"
       - "scripts/lfea-b3.15-bm1-inputxml-check.mjs"
       - "scripts/lfea-b3.16-inputxml-ground-truth-check.mjs"
@@ -15,6 +16,7 @@ on:
       - "scripts/lfea-bm1-cii-output-comparison*.mjs"
       - "src/core/linear-fea-piping-components/**"
       - "src/core/linear-fea-b31-code-engine/**"
+      - "src/core/linear-piping-code-application/**"
   workflow_dispatch:
 
 permissions:
