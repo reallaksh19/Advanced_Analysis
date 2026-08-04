@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 
 export const NON_FEA_P0_COMMANDS = Object.freeze([
+  ['non-fea-p0-tests', ['node', ['--test', 'tests/non-fea-p0-*.test.mjs']]],
   ['check:workspace-contracts', ['npm', ['run', 'check:workspace-contracts']]],
   ['check:first-cut', ['npm', ['run', 'check:first-cut']]],
   ['check:first-cut-engineering-benchmarks', ['npm', ['run', 'check:first-cut-engineering-benchmarks']]],
