@@ -1,0 +1,46 @@
+name: M028 Source Snapshot
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Verify exact clean checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
+          git rev-parse HEAD > M028_SNAPSHOT_SHA.txt
+      - name: Build source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os, zipfile
+          excluded = {'.git', 'node_modules'}
+          with zipfile.ZipFile('m028-source.zip', 'w', zipfile.ZIP_DEFLATED) as z:
+              for root, dirs, files in os.walk('.'):
+                  dirs[:] = [d for d in dirs if d not in excluded]
+                  for name in files:
+                      path = os.path.join(root, name)
+                      if path == './m028-source.zip':
+                          continue
+                      z.write(path, path[2:] if path.startswith('./') else path)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m028-source-snapshot
+          path: m028-source.zip
+          if-no-files-found: error
+          retention-days: 2
