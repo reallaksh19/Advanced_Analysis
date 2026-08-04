@@ -31,14 +31,16 @@ export async function executeNonFeaFixtureSample({ fixturePath, fixture, executi
     const text = await recorder.capture('UTF8_DECODE', () => bytes.toString('utf8'));
     raw = await recorder.capture('JSON_PARSE', () => JSON.parse(text));
     rawBeforeHash = semanticHash(raw);
-    dataset = await recorder.capture('NORMALIZATION', () => normalizeWorkspaceDataset(raw, fixture, { sourceBytes: bytes, sourceSha256 }));
-    products = { dataset: semanticHash(dataset), hierarchy: semanticHash(dataset.hierarchy), sharedModel: semanticHash(dataset.sharedModel) };
-    rawAfterHash = semanticHash(raw);
-    if (rawBeforeHash !== rawAfterHash || sha256(bytes) !== sourceSha256) {
-      const error = new Error('Source package or bytes changed during read-only baseline execution.');
-      error.code = 'P0_SOURCE_MUTATED';
-      throw error;
-    }
+    dataset = await recorder.capture('NORMALIZATION', () => normalizeWorkspaceDataset(raw, fixture, {
+      sourceBytes: bytes,
+      sourceSha256,
+    }));
+    assertSourceUnchanged({ raw, bytes, rawBeforeHash, sourceSha256 });
+    products = {
+      dataset: semanticHash(dataset),
+      hierarchy: semanticHash(dataset.hierarchy),
+      sharedModel: semanticHash(dataset.sharedModel),
+    };
     await recorder.capture('WORKSPACE_SNAPSHOT', () => WorkspaceState.loadDataset(dataset));
     const profile = projectDataStore.getProfile();
     const supportSites = await recorder.capture('SUPPORT_SITES', () => buildSupportSiteModel(dataset, profile));
@@ -46,7 +48,9 @@ export async function executeNonFeaFixtureSample({ fixturePath, fixture, executi
     const zoneProjection = await recorder.capture('MODEL_ZONE_PROJECTION', () => projectDatasetForModelZone(dataset, null));
     const scopedSupports = projectSupportSiteModelForModelZone(supportSites, zoneProjection);
     const resolved = await recorder.capture('RESOLVED_GEOMETRY', () => filterResolvedGeometryForModelZone(
-      buildResolvedEngineeringGeometry(dataset, profile, scopedSupports), zoneProjection, scopedSupports,
+      buildResolvedEngineeringGeometry(dataset, profile, scopedSupports),
+      zoneProjection,
+      scopedSupports,
     ));
     const renderModel = await recorder.capture('RENDER_MODEL', () => buildViewportRenderModel(resolved));
     products = {
@@ -56,7 +60,10 @@ export async function executeNonFeaFixtureSample({ fixturePath, fixture, executi
       zoneProjection: semanticHash(zoneProjection),
       resolvedGeometry: semanticHash(resolved),
       renderModel: semanticHash(renderModel),
-      diagnostics: semanticHash({ skippedEntityIds: renderModel.skippedEntityIds, summary: renderModel.summary }),
+      diagnostics: semanticHash({
+        skippedEntityIds: renderModel.skippedEntityIds,
+        summary: renderModel.summary,
+      }),
     };
     identity = {
       datasetId: dataset.datasetId,
@@ -72,6 +79,8 @@ export async function executeNonFeaFixtureSample({ fixturePath, fixture, executi
       renderableCount: renderModel.summary.renderableCount,
       diagnosticCount: renderModel.diagnosticPrimitives.length,
     };
+    rawAfterHash = semanticHash(raw);
+    assertSourceUnchanged({ raw, bytes, rawBeforeHash, sourceSha256 });
   } catch {
     // The stage recorder owns exact failure evidence; P0 still writes the full ledger.
   } finally {
@@ -81,7 +90,9 @@ export async function executeNonFeaFixtureSample({ fixturePath, fixture, executi
     fixture: Object.freeze({
       sourceSha256,
       identity,
-      authorityNotes: dataset ? ['Normalized through production normalizeWorkspaceDataset.'] : ['Production normalization did not complete.'],
+      authorityNotes: dataset
+        ? ['Normalized through production normalizeWorkspaceDataset.']
+        : ['Production normalization did not complete.'],
     }),
     run: Object.freeze({
       ...recorder.snapshot(),
@@ -90,6 +101,16 @@ export async function executeNonFeaFixtureSample({ fixturePath, fixture, executi
       sourceHashes: { before: rawBeforeHash, after: rawAfterHash, bytes: sourceSha256 },
     }),
   });
+}
+
+function assertSourceUnchanged({ raw, bytes, rawBeforeHash, sourceSha256 }) {
+  const rawCurrentHash = semanticHash(raw);
+  const byteCurrentHash = sha256(bytes);
+  if (rawCurrentHash !== rawBeforeHash || byteCurrentHash !== sourceSha256) {
+    const error = new Error('Source package or bytes changed during read-only baseline execution.');
+    error.code = 'P0_SOURCE_MUTATED';
+    throw error;
+  }
 }
 
 function sha256(value) { return createHash('sha256').update(value).digest('hex'); }
