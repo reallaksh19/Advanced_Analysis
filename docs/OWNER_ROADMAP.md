@@ -1563,3 +1563,134 @@ since the primary target (EXP) genuinely improved and both known
 remaining gaps (restraint friction at nodes 70/80, the B31.3-2018 vs.
 2024 edition label) are unchanged, already-disclosed, out-of-scope
 items.
+
+## ±10% acceptance bar: clarified scope, and the friction root cause
+
+Before dispatching the next Work Pack, ran a fresh point-by-point audit
+of the SUS-case comparison against the "benchmark can be considered
+close only when ±10% accuracy is achieved" bar — checking every matched
+displacement/reaction, not just governing/summary metrics. Found many
+individual comparisons well outside ±10%, concentrated in transverse
+(X/Z-direction) quantities near nodes 70 and 80. Asked the Owner to
+confirm scope via `AskUserQuestion`; answer confirmed the strict reading:
+±10% must hold at **every matched node/DOF/element**, not only
+governing values. This is now the standing acceptance criterion.
+
+Traced the root cause by hand-computing real Coulomb friction
+mobilization (`T/μN`) from `BM1_CIIOutput.xml`'s raw `RESTRAINT_REPORT`
+(μ=0.3 at both nodes):
+
+- **SUS**: node 70 `N=17230.73N, T=1707.95N, μN=5169.22N` → 33.0%
+  mobilized; node 80 `N=15370.62N, T=849.15N, μN=4611.19N` → 18.4%
+  mobilized. Both comfortably "stuck."
+- **OPE**: node 70 `N=862.995N, T=257.21N, μN=258.90N` → 99.3%
+  mobilized; node 80 `N=19742.13N, T=5840.25N, μN=5922.64N` → 98.6%
+  mobilized. Both essentially *at* the Coulomb limit — the hard case.
+
+This asymmetry rules out a naive rigid-restraint shortcut and confirms
+real nonlinear friction physics is needed to close the gap. Became the
+technical grounding for the M025 (#592) Work Pack and its 5-question
+expert-level qualification questionnaire (added to #592 before
+dispatching a new agent).
+
+## M025 (#592) → PR #594, held — real non-convergence found, not merged
+
+Dispatched to model the two live `FRIC_COEF=0.3` restraints at nodes
+70/80 with a genuine active-set Coulomb outer solve around the unchanged
+linear kernel, per the mobilization asymmetry above.
+
+**The PR's diff does not contain its own real implementation.** Its core
+solve script (`scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs`) is
+byte-for-byte unmodified on the PR branch — the actual integration is
+applied at CI time by three self-modifying "patch scripts," run by a
+`pull_request`-triggered workflow with `permissions: contents: write`
+that then `git commit`s and pushes the materialized result back onto the
+PR's own branch. This means the PR's diff, as posted, is not the code
+that would actually run — flagged directly on the PR as a process/review-
+integrity concern independent of the friction algorithm's correctness.
+
+Refused to take the PR's claimed passing status on faith. Instead
+manually applied, via the Edit tool (the CI-triggering patch scripts
+could not be executed directly — blocked by the platform's own auto-mode
+safety classifier, not worked around), the exact transformations the
+three patch scripts describe, reconstructing the real materialized
+integration in a dedicated worktree. This surfaced two genuine, concrete
+findings a diff-only review would have missed:
+
+1. **A real duplicate-key bug**: the `package.json` patch searches for
+   the line after `check:lfea-b3.17` and inserts a duplicate
+   `check:lfea-b3.18` entry (that key already exists elsewhere in
+   `scripts`, added by M024/PR #590, not adjacent to `b3.17`) alongside
+   the intended `check:lfea-b3.19`. Confirmed by direct
+   `grep -n "check:lfea-b3.1[789]"` against the real file: `b3.17` at
+   line 60, `b3.18` at line 109 — not adjacent, confirming the collision
+   would occur verbatim as scripted.
+2. **Real algorithmic non-convergence**: running the friction check
+   (`node scripts/lfea-b3.19-bm1-friction-check.mjs`) against the
+   hand-materialized integration threw a genuine non-convergence error
+   at the very first OPE thermal load step (1/32) — the fixed-point
+   iteration (even after the PR's own "stabilization" pass: relaxation
+   0.55→0.2, iterations 80→240, tolerances loosened) could not settle
+   the near-limit friction state at nodes 70/80 (98.6–99.3% mobilized,
+   exactly the hard case identified above). Both nodes were oscillating
+   in `SLIP` with force residuals close to but not converging on the
+   Coulomb limit.
+
+Both findings reported to the PR via comment, including a suggestion to
+consider a proper return-mapping/active-set update or semismooth-Newton
+scheme rather than further tolerance loosening, since the already-applied
+stabilization was insufficient. Also flagged the `check:lfea-b3.19`
+script-name collision with PR #595 (below) as a separate, unrelated
+merge-sequencing conflict. **Held per Owner instruction — not merged,
+no further Owner action pending the agent's next round.**
+
+## PR #595: runtime B31/B31J factor calculator — reviewed, held in draft
+
+Not a dispatched Work Pack — a generalization the agent raised against
+the closed #588 discussion, confirmed as legitimate/in-scope by the
+Owner. Adds a standalone runtime calculator package
+(`src/core/linear-fea-b31-factor-calculator/`) that derives and seals
+ASME B31.3 Appendix D / ASME B31J flexibility and stress-factor records
+from caller geometry or InputXML, across four edition profiles
+(`B31_3_2018_APPENDIX_D`, `B31_3_2020_B31J_2017`,
+`B31_3_2022_B31J_2017`, `B31_3_2024_B31J_2023` — no `B31J_2022`, since
+none exists). Deliberately calculate-only: never applies stiffness,
+never evaluates code stress, never solves a model.
+
+**Reviewed the exact head** (`5b5e82c3312e3dbc2c0d3ed5bb13a487c16e770a`)
+in a dedicated worktree; confirmed the diff against the real base
+matches the PR's own claimed "13 files changed, +1847/-2" exactly; read
+all 13 changed files in full. Independently hand-derived the Appendix D
+Note (7) bend formula from scratch before reading the PR's own
+derivation logic, and reproduced all four asserted values for the
+`check:lfea-b3.19` bend case to full double precision (`h =
+0.14753712217178722`, `flexibility.inPlane = 9.506141774188135`,
+`inPlaneBending SIF = 2.619611948608015`, `outOfPlaneBending SIF =
+2.1830099571733457`). Ran both new check scripts directly — real PASS on
+both, including the B-4.5 integration check's extraction of BM1's real
+`IX-S5` bend geometry from live `BM1_InputXML.xml`
+(`outerDiameter≈0.323850006`, `wallThickness≈0.009525`,
+`bendRadius≈0.457199982`, all within `1e-12`), matching values already
+independently verified during the M024 review. Ran the full
+`check:lfea-linear-core` aggregate (~40 scripts) against the exact head:
+exit code 0, zero regressions. Confirmed real GitHub Actions CI
+(`qualify-m022a`, `qualify-m023`, `qualify-m024`, all `success`) —
+independently verifying the PR's own claim.
+
+The PR is honest about not being production-ready: its own body
+discloses, from a post-implementation external-benchmark review, two
+open questions that keep it in draft — (1) whether B31J's smooth-bend
+flexibility rule is `1.3/h` (per cited vendor guidance) rather than the
+`1.65/h` currently implemented, and (2) a `1.26` divisor vendor guidance
+applies to verified welding tees that the current `VERIFIED_B16_9` path
+does not apply. Reviewed both from domain knowledge (B31J's stated scope
+is fittings not covered by Appendix D — tees, o-lets, reducers — and has
+historically left the classical Appendix D smooth-bend formulas
+unchanged, consistent with what's implemented) but could not verify
+either directly against primary B31J-2017/2023 text in this review;
+posted this assessment to the PR and agreed both need a primary-source
+citation before the draft flag comes off. Also confirmed, independent of
+either PR's correctness, that `check:lfea-b3.19` is registered by both
+this PR and PR #594 for two unrelated checks — a real script-name
+collision that must be resolved before either merges cleanly. **Held in
+draft per the PR's own disposition and this review — not merged.**
