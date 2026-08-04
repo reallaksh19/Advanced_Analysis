@@ -69,9 +69,20 @@ jobs:
 
       - name: Execute inline insertion and transaction contracts
         run: |
-          node --test \
+          set -o pipefail
+          node --test --test-reporter=tap \
             tests/topology-edit-inline-component-insertion.test.mjs \
             tests/topology-edit-professional-operation-transaction.test.mjs \
             tests/topology-edit-professional-engineering-catalog.test.mjs \
             tests/topology-edit-professional-engineering-compatibility.test.mjs \
-            tests/topology-edit-component-hud-context.test.mjs
+            tests/topology-edit-component-hud-context.test.mjs \
+            2>&1 | tee inline-component-test-output.txt
+
+      - name: Upload focused test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-inline-component-output-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}-${{ github.run_attempt }}
+          path: inline-component-test-output.txt
+          if-no-files-found: error
+          retention-days: 7
