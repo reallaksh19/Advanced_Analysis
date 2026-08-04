@@ -1,0 +1,134 @@
+name: M023 Bootstrap Exact-Head Patch
+
+on:
+  push:
+    branches:
+      - agent/m023-bm1-b31-stress-caesar
+    paths:
+      - ".github/workflows/m023-bootstrap.yml"
+      - "scripts/lfea-b3.17-*.mjs"
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out branch head
+        uses: actions/checkout@v4
+        with:
+          ref: agent/m023-bm1-b31-stress-caesar
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Apply exact M023 wiring
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          fixture_path = Path('scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs')
+          source = fixture_path.read_text()
+          source = source.replace(
+              "import { compileCodeResult, sealCodeProfile, sealEditionDataset, sealStressFactorSet } from '../src/core/linear-fea-b31-code-engine/index.js';",
+              "import { compileCodeResult, sealStressFactorSet } from '../src/core/linear-fea-b31-code-engine/index.js';",
+          )
+          marker = "import { semanticHash } from '../src/core/shared-piping-model/canonical-json.js';\n"
+          addition = marker + "import { augmentBm1CodeStress, bm1CodeAuthorities } from './lfea-b3.17-bm1-code-stress-fixtures.mjs';\n"
+          if "augmentBm1CodeStress" not in source:
+              assert marker in source
+              source = source.replace(marker, addition, 1)
+          source = source.replace("export const SCREENING_ALLOWABLE = 138e6;\n", "")
+          old_solve = """export function solveBm1InputXml() {
+            const authorities = buildBm1InputXmlAuthorities();
+            const sustained = analyseCase(authorities, 'BM1-SUSTAINED', false);
+            const operating = analyseCase(authorities, 'BM1-OPERATING-T1', true);
+            const code = displacementStressResults(authorities, sustained, operating);
+            return { ...authorities, sustained, operating, code, report: buildReport(authorities, sustained, operating, code) };
+          }
+          """
+          new_solve = """export function solveBm1InputXml() {
+            const authorities = buildBm1InputXmlAuthorities();
+            const sustained = analyseCase(authorities, 'BM1-SUSTAINED', false);
+            const operating = analyseCase(authorities, 'BM1-OPERATING-T1', true);
+            const codeAuthorities = bm1CodeAuthorities(authorities);
+            const code = displacementStressResults(authorities, sustained, operating, codeAuthorities);
+            const baseResult = { ...authorities, sustained, operating, code, report: buildReport(authorities, sustained, operating, code) };
+            return augmentBm1CodeStress(baseResult, codeAuthorities);
+          }
+          """
+          if old_solve in source:
+              source = source.replace(old_solve, new_solve, 1)
+          else:
+              assert "return augmentBm1CodeStress(baseResult, codeAuthorities);" in source
+          pattern = re.compile(
+              r"function displacementStressResults\(authorities, sustained, operating\) \{\n[\s\S]*?\n  return authorities\.modelEntries",
+          )
+          replacement = """function displacementStressResults(authorities, sustained, operating, codeAuthorities) {
+            const { profile, editionDataset: dataset } = codeAuthorities;
+            return authorities.modelEntries"""
+          source, count = pattern.subn(replacement, source, count=1)
+          if count == 0:
+              assert "function displacementStressResults(authorities, sustained, operating, codeAuthorities)" in source
+          assert "SCREENING_ALLOWABLE" not in source
+          assert "M020-BM1-SCREENING-NOT-CAESAR-AUTHORITY" not in source
+          fixture_path.write_text(source)
+
+          helper_path = Path('scripts/lfea-b3.17-bm1-code-stress-fixtures.mjs')
+          helper = helper_path.read_text()
+          helper = helper.replace(
+              'export function augmentBm1CodeStress(baseResult) {',
+              'export function augmentBm1CodeStress(baseResult, suppliedCodeAuthorities = null) {',
+          )
+          helper = helper.replace(
+              '  const codeAuthorities = bm1CodeAuthorities(baseResult);',
+              '  const codeAuthorities = suppliedCodeAuthorities ?? bm1CodeAuthorities(baseResult);',
+          )
+          helper_path.write_text(helper)
+
+          package_path = Path('package.json')
+          package = package_path.read_text()
+          b316 = '    "check:lfea-b3.16": "node scripts/lfea-b3.16-inputxml-ground-truth-check.mjs",\n'
+          b317 = '    "check:lfea-b3.17": "node scripts/lfea-b3.17-bm1-code-stress-check.mjs",\n'
+          if b317 not in package:
+              assert b316 in package
+              package = package.replace(b316, b316 + b317, 1)
+          old_chain = 'npm run check:lfea-b3.15 && npm run check:lfea-b3.16 && npm run check:lfea-b4.0'
+          new_chain = 'npm run check:lfea-b3.15 && npm run check:lfea-b3.16 && npm run check:lfea-b3.17 && npm run check:lfea-b4.0'
+          if old_chain in package:
+              package = package.replace(old_chain, new_chain, 1)
+          else:
+              assert new_chain in package
+          package_path.write_text(package)
+
+          Path('.github/workflows/m023-bootstrap.yml').unlink()
+          PY
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate M020 M021 and M023
+        run: |
+          node --check scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs
+          node --check scripts/lfea-b3.17-caesar-stress-report.mjs
+          node --check scripts/lfea-b3.17-bm1-code-stress-fixtures.mjs
+          node --check scripts/lfea-b3.17-bm1-code-stress-check.mjs
+          npm run check:lfea-b3.15
+          npm run check:lfea-b3.16
+          npm run check:lfea-b3.17
+
+      - name: Commit validated wiring
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "M023: wire BM1 sustained and CAESAR stress comparison"
+          git push origin HEAD:agent/m023-bm1-b31-stress-caesar
