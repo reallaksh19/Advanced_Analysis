@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/non-fea-p0-exact-head.yml'
+      - '.github/workflows/topology-edit-track-c.yml'
       - 'e2e/non-fea-p0-current-main-baseline.spec.js'
       - 'scripts/authorized-enrichment-consumer-controller-check.mjs'
       - 'scripts/non-fea-baseline/**'
@@ -15,6 +16,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/non-fea-p0-exact-head.yml'
+      - '.github/workflows/topology-edit-track-c.yml'
       - 'e2e/non-fea-p0-current-main-baseline.spec.js'
       - 'scripts/authorized-enrichment-consumer-controller-check.mjs'
       - 'scripts/non-fea-baseline/**'
