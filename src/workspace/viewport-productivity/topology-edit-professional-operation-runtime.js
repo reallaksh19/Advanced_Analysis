@@ -108,6 +108,7 @@ export class TopologyEditProfessionalOperationRuntime {
       topology: canonical,
       selection: this.controller.selection,
       catalogue: this.catalogue,
+      workspaceDataset: this.controller.workspaceDataset,
     });
     if (!this.componentContext.supported) return this.componentContext;
     const candidateIds = new Set(
