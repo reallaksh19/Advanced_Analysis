@@ -32,6 +32,7 @@ const REQUIRED_SOURCE_PATHS = Object.freeze([
   'src/core/bucket-b/axisymmetric-bb10-load-cases.js',
   'src/core/bucket-b/axisymmetric-bb10-lame.js',
   'src/core/bucket-b/axisymmetric-bb10-core.js',
+  'src/core/bucket-b/axisymmetric-bb10-shared-gate-anchor.js',
   'src/core/bucket-b/bb10-check.mjs',
   'src/core/bucket-b/registry.js',
   'src/core/bucket-b/index.js',
