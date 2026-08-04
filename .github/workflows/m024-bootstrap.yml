@@ -37,19 +37,25 @@ jobs:
           python3 <<'PY'
           from pathlib import Path
 
-          path = Path('scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs')
-          source = path.read_text()
+          fixture_path = Path('scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs')
+          fixture = fixture_path.read_text()
 
           old_component = "componentId: `${sourceSegment.id}.${segment.id}`"
-          assert old_component in source
-          source = source.replace(old_component, "componentId: sourceSegment.id", 1)
+          assert old_component in fixture
+          fixture = fixture.replace(old_component, "componentId: sourceSegment.id", 1)
 
           old_pressure = "pressureStiffening: entry.component?.componentType === 'BEND'"
-          assert source.count(old_pressure) == 1
-          source = source.replace(old_pressure, 'pressureStiffening: false', 1)
+          assert fixture.count(old_pressure) == 1
+          fixture = fixture.replace(old_pressure, 'pressureStiffening: false', 1)
+          fixture_path.write_text(fixture)
 
-          path.write_text(source)
+          check_path = Path('scripts/lfea-b3.18-bm1-bend-check.mjs')
+          check = check_path.read_text()
+          old_factor = 'definition.component.factorSet.flexibilityFactor.value'
+          assert check.count(old_factor) == 1
+          check_path.write_text(check.replace(old_factor, 'definition.component.flexibility.factor', 1))
           PY
+          sed -n '1,220p' scripts/lfea-b3.18-bm1-bend-check.mjs
           rm -rf tmp .m024 .github/workflows/m024-bootstrap.yml
           node --check scripts/lfea-b3.15-bm1-inputxml-fixtures.mjs
           node --check scripts/lfea-b3.17-bm1-code-stress-fixtures.mjs
