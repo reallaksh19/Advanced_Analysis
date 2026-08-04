@@ -9,12 +9,14 @@ on:
       - 'src/core/support-restraints/attachment-resolution-helpers.js'
       - 'src/workspace/dataset-adapter.js'
       - 'src/workspace/dataset-types.js'
+      - 'src/workspace/topology-edit/topology-edit-candidate-builder.js'
+      - 'src/workspace/topology-edit/topology-edit-checker-lineage.js'
       - 'src/workspace/topology-edit/topology-edit-source-adapter.js'
       - 'src/workspace/topology-edit/topology-edit-render-model.js'
       - 'src/workspace/topology-edit/topology-edit-typed-viewport-backend.js'
       - 'src/workspace/topology-edit/support-restraint-family.js'
       - 'tests/topology-edit-sjson-render-authority.test.mjs'
-      - 'tests/topology-edit-split-diagnostic.test.mjs'
+      - 'tests/topology-edit-split-lineage-certification.test.mjs'
       - 'tests/topology-edit-20-element-demo-loader.test.mjs'
       - 'tests/topology-edit-render-fidelity.test.mjs'
       - 'tests/topology-edit-m003-capability-authority.test.mjs'
@@ -63,18 +65,20 @@ jobs:
           node --check src/core/support-restraints/attachment-resolution-helpers.js
           node --check src/workspace/dataset-adapter.js
           node --check src/workspace/dataset-types.js
+          node --check src/workspace/topology-edit/topology-edit-candidate-builder.js
+          node --check src/workspace/topology-edit/topology-edit-checker-lineage.js
           node --check src/workspace/topology-edit/topology-edit-source-adapter.js
           node --check src/workspace/topology-edit/topology-edit-render-model.js
           node --check src/workspace/topology-edit/topology-edit-typed-viewport-backend.js
           node --check tests/topology-edit-sjson-render-authority.test.mjs
-          node --check tests/topology-edit-split-diagnostic.test.mjs
+          node --check tests/topology-edit-split-lineage-certification.test.mjs
           node --check e2e/topology-edit-sjson-render-authority.spec.js
           git diff --check
 
-      - name: Execute canonical, typed geometry, support, and split diagnostics
+      - name: Execute canonical, typed geometry, support, and split-lineage tests
         run: |
           node --test \
-            tests/topology-edit-split-diagnostic.test.mjs \
+            tests/topology-edit-split-lineage-certification.test.mjs \
             tests/topology-edit-sjson-render-authority.test.mjs \
             tests/topology-edit-20-element-demo-loader.test.mjs \
             tests/topology-edit-render-fidelity.test.mjs \
