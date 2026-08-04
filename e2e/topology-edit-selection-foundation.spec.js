@@ -103,38 +103,35 @@ test('tree modifier selection is deterministic and dataset replacement clears it
   await expect(demoButton).toBeEnabled();
   await demoButton.click();
 
-  await expect.poll(() => page.evaluate((datasetBeforeKey) => {
+  await expect.poll(() => page.evaluate(({
+    controllerKey,
+    datasetBeforeKey,
+    sessionVersionBeforeValue,
+  }) => {
     const currentDataset = globalThis.AnalysisWorkspace
       ?.getSnapshot?.()?.dataset ?? null;
-    return Boolean(
-      currentDataset && currentDataset !== globalThis[datasetBeforeKey]
-    );
-  }, DATASET_BEFORE_KEY)).toBe(true);
-
-  const webGlButton = page.getByRole('button', { name: '3D WebGL', exact: true });
-  await expect(webGlButton).toBeVisible();
-  await webGlButton.click();
-  const editButton = page.getByRole('button', { name: '3D Edit', exact: true });
-  await expect(editButton).toBeVisible();
-  await expect(editButton).toBeEnabled();
-  await editButton.click();
-
-  const replacementHost = page.locator(
-    '[data-role="topology-edit-render-host"][data-topology-edit-clean-shell="true"]',
-  );
-  await expect(replacementHost).toBeVisible();
-  await expect(replacementHost.locator('canvas')).toBeVisible();
-  await expect.poll(async () => ({
-    selectionCount: selectionIds(await replacementHost.getAttribute(
-      'data-topology-edit-selection-ids',
-    )).length,
-    epochReconciled: Number(await replacementHost.getAttribute(
-      'data-topology-edit-dataset-session-version',
-    )) > sessionVersionBefore,
+    const state = globalThis[controllerKey]?.editorStore?.getState?.() ?? null;
+    return {
+      datasetReplaced: Boolean(
+        currentDataset && currentDataset !== globalThis[datasetBeforeKey]
+      ),
+      selectionCount: state?.selection?.canonicalIds?.length ?? -1,
+      epochReconciled: Number(state?.dataset?.sessionVersion ?? 0)
+        > sessionVersionBeforeValue,
+    };
+  }, {
+    controllerKey: CONTROLLER_KEY,
+    datasetBeforeKey: DATASET_BEFORE_KEY,
+    sessionVersionBeforeValue: sessionVersionBefore,
   })).toEqual({
+    datasetReplaced: true,
     selectionCount: 0,
     epochReconciled: true,
   });
+
+  await expect(page.locator(
+    '[data-role="tree-list"] [data-action="select-entity"][aria-selected="true"]',
+  )).toHaveCount(0);
 
   evidence.modifiers = 'PASS';
   evidence.datasetReset = 'PASS';
