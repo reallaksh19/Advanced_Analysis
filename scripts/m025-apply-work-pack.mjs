@@ -115,8 +115,8 @@ patch('package.json', (initial) => {
   let content = initial;
   content = replaceOnce(
     content,
-    '    "check:lfea-b3.18": "node scripts/lfea-b3.18-bm1-bend-check.mjs",\n',
-    '    "check:lfea-b3.18": "node scripts/lfea-b3.18-bm1-bend-check.mjs",\n    "check:lfea-b3.19": "node scripts/lfea-b3.19-bm1-friction-check.mjs",\n',
+    '    "check:lfea-b3.17": "node scripts/lfea-b3.17-bm1-code-stress-check.mjs",\n',
+    '    "check:lfea-b3.17": "node scripts/lfea-b3.17-bm1-code-stress-check.mjs",\n    "check:lfea-b3.18": "node scripts/lfea-b3.18-bm1-bend-check.mjs",\n    "check:lfea-b3.19": "node scripts/lfea-b3.19-bm1-friction-check.mjs",\n',
     'b3.19 package script insertion',
   );
   content = replaceOnce(
