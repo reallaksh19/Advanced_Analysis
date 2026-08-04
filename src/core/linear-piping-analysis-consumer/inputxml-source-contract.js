@@ -16,7 +16,8 @@ export const INPUTXML_SOURCE_KEYS = Object.freeze([
   'content', 'contentHash', 'semanticHash',
 ]);
 export const INPUTXML_INGESTION_KEYS = Object.freeze([
-  'unit', 'source', 'componentOrigins', 'restraintTypeCodeMap', 'bendRadiusTolerance',
+  'unit', 'source', 'componentOrigins', 'restraintTypeCodeMap',
+  'restraintTypeMutation', 'bendRadiusTolerance',
 ]);
 export const INPUTXML_INGESTION_V2_KEYS = Object.freeze([
   ...INPUTXML_INGESTION_KEYS,
@@ -40,7 +41,6 @@ const HASH_PATTERN = /^fnv1a64:[0-9a-f]{16}$/u;
 export const INPUTXML_MEDIA_TYPE = 'application/xml';
 export const CANONICAL_ANALYSIS_UNIT = 'm';
 
-/** Seal exact decoded InputXML text as an immutable project-source authority. */
 export function sealLinearPipingInputXmlSource(input) {
   requireRecord(input, 'inputXmlSourceInput');
   requireExactKeys(input, [

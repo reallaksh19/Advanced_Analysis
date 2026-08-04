@@ -1,5 +1,9 @@
 import { requireDeclaredValue } from '../shared-analysis-contract/declared-value.js';
-import { deepFreeze } from '../shared-piping-model/immutable.js';
+import { deepFreeze, isPlainRecord } from '../shared-piping-model/immutable.js';
+import {
+  defaultRestraintTypeMutationConfig,
+  normalizeRestraintTypeMutationConfig,
+} from '../geometry/adapters/inputxml-restraint-type-mutation.js';
 import {
   CANONICAL_ANALYSIS_UNIT,
   INPUTXML_ANALYSIS_REQUEST_KEYS,
@@ -30,7 +34,11 @@ export function validateLinearPipingInputXmlAnalysisRequest(value) {
     failInputXml('InputXML analysis request schema is unsupported.', 'PIPING_INPUTXML_REQUEST_INVALID');
   }
   const inputXmlSource = requireLinearPipingInputXmlSource(value.inputXmlSource);
-  const ingestionOptions = requireIngestionOptions(value.ingestionOptions, inputXmlSource, value.schema);
+  const ingestionOptions = requireIngestionOptions(
+    value.ingestionOptions,
+    inputXmlSource,
+    value.schema,
+  );
   const conditioning = requireConditioning(value.conditioning);
   const sourceAnalysisRequest = validateLinearPipingSourceAnalysisRequest(value.sourceAnalysisRequest);
   return Object.freeze({
@@ -45,12 +53,16 @@ export function validateLinearPipingInputXmlAnalysisRequest(value) {
 function requireIngestionOptions(value, source, schema) {
   requireRecord(value, 'inputXmlAnalysisRequest.ingestionOptions');
   const isV2 = schema === LINEAR_PIPING_INPUTXML_ANALYSIS_REQUEST_V2_SCHEMA;
+  const accepted = {
+    restraintTypeMutation: defaultRestraintTypeMutationConfig(),
+    ...value,
+  };
   requireExactKeys(
-    value,
+    accepted,
     isV2 ? INPUTXML_INGESTION_V2_KEYS : INPUTXML_INGESTION_KEYS,
     'inputXmlAnalysisRequest.ingestionOptions',
   );
-  const unit = requireText(value.unit, 'inputXmlAnalysisRequest.ingestionOptions.unit');
+  const unit = requireText(accepted.unit, 'inputXmlAnalysisRequest.ingestionOptions.unit');
   if (!isV2 && unit !== CANONICAL_ANALYSIS_UNIT) {
     failInputXml(
       'InputXML request v1 unit must already be metres; use request v2 for governed conversion.',
@@ -58,7 +70,7 @@ function requireIngestionOptions(value, source, schema) {
     );
   }
   const unitNormalizationProfile = isV2
-    ? requireLinearPipingInputXmlUnitProfile(value.unitNormalizationProfile)
+    ? requireLinearPipingInputXmlUnitProfile(accepted.unitNormalizationProfile)
     : null;
   if (unitNormalizationProfile && !unitNormalizationProfile.allowedSourceUnits.includes(unit)) {
     failInputXml(
@@ -66,23 +78,58 @@ function requireIngestionOptions(value, source, schema) {
       'PIPING_INPUTXML_UNIT_NOT_AUTHORIZED',
     );
   }
-  if (value.source !== source.sourceId) {
+  if (accepted.source !== source.sourceId) {
     failInputXml(
       'InputXML ingestion source must equal the sealed source identity.',
       'PIPING_INPUTXML_SOURCE_MISMATCH',
     );
   }
-  requireComponentOrigins(value.componentOrigins);
-  requireRestraintMap(value.restraintTypeCodeMap);
-  requireDeclaredValue(value, 'bendRadiusTolerance', { exclusiveMinimum: 0 });
+  requireComponentOrigins(accepted.componentOrigins);
+  requireRestraintMap(accepted.restraintTypeCodeMap);
+  const restraintTypeMutation = requireRestraintMutation(accepted.restraintTypeMutation);
+  requireDeclaredValue(accepted, 'bendRadiusTolerance', { exclusiveMinimum: 0 });
   return deepFreeze({
     unit,
-    source: value.source,
-    componentOrigins: structuredClone(value.componentOrigins),
-    restraintTypeCodeMap: { ...value.restraintTypeCodeMap },
-    bendRadiusTolerance: { ...value.bendRadiusTolerance },
+    source: accepted.source,
+    componentOrigins: structuredClone(accepted.componentOrigins),
+    restraintTypeCodeMap: { ...accepted.restraintTypeCodeMap },
+    restraintTypeMutation,
+    bendRadiusTolerance: { ...accepted.bendRadiusTolerance },
     unitNormalizationProfile,
   });
+}
+
+function requireRestraintMutation(value) {
+  if (!isPlainRecord(value)) {
+    failInputXml(
+      'InputXML restraint mutation must be a record.',
+      'PIPING_INPUTXML_RESTRAINT_MUTATION_INVALID',
+    );
+  }
+  requireExactKeys(value, ['enabled', 'rows'], 'ingestionOptions.restraintTypeMutation');
+  if (typeof value.enabled !== 'boolean' || !Array.isArray(value.rows)) {
+    failInputXml(
+      'InputXML restraint mutation requires boolean enabled and array rows.',
+      'PIPING_INPUTXML_RESTRAINT_MUTATION_INVALID',
+    );
+  }
+  value.rows.forEach((row, index) => {
+    requireRecord(row, `ingestionOptions.restraintTypeMutation.rows[${index}]`);
+    requireExactKeys(
+      row,
+      ['label', 'from', 'to'],
+      `ingestionOptions.restraintTypeMutation.rows[${index}]`,
+    );
+    for (const key of ['label', 'from', 'to']) {
+      if (typeof row[key] !== 'string') {
+        failInputXml(
+          'InputXML restraint mutation row values must be strings.',
+          'PIPING_INPUTXML_RESTRAINT_MUTATION_INVALID',
+        );
+      }
+    }
+  });
+  return deepFreeze(normalizeRestraintTypeMutationConfig(value));
 }
 
 function requireComponentOrigins(value) {

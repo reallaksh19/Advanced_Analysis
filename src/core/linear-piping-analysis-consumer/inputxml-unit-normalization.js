@@ -23,7 +23,13 @@ import {
 const LENGTH_META_FIELDS = Object.freeze(['bendDeclaredRadius', 'bendComputedRadius']);
 const DIMENSIONLESS_META_FIELDS = new Set([
   'materialNumber', 'sourceType', 'sourceIndex', 'bendAngle1', 'bendAngle2',
-  'numMiter', 'bendCompoundMiter',
+  'numMiter', 'bendCompoundMiter', 'bendAngle1Automatic',
+  'bendStationNode1', 'bendStationNode2', 'bendInternalStations',
+  'analysis',
+]);
+const NODE_META_FIELDS = new Set([
+  'caesarNodeNumber',
+  'restraints',
 ]);
 
 export function normalizeLinearPipingInputXmlGeometry(geometry, profileValue) {
@@ -95,11 +101,7 @@ function normalizeGeometry(geometry, scale, sourceUnit, profile) {
 
 function normalizeNode(node, scale, index) {
   requireRecord(node, `inputXmlGeometry.nodes[${index}]`);
-  rejectUnknownNumericMetadata(
-    node.meta,
-    new Set(['caesarNodeNumber']),
-    `nodes[${index}].meta`,
-  );
+  rejectUnknownNumericMetadata(node.meta, NODE_META_FIELDS, `nodes[${index}].meta`);
   rejectUnknownNumericFields(node, new Set(['x', 'y', 'z']), `nodes[${index}]`);
   return {
     ...structuredClone(node),

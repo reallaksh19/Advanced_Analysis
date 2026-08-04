@@ -20,7 +20,6 @@ import { validateLinearPipingInputXmlAnalysisRequest } from './inputxml-request-
 
 export { validateLinearPipingInputXmlAnalysisRequest } from './inputxml-request-validation.js';
 
-/** Existing Phase 2B result-only boundary, preserved for compatibility. */
 export function runLinearPipingAnalysisFromInputXml(request, runtime) {
   const compiled = compileBoundInputXml(request, runtime);
   return sealInputXmlAnalysisResult({
@@ -32,7 +31,6 @@ export function runLinearPipingAnalysisFromInputXml(request, runtime) {
   });
 }
 
-/** Compile one sealed InputXML source into the retained B-2.5/B-3.0/T0 context. */
 export function compileLinearPipingInputXmlAnalysisContext(request, runtime) {
   const compiled = compileBoundInputXml(request, runtime);
   return sealLinearPipingInputXmlAnalysisContext({
@@ -61,6 +59,7 @@ function compileBoundInputXml(request, runtime) {
     source: accepted.ingestionOptions.source,
     componentOrigins: accepted.ingestionOptions.componentOrigins,
     restraintTypeCodeMap: accepted.ingestionOptions.restraintTypeCodeMap,
+    restraintTypeMutation: accepted.ingestionOptions.restraintTypeMutation,
     bendRadiusTolerance,
     fileName: source.fileName,
   });
