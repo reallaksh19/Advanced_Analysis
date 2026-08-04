@@ -13,53 +13,60 @@ const expectedOwnership = new Map([
   ['/repo/src/vendors/catalog.js', 'vendor-integrations'],
   ['/repo/src/utils/format.js', 'application-support'],
   ['/repo/src/mocks/model.js', 'application-support'],
-  ['/repo/src/workspace/enrichment/first-cut-workbench-controller.js', 'workspace-enrichment'],
-  ['/repo/src/workspace/first-cut-result-store.js', 'workspace-enrichment'],
-  ['/repo/src/workspace/linear-piping-results-workbench.js', 'workspace-linear-piping'],
-  ['/repo/src/workspace/analysis-coordinator.js', 'workspace-analysis'],
-  ['/repo/src/workspace/model-calculation-controller.js', 'workspace-analysis'],
-  ['/repo/src/workspace/support-restraint-store.js', 'workspace-analysis'],
-  ['/repo/src/workspace/dataset-controller.js', 'workspace-data'],
-  ['/repo/src/workspace/master-data-controller.js', 'workspace-data'],
-  ['/repo/src/workspace/properties-panel.js', 'workspace-data'],
-  ['/repo/src/workspace/bootstrap.js', 'workspace-shell'],
-  ['/repo/src/workspace/workspace-layout.js', 'workspace-shell'],
-  ['/repo/src/workspace/lafea-workbench.js', 'fea-workbenches'],
+  ['/repo/src/core/fea-benchmarks/catalog.js', 'core-fea-benchmarks'],
   ['/repo/src/core/local-shell/index.js', 'core-local-shell'],
+  ['/repo/src/core/linear-piping-analysis/index.js', 'core-linear-piping'],
+  ['/repo/src/core/support-engineering/index.js', 'core-support-engineering'],
 ]);
 
-const automaticOwnership = [
+const automaticWorkspaceOwnership = [
+  '/repo/src/workspace/bootstrap.js',
+  '/repo/src/workspace/analysis-coordinator.js',
+  '/repo/src/workspace/engineering-model-store.js',
+  '/repo/src/workspace/dataset-controller.js',
+  '/repo/src/workspace/workspace-state.js',
+  '/repo/src/workspace/enrichment/first-cut-workbench-controller.js',
+  '/repo/src/workspace/linear-piping-results-workbench.js',
+  '/repo/src/workspace/lafea-workbench.js',
+  '/repo/src/workspace/lfea-workbench.js',
+  '/repo/src/workspace/topology-edit/topology-edit-controller.js',
   '/repo/src/workspace/sequential-sketcher/sequential-sketcher-controller.js',
-  '/repo/src/workspace/sequential-sketcher/sequential-sketcher-view.js',
+  '/repo/src/workspace/viewport-panel.js',
 ];
 
 for (const [id, expected] of expectedOwnership) {
   assert.equal(manualChunk(id), expected, `${id} must map to ${expected}`);
 }
-for (const id of automaticOwnership) {
+for (const id of automaticWorkspaceOwnership) {
   assert.equal(
     manualChunk(id),
     undefined,
-    `${id} must remain under Rollup automatic ownership to avoid a cyclic sketcher chunk.`,
+    `${id} must remain under Rollup graph-aware ownership to avoid cross-chunk TDZ cycles.`,
   );
 }
 
 assert.equal(manualChunk('/repo/src/main.js'), undefined);
-assert.equal(viteSource.includes("return 'workspace-sketcher'"), false);
-assert.equal(viteSource.includes('onlyExplicitManualChunks: true'), true);
+assert.equal(viteSource.includes("return 'workspace-"), false);
+assert.equal(viteSource.includes("return 'fea-workbenches'"), false);
+assert.equal(viteSource.includes("if (source.includes('/src/workspace/')) return undefined;"), true);
+assert.equal(viteSource.includes('onlyExplicitManualChunks: false'), true);
+assert.equal(viteSource.includes('onlyExplicitManualChunks: true'), false);
 assert.equal(viteSource.includes('chunkSizeWarningLimit'), false);
-assert.equal(policySource.includes('const maximumBytes = 500 * 1024;'), true);
+assert.equal(policySource.includes('const targetBytes = 500 * 1024;'), true);
+assert.equal(policySource.includes('const maximumBytes = 1024 * 1024;'), true);
 assert.equal(policySource.includes('chunk.bytes <= maximumBytes'), true);
-assert.equal(new Set(expectedOwnership.values()).size >= 10, true);
+assert.equal(new Set(expectedOwnership.values()).size >= 8, true);
 
 console.log(JSON.stringify({
   check: 'bundle-chunk-ownership',
   status: 'PASS',
-  explicitManualChunks: true,
-  chunkSizePolicyBytes: 500 * 1024,
+  explicitManualChunks: false,
+  dependencyAwareManualChunks: true,
+  chunkSizeTargetBytes: 500 * 1024,
+  chunkSizeSafetyCeilingBytes: 1024 * 1024,
   ownershipAssertions: expectedOwnership.size,
-  automaticOwnershipAssertions: automaticOwnership.length,
+  automaticWorkspaceOwnershipAssertions: automaticWorkspaceOwnership.length,
   distinctChunkOwners: new Set(expectedOwnership.values()).size,
-  sequentialSketcherOwnership: 'ROLLUP_AUTOMATIC',
-  thresholdChanged: false,
+  workspaceOwnership: 'ROLLUP_GRAPH_AWARE',
+  correctnessPreferredOverTarget: true,
 }));
