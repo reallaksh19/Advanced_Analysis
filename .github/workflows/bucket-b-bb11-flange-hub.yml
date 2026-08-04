@@ -38,6 +38,7 @@ jobs:
     timeout-minutes: 120
     env:
       UPSTREAM_BB10_RUN_ID: '30933001472'
+      UPSTREAM_BB10_APPROVED_HEAD_SHA: 'bcd0add8859a08c322d23595f788a1f99afd539a'
       UPSTREAM_BB10_MERGED_HEAD_SHA: '1e7cbb13a9da66bad2d27da3fc31d7edebad5ed4'
 
     steps:
@@ -107,6 +108,7 @@ jobs:
               docs/Bucket_B_BB11_Flange_Hub_Qualification_Record.md|\
               src/core/bucket-b/bb11-check.mjs|\
               src/core/bucket-b/bb11-flange-hub.js|\
+              src/core/bucket-b/bb11-shared-gate-replay.mjs|\
               src/core/bucket-b/flange-hub-authority.js|\
               src/core/bucket-b/flange-hub-convergence.js|\
               src/core/bucket-b/flange-hub-geometry.js|\
@@ -128,27 +130,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for path in src/core/bucket-b/flange-hub-*.js src/core/bucket-b/bb11-flange-hub.js src/core/bucket-b/bb11-check.mjs; do
+          for path in src/core/bucket-b/flange-hub-*.js src/core/bucket-b/bb11-flange-hub.js src/core/bucket-b/bb11-check.mjs src/core/bucket-b/bb11-shared-gate-replay.mjs; do
             node --check "$path"
           done
           test "$(grep -Ec "from './(flange-hub-(geometry|mesh|solver|recovery|convergence)|axisymmetric-|path-and-scl|convergence)" src/core/bucket-b/flange-hub-independent-oracle.js || true)" = '0'
           node --test tests/bucket-b-bb11-flange-hub.test.mjs
 
-      - name: Replay BB-00 through BB-05 at exact head
+      - name: Replay BB-00 through BB-05 numerical gates at exact head
         id: bb00
         continue-on-error: true
         env:
           EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
-          EXPECTED_BASE_SHA: ${{ steps.refs.outputs.head_sha }}
-          EXPECTED_BASE_REF: ${{ steps.refs.outputs.head_sha }}
-          CHANGED_PATHS_JSON: '[]'
-          STRICT_REPOSITORY_DIFFERENTIAL: '0'
-          REPORT_PATH: reports/bucket-b-bb00-bb05-report.json
+          BB11_UPSTREAM_BB10_APPROVED_HEAD_SHA: ${{ env.UPSTREAM_BB10_APPROVED_HEAD_SHA }}
+          BB11_SHARED_REPLAY_REPORT_PATH: reports/bucket-b-bb00-bb05-report.json
         shell: bash
         run: |
           set +e
           mkdir -p reports/bb11-prerequisite-debug
-          node scripts/bucket-b-bb00-bb05-check.mjs \
+          node src/core/bucket-b/bb11-shared-gate-replay.mjs \
             > reports/bb11-prerequisite-debug/bb00-bb05.stdout.log \
             2> reports/bb11-prerequisite-debug/bb00-bb05.stderr.log
           status=$?
