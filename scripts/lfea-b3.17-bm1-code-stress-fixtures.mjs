@@ -198,7 +198,7 @@ function augmentReport(report, sustainedCode, comparison, codeAuthorities) {
   const limitations = report.limitations
     .filter((entry) => !entry.includes('ALLOWABLESTRESS values') && !entry.includes('screening allowable'));
   limitations.push(
-    'M023 replaces the M020 screening allowable with two declared ASTM A106 Grade B ASME B31.3-2024 Table A-1 points: 20,000 psi at 293.15 K and 393.15 K, converted to Pa with the exact SI psi conversion.',
+    'M023 uses two declared ASTM A106 Grade B ASME B31.3-2024 Table A-1 points: 20,000 psi at 293.15 K and 393.15 K, converted to Pa with the exact SI psi conversion.',
     'M023 evaluates SUSTAINED at every compiled code point from the sustained recovery and derives P*Do/(4t) through the existing sealed PRESSURE-primitive code-application authority.',
     ...comparison.limitations,
   );
