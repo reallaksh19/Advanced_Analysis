@@ -10,6 +10,10 @@ import {
   prismaticAnnularAxialReference,
   verifyReversedEdgeInvariance,
 } from '../src/core/bucket-b/index.js';
+import {
+  FLANGE_HUB_SOLVER_POLICY,
+  solveJacobiPcg,
+} from '../src/core/bucket-b/flange-hub-solver.js';
 
 test('BB-11 frozen geometry creates exact tangent fillets', () => {
   const geometry = createCanonicalFlangeHubGeometry();
@@ -93,6 +97,51 @@ test('BB-11 analytical references distinguish closed-end and axial-member mechan
   });
   assert.ok(axial.sigmaZ > 0);
   assert.ok(axial.strainEnergy > 0);
+});
+
+test('BB-11 PCG certifies the explicit reduced-system residual', () => {
+  const matrix = [
+    [260540.684223896, 134390.7176773181, 10563.593440651774, 106773.17388776125, -182202.7550541164, 346171.37103598577],
+    [134390.7176773181, 77368.06321251801, -5146.841634026626, 71692.2047941879, -106627.29063906257, 184531.9402200637],
+    [10563.593440651774, -5146.841634026626, 16089.734328529348, -22023.398789019266, 11755.66422880915, 2600.6011287125907],
+    [106773.17388776127, 71692.2047941879, -22023.398789019266, 90076.09026088555, -107238.03851437203, 163837.1244290935],
+    [-182202.7550541164, -106627.29063906257, 11755.66422880915, -107238.03851437203, 151133.71244079166, -256584.70158791987],
+    [346171.3710359858, 184531.9402200637, 2600.6011287125903, 163837.1244290935, -256584.70158791987, 472136.5592620091],
+  ];
+  const rhs = Float64Array.from([
+    2812.9339433121654,
+    105248.90801934985,
+    -18313.08376035325,
+    -76204.72060288778,
+    -96990.1629041906,
+    -22172.613995949156,
+  ]);
+  const diagonal = Float64Array.from(matrix.map((row, index) => row[index]));
+  const multiply = (vector) => Float64Array.from(matrix.map((row) => (
+    row.reduce((sum, value, column) => sum + value * vector[column], 0)
+  )));
+  const solution = solveJacobiPcg({
+    multiply,
+    rhs,
+    diagonal,
+    policy: FLANGE_HUB_SOLVER_POLICY,
+  });
+  const explicitResidual = Float64Array.from(multiply(solution.vector), (value, index) => (
+    value - rhs[index]
+  ));
+  const explicitResidualNorm = Math.sqrt(
+    explicitResidual.reduce((sum, value) => sum + value ** 2, 0),
+  );
+  const rhsNorm = Math.sqrt(rhs.reduce((sum, value) => sum + value ** 2, 0));
+  const tolerance = Math.max(
+    FLANGE_HUB_SOLVER_POLICY.absoluteResidualTolerance,
+    FLANGE_HUB_SOLVER_POLICY.relativeResidualTolerance * rhsNorm,
+  );
+  assert.equal(FLANGE_HUB_SOLVER_POLICY.stoppingCriterion, 'EXPLICIT_REDUCED_SYSTEM_RESIDUAL');
+  assert.ok(solution.residualReplacementCount >= 1);
+  assert.ok(explicitResidualNorm <= tolerance);
+  assert.ok(Math.abs(explicitResidualNorm - solution.explicitResidualNorm) <= 1e-10);
+  assert.ok(solution.relativeResidual <= FLANGE_HUB_SOLVER_POLICY.relativeResidualTolerance);
 });
 
 test('BB-11 registry rejects direct caller state', () => {
