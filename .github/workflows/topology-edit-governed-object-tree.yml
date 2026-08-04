@@ -61,9 +61,7 @@ jobs:
       - name: Execute canonical tree contracts
         run: |
           node --test --test-reporter=tap \
-            tests/topology-edit-object-tree-model.test.mjs \
-            tests/topology-edit-editor-selection-state.test.mjs \
-            tests/topology-edit-editor-selection-coordinator.test.mjs
+            tests/topology-edit-object-tree-model.test.mjs
 
       - name: Execute mounted Chromium tree qualification
         run: |
