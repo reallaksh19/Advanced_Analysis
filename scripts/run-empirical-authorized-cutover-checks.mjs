@@ -13,6 +13,7 @@ const checks = [
   ['consumer-controller-anti-drift', ['scripts/authorized-enrichment-consumer-controller-anti-drift-check.mjs']],
   ['workspace-api', ['scripts/authorized-enrichment-workspace-api-check.mjs']],
   ['workspace-api-anti-drift', ['scripts/authorized-enrichment-workspace-api-anti-drift-check.mjs']],
+  ['load-view', ['scripts/authorized-empirical-execution-view-check.mjs']],
   ['load-view-anti-drift', ['scripts/authorized-empirical-execution-view-anti-drift-check.mjs']],
   ['engineering-controller', ['--test', 'tests/engineering-model-controller-dataset-guard.test.mjs']],
 ];
