@@ -177,6 +177,7 @@ export function validateAxisymmetricRegistrationApprovalReceipt(value, {
   expectedHeadSha,
   expectedBaseSha,
 } = {}) {
+  if (!value) throw new TypeError('AXI_REG_APPROVAL_RECEIPT_REQUIRED');
   requireSchemaAndHash(value, AXISYMMETRIC_REGISTRATION_APPROVAL_SCHEMA);
   requireGitSha(value.exactHeadSha, 'exactHeadSha');
   requireGitSha(value.baseSha, 'baseSha');
