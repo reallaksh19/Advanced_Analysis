@@ -188,12 +188,12 @@ function blockers({ analysisEntities, referenceC, operatingK, designK, tableRang
     'BRANCH',
     'hydroPressure has no unit encoded in its field name or sealed authority contract.',
   ));
-  if (!temperaturesCovered(operatingK, tableRanges)) rows.push(blocker(
+  if (operatingK.length > 0 && !temperaturesCovered(operatingK, tableRanges)) rows.push(blocker(
     'STAGEDJSON_OPERATING_MATERIAL_TABLE_RANGE_INSUFFICIENT',
     'MATERIAL',
     `Operating material states require ${operatingK.join(', ')} K but the current tables end at ${tableRanges.map((row) => `${row.materialId}:${row.maximumTemperatureK}`).join(', ')} K.`,
   ));
-  if (!temperaturesCovered(designK, tableRanges)) rows.push(blocker(
+  if (designK.length > 0 && !temperaturesCovered(designK, tableRanges)) rows.push(blocker(
     'STAGEDJSON_DESIGN_MATERIAL_TABLE_RANGE_INSUFFICIENT',
     'MATERIAL',
     `Design material states require ${designK.join(', ')} K but the current tables do not bracket those temperatures.`,
