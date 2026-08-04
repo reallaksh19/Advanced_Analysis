@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
 import { createThreePrimitive } from '../src/workspace/three-primitive-factory.js';
+import { finiteKey } from '../src/workspace/three-pipe-primitives.js';
 import { ThreeSceneResourcePool } from '../src/workspace/three-scene-resource-pool.js';
 import { compileThreeModel } from '../src/workspace/three-viewport-scene.js';
 import { VIEWPORT_RENDER_MODEL_SCHEMA } from '../src/workspace/viewport-render-model.js';
@@ -50,6 +51,14 @@ test('P1 shares canonical geometry and materials without sharing object identity
   pool.dispose();
   assert.equal(geometryDisposals, 1);
   assert.equal(materialDisposals, 1);
+});
+
+test('P1 geometry keys preserve adjacent finite values exactly', () => {
+  const left = 1;
+  const right = 1 + Number.EPSILON;
+  assert.notEqual(left, right);
+  assert.notEqual(finiteKey(left), finiteKey(right));
+  assert.equal(finiteKey(-0), '0');
 });
 
 test('P1 scaled canonical cylinder preserves legacy world bounds', () => {
