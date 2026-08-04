@@ -26,14 +26,21 @@ const REQUIRED_P0_FILES = [
   'scripts/non-fea-baseline/runner-options.mjs',
   'scripts/non-fea-baseline/stage-recorder.mjs',
   'scripts/non-fea-baseline/statistics.mjs',
+  'tests/non-fea-p0-browser-evidence.test.mjs',
   'tests/non-fea-p0-report-validator.test.mjs',
   'tests/non-fea-p0-statistics.test.mjs',
 ];
 
 test('P0 route inventory covers every required stage exactly once', () => {
   assert.doesNotThrow(() => assertNonFeaRouteInventory());
-  assert.equal(NON_FEA_PRODUCTION_ROUTE_INVENTORY.stages.length, NON_FEA_STAGE_IDS.length);
-  assert.equal(new Set(NON_FEA_PRODUCTION_ROUTE_INVENTORY.stages.map((row) => row.stageId)).size, NON_FEA_STAGE_IDS.length);
+  assert.equal(
+    NON_FEA_PRODUCTION_ROUTE_INVENTORY.stages.length,
+    NON_FEA_STAGE_IDS.length,
+  );
+  assert.equal(
+    new Set(NON_FEA_PRODUCTION_ROUTE_INVENTORY.stages.map((row) => row.stageId)).size,
+    NON_FEA_STAGE_IDS.length,
+  );
 });
 
 test('P0 route inventory freezes ownership and source non-mutation', () => {
@@ -50,7 +57,9 @@ test('P0 deliverable set is present', async () => {
 });
 
 test('P0 seed report is explicitly unexecuted and fail-closed', async () => {
-  const report = JSON.parse(await readFile('reports/non-fea-current-main-baseline.json', 'utf8'));
+  const report = JSON.parse(
+    await readFile('reports/non-fea-current-main-baseline.json', 'utf8'),
+  );
   assert.equal(report.schema, 'non-fea-current-main-baseline/v1');
   assert.equal(report.status, 'IMPLEMENTATION_READY_OWNER_EXECUTION_REQUIRED');
   assert.equal(report.completion.P0_ACCEPTED, false);
@@ -59,10 +68,11 @@ test('P0 seed report is explicitly unexecuted and fail-closed', async () => {
   assert.ok(report.fixtureRoleBindings.every((row) => row.status === 'MISSING_AUTHORITY'));
 });
 
-test('P0 runner provides explicit exact fixture-role binding', async () => {
+test('P0 runner provides explicit exact fixture and browser evidence binding', async () => {
   const source = await readFile('scripts/non-fea-baseline/runner-options.mjs', 'utf8');
   assert.match(source, /--fixture-role/u);
   assert.match(source, /ROLE=repository\/path/u);
   assert.match(source, /Duplicate --fixture-role binding/u);
   assert.match(source, /NON_FEA_REQUIRED_FIXTURE_ROLES/u);
+  assert.match(source, /--browser-evidence/u);
 });
