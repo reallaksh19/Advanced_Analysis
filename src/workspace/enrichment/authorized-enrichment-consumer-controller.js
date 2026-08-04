@@ -1,8 +1,8 @@
 import { semanticHash } from '../../core/shared-piping-model/canonical-json.js';
 import { deepFreeze } from '../../core/shared-piping-model/immutable.js';
 import {
-  requireAuthorizedEmpiricalLoadInput,
-} from '../engineering-loads/authorized-empirical-load-input.js';
+  requireAuthorizedEmpiricalRuntimePackage,
+} from '../engineering-loads/authorized-empirical-runtime-package.js';
 import {
   requireAuthorizedStagedJsonSidecar,
 } from './authorized-staged-json-sidecar.js';
@@ -17,15 +17,13 @@ import {
 } from './authorized-staged-json-download.js';
 
 export const AUTHORIZED_EMPIRICAL_CONSUMER_REQUEST_SCHEMA =
-  'authorized-empirical-consumer-request/v1';
+  'authorized-empirical-consumer-request/v2';
 export const AUTHORIZED_STAGED_JSON_CONSUMER_REQUEST_SCHEMA =
   'authorized-staged-json-consumer-request/v1';
 export const AUTHORIZED_STAGED_JSON_CONSUMER_RESULT_SCHEMA =
   'authorized-staged-json-consumer-result/v1';
 
-const EMPIRICAL_KEYS = Object.freeze([
-  'schema', 'executionId', 'executedAt', 'authorizedInput',
-]);
+const EMPIRICAL_KEYS = Object.freeze(['schema', 'runtimePackage']);
 const STAGED_JSON_KEYS = Object.freeze([
   'schema', 'operationId', 'sidecar', 'source', 'mapping', 'formatting',
   'outputFileName', 'writeId', 'writtenAt', 'downloadId', 'triggeredAt',
@@ -50,7 +48,11 @@ export function computeAuthorizedStagedJsonConsumerResultSemanticHash(value) {
 export class AuthorizedEnrichmentConsumerController {
   constructor({ engineeringModelStore, masterDataController }) {
     if (!engineeringModelStore
-        || typeof engineeringModelStore.calculateAuthorized !== 'function') {
+        || typeof engineeringModelStore.configureAuthorizedEmpiricalPackage !== 'function'
+        || typeof engineeringModelStore.executeConfiguredAuthorized !== 'function'
+        || typeof engineeringModelStore.refreshAuthorizedEmpiricalPackage !== 'function'
+        || typeof engineeringModelStore.markEmpiricalStale !== 'function'
+        || typeof engineeringModelStore.getEmpiricalAuthorizationState !== 'function') {
       fail('An authorized engineering-model store is required.',
         'AUTHORIZED_ENRICHMENT_EMPIRICAL_STORE_INVALID');
     }
@@ -63,19 +65,38 @@ export class AuthorizedEnrichmentConsumerController {
     this.masterDataController = masterDataController;
   }
 
-  executeEmpirical(input) {
+  configureEmpirical(input) {
     exact(input, EMPIRICAL_KEYS, 'authorizedEmpiricalConsumerRequest');
     if (input.schema !== AUTHORIZED_EMPIRICAL_CONSUMER_REQUEST_SCHEMA) {
       fail('Unsupported authorized empirical consumer request.',
         'AUTHORIZED_ENRICHMENT_SCHEMA_INVALID');
     }
-    const authorizedInput = requireAuthorizedEmpiricalLoadInput(input.authorizedInput);
-    return this.engineeringModelStore.calculateAuthorized({
-      executionId: identity(input.executionId, 'executionId'),
-      executedAt: timestamp(input.executedAt, 'executedAt'),
-      authorizedInput,
-      masterData: this.masterDataController.getMasterData(),
-    });
+    const runtimePackage = requireAuthorizedEmpiricalRuntimePackage(input.runtimePackage);
+    return this.engineeringModelStore.configureAuthorizedEmpiricalPackage(
+      runtimePackage,
+      this.masterDataController.getMasterData(),
+    );
+  }
+
+  executeEmpirical(input = undefined) {
+    if (input !== undefined) this.configureEmpirical(input);
+    return this.engineeringModelStore.executeConfiguredAuthorized(
+      this.masterDataController.getMasterData(),
+    );
+  }
+
+  refreshEmpirical() {
+    return this.engineeringModelStore.refreshAuthorizedEmpiricalPackage(
+      this.masterDataController.getMasterData(),
+    );
+  }
+
+  markEmpiricalStale(reason, datasetVersion = null) {
+    return this.engineeringModelStore.markEmpiricalStale(reason, datasetVersion);
+  }
+
+  getEmpiricalAuthorizationState() {
+    return this.engineeringModelStore.getEmpiricalAuthorizationState();
   }
 
   async downloadStagedJson(input, documentRef, runtime) {
@@ -186,7 +207,7 @@ function timestamp(value, label) {
 }
 function fileName(value, label) {
   const result = identity(value, label);
-  if (/[\/]/u.test(result) || result === '.' || result === '..') {
+  if (/[\\/]/u.test(result) || result === '.' || result === '..') {
     fail(`${label} must be a file name, not a path.`,
       'AUTHORIZED_ENRICHMENT_FILE_NAME_INVALID');
   }
