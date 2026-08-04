@@ -1,0 +1,23 @@
+{
+  "schema": "non-fea-p1-qualification-seed/v1",
+  "status": "EVIDENCE_IMPLEMENTATION_READY_EXECUTION_REQUIRED",
+  "baseCommitSha": null,
+  "exactHeadSha": null,
+  "executionId": null,
+  "p0Accepted": false,
+  "fixtureRole": "LARGE_MODEL_4884_ENTITY",
+  "fixturePath": null,
+  "sourceSha256": "88e62782772d743e9236d13775476826f9649ab06d3161de35dc500baa85a9c6",
+  "browserEvidence": null,
+  "protectedManifest": null,
+  "qualificationStatus": "BLOCKED",
+  "blockers": [
+    "P0_OWNER_ACCEPTANCE_REQUIRED",
+    "P1_CURRENT_MAIN_SCOPE_BASE_REQUIRED",
+    "P1_EXACT_HEAD_BROWSER_EVIDENCE_REQUIRED",
+    "P1_REQUIRED_STAGE_OBSERVABILITY_REQUIRED",
+    "P1_CURRENT_HEAD_RENDER_OWNER_EVIDENCE_REQUIRED",
+    "P1_PRODUCTION_INSTALLED_PROTECTED_MANIFEST_REQUIRED",
+    "P1_THRESHOLD_EVALUATION_REQUIRED"
+  ]
+}

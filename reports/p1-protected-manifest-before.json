@@ -1,0 +1,11 @@
+{
+  "schema": "non-fea-p1-protected-manifest-seed/v1",
+  "status": "NOT_EXECUTED",
+  "baseCommitSha": null,
+  "exactHeadSha": null,
+  "executionId": null,
+  "fixtureRole": "LARGE_MODEL_4884_ENTITY",
+  "fixturePath": null,
+  "expectedSourceSha256": "88e62782772d743e9236d13775476826f9649ab06d3161de35dc500baa85a9c6",
+  "requiredMaterializationAuthority": "PRODUCTION_RENDER_THREE_MODEL"
+}
