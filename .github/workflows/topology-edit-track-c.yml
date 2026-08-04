@@ -1,0 +1,162 @@
+name: Topology Edit Track C Foundation
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/topology-edit-track-c.yml"
+      - "src/workspace/topology-edit/topology-edit-scope-contract.js"
+      - "src/workspace/topology-edit/topology-edit-large-model-controller.js"
+      - "src/workspace/topology-edit/topology-edit-worker-client.js"
+      - "src/workspace/topology-edit/topology-edit-worker.js"
+      - "tests/topology-edit-track-c.test.mjs"
+      - "tests/topology-edit-track-c-evidence.test.mjs"
+      - "tests/fixtures/topology-edit/large-model/**"
+      - "tests/fixtures/topology-edit/1885s/prerequisite-manifest.json"
+      - "scripts/topology-edit-write-track-c-evidence.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-track-c-foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: "true"
+      TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      TRACK_C_GOVERNANCE_LOG: reports/qualification/topology-edit-track-c-governance.log
+      TRACK_C_BLOCKED_EVIDENCE: reports/qualification/topology-edit-track-c-blocked.json
+      TRACK_C_PASS_EVIDENCE: reports/qualification/topology-edit-track-c-evidence.json
+
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Record qualification start
+        run: echo "TOPOLOGY_EDIT_QUALIFICATION_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Retain and record Wave 0 governance gates
+        id: governance
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p reports/qualification
+          : > "$TRACK_C_GOVERNANCE_LOG"
+          status=0
+          run_gate() {
+            local command="$1"
+            printf '\n## %s\n' "$command" | tee -a "$TRACK_C_GOVERNANCE_LOG"
+            bash -o pipefail -c "$command" 2>&1 | tee -a "$TRACK_C_GOVERNANCE_LOG"
+            local code="${PIPESTATUS[0]}"
+            if [[ "$code" -ne 0 && "$status" -eq 0 ]]; then status="$code"; fi
+          }
+          run_gate "node scripts/topology-edit-source-drift-check.mjs"
+          run_gate "node scripts/topology-edit-api-drift-check.mjs"
+          run_gate "node scripts/topology-edit-prohibited-imports.mjs"
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Run portable Track C qualification
+        id: portable
+        run: >-
+          node --test
+          tests/topology-edit-track-c.test.mjs
+          tests/topology-edit-track-c-evidence.test.mjs
+
+      - name: Write exact-head Track C pass evidence
+        if: steps.governance.outcome == 'success'
+        run: node scripts/topology-edit-write-track-c-evidence.mjs
+
+      - name: Write exact-head Track C blocked evidence
+        if: steps.governance.outcome != 'success'
+        env:
+          GOVERNANCE_EXIT_CODE: ${{ steps.governance.outputs.exit_code }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { readFile, writeFile } from 'node:fs/promises';
+          const log = await readFile(process.env.TRACK_C_GOVERNANCE_LOG);
+          const evidence = {
+            schema: 'TopologyEditTrackCQualificationBlocker.v1',
+            status: 'BLOCKED_GOVERNANCE_DRIFT',
+            repository: process.env.GITHUB_REPOSITORY,
+            commit: process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA,
+            startedAt: process.env.TOPOLOGY_EDIT_QUALIFICATION_STARTED_AT,
+            generatedAt: new Date().toISOString(),
+            releaseQualified: false,
+            governance: {
+              status: 'FAILED',
+              exitCode: Number(process.env.GOVERNANCE_EXIT_CODE || 1),
+              logPath: process.env.TRACK_C_GOVERNANCE_LOG,
+              logSha256: createHash('sha256').update(log).digest('hex'),
+            },
+            portableQualification: 'PASSED',
+            deferred: [
+              'Wave 0 API and behavior disposition authority must cover every current Topology Edit module.',
+              'A blocked governance disposition is not Track C qualification or release evidence.',
+            ],
+          };
+          await writeFile(
+            process.env.TRACK_C_BLOCKED_EVIDENCE,
+            `${JSON.stringify(evidence, null, 2)}\n`,
+            'utf8',
+          );
+          console.log(JSON.stringify(evidence, null, 2));
+          NODE
+
+      - name: Adjudicate Track C evidence publication
+        if: always() && steps.portable.outcome == 'success'
+        env:
+          GOVERNANCE_OUTCOME: ${{ steps.governance.outcome }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { readFile } from 'node:fs/promises';
+          if (process.env.GOVERNANCE_OUTCOME === 'success') {
+            const evidence = JSON.parse(await readFile(process.env.TRACK_C_PASS_EVIDENCE, 'utf8'));
+            if (evidence.commit !== process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA) {
+              throw new Error('TRACK_C_PASS_EVIDENCE_HEAD_MISMATCH');
+            }
+            if (evidence.trackBClosure?.releaseQualified !== false) {
+              throw new Error('TRACK_C_PASS_EVIDENCE_RELEASE_BOUNDARY_INVALID');
+            }
+          } else {
+            const evidence = JSON.parse(await readFile(process.env.TRACK_C_BLOCKED_EVIDENCE, 'utf8'));
+            const log = await readFile(process.env.TRACK_C_GOVERNANCE_LOG);
+            const hash = createHash('sha256').update(log).digest('hex');
+            if (evidence.commit !== process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA) {
+              throw new Error('TRACK_C_BLOCKED_EVIDENCE_HEAD_MISMATCH');
+            }
+            if (evidence.status !== 'BLOCKED_GOVERNANCE_DRIFT'
+                || evidence.releaseQualified !== false
+                || evidence.governance?.logSha256 !== hash) {
+              throw new Error('TRACK_C_BLOCKED_EVIDENCE_INVALID');
+            }
+          }
+          NODE
+
+      - name: Upload Track C evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-track-c-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          path: |
+            reports/qualification/topology-edit-track-c-evidence.json
+            reports/qualification/topology-edit-track-c-blocked.json
+            reports/qualification/topology-edit-track-c-governance.log
+          if-no-files-found: warn
+          retention-days: 30
