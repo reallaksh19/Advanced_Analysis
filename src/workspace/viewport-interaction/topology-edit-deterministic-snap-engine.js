@@ -313,7 +313,7 @@ function candidateScore(candidate) {
     quantize(candidate.worldDistanceMm),
     quantize(candidate.constraintError),
     candidate.kind,
-    candidate.canonicalTargetIds.join(','),
+    candidate.canonicalTargetIds.join(',') || '~',
     candidate.stableTieBreaker,
     candidate.candidateId,
   ];
@@ -391,7 +391,7 @@ function orthogonalPoints(raw, target) {
     { axis: 'X', worldPoint: { x: target.x, y: raw.y, z: raw.z } },
     { axis: 'Y', worldPoint: { x: raw.x, y: target.y, z: raw.z } },
     { axis: 'Z', worldPoint: { x: raw.x, y: raw.y, z: target.z } },
-  ];
+  ].filter((row) => distance(raw, row.worldPoint) > GEOMETRY_EPSILON_MM);
 }
 
 function gridPoint(point, anchor, mode, size) {
