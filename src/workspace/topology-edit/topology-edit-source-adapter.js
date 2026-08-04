@@ -212,7 +212,7 @@ function buildEdgesAndJunctions(topologyGraph, entitiesById, portToNode) {
         id: deriveCanonicalId('junction', component.componentKey),
         componentKey: component.componentKey,
         nodeIds: uniqueNodeIds,
-        entityType: entity.entityType,
+        entityType: normalizeTopologyEditEntityType(entity.entityType),
       }));
     }
     // Components resolving to fewer than 2 nodes (open/unconnected ports)
@@ -235,7 +235,7 @@ function buildCanonicalEdge(component, entity, fromNodeId, toNodeId) {
     diameterMm: resolveDiameterMm(entity),
     outsideDiameterMm,
     diameterAuthority: outsideDiameterMm === null ? 'UNRESOLVED' : 'OUTSIDE_DIAMETER',
-    entityType: entity.entityType,
+    entityType: normalizeTopologyEditEntityType(entity.entityType),
     sourcePath: entity.sourcePath,
   });
 }
@@ -248,6 +248,17 @@ function resolveOutsideDiameterMm(entity) {
   return Number.isFinite(entity.outsideDiameterMm) && entity.outsideDiameterMm > 0
     ? entity.outsideDiameterMm
     : null;
+}
+
+function normalizeTopologyEditEntityType(value) {
+  const token = stringValue(value).toUpperCase();
+  return ({
+    FLAN: 'FLANGE',
+    VALV: 'VALVE',
+    REDU: 'REDUCER',
+    GASK: 'GASKET',
+    INST: 'INSTRUMENT',
+  })[token] || token;
 }
 
 function deriveCanonicalId(kind, sourceIdentity) {
