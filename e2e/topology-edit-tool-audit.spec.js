@@ -3,19 +3,14 @@ import { expect, test } from '@playwright/test';
 
 const REPORT_PATH = 'reports/qualification/topology-edit-tool-audit.json';
 const CONTROLLER_KEY = '__TOPOLOGY_EDIT_TOOL_AUDIT_CONTROLLER__';
-
 const EDGE_ACTIONS = Object.freeze([
-  'split-edge-half',
-  'disconnect-from',
-  'disconnect-to',
-  'delete-edge',
+  'split-edge-half', 'disconnect-from', 'disconnect-to', 'delete-edge',
 ]);
 const TWO_NODE_ACTIONS = Object.freeze([
-  'set-gap-3',
-  'set-gap-20',
-  'merge-nodes',
-  'bridge-gap',
-  'add-straight',
+  'set-gap-3', 'set-gap-20', 'merge-nodes', 'bridge-gap', 'add-straight',
+]);
+const ALL_ACTIONS = Object.freeze([
+  'move-positive-z', ...TWO_NODE_ACTIONS, ...EDGE_ACTIONS,
 ]);
 
 // This audit intentionally uses the real WebGL backend. Do not replace it with
@@ -34,19 +29,21 @@ test('real WebGL selection enables the exact governed edit tools', async ({ page
   });
 
   const host = await openFinalAuditController(page);
-  const editPanel = host.locator('details[data-panel-kind="commands"]');
-  await editPanel.locator('summary').click();
-
-  await expectAllDisabled(page, ['move-positive-z', ...TWO_NODE_ACTIONS, ...EDGE_ACTIONS]);
+  await host.locator('details[data-panel-kind="commands"] summary').click();
+  await expectDisabled(page, ALL_ACTIONS);
 
   await clickCanonicalObject(page, 'edge:P-001');
-  await expect.poll(() => controllerSelection(page)).toEqual({ nodeIds: [], edgeId: 'edge:P-001' });
+  await expect.poll(() => controllerSelection(page)).toEqual({
+    nodeIds: [], edgeId: 'edge:P-001',
+  });
   await expectEnabled(page, EDGE_ACTIONS);
   await expectDisabled(page, ['move-positive-z', ...TWO_NODE_ACTIONS]);
 
   const singleNodeId = await nodeIdForPort(page, 'P-001:port:start');
   await clickCanonicalObject(page, singleNodeId);
-  await expect.poll(() => controllerSelection(page)).toEqual({ nodeIds: [singleNodeId], edgeId: null });
+  await expect.poll(() => controllerSelection(page)).toEqual({
+    nodeIds: [singleNodeId], edgeId: null,
+  });
   await expectEnabled(page, ['move-positive-z']);
   await expectDisabled(page, [...TWO_NODE_ACTIONS, ...EDGE_ACTIONS]);
 
@@ -55,8 +52,7 @@ test('real WebGL selection enables the exact governed edit tools', async ({ page
   await clickCanonicalObject(page, anchorNodeId);
   await clickCanonicalObject(page, movingNodeId, true);
   await expect.poll(() => controllerSelection(page)).toEqual({
-    nodeIds: [anchorNodeId, movingNodeId],
-    edgeId: null,
+    nodeIds: [anchorNodeId, movingNodeId], edgeId: null,
   });
   await expectEnabled(page, TWO_NODE_ACTIONS);
   await expectDisabled(page, ['move-positive-z', ...EDGE_ACTIONS]);
@@ -66,7 +62,9 @@ test('real WebGL selection enables the exact governed edit tools', async ({ page
     status: 'PASS_WEBGL_SELECTION_ENABLEMENT',
     candidateHead: process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA || process.env.GITHUB_SHA || null,
     fixture: 'public/fixtures/topology-edit-20-element-demo.staged.json',
-    backend: await page.evaluate((key) => globalThis[key]?.viewportBackend?.constructor?.name ?? null, CONTROLLER_KEY),
+    backend: await page.evaluate((key) => (
+      globalThis[key]?.viewportBackend?.constructor?.name ?? null
+    ), CONTROLLER_KEY),
     edgeSelection: 'edge:P-001',
     singleNodeSelection: singleNodeId,
     twoNodeSelection: [anchorNodeId, movingNodeId],
@@ -96,17 +94,20 @@ async function openFinalAuditController(page) {
   await expect.poll(() => page.evaluate(() => (
     globalThis.AnalysisWorkspace?.getSnapshot?.()?.dataset?.entities?.length ?? 0
   ))).toBe(20);
+
   await page.getByRole('button', { name: '3D Edit', exact: true }).click();
   const host = page.locator('[data-role="topology-edit-render-host"]');
   await expect(host).toBeVisible();
+  await expect(host).toHaveAttribute('data-topology-edit-clean-shell', 'true');
 
   await page.evaluate(async (key) => {
-    const { APPLICATION_EVENTS } = await import('/src/workspace/event-topics.js');
+    const moduleUrl = (path) => new URL(`src/${path}`, document.baseURI).href;
+    const { APPLICATION_EVENTS } = await import(moduleUrl('workspace/event-topics.js'));
     globalThis.EventBus.publish(APPLICATION_EVENTS.CHANGED, {
       state: { activeViewId: 'TOPOLOGY_EDIT_TOOL_AUDIT' },
     });
     const { TopologyEdit3DViewController } = await import(
-      '/src/workspace/topology-edit-3d-professional-controller.js'
+      moduleUrl('workspace/topology-edit-3d-professional-controller.js')
     );
     const controller = new TopologyEdit3DViewController(globalThis.EventBus);
     globalThis[key] = controller;
@@ -141,13 +142,14 @@ async function clickCanonicalObject(page, canonicalId, additive = false) {
 
     let target = null;
     for (const groupName of ['draftGroup', 'sourceGroup']) {
-      const group = backend.groups?.[groupName];
-      group?.traverse?.((object) => {
+      backend.groups?.[groupName]?.traverse?.((object) => {
         if (target) return;
         const direct = object.userData?.pickTarget;
         if (direct?.objectId === id) target = direct;
         const table = object.userData?.pickTable;
-        const match = Array.isArray(table) ? table.find((row) => row?.objectId === id) : null;
+        const match = Array.isArray(table)
+          ? table.find((row) => row?.objectId === id)
+          : null;
         if (!target && match) target = match;
       });
       if (target) break;
@@ -176,10 +178,6 @@ async function controllerSelection(page) {
       edgeId: selection?.edgeId ?? null,
     };
   }, CONTROLLER_KEY);
-}
-
-async function expectAllDisabled(page, actionIds) {
-  await expectDisabled(page, actionIds);
 }
 
 async function expectEnabled(page, actionIds) {
