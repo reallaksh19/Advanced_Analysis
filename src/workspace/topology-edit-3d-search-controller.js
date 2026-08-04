@@ -119,7 +119,7 @@ export class TopologyEdit3DViewController extends LifecycleController {
     if (result.workspaceEntityIds.length) {
       this.eventBus.publish(EVENT_TOPICS.VIEWPORT_SELECTION_REQUESTED, {
         entityId: result.workspaceEntityIds[0],
-        source: 'topology-edit-canonical-search',
+        source: 'topology-edit-3d',
       });
     }
     this.updateActionButtons();
