@@ -11,6 +11,7 @@ const expected = [
   'scripts/authorized-enrichment-consumer-controller-check.mjs',
   'scripts/authorized-enrichment-workspace-api-anti-drift-check.mjs',
   'scripts/authorized-enrichment-workspace-api-check.mjs',
+  'scripts/empirical-authorized-blocked-cases-check.mjs',
   'scripts/empirical-authorized-cutover-manifest-check.mjs',
   'scripts/empirical-authorized-cutover-production-check.mjs',
   'scripts/empirical-authorized-parity-check.mjs',
