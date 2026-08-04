@@ -6,6 +6,7 @@ export * from './q8-quality.js';
 export * from './convergence.js';
 export {
   evaluateConvergence,
+  GLOBAL_DISPLACEMENT_ASYMPTOTIC_TAIL_PROFILE_ID,
   REFERENCE_BOUND_BOUNDED_OSCILLATION_PROFILE_ID,
 } from './reference-bound-convergence.js';
 export * from './fixed-coordinate-recovery.js';
