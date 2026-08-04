@@ -1,9 +1,15 @@
+import { Buffer } from 'node:buffer';
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 
-const FIXTURE_BYTES = readFileSync(
+const FIXTURE_TEXT = readFileSync(
   new URL('../public/fixtures/topology-edit-20-element-demo.staged.json', import.meta.url),
+  'utf8',
 );
+const UTF16LE_FIXTURE_BYTES = Buffer.concat([
+  Buffer.from([0xff, 0xfe]),
+  Buffer.from(FIXTURE_TEXT, 'utf16le'),
+]);
 
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 1050 });
@@ -16,9 +22,9 @@ test('uploaded SJSON survives 3D Edit leave and re-entry with the clean canvas s
   const fileInput = page.locator('[data-role="dataset-file"]');
   await expect(fileInput).toHaveAttribute('accept', /\.sjson/);
   await fileInput.setInputFiles({
-    name: 'Sjon.sjson',
+    name: 'Sjon.json',
     mimeType: 'application/json',
-    buffer: FIXTURE_BYTES,
+    buffer: UTF16LE_FIXTURE_BYTES,
   });
 
   await expect.poll(() => page.evaluate(() => (
