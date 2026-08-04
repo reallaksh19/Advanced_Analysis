@@ -3,12 +3,10 @@ import { defineConfig } from 'vite';
 const buildTime = new Date().toISOString();
 
 /**
- * Keep manual chunking limited to dependency-only or calculation-core domains.
- *
- * The workspace is a single statically imported application graph containing
- * stores, controllers, views, and top-level singleton instances. Splitting that
- * graph by filename prefix creates cross-chunk evaluation cycles and production
- * temporal-dead-zone failures that do not occur in Vite development mode.
+ * Keep manual chunking limited to dependency-oriented or calculation-core
+ * domains. Workspace modules remain graph-owned because they contain stores,
+ * controllers, views, and top-level singleton instances with cross-feature
+ * imports.
  */
 export function manualChunk(id) {
   const source = id.replaceAll('\\', '/');
@@ -42,9 +40,8 @@ export function manualChunk(id) {
   if (source.includes('/src/vendors/')) return 'vendor-integrations';
   if (source.includes('/src/utils/') || source.includes('/src/mocks/')) return 'application-support';
 
-  // Workspace modules must stay under Rollup's graph-aware ownership. This
-  // includes LAFEA/LFEA workbenches, enrichment, topology editing, sketcher,
-  // analysis, data, shell, and presentation modules.
+  // Rollup must own the complete workspace graph so evaluation order follows
+  // its static dependency analysis rather than filename-based partitions.
   if (source.includes('/src/workspace/')) return undefined;
   return undefined;
 }
@@ -60,7 +57,10 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: manualChunk,
-        onlyExplicitManualChunks: true,
+        // Allow dependencies of a selected manual chunk to move with that
+        // chunk. Explicit-only ownership created circular chunks and TDZ
+        // failures in the generated ESM graph.
+        onlyExplicitManualChunks: false,
       },
     },
   },
