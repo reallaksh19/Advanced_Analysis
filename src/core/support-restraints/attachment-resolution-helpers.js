@@ -37,10 +37,11 @@ export function createAttachmentRecord(support, target, evidenceType, tolerance,
 
 export function sourceRelatedComponents(support, sharedModel, targets) {
   const nodes = sharedModel.sourceReferences?.nodes || [];
+  const nodeByKey = new Map(nodes.map((node) => [node.sourceNodeKey, node]));
   const parentByNode = new Map(nodes.map((node) => [node.sourceNodeKey, node.parentSourceNodeKey]));
   const supportParent = parentByNode.get(support.sourceReferences.sourceNodeKey) || '';
   const supportPathParent = parentPath(support.sourceReferences.sourcePath);
-  return targets.filter((target) => target.targetType === 'COMPONENT_REFERENCE').filter((target) => {
+  const related = targets.filter((target) => target.targetType === 'COMPONENT_REFERENCE').filter((target) => {
     const targetParent = parentByNode.get(target.sourceEvidence.sourceNodeKey) || '';
     const targetPathParent = parentPath(target.sourceEvidence.sourcePath);
     return Boolean(
@@ -48,6 +49,7 @@ export function sourceRelatedComponents(support, sharedModel, targets) {
       || (supportPathParent && targetPathParent && supportPathParent === targetPathParent),
     );
   });
+  return nearestSourceSequenceTargets(support, related, nodeByKey, supportParent);
 }
 
 export function portTargets(ports, targets) {
@@ -139,6 +141,31 @@ export function diagnosticOrder(left, right) {
 
 export function byKey(field) {
   return (left, right) => stringValue(left?.[field]).localeCompare(stringValue(right?.[field]));
+}
+
+function nearestSourceSequenceTargets(support, related, nodeByKey, supportParent) {
+  const supportNode = nodeByKey.get(support.sourceReferences.sourceNodeKey);
+  if (!supportParent || !Number.isInteger(supportNode?.childIndex)) return related;
+  const siblings = related.flatMap((target) => {
+    const node = nodeByKey.get(target.sourceEvidence.sourceNodeKey);
+    return node?.parentSourceNodeKey === supportParent && Number.isInteger(node.childIndex)
+      ? [{ target, childIndex: node.childIndex }]
+      : [];
+  });
+  if (!siblings.length) return related;
+
+  const preceding = siblings.filter((row) => row.childIndex < supportNode.childIndex);
+  if (preceding.length) {
+    const nearestIndex = Math.max(...preceding.map((row) => row.childIndex));
+    return preceding.filter((row) => row.childIndex === nearestIndex).map((row) => row.target);
+  }
+
+  const following = siblings.filter((row) => row.childIndex > supportNode.childIndex);
+  if (following.length) {
+    const nearestIndex = Math.min(...following.map((row) => row.childIndex));
+    return following.filter((row) => row.childIndex === nearestIndex).map((row) => row.target);
+  }
+  return related;
 }
 
 function confidence(evidenceType, projection, tolerance, identity) {

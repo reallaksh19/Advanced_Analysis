@@ -199,42 +199,72 @@ function buildEdgesAndJunctions(topologyGraph, entitiesById, portToNode) {
     const startPort = ports.find((port) => port.role === 'start');
     const endPort = ports.find((port) => port.role === 'end');
     if (ports.length === 2 && startPort && endPort && uniqueNodeIds.length === 2) {
-      edges.push(freezeEdge({
-        id: `edge:${component.componentKey}`,
-        componentKey: component.componentKey,
-        fromNodeId: portToNode.get(startPort.portKey),
-        toNodeId: portToNode.get(endPort.portKey),
-        diameterMm: resolveDiameterMm(entity),
-        entityType: entity.entityType,
-        sourcePath: entity.sourcePath,
-      }));
+      edges.push(buildCanonicalEdge(
+        component,
+        entity,
+        portToNode.get(startPort.portKey),
+        portToNode.get(endPort.portKey),
+      ));
     } else if (ports.length === 2 && uniqueNodeIds.length === 2) {
-      edges.push(freezeEdge({
-        id: `edge:${component.componentKey}`,
-        componentKey: component.componentKey,
-        fromNodeId: nodeIds[0],
-        toNodeId: nodeIds[1],
-        diameterMm: resolveDiameterMm(entity),
-        entityType: entity.entityType,
-        sourcePath: entity.sourcePath,
-      }));
+      edges.push(buildCanonicalEdge(component, entity, nodeIds[0], nodeIds[1]));
     } else if (uniqueNodeIds.length >= 2) {
       junctions.push(freezeJunction({
-        id: `junction:${component.componentKey}`,
+        id: deriveCanonicalId('junction', component.componentKey),
         componentKey: component.componentKey,
         nodeIds: uniqueNodeIds,
-        entityType: entity.entityType,
+        entityType: normalizeTopologyEditEntityType(entity.entityType),
       }));
     }
     // Components resolving to fewer than 2 nodes (open/unconnected ports)
     // are left un-modeled as edges/junctions; they remain visible via the
     // dataset itself but are not part of the editable route graph yet.
   });
-  return { edges: edges.sort((left, right) => left.id.localeCompare(right.id)), junctions: junctions.sort((left, right) => left.id.localeCompare(right.id)) };
+  return {
+    edges: edges.sort((left, right) => left.id.localeCompare(right.id)),
+    junctions: junctions.sort((left, right) => left.id.localeCompare(right.id)),
+  };
+}
+
+function buildCanonicalEdge(component, entity, fromNodeId, toNodeId) {
+  const outsideDiameterMm = resolveOutsideDiameterMm(entity);
+  return freezeEdge({
+    id: deriveCanonicalId('edge', component.componentKey),
+    componentKey: component.componentKey,
+    fromNodeId,
+    toNodeId,
+    diameterMm: resolveDiameterMm(entity),
+    outsideDiameterMm,
+    diameterAuthority: outsideDiameterMm === null ? 'UNRESOLVED' : 'OUTSIDE_DIAMETER',
+    entityType: normalizeTopologyEditEntityType(entity.entityType),
+    sourcePath: entity.sourcePath,
+  });
 }
 
 function resolveDiameterMm(entity) {
   return Number.isFinite(entity.nominalDiameterMm) ? entity.nominalDiameterMm : null;
+}
+
+function resolveOutsideDiameterMm(entity) {
+  return Number.isFinite(entity.outsideDiameterMm) && entity.outsideDiameterMm > 0
+    ? entity.outsideDiameterMm
+    : null;
+}
+
+function normalizeTopologyEditEntityType(value) {
+  const token = stringValue(value).toUpperCase();
+  return ({
+    FLAN: 'FLANGE',
+    VALV: 'VALVE',
+    REDU: 'REDUCER',
+    GASK: 'GASKET',
+    INST: 'INSTRUMENT',
+  })[token] || token;
+}
+
+function deriveCanonicalId(kind, sourceIdentity) {
+  const identity = stringValue(sourceIdentity);
+  if (identity && !/\s/u.test(identity)) return `${kind}:${identity}`;
+  return `${kind}:hash-${semanticHash({ kind, sourceIdentity: identity }).slice(0, 24)}`;
 }
 
 // ---- supports ---------------------------------------------------------
@@ -250,9 +280,10 @@ function buildSupports(dataset, topologyGraph, portToNode, attachmentModel, rest
       const attachment = attachmentsBySupportKey.get(entity.entityId);
       const nodeId = resolveSupportNodeId(attachment, componentsByKey, portToNode);
       return freezeSupport({
-        id: `support:${entity.entityId}`,
+        id: deriveCanonicalId('support', entity.entityId),
         entityId: entity.entityId,
         nodeId,
+        hostEntityId: attachment?.attachedComponentKey || null,
         resolved: Boolean(nodeId),
         attachmentEvidenceType: attachment?.evidenceType || null,
         restraint: restraintsBySupportKey.get(entity.entityId) || null,
@@ -318,6 +349,7 @@ function synthesizePipeEntity(entityId, start, end, edge, editSessionId) {
     category: 'pipe',
     componentReference: entityId,
     nominalDiameterMm: Number.isFinite(edge.diameterMm) ? edge.diameterMm : null,
+    outsideDiameterMm: Number.isFinite(edge.outsideDiameterMm) ? edge.outsideDiameterMm : null,
     properties: {
       identity: { entityId, sourceEntityId: entityId, name: `PIPE ${entityId}`, entityType: 'PIPE' },
       geometry: { start, end, center: midpoint(start, end) },
