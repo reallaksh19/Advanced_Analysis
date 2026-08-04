@@ -1,0 +1,169 @@
+name: Bucket B BB-10 axisymmetric Q8 registration
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/bucket-b-bb10-axisymmetric-registration.yml'
+      - 'src/core/bucket-b/axisymmetric-*.js'
+      - 'src/core/bucket-b/bb10-check.mjs'
+      - 'src/core/bucket-b/registry.js'
+      - 'src/core/bucket-b/index.js'
+  workflow_dispatch:
+    inputs:
+      expected_head_sha:
+        description: Exact repository head to qualify; defaults to the dispatched ref SHA.
+        required: false
+        type: string
+      expected_base_sha:
+        description: Exact current-main base SHA for the BB-10 changed-path audit.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-bb10:
+    name: Exact-head BB-10 axisymmetric registration
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Resolve exact qualification refs
+        id: refs
+        shell: bash
+        env:
+          DISPATCH_HEAD_SHA: ${{ inputs.expected_head_sha }}
+          DISPATCH_BASE_SHA: ${{ inputs.expected_base_sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          head_sha="${DISPATCH_HEAD_SHA:-${PR_HEAD_SHA:-${GITHUB_SHA}}}"
+          base_sha="${DISPATCH_BASE_SHA:-${PR_BASE_SHA:-}}"
+          if [[ ! "$head_sha" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "Invalid exact head SHA: $head_sha" >&2
+            exit 1
+          fi
+          if [[ ! "$base_sha" =~ ^[0-9a-fA-F]{40}$ ]] || [[ "$base_sha" =~ ^0{40}$ ]]; then
+            echo "A valid nonzero 40-character expected base SHA is required." >&2
+            exit 1
+          fi
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Check out exact qualification head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.refs.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify exact head and base
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          EXPECTED_BASE_SHA: ${{ steps.refs.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          git cat-file -e "${EXPECTED_HEAD_SHA}^{commit}"
+          git cat-file -e "${EXPECTED_BASE_SHA}^{commit}"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          git merge-base --is-ancestor "$EXPECTED_BASE_SHA" "$EXPECTED_HEAD_SHA"
+          git diff --check "${EXPECTED_BASE_SHA}...${EXPECTED_HEAD_SHA}"
+
+      - name: Resolve governed shared-gate baseline
+        id: shared_anchor
+        shell: bash
+        run: |
+          set -euo pipefail
+          marker_path='src/core/bucket-b/axisymmetric-bb10-shared-gate-anchor.js'
+          marker_commit="$(git log --reverse --diff-filter=A --format=%H -- "$marker_path" | head -n 1)"
+          if [[ ! "$marker_commit" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "Unable to resolve the governed BB-10 shared-gate marker." >&2
+            exit 1
+          fi
+          shared_base_sha="$(git rev-parse "${marker_commit}^")"
+          git cat-file -e "${shared_base_sha}^{commit}"
+          git merge-base --is-ancestor "$shared_base_sha" "${{ steps.refs.outputs.head_sha }}"
+          test "$(git diff --name-only "${shared_base_sha}...${{ steps.refs.outputs.head_sha }}" | grep -c '^\.github/workflows/bucket-b-bb10-axisymmetric-registration.yml$' || true)" = "0"
+          echo "anchor_sha=$shared_base_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Run authoritative same-head BB-00 through BB-05 shared gates
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          EXPECTED_BASE_SHA: ${{ steps.shared_anchor.outputs.anchor_sha }}
+          EXPECTED_BASE_REF: ${{ steps.shared_anchor.outputs.anchor_sha }}
+          STRICT_REPOSITORY_DIFFERENTIAL: '1'
+          REPORT_PATH: reports/bucket-b-bb00-bb05-exact-head-report.json
+        run: node scripts/bucket-b-bb00-bb05-check.mjs
+
+      - name: Replay BB-06 planar regression
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          BB06_REPORT_PATH: reports/bucket-b-bb06-lug-clamp-report.json
+        run: node src/core/bucket-b/bb06-check.mjs
+
+      - name: Replay BB-07 planar regression
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          BB06_REPORT_PATH: reports/bucket-b-bb06-lug-clamp-report.json
+          BB07_REPORT_PATH: reports/bucket-b-bb07-bracket-gusset-report.json
+        run: node src/core/bucket-b/bb07-check.mjs
+
+      - name: Run BB-10 exact-head registration
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          EXPECTED_BASE_SHA: ${{ steps.refs.outputs.base_sha }}
+          BB10_SHARED_REPORT_PATH: reports/bucket-b-bb00-bb05-exact-head-report.json
+          BB06_REPORT_PATH: reports/bucket-b-bb06-lug-clamp-report.json
+          BB07_REPORT_PATH: reports/bucket-b-bb07-bracket-gusset-report.json
+          BB10_REPORT_PATH: reports/bucket-b-bb10-axisymmetric-registration-report.json
+          BB10_CORE_STDOUT_PATH: reports/bucket-b-bb10-core-stdout.json
+          BB10_CORE_STDERR_PATH: reports/bucket-b-bb10-core-stderr.log
+        run: node src/core/bucket-b/bb10-check.mjs
+
+      - name: Rerun BB-10 and require byte-identical report
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          EXPECTED_BASE_SHA: ${{ steps.refs.outputs.base_sha }}
+          BB10_SHARED_REPORT_PATH: reports/bucket-b-bb00-bb05-exact-head-report.json
+          BB06_REPORT_PATH: reports/bucket-b-bb06-lug-clamp-report.json
+          BB07_REPORT_PATH: reports/bucket-b-bb07-bracket-gusset-report.json
+          BB10_REPORT_PATH: reports/bucket-b-bb10-axisymmetric-registration-report-replay.json
+          BB10_CORE_STDOUT_PATH: reports/bucket-b-bb10-core-stdout-replay.json
+          BB10_CORE_STDERR_PATH: reports/bucket-b-bb10-core-stderr-replay.log
+        run: |
+          set -euo pipefail
+          node src/core/bucket-b/bb10-check.mjs
+          cmp reports/bucket-b-bb10-axisymmetric-registration-report.json reports/bucket-b-bb10-axisymmetric-registration-report-replay.json
+          cmp reports/bucket-b-bb10-core-stdout.json reports/bucket-b-bb10-core-stdout-replay.json
+          cmp reports/bucket-b-bb10-core-stderr.log reports/bucket-b-bb10-core-stderr-replay.log
+
+      - name: Upload BB-10 retained qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bucket-b-bb10-axisymmetric-registration-${{ steps.refs.outputs.head_sha }}-${{ github.run_attempt }}
+          path: |
+            reports/bucket-b-bb00-bb05-exact-head-report.json
+            reports/bucket-b-bb06-lug-clamp-report.json
+            reports/bucket-b-bb07-bracket-gusset-report.json
+            reports/bucket-b-bb10-axisymmetric-registration-report.json
+            reports/bucket-b-bb10-axisymmetric-registration-report-replay.json
+            reports/bucket-b-bb10-core-stdout.json
+            reports/bucket-b-bb10-core-stdout-replay.json
+            reports/bucket-b-bb10-core-stderr.log
+            reports/bucket-b-bb10-core-stderr-replay.log
+          if-no-files-found: error
+          retention-days: 30
