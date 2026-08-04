@@ -66,7 +66,6 @@ if (source.includes('/src/workspace/topology-edit-3d-')
   || source.includes('/src/workspace/viewport-presentation/')) {
   return 'workspace-topology-edit-ui';
 }
-  if (source.includes('/src/workspace/sequential-sketcher/')) return 'workspace-sketcher';
   if (source.includes('/src/workspace/enrichment/')
     || source.includes('/src/workspace/first-cut-')) return 'workspace-enrichment';
   if (source.includes('/src/workspace/linear-piping')) return 'workspace-linear-piping';
