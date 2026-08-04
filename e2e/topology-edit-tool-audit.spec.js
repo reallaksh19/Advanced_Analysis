@@ -77,10 +77,14 @@ test('all ten governed edit tools execute independently on fresh 20-object sampl
   for (const scenario of COMMAND_SCENARIOS) {
     const host = await openFinalAuditController(page);
     await openPanel(host, 'commands');
-    const targets = await visibleSelectionTargets(page);
     const baseHash = await host.getAttribute('data-topology-edit-canonical-hash');
 
-    await selectVisibleTarget(page, targets, scenario.kind);
+    if (scenario.kind === 'two-node') {
+      await selectQualifiedGapBySearch(page, host);
+    } else {
+      const targets = await visibleSelectionTargets(page);
+      await selectVisibleTarget(page, targets, scenario.kind);
+    }
     const button = page.locator(`[data-command-action="${scenario.actionId}"]`);
     await expect(button).toBeEnabled();
     const selectionStatus = await statusOutput(page).innerText();
@@ -233,12 +237,17 @@ async function openPanel(host, kind) {
 }
 
 async function visibleSelectionTargets(page) {
-  return page.evaluate((key) => {
+  return page.evaluate(async (key) => {
     const controller = globalThis[key];
     const backend = controller?.viewportBackend;
     const topology = controller?.session?.currentTopology?.();
     const canvas = backend?.renderer?.domElement;
     if (!backend || !topology || !canvas) throw new Error('Visible selection audit context is unavailable.');
+    const moduleUrl = new URL(
+      'src/workspace/topology-edit/topology-edit-command-ui.js',
+      document.baseURI,
+    ).href;
+    const { topologyEditExactGapContext } = await import(moduleUrl);
     const rect = canvas.getBoundingClientRect();
     const points = new Map();
     for (let y = rect.top + 1; y < rect.bottom; y += 3) {
@@ -253,11 +262,17 @@ async function visibleSelectionTargets(page) {
       ? 'edge:P-001'
       : [...points.keys()].find((id) => id.startsWith('edge:'));
     const nodeIds = [...points.keys()].filter((id) => id.startsWith('node:'));
-    const nodeForPort = (portKey) => topology.nodes.find(
-      (node) => node.portKeys?.includes(portKey),
-    )?.id;
-    const pair = ['P-001:port:end', 'E-001:port:start'].map(nodeForPort);
-    if (!edgeId || !nodeIds.length || pair.some((id) => !id || !points.has(id))) {
+    let pair = null;
+    for (let left = 0; left < nodeIds.length && !pair; left += 1) {
+      for (let right = left + 1; right < nodeIds.length; right += 1) {
+        const selection = { nodeIds: [nodeIds[left], nodeIds[right]], edgeId: null };
+        if (topologyEditExactGapContext(selection, topology)) {
+          pair = selection.nodeIds;
+          break;
+        }
+      }
+    }
+    if (!edgeId || !nodeIds.length || !pair) {
       throw new Error(`Visible governed selection targets are incomplete: ${JSON.stringify({ edgeId, nodeIds, pair })}`);
     }
     return {
@@ -277,13 +292,21 @@ async function canonicalNodeForPort(page, portKey) {
   }, { key: CONTROLLER_KEY, port: portKey });
 }
 
-async function selectBySearch(page, host, canonicalId) {
+async function selectQualifiedGapBySearch(page, host) {
+  const first = await canonicalNodeForPort(page, QUALIFIED_GAP_PORTS[0]);
+  const second = await canonicalNodeForPort(page, QUALIFIED_GAP_PORTS[1]);
+  await selectBySearch(page, host, first);
+  await selectBySearch(page, host, second, true);
+  await expect(statusOutput(page)).toContainText('Selected nodes 1=');
+}
+
+async function selectBySearch(page, host, canonicalId, additive = false) {
   await openPanel(host, 'topology-edit-canonical-search');
   const input = page.locator('[data-role="topology-edit-search-input"]');
   await input.fill(canonicalId);
   const result = page.locator(`[data-search-canonical-id="${canonicalId}"]`);
   await expect(result).toHaveCount(1);
-  await result.click();
+  await result.click({ modifiers: additive ? ['Shift'] : [] });
 }
 
 async function selectVisibleTarget(page, targets, kind) {
