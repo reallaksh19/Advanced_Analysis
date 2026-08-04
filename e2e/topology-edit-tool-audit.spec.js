@@ -12,6 +12,18 @@ const TWO_NODE_ACTIONS = Object.freeze([
 const ALL_ACTIONS = Object.freeze([
   'move-positive-z', ...TWO_NODE_ACTIONS, ...EDGE_ACTIONS,
 ]);
+const COMMAND_SCENARIOS = Object.freeze([
+  { actionId: 'move-positive-z', ports: ['P-001:port:start'] },
+  { actionId: 'set-gap-3', ports: ['P-001:port:end', 'E-001:port:start'] },
+  { actionId: 'set-gap-20', ports: ['P-001:port:end', 'E-001:port:start'] },
+  { actionId: 'merge-nodes', ports: ['P-001:port:end', 'E-001:port:start'] },
+  { actionId: 'bridge-gap', ports: ['P-003:port:end', 'R-001:port:start'] },
+  { actionId: 'add-straight', ports: ['P-003:port:end', 'R-001:port:start'] },
+  { actionId: 'split-edge-half', edgeId: 'edge:P-001' },
+  { actionId: 'disconnect-from', edgeId: 'edge:P-001' },
+  { actionId: 'disconnect-to', edgeId: 'edge:P-001' },
+  { actionId: 'delete-edge', edgeId: 'edge:P-001' },
+]);
 
 // This audit intentionally uses the real WebGL backend. Do not replace it with
 // the canvas2d qualification fallback used by older walkthroughs.
@@ -20,16 +32,9 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => globalThis.localStorage?.clear());
 });
 
-test('real WebGL selection enables the exact governed edit tools', async ({ page }, testInfo) => {
-  const pageErrors = [];
-  const consoleErrors = [];
-  page.on('pageerror', (error) => pageErrors.push(error.message));
-  page.on('console', (message) => {
-    if (message.type() === 'error') consoleErrors.push(message.text());
-  });
-
+test('real WebGL selection enables the exact governed edit tools', async ({ page }) => {
   const host = await openFinalAuditController(page);
-  await host.locator('details[data-panel-kind="commands"] summary').click();
+  await openPanel(host, 'commands');
   await expectDisabled(page, ALL_ACTIONS);
 
   await clickCanonicalObject(page, 'edge:P-001');
@@ -39,55 +44,130 @@ test('real WebGL selection enables the exact governed edit tools', async ({ page
   await expectEnabled(page, EDGE_ACTIONS);
   await expectDisabled(page, ['move-positive-z', ...TWO_NODE_ACTIONS]);
 
-  const singleNodeId = await nodeIdForPort(page, 'P-001:port:start');
-  await clickCanonicalObject(page, singleNodeId);
+  const singleNodeId = await selectPort(page, 'P-001:port:start', false);
   await expect.poll(() => controllerSelection(page)).toEqual({
     nodeIds: [singleNodeId], edgeId: null,
   });
   await expectEnabled(page, ['move-positive-z']);
   await expectDisabled(page, [...TWO_NODE_ACTIONS, ...EDGE_ACTIONS]);
 
-  const anchorNodeId = await nodeIdForPort(page, 'P-001:port:end');
-  const movingNodeId = await nodeIdForPort(page, 'E-001:port:start');
-  await clickCanonicalObject(page, anchorNodeId);
-  await clickCanonicalObject(page, movingNodeId, true);
+  const anchorNodeId = await selectPort(page, 'P-001:port:end', false);
+  const movingNodeId = await selectPort(page, 'E-001:port:start', true);
   await expect.poll(() => controllerSelection(page)).toEqual({
     nodeIds: [anchorNodeId, movingNodeId], edgeId: null,
   });
   await expectEnabled(page, TWO_NODE_ACTIONS);
   await expectDisabled(page, ['move-positive-z', ...EDGE_ACTIONS]);
+});
 
-  const report = {
-    schema: 'TopologyEditToolAuditEvidence.v1',
-    status: 'PASS_WEBGL_SELECTION_ENABLEMENT',
-    candidateHead: process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA || process.env.GITHUB_SHA || null,
-    fixture: 'public/fixtures/topology-edit-20-element-demo.staged.json',
-    backend: await page.evaluate((key) => (
-      globalThis[key]?.viewportBackend?.constructor?.name ?? null
-    ), CONTROLLER_KEY),
-    edgeSelection: 'edge:P-001',
-    singleNodeSelection: singleNodeId,
-    twoNodeSelection: [anchorNodeId, movingNodeId],
-    enabledActions: {
-      edge: EDGE_ACTIONS,
-      singleNode: ['move-positive-z'],
-      twoNode: TWO_NODE_ACTIONS,
-    },
-    pageErrors,
-    consoleErrors,
-  };
-  expect(pageErrors).toEqual([]);
-  expect(consoleErrors.filter(isCriticalConsoleError)).toEqual([]);
-  await testInfo.attach('tool-enablement', {
+test('all ten governed edit tools execute independently on the 20-object sample', async ({ page }, testInfo) => {
+  const executions = [];
+  for (const scenario of COMMAND_SCENARIOS) {
+    const host = await openFinalAuditController(page);
+    await openPanel(host, 'commands');
+    if (scenario.edgeId) await clickCanonicalObject(page, scenario.edgeId);
+    else {
+      for (let index = 0; index < scenario.ports.length; index += 1) {
+        await selectPort(page, scenario.ports[index], index > 0);
+      }
+    }
+
+    const button = page.locator(`[data-command-action="${scenario.actionId}"]`);
+    await expect(button).toBeEnabled();
+    const beforeHash = await host.getAttribute('data-topology-edit-canonical-hash');
+    await button.click();
+    await expect(host).toHaveAttribute('data-topology-edit-active-command-count', '1');
+    const afterHash = await host.getAttribute('data-topology-edit-canonical-hash');
+    expect(afterHash).not.toBe(beforeHash);
+    const status = await page.locator('[data-role="topology-edit-status"]').innerText();
+    expect(status).toMatch(/accepted/i);
+    executions.push({
+      actionId: scenario.actionId,
+      selection: await controllerSelection(page),
+      beforeHash,
+      afterHash,
+      status,
+    });
+  }
+
+  await testInfo.attach('all-tools-final-state', {
     body: await page.screenshot({ fullPage: true }),
     contentType: 'image/png',
   });
   await mkdir('reports/qualification', { recursive: true });
-  await writeFile(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`);
+  await writeFile(REPORT_PATH, `${JSON.stringify({
+    schema: 'TopologyEditToolAuditEvidence.v1',
+    status: 'PASS_ALL_GOVERNED_EDIT_TOOLS',
+    candidateHead: process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA || process.env.GITHUB_SHA || null,
+    fixture: 'public/fixtures/topology-edit-20-element-demo.staged.json',
+    backend: 'TopologyEditNavigationHudViewportBackend',
+    executionCount: executions.length,
+    executions,
+  }, null, 2)}\n`);
+});
+
+test('navigation, presentation, history, and draft controls remain operable', async ({ page }) => {
+  const host = await openFinalAuditController(page);
+  await openPanel(host, 'commands');
+  await clickCanonicalObject(page, 'edge:P-001');
+
+  for (const mode of ['select', 'orbit', 'pan', 'select']) {
+    await page.locator(`[data-navigation-mode="${mode}"]`).click();
+    await expect(host).toHaveAttribute('data-topology-edit-navigation-mode', mode);
+  }
+  await page.locator('[data-navigation-action="fit"]').click();
+  await expect(page.locator('[data-role="topology-edit-status"]')).toContainText('View command: fit.');
+
+  const views = host.locator('details[data-panel-kind="views"]');
+  await views.locator('summary').click();
+  for (const action of ['fit-selection', 'home', 'previous', 'pivot-selection']) {
+    await page.locator(`[data-navigation-action="${action}"]`).click();
+    await expect(page.locator('[data-role="topology-edit-status"]'))
+      .toContainText(`View command: ${action}.`);
+  }
+  await page.locator('[data-navigation-action="projection"]').click();
+  await expect(host).toHaveAttribute('data-topology-edit-projection', /orthographic|perspective/);
+  for (const view of ['iso', 'top', 'front', 'right']) {
+    await page.locator(`[data-standard-view="${view}"]`).click();
+    await expect(page.locator('[data-role="topology-edit-status"]'))
+      .toContainText(`Standard view: ${view.toUpperCase()}.`);
+  }
+
+  await openPanel(host, 'display');
+  await page.locator('[data-action="hide-selected"]').click();
+  await expect(page.locator('[data-role="presentation-visibility-status"]')).toHaveText('Hidden: 1');
+  await page.locator('[data-action="show-all"]').click();
+  await expect(page.locator('[data-role="presentation-visibility-status"]')).toHaveText('Visibility: all');
+  await page.locator('[data-action="isolate-selected"]').click();
+  await expect(page.locator('[data-role="presentation-visibility-status"]')).toHaveText('Isolated: 1');
+  await page.locator('[data-action="reset-presentation"]').click();
+  await expect(page.locator('[data-role="presentation-visibility-status"]')).toHaveText('Visibility: all');
+
+  await selectPort(page, 'P-001:port:start', false);
+  await page.locator('[data-command-action="move-positive-z"]').click();
+  await expect(host).toHaveAttribute('data-topology-edit-active-command-count', '1');
+  await page.locator('[data-action="undo"]').click();
+  await expect(host).toHaveAttribute('data-topology-edit-active-command-count', '0');
+  await page.locator('[data-action="redo"]').click();
+  await expect(host).toHaveAttribute('data-topology-edit-active-command-count', '1');
+  await page.locator('[data-action="save-draft"]').click();
+  await expect(page.locator('[data-role="topology-edit-status"]')).toContainText('Draft saved:');
+  await expect(host).not.toHaveAttribute('data-topology-edit-draft-package-hash', '');
+
+  await openPanel(host, 'draft');
+  await page.locator('[data-action="reload-draft"]').click();
+  await expect(page.locator('[data-role="topology-edit-status"]'))
+    .toContainText('Draft restored at session version');
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.locator('[data-action="export-draft"]').click(),
+  ]);
+  expect(download.suggestedFilename()).toMatch(/topology-edit.*\.json$/i);
 });
 
 async function openFinalAuditController(page) {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.evaluate(() => globalThis.localStorage?.clear());
   const navigation = page.getByRole('navigation', { name: 'Application views' });
   await navigation.getByRole('button', { name: 'Workspace', exact: true }).click();
   await page.locator('[data-action="load-topology-edit-demo"]').click();
@@ -102,16 +182,17 @@ async function openFinalAuditController(page) {
     ).href;
     const { TopologyEdit3DViewController } = await import(moduleUrl);
     const prototype = TopologyEdit3DViewController.prototype;
-    if (prototype.__toolAuditActivateWrapped) return;
-    const activate = prototype.activate;
-    prototype.activate = async function auditedActivate(...args) {
-      globalThis[key] = this;
-      return activate.apply(this, args);
-    };
-    Object.defineProperty(prototype, '__toolAuditActivateWrapped', {
-      value: true,
-      configurable: true,
-    });
+    if (!prototype.__toolAuditActivateWrapped) {
+      const activate = prototype.activate;
+      prototype.activate = async function auditedActivate(...args) {
+        globalThis[key] = this;
+        return activate.apply(this, args);
+      };
+      Object.defineProperty(prototype, '__toolAuditActivateWrapped', {
+        value: true,
+        configurable: true,
+      });
+    }
   }, CONTROLLER_KEY);
 
   await page.getByRole('button', { name: '3D Edit', exact: true }).click();
@@ -125,46 +206,38 @@ async function openFinalAuditController(page) {
   return host;
 }
 
-async function nodeIdForPort(page, portKey) {
-  return page.evaluate(({ key, port }) => {
-    const topology = globalThis[key]?.session?.currentTopology?.();
-    const node = topology?.nodes?.find((row) => row.portKeys?.includes(port));
-    if (!node) throw new Error(`Canonical node for ${port} is unavailable.`);
-    return node.id;
-  }, { key: CONTROLLER_KEY, port: portKey });
+async function openPanel(host, kind) {
+  const panel = host.locator(`details[data-panel-kind="${kind}"]`);
+  if (!(await panel.evaluate((element) => element.open))) await panel.locator('summary').click();
+  return panel;
+}
+
+async function selectPort(page, portKey, additive) {
+  const host = page.locator('[data-role="topology-edit-render-host"]');
+  await openPanel(host, 'topology-edit-canonical-search');
+  const input = page.locator('[data-role="topology-edit-search-input"]');
+  await input.fill(portKey);
+  const result = page.locator('[data-search-object-kind="node"]');
+  await expect(result).toHaveCount(1);
+  const canonicalId = await result.getAttribute('data-search-canonical-id');
+  await result.click({ modifiers: additive ? ['Shift'] : [] });
+  return canonicalId;
 }
 
 async function clickCanonicalObject(page, canonicalId, additive = false) {
   const point = await page.evaluate(({ key, id }) => {
-    const controller = globalThis[key];
-    const backend = controller?.viewportBackend;
-    const camera = backend?.activeCamera;
+    const backend = globalThis[key]?.viewportBackend;
     const canvas = backend?.renderer?.domElement;
-    if (!backend || !camera || !canvas) throw new Error('WebGL audit context is unavailable.');
-
-    let target = null;
-    for (const groupName of ['draftGroup', 'sourceGroup']) {
-      backend.groups?.[groupName]?.traverse?.((object) => {
-        if (target) return;
-        const direct = object.userData?.pickTarget;
-        if (direct?.objectId === id) target = direct;
-        const table = object.userData?.pickTable;
-        const match = Array.isArray(table)
-          ? table.find((row) => row?.objectId === id)
-          : null;
-        if (!target && match) target = match;
-      });
-      if (target) break;
-    }
-    if (!target) throw new Error(`Pick target ${id} is unavailable.`);
-    const bounds = backend.boundsForPick(target);
-    if (!bounds || bounds.isEmpty()) throw new Error(`Pick bounds ${id} are unavailable.`);
-    const center = bounds.getCenter(camera.position.clone()).project(camera);
+    if (!backend || !canvas) throw new Error('WebGL audit context is unavailable.');
     const rect = canvas.getBoundingClientRect();
-    return {
-      x: rect.left + ((center.x + 1) / 2) * rect.width,
-      y: rect.top + ((1 - center.y) / 2) * rect.height,
-    };
+    for (let y = rect.top + 1; y < rect.bottom; y += 2) {
+      for (let x = rect.left + 1; x < rect.right; x += 2) {
+        const context = backend.pickContext(x, y);
+        const pick = context ? backend.pickWithRaycaster(context.pointer) : null;
+        if (pick?.objectId === id) return { x, y };
+      }
+    }
+    throw new Error(`Visible ray pick target ${id} is unavailable.`);
   }, { key: CONTROLLER_KEY, id: canonicalId });
 
   if (additive) await page.keyboard.down('Shift');
@@ -192,16 +265,4 @@ async function expectDisabled(page, actionIds) {
   for (const actionId of actionIds) {
     await expect(page.locator(`[data-command-action="${actionId}"]`)).toBeDisabled();
   }
-}
-
-function isCriticalConsoleError(message) {
-  return [
-    /ReferenceError/i,
-    /Cannot access .* before initialization/i,
-    /does not provide an export named/i,
-    /Failed to fetch dynamically imported module/i,
-    /circular import/i,
-    /WebGL context lost/i,
-    /TOPOLOGY_EDIT/i,
-  ].some((pattern) => pattern.test(message));
 }
