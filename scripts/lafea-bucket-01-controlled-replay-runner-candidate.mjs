@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -8,15 +7,15 @@ import {
 } from '../src/workspace/lafea-bucket-01-independent-candidate-verification.js';
 import { canonicalLafeaSha256 } from '../src/workspace/lafea-canonical-sha256.js';
 import {
-  firstHash,
-  git,
-  rawHashFile,
   receipt,
   runNodeStageRetained,
-  writeHashedJson,
   writeJson,
 } from './lafea-bucket-01-controlled-replay-support.mjs';
-import { descriptor, envelope } from './lafea-bucket-01-controlled-replay-runner-paths.mjs';
+import {
+  descriptor,
+  envelope,
+  runnerError,
+} from './lafea-bucket-01-controlled-replay-runner-paths.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
