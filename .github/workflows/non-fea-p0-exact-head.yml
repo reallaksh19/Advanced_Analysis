@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/non-fea-p0-exact-head.yml'
       - 'e2e/non-fea-p0-current-main-baseline.spec.js'
+      - 'scripts/authorized-enrichment-consumer-controller-check.mjs'
       - 'scripts/non-fea-baseline/**'
       - 'scripts/run-non-fea-current-main-baseline.mjs'
       - 'src/workspace/non-fea-p0-observability.js'
@@ -15,6 +16,7 @@ on:
     paths:
       - '.github/workflows/non-fea-p0-exact-head.yml'
       - 'e2e/non-fea-p0-current-main-baseline.spec.js'
+      - 'scripts/authorized-enrichment-consumer-controller-check.mjs'
       - 'scripts/non-fea-baseline/**'
       - 'scripts/run-non-fea-current-main-baseline.mjs'
       - 'src/workspace/non-fea-p0-observability.js'
@@ -82,6 +84,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          node --check scripts/authorized-enrichment-consumer-controller-check.mjs
+          node scripts/run-authorized-enrichment-consumer-controller-checks.mjs
           node --check src/workspace/non-fea-p0-observability.js
           node --check src/workspace/three-viewport-scene.js
           node --check e2e/non-fea-p0-current-main-baseline.spec.js

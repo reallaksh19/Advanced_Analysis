@@ -70,62 +70,33 @@ const sourceValue = {
 };
 const sourceText = JSON.stringify(sourceValue);
 const runtimeState = makeRuntimeState();
-const stagedResult = await controller.downloadStagedJson({
-  schema: AUTHORIZED_STAGED_JSON_CONSUMER_REQUEST_SCHEMA,
-  operationId: 'STAGED-OP-P19',
-  sidecar: makeSidecar(),
-  source: {
-    sourceId: 'SOURCE-P19',
-    fileName: 'source.sjson.json',
-    sha256: await sha256Utf8(sourceText),
-    byteLength: new TextEncoder().encode(sourceText).byteLength,
-    text: sourceText,
-  },
-  mapping: {
-    sourceRecordIdField: 'id',
-    targetIdField: 'targetId',
-    lineKeyField: 'lineKey',
-    attributesField: 'attributes',
-    childrenField: 'children',
-  },
-  formatting: { indent: 2, newline: '\n', terminalNewline: true },
-  outputFileName: 'source.enriched.sjson.json',
-  writeId: 'WRITE-P19',
-  writtenAt: '2026-08-03T01:47:00.000Z',
-  downloadId: 'DOWNLOAD-P19',
-  triggeredAt: '2026-08-03T01:48:00.000Z',
-}, runtimeState.documentRef, runtimeState.runtime);
+const sourceSha256 = await sha256Utf8(sourceText);
+const stagedRequest = makeStagedRequest(sourceText, sourceSha256);
+const stagedResult = await controller.downloadStagedJson(
+  stagedRequest,
+  runtimeState.documentRef,
+  runtimeState.runtime,
+);
 assert.deepEqual(requireAuthorizedStagedJsonConsumerResult(stagedResult), stagedResult);
 assert.equal(stagedResult.operationId, 'STAGED-OP-P19');
 assert.equal(stagedResult.projectId, 'PROJECT-P19');
 assert.equal(stagedResult.status, 'TRIGGERED');
 assert.equal(stagedResult.fileName, 'source.enriched.sjson.json');
 assert.equal(stagedResult.sha256, await sha256Utf8(runtimeState.blobs[0].parts[0]));
-assert.equal(stagedResult.byteLength, new TextEncoder().encode(runtimeState.blobs[0].parts[0]).byteLength);
+assert.equal(
+  stagedResult.byteLength,
+  new TextEncoder().encode(runtimeState.blobs[0].parts[0]).byteLength,
+);
 assert.equal(runtimeState.anchor.clickCount, 1);
 assert.deepEqual(runtimeState.revokedUrls, ['blob:authorized-enrichment-p19']);
 assert.equal(Object.isFrozen(stagedResult), true);
 
 const repeatedState = makeRuntimeState();
-const repeated = await controller.downloadStagedJson({
-  schema: AUTHORIZED_STAGED_JSON_CONSUMER_REQUEST_SCHEMA,
-  operationId: 'STAGED-OP-P19',
-  sidecar: makeSidecar(),
-  source: {
-    sourceId: 'SOURCE-P19', fileName: 'source.sjson.json',
-    sha256: await sha256Utf8(sourceText),
-    byteLength: new TextEncoder().encode(sourceText).byteLength,
-    text: sourceText,
-  },
-  mapping: {
-    sourceRecordIdField: 'id', targetIdField: 'targetId', lineKeyField: 'lineKey',
-    attributesField: 'attributes', childrenField: 'children',
-  },
-  formatting: { indent: 2, newline: '\n', terminalNewline: true },
-  outputFileName: 'source.enriched.sjson.json',
-  writeId: 'WRITE-P19', writtenAt: '2026-08-03T01:47:00.000Z',
-  downloadId: 'DOWNLOAD-P19', triggeredAt: '2026-08-03T01:48:00.000Z',
-}, repeatedState.documentRef, repeatedState.runtime);
+const repeated = await controller.downloadStagedJson(
+  stagedRequest,
+  repeatedState.documentRef,
+  repeatedState.runtime,
+);
 assert.deepEqual(repeated, stagedResult, 'consumer operation must be deterministic');
 
 const tampered = { ...stagedResult, fileName: 'tampered.json' };
@@ -159,13 +130,24 @@ console.log(JSON.stringify({
 function makeRuntimeState() {
   const state = { blobs: [], revokedUrls: [], anchor: null };
   class FakeBlob {
-    constructor(parts, options) { this.parts = parts; this.options = options; state.blobs.push(this); }
+    constructor(parts, options) {
+      this.parts = parts;
+      this.options = options;
+      state.blobs.push(this);
+    }
   }
   state.anchor = {
-    href: '', download: '', clickCount: 0,
+    href: '',
+    download: '',
+    clickCount: 0,
     click() { this.clickCount += 1; },
   };
-  state.documentRef = { createElement(tag) { assert.equal(tag, 'a'); return state.anchor; } };
+  state.documentRef = {
+    createElement(tag) {
+      assert.equal(tag, 'a');
+      return state.anchor;
+    },
+  };
   state.runtime = {
     BlobCtor: FakeBlob,
     createObjectURL() { return 'blob:authorized-enrichment-p19'; },
@@ -183,4 +165,130 @@ function makeAuthorizedInput() {
     baselineRevision: 1,
     baselineSemanticHash: 'fnv1a64:1111111111111111',
     readinessEvaluationSemanticHash: 'fnv1a64:2222222222222222',
-    readinessSemanticHash: 'fnv1a64:333333333333332rÀ¢†æFöfe6VÖçF–4†6ƒ¢vfçccC£CCCCCCCCCCCCCCCBrÀ¢&ö¦V7F–öå–ÆöE6VÖçF–4†6ƒ¢vfçccC£SSSSSSSSSSSSSSSRrÀ¢FFW%fW'6–öã¢vV×—&–6ÂÖFFW"óããrÀ¢6öæf–wW&F–öä†6ƒ¢vfçccC£cccccccccccccccbrÀ¢7&VFVDC¢s##bÓ‚Ó5C£CC£ã¢rÀ¢Æ–æT&–æF–æw3¢·°¢F&vWD–C¢tÄ”äS¥3rÂ6÷W&6U&V6÷&D–C¢u3rÂÆ–æT¶W“¢u3rÀ¢&ö¦V7F–öå&V6÷&E6VÖçF–4†6ƒ¢vfçccC£sssssssssssssssrrÀ¢ÕÒÀ¢6ö×öæVçD&–æF–æw3¢·°¢F&vWD–C¢t4ôÕôäTåC¤3rÂ6÷W&6U&V6÷&D–C¢t3rÂÆ–æT¶W“¢u3rÀ¢6FÆöt¶W“¢t5bÓrÂ&ö¦V7F–öå&V6÷&E6VÖçF–4†6ƒ¢vfçccC£ƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒ‚rÀ¢ÕÒÀ¢ÆöD6Æ7VÆF–öä÷fW&Æ“¢°¢—U6V7F–öå&÷W'F–W3¢°¢3¢²÷WG6–FTF–ÖWFW$ÖÓ¢ÂvÆÅF†–6¶æW74ÖÓ¢RÂÖFW&–Ä6öFS¢tÔBÓrÂ–ç7VÆF–öä6öFS¢çVÆÂÂ–ç7VÆF–öåF†–6¶æW74ÖÓ¢ÒÀ¢ÒÀ¢ÖFW&–ÄFVç6—F–W4¶uW$Ó3¢²tÔBÓs¢sƒSÒÀ¢÷W&F–ætfÇV–DFVç6—F–W4¶uW$Ó3¢²3¢ƒÒÀ¢‡–G&ôfÇV–DFVç6—F–W4¶uW$Ó3¢²3¢ÒÀ¢–ç7VÆF–öäFVç6—F–W4¶uW$Ó3¢·ÒÀ¢6ö×öæVçEvV–v‡G4¶s¢²t5bÓs¢ÒÀ¢ÒÀ¢÷fW&Æ•6VÖçF–4†6ƒ¢rrÀ¢7VÖÖ'“¢°¢Æ–æT6÷VçC¢Â6ö×öæVçD6÷VçC¢ÂÖFW&–Ä6öFT6÷VçC¢À¢–ç7VÆF–öä6öFT6÷VçC¢Â6ö×öæVçD6FÆöt6÷VçC¢À¢ÒÀ¢6VÖçF–4†6ƒ¢vfçccC£rÀ¢Ó°¢G&gBæ÷fW&Æ•6VÖçF–4†6‚Ò6VÖçF–4†6‚†G&gBæÆöD6Æ7VÆF–öä÷fW&Æ’“°¢G&gBç6VÖçF–4†6‚Ò6ö×WFTWF†÷&—¦VDV×—&–6ÄÆöD–çWE6VÖçF–4†6‚†G&gB“°¢&WGW&âG&gC°§Ð ¦gVæ7F–öâÖ¶U6–FV6"‚’°¢6öç7BVçG'”G&gBÒ°¢66†VÖ¢UD„õ$•¤TEõ5DtTEô¥4ôåôTåE%•õ44„TÔÀ¢F&vWD–C¢tÄ”äS¥3rÂF&vWD¶–æC¢tÄ”äRrÂ6÷W&6U&V6÷&D–C¢u3rÂÆ–æT¶W“¢u3rÀ¢GG&–'WFW3¢²Æ–æTW‡÷'DÆ&VÃ¢tÄ”äRÕ3rÒÀ¢&ö¦V7F–öå&V6÷&E6VÖçF–4†6ƒ¢vfçccC¦rÀ¢6VÖçF–4†6ƒ¢vfçccC£rÀ¢Ó°¢6öç7BVçG'’Ò²ââæVçG'”G&gBÂ6VÖçF–4†6ƒ¢6ö×WFU7FvVD§6öå6–FV6$VçG'•6VÖçF–4†6‚†VçG'”G&gB’Ó°¢6öç7BG&gBÒ°¢66†VÖ¢UD„õ$•¤TEõ5DtTEô¥4ôåõ4”DT4%õ44„TÔÀ¢6–FV6$–C¢u4”DT4"Õ’rÂ&ö¦V7D–C¢u$ô¤T5BÕ’rÂ&6VÆ–æT–C¢t$4RÕ’rÂ&6VÆ–æU&Wf—6–öã¢À¢&6VÆ–æU6VÖçF–4†6ƒ¢vfçccC¦&&&&&&&&&&&&&&&"rÀ¢&VF–æW74WfÇVF–öå6VÖçF–4†6ƒ¢vfçccC¦6666666666666662rÀ¢&VF–æW756VÖçF–4†6ƒ¢vfçccC¦FFFFFFFFFFFFFFFBrÀ¢†æFöfe6VÖçF–4†6ƒ¢vfçccC¦VVVVVVVVVVVVVVVRrÀ¢&ö¦V7F–öå–ÆöE6VÖçF–4†6ƒ¢vfçccC¦fffffffffffffffbrÀ¢FFW%fW'6–öã¢w7FvVBÖ§6öâÖFFW"óããrÀ¢6öæf–wW&F–öä†6ƒ¢vfçccC£#3CScsƒ“&6FVbrÀ¢7&VFVDC¢s##bÓ‚Ó5C£C3£ã¢rÀ¢VçG&–W3¢¶VçG'•ÒÀ¢7VÖÖ'“¢²VçG'”6÷VçC¢ÂÆ–æTVçG'”6÷VçC¢Â6ö×öæVçDVçG'”6÷VçC¢ÂGG&–'WFT6÷VçC¢ÒÀ¢6VÖçF–4†6ƒ¢vfçccC£rÀ¢Ó°¢&WGW&â²ââæG&gBÂ6VÖçF–4†6ƒ¢6ö×WFTWF†÷&—¦VE7FvVD§6öå6–FV6%6VÖçF–4†6‚†G&gB’Ó°§Ð
+    readinessSemanticHash: 'fnv1a64:3333333333333333',
+    handoffSemanticHash: 'fnv1a64:4444444444444444',
+    projectionPayloadSemanticHash: 'fnv1a64:5555555555555555',
+    adapterVersion: 'empirical-adapter/1.0.0',
+    configurationHash: 'fnv1a64:6666666666666666',
+    createdAt: '2026-08-03T01:44:00.000Z',
+    lineBindings: [{
+      targetId: 'line:001',
+      sourceRecordId: 'src-line-001',
+      lineKey: 'L-1',
+      projectionRecordSemanticHash: 'fnv1a64:7777777777777777',
+    }],
+    componentBindings: [{
+      targetId: 'component:001',
+      sourceRecordId: 'src-component-001',
+      lineKey: 'L-1',
+      catalogKey: 'CV-1',
+      projectionRecordSemanticHash: 'fnv1a64:8888888888888888',
+    }],
+    loadCalculationOverlay: {
+      pipeSectionProperties: {
+        'L-1': {
+          outsideDiameterMm: 100,
+          wallThicknessMm: 5,
+          materialCode: 'MAT-1',
+          insulationCode: 'INS-1',
+          insulationThicknessMm: 10,
+        },
+      },
+      materialDensitiesKgPerM3: { 'MAT-1': 7850 },
+      operatingFluidDensitiesKgPerM3: { 'L-1': 800 },
+      hydroFluidDensitiesKgPerM3: { 'L-1': 1000 },
+      insulationDensitiesKgPerM3: { 'INS-1': 120 },
+      componentWeightsKg: { 'CV-1': 10 },
+    },
+    overlaySemanticHash: '',
+    summary: {
+      lineCount: 1,
+      componentCount: 1,
+      materialCodeCount: 1,
+      insulationCodeCount: 1,
+      componentCatalogCount: 1,
+    },
+    semanticHash: 'fnv1a64:0000000000000000',
+  };
+  draft.overlaySemanticHash = semanticHash(draft.loadCalculationOverlay);
+  draft.semanticHash = computeAuthorizedEmpiricalLoadInputSemanticHash(draft);
+  return draft;
+}
+
+function makeStagedRequest(text, sourceSha256) {
+  return {
+    schema: AUTHORIZED_STAGED_JSON_CONSUMER_REQUEST_SCHEMA,
+    operationId: 'STAGED-OP-P19',
+    sidecar: makeSidecar(),
+    source: {
+      sourceId: 'SOURCE-P19',
+      fileName: 'source.sjson.json',
+      sha256: sourceSha256,
+      byteLength: new TextEncoder().encode(text).byteLength,
+      text,
+    },
+    mapping: {
+      sourceRecordIdField: 'id',
+      targetIdField: 'targetId',
+      lineKeyField: 'lineKey',
+      attributesField: 'attributes',
+      childrenField: 'children',
+    },
+    formatting: { indent: 2, newline: '\n', terminalNewline: true },
+    outputFileName: 'source.enriched.sjson.json',
+    writeId: 'WRITE-P19',
+    writtenAt: '2026-08-03T01:47:00.000Z',
+    downloadId: 'DOWNLOAD-P19',
+    triggeredAt: '2026-08-03T01:48:00.000Z',
+  };
+}
+
+function makeSidecar() {
+  const entries = [makeEntry({
+    targetId: 'LINE:S100',
+    targetKind: 'LINE',
+    sourceRecordId: 'S100',
+    lineKey: 'S100',
+    attributes: { lineExportLabel: 'LINE-S100' },
+    projectionRecordSemanticHash: 'fnv1a64:7777777777777777',
+  })];
+  const draft = {
+    schema: AUTHORIZED_STAGED_JSON_SIDECAR_SCHEMA,
+    sidecarId: 'SIDECAR-P19',
+    projectId: 'PROJECT-P19',
+    baselineId: 'BASE-P19',
+    baselineRevision: 1,
+    baselineSemanticHash: 'fnv1a64:1111111111111111',
+    readinessEvaluationSemanticHash: 'fnv1a64:2222222222222222',
+    readinessSemanticHash: 'fnv1a64:3333333333333333',
+    handoffSemanticHash: 'fnv1a64:4444444444444444',
+    projectionPayloadSemanticHash: 'fnv1a64:5555555555555555',
+    adapterVersion: 'staged-json-adapter/1.0.0',
+    configurationHash: 'fnv1a64:6666666666666666',
+    createdAt: '2026-08-03T01:44:00.000Z',
+    entries,
+    summary: {
+      entryCount: 1,
+      lineEntryCount: 1,
+      componentEntryCount: 0,
+      attributeCount: 1,
+    },
+    semanticHash: 'fnv1a64:0000000000000000',
+  };
+  return {
+    ...draft,
+    semanticHash: computeAuthorizedStagedJsonSidecarSemanticHash(draft),
+  };
+}
+
+function makeEntry(value) {
+  const draft = {
+    schema: AUTHORIZED_STAGED_JSON_ENTRY_SCHEMA,
+    ...value,
+    semanticHash: 'fnv1a64:0000000000000000',
+  };
+  return {
+    ...draft,
+    semanticHash: computeStagedJsonSidecarEntrySemanticHash(draft),
+  };
+}
