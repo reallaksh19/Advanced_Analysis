@@ -15,19 +15,21 @@ import { NON_FEA_P0_COMMANDS, runNonFeaP0Command } from './non-fea-baseline/comm
 import { summarizeNonFeaStages } from './non-fea-baseline/statistics.mjs';
 import { parseNonFeaBaselineArguments } from './non-fea-baseline/runner-options.mjs';
 import { resolveNonFeaFixtureRoleBindings } from './non-fea-baseline/fixture-role-bindings.mjs';
+import { nonFeaFixtureExecutionPaths } from './non-fea-baseline/fixture-authority-manifest.mjs';
 import { executeNonFeaFixtureSample } from './non-fea-baseline/fixture-sample-runner.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const options = parseNonFeaBaselineArguments(process.argv.slice(2));
 const exactHeadSha = gitValue(['rev-parse', 'HEAD']);
-const programmeBaseSha = gitValue(['merge-base', 'HEAD', 'main']) || '7a6cfadb2c898ddac8cb2dba09b7d400ff800696';
+const programmeBaseSha = gitValue(['merge-base', 'HEAD', 'main']) || 'e7eebe4a911050d1cb64d3a57fac33e53752795e';
 const executionId = options.executionId || `p0-${exactHeadSha.slice(0, 12) || 'unknown'}`;
 const failures = [];
 const fixtureRuns = [];
 const fixtureLedger = [];
 assertNonFeaRouteInventory();
 
-for (const fixture of options.fixtures) {
+const fixturePaths = nonFeaFixtureExecutionPaths(options.fixtures, options.fixtureRoles);
+for (const fixture of fixturePaths) {
   const fixturePath = path.resolve(ROOT, fixture);
   const repositoryPath = normalizePath(path.relative(ROOT, fixturePath));
   let metadata;
@@ -54,7 +56,7 @@ for (const fixture of options.fixtures) {
     ...metadata,
     sourceSha256: cold.fixture.sourceSha256,
     declaredUse: ['normalization', 'support-sites', 'route-partition', 'resolved-geometry', 'render-model'],
-    realOrSimulated: 'REAL_REPOSITORY_FIXTURE',
+    realOrSimulated: 'REAL_REPOSITORY_OR_EXPLICIT_FIXTURE',
     expectedIdentity: cold.fixture.identity,
     authorityNotes: cold.fixture.authorityNotes,
   });
@@ -65,7 +67,7 @@ for (const fixture of options.fixtures) {
   }
 }
 
-const roleResolution = resolveNonFeaFixtureRoleBindings(options.fixtureRoles, fixtureLedger);
+const roleResolution = resolveNonFeaFixtureRoleBindings(options.fixtureRoles, fixtureLedger, fixtureRuns);
 failures.push(...roleResolution.failures);
 const commandRuns = options.runCommands ? NON_FEA_P0_COMMANDS.map((row) => runNonFeaP0Command(row, ROOT)) : [];
 if (!options.runCommands) failures.push(nonFeaFailure({
@@ -122,7 +124,7 @@ console.log(JSON.stringify({
   exactHeadSha: report.exactHeadSha,
   executionId: report.executionId,
   fixtureCount: report.fixtureLedger.length,
-  boundFixtureRoleCount: report.fixtureRoleBindings.filter((row) => row.status === 'BOUND').length,
+  verifiedFixtureRoleCount: report.fixtureRoleBindings.filter((row) => row.status === 'VERIFIED').length,
   runCount: report.fixtureRuns.length,
   failureCount: report.failures.length,
   output: options.output,
