@@ -6,7 +6,9 @@ import {
   createCanonicalFlangeHubGeometry,
   createFlangeHubLoadDefinition,
   createFlangeHubMesh,
+  createFlangeHubPathDefinitions,
   closedEndLameReference,
+  invertAxisymmetricQ8Mapping,
   prismaticAnnularAxialReference,
   verifyReversedEdgeInvariance,
 } from '../src/core/bucket-b/index.js';
@@ -51,6 +53,62 @@ test('BB-11 M0 mesh is deterministic and meets registered quality', () => {
   assert.ok(first.quality.maximumHotspotAspectRatio <= 5);
   assert.ok(first.quality.midsidePlacementResidual <= 1e-9);
   assert.equal(first.duplicateInterfaceNodes.length, 0);
+});
+
+test('BB-11 fixed paths invert below governed residual tolerance at M0 through M3', () => {
+  const geometry = createCanonicalFlangeHubGeometry();
+  const definitions = createFlangeHubPathDefinitions(geometry);
+  let targetedLargeHubSample = null;
+
+  for (const levelId of ['M0', 'M1', 'M2', 'M3']) {
+    const mesh = createFlangeHubMesh(levelId, geometry);
+    const nodesById = new Map(mesh.nodes.map((node) => [node.nodeId, node]));
+    const elementRows = mesh.elements.map((element) => ({
+      ...element,
+      nodes: element.nodeIds.map((nodeId) => nodesById.get(nodeId)),
+    }));
+
+    definitions.paths.forEach((path) => path.points.forEach((point, pointIndex) => {
+      const recoveries = elementRows
+        .filter((element) => path.expectedBlockIds.includes(element.blockId))
+        .filter((element) => pointInElementBoundingBox(point, element.nodes))
+        .map((element) => ({
+          element,
+          inverse: invertAxisymmetricQ8Mapping(element.nodes, point, { tolerance: 1e-11 }),
+        }))
+        .filter(({ inverse }) => inverse.converged
+          && Math.abs(inverse.xi) <= 1 + 1e-9
+          && Math.abs(inverse.eta) <= 1 + 1e-9);
+
+      assert.ok(
+        recoveries.length > 0,
+        `${levelId}:${path.pathId}:S${String(pointIndex + 1).padStart(2, '0')} has no governed containing element`,
+      );
+      const selected = recoveries.sort((left, right) => (
+        naturalMargin(right.inverse) - naturalMargin(left.inverse)
+        || left.element.elementId.localeCompare(right.element.elementId)
+      ))[0];
+      const corners = selected.element.nodes.slice(0, 4);
+      const probeH = Math.max(...corners.map((node, index) => (
+        pointDistance(node, corners[(index + 1) % 4])
+      )));
+      const acceptance = Math.max(1e-10, 1e-10 * probeH);
+      assert.ok(
+        selected.inverse.mappingResidual <= acceptance,
+        `${levelId}:${path.pathId}:S${String(pointIndex + 1).padStart(2, '0')} residual ${selected.inverse.mappingResidual} exceeds ${acceptance}`,
+      );
+      if (levelId === 'M3' && path.pathId === 'SCL-HUB-LARGE' && pointIndex === 13) {
+        targetedLargeHubSample = {
+          elementId: selected.element.elementId,
+          residual: selected.inverse.mappingResidual,
+          acceptance,
+        };
+      }
+    }));
+  }
+
+  assert.ok(targetedLargeHubSample, 'M3 SCL-HUB-LARGE:S14 regression was not executed');
+  assert.ok(targetedLargeHubSample.residual <= targetedLargeHubSample.acceptance);
 });
 
 test('BB-11 load definitions preserve sign and reversed-edge invariance', () => {
@@ -170,3 +228,18 @@ test('BB-11 registry rejects direct caller state', () => {
     /state.*authority/i,
   );
 });
+
+function pointInElementBoundingBox(point, nodes) {
+  const radii = nodes.map((node) => node.r);
+  const axial = nodes.map((node) => node.z);
+  return point.r >= Math.min(...radii) - 1e-9
+    && point.r <= Math.max(...radii) + 1e-9
+    && point.z >= Math.min(...axial) - 1e-9
+    && point.z <= Math.max(...axial) + 1e-9;
+}
+function naturalMargin(inverse) {
+  return Math.min(1 - Math.abs(inverse.xi), 1 - Math.abs(inverse.eta));
+}
+function pointDistance(left, right) {
+  return Math.hypot(left.r - right.r, left.z - right.z);
+}
