@@ -25,30 +25,31 @@ test('production Sjson opens 3D Edit with typed inline geometry and support over
   await expect(page.locator('[data-role="tree-error"]')).toBeHidden();
 
   await page.getByRole('button', { name: '3D Edit', exact: true }).click();
-  const host = page.locator('[data-role="topology-edit-render-host"]');
-  await expect(host).toBeVisible({ timeout: 60_000 });
-  await expect(host).toHaveAttribute('data-topology-edit-clean-shell', 'true');
-  await expect(host.locator('.topology-edit-3d-canvas canvas')).toHaveCount(1);
+  const shell = page.locator('[data-role="topology-edit-render-host"]');
+  const canvasHost = shell.locator('[data-role="topology-edit-canvas-mount"]');
+  await expect(shell).toBeVisible({ timeout: 60_000 });
+  await expect(shell).toHaveAttribute('data-topology-edit-clean-shell', 'true');
+  await expect(canvasHost.locator('canvas')).toHaveCount(1);
 
-  await expect.poll(() => integerAttribute(host, 'data-topology-edit-typed-primitive-count'), {
+  await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-typed-primitive-count'), {
     timeout: 60_000,
   }).toBeGreaterThan(0);
-  await expect.poll(() => integerAttribute(host, 'data-topology-edit-flange-primitive-count'), {
+  await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-flange-primitive-count'), {
     timeout: 60_000,
   }).toBeGreaterThan(0);
-  await expect.poll(() => integerAttribute(host, 'data-topology-edit-valve-primitive-count'), {
+  await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-valve-primitive-count'), {
     timeout: 60_000,
   }).toBeGreaterThan(0);
-  await expect.poll(() => integerAttribute(host, 'data-topology-edit-support-overlay-count'), {
+  await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-support-overlay-count'), {
     timeout: 60_000,
   }).toBeGreaterThan(0);
-  await expect.poll(() => integerAttribute(host, 'data-topology-edit-resolved-support-origin-count'), {
+  await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-resolved-support-origin-count'), {
     timeout: 60_000,
   }).toBeGreaterThan(0);
 
   const bodyText = await page.locator('body').innerText();
   expect(bodyText).not.toContain('TopologyEditCanonicalId:');
-  await expect(host.locator('[data-role="topology-edit-status"]')).toContainText(/nodes, .*edges, .*supports/u);
+  await expect(shell.locator('[data-role="topology-edit-status"]')).toContainText(/nodes, .*edges, .*supports/u);
 });
 
 async function integerAttribute(locator, name) {
