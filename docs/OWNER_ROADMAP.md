@@ -973,3 +973,65 @@ acceptance oracle is a real self-consistency proof (global equilibrium
 of recovered reactions vs. applied gravity load, full fixture coverage,
 new inheritance tests) rather than a table match — the actual
 cross-check against CAESAR II happens once the user's results arrive.
+
+### M020 redirected: 1885Sjson gravity-only → real BM1 CAESAR II fixture
+
+Before any implementation started on #553, user pointed at a stronger
+benchmark candidate: `benchmarks/LFEA/BM1/BM1_InputXML.xml`, a real,
+complete CAESAR II 14.00-native export (originally CAESAR II's own
+bundled example `1001-P`, then user-edited into a smaller `BM1_LEG`
+model) — not a topology-only file built by an external converter like
+#552's. User states they can extract full nodewise force/moment/SIF/
+K/stress reference data for it, and is actively iterating on the file
+directly on `main`. Asked via `AskUserQuestion` whether to redirect,
+run both, or pause M020 for a new BM1-only issue — user chose
+redirect.
+
+Ran `inputXmlToCanonicalGeometry` directly against the file (not just
+read the source) before rewriting the issue, and found real gaps #552
+never exercised: (1) BM1's own `<UNITS>` block is never read, and two
+BM1 revisions pulled minutes apart used *different* unit conventions
+for `EMOD` (`N./sq.mm.` vs `KPa`) — a fixed caller-supplied unit
+cannot be correct for both; (2) `RESTRAINT` `TYPE` codes in the file
+don't match the standard CAESAR II 1–62 table (`TYPE="17"` with
+`YCOSINE="1.0"` — inconsistent with `17`'s documented `-Y` meaning;
+`TYPE="7"`, not in the table at all); (3) `BEND` `ANGLE1` sometimes
+carries `-2.020200` (exactly `2×` the CAESAR sentinel) instead of a
+real angle, rejected today as `BEND_COMPOUND_MITER_NOT_SUPPORTED` on
+6 of 22 elements in the original file — confirmed this isn't just "no
+override" since a real `45.000000` angle appears alongside it in the
+same file; (4) `HANGER`/`SIF`/`ALLOWABLESTRESS` child elements aren't
+read anywhere in the adapter — the original file's real spring hangers
+came back silently `FREE` (physically wrong).
+
+User then supplied the exact real-world cause of gap (2) directly: a
+known, documented CAESAR export bug, for which **this repo already
+has a working, configurable fix that just isn't wired into the LFEA
+production path** — `src/calc-workspace/cii-standalone-port/core/
+restraint-type-mutation.js` (`mutateRestraintType`, default rows
+`+Y:17→14, LIM:7→8, GUI:10→9, X:1→2, Y:2→3, Z:3→5, 18→15` — matching
+BM1's observed codes exactly) plus its companion `restraint-type-
+codes.js` (the real 1–62 CAESAR II table, documented as mirroring a
+`3D_Converters` Python worker) and an existing settings UI
+(`xml-cii-adapted-config.js`, `inputXmlRestraintTypeMutation: {
+enabled, rows }`). Confirmed via `grep` this is never imported by
+`inputXmlToCanonicalGeometry.js` — the fix exists, it's just
+unreachable from the path BM1 needs. Rewrote #553's Part A to wire
+this existing mechanism in directly rather than have the agent
+re-derive a type map from scratch.
+
+#553 rewritten in place (kept as one issue, original 1885Sjson scope
+retained in a collapsed `<details>` block for history) rather than
+closed and re-opened, since no implementation had started. New scope:
+Part A closes all four format gaps (restraint-type-mutation wiring,
+UNITS-block consumption, bend-angle-sentinel investigation, HANGER/
+SIF/ALLOWABLESTRESS handling — check what the live file actually uses
+before over-building); Part B wires the real solve chain (M013/M018's
+B-1→B-2.5→B-3.0→B-3.3→B-3.4 plus the real B-4.0–B-4.2 code engine)
+against the live BM1 fixture, producing SUSTAINED/DISPLACEMENT_STRESS_
+RANGE reactions, displacements, member forces, and code-point stress
+— a fuller benchmark than #552's gravity-only scope, since BM1 has
+real declared thermal/pressure values #552's fixture mostly lacked.
+Explicitly instructed the agent to always read the live file from
+`main` at implementation time, not a snapshot, since the user is still
+actively editing it.
