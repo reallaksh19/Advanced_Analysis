@@ -32,7 +32,7 @@ for (const label of ['OPE', 'SUS', 'EXP']) {
   assert.equal(section.restraint.matched.length, 10, `${label} restraint matched count`);
   assert.deepEqual(section.restraint.unmatchedCiiNodes, []);
   assert.equal(section.globalForce.matched.length, 13, `${label} globalForce matched count`);
-  assert.deepEqual([...section.globalForce.unmatchedCiiPairs].sort(), [...UNMATCHED_BEND_PAIR_KEYS].sort());
+  assert.deepEqual([...section.globalForce.unmatchedPairKeys].sort(), [...UNMATCHED_BEND_PAIR_KEYS].sort());
 }
 
 /*
