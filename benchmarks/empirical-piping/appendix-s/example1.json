@@ -1,0 +1,12 @@
+{
+  "schema": "empirical-piping-appendix-s-example1/v1",
+  "classification": "BENCHMARK_REFERENCE",
+  "bend30FarReferenceDisplacementMm": 0.400,
+  "refinement": [
+    {"segmentsPer90":2,"bend30FarMm":1.174,"bend40FarMm":20.183,"n20ReactionErrorPercent":1.372},
+    {"segmentsPer90":4,"bend30FarMm":0.751,"bend40FarMm":19.556,"n20ReactionErrorPercent":0.628},
+    {"segmentsPer90":8,"bend30FarMm":0.646,"bend40FarMm":19.401,"n20ReactionErrorPercent":0.445},
+    {"segmentsPer90":16,"bend30FarMm":0.620,"bend40FarMm":19.363,"n20ReactionErrorPercent":0.400},
+    {"segmentsPer90":32,"bend30FarMm":0.613,"bend40FarMm":19.353,"n20ReactionErrorPercent":0.389}
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "schema": "empirical-piping-formula-register/v1",
+  "method": "EMPIRICAL_BEAM_CONTACT_V1",
+  "engineeringDocumentId": "EMP-PROD-05B-EBR-001",
+  "formulas": [
+    {"id":"EMP-SEC-001","class":"DIRECT_MECHANICS","quantity":"annular area","expression":"pi/4*(Do^2-Di^2)"},
+    {"id":"EMP-SEC-002","class":"DIRECT_MECHANICS","quantity":"second moment","expression":"pi/64*(Do^4-Di^4)"},
+    {"id":"EMP-SEC-003","class":"DIRECT_MECHANICS","quantity":"polar moment","expression":"2*I"},
+    {"id":"EMP-SEC-004","class":"DIRECT_MECHANICS","quantity":"elastic section modulus","expression":"2*I/Do"},
+    {"id":"EMP-WGT-001","class":"DERIVED_RELATION","quantity":"pipe mass per length","expression":"rho*A_weight"},
+    {"id":"EMP-WGT-002","class":"DERIVED_RELATION","quantity":"global line load","expression":"g*(mp+mf+mi+md)"},
+    {"id":"EMP-BM-001","class":"DIRECT_MECHANICS","quantity":"axial coefficient","expression":"EA/L"},
+    {"id":"EMP-BM-002","class":"DIRECT_MECHANICS","quantity":"bending coefficient","expression":"12EI/L^3"},
+    {"id":"EMP-BM-003","class":"DIRECT_MECHANICS","quantity":"bending coefficient","expression":"6EI/L^2"},
+    {"id":"EMP-BM-004","class":"DIRECT_MECHANICS","quantity":"bending coefficient","expression":"4EI/L"},
+    {"id":"EMP-BM-005","class":"DIRECT_MECHANICS","quantity":"bending coefficient","expression":"2EI/L"},
+    {"id":"EMP-THM-001","class":"DIRECT_MECHANICS","quantity":"thermal strain","expression":"alpha*DeltaT"},
+    {"id":"EMP-BND-010","class":"ADOPTED_EMPIRICAL","quantity":"elbow representation","expression":"8 equal-angle segments per 90 degrees"},
+    {"id":"EMP-CNT-001","class":"DIRECT_MECHANICS","quantity":"unilateral contact","expression":"R>=0,g>=0,Rg=0"},
+    {"id":"EMP-ACT-001","class":"DIRECT_MECHANICS","quantity":"member end actions","expression":"f=k*d-f0"},
+    {"id":"EMP-ACT-002","class":"DIRECT_MECHANICS","quantity":"internal moment field","expression":"M(x)=Mi+Vi*x-q*x^2/2 under declared q convention"},
+    {"id":"EMP-ACT-003","class":"DIRECT_MECHANICS","quantity":"station axial force","expression":"N=F dot t"},
+    {"id":"EMP-STR-001","class":"DERIVED_RELATION","quantity":"pressure force","expression":"P*Asf"},
+    {"id":"EMP-STR-002","class":"CODE_FORMULA","quantity":"sustained axial stress","expression":"Fsa/Asp","sourceStatus":"EDITION_DATASET_REQUIRED"},
+    {"id":"EMP-STR-003","class":"CODE_FORMULA","quantity":"sustained bending stress","expression":"hypot(Isi*Msi,Iso*Mso)/Z","sourceStatus":"EDITION_DATASET_REQUIRED"},
+    {"id":"EMP-STR-004","class":"CODE_FORMULA","quantity":"sustained torsional stress","expression":"Mt/(2Z)","sourceStatus":"EDITION_DATASET_REQUIRED"},
+    {"id":"EMP-STR-005","class":"CODE_FORMULA","quantity":"sustained longitudinal stress","expression":"hypot(abs(Ssa)+Ssb,2*Sst)","sourceStatus":"EDITION_DATASET_REQUIRED"}
+  ]
+}

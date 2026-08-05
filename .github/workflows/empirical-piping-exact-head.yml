@@ -1,0 +1,71 @@
+name: empirical-piping-exact-head
+
+on:
+  pull_request:
+    paths:
+      - 'src/core/empirical-piping-mechanics/**'
+      - 'src/core/empirical-support-frame-screen/**'
+      - 'benchmarks/empirical-piping/**'
+      - 'docs/empirical-piping-agent-qualification-and-work-pack.md'
+      - 'docs/empirical-piping-engineering-basis-and-benchmark.md'
+      - 'scripts/empirical-piping-*.mjs'
+      - '.github/workflows/empirical-piping-exact-head.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Prove exact-head execution
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          git diff --exit-code
+
+      - name: Enforce changed-path containment
+        shell: bash
+        run: |
+          git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" > /tmp/empirical-paths.txt
+          while IFS= read -r changed; do
+            case "$changed" in
+              src/core/empirical-piping-mechanics/*|src/core/empirical-support-frame-screen/*|benchmarks/empirical-piping/*|docs/empirical-piping-agent-qualification-and-work-pack.md|docs/empirical-piping-engineering-basis-and-benchmark.md|scripts/empirical-piping-*.mjs|.github/workflows/empirical-piping-exact-head.yml) ;;
+              *) echo "Forbidden changed path for this work-pack slice: $changed"; exit 1 ;;
+            esac
+          done < /tmp/empirical-paths.txt
+
+      - name: Source and benchmark isolation
+        run: node scripts/empirical-piping-source-boundary-check.mjs
+
+      - name: Closed-form mechanics
+        run: node scripts/empirical-piping-closed-form-check.mjs
+
+      - name: Contact and load-case decomposition
+        run: node scripts/empirical-piping-contact-check.mjs
+
+      - name: Member actions and bend station recovery
+        run: node scripts/empirical-piping-action-recovery-check.mjs
+
+      - name: Elbow convergence
+        run: node scripts/empirical-piping-elbow-convergence-check.mjs
+
+      - name: Table S302.6.3 sustained stress
+        run: node scripts/empirical-piping-s302.6.3-check.mjs
+
+      - name: Determinism
+        run: node scripts/empirical-piping-determinism-check.mjs
+
+      - name: Anti-drift mutations
+        run: node scripts/empirical-piping-anti-drift-check.mjs
