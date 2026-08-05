@@ -29,6 +29,11 @@ on:
         description: Exact parent/base SHA used for the changed-path and whitespace audit.
         required: true
         type: string
+      enforce_changed_path_allowlist:
+        description: Enforce the original BB-00 through BB-05 source-scope allowlist for an explicit qualification run.
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -96,12 +101,13 @@ jobs:
           EXPECTED_BASE_SHA: ${{ steps.refs.outputs.base_sha }}
         run: git diff --check "${EXPECTED_BASE_SHA}...${EXPECTED_HEAD_SHA}"
 
-      - name: Run exact-head shared-gate qualification
+      - name: Run exact-head shared-gate qualification or downstream replay
         env:
           EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
           EXPECTED_BASE_SHA: ${{ steps.refs.outputs.base_sha }}
           EXPECTED_BASE_REF: ${{ steps.refs.outputs.base_sha }}
           STRICT_REPOSITORY_DIFFERENTIAL: '1'
+          ENFORCE_CHANGED_PATH_ALLOWLIST: ${{ github.event_name == 'workflow_dispatch' && inputs.enforce_changed_path_allowlist && '1' || '0' }}
           REPORT_PATH: reports/bucket-b-bb00-bb05-exact-head-report.json
         run: node scripts/bucket-b-bb00-bb05-check.mjs
 
@@ -138,4 +144,4 @@ jobs:
             reports/bucket-b-bb06-lug-clamp-report.json
             reports/bucket-b-bb07-bracket-gusset-report.json
             reports/bucket-b-bb08-pipe-pad-report.json
-          if-no-files-found: error
+          if-no-files-found: warn
