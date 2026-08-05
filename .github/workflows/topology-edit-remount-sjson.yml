@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/topology-edit-remount-sjson.yml'
       - 'src/workspace/load-calc-consumer-controller.js'
+      - 'src/workspace/workspace-shell-controller.js'
       - 'src/workspace/tree-panel-events.js'
       - 'src/workspace/topology-edit-3d-professional-controller.js'
       - 'src/workspace/topology-edit-3d-sjson-fidelity-controller.js'
@@ -61,6 +62,7 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
           node --check src/workspace/load-calc-consumer-controller.js
+          node --check src/workspace/workspace-shell-controller.js
           node --check src/workspace/topology-edit-3d-sjson-fidelity-controller.js
           node --check src/workspace/topology-edit/topology-edit-sjson-visual-authority.js
           node --check src/workspace/topology-edit/topology-edit-sjson-tee-projection.js
@@ -70,6 +72,7 @@ jobs:
           node --check src/workspace/tree-panel-events.js
           node --check e2e/topology-edit-remount-sjson.spec.js
           node --check e2e/topology-edit-sjson-render-authority.spec.js
+          node --check e2e/topology-edit-clean-layout.spec.js
           git diff --check
 
       - name: Execute SJSON import and clean-shell remount qualification
