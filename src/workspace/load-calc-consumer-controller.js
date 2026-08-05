@@ -10,6 +10,9 @@ import {
   empiricalLoadCalcScenarioStore,
 } from './engineering-loads/empirical-load-calc-scenario-store.js';
 import {
+  empiricalResultOverlayStore,
+} from './engineering-loads/empirical-result-overlay-store.js';
+import {
   renderEmpiricalScenarioEvidence,
   renderEmpiricalScenarioLoadCases,
   renderEmpiricalScenarioMethods,
@@ -48,6 +51,12 @@ export class LoadCalcConsumerController {
       this.eventBus.subscribe(EMPIRICAL_LOAD_CALC_SCENARIO_EVENTS.CHANGED, ({ snapshot }) => {
         this.message = empiricalScenarioMessage(snapshot);
         this.render();
+      }),
+      this.eventBus.subscribe(EMPIRICAL_LOAD_CALC_SCENARIO_EVENTS.RESULT_OVERLAY_CHANGED, ({ snapshot, projection }) => {
+        this.topologyEdit3DController?.viewportBackend?.setGovernedResultProjection(
+          projection,
+          snapshot?.reasonCode || 'EMPIRICAL_EXECUTION_REQUIRED',
+        );
       }),
       this.eventBus.subscribe(EMPIRICAL_LOAD_CALC_SCENARIO_EVENTS.FAILED, ({ message }) => this.handleFailure(message)),
     ];
@@ -158,6 +167,7 @@ export class LoadCalcConsumerController {
         proposal: empiricalLoadCalcScenarioStore.getProposal(),
         authorization: empiricalLoadCalcScenarioStore.getAuthorization(),
         execution: empiricalLoadCalcScenarioStore.getExecution(),
+        overlaySnapshot: empiricalResultOverlayStore.getSnapshot(),
       };
       if (tab === 'overview') {
         renderEmpiricalScenarioOverview(pane, empiricalState);
@@ -200,7 +210,14 @@ export class LoadCalcConsumerController {
             return;
           }
         }
-        if (revision === this.renderRevision) this.topologyEdit3DController.renderPane(pane);
+        if (revision === this.renderRevision) {
+          const overlaySnapshot = empiricalResultOverlayStore.getSnapshot();
+          this.topologyEdit3DController.viewportBackend?.setGovernedResultProjection(
+            empiricalResultOverlayStore.getProjection(),
+            overlaySnapshot.reasonCode || 'EMPIRICAL_EXECUTION_REQUIRED',
+          );
+          this.topologyEdit3DController.renderPane(pane);
+        }
       } else {
         throw new RangeError(`Unknown Load Calc tab: ${tab}.`);
       }
