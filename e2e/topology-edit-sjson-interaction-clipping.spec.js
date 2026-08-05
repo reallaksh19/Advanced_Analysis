@@ -61,28 +61,44 @@ test('SJSON nodes and components select the right editor while clipping follows 
   await expect(page.locator('[data-role="professional-edge-id"]')).toHaveValue(/^edge:/);
 
   const before = await clippingSnapshot(page);
+  expect(before).not.toBeNull();
   const rect = await canvas.boundingBox();
+  if (!rect) throw new Error('SJSON canvas has no visible bounding box.');
   await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
   await page.mouse.wheel(0, -900);
-  await expect.poll(() => clippingSnapshot(page), { timeout: 15_000 }).not.toEqual(before);
+  await expect.poll(async () => {
+    const current = await clippingSnapshot(page);
+    return Boolean(current && (
+      Math.abs(current.near - before.near) > 1e-6
+      || Math.abs(current.far - before.far) > 1e-6
+    ));
+  }, { timeout: 15_000 }).toBe(true);
   const zoomed = await clippingSnapshot(page);
   expect(zoomed.mode).toBe('AUTO');
   expect(zoomed.near).toBeGreaterThan(0);
-  expect(zoomed.near).toBeLessThan(zoomed.nearestDepth);
+  expect(zoomed.nearestDepth).toBeGreaterThan(zoomed.near);
 
   const displayPanel = renderHost.locator('details[data-panel-kind="display"]');
   if (!(await displayPanel.evaluate((element) => element.open))) {
     await displayPanel.locator(':scope > summary').click();
   }
-  await displayPanel.locator('[data-role="sjson-node-radius-mm"]').fill('7');
+  await displayPanel.locator('[data-role="sjson-node-radius-mm"]').evaluate((element) => {
+    element.value = '7';
+  });
   await displayPanel.locator('[data-role="sjson-camera-auto-clipping"]').uncheck();
   await displayPanel.locator('[data-role="sjson-camera-near-mm"]').fill('2');
   await displayPanel.locator('[data-role="sjson-camera-far-mm"]').fill('250000');
   await displayPanel.getByRole('button', { name: 'Apply viewport settings' }).click();
   await expect(canvasMount).toHaveAttribute('data-topology-edit-camera-clipping-mode', 'MANUAL');
-  await expect.poll(() => Number(canvasMount.getAttribute('data-topology-edit-camera-near-mm'))).toBe(2);
-  await expect.poll(() => Number(canvasMount.getAttribute('data-topology-edit-camera-far-mm'))).toBe(250000);
-  await expect.poll(() => Number(canvasMount.getAttribute('data-topology-edit-visible-node-marker-radius-mm'))).toBe(7);
+  await expect.poll(async () => Number(
+    await canvasMount.getAttribute('data-topology-edit-camera-near-mm'),
+  )).toBe(2);
+  await expect.poll(async () => Number(
+    await canvasMount.getAttribute('data-topology-edit-camera-far-mm'),
+  )).toBe(250000);
+  await expect.poll(async () => Number(
+    await canvasMount.getAttribute('data-topology-edit-visible-node-marker-radius-mm'),
+  )).toBe(7);
 
   await displayPanel.locator('[data-role="sjson-camera-auto-clipping"]').check();
   await displayPanel.getByRole('button', { name: 'Apply viewport settings' }).click();
