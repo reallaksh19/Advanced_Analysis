@@ -104,7 +104,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sha256sum reports/bm2-consolidated-latest-output.json > /tmp/m031-bm2-report.sha256
+          sha256sum \
+            reports/bm2-consolidated-latest-output.json \
+            reports/bm2-nonfriction-linear-fea-out-of-tolerance.json \
+            reports/bm2-nonfriction-linear-fea-out-of-tolerance.csv \
+            > /tmp/m031-bm2-report.sha256
           node scripts/lfea-bm2-consolidated-latest-output-check.mjs --write > /tmp/m031-bm2-consolidated-replay.log
           sha256sum --check /tmp/m031-bm2-report.sha256
 
@@ -114,6 +118,8 @@ jobs:
           name: m031-bm2-qualified-${{ env.TARGET_HEAD_SHA }}
           path: |
             reports/bm2-consolidated-latest-output.json
+            reports/bm2-nonfriction-linear-fea-out-of-tolerance.json
+            reports/bm2-nonfriction-linear-fea-out-of-tolerance.csv
             /tmp/m031-bm2-qualified.log
             /tmp/m031-bm2-consolidated.log
             /tmp/m031-bm2-report.sha256
