@@ -18,7 +18,10 @@ concurrency:
 
 jobs:
   contracts-and-bridge:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.base.ref == 'main'
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      startsWith(github.head_ref, 'agent/lafea-nc00-') ||
+      startsWith(github.head_ref, 'agent/lafea-nc-solver-')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
