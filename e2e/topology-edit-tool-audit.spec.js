@@ -269,6 +269,36 @@ async function visibleSelectionTargets(page) {
   }, CONTROLLER_KEY);
 }
 
+async function currentVisiblePointForCanonicalId(page, target) {
+  return page.evaluate(({ key, canonicalId, preferredPoint }) => {
+    const backend = globalThis[key]?.viewportBackend;
+    const canvas = backend?.renderer?.domElement;
+    if (!backend || !canvas) throw new Error('Current production picking context is unavailable.');
+    const rect = canvas.getBoundingClientRect();
+    const candidates = [];
+    if (Number.isFinite(preferredPoint?.x) && Number.isFinite(preferredPoint?.y)) {
+      candidates.push(preferredPoint);
+    }
+    for (let y = rect.top + 1; y < rect.bottom; y += 3) {
+      for (let x = rect.left + 1; x < rect.right; x += 3) {
+        candidates.push({ x, y });
+      }
+    }
+    for (const point of candidates) {
+      const context = backend.pickContext(point.x, point.y);
+      const direct = context ? backend.pickWithRaycaster(context.pointer) : null;
+      if (direct?.objectId !== canonicalId) continue;
+      const production = backend.pickAt(point.x, point.y);
+      if (production?.objectId === canonicalId) return point;
+    }
+    throw new Error(`Current projection cannot resolve ${canonicalId} through both direct and production picking.`);
+  }, {
+    key: CONTROLLER_KEY,
+    canonicalId: target.id,
+    preferredPoint: target.point,
+  });
+}
+
 async function canonicalNodeForPort(page, portKey) {
   return page.evaluate(({ key, port }) => {
     const node = globalThis[key]?.session?.currentTopology?.()?.nodes
@@ -354,15 +384,20 @@ async function selectBySearch(page, host, canonicalId, additive = false) {
 
 async function selectVisibleTarget(page, targets, kind) {
   if (kind === 'edge') {
-    await clickPoint(page, targets.edge.point);
+    await clickCanonicalVisibleTarget(page, targets.edge);
     return;
   }
   if (kind === 'single-node') {
-    await clickPoint(page, targets.singleNode.point);
+    await clickCanonicalVisibleTarget(page, targets.singleNode);
     return;
   }
-  await clickPoint(page, targets.twoNode[0].point);
-  await clickPoint(page, targets.twoNode[1].point, true);
+  await clickCanonicalVisibleTarget(page, targets.twoNode[0]);
+  await clickCanonicalVisibleTarget(page, targets.twoNode[1], true);
+}
+
+async function clickCanonicalVisibleTarget(page, target, additive = false) {
+  const point = await currentVisiblePointForCanonicalId(page, target);
+  await clickPoint(page, point, additive);
 }
 
 async function clickPoint(page, point, additive = false) {
