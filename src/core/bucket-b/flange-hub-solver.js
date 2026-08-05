@@ -11,7 +11,7 @@ import {
 import { FLANGE_HUB_MATERIAL_PROFILE } from './flange-hub-geometry.js';
 
 export const FLANGE_HUB_SOLVER_POLICY = deepFreeze({
-  solverPolicyId: 'BKT-B-FLANGE-HUB-DETERMINISTIC-JACOBI-PCG-V2',
+  solverPolicyId: 'BKT-B-FLANGE-HUB-DETERMINISTIC-JACOBI-PCG-V3',
   relativeResidualTolerance: 1e-10,
   absoluteResidualTolerance: 1e-8,
   maximumIterationMultiplier: 8,
@@ -19,6 +19,7 @@ export const FLANGE_HUB_SOLVER_POLICY = deepFreeze({
   residualReplacementInterval: 0,
   stoppingCriterion: 'EXPLICIT_REDUCED_SYSTEM_RESIDUAL',
   constraintMethod: 'EXACT_ZERO_DISPLACEMENT_ELIMINATION',
+  reducedMatrixStorage: 'DETERMINISTIC_TYPED_SPARSE_ROWS',
 });
 
 export function solveFlangeHubLoadCase({ mesh, loadCaseId } = {}) {
@@ -45,37 +46,52 @@ export function solveFlangeHubLoadCase({ mesh, loadCaseId } = {}) {
       const target = stiffnessRows[dofs[row]];
       for (let column = 0; column < 16; column += 1) {
         const globalColumn = dofs[column];
-        target.set(globalColumn, (target.get(globalColumn) ?? 0) + kernel.stiffness[row][column]);
+        target.set(
+          globalColumn,
+          (target.get(globalColumn) ?? 0) + kernel.stiffness[row][column],
+        );
       }
     }
   });
 
-  const loadEvidence = assembleLoads({ mesh, loadDefinition, nodesById, nodeIndex, force });
-  const constrainedDofs = deriveConstrainedDofs({ mesh, loadDefinition, nodeIndex });
+  const loadEvidence = assembleLoads({
+    mesh,
+    loadDefinition,
+    nodesById,
+    nodeIndex,
+    force,
+  });
+  const constrainedDofs = deriveConstrainedDofs({
+    mesh,
+    loadDefinition,
+    nodeIndex,
+  });
   const constrained = new Set(constrainedDofs.map((row) => row.dof));
-  if (constrained.size === 0) throw new RangeError('FH_AXIAL_TRANSLATION_UNDERCONSTRAINED');
-  if (constrainedDofs.some((row) => row.component !== 'UZ')) throw new TypeError('FH_RADIAL_CONSTRAINT_FORBIDDEN');
+  if (constrained.size === 0) {
+    throw new RangeError('FH_AXIAL_TRANSLATION_UNDERCONSTRAINED');
+  }
+  if (constrainedDofs.some((row) => row.component !== 'UZ')) {
+    throw new TypeError('FH_RADIAL_CONSTRAINT_FORBIDDEN');
+  }
 
   const freeDofs = Array.from({ length: dofCount }, (_, dof) => dof)
     .filter((dof) => !constrained.has(dof));
-  const localIndex = new Map(freeDofs.map((dof, index) => [dof, index]));
+  const globalToLocal = new Int32Array(dofCount);
+  globalToLocal.fill(-1);
+  freeDofs.forEach((dof, index) => { globalToLocal[dof] = index; });
   const rhs = Float64Array.from(freeDofs.map((dof) => force[dof]));
-  const diagonal = Float64Array.from(freeDofs.map((dof) => stiffnessRows[dof].get(dof) ?? 0));
+  const diagonal = Float64Array.from(
+    freeDofs.map((dof) => stiffnessRows[dof].get(dof) ?? 0),
+  );
   if (diagonal.some((value) => !Number.isFinite(value) || !(value > 0))) {
     throw new RangeError('FH_REDUCED_STIFFNESS_NONPOSITIVE_DIAGONAL');
   }
-  const multiply = (vector) => {
-    const result = new Float64Array(freeDofs.length);
-    freeDofs.forEach((globalRow, rowIndex) => {
-      let sum = 0;
-      stiffnessRows[globalRow].forEach((value, globalColumn) => {
-        const columnIndex = localIndex.get(globalColumn);
-        if (columnIndex !== undefined) sum += value * vector[columnIndex];
-      });
-      result[rowIndex] = sum;
-    });
-    return result;
-  };
+  const reducedRows = createReducedSparseRows({
+    stiffnessRows,
+    freeDofs,
+    globalToLocal,
+  });
+  const multiply = createTypedSparseMultiplier(reducedRows);
   const solution = solveJacobiPcg({
     multiply,
     rhs,
@@ -83,7 +99,9 @@ export function solveFlangeHubLoadCase({ mesh, loadCaseId } = {}) {
     policy: FLANGE_HUB_SOLVER_POLICY,
   });
   const displacement = new Float64Array(dofCount);
-  freeDofs.forEach((dof, index) => { displacement[dof] = solution.vector[index]; });
+  freeDofs.forEach((dof, index) => {
+    displacement[dof] = solution.vector[index];
+  });
   const internal = multiplySparse(stiffnessRows, displacement);
 
   let strainEnergy = 0;
@@ -103,11 +121,16 @@ export function solveFlangeHubLoadCase({ mesh, loadCaseId } = {}) {
   const energyRelativeDifference = Math.abs(2 * strainEnergy - externalWork)
     / Math.max(1, Math.abs(2 * strainEnergy), Math.abs(externalWork));
   const freeResidual = freeResidualNorm({ internal, force, freeDofs });
-  const freeResidualRelative = freeResidual
-    / Math.max(1, vectorNorm(force));
-  if (axialForceImbalance > 1e-8) throw new RangeError(`FH_AXIAL_FORCE_IMBALANCE:${axialForceImbalance}`);
-  if (energyRelativeDifference > 1e-8) throw new RangeError(`FH_ENERGY_IDENTITY_FAILURE:${energyRelativeDifference}`);
-  if (freeResidualRelative > 1e-10) throw new RangeError(`FH_FREE_DOF_RESIDUAL_FAILURE:${freeResidualRelative}`);
+  const freeResidualRelative = freeResidual / Math.max(1, vectorNorm(force));
+  if (axialForceImbalance > 1e-8) {
+    throw new RangeError(`FH_AXIAL_FORCE_IMBALANCE:${axialForceImbalance}`);
+  }
+  if (energyRelativeDifference > 1e-8) {
+    throw new RangeError(`FH_ENERGY_IDENTITY_FAILURE:${energyRelativeDifference}`);
+  }
+  if (freeResidualRelative > 1e-10) {
+    throw new RangeError(`FH_FREE_DOF_RESIDUAL_FAILURE:${freeResidualRelative}`);
+  }
 
   const nodalDisplacements = nodes.map((node, index) => deepFreeze({
     nodeId: node.nodeId,
@@ -160,6 +183,10 @@ export function solveFlangeHubLoadCase({ mesh, loadCaseId } = {}) {
       ...FLANGE_HUB_SOLVER_POLICY,
       freeDofCount: freeDofs.length,
       constrainedDofCount: constrainedDofs.length,
+      reducedNonzeroCount: reducedRows.reduce(
+        (sum, row) => sum + row.values.length,
+        0,
+      ),
       iterations: solution.iterations,
       residualNorm: solution.residualNorm,
       relativeResidual: solution.relativeResidual,
@@ -198,6 +225,42 @@ export function solveFlangeHubLoadCase({ mesh, loadCaseId } = {}) {
   return deepFreeze({ ...payload, semanticHash: semanticHash(payload) });
 }
 
+function createReducedSparseRows({ stiffnessRows, freeDofs, globalToLocal }) {
+  return freeDofs.map((globalRow) => {
+    const columns = [];
+    const values = [];
+    stiffnessRows[globalRow].forEach((value, globalColumn) => {
+      const localColumn = globalToLocal[globalColumn];
+      if (localColumn >= 0) {
+        columns.push(localColumn);
+        values.push(value);
+      }
+    });
+    return {
+      columns: Int32Array.from(columns),
+      values: Float64Array.from(values),
+    };
+  });
+}
+
+function createTypedSparseMultiplier(rows) {
+  const result = new Float64Array(rows.length);
+  return (vector) => {
+    if (!vector || vector.length !== rows.length) {
+      throw new TypeError('FH_TYPED_SPARSE_MULTIPLY_SHAPE_MISMATCH');
+    }
+    for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+      const row = rows[rowIndex];
+      let sum = 0;
+      for (let entry = 0; entry < row.values.length; entry += 1) {
+        sum += row.values[entry] * vector[row.columns[entry]];
+      }
+      result[rowIndex] = sum;
+    }
+    return result;
+  };
+}
+
 function assembleLoads({ mesh, loadDefinition, nodesById, nodeIndex, force }) {
   const rows = [];
   const add = (evidence, role) => {
@@ -216,30 +279,42 @@ function assembleLoads({ mesh, loadDefinition, nodesById, nodeIndex, force }) {
     rows.push({ role, evidence });
   };
   if (loadDefinition.loadCaseId === 'FH-PRES-001') {
-    selectEdges(mesh, 'FH-BOUNDARY-BORE').forEach((edge) => add(integratePressureEdge({
-      edgeId: edge.edgeId,
-      nodes: edge.nodeIds.map((id) => nodesById.get(id)),
-      outwardNormal: edge.outwardNormal,
-    }, loadDefinition.internalPressure), 'INTERNAL_BORE_PRESSURE'));
-    selectEdges(mesh, 'FH-BOUNDARY-PIPE-END').forEach((edge) => add(integrateAxialTractionEdge({
-      edgeId: edge.edgeId,
-      nodes: edge.nodeIds.map((id) => nodesById.get(id)),
-      outwardNormal: edge.outwardNormal,
-    }, loadDefinition.equivalentEndTraction), 'EQUIVALENT_PRESSURE_END_THRUST'));
-  } else if (loadDefinition.loadCaseId === 'FH-AXIAL-001') {
-    selectEdges(mesh, 'FH-BOUNDARY-PIPE-END').forEach((edge) => add(integrateAxialTractionEdge({
-      edgeId: edge.edgeId,
-      nodes: edge.nodeIds.map((id) => nodesById.get(id)),
-      outwardNormal: edge.outwardNormal,
-    }, loadDefinition.equivalentEndTraction), 'INDEPENDENT_AXIAL_MEMBRANE_LOAD'));
-  } else if (loadDefinition.loadCaseId === 'FH-GASKET-001') {
-    selectEdges(mesh, 'FH-BOUNDARY-GASKET-FACE')
-      .filter((edge) => edgeWithinRadius(edge, nodesById, 65, 95))
-      .forEach((edge) => add(integrateAxialTractionEdge({
+    selectEdges(mesh, 'FH-BOUNDARY-BORE').forEach((edge) => add(
+      integratePressureEdge({
         edgeId: edge.edgeId,
         nodes: edge.nodeIds.map((id) => nodesById.get(id)),
         outwardNormal: edge.outwardNormal,
-      }, -loadDefinition.faceCompression), 'OPTIONAL_GASKET_FACE_COMPRESSION'));
+      }, loadDefinition.internalPressure),
+      'INTERNAL_BORE_PRESSURE',
+    ));
+    selectEdges(mesh, 'FH-BOUNDARY-PIPE-END').forEach((edge) => add(
+      integrateAxialTractionEdge({
+        edgeId: edge.edgeId,
+        nodes: edge.nodeIds.map((id) => nodesById.get(id)),
+        outwardNormal: edge.outwardNormal,
+      }, loadDefinition.equivalentEndTraction),
+      'EQUIVALENT_PRESSURE_END_THRUST',
+    ));
+  } else if (loadDefinition.loadCaseId === 'FH-AXIAL-001') {
+    selectEdges(mesh, 'FH-BOUNDARY-PIPE-END').forEach((edge) => add(
+      integrateAxialTractionEdge({
+        edgeId: edge.edgeId,
+        nodes: edge.nodeIds.map((id) => nodesById.get(id)),
+        outwardNormal: edge.outwardNormal,
+      }, loadDefinition.equivalentEndTraction),
+      'INDEPENDENT_AXIAL_MEMBRANE_LOAD',
+    ));
+  } else if (loadDefinition.loadCaseId === 'FH-GASKET-001') {
+    selectEdges(mesh, 'FH-BOUNDARY-GASKET-FACE')
+      .filter((edge) => edgeWithinRadius(edge, nodesById, 65, 95))
+      .forEach((edge) => add(
+        integrateAxialTractionEdge({
+          edgeId: edge.edgeId,
+          nodes: edge.nodeIds.map((id) => nodesById.get(id)),
+          outwardNormal: edge.outwardNormal,
+        }, -loadDefinition.faceCompression),
+        'OPTIONAL_GASKET_FACE_COMPRESSION',
+      ));
   }
   if (rows.length === 0) throw new TypeError('FH_LOAD_CASE_HAS_NO_EDGES');
   const totalQuadratureResultant = rows.reduce((sum, row) => ({
@@ -253,8 +328,16 @@ function assembleLoads({ mesh, loadDefinition, nodesById, nodeIndex, force }) {
   const mismatch = Math.hypot(
     totalNodalResultant.radial - totalQuadratureResultant.radial,
     totalNodalResultant.axial - totalQuadratureResultant.axial,
-  ) / Math.max(1, Math.hypot(totalQuadratureResultant.radial, totalQuadratureResultant.axial));
-  if (mismatch > 1e-10) throw new RangeError(`FH_TOTAL_NODAL_QUADRATURE_MISMATCH:${mismatch}`);
+  ) / Math.max(
+    1,
+    Math.hypot(
+      totalQuadratureResultant.radial,
+      totalQuadratureResultant.axial,
+    ),
+  );
+  if (mismatch > 1e-10) {
+    throw new RangeError(`FH_TOTAL_NODAL_QUADRATURE_MISMATCH:${mismatch}`);
+  }
   return deepFreeze({
     edges: rows,
     totalQuadratureResultant,
@@ -271,17 +354,24 @@ function assembleLoads({ mesh, loadDefinition, nodesById, nodeIndex, force }) {
 function deriveConstrainedDofs({ mesh, loadDefinition, nodeIndex }) {
   const result = [];
   mesh.nodes.forEach((node) => {
-    const gasketSupport = loadDefinition.axialSupport === 'GASKET_SUPPORT_ANNULUS'
-      && Math.abs(node.z - 90) <= 1e-10 && node.r >= 60 - 1e-10 && node.r <= 95 + 1e-10;
+    const gasketSupport = loadDefinition.axialSupport
+        === 'GASKET_SUPPORT_ANNULUS'
+      && Math.abs(node.z - 90) <= 1e-10
+      && node.r >= 60 - 1e-10
+      && node.r <= 95 + 1e-10;
     const remoteSupport = loadDefinition.axialSupport === 'REMOTE_PIPE_END'
-      && Math.abs(node.z + 100) <= 1e-10 && node.r >= 50 - 1e-10 && node.r <= 60 + 1e-10;
+      && Math.abs(node.z + 100) <= 1e-10
+      && node.r >= 50 - 1e-10
+      && node.r <= 60 + 1e-10;
     if (gasketSupport || remoteSupport) {
       result.push({
         dof: 2 * nodeIndex.get(node.nodeId) + 1,
         nodeId: node.nodeId,
         component: 'UZ',
         value: 0,
-        boundaryId: gasketSupport ? 'FH-BOUNDARY-GASKET-FACE' : 'FH-BOUNDARY-PIPE-END',
+        boundaryId: gasketSupport
+          ? 'FH-BOUNDARY-GASKET-FACE'
+          : 'FH-BOUNDARY-PIPE-END',
         mechanicalInterpretation: gasketSupport
           ? 'IDEALIZED_AXIAL_GASKET_SUPPORT_RADIAL_MOTION_FREE'
           : 'REMOTE_PIPE_END_AXIAL_REFERENCE_RADIAL_MOTION_FREE',
@@ -297,7 +387,9 @@ export function solveJacobiPcg({
   diagonal,
   policy = FLANGE_HUB_SOLVER_POLICY,
 } = {}) {
-  if (typeof multiply !== 'function') throw new TypeError('FH_PCG_MULTIPLY_REQUIRED');
+  if (typeof multiply !== 'function') {
+    throw new TypeError('FH_PCG_MULTIPLY_REQUIRED');
+  }
   if (!rhs || !diagonal || rhs.length !== diagonal.length || rhs.length === 0) {
     throw new TypeError('FH_PCG_VECTOR_SHAPE_MISMATCH');
   }
@@ -334,7 +426,9 @@ export function solveJacobiPcg({
 
   const explicitResidual = () => {
     const product = multiply(x);
-    if (!product || product.length !== n) throw new TypeError('FH_PCG_MULTIPLY_SHAPE_MISMATCH');
+    if (!product || product.length !== n) {
+      throw new TypeError('FH_PCG_MULTIPLY_SHAPE_MISMATCH');
+    }
     const value = new Float64Array(n);
     for (let i = 0; i < n; i += 1) value[i] = rhs[i] - product[i];
     return value;
@@ -365,7 +459,9 @@ export function solveJacobiPcg({
 
   for (let iteration = 1; iteration <= maximumIterations; iteration += 1) {
     const Ap = multiply(p);
-    if (!Ap || Ap.length !== n) throw new TypeError('FH_PCG_MULTIPLY_SHAPE_MISMATCH');
+    if (!Ap || Ap.length !== n) {
+      throw new TypeError('FH_PCG_MULTIPLY_SHAPE_MISMATCH');
+    }
     const curvature = dot(p, Ap);
     if (!Number.isFinite(curvature) || !(curvature > 0)) {
       throw new RangeError('FH_PCG_NONPOSITIVE_CURVATURE');
@@ -396,26 +492,56 @@ export function solveJacobiPcg({
   }
   const certified = explicitResidual();
   explicitResidualNorm = vectorNorm(certified);
-  throw new RangeError(`FH_PCG_DID_NOT_CONVERGE:${explicitResidualNorm / denominatorNorm}`);
+  throw new RangeError(
+    `FH_PCG_DID_NOT_CONVERGE:${explicitResidualNorm / denominatorNorm}`,
+  );
 }
 
 function multiplySparse(rows, vector) {
   const result = new Float64Array(rows.length);
   rows.forEach((row, index) => {
     let sum = 0;
-    row.forEach((value, column) => { sum += value * vector[column]; });
+    row.forEach((value, column) => {
+      sum += value * vector[column];
+    });
     result[index] = sum;
   });
   return result;
 }
+
 function freeResidualNorm({ internal, force, freeDofs }) {
   let squared = 0;
-  freeDofs.forEach((dof) => { const residual = internal[dof] - force[dof]; squared += residual ** 2; });
+  freeDofs.forEach((dof) => {
+    const residual = internal[dof] - force[dof];
+    squared += residual ** 2;
+  });
   return Math.sqrt(squared);
 }
-function globalDofs(nodeIds, nodeIndex) { return nodeIds.flatMap((id) => { const index = nodeIndex.get(id); return [2 * index, 2 * index + 1]; }); }
-function selectEdges(mesh, boundaryId) { return mesh.boundaryEdges.filter((edge) => edge.boundaryId === boundaryId); }
-function edgeWithinRadius(edge, nodesById, minimum, maximum) { const radii = edge.nodeIds.map((id) => nodesById.get(id).r); return Math.min(...radii) >= minimum - 1e-10 && Math.max(...radii) <= maximum + 1e-10; }
-function dot(left, right) { let sum = 0; for (let i = 0; i < left.length; i += 1) sum += left[i] * right[i]; return sum; }
-function vectorNorm(value) { return Math.sqrt(dot(value, value)); }
-function requireMesh(mesh) { if (!mesh || mesh.schema !== 'flange-hub-mesh-evidence/v1' || mesh.quality?.accepted !== true) throw new TypeError('FH_QUALIFIED_MESH_REQUIRED'); }
+function globalDofs(nodeIds, nodeIndex) {
+  return nodeIds.flatMap((id) => {
+    const index = nodeIndex.get(id);
+    return [2 * index, 2 * index + 1];
+  });
+}
+function selectEdges(mesh, boundaryId) {
+  return mesh.boundaryEdges.filter((edge) => edge.boundaryId === boundaryId);
+}
+function edgeWithinRadius(edge, nodesById, minimum, maximum) {
+  const radii = edge.nodeIds.map((id) => nodesById.get(id).r);
+  return Math.min(...radii) >= minimum - 1e-10
+    && Math.max(...radii) <= maximum + 1e-10;
+}
+function dot(left, right) {
+  let sum = 0;
+  for (let i = 0; i < left.length; i += 1) sum += left[i] * right[i];
+  return sum;
+}
+function vectorNorm(value) {
+  return Math.sqrt(dot(value, value));
+}
+function requireMesh(mesh) {
+  if (!mesh || mesh.schema !== 'flange-hub-mesh-evidence/v1'
+    || mesh.quality?.accepted !== true) {
+    throw new TypeError('FH_QUALIFIED_MESH_REQUIRED');
+  }
+}
