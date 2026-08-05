@@ -92,7 +92,7 @@ test('3D Edit keeps the left model tree visible while the canvas remains primary
   await expect(host.getByRole('button', { name: 'Save draft', exact: true })).toBeVisible();
   await expect(host.getByRole('button', { name: 'Commit draft', exact: true })).toBeVisible();
 
-  const footerText = await statusbar.locator('[data-role="topology-edit-status"]')).innerText();
+  const footerText = await statusbar.locator('[data-role="topology-edit-status"]').innerText();
   expect(footerText).toMatch(/nodes, .*edges, .*supports/);
 
   await page.getByRole('button', { name: '3D WebGL', exact: true }).click();
