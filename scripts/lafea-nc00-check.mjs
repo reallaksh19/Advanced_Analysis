@@ -326,6 +326,20 @@ async function writeArtifacts(values, solver, profile, reportValue, supplemental
     resolve(artifactRoot, 'completed-structural-reconstruction.json'),
     `${JSON.stringify(supplemental.completedReconstruction, null, 2)}\n`,
   );
+  const externalExecutionLedger = supplemental.externalExecution.results.map((row) => ({
+    fixtureId: row.fixtureId,
+    status: row.status,
+    error: row.error ?? null,
+    executionDisposition: row.evidence?.executionDisposition ?? null,
+    receiptHash: row.evidence?.receipt?.semanticHash ?? null,
+    rawManifestHash: row.evidence?.rawManifest?.rawManifestSemanticHash ?? null,
+    parsedResultHash: row.evidence?.parsedResult?.resultPayloadSemanticHash ?? null,
+    reconstructionHash: row.evidence?.reconstruction?.semanticHash ?? null,
+  }));
+  await writeFile(
+    resolve(artifactRoot, 'external-execution-results.json'),
+    `${JSON.stringify(externalExecutionLedger, null, 2)}\n`,
+  );
   for (const row of supplemental.externalExecution.results) {
     if (!row.evidence) continue;
     const directory = resolve(artifactRoot, row.fixtureId, 'raw');
