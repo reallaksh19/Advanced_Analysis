@@ -1,0 +1,82 @@
+name: BB-11 oracle convergence-row diagnostic
+
+on:
+  push:
+    branches:
+      - fix/bb11-governed-oracle-interface-continuity
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    env:
+      TZ: UTC
+      LC_ALL: C
+      BB11_DIAGNOSTICS: '1'
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/bb11-governed-oracle-interface-continuity
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Materialize current governed-repair candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from textwrap import dedent
+
+          workflow = Path('.github/workflows/bb11-oracle-interface-bootstrap.yml').read_text()
+          start_marker = "          python3 - <<'PY'\n"
+          end_marker = "\n          PY\n"
+          start = workflow.index(start_marker) + len(start_marker)
+          end = workflow.index(end_marker, start)
+          script = dedent(workflow[start:end])
+          exec(compile(script, '<bb11-oracle-repair-materializer>', 'exec'))
+          PY
+          node --check src/core/bucket-b/flange-hub-independent-oracle.js
+
+      - name: Print exact convergence rows
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports
+          node --input-type=module <<'NODE' | tee reports/bb11-oracle-convergence-diagnostic.json
+          import { runIndependentFlangeHubOracle } from './src/core/bucket-b/flange-hub-independent-oracle.js';
+          const output = [];
+          for (const loadCaseId of ['FH-PRES-001', 'FH-AXIAL-001', 'FH-GASKET-001']) {
+            const report = runIndependentFlangeHubOracle(loadCaseId);
+            output.push({
+              loadCaseId,
+              status: report.status,
+              convergence: report.convergence,
+              levels: report.levels.map((level) => ({
+                levelId: level.levelId,
+                nodeCount: level.nodeCount,
+                elementCount: level.elementCount,
+                solver: level.solver,
+                connectivity: level.connectivity,
+                probes: level.probes,
+                strainEnergy: level.strainEnergy,
+                axialReaction: level.axialReaction,
+              })),
+            });
+          }
+          process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
+          NODE
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bb11-oracle-convergence-${{ github.sha }}
+          path: reports
+          retention-days: 30
