@@ -324,6 +324,7 @@ async function executeAgainstAnyEdge(page, host, actionId, baseHash) {
       edgeId,
       outcomeStatus: result.outcomeStatus,
       accepted: result.accepted,
+      transactionHash: result.authority?.transactionHash ?? null,
     });
     if (result.accepted) return { ...result, attempts };
   }
@@ -336,6 +337,7 @@ async function executeAgainstAnyEdge(page, host, actionId, baseHash) {
     activeCommandCount: 0,
     baseHash,
     afterHash: baseHash,
+    authority: null,
     attempts,
   };
 }
@@ -344,15 +346,30 @@ async function executeSelectedAction(page, host, actionId, baseHash, targetId = 
   const button = page.locator(`[data-command-action="${actionId}"]`);
   await expect(button).toBeEnabled();
   const selectionStatus = await statusOutput(page).innerText();
+  const priorJournalHash = await page.evaluate((key) => (
+    globalThis[key]?.session?.journal?.journalHash ?? null
+  ), CONTROLLER_KEY);
   await button.click();
   const outcomeStatus = await statusOutput(page).innerText();
   const activeCommandCount = Number(
     await host.getAttribute('data-topology-edit-active-command-count') || 0,
   );
   const afterHash = await host.getAttribute('data-topology-edit-canonical-hash');
+  const authority = await commandAuthorityEvidence(page, priorJournalHash);
+  const completeAuthority = [
+    authority?.commandId,
+    authority?.requestHash,
+    authority?.journalEntryHash,
+    authority?.transactionHash,
+    authority?.journalHash,
+    authority?.activeCanonicalTopologyHash,
+    authority?.sessionHash,
+  ].every(Boolean);
   const accepted = /accepted/i.test(outcomeStatus)
     && activeCommandCount === 1
-    && afterHash !== baseHash;
+    && afterHash !== baseHash
+    && authority?.activeCanonicalTopologyHash === afterHash
+    && completeAuthority;
   return {
     actionId,
     targetId,
@@ -362,7 +379,56 @@ async function executeSelectedAction(page, host, actionId, baseHash, targetId = 
     activeCommandCount,
     baseHash,
     afterHash,
+    authority,
   };
+}
+
+async function commandAuthorityEvidence(page, priorJournalHash) {
+  return page.evaluate(async ({ key, priorHash }) => {
+    const session = globalThis[key]?.session;
+    const journal = session?.journal;
+    const replay = session?.replay;
+    const entry = journal?.history?.at(-1) ?? null;
+    const snapshot = session?.snapshot?.() ?? null;
+    if (!priorHash || !journal || !replay || !entry) return null;
+    const moduleUrl = new URL(
+      'src/core/shared-piping-model/index.js',
+      document.baseURI,
+    ).href;
+    const { semanticHash } = await import(moduleUrl);
+    const transactionMaterial = {
+      schema: 'TopologyEditJournalTransition.v1',
+      action: 'ACCEPT_COMMAND',
+      disposition: 'ACCEPTED',
+      priorJournalHash: priorHash,
+      journalHash: journal.journalHash,
+      sessionVersion: journal.sessionVersion,
+      activeCanonicalTopologyHash: replay.activeCanonicalTopologyHash,
+      replayHash: replay.replayHash,
+      certificationHash: entry.certificationHash,
+      reason: null,
+    };
+    return {
+      commandId: entry.commandId,
+      commandType: entry.commandType,
+      requestHash: entry.request?.requestHash ?? null,
+      resolutionHash: entry.receipt?.resolutionHash ?? null,
+      validationHash: entry.receipt?.result?.validationHash ?? null,
+      candidateDraftHash: entry.receipt?.result?.candidateDraftHash ?? null,
+      editLedgerHash: entry.receipt?.result?.editLedgerHash ?? null,
+      certificationHash: entry.certificationHash,
+      journalEntryHash: entry.entryHash,
+      transactionHash: semanticHash(transactionMaterial),
+      transactionMaterial,
+      priorJournalHash: priorHash,
+      journalHash: journal.journalHash,
+      historyHash: journal.historyHash,
+      activeLedgerHash: journal.activeLedgerHash,
+      replayHash: replay.replayHash,
+      activeCanonicalTopologyHash: replay.activeCanonicalTopologyHash,
+      sessionHash: snapshot?.sessionHash ?? null,
+    };
+  }, { key: CONTROLLER_KEY, priorHash: priorJournalHash });
 }
 
 async function selectQualifiedGapBySearch(page, host) {
