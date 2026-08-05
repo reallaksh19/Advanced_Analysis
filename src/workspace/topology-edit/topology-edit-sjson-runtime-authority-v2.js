@@ -22,7 +22,7 @@ export const SJSON_BENCHMARK_SOURCE_HASH = 'fnv1a64:0fa77fc2c202d8ae';
 export const SJSON_SUPPORT_RENDER_AUTHORITY =
   'TOPO_VALIDATOR_SUPPORT_MARKER_AND_DIRECTION_GEOMETRY';
 const CAMERA_DIRECTION = Object.freeze({ x: 1, y: 1, z: 0.8 });
-const MARKER_RADIUS_RATIO = 0.18;
+const MARKER_RADIUS_RATIO = 0.54;
 
 export function deriveGovernedSjsonSupportBundle({ canonical, dataset, draftVisual, backend }) {
   const exactSupportTopology = supportTopologyForExactOrigins(canonical);
