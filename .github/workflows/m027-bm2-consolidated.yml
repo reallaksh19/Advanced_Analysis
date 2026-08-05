@@ -1,0 +1,119 @@
+name: M027 BM2 Consolidated Qualification
+
+on:
+  pull_request:
+    branches:
+      - main
+      - agent/common-inputxml-restraint-correction
+    paths:
+      - 'benchmarks/LFEA/BM2/**'
+      - 'docs/qualification/M027_BM2_CONSOLIDATED_RECORD.md'
+      - 'scripts/lfea-b3.25-bm2-*.mjs'
+      - 'scripts/lfea-b3.26-bm2-*.mjs'
+      - 'scripts/lfea-b3.28-bm2-*.mjs'
+      - 'scripts/lfea-b3.29-bm2-*.mjs'
+      - 'scripts/lfea-bm2-consolidated-latest-output-check.mjs'
+      - 'scripts/lfea-common-inputxml-restraint-correction-check.mjs'
+      - 'src/core/geometry/adapters/inputxml-ingestion-audit.js'
+      - 'src/core/geometry/adapters/inputxml-restraint-type-mutation.js'
+      - 'src/core/geometry/adapters/inputXmlToCanonicalGeometry.js'
+      - 'src/core/centerline-beam-fea/geometry-conditioning.js'
+      - '.github/workflows/m027-bm2-consolidated.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m027-bm2-consolidated-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_HEAD_SHA }}
+          fetch-depth: 1
+
+      - name: Verify immutable checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
+          test -z "$(git status --porcelain)"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Syntax-check consolidated sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in \
+            scripts/lfea-b3.25-bm2-inputxml-ingestion-check.mjs \
+            scripts/lfea-b3.26-bm2-output-comparison.mjs \
+            scripts/lfea-b3.26-bm2-output-comparison-runtime.mjs \
+            scripts/lfea-b3.26-bm2-solve-fixtures.mjs \
+            scripts/lfea-b3.26-bm2-solve-runtime.mjs \
+            scripts/lfea-b3.26-bm2-solve-comparison-check.mjs \
+            scripts/lfea-b3.28-bm2-junction-source-audit.mjs \
+            scripts/lfea-b3.28-bm2-junction-surface-node-runtime-base.mjs \
+            scripts/lfea-b3.28-bm2-junction-surface-node-runtime.mjs \
+            scripts/lfea-b3.28-bm2-junction-surface-node-check.mjs \
+            scripts/lfea-b3.29-bm2-bend-geometry-authority-v2.mjs \
+            scripts/lfea-b3.29-bm2-bend-geometry-check.mjs \
+            scripts/lfea-b3.29-bm2-collapsed-span-audit.mjs \
+            scripts/lfea-bm2-consolidated-latest-output-check.mjs; do
+            node --check "$file"
+          done
+          git diff --check
+
+      - name: Common InputXML restraint export correction
+        run: node scripts/lfea-common-inputxml-restraint-correction-check.mjs
+
+      - name: BM2 ingestion and diagnostics
+        run: node scripts/lfea-b3.25-bm2-inputxml-ingestion-check.mjs
+
+      - name: BM2 occurrence-preserving baseline comparison
+        run: node scripts/lfea-b3.26-bm2-solve-comparison-check.mjs
+
+      - name: BM2 B31J junction topology
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/lfea-b3.28-bm2-junction-source-audit.mjs > /tmp/bm2-junction-source-audit.json
+          node scripts/lfea-b3.28-bm2-junction-surface-node-check.mjs
+
+      - name: BM2 bend geometry and station authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/lfea-b3.29-bm2-collapsed-span-audit.mjs
+          node scripts/lfea-b3.29-bm2-bend-geometry-check.mjs
+
+      - name: Latest strict and diagnostic output policy
+        run: node scripts/lfea-bm2-consolidated-latest-output-check.mjs --write
+
+      - name: Full linear-core regression
+        run: npm run check:lfea-linear-core
+
+      - name: Upload deterministic BM2 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m027-bm2-consolidated-${{ env.TARGET_HEAD_SHA }}
+          path: |
+            reports/bm2-consolidated-latest-output.json
+            reports/lfea-bm2-*.json
+          if-no-files-found: error
+          retention-days: 30
