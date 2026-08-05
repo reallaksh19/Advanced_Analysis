@@ -10,6 +10,9 @@ import {
 import {
   deriveSjsonTopoValidatorSupportProjection,
 } from './topology-edit-sjson-restraint-projection.js';
+import {
+  projectGovernedSjsonSupportGlyphs,
+} from './topology-edit-sjson-support-glyph-projection-v3.js';
 import { fitPerspectiveCameraToRenderBounds } from './topology-edit-sjson-benchmark-camera.js';
 import {
   TOPOLOGY_EDIT_SUPPORT_RENDER_STYLES,
@@ -40,8 +43,13 @@ export function deriveGovernedSjsonSupportBundle({ canonical, dataset, draftVisu
     verticalAxis: 'Z',
     markerSizeMm,
   });
+  const governedGlyphProjection = projectGovernedSjsonSupportGlyphs({
+    overlays: supportAuthority.overlays,
+    supportTopology,
+    markerSizeMm,
+  });
   const supportProjection = Object.freeze({
-    ...supportAuthority.projection,
+    ...governedGlyphProjection,
     renderStyle: TOPOLOGY_EDIT_SUPPORT_RENDER_STYLES.TOPO_VALIDATOR_COMPACT,
     renderAuthority: SJSON_SUPPORT_RENDER_AUTHORITY,
     compactMarkerRadiusMm: Math.max(markerSizeMm * MARKER_RADIUS_RATIO, 1),
@@ -73,9 +81,11 @@ export function applySjsonBenchmarkCameraFit(backend) {
   });
   backend.lastBounds = bounds.clone();
   backend.sceneBoundsCache = bounds.clone();
+  backend.updateGovernedCameraClipping?.();
   backend.initialCameraState = backend.captureCameraState?.() || backend.initialCameraState;
   return Object.freeze({
     ...cameraFit,
+    clipping: backend.governedCameraClippingSnapshot?.() || null,
     sourceHash: SJSON_BENCHMARK_SOURCE_HASH,
     engineeringDirection: renderDirectionToEngineering(cameraFit.renderDirection),
   });

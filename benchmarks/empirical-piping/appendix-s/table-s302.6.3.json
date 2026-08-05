@@ -1,0 +1,20 @@
+{
+  "schema": "empirical-piping-table-s302.6.3/v1",
+  "classification": "BENCHMARK_REFERENCE",
+  "condition": "SUSTAINED_CONDITION_3",
+  "node20": {
+    "outsideDiameterM": 0.4064,
+    "nominalWallM": 0.009525,
+    "corrosionAllowanceM": 0.0016002,
+    "pressurePaDisplayed": 3795000,
+    "mechanicalAxialForceN": 12575,
+    "bendingMomentNm": 82845,
+    "publishedSustainedLongitudinalStressPa": 129975000,
+    "allowablePa": 124500000,
+    "sustainedInPlaneIndex": 1.0,
+    "sustainedOutOfPlaneIndex": 1.0,
+    "outOfPlaneMomentNm": 0,
+    "torsionalMomentNm": 0
+  },
+  "evidenceNote": "Displayed pressure precision and the separately published pressure-force evidence must not be mixed without a source-precision record."
+}

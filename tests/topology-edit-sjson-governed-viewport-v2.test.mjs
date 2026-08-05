@@ -30,7 +30,7 @@ const CONFIGURATION = {
   cameraFarMm: 1_000_000,
 };
 
-test('governed route renders lines, wireframe nodes, and independent invisible picks', () => {
+test('governed route renders lines, translucent nodes, and independent invisible picks', () => {
   const backend = new TopologyEditSjsonGovernedViewportBackend({ navigationConfiguration: CONFIGURATION });
   backend.renderProjection(backend.groups.draftGroup, {
     schema: TOPOLOGY_EDIT_SJSON_GOVERNED_PROJECTION_SCHEMA,
@@ -51,34 +51,41 @@ test('governed route renders lines, wireframe nodes, and independent invisible p
   assert.equal(objects.get('topology-edit-edit-draft-centerline:pipe:1')?.isLine, true);
   const routeProxy = objects.get('topology-edit-route-pick-proxy:pipe:1');
   assert.equal(routeProxy?.isMesh, true);
+  assert.equal(routeProxy.geometry.parameters.radiusTop, 12.6);
   assert.equal(routeProxy.material.opacity, 0);
   const marker = objects.get('topology-edit-visible-node-marker:node:1');
   const nodeProxy = objects.get('topology-edit-node-pick-proxy:node:1');
-  assert.equal(marker?.isLineSegments, true);
+  assert.equal(marker?.isMesh, true);
+  assert.equal(marker.geometry.type, 'SphereGeometry');
   assert.equal(marker.userData.visualRadiusMm, 4.2);
   assert.equal(marker.userData.nonPickable, true);
-  assert.equal(marker.userData.renderAuthority, 'CANONICAL_NODE_WIREFRAME_MARKER_V2');
-  assert.equal(marker.material.opacity, 0.24);
+  assert.equal(marker.userData.renderAuthority, 'CANONICAL_NODE_TRANSLUCENT_SPHERE_V3');
+  assert.equal(marker.material.opacity, 0.18);
   assert.equal(marker.material.depthTest, false);
-  assert.equal(nodeProxy.geometry.parameters.radius, 16.8);
+  assert.equal(nodeProxy.geometry.parameters.radius, 25.2);
   assert.equal(nodeProxy.material.opacity, 0);
   assert.equal(nodeProxy.userData.pickTarget.objectKind, 'node');
-  assert.equal(nodeProxy.userData.renderAuthority, 'CANONICAL_NODE_PICK_PROXY_V2');
+  assert.equal(nodeProxy.userData.renderAuthority, 'CANONICAL_NODE_PICK_PROXY_V3');
   backend.destroy();
 });
 
-test('governed supports are depth-independent overlays with outlined heads and pick proxies', () => {
+test('governed supports render stable restraint identity with bidirectional arrows', () => {
   const backend = new TopologyEditSjsonGovernedViewportBackend({ navigationConfiguration: CONFIGURATION });
   backend.renderProjection(backend.groups.supportGroup, {
     renderStyle: TOPOLOGY_EDIT_SUPPORT_RENDER_STYLES.TOPO_VALIDATOR_COMPACT,
     compactMarkerRadiusMm: 12.6,
+    glyphMetrics: { placementAuthority: 'HOST_OD_HALF_CONTACT_PLUS_TWO_THIRDS_OD_GLYPH_V1' },
     elements: [{
       id: 'support:1', entityId: 'support:1', type: 'SUPPORT', x: 0, y: 0, z: 0,
       pickTarget: { objectKind: 'support', objectId: 'support:1' },
     }],
     segments: [{
       id: 'restraint:1', entityId: 'restraint:1', type: 'RESTRAINT_DIRECTION',
-      start: { x: 0, y: 0, z: 0 }, end: { x: 80, y: 0, z: 0 }, colorInt: 0xef4444,
+      start: { x: 50, y: 0, z: 0 }, end: { x: 116.6666666667, y: 0, z: 0 }, colorInt: 0xef4444,
+      directionalArrows: [
+        { polarity: 'POSITIVE', start: { x: 50, y: 0, z: 0 }, end: { x: 116.6666666667, y: 0, z: 0 } },
+        { polarity: 'NEGATIVE', start: { x: -50, y: 0, z: 0 }, end: { x: -116.6666666667, y: 0, z: 0 } },
+      ],
       pickTarget: { objectKind: 'restraint', objectId: 'restraint:1', supportId: 'support:1' },
     }],
   }, 0x22d3ee, 1, 70);
@@ -86,6 +93,7 @@ test('governed supports are depth-independent overlays with outlined heads and p
   const marker = objects.get('topology-edit-compact-support-marker:support:1');
   const markerProxy = objects.get('topology-edit-compact-support-pick-proxy:support:1');
   const shaft = objects.get('topology-edit-compact-restraint-shaft:restraint:1');
+  const negativeShaft = objects.get('topology-edit-compact-restraint-shaft:restraint:1:negative');
   const head = objects.get('topology-edit-compact-restraint-head:restraint:1');
   const arrowProxy = objects.get('topology-edit-compact-restraint-pick-proxy:restraint:1');
   assert.equal(marker?.isLineSegments, true);
@@ -93,6 +101,7 @@ test('governed supports are depth-independent overlays with outlined heads and p
   assert.equal(marker.material.opacity, 0.15);
   assert.equal(markerProxy.userData.pickTarget.objectKind, 'support');
   assert.equal(shaft?.isLine, true);
+  assert.equal(negativeShaft?.isLine, true);
   assert.equal(shaft.material.depthTest, false);
   assert.equal(head?.isLineSegments, true);
   assert.equal(head.material.opacity, 0.5);

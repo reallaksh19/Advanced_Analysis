@@ -1,0 +1,9 @@
+{
+  "schema": "empirical-piping-appendix-s-example2/v1",
+  "classification": "BENCHMARK_REFERENCE",
+  "coldActiveRests": ["N20","N50","N120"],
+  "attachedTrialN50ReactionKn": -12.842,
+  "finalActiveRests": ["N20","N120"],
+  "finalN50ReactionKn": 0.0,
+  "finalN50UpliftMm": 22.050
+}

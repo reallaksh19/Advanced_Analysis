@@ -99,6 +99,8 @@ export class TopologyEditInteractionViewportAdapter {
     if (event.button !== 0 || !this.gizmoModel || this.activeDrag) return;
     const mode = this.pickHandleMode(event);
     if (!mode) return;
+    const canonicalHit = this.canonicalSelectionAt(event);
+    if (shouldYieldGizmoToCanonicalSelection(this.gizmoModel.nodeId, canonicalHit)) return;
     markHandled(event);
     this.canvas?.focus({ preventScroll: true });
     const anchor = new THREE.Vector3(
@@ -174,6 +176,13 @@ export class TopologyEditInteractionViewportAdapter {
     return hit ? interactionMode(hit.object) : null;
   }
 
+  canonicalSelectionAt(event) {
+    const context = this.backend.pickContext?.(event.clientX, event.clientY);
+    return context
+      ? this.backend.pickWithRaycaster?.(context.pointer) ?? null
+      : null;
+  }
+
   pointerTarget(event, active) {
     const context = pointerContext(this.canvas, event, this.pointer);
     if (!context) return null;
@@ -188,6 +197,17 @@ export class TopologyEditInteractionViewportAdapter {
     const distance = point.clone().sub(active.anchor).dot(axis);
     return active.anchor.clone().addScaledVector(axis, distance);
   }
+}
+
+export function shouldYieldGizmoToCanonicalSelection(gizmoNodeId, canonicalHit) {
+  const objectId = String(canonicalHit?.objectId || '');
+  const objectKind = String(canonicalHit?.objectKind || '').toLowerCase();
+  const selectedNodeId = String(gizmoNodeId || '');
+  return Boolean(
+    objectId
+    && ['node', 'component'].includes(objectKind)
+    && objectId !== selectedNodeId,
+  );
 }
 
 export function topologyEditCameraSnapshot(backend, canvas) {

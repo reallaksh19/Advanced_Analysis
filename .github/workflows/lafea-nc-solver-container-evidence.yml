@@ -1,0 +1,196 @@
+name: LAFEA-NC Immutable Solver Container Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/lafea-nc-solver-container-evidence.yml'
+      - 'docs/nonlinear-shell-contact/LAFEA_NC_SOLVER_CONTAINER_EVIDENCE.md'
+      - 'scripts/lafea-nc-solver-container-build.mjs'
+      - 'scripts/lafea-nc-solver-container-evidence-check.mjs'
+      - 'tests/nonlinear-shell-contact-solver-container-evidence.test.mjs'
+  workflow_dispatch:
+    inputs:
+      head_sha:
+        description: Exact container evidence head SHA
+        required: true
+        type: string
+      base_sha:
+        description: Exact merged interpreter evidence base SHA
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  exact-head-immutable-container-evidence:
+    runs-on: ubuntu-24.04
+    env:
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      DISPATCH_HEAD_SHA: ${{ inputs.head_sha }}
+      DISPATCH_BASE_SHA: ${{ inputs.base_sha }}
+      BASE_BRANCH: main
+      PRIOR_RUN_ID: '31020392736'
+      PRIOR_ARTIFACT_ID: '8936332477'
+      PRIOR_ARTIFACT_NAME: lafea-nc-solver-interpreter-df63cc2185c7bde10ab3ac915e34c3685e90ce36-1
+      PRIOR_ARTIFACT_DIGEST: sha256:d405b0aa046bb78d010f6d32141efc84ca5f71b0dbbf9a0f1dae233d92c28c29
+      EXECUTABLE_HASH: sha256:9a33d293706a66bee86f2f0ecf996a66758f904c20d61ad8c83ddc0f92ae4b7e
+      INTERPRETER_HASH: sha256:1cd555ac46b7887edeaf3c42aac5408c8135e52f6b37870da2cf82d5fe14e829
+    steps:
+      - name: Resolve exact head
+        id: exact
+        shell: bash
+        run: |
+          set -euo pipefail
+          head_sha="${DISPATCH_HEAD_SHA:-${PR_HEAD_SHA:-${GITHUB_SHA}}}"
+          [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]]
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.exact.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Resolve live interpreter-evidence base
+        id: base
+        shell: bash
+        env:
+          EXACT_HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "$BASE_BRANCH:refs/remotes/origin/$BASE_BRANCH"
+          live_base="$(git rev-parse "refs/remotes/origin/$BASE_BRANCH")"
+          base_sha="${DISPATCH_BASE_SHA:-${PR_BASE_SHA}}"
+          [[ "$base_sha" =~ ^[0-9a-f]{40}$ ]]
+          test "$base_sha" = "$live_base"
+          test "$(git rev-parse HEAD)" = "$EXACT_HEAD_SHA"
+          git merge-base --is-ancestor "$base_sha" "$EXACT_HEAD_SHA"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify path containment, syntax and OCI negative controls
+        shell: bash
+        env:
+          EXACT_HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
+          BASE_SHA: ${{ steps.base.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          git diff --check "$BASE_SHA...$EXACT_HEAD_SHA"
+          mapfile -t paths < <(git diff --name-only "$BASE_SHA...$EXACT_HEAD_SHA")
+          test "${#paths[@]}" = '5'
+          for path in "${paths[@]}"; do
+            case "$path" in
+              .github/workflows/lafea-nc-solver-container-evidence.yml|\
+              docs/nonlinear-shell-contact/LAFEA_NC_SOLVER_CONTAINER_EVIDENCE.md|\
+              scripts/lafea-nc-solver-container-build.mjs|\
+              scripts/lafea-nc-solver-container-evidence-check.mjs|\
+              tests/nonlinear-shell-contact-solver-container-evidence.test.mjs) ;;
+              *) echo "Container-evidence changed-path violation: $path" >&2; exit 1 ;;
+            esac
+          done
+          node --check scripts/lafea-nc-solver-container-build.mjs
+          node --check scripts/lafea-nc-solver-container-evidence-check.mjs
+          node --check tests/nonlinear-shell-contact-solver-container-evidence.test.mjs
+          node --test tests/nonlinear-shell-contact-solver-container-evidence.test.mjs
+
+      - name: Verify and download sealed interpreter evidence
+        id: prior
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          metadata="$(gh api "/repos/$GITHUB_REPOSITORY/actions/artifacts/$PRIOR_ARTIFACT_ID")"
+          test "$(jq -r .name <<<"$metadata")" = "$PRIOR_ARTIFACT_NAME"
+          test "$(jq -r .digest <<<"$metadata")" = "$PRIOR_ARTIFACT_DIGEST"
+          test "$(jq -r .workflow_run.id <<<"$metadata")" = "$PRIOR_RUN_ID"
+          test "$(jq -r .workflow_run.head_sha <<<"$metadata")" = 'df63cc2185c7bde10ab3ac915e34c3685e90ce36'
+          rm -rf "$RUNNER_TEMP/prior-interpreter"
+          mkdir -p "$RUNNER_TEMP/prior-interpreter"
+          gh run download "$PRIOR_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "$PRIOR_ARTIFACT_NAME" \
+            --dir "$RUNNER_TEMP/prior-interpreter"
+          root="$RUNNER_TEMP/prior-interpreter"
+          test "sha256:$(sha256sum "$root/binary/ccx_2.22" | cut -d' ' -f1)" = "$EXECUTABLE_HASH"
+          test "sha256:$(sha256sum "$root/libraries/ld-linux-x86-64.so.2" | cut -d' ' -f1)" = "$INTERPRETER_HASH"
+          node -e "const fs=require('node:fs');const root=process.argv[1];const report=JSON.parse(fs.readFileSync(root+'/reports-interpreter/solver-custody-build-report.json'));const provenance=JSON.parse(fs.readFileSync(root+'/metadata/interpreter-provenance.json'));if(report.status!=='SOLVER_CUSTODY_BLOCKED'||report.verifiedEvidenceCount!==7||JSON.stringify(report.missingEvidence)!==JSON.stringify(['CONTAINER_RECORD'])||provenance.runtimeExitCode!==201)process.exit(1);" "$root"
+          echo "root=$root" >> "$GITHUB_OUTPUT"
+
+      - name: Assemble, inspect and replay immutable OCI evidence twice
+        id: assemble
+        shell: bash
+        env:
+          PRIOR_ROOT: ${{ steps.prior.outputs.root }}
+        run: |
+          set +e
+          rm -rf artifacts/lafea-nc-solver-container artifacts/lafea-nc-solver-container-debug
+          mkdir -p artifacts/lafea-nc-solver-container-debug
+          {
+            set -e
+            node scripts/lafea-nc-solver-container-build.mjs \
+              --evidence-root="$PRIOR_ROOT" \
+              --output-dir="$RUNNER_TEMP/lafea-container-a"
+            node scripts/lafea-nc-solver-container-evidence-check.mjs \
+              --root="$RUNNER_TEMP/lafea-container-a" \
+              --output-dir="$RUNNER_TEMP/lafea-container-a/reports-container"
+            node scripts/lafea-nc-solver-container-build.mjs \
+              --evidence-root="$PRIOR_ROOT" \
+              --output-dir="$RUNNER_TEMP/lafea-container-b"
+            node scripts/lafea-nc-solver-container-evidence-check.mjs \
+              --root="$RUNNER_TEMP/lafea-container-b" \
+              --output-dir="$RUNNER_TEMP/lafea-container-b/reports-container"
+            diff -ru "$RUNNER_TEMP/lafea-container-a" "$RUNNER_TEMP/lafea-container-b"
+          } > artifacts/lafea-nc-solver-container-debug/controller.stdout.log \
+            2> artifacts/lafea-nc-solver-container-debug/controller.stderr.log
+          status=$?
+          printf '%s\n' "$status" > artifacts/lafea-nc-solver-container-debug/exit-code.txt
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          if [[ "$status" = '0' ]]; then
+            mkdir -p artifacts/lafea-nc-solver-container
+            cp -R "$RUNNER_TEMP/lafea-container-a"/. artifacts/lafea-nc-solver-container/
+          fi
+          exit 0
+
+      - name: Upload immutable-container diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc-solver-container-debug-${{ steps.exact.outputs.head_sha }}-${{ github.run_attempt }}
+          path: artifacts/lafea-nc-solver-container-debug
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce immutable-container success
+        shell: bash
+        env:
+          EXIT_CODE: ${{ steps.assemble.outputs.exit_code }}
+        run: test "$EXIT_CODE" = '0'
+
+      - name: Verify qualified custody boundary and clean source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=artifacts/lafea-nc-solver-container
+          test -z "$(git status --porcelain --untracked-files=no)"
+          test -s "$root/container/calculix-ccx-2.22.oci.tar"
+          grep -F 'exitCode=201' "$root/container/runtime-probe.txt"
+          grep -F 'Usage: CalculiX.exe -i jobname' "$root/container/runtime-probe.txt"
+          node -e "const fs=require('node:fs');const root=process.argv[1];const report=JSON.parse(fs.readFileSync(root+'/reports-container/solver-custody-qualified-report.json'));const inventory=JSON.parse(fs.readFileSync(root+'/reports-container/solver-custody-qualified-inventory.json'));const container=JSON.parse(fs.readFileSync(root+'/records/container-record.json'));if(report.status!=='SOLVER_CUSTODY_QUALIFIED'||report.verifiedEvidenceCount!==8||report.missingEvidence.length!==0||report.blockers.length!==0||report.authority.solverCustodyQualified!==true||report.authority.solverBridgeQualified!==false||report.authority.shellFormulationQualified!==false||report.authority.productionExecutionAuthorized!==false||report.authority.mergeAuthorized!==false||inventory.evidence.find((entry)=>entry.id==='CONTAINER_RECORD')?.status!=='PRESENT'||container.immutable!==true)process.exit(1);" "$root"
+
+      - name: Upload immutable solver-container evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc-solver-container-${{ steps.exact.outputs.head_sha }}-${{ github.run_attempt }}
+          path: artifacts/lafea-nc-solver-container
+          if-no-files-found: error
+          retention-days: 30

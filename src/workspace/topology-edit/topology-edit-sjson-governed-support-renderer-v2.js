@@ -27,7 +27,9 @@ export function renderGovernedSjsonSupports({ backend, group, projection }) {
   const lineMaterials = new Map();
   const pickMaterial = invisiblePickMaterial();
   let markerCount = 0;
-  let arrowCount = 0;
+  let restraintGlyphCount = 0;
+  let directionalArrowCount = 0;
+  let bidirectionalRestraintCount = 0;
   try {
     for (const element of projection.elements || []) {
       const point = finiteVector(element);
@@ -55,7 +57,7 @@ export function renderGovernedSjsonSupports({ backend, group, projection }) {
       proxy.userData = {
         ...pickUserData(element),
         pickProxy: true,
-        renderAuthority: 'GOVERNED_SUPPORT_PICK_PROXY_V2',
+        renderAuthority: 'GOVERNED_SUPPORT_PICK_PROXY_V3',
       };
       proxy.renderOrder = OVERLAY_RENDER_ORDER + 1;
       staging.add(proxy);
@@ -64,7 +66,7 @@ export function renderGovernedSjsonSupports({ backend, group, projection }) {
     }
 
     for (const segment of projection.segments || []) {
-      const arrow = supportArrow(
+      const arrow = supportArrowGroup(
         segment,
         lineMaterial(lineMaterials, segment.colorInt, RESTRAINT_OPACITY, false),
         pickMaterial,
@@ -74,11 +76,20 @@ export function renderGovernedSjsonSupports({ backend, group, projection }) {
       if (!arrow) continue;
       staging.add(arrow.object);
       bounds.union(arrow.bounds);
-      arrowCount += 1;
+      restraintGlyphCount += 1;
+      directionalArrowCount += arrow.directionalArrowCount;
+      if (arrow.directionalArrowCount > 1) bidirectionalRestraintCount += 1;
     }
     while (staging.children.length) group.add(staging.children[0]);
     backend.applySectionPlanesToGroup(group);
-    publishSupportEvidence(backend.hostElement, markerCount, arrowCount, markerRadiusMm);
+    publishSupportEvidence(backend.hostElement, {
+      markerCount,
+      restraintGlyphCount,
+      directionalArrowCount,
+      bidirectionalRestraintCount,
+      markerRadiusMm,
+      placementAuthority: projection.glyphMetrics?.placementAuthority || '',
+    });
     return bounds;
   } catch (error) {
     disposeStaging(staging, [
@@ -101,9 +112,41 @@ function supportCross(point, radiusMm, material) {
   return new THREE.LineSegments(geometry, material);
 }
 
-function supportArrow(segment, lineRow, pickMaterial, markerRadiusMm, radialSegments) {
-  const start = finiteVector(segment.start);
-  const end = finiteVector(segment.end);
+function supportArrowGroup(segment, lineRow, pickMaterial, markerRadiusMm, radialSegments) {
+  const rows = Array.isArray(segment.directionalArrows) && segment.directionalArrows.length
+    ? segment.directionalArrows
+    : [{ start: segment.start, end: segment.end, polarity: 'POSITIVE' }];
+  const group = new THREE.Group();
+  group.name = `topology-edit-compact-restraint-arrow:${segment.id || ''}`;
+  group.userData = {
+    overlay: true,
+    placementAuthority: segment.placementAuthority || '',
+    directionalArrowCount: rows.length,
+  };
+  group.renderOrder = OVERLAY_RENDER_ORDER + 2;
+  const bounds = new THREE.Box3();
+  let rendered = 0;
+  rows.forEach((row, index) => {
+    const arrow = supportArrow(
+      segment,
+      row,
+      index,
+      lineRow,
+      pickMaterial,
+      markerRadiusMm,
+      radialSegments,
+    );
+    if (!arrow) return;
+    group.add(arrow.object);
+    bounds.union(arrow.bounds);
+    rendered += 1;
+  });
+  return rendered ? { object: group, bounds, directionalArrowCount: rendered } : null;
+}
+
+function supportArrow(segment, row, index, lineRow, pickMaterial, markerRadiusMm, radialSegments) {
+  const start = finiteVector(row.start);
+  const end = finiteVector(row.end);
   if (!start || !end) return null;
   const direction = end.clone().sub(start);
   const totalLengthMm = direction.length();
@@ -112,61 +155,67 @@ function supportArrow(segment, lineRow, pickMaterial, markerRadiusMm, radialSegm
   const headLengthMm = Math.min(totalLengthMm * 0.32, markerRadiusMm * 1.25);
   const headRadiusMm = Math.max(2.5, markerRadiusMm * 0.42);
   const shaftEnd = end.clone().addScaledVector(direction, -headLengthMm);
-  const group = new THREE.Group();
-  group.name = `topology-edit-compact-restraint-arrow:${segment.id || ''}`;
-  group.userData = { overlay: true };
-  group.renderOrder = OVERLAY_RENDER_ORDER + 2;
+  const object = new THREE.Group();
+  const suffix = index === 0 ? '' : `:${String(row.polarity || index).toLowerCase()}`;
 
   if (start.distanceTo(shaftEnd) > MIN_LENGTH_MM) {
     const shaft = new THREE.Line(
       new THREE.BufferGeometry().setFromPoints([start, shaftEnd]),
       lineRow,
     );
-    shaft.name = `topology-edit-compact-restraint-shaft:${segment.id || ''}`;
-    shaft.userData = { nonPickable: true, overlay: true };
+    shaft.name = `topology-edit-compact-restraint-shaft:${segment.id || ''}${suffix}`;
+    shaft.userData = { nonPickable: true, overlay: true, polarity: row.polarity || '' };
     shaft.renderOrder = OVERLAY_RENDER_ORDER + 2;
-    group.add(shaft);
+    object.add(shaft);
   }
   const cone = new THREE.ConeGeometry(headRadiusMm, headLengthMm, 4);
   const headGeometry = new THREE.EdgesGeometry(cone, 1);
   cone.dispose();
   const head = new THREE.LineSegments(headGeometry, lineRow);
-  head.name = `topology-edit-compact-restraint-head:${segment.id || ''}`;
+  head.name = `topology-edit-compact-restraint-head:${segment.id || ''}${suffix}`;
   head.position.copy(end).addScaledVector(direction, -headLengthMm / 2);
   head.quaternion.setFromUnitVectors(Y_AXIS, direction);
-  head.userData = pickUserData(segment);
+  head.userData = { nonPickable: true, overlay: true, polarity: row.polarity || '' };
   head.renderOrder = OVERLAY_RENDER_ORDER + 3;
-  group.add(head);
+  object.add(head);
 
   const proxy = cylinderBetween(
     start,
     end,
-    Math.max(4, markerRadiusMm * 0.45),
+    Math.max(6, markerRadiusMm * 0.6),
     pickMaterial,
     radialSegments,
   );
   if (proxy) {
-    proxy.name = `topology-edit-compact-restraint-pick-proxy:${segment.id || ''}`;
+    proxy.name = `topology-edit-compact-restraint-pick-proxy:${segment.id || ''}${suffix}`;
     proxy.userData = {
       ...pickUserData(segment),
       pickProxy: true,
-      renderAuthority: 'GOVERNED_RESTRAINT_PICK_PROXY_V2',
+      polarity: row.polarity || '',
+      renderAuthority: 'GOVERNED_RESTRAINT_PICK_PROXY_V3',
     };
     proxy.renderOrder = OVERLAY_RENDER_ORDER + 4;
-    group.add(proxy);
+    object.add(proxy);
   }
   const bounds = new THREE.Box3().setFromPoints([start, end]);
   bounds.expandByScalar(headRadiusMm);
-  return { object: group, bounds };
+  return { object, bounds };
 }
 
-function publishSupportEvidence(host, markerCount, arrowCount, markerRadiusMm) {
+function publishSupportEvidence(host, metrics) {
   if (!host) return;
-  host.dataset.topologyEditRenderedSupportMarkerCount = String(markerCount);
-  host.dataset.topologyEditRenderedRestraintArrowCount = String(arrowCount);
-  host.dataset.topologyEditRenderedSupportMarkerRadiusMm = String(markerRadiusMm);
+  host.dataset.topologyEditRenderedSupportMarkerCount = String(metrics.markerCount);
+  host.dataset.topologyEditRenderedRestraintArrowCount = String(metrics.restraintGlyphCount);
+  host.dataset.topologyEditRenderedDirectionalArrowCount = String(metrics.directionalArrowCount);
+  host.dataset.topologyEditRenderedBidirectionalRestraintCount = String(
+    metrics.bidirectionalRestraintCount,
+  );
+  host.dataset.topologyEditSupportArrowPlacementAuthority = metrics.placementAuthority;
+  host.dataset.topologyEditRenderedSupportMarkerRadiusMm = String(metrics.markerRadiusMm);
   host.dataset.topologyEditRenderedSupportMarkerOpacity = String(SUPPORT_MARKER_OPACITY);
   host.dataset.topologyEditRenderedRestraintOpacity = String(RESTRAINT_OPACITY);
   host.dataset.topologyEditSupportOverlayDepthIndependent = 'true';
-  host.dataset.topologyEditVisibleSupportOverlayCount = String(markerCount + arrowCount);
+  host.dataset.topologyEditVisibleSupportOverlayCount = String(
+    metrics.markerCount + metrics.directionalArrowCount,
+  );
 }
