@@ -1,0 +1,302 @@
+name: Bucket B BB-11 flange-hub qualification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/bucket-b-bb11-flange-hub.yml'
+      - 'src/core/bucket-b/bb11-*.js'
+      - 'src/core/bucket-b/bb11-*.mjs'
+      - 'src/core/bucket-b/flange-hub-*.js'
+      - 'src/core/bucket-b/registry.js'
+      - 'src/core/bucket-b/index.js'
+      - 'tests/bucket-b-bb11-flange-hub.test.mjs'
+      - 'docs/Bucket_B_BB11_Flange_Hub_Qualification_Record.md'
+  workflow_dispatch:
+    inputs:
+      expected_head_sha:
+        description: Exact head SHA; defaults to dispatched ref.
+        required: false
+        type: string
+      expected_base_sha:
+        description: Exact current-main base SHA.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: bucket-b-bb11-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify-bb11:
+    name: Exact-head BB-11 flange-hub qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      UPSTREAM_BB10_RUN_ID: '30933001472'
+      UPSTREAM_BB10_APPROVED_HEAD_SHA: 'bcd0add8859a08c322d23595f788a1f99afd539a'
+      UPSTREAM_BB10_MERGED_HEAD_SHA: '1e7cbb13a9da66bad2d27da3fc31d7edebad5ed4'
+
+    steps:
+      - name: Resolve exact head
+        id: refs
+        shell: bash
+        env:
+          DISPATCH_HEAD_SHA: ${{ inputs.expected_head_sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          head_sha="${DISPATCH_HEAD_SHA:-${PR_HEAD_SHA:-${GITHUB_SHA}}}"
+          [[ "$head_sha" =~ ^[0-9a-fA-F]{40}$ ]]
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.refs.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Resolve live current-main base
+        id: base
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_BASE_SHA: ${{ inputs.expected_base_sha }}
+          EXACT_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          current_main="$(git rev-parse origin/main)"
+          if [[ "$EVENT_NAME" == 'workflow_dispatch' ]]; then
+            base_sha="$DISPATCH_BASE_SHA"
+          else
+            base_sha="$(git merge-base origin/main "$EXACT_HEAD_SHA")"
+          fi
+          [[ "$base_sha" =~ ^[0-9a-fA-F]{40}$ ]]
+          test "$base_sha" = "$current_main"
+          git merge-base --is-ancestor "$base_sha" "$EXACT_HEAD_SHA"
+          test "$(git rev-list --count "${EXACT_HEAD_SHA}..origin/main")" = '0'
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+          echo "current_main=$current_main" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify exact head and changed-path scope
+        shell: bash
+        env:
+          EXACT_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          BASE_SHA: ${{ steps.base.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXACT_HEAD_SHA"
+          git diff --check "${BASE_SHA}...${EXACT_HEAD_SHA}"
+          mapfile -t paths < <(git diff --name-only "${BASE_SHA}...${EXACT_HEAD_SHA}")
+          for path in "${paths[@]}"; do
+            case "$path" in
+              .github/workflows/bucket-b-bb11-flange-hub.yml|\
+              docs/Bucket_B_BB11_Flange_Hub_Qualification_Record.md|\
+              src/core/bucket-b/bb11-check.mjs|\
+              src/core/bucket-b/bb11-flange-hub.js|\
+              src/core/bucket-b/bb11-shared-gate-replay.mjs|\
+              src/core/bucket-b/flange-hub-authority.js|\
+              src/core/bucket-b/flange-hub-convergence.js|\
+              src/core/bucket-b/flange-hub-geometry.js|\
+              src/core/bucket-b/flange-hub-independent-oracle.js|\
+              src/core/bucket-b/flange-hub-loads.js|\
+              src/core/bucket-b/flange-hub-mesh.js|\
+              src/core/bucket-b/flange-hub-recovery.js|\
+              src/core/bucket-b/flange-hub-reference.js|\
+              src/core/bucket-b/flange-hub-solver.js|\
+              src/core/bucket-b/index.js|\
+              src/core/bucket-b/registry.js|\
+              tests/bucket-b-bb11-flange-hub.test.mjs) ;;
+              *) echo "BB-11 changed-path violation: $path" >&2; exit 1 ;;
+            esac
+          done
+          test "$(git diff --name-only "${BASE_SHA}...${EXACT_HEAD_SHA}" | grep -Ec '^src/core/bucket-b/axisymmetric-' || true)" = '0'
+
+      - name: Verify syntax and oracle import separation
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in src/core/bucket-b/flange-hub-*.js src/core/bucket-b/bb11-flange-hub.js src/core/bucket-b/bb11-check.mjs src/core/bucket-b/bb11-shared-gate-replay.mjs; do
+            node --check "$path"
+          done
+          test "$(grep -Ec "from './(flange-hub-(geometry|mesh|solver|recovery|convergence)|axisymmetric-|path-and-scl|convergence)" src/core/bucket-b/flange-hub-independent-oracle.js || true)" = '0'
+          node --test tests/bucket-b-bb11-flange-hub.test.mjs
+
+      - name: Replay BB-00 through BB-05 numerical gates at exact head
+        id: bb00
+        continue-on-error: true
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          BB11_UPSTREAM_BB10_APPROVED_HEAD_SHA: ${{ env.UPSTREAM_BB10_APPROVED_HEAD_SHA }}
+          BB11_SHARED_REPLAY_REPORT_PATH: reports/bucket-b-bb00-bb05-report.json
+        shell: bash
+        run: |
+          set +e
+          mkdir -p reports/bb11-prerequisite-debug
+          node src/core/bucket-b/bb11-shared-gate-replay.mjs \
+            > reports/bb11-prerequisite-debug/bb00-bb05.stdout.log \
+            2> reports/bb11-prerequisite-debug/bb00-bb05.stderr.log
+          status=$?
+          printf '%s\n' "$status" > reports/bb11-prerequisite-debug/bb00-bb05.exit-code.txt
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload BB-00 through BB-05 diagnostic custody
+        if: always()
+        id: bb00_debug
+        uses: actions/upload-artifact@v4
+        with:
+          name: bucket-b-bb11-prerequisite-debug-${{ steps.refs.outputs.head_sha }}-${{ github.run_attempt }}
+          path: |
+            reports/bb11-prerequisite-debug
+            reports/bucket-b-bb00-bb05-report.json
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Enforce BB-00 through BB-05 replay
+        shell: bash
+        env:
+          EXIT_CODE: ${{ steps.bb00.outputs.exit_code }}
+        run: |
+          set -euo pipefail
+          test "$EXIT_CODE" = '0'
+
+      - name: Replay BB-06
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          BB06_REPORT_PATH: reports/bucket-b-bb06-report.json
+        run: node src/core/bucket-b/bb06-check.mjs
+
+      - name: Replay BB-07
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          BB06_REPORT_PATH: reports/bucket-b-bb06-report.json
+          BB07_REPORT_PATH: reports/bucket-b-bb07-report.json
+        run: node src/core/bucket-b/bb07-check.mjs
+
+      - name: Replay BB-08
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          BB07_REPORT_PATH: reports/bucket-b-bb07-report.json
+          BB08_REPORT_PATH: reports/bucket-b-bb08-report.json
+        run: node src/core/bucket-b/bb08-check.mjs
+
+      - name: Replay BB-09 when present
+        id: bb09
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          if [[ -f src/core/bucket-b/bb09-check.mjs ]]; then
+            EXPECTED_HEAD_SHA="$EXPECTED_HEAD_SHA" \
+            BB08_REPORT_PATH=reports/bucket-b-bb08-report.json \
+            BB09_REPORT_PATH=reports/bucket-b-bb09-report.json \
+            node src/core/bucket-b/bb09-check.mjs
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download retained upstream BB-10 artifact
+        id: upstream
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p upstream-bb10
+          gh run download "$UPSTREAM_BB10_RUN_ID" --repo "$GITHUB_REPOSITORY" --dir upstream-bb10
+          report="$(find upstream-bb10 -type f -name 'bucket-b-bb10-axisymmetric-registration-report.json' -print -quit)"
+          test -n "$report"
+          echo "report=$report" >> "$GITHUB_OUTPUT"
+
+      - name: Execute BB-11 evidence and approval twice internally
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          EXPECTED_BASE_SHA: ${{ steps.base.outputs.base_sha }}
+          CURRENT_MAIN_SHA: ${{ steps.base.outputs.current_main }}
+          BB11_OUTPUT_DIR: reports/bb11
+          BB11_UPSTREAM_BB10_REPORT_PATH: ${{ steps.upstream.outputs.report }}
+          BB11_UPSTREAM_BB10_MERGED_HEAD_SHA: ${{ env.UPSTREAM_BB10_MERGED_HEAD_SHA }}
+          BB11_UPSTREAM_ARTIFACT_ID: '8901921021'
+          BB11_UPSTREAM_ARTIFACT_DIGEST: 'sha256:317731aefd35b87bce2b7221704a1e34753aba97bb4513310001b407346b74b7'
+          BB11_BB00_BB05_REPORT_PATH: reports/bucket-b-bb00-bb05-report.json
+          BB11_BB06_REPORT_PATH: reports/bucket-b-bb06-report.json
+          BB11_BB07_REPORT_PATH: reports/bucket-b-bb07-report.json
+          BB11_BB08_REPORT_PATH: reports/bucket-b-bb08-report.json
+          BB11_BB09_REPORT_PATH: ${{ steps.bb09.outputs.present == 'true' && 'reports/bucket-b-bb09-report.json' || '' }}
+          TZ: UTC
+          LC_ALL: C
+        run: node src/core/bucket-b/bb11-check.mjs
+
+      - name: Upload raw BB-11 evidence
+        if: always()
+        id: raw_artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bucket-b-bb11-raw-${{ steps.refs.outputs.head_sha }}-${{ github.run_attempt }}
+          path: |
+            reports/bucket-b-bb00-bb05-report.json
+            reports/bucket-b-bb06-report.json
+            reports/bucket-b-bb07-report.json
+            reports/bucket-b-bb08-report.json
+            reports/bucket-b-bb09-report.json
+            reports/bb11
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Generate byte-identical exact-head reports
+        shell: bash
+        env:
+          BB11_OUTPUT_DIR: reports/bb11
+          BB11_ARTIFACT_ID: ${{ steps.raw_artifact.outputs.artifact-id }}
+          BB11_ARTIFACT_DIGEST: ${{ steps.raw_artifact.outputs.artifact-digest }}
+        run: |
+          set -euo pipefail
+          node src/core/bucket-b/bb11-check.mjs --finalize > reports/bb11/bucket-b-bb11-finalize-stdout.json
+          cp reports/bb11/bucket-b-bb11-report.json reports/bb11/bucket-b-bb11-report-replay.json
+          node src/core/bucket-b/bb11-check.mjs --finalize > reports/bb11/bucket-b-bb11-finalize-stdout-replay.json
+          cmp reports/bb11/bucket-b-bb11-report.json reports/bb11/bucket-b-bb11-report-replay.json
+          cmp reports/bb11/bucket-b-bb11-finalize-stdout.json reports/bb11/bucket-b-bb11-finalize-stdout-replay.json
+
+      - name: Upload final BB-11 report
+        id: final_artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bucket-b-bb11-final-${{ steps.refs.outputs.head_sha }}-${{ github.run_attempt }}
+          path: |
+            reports/bb11/bucket-b-bb11-report.json
+            reports/bb11/bucket-b-bb11-report-replay.json
+            reports/bb11/bucket-b-bb11-finalize-stdout.json
+            reports/bb11/bucket-b-bb11-finalize-stdout-replay.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish workflow custody summary
+        shell: bash
+        run: |
+          {
+            echo '### BB-11 exact-head custody'
+            echo ''
+            echo '- Exact head: `${{ steps.refs.outputs.head_sha }}`'
+            echo '- Base/current main: `${{ steps.base.outputs.base_sha }}`'
+            echo '- Raw artifact ID: `${{ steps.raw_artifact.outputs.artifact-id }}`'
+            echo '- Raw artifact digest: `${{ steps.raw_artifact.outputs.artifact-digest }}`'
+            echo '- Final artifact ID: `${{ steps.final_artifact.outputs.artifact-id }}`'
+            echo '- Final artifact digest: `${{ steps.final_artifact.outputs.artifact-digest }}`'
+          } >> "$GITHUB_STEP_SUMMARY"
