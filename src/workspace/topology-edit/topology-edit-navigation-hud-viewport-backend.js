@@ -120,13 +120,13 @@ export class TopologyEditNavigationHudViewportBackend extends TopologyEditSuppor
       this.renderer.setPixelRatio(policy.pixelRatio);
       this.resize();
     }
-    if (host) {
-      host.dataset.topologyEditLargeModelTier = policy.tier;
-      host.dataset.topologyEditRenderItemCount = String(policy.renderItemCount);
-      host.dataset.topologyEditRequestedPixelRatio = String(policy.requestedPixelRatio);
-      host.dataset.topologyEditAppliedPixelRatio = String(policy.pixelRatio);
-      host.dataset.topologyEditGpuFirstPicking = String(policy.gpuFirstPicking);
-    }
+    performanceEvidenceHosts(host).forEach((evidenceHost) => {
+      evidenceHost.dataset.topologyEditLargeModelTier = policy.tier;
+      evidenceHost.dataset.topologyEditRenderItemCount = String(policy.renderItemCount);
+      evidenceHost.dataset.topologyEditRequestedPixelRatio = String(policy.requestedPixelRatio);
+      evidenceHost.dataset.topologyEditAppliedPixelRatio = String(policy.pixelRatio);
+      evidenceHost.dataset.topologyEditGpuFirstPicking = String(policy.gpuFirstPicking);
+    });
     return policy;
   }
 
@@ -184,4 +184,9 @@ export function engineeringBasisQuaternion() {
 
 function isExactGpuSample(hit) {
   return Number(hit?.sample?.distanceSquared) === 0;
+}
+
+function performanceEvidenceHosts(host) {
+  const shell = host?.closest?.('[data-role="topology-edit-render-host"]');
+  return [...new Set([host, shell].filter(Boolean))];
 }
