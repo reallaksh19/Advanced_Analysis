@@ -33,7 +33,7 @@ test('production Sjson compact support scene fits completely inside the WebGL vi
   }).toBe(FIT_ALGORITHM);
   await expect(host).toHaveAttribute('data-topology-edit-support-render-style', SUPPORT_RENDER_STYLE);
   await expect(host).toHaveAttribute('data-topology-edit-support-render-authority', SUPPORT_RENDER_AUTHORITY);
-  await expect.poll(() => Number(host.getAttribute('data-topology-edit-compact-support-marker-radius-mm')), {
+  await expect.poll(async () => Number(await host.getAttribute('data-topology-edit-compact-support-marker-radius-mm')), {
     timeout: 60_000,
   }).toBeCloseTo(12.6, 6);
 
