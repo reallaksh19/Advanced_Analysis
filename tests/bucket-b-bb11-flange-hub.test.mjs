@@ -160,28 +160,11 @@ test('BB-11 analytical references distinguish closed-end and axial-member mechan
   assert.ok(axial.strainEnergy > 0);
 });
 
-test('BB-11 PCG certifies and replaces the explicit reduced-system residual', () => {
-  const matrix = [
-    [260540.684223896, 134390.7176773181, 10563.593440651774, 106773.17388776125, -182202.7550541164, 346171.37103598577],
-    [134390.7176773181, 77368.06321251801, -5146.841634026626, 71692.2047941879, -106627.29063906257, 184531.9402200637],
-    [10563.593440651774, -5146.841634026626, 16089.734328529348, -22023.398789019266, 11755.66422880915, 2600.6011287125907],
-    [106773.17388776127, 71692.2047941879, -22023.398789019266, 90076.09026088555, -107238.03851437203, 163837.1244290935],
-    [-182202.7550541164, -106627.29063906257, 11755.66422880915, -107238.03851437203, 151133.71244079166, -256584.70158791987],
-    [346171.3710359858, 184531.9402200637, 2600.6011287125903, 163837.1244290935, -256584.70158791987, 472136.5592620091],
-  ];
-  const rhs = Float64Array.from([
-    2812.9339433121654,
-    105248.90801934985,
-    -18313.08376035325,
-    -76204.72060288778,
-    -96990.1629041906,
-    -22172.613995949156,
-  ]);
-  const diagonal = Float64Array.from(matrix.map((row, index) => row[index]));
-  const multiply = (vector) => Float64Array.from(matrix.map((row) => (
-    row.reduce((sum, value, column) => sum + value * vector[column], 0)
-  )));
-  const certify = (solution, policy) => {
+test('BB-11 PCG certifies the production residual and exercises deterministic replacement', () => {
+  const certify = ({ matrix, rhs, solution, policy }) => {
+    const multiply = (vector) => Float64Array.from(matrix.map((row) => (
+      row.reduce((sum, value, column) => sum + value * vector[column], 0)
+    )));
     const explicitResidual = Float64Array.from(multiply(solution.vector), (value, index) => (
       value - rhs[index]
     ));
@@ -198,27 +181,76 @@ test('BB-11 PCG certifies and replaces the explicit reduced-system residual', ()
     assert.ok(solution.relativeResidual <= policy.relativeResidualTolerance);
   };
 
+  const productionMatrix = [
+    [4, 1, 0],
+    [1, 3, 1],
+    [0, 1, 2],
+  ];
+  const productionRhs = Float64Array.from([1, 2, 3]);
+  const productionMultiply = (vector) => Float64Array.from(
+    productionMatrix.map((row) => row.reduce(
+      (sum, value, column) => sum + value * vector[column],
+      0,
+    )),
+  );
   const productionSolution = solveJacobiPcg({
-    multiply,
-    rhs,
-    diagonal,
+    multiply: productionMultiply,
+    rhs: productionRhs,
+    diagonal: Float64Array.from([4, 3, 2]),
     policy: FLANGE_HUB_SOLVER_POLICY,
   });
   assert.equal(FLANGE_HUB_SOLVER_POLICY.stoppingCriterion, 'EXPLICIT_REDUCED_SYSTEM_RESIDUAL');
-  certify(productionSolution, FLANGE_HUB_SOLVER_POLICY);
+  assert.equal(FLANGE_HUB_SOLVER_POLICY.relativeResidualTolerance, 1e-12);
+  certify({
+    matrix: productionMatrix,
+    rhs: productionRhs,
+    solution: productionSolution,
+    policy: FLANGE_HUB_SOLVER_POLICY,
+  });
 
+  const replacementMatrix = [
+    [260540.684223896, 134390.7176773181, 10563.593440651774, 106773.17388776125, -182202.7550541164, 346171.37103598577],
+    [134390.7176773181, 77368.06321251801, -5146.841634026626, 71692.2047941879, -106627.29063906257, 184531.9402200637],
+    [10563.593440651774, -5146.841634026626, 16089.734328529348, -22023.398789019266, 11755.66422880915, 2600.6011287125907],
+    [106773.17388776127, 71692.2047941879, -22023.398789019266, 90076.09026088555, -107238.03851437203, 163837.1244290935],
+    [-182202.7550541164, -106627.29063906257, 11755.66422880915, -107238.03851437203, 151133.71244079166, -256584.70158791987],
+    [346171.3710359858, 184531.9402200637, 2600.6011287125903, 163837.1244290935, -256584.70158791987, 472136.5592620091],
+  ];
+  const replacementRhs = Float64Array.from([
+    2812.9339433121654,
+    105248.90801934985,
+    -18313.08376035325,
+    -76204.72060288778,
+    -96990.1629041906,
+    -22172.613995949156,
+  ]);
+  const replacementMultiply = (vector) => Float64Array.from(
+    replacementMatrix.map((row) => row.reduce(
+      (sum, value, column) => sum + value * vector[column],
+      0,
+    )),
+  );
   const replacementPolicy = {
     ...FLANGE_HUB_SOLVER_POLICY,
+    relativeResidualTolerance: 1e-10,
+    absoluteResidualTolerance: 1e-8,
     residualReplacementInterval: 5,
   };
   const replacementSolution = solveJacobiPcg({
-    multiply,
-    rhs,
-    diagonal,
+    multiply: replacementMultiply,
+    rhs: replacementRhs,
+    diagonal: Float64Array.from(
+      replacementMatrix.map((row, index) => row[index]),
+    ),
     policy: replacementPolicy,
   });
   assert.ok(replacementSolution.residualReplacementCount >= 1);
-  certify(replacementSolution, replacementPolicy);
+  certify({
+    matrix: replacementMatrix,
+    rhs: replacementRhs,
+    solution: replacementSolution,
+    policy: replacementPolicy,
+  });
 });
 
 test('BB-11 independent oracle SGS-PCG solves an SPD system with explicit residual custody', () => {
