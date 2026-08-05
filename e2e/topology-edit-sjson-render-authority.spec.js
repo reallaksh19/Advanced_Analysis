@@ -17,6 +17,12 @@ const BENCHMARK_ENGINEERING_DIRECTION = Object.freeze({
   y: 0.6154574548966636,
   z: 0.49236596391733095,
 });
+const SUPPORT_RESTRAINT_AUTHORITY =
+  'TOPO_VALIDATOR_SUPPORT_HIERARCHY_POSITION_RESTRAINT_ARRAY';
+const SUPPORT_GROUPING_AUTHORITY =
+  'MDSSREF_MDSGUIDEREF_PREV_NAME_THEN_POSITION_0_001MM';
+const SUPPORT_RESTRAINT_RESOLUTION_AUTHORITY =
+  'TOPO_VALIDATOR_SJ_RESTRAINT_RESOLVER';
 
 test.beforeEach(async ({ page }) => {
   test.setTimeout(120_000);
@@ -24,7 +30,7 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => globalThis.localStorage?.clear());
 });
 
-test('production Sjson opens 3D Edit with complete typed fittings and spatially distinct supports', async ({ page }, testInfo) => {
+test('production Sjson opens 3D Edit with complete typed fittings and Topo validator support parity', async ({ page }, testInfo) => {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
 
   await page.locator('[data-role="dataset-file"]').setInputFiles({
@@ -79,12 +85,53 @@ test('production Sjson opens 3D Edit with complete typed fittings and spatially 
   await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-support-overlay-count'), {
     timeout: 60_000,
   }).toBeGreaterThan(0);
+
   await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-exact-support-origin-count'), {
     timeout: 60_000,
-  }).toBeGreaterThanOrEqual(37);
+  }).toBe(37);
+  await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-raw-support-count'), {
+    timeout: 60_000,
+  }).toBe(139);
+  await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-projected-source-support-count'), {
+    timeout: 60_000,
+  }).toBe(137);
+  await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-deferred-source-support-count'), {
+    timeout: 60_000,
+  }).toBe(2);
+  await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-support-anchor-count'), {
+    timeout: 60_000,
+  }).toBe(34);
+  await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-native-restraint-record-count'), {
+    timeout: 60_000,
+  }).toBe(47);
+  await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-collapsed-source-support-count'), {
+    timeout: 60_000,
+  }).toBe(103);
+  await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-hierarchy-support-merge-count'), {
+    timeout: 60_000,
+  }).toBe(42);
+  await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-position-support-merge-count'), {
+    timeout: 60_000,
+  }).toBe(61);
+  await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-projected-restraint-direction-count'), {
+    timeout: 60_000,
+  }).toBe(47);
   await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-distinct-support-origin-count'), {
     timeout: 60_000,
-  }).toBeGreaterThanOrEqual(37);
+  }).toBe(34);
+  await expect.poll(() => canvasHost.getAttribute('data-topology-edit-support-restraint-authority'), {
+    timeout: 60_000,
+  }).toBe(SUPPORT_RESTRAINT_AUTHORITY);
+  await expect.poll(() => canvasHost.getAttribute('data-topology-edit-support-restraint-grouping-authority'), {
+    timeout: 60_000,
+  }).toBe(SUPPORT_GROUPING_AUTHORITY);
+  await expect.poll(() => canvasHost.getAttribute('data-topology-edit-support-restraint-resolution-authority'), {
+    timeout: 60_000,
+  }).toBe(SUPPORT_RESTRAINT_RESOLUTION_AUTHORITY);
+  await expect.poll(() => canvasHost.getAttribute('data-topology-edit-support-restraint-authority-hash'), {
+    timeout: 60_000,
+  }).not.toBe('');
+
   await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-visual-proxy-warning-count'), {
     timeout: 60_000,
   }).toBeGreaterThan(0);
@@ -121,7 +168,7 @@ test('production Sjson opens 3D Edit with complete typed fittings and spatially 
     const canvasElement = element.querySelector('canvas');
     const canvasRect = canvasElement?.getBoundingClientRect();
     return {
-      schema: 'topology-edit-sjson-webgl-ledger/v1',
+      schema: 'topology-edit-sjson-webgl-ledger/v2',
       baseCandidateSha: args.baseCandidateSha,
       executingCandidateSha: args.executingCandidateSha,
       browserBuildSha: globalThis.__BUILD_SHA__ || null,
@@ -170,10 +217,27 @@ test('production Sjson opens 3D Edit with complete typed fittings and spatially 
         olet: Number(element.dataset.topologyEditOletPrimitiveCount || 0),
         diagnostic: Number(element.dataset.topologyEditDiagnosticPrimitiveCount || 0),
       },
+      supportAuthority: {
+        authority: element.dataset.topologyEditSupportRestraintAuthority || '',
+        groupingAuthority: element.dataset.topologyEditSupportRestraintGroupingAuthority || '',
+        restraintResolutionAuthority:
+          element.dataset.topologyEditSupportRestraintResolutionAuthority || '',
+        authorityHash: element.dataset.topologyEditSupportRestraintAuthorityHash || '',
+      },
       supportCounts: {
-        overlay: Number(element.dataset.topologyEditSupportOverlayCount || 0),
-        exactOrigin: Number(element.dataset.topologyEditExactSupportOriginCount || 0),
-        distinctOrigin: Number(element.dataset.topologyEditDistinctSupportOriginCount || 0),
+        legacyOverlay: Number(element.dataset.topologyEditSupportOverlayCount || 0),
+        exactRawAttachmentOrigin: Number(element.dataset.topologyEditExactSupportOriginCount || 0),
+        rawSource: Number(element.dataset.topologyEditRawSupportCount || 0),
+        projectedSource: Number(element.dataset.topologyEditProjectedSourceSupportCount || 0),
+        deferredSource: Number(element.dataset.topologyEditDeferredSourceSupportCount || 0),
+        supportAnchor: Number(element.dataset.topologyEditSupportAnchorCount || 0),
+        nativeRestraintRecord: Number(element.dataset.topologyEditNativeRestraintRecordCount || 0),
+        collapsedSource: Number(element.dataset.topologyEditCollapsedSourceSupportCount || 0),
+        hierarchyMerge: Number(element.dataset.topologyEditHierarchySupportMergeCount || 0),
+        positionMerge: Number(element.dataset.topologyEditPositionSupportMergeCount || 0),
+        projectedRestraintDirection:
+          Number(element.dataset.topologyEditProjectedRestraintDirectionCount || 0),
+        distinctProjectedOrigin: Number(element.dataset.topologyEditDistinctSupportOriginCount || 0),
       },
     };
   }, {
@@ -200,6 +264,26 @@ test('production Sjson opens 3D Edit with complete typed fittings and spatially 
   expect(ledger.diameterAuthorityCounts.parentBranch).toBeGreaterThanOrEqual(100);
   expect(ledger.diameterAuthorityCounts.referencedBranch).toBeGreaterThanOrEqual(13);
   expect(ledger.diameterAuthorityCounts.supportParentBranch).toBeGreaterThanOrEqual(100);
+  expect(ledger.supportAuthority).toEqual({
+    authority: SUPPORT_RESTRAINT_AUTHORITY,
+    groupingAuthority: SUPPORT_GROUPING_AUTHORITY,
+    restraintResolutionAuthority: SUPPORT_RESTRAINT_RESOLUTION_AUTHORITY,
+    authorityHash: ledger.supportAuthority.authorityHash,
+  });
+  expect(ledger.supportAuthority.authorityHash).not.toBe('');
+  expect(ledger.supportCounts).toMatchObject({
+    exactRawAttachmentOrigin: 37,
+    rawSource: 139,
+    projectedSource: 137,
+    deferredSource: 2,
+    supportAnchor: 34,
+    nativeRestraintRecord: 47,
+    collapsedSource: 103,
+    hierarchyMerge: 42,
+    positionMerge: 61,
+    projectedRestraintDirection: 47,
+    distinctProjectedOrigin: 34,
+  });
 
   const ledgerPath = testInfo.outputPath('sjson-3d-edit-render-ledger.json');
   writeFileSync(ledgerPath, `${JSON.stringify(ledger, null, 2)}\n`, 'utf8');
