@@ -85,7 +85,10 @@ test('production Sjson opens 3D Edit with complete typed fittings and spatially 
   expect(bodyText).not.toContain('TopologyEditCanonicalId:');
   await expect(shell.locator('[data-role="topology-edit-status"]')).toContainText(/nodes, .*edges, .*supports/u);
 
-  const ledger = await canvasHost.evaluate(({ baseCandidateSha, executingCandidateSha }, element) => ({
+  const ledger = await canvasHost.evaluate((element, {
+    baseCandidateSha,
+    executingCandidateSha,
+  }) => ({
     schema: 'topology-edit-sjson-webgl-ledger/v1',
     baseCandidateSha,
     executingCandidateSha,
