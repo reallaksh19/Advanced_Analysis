@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import * as THREE from 'three';
 
 import {
   TOPOLOGY_EDIT_ISSUE_OVERLAY_SCHEMA,
@@ -33,16 +32,12 @@ const CONFIGURATION = {
 
 test('governed route renders visible envelopes with direct picks, physical radius lineage, and larger proxies', () => {
   const backend = new TopologyEditSjsonGovernedViewportBackend({ navigationConfiguration: CONFIGURATION });
-  backend.engineeringBounds = new THREE.Box3(
-    new THREE.Vector3(0, 0, 0),
-    new THREE.Vector3(100_000, 0, 0),
-  );
   backend.renderProjection(backend.groups.draftGroup, {
     schema: TOPOLOGY_EDIT_SJSON_GOVERNED_PROJECTION_SCHEMA,
     renderStyle: TOPOLOGY_EDIT_SJSON_EDIT_DRAFT_RENDER_STYLE,
     compactSegments: [{
       id: 'pipe:1', entityId: 'edge:1', kind: 'PIPE', radiusMm: 50,
-      start: { x: 0, y: 0, z: 0 }, end: { x: 100, y: 0, z: 0 },
+      start: { x: 0, y: 0, z: 0 }, end: { x: 100_000, y: 0, z: 0 },
       pickTarget: { modelRole: 'draft', objectKind: 'component', objectId: 'edge:1' },
     }],
     compactElements: [{
