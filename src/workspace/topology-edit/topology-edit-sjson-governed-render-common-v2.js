@@ -26,15 +26,15 @@ export function clamp(value, minimum, maximum) {
 }
 
 export function nodeVisualRadius(configuration) {
-  return clamp((positive(configuration?.pickingRadius) || 28) * 0.15, 3, 5);
+  return clamp((positive(configuration?.pickingRadius) || 28) * 0.15, 3, 6);
 }
 
 export function nodePickRadius(configuration) {
-  return clamp((positive(configuration?.pickingRadius) || 28) * 0.6, 10, 18);
+  return clamp((positive(configuration?.pickingRadius) || 28) * 0.9, 16, 30);
 }
 
 export function routePickRadius(configuration) {
-  return clamp((positive(configuration?.pickingRadius) || 28) * 0.22, 4, 8);
+  return clamp((positive(configuration?.pickingRadius) || 28) * 0.45, 8, 16);
 }
 
 export function lineMaterial(cache, colorValue, opacity, depthTest = true) {
