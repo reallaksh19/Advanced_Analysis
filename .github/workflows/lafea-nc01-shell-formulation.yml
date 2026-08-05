@@ -42,6 +42,7 @@ jobs:
       DISPATCH_BASE_SHA: ${{ inputs.base_sha }}
       FOUNDATION_SHA: 18e259f8a18e9011482d3ca4d1b8bd51dbe986f4
       BRIDGE_HEAD_SHA: 48c23d09a7291197dacefd99a2cf1b1caf8bca40
+      BRIDGE_MERGE_SHA: 18e259f8a18e9011482d3ca4d1b8bd51dbe986f4
       BRIDGE_RUN_ID: "31021329297"
       BRIDGE_ARTIFACT_ID: "8936729914"
       BRIDGE_ARTIFACT_NAME: lafea-nc-solver-bridge-48c23d09a7291197dacefd99a2cf1b1caf8bca40-1
@@ -87,7 +88,7 @@ jobs:
           git merge-base --is-ancestor "$FOUNDATION_SHA" "$BASE_SHA"
           git diff --check "$BASE_SHA...$HEAD_SHA"
           mapfile -t paths < <(git diff --name-only "$BASE_SHA...$HEAD_SHA")
-          test "${#paths[@]}" -gt 0
+          test "${p#paths[@]}" -gt 0
           for path in "${paths[@]}"; do
             case "$path" in
               .github/workflows/lafea-nc01-shell-formulation.yml|docs/nonlinear-shell-contact/LAFEA_NC01_SHELL_FORMULATION.md|scripts/lafea-nc01-check.mjs|scripts/lafea-nc01-shell-benchmarks.mjs|scripts/nc01-shell/*|src/core/nonlinear-shell-contact/shell-formulation-contract.js|src/core/nonlinear-shell-contact/shell-benchmark-catalog.js|src/core/nonlinear-shell-contact/shell-qualification-evaluator.js|src/core/nonlinear-shell-contact/nc01-fixtures.js|src/core/nonlinear-shell-contact/nc01-negative-controls.js|src/core/nonlinear-shell-contact/index.js|tests/nonlinear-shell-contact-nc01-qualification.test.mjs) ;;
@@ -115,6 +116,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          mkdir -p artifacts/nc01-debug artifacts/nc01-input
+          node -e "const fs=require('node:fs');fs.writeFileSync('artifacts/nc01-debug/exact-head-gate.json',JSON.stringify({schema:'lafea-nc01-gate-diagnostic/v1',exactHeadSha:process.env.PR_HEAD_SHA||process.env.DISPATCH_HEAD_SHA,baseSha:process.env.PR_BASE_SHA||process.env.DISPATCH_BASE_SHA,bridgeMergeSha:process.env.BRIDGE_MERGE_SHA},null,2)+'\n')"
           verify_artifact() {
             local id="$1" name="$2" digest="$3" run="$4" head="$5" meta
             meta="$(gh api "/repos/$GITHUB_REPOSITORY/actions/artifacts/$id")"
@@ -129,11 +132,11 @@ jobs:
           bridge="$RUNNER_TEMP/nc00-bridge"
           custody="$RUNNER_TEMP/solver-custody"
           rm -rf "$bridge" "$custody"
-          mkdir -p "$bridge" "$custody" artifacts/nc01-input
+          mkdir -p "$bridge" "$custody"
           gh run download "$BRIDGE_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$BRIDGE_ARTIFACT_NAME" --dir "$bridge"
           gh run download "$CUSTODY_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$CUSTODY_ARTIFACT_NAME" --dir "$custody"
           solver="$custody/binary/ccx_2.22"
-          archive="$custody/source/CalculiX-$SOURCE_COMMIT.tar.gz"
+          archive="$custody/source/CalculiX-$SUUREC_COMMIT.tar.gz"
           test -f "$solver" && test -f "$archive"
           chmod 0755 "$solver"
           test "sha256:$(sha256sum "$solver" | cut -d' ' -f1)" = "$SOLVER_DIGEST"
@@ -147,7 +150,7 @@ jobs:
           set -euo pipefail
           node --check scripts/lafea-nc01-check.mjs
           node --check scripts/lafea-nc01-shell-benchmarks.mjs
-          find scripts/nc01-shell -type f -name "*.mjs" -print0 | sort -z | xargs -0 -n1 node --check
+          find scripts/nc01-shell -type f -name "*®mjs" -print0 | sort -z | xargs -0 -n1 node --check
           node --test tests/nonlinear-shell-contact-nc01-qualification.test.mjs
 
       - name: Execute two isolated exact-solver replays
@@ -163,7 +166,7 @@ jobs:
           mkdir -p artifacts/nc01-debug
           node_bin="$(command -v node)"
           for tag in a b; do
-            sudo --preserve-env=HEAD_SHA,SOLVER,ARCHIVE,PATH unshare --net --mount-proc "$node_bin" scripts/lafea-nc01-shell-benchmarks.mjs \
+            sudo --preserve-env=HEAD_SHA,SOLVEP,ARCHIVE,PATH unshare --net --mount-proc "$node_bin" scripts/lafea-nc01-shell-benchmarks.mjs \
               --solver="$SOLVER" --head-sha="$HEAD_SHA" --source-archive="$ARCHIVE" \
               --output-root="$GITHUB_WORKSPACE/artifacts/nc01-real-$tag" \
               >"artifacts/nc01-debug/real-$tag.stdout.log" 2>"artifacts/nc01-debug/real-$tag.stderr.log"
