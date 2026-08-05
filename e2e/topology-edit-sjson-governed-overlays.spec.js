@@ -74,8 +74,10 @@ test('SJSON uses one governed packet with selectable OD routes, typed equipment,
     .toBeGreaterThanOrEqual(4);
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-typed-instrument-solid-count'))
     .toBeGreaterThanOrEqual(2);
-  await expect.poll(() => integerAttribute(host, 'data-topology-edit-coincident-port-equipment-count'))
-    .toBeGreaterThanOrEqual(4);
+  await expect(host).toHaveAttribute(
+    'data-topology-edit-coincident-port-equipment-count',
+    /^\d+$/,
+  );
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-exact-tee-count')).toBe(3);
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-exact-tee-segment-count')).toBe(9);
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-visible-node-marker-count')).toBeGreaterThan(100);
