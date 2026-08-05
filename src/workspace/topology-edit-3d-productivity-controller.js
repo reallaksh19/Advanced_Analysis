@@ -1,10 +1,10 @@
-import './topology-edit-productivity.css';
 import {
   TopologyEdit3DViewController as ProfessionalController,
 } from './topology-edit-3d-professional-controller.js';
 import {
   TopologyEditCleanShellRuntime,
 } from './viewport-productivity/topology-edit-clean-shell-runtime.js';
+import './topology-edit-productivity.css';
 
 /** Adds presentation-only productivity behavior without acquiring topology authority. */
 export class TopologyEdit3DViewController extends ProfessionalController {
