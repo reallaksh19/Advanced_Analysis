@@ -10,6 +10,8 @@ import {
 } from './topology-edit-sjson-edit-draft-projection.js';
 
 const MIN_LENGTH_MM = 1e-7;
+const TOPO_VALIDATOR_COMPACT_SUPPORT_MARKER_OPACITY = 0.15;
+const TOPO_VALIDATOR_COMPACT_RESTRAINT_OPACITY = 0.5;
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
 
 /**
@@ -86,6 +88,8 @@ export class TopologyEditSjsonEditDraftNavigationHudViewportBackend
       projection.compactMarkerRadiusMm,
       'TOPOLOGY_EDIT_COMPACT_SUPPORT_MARKER_POLICY_MISSING',
     );
+    const markerOpacity = Math.min(opacity, TOPO_VALIDATOR_COMPACT_SUPPORT_MARKER_OPACITY);
+    const restraintOpacity = Math.min(opacity, TOPO_VALIDATOR_COMPACT_RESTRAINT_OPACITY);
     const staging = new THREE.Group();
     const materials = new Map();
     let markerCount = 0;
@@ -93,7 +97,7 @@ export class TopologyEditSjsonEditDraftNavigationHudViewportBackend
     try {
       for (const element of projection.elements || []) {
         if (!finiteElement(element)) continue;
-        const material = cachedMaterial(materials, 0x22d3ee, opacity);
+        const material = cachedMaterial(materials, 0x22d3ee, markerOpacity);
         const marker = new THREE.Mesh(
           new THREE.SphereGeometry(
             markerRadiusMm,
@@ -111,7 +115,7 @@ export class TopologyEditSjsonEditDraftNavigationHudViewportBackend
       for (const segment of projection.segments || []) {
         const arrow = compactSupportArrow(
           segment,
-          cachedMaterial(materials, segment.colorInt, opacity),
+          cachedMaterial(materials, segment.colorInt, restraintOpacity),
           markerRadiusMm,
           this.navigationConfiguration.meshRadialSegments,
         );
@@ -130,6 +134,8 @@ export class TopologyEditSjsonEditDraftNavigationHudViewportBackend
       this.hostElement.dataset.topologyEditRenderedSupportMarkerCount = String(markerCount);
       this.hostElement.dataset.topologyEditRenderedRestraintArrowCount = String(arrowCount);
       this.hostElement.dataset.topologyEditRenderedSupportMarkerRadiusMm = String(markerRadiusMm);
+      this.hostElement.dataset.topologyEditRenderedSupportMarkerOpacity = String(markerOpacity);
+      this.hostElement.dataset.topologyEditRenderedRestraintOpacity = String(restraintOpacity);
     }
     return bounds;
   }
