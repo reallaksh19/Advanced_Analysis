@@ -4,6 +4,7 @@ import { APPLICATION_EVENTS, EVENT_TOPICS } from './event-topics.js';
 
 const STORAGE_KEY = 'workspace-layout-prefs/v2';
 const PANEL_MINIMUM_PX = 200;
+const FOCUS_PANEL_WIDTH_PX = 48;
 
 /** Owns layout, shared-view switching, and panel resizing only. */
 export class WorkspaceShellController {
@@ -49,6 +50,7 @@ export class WorkspaceShellController {
     const next = Boolean(active);
     if (this.state.topologyEdit3DActive === next) return;
     this.state.topologyEdit3DActive = next;
+    this.applyPanelLayout();
     this.updateViewportTabButtons();
     this.applyViewportLayout();
   }
@@ -120,7 +122,7 @@ export class WorkspaceShellController {
 
   togglePanel(key) {
     this.state[key] = !this.state[key];
-    this.applyState();
+    this.applyPanelLayout();
     this.saveState();
   }
 
@@ -131,7 +133,7 @@ export class WorkspaceShellController {
 
   pointerDown(event) {
     const resizer = event.target.closest('.panel-resizer');
-    if (!resizer) return;
+    if (!resizer || this.state.topologyEdit3DActive) return;
     const tree = this.shellElement.querySelector('.tree-panel');
     const properties = this.shellElement.querySelector('.properties-panel');
     this.dragContext = {
@@ -152,7 +154,7 @@ export class WorkspaceShellController {
     const delta = event.clientX - this.dragContext.startX;
     if (this.dragContext.action === 'resize-left') this.state.leftPanelWidth = clamp(this.dragContext.leftWidth + delta, PANEL_MINIMUM_PX, this.dragContext.maximumWidth);
     if (this.dragContext.action === 'resize-right') this.state.rightPanelWidth = clamp(this.dragContext.rightWidth - delta, PANEL_MINIMUM_PX, this.dragContext.maximumWidth);
-    this.applyState();
+    this.applyPanelLayout();
   }
 
   pointerUp() {
@@ -164,13 +166,22 @@ export class WorkspaceShellController {
     globalThis.dispatchEvent?.(new Event('resize'));
   }
 
+  applyPanelLayout() {
+    if (!this.shellElement) return;
+    const focus = this.state.topologyEdit3DActive;
+    const treeCollapsed = focus || this.state.treeCollapsed;
+    const propertiesCollapsed = focus || this.state.propertiesCollapsed;
+    const left = treeCollapsed ? FOCUS_PANEL_WIDTH_PX : this.state.leftPanelWidth;
+    const right = propertiesCollapsed ? FOCUS_PANEL_WIDTH_PX : this.state.rightPanelWidth;
+    this.shellElement.style.gridTemplateColumns = `${left}px 4px minmax(360px,1fr) 4px ${right}px`;
+    this.shellElement.dataset.topologyEditFocusLayout = String(focus);
+    this.shellElement.querySelector('.tree-panel').classList.toggle('workspace-panel--collapsed', treeCollapsed);
+    this.shellElement.querySelector('.properties-panel').classList.toggle('workspace-panel--collapsed', propertiesCollapsed);
+  }
+
   applyState() {
     if (!this.shellElement) return;
-    const left = this.state.treeCollapsed ? 48 : this.state.leftPanelWidth;
-    const right = this.state.propertiesCollapsed ? 48 : this.state.rightPanelWidth;
-    this.shellElement.style.gridTemplateColumns = `${left}px 4px minmax(360px,1fr) 4px ${right}px`;
-    this.shellElement.querySelector('.tree-panel').classList.toggle('workspace-panel--collapsed', this.state.treeCollapsed);
-    this.shellElement.querySelector('.properties-panel').classList.toggle('workspace-panel--collapsed', this.state.propertiesCollapsed);
+    this.applyPanelLayout();
     this.switchViewportTab(this.state.activeViewportTab);
   }
 

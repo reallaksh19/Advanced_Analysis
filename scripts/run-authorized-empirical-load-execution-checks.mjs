@@ -1,5 +1,6 @@
 await import('./empirical-formula-register-check.mjs');
 await import('./empirical-component-load-authority-check.mjs');
+await import('./empirical-component-moment-demand-check.mjs');
 await import('./empirical-cog-load-distribution-check.mjs');
 await import('./authorized-empirical-method-execution-check.mjs');
 await import('./authorized-empirical-runtime-package-v2-check.mjs');
