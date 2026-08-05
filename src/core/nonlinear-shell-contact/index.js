@@ -24,3 +24,5 @@ export * from './elastic-denting-procedure-contract.js';
 export * from './elastic-denting-qualification-evaluator.js';
 export * from './plastic-material-contract.js';
 export * from './plastic-material-qualification-evaluator.js';
+export * from './plastic-denting-procedure-contract.js';
+export * from './plastic-denting-qualification-evaluator.js';
