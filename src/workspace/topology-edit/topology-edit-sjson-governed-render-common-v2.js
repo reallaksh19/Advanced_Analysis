@@ -26,7 +26,7 @@ export function clamp(value, minimum, maximum) {
 }
 
 export function nodeVisualRadius(configuration) {
-  return clamp((positive(configuration?.pickingRadius) || 28) * 0.25, 4, 8);
+  return clamp((positive(configuration?.pickingRadius) || 28) * 0.15, 3, 5);
 }
 
 export function nodePickRadius(configuration) {
