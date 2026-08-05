@@ -57,7 +57,7 @@ export function evidence(context, input) {
   const oracle = seal({
     schema: 'lafea-nc01-independent-oracle/v1',
     benchmarkId: input.id,
-    implementationId: 'LAFEA_NC01_STANDALONE_DAT_ORACLE_V1',
+    implementationId: 'LAFEA_NC01_STANDALONE_DAT_ORACLE_V2',
     implementationHash: context.implementationHash,
     productionImports: [],
     referenceHash: reference.semanticHash,
@@ -89,34 +89,45 @@ export function evidence(context, input) {
 }
 
 export function parseDat(text) {
+  const energyHistory = blocks(text, /internal energy density \(elem, integ\.pnt\.,energy\)/gu, 'energy');
   return {
     displacements: block(text, /displacements \(vx,vy,vz\)/gu, 'node'),
     forces: block(text, /forces \(fx,fy,fz\)/gu, 'node'),
     stresses: block(text, /stresses \(elem, integ\.pnt\.,sxx,syy,szz,sxy,sxz,syz\)/gu, 'point'),
     strains: block(text, /strains \(elem, integ\.pnt\.,exx,eyy,ezz,exy,exz,eyz\)/gu, 'point'),
+    energyDensity: energyHistory.at(-1) ?? [],
+    energyHistory,
   };
 }
 
 function block(text, pattern, kind) {
-  const found = [...text.matchAll(pattern)];
-  if (!found.length) return [];
+  return blocks(text, pattern, kind).at(-1) ?? [];
+}
+
+function blocks(text, pattern, kind) {
+  return [...text.matchAll(pattern)].map((match) => parseRows(text, match.index + match[0].length, kind));
+}
+
+function parseRows(text, start, kind) {
   const rows = [];
-  for (const line of text.slice(found.at(-1).index + found.at(-1)[0].length).split(/\r?\n/u).slice(2)) {
+  for (const line of text.slice(start).split(/\r?\n/u).slice(2)) {
     const parts = line.trim().split(/\s+/u);
-    const minimum = kind === 'node' ? 4 : 8;
+    const minimum = kind === 'node' ? 4 : kind === 'energy' ? 3 : 8;
     if (parts.length < minimum || !/^\d+$/u.test(parts[0])) {
       if (rows.length) break;
       continue;
     }
     rows.push(kind === 'node'
       ? { node: Number(parts[0]), values: parts.slice(1, 4).map(Number) }
-      : { element: Number(parts[0]), point: Number(parts[1]), values: parts.slice(2, 8).map(Number) });
+      : kind === 'energy'
+        ? { element: Number(parts[0]), point: Number(parts[1]), value: Number(parts[2]) }
+        : { element: Number(parts[0]), point: Number(parts[1]), values: parts.slice(2, 8).map(Number) });
   }
   return rows;
 }
 
-export function reactionResidual(rows, scale = 1) {
-  const sums = [0, 0, 0];
+export function reactionResidual(rows, scale = 1, appliedZ = 0) {
+  const sums = [0, 0, appliedZ];
   for (const row of rows) for (let i = 0; i < 3; i += 1) sums[i] += row.values[i];
   return Math.hypot(...sums) / Math.max(Math.abs(scale), 1e-30);
 }
