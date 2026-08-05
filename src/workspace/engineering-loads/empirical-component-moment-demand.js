@@ -18,6 +18,12 @@ const RECORD_KEYS = Object.freeze([
   'sourceEvidenceSemanticHash', 'disposition', 'verticalReactionDistribution',
 ]);
 
+const POLICY_HANDLED_AUTHORITY_BLOCKERS = new Set([
+  'EMPIRICAL_COMPONENT_COG_OFF_ROUTE',
+  'EMPIRICAL_COMPONENT_COG_ROUTE_AMBIGUOUS',
+  'EMPIRICAL_COMPONENT_EXPLICIT_MOMENT_UNSUPPORTED',
+]);
+
 /**
  * Captures source point moments and CoG eccentric gravity couples as separate
  * downstream support/civil demands. This function never changes or distributes
@@ -39,6 +45,7 @@ export function captureEmpiricalComponentMomentDemand(input) {
   const edgeById = new Map(
     input.routePartitionModel.edges.map((edge) => [edge.entityId, edge]),
   );
+
   const toleranceMm = nonnegative(
     projectDataValue(input.profile, 'topology.portMatchToleranceMm'),
   );
@@ -51,11 +58,20 @@ export function captureEmpiricalComponentMomentDemand(input) {
   const loadCaseIds = uniqueSortedStrings(
     projectDataValue(input.profile, 'loadCalculation.activeLoadCases') || [],
   );
+
   const globalBlockers = [];
-  if (toleranceMm === null) globalBlockers.push(blocker('EMPIRICAL_MOMENT_TOLERANCE_INVALID'));
-  if (gravityMPerS2 === null) globalBlockers.push(blocker('EMPIRICAL_MOMENT_GRAVITY_INVALID'));
-  if (loadFactor === null) globalBlockers.push(blocker('EMPIRICAL_MOMENT_LOAD_FACTOR_INVALID'));
-  if (loadCaseIds.length === 0) globalBlockers.push(blocker('EMPIRICAL_MOMENT_LOAD_CASES_MISSING'));
+  if (toleranceMm === null) {
+    globalBlockers.push(blocker('EMPIRICAL_MOMENT_TOLERANCE_INVALID'));
+  }
+  if (gravityMPerS2 === null) {
+    globalBlockers.push(blocker('EMPIRICAL_MOMENT_GRAVITY_INVALID'));
+  }
+  if (loadFactor === null) {
+    globalBlockers.push(blocker('EMPIRICAL_MOMENT_LOAD_FACTOR_INVALID'));
+  }
+  if (loadCaseIds.length === 0) {
+    globalBlockers.push(blocker('EMPIRICAL_MOMENT_LOAD_CASES_MISSING'));
+  }
 
   const records = [];
   const blockers = [...globalBlockers];
@@ -69,6 +85,8 @@ export function captureEmpiricalComponentMomentDemand(input) {
       }));
       continue;
     }
+
+    propagateUnhandledAuthorityBlockers(authorityRecord, blockers);
 
     const explicit = sourceExplicitMomentRecord(authorityRecord);
     if (explicit.record) records.push(explicit.record);
@@ -192,33 +210,64 @@ export function captureEmpiricalComponentMomentDemand(input) {
 
 export function requireEmpiricalComponentMomentDemand(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    fail('EMPIRICAL_COMPONENT_MOMENT_DEMAND_INVALID', 'Moment demand must be an object.');
+    fail(
+      'EMPIRICAL_COMPONENT_MOMENT_DEMAND_INVALID',
+      'Moment demand must be an object.',
+    );
   }
   if (value.schema !== EMPIRICAL_COMPONENT_MOMENT_DEMAND_SCHEMA) {
-    fail('EMPIRICAL_COMPONENT_MOMENT_DEMAND_SCHEMA_INVALID', 'Unexpected moment-demand schema.');
+    fail(
+      'EMPIRICAL_COMPONENT_MOMENT_DEMAND_SCHEMA_INVALID',
+      'Unexpected moment-demand schema.',
+    );
   }
   if (!Array.isArray(value.records) || !Array.isArray(value.blockers)) {
-    fail('EMPIRICAL_COMPONENT_MOMENT_DEMAND_INVALID', 'Moment records and blockers must be arrays.');
+    fail(
+      'EMPIRICAL_COMPONENT_MOMENT_DEMAND_INVALID',
+      'Moment records and blockers must be arrays.',
+    );
   }
   const ids = value.records.map((row) => row?.demandId);
   if (new Set(ids).size !== ids.length || !isStrictlySorted(ids)) {
-    fail('EMPIRICAL_COMPONENT_MOMENT_DEMAND_ORDER_INVALID', 'Moment demand IDs must be unique and sorted.');
+    fail(
+      'EMPIRICAL_COMPONENT_MOMENT_DEMAND_ORDER_INVALID',
+      'Moment demand IDs must be unique and sorted.',
+    );
   }
   value.records.forEach(validateRecord);
   if (value.numericalVerticalReactionMethodChanged !== false
       || value.verticalReactionDistributionPerformed !== false) {
-    fail('EMPIRICAL_COMPONENT_MOMENT_REACTION_BOUNDARY_INVALID', 'Moment demand must not alter vertical reactions.');
+    fail(
+      'EMPIRICAL_COMPONENT_MOMENT_REACTION_BOUNDARY_INVALID',
+      'Moment demand must not alter vertical reactions.',
+    );
   }
   const { semanticHash: suppliedHash, ...projection } = value;
   if (suppliedHash !== semanticHash(projection)) {
-    fail('EMPIRICAL_COMPONENT_MOMENT_DEMAND_HASH_MISMATCH', 'Moment-demand semantic hash mismatch.');
+    fail(
+      'EMPIRICAL_COMPONENT_MOMENT_DEMAND_HASH_MISMATCH',
+      'Moment-demand semantic hash mismatch.',
+    );
   }
   return freezeDeep(value);
 }
 
+function propagateUnhandledAuthorityBlockers(authorityRecord, target) {
+  for (const row of authorityRecord.blockers || []) {
+    if (!row?.code || POLICY_HANDLED_AUTHORITY_BLOCKERS.has(row.code)) continue;
+    target.push(blocker(row.code, {
+      ...row,
+      entityId: authorityRecord.entityId,
+      routeId: authorityRecord.routeId,
+    }));
+  }
+}
+
 function sourceExplicitMomentRecord(authorityRecord) {
   const explicit = authorityRecord.explicitMoment;
-  if (!explicit || explicit.magnitudeNm === 0) return { record: null, blocker: null };
+  if (!explicit || explicit.magnitudeNm === 0) {
+    return { record: null, blocker: null };
+  }
   if (!(explicit.magnitudeNm > 0) || !stringValue(explicit.axis)) {
     return {
       record: null,
@@ -227,14 +276,16 @@ function sourceExplicitMomentRecord(authorityRecord) {
       }),
     };
   }
-  const chainageMm = finite(authorityRecord.candidateChainageMm)
-    ?? finite(authorityRecord.currentMethodPointChainageMm);
+  const candidate = finite(authorityRecord.candidateChainageMm);
+  const fallback = finite(authorityRecord.currentMethodPointChainageMm);
+  const chainageMm = candidate ?? fallback;
   if (!authorityRecord.routeId || chainageMm === null) {
     return {
       record: null,
-      blocker: blocker('EMPIRICAL_COMPONENT_EXPLICIT_MOMENT_LOCATION_UNRESOLVED', {
-        entityId: authorityRecord.entityId,
-      }),
+      blocker: blocker(
+        'EMPIRICAL_COMPONENT_EXPLICIT_MOMENT_LOCATION_UNRESOLVED',
+        { entityId: authorityRecord.entityId },
+      ),
     };
   }
   return {
@@ -268,10 +319,16 @@ function nearestUnambiguousProjection(pointMm, route, edgeById, toleranceMm) {
   const candidates = [];
   for (const row of route.entityChainages || []) {
     const edge = edgeById.get(row.entityId);
-    if (!edge || edge.pointComponent || edge.topologyCarrier || !(edge.lengthMm > 0)) continue;
+    if (!edge || edge.pointComponent || edge.topologyCarrier || !(edge.lengthMm > 0)) {
+      continue;
+    }
     const projected = projectToSegment(pointMm, edge.startMm, edge.endMm);
-    const start = finite(row.sourceStartChainageMm) ?? finite(row.startMm);
-    const end = finite(row.sourceEndChainageMm) ?? finite(row.endMm);
+    const sourceStart = finite(row.sourceStartChainageMm);
+    const sourceEnd = finite(row.sourceEndChainageMm);
+    const fallbackStart = finite(row.startMm);
+    const fallbackEnd = finite(row.endMm);
+    const start = sourceStart ?? fallbackStart;
+    const end = sourceEnd ?? fallbackEnd;
     if (start === null || end === null) continue;
     candidates.push({
       chainageMm: start + projected.ratio * (end - start),
@@ -281,7 +338,10 @@ function nearestUnambiguousProjection(pointMm, route, edgeById, toleranceMm) {
     });
   }
   if (candidates.length === 0) {
-    return { qualified: false, code: 'EMPIRICAL_MOMENT_ROUTE_PROJECTION_MISSING' };
+    return {
+      qualified: false,
+      code: 'EMPIRICAL_MOMENT_ROUTE_PROJECTION_MISSING',
+    };
   }
   candidates.sort((left, right) => (
     left.distanceMm - right.distanceMm
@@ -294,7 +354,8 @@ function nearestUnambiguousProjection(pointMm, route, edgeById, toleranceMm) {
     (row) => Math.abs(row.distanceMm - nearestDistanceMm) <= tieLimit,
   );
   const chainages = nearest.map((row) => row.chainageMm);
-  if (Math.max(...chainages) - Math.min(...chainages) > Math.max(toleranceMm, 1e-9)) {
+  if (Math.max(...chainages) - Math.min(...chainages)
+      > Math.max(toleranceMm, 1e-9)) {
     return {
       qualified: false,
       code: 'EMPIRICAL_MOMENT_ROUTE_PROJECTION_AMBIGUOUS',
@@ -304,47 +365,98 @@ function nearestUnambiguousProjection(pointMm, route, edgeById, toleranceMm) {
   return {
     qualified: true,
     chainageMm: sum(chainages) / chainages.length,
-    projectedPointMm: averagePoint(nearest.map((row) => row.projectedPointMm)),
+    projectedPointMm: averagePoint(
+      nearest.map((row) => row.projectedPointMm),
+    ),
     nearestDistanceMm,
   };
 }
 
 function resolveComponentMass(entity, profile) {
-  const weights = projectDataValue(profile, 'loadCalculation.componentWeightsKg') || {};
+  const weights = projectDataValue(
+    profile,
+    'loadCalculation.componentWeightsKg',
+  ) || {};
   const attributes = entity.properties?.attributes || {};
-  const catalogKey = stringValue(attributes.CATALOG_KEY) || stringValue(entity.sourceEntityId);
+  const catalogKey = stringValue(attributes.CATALOG_KEY)
+    || stringValue(entity.sourceEntityId);
   const raw = weights[catalogKey];
   const massKg = positive(typeof raw === 'object' ? raw?.massKg : raw);
   return massKg === null
-    ? { qualified: false, code: 'EMPIRICAL_MOMENT_COMPONENT_MASS_MISSING', catalogKey }
+    ? {
+      qualified: false,
+      code: 'EMPIRICAL_MOMENT_COMPONENT_MASS_MISSING',
+      catalogKey,
+    }
     : { qualified: true, catalogKey, massKg };
 }
 
 function verifyAuthorityBindings(input, audit) {
   const mismatches = [];
   compare('datasetId', input.dataset.datasetId, audit.datasetId, mismatches);
-  compare('datasetVersion', input.dataset.version ?? null, audit.datasetVersion, mismatches);
-  compare('sourceDatasetHash', input.dataset.sourceSha256 ?? null, audit.sourceDatasetHash, mismatches);
-  compare('sharedModelSemanticHash', input.dataset.sharedModel.semanticHash, audit.sharedModelSemanticHash, mismatches);
-  compare('routePartitionModelSemanticHash', semanticHash(input.routePartitionModel), audit.routePartitionModelSemanticHash, mismatches);
-  compare('projectDataProfileSemanticHash', semanticHash(input.profile), audit.projectDataProfileSemanticHash, mismatches);
+  compare(
+    'datasetVersion',
+    input.dataset.version ?? null,
+    audit.datasetVersion,
+    mismatches,
+  );
+  compare(
+    'sourceDatasetHash',
+    input.dataset.sourceSha256 ?? null,
+    audit.sourceDatasetHash,
+    mismatches,
+  );
+  compare(
+    'sharedModelSemanticHash',
+    input.dataset.sharedModel.semanticHash,
+    audit.sharedModelSemanticHash,
+    mismatches,
+  );
+  compare(
+    'routePartitionModelSemanticHash',
+    semanticHash(input.routePartitionModel),
+    audit.routePartitionModelSemanticHash,
+    mismatches,
+  );
+  compare(
+    'projectDataProfileSemanticHash',
+    semanticHash(input.profile),
+    audit.projectDataProfileSemanticHash,
+    mismatches,
+  );
   if (mismatches.length > 0) {
-    fail('EMPIRICAL_COMPONENT_MOMENT_AUTHORITY_BINDING_MISMATCH', 'Moment-demand inputs do not match the authority audit.', mismatches);
+    fail(
+      'EMPIRICAL_COMPONENT_MOMENT_AUTHORITY_BINDING_MISMATCH',
+      'Moment-demand inputs do not match the authority audit.',
+      mismatches,
+    );
   }
 }
 
 function validateRecord(record) {
   exact(record, RECORD_KEYS, 'momentDemandRecord');
-  if (!stringValue(record.demandId) || !stringValue(record.demandKind)
-      || !stringValue(record.entityId) || !stringValue(record.routeId)) {
-    fail('EMPIRICAL_COMPONENT_MOMENT_RECORD_INVALID', 'Moment demand identity is invalid.');
+  if (!stringValue(record.demandId)
+      || !stringValue(record.demandKind)
+      || !stringValue(record.entityId)
+      || !stringValue(record.routeId)) {
+    fail(
+      'EMPIRICAL_COMPONENT_MOMENT_RECORD_INVALID',
+      'Moment demand identity is invalid.',
+    );
   }
-  if (!(record.magnitudeNm > 0) || !Number.isFinite(record.applicationChainageMm)) {
-    fail('EMPIRICAL_COMPONENT_MOMENT_RECORD_INVALID', 'Moment magnitude and chainage must be finite and positive.');
+  if (!(record.magnitudeNm > 0)
+      || !Number.isFinite(record.applicationChainageMm)) {
+    fail(
+      'EMPIRICAL_COMPONENT_MOMENT_RECORD_INVALID',
+      'Moment magnitude and chainage must be finite and positive.',
+    );
   }
   if (record.disposition !== EMPIRICAL_COMPONENT_MOMENT_DISPOSITION
       || record.verticalReactionDistribution !== 'NOT_PERFORMED') {
-    fail('EMPIRICAL_COMPONENT_MOMENT_REACTION_BOUNDARY_INVALID', 'Moment record crossed the vertical-reaction boundary.');
+    fail(
+      'EMPIRICAL_COMPONENT_MOMENT_REACTION_BOUNDARY_INVALID',
+      'Moment record crossed the vertical-reaction boundary.',
+    );
   }
 }
 
@@ -352,23 +464,40 @@ function projectToSegment(point, start, end) {
   const vector = subtract(end, start);
   const denominator = dot(vector, vector);
   if (!(denominator > 0)) {
-    return { ratio: 0, distanceMm: Number.POSITIVE_INFINITY, pointMm: start };
+    return {
+      ratio: 0,
+      distanceMm: Number.POSITIVE_INFINITY,
+      pointMm: start,
+    };
   }
   const raw = dot(subtract(point, start), vector) / denominator;
   const ratio = Math.max(0, Math.min(1, raw));
   const pointMm = add(start, scale(vector, ratio));
-  return { ratio, pointMm, distanceMm: magnitude(subtract(point, pointMm)) };
+  return {
+    ratio,
+    pointMm,
+    distanceMm: magnitude(subtract(point, pointMm)),
+  };
 }
 
 function assertInput(input) {
-  if (!input?.dataset || !input?.profile || !input?.routePartitionModel || !input?.authorityAudit) {
-    fail('EMPIRICAL_COMPONENT_MOMENT_INPUT_INVALID', 'Dataset, profile, route model and authority audit are required.');
+  if (!input?.dataset
+      || !input?.profile
+      || !input?.routePartitionModel
+      || !input?.authorityAudit) {
+    fail(
+      'EMPIRICAL_COMPONENT_MOMENT_INPUT_INVALID',
+      'Dataset, profile, route model and authority audit are required.',
+    );
   }
   if (!Array.isArray(input.dataset.entities)
       || !input.dataset.sharedModel
       || !Array.isArray(input.routePartitionModel.routes)
       || !Array.isArray(input.routePartitionModel.edges)) {
-    fail('EMPIRICAL_COMPONENT_MOMENT_INPUT_INVALID', 'Moment-demand model inputs are incomplete.');
+    fail(
+      'EMPIRICAL_COMPONENT_MOMENT_INPUT_INVALID',
+      'Moment-demand model inputs are incomplete.',
+    );
   }
 }
 
@@ -376,29 +505,57 @@ function exact(value, keys, label) {
   const actual = Object.keys(value || {}).sort(compareCodeUnits);
   const expected = [...keys].sort(compareCodeUnits);
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-    fail('EMPIRICAL_COMPONENT_MOMENT_KEYS_INVALID', `${label} has unexpected keys.`, { actual, expected });
+    fail(
+      'EMPIRICAL_COMPONENT_MOMENT_KEYS_INVALID',
+      `${label} has unexpected keys.`,
+      { actual, expected },
+    );
   }
 }
+
 function uniqueSortedStrings(values) {
-  return [...new Set(values.map((value) => stringValue(value)).filter(Boolean))]
+  return [...new Set(values
+    .map((value) => stringValue(value))
+    .filter(Boolean))]
     .sort(compareCodeUnits);
 }
+
 function finite(value) {
+  if (value === null || value === undefined || value === '') return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
+
 function positive(value) {
   const number = finite(value);
   return number !== null && number > 0 ? number : null;
 }
+
 function nonnegative(value) {
   const number = finite(value);
   return number !== null && number >= 0 ? number : null;
 }
-function add(a, b) { return { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }; }
-function subtract(a, b) { return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }; }
-function scale(value, factor) { return { x: value.x * factor, y: value.y * factor, z: value.z * factor }; }
-function dot(a, b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+
+function add(a, b) {
+  return { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z };
+}
+
+function subtract(a, b) {
+  return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z };
+}
+
+function scale(value, factor) {
+  return {
+    x: value.x * factor,
+    y: value.y * factor,
+    z: value.z * factor,
+  };
+}
+
+function dot(a, b) {
+  return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
 function cross(a, b) {
   return {
     x: a.y * b.z - a.z * b.y,
@@ -406,15 +563,32 @@ function cross(a, b) {
     z: a.x * b.y - a.y * b.x,
   };
 }
-function magnitude(value) { return Math.hypot(value.x, value.y, value.z); }
+
+function magnitude(value) {
+  return Math.hypot(value.x, value.y, value.z);
+}
+
 function averagePoint(points) {
-  return scale(points.reduce(add, { x: 0, y: 0, z: 0 }), 1 / points.length);
+  return scale(
+    points.reduce(add, { x: 0, y: 0, z: 0 }),
+    1 / points.length,
+  );
 }
-function sum(values) { return values.reduce((total, value) => total + value, 0); }
+
+function sum(values) {
+  return values.reduce((total, value) => total + value, 0);
+}
+
 function compare(field, expected, actual, mismatches) {
-  if (JSON.stringify(expected) !== JSON.stringify(actual)) mismatches.push({ field, expected, actual });
+  if (JSON.stringify(expected) !== JSON.stringify(actual)) {
+    mismatches.push({ field, expected, actual });
+  }
 }
-function blocker(code, details = {}) { return freezeDeep({ code, ...details }); }
+
+function blocker(code, details = {}) {
+  return freezeDeep({ code, ...details });
+}
+
 function dedupeRows(rows) {
   const seen = new Set();
   return rows.filter((row) => {
@@ -422,12 +596,21 @@ function dedupeRows(rows) {
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
-  }).sort((left, right) => compareCodeUnits(JSON.stringify(left), JSON.stringify(right)));
+  }).sort((left, right) => (
+    compareCodeUnits(JSON.stringify(left), JSON.stringify(right))
+  ));
 }
+
 function isStrictlySorted(values) {
-  return values.every((value, index) => index === 0 || compareCodeUnits(values[index - 1], value) < 0);
+  return values.every((value, index) => (
+    index === 0 || compareCodeUnits(values[index - 1], value) < 0
+  ));
 }
-function compareCodeUnits(left, right) { return left < right ? -1 : left > right ? 1 : 0; }
+
+function compareCodeUnits(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function fail(code, message, details = null) {
   const error = new Error(message);
   error.code = code;
