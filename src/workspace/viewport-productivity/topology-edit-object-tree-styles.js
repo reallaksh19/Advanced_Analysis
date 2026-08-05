@@ -12,6 +12,7 @@ export function ensureTopologyEditObjectTreeStyles(document) {
       border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
       border-radius: 0.55rem;
       background: color-mix(in srgb, Canvas 96%, currentColor 4%);
+      contain: layout style;
     }
     .topology-edit-object-tree__header {
       display: grid;
@@ -42,11 +43,14 @@ export function ensureTopologyEditObjectTreeStyles(document) {
       max-height: min(58vh, 34rem);
       overflow: auto;
       scrollbar-gutter: stable;
+      contain: layout style paint;
     }
     .topology-edit-object-tree__group {
       border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
       border-radius: 0.4rem;
       overflow: clip;
+      content-visibility: auto;
+      contain-intrinsic-size: auto 320px;
     }
     .topology-edit-object-tree__group > summary {
       display: flex;
@@ -73,6 +77,7 @@ export function ensureTopologyEditObjectTreeStyles(document) {
       gap: 0.35rem;
       padding: 0.35rem;
       background: Canvas;
+      contain: layout style paint;
     }
     .topology-edit-object-tree__select {
       display: grid;
@@ -126,6 +131,22 @@ export function ensureTopologyEditObjectTreeStyles(document) {
     }
     .topology-edit-object-tree__actions button[data-object-tree-action="delete-edge"] {
       color: #b91c1c;
+    }
+    .topology-edit-object-tree__more {
+      width: 100%;
+      min-height: 2rem;
+      border: 0;
+      border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+      border-radius: 0;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #0ea5e9;
+      background: color-mix(in srgb, Canvas 94%, #0ea5e9 6%);
+      cursor: pointer;
+    }
+    .topology-edit-object-tree__more:hover,
+    .topology-edit-object-tree__more:focus-visible {
+      background: color-mix(in srgb, Canvas 86%, #0ea5e9 14%);
     }
     .topology-edit-object-tree__empty {
       margin: 0;
