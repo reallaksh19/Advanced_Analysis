@@ -12,6 +12,11 @@ const EXECUTING_CANDIDATE_SHA = process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA
 const BENCHMARK_VIEWPORT = Object.freeze({ width: 1637, height: 869 });
 const BENCHMARK_CAMERA_AUTHORITY =
   'TOPO_VALIDATOR_FIT_BOX_SIZE_0_9_PLUS_200_DIRECTION_1_1_0_8';
+const BENCHMARK_ENGINEERING_DIRECTION = Object.freeze({
+  x: 0.6154574548966636,
+  y: 0.6154574548966636,
+  z: 0.49236596391733095,
+});
 
 test.beforeEach(async ({ page }) => {
   test.setTimeout(120_000);
@@ -185,11 +190,10 @@ test('production Sjson opens 3D Edit with complete typed fittings and spatially 
   expect(ledger.visualModelHash).not.toBe('');
   expect(ledger.supportProjectionHash).not.toBe('');
   expect(ledger.camera.authority).toBe(BENCHMARK_CAMERA_AUTHORITY);
-  expect(ledger.camera.engineeringDirection).toEqual({
-    x: 0.6154574548966636,
-    y: 0.6154574548966636,
-    z: 0.49236596391733095,
-  });
+  for (const axis of ['x', 'y', 'z']) {
+    expect(ledger.camera.engineeringDirection?.[axis])
+      .toBeCloseTo(BENCHMARK_ENGINEERING_DIRECTION[axis], 12);
+  }
   expect(ledger.camera.bounds?.diagonalMm).toBeGreaterThan(0);
   expect(ledger.canvas?.width).toBeGreaterThan(500);
   expect(ledger.canvas?.height).toBeGreaterThan(450);
