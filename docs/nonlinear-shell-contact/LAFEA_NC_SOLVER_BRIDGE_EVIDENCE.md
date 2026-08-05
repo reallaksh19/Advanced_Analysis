@@ -11,7 +11,9 @@ Real CalculiX 2.22 execution exposed contract/runtime mismatches that synthetic 
 1. the original deck writer emitted 22-character scientific values, while the CalculiX free-field reader accepts the governed values only within its 20-character numeric field;
 2. a legitimate FRD dataset is named `ERROR`, which must not be interpreted as a solver diagnostic;
 3. nonlinear iteration logs may contain transient `no convergence` messages before a later converged increment and final `Job finished` marker;
-4. CalculiX reports step ordinals rather than preserving the requested `NAME=` token, so exact step order must be reconstructed by governed ordinal count.
+4. CalculiX reports step ordinals rather than preserving the requested `NAME=` token, so exact step order must be reconstructed by governed ordinal count;
+5. generated `S3/S4` contact-carrier elements require a positive shell section and cannot safely be combined with the original shell-element `*RIGID BODY` MPC representation;
+6. the saddle adapter's original reference elevation intersected the governed shell before loading and therefore did not represent a valid bridge smoke-test placement.
 
 The corrected deck profile is versioned as:
 
@@ -19,6 +21,16 @@ The corrected deck profile is versioned as:
 CALCULIX_2_22_NC00_DECK_V2
 SCIENTIFIC_15_SIGNIFICANT_DIGITS_CCX_FIELD20_V1
 ```
+
+Generated master surfaces use the deterministic bridge-only carrier profile:
+
+```text
+DIRECTLY_PRESCRIBED_SHELL_CARRIER_V1
+```
+
+The carrier reuses the governed model material, has a positive unit thickness, and fixes all generated carrier nodes initially. Prescribed rigid-surface translations are then applied identically to every carrier node. This is a solver-bridge representation only and is not evidence of contact-procedure accuracy.
+
+The saddle adapter retains its radius, length and width but uses reference point `[50, 50, -25]`, placing the complete generated surface below the shell before the prescribed motion.
 
 ## Exact solver custody input
 
