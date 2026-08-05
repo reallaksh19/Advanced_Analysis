@@ -13,7 +13,7 @@ import {
   supportTopologyForExactOrigins,
   visualPrimitiveKindCounts,
 } from './topology-edit/topology-edit-sjson-visual-authority.js';
-import { deriveSjsonCompleteVisualGeometry } from './topology-edit/topology-edit-sjson-point-component-projection.js';
+import { deriveSjsonCompleteVisualGeometry } from './topology-edit/topology-edit-sjson-parent-branch-diameter.js';
 
 /**
  * Production adapter for staged SJSON visual fidelity. Engineering topology,
@@ -113,6 +113,12 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     );
     host.dataset.topologyEditVisualProxyWarningCount = String(
       diagnostics.filter((row) => row.code === 'VISUAL_NOMINAL_BORE_PROXY_USED').length,
+    );
+    host.dataset.topologyEditParentBranchDiameterCount = String(
+      diagnostics.filter((row) => row.code === 'VISUAL_PARENT_BRANCH_DIAMETER_USED').length,
+    );
+    host.dataset.topologyEditReferencedBranchDiameterCount = String(
+      diagnostics.filter((row) => row.code === 'VISUAL_REFERENCED_BRANCH_DIAMETER_USED').length,
     );
     host.dataset.topologyEditVisualModelHash = this.visualModelHash || '';
     host.dataset.topologyEditSupportProjectionHash = semanticHash(supportProjection);
