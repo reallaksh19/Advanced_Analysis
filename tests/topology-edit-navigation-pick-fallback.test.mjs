@@ -9,15 +9,16 @@ const rayReceipt = Object.freeze({ objectId: 'edge:ray', objectKind: 'component'
 {
   const backend = backendHarness({
     gpuHit: { target: exactTarget },
-    gpuPoint: null,
+    gpuPoint: Object.freeze({ x: 1, y: 2, z: 3 }),
     rayReceipt,
   });
   assert.equal(
     backend.pickAt(100, 200),
     rayReceipt,
-    'An unresolved nearby GPU identity must not suppress the exact raycaster fallback.',
+    'The exact ray identity under the pointer must precede nearby GPU-radius candidates.',
   );
   assert.equal(backend.calls.raycaster, 1);
+  assert.equal(backend.calls.gpu, 0);
   assert.equal(backend.calls.receipt, 0);
 }
 
@@ -28,33 +29,45 @@ const rayReceipt = Object.freeze({ objectId: 'edge:ray', objectKind: 'component'
     gpuHit: { target: exactTarget },
     gpuPoint: point,
     gpuReceipt,
-    rayReceipt,
+    rayReceipt: null,
   });
   assert.equal(
     backend.pickAt(100, 200),
     gpuReceipt,
-    'A GPU identity with an exact governed ray point retains precedence.',
+    'GPU radius sampling remains the fallback when no exact ray target exists.',
   );
+  assert.equal(backend.calls.raycaster, 1);
+  assert.equal(backend.calls.gpu, 1);
   assert.equal(backend.calls.receipt, 1);
-  assert.equal(backend.calls.raycaster, 0);
 }
 
 {
-  const backend = backendHarness({ gpuHit: null, gpuPoint: null, rayReceipt });
-  assert.equal(backend.pickAt(100, 200), rayReceipt);
+  const backend = backendHarness({
+    gpuHit: { target: exactTarget },
+    gpuPoint: null,
+    rayReceipt: null,
+  });
+  assert.equal(backend.pickAt(100, 200), null);
   assert.equal(backend.calls.raycaster, 1);
+  assert.equal(backend.calls.gpu, 1);
+  assert.equal(backend.calls.receipt, 0);
 }
 
-console.log('PASS topology-edit navigation GPU-to-ray picking fallback');
+console.log('PASS topology-edit exact-ray then GPU picking authority');
 
 function backendHarness({ gpuHit, gpuPoint, gpuReceipt = null, rayReceipt: fallback }) {
   const backend = Object.create(TopologyEditNavigationHudViewportBackend.prototype);
   backend.contextLost = false;
   backend.configurationError = null;
   backend.activeCamera = Object.freeze({});
-  backend.calls = { receipt: 0, raycaster: 0 };
+  backend.calls = { receipt: 0, raycaster: 0, gpu: 0 };
   backend.pickContext = () => ({ rect: Object.freeze({}), pointer: Object.freeze({}) });
-  backend.gpuPicker = { pick: () => gpuHit };
+  backend.gpuPicker = {
+    pick: () => {
+      backend.calls.gpu += 1;
+      return gpuHit;
+    },
+  };
   backend.resolveGpuPickPoint = () => gpuPoint;
   backend.pickReceipt = () => {
     backend.calls.receipt += 1;
