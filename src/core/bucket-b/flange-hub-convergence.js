@@ -27,18 +27,45 @@ export const FLANGE_HUB_CONVERGENCE_POLICY = deepFreeze({
   },
 });
 
-export function evaluateFlangeHubConvergence({ loadCaseId, levelRows, nominalStress, appliedResultant } = {}) {
-  if (!Array.isArray(levelRows) || levelRows.length < 4) throw new TypeError('FH_CONVERGENCE_REQUIRES_FOUR_LEVELS');
-  const ordered = [...levelRows].sort((a, b) => levelOrdinal(a.mesh.levelId) - levelOrdinal(b.mesh.levelId));
+export function evaluateFlangeHubConvergence({
+  loadCaseId,
+  levelRows,
+  nominalStress,
+  appliedResultant,
+} = {}) {
+  if (!Array.isArray(levelRows) || levelRows.length < 4) {
+    throw new TypeError('FH_CONVERGENCE_REQUIRES_FOUR_LEVELS');
+  }
+  const ordered = [...levelRows].sort(
+    (left, right) => levelOrdinal(left.mesh.levelId)
+      - levelOrdinal(right.mesh.levelId),
+  );
   requireLevels(ordered);
   ordered.forEach((row) => {
-    if (row.result.loadCaseId !== loadCaseId || row.recovery.loadCaseId !== loadCaseId) throw new TypeError('FH_CONVERGENCE_LOAD_CASE_MISMATCH');
-    if (row.mesh.quality?.accepted !== true) throw new RangeError(`FH_CONVERGENCE_MESH_QUALITY_FAILURE:${row.mesh.levelId}`);
+    if (row.result.loadCaseId !== loadCaseId
+      || row.recovery.loadCaseId !== loadCaseId) {
+      throw new TypeError('FH_CONVERGENCE_LOAD_CASE_MISMATCH');
+    }
+    if (row.mesh.quality?.accepted !== true) {
+      throw new RangeError(
+        `FH_CONVERGENCE_MESH_QUALITY_FAILURE:${row.mesh.levelId}`,
+      );
+    }
   });
   const quantities = [];
-  const add = (quantity) => quantities.push(evaluateQuantity(quantity, ordered, nominalStress, appliedResultant));
+  const add = (quantity) => quantities.push(evaluateQuantity(
+    quantity,
+    ordered,
+    nominalStress,
+    appliedResultant,
+  ));
 
-  const displacementProbes = ['P-PIPE-REMOTE', 'P-HUB-MID', 'P-FLANGE-INNER', 'P-FLANGE-MID'];
+  const displacementProbes = [
+    'P-PIPE-REMOTE',
+    'P-HUB-MID',
+    'P-FLANGE-INNER',
+    'P-FLANGE-MID',
+  ];
   displacementProbes.forEach((probeId) => {
     ['radial', 'axial'].forEach((component) => add({
       quantityId: `${probeId}:U_${component.toUpperCase()}`,
@@ -60,13 +87,23 @@ export function evaluateFlangeHubConvergence({ loadCaseId, levelRows, nominalStr
 
   ordered[0].recovery.probes.forEach((probe) => {
     ['sigmaR', 'sigmaZ', 'sigmaTheta', 'tauRZ'].forEach((component) => {
-      const values = ordered.map((row) => Math.abs(findProbe(row.recovery, probe.probeId).recoveredTensor[component]));
-      const stressFloor = Math.max(1e-12, Math.abs(nominalStress) * FLANGE_HUB_CONVERGENCE_POLICY.physicalFloors.stressFractionOfNominal);
+      const values = ordered.map((row) => Math.abs(
+        findProbe(row.recovery, probe.probeId).recoveredTensor[component],
+      ));
+      const stressFloor = Math.max(
+        1e-12,
+        Math.abs(nominalStress)
+          * FLANGE_HUB_CONVERGENCE_POLICY.physicalFloors
+            .stressFractionOfNominal,
+      );
       if (Math.max(...values) <= stressFloor) return;
       add({
         quantityId: `${probe.probeId}:${component}`,
         quantityKind: 'LOCAL_STRESS',
-        field: (row) => findProbe(row.recovery, probe.probeId).recoveredTensor[component],
+        field: (row) => findProbe(
+          row.recovery,
+          probe.probeId,
+        ).recoveredTensor[component],
         h: (row) => findProbe(row.recovery, probe.probeId).probeH,
         probeH: (row) => findProbe(row.recovery, probe.probeId).probeH,
         floor: stressFloor,
@@ -79,46 +116,101 @@ export function evaluateFlangeHubConvergence({ loadCaseId, levelRows, nominalStr
     add({
       quantityId: `${path.pathId}:SECTION_FORCE`,
       quantityKind: 'SECTION_RESULTANT',
-      field: (row) => findPath(row.recovery, path.pathId).section.membraneForceResultant,
+      field: (row) => findPath(
+        row.recovery,
+        path.pathId,
+      ).section.membraneForceResultant,
       h: (row) => findPath(row.recovery, path.pathId).probeH,
-      floor: Math.max(1e-8, Math.abs(appliedResultant) * FLANGE_HUB_CONVERGENCE_POLICY.physicalFloors.resultantFractionOfApplied),
+      floor: Math.max(
+        1e-8,
+        Math.abs(appliedResultant)
+          * FLANGE_HUB_CONVERGENCE_POLICY.physicalFloors
+            .resultantFractionOfApplied,
+      ),
       limit: FLANGE_HUB_CONVERGENCE_POLICY.limits.SECTION_RESULTANT,
     });
     add({
       quantityId: `${path.pathId}:SECTION_BENDING`,
       quantityKind: 'SCL_BENDING',
-      field: (row) => findPath(row.recovery, path.pathId).section.bendingMomentResultant,
+      field: (row) => findPath(
+        row.recovery,
+        path.pathId,
+      ).section.bendingMomentResultant,
       h: (row) => findPath(row.recovery, path.pathId).probeH,
       probeH: (row) => findPath(row.recovery, path.pathId).probeH,
-      floor: Math.max(1e-8, Math.abs(appliedResultant) * FLANGE_HUB_CONVERGENCE_POLICY.physicalFloors.resultantFractionOfApplied),
+      floor: Math.max(
+        1e-8,
+        Math.abs(appliedResultant)
+          * FLANGE_HUB_CONVERGENCE_POLICY.physicalFloors
+            .resultantFractionOfApplied,
+      ),
       limit: FLANGE_HUB_CONVERGENCE_POLICY.limits.SCL_BENDING,
     });
     ['sigmaX', 'sigmaY', 'sigmaZ', 'tauXY'].forEach((component) => {
-      const stressFloor = Math.max(1e-12, Math.abs(nominalStress) * FLANGE_HUB_CONVERGENCE_POLICY.physicalFloors.stressFractionOfNominal);
-      const membraneValues = ordered.map((row) => Math.abs(findPath(row.recovery, path.pathId).scl.membrane[component]));
-      if (Math.max(...membraneValues) > stressFloor) add({
-        quantityId: `${path.pathId}:MEMBRANE:${component}`,
-        quantityKind: 'SCL_MEMBRANE',
-        field: (row) => findPath(row.recovery, path.pathId).scl.membrane[component],
-        h: (row) => findPath(row.recovery, path.pathId).probeH,
-        probeH: (row) => findPath(row.recovery, path.pathId).probeH,
-        floor: stressFloor,
-        limit: FLANGE_HUB_CONVERGENCE_POLICY.limits.SCL_MEMBRANE,
-      });
-      const bendingValues = ordered.map((row) => Math.abs(findPath(row.recovery, path.pathId).scl.bending[component]));
-      if (Math.max(...bendingValues) > stressFloor) add({
-        quantityId: `${path.pathId}:BENDING:${component}`,
-        quantityKind: 'SCL_BENDING',
-        field: (row) => findPath(row.recovery, path.pathId).scl.bending[component],
-        h: (row) => findPath(row.recovery, path.pathId).probeH,
-        probeH: (row) => findPath(row.recovery, path.pathId).probeH,
-        floor: stressFloor,
-        limit: FLANGE_HUB_CONVERGENCE_POLICY.limits.SCL_BENDING,
-      });
+      const stressFloor = Math.max(
+        1e-12,
+        Math.abs(nominalStress)
+          * FLANGE_HUB_CONVERGENCE_POLICY.physicalFloors
+            .stressFractionOfNominal,
+      );
+      const membraneValues = ordered.map((row) => Math.abs(
+        findPath(row.recovery, path.pathId).scl.membrane[component],
+      ));
+      if (Math.max(...membraneValues) > stressFloor) {
+        add({
+          quantityId: `${path.pathId}:MEMBRANE:${component}`,
+          quantityKind: 'SCL_MEMBRANE',
+          field: (row) => findPath(
+            row.recovery,
+            path.pathId,
+          ).scl.membrane[component],
+          h: (row) => findPath(row.recovery, path.pathId).probeH,
+          probeH: (row) => findPath(row.recovery, path.pathId).probeH,
+          floor: stressFloor,
+          limit: FLANGE_HUB_CONVERGENCE_POLICY.limits.SCL_MEMBRANE,
+        });
+      }
+      const bendingValues = ordered.map((row) => Math.abs(
+        findPath(row.recovery, path.pathId).scl.bending[component],
+      ));
+      if (Math.max(...bendingValues) > stressFloor) {
+        add({
+          quantityId: `${path.pathId}:BENDING:${component}`,
+          quantityKind: 'SCL_BENDING',
+          field: (row) => findPath(
+            row.recovery,
+            path.pathId,
+          ).scl.bending[component],
+          h: (row) => findPath(row.recovery, path.pathId).probeH,
+          probeH: (row) => findPath(row.recovery, path.pathId).probeH,
+          floor: stressFloor,
+          limit: FLANGE_HUB_CONVERGENCE_POLICY.limits.SCL_BENDING,
+        });
+      }
     });
   });
 
   const failed = quantities.filter((row) => !row.accepted);
+  if (failed.length > 0 && process.env.BB11_DIAGNOSTICS === '1') {
+    process.stderr.write(`${JSON.stringify({
+      event: 'BB11_CONVERGENCE_DIAGNOSTIC',
+      loadCaseId,
+      failed: failed.map((row) => ({
+        quantityId: row.quantityId,
+        quantityKind: row.quantityKind,
+        levels: row.levels,
+        registeredDisposition: row.registeredEvaluation.disposition,
+        registeredAccepted:
+          row.registeredEvaluation.acceptedForAdjudication,
+        observedOrder: row.registeredEvaluation.observedOrder,
+        finestRelativeChange:
+          row.registeredEvaluation.finestRelativeChange,
+        strictPhysicalFloor: row.strictPhysicalFloor,
+        strictFinestChange: row.strictFinestChange,
+        strictLimit: row.strictLimit,
+      })),
+    })}\n`);
+  }
   const payload = {
     schema: 'flange-hub-convergence-evidence/v1',
     moduleId: 'C2D-FLANGE-HUB',
@@ -132,7 +224,12 @@ export function evaluateFlangeHubConvergence({ loadCaseId, levelRows, nominalStr
   return deepFreeze({ ...payload, semanticHash: semanticHash(payload) });
 }
 
-function evaluateQuantity(definition, rows, nominalStress, appliedResultant) {
+function evaluateQuantity(
+  definition,
+  rows,
+  nominalStress,
+  appliedResultant,
+) {
   const levels = rows.map((row) => ({
     level: row.mesh.levelId,
     h: definition.h(row),
@@ -167,7 +264,24 @@ function evaluateQuantity(definition, rows, nominalStress, appliedResultant) {
   });
 }
 
-function findProbe(recovery, probeId) { const row = recovery.probes.find((value) => value.probeId === probeId); if (!row) throw new TypeError(`FH_MISSING_PROBE:${probeId}`); return row; }
-function findPath(recovery, pathId) { const row = recovery.paths.find((value) => value.pathId === pathId); if (!row) throw new TypeError(`FH_MISSING_PATH:${pathId}`); return row; }
-function levelOrdinal(levelId) { const value = Number(levelId?.slice(1)); if (!Number.isInteger(value)) throw new TypeError(`FH_INVALID_LEVEL:${levelId}`); return value; }
-function requireLevels(rows) { const ids = rows.map((row) => row.mesh.levelId); if (ids.join(',') !== 'M0,M1,M2,M3') throw new TypeError(`FH_LEVEL_LADDER_INVALID:${ids.join(',')}`); }
+function findProbe(recovery, probeId) {
+  const row = recovery.probes.find((value) => value.probeId === probeId);
+  if (!row) throw new TypeError(`FH_MISSING_PROBE:${probeId}`);
+  return row;
+}
+function findPath(recovery, pathId) {
+  const row = recovery.paths.find((value) => value.pathId === pathId);
+  if (!row) throw new TypeError(`FH_MISSING_PATH:${pathId}`);
+  return row;
+}
+function levelOrdinal(levelId) {
+  const value = Number(levelId?.slice(1));
+  if (!Number.isInteger(value)) throw new TypeError(`FH_INVALID_LEVEL:${levelId}`);
+  return value;
+}
+function requireLevels(rows) {
+  const ids = rows.map((row) => row.mesh.levelId);
+  if (ids.join(',') !== 'M0,M1,M2,M3') {
+    throw new TypeError(`FH_LEVEL_LADDER_INVALID:${ids.join(',')}`);
+  }
+}
