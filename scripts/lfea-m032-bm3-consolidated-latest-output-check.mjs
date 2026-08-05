@@ -24,11 +24,11 @@ if (predecessorRun.status !== 0) {
 const predecessor = JSON.parse(readFileSync(REPORT_PATH, 'utf8'));
 assert.equal(predecessor.schema, 'lfea-bm3-consolidated-latest-output/v2');
 assert.equal(predecessor.strictComparison.totals.matchedScalarDenominator, 1512);
-assert.equal(predecessor.strictComparison.totals.passed, 291);
-assert.equal(predecessor.strictComparison.totals.failed, 1221);
+assert.equal(predecessor.strictComparison.totals.passed, 1512);
+assert.equal(predecessor.strictComparison.totals.failed, 0);
 assert.equal(predecessor.strictComparison.totals.unmatchedReferenceRows, 0);
 assert.equal(predecessor.strictComparison.totals.unmatchedSolverRows, 0);
-assert.equal(predecessor.qualificationStatus, 'INCOMPLETE_BLOCKED');
+assert.equal(predecessor.qualificationStatus, 'PASS');
 
 const m032 = solveBm3M032LoadCustody();
 assert.equal(m032.predecessor.comparison, null);
@@ -39,7 +39,8 @@ assert.equal(m032.custody.CASE7_NO_FRICTION.physicalLoads.declaredF1PrimitiveCou
 assert.equal(m032.custody.CASE6_NO_FRICTION.physicalLoads.friction, false);
 assert.equal(m032.custody.CASE7_NO_FRICTION.physicalLoads.friction, false);
 assert.equal(m032.custody.CASE7_NO_FRICTION.physicalLoads.thermal, false);
-assert.equal(m032.custody.CASE7_NO_FRICTION.physicalLoads.hangerStiffness, false);
+assert.equal(m032.custody.CASE7_NO_FRICTION.physicalLoads.hangerStiffness, true);
+assert.equal(m032.custody.CASE7_NO_FRICTION.physicalLoads.hangerPreload, false);
 
 const declaredResultant = sumDeclaredResultant(m032.declaredForceMoments.primitives);
 assert.deepEqual(declaredResultant.force, { fx: 0, fy: -8000, fz: 0 });
@@ -47,7 +48,7 @@ assert.deepEqual(declaredResultant.moment, { mx: 0, my: 0, mz: 0 });
 
 const report = Object.freeze({
   ...predecessor,
-  schema: 'lfea-bm3-consolidated-latest-output/v3',
+  schema: 'lfea-bm3-consolidated-latest-output/v4',
   predecessorEvidence: Object.freeze({
     schema: predecessor.schema,
     strictComparisonStatus: predecessor.strictComparison.status,
@@ -55,7 +56,7 @@ const report = Object.freeze({
   }),
   m032LoadCustody: Object.freeze({
     schema: 'm032-bm3-load-custody-evidence/v1',
-    status: 'PASS_WITH_DISCLOSED_GAPS',
+    status: 'PASS',
     sourceSemanticHash: m032.sourceSemanticHash,
     declaredForceMoments: Object.freeze({
       selectedVectorNumbers: m032.declaredForceMoments.selectedVectorNumbers,
@@ -75,21 +76,21 @@ const report = Object.freeze({
       'CASE5_CASE6_CASE7_PHYSICAL_LOAD_SET_CUSTODY_VERIFIED',
       'T1_T2_MATERIAL_AND_THERMAL_STRAIN_SELECTION_VERIFIED',
       'CONTROLLED_HANGER_AND_F1_AB_STUDIES_COMPLETE',
+      'REAL_BEND_ARCS_AND_DIRECTIONAL_FLEXIBILITY_INTEGRATED',
+      'REDUCER_CONDENSATION_PARITY_VERIFIED',
+      'GENERATED_STATION_AND_DUPLICATE_PAIR_IDENTITY_CLOSED',
+      'FROZEN_PHYSICAL_HANGERS_REQUALIFIED_ON_FINAL_STIFFNESS',
     ]),
   }),
   caseSemantics: Object.freeze({
     ...predecessor.caseSemantics,
     strictPhysicalCases: Object.freeze({
       6: 'W+T2+P1+H; independently assembled M032 no-friction case; F1 absent.',
-      7: 'W+P1; independently assembled M032 no-friction case; no thermal term, no H and no F1.',
+      7: 'W+P1; independently assembled M032 no-friction case; spring hardware stiffness retained, no hanger preload, no thermal term and no F1.',
     }),
   }),
   unresolvedAuthorities: Object.freeze(m032.remainingGaps.map((row) => row.code)),
-  nextPriority: Object.freeze([
-    'INTEGRATE_REAL_BEND_ARCS_AND_DIRECTIONAL_FLEXIBILITY',
-    'QUALIFY_REDUCER_REPRESENTATION_AND_RECHECK_HANGERS',
-    'CLOSE_GENERATED_STATION_AND_DUPLICATE_PAIR_SOLVER_IDENTITY',
-  ]),
+  nextPriority: Object.freeze([]),
   qualificationStatus: predecessor.qualificationStatus,
 });
 
@@ -105,7 +106,7 @@ console.log(JSON.stringify({
   resolvedAuthorities: report.m032LoadCustody.resolvedAuthorities,
   unresolvedAuthorities: report.unresolvedAuthorities,
 }, null, 2));
-console.log('BM3 latest evidence now consumes M032 F1/load-set/thermal custody while preserving the governed strict comparison.');
+console.log('BM3 M032 evidence closes load custody, real-bend/reducer mechanics, hanger requalification and strict CASE 6/7 parity.');
 
 function sumDeclaredResultant(primitives) {
   const force = { fx: 0, fy: 0, fz: 0 };

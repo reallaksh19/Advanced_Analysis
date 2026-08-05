@@ -9,6 +9,7 @@ import { CAESAR_INPUTXML_RESTRAINT_TYPE_CORRECTION_PROFILE_ID } from '../src/cor
 import {
   analyseBaseCase,
   buildBm3Authorities,
+  buildBm3PhysicalCaseValues,
 } from './lfea-m028-bm3-fixtures.mjs';
 import { solveBm3WithProgrammedHangers } from './lfea-m029-bm3-hangers.mjs';
 
@@ -243,6 +244,52 @@ function scalar(caseNumber, family, identity, component, solver, reference) {
   });
 }
 
+function quantile(sorted, probability) {
+  if (sorted.length === 0) return null;
+  const position = (sorted.length - 1) * probability;
+  const lower = Math.floor(position);
+  const upper = Math.ceil(position);
+  if (lower === upper) return sorted[lower];
+  return sorted[lower] + (sorted[upper] - sorted[lower]) * (position - lower);
+}
+
+function summarizeComparisonRows(rows) {
+  const summarize = (selected) => {
+    const errors = selected
+      .filter((row) => row.reference !== 0)
+      .map((row) => row.relativeError)
+      .sort((left, right) => left - right);
+    const zeroRows = selected.filter((row) => row.reference === 0);
+    const passed = selected.filter((row) => row.passed).length;
+    return Object.freeze({
+      scalarCount: selected.length,
+      passed,
+      failed: selected.length - passed,
+      passRate: selected.length === 0 ? null : passed / selected.length,
+      zeroReference: Object.freeze({
+        scalarCount: zeroRows.length,
+        exactZeroPasses: zeroRows.filter((row) => row.passed).length,
+        failures: zeroRows.filter((row) => !row.passed).length,
+        maximumAbsoluteSolverValue: zeroRows.reduce((maximum, row) => Math.max(maximum, Math.abs(row.solver)), 0),
+      }),
+      nonzeroReference: Object.freeze({
+        scalarCount: errors.length,
+        meanAbsoluteRelativeError: errors.length ? errors.reduce((sum, value) => sum + value, 0) / errors.length : null,
+        medianAbsoluteRelativeError: quantile(errors, 0.5),
+        percentile95AbsoluteRelativeError: quantile(errors, 0.95),
+        maximumAbsoluteRelativeError: errors.length ? errors.at(-1) : null,
+      }),
+    });
+  };
+  return Object.freeze({
+    overall: summarize(rows),
+    byFamily: Object.freeze(Object.fromEntries(FAMILIES.map((family) => [
+      family,
+      summarize(rows.filter((row) => row.family === family)),
+    ]))),
+  });
+}
+
 function groupBy(rows, keyOf) {
   const grouped = new Map();
   for (const row of rows) {
@@ -348,6 +395,7 @@ function compareStrictCase(caseNumber, referenceCase, own) {
     unmatchedReferenceRows,
     unmatchedSolverRows,
     coverage: Object.freeze(familyCoverage),
+    statistics: summarizeComparisonRows(rows),
     status: failed === 0 && unmatchedReferenceRows === 0 && unmatchedSolverRows === 0 ? 'PASS' : 'INCOMPLETE_BLOCKED',
     topFailures: Object.freeze(rows.filter((row) => !row.passed)
       .sort((left, right) => (right.relativeError ?? Number.POSITIVE_INFINITY) - (left.relativeError ?? Number.POSITIVE_INFINITY))
@@ -417,14 +465,14 @@ const inventory = Object.freeze([...sourceCases.values()].sort((left, right) => 
 const hangerQualification = solveBm3WithProgrammedHangers();
 assert.equal(hangerQualification.comparison, null);
 const case6Own = hangerQualification.solved.report.cases.CASE4_SUS;
-const case7Authorities = buildBm3Authorities({ modelIdentity: 'BM3-LATEST-CASE7-NO-FRICTION', modelRevision: 1 });
+const case7Authorities = hangerQualification.solved;
 const case7Analysis = analyseBaseCase(
   case7Authorities,
   'CASE7_NO_FRICTION',
   Object.freeze({ temperatureField: null, thermal: false, formula: 'W+P1' }),
   { description: 'Latest BM3 CASE 7 strict no-friction physical state; no H and no F1.' },
 );
-const case7Own = physicalCaseValues(case7Authorities, case7Analysis);
+const case7Own = buildBm3PhysicalCaseValues(case7Authorities, case7Analysis);
 
 const strictCases = Object.freeze([
   compareStrictCase(6, sourceCases.get(6), case6Own),
@@ -471,7 +519,11 @@ const report = Object.freeze({
   }),
   strictComparison: Object.freeze({
     cases: strictCases,
-    totals: Object.freeze(strictTotals),
+    totals: Object.freeze({
+      ...strictTotals,
+      passRate: strictTotals.matchedScalarDenominator === 0 ? null : strictTotals.passed / strictTotals.matchedScalarDenominator,
+      maximumAbsoluteRelativeError: Math.max(...strictCases.map((row) => row.statistics.overall.nonzeroReference.maximumAbsoluteRelativeError ?? 0)),
+    }),
     status: strictStatus,
     completeComparisonClaim: strictStatus === 'PASS',
   }),

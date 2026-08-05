@@ -25,17 +25,17 @@ assert.ok(declared.authorities.every((row) => Object.values(row.moment).every((v
 assert.equal(new Set(declared.primitives.map((row) => row.primitiveId)).size, 2);
 
 const expected = Object.freeze({
-  CASE3_OPE: Object.freeze({ f1: 0, hanger: 2, thermal: true, temperatureField: 'operatingTemperature' }),
-  CASE4_SUS: Object.freeze({ f1: 0, hanger: 2, thermal: true, temperatureField: 'operatingTemperature2' }),
-  CASE5_OCC: Object.freeze({ f1: 2, hanger: 2, thermal: false, temperatureField: null }),
-  CASE6_NO_FRICTION: Object.freeze({ f1: 0, hanger: 2, thermal: true, temperatureField: 'operatingTemperature2' }),
-  CASE7_NO_FRICTION: Object.freeze({ f1: 0, hanger: 0, thermal: false, temperatureField: null }),
+  CASE3_OPE: Object.freeze({ f1: 0, hangerPreload: 2, hangerStiffness: true, thermal: true, temperatureField: 'operatingTemperature' }),
+  CASE4_SUS: Object.freeze({ f1: 0, hangerPreload: 2, hangerStiffness: true, thermal: true, temperatureField: 'operatingTemperature2' }),
+  CASE5_OCC: Object.freeze({ f1: 2, hangerPreload: 2, hangerStiffness: true, thermal: false, temperatureField: null }),
+  CASE6_NO_FRICTION: Object.freeze({ f1: 0, hangerPreload: 2, hangerStiffness: true, thermal: true, temperatureField: 'operatingTemperature2' }),
+  CASE7_NO_FRICTION: Object.freeze({ f1: 0, hangerPreload: 0, hangerStiffness: true, thermal: false, temperatureField: null }),
 });
 for (const [caseKey, policy] of Object.entries(expected)) {
   const custody = solved.custody[caseKey];
   assert.equal(custody.physicalLoads.declaredF1PrimitiveCount, policy.f1, `${caseKey} F1 custody`);
-  assert.equal(custody.physicalLoads.hangerPreloadPrimitiveCount, policy.hanger, `${caseKey} hanger preload custody`);
-  assert.equal(custody.physicalLoads.hangerStiffness, policy.hanger > 0, `${caseKey} hanger stiffness custody`);
+  assert.equal(custody.physicalLoads.hangerPreloadPrimitiveCount, policy.hangerPreload, `${caseKey} hanger preload custody`);
+  assert.equal(custody.physicalLoads.hangerStiffness, policy.hangerStiffness, `${caseKey} hanger stiffness custody`);
   assert.equal(custody.physicalLoads.thermal, policy.thermal, `${caseKey} thermal custody`);
   assert.equal(custody.physicalLoads.temperatureField, policy.temperatureField, `${caseKey} temperature-field custody`);
   assert.equal(custody.physicalLoads.friction, false, `${caseKey} friction custody`);
@@ -72,18 +72,11 @@ assert.ok(effects.f1AtHangerOff.l2DisplacementDelta > 0, 'F1-only toggle without
 assert.ok(effects.f1AtHangerOn.l2DisplacementDelta > 0, 'F1-only toggle with hangers must change the response.');
 assert.equal(solved.controlledStudies.design, 'TWO_BY_TWO_HANGER_F1_FACTORIAL_WITH_FRICTION_HELD_OFF');
 
-assert.deepEqual(
-  solved.remainingGaps.map((row) => row.code),
-  [
-    'BEND_SOURCE_SPAN_COMPILED_AS_STRAIGHT_CHORD',
-    'REDUCER_CANDIDATE_PENDING_PARITY',
-    'GENERATED_STATION_AND_DUPLICATE_PAIR_SOLVER_IDENTITY_INCOMPLETE',
-  ],
-);
+assert.deepEqual(solved.remainingGaps, []);
 
 const retained = Object.freeze({
-  schema: 'm032-bm3-load-custody-qualification/v1',
-  status: 'PASS_WITH_DISCLOSED_GAPS',
+  schema: 'm032-bm3-load-custody-qualification/v2',
+  status: 'PASS',
   sourceSemanticHash: solved.sourceSemanticHash,
   declaredForceMoments: Object.freeze({
     selectedVectorNumbers: declared.selectedVectorNumbers,
@@ -118,4 +111,4 @@ console.log(JSON.stringify({
   controlledEffects: retained.controlledStudies.effects,
   remainingGaps: retained.remainingGaps.map((row) => row.code),
 }, null, 2));
-console.log('M032 F1 compilation, CASE 3-7 custody, thermal-state selection and controlled H/F1 studies PASS WITH DISCLOSED GAPS.');
+console.log('M032 F1 compilation, CASE 3-7 custody, thermal-state selection, hanger hardware custody and controlled H/F1 studies PASS.');

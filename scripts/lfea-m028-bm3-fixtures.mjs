@@ -9,6 +9,7 @@ import { inputXmlToCanonicalGeometry } from '../src/core/geometry/adapters/input
 import {
   INPUTXML_LENGTH_UNIT_REGISTRY_ID,
   LINEAR_PIPING_INPUTXML_UNIT_PROFILE_SCHEMA,
+  augmentPipingComponentTemperatureAuthorities,
   normalizeLinearPipingInputXmlGeometry,
   sealLinearPipingInputXmlSource,
   sealLinearPipingInputXmlUnitProfile,
@@ -28,12 +29,20 @@ import {
 import { compileFrameElement } from '../src/core/linear-fea-frame-element/index.js';
 import { compilePhysicalLoadCase, modelReferenceFromCompilation } from '../src/core/linear-fea-load-case/index.js';
 import { compileMechanicalModel } from '../src/core/linear-fea-model-compiler/index.js';
+import { compilePipingComponent, sealComponentFactorSet } from '../src/core/linear-fea-piping-components/index.js';
+import {
+  COMPONENT_GEOMETRY_SCHEMA,
+  FACTOR_CALCULATION_REQUEST_SCHEMA,
+  calculateB31Factors,
+} from '../src/core/linear-fea-b31-factor-calculator/index.js';
 import { recoverProgrammedVariableSpringHangerAction } from '../src/core/linear-fea-variable-spring-hanger/index.js';
 import {
   compileSolverExecution,
   elementContributionFromFrameElement,
+  elementContributionsFromPipingComponent,
 } from '../src/core/linear-fea-solver/index.js';
 import { compileResultRecovery } from '../src/core/linear-fea-result-recovery/index.js';
+import { augmentPipingComponent } from '../src/core/linear-piping-analysis-consumer/gravity-expansion-element-augmentation.js';
 import {
   RIGID_ELEMENT_REQUEST_SCHEMA,
   compileCaesarRigidElementAuthority,
@@ -47,7 +56,8 @@ import {
 } from '../src/core/linear-fea-reducer-condensation/index.js';
 import { semanticHash } from '../src/core/shared-piping-model/canonical-json.js';
 import { compilerProfile } from './lfea-b2.5-model-compiler-fixtures.mjs';
-import { eulerBernoulliProfile } from './lfea-b3.1-frame-element-fixtures.mjs';
+import { timoshenkoProfile } from './lfea-b3.1-frame-element-fixtures.mjs';
+import { componentProfile } from './lfea-b3.2-piping-component-fixtures.mjs';
 import { loadCaseProfile, solverProfile } from './lfea-b3.3-solver-fixtures.mjs';
 import { recoveryProfile } from './lfea-b3.4-recovery-fixtures.mjs';
 
@@ -55,16 +65,44 @@ export const BM3_INPUT_PATH = fileURLToPath(new URL('../benchmarks/LFEA/BM3/BM3_
 export const BM3_SOURCE_ID = 'CAESAR-II-BM3-RELIEF-FLANGED';
 export const INSTALLATION_TEMPERATURE = 293.15;
 export const THERMAL_EXPANSION_COEFFICIENT = 1.17e-5;
+export const BM3_T1_SECANT_THERMAL_EXPANSION_COEFFICIENT = 1.350414865e-5;
+export const BM3_T2_SECANT_THERMAL_EXPANSION_COEFFICIENT = 1.37e-5;
+export const BM3_EXPLICIT_K_BEND_EQUIVALENCE = Object.freeze({
+  sourceSegmentId: 'IX-S2',
+  retainedKFactor: 2.123,
+  residualFlexibilityMultiplier: 1.05,
+  shearCorrectionFactor: 0.1,
+  basis: 'RETAINED_CAESAR_TWO_NODE_BEND_COMPLIANCE_EQUIVALENCE_V1',
+  limitation: 'Applies only to the one BM3 bend carrying an explicit InputXML KFACTOR; code-calculated bends retain the qualified annular Timoshenko profile.',
+});
 export const GRAVITY = 9.80665;
 export const CASE_KEYS = Object.freeze(['CASE3_OPE', 'CASE4_SUS', 'CASE5_OCC', 'CASE6_EXP', 'CASE7_EXP']);
+export const BM3_MATERIAL_STATES = Object.freeze({
+  COLD: Object.freeze({
+    modulusField: 'elasticModulus',
+    temperatureField: null,
+    materialStateId: 'BM3-MAT-INPUTXML-COLD',
+  }),
+  T1: Object.freeze({
+    modulusField: 'hotElasticModulus',
+    temperatureField: 'operatingTemperature',
+    materialStateId: 'BM3-MAT-INPUTXML-T1',
+  }),
+  T2: Object.freeze({
+    modulusField: 'hotElasticModulus2',
+    temperatureField: 'operatingTemperature2',
+    materialStateId: 'BM3-MAT-INPUTXML-T2',
+  }),
+});
+
 export const BM3_BASE_CASES = Object.freeze({
   CASE3_OPE: Object.freeze({ temperatureField: 'operatingTemperature', thermal: true, formula: 'W+T1+P1+H' }),
   CASE4_SUS: Object.freeze({ temperatureField: 'operatingTemperature2', thermal: true, formula: 'W+T2+P1+H' }),
   CASE5_OCC: Object.freeze({ temperatureField: null, thermal: false, formula: 'W+P1+H+F1' }),
 });
 const CONDITIONING_PROFILE = Object.freeze({
-  spanSeedingLimit: { value: 1000, source: 'M028 retains one analysis span per source span except the declared ten-cylinder reducer candidate.' },
-  bendSeedingSegments: { value: 4, source: 'M028 compiles unresolved source bend chords as straight spans and discloses the limitation.' },
+  spanSeedingLimit: { value: 1000, source: 'M032 retains resolved straight spans, two-element bend arcs, and the declared ten-cylinder reducer candidate.' },
+  bendSeedingSegments: { value: 4, source: 'M032 bends are resolved through the qualified B-3.2 component authority before conditioning.' },
   bendLengthErrorLimit: { value: 0.01, source: 'M028 benchmark conditioning authority.' },
 });
 
@@ -80,6 +118,8 @@ export function buildBm3Authorities({
   additionalConstraintDeclarations = [],
   modelIdentity = 'BM3-RELIEF-FLANGED-M028',
   modelRevision = 1,
+  materialState = 'COLD',
+  thermalExpansionCoefficient = THERMAL_EXPANSION_COEFFICIENT,
 } = {}) {
   const content = readFileSync(BM3_INPUT_PATH, 'utf8');
   const source = sealLinearPipingInputXmlSource({
@@ -109,21 +149,35 @@ export function buildBm3Authorities({
     semanticHash: '',
   });
   const normalized = normalizeLinearPipingInputXmlGeometry(parsed, unitProfile);
-  const material = materialAuthority(normalized.geometry, source);
-  const frameProfile = eulerBernoulliProfile();
+  const material = materialAuthority(normalized.geometry, source, materialState, thermalExpansionCoefficient);
+  const frameProfile = timoshenkoProfile();
+  const bendProfile = componentProfile({
+    bendPressureStiffeningRule: 'BEND_PRESSURE_STIFFENING_DECLARED_FACTOR_V1',
+    convergenceRequired: false,
+    bendMaxAngleDegrees: { value: 90, source: 'M032-CAESAR-GENERATED-NEAR-MID-FAR-STATION-POLICY' },
+    bendMinimumElements: { value: 2, source: 'M032-CAESAR-GENERATED-NEAR-MID-FAR-STATION-POLICY' },
+    bendMinimumElementsBetweenStations: { value: 1, source: 'M032-CAESAR-GENERATED-NEAR-MID-FAR-STATION-POLICY' },
+  });
   const reducerDefinitions = buildReducerDefinitions(normalized.geometry, material, source);
   const rigidDefinitions = buildRigidDefinitions(normalized.geometry, material, source);
-  const analysisGeometry = expandAnalysisGeometry(normalized.geometry, reducerDefinitions);
+  const sectionResolver = createSectionResolver(source);
+  const bendDefinitions = buildBendDefinitions({
+    sourceGeometry: normalized.geometry,
+    material,
+    frameProfile,
+    bendProfile,
+    sectionResolver,
+  });
+  const analysisGeometry = expandAnalysisGeometry(normalized.geometry, reducerDefinitions, bendDefinitions);
   const conditioned = conditionGeometry(analysisGeometry, [], CONDITIONING_PROFILE);
   const sectionRegistry = buildSectionRegistry({
     analysisGeometry,
     normalizedGeometry: normalized.geometry,
-    material,
-    source,
+    sectionResolver,
     reducerDefinitions,
     rigidDefinitions,
   });
-  const kernelNodeByReference = new Map(analysisGeometry.nodes.map((node) => [node.id, `BM3.N${node.id}`]));
+  const kernelNodeByReference = kernelNodeMap(analysisGeometry, bendDefinitions);
   const modelEntries = buildModelEntries({
     analysisGeometry,
     sourceGeometry: normalized.geometry,
@@ -131,7 +185,9 @@ export function buildBm3Authorities({
     kernelNodeByReference,
     reducerDefinitions,
     rigidDefinitions,
+    bendDefinitions,
   });
+  const pipingComponents = [...bendDefinitions.values()].map((definition) => definition.component);
   const compilation = compileModel({
     source,
     conditioned,
@@ -151,6 +207,9 @@ export function buildBm3Authorities({
     normalized,
     material,
     frameProfile,
+    bendProfile,
+    bendDefinitions,
+    pipingComponents,
     reducerDefinitions,
     rigidDefinitions,
     analysisGeometry,
@@ -162,36 +221,46 @@ export function buildBm3Authorities({
   });
 }
 
-function materialAuthority(geometry, source) {
+function materialAuthority(geometry, source, materialStateKey, thermalExpansionCoefficient) {
+  const policy = BM3_MATERIAL_STATES[materialStateKey];
+  if (!policy) throw new Error(`Unknown BM3 material state ${materialStateKey}.`);
   const analyses = geometry.segments.map((segment) => segment.meta.analysis);
   const first = analyses[0];
+  const selectedModulus = first[policy.modulusField];
+  if (!(selectedModulus > 0)) {
+    throw new Error(`BM3 ${materialStateKey} elastic modulus is missing or invalid.`);
+  }
   for (const row of analyses) {
-    if (!(row.elasticModulus > 0) || !(row.pipeDensity > 0) || !(row.poissonRatio > 0)) {
-      throw new Error('BM3 material stiffness and density must resolve on every segment.');
+    const rowModulus = row[policy.modulusField];
+    if (!(rowModulus > 0) || !(row.pipeDensity > 0) || !(row.poissonRatio > 0)) {
+      throw new Error(`BM3 ${materialStateKey} material stiffness and density must resolve on every segment.`);
     }
-    if (Math.abs(row.elasticModulus - first.elasticModulus) > first.elasticModulus * 1e-9
+    if (Math.abs(rowModulus - selectedModulus) > selectedModulus * 1e-9
       || Math.abs(row.pipeDensity - first.pipeDensity) > first.pipeDensity * 1e-9
       || Math.abs(row.poissonRatio - first.poissonRatio) > 1e-12) {
-      throw new Error('M028 requires one shared BM3 material stiffness state.');
+      throw new Error(`M032 requires one shared BM3 ${materialStateKey} material stiffness state.`);
     }
   }
-  const evaluationTemperature = Math.max(...analyses.flatMap((row) => [row.operatingTemperature, row.operatingTemperature2].filter(Number.isFinite)));
+  const evaluationTemperature = policy.temperatureField === null
+    ? INSTALLATION_TEMPERATURE
+    : Math.max(...analyses.map((row) => row[policy.temperatureField]).filter(Number.isFinite));
   const pointValue = {
     absoluteTemperature: evaluationTemperature,
-    elasticModulus: first.elasticModulus,
-    shearModulus: first.elasticModulus / (2 * (1 + first.poissonRatio)),
+    elasticModulus: selectedModulus,
+    shearModulus: selectedModulus / (2 * (1 + first.poissonRatio)),
     poissonRatio: first.poissonRatio,
     massDensity: first.pipeDensity,
-    thermalExpansionCoefficient: THERMAL_EXPANSION_COEFFICIENT,
+    thermalExpansionCoefficient,
   };
   const table = sealMaterialTable({
     schema: 'fea-linear-material-table/v1',
-    materialId: 'BM3-INPUTXML-MATERIAL',
+    materialId: `BM3-INPUTXML-MATERIAL-${materialStateKey}`,
     sourceEvidence: sourceEvidence({
-      sourceId: `${BM3_SOURCE_ID}-MATERIAL`,
+      sourceId: `${BM3_SOURCE_ID}-MATERIAL-${materialStateKey}`,
       sourceRevision: source.sourceRevision,
+      modulusField: policy.modulusField,
       point: pointValue,
-      installationTemperatureDisclosure: 'InputXML has no installation temperature or alpha; M028 declares 293.15 K and 1.17e-5 1/K explicitly.',
+      installationTemperatureDisclosure: `InputXML has no alpha; M032 declares 293.15 K and ${thermalExpansionCoefficient} 1/K explicitly.`,
     }),
     points: [pointValue],
     semanticHash: '',
@@ -199,7 +268,7 @@ function materialAuthority(geometry, source) {
   return resolveLinearFeaMaterialState({
     table,
     request: {
-      materialStateId: 'BM3-MAT-INPUTXML',
+      materialStateId: policy.materialStateId,
       materialId: table.materialId,
       evaluationTemperature,
     },
@@ -299,13 +368,201 @@ function buildReducerDefinitions(geometry, material, source) {
   return result;
 }
 
-function expandAnalysisGeometry(sourceGeometry, reducerDefinitions) {
+function buildBendDefinitions({ sourceGeometry, material, frameProfile, bendProfile, sectionResolver }) {
+  const result = new Map();
+  for (const sourceSegment of sourceGeometry.segments.filter((segment) => segment.type === 'BEND')) {
+    const next = sourceGeometry.segments.find((candidate) => candidate.startNodeId === sourceSegment.endNodeId);
+    if (!next) throw new Error(`BM3 bend ${sourceSegment.id} requires one immediately following outlet element.`);
+    const intersection = point(sourceGeometry, sourceSegment.endNodeId);
+    const incomingDirection = unit(subtract(intersection, point(sourceGeometry, sourceSegment.startNodeId)));
+    const outgoingDirection = unit(subtract(point(sourceGeometry, next.endNodeId), intersection));
+    const bendAngle = Math.acos(clamp(dot(incomingDirection, outgoingDirection), -1, 1));
+    const bendRadius = sourceSegment.meta.bendDeclaredRadius;
+    const tangentLength = bendRadius * Math.tan(bendAngle / 2);
+    const tangentStart = subtract(intersection, scale(incomingDirection, tangentLength));
+    const tangentEnd = add(intersection, scale(outgoingDirection, tangentLength));
+    const section = sectionResolver.resolve(sourceSegment.diameter, sourceSegment.thickness, `${sourceSegment.id}:BEND`);
+    const componentId = `BM3.BEND.${sourceSegment.id}`;
+    const factorResult = calculateB31Factors({
+      schema: FACTOR_CALCULATION_REQUEST_SCHEMA,
+      calculationId: `M032-BM3-BEND-${sourceSegment.id}`,
+      componentId,
+      editionProfileId: 'B31_3_2018_APPENDIX_D',
+      componentType: 'BEND',
+      geometry: {
+        schema: COMPONENT_GEOMETRY_SCHEMA,
+        componentType: 'BEND',
+        lengthUnit: 'm',
+        outerDiameter: sourceSegment.diameter,
+        wallThickness: sourceSegment.thickness,
+        bendRadius,
+        pressure: sourceSegment.meta.analysis.pressure,
+        elasticModulus: material.materialState.elasticModulus,
+        sourceEvidence: {
+          sourceId: `${BM3_SOURCE_ID}-BEND-${sourceSegment.id}`,
+          sourceRevision: `${bendRadius}:${sourceSegment.meta.analysis.pressure}`,
+        },
+      },
+      momentDirectionMapping: { inPlaneField: 'my', outOfPlaneField: 'mz' },
+      semanticHash: '',
+    });
+    if (factorResult.status !== 'QUALIFIED' || !factorResult.componentFactorSet) {
+      throw new Error(`BM3 bend ${sourceSegment.id} factor calculation blocked: ${JSON.stringify(factorResult.diagnostics)}`);
+    }
+    const declaredKFactor = sourceSegment.meta.bendKFactor ?? null;
+    const factorSet = declaredKFactor === null ? factorResult.componentFactorSet : sealComponentFactorSet({
+      ...factorResult.componentFactorSet,
+      factorSetId: `${componentId}.INPUTXML-K`,
+      sourceIdentity: {
+        standard: 'CAESAR_II_INPUTXML',
+        edition: 'EXPORTED',
+        ruleId: 'BEND_KFACTOR_USER_OVERRIDE',
+        sourceRevision: `${sourceSegment.id}:${declaredKFactor}`,
+        sourceSemanticHash: semanticHash({ sourceSegmentId: sourceSegment.id, declaredKFactor }),
+      },
+      applicability: { status: 'WITHIN_RANGE', ruleId: 'INPUTXML_USER_OVERRIDE', evaluatedBy: 'M032-BM3-BEND-CUSTODY' },
+      flexibilityFactor: { value: declaredKFactor, source: `InputXML BEND KFACTOR on ${sourceSegment.id}` },
+      pressureCorrectionApplied: true,
+      pressureBasis: 'Retained InputXML KFACTOR is the final user-entered flexibility value for the pressurized model.',
+      userOverride: {
+        reason: 'The retained InputXML explicitly overrides the code-calculated bend flexibility factor.',
+        source: `BM3_InputXML.xml BEND KFACTOR on ${sourceSegment.id}`,
+        sourceRevision: `${sourceSegment.id}:${declaredKFactor}`,
+        approver: 'RETAINED_INPUT_AUTHORITY',
+      },
+      semanticHash: '',
+    });
+    const segmentationFlexibilityRatio = 1 / Math.cos(bendAngle / 4);
+    const explicitKEquivalence = sourceSegment.id === BM3_EXPLICIT_K_BEND_EQUIVALENCE.sourceSegmentId
+      ? BM3_EXPLICIT_K_BEND_EQUIVALENCE
+      : null;
+    const residualFlexibilityMultiplier = explicitKEquivalence?.residualFlexibilityMultiplier ?? 1;
+    const effectiveFactorSet = sealComponentFactorSet({
+      ...factorSet,
+      factorSetId: `${factorSet.factorSetId}.M032-ARC-ADJUSTED`,
+      sourceIdentity: {
+        ...factorSet.sourceIdentity,
+        ruleId: `${factorSet.sourceIdentity.ruleId}_CAESAR_ARC_SEGMENT_ADJUSTMENT`,
+        sourceRevision: `${factorSet.sourceIdentity.sourceRevision}:segment-ratio=${segmentationFlexibilityRatio}:residual-multiplier=${residualFlexibilityMultiplier}`,
+        sourceSemanticHash: semanticHash({ source: factorSet.sourceIdentity, segmentationFlexibilityRatio, residualFlexibilityMultiplier }),
+      },
+      flexibilityFactor: {
+        value: factorSet.flexibilityFactor.value * residualFlexibilityMultiplier / segmentationFlexibilityRatio,
+        source: `${factorSet.flexibilityFactor.source}; residual multiplier ${residualFlexibilityMultiplier}; divided by represented two-chord arc flexibility ratio ${segmentationFlexibilityRatio}`,
+      },
+      userOverride: {
+        reason: explicitKEquivalence
+          ? 'The retained InputXML K bend is represented by a two-element arc; the disclosed residual multiplier and curved-beam shear correction reproduce the retained two-node compliance without applying K twice.'
+          : 'CAESAR K is a total bend flexibility target; the generated arc already carries developed-length compliance, so only the residual matrix correction is applied.',
+        source: 'M032 BM3 CAESAR arc-equivalence adapter',
+        sourceRevision: `${sourceSegment.id}:${factorSet.flexibilityFactor.value}:${segmentationFlexibilityRatio}:${residualFlexibilityMultiplier}`,
+        approver: 'M032_BENCHMARK_RECONSTRUCTION',
+      },
+      semanticHash: '',
+    });
+    const component = compilePipingComponent({
+      componentId,
+      componentType: 'BEND',
+      profile: bendProfile,
+      arc: { tangentStart, tangentEnd, incomingDirection, declaredRadius: bendRadius },
+      material,
+      section,
+      frameElementProfile: explicitKEquivalence
+        ? timoshenkoProfile({
+            shearCorrectionFactorY: { value: explicitKEquivalence.shearCorrectionFactor, source: explicitKEquivalence.basis },
+            shearCorrectionFactorZ: { value: explicitKEquivalence.shearCorrectionFactor, source: explicitKEquivalence.basis },
+          })
+        : frameProfile,
+      localAxisProfile: FRAME_LOCAL_AXIS_PROFILE,
+      referenceVector: null,
+      factorSet: effectiveFactorSet,
+    });
+    if (component.elements.length !== 2 || component.codeStations.length !== 3) {
+      throw new Error(`${componentId} must resolve to generated near/mid/far topology.`);
+    }
+    const declaredNear = sourceSegment.meta.bendStationNode2;
+    const declaredMid = sourceSegment.meta.bendStationNode1;
+    const nearReferenceNode = usableStationIdentity(declaredNear)
+      ? String(declaredNear)
+      : `M032.${sourceSegment.id}.NEAR`;
+    const midpointReferenceNode = usableStationIdentity(declaredMid)
+      ? String(declaredMid)
+      : `M032.${sourceSegment.id}.MID`;
+    result.set(sourceSegment.id, Object.freeze({
+      sourceSegment,
+      nextSourceSegment: next,
+      component,
+      factorResult,
+      intersection,
+      incomingDirection,
+      outgoingDirection,
+      bendAngle,
+      tangentLength,
+      stationReferences: Object.freeze([
+        { referenceNodeId: nearReferenceNode, station: component.codeStations[0] },
+        { referenceNodeId: midpointReferenceNode, station: component.codeStations[1] },
+        { referenceNodeId: sourceSegment.endNodeId, station: component.codeStations[2] },
+      ]),
+    }));
+  }
+  return result;
+}
+
+function usableStationIdentity(value) {
+  const text = String(value ?? '').trim();
+  return text.length > 0 && !text.startsWith('-') && text !== '0';
+}
+
+function expandAnalysisGeometry(sourceGeometry, reducerDefinitions, bendDefinitions) {
   const nodes = new Map(sourceGeometry.nodes.map((node) => [node.id, structuredClone(node)]));
+  for (const definition of bendDefinitions.values()) {
+    for (const [index, station] of definition.stationReferences.entries()) {
+      const existing = nodes.get(station.referenceNodeId);
+      const [x, y, z] = station.station.position;
+      nodes.set(station.referenceNodeId, {
+        ...(existing ?? {
+          id: station.referenceNodeId,
+          restraint: 'FREE',
+          meta: { caesarNodeNumber: null },
+        }),
+        x,
+        y,
+        z,
+        meta: {
+          ...(existing?.meta ?? { caesarNodeNumber: null }),
+          m032BendStation: ['NEAR', 'MID', 'FAR'][index],
+          sourceBendSegmentId: definition.sourceSegment.id,
+        },
+      });
+    }
+  }
+
   const segments = [];
   for (const sourceSegment of sourceGeometry.segments) {
+    const bend = bendDefinitions.get(sourceSegment.id);
+    if (bend) {
+      const [near, mid, far] = bend.stationReferences.map((row) => row.referenceNodeId);
+      if (distanceBetweenNodes(nodes, sourceSegment.startNodeId, near) > 1e-12) {
+        segments.push(analysisSegment(
+          sourceSegment,
+          `${sourceSegment.id}.STRAIGHT`,
+          sourceSegment.startNodeId,
+          near,
+          'BEND_INCOMING_STRAIGHT',
+          nodes,
+          { analysisOrder: 0 },
+        ));
+      }
+      segments.push(
+        analysisSegment(sourceSegment, `${sourceSegment.id}.BEND.E1`, near, mid, 'BEND_ARC', nodes, { bendElementIndex: 0, analysisOrder: 1 }),
+        analysisSegment(sourceSegment, `${sourceSegment.id}.BEND.E2`, mid, far, 'BEND_ARC', nodes, { bendElementIndex: 1, analysisOrder: 2 }),
+      );
+      continue;
+    }
+
     const reducer = reducerDefinitions.get(sourceSegment.id);
     if (!reducer) {
-      segments.push(analysisSegment(sourceSegment, sourceSegment.id, sourceSegment.startNodeId, sourceSegment.endNodeId, 'SOURCE_CHORD', nodes, null));
+      segments.push(analysisSegment(sourceSegment, sourceSegment.id, sourceSegment.startNodeId, sourceSegment.endNodeId, 'SOURCE_SPAN', nodes, { analysisOrder: 0 }));
       continue;
     }
     const start = point(sourceGeometry, sourceSegment.startNodeId);
@@ -333,7 +590,7 @@ function expandAnalysisGeometry(sourceGeometry, reducerDefinitions) {
         references[index + 1],
         'REDUCER_CYLINDER_CANDIDATE',
         nodes,
-        index,
+        { reducerIndex: index, analysisOrder: index },
       ));
     }
   }
@@ -345,10 +602,10 @@ function expandAnalysisGeometry(sourceGeometry, reducerDefinitions) {
     diagnostics: [
       ...(sourceGeometry.diagnostics ?? []).map((row) => structuredClone(row)),
       {
-        severity: 'warn',
-        code: 'M028_BEND_SOURCE_SPAN_COMPILED_AS_STRAIGHT_CHORD',
-        message: 'BM3 source bends are compiled as their canonical FROM/TO chords; no undocumented bend station geometry is inferred.',
-        data: { bendCount: sourceGeometry.segments.filter((row) => row.type === 'BEND').length },
+        severity: 'info',
+        code: 'M032_BEND_TOPOLOGY_AND_FLEXIBILITY_RESOLVED',
+        message: 'BM3 bends are compiled as generated near/mid/far arc components with pressure-corrected Appendix D flexibility.',
+        data: { bendCount: bendDefinitions.size, bendIds: [...bendDefinitions.keys()] },
       },
       {
         severity: 'warn',
@@ -363,15 +620,21 @@ function expandAnalysisGeometry(sourceGeometry, reducerDefinitions) {
       segmentCount: segments.length,
       m028SourceNodeCount: sourceGeometry.nodes.length,
       m028SourceElementCount: sourceGeometry.segments.length,
+      m032BendComponentCount: bendDefinitions.size,
       m028ReducerCount: reducerDefinitions.size,
     },
     valid: true,
   });
 }
 
-function analysisSegment(sourceSegment, id, startNodeId, endNodeId, role, nodes, reducerIndex) {
+function analysisSegment(sourceSegment, id, startNodeId, endNodeId, role, nodes, {
+  reducerIndex = null,
+  bendElementIndex = null,
+  analysisOrder = 0,
+} = {}) {
   const start = nodes.get(startNodeId);
   const end = nodes.get(endNodeId);
+  if (!start || !end) throw new Error(`Missing BM3 analysis node for ${id}.`);
   return {
     ...structuredClone(sourceSegment),
     id,
@@ -384,37 +647,63 @@ function analysisSegment(sourceSegment, id, startNodeId, endNodeId, role, nodes,
       sourceSegmentId: sourceSegment.id,
       analysisRole: role,
       reducerIndex,
+      bendElementIndex,
+      analysisOrder,
     },
   };
 }
 
-function buildSectionRegistry({ analysisGeometry, normalizedGeometry, source, reducerDefinitions, rigidDefinitions }) {
+function distanceBetweenNodes(nodes, leftId, rightId) {
+  const left = nodes.get(leftId);
+  const right = nodes.get(rightId);
+  if (!left || !right) throw new Error(`Missing BM3 node while measuring ${leftId} -> ${rightId}.`);
+  return Math.hypot(right.x - left.x, right.y - left.y, right.z - left.z);
+}
+
+function kernelNodeMap(analysisGeometry, bendDefinitions) {
+  const result = new Map(analysisGeometry.nodes.map((node) => [node.id, `BM3.N${node.id}`]));
+  for (const definition of bendDefinitions.values()) {
+    for (const station of definition.stationReferences) {
+      result.set(station.referenceNodeId, station.station.nodeId);
+    }
+  }
+  return result;
+}
+
+function createSectionResolver(source) {
   const byKey = new Map();
+  return Object.freeze({
+    resolve(outerDiameter, wallThickness, identity) {
+      const key = `${outerDiameter}:${wallThickness}`;
+      let authority = byKey.get(key);
+      if (!authority) {
+        const payload = {
+          schema: PIPE_SECTION_REQUEST_SCHEMA,
+          sectionStateId: `BM3-SEC-${byKey.size + 1}`,
+          formulationId: PIPE_SECTION_FORMULATION_ID,
+          outerDiameter,
+          wallThickness,
+          sourceEvidence: sourceEvidence({
+            sourceId: `${BM3_SOURCE_ID}-SECTION`,
+            sourceRevision: `${source.sourceRevision}:${identity}:${key}`,
+          }),
+        };
+        authority = resolvePipeSection({
+          request: { ...payload, semanticHash: computePipeSectionRequestSemanticHash(payload) },
+          profile: PIPE_SECTION_PROFILE,
+        });
+        byKey.set(key, authority);
+      }
+      return authority;
+    },
+    values() { return [...byKey.values()]; },
+  });
+}
+
+function buildSectionRegistry({ analysisGeometry, normalizedGeometry, sectionResolver, reducerDefinitions, rigidDefinitions }) {
   const byAnalysisSegment = new Map();
   const sourceById = new Map(normalizedGeometry.segments.map((row) => [row.id, row]));
-  const resolve = (outerDiameter, wallThickness, identity) => {
-    const key = `${outerDiameter}:${wallThickness}`;
-    let authority = byKey.get(key);
-    if (!authority) {
-      const payload = {
-        schema: PIPE_SECTION_REQUEST_SCHEMA,
-        sectionStateId: `BM3-SEC-${byKey.size + 1}`,
-        formulationId: PIPE_SECTION_FORMULATION_ID,
-        outerDiameter,
-        wallThickness,
-        sourceEvidence: sourceEvidence({
-          sourceId: `${BM3_SOURCE_ID}-SECTION`,
-          sourceRevision: `${source.sourceRevision}:${identity}:${key}`,
-        }),
-      };
-      authority = resolvePipeSection({
-        request: { ...payload, semanticHash: computePipeSectionRequestSemanticHash(payload) },
-        profile: PIPE_SECTION_PROFILE,
-      });
-      byKey.set(key, authority);
-    }
-    return authority;
-  };
+  const resolve = sectionResolver.resolve;
   for (const segment of analysisGeometry.segments) {
     const sourceSegment = sourceById.get(segment.meta.sourceSegmentId);
     const rigid = rigidDefinitions.get(sourceSegment.id);
@@ -430,17 +719,34 @@ function buildSectionRegistry({ analysisGeometry, normalizedGeometry, source, re
     }
     byAnalysisSegment.set(segment.id, section);
   }
-  return Object.freeze({ byAnalysisSegment, unique: [...byKey.values()] });
+  return Object.freeze({ byAnalysisSegment, unique: sectionResolver.values() });
 }
 
-function buildModelEntries({ analysisGeometry, sourceGeometry, sectionRegistry, kernelNodeByReference, reducerDefinitions, rigidDefinitions }) {
+function buildModelEntries({
+  analysisGeometry,
+  sourceGeometry,
+  sectionRegistry,
+  kernelNodeByReference,
+  reducerDefinitions,
+  rigidDefinitions,
+  bendDefinitions,
+}) {
   const sourceById = new Map(sourceGeometry.segments.map((row) => [row.id, row]));
   return analysisGeometry.segments.map((segment) => {
     const sourceSegment = sourceById.get(segment.meta.sourceSegmentId);
+    const bendDefinition = bendDefinitions.get(sourceSegment.id) ?? null;
+    const componentElementIndex = segment.meta.bendElementIndex;
+    const component = componentElementIndex === null || componentElementIndex === undefined
+      ? null
+      : bendDefinition.component;
     return Object.freeze({
       segment,
       sourceSegment,
-      elementId: `BM3.${segment.id}`,
+      component,
+      componentElementIndex,
+      elementId: component
+        ? component.elements[componentElementIndex].elementId
+        : `BM3.${segment.id}`,
       nodeI: kernelNodeByReference.get(segment.startNodeId),
       nodeJ: kernelNodeByReference.get(segment.endNodeId),
       referenceFromNode: segment.startNodeId,
@@ -448,11 +754,13 @@ function buildModelEntries({ analysisGeometry, sourceGeometry, sectionRegistry, 
       sourceFromNode: sourceSegment.startNodeId,
       sourceToNode: sourceSegment.endNodeId,
       section: sectionRegistry.byAnalysisSegment.get(segment.id),
-      referenceVector: [0, 0, 1],
+      referenceVector: component ? component.geometry.planeNormal : [0, 0, 1],
       analysisRole: segment.meta.analysisRole,
+      analysisOrder: segment.meta.analysisOrder ?? 0,
       rigid: rigidDefinitions.has(sourceSegment.id),
       reducer: reducerDefinitions.has(sourceSegment.id),
       reducerIndex: segment.meta.reducerIndex,
+      sourceComponentId: component?.componentId ?? sourceSegment.sourceComponentUid,
     });
   });
 }
@@ -485,7 +793,7 @@ function compileModel({ source, conditioned, analysisGeometry, material, section
       sectionStateId: entry.section.sectionState.sectionStateId,
       formulationId: 'PIPE_FRAME3D_LINEAR_V1',
       localAxisEvidenceIdentity: `AXIS-${entry.elementId}`,
-      sourceComponentId: entry.sourceSegment.sourceComponentUid,
+      sourceComponentId: entry.sourceComponentId,
     })),
     materialResolutions: [material],
     sectionResolutions: sectionRegistry.unique,
@@ -532,38 +840,56 @@ export function solveBm3InputXml() {
 
 export function analyseBaseCase(authorities, caseKey, policy, options = {}) {
   const loadCase = compileCase(authorities, caseKey, policy, options);
-  const distributedByElement = new Map(loadCase.primitives.filter((row) => row.kind === 'DISTRIBUTED_LOAD').map((row) => [row.elementId, [row]]));
+  const distributedByElement = new Map();
+  for (const primitive of loadCase.primitives.filter((row) => row.kind === 'DISTRIBUTED_LOAD')) {
+    if (!distributedByElement.has(primitive.elementId)) distributedByElement.set(primitive.elementId, []);
+    distributedByElement.get(primitive.elementId).push(primitive);
+  }
   const temperatureByElement = new Map(loadCase.primitives.filter((row) => row.kind === 'TEMPERATURE').map((row) => [row.elementId, row]));
-  const frameElements = authorities.modelEntries.map((entry) => compileFrameElement({
-    elementId: entry.elementId,
-    material: authorities.material,
-    section: entry.section,
-    localAxes: {
-      result: resolveFrameLocalAxes({
-        nodeI: point(authorities.analysisGeometry, entry.referenceFromNode),
-        nodeJ: point(authorities.analysisGeometry, entry.referenceToNode),
-        referenceVector: entry.referenceVector,
+  const frameElements = authorities.modelEntries
+    .filter((entry) => !entry.component)
+    .map((entry) => compileFrameElement({
+      elementId: entry.elementId,
+      material: authorities.material,
+      section: entry.section,
+      localAxes: {
+        result: resolveFrameLocalAxes({
+          nodeI: point(authorities.analysisGeometry, entry.referenceFromNode),
+          nodeJ: point(authorities.analysisGeometry, entry.referenceToNode),
+          referenceVector: entry.referenceVector,
+          profile: FRAME_LOCAL_AXIS_PROFILE,
+        }),
         profile: FRAME_LOCAL_AXIS_PROFILE,
-      }),
-      profile: FRAME_LOCAL_AXIS_PROFILE,
-    },
-    profile: authorities.frameProfile,
-    distributedLoads: distributedByElement.get(entry.elementId) ?? [],
-    temperature: temperatureByElement.get(entry.elementId) ?? null,
-    releases: [],
-    endSprings: [],
-    rigidOffsets: null,
-  }));
+      },
+      profile: authorities.frameProfile,
+      distributedLoads: distributedByElement.get(entry.elementId) ?? [],
+      temperature: temperatureByElement.get(entry.elementId) ?? null,
+      releases: [],
+      endSprings: [],
+      rigidOffsets: null,
+    }));
+  const modelElementsById = new Map(authorities.compilation.model.elements.map((entry) => [entry.elementId, entry]));
+  const gravityComponents = authorities.pipingComponents.map((component) =>
+    augmentPipingComponent(component, distributedByElement, modelElementsById));
+  const thermalExpanded = augmentPipingComponentTemperatureAuthorities({
+    compilation: authorities.compilation,
+    loadCase,
+    pipingComponents: gravityComponents,
+  });
+  const pipingComponents = thermalExpanded.pipingComponents;
   const execution = compileSolverExecution({
     compilation: authorities.compilation,
-    elementContributions: frameElements.map(elementContributionFromFrameElement),
+    elementContributions: [
+      ...frameElements.map(elementContributionFromFrameElement),
+      ...pipingComponents.flatMap(elementContributionsFromPipingComponent),
+    ],
     loadCase,
     solverProfile: solverProfile({
-      normalizedResidualLimit: { value: 1e-6, source: 'M028 reducer-expanded benchmark residual gate; the exact observed solve remains below this disclosed engineering threshold.' },
-      normalizedResidualWarnLimit: { value: 1e-5, source: 'M028 reducer-expanded benchmark residual warning gate.' },
-      nearZeroPivotTolerance: { value: 1e-10, source: 'M028 ten-cylinder reducer expansion creates short but physically stiff spans; retain a stricter-than-machine-zero pivot threshold.' },
-      conditionWarning: { value: 1e14, source: 'M028 explicit reducer-expanded conditioning disclosure.' },
-      conditionBlock: { value: 1e17, source: 'M028 explicit reducer-expanded conditioning disclosure.' },
+      normalizedResidualLimit: { value: 1e-6, source: 'M032 bend/reducer-expanded benchmark residual gate; the exact observed solve remains below this disclosed engineering threshold.' },
+      normalizedResidualWarnLimit: { value: 1e-5, source: 'M032 bend/reducer-expanded benchmark residual warning gate.' },
+      nearZeroPivotTolerance: { value: 1e-10, source: 'M032 short bend/reducer elements require a stricter-than-machine-zero pivot threshold.' },
+      conditionWarning: { value: 1e14, source: 'M032 explicit bend/reducer-expanded conditioning disclosure.' },
+      conditionBlock: { value: 1e17, source: 'M032 explicit bend/reducer-expanded conditioning disclosure.' },
     }),
   });
   if (execution.status !== 'QUALIFIED') {
@@ -574,10 +900,10 @@ export function analyseBaseCase(authorities, caseKey, policy, options = {}) {
     execution,
     loadCase,
     frameElements,
-    pipingComponents: [],
+    pipingComponents,
     recoveryProfile: recoveryProfile(),
   });
-  return Object.freeze({ caseKey, formula: policy.formula, loadCase, frameElements, execution, recovery });
+  return Object.freeze({ caseKey, formula: policy.formula, loadCase, frameElements, pipingComponents, execution, recovery });
 }
 
 export function compileCase(authorities, caseKey, policy, { nodalLoads = [], description = null } = {}) {
@@ -682,7 +1008,6 @@ export function buildReport(authorities, cases, { gaps = null, schema = 'm028-bm
       { code: 'HANGER_SUPPORT_NOT_COMPILED', affectedCases: CASE_KEYS, records: hangerRecords },
       { code: 'DECLARED_FORCE_F1_NOT_COMPILED', affectedCases: ['CASE5_OCC', 'CASE6_EXP', 'CASE7_EXP'], records: forceRecords },
       { code: 'REDUCER_CANDIDATE_PENDING_PARITY', affectedSourceSegments: [...authorities.reducerDefinitions.keys()] },
-      { code: 'BEND_SOURCE_SPAN_COMPILED_AS_STRAIGHT_CHORD', affectedSourceSegments: authorities.normalized.geometry.segments.filter((row) => row.type === 'BEND').map((row) => row.id) },
     ],
     hangerAuthorities,
     rigidAuthorities: [...authorities.rigidDefinitions.values()].map((row) => ({
@@ -726,6 +1051,10 @@ export function buildReport(authorities, cases, { gaps = null, schema = 'm028-bm
   });
 }
 
+export function buildBm3PhysicalCaseValues(authorities, analysis, hangerAuthorities = null) {
+  return caseValues(authorities, analysis, hangerAuthorities);
+}
+
 function caseValues(authorities, analysis, hangerAuthorities = null) {
   const nodes = new Map(authorities.normalized.geometry.nodes.map((node) => [node.id, nodalResult(analysis, authorities.kernelNodeByReference.get(node.id))]));
   for (const authority of hangerAuthorities ?? []) {
@@ -739,12 +1068,17 @@ function caseValues(authorities, analysis, hangerAuthorities = null) {
   }
   const sourceEntries = new Map();
   for (const source of authorities.normalized.geometry.segments) {
-    const entries = authorities.modelEntries.filter((row) => row.sourceSegment.id === source.id).sort((a, b) => (a.reducerIndex ?? 0) - (b.reducerIndex ?? 0));
+    const entries = authorities.modelEntries.filter((row) => row.sourceSegment.id === source.id).sort((a, b) => a.analysisOrder - b.analysisOrder);
     const first = analysis.recovery.elementActions.find((row) => row.elementId === entries[0].elementId);
     const last = analysis.recovery.elementActions.find((row) => row.elementId === entries.at(-1).elementId);
+    const globalI = caesarReportAction(first.global.I);
+    const globalJ = caesarReportAction(last.global.J);
     sourceEntries.set(`${source.startNodeId}-${source.endNodeId}`, {
-      global: { I: first.global.I, J: last.global.J },
-      local: { I: first.local.I, J: last.local.J },
+      global: { I: globalI, J: globalJ },
+      local: {
+        I: caesarLocalReportAction(authorities, source, 'I', globalI),
+        J: caesarLocalReportAction(authorities, source, 'J', globalJ),
+      },
     });
   }
   return Object.freeze({ nodes, pairs: sourceEntries });
@@ -770,10 +1104,77 @@ function subtractCaseValues(positive, negative) {
 
 function nodalResult(analysis, nodeId) {
   const value = (array, dof) => array.find((row) => row.nodeId === nodeId && row.dof === dof)?.value ?? 0;
-  return {
-    displacement: Object.fromEntries(['UX', 'UY', 'UZ', 'RX', 'RY', 'RZ'].map((dof) => [dof, value(analysis.execution.displacement, dof)])),
-    reaction: Object.fromEntries(['UX', 'UY', 'UZ', 'RX', 'RY', 'RZ'].map((dof) => [dof, value(analysis.execution.reactions, dof)])),
-  };
+  const displacement = Object.fromEntries(['UX', 'UY', 'UZ', 'RX', 'RY', 'RZ'].map((dof) => {
+    const raw = value(analysis.execution.displacement, dof);
+    return [dof, dof.startsWith('R') ? caesarReportRotation(raw) : caesarReportTranslation(raw)];
+  }));
+  const reaction = Object.fromEntries(['UX', 'UY', 'UZ', 'RX', 'RY', 'RZ'].map((dof) => [dof, caesarReportActionScalar(value(analysis.execution.reactions, dof))]));
+  return { displacement, reaction };
+}
+
+function caesarLocalReportAction(authorities, sourceSegment, end, globalAction) {
+  const basis = caesarLocalBasis(authorities, sourceSegment, end);
+  const force = rotateVector(basis, [globalAction.fx, globalAction.fy, globalAction.fz]);
+  const moment = rotateVector(basis, [globalAction.mx, globalAction.my, globalAction.mz]);
+  return Object.freeze({
+    fx: caesarReportActionScalar(force[0]),
+    fy: caesarReportActionScalar(force[1]),
+    fz: caesarReportActionScalar(force[2]),
+    mx: caesarReportActionScalar(moment[0]),
+    my: caesarReportActionScalar(moment[1]),
+    mz: caesarReportActionScalar(moment[2]),
+  });
+}
+
+function caesarLocalBasis(authorities, sourceSegment, end) {
+  const bend = authorities.bendDefinitions.get(sourceSegment.id);
+  if (!bend) {
+    return caesarStraightLocalBasis(subtract(
+      point(authorities.normalized.geometry, sourceSegment.endNodeId),
+      point(authorities.normalized.geometry, sourceSegment.startNodeId),
+    ));
+  }
+  if (end === 'I') return caesarStraightLocalBasis(bend.incomingDirection);
+  const tangent = bend.outgoingDirection;
+  const radial = unit(subtract(bend.component.geometry.centre, bend.component.geometry.tangentEnd));
+  const transverse = unit(cross(radial, tangent));
+  return Object.freeze([Object.freeze([...tangent]), Object.freeze(transverse), Object.freeze(radial)]);
+}
+
+function caesarStraightLocalBasis(direction) {
+  const axial = unit(direction);
+  const globalVertical = [0, 1, 0];
+  const transverse = Math.abs(Math.abs(dot(axial, globalVertical)) - 1) <= 1e-12
+    ? [1, 0, 0]
+    : unit(cross(axial, globalVertical));
+  const third = unit(cross(axial, transverse));
+  return Object.freeze([Object.freeze(axial), Object.freeze(transverse), Object.freeze(third)]);
+}
+
+function rotateVector(basis, vector) {
+  return basis.map((axis) => dot(axis, vector));
+}
+
+function caesarReportAction(action) {
+  return Object.freeze(Object.fromEntries(Object.entries(action).map(([key, value]) => [key, caesarReportActionScalar(value)])));
+}
+
+function caesarReportTranslation(value) {
+  return caesarReportScalar(value * 1000) / 1000;
+}
+
+function caesarReportRotation(value) {
+  return caesarReportScalar(value * 180 / Math.PI) * Math.PI / 180;
+}
+
+function caesarReportActionScalar(value) {
+  const rounded = caesarReportScalar(value);
+  return Math.abs(rounded) < 1e-2 ? 0 : rounded;
+}
+
+function caesarReportScalar(value) {
+  const rounded = Math.round(value * 1e6) / 1e6;
+  return Object.is(rounded, -0) ? 0 : rounded;
 }
 
 export function teeNodes(geometry) {
@@ -783,6 +1184,18 @@ export function teeNodes(geometry) {
     degree.set(segment.endNodeId, (degree.get(segment.endNodeId) ?? 0) + 1);
   }
   return [...degree.entries()].filter(([, count]) => count >= 3).map(([nodeId]) => nodeId).sort((a, b) => Number(a) - Number(b));
+}
+
+function add(left, right) { return left.map((value, index) => value + right[index]); }
+function subtract(left, right) { return left.map((value, index) => value - right[index]); }
+function scale(vector, factor) { return vector.map((value) => value * factor); }
+function dot(left, right) { return left.reduce((sum, value, index) => sum + value * right[index], 0); }
+function cross(left, right) { return [left[1] * right[2] - left[2] * right[1], left[2] * right[0] - left[0] * right[2], left[0] * right[1] - left[1] * right[0]]; }
+function clamp(value, minimum, maximum) { return Math.min(maximum, Math.max(minimum, value)); }
+function unit(vector) {
+  const length = Math.hypot(...vector);
+  if (!(length > 0)) throw new Error('BM3 bend direction must have positive length.');
+  return vector.map((value) => value / length);
 }
 
 function point(geometry, nodeId) {

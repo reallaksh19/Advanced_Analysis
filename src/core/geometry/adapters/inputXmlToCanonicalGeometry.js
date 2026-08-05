@@ -308,6 +308,8 @@ function analysisMetadata(edge, carry, units, diagnostics) {
   const length = (value) => convertInputXmlLengthToMetres(value, units.lengthUnit);
   return {
     elasticModulus: inheritedCanonicalField({ edge, names: ['MODULUS'], carry, key: 'elasticModulus', label: 'MODULUS', diagnostics, declaration: units.elasticModulus, quantity: 'EMOD' }),
+    hotElasticModulus: inheritedCanonicalField({ edge, names: ['HOT_MOD1'], carry, key: 'hotElasticModulus', label: 'HOT_MOD1', diagnostics, declaration: units.elasticModulus, quantity: 'EMOD' }),
+    hotElasticModulus2: inheritedCanonicalField({ edge, names: ['HOT_MOD2'], carry, key: 'hotElasticModulus2', label: 'HOT_MOD2', diagnostics, declaration: units.elasticModulus, quantity: 'EMOD' }),
     poissonRatio: inheritedCanonicalField({ edge, names: ['POISSONS'], carry, key: 'poissonRatio', label: 'POISSONS', diagnostics, convert: (value) => value }),
     operatingTemperature: inheritedCanonicalField({ edge, names: ['TEMP_EXP_C1'], carry, key: 'operatingTemperature', label: 'TEMP_EXP_C1', diagnostics, declaration: units.temperature, quantity: 'TEMP' }),
     operatingTemperature2: inheritedCanonicalField({ edge, names: ['TEMP_EXP_C2'], carry, key: 'operatingTemperature2', label: 'TEMP_EXP_C2', diagnostics, declaration: units.temperature, quantity: 'TEMP' }),
@@ -451,6 +453,7 @@ function attachBendGeometry(segment, edge, _tolerance, diagnostics) {
   const angle1 = physicalBendAngle(rawAngle1);
   const angle2 = physicalBendAngle(rawAngle2);
   const numMiter = caesarNumberOrNull(attributeValue(attrs, 'NUM_MITER'));
+  const kFactor = caesarNumberOrNull(attributeValue(attrs, 'KFACTOR'));
   const node1 = cleanNodeId(attributeValue(attrs, 'NODE1')) || null;
   const node2 = cleanNodeId(attributeValue(attrs, 'NODE2')) || null;
   const internalStationNodes = [node1, node2].filter(
@@ -460,6 +463,7 @@ function attachBendGeometry(segment, edge, _tolerance, diagnostics) {
   segment.meta.bendAngle1 = angle1 ?? undefined;
   segment.meta.bendAngle2 = angle2 ?? undefined;
   segment.meta.numMiter = numMiter ?? undefined;
+  segment.meta.bendKFactor = kFactor ?? undefined;
   segment.meta.bendStationNode1 = node1 ?? undefined;
   segment.meta.bendStationNode2 = node2 ?? undefined;
   if (isDoubleSentinel(rawAngle1)) {

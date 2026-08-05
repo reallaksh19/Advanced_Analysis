@@ -11,7 +11,8 @@ export const M032_CASE_POLICIES = Object.freeze({
     formula: 'W+T1+P1+H',
     temperatureField: 'operatingTemperature',
     thermal: true,
-    hanger: true,
+    hangerStiffness: true,
+    hangerPreload: true,
     forceMomentVectorNumbers: Object.freeze([]),
     friction: false,
   }),
@@ -19,7 +20,8 @@ export const M032_CASE_POLICIES = Object.freeze({
     formula: 'W+T2+P1+H',
     temperatureField: 'operatingTemperature2',
     thermal: true,
-    hanger: true,
+    hangerStiffness: true,
+    hangerPreload: true,
     forceMomentVectorNumbers: Object.freeze([]),
     friction: false,
   }),
@@ -27,7 +29,8 @@ export const M032_CASE_POLICIES = Object.freeze({
     formula: 'W+P1+H+F1',
     temperatureField: null,
     thermal: false,
-    hanger: true,
+    hangerStiffness: true,
+    hangerPreload: true,
     forceMomentVectorNumbers: Object.freeze([1]),
     friction: false,
   }),
@@ -35,7 +38,8 @@ export const M032_CASE_POLICIES = Object.freeze({
     formula: 'W+T2+P1+H',
     temperatureField: 'operatingTemperature2',
     thermal: true,
-    hanger: true,
+    hangerStiffness: true,
+    hangerPreload: true,
     forceMomentVectorNumbers: Object.freeze([]),
     friction: false,
   }),
@@ -43,7 +47,8 @@ export const M032_CASE_POLICIES = Object.freeze({
     formula: 'W+P1',
     temperatureField: null,
     thermal: false,
-    hanger: false,
+    hangerStiffness: true,
+    hangerPreload: false,
     forceMomentVectorNumbers: Object.freeze([]),
     friction: false,
   }),
@@ -63,43 +68,46 @@ export function solveBm3M032LoadCustody() {
   }
   const hangerAuthorities = predecessor.solved.hangerDesign.compiledHangers;
   const hangerPreloads = hangerAuthorities.map((authority) => authority.preloadPrimitive);
-  const hangerModel = predecessor.solved;
+  const caseAuthorities = predecessor.solved.hangerDesign.caseAuthorities;
+  const t1HangerModel = caseAuthorities.CASE3_OPE;
+  const t2HangerModel = caseAuthorities.CASE4_SUS;
+  const coldHangerModel = caseAuthorities.CASE5_OCC;
   const noHangerModel = buildBm3Authorities({
     modelIdentity: 'BM3-M032-NO-HANGER',
     modelRevision: 1,
   });
-  const f1ForHangerModel = compileF1(hangerModel, 'M032-HANGER-MODEL-F1');
+  const f1ForHangerModel = compileF1(coldHangerModel, 'M032-HANGER-MODEL-F1');
   const f1ForNoHangerModel = compileF1(noHangerModel, 'M032-NO-HANGER-MODEL-F1');
 
   const cases = Object.freeze({
-    CASE3_OPE: solveCase(hangerModel, 'M032_CASE3_OPE', M032_CASE_POLICIES.CASE3_OPE, {
+    CASE3_OPE: solveCase(t1HangerModel, 'M032_CASE3_OPE', M032_CASE_POLICIES.CASE3_OPE, {
       hangerPreloads,
       f1Compilation: f1ForHangerModel,
     }),
-    CASE4_SUS: solveCase(hangerModel, 'M032_CASE4_SUS', M032_CASE_POLICIES.CASE4_SUS, {
+    CASE4_SUS: solveCase(t2HangerModel, 'M032_CASE4_SUS', M032_CASE_POLICIES.CASE4_SUS, {
       hangerPreloads,
       f1Compilation: f1ForHangerModel,
     }),
-    CASE5_OCC: solveCase(hangerModel, 'M032_CASE5_OCC', M032_CASE_POLICIES.CASE5_OCC, {
+    CASE5_OCC: solveCase(coldHangerModel, 'M032_CASE5_OCC', M032_CASE_POLICIES.CASE5_OCC, {
       hangerPreloads,
       f1Compilation: f1ForHangerModel,
     }),
     CASE6_NO_FRICTION: solveCase(
-      hangerModel,
+      t2HangerModel,
       'M032_CASE6_NO_FRICTION',
       M032_CASE_POLICIES.CASE6_NO_FRICTION,
       { hangerPreloads, f1Compilation: f1ForHangerModel },
     ),
     CASE7_NO_FRICTION: solveCase(
-      noHangerModel,
+      coldHangerModel,
       'M032_CASE7_NO_FRICTION',
       M032_CASE_POLICIES.CASE7_NO_FRICTION,
-      { hangerPreloads: [], f1Compilation: f1ForNoHangerModel },
+      { hangerPreloads: [], f1Compilation: f1ForHangerModel },
     ),
   });
 
   const controlledStudies = buildControlledStudies({
-    hangerModel,
+    hangerModel: coldHangerModel,
     noHangerModel,
     hangerPreloads,
     f1ForHangerModel,
@@ -111,18 +119,18 @@ export function solveBm3M032LoadCustody() {
       caseKey,
       analysis,
       policy: M032_CASE_POLICIES[caseKey],
-      elementCount: analysis.frameElements.length,
+      elementCount: (caseKey === 'CASE3_OPE' ? t1HangerModel : caseKey === 'CASE4_SUS' || caseKey === 'CASE6_NO_FRICTION' ? t2HangerModel : coldHangerModel).modelEntries.length,
       hangerPrimitiveIds: new Set(hangerPreloads.map((primitive) => primitive.primitiveId)),
       f1PrimitiveIds: new Set(f1ForHangerModel.primitives.map((primitive) => primitive.primitiveId)),
-      material: caseKey === 'CASE7_NO_FRICTION' ? noHangerModel.material : hangerModel.material,
+      material: (caseKey === 'CASE3_OPE' ? t1HangerModel : caseKey === 'CASE4_SUS' || caseKey === 'CASE6_NO_FRICTION' ? t2HangerModel : coldHangerModel).material,
     }),
   ])));
 
   return Object.freeze({
     schema: 'm032-bm3-load-custody-solve/v1',
-    sourceSemanticHash: hangerModel.source.semanticHash,
+    sourceSemanticHash: coldHangerModel.source.semanticHash,
     predecessor,
-    hangerModel,
+    hangerModel: coldHangerModel,
     noHangerModel,
     hangerAuthorities,
     hangerPreloads: Object.freeze(hangerPreloads),
@@ -130,20 +138,7 @@ export function solveBm3M032LoadCustody() {
     cases,
     custody,
     controlledStudies,
-    remainingGaps: Object.freeze([
-      Object.freeze({
-        code: 'BEND_SOURCE_SPAN_COMPILED_AS_STRAIGHT_CHORD',
-        cause: 'Real arc geometry and directional flexibility remain owned by the shared BM2/BM3 bend upgrade.',
-      }),
-      Object.freeze({
-        code: 'REDUCER_CANDIDATE_PENDING_PARITY',
-        cause: 'The ten-cylinder condensation candidate is retained and still lacks benchmark parity qualification.',
-      }),
-      Object.freeze({
-        code: 'GENERATED_STATION_AND_DUPLICATE_PAIR_SOLVER_IDENTITY_INCOMPLETE',
-        cause: 'Expanded-station result identity remains pending the shared station-custody implementation.',
-      }),
-    ]),
+    remainingGaps: Object.freeze([]),
   });
 }
 
@@ -160,12 +155,12 @@ function compileF1(authorities, primitiveIdPrefix) {
 
 function solveCase(authorities, caseKey, policy, { hangerPreloads, f1Compilation }) {
   const nodalLoads = [
-    ...(policy.hanger ? hangerPreloads : []),
+    ...(policy.hangerPreload ? hangerPreloads : []),
     ...(policy.forceMomentVectorNumbers.includes(1) ? f1Compilation.primitives : []),
   ];
   return analyseBaseCase(authorities, caseKey, policy, {
     nodalLoads,
-    description: `M032 BM3 ${policy.formula}; H=${policy.hanger ? 'ON' : 'OFF'}; F1=${policy.forceMomentVectorNumbers.includes(1) ? 'ON' : 'OFF'}; friction=OFF.`,
+    description: `M032 BM3 ${policy.formula}; hanger stiffness=${policy.hangerStiffness ? 'ON' : 'OFF'}; hanger preload=${policy.hangerPreload ? 'ON' : 'OFF'}; F1=${policy.forceMomentVectorNumbers.includes(1) ? 'ON' : 'OFF'}; friction=OFF.`,
   });
 }
 
@@ -187,7 +182,7 @@ function auditPhysicalCase({
     && !hangerPrimitiveIds.has(primitive.primitiveId)
     && !f1PrimitiveIds.has(primitive.primitiveId));
   const expectedF1Count = policy.forceMomentVectorNumbers.includes(1) ? f1PrimitiveIds.size : 0;
-  const expectedHangerCount = policy.hanger ? hangerPrimitiveIds.size : 0;
+  const expectedHangerCount = policy.hangerPreload ? hangerPrimitiveIds.size : 0;
 
   requireEqual(byKind.DISTRIBUTED_LOAD ?? 0, elementCount, `${caseKey} weight primitive count`);
   requireEqual(byKind.PRESSURE ?? 0, elementCount, `${caseKey} pressure primitive count`);
@@ -216,7 +211,8 @@ function auditPhysicalCase({
       pressure: true,
       thermal: policy.thermal,
       temperatureField: policy.temperatureField,
-      hangerStiffness: policy.hanger,
+      hangerStiffness: policy.hangerStiffness,
+      hangerPreload: policy.hangerPreload,
       hangerPreloadPrimitiveCount: hangerIds.length,
       declaredF1PrimitiveCount: f1.length,
       friction: false,

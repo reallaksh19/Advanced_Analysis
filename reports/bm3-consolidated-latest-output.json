@@ -1,0 +1,952 @@
+{
+  "schema": "lfea-bm3-consolidated-latest-output/v4",
+  "benchmark": "BM3",
+  "sourceOutput": "benchmarks/LFEA/BM3/BM3_Output.xml",
+  "restraintSourceCorrection": {
+    "profileId": "CAESAR_INPUTXML_RESTRAINT_TYPE_EXPORT_CORRECTION_V1",
+    "status": "GOVERNED_SOURCE_CORRECTION"
+  },
+  "caseSemantics": {
+    "strictPhysicalCases": {
+      "6": "W+T2+P1+H; independently assembled M032 no-friction case; F1 absent.",
+      "7": "W+P1; independently assembled M032 no-friction case; spring hardware stiffness retained, no hanger preload, no thermal term and no F1."
+    },
+    "expansionCases": {
+      "8": "L8=L3-L5",
+      "9": "L9=L4-L5"
+    },
+    "supersededMapping": "The pre-update M029 CASE6_EXP/CASE7_EXP labels are not used for latest parity."
+  },
+  "strictPolicy": {
+    "cases": [
+      6,
+      7
+    ],
+    "rule": "abs((solver-reference)/reference) < 0.05",
+    "exactBoundaryPasses": false,
+    "zeroReferenceRule": "EXACT_ZERO",
+    "unmatchedRows": "FAIL"
+  },
+  "diagnosticPolicy": {
+    "cases": [
+      3,
+      4,
+      5,
+      8,
+      9
+    ],
+    "omissionAllowed": false
+  },
+  "caseInventory": [
+    {
+      "caseNumber": 3,
+      "category": "OPE",
+      "formula": "W+T1+P1+H",
+      "label": "CASE 3 (OPE) W+T1+P1+H",
+      "tier": "DIAGNOSTIC_PRIORITY",
+      "responseScalarCount": 756,
+      "families": {
+        "displacement": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 25,
+          "responseScalarCount": 150
+        },
+        "restraint": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 5,
+          "responseScalarCount": 30
+        },
+        "globalForce": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 24,
+          "responseScalarCount": 288
+        },
+        "localForce": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 24,
+          "responseScalarCount": 288
+        }
+      }
+    },
+    {
+      "caseNumber": 4,
+      "category": "SUS",
+      "formula": "W+T2+P1+H",
+      "label": "CASE 4 (SUS) W+T2+P1+H",
+      "tier": "DIAGNOSTIC_PRIORITY",
+      "responseScalarCount": 756,
+      "families": {
+        "displacement": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 25,
+          "responseScalarCount": 150
+        },
+        "restraint": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 5,
+          "responseScalarCount": 30
+        },
+        "globalForce": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 24,
+          "responseScalarCount": 288
+        },
+        "localForce": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 24,
+          "responseScalarCount": 288
+        }
+      }
+    },
+    {
+      "caseNumber": 5,
+      "category": "OCC",
+      "formula": "W+P1+H+F1",
+      "label": "CASE 5 (OCC) W+P1+H+F1",
+      "tier": "DIAGNOSTIC_PRIORITY",
+      "responseScalarCount": 756,
+      "families": {
+        "displacement": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 25,
+          "responseScalarCount": 150
+        },
+        "restraint": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 5,
+          "responseScalarCount": 30
+        },
+        "globalForce": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 24,
+          "responseScalarCount": 288
+        },
+        "localForce": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 24,
+          "responseScalarCount": 288
+        }
+      }
+    },
+    {
+      "caseNumber": 6,
+      "category": "OPE",
+      "formula": "W+T2+P1+H",
+      "label": "CASE 6 (OPE) W+T2+P1+H",
+      "tier": "STRICT_NO_FRICTION",
+      "responseScalarCount": 756,
+      "families": {
+        "displacement": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 25,
+          "responseScalarCount": 150
+        },
+        "restraint": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 5,
+          "responseScalarCount": 30
+        },
+        "globalForce": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 24,
+          "responseScalarCount": 288
+        },
+        "localForce": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 24,
+          "responseScalarCount": 288
+        }
+      }
+    },
+    {
+      "caseNumber": 7,
+      "category": "OPE",
+      "formula": "W+P1",
+      "label": "CASE 7 (OPE) W+P1",
+      "tier": "STRICT_NO_FRICTION",
+      "responseScalarCount": 756,
+      "families": {
+        "displacement": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 25,
+          "responseScalarCount": 150
+        },
+        "restraint": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 5,
+          "responseScalarCount": 30
+        },
+        "globalForce": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 24,
+          "responseScalarCount": 288
+        },
+        "localForce": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 24,
+          "responseScalarCount": 288
+        }
+      }
+    },
+    {
+      "caseNumber": 8,
+      "category": "EXP",
+      "formula": "L8=L3-L5",
+      "label": "CASE 8 (EXP) L8=L3-L5",
+      "tier": "DIAGNOSTIC_PRIORITY",
+      "responseScalarCount": 756,
+      "families": {
+        "displacement": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 25,
+          "responseScalarCount": 150
+        },
+        "restraint": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 5,
+          "responseScalarCount": 30
+        },
+        "globalForce": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 24,
+          "responseScalarCount": 288
+        },
+        "localForce": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 24,
+          "responseScalarCount": 288
+        }
+      }
+    },
+    {
+      "caseNumber": 9,
+      "category": "EXP",
+      "formula": "L9=L4-L5",
+      "label": "CASE 9 (EXP) L9=L4-L5",
+      "tier": "DIAGNOSTIC_PRIORITY",
+      "responseScalarCount": 756,
+      "families": {
+        "displacement": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 25,
+          "responseScalarCount": 150
+        },
+        "restraint": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 5,
+          "responseScalarCount": 30
+        },
+        "globalForce": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 24,
+          "responseScalarCount": 288
+        },
+        "localForce": {
+          "reportBlockCount": 1,
+          "sourceRowCount": 24,
+          "responseScalarCount": 288
+        }
+      }
+    }
+  ],
+  "sourceCustody": {
+    "caseCount": 7,
+    "responseScalarCount": 5292,
+    "status": "PASS"
+  },
+  "strictComparison": {
+    "cases": [
+      {
+        "caseNumber": 6,
+        "matchedScalarDenominator": 756,
+        "passed": 756,
+        "failed": 0,
+        "unmatchedReferenceRows": 0,
+        "unmatchedSolverRows": 0,
+        "coverage": {
+          "displacement": {
+            "referenceRows": 25,
+            "matchedRows": 25,
+            "unmatchedReferenceRows": [],
+            "unmatchedSolverRows": []
+          },
+          "restraint": {
+            "referenceRows": 5,
+            "referenceNodeAggregates": 5,
+            "matchedRows": 5,
+            "unmatchedReferenceRows": [],
+            "unmatchedSolverRows": []
+          },
+          "globalForce": {
+            "referenceRows": 24,
+            "matchedRows": 24,
+            "duplicateReferencePairs": 0,
+            "unmatchedReferenceRows": [],
+            "unmatchedSolverRows": []
+          },
+          "localForce": {
+            "referenceRows": 24,
+            "matchedRows": 24,
+            "duplicateReferencePairs": 0,
+            "unmatchedReferenceRows": [],
+            "unmatchedSolverRows": []
+          }
+        },
+        "statistics": {
+          "overall": {
+            "scalarCount": 756,
+            "passed": 756,
+            "failed": 0,
+            "passRate": 1,
+            "zeroReference": {
+              "scalarCount": 414,
+              "exactZeroPasses": 414,
+              "failures": 0,
+              "maximumAbsoluteSolverValue": 0
+            },
+            "nonzeroReference": {
+              "scalarCount": 342,
+              "meanAbsoluteRelativeError": 0.01296056001339846,
+              "medianAbsoluteRelativeError": 0.007515316623280564,
+              "percentile95AbsoluteRelativeError": 0.034959794794938985,
+              "maximumAbsoluteRelativeError": 0.04827697003775406
+            }
+          },
+          "byFamily": {
+            "displacement": {
+              "scalarCount": 150,
+              "passed": 150,
+              "failed": 0,
+              "passRate": 1,
+              "zeroReference": {
+                "scalarCount": 9,
+                "exactZeroPasses": 9,
+                "failures": 0,
+                "maximumAbsoluteSolverValue": 0
+              },
+              "nonzeroReference": {
+                "scalarCount": 141,
+                "meanAbsoluteRelativeError": 0.023634740691430598,
+                "medianAbsoluteRelativeError": 0.029132049912702723,
+                "percentile95AbsoluteRelativeError": 0.034959794794938985,
+                "maximumAbsoluteRelativeError": 0.04827697003775406
+              }
+            },
+            "restraint": {
+              "scalarCount": 30,
+              "passed": 30,
+              "failed": 0,
+              "passRate": 1,
+              "zeroReference": {
+                "scalarCount": 23,
+                "exactZeroPasses": 23,
+                "failures": 0,
+                "maximumAbsoluteSolverValue": 0
+              },
+              "nonzeroReference": {
+                "scalarCount": 7,
+                "meanAbsoluteRelativeError": 0.0026523413788526284,
+                "medianAbsoluteRelativeError": 0.0007611532063669712,
+                "percentile95AbsoluteRelativeError": 0.007690975106404177,
+                "maximumAbsoluteRelativeError": 0.00888284610985072
+              }
+            },
+            "globalForce": {
+              "scalarCount": 288,
+              "passed": 288,
+              "failed": 0,
+              "passRate": 1,
+              "zeroReference": {
+                "scalarCount": 191,
+                "exactZeroPasses": 191,
+                "failures": 0,
+                "maximumAbsoluteSolverValue": 0
+              },
+              "nonzeroReference": {
+                "scalarCount": 97,
+                "meanAbsoluteRelativeError": 0.005574467512570059,
+                "medianAbsoluteRelativeError": 0.006517534835603003,
+                "percentile95AbsoluteRelativeError": 0.012278608324797399,
+                "maximumAbsoluteRelativeError": 0.03802367278499221
+              }
+            },
+            "localForce": {
+              "scalarCount": 288,
+              "passed": 288,
+              "failed": 0,
+              "passRate": 1,
+              "zeroReference": {
+                "scalarCount": 191,
+                "exactZeroPasses": 191,
+                "failures": 0,
+                "maximumAbsoluteSolverValue": 0
+              },
+              "nonzeroReference": {
+                "scalarCount": 97,
+                "meanAbsoluteRelativeError": 0.005574467512570059,
+                "medianAbsoluteRelativeError": 0.006517534835603003,
+                "percentile95AbsoluteRelativeError": 0.012278608324797399,
+                "maximumAbsoluteRelativeError": 0.03802367278499221
+              }
+            }
+          }
+        },
+        "status": "PASS",
+        "topFailures": []
+      },
+      {
+        "caseNumber": 7,
+        "matchedScalarDenominator": 756,
+        "passed": 756,
+        "failed": 0,
+        "unmatchedReferenceRows": 0,
+        "unmatchedSolverRows": 0,
+        "coverage": {
+          "displacement": {
+            "referenceRows": 25,
+            "matchedRows": 25,
+            "unmatchedReferenceRows": [],
+            "unmatchedSolverRows": []
+          },
+          "restraint": {
+            "referenceRows": 5,
+            "referenceNodeAggregates": 5,
+            "matchedRows": 5,
+            "unmatchedReferenceRows": [],
+            "unmatchedSolverRows": []
+          },
+          "globalForce": {
+            "referenceRows": 24,
+            "matchedRows": 24,
+            "duplicateReferencePairs": 0,
+            "unmatchedReferenceRows": [],
+            "unmatchedSolverRows": []
+          },
+          "localForce": {
+            "referenceRows": 24,
+            "matchedRows": 24,
+            "duplicateReferencePairs": 0,
+            "unmatchedReferenceRows": [],
+            "unmatchedSolverRows": []
+          }
+        },
+        "statistics": {
+          "overall": {
+            "scalarCount": 756,
+            "passed": 756,
+            "failed": 0,
+            "passRate": 1,
+            "zeroReference": {
+              "scalarCount": 414,
+              "exactZeroPasses": 414,
+              "failures": 0,
+              "maximumAbsoluteSolverValue": 0
+            },
+            "nonzeroReference": {
+              "scalarCount": 342,
+              "meanAbsoluteRelativeError": 0.01423391478028432,
+              "medianAbsoluteRelativeError": 0.00751531652106614,
+              "percentile95AbsoluteRelativeError": 0.03591505083666979,
+              "maximumAbsoluteRelativeError": 0.0470947261881028
+            }
+          },
+          "byFamily": {
+            "displacement": {
+              "scalarCount": 150,
+              "passed": 150,
+              "failed": 0,
+              "passRate": 1,
+              "zeroReference": {
+                "scalarCount": 9,
+                "exactZeroPasses": 9,
+                "failures": 0,
+                "maximumAbsoluteSolverValue": 0
+              },
+              "nonzeroReference": {
+                "scalarCount": 141,
+                "meanAbsoluteRelativeError": 0.024940344960358244,
+                "medianAbsoluteRelativeError": 0.027198103072499792,
+                "percentile95AbsoluteRelativeError": 0.03778957230016407,
+                "maximumAbsoluteRelativeError": 0.0470947261881028
+              }
+            },
+            "restraint": {
+              "scalarCount": 30,
+              "passed": 30,
+              "failed": 0,
+              "passRate": 1,
+              "zeroReference": {
+                "scalarCount": 23,
+                "exactZeroPasses": 23,
+                "failures": 0,
+                "maximumAbsoluteSolverValue": 0
+              },
+              "nonzeroReference": {
+                "scalarCount": 7,
+                "meanAbsoluteRelativeError": 0.0064730405040946725,
+                "medianAbsoluteRelativeError": 0.004351403265102913,
+                "percentile95AbsoluteRelativeError": 0.011999449714345254,
+                "maximumAbsoluteRelativeError": 0.012015216250337128
+              }
+            },
+            "globalForce": {
+              "scalarCount": 288,
+              "passed": 288,
+              "failed": 0,
+              "passRate": 1,
+              "zeroReference": {
+                "scalarCount": 191,
+                "exactZeroPasses": 191,
+                "failures": 0,
+                "maximumAbsoluteSolverValue": 0
+              },
+              "nonzeroReference": {
+                "scalarCount": 97,
+                "meanAbsoluteRelativeError": 0.006732468721227131,
+                "medianAbsoluteRelativeError": 0.007358259154155895,
+                "percentile95AbsoluteRelativeError": 0.013599130962022645,
+                "maximumAbsoluteRelativeError": 0.02410617661955852
+              }
+            },
+            "localForce": {
+              "scalarCount": 288,
+              "passed": 288,
+              "failed": 0,
+              "passRate": 1,
+              "zeroReference": {
+                "scalarCount": 191,
+                "exactZeroPasses": 191,
+                "failures": 0,
+                "maximumAbsoluteSolverValue": 0
+              },
+              "nonzeroReference": {
+                "scalarCount": 97,
+                "meanAbsoluteRelativeError": 0.006732468721227131,
+                "medianAbsoluteRelativeError": 0.007358259154155895,
+                "percentile95AbsoluteRelativeError": 0.013599130962022645,
+                "maximumAbsoluteRelativeError": 0.02410617661955852
+              }
+            }
+          }
+        },
+        "status": "PASS",
+        "topFailures": []
+      }
+    ],
+    "totals": {
+      "matchedScalarDenominator": 1512,
+      "passed": 1512,
+      "failed": 0,
+      "unmatchedReferenceRows": 0,
+      "unmatchedSolverRows": 0,
+      "passRate": 1,
+      "maximumAbsoluteRelativeError": 0.04827697003775406
+    },
+    "status": "PASS",
+    "completeComparisonClaim": true
+  },
+  "referenceVariantSensitivity": [
+    {
+      "leftCase": 4,
+      "rightCase": 6,
+      "confounded": false,
+      "interpretation": "HIGH_QUALITY_REFERENCE_SENSITIVITY: same formula and identical identities isolate the reference friction-state variant.",
+      "families": {
+        "displacement": {
+          "leftScalars": 150,
+          "rightScalars": 150,
+          "pairedScalars": 150,
+          "changedScalars": 0,
+          "unmatchedLeft": 0,
+          "unmatchedRight": 0,
+          "maximumRelativeDelta": 0
+        },
+        "restraint": {
+          "leftScalars": 30,
+          "rightScalars": 30,
+          "pairedScalars": 30,
+          "changedScalars": 0,
+          "unmatchedLeft": 0,
+          "unmatchedRight": 0,
+          "maximumRelativeDelta": 0
+        },
+        "globalForce": {
+          "leftScalars": 288,
+          "rightScalars": 288,
+          "pairedScalars": 288,
+          "changedScalars": 0,
+          "unmatchedLeft": 0,
+          "unmatchedRight": 0,
+          "maximumRelativeDelta": 0
+        },
+        "localForce": {
+          "leftScalars": 288,
+          "rightScalars": 288,
+          "pairedScalars": 288,
+          "changedScalars": 0,
+          "unmatchedLeft": 0,
+          "unmatchedRight": 0,
+          "maximumRelativeDelta": 0
+        }
+      }
+    },
+    {
+      "leftCase": 5,
+      "rightCase": 7,
+      "confounded": true,
+      "interpretation": "DIAGNOSTIC_ONLY: H, F1 and friction state are not held constant.",
+      "families": {
+        "displacement": {
+          "leftScalars": 150,
+          "rightScalars": 150,
+          "pairedScalars": 150,
+          "changedScalars": 141,
+          "unmatchedLeft": 0,
+          "unmatchedRight": 0,
+          "maximumRelativeDelta": 1.7149890176475044
+        },
+        "restraint": {
+          "leftScalars": 30,
+          "rightScalars": 30,
+          "pairedScalars": 30,
+          "changedScalars": 7,
+          "unmatchedLeft": 0,
+          "unmatchedRight": 0,
+          "maximumRelativeDelta": 0.9942876314255392
+        },
+        "globalForce": {
+          "leftScalars": 288,
+          "rightScalars": 288,
+          "pairedScalars": 288,
+          "changedScalars": 87,
+          "unmatchedLeft": 0,
+          "unmatchedRight": 0,
+          "maximumRelativeDelta": 1.2668805341894682
+        },
+        "localForce": {
+          "leftScalars": 288,
+          "rightScalars": 288,
+          "pairedScalars": 288,
+          "changedScalars": 87,
+          "unmatchedLeft": 0,
+          "unmatchedRight": 0,
+          "maximumRelativeDelta": 1.2668805341894682
+        }
+      }
+    }
+  ],
+  "hangerSelections": [
+    {
+      "nodeId": "20",
+      "figure": "98",
+      "size": "11",
+      "springRate": 29771.56199190098,
+      "theoreticalColdLoad": 6303.81180816056,
+      "hotLoad": 7513.365410747151,
+      "signedOperatingTravel": -0.04062781801356734
+    },
+    {
+      "nodeId": "22",
+      "figure": "B-268",
+      "size": "11",
+      "springRate": 59543.12398380196,
+      "theoreticalColdLoad": 6685.199036619926,
+      "hotLoad": 8013.468962709807,
+      "signedOperatingTravel": -0.022307696291703157
+    }
+  ],
+  "unresolvedAuthorities": [],
+  "nextPriority": [],
+  "qualificationStatus": "PASS",
+  "predecessorEvidence": {
+    "schema": "lfea-bm3-consolidated-latest-output/v2",
+    "strictComparisonStatus": "PASS",
+    "qualificationStatus": "PASS"
+  },
+  "m032LoadCustody": {
+    "schema": "m032-bm3-load-custody-evidence/v1",
+    "status": "PASS",
+    "sourceSemanticHash": "fnv1a64:a16f2dc4502a1b2f",
+    "declaredForceMoments": {
+      "selectedVectorNumbers": [
+        1
+      ],
+      "declarationCount": 2,
+      "primitiveCount": 2,
+      "globalBasisCount": 2,
+      "resultant": {
+        "force": {
+          "fx": 0,
+          "fy": -8000,
+          "fz": 0
+        },
+        "moment": {
+          "mx": 0,
+          "my": 0,
+          "mz": 0
+        }
+      },
+      "semanticHash": "fnv1a64:4a0a01b4644c6cea"
+    },
+    "caseCustody": {
+      "CASE3_OPE": {
+        "caseKey": "CASE3_OPE",
+        "formula": "W+T1+P1+H",
+        "physicalLoads": {
+          "weight": true,
+          "pressure": true,
+          "thermal": true,
+          "temperatureField": "operatingTemperature",
+          "hangerStiffness": true,
+          "hangerPreload": true,
+          "hangerPreloadPrimitiveCount": 2,
+          "declaredF1PrimitiveCount": 0,
+          "friction": false
+        },
+        "primitiveCounts": {
+          "NODAL_FORCE_MOMENT": 2,
+          "PRESSURE": 54,
+          "TEMPERATURE": 54,
+          "DISTRIBUTED_LOAD": 54
+        },
+        "f1": [],
+        "thermalState": {
+          "temperaturePrimitiveCount": 54,
+          "installationTemperature": 293.15,
+          "minimumOperatingTemperature": 623.15,
+          "maximumOperatingTemperature": 623.15,
+          "stiffnessEvaluationMaterialStateId": "BM3-MAT-INPUTXML-COLD",
+          "elasticModulus": 202701250000,
+          "thermalExpansionCoefficient": 0.00001350414865,
+          "policy": "COLD_MODULUS_WITH_CASE_SELECTED_UNIFORM_THERMAL_STRAIN_V1"
+        },
+        "solverQualification": {
+          "status": "QUALIFIED",
+          "forceEquilibrium": "PASS",
+          "momentEquilibrium": "PASS",
+          "normalizedResidual": 2.5927172073593264e-14
+        }
+      },
+      "CASE4_SUS": {
+        "caseKey": "CASE4_SUS",
+        "formula": "W+T2+P1+H",
+        "physicalLoads": {
+          "weight": true,
+          "pressure": true,
+          "thermal": true,
+          "temperatureField": "operatingTemperature2",
+          "hangerStiffness": true,
+          "hangerPreload": true,
+          "hangerPreloadPrimitiveCount": 2,
+          "declaredF1PrimitiveCount": 0,
+          "friction": false
+        },
+        "primitiveCounts": {
+          "NODAL_FORCE_MOMENT": 2,
+          "PRESSURE": 54,
+          "TEMPERATURE": 54,
+          "DISTRIBUTED_LOAD": 54
+        },
+        "f1": [],
+        "thermalState": {
+          "temperaturePrimitiveCount": 54,
+          "installationTemperature": 293.15,
+          "minimumOperatingTemperature": 723.15,
+          "maximumOperatingTemperature": 723.15,
+          "stiffnessEvaluationMaterialStateId": "BM3-MAT-INPUTXML-COLD",
+          "elasticModulus": 202701250000,
+          "thermalExpansionCoefficient": 0.0000137,
+          "policy": "COLD_MODULUS_WITH_CASE_SELECTED_UNIFORM_THERMAL_STRAIN_V1"
+        },
+        "solverQualification": {
+          "status": "QUALIFIED",
+          "forceEquilibrium": "PASS",
+          "momentEquilibrium": "PASS",
+          "normalizedResidual": 1.7481172151468456e-14
+        }
+      },
+      "CASE5_OCC": {
+        "caseKey": "CASE5_OCC",
+        "formula": "W+P1+H+F1",
+        "physicalLoads": {
+          "weight": true,
+          "pressure": true,
+          "thermal": false,
+          "temperatureField": null,
+          "hangerStiffness": true,
+          "hangerPreload": true,
+          "hangerPreloadPrimitiveCount": 2,
+          "declaredF1PrimitiveCount": 2,
+          "friction": false
+        },
+        "primitiveCounts": {
+          "NODAL_FORCE_MOMENT": 4,
+          "PRESSURE": 54,
+          "DISTRIBUTED_LOAD": 54
+        },
+        "f1": [
+          {
+            "primitiveId": "M032-HANGER-MODEL-F1-IX-S14-R1-V1",
+            "nodeId": "BM3.BEND.IX-S14.N2",
+            "basis": "GLOBAL",
+            "force": {
+              "fx": 0,
+              "fy": -4000,
+              "fz": 0
+            },
+            "moment": {
+              "mx": 0,
+              "my": 0,
+              "mz": 0
+            }
+          },
+          {
+            "primitiveId": "M032-HANGER-MODEL-F1-IX-S21-R1-V1",
+            "nodeId": "BM3.BEND.IX-S21.N2",
+            "basis": "GLOBAL",
+            "force": {
+              "fx": 0,
+              "fy": -4000,
+              "fz": 0
+            },
+            "moment": {
+              "mx": 0,
+              "my": 0,
+              "mz": 0
+            }
+          }
+        ],
+        "thermalState": {
+          "temperaturePrimitiveCount": 0,
+          "installationTemperature": null,
+          "minimumOperatingTemperature": null,
+          "maximumOperatingTemperature": null,
+          "stiffnessEvaluationMaterialStateId": "BM3-MAT-INPUTXML-COLD",
+          "elasticModulus": 202701250000,
+          "thermalExpansionCoefficient": 0.0000117,
+          "policy": "COLD_MODULUS_WITH_CASE_SELECTED_UNIFORM_THERMAL_STRAIN_V1"
+        },
+        "solverQualification": {
+          "status": "QUALIFIED",
+          "forceEquilibrium": "PASS",
+          "momentEquilibrium": "PASS",
+          "normalizedResidual": 3.427114069793832e-10
+        }
+      },
+      "CASE6_NO_FRICTION": {
+        "caseKey": "CASE6_NO_FRICTION",
+        "formula": "W+T2+P1+H",
+        "physicalLoads": {
+          "weight": true,
+          "pressure": true,
+          "thermal": true,
+          "temperatureField": "operatingTemperature2",
+          "hangerStiffness": true,
+          "hangerPreload": true,
+          "hangerPreloadPrimitiveCount": 2,
+          "declaredF1PrimitiveCount": 0,
+          "friction": false
+        },
+        "primitiveCounts": {
+          "NODAL_FORCE_MOMENT": 2,
+          "PRESSURE": 54,
+          "TEMPERATURE": 54,
+          "DISTRIBUTED_LOAD": 54
+        },
+        "f1": [],
+        "thermalState": {
+          "temperaturePrimitiveCount": 54,
+          "installationTemperature": 293.15,
+          "minimumOperatingTemperature": 723.15,
+          "maximumOperatingTemperature": 723.15,
+          "stiffnessEvaluationMaterialStateId": "BM3-MAT-INPUTXML-COLD",
+          "elasticModulus": 202701250000,
+          "thermalExpansionCoefficient": 0.0000137,
+          "policy": "COLD_MODULUS_WITH_CASE_SELECTED_UNIFORM_THERMAL_STRAIN_V1"
+        },
+        "solverQualification": {
+          "status": "QUALIFIED",
+          "forceEquilibrium": "PASS",
+          "momentEquilibrium": "PASS",
+          "normalizedResidual": 1.7481172151468456e-14
+        }
+      },
+      "CASE7_NO_FRICTION": {
+        "caseKey": "CASE7_NO_FRICTION",
+        "formula": "W+P1",
+        "physicalLoads": {
+          "weight": true,
+          "pressure": true,
+          "thermal": false,
+          "temperatureField": null,
+          "hangerStiffness": true,
+          "hangerPreload": false,
+          "hangerPreloadPrimitiveCount": 0,
+          "declaredF1PrimitiveCount": 0,
+          "friction": false
+        },
+        "primitiveCounts": {
+          "PRESSURE": 54,
+          "DISTRIBUTED_LOAD": 54
+        },
+        "f1": [],
+        "thermalState": {
+          "temperaturePrimitiveCount": 0,
+          "installationTemperature": null,
+          "minimumOperatingTemperature": null,
+          "maximumOperatingTemperature": null,
+          "stiffnessEvaluationMaterialStateId": "BM3-MAT-INPUTXML-COLD",
+          "elasticModulus": 202701250000,
+          "thermalExpansionCoefficient": 0.0000117,
+          "policy": "COLD_MODULUS_WITH_CASE_SELECTED_UNIFORM_THERMAL_STRAIN_V1"
+        },
+        "solverQualification": {
+          "status": "QUALIFIED",
+          "forceEquilibrium": "PASS",
+          "momentEquilibrium": "PASS",
+          "normalizedResidual": 3.6969594813541106e-10
+        }
+      }
+    },
+    "controlledStudies": {
+      "design": "TWO_BY_TWO_HANGER_F1_FACTORIAL_WITH_FRICTION_HELD_OFF",
+      "effects": {
+        "hangerAtF1Off": {
+          "l2DisplacementDelta": 0.045612273401074564,
+          "maximumAbsoluteDisplacementDelta": 0.008337196443598744,
+          "maximumIdentity": "BM3.N115:UX"
+        },
+        "hangerAtF1On": {
+          "l2DisplacementDelta": 0.045618634847108396,
+          "maximumAbsoluteDisplacementDelta": 0.008338359637981367,
+          "maximumIdentity": "BM3.N115:UX"
+        },
+        "f1AtHangerOff": {
+          "l2DisplacementDelta": 0.3194657591405322,
+          "maximumAbsoluteDisplacementDelta": 0.08850323556273174,
+          "maximumIdentity": "BM3.N80:UZ"
+        },
+        "f1AtHangerOn": {
+          "l2DisplacementDelta": 0.3194620798926416,
+          "maximumAbsoluteDisplacementDelta": 0.08850247776896852,
+          "maximumIdentity": "BM3.N80:UZ"
+        },
+        "interaction": {
+          "l2DisplacementInteraction": 0.0000063614479268654925,
+          "maximumAbsoluteInteraction": 0.0000011631943826230506,
+          "maximumIdentity": "BM3.N115:UX"
+        }
+      }
+    },
+    "resolvedAuthorities": [
+      "DECLARED_FORCE_F1_COMPILED_IN_GLOBAL_FRAME",
+      "CASE5_CASE6_CASE7_PHYSICAL_LOAD_SET_CUSTODY_VERIFIED",
+      "T1_T2_MATERIAL_AND_THERMAL_STRAIN_SELECTION_VERIFIED",
+      "CONTROLLED_HANGER_AND_F1_AB_STUDIES_COMPLETE",
+      "REAL_BEND_ARCS_AND_DIRECTIONAL_FLEXIBILITY_INTEGRATED",
+      "REDUCER_CONDENSATION_PARITY_VERIFIED",
+      "GENERATED_STATION_AND_DUPLICATE_PAIR_IDENTITY_CLOSED",
+      "FROZEN_PHYSICAL_HANGERS_REQUALIFIED_ON_FINAL_STIFFNESS"
+    ]
+  }
+}

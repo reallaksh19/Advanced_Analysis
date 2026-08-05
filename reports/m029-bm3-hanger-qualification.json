@@ -1,0 +1,577 @@
+{
+  "schema": "m029-bm3-programmed-hanger-qualification/v2",
+  "status": "PASS_WITH_REDUCER_PARITY_PENDING_IN_PREDECESSOR",
+  "sourceSemanticHash": "fnv1a64:a16f2dc4502a1b2f",
+  "authority": {
+    "catalogId": "ANVIL-PP-11.11-VARIABLE-SPRING-2022",
+    "catalogSemanticHash": "fnv1a64:e2a2e331244cb641",
+    "designMethod": "RESTRAINED_WEIGHT_THEN_OPERATING_TRAVEL_THEN_FIRST_VALID_CATALOG_ENTRY_V1",
+    "compileMethod": "GLOBAL_Y_LINEAR_SPRING_PLUS_THEORETICAL_COLD_LOAD_PRELOAD_V1",
+    "recoveryMethod": "TOTAL_SUPPORT_ACTION_EQUALS_COLD_LOAD_MINUS_K_TIMES_DISPLACEMENT_V1"
+  },
+  "designEvidence": [
+    {
+      "nodeId": "20",
+      "designInput": {
+        "hotLoad": 7513.365410747151,
+        "signedOperatingTravel": -0.04062781801356734
+      },
+      "selected": {
+        "entryId": "ANVIL-PP-11.11-VARIABLE-SPRING-2022:FIG_98:11",
+        "seriesId": "FIG_98",
+        "figure": "98",
+        "size": "11",
+        "springRate": 29771.56199190098,
+        "hotLoad": 7513.365410747151,
+        "theoreticalColdLoad": 6303.81180816056,
+        "signedOperatingTravel": -0.04062781801356734,
+        "variability": 0.16098692615914043,
+        "minimumWorkingLoad": 4537.1860475657095,
+        "maximumWorkingLoad": 9830.569769725704,
+        "reservedMinimumWorkingLoad": 4559.871977803537,
+        "reservedMaximumWorkingLoad": 9781.416920877075,
+        "accepted": true,
+        "rejectionReasons": []
+      },
+      "rejectedCandidateCount": 59,
+      "caesarQualificationOracle": {
+        "nodeId": "20",
+        "manufacturer": "ANVIL",
+        "figure": "98",
+        "size": "11",
+        "signedOperatingTravel": -0.040667225,
+        "hotLoad": 7538.96582,
+        "theoreticalColdLoad": 6328.299316,
+        "springRate": 29770.3979,
+        "loadVariationPercent": 16.558788
+      },
+      "opeRecoveredSupportAction": {
+        "schema": "fea-linear-programmed-variable-spring-action/v1",
+        "hangerId": "M029-BM3-HANGER-20",
+        "nodeId": "20",
+        "kernelNodeId": "BM3.BEND.IX-S4.N2",
+        "dof": "UY",
+        "displacement": -0.04062781801292843,
+        "theoreticalColdLoad": 6303.81180816056,
+        "elasticSupportAction": 1209.5536025675701,
+        "totalSupportAction": 7513.36541072813,
+        "signConvention": "SUPPORT_ACTION_ON_STRUCTURE_POSITIVE_GLOBAL_Y"
+      }
+    },
+    {
+      "nodeId": "22",
+      "designInput": {
+        "hotLoad": 8013.468962709807,
+        "signedOperatingTravel": -0.022307696291703157
+      },
+      "selected": {
+        "entryId": "ANVIL-PP-11.11-VARIABLE-SPRING-2022:FIG_B268:11",
+        "seriesId": "FIG_B268",
+        "figure": "B-268",
+        "size": "11",
+        "springRate": 59543.12398380196,
+        "hotLoad": 8013.468962709807,
+        "theoreticalColdLoad": 6685.199036619926,
+        "signedOperatingTravel": -0.022307696291703157,
+        "variability": 0.1657546728228317,
+        "minimumWorkingLoad": 4537.1860475657095,
+        "maximumWorkingLoad": 9830.569769725704,
+        "reservedMinimumWorkingLoad": 4559.871977803537,
+        "reservedMaximumWorkingLoad": 9781.416920877075,
+        "accepted": true,
+        "rejectionReasons": []
+      },
+      "rejectedCandidateCount": 36,
+      "caesarQualificationOracle": {
+        "nodeId": "22",
+        "manufacturer": "ANVIL",
+        "figure": "B-268",
+        "size": "11",
+        "signedOperatingTravel": -0.022357399,
+        "hotLoad": 7987.288574,
+        "theoreticalColdLoad": 6656.125488,
+        "springRate": 59540.7959,
+        "loadVariationPercent": 17.166019
+      },
+      "opeRecoveredSupportAction": {
+        "schema": "fea-linear-programmed-variable-spring-action/v1",
+        "hangerId": "M029-BM3-HANGER-22",
+        "nodeId": "22",
+        "kernelNodeId": "BM3.N22",
+        "dof": "UY",
+        "displacement": -0.022307696291059907,
+        "theoreticalColdLoad": 6685.199036619926,
+        "elasticSupportAction": 1328.2699260515792,
+        "totalSupportAction": 8013.468962671505,
+        "signConvention": "SUPPORT_ACTION_ON_STRUCTURE_POSITIVE_GLOBAL_Y"
+      }
+    }
+  ],
+  "solverQualification": {
+    "CASE3_OPE": {
+      "status": "QUALIFIED",
+      "formula": "W+T1+P1+H",
+      "diagnostics": {
+        "residual": {
+          "checkId": "ALGEBRAIC_RESIDUAL_NORMALIZED",
+          "value": 2.5927172073593264e-14,
+          "limit": 0.000001,
+          "status": "PASS",
+          "limitSource": "M032 bend/reducer-expanded benchmark residual gate; the exact observed solve remains below this disclosed engineering threshold."
+        },
+        "forceEquilibrium": {
+          "checkId": "GLOBAL_FORCE_EQUILIBRIUM_RELATIVE",
+          "value": 5.57278250051909e-15,
+          "limit": 0.000001,
+          "status": "PASS",
+          "limitSource": "LFEA-B3.3-FIXTURE-PROFILE",
+          "imbalance": 0.000005343881360469262,
+          "groundedSpringCount": 2,
+          "groundedSpringForceMagnitude": 2537.8235286191493
+        },
+        "momentEquilibrium": {
+          "checkId": "GLOBAL_MOMENT_EQUILIBRIUM_RELATIVE",
+          "value": 9.360140452802362e-16,
+          "limit": 0.000001,
+          "status": "PASS",
+          "limitSource": "LFEA-B3.3-FIXTURE-PROFILE",
+          "imbalance": 0.00000607770275249873,
+          "referenceNodeId": "BM3.BEND.IX-S14.N0",
+          "referenceRule": "FIRST_CANONICAL_NODE_V1",
+          "groundedSpringCount": 2,
+          "groundedSpringForceMagnitude": 2537.8235286191493
+        },
+        "energyBalance": {
+          "checkId": "ENERGY_BALANCE_RELATIVE",
+          "value": 1.7522493481838404e-16,
+          "limit": 1e-7,
+          "status": "PASS",
+          "limitSource": "LFEA-B3.3-FIXTURE-PROFILE",
+          "internalEnergy": 1328752.91918466,
+          "externalWork": 1328752.9191846603
+        },
+        "conditioning": {
+          "checkId": "CONDITION_ESTIMATE",
+          "value": 291378022.789908,
+          "limit": 100000000000000,
+          "status": "PASS",
+          "limitSource": "M032 explicit bend/reducer-expanded conditioning disclosure.",
+          "blockLimit": 100000000000000000,
+          "blockLimitSource": "M032 explicit bend/reducer-expanded conditioning disclosure."
+        }
+      },
+      "factorization": {
+        "backend": "FEA_SPARSE_DIRECT_CHOLESKY_LDLT_V1",
+        "kind": "CHOLESKY",
+        "minAbsPivot": 6.64043910250112e-7,
+        "maxAbsPivot": 1.0000000000000002,
+        "negativePivotCount": 0,
+        "conditionEstimate": 291378022.789908,
+        "conditionEstimateMethod": "POWER_INVERSE_POWER_ITERATION_V1"
+      }
+    },
+    "CASE4_SUS": {
+      "status": "QUALIFIED",
+      "formula": "W+T2+P1+H",
+      "diagnostics": {
+        "residual": {
+          "checkId": "ALGEBRAIC_RESIDUAL_NORMALIZED",
+          "value": 1.7481172151468456e-14,
+          "limit": 0.000001,
+          "status": "PASS",
+          "limitSource": "M032 bend/reducer-expanded benchmark residual gate; the exact observed solve remains below this disclosed engineering threshold."
+        },
+        "forceEquilibrium": {
+          "checkId": "GLOBAL_FORCE_EQUILIBRIUM_RELATIVE",
+          "value": 1.7870010888450905e-15,
+          "limit": 0.000001,
+          "status": "PASS",
+          "limitSource": "LFEA-B3.3-FIXTURE-PROFILE",
+          "imbalance": 0.0000022652540762333834,
+          "groundedSpringCount": 2,
+          "groundedSpringForceMagnitude": 3349.2119015443795
+        },
+        "momentEquilibrium": {
+          "checkId": "GLOBAL_MOMENT_EQUILIBRIUM_RELATIVE",
+          "value": 8.263155306281711e-16,
+          "limit": 0.000001,
+          "status": "PASS",
+          "limitSource": "LFEA-B3.3-FIXTURE-PROFILE",
+          "imbalance": 0.000007092694532025576,
+          "referenceNodeId": "BM3.BEND.IX-S14.N0",
+          "referenceRule": "FIRST_CANONICAL_NODE_V1",
+          "groundedSpringCount": 2,
+          "groundedSpringForceMagnitude": 3349.2119015443795
+        },
+        "energyBalance": {
+          "checkId": "ENERGY_BALANCE_RELATIVE",
+          "value": 2.005390293219886e-16,
+          "limit": 1e-7,
+          "status": "PASS",
+          "limitSource": "LFEA-B3.3-FIXTURE-PROFILE",
+          "internalEnergy": 2322048.1762683024,
+          "externalWork": 2322048.176268302
+        },
+        "conditioning": {
+          "checkId": "CONDITION_ESTIMATE",
+          "value": 291378022.789908,
+          "limit": 100000000000000,
+          "status": "PASS",
+          "limitSource": "M032 explicit bend/reducer-expanded conditioning disclosure.",
+          "blockLimit": 100000000000000000,
+          "blockLimitSource": "M032 explicit bend/reducer-expanded conditioning disclosure."
+        }
+      },
+      "factorization": {
+        "backend": "FEA_SPARSE_DIRECT_CHOLESKY_LDLT_V1",
+        "kind": "CHOLESKY",
+        "minAbsPivot": 6.64043910250112e-7,
+        "maxAbsPivot": 1.0000000000000002,
+        "negativePivotCount": 0,
+        "conditionEstimate": 291378022.789908,
+        "conditionEstimateMethod": "POWER_INVERSE_POWER_ITERATION_V1"
+      }
+    },
+    "CASE5_OCC": {
+      "status": "QUALIFIED",
+      "formula": "W+P1+H+F1",
+      "diagnostics": {
+        "residual": {
+          "checkId": "ALGEBRAIC_RESIDUAL_NORMALIZED",
+          "value": 4.978929611730391e-10,
+          "limit": 0.000001,
+          "status": "PASS",
+          "limitSource": "M032 bend/reducer-expanded benchmark residual gate; the exact observed solve remains below this disclosed engineering threshold."
+        },
+        "forceEquilibrium": {
+          "checkId": "GLOBAL_FORCE_EQUILIBRIUM_RELATIVE",
+          "value": 2.7037086559394395e-11,
+          "limit": 0.000001,
+          "status": "PASS",
+          "limitSource": "LFEA-B3.3-FIXTURE-PROFILE",
+          "imbalance": 0.0000012079388937032434,
+          "groundedSpringCount": 2,
+          "groundedSpringForceMagnitude": 17.42199426068538
+        },
+        "momentEquilibrium": {
+          "checkId": "GLOBAL_MOMENT_EQUILIBRIUM_RELATIVE",
+          "value": 3.69512359967196e-12,
+          "limit": 0.000001,
+          "status": "PASS",
+          "limitSource": "LFEA-B3.3-FIXTURE-PROFILE",
+          "imbalance": 0.0000013550167532192886,
+          "referenceNodeId": "BM3.BEND.IX-S14.N0",
+          "referenceRule": "FIRST_CANONICAL_NODE_V1",
+          "groundedSpringCount": 2,
+          "groundedSpringForceMagnitude": 17.42199426068538
+        },
+        "energyBalance": {
+          "checkId": "ENERGY_BALANCE_RELATIVE",
+          "value": 6.584940382382954e-16,
+          "limit": 1e-7,
+          "status": "PASS",
+          "limitSource": "LFEA-B3.3-FIXTURE-PROFILE",
+          "internalEnergy": 64.74252107074987,
+          "externalWork": 64.74252107074983
+        },
+        "conditioning": {
+          "checkId": "CONDITION_ESTIMATE",
+          "value": 291378022.789908,
+          "limit": 100000000000000,
+          "status": "PASS",
+          "limitSource": "M032 explicit bend/reducer-expanded conditioning disclosure.",
+          "blockLimit": 100000000000000000,
+          "blockLimitSource": "M032 explicit bend/reducer-expanded conditioning disclosure."
+        }
+      },
+      "factorization": {
+        "backend": "FEA_SPARSE_DIRECT_CHOLESKY_LDLT_V1",
+        "kind": "CHOLESKY",
+        "minAbsPivot": 6.64043910250112e-7,
+        "maxAbsPivot": 1.0000000000000002,
+        "negativePivotCount": 0,
+        "conditionEstimate": 291378022.789908,
+        "conditionEstimateMethod": "POWER_INVERSE_POWER_ITERATION_V1"
+      }
+    },
+    "CASE6_EXP": {
+      "status": "DERIVED",
+      "formula": "L6=L3-L5",
+      "positive": "CASE3_OPE",
+      "negative": "CASE5_OCC"
+    },
+    "CASE7_EXP": {
+      "status": "DERIVED",
+      "formula": "L7=L4-L5",
+      "positive": "CASE4_SUS",
+      "negative": "CASE5_OCC"
+    }
+  },
+  "unresolvedGaps": [
+    {
+      "code": "DECLARED_FORCE_F1_NOT_COMPILED",
+      "affectedCases": [
+        "CASE5_OCC",
+        "CASE6_EXP",
+        "CASE7_EXP"
+      ],
+      "records": [
+        {
+          "forceMomentNumber": 1,
+          "nodeId": "65",
+          "vectors": [
+            {
+              "number": 1,
+              "force": {
+                "fx": null,
+                "fy": -4000,
+                "fz": null
+              },
+              "moment": {
+                "mx": null,
+                "my": null,
+                "mz": null
+              }
+            },
+            {
+              "number": 2,
+              "force": {
+                "fx": null,
+                "fy": null,
+                "fz": null
+              },
+              "moment": {
+                "mx": null,
+                "my": null,
+                "mz": null
+              }
+            },
+            {
+              "number": 3,
+              "force": {
+                "fx": null,
+                "fy": null,
+                "fz": null
+              },
+              "moment": {
+                "mx": null,
+                "my": null,
+                "mz": null
+              }
+            },
+            {
+              "number": 4,
+              "force": {
+                "fx": null,
+                "fy": null,
+                "fz": null
+              },
+              "moment": {
+                "mx": null,
+                "my": null,
+                "mz": null
+              }
+            },
+            {
+              "number": 5,
+              "force": {
+                "fx": null,
+                "fy": null,
+                "fz": null
+              },
+              "moment": {
+                "mx": null,
+                "my": null,
+                "mz": null
+              }
+            },
+            {
+              "number": 6,
+              "force": {
+                "fx": null,
+                "fy": null,
+                "fz": null
+              },
+              "moment": {
+                "mx": null,
+                "my": null,
+                "mz": null
+              }
+            },
+            {
+              "number": 7,
+              "force": {
+                "fx": null,
+                "fy": null,
+                "fz": null
+              },
+              "moment": {
+                "mx": null,
+                "my": null,
+                "mz": null
+              }
+            },
+            {
+              "number": 8,
+              "force": {
+                "fx": null,
+                "fy": null,
+                "fz": null
+              },
+              "moment": {
+                "mx": null,
+                "my": null,
+                "mz": null
+              }
+            },
+            {
+              "number": 9,
+              "force": {
+                "fx": null,
+                "fy": null,
+                "fz": null
+              },
+              "moment": {
+                "mx": null,
+                "my": null,
+                "mz": null
+              }
+            }
+          ]
+        },
+        {
+          "forceMomentNumber": 1,
+          "nodeId": "100",
+          "vectors": [
+            {
+              "number": 1,
+              "force": {
+                "fx": null,
+                "fy": -4000,
+                "fz": null
+              },
+              "moment": {
+                "mx": null,
+                "my": null,
+                "mz": null
+              }
+            },
+            {
+              "number": 2,
+              "force": {
+                "fx": null,
+                "fy": null,
+                "fz": null
+              },
+              "moment": {
+                "mx": null,
+                "my": null,
+                "mz": null
+              }
+            },
+            {
+              "number": 3,
+              "force": {
+                "fx": null,
+                "fy": null,
+                "fz": null
+              },
+              "moment": {
+                "mx": null,
+                "my": null,
+                "mz": null
+              }
+            },
+            {
+              "number": 4,
+              "force": {
+                "fx": null,
+                "fy": null,
+                "fz": null
+              },
+              "moment": {
+                "mx": null,
+                "my": null,
+                "mz": null
+              }
+            },
+            {
+              "number": 5,
+              "force": {
+                "fx": null,
+                "fy": null,
+                "fz": null
+              },
+              "moment": {
+                "mx": null,
+                "my": null,
+                "mz": null
+              }
+            },
+            {
+              "number": 6,
+              "force": {
+                "fx": null,
+                "fy": null,
+                "fz": null
+              },
+              "moment": {
+                "mx": null,
+                "my": null,
+                "mz": null
+              }
+            },
+            {
+              "number": 7,
+              "force": {
+                "fx": null,
+                "fy": null,
+                "fz": null
+              },
+              "moment": {
+                "mx": null,
+                "my": null,
+                "mz": null
+              }
+            },
+            {
+              "number": 8,
+              "force": {
+                "fx": null,
+                "fy": null,
+                "fz": null
+              },
+              "moment": {
+                "mx": null,
+                "my": null,
+                "mz": null
+              }
+            },
+            {
+              "number": 9,
+              "force": {
+                "fx": null,
+                "fy": null,
+                "fz": null
+              },
+              "moment": {
+                "mx": null,
+                "my": null,
+                "mz": null
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "REDUCER_CANDIDATE_PENDING_PARITY",
+      "affectedSourceSegments": [
+        "IX-S16",
+        "IX-S23"
+      ]
+    }
+  ],
+  "legacyNumericalComparison": "DISABLED_AFTER_OUTPUT_CASE_RENUMBERING",
+  "latestOutputAuthority": "scripts/lfea-bm3-consolidated-latest-output-check.mjs"
+}
