@@ -76,7 +76,8 @@ jobs:
             src/core/bucket-b/flange-hub-loads.js \
             src/core/bucket-b/flange-hub-solver.js \
             src/core/bucket-b/flange-hub-recovery.js \
-            src/core/bucket-b/flange-hub-convergence.js)"
+            src/core/bucket-b/flange-hub-convergence.js \
+            src/core/bucket-b/flange-hub-independent-oracle.js)"
 
       - name: Verify syntax, determinism, conformity, and frozen production isolation
         run: |
@@ -238,7 +239,7 @@ jobs:
           ));
           assert.equal(
             report.schema,
-            'bb11-b03-b04-transition-full-qualification/v1',
+            'bb11-b03-b04-transition-full-qualification/v2',
           );
           assert.equal(report.exactHeadSha, process.env.EXPECTED_HEAD_SHA);
           assert.equal(
@@ -254,6 +255,22 @@ jobs:
             'CANDIDATE_QUALIFIED_FOR_GOVERNED_PROMOTION_REVIEW',
           );
           assert.equal(report.deterministicReplay.byteIdentical, true);
+          assert.deepEqual(report.oracleCompatibilityCorrection, {
+            classification: 'CANDIDATE_ONLY_NON_AUTHORIZING_CONTROL_FLOW_CORRECTION',
+            governedOracleSourceModified: false,
+            correction: 'DEFER_PROFILE_RESOLUTION_UNTIL_BLOCK_KIND_IS_STRIP',
+            mechanicalInputsModified: false,
+            oracleFormulationModified: false,
+            productionPromotionBlockedUntilGovernedCorrectionLands: true,
+            governedOracleSourceSha256:
+              report.oracleCompatibilityCorrection.governedOracleSourceSha256,
+            correctedOracleSourceSha256:
+              report.oracleCompatibilityCorrection.correctedOracleSourceSha256,
+          });
+          assert.notEqual(
+            report.oracleCompatibilityCorrection.governedOracleSourceSha256,
+            report.oracleCompatibilityCorrection.correctedOracleSourceSha256,
+          );
           report.coreEvidence.checkResults.forEach(
             (row) => assert.equal(row.status, 'PASS'),
           );
