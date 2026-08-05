@@ -11,9 +11,11 @@ import {
 } from './contracts.js';
 import { OUTPUT_TYPES, SHELL_ELEMENT_PROFILE } from './canonical-model.js';
 
+export const CALCULIX_FIELD20_NUMERIC_FORMAT = 'SCIENTIFIC_15_SIGNIFICANT_DIGITS_CCX_FIELD20_V1';
+
 export const DEFAULT_DECK_PROFILE_INPUT = Object.freeze({
   schema: SCHEMAS.DECK_PROFILE,
-  deckProfileId: 'CALCULIX_2_22_NC00_DECK_V1',
+  deckProfileId: 'CALCULIX_2_22_NC00_DECK_V2',
   solverId: 'CALCULIX_CCX_2_22_PROVISIONAL',
   elementMappings: [{
     canonicalElementProfile: SHELL_ELEMENT_PROFILE,
@@ -26,7 +28,7 @@ export const DEFAULT_DECK_PROFILE_INPUT = Object.freeze({
     contactPairs: 'CODE_UNIT_ID',
     loadSteps: 'CANONICAL_SEQUENCE',
   },
-  numericFormat: 'SCIENTIFIC_16_DIGITS_V1',
+  numericFormat: CALCULIX_FIELD20_NUMERIC_FORMAT,
   lineEndings: 'LF',
   fileNames: {
     input: 'model.inp',
@@ -84,7 +86,7 @@ export function createDeckProfile(input) {
   Object.entries(expectedOrdering).forEach(([key, value]) => {
     if (input.ordering[key] !== value) throw new TypeError(`Unsupported ${key} ordering.`);
   });
-  if (input.numericFormat !== 'SCIENTIFIC_16_DIGITS_V1') {
+  if (input.numericFormat !== CALCULIX_FIELD20_NUMERIC_FORMAT) {
     throw new TypeError('Unsupported numeric formatting profile.');
   }
   if (input.lineEndings !== 'LF') throw new TypeError('Deck line endings must be LF.');

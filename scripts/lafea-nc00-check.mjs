@@ -64,7 +64,11 @@ for (const [fixtureId, fixtureInput] of Object.entries(allFixtureInputs)) {
   assert.equal(first.deckSha256, second.deckSha256);
   assert.deepEqual(first.maps, second.maps);
   if (fixtureId.startsWith('NC00-F2')) {
-    assert.match(first.deckText, /\*RIGID BODY/iu);
+    assert.doesNotMatch(first.deckText, /\*RIGID BODY/iu);
+    assert.match(
+      first.deckText,
+      /\*\* generated rigid carrier profile=DIRECTLY_PRESCRIBED_SHELL_CARRIER_V1/iu,
+    );
     assert.match(first.deckText, /\*CONTACT PAIR/iu);
   }
   generated.set(fixtureId, { model, deck: first });
@@ -321,6 +325,20 @@ async function writeArtifacts(values, solver, profile, reportValue, supplemental
   await writeFile(
     resolve(artifactRoot, 'completed-structural-reconstruction.json'),
     `${JSON.stringify(supplemental.completedReconstruction, null, 2)}\n`,
+  );
+  const externalExecutionLedger = supplemental.externalExecution.results.map((row) => ({
+    fixtureId: row.fixtureId,
+    status: row.status,
+    error: row.error ?? null,
+    executionDisposition: row.evidence?.executionDisposition ?? null,
+    receiptHash: row.evidence?.receipt?.semanticHash ?? null,
+    rawManifestHash: row.evidence?.rawManifest?.rawManifestSemanticHash ?? null,
+    parsedResultHash: row.evidence?.parsedResult?.resultPayloadSemanticHash ?? null,
+    reconstructionHash: row.evidence?.reconstruction?.semanticHash ?? null,
+  }));
+  await writeFile(
+    resolve(artifactRoot, 'external-execution-results.json'),
+    `${JSON.stringify(externalExecutionLedger, null, 2)}\n`,
   );
   for (const row of supplemental.externalExecution.results) {
     if (!row.evidence) continue;
