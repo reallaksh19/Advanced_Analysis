@@ -182,9 +182,17 @@ assert.equal(supportBySite.get('SUP-M').geometryChanged, false);
 const registration = getEmpiricalMethodRegistration('EMPIRICAL_BEAM_CONTACT_V1');
 assert.equal(registration.runtimeStatus, 'REGISTERED');
 assert.deepEqual(registration.qualifiedDofs, ['UX', 'UY', 'RZ']);
+const restraintNetworkRegistration = getEmpiricalMethodRegistration(
+  'EMPIRICAL_RESTRAINT_NETWORK_V1',
+);
+assert.equal(restraintNetworkRegistration.runtimeStatus, 'REGISTERED');
 assert.equal(
-  getEmpiricalMethodRegistration('EMPIRICAL_RESTRAINT_NETWORK_V1').runtimeStatus,
-  'NOT_REGISTERED',
+  restraintNetworkRegistration.qualificationStatus,
+  'QUALIFIED_RESTRICTED_DOMAIN',
+);
+assert.deepEqual(
+  restraintNetworkRegistration.qualifiedDofs,
+  ['ONE_TRANSLATIONAL_DIRECTION'],
 );
 
 const staleScenario = createEmpiricalAnalysisScenario({
