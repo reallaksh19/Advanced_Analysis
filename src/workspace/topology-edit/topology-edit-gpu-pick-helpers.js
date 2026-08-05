@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 
 export const TOPOLOGY_EDIT_MAX_GPU_PICK_ID = 0xffffff;
-export const TOPOLOGY_EDIT_GPU_PICK_PIXEL_RADIUS = 2;
+// Public contract is CSS pixels. resolveTopologyEditPickViewport converts this
+// to physical render-target pixels using the active devicePixelRatio.
+export const TOPOLOGY_EDIT_GPU_PICK_PIXEL_RADIUS = 8;
+export const TOPOLOGY_EDIT_GPU_PICK_MAX_PIXEL_RADIUS = 24;
 
 export function encodeTopologyEditPickId(id) {
   const value = Number(id);
@@ -58,7 +61,8 @@ export function resolveTopologyEditPickViewport(
   const pixelX = clamp(Math.floor((clientX - rect.left) * ratio), 0, fullWidth - 1);
   const topY = clamp(Math.floor((clientY - rect.top) * ratio), 0, fullHeight - 1);
   const pixelY = fullHeight - 1 - topY;
-  const radius = normalizeRadius(pixelRadius);
+  const cssRadius = normalizeRadius(pixelRadius);
+  const radius = Math.max(1, Math.ceil(cssRadius * ratio));
   const x = Math.max(0, pixelX - radius);
   const y = Math.max(0, pixelY - radius);
   const maxX = Math.min(fullWidth - 1, pixelX + radius);
@@ -70,6 +74,9 @@ export function resolveTopologyEditPickViewport(
     height: maxY - y + 1,
     fullWidth,
     fullHeight,
+    cssRadius,
+    physicalRadius: radius,
+    pixelRatio: ratio,
   });
 }
 
@@ -190,9 +197,9 @@ function validRect(rect) {
 }
 
 function normalizeRadius(value) {
-  const radius = Number(value);
-  return Number.isInteger(radius) && radius >= 0 && radius <= 8
-    ? radius
+  const radius = Math.round(Number(value));
+  return Number.isFinite(radius) && radius >= 0
+    ? clamp(radius, 0, TOPOLOGY_EDIT_GPU_PICK_MAX_PIXEL_RADIUS)
     : TOPOLOGY_EDIT_GPU_PICK_PIXEL_RADIUS;
 }
 
