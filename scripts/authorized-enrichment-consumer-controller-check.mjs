@@ -25,6 +25,9 @@ import {
   AUTHORIZED_EMPIRICAL_CONSUMER_REQUEST_SCHEMA,
   AuthorizedEnrichmentConsumerController,
 } from '../src/workspace/enrichment/authorized-enrichment-consumer-controller.js';
+import {
+  AUTHORIZED_EMPIRICAL_METHOD_CONSUMER_REQUEST_SCHEMA,
+} from '../src/workspace/enrichment/authorized-empirical-method-consumer-controller-v2.js';
 
 const sharedRunner = await readFile(
   new URL('./run-authorized-enrichment-consumer-controller-checks.mjs', import.meta.url),
@@ -60,6 +63,10 @@ assert.equal(
 assert.equal(
   AUTHORIZED_EMPIRICAL_RUNTIME_PACKAGE_V2_SCHEMA,
   'authorized-empirical-runtime-package/v2',
+);
+assert.equal(
+  AUTHORIZED_EMPIRICAL_METHOD_CONSUMER_REQUEST_SCHEMA,
+  'authorized-empirical-method-consumer-request/v1',
 );
 
 const masterData = Object.freeze({ marker: 'MASTER-DATA-EMP01' });
@@ -146,6 +153,7 @@ console.log(JSON.stringify({
   methodSelectingRequestSchema: AUTHORIZED_EMPIRICAL_LOAD_EXECUTION_V2_REQUEST_SCHEMA,
   methodSelectingReceiptSchema: AUTHORIZED_EMPIRICAL_LOAD_EXECUTION_V2_SCHEMA,
   methodBoundRuntimePackageSchema: AUTHORIZED_EMPIRICAL_RUNTIME_PACKAGE_V2_SCHEMA,
+  configuredMethodConsumerSchema: AUTHORIZED_EMPIRICAL_METHOD_CONSUMER_REQUEST_SCHEMA,
 }, null, 2));
 
 function makeRuntimePackage() {
