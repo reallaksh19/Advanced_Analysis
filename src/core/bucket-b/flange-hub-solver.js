@@ -646,8 +646,11 @@ function deriveConstrainedDofs({ mesh, loadDefinition, nodeIndex }) {
 function multiplySparse(rows, vector) {
   const result = new Float64Array(rows.length);
   rows.forEach((row, index) => {
+    const entries = [...row.entries()].sort(
+      ([leftColumn], [rightColumn]) => leftColumn - rightColumn,
+    );
     let sum = 0;
-    row.forEach((value, column) => {
+    entries.forEach(([column, value]) => {
       sum += value * vector[column];
     });
     result[index] = sum;
