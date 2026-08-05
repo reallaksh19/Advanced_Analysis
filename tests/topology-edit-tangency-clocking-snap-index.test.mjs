@@ -173,8 +173,8 @@ test('three-port branch geometry infers the run pair and publishes signed clocki
   ));
   assert.equal(branch.featureId, 'junction:tee:branch-clocking:node:branch');
   assert.deepEqual(branch.canonicalTargetIds, ['junction:tee', 'node:branch']);
-  assert.equal(branch.clockingAngleDeg, 0);
-  assert.match(branch.label, /Branch clocking 0°/u);
+  assert.equal(branch.clockingAngleDeg, -90);
+  assert.match(branch.label, /Branch clocking -90°/u);
 
   const result = resolve(index, { x: 0.5, y: 20, z: 0 });
   assert.equal(result.status, 'RESOLVED');
