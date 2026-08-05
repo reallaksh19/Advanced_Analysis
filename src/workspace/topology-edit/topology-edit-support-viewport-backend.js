@@ -3,6 +3,11 @@ import * as THREE from 'three';
 import { materializeTopologyEditSupportOverlay } from './topology-edit-support-glyph-geometry.js';
 import { TopologyEditTypedViewportBackend } from './topology-edit-typed-viewport-backend.js';
 
+export const TOPOLOGY_EDIT_SUPPORT_RENDER_STYLES = Object.freeze({
+  RICH_ENGINEERING_GLYPH: 'RICH_ENGINEERING_GLYPH',
+  TOPO_VALIDATOR_COMPACT: 'TOPO_VALIDATOR_COMPACT',
+});
+
 export class TopologyEditSupportViewportBackend extends TopologyEditTypedViewportBackend {
   renderSession(model) {
     if (!Array.isArray(model?.supports?.glyphOverlays)) {
@@ -17,6 +22,15 @@ export class TopologyEditSupportViewportBackend extends TopologyEditTypedViewpor
   renderProjection(group, projection, colorHex, opacity, markerSize) {
     if (group !== this.groups.supportGroup || !Array.isArray(projection?.glyphOverlays)) {
       return super.renderProjection(group, projection, colorHex, opacity, markerSize);
+    }
+    if (projection.renderStyle === TOPOLOGY_EDIT_SUPPORT_RENDER_STYLES.TOPO_VALIDATOR_COMPACT) {
+      return super.renderProjection(
+        group,
+        projection,
+        colorHex,
+        opacity,
+        compactSupportMarkerRadius(projection, markerSize),
+      );
     }
     return this.renderSupportGlyphProjection(group, projection);
   }
@@ -56,6 +70,16 @@ export function supportEngineeringBoundsProjection(projection) {
   });
 }
 
+function compactSupportMarkerRadius(projection, fallbackMarkerSize) {
+  const explicit = Number(projection?.compactMarkerRadiusMm);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  const fallback = Number(fallbackMarkerSize);
+  if (Number.isFinite(fallback) && fallback > 0) return Math.max(fallback * 0.18, 1);
+  throw new Error(
+    'TOPOLOGY_EDIT_COMPACT_SUPPORT_MARKER_POLICY_MISSING: A positive compact marker radius is required.',
+  );
+}
+
 function supportMarkerSize(configuredValue, projection) {
   const configured = Number(configuredValue);
   if (!Number.isFinite(configured) || configured <= 0) {
@@ -81,7 +105,7 @@ function disposeStaging(root) {
   root.traverse((object) => {
     if (object.geometry) geometries.add(object.geometry);
     const rows = Array.isArray(object.material) ? object.material : [object.material];
-    rows.filter(Boolean).forEach((material) => materials.add(material));
+    rows.filter(Bolean).forEach((material) => materials.add(material));
   });
   geometries.forEach((geometry) => geometry.dispose());
   materials.forEach((material) => material.dispose());
