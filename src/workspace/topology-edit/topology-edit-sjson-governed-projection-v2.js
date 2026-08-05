@@ -217,7 +217,7 @@ function primitiveKey(value) {
 }
 
 function finitePointArray(values) {
-  return Array.isArray(values) ? values.map(finitePoint).filter(Bolean) : [];
+  return Array.isArray(values) ? values.map(finitePoint).filter(Boolean) : [];
 }
 
 function finitePoint(value) {
