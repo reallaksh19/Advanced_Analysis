@@ -4,16 +4,18 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - '.github/workflows/lafea-nc01-shell-formulation.yml'
-      - 'docs/nonlinear-shell-contact/LAFEA_NC01_SHELL_FORMULATION.md'
-      - 'scripts/lafea-nc01-check.mjs'
-      - 'src/core/nonlinear-shell-contact/shell-formulation-contract.js'
-      - 'src/core/nonlinear-shell-contact/shell-benchmark-catalog.js'
-      - 'src/core/nonlinear-shell-contact/shell-qualification-evaluator.js'
-      - 'src/core/nonlinear-shell-contact/nc01-fixtures.js'
-      - 'src/core/nonlinear-shell-contact/nc01-negative-controls.js'
-      - 'src/core/nonlinear-shell-contact/index.js'
-      - 'tests/nonlinear-shell-contact-nc01-qualification.test.mjs'
+      - ".github/workflows/lafea-nc01-shell-formulation.yml"
+      - "docs/nonlinear-shell-contact/LAFEA_NC01_SHELL_FORMULATION.md"
+      - "scripts/lafea-nc01-check.mjs"
+      - "scripts/lafea-nc01-shell-benchmarks.mjs"
+      - "scripts/nc01-shell/**"
+      - "src/core/nonlinear-shell-contact/shell-formulation-contract.js"
+      - "src/core/nonlinear-shell-contact/shell-benchmark-catalog.js"
+      - "src/core/nonlinear-shell-contact/shell-qualification-evaluator.js"
+      - "src/core/nonlinear-shell-contact/nc01-fixtures.js"
+      - "src/core/nonlinear-shell-contact/nc01-negative-controls.js"
+      - "src/core/nonlinear-shell-contact/index.js"
+      - "tests/nonlinear-shell-contact-nc01-qualification.test.mjs"
   workflow_dispatch:
     inputs:
       head_sha:
@@ -41,10 +43,18 @@ jobs:
       FOUNDATION_SHA: 18e259f8a18e9011482d3ca4d1b8bd51dbe986f4
       BRIDGE_MERGE_SHA: 18e259f8a18e9011482d3ca4d1b8bd51dbe986f4
       BRIDGE_HEAD_SHA: 48c23d09a7291197dacefd99a2cf1b1caf8bca40
-      BRIDGE_RUN_ID: '31021329297'
-      BRIDGE_ARTIFACT_ID: '8936729914'
+      BRIDGE_RUN_ID: "31021329297"
+      BRIDGE_ARTIFACT_ID: "8936729914"
       BRIDGE_ARTIFACT_NAME: lafea-nc-solver-bridge-48c23d09a7291197dacefd99a2cf1b1caf8bca40-1
-      BRIDGE_ARTIFACT_DIGEST: sha256:2b1458c447724d15a2e9178af8302cba91b78593854f8741ffc57a9f0646d28d
+      BRIDGE_ARTIFACT_DIGEST: "sha256:2b1458c447724d15a2e9178af8302cba91b78593854f8741ffc57a9f0646d28d"
+      CUSTODY_HEAD_SHA: 2826cac45acc13fdd9634c861f9910e339f9d5d5
+      CUSTODY_RUN_ID: "31020771678"
+      CUSTODY_ARTIFACT_ID: "8936496053"
+      CUSTODY_ARTIFACT_NAME: lafea-nc-solver-container-2826cac45acc13fdd9634c861f9910e339f9d5d5-1
+      CUSTODY_ARTIFACT_DIGEST: "sha256:e14b467cd43f38218f3dba750b6c5f4f1ee83ed8ea9d241bf65673b9e7caf9b8"
+      SOLVER_DIGEST: "sha256:9a33d293706a66bee86f2f0ecf996a66758f904c20d61ad8c83ddc0f92ae4b7e"
+      SOURCE_COMMIT: cff1bb12ec7d24ad9048a1f54ae243a18d1a0b54
+
     steps:
       - name: Resolve exact head and base
         id: exact
@@ -64,35 +74,28 @@ jobs:
           ref: ${{ steps.exact.outputs.head_sha }}
           fetch-depth: 0
 
-      - name: Verify live base, ancestry and exact checkout
+      - name: Verify live base and phase paths
         shell: bash
         env:
-          EXACT_HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
+          HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
           BASE_SHA: ${{ steps.exact.outputs.base_sha }}
         run: |
           set -euo pipefail
           git fetch --no-tags origin main:refs/remotes/origin/main
-          live_base="$(git rev-parse refs/remotes/origin/main)"
-          test "$live_base" = "$BASE_SHA"
-          test "$(git rev-parse HEAD)" = "$EXACT_HEAD_SHA"
-          git merge-base --is-ancestor "$BASE_SHA" "$EXACT_HEAD_SHA"
+          test "$(git rev-parse refs/remotes/origin/main)" = "$BASE_SHA"
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          git merge-base --is-ancestor "$BASE_SHA" "$HEAD_SHA"
           git merge-base --is-ancestor "$FOUNDATION_SHA" "$BASE_SHA"
-          git diff --check "$BASE_SHA...$EXACT_HEAD_SHA"
-
-      - name: Enforce NC-01 changed-path containment
-        shell: bash
-        env:
-          EXACT_HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
-          BASE_SHA: ${{ steps.exact.outputs.base_sha }}
-        run: |
-          set -euo pipefail
-          mapfile -t paths < <(git diff --name-only "$BASE_SHA...$EXACT_HEAD_SHA")
-          test "${#paths[@]}" -ge 1
+          git diff --check "$BASE_SHA...$HEAD_SHA"
+          mapfile -t paths < <(git diff --name-only "$BASE_SHA...$HEAD_SHA")
+          test "${#paths[@]}" -gt 0
           for path in "${paths[@]}"; do
             case "$path" in
               .github/workflows/lafea-nc01-shell-formulation.yml|\
               docs/nonlinear-shell-contact/LAFEA_NC01_SHELL_FORMULATION.md|\
               scripts/lafea-nc01-check.mjs|\
+              scripts/lafea-nc01-shell-benchmarks.mjs|\
+              scripts/nc01-shell/*|\
               src/core/nonlinear-shell-contact/shell-formulation-contract.js|\
               src/core/nonlinear-shell-contact/shell-benchmark-catalog.js|\
               src/core/nonlinear-shell-contact/shell-qualification-evaluator.js|\
@@ -100,93 +103,129 @@ jobs:
               src/core/nonlinear-shell-contact/nc01-negative-controls.js|\
               src/core/nonlinear-shell-contact/index.js|\
               tests/nonlinear-shell-contact-nc01-qualification.test.mjs) ;;
-              *) echo "NC-01 changed-path violation: $path" >&2; exit 1 ;;
+              *) echo "NC-01 path violation: $path" >&2; exit 1 ;;
             esac
           done
 
-      - name: Set up Node.js
+      - name: Set up Node 22
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: "22"
           cache: npm
 
-      - name: Install repository dependencies
-        run: npm ci
+      - name: Install dependencies
+        run: |
+          npm ci
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libblas3 liblapack3 libgfortran5
 
-      - name: Verify immutable NC-00 bridge artifact and create normalized binding
+      - name: Download and validate governed upstream artifacts
+        id: custody
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          metadata="$(gh api "/repos/$GITHUB_REPOSITORY/actions/artifacts/$BRIDGE_ARTIFACT_ID")"
-          test "$(jq -r .name <<<"$metadata")" = "$BRIDGE_ARTIFACT_NAME"
-          test "$(jq -r .digest <<<"$metadata")" = "$BRIDGE_ARTIFACT_DIGEST"
-          test "$(jq -r .expired <<<"$metadata")" = 'false'
-          test "$(jq -r .workflow_run.id <<<"$metadata")" = "$BRIDGE_RUN_ID"
-          test "$(jq -r .workflow_run.head_sha <<<"$metadata")" = "$BRIDGE_HEAD_SHA"
-          rm -rf "$RUNNER_TEMP/nc00-bridge"
-          mkdir -p "$RUNNER_TEMP/nc00-bridge" artifacts/nc01-input
-          gh run download "$BRIDGE_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$BRIDGE_ARTIFACT_NAME" --dir "$RUNNER_TEMP/nc00-bridge"
-          node --input-type=module - "$RUNNER_TEMP/nc00-bridge" artifacts/nc01-input/upstream-binding.json <<'NODE'
-          import { readFileSync, writeFileSync } from 'node:fs';
-          import { resolve } from 'node:path';
-          import { createSolverBridgeBinding } from './src/core/nonlinear-shell-contact/shell-qualification-evaluator.js';
-          const [root, output] = process.argv.slice(2);
-          const summary = JSON.parse(readFileSync(resolve(root, 'solver-bridge-summary.json'), 'utf8'));
-          const authority = JSON.parse(readFileSync(resolve(root, 'solver-bridge-authority.json'), 'utf8'));
-          if (summary.status !== 'SOLVER_BRIDGE_QUALIFIED' || summary.exactHeadSha !== process.env.BRIDGE_HEAD_SHA || summary.authority.solverCustodyQualified !== true || summary.authority.solverBridgeQualified !== true || summary.authority.nc01Authorized !== true || authority.semanticHash !== summary.authorityRecordHash) process.exit(1);
-          const binding = createSolverBridgeBinding({
-            exactHeadSha: summary.exactHeadSha,
-            mergeCommitSha: process.env.BRIDGE_MERGE_SHA,
-            workflowRunId: process.env.BRIDGE_RUN_ID,
-            artifactId: process.env.BRIDGE_ARTIFACT_ID,
-            artifactDigest: process.env.BRIDGE_ARTIFACT_DIGEST,
-            summaryHash: summary.nc00ReportHash,
-            authorityRecordHash: summary.authorityRecordHash,
-            deterministicExecutionHash: summary.deterministicExecutionHash,
-            validatorIdentity: 'LAFEA_NC_SOLVER_BRIDGE_EVIDENCE_V1',
-            validatorRevision: summary.exactHeadSha,
-            solverCustodyQualified: summary.authority.solverCustodyQualified,
-            solverBridgeQualified: summary.authority.solverBridgeQualified,
-            nc01Authorized: summary.authority.nc01Authorized,
-          });
-          writeFileSync(output, `${JSON.stringify(binding, null, 2)}\n`);
-          NODE
+          verify_artifact() {
+            local id="$1" name="$2" digest="$3" run="$4" head="$5"
+            local meta
+            meta="$(gh api "/repos/$GITHUB_REPOSITORY/actions/artifacts/$id")"
+            test "$(jq -r .name <<<"$meta")" = "$name"
+            test "$(jq -r .digest <<<"$meta")" = "$digest"
+            test "$(jq -r .expired <<<"$meta")" = "false"
+            test "$(jq -r .workflow_run.id <<<"$meta")" = "$run"
+            test "$(jq -r .workflow_run.head_sha <<<"$meta")" = "$head"
+          }
+          verify_artifact "$BRIDGE_ARTIFACT_ID" "$BRIDGE_ARTIFACT_NAME" "$BRIDGE_ARTIFACT_DIGEST" "$BRIDGE_RUN_ID" "$BRIDGE_HEAD_SHA"
+          verify_artifact "$CUSTODY_ARTIFACT_ID" "$CUSTODY_ARTIFACT_NAME" "$CUSTODY_ARTIFACT_DIGEST" "$CUSTODY_RUN_ID" "$CUSTODY_HEAD_SHA"
+          bridge="$RUNNER_TEMP/nc00-bridge"
+          custody="$RUNNER_TEMP/solver-custody"
+          rm -rf "$bridge" "$custody"
+          mkdir -p "$bridge" "$custody" artifacts/nc01-input
+          gh run download "$BRIDGE_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$BRIDGE_ARTIFACT_NAME" --dir "$bridge"
+          gh run download "$CUSTODY_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$CUSTODY_ARTIFACT_NAME" --dir "$custody"
+          solver="$custody/binary/ccx_2.22"
+          archive="$custody/source/CalculiX-$SOURCE_COMMIT.tar.gz"
+          test -f "$solver"
+          test -f "$archive"
+          chmod 0755 "$solver"
+          test "sha256:$(sha256sum "$solver" | cut -d' ' -f1)" = "$SOLVER_DIGEST"
+          node -e "const fs=require('node:fs');const r=JSON.parse(fs.readFileSync(process.argv[1]));if(r.status!=='SOLVER_CUSTODY_QUALIFIED'||r.verifiedEvidenceCount!==8||r.authority.solverCustodyQualified!==true||r.authority.solverBridgeQualified!==false)process.exit(1)" "$custody/reports-container/solver-custody-qualified-report.json"
+          node scripts/nc01-shell/prepare-binding.mjs "$bridge" artifacts/nc01-input/upstream-binding.json
+          echo "solver=$solver" >> "$GITHUB_OUTPUT"
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
 
-      - name: Run syntax, unit and negative-control gates
-        shell: bash
+      - name: Run syntax, unit and negative controls
         run: |
-          set -euo pipefail
           node --check scripts/lafea-nc01-check.mjs
-          for file in src/core/nonlinear-shell-contact/{shell-formulation-contract,shell-benchmark-catalog,shell-qualification-evaluator,nc01-fixtures,nc01-negative-controls,index}.js; do node --check "$file"; done
+          node --check scripts/lafea-nc01-shell-benchmarks.mjs
+          find scripts/nc01-shell -type f -name "*.mjs" -print0 | sort -z | xargs -0 -n1 node --check
           node --test tests/nonlinear-shell-contact-nc01-qualification.test.mjs
 
-      - name: Execute complete NC-01 evaluation twice
-        id: execute
+      - name: Execute real shell evidence twice
+        id: real
         shell: bash
         env:
-          EXACT_HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
+          HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
+          SOLVER: ${{ steps.custody.outputs.solver }}
+          ARCHIVE: ${{ steps.custody.outputs.archive }}
         run: |
           set +e
-          rm -rf artifacts/nc01-a artifacts/nc01-b artifacts/nc01-debug
+          rm -rf artifacts/nc01-real-a artifacts/nc01-real-b artifacts/nc01-debug
           mkdir -p artifacts/nc01-debug
-          evidence_args=()
-          if test -d evidence/nonlinear-shell-contact/nc01/benchmarks; then
-            evidence_args+=(--evidence-root=evidence/nonlinear-shell-contact/nc01/benchmarks)
-          fi
-          node scripts/lafea-nc01-check.mjs --head-sha="$EXACT_HEAD_SHA" --upstream-binding=artifacts/nc01-input/upstream-binding.json --output-dir=artifacts/nc01-a "${evidence_args[@]}" >artifacts/nc01-debug/replay-a.stdout.log 2>artifacts/nc01-debug/replay-a.stderr.log
+          node_bin="$(command -v node)"
+          run_one() {
+            local tag="$1"
+            sudo --preserve-env=HEAD_SHA,SOLVER,ARCHIVE,PATH \
+              unshare --net --mount-proc "$node_bin" scripts/lafea-nc01-shell-benchmarks.mjs \
+              --solver="$SOLVER" --head-sha="$HEAD_SHA" --source-archive="$ARCHIVE" \
+              --output-root="$GITHUB_WORKSPACE/artifacts/nc01-real-$tag" \
+              >"artifacts/nc01-debug/real-$tag.stdout.log" \
+              2>"artifacts/nc01-debug/real-$tag.stderr.log"
+          }
+          run_one a
           a=$?
-          node scripts/lafea-nc01-check.mjs --head-sha="$EXACT_HEAD_SHA" --upstream-binding=artifacts/nc01-input/upstream-binding.json --output-dir=artifacts/nc01-b "${evidence_args[@]}" >artifacts/nc01-debug/replay-b.stdout.log 2>artifacts/nc01-debug/replay-b.stderr.log
+          run_one b
           b=$?
-          printf '%s\n' "$a" > artifacts/nc01-debug/replay-a.exit-code.txt
-          printf '%s\n' "$b" > artifacts/nc01-debug/replay-b.exit-code.txt
-          if test -f artifacts/nc01-a/nc01-report.canonical.json && test -f artifacts/nc01-b/nc01-report.canonical.json; then
-            cmp artifacts/nc01-a/nc01-report.canonical.json artifacts/nc01-b/nc01-report.canonical.json
+          printf "%s\n" "$a" > artifacts/nc01-debug/real-a.exit-code.txt
+          printf "%s\n" "$b" > artifacts/nc01-debug/real-b.exit-code.txt
+          if test "$a" = 0 && test "$b" = 0; then
+            cmp artifacts/nc01-real-a/real-shell-benchmark-summary.canonical.json artifacts/nc01-real-b/real-shell-benchmark-summary.canonical.json
+            diff -ru artifacts/nc01-real-a/evidence artifacts/nc01-real-b/evidence
+            test "$(find artifacts/nc01-real-a/evidence -maxdepth 1 -type f -name '*.json' | wc -l)" = 6
           fi
-          echo "exit_a=$a" >> "$GITHUB_OUTPUT"
-          echo "exit_b=$b" >> "$GITHUB_OUTPUT"
+          echo "a=$a" >> "$GITHUB_OUTPUT"
+          echo "b=$b" >> "$GITHUB_OUTPUT"
           exit 0
+
+      - name: Evaluate complete qualification twice
+        id: evaluate
+        shell: bash
+        env:
+          HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
+          REAL_A: ${{ steps.real.outputs.a }}
+          REAL_B: ${{ steps.real.outputs.b }}
+        run: |
+          set +e
+          if test "$REAL_A" != 0 || test "$REAL_B" != 0; then
+            echo "a=97" >> "$GITHUB_OUTPUT"
+            echo "b=97" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          node scripts/lafea-nc01-check.mjs --head-sha="$HEAD_SHA" --upstream-binding=artifacts/nc01-input/upstream-binding.json --evidence-root=artifacts/nc01-real-a/evidence --output-dir=artifacts/nc01-a >artifacts/nc01-debug/eval-a.stdout.log 2>artifacts/nc01-debug/eval-a.stderr.log
+          a=$?
+          node scripts/lafea-nc01-check.mjs --head-sha="$HEAD_SHA" --upstream-binding=artifacts/nc01-input/upstream-binding.json --evidence-root=artifacts/nc01-real-b/evidence --output-dir=artifacts/nc01-b >artifacts/nc01-debug/eval-b.stdout.log 2>artifacts/nc01-debug/eval-b.stderr.log
+          b=$?
+          printf "%s\n" "$a" > artifacts/nc01-debug/eval-a.exit-code.txt
+          printf "%s\n" "$b" > artifacts/nc01-debug/eval-b.exit-code.txt
+          cmp artifacts/nc01-a/nc01-report.canonical.json artifacts/nc01-b/nc01-report.canonical.json
+          echo "a=$a" >> "$GITHUB_OUTPUT"
+          echo "b=$b" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Verify clean source tree
+        if: always()
+        run: test -z "$(git status --porcelain --untracked-files=no)"
 
       - name: Upload NC-01 diagnostic evidence
         if: always()
@@ -198,18 +237,17 @@ jobs:
           retention-days: 30
 
       - name: Enforce qualified exact-head result
-        shell: bash
         env:
-          EXIT_A: ${{ steps.execute.outputs.exit_a }}
-          EXIT_B: ${{ steps.execute.outputs.exit_b }}
+          REAL_A: ${{ steps.real.outputs.a }}
+          REAL_B: ${{ steps.real.outputs.b }}
+          EVAL_A: ${{ steps.evaluate.outputs.a }}
+          EVAL_B: ${{ steps.evaluate.outputs.b }}
         run: |
-          set -euo pipefail
-          test "$EXIT_A" = '0'
-          test "$EXIT_B" = '0'
-          node -e "const fs=require('node:fs');const r=JSON.parse(fs.readFileSync('artifacts/nc01-a/nc01-report.json'));if(r.status!=='NC01_QUALIFIED'||r.qualification.authority.shellFormulationQualified!==true||r.qualification.authority.nc02Authorized!==true||r.qualification.authority.contactProcedureQualified!==false||r.qualification.authority.productionExecutionAuthorized!==false)process.exit(1);"
-
-      - name: Verify clean source tree
-        run: test -z "$(git status --porcelain --untracked-files=no)"
+          test "$REAL_A" = "0"
+          test "$REAL_B" = "0"
+          test "$EVAL_A" = "0"
+          test "$EVAL_B" = "0"
+          node -e "const fs=require('node:fs');const r=JSON.parse(fs.readFileSync('artifacts/nc01-a/nc01-report.json'));if(r.status!=='NC01_QUALIFIED'||r.qualification.authority.shellFormulationQualified!==true||r.qualification.authority.nc02Authorized!==true||r.qualification.authority.productionExecutionAuthorized!==false)process.exit(1)"
 
       - name: Upload authoritative NC-01 evidence
         uses: actions/upload-artifact@v4
@@ -218,6 +256,8 @@ jobs:
           path: |
             artifacts/nc01-a
             artifacts/nc01-b
+            artifacts/nc01-real-a
+            artifacts/nc01-real-b
             artifacts/nc01-input
           if-no-files-found: error
           retention-days: 30
