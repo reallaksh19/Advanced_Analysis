@@ -17,6 +17,12 @@ const DECLARATIONS = Object.freeze({
     KN: { scale: 1000, factor: 0.0044482216152605 },
     LBF: { scale: 4.4482216152605, factor: 1 },
   }),
+  MOMENT: Object.freeze({
+    NM: { scale: 1, factor: 0.1129848290276167 },
+    KNM: { scale: 1000, factor: 0.0001129848290276167 },
+    LBFIN: { scale: 0.1129848290276167, factor: 1 },
+    LBFFT: { scale: 1.3558179483314004, factor: 1 / 12 },
+  }),
   STRESS: Object.freeze({
     PA: { scale: 1, factor: 6894.757293168 },
     KPA: { scale: 1000, factor: 6.894757293168 },
@@ -44,6 +50,10 @@ function normalizedLabel(value) {
     .replace(/\bBARS\b/gu, 'BAR')
     .replace(/\bINCHES\b/gu, 'IN')
     .replace(/\bLBS?\.?\b/gu, 'LBF')
+    .replace(/LBF\.?[-·*\s]*IN\.?/gu, 'LBFIN')
+    .replace(/LBF\.?[-·*\s]*FT\.?/gu, 'LBFFT')
+    .replace(/KN\.?[-·*\s]*M\.?/gu, 'KNM')
+    .replace(/N\.?[-·*\s]*M\.?/gu, 'NM')
     .replace(/N\.?\s*\/\s*SQ\.?\s*MM\.?/gu, 'N/SQMM')
     .replace(/KG\.?\s*\/\s*CU\.?\s*CM\.?/gu, 'KG/CUCM')
     .replace(/KG\.?\s*\/\s*M(?:\^?3|3)\.?/gu, 'KG/M3')
@@ -94,6 +104,7 @@ export function parseInputXmlUnitSystem(xmlText, fallbackLengthUnit, diagnostics
       declared: false,
       lengthUnit: fallbackLengthUnit || null,
       force: null,
+      momentInput: null,
       stress: null,
       pressure: null,
       elasticModulus: null,
@@ -109,6 +120,7 @@ export function parseInputXmlUnitSystem(xmlText, fallbackLengthUnit, diagnostics
     declared: true,
     lengthUnit: length?.unit ?? fallbackLengthUnit ?? null,
     force: declaredUnit(units.inner, 'FORCE', DECLARATIONS.FORCE, diagnostics),
+    momentInput: declaredUnit(units.inner, 'MOMENT-INPUT', DECLARATIONS.MOMENT, diagnostics),
     stress: declaredUnit(units.inner, 'STRESS', DECLARATIONS.STRESS, diagnostics),
     pressure: declaredUnit(units.inner, 'PRESSURE', DECLARATIONS.STRESS, diagnostics),
     elasticModulus: declaredUnit(units.inner, 'EMOD', DECLARATIONS.STRESS, diagnostics),

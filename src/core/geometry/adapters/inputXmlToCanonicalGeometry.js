@@ -77,6 +77,7 @@ const BEND_TAGS = ['BEND', 'BENDS', 'ELBOW', 'ELBOWS'];
 const RIGID_TAGS = ['RIGID', 'RIGIDS'];
 const SIF_TAGS = ['SIF', 'SIFS'];
 const HANGER_TAGS = ['HANGER', 'HANGERS'];
+const FORCES_MOMENTS_TAGS = ['FORCESMOMENTS'];
 const ALLOWABLE_STRESS_TAGS = ['ALLOWABLESTRESS'];
 const REDUCER_TAGS = ['REDUCER', 'REDUCERS', 'REDU', 'REDC', 'REDE'];
 const RESTRAINT_TAGS = ['RESTRAINT', 'RESTRAINTS'];
@@ -310,6 +311,7 @@ function analysisMetadata(edge, carry, units, diagnostics) {
     elasticModulus: inheritedCanonicalField({ edge, names: ['MODULUS'], carry, key: 'elasticModulus', label: 'MODULUS', diagnostics, declaration: units.elasticModulus, quantity: 'EMOD' }),
     poissonRatio: inheritedCanonicalField({ edge, names: ['POISSONS'], carry, key: 'poissonRatio', label: 'POISSONS', diagnostics, convert: (value) => value }),
     operatingTemperature: inheritedCanonicalField({ edge, names: ['TEMP_EXP_C1'], carry, key: 'operatingTemperature', label: 'TEMP_EXP_C1', diagnostics, declaration: units.temperature, quantity: 'TEMP' }),
+    operatingTemperature2: inheritedCanonicalField({ edge, names: ['TEMP_EXP_C2'], carry, key: 'operatingTemperature2', label: 'TEMP_EXP_C2', diagnostics, declaration: units.temperature, quantity: 'TEMP' }),
     pressure: inheritedCanonicalField({ edge, names: ['PRESSURE1'], carry, key: 'pressure', label: 'PRESSURE1', diagnostics, declaration: units.pressure, quantity: 'PRESSURE' }),
     hydroPressure: inheritedCanonicalField({ edge, names: ['HYDRO_PRESSURE'], carry, key: 'hydroPressure', label: 'HYDRO_PRESSURE', diagnostics, declaration: units.pressure, quantity: 'PRESSURE' }),
     fluidDensity: inheritedCanonicalField({ edge, names: ['FLUID_DENSITY', 'FDENSITY'], carry, key: 'fluidDensity', label: 'FLUID_DENSITY', diagnostics, declaration: units.fluidDensity, quantity: 'FDENS' }),
@@ -360,6 +362,40 @@ function attachChildEvidence(segment, edge, units, diagnostics) {
       { elementIndex: edge.index, hangers },
     );
   }
+  const forcesMoments = findAnyElements(edge.tag.inner, FORCES_MOMENTS_TAGS)
+    .map((tag) => {
+      const nodeNumber = caesarNumberOrNull(attributeValue(tag.attributes, 'NODE_NUM', 'NODE'));
+      const nodeId = nodeNumber == null ? null : cleanNodeId(String(nodeNumber));
+      const vectors = findElements(tag.inner, 'VECTOR')
+        .map((vector) => ({
+          number: caesarNumberOrNull(attributeValue(vector.attributes, 'NUMBER')),
+          force: {
+            fx: convertedOptional(vector, 'FX', units.force, 'FORCE', edge, diagnostics),
+            fy: convertedOptional(vector, 'FY', units.force, 'FORCE', edge, diagnostics),
+            fz: convertedOptional(vector, 'FZ', units.force, 'FORCE', edge, diagnostics),
+          },
+          moment: {
+            mx: convertedOptionalMoment(vector, 'MX', units, edge, diagnostics),
+            my: convertedOptionalMoment(vector, 'MY', units, edge, diagnostics),
+            mz: convertedOptionalMoment(vector, 'MZ', units, edge, diagnostics),
+          },
+        }))
+        .filter((row) => row.number !== null);
+      return {
+        forceMomentNumber: caesarNumberOrNull(attributeValue(tag.attributes, 'FORCMNT_NUM')),
+        nodeId,
+        vectors,
+      };
+    })
+    .filter((row) => row.nodeId !== null);
+  if (forcesMoments.length > 0) {
+    segment.meta.analysis.forcesMoments = forcesMoments;
+    addDiagnostic(
+      diagnostics, 'warn', 'INPUTXML_FORCES_MOMENTS_PRESENT_NOT_COMPILED',
+      `Element ${edge.index + 1} contains ${forcesMoments.length} active FORCESMOMENTS record(s); their vectors are retained but no external nodal load is applied by geometry ingestion.`,
+      { elementIndex: edge.index, forcesMoments },
+    );
+  }
   const allowableCount = findAnyElements(edge.tag.inner, ALLOWABLE_STRESS_TAGS).length;
   if (allowableCount > 0) {
     segment.meta.analysis.allowableStressRecordCount = allowableCount;
@@ -369,6 +405,25 @@ function attachChildEvidence(segment, edge, units, diagnostics) {
       { elementIndex: edge.index, recordCount: allowableCount },
     );
   }
+}
+
+function convertedOptional(tag, attribute, declaration, quantity, edge, diagnostics) {
+  const value = caesarNumberOrNull(attributeValue(tag.attributes, attribute));
+  return value == null ? null : safeConvert(value, declaration, quantity, edge, diagnostics);
+}
+
+function convertedOptionalMoment(tag, attribute, units, edge, diagnostics) {
+  const value = caesarNumberOrNull(attributeValue(tag.attributes, attribute));
+  if (value == null) return null;
+  if (!units.momentInput) {
+    addDiagnostic(
+      diagnostics, 'error', 'INPUTXML_UNIT_DECLARATION_REQUIRED',
+      'InputXML <UNITS> must declare MOMENT-INPUT to convert moment inputs.',
+      { elementIndex: edge.index, quantity: 'MOMENT' },
+    );
+    return null;
+  }
+  return safeConvert(value, units.momentInput, 'MOMENT-INPUT', edge, diagnostics);
 }
 
 function safeConvert(value, declaration, quantity, edge, diagnostics) {
