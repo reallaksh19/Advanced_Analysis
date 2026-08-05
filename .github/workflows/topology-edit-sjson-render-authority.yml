@@ -19,6 +19,7 @@ on:
       - 'src/workspace/topology-edit/topology-edit-sjson-visual-authority.js'
       - 'src/workspace/topology-edit/topology-edit-sjson-tee-projection.js'
       - 'src/workspace/topology-edit/topology-edit-sjson-point-component-projection.js'
+      - 'src/workspace/topology-edit/topology-edit-sjson-parent-branch-diameter.js'
       - 'src/workspace/topology-edit/support-restraint-family.js'
       - 'tests/topology-edit-sjson-render-authority.test.mjs'
       - 'tests/topology-edit-sjson-fidelity.test.mjs'
@@ -81,6 +82,7 @@ jobs:
           node --check src/workspace/topology-edit/topology-edit-sjson-visual-authority.js
           node --check src/workspace/topology-edit/topology-edit-sjson-tee-projection.js
           node --check src/workspace/topology-edit/topology-edit-sjson-point-component-projection.js
+          node --check src/workspace/topology-edit/topology-edit-sjson-parent-branch-diameter.js
           node --check tests/topology-edit-sjson-render-authority.test.mjs
           node --check tests/topology-edit-sjson-fidelity.test.mjs
           node --check tests/topology-edit-split-lineage-certification.test.mjs
