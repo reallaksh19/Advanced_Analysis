@@ -42,6 +42,9 @@ test('SJSON nodes and components select the right editor while clipping follows 
   await expect(canvas).toHaveCount(1, { timeout: 60_000 });
   await expect.poll(() => canvasMount.getAttribute('data-topology-edit-visible-node-marker-count'))
     .not.toBeNull();
+  await expect.poll(async () => Number(
+    await canvasMount.getAttribute('data-topology-edit-route-display-envelope-count'),
+  )).toBeGreaterThan(0);
 
   const nodePoint = await visiblePickPoint(page, 'node');
   await page.mouse.click(nodePoint.x, nodePoint.y);
@@ -112,22 +115,55 @@ test('SJSON nodes and components select the right editor while clipping follows 
 
 async function visiblePickPoint(page, kind) {
   return page.evaluate(({ key, objectKind }) => {
-    const backend = globalThis[key]?.viewportBackend;
+    const controller = globalThis[key];
+    const backend = controller?.viewportBackend;
     const canvas = backend?.renderer?.domElement;
-    if (!backend || !canvas) throw new Error('SJSON viewport backend is unavailable.');
+    const camera = backend?.activeCamera;
+    const draftGroup = backend?.groups?.draftGroup;
+    const THREE = backend?.scene?.constructor ? globalThis.__THREE_FOR_PICK_TEST__ : null;
+    if (!backend || !canvas || !camera || !draftGroup) {
+      throw new Error('SJSON viewport backend is unavailable.');
+    }
     const rect = canvas.getBoundingClientRect();
-    for (let y = rect.top + 2; y < rect.bottom - 1; y += 3) {
-      for (let x = rect.left + 2; x < rect.right - 1; x += 3) {
-        const context = backend.pickContext(x, y);
-        const pick = context ? backend.pickWithRaycaster(context.pointer) : null;
-        if (!pick?.objectId) continue;
-        const matchesNode = objectKind === 'node' && String(pick.objectId).startsWith('node:');
+    const candidates = [];
+    draftGroup.updateMatrixWorld(true);
+    camera.updateMatrixWorld(true);
+    draftGroup.traverse((object) => {
+      const target = object.userData?.pickTarget;
+      if (!target?.objectId || !object.visible) return;
+      const matches = objectKind === 'node'
+        ? target.objectKind === 'node'
+        : target.objectKind === 'component' && object.userData?.directPickMesh === true;
+      if (!matches) return;
+      object.geometry?.computeBoundingSphere?.();
+      const center = object.geometry?.boundingSphere?.center?.clone?.()
+        ?? object.position.clone();
+      center.applyMatrix4(object.matrixWorld).project(camera);
+      if (![center.x, center.y, center.z].every(Number.isFinite)) return;
+      if (center.z < -1 || center.z > 1) return;
+      const x = rect.left + ((center.x + 1) * 0.5 * rect.width);
+      const y = rect.top + ((1 - center.y) * 0.5 * rect.height);
+      if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return;
+      candidates.push({ x, y, objectId: target.objectId });
+    });
+    const offsets = [
+      [0, 0], [-4, 0], [4, 0], [0, -4], [0, 4],
+      [-8, 0], [8, 0], [0, -8], [0, 8],
+    ];
+    for (const candidate of candidates) {
+      for (const [dx, dy] of offsets) {
+        const x = candidate.x + dx;
+        const y = candidate.y + dy;
+        const pick = backend.pickAt(x, y);
+        const matchesNode = objectKind === 'node' && String(pick?.objectId || '').startsWith('node:');
         const matchesComponent = objectKind === 'component'
-          && String(pick.objectId).startsWith('edge:');
+          && String(pick?.objectId || '').startsWith('edge:');
         if (matchesNode || matchesComponent) return { x, y, objectId: pick.objectId };
       }
     }
-    throw new Error(`No visible ${objectKind} pick point was found.`);
+    throw new Error(
+      `No visible ${objectKind} production pick point was found from ${candidates.length} projected candidates.`,
+    );
   }, { key: CONTROLLER_KEY, objectKind: kind });
 }
 
