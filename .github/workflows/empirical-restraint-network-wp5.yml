@@ -72,7 +72,7 @@ jobs:
           node --check scripts/empirical-restraint-network-check.mjs
           node --check scripts/wp5-runtime-analysis-direction-patch.mjs
 
-      - name: Restricted global restraint-network qualification
+      - name: Attachment-bound global restraint-network qualification
         run: node scripts/empirical-restraint-network-check.mjs
 
       - name: Adapter and scenario regression
