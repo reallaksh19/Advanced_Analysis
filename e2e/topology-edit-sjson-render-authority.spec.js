@@ -12,6 +12,8 @@ const EXECUTING_CANDIDATE_SHA = process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA
 const BENCHMARK_VIEWPORT = Object.freeze({ width: 1637, height: 869 });
 const BENCHMARK_CAMERA_AUTHORITY =
   'TOPO_VALIDATOR_FIT_BOX_SIZE_0_9_PLUS_200_DIRECTION_1_1_0_8';
+const BENCHMARK_CAMERA_FIT_ALGORITHM =
+  'TOPO_VALIDATOR_ASPECT_SAFE_PERSPECTIVE_FIT_DIRECTION_1_1_0_8_V1';
 const BENCHMARK_ENGINEERING_DIRECTION = Object.freeze({
   x: 0.6154574548966636,
   y: 0.6154574548966636,
@@ -23,6 +25,10 @@ const SUPPORT_GROUPING_AUTHORITY =
   'MDSSREF_MDSGUIDEREF_PREV_NAME_THEN_POSITION_0_001MM';
 const SUPPORT_RESTRAINT_RESOLUTION_AUTHORITY =
   'TOPO_VALIDATOR_SJ_RESTRAINT_RESOLVER';
+const SUPPORT_RENDER_STYLE = 'TOPO_VALIDATOR_COMPACT';
+const SUPPORT_RENDER_AUTHORITY = 'TOPO_VALIDATOR_SUPPORT_MARKER_AND_DIRECTION_GEOMETRY';
+const COMPACT_SUPPORT_MARKER_RADIUS_MM = 12.6;
+const APPROVED_NDC_LIMIT = 0.81;
 
 test.beforeEach(async ({ page }) => {
   test.setTimeout(120_000);
@@ -131,6 +137,16 @@ test('production Sjson opens 3D Edit with complete typed fittings and Topo valid
   await expect.poll(() => canvasHost.getAttribute('data-topology-edit-support-restraint-authority-hash'), {
     timeout: 60_000,
   }).not.toBe('');
+  await expect.poll(() => canvasHost.getAttribute('data-topology-edit-support-render-style'), {
+    timeout: 60_000,
+  }).toBe(SUPPORT_RENDER_STYLE);
+  await expect.poll(() => canvasHost.getAttribute('data-topology-edit-support-render-authority'), {
+    timeout: 60_000,
+  }).toBe(SUPPORT_RENDER_AUTHORITY);
+  await expect.poll(() => numberAttribute(
+    canvasHost,
+    'data-topology-edit-compact-support-marker-radius-mm',
+  ), { timeout: 60_000 }).toBeCloseTo(COMPACT_SUPPORT_MARKER_RADIUS_MM, 6);
 
   await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-visual-proxy-warning-count'), {
     timeout: 60_000,
@@ -147,6 +163,13 @@ test('production Sjson opens 3D Edit with complete typed fittings and Topo valid
   await expect.poll(() => canvasHost.getAttribute('data-topology-edit-benchmark-camera-authority'), {
     timeout: 60_000,
   }).toBe(BENCHMARK_CAMERA_AUTHORITY);
+  await expect.poll(() => canvasHost.getAttribute('data-topology-edit-benchmark-camera-fit-algorithm'), {
+    timeout: 60_000,
+  }).toBe(BENCHMARK_CAMERA_FIT_ALGORITHM);
+  await expect.poll(() => jsonAttribute(
+    canvasHost,
+    'data-topology-edit-benchmark-screen-bounds',
+  )?.fitsViewport === true, { timeout: 60_000 }).toBe(true);
   await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-geometry-diagnostic-count'), {
     timeout: 60_000,
   }).toBe(0);
@@ -168,7 +191,7 @@ test('production Sjson opens 3D Edit with complete typed fittings and Topo valid
     const canvasElement = element.querySelector('canvas');
     const canvasRect = canvasElement?.getBoundingClientRect();
     return {
-      schema: 'topology-edit-sjson-webgl-ledger/v2',
+      schema: 'topology-edit-sjson-webgl-ledger/v3',
       baseCandidateSha: args.baseCandidateSha,
       executingCandidateSha: args.executingCandidateSha,
       browserBuildSha: globalThis.__BUILD_SHA__ || null,
@@ -188,11 +211,13 @@ test('production Sjson opens 3D Edit with complete typed fittings and Topo valid
       } : null,
       camera: {
         authority: element.dataset.topologyEditBenchmarkCameraAuthority || '',
+        fitAlgorithm: element.dataset.topologyEditBenchmarkCameraFitAlgorithm || '',
         engineeringDirection: parseJson(
           element.dataset.topologyEditBenchmarkCameraEngineeringDirection,
         ),
         renderDirection: parseJson(element.dataset.topologyEditBenchmarkCameraRenderDirection),
         bounds: parseJson(element.dataset.topologyEditBenchmarkBounds),
+        screenBoundsNdc: parseJson(element.dataset.topologyEditBenchmarkScreenBounds),
       },
       sourceHash: element.closest('[data-role="topology-edit-render-host"]')?.dataset.topologyEditDatasetSourceHash || '',
       canonicalHash: element.closest('[data-role="topology-edit-render-host"]')?.dataset.topologyEditDatasetCanonicalHash || '',
@@ -223,6 +248,10 @@ test('production Sjson opens 3D Edit with complete typed fittings and Topo valid
         restraintResolutionAuthority:
           element.dataset.topologyEditSupportRestraintResolutionAuthority || '',
         authorityHash: element.dataset.topologyEditSupportRestraintAuthorityHash || '',
+        renderStyle: element.dataset.topologyEditSupportRenderStyle || '',
+        renderAuthority: element.dataset.topologyEditSupportRenderAuthority || '',
+        compactMarkerRadiusMm:
+          Number(element.dataset.topologyEditCompactSupportMarkerRadiusMm || 0),
       },
       supportCounts: {
         legacyOverlay: Number(element.dataset.topologyEditSupportOverlayCount || 0),
@@ -254,11 +283,21 @@ test('production Sjson opens 3D Edit with complete typed fittings and Topo valid
   expect(ledger.visualModelHash).not.toBe('');
   expect(ledger.supportProjectionHash).not.toBe('');
   expect(ledger.camera.authority).toBe(BENCHMARK_CAMERA_AUTHORITY);
+  expect(ledger.camera.fitAlgorithm).toBe(BENCHMARK_CAMERA_FIT_ALGORITHM);
   for (const axis of ['x', 'y', 'z']) {
     expect(ledger.camera.engineeringDirection?.[axis])
       .toBeCloseTo(BENCHMARK_ENGINEERING_DIRECTION[axis], 12);
   }
   expect(ledger.camera.bounds?.diagonalMm).toBeGreaterThan(0);
+  expect(ledger.camera.screenBoundsNdc?.fitsViewport).toBe(true);
+  expect(ledger.camera.screenBoundsNdc?.minimum?.x).toBeGreaterThanOrEqual(-APPROVED_NDC_LIMIT);
+  expect(ledger.camera.screenBoundsNdc?.maximum?.x).toBeLessThanOrEqual(APPROVED_NDC_LIMIT);
+  expect(ledger.camera.screenBoundsNdc?.minimum?.y).toBeGreaterThanOrEqual(-APPROVED_NDC_LIMIT);
+  expect(ledger.camera.screenBoundsNdc?.maximum?.y).toBeLessThanOrEqual(APPROVED_NDC_LIMIT);
+  expect(ledger.camera.screenBoundsNdc?.minimum?.z).toBeGreaterThanOrEqual(-1.001);
+  expect(ledger.camera.screenBoundsNdc?.maximum?.z).toBeLessThanOrEqual(1.001);
+  expect(ledger.camera.screenBoundsNdc?.span?.x).toBeGreaterThan(0.35);
+  expect(ledger.camera.screenBoundsNdc?.span?.y).toBeGreaterThan(0.5);
   expect(ledger.canvas?.width).toBeGreaterThan(500);
   expect(ledger.canvas?.height).toBeGreaterThan(450);
   expect(ledger.diameterAuthorityCounts.parentBranch).toBeGreaterThanOrEqual(100);
@@ -269,6 +308,9 @@ test('production Sjson opens 3D Edit with complete typed fittings and Topo valid
     groupingAuthority: SUPPORT_GROUPING_AUTHORITY,
     restraintResolutionAuthority: SUPPORT_RESTRAINT_RESOLUTION_AUTHORITY,
     authorityHash: ledger.supportAuthority.authorityHash,
+    renderStyle: SUPPORT_RENDER_STYLE,
+    renderAuthority: SUPPORT_RENDER_AUTHORITY,
+    compactMarkerRadiusMm: COMPACT_SUPPORT_MARKER_RADIUS_MM,
   });
   expect(ledger.supportAuthority.authorityHash).not.toBe('');
   expect(ledger.supportCounts).toMatchObject({
@@ -300,6 +342,16 @@ test('production Sjson opens 3D Edit with complete typed fittings and Topo valid
 async function integerAttribute(locator, name) {
   const value = await locator.getAttribute(name);
   return Number.parseInt(value || '0', 10) || 0;
+}
+
+async function numberAttribute(locator, name) {
+  const value = Number(await locator.getAttribute(name));
+  return Number.isFinite(value) ? value : 0;
+}
+
+async function jsonAttribute(locator, name) {
+  const value = await locator.getAttribute(name);
+  try { return JSON.parse(value || 'null'); } catch { return null; }
 }
 
 function sha256(bytes) {
