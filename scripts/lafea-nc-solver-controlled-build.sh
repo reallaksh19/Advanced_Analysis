@@ -64,7 +64,7 @@ printf '%s\n' '$CANONICAL_DATE'
 DATE
   chmod +x "$build_root/fixed-bin/date"
 
-  local cflags="-Wall -O2 -g0 -fno-record-gcc-switches -ffile-prefix-map=$build_root=/usr/src/lafea-build -I ../../SPOOLES.2.2 -DARCH=\\\"Linux\\\" -DSPOOLES -DARPACK -DMATRIXSTORAGE -DNETWORKOUT"
+  local cflags="-Wall -O2 -g0 -fno-record-gcc-switches -ffile-prefix-map=$build_root=/usr/src/lafea-build -I ../../SPOOLES.2.2 -DARCH=Linux -DSPOOLES -DARPACK -DMATRIXSTORAGE -DNETWORKOUT"
   local fflags="-Wall -O2 -g0 -fallow-argument-mismatch -ffile-prefix-map=$build_root=/usr/src/lafea-build"
   local libs="../../SPOOLES.2.2/spooles.a $arpack_lib -llapack -lblas -lpthread -lm -lc"
 
