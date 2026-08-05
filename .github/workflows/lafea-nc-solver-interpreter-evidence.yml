@@ -117,6 +117,17 @@ jobs:
           node -e "const fs=require('node:fs');const report=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));if(report.status!=='SOLVER_CUSTODY_BLOCKED'||report.verifiedEvidenceCount!==7||JSON.stringify(report.missingEvidence)!==JSON.stringify(['CONTAINER_RECORD']))process.exit(1);" "$report"
           echo "build_root=$build_root" >> "$GITHUB_OUTPUT"
 
+      - name: Make chroot discoverable under a scrubbed environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          chroot_path="$(command -v chroot)"
+          test -x "$chroot_path"
+          if [[ "$chroot_path" != '/usr/bin/chroot' ]]; then
+            sudo ln -sf "$chroot_path" /usr/bin/chroot
+          fi
+          env -i chroot --version >/dev/null
+
       - name: Acquire and independently replay interpreter custody
         id: acquire
         shell: bash
@@ -127,6 +138,7 @@ jobs:
           rm -rf artifacts/lafea-nc-solver-interpreter artifacts/lafea-nc-solver-interpreter-debug
           mkdir -p artifacts/lafea-nc-solver-interpreter-debug
           {
+            set -e
             node scripts/lafea-nc-solver-interpreter-evidence.mjs \
               --build-root="$BUILD_ROOT" \
               --output-dir="$RUNNER_TEMP/lafea-interpreter-a"
