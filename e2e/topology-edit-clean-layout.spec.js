@@ -154,6 +154,7 @@ test('3D Edit provides resizable persistent inspector, selection focus, status b
   await expect(host.locator('[data-role="topology-edit-status"]')).toContainText('Draft restored at session version');
   await expect(host).toHaveAttribute('data-topology-edit-inspector-width-px', '336');
   await expect(displayPanel).toHaveAttribute('open', '');
+  await expect(draftPanel).toHaveAttribute('open', '');
 
   await host.focus();
   await page.keyboard.press('Escape');
