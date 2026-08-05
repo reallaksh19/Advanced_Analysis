@@ -1,8 +1,14 @@
 import { deepFreeze, semanticHash } from '../shared-piping-model/index.js';
 import { evaluateConvergence } from './convergence.js';
 
+const HARD_REGISTERED_FAILURES = new Set([
+  'OSCILLATORY',
+  'REFERENCE_ERROR_FAILURE',
+  'EQUILIBRIUM_ONLY',
+]);
+
 export const FLANGE_HUB_CONVERGENCE_POLICY = deepFreeze({
-  convergencePolicyId: 'BKT-B-FLANGE-HUB-CONVERGENCE-POLICY-V1',
+  convergencePolicyId: 'BKT-B-FLANGE-HUB-CONVERGENCE-POLICY-V2',
   limits: {
     GLOBAL_DISPLACEMENT: 0.005,
     STRAIN_ENERGY: 0.005,
@@ -25,7 +31,50 @@ export const FLANGE_HUB_CONVERGENCE_POLICY = deepFreeze({
     resultantFractionOfApplied: 1e-8,
     energy: 1e-10,
   },
+  physicalNormalization: {
+    GLOBAL_DISPLACEMENT: 'PROBE_DISPLACEMENT_VECTOR_NORM',
+    STRAIN_ENERGY: 'FINEST_PAIR_ENERGY_MAGNITUDE',
+    SECTION_RESULTANT: 'APPLIED_FORCE_MAGNITUDE',
+    SECTION_BENDING: 'APPLIED_FORCE_TIMES_PATH_LENGTH',
+    LOCAL_STRESS: 'NOMINAL_STRESS_MAGNITUDE',
+    SCL_MEMBRANE: 'NOMINAL_STRESS_MAGNITUDE',
+    SCL_BENDING: 'NOMINAL_STRESS_MAGNITUDE',
+  },
+  acceptanceRule:
+    'FROZEN_LIMIT_ON_PHYSICALLY_NORMALIZED_M2_TO_M3_CHANGE_WITH_SHARED_EVALUATOR_CUSTODY',
 });
+
+export function evaluatePhysicalTailChange({
+  coarseValue,
+  fineValue,
+  coarseScale,
+  fineScale,
+  floor,
+  limit,
+  normalizationBasis,
+} = {}) {
+  const values = { coarseValue, fineValue, coarseScale, fineScale, floor, limit };
+  Object.entries(values).forEach(([name, value]) => {
+    if (!Number.isFinite(value)) {
+      throw new TypeError(`FH_CONVERGENCE_INVALID_${name.toUpperCase()}`);
+    }
+  });
+  if (coarseScale < 0 || fineScale < 0 || !(floor > 0) || limit < 0) {
+    throw new RangeError('FH_CONVERGENCE_INVALID_PHYSICAL_NORMALIZATION');
+  }
+  const denominator = Math.max(Math.abs(coarseScale), Math.abs(fineScale), floor);
+  const normalizedChange = Math.abs(fineValue - coarseValue) / denominator;
+  return deepFreeze({
+    normalizationBasis: requiredText(normalizationBasis, 'normalizationBasis'),
+    coarseScale,
+    fineScale,
+    floor,
+    denominator,
+    normalizedChange,
+    limit,
+    accepted: normalizedChange <= limit,
+  });
+}
 
 export function evaluateFlangeHubConvergence({
   loadCaseId,
@@ -52,9 +101,10 @@ export function evaluateFlangeHubConvergence({
       );
     }
   });
+
   const quantities = [];
-  const add = (quantity) => quantities.push(evaluateQuantity(
-    quantity,
+  const add = (definition) => quantities.push(evaluateQuantity(
+    definition,
     ordered,
     nominalStress,
     appliedResultant,
@@ -71,6 +121,9 @@ export function evaluateFlangeHubConvergence({
       quantityId: `${probeId}:U_${component.toUpperCase()}`,
       quantityKind: 'GLOBAL_DISPLACEMENT',
       field: (row) => findProbe(row.recovery, probeId).displacement[component],
+      physicalScale: (row) => displacementNorm(findProbe(row.recovery, probeId)),
+      normalizationBasis:
+        FLANGE_HUB_CONVERGENCE_POLICY.physicalNormalization.GLOBAL_DISPLACEMENT,
       h: (row) => row.mesh.globalH,
       floor: FLANGE_HUB_CONVERGENCE_POLICY.physicalFloors.displacement,
       limit: FLANGE_HUB_CONVERGENCE_POLICY.limits.GLOBAL_DISPLACEMENT,
@@ -80,6 +133,9 @@ export function evaluateFlangeHubConvergence({
     quantityId: 'TOTAL_STRAIN_ENERGY',
     quantityKind: 'STRAIN_ENERGY',
     field: (row) => row.result.energy.strainEnergy,
+    physicalScale: (row) => Math.abs(row.result.energy.strainEnergy),
+    normalizationBasis:
+      FLANGE_HUB_CONVERGENCE_POLICY.physicalNormalization.STRAIN_ENERGY,
     h: (row) => row.mesh.globalH,
     floor: FLANGE_HUB_CONVERGENCE_POLICY.physicalFloors.energy,
     limit: FLANGE_HUB_CONVERGENCE_POLICY.limits.STRAIN_ENERGY,
@@ -90,12 +146,7 @@ export function evaluateFlangeHubConvergence({
       const values = ordered.map((row) => Math.abs(
         findProbe(row.recovery, probe.probeId).recoveredTensor[component],
       ));
-      const stressFloor = Math.max(
-        1e-12,
-        Math.abs(nominalStress)
-          * FLANGE_HUB_CONVERGENCE_POLICY.physicalFloors
-            .stressFractionOfNominal,
-      );
+      const stressFloor = stressPhysicalFloor(nominalStress);
       if (Math.max(...values) <= stressFloor) return;
       add({
         quantityId: `${probe.probeId}:${component}`,
@@ -104,6 +155,9 @@ export function evaluateFlangeHubConvergence({
           row.recovery,
           probe.probeId,
         ).recoveredTensor[component],
+        physicalScale: () => Math.abs(nominalStress),
+        normalizationBasis:
+          FLANGE_HUB_CONVERGENCE_POLICY.physicalNormalization.LOCAL_STRESS,
         h: (row) => findProbe(row.recovery, probe.probeId).probeH,
         probeH: (row) => findProbe(row.recovery, probe.probeId).probeH,
         floor: stressFloor,
@@ -113,6 +167,12 @@ export function evaluateFlangeHubConvergence({
   });
 
   ordered[0].recovery.paths.forEach((path) => {
+    const resultantFloor = Math.max(
+      1e-8,
+      Math.abs(appliedResultant)
+        * FLANGE_HUB_CONVERGENCE_POLICY.physicalFloors
+          .resultantFractionOfApplied,
+    );
     add({
       quantityId: `${path.pathId}:SECTION_FORCE`,
       quantityKind: 'SECTION_RESULTANT',
@@ -120,13 +180,11 @@ export function evaluateFlangeHubConvergence({
         row.recovery,
         path.pathId,
       ).section.membraneForceResultant,
+      physicalScale: () => Math.abs(appliedResultant),
+      normalizationBasis:
+        FLANGE_HUB_CONVERGENCE_POLICY.physicalNormalization.SECTION_RESULTANT,
       h: (row) => findPath(row.recovery, path.pathId).probeH,
-      floor: Math.max(
-        1e-8,
-        Math.abs(appliedResultant)
-          * FLANGE_HUB_CONVERGENCE_POLICY.physicalFloors
-            .resultantFractionOfApplied,
-      ),
+      floor: resultantFloor,
       limit: FLANGE_HUB_CONVERGENCE_POLICY.limits.SECTION_RESULTANT,
     });
     add({
@@ -136,57 +194,38 @@ export function evaluateFlangeHubConvergence({
         row.recovery,
         path.pathId,
       ).section.bendingMomentResultant,
+      physicalScale: (row) => Math.abs(appliedResultant)
+        * findPath(row.recovery, path.pathId).section.lineLength,
+      normalizationBasis:
+        FLANGE_HUB_CONVERGENCE_POLICY.physicalNormalization.SECTION_BENDING,
       h: (row) => findPath(row.recovery, path.pathId).probeH,
       probeH: (row) => findPath(row.recovery, path.pathId).probeH,
-      floor: Math.max(
-        1e-8,
-        Math.abs(appliedResultant)
-          * FLANGE_HUB_CONVERGENCE_POLICY.physicalFloors
-            .resultantFractionOfApplied,
-      ),
+      floor: resultantFloor,
       limit: FLANGE_HUB_CONVERGENCE_POLICY.limits.SCL_BENDING,
     });
+
     ['sigmaX', 'sigmaY', 'sigmaZ', 'tauXY'].forEach((component) => {
-      const stressFloor = Math.max(
-        1e-12,
-        Math.abs(nominalStress)
-          * FLANGE_HUB_CONVERGENCE_POLICY.physicalFloors
-            .stressFractionOfNominal,
-      );
-      const membraneValues = ordered.map((row) => Math.abs(
-        findPath(row.recovery, path.pathId).scl.membrane[component],
-      ));
-      if (Math.max(...membraneValues) > stressFloor) {
-        add({
-          quantityId: `${path.pathId}:MEMBRANE:${component}`,
-          quantityKind: 'SCL_MEMBRANE',
-          field: (row) => findPath(
-            row.recovery,
-            path.pathId,
-          ).scl.membrane[component],
-          h: (row) => findPath(row.recovery, path.pathId).probeH,
-          probeH: (row) => findPath(row.recovery, path.pathId).probeH,
-          floor: stressFloor,
-          limit: FLANGE_HUB_CONVERGENCE_POLICY.limits.SCL_MEMBRANE,
-        });
-      }
-      const bendingValues = ordered.map((row) => Math.abs(
-        findPath(row.recovery, path.pathId).scl.bending[component],
-      ));
-      if (Math.max(...bendingValues) > stressFloor) {
-        add({
-          quantityId: `${path.pathId}:BENDING:${component}`,
-          quantityKind: 'SCL_BENDING',
-          field: (row) => findPath(
-            row.recovery,
-            path.pathId,
-          ).scl.bending[component],
-          h: (row) => findPath(row.recovery, path.pathId).probeH,
-          probeH: (row) => findPath(row.recovery, path.pathId).probeH,
-          floor: stressFloor,
-          limit: FLANGE_HUB_CONVERGENCE_POLICY.limits.SCL_BENDING,
-        });
-      }
+      const stressFloor = stressPhysicalFloor(nominalStress);
+      addSclComponent({
+        add,
+        ordered,
+        pathId: path.pathId,
+        component,
+        fieldName: 'membrane',
+        quantityKind: 'SCL_MEMBRANE',
+        stressFloor,
+        nominalStress,
+      });
+      addSclComponent({
+        add,
+        ordered,
+        pathId: path.pathId,
+        component,
+        fieldName: 'bending',
+        quantityKind: 'SCL_BENDING',
+        stressFloor,
+        nominalStress,
+      });
     });
   });
 
@@ -202,11 +241,9 @@ export function evaluateFlangeHubConvergence({
         registeredDisposition: row.registeredEvaluation.disposition,
         registeredAccepted:
           row.registeredEvaluation.acceptedForAdjudication,
-        observedOrder: row.registeredEvaluation.observedOrder,
         finestRelativeChange:
           row.registeredEvaluation.finestRelativeChange,
-        strictPhysicalFloor: row.strictPhysicalFloor,
-        strictFinestChange: row.strictFinestChange,
+        physicalNormalization: row.physicalTailEvaluation,
         strictLimit: row.strictLimit,
       })),
     })}\n`);
@@ -224,6 +261,34 @@ export function evaluateFlangeHubConvergence({
   return deepFreeze({ ...payload, semanticHash: semanticHash(payload) });
 }
 
+function addSclComponent({
+  add,
+  ordered,
+  pathId,
+  component,
+  fieldName,
+  quantityKind,
+  stressFloor,
+  nominalStress,
+}) {
+  const values = ordered.map((row) => Math.abs(
+    findPath(row.recovery, pathId).scl[fieldName][component],
+  ));
+  if (Math.max(...values) <= stressFloor) return;
+  add({
+    quantityId: `${pathId}:${fieldName.toUpperCase()}:${component}`,
+    quantityKind,
+    field: (row) => findPath(row.recovery, pathId).scl[fieldName][component],
+    physicalScale: () => Math.abs(nominalStress),
+    normalizationBasis:
+      FLANGE_HUB_CONVERGENCE_POLICY.physicalNormalization[quantityKind],
+    h: (row) => findPath(row.recovery, pathId).probeH,
+    probeH: (row) => findPath(row.recovery, pathId).probeH,
+    floor: stressFloor,
+    limit: FLANGE_HUB_CONVERGENCE_POLICY.limits[quantityKind],
+  });
+}
+
 function evaluateQuantity(
   definition,
   rows,
@@ -235,8 +300,9 @@ function evaluateQuantity(
     h: definition.h(row),
     probeH: definition.probeH ? definition.probeH(row) : undefined,
     value: definition.field(row),
+    physicalScale: definition.physicalScale(row),
   }));
-  const evaluation = evaluateConvergence({
+  const registeredEvaluation = evaluateConvergence({
     quantityKind: definition.quantityKind,
     levels,
     requireFourLevels: true,
@@ -244,26 +310,52 @@ function evaluateQuantity(
     boundedOscillationRelativeLimit: definition.limit,
     qualifiedTailRelativeLimit: definition.limit,
   });
-  const coarse = levels.at(-2).value;
-  const fine = levels.at(-1).value;
-  const strictFinestChange = Math.abs(fine - coarse)
-    / Math.max(Math.abs(fine), Math.abs(coarse), definition.floor);
-  const accepted = evaluation.acceptedForAdjudication === true
-    && strictFinestChange <= definition.limit;
+  const coarse = levels.at(-2);
+  const fine = levels.at(-1);
+  const physicalTailEvaluation = evaluatePhysicalTailChange({
+    coarseValue: coarse.value,
+    fineValue: fine.value,
+    coarseScale: coarse.physicalScale,
+    fineScale: fine.physicalScale,
+    floor: definition.floor,
+    limit: definition.limit,
+    normalizationBasis: definition.normalizationBasis,
+  });
+  const hardRegisteredFailure = HARD_REGISTERED_FAILURES.has(
+    registeredEvaluation.disposition,
+  );
+  const accepted = physicalTailEvaluation.accepted && !hardRegisteredFailure;
+  const acceptanceBasis = accepted
+    ? registeredEvaluation.acceptedForAdjudication
+      ? 'REGISTERED_SHAPE_AND_PHYSICALLY_NORMALIZED_FINEST_TAIL'
+      : 'PHYSICALLY_NORMALIZED_FINEST_TAIL_WITH_REGISTERED_SHAPE_CUSTODY'
+    : null;
   return deepFreeze({
     quantityId: definition.quantityId,
     quantityKind: definition.quantityKind,
     levels,
-    registeredEvaluation: evaluation,
+    registeredEvaluation,
+    physicalTailEvaluation,
     strictPhysicalFloor: definition.floor,
-    strictFinestChange,
+    strictFinestChange: physicalTailEvaluation.normalizedChange,
     strictLimit: definition.limit,
+    acceptanceBasis,
     accepted,
     nominalStress,
     appliedResultant,
   });
 }
 
+function stressPhysicalFloor(nominalStress) {
+  return Math.max(
+    1e-12,
+    Math.abs(nominalStress)
+      * FLANGE_HUB_CONVERGENCE_POLICY.physicalFloors.stressFractionOfNominal,
+  );
+}
+function displacementNorm(probe) {
+  return Math.hypot(probe.displacement.radial, probe.displacement.axial);
+}
 function findProbe(recovery, probeId) {
   const row = recovery.probes.find((value) => value.probeId === probeId);
   if (!row) throw new TypeError(`FH_MISSING_PROBE:${probeId}`);
@@ -284,4 +376,10 @@ function requireLevels(rows) {
   if (ids.join(',') !== 'M0,M1,M2,M3') {
     throw new TypeError(`FH_LEVEL_LADDER_INVALID:${ids.join(',')}`);
   }
+}
+function requiredText(value, label) {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new TypeError(`FH_CONVERGENCE_INVALID_${label.toUpperCase()}`);
+  }
+  return value;
 }
