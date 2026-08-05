@@ -27,6 +27,12 @@ import {
 import {
   TOPOLOGY_EDIT_SUPPORT_RENDER_STYLES,
 } from './topology-edit/topology-edit-support-viewport-backend.js';
+import {
+  adaptSjsonVisualToEditDraftProjection,
+} from './topology-edit/topology-edit-sjson-edit-draft-projection.js';
+import {
+  TopologyEditSjsonEditDraftViewportBackend,
+} from './topology-edit/topology-edit-sjson-edit-draft-viewport-backend.js';
 
 const BENCHMARK_SOURCE_HASH = 'fnv1a64:0fa77fc2c202d8ae';
 const TOPO_VALIDATOR_ENGINEERING_CAMERA_DIRECTION = Object.freeze({ x: 1, y: 1, z: 0.8 });
@@ -41,6 +47,10 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     this.sjsonBenchmarkView = null;
   }
 
+  createViewportBackend() {
+    return new TopologyEditSjsonEditDraftViewportBackend();
+  }
+
   buildWorkspaceCanonical(dataset, graph) {
     const canonical = super.buildWorkspaceCanonical(dataset, graph);
     return enrichCanonicalSupportsWithExactOrigins(
@@ -51,10 +61,14 @@ export class TopologyEdit3DViewController extends ProfessionalController {
   }
 
   deriveVisual(canonical, modelRole) {
-    const result = deriveSjsonCompleteVisualGeometry({
+    const complete = deriveSjsonCompleteVisualGeometry({
       canonicalTopology: canonical,
       dataset: this.workspaceDataset,
       modelRole,
+    });
+    const result = adaptSjsonVisualToEditDraftProjection({
+      visualResult: complete,
+      dataset: this.workspaceDataset,
     });
     this.sjsonVisualByRole.set(String(modelRole || 'DRAFT').toUpperCase(), result);
     return result;
@@ -104,7 +118,7 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     this.sjsonBenchmarkView = canonical.sourceHash === BENCHMARK_SOURCE_HASH
       ? applyTopoValidatorBenchmarkFit(backend)
       : null;
-    backend.invalidate?.('sjson-topo-validator-restraint-projection');
+    backend.invalidate?.('sjson-topo-validator-edit-draft-restraint-projection');
 
     this.visualDiagnostics = [
       ...(draftVisual?.model?.diagnostics || []),
@@ -113,6 +127,7 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     ];
     this.visualModelHash = semanticHash({
       draftVisualGeometryHash: draftVisual?.model?.visualGeometryHash || '',
+      editDraftMetrics: draftVisual?.editDraftMetrics || null,
       supportProjection,
       supportRestraintAuthorityHash: supportAuthority.authorityHash,
       supportRestraintMetrics: supportAuthority.metrics,
@@ -126,15 +141,17 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     this.publishSjsonFidelityEvidence(
       canonical,
       supportProjection,
-      draftVisual?.model,
+      draftVisual,
       supportTopology,
       supportAuthority,
     );
   }
 
-  publishSjsonFidelityEvidence(canonical, supportProjection, visualModel, supportTopology, supportAuthority) {
+  publishSjsonFidelityEvidence(canonical, supportProjection, visualResult, supportTopology, supportAuthority) {
     const host = this.canvasMount;
     if (!host) return;
+    const visualModel = visualResult?.model;
+    const editDraftMetrics = visualResult?.editDraftMetrics;
     const counts = visualPrimitiveKindCounts(visualModel);
     const reducerCount = (counts.CONICAL_REDUCER || 0) + (counts.ECCENTRIC_REDUCER || 0);
     const diagnostics = visualModel?.diagnostics || [];
@@ -179,6 +196,23 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     host.dataset.topologyEditSupportRenderAuthority = supportProjection?.renderAuthority || '';
     host.dataset.topologyEditCompactSupportMarkerRadiusMm = String(
       supportProjection?.compactMarkerRadiusMm || 0,
+    );
+    host.dataset.topologyEditEditDraftRenderAuthority = editDraftMetrics?.authority || '';
+    host.dataset.topologyEditEditDraftElbowAuthority = editDraftMetrics?.elbowCurveAuthority || '';
+    host.dataset.topologyEditEditDraftCompactSegmentCount = String(
+      editDraftMetrics?.compactSegmentCount || 0,
+    );
+    host.dataset.topologyEditEditDraftSourceTangentElbowCount = String(
+      editDraftMetrics?.sourceTangentElbowCount || 0,
+    );
+    host.dataset.topologyEditEditDraftMaxStartTangentError = String(
+      editDraftMetrics?.maxStartTangentError ?? '',
+    );
+    host.dataset.topologyEditEditDraftMaxEndTangentError = String(
+      editDraftMetrics?.maxEndTangentError ?? '',
+    );
+    host.dataset.topologyEditEditDraftFirstElbow = JSON.stringify(
+      editDraftMetrics?.firstElbow || null,
     );
     host.dataset.topologyEditVisualProxyWarningCount = String(
       diagnostics.filter((row) => row.code === 'VISUAL_NOMINAL_BORE_PROXY_USED').length,
