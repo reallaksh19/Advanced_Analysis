@@ -6,7 +6,7 @@ export const BM2_CII_OUTPUT_PATH = fileURLToPath(new URL('../benchmarks/LFEA/BM2
 const CASES = Object.freeze(['OPE', 'SUS', 'EXP']);
 
 export const BM2_COMPARISON_POLICY = Object.freeze({
-  relativeTolerancePercent: 10,
+  relativeTolerancePercent: 5,
   nearZeroReferenceThreshold: 1e-9,
   absoluteTolerance: Object.freeze({
     translation: 1e-5,

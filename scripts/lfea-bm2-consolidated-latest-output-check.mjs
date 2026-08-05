@@ -151,6 +151,7 @@ function strictMatchedSubset() {
     failed,
     coverage: comparison.coverage,
     status: failed === 0 && coverageComplete ? 'PASS' : 'INCOMPLETE_BLOCKED',
+    solverQualification: comparison.solverQualification,
     topFailures: Object.freeze(rows.filter((row) => !row.passed)
       .sort((left, right) => (right.relativeError ?? Number.POSITIVE_INFINITY) - (left.relativeError ?? Number.POSITIVE_INFINITY))
       .slice(0, 50)),
@@ -188,8 +189,8 @@ const report = Object.freeze({
   restraintSourceCorrection: Object.freeze({
     profileId: CAESAR_INPUTXML_RESTRAINT_TYPE_CORRECTION_PROFILE_ID,
     status: 'GOVERNED_SOURCE_CORRECTION',
-    mechanicalClassificationStatus: 'PARTIAL_LEGACY_BASELINE',
-    unilateralActiveSetStatus: 'NOT_QUALIFIED',
+    mechanicalClassificationStatus: 'M031_MATRIX_MECHANICS',
+    unilateralActiveSetStatus: strict.solverQualification.nonlinearRestraints.status,
   }),
   strictPolicy: Object.freeze({
     cases: Object.freeze([3, 4, 6]),
@@ -217,12 +218,17 @@ const report = Object.freeze({
     sourceCorrectionDisposition: 'SUPERSEDED_BY_GOVERNED_COMMON_PROFILE',
     reason: 'BLOCKED_OUTPUT_INFERRED_UNILATERAL_ACTIVE_STATE_WITHOUT_COMPLEMENTARITY_GAP_STIFFNESS_FRICTION_QUALIFICATION',
   }),
+  closedM031Scope: Object.freeze([
+    'BEND_ARC_AND_FLEXIBILITY_IN_ASSEMBLED_STIFFNESS',
+    'B31J_RUN_AND_BRANCH_DIRECTIONAL_STIFFNESS_SINGLE_OWNER',
+    'PLUS_Y_COMPLEMENTARITY_ACTIVE_SET',
+    'SCALED_CONDITION_AND_WEAKEST_NODE_DOF_DIAGNOSTIC',
+    'FULL_RETAINED_STATION_ROW_CUSTODY',
+  ]),
   nextPriority: Object.freeze([
-    'COMPLETE_BEND_ARC_AND_DIRECTIONAL_FLEXIBILITY_IN_SOLVE',
-    'APPLY_B31J_JUNCTION_STIFFNESS_WITH_SINGLE_OWNERSHIP',
-    'QUALIFY_CORRECTED_RESTRAINT_TYPE_MECHANICS_AND_UNILATERAL_ACTIVE_SET',
-    'DIAGNOSE_CONDITIONING_AND_NEAR_NULL_MODES_BY_NODE_DOF',
-    'CLOSE_FULL_STATION_ROW_CUSTODY_BEFORE_PARITY_CLAIM',
+    'CLASSIFY_CORRECTED_RESTRAINT_TYPE_15_WITH_SOURCE_AUTHORITY',
+    'RESOLVE_SOURCE_SIF_TYPE_5_B31J_APPLICABILITY',
+    'CLOSE_REMAINING_NUMERICAL_DELTAS_WITHOUT_CHANGING_THE_FIVE_PERCENT_POLICY',
   ]),
   qualificationStatus: strict.status,
 });

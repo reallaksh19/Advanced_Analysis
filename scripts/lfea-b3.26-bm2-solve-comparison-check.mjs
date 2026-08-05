@@ -16,7 +16,7 @@ import {
   buildBm2CiiComparisonConditioned,
 } from './lfea-b3.26-bm2-output-comparison-runtime.mjs';
 
-console.log('\n--- LFEA B-3.26 M027 BM2 benchmark custody + matched-subset comparison ---');
+console.log('\n--- LFEA B-3.26 M031 BM2 full retained-station comparison ---');
 
 assert.deepEqual(BM2_COMPARISON_FAMILIES, [
   'displacement',
@@ -151,53 +151,40 @@ for (const label of ['OPE', 'SUS', 'EXP']) {
 const comparison = buildBm2CiiComparisonConditioned();
 assert.equal(comparison.schema, 'lfea-bm2-cii-output-comparison/v4');
 assert.equal(comparison.comparisonMetric, BM2_MATCHED_SUBSET_METRIC);
-assert.equal(comparison.comparisonScope, 'MATCHED_SOURCE_SUBSET_ONLY');
-assert.equal(comparison.completeComparisonClaim, false);
+assert.equal(comparison.comparisonPolicy.relativeTolerancePercent, 5);
+assert.equal(comparison.comparisonScope, 'FULL_RETAINED_STATION_ROWS');
+assert.equal(comparison.completeComparisonClaim, true);
 assert.equal(comparison.toleranceAuthority, 'RESULT_FAMILY_AND_COMPONENT_V1');
-assert.equal(comparison.matchedSubsetStatus, 'GAP_DISCLOSED');
-assert.equal(comparison.qualificationStatus, 'INCOMPLETE_BLOCKED');
-assert.match(comparison.restraintAuthorityStatus, /PROJECT_MUTATIONS_NOT_BENCHMARK_AUTHORITY/u);
-assert.deepEqual(comparison.totals, {
-  comparisons: 2232,
-  passed: 771,
-  failed: 1461,
-  untraced: 0,
-});
+assert.equal(comparison.qualificationStatus, 'COMPLETE');
 assert.equal(comparison.coverage.schema, BM2_COVERAGE_SCHEMA);
 assert.equal(comparison.coverage.metricName, BM2_MATCHED_SUBSET_METRIC);
-assert.equal(comparison.coverage.matchedScalarDenominator, 2232);
+assert.equal(comparison.coverage.matchedScalarDenominator, 5598);
 assert.equal(comparison.coverage.sourceLevelScalarDenominator, 3240);
 assert.equal(comparison.coverage.fullStationScalarDenominator, 5598);
 assert.equal(comparison.coverage.declaredReportRows, 567);
 assert.equal(comparison.coverage.parsedReportRows, 567);
 assert.equal(comparison.coverage.duplicateRowOccurrences, 3);
-assert.equal(comparison.coverage.unresolvedClassificationRows, 318);
-assert.equal(comparison.coverage.unmatchedSolverRows, 84);
-assert.equal(comparison.coverage.coverageStatus, 'INCOMPLETE_BLOCKED');
+assert.equal(comparison.coverage.unresolvedClassificationRows, 0);
+assert.equal(comparison.coverage.unmatchedSolverRows, 0);
+assert.equal(comparison.coverage.coverageStatus, 'COMPLETE');
+assert.equal(comparison.totals.comparisons, 5598);
+assert.equal(comparison.totals.comparisons, comparison.totals.passed + comparison.totals.failed);
+assert.equal(comparison.totals.untraced, 0);
 for (const family of BM2_COMPARISON_FAMILIES) {
   assert.equal(typeof comparison.toleranceAudit[family], 'object');
 }
-assert.equal(comparison.totals.comparisons, comparison.totals.passed + comparison.totals.failed);
-assert.equal(
-  comparison.totals.untraced,
-  0,
-  'Every out-of-tolerance matched-subset result must name at least one cause code.',
-);
 for (const label of ['OPE', 'SUS', 'EXP']) {
   const section = comparison.cases[label];
-  assert.equal(section.displacement.coverage.matchedScalarDenominator, 210);
-  assert.equal(section.restraint.coverage.matchedScalarDenominator, 30);
-  assert.equal(section.globalForce.coverage.matchedScalarDenominator, 252);
-  assert.equal(section.localForce.coverage.matchedScalarDenominator, 252);
-  assert.equal(section.displacement.coverage.unresolvedClassificationRows, 26);
-  assert.equal(section.globalForce.coverage.unresolvedClassificationRows, 40);
-  assert.equal(section.localForce.coverage.unresolvedClassificationRows, 40);
-  assert.equal(section.globalForce.coverage.unmatchedSolverRows, 14);
-  assert.equal(section.localForce.coverage.unmatchedSolverRows, 14);
-  assert.equal(section.restraint.coverage.duplicateRowOccurrences, 1);
+  assert.equal(section.displacement.coverage.matchedScalarDenominator, 366);
+  assert.equal(section.restraint.coverage.matchedScalarDenominator, 36);
+  assert.equal(section.globalForce.coverage.matchedScalarDenominator, 732);
+  assert.equal(section.localForce.coverage.matchedScalarDenominator, 732);
   for (const family of BM2_COMPARISON_FAMILIES) {
     assert.equal(section[family].summary.untraced, 0, `${label} ${family} untraced failures`);
     assert.equal(section[family].coverage.schema, BM2_COVERAGE_SCHEMA);
+    assert.equal(section[family].coverage.coverageStatus, 'COMPLETE');
+    assert.equal(section[family].coverage.unresolvedClassificationRows, 0);
+    assert.equal(section[family].coverage.unmatchedSolverRows, 0);
   }
 }
 
