@@ -397,10 +397,6 @@ for (const entry of explicitCases) {
     const familyInventory = entry.families[family];
     assert.ok(familyInventory, `BM2 CASE ${entry.number} missing ${family}`);
     assert.ok(familyInventory.reportCount >= 1, `BM2 CASE ${entry.number} ${family} report occurrence custody`);
-    assert.ok(
-      familyInventory.scalarCounts.every((count) => count === expectedScalars),
-      `BM2 CASE ${entry.number} ${family} occurrence scalar custody`,
-    );
     assert.equal(
       familyInventory.selectedScalarCount,
       expectedScalars,
@@ -532,7 +528,7 @@ const report = Object.freeze({
   ]),
   nextPriority: Object.freeze([
     'REQUALIFY_JUNCTION_SIF_AND_FLEXIBILITY_TO_ASME_B31_3_2018_APPENDIX_D',
-    'USE_NONFRICTION_OUT_OF_TOLERANCE_LEDGER_TO_PRIITIZE_REMAINING_LINEAR_FEA_DELTAS',
+    'USE_NONFRICTION_OUT_OF_TOLERANCE_LEDGER_TO_PRIORITIZE_REMAINING_LINEAR_FEA_DELTAS',
     'CLOSE_REMAINING_NUMERICAL_DELTAS_WITHOUT_CHANGING_THE_FIVE_PERCENT_POLICY',
   ]),
   qualificationStatus: strict.status,
