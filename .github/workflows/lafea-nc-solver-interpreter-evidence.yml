@@ -1,0 +1,198 @@
+name: LAFEA-NC Solver Interpreter Custody Evidence
+
+on:
+  pull_request:
+    branches:
+      - agent/lafea-nc-solver-build-evidence
+    paths:
+      - '.github/workflows/lafea-nc-solver-interpreter-evidence.yml'
+      - 'docs/nonlinear-shell-contact/LAFEA_NC_SOLVER_INTERPRETER_EVIDENCE.md'
+      - 'scripts/lafea-nc-solver-interpreter-evidence.mjs'
+      - 'tests/nonlinear-shell-contact-solver-interpreter-evidence.test.mjs'
+  workflow_dispatch:
+    inputs:
+      head_sha:
+        description: Exact interpreter evidence head SHA
+        required: true
+        type: string
+      base_sha:
+        description: Exact controlled-build evidence base SHA
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  exact-head-interpreter-custody-evidence:
+    runs-on: ubuntu-24.04
+    env:
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      DISPATCH_HEAD_SHA: ${{ inputs.head_sha }}
+      DISPATCH_BASE_SHA: ${{ inputs.base_sha }}
+      BASE_BRANCH: agent/lafea-nc-solver-build-evidence
+      BUILD_EVIDENCE_RUN_ID: '30999218704'
+      BUILD_EVIDENCE_ARTIFACT: lafea-nc-solver-build-d06ab8a516865a5b31a2bc26ff1e290ce859b7bb-1
+      BUILD_EVIDENCE_ARTIFACT_DIGEST: sha256:1376414aef5febf71da1d268c21d8adabf3145e0a0e8d43530dadc13cd6d491c
+      EXECUTABLE_HASH: sha256:9a33d293706a66bee86f2f0ecf996a66758f904c20d61ad8c83ddc0f92ae4b7e
+    steps:
+      - name: Resolve exact head
+        id: exact
+        shell: bash
+        run: |
+          set -euo pipefail
+          head_sha="${DISPATCH_HEAD_SHA:-${PR_HEAD_SHA:-${GITHUB_SHA}}}"
+          [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]]
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.exact.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Resolve live controlled-build base
+        id: base
+        shell: bash
+        env:
+          EXACT_HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "$BASE_BRANCH:refs/remotes/origin/$BASE_BRANCH"
+          live_base="$(git rev-parse "refs/remotes/origin/$BASE_BRANCH")"
+          base_sha="${DISPATCH_BASE_SHA:-${PR_BASE_SHA}}"
+          [[ "$base_sha" =~ ^[0-9a-f]{40}$ ]]
+          test "$base_sha" = "$live_base"
+          test "$(git rev-parse HEAD)" = "$EXACT_HEAD_SHA"
+          git merge-base --is-ancestor "$base_sha" "$EXACT_HEAD_SHA"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify changed-path containment, syntax, and unit contracts
+        shell: bash
+        env:
+          EXACT_HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
+          BASE_SHA: ${{ steps.base.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          git diff --check "$BASE_SHA...$EXACT_HEAD_SHA"
+          mapfile -t paths < <(git diff --name-only "$BASE_SHA...$EXACT_HEAD_SHA")
+          test "${#paths[@]}" = '4'
+          for path in "${paths[@]}"; do
+            case "$path" in
+              .github/workflows/lafea-nc-solver-interpreter-evidence.yml|\
+              docs/nonlinear-shell-contact/LAFEA_NC_SOLVER_INTERPRETER_EVIDENCE.md|\
+              scripts/lafea-nc-solver-interpreter-evidence.mjs|\
+              tests/nonlinear-shell-contact-solver-interpreter-evidence.test.mjs) ;;
+              *) echo "Interpreter-custody changed-path violation: $path" >&2; exit 1 ;;
+            esac
+          done
+          node --check scripts/lafea-nc-solver-interpreter-evidence.mjs
+          node --check tests/nonlinear-shell-contact-solver-interpreter-evidence.test.mjs
+          node --test tests/nonlinear-shell-contact-solver-interpreter-evidence.test.mjs
+
+      - name: Download sealed controlled-build evidence
+        id: prior
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          rm -rf "$RUNNER_TEMP/prior-build"
+          mkdir -p "$RUNNER_TEMP/prior-build"
+          gh run download "$BUILD_EVIDENCE_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "$BUILD_EVIDENCE_ARTIFACT" \
+            --dir "$RUNNER_TEMP/prior-build"
+          report="$(find "$RUNNER_TEMP/prior-build" -path '*/reports-final/solver-custody-build-report.json' -print -quit)"
+          test -n "$report"
+          build_root="$(dirname "$(dirname "$report")")"
+          test "sha256:$(sha256sum "$build_root/binary/ccx_2.22" | cut -d' ' -f1)" = "$EXECUTABLE_HASH"
+          node -e "const fs=require('node:fs');const report=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));if(report.status!=='SOLVER_CUSTODY_BLOCKED'||report.verifiedEvidenceCount!==7||JSON.stringify(report.missingEvidence)!==JSON.stringify(['CONTAINER_RECORD']))process.exit(1);" "$report"
+          echo "build_root=$build_root" >> "$GITHUB_OUTPUT"
+
+      - name: Make chroot discoverable under a scrubbed environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          chroot_path="$(command -v chroot)"
+          test -x "$chroot_path"
+          if [[ "$chroot_path" != '/usr/bin/chroot' ]]; then
+            sudo ln -sf "$chroot_path" /usr/bin/chroot
+          fi
+          env -i chroot --version >/dev/null
+
+      - name: Acquire and independently replay interpreter custody
+        id: acquire
+        shell: bash
+        env:
+          BUILD_ROOT: ${{ steps.prior.outputs.build_root }}
+        run: |
+          set +e
+          rm -rf artifacts/lafea-nc-solver-interpreter artifacts/lafea-nc-solver-interpreter-debug
+          mkdir -p artifacts/lafea-nc-solver-interpreter-debug
+          {
+            set -e
+            node scripts/lafea-nc-solver-interpreter-evidence.mjs \
+              --build-root="$BUILD_ROOT" \
+              --output-dir="$RUNNER_TEMP/lafea-interpreter-a"
+            node scripts/lafea-nc-solver-build-evidence-check.mjs \
+              --root="$RUNNER_TEMP/lafea-interpreter-a" \
+              --output-dir="$RUNNER_TEMP/lafea-interpreter-a/reports-interpreter"
+            node scripts/lafea-nc-solver-interpreter-evidence.mjs \
+              --build-root="$BUILD_ROOT" \
+              --output-dir="$RUNNER_TEMP/lafea-interpreter-b"
+            node scripts/lafea-nc-solver-build-evidence-check.mjs \
+              --root="$RUNNER_TEMP/lafea-interpreter-b" \
+              --output-dir="$RUNNER_TEMP/lafea-interpreter-b/reports-interpreter"
+            diff -ru "$RUNNER_TEMP/lafea-interpreter-a" "$RUNNER_TEMP/lafea-interpreter-b"
+          } > artifacts/lafea-nc-solver-interpreter-debug/controller.stdout.log \
+            2> artifacts/lafea-nc-solver-interpreter-debug/controller.stderr.log
+          status=$?
+          printf '%s\n' "$status" > artifacts/lafea-nc-solver-interpreter-debug/exit-code.txt
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          if [[ "$status" = '0' ]]; then
+            mkdir -p artifacts/lafea-nc-solver-interpreter
+            cp -R "$RUNNER_TEMP/lafea-interpreter-a"/. artifacts/lafea-nc-solver-interpreter/
+          fi
+          exit 0
+
+      - name: Upload interpreter-custody diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc-solver-interpreter-debug-${{ steps.exact.outputs.head_sha }}-${{ github.run_attempt }}
+          path: artifacts/lafea-nc-solver-interpreter-debug
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce interpreter-custody success
+        shell: bash
+        env:
+          EXIT_CODE: ${{ steps.acquire.outputs.exit_code }}
+        run: test "$EXIT_CODE" = '0'
+
+      - name: Verify final interpreter evidence and clean source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain --untracked-files=no)"
+          test -s artifacts/lafea-nc-solver-interpreter/libraries/ld-linux-x86-64.so.2
+          test -s artifacts/lafea-nc-solver-interpreter/interpreter/interpreter-probe.txt
+          grep -F 'runtimeExitCode=201' artifacts/lafea-nc-solver-interpreter/interpreter/interpreter-probe.txt
+          grep -F 'Usage: CalculiX.exe -i jobname' artifacts/lafea-nc-solver-interpreter/interpreter/interpreter-probe.txt
+          node -e "const fs=require('node:fs');const root='artifacts/lafea-nc-solver-interpreter';const record=JSON.parse(fs.readFileSync(root+'/records/linked-libraries-record.json','utf8'));const report=JSON.parse(fs.readFileSync(root+'/reports-interpreter/solver-custody-build-report.json','utf8'));if(!record.libraries.some((entry)=>entry.name==='ld-linux-x86-64.so.2')||report.status!=='SOLVER_CUSTODY_BLOCKED'||report.verifiedEvidenceCount!==7||report.authority.solverCustodyQualified!==false||report.authority.solverBridgeQualified!==false)process.exit(1);"
+
+      - name: Upload interpreter-custody evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc-solver-interpreter-${{ steps.exact.outputs.head_sha }}-${{ github.run_attempt }}
+          path: artifacts/lafea-nc-solver-interpreter
+          if-no-files-found: error
+          retention-days: 30
