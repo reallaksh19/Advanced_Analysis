@@ -64,7 +64,11 @@ for (const [fixtureId, fixtureInput] of Object.entries(allFixtureInputs)) {
   assert.equal(first.deckSha256, second.deckSha256);
   assert.deepEqual(first.maps, second.maps);
   if (fixtureId.startsWith('NC00-F2')) {
-    assert.match(first.deckText, /\*RIGID BODY/iu);
+    assert.doesNotMatch(first.deckText, /\*RIGID BODY/iu);
+    assert.match(
+      first.deckText,
+      /\*\* generated rigid carrier profile=DIRECTLY_PRESCRIBED_SHELL_CARRIER_V1/iu,
+    );
     assert.match(first.deckText, /\*CONTACT PAIR/iu);
   }
   generated.set(fixtureId, { model, deck: first });
