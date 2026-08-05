@@ -4,10 +4,12 @@ on:
   pull_request:
     paths:
       - '.github/workflows/topology-edit-render-fidelity.yml'
+      - 'src/workspace/topology-edit-3d-sjson-fidelity-controller.js'
       - 'src/workspace/topology-edit/topology-edit-primitive-geometry.js'
       - 'src/workspace/topology-edit/topology-edit-render-resource-signatures.js'
       - 'src/workspace/topology-edit/topology-edit-typed-viewport-backend.js'
       - 'src/workspace/topology-edit/topology-edit-support-viewport-backend.js'
+      - 'src/workspace/topology-edit/topology-edit-sjson-benchmark-camera.js'
       - 'src/workspace/topology-edit/topology-edit-sjson-visual-authority.js'
       - 'src/workspace/topology-edit/topology-edit-sjson-tee-projection.js'
       - 'src/workspace/topology-edit/topology-edit-sjson-point-component-projection.js'
@@ -18,6 +20,8 @@ on:
       - 'tests/topology-edit-render-resource-custom-geometry.test.mjs'
       - 'tests/topology-edit-m002-typed-geometry.test.mjs'
       - 'tests/topology-edit-m003-support-glyphs.test.mjs'
+      - 'tests/topology-edit-sjson-benchmark-camera.test.mjs'
+      - 'tests/topology-edit-sjson-compact-support-render.test.mjs'
       - 'tests/topology-edit-sjson-fidelity.test.mjs'
       - 'tests/topology-edit-sjson-restraint-projection.test.mjs'
       - 'public/Sjson.json'
@@ -57,10 +61,12 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+          node --check src/workspace/topology-edit-3d-sjson-fidelity-controller.js
           node --check src/workspace/topology-edit/topology-edit-primitive-geometry.js
           node --check src/workspace/topology-edit/topology-edit-render-resource-signatures.js
           node --check src/workspace/topology-edit/topology-edit-typed-viewport-backend.js
           node --check src/workspace/topology-edit/topology-edit-support-viewport-backend.js
+          node --check src/workspace/topology-edit/topology-edit-sjson-benchmark-camera.js
           node --check src/workspace/topology-edit/topology-edit-sjson-visual-authority.js
           node --check src/workspace/topology-edit/topology-edit-sjson-tee-projection.js
           node --check src/workspace/topology-edit/topology-edit-sjson-point-component-projection.js
@@ -69,6 +75,8 @@ jobs:
           node --check src/workspace/topology-edit/topology-edit-sjson-restraint-projection.js
           node --check tests/topology-edit-render-fidelity.test.mjs
           node --check tests/topology-edit-render-resource-custom-geometry.test.mjs
+          node --check tests/topology-edit-sjson-benchmark-camera.test.mjs
+          node --check tests/topology-edit-sjson-compact-support-render.test.mjs
           node --check tests/topology-edit-sjson-fidelity.test.mjs
           node --check tests/topology-edit-sjson-restraint-projection.test.mjs
           git diff --check
@@ -80,5 +88,7 @@ jobs:
             tests/topology-edit-m003-support-glyphs.test.mjs \
             tests/topology-edit-render-fidelity.test.mjs \
             tests/topology-edit-render-resource-custom-geometry.test.mjs \
+            tests/topology-edit-sjson-benchmark-camera.test.mjs \
+            tests/topology-edit-sjson-compact-support-render.test.mjs \
             tests/topology-edit-sjson-fidelity.test.mjs \
             tests/topology-edit-sjson-restraint-projection.test.mjs

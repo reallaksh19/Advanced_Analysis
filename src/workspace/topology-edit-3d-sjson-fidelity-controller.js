@@ -21,9 +21,18 @@ import {
 import {
   deriveSjsonTopoValidatorSupportProjection,
 } from './topology-edit/topology-edit-sjson-restraint-projection.js';
+import {
+  fitPerspectiveCameraToRenderBounds,
+} from './topology-edit/topology-edit-sjson-benchmark-camera.js';
+import {
+  TOPOLOGY_EDIT_SUPPORT_RENDER_STYLES,
+} from './topology-edit/topology-edit-support-viewport-backend.js';
 
 const BENCHMARK_SOURCE_HASH = 'fnv1a64:0fa77fc2c202d8ae';
 const TOPO_VALIDATOR_ENGINEERING_CAMERA_DIRECTION = Object.freeze({ x: 1, y: 1, z: 0.8 });
+const TOPO_VALIDATOR_COMPACT_MARKER_RADIUS_RATIO = 0.18;
+const TOPO_VALIDATOR_COMPACT_RENDER_AUTHORITY =
+  'TOPO_VALIDATOR_SUPPORT_MARKER_AND_DIRECTION_GEOMETRY';
 
 export class TopologyEdit3DViewController extends ProfessionalController {
   constructor(eventBus, lifecycleOptions = {}) {
@@ -78,7 +87,16 @@ export class TopologyEdit3DViewController extends ProfessionalController {
       verticalAxis: 'Z',
       markerSizeMm,
     });
-    const { overlays, projection: supportProjection } = supportAuthority;
+    const overlays = supportAuthority.overlays;
+    const supportProjection = Object.freeze({
+      ...supportAuthority.projection,
+      renderStyle: TOPOLOGY_EDIT_SUPPORT_RENDER_STYLES.TOPO_VALIDATOR_COMPACT,
+      renderAuthority: TOPO_VALIDATOR_COMPACT_RENDER_AUTHORITY,
+      compactMarkerRadiusMm: Math.max(
+        markerSizeMm * TOPO_VALIDATOR_COMPACT_MARKER_RADIUS_RATIO,
+        1,
+      ),
+    });
 
     backend.clearGroup(supportGroup);
     backend.renderProjection(supportGroup, supportProjection, 0x22d3ee, 1, markerSizeMm);
@@ -157,6 +175,11 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     host.dataset.topologyEditSupportRestraintGroupingAuthority = supportAuthority?.groupingAuthority || '';
     host.dataset.topologyEditSupportRestraintResolutionAuthority = supportAuthority?.restraintAuthority || '';
     host.dataset.topologyEditSupportRestraintAuthorityHash = supportAuthority?.authorityHash || '';
+    host.dataset.topologyEditSupportRenderStyle = supportProjection?.renderStyle || '';
+    host.dataset.topologyEditSupportRenderAuthority = supportProjection?.renderAuthority || '';
+    host.dataset.topologyEditCompactSupportMarkerRadiusMm = String(
+      supportProjection?.compactMarkerRadiusMm || 0,
+    );
     host.dataset.topologyEditVisualProxyWarningCount = String(
       diagnostics.filter((row) => row.code === 'VISUAL_NOMINAL_BORE_PROXY_USED').length,
     );
@@ -170,6 +193,7 @@ export class TopologyEdit3DViewController extends ProfessionalController {
       supportTopology?.supportVisualDiameterAdaptations?.length || 0,
     );
     host.dataset.topologyEditBenchmarkCameraAuthority = this.sjsonBenchmarkView?.authority || '';
+    host.dataset.topologyEditBenchmarkCameraFitAlgorithm = this.sjsonBenchmarkView?.fitAlgorithm || '';
     host.dataset.topologyEditBenchmarkCameraEngineeringDirection = JSON.stringify(
       this.sjsonBenchmarkView?.engineeringDirection || null,
     );
@@ -178,6 +202,9 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     );
     host.dataset.topologyEditBenchmarkBounds = JSON.stringify(
       this.sjsonBenchmarkView?.renderBounds || null,
+    );
+    host.dataset.topologyEditBenchmarkScreenBounds = JSON.stringify(
+      this.sjsonBenchmarkView?.screenBoundsNdc || null,
     );
     host.dataset.topologyEditVisualModelHash = this.visualModelHash || '';
     host.dataset.topologyEditSupportProjectionHash = semanticHash(supportProjection);
@@ -192,70 +219,33 @@ export class TopologyEdit3DViewController extends ProfessionalController {
 }
 
 function applyTopoValidatorBenchmarkFit(backend) {
-  const bounds = backend.lastBounds && !backend.lastBounds.isEmpty()
-    ? backend.lastBounds.clone()
-    : new THREE.Box3().setFromObject(backend.engineeringRoot);
+  backend.engineeringRoot?.updateMatrixWorld(true);
+  const bounds = new THREE.Box3().setFromObject(backend.engineeringRoot);
   if (!backend.camera || !backend.controls || bounds.isEmpty()) return null;
-  const center = bounds.getCenter(new THREE.Vector3());
-  const size = bounds.getSize(new THREE.Vector3());
-  const diagonalMm = size.length() || 1000;
-  const cameraDistanceMm = diagonalMm * 0.9 + 200;
   const renderDirectionValue = engineeringDirectionToRender(
     TOPO_VALIDATOR_ENGINEERING_CAMERA_DIRECTION,
   );
-  const renderDirection = new THREE.Vector3(
-    renderDirectionValue.x,
-    renderDirectionValue.y,
-    renderDirectionValue.z,
-  );
+  const fitMargin = Number(backend.navigationConfiguration?.cameraFitMargin);
+  if (!Number.isFinite(fitMargin) || fitMargin < 1) {
+    throw new Error('TOPOLOGY_EDIT_CAMERA_FIT_MARGIN_INVALID: Approved cameraFitMargin is required.');
+  }
+  const cameraFit = fitPerspectiveCameraToRenderBounds({
+    camera: backend.camera,
+    controls: backend.controls,
+    bounds,
+    direction: renderDirectionValue,
+    fitMargin,
+  });
 
-  backend.camera.up.set(0, 1, 0);
-  backend.camera.position.copy(center).addScaledVector(renderDirection, cameraDistanceMm);
-  backend.camera.lookAt(center);
-  backend.controls.target.copy(center);
-  backend.controls.update();
+  backend.lastBounds = bounds.clone();
   backend.sceneBoundsCache = bounds.clone();
-  backend.camera.near = Math.max(0.1, cameraDistanceMm - diagonalMm * 2);
-  backend.camera.far = Math.max(
-    backend.camera.near + 1000,
-    cameraDistanceMm + diagonalMm * 4 + 1000,
-  );
-  backend.camera.updateProjectionMatrix();
   backend.initialCameraState = backend.captureCameraState?.() || backend.initialCameraState;
 
-  const fittedRenderDirection = backend.camera.position.clone()
-    .sub(backend.controls.target)
-    .normalize();
-  const engineeringDirection = renderDirectionToEngineering({
-    x: fittedRenderDirection.x,
-    y: fittedRenderDirection.y,
-    z: fittedRenderDirection.z,
-  });
+  const engineeringDirection = renderDirectionToEngineering(cameraFit.renderDirection);
   return Object.freeze({
-    authority: 'TOPO_VALIDATOR_FIT_BOX_SIZE_0_9_PLUS_200_DIRECTION_1_1_0_8',
+    ...cameraFit,
     sourceHash: BENCHMARK_SOURCE_HASH,
     engineeringDirection,
-    renderDirection: {
-      x: fittedRenderDirection.x,
-      y: fittedRenderDirection.y,
-      z: fittedRenderDirection.z,
-    },
-    renderBounds: {
-      min: { x: bounds.min.x, y: bounds.min.y, z: bounds.min.z },
-      max: { x: bounds.max.x, y: bounds.max.y, z: bounds.max.z },
-      size: { x: size.x, y: size.y, z: size.z },
-      diagonalMm,
-    },
-    cameraDistanceMm,
-    cameraPosition: {
-      x: backend.camera.position.x,
-      y: backend.camera.position.y,
-      z: backend.camera.position.z,
-    },
-    target: { x: center.x, y: center.y, z: center.z },
-    fovDeg: Number(backend.camera.fov) || null,
-    near: backend.camera.near,
-    far: backend.camera.far,
   });
 }
 
