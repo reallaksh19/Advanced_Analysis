@@ -1,6 +1,6 @@
 import {
   TopologyEdit3DViewController as ProfessionalController,
-} from './topology-edit-3d-professional-controller.js';
+} from './topology-edit-3d-productivity-controller.js';
 import { SupportRestraintStore } from './support-restraint-store.js';
 import { semanticHash } from '../core/shared-piping-model/index.js';
 import {
