@@ -42,6 +42,10 @@ const RUN_DIAMETER_KINDS = new Set([
   'GASKET_DISC',
   'INSTRUMENT_MARKER',
 ]);
+const OUTLET_AUTHORITIES = new Set([
+  'SOURCE_REFERENCED_PARENT_BRANCH',
+  'SOURCE_PARENT_BRANCH_FALLBACK',
+]);
 
 async function loadProductionSjson() {
   const bytes = new Uint8Array(await readFile(SJSON_URL));
@@ -158,11 +162,12 @@ test('production Sjson materializes fittings and exact support sites determinist
           entity,
           primitive,
         );
-        assert.ok(referenced, `TEE ${primitive.canonicalEntityId} needs a referenced branch.`);
+        assert.ok(referenced, `TEE ${primitive.canonicalEntityId} needs an outlet branch basis.`);
         assert.equal(primitive.parameters.branchOutsideDiameterMm, referenced.diameterMm);
+        assert.ok(OUTLET_AUTHORITIES.has(primitive.parameters.branchOutsideDiameterAuthority));
         assert.equal(
-          primitive.parameters.branchOutsideDiameterAuthority,
-          'SOURCE_REFERENCED_PARENT_BRANCH',
+          primitive.parameters.branchOutsideDiameterAuthority === 'SOURCE_PARENT_BRANCH_FALLBACK',
+          referenced.relationAuthority === 'PARENT_BRANCH_FALLBACK_NO_INCLUDED_REFERENCE',
         );
         parentBranchApplicationCount += 1;
         referencedBranchApplicationCount += 1;
@@ -173,11 +178,12 @@ test('production Sjson materializes fittings and exact support sites determinist
           entity,
           primitive,
         );
-        assert.ok(referenced, `OLET ${primitive.canonicalEntityId} needs a referenced branch.`);
+        assert.ok(referenced, `OLET ${primitive.canonicalEntityId} needs an outlet branch basis.`);
         assert.equal(primitive.parameters.branchOutsideDiameterMm, referenced.diameterMm);
+        assert.ok(OUTLET_AUTHORITIES.has(primitive.parameters.branchOutsideDiameterAuthority));
         assert.equal(
-          primitive.parameters.branchOutsideDiameterAuthority,
-          'SOURCE_REFERENCED_PARENT_BRANCH',
+          primitive.parameters.branchOutsideDiameterAuthority === 'SOURCE_PARENT_BRANCH_FALLBACK',
+          referenced.relationAuthority === 'PARENT_BRANCH_FALLBACK_NO_INCLUDED_REFERENCE',
         );
         referencedBranchApplicationCount += 1;
       }
