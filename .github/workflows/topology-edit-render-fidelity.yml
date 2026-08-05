@@ -13,11 +13,13 @@ on:
       - 'src/workspace/topology-edit/topology-edit-sjson-point-component-projection.js'
       - 'src/workspace/topology-edit/topology-edit-sjson-parent-branch-diameter.js'
       - 'src/workspace/topology-edit/topology-edit-sjson-support-parent-branch-diameter.js'
+      - 'src/workspace/topology-edit/topology-edit-sjson-restraint-projection.js'
       - 'tests/topology-edit-render-fidelity.test.mjs'
       - 'tests/topology-edit-render-resource-custom-geometry.test.mjs'
       - 'tests/topology-edit-m002-typed-geometry.test.mjs'
       - 'tests/topology-edit-m003-support-glyphs.test.mjs'
       - 'tests/topology-edit-sjson-fidelity.test.mjs'
+      - 'tests/topology-edit-sjson-restraint-projection.test.mjs'
       - 'public/Sjson.json'
   workflow_dispatch:
 
@@ -64,9 +66,11 @@ jobs:
           node --check src/workspace/topology-edit/topology-edit-sjson-point-component-projection.js
           node --check src/workspace/topology-edit/topology-edit-sjson-parent-branch-diameter.js
           node --check src/workspace/topology-edit/topology-edit-sjson-support-parent-branch-diameter.js
+          node --check src/workspace/topology-edit/topology-edit-sjson-restraint-projection.js
           node --check tests/topology-edit-render-fidelity.test.mjs
           node --check tests/topology-edit-render-resource-custom-geometry.test.mjs
           node --check tests/topology-edit-sjson-fidelity.test.mjs
+          node --check tests/topology-edit-sjson-restraint-projection.test.mjs
           git diff --check
 
       - name: Execute render contracts
@@ -76,4 +80,5 @@ jobs:
             tests/topology-edit-m003-support-glyphs.test.mjs \
             tests/topology-edit-render-fidelity.test.mjs \
             tests/topology-edit-render-resource-custom-geometry.test.mjs \
-            tests/topology-edit-sjson-fidelity.test.mjs
+            tests/topology-edit-sjson-fidelity.test.mjs \
+            tests/topology-edit-sjson-restraint-projection.test.mjs
