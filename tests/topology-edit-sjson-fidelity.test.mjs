@@ -24,6 +24,9 @@ import {
   referencedBranchDiameterForEntity,
 } from '../src/workspace/topology-edit/topology-edit-sjson-parent-branch-diameter.js';
 import {
+  applySjsonParentBranchDiametersToSupportTopology,
+} from '../src/workspace/topology-edit/topology-edit-sjson-support-parent-branch-diameter.js';
+import {
   distinctExactSupportOriginCount,
   enrichCanonicalSupportsWithExactOrigins,
   supportTopologyForExactOrigins,
@@ -255,11 +258,29 @@ test('production Sjson materializes fittings and exact support sites determinist
   material.dispose();
   assert.deepEqual(failures, [], 'Every production typed primitive must materialize in Three.js.');
 
-  const supportTopology = supportTopologyForExactOrigins(canonical);
+  const exactSupportTopology = supportTopologyForExactOrigins(canonical);
+  const supportTopology = applySjsonParentBranchDiametersToSupportTopology(
+    exactSupportTopology,
+    dataset,
+    independentBranchIndex,
+  );
+  assert.ok(supportTopology.supportVisualDiameterAdaptations.length >= 100);
+  for (const adaptation of supportTopology.supportVisualDiameterAdaptations) {
+    const edge = supportTopology.edges.find((row) => row.id === adaptation.edgeId);
+    assert.equal(edge.outsideDiameterMm, adaptation.outsideDiameterMm);
+    assert.equal(edge.supportVisualOutsideDiameterAuthority, 'SOURCE_PARENT_BRANCH');
+  }
   const overlays = deriveAllSupportRestraintGeometry({
     canonicalTopology: supportTopology,
     verticalAxis: 'Z',
   });
+  assert.equal(
+    overlays.flatMap((row) => row.restraints || [])
+      .flatMap((row) => row.diagnostics || [])
+      .filter((row) => row.code === 'HOST_OUTSIDE_DIAMETER_MISSING').length,
+    0,
+    'Support contact geometry must use the host parent-branch diameter.',
+  );
   const supportProjection = projectSupportGeometryToViewport(overlays, {
     markerSizeMm: 70,
   });
