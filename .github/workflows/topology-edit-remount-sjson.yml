@@ -12,6 +12,7 @@ on:
       - 'src/workspace/topology-edit/topology-edit-sjson-visual-authority.js'
       - 'src/workspace/topology-edit/topology-edit-sjson-tee-projection.js'
       - 'src/workspace/topology-edit/topology-edit-sjson-point-component-projection.js'
+      - 'src/workspace/topology-edit/topology-edit-sjson-parent-branch-diameter.js'
       - 'src/workspace/topology-edit-clean.css'
       - 'e2e/topology-edit-remount-sjson.spec.js'
       - 'e2e/topology-edit-sjson-render-authority.spec.js'
@@ -63,6 +64,7 @@ jobs:
           node --check src/workspace/topology-edit/topology-edit-sjson-visual-authority.js
           node --check src/workspace/topology-edit/topology-edit-sjson-tee-projection.js
           node --check src/workspace/topology-edit/topology-edit-sjson-point-component-projection.js
+          node --check src/workspace/topology-edit/topology-edit-sjson-parent-branch-diameter.js
           node --check src/workspace/tree-panel-events.js
           node --check e2e/topology-edit-remount-sjson.spec.js
           node --check e2e/topology-edit-sjson-render-authority.spec.js
