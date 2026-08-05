@@ -8,7 +8,7 @@ export function createAnalyzeLayout(documentRef) {
     <header class="ixa__header">
       <div>
         <h1 class="ixa__title">InputXML Analyzer</h1>
-        <p class="ixa__subtitle">Load any real CAESAR II InputXML file to see its parsed topology, restraint classification, and load-time diagnostics.</p>
+        <p class="ixa__subtitle">Load any real CAESAR II InputXML file to see its parsed topology, restraint classification, load-time diagnostics, and a generic self-weight/pressure/thermal solve.</p>
       </div>
       <a class="ixa__nav-link" href="./index.html">&larr; Back to workspace</a>
     </header>
@@ -52,10 +52,11 @@ export function renderLoadedBar(documentRef, container, { fileName, onReload, on
   container.append(bar);
 }
 
-export function renderReport(documentRef, container, report, sectionState) {
+export function renderReport(documentRef, container, report, sectionState, solve) {
   container.replaceChildren();
   container.append(criticalBanner(documentRef, report));
   container.append(summaryCards(documentRef, report));
+  container.append(resultantsSection(documentRef, report, solve));
   container.append(
     collapsibleSection(documentRef, {
       key: 'restraints',
@@ -92,7 +93,151 @@ export function renderReport(documentRef, container, report, sectionState) {
       body: configBlock(documentRef, report),
     }),
   );
-  container.append(nextPhaseNote(documentRef));
+}
+
+function resultantsSection(documentRef, report, solve) {
+  const wrap = documentRef.createElement('section');
+  wrap.className = 'ixa__section';
+  const header = documentRef.createElement('div');
+  header.className = 'ixa__section-header';
+  header.style.cursor = 'default';
+  const blocked = report.criticalFindings.unresolvedRestraintCount > 0 || report.errorCount > 0;
+  const status = solve.solveState.status;
+  header.innerHTML = `<h2 class="ixa__section-title">Resultants</h2>`;
+  const runButton = button(
+    documentRef,
+    status === 'running' ? 'Solving…' : status === 'success' ? 'Re-run solve' : 'Run analysis',
+    'ixa__button ixa__button--primary',
+    solve.onSolve,
+  );
+  runButton.disabled = blocked || status === 'running';
+  header.append(runButton);
+
+  const body = documentRef.createElement('div');
+  body.className = 'ixa__section-body';
+
+  if (blocked) {
+    body.append(emptyState(documentRef, 'Resolve the restraint/diagnostic errors above before running the solve.'));
+  } else if (status === 'idle') {
+    const note = documentRef.createElement('p');
+    note.className = 'ixa__dropzone-hint';
+    note.textContent = 'Runs a generic self-weight + pressure + thermal linear solve on this file’s topology and shows nodal displacements and restraint reactions.';
+    body.append(note);
+  } else if (status === 'running') {
+    body.append(emptyState(documentRef, 'Solving…'));
+  } else if (status === 'error') {
+    const err = documentRef.createElement('div');
+    err.className = 'ixa__error';
+    err.hidden = false;
+    err.textContent = solve.solveState.code
+      ? `${solve.solveState.code}: ${solve.solveState.message}`
+      : solve.solveState.message;
+    body.append(err);
+  } else if (status === 'success') {
+    body.append(resultantsBody(documentRef, solve.solveState.result));
+  }
+
+  wrap.append(header, body);
+  return wrap;
+}
+
+function resultantsBody(documentRef, result) {
+  const wrap = documentRef.createElement('div');
+  wrap.style.display = 'flex';
+  wrap.style.flexDirection = 'column';
+  wrap.style.gap = '16px';
+
+  const badges = documentRef.createElement('div');
+  badges.className = 'ixa__cards';
+  badges.innerHTML = `
+    <div class="ixa__card"><div class="ixa__card-value">${result.elements.length}</div><div class="ixa__card-label">Elements solved</div></div>
+    <div class="ixa__card"><div class="ixa__card-value">${result.nodes.length}</div><div class="ixa__card-label">Nodes solved</div></div>
+    <div class="ixa__card"><div class="ixa__card-value">${result.thermalCaseAvailable ? 'Yes' : 'No'}</div><div class="ixa__card-label">Thermal (OPE) case</div></div>
+  `;
+  wrap.append(badges);
+
+  if (result.limitations.length > 0) {
+    const limWrap = documentRef.createElement('div');
+    for (const lim of result.limitations) {
+      const row = documentRef.createElement('div');
+      row.className = 'ixa__diag-row';
+      row.innerHTML = `
+        <div class="ixa__diag-severity ixa__diag-severity--info">disclosed</div>
+        <div class="ixa__diag-message">${escapeHtml(lim.cause)}<span class="ixa__diag-code">${escapeHtml(lim.code)}</span></div>
+      `;
+      limWrap.append(row);
+    }
+    wrap.append(subheading(documentRef, 'Disclosed limitations of this solve'), limWrap);
+  }
+
+  const restrained = result.nodes.filter((n) => n.restraint && n.restraint !== 'FREE');
+  if (restrained.length > 0) {
+    wrap.append(subheading(documentRef, `Restraint reactions (${restrained.length})`));
+    wrap.append(reactionTable(documentRef, restrained, result.thermalCaseAvailable));
+  }
+
+  wrap.append(subheading(documentRef, `Nodal displacements (${result.nodes.length})`));
+  wrap.append(displacementTable(documentRef, result.nodes, result.thermalCaseAvailable));
+
+  return wrap;
+}
+
+function reactionTable(documentRef, nodes, hasOpe) {
+  const table = documentRef.createElement('table');
+  table.className = 'ixa__table';
+  const opeHeader = hasOpe ? '<th>OPE Fx</th><th>OPE Fy</th><th>OPE Fz</th>' : '';
+  table.innerHTML = `<thead><tr><th>Node</th><th>Restraint</th><th>SUS Fx (N)</th><th>SUS Fy (N)</th><th>SUS Fz (N)</th>${opeHeader}</tr></thead>`;
+  const tbody = documentRef.createElement('tbody');
+  for (const node of nodes) {
+    const tr = documentRef.createElement('tr');
+    const ope = hasOpe
+      ? `<td>${fmt(node.operating.reaction.UX)}</td><td>${fmt(node.operating.reaction.UY)}</td><td>${fmt(node.operating.reaction.UZ)}</td>`
+      : '';
+    tr.innerHTML = `
+      <td class="ixa__mono">${escapeHtml(node.sourceNodeId)}</td>
+      <td>${escapeHtml(node.restraint)}</td>
+      <td>${fmt(node.sustained.reaction.UX)}</td><td>${fmt(node.sustained.reaction.UY)}</td><td>${fmt(node.sustained.reaction.UZ)}</td>
+      ${ope}
+    `;
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  const scroll = documentRef.createElement('div');
+  scroll.style.overflowX = 'auto';
+  scroll.append(table);
+  return scroll;
+}
+
+function displacementTable(documentRef, nodes, hasOpe) {
+  const table = documentRef.createElement('table');
+  table.className = 'ixa__table';
+  const opeHeader = hasOpe ? '<th>OPE dx (mm)</th><th>OPE dy (mm)</th><th>OPE dz (mm)</th>' : '';
+  table.innerHTML = `<thead><tr><th>Node</th><th>SUS dx (mm)</th><th>SUS dy (mm)</th><th>SUS dz (mm)</th>${opeHeader}</tr></thead>`;
+  const tbody = documentRef.createElement('tbody');
+  for (const node of nodes) {
+    const tr = documentRef.createElement('tr');
+    const ope = hasOpe
+      ? `<td>${fmt(node.operating.displacement.UX * 1000)}</td><td>${fmt(node.operating.displacement.UY * 1000)}</td><td>${fmt(node.operating.displacement.UZ * 1000)}</td>`
+      : '';
+    tr.innerHTML = `
+      <td class="ixa__mono">${escapeHtml(node.sourceNodeId)}</td>
+      <td>${fmt(node.sustained.displacement.UX * 1000)}</td><td>${fmt(node.sustained.displacement.UY * 1000)}</td><td>${fmt(node.sustained.displacement.UZ * 1000)}</td>
+      ${ope}
+    `;
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  const scroll = documentRef.createElement('div');
+  scroll.style.maxHeight = '360px';
+  scroll.style.overflow = 'auto';
+  scroll.append(table);
+  return scroll;
+}
+
+function fmt(value) {
+  if (!Number.isFinite(value)) return '—';
+  if (Math.abs(value) < 1e-6) return '0';
+  return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
 function criticalBanner(documentRef, report) {
@@ -257,13 +402,6 @@ function configBlock(documentRef, report) {
   pre.className = 'ixa__config-json';
   pre.textContent = JSON.stringify(report.restraintTypeCodeMap, null, 2);
   wrap.append(note, pre);
-  return wrap;
-}
-
-function nextPhaseNote(documentRef) {
-  const wrap = documentRef.createElement('div');
-  wrap.className = 'ixa__next-phase';
-  wrap.innerHTML = '<strong>What this page does today:</strong> parses and classifies the file exactly as the production ingestion pipeline would &mdash; topology, restraint mechanics, and every diagnostic it raises. <strong>What is not yet wired here:</strong> running the full solve (materials, sections, load cases) for an arbitrary uploaded file and displaying displacement/force/stress resultants &mdash; that is scoped as the next phase, tracked separately, so it is not claimed here before it is real.';
   return wrap;
 }
 

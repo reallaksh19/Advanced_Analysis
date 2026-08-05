@@ -1,4 +1,5 @@
 import { diagnoseInputXmlLoad } from '../core/geometry/adapters/inputxml-load-diagnostics.js';
+import { solveInputXmlGeneric } from '../core/linear-piping-analysis-consumer/generic-inputxml-solve.js';
 import { createAnalyzeLayout, renderLoadedBar, renderReport } from './analyze-view.js';
 
 export class AnalyzeController {
@@ -9,9 +10,11 @@ export class AnalyzeController {
     this.applicationRoot = applicationRoot;
     this.documentRef = documentRef ?? applicationRoot.ownerDocument ?? document;
     this.fileName = null;
+    this.xmlText = null;
     this.report = null;
     this.error = null;
     this.sectionState = { restraints: true, topology: false, diagnostics: false, config: false };
+    this.solveState = { status: 'idle' };
     this.elements = null;
   }
 
@@ -51,13 +54,16 @@ export class AnalyzeController {
 
   async loadFile(file) {
     this.error = null;
+    this.solveState = { status: 'idle' };
     try {
       const text = await file.text();
+      this.xmlText = text;
       this.report = diagnoseInputXmlLoad(text, { fileName: file.name });
       this.fileName = file.name;
       this.sectionState = { restraints: true, topology: false, diagnostics: false, config: false };
     } catch (error) {
       this.report = null;
+      this.xmlText = null;
       this.fileName = file.name;
       this.error = describeError(error, file.name);
     }
@@ -66,8 +72,28 @@ export class AnalyzeController {
 
   clear() {
     this.report = null;
+    this.xmlText = null;
     this.fileName = null;
     this.error = null;
+    this.solveState = { status: 'idle' };
+    this.render();
+  }
+
+  async runSolve() {
+    if (!this.xmlText || this.solveState.status === 'running') return;
+    this.solveState = { status: 'running' };
+    this.render();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    try {
+      const result = solveInputXmlGeneric(this.xmlText, { modelId: 'IXA', fileName: this.fileName ?? undefined });
+      this.solveState = { status: 'success', result };
+    } catch (error) {
+      this.solveState = {
+        status: 'error',
+        message: error instanceof Error ? error.message : String(error),
+        code: error?.code ?? null,
+      };
+    }
     this.render();
   }
 
@@ -94,7 +120,10 @@ export class AnalyzeController {
 
     reportRoot.replaceChildren();
     if (this.report) {
-      renderReport(this.documentRef, reportRoot, this.report, this.sectionState);
+      renderReport(this.documentRef, reportRoot, this.report, this.sectionState, {
+        solveState: this.solveState,
+        onSolve: () => this.runSolve(),
+      });
       for (const section of reportRoot.querySelectorAll('[data-section-key]')) {
         const header = section.querySelector('.ixa__section-header');
         header.addEventListener('click', () => this.toggleSection(section.dataset.sectionKey));
