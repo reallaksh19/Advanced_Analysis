@@ -327,6 +327,10 @@ function compileRegion(context) {
   const supportNodeByRestraintId = {};
   const componentStationEvidence = [];
   const componentById = new Map(context.sharedModel.components.map((row) => [row.componentKey, row]));
+  const runtimeContext = {
+    ...context,
+    regionPlaneOffset: determineRegionPlaneOffset(context, componentById),
+  };
 
   for (const componentKey of [...context.region.componentKeys].sort()) {
     const component = componentById.get(componentKey);
@@ -373,7 +377,7 @@ function compileRegion(context) {
         component,
         componentOccurrences,
         componentPrimitives,
-        context,
+        context: runtimeContext,
         sectionStates,
         lineProperties,
         thermal,
@@ -389,7 +393,7 @@ function compileRegion(context) {
         component,
         componentOccurrences,
         componentPrimitives,
-        context,
+        context: runtimeContext,
         sectionStates,
         lineProperties,
         thermal,
@@ -525,7 +529,7 @@ function compileElbowComponent(state) {
   const endpoints = componentEndpoints(state.component, state.context.topology);
   const center = sourcePointToM(
     state.component.geometry?.center,
-    state.context.sourceLengthFactorM,
+    state.context.topology.sourceLengthFactorM,
   );
   if (!center) {
     throw runtimeError(
@@ -1024,11 +1028,24 @@ function loadOwnershipBlockers(loadCase, configuration) {
   return rows;
 }
 
+function determineRegionPlaneOffset(context, componentById) {
+  const normal = context.request.coordinateFrame.analysisPlaneBasis.normal;
+  for (const componentKey of [...context.region.componentKeys].sort()) {
+    const component = componentById.get(componentKey);
+    if (!component) continue;
+    const endpoints = componentEndpoints(component, context.topology);
+    return dot(endpoints.pointI, normal);
+  }
+  throw runtimeError(
+    EMPIRICAL_FAILURE_CODES.GEOMETRY_INVALID,
+    `Region ${context.region.connectedComponentId} has no component geometry.`,
+  );
+}
+
 function assertComponentPlanarity(points, region, context, componentKey) {
   const normal = context.request.coordinateFrame.analysisPlaneBasis.normal;
   const offsets = points.map((point) => dot(point, normal));
-  const regionOffset = context.regionPlaneOffsets?.get(region.connectedComponentId)
-    ?? offsets[0];
+  const regionOffset = context.regionPlaneOffset ?? offsets[0];
   offsets.forEach((offset) => {
     if (Math.abs(offset - regionOffset) > context.profile.tolerances.planarityM) {
       throw runtimeError(
