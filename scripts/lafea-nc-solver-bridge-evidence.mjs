@@ -96,6 +96,7 @@ async function main() {
       'model.sta',
       'model.cvg',
       'model.12d',
+      'spooles.out',
       'solver.stdout.txt',
       'solver.stderr.txt',
     ],
