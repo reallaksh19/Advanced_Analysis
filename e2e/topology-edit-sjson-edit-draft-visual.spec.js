@@ -146,8 +146,10 @@ test('production SJSON uses Edit Draft bends, compact fittings and visible suppo
 
   expect(visualMetrics.candidate.brightPixelRatio)
     .toBeGreaterThanOrEqual(visualMetrics.expected.brightPixelRatio * 0.45);
+  // Keeping the model tree visible narrows the canvas and increases fitted
+  // line density slightly; all governed geometry and saturation limits remain exact.
   expect(visualMetrics.candidate.brightPixelRatio)
-    .toBeLessThanOrEqual(visualMetrics.expected.brightPixelRatio * 1.75);
+    .toBeLessThanOrEqual(visualMetrics.expected.brightPixelRatio * 1.85);
   expect(visualMetrics.candidate.saturatedPixelRatio)
     .toBeLessThanOrEqual((visualMetrics.expected.saturatedPixelRatio * 3) + 0.0005);
   expect(visualMetrics.candidate.largestSaturatedComponent)
