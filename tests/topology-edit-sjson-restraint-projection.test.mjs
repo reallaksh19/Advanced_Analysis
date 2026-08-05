@@ -64,7 +64,7 @@ test('production Sjson projects Topo validator native restraint records only', a
   });
 
   assert.equal(first.authority, 'TOPO_VALIDATOR_NATIVE_RESTRAINT_RECORDS');
-  assert.equal(first.groupingAuthority, 'EXACT_SITE_HOST_AND_RESTRAINT_FAMILY');
+  assert.equal(first.groupingAuthority, 'EXACT_SITE_AND_RESTRAINT_FAMILY');
   assert.equal(first.authorityHash, second.authorityHash);
   assert.deepEqual(first.projection, second.projection);
   assert.equal(first.metrics.rawSupportCount, 139);
@@ -91,6 +91,7 @@ test('production Sjson projects Topo validator native restraint records only', a
   );
   assert.ok(first.groups.every((row) => row.representativeSupportId));
   assert.ok(first.groups.every((row) => row.memberSupportIds.length >= 1));
+  assert.ok(first.groups.every((row) => row.memberHostEntityIds.length >= 1));
   assert.equal(
     first.overlays.flatMap((row) => row.restraints || [])
       .flatMap((row) => row.diagnostics || [])
