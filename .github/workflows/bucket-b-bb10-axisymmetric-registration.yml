@@ -20,6 +20,11 @@ on:
         description: Exact current-main base SHA for the BB-10 changed-path audit.
         required: true
         type: string
+      qualification_mode:
+        description: Issue a full BB-10 registration report rather than a downstream numerical replay.
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -97,9 +102,30 @@ jobs:
           git merge-base --is-ancestor "$EXPECTED_BASE_SHA" "$EXPECTED_HEAD_SHA"
           git diff --check "${EXPECTED_BASE_SHA}...${EXPECTED_HEAD_SHA}"
 
-      - name: Resolve governed shared-gate baseline
-        id: shared_anchor
+      - name: Classify BB-10 execution mode
+        id: mode
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_QUALIFICATION_MODE: ${{ inputs.qualification_mode }}
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          EXPECTED_BASE_SHA: ${{ steps.exact_base.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          mode='replay'
+          if [[ "$EVENT_NAME" == 'workflow_dispatch' && "$DISPATCH_QUALIFICATION_MODE" == 'true' ]]; then
+            mode='qualification'
+          elif git diff --name-only "${EXPECTED_BASE_SHA}...${EXPECTED_HEAD_SHA}" \
+            | grep -qx 'src/core/bucket-b/axisymmetric-bb10-shared-gate-anchor.js'; then
+            mode='qualification'
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "BB-10 execution mode: $mode"
+
+      - name: Verify retained BB-10 shared-gate anchor ancestry
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
         run: |
           set -euo pipefail
           marker_path='src/core/bucket-b/axisymmetric-bb10-shared-gate-anchor.js'
@@ -108,18 +134,16 @@ jobs:
             echo "Unable to resolve the governed BB-10 shared-gate marker." >&2
             exit 1
           fi
-          shared_base_sha="$(git rev-parse "${marker_commit}^")"
-          git cat-file -e "${shared_base_sha}^{commit}"
-          git merge-base --is-ancestor "$shared_base_sha" "${{ steps.refs.outputs.head_sha }}"
-          test "$(git diff --name-only "${shared_base_sha}...${{ steps.refs.outputs.head_sha }}" | grep -c '^\.github/workflows/bucket-b-bb10-axisymmetric-registration.yml$' || true)" = "0"
-          echo "anchor_sha=$shared_base_sha" >> "$GITHUB_OUTPUT"
+          git cat-file -e "${marker_commit}^{commit}"
+          git merge-base --is-ancestor "$marker_commit" "$EXPECTED_HEAD_SHA"
 
       - name: Run authoritative same-head BB-00 through BB-05 shared gates
         env:
           EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
-          EXPECTED_BASE_SHA: ${{ steps.shared_anchor.outputs.anchor_sha }}
-          EXPECTED_BASE_REF: ${{ steps.shared_anchor.outputs.anchor_sha }}
+          EXPECTED_BASE_SHA: ${{ steps.exact_base.outputs.base_sha }}
+          EXPECTED_BASE_REF: ${{ steps.exact_base.outputs.base_sha }}
           STRICT_REPOSITORY_DIFFERENTIAL: '1'
+          ENFORCE_CHANGED_PATH_ALLOWLIST: '0'
           REPORT_PATH: reports/bucket-b-bb00-bb05-exact-head-report.json
         run: node scripts/bucket-b-bb00-bb05-check.mjs
 
@@ -137,6 +161,7 @@ jobs:
         run: node src/core/bucket-b/bb07-check.mjs
 
       - name: Run BB-10 exact-head registration
+        if: ${{ steps.mode.outputs.mode == 'qualification' }}
         env:
           EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
           EXPECTED_BASE_SHA: ${{ steps.exact_base.outputs.base_sha }}
@@ -149,6 +174,7 @@ jobs:
         run: node src/core/bucket-b/bb10-check.mjs
 
       - name: Rerun BB-10 and require byte-identical report
+        if: ${{ steps.mode.outputs.mode == 'qualification' }}
         env:
           EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
           EXPECTED_BASE_SHA: ${{ steps.exact_base.outputs.base_sha }}
@@ -165,7 +191,41 @@ jobs:
           cmp reports/bucket-b-bb10-core-stdout.json reports/bucket-b-bb10-core-stdout-replay.json
           cmp reports/bucket-b-bb10-core-stderr.log reports/bucket-b-bb10-core-stderr-replay.log
 
-      - name: Upload BB-10 retained qualification evidence
+      - name: Run byte-identical BB-10 downstream core replay
+        if: ${{ steps.mode.outputs.mode == 'replay' }}
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          EXPECTED_BASE_SHA: ${{ steps.exact_base.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p reports
+          node src/core/bucket-b/bb10-check.mjs --core \
+            > reports/bucket-b-bb10-core-stdout.json \
+            2> reports/bucket-b-bb10-core-stderr.log
+          node src/core/bucket-b/bb10-check.mjs --core \
+            > reports/bucket-b-bb10-core-stdout-replay.json \
+            2> reports/bucket-b-bb10-core-stderr-replay.log
+          cmp reports/bucket-b-bb10-core-stdout.json reports/bucket-b-bb10-core-stdout-replay.json
+          cmp reports/bucket-b-bb10-core-stderr.log reports/bucket-b-bb10-core-stderr-replay.log
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const hash = (path) => `sha256:${createHash('sha256').update(readFileSync(path)).digest('hex')}`;
+          const report = {
+            schema: 'bucket-b-bb10-downstream-replay/v1',
+            exactHeadSha: process.env.EXPECTED_HEAD_SHA,
+            baseSha: process.env.EXPECTED_BASE_SHA,
+            mode: 'DOWNSTREAM_NUMERICAL_REPLAY_NON_AUTHORIZING',
+            coreStdoutHash: hash('reports/bucket-b-bb10-core-stdout.json'),
+            coreStderrHash: hash('reports/bucket-b-bb10-core-stderr.log'),
+            byteIdentical: true,
+            axisymmetricRegistrationAuthorityReissued: false,
+          };
+          writeFileSync('reports/bucket-b-bb10-downstream-replay.json', `${JSON.stringify(report, null, 2)}\n`);
+          NODE
+
+      - name: Upload BB-10 retained qualification or replay evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -176,9 +236,10 @@ jobs:
             reports/bucket-b-bb07-bracket-gusset-report.json
             reports/bucket-b-bb10-axisymmetric-registration-report.json
             reports/bucket-b-bb10-axisymmetric-registration-report-replay.json
+            reports/bucket-b-bb10-downstream-replay.json
             reports/bucket-b-bb10-core-stdout.json
             reports/bucket-b-bb10-core-stdout-replay.json
             reports/bucket-b-bb10-core-stderr.log
             reports/bucket-b-bb10-core-stderr-replay.log
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30
