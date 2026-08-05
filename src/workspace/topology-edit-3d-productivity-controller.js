@@ -48,6 +48,15 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     this.cleanShellRuntime.restoreViewState(viewState.cleanShell);
   }
 
+  reloadDraft() {
+    const draftPanelWasOpen = Boolean(
+      this.hostElement?.querySelector('details[data-panel-kind="draft"]')?.open,
+    );
+    const result = super.reloadDraft();
+    if (draftPanelWasOpen) this.cleanShellRuntime.openPanel('draft');
+    return result;
+  }
+
   handleUnifiedSelectionChanged(payload) {
     super.handleUnifiedSelectionChanged(payload);
     this.cleanShellRuntime.selectionChanged(payload);
