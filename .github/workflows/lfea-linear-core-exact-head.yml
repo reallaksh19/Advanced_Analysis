@@ -63,7 +63,11 @@ jobs:
         run: npm run check:lfea-b3.3
 
       - name: Emit exact residual, equilibrium and station-custody evidence
-        run: node scripts/lfea-linear-core-exact-head-evidence.mjs
+        shell: bash
+        run: |
+          mkdir -p artifacts/lfea-linear-core-exact-head
+          set -o pipefail
+          node scripts/lfea-linear-core-exact-head-evidence.mjs 2>&1 | tee artifacts/lfea-linear-core-exact-head/emitter.log
 
       - name: Element-end, nodal and code-station recovery
         run: npm run check:lfea-b3.4
@@ -78,6 +82,7 @@ jobs:
         run: npm run check:lfea-bm1-cii-comparison
 
       - name: Retain exact-head JSON and CSV evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: lfea-linear-core-exact-head-${{ github.event.pull_request.head.sha }}
