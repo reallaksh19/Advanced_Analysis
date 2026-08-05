@@ -133,13 +133,20 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     host.dataset.topologyEditNativeRestraintRecordCount = String(
       supportAuthority?.metrics?.nativeRestraintRecordCount || 0,
     );
-    host.dataset.topologyEditExcludedSupportCount = String(
-      supportAuthority?.metrics?.excludedSupportCount || 0,
+    host.dataset.topologyEditCollapsedSourceSupportCount = String(
+      supportAuthority?.metrics?.collapsedSourceSupportCount || 0,
+    );
+    host.dataset.topologyEditResolvedNativeRestraintCount = String(
+      supportAuthority?.metrics?.resolvedNativeRestraintCount || 0,
+    );
+    host.dataset.topologyEditDiagnosticNativeRestraintCount = String(
+      supportAuthority?.metrics?.diagnosticNativeRestraintCount || 0,
     );
     host.dataset.topologyEditProjectedRestraintDirectionCount = String(
       supportAuthority?.metrics?.projectedRestraintDirectionCount || 0,
     );
     host.dataset.topologyEditSupportRestraintAuthority = supportAuthority?.authority || '';
+    host.dataset.topologyEditSupportRestraintGroupingAuthority = supportAuthority?.groupingAuthority || '';
     host.dataset.topologyEditSupportRestraintAuthorityHash = supportAuthority?.authorityHash || '';
     host.dataset.topologyEditVisualProxyWarningCount = String(
       diagnostics.filter((row) => row.code === 'VISUAL_NOMINAL_BORE_PROXY_USED').length,
