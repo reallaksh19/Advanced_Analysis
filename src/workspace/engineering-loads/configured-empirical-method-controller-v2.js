@@ -1,6 +1,5 @@
 import { semanticHash } from '../../core/shared-piping-model/canonical-json.js';
 import { deepFreeze } from '../../core/shared-piping-model/immutable.js';
-import { engineeringModelStore } from '../engineering-model-store.js';
 import { projectDataStore } from '../project-data/project-data-store.js';
 import { engineeringSupportLoadStore } from './engineering-support-load-store.js';
 import {
@@ -14,7 +13,7 @@ import {
 /** Explicit opt-in configured execution; ordinary V1 model-store methods remain unchanged. */
 export class ConfiguredEmpiricalMethodControllerV2 {
   constructor({
-    modelStore = engineeringModelStore,
+    modelStore,
     profileStore = projectDataStore,
     supportLoadStore = engineeringSupportLoadStore,
     runtimeStore = new AuthorizedEmpiricalRuntimeStoreV2(),
@@ -145,6 +144,3 @@ function fail(message, code, details = null) {
   error.details = details === null ? null : deepFreeze(details);
   throw error;
 }
-
-export const configuredEmpiricalMethodControllerV2 =
-  new ConfiguredEmpiricalMethodControllerV2();
