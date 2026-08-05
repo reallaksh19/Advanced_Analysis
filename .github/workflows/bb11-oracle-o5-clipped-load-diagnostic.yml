@@ -35,6 +35,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           from textwrap import dedent
+          import re
 
           workflow = Path('.github/workflows/bb11-oracle-interface-bootstrap.yml').read_text()
           start_marker = "          python3 - <<'PY'\n"
@@ -52,89 +53,93 @@ jobs:
               raise SystemExit('ORACLE_O5_LEVEL_INSERTION_FAILED')
           source = source.replace(levels_old, levels_new, 1)
 
-          add_old = """  const addEdge = (edge, tractionAt) => {
-            const nodes = edge.nodeIds.map((id) => nodeById.get(id));
-            GL4.forEach((gauss) => {
-              const N = [(1 - gauss.value) / 2, (1 + gauss.value) / 2];
-              const dN = [-0.5, 0.5];
-              const r = N[0] * nodes[0].r + N[1] * nodes[1].r;
-              const z = N[0] * nodes[0].z + N[1] * nodes[1].z;
-              const dr = dN[0] * nodes[0].r + dN[1] * nodes[1].r;
-              const dz = dN[0] * nodes[0].z + dN[1] * nodes[1].z;
-              const jacobian = Math.hypot(dr, dz);
-              const traction = tractionAt(r, z);
-              const factor = gauss.weight * 2 * Math.PI * r * jacobian;
-              for (let index = 0; index < 2; index += 1) {
-                const node = nodeIndex.get(nodes[index].id);
-                force[2 * node] += N[index] * traction[0] * factor;
-                force[2 * node + 1] += N[index] * traction[1] * factor;
-              }
-              radial += traction[0] * factor;
-              axial += traction[1] * factor;
-            });
-          };"""
-          add_new = """  const addEdge = (edge, tractionAt, parameterRange = [0, 1]) => {
-            const nodes = edge.nodeIds.map((id) => nodeById.get(id));
-            const [q0, q1] = parameterRange;
-            const half = (q1 - q0) / 2;
-            const middle = (q1 + q0) / 2;
-            GL4.forEach((gauss) => {
-              const q = middle + half * gauss.value;
-              const N = [1 - q, q];
-              const r = N[0] * nodes[0].r + N[1] * nodes[1].r;
-              const z = N[0] * nodes[0].z + N[1] * nodes[1].z;
-              const jacobian = Math.hypot(
-                nodes[1].r - nodes[0].r,
-                nodes[1].z - nodes[0].z,
-              ) * half;
-              const traction = tractionAt(r, z);
-              const factor = gauss.weight * 2 * Math.PI * r * jacobian;
-              for (let index = 0; index < 2; index += 1) {
-                const node = nodeIndex.get(nodes[index].id);
-                force[2 * node] += N[index] * traction[0] * factor;
-                force[2 * node + 1] += N[index] * traction[1] * factor;
-              }
-              radial += traction[0] * factor;
-              axial += traction[1] * factor;
-            });
-          };
-          const clippedRadialRange = (edge, minimum, maximum) => {
-            const nodes = edge.nodeIds.map((id) => nodeById.get(id));
-            const first = nodes[0].r;
-            const second = nodes[1].r;
-            const delta = second - first;
-            if (Math.abs(delta) <= 1e-15) return null;
-            const lower = Math.max(0, Math.min(1, (minimum - first) / delta));
-            const upper = Math.max(0, Math.min(1, (maximum - first) / delta));
-            const q0 = Math.min(lower, upper);
-            const q1 = Math.max(lower, upper);
-            const edgeMinimum = Math.min(first, second);
-            const edgeMaximum = Math.max(first, second);
-            if (edgeMaximum <= minimum || edgeMinimum >= maximum || q1 - q0 <= 1e-15) {
-              return null;
-            }
-            return [q0, q1];
-          };"""
-          if source.count(add_old) != 1:
-              raise SystemExit('ORACLE_ADD_EDGE_PATCH_FAILED')
-          source = source.replace(add_old, add_new, 1)
-
-          gasket_old = """  } else {
-            mesh.boundaries
-              .filter((edge) => edge.type === 'FACE'
-                && edgeRange(edge, nodeById, 65, 95))
-              .forEach((edge) => addEdge(edge, () => [0, -20]));
-          }"""
-          gasket_new = """  } else {
-            mesh.boundaries.filter((edge) => edge.type === 'FACE')
-              .forEach((edge) => {
-                const range = clippedRadialRange(edge, 65, 95);
-                if (range) addEdge(edge, () => [0, -20], range);
+          add_new = dedent("""
+            const addEdge = (edge, tractionAt, parameterRange = [0, 1]) => {
+              const nodes = edge.nodeIds.map((id) => nodeById.get(id));
+              const [q0, q1] = parameterRange;
+              const half = (q1 - q0) / 2;
+              const middle = (q1 + q0) / 2;
+              GL4.forEach((gauss) => {
+                const q = middle + half * gauss.value;
+                const N = [1 - q, q];
+                const r = N[0] * nodes[0].r + N[1] * nodes[1].r;
+                const z = N[0] * nodes[0].z + N[1] * nodes[1].z;
+                const jacobian = Math.hypot(
+                  nodes[1].r - nodes[0].r,
+                  nodes[1].z - nodes[0].z,
+                ) * half;
+                const traction = tractionAt(r, z);
+                const factor = gauss.weight * 2 * Math.PI * r * jacobian;
+                for (let index = 0; index < 2; index += 1) {
+                  const node = nodeIndex.get(nodes[index].id);
+                  force[2 * node] += N[index] * traction[0] * factor;
+                  force[2 * node + 1] += N[index] * traction[1] * factor;
+                }
+                radial += traction[0] * factor;
+                axial += traction[1] * factor;
               });
-          }"""
-          if source.count(gasket_old) != 1:
+            };
+            const clippedRadialRange = (edge, minimum, maximum) => {
+              const nodes = edge.nodeIds.map((id) => nodeById.get(id));
+              const first = nodes[0].r;
+              const second = nodes[1].r;
+              const delta = second - first;
+              if (Math.abs(delta) <= 1e-15) return null;
+              const lower = Math.max(0, Math.min(1, (minimum - first) / delta));
+              const upper = Math.max(0, Math.min(1, (maximum - first) / delta));
+              const q0 = Math.min(lower, upper);
+              const q1 = Math.max(lower, upper);
+              const edgeMinimum = Math.min(first, second);
+              const edgeMaximum = Math.max(first, second);
+              if (edgeMaximum <= minimum || edgeMinimum >= maximum
+                || q1 - q0 <= 1e-15) {
+                return null;
+              }
+              return [q0, q1];
+            };
+          """).strip('\n')
+          add_pattern = (
+              r"  const addEdge = \(edge, tractionAt\) => \{.*?\n"
+              r"  \};\n"
+              r"  if \(load\.id === 'FH-PRES-001'\) \{"
+          )
+          source, count = re.subn(
+              add_pattern,
+              add_new + "\n  if (load.id === 'FH-PRES-001') {",
+              source,
+              count=1,
+              flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit('ORACLE_ADD_EDGE_PATCH_FAILED')
+
+          gasket_new = dedent("""
+            } else {
+              mesh.boundaries.filter((edge) => edge.type === 'FACE')
+                .forEach((edge) => {
+                  const range = clippedRadialRange(edge, 65, 95);
+                  if (range) addEdge(edge, () => [0, -20], range);
+                });
+            }
+          """).strip('\n')
+          gasket_pattern = (
+              r"  \} else \{\s*"
+              r"mesh\.boundaries\s*"
+              r"\.filter\(\(edge\) => edge\.type === 'FACE'\s*"
+              r"&& edgeRange\(edge, nodeById, 65, 95\)\)\s*"
+              r"\.forEach\(\(edge\) => addEdge\(edge, \(\) => \[0, -20\]\)\);\s*"
+              r"\}"
+          )
+          source, count = re.subn(
+              gasket_pattern,
+              gasket_new,
+              source,
+              count=1,
+              flags=re.S,
+          )
+          if count != 1:
               raise SystemExit('ORACLE_GASKET_CLIPPING_PATCH_FAILED')
-          source = source.replace(gasket_old, gasket_new, 1)
+
           path.write_text(source)
           PY
           node --check src/core/bucket-b/flange-hub-independent-oracle.js
