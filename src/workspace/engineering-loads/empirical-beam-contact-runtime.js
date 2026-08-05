@@ -303,6 +303,7 @@ function solveRegion(context) {
       ...assembled.members.flatMap((member) => member.formulaTrace),
       ...memberActions.flatMap((row) => row.formulaTrace),
       ...internalExtrema.flatMap((row) => row.formulaTrace),
+      ...compilation.componentStationEvidence.flatMap((row) => row.formulaTrace || []),
       ...equilibrium.formulaTrace,
     ]),
   });
@@ -634,6 +635,7 @@ function compileElbowComponent(state) {
     segmentCount: elbow.segmentCount,
     physicalArcLengthM: elbow.physicalArcLengthM,
     nodeIds: elbow.nodes.map((row) => row.id),
+    formulaTrace: elbow.formulaTrace,
   }));
 }
 
