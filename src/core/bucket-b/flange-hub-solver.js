@@ -11,7 +11,7 @@ import {
 import { FLANGE_HUB_MATERIAL_PROFILE } from './flange-hub-geometry.js';
 
 export const FLANGE_HUB_SOLVER_POLICY = deepFreeze({
-  solverPolicyId: 'BKT-B-FLANGE-HUB-DETERMINISTIC-SGS-PCG-V9',
+  solverPolicyId: 'BKT-B-FLANGE-HUB-DETERMINISTIC-SGS-PCG-REFINED-V10',
   relativeResidualTolerance: 1e-10,
   absoluteResidualTolerance: 1e-8,
   maximumIterationMultiplier: 8,
@@ -22,6 +22,10 @@ export const FLANGE_HUB_SOLVER_POLICY = deepFreeze({
   stoppingCriterion: 'EXPLICIT_REDUCED_SYSTEM_RESIDUAL',
   constraintMethod: 'EXACT_ZERO_DISPLACEMENT_ELIMINATION',
   reducedMatrixStorage: 'DETERMINISTIC_SORTED_TYPED_SPARSE_ROWS',
+  iterativeRefinementMaximumRounds: 2,
+  iterativeRefinementTargetRelativeResidual: 1e-13,
+  correctionRelativeResidualTolerance: 1e-4,
+  correctionAbsoluteResidualTolerance: 1e-12,
 });
 
 export function solveFlangeHubLoadCase({ mesh, loadCaseId } = {}) {
@@ -93,7 +97,7 @@ export function solveFlangeHubLoadCase({ mesh, loadCaseId } = {}) {
     freeDofs,
     globalToLocal,
   });
-  const solution = solveSgsPcg({
+  const solution = solveIterativelyRefinedSgsPcg({
     rows: reducedRows,
     rhs,
     diagonal,
@@ -210,6 +214,12 @@ export function solveFlangeHubLoadCase({ mesh, loadCaseId } = {}) {
         0,
       ),
       iterations: solution.iterations,
+      primaryIterations: solution.primaryIterations,
+      refinementRounds: solution.refinementRounds,
+      refinementIterations: solution.refinementIterations,
+      preRefinementResidualNorm: solution.preRefinementResidualNorm,
+      preRefinementRelativeResidual: solution.preRefinementRelativeResidual,
+      iterativeRefinementTargetMet: solution.iterativeRefinementTargetMet,
       residualNorm: solution.residualNorm,
       relativeResidual: solution.relativeResidual,
       recursiveResidualNorm: solution.recursiveResidualNorm,
@@ -360,6 +370,97 @@ export function solveSgsPcg({
     policy,
     context,
   });
+}
+
+export function solveIterativelyRefinedSgsPcg({
+  rows,
+  rhs,
+  diagonal,
+  policy = FLANGE_HUB_SOLVER_POLICY,
+  context = 'UNSCOPED_REFINED',
+} = {}) {
+  validateLinearSystemInputs({ rows, rhs, diagonal });
+  const multiply = createTypedSparseMultiplier(rows);
+  const precondition = createSymmetricGaussSeidelPreconditioner(rows, diagonal);
+  const primary = solvePreconditionedPcg({
+    multiply,
+    rhs,
+    precondition,
+    policy,
+    context,
+  });
+  const vector = Float64Array.from(primary.vector);
+  const rhsNorm = vectorNorm(rhs);
+  const denominatorNorm = Math.max(1, rhsNorm);
+  const maximumRounds = Number.isInteger(policy.iterativeRefinementMaximumRounds)
+    && policy.iterativeRefinementMaximumRounds > 0
+    ? policy.iterativeRefinementMaximumRounds
+    : 0;
+  const targetRelativeResidual = Number.isFinite(
+    policy.iterativeRefinementTargetRelativeResidual,
+  ) && policy.iterativeRefinementTargetRelativeResidual > 0
+    ? policy.iterativeRefinementTargetRelativeResidual
+    : policy.relativeResidualTolerance;
+  const correctionPolicy = {
+    ...policy,
+    relativeResidualTolerance: policy.correctionRelativeResidualTolerance,
+    absoluteResidualTolerance: policy.correctionAbsoluteResidualTolerance,
+    residualReplacementInterval: 0,
+  };
+  const residualAtCurrentVector = () => {
+    const product = multiply(vector);
+    const residual = new Float64Array(rhs.length);
+    for (let index = 0; index < rhs.length; index += 1) {
+      residual[index] = rhs[index] - product[index];
+    }
+    return residual;
+  };
+
+  let residual = residualAtCurrentVector();
+  const preRefinementResidualNorm = vectorNorm(residual);
+  const preRefinementRelativeResidual = preRefinementResidualNorm / denominatorNorm;
+  const refinementIterations = [];
+  let residualReplacementCount = primary.residualReplacementCount;
+  let recursiveResidualNorm = primary.recursiveResidualNorm;
+
+  for (let round = 1; round <= maximumRounds; round += 1) {
+    const relativeResidual = vectorNorm(residual) / denominatorNorm;
+    if (relativeResidual <= targetRelativeResidual) break;
+    const correction = solvePreconditionedPcg({
+      multiply,
+      rhs: residual,
+      precondition,
+      policy: correctionPolicy,
+      context: `${context}:REFINEMENT-${round}`,
+    });
+    for (let index = 0; index < vector.length; index += 1) {
+      vector[index] += correction.vector[index];
+    }
+    refinementIterations.push(correction.iterations);
+    residualReplacementCount += correction.residualReplacementCount;
+    recursiveResidualNorm = correction.recursiveResidualNorm;
+    residual = residualAtCurrentVector();
+  }
+
+  const explicitResidualNorm = vectorNorm(residual);
+  const relativeResidual = explicitResidualNorm / denominatorNorm;
+  return {
+    vector,
+    iterations: primary.iterations
+      + refinementIterations.reduce((sum, value) => sum + value, 0),
+    primaryIterations: primary.iterations,
+    refinementRounds: refinementIterations.length,
+    refinementIterations,
+    preRefinementResidualNorm,
+    preRefinementRelativeResidual,
+    iterativeRefinementTargetRelativeResidual: targetRelativeResidual,
+    iterativeRefinementTargetMet: relativeResidual <= targetRelativeResidual,
+    residualNorm: explicitResidualNorm,
+    relativeResidual,
+    recursiveResidualNorm,
+    explicitResidualNorm,
+    residualReplacementCount,
+  };
 }
 
 export function solveJacobiPcg({
