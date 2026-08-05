@@ -1,0 +1,54 @@
+name: Common CAESAR InputXML and Output Policy
+
+on:
+  pull_request:
+    paths:
+      - 'benchmarks/LFEA/BM1/**'
+      - 'benchmarks/LFEA/BM2/**'
+      - 'benchmarks/LFEA/BM3/**'
+      - 'src/core/geometry/adapters/inputxml-restraint-type-mutation.js'
+      - 'src/core/geometry/adapters/inputXmlToCanonicalGeometry.js'
+      - 'src/calc-workspace/cii-standalone-port/core/restraint-type-mutation.js'
+      - 'scripts/lfea-common-inputxml-restraint-correction-check.mjs'
+      - 'scripts/lfea-common-caesar-output-benchmark-policy-check.mjs'
+      - 'docs/qualification/COMMON_INPUTXML_RESTRAINT_CORRECTION.md'
+      - 'docs/qualification/COMMON_CAESAR_OUTPUT_BENCHMARK_POLICY.md'
+      - '.github/workflows/common-inputxml-restraint-correction.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: InputXML restraint export correction contract
+        run: node scripts/lfea-common-inputxml-restraint-correction-check.mjs
+
+      - name: Latest BM2/BM3 output policy and diagnostic inventory
+        run: node scripts/lfea-common-caesar-output-benchmark-policy-check.mjs --write
+
+      - name: Upload deterministic benchmark-policy evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: common-caesar-output-benchmark-policy-${{ github.event.pull_request.head.sha || github.sha }}
+          path: reports/common-caesar-output-benchmark-policy.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Linear-core regression aggregate
+        run: npm run check:lfea-linear-core
