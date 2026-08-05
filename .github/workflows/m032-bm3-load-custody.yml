@@ -1,4 +1,4 @@
-name: M032 Apply Governed Strict-Parity Patch
+name: M032 Publish Qualified Mechanics
 
 on:
   pull_request:
@@ -16,11 +16,11 @@ permissions:
   contents: write
 
 concurrency:
-  group: m032-bm3-apply-${{ github.event.pull_request.number || github.ref }}
+  group: m032-bm3-publish-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  apply:
+  publish:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -59,17 +59,12 @@ jobs:
           test "$(wc -c < /tmp/m032.patch)" -eq 150461
           echo "3aa3dc84ee2991f428e0541b701ff9766b65cdaeefeffc052c2bcac6ca1f761e  /tmp/m032.patch" | sha256sum -c -
           git apply --check /tmp/m032.patch
-          cat .github/m032-final-workflow/part-* | tr -d '\n' > /tmp/m032-final-workflow.b64
-          test "$(wc -c < /tmp/m032-final-workflow.b64)" -eq 5424
-          echo "076028613e0235fa5ca84c311f427b4785d25dffd07c21174c65620e27108743  /tmp/m032-final-workflow.b64" | sha256sum -c -
-          base64 --decode /tmp/m032-final-workflow.b64 > /tmp/m032-final-workflow.yml
 
-      - name: Apply governed mechanics and install final workflow
+      - name: Apply governed mechanics and remove staging
         shell: bash
         run: |
           set -euo pipefail
           git apply /tmp/m032.patch
-          cp /tmp/m032-final-workflow.yml .github/workflows/m032-bm3-load-custody.yml
           rm -rf .github/m032-patch .github/m032-final.patch.gz.b64 .github/m032-final-workflow.b64 .github/m032-final-workflow
           git diff --check
 
@@ -83,7 +78,7 @@ jobs:
           npm run check:lfea-bm1-cii-comparison
           npm run check:lfea-linear-core
 
-      - name: Publish governed branch head
+      - name: Publish governed source head
         shell: bash
         run: |
           set -euo pipefail
