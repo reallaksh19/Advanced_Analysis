@@ -45,15 +45,15 @@ jobs:
           replacements = [
               (
                   "export const FLANGE_HUB_MESH_FAMILY_ID = 'BKT-B-FLANGE-Q8-MESH-FAMILY-V1';",
-                  "export const FLANGE_HUB_MESH_FAMILY_ID = 'BKT-B-FLANGE-Q8-DIAGNOSTIC-B05-B06-V1';",
+                  "export const FLANGE_HUB_MESH_FAMILY_ID = 'BKT-B-FLANGE-Q8-DIAGNOSTIC-B05-B06-1P5-V1';",
               ),
               (
                   'return piecewiseBreakpoints(segmentLengths, [4, 6, 2]);',
-                  'return piecewiseBreakpoints(segmentLengths, [8, 12, 4]);',
+                  'return piecewiseBreakpoints(segmentLengths, [6, 9, 3]);',
               ),
               (
                   'return piecewiseBreakpoints([horizontalLength, verticalLength], [4, 6]);',
-                  'return piecewiseBreakpoints([horizontalLength, verticalLength], [8, 12]);',
+                  'return piecewiseBreakpoints([horizontalLength, verticalLength], [6, 9]);',
               ),
           ]
           for old, new in replacements:
@@ -73,7 +73,7 @@ jobs:
 
       - name: Execute axial-only diagnostic
         env:
-          BB11_DIAGNOSTIC_MESH_FAMILY_ID: BKT-B-FLANGE-Q8-DIAGNOSTIC-B05-B06-V1
+          BB11_DIAGNOSTIC_MESH_FAMILY_ID: BKT-B-FLANGE-Q8-DIAGNOSTIC-B05-B06-1P5-V1
           BB11_AXIAL_DIAGNOSTIC_REPORT_PATH: reports/bb11-axial-tail-b05-b06.json
           TZ: UTC
           LC_ALL: C
