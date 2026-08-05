@@ -8,7 +8,7 @@ on:
       - '.github/workflows/m028-publish-staging.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   publish:
@@ -62,16 +62,39 @@ jobs:
           sha256sum -c /tmp/m028-report.sha256
           rm reports/m028-bm3-qualification.json
 
-      - name: Verify final source boundary and publish
+      - name: Assemble exact seven-file candidate
         shell: bash
         run: |
           set -euo pipefail
-          expected=$'.github/workflows/m028-bm3.yml\ndocs/qualification/M028_BM3_ENGINEERING_RECORD.md\nscripts/lfea-m028-bm3-check.mjs\nscripts/lfea-m028-bm3-comparison.mjs\nscripts/lfea-m028-bm3-fixtures.mjs\nsrc/core/geometry/adapters/inputXmlToCanonicalGeometry.js\nsrc/core/geometry/adapters/inputxml-unit-system.js'
-          actual="$(git diff --cached --name-only 833b5c51543caf50941957330a208661c9f09954 -- | sort)"
-          printf 'EXPECTED FILES:\n%s\nACTUAL FILES:\n%s\n' "$expected" "$actual"
-          test "$actual" = "$expected"
-          git add -A
-          git config user.name 'M028 Qualification Bot'
-          git config user.email 'm028-qualification@users.noreply.github.com'
-          git commit -m 'M028: onboard BM3 with disclosed diagnostics'
-          git push origin HEAD:agent/m028-publish-staging
+          root=/tmp/m028-qualified-candidate
+          rm -rf "$root"
+          mkdir -p "$root"
+          paths=(
+            '.github/workflows/m028-bm3.yml'
+            'docs/qualification/M028_BM3_ENGINEERING_RECORD.md'
+            'scripts/lfea-m028-bm3-check.mjs'
+            'scripts/lfea-m028-bm3-comparison.mjs'
+            'scripts/lfea-m028-bm3-fixtures.mjs'
+            'src/core/geometry/adapters/inputXmlToCanonicalGeometry.js'
+            'src/core/geometry/adapters/inputxml-unit-system.js'
+          )
+          for path in "${paths[@]}"; do
+            test -f "$path"
+            mkdir -p "$root/$(dirname "$path")"
+            cp "$path" "$root/$path"
+          done
+          test ! -e .m028-transport
+          test ! -e .github/workflows/m028-publish-staging.yml
+          (
+            cd "$root"
+            find . -type f ! -name MANIFEST.sha256 -print0 | sort -z | xargs -0 sha256sum > MANIFEST.sha256
+          )
+          test "$(find "$root" -type f | wc -l)" -eq 8
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m028-qualified-candidate-${{ github.sha }}
+          path: /tmp/m028-qualified-candidate
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 2
