@@ -14,6 +14,9 @@ import {
 import {
   resolveTopologyEditPickViewport,
 } from '../src/workspace/topology-edit/topology-edit-gpu-pick-helpers.js';
+import {
+  shouldYieldGizmoToCanonicalSelection,
+} from '../src/workspace/viewport-interaction/topology-edit-interaction-viewport-adapter.js';
 
 test('support glyphs begin at OD/2 contacts and extend by two thirds OD', () => {
   const projection = projectGovernedSjsonSupportGlyphs({
@@ -78,6 +81,26 @@ test('GPU pick radius is expressed in CSS pixels and scales with DPR', () => {
   assert.equal(viewport.pixelRatio, 3);
   assert.equal(viewport.width, 49);
   assert.equal(viewport.height, 49);
+});
+
+test('overlapping gizmos yield to another canonical node or component', () => {
+  assert.equal(shouldYieldGizmoToCanonicalSelection(
+    'node:selected',
+    { objectKind: 'component', objectId: 'edge:other' },
+  ), true);
+  assert.equal(shouldYieldGizmoToCanonicalSelection(
+    'node:selected',
+    { objectKind: 'node', objectId: 'node:other' },
+  ), true);
+  assert.equal(shouldYieldGizmoToCanonicalSelection(
+    'node:selected',
+    { objectKind: 'node', objectId: 'node:selected' },
+  ), false);
+  assert.equal(shouldYieldGizmoToCanonicalSelection('node:selected', null), false);
+  assert.equal(shouldYieldGizmoToCanonicalSelection(
+    'node:selected',
+    { objectKind: 'issue', objectId: 'issue:1' },
+  ), false);
 });
 
 test('automatic clipping remains conservative outside and inside scene bounds', () => {
