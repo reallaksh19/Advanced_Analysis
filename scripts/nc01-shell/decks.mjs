@@ -44,7 +44,7 @@ export function cantileverDeck({ title, mesh, thickness, E, load, elementType = 
   const lines = ['*HEADING',title,...meshText(mesh, elementType),'*MATERIAL,NAME=MAT','*ELASTIC',`${E},0`,
     '*SHELL SECTION,ELSET=EALL,MATERIAL=MAT',fmt(thickness),'*NSET,NSET=FIX',fixed.join(','),'*BOUNDARY','FIX,1,6,0',
     '*STEP','*STATIC','*CLOAD',`${tip[0].id},3,${fmt(load/6)}`,`${tip[1].id},3,${fmt(2*load/3)}`,`${tip[2].id},3,${fmt(load/6)}`,
-    '*NODE PRINT,NSET=NALL','U,RF','*EL PRINT,ELSET=EALL','S,E','*NODE FILE','U,RF','*EL FILE','S,E','*END STEP'];
+    '*NODE PRINT,NSET=NALL','U','*NODE PRINT,NSET=FIX','RF','*EL PRINT,ELSET=EALL','S,E','*NODE FILE','U,RF','*EL FILE','S,E','*END STEP'];
   return `${lines.join('\n')}\n`;
 }
 function meshText(mesh, type = 'S8R') {
