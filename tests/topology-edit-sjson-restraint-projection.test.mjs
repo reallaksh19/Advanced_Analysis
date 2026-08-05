@@ -27,7 +27,7 @@ import {
 
 const SJSON_URL = new URL('../public/Sjson.json', import.meta.url);
 
-test('production Sjson projects Topo validator native restraint records only', async () => {
+test('production Sjson matches Topo validator support anchors and restraint arrays', async () => {
   const bytes = new Uint8Array(await readFile(SJSON_URL));
   const raw = JSON.parse(new TextDecoder().decode(bytes).replace(/^\uFEFF/u, ''));
   const dataset = normalizeWorkspaceDataset(raw, 'Sjson.json', {
@@ -54,44 +54,48 @@ test('production Sjson projects Topo validator native restraint records only', a
 
   const first = deriveSjsonTopoValidatorSupportProjection({
     canonicalTopology: supportTopology,
+    dataset,
     markerSizeMm: 70,
     verticalAxis: 'Z',
   });
   const second = deriveSjsonTopoValidatorSupportProjection({
     canonicalTopology: structuredClone(supportTopology),
+    dataset: structuredClone(dataset),
     markerSizeMm: 70,
     verticalAxis: 'Z',
   });
 
-  assert.equal(first.authority, 'TOPO_VALIDATOR_NATIVE_RESTRAINT_RECORDS');
-  assert.equal(first.groupingAuthority, 'EXACT_SITE_AND_RESTRAINT_FAMILY');
+  assert.equal(first.authority, 'TOPO_VALIDATOR_SUPPORT_HIERARCHY_POSITION_RESTRAINT_ARRAY');
+  assert.equal(
+    first.groupingAuthority,
+    'MDSSREF_MDSGUIDEREF_PREV_NAME_THEN_POSITION_0_001MM',
+  );
+  assert.equal(first.restraintAuthority, 'TOPO_VALIDATOR_SJ_RESTRAINT_RESOLVER');
   assert.equal(first.authorityHash, second.authorityHash);
   assert.deepEqual(first.projection, second.projection);
   assert.equal(first.metrics.rawSupportCount, 139);
+  assert.equal(first.metrics.supportAnchorCount, 37);
   assert.equal(first.metrics.nativeRestraintRecordCount, 47);
-  assert.equal(first.metrics.collapsedSourceSupportCount, 92);
-  assert.equal(first.metrics.projectedSupportMarkerCount, 47);
+  assert.equal(first.metrics.projectedSupportMarkerCount, 37);
   assert.equal(first.metrics.distinctOriginCount, 37);
-  assert.equal(first.metrics.resolvedNativeRestraintCount, 36);
-  assert.equal(first.metrics.diagnosticNativeRestraintCount, 11);
-  assert.equal(first.projection.glyphOverlays.length, 47);
-  assert.equal(first.groups.length, 47);
+  assert.equal(
+    first.metrics.collapsedSourceSupportCount,
+    first.metrics.projectedSourceSupportCount - first.metrics.supportAnchorCount,
+  );
+  assert.equal(first.projection.glyphOverlays.length, 37);
+  assert.equal(first.anchors.length, 37);
   assert.equal(first.decisions.length, canonical.supports.length);
   assert.equal(
-    first.decisions.filter((row) => row.disposition === 'REPRESENTATIVE').length,
+    first.anchors.reduce((sum, anchor) => sum + anchor.restraintCount, 0),
     47,
   );
   assert.equal(
-    first.decisions.filter((row) => row.disposition === 'COLLAPSED_TO_REPRESENTATIVE').length,
-    92,
+    new Set(first.anchors.flatMap((anchor) => anchor.memberSupportIds)).size,
+    first.metrics.projectedSourceSupportCount,
   );
-  assert.equal(
-    new Set(first.groups.flatMap((row) => row.memberSupportIds)).size,
-    canonical.supports.length,
-  );
-  assert.ok(first.groups.every((row) => row.representativeSupportId));
-  assert.ok(first.groups.every((row) => row.memberSupportIds.length >= 1));
-  assert.ok(first.groups.every((row) => row.memberHostEntityIds.length >= 1));
+  assert.ok(first.anchors.every((anchor) => anchor.representativeSupportId));
+  assert.ok(first.anchors.every((anchor) => anchor.memberSupportIds.length >= 1));
+  assert.ok(first.anchors.every((anchor) => anchor.restraintTypes.length >= 1));
   assert.equal(
     first.overlays.flatMap((row) => row.restraints || [])
       .flatMap((row) => row.diagnostics || [])
