@@ -80,8 +80,11 @@ export function conditionGeometry(geometry, requiredAttachmentPoints, profile) {
 
   const structural = validateCanonicalGeometry(conditioned, { requireKnownUnit: false });
   if (!structural.ok) {
+    const details = structural.errors.map((error) => (
+      error.message ? `${error.code} (${error.message})` : error.code
+    ));
     throw new SharedAnalysisContractError(
-      `Conditioned geometry failed structural validation: ${structural.errors.map((error) => error.code).join(', ')}`,
+      `Conditioned geometry failed structural validation: ${details.join(', ')}`,
       'CONDITIONED_GEOMETRY_INVALID',
     );
   }
