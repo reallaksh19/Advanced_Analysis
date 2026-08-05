@@ -1,0 +1,62 @@
+name: BB-11 balanced 1.5x candidate screen
+
+on:
+  push:
+    branches:
+      - candidate/bb11-balanced-1p5
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_OPTIONS: --max-old-space-size=6144
+
+jobs:
+  screen:
+    name: Non-authorizing balanced 1.5x screen
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify exact branch and governed scope
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          git diff --check HEAD^
+          changed="$(git diff --name-only HEAD^...HEAD)"
+          test "$(printf '%s\n' "$changed" | grep -c '^scripts/bb11-balanced-1p5-screen.mjs$' || true)" = "1"
+          test "$(printf '%s\n' "$changed" | grep -c '^\.github/workflows/bb11-balanced-1p5-screen.yml$' || true)" = "1"
+          test "$(printf '%s\n' "$changed" | wc -l)" = "2"
+
+      - name: Run balanced 1.5x M0-M3 candidate screen
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+          EXPECTED_BASE_SHA: ${{ github.event.before }}
+        run: node --expose-gc scripts/bb11-balanced-1p5-screen.mjs
+
+      - name: Upload candidate screen evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bb11-balanced-1p5-${{ github.sha }}
+          path: reports/bb11-balanced-1p5/
+          if-no-files-found: warn
+          retention-days: 30
