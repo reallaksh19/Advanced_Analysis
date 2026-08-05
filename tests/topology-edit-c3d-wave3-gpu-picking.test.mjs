@@ -6,8 +6,10 @@ import * as THREE from 'three';
 import {
   decodeTopologyEditPickId,
   encodeTopologyEditPickId,
+  resolveTopologyEditPickSamplePointer,
   resolveTopologyEditPickViewport,
   selectNearestTopologyEditPickId,
+  selectNearestTopologyEditPickSample,
 } from '../src/workspace/topology-edit/topology-edit-gpu-pick-helpers.js';
 import {
   TopologyEditGpuPicker,
@@ -36,16 +38,30 @@ test('24-bit pick IDs round-trip exactly and reject reserved values', () => {
   assert.throws(() => encodeTopologyEditPickId(0x1000000), RangeError);
 });
 
-test('nearest nonzero sample wins deterministically', () => {
+test('nearest nonzero sample and its winning pixel lineage are deterministic', () => {
   const bytes = new Uint8Array(5 * 5 * 4);
   writeId(bytes, 5, 0, 0, 17);
   writeId(bytes, 5, 2, 2, 23);
   assert.equal(selectNearestTopologyEditPickId(bytes, 5, 5), 23);
+  assert.deepEqual(selectNearestTopologyEditPickSample(bytes, 5, 5), {
+    id: 23,
+    x: 2,
+    y: 2,
+    pixel: 12,
+    distanceSquared: 0,
+  });
 
   const tie = new Uint8Array(3 * 3 * 4);
   writeId(tie, 3, 0, 1, 31);
   writeId(tie, 3, 2, 1, 32);
   assert.equal(selectNearestTopologyEditPickId(tie, 3, 3), 31);
+  assert.deepEqual(selectNearestTopologyEditPickSample(tie, 3, 3), {
+    id: 31,
+    x: 0,
+    y: 1,
+    pixel: 3,
+    distanceSquared: 1,
+  });
 });
 
 test('pick viewport honors CSS radius, pixel ratio, bounds, and WebGL Y origin', () => {
@@ -64,8 +80,9 @@ test('pick viewport honors CSS radius, pixel ratio, bounds, and WebGL Y origin',
       pixelRatio: 2,
     },
   );
+  const viewport = resolveTopologyEditPickViewport(renderer, 50, 40, RECT, 2);
   assert.deepEqual(
-    resolveTopologyEditPickViewport(renderer, 50, 40, RECT, 2),
+    viewport,
     {
       x: 96,
       y: 75,
@@ -78,9 +95,16 @@ test('pick viewport honors CSS radius, pixel ratio, bounds, and WebGL Y origin',
       pixelRatio: 2,
     },
   );
+  const pointer = resolveTopologyEditPickSamplePointer(viewport, {
+    id: 1,
+    x: 4,
+    y: 4,
+  });
+  assertNear(pointer.x, 0.005);
+  assertNear(pointer.y, -0.00625);
 });
 
-test('GPU picker resolves exact object identity and restores renderer state', () => {
+test('GPU picker resolves exact object identity, sample ray, and renderer state', () => {
   const scene = new THREE.Scene();
   const original = new THREE.MeshBasicMaterial({ color: 0x123456 });
   original.clippingPlanes = [new THREE.Plane(new THREE.Vector3(1, 0, 0), -5)];
@@ -108,6 +132,15 @@ test('GPU picker resolves exact object identity and restores renderer state', ()
   assert.equal(hit.target.objectId, 'PIPE-1');
   assert.equal(hit.object, mesh);
   assert.equal(hit.instanceId, null);
+  assert.deepEqual(hit.sample, {
+    id: hit.sample.id,
+    x: 1,
+    y: 1,
+    pixel: 4,
+    distanceSquared: 0,
+  });
+  assertNear(hit.samplePointer.x, 0.01);
+  assertNear(hit.samplePointer.y, -0.0125);
   assert.equal(renderer.observedGhostVisible, false);
   assert.equal(renderer.observedClippingPlanes, 1);
   assert.equal(mesh.material, original);
@@ -142,6 +175,9 @@ test('GPU picker assigns exact per-instance IDs and restores geometry', () => {
   assert.equal(hit.target.objectId, 'NODE-B');
   assert.equal(hit.object, mesh);
   assert.equal(hit.instanceId, 1);
+  assert.equal(hit.sample.id > 0, true);
+  assertNear(hit.samplePointer.x, 0.01);
+  assertNear(hit.samplePointer.y, -0.0125);
   assert.equal(mesh.geometry, geometry);
   assert.equal(mesh.material, material);
   assert.equal(geometry.getAttribute('instancePickColor'), undefined);
@@ -246,6 +282,10 @@ class FakeRenderer {
 function writeId(bytes, width, x, y, id) {
   const color = encodeTopologyEditPickId(id);
   bytes.set([color.r, color.g, color.b, 255], (y * width + x) * 4);
+}
+
+function assertNear(actual, expected, tolerance = 1e-12) {
+  assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} differs from ${expected}`);
 }
 
 function assignVector4(target, args) {
