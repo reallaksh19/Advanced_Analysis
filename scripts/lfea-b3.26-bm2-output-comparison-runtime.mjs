@@ -9,8 +9,31 @@ import { solveBm2InputXmlConditioned } from './lfea-b3.26-bm2-solve-runtime.mjs'
 const CASES = Object.freeze(['OPE', 'SUS', 'EXP']);
 const NODE_DOFS = Object.freeze(['UX', 'UY', 'UZ', 'RX', 'RY', 'RZ']);
 const ACTION_FIELDS = Object.freeze(['fx', 'fy', 'fz', 'mx', 'my', 'mz']);
-const FORCE_FIELDS = new Set(['UX', 'UY', 'UZ', 'fx', 'fy', 'fz']);
-const ROTATION_FIELDS = new Set(['RX', 'RY', 'RZ']);
+const TRANSLATION_DOFS = new Set(['UX', 'UY', 'UZ']);
+const FORCE_FIELDS = new Set(['fx', 'fy', 'fz']);
+
+export const BM2_COMPARISON_FAMILIES = Object.freeze([
+  'displacement',
+  'restraint',
+  'globalForce',
+  'localForce',
+]);
+
+export function absoluteToleranceForComparison(family, field) {
+  if (family === 'displacement') {
+    if (TRANSLATION_DOFS.has(field)) return BM2_COMPARISON_POLICY.absoluteTolerance.translation;
+    if (NODE_DOFS.includes(field)) return BM2_COMPARISON_POLICY.absoluteTolerance.rotation;
+  }
+  if (family === 'restraint') {
+    if (TRANSLATION_DOFS.has(field)) return BM2_COMPARISON_POLICY.absoluteTolerance.force;
+    if (NODE_DOFS.includes(field)) return BM2_COMPARISON_POLICY.absoluteTolerance.moment;
+  }
+  if (family === 'globalForce' || family === 'localForce') {
+    if (FORCE_FIELDS.has(field)) return BM2_COMPARISON_POLICY.absoluteTolerance.force;
+    if (ACTION_FIELDS.includes(field)) return BM2_COMPARISON_POLICY.absoluteTolerance.moment;
+  }
+  throw new Error(`Unsupported BM2 comparison family/field: ${family}/${field}`);
+}
 
 function ciiDisplacement(row) {
   return {
@@ -33,11 +56,19 @@ function ownValues(report) {
     cases.OPE.nodes.set(node.sourceNodeId, node.operating);
     cases.SUS.nodes.set(node.sourceNodeId, node.sustained);
     cases.EXP.nodes.set(node.sourceNodeId, {
-      displacement: Object.fromEntries(NODE_DOFS.map((field) => [field, node.operating.displacement[field] - node.sustained.displacement[field]])),
-      reaction: Object.fromEntries(NODE_DOFS.map((field) => [field, node.operating.reaction[field] - node.sustained.reaction[field]])),
+      displacement: Object.fromEntries(NODE_DOFS.map((field) => [
+        field,
+        node.operating.displacement[field] - node.sustained.displacement[field],
+      ])),
+      reaction: Object.fromEntries(NODE_DOFS.map((field) => [
+        field,
+        node.operating.reaction[field] - node.sustained.reaction[field],
+      ])),
     });
   }
-  const subtract = (a, b) => Object.fromEntries(ACTION_FIELDS.map((field) => [field, a[field] - b[field]]));
+  const subtract = (a, b) => Object.fromEntries(
+    ACTION_FIELDS.map((field) => [field, a[field] - b[field]]),
+  );
   for (const element of report.elements) {
     const key = `${element.fromNode}-${element.toNode}`;
     cases.OPE.pairs.set(key, { global: element.operating.global, local: element.operating.local });
@@ -54,13 +85,6 @@ function ownValues(report) {
     });
   }
   return cases;
-}
-
-function absoluteTolerance(field) {
-  if (FORCE_FIELDS.has(field)) return BM2_COMPARISON_POLICY.absoluteTolerance.force;
-  if (ROTATION_FIELDS.has(field)) return BM2_COMPARISON_POLICY.absoluteTolerance.rotation;
-  if (['mx', 'my', 'mz'].includes(field)) return BM2_COMPARISON_POLICY.absoluteTolerance.moment;
-  return BM2_COMPARISON_POLICY.absoluteTolerance.translation;
 }
 
 function causes({ family, nodeId, pairKey, elementByPair, branchNodeIds }) {
@@ -81,8 +105,12 @@ function scalar({ caseLabel, family, identifier, end = null, field, ours, cii, c
   const absoluteDifference = ours - cii;
   const nearZero = Math.abs(cii) <= BM2_COMPARISON_POLICY.nearZeroReferenceThreshold;
   const percentDifference = nearZero ? null : (absoluteDifference / Math.abs(cii)) * 100;
-  const tolerance = nearZero ? absoluteTolerance(field) : BM2_COMPARISON_POLICY.relativeTolerancePercent;
-  const passed = nearZero ? Math.abs(absoluteDifference) <= tolerance : Math.abs(percentDifference) <= tolerance;
+  const tolerance = nearZero
+    ? absoluteToleranceForComparison(family, field)
+    : BM2_COMPARISON_POLICY.relativeTolerancePercent;
+  const passed = nearZero
+    ? Math.abs(absoluteDifference) <= tolerance
+    : Math.abs(percentDifference) <= tolerance;
   return Object.freeze({
     caseLabel,
     family,
@@ -112,72 +140,134 @@ function summary(rows) {
   });
 }
 
+function toleranceAudit(cases) {
+  const counts = {};
+  for (const family of BM2_COMPARISON_FAMILIES) counts[family] = {};
+  for (const section of Object.values(cases)) {
+    for (const family of BM2_COMPARISON_FAMILIES) {
+      for (const row of section[family].rows) {
+        if (row.comparisonMode !== 'ABSOLUTE_NEAR_ZERO_REFERENCE') continue;
+        const key = `${row.field}:${row.tolerance}`;
+        counts[family][key] = (counts[family][key] ?? 0) + 1;
+      }
+    }
+  }
+  return Object.freeze(Object.fromEntries(
+    Object.entries(counts).map(([family, rows]) => [family, Object.freeze(rows)]),
+  ));
+}
+
 export function buildBm2CiiComparisonConditioned() {
   const cii = parseBm2CiiOutput(readFileSync(BM2_CII_OUTPUT_PATH, 'utf8'));
   const solved = solveBm2InputXmlConditioned();
   const ours = ownValues(solved.report);
   const ownNodeIds = new Set(solved.report.nodes.map((row) => row.sourceNodeId));
   const ownPairKeys = new Set(solved.report.elements.map((row) => `${row.fromNode}-${row.toNode}`));
-  const elementByPair = new Map(solved.report.elements.map((row) => [`${row.fromNode}-${row.toNode}`, row]));
-  const branchNodeIds = new Set(['30', '70', '100', '140', '150']);
+  const elementByPair = new Map(
+    solved.report.elements.map((row) => [`${row.fromNode}-${row.toNode}`, row]),
+  );
+  const branchNodeIds = new Set(['30', '60', '70', '100', '140', '150']);
   const cases = {};
 
   for (const caseLabel of CASES) {
     const displacement = [];
     const unmatchedDisplacementNodes = [];
     for (const [nodeId, reference] of cii.displacement.get(caseLabel)) {
-      if (!ownNodeIds.has(nodeId)) { unmatchedDisplacementNodes.push(nodeId); continue; }
+      if (!ownNodeIds.has(nodeId)) {
+        unmatchedDisplacementNodes.push(nodeId);
+        continue;
+      }
       const ciiRow = ciiDisplacement(reference);
       const ownRow = ours[caseLabel].nodes.get(nodeId).displacement;
-      for (const field of NODE_DOFS) displacement.push(scalar({
-        caseLabel, family: 'displacement', identifier: nodeId, field,
-        ours: ownRow[field], cii: ciiRow[field],
-        context: { family: 'displacement', nodeId, pairKey: null, elementByPair, branchNodeIds },
-      }));
+      for (const field of NODE_DOFS) {
+        displacement.push(scalar({
+          caseLabel,
+          family: 'displacement',
+          identifier: nodeId,
+          field,
+          ours: ownRow[field],
+          cii: ciiRow[field],
+          context: { family: 'displacement', nodeId, pairKey: null, elementByPair, branchNodeIds },
+        }));
+      }
     }
 
     const restraint = [];
     const unmatchedRestraintNodes = [];
     for (const [nodeId, reference] of cii.restraint.get(caseLabel)) {
-      if (!ownNodeIds.has(nodeId)) { unmatchedRestraintNodes.push(nodeId); continue; }
+      if (!ownNodeIds.has(nodeId)) {
+        unmatchedRestraintNodes.push(nodeId);
+        continue;
+      }
       const ciiRow = ciiRestraint(reference);
       const ownRow = ours[caseLabel].nodes.get(nodeId).reaction;
-      for (const field of NODE_DOFS) restraint.push(scalar({
-        caseLabel, family: 'restraint', identifier: nodeId, field,
-        ours: ownRow[field], cii: ciiRow[field],
-        context: { family: 'restraint', nodeId, pairKey: null, elementByPair, branchNodeIds },
-      }));
+      for (const field of NODE_DOFS) {
+        restraint.push(scalar({
+          caseLabel,
+          family: 'restraint',
+          identifier: nodeId,
+          field,
+          ours: ownRow[field],
+          cii: ciiRow[field],
+          context: { family: 'restraint', nodeId, pairKey: null, elementByPair, branchNodeIds },
+        }));
+      }
     }
 
     const compareActions = (family, referenceMap, ownField) => {
       const rows = [];
       const unmatchedPairKeys = [];
       for (const [pairKey, reference] of referenceMap) {
-        if (!ownPairKeys.has(pairKey)) { unmatchedPairKeys.push(pairKey); continue; }
+        if (!ownPairKeys.has(pairKey)) {
+          unmatchedPairKeys.push(pairKey);
+          continue;
+        }
         const ownRow = ours[caseLabel].pairs.get(pairKey)[ownField];
         for (const end of ['I', 'J']) {
-          for (const field of ACTION_FIELDS) rows.push(scalar({
-            caseLabel, family, identifier: pairKey, end, field,
-            ours: ownRow[end][field], cii: reference[end][field],
-            context: { family, nodeId: null, pairKey, elementByPair, branchNodeIds },
-          }));
+          for (const field of ACTION_FIELDS) {
+            rows.push(scalar({
+              caseLabel,
+              family,
+              identifier: pairKey,
+              end,
+              field,
+              ours: ownRow[end][field],
+              cii: reference[end][field],
+              context: { family, nodeId: null, pairKey, elementByPair, branchNodeIds },
+            }));
+          }
         }
       }
-      return Object.freeze({ rows: Object.freeze(rows), unmatchedPairKeys: Object.freeze(unmatchedPairKeys), summary: summary(rows) });
+      return Object.freeze({
+        rows: Object.freeze(rows),
+        unmatchedPairKeys: Object.freeze(unmatchedPairKeys),
+        summary: summary(rows),
+      });
     };
 
     const globalForce = compareActions('globalForce', cii.globalForce.get(caseLabel), 'global');
     const localForce = compareActions('localForce', cii.localForce.get(caseLabel), 'local');
     cases[caseLabel] = Object.freeze({
-      displacement: Object.freeze({ rows: Object.freeze(displacement), unmatchedNodes: Object.freeze(unmatchedDisplacementNodes), summary: summary(displacement) }),
-      restraint: Object.freeze({ rows: Object.freeze(restraint), unmatchedNodes: Object.freeze(unmatchedRestraintNodes), summary: summary(restraint) }),
+      displacement: Object.freeze({
+        rows: Object.freeze(displacement),
+        unmatchedNodes: Object.freeze(unmatchedDisplacementNodes),
+        summary: summary(displacement),
+      }),
+      restraint: Object.freeze({
+        rows: Object.freeze(restraint),
+        unmatchedNodes: Object.freeze(unmatchedRestraintNodes),
+        summary: summary(restraint),
+      }),
       globalForce,
       localForce,
     });
   }
 
   const summaries = Object.values(cases).flatMap((section) => [
-    section.displacement.summary, section.restraint.summary, section.globalForce.summary, section.localForce.summary,
+    section.displacement.summary,
+    section.restraint.summary,
+    section.globalForce.summary,
+    section.localForce.summary,
   ]);
   const totals = summaries.reduce((acc, row) => ({
     comparisons: acc.comparisons + row.comparisons,
@@ -187,11 +277,13 @@ export function buildBm2CiiComparisonConditioned() {
   }), { comparisons: 0, passed: 0, failed: 0, untraced: 0 });
 
   return Object.freeze({
-    schema: 'lfea-bm2-cii-output-comparison/v2',
+    schema: 'lfea-bm2-cii-output-comparison/v3',
     sourceInputPath: 'benchmarks/LFEA/BM2/Input_BM2.xml',
     sourceOutputPath: 'benchmarks/LFEA/BM2/Output_BM2.xml',
     sourceInputSemanticHash: solved.source.semanticHash,
     comparisonPolicy: BM2_COMPARISON_POLICY,
+    toleranceAuthority: 'RESULT_FAMILY_AND_COMPONENT_V1',
+    toleranceAudit: toleranceAudit(cases),
     solverConditioningProfile: solved.report.solverConditioningProfile,
     qualificationStatus: totals.failed === 0 ? 'WITHIN_TOLERANCE' : 'GAP_DISCLOSED',
     totals: Object.freeze(totals),
