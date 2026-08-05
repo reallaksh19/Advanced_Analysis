@@ -11,10 +11,12 @@ import {
 import {
   absoluteToleranceForComparison,
   BM2_COMPARISON_FAMILIES,
+  BM2_COVERAGE_SCHEMA,
+  BM2_MATCHED_SUBSET_METRIC,
   buildBm2CiiComparisonConditioned,
 } from './lfea-b3.26-bm2-output-comparison-runtime.mjs';
 
-console.log('\n--- LFEA B-3.26 M027 BM2 first solve + real CAESAR comparison ---');
+console.log('\n--- LFEA B-3.26 M027 BM2 benchmark custody + matched-subset comparison ---');
 
 assert.deepEqual(BM2_COMPARISON_FAMILIES, [
   'displacement',
@@ -70,7 +72,6 @@ assert.equal(solved.normalized.geometry.valid, true);
 assert.equal(solved.report.schema, 'm027-bm2-first-solve-report/v1');
 assert.equal(solved.report.counts.sourceElements, 35);
 assert.equal(solved.report.counts.rigidElements, 9);
-// Phase 1 proves 11 physical BEND child records; 9 retain resolved bend-radius geometry.
 assert.equal(solved.report.counts.bendTaggedElements, 9);
 assert.equal(solved.report.counts.reducerTaggedElements, 0);
 assert.equal(solved.report.solverConditioningProfile.backend, 'FEA_SPARSE_DIRECT_CHOLESKY_LDLT_V1');
@@ -103,23 +104,76 @@ assert.equal(
 );
 
 const output = parseBm2CiiOutput(readFileSync(BM2_CII_OUTPUT_PATH, 'utf8'));
+assert.equal(output.schema, 'fea-caesar-output-row-custody/v1');
 for (const label of ['OPE', 'SUS', 'EXP']) {
-  assert.equal(output.displacement.get(label).size, 61);
-  assert.equal(output.globalForce.get(label).size, 61);
-  assert.equal(output.localForce.get(label).size, 61);
-  assert.ok(output.restraint.get(label).size > 0);
+  assert.equal(output.displacement.get(label).rows.length, 61);
+  assert.equal(output.globalForce.get(label).rows.length, 61);
+  assert.equal(output.localForce.get(label).rows.length, 61);
+  assert.equal(output.restraint.get(label).rows.length, 6);
+  assert.equal(output.restraint.get(label).aggregatedByNode.size, 5);
+  assert.equal(output.restraint.get(label).duplicateRowOccurrences, 1);
+}
+
+const actionBlock = (fromNode, toNode, fx) => `
+  <ELEMENT FROM_NODE="${fromNode}" TO_NODE="${toNode}">
+    <FORCES><FROM FX="${fx}" FY="0" FZ="0"/><TO FX="${-fx}" FY="0" FZ="0"/></FORCES>
+    <MOMENTS><FROM MX="0" MY="0" MZ="0"/><TO MX="0" MY="0" MZ="0"/></MOMENTS>
+  </ELEMENT>`;
+const reportFixture = (label) => `
+<DISPLACEMENT_REPORT LOADCASE="L1 (${label})">
+  <NODE NUMBER="1"><TRANSLATIONS DX="0" DY="0" DZ="0"/><ROTATIONS RX="0" RY="0" RZ="0"/></NODE>
+</DISPLACEMENT_REPORT>
+<RESTRAINT_REPORT LOADCASE="L1 (${label})">
+  <RESTRAINT NODE="1" TYPE="+Y"><FORCES FX="0" FY="1" FZ="0"/><MOMENTS MX="0" MY="0" MZ="0"/></RESTRAINT>
+</RESTRAINT_REPORT>
+<GLOBAL_FORCE_REPORT LOADCASE="L1 (${label})">
+  ${actionBlock('1', '2', 1)}
+  ${actionBlock('1', '2', 2)}
+  ${actionBlock('2', '1', 3)}
+</GLOBAL_FORCE_REPORT>
+<LOCAL_FORCE_REPORT LOADCASE="L1 (${label})">
+  ${actionBlock('1', '2', 1)}
+  ${actionBlock('1', '2', 2)}
+  ${actionBlock('2', '1', 3)}
+</LOCAL_FORCE_REPORT>`;
+const fixture = parseBm2CiiOutput(`<OUTPUT>${['OPE', 'SUS', 'EXP'].map(reportFixture).join('\n')}</OUTPUT>`);
+for (const label of ['OPE', 'SUS', 'EXP']) {
+  const global = fixture.globalForce.get(label);
+  assert.equal(global.rows.length, 3, 'Duplicate and reversed report rows must all survive.');
+  assert.equal(global.byPair.get('1-2').length, 2);
+  assert.equal(global.byPair.get('1-2')[0].occurrenceOrdinalWithinCaseFamilyAndPair, 0);
+  assert.equal(global.byPair.get('1-2')[1].occurrenceOrdinalWithinCaseFamilyAndPair, 1);
+  assert.equal(global.byPair.get('2-1').length, 1);
+  assert.equal(global.duplicateRowOccurrences, 1);
+  assert.equal(new Set(global.rows.map((row) => row.rowUid)).size, 3);
 }
 
 const comparison = buildBm2CiiComparisonConditioned();
-assert.equal(comparison.schema, 'lfea-bm2-cii-output-comparison/v3');
+assert.equal(comparison.schema, 'lfea-bm2-cii-output-comparison/v4');
+assert.equal(comparison.comparisonMetric, BM2_MATCHED_SUBSET_METRIC);
+assert.equal(comparison.comparisonScope, 'MATCHED_SOURCE_SUBSET_ONLY');
+assert.equal(comparison.completeComparisonClaim, false);
 assert.equal(comparison.toleranceAuthority, 'RESULT_FAMILY_AND_COMPONENT_V1');
-assert.ok(['WITHIN_TOLERANCE', 'GAP_DISCLOSED'].includes(comparison.qualificationStatus));
+assert.equal(comparison.matchedSubsetStatus, 'GAP_DISCLOSED');
+assert.equal(comparison.qualificationStatus, 'INCOMPLETE_BLOCKED');
+assert.match(comparison.restraintAuthorityStatus, /PROJECT_MUTATIONS_NOT_BENCHMARK_AUTHORITY/u);
 assert.deepEqual(comparison.totals, {
   comparisons: 2232,
   passed: 771,
   failed: 1461,
   untraced: 0,
 });
+assert.equal(comparison.coverage.schema, BM2_COVERAGE_SCHEMA);
+assert.equal(comparison.coverage.metricName, BM2_MATCHED_SUBSET_METRIC);
+assert.equal(comparison.coverage.matchedScalarDenominator, 2232);
+assert.equal(comparison.coverage.sourceLevelScalarDenominator, 3240);
+assert.equal(comparison.coverage.fullStationScalarDenominator, 5598);
+assert.equal(comparison.coverage.declaredReportRows, 567);
+assert.equal(comparison.coverage.parsedReportRows, 567);
+assert.equal(comparison.coverage.duplicateRowOccurrences, 3);
+assert.equal(comparison.coverage.unresolvedClassificationRows, 318);
+assert.equal(comparison.coverage.unmatchedSolverRows, 84);
+assert.equal(comparison.coverage.coverageStatus, 'INCOMPLETE_BLOCKED');
 for (const family of BM2_COMPARISON_FAMILIES) {
   assert.equal(typeof comparison.toleranceAudit[family], 'object');
 }
@@ -127,16 +181,23 @@ assert.equal(comparison.totals.comparisons, comparison.totals.passed + compariso
 assert.equal(
   comparison.totals.untraced,
   0,
-  'Every out-of-tolerance result must name at least one cause code.',
+  'Every out-of-tolerance matched-subset result must name at least one cause code.',
 );
 for (const label of ['OPE', 'SUS', 'EXP']) {
   const section = comparison.cases[label];
-  assert.ok(section.displacement.rows.length > 0, `${label} displacement matches`);
-  assert.ok(section.restraint.rows.length > 0, `${label} restraint matches`);
-  assert.ok(section.globalForce.rows.length > 0, `${label} global-force matches`);
-  assert.ok(section.localForce.rows.length > 0, `${label} local-force matches`);
+  assert.equal(section.displacement.coverage.matchedScalarDenominator, 210);
+  assert.equal(section.restraint.coverage.matchedScalarDenominator, 30);
+  assert.equal(section.globalForce.coverage.matchedScalarDenominator, 252);
+  assert.equal(section.localForce.coverage.matchedScalarDenominator, 252);
+  assert.equal(section.displacement.coverage.unresolvedClassificationRows, 26);
+  assert.equal(section.globalForce.coverage.unresolvedClassificationRows, 40);
+  assert.equal(section.localForce.coverage.unresolvedClassificationRows, 40);
+  assert.equal(section.globalForce.coverage.unmatchedSolverRows, 14);
+  assert.equal(section.localForce.coverage.unmatchedSolverRows, 14);
+  assert.equal(section.restraint.coverage.duplicateRowOccurrences, 1);
   for (const family of BM2_COMPARISON_FAMILIES) {
     assert.equal(section[family].summary.untraced, 0, `${label} ${family} untraced failures`);
+    assert.equal(section[family].coverage.schema, BM2_COVERAGE_SCHEMA);
   }
 }
 
@@ -155,13 +216,21 @@ const caseSummary = Object.fromEntries(Object.entries(comparison.cases).map(([la
   restraint: section.restraint.summary,
   globalForce: section.globalForce.summary,
   localForce: section.localForce.summary,
-  unmatchedCiiNodes: section.displacement.unmatchedNodes.length,
-  unmatchedCiiGlobalPairs: section.globalForce.unmatchedPairKeys.length,
-  unmatchedCiiLocalPairs: section.localForce.unmatchedPairKeys.length,
+  coverage: Object.fromEntries(BM2_COMPARISON_FAMILIES.map((family) => [family, {
+    matchedRows: section[family].coverage.matchedRows,
+    unresolvedClassificationRows: section[family].coverage.unresolvedClassificationRows,
+    unmatchedSolverRows: section[family].coverage.unmatchedSolverRows,
+    matchedScalarDenominator: section[family].coverage.matchedScalarDenominator,
+    fullStationScalarDenominator: section[family].coverage.fullStationScalarDenominator,
+    coverageStatus: section[family].coverage.coverageStatus,
+  }])),
 }]));
 console.log(JSON.stringify({
   qualificationStatus: comparison.qualificationStatus,
+  matchedSubsetStatus: comparison.matchedSubsetStatus,
   totals: comparison.totals,
+  coverage: comparison.coverage,
+  restraintAuthorityStatus: comparison.restraintAuthorityStatus,
   toleranceAuthority: comparison.toleranceAuthority,
   toleranceAudit: comparison.toleranceAudit,
   executionStatus: {
@@ -180,4 +249,4 @@ console.log(JSON.stringify({
   })),
   limitations: comparison.limitations,
 }, null, 2));
-console.log(`LFEA B-3.26 M027 BM2 comparison ${comparison.qualificationStatus}`);
+console.log(`LFEA B-3.26 M027 benchmark ${comparison.qualificationStatus}; matched subset ${comparison.matchedSubsetStatus}`);
