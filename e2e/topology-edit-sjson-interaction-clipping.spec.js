@@ -125,27 +125,45 @@ async function visiblePickPoint(page, kind) {
     }
     const rect = canvas.getBoundingClientRect();
     const candidates = [];
-    draftGroup.updateMatrixWorld(true);
-    camera.updateMatrixWorld(true);
-    draftGroup.traverse((object) => {
-      if (!object.visible) return;
-      const name = String(object.name || '');
-      const matches = objectKind === 'node'
-        ? name.startsWith('topology-edit-node-pick-proxy:')
-        : name.startsWith('topology-edit-visible-route-solid:')
-          && object.userData?.directPickMesh === true;
-      if (!matches) return;
+    const matchesCanonicalKind = (canonicalId) => (
+      objectKind === 'node'
+        ? canonicalId.startsWith('node:')
+        : canonicalId.startsWith('edge:')
+    );
+    const appendCandidate = (object, worldMatrix, canonicalId) => {
+      if (!matchesCanonicalKind(canonicalId)) return;
       object.geometry?.computeBoundingSphere?.();
       const center = object.geometry?.boundingSphere?.center?.clone?.()
         ?? object.position.clone();
-      center.applyMatrix4(object.matrixWorld).project(camera);
+      center.applyMatrix4(worldMatrix).project(camera);
       if (![center.x, center.y, center.z].every(Number.isFinite)) return;
       if (center.z < -1 || center.z > 1) return;
       const x = rect.left + ((center.x + 1) * 0.5 * rect.width);
       const y = rect.top + ((1 - center.y) * 0.5 * rect.height);
       if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return;
-      candidates.push({ x, y, name });
+      candidates.push({ x, y, objectId: canonicalId });
+    };
+
+    draftGroup.updateMatrixWorld(true);
+    camera.updateMatrixWorld(true);
+    draftGroup.traverse((object) => {
+      if (!object.visible || !object.isMesh) return;
+      const pickTable = object.userData?.pickTable;
+      if (object.isInstancedMesh && Array.isArray(pickTable)) {
+        for (let index = 0; index < pickTable.length; index += 1) {
+          const canonicalId = String(pickTable[index]?.objectId || '');
+          if (!matchesCanonicalKind(canonicalId)) continue;
+          const instanceMatrix = object.matrixWorld.clone().identity();
+          object.getMatrixAt(index, instanceMatrix);
+          const worldMatrix = object.matrixWorld.clone().multiply(instanceMatrix);
+          appendCandidate(object, worldMatrix, canonicalId);
+        }
+        return;
+      }
+      const canonicalId = String(object.userData?.pickTarget?.objectId || '');
+      appendCandidate(object, object.matrixWorld, canonicalId);
     });
+
     const offsets = [
       [0, 0], [-4, 0], [4, 0], [0, -4], [0, 4],
       [-8, 0], [8, 0], [0, -8], [0, 8],
@@ -156,9 +174,7 @@ async function visiblePickPoint(page, kind) {
         const y = candidate.y + dy;
         const pick = backend.pickAt(x, y);
         const canonicalId = String(pick?.objectId || '');
-        const matchesNode = objectKind === 'node' && canonicalId.startsWith('node:');
-        const matchesComponent = objectKind === 'component' && canonicalId.startsWith('edge:');
-        if (matchesNode || matchesComponent) return { x, y, objectId: canonicalId };
+        if (matchesCanonicalKind(canonicalId)) return { x, y, objectId: canonicalId };
       }
     }
     throw new Error(
