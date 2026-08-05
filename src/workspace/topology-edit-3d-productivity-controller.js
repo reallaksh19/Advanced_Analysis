@@ -11,6 +11,9 @@ export class TopologyEdit3DViewController extends ProfessionalController {
   constructor(eventBus, lifecycleOptions = {}) {
     super(eventBus, lifecycleOptions);
     this.cleanShellRuntime = new TopologyEditCleanShellRuntime(this);
+    this.sourceVisualCache = null;
+    this.sourceVisualCacheDataset = null;
+    this.sourceVisualCacheKey = '';
     const getProfessionalViewState = this.lifecycle.getViewState;
     this.lifecycle.getViewState = () => ({
       ...getProfessionalViewState(),
@@ -32,8 +35,31 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     this.cleanShellRuntime.mount(this.hostElement);
   }
 
+  deriveVisual(canonical, modelRole) {
+    const role = String(modelRole || 'DRAFT').toUpperCase();
+    if (role !== 'SOURCE') return super.deriveVisual(canonical, modelRole);
+    const key = sourceVisualKey(canonical);
+    if (
+      this.sourceVisualCache
+      && this.sourceVisualCacheDataset === this.workspaceDataset
+      && this.sourceVisualCacheKey === key
+    ) {
+      if (this.hostElement) this.hostElement.dataset.topologyEditSourceVisualCache = 'HIT';
+      return this.sourceVisualCache;
+    }
+    const result = super.deriveVisual(canonical, modelRole);
+    this.sourceVisualCache = result;
+    this.sourceVisualCacheDataset = this.workspaceDataset;
+    this.sourceVisualCacheKey = key;
+    if (this.hostElement) this.hostElement.dataset.topologyEditSourceVisualCache = 'MISS';
+    return result;
+  }
+
   deactivate() {
     this.cleanShellRuntime.destroy();
+    this.sourceVisualCache = null;
+    this.sourceVisualCacheDataset = null;
+    this.sourceVisualCacheKey = '';
     super.deactivate();
   }
 
@@ -79,4 +105,8 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     super.updateActionButtons();
     this.cleanShellRuntime?.updateAvailability();
   }
+}
+
+function sourceVisualKey(canonical) {
+  return `${String(canonical?.sourceHash || '')}:${String(canonical?.canonicalTopologyHash || '')}`;
 }
