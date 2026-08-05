@@ -8,9 +8,15 @@ on:
       - 'src/workspace/load-calc-consumer-controller.js'
       - 'src/workspace/tree-panel-events.js'
       - 'src/workspace/topology-edit-3d-professional-controller.js'
+      - 'src/workspace/topology-edit-3d-sjson-fidelity-controller.js'
+      - 'src/workspace/topology-edit/topology-edit-sjson-visual-authority.js'
+      - 'src/workspace/topology-edit/topology-edit-sjson-tee-projection.js'
+      - 'src/workspace/topology-edit/topology-edit-sjson-point-component-projection.js'
       - 'src/workspace/topology-edit-clean.css'
       - 'e2e/topology-edit-remount-sjson.spec.js'
+      - 'e2e/topology-edit-sjson-render-authority.spec.js'
       - 'e2e/topology-edit-clean-layout.spec.js'
+      - 'public/Sjson.json'
       - 'public/fixtures/topology-edit-20-element-demo.staged.json'
   workflow_dispatch:
 
@@ -53,14 +59,20 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
           node --check src/workspace/load-calc-consumer-controller.js
+          node --check src/workspace/topology-edit-3d-sjson-fidelity-controller.js
+          node --check src/workspace/topology-edit/topology-edit-sjson-visual-authority.js
+          node --check src/workspace/topology-edit/topology-edit-sjson-tee-projection.js
+          node --check src/workspace/topology-edit/topology-edit-sjson-point-component-projection.js
           node --check src/workspace/tree-panel-events.js
           node --check e2e/topology-edit-remount-sjson.spec.js
+          node --check e2e/topology-edit-sjson-render-authority.spec.js
           git diff --check
 
       - name: Execute SJSON import and clean-shell remount qualification
         run: |
           npx playwright test \
             e2e/topology-edit-remount-sjson.spec.js \
+            e2e/topology-edit-sjson-render-authority.spec.js \
             e2e/topology-edit-clean-layout.spec.js \
             --project=chromium --workers=1 --retries=0 --reporter=line
 
