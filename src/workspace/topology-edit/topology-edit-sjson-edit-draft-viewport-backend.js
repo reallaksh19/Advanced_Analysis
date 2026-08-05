@@ -17,7 +17,7 @@ const Y_AXIS = new THREE.Vector3(0, 1, 0);
  * HUD, sectioning and render-resource layers, while replacing rich component
  * solids with the compact Edit Draft representation.
  */
-export class TopologyEditSjsonEditDraftViewportBackend
+export class TopologyEditSjsonEditDraftNavigationHudViewportBackend
   extends TopologyEditNavigationHudViewportBackend {
   renderSession(model) {
     this.renderOptimizationEvidence = null;
@@ -134,6 +134,9 @@ export class TopologyEditSjsonEditDraftViewportBackend
     return bounds;
   }
 }
+
+export const TopologyEditSjsonEditDraftViewportBackend =
+  TopologyEditSjsonEditDraftNavigationHudViewportBackend;
 
 function compactSegmentObject(segment, material, radialSegments) {
   const start = finiteVector(segment.start);
