@@ -5,11 +5,65 @@ import { fileURLToPath } from 'node:url';
 import { solveBm2InputXmlConditioned } from './lfea-b3.26-bm2-solve-runtime.mjs';
 import {
   BM2_CII_OUTPUT_PATH,
+  BM2_COMPARISON_POLICY,
   parseBm2CiiOutput,
 } from './lfea-b3.26-bm2-output-comparison.mjs';
-import { buildBm2CiiComparisonConditioned } from './lfea-b3.26-bm2-output-comparison-runtime.mjs';
+import {
+  absoluteToleranceForComparison,
+  BM2_COMPARISON_FAMILIES,
+  buildBm2CiiComparisonConditioned,
+} from './lfea-b3.26-bm2-output-comparison-runtime.mjs';
 
 console.log('\n--- LFEA B-3.26 M027 BM2 first solve + real CAESAR comparison ---');
+
+assert.deepEqual(BM2_COMPARISON_FAMILIES, [
+  'displacement',
+  'restraint',
+  'globalForce',
+  'localForce',
+]);
+for (const field of ['UX', 'UY', 'UZ']) {
+  assert.equal(
+    absoluteToleranceForComparison('displacement', field),
+    BM2_COMPARISON_POLICY.absoluteTolerance.translation,
+  );
+  assert.equal(
+    absoluteToleranceForComparison('restraint', field),
+    BM2_COMPARISON_POLICY.absoluteTolerance.force,
+  );
+}
+for (const field of ['RX', 'RY', 'RZ']) {
+  assert.equal(
+    absoluteToleranceForComparison('displacement', field),
+    BM2_COMPARISON_POLICY.absoluteTolerance.rotation,
+  );
+  assert.equal(
+    absoluteToleranceForComparison('restraint', field),
+    BM2_COMPARISON_POLICY.absoluteTolerance.moment,
+  );
+}
+for (const family of ['globalForce', 'localForce']) {
+  for (const field of ['fx', 'fy', 'fz']) {
+    assert.equal(
+      absoluteToleranceForComparison(family, field),
+      BM2_COMPARISON_POLICY.absoluteTolerance.force,
+    );
+  }
+  for (const field of ['mx', 'my', 'mz']) {
+    assert.equal(
+      absoluteToleranceForComparison(family, field),
+      BM2_COMPARISON_POLICY.absoluteTolerance.moment,
+    );
+  }
+}
+assert.throws(
+  () => absoluteToleranceForComparison('displacement', 'fx'),
+  /Unsupported BM2 comparison family\/field/u,
+);
+assert.throws(
+  () => absoluteToleranceForComparison('unknown', 'UX'),
+  /Unsupported BM2 comparison family\/field/u,
+);
 
 const solved = solveBm2InputXmlConditioned();
 assert.equal(solved.normalized.geometry.valid, true);
@@ -30,16 +84,23 @@ const rigidRows = solved.report.elements.filter((row) => row.rigid);
 assert.equal(rigidRows.length, 9);
 assert.ok(rigidRows.every((row) => row.rigidAuthority !== null));
 assert.ok(rigidRows.every((row) => row.codeStressEligible === false));
-assert.ok(rigidRows.every((row) => row.rigidAuthority.structuralParticipation.recoverForcesAndMoments === true));
+assert.ok(rigidRows.every(
+  (row) => row.rigidAuthority.structuralParticipation.recoverForcesAndMoments === true,
+));
 const zeroRigid = rigidRows.find((row) => row.fromNode === '300' && row.toNode === '310');
 assert.ok(zeroRigid, 'The real zero-weight rigid element 300-310 must be present.');
 assert.equal(zeroRigid.rigidAuthority.gravity.enteredRigidWeight, 0);
 assert.equal(zeroRigid.rigidAuthority.gravity.totalWeight, 0);
 assert.equal(zeroRigid.rigidAuthority.gravity.totalLineWeight, 0);
-assert.ok(rigidRows.filter((row) => row !== zeroRigid).every((row) => row.rigidAuthority.gravity.enteredRigidWeight > 0));
+assert.ok(rigidRows.filter((row) => row !== zeroRigid).every(
+  (row) => row.rigidAuthority.gravity.enteredRigidWeight > 0,
+));
 assert.equal(solved.report.elements.some((row) => row.rigid && row.codeStressEligible), false);
 assert.equal(solved.report.limitations.some((row) => row.code === 'BM2_NO_TRUE_REDUCER_TAG'), true);
-assert.equal(solved.report.limitations.some((row) => row.code === 'BM2_SOLVER_CONDITIONING_PROFILE_STUDY'), true);
+assert.equal(
+  solved.report.limitations.some((row) => row.code === 'BM2_SOLVER_CONDITIONING_PROFILE_STUDY'),
+  true,
+);
 
 const output = parseBm2CiiOutput(readFileSync(BM2_CII_OUTPUT_PATH, 'utf8'));
 for (const label of ['OPE', 'SUS', 'EXP']) {
@@ -50,18 +111,31 @@ for (const label of ['OPE', 'SUS', 'EXP']) {
 }
 
 const comparison = buildBm2CiiComparisonConditioned();
-assert.equal(comparison.schema, 'lfea-bm2-cii-output-comparison/v2');
+assert.equal(comparison.schema, 'lfea-bm2-cii-output-comparison/v3');
+assert.equal(comparison.toleranceAuthority, 'RESULT_FAMILY_AND_COMPONENT_V1');
 assert.ok(['WITHIN_TOLERANCE', 'GAP_DISCLOSED'].includes(comparison.qualificationStatus));
-assert.ok(comparison.totals.comparisons > 0);
+assert.deepEqual(comparison.totals, {
+  comparisons: 2232,
+  passed: 771,
+  failed: 1461,
+  untraced: 0,
+});
+for (const family of BM2_COMPARISON_FAMILIES) {
+  assert.equal(typeof comparison.toleranceAudit[family], 'object');
+}
 assert.equal(comparison.totals.comparisons, comparison.totals.passed + comparison.totals.failed);
-assert.equal(comparison.totals.untraced, 0, 'Every out-of-tolerance result must name at least one cause code.');
+assert.equal(
+  comparison.totals.untraced,
+  0,
+  'Every out-of-tolerance result must name at least one cause code.',
+);
 for (const label of ['OPE', 'SUS', 'EXP']) {
   const section = comparison.cases[label];
   assert.ok(section.displacement.rows.length > 0, `${label} displacement matches`);
   assert.ok(section.restraint.rows.length > 0, `${label} restraint matches`);
   assert.ok(section.globalForce.rows.length > 0, `${label} global-force matches`);
   assert.ok(section.localForce.rows.length > 0, `${label} local-force matches`);
-  for (const family of ['displacement', 'restraint', 'globalForce', 'localForce']) {
+  for (const family of BM2_COMPARISON_FAMILIES) {
     assert.equal(section[family].summary.untraced, 0, `${label} ${family} untraced failures`);
   }
 }
@@ -88,6 +162,8 @@ const caseSummary = Object.fromEntries(Object.entries(comparison.cases).map(([la
 console.log(JSON.stringify({
   qualificationStatus: comparison.qualificationStatus,
   totals: comparison.totals,
+  toleranceAuthority: comparison.toleranceAuthority,
+  toleranceAudit: comparison.toleranceAudit,
   executionStatus: {
     sustained: solved.sustained.execution.status,
     operating: solved.operating.execution.status,
