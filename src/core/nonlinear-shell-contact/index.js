@@ -18,3 +18,5 @@ export * from './independent-checker.js';
 export * from './shell-formulation-contract.js';
 export * from './shell-benchmark-catalog.js';
 export * from './shell-qualification-evaluator.js';
+export * from './contact-procedure-contract.js';
+export * from './contact-qualification-evaluator.js';
