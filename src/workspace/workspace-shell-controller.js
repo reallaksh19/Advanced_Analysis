@@ -133,11 +133,13 @@ export class WorkspaceShellController {
 
   pointerDown(event) {
     const resizer = event.target.closest('.panel-resizer');
-    if (!resizer || this.state.topologyEdit3DActive) return;
+    if (!resizer) return;
+    const action = resizer.dataset.action;
+    if (this.state.topologyEdit3DActive && action !== 'resize-left') return;
     const tree = this.shellElement.querySelector('.tree-panel');
     const properties = this.shellElement.querySelector('.properties-panel');
     this.dragContext = {
-      action: resizer.dataset.action,
+      action,
       startX: event.clientX,
       leftWidth: tree.getBoundingClientRect().width,
       rightWidth: properties.getBoundingClientRect().width,
@@ -169,12 +171,13 @@ export class WorkspaceShellController {
   applyPanelLayout() {
     if (!this.shellElement) return;
     const focus = this.state.topologyEdit3DActive;
-    const treeCollapsed = focus || this.state.treeCollapsed;
+    const treeCollapsed = this.state.treeCollapsed;
     const propertiesCollapsed = focus || this.state.propertiesCollapsed;
     const left = treeCollapsed ? FOCUS_PANEL_WIDTH_PX : this.state.leftPanelWidth;
     const right = propertiesCollapsed ? FOCUS_PANEL_WIDTH_PX : this.state.rightPanelWidth;
     this.shellElement.style.gridTemplateColumns = `${left}px 4px minmax(360px,1fr) 4px ${right}px`;
     this.shellElement.dataset.topologyEditFocusLayout = String(focus);
+    this.shellElement.dataset.topologyEditLeftPanelVisible = String(!treeCollapsed);
     this.shellElement.querySelector('.tree-panel').classList.toggle('workspace-panel--collapsed', treeCollapsed);
     this.shellElement.querySelector('.properties-panel').classList.toggle('workspace-panel--collapsed', propertiesCollapsed);
   }
