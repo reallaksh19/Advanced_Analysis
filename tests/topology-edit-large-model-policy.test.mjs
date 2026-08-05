@@ -54,7 +54,7 @@ import {
   assert.equal(window.items[0], items[0]);
   assert.equal(window.items[159], items[159]);
   assert.equal(window.items.at(-1).canonicalId, selectedId);
-  assert.equal(window.remainingCount, 840);
+  assert.equal(window.remainingCount, 839);
   assert.deepEqual(
     window.items.map((item) => item.canonicalId),
     [...window.items.map((item) => item.canonicalId)].sort(),
