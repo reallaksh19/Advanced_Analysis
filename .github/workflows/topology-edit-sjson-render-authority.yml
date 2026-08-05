@@ -11,6 +11,7 @@ on:
       - 'src/workspace/dataset-adapter.js'
       - 'src/workspace/dataset-types.js'
       - 'src/workspace/load-calc-consumer-controller.js'
+      - 'src/workspace/workspace-shell-controller.js'
       - 'src/workspace/topology-edit-3d-sjson-fidelity-controller.js'
       - 'src/workspace/topology-edit/topology-edit-candidate-builder.js'
       - 'src/workspace/topology-edit/topology-edit-checker-lineage.js'
@@ -75,6 +76,7 @@ jobs:
           node --check src/workspace/dataset-adapter.js
           node --check src/workspace/dataset-types.js
           node --check src/workspace/load-calc-consumer-controller.js
+          node --check src/workspace/workspace-shell-controller.js
           node --check src/workspace/topology-edit-3d-sjson-fidelity-controller.js
           node --check src/workspace/topology-edit/topology-edit-candidate-builder.js
           node --check src/workspace/topology-edit/topology-edit-checker-lineage.js
@@ -90,6 +92,7 @@ jobs:
           node --check tests/topology-edit-sjson-fidelity.test.mjs
           node --check tests/topology-edit-split-lineage-certification.test.mjs
           node --check e2e/topology-edit-sjson-render-authority.spec.js
+          node --check e2e/topology-edit-clean-layout.spec.js
           git diff --check
 
       - name: Execute canonical, typed geometry, support, and split-lineage tests
