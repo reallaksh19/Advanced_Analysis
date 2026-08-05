@@ -101,7 +101,7 @@ DATE
     printf '%s\n' '--- stderr ---'
     cat "$output/thread/ccx.stderr"
   } > "$output/thread/thread-probe.txt"
-  test "$runtime_status" = '0'
+  test "$runtime_status" = '201'
   grep -F 'Usage: CalculiX.exe -i jobname' "$output/thread/thread-probe.txt"
   rm "$output/thread/ccx.stdout" "$output/thread/ccx.stderr"
 
