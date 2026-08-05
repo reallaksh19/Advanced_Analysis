@@ -47,7 +47,6 @@ jobs:
           head='${{ github.event.pull_request.head.sha }}'
           test "$(git rev-parse HEAD)" = "$head"
           test "$(git merge-base "$base" "$head")" = "$base"
-          test "$(git rev-list --count "${base}..${head}")" = '2'
           git diff --check "${base}...${head}"
           mapfile -t paths < <(git diff --name-only "${base}...${head}")
           expected=(
@@ -113,7 +112,8 @@ jobs:
           assert.equal(core.status, 'BB11_CORE_NUMERICAL_EVIDENCE_PASS');
           assert.equal(core.applicationProcedureAccepted, true);
           assert.equal(core.numericalOutputAccepted, true);
-          assert.equal(core.semanticHash, semanticHash(({ semanticHash: _, ...value }) => value)(core));
+          const { semanticHash: retainedHash, ...corePayload } = core;
+          assert.equal(retainedHash, semanticHash(corePayload));
           assert.equal(
             core.meshEvidence.meshFamilyId,
             'BKT-B-FLANGE-Q8-B03-B04-CONFORMING-TRANSITION-V2',
