@@ -64,6 +64,8 @@ jobs:
 
       - name: Emit exact residual, equilibrium and station-custody evidence
         shell: bash
+        env:
+          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           mkdir -p artifacts/lfea-linear-core-exact-head
           set +e
