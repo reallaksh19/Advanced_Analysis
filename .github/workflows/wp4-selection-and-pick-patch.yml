@@ -1,0 +1,34 @@
+name: wp4-selection-and-pick-patch
+
+on:
+  push:
+    branches:
+      - agent/empirical-result-overlays-wp4
+    paths:
+      - 'scripts/wp4-selection-and-pick-patch.mjs'
+      - '.github/workflows/wp4-selection-and-pick-patch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/empirical-result-overlays-wp4
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/wp4-selection-and-pick-patch.mjs
+      - shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/workspace/engineering-loads/empirical-result-overlay.js src/workspace/topology-edit/topology-edit-empirical-result-renderer-v1.js src/workspace/load-calc-consumer-controller.js src/workspace/engineering-loads/empirical-load-calc-scenario-view.js scripts/empirical-result-overlay-check.mjs
+          git diff --cached --quiet && exit 0
+          git commit -m 'Complete WP4 result picking and table selection'
+          git push origin HEAD:agent/empirical-result-overlays-wp4
