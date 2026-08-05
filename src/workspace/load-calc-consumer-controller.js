@@ -116,7 +116,7 @@ export class LoadCalcConsumerController {
         const { renderJsonTraceUI } = await import('./json-trace-ui.js');
         if (revision === this.renderRevision) pane.replaceChildren(renderJsonTraceUI(pane.ownerDocument));
       } else if (tab === '3d') {
-        const { TopologyEdit3DViewController } = await import('./topology-edit-3d-professional-controller.js');
+        const { TopologyEdit3DViewController } = await import('./topology-edit-3d-sjson-fidelity-controller.js');
         if (revision !== this.renderRevision) return;
         if (!this.topologyEdit3DController?.hostElement) {
           resetTopologyEditCleanShell(this.rootElement.ownerDocument);
