@@ -285,7 +285,7 @@ function benchmarkBindings({ exactHeadSha, baseSha, core, stdoutHash, stderrHash
     solverPolicyHash: semanticHash(FLANGE_HUB_SOLVER_POLICY),
     loadIntegrationProfileHash: semanticHash('AXI_Q8_FULL_CIRCUMFERENCE_LOAD_INTEGRATION_V1'),
     recoveryProfileHash: semanticHash('AXI_Q8_GAUSS_POINT_STRESS_RECOVERY_V1'),
-    pathDefinitionHash: core.coreEvidence.pathDefinitions.semanticHash,
+    pathDefinitionHash: core.coreEvidence.pathDefinitionHash,
     referenceAuthorityHash: core.independentEvidence.referenceRegistry.semanticHash,
     observedEvidenceHashes: [core.geometryEvidence.semanticHash, core.meshEvidence.semanticHash, core.coreEvidence.semanticHash, core.outputEvidence.semanticHash, core.independentEvidence.semanticHash],
     stdoutHash,
