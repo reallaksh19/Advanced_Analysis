@@ -1,0 +1,106 @@
+name: M032 BM3 Load Custody Qualification
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'benchmarks/LFEA/BM3/**'
+      - 'docs/LFEA_M032_BM3_LOAD_CUSTODY.md'
+      - 'reports/m032-bm3-load-custody.json'
+      - 'scripts/lfea-m028-bm3-*.mjs'
+      - 'scripts/lfea-m029-bm3-*.mjs'
+      - 'scripts/lfea-m032-*.mjs'
+      - 'scripts/lfea-bm3-consolidated-latest-output-check.mjs'
+      - 'src/core/geometry/adapters/inputXmlToCanonicalGeometry.js'
+      - 'src/core/linear-piping-inputxml-force-moment/**'
+      - 'src/core/linear-fea-load-case/**'
+      - 'src/core/linear-fea-solver/**'
+      - 'src/core/linear-fea-variable-spring-hanger/**'
+      - '.github/workflows/m032-bm3-load-custody.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m032-bm3-load-custody-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_HEAD_SHA }}
+          fetch-depth: 1
+
+      - name: Verify immutable checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
+          test -z "$(git status --porcelain)"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Syntax-check M032 sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in \
+            src/core/linear-piping-inputxml-force-moment/index.js \
+            scripts/lfea-m032-inputxml-force-moment-check.mjs \
+            scripts/lfea-m032-bm3-load-custody.mjs \
+            scripts/lfea-m032-bm3-load-custody-check.mjs; do
+            node --check "$file"
+          done
+          git diff --check
+
+      - name: Generic InputXML force-moment qualification
+        run: node scripts/lfea-m032-inputxml-force-moment-check.mjs
+
+      - name: M032 BM3 physical load-set qualification
+        run: node scripts/lfea-m032-bm3-load-custody-check.mjs
+
+      - name: M029 hanger regression
+        run: node scripts/lfea-m029-bm3-hanger-check.mjs
+
+      - name: Latest BM3 strict comparison
+        run: node scripts/lfea-bm3-consolidated-latest-output-check.mjs --write
+
+      - name: BM1 comparison regression
+        run: npm run check:lfea-bm1-cii-comparison
+
+      - name: Full linear-core regression
+        run: npm run check:lfea-linear-core
+
+      - name: Verify deterministic M032 evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum reports/m032-bm3-load-custody.json > /tmp/m032.sha256
+          node scripts/lfea-m032-bm3-load-custody-check.mjs > /tmp/m032-repeat.log
+          sha256sum -c /tmp/m032.sha256
+
+      - name: Upload deterministic M032 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m032-bm3-load-custody-${{ env.TARGET_HEAD_SHA }}
+          path: |
+            reports/m032-bm3-load-custody.json
+            reports/m029-bm3-hanger-qualification.json
+            reports/bm3-consolidated-latest-output.json
+          if-no-files-found: error
+          retention-days: 30
