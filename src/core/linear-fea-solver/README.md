@@ -59,3 +59,5 @@ npm run check:lfea-b3.5
 ```
 
 B-3.3 retains the closed-form FRAME-3D-01 and PRESCRIBED-01 checks and now exercises the sparse path by default. B-3.5 permanently solves the same fixtures with both declared backends, reports the measured output differences, verifies backend-separated reuse and checks deterministic sparse replay and diagnostic equivalence.
+
+Grounded `LINEAR_SPRING` constraints remain free analysis DOFs. Their support action is recovered explicitly as `-k u` in `execution.reactions`; fixed and prescribed reactions remain `K U - F` at constrained DOFs. Numerical free-body qualification removes grounded-spring `k u` terms from assembled `K U` before summing element resultants, preventing a valid spring support from being mistaken for an unbalanced internal force.
