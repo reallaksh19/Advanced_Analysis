@@ -64,7 +64,7 @@ test('SJSON compact support style bypasses rich support bodies and preserves exa
   const projection = Object.freeze({
     ...baseProjection,
     renderStyle: TOPOLOGY_EDIT_SUPPORT_RENDER_STYLES.TOPO_VALIDATOR_COMPACT,
-    compactMarkerRadiusMm: 12.6,
+    compactMarkerRadiusMm: 37.8,
   });
   const backend = new TopologyEditSupportViewportBackend({ navigationConfiguration: CONFIGURATION });
 
