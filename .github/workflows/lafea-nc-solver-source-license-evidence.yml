@@ -1,0 +1,181 @@
+name: LAFEA-NC Solver Source and License Evidence
+
+on:
+  pull_request:
+    branches:
+      - agent/lafea-nc-solver-custody-evidence
+    paths:
+      - '.github/workflows/lafea-nc-solver-source-license-evidence.yml'
+      - 'docs/nonlinear-shell-contact/LAFEA_NC_SOLVER_SOURCE_LICENSE_EVIDENCE.md'
+      - 'scripts/lafea-nc-solver-source-license-check.mjs'
+      - 'tests/nonlinear-shell-contact-solver-source-license.test.mjs'
+  workflow_dispatch:
+    inputs:
+      head_sha:
+        description: Exact source-and-license evidence head SHA
+        required: true
+        type: string
+      base_sha:
+        description: Exact solver-custody intake base SHA
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  exact-head-source-license-evidence:
+    runs-on: ubuntu-24.04
+    env:
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      DISPATCH_HEAD_SHA: ${{ inputs.head_sha }}
+      DISPATCH_BASE_SHA: ${{ inputs.base_sha }}
+      BASE_BRANCH: agent/lafea-nc-solver-custody-evidence
+      UPSTREAM_REPOSITORY: https://github.com/Dhondtguido/CalculiX.git
+      UPSTREAM_COMMIT: cff1bb12ec7d24ad9048a1f54ae243a18d1a0b54
+      UPSTREAM_TREE: f53d7391769d610dcd1247cff8fb953072d11720
+      UPSTREAM_PARENT: 4bf1bda9e88de93608d2a6449cf024f77c2f7997
+      UPSTREAM_SUBJECT: '"posted ccx_2.22"'
+      LICENSE_GIT_BLOB: d159169d1050894d3ea3b98e1c965c4058208fe1
+    steps:
+      - name: Resolve exact head
+        id: exact
+        shell: bash
+        run: |
+          set -euo pipefail
+          head_sha="${DISPATCH_HEAD_SHA:-${PR_HEAD_SHA:-${GITHUB_SHA}}}"
+          [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]]
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.exact.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Resolve live intake base
+        id: base
+        shell: bash
+        env:
+          EXACT_HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "$BASE_BRANCH:refs/remotes/origin/$BASE_BRANCH"
+          live_base="$(git rev-parse "refs/remotes/origin/$BASE_BRANCH")"
+          base_sha="${DISPATCH_BASE_SHA:-${PR_BASE_SHA}}"
+          [[ "$base_sha" =~ ^[0-9a-f]{40}$ ]]
+          test "$base_sha" = "$live_base"
+          test "$(git rev-parse HEAD)" = "$EXACT_HEAD_SHA"
+          git merge-base --is-ancestor "$base_sha" "$EXACT_HEAD_SHA"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify changed-path containment, syntax, and unit contracts
+        shell: bash
+        env:
+          EXACT_HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
+          BASE_SHA: ${{ steps.base.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          git diff --check "$BASE_SHA...$EXACT_HEAD_SHA"
+          mapfile -t paths < <(git diff --name-only "$BASE_SHA...$EXACT_HEAD_SHA")
+          test "${#paths[@]}" = '4'
+          for path in "${paths[@]}"; do
+            case "$path" in
+              .github/workflows/lafea-nc-solver-source-license-evidence.yml|\
+              docs/nonlinear-shell-contact/LAFEA_NC_SOLVER_SOURCE_LICENSE_EVIDENCE.md|\
+              scripts/lafea-nc-solver-source-license-check.mjs|\
+              tests/nonlinear-shell-contact-solver-source-license.test.mjs) ;;
+              *) echo "Source/license evidence changed-path violation: $path" >&2; exit 1 ;;
+            esac
+          done
+          node --check scripts/lafea-nc-solver-source-license-check.mjs
+          node --check tests/nonlinear-shell-contact-solver-source-license.test.mjs
+          node --test tests/nonlinear-shell-contact-solver-source-license.test.mjs
+
+      - name: Fetch exact upstream CalculiX commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "$RUNNER_TEMP/calculix-upstream"
+          git init -q "$RUNNER_TEMP/calculix-upstream"
+          git -C "$RUNNER_TEMP/calculix-upstream" remote add origin "$UPSTREAM_REPOSITORY"
+          git -C "$RUNNER_TEMP/calculix-upstream" fetch --no-tags --depth=2 origin "$UPSTREAM_COMMIT"
+          test "$(git -C "$RUNNER_TEMP/calculix-upstream" rev-parse FETCH_HEAD)" = "$UPSTREAM_COMMIT"
+          test "$(git -C "$RUNNER_TEMP/calculix-upstream" rev-parse "$UPSTREAM_COMMIT^{tree}")" = "$UPSTREAM_TREE"
+          test "$(git -C "$RUNNER_TEMP/calculix-upstream" rev-parse "$UPSTREAM_COMMIT^")" = "$UPSTREAM_PARENT"
+          test "$(git -C "$RUNNER_TEMP/calculix-upstream" show -s --format=%s "$UPSTREAM_COMMIT")" = "$UPSTREAM_SUBJECT"
+
+      - name: Generate deterministic source and license evidence twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "$RUNNER_TEMP/source-license-a" "$RUNNER_TEMP/source-license-b"
+          for suffix in a b; do
+            out="$RUNNER_TEMP/source-license-$suffix"
+            mkdir -p "$out"
+            archive="CalculiX-$UPSTREAM_COMMIT.tar.gz"
+            prefix="CalculiX-$UPSTREAM_COMMIT/"
+            git -C "$RUNNER_TEMP/calculix-upstream" archive --format=tar --prefix="$prefix" "$UPSTREAM_COMMIT" > "$out/source.tar"
+            gzip -n -9 < "$out/source.tar" > "$out/$archive"
+            rm "$out/source.tar"
+            git -C "$RUNNER_TEMP/calculix-upstream" show "$UPSTREAM_COMMIT:LICENSE" > "$out/LICENSE"
+            test "$(git hash-object "$out/LICENSE")" = "$LICENSE_GIT_BLOB"
+            archive_hash="sha256:$(sha256sum "$out/$archive" | cut -d' ' -f1)"
+            license_hash="sha256:$(sha256sum "$out/LICENSE" | cut -d' ' -f1)"
+            git_version="$(git --version)"
+            node - "$out/source-license-provenance.json" "$archive" "$archive_hash" "$license_hash" "$git_version" <<'NODE'
+          const [path, archivePath, archiveHash, licenseHash, gitVersion] = process.argv.slice(2);
+          const fs = require('node:fs');
+          const commit = process.env.UPSTREAM_COMMIT;
+          const record = {
+            schema: 'calculix-source-license-provenance/v1',
+            repository: 'https://github.com/Dhondtguido/CalculiX',
+            commit,
+            tree: process.env.UPSTREAM_TREE,
+            parent: process.env.UPSTREAM_PARENT,
+            commitSubject: process.env.UPSTREAM_SUBJECT,
+            archivePolicy: 'GIT_ARCHIVE_TAR_GZIP_N_9',
+            archivePrefix: `CalculiX-${commit}/`,
+            archivePath,
+            archiveHash,
+            licensePath: 'LICENSE',
+            licenseHash,
+            licenseGitBlob: process.env.LICENSE_GIT_BLOB,
+            licenseSpdxId: 'GPL-2.0-or-later',
+            gitVersion,
+          };
+          fs.writeFileSync(path, `${JSON.stringify(record, null, 2)}\n`);
+          NODE
+          done
+          diff -ru "$RUNNER_TEMP/source-license-a" "$RUNNER_TEMP/source-license-b"
+
+      - name: Generate byte-identical partial custody reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "$RUNNER_TEMP/source-license-report-a" "$RUNNER_TEMP/source-license-report-b" artifacts/lafea-nc-solver-source-license
+          node scripts/lafea-nc-solver-source-license-check.mjs \
+            --root="$RUNNER_TEMP/source-license-a" \
+            --output-dir="$RUNNER_TEMP/source-license-report-a"
+          node scripts/lafea-nc-solver-source-license-check.mjs \
+            --root="$RUNNER_TEMP/source-license-b" \
+            --output-dir="$RUNNER_TEMP/source-license-report-b"
+          diff -ru "$RUNNER_TEMP/source-license-report-a" "$RUNNER_TEMP/source-license-report-b"
+          mkdir -p artifacts/lafea-nc-solver-source-license
+          cp -R "$RUNNER_TEMP/source-license-a"/. artifacts/lafea-nc-solver-source-license/
+          cp -R "$RUNNER_TEMP/source-license-report-a"/. artifacts/lafea-nc-solver-source-license/
+          test -z "$(git status --porcelain --untracked-files=no)"
+
+      - name: Upload source and license evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc-solver-source-license-${{ steps.exact.outputs.head_sha }}-${{ github.run_attempt }}
+          path: artifacts/lafea-nc-solver-source-license
+          if-no-files-found: error
+          retention-days: 30
