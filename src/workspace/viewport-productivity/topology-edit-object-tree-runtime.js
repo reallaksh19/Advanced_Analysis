@@ -66,7 +66,7 @@ export class TopologyEditObjectTreeRuntime {
     const nextTree = createTopologyEditObjectTree(topology);
     if (this.tree?.treeHash === nextTree.treeHash) {
       this.tree = nextTree;
-      this.patchSelectionState();
+      this.selectionChanged();
       return;
     }
     this.tree = nextTree;
@@ -76,6 +76,15 @@ export class TopologyEditObjectTreeRuntime {
 
   selectionChanged() {
     if (!this.element || !this.tree) return;
+    const selection = this.currentSelection();
+    const renderedIds = new Set(
+      [...this.element.querySelectorAll('[data-object-tree-select]')]
+        .map((button) => button.dataset.objectTreeSelect),
+    );
+    if (selection.canonicalIds.some((canonicalId) => !renderedIds.has(canonicalId))) {
+      this.render();
+      return;
+    }
     this.patchSelectionState();
   }
 
@@ -428,21 +437,12 @@ export function selectTopologyEditObjectTreeWindow(items, selectedIds, limitInpu
   const rows = Array.isArray(items) ? items : [];
   const selected = selectedIds instanceof Set ? selectedIds : new Set(selectedIds || []);
   const limit = Math.max(1, Math.floor(Number(limitInput) || FALLBACK_INITIAL_ROWS));
-  const included = new Set();
-  const accepted = [];
-  rows.slice(0, limit).forEach((item) => {
-    included.add(item.canonicalId);
-    accepted.push(item);
-  });
-  rows.forEach((item) => {
-    if (!selected.has(item.canonicalId) || included.has(item.canonicalId)) return;
-    included.add(item.canonicalId);
-    accepted.push(item);
-  });
-  accepted.sort((left, right) => rows.indexOf(left) - rows.indexOf(right));
+  const accepted = rows.filter((item, index) => (
+    index < limit || selected.has(item.canonicalId)
+  ));
   return Object.freeze({
     items: Object.freeze(accepted),
-    remainingCount: Math.max(0, rows.length - Math.min(rows.length, limit)),
+    remainingCount: Math.max(0, rows.length - accepted.length),
     requestedLimit: limit,
   });
 }
