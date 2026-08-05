@@ -74,7 +74,10 @@ async function main() {
     licenseReviewStatus: 'REVIEWED',
   });
   const profilePath = join(outputRoot, 'approved-solver-profile.json');
-  await writeJson(profilePath, solverProfile);
+  const solverProfileInput = { ...solverProfile };
+  delete solverProfileInput.solverProfileSemanticHash;
+  await writeJson(profilePath, solverProfileInput);
+  await writeJson(join(outputRoot, 'approved-solver-profile-receipt.json'), solverProfile);
 
   const policy = {
     executablePath: runtime.executablePath,
