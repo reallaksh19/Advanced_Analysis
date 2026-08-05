@@ -4,7 +4,11 @@ import {
   projectSupportGeometryToViewport,
 } from './support-restraint-family.js';
 
-const RENDERABLE_QUALIFICATIONS = new Set(['EXPLICIT', 'TYPE', 'PARTIAL']);
+const RENDERABLE_QUALIFICATIONS = new Set([
+  'EXPLICITLY_RESOLVED',
+  'TYPE_CLASSIFIED',
+  'PARTIALLY_RESOLVED',
+]);
 const ACTIVE_RESTRAINT_STATES = new Set(['RESTRAINED', 'GAP', 'SPRING']);
 const RESTRAINT_DIRECTION_FIELDS = Object.freeze([
   'vertical',
