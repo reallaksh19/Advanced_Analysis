@@ -19,6 +19,7 @@ export class TopologyEditPresentationRuntime {
     applyTopologyEditCanonicalVisibility(this.viewportBackend.groups.sourceGroup, state.canonicalVisibility);
     applyTopologyEditCanonicalVisibility(this.viewportBackend.groups.draftGroup, state.canonicalVisibility);
     applyTopologyEditSectionPresentation(this.viewportBackend, state.section);
+    this.viewportBackend.gpuPicker?.invalidateScene?.();
     this.viewportBackend.invalidate?.('presentation-state');
     return state.presentationHash;
   }
@@ -26,6 +27,7 @@ export class TopologyEditPresentationRuntime {
   destroy() {
     if (!this.viewportBackend) return;
     clearTopologyEditSectionPresentation(this.viewportBackend);
+    this.viewportBackend.gpuPicker?.invalidateScene?.();
     this.viewportBackend.invalidate?.('presentation-destroy');
     this.viewportBackend = null;
     this.state = null;
