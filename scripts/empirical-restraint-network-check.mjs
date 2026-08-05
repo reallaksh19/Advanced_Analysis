@@ -187,7 +187,17 @@ assert.equal(unqualifiedResult.status, 'BLOCKED');
 assert(hasBlocker(unqualifiedResult, EMPIRICAL_FAILURE_CODES.EMPIRICAL_PROFILE_UNQUALIFIED));
 
 const branchProfile = profileFor(['L1', 'L2', 'L3']);
-const branchResult = execute(buildBranchFixture(branchProfile));
+const branchFixture = buildBranchFixture(branchProfile);
+const branchResult = execute(branchFixture);
+console.log('WP5_BRANCH_DIAGNOSTIC', JSON.stringify({
+  status: branchResult.status,
+  blockers: branchResult.loadCases.map((row) => ({
+    loadCaseId: row.loadCaseId,
+    blockers: row.blockers,
+  })),
+  connections: branchFixture.topologyGraph.connections,
+  unresolvedPorts: branchFixture.topologyGraph.unresolvedPorts,
+}, null, 2));
 assert.equal(branchResult.status, 'BLOCKED');
 assert(hasBlocker(branchResult, EMPIRICAL_FAILURE_CODES.TOPOLOGY_BRANCH_PROFILE_REQUIRED));
 assert.equal(branchResult.summary.calculatedCaseCount, 0);
