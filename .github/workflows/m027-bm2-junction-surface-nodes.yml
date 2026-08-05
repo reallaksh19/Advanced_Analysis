@@ -46,17 +46,17 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
           node --check scripts/lfea-b3.28-bm2-junction-source-audit.mjs
+          node --check scripts/lfea-b3.28-bm2-junction-surface-node-runtime.mjs
+          node --check scripts/lfea-b3.28-bm2-junction-surface-node-check.mjs
           git diff --check
 
       - name: Audit B31J junction topology
         run: node scripts/lfea-b3.28-bm2-junction-source-audit.mjs
 
       - name: Qualify surface-node transformation
-        if: ${{ hashFiles('scripts/lfea-b3.28-bm2-junction-surface-node-check.mjs') != '' }}
         run: node scripts/lfea-b3.28-bm2-junction-surface-node-check.mjs
 
       - name: Linear-core regression aggregate
-        if: ${{ hashFiles('scripts/lfea-b3.28-bm2-junction-surface-node-check.mjs') != '' }}
         run: npm run check:lfea-linear-core
 
       - name: Publish surface-node evidence
@@ -65,5 +65,5 @@ jobs:
         with:
           name: m027-bm2-junction-surface-nodes
           path: reports/lfea-bm2-junction-surface-nodes.json
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 30
