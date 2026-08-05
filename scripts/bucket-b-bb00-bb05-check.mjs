@@ -37,6 +37,7 @@ import { semanticHash } from '../src/core/shared-piping-model/index.js';
 
 const ROOT = resolve(new URL('..', import.meta.url).pathname);
 const strictRepositoryDifferential = process.env.STRICT_REPOSITORY_DIFFERENTIAL === '1';
+const enforceChangedPathAllowlist = process.env.ENFORCE_CHANGED_PATH_ALLOWLIST !== '0';
 const checks = [];
 const childEvidence = [];
 async function check(checkId, fn) {
@@ -57,7 +58,9 @@ const allowed = changedPaths.every((path) => path === 'docs/Bucket_B_Two_Dimensi
   || path === 'scripts/bucket-b-bb00-bb05-check.mjs'
   || path === '.github/workflows/bucket-b-shared-gates.yml'
   || path.startsWith('src/core/bucket-b/'));
-assert.equal(allowed, true, `Changed-path allowlist violation: ${changedPaths.join(', ')}`);
+if (enforceChangedPathAllowlist) {
+  assert.equal(allowed, true, `Changed-path allowlist violation: ${changedPaths.join(', ')}`);
+}
 const phase3T6Touched = changedPaths.some((path) => /bucket-01|phase3|candidate-projection|controlled-replay/i.test(path));
 assert.equal(phase3T6Touched, false, 'Bucket-01 Phase 3 paths must remain untouched.');
 
@@ -180,6 +183,7 @@ const report = Object.freeze({
   checkCount: checks.length,
   checks,
   changedPaths,
+  changedPathAllowlistEnforced: enforceChangedPathAllowlist,
   phase3T6Touched,
   productionDifferentialExecuted: strictRepositoryDifferential,
   applicationExecutionAuthorized: false,
