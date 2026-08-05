@@ -40,12 +40,18 @@ assert.ok(rigidRows.every((row) => row.sourceSegment.meta.analysis.rigid.type ==
 assert.ok(rigidRows.every((row) => row.sourceSegment.meta.analysis.rigid.weight > 0));
 assert.deepEqual(teeNodes(authorities.normalized.geometry), ['35', '40']);
 assert.deepEqual([...authorities.reducerDefinitions.keys()], ['IX-S16', 'IX-S23']);
+assert.equal(authorities.bendDefinitions.size, declared.bends);
+assert.equal(authorities.pipingComponents.length, declared.bends);
+assert.ok(authorities.pipingComponents.every((component) => component.componentType === 'BEND'));
 
 const diagnostics = authorities.analysisGeometry.diagnostics;
 assert.equal(diagnostics.filter((row) => row.code === 'INPUTXML_HANGER_PRESENT_NOT_COMPILED').length, 2);
 assert.equal(diagnostics.filter((row) => row.code === 'INPUTXML_FORCES_MOMENTS_PRESENT_NOT_COMPILED').length, 2);
 assert.ok(diagnostics.some((row) => row.code === 'M028_REDUCER_CANDIDATE_PENDING_PARITY'));
-assert.ok(diagnostics.some((row) => row.code === 'M028_BEND_SOURCE_SPAN_COMPILED_AS_STRAIGHT_CHORD'));
+const bendResolution = diagnostics.find((row) => row.code === 'M032_BEND_TOPOLOGY_AND_FLEXIBILITY_RESOLVED');
+assert.ok(bendResolution);
+assert.equal(bendResolution.data.bendCount, declared.bends);
+assert.equal(diagnostics.some((row) => row.code === 'M028_BEND_SOURCE_SPAN_COMPILED_AS_STRAIGHT_CHORD'), false);
 
 const solverQualification = {};
 for (const [caseKey, policy] of Object.entries(BM3_BASE_CASES)) {
