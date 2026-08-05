@@ -1,0 +1,69 @@
+name: LAFEA-NC NC-08 Module Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/lafea-nc08-module-qualification.yml'
+      - 'docs/nonlinear-shell-contact/LAFEA_NC08_MODULE_QUALIFICATION.md'
+      - 'scripts/lafea-nc08-check.mjs'
+      - 'src/core/nonlinear-shell-contact/module-qualification-contract.js'
+      - 'src/core/nonlinear-shell-contact/module-qualification-evaluator.js'
+      - 'src/core/nonlinear-shell-contact/nc08-fixtures.js'
+      - 'src/core/nonlinear-shell-contact/nc08-negative-controls.js'
+      - 'src/core/nonlinear-shell-contact/index.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nc08-contracts:
+    if: github.event_name != 'pull_request' || github.base_ref == 'agent/lafea-nc07-case-assessment'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify exact stacked head
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          git merge-base --is-ancestor "$BASE_SHA" HEAD
+      - name: Enforce NC-08 path containment
+        run: |
+          set -euo pipefail
+          git diff --name-only "$BASE_SHA"..HEAD | while read -r path; do
+            case "$path" in
+              .github/workflows/lafea-nc08-module-qualification.yml|docs/nonlinear-shell-contact/LAFEA_NC08_MODULE_QUALIFICATION.md|scripts/lafea-nc08-check.mjs|src/core/nonlinear-shell-contact/module-qualification-contract.js|src/core/nonlinear-shell-contact/module-qualification-evaluator.js|src/core/nonlinear-shell-contact/nc08-fixtures.js|src/core/nonlinear-shell-contact/nc08-negative-controls.js|src/core/nonlinear-shell-contact/index.js) ;;
+              *) echo "Unexpected NC-08 path: $path" >&2; exit 1 ;;
+            esac
+          done
+      - name: Syntax check
+        run: |
+          set -euo pipefail
+          node --check scripts/lafea-nc08-check.mjs
+          for file in src/core/nonlinear-shell-contact/{module-qualification-contract,module-qualification-evaluator,nc08-fixtures,nc08-negative-controls,index}.js; do node --check "$file"; done
+          git diff --check
+      - name: Deterministic replay
+        run: |
+          set -euo pipefail
+          node scripts/lafea-nc08-check.mjs --output-dir=artifacts/nc08-a
+          node scripts/lafea-nc08-check.mjs --output-dir=artifacts/nc08-b
+          cmp artifacts/nc08-a/nc08-report.json artifacts/nc08-b/nc08-report.json
+          cmp artifacts/nc08-a/nc08-contract.json artifacts/nc08-b/nc08-contract.json
+      - name: Verify clean source tree
+        run: git diff --exit-code
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lafea-nc08-${{ env.TARGET_SHA }}-${{ github.run_attempt }}
+          path: artifacts
+          retention-days: 30
