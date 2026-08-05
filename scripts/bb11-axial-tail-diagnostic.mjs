@@ -23,7 +23,7 @@ const outputPath = resolve(
     ?? 'reports/bb11-axial-tail-diagnostic.json',
 );
 const expectedMeshFamilyId = process.env.BB11_DIAGNOSTIC_MESH_FAMILY_ID
-  ?? 'BKT-B-FLANGE-Q8-DIAGNOSTIC-B05-B06-V1';
+  ?? 'BKT-B-FLANGE-Q8-DIAGNOSTIC-B05-B06-1P5-V1';
 const geometry = createCanonicalFlangeHubGeometry();
 const pathDefinitions = createFlangeHubPathDefinitions(geometry);
 const levels = [];
@@ -108,7 +108,7 @@ const strictLimit = 0.005;
 const report = {
   schema: 'bb11-axial-tail-diagnostic/v1',
   authority: 'NON_AUTHORIZING_DIAGNOSTIC_ONLY',
-  hypothesis: 'DOUBLE_B05_B06_LONGITUDINAL_RESOLUTION',
+  hypothesis: 'ONE_POINT_FIVE_X_B05_B06_LONGITUDINAL_RESOLUTION',
   loadCaseId: 'FH-AXIAL-001',
   quantityId: 'P-HUB-MID:U_AXIAL',
   meshFamilyId: expectedMeshFamilyId,
