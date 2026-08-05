@@ -1,4 +1,4 @@
-name: BB-11 axial tail B05-B06 diagnostic
+name: BB-11 axial tail transverse diagnostic
 
 on:
   push:
@@ -33,7 +33,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Apply workspace-only B05-B06 refinement
+      - name: Apply workspace-only conforming transverse refinement
         shell: bash
         run: |
           set -euo pipefail
@@ -45,15 +45,11 @@ jobs:
           replacements = [
               (
                   "export const FLANGE_HUB_MESH_FAMILY_ID = 'BKT-B-FLANGE-Q8-MESH-FAMILY-V1';",
-                  "export const FLANGE_HUB_MESH_FAMILY_ID = 'BKT-B-FLANGE-Q8-DIAGNOSTIC-B05-B06-1P5-V1';",
+                  "export const FLANGE_HUB_MESH_FAMILY_ID = 'BKT-B-FLANGE-Q8-DIAGNOSTIC-TRANSVERSE-1P5-V1';",
               ),
               (
-                  'return piecewiseBreakpoints(segmentLengths, [4, 6, 2]);',
-                  'return piecewiseBreakpoints(segmentLengths, [6, 9, 3]);',
-              ),
-              (
-                  'return piecewiseBreakpoints([horizontalLength, verticalLength], [4, 6]);',
-                  'return piecewiseBreakpoints([horizontalLength, verticalLength], [6, 9]);',
+                  'const COMPUTATIONAL_V = Object.freeze(Array.from({ length: 9 }, (_, index) => index / 8));',
+                  'const COMPUTATIONAL_V = Object.freeze(Array.from({ length: 13 }, (_, index) => index / 12));',
               ),
           ]
           for old, new in replacements:
@@ -73,8 +69,8 @@ jobs:
 
       - name: Execute axial-only diagnostic
         env:
-          BB11_DIAGNOSTIC_MESH_FAMILY_ID: BKT-B-FLANGE-Q8-DIAGNOSTIC-B05-B06-1P5-V1
-          BB11_AXIAL_DIAGNOSTIC_REPORT_PATH: reports/bb11-axial-tail-b05-b06.json
+          BB11_DIAGNOSTIC_MESH_FAMILY_ID: BKT-B-FLANGE-Q8-DIAGNOSTIC-TRANSVERSE-1P5-V1
+          BB11_AXIAL_DIAGNOSTIC_REPORT_PATH: reports/bb11-axial-tail-transverse.json
           TZ: UTC
           LC_ALL: C
         run: node scripts/bb11-axial-tail-diagnostic.mjs
@@ -83,7 +79,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bb11-axial-tail-b05-b06-${{ github.sha }}-${{ github.run_attempt }}
-          path: reports/bb11-axial-tail-b05-b06.json
+          name: bb11-axial-tail-transverse-${{ github.sha }}-${{ github.run_attempt }}
+          path: reports/bb11-axial-tail-transverse.json
           if-no-files-found: warn
           retention-days: 14
