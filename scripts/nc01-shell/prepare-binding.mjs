@@ -14,9 +14,11 @@ if (summary.status !== 'SOLVER_BRIDGE_QUALIFIED'
   || authority.semanticHash !== summary.authorityRecordHash) {
   throw new Error('Retained NC-00 bridge receipt is invalid.');
 }
+const bridgeMergeSha = process.env.BRIDGE_MERGE_SHA ?? '18e259f8a18e9011482d3ca4d1b8bd51dbe986f4';
+if (!/^[0-9a-f]{40}$/u.test(bridgeMergeSha)) throw new TypeError('Invalid NC-00 bridge merge SHA.');
 const binding = createSolverBridgeBinding({
   exactHeadSha: summary.exactHeadSha,
-  mergeCommitSha: process.env.BRIDGE_MERGE_SHA,
+  mergeCommitSha: bridgeMergeSha,
   workflowRunId: process.env.BRIDGE_RUN_ID,
   artifactId: process.env.BRIDGE_ARTIFACT_ID,
   artifactDigest: process.env.BRIDGE_ARTIFACT_DIGEST,
