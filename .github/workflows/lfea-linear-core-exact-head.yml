@@ -1,0 +1,73 @@
+name: lfea-linear-core-exact-head
+
+on:
+  pull_request:
+    paths:
+      - 'src/core/centerline-beam-fea/**'
+      - 'src/core/linear-fea-*/**'
+      - 'src/core/linear-piping-analysis-consumer/**'
+      - 'scripts/lfea-b1-conditioning-check.mjs'
+      - 'scripts/linear-piping-inputxml-unit-normalization-check.mjs'
+      - '.github/workflows/lfea-linear-core-exact-head.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Prove exact-head execution
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          git diff --exit-code
+
+      - name: Enforce changed-path containment
+        shell: bash
+        run: |
+          git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" > /tmp/lfea-linear-core-paths.txt
+          while IFS= read -r changed; do
+            case "$changed" in
+              src/core/centerline-beam-fea/*|src/core/linear-fea-*/*|src/core/linear-piping-analysis-consumer/*|scripts/lfea-b1-conditioning-check.mjs|scripts/linear-piping-inputxml-unit-normalization-check.mjs|.github/workflows/lfea-linear-core-exact-head.yml) ;;
+              *) echo "Forbidden changed path for the linear-core qualification slice: $changed"; exit 1 ;;
+            esac
+          done < /tmp/lfea-linear-core-paths.txt
+
+      - name: InputXML unit normalization
+        run: node scripts/linear-piping-inputxml-unit-normalization-check.mjs
+
+      - name: Conditioned topology and retained-station custody
+        run: node scripts/lfea-b1-conditioning-check.mjs
+
+      - name: DOF conventions and mechanical-model compilation
+        run: npm run check:lfea-b2.0 && npm run check:lfea-b2.5
+
+      - name: Physical load cases and element formulations
+        run: npm run check:lfea-b3.0 && npm run check:lfea-b3.1 && npm run check:lfea-b3.2
+
+      - name: Assembly, sparse solve, residuals and equilibrium
+        run: npm run check:lfea-b3.3
+
+      - name: Element-end, nodal and code-station recovery
+        run: npm run check:lfea-b3.4
+
+      - name: Production linear piping consumer
+        run: npm run check:linear-piping-analysis-consumer
+
+      - name: Derived cases and B31 code evaluation
+        run: npm run check:lfea-b4.0 && npm run check:lfea-b4.4 && npm run check:lfea-code-application
+
+      - name: Fixed-input commercial benchmark regression
+        run: npm run check:lfea-bm1-cii-comparison
