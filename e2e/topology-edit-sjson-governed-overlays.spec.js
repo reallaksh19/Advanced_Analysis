@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test';
 const SJSON_BYTES = readFileSync(new URL('../public/Sjson.json', import.meta.url));
 const VIEWPORT = Object.freeze({ width: 1637, height: 869 });
 
-test('SJSON uses one governed packet with exact tees, selectable sphere nodes and OD support overlays', async ({ page }, testInfo) => {
+test('SJSON uses one governed packet with visibly selectable OD routes, exact tees, sphere nodes and support overlays', async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   await page.setViewportSize(VIEWPORT);
   await page.addInitScript(() => globalThis.localStorage?.clear());
@@ -27,7 +27,15 @@ test('SJSON uses one governed packet with exact tees, selectable sphere nodes an
   await expect(host).toHaveAttribute('data-topology-edit-sjson-single-render-packet', 'true');
   await expect(host).toHaveAttribute('data-topology-edit-sjson-projection-schema', 'SjsonEditDraftProjection.v2');
   await expect(host).toHaveAttribute('data-topology-edit-active-rich-primitive-count', '0');
-  await expect(host).toHaveAttribute('data-topology-edit-visible-route-solid-mesh-count', '0');
+  await expect(host).toHaveAttribute('data-topology-edit-draft-solid-mesh-pickable', 'true');
+  await expect(host).toHaveAttribute(
+    'data-topology-edit-route-radius-authority',
+    'CANONICAL_PROJECTED_RADIUS_WITH_BOUNDED_DISPLAY_ENVELOPE_V2',
+  );
+  await expect(host).toHaveAttribute(
+    'data-topology-edit-route-display-envelope-policy',
+    'BOUNDED_MODEL_DIAGONAL_MINIMUM_V2',
+  );
   await expect(host).toHaveAttribute('data-topology-edit-node-visual-and-pick-geometry-separated', 'true');
   await expect(host).toHaveAttribute('data-topology-edit-visible-node-marker-geometry', 'TRANSLUCENT_SPHERE');
   await expect(host).toHaveAttribute('data-topology-edit-support-overlay-depth-independent', 'true');
@@ -45,6 +53,14 @@ test('SJSON uses one governed packet with exact tees, selectable sphere nodes an
     'SJSON_COMPACT_WIREFRAME_ISSUE_OVERLAY_V2',
   );
 
+  await expect.poll(() => integerAttribute(host, 'data-topology-edit-visible-route-solid-mesh-count'))
+    .toBeGreaterThan(0);
+  await expect.poll(() => integerAttribute(host, 'data-topology-edit-route-display-envelope-count'))
+    .toBeGreaterThan(0);
+  await expect.poll(async () => ({
+    solid: await integerAttribute(host, 'data-topology-edit-visible-route-solid-mesh-count'),
+    directlyPickable: await integerAttribute(host, 'data-topology-edit-direct-pick-route-mesh-count'),
+  })).toEqual(await expectedRouteCounts(host));
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-exact-tee-count')).toBe(3);
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-exact-tee-segment-count')).toBe(9);
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-visible-node-marker-count')).toBeGreaterThan(100);
@@ -70,6 +86,11 @@ test('SJSON uses one governed packet with exact tees, selectable sphere nodes an
     fullPage: false,
   });
 });
+
+async function expectedRouteCounts(host) {
+  const solid = await integerAttribute(host, 'data-topology-edit-visible-route-solid-mesh-count');
+  return { solid, directlyPickable: solid };
+}
 
 async function expectedSupportCounts(host) {
   const expected = await integerAttribute(host, 'data-topology-edit-rendered-support-marker-count')
