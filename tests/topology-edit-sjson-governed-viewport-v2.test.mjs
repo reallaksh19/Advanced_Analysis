@@ -27,7 +27,7 @@ const CONFIGURATION = {
   cameraFarMm: 1_000_000,
 };
 
-test('governed route renders lines, separate translucent nodes, and invisible picks', () => {
+test('governed route renders lines, wireframe nodes, and independent invisible picks', () => {
   const backend = new TopologyEditSjsonGovernedViewportBackend({ navigationConfiguration: CONFIGURATION });
   backend.renderProjection(backend.groups.draftGroup, {
     schema: TOPOLOGY_EDIT_SJSON_GOVERNED_PROJECTION_SCHEMA,
@@ -51,17 +51,20 @@ test('governed route renders lines, separate translucent nodes, and invisible pi
   assert.equal(routeProxy.material.opacity, 0);
   const marker = objects.get('topology-edit-visible-node-marker:node:1');
   const nodeProxy = objects.get('topology-edit-node-pick-proxy:node:1');
-  assert.equal(marker?.isMesh, true);
-  assert.equal(marker.geometry.parameters.radius, 4.2);
+  assert.equal(marker?.isLineSegments, true);
+  assert.equal(marker.userData.visualRadiusMm, 4.2);
+  assert.equal(marker.userData.nonPickable, true);
+  assert.equal(marker.userData.renderAuthority, 'CANONICAL_NODE_WIREFRAME_MARKER_V2');
   assert.equal(marker.material.opacity, 0.24);
   assert.equal(marker.material.depthTest, false);
   assert.equal(nodeProxy.geometry.parameters.radius, 16.8);
   assert.equal(nodeProxy.material.opacity, 0);
   assert.equal(nodeProxy.userData.pickTarget.objectKind, 'node');
+  assert.equal(nodeProxy.userData.renderAuthority, 'CANONICAL_NODE_PICK_PROXY_V2');
   backend.destroy();
 });
 
-test('governed supports are depth-independent overlays with pick proxies', () => {
+test('governed supports are depth-independent overlays with outlined heads and pick proxies', () => {
   const backend = new TopologyEditSjsonGovernedViewportBackend({ navigationConfiguration: CONFIGURATION });
   backend.renderProjection(backend.groups.supportGroup, {
     renderStyle: TOPOLOGY_EDIT_SUPPORT_RENDER_STYLES.TOPO_VALIDATOR_COMPACT,
@@ -88,6 +91,7 @@ test('governed supports are depth-independent overlays with pick proxies', () =>
   assert.equal(markerProxy.userData.pickTarget.objectKind, 'support');
   assert.equal(shaft?.isLine, true);
   assert.equal(shaft.material.depthTest, false);
+  assert.equal(head?.isLineSegments, true);
   assert.equal(head.material.opacity, 0.5);
   assert.equal(head.material.depthTest, false);
   assert.equal(arrowProxy.userData.pickTarget.objectKind, 'restraint');
