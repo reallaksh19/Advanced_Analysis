@@ -1,5 +1,6 @@
 import { freezeDeep } from '../dataset-utils.js';
 import { calculateAuthorizedEmpiricalLoadExecution } from './authorized-empirical-load-execution.js';
+import { calculateAuthorizedEmpiricalLoadExecutionV2 } from './authorized-empirical-load-execution-v2.js';
 import { calculateSupportLoadDistribution } from './support-load-distribution-v3.js';
 
 /** Owns the last explicit engineering calculation and its edit freshness. */
@@ -16,6 +17,15 @@ export class EngineeringSupportLoadStore {
 
   calculateAuthorized(input) {
     const execution = calculateAuthorizedEmpiricalLoadExecution(input);
+    return this.#recordAuthorizedExecution(execution);
+  }
+
+  calculateAuthorizedV2(input) {
+    const execution = calculateAuthorizedEmpiricalLoadExecutionV2(input);
+    return this.#recordAuthorizedExecution(execution);
+  }
+
+  #recordAuthorizedExecution(execution) {
     this.#authorizedExecution = execution;
     this.#distribution = execution.distribution;
     return execution;
@@ -23,8 +33,8 @@ export class EngineeringSupportLoadStore {
 
   markStale(reason, datasetVersion) {
     if (!this.#distribution) return null;
-    // The active store clears its current receipt; the separate runtime store
-    // retains immutable historical receipt evidence and stale authorization state.
+    // The active store clears its current receipt; separate runtime stores retain
+    // immutable historical receipt evidence and stale authorization state.
     this.#authorizedExecution = null;
     this.#distribution = freezeDeep({
       ...this.#distribution,
