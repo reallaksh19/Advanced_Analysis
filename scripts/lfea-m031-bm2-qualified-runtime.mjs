@@ -53,8 +53,8 @@ export const BM2_M031_SOLVER_CONDITIONING_PROFILE = Object.freeze({
 export const BM2_M031_ACTIVE_SET_PROFILE = Object.freeze({
   schema: 'lfea-bm2-unilateral-active-set-profile/v2',
   contacts: Object.freeze([
-    Object.freeze({ typeCode: '14', dof: 'UY', permittedGapDirection: '+Y' }),
-    Object.freeze({ typeCode: '15', dof: 'UZ', permittedGapDirection: '+Z' }),
+    Object.freeze({ typeCode: '14', canonicalType: '+Y', expectedDof: 'UY', permittedGapDirection: '+Y' }),
+    Object.freeze({ typeCode: '15', canonicalType: '+Z', expectedDof: 'UZ', permittedGapDirection: '+Z' }),
   ]),
   initialState: 'ALL_CANDIDATES_ACTIVE',
   gapTolerance: 1e-9,
@@ -334,6 +334,79 @@ function junctionMechanics(tees, material) {
   });
 }
 
+function dominantTranslationalAxis(restraint, context) {
+  const signedCosines = [
+    Number(restraint.xCosine ?? 0),
+    Number(restraint.yCosine ?? 0),
+    Number(restraint.zCosine ?? 0),
+  ];
+  const magnitudes = signedCosines.map((value) => Math.abs(value));
+  const maximum = Math.max(...magnitudes);
+  if (!(maximum > 0)) {
+    throw new Error(`${context} has no non-zero translational direction cosine.`);
+  }
+  const tolerance = 1e-12;
+  const dominantIndices = magnitudes
+    .map((value, index) => (Math.abs(value - maximum) <= tolerance ? index : -1))
+    .filter((index) => index >= 0);
+  if (dominantIndices.length !== 1) {
+    throw new Error(`${context} has ambiguous translational direction cosines ${signedCosines.join('/')}.`);
+  }
+  const axisIndex = dominantIndices[0];
+  return Object.freeze({
+    axis: ['X', 'Y', 'Z'][axisIndex],
+    dof: ['UX', 'UY', 'UZ'][axisIndex],
+    signedCosine: signedCosines[axisIndex],
+    directionCosines: Object.freeze({
+      x: signedCosines[0],
+      y: signedCosines[1],
+      z: signedCosines[2],
+    }),
+    authority: 'INPUTXML_DIRECTION_COSINE_DOMINANT_AXIS_V1',
+  });
+}
+
+function restraintOccurrences(geometry) {
+  const rows = [];
+  for (const node of geometry.nodes) {
+    for (const [occurrenceIndex, restraint] of (node.meta?.restraints ?? []).entries()) {
+      const typeCode = String(restraint.typeCode);
+      const contact = UNILATERAL_CONTACT_BY_TYPE.get(typeCode);
+      const directional = typeCode === '0'
+        ? null
+        : dominantTranslationalAxis(restraint, `BM2 node ${node.id} restraint ${occurrenceIndex + 1}`);
+      if (contact && directional.dof !== contact.expectedDof) {
+        throw new Error(
+          `BM2 node ${node.id} corrected type ${typeCode} expects ${contact.expectedDof}, but its direction cosines resolve ${directional.dof}.`,
+        );
+      }
+      rows.push(Object.freeze({
+        nodeId: node.id,
+        occurrence: occurrenceIndex + 1,
+        sourceTypeCode: String(restraint.sourceTypeCode ?? typeCode),
+        correctedTypeCode: typeCode,
+        canonicalType: contact?.canonicalType ?? (typeCode === '9' ? 'GUI' : typeCode === '0' ? 'ANC' : 'UNKNOWN'),
+        dof: typeCode === '0' ? 'UX,UY,UZ,RX,RY,RZ' : directional.dof,
+        axis: typeCode === '0' ? null : directional.axis,
+        directionCosines: typeCode === '0'
+          ? Object.freeze({ x: 0, y: 0, z: 0 })
+          : directional.directionCosines,
+        mechanics: contact
+          ? 'UNILATERAL_COMPLEMENTARITY_ACTIVE_SET'
+          : typeCode === '9'
+            ? 'BILATERAL_TRANSLATIONAL_GUIDE'
+            : typeCode === '0'
+              ? 'FULL_6_DOF_ANCHOR'
+              : 'UNKNOWN',
+        axisAuthority: typeCode === '0' ? 'ANCHOR_ALL_DOF_V1' : directional.authority,
+      }));
+    }
+  }
+  return Object.freeze(rows.sort((left, right) => (
+    compareIds(left.nodeId, right.nodeId) || left.occurrence - right.occurrence
+  )));
+}
+
 function correctedDirectionalStiffness(frameElement, factors) {
   const section = frameElement.section;
   const local = frameLocalStiffness({
@@ -360,15 +433,29 @@ function correctedDirectionalStiffness(frameElement, factors) {
 function unilateralCandidates(geometry) {
   const candidates = new Map();
   for (const node of geometry.nodes) {
-    for (const restraint of node.meta?.restraints ?? []) {
+    for (const [occurrenceIndex, restraint] of (node.meta?.restraints ?? []).entries()) {
       const contact = UNILATERAL_CONTACT_BY_TYPE.get(String(restraint.typeCode));
       if (!contact) continue;
-      const key = contactKey(node.id, contact.dof);
+      const directional = dominantTranslationalAxis(
+        restraint,
+        `BM2 node ${node.id} unilateral restraint ${occurrenceIndex + 1}`,
+      );
+      if (directional.dof !== contact.expectedDof) {
+        throw new Error(
+          `BM2 node ${node.id} corrected type ${contact.typeCode} expects ${contact.expectedDof}, but its direction cosines resolve ${directional.dof}.`,
+        );
+      }
+      const key = contactKey(node.id, directional.dof);
       candidates.set(key, Object.freeze({
         key,
         nodeId: node.id,
+        occurrence: occurrenceIndex + 1,
         typeCode: contact.typeCode,
-        dof: contact.dof,
+        canonicalType: contact.canonicalType,
+        dof: directional.dof,
+        axis: directional.axis,
+        directionCosines: directional.directionCosines,
+        axisAuthority: directional.authority,
         permittedGapDirection: contact.permittedGapDirection,
       }));
     }
@@ -393,17 +480,20 @@ function constraintDeclarations(geometry, activeContacts) {
     }
     for (const restraint of node.meta?.restraints ?? []) {
       const contact = UNILATERAL_CONTACT_BY_TYPE.get(String(restraint.typeCode));
-      if (contact && activeContacts.has(contactKey(node.id, contact.dof))) {
-        add(node.id, contact.dof, `${contact.permittedGapDirection.replace('+', 'PLUS-')}-ACTIVE`);
+      if (contact) {
+        const directional = dominantTranslationalAxis(restraint, `BM2 node ${node.id} ${contact.canonicalType} restraint`);
+        if (directional.dof !== contact.expectedDof) {
+          throw new Error(
+            `BM2 node ${node.id} corrected type ${contact.typeCode} expects ${contact.expectedDof}, but its direction cosines resolve ${directional.dof}.`,
+          );
+        }
+        if (activeContacts.has(contactKey(node.id, directional.dof))) {
+          add(node.id, directional.dof, `${contact.permittedGapDirection.replace('+', 'PLUS-')}-ACTIVE`);
+        }
       }
-      if (restraint.typeCode === '9') {
-        const direction = [
-          Math.abs(restraint.xCosine ?? 0),
-          Math.abs(restraint.yCosine ?? 0),
-          Math.abs(restraint.zCosine ?? 0),
-        ];
-        const axis = direction.indexOf(Math.max(...direction));
-        add(node.id, ['UX', 'UY', 'UZ'][axis], 'GUIDE');
+      if (String(restraint.typeCode) === '9') {
+        const directional = dominantTranslationalAxis(restraint, `BM2 node ${node.id} GUI restraint`);
+        add(node.id, directional.dof, 'GUIDE');
       }
     }
   }
@@ -937,12 +1027,52 @@ function transferEndpoint(authorities, mechanics, analysis, transfer) {
   return reportedEndpoint(authorities, mechanics, action, record, transfer.end);
 }
 
+function negateAction(action) {
+  return Object.freeze({
+    fx: clean(-action.fx),
+    fy: clean(-action.fy),
+    fz: clean(-action.fz),
+    mx: clean(-action.mx),
+    my: clean(-action.my),
+    mz: clean(-action.mz),
+  });
+}
+
+function collapsedTransferReportAxes(authorities, group) {
+  if (group.authority !== 'ZERO_PHYSICAL_LENGTH_REPORT_ACTION_ALIAS_V1'
+      || group.role !== 'TANGENT_CONSUMED_REPORT_TRANSFER'
+      || group.participation?.stiffness !== false
+      || group.participation?.gravity !== false
+      || group.participation?.thermal !== false
+      || group.participation?.mass !== false
+      || group.participation?.recoverReportActions !== true) {
+    throw new Error(`BM2 empty pair ${group.key} lacks governed collapsed-transfer authority.`);
+  }
+  const source = authorities.normalized.geometry.segments.find((segment) => segment.id === group.sourceSegmentId);
+  if (!source) throw new Error(`BM2 collapsed pair ${group.key} lacks source segment ${group.sourceSegmentId}.`);
+  const from = point(authorities.normalized.geometry, source.startNodeId);
+  const to = point(authorities.normalized.geometry, source.endNodeId);
+  return caesarStraightReportAxes(subtract(to, from));
+}
+
 function pairAction(authorities, mechanics, analysis, group) {
   if (group.elementIds.length === 0) {
     const endpoint = transferEndpoint(authorities, mechanics, analysis, group.transferAction);
+    const axes = collapsedTransferReportAxes(authorities, group);
+    const globalJ = endpoint.global;
+    const globalI = negateAction(globalJ);
     return Object.freeze({
-      local: Object.freeze({ I: endpoint.local, J: endpoint.local }),
-      global: Object.freeze({ I: endpoint.global, J: endpoint.global }),
+      local: Object.freeze({
+        I: projectGlobalActionToCaesarLocal(globalI, axes),
+        J: projectGlobalActionToCaesarLocal(globalJ, axes),
+      }),
+      global: Object.freeze({ I: globalI, J: globalJ }),
+      custody: Object.freeze({
+        authority: group.authority,
+        rule: 'LOAD_FREE_COLLAPSED_SPAN_EQUAL_OPPOSITE_GLOBAL_ACTIONS_V1',
+        localAxisRule: 'DECLARED_SOURCE_SPAN_CAESAR_STRAIGHT_ABC_V1',
+        transferAction: group.transferAction,
+      }),
     });
   }
   const [reportFrom, reportTo] = group.key.split('-');
@@ -1000,6 +1130,7 @@ function derivedLedger(operating, sustained) {
 
 function buildReport(authorities, entries, mechanics, sustained, operating) {
   const nodeIds = reportNodeIds(authorities);
+  const restraintAuthorityRows = restraintOccurrences(authorities.normalized.geometry);
   const elements = [...authorities.pairGroups.values()]
     .sort((left, right) => compareIds(left.key.split('-')[0], right.key.split('-')[0])
       || compareIds(left.key.split('-')[1], right.key.split('-')[1]))
@@ -1070,8 +1201,20 @@ function buildReport(authorities, entries, mechanics, sustained, operating) {
     }),
     restraintClassification: Object.freeze({
       correctionProfile: 'CAESAR_INPUTXML_RESTRAINT_TYPE_EXPORT_CORRECTION_V1',
-      type15: Object.freeze({ canonicalType: '+Z', dof: 'UZ', mechanics: 'UNILATERAL_COMPLEMENTARITY_ACTIVE_SET' }),
-      status: 'SOURCE_CLASSIFIED_AND_MECHANICALLY_COMPILED',
+      outputLabelAuthority: 'BM2_OUTPUT_XML_RESTRAINT_REPORT_TEXT_V1',
+      axisAuthority: 'INPUTXML_DIRECTION_COSINES_CROSS_CHECKED_WITH_OUTPUT_BM2_TEXT_V1',
+      globalVerticalAxis: 'Y',
+      sourceLocationCount: 5,
+      validOccurrenceCount: restraintAuthorityRows.length,
+      node40IndependentOccurrenceCount: restraintAuthorityRows.filter((row) => row.nodeId === '40').length,
+      occurrences: restraintAuthorityRows,
+      type15: Object.freeze({
+        canonicalType: '+Z',
+        expectedDof: 'UZ',
+        resolvedDof: restraintAuthorityRows.find((row) => row.correctedTypeCode === '15')?.dof ?? null,
+        mechanics: 'UNILATERAL_COMPLEMENTARITY_ACTIVE_SET',
+      }),
+      status: 'SOURCE_CLASSIFIED_AXIS_RESOLVED_AND_MECHANICALLY_COMPILED',
     }),
     nonlinearRestraints: Object.freeze({
       profile: BM2_M031_ACTIVE_SET_PROFILE,

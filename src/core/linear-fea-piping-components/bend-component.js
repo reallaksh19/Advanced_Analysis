@@ -161,9 +161,14 @@ export function bendFlexibilityDoubleCountGuard({
   const geometricFlexibilityRatio = cleanNumber(segmentedGeometricCompliance / directCompliance);
   const appliedCorrectionRatio = cleanNumber(measuredUncorrectedRigidity / measuredCorrectedRigidity);
   const totalFlexibilityRatio = cleanNumber(correctedSegmentedCompliance / directCompliance);
+  const expectedTotalFlexibilityRatio = cleanNumber(geometricFlexibilityRatio * appliedCorrectionRatio);
   const segmentationSurplus = cleanNumber(geometricFlexibilityRatio - 1);
   const correctionResidual = cleanNumber(
     Math.abs(appliedCorrectionRatio - declaredFactor) / Math.max(declaredFactor, 1),
+  );
+  const totalRatioIdentityResidual = cleanNumber(
+    Math.abs(totalFlexibilityRatio - expectedTotalFlexibilityRatio)
+      / Math.max(expectedTotalFlexibilityRatio, 1),
   );
 
   if (geometryBasis.endsWith('GEOMETRY_INCLUDED_V1') && segmentationSurplus > tolerance) {
@@ -179,6 +184,12 @@ export function bendFlexibilityDoubleCountGuard({
     fail(
       `The bending rigidity measured on the compiled elements reproduces a flexibility correction of ${appliedCorrectionRatio}, not the declared ${declaredFactor}; the component correction is not applied exactly once.`,
       code,
+    );
+  }
+  if (totalRatioIdentityResidual > tolerance) {
+    fail(
+      `The total chord-referenced flexibility ratio ${totalFlexibilityRatio} does not equal the independent geometry ratio ${geometricFlexibilityRatio} multiplied by the applied matrix correction ${appliedCorrectionRatio}.`,
+      'PIPING_COMPONENT_BEND_FLEXIBILITY_EVIDENCE_INCONSISTENT',
     );
   }
 
@@ -198,7 +209,12 @@ export function bendFlexibilityDoubleCountGuard({
     segmentationSurplus,
     appliedCorrectionRatio,
     correctionResidual,
+    declaredFactorApplicationBasis: 'DEVELOPED_ARC_ELEMENT_BENDING_RIGIDITY_V1',
     totalFlexibilityRatio,
+    totalFlexibilityReferenceBasis: 'DIRECT_TANGENT_CHORD_COMPLIANCE_V1',
+    totalFlexibilityIdentity: 'TOTAL_EQUALS_GEOMETRIC_RATIO_TIMES_APPLIED_CORRECTION_V1',
+    expectedTotalFlexibilityRatio,
+    totalRatioIdentityResidual,
     tolerance,
     toleranceSource,
     accepted: true,
