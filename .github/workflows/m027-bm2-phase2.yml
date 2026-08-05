@@ -1,0 +1,44 @@
+name: M027 BM2 Phase 2 Solve Comparison
+
+on:
+  pull_request:
+    paths:
+      - 'benchmarks/LFEA/BM2/**'
+      - 'src/core/geometry/adapters/inputxml-*.js'
+      - 'src/core/linear-fea-rigid-element/**'
+      - 'scripts/lfea-b3.25-bm2-inputxml-ingestion-check.mjs'
+      - 'scripts/lfea-b3.26-bm2-*.mjs'
+      - '.github/workflows/m027-bm2-phase1.yml'
+      - '.github/workflows/m027-bm2-phase2.yml'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  solve-and-compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: BM2 ingestion prerequisite
+        run: node scripts/lfea-b3.25-bm2-inputxml-ingestion-check.mjs
+      - name: BM2 first solve and CAESAR comparison
+        run: node scripts/lfea-b3.26-bm2-solve-comparison-check.mjs
+      - name: Publish deterministic comparison ledger
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m027-bm2-cii-output-comparison
+          path: reports/lfea-bm2-cii-output-comparison.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Linear-core regression aggregate
+        run: npm run check:lfea-linear-core
