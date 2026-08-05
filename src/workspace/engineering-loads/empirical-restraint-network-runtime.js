@@ -523,6 +523,7 @@ function compileStraightComponent(state) {
       secondMomentM4: section.secondMomentM4,
       elasticModulusPa: line.elasticModulusPa,
       thermalExpansionPerK: line.thermalExpansionPerK,
+      analysisDirection: state.analysisDirection,
       complianceMPerN,
       stiffnessNPerM: 1 / complianceMPerN,
       formulaTrace: [
@@ -1040,16 +1041,15 @@ function projectedThermalMovement(segment, deltaTK) {
 }
 
 function segmentAnalysisDirection(segment) {
-  // The directional projection squared is retained for compliance, while the
-  // signed thermal projection is reconstructed from the stored tangent and
-  // the runtime-injected immutable analysis direction.
-  return segment.analysisDirection || CURRENT_ANALYSIS_DIRECTION;
-}
-
-let CURRENT_ANALYSIS_DIRECTION = Object.freeze([1, 0, 0]);
-
-function setCurrentAnalysisDirection(direction) {
-  CURRENT_ANALYSIS_DIRECTION = direction;
+  const direction = segment.analysisDirection;
+  if (!Array.isArray(direction) || direction.length !== 3
+    || direction.some((item) => !Number.isFinite(item))) {
+    throw runtimeError(
+      EMPIRICAL_FAILURE_CODES.RESTRAINT_AXIS_AMBIGUOUS,
+      `Segment ${segment.id} has no immutable analysis direction.`,
+    );
+  }
+  return direction;
 }
 
 function loadOwnershipBlockers(loadCase, configuration) {
@@ -1408,9 +1408,7 @@ function unitVector(value, field) {
   }
   const length = magnitude(value);
   if (Math.abs(length - 1) > 1e-8) throw new TypeError(`${field} must be a unit vector.`);
-  const normalized = deepFreeze(value.map((item) => Object.is(item, -0) ? 0 : item));
-  setCurrentAnalysisDirection(normalized);
-  return normalized;
+  return deepFreeze(value.map((item) => Object.is(item, -0) ? 0 : item));
 }
 
 function normalizedType(value) {
