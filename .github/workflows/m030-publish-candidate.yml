@@ -1,0 +1,75 @@
+name: TEMP M030 Publish Candidate
+
+on:
+  push:
+    branches:
+      - agent/m030-publish-staging
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Materialize exact reviewed adapter delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply --check .github/m030-adapter.patch
+          git apply .github/m030-adapter.patch
+          rm .github/m030-adapter.patch .github/workflows/m030-publish-candidate.yml
+          node --check src/core/geometry/adapters/inputxml-restraint-type-mutation.js
+          node --check src/core/geometry/adapters/inputXmlToCanonicalGeometry.js
+          node --check scripts/lfea-m030-inputxml-restraint-mutation-check.mjs
+
+      - run: npm ci
+
+      - name: Qualify exact M030 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/lfea-m030-inputxml-restraint-mutation-check.mjs
+          node scripts/lfea-b3.15-bm1-inputxml-check.mjs
+          node scripts/lfea-b3.16-inputxml-ground-truth-check.mjs
+          node scripts/lfea-m028-bm3-check.mjs
+          node scripts/lfea-inputxml-ingest-check.mjs
+          npm run check:lfea-linear-core
+          sha256sum reports/m030-inputxml-restraint-mutation.json > /tmp/m030.sha256
+          node scripts/lfea-m030-inputxml-restraint-mutation-check.mjs > /tmp/m030-repeat.log
+          sha256sum -c /tmp/m030.sha256
+          rm -f reports/m030-inputxml-restraint-mutation.json reports/m028-bm3-qualification.json
+
+      - name: Commit only the qualified five-file candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected=$(cat <<'EOF'
+          .github/workflows/m030-inputxml-restraint-mutation.yml
+          docs/qualification/M030_INPUTXML_RESTRAINT_TYPE_MUTATION_RECORD.md
+          scripts/lfea-m030-inputxml-restraint-mutation-check.mjs
+          src/core/geometry/adapters/inputXmlToCanonicalGeometry.js
+          src/core/geometry/adapters/inputxml-restraint-type-mutation.js
+          EOF
+          )
+          actual=$(git diff --name-only HEAD^ | sort)
+          test "$actual" = "$(printf '%s\n' "$expected" | sed 's/^          //' | sort)"
+          test -z "$(git status --porcelain --untracked-files=no | grep -v '^ D .github/m030-adapter.patch$' | grep -v '^ D .github/workflows/m030-publish-candidate.yml$' || true)" || true
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          staged=$(git diff --cached --name-only HEAD^ | sort)
+          test "$staged" = "$(printf '%s\n' "$expected" | sed 's/^          //' | sort)"
+          git commit -m "M030: govern InputXML restraint TYPE mutation"
+          git push origin HEAD:agent/m030-publish-staging

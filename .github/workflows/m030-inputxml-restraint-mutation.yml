@@ -1,0 +1,81 @@
+name: M030 InputXML Restraint TYPE Mutation
+
+on:
+  pull_request:
+    branches:
+      - main
+      - agent/m028-bm3-onboarding
+    paths:
+      - '.github/workflows/m030-inputxml-restraint-mutation.yml'
+      - 'benchmarks/LFEA/BM1/**'
+      - 'benchmarks/LFEA/BM2/**'
+      - 'benchmarks/LFEA/BM3/**'
+      - 'docs/qualification/M030_INPUTXML_RESTRAINT_TYPE_MUTATION_RECORD.md'
+      - 'scripts/lfea-m030-inputxml-restraint-mutation-check.mjs'
+      - 'src/core/geometry/adapters/inputxml-restraint-type-mutation.js'
+      - 'src/core/geometry/adapters/inputXmlToCanonicalGeometry.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Verify immutable candidate checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
+          git rev-parse HEAD
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Cross-BM restraint mutation authority
+        run: node scripts/lfea-m030-inputxml-restraint-mutation-check.mjs
+
+      - name: Existing InputXML and BM regression chain
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run check:lfea-b3.15
+          npm run check:lfea-b3.16
+          node scripts/lfea-m028-bm3-check.mjs
+          node scripts/lfea-inputxml-ingest-check.mjs
+
+      - name: Complete linear-core regression
+        run: npm run check:lfea-linear-core
+
+      - name: Verify deterministic evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum reports/m030-inputxml-restraint-mutation.json > /tmp/m030-report.sha256
+          node scripts/lfea-m030-inputxml-restraint-mutation-check.mjs > /tmp/m030-repeat.log
+          sha256sum -c /tmp/m030-report.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m030-inputxml-restraint-mutation-${{ github.event.pull_request.head.sha || github.sha }}
+          path: reports/m030-inputxml-restraint-mutation.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Restore clean worktree after evidence publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f reports/m030-inputxml-restraint-mutation.json reports/m028-bm3-qualification.json
+          test -z "$(git status --porcelain)"
