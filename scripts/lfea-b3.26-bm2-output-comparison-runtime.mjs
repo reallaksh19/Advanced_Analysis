@@ -215,14 +215,17 @@ function groupRows(rows, keyOf) {
 function causes({ family, nodeId, sourceElement, branchNodeIds }) {
   const values = [];
   if (family === 'restraint') values.push('BM2_UNILATERAL_CONTACT_RESPONSE_DELTA_AFTER_COMPLEMENTARITY');
-  if (nodeId === '130') values.push('BM2_UNKNOWN_RESTRAINT_TYPE_15_OMITTED');
+  if (nodeId === '130') values.push('BM2_PLUS_Z_RESPONSE_DELTA_AFTER_COMPLEMENTARITY');
   if (sourceElement?.bendTagged) values.push('BM2_REMAINING_BEND_RESPONSE_DELTA_AFTER_ARC_FLEXIBILITY');
   if (sourceElement?.rigid) values.push('BM2_RIGID_BODY_LOAD_DISTRIBUTION_ASSUMPTION');
   const pairNodes = sourceElement
     ? [sourceElement.sourceFromNode, sourceElement.sourceToNode]
     : [];
-  if (branchNodeIds.has(nodeId) || pairNodes.some((id) => branchNodeIds.has(id))) {
-    values.push('BM2_REMAINING_B31J_RESPONSE_DELTA_AFTER_MATRIX_STIFFNESS');
+  const relatedNodes = [nodeId, ...pairNodes].filter(Boolean).map(String);
+  if (relatedNodes.some((id) => id === '100' || id === '140')) {
+    values.push('BM2_WELDOLET_SKETCH_2_6_FLEXIBILITY_EQUATIONS_DEFERRED');
+  } else if (branchNodeIds.has(nodeId) || pairNodes.some((id) => branchNodeIds.has(id))) {
+    values.push('BM2_REMAINING_WELDING_TEE_RESPONSE_DELTA_AFTER_MATRIX_STIFFNESS');
   }
   values.push('BM2_NUMERICAL_RESPONSE_DELTA_AFTER_M031_MECHANICS');
   return [...new Set(values)];

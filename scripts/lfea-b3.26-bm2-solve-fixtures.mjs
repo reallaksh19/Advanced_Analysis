@@ -40,7 +40,7 @@ import {
 } from '../src/core/linear-fea-rigid-element/index.js';
 import { semanticHash } from '../src/core/shared-piping-model/canonical-json.js';
 import { compilerProfile } from './lfea-b2.5-model-compiler-fixtures.mjs';
-import { eulerBernoulliProfile } from './lfea-b3.1-frame-element-fixtures.mjs';
+import { timoshenkoProfile } from './lfea-b3.1-frame-element-fixtures.mjs';
 import { loadCaseProfile, solverProfile } from './lfea-b3.3-solver-fixtures.mjs';
 import { recoveryProfile } from './lfea-b3.4-recovery-fixtures.mjs';
 
@@ -48,7 +48,7 @@ export const BM2_INPUT_PATH = fileURLToPath(new URL('../benchmarks/LFEA/BM2/Inpu
 export const BM2_OUTPUT_PATH = fileURLToPath(new URL('../benchmarks/LFEA/BM2/Output_BM2.xml', import.meta.url));
 export const BM2_SOURCE_ID = 'CAESAR-II-BM2-LIVE-INPUTXML';
 export const INSTALLATION_TEMPERATURE = 293.15;
-export const THERMAL_EXPANSION_COEFFICIENT = 1.17e-5;
+export const THERMAL_EXPANSION_COEFFICIENT = 1.37e-5;
 export const GRAVITY = 9.80665;
 
 const CONDITIONING_PROFILE = Object.freeze({
@@ -107,7 +107,7 @@ function materialAuthority(geometry, source) {
       sourceId: `${BM2_SOURCE_ID}-MATERIAL`,
       sourceRevision: source.sourceRevision,
       point: pointValue,
-      installationTemperatureDisclosure: 'InputXML has no installation temperature or alpha; M027 declares 293.15 K and 1.17e-5 1/K.',
+      installationTemperatureDisclosure: 'InputXML omits alpha; M031 declares the B31.3 Table C-3 carbon-steel mean coefficient at the retained 350 C operating temperature.',
     }),
     points: [pointValue],
     semanticHash: '',
@@ -347,7 +347,7 @@ export function buildBm2SolveAuthorities() {
     entries,
     conditioned,
     compilation,
-    frameProfile: eulerBernoulliProfile(),
+    frameProfile: timoshenkoProfile(),
   });
 }
 

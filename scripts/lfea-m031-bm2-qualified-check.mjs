@@ -14,14 +14,24 @@ assert.equal(report.counts.retainedReportNodes, 61);
 assert.equal(report.counts.retainedReportPairs, 61);
 assert.ok(report.flexibilityOwnership.bendElements > 11);
 assert.equal(report.flexibilityOwnership.duplicateOwnerCount, 0);
+assert.equal(report.flexibilityOwnership.fictitiousRigidElements, 5);
+assert.equal(report.flexibilityOwnership.fictitiousRigidAuthority, 'CAESAR_RIGID_10X_ENTERED_WALL_ZERO_MASS_ZERO_THERMAL_V1');
+assert.equal(report.junctionClassification.weldingTees, 3);
+assert.equal(report.junctionClassification.weldolets, 2);
+assert.equal(report.junctionClassification.falseWeldingTeeSubstitutions, 0);
+assert.equal(report.localForceReportingAuthority.rule, 'CAESAR_ELEMENT_ENDPOINT_LOCAL_ABC_V1');
 assert.equal(report.nonlinearRestraints.status, 'QUALIFIED_COMPLEMENTARITY_ACTIVE_SET_V1');
+assert.equal(report.restraintClassification.type15.canonicalType, '+Z');
+assert.equal(report.restraintClassification.type15.dof, 'UZ');
+assert.equal(report.counts.plusZCandidates, 1);
 assert.ok(report.nonlinearRestraints.sustained.ledger.every((row) => row.passed));
 assert.ok(report.nonlinearRestraints.operating.ledger.every((row) => row.passed));
 assert.equal(report.nonlinearRestraints.expansion.status, 'DERIVED_FROM_CONVERGED_PHYSICAL_CASES');
 assert.equal(report.conditioning.sustained.matrixConditioned, true);
 assert.equal(report.conditioning.operating.matrixConditioned, true);
-assert.equal(report.conditioning.sustained.residualQualified, false);
-assert.equal(report.conditioning.sustained.qualificationStatus, 'CONDITIONAL_RESIDUAL_WARN');
+assert.equal(report.conditioning.sustained.residualQualified, true);
+assert.equal(report.conditioning.sustained.qualificationStatus, 'PASS');
+assert.ok(report.conditioning.sustained.backwardResidual.value < 1e-9);
 assert.equal(report.conditioning.operating.residualQualified, true);
 assert.equal(report.conditioning.operating.wellConditioned, true);
 assert.ok(report.conditioning.sustained.weakestNodeDof);
@@ -55,6 +65,8 @@ assert.equal(comparison.coverage.unmatchedSolverRows, 0);
 assert.equal(comparison.coverage.coverageStatus, 'COMPLETE');
 assert.equal(comparison.completeComparisonClaim, true);
 assert.equal(comparison.totals.untraced, 0);
+assert.equal(comparison.totals.passed, 4383);
+assert.equal(comparison.totals.failed, 1215);
 
 console.log(JSON.stringify({
   status: 'PASS',
@@ -63,6 +75,8 @@ console.log(JSON.stringify({
     bendElements: report.flexibilityOwnership.bendElements,
     junctions: report.counts.b31jJunctions,
     plusYCandidates: report.counts.plusYCandidates,
+    plusZCandidates: report.counts.plusZCandidates,
+    unilateralCandidates: report.counts.unilateralCandidates,
     unilateralStatus: report.nonlinearRestraints.status,
   },
   conditioning: report.conditioning,

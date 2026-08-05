@@ -278,6 +278,8 @@ function calculateFactor(authorities, bend, parentEntry) {
     bendRadius: bend.record.radius,
     pressure: analysis.pressure ?? 0,
     elasticModulus: authorities.material.materialState.elasticModulus,
+    bendAngleDegrees: bend.sweepAngle * 180 / Math.PI,
+    smooth90FlexibilityCorrection: Math.abs(bend.sweepAngle - Math.PI / 2) <= 1e-9,
   };
   return calculateB31Factors({
     schema: FACTOR_CALCULATION_REQUEST_SCHEMA,
