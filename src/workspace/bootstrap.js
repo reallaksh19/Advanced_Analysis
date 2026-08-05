@@ -48,6 +48,12 @@ import { WorkspaceShellController } from './workspace-shell-controller.js';
 import { SequentialSketcherController } from './sequential-sketcher/sequential-sketcher-controller.js';
 import { EngineeringModelController } from './engineering-model-controller.js';
 import { engineeringModelStore } from './engineering-model-store.js';
+import {
+  EmpiricalLoadCalcScenarioController,
+} from './engineering-loads/empirical-load-calc-scenario-controller.js';
+import {
+  empiricalLoadCalcScenarioStore,
+} from './engineering-loads/empirical-load-calc-scenario-store.js';
 import { projectDataStore } from './project-data/project-data-store.js';
 import { masterDataController } from './master-data-controller.js';
 
@@ -65,6 +71,7 @@ export function bootstrapAnalysisWorkspace(rootElement) {
   FirstCutResultStore.clear();
   TopologyStore.clear(); SupportRestraintStore.clear(); ModelLoadStore.clear();
   SupportLoadScreeningStore.clear(); VerticalBeamStore.clear(); ModelCalculationStore.clear();
+  empiricalLoadCalcScenarioStore.clear();
   renderWorkspaceLayout(rootElement);
   const capabilityRegistry = createDefaultAnalysisCapabilityRegistry();
   const workspaceConsumerController = new WorkspaceConsumerController(EventBus);
@@ -72,6 +79,20 @@ export function bootstrapAnalysisWorkspace(rootElement) {
   const settingsController = new SettingsController(rootElement.querySelector('[data-role="settings-consumer-root"]'),EventBus,settingsPersistence,() => ({ materializedContractKeys: workspaceConsumerController.getContext()?.availabilitySummary?.availableContractKeys || [] }));
   const datasetController = new DatasetController(EventBus, WorkspaceState);
   const engineeringModelController = new EngineeringModelController(EventBus, WorkspaceState, masterDataController);
+  const empiricalLoadCalcScenarioController = new EmpiricalLoadCalcScenarioController(
+    EventBus,
+    () => {
+      const snapshot = WorkspaceState.getSnapshot();
+      return {
+        datasetId: snapshot.status === 'ready' ? snapshot.dataset?.datasetId || '' : '',
+        sharedModel: snapshot.status === 'ready' ? snapshot.dataset?.sharedModel || null : null,
+        topologyGraph: TopologyStore.getGraph(),
+        supportAttachmentModel: SupportRestraintStore.getAttachmentModel(),
+        restraintCapabilityModel: SupportRestraintStore.getRestraintModel(),
+        sourceLoadPrimitiveSet: ModelLoadStore.getLoadPrimitiveSet(),
+      };
+    },
+  );
   const sharedModelController = new SharedModelController(EventBus, WorkspaceState, rootElement.ownerDocument);
   const topologyController = new TopologyController(EventBus, TopologyStore, rootElement.ownerDocument);
   const supportRestraintController = new SupportRestraintController(EventBus, SupportRestraintStore, TopologyStore, rootElement.ownerDocument);
@@ -118,7 +139,7 @@ export function bootstrapAnalysisWorkspace(rootElement) {
   const firstCutWorkbenchLauncherController = new FirstCutWorkbenchLauncherController(rootElement);
   const sequentialSketcherRoot = rootElement.querySelector('[data-role="sequential-sketcher-root"]');
   const sequentialSketcherController = sequentialSketcherRoot ? new SequentialSketcherController(sequentialSketcherRoot, EventBus, WorkspaceState) : null;
-  const controllers = [workspaceShellController,firstCutWorkbenchController,firstCutWorkbenchLauncherController,datasetController,engineeringModelController,sharedModelController,topologyController,supportRestraintController,modelLoadController,supportLoadScreeningController,verticalBeamController,modelCalculationController,modelSupportLoadController,sessionController,analysisCoordinator,ledgerController,treePanel,viewportPanel,sharedModelPanel,topologyPanel,supportRestraintPanel,modelLoadPanel,supportLoadScreeningPanel,verticalBeamPanel,modelCalculationPanel,modelSupportLoadPanel,propertiesPanel,workspaceConsumerController,settingsController,applicationShellController,tabBenchmarkStatusController,sequentialSketcherController].filter(Boolean);
+  const controllers = [workspaceShellController,firstCutWorkbenchController,firstCutWorkbenchLauncherController,datasetController,engineeringModelController,empiricalLoadCalcScenarioController,sharedModelController,topologyController,supportRestraintController,modelLoadController,supportLoadScreeningController,verticalBeamController,modelCalculationController,modelSupportLoadController,sessionController,analysisCoordinator,ledgerController,treePanel,viewportPanel,sharedModelPanel,topologyPanel,supportRestraintPanel,modelLoadPanel,supportLoadScreeningPanel,verticalBeamPanel,modelCalculationPanel,modelSupportLoadPanel,propertiesPanel,workspaceConsumerController,settingsController,applicationShellController,tabBenchmarkStatusController,sequentialSketcherController].filter(Boolean);
   controllers.forEach((controller) => controller.init());
   globalThis.EventBus = EventBus;
   return Object.freeze({
@@ -134,6 +155,14 @@ export function bootstrapAnalysisWorkspace(rootElement) {
     getEngineeringSettingsProfile(){return settingsController.getProfile();},getEngineeringSettingsAudit(){return settingsController.getAudit();},getSettingsReviewModel(){return settingsController.getReviewModel();},
     getWorkspaceConsumerContext(){return workspaceConsumerController.getContext();},listWorkspaceConsumers(){return applicationShellController.getRegistry().consumers;},getWorkspaceConsumerReadiness(consumerId){return applicationShellController.getReadiness(consumerId);},getApplicationViewState(){return applicationShellController.getPublicState();},activateApplicationView(viewId){return applicationShellController.activate(viewId);},
     getLoadCalculationReviewModel(){return applicationShellController.getLoadCalculationReviewModel();},
+    getEmpiricalLoadCalcScenarioState(){return empiricalLoadCalcScenarioController.getSnapshot();},
+    getEmpiricalLoadCalcScenarioProposal(){return empiricalLoadCalcScenarioController.getProposal();},
+    getEmpiricalLoadCalcAuthorization(){return empiricalLoadCalcScenarioController.getAuthorization();},
+    getEmpiricalLoadCalcExecution(){return empiricalLoadCalcScenarioController.getExecution();},
+    configureEmpiricalLoadCalcScenario(value){return empiricalLoadCalcScenarioController.configure(value);},
+    authorizeEmpiricalLoadCalcScenario(value){return empiricalLoadCalcScenarioController.authorize(value);},
+    calculateEmpiricalLoadCalcScenario(value){return empiricalLoadCalcScenarioController.calculate(value);},
+    cloneEmpiricalLoadCalcProfile(value){return empiricalLoadCalcScenarioController.cloneProfile(value);},
     getProjectDataProfile(){return projectDataStore.getProfile();},
     getSupportSiteModel(){return engineeringModelStore.getSupportSiteModel();},
     getRoutePartitionModel(){return engineeringModelStore.getRoutePartitionModel();},
