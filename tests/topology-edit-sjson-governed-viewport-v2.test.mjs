@@ -52,7 +52,7 @@ test('governed route renders lines, separate translucent nodes, and invisible pi
   const marker = objects.get('topology-edit-visible-node-marker:node:1');
   const nodeProxy = objects.get('topology-edit-node-pick-proxy:node:1');
   assert.equal(marker?.isMesh, true);
-  assert.equal(marker.geometry.parameters.radius, 7);
+  assert.equal(marker.geometry.parameters.radius, 4.2);
   assert.equal(marker.material.opacity, 0.24);
   assert.equal(marker.material.depthTest, false);
   assert.equal(nodeProxy.geometry.parameters.radius, 16.8);
