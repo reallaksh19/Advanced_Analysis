@@ -66,8 +66,15 @@ jobs:
         shell: bash
         run: |
           mkdir -p artifacts/lfea-linear-core-exact-head
-          set -o pipefail
-          node scripts/lfea-linear-core-exact-head-evidence.mjs 2>&1 | tee artifacts/lfea-linear-core-exact-head/emitter.log
+          set +e
+          node scripts/lfea-linear-core-exact-head-evidence.mjs > artifacts/lfea-linear-core-exact-head/emitter.log 2>&1
+          status=$?
+          cat artifacts/lfea-linear-core-exact-head/emitter.log
+          if [ "$status" -ne 0 ]; then
+            message="$(tail -n 40 artifacts/lfea-linear-core-exact-head/emitter.log | tr '\n' ' ' | sed 's/%/%25/g')"
+            echo "::error file=scripts/lfea-linear-core-exact-head-evidence.mjs::$message"
+            exit "$status"
+          fi
 
       - name: Element-end, nodal and code-station recovery
         run: npm run check:lfea-b3.4
