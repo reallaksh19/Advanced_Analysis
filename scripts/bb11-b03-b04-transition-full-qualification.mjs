@@ -19,6 +19,10 @@ const SOURCE_PATH = path.join(
   ROOT,
   'src/core/bucket-b/bb11-flange-hub.js',
 );
+const ORACLE_SOURCE_PATH = path.join(
+  ROOT,
+  'src/core/bucket-b/flange-hub-independent-oracle.js',
+);
 const expectedHeadSha = requiredSha(
   process.env.EXPECTED_HEAD_SHA,
   'EXPECTED_HEAD_SHA',
@@ -41,25 +45,64 @@ const temporaryModulePath = path.join(
   'src/core/bucket-b',
   `.bb11-transition-candidate-core-${process.pid}.mjs`,
 );
+const temporaryOraclePath = path.join(
+  ROOT,
+  'src/core/bucket-b',
+  `.bb11-transition-candidate-oracle-${process.pid}.mjs`,
+);
 
-const governedImport = `import {
+const governedMeshImport = `import {
   createFlangeHubMesh,
   FLANGE_HUB_MESH_LEVELS,
 } from './flange-hub-mesh.js';`;
-const candidateImport = `import {
+const candidateMeshImport = `import {
   createFlangeHubTransitionCandidateMesh as createFlangeHubMesh,
   FLANGE_HUB_TRANSITION_CANDIDATE_LEVELS as FLANGE_HUB_MESH_LEVELS,
 } from './flange-hub-transition-candidate.js';`;
+const governedOracleImport =
+  "import { runIndependentFlangeHubOracle } from './flange-hub-independent-oracle.js';";
+const candidateOracleImport =
+  `import { runIndependentFlangeHubOracle } from './${path.basename(temporaryOraclePath)}';`;
+const governedOracleBlockMap = `function blockMap(block) {
+  const outer = profile(block.profile);
+  if (block.kind === 'STRIP') {
+    return (u, v) => {`;
+const correctedOracleBlockMap = `function blockMap(block) {
+  if (block.kind === 'STRIP') {
+    const outer = profile(block.profile);
+    return (u, v) => {`;
 
 await mkdir(outputDirectory, { recursive: true });
 const source = await readFile(SOURCE_PATH, 'utf8');
+const oracleSource = await readFile(ORACLE_SOURCE_PATH, 'utf8');
 assert.equal(
-  occurrences(source, governedImport),
+  occurrences(source, governedMeshImport),
   1,
   'BB11_TRANSITION_GOVERNED_MESH_IMPORT_COUNT',
 );
-const transformed = source.replace(governedImport, candidateImport);
-assert.notEqual(transformed, source, 'BB11_TRANSITION_IMPORT_NOT_REPLACED');
+assert.equal(
+  occurrences(source, governedOracleImport),
+  1,
+  'BB11_TRANSITION_GOVERNED_ORACLE_IMPORT_COUNT',
+);
+assert.equal(
+  occurrences(oracleSource, governedOracleBlockMap),
+  1,
+  'BB11_TRANSITION_GOVERNED_ORACLE_BLOCK_MAP_COUNT',
+);
+const correctedOracleSource = oracleSource.replace(
+  governedOracleBlockMap,
+  correctedOracleBlockMap,
+);
+assert.notEqual(
+  correctedOracleSource,
+  oracleSource,
+  'BB11_TRANSITION_ORACLE_CONTROL_FLOW_NOT_CORRECTED',
+);
+let transformed = source.replace(governedMeshImport, candidateMeshImport);
+transformed = transformed.replace(governedOracleImport, candidateOracleImport);
+assert.notEqual(transformed, source, 'BB11_TRANSITION_IMPORTS_NOT_REPLACED');
+await writeFile(temporaryOraclePath, correctedOracleSource, 'utf8');
 await writeFile(temporaryModulePath, transformed, 'utf8');
 
 let first;
@@ -69,6 +112,7 @@ try {
   second = runCoreChild(temporaryModulePath);
 } finally {
   await rm(temporaryModulePath, { force: true });
+  await rm(temporaryOraclePath, { force: true });
 }
 
 await writeFile(
@@ -132,13 +176,24 @@ assert.deepEqual(core.authority, {
 
 const prerequisites = await readPrerequisites(expectedHeadSha);
 const payload = {
-  schema: 'bb11-b03-b04-transition-full-qualification/v1',
+  schema: 'bb11-b03-b04-transition-full-qualification/v2',
   exactHeadSha: expectedHeadSha,
   productionParentSha,
   moduleId: 'C2D-FLANGE-HUB',
   meshFamilyId: FLANGE_HUB_TRANSITION_CANDIDATE_FAMILY_ID,
   status: 'CANDIDATE_FULL_BB11_QUALIFICATION_PASS',
   decision: 'CANDIDATE_QUALIFIED_FOR_GOVERNED_PROMOTION_REVIEW',
+  oracleCompatibilityCorrection: {
+    classification: 'CANDIDATE_ONLY_NON_AUTHORIZING_CONTROL_FLOW_CORRECTION',
+    governedOracleSourceModified: false,
+    correction:
+      'DEFER_PROFILE_RESOLUTION_UNTIL_BLOCK_KIND_IS_STRIP',
+    mechanicalInputsModified: false,
+    oracleFormulationModified: false,
+    productionPromotionBlockedUntilGovernedCorrectionLands: true,
+    governedOracleSourceSha256: sha256(oracleSource),
+    correctedOracleSourceSha256: sha256(correctedOracleSource),
+  },
   deterministicReplay: {
     byteIdentical: true,
     stdoutSha256: sha256(first.stdout),
