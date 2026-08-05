@@ -19,6 +19,7 @@ permissions:
 
 jobs:
   nc01-contracts:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.base.ref == 'agent/lafea-nc00-shell-contact-foundation'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
