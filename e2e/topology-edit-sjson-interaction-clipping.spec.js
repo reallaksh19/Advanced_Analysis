@@ -43,7 +43,7 @@ test('SJSON nodes and components select the right editor while clipping follows 
   await expect.poll(() => canvasMount.getAttribute('data-topology-edit-visible-node-marker-count'))
     .not.toBeNull();
 
-  const nodePoint = await projectedPickPoint(page, 'node');
+  const nodePoint = await visiblePickPoint(page, 'node');
   await page.mouse.click(nodePoint.x, nodePoint.y);
   await expect(renderHost).toHaveAttribute('data-topology-edit-selection-source', 'viewport');
   await expect(renderHost).toHaveAttribute('data-topology-edit-selection-primary-id', /^node:/);
@@ -51,7 +51,7 @@ test('SJSON nodes and components select the right editor while clipping follows 
     'details[data-panel-kind="topology-edit-professional-interaction"]',
   )).toHaveAttribute('open', '');
 
-  const componentPoint = await projectedPickPoint(page, 'component');
+  const componentPoint = await visiblePickPoint(page, 'component');
   await page.mouse.click(componentPoint.x, componentPoint.y);
   await expect(renderHost).toHaveAttribute('data-topology-edit-selection-source', 'viewport');
   await expect(renderHost).toHaveAttribute('data-topology-edit-selection-primary-id', /^edge:/);
@@ -110,28 +110,24 @@ test('SJSON nodes and components select the right editor while clipping follows 
   });
 });
 
-async function projectedPickPoint(page, kind) {
+async function visiblePickPoint(page, kind) {
   return page.evaluate(({ key, objectKind }) => {
     const backend = globalThis[key]?.viewportBackend;
     const canvas = backend?.renderer?.domElement;
     if (!backend || !canvas) throw new Error('SJSON viewport backend is unavailable.');
-    let target = null;
-    backend.groups.draftGroup.traverse((object) => {
-      if (target || !object.isMesh) return;
-      const pick = object.userData?.pickTarget;
-      if (!pick || pick.objectKind !== objectKind) return;
-      if (objectKind === 'component' && !String(pick.objectId).startsWith('edge:')) return;
-      if (objectKind === 'component' && object.geometry?.type !== 'CylinderGeometry') return;
-      target = object;
-    });
-    if (!target) throw new Error(`No ${objectKind} pick proxy was found.`);
-    const point = target.getWorldPosition(new backend.activeCamera.position.constructor());
-    point.project(backend.activeCamera);
     const rect = canvas.getBoundingClientRect();
-    return {
-      x: rect.left + ((point.x + 1) / 2) * rect.width,
-      y: rect.top + ((1 - point.y) / 2) * rect.height,
-    };
+    for (let y = rect.top + 2; y < rect.bottom - 1; y += 3) {
+      for (let x = rect.left + 2; x < rect.right - 1; x += 3) {
+        const context = backend.pickContext(x, y);
+        const pick = context ? backend.pickWithRaycaster(context.pointer) : null;
+        if (!pick?.objectId) continue;
+        const matchesNode = objectKind === 'node' && String(pick.objectId).startsWith('node:');
+        const matchesComponent = objectKind === 'component'
+          && String(pick.objectId).startsWith('edge:');
+        if (matchesNode || matchesComponent) return { x, y, objectId: pick.objectId };
+      }
+    }
+    throw new Error(`No visible ${objectKind} pick point was found.`);
   }, { key: CONTROLLER_KEY, objectKind: kind });
 }
 
