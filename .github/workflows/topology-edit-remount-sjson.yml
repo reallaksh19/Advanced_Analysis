@@ -74,7 +74,7 @@ jobs:
             e2e/topology-edit-remount-sjson.spec.js \
             e2e/topology-edit-sjson-render-authority.spec.js \
             e2e/topology-edit-clean-layout.spec.js \
-            --project=chromium --workers=1 --retries=0 --reporter=line
+            --project=chromium --workers=1 --retries=0 --trace=on --reporter=line
 
       - name: Upload browser evidence
         if: always()
