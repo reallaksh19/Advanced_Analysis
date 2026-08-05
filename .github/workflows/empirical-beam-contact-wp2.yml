@@ -7,6 +7,7 @@ on:
       - 'src/workspace/engineering-loads/empirical-beam-contact-*.js'
       - 'src/workspace/engineering-loads/authorized-empirical-beam-contact-execution.js'
       - 'scripts/empirical-beam-contact-runtime-check.mjs'
+      - 'scripts/empirical-beam-contact-elbow-runtime-check.mjs'
       - '.github/workflows/empirical-beam-contact-wp2.yml'
       - '.github/workflows/empirical-piping-exact-head.yml'
 
@@ -36,3 +37,6 @@ jobs:
 
       - name: Run authorized beam/contact runtime bridge checks
         run: node scripts/empirical-beam-contact-runtime-check.mjs
+
+      - name: Run elbow and region-planarity bridge checks
+        run: node scripts/empirical-beam-contact-elbow-runtime-check.mjs
