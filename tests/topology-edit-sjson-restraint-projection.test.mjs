@@ -65,6 +65,16 @@ test('production Sjson matches Topo validator support anchors and restraint arra
     verticalAxis: 'Z',
   });
 
+  console.log(`SJSON_TOPO_VALIDATOR_SUPPORT_METRICS=${JSON.stringify({
+    metrics: first.metrics,
+    anchorRestraintCounts: first.anchors.map((anchor) => ({
+      anchorKey: anchor.anchorKey,
+      restraintTypes: anchor.restraintTypes,
+      memberCount: anchor.memberSupportIds.length,
+    })),
+    decisionCounts: Object.groupBy(first.decisions, (decision) => decision.disposition),
+  })}`);
+
   assert.equal(first.authority, 'TOPO_VALIDATOR_SUPPORT_HIERARCHY_POSITION_RESTRAINT_ARRAY');
   assert.equal(
     first.groupingAuthority,
