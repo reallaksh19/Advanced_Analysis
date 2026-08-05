@@ -166,10 +166,10 @@ test('production Sjson opens 3D Edit with complete typed fittings and Topo valid
   await expect.poll(() => canvasHost.getAttribute('data-topology-edit-benchmark-camera-fit-algorithm'), {
     timeout: 60_000,
   }).toBe(BENCHMARK_CAMERA_FIT_ALGORITHM);
-  await expect.poll(() => jsonAttribute(
+  await expect.poll(async () => (await jsonAttribute(
     canvasHost,
     'data-topology-edit-benchmark-screen-bounds',
-  )?.fitsViewport === true, { timeout: 60_000 }).toBe(true);
+  ))?.fitsViewport === true, { timeout: 60_000 }).toBe(true);
   await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-geometry-diagnostic-count'), {
     timeout: 60_000,
   }).toBe(0);
