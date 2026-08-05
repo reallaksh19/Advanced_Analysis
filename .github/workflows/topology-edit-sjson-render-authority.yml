@@ -6,21 +6,38 @@ on:
       - '.github/workflows/topology-edit-sjson-render-authority.yml'
       - 'public/Sjson.json'
       - 'public/fixtures/topology-edit-20-element-demo.staged.json'
+      - 'Temp/3D EDIT RENDER/EXPECTED.png'
       - 'src/core/support-restraints/attachment-resolution-helpers.js'
       - 'src/workspace/dataset-adapter.js'
       - 'src/workspace/dataset-types.js'
+      - 'src/workspace/load-calc-consumer-controller.js'
+      - 'src/workspace/workspace-shell-controller.js'
+      - 'src/workspace/topology-edit-3d-sjson-fidelity-controller.js'
       - 'src/workspace/topology-edit/topology-edit-candidate-builder.js'
       - 'src/workspace/topology-edit/topology-edit-checker-lineage.js'
       - 'src/workspace/topology-edit/topology-edit-source-adapter.js'
       - 'src/workspace/topology-edit/topology-edit-render-model.js'
       - 'src/workspace/topology-edit/topology-edit-typed-viewport-backend.js'
+      - 'src/workspace/topology-edit/topology-edit-support-viewport-backend.js'
+      - 'src/workspace/topology-edit/topology-edit-sjson-benchmark-camera.js'
+      - 'src/workspace/topology-edit/topology-edit-sjson-visual-authority.js'
+      - 'src/workspace/topology-edit/topology-edit-sjson-tee-projection.js'
+      - 'src/workspace/topology-edit/topology-edit-sjson-point-component-projection.js'
+      - 'src/workspace/topology-edit/topology-edit-sjson-parent-branch-diameter.js'
+      - 'src/workspace/topology-edit/topology-edit-sjson-support-parent-branch-diameter.js'
+      - 'src/workspace/topology-edit/topology-edit-sjson-restraint-projection.js'
       - 'src/workspace/topology-edit/support-restraint-family.js'
       - 'tests/topology-edit-sjson-render-authority.test.mjs'
+      - 'tests/topology-edit-sjson-fidelity.test.mjs'
+      - 'tests/topology-edit-sjson-restraint-projection.test.mjs'
+      - 'tests/topology-edit-sjson-benchmark-camera.test.mjs'
+      - 'tests/topology-edit-sjson-compact-support-render.test.mjs'
       - 'tests/topology-edit-split-lineage-certification.test.mjs'
       - 'tests/topology-edit-20-element-demo-loader.test.mjs'
       - 'tests/topology-edit-render-fidelity.test.mjs'
       - 'tests/topology-edit-m003-capability-authority.test.mjs'
       - 'e2e/topology-edit-sjson-render-authority.spec.js'
+      - 'e2e/topology-edit-sjson-screen-bounds.spec.js'
       - 'e2e/topology-edit-clean-layout.spec.js'
   workflow_dispatch:
 
@@ -65,14 +82,31 @@ jobs:
           node --check src/core/support-restraints/attachment-resolution-helpers.js
           node --check src/workspace/dataset-adapter.js
           node --check src/workspace/dataset-types.js
+          node --check src/workspace/load-calc-consumer-controller.js
+          node --check src/workspace/workspace-shell-controller.js
+          node --check src/workspace/topology-edit-3d-sjson-fidelity-controller.js
           node --check src/workspace/topology-edit/topology-edit-candidate-builder.js
           node --check src/workspace/topology-edit/topology-edit-checker-lineage.js
           node --check src/workspace/topology-edit/topology-edit-source-adapter.js
           node --check src/workspace/topology-edit/topology-edit-render-model.js
           node --check src/workspace/topology-edit/topology-edit-typed-viewport-backend.js
+          node --check src/workspace/topology-edit/topology-edit-support-viewport-backend.js
+          node --check src/workspace/topology-edit/topology-edit-sjson-benchmark-camera.js
+          node --check src/workspace/topology-edit/topology-edit-sjson-visual-authority.js
+          node --check src/workspace/topology-edit/topology-edit-sjson-tee-projection.js
+          node --check src/workspace/topology-edit/topology-edit-sjson-point-component-projection.js
+          node --check src/workspace/topology-edit/topology-edit-sjson-parent-branch-diameter.js
+          node --check src/workspace/topology-edit/topology-edit-sjson-support-parent-branch-diameter.js
+          node --check src/workspace/topology-edit/topology-edit-sjson-restraint-projection.js
           node --check tests/topology-edit-sjson-render-authority.test.mjs
+          node --check tests/topology-edit-sjson-fidelity.test.mjs
+          node --check tests/topology-edit-sjson-restraint-projection.test.mjs
+          node --check tests/topology-edit-sjson-benchmark-camera.test.mjs
+          node --check tests/topology-edit-sjson-compact-support-render.test.mjs
           node --check tests/topology-edit-split-lineage-certification.test.mjs
           node --check e2e/topology-edit-sjson-render-authority.spec.js
+          node --check e2e/topology-edit-sjson-screen-bounds.spec.js
+          node --check e2e/topology-edit-clean-layout.spec.js
           git diff --check
 
       - name: Execute canonical, typed geometry, support, and split-lineage tests
@@ -80,6 +114,10 @@ jobs:
           node --test \
             tests/topology-edit-split-lineage-certification.test.mjs \
             tests/topology-edit-sjson-render-authority.test.mjs \
+            tests/topology-edit-sjson-fidelity.test.mjs \
+            tests/topology-edit-sjson-restraint-projection.test.mjs \
+            tests/topology-edit-sjson-benchmark-camera.test.mjs \
+            tests/topology-edit-sjson-compact-support-render.test.mjs \
             tests/topology-edit-20-element-demo-loader.test.mjs \
             tests/topology-edit-render-fidelity.test.mjs \
             tests/topology-edit-m003-capability-authority.test.mjs
@@ -88,8 +126,9 @@ jobs:
         run: |
           npx playwright test \
             e2e/topology-edit-sjson-render-authority.spec.js \
+            e2e/topology-edit-sjson-screen-bounds.spec.js \
             e2e/topology-edit-clean-layout.spec.js \
-            --project=chromium --workers=1 --retries=0 --reporter=line
+            --project=chromium --workers=1 --retries=0 --trace=on --reporter=line
 
       - name: Upload browser evidence
         if: always()
@@ -99,5 +138,6 @@ jobs:
           path: |
             playwright-report
             test-results
+            Temp/3D EDIT RENDER/EXPECTED.png
           if-no-files-found: warn
           retention-days: 30
