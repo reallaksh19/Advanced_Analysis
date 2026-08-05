@@ -247,7 +247,7 @@ function auditPhysicalCase({
       status: analysis.execution.status,
       forceEquilibrium: analysis.execution.diagnostics.forceEquilibrium.status,
       momentEquilibrium: analysis.execution.diagnostics.momentEquilibrium.status,
-      normalizedResidual: analysis.execution.diagnostics.residual.normalizedResidual,
+      normalizedResidual: analysis.execution.diagnostics.residual.value,
     }),
   });
 }
