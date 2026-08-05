@@ -90,19 +90,23 @@ assert(rigidCase.numericalEvidence.reciprocalConditionEstimate > 0);
 assert(rigidCase.numericalEvidence.scaledResidual <= 1e-12);
 
 const rigidBySite = bySupportSite(rigidCase.supportResults);
-console.log('WP5_RIGID_DIAGNOSTIC', JSON.stringify({
-  supportResults: rigidCase.supportResults.map((row) => ({
-    supportSiteId: row.supportSiteId,
-    reactionComponentN: row.reactionComponentN,
-    displacementM: row.displacementM,
-    trialFreeMovementM: row.trialFreeMovementM,
-  })),
-  memberActions: rigidCase.memberActions,
-}, null, 2));
-const leftExpected = EA * 1e-5 * 100;
+const middleAttachment = rigidZ.supportAttachmentModel.attachments
+  .find((row) => row.supportKey === 'LS-M');
+assert(middleAttachment, 'The governed LS-M attachment must exist.');
+const middleStationM = middleAttachment.projectedPointCanonical.z / 1000;
+const junctionStationM = 0.5;
+const terminalStationM = 1;
+assert.equal(middleStationM, 0.25);
+const leftLengthM = middleStationM;
+const rightL1LengthM = junctionStationM - middleStationM;
+const rightL2LengthM = terminalStationM - junctionStationM;
+const leftExpected = (
+  leftLengthM * 1e-5 * 100
+) / (leftLengthM / EA);
 const rightExpected = (
-  0.1 * 1e-5 * 100 + 0.5 * 2e-5 * 100
-) / (0.6 / EA);
+  rightL1LengthM * 1e-5 * 100
+  + rightL2LengthM * 2e-5 * 100
+) / ((rightL1LengthM + rightL2LengthM) / EA);
 close(rigidBySite.get('ANC-A').reactionComponentN, leftExpected, 1e-6, 'left anchor reaction');
 close(
   rigidBySite.get('LS-M').reactionComponentN,
