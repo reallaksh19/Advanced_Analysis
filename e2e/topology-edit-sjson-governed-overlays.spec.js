@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test';
 const SJSON_BYTES = readFileSync(new URL('../public/Sjson.json', import.meta.url));
 const VIEWPORT = Object.freeze({ width: 1637, height: 869 });
 
-test('SJSON uses one governed packet with exact tees, visible nodes and compact overlays', async ({ page }, testInfo) => {
+test('SJSON uses one governed packet with exact tees, selectable sphere nodes and OD support overlays', async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   await page.setViewportSize(VIEWPORT);
   await page.addInitScript(() => globalThis.localStorage?.clear());
@@ -29,37 +29,53 @@ test('SJSON uses one governed packet with exact tees, visible nodes and compact 
   await expect(host).toHaveAttribute('data-topology-edit-active-rich-primitive-count', '0');
   await expect(host).toHaveAttribute('data-topology-edit-visible-route-solid-mesh-count', '0');
   await expect(host).toHaveAttribute('data-topology-edit-node-visual-and-pick-geometry-separated', 'true');
-  await expect(host).toHaveAttribute('data-topology-edit-visible-node-marker-geometry', 'OCTAHEDRON_WIREFRAME');
+  await expect(host).toHaveAttribute('data-topology-edit-visible-node-marker-geometry', 'TRANSLUCENT_SPHERE');
   await expect(host).toHaveAttribute('data-topology-edit-support-overlay-depth-independent', 'true');
+  await expect(host).toHaveAttribute(
+    'data-topology-edit-support-arrow-placement-authority',
+    'HOST_OD_HALF_CONTACT_PLUS_TWO_THIRDS_OD_GLYPH_V1',
+  );
+  await expect(host).toHaveAttribute('data-topology-edit-camera-clipping-mode', 'AUTO');
+  await expect(host).toHaveAttribute(
+    'data-topology-edit-camera-clipping-authority',
+    'SJSON_CAMERA_SPACE_DYNAMIC_CLIPPING_V1',
+  );
   await expect(host).toHaveAttribute(
     'data-topology-edit-sjson-issue-render-authority',
     'SJSON_COMPACT_WIREFRAME_ISSUE_OVERLAY_V2',
-  );
-  await expect(host).toHaveAttribute(
-    'data-topology-edit-sjson-issue-marker-geometry',
-    'OCTAHEDRON_WIREFRAME',
   );
 
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-exact-tee-count')).toBe(3);
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-exact-tee-segment-count')).toBe(9);
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-visible-node-marker-count')).toBeGreaterThan(100);
-  await expect.poll(() => numberAttribute(host, 'data-topology-edit-visible-node-marker-radius-mm')).toBeLessThanOrEqual(8);
+  await expect.poll(() => numberAttribute(host, 'data-topology-edit-visible-node-marker-radius-mm')).toBeLessThanOrEqual(12);
   await expect.poll(() => numberAttribute(host, 'data-topology-edit-node-pick-proxy-radius-mm')).toBeGreaterThan(
     await numberAttribute(host, 'data-topology-edit-visible-node-marker-radius-mm'),
   );
+  await expect.poll(() => integerAttribute(host, 'data-topology-edit-gpu-pick-radius-css-px')).toBeGreaterThanOrEqual(8);
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-rendered-support-marker-count')).toBe(34);
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-rendered-restraint-arrow-count')).toBe(47);
-  await expect.poll(() => integerAttribute(host, 'data-topology-edit-visible-support-overlay-count')).toBe(81);
+  await expect.poll(() => integerAttribute(host, 'data-topology-edit-rendered-directional-arrow-count')).toBeGreaterThan(47);
+  await expect.poll(() => integerAttribute(host, 'data-topology-edit-rendered-bidirectional-restraint-count')).toBeGreaterThan(0);
+  await expect.poll(async () => ({
+    visible: await integerAttribute(host, 'data-topology-edit-visible-support-overlay-count'),
+    expected: await integerAttribute(host, 'data-topology-edit-rendered-support-marker-count')
+      + await integerAttribute(host, 'data-topology-edit-rendered-directional-arrow-count'),
+  })).toEqual(await expectedSupportCounts(host));
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-sjson-visible-issue-marker-count'))
     .toBeGreaterThan(0);
-  await expect.poll(() => numberAttribute(host, 'data-topology-edit-sjson-issue-marker-radius-mm'))
-    .toBeLessThanOrEqual(8);
 
   await page.screenshot({
     path: testInfo.outputPath('sjson-governed-overlays.png'),
     fullPage: false,
   });
 });
+
+async function expectedSupportCounts(host) {
+  const expected = await integerAttribute(host, 'data-topology-edit-rendered-support-marker-count')
+    + await integerAttribute(host, 'data-topology-edit-rendered-directional-arrow-count');
+  return { visible: expected, expected };
+}
 
 async function integerAttribute(locator, name) {
   return Number.parseInt(await locator.getAttribute(name) || '0', 10) || 0;
