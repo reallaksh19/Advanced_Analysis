@@ -1,0 +1,122 @@
+name: LAFEA-NC Solver Custody Evidence
+
+on:
+  pull_request:
+    branches:
+      - agent/lafea-nc00-shell-contact-foundation
+    paths:
+      - '.github/workflows/lafea-nc-solver-custody-evidence.yml'
+      - 'docs/nonlinear-shell-contact/LAFEA_NC_SOLVER_CUSTODY_EVIDENCE.md'
+      - 'evidence/nonlinear-shell-contact/solver-custody/inventory.json'
+      - 'scripts/lafea-nc-solver-custody-check.mjs'
+      - 'src/core/nonlinear-shell-contact/solver-custody-evidence.js'
+      - 'tests/nonlinear-shell-contact-solver-custody.test.mjs'
+  workflow_dispatch:
+    inputs:
+      head_sha:
+        description: Exact solver-custody evidence head SHA
+        required: true
+        type: string
+      base_sha:
+        description: Exact NC-00 base SHA
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  exact-head-solver-custody-evidence:
+    runs-on: ubuntu-24.04
+    env:
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      DISPATCH_HEAD_SHA: ${{ inputs.head_sha }}
+      DISPATCH_BASE_SHA: ${{ inputs.base_sha }}
+      NC00_BASE_BRANCH: agent/lafea-nc00-shell-contact-foundation
+    steps:
+      - name: Resolve exact head
+        id: exact
+        shell: bash
+        run: |
+          set -euo pipefail
+          head_sha="${DISPATCH_HEAD_SHA:-${PR_HEAD_SHA:-${GITHUB_SHA}}}"
+          [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]]
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.exact.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Resolve live NC-00 base
+        id: base
+        shell: bash
+        env:
+          EXACT_HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "$NC00_BASE_BRANCH:refs/remotes/origin/$NC00_BASE_BRANCH"
+          live_base="$(git rev-parse "refs/remotes/origin/$NC00_BASE_BRANCH")"
+          base_sha="${DISPATCH_BASE_SHA:-${PR_BASE_SHA}}"
+          [[ "$base_sha" =~ ^[0-9a-f]{40}$ ]]
+          test "$base_sha" = "$live_base"
+          test "$(git rev-parse HEAD)" = "$EXACT_HEAD_SHA"
+          git merge-base --is-ancestor "$base_sha" "$EXACT_HEAD_SHA"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify changed-path containment and syntax
+        shell: bash
+        env:
+          EXACT_HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
+          BASE_SHA: ${{ steps.base.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXACT_HEAD_SHA"
+          git diff --check "$BASE_SHA...$EXACT_HEAD_SHA"
+          mapfile -t paths < <(git diff --name-only "$BASE_SHA...$EXACT_HEAD_SHA")
+          test "${#paths[@]}" = '6'
+          for path in "${paths[@]}"; do
+            case "$path" in
+              .github/workflows/lafea-nc-solver-custody-evidence.yml|\
+              docs/nonlinear-shell-contact/LAFEA_NC_SOLVER_CUSTODY_EVIDENCE.md|\
+              evidence/nonlinear-shell-contact/solver-custody/inventory.json|\
+              scripts/lafea-nc-solver-custody-check.mjs|\
+              src/core/nonlinear-shell-contact/solver-custody-evidence.js|\
+              tests/nonlinear-shell-contact-solver-custody.test.mjs) ;;
+              *) echo "Solver-custody changed-path violation: $path" >&2; exit 1 ;;
+            esac
+          done
+          node --check src/core/nonlinear-shell-contact/solver-custody-evidence.js
+          node --check scripts/lafea-nc-solver-custody-check.mjs
+          node --check tests/nonlinear-shell-contact-solver-custody.test.mjs
+          node -e "JSON.parse(require('node:fs').readFileSync('evidence/nonlinear-shell-contact/solver-custody/inventory.json','utf8'))"
+
+      - name: Execute custody contracts and negative controls
+        run: node --test tests/nonlinear-shell-contact-solver-custody.test.mjs
+
+      - name: Generate byte-identical blocked evidence reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "$RUNNER_TEMP/solver-custody-a" "$RUNNER_TEMP/solver-custody-b" artifacts/lafea-nc-solver-custody
+          node scripts/lafea-nc-solver-custody-check.mjs --output-dir="$RUNNER_TEMP/solver-custody-a"
+          node scripts/lafea-nc-solver-custody-check.mjs --output-dir="$RUNNER_TEMP/solver-custody-b"
+          diff -ru "$RUNNER_TEMP/solver-custody-a" "$RUNNER_TEMP/solver-custody-b"
+          mkdir -p artifacts
+          cp -R "$RUNNER_TEMP/solver-custody-a" artifacts/lafea-nc-solver-custody
+          test -z "$(git status --porcelain --untracked-files=no)"
+
+      - name: Upload solver custody evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc-solver-custody-${{ steps.exact.outputs.head_sha }}-${{ github.run_attempt }}
+          path: artifacts/lafea-nc-solver-custody
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,78 @@
+{
+  "schema": "nonlinear-shell-contact-solver-custody-evidence/v1",
+  "solver": {
+    "solverId": "CALCULIX.CCX.2.22",
+    "solverFamily": "CALCULIX_CRUNCHIX",
+    "solverVersion": "2.22",
+    "sourceRepository": "https://github.com/Dhondtguido/CalculiX",
+    "sourceCommit": "cff1bb12ec7d24ad9048a1f54ae243a18d1a0b54"
+  },
+  "evidence": [
+    {
+      "id": "SOURCE_ARCHIVE",
+      "status": "MISSING",
+      "path": null,
+      "sha256": null,
+      "mediaType": null,
+      "note": "No governed CalculiX 2.22 source archive is stored in this repository."
+    },
+    {
+      "id": "EXECUTABLE_BINARY",
+      "status": "MISSING",
+      "path": null,
+      "sha256": null,
+      "mediaType": null,
+      "note": "No governed ccx executable is stored in this repository."
+    },
+    {
+      "id": "CONTAINER_RECORD",
+      "status": "MISSING",
+      "path": null,
+      "sha256": null,
+      "mediaType": null,
+      "note": "No immutable container image digest or container record is stored in this repository."
+    },
+    {
+      "id": "BUILD_RECORD",
+      "status": "MISSING",
+      "path": null,
+      "sha256": null,
+      "mediaType": null,
+      "note": "No compiler identity, compiler flags, or reproducible build command record is stored in this repository."
+    },
+    {
+      "id": "PLATFORM_RECORD",
+      "status": "MISSING",
+      "path": null,
+      "sha256": null,
+      "mediaType": null,
+      "note": "No governed operating-system, architecture, libc, kernel, or platform fingerprint record is stored in this repository."
+    },
+    {
+      "id": "LINKED_LIBRARIES_RECORD",
+      "status": "MISSING",
+      "path": null,
+      "sha256": null,
+      "mediaType": null,
+      "note": "No governed linked-library ledger and aggregate hash is stored in this repository."
+    },
+    {
+      "id": "THREAD_POLICY_RECORD",
+      "status": "MISSING",
+      "path": null,
+      "sha256": null,
+      "mediaType": null,
+      "note": "No governed deterministic thread-count and environment-variable record is stored in this repository."
+    },
+    {
+      "id": "LICENSE_RECORD",
+      "status": "MISSING",
+      "path": null,
+      "sha256": null,
+      "mediaType": null,
+      "note": "No solver license text, SPDX identity, or license-text hash is stored in this repository."
+    }
+  ],
+  "qualificationRequested": false,
+  "inventoryHash": "sha256:15b50c58495c2c674cea1fe458f71d071e080a2b9ae6028b8d80a30d18911610"
+}
