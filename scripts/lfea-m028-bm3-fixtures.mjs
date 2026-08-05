@@ -28,6 +28,7 @@ import {
 import { compileFrameElement } from '../src/core/linear-fea-frame-element/index.js';
 import { compilePhysicalLoadCase, modelReferenceFromCompilation } from '../src/core/linear-fea-load-case/index.js';
 import { compileMechanicalModel } from '../src/core/linear-fea-model-compiler/index.js';
+import { recoverProgrammedVariableSpringHangerAction } from '../src/core/linear-fea-variable-spring-hanger/index.js';
 import {
   compileSolverExecution,
   elementContributionFromFrameElement,
@@ -56,7 +57,7 @@ export const INSTALLATION_TEMPERATURE = 293.15;
 export const THERMAL_EXPANSION_COEFFICIENT = 1.17e-5;
 export const GRAVITY = 9.80665;
 export const CASE_KEYS = Object.freeze(['CASE3_OPE', 'CASE4_SUS', 'CASE5_OCC', 'CASE6_EXP', 'CASE7_EXP']);
-const BASE_CASES = Object.freeze({
+export const BM3_BASE_CASES = Object.freeze({
   CASE3_OPE: Object.freeze({ temperatureField: 'operatingTemperature', thermal: true, formula: 'W+T1+P1+H' }),
   CASE4_SUS: Object.freeze({ temperatureField: 'operatingTemperature2', thermal: true, formula: 'W+T2+P1+H' }),
   CASE5_OCC: Object.freeze({ temperatureField: null, thermal: false, formula: 'W+P1+H+F1' }),
@@ -75,7 +76,11 @@ export function sourceEvidence(value) {
   };
 }
 
-export function buildBm3Authorities() {
+export function buildBm3Authorities({
+  additionalConstraintDeclarations = [],
+  modelIdentity = 'BM3-RELIEF-FLANGED-M028',
+  modelRevision = 1,
+} = {}) {
   const content = readFileSync(BM3_INPUT_PATH, 'utf8');
   const source = sealLinearPipingInputXmlSource({
     sourceId: BM3_SOURCE_ID,
@@ -135,6 +140,9 @@ export function buildBm3Authorities() {
     sectionRegistry,
     kernelNodeByReference,
     modelEntries,
+    additionalConstraintDeclarations,
+    modelIdentity,
+    modelRevision,
   });
   return Object.freeze({
     content,
@@ -449,7 +457,7 @@ function buildModelEntries({ analysisGeometry, sourceGeometry, sectionRegistry, 
   });
 }
 
-function compileModel({ source, conditioned, analysisGeometry, material, sectionRegistry, kernelNodeByReference, modelEntries }) {
+function compileModel({ source, conditioned, analysisGeometry, material, sectionRegistry, kernelNodeByReference, modelEntries, additionalConstraintDeclarations, modelIdentity, modelRevision }) {
   const localAxisResults = modelEntries.map((entry) => ({
     evidenceIdentity: `AXIS-${entry.elementId}`,
     result: resolveFrameLocalAxes({
@@ -460,8 +468,8 @@ function compileModel({ source, conditioned, analysisGeometry, material, section
     }),
   }));
   return compileMechanicalModel({
-    modelIdentity: 'BM3-RELIEF-FLANGED-M028',
-    modelRevision: 1,
+    modelIdentity,
+    modelRevision,
     sourceSemanticHash: source.semanticHash,
     conditionedTopology: conditioned,
     nodeBindings: analysisGeometry.nodes.map((node) => ({
@@ -483,12 +491,12 @@ function compileModel({ source, conditioned, analysisGeometry, material, section
     sectionResolutions: sectionRegistry.unique,
     localAxisResults,
     localAxisProfile: FRAME_LOCAL_AXIS_PROFILE,
-    constraintDeclarations: constraintDeclarations(analysisGeometry, kernelNodeByReference),
+    constraintDeclarations: constraintDeclarations(analysisGeometry, kernelNodeByReference, additionalConstraintDeclarations),
     profile: compilerProfile(),
   });
 }
 
-function constraintDeclarations(geometry, kernelNodeByReference) {
+function constraintDeclarations(geometry, kernelNodeByReference, additionalConstraintDeclarations = []) {
   const rows = new Map();
   const add = (referenceNode, dof) => rows.set(`${referenceNode}:${dof}`, {
     declarationId: `BM3-C-${referenceNode}-${dof}`,
@@ -503,12 +511,17 @@ function constraintDeclarations(geometry, kernelNodeByReference) {
       if (restraint.typeCode === '3') add(node.id, 'UY');
     }
   }
+  for (const declaration of additionalConstraintDeclarations) {
+    const key = `${declaration.nodeId}:${declaration.dof}`;
+    if (rows.has(key)) throw new Error(`BM3 additional constraint conflicts at ${key}.`);
+    rows.set(key, declaration);
+  }
   return [...rows.values()];
 }
 
 export function solveBm3InputXml() {
   const authorities = buildBm3Authorities();
-  const base = Object.fromEntries(Object.entries(BASE_CASES).map(([key, policy]) => [key, analyseBaseCase(authorities, key, policy)]));
+  const base = Object.fromEntries(Object.entries(BM3_BASE_CASES).map(([key, policy]) => [key, analyseBaseCase(authorities, key, policy)]));
   const cases = {
     ...base,
     CASE6_EXP: differenceCase('CASE6_EXP', base.CASE3_OPE, base.CASE5_OCC, 'L6=L3-L5'),
@@ -517,8 +530,8 @@ export function solveBm3InputXml() {
   return Object.freeze({ ...authorities, cases, report: buildReport(authorities, cases) });
 }
 
-function analyseBaseCase(authorities, caseKey, policy) {
-  const loadCase = compileCase(authorities, caseKey, policy);
+export function analyseBaseCase(authorities, caseKey, policy, options = {}) {
+  const loadCase = compileCase(authorities, caseKey, policy, options);
   const distributedByElement = new Map(loadCase.primitives.filter((row) => row.kind === 'DISTRIBUTED_LOAD').map((row) => [row.elementId, [row]]));
   const temperatureByElement = new Map(loadCase.primitives.filter((row) => row.kind === 'TEMPERATURE').map((row) => [row.elementId, row]));
   const frameElements = authorities.modelEntries.map((entry) => compileFrameElement({
@@ -567,7 +580,7 @@ function analyseBaseCase(authorities, caseKey, policy) {
   return Object.freeze({ caseKey, formula: policy.formula, loadCase, frameElements, execution, recovery });
 }
 
-function compileCase(authorities, caseKey, policy) {
+export function compileCase(authorities, caseKey, policy, { nodalLoads = [], description = null } = {}) {
   const primitives = [];
   for (const entry of authorities.modelEntries) {
     const lineWeight = lineWeightForEntry(authorities, entry);
@@ -609,10 +622,11 @@ function compileCase(authorities, caseKey, policy) {
       });
     }
   }
+  primitives.push(...nodalLoads);
   return compilePhysicalLoadCase({
     loadCaseId: `BM3-${caseKey}`,
     loadCaseClass: 'MIXED_PHYSICAL',
-    presentation: { label: caseKey, description: `M028 BM3 ${policy.formula}; hanger and declared F1 are intentionally omitted.` },
+    presentation: { label: caseKey, description: description ?? `M028 BM3 ${policy.formula}; hanger and declared F1 are intentionally omitted.` },
     modelReference: modelReferenceFromCompilation(authorities.compilation),
     primitives,
     profile: loadCaseProfile({ gravitationalAcceleration: { value: GRAVITY, source: 'SI-STANDARD-GRAVITY-EXACT' } }),
@@ -634,13 +648,13 @@ function lineWeightForEntry(authorities, entry) {
   return metal + fluid + insulation;
 }
 
-function differenceCase(caseKey, positive, negative, formula) {
+export function differenceCase(caseKey, positive, negative, formula) {
   return Object.freeze({ caseKey, formula, derived: true, positive: positive.caseKey, negative: negative.caseKey });
 }
 
-function buildReport(authorities, cases) {
+export function buildReport(authorities, cases, { gaps = null, schema = 'm028-bm3-analysis-report/v1', hangerAuthorities = null } = {}) {
   const sourceNodes = authorities.normalized.geometry.nodes.map((node) => node.id);
-  const baseValues = Object.fromEntries(Object.entries(cases).filter(([, row]) => !row.derived).map(([key, analysis]) => [key, caseValues(authorities, analysis)]));
+  const baseValues = Object.fromEntries(Object.entries(cases).filter(([, row]) => !row.derived).map(([key, analysis]) => [key, caseValues(authorities, analysis, hangerAuthorities)]));
   const values = {
     ...baseValues,
     CASE6_EXP: subtractCaseValues(baseValues.CASE3_OPE, baseValues.CASE5_OCC),
@@ -649,7 +663,7 @@ function buildReport(authorities, cases) {
   const forceRecords = authorities.normalized.geometry.segments.flatMap((row) => row.meta.analysis.forcesMoments ?? []);
   const hangerRecords = authorities.normalized.geometry.segments.flatMap((row) => row.meta.analysis.hangers ?? []);
   return Object.freeze({
-    schema: 'm028-bm3-analysis-report/v1',
+    schema,
     sourceSemanticHash: authorities.source.semanticHash,
     counts: {
       sourceNodes: authorities.normalized.geometry.nodes.length,
@@ -664,12 +678,13 @@ function buildReport(authorities, cases) {
       hangerRecords: hangerRecords.length,
     },
     diagnostics: authorities.analysisGeometry.diagnostics.map((row) => ({ severity: row.severity, code: row.code, message: row.message, data: row.data ?? null })),
-    gaps: [
+    gaps: gaps ?? [
       { code: 'HANGER_SUPPORT_NOT_COMPILED', affectedCases: CASE_KEYS, records: hangerRecords },
       { code: 'DECLARED_FORCE_F1_NOT_COMPILED', affectedCases: ['CASE5_OCC', 'CASE6_EXP', 'CASE7_EXP'], records: forceRecords },
       { code: 'REDUCER_CANDIDATE_PENDING_PARITY', affectedSourceSegments: [...authorities.reducerDefinitions.keys()] },
       { code: 'BEND_SOURCE_SPAN_COMPILED_AS_STRAIGHT_CHORD', affectedSourceSegments: authorities.normalized.geometry.segments.filter((row) => row.type === 'BEND').map((row) => row.id) },
     ],
+    hangerAuthorities,
     rigidAuthorities: [...authorities.rigidDefinitions.values()].map((row) => ({
       sourceSegmentId: row.sourceSegment.id,
       type: row.sourceSegment.meta.analysis.rigid.type,
@@ -711,8 +726,17 @@ function buildReport(authorities, cases) {
   });
 }
 
-function caseValues(authorities, analysis) {
+function caseValues(authorities, analysis, hangerAuthorities = null) {
   const nodes = new Map(authorities.normalized.geometry.nodes.map((node) => [node.id, nodalResult(analysis, authorities.kernelNodeByReference.get(node.id))]));
+  for (const authority of hangerAuthorities ?? []) {
+    const recovered = recoverProgrammedVariableSpringHangerAction({ authority, execution: analysis.execution });
+    const prior = nodes.get(authority.nodeId);
+    if (!prior) throw new Error(`Programmed hanger ${authority.hangerId} references unknown source node ${authority.nodeId}.`);
+    nodes.set(authority.nodeId, {
+      displacement: prior.displacement,
+      reaction: { ...prior.reaction, UY: recovered.totalSupportAction },
+    });
+  }
   const sourceEntries = new Map();
   for (const source of authorities.normalized.geometry.segments) {
     const entries = authorities.modelEntries.filter((row) => row.sourceSegment.id === source.id).sort((a, b) => (a.reducerIndex ?? 0) - (b.reducerIndex ?? 0));

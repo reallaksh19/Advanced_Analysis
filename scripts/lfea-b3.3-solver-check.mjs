@@ -27,6 +27,7 @@ import {
 } from '../src/core/linear-fea-solver/index.js';
 import {
   cantileverCompilation,
+  cantileverConstraintDeclarations,
   cantileverWithSettlementSlotCompilation,
   elementContributions,
   floatingCompilation,
@@ -318,6 +319,47 @@ test('B33-T17', 'requireSolverExecution refuses a stale semantic hash', () => {
   delete tampered.prescribedValueDiagnostics;
   delete tampered.nodalForceDiagnostics;
   expectCode(() => requireSolverExecution(tampered), 'SOLVER_HASH_MISMATCH');
+});
+
+
+test('B33-T18', 'A grounded spring is recovered as a support reaction and participates in the global free body', () => {
+  const stiffness = 2.5e6;
+  const appliedFy = -1000;
+  const springCompilation = cantileverCompilation({
+    constraintDeclarations: [
+      ...cantileverConstraintDeclarations(),
+      {
+        declarationId: 'C-N122-UY-SPRING',
+        kind: 'PARTIAL_RELEASE_SPRING',
+        nodeId: 'N-000122',
+        dof: 'UY',
+        stiffness,
+      },
+    ],
+  });
+  const springCase = tipLoadCase(springCompilation, {
+    loadCaseId: 'LC-TIP-SPRING-REACTION',
+    primitives: [tipLoadPrimitive({
+      primitiveId: 'LP-TIP-SPRING-REACTION',
+      force: { fx: 0, fy: appliedFy, fz: 0 },
+      moment: { mx: 0, my: 0, mz: 0 },
+    })],
+  });
+  const execution = compileSolverExecution({
+    compilation: springCompilation,
+    elementContributions: contributions,
+    loadCase: springCase,
+    solverProfile: profile,
+  });
+  const tipUy = displacementAt(execution, 'N-000122', 'UY');
+  const springReaction = reactionAt(execution, 'N-000122', 'UY');
+  const rootReaction = reactionAt(execution, 'N-000120', 'UY');
+  assertClose(springReaction, -stiffness * tipUy, 1e-12, 'grounded spring support action');
+  assert.ok(Math.abs(rootReaction + springReaction + appliedFy) <= 1e-9, 'complete applied/fixed/spring vertical free body');
+  assert.equal(execution.reactions.filter((entry) => entry.nodeId === 'N-000122' && entry.dof === 'UY').length, 1);
+  assert.equal(execution.diagnostics.forceEquilibrium.groundedSpringCount, 1);
+  assert.equal(execution.diagnostics.momentEquilibrium.groundedSpringCount, 1);
+  assert.equal(execution.status, 'QUALIFIED');
 });
 
 console.log('\nLFEA B-3.3 sparse assembly and solver check PASS\n');

@@ -316,9 +316,17 @@ export function compileSolverExecution({ compilation, elementContributions, load
       return KU.map((value, index) => value - Ffull[index]);
     })();
 
-  const reactionEntries = assembly.constrained
+  const constrainedReactionEntries = assembly.constrained
     .filter((entry) => entry.behavior !== INACTIVE_ANALYSIS_DOF_BEHAVIOR)
-    .map((entry) => ({ nodeId: entry.nodeId, dof: entry.dof, value: fullResidualVector[entry.globalIndex] }))
+    .map((entry) => ({ nodeId: entry.nodeId, dof: entry.dof, value: fullResidualVector[entry.globalIndex] }));
+  const groundedSpringReactionEntries = model.constraints
+    .filter((constraint) => constraint.behavior === 'LINEAR_SPRING')
+    .map((constraint) => ({
+      nodeId: constraint.nodeId,
+      dof: constraint.dof,
+      value: -constraint.stiffness * Ufull[dofIndexOf(dofMap, constraint.nodeId, constraint.dof)],
+    }));
+  const reactionEntries = [...constrainedReactionEntries, ...groundedSpringReactionEntries]
     .sort((left, right) => compareAscii(`${left.nodeId}:${left.dof}`, `${right.nodeId}:${right.dof}`));
   const displacementEntries = canonicalEntries(Ufull, dofMap, dofMap.nodeOrder);
 

@@ -1,0 +1,101 @@
+name: M029 Programmed Spring Hangers
+
+on:
+  pull_request:
+    branches:
+      - main
+      - agent/m028-bm3-onboarding
+      - agent/m030-inputxml-restraint-mutation
+    paths:
+      - '.github/workflows/m029-programmed-spring-hangers.yml'
+      - 'benchmarks/LFEA/BM3/**'
+      - 'docs/qualification/M029_PROGRAMMED_SPRING_HANGER_RECORD.md'
+      - 'scripts/lfea-m028-bm3-*.mjs'
+      - 'scripts/lfea-m029-bm3-*.mjs'
+      - 'scripts/lfea-b3.3-solver-check.mjs'
+      - 'src/core/linear-fea-variable-spring-hanger/**'
+      - 'src/core/linear-fea-solver/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Verify immutable candidate checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
+          git rev-parse HEAD
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Changed-source syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check src/core/linear-fea-variable-spring-hanger/catalog.js
+          node --check src/core/linear-fea-variable-spring-hanger/design.js
+          node --check src/core/linear-fea-variable-spring-hanger/compile.js
+          node --check src/core/linear-fea-variable-spring-hanger/recover.js
+          node --check src/core/linear-fea-variable-spring-hanger/index.js
+          node --check src/core/linear-fea-solver/solve.js
+          node --check src/core/linear-fea-solver/qualification.js
+          node --check scripts/lfea-m028-bm3-fixtures.mjs
+          node --check scripts/lfea-m028-bm3-comparison.mjs
+          node --check scripts/lfea-m029-bm3-hangers.mjs
+          node --check scripts/lfea-m029-bm3-hanger-check.mjs
+
+      - name: Solver grounded-spring regression
+        run: node scripts/lfea-b3.3-solver-check.mjs
+
+      - name: M029 first-principles hanger qualification
+        run: node scripts/lfea-m029-bm3-hanger-check.mjs
+
+      - name: Preserve M028 and M030 prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/lfea-m028-bm3-check.mjs
+          node scripts/lfea-m030-inputxml-restraint-mutation-check.mjs
+
+      - name: Complete linear-core regression
+        run: npm run check:lfea-linear-core
+
+      - name: Verify deterministic evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum reports/m029-bm3-hanger-qualification.json > /tmp/m029-report.sha256
+          node scripts/lfea-m029-bm3-hanger-check.mjs > /tmp/m029-repeat.log
+          sha256sum -c /tmp/m029-report.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m029-programmed-spring-hangers-${{ github.event.pull_request.head.sha || github.sha }}
+          path: reports/m029-bm3-hanger-qualification.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Restore clean worktree after evidence publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f reports/m029-bm3-hanger-qualification.json
+          rm -f reports/m028-bm3-qualification.json
+          rm -f reports/m030-inputxml-restraint-mutation.json
+          test -z "$(git status --porcelain)"

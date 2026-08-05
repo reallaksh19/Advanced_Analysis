@@ -114,8 +114,7 @@ function parseElementActions(xmlText, tag, destination, declaredCounts) {
   }
 }
 
-export function buildBm3CiiComparison() {
-  const solved = solveBm3InputXml();
+export function buildBm3CiiComparison({ solved = solveBm3InputXml(), schema = 'm028-bm3-cii-output-comparison/v1' } = {}) {
   const cii = parseBm3CiiOutput(readFileSync(BM3_OUTPUT_PATH, 'utf8'));
   const sourceSegments = new Map(solved.normalized.geometry.segments.map((row) => [`${row.startNodeId}-${row.endNodeId}`, row]));
   const cases = {};
@@ -126,15 +125,15 @@ export function buildBm3CiiComparison() {
     for (const [nodeId, reference] of cii.displacement.get(key)) {
       const actual = ours.nodes.get(nodeId)?.displacement;
       if (!actual) throw new Error(`M028 has no source displacement identity for ${key} node ${nodeId}.`);
-      displacement.push(compareVector({ key, family: 'displacement', identity: `node ${nodeId}`, actual, reference, fields: DOFS, context: { nodeId } }));
+      displacement.push(compareVector({ key, family: 'displacement', identity: `node ${nodeId}`, actual, reference, fields: DOFS, context: { nodeId }, gaps: solved.report.gaps }));
     }
     const restraint = [];
     for (const [nodeId, reference] of cii.restraint.get(key)) {
       const actual = ours.nodes.get(nodeId)?.reaction ?? Object.fromEntries(DOFS.map((dof) => [dof, 0]));
-      restraint.push(compareVector({ key, family: 'restraint', identity: `node ${nodeId}`, actual, reference, fields: DOFS, context: { nodeId, types: reference.types } }));
+      restraint.push(compareVector({ key, family: 'restraint', identity: `node ${nodeId}`, actual, reference, fields: DOFS, context: { nodeId, types: reference.types }, gaps: solved.report.gaps }));
     }
-    const globalForce = compareActionFamily({ key, family: 'globalForce', actual: ours.pairs, reference: cii.globalForce.get(key), sourceSegments });
-    const localForce = compareActionFamily({ key, family: 'localForce', actual: ours.pairs, reference: cii.localForce.get(key), sourceSegments });
+    const globalForce = compareActionFamily({ key, family: 'globalForce', actual: ours.pairs, reference: cii.globalForce.get(key), sourceSegments, gaps: solved.report.gaps });
+    const localForce = compareActionFamily({ key, family: 'localForce', actual: ours.pairs, reference: cii.localForce.get(key), sourceSegments, gaps: solved.report.gaps });
     const caseEntries = [...displacement.flatMap((row) => row.entries), ...restraint.flatMap((row) => row.entries), ...globalForce.flatMap((row) => row.entries), ...localForce.flatMap((row) => row.entries)];
     allEntries.push(...caseEntries);
     cases[key] = {
@@ -153,7 +152,7 @@ export function buildBm3CiiComparison() {
   ]));
   summary.byCause = summarizeCauses(allEntries.filter((row) => !row.pass));
   return Object.freeze({
-    schema: 'm028-bm3-cii-output-comparison/v1',
+    schema,
     inputSourceSemanticHash: solved.source.semanticHash,
     outputPath: 'benchmarks/LFEA/BM3/BM3_Output.xml',
     methodology: {
@@ -173,7 +172,7 @@ export function buildBm3CiiComparison() {
   });
 }
 
-function compareActionFamily({ key, family, actual, reference, sourceSegments }) {
+function compareActionFamily({ key, family, actual, reference, sourceSegments, gaps }) {
   const rows = [];
   for (const [pairKey, expected] of reference) {
     const pair = actual.get(pairKey)?.[family === 'globalForce' ? 'global' : 'local'];
@@ -189,6 +188,7 @@ function compareActionFamily({ key, family, actual, reference, sourceSegments })
         reference: expected[end],
         fields: ACTION_FIELDS,
         context: { pairKey, end, sourceSegment },
+        gaps,
       }).entries);
     }
     rows.push({ pairKey, entries });
@@ -196,7 +196,7 @@ function compareActionFamily({ key, family, actual, reference, sourceSegments })
   return rows;
 }
 
-function compareVector({ key, family, identity, actual, reference, fields, context }) {
+function compareVector({ key, family, identity, actual, reference, fields, context, gaps }) {
   const entries = fields.map((component) => classify({
     caseKey: key,
     family,
@@ -205,7 +205,7 @@ function compareVector({ key, family, identity, actual, reference, fields, conte
     ours: actual[component],
     caesar: reference[component],
     zeroTolerance: toleranceFor(family, component),
-    causes: causesFor({ caseKey: key, family, component, context }),
+    causes: causesFor({ caseKey: key, family, component, context, gaps }),
   }));
   return { identity, entries };
 }
@@ -240,28 +240,37 @@ function toleranceFor(family, component) {
   return component.startsWith('m') ? ZERO_TOLERANCE.elementMoment : ZERO_TOLERANCE.elementForce;
 }
 
-function causesFor({ caseKey, family, context }) {
-  const causes = [{
-    code: 'HANGER_SUPPORT_NOT_COMPILED',
-    scope: 'SYSTEM_WIDE_CASE_STIFFNESS_AND_PRELOAD',
-    detail: `${caseKey} contains H in the CAESAR formula; the two hanger spring/preload authorities are intentionally absent.`,
-  }];
-  if (['CASE5_OCC', 'CASE6_EXP', 'CASE7_EXP'].includes(caseKey)) {
+function causesFor({ caseKey, family, context, gaps = [] }) {
+  const byCode = new Map(gaps.map((gap) => [gap.code, gap]));
+  const causes = [];
+  const hanger = byCode.get('HANGER_SUPPORT_NOT_COMPILED');
+  if (hanger && (hanger.affectedCases ?? []).includes(caseKey)) {
     causes.push({
-      code: 'DECLARED_FORCE_F1_NOT_COMPILED',
+      code: hanger.code,
+      scope: 'SYSTEM_WIDE_CASE_STIFFNESS_AND_PRELOAD',
+      detail: `${caseKey} contains H in the CAESAR formula; the two hanger spring/preload authorities are intentionally absent.`,
+    });
+  }
+  const declaredForce = byCode.get('DECLARED_FORCE_F1_NOT_COMPILED');
+  if (declaredForce && (declaredForce.affectedCases ?? []).includes(caseKey)) {
+    causes.push({
+      code: declaredForce.code,
       scope: 'SYSTEM_WIDE_CASE_LOAD_PATH',
       detail: `${caseKey} contains or is derived from CASE5 OCC, where F1 at nodes 65 and 100 is intentionally absent.`,
     });
   }
   const segment = context.sourceSegment;
-  if (segment?.type === 'BEND') {
+  const bend = byCode.get('BEND_SOURCE_SPAN_COMPILED_AS_STRAIGHT_CHORD');
+  if (bend?.systemWide === true || (bend && segment?.type === 'BEND')) {
     causes.push({
-      code: 'BEND_SOURCE_SPAN_COMPILED_AS_STRAIGHT_CHORD',
-      scope: `${family.toUpperCase()}_SOURCE_ELEMENT`,
-      detail: `Source segment ${segment.id} is a bend whose undocumented station geometry is not inferred.`,
+      code: bend.code,
+      scope: bend.systemWide === true ? 'SYSTEM_WIDE_GEOMETRY_AND_FLEXIBILITY' : `${family.toUpperCase()}_SOURCE_ELEMENT`,
+      detail: bend.systemWide === true
+        ? `${caseKey} is solved with six bend source spans compiled as straight chords; their missing arc geometry and flexibility alter the global stiffness/load path.`
+        : `Source segment ${segment.id} is a bend whose undocumented station geometry is not inferred.`,
     });
   }
-  if (segment && ['IX-S16', 'IX-S23'].includes(segment.id)) {
+  if (byCode.has('REDUCER_CANDIDATE_PENDING_PARITY') && segment && ['IX-S16', 'IX-S23'].includes(segment.id)) {
     causes.push({
       code: 'REDUCER_CANDIDATE_PENDING_PARITY',
       scope: `${family.toUpperCase()}_SOURCE_ELEMENT`,
