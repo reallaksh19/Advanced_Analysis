@@ -114,12 +114,7 @@ jobs:
           test -n "$report"
           build_root="$(dirname "$(dirname "$report")")"
           test "sha256:$(sha256sum "$build_root/binary/ccx_2.22" | cut -d' ' -f1)" = "$EXECUTABLE_HASH"
-          node - "$report" <<'NODE'
-const fs = require('node:fs');
-const report = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
-if (report.status !== 'SOLVER_CUSTODY_BLOCKED' || report.verifiedEvidenceCount !== 7) process.exit(1);
-if (JSON.stringify(report.missingEvidence) !== JSON.stringify(['CONTAINER_RECORD'])) process.exit(1);
-NODE
+          node -e "const fs=require('node:fs');const report=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));if(report.status!=='SOLVER_CUSTODY_BLOCKED'||report.verifiedEvidenceCount!==7||JSON.stringify(report.missingEvidence)!==JSON.stringify(['CONTAINER_RECORD']))process.exit(1);" "$report"
           echo "build_root=$build_root" >> "$GITHUB_OUTPUT"
 
       - name: Acquire and independently replay interpreter custody
@@ -180,15 +175,7 @@ NODE
           test -s artifacts/lafea-nc-solver-interpreter/interpreter/interpreter-probe.txt
           grep -F 'runtimeExitCode=201' artifacts/lafea-nc-solver-interpreter/interpreter/interpreter-probe.txt
           grep -F 'Usage: CalculiX.exe -i jobname' artifacts/lafea-nc-solver-interpreter/interpreter/interpreter-probe.txt
-          node - <<'NODE'
-const fs = require('node:fs');
-const root = 'artifacts/lafea-nc-solver-interpreter';
-const record = JSON.parse(fs.readFileSync(`${root}/records/linked-libraries-record.json`, 'utf8'));
-const report = JSON.parse(fs.readFileSync(`${root}/reports-interpreter/solver-custody-build-report.json`, 'utf8'));
-if (!record.libraries.some((entry) => entry.name === 'ld-linux-x86-64.so.2')) process.exit(1);
-if (report.status !== 'SOLVER_CUSTODY_BLOCKED' || report.verifiedEvidenceCount !== 7) process.exit(1);
-if (report.authority.solverCustodyQualified !== false || report.authority.solverBridgeQualified !== false) process.exit(1);
-NODE
+          node -e "const fs=require('node:fs');const root='artifacts/lafea-nc-solver-interpreter';const record=JSON.parse(fs.readFileSync(root+'/records/linked-libraries-record.json','utf8'));const report=JSON.parse(fs.readFileSync(root+'/reports-interpreter/solver-custody-build-report.json','utf8'));if(!record.libraries.some((entry)=>entry.name==='ld-linux-x86-64.so.2')||report.status!=='SOLVER_CUSTODY_BLOCKED'||report.verifiedEvidenceCount!==7||report.authority.solverCustodyQualified!==false||report.authority.solverBridgeQualified!==false)process.exit(1);"
 
       - name: Upload interpreter-custody evidence
         uses: actions/upload-artifact@v4
