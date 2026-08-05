@@ -4,7 +4,10 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { conditionGeometry } from '../src/core/centerline-beam-fea/index.js';
+import {
+  conditionGeometry,
+  seedRequiredAttachmentPoints,
+} from '../src/core/centerline-beam-fea/index.js';
 import { compileSolverExecution } from '../src/core/linear-fea-solver/index.js';
 import {
   cantileverCompilation,
@@ -15,7 +18,7 @@ import {
 
 const OUTPUT_DIR = path.resolve('artifacts/lfea-linear-core-exact-head');
 const EVIDENCE_SCHEMA = 'lfea-linear-core-exact-head-evidence/v1';
-const CANDIDATE_SHA = process.env.GITHUB_SHA ?? 'LOCAL_UNBOUND';
+const CANDIDATE_SHA = process.env.CANDIDATE_SHA ?? process.env.GITHUB_SHA ?? 'LOCAL_UNBOUND';
 
 const stationEvidence = retainedStationEvidence();
 const solveEvidence = numericalSolveEvidence();
@@ -54,6 +57,7 @@ fs.writeFileSync(
 console.log(JSON.stringify(evidence, null, 2));
 console.log(`Wrote ${path.relative(process.cwd(), OUTPUT_DIR)}/evidence.json`);
 console.log(`Wrote ${path.relative(process.cwd(), OUTPUT_DIR)}/station-custody.csv`);
+if (process.env.GITHUB_ACTIONS === 'true') emitWorkflowNotice(evidence);
 
 function retainedStationEvidence() {
   const geometry = {
@@ -116,12 +120,26 @@ function retainedStationEvidence() {
   assert.equal(replay.semanticHash, result.semanticHash);
   assert.equal(replay.report.attachmentPointsInserted.length, 0);
 
-  const perturbed = conditionGeometry(geometry, [
+  const perturbedPoints = [
     { attachmentPointId: 'PERTURBED-A', segmentId: 'S1', fraction: 0.5, kind: 'ATTACHMENT_LOAD_EXTRACTION' },
     { attachmentPointId: 'PERTURBED-B', segmentId: 'S1', fraction: 0.500000000001, kind: 'ATTACHMENT_LOAD_EXTRACTION' },
-  ], profile);
-  const perturbedNodeIds = perturbed.report.attachmentPointsInserted.map((row) => row.nodeId);
-  assert.equal(new Set(perturbedNodeIds).size, 2);
+  ];
+  const perturbedSeed = seedRequiredAttachmentPoints(geometry, perturbedPoints);
+  const perturbedNodeIds = perturbedSeed.inserted.map((row) => row.nodeId);
+  const perturbedMinimumSpan = Math.min(...perturbedSeed.geometry.segments.map((segment) => segment.length));
+  assert.equal(new Set(perturbedNodeIds).size, 2, 'non-equal fractions must remain distinct');
+  assert.ok(perturbedMinimumSpan > 0, 'direct seeding must not manufacture an exact zero span');
+  let perturbedConditioningRejection = null;
+  try {
+    conditionGeometry(geometry, perturbedPoints, profile);
+  } catch (error) {
+    perturbedConditioningRejection = {
+      code: error?.code ?? null,
+      message: error?.message ?? String(error),
+    };
+  }
+  assert.equal(perturbedConditioningRejection?.code, 'CONDITIONED_GEOMETRY_INVALID');
+  assert.match(perturbedConditioningRejection.message, /SEGMENT_ZERO_LENGTH/u);
 
   return {
     summary: {
@@ -142,6 +160,10 @@ function retainedStationEvidence() {
       geometricToleranceApplied: false,
       perturbation: 1e-12,
       perturbedStationPhysicalNodeCount: new Set(perturbedNodeIds).size,
+      perturbedMinimumSpan,
+      fullConditioningDisposition: 'REJECTED_NEAR_ZERO_SPAN',
+      rejectionCode: perturbedConditioningRejection.code,
+      rejectionMessage: perturbedConditioningRejection.message,
     },
     csv: toCsv(rows),
   };
@@ -191,6 +213,27 @@ function numericalSolveEvidence() {
     fixedNodeReactionClosure: reactionClosure,
     maximumReactionAbsoluteDifference: Math.max(...reactionClosure.map((row) => row.absoluteDifference)),
   };
+}
+
+function emitWorkflowNotice(evidence) {
+  const compact = {
+    candidateSha: evidence.candidateSha,
+    evidenceSha256: evidence.evidenceSha256,
+    station: evidence.retainedStationEvidence,
+    tolerance: evidence.toleranceSensitivity,
+    solverStatus: evidence.solverEvidence.status,
+    diagnostics: evidence.solverEvidence.diagnostics,
+    maximumReactionAbsoluteDifference: evidence.solverEvidence.maximumReactionAbsoluteDifference,
+  };
+  const message = annotationEscape(JSON.stringify(compact));
+  console.log(`::notice file=scripts/lfea-linear-core-exact-head-evidence.mjs,title=LFEA exact-head numerical evidence::${message}`);
+}
+
+function annotationEscape(value) {
+  return value
+    .replaceAll('%', '%25')
+    .replaceAll('\r', '%0D')
+    .replaceAll('\n', '%0A');
 }
 
 function toCsv(rows) {
