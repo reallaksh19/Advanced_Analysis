@@ -59,6 +59,7 @@ jobs:
           node --check src/workspace/topology-edit/topology-edit-sjson-governed-render-common-v2.js
           node --check src/workspace/topology-edit/topology-edit-sjson-governed-route-renderer-v2.js
           node --check src/workspace/topology-edit/topology-edit-sjson-governed-support-renderer-v2.js
+          node --check src/workspace/topology-edit/topology-edit-sjson-governed-issue-renderer-v2.js
           node --check src/workspace/topology-edit/topology-edit-sjson-governed-viewport-backend-v2.js
           node --check src/workspace/topology-edit/topology-edit-sjson-runtime-authority-v2.js
           node --check src/workspace/topology-edit/topology-edit-sjson-fidelity-evidence-v2.js
