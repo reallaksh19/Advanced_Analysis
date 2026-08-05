@@ -2,6 +2,9 @@
 import * as THREE from 'three';
 import { ViewportAxisHUD } from '../viewport-axis-hud.js';
 import { ENGINEERING_TO_RENDER_MATRIX4_ELEMENTS } from './topology-edit-coordinate-transform.js';
+import {
+  createTopologyEditLargeModelPolicy,
+} from './topology-edit-large-model-policy.js';
 import { createTopologyEditOrientationSnapshot } from './topology-edit-orientation-contract.js';
 import { TopologyEditOrientationCubeRuntime } from './topology-edit-orientation-cube-runtime.js';
 import { optimizeTopologyEditRenderGroups } from './topology-edit-render-optimizer.js';
@@ -13,6 +16,7 @@ export class TopologyEditNavigationHudViewportBackend extends TopologyEditSuppor
     this.axisHud = null;
     this.orientationCube = null;
     this.renderOptimizationEvidence = null;
+    this.largeModelPolicy = null;
   }
 
   mount(host) {
@@ -34,19 +38,15 @@ export class TopologyEditNavigationHudViewportBackend extends TopologyEditSuppor
   }
 
   /**
-   * An exact ray hit is authoritative for a direct pointer click. GPU radius
-   * sampling remains the dense-scene fallback, but cannot replace a different
-   * exact node/edge under the cursor with a nearby proxy from the search window.
-   * A fallback receipt resolves through the deterministic winning GPU sample,
-   * not the original cursor ray, so the configured screen-space tolerance is real.
+   * The ID-buffer sample at the exact cursor is authoritative and the same pass
+   * supplies the governed screen-space acquisition radius. Only the winning
+   * object is ray-intersected to recover an engineering point. A whole-scene
+   * CPU raycast is retained solely for unavailable/failed GPU picking.
    */
   pickAt(clientX, clientY) {
     if (this.contextLost || this.configurationError) return null;
     const context = this.pickContext(clientX, clientY);
     if (!context) return null;
-
-    const rayReceipt = this.pickWithRaycaster(context.pointer);
-    if (rayReceipt) return rayReceipt;
 
     const gpuHit = this.gpuPicker?.pick({
       clientX,
@@ -54,20 +54,72 @@ export class TopologyEditNavigationHudViewportBackend extends TopologyEditSuppor
       rect: context.rect,
       camera: this.activeCamera,
     });
-    if (!gpuHit) return null;
-    const point = this.resolveGpuPickPoint(
-      gpuHit,
-      gpuHit.samplePointer ?? context.pointer,
-    );
-    return point ? this.pickReceipt(gpuHit.target, point) : null;
+    if (gpuHit) {
+      const point = this.resolveGpuPickPoint(
+        gpuHit,
+        gpuHit.samplePointer ?? context.pointer,
+      );
+      if (point) return this.pickReceipt(gpuHit.target, point);
+    }
+    return this.pickWithRaycaster(context.pointer);
   }
 
   renderSession(model) {
+    this.applyLargeModelPolicy(model);
     this.renderOptimizationEvidence = null;
     super.renderSession(model);
     this.renderOptimizationEvidence = optimizeTopologyEditRenderGroups(this.groups);
     this.engineeringRoot.updateMatrixWorld(true);
+    this.gpuPicker?.invalidateScene?.();
     this.invalidate('render-resource-optimization');
+  }
+
+  renderGhost(ghost, markerSize) {
+    const result = super.renderGhost(ghost, markerSize);
+    this.gpuPicker?.invalidateScene?.();
+    return result;
+  }
+
+  clearGhost() {
+    const result = super.clearGhost();
+    this.gpuPicker?.invalidateScene?.();
+    return result;
+  }
+
+  renderIssues(overlay) {
+    const result = super.renderIssues(overlay);
+    this.gpuPicker?.invalidateScene?.();
+    return result;
+  }
+
+  clearIssues() {
+    const result = super.clearIssues();
+    this.gpuPicker?.invalidateScene?.();
+    return result;
+  }
+
+  applyLargeModelPolicy(model) {
+    const host = this.hostElement;
+    const policy = createTopologyEditLargeModelPolicy({
+      model,
+      devicePixelRatio: globalThis.devicePixelRatio,
+      viewportWidth: host?.clientWidth,
+      viewportHeight: host?.clientHeight,
+    });
+    this.largeModelPolicy = policy;
+    const currentRatio = Number(this.renderer?.getPixelRatio?.());
+    if (this.renderer && currentRatio !== policy.pixelRatio) {
+      this.renderer.setPixelRatio(policy.pixelRatio);
+      this.resize();
+    }
+    if (host) {
+      host.dataset.topologyEditLargeModelTier = policy.tier;
+      host.dataset.topologyEditRenderItemCount = String(policy.renderItemCount);
+      host.dataset.topologyEditRequestedPixelRatio = String(policy.requestedPixelRatio);
+      host.dataset.topologyEditAppliedPixelRatio = String(policy.pixelRatio);
+      host.dataset.topologyEditGpuFirstPicking = String(policy.gpuFirstPicking);
+    }
+    return policy;
   }
 
   orientationSnapshot() {
@@ -112,6 +164,7 @@ export class TopologyEditNavigationHudViewportBackend extends TopologyEditSuppor
     this.axisHud?.dispose();
     this.axisHud = null;
     this.renderOptimizationEvidence = null;
+    this.largeModelPolicy = null;
     super.destroy();
   }
 }
