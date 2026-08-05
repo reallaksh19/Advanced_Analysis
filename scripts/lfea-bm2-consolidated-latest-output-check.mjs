@@ -218,7 +218,7 @@ function strictMatchedSubset() {
     assert.ok(authority, `BM2 strict comparison case ${caseLabel} lacks no-friction case authority.`);
     for (const family of Object.keys(CASE_FAMILY_SCALARS)) {
       assert.equal(
-        section[family].rows.length * (family === 'globalForce' || family === 'localForce' ? 12 : 6),
+        section[family].rows.length,
         CASE_FAMILY_SCALARS[family],
         `BM2 ${caseLabel} ${family} retained scalar custody`,
       );
