@@ -1,0 +1,62 @@
+name: BB-11 bounded M4 axial-tail diagnostic
+
+on:
+  push:
+    branches:
+      - diagnostic/bb11-bounded-m4
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_OPTIONS: --max-old-space-size=6144
+
+jobs:
+  bounded-m4-diagnostic:
+    name: Non-authorizing bounded M4 axial-tail diagnostic
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out exact diagnostic head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify exact branch and governed scope
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          git diff --check HEAD^
+          changed="$(git diff --name-only HEAD^...HEAD)"
+          test "$(printf '%s\n' "$changed" | grep -c '^scripts/bb11-bounded-m4-diagnostic.mjs$' || true)" = "1"
+          test "$(printf '%s\n' "$changed" | grep -c '^\.github/workflows/bb11-bounded-m4-diagnostic.yml$' || true)" = "1"
+          test "$(printf '%s\n' "$changed" | wc -l)" = "2"
+
+      - name: Run bounded M4 diagnostic with production-invariance proof
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+          EXPECTED_BASE_SHA: ${{ github.event.before }}
+        run: node --expose-gc scripts/bb11-bounded-m4-diagnostic.mjs
+
+      - name: Upload bounded diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bb11-bounded-m4-${{ github.sha }}
+          path: reports/bb11-bounded-m4/
+          if-no-files-found: warn
+          retention-days: 30
