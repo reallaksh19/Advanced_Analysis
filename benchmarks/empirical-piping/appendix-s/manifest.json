@@ -1,0 +1,14 @@
+{
+  "schema": "empirical-piping-benchmark-manifest/v1",
+  "classification": "BENCHMARK_REFERENCE",
+  "source": {"standard":"ASME B31.3","edition":"2006","appendix":"S"},
+  "fixtures": ["example1.json","example2.json","table-s302.6.3.json"],
+  "productionImportAllowed": false,
+  "nearZeroPolicy": {
+    "displacementFloorMm": 1.0,
+    "forceFloorKn": 0.1,
+    "momentFloorKnM": 5.0,
+    "stressFloorMpa": 1.0,
+    "marker": "N/A_NEAR_ZERO_REFERENCE"
+  }
+}
