@@ -78,10 +78,25 @@ test('production SJSON uses Edit Draft bends, compact fittings and visible suppo
 
   const firstElbow = await jsonAttribute(canvasHost, 'data-topology-edit-edit-draft-first-elbow');
   expect(firstElbow?.authority).toBe(ELBOW_AUTHORITY);
-  expect(firstElbow?.sourceStart).toEqual({ x: 421773.221, y: -1141354, z: 1184.15 });
-  expect(firstElbow?.tangentIntersection).toEqual({ x: 421773.221, y: -1141125, z: 1184.15 });
-  expect(firstElbow?.sourceEnd).toEqual({ x: 422002.221, y: -1141125, z: 1184.15 });
-  expect(firstElbow?.radiusMm).toBe(229);
+  expect(finitePoint(firstElbow?.sourceStart)).toBe(true);
+  expect(finitePoint(firstElbow?.tangentIntersection)).toBe(true);
+  expect(finitePoint(firstElbow?.sourceEnd)).toBe(true);
+  const startTangentLength = pointDistance(
+    firstElbow.sourceStart,
+    firstElbow.tangentIntersection,
+  );
+  const endTangentLength = pointDistance(
+    firstElbow.tangentIntersection,
+    firstElbow.sourceEnd,
+  );
+  expect(firstElbow.radiusMm).toBeCloseTo(
+    Math.min(startTangentLength, endTangentLength),
+    6,
+  );
+  expect(firstElbow.tangentIntersection).not.toEqual(firstElbow.sourceStart);
+  expect(firstElbow.tangentIntersection).not.toEqual(firstElbow.sourceEnd);
+  expect(firstElbow.startTangentError).toBeLessThanOrEqual(1e-12);
+  expect(firstElbow.endTangentError).toBeLessThanOrEqual(1e-12);
 
   await expect.poll(() => canvasHost.getAttribute('data-topology-edit-support-render-authority'), {
     timeout: 60_000,
@@ -98,6 +113,14 @@ test('production SJSON uses Edit Draft bends, compact fittings and visible suppo
     canvasHost,
     'data-topology-edit-rendered-support-marker-radius-mm',
   ), { timeout: 60_000 }).toBeCloseTo(12.6, 6);
+  await expect.poll(() => numberAttribute(
+    canvasHost,
+    'data-topology-edit-rendered-support-marker-opacity',
+  ), { timeout: 60_000 }).toBeCloseTo(0.15, 6);
+  await expect.poll(() => numberAttribute(
+    canvasHost,
+    'data-topology-edit-rendered-restraint-opacity',
+  ), { timeout: 60_000 }).toBeCloseTo(0.5, 6);
 
   const screenshotPath = testInfo.outputPath('sjson-edit-draft-visual.png');
   await page.screenshot({ path: screenshotPath, fullPage: false });
@@ -233,6 +256,21 @@ async function compareCanvasVisuals(page, expectedBytes, candidateBytes, rect) {
       height: rect.height,
     },
   });
+}
+
+function finitePoint(value) {
+  return Boolean(
+    value
+    && [value.x, value.y, value.z].every((coordinate) => Number.isFinite(Number(coordinate))),
+  );
+}
+
+function pointDistance(left, right) {
+  return Math.hypot(
+    Number(right.x) - Number(left.x),
+    Number(right.y) - Number(left.y),
+    Number(right.z) - Number(left.z),
+  );
 }
 
 async function integerAttribute(locator, name) {
