@@ -1,6 +1,7 @@
 import { deepFreeze, semanticHash } from '../../core/shared-piping-model/index.js';
 import {
   createTopologyEditOperationSnapSpatialIndex,
+  installTopologyEditOperationSnapIndex,
   TOPOLOGY_EDIT_OPERATION_SNAP_FEATURE_SCHEMA,
 } from './topology-edit-operation-snap-index.js';
 import { TOPOLOGY_EDIT_SNAP_SPATIAL_INDEX_SCHEMA } from './topology-edit-snap-spatial-index.js';
@@ -66,6 +67,7 @@ export function installTopologyEditTangencyClockingSnapIndex(runtime, options = 
     fail('runtime is required.');
   }
   if (runtime.__tangencyClockingSnapIndexInstalled) return runtime;
+  installTopologyEditOperationSnapIndex(runtime, options);
   const extentMm = positive(
     options.operationLineExtentMm
       ?? Math.max(Number(runtime.snapIndexCellSizeMm ?? 500) * 2, 500),
