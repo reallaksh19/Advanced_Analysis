@@ -10,7 +10,6 @@ import {
   governedPositive,
   invisiblePickMaterial,
   lineMaterial,
-  meshMaterial,
   nodePickRadius,
   pickUserData,
 } from './topology-edit-sjson-governed-render-common-v2.js';
@@ -26,7 +25,6 @@ export function renderGovernedSjsonSupports({ backend, group, projection }) {
   const staging = new THREE.Group();
   const bounds = new THREE.Box3();
   const lineMaterials = new Map();
-  const meshMaterials = new Map();
   const pickMaterial = invisiblePickMaterial();
   let markerCount = 0;
   let arrowCount = 0;
@@ -69,7 +67,6 @@ export function renderGovernedSjsonSupports({ backend, group, projection }) {
       const arrow = supportArrow(
         segment,
         lineMaterial(lineMaterials, segment.colorInt, RESTRAINT_OPACITY, false),
-        meshMaterial(meshMaterials, segment.colorInt, RESTRAINT_OPACITY, false),
         pickMaterial,
         markerRadiusMm,
         backend.navigationConfiguration.meshRadialSegments,
@@ -86,7 +83,6 @@ export function renderGovernedSjsonSupports({ backend, group, projection }) {
   } catch (error) {
     disposeStaging(staging, [
       ...lineMaterials.values(),
-      ...meshMaterials.values(),
       pickMaterial,
     ]);
     throw error;
@@ -105,7 +101,7 @@ function supportCross(point, radiusMm, material) {
   return new THREE.LineSegments(geometry, material);
 }
 
-function supportArrow(segment, lineRow, headRow, pickMaterial, markerRadiusMm, radialSegments) {
+function supportArrow(segment, lineRow, pickMaterial, markerRadiusMm, radialSegments) {
   const start = finiteVector(segment.start);
   const end = finiteVector(segment.end);
   if (!start || !end) return null;
@@ -131,10 +127,10 @@ function supportArrow(segment, lineRow, headRow, pickMaterial, markerRadiusMm, r
     shaft.renderOrder = OVERLAY_RENDER_ORDER + 2;
     group.add(shaft);
   }
-  const head = new THREE.Mesh(
-    new THREE.ConeGeometry(headRadiusMm, headLengthMm, Math.max(8, radialSegments)),
-    headRow,
-  );
+  const cone = new THREE.ConeGeometry(headRadiusMm, headLengthMm, 4);
+  const headGeometry = new THREE.EdgesGeometry(cone, 1);
+  cone.dispose();
+  const head = new THREE.LineSegments(headGeometry, lineRow);
   head.name = `topology-edit-compact-restraint-head:${segment.id || ''}`;
   head.position.copy(end).addScaledVector(direction, -headLengthMm / 2);
   head.quaternion.setFromUnitVectors(Y_AXIS, direction);
