@@ -19,9 +19,11 @@ import {
 } from './topology-edit-sjson-governed-projection-v2.js';
 
 const NODE_VISUAL_OPACITY = 0.18;
-const ROUTE_SOLID_RENDER_AUTHORITY = 'GOVERNED_OD_SOLID_ROUTE_MESH_V4';
-const ROUTE_SOLID_PICK_AUTHORITY = 'GOVERNED_DRAFT_OD_SOLID_PICK_TARGET_V4';
-const ROUTE_RADIUS_AUTHORITY = 'CANONICAL_PROJECTED_RADIUS_OR_OUTSIDE_DIAMETER_V1';
+const ROUTE_SOLID_RENDER_AUTHORITY = 'GOVERNED_OD_SOLID_ROUTE_MESH_V5';
+const ROUTE_SOLID_PICK_AUTHORITY = 'GOVERNED_DRAFT_OD_SOLID_PICK_TARGET_V5';
+const ROUTE_RADIUS_AUTHORITY = 'CANONICAL_PROJECTED_RADIUS_WITH_BOUNDED_DISPLAY_ENVELOPE_V2';
+const ROUTE_DISPLAY_MIN_DIAGONAL_FRACTION = 0.0025;
+const ROUTE_DISPLAY_MAX_PHYSICAL_MULTIPLIER = 12;
 
 export function renderGovernedSjsonRoute({
   backend,
@@ -41,47 +43,61 @@ export function renderGovernedSjsonRoute({
   let solidMeshCount = 0;
   let directPickMeshCount = 0;
   let pickProxyCount = 0;
+  let displayEnvelopeCount = 0;
   try {
     for (const segment of projection.compactSegments || []) {
       const points = routePoints(segment);
       if (points.length < 2) continue;
       const color = Number.isInteger(segment.colorInt) ? segment.colorInt : fallbackColor;
-      const visualRadiusMm = routeVisualRadius(segment);
-      const endRadiusMm = routeEndRadius(segment);
-      const solid = visualRadiusMm === null
+      const physicalRadiusMm = routeVisualRadius(segment);
+      const physicalEndRadiusMm = routeEndRadius(segment);
+      const displayRadiusMm = governedRouteDisplayRadius(backend, physicalRadiusMm);
+      const displayEndRadiusMm = physicalEndRadiusMm === null
+        ? null
+        : governedRouteDisplayRadius(backend, physicalEndRadiusMm);
+      const solid = displayRadiusMm === null
         ? null
         : routeSolidMesh(
           segment,
           points,
-          routeMeshMaterial(routeMaterials, color, opacity),
-          visualRadiusMm,
-          endRadiusMm,
+          routeMeshMaterial(routeMaterials, color, opacity, isDraft),
+          displayRadiusMm,
+          displayEndRadiusMm,
           backend.navigationConfiguration.meshRadialSegments,
         );
       if (solid) {
+        const displayEnvelopeApplied = displayRadiusMm > physicalRadiusMm + 1e-9
+          || (physicalEndRadiusMm !== null && displayEndRadiusMm > physicalEndRadiusMm + 1e-9);
         solid.name = `topology-edit-visible-route-solid:${segment.id || ''}`;
         solid.userData = isDraft
           ? {
             ...pickUserData(segment),
             directPickMesh: true,
             visualRouteSolid: true,
-            routeRadiusMm: visualRadiusMm,
-            routeEndRadiusMm: endRadiusMm,
+            routePhysicalRadiusMm: physicalRadiusMm,
+            routePhysicalEndRadiusMm: physicalEndRadiusMm,
+            routeDisplayRadiusMm: displayRadiusMm,
+            routeDisplayEndRadiusMm: displayEndRadiusMm,
+            displayEnvelopeApplied,
             radiusAuthority: ROUTE_RADIUS_AUTHORITY,
             renderAuthority: ROUTE_SOLID_PICK_AUTHORITY,
           }
           : {
             nonPickable: true,
             visualRouteSolid: true,
-            routeRadiusMm: visualRadiusMm,
-            routeEndRadiusMm: endRadiusMm,
+            routePhysicalRadiusMm: physicalRadiusMm,
+            routePhysicalEndRadiusMm: physicalEndRadiusMm,
+            routeDisplayRadiusMm: displayRadiusMm,
+            routeDisplayEndRadiusMm: displayEndRadiusMm,
+            displayEnvelopeApplied,
             radiusAuthority: ROUTE_RADIUS_AUTHORITY,
             renderAuthority: ROUTE_SOLID_RENDER_AUTHORITY,
           };
         staging.add(solid);
         solidMeshCount += 1;
         if (isDraft) directPickMeshCount += 1;
-        expandRouteBounds(bounds, points, Math.max(visualRadiusMm, endRadiusMm || 0));
+        if (displayEnvelopeApplied) displayEnvelopeCount += 1;
+        expandRouteBounds(bounds, points, Math.max(displayRadiusMm, displayEndRadiusMm || 0));
       } else {
         points.forEach((point) => bounds.expandByPoint(point));
       }
@@ -92,14 +108,15 @@ export function renderGovernedSjsonRoute({
           lineMaterials,
           color,
           centerlineOpacity(segment, opacity, Boolean(solid)),
-          true,
+          false,
         ),
       );
       line.name = `topology-edit-edit-draft-centerline:${segment.id || ''}`;
+      line.renderOrder = OVERLAY_RENDER_ORDER - 4;
       line.userData = isDraft
         ? {
           ...pickUserData(segment),
-          renderAuthority: 'GOVERNED_DRAFT_CENTERLINE_PICK_TARGET_V3',
+          renderAuthority: 'GOVERNED_DRAFT_CENTERLINE_PICK_TARGET_V4',
         }
         : {
           nonPickable: true,
@@ -113,7 +130,11 @@ export function renderGovernedSjsonRoute({
           segment,
           points,
           pickMaterial,
-          governedRoutePickRadius(backend.navigationConfiguration, visualRadiusMm, endRadiusMm),
+          governedRoutePickRadius(
+            backend.navigationConfiguration,
+            displayRadiusMm,
+            displayEndRadiusMm,
+          ),
           backend.navigationConfiguration.meshRadialSegments,
         );
         if (proxy) {
@@ -140,6 +161,7 @@ export function renderGovernedSjsonRoute({
       solidMeshCount,
       directPickMeshCount,
       pickProxyCount,
+      displayEnvelopeCount,
       ...nodeMetrics,
     }, isDraft);
     return bounds;
@@ -302,24 +324,29 @@ function routePickProxy(segment, points, material, radiusMm, radialSegments) {
   proxy.userData = {
     ...pickUserData(segment),
     pickProxy: true,
-    renderAuthority: 'GOVERNED_ROUTE_PICK_PROXY_V4',
+    renderAuthority: 'GOVERNED_ROUTE_PICK_PROXY_V5',
   };
   return proxy;
 }
 
-function routeMeshMaterial(cache, colorValue, opacity) {
+function routeMeshMaterial(cache, colorValue, opacity, isDraft) {
   const color = Number.isInteger(colorValue) ? colorValue : 0x64748b;
-  const governedOpacity = Math.min(Math.max(Number(opacity) || 0, 0.12), 1);
-  const key = `${color}:${governedOpacity}`;
+  const requestedOpacity = Math.min(Math.max(Number(opacity) || 0, 0.12), 1);
+  const governedOpacity = isDraft
+    ? Math.min(0.72, Math.max(0.52, requestedOpacity))
+    : Math.min(0.18, requestedOpacity);
+  const key = `${color}:${governedOpacity}:${isDraft ? 'draft' : 'source'}`;
   if (!cache.has(key)) {
-    cache.set(key, new THREE.MeshStandardMaterial({
+    cache.set(key, new THREE.MeshBasicMaterial({
       color,
-      roughness: 0.38,
-      metalness: 0.12,
-      transparent: governedOpacity < 1,
+      transparent: true,
       opacity: governedOpacity,
       depthTest: true,
-      depthWrite: governedOpacity >= 0.98,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      polygonOffset: true,
+      polygonOffsetFactor: isDraft ? -1 : 1,
+      polygonOffsetUnits: isDraft ? -1 : 1,
     }));
   }
   return cache.get(key);
@@ -340,9 +367,25 @@ function routeEndRadius(segment) {
   );
 }
 
-function governedRoutePickRadius(configuration, visualRadiusMm, endRadiusMm) {
+function governedRouteDisplayRadius(backend, physicalRadiusMm) {
+  if (!(physicalRadiusMm > 0)) return null;
+  const diagonal = engineeringDiagonal(backend);
+  if (!(diagonal > 0)) return physicalRadiusMm;
+  const minimumAtFitMm = diagonal * ROUTE_DISPLAY_MIN_DIAGONAL_FRACTION;
+  const maximumEnvelopeMm = physicalRadiusMm * ROUTE_DISPLAY_MAX_PHYSICAL_MULTIPLIER;
+  return Math.max(physicalRadiusMm, Math.min(minimumAtFitMm, maximumEnvelopeMm));
+}
+
+function engineeringDiagonal(backend) {
+  const bounds = backend?.engineeringBounds;
+  if (!(bounds instanceof THREE.Box3) || bounds.isEmpty()) return null;
+  const diagonal = bounds.getSize(new THREE.Vector3()).length();
+  return Number.isFinite(diagonal) && diagonal > 0 ? diagonal : null;
+}
+
+function governedRoutePickRadius(configuration, displayRadiusMm, endDisplayRadiusMm) {
   const configured = routePickRadius(configuration);
-  const visible = Math.max(visualRadiusMm || 0, endRadiusMm || 0);
+  const visible = Math.max(displayRadiusMm || 0, endDisplayRadiusMm || 0);
   return visible > 0 ? Math.max(configured, visible + Math.min(configured * 0.5, 8)) : configured;
 }
 
@@ -352,7 +395,7 @@ function expandRouteBounds(bounds, points, radiusMm) {
 
 function centerlineOpacity(segment, opacity, hasSolid) {
   if (!hasSolid) return routeOpacity(segment, opacity);
-  return Math.min(Number(opacity) || 0, 0.26);
+  return Math.min(Math.max(Number(opacity) || 0, 0.72), 0.96);
 }
 
 function routeOpacity(segment, opacity) {
@@ -390,6 +433,8 @@ function publishRouteEvidence(host, projection, metrics, isDraft) {
   host.dataset.topologyEditVisibleRouteSolidMeshCount = String(metrics.solidMeshCount);
   host.dataset.topologyEditDirectPickRouteMeshCount = String(metrics.directPickMeshCount);
   host.dataset.topologyEditRoutePickProxyCount = String(metrics.pickProxyCount);
+  host.dataset.topologyEditRouteDisplayEnvelopeCount = String(metrics.displayEnvelopeCount);
+  host.dataset.topologyEditRouteDisplayEnvelopePolicy = 'BOUNDED_MODEL_DIAGONAL_MINIMUM_V2';
   host.dataset.topologyEditDraftCenterlinePickable = 'true';
   host.dataset.topologyEditDraftSolidMeshPickable = String(metrics.directPickMeshCount > 0);
   host.dataset.topologyEditRouteRadiusAuthority = ROUTE_RADIUS_AUTHORITY;
