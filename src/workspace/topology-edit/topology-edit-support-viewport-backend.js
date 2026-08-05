@@ -10,12 +10,16 @@ export const TOPOLOGY_EDIT_SUPPORT_RENDER_STYLES = Object.freeze({
 
 export class TopologyEditSupportViewportBackend extends TopologyEditTypedViewportBackend {
   renderSession(model) {
-    if (!Array.isArray(model?.supports?.glyphOverlays)) {
+    const supports = model?.supports;
+    if (
+      supports?.renderStyle === TOPOLOGY_EDIT_SUPPORT_RENDER_STYLES.TOPO_VALIDATOR_COMPACT
+      || !Array.isArray(supports?.glyphOverlays)
+    ) {
       return super.renderSession(model);
     }
     return super.renderSession({
       ...model,
-      supports: supportEngineeringBoundsProjection(model.supports),
+      supports: supportEngineeringBoundsProjection(supports),
     });
   }
 
@@ -105,7 +109,7 @@ function disposeStaging(root) {
   root.traverse((object) => {
     if (object.geometry) geometries.add(object.geometry);
     const rows = Array.isArray(object.material) ? object.material : [object.material];
-    rows.filter(Bolean).forEach((material) => materials.add(material));
+    rows.filter(Boolean).forEach((material) => materials.add(material));
   });
   geometries.forEach((geometry) => geometry.dispose());
   materials.forEach((material) => material.dispose());
