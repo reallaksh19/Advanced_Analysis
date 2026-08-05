@@ -71,6 +71,44 @@ const correctedOracleBlockMap = `function blockMap(block) {
   if (block.kind === 'STRIP') {
     const outer = profile(block.profile);
     return (u, v) => {`;
+const governedOracleCurvatureGuard = `    const product = multiply(direction);
+    const curvature = dot(direction, product);
+    if (!Number.isFinite(curvature) || !(curvature > 0)) {
+      throw new RangeError('ORACLE_NONPOSITIVE_PCG_CURVATURE');
+    }
+    const alpha = residualPreconditioned / curvature;`;
+const correctedOracleCurvatureGuard = `    let product = multiply(direction);
+    let curvature = dot(direction, product);
+    if (!Number.isFinite(curvature) || !(curvature > 0)) {
+      const certified = explicitResidual(multiply, rhs, x);
+      explicitResidualNorm = norm(certified);
+      if (explicitResidualNorm <= tolerance) {
+        return {
+          x,
+          iterations: iteration - 1,
+          relativeResidual: explicitResidualNorm / denominator,
+          explicitResidualNorm,
+          residualReplacementCount,
+        };
+      }
+      residualVector = certified;
+      z = precondition(residualVector);
+      direction = Float64Array.from(z);
+      residualPreconditioned = dot(residualVector, z);
+      if (!Number.isFinite(residualPreconditioned)
+        || !(residualPreconditioned > 0)) {
+        throw new RangeError('ORACLE_NONPOSITIVE_PRECONDITIONED_RESIDUAL');
+      }
+      product = multiply(direction);
+      curvature = dot(direction, product);
+      if (!Number.isFinite(curvature) || !(curvature > 0)) {
+        throw new RangeError('ORACLE_NONPOSITIVE_PCG_CURVATURE_AFTER_RESTART');
+      }
+      residualReplacementCount += 1;
+      bestResidualNorm = explicitResidualNorm;
+      lastMaterialImprovement = iteration;
+    }
+    const alpha = residualPreconditioned / curvature;`;
 
 await mkdir(outputDirectory, { recursive: true });
 const source = await readFile(SOURCE_PATH, 'utf8');
@@ -90,9 +128,18 @@ assert.equal(
   1,
   'BB11_TRANSITION_GOVERNED_ORACLE_BLOCK_MAP_COUNT',
 );
-const correctedOracleSource = oracleSource.replace(
+assert.equal(
+  occurrences(oracleSource, governedOracleCurvatureGuard),
+  1,
+  'BB11_TRANSITION_GOVERNED_ORACLE_CURVATURE_GUARD_COUNT',
+);
+let correctedOracleSource = oracleSource.replace(
   governedOracleBlockMap,
   correctedOracleBlockMap,
+);
+correctedOracleSource = correctedOracleSource.replace(
+  governedOracleCurvatureGuard,
+  correctedOracleCurvatureGuard,
 );
 assert.notEqual(
   correctedOracleSource,
@@ -176,7 +223,7 @@ assert.deepEqual(core.authority, {
 
 const prerequisites = await readPrerequisites(expectedHeadSha);
 const payload = {
-  schema: 'bb11-b03-b04-transition-full-qualification/v2',
+  schema: 'bb11-b03-b04-transition-full-qualification/v3',
   exactHeadSha: expectedHeadSha,
   productionParentSha,
   moduleId: 'C2D-FLANGE-HUB',
@@ -184,12 +231,15 @@ const payload = {
   status: 'CANDIDATE_FULL_BB11_QUALIFICATION_PASS',
   decision: 'CANDIDATE_QUALIFIED_FOR_GOVERNED_PROMOTION_REVIEW',
   oracleCompatibilityCorrection: {
-    classification: 'CANDIDATE_ONLY_NON_AUTHORIZING_CONTROL_FLOW_CORRECTION',
+    classification: 'CANDIDATE_ONLY_NON_AUTHORIZING_ORACLE_ROBUSTNESS_CORRECTION',
     governedOracleSourceModified: false,
-    correction:
+    corrections: [
       'DEFER_PROFILE_RESOLUTION_UNTIL_BLOCK_KIND_IS_STRIP',
+      'CERTIFIED_RESIDUAL_RESTART_ON_NONPOSITIVE_PCG_CURVATURE',
+    ],
     mechanicalInputsModified: false,
     oracleFormulationModified: false,
+    oracleSolverControlFlowModified: true,
     productionPromotionBlockedUntilGovernedCorrectionLands: true,
     governedOracleSourceSha256: sha256(oracleSource),
     correctedOracleSourceSha256: sha256(correctedOracleSource),
