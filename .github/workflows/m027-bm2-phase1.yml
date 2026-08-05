@@ -1,0 +1,31 @@
+name: M027 BM2 Phase 1 Ingestion
+
+on:
+  pull_request:
+    paths:
+      - 'benchmarks/LFEA/BM2/**'
+      - 'src/core/geometry/adapters/inputxml-*.js'
+      - 'scripts/lfea-b3.25-bm2-inputxml-ingestion-check.mjs'
+      - '.github/workflows/m027-bm2-phase1.yml'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ingestion-and-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: BM2 ingestion and diagnostics
+        run: node scripts/lfea-b3.25-bm2-inputxml-ingestion-check.mjs
+      - name: Linear-core regression aggregate
+        run: npm run check:lfea-linear-core
