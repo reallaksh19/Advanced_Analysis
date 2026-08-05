@@ -26,7 +26,6 @@ const FAILURE_PATTERNS = Object.freeze([
   { id: 'NO_CONVERGENCE', pattern: /\bNO\s+CONVERGENCE\b/iu, transientWhenComplete: true },
   { id: 'DIVERGENCE', pattern: /\bDIVERGENCE\b/iu, transientWhenComplete: true },
   { id: 'SEGMENTATION_FAULT', pattern: /\bSEGMENTATION\s+FAULT\b/iu },
-  { id: 'NAN_OR_INFINITY', pattern: /(?:\bNAN\b|\bINF(?:INITY)?\b)/iu },
 ]);
 
 export function inventoryExternalSolverOutputs(retainedFiles, canonicalModel) {
@@ -62,6 +61,9 @@ export function inventoryExternalSolverOutputs(retainedFiles, canonicalModel) {
       pattern.test(diagnosticText) && !(transientWhenComplete && completionEstablished)
     ))
     .map(({ id }) => id);
+  if (hasUnqualifiedNonFiniteDiagnostic(diagnosticText, completionEstablished)) {
+    failureMarkers.push('NAN_OR_INFINITY');
+  }
   const stepInventory = parseStepInventory(searchableText);
   const incrementInventory = parseIncrementInventory(searchableText);
   const provisionalDatasetInventory = frdFiles.flatMap(([path, bytes]) => (
@@ -240,10 +242,30 @@ function assessIncrementSequence(rows) {
   };
 }
 
+function hasUnqualifiedNonFiniteDiagnostic(text, completionEstablished) {
+  const nonFinite = /(?:\bNAN\b|\bINF(?:INITY)?\b)/iu;
+  if (!nonFinite.test(text)) return false;
+  if (!completionEstablished) return true;
+  const zeroContactEstablished = /NUMBER\s+OF\s+CONTACT\s+SPRING\s+ELEMENTS\s*=\s*0/iu.test(text);
+  if (!zeroContactEstablished) return true;
+  const lines = text.split(/\r?\n/u);
+  return lines.some((line, index) => {
+    if (!nonFinite.test(line)) return false;
+    if (/PRESSURE\s+RATIO[^\r\n]*=\s*[-+]?NAN\b/iu.test(line)) return false;
+    const context = lines.slice(Math.max(0, index - 5), index + 1).join('\n');
+    const zeroContactStatistic = /(?:CENTER\s+OF\s+GRAVITY\s+AND\s+MEAN\s+NORMAL|MOMENT\s+ABOUT\s+THE\s+CENTER\s+OF\s+GRAVITY|AREA\s*,\s*NORMAL\s+FORCE)/iu.test(context);
+    return !zeroContactStatistic;
+  });
+}
+
 function detectDatContactOutputs(text) {
   const fields = [];
-  if (/\b(?:CFN|TOTAL\s+NORMAL\s+FORCE)\b/iu.test(text)) fields.push('CONTACT_NORMAL_FORCE');
-  if (/\b(?:CONTACT\s+AREA|AREA\s+OF\s+THE\s+CONTACT\s+AREA)\b/iu.test(text)) {
+  const integratedContactHeader = /AREA\s*,\s*NORMAL\s+FORCE\s*\(\+\s*=\s*TENSION\)\s+AND\s+SHEAR\s+FORCE/iu;
+  if (/\b(?:CFN|TOTAL\s+NORMAL\s+FORCE)\b/iu.test(text) || integratedContactHeader.test(text)) {
+    fields.push('CONTACT_NORMAL_FORCE');
+  }
+  if (/\b(?:CONTACT\s+AREA|AREA\s+OF\s+THE\s+CONTACT\s+AREA)\b/iu.test(text)
+      || integratedContactHeader.test(text)) {
     fields.push('CONTACT_AREA');
   }
   return fields;
