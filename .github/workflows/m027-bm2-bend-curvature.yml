@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/m027-bm2-bend-curvature.yml'
-      - 'scripts/lfea-b3.29-bm2-bend-geometry-runtime.mjs'
+      - 'scripts/lfea-b3.29-bm2-bend-geometry-authority.mjs'
       - 'scripts/lfea-b3.29-bm2-bend-geometry-check.mjs'
       - 'scripts/lfea-b3.29-bm2-bend-solve-runtime.mjs'
       - 'scripts/lfea-b3.29-bm2-bend-comparison-runtime.mjs'
@@ -48,7 +48,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
-          node --check scripts/lfea-b3.29-bm2-bend-geometry-runtime.mjs
+          node --check scripts/lfea-b3.29-bm2-bend-geometry-authority.mjs
           node --check scripts/lfea-b3.29-bm2-bend-geometry-check.mjs
           if test -f scripts/lfea-b3.29-bm2-bend-solve-runtime.mjs; then
             node --check scripts/lfea-b3.29-bm2-bend-solve-runtime.mjs
