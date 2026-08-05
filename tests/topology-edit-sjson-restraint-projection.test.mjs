@@ -62,6 +62,11 @@ test('production Sjson projects Topo validator native restraint records only', a
     markerSizeMm: 70,
     verticalAxis: 'Z',
   });
+  const deduplicationEvidence = restraintDeduplicationEvidence(first.overlays);
+  console.log(`SJSON_RESTRAINT_DEDUPLICATION_EVIDENCE=${JSON.stringify({
+    metrics: first.metrics,
+    deduplicationEvidence,
+  })}`);
 
   assert.equal(first.authority, 'TOPO_VALIDATOR_NATIVE_RESTRAINT_RECORDS');
   assert.equal(first.authorityHash, second.authorityHash);
@@ -74,9 +79,13 @@ test('production Sjson projects Topo validator native restraint records only', a
   assert.equal(first.projection.glyphOverlays.length, 47);
   assert.equal(first.decisions.length, canonical.supports.length);
   assert.ok(first.decisions.every((row) => row.supportId));
-  assert.ok(first.decisions.some((row) => row.reason === 'NO_RESTRAINT_RECORD'));
+  assert.ok(first.decisions.some((row) => row.disposition === 'EXCLUDE'));
   assert.ok(first.decisions.filter((row) => row.disposition === 'INCLUDE')
-    .every((row) => ['EXPLICIT', 'TYPE', 'PARTIAL'].includes(row.qualification)));
+    .every((row) => [
+      'EXPLICITLY_RESOLVED',
+      'TYPE_CLASSIFIED',
+      'PARTIALLY_RESOLVED',
+    ].includes(row.qualification)));
   assert.equal(
     first.overlays.flatMap((row) => row.restraints || [])
       .flatMap((row) => row.diagnostics || [])
@@ -84,3 +93,29 @@ test('production Sjson projects Topo validator native restraint records only', a
     0,
   );
 });
+
+function restraintDeduplicationEvidence(overlays) {
+  const origin = (point) => [point.x, point.y, point.z]
+    .map((value) => Number(value).toFixed(6)).join('|');
+  const direction = (vector) => vector
+    ? [vector.x, vector.y, vector.z].map((value) => Number(value).toFixed(6)).join('|')
+    : 'NONE';
+  const records = overlays.flatMap((overlay) => (
+    (overlay.restraints || []).map((restraint) => ({ overlay, restraint }))
+  ));
+  return {
+    restraintRows: records.length,
+    uniqueSiteFamily: new Set(records.map(({ overlay, restraint }) => (
+      `${origin(overlay.origin)}|${restraint.family}`
+    ))).size,
+    uniqueSiteFamilyDirection: new Set(records.map(({ overlay, restraint }) => (
+      `${origin(overlay.origin)}|${restraint.family}|${direction(restraint.direction)}`
+    ))).size,
+    uniqueSiteDirection: new Set(records.map(({ overlay, restraint }) => (
+      `${origin(overlay.origin)}|${direction(restraint.direction)}`
+    ))).size,
+    uniqueSiteHostFamily: new Set(records.map(({ overlay, restraint }) => (
+      `${origin(overlay.origin)}|${overlay.hostEntityId}|${restraint.family}`
+    ))).size,
+  };
+}
