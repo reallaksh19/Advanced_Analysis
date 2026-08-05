@@ -119,9 +119,15 @@ function inventoryExplicitSourceCases(xmlText) {
       const entry = byCase.get(parsed.number);
       assert.equal(entry.category, parsed.category, `BM2 CASE ${parsed.number} category consistency`);
       assert.equal(entry.formula, parsed.formula, `BM2 CASE ${parsed.number} formula consistency`);
-      assert.equal(entry.families[family], undefined, `BM2 CASE ${parsed.number} duplicate ${family} report`);
       const values = Object.freeze(reportValues(report, family));
-      entry.families[family] = Object.freeze({ reportCount: 1, scalarCount: values.length });
+      const prior = entry.families[family] ?? Object.freeze({ reportCount: 0, scalarCounts: Object.freeze([]) });
+      entry.families[family] = Object.freeze({
+        reportCount: prior.reportCount + 1,
+        scalarCounts: Object.freeze([...prior.scalarCounts, values.length]),
+        selectedOccurrenceOrdinal: prior.reportCount,
+        selectedScalarCount: values.length,
+        selectionRule: 'LAST_REPORT_OCCURRENCE_MATCHES_COMPARISON_PARSER',
+      });
     }
   }
   return [...byCase.values()].sort((left, right) => left.number - right.number);
@@ -349,6 +355,18 @@ function strictMatchedSubset() {
 }
 
 function inventoryRecord(entry, custody, derivation = null) {
+  const sourceReportOccurrences = entry.families == null
+    ? null
+    : Object.freeze(Object.fromEntries(Object.entries(entry.families).map(([family, value]) => [
+      family,
+      Object.freeze({
+        reportCount: value.reportCount,
+        scalarCounts: value.scalarCounts,
+        selectedOccurrenceOrdinal: value.selectedOccurrenceOrdinal,
+        selectedScalarCount: value.selectedScalarCount,
+        selectionRule: value.selectionRule,
+      }),
+    ])));
   return Object.freeze({
     number: entry.number,
     category: entry.category,
@@ -357,6 +375,7 @@ function inventoryRecord(entry, custody, derivation = null) {
     tier: entry.tier,
     custody,
     derivation,
+    sourceReportOccurrences,
     retainedResponseScalarCount: RETAINED_SCALARS_PER_CASE,
     familyScalarCounts: CASE_FAMILY_SCALARS,
   });
@@ -375,11 +394,17 @@ for (const entry of explicitCases) {
   entry.tier = authority.tier;
   entry.custody = authority.custody;
   for (const [family, expectedScalars] of Object.entries(CASE_FAMILY_SCALARS)) {
-    assert.ok(entry.families[family], `BM2 CASE ${entry.number} missing ${family}`);
+    const familyInventory = entry.families[family];
+    assert.ok(familyInventory, `BM2 CASE ${entry.number} missing ${family}`);
+    assert.ok(familyInventory.reportCount >= 1, `BM2 CASE ${entry.number} ${family} report occurrence custody`);
+    assert.ok(
+      familyInventory.scalarCounts.every((count) => count === expectedScalars),
+      `BM2 CASE ${entry.number} ${family} occurrence scalar custody`,
+    );
     assert.equal(
-      entry.families[family].scalarCount,
+      familyInventory.selectedScalarCount,
       expectedScalars,
-      `BM2 CASE ${entry.number} ${family} scalar custody`,
+      `BM2 CASE ${entry.number} ${family} selected scalar custody`,
     );
   }
 }
@@ -387,7 +412,7 @@ for (const entry of explicitCases) {
 const strict = strictMatchedSubset();
 const explicitCaseInventory = Object.freeze(explicitCases.map((entry) => inventoryRecord(
   entry,
-  'EXPLICIT_PHYSICAL_SOURCE_REPORT',
+  'EXPLICIT_PHYSICAL_SOURCE_REPORT_LAST_OCCURRENCE_SELECTED',
 )));
 const derivedCaseInventory = Object.freeze([inventoryRecord(
   STRICT_CASE_AUTHORITY.EXP,
@@ -467,9 +492,9 @@ const report = Object.freeze({
   strictPolicy: outOfToleranceReport.strictPolicy,
   diagnosticPolicy: Object.freeze({
     cases: OMITTED_DIAGNOSTIC_CASES,
-    sourceAvailability: 'NOT_PRESENT_IN_RETAINED_OUTPUT',
+    sourceAvailability: 'CASE_NUMBER_LABELS_NOT_PRESENT_IN_RETAINED_OUTPUT',
     omissionAllowed: true,
-    reason: 'RETAINED_OUTPUT_IS_STRICT_NONFRICTION_PHYSICAL_CASES_ONLY',
+    reason: 'STRICT_REFERENCE_USES_LAST_CASE_3_AND_CASE_4_REPORT_OCCURRENCES',
   }),
   explicitSourceCaseInventory: explicitCaseInventory,
   derivedCaseInventory,
@@ -479,7 +504,7 @@ const report = Object.freeze({
   retainedResponseScalarCount: caseInventory
     .reduce((sum, entry) => sum + entry.retainedResponseScalarCount, 0),
   referenceVariantSensitivity: Object.freeze({
-    status: 'NOT_AVAILABLE_EXPLICIT_DIAGNOSTIC_VARIANTS_OMITTED',
+    status: 'NOT_AVAILABLE_BY_DISTINCT_CASE_NUMBER_LABEL',
     omittedCases: OMITTED_DIAGNOSTIC_CASES,
   }),
   strictMatchedSubset: Object.freeze({
@@ -502,11 +527,12 @@ const report = Object.freeze({
     'PLUS_Y_AND_PLUS_Z_COMPLEMENTARITY_ACTIVE_SET',
     'SCALED_CONDITION_AND_WEAKEST_NODE_DOF_DIAGNOSTIC',
     'FULL_RETAINED_STATION_ROW_CUSTODY',
+    'REPEATED_PHYSICAL_REPORT_OCCURRENCE_CUSTODY',
     'EXPLICIT_PHYSICAL_AND_DERIVED_EXPANSION_CASE_CUSTODY',
   ]),
   nextPriority: Object.freeze([
     'REQUALIFY_JUNCTION_SIF_AND_FLEXIBILITY_TO_ASME_B31_3_2018_APPENDIX_D',
-    'USE_NONFRICTION_OUT_OF_TOLERANCE_LEDGER_TO_PRIORITIZE_REMAINING_LINEAR_FEA_DELTAS',
+    'USE_NONFRICTION_OUT_OF_TOLERANCE_LEDGER_TO_PRIITIZE_REMAINING_LINEAR_FEA_DELTAS',
     'CLOSE_REMAINING_NUMERICAL_DELTAS_WITHOUT_CHANGING_THE_FIVE_PERCENT_POLICY',
   ]),
   qualificationStatus: strict.status,
@@ -536,4 +562,4 @@ console.log(JSON.stringify({
   expansionDerivation: strict.expansionDerivation,
   qualificationStatus: report.qualificationStatus,
 }, null, 2));
-console.log('BM2 non-friction linear-FEA custody PASS; explicit CASE 3/4 and derived CASE 6 are fully traced.');
+console.log('BM2 non-friction linear-FEA custody PASS; last CASE 3/4 occurrences and derived CASE 6 are fully traced.');
