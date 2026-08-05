@@ -1,5 +1,10 @@
 import * as THREE from 'three';
 import {
+  createGovernedSjsonEquipmentGeometry,
+  isGovernedSjsonEquipmentKind,
+  TOPOLOGY_EDIT_SJSON_EQUIPMENT_GEOMETRY_AUTHORITY,
+} from './topology-edit-sjson-governed-equipment-geometry-v1.js';
+import {
   MIN_LENGTH_MM,
   OVERLAY_RENDER_ORDER,
   Y_AXIS,
@@ -44,6 +49,8 @@ export function renderGovernedSjsonRoute({
   let directPickMeshCount = 0;
   let pickProxyCount = 0;
   let displayEnvelopeCount = 0;
+  let equipmentSolidCount = 0;
+  const equipmentCounts = { FLANGE: 0, GASKET: 0, VALVE: 0, INSTRUMENT: 0 };
   try {
     const displayDiagonalMm = projectionDiagonal(projection);
     for (const segment of projection.compactSegments || []) {
@@ -56,6 +63,7 @@ export function renderGovernedSjsonRoute({
       const displayEndRadiusMm = physicalEndRadiusMm === null
         ? null
         : governedRouteDisplayRadius(displayDiagonalMm, physicalEndRadiusMm);
+      const equipmentKind = governedEquipmentKind(segment);
       const solid = displayRadiusMm === null
         ? null
         : routeSolidMesh(
@@ -69,7 +77,19 @@ export function renderGovernedSjsonRoute({
       if (solid) {
         const displayEnvelopeApplied = displayRadiusMm > physicalRadiusMm + 1e-9
           || (physicalEndRadiusMm !== null && displayEndRadiusMm > physicalEndRadiusMm + 1e-9);
-        solid.name = `topology-edit-visible-route-solid:${segment.id || ''}`;
+        solid.name = equipmentKind
+          ? `topology-edit-visible-equipment-solid:${equipmentKind}:${segment.id || ''}`
+          : `topology-edit-visible-route-solid:${segment.id || ''}`;
+        const equipmentEvidence = equipmentKind
+          ? {
+            typedEquipmentSolid: true,
+            equipmentKind,
+            equipmentGeometryAuthority: TOPOLOGY_EDIT_SJSON_EQUIPMENT_GEOMETRY_AUTHORITY,
+            presentationOnlyExtent: segment.presentationOnlyExtent === true,
+            sourceCoincidentPorts: segment.sourceCoincidentPorts === true,
+            axisInference: segment.axisInference || null,
+          }
+          : {};
         solid.userData = isDraft
           ? {
             ...pickUserData(segment),
@@ -82,6 +102,7 @@ export function renderGovernedSjsonRoute({
             displayEnvelopeApplied,
             radiusAuthority: ROUTE_RADIUS_AUTHORITY,
             renderAuthority: ROUTE_SOLID_PICK_AUTHORITY,
+            ...equipmentEvidence,
           }
           : {
             nonPickable: true,
@@ -93,12 +114,18 @@ export function renderGovernedSjsonRoute({
             displayEnvelopeApplied,
             radiusAuthority: ROUTE_RADIUS_AUTHORITY,
             renderAuthority: ROUTE_SOLID_RENDER_AUTHORITY,
+            ...equipmentEvidence,
           };
         staging.add(solid);
         solidMeshCount += 1;
+        if (equipmentKind) {
+          equipmentSolidCount += 1;
+          equipmentCounts[equipmentKind] += 1;
+        }
         if (isDraft) directPickMeshCount += 1;
         if (displayEnvelopeApplied) displayEnvelopeCount += 1;
-        expandRouteBounds(bounds, points, Math.max(displayRadiusMm, displayEndRadiusMm || 0));
+        expandRouteBounds(bounds, points, Math.max(displayRadiusMm, displayEndRadiusMm || 0)
+          * (equipmentKind === 'FLANGE' ? 1.55 : equipmentKind === 'VALVE' ? 1.5 : 1.35));
       } else {
         points.forEach((point) => bounds.expandByPoint(point));
       }
@@ -163,6 +190,8 @@ export function renderGovernedSjsonRoute({
       directPickMeshCount,
       pickProxyCount,
       displayEnvelopeCount,
+      equipmentSolidCount,
+      equipmentCounts,
       ...nodeMetrics,
     }, isDraft);
     return bounds;
@@ -295,7 +324,12 @@ function routeSolidMesh(segment, points, material, radiusMm, endRadiusMm, radial
     const direction = end.clone().sub(start);
     const lengthMm = direction.length();
     if (lengthMm <= MIN_LENGTH_MM) return null;
-    geometry = new THREE.CylinderGeometry(
+    geometry = createGovernedSjsonEquipmentGeometry({
+      kind: governedEquipmentKind(segment),
+      radiusMm,
+      lengthMm,
+      radialSegments: governedRadialSegments,
+    }) || new THREE.CylinderGeometry(
       endRadiusMm || radiusMm,
       radiusMm,
       lengthMm,
@@ -396,6 +430,11 @@ function governedRoutePickRadius(configuration, displayRadiusMm, endDisplayRadiu
   return visible > 0 ? Math.max(configured, visible + Math.min(configured * 0.5, 8)) : configured;
 }
 
+function governedEquipmentKind(segment) {
+  const kind = String(segment?.kind || '').toUpperCase();
+  return isGovernedSjsonEquipmentKind(kind) ? kind : null;
+}
+
 function expandRouteBounds(bounds, points, radiusMm) {
   points.forEach((point) => expandPointRadius(bounds, point, radiusMm));
 }
@@ -456,4 +495,14 @@ function publishRouteEvidence(host, projection, metrics, isDraft) {
   host.dataset.topologyEditExactTeeSegmentCount = String(editDraft.exactTeeSegmentCount || 0);
   host.dataset.topologyEditExactOletCount = String(editDraft.exactOletCount || 0);
   host.dataset.topologyEditExactOletSegmentCount = String(editDraft.exactOletSegmentCount || 0);
+  host.dataset.topologyEditCoincidentPortEquipmentCount = String(
+    editDraft.coincidentPortEquipmentCount || 0,
+  );
+  host.dataset.topologyEditTypedEquipmentSolidCount = String(metrics.equipmentSolidCount || 0);
+  host.dataset.topologyEditTypedFlangeSolidCount = String(metrics.equipmentCounts?.FLANGE || 0);
+  host.dataset.topologyEditTypedGasketSolidCount = String(metrics.equipmentCounts?.GASKET || 0);
+  host.dataset.topologyEditTypedValveSolidCount = String(metrics.equipmentCounts?.VALVE || 0);
+  host.dataset.topologyEditTypedInstrumentSolidCount = String(metrics.equipmentCounts?.INSTRUMENT || 0);
+  host.dataset.topologyEditEquipmentGeometryAuthority =
+    TOPOLOGY_EDIT_SJSON_EQUIPMENT_GEOMETRY_AUTHORITY;
 }

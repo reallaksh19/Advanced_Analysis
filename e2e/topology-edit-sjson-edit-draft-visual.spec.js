@@ -111,8 +111,16 @@ test('production SJSON uses Edit Draft bends, compact fittings and visible suppo
   ), { timeout: 60_000 }).toBe(47);
   await expect.poll(() => numberAttribute(
     canvasHost,
-    'data-topology-edit-rendered-support-marker-radius-mm',
+    'data-topology-edit-rendered-support-base-marker-radius-mm',
   ), { timeout: 60_000 }).toBeCloseTo(12.6, 6);
+  await expect.poll(() => numberAttribute(
+    canvasHost,
+    'data-topology-edit-rendered-support-marker-radius-mm',
+  ), { timeout: 60_000 }).toBeCloseTo(37.8, 6);
+  await expect.poll(() => numberAttribute(
+    canvasHost,
+    'data-topology-edit-support-display-scale',
+  ), { timeout: 60_000 }).toBeCloseTo(3, 6);
   await expect.poll(() => numberAttribute(
     canvasHost,
     'data-topology-edit-rendered-support-marker-opacity',

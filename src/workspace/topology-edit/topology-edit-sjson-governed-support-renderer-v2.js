@@ -18,10 +18,12 @@ const SUPPORT_MARKER_OPACITY = 0.15;
 const RESTRAINT_OPACITY = 0.5;
 
 export function renderGovernedSjsonSupports({ backend, group, projection }) {
-  const markerRadiusMm = governedPositive(
+  const baseMarkerRadiusMm = governedPositive(
     projection.compactMarkerRadiusMm,
     'TOPOLOGY_EDIT_COMPACT_SUPPORT_MARKER_POLICY_MISSING',
   );
+  const displayScale = displayScaleValue(projection.compactMarkerDisplayScale);
+  const markerRadiusMm = baseMarkerRadiusMm * displayScale;
   const staging = new THREE.Group();
   const bounds = new THREE.Box3();
   const lineMaterials = new Map();
@@ -40,7 +42,13 @@ export function renderGovernedSjsonSupports({ backend, group, projection }) {
         lineMaterial(lineMaterials, 0x22d3ee, SUPPORT_MARKER_OPACITY, false),
       );
       marker.name = `topology-edit-compact-support-marker:${element.id || element.entityId || ''}`;
-      marker.userData = { nonPickable: true, overlay: true };
+      marker.userData = {
+        nonPickable: true,
+        overlay: true,
+        baseMarkerRadiusMm,
+        markerRadiusMm,
+        displayScale,
+      };
       marker.renderOrder = OVERLAY_RENDER_ORDER;
       staging.add(marker);
 
@@ -57,6 +65,9 @@ export function renderGovernedSjsonSupports({ backend, group, projection }) {
       proxy.userData = {
         ...pickUserData(element),
         pickProxy: true,
+        baseMarkerRadiusMm,
+        markerRadiusMm,
+        displayScale,
         renderAuthority: 'GOVERNED_SUPPORT_PICK_PROXY_V3',
       };
       proxy.renderOrder = OVERLAY_RENDER_ORDER + 1;
@@ -87,7 +98,9 @@ export function renderGovernedSjsonSupports({ backend, group, projection }) {
       restraintGlyphCount,
       directionalArrowCount,
       bidirectionalRestraintCount,
+      baseMarkerRadiusMm,
       markerRadiusMm,
+      displayScale,
       placementAuthority: projection.glyphMetrics?.placementAuthority || '',
     });
     return bounds;
@@ -202,6 +215,11 @@ function supportArrow(segment, row, index, lineRow, pickMaterial, markerRadiusMm
   return { object, bounds };
 }
 
+function displayScaleValue(value) {
+  if (value === undefined || value === null || value === '') return 1;
+  return governedPositive(value, 'TOPOLOGY_EDIT_COMPACT_SUPPORT_DISPLAY_SCALE_INVALID');
+}
+
 function publishSupportEvidence(host, metrics) {
   if (!host) return;
   host.dataset.topologyEditRenderedSupportMarkerCount = String(metrics.markerCount);
@@ -211,7 +229,9 @@ function publishSupportEvidence(host, metrics) {
     metrics.bidirectionalRestraintCount,
   );
   host.dataset.topologyEditSupportArrowPlacementAuthority = metrics.placementAuthority;
+  host.dataset.topologyEditRenderedSupportBaseMarkerRadiusMm = String(metrics.baseMarkerRadiusMm);
   host.dataset.topologyEditRenderedSupportMarkerRadiusMm = String(metrics.markerRadiusMm);
+  host.dataset.topologyEditSupportDisplayScale = String(metrics.displayScale);
   host.dataset.topologyEditRenderedSupportMarkerOpacity = String(SUPPORT_MARKER_OPACITY);
   host.dataset.topologyEditRenderedRestraintOpacity = String(RESTRAINT_OPACITY);
   host.dataset.topologyEditSupportOverlayDepthIndependent = 'true';
