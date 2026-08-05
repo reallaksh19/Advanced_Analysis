@@ -16,8 +16,10 @@ const QUALIFICATION_RANK = Object.freeze({
 
 /**
  * Topo validator projects one native restraint record per governed physical
- * site/host/family, while retaining every raw SUPPORT row as lineage. Canonical
- * supports remain untouched; consolidation exists only in the visual projection.
+ * site/family. Source rows can point at different segmented host edges while
+ * describing the same physical restraint; host identity is therefore resolved
+ * on the deterministic representative, not used as record identity. Canonical
+ * supports remain untouched and every source row remains in projection lineage.
  */
 export function deriveSjsonTopoValidatorSupportProjection(input = {}) {
   const canonicalTopology = input.canonicalTopology;
@@ -47,7 +49,7 @@ export function deriveSjsonTopoValidatorSupportProjection(input = {}) {
   );
   const authorityBasis = {
     authority: 'TOPO_VALIDATOR_NATIVE_RESTRAINT_RECORDS',
-    groupingAuthority: 'EXACT_SITE_HOST_AND_RESTRAINT_FAMILY',
+    groupingAuthority: 'EXACT_SITE_AND_RESTRAINT_FAMILY',
     canonicalTopologyHash: canonicalTopology.canonicalTopologyHash || null,
     decisions: consolidation.decisions,
     groups: consolidation.groups,
@@ -89,18 +91,21 @@ function consolidateNativeRestraints(canonicalTopology) {
     const rankedRows = [...rows].sort(compareRepresentativeRows);
     const representativeRow = rankedRows[0];
     const memberSupportIds = rows.map((row) => stringValue(row.support.id)).sort(compareCodeUnits);
+    const memberHostEntityIds = uniqueSorted(rows.map((row) => row.hostEntityId));
     const sourcePaths = uniqueSorted(rows.flatMap((row) => supportSourcePaths(row.support)));
     const representative = mergeProjectionLineage(
       representativeRow.support,
       groupKey,
       memberSupportIds,
+      memberHostEntityIds,
       sourcePaths,
     );
     representatives.push(representative);
     groups.push(Object.freeze({
       groupKey,
       representativeSupportId: stringValue(representative.id),
-      hostEntityId: representativeRow.hostEntityId,
+      representativeHostEntityId: representativeRow.hostEntityId,
+      memberHostEntityIds: Object.freeze(memberHostEntityIds),
       family: representativeRow.family,
       origin: representativeRow.origin,
       memberSupportIds: Object.freeze(memberSupportIds),
@@ -144,7 +149,7 @@ function supportGroupDescriptor(support, nodePositions) {
     origin,
     hostEntityId,
     family,
-    groupKey: `${pointKey(origin)}|${hostEntityId}|${family}`,
+    groupKey: `${pointKey(origin)}|${family}`,
   });
 }
 
@@ -152,6 +157,8 @@ function compareRepresentativeRows(left, right) {
   const leftRank = representativeRank(left.support);
   const rightRank = representativeRank(right.support);
   if (leftRank !== rightRank) return leftRank - rightRank;
+  const hostOrder = compareCodeUnits(left.hostEntityId, right.hostEntityId);
+  if (hostOrder !== 0) return hostOrder;
   return compareCodeUnits(stringValue(left.support.id), stringValue(right.support.id));
 }
 
@@ -159,10 +166,19 @@ function representativeRank(support) {
   const qualification = normalizedToken(support.restraint?.qualification);
   const qualificationRank = QUALIFICATION_RANK[qualification] ?? 99;
   const solverRank = support.restraint?.solverEligible === true ? 0 : 1;
-  return qualificationRank * 10 + solverRank;
+  const hostRank = stringValue(
+    support.hostEntityId || support.edgeId || support.attachedEdgeId,
+  ) ? 0 : 1;
+  return qualificationRank * 100 + solverRank * 10 + hostRank;
 }
 
-function mergeProjectionLineage(support, groupKey, memberSupportIds, sourcePaths) {
+function mergeProjectionLineage(
+  support,
+  groupKey,
+  memberSupportIds,
+  memberHostEntityIds,
+  sourcePaths,
+) {
   const restraint = support.restraint
     ? {
         ...support.restraint,
@@ -172,6 +188,7 @@ function mergeProjectionLineage(support, groupKey, memberSupportIds, sourcePaths
         ]),
         projectionGroupKey: groupKey,
         projectionMemberSupportIds: [...memberSupportIds],
+        projectionMemberHostEntityIds: [...memberHostEntityIds],
       }
     : support.restraint;
   return {
@@ -180,6 +197,7 @@ function mergeProjectionLineage(support, groupKey, memberSupportIds, sourcePaths
     restraint,
     projectionGroupKey: groupKey,
     projectionMemberSupportIds: [...memberSupportIds],
+    projectionMemberHostEntityIds: [...memberHostEntityIds],
     projectionAuthority: 'TOPO_VALIDATOR_NATIVE_RESTRAINT_RECORDS',
   };
 }
