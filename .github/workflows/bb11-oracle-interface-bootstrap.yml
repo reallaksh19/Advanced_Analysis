@@ -28,16 +28,19 @@ jobs:
           cache: npm
       - run: npm ci
 
-      - name: Apply exact oracle-interface repair
+      - name: Apply exact oracle geometry, connectivity, and probe repair
         shell: bash
         run: |
+          set -euo pipefail
+          git show 022cd7843d5dc6257aca9bce68e42c1db919b302:src/core/bucket-b/flange-hub-independent-oracle.js \
+            > src/core/bucket-b/flange-hub-independent-oracle.js
           python3 - <<'PY'
           from pathlib import Path
           from textwrap import dedent
           import re
 
-          path = Path('src/core/bucket-b/flange-hub-independent-oracle.js')
-          source = path.read_text()
+          source_path = Path('src/core/bucket-b/flange-hub-independent-oracle.js')
+          source = source_path.read_text()
 
           def sub_once(pattern, replacement, label):
               global source
@@ -50,7 +53,6 @@ jobs:
               "function blockMap(block) {\n  if (block.kind === 'STRIP') {\n    const outer = profile(block.profile);",
               'defer-profile-resolution',
           )
-
           sub_once(
               r"  if \(id === 'SMALL_ARC'\) \{\s*return arc\(\s*GEOMETRY\.smallCenter,\s*6,\s*GEOMETRY\.smallStartAngle,\s*GEOMETRY\.smallSweep,\s*\);\s*\}",
               dedent("""
@@ -69,7 +71,6 @@ jobs:
               """).strip(),
               'small-arc-exact-tangent',
           )
-
           sub_once(
               r"  if \(id === 'LARGE_ARC'\) \{\s*return arc\(\s*GEOMETRY\.largeCenter,\s*10,\s*GEOMETRY\.largeStartAngle,\s*GEOMETRY\.largeSweep,\s*\);\s*\}",
               dedent("""
@@ -88,30 +89,17 @@ jobs:
               """).strip(),
               'large-arc-exact-tangent',
           )
+          sub_once(
+              r"function midpointToBore\(outer\) \{.*?\n\}\n\nfunction invertQ4",
+              dedent("""
+              function midpointToBore(outer) {
+                return { r: (50 + outer.r) / 2, z: outer.z };
+              }
 
-          marker = 'export function runIndependentFlangeHubOracle(loadCaseId) {'
-          if source.count(marker) != 1:
-              raise SystemExit('mesh-inspection-export: marker count mismatch')
-          inspection = dedent("""
-          export function inspectIndependentFlangeHubOracleMesh(levelId = 'O0') {
-            const definition = LEVELS.find((row) => row.levelId === levelId);
-            if (!definition) throw new TypeError(`ORACLE_UNKNOWN_LEVEL:${levelId}`);
-            const mesh = q4Mesh(definition);
-            return freeze({
-              schema: 'flange-hub-independent-oracle-mesh-inspection/v1',
-              authority: 'NON_AUTHORIZING_DIAGNOSTIC_ONLY',
-              levelId,
-              refinement: definition.refinement,
-              nodeCount: mesh.nodes.length,
-              elementCount: mesh.elements.length,
-              connectivity: mesh.connectivity,
-              meshHash: oracleHash(mesh),
-            });
-          }
-
-          """).lstrip()
-          source = source.replace(marker, inspection + marker, 1)
-
+              function invertQ4
+              """).strip(),
+              'physical-probe-strip-custody',
+          )
           sub_once(
               r"  return freeze\(\{\s*nodes,\s*elements: finalElements,\s*boundaries: finalBoundaries,\s*globalH,\s*\}\);\s*\}\s*\nfunction blockMap",
               dedent("""
@@ -150,26 +138,19 @@ jobs:
               while (unvisited.size > 0) {
                 const seed = [...unvisited].sort()[0];
                 const queue = [seed];
-                const nodeIds = [];
                 const blockIds = new Set();
+                let nodeCount = 0;
                 unvisited.delete(seed);
                 while (queue.length > 0) {
                   const nodeId = queue.shift();
-                  nodeIds.push(nodeId);
+                  nodeCount += 1;
                   blockIdsByNode.get(nodeId).forEach((id) => blockIds.add(id));
                   [...adjacency.get(nodeId)].sort().forEach((otherId) => {
                     if (unvisited.delete(otherId)) queue.push(otherId);
                   });
                 }
-                components.push({
-                  nodeCount: nodeIds.length,
-                  minimumNodeId: [...nodeIds].sort()[0],
-                  blockIds: [...blockIds].sort(),
-                });
+                components.push({ nodeCount, blockIds: [...blockIds].sort() });
               }
-              components.sort((left, right) => (
-                left.minimumNodeId.localeCompare(right.minimumNodeId)
-              ));
               return {
                 componentCount: components.length,
                 components,
@@ -182,31 +163,29 @@ jobs:
               'connectivity-certificate',
           )
 
-          path.write_text(source)
+          source_path.write_text(source)
 
           test_source = dedent("""
           import assert from 'node:assert/strict';
           import test from 'node:test';
           import {
-            inspectIndependentFlangeHubOracleMesh,
+            runIndependentFlangeHubOracle,
             solveIndependentOracleLinearSystem,
           } from '../src/core/bucket-b/flange-hub-independent-oracle.js';
 
-          test('BB-11 independent oracle mesh is one connected component at O0', () => {
-            const evidence = inspectIndependentFlangeHubOracleMesh('O0');
-            assert.equal(evidence.authority, 'NON_AUTHORIZING_DIAGNOSTIC_ONLY');
-            assert.equal(evidence.connectivity.componentCount, 1);
-            assert.equal(evidence.connectivity.accepted, true);
-            assert.deepEqual(
-              evidence.connectivity.components[0].blockIds,
-              ['O-B00', 'O-B01', 'O-B02', 'O-B03', 'O-B04', 'O-B05', 'O-B06', 'O-B07'],
-            );
-          });
-
-          test('BB-11 independent oracle mesh remains connected at O3', () => {
-            const evidence = inspectIndependentFlangeHubOracleMesh('O3');
-            assert.equal(evidence.connectivity.componentCount, 1);
-            assert.equal(evidence.connectivity.accepted, true);
+          test('BB-11 independent oracle solves all load cases on one connected mesh', () => {
+            for (const loadCaseId of ['FH-PRES-001', 'FH-AXIAL-001', 'FH-GASKET-001']) {
+              const report = runIndependentFlangeHubOracle(loadCaseId);
+              assert.equal(report.status, 'PASS');
+              assert.equal(report.levels.length, 4);
+              report.levels.forEach((level) => {
+                assert.equal(level.connectivity.componentCount, 1);
+                assert.equal(level.connectivity.accepted, true);
+                assert.ok(level.solver.explicitResidualNorm <= 1e-8);
+                const probe = level.probes.find((row) => row.id === 'P-HUB-MID');
+                assert.deepEqual(probe.point, { r: 62.75, z: 30 });
+              });
+            }
           });
 
           test('BB-11 independent oracle linear solver retains certified SPD behavior', () => {
@@ -223,18 +202,16 @@ jobs:
           });
           """).lstrip()
           Path('tests/bucket-b-bb11-independent-oracle-interface.test.mjs').write_text(test_source)
-
           Path('.github/workflows/bb11-oracle-interface-bootstrap.yml').unlink()
           PY
 
-      - name: Validate and execute complete oracle
+      - name: Validate governed repair
         shell: bash
         run: |
           set -euo pipefail
           node --check src/core/bucket-b/flange-hub-independent-oracle.js
-          node --test tests/bucket-b-bb11-independent-oracle-interface.test.mjs
-          timeout --signal=TERM --kill-after=60s 40m node --input-type=module --eval "import { runIndependentFlangeHubOracle } from './src/core/bucket-b/flange-hub-independent-oracle.js'; const ids=['FH-PRES-001','FH-AXIAL-001','FH-GASKET-001']; process.stdout.write(JSON.stringify(ids.map(runIndependentFlangeHubOracle)));" > /tmp/oracle.json
-          node --input-type=module --eval "import assert from 'node:assert/strict'; import { readFile } from 'node:fs/promises'; const reports=JSON.parse(await readFile('/tmp/oracle.json','utf8')); reports.forEach((report)=>{ assert.equal(report.status,'PASS'); report.levels.forEach((level)=>assert.ok(level.solver.explicitResidualNorm <= 1e-8)); });"
+          timeout --signal=TERM --kill-after=60s 45m \
+            node --test tests/bucket-b-bb11-independent-oracle-interface.test.mjs
 
       - name: Commit governed repair
         shell: bash
@@ -244,5 +221,5 @@ jobs:
           git config user.email 'actions@users.noreply.github.com'
           git add -A
           git diff --cached --check
-          git commit -m 'Fix BB-11 independent oracle interface continuity'
+          git commit -m 'Fix BB-11 independent oracle geometry continuity'
           git push origin HEAD:fix/bb11-governed-oracle-interface-continuity
