@@ -2,11 +2,12 @@ import { deepFreeze, stringValue } from '../../core/shared-piping-model/index.js
 import { restraintColor } from './support-restraint-family.js';
 
 export const SJSON_SUPPORT_GLYPH_PLACEMENT_AUTHORITY =
-  'HOST_OD_HALF_CONTACT_PLUS_TWO_THIRDS_OD_GLYPH_V1';
+  'HOST_OD_HALF_CONTACT_PLUS_TWO_OD_GLYPH_V2';
 
 /**
  * Projects one stable restraint record into one or two screen glyph arrows.
- * Radial contacts begin at OD/2 plus the governed gap. Arrow length is 2*OD/3.
+ * Radial contacts begin at OD/2 plus the governed gap. Arrow length is 2*OD,
+ * three times the previous compact presentation, without changing contact truth.
  */
 export function projectGovernedSjsonSupportGlyphs({
   overlays,
@@ -48,7 +49,7 @@ export function projectGovernedSjsonSupportGlyphs({
     const host = edgeIndex.get(stringValue(overlay.hostEntityId));
     const outsideDiameterMm = positive(host?.outsideDiameterMm);
     if (outsideDiameterMm === null) continue;
-    const glyphLengthMm = (outsideDiameterMm * 2) / 3;
+    const glyphLengthMm = outsideDiameterMm * 2;
     for (const restraint of overlay.restraints || []) {
       const arrows = directionalArrows(restraint, glyphLengthMm, outsideDiameterMm);
       if (!arrows.length) continue;
