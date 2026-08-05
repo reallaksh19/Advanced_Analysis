@@ -1,0 +1,101 @@
+name: TEMP M029 Publish Candidate
+
+on:
+  push:
+    branches:
+      - agent/m029-publish-staging
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Reconstruct exact M029 candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/m029-overlay/chunk-*.txt | base64 --decode > /tmp/m029-overlay.tar.gz
+          echo 'e773b76b7315214acec3c3fd8aa005306e24d83a492f4283607f1ce5aa5cb889  /tmp/m029-overlay.tar.gz' | sha256sum --check
+          tar -xzf /tmp/m029-overlay.tar.gz
+          rm -rf .github/m029-overlay .github/workflows/m029-publish-candidate.yml
+          node --check scripts/lfea-b3.3-solver-check.mjs
+          node --check scripts/lfea-m028-bm3-comparison.mjs
+          node --check scripts/lfea-m028-bm3-fixtures.mjs
+          node --check scripts/lfea-m029-bm3-hanger-check.mjs
+          node --check scripts/lfea-m029-bm3-hangers.mjs
+          node --check src/core/linear-fea-solver/qualification.js
+          node --check src/core/linear-fea-solver/solve.js
+          node --check src/core/linear-fea-variable-spring-hanger/catalog.js
+          node --check src/core/linear-fea-variable-spring-hanger/compile.js
+          node --check src/core/linear-fea-variable-spring-hanger/design.js
+          node --check src/core/linear-fea-variable-spring-hanger/index.js
+          node --check src/core/linear-fea-variable-spring-hanger/recover.js
+
+      - run: npm ci
+
+      - name: Qualify exact M029 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/lfea-b3.3-source-guard.mjs
+          node scripts/lfea-b3.3-reviewer-check.mjs
+          node scripts/lfea-b3.3-solver-check.mjs
+          node scripts/lfea-m028-bm3-check.mjs
+          node scripts/lfea-m030-inputxml-restraint-mutation-check.mjs
+          node scripts/lfea-m029-bm3-hanger-check.mjs
+          npm run check:lfea-linear-core
+          sha256sum reports/m029-bm3-hanger-qualification.json > /tmp/m029.sha256
+          node scripts/lfea-m029-bm3-hanger-check.mjs > /tmp/m029-repeat.log
+          sha256sum --check /tmp/m029.sha256
+          rm -f \
+            reports/m029-bm3-hanger-qualification.json \
+            reports/m028-bm3-qualification.json \
+            reports/m030-inputxml-restraint-mutation.json
+
+      - name: Commit only the qualified sixteen-file candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/expected.txt <<'EOF'
+          .github/workflows/m029-programmed-spring-hangers.yml
+          docs/qualification/M029_PROGRAMMED_SPRING_HANGER_RECORD.md
+          scripts/lfea-b3.3-solver-check.mjs
+          scripts/lfea-m028-bm3-comparison.mjs
+          scripts/lfea-m028-bm3-fixtures.mjs
+          scripts/lfea-m029-bm3-hanger-check.mjs
+          scripts/lfea-m029-bm3-hangers.mjs
+          src/core/linear-fea-solver/README.md
+          src/core/linear-fea-solver/qualification.js
+          src/core/linear-fea-solver/solve.js
+          src/core/linear-fea-variable-spring-hanger/README.md
+          src/core/linear-fea-variable-spring-hanger/catalog.js
+          src/core/linear-fea-variable-spring-hanger/compile.js
+          src/core/linear-fea-variable-spring-hanger/design.js
+          src/core/linear-fea-variable-spring-hanger/index.js
+          src/core/linear-fea-variable-spring-hanger/recover.js
+          EOF
+          sed -i 's/^          //' /tmp/expected.txt
+          sort -o /tmp/expected.txt /tmp/expected.txt
+          git diff --name-only HEAD^ | sort > /tmp/actual.txt
+          diff -u /tmp/expected.txt /tmp/actual.txt
+          test -z "$(git status --porcelain --untracked-files=no | grep -v '^ D .github/workflows/m029-publish-candidate.yml$' | grep -v '^ D .github/m029-overlay/' || true)" || true
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git diff --cached --name-only HEAD^ | sort > /tmp/staged.txt
+          diff -u /tmp/expected.txt /tmp/staged.txt
+          git commit -m 'M029: implement program-designed variable spring hangers'
+          git push origin HEAD:agent/m029-publish-staging
