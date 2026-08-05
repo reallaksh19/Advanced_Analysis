@@ -245,6 +245,7 @@ jobs:
         run: node src/core/bucket-b/bb11-check.mjs
 
       - name: Upload raw BB-11 evidence
+        if: always()
         id: raw_artifact
         uses: actions/upload-artifact@v4
         with:
