@@ -9,7 +9,7 @@ import {
   createApplicationViewStateV11,
   createWorkspaceConsumerContext,
   createWorkspaceConsumerReadinessRegistry,
-  createWorkspaceConsumerRegistry_V11,
+  createWorkspaceConsumerRegistryV11,
   validateApplicationViewStateV11,
   validateWorkspaceConsumerRegistryV11,
 } from '../src/core/workspace-consumers/index.js';
