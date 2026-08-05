@@ -8,7 +8,6 @@ import {
   finiteVector,
   invisiblePickMaterial,
   lineMaterial,
-  meshMaterial,
   nodePickRadius,
   nodeVisualRadius,
   pickUserData,
@@ -71,6 +70,7 @@ export function renderGovernedSjsonRoute({
         bounds,
         projection.compactElements || [],
         backend.navigationConfiguration,
+        lineMaterials,
       );
     }
     while (staging.children.length) group.add(staging.children[0]);
@@ -87,23 +87,35 @@ export function renderGovernedSjsonRoute({
   }
 }
 
-function addGovernedNodes(staging, bounds, elements, configuration) {
+function addGovernedNodes(staging, bounds, elements, configuration, lineMaterials) {
   const nodes = (elements || []).filter((element) => finiteVector(element));
   const visualRadiusMm = nodeVisualRadius(configuration);
   const pickRadiusMm = nodePickRadius(configuration);
   if (!nodes.length) return emptyNodeMetrics(configuration);
   const radialSegments = Math.max(8, configuration.meshRadialSegments);
   const heightSegments = Math.max(6, Math.floor(radialSegments * 0.75));
-  const visualGeometry = new THREE.SphereGeometry(visualRadiusMm, radialSegments, heightSegments);
+  const visualSolid = new THREE.OctahedronGeometry(visualRadiusMm, 0);
+  const visualGeometry = new THREE.EdgesGeometry(visualSolid);
+  visualSolid.dispose();
   const pickGeometry = new THREE.SphereGeometry(pickRadiusMm, radialSegments, heightSegments);
-  const visualMaterial = meshMaterial(new Map(), 0x93c5fd, NODE_VISUAL_OPACITY, false);
+  const visualMaterial = lineMaterial(
+    lineMaterials,
+    0x93c5fd,
+    NODE_VISUAL_OPACITY,
+    false,
+  );
   const pickMaterial = invisiblePickMaterial();
   for (const node of nodes) {
     const point = finiteVector(node);
-    const marker = new THREE.Mesh(visualGeometry, visualMaterial);
+    const marker = new THREE.LineSegments(visualGeometry, visualMaterial);
     marker.name = `topology-edit-visible-node-marker:${node.id || node.entityId || ''}`;
     marker.position.copy(point);
-    marker.userData = pickUserData(node);
+    marker.userData = {
+      nonPickable: true,
+      visualNodeMarker: true,
+      visualRadiusMm,
+      renderAuthority: 'CANONICAL_NODE_WIREFRAME_MARKER_V2',
+    };
     marker.renderOrder = OVERLAY_RENDER_ORDER - 2;
     staging.add(marker);
 
@@ -211,6 +223,7 @@ function publishRouteEvidence(host, projection, metrics, isDraft) {
   host.dataset.topologyEditNodePickProxyRadiusMm = String(metrics.nodePickRadiusMm);
   host.dataset.topologyEditVisibleNodeMarkerOpacity = String(metrics.nodeOpacity);
   host.dataset.topologyEditNodeVisualAndPickGeometrySeparated = 'true';
+  host.dataset.topologyEditVisibleNodeMarkerGeometry = 'OCTAHEDRON_WIREFRAME';
   host.dataset.topologyEditExactTeeCount = String(editDraft.exactTeeCount || 0);
   host.dataset.topologyEditExactTeeSegmentCount = String(editDraft.exactTeeSegmentCount || 0);
   host.dataset.topologyEditExactOletCount = String(editDraft.exactOletCount || 0);
