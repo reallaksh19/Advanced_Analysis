@@ -1,0 +1,111 @@
+name: LAFEA-NC NC-00 Solver Bridge
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/lafea-nc00-solver-bridge.yml'
+      - 'docs/nonlinear-shell-contact/**'
+      - 'scripts/lafea-nc00-check.mjs'
+      - 'src/core/nonlinear-shell-contact/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lafea-nc00-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts-and-bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      NC00_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      NC00_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.repository.default_branch }}
+      NC00_BRANCH: ${{ github.head_ref || github.ref_name }}
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.NC00_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify exact head and current-main ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$NC00_HEAD_SHA"
+          git fetch origin main --no-tags
+          behind="$(git rev-list --count HEAD..origin/main)"
+          test "$behind" = "0"
+          echo "NC00_BASE_SHA=$(git merge-base HEAD origin/main)" >> "$GITHUB_ENV"
+
+      - name: Enforce changed-path containment
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          mapfile -t paths < <(git diff --name-only "$NC00_BASE_SHA...HEAD")
+          test "${#paths[@]}" -gt 0
+          for path in "${paths[@]}"; do
+            case "$path" in
+              .github/workflows/lafea-nc00-solver-bridge.yml|docs/nonlinear-shell-contact/*|scripts/lafea-nc00-check.mjs|src/core/nonlinear-shell-contact/*) ;;
+              *) echo "Forbidden NC-00 path: $path" >&2; exit 1 ;;
+            esac
+          done
+
+      - name: Syntax-check NC-00 sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          find src/core/nonlinear-shell-contact -type f -name '*.js' -print0 | sort -z | xargs -0 -n1 node --check
+          node --check scripts/lafea-nc00-check.mjs
+
+      - name: Contracts-only replay A
+        shell: bash
+        env:
+          NC00_EXACT_HEAD_SHA: ${{ env.NC00_HEAD_SHA }}
+          NC00_ARTIFACT_DIR: .artifacts/lafea-nc00/run-a
+        run: node scripts/lafea-nc00-check.mjs --contracts-only
+
+      - name: Contracts-only replay B
+        shell: bash
+        env:
+          NC00_EXACT_HEAD_SHA: ${{ env.NC00_HEAD_SHA }}
+          NC00_ARTIFACT_DIR: .artifacts/lafea-nc00/run-b
+        run: node scripts/lafea-nc00-check.mjs --contracts-only
+
+      - name: Compare deterministic artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          diff -ru --exclude='nc00-report.json' .artifacts/lafea-nc00/run-a .artifacts/lafea-nc00/run-b
+          a="$(node -e "console.log(JSON.parse(require('fs').readFileSync('.artifacts/lafea-nc00/run-a/nc00-report.json')).semanticHash)")"
+          b="$(node -e "console.log(JSON.parse(require('fs').readFileSync('.artifacts/lafea-nc00/run-b/nc00-report.json')).semanticHash)")"
+          test "$a" = "$b"
+          test "$(node -e "console.log(JSON.parse(require('fs').readFileSync('.artifacts/lafea-nc00/run-a/nc00-report.json')).authority.solverBridgeQualified)")" = "false"
+
+      - name: Verify clean source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain --untracked-files=no)"
+
+      - name: Upload NC-00 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc00-${{ env.NC00_HEAD_SHA }}-${{ github.run_attempt }}
+          path: .artifacts/lafea-nc00
+          if-no-files-found: error
+          retention-days: 30
