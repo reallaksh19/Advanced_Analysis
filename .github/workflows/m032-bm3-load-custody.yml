@@ -63,7 +63,8 @@ jobs:
             src/core/linear-piping-inputxml-force-moment/index.js \
             scripts/lfea-m032-inputxml-force-moment-check.mjs \
             scripts/lfea-m032-bm3-load-custody.mjs \
-            scripts/lfea-m032-bm3-load-custody-check.mjs; do
+            scripts/lfea-m032-bm3-load-custody-check.mjs \
+            scripts/lfea-m032-bm3-consolidated-latest-output-check.mjs; do
             node --check "$file"
           done
           git diff --check
@@ -77,8 +78,8 @@ jobs:
       - name: M029 hanger regression
         run: node scripts/lfea-m029-bm3-hanger-check.mjs
 
-      - name: Latest BM3 strict comparison
-        run: node scripts/lfea-bm3-consolidated-latest-output-check.mjs --write
+      - name: Latest BM3 strict comparison with M032 custody
+        run: node scripts/lfea-m032-bm3-consolidated-latest-output-check.mjs
 
       - name: BM1 comparison regression
         run: npm run check:lfea-bm1-cii-comparison
@@ -90,8 +91,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sha256sum reports/m032-bm3-load-custody.json > /tmp/m032.sha256
+          sha256sum \
+            reports/m032-bm3-load-custody.json \
+            reports/bm3-consolidated-latest-output.json \
+            > /tmp/m032.sha256
           node scripts/lfea-m032-bm3-load-custody-check.mjs > /tmp/m032-repeat.log
+          node scripts/lfea-m032-bm3-consolidated-latest-output-check.mjs > /tmp/m032-consolidated-repeat.log
           sha256sum -c /tmp/m032.sha256
 
       - name: Upload deterministic M032 evidence
