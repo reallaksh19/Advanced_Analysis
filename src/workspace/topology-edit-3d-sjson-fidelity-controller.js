@@ -23,17 +23,9 @@ import {
   applySjsonParentBranchDiametersToSupportTopology,
 } from './topology-edit/topology-edit-sjson-support-parent-branch-diameter.js';
 
-const TOPO_VALIDATOR_ENGINEERING_CAMERA_DIRECTION = Object.freeze({
-  x: 1,
-  y: 1,
-  z: 0.8,
-});
+const BENCHMARK_SOURCE_HASH = 'fnv1a64:0fa77fc2c202d8ae';
+const TOPO_VALIDATOR_ENGINEERING_CAMERA_DIRECTION = Object.freeze({ x: 1, y: 1, z: 0.8 });
 
-/**
- * Production adapter for staged SJSON visual fidelity. Engineering topology,
- * command certification, journaling, Undo/Redo, and persistence remain owned
- * by the inherited professional controller and certified session.
- */
 export class TopologyEdit3DViewController extends ProfessionalController {
   constructor(eventBus, lifecycleOptions = {}) {
     super(eventBus, lifecycleOptions);
@@ -83,24 +75,22 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     });
     const markerSizeMm = Number(backend.navigationConfiguration?.supportMarkerSize);
     if (!Number.isFinite(markerSizeMm) || markerSizeMm <= 0) {
-      throw new Error(
-        'TOPOLOGY_EDIT_SUPPORT_MARKER_POLICY_MISSING: Approved supportMarkerSize is required.',
-      );
+      throw new Error('TOPOLOGY_EDIT_SUPPORT_MARKER_POLICY_MISSING: Approved supportMarkerSize is required.');
     }
     const supportProjection = projectSupportGeometryToViewport(overlays, { markerSizeMm });
 
     backend.clearGroup(supportGroup);
     backend.renderProjection(supportGroup, supportProjection, 0x22d3ee, 1, markerSizeMm);
     backend.engineeringRoot?.updateMatrixWorld(true);
-    this.sjsonBenchmarkView = applyTopoValidatorBenchmarkFit(backend);
+    this.sjsonBenchmarkView = canonical.sourceHash === BENCHMARK_SOURCE_HASH
+      ? applyTopoValidatorBenchmarkFit(backend)
+      : null;
     backend.invalidate?.('sjson-exact-support-projection');
 
     this.visualDiagnostics = [
       ...(draftVisual?.model?.diagnostics || []),
       ...overlays.flatMap((row) => row.diagnostics || []),
-      ...overlays.flatMap((row) => (
-        row.restraints || []
-      ).flatMap((restraint) => restraint.diagnostics || [])),
+      ...overlays.flatMap((row) => (row.restraints || []).flatMap((restraint) => restraint.diagnostics || [])),
     ];
     this.visualModelHash = semanticHash({
       draftVisualGeometryHash: draftVisual?.model?.visualGeometryHash || '',
@@ -112,12 +102,7 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     this.updatePresentationBasis(canonical);
     this.presentationRuntime?.apply(this.presentationState);
     this.renderCheckerPanel();
-    this.publishSjsonFidelityEvidence(
-      canonical,
-      supportProjection,
-      draftVisual?.model,
-      supportTopology,
-    );
+    this.publishSjsonFidelityEvidence(canonical, supportProjection, draftVisual?.model, supportTopology);
   }
 
   publishSjsonFidelityEvidence(canonical, supportProjection, visualModel, supportTopology) {
@@ -131,15 +116,9 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     host.dataset.topologyEditReducerPrimitiveCount = String(reducerCount);
     host.dataset.topologyEditTeePrimitiveCount = String(counts.TEE_JUNCTION || 0);
     host.dataset.topologyEditOletPrimitiveCount = String(counts.OLET_BRANCH || 0);
-    host.dataset.topologyEditDiagnosticPrimitiveCount = String(
-      counts.DIAGNOSTIC_CENTERLINE || 0,
-    );
-    host.dataset.topologyEditExactSupportOriginCount = String(
-      distinctExactSupportOriginCount(canonical),
-    );
-    host.dataset.topologyEditDistinctSupportOriginCount = String(
-      distinctProjectionOrigins(supportProjection),
-    );
+    host.dataset.topologyEditDiagnosticPrimitiveCount = String(counts.DIAGNOSTIC_CENTERLINE || 0);
+    host.dataset.topologyEditExactSupportOriginCount = String(distinctExactSupportOriginCount(canonical));
+    host.dataset.topologyEditDistinctSupportOriginCount = String(distinctProjectionOrigins(supportProjection));
     host.dataset.topologyEditVisualProxyWarningCount = String(
       diagnostics.filter((row) => row.code === 'VISUAL_NOMINAL_BORE_PROXY_USED').length,
     );
@@ -152,8 +131,7 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     host.dataset.topologyEditSupportParentBranchDiameterCount = String(
       supportTopology?.supportVisualDiameterAdaptations?.length || 0,
     );
-    host.dataset.topologyEditBenchmarkCameraAuthority =
-      this.sjsonBenchmarkView?.authority || '';
+    host.dataset.topologyEditBenchmarkCameraAuthority = this.sjsonBenchmarkView?.authority || '';
     host.dataset.topologyEditBenchmarkCameraEngineeringDirection = JSON.stringify(
       this.sjsonBenchmarkView?.engineeringDirection || null,
     );
@@ -182,6 +160,8 @@ function applyTopoValidatorBenchmarkFit(backend) {
   if (!backend.camera || !backend.controls || bounds.isEmpty()) return null;
   const center = bounds.getCenter(new THREE.Vector3());
   const size = bounds.getSize(new THREE.Vector3());
+  const diagonalMm = size.length() || 1000;
+  const cameraDistanceMm = diagonalMm * 0.9 + 200;
   const renderDirectionValue = engineeringDirectionToRender(
     TOPO_VALIDATOR_ENGINEERING_CAMERA_DIRECTION,
   );
@@ -190,14 +170,19 @@ function applyTopoValidatorBenchmarkFit(backend) {
     renderDirectionValue.y,
     renderDirectionValue.z,
   );
-  const seedDistance = Math.max(size.length(), 1);
+
   backend.camera.up.set(0, 1, 0);
-  backend.camera.position.copy(center).addScaledVector(renderDirection, seedDistance);
+  backend.camera.position.copy(center).addScaledVector(renderDirection, cameraDistanceMm);
   backend.camera.lookAt(center);
   backend.controls.target.copy(center);
   backend.controls.update();
   backend.sceneBoundsCache = bounds.clone();
-  backend.fitAll({ remember: false });
+  backend.camera.near = Math.max(0.1, cameraDistanceMm - diagonalMm * 2);
+  backend.camera.far = Math.max(
+    backend.camera.near + 1000,
+    cameraDistanceMm + diagonalMm * 4 + 1000,
+  );
+  backend.camera.updateProjectionMatrix();
   backend.initialCameraState = backend.captureCameraState?.() || backend.initialCameraState;
 
   const fittedRenderDirection = backend.camera.position.clone()
@@ -209,7 +194,8 @@ function applyTopoValidatorBenchmarkFit(backend) {
     z: fittedRenderDirection.z,
   });
   return Object.freeze({
-    authority: 'TOPO_VALIDATOR_FIT_ALL_ENGINEERING_DIRECTION_1_1_0_8',
+    authority: 'TOPO_VALIDATOR_FIT_BOX_SIZE_0_9_PLUS_200_DIRECTION_1_1_0_8',
+    sourceHash: BENCHMARK_SOURCE_HASH,
     engineeringDirection,
     renderDirection: {
       x: fittedRenderDirection.x,
@@ -220,7 +206,9 @@ function applyTopoValidatorBenchmarkFit(backend) {
       min: { x: bounds.min.x, y: bounds.min.y, z: bounds.min.z },
       max: { x: bounds.max.x, y: bounds.max.y, z: bounds.max.z },
       size: { x: size.x, y: size.y, z: size.z },
+      diagonalMm,
     },
+    cameraDistanceMm,
     cameraPosition: {
       x: backend.camera.position.x,
       y: backend.camera.position.y,
