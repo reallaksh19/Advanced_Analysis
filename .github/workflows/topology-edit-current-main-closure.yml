@@ -1,0 +1,90 @@
+name: 3D Edit Current Main Closure
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/topology-edit-current-main-closure.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: topology-edit-current-main-closure-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  current-main-closure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PLAYWRIGHT_BROWSER_CHANNEL: chromium
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies and Chromium
+        run: |
+          set -euo pipefail
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Verify exact source and patch hygiene
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+          git diff --check
+          test -s public/Sjson.json
+          test -s src/workspace/topology-edit-3d-interaction-controller.js
+          test -s src/workspace/viewport-interaction/topology-edit-tangency-clocking-snap-index.js
+
+      - name: Execute complete topology-edit unit matrix
+        run: |
+          set -euo pipefail
+          mapfile -t UNIT_TESTS < <(find tests -maxdepth 1 -type f -name 'topology-edit-*.test.mjs' -print | sort)
+          test "${#UNIT_TESTS[@]}" -gt 0
+          printf '%s\n' "${UNIT_TESTS[@]}" > topology-edit-unit-files.txt
+          node --test --test-reporter=tap "${UNIT_TESTS[@]}" 2>&1 | tee topology-edit-unit-output.txt
+
+      - name: Build production application
+        run: |
+          set -euo pipefail
+          npm run build 2>&1 | tee topology-edit-build-output.txt
+
+      - name: Execute complete mounted Chromium topology-edit matrix
+        run: |
+          set -euo pipefail
+          mapfile -t E2E_TESTS < <(find e2e -maxdepth 1 -type f -name 'topology-edit-*.spec.js' -print | sort)
+          test "${#E2E_TESTS[@]}" -gt 0
+          printf '%s\n' "${E2E_TESTS[@]}" > topology-edit-e2e-files.txt
+          npx playwright test "${E2E_TESTS[@]}" \
+            --project=chromium \
+            --workers=1 \
+            --retries=0 \
+            --reporter=line 2>&1 | tee topology-edit-e2e-output.txt
+
+      - name: Upload closure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-current-main-closure-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}-${{ github.run_attempt }}
+          path: |
+            topology-edit-unit-files.txt
+            topology-edit-unit-output.txt
+            topology-edit-build-output.txt
+            topology-edit-e2e-files.txt
+            topology-edit-e2e-output.txt
+            playwright-report
+            test-results
+          if-no-files-found: warn
+          retention-days: 30
