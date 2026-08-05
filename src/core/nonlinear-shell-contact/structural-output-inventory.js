@@ -22,11 +22,10 @@ const COMPLETION_PATTERNS = Object.freeze([
 
 const FAILURE_PATTERNS = Object.freeze([
   { id: 'FATAL', pattern: /\bFATAL\b/iu },
-  { id: 'ERROR', pattern: /\bERROR\b/iu },
-  { id: 'NO_CONVERGENCE', pattern: /\bNO\s+CONVERGENCE\b/iu },
-  { id: 'DIVERGENCE', pattern: /\bDIVERGENCE\b/iu },
+  { id: 'ERROR', pattern: /(?:^|\n)\s*\*?ERROR\b/iu },
+  { id: 'NO_CONVERGENCE', pattern: /\bNO\s+CONVERGENCE\b/iu, transientWhenComplete: true },
+  { id: 'DIVERGENCE', pattern: /\bDIVERGENCE\b/iu, transientWhenComplete: true },
   { id: 'SEGMENTATION_FAULT', pattern: /\bSEGMENTATION\s+FAULT\b/iu },
-  { id: 'NAN_OR_INFINITY', pattern: /(?:\bNAN\b|\bINF(?:INITY)?\b)/iu },
 ]);
 
 export function inventoryExternalSolverOutputs(retainedFiles, canonicalModel) {
@@ -34,24 +33,37 @@ export function inventoryExternalSolverOutputs(retainedFiles, canonicalModel) {
     throw new TypeError('retainedFiles must be a Map.');
   }
   const textFiles = [];
+  const diagnosticTextFiles = [];
   const frdFiles = [];
   for (const [relativePath, bytes] of retainedFiles.entries()) {
     if (!Buffer.isBuffer(bytes)) throw new TypeError(`Retained file ${relativePath} is not a Buffer.`);
     if (/\.frd$/iu.test(relativePath)) frdFiles.push([relativePath, bytes]);
     if (/\.(?:txt|dat|sta|cvg|frd)$/iu.test(relativePath)) {
-      textFiles.push([relativePath, decodeBoundedText(bytes, relativePath)]);
+      const decoded = decodeBoundedText(bytes, relativePath);
+      textFiles.push([relativePath, decoded]);
+      if (!/\.frd$/iu.test(relativePath)) diagnosticTextFiles.push([relativePath, decoded]);
     }
   }
   textFiles.sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
+  diagnosticTextFiles.sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
   frdFiles.sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
   const searchableText = textFiles.map(([path, text]) => `\n--- ${path} ---\n${text}`).join('');
+  const diagnosticText = diagnosticTextFiles
+    .map(([path, text]) => `\n--- ${path} ---\n${text}`)
+    .join('');
 
   const completionMarkers = COMPLETION_PATTERNS
     .filter(({ pattern }) => pattern.test(searchableText))
     .map(({ id }) => id);
+  const completionEstablished = completionMarkers.length > 0;
   const failureMarkers = FAILURE_PATTERNS
-    .filter(({ pattern }) => pattern.test(searchableText))
+    .filter(({ pattern, transientWhenComplete }) => (
+      pattern.test(diagnosticText) && !(transientWhenComplete && completionEstablished)
+    ))
     .map(({ id }) => id);
+  if (hasUnqualifiedNonFiniteDiagnostic(diagnosticText, completionEstablished)) {
+    failureMarkers.push('NAN_OR_INFINITY');
+  }
   const stepInventory = parseStepInventory(searchableText);
   const incrementInventory = parseIncrementInventory(searchableText);
   const provisionalDatasetInventory = frdFiles.flatMap(([path, bytes]) => (
@@ -166,10 +178,10 @@ function parseStepInventory(text) {
     seen.add(key);
     rows.push({ stepId: id, ordinal: rows.length + 1, source });
   };
-  for (const match of text.matchAll(/\bSTEP\s+(?:NAME\s*=\s*)?([A-Za-z0-9_.:-]+)\b/giu)) {
+  for (const match of text.matchAll(/^\s*STEP\s+(?:NAME\s*=\s*)?([A-Za-z0-9_.:-]+)\s*$/gimu)) {
     add(match[1], 'TEXT_STEP_MARKER');
   }
-  for (const match of text.matchAll(/^\s*1PSTEP\s+([0-9]+)\b/gmu)) {
+  for (const match of text.matchAll(/^\s*1PSTEP\s+[0-9]+\s+[0-9]+\s+([0-9]+)\s*$/gmu)) {
     add(match[1], 'FRD_PARAMETER_HEADER');
   }
   return rows;
@@ -177,7 +189,9 @@ function parseStepInventory(text) {
 
 function parseIncrementInventory(text) {
   const rows = [];
-  for (const match of text.matchAll(/\bSTEP\s+([A-Za-z0-9_.:-]+)[^\n]*\bINCREMENT\s+([0-9]+)\b/giu)) {
+  for (const match of text.matchAll(
+    /^\s*STEP\s+([A-Za-z0-9_.:-]+).*?\bINCREMENT\s+([0-9]+).*$/gimu,
+  )) {
     rows.push({
       ordinal: rows.length + 1,
       stepId: match[1],
@@ -188,9 +202,11 @@ function parseIncrementInventory(text) {
   if (rows.length === 0) {
     let latestStep = null;
     for (const line of text.split(/\r?\n/u)) {
-      const step = line.match(/\bSTEP\s+(?:NAME\s*=\s*)?([A-Za-z0-9_.:-]+)\b/iu);
+      const step = line.match(/^\s*STEP\s+(?:NAME\s*=\s*)?([A-Za-z0-9_.:-]+)\s*$/iu);
       if (step) latestStep = step[1];
-      const increment = line.match(/\bINCREMENT\s+([0-9]+)\b/iu);
+      const increment = line.match(
+        /^\s*INCREMENT\s+([0-9]+)(?:\s+ATTEMPT\s+[0-9]+)?\s*$/iu,
+      );
       if (increment) {
         rows.push({
           ordinal: rows.length + 1,
@@ -226,10 +242,30 @@ function assessIncrementSequence(rows) {
   };
 }
 
+function hasUnqualifiedNonFiniteDiagnostic(text, completionEstablished) {
+  const nonFinite = /(?:\bNAN\b|\bINF(?:INITY)?\b)/iu;
+  if (!nonFinite.test(text)) return false;
+  if (!completionEstablished) return true;
+  const zeroContactEstablished = /NUMBER\s+OF\s+CONTACT\s+SPRING\s+ELEMENTS\s*=\s*0/iu.test(text);
+  if (!zeroContactEstablished) return true;
+  const lines = text.split(/\r?\n/u);
+  return lines.some((line, index) => {
+    if (!nonFinite.test(line)) return false;
+    if (/PRESSURE\s+RATIO[^\r\n]*=\s*[-+]?NAN\b/iu.test(line)) return false;
+    const context = lines.slice(Math.max(0, index - 5), index + 1).join('\n');
+    const zeroContactStatistic = /(?:CENTER\s+OF\s+GRAVITY\s+AND\s+MEAN\s+NORMAL|MOMENT\s+ABOUT\s+THE\s+CENTER\s+OF\s+GRAVITY|AREA\s*,\s*NORMAL\s+FORCE)/iu.test(context);
+    return !zeroContactStatistic;
+  });
+}
+
 function detectDatContactOutputs(text) {
   const fields = [];
-  if (/\b(?:CFN|TOTAL\s+NORMAL\s+FORCE)\b/iu.test(text)) fields.push('CONTACT_NORMAL_FORCE');
-  if (/\b(?:CONTACT\s+AREA|AREA\s+OF\s+THE\s+CONTACT\s+AREA)\b/iu.test(text)) {
+  const integratedContactHeader = /AREA\s*,\s*NORMAL\s+FORCE\s*\(\+\s*=\s*TENSION\)\s+AND\s+SHEAR\s+FORCE/iu;
+  if (/\b(?:CFN|TOTAL\s+NORMAL\s+FORCE)\b/iu.test(text) || integratedContactHeader.test(text)) {
+    fields.push('CONTACT_NORMAL_FORCE');
+  }
+  if (/\b(?:CONTACT\s+AREA|AREA\s+OF\s+THE\s+CONTACT\s+AREA)\b/iu.test(text)
+      || integratedContactHeader.test(text)) {
     fields.push('CONTACT_AREA');
   }
   return fields;

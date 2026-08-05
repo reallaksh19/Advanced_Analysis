@@ -11,6 +11,9 @@ import {
   createDeterministicRigidSurfaceMesh,
 } from './rigid-surface-mesher.js';
 
+const RIGID_CARRIER_PROFILE = 'DIRECTLY_PRESCRIBED_SHELL_CARRIER_V1';
+const RIGID_CARRIER_THICKNESS = 1;
+
 export function writeDeterministicSolverDeck(canonicalModel, deckProfile) {
   validateCanonicalNonlinearShellContactModel(canonicalModel);
   validateDeckProfile(deckProfile);
@@ -146,7 +149,7 @@ export function writeDeterministicSolverDeck(canonicalModel, deckProfile) {
     ].join(', '));
     step.loads.forEach((load) => appendLoad(lines, load, nodeMap, surfaceMap));
     step.prescribedMotions.forEach((motion) => {
-      appendMotion(lines, motion, nodeMap, rigidMaps.referenceNodeMap);
+      appendMotion(lines, motion, nodeMap, rigidMaps.motionNodeMap);
     });
     outputRequestMap[step.stepId] = appendOutputRequests(
       lines,
@@ -171,6 +174,7 @@ export function writeDeterministicSolverDeck(canonicalModel, deckProfile) {
     contactMap,
     loadStepMap,
     rigidReferenceNodeMap: rigidMaps.referenceNodeMap,
+    rigidMotionNodeMap: rigidMaps.motionNodeMap,
     rigidGeometryMap: rigidMaps.geometryMap,
     outputRequestMap,
   };
@@ -181,6 +185,7 @@ export function writeDeterministicSolverDeck(canonicalModel, deckProfile) {
     surfaceMapHash: semanticHash(surfaceMap),
     contactMapHash: semanticHash(contactMap),
     loadStepMapHash: semanticHash(loadStepMap),
+    rigidMotionNodeMapHash: semanticHash(rigidMaps.motionNodeMap),
     rigidGeometryMapHash: semanticHash(rigidMaps.geometryMap),
     outputRequestMapHash: semanticHash(outputRequestMap),
   };
@@ -207,18 +212,26 @@ export function formatNumber(value) {
     throw new TypeError('Deck numbers must be finite.');
   }
   const normalized = Object.is(value, -0) ? 0 : value;
-  const [mantissa, exponent] = normalized.toExponential(16).split('e');
+  const [mantissa, exponent] = normalized.toExponential(14).split('e');
   const exponentNumber = Number(exponent);
+  if (Math.abs(exponentNumber) > 99) {
+    throw new TypeError('Deck number exponent exceeds the CalculiX field-20 profile.');
+  }
   const sign = exponentNumber >= 0 ? '+' : '-';
-  return `${mantissa}E${sign}${String(Math.abs(exponentNumber)).padStart(3, '0')}`;
+  return `${mantissa}E${sign}${String(Math.abs(exponentNumber)).padStart(2, '0')}`;
 }
 
 function appendRigidSurfaceDefinitions(lines, model, nodeMap, elementMap) {
   const surfaceMap = {};
   const referenceNodeMap = {};
+  const motionNodeMap = {};
   const geometryMap = {};
   let nextNode = Math.max(0, ...Object.values(nodeMap)) + 1;
   let nextElement = Math.max(0, ...Object.values(elementMap)) + 1;
+  const carrierMaterial = model.materials[0];
+  if (model.rigidSurfaces.length && !carrierMaterial) {
+    throw new TypeError('Rigid surface carrier elements require one governed material.');
+  }
 
   model.rigidSurfaces.forEach((surface) => {
     const mesh = createDeterministicRigidSurfaceMesh(surface, {
@@ -229,10 +242,15 @@ function appendRigidSurfaceDefinitions(lines, model, nodeMap, elementMap) {
     nextElement = mesh.nextElementId;
     const elementSet = solverToken('RIGEL', surface.rigidSurfaceId);
     const rigidSurfaceName = solverToken('RIGSURF', surface.rigidSurfaceId);
+    const prescribedNodeIds = [
+      ...mesh.nodes.map((node) => node.id),
+      mesh.referenceNode.id,
+    ];
 
     lines.push(`** generated rigid surface=${surface.rigidSurfaceId}`);
     lines.push(`** generated rigid surface type=${surface.surfaceType}`);
     lines.push(`** generated rigid geometry hash=${mesh.geometrySemanticHash}`);
+    lines.push(`** generated rigid carrier profile=${RIGID_CARRIER_PROFILE}`);
     lines.push('*NODE');
     mesh.nodes.forEach((node) => {
       lines.push(`${node.id}, ${node.coordinates.map(formatNumber).join(', ')}`);
@@ -245,24 +263,31 @@ function appendRigidSurfaceDefinitions(lines, model, nodeMap, elementMap) {
       lines.push(`*ELEMENT, TYPE=${type}, ELSET=${elementSet}`);
       rows.forEach((element) => lines.push(`${element.id}, ${element.nodeIds.join(', ')}`));
     });
-    lines.push(`*RIGID BODY, ELSET=${elementSet}, REF NODE=${mesh.referenceNode.id}`);
+    lines.push(
+      `*SHELL SECTION, ELSET=${elementSet}, MATERIAL=${solverToken('MAT', carrierMaterial.materialId)}`,
+    );
+    lines.push(formatNumber(RIGID_CARRIER_THICKNESS));
     lines.push(`*SURFACE, NAME=${rigidSurfaceName}, TYPE=ELEMENT`);
     mesh.elements.forEach((element) => lines.push(`${element.id}, ${mesh.contactFaceLabel}`));
-    if (surface.motionAuthority === 'FIXED') {
-      lines.push('*BOUNDARY');
-      lines.push(`${mesh.referenceNode.id}, 1, 6, ${formatNumber(0)}`);
-    }
+    lines.push('*BOUNDARY');
+    prescribedNodeIds.forEach((nodeId) => {
+      lines.push(`${nodeId}, 1, 3, ${formatNumber(0)}`);
+    });
 
     surfaceMap[surface.rigidSurfaceId] = rigidSurfaceName;
     referenceNodeMap[surface.rigidSurfaceId] = mesh.referenceNode.id;
+    motionNodeMap[surface.rigidSurfaceId] = prescribedNodeIds;
     geometryMap[surface.rigidSurfaceId] = {
       surfaceType: surface.surfaceType,
       geometryProfileId: mesh.geometryProfileId,
       geometrySemanticHash: mesh.geometrySemanticHash,
       geometryStatistics: mesh.geometryStatistics,
+      carrierProfile: RIGID_CARRIER_PROFILE,
+      carrierThickness: RIGID_CARRIER_THICKNESS,
+      carrierMaterialId: carrierMaterial.materialId,
     };
   });
-  return { surfaceMap, referenceNodeMap, geometryMap };
+  return { surfaceMap, referenceNodeMap, motionNodeMap, geometryMap };
 }
 
 function appendLoad(lines, load, nodeMap, surfaceMap) {
@@ -284,14 +309,18 @@ function appendLoad(lines, load, nodeMap, surfaceMap) {
   throw new TypeError(`Unsupported deck load type ${load.loadType}.`);
 }
 
-function appendMotion(lines, motion, nodeMap, rigidReferenceNodeMap) {
-  const target = motion.targetType === 'NODE'
-    ? nodeMap[motion.targetId]
-    : rigidReferenceNodeMap[motion.targetId];
-  if (!target) throw new TypeError(`Motion target ${motion.targetId} has no solver mapping.`);
+function appendMotion(lines, motion, nodeMap, rigidMotionNodeMap) {
+  const targets = motion.targetType === 'NODE'
+    ? [nodeMap[motion.targetId]]
+    : rigidMotionNodeMap[motion.targetId];
+  if (!Array.isArray(targets) || targets.some((target) => !target)) {
+    throw new TypeError(`Motion target ${motion.targetId} has no solver mapping.`);
+  }
   const dof = dofNumber(motion.dof);
   lines.push('*BOUNDARY');
-  lines.push(`${target}, ${dof}, ${dof}, ${formatNumber(motion.value)}`);
+  targets.forEach((target) => {
+    lines.push(`${target}, ${dof}, ${dof}, ${formatNumber(motion.value)}`);
+  });
 }
 
 function appendOutputRequests(lines, outputs, contactPairs, surfaceMap, rigidSurfaceMap) {

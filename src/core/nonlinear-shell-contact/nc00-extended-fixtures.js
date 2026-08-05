@@ -15,18 +15,22 @@ export function createNc00ExtendedRigidFixtureInputs(baseContactInput) {
     'NC00-F2-PLANE': {
       surfaceType: 'RIGID_PLANE',
       dimensions: { radius: null, length: 200, width: 200, angle: null },
+      referencePoint: null,
     },
     'NC00-F2-SPHERE': {
       surfaceType: 'RIGID_SPHERE',
       dimensions: { radius: 75, length: null, width: null, angle: 70 },
+      referencePoint: null,
     },
     'NC00-F2-CYLINDER': {
       surfaceType: 'RIGID_CYLINDER',
       dimensions: { radius: 75, length: 200, width: null, angle: 120 },
+      referencePoint: null,
     },
     'NC00-F2-SADDLE': {
       surfaceType: 'RIGID_SADDLE',
       dimensions: { radius: 75, length: 200, width: 100, angle: null },
+      referencePoint: [50, 50, -25],
     },
   };
   return Object.fromEntries(Object.entries(definitions).map(([fixtureId, definition]) => {
@@ -35,6 +39,9 @@ export function createNc00ExtendedRigidFixtureInputs(baseContactInput) {
     input.rigidSurfaces[0].rigidSurfaceId = `${fixtureId}-RIGID`;
     input.rigidSurfaces[0].surfaceType = definition.surfaceType;
     input.rigidSurfaces[0].dimensions = definition.dimensions;
+    if (definition.referencePoint) {
+      input.rigidSurfaces[0].referencePoint = [...definition.referencePoint];
+    }
     input.contactPairs[0].rigidSurfaceId = input.rigidSurfaces[0].rigidSurfaceId;
     input.loadSteps.forEach((step) => step.prescribedMotions.forEach((motion) => {
       motion.targetId = input.rigidSurfaces[0].rigidSurfaceId;
@@ -58,9 +65,10 @@ export function createCompletedStructuralOutputFixture({
 }) {
   const statusLines = [];
   model.loadSteps.forEach((step, index) => {
-    statusLines.push(`STEP ${step.stepId} INCREMENT 1`);
-    statusLines.push(`STEP ${step.stepId} INCREMENT 2`);
-    statusLines.push(`STEP ${step.stepId} COMPLETED ${index + 1}`);
+    statusLines.push(`STEP ${step.stepId}`);
+    statusLines.push('INCREMENT 1');
+    statusLines.push('INCREMENT 2');
+    statusLines.push(`STEP_COMPLETED ${index + 1}`);
   });
   statusLines.push('JOB FINISHED');
   const status = Buffer.from(`${statusLines.join('\n')}\n`, 'utf8');
@@ -72,7 +80,7 @@ export function createCompletedStructuralOutputFixture({
   ].join('\n'), 'utf8');
   const frd = Buffer.from([
     ...model.loadSteps.flatMap((step, stepIndex) => [
-      `    1PSTEP      ${stepIndex + 1}`,
+      `    1PSTEP      ${stepIndex + 1}           1           ${stepIndex + 1}`,
       ' -4  DISP        3    1',
       ' -5  D1          1',
       ' -5  D2          2',

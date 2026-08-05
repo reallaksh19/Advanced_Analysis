@@ -1,0 +1,208 @@
+name: LAFEA-NC Solver Bridge Evidence
+
+on:
+  pull_request:
+    branches:
+      - agent/lafea-nc-solver-container-evidence
+    paths:
+      - '.github/workflows/lafea-nc-solver-bridge-evidence.yml'
+      - 'docs/nonlinear-shell-contact/LAFEA_NC_SOLVER_BRIDGE_EVIDENCE.md'
+      - 'scripts/lafea-nc00-check.mjs'
+      - 'scripts/lafea-nc-solver-bridge-evidence.mjs'
+      - 'src/core/nonlinear-shell-contact/deck-profile.js'
+      - 'src/core/nonlinear-shell-contact/deck-writer.js'
+      - 'src/core/nonlinear-shell-contact/nc00-extended-fixtures.js'
+      - 'src/core/nonlinear-shell-contact/structural-output-inventory.js'
+      - 'src/core/nonlinear-shell-contact/result-reconstruction.js'
+      - 'tests/nonlinear-shell-contact-solver-bridge-evidence.test.mjs'
+  workflow_dispatch:
+    inputs:
+      head_sha:
+        description: Exact solver bridge evidence head SHA
+        required: true
+        type: string
+      base_sha:
+        description: Exact immutable-container evidence base SHA
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  exact-head-solver-bridge-evidence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      DISPATCH_HEAD_SHA: ${{ inputs.head_sha }}
+      DISPATCH_BASE_SHA: ${{ inputs.base_sha }}
+      BASE_BRANCH: agent/lafea-nc-solver-container-evidence
+      CUSTODY_RUN_ID: '31003696654'
+      CUSTODY_ARTIFACT_ID: '8929389138'
+      CUSTODY_ARTIFACT_NAME: lafea-nc-solver-container-8ae900d078d797b02aa82074e4bf485a5f1156e0-1
+      CUSTODY_ARTIFACT_DIGEST: sha256:86a3e3fa66fe88e0eb47627418205a9d4ed22e9ede6b4517ffb6518fa9d54a30
+    steps:
+      - name: Resolve exact head
+        id: exact
+        shell: bash
+        run: |
+          set -euo pipefail
+          head_sha="${DISPATCH_HEAD_SHA:-${PR_HEAD_SHA:-${GITHUB_SHA}}}"
+          [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]]
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.exact.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Resolve live container-evidence base
+        id: base
+        shell: bash
+        env:
+          EXACT_HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "$BASE_BRANCH:refs/remotes/origin/$BASE_BRANCH"
+          live_base="$(git rev-parse "refs/remotes/origin/$BASE_BRANCH")"
+          base_sha="${DISPATCH_BASE_SHA:-${PR_BASE_SHA}}"
+          [[ "$base_sha" =~ ^[0-9a-f]{40}$ ]]
+          test "$base_sha" = "$live_base"
+          test "$(git rev-parse HEAD)" = "$EXACT_HEAD_SHA"
+          git merge-base --is-ancestor "$base_sha" "$EXACT_HEAD_SHA"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Install exact runtime library packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libblas3 liblapack3 libgfortran5
+
+      - name: Verify path containment, syntax and bridge negative controls
+        shell: bash
+        env:
+          EXACT_HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
+          BASE_SHA: ${{ steps.base.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          git diff --check "$BASE_SHA...$EXACT_HEAD_SHA"
+          mapfile -t paths < <(git diff --name-only "$BASE_SHA...$EXACT_HEAD_SHA")
+          test "${#paths[@]}" = '10'
+          for path in "${paths[@]}"; do
+            case "$path" in
+              .github/workflows/lafea-nc-solver-bridge-evidence.yml|\
+              docs/nonlinear-shell-contact/LAFEA_NC_SOLVER_BRIDGE_EVIDENCE.md|\
+              scripts/lafea-nc00-check.mjs|\
+              scripts/lafea-nc-solver-bridge-evidence.mjs|\
+              src/core/nonlinear-shell-contact/deck-profile.js|\
+              src/core/nonlinear-shell-contact/deck-writer.js|\
+              src/core/nonlinear-shell-contact/nc00-extended-fixtures.js|\
+              src/core/nonlinear-shell-contact/structural-output-inventory.js|\
+              src/core/nonlinear-shell-contact/result-reconstruction.js|\
+              tests/nonlinear-shell-contact-solver-bridge-evidence.test.mjs) ;;
+              *) echo "Solver-bridge changed-path violation: $path" >&2; exit 1 ;;
+            esac
+          done
+          node --check scripts/lafea-nc00-check.mjs
+          node --check scripts/lafea-nc-solver-bridge-evidence.mjs
+          node --check src/core/nonlinear-shell-contact/deck-profile.js
+          node --check src/core/nonlinear-shell-contact/deck-writer.js
+          node --check src/core/nonlinear-shell-contact/nc00-extended-fixtures.js
+          node --check src/core/nonlinear-shell-contact/structural-output-inventory.js
+          node --check src/core/nonlinear-shell-contact/result-reconstruction.js
+          node --check tests/nonlinear-shell-contact-solver-bridge-evidence.test.mjs
+          node --test tests/nonlinear-shell-contact-solver-bridge-evidence.test.mjs
+
+      - name: Verify and download qualified solver custody
+        id: custody
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          metadata="$(gh api "/repos/$GITHUB_REPOSITORY/actions/artifacts/$CUSTODY_ARTIFACT_ID")"
+          test "$(jq -r .name <<<"$metadata")" = "$CUSTODY_ARTIFACT_NAME"
+          test "$(jq -r .digest <<<"$metadata")" = "$CUSTODY_ARTIFACT_DIGEST"
+          test "$(jq -r .workflow_run.id <<<"$metadata")" = "$CUSTODY_RUN_ID"
+          test "$(jq -r .workflow_run.head_sha <<<"$metadata")" = '8ae900d078d797b02aa82074e4bf485a5f1156e0'
+          rm -rf "$RUNNER_TEMP/solver-custody"
+          mkdir -p "$RUNNER_TEMP/solver-custody"
+          gh run download "$CUSTODY_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "$CUSTODY_ARTIFACT_NAME" \
+            --dir "$RUNNER_TEMP/solver-custody"
+          node -e "const fs=require('node:fs');const root=process.argv[1];const report=JSON.parse(fs.readFileSync(root+'/reports-container/solver-custody-qualified-report.json'));if(report.status!=='SOLVER_CUSTODY_QUALIFIED'||report.verifiedEvidenceCount!==8||report.authority.solverCustodyQualified!==true||report.authority.solverBridgeQualified!==false)process.exit(1);" "$RUNNER_TEMP/solver-custody"
+          echo "root=$RUNNER_TEMP/solver-custody" >> "$GITHUB_OUTPUT"
+
+      - name: Execute exact solver bridge twice in an isolated network namespace
+        id: bridge
+        shell: bash
+        env:
+          CUSTODY_ROOT: ${{ steps.custody.outputs.root }}
+          EXACT_HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
+          BASE_SHA: ${{ steps.base.outputs.base_sha }}
+        run: |
+          set +e
+          rm -rf artifacts/lafea-nc-solver-bridge artifacts/lafea-nc-solver-bridge-debug
+          mkdir -p artifacts/lafea-nc-solver-bridge-debug
+          sudo --preserve-env=CUSTODY_ROOT,EXACT_HEAD_SHA,BASE_SHA,GITHUB_WORKSPACE,PATH \
+            unshare --net --mount-proc \
+            node scripts/lafea-nc-solver-bridge-evidence.mjs \
+              --custody-root="$CUSTODY_ROOT" \
+              --head-sha="$EXACT_HEAD_SHA" \
+              --base-sha="$BASE_SHA" \
+              --output-root="$GITHUB_WORKSPACE/artifacts/lafea-nc-solver-bridge" \
+            > artifacts/lafea-nc-solver-bridge-debug/controller.stdout.log \
+            2> artifacts/lafea-nc-solver-bridge-debug/controller.stderr.log
+          status=$?
+          printf '%s\n' "$status" > artifacts/lafea-nc-solver-bridge-debug/exit-code.txt
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload solver-bridge diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc-solver-bridge-debug-${{ steps.exact.outputs.head_sha }}-${{ github.run_attempt }}
+          path: |
+            artifacts/lafea-nc-solver-bridge-debug
+            artifacts/lafea-nc-solver-bridge
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce solver-bridge success
+        shell: bash
+        env:
+          EXIT_CODE: ${{ steps.bridge.outputs.exit_code }}
+        run: test "$EXIT_CODE" = '0'
+
+      - name: Verify authority boundary and clean source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=artifacts/lafea-nc-solver-bridge
+          test -z "$(git status --porcelain --untracked-files=no)"
+          node -e "const fs=require('node:fs');const root=process.argv[1];const summary=JSON.parse(fs.readFileSync(root+'/solver-bridge-summary.json'));const authority=JSON.parse(fs.readFileSync(root+'/solver-bridge-authority.json'));if(summary.status!=='SOLVER_BRIDGE_QUALIFIED'||summary.externalFixtureCount<7||summary.networkIsolationEstablished!==true||summary.authority.solverCustodyQualified!==true||summary.authority.solverBridgeQualified!==true||summary.authority.nc01Authorized!==true||summary.authority.shellFormulationQualified!==false||summary.authority.contactProcedureQualified!==false||summary.authority.productionExecutionAuthorized!==false||summary.authority.mergeAuthorized!==false||authority.authorityState!=='SOLVER_BRIDGE_QUALIFIED')process.exit(1);" "$root"
+
+      - name: Upload solver-bridge evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc-solver-bridge-${{ steps.exact.outputs.head_sha }}-${{ github.run_attempt }}
+          path: artifacts/lafea-nc-solver-bridge
+          if-no-files-found: error
+          retention-days: 30
