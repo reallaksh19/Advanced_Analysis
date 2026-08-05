@@ -1,7 +1,11 @@
 import * as THREE from 'three';
 
 export const SJSON_CAMERA_CLIPPING_AUTHORITY =
-  'SJSON_CAMERA_SPACE_DYNAMIC_CLIPPING_V1';
+  'SJSON_CAMERA_SPACE_DYNAMIC_CLIPPING_V2';
+
+const MIN_DEPTH_MM = 1e-6;
+const AUTO_NEAR_FRACTION = 0.25;
+const AUTO_FAR_MARGIN_FRACTION = 0.1;
 
 export function createGovernedCameraClippingPolicy(configuration, input = {}) {
   const configuredNear = positive(configuration?.cameraNearMm) || 0.1;
@@ -28,17 +32,16 @@ export function applyGovernedCameraClipping(backend) {
     backend.navigationConfiguration,
     backend.governedCameraClippingPolicy,
   );
-  let result;
-  if (policy.mode === 'MANUAL') {
-    result = {
+  const result = policy.mode === 'MANUAL'
+    ? {
       nearMm: policy.nearMm,
       farMm: policy.farMm,
       nearestDepthMm: null,
       farthestDepthMm: null,
-    };
-  } else {
-    result = automaticClipping(camera, clippingBounds(backend), policy);
-  }
+      cameraInsideBounds: null,
+    }
+    : automaticClipping(camera, clippingBounds(backend), policy);
+
   camera.near = result.nearMm;
   camera.far = result.farMm;
   camera.updateProjectionMatrix();
@@ -51,44 +54,63 @@ export function applyGovernedCameraClipping(backend) {
     appliedFarMm: result.farMm,
     nearestDepthMm: result.nearestDepthMm,
     farthestDepthMm: result.farthestDepthMm,
+    cameraInsideBounds: result.cameraInsideBounds,
   });
   publish(backend.hostElement, backend.governedCameraClippingEvidence);
   return backend.governedCameraClippingEvidence;
 }
 
+/**
+ * Uses a bounding sphere rather than AABB corner depths. A camera fitted to a
+ * selected node can sit inside the full-model AABB; corner-only depths then
+ * produce an unsafe large near plane and remove the route while selection HUDs
+ * remain visible. The sphere interval is conservative for every point in the
+ * governed scene bounds, including panel resize and fit-selection transitions.
+ */
 function automaticClipping(camera, bounds, policy) {
   if (!(bounds instanceof THREE.Box3) || bounds.isEmpty()) {
-    return {
-      nearMm: policy.nearMm,
-      farMm: policy.farMm,
-      nearestDepthMm: null,
-      farthestDepthMm: null,
-    };
+    return fallbackClipping(policy);
   }
   camera.updateMatrixWorld(true);
-  const depths = corners(bounds)
-    .map((point) => -point.applyMatrix4(camera.matrixWorldInverse).z)
-    .filter(Number.isFinite);
-  const positiveDepths = depths.filter((value) => value > 1e-6);
-  if (!positiveDepths.length) {
-    return {
-      nearMm: policy.nearMm,
-      farMm: policy.farMm,
-      nearestDepthMm: null,
-      farthestDepthMm: null,
-    };
+  const sphere = bounds.getBoundingSphere(new THREE.Sphere());
+  if (!Number.isFinite(sphere.radius) || sphere.radius <= 0) {
+    return fallbackClipping(policy);
   }
-  const nearestDepthMm = Math.min(...positiveDepths);
-  const farthestDepthMm = Math.max(...positiveDepths);
-  // Keep the near plane safely in front of the closest scene corner. Recomputing
-  // this after every OrbitControls change prevents wheel zoom from slicing geometry.
-  const nearMm = Math.max(policy.nearMm, nearestDepthMm * 0.05);
-  const sceneSpan = Math.max(farthestDepthMm - nearestDepthMm, 1);
+  const centerCamera = sphere.center.clone().applyMatrix4(camera.matrixWorldInverse);
+  const centerDepthMm = -centerCamera.z;
+  const nearestDepthMm = Math.max(0, centerDepthMm - sphere.radius);
+  const farthestDepthMm = centerDepthMm + sphere.radius;
+  if (!Number.isFinite(farthestDepthMm) || farthestDepthMm <= MIN_DEPTH_MM) {
+    return fallbackClipping(policy);
+  }
+
+  const cameraInsideBounds = nearestDepthMm <= MIN_DEPTH_MM;
+  const nearMm = cameraInsideBounds
+    ? policy.nearMm
+    : Math.max(policy.nearMm, nearestDepthMm * AUTO_NEAR_FRACTION);
+  const farMarginMm = Math.max(1, sphere.radius * AUTO_FAR_MARGIN_FRACTION);
   const farMm = Math.max(
+    policy.farMm,
+    farthestDepthMm + farMarginMm,
     nearMm + 1,
-    farthestDepthMm + Math.max(sceneSpan * 0.25, nearMm * 4),
   );
-  return { nearMm, farMm, nearestDepthMm, farthestDepthMm };
+  return {
+    nearMm,
+    farMm,
+    nearestDepthMm,
+    farthestDepthMm,
+    cameraInsideBounds,
+  };
+}
+
+function fallbackClipping(policy) {
+  return {
+    nearMm: policy.nearMm,
+    farMm: policy.farMm,
+    nearestDepthMm: null,
+    farthestDepthMm: null,
+    cameraInsideBounds: null,
+  };
 }
 
 function clippingBounds(backend) {
@@ -101,26 +123,13 @@ function clippingBounds(backend) {
   return null;
 }
 
-function corners(box) {
-  const { min, max } = box;
-  return [
-    new THREE.Vector3(min.x, min.y, min.z),
-    new THREE.Vector3(min.x, min.y, max.z),
-    new THREE.Vector3(min.x, max.y, min.z),
-    new THREE.Vector3(min.x, max.y, max.z),
-    new THREE.Vector3(max.x, min.y, min.z),
-    new THREE.Vector3(max.x, min.y, max.z),
-    new THREE.Vector3(max.x, max.y, min.z),
-    new THREE.Vector3(max.x, max.y, max.z),
-  ];
-}
-
 function publish(host, evidence) {
   if (!host || !evidence) return;
   host.dataset.topologyEditCameraClippingAuthority = evidence.authority;
   host.dataset.topologyEditCameraClippingMode = evidence.mode;
   host.dataset.topologyEditCameraNearMm = String(evidence.appliedNearMm);
   host.dataset.topologyEditCameraFarMm = String(evidence.appliedFarMm);
+  host.dataset.topologyEditCameraInsideBounds = String(evidence.cameraInsideBounds === true);
 }
 
 function positive(value) {
