@@ -128,12 +128,12 @@ async function visiblePickPoint(page, kind) {
     draftGroup.updateMatrixWorld(true);
     camera.updateMatrixWorld(true);
     draftGroup.traverse((object) => {
-      const target = object.userData?.pickTarget;
-      if (!target?.objectId || !object.visible) return;
-      const canonicalId = String(target.objectId);
+      if (!object.visible) return;
+      const name = String(object.name || '');
       const matches = objectKind === 'node'
-        ? canonicalId.startsWith('node:')
-        : canonicalId.startsWith('edge:') && object.userData?.directPickMesh === true;
+        ? name.startsWith('topology-edit-node-pick-proxy:')
+        : name.startsWith('topology-edit-visible-route-solid:')
+          && object.userData?.directPickMesh === true;
       if (!matches) return;
       object.geometry?.computeBoundingSphere?.();
       const center = object.geometry?.boundingSphere?.center?.clone?.()
@@ -144,7 +144,7 @@ async function visiblePickPoint(page, kind) {
       const x = rect.left + ((center.x + 1) * 0.5 * rect.width);
       const y = rect.top + ((1 - center.y) * 0.5 * rect.height);
       if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return;
-      candidates.push({ x, y, objectId: canonicalId });
+      candidates.push({ x, y, name });
     });
     const offsets = [
       [0, 0], [-4, 0], [4, 0], [0, -4], [0, 4],
@@ -155,10 +155,10 @@ async function visiblePickPoint(page, kind) {
         const x = candidate.x + dx;
         const y = candidate.y + dy;
         const pick = backend.pickAt(x, y);
-        const matchesNode = objectKind === 'node' && String(pick?.objectId || '').startsWith('node:');
-        const matchesComponent = objectKind === 'component'
-          && String(pick?.objectId || '').startsWith('edge:');
-        if (matchesNode || matchesComponent) return { x, y, objectId: pick.objectId };
+        const canonicalId = String(pick?.objectId || '');
+        const matchesNode = objectKind === 'node' && canonicalId.startsWith('node:');
+        const matchesComponent = objectKind === 'component' && canonicalId.startsWith('edge:');
+        if (matchesNode || matchesComponent) return { x, y, objectId: canonicalId };
       }
     }
     throw new Error(
