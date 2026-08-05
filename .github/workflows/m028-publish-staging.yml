@@ -49,7 +49,7 @@ jobs:
           node --check scripts/lfea-m028-bm3-fixtures.mjs
           node --check src/core/geometry/adapters/inputXmlToCanonicalGeometry.js
           node --check src/core/geometry/adapters/inputxml-unit-system.js
-          git diff --check origin/main
+          git diff --check 833b5c51543caf50941957330a208661c9f09954
 
       - name: Qualify M028 and full linear core
         shell: bash
@@ -67,7 +67,8 @@ jobs:
         run: |
           set -euo pipefail
           expected=$'.github/workflows/m028-bm3.yml\ndocs/qualification/M028_BM3_ENGINEERING_RECORD.md\nscripts/lfea-m028-bm3-check.mjs\nscripts/lfea-m028-bm3-comparison.mjs\nscripts/lfea-m028-bm3-fixtures.mjs\nsrc/core/geometry/adapters/inputXmlToCanonicalGeometry.js\nsrc/core/geometry/adapters/inputxml-unit-system.js'
-          actual="$(git diff --cached --name-only origin/main -- | sort)"
+          actual="$(git diff --cached --name-only 833b5c51543caf50941957330a208661c9f09954 -- | sort)"
+          printf 'EXPECTED FILES:\n%s\nACTUAL FILES:\n%s\n' "$expected" "$actual"
           test "$actual" = "$expected"
           git add -A
           git config user.name 'M028 Qualification Bot'
