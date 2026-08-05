@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => globalThis.localStorage?.clear());
 });
 
-test('3D Edit keeps the canvas primary and defers dense controls into inspector drawers', async ({ page }) => {
+test('3D Edit keeps the left model tree visible while the canvas remains primary', async ({ page }) => {
   await openProductionDemo(page);
 
   const outerShell = page.locator('.workspace-shell');
@@ -19,12 +19,15 @@ test('3D Edit keeps the canvas primary and defers dense controls into inspector 
   const sidecar = host.locator('[data-role="topology-edit-sidecar"]');
   const statusbar = host.locator('[data-role="topology-edit-statusbar"]');
   const compactDock = page.locator('[data-role="load-calc-consumer-root"]');
+  const canonicalTree = host.locator('[data-role="topology-edit-object-tree"]');
 
   await expect(host).toHaveAttribute('data-topology-edit-clean-shell', 'true');
   await expect(host).toHaveAttribute('data-topology-edit-inspector-open', 'true');
   await expect(host).toHaveAttribute('data-topology-edit-inspector-width-px', '320');
   await expect(outerShell).toHaveAttribute('data-topology-edit-focus-layout', 'true');
-  await expect(treePanel).toHaveClass(/workspace-panel--collapsed/);
+  await expect(outerShell).toHaveAttribute('data-topology-edit-left-panel-visible', 'true');
+  await expect(treePanel).not.toHaveClass(/workspace-panel--collapsed/);
+  await expect(treePanel).toBeVisible();
   await expect(propertiesPanel).toHaveClass(/workspace-panel--collapsed/);
   await expect(workspace).toBeVisible();
   await expect(canvas).toBeVisible();
@@ -32,20 +35,42 @@ test('3D Edit keeps the canvas primary and defers dense controls into inspector 
   await expect(statusbar).toBeVisible();
   await expect(compactDock).toHaveClass(/load-calc-dock--compact/);
 
-  const [outerBox, workspaceBox, canvasBox, sidecarBox] = await Promise.all([
+  const [outerBox, treeBox, workspaceBox, canvasBox, sidecarBox] = await Promise.all([
     outerShell.boundingBox(),
+    treePanel.boundingBox(),
     workspace.boundingBox(),
     canvas.boundingBox(),
     sidecar.boundingBox(),
   ]);
   expect(outerBox).not.toBeNull();
+  expect(treeBox).not.toBeNull();
   expect(workspaceBox).not.toBeNull();
   expect(canvasBox).not.toBeNull();
   expect(sidecarBox).not.toBeNull();
-  expect(workspaceBox.width / outerBox.width).toBeGreaterThan(0.9);
+  expect(treeBox.width).toBeGreaterThan(250);
+  expect(workspaceBox.width / outerBox.width).toBeGreaterThan(0.7);
   expect(canvasBox.width).toBeGreaterThan(sidecarBox.width * 2.5);
   expect(canvasBox.width / workspaceBox.width).toBeGreaterThan(0.7);
   expect(canvasBox.height).toBeGreaterThan(650);
+
+  await expect(host).toHaveAttribute('data-topology-edit-gpu-first-picking', 'true');
+  await expect(host).toHaveAttribute('data-topology-edit-large-model-tier', /STANDARD|LARGE|MASSIVE/);
+  const [requestedRatio, appliedRatio, renderItems] = await Promise.all([
+    numberAttribute(host, 'data-topology-edit-requested-pixel-ratio'),
+    numberAttribute(host, 'data-topology-edit-applied-pixel-ratio'),
+    integerAttribute(host, 'data-topology-edit-render-item-count'),
+  ]);
+  expect(appliedRatio).toBeGreaterThan(0);
+  expect(appliedRatio).toBeLessThanOrEqual(requestedRatio);
+  expect(renderItems).toBeGreaterThan(0);
+
+  const [treeTotal, treeRows] = await Promise.all([
+    integerAttribute(canonicalTree, 'data-topology-edit-object-tree-count'),
+    integerAttribute(canonicalTree, 'data-topology-edit-object-tree-rendered-row-count'),
+  ]);
+  expect(treeTotal).toBeGreaterThan(0);
+  expect(treeRows).toBeGreaterThan(0);
+  expect(treeRows).toBeLessThanOrEqual(treeTotal);
 
   await expect(compactDock.locator('.empirical-load-calc__facts')).toBeHidden();
   await expect(compactDock.locator('.empirical-load-calc__actions')).toBeHidden();
@@ -134,9 +159,11 @@ test('3D Edit provides resizable persistent inspector, selection focus, status b
   if (!(await commandPanel.evaluate((element) => element.open))) {
     await commandPanel.locator(':scope > summary').click();
   }
+  await expect(host).toHaveAttribute('data-topology-edit-source-visual-cache', 'MISS');
   await host.locator('[data-command-action="move-positive-z"]').click();
   await expect(host).toHaveAttribute('data-topology-edit-active-command-count', '1');
   await expect(host).toHaveAttribute('data-topology-edit-draft-state', 'saved');
+  await expect(host).toHaveAttribute('data-topology-edit-source-visual-cache', 'HIT');
   await expect(host.locator('[data-role="topology-edit-draft-state"]')).toHaveText('Saved · 1 edit');
 
   await resizer.focus();
@@ -194,6 +221,7 @@ async function openProductionDemo(page) {
   const host = page.locator('[data-role="topology-edit-render-host"]');
   await expect(host).toBeVisible();
   await expect.poll(() => page.evaluate((key) => Boolean(globalThis[key]?.session), CONTROLLER_KEY)).toBe(true);
+  await expect(host).toHaveAttribute('data-topology-edit-render-item-count', /[1-9]\d*/);
   return host;
 }
 
@@ -215,4 +243,8 @@ async function selectQualifiedNode(page) {
 
 async function integerAttribute(locator, name) {
   return Number.parseInt(await locator.getAttribute(name) || '0', 10) || 0;
+}
+
+async function numberAttribute(locator, name) {
+  return Number(await locator.getAttribute(name)) || 0;
 }
