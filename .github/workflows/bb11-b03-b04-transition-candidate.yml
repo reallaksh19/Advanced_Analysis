@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/bb11-b03-b04-transition-candidate.yml'
       - 'scripts/bb11-b03-b04-transition-screen.mjs'
+      - 'scripts/bb11-b03-b04-transition-full-qualification.mjs'
       - 'src/core/bucket-b/flange-hub-diagnostic-solver.js'
       - 'src/core/bucket-b/flange-hub-transition-candidate.js'
       - 'tests/bucket-b-bb11-transition-candidate.test.mjs'
@@ -15,13 +16,16 @@ permissions:
   contents: read
 
 env:
-  BB11_PRODUCTION_PARENT_SHA: 6ad8a7b19b8ed339e5847b7fb93df9caf107e3fe
+  BB11_PRODUCTION_PARENT_SHA: 022cd7843d5dc6257aca9bce68e42c1db919b302
+  BB11_UPSTREAM_BB10_APPROVED_HEAD_SHA: bcd0add8859a08c322d23595f788a1f99afd539a
+  TZ: UTC
+  LC_ALL: C
 
 jobs:
-  axial-screen:
-    name: Non-authorizing B03/B04 transition axial screen
+  qualify:
+    name: Non-authorizing B03/B04 transition qualification
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - name: Check out exact candidate head
         uses: actions/checkout@v4
@@ -50,11 +54,12 @@ jobs:
           test "$(git merge-base "$EVENT_BASE_SHA" "$EXPECTED_HEAD_SHA")" = "$EVENT_BASE_SHA"
           git diff --check "${EVENT_BASE_SHA}...${EXPECTED_HEAD_SHA}"
           mapfile -t paths < <(git diff --name-only "${EVENT_BASE_SHA}...${EXPECTED_HEAD_SHA}")
-          test "${#paths[@]}" -eq 5
+          test "${#paths[@]}" -eq 6
           for changed in "${paths[@]}"; do
             case "$changed" in
               .github/workflows/bb11-b03-b04-transition-candidate.yml|\
               scripts/bb11-b03-b04-transition-screen.mjs|\
+              scripts/bb11-b03-b04-transition-full-qualification.mjs|\
               src/core/bucket-b/flange-hub-diagnostic-solver.js|\
               src/core/bucket-b/flange-hub-transition-candidate.js|\
               tests/bucket-b-bb11-transition-candidate.test.mjs) ;;
@@ -65,6 +70,7 @@ jobs:
             esac
           done
           test -z "$(git diff --name-only "${EVENT_BASE_SHA}...${EXPECTED_HEAD_SHA}" -- \
+            src/core/bucket-b/bb11-flange-hub.js \
             src/core/bucket-b/flange-hub-mesh.js \
             src/core/bucket-b/flange-hub-geometry.js \
             src/core/bucket-b/flange-hub-loads.js \
@@ -78,6 +84,7 @@ jobs:
           node --check src/core/bucket-b/flange-hub-diagnostic-solver.js
           node --check src/core/bucket-b/flange-hub-transition-candidate.js
           node --check scripts/bb11-b03-b04-transition-screen.mjs
+          node --check scripts/bb11-b03-b04-transition-full-qualification.mjs
           node --check tests/bucket-b-bb11-transition-candidate.test.mjs
           node --test tests/bucket-b-bb11-transition-candidate.test.mjs
 
@@ -100,7 +107,7 @@ jobs:
           echo "exit_code=$status" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Enforce candidate axial acceptance
+      - name: Enforce refreshed candidate axial acceptance
         shell: bash
         env:
           SCREEN_EXIT_CODE: ${{ steps.screen.outputs.exit_code }}
@@ -161,6 +168,104 @@ jobs:
           });
           NODE
 
+      - name: Replay BB-00 through BB-08 and BB-10 core at candidate head
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p reports/prerequisites
+          BB11_SHARED_REPLAY_REPORT_PATH=reports/prerequisites/bb00-bb05.json \
+            node src/core/bucket-b/bb11-shared-gate-replay.mjs
+          BB06_REPORT_PATH=reports/prerequisites/bb06.json \
+            node src/core/bucket-b/bb06-check.mjs
+          BB06_REPORT_PATH=reports/prerequisites/bb06.json \
+          BB07_REPORT_PATH=reports/prerequisites/bb07.json \
+            node src/core/bucket-b/bb07-check.mjs
+          BB07_REPORT_PATH=reports/prerequisites/bb07.json \
+          BB08_REPORT_PATH=reports/prerequisites/bb08.json \
+            node src/core/bucket-b/bb08-check.mjs
+          if [[ -f src/core/bucket-b/bb09-check.mjs ]]; then
+            BB08_REPORT_PATH=reports/prerequisites/bb08.json \
+            BB09_REPORT_PATH=reports/prerequisites/bb09.json \
+              node src/core/bucket-b/bb09-check.mjs
+          fi
+          node src/core/bucket-b/bb10-check.mjs --core \
+            > reports/prerequisites/bb10-core-a.json
+          node src/core/bucket-b/bb10-check.mjs --core \
+            > reports/prerequisites/bb10-core-b.json
+          cmp reports/prerequisites/bb10-core-a.json \
+            reports/prerequisites/bb10-core-b.json
+
+      - name: Execute complete candidate BB-11 qualification twice
+        id: full
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BB11_TRANSITION_FULL_OUTPUT_DIR: reports/bb11-transition-full
+          BB11_BB00_BB05_REPORT_PATH: reports/prerequisites/bb00-bb05.json
+          BB11_BB06_REPORT_PATH: reports/prerequisites/bb06.json
+          BB11_BB07_REPORT_PATH: reports/prerequisites/bb07.json
+          BB11_BB08_REPORT_PATH: reports/prerequisites/bb08.json
+          BB11_BB10_CORE_A_PATH: reports/prerequisites/bb10-core-a.json
+          BB11_BB10_CORE_B_PATH: reports/prerequisites/bb10-core-b.json
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: |
+          set +e
+          timeout --signal=TERM --kill-after=60s 55m \
+            node scripts/bb11-b03-b04-transition-full-qualification.mjs \
+            > >(tee reports/bb11-transition-full.stdout.log) \
+            2> >(tee reports/bb11-transition-full.stderr.log >&2)
+          status=$?
+          printf '%s\n' "$status" > reports/bb11-transition-full.exit-code.txt
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Enforce complete candidate qualification and non-authority
+        shell: bash
+        env:
+          FULL_EXIT_CODE: ${{ steps.full.outputs.exit_code }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$FULL_EXIT_CODE" = '0'
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFile } from 'node:fs/promises';
+          const report = JSON.parse(await readFile(
+            'reports/bb11-transition-full/bb11-b03-b04-transition-full-qualification.json',
+            'utf8',
+          ));
+          assert.equal(
+            report.schema,
+            'bb11-b03-b04-transition-full-qualification/v1',
+          );
+          assert.equal(report.exactHeadSha, process.env.EXPECTED_HEAD_SHA);
+          assert.equal(
+            report.productionParentSha,
+            process.env.BB11_PRODUCTION_PARENT_SHA,
+          );
+          assert.equal(
+            report.status,
+            'CANDIDATE_FULL_BB11_QUALIFICATION_PASS',
+          );
+          assert.equal(
+            report.decision,
+            'CANDIDATE_QUALIFIED_FOR_GOVERNED_PROMOTION_REVIEW',
+          );
+          assert.equal(report.deterministicReplay.byteIdentical, true);
+          report.coreEvidence.checkResults.forEach(
+            (row) => assert.equal(row.status, 'PASS'),
+          );
+          assert.deepEqual(report.authority, {
+            qualificationAuthorityGranted: false,
+            productionAuthorityGranted: false,
+            productionMeshSelected: false,
+            mergeAuthorityGranted: false,
+            bb12Authorized: false,
+          });
+          NODE
+
       - name: Upload non-authorizing candidate evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -168,4 +273,4 @@ jobs:
           name: bb11-b03-b04-transition-${{ github.event.pull_request.head.sha }}-${{ github.run_attempt }}
           path: reports
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 30
