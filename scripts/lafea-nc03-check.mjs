@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { semanticHash } from '../src/core/nonlinear-shell-contact/contracts.js';
+import { DEFAULT_ELASTIC_DENTING_PROCEDURE, REQUIRED_ELASTIC_DENTING_BENCHMARKS, validateElasticDentingProcedureContract } from '../src/core/nonlinear-shell-contact/elastic-denting-procedure-contract.js';
+import { evaluateElasticDentingQualification } from '../src/core/nonlinear-shell-contact/elastic-denting-qualification-evaluator.js';
+import { NC03_CONTRACT_FIXTURES } from '../src/core/nonlinear-shell-contact/nc03-fixtures.js';
+import { runNc03NegativeControls } from '../src/core/nonlinear-shell-contact/nc03-negative-controls.js';
+const arg=process.argv.find((entry)=>entry.startsWith('--output-dir=')); const outputDir=resolve(arg?.slice('--output-dir='.length)||'artifacts/lafea-nc03'); await mkdir(outputDir,{recursive:true});
+for (const fixture of NC03_CONTRACT_FIXTURES) validateElasticDentingProcedureContract(fixture.contract);
+const negatives=runNc03NegativeControls(); assert.ok(negatives.length>=20); assert.ok(negatives.every((entry)=>entry.passed));
+const qualification=evaluateElasticDentingQualification({contract:DEFAULT_ELASTIC_DENTING_PROCEDURE}); assert.equal(qualification.status,'NC03_BLOCKED'); assert.equal(qualification.authority.nc03ContractQualified,true); assert.equal(qualification.authority.elasticDentingProcedureQualified,false); assert.equal(qualification.authority.plasticDentingProcedureQualified,false);
+const report={schema:'nonlinear-shell-contact-nc03-contract-run/v1',status:qualification.status,elasticDentingProcedureHash:DEFAULT_ELASTIC_DENTING_PROCEDURE.elasticDentingProcedureHash,benchmarkCount:REQUIRED_ELASTIC_DENTING_BENCHMARKS.length,fixtureCount:NC03_CONTRACT_FIXTURES.length,negativeControlCount:negatives.length,qualification}; const sealed={...report,runSemanticHash:semanticHash(report)};
+await writeFile(resolve(outputDir,'nc03-report.json'),`${JSON.stringify(sealed,null,2)}\n`,'utf8'); await writeFile(resolve(outputDir,'nc03-contract.json'),`${JSON.stringify(DEFAULT_ELASTIC_DENTING_PROCEDURE,null,2)}\n`,'utf8'); console.log(JSON.stringify(sealed));
