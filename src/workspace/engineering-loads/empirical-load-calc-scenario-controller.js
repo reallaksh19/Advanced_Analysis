@@ -2,6 +2,9 @@ import { APPLICATION_EVENTS, EVENT_TOPICS } from '../event-topics.js';
 import {
   empiricalLoadCalcScenarioStore,
 } from './empirical-load-calc-scenario-store.js';
+import {
+  empiricalResultOverlayStore,
+} from './empirical-result-overlay-store.js';
 
 export const EMPIRICAL_LOAD_CALC_SCENARIO_EVENTS = Object.freeze({
   CONFIGURE_REQUESTED: 'empirical-load-calc-scenario:configure-requested',
@@ -9,11 +12,17 @@ export const EMPIRICAL_LOAD_CALC_SCENARIO_EVENTS = Object.freeze({
   CALCULATE_REQUESTED: 'empirical-load-calc-scenario:calculate-requested',
   CLONE_PROFILE_REQUESTED: 'empirical-load-calc-scenario:clone-profile-requested',
   CHANGED: 'empirical-load-calc-scenario:changed',
+  RESULT_OVERLAY_CHANGED: 'empirical-load-calc-scenario:result-overlay-changed',
   FAILED: 'empirical-load-calc-scenario:failed',
 });
 
 export class EmpiricalLoadCalcScenarioController {
-  constructor(eventBus, authorityProvider = null, store = empiricalLoadCalcScenarioStore) {
+  constructor(
+    eventBus,
+    authorityProvider = null,
+    store = empiricalLoadCalcScenarioStore,
+    resultOverlayStore = empiricalResultOverlayStore,
+  ) {
     if (!eventBus || typeof eventBus.subscribe !== 'function'
       || typeof eventBus.publish !== 'function') {
       throw new TypeError('Empirical Load Calc scenario controller requires an event bus.');
@@ -23,6 +32,7 @@ export class EmpiricalLoadCalcScenarioController {
       ? authorityProvider
       : () => null;
     this.store = store;
+    this.resultOverlayStore = resultOverlayStore;
     this.unsubscribers = [];
   }
 
@@ -53,15 +63,15 @@ export class EmpiricalLoadCalcScenarioController {
         APPLICATION_EVENTS.CONTEXT_CHANGED,
         () => this.refresh(),
       ),
-      this.store.subscribe((snapshot) => this.eventBus.publish(
-        EMPIRICAL_LOAD_CALC_SCENARIO_EVENTS.CHANGED,
-        { snapshot },
-      )),
+      this.store.subscribe((snapshot) => this.#publishScenarioState(snapshot)),
+      this.resultOverlayStore.subscribe(({ snapshot, projection, details }) => {
+        this.eventBus.publish(
+          EMPIRICAL_LOAD_CALC_SCENARIO_EVENTS.RESULT_OVERLAY_CHANGED,
+          { snapshot, projection, details },
+        );
+      }),
     ];
-    this.eventBus.publish(
-      EMPIRICAL_LOAD_CALC_SCENARIO_EVENTS.CHANGED,
-      { snapshot: this.store.getSnapshot() },
-    );
+    this.#publishScenarioState(this.store.getSnapshot());
   }
 
   configure(value) {
@@ -89,7 +99,11 @@ export class EmpiricalLoadCalcScenarioController {
       const profile = this.store.cloneProfile(value);
       this.eventBus.publish(
         EMPIRICAL_LOAD_CALC_SCENARIO_EVENTS.CHANGED,
-        { snapshot: this.store.getSnapshot(), clonedProfile: profile },
+        {
+          snapshot: this.store.getSnapshot(),
+          overlaySnapshot: this.resultOverlayStore.getSnapshot(),
+          clonedProfile: profile,
+        },
       );
       return profile;
     });
@@ -124,11 +138,26 @@ export class EmpiricalLoadCalcScenarioController {
   getProposal() { return this.store.getProposal(); }
   getAuthorization() { return this.store.getAuthorization(); }
   getExecution() { return this.store.getExecution(); }
+  getResultOverlaySnapshot() { return this.resultOverlayStore.getSnapshot(); }
+  getResultOverlayProjection() { return this.resultOverlayStore.getProjection(); }
 
   destroy() {
     this.unsubscribers.forEach((unsubscribe) => unsubscribe());
     this.unsubscribers = [];
+    this.resultOverlayStore.clear('EMPIRICAL_SCENARIO_CONTROLLER_DESTROYED');
     this.store.clear('EMPIRICAL_SCENARIO_CONTROLLER_DESTROYED');
+  }
+
+  #publishScenarioState(snapshot) {
+    const overlaySnapshot = this.resultOverlayStore.sync({
+      snapshot,
+      proposal: this.store.getProposal(),
+      execution: this.store.getExecution(),
+    });
+    this.eventBus.publish(
+      EMPIRICAL_LOAD_CALC_SCENARIO_EVENTS.CHANGED,
+      { snapshot, overlaySnapshot },
+    );
   }
 
   #run(operation, callback) {
