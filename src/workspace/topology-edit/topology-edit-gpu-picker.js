@@ -6,10 +6,11 @@ import {
   encodeTopologyEditPickId,
   normalizeTopologyEditPickRadius,
   renderTopologyEditPickPass,
+  resolveTopologyEditPickSamplePointer,
   resolveTopologyEditPickViewport,
   restoreTopologyEditRendererState,
   sameTopologyEditPickKeys,
-  selectNearestTopologyEditPickId,
+  selectNearestTopologyEditPickSample,
   topologyEditPickMaterialKey,
   topologyEditPickTargetKey,
 } from './topology-edit-gpu-pick-helpers.js';
@@ -72,12 +73,16 @@ export class TopologyEditGpuPicker {
         viewport.height,
         bytes,
       );
-      const id = selectNearestTopologyEditPickId(
+      const sample = selectNearestTopologyEditPickSample(
         bytes,
         viewport.width,
         viewport.height,
       );
-      return prepared.entries.get(id) ?? null;
+      if (!sample) return null;
+      const entry = prepared.entries.get(sample.id);
+      const samplePointer = resolveTopologyEditPickSamplePointer(viewport, sample);
+      if (!entry || !samplePointer) return null;
+      return Object.freeze({ ...entry, sample, samplePointer });
     } catch {
       return null;
     } finally {
