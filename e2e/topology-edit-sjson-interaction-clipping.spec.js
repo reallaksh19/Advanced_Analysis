@@ -120,7 +120,6 @@ async function visiblePickPoint(page, kind) {
     const canvas = backend?.renderer?.domElement;
     const camera = backend?.activeCamera;
     const draftGroup = backend?.groups?.draftGroup;
-    const THREE = backend?.scene?.constructor ? globalThis.__THREE_FOR_PICK_TEST__ : null;
     if (!backend || !canvas || !camera || !draftGroup) {
       throw new Error('SJSON viewport backend is unavailable.');
     }
@@ -131,9 +130,10 @@ async function visiblePickPoint(page, kind) {
     draftGroup.traverse((object) => {
       const target = object.userData?.pickTarget;
       if (!target?.objectId || !object.visible) return;
+      const canonicalId = String(target.objectId);
       const matches = objectKind === 'node'
-        ? target.objectKind === 'node'
-        : target.objectKind === 'component' && object.userData?.directPickMesh === true;
+        ? canonicalId.startsWith('node:')
+        : canonicalId.startsWith('edge:') && object.userData?.directPickMesh === true;
       if (!matches) return;
       object.geometry?.computeBoundingSphere?.();
       const center = object.geometry?.boundingSphere?.center?.clone?.()
@@ -144,7 +144,7 @@ async function visiblePickPoint(page, kind) {
       const x = rect.left + ((center.x + 1) * 0.5 * rect.width);
       const y = rect.top + ((1 - center.y) * 0.5 * rect.height);
       if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return;
-      candidates.push({ x, y, objectId: target.objectId });
+      candidates.push({ x, y, objectId: canonicalId });
     });
     const offsets = [
       [0, 0], [-4, 0], [4, 0], [0, -4], [0, 4],
