@@ -110,7 +110,9 @@ DATE
   ldd "$output/binary/ccx_2.22" | awk '/=> \/[^ ]+/ {print $3} /^\// {print $1}' | sort -u > "$build_root/ldd-paths.txt"
   while IFS= read -r library; do test -f "$library"; cp -L "$library" "$output/libraries/$(basename "$library")"; done < "$build_root/ldd-paths.txt"
 
-  node - "$output/metadata/build-input.json" "$compiler_id" "$compiler_version" "$SOURCE_ARCHIVE_HASH" "$LICENSE_HASH" "$CANONICAL_COMMAND" "$cflags" "$fflags" "$libs" "$spooles_source_hash" "$arpack_version" "$blas_version" "$lapack_version" <<'NODE'
+  local recorded_cflags="${cflags//$build_root/\/usr\/src\/lafea-build}"
+  local recorded_fflags="${fflags//$build_root/\/usr\/src\/lafea-build}"
+  node - "$output/metadata/build-input.json" "$compiler_id" "$compiler_version" "$SOURCE_ARCHIVE_HASH" "$LICENSE_HASH" "$CANONICAL_COMMAND" "$recorded_cflags" "$recorded_fflags" "$libs" "$spooles_source_hash" "$arpack_version" "$blas_version" "$lapack_version" <<'NODE'
 const fs = require('node:fs');
 const [path, compilerId, compilerVersion, sourceArchiveHash, licenseTextHash, canonicalBuildCommand, cflags, fflags, libs, spoolesSourceHash, arpackVersion, blasVersion, lapackVersion] = process.argv.slice(2);
 const value = { compilerId, compilerVersion, sourceArchiveHash, licenseTextHash, canonicalBuildCommand, compilerFlags: [cflags, fflags, libs], dependencySources: { spooles: { version: '2.2', url: 'https://www.netlib.org/linalg/spooles/spooles.2.2.tgz', sha256: spoolesSourceHash }, arpack: { package: 'libarpack2-dev', version: arpackVersion }, blas: { package: 'libblas-dev', version: blasVersion }, lapack: { package: 'liblapack-dev', version: lapackVersion } } };
