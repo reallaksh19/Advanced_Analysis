@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test';
 const SJSON_BYTES = readFileSync(new URL('../public/Sjson.json', import.meta.url));
 const VIEWPORT = Object.freeze({ width: 1637, height: 869 });
 
-test('SJSON uses one governed packet with exact tees, visible nodes and support overlays', async ({ page }, testInfo) => {
+test('SJSON uses one governed packet with exact tees, visible nodes and compact overlays', async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   await page.setViewportSize(VIEWPORT);
   await page.addInitScript(() => globalThis.localStorage?.clear());
@@ -29,7 +29,16 @@ test('SJSON uses one governed packet with exact tees, visible nodes and support 
   await expect(host).toHaveAttribute('data-topology-edit-active-rich-primitive-count', '0');
   await expect(host).toHaveAttribute('data-topology-edit-visible-route-solid-mesh-count', '0');
   await expect(host).toHaveAttribute('data-topology-edit-node-visual-and-pick-geometry-separated', 'true');
+  await expect(host).toHaveAttribute('data-topology-edit-visible-node-marker-geometry', 'OCTAHEDRON_WIREFRAME');
   await expect(host).toHaveAttribute('data-topology-edit-support-overlay-depth-independent', 'true');
+  await expect(host).toHaveAttribute(
+    'data-topology-edit-sjson-issue-render-authority',
+    'SJSON_COMPACT_WIREFRAME_ISSUE_OVERLAY_V2',
+  );
+  await expect(host).toHaveAttribute(
+    'data-topology-edit-sjson-issue-marker-geometry',
+    'OCTAHEDRON_WIREFRAME',
+  );
 
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-exact-tee-count')).toBe(3);
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-exact-tee-segment-count')).toBe(9);
@@ -41,6 +50,10 @@ test('SJSON uses one governed packet with exact tees, visible nodes and support 
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-rendered-support-marker-count')).toBe(34);
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-rendered-restraint-arrow-count')).toBe(47);
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-visible-support-overlay-count')).toBe(81);
+  await expect.poll(() => integerAttribute(host, 'data-topology-edit-sjson-visible-issue-marker-count'))
+    .toBeGreaterThan(0);
+  await expect.poll(() => numberAttribute(host, 'data-topology-edit-sjson-issue-marker-radius-mm'))
+    .toBeLessThanOrEqual(8);
 
   await page.screenshot({
     path: testInfo.outputPath('sjson-governed-overlays.png'),
