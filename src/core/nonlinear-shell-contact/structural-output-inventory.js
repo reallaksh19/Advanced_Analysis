@@ -176,10 +176,10 @@ function parseStepInventory(text) {
     seen.add(key);
     rows.push({ stepId: id, ordinal: rows.length + 1, source });
   };
-  for (const match of text.matchAll(/\bSTEP\s+(?:NAME\s*=\s*)?([A-Za-z0-9_.:-]+)\b/giu)) {
+  for (const match of text.matchAll(/^\s*STEP\s+(?:NAME\s*=\s*)?([A-Za-z0-9_.:-]+)\s*$/gimu)) {
     add(match[1], 'TEXT_STEP_MARKER');
   }
-  for (const match of text.matchAll(/^\s*1PSTEP\s+([0-9]+)\b/gmu)) {
+  for (const match of text.matchAll(/^\s*1PSTEP\s+[0-9]+\s+[0-9]+\s+([0-9]+)\s*$/gmu)) {
     add(match[1], 'FRD_PARAMETER_HEADER');
   }
   return rows;
@@ -187,7 +187,9 @@ function parseStepInventory(text) {
 
 function parseIncrementInventory(text) {
   const rows = [];
-  for (const match of text.matchAll(/\bSTEP\s+([A-Za-z0-9_.:-]+)[^\n]*\bINCREMENT\s+([0-9]+)\b/giu)) {
+  for (const match of text.matchAll(
+    /^\s*STEP\s+([A-Za-z0-9_.:-]+).*?\bINCREMENT\s+([0-9]+).*$/gimu,
+  )) {
     rows.push({
       ordinal: rows.length + 1,
       stepId: match[1],
@@ -198,9 +200,11 @@ function parseIncrementInventory(text) {
   if (rows.length === 0) {
     let latestStep = null;
     for (const line of text.split(/\r?\n/u)) {
-      const step = line.match(/\bSTEP\s+(?:NAME\s*=\s*)?([A-Za-z0-9_.:-]+)\b/iu);
+      const step = line.match(/^\s*STEP\s+(?:NAME\s*=\s*)?([A-Za-z0-9_.:-]+)\s*$/iu);
       if (step) latestStep = step[1];
-      const increment = line.match(/\bINCREMENT\s+([0-9]+)\b/iu);
+      const increment = line.match(
+        /^\s*INCREMENT\s+([0-9]+)(?:\s+ATTEMPT\s+[0-9]+)?\s*$/iu,
+      );
       if (increment) {
         rows.push({
           ordinal: rows.length + 1,
