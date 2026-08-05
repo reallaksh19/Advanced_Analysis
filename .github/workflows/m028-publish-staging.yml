@@ -1,0 +1,76 @@
+name: M028 Isolated Publisher
+
+on:
+  push:
+    branches:
+      - agent/m028-publish-staging
+    paths:
+      - '.github/workflows/m028-publish-staging.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct and verify candidate patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .m028-transport/part-* > /tmp/m028.patch.gz.b64
+          echo '1ff2f68d37f4010f7f8ba04c8eafd4adb54987ea4090020923c6642fc8600848  /tmp/m028.patch.gz.b64' | sha256sum -c -
+          base64 -d /tmp/m028.patch.gz.b64 > /tmp/m028.patch.gz
+          echo '50396873e46e2b644f3503155ff36601ae8a225e92684aa04b3ecf6f03ff4a7c  /tmp/m028.patch.gz' | sha256sum -c -
+          gzip -dc /tmp/m028.patch.gz > /tmp/m028.patch
+          echo '9edc73e45bcb0ce54cc3d9e878af476c269138a1dd1ddbb0007bfd75cd9b2291  /tmp/m028.patch' | sha256sum -c -
+          git apply --check /tmp/m028.patch
+          git apply --index /tmp/m028.patch
+          git rm -r .m028-transport .github/workflows/m028-publish-staging.yml
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Verify changed-source syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/lfea-m028-bm3-check.mjs
+          node --check scripts/lfea-m028-bm3-comparison.mjs
+          node --check scripts/lfea-m028-bm3-fixtures.mjs
+          node --check src/core/geometry/adapters/inputXmlToCanonicalGeometry.js
+          node --check src/core/geometry/adapters/inputxml-unit-system.js
+          git diff --check origin/main
+
+      - name: Qualify M028 and full linear core
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/lfea-m028-bm3-check.mjs
+          npm run check:lfea-linear-core
+          sha256sum reports/m028-bm3-qualification.json > /tmp/m028-report.sha256
+          node scripts/lfea-m028-bm3-check.mjs > /tmp/m028-repeat.log
+          sha256sum -c /tmp/m028-report.sha256
+          rm reports/m028-bm3-qualification.json
+
+      - name: Verify final source boundary and publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected=$'.github/workflows/m028-bm3.yml\ndocs/qualification/M028_BM3_ENGINEERING_RECORD.md\nscripts/lfea-m028-bm3-check.mjs\nscripts/lfea-m028-bm3-comparison.mjs\nscripts/lfea-m028-bm3-fixtures.mjs\nsrc/core/geometry/adapters/inputXmlToCanonicalGeometry.js\nsrc/core/geometry/adapters/inputxml-unit-system.js'
+          actual="$(git diff --name-only origin/main -- | sort)"
+          test "$actual" = "$expected"
+          git add -A
+          git config user.name 'M028 Qualification Bot'
+          git config user.email 'm028-qualification@users.noreply.github.com'
+          git commit -m 'M028: onboard BM3 with disclosed diagnostics'
+          git push origin HEAD:agent/m028-publish-staging
