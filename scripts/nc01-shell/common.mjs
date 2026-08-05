@@ -115,8 +115,8 @@ function block(text, pattern, kind) {
   return rows;
 }
 
-export function reactionResidual(rows, scale = 1, appliedZ = 0) {
-  const sums = [0, 0, appliedZ];
+export function reactionResidual(rows, scale = 1) {
+  const sums = [0, 0, 0];
   for (const row of rows) for (let i = 0; i < 3; i += 1) sums[i] += row.values[i];
   return Math.hypot(...sums) / Math.max(Math.abs(scale), 1e-30);
 }
