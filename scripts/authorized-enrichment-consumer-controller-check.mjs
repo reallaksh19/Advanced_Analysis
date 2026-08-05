@@ -4,6 +4,9 @@ import { semanticHash } from '../src/core/shared-piping-model/canonical-json.js'
 import {
   EMPIRICAL_COMPONENT_LOAD_AUTHORITY_AUDIT_SCHEMA,
 } from '../src/workspace/engineering-loads/empirical-component-load-authority.js';
+import {
+  EMPIRICAL_COMPONENT_MOMENT_DEMAND_SCHEMA,
+} from '../src/workspace/engineering-loads/empirical-component-moment-demand.js';
 import { EMPIRICAL_FORMULA_REGISTER } from '../src/workspace/engineering-loads/empirical-formula-register.js';
 import { computeAuthorizedEmpiricalLoadInputSemanticHash } from '../src/workspace/engineering-loads/authorized-empirical-load-input.js';
 import {
@@ -49,6 +52,10 @@ assert.equal(EMPIRICAL_FORMULA_REGISTER.validation.detailedAnalysisSubstitution,
 assert.equal(
   EMPIRICAL_COMPONENT_LOAD_AUTHORITY_AUDIT_SCHEMA,
   'empirical-component-load-authority-audit/v1',
+);
+assert.equal(
+  EMPIRICAL_COMPONENT_MOMENT_DEMAND_SCHEMA,
+  'empirical-component-moment-demand/v1',
 );
 assert.equal(SUPPORT_LOAD_DISTRIBUTION_COG_SCHEMA, 'support-load-distribution/v4');
 assert.equal(EMPIRICAL_LOAD_COG_METHOD, 'CHAINAGE_TRIBUTARY_SPAN_V3_COG');
@@ -148,6 +155,7 @@ console.log(JSON.stringify({
   formulaRegisterMethod: EMPIRICAL_FORMULA_REGISTER.method,
   formulaRegisterSemanticHash: EMPIRICAL_FORMULA_REGISTER.semanticHash,
   componentLoadAuthorityAuditSchema: EMPIRICAL_COMPONENT_LOAD_AUTHORITY_AUDIT_SCHEMA,
+  componentMomentDemandSchema: EMPIRICAL_COMPONENT_MOMENT_DEMAND_SCHEMA,
   cogDistributionSchema: SUPPORT_LOAD_DISTRIBUTION_COG_SCHEMA,
   cogDistributionMethod: EMPIRICAL_LOAD_COG_METHOD,
   methodSelectingRequestSchema: AUTHORIZED_EMPIRICAL_LOAD_EXECUTION_V2_REQUEST_SCHEMA,
