@@ -36,6 +36,10 @@ The M032 check runs the complete two-by-two hanger/F1 factorial while holding we
 
 It reports both context-specific main effects and the interaction term. A single CASE 5/7 comparison is not used for causal attribution.
 
+## Consolidated evidence
+
+`lfea-m032-bm3-consolidated-latest-output-check.mjs` first reproduces the retained strict comparator, then promotes that result into the v3 latest-evidence record with M032 load custody attached. The strict denominator and ±5% policy are preserved; only the resolved/unresolved authority inventory changes.
+
 ## Direct qualification
 
 Run:
@@ -44,17 +48,17 @@ Run:
 node scripts/lfea-m032-inputxml-force-moment-check.mjs
 node scripts/lfea-m032-bm3-load-custody-check.mjs
 node scripts/lfea-m029-bm3-hanger-check.mjs
-node scripts/lfea-bm3-consolidated-latest-output-check.mjs
+node scripts/lfea-m032-bm3-consolidated-latest-output-check.mjs
 ```
 
-The M032 report is written to `reports/m032-bm3-load-custody.json`.
+The direct M032 report is written to `reports/m032-bm3-load-custody.json`. The consolidated v3 record is written to `reports/bm3-consolidated-latest-output.json`.
 
 ## Explicitly remaining
 
 This slice does not claim full BM3 parity. The remaining named gaps are:
 
 - real bend arc geometry and directional flexibility on the shared BM2/BM3 path;
-- reducer-candidate parity qualification;
+- reducer-candidate parity qualification and frozen-hanger recheck;
 - generated-station and duplicate-pair solver/report identity.
 
 The strict ±5% policy is unchanged.
