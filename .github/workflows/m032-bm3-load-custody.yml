@@ -103,6 +103,18 @@ jobs:
           node scripts/lfea-m032-bm3-consolidated-latest-output-check.mjs > /tmp/m032-consolidated-repeat.log
           sha256sum -c /tmp/m032.sha256
 
+      - name: Archive exact source head
+        shell: bash
+        run: git archive --format=zip --output=/tmp/m032-source.zip HEAD
+
+      - name: Upload exact source head
+        uses: actions/upload-artifact@v4
+        with:
+          name: m032-source-${{ env.TARGET_HEAD_SHA }}
+          path: /tmp/m032-source.zip
+          if-no-files-found: error
+          retention-days: 3
+
       - name: Upload deterministic M032 evidence
         uses: actions/upload-artifact@v4
         with:
