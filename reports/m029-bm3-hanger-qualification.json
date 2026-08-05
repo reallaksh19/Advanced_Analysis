@@ -13,8 +13,8 @@
     {
       "nodeId": "20",
       "designInput": {
-        "hotLoad": 7513.365410747151,
-        "signedOperatingTravel": -0.04062781801356734
+        "hotLoad": 7484.214690039181,
+        "signedOperatingTravel": -0.0406075378865997
       },
       "selected": {
         "entryId": "ANVIL-PP-11.11-VARIABLE-SPRING-2022:FIG_98:11",
@@ -22,10 +22,10 @@
         "figure": "98",
         "size": "11",
         "springRate": 29771.56199190098,
-        "hotLoad": 7513.365410747151,
-        "theoreticalColdLoad": 6303.81180816056,
-        "signedOperatingTravel": -0.04062781801356734,
-        "variability": 0.16098692615914043,
+        "hotLoad": 7484.214690039181,
+        "theoreticalColdLoad": 6275.26485850981,
+        "signedOperatingTravel": -0.0406075378865997,
+        "variability": 0.16153329128016253,
         "minimumWorkingLoad": 4537.1860475657095,
         "maximumWorkingLoad": 9830.569769725704,
         "reservedMinimumWorkingLoad": 4559.871977803537,
@@ -51,18 +51,18 @@
         "nodeId": "20",
         "kernelNodeId": "BM3.BEND.IX-S4.N2",
         "dof": "UY",
-        "displacement": -0.04062781801292843,
-        "theoreticalColdLoad": 6303.81180816056,
-        "elasticSupportAction": 1209.5536025675701,
-        "totalSupportAction": 7513.36541072813,
+        "displacement": -0.040607537884402606,
+        "theoreticalColdLoad": 6275.26485850981,
+        "elasticSupportAction": 1208.9498314639598,
+        "totalSupportAction": 7484.21468997377,
         "signConvention": "SUPPORT_ACTION_ON_STRUCTURE_POSITIVE_GLOBAL_Y"
       }
     },
     {
       "nodeId": "22",
       "designInput": {
-        "hotLoad": 8013.468962709807,
-        "signedOperatingTravel": -0.022307696291703157
+        "hotLoad": 7963.032008619033,
+        "signedOperatingTravel": -0.02228759819115177
       },
       "selected": {
         "entryId": "ANVIL-PP-11.11-VARIABLE-SPRING-2022:FIG_B268:11",
@@ -70,10 +70,10 @@
         "figure": "B-268",
         "size": "11",
         "springRate": 59543.12398380196,
-        "hotLoad": 8013.468962709807,
-        "theoreticalColdLoad": 6685.199036619926,
-        "signedOperatingTravel": -0.022307696291703157,
-        "variability": 0.1657546728228317,
+        "hotLoad": 7963.032008619033,
+        "theoreticalColdLoad": 6635.958786222123,
+        "signedOperatingTravel": -0.02228759819115177,
+        "variability": 0.16665426196460234,
         "minimumWorkingLoad": 4537.1860475657095,
         "maximumWorkingLoad": 9830.569769725704,
         "reservedMinimumWorkingLoad": 4559.871977803537,
@@ -99,10 +99,10 @@
         "nodeId": "22",
         "kernelNodeId": "BM3.N22",
         "dof": "UY",
-        "displacement": -0.022307696291059907,
-        "theoreticalColdLoad": 6685.199036619926,
-        "elasticSupportAction": 1328.2699260515792,
-        "totalSupportAction": 8013.468962671505,
+        "displacement": -0.02228759818895853,
+        "theoreticalColdLoad": 6635.958786222123,
+        "elasticSupportAction": 1327.073222266318,
+        "totalSupportAction": 7963.0320084884415,
         "signConvention": "SUPPORT_ACTION_ON_STRUCTURE_POSITIVE_GLOBAL_Y"
       }
     }
@@ -114,45 +114,45 @@
       "diagnostics": {
         "residual": {
           "checkId": "ALGEBRAIC_RESIDUAL_NORMALIZED",
-          "value": 2.5927172073593264e-14,
+          "value": 3.977459945571034e-14,
           "limit": 0.000001,
           "status": "PASS",
           "limitSource": "M032 bend/reducer-expanded benchmark residual gate; the exact observed solve remains below this disclosed engineering threshold."
         },
         "forceEquilibrium": {
           "checkId": "GLOBAL_FORCE_EQUILIBRIUM_RELATIVE",
-          "value": 5.57278250051909e-15,
+          "value": 1.7219227052486802e-15,
           "limit": 0.000001,
           "status": "PASS",
           "limitSource": "LFEA-B3.3-FIXTURE-PROFILE",
-          "imbalance": 0.000005343881360469262,
+          "imbalance": 0.0000016511949333377232,
           "groundedSpringCount": 2,
-          "groundedSpringForceMagnitude": 2537.8235286191493
+          "groundedSpringForceMagnitude": 2536.0230537302778
         },
         "momentEquilibrium": {
           "checkId": "GLOBAL_MOMENT_EQUILIBRIUM_RELATIVE",
-          "value": 9.360140452802362e-16,
+          "value": 1.1613754673449186e-15,
           "limit": 0.000001,
           "status": "PASS",
           "limitSource": "LFEA-B3.3-FIXTURE-PROFILE",
-          "imbalance": 0.00000607770275249873,
+          "imbalance": 0.0000075410134708414724,
           "referenceNodeId": "BM3.BEND.IX-S14.N0",
           "referenceRule": "FIRST_CANONICAL_NODE_V1",
           "groundedSpringCount": 2,
-          "groundedSpringForceMagnitude": 2537.8235286191493
+          "groundedSpringForceMagnitude": 2536.0230537302778
         },
         "energyBalance": {
           "checkId": "ENERGY_BALANCE_RELATIVE",
-          "value": 1.7522493481838404e-16,
+          "value": 5.256757081215374e-16,
           "limit": 1e-7,
           "status": "PASS",
           "limitSource": "LFEA-B3.3-FIXTURE-PROFILE",
-          "internalEnergy": 1328752.91918466,
-          "externalWork": 1328752.9191846603
+          "internalEnergy": 1328750.634982958,
+          "externalWork": 1328750.6349829573
         },
         "conditioning": {
           "checkId": "CONDITION_ESTIMATE",
-          "value": 291378022.789908,
+          "value": 290882916.16095245,
           "limit": 100000000000000,
           "status": "PASS",
           "limitSource": "M032 explicit bend/reducer-expanded conditioning disclosure.",
@@ -163,10 +163,10 @@
       "factorization": {
         "backend": "FEA_SPARSE_DIRECT_CHOLESKY_LDLT_V1",
         "kind": "CHOLESKY",
-        "minAbsPivot": 6.64043910250112e-7,
+        "minAbsPivot": 6.650381036881827e-7,
         "maxAbsPivot": 1.0000000000000002,
         "negativePivotCount": 0,
-        "conditionEstimate": 291378022.789908,
+        "conditionEstimate": 290882916.16095245,
         "conditionEstimateMethod": "POWER_INVERSE_POWER_ITERATION_V1"
       }
     },
@@ -176,45 +176,45 @@
       "diagnostics": {
         "residual": {
           "checkId": "ALGEBRAIC_RESIDUAL_NORMALIZED",
-          "value": 1.7481172151468456e-14,
+          "value": 2.104385200648703e-14,
           "limit": 0.000001,
           "status": "PASS",
           "limitSource": "M032 bend/reducer-expanded benchmark residual gate; the exact observed solve remains below this disclosed engineering threshold."
         },
         "forceEquilibrium": {
           "checkId": "GLOBAL_FORCE_EQUILIBRIUM_RELATIVE",
-          "value": 1.7870010888450905e-15,
+          "value": 3.1302208692703763e-15,
           "limit": 0.000001,
           "status": "PASS",
           "limitSource": "LFEA-B3.3-FIXTURE-PROFILE",
-          "imbalance": 0.0000022652540762333834,
+          "imbalance": 0.0000039679580407093945,
           "groundedSpringCount": 2,
-          "groundedSpringForceMagnitude": 3349.2119015443795
+          "groundedSpringForceMagnitude": 3346.8414561961827
         },
         "momentEquilibrium": {
           "checkId": "GLOBAL_MOMENT_EQUILIBRIUM_RELATIVE",
-          "value": 8.263155306281711e-16,
+          "value": 3.9607877446102123e-16,
           "limit": 0.000001,
           "status": "PASS",
           "limitSource": "LFEA-B3.3-FIXTURE-PROFILE",
-          "imbalance": 0.000007092694532025576,
+          "imbalance": 0.00000339974930680322,
           "referenceNodeId": "BM3.BEND.IX-S14.N0",
           "referenceRule": "FIRST_CANONICAL_NODE_V1",
           "groundedSpringCount": 2,
-          "groundedSpringForceMagnitude": 3349.2119015443795
+          "groundedSpringForceMagnitude": 3346.8414561961827
         },
         "energyBalance": {
           "checkId": "ENERGY_BALANCE_RELATIVE",
-          "value": 2.005390293219886e-16,
+          "value": 6.016181627590259e-16,
           "limit": 1e-7,
           "status": "PASS",
           "limitSource": "LFEA-B3.3-FIXTURE-PROFILE",
-          "internalEnergy": 2322048.1762683024,
-          "externalWork": 2322048.176268302
+          "internalEnergy": 2322044.0279206955,
+          "externalWork": 2322044.027920697
         },
         "conditioning": {
           "checkId": "CONDITION_ESTIMATE",
-          "value": 291378022.789908,
+          "value": 290882916.16095245,
           "limit": 100000000000000,
           "status": "PASS",
           "limitSource": "M032 explicit bend/reducer-expanded conditioning disclosure.",
@@ -225,10 +225,10 @@
       "factorization": {
         "backend": "FEA_SPARSE_DIRECT_CHOLESKY_LDLT_V1",
         "kind": "CHOLESKY",
-        "minAbsPivot": 6.64043910250112e-7,
+        "minAbsPivot": 6.650381036881827e-7,
         "maxAbsPivot": 1.0000000000000002,
         "negativePivotCount": 0,
-        "conditionEstimate": 291378022.789908,
+        "conditionEstimate": 290882916.16095245,
         "conditionEstimateMethod": "POWER_INVERSE_POWER_ITERATION_V1"
       }
     },
@@ -238,45 +238,45 @@
       "diagnostics": {
         "residual": {
           "checkId": "ALGEBRAIC_RESIDUAL_NORMALIZED",
-          "value": 4.978929611730391e-10,
+          "value": 3.1332537091323257e-10,
           "limit": 0.000001,
           "status": "PASS",
           "limitSource": "M032 bend/reducer-expanded benchmark residual gate; the exact observed solve remains below this disclosed engineering threshold."
         },
         "forceEquilibrium": {
           "checkId": "GLOBAL_FORCE_EQUILIBRIUM_RELATIVE",
-          "value": 2.7037086559394395e-11,
+          "value": 7.542404185331964e-12,
           "limit": 0.000001,
           "status": "PASS",
           "limitSource": "LFEA-B3.3-FIXTURE-PROFILE",
-          "imbalance": 0.0000012079388937032434,
+          "imbalance": 3.3638611990050086e-7,
           "groundedSpringCount": 2,
-          "groundedSpringForceMagnitude": 17.42199426068538
+          "groundedSpringForceMagnitude": 17.392008653535058
         },
         "momentEquilibrium": {
           "checkId": "GLOBAL_MOMENT_EQUILIBRIUM_RELATIVE",
-          "value": 3.69512359967196e-12,
+          "value": 8.613941737432634e-12,
           "limit": 0.000001,
           "status": "PASS",
           "limitSource": "LFEA-B3.3-FIXTURE-PROFILE",
-          "imbalance": 0.0000013550167532192886,
+          "imbalance": 0.000003152640559084128,
           "referenceNodeId": "BM3.BEND.IX-S14.N0",
           "referenceRule": "FIRST_CANONICAL_NODE_V1",
           "groundedSpringCount": 2,
-          "groundedSpringForceMagnitude": 17.42199426068538
+          "groundedSpringForceMagnitude": 17.392008653535058
         },
         "energyBalance": {
           "checkId": "ENERGY_BALANCE_RELATIVE",
-          "value": 6.584940382382954e-16,
+          "value": 4.4087903267748843e-16,
           "limit": 1e-7,
           "status": "PASS",
           "limitSource": "LFEA-B3.3-FIXTURE-PROFILE",
-          "internalEnergy": 64.74252107074987,
-          "externalWork": 64.74252107074983
+          "internalEnergy": 64.46600387819994,
+          "externalWork": 64.46600387819991
         },
         "conditioning": {
           "checkId": "CONDITION_ESTIMATE",
-          "value": 291378022.789908,
+          "value": 290882916.16095245,
           "limit": 100000000000000,
           "status": "PASS",
           "limitSource": "M032 explicit bend/reducer-expanded conditioning disclosure.",
@@ -287,10 +287,10 @@
       "factorization": {
         "backend": "FEA_SPARSE_DIRECT_CHOLESKY_LDLT_V1",
         "kind": "CHOLESKY",
-        "minAbsPivot": 6.64043910250112e-7,
+        "minAbsPivot": 6.650381036881827e-7,
         "maxAbsPivot": 1.0000000000000002,
         "negativePivotCount": 0,
-        "conditionEstimate": 291378022.789908,
+        "conditionEstimate": 290882916.16095245,
         "conditionEstimateMethod": "POWER_INVERSE_POWER_ITERATION_V1"
       }
     },

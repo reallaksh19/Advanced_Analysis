@@ -70,10 +70,8 @@ export const BM3_T2_SECANT_THERMAL_EXPANSION_COEFFICIENT = 1.37e-5;
 export const BM3_EXPLICIT_K_BEND_EQUIVALENCE = Object.freeze({
   sourceSegmentId: 'IX-S2',
   retainedKFactor: 2.123,
-  residualFlexibilityMultiplier: 1.05,
-  shearCorrectionFactor: 0.1,
   basis: 'RETAINED_CAESAR_TWO_NODE_BEND_COMPLIANCE_EQUIVALENCE_V1',
-  limitation: 'Applies only to the one BM3 bend carrying an explicit InputXML KFACTOR; code-calculated bends retain the qualified annular Timoshenko profile.',
+  limitation: 'Applies only to the one BM3 bend carrying an explicit InputXML KFACTOR. Uses the same segmentation-ratio correction and the same Cowper (1966) thin-annulus shear correction factor (0.53) as every code-calculated bend and straight element in this model — no bend-specific multiplier or shear factor.',
 });
 export const GRAVITY = 9.80665;
 export const CASE_KEYS = Object.freeze(['CASE3_OPE', 'CASE4_SUS', 'CASE5_OCC', 'CASE6_EXP', 'CASE7_EXP']);
@@ -436,27 +434,26 @@ function buildBendDefinitions({ sourceGeometry, material, frameProfile, bendProf
     const explicitKEquivalence = sourceSegment.id === BM3_EXPLICIT_K_BEND_EQUIVALENCE.sourceSegmentId
       ? BM3_EXPLICIT_K_BEND_EQUIVALENCE
       : null;
-    const residualFlexibilityMultiplier = explicitKEquivalence?.residualFlexibilityMultiplier ?? 1;
     const effectiveFactorSet = sealComponentFactorSet({
       ...factorSet,
       factorSetId: `${factorSet.factorSetId}.M032-ARC-ADJUSTED`,
       sourceIdentity: {
         ...factorSet.sourceIdentity,
         ruleId: `${factorSet.sourceIdentity.ruleId}_CAESAR_ARC_SEGMENT_ADJUSTMENT`,
-        sourceRevision: `${factorSet.sourceIdentity.sourceRevision}:segment-ratio=${segmentationFlexibilityRatio}:residual-multiplier=${residualFlexibilityMultiplier}`,
-        sourceSemanticHash: semanticHash({ source: factorSet.sourceIdentity, segmentationFlexibilityRatio, residualFlexibilityMultiplier }),
+        sourceRevision: `${factorSet.sourceIdentity.sourceRevision}:segment-ratio=${segmentationFlexibilityRatio}`,
+        sourceSemanticHash: semanticHash({ source: factorSet.sourceIdentity, segmentationFlexibilityRatio }),
       },
       flexibilityFactor: {
-        value: factorSet.flexibilityFactor.value * residualFlexibilityMultiplier / segmentationFlexibilityRatio,
-        source: `${factorSet.flexibilityFactor.source}; residual multiplier ${residualFlexibilityMultiplier}; divided by represented two-chord arc flexibility ratio ${segmentationFlexibilityRatio}`,
+        value: factorSet.flexibilityFactor.value / segmentationFlexibilityRatio,
+        source: `${factorSet.flexibilityFactor.source}; divided by represented two-chord arc flexibility ratio ${segmentationFlexibilityRatio}`,
       },
       userOverride: {
         reason: explicitKEquivalence
-          ? 'The retained InputXML K bend is represented by a two-element arc; the disclosed residual multiplier and curved-beam shear correction reproduce the retained two-node compliance without applying K twice.'
-          : 'CAESAR K is a total bend flexibility target; the generated arc already carries developed-length compliance, so only the residual matrix correction is applied.',
+          ? 'The retained InputXML K bend is represented by a two-element arc; the total bending flexibility is reduced by the same two-chord segmentation ratio applied to every bend in this model, so the two-element assembly reproduces the single declared K without applying it twice. No bend-specific multiplier or shear-factor override is applied.'
+          : 'CAESAR K is a total bend flexibility target; the generated arc already carries developed-length compliance, so only the segmentation-ratio correction is applied.',
         source: 'M032 BM3 CAESAR arc-equivalence adapter',
-        sourceRevision: `${sourceSegment.id}:${factorSet.flexibilityFactor.value}:${segmentationFlexibilityRatio}:${residualFlexibilityMultiplier}`,
-        approver: 'M032_BENCHMARK_RECONSTRUCTION',
+        sourceRevision: `${sourceSegment.id}:${factorSet.flexibilityFactor.value}:${segmentationFlexibilityRatio}`,
+        approver: explicitKEquivalence ? 'RETAINED_INPUT_AUTHORITY' : 'M032_BM3_BEND_ARC_ADAPTER',
       },
       semanticHash: '',
     });
@@ -467,12 +464,7 @@ function buildBendDefinitions({ sourceGeometry, material, frameProfile, bendProf
       arc: { tangentStart, tangentEnd, incomingDirection, declaredRadius: bendRadius },
       material,
       section,
-      frameElementProfile: explicitKEquivalence
-        ? timoshenkoProfile({
-            shearCorrectionFactorY: { value: explicitKEquivalence.shearCorrectionFactor, source: explicitKEquivalence.basis },
-            shearCorrectionFactorZ: { value: explicitKEquivalence.shearCorrectionFactor, source: explicitKEquivalence.basis },
-          })
-        : frameProfile,
+      frameElementProfile: frameProfile,
       localAxisProfile: FRAME_LOCAL_AXIS_PROFILE,
       referenceVector: null,
       factorSet: effectiveFactorSet,

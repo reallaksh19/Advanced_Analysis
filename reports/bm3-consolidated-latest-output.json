@@ -259,8 +259,8 @@
       {
         "caseNumber": 6,
         "matchedScalarDenominator": 756,
-        "passed": 756,
-        "failed": 0,
+        "passed": 748,
+        "failed": 8,
         "unmatchedReferenceRows": 0,
         "unmatchedSolverRows": 0,
         "coverage": {
@@ -295,9 +295,9 @@
         "statistics": {
           "overall": {
             "scalarCount": 756,
-            "passed": 756,
-            "failed": 0,
-            "passRate": 1,
+            "passed": 748,
+            "failed": 8,
+            "passRate": 0.9894179894179894,
             "zeroReference": {
               "scalarCount": 414,
               "exactZeroPasses": 414,
@@ -306,18 +306,18 @@
             },
             "nonzeroReference": {
               "scalarCount": 342,
-              "meanAbsoluteRelativeError": 0.01296056001339846,
-              "medianAbsoluteRelativeError": 0.007515316623280564,
-              "percentile95AbsoluteRelativeError": 0.034959794794938985,
-              "maximumAbsoluteRelativeError": 0.04827697003775406
+              "meanAbsoluteRelativeError": 0.015716360694423812,
+              "medianAbsoluteRelativeError": 0.009348763407637333,
+              "percentile95AbsoluteRelativeError": 0.03572834916320326,
+              "maximumAbsoluteRelativeError": 0.11378712113480972
             }
           },
           "byFamily": {
             "displacement": {
               "scalarCount": 150,
-              "passed": 150,
-              "failed": 0,
-              "passRate": 1,
+              "passed": 146,
+              "failed": 4,
+              "passRate": 0.9733333333333334,
               "zeroReference": {
                 "scalarCount": 9,
                 "exactZeroPasses": 9,
@@ -326,10 +326,10 @@
               },
               "nonzeroReference": {
                 "scalarCount": 141,
-                "meanAbsoluteRelativeError": 0.023634740691430598,
-                "medianAbsoluteRelativeError": 0.029132049912702723,
-                "percentile95AbsoluteRelativeError": 0.034959794794938985,
-                "maximumAbsoluteRelativeError": 0.04827697003775406
+                "meanAbsoluteRelativeError": 0.022738863723517244,
+                "medianAbsoluteRelativeError": 0.019125040520264668,
+                "percentile95AbsoluteRelativeError": 0.040220843180786066,
+                "maximumAbsoluteRelativeError": 0.11378712113480972
               }
             },
             "restraint": {
@@ -345,17 +345,17 @@
               },
               "nonzeroReference": {
                 "scalarCount": 7,
-                "meanAbsoluteRelativeError": 0.0026523413788526284,
-                "medianAbsoluteRelativeError": 0.0007611532063669712,
-                "percentile95AbsoluteRelativeError": 0.007690975106404177,
-                "maximumAbsoluteRelativeError": 0.00888284610985072
+                "meanAbsoluteRelativeError": 0.011331582171242261,
+                "medianAbsoluteRelativeError": 0.01018399133481532,
+                "percentile95AbsoluteRelativeError": 0.01940747575806694,
+                "maximumAbsoluteRelativeError": 0.02067118668552538
               }
             },
             "globalForce": {
               "scalarCount": 288,
-              "passed": 288,
-              "failed": 0,
-              "passRate": 1,
+              "passed": 286,
+              "failed": 2,
+              "passRate": 0.9930555555555556,
               "zeroReference": {
                 "scalarCount": 191,
                 "exactZeroPasses": 191,
@@ -364,17 +364,17 @@
               },
               "nonzeroReference": {
                 "scalarCount": 97,
-                "meanAbsoluteRelativeError": 0.005574467512570059,
-                "medianAbsoluteRelativeError": 0.006517534835603003,
-                "percentile95AbsoluteRelativeError": 0.012278608324797399,
-                "maximumAbsoluteRelativeError": 0.03802367278499221
+                "meanAbsoluteRelativeError": 0.01077059019215628,
+                "medianAbsoluteRelativeError": 0.0075153175432100035,
+                "percentile95AbsoluteRelativeError": 0.027818410463534348,
+                "maximumAbsoluteRelativeError": 0.07603993981172005
               }
             },
             "localForce": {
               "scalarCount": 288,
-              "passed": 288,
-              "failed": 0,
-              "passRate": 1,
+              "passed": 286,
+              "failed": 2,
+              "passRate": 0.9930555555555556,
               "zeroReference": {
                 "scalarCount": 191,
                 "exactZeroPasses": 191,
@@ -383,22 +383,111 @@
               },
               "nonzeroReference": {
                 "scalarCount": 97,
-                "meanAbsoluteRelativeError": 0.005574467512570059,
-                "medianAbsoluteRelativeError": 0.006517534835603003,
-                "percentile95AbsoluteRelativeError": 0.012278608324797399,
-                "maximumAbsoluteRelativeError": 0.03802367278499221
+                "meanAbsoluteRelativeError": 0.01077059019215628,
+                "medianAbsoluteRelativeError": 0.0075153175432100035,
+                "percentile95AbsoluteRelativeError": 0.027818410463534348,
+                "maximumAbsoluteRelativeError": 0.07603993981172005
               }
             }
           }
         },
-        "status": "PASS",
-        "topFailures": []
+        "status": "INCOMPLETE_BLOCKED",
+        "topFailures": [
+          {
+            "caseNumber": 6,
+            "family": "displacement",
+            "identity": "block=0|node=10|occ=0",
+            "component": "RY",
+            "solver": 0.00015156439224318758,
+            "reference": 0.00017102481340292437,
+            "difference": -0.000019460421159736785,
+            "relativeError": 0.11378712113480972,
+            "passed": false
+          },
+          {
+            "caseNumber": 6,
+            "family": "displacement",
+            "identity": "block=0|node=15|occ=0",
+            "component": "RY",
+            "solver": 0.00015156439224318758,
+            "reference": 0.00017102481340292437,
+            "difference": -0.000019460421159736785,
+            "relativeError": 0.11378712113480972,
+            "passed": false
+          },
+          {
+            "caseNumber": 6,
+            "family": "globalForce",
+            "identity": "block=0|pair=30-35|occ=0|end=J",
+            "component": "fy",
+            "solver": -1783.603049,
+            "reference": -1930.389771,
+            "difference": 146.78672200000005,
+            "relativeError": 0.07603993981172005,
+            "passed": false
+          },
+          {
+            "caseNumber": 6,
+            "family": "localForce",
+            "identity": "block=0|pair=30-35|occ=0|end=J",
+            "component": "fz",
+            "solver": 1783.603049,
+            "reference": 1930.389771,
+            "difference": -146.78672200000005,
+            "relativeError": 0.07603993981172005,
+            "passed": false
+          },
+          {
+            "caseNumber": 6,
+            "family": "displacement",
+            "identity": "block=0|node=10|occ=0",
+            "component": "RX",
+            "solver": -0.004617844494804157,
+            "reference": -0.004954762853609142,
+            "difference": 0.00033691835880498514,
+            "relativeError": 0.06799888688104769,
+            "passed": false
+          },
+          {
+            "caseNumber": 6,
+            "family": "displacement",
+            "identity": "block=0|node=60|occ=0",
+            "component": "UY",
+            "solver": -0.000073434,
+            "reference": -0.000078448,
+            "difference": 0.000005014000000000003,
+            "relativeError": 0.06391495003059355,
+            "passed": false
+          },
+          {
+            "caseNumber": 6,
+            "family": "globalForce",
+            "identity": "block=0|pair=30-35|occ=0|end=I",
+            "component": "fy",
+            "solver": 2439.273661,
+            "reference": 2586.144287,
+            "difference": -146.8706259999999,
+            "relativeError": 0.056791350249979264,
+            "passed": false
+          },
+          {
+            "caseNumber": 6,
+            "family": "localForce",
+            "identity": "block=0|pair=30-35|occ=0|end=I",
+            "component": "fz",
+            "solver": -2439.273661,
+            "reference": -2586.144287,
+            "difference": 146.8706259999999,
+            "relativeError": 0.056791350249979264,
+            "passed": false
+          }
+        ]
       },
       {
         "caseNumber": 7,
         "matchedScalarDenominator": 756,
-        "passed": 756,
-        "failed": 0,
+        "passed": 744,
+        "failed": 12,
         "unmatchedReferenceRows": 0,
         "unmatchedSolverRows": 0,
         "coverage": {
@@ -433,9 +522,9 @@
         "statistics": {
           "overall": {
             "scalarCount": 756,
-            "passed": 756,
-            "failed": 0,
-            "passRate": 1,
+            "passed": 744,
+            "failed": 12,
+            "passRate": 0.9841269841269841,
             "zeroReference": {
               "scalarCount": 414,
               "exactZeroPasses": 414,
@@ -444,18 +533,18 @@
             },
             "nonzeroReference": {
               "scalarCount": 342,
-              "meanAbsoluteRelativeError": 0.01423391478028432,
-              "medianAbsoluteRelativeError": 0.00751531652106614,
-              "percentile95AbsoluteRelativeError": 0.03591505083666979,
-              "maximumAbsoluteRelativeError": 0.0470947261881028
+              "meanAbsoluteRelativeError": 0.020287732363647844,
+              "medianAbsoluteRelativeError": 0.013003950173311312,
+              "percentile95AbsoluteRelativeError": 0.041474464978452044,
+              "maximumAbsoluteRelativeError": 0.14477211796246645
             }
           },
           "byFamily": {
             "displacement": {
               "scalarCount": 150,
-              "passed": 150,
-              "failed": 0,
-              "passRate": 1,
+              "passed": 142,
+              "failed": 8,
+              "passRate": 0.9466666666666667,
               "zeroReference": {
                 "scalarCount": 9,
                 "exactZeroPasses": 9,
@@ -464,10 +553,10 @@
               },
               "nonzeroReference": {
                 "scalarCount": 141,
-                "meanAbsoluteRelativeError": 0.024940344960358244,
-                "medianAbsoluteRelativeError": 0.027198103072499792,
-                "percentile95AbsoluteRelativeError": 0.03778957230016407,
-                "maximumAbsoluteRelativeError": 0.0470947261881028
+                "meanAbsoluteRelativeError": 0.03496333486897291,
+                "medianAbsoluteRelativeError": 0.035274976787294965,
+                "percentile95AbsoluteRelativeError": 0.05722923011978738,
+                "maximumAbsoluteRelativeError": 0.14477211796246645
               }
             },
             "restraint": {
@@ -483,17 +572,17 @@
               },
               "nonzeroReference": {
                 "scalarCount": 7,
-                "meanAbsoluteRelativeError": 0.0064730405040946725,
-                "medianAbsoluteRelativeError": 0.004351403265102913,
-                "percentile95AbsoluteRelativeError": 0.011999449714345254,
-                "maximumAbsoluteRelativeError": 0.012015216250337128
+                "meanAbsoluteRelativeError": 0.009773779204112732,
+                "medianAbsoluteRelativeError": 0.006025514959974778,
+                "percentile95AbsoluteRelativeError": 0.018604803994097426,
+                "maximumAbsoluteRelativeError": 0.018831361692257922
               }
             },
             "globalForce": {
               "scalarCount": 288,
-              "passed": 288,
-              "failed": 0,
-              "passRate": 1,
+              "passed": 286,
+              "failed": 2,
+              "passRate": 0.9930555555555556,
               "zeroReference": {
                 "scalarCount": 191,
                 "exactZeroPasses": 191,
@@ -502,17 +591,17 @@
               },
               "nonzeroReference": {
                 "scalarCount": 97,
-                "meanAbsoluteRelativeError": 0.006732468721227131,
-                "medianAbsoluteRelativeError": 0.007358259154155895,
-                "percentile95AbsoluteRelativeError": 0.013599130962022645,
-                "maximumAbsoluteRelativeError": 0.02410617661955852
+                "meanAbsoluteRelativeError": 0.010000813388729867,
+                "medianAbsoluteRelativeError": 0.00751531621442287,
+                "percentile95AbsoluteRelativeError": 0.039281626112487394,
+                "maximumAbsoluteRelativeError": 0.056341507738092225
               }
             },
             "localForce": {
               "scalarCount": 288,
-              "passed": 288,
-              "failed": 0,
-              "passRate": 1,
+              "passed": 286,
+              "failed": 2,
+              "passRate": 0.9930555555555556,
               "zeroReference": {
                 "scalarCount": 191,
                 "exactZeroPasses": 191,
@@ -521,29 +610,162 @@
               },
               "nonzeroReference": {
                 "scalarCount": 97,
-                "meanAbsoluteRelativeError": 0.006732468721227131,
-                "medianAbsoluteRelativeError": 0.007358259154155895,
-                "percentile95AbsoluteRelativeError": 0.013599130962022645,
-                "maximumAbsoluteRelativeError": 0.02410617661955852
+                "meanAbsoluteRelativeError": 0.010000813388729867,
+                "medianAbsoluteRelativeError": 0.00751531621442287,
+                "percentile95AbsoluteRelativeError": 0.039281626112487394,
+                "maximumAbsoluteRelativeError": 0.056341507738092225
               }
             }
           }
         },
-        "status": "PASS",
-        "topFailures": []
+        "status": "INCOMPLETE_BLOCKED",
+        "topFailures": [
+          {
+            "caseNumber": 7,
+            "family": "displacement",
+            "identity": "block=0|node=10|occ=0",
+            "component": "RY",
+            "solver": -0.00003897320219703338,
+            "reference": -0.000045570546769571946,
+            "difference": 0.000006597344572538564,
+            "relativeError": 0.14477211796246645,
+            "passed": false
+          },
+          {
+            "caseNumber": 7,
+            "family": "displacement",
+            "identity": "block=0|node=15|occ=0",
+            "component": "RY",
+            "solver": -0.00003897320219703338,
+            "reference": -0.000045570546769571946,
+            "difference": 0.000006597344572538564,
+            "relativeError": 0.14477211796246645,
+            "passed": false
+          },
+          {
+            "caseNumber": 7,
+            "family": "displacement",
+            "identity": "block=0|node=15|occ=0",
+            "component": "UX",
+            "solver": 0.00030640699999999997,
+            "reference": 0.000341014,
+            "difference": -0.00003460700000000003,
+            "relativeError": 0.10148263707648375,
+            "passed": false
+          },
+          {
+            "caseNumber": 7,
+            "family": "displacement",
+            "identity": "block=0|node=10|occ=0",
+            "component": "UY",
+            "solver": -0.000350279,
+            "reference": -0.00038679999999999997,
+            "difference": 0.00003652099999999997,
+            "relativeError": 0.09441830403309197,
+            "passed": false
+          },
+          {
+            "caseNumber": 7,
+            "family": "displacement",
+            "identity": "block=0|node=10|occ=0",
+            "component": "RX",
+            "solver": -0.0010548944531978926,
+            "reference": -0.0011381117519329823,
+            "difference": 0.00008321729873508963,
+            "relativeError": 0.07311874127804445,
+            "passed": false
+          },
+          {
+            "caseNumber": 7,
+            "family": "displacement",
+            "identity": "block=0|node=10|occ=0",
+            "component": "RZ",
+            "solver": -0.00038201766667651885,
+            "reference": -0.0004104316268989865,
+            "difference": 0.000028413960222467647,
+            "relativeError": 0.06922946079265173,
+            "passed": false
+          },
+          {
+            "caseNumber": 7,
+            "family": "displacement",
+            "identity": "block=0|node=15|occ=0",
+            "component": "RZ",
+            "solver": -0.0017182068354183377,
+            "reference": -0.0018253351449057495,
+            "difference": 0.00010712830948741178,
+            "relativeError": 0.0586896657232463,
+            "passed": false
+          },
+          {
+            "caseNumber": 7,
+            "family": "displacement",
+            "identity": "block=0|node=20|occ=0",
+            "component": "UX",
+            "solver": 0.001246194,
+            "reference": 0.001321842,
+            "difference": -0.00007564799999999999,
+            "relativeError": 0.05722923011978738,
+            "passed": false
+          },
+          {
+            "caseNumber": 7,
+            "family": "globalForce",
+            "identity": "block=0|pair=10-15|occ=0|end=J",
+            "component": "fy",
+            "solver": 931.766172,
+            "reference": 987.397644,
+            "difference": -55.63147200000003,
+            "relativeError": 0.056341507738092225,
+            "passed": false
+          },
+          {
+            "caseNumber": 7,
+            "family": "globalForce",
+            "identity": "block=0|pair=15-20|occ=0|end=I",
+            "component": "fy",
+            "solver": -931.766172,
+            "reference": -987.397644,
+            "difference": 55.63147200000003,
+            "relativeError": 0.056341507738092225,
+            "passed": false
+          },
+          {
+            "caseNumber": 7,
+            "family": "localForce",
+            "identity": "block=0|pair=10-15|occ=0|end=J",
+            "component": "fy",
+            "solver": -931.766172,
+            "reference": -987.397644,
+            "difference": 55.63147200000003,
+            "relativeError": 0.056341507738092225,
+            "passed": false
+          },
+          {
+            "caseNumber": 7,
+            "family": "localForce",
+            "identity": "block=0|pair=15-20|occ=0|end=I",
+            "component": "fz",
+            "solver": 931.766172,
+            "reference": 987.397644,
+            "difference": -55.63147200000003,
+            "relativeError": 0.056341507738092225,
+            "passed": false
+          }
+        ]
       }
     ],
     "totals": {
       "matchedScalarDenominator": 1512,
-      "passed": 1512,
-      "failed": 0,
+      "passed": 1492,
+      "failed": 20,
       "unmatchedReferenceRows": 0,
       "unmatchedSolverRows": 0,
-      "passRate": 1,
-      "maximumAbsoluteRelativeError": 0.04827697003775406
+      "passRate": 0.9867724867724867,
+      "maximumAbsoluteRelativeError": 0.14477211796246645
     },
-    "status": "PASS",
-    "completeComparisonClaim": true
+    "status": "INCOMPLETE_BLOCKED",
+    "completeComparisonClaim": false
   },
   "referenceVariantSensitivity": [
     {
@@ -641,27 +863,29 @@
       "figure": "98",
       "size": "11",
       "springRate": 29771.56199190098,
-      "theoreticalColdLoad": 6303.81180816056,
-      "hotLoad": 7513.365410747151,
-      "signedOperatingTravel": -0.04062781801356734
+      "theoreticalColdLoad": 6275.26485850981,
+      "hotLoad": 7484.214690039181,
+      "signedOperatingTravel": -0.0406075378865997
     },
     {
       "nodeId": "22",
       "figure": "B-268",
       "size": "11",
       "springRate": 59543.12398380196,
-      "theoreticalColdLoad": 6685.199036619926,
-      "hotLoad": 8013.468962709807,
-      "signedOperatingTravel": -0.022307696291703157
+      "theoreticalColdLoad": 6635.958786222123,
+      "hotLoad": 7963.032008619033,
+      "signedOperatingTravel": -0.02228759819115177
     }
   ],
   "unresolvedAuthorities": [],
-  "nextPriority": [],
-  "qualificationStatus": "PASS",
+  "nextPriority": [
+    "Named residual: CASE 6/7 strict comparator still fails 20/1512 scalars, clustered at the anchor-adjacent nodes and the first bend pair (see strictFailingScalars). Root cause not yet isolated between residual anchor rotational stiffness and bend-adjacent shear/moment transfer; investigate before claiming full strict parity."
+  ],
+  "qualificationStatus": "INCOMPLETE_BLOCKED",
   "predecessorEvidence": {
     "schema": "lfea-bm3-consolidated-latest-output/v2",
-    "strictComparisonStatus": "PASS",
-    "qualificationStatus": "PASS"
+    "strictComparisonStatus": "INCOMPLETE_BLOCKED",
+    "qualificationStatus": "INCOMPLETE_BLOCKED"
   },
   "m032LoadCustody": {
     "schema": "m032-bm3-load-custody-evidence/v1",
@@ -724,7 +948,7 @@
           "status": "QUALIFIED",
           "forceEquilibrium": "PASS",
           "momentEquilibrium": "PASS",
-          "normalizedResidual": 2.5927172073593264e-14
+          "normalizedResidual": 3.977459945571034e-14
         }
       },
       "CASE4_SUS": {
@@ -762,7 +986,7 @@
           "status": "QUALIFIED",
           "forceEquilibrium": "PASS",
           "momentEquilibrium": "PASS",
-          "normalizedResidual": 1.7481172151468456e-14
+          "normalizedResidual": 2.104385200648703e-14
         }
       },
       "CASE5_OCC": {
@@ -830,7 +1054,7 @@
           "status": "QUALIFIED",
           "forceEquilibrium": "PASS",
           "momentEquilibrium": "PASS",
-          "normalizedResidual": 3.427114069793832e-10
+          "normalizedResidual": 3.984905357709178e-10
         }
       },
       "CASE6_NO_FRICTION": {
@@ -868,7 +1092,7 @@
           "status": "QUALIFIED",
           "forceEquilibrium": "PASS",
           "momentEquilibrium": "PASS",
-          "normalizedResidual": 1.7481172151468456e-14
+          "normalizedResidual": 2.104385200648703e-14
         }
       },
       "CASE7_NO_FRICTION": {
@@ -904,7 +1128,7 @@
           "status": "QUALIFIED",
           "forceEquilibrium": "PASS",
           "momentEquilibrium": "PASS",
-          "normalizedResidual": 3.6969594813541106e-10
+          "normalizedResidual": 2.413085198407082e-10
         }
       }
     },
@@ -912,28 +1136,28 @@
       "design": "TWO_BY_TWO_HANGER_F1_FACTORIAL_WITH_FRICTION_HELD_OFF",
       "effects": {
         "hangerAtF1Off": {
-          "l2DisplacementDelta": 0.045612273401074564,
-          "maximumAbsoluteDisplacementDelta": 0.008337196443598744,
+          "l2DisplacementDelta": 0.04511520685601893,
+          "maximumAbsoluteDisplacementDelta": 0.008260335143615717,
           "maximumIdentity": "BM3.N115:UX"
         },
         "hangerAtF1On": {
-          "l2DisplacementDelta": 0.045618634847108396,
-          "maximumAbsoluteDisplacementDelta": 0.008338359637981367,
+          "l2DisplacementDelta": 0.04512125782459551,
+          "maximumAbsoluteDisplacementDelta": 0.008261443403692859,
           "maximumIdentity": "BM3.N115:UX"
         },
         "f1AtHangerOff": {
-          "l2DisplacementDelta": 0.3194657591405322,
-          "maximumAbsoluteDisplacementDelta": 0.08850323556273174,
+          "l2DisplacementDelta": 0.3190742416733326,
+          "maximumAbsoluteDisplacementDelta": 0.08841997938472063,
           "maximumIdentity": "BM3.N80:UZ"
         },
         "f1AtHangerOn": {
-          "l2DisplacementDelta": 0.3194620798926416,
-          "maximumAbsoluteDisplacementDelta": 0.08850247776896852,
+          "l2DisplacementDelta": 0.31907075076461244,
+          "maximumAbsoluteDisplacementDelta": 0.08841925977606085,
           "maximumIdentity": "BM3.N80:UZ"
         },
         "interaction": {
-          "l2DisplacementInteraction": 0.0000063614479268654925,
-          "maximumAbsoluteInteraction": 0.0000011631943826230506,
+          "l2DisplacementInteraction": 0.000006050970145570465,
+          "maximumAbsoluteInteraction": 0.0000011082600771400442,
           "maximumIdentity": "BM3.N115:UX"
         }
       }
@@ -948,5 +1172,147 @@
       "GENERATED_STATION_AND_DUPLICATE_PAIR_IDENTITY_CLOSED",
       "FROZEN_PHYSICAL_HANGERS_REQUALIFIED_ON_FINAL_STIFFNESS"
     ]
-  }
+  },
+  "strictFailingScalars": [
+    {
+      "caseNumber": 6,
+      "family": "displacement",
+      "identity": "block=0|node=10|occ=0",
+      "component": "RY",
+      "relativeError": 0.11378712113480972
+    },
+    {
+      "caseNumber": 6,
+      "family": "displacement",
+      "identity": "block=0|node=15|occ=0",
+      "component": "RY",
+      "relativeError": 0.11378712113480972
+    },
+    {
+      "caseNumber": 6,
+      "family": "globalForce",
+      "identity": "block=0|pair=30-35|occ=0|end=J",
+      "component": "fy",
+      "relativeError": 0.07603993981172005
+    },
+    {
+      "caseNumber": 6,
+      "family": "localForce",
+      "identity": "block=0|pair=30-35|occ=0|end=J",
+      "component": "fz",
+      "relativeError": 0.07603993981172005
+    },
+    {
+      "caseNumber": 6,
+      "family": "displacement",
+      "identity": "block=0|node=10|occ=0",
+      "component": "RX",
+      "relativeError": 0.06799888688104769
+    },
+    {
+      "caseNumber": 6,
+      "family": "displacement",
+      "identity": "block=0|node=60|occ=0",
+      "component": "UY",
+      "relativeError": 0.06391495003059355
+    },
+    {
+      "caseNumber": 6,
+      "family": "globalForce",
+      "identity": "block=0|pair=30-35|occ=0|end=I",
+      "component": "fy",
+      "relativeError": 0.056791350249979264
+    },
+    {
+      "caseNumber": 6,
+      "family": "localForce",
+      "identity": "block=0|pair=30-35|occ=0|end=I",
+      "component": "fz",
+      "relativeError": 0.056791350249979264
+    },
+    {
+      "caseNumber": 7,
+      "family": "displacement",
+      "identity": "block=0|node=10|occ=0",
+      "component": "RY",
+      "relativeError": 0.14477211796246645
+    },
+    {
+      "caseNumber": 7,
+      "family": "displacement",
+      "identity": "block=0|node=15|occ=0",
+      "component": "RY",
+      "relativeError": 0.14477211796246645
+    },
+    {
+      "caseNumber": 7,
+      "family": "displacement",
+      "identity": "block=0|node=15|occ=0",
+      "component": "UX",
+      "relativeError": 0.10148263707648375
+    },
+    {
+      "caseNumber": 7,
+      "family": "displacement",
+      "identity": "block=0|node=10|occ=0",
+      "component": "UY",
+      "relativeError": 0.09441830403309197
+    },
+    {
+      "caseNumber": 7,
+      "family": "displacement",
+      "identity": "block=0|node=10|occ=0",
+      "component": "RX",
+      "relativeError": 0.07311874127804445
+    },
+    {
+      "caseNumber": 7,
+      "family": "displacement",
+      "identity": "block=0|node=10|occ=0",
+      "component": "RZ",
+      "relativeError": 0.06922946079265173
+    },
+    {
+      "caseNumber": 7,
+      "family": "displacement",
+      "identity": "block=0|node=15|occ=0",
+      "component": "RZ",
+      "relativeError": 0.0586896657232463
+    },
+    {
+      "caseNumber": 7,
+      "family": "displacement",
+      "identity": "block=0|node=20|occ=0",
+      "component": "UX",
+      "relativeError": 0.05722923011978738
+    },
+    {
+      "caseNumber": 7,
+      "family": "globalForce",
+      "identity": "block=0|pair=10-15|occ=0|end=J",
+      "component": "fy",
+      "relativeError": 0.056341507738092225
+    },
+    {
+      "caseNumber": 7,
+      "family": "globalForce",
+      "identity": "block=0|pair=15-20|occ=0|end=I",
+      "component": "fy",
+      "relativeError": 0.056341507738092225
+    },
+    {
+      "caseNumber": 7,
+      "family": "localForce",
+      "identity": "block=0|pair=10-15|occ=0|end=J",
+      "component": "fy",
+      "relativeError": 0.056341507738092225
+    },
+    {
+      "caseNumber": 7,
+      "family": "localForce",
+      "identity": "block=0|pair=15-20|occ=0|end=I",
+      "component": "fz",
+      "relativeError": 0.056341507738092225
+    }
+  ]
 }
