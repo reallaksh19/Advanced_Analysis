@@ -64,10 +64,14 @@ jobs:
             scripts/lfea-m032-inputxml-force-moment-check.mjs \
             scripts/lfea-m032-bm3-load-custody.mjs \
             scripts/lfea-m032-bm3-load-custody-check.mjs \
-            scripts/lfea-m032-bm3-consolidated-latest-output-check.mjs; do
+            scripts/lfea-m032-bm3-consolidated-latest-output-check.mjs \
+            scripts/lfea-m032-bm3-mechanics-probe.mjs; do
             node --check "$file"
           done
           git diff --check
+
+      - name: Temporary BM3 mechanics probe
+        run: node scripts/lfea-m032-bm3-mechanics-probe.mjs
 
       - name: Generic InputXML force-moment qualification
         run: node scripts/lfea-m032-inputxml-force-moment-check.mjs
