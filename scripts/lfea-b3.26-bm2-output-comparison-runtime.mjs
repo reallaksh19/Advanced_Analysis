@@ -87,7 +87,7 @@ function sourceRestraintDescriptors(node) {
     } else if (typeCode === '15') {
       ciiType = 'Rigid +Z';
       dofs = ['UZ'];
-    } else if (typeCode === '8') {
+    } else if (typeCode === '9') {
       ciiType = 'Rigid GUI';
       dofs = [dominantGuideDof(restraint)];
     } else {

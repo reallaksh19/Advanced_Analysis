@@ -43,7 +43,7 @@ const CORRECTED_TYPE_MAP = Object.freeze({
 
 const EXPECTED_ROWS = Object.freeze([
   Object.freeze({ label: '+Y', from: '17', to: '14' }),
-  Object.freeze({ label: 'LIM', from: '7', to: '8' }),
+  Object.freeze({ label: 'GUI', from: '7', to: '9' }),
   Object.freeze({ label: 'GUI', from: '10', to: '9' }),
   Object.freeze({ label: 'X', from: '1', to: '2' }),
   Object.freeze({ label: 'Y', from: '2', to: '3' }),

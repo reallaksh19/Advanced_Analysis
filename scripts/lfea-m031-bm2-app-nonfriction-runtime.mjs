@@ -79,7 +79,7 @@ function contactConstraints(geometry, activeContact) {
       const typeCode = String(restraint.typeCode);
       if (typeCode === '14' && activeContact === 'PLUS_Y') add(node.id, 'UY', 'PLUS-Y-ACTIVE');
       if (typeCode === '15' && activeContact === 'PLUS_Z') add(node.id, 'UZ', 'PLUS-Z-ACTIVE');
-      if (typeCode === '8') add(node.id, dominantGuideDof(restraint), 'GUIDE');
+      if (typeCode === '9') add(node.id, dominantGuideDof(restraint), 'GUIDE');
     }
   }
   return Object.freeze([...rows.values()].sort((left, right) => compareIds(left.nodeId, right.nodeId)

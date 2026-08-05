@@ -67,8 +67,8 @@ function comparisonRow({ caseLabel, family, identifier, nodeId, component, refer
 }
 
 function dominantGuideDof(restraints) {
-  const guide = restraints.find((row) => String(row.typeCode) === '8');
-  if (!guide) throw new Error('BM2 guide occurrence lacks source type 8 evidence.');
+  const guide = restraints.find((row) => String(row.typeCode) === '9');
+  if (!guide) throw new Error('BM2 guide occurrence lacks source type 9 evidence.');
   const values = [Math.abs(guide.xCosine ?? 0), Math.abs(guide.yCosine ?? 0), Math.abs(guide.zCosine ?? 0)];
   return ['UX', 'UY', 'UZ'][values.indexOf(Math.max(...values))];
 }

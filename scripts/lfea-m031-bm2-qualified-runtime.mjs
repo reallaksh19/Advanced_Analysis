@@ -396,7 +396,7 @@ function constraintDeclarations(geometry, activeContacts) {
       if (contact && activeContacts.has(contactKey(node.id, contact.dof))) {
         add(node.id, contact.dof, `${contact.permittedGapDirection.replace('+', 'PLUS-')}-ACTIVE`);
       }
-      if (restraint.typeCode === '8') {
+      if (restraint.typeCode === '9') {
         const direction = [
           Math.abs(restraint.xCosine ?? 0),
           Math.abs(restraint.yCosine ?? 0),

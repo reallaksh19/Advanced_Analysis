@@ -19,7 +19,7 @@ export function buildBm2IngestionAudit() {
   const geometry = inputXmlToCanonicalGeometry(xmlText, {
     unit: 'mm',
     source: 'CAESAR-II-BM2-INPUTXML',
-    restraintTypeCodeMap: { 0: 'ANCHOR', 14: 'GUIDE', 8: 'GUIDE' },
+    restraintTypeCodeMap: { 0: 'ANCHOR', 14: 'GUIDE', 8: 'GUIDE', 9: 'GUIDE' },
     bendRadiusTolerance: 1e-6,
   });
   return Object.freeze({ xmlText, geometry, audit: auditInputXmlIngestion(xmlText, geometry) });
