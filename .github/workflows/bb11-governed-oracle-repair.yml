@@ -1,0 +1,80 @@
+name: BB-11 governed independent-oracle repair
+
+on:
+  pull_request:
+    branches:
+      - agent/bucket-b-bb11-flange-hub
+    paths:
+      - src/core/bucket-b/flange-hub-independent-oracle.js
+      - tests/bucket-b-bb11-independent-oracle-repair.test.mjs
+      - .github/workflows/bb11-governed-oracle-repair.yml
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-governed-oracle-repair:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      TZ: UTC
+      LC_ALL: C
+      NODE_OPTIONS: --max-old-space-size=7168
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Enforce exact ancestry and three-file scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='${{ github.event.pull_request.base.sha }}'
+          head='${{ github.event.pull_request.head.sha }}'
+          test "$(git rev-parse HEAD)" = "$head"
+          test "$(git merge-base "$base" "$head")" = "$base"
+          git diff --check "${base}...${head}"
+          mapfile -t paths < <(git diff --name-only "${base}...${head}")
+          test "${#paths[@]}" -eq 3
+          test "${paths[0]}" = '.github/workflows/bb11-governed-oracle-repair.yml'
+          test "${paths[1]}" = 'src/core/bucket-b/flange-hub-independent-oracle.js'
+          test "${paths[2]}" = 'tests/bucket-b-bb11-independent-oracle-repair.test.mjs'
+
+      - name: Validate source and governed regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check src/core/bucket-b/flange-hub-independent-oracle.js
+          timeout --signal=TERM --kill-after=60s 48m \
+            node --test tests/bucket-b-bb11-independent-oracle-repair.test.mjs
+
+      - name: Execute complete oracle twice and require byte identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports
+          for run in a b; do
+            timeout --signal=TERM --kill-after=60s 48m \
+              node --input-type=module --eval "import { runIndependentFlangeHubOracle } from './src/core/bucket-b/flange-hub-independent-oracle.js'; const ids=['FH-PRES-001','FH-AXIAL-001','FH-GASKET-001']; process.stdout.write(JSON.stringify(ids.map(runIndependentFlangeHubOracle)));" \
+              > "reports/oracle-${run}.json"
+          done
+          cmp reports/oracle-a.json reports/oracle-b.json
+          node --input-type=module --eval "import assert from 'node:assert/strict'; import { readFile } from 'node:fs/promises'; const reports=JSON.parse(await readFile('reports/oracle-a.json','utf8')); reports.forEach((report)=>{ assert.equal(report.status,'PASS'); assert.equal(report.levels.length,5); report.levels.forEach((level)=>{ assert.equal(level.connectivity.accepted,true); assert.ok(level.solver.relativeResidual <= 1e-10); assert.ok(Number.isFinite(level.solver.explicitResidualNorm)); }); report.convergence.rows.forEach((row)=>assert.equal(row.accepted,true)); });"
+
+      - name: Upload governed oracle evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: bb11-governed-oracle-${{ github.event.pull_request.head.sha }}
+          path: reports
+          retention-days: 30
