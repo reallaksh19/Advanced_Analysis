@@ -1,0 +1,66 @@
+name: BB-11 independent-oracle Jacobi diagnostic
+
+on:
+  push:
+    branches:
+      - diagnostic/bb11-oracle-jacobi
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bb11-oracle-jacobi-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    name: Diagnose FH-PRES-001 O0 with Jacobi-PCG
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TZ: UTC
+      LC_ALL: C
+      BB11_DIAGNOSTICS: '1'
+    steps:
+      - name: Check out exact diagnostic head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify diagnostic containment
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/bb11-independent-oracle-jacobi-diagnostic.mjs
+          git diff --check HEAD^
+          mapfile -t paths < <(git diff --name-only HEAD^ HEAD)
+          test "${#paths[@]}" -eq 2
+          printf '%s\n' "${paths[@]}" | sort > /tmp/actual-paths
+          printf '%s\n' \
+            '.github/workflows/bb11-independent-oracle-jacobi-diagnostic.yml' \
+            'scripts/bb11-independent-oracle-jacobi-diagnostic.mjs' \
+            | sort > /tmp/expected-paths
+          cmp /tmp/actual-paths /tmp/expected-paths
+
+      - name: Run O0 pressure Jacobi diagnostic
+        run: node scripts/bb11-independent-oracle-jacobi-diagnostic.mjs
+
+      - name: Upload diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bb11-oracle-jacobi-${{ github.sha }}-${{ github.run_attempt }}
+          path: reports/bb11-oracle-jacobi
+          if-no-files-found: warn
+          retention-days: 30
