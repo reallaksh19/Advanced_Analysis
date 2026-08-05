@@ -1,15 +1,19 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 
 const SJSON_BYTES = readFileSync(new URL('../public/Sjson.json', import.meta.url));
+const EXPECTED_BENCHMARK_URL = new URL('../Temp/3D EDIT RENDER/EXPECTED.png', import.meta.url);
+const EXPECTED_BENCHMARK_BYTES = readFileSync(EXPECTED_BENCHMARK_URL);
 const REPORTED_CANDIDATE_SHA = '8754ea4f7ff839d5085ceffa845ded9c81557149';
 const EXECUTING_CANDIDATE_SHA = process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA
   || process.env.GITHUB_SHA
   || 'UNKNOWN';
+const BENCHMARK_VIEWPORT = Object.freeze({ width: 1637, height: 869 });
 
 test.beforeEach(async ({ page }) => {
   test.setTimeout(120_000);
-  await page.setViewportSize({ width: 1600, height: 1050 });
+  await page.setViewportSize(BENCHMARK_VIEWPORT);
   await page.addInitScript(() => globalThis.localStorage?.clear());
 });
 
@@ -83,6 +87,9 @@ test('production Sjson opens 3D Edit with complete typed fittings and spatially 
   await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-referenced-branch-diameter-count'), {
     timeout: 60_000,
   }).toBeGreaterThanOrEqual(13);
+  await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-support-parent-branch-diameter-count'), {
+    timeout: 60_000,
+  }).toBeGreaterThanOrEqual(100);
   await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-geometry-diagnostic-count'), {
     timeout: 60_000,
   }).toBe(0);
@@ -91,14 +98,32 @@ test('production Sjson opens 3D Edit with complete typed fittings and spatially 
   expect(bodyText).not.toContain('TopologyEditCanonicalId:');
   await expect(shell.locator('[data-role="topology-edit-status"]')).toContainText(/nodes, .*edges, .*supports/u);
 
+  const screenshotPath = testInfo.outputPath('sjson-3d-edit-fittings-supports.png');
+  await page.screenshot({
+    path: screenshotPath,
+    fullPage: false,
+  });
+  const candidateScreenshotBytes = readFileSync(screenshotPath);
+  const expectedPath = testInfo.outputPath('EXPECTED.png');
+  copyFileSync(EXPECTED_BENCHMARK_URL, expectedPath);
+
   const ledger = await canvasHost.evaluate((element, {
     baseCandidateSha,
     executingCandidateSha,
+    benchmarkViewport,
+    benchmarkSha256,
+    candidateScreenshotSha256,
   }) => ({
     schema: 'topology-edit-sjson-webgl-ledger/v1',
     baseCandidateSha,
     executingCandidateSha,
     browserBuildSha: globalThis.__BUILD_SHA__ || null,
+    benchmark: {
+      path: 'Temp/3D EDIT RENDER/EXPECTED.png',
+      viewport: benchmarkViewport,
+      sha256: benchmarkSha256,
+      candidateScreenshotSha256,
+    },
     sourceHash: element.closest('[data-role="topology-edit-render-host"]')?.dataset.topologyEditDatasetSourceHash || '',
     canonicalHash: element.closest('[data-role="topology-edit-render-host"]')?.dataset.topologyEditDatasetCanonicalHash || '',
     visualModelHash: element.dataset.topologyEditVisualModelHash || '',
@@ -109,6 +134,7 @@ test('production Sjson opens 3D Edit with complete typed fittings and spatially 
     diameterAuthorityCounts: {
       parentBranch: Number(element.dataset.topologyEditParentBranchDiameterCount || 0),
       referencedBranch: Number(element.dataset.topologyEditReferencedBranchDiameterCount || 0),
+      supportParentBranch: Number(element.dataset.topologyEditSupportParentBranchDiameterCount || 0),
       visualProxy: Number(element.dataset.topologyEditVisualProxyWarningCount || 0),
     },
     primitiveCounts: {
@@ -129,6 +155,9 @@ test('production Sjson opens 3D Edit with complete typed fittings and spatially 
   }), {
     baseCandidateSha: REPORTED_CANDIDATE_SHA,
     executingCandidateSha: EXECUTING_CANDIDATE_SHA,
+    benchmarkViewport: BENCHMARK_VIEWPORT,
+    benchmarkSha256: sha256(EXPECTED_BENCHMARK_BYTES),
+    candidateScreenshotSha256: sha256(candidateScreenshotBytes),
   });
 
   expect(ledger.executingCandidateSha).not.toBe('UNKNOWN');
@@ -138,12 +167,13 @@ test('production Sjson opens 3D Edit with complete typed fittings and spatially 
   expect(ledger.supportProjectionHash).not.toBe('');
   expect(ledger.diameterAuthorityCounts.parentBranch).toBeGreaterThanOrEqual(100);
   expect(ledger.diameterAuthorityCounts.referencedBranch).toBeGreaterThanOrEqual(13);
+  expect(ledger.diameterAuthorityCounts.supportParentBranch).toBeGreaterThanOrEqual(100);
 
   const ledgerPath = testInfo.outputPath('sjson-3d-edit-render-ledger.json');
   writeFileSync(ledgerPath, `${JSON.stringify(ledger, null, 2)}\n`, 'utf8');
-  await page.screenshot({
-    path: testInfo.outputPath('sjson-3d-edit-fittings-supports.png'),
-    fullPage: true,
+  await testInfo.attach('expected-3d-edit-render-benchmark', {
+    path: expectedPath,
+    contentType: 'image/png',
   });
   await testInfo.attach('sjson-3d-edit-render-ledger', {
     path: ledgerPath,
@@ -154,4 +184,8 @@ test('production Sjson opens 3D Edit with complete typed fittings and spatially 
 async function integerAttribute(locator, name) {
   const value = await locator.getAttribute(name);
   return Number.parseInt(value || '0', 10) || 0;
+}
+
+function sha256(bytes) {
+  return createHash('sha256').update(bytes).digest('hex');
 }
