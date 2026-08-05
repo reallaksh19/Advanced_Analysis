@@ -40,7 +40,7 @@ import {
 } from '../src/workspace/engineering-loads/empirical-method-registry.js';
 
 const METHOD = 'EMPIRICAL_RESTRAINT_NETWORK_V1';
-const LOAD_CASE_ID = 'THERMAL-Z';
+const LOAD_CASE_ID = 'EXP-THERMAL-ON-HOT-SUPPORT-SET';
 const EXECUTED_AT = '2026-08-05T23:00:00.000Z';
 const SOURCE_HASH = 'sha256:wp5-qualified-fixture';
 const E = 200e9;
