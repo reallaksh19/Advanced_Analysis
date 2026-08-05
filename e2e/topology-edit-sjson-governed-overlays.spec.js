@@ -38,7 +38,7 @@ test('SJSON uses one governed packet with exact tees, selectable sphere nodes an
   await expect(host).toHaveAttribute('data-topology-edit-camera-clipping-mode', 'AUTO');
   await expect(host).toHaveAttribute(
     'data-topology-edit-camera-clipping-authority',
-    'SJSON_CAMERA_SPACE_DYNAMIC_CLIPPING_V1',
+    'SJSON_CAMERA_SPACE_DYNAMIC_CLIPPING_V2',
   );
   await expect(host).toHaveAttribute(
     'data-topology-edit-sjson-issue-render-authority',
