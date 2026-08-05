@@ -23,9 +23,11 @@ on:
       - 'src/workspace/topology-edit/topology-edit-sjson-point-component-projection.js'
       - 'src/workspace/topology-edit/topology-edit-sjson-parent-branch-diameter.js'
       - 'src/workspace/topology-edit/topology-edit-sjson-support-parent-branch-diameter.js'
+      - 'src/workspace/topology-edit/topology-edit-sjson-restraint-projection.js'
       - 'src/workspace/topology-edit/support-restraint-family.js'
       - 'tests/topology-edit-sjson-render-authority.test.mjs'
       - 'tests/topology-edit-sjson-fidelity.test.mjs'
+      - 'tests/topology-edit-sjson-restraint-projection.test.mjs'
       - 'tests/topology-edit-split-lineage-certification.test.mjs'
       - 'tests/topology-edit-20-element-demo-loader.test.mjs'
       - 'tests/topology-edit-render-fidelity.test.mjs'
@@ -88,8 +90,10 @@ jobs:
           node --check src/workspace/topology-edit/topology-edit-sjson-point-component-projection.js
           node --check src/workspace/topology-edit/topology-edit-sjson-parent-branch-diameter.js
           node --check src/workspace/topology-edit/topology-edit-sjson-support-parent-branch-diameter.js
+          node --check src/workspace/topology-edit/topology-edit-sjson-restraint-projection.js
           node --check tests/topology-edit-sjson-render-authority.test.mjs
           node --check tests/topology-edit-sjson-fidelity.test.mjs
+          node --check tests/topology-edit-sjson-restraint-projection.test.mjs
           node --check tests/topology-edit-split-lineage-certification.test.mjs
           node --check e2e/topology-edit-sjson-render-authority.spec.js
           node --check e2e/topology-edit-clean-layout.spec.js
@@ -101,6 +105,7 @@ jobs:
             tests/topology-edit-split-lineage-certification.test.mjs \
             tests/topology-edit-sjson-render-authority.test.mjs \
             tests/topology-edit-sjson-fidelity.test.mjs \
+            tests/topology-edit-sjson-restraint-projection.test.mjs \
             tests/topology-edit-20-element-demo-loader.test.mjs \
             tests/topology-edit-render-fidelity.test.mjs \
             tests/topology-edit-m003-capability-authority.test.mjs
