@@ -21,7 +21,7 @@ const xml = readFileSync(BM1_PATH, 'utf8');
 const geometry = inputXmlToCanonicalGeometry(xml, {
   unit: 'mm',
   source: 'CAESAR-II-BM1-LIVE-INPUTXML',
-  restraintTypeCodeMap: { 0: 'ANCHOR', 14: 'GUIDE', 8: 'GUIDE' },
+  restraintTypeCodeMap: { 0: 'ANCHOR', 14: 'GUIDE', 8: 'GUIDE', 9: 'GUIDE' },
   bendRadiusTolerance: 1e-6,
 });
 
@@ -86,7 +86,7 @@ const sourceRestraints = first.nodes.flatMap((row) => row.restraints);
 assert.ok(sourceRestraints.some((row) => row.sourceTypeCode === '17'
   && row.typeCode === '14' && row.mutationApplied === true));
 assert.ok(sourceRestraints.some((row) => row.sourceTypeCode === '7'
-  && row.typeCode === '8' && row.mutationApplied === true));
+  && row.typeCode === '9' && row.mutationApplied === true));
 
 assert.equal(firstExports.length, 3);
 assert.equal(firstExports[0].mediaType, 'application/json');

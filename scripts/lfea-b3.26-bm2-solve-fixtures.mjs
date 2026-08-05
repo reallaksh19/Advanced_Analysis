@@ -242,7 +242,7 @@ function constraintDeclarations(geometry) {
     }
     for (const restraint of node.meta.restraints ?? []) {
       if (restraint.typeCode === '14') add(node.id, 'UY', 'PLUS-Y-LINEARIZED');
-      if (restraint.typeCode === '8') {
+      if (restraint.typeCode === '9') {
         const direction = [
           Math.abs(restraint.xCosine ?? 0),
           Math.abs(restraint.yCosine ?? 0),
@@ -309,7 +309,7 @@ export function buildBm2SolveAuthorities() {
   const parsed = inputXmlToCanonicalGeometry(content, {
     unit: 'mm',
     source: BM2_SOURCE_ID,
-    restraintTypeCodeMap: { 0: 'ANCHOR', 14: 'GUIDE', 8: 'GUIDE' },
+    restraintTypeCodeMap: { 0: 'ANCHOR', 14: 'GUIDE', 8: 'GUIDE', 9: 'GUIDE' },
     bendRadiusTolerance: 1e-6,
   });
   const unitProfile = sealLinearPipingInputXmlUnitProfile({
