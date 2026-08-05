@@ -11,12 +11,12 @@ import {
 import { FLANGE_HUB_MATERIAL_PROFILE } from './flange-hub-geometry.js';
 
 export const FLANGE_HUB_SOLVER_POLICY = deepFreeze({
-  solverPolicyId: 'BKT-B-FLANGE-HUB-DETERMINISTIC-SGS-PCG-V5',
+  solverPolicyId: 'BKT-B-FLANGE-HUB-DETERMINISTIC-SGS-PCG-V6',
   relativeResidualTolerance: 1e-12,
   absoluteResidualTolerance: 1e-10,
   maximumIterationMultiplier: 8,
   minimumMaximumIterations: 2000,
-  residualReplacementInterval: 0,
+  residualReplacementInterval: 1024,
   preconditionerId: 'SYMMETRIC_GAUSS_SEIDEL',
   stoppingCriterion: 'EXPLICIT_REDUCED_SYSTEM_RESIDUAL',
   constraintMethod: 'EXACT_ZERO_DISPLACEMENT_ELIMINATION',
