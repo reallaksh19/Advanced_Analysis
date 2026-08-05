@@ -1,0 +1,186 @@
+name: LAFEA-NC Solver Controlled Build Evidence
+
+on:
+  pull_request:
+    branches:
+      - agent/lafea-nc-solver-source-license-evidence
+    paths:
+      - '.github/workflows/lafea-nc-solver-build-evidence.yml'
+      - 'docs/nonlinear-shell-contact/LAFEA_NC_SOLVER_BUILD_EVIDENCE.md'
+      - 'scripts/lafea-nc-solver-controlled-build.sh'
+      - 'scripts/lafea-nc-solver-build-evidence-check.mjs'
+      - 'tests/nonlinear-shell-contact-solver-build-evidence.test.mjs'
+  workflow_dispatch:
+    inputs:
+      head_sha:
+        description: Exact controlled-build evidence head SHA
+        required: true
+        type: string
+      base_sha:
+        description: Exact source/license evidence base SHA
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  exact-head-controlled-build-evidence:
+    runs-on: ubuntu-24.04
+    env:
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      DISPATCH_HEAD_SHA: ${{ inputs.head_sha }}
+      DISPATCH_BASE_SHA: ${{ inputs.base_sha }}
+      BASE_BRANCH: agent/lafea-nc-solver-source-license-evidence
+      SOURCE_EVIDENCE_RUN_ID: '30995729131'
+      SOURCE_ARCHIVE_HASH: sha256:901908b655837fadc0a2753331bbaf81916ee1701b4c015254f1b09a15eec97f
+      LICENSE_HASH: sha256:8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
+    steps:
+      - name: Resolve exact head
+        id: exact
+        shell: bash
+        run: |
+          set -euo pipefail
+          head_sha="${DISPATCH_HEAD_SHA:-${PR_HEAD_SHA:-${GITHUB_SHA}}}"
+          [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]]
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.exact.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Resolve live source/license base
+        id: base
+        shell: bash
+        env:
+          EXACT_HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "$BASE_BRANCH:refs/remotes/origin/$BASE_BRANCH"
+          live_base="$(git rev-parse "refs/remotes/origin/$BASE_BRANCH")"
+          base_sha="${DISPATCH_BASE_SHA:-${PR_BASE_SHA}}"
+          [[ "$base_sha" =~ ^[0-9a-f]{40}$ ]]
+          test "$base_sha" = "$live_base"
+          test "$(git rev-parse HEAD)" = "$EXACT_HEAD_SHA"
+          git merge-base --is-ancestor "$base_sha" "$EXACT_HEAD_SHA"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify changed-path containment, syntax, and unit contracts
+        shell: bash
+        env:
+          EXACT_HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
+          BASE_SHA: ${{ steps.base.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          git diff --check "$BASE_SHA...$EXACT_HEAD_SHA"
+          mapfile -t paths < <(git diff --name-only "$BASE_SHA...$EXACT_HEAD_SHA")
+          test "${#paths[@]}" = '5'
+          for path in "${paths[@]}"; do
+            case "$path" in
+              .github/workflows/lafea-nc-solver-build-evidence.yml|\
+              docs/nonlinear-shell-contact/LAFEA_NC_SOLVER_BUILD_EVIDENCE.md|\
+              scripts/lafea-nc-solver-controlled-build.sh|\
+              scripts/lafea-nc-solver-build-evidence-check.mjs|\
+              tests/nonlinear-shell-contact-solver-build-evidence.test.mjs) ;;
+              *) echo "Controlled-build changed-path violation: $path" >&2; exit 1 ;;
+            esac
+          done
+          bash -n scripts/lafea-nc-solver-controlled-build.sh
+          node --check scripts/lafea-nc-solver-build-evidence-check.mjs
+          node --check tests/nonlinear-shell-contact-solver-build-evidence.test.mjs
+          node --test tests/nonlinear-shell-contact-solver-build-evidence.test.mjs
+
+      - name: Install controlled build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc gfortran make perl curl ca-certificates \
+            libarpack2-dev libblas-dev liblapack-dev binutils
+
+      - name: Download retained source and license evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          rm -rf "$RUNNER_TEMP/prior-source"
+          mkdir -p "$RUNNER_TEMP/prior-source"
+          gh run download "$SOURCE_EVIDENCE_RUN_ID" --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/prior-source"
+          source_archive="$(find "$RUNNER_TEMP/prior-source" -type f -name 'CalculiX-*.tar.gz' -print -quit)"
+          license_file="$(find "$RUNNER_TEMP/prior-source" -type f -name LICENSE -print -quit)"
+          test -n "$source_archive" && test -n "$license_file"
+          test "sha256:$(sha256sum "$source_archive" | cut -d' ' -f1)" = "$SOURCE_ARCHIVE_HASH"
+          test "sha256:$(sha256sum "$license_file" | cut -d' ' -f1)" = "$LICENSE_HASH"
+
+      - name: Execute independent controlled builds
+        id: build
+        shell: bash
+        run: |
+          set +e
+          rm -rf artifacts/lafea-nc-solver-build artifacts/lafea-nc-solver-build-debug
+          mkdir -p artifacts/lafea-nc-solver-build-debug
+          SOURCE_ARTIFACT_DIR="$RUNNER_TEMP/prior-source" \
+          OUTPUT_A="$RUNNER_TEMP/lafea-build-evidence-a" \
+          OUTPUT_B="$RUNNER_TEMP/lafea-build-evidence-b" \
+            bash scripts/lafea-nc-solver-controlled-build.sh \
+            > artifacts/lafea-nc-solver-build-debug/controller.stdout.log \
+            2> artifacts/lafea-nc-solver-build-debug/controller.stderr.log
+          status=$?
+          printf '%s\n' "$status" > artifacts/lafea-nc-solver-build-debug/exit-code.txt
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          if [[ "$status" = '0' ]]; then
+            mkdir -p artifacts/lafea-nc-solver-build
+            cp -R "$RUNNER_TEMP/lafea-build-evidence-a"/. artifacts/lafea-nc-solver-build/
+          else
+            if [[ -d "$RUNNER_TEMP/lafea-nc-ccx-build" ]]; then
+              cp -R "$RUNNER_TEMP/lafea-nc-ccx-build" artifacts/lafea-nc-solver-build-debug/work-root
+            fi
+          fi
+          exit 0
+
+      - name: Upload controlled-build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc-solver-build-debug-${{ steps.exact.outputs.head_sha }}-${{ github.run_attempt }}
+          path: artifacts/lafea-nc-solver-build-debug
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce controlled-build success
+        shell: bash
+        env:
+          EXIT_CODE: ${{ steps.build.outputs.exit_code }}
+        run: test "$EXIT_CODE" = '0'
+
+      - name: Verify clean source tree and final evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain --untracked-files=no)"
+          test -s artifacts/lafea-nc-solver-build/binary/ccx_2.22
+          node scripts/lafea-nc-solver-build-evidence-check.mjs \
+            --root=artifacts/lafea-nc-solver-build \
+            --output-dir=artifacts/lafea-nc-solver-build/reports-final
+          diff -u \
+            artifacts/lafea-nc-solver-build/reports/solver-custody-build-report.json \
+            artifacts/lafea-nc-solver-build/reports-final/solver-custody-build-report.json
+
+      - name: Upload controlled-build evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc-solver-build-${{ steps.exact.outputs.head_sha }}-${{ github.run_attempt }}
+          path: artifacts/lafea-nc-solver-build
+          if-no-files-found: error
+          retention-days: 30
