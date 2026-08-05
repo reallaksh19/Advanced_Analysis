@@ -30,3 +30,5 @@ export * from './code-assessment-package-contract.js';
 export * from './code-assessment-qualification-evaluator.js';
 export * from './case-assessment-receipt-contract.js';
 export * from './case-assessment-qualification-evaluator.js';
+export * from './module-qualification-contract.js';
+export * from './module-qualification-evaluator.js';
