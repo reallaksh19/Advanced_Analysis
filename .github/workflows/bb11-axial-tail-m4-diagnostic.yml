@@ -1,0 +1,163 @@
+name: BB-11 bounded axial tail M4 diagnostic
+
+on:
+  push:
+    branches:
+      - diagnostic/bb11-axial-tail-m4
+    paths:
+      - '.github/workflows/bb11-axial-tail-m4-diagnostic.yml'
+      - 'scripts/bb11-axial-tail-m4-diagnostic.mjs'
+      - 'src/core/bucket-b/flange-hub-diagnostic-solver.js'
+      - 'tests/bucket-b-bb11-m4-diagnostic.test.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    name: Non-authorizing bounded axial M0-M4 diagnostic
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+
+    steps:
+      - name: Check out diagnostic head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify exact production ancestry and blob identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin agent/bucket-b-bb11-flange-hub --depth=1
+          production_head="$(git rev-parse origin/agent/bucket-b-bb11-flange-hub)"
+          diagnostic_head="$(git rev-parse HEAD)"
+          git merge-base --is-ancestor "$production_head" "$diagnostic_head"
+
+          changed="$(git diff --name-only "$production_head" "$diagnostic_head" | sort)"
+          expected=$'.github/workflows/bb11-axial-tail-m4-diagnostic.yml\nscripts/bb11-axial-tail-m4-diagnostic.mjs\nsrc/core/bucket-b/flange-hub-diagnostic-solver.js\ntests/bucket-b-bb11-m4-diagnostic.test.mjs'
+          test "$changed" = "$expected"
+
+          while IFS= read -r path; do
+            test -n "$path"
+            test "$(git rev-parse "$production_head:$path")" = "$(git rev-parse "$diagnostic_head:$path")"
+          done <<'PATHS'
+          .github/workflows/bucket-b-bb11-flange-hub.yml
+          docs/Bucket_B_BB11_Flange_Hub_Qualification_Record.md
+          src/core/bucket-b/bb11-check.mjs
+          src/core/bucket-b/bb11-flange-hub.js
+          src/core/bucket-b/bb11-shared-gate-replay.mjs
+          src/core/bucket-b/flange-hub-authority.js
+          src/core/bucket-b/flange-hub-convergence.js
+          src/core/bucket-b/flange-hub-geometry.js
+          src/core/bucket-b/flange-hub-independent-oracle.js
+          src/core/bucket-b/flange-hub-loads.js
+          src/core/bucket-b/flange-hub-mesh.js
+          src/core/bucket-b/flange-hub-recovery.js
+          src/core/bucket-b/flange-hub-reference.js
+          src/core/bucket-b/flange-hub-solver.js
+          src/core/bucket-b/index.js
+          src/core/bucket-b/registry.js
+          tests/bucket-b-bb11-flange-hub.test.mjs
+          PATHS
+
+          {
+            printf 'BB11_PRODUCTION_HEAD=%s\n' "$production_head"
+            printf 'BB11_DIAGNOSTIC_HEAD=%s\n' "$diagnostic_head"
+            printf 'BB11_PRODUCTION_BLOB_IDENTITY=true\n'
+            printf 'BB11_DIAGNOSTIC_SOLVER_BLOB=%s\n' "$(git rev-parse HEAD:src/core/bucket-b/flange-hub-diagnostic-solver.js)"
+            printf 'BB11_DIAGNOSTIC_SCRIPT_BLOB=%s\n' "$(git rev-parse HEAD:scripts/bb11-axial-tail-m4-diagnostic.mjs)"
+            printf 'BB11_DIAGNOSTIC_WORKFLOW_BLOB=%s\n' "$(git rev-parse HEAD:.github/workflows/bb11-axial-tail-m4-diagnostic.yml)"
+          } >> "$GITHUB_ENV"
+
+          printf 'production_head=%s\ndiagnostic_head=%s\n' "$production_head" "$diagnostic_head"
+
+      - name: Verify diagnostic syntax and bounded M0 equivalence
+        env:
+          TZ: UTC
+          LC_ALL: C
+        run: |
+          node --check src/core/bucket-b/flange-hub-diagnostic-solver.js
+          node --check scripts/bb11-axial-tail-m4-diagnostic.mjs
+          node --check tests/bucket-b-bb11-m4-diagnostic.test.mjs
+          node --test tests/bucket-b-bb11-m4-diagnostic.test.mjs
+
+      - name: Add workspace-only M4 level
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/core/bucket-b/flange-hub-mesh.js')
+          text = path.read_text()
+          replacements = [
+              (
+                  "export const FLANGE_HUB_MESH_FAMILY_ID = 'BKT-B-FLANGE-Q8-MESH-FAMILY-V1';",
+                  "export const FLANGE_HUB_MESH_FAMILY_ID = 'BKT-B-FLANGE-Q8-DIAGNOSTIC-M4-V1';",
+              ),
+              (
+                  "  { levelId: 'M3', refinement: 8 },\n]);",
+                  "  { levelId: 'M3', refinement: 8 },\n  { levelId: 'M4', refinement: 16 },\n]);",
+              ),
+          ]
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected one diagnostic replacement for {old!r}; found {count}')
+              text = text.replace(old, new)
+          path.write_text(text)
+          PY
+          git diff --check
+          node --check src/core/bucket-b/flange-hub-mesh.js
+          git diff -- src/core/bucket-b/flange-hub-mesh.js
+
+      - name: Execute bounded axial M0-M4 diagnostic
+        env:
+          BB11_DIAGNOSTIC_MESH_FAMILY_ID: BKT-B-FLANGE-Q8-DIAGNOSTIC-M4-V1
+          BB11_M4_DIAGNOSTIC_REPORT_PATH: reports/bb11-axial-tail-m4.json
+          BB11_DIAGNOSTIC_HEAP_LIMIT_MIB: '6144'
+          BB11_DIAGNOSTIC_TIMEOUT_MINUTES: '55'
+          TZ: UTC
+          LC_ALL: C
+        run: timeout --signal=TERM --kill-after=30s 55m node --max-old-space-size=6144 --expose-gc scripts/bb11-axial-tail-m4-diagnostic.mjs
+
+      - name: Validate non-authorizing bounded evidence
+        if: success()
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          const report = JSON.parse(readFileSync('reports/bb11-axial-tail-m4.json', 'utf8'));
+          assert.equal(report.status, 'COMPLETED');
+          assert.equal(report.levels.length, 5);
+          assert.deepEqual(report.levels.map((row) => row.levelId), ['M0', 'M1', 'M2', 'M3', 'M4']);
+          assert.equal(report.custody.productionBlobIdentityVerified, true);
+          assert.equal(report.qualificationAuthorityGranted, false);
+          assert.equal(report.productionAuthorityGranted, false);
+          assert.equal(report.mergeAuthorityGranted, false);
+          assert.equal(report.bb12Authorized, false);
+          assert.ok(report.levels.every((row) => row.serializedResultBytes < 1_000_000));
+          assert.ok(report.levels.every((row) => row.equilibrium.accepted));
+          assert.ok(report.levels.every((row) => row.energy.accepted));
+          assert.ok(report.levels.every((row) => row.residual.accepted));
+          NODE
+
+      - name: Upload non-authorizing evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bb11-bounded-axial-tail-m4-${{ github.sha }}-${{ github.run_attempt }}
+          path: reports/bb11-axial-tail-m4.json
+          if-no-files-found: error
+          retention-days: 14
