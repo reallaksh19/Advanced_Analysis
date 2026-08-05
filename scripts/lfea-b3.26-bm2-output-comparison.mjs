@@ -1,12 +1,13 @@
 import { fileURLToPath } from 'node:url';
 import { findElements } from '../src/core/geometry/adapters/inputxml-tag-scanner.js';
+import { completeBm2ExpansionCase } from './lfea-b3.26-bm2-output-comparison-expansion.mjs';
 
 export const BM2_CII_OUTPUT_PATH = fileURLToPath(new URL('../benchmarks/LFEA/BM2/Output_BM2.xml', import.meta.url));
 
 const CASES = Object.freeze(['OPE', 'SUS', 'EXP']);
 
 export const BM2_COMPARISON_POLICY = Object.freeze({
-  relativeTolerancePercent: 10,
+  relativeTolerancePercent: 5,
   nearZeroReferenceThreshold: 1e-9,
   absoluteTolerance: Object.freeze({
     translation: 1e-5,
@@ -216,11 +217,8 @@ export function parseBm2CiiOutput(xmlText) {
 
   const globalForce = parseElementReports(xmlText, 'GLOBAL_FORCE_REPORT', 'globalForce');
   const localForce = parseElementReports(xmlText, 'LOCAL_FORCE_REPORT', 'localForce');
-  for (const label of CASES) {
-    for (const [name, map] of Object.entries({ displacement, restraint, globalForce, localForce })) {
-      if (!map.has(label)) throw new Error(`Output_BM2.xml is missing ${name} report for ${label}.`);
-    }
-  }
+  const reportMaps = { displacement, restraint, globalForce, localForce };
+  const expansionCase = completeBm2ExpansionCase(reportMaps);
 
   return Object.freeze({
     schema: 'fea-caesar-output-row-custody/v1',
@@ -228,5 +226,6 @@ export function parseBm2CiiOutput(xmlText) {
     restraint,
     globalForce,
     localForce,
+    caseDerivation: Object.freeze({ EXP: expansionCase }),
   });
 }

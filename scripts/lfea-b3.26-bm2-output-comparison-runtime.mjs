@@ -4,7 +4,7 @@ import {
   BM2_COMPARISON_POLICY,
   parseBm2CiiOutput,
 } from './lfea-b3.26-bm2-output-comparison.mjs';
-import { solveBm2InputXmlConditioned } from './lfea-b3.26-bm2-solve-runtime.mjs';
+import { solveBm2InputXmlConditioned } from './lfea-m031-bm2-qualified-runtime.mjs';
 
 const CASES = Object.freeze(['OPE', 'SUS', 'EXP']);
 const NODE_DOFS = Object.freeze(['UX', 'UY', 'UZ', 'RX', 'RY', 'RZ']);
@@ -20,7 +20,7 @@ export const BM2_COMPARISON_FAMILIES = Object.freeze([
 ]);
 
 export const BM2_COVERAGE_SCHEMA = 'fea-caesar-output-coverage/v1';
-export const BM2_MATCHED_SUBSET_METRIC = 'CURRENT_MATCHED_SOURCE_SUBSET_SCALARS';
+export const BM2_MATCHED_SUBSET_METRIC = 'FULL_RETAINED_STATION_SCALARS';
 
 export function absoluteToleranceForComparison(family, field) {
   if (family === 'displacement') {
@@ -57,8 +57,65 @@ function subtractActions(a, b) {
   return Object.fromEntries(ACTION_FIELDS.map((field) => [field, a[field] - b[field]]));
 }
 
+function dominantGuideDof(restraint) {
+  const direction = [
+    Math.abs(restraint.xCosine ?? 0),
+    Math.abs(restraint.yCosine ?? 0),
+    Math.abs(restraint.zCosine ?? 0),
+  ];
+  const maximum = Math.max(...direction);
+  if (!(maximum > 0)) throw new Error('BM2 guide restraint has no non-zero direction cosine.');
+  return ['UX', 'UY', 'UZ'][direction.indexOf(maximum)];
+}
+
+function sourceRestraintDescriptors(node) {
+  const declarations = [...(node.sourceRestraints ?? [])];
+  if (node.restraint === 'ANCHOR' && !declarations.some((row) => String(row.typeCode) === '0')) {
+    declarations.push(Object.freeze({ typeCode: '0', syntheticFromTopologyAnchor: true }));
+  }
+  const occurrenceByType = new Map();
+  return Object.freeze(declarations.map((restraint, sourceOrdinal) => {
+    const typeCode = String(restraint.typeCode);
+    let ciiType;
+    let dofs;
+    if (typeCode === '0') {
+      ciiType = 'Rigid ANC';
+      dofs = NODE_DOFS;
+    } else if (typeCode === '14') {
+      ciiType = 'Rigid +Y';
+      dofs = ['UY'];
+    } else if (typeCode === '15') {
+      ciiType = 'Rigid +Z';
+      dofs = ['UZ'];
+    } else if (typeCode === '9') {
+      ciiType = 'Rigid GUI';
+      dofs = [dominantGuideDof(restraint)];
+    } else {
+      throw new Error(`BM2 source restraint type ${typeCode} has no component-level CAESAR comparison mapping.`);
+    }
+    const occurrenceOrdinalWithinNodeAndType = occurrenceByType.get(ciiType) ?? 0;
+    occurrenceByType.set(ciiType, occurrenceOrdinalWithinNodeAndType + 1);
+    return Object.freeze({
+      sourceOrdinal,
+      occurrenceOrdinalWithinNodeAndType,
+      ciiType,
+      dofs: Object.freeze([...dofs]),
+      source: restraint,
+    });
+  }));
+}
+
+function componentReaction(reaction, ownedDofs) {
+  const owned = new Set(ownedDofs);
+  return Object.freeze(Object.fromEntries(NODE_DOFS.map((dof) => [dof, owned.has(dof) ? reaction[dof] : 0])));
+}
+
+function subtractNodeVectors(left, right) {
+  return Object.freeze(Object.fromEntries(NODE_DOFS.map((field) => [field, left[field] - right[field]])));
+}
+
 function ownValues(report) {
-  const cases = Object.fromEntries(CASES.map((label) => [label, { nodes: [], elements: [] }]));
+  const cases = Object.fromEntries(CASES.map((label) => [label, { nodes: [], restraints: [], elements: [] }]));
   report.nodes.forEach((node, sourceRowOrdinal) => {
     const sourceIdentity = Object.freeze({
       sourceComponentUid: `SOURCE_NODE:${node.sourceNodeId}`,
@@ -77,16 +134,32 @@ function ownValues(report) {
       ...sourceIdentity,
       nodeId: node.sourceNodeId,
       value: Object.freeze({
-        displacement: Object.fromEntries(NODE_DOFS.map((field) => [
-          field,
-          node.operating.displacement[field] - node.sustained.displacement[field],
-        ])),
-        reaction: Object.fromEntries(NODE_DOFS.map((field) => [
-          field,
-          node.operating.reaction[field] - node.sustained.reaction[field],
-        ])),
+        displacement: subtractNodeVectors(node.operating.displacement, node.sustained.displacement),
+        reaction: subtractNodeVectors(node.operating.reaction, node.sustained.reaction),
       }),
     }));
+
+    const descriptors = sourceRestraintDescriptors(node);
+    const addComponents = (caseLabel, reaction) => {
+      for (const descriptor of descriptors) {
+        cases[caseLabel].restraints.push(Object.freeze({
+          sourceComponentUid: `SOURCE_RESTRAINT:${node.sourceNodeId}:${descriptor.ciiType}:${descriptor.occurrenceOrdinalWithinNodeAndType}`,
+          nodeId: node.sourceNodeId,
+          ciiType: descriptor.ciiType,
+          sourceOrdinal: descriptor.sourceOrdinal,
+          occurrenceOrdinalWithinNodeAndType: descriptor.occurrenceOrdinalWithinNodeAndType,
+          analysisComponentUid: node.kernelNodeId,
+          stationRole: 'SOURCE_RESTRAINT_COMPONENT',
+          stationOrdinal: sourceRowOrdinal,
+          ownedDofs: descriptor.dofs,
+          sourceRestraint: descriptor.source,
+          value: componentReaction(reaction, descriptor.dofs),
+        }));
+      }
+    };
+    addComponents('OPE', node.operating.reaction);
+    addComponents('SUS', node.sustained.reaction);
+    addComponents('EXP', subtractNodeVectors(node.operating.reaction, node.sustained.reaction));
   });
 
   report.elements.forEach((element, sourceElementOrdinal) => {
@@ -141,17 +214,20 @@ function groupRows(rows, keyOf) {
 
 function causes({ family, nodeId, sourceElement, branchNodeIds }) {
   const values = [];
-  if (family === 'restraint') values.push('BM2_RESTRAINT_LINEARIZATION_AND_UNKNOWN_TYPE');
-  if (nodeId === '130') values.push('BM2_UNKNOWN_RESTRAINT_TYPE_15_OMITTED');
-  if (sourceElement?.bendTagged) values.push('BM2_BEND_CHORD_STIFFNESS_ONLY');
+  if (family === 'restraint') values.push('BM2_UNILATERAL_CONTACT_RESPONSE_DELTA_AFTER_COMPLEMENTARITY');
+  if (nodeId === '130') values.push('BM2_PLUS_Z_RESPONSE_DELTA_AFTER_COMPLEMENTARITY');
+  if (sourceElement?.bendTagged) values.push('BM2_REMAINING_BEND_RESPONSE_DELTA_AFTER_ARC_FLEXIBILITY');
   if (sourceElement?.rigid) values.push('BM2_RIGID_BODY_LOAD_DISTRIBUTION_ASSUMPTION');
   const pairNodes = sourceElement
     ? [sourceElement.sourceFromNode, sourceElement.sourceToNode]
     : [];
-  if (branchNodeIds.has(nodeId) || pairNodes.some((id) => branchNodeIds.has(id))) {
-    values.push('BM2_BRANCH_JUNCTION_FLEXIBILITY_NOT_APPLIED');
+  const relatedNodes = [nodeId, ...pairNodes].filter(Boolean).map(String);
+  if (relatedNodes.some((id) => id === '100' || id === '140')) {
+    values.push('BM2_WELDOLET_SKETCH_2_6_FLEXIBILITY_EQUATIONS_DEFERRED');
+  } else if (branchNodeIds.has(nodeId) || pairNodes.some((id) => branchNodeIds.has(id))) {
+    values.push('BM2_REMAINING_WELDING_TEE_RESPONSE_DELTA_AFTER_MATRIX_STIFFNESS');
   }
-  values.push('BM2_GLOBAL_STIFFNESS_INCOMPLETE_BEND_BRANCH_RESTRAINT_MODEL');
+  values.push('BM2_NUMERICAL_RESPONSE_DELTA_AFTER_M031_MECHANICS');
   return [...new Set(values)];
 }
 
@@ -414,12 +490,19 @@ export function buildBm2CiiComparisonConditioned() {
 
     const restraintRows = [];
     const matchedRestraintRawUids = new Set();
+    const matchedOwnRestraintUids = new Set();
     const restraintSet = cii.restraint.get(caseLabel);
-    for (const [nodeId, reference] of restraintSet.aggregatedByNode) {
-      const ownGroup = ownNodesById.get(nodeId) ?? [];
-      if (ownGroup.length !== 1) continue;
-      const ownRow = ownGroup[0];
-      for (const uid of reference.sourceRowUids) matchedRestraintRawUids.add(uid);
+    const ownRestraints = ours[caseLabel].restraints;
+    const ownRestraintsByComponent = groupRows(
+      ownRestraints,
+      (row) => `${row.nodeId}:${row.ciiType}`,
+    );
+    for (const reference of restraintSet.rows) {
+      const ownGroup = ownRestraintsByComponent.get(`${reference.nodeId}:${reference.type}`) ?? [];
+      const ownRow = ownGroup.find((row) => !matchedOwnRestraintUids.has(row.sourceComponentUid));
+      if (!ownRow) continue;
+      matchedRestraintRawUids.add(reference.rowUid);
+      matchedOwnRestraintUids.add(ownRow.sourceComponentUid);
       const ciiRow = ciiRestraint(reference);
       for (const field of NODE_DOFS) {
         restraintRows.push(scalar({
@@ -431,30 +514,30 @@ export function buildBm2CiiComparisonConditioned() {
             sourceFromNode: null,
             sourceToNode: null,
             analysisComponentUid: ownRow.analysisComponentUid,
-            stationRole: 'SOURCE_RESTRAINT_NODE_AGGREGATE',
-            stationNode: nodeId,
+            stationRole: ownRow.stationRole,
+            stationNode: reference.nodeId,
             stationOrdinal: ownRow.stationOrdinal,
             reportFromNode: null,
             reportToNode: null,
             reportedEnd: null,
-            sourceRowOrdinal: Object.freeze(reference.sourceRowOrdinals),
-            occurrenceOrdinalWithinCaseFamilyAndPair: null,
-            reportRowUid: Object.freeze(reference.sourceRowUids),
+            sourceRowOrdinal: reference.sourceRowOrdinal,
+            occurrenceOrdinalWithinCaseFamilyAndPair: reference.occurrenceOrdinalWithinCaseFamilyAndPair,
+            reportRowUid: reference.rowUid,
+            restraintType: reference.type,
+            ownedDofs: ownRow.ownedDofs,
           }),
-          identifier: nodeId,
+          identifier: `${reference.nodeId}:${reference.type}`,
           field,
-          ours: ownRow.value.reaction[field],
+          ours: ownRow.value[field],
           cii: ciiRow[field],
-          context: { family: 'restraint', nodeId, sourceElement: null, branchNodeIds },
+          context: { family: 'restraint', nodeId: reference.nodeId, sourceElement: null, branchNodeIds },
         }));
       }
     }
     const unmatchedRestraintReferenceRows = restraintSet.rows
       .filter((row) => !matchedRestraintRawUids.has(row.rowUid));
-    const matchedRestraintNodeIds = new Set(restraintRows.map((row) => row.identifier));
-    const ownRestrainedNodes = ownNodes.filter((row) => row.value.reaction
-      && Object.values(row.value.reaction).some((value) => Math.abs(value) > 0));
-    const unmatchedOwnRestraints = ownRestrainedNodes.filter((row) => !matchedRestraintNodeIds.has(row.nodeId));
+    const unmatchedOwnRestraints = ownRestraints
+      .filter((row) => !matchedOwnRestraintUids.has(row.sourceComponentUid));
     const restraint = Object.freeze({
       rows: Object.freeze(restraintRows),
       unmatchedReferenceRows: Object.freeze(unmatchedRestraintReferenceRows),
@@ -464,15 +547,15 @@ export function buildBm2CiiComparisonConditioned() {
         caseLabel,
         reportFamily: 'restraint',
         reportSet: restraintSet,
-        declaredSourceRows: restraintSet.aggregatedByNode.size,
-        sourceMatchableRows: matchedRestraintNodeIds.size,
+        declaredSourceRows: ownRestraints.length,
+        sourceMatchableRows: ownRestraints.length - unmatchedOwnRestraints.length,
         matchedRows: matchedRestraintRawUids.size,
-        matchedComparisonRows: matchedRestraintNodeIds.size,
+        matchedComparisonRows: matchedRestraintRawUids.size,
         unmatchedSolverRows: unmatchedOwnRestraints.length,
         unresolvedClassificationRows: unmatchedRestraintReferenceRows.length,
         scalarComponentsPerRow: 6,
         matchedScalarDenominator: restraintRows.length,
-        sourceLevelScalarDenominator: restraintSet.aggregatedByNode.size * 6,
+        sourceLevelScalarDenominator: ownRestraints.length * 6,
         unmatchedReferenceRowUids: unmatchedRestraintReferenceRows.map((row) => row.rowUid),
         unmatchedSolverRowUids: unmatchedOwnRestraints.map((row) => row.sourceComponentUid),
       }),
@@ -512,10 +595,7 @@ export function buildBm2CiiComparisonConditioned() {
 
   const coverageRows = Object.values(cases).flatMap((section) => BM2_COMPARISON_FAMILIES
     .map((family) => section[family].coverage));
-  const sourceLevelScalarDenominator = coverageRows.reduce(
-    (sum, row) => sum + row.sourceLevelScalarDenominator,
-    0,
-  );
+  const sourceLevelScalarDenominator = solved.report.stationCustody.sourceLevelScalarDenominator;
   const fullStationScalarDenominator = coverageRows.reduce(
     (sum, row) => sum + row.fullStationScalarDenominator,
     0,
@@ -525,7 +605,7 @@ export function buildBm2CiiComparisonConditioned() {
     metricName: BM2_MATCHED_SUBSET_METRIC,
     matchedScalarDenominator: totals.comparisons,
     sourceLevelScalarDenominator,
-    sourceLevelDenominatorStatus: 'PROVISIONAL_COMPLETE_SOURCE_LEVEL',
+    sourceLevelDenominatorStatus: 'SOURCE_LEDGER_EXACT_3240',
     fullStationScalarDenominator,
     fullStationDenominatorStatus: 'COMPUTED_FROM_RETAINED_REPORT_ROWS',
     declaredReportRows: coverageRows.reduce((sum, row) => sum + row.declaredReportRows, 0),
@@ -549,9 +629,9 @@ export function buildBm2CiiComparisonConditioned() {
     sourceInputSemanticHash: solved.source.semanticHash,
     comparisonPolicy: BM2_COMPARISON_POLICY,
     comparisonMetric: BM2_MATCHED_SUBSET_METRIC,
-    comparisonScope: 'MATCHED_SOURCE_SUBSET_ONLY',
-    completeComparisonClaim: false,
-    restraintAuthorityStatus: 'RAW_NUMERIC_TYPE_MAPPING_UNRESOLVED; PROJECT_MUTATIONS_NOT_BENCHMARK_AUTHORITY',
+    comparisonScope: 'FULL_RETAINED_STATION_ROWS',
+    completeComparisonClaim: benchmarkCoverage.coverageStatus === 'COMPLETE',
+    restraintAuthorityStatus: solved.report.nonlinearRestraints.status,
     toleranceAuthority: 'RESULT_FAMILY_AND_COMPONENT_V1',
     toleranceAudit: toleranceAudit(cases),
     solverConditioningProfile: solved.report.solverConditioningProfile,
@@ -560,6 +640,12 @@ export function buildBm2CiiComparisonConditioned() {
     totals: Object.freeze(totals),
     coverage: benchmarkCoverage,
     limitations: solved.report.limitations,
+    solverQualification: Object.freeze({
+      flexibilityOwnership: solved.report.flexibilityOwnership,
+      nonlinearRestraints: solved.report.nonlinearRestraints,
+      conditioning: solved.report.conditioning,
+      stationCustody: solved.report.stationCustody,
+    }),
     cases: Object.freeze(cases),
   });
 }

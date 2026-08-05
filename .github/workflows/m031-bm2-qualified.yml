@@ -1,0 +1,143 @@
+name: M031 BM2 Qualified Mechanics
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'benchmarks/LFEA/BM2/**'
+      - 'scripts/lfea-m031-bm2-qualified-*.mjs'
+      - 'scripts/lfea-m031-bm2-app-nonfriction-*.mjs'
+      - 'scripts/lfea-b3.26-bm2-output-comparison*.mjs'
+      - 'scripts/lfea-b3.26-bm2-solve-comparison-check.mjs'
+      - 'scripts/lfea-b3.26-bm2-solve-fixtures.mjs'
+      - 'scripts/lfea-bm2-consolidated-latest-output-check.mjs'
+      - 'scripts/lfea-b3.28-bm2-*.mjs'
+      - 'scripts/lfea-b3.29-bm2-*.mjs'
+      - 'src/core/linear-fea-b31-factor-calculator/**'
+      - 'src/core/linear-fea-frame-element/**'
+      - 'src/core/linear-fea-piping-components/**'
+      - 'src/core/linear-fea-solver/**'
+      - 'src/core/linear-fea-result-recovery/**'
+      - 'src/core/linear-piping-analysis-consumer/**'
+      - '.github/workflows/m031-bm2-qualified.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m031-bm2-qualified-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_HEAD_SHA }}
+          fetch-depth: 1
+
+      - name: Verify immutable checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
+          test -z "$(git status --porcelain)"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Syntax and diff hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/lfea-m031-bm2-qualified-runtime.mjs
+          node --check scripts/lfea-m031-bm2-qualified-check.mjs
+          node --check scripts/lfea-m031-bm2-app-nonfriction-runtime.mjs
+          node --check scripts/lfea-m031-bm2-app-nonfriction-check.mjs
+          node --check scripts/lfea-b3.26-bm2-output-comparison-runtime.mjs
+          node --check scripts/lfea-b3.26-bm2-solve-comparison-check.mjs
+          node --check scripts/lfea-b3.26-bm2-solve-fixtures.mjs
+          node --check scripts/lfea-b3.29-bm2-bend-geometry-authority-v2.mjs
+          node --check scripts/lfea-bm2-consolidated-latest-output-check.mjs
+          node --check src/core/linear-fea-solver/solve.js
+          git diff --check
+
+      - name: M031 matrix mechanics and full station custody
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/lfea-m031-bm2-qualified-check.mjs | tee /tmp/m031-bm2-qualified.log
+
+      - name: BM2 comparison contract regression
+        run: node scripts/lfea-b3.26-bm2-solve-comparison-check.mjs
+
+      - name: Direct consolidated strict policy command
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/lfea-bm2-consolidated-latest-output-check.mjs --write | tee /tmp/m031-bm2-consolidated.log
+
+      - name: Production app non-friction node reverse engineering
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/lfea-m031-bm2-app-nonfriction-check.mjs --write | tee /tmp/m031-bm2-app-nonfriction.log
+
+      - name: BM1 comparison regression
+        run: npm run check:lfea-bm1-cii-comparison
+
+      - name: BM3 coupled-spring regression
+        run: node scripts/lfea-m028-bm3-check.mjs
+
+      - name: BM3 hanger regression
+        run: node scripts/lfea-m029-bm3-hanger-check.mjs
+
+      - name: BM3 consolidated regression
+        run: node scripts/lfea-bm3-consolidated-latest-output-check.mjs
+
+      - name: Full linear-core regression
+        run: npm run check:lfea-linear-core
+
+      - name: Deterministic evidence replay
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum \
+            reports/bm2-consolidated-latest-output.json \
+            reports/bm2-nonfriction-linear-fea-out-of-tolerance.json \
+            reports/bm2-nonfriction-linear-fea-out-of-tolerance.csv \
+            reports/bm2-app-nonfriction-node-reverse-engineering.json \
+            reports/bm2-app-nonfriction-node-reverse-engineering.csv \
+            > /tmp/m031-bm2-report.sha256
+          node scripts/lfea-bm2-consolidated-latest-output-check.mjs --write > /tmp/m031-bm2-consolidated-replay.log
+          node scripts/lfea-m031-bm2-app-nonfriction-check.mjs --write > /tmp/m031-bm2-app-nonfriction-replay.log
+          sha256sum --check /tmp/m031-bm2-report.sha256
+
+      - name: Upload deterministic qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m031-bm2-qualified-${{ env.TARGET_HEAD_SHA }}
+          path: |
+            reports/bm2-consolidated-latest-output.json
+            reports/bm2-nonfriction-linear-fea-out-of-tolerance.json
+            reports/bm2-nonfriction-linear-fea-out-of-tolerance.csv
+            reports/bm2-app-nonfriction-node-reverse-engineering.json
+            reports/bm2-app-nonfriction-node-reverse-engineering.csv
+            /tmp/m031-bm2-qualified.log
+            /tmp/m031-bm2-consolidated.log
+            /tmp/m031-bm2-app-nonfriction.log
+            /tmp/m031-bm2-report.sha256
+          if-no-files-found: error
+          retention-days: 30

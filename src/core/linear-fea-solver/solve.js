@@ -167,6 +167,53 @@ function solveScaledSystem(factorization, rhs) {
   return applyDiagonalScalingToVector(scaledSolution, factorization.scaling.factors);
 }
 
+function vectorNorm2(vector) {
+  return Math.sqrt(vector.reduce((sum, value) => sum + value * value, 0));
+}
+
+function multiplyFreeSystem(factorization, denseKff, vector) {
+  if (factorization.backend === SPARSE_DIRECT_BACKEND_ID) {
+    return sparseMultiply(factorization.sparseFreeMatrix, vector);
+  }
+  const output = new Array(factorization.m).fill(0);
+  for (let row = 0; row < factorization.m; row += 1) {
+    let sum = 0;
+    for (let column = 0; column < factorization.m; column += 1) {
+      sum += denseKff[row * factorization.m + column] * vector[column];
+    }
+    output[row] = sum;
+  }
+  return output;
+}
+
+/**
+ * Deterministic iterative refinement for the already-factorized free system.
+ * The correction solve uses the same declared backend, scaling and factors;
+ * a candidate is retained only when its unscaled algebraic residual strictly
+ * decreases. This improves floating-point recovery without changing the
+ * mechanical system, partition, regularization policy or qualification limit.
+ */
+function refineScaledSolution(factorization, denseKff, rhs, initialSolution) {
+  let solution = [...initialSolution];
+  let predicted = multiplyFreeSystem(factorization, denseKff, solution);
+  let residual = rhs.map((value, index) => value - predicted[index]);
+  let residualNorm = vectorNorm2(residual);
+  const maximumIterations = 3;
+  for (let iteration = 0; iteration < maximumIterations; iteration += 1) {
+    if (residualNorm === 0) break;
+    const correction = solveScaledSystem(factorization, residual);
+    const candidate = solution.map((value, index) => value + correction[index]);
+    predicted = multiplyFreeSystem(factorization, denseKff, candidate);
+    const candidateResidual = rhs.map((value, index) => value - predicted[index]);
+    const candidateNorm = vectorNorm2(candidateResidual);
+    if (!(candidateNorm < residualNorm)) break;
+    solution = candidate;
+    residual = candidateResidual;
+    residualNorm = candidateNorm;
+  }
+  return solution;
+}
+
 function canonicalEntries(vector, dofMap, nodeIds) {
   const entries = [];
   for (const nodeId of nodeIds) {
@@ -254,13 +301,15 @@ export function compileSolverExecution({ compilation, elementContributions, load
     }),
   );
 
-  const Uf = solveScaledSystem(factorization, Ffree);
+  const denseKff = acceptedProfile.backend === SPARSE_DIRECT_BACKEND_ID
+    ? undefined
+    : subRectangular(assembly.K, assembly.n, assembly.freeIndices, assembly.freeIndices);
+  const directUf = solveScaledSystem(factorization, Ffree);
+  const Uf = refineScaledSolution(factorization, denseKff, Ffree, directUf);
   assembly.freeIndices.forEach((index, row) => { Ufull[index] = Uf[row]; });
 
   const residual = residualCheck({
-    Kff: acceptedProfile.backend === SPARSE_DIRECT_BACKEND_ID
-      ? undefined
-      : subRectangular(assembly.K, assembly.n, assembly.freeIndices, assembly.freeIndices),
+    Kff: denseKff,
     sparseKff: factorization.sparseFreeMatrix,
     m: assembly.freeIndices.length,
     Uf,
