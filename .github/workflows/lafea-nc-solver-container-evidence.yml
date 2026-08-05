@@ -3,7 +3,7 @@ name: LAFEA-NC Immutable Solver Container Evidence
 on:
   pull_request:
     branches:
-      - agent/lafea-nc-solver-interpreter-evidence
+      - main
     paths:
       - '.github/workflows/lafea-nc-solver-container-evidence.yml'
       - 'docs/nonlinear-shell-contact/LAFEA_NC_SOLVER_CONTAINER_EVIDENCE.md'
@@ -17,7 +17,7 @@ on:
         required: true
         type: string
       base_sha:
-        description: Exact interpreter evidence base SHA
+        description: Exact merged interpreter evidence base SHA
         required: true
         type: string
 
@@ -33,11 +33,11 @@ jobs:
       PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
       DISPATCH_HEAD_SHA: ${{ inputs.head_sha }}
       DISPATCH_BASE_SHA: ${{ inputs.base_sha }}
-      BASE_BRANCH: agent/lafea-nc-solver-interpreter-evidence
-      PRIOR_RUN_ID: '31002498404'
-      PRIOR_ARTIFACT_ID: '8928867031'
-      PRIOR_ARTIFACT_NAME: lafea-nc-solver-interpreter-374547d65155c6c35c3d6336cc0ea32d71399f49-1
-      PRIOR_ARTIFACT_DIGEST: sha256:2bba2951c60a1901b6a3072d7e7f7e5407a35ea4823013a4f964e685572d0f3a
+      BASE_BRANCH: main
+      PRIOR_RUN_ID: '31020392736'
+      PRIOR_ARTIFACT_ID: '8936332477'
+      PRIOR_ARTIFACT_NAME: lafea-nc-solver-interpreter-df63cc2185c7bde10ab3ac915e34c3685e90ce36-1
+      PRIOR_ARTIFACT_DIGEST: sha256:d405b0aa046bb78d010f6d32141efc84ca5f71b0dbbf9a0f1dae233d92c28c29
       EXECUTABLE_HASH: sha256:9a33d293706a66bee86f2f0ecf996a66758f904c20d61ad8c83ddc0f92ae4b7e
       INTERPRETER_HASH: sha256:1cd555ac46b7887edeaf3c42aac5408c8135e52f6b37870da2cf82d5fe14e829
     steps:
@@ -113,7 +113,7 @@ jobs:
           test "$(jq -r .name <<<"$metadata")" = "$PRIOR_ARTIFACT_NAME"
           test "$(jq -r .digest <<<"$metadata")" = "$PRIOR_ARTIFACT_DIGEST"
           test "$(jq -r .workflow_run.id <<<"$metadata")" = "$PRIOR_RUN_ID"
-          test "$(jq -r .workflow_run.head_sha <<<"$metadata")" = '374547d65155c6c35c3d6336cc0ea32d71399f49'
+          test "$(jq -r .workflow_run.head_sha <<<"$metadata")" = 'df63cc2185c7bde10ab3ac915e34c3685e90ce36'
           rm -rf "$RUNNER_TEMP/prior-interpreter"
           mkdir -p "$RUNNER_TEMP/prior-interpreter"
           gh run download "$PRIOR_RUN_ID" \
