@@ -4,13 +4,15 @@ on:
   pull_request:
     paths:
       - '.github/workflows/m027-bm2-bend-curvature.yml'
-      - 'scripts/lfea-b3.29-bm2-bend-geometry-authority.mjs'
+      - 'scripts/lfea-b3.29-bm2-bend-geometry-authority-v2.mjs'
       - 'scripts/lfea-b3.29-bm2-bend-geometry-check.mjs'
       - 'scripts/lfea-b3.29-bm2-collapsed-span-audit.mjs'
       - 'scripts/lfea-b3.29-bm2-bend-solve-runtime.mjs'
       - 'scripts/lfea-b3.29-bm2-bend-comparison-runtime.mjs'
       - 'scripts/lfea-b3.29-bm2-bend-check.mjs'
       - 'scripts/lfea-b3.28-bm2-junction-surface-node-runtime.mjs'
+      - 'scripts/lfea-b3.28-bm2-junction-surface-node-runtime-base.mjs'
+      - 'src/core/centerline-beam-fea/geometry-conditioning.js'
       - 'benchmarks/LFEA/BM2/Input_BM2.xml'
       - 'benchmarks/LFEA/BM2/Output_BM2.xml'
   workflow_dispatch:
@@ -49,7 +51,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
-          node --check scripts/lfea-b3.29-bm2-bend-geometry-authority.mjs
+          node --check scripts/lfea-b3.29-bm2-bend-geometry-authority-v2.mjs
           node --check scripts/lfea-b3.29-bm2-bend-geometry-check.mjs
           node --check scripts/lfea-b3.29-bm2-collapsed-span-audit.mjs
           if test -f scripts/lfea-b3.29-bm2-bend-solve-runtime.mjs; then
