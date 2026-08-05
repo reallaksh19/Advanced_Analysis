@@ -1,6 +1,7 @@
 import { sparseMultiply } from '../lafea-linear-solve/sparse-matrix.js';
 import { DOF_ORDER } from '../linear-fea-contract/conventions.js';
 import { dot, matVec, norm2 } from './linear-algebra.js';
+import { dofIndexOf } from './dof-map.js';
 import { QUALIFICATION_STATUSES } from './solver-contract.js';
 
 /**
@@ -33,6 +34,28 @@ function multiply({ K, sparseK, n, vector }) {
 }
 
 /**
+ * Grounded LINEAR_SPRING constraints contribute diagonal stiffness to K, but
+ * their `k u` terms are external support actions rather than element-internal
+ * nodal resultants. Remove those terms before applying the global rigid-body
+ * force/moment identities. Fixed and prescribed reactions remain represented
+ * through the element resultants at their constrained nodes.
+ */
+function removeGroundedSpringResultants({ model, dofMap, vector, Ufull }) {
+  const result = [...vector];
+  let springCount = 0;
+  let springForceMagnitude = 0;
+  for (const constraint of model.constraints) {
+    if (constraint.behavior !== 'LINEAR_SPRING') continue;
+    const index = dofIndexOf(dofMap, constraint.nodeId, constraint.dof);
+    const springResultant = constraint.stiffness * Ufull[index];
+    result[index] -= springResultant;
+    springForceMagnitude += Math.abs(springResultant);
+    springCount += 1;
+  }
+  return { vector: result, springCount, springForceMagnitude };
+}
+
+/**
  * Section 8.1 "Algebraic residual": normalized residual of the solved
  * free-free system, `||Kff Uf - Ffree|| / max(||Ffree||, floor)`.
  */
@@ -51,11 +74,11 @@ export function residualCheck({ Kff, sparseKff, m, Uf, Ffree, policies }) {
 }
 
 /**
- * Section 8.1 "Global force equilibrium": `K U` already equals applied load
- * plus reaction at every DOF up to solver residual (reaction is defined as
- * `K U - F` exactly so this holds), so summing `K U` translational components
- * over every node is a direct free-body force-balance check, not a restatement
- * of the residual gate above.
+ * Section 8.1 "Global force equilibrium": fixed/prescribed reactions are
+ * represented by `K U - F` at constrained DOFs, while grounded spring support
+ * actions are `-k u` at otherwise-free DOFs. Removing each spring's `k u`
+ * contribution from `K U` leaves the element nodal resultants, whose global
+ * translational sum is the direct free-body force-balance check.
  */
 export function forceEquilibriumCheck({
   model,
@@ -67,7 +90,9 @@ export function forceEquilibriumCheck({
   Ffull,
   policies,
 }) {
-  const combined = multiply({ K, sparseK, n, vector: Ufull });
+  const assembled = multiply({ K, sparseK, n, vector: Ufull });
+  const springAdjusted = removeGroundedSpringResultants({ model, dofMap, vector: assembled, Ufull });
+  const combined = springAdjusted.vector;
   let sumX = 0;
   let sumY = 0;
   let sumZ = 0;
@@ -84,7 +109,13 @@ export function forceEquilibriumCheck({
   const reference = Math.max(referenceMagnitude, policies.equilibriumAbsoluteForceFloor.value);
   const relativeImbalance = imbalance / reference;
   const result = gate('GLOBAL_FORCE_EQUILIBRIUM_RELATIVE', relativeImbalance, policies.equilibriumRelativeLimit.value);
-  return { ...result, limitSource: policies.equilibriumRelativeLimit.source, imbalance };
+  return {
+    ...result,
+    limitSource: policies.equilibriumRelativeLimit.source,
+    imbalance,
+    groundedSpringCount: springAdjusted.springCount,
+    groundedSpringForceMagnitude: springAdjusted.springForceMagnitude,
+  };
 }
 
 /**
@@ -101,7 +132,9 @@ export function momentEquilibriumCheck({
   Ffull,
   policies,
 }) {
-  const combined = multiply({ K, sparseK, n, vector: Ufull });
+  const assembled = multiply({ K, sparseK, n, vector: Ufull });
+  const springAdjusted = removeGroundedSpringResultants({ model, dofMap, vector: assembled, Ufull });
+  const combined = springAdjusted.vector;
   const referenceNodeId = dofMap.nodeOrder[0];
   const referencePosition = model.nodes.find((node) => node.nodeId === referenceNodeId).position;
 
@@ -133,6 +166,8 @@ export function momentEquilibriumCheck({
     imbalance,
     referenceNodeId,
     referenceRule: 'FIRST_CANONICAL_NODE_V1',
+    groundedSpringCount: springAdjusted.springCount,
+    groundedSpringForceMagnitude: springAdjusted.springForceMagnitude,
   };
 }
 
