@@ -10,6 +10,8 @@ const EXECUTING_CANDIDATE_SHA = process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA
   || process.env.GITHUB_SHA
   || 'UNKNOWN';
 const BENCHMARK_VIEWPORT = Object.freeze({ width: 1637, height: 869 });
+const BENCHMARK_CAMERA_AUTHORITY =
+  'TOPO_VALIDATOR_FIT_BOX_SIZE_0_9_PLUS_200_DIRECTION_1_1_0_8';
 
 test.beforeEach(async ({ page }) => {
   test.setTimeout(120_000);
@@ -90,6 +92,9 @@ test('production Sjson opens 3D Edit with complete typed fittings and spatially 
   await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-support-parent-branch-diameter-count'), {
     timeout: 60_000,
   }).toBeGreaterThanOrEqual(100);
+  await expect.poll(() => canvasHost.getAttribute('data-topology-edit-benchmark-camera-authority'), {
+    timeout: 60_000,
+  }).toBe(BENCHMARK_CAMERA_AUTHORITY);
   await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-geometry-diagnostic-count'), {
     timeout: 60_000,
   }).toBe(0);
@@ -99,60 +104,74 @@ test('production Sjson opens 3D Edit with complete typed fittings and spatially 
   await expect(shell.locator('[data-role="topology-edit-status"]')).toContainText(/nodes, .*edges, .*supports/u);
 
   const screenshotPath = testInfo.outputPath('sjson-3d-edit-fittings-supports.png');
-  await page.screenshot({
-    path: screenshotPath,
-    fullPage: false,
-  });
+  await page.screenshot({ path: screenshotPath, fullPage: false });
   const candidateScreenshotBytes = readFileSync(screenshotPath);
   const expectedPath = testInfo.outputPath('EXPECTED.png');
   copyFileSync(EXPECTED_BENCHMARK_URL, expectedPath);
 
-  const ledger = await canvasHost.evaluate((element, {
-    baseCandidateSha,
-    executingCandidateSha,
-    benchmarkViewport,
-    benchmarkSha256,
-    candidateScreenshotSha256,
-  }) => ({
-    schema: 'topology-edit-sjson-webgl-ledger/v1',
-    baseCandidateSha,
-    executingCandidateSha,
-    browserBuildSha: globalThis.__BUILD_SHA__ || null,
-    benchmark: {
-      path: 'Temp/3D EDIT RENDER/EXPECTED.png',
-      viewport: benchmarkViewport,
-      sha256: benchmarkSha256,
-      candidateScreenshotSha256,
-    },
-    sourceHash: element.closest('[data-role="topology-edit-render-host"]')?.dataset.topologyEditDatasetSourceHash || '',
-    canonicalHash: element.closest('[data-role="topology-edit-render-host"]')?.dataset.topologyEditDatasetCanonicalHash || '',
-    visualModelHash: element.dataset.topologyEditVisualModelHash || '',
-    supportProjectionHash: element.dataset.topologyEditSupportProjectionHash || '',
-    journalHash: element.dataset.topologyEditJournalHash || '',
-    typedPrimitiveCount: Number(element.dataset.topologyEditTypedPrimitiveCount || 0),
-    geometryDiagnosticCount: Number(element.dataset.topologyEditGeometryDiagnosticCount || 0),
-    diameterAuthorityCounts: {
-      parentBranch: Number(element.dataset.topologyEditParentBranchDiameterCount || 0),
-      referencedBranch: Number(element.dataset.topologyEditReferencedBranchDiameterCount || 0),
-      supportParentBranch: Number(element.dataset.topologyEditSupportParentBranchDiameterCount || 0),
-      visualProxy: Number(element.dataset.topologyEditVisualProxyWarningCount || 0),
-    },
-    primitiveCounts: {
-      pipe: Number(element.dataset.topologyEditPipePrimitiveCount || 0),
-      elbow: Number(element.dataset.topologyEditElbowPrimitiveCount || 0),
-      flange: Number(element.dataset.topologyEditFlangePrimitiveCount || 0),
-      valve: Number(element.dataset.topologyEditValvePrimitiveCount || 0),
-      reducer: Number(element.dataset.topologyEditReducerPrimitiveCount || 0),
-      tee: Number(element.dataset.topologyEditTeePrimitiveCount || 0),
-      olet: Number(element.dataset.topologyEditOletPrimitiveCount || 0),
-      diagnostic: Number(element.dataset.topologyEditDiagnosticPrimitiveCount || 0),
-    },
-    supportCounts: {
-      overlay: Number(element.dataset.topologyEditSupportOverlayCount || 0),
-      exactOrigin: Number(element.dataset.topologyEditExactSupportOriginCount || 0),
-      distinctOrigin: Number(element.dataset.topologyEditDistinctSupportOriginCount || 0),
-    },
-  }), {
+  const ledger = await canvasHost.evaluate((element, args) => {
+    const parseJson = (value) => {
+      try { return JSON.parse(value || 'null'); } catch { return null; }
+    };
+    const canvasElement = element.querySelector('canvas');
+    const canvasRect = canvasElement?.getBoundingClientRect();
+    return {
+      schema: 'topology-edit-sjson-webgl-ledger/v1',
+      baseCandidateSha: args.baseCandidateSha,
+      executingCandidateSha: args.executingCandidateSha,
+      browserBuildSha: globalThis.__BUILD_SHA__ || null,
+      benchmark: {
+        path: 'Temp/3D EDIT RENDER/EXPECTED.png',
+        viewport: args.benchmarkViewport,
+        sha256: args.benchmarkSha256,
+        candidateScreenshotSha256: args.candidateScreenshotSha256,
+      },
+      canvas: canvasRect ? {
+        left: canvasRect.left,
+        top: canvasRect.top,
+        width: canvasRect.width,
+        height: canvasRect.height,
+        pixelWidth: canvasElement.width,
+        pixelHeight: canvasElement.height,
+      } : null,
+      camera: {
+        authority: element.dataset.topologyEditBenchmarkCameraAuthority || '',
+        engineeringDirection: parseJson(
+          element.dataset.topologyEditBenchmarkCameraEngineeringDirection,
+        ),
+        renderDirection: parseJson(element.dataset.topologyEditBenchmarkCameraRenderDirection),
+        bounds: parseJson(element.dataset.topologyEditBenchmarkBounds),
+      },
+      sourceHash: element.closest('[data-role="topology-edit-render-host"]')?.dataset.topologyEditDatasetSourceHash || '',
+      canonicalHash: element.closest('[data-role="topology-edit-render-host"]')?.dataset.topologyEditDatasetCanonicalHash || '',
+      visualModelHash: element.dataset.topologyEditVisualModelHash || '',
+      supportProjectionHash: element.dataset.topologyEditSupportProjectionHash || '',
+      journalHash: element.dataset.topologyEditJournalHash || '',
+      typedPrimitiveCount: Number(element.dataset.topologyEditTypedPrimitiveCount || 0),
+      geometryDiagnosticCount: Number(element.dataset.topologyEditGeometryDiagnosticCount || 0),
+      diameterAuthorityCounts: {
+        parentBranch: Number(element.dataset.topologyEditParentBranchDiameterCount || 0),
+        referencedBranch: Number(element.dataset.topologyEditReferencedBranchDiameterCount || 0),
+        supportParentBranch: Number(element.dataset.topologyEditSupportParentBranchDiameterCount || 0),
+        visualProxy: Number(element.dataset.topologyEditVisualProxyWarningCount || 0),
+      },
+      primitiveCounts: {
+        pipe: Number(element.dataset.topologyEditPipePrimitiveCount || 0),
+        elbow: Number(element.dataset.topologyEditElbowPrimitiveCount || 0),
+        flange: Number(element.dataset.topologyEditFlangePrimitiveCount || 0),
+        valve: Number(element.dataset.topologyEditValvePrimitiveCount || 0),
+        reducer: Number(element.dataset.topologyEditReducerPrimitiveCount || 0),
+        tee: Number(element.dataset.topologyEditTeePrimitiveCount || 0),
+        olet: Number(element.dataset.topologyEditOletPrimitiveCount || 0),
+        diagnostic: Number(element.dataset.topologyEditDiagnosticPrimitiveCount || 0),
+      },
+      supportCounts: {
+        overlay: Number(element.dataset.topologyEditSupportOverlayCount || 0),
+        exactOrigin: Number(element.dataset.topologyEditExactSupportOriginCount || 0),
+        distinctOrigin: Number(element.dataset.topologyEditDistinctSupportOriginCount || 0),
+      },
+    };
+  }, {
     baseCandidateSha: REPORTED_CANDIDATE_SHA,
     executingCandidateSha: EXECUTING_CANDIDATE_SHA,
     benchmarkViewport: BENCHMARK_VIEWPORT,
@@ -165,6 +184,15 @@ test('production Sjson opens 3D Edit with complete typed fittings and spatially 
   expect(ledger.canonicalHash).not.toBe('');
   expect(ledger.visualModelHash).not.toBe('');
   expect(ledger.supportProjectionHash).not.toBe('');
+  expect(ledger.camera.authority).toBe(BENCHMARK_CAMERA_AUTHORITY);
+  expect(ledger.camera.engineeringDirection).toEqual({
+    x: 0.6154574548966636,
+    y: 0.6154574548966636,
+    z: 0.49236596391733095,
+  });
+  expect(ledger.camera.bounds?.diagonalMm).toBeGreaterThan(0);
+  expect(ledger.canvas?.width).toBeGreaterThan(500);
+  expect(ledger.canvas?.height).toBeGreaterThan(450);
   expect(ledger.diameterAuthorityCounts.parentBranch).toBeGreaterThanOrEqual(100);
   expect(ledger.diameterAuthorityCounts.referencedBranch).toBeGreaterThanOrEqual(13);
   expect(ledger.diameterAuthorityCounts.supportParentBranch).toBeGreaterThanOrEqual(100);
