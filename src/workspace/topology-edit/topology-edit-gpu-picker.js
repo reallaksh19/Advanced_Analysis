@@ -29,6 +29,11 @@ export class TopologyEditGpuPicker {
     this.instancedIds = new WeakMap();
     this.nextPickId = 1;
     this.materials = new Map();
+    this.indexedRows = [];
+    this.indexedEntries = new Map();
+    this.instancedPickGeometries = new Map();
+    this.sceneRevision = 0;
+    this.indexRevision = -1;
     this.disposed = false;
   }
 
@@ -37,6 +42,17 @@ export class TopologyEditGpuPicker {
       && typeof this.renderer.setRenderTarget === 'function'
       && typeof this.renderer.readRenderTargetPixels === 'function'
       && typeof this.renderer.render === 'function';
+  }
+
+  invalidateScene() {
+    if (this.disposed) return;
+    this.releaseSceneIndex();
+    this.objectIds = new WeakMap();
+    this.instancedIds = new WeakMap();
+    this.nextPickId = 1;
+    this.materials.forEach((material) => material.dispose());
+    this.materials.clear();
+    this.sceneRevision += 1;
   }
 
   pick({ clientX, clientY, rect, camera } = {}) {
@@ -92,76 +108,116 @@ export class TopologyEditGpuPicker {
   }
 
   prepareScene() {
+    this.ensureSceneIndex();
     const restorations = [];
-    const entries = new Map();
-    this.scene.updateMatrixWorld?.(true);
-    this.scene.traverse?.((object) => {
-      if (!object?.isMesh) return;
-      if (!isEffectivelyVisible(object) || hasNonPickableAncestor(object)) {
+    for (const row of this.indexedRows) {
+      const object = row.object;
+      if (row.kind === 'HIDDEN' || !isEffectivelyVisible(object)) {
         hideForPick(object, restorations);
-        return;
+        continue;
       }
-      if (isInstancedPickObject(object)) {
-        this.prepareInstancedObject(object, restorations, entries);
-        return;
+      if (row.kind === 'INSTANCED') {
+        const originalMaterial = object.material;
+        const originalGeometry = object.geometry;
+        restorations.push(() => {
+          object.material = originalMaterial;
+          object.geometry = originalGeometry;
+        });
+        object.geometry = row.pickGeometry;
+        object.material = row.pickMaterial;
+        continue;
       }
-      this.prepareObject(object, restorations, entries);
-    });
+      const originalMaterial = object.material;
+      const originalBeforeRender = object.onBeforeRender;
+      restorations.push(() => {
+        object.material = originalMaterial;
+        object.onBeforeRender = originalBeforeRender;
+      });
+      object.material = row.pickMaterial;
+      object.onBeforeRender = () => {
+        row.pickMaterial.uniforms.pickColor.value.setRGB(
+          row.color.r / 255,
+          row.color.g / 255,
+          row.color.b / 255,
+        );
+      };
+    }
     return {
-      entries,
+      entries: this.indexedEntries,
       restore: () => restorePreparedObjects(restorations),
     };
   }
 
-  prepareObject(object, restorations, entries) {
-    const target = object.userData?.pickTarget;
-    if (!target?.objectId) return hideForPick(object, restorations);
-    const id = this.objectId(object, target);
-    if (!id) return hideForPick(object, restorations);
-    const originalMaterial = object.material;
-    const originalBeforeRender = object.onBeforeRender;
-    const material = this.materialFor(originalMaterial, false);
-    const color = encodeTopologyEditPickId(id);
-    restorations.push(() => {
-      object.material = originalMaterial;
-      object.onBeforeRender = originalBeforeRender;
+  ensureSceneIndex() {
+    if (this.indexRevision === this.sceneRevision) return;
+    this.releaseSceneIndex();
+    this.scene.updateMatrixWorld?.(true);
+    this.scene.traverse?.((object) => {
+      if (!object?.isMesh) return;
+      if (hasNonPickableAncestor(object)) {
+        this.indexedRows.push({ kind: 'HIDDEN', object });
+        return;
+      }
+      if (isInstancedPickObject(object)) {
+        this.indexInstancedObject(object);
+        return;
+      }
+      this.indexObject(object);
     });
-    object.material = material;
-    object.onBeforeRender = () => {
-      material.uniforms.pickColor.value.setRGB(
-        color.r / 255,
-        color.g / 255,
-        color.b / 255,
-      );
-    };
-    entries.set(id, Object.freeze({ target, object, instanceId: null }));
+    this.indexRevision = this.sceneRevision;
   }
 
-  prepareInstancedObject(object, restorations, entries) {
+  indexObject(object) {
+    const target = object.userData?.pickTarget;
+    if (!target?.objectId) {
+      this.indexedRows.push({ kind: 'HIDDEN', object });
+      return;
+    }
+    const id = this.objectId(object, target);
+    if (!id) {
+      this.indexedRows.push({ kind: 'HIDDEN', object });
+      return;
+    }
+    const pickMaterial = this.materialFor(object.material, false);
+    const color = encodeTopologyEditPickId(id);
+    this.indexedRows.push({ kind: 'OBJECT', object, pickMaterial, color });
+    this.indexedEntries.set(id, Object.freeze({ target, object, instanceId: null }));
+  }
+
+  indexInstancedObject(object) {
     const targets = object.userData.pickTable;
     const ids = this.instanceIds(object, targets);
-    if (!ids) return hideForPick(object, restorations);
+    if (!ids) {
+      this.indexedRows.push({ kind: 'HIDDEN', object });
+      return;
+    }
     const colors = new Float32Array(targets.length * 3);
     targets.forEach((target, index) => {
       const id = ids[index];
       const color = encodeTopologyEditPickId(id);
       colors.set([color.r / 255, color.g / 255, color.b / 255], index * 3);
-      entries.set(id, Object.freeze({ target, object, instanceId: index }));
+      this.indexedEntries.set(id, Object.freeze({ target, object, instanceId: index }));
     });
-    const originalMaterial = object.material;
-    const originalGeometry = object.geometry;
-    const pickGeometry = originalGeometry.clone();
+    const pickGeometry = object.geometry.clone();
     pickGeometry.setAttribute(
       'instancePickColor',
       new THREE.InstancedBufferAttribute(colors, 3, false),
     );
-    restorations.push(() => {
-      object.material = originalMaterial;
-      object.geometry = originalGeometry;
-      pickGeometry.dispose();
+    this.instancedPickGeometries.set(object, pickGeometry);
+    this.indexedRows.push({
+      kind: 'INSTANCED',
+      object,
+      pickGeometry,
+      pickMaterial: this.materialFor(object.material, true),
     });
-    object.geometry = pickGeometry;
-    object.material = this.materialFor(originalMaterial, true);
+  }
+
+  releaseSceneIndex() {
+    this.instancedPickGeometries.forEach((geometry) => geometry.dispose());
+    this.instancedPickGeometries.clear();
+    this.indexedRows = [];
+    this.indexedEntries = new Map();
+    this.indexRevision = -1;
   }
 
   objectId(object, target) {
@@ -224,6 +280,7 @@ export class TopologyEditGpuPicker {
 
   dispose() {
     if (this.disposed) return;
+    this.releaseSceneIndex();
     this.disposed = true;
     this.renderTarget?.dispose();
     this.materials.forEach((material) => material.dispose());
