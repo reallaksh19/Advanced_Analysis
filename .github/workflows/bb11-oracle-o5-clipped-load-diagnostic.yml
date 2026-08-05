@@ -1,0 +1,177 @@
+name: BB-11 oracle O5 and clipped gasket diagnostic
+
+on:
+  push:
+    branches:
+      - fix/bb11-governed-oracle-interface-continuity
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose-o5:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      TZ: UTC
+      LC_ALL: C
+      BB11_DIAGNOSTICS: '1'
+      NODE_OPTIONS: --max-old-space-size=7168
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/bb11-governed-oracle-interface-continuity
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Materialize repaired oracle, exact gasket clipping, and O5
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from textwrap import dedent
+
+          workflow = Path('.github/workflows/bb11-oracle-interface-bootstrap.yml').read_text()
+          start_marker = "          python3 - <<'PY'\n"
+          end_marker = "\n          PY\n"
+          start = workflow.index(start_marker) + len(start_marker)
+          end = workflow.index(end_marker, start)
+          exec(compile(dedent(workflow[start:end]), '<materializer>', 'exec'))
+
+          path = Path('src/core/bucket-b/flange-hub-independent-oracle.js')
+          source = path.read_text()
+
+          levels_old = "  Object.freeze({ levelId: 'O3', refinement: 8 }),\n]);"
+          levels_new = "  Object.freeze({ levelId: 'O3', refinement: 8 }),\n  Object.freeze({ levelId: 'O4', refinement: 16 }),\n  Object.freeze({ levelId: 'O5', refinement: 32 }),\n]);"
+          if source.count(levels_old) != 1:
+              raise SystemExit('ORACLE_O5_LEVEL_INSERTION_FAILED')
+          source = source.replace(levels_old, levels_new, 1)
+
+          add_old = """  const addEdge = (edge, tractionAt) => {
+            const nodes = edge.nodeIds.map((id) => nodeById.get(id));
+            GL4.forEach((gauss) => {
+              const N = [(1 - gauss.value) / 2, (1 + gauss.value) / 2];
+              const dN = [-0.5, 0.5];
+              const r = N[0] * nodes[0].r + N[1] * nodes[1].r;
+              const z = N[0] * nodes[0].z + N[1] * nodes[1].z;
+              const dr = dN[0] * nodes[0].r + dN[1] * nodes[1].r;
+              const dz = dN[0] * nodes[0].z + dN[1] * nodes[1].z;
+              const jacobian = Math.hypot(dr, dz);
+              const traction = tractionAt(r, z);
+              const factor = gauss.weight * 2 * Math.PI * r * jacobian;
+              for (let index = 0; index < 2; index += 1) {
+                const node = nodeIndex.get(nodes[index].id);
+                force[2 * node] += N[index] * traction[0] * factor;
+                force[2 * node + 1] += N[index] * traction[1] * factor;
+              }
+              radial += traction[0] * factor;
+              axial += traction[1] * factor;
+            });
+          };"""
+          add_new = """  const addEdge = (edge, tractionAt, parameterRange = [0, 1]) => {
+            const nodes = edge.nodeIds.map((id) => nodeById.get(id));
+            const [q0, q1] = parameterRange;
+            const half = (q1 - q0) / 2;
+            const middle = (q1 + q0) / 2;
+            GL4.forEach((gauss) => {
+              const q = middle + half * gauss.value;
+              const N = [1 - q, q];
+              const r = N[0] * nodes[0].r + N[1] * nodes[1].r;
+              const z = N[0] * nodes[0].z + N[1] * nodes[1].z;
+              const jacobian = Math.hypot(
+                nodes[1].r - nodes[0].r,
+                nodes[1].z - nodes[0].z,
+              ) * half;
+              const traction = tractionAt(r, z);
+              const factor = gauss.weight * 2 * Math.PI * r * jacobian;
+              for (let index = 0; index < 2; index += 1) {
+                const node = nodeIndex.get(nodes[index].id);
+                force[2 * node] += N[index] * traction[0] * factor;
+                force[2 * node + 1] += N[index] * traction[1] * factor;
+              }
+              radial += traction[0] * factor;
+              axial += traction[1] * factor;
+            });
+          };
+          const clippedRadialRange = (edge, minimum, maximum) => {
+            const nodes = edge.nodeIds.map((id) => nodeById.get(id));
+            const first = nodes[0].r;
+            const second = nodes[1].r;
+            const delta = second - first;
+            if (Math.abs(delta) <= 1e-15) return null;
+            const lower = Math.max(0, Math.min(1, (minimum - first) / delta));
+            const upper = Math.max(0, Math.min(1, (maximum - first) / delta));
+            const q0 = Math.min(lower, upper);
+            const q1 = Math.max(lower, upper);
+            const edgeMinimum = Math.min(first, second);
+            const edgeMaximum = Math.max(first, second);
+            if (edgeMaximum <= minimum || edgeMinimum >= maximum || q1 - q0 <= 1e-15) {
+              return null;
+            }
+            return [q0, q1];
+          };"""
+          if source.count(add_old) != 1:
+              raise SystemExit('ORACLE_ADD_EDGE_PATCH_FAILED')
+          source = source.replace(add_old, add_new, 1)
+
+          gasket_old = """  } else {
+            mesh.boundaries
+              .filter((edge) => edge.type === 'FACE'
+                && edgeRange(edge, nodeById, 65, 95))
+              .forEach((edge) => addEdge(edge, () => [0, -20]));
+          }"""
+          gasket_new = """  } else {
+            mesh.boundaries.filter((edge) => edge.type === 'FACE')
+              .forEach((edge) => {
+                const range = clippedRadialRange(edge, 65, 95);
+                if (range) addEdge(edge, () => [0, -20], range);
+              });
+          }"""
+          if source.count(gasket_old) != 1:
+              raise SystemExit('ORACLE_GASKET_CLIPPING_PATCH_FAILED')
+          source = source.replace(gasket_old, gasket_new, 1)
+          path.write_text(source)
+          PY
+          node --check src/core/bucket-b/flange-hub-independent-oracle.js
+
+      - name: Execute O0-O5 oracle and print exact tails
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports
+          timeout --signal=TERM --kill-after=60s 55m node --input-type=module <<'NODE' | tee reports/bb11-oracle-o5-clipped.json
+          import { runIndependentFlangeHubOracle } from './src/core/bucket-b/flange-hub-independent-oracle.js';
+          const output = [];
+          for (const loadCaseId of ['FH-PRES-001', 'FH-AXIAL-001', 'FH-GASKET-001']) {
+            const report = runIndependentFlangeHubOracle(loadCaseId);
+            output.push({
+              loadCaseId,
+              status: report.status,
+              rows: report.convergence.rows,
+              appliedResultants: report.levels.map((level) => ({
+                levelId: level.levelId,
+                appliedResultants: level.appliedResultants,
+                axialReaction: level.axialReaction,
+                strainEnergy: level.strainEnergy,
+              })),
+              levels: report.levels.map(({ levelId, nodeCount, elementCount, solver }) => ({
+                levelId,
+                nodeCount,
+                elementCount,
+                solver,
+              })),
+            });
+          }
+          process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
+          NODE
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bb11-oracle-o5-clipped-${{ github.sha }}
+          path: reports
+          retention-days: 30
