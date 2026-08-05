@@ -598,11 +598,29 @@ function evidence(value, field) {
 }
 
 function port(componentKey, role, position) {
+  const portKey = `${componentKey}:${role}`;
+  const peerMap = {
+    'PIPE-1:TO': 'PIPE-2:FROM',
+    'PIPE-2:FROM': 'PIPE-1:TO',
+    'LOOP-1:TO': 'LOOP-2:FROM',
+    'LOOP-2:FROM': 'LOOP-1:TO',
+    'LOOP-2:TO': 'LOOP-3:FROM',
+    'LOOP-3:FROM': 'LOOP-2:TO',
+    'LOOP-3:TO': 'LOOP-4:FROM',
+    'LOOP-4:FROM': 'LOOP-3:TO',
+    'LOOP-4:TO': 'LOOP-1:FROM',
+    'LOOP-1:FROM': 'LOOP-4:TO',
+  };
+  const sourceReference = { sourcePath: `${componentKey}.${role}` };
+  if (peerMap[portKey]) sourceReference.explicitPeerPortKey = peerMap[portKey];
+  const branchCenter = role === 'FROM' && ['ARM-Z', 'ARM-X', 'ARM-Y'].includes(componentKey);
+  if (branchCenter) sourceReference.explicitConnectionId = 'WP5-BRANCH-JUNCTION';
   return {
-    portKey: `${componentKey}:${role}`,
+    portKey,
     role,
     position,
-    sourceReference: { sourcePath: `${componentKey}.${role}` },
+    multiConnection: branchCenter && componentKey === 'ARM-Z',
+    sourceReference,
   };
 }
 
