@@ -135,14 +135,8 @@ jobs:
           assert.equal(report.physicalTailEvaluation.accepted, true);
           assert.ok(report.physicalTailEvaluation.normalizedChange <= 0.005);
           assert.notEqual(report.registeredEvaluation.disposition, 'OSCILLATORY');
-          assert.notEqual(
-            report.registeredEvaluation.disposition,
-            'REFERENCE_ERROR_FAILURE',
-          );
-          assert.notEqual(
-            report.registeredEvaluation.disposition,
-            'EQUILIBRIUM_ONLY',
-          );
+          assert.notEqual(report.registeredEvaluation.disposition, 'REFERENCE_ERROR_FAILURE');
+          assert.notEqual(report.registeredEvaluation.disposition, 'EQUILIBRIUM_ONLY');
           assert.equal(report.accepted, true);
           assert.equal(
             report.decision,
@@ -152,10 +146,7 @@ jobs:
             assert.equal(level.quality.accepted, true);
             assert.equal(level.interfaceEvidence.allConforming, true);
             assert.equal(level.interfaceEvidence.hangingNodeCount, 0);
-            assert.equal(
-              level.probeEvidence.positiveZOwnershipVerified,
-              true,
-            );
+            assert.equal(level.probeEvidence.positiveZOwnershipVerified, true);
             assert.equal(level.equilibrium.accepted, true);
             assert.equal(level.energy.accepted, true);
             assert.equal(level.residual.accepted, true);
@@ -239,37 +230,39 @@ jobs:
           ));
           assert.equal(
             report.schema,
-            'bb11-b03-b04-transition-full-qualification/v2',
+            'bb11-b03-b04-transition-full-qualification/v3',
           );
           assert.equal(report.exactHeadSha, process.env.EXPECTED_HEAD_SHA);
           assert.equal(
             report.productionParentSha,
             process.env.BB11_PRODUCTION_PARENT_SHA,
           );
-          assert.equal(
-            report.status,
-            'CANDIDATE_FULL_BB11_QUALIFICATION_PASS',
-          );
+          assert.equal(report.status, 'CANDIDATE_FULL_BB11_QUALIFICATION_PASS');
           assert.equal(
             report.decision,
             'CANDIDATE_QUALIFIED_FOR_GOVERNED_PROMOTION_REVIEW',
           );
           assert.equal(report.deterministicReplay.byteIdentical, true);
-          assert.deepEqual(report.oracleCompatibilityCorrection, {
-            classification: 'CANDIDATE_ONLY_NON_AUTHORIZING_CONTROL_FLOW_CORRECTION',
-            governedOracleSourceModified: false,
-            correction: 'DEFER_PROFILE_RESOLUTION_UNTIL_BLOCK_KIND_IS_STRIP',
-            mechanicalInputsModified: false,
-            oracleFormulationModified: false,
-            productionPromotionBlockedUntilGovernedCorrectionLands: true,
-            governedOracleSourceSha256:
-              report.oracleCompatibilityCorrection.governedOracleSourceSha256,
-            correctedOracleSourceSha256:
-              report.oracleCompatibilityCorrection.correctedOracleSourceSha256,
-          });
+          const correction = report.oracleCompatibilityCorrection;
+          assert.equal(
+            correction.classification,
+            'CANDIDATE_ONLY_NON_AUTHORIZING_ORACLE_ROBUSTNESS_CORRECTION',
+          );
+          assert.equal(correction.governedOracleSourceModified, false);
+          assert.deepEqual(correction.corrections, [
+            'DEFER_PROFILE_RESOLUTION_UNTIL_BLOCK_KIND_IS_STRIP',
+            'CERTIFIED_RESIDUAL_RESTART_ON_NONPOSITIVE_PCG_CURVATURE',
+          ]);
+          assert.equal(correction.mechanicalInputsModified, false);
+          assert.equal(correction.oracleFormulationModified, false);
+          assert.equal(correction.oracleSolverControlFlowModified, true);
+          assert.equal(
+            correction.productionPromotionBlockedUntilGovernedCorrectionLands,
+            true,
+          );
           assert.notEqual(
-            report.oracleCompatibilityCorrection.governedOracleSourceSha256,
-            report.oracleCompatibilityCorrection.correctedOracleSourceSha256,
+            correction.governedOracleSourceSha256,
+            correction.correctedOracleSourceSha256,
           );
           report.coreEvidence.checkResults.forEach(
             (row) => assert.equal(row.status, 'PASS'),
