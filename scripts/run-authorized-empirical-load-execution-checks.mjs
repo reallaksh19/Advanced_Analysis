@@ -1,4 +1,5 @@
 await import('./empirical-formula-register-check.mjs');
+await import('./empirical-appendix-s-vertical-benchmark.mjs');
 await import('./empirical-component-load-authority-check.mjs');
 await import('./empirical-component-moment-demand-check.mjs');
 await import('./empirical-cog-load-distribution-check.mjs');
