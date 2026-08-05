@@ -67,6 +67,8 @@ jobs:
           node --check src/workspace/engineering-loads/empirical-restraint-network-runtime.js
           node --check src/workspace/engineering-loads/empirical-method-registry.js
           node --check src/workspace/engineering-loads/adapters/sjson-to-empirical-piping-request.js
+          node --check src/core/piping-topology/topology-graph.js
+          node --check src/core/piping-topology/explicit-stage.js
           node --check scripts/empirical-restraint-network-check.mjs
 
       - name: Restricted global restraint-network qualification
