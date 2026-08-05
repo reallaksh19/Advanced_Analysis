@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test';
 const SJSON_BYTES = readFileSync(new URL('../public/Sjson.json', import.meta.url));
 const VIEWPORT = Object.freeze({ width: 1637, height: 869 });
 
-test('SJSON uses one governed packet with OD-solid selectable routes, exact tees, sphere nodes and support overlays', async ({ page }, testInfo) => {
+test('SJSON uses one governed packet with visibly selectable OD routes, exact tees, sphere nodes and support overlays', async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   await page.setViewportSize(VIEWPORT);
   await page.addInitScript(() => globalThis.localStorage?.clear());
@@ -30,7 +30,11 @@ test('SJSON uses one governed packet with OD-solid selectable routes, exact tees
   await expect(host).toHaveAttribute('data-topology-edit-draft-solid-mesh-pickable', 'true');
   await expect(host).toHaveAttribute(
     'data-topology-edit-route-radius-authority',
-    'CANONICAL_PROJECTED_RADIUS_OR_OUTSIDE_DIAMETER_V1',
+    'CANONICAL_PROJECTED_RADIUS_WITH_BOUNDED_DISPLAY_ENVELOPE_V2',
+  );
+  await expect(host).toHaveAttribute(
+    'data-topology-edit-route-display-envelope-policy',
+    'BOUNDED_MODEL_DIAGONAL_MINIMUM_V2',
   );
   await expect(host).toHaveAttribute('data-topology-edit-node-visual-and-pick-geometry-separated', 'true');
   await expect(host).toHaveAttribute('data-topology-edit-visible-node-marker-geometry', 'TRANSLUCENT_SPHERE');
@@ -50,6 +54,8 @@ test('SJSON uses one governed packet with OD-solid selectable routes, exact tees
   );
 
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-visible-route-solid-mesh-count'))
+    .toBeGreaterThan(0);
+  await expect.poll(() => integerAttribute(host, 'data-topology-edit-route-display-envelope-count'))
     .toBeGreaterThan(0);
   await expect.poll(async () => ({
     solid: await integerAttribute(host, 'data-topology-edit-visible-route-solid-mesh-count'),
