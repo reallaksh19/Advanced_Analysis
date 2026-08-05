@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { fileURLToPath } from 'node:url';
 
 const buildTime = new Date().toISOString();
 
@@ -55,6 +56,10 @@ export default defineConfig({
   build: {
     modulePreload: false,
     rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        analyze: fileURLToPath(new URL('./analyze.html', import.meta.url)),
+      },
       output: {
         manualChunks: manualChunk,
         // Allow dependencies of a selected manual chunk to move with that

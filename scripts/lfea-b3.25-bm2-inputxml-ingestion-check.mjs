@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { DEFAULT_RESTRAINT_TYPE_CODE_MAP } from '../src/core/geometry/adapters/inputxml-restraint-type-mutation.js';
 import { fileURLToPath } from 'node:url';
 import { inputXmlToCanonicalGeometry } from '../src/core/geometry/adapters/inputXmlToCanonicalGeometry.js';
 import { auditInputXmlIngestion } from '../src/core/geometry/adapters/inputxml-ingestion-audit.js';
@@ -19,7 +20,7 @@ export function buildBm2IngestionAudit() {
   const geometry = inputXmlToCanonicalGeometry(xmlText, {
     unit: 'mm',
     source: 'CAESAR-II-BM2-INPUTXML',
-    restraintTypeCodeMap: { 0: 'ANCHOR', 14: 'GUIDE', 8: 'GUIDE', 9: 'GUIDE' },
+    restraintTypeCodeMap: DEFAULT_RESTRAINT_TYPE_CODE_MAP,
     bendRadiusTolerance: 1e-6,
   });
   return Object.freeze({ xmlText, geometry, audit: auditInputXmlIngestion(xmlText, geometry) });

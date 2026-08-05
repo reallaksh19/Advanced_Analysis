@@ -2,6 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { DEFAULT_RESTRAINT_TYPE_CODE_MAP } from '../src/core/geometry/adapters/inputxml-restraint-type-mutation.js';
 import { fileURLToPath } from 'node:url';
 import { inputXmlToCanonicalGeometry } from '../src/core/geometry/adapters/inputXmlToCanonicalGeometry.js';
 import { buildBm1InputXmlAuthorities } from './lfea-b3.15-bm1-inputxml-fixtures.mjs';
@@ -21,7 +22,7 @@ const xml = readFileSync(BM1_PATH, 'utf8');
 const geometry = inputXmlToCanonicalGeometry(xml, {
   unit: 'mm',
   source: 'CAESAR-II-BM1-LIVE-INPUTXML',
-  restraintTypeCodeMap: { 0: 'ANCHOR', 14: 'GUIDE', 8: 'GUIDE', 9: 'GUIDE' },
+  restraintTypeCodeMap: DEFAULT_RESTRAINT_TYPE_CODE_MAP,
   bendRadiusTolerance: 1e-6,
 });
 
