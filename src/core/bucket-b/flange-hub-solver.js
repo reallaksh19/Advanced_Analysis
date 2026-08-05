@@ -11,13 +11,14 @@ import {
 import { FLANGE_HUB_MATERIAL_PROFILE } from './flange-hub-geometry.js';
 
 export const FLANGE_HUB_SOLVER_POLICY = deepFreeze({
-  solverPolicyId: 'BKT-B-FLANGE-HUB-DETERMINISTIC-SGS-PCG-V6',
+  solverPolicyId: 'BKT-B-FLANGE-HUB-DETERMINISTIC-SGS-PCG-V7',
   relativeResidualTolerance: 1e-12,
   absoluteResidualTolerance: 1e-10,
   maximumIterationMultiplier: 8,
   minimumMaximumIterations: 2000,
   residualReplacementInterval: 1024,
   preconditionerId: 'SYMMETRIC_GAUSS_SEIDEL',
+  summationPolicyId: 'KAHAN_COMPENSATED_DETERMINISTIC_ORDER',
   stoppingCriterion: 'EXPLICIT_REDUCED_SYSTEM_RESIDUAL',
   constraintMethod: 'EXACT_ZERO_DISPLACEMENT_ELIMINATION',
   reducedMatrixStorage: 'DETERMINISTIC_SORTED_TYPED_SPARSE_ROWS',
@@ -106,16 +107,28 @@ export function solveFlangeHubLoadCase({ mesh, loadCaseId } = {}) {
   const internal = multiplySparse(stiffnessRows, displacement);
 
   let strainEnergy = 0;
+  let strainEnergyCorrection = 0;
   let externalWork = 0;
+  let externalWorkCorrection = 0;
   for (let dof = 0; dof < dofCount; dof += 1) {
-    strainEnergy += 0.5 * displacement[dof] * internal[dof];
-    externalWork += force[dof] * displacement[dof];
+    const energyTerm = 0.5 * displacement[dof] * internal[dof];
+    const energyAdjusted = energyTerm - strainEnergyCorrection;
+    const nextEnergy = strainEnergy + energyAdjusted;
+    strainEnergyCorrection = (nextEnergy - strainEnergy) - energyAdjusted;
+    strainEnergy = nextEnergy;
+    const workTerm = force[dof] * displacement[dof];
+    const workAdjusted = workTerm - externalWorkCorrection;
+    const nextWork = externalWork + workAdjusted;
+    externalWorkCorrection = (nextWork - externalWork) - workAdjusted;
+    externalWork = nextWork;
   }
   const reactions = constrainedDofs.map((constraint) => ({
     ...constraint,
     reaction: internal[constraint.dof] - force[constraint.dof],
   }));
-  const axialReaction = reactions.reduce((sum, row) => sum + row.reaction, 0);
+  const axialReaction = compensatedScalarSum(
+    reactions.map((row) => row.reaction),
+  );
   const appliedAxial = loadEvidence.totalQuadratureResultant.axial;
   const axialForceImbalance = Math.abs(appliedAxial + axialReaction)
     / Math.max(1, Math.abs(appliedAxial), Math.abs(axialReaction));
@@ -261,8 +274,13 @@ function createTypedSparseMultiplier(rows) {
     for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
       const row = rows[rowIndex];
       let sum = 0;
+      let correction = 0;
       for (let entry = 0; entry < row.values.length; entry += 1) {
-        sum += row.values[entry] * vector[row.columns[entry]];
+        const term = row.values[entry] * vector[row.columns[entry]];
+        const adjusted = term - correction;
+        const next = sum + adjusted;
+        correction = (next - sum) - adjusted;
+        sum = next;
       }
       result[rowIndex] = sum;
     }
@@ -279,24 +297,36 @@ function createSymmetricGaussSeidelPreconditioner(rows, diagonal) {
       throw new TypeError('FH_SGS_PRECONDITIONER_SHAPE_MISMATCH');
     }
     for (let rowIndex = 0; rowIndex < count; rowIndex += 1) {
-      let value = residual[rowIndex];
+      let lowerSum = 0;
+      let lowerCorrection = 0;
       const row = rows[rowIndex];
       for (let entryIndex = 0; entryIndex < row.values.length; entryIndex += 1) {
         const column = row.columns[entryIndex];
         if (column >= rowIndex) break;
-        value -= row.values[entryIndex] * forward[column];
+        const term = row.values[entryIndex] * forward[column];
+        const adjusted = term - lowerCorrection;
+        const next = lowerSum + adjusted;
+        lowerCorrection = (next - lowerSum) - adjusted;
+        lowerSum = next;
       }
-      forward[rowIndex] = value / diagonal[rowIndex];
+      forward[rowIndex] = (residual[rowIndex] - lowerSum) / diagonal[rowIndex];
     }
     for (let rowIndex = count - 1; rowIndex >= 0; rowIndex -= 1) {
-      let value = diagonal[rowIndex] * forward[rowIndex];
+      let upperSum = 0;
+      let upperCorrection = 0;
       const row = rows[rowIndex];
       for (let entryIndex = row.values.length - 1; entryIndex >= 0; entryIndex -= 1) {
         const column = row.columns[entryIndex];
         if (column <= rowIndex) break;
-        value -= row.values[entryIndex] * result[column];
+        const term = row.values[entryIndex] * result[column];
+        const adjusted = term - upperCorrection;
+        const next = upperSum + adjusted;
+        upperCorrection = (next - upperSum) - adjusted;
+        upperSum = next;
       }
-      result[rowIndex] = value / diagonal[rowIndex];
+      result[rowIndex] = (
+        diagonal[rowIndex] * forward[rowIndex] - upperSum
+      ) / diagonal[rowIndex];
     }
     return result;
   };
@@ -650,8 +680,13 @@ function multiplySparse(rows, vector) {
       ([leftColumn], [rightColumn]) => leftColumn - rightColumn,
     );
     let sum = 0;
+    let correction = 0;
     entries.forEach(([column, value]) => {
-      sum += value * vector[column];
+      const term = value * vector[column];
+      const adjusted = term - correction;
+      const next = sum + adjusted;
+      correction = (next - sum) - adjusted;
+      sum = next;
     });
     result[index] = sum;
   });
@@ -660,9 +695,14 @@ function multiplySparse(rows, vector) {
 
 function freeResidualNorm({ internal, force, freeDofs }) {
   let squared = 0;
+  let correction = 0;
   freeDofs.forEach((dof) => {
     const residual = internal[dof] - force[dof];
-    squared += residual ** 2;
+    const term = residual ** 2;
+    const adjusted = term - correction;
+    const next = squared + adjusted;
+    correction = (next - squared) - adjusted;
+    squared = next;
   });
   return Math.sqrt(squared);
 }
@@ -682,13 +722,29 @@ function edgeWithinRadius(edge, nodesById, minimum, maximum) {
 }
 function dot(left, right) {
   let sum = 0;
+  let correction = 0;
   for (let index = 0; index < left.length; index += 1) {
-    sum += left[index] * right[index];
+    const term = left[index] * right[index];
+    const adjusted = term - correction;
+    const next = sum + adjusted;
+    correction = (next - sum) - adjusted;
+    sum = next;
   }
   return sum;
 }
 function vectorNorm(value) {
   return Math.sqrt(dot(value, value));
+}
+function compensatedScalarSum(values) {
+  let sum = 0;
+  let correction = 0;
+  values.forEach((value) => {
+    const adjusted = value - correction;
+    const next = sum + adjusted;
+    correction = (next - sum) - adjusted;
+    sum = next;
+  });
+  return sum;
 }
 function requireMesh(mesh) {
   if (!mesh || mesh.schema !== 'flange-hub-mesh-evidence/v1'
