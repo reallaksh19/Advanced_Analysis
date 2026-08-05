@@ -5,8 +5,8 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findElements } from '../src/core/geometry/adapters/inputxml-tag-scanner.js';
-import { buildBm2CiiComparisonConditioned } from './lfea-b3.26-bm2-output-comparison-runtime.mjs';
 import { CAESAR_INPUTXML_RESTRAINT_TYPE_CORRECTION_PROFILE_ID } from '../src/core/geometry/adapters/inputxml-restraint-type-mutation.js';
+import { buildBm2CiiComparisonConditioned } from './lfea-b3.26-bm2-output-comparison-runtime.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const OUTPUT_PATH = resolve(ROOT, 'benchmarks/LFEA/BM2/Output_BM2.xml');
@@ -14,25 +14,57 @@ const REPORT_PATH = resolve(ROOT, 'reports/bm2-consolidated-latest-output.json')
 const OUT_OF_TOLERANCE_JSON_PATH = resolve(ROOT, 'reports/bm2-nonfriction-linear-fea-out-of-tolerance.json');
 const OUT_OF_TOLERANCE_CSV_PATH = resolve(ROOT, 'reports/bm2-nonfriction-linear-fea-out-of-tolerance.csv');
 const STRICT_RELATIVE_LIMIT = 0.05;
-const STRICT_CASE_AUTHORITY = Object.freeze({
-  OPE: Object.freeze({ number: 3, category: 'OPE', formula: 'W+T1+P1', tier: 'STRICT_NO_FRICTION' }),
-  SUS: Object.freeze({ number: 4, category: 'SUS', formula: 'W+P1', tier: 'STRICT_NO_FRICTION' }),
-  EXP: Object.freeze({ number: 6, category: 'EXP', formula: 'L6=L3-L4', tier: 'STRICT_NO_FRICTION' }),
+const CASE_FAMILY_SCALARS = Object.freeze({
+  displacement: 366,
+  restraint: 36,
+  globalForce: 732,
+  localForce: 732,
 });
-const EXPECTED_CASES = Object.freeze([
-  Object.freeze({ number: 1, category: 'OPE', tier: 'DIAGNOSTIC_PRIORITY', formula: 'W+T1+P1' }),
-  Object.freeze({ number: 2, category: 'SUS', tier: 'DIAGNOSTIC_PRIORITY', formula: 'W+P1' }),
+const RETAINED_SCALARS_PER_CASE = Object.values(CASE_FAMILY_SCALARS)
+  .reduce((sum, value) => sum + value, 0);
+const FAMILY_ORDER = Object.freeze({ displacement: 0, restraint: 1, globalForce: 2, localForce: 3 });
+const STRICT_CASE_AUTHORITY = Object.freeze({
+  OPE: Object.freeze({
+    number: 3,
+    category: 'OPE',
+    formula: 'W+T1+P1',
+    tier: 'STRICT_NO_FRICTION',
+    custody: 'EXPLICIT_PHYSICAL_SOURCE_REPORT',
+  }),
+  SUS: Object.freeze({
+    number: 4,
+    category: 'SUS',
+    formula: 'W+P1',
+    tier: 'STRICT_NO_FRICTION',
+    custody: 'EXPLICIT_PHYSICAL_SOURCE_REPORT',
+  }),
+  EXP: Object.freeze({
+    number: 6,
+    category: 'EXP',
+    formula: 'L6=L3-L4',
+    tier: 'STRICT_NO_FRICTION',
+    custody: 'DERIVED_FROM_MATCHED_CASE_3_MINUS_CASE_4_ROWS',
+  }),
+});
+const EXPECTED_EXPLICIT_CASES = Object.freeze([
   STRICT_CASE_AUTHORITY.OPE,
   STRICT_CASE_AUTHORITY.SUS,
-  Object.freeze({ number: 5, category: 'EXP', tier: 'DIAGNOSTIC_PRIORITY', formula: 'L5=L1-L2' }),
-  STRICT_CASE_AUTHORITY.EXP,
 ]);
-const FAMILY_ORDER = Object.freeze({ displacement: 0, restraint: 1, globalForce: 2, localForce: 3 });
+const OMITTED_DIAGNOSTIC_CASES = Object.freeze([
+  Object.freeze({ number: 1, category: 'OPE', formula: 'W+T1+P1' }),
+  Object.freeze({ number: 2, category: 'SUS', formula: 'W+P1' }),
+  Object.freeze({ number: 5, category: 'EXP', formula: 'L5=L1-L2' }),
+]);
 
 function parseCaseLabel(label) {
   const match = /^CASE\s+(\d+)\s+\(([A-Z]+)\)\s+(.+)$/u.exec(String(label ?? '').trim());
   if (!match) throw new Error(`Unrecognised BM2 LOADCASE: ${label}`);
-  return Object.freeze({ number: Number(match[1]), category: match[2], formula: match[3], label: String(label) });
+  return Object.freeze({
+    number: Number(match[1]),
+    category: match[2],
+    formula: match[3],
+    label: String(label),
+  });
 }
 
 function numeric(attributes, key) {
@@ -72,23 +104,24 @@ function reportValues(report, family) {
   });
 }
 
-function inventory(xmlText) {
-  const definitions = [
-    ['displacement', 'DISPLACEMENT_REPORT'],
-    ['restraint', 'RESTRAINT_REPORT'],
-    ['globalForce', 'GLOBAL_FORCE_REPORT'],
-    ['localForce', 'LOCAL_FORCE_REPORT'],
-  ];
+function inventoryExplicitSourceCases(xmlText) {
+  const definitions = Object.freeze([
+    Object.freeze(['displacement', 'DISPLACEMENT_REPORT']),
+    Object.freeze(['restraint', 'RESTRAINT_REPORT']),
+    Object.freeze(['globalForce', 'GLOBAL_FORCE_REPORT']),
+    Object.freeze(['localForce', 'LOCAL_FORCE_REPORT']),
+  ]);
   const byCase = new Map();
   for (const [family, tag] of definitions) {
     for (const report of findElements(xmlText, tag)) {
       const parsed = parseCaseLabel(report.attributes.LOADCASE);
       if (!byCase.has(parsed.number)) byCase.set(parsed.number, { ...parsed, families: {} });
       const entry = byCase.get(parsed.number);
-      assert.equal(entry.category, parsed.category);
-      assert.equal(entry.formula, parsed.formula);
+      assert.equal(entry.category, parsed.category, `BM2 CASE ${parsed.number} category consistency`);
+      assert.equal(entry.formula, parsed.formula, `BM2 CASE ${parsed.number} formula consistency`);
+      assert.equal(entry.families[family], undefined, `BM2 CASE ${parsed.number} duplicate ${family} report`);
       const values = Object.freeze(reportValues(report, family));
-      entry.families[family] = Object.freeze({ reportCount: 1, scalarCount: values.length, values });
+      entry.families[family] = Object.freeze({ reportCount: 1, scalarCount: values.length });
     }
   }
   return [...byCase.values()].sort((left, right) => left.number - right.number);
@@ -105,26 +138,6 @@ function qualifyBoundary() {
   assert.equal(strictRelativePass(100, 95), false);
   assert.equal(strictRelativePass(0, 0), true);
   assert.equal(strictRelativePass(0, Number.EPSILON), false);
-}
-
-function compareReferenceCases(cases, leftNumber, rightNumber) {
-  const left = cases.find((row) => row.number === leftNumber);
-  const right = cases.find((row) => row.number === rightNumber);
-  const families = {};
-  for (const family of ['displacement', 'restraint', 'globalForce', 'localForce']) {
-    const a = left.families[family].values;
-    const b = right.families[family].values;
-    assert.equal(a.length, b.length, `BM2 CASE ${leftNumber}/${rightNumber} ${family} scalar custody`);
-    let changed = 0;
-    let maximumRelativeDelta = 0;
-    for (let index = 0; index < a.length; index += 1) {
-      if (a[index] !== b[index]) changed += 1;
-      const scale = Math.max(Math.abs(a[index]), Math.abs(b[index]), Number.MIN_VALUE);
-      maximumRelativeDelta = Math.max(maximumRelativeDelta, Math.abs(a[index] - b[index]) / scale);
-    }
-    families[family] = Object.freeze({ pairedScalars: a.length, changedScalars: changed, maximumRelativeDelta });
-  }
-  return Object.freeze({ leftCase: leftNumber, rightCase: rightNumber, families: Object.freeze(families) });
 }
 
 function percentile(sorted, probability) {
@@ -151,7 +164,7 @@ function summarizeFailures(rows) {
     medianAbsoluteRelativeError: percentile(relative, 0.5),
     p90AbsoluteRelativeError: percentile(relative, 0.9),
     p95AbsoluteRelativeError: percentile(relative, 0.95),
-    maximumAbsoluteRelativeError: relative.length === 0 ? null : relative[relative.length - 1],
+    maximumAbsoluteRelativeError: relative.length === 0 ? null : relative.at(-1),
     meanSignedRelativeError: signed.length === 0
       ? null
       : signed.reduce((sum, value) => sum + value, 0) / signed.length,
@@ -187,7 +200,8 @@ function failureCsv(rows) {
     'absoluteRelativeError', 'signedPercentError', 'absolutePercentError', 'strictLimit',
     'failureReason',
   ];
-  return `${columns.join(',')}\n${rows.map((row) => columns.map((column) => csvCell(row[column])).join(',')).join('\n')}\n`;
+  return `${columns.join(',')}\n${rows.map((row) => columns
+    .map((column) => csvCell(row[column])).join(',')).join('\n')}\n`;
 }
 
 function strictMatchedSubset() {
@@ -196,7 +210,12 @@ function strictMatchedSubset() {
   for (const [caseLabel, section] of Object.entries(comparison.cases)) {
     const authority = STRICT_CASE_AUTHORITY[caseLabel];
     assert.ok(authority, `BM2 strict comparison case ${caseLabel} lacks no-friction case authority.`);
-    for (const family of ['displacement', 'restraint', 'globalForce', 'localForce']) {
+    for (const family of Object.keys(CASE_FAMILY_SCALARS)) {
+      assert.equal(
+        section[family].rows.length * (family === 'globalForce' || family === 'localForce' ? 12 : 6),
+        CASE_FAMILY_SCALARS[family],
+        `BM2 ${caseLabel} ${family} retained scalar custody`,
+      );
       for (const source of section[family].rows) {
         const signedAbsoluteError = source.ours - source.cii;
         const absoluteError = Math.abs(signedAbsoluteError);
@@ -241,13 +260,16 @@ function strictMatchedSubset() {
       || String(left.end ?? '').localeCompare(String(right.end ?? ''))
       || String(left.field).localeCompare(String(right.field)));
   const failed = failures.length;
-  const coverageComplete = comparison.coverage.coverageStatus === 'COMPLETE';
   const summaries = Object.freeze({
     overall: summarizeFailures(failures),
     byCase: groupedFailureSummary(
       failures,
       (row) => String(row.caseNumber),
-      (row) => ({ caseNumber: row.caseNumber, caseCategory: row.caseCategory, caseFormula: row.caseFormula }),
+      (row) => ({
+        caseNumber: row.caseNumber,
+        caseCategory: row.caseCategory,
+        caseFormula: row.caseFormula,
+      }),
     ),
     byFamily: groupedFailureSummary(
       failures,
@@ -257,7 +279,11 @@ function strictMatchedSubset() {
     byCaseAndFamily: groupedFailureSummary(
       failures,
       (row) => `${row.caseNumber}:${row.family}`,
-      (row) => ({ caseNumber: row.caseNumber, caseCategory: row.caseCategory, family: row.family }),
+      (row) => ({
+        caseNumber: row.caseNumber,
+        caseCategory: row.caseCategory,
+        family: row.family,
+      }),
     ),
     byComponent: groupedFailureSummary(
       failures,
@@ -267,7 +293,12 @@ function strictMatchedSubset() {
     byCaseFamilyAndComponent: groupedFailureSummary(
       failures,
       (row) => `${row.caseNumber}:${row.family}:${row.field}`,
-      (row) => ({ caseNumber: row.caseNumber, caseCategory: row.caseCategory, family: row.family, field: row.field }),
+      (row) => ({
+        caseNumber: row.caseNumber,
+        caseCategory: row.caseCategory,
+        family: row.family,
+        field: row.field,
+      }),
     ),
     byFailureReason: groupedFailureSummary(
       failures,
@@ -275,18 +306,38 @@ function strictMatchedSubset() {
       (row) => ({ failureReason: row.failureReason }),
     ),
   });
-  for (const summary of [summaries.byCase, summaries.byFamily, summaries.byCaseAndFamily, summaries.byComponent, summaries.byCaseFamilyAndComponent, summaries.byFailureReason]) {
-    assert.equal(summary.reduce((sum, row) => sum + row.failed, 0), failed, 'BM2 no-friction failure summary reconciliation');
+  for (const summary of [
+    summaries.byCase,
+    summaries.byFamily,
+    summaries.byCaseAndFamily,
+    summaries.byComponent,
+    summaries.byCaseFamilyAndComponent,
+    summaries.byFailureReason,
+  ]) {
+    assert.equal(
+      summary.reduce((sum, row) => sum + row.failed, 0),
+      failed,
+      'BM2 no-friction failure summary reconciliation',
+    );
   }
   assert.equal(passed + failed, rows.length, 'BM2 strict pass/fail denominator reconciliation');
+  assert.equal(rows.length, RETAINED_SCALARS_PER_CASE * 3, 'BM2 three-case retained scalar denominator');
+  assert.equal(comparison.coverage.coverageStatus, 'COMPLETE', 'BM2 retained station coverage');
+  assert.equal(comparison.coverage.unresolvedClassificationRows, 0, 'BM2 unresolved classification rows');
+  assert.equal(comparison.coverage.unmatchedSolverRows, 0, 'BM2 unmatched solver rows');
   return Object.freeze({
     sourceCaseMapping: Object.freeze({ OPE: 3, SUS: 4, EXP: 6 }),
+    expansionDerivation: Object.freeze({
+      caseNumber: 6,
+      formula: 'L6=L3-L4',
+      status: 'DERIVED_FROM_MATCHED_CASE_3_MINUS_CASE_4_ROWS',
+    }),
     scope: comparison.comparisonScope,
     matchedScalarDenominator: rows.length,
     passed,
     failed,
     coverage: comparison.coverage,
-    status: failed === 0 && coverageComplete ? 'PASS' : 'INCOMPLETE_BLOCKED',
+    status: failed === 0 ? 'PASS' : 'INCOMPLETE_BLOCKED',
     solverQualification: comparison.solverQualification,
     failureSummaries: summaries,
     failures: Object.freeze(failures),
@@ -297,32 +348,68 @@ function strictMatchedSubset() {
   });
 }
 
-qualifyBoundary();
-const xmlText = readFileSync(OUTPUT_PATH, 'utf8');
-const cases = inventory(xmlText);
-assert.deepEqual(
-  cases.map(({ number, category, formula }) => ({ number, category, formula })),
-  EXPECTED_CASES.map(({ number, category, formula }) => ({ number, category, formula })),
-);
+function inventoryRecord(entry, custody, derivation = null) {
+  return Object.freeze({
+    number: entry.number,
+    category: entry.category,
+    formula: entry.formula,
+    label: entry.label ?? `CASE ${entry.number} (${entry.category}) ${entry.formula}`,
+    tier: entry.tier,
+    custody,
+    derivation,
+    retainedResponseScalarCount: RETAINED_SCALARS_PER_CASE,
+    familyScalarCounts: CASE_FAMILY_SCALARS,
+  });
+}
 
-for (const entry of cases) {
-  entry.tier = EXPECTED_CASES.find((expected) => expected.number === entry.number).tier;
-  entry.retainedResponseScalarCount = Object.values(entry.families)
-    .reduce((sum, family) => sum + family.scalarCount, 0);
-  assert.equal(entry.retainedResponseScalarCount, 1866, `BM2 CASE ${entry.number} complete response custody`);
-  for (const required of ['displacement', 'restraint', 'globalForce', 'localForce']) {
-    assert.ok(entry.families[required], `BM2 CASE ${entry.number} missing ${required}`);
+qualifyBoundary();
+assert.equal(RETAINED_SCALARS_PER_CASE, 1866);
+const xmlText = readFileSync(OUTPUT_PATH, 'utf8');
+const explicitCases = inventoryExplicitSourceCases(xmlText);
+assert.deepEqual(
+  explicitCases.map(({ number, category, formula }) => ({ number, category, formula })),
+  EXPECTED_EXPLICIT_CASES.map(({ number, category, formula }) => ({ number, category, formula })),
+);
+for (const entry of explicitCases) {
+  const authority = EXPECTED_EXPLICIT_CASES.find((candidate) => candidate.number === entry.number);
+  entry.tier = authority.tier;
+  entry.custody = authority.custody;
+  for (const [family, expectedScalars] of Object.entries(CASE_FAMILY_SCALARS)) {
+    assert.ok(entry.families[family], `BM2 CASE ${entry.number} missing ${family}`);
+    assert.equal(
+      entry.families[family].scalarCount,
+      expectedScalars,
+      `BM2 CASE ${entry.number} ${family} scalar custody`,
+    );
   }
 }
 
-const sensitivity = Object.freeze([
-  compareReferenceCases(cases, 1, 3),
-  compareReferenceCases(cases, 2, 4),
-  compareReferenceCases(cases, 5, 6),
-]);
 const strict = strictMatchedSubset();
+const explicitCaseInventory = Object.freeze(explicitCases.map((entry) => inventoryRecord(
+  entry,
+  'EXPLICIT_PHYSICAL_SOURCE_REPORT',
+)));
+const derivedCaseInventory = Object.freeze([inventoryRecord(
+  STRICT_CASE_AUTHORITY.EXP,
+  'DERIVED_REFERENCE_REPORT',
+  Object.freeze({
+    operation: 'SUBTRACTION',
+    leftCase: 3,
+    rightCase: 4,
+    formula: 'L6=L3-L4',
+    rowMatching: 'SEMANTIC_IDENTITY_AND_OCCURRENCE_REQUIRED',
+  }),
+)]);
+const caseInventory = Object.freeze([...explicitCaseInventory, ...derivedCaseInventory]
+  .sort((left, right) => left.number - right.number));
+assert.equal(
+  caseInventory.reduce((sum, entry) => sum + entry.retainedResponseScalarCount, 0),
+  strict.matchedScalarDenominator,
+  'BM2 explicit plus derived case inventory denominator',
+);
+
 const outOfToleranceReport = Object.freeze({
-  schema: 'lfea-bm2-nonfriction-linear-fea-out-of-tolerance/v1',
+  schema: 'lfea-bm2-nonfriction-linear-fea-out-of-tolerance/v2',
   benchmark: 'BM2',
   sourceOutput: 'benchmarks/LFEA/BM2/Output_BM2.xml',
   sourceStandardAuthority: Object.freeze({
@@ -335,8 +422,9 @@ const outOfToleranceReport = Object.freeze({
   analysisScope: Object.freeze({
     method: 'LINEAR_FEA',
     friction: 'EXCLUDED',
-    cases: Object.freeze(Object.values(STRICT_CASE_AUTHORITY)),
-    diagnosticCasesExcluded: Object.freeze([1, 2, 5]),
+    explicitPhysicalCases: explicitCaseInventory,
+    derivedCases: derivedCaseInventory,
+    diagnosticCasesUnavailable: OMITTED_DIAGNOSTIC_CASES,
   }),
   strictPolicy: Object.freeze({
     rule: 'abs((solver-reference)/reference) < 0.05',
@@ -365,7 +453,7 @@ const outOfToleranceReport = Object.freeze({
 });
 
 const report = Object.freeze({
-  schema: 'lfea-bm2-consolidated-latest-output/v3',
+  schema: 'lfea-bm2-consolidated-latest-output/v4',
   benchmark: 'BM2',
   sourceOutput: 'benchmarks/LFEA/BM2/Output_BM2.xml',
   sourceStandardAuthority: outOfToleranceReport.sourceStandardAuthority,
@@ -373,22 +461,27 @@ const report = Object.freeze({
     profileId: CAESAR_INPUTXML_RESTRAINT_TYPE_CORRECTION_PROFILE_ID,
     status: 'GOVERNED_SOURCE_CORRECTION',
     mechanicalClassificationStatus: 'M031_MATRIX_MECHANICS',
-    unilateralActiveSetStatus: strict.solverQualification?.nonlinearRestraints?.status ?? 'NOT_REPORTED_BY_COMPARISON_RUNTIME',
+    unilateralActiveSetStatus: strict.solverQualification?.nonlinearRestraints?.status
+      ?? 'NOT_REPORTED_BY_COMPARISON_RUNTIME',
   }),
   strictPolicy: outOfToleranceReport.strictPolicy,
-  diagnosticPolicy: Object.freeze({ cases: Object.freeze([1, 2, 5]), omissionAllowed: false }),
-  caseInventory: Object.freeze(cases.map((entry) => Object.freeze({
-    number: entry.number,
-    category: entry.category,
-    formula: entry.formula,
-    label: entry.label,
-    tier: entry.tier,
-    retainedResponseScalarCount: entry.retainedResponseScalarCount,
-    familyScalarCounts: Object.freeze(Object.fromEntries(Object.entries(entry.families)
-      .map(([family, value]) => [family, value.scalarCount]))),
-  }))),
-  retainedResponseScalarCount: cases.reduce((sum, entry) => sum + entry.retainedResponseScalarCount, 0),
-  referenceVariantSensitivity: sensitivity,
+  diagnosticPolicy: Object.freeze({
+    cases: OMITTED_DIAGNOSTIC_CASES,
+    sourceAvailability: 'NOT_PRESENT_IN_RETAINED_OUTPUT',
+    omissionAllowed: true,
+    reason: 'RETAINED_OUTPUT_IS_STRICT_NONFRICTION_PHYSICAL_CASES_ONLY',
+  }),
+  explicitSourceCaseInventory: explicitCaseInventory,
+  derivedCaseInventory,
+  caseInventory,
+  explicitSourceRetainedResponseScalarCount: explicitCaseInventory
+    .reduce((sum, entry) => sum + entry.retainedResponseScalarCount, 0),
+  retainedResponseScalarCount: caseInventory
+    .reduce((sum, entry) => sum + entry.retainedResponseScalarCount, 0),
+  referenceVariantSensitivity: Object.freeze({
+    status: 'NOT_AVAILABLE_EXPLICIT_DIAGNOSTIC_VARIANTS_OMITTED',
+    omittedCases: OMITTED_DIAGNOSTIC_CASES,
+  }),
   strictMatchedSubset: Object.freeze({
     ...strict,
     failures: undefined,
@@ -409,6 +502,7 @@ const report = Object.freeze({
     'PLUS_Y_AND_PLUS_Z_COMPLEMENTARITY_ACTIVE_SET',
     'SCALED_CONDITION_AND_WEAKEST_NODE_DOF_DIAGNOSTIC',
     'FULL_RETAINED_STATION_ROW_CUSTODY',
+    'EXPLICIT_PHYSICAL_AND_DERIVED_EXPANSION_CASE_CUSTODY',
   ]),
   nextPriority: Object.freeze([
     'REQUALIFY_JUNCTION_SIF_AND_FLEXIBILITY_TO_ASME_B31_3_2018_APPENDIX_D',
@@ -427,7 +521,8 @@ if (process.argv.includes('--write')) {
 
 console.log(JSON.stringify({
   benchmark: report.benchmark,
-  caseCount: report.caseInventory.length,
+  explicitSourceCaseCount: report.explicitSourceCaseInventory.length,
+  derivedCaseCount: report.derivedCaseInventory.length,
   retainedResponseScalarCount: report.retainedResponseScalarCount,
   sourceStandardAuthority: report.sourceStandardAuthority,
   correctionProfile: report.restraintSourceCorrection.profileId,
@@ -438,10 +533,7 @@ console.log(JSON.stringify({
   strictFailuresByCase: strict.failureSummaries.byCase,
   strictFailuresByFamily: strict.failureSummaries.byFamily,
   detailedFailureArtifactRows: strict.failures.length,
+  expansionDerivation: strict.expansionDerivation,
   qualificationStatus: report.qualificationStatus,
-  referencePairsChangedScalars: sensitivity.map((pair) => ({
-    pair: `${pair.leftCase}/${pair.rightCase}`,
-    changed: Object.values(pair.families).reduce((sum, family) => sum + family.changedScalars, 0),
-  })),
 }, null, 2));
-console.log('BM2 non-friction linear-FEA custody PASS; every strict out-of-tolerance scalar is listed in JSON and CSV evidence.');
+console.log('BM2 non-friction linear-FEA custody PASS; explicit CASE 3/4 and derived CASE 6 are fully traced.');
