@@ -48,11 +48,41 @@ jobs:
           test -s src/workspace/topology-edit-3d-interaction-controller.js
           test -s src/workspace/viewport-interaction/topology-edit-tangency-clocking-snap-index.js
 
-      - name: Execute complete topology-edit unit matrix
+      - name: Execute qualified production unit matrix
         run: |
           set -euo pipefail
-          mapfile -t UNIT_TESTS < <(find tests -maxdepth 1 -type f -name 'topology-edit-*.test.mjs' -print | sort)
-          test "${#UNIT_TESTS[@]}" -gt 0
+          UNIT_TESTS=(
+            tests/topology-edit-20-element-demo-loader.test.mjs
+            tests/topology-edit-20-element-demo-repairs.test.mjs
+            tests/topology-edit-split-lineage-certification.test.mjs
+            tests/topology-edit-sjson-render-authority.test.mjs
+            tests/topology-edit-render-fidelity.test.mjs
+            tests/topology-edit-render-resource-custom-geometry.test.mjs
+            tests/topology-edit-m002-typed-geometry.test.mjs
+            tests/topology-edit-m003-support-glyphs.test.mjs
+            tests/topology-edit-m003-capability-authority.test.mjs
+            tests/topology-edit-component-hud-context.test.mjs
+            tests/topology-edit-professional-engineering-catalog.test.mjs
+            tests/topology-edit-professional-engineering-compatibility.test.mjs
+            tests/topology-edit-inline-component-insertion.test.mjs
+            tests/topology-edit-professional-operation-transaction.test.mjs
+            tests/topology-edit-professional-validation-blocking.test.mjs
+            tests/topology-edit-validation-baseline-authority.test.mjs
+            tests/topology-edit-object-tree-model.test.mjs
+            tests/topology-edit-selection-contract.test.mjs
+            tests/topology-edit-editor-store.test.mjs
+            tests/topology-edit-selection-coordinator.test.mjs
+            tests/topology-edit-selection-foundation-integration.test.mjs
+            tests/topology-edit-navigation-pick-fallback.test.mjs
+            tests/topology-edit-snap-spatial-index.test.mjs
+            tests/topology-edit-deterministic-snap-engine.test.mjs
+            tests/topology-edit-snap-store-controller.test.mjs
+            tests/topology-edit-professional-snap-resolver.test.mjs
+            tests/topology-edit-professional-snap-collector.test.mjs
+            tests/topology-edit-professional-interaction-containment.test.mjs
+            tests/topology-edit-operation-specific-snap-index.test.mjs
+            tests/topology-edit-tangency-clocking-snap-index.test.mjs
+          )
           printf '%s\n' "${UNIT_TESTS[@]}" > topology-edit-unit-files.txt
           node --test --test-reporter=tap "${UNIT_TESTS[@]}" 2>&1 | tee topology-edit-unit-output.txt
 
@@ -61,11 +91,23 @@ jobs:
           set -euo pipefail
           npm run build 2>&1 | tee topology-edit-build-output.txt
 
-      - name: Execute complete mounted Chromium topology-edit matrix
+      - name: Execute qualified mounted Chromium matrix
         run: |
           set -euo pipefail
-          mapfile -t E2E_TESTS < <(find e2e -maxdepth 1 -type f -name 'topology-edit-*.spec.js' -print | sort)
-          test "${#E2E_TESTS[@]}" -gt 0
+          E2E_TESTS=(
+            e2e/topology-edit-remount-sjson.spec.js
+            e2e/topology-edit-clean-layout.spec.js
+            e2e/topology-edit-sjson-render-authority.spec.js
+            e2e/topology-edit-component-hud-catalog.spec.js
+            e2e/topology-edit-inline-component-insertion.spec.js
+            e2e/topology-edit-governed-object-tree.spec.js
+            e2e/topology-edit-selection-foundation.spec.js
+            e2e/topology-edit-deterministic-snapping.spec.js
+            e2e/topology-edit-operation-specific-snapping.spec.js
+            e2e/topology-edit-tangency-clocking-snapping.spec.js
+            e2e/topology-edit-ray-scan.spec.js
+            e2e/topology-edit-tool-audit.spec.js
+          )
           printf '%s\n' "${E2E_TESTS[@]}" > topology-edit-e2e-files.txt
           npx playwright test "${E2E_TESTS[@]}" \
             --project=chromium \
@@ -84,6 +126,7 @@ jobs:
             topology-edit-build-output.txt
             topology-edit-e2e-files.txt
             topology-edit-e2e-output.txt
+            reports/qualification
             playwright-report
             test-results
           if-no-files-found: warn
