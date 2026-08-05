@@ -8,6 +8,7 @@ on:
       - 'src/workspace/load-calc-consumer-view.js'
       - 'src/workspace/bootstrap.js'
       - 'scripts/empirical-load-calc-scenario-check.mjs'
+      - 'scripts/advanced-shell-contract-check.mjs'
       - '.github/workflows/empirical-load-calc-wp3.yml'
       - '.github/workflows/empirical-piping-exact-head.yml'
 
