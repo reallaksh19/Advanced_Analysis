@@ -73,8 +73,7 @@ test('SJSON compact supports render one enlarged marker and one two-OD direction
   });
   const projection = {
     renderStyle: TOPOLOGY_EDIT_SUPPORT_RENDER_STYLES.TOPO_VALIDATOR_COMPACT,
-    compactMarkerRadiusMm: 12.6,
-    compactMarkerDisplayScale: 3,
+    compactMarkerRadiusMm: 37.8,
     elements: [{
       id: 'support:1',
       entityId: 'support:1',
@@ -119,10 +118,23 @@ test('SJSON compact supports render one enlarged marker and one two-OD direction
   const marker = backend.groups.supportGroup.children.find(
     (object) => object.name === 'topology-edit-compact-support-marker:support:1',
   );
-  assert.equal(marker.userData.baseMarkerRadiusMm, 12.6);
-  assert.equal(marker.userData.displayScale, 3);
-  assert.equal(marker.userData.markerRadiusMm, 37.8);
+  assert.ok(marker, 'compact support marker is required');
+  assert.equal(maxVertexRadius(marker.geometry), 37.8);
   assert.ok(picks.some((row) => row.objectKind === 'support'));
   assert.ok(picks.some((row) => row.objectKind === 'restraint'));
   backend.destroy();
 });
+
+function maxVertexRadius(geometry) {
+  const positions = geometry?.getAttribute?.('position');
+  assert.ok(positions, 'compact support marker position attribute is required');
+  let maximum = 0;
+  for (let index = 0; index < positions.count; index += 1) {
+    maximum = Math.max(maximum, Math.hypot(
+      positions.getX(index),
+      positions.getY(index),
+      positions.getZ(index),
+    ));
+  }
+  return maximum;
+}
