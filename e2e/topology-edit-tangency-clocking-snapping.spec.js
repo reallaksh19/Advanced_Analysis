@@ -95,6 +95,9 @@ test('mounted real topology resolves exact elbow tangency or branch clocking wit
       query,
       expectedIdentity: identity,
     });
+    const resolvedFeature = index.segmentFeatures.find((row) => (
+      row.featureId === result.candidate?.sourceFeatureId
+    ));
     return {
       authority: index.tangencyClockingFeatureAuthority,
       feature: {
@@ -105,7 +108,7 @@ test('mounted real topology resolves exact elbow tangency or branch clocking wit
       result: {
         status: result.status,
         sourceFeatureId: result.candidate?.sourceFeatureId ?? null,
-        operationVariant: result.candidate?.operationVariant ?? null,
+        operationVariant: resolvedFeature?.operationVariant ?? null,
         targetIds: result.targetIds,
       },
     };
