@@ -8,6 +8,7 @@ import {
   finiteVector,
   invisiblePickMaterial,
   lineMaterial,
+  meshMaterial,
   nodePickRadius,
   nodeVisualRadius,
   pickUserData,
@@ -17,7 +18,7 @@ import {
   TOPOLOGY_EDIT_SJSON_GOVERNED_RENDER_AUTHORITY,
 } from './topology-edit-sjson-governed-projection-v2.js';
 
-const NODE_VISUAL_OPACITY = 0.24;
+const NODE_VISUAL_OPACITY = 0.18;
 
 export function renderGovernedSjsonRoute({
   backend,
@@ -29,6 +30,7 @@ export function renderGovernedSjsonRoute({
   const staging = new THREE.Group();
   const bounds = new THREE.Box3();
   const lineMaterials = new Map();
+  const meshMaterials = new Map();
   const pickMaterial = invisiblePickMaterial();
   let lineCount = 0;
   let pickProxyCount = 0;
@@ -63,14 +65,14 @@ export function renderGovernedSjsonRoute({
       }
     }
 
-    let nodeMetrics = emptyNodeMetrics(backend.navigationConfiguration);
+    let nodeMetrics = emptyNodeMetrics(backend);
     if (group === backend.groups.draftGroup) {
       nodeMetrics = addGovernedNodes(
         staging,
         bounds,
         projection.compactElements || [],
-        backend.navigationConfiguration,
-        lineMaterials,
+        backend,
+        meshMaterials,
       );
     }
     while (staging.children.length) group.add(staging.children[0]);
@@ -82,24 +84,31 @@ export function renderGovernedSjsonRoute({
     }, group === backend.groups.draftGroup);
     return bounds;
   } catch (error) {
-    disposeStaging(staging, [...lineMaterials.values(), pickMaterial]);
+    disposeStaging(staging, [
+      ...lineMaterials.values(),
+      ...meshMaterials.values(),
+      pickMaterial,
+    ]);
     throw error;
   }
 }
 
-function addGovernedNodes(staging, bounds, elements, configuration, lineMaterials) {
+function addGovernedNodes(staging, bounds, elements, backend, meshMaterials) {
   const nodes = (elements || []).filter((element) => finiteVector(element));
-  const visualRadiusMm = nodeVisualRadius(configuration);
+  const configuration = backend.navigationConfiguration;
+  const visualRadiusMm = governedNodeVisualRadius(backend);
   const pickRadiusMm = nodePickRadius(configuration);
-  if (!nodes.length) return emptyNodeMetrics(configuration);
-  const radialSegments = Math.max(8, configuration.meshRadialSegments);
-  const heightSegments = Math.max(6, Math.floor(radialSegments * 0.75));
-  const visualSolid = new THREE.OctahedronGeometry(visualRadiusMm, 0);
-  const visualGeometry = new THREE.EdgesGeometry(visualSolid);
-  visualSolid.dispose();
+  if (!nodes.length) return emptyNodeMetrics(backend);
+  const radialSegments = Math.max(12, configuration.meshRadialSegments);
+  const heightSegments = Math.max(8, Math.floor(radialSegments * 0.75));
+  const visualGeometry = new THREE.SphereGeometry(
+    visualRadiusMm,
+    radialSegments,
+    heightSegments,
+  );
   const pickGeometry = new THREE.SphereGeometry(pickRadiusMm, radialSegments, heightSegments);
-  const visualMaterial = lineMaterial(
-    lineMaterials,
+  const visualMaterial = meshMaterial(
+    meshMaterials,
     0x93c5fd,
     NODE_VISUAL_OPACITY,
     false,
@@ -107,14 +116,14 @@ function addGovernedNodes(staging, bounds, elements, configuration, lineMaterial
   const pickMaterial = invisiblePickMaterial();
   for (const node of nodes) {
     const point = finiteVector(node);
-    const marker = new THREE.LineSegments(visualGeometry, visualMaterial);
+    const marker = new THREE.Mesh(visualGeometry, visualMaterial);
     marker.name = `topology-edit-visible-node-marker:${node.id || node.entityId || ''}`;
     marker.position.copy(point);
     marker.userData = {
       nonPickable: true,
       visualNodeMarker: true,
       visualRadiusMm,
-      renderAuthority: 'CANONICAL_NODE_WIREFRAME_MARKER_V2',
+      renderAuthority: 'CANONICAL_NODE_TRANSLUCENT_SPHERE_V3',
     };
     marker.renderOrder = OVERLAY_RENDER_ORDER - 2;
     staging.add(marker);
@@ -125,7 +134,7 @@ function addGovernedNodes(staging, bounds, elements, configuration, lineMaterial
     proxy.userData = {
       ...pickUserData(node),
       pickProxy: true,
-      renderAuthority: 'CANONICAL_NODE_PICK_PROXY_V2',
+      renderAuthority: 'CANONICAL_NODE_PICK_PROXY_V3',
     };
     proxy.renderOrder = OVERLAY_RENDER_ORDER - 1;
     staging.add(proxy);
@@ -139,11 +148,18 @@ function addGovernedNodes(staging, bounds, elements, configuration, lineMaterial
   };
 }
 
-function emptyNodeMetrics(configuration) {
+function governedNodeVisualRadius(backend) {
+  const explicit = Number(backend?.governedNodeMarkerRadiusMm);
+  return Number.isFinite(explicit) && explicit > 0
+    ? explicit
+    : nodeVisualRadius(backend?.navigationConfiguration);
+}
+
+function emptyNodeMetrics(backend) {
   return {
     nodeCount: 0,
-    nodeVisualRadiusMm: nodeVisualRadius(configuration),
-    nodePickRadiusMm: nodePickRadius(configuration),
+    nodeVisualRadiusMm: governedNodeVisualRadius(backend),
+    nodePickRadiusMm: nodePickRadius(backend?.navigationConfiguration),
     nodeOpacity: NODE_VISUAL_OPACITY,
   };
 }
@@ -191,7 +207,7 @@ function routePickProxy(segment, points, material, radiusMm, radialSegments) {
   proxy.userData = {
     ...pickUserData(segment),
     pickProxy: true,
-    renderAuthority: 'GOVERNED_ROUTE_PICK_PROXY_V2',
+    renderAuthority: 'GOVERNED_ROUTE_PICK_PROXY_V3',
   };
   return proxy;
 }
@@ -223,7 +239,7 @@ function publishRouteEvidence(host, projection, metrics, isDraft) {
   host.dataset.topologyEditNodePickProxyRadiusMm = String(metrics.nodePickRadiusMm);
   host.dataset.topologyEditVisibleNodeMarkerOpacity = String(metrics.nodeOpacity);
   host.dataset.topologyEditNodeVisualAndPickGeometrySeparated = 'true';
-  host.dataset.topologyEditVisibleNodeMarkerGeometry = 'OCTAHEDRON_WIREFRAME';
+  host.dataset.topologyEditVisibleNodeMarkerGeometry = 'TRANSLUCENT_SPHERE';
   host.dataset.topologyEditExactTeeCount = String(editDraft.exactTeeCount || 0);
   host.dataset.topologyEditExactTeeSegmentCount = String(editDraft.exactTeeSegmentCount || 0);
   host.dataset.topologyEditExactOletCount = String(editDraft.exactOletCount || 0);
