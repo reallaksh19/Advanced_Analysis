@@ -33,14 +33,19 @@ export class TopologyEdit3DViewController extends ProfessionalController {
   }
 
   buildWorkspaceCanonical(dataset, graph) {
+    const canonical = super.buildWorkspaceCanonical(dataset, graph);
+    if (!this.isGovernedSjsonCanonical(canonical)) return canonical;
     return enrichCanonicalSupportsWithExactOrigins(
-      super.buildWorkspaceCanonical(dataset, graph),
+      canonical,
       dataset,
       SupportRestraintStore.getAttachmentModel(),
     );
   }
 
   deriveVisual(canonical, modelRole) {
+    if (!this.isGovernedSjsonCanonical(canonical)) {
+      return super.deriveVisual(canonical, modelRole);
+    }
     const result = adaptSjsonVisualToGovernedEditDraftProjection({
       visualResult: deriveSjsonCompleteVisualGeometry({
         canonicalTopology: canonical,
@@ -68,6 +73,11 @@ export class TopologyEdit3DViewController extends ProfessionalController {
   refreshView(canonical) {
     this.sjsonSupportBundle = null;
     this.viewportBackend?.setGovernedSupportProjection(null);
+    if (!this.isGovernedSjsonCanonical(canonical)) {
+      this.sjsonVisualByRole.clear();
+      this.sjsonBenchmarkView = null;
+      return super.refreshView(canonical);
+    }
     super.refreshView(canonical);
 
     const bundle = this.sjsonSupportBundle;
@@ -77,9 +87,7 @@ export class TopologyEdit3DViewController extends ProfessionalController {
         'TOPOLOGY_EDIT_SJSON_SINGLE_RENDER_PACKET_MISSING: Draft visual and support authority are required.',
       );
     }
-    this.sjsonBenchmarkView = canonical.sourceHash === SJSON_BENCHMARK_SOURCE_HASH
-      ? applySjsonBenchmarkCameraFit(this.viewportBackend)
-      : null;
+    this.sjsonBenchmarkView = applySjsonBenchmarkCameraFit(this.viewportBackend);
     this.visualDiagnostics = [
       ...(draftVisual.model?.diagnostics || []),
       ...bundle.overlays.flatMap((row) => row.diagnostics || []),
@@ -112,6 +120,10 @@ export class TopologyEdit3DViewController extends ProfessionalController {
       visualModelHash: this.visualModelHash,
       journalHash: this.session?.journal?.journalHash || '',
     });
+  }
+
+  isGovernedSjsonCanonical(canonical) {
+    return canonical?.sourceHash === SJSON_BENCHMARK_SOURCE_HASH;
   }
 
   deactivate() {
