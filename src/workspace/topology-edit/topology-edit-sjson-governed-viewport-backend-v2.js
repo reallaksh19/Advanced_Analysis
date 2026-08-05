@@ -6,10 +6,11 @@ import {
   TOPOLOGY_EDIT_SJSON_EDIT_DRAFT_RENDER_STYLE,
   TOPOLOGY_EDIT_SJSON_GOVERNED_PROJECTION_SCHEMA,
 } from './topology-edit-sjson-governed-projection-v2.js';
+import { renderGovernedSjsonIssues } from './topology-edit-sjson-governed-issue-renderer-v2.js';
 import { renderGovernedSjsonRoute } from './topology-edit-sjson-governed-route-renderer-v2.js';
 import { renderGovernedSjsonSupports } from './topology-edit-sjson-governed-support-renderer-v2.js';
 
-/** One render transaction for SJSON route, nodes, and support overlays. */
+/** One render transaction for SJSON route, nodes, supports, and transient checker HUD. */
 export class TopologyEditSjsonGovernedNavigationHudViewportBackendV2
   extends TopologyEditNavigationHudViewportBackend {
   constructor(options = {}) {
@@ -56,6 +57,13 @@ export class TopologyEditSjsonGovernedNavigationHudViewportBackendV2
       return renderGovernedSjsonSupports({ backend: this, group, projection });
     }
     return super.renderProjection(group, projection, colorHex, opacity, markerSize);
+  }
+
+  renderIssues(overlay) {
+    if (!this.governedSupportProjection) return super.renderIssues(overlay);
+    const count = renderGovernedSjsonIssues({ backend: this, overlay });
+    this.invalidate('issue-overlay');
+    return count;
   }
 
   destroy() {
