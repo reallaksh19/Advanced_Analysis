@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { formatNumber } from '../src/core/nonlinear-shell-contact/deck-writer.js';
+import { createCanonicalNonlinearShellContactModel } from '../src/core/nonlinear-shell-contact/canonical-model.js';
+import {
+  DEFAULT_DECK_PROFILE_INPUT,
+  createDeckProfile,
+} from '../src/core/nonlinear-shell-contact/deck-profile.js';
+import {
+  formatNumber,
+  writeDeterministicSolverDeck,
+} from '../src/core/nonlinear-shell-contact/deck-writer.js';
+import { createNc00ExtendedRigidFixtureInputs } from '../src/core/nonlinear-shell-contact/nc00-extended-fixtures.js';
+import { createNc00FixtureInputs } from '../src/core/nonlinear-shell-contact/nc00-fixtures.js';
 import { inventoryExternalSolverOutputs } from '../src/core/nonlinear-shell-contact/structural-output-inventory.js';
 import { reconstructStepSequence } from '../src/core/nonlinear-shell-contact/result-reconstruction.js';
 
@@ -57,5 +67,30 @@ test('CalculiX ordinal step markers bind by exact governed count when names are 
       expectedStepIds: ['STEP-PRESSURE', 'STEP-INDENT', 'STEP-UNLOAD'],
       observedStepIds: ['1', '2', '3'],
     },
+  );
+});
+
+test('rigid surface carriers use prescribed nodes rather than shell rigid-body MPCs', () => {
+  const inputs = createNc00FixtureInputs();
+  const model = createCanonicalNonlinearShellContactModel(inputs['NC00-F2']);
+  const deckProfile = createDeckProfile(DEFAULT_DECK_PROFILE_INPUT);
+  const deck = writeDeterministicSolverDeck(model, deckProfile);
+  const rigidId = model.rigidSurfaces[0].rigidSurfaceId;
+  const motionNodes = deck.maps.rigidMotionNodeMap[rigidId];
+  assert.ok(Array.isArray(motionNodes) && motionNodes.length > 4);
+  assert.doesNotMatch(deck.deckText, /\*RIGID BODY/iu);
+  assert.match(deck.deckText, /generated rigid carrier profile=DIRECTLY_PRESCRIBED_SHELL_CARRIER_V1/u);
+  assert.match(deck.deckText, /\*SHELL SECTION, ELSET=RIGEL_/u);
+  motionNodes.forEach((nodeId) => {
+    assert.match(deck.deckText, new RegExp(`^${nodeId}, 3, 3, 1\\.00000000000000E-01$`, 'mu'));
+  });
+});
+
+test('saddle adapter is positioned below the shell without initial geometric intersection', () => {
+  const inputs = createNc00FixtureInputs();
+  const extended = createNc00ExtendedRigidFixtureInputs(inputs['NC00-F2']);
+  assert.deepEqual(
+    extended['NC00-F2-SADDLE'].rigidSurfaces[0].referencePoint,
+    [50, 50, -25],
   );
 });
