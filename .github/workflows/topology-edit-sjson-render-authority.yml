@@ -19,6 +19,8 @@ on:
       - 'src/workspace/topology-edit/topology-edit-render-model.js'
       - 'src/workspace/topology-edit/topology-edit-typed-viewport-backend.js'
       - 'src/workspace/topology-edit/topology-edit-support-viewport-backend.js'
+      - 'src/workspace/topology-edit/topology-edit-sjson-edit-draft-projection.js'
+      - 'src/workspace/topology-edit/topology-edit-sjson-edit-draft-viewport-backend.js'
       - 'src/workspace/topology-edit/topology-edit-sjson-benchmark-camera.js'
       - 'src/workspace/topology-edit/topology-edit-sjson-visual-authority.js'
       - 'src/workspace/topology-edit/topology-edit-sjson-tee-projection.js'
@@ -27,6 +29,8 @@ on:
       - 'src/workspace/topology-edit/topology-edit-sjson-support-parent-branch-diameter.js'
       - 'src/workspace/topology-edit/topology-edit-sjson-restraint-projection.js'
       - 'src/workspace/topology-edit/support-restraint-family.js'
+      - 'tests/topology-edit-sjson-edit-draft-projection.test.mjs'
+      - 'tests/topology-edit-sjson-edit-draft-viewport.test.mjs'
       - 'tests/topology-edit-sjson-render-authority.test.mjs'
       - 'tests/topology-edit-sjson-fidelity.test.mjs'
       - 'tests/topology-edit-sjson-restraint-projection.test.mjs'
@@ -36,6 +40,7 @@ on:
       - 'tests/topology-edit-20-element-demo-loader.test.mjs'
       - 'tests/topology-edit-render-fidelity.test.mjs'
       - 'tests/topology-edit-m003-capability-authority.test.mjs'
+      - 'e2e/topology-edit-sjson-edit-draft-visual.spec.js'
       - 'e2e/topology-edit-sjson-render-authority.spec.js'
       - 'e2e/topology-edit-sjson-screen-bounds.spec.js'
       - 'e2e/topology-edit-clean-layout.spec.js'
@@ -91,6 +96,8 @@ jobs:
           node --check src/workspace/topology-edit/topology-edit-render-model.js
           node --check src/workspace/topology-edit/topology-edit-typed-viewport-backend.js
           node --check src/workspace/topology-edit/topology-edit-support-viewport-backend.js
+          node --check src/workspace/topology-edit/topology-edit-sjson-edit-draft-projection.js
+          node --check src/workspace/topology-edit/topology-edit-sjson-edit-draft-viewport-backend.js
           node --check src/workspace/topology-edit/topology-edit-sjson-benchmark-camera.js
           node --check src/workspace/topology-edit/topology-edit-sjson-visual-authority.js
           node --check src/workspace/topology-edit/topology-edit-sjson-tee-projection.js
@@ -98,20 +105,25 @@ jobs:
           node --check src/workspace/topology-edit/topology-edit-sjson-parent-branch-diameter.js
           node --check src/workspace/topology-edit/topology-edit-sjson-support-parent-branch-diameter.js
           node --check src/workspace/topology-edit/topology-edit-sjson-restraint-projection.js
+          node --check tests/topology-edit-sjson-edit-draft-projection.test.mjs
+          node --check tests/topology-edit-sjson-edit-draft-viewport.test.mjs
           node --check tests/topology-edit-sjson-render-authority.test.mjs
           node --check tests/topology-edit-sjson-fidelity.test.mjs
           node --check tests/topology-edit-sjson-restraint-projection.test.mjs
           node --check tests/topology-edit-sjson-benchmark-camera.test.mjs
           node --check tests/topology-edit-sjson-compact-support-render.test.mjs
           node --check tests/topology-edit-split-lineage-certification.test.mjs
+          node --check e2e/topology-edit-sjson-edit-draft-visual.spec.js
           node --check e2e/topology-edit-sjson-render-authority.spec.js
           node --check e2e/topology-edit-sjson-screen-bounds.spec.js
           node --check e2e/topology-edit-clean-layout.spec.js
           git diff --check
 
-      - name: Execute canonical, typed geometry, support, and split-lineage tests
+      - name: Execute canonical, Edit Draft geometry, support, and split-lineage tests
         run: |
           node --test \
+            tests/topology-edit-sjson-edit-draft-projection.test.mjs \
+            tests/topology-edit-sjson-edit-draft-viewport.test.mjs \
             tests/topology-edit-split-lineage-certification.test.mjs \
             tests/topology-edit-sjson-render-authority.test.mjs \
             tests/topology-edit-sjson-fidelity.test.mjs \
@@ -122,9 +134,10 @@ jobs:
             tests/topology-edit-render-fidelity.test.mjs \
             tests/topology-edit-m003-capability-authority.test.mjs
 
-      - name: Execute real Sjson Chromium/WebGL qualification
+      - name: Execute real Sjson Chromium/WebGL visual qualification
         run: |
           npx playwright test \
+            e2e/topology-edit-sjson-edit-draft-visual.spec.js \
             e2e/topology-edit-sjson-render-authority.spec.js \
             e2e/topology-edit-sjson-screen-bounds.spec.js \
             e2e/topology-edit-clean-layout.spec.js \
