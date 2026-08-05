@@ -13,6 +13,9 @@ import {
   verifyReversedEdgeInvariance,
 } from '../src/core/bucket-b/index.js';
 import {
+  solveIndependentOracleLinearSystem,
+} from '../src/core/bucket-b/flange-hub-independent-oracle.js';
+import {
   FLANGE_HUB_SOLVER_POLICY,
   solveJacobiPcg,
 } from '../src/core/bucket-b/flange-hub-solver.js';
@@ -216,6 +219,22 @@ test('BB-11 PCG certifies and replaces the explicit reduced-system residual', ()
   });
   assert.ok(replacementSolution.residualReplacementCount >= 1);
   certify(replacementSolution, replacementPolicy);
+});
+
+test('BB-11 independent oracle SGS-PCG solves an SPD system with explicit residual custody', () => {
+  const rows = [
+    [{ column: 0, value: 4 }, { column: 1, value: 1 }],
+    [{ column: 0, value: 1 }, { column: 1, value: 3 }, { column: 2, value: 1 }],
+    [{ column: 1, value: 1 }, { column: 2, value: 2 }],
+  ];
+  const rhs = Float64Array.from([1, 2, 3]);
+  const solved = solveIndependentOracleLinearSystem({ rows, rhs });
+  const expected = [2 / 9, 1 / 9, 13 / 9];
+  expected.forEach((value, index) => {
+    assert.ok(Math.abs(solved.x[index] - value) <= 1e-10);
+  });
+  assert.ok(solved.relativeResidual <= 1e-10);
+  assert.ok(solved.explicitResidualNorm <= 1e-8);
 });
 
 test('BB-11 registry rejects direct caller state', () => {
