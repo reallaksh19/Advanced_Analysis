@@ -1,0 +1,34 @@
+name: wp2-trace-source-patch
+
+on:
+  push:
+    branches:
+      - agent/empirical-beam-contact-runtime-wp2
+    paths:
+      - 'scripts/wp2-trace-source-patch.mjs'
+      - '.github/workflows/wp2-trace-source-patch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/empirical-beam-contact-runtime-wp2
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/wp2-trace-source-patch.mjs
+      - shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/workspace/engineering-loads/empirical-beam-contact-runtime.js
+          git diff --cached --quiet && exit 0
+          git commit -m 'Carry elbow formula authority into WP2 results'
+          git push origin HEAD:agent/empirical-beam-contact-runtime-wp2
