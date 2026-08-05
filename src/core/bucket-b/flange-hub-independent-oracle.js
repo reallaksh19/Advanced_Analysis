@@ -4,12 +4,20 @@ export const FLANGE_HUB_INDEPENDENT_ORACLE_DESCRIPTOR = Object.freeze({
   oracleId: 'BB11_INDEPENDENT_APPLICATION_ORACLE_V1',
   formulation: 'INDEPENDENT_AXISYMMETRIC_Q4_FULL_2X2',
   sourceSeparation: 'NO_PRODUCTION_FEA_IMPORTS',
-  linearSolver: 'DETERMINISTIC_SGS_PCG_EXPLICIT_RESIDUAL_V1',
+  linearSolver: 'DETERMINISTIC_SGS_PCG_EXPLICIT_RESIDUAL_V2',
   stressOrder: Object.freeze(['sigmaR', 'sigmaZ', 'sigmaTheta', 'tauRZ']),
   strainOrder: Object.freeze(['epsilonR', 'epsilonZ', 'epsilonTheta', 'gammaRZ']),
 });
 
 const MATERIAL = Object.freeze({ E: 210000, nu: 0.30 });
+const ORACLE_SOLVER_POLICY = Object.freeze({
+  relativeResidualTolerance: 1e-10,
+  absoluteResidualTolerance: 1e-8,
+  maximumIterations: 12000,
+  stagnationWindow: 500,
+  minimumStagnationReduction: 1e-4,
+  diagnosticInterval: 1000,
+});
 const GEOMETRY = Object.freeze({
   bore: 50,
   pipeOuter: 60,
@@ -68,7 +76,17 @@ export function runIndependentFlangeHubOracle(loadCaseId) {
   if (!['FH-PRES-001', 'FH-AXIAL-001', 'FH-GASKET-001'].includes(loadCaseId)) {
     throw new TypeError(`ORACLE_UNKNOWN_LOAD_CASE:${loadCaseId}`);
   }
-  const levels = LEVELS.map((definition) => solveLevel(definition, loadCaseId));
+  const levels = [];
+  for (const definition of LEVELS) {
+    diagnostic(`ORACLE_LEVEL_START:${loadCaseId}:${definition.levelId}`);
+    const level = solveLevel(definition, loadCaseId);
+    levels.push(level);
+    diagnostic(
+      `ORACLE_LEVEL_PASS:${loadCaseId}:${definition.levelId}:`
+      + `iterations=${level.solver.iterations}:`
+      + `relativeResidual=${level.solver.relativeResidual}`,
+    );
+  }
   const convergence = oracleConvergence(levels);
   const payload = {
     schema: 'flange-hub-independent-oracle-evidence/v1',
@@ -104,7 +122,8 @@ export function solveIndependentOracleLinearSystem({ rows, rhs } = {}) {
         throw new TypeError('ORACLE_LINEAR_SYSTEM_ENTRY_INVALID');
       }
       return { column: entry.column, value: entry.value };
-    }).sort((left, right) => left.column - right.column);
+    }).filter((entry) => entry.value !== 0)
+      .sort((left, right) => left.column - right.column);
     if (!values.some((entry) => entry.column === rowIndex && entry.value > 0)) {
       throw new RangeError('ORACLE_NONPOSITIVE_PRECONDITIONER_DIAGONAL');
     }
@@ -113,9 +132,14 @@ export function solveIndependentOracleLinearSystem({ rows, rhs } = {}) {
   const diagonal = Float64Array.from(normalized.map((row, index) => (
     row.find((entry) => entry.column === index).value
   )));
-  const multiply = (vector) => multiplyReducedRows(normalized, vector);
+  const multiply = createReducedRowMultiplier(normalized);
   const precondition = createSymmetricGaussSeidelPreconditioner(normalized, diagonal);
-  return pcg(multiply, Float64Array.from(rhs), precondition);
+  return pcg(
+    multiply,
+    Float64Array.from(rhs),
+    precondition,
+    ORACLE_SOLVER_POLICY,
+  );
 }
 
 function solveLevel(definition, loadCaseId) {
@@ -191,7 +215,7 @@ function solveLevel(definition, loadCaseId) {
     globalH: mesh.globalH,
     meshHash: oracleHash(mesh),
     solver: {
-      solverId: 'DETERMINISTIC_SGS_PCG_EXPLICIT_RESIDUAL_V1',
+      solverId: 'DETERMINISTIC_SGS_PCG_EXPLICIT_RESIDUAL_V2',
       iterations: solved.iterations,
       relativeResidual: solved.relativeResidual,
       explicitResidualNorm: solved.explicitResidualNorm,
@@ -670,7 +694,7 @@ function oracleConvergence(levels) {
   return { rows, accepted: rows.every((row) => row.accepted) };
 }
 
-function pcg(multiply, rhs, precondition) {
+function pcg(multiply, rhs, precondition, policy) {
   const count = rhs.length;
   const x = new Float64Array(count);
   let residualVector = Float64Array.from(rhs);
@@ -683,12 +707,16 @@ function pcg(multiply, rhs, precondition) {
   }
   const rhsNorm = norm(rhs);
   const denominator = Math.max(1, rhsNorm);
-  const tolerance = Math.max(1e-8, 1e-10 * rhsNorm);
-  const maximumIterations = Math.max(2000, 8 * count);
+  const tolerance = Math.max(
+    policy.absoluteResidualTolerance,
+    policy.relativeResidualTolerance * rhsNorm,
+  );
   let explicitResidualNorm = norm(residualVector);
   let residualReplacementCount = 0;
+  let bestResidualNorm = explicitResidualNorm;
+  let lastMaterialImprovement = 0;
 
-  for (let iteration = 1; iteration <= maximumIterations; iteration += 1) {
+  for (let iteration = 1; iteration <= policy.maximumIterations; iteration += 1) {
     const product = multiply(direction);
     const curvature = dot(direction, product);
     if (!Number.isFinite(curvature) || !(curvature > 0)) {
@@ -699,7 +727,27 @@ function pcg(multiply, rhs, precondition) {
       x[index] += alpha * direction[index];
       residualVector[index] -= alpha * product[index];
     }
-    if (norm(residualVector) <= tolerance) {
+    const recursiveResidualNorm = norm(residualVector);
+    if (recursiveResidualNorm
+      <= bestResidualNorm * (1 - policy.minimumStagnationReduction)) {
+      bestResidualNorm = recursiveResidualNorm;
+      lastMaterialImprovement = iteration;
+    }
+    if (iteration - lastMaterialImprovement >= policy.stagnationWindow) {
+      const certified = explicitResidual(multiply, rhs, x);
+      explicitResidualNorm = norm(certified);
+      throw new RangeError(
+        `ORACLE_PCG_STAGNATION:${iteration}:`
+        + `${explicitResidualNorm / denominator}`,
+      );
+    }
+    if (iteration % policy.diagnosticInterval === 0) {
+      diagnostic(
+        `ORACLE_PCG_PROGRESS:iterations=${iteration}:`
+        + `recursiveRelativeResidual=${recursiveResidualNorm / denominator}`,
+      );
+    }
+    if (recursiveResidualNorm <= tolerance) {
       const certified = explicitResidual(multiply, rhs, x);
       explicitResidualNorm = norm(certified);
       if (explicitResidualNorm <= tolerance) {
@@ -715,7 +763,13 @@ function pcg(multiply, rhs, precondition) {
       z = precondition(residualVector);
       direction = Float64Array.from(z);
       residualPreconditioned = dot(residualVector, z);
+      if (!Number.isFinite(residualPreconditioned)
+        || !(residualPreconditioned > 0)) {
+        throw new RangeError('ORACLE_NONPOSITIVE_PRECONDITIONED_RESIDUAL');
+      }
       residualReplacementCount += 1;
+      bestResidualNorm = explicitResidualNorm;
+      lastMaterialImprovement = iteration;
       continue;
     }
     z = precondition(residualVector);
@@ -732,46 +786,61 @@ function pcg(multiply, rhs, precondition) {
   const certified = explicitResidual(multiply, rhs, x);
   explicitResidualNorm = norm(certified);
   throw new RangeError(
-    `ORACLE_PCG_FAILURE:${explicitResidualNorm / denominator}`,
+    `ORACLE_PCG_FAILURE:${policy.maximumIterations}:`
+    + `${explicitResidualNorm / denominator}`,
   );
 }
 
 function createSymmetricGaussSeidelPreconditioner(rows, diagonal) {
+  const count = rows.length;
+  const forward = new Float64Array(count);
+  const result = new Float64Array(count);
   return (residual) => {
-    const count = residual.length;
-    const forward = new Float64Array(count);
     for (let rowIndex = 0; rowIndex < count; rowIndex += 1) {
       let value = residual[rowIndex];
-      rows[rowIndex].forEach((entry) => {
-        if (entry.column < rowIndex) value -= entry.value * forward[entry.column];
-      });
+      for (const entry of rows[rowIndex]) {
+        if (entry.column >= rowIndex) break;
+        value -= entry.value * forward[entry.column];
+      }
       forward[rowIndex] = value / diagonal[rowIndex];
     }
-    const result = new Float64Array(count);
     for (let rowIndex = count - 1; rowIndex >= 0; rowIndex -= 1) {
       let value = diagonal[rowIndex] * forward[rowIndex];
-      rows[rowIndex].forEach((entry) => {
-        if (entry.column > rowIndex) value -= entry.value * result[entry.column];
-      });
+      const row = rows[rowIndex];
+      for (let entryIndex = row.length - 1; entryIndex >= 0; entryIndex -= 1) {
+        const entry = row[entryIndex];
+        if (entry.column <= rowIndex) break;
+        value -= entry.value * result[entry.column];
+      }
       result[rowIndex] = value / diagonal[rowIndex];
     }
     return result;
   };
 }
 
-function multiplyReducedRows(rows, vector) {
+function createReducedRowMultiplier(rows) {
   const result = new Float64Array(rows.length);
-  rows.forEach((row, rowIndex) => {
-    let value = 0;
-    row.forEach((entry) => { value += entry.value * vector[entry.column]; });
-    result[rowIndex] = value;
-  });
-  return result;
+  return (vector) => {
+    for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+      let value = 0;
+      for (const entry of rows[rowIndex]) {
+        value += entry.value * vector[entry.column];
+      }
+      result[rowIndex] = value;
+    }
+    return result;
+  };
 }
 
 function explicitResidual(multiply, rhs, x) {
   const product = multiply(x);
   return Float64Array.from(rhs, (value, index) => value - product[index]);
+}
+
+function diagnostic(message) {
+  if (process.env.BB11_DIAGNOSTICS === '1') {
+    process.stderr.write(`${message}\n`);
+  }
 }
 
 function probe(level, id) {
