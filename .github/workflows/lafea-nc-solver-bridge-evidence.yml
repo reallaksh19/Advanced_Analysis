@@ -10,6 +10,7 @@ on:
       - 'scripts/lafea-nc-solver-bridge-evidence.mjs'
       - 'src/core/nonlinear-shell-contact/deck-profile.js'
       - 'src/core/nonlinear-shell-contact/deck-writer.js'
+      - 'src/core/nonlinear-shell-contact/nc00-extended-fixtures.js'
       - 'src/core/nonlinear-shell-contact/structural-output-inventory.js'
       - 'src/core/nonlinear-shell-contact/result-reconstruction.js'
       - 'tests/nonlinear-shell-contact-solver-bridge-evidence.test.mjs'
@@ -100,7 +101,7 @@ jobs:
           set -euo pipefail
           git diff --check "$BASE_SHA...$EXACT_HEAD_SHA"
           mapfile -t paths < <(git diff --name-only "$BASE_SHA...$EXACT_HEAD_SHA")
-          test "${#paths[@]}" = '8'
+          test "${#paths[@]}" = '9'
           for path in "${paths[@]}"; do
             case "$path" in
               .github/workflows/lafea-nc-solver-bridge-evidence.yml|\
@@ -108,6 +109,7 @@ jobs:
               scripts/lafea-nc-solver-bridge-evidence.mjs|\
               src/core/nonlinear-shell-contact/deck-profile.js|\
               src/core/nonlinear-shell-contact/deck-writer.js|\
+              src/core/nonlinear-shell-contact/nc00-extended-fixtures.js|\
               src/core/nonlinear-shell-contact/structural-output-inventory.js|\
               src/core/nonlinear-shell-contact/result-reconstruction.js|\
               tests/nonlinear-shell-contact-solver-bridge-evidence.test.mjs) ;;
@@ -117,6 +119,7 @@ jobs:
           node --check scripts/lafea-nc-solver-bridge-evidence.mjs
           node --check src/core/nonlinear-shell-contact/deck-profile.js
           node --check src/core/nonlinear-shell-contact/deck-writer.js
+          node --check src/core/nonlinear-shell-contact/nc00-extended-fixtures.js
           node --check src/core/nonlinear-shell-contact/structural-output-inventory.js
           node --check src/core/nonlinear-shell-contact/result-reconstruction.js
           node --check tests/nonlinear-shell-contact-solver-bridge-evidence.test.mjs
