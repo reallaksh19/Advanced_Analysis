@@ -70,6 +70,7 @@ jobs:
           node --check src/workspace/topology-edit/topology-edit-sjson-parent-branch-diameter.js
           node --check src/workspace/topology-edit/topology-edit-sjson-support-parent-branch-diameter.js
           node --check src/workspace/topology-edit/topology-edit-sjson-restraint-projection.js
+          node --check tests/topology-edit-sjson-production-editability.test.mjs
           node --check tests/topology-edit-sjson-governed-projection-v2.test.mjs
           node --check tests/topology-edit-sjson-governed-viewport-v2.test.mjs
           node --check e2e/topology-edit-sjson-governed-overlays.spec.js
@@ -82,6 +83,7 @@ jobs:
       - name: Execute canonical, governed projection, support, and lineage tests
         run: |
           node --test \
+            tests/topology-edit-sjson-production-editability.test.mjs \
             tests/topology-edit-sjson-governed-projection-v2.test.mjs \
             tests/topology-edit-sjson-governed-viewport-v2.test.mjs \
             tests/topology-edit-sjson-edit-draft-projection.test.mjs \
