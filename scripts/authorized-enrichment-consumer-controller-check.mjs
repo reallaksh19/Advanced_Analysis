@@ -46,6 +46,15 @@ assert.equal(
   true,
   'shared controller suite no longer qualifies authorized empirical execution',
 );
+const empiricalRunner = await readFile(
+  new URL('./run-authorized-empirical-load-execution-checks.mjs', import.meta.url),
+  'utf8',
+);
+assert.equal(
+  empiricalRunner.includes('empirical-appendix-s-vertical-benchmark.mjs'),
+  true,
+  'shared empirical suite no longer runs standalone Appendix S vertical benchmark',
+);
 assert.equal(EMPIRICAL_FORMULA_REGISTER.schema, 'empirical-formula-register/v1');
 assert.equal(EMPIRICAL_FORMULA_REGISTER.method, 'CHAINAGE_TRIBUTARY_SPAN_V2');
 assert.equal(EMPIRICAL_FORMULA_REGISTER.validation.detailedAnalysisSubstitution, false);
@@ -162,6 +171,7 @@ console.log(JSON.stringify({
   methodSelectingReceiptSchema: AUTHORIZED_EMPIRICAL_LOAD_EXECUTION_V2_SCHEMA,
   methodBoundRuntimePackageSchema: AUTHORIZED_EMPIRICAL_RUNTIME_PACKAGE_V2_SCHEMA,
   configuredMethodConsumerSchema: AUTHORIZED_EMPIRICAL_METHOD_CONSUMER_REQUEST_SCHEMA,
+  standaloneAppendixSVerticalBenchmarkRegistered: true,
 }, null, 2));
 
 function makeRuntimePackage() {
