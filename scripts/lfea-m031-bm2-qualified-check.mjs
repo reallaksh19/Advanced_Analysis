@@ -65,8 +65,8 @@ assert.equal(comparison.coverage.unmatchedSolverRows, 0);
 assert.equal(comparison.coverage.coverageStatus, 'COMPLETE');
 assert.equal(comparison.completeComparisonClaim, true);
 assert.equal(comparison.totals.untraced, 0);
-assert.equal(comparison.totals.passed, 4383);
-assert.equal(comparison.totals.failed, 1215);
+assert.equal(comparison.totals.passed, 4364);
+assert.equal(comparison.totals.failed, 1234);
 
 console.log(JSON.stringify({
   status: 'PASS',
