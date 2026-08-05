@@ -12,6 +12,9 @@ import {
   TOPOLOGY_EDIT_SJSON_GOVERNED_PROJECTION_SCHEMA,
 } from '../src/workspace/topology-edit/topology-edit-sjson-governed-projection-v2.js';
 import {
+  TOPOLOGY_EDIT_SJSON_EQUIPMENT_GEOMETRY_AUTHORITY,
+} from '../src/workspace/topology-edit/topology-edit-sjson-governed-equipment-geometry-v1.js';
+import {
   TOPOLOGY_EDIT_SUPPORT_RENDER_STYLES,
 } from '../src/workspace/topology-edit/topology-edit-support-viewport-backend.js';
 
@@ -91,22 +94,79 @@ test('governed route renders visible envelopes with direct picks, physical radiu
   backend.destroy();
 });
 
-test('governed supports render stable restraint identity with bidirectional arrows', () => {
+test('governed inline equipment retains distinct flange, gasket, valve, and instrument silhouettes', () => {
+  const backend = new TopologyEditSjsonGovernedViewportBackend({ navigationConfiguration: CONFIGURATION });
+  const kinds = ['FLANGE', 'GASKET', 'VALVE', 'INSTRUMENT'];
+  backend.renderProjection(backend.groups.draftGroup, {
+    schema: TOPOLOGY_EDIT_SJSON_GOVERNED_PROJECTION_SCHEMA,
+    renderStyle: TOPOLOGY_EDIT_SJSON_EDIT_DRAFT_RENDER_STYLE,
+    compactSegments: kinds.map((kind, index) => ({
+      id: `${kind.toLowerCase()}:1`,
+      entityId: `edge:${kind.toLowerCase()}`,
+      kind,
+      radiusMm: 20,
+      start: { x: index * 100, y: 0, z: 0 },
+      end: { x: index * 100 + 60, y: 0, z: 0 },
+      presentationOnlyExtent: kind === 'INSTRUMENT',
+      sourceCoincidentPorts: kind === 'INSTRUMENT',
+      axisInference: kind === 'INSTRUMENT' ? 'NEAREST_GOVERNED_ROUTE_SEGMENT' : null,
+      pickTarget: {
+        modelRole: 'draft', objectKind: 'component', objectId: `edge:${kind.toLowerCase()}`,
+      },
+    })),
+    compactElements: [],
+    editDraftMetrics: { coincidentPortEquipmentCount: 1 },
+  }, 0x0284c7, 1, 10);
+
+  const objects = namedObjects(backend.groups.draftGroup);
+  const expectedGeometry = {
+    FLANGE: 'LatheGeometry',
+    GASKET: 'CylinderGeometry',
+    VALVE: 'LatheGeometry',
+    INSTRUMENT: 'SphereGeometry',
+  };
+  for (const kind of kinds) {
+    const id = `${kind.toLowerCase()}:1`;
+    const solid = objects.get(`topology-edit-visible-equipment-solid:${kind}:${id}`);
+    assert.equal(solid?.isMesh, true, `${kind} solid missing`);
+    assert.equal(solid.geometry.type, expectedGeometry[kind]);
+    assert.equal(solid.userData.typedEquipmentSolid, true);
+    assert.equal(solid.userData.equipmentKind, kind);
+    assert.equal(
+      solid.userData.equipmentGeometryAuthority,
+      TOPOLOGY_EDIT_SJSON_EQUIPMENT_GEOMETRY_AUTHORITY,
+    );
+    assert.equal(solid.userData.pickTarget.objectId, `edge:${kind.toLowerCase()}`);
+    assert.equal(solid.userData.directPickMesh, true);
+    assert.equal(
+      objects.get(`topology-edit-route-pick-proxy:${id}`)?.userData.pickTarget.objectId,
+      `edge:${kind.toLowerCase()}`,
+    );
+  }
+  const instrument = objects.get(
+    'topology-edit-visible-equipment-solid:INSTRUMENT:instrument:1',
+  );
+  assert.equal(instrument.userData.presentationOnlyExtent, true);
+  assert.equal(instrument.userData.sourceCoincidentPorts, true);
+  backend.destroy();
+});
+
+test('governed supports render stable restraint identity with bidirectional arrows at threefold presentation scale', () => {
   const backend = new TopologyEditSjsonGovernedViewportBackend({ navigationConfiguration: CONFIGURATION });
   backend.renderProjection(backend.groups.supportGroup, {
     renderStyle: TOPOLOGY_EDIT_SUPPORT_RENDER_STYLES.TOPO_VALIDATOR_COMPACT,
-    compactMarkerRadiusMm: 12.6,
-    glyphMetrics: { placementAuthority: 'HOST_OD_HALF_CONTACT_PLUS_TWO_THIRDS_OD_GLYPH_V1' },
+    compactMarkerRadiusMm: 37.8,
+    glyphMetrics: { placementAuthority: 'HOST_OD_HALF_CONTACT_PLUS_TWO_OD_GLYPH_V2' },
     elements: [{
       id: 'support:1', entityId: 'support:1', type: 'SUPPORT', x: 0, y: 0, z: 0,
       pickTarget: { objectKind: 'support', objectId: 'support:1' },
     }],
     segments: [{
       id: 'restraint:1', entityId: 'restraint:1', type: 'RESTRAINT_DIRECTION',
-      start: { x: 50, y: 0, z: 0 }, end: { x: 116.6666666667, y: 0, z: 0 }, colorInt: 0xef4444,
+      start: { x: 50, y: 0, z: 0 }, end: { x: 250, y: 0, z: 0 }, colorInt: 0xef4444,
       directionalArrows: [
-        { polarity: 'POSITIVE', start: { x: 50, y: 0, z: 0 }, end: { x: 116.6666666667, y: 0, z: 0 } },
-        { polarity: 'NEGATIVE', start: { x: -50, y: 0, z: 0 }, end: { x: -116.6666666667, y: 0, z: 0 } },
+        { polarity: 'POSITIVE', start: { x: 50, y: 0, z: 0 }, end: { x: 250, y: 0, z: 0 } },
+        { polarity: 'NEGATIVE', start: { x: -50, y: 0, z: 0 }, end: { x: -250, y: 0, z: 0 } },
       ],
       pickTarget: { objectKind: 'restraint', objectId: 'restraint:1', supportId: 'support:1' },
     }],
