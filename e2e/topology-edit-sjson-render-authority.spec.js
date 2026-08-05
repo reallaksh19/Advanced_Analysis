@@ -1,8 +1,11 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 
 const SJSON_BYTES = readFileSync(new URL('../public/Sjson.json', import.meta.url));
 const REPORTED_CANDIDATE_SHA = '8754ea4f7ff839d5085ceffa845ded9c81557149';
+const EXECUTING_CANDIDATE_SHA = process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA
+  || process.env.GITHUB_SHA
+  || 'UNKNOWN';
 
 test.beforeEach(async ({ page }) => {
   test.setTimeout(120_000);
@@ -82,10 +85,11 @@ test('production Sjson opens 3D Edit with complete typed fittings and spatially 
   expect(bodyText).not.toContain('TopologyEditCanonicalId:');
   await expect(shell.locator('[data-role="topology-edit-status"]')).toContainText(/nodes, .*edges, .*supports/u);
 
-  const ledger = await canvasHost.evaluate((element, baseCandidateSha) => ({
+  const ledger = await canvasHost.evaluate(({ baseCandidateSha, executingCandidateSha }, element) => ({
     schema: 'topology-edit-sjson-webgl-ledger/v1',
     baseCandidateSha,
-    executingCandidateSha: globalThis.__BUILD_SHA__ || null,
+    executingCandidateSha,
+    browserBuildSha: globalThis.__BUILD_SHA__ || null,
     sourceHash: element.closest('[data-role="topology-edit-render-host"]')?.dataset.topologyEditDatasetSourceHash || '',
     canonicalHash: element.closest('[data-role="topology-edit-render-host"]')?.dataset.topologyEditDatasetCanonicalHash || '',
     visualModelHash: element.dataset.topologyEditVisualModelHash || '',
@@ -108,19 +112,25 @@ test('production Sjson opens 3D Edit with complete typed fittings and spatially 
       exactOrigin: Number(element.dataset.topologyEditExactSupportOriginCount || 0),
       distinctOrigin: Number(element.dataset.topologyEditDistinctSupportOriginCount || 0),
     },
-  }), REPORTED_CANDIDATE_SHA);
+  }), {
+    baseCandidateSha: REPORTED_CANDIDATE_SHA,
+    executingCandidateSha: EXECUTING_CANDIDATE_SHA,
+  });
 
+  expect(ledger.executingCandidateSha).not.toBe('UNKNOWN');
   expect(ledger.sourceHash).not.toBe('');
   expect(ledger.canonicalHash).not.toBe('');
   expect(ledger.visualModelHash).not.toBe('');
   expect(ledger.supportProjectionHash).not.toBe('');
 
+  const ledgerPath = testInfo.outputPath('sjson-3d-edit-render-ledger.json');
+  writeFileSync(ledgerPath, `${JSON.stringify(ledger, null, 2)}\n`, 'utf8');
   await page.screenshot({
     path: testInfo.outputPath('sjson-3d-edit-fittings-supports.png'),
     fullPage: true,
   });
   await testInfo.attach('sjson-3d-edit-render-ledger', {
-    body: Buffer.from(JSON.stringify(ledger, null, 2)),
+    path: ledgerPath,
     contentType: 'application/json',
   });
 });
