@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+const CONTROLLER_KEY = '__TOPOLOGY_EDIT_PRODUCTIVITY_CONTROLLER__';
+
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 1050 });
   await page.addInitScript(() => globalThis.localStorage?.clear());
@@ -19,6 +21,8 @@ test('3D Edit keeps the canvas primary and defers dense controls into inspector 
   const compactDock = page.locator('[data-role="load-calc-consumer-root"]');
 
   await expect(host).toHaveAttribute('data-topology-edit-clean-shell', 'true');
+  await expect(host).toHaveAttribute('data-topology-edit-inspector-open', 'true');
+  await expect(host).toHaveAttribute('data-topology-edit-inspector-width-px', '320');
   await expect(outerShell).toHaveAttribute('data-topology-edit-focus-layout', 'true');
   await expect(treePanel).toHaveClass(/workspace-panel--collapsed/);
   await expect(propertiesPanel).toHaveClass(/workspace-panel--collapsed/);
@@ -59,6 +63,7 @@ test('3D Edit keeps the canvas primary and defers dense controls into inspector 
 
   await expect(host.getByRole('button', { name: 'Select', exact: true })).toBeVisible();
   await expect(host.getByRole('button', { name: 'Fit', exact: true })).toBeVisible();
+  await expect(host.getByRole('button', { name: 'Fit selection', exact: true })).toBeVisible();
   await expect(host.getByRole('button', { name: 'Save draft', exact: true })).toBeVisible();
   await expect(host.getByRole('button', { name: 'Commit draft', exact: true })).toBeVisible();
 
@@ -71,6 +76,91 @@ test('3D Edit keeps the canvas primary and defers dense controls into inspector 
   await expect(propertiesPanel).not.toHaveClass(/workspace-panel--collapsed/);
 });
 
+test('3D Edit provides resizable persistent inspector, selection focus, status badges, and keyboard help', async ({ page }) => {
+  const host = await openProductionDemo(page);
+  const canvas = host.locator('canvas');
+  const sidecar = host.locator('[data-role="topology-edit-sidecar"]');
+  const resizer = host.locator('[data-role="topology-edit-sidecar-resizer"]');
+  const fitSelection = host.getByRole('button', { name: 'Fit selection', exact: true });
+  const clearSelection = host.getByRole('button', { name: 'Clear', exact: true });
+  const shortcuts = host.locator('[data-role="topology-edit-shortcuts"]');
+
+  await expect(resizer).toBeVisible();
+  await expect(fitSelection).toBeDisabled();
+  await expect(clearSelection).toBeDisabled();
+  await expect(host.locator('[data-role="topology-edit-draft-state"]')).toHaveText('Clean · 0 edits');
+
+  await resizer.focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(host).toHaveAttribute('data-topology-edit-inspector-width-px', '336');
+
+  await host.getByRole('button', { name: 'Inspector', exact: true }).click();
+  await expect(host).toHaveAttribute('data-topology-edit-inspector-open', 'false');
+  await expect(sidecar).toBeHidden();
+  await host.focus();
+  await page.keyboard.press('i');
+  await expect(host).toHaveAttribute('data-topology-edit-inspector-open', 'true');
+  await expect(sidecar).toBeVisible();
+
+  await host.focus();
+  await page.keyboard.press('Shift+/');
+  await expect(shortcuts).toBeVisible();
+  await expect(shortcuts).toContainText('Double-click');
+  await page.keyboard.press('Escape');
+  await expect(shortcuts).toBeHidden();
+
+  const nodeId = await selectQualifiedNode(page);
+  await expect(host).toHaveAttribute('data-topology-edit-selection-count', '1');
+  await expect(host.locator('[data-role="topology-edit-selection-summary"]')).toHaveAttribute('title', nodeId);
+  await expect(fitSelection).toBeEnabled();
+  await expect(clearSelection).toBeEnabled();
+  await expect(host.locator('details[data-panel-kind="topology-edit-inspection"]')).toHaveAttribute('open', '');
+  await expect(host.locator('details[data-panel-kind="topology-edit-professional-interaction"]')).toHaveAttribute('open', '');
+
+  await canvas.dispatchEvent('dblclick');
+  await expect(host.locator('[data-role="topology-edit-status"]')).toContainText('View command: fit-selection.');
+
+  const issueCount = await integerAttribute(host, 'data-topology-edit-visible-issue-count');
+  expect(issueCount).toBeGreaterThan(0);
+  const issuePanel = host.locator('details[data-panel-kind="topology-edit-checker"]');
+  await expect(issuePanel).toHaveAttribute('open', '');
+  await expect(issuePanel.locator('[data-role="topology-edit-panel-badge"]')).toBeVisible();
+
+  const displayPanel = host.locator('details[data-panel-kind="display"]');
+  if (!(await displayPanel.evaluate((element) => element.open))) {
+    await displayPanel.locator(':scope > summary').click();
+  }
+  const commandPanel = host.locator('details[data-panel-kind="commands"]');
+  if (!(await commandPanel.evaluate((element) => element.open))) {
+    await commandPanel.locator(':scope > summary').click();
+  }
+  await host.locator('[data-command-action="move-positive-z"]').click();
+  await expect(host).toHaveAttribute('data-topology-edit-active-command-count', '1');
+  await expect(host).toHaveAttribute('data-topology-edit-draft-state', 'saved');
+  await expect(host.locator('[data-role="topology-edit-draft-state"]')).toHaveText('Saved · 1 edit');
+
+  await resizer.focus();
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await expect(host).toHaveAttribute('data-topology-edit-inspector-width-px', '304');
+  await displayPanel.locator(':scope > summary').click();
+  await expect(displayPanel).not.toHaveAttribute('open', '');
+
+  const draftPanel = host.locator('details[data-panel-kind="draft"]');
+  if (!(await draftPanel.evaluate((element) => element.open))) {
+    await draftPanel.locator(':scope > summary').click();
+  }
+  await host.locator('[data-action="reload-draft"]').click();
+  await expect(host.locator('[data-role="topology-edit-status"]')).toContainText('Draft restored at session version');
+  await expect(host).toHaveAttribute('data-topology-edit-inspector-width-px', '336');
+  await expect(displayPanel).toHaveAttribute('open', '');
+
+  await host.focus();
+  await page.keyboard.press('Escape');
+  await expect(host).toHaveAttribute('data-topology-edit-selection-count', '0');
+  await expect(fitSelection).toBeDisabled();
+});
+
 async function openProductionDemo(page) {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   const navigation = page.getByRole('navigation', { name: 'Application views' });
@@ -79,6 +169,49 @@ async function openProductionDemo(page) {
   await expect.poll(() => page.evaluate(() => (
     globalThis.AnalysisWorkspace?.getSnapshot?.()?.dataset?.entities?.length ?? 0
   ))).toBe(20);
+
+  await page.evaluate(async (key) => {
+    const moduleUrl = new URL(
+      'src/workspace/topology-edit-3d-sjson-fidelity-controller.js',
+      document.baseURI,
+    ).href;
+    const { TopologyEdit3DViewController } = await import(moduleUrl);
+    const prototype = TopologyEdit3DViewController.prototype;
+    if (prototype.__productivityActivateWrapped) return;
+    const activate = prototype.activate;
+    prototype.activate = async function productivityActivate(...args) {
+      globalThis[key] = this;
+      return activate.apply(this, args);
+    };
+    Object.defineProperty(prototype, '__productivityActivateWrapped', {
+      value: true,
+      configurable: true,
+    });
+  }, CONTROLLER_KEY);
+
   await page.getByRole('button', { name: '3D Edit', exact: true }).click();
-  await expect(page.locator('[data-role="topology-edit-render-host"]')).toBeVisible();
+  const host = page.locator('[data-role="topology-edit-render-host"]');
+  await expect(host).toBeVisible();
+  await expect.poll(() => page.evaluate((key) => Boolean(globalThis[key]?.session), CONTROLLER_KEY)).toBe(true);
+  return host;
+}
+
+async function selectQualifiedNode(page) {
+  return page.evaluate((key) => {
+    const controller = globalThis[key];
+    const topology = controller.session.currentTopology();
+    const node = topology.nodes.find((row) => row.portKeys?.includes('P-001:port:start'))
+      ?? topology.nodes[0];
+    controller.selectionCoordinator.requestCanonical(
+      'REPLACE',
+      [node.id],
+      'search',
+      { primaryId: node.id, anchorId: node.id },
+    );
+    return node.id;
+  }, CONTROLLER_KEY);
+}
+
+async function integerAttribute(locator, name) {
+  return Number.parseInt(await locator.getAttribute(name) || '0', 10) || 0;
 }
