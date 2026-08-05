@@ -45,16 +45,17 @@ export function renderGovernedSjsonRoute({
   let pickProxyCount = 0;
   let displayEnvelopeCount = 0;
   try {
+    const displayDiagonalMm = projectionDiagonal(projection);
     for (const segment of projection.compactSegments || []) {
       const points = routePoints(segment);
       if (points.length < 2) continue;
       const color = Number.isInteger(segment.colorInt) ? segment.colorInt : fallbackColor;
       const physicalRadiusMm = routeVisualRadius(segment);
       const physicalEndRadiusMm = routeEndRadius(segment);
-      const displayRadiusMm = governedRouteDisplayRadius(backend, physicalRadiusMm);
+      const displayRadiusMm = governedRouteDisplayRadius(displayDiagonalMm, physicalRadiusMm);
       const displayEndRadiusMm = physicalEndRadiusMm === null
         ? null
-        : governedRouteDisplayRadius(backend, physicalEndRadiusMm);
+        : governedRouteDisplayRadius(displayDiagonalMm, physicalEndRadiusMm);
       const solid = displayRadiusMm === null
         ? null
         : routeSolidMesh(
@@ -261,6 +262,20 @@ function routePoints(segment) {
     .getPoints(Math.max(8, Math.floor(Number(segment.curveSegments) || 12)));
 }
 
+function projectionDiagonal(projection) {
+  const bounds = new THREE.Box3();
+  for (const segment of projection?.compactSegments || []) {
+    routePoints(segment).forEach((point) => bounds.expandByPoint(point));
+  }
+  for (const element of projection?.compactElements || []) {
+    const point = finiteVector(element);
+    if (point) bounds.expandByPoint(point);
+  }
+  if (bounds.isEmpty()) return null;
+  const diagonal = bounds.getSize(new THREE.Vector3()).length();
+  return Number.isFinite(diagonal) && diagonal > 0 ? diagonal : null;
+}
+
 function routeSolidMesh(segment, points, material, radiusMm, endRadiusMm, radialSegments) {
   let geometry;
   let position = null;
@@ -367,20 +382,12 @@ function routeEndRadius(segment) {
   );
 }
 
-function governedRouteDisplayRadius(backend, physicalRadiusMm) {
+function governedRouteDisplayRadius(diagonalMm, physicalRadiusMm) {
   if (!(physicalRadiusMm > 0)) return null;
-  const diagonal = engineeringDiagonal(backend);
-  if (!(diagonal > 0)) return physicalRadiusMm;
-  const minimumAtFitMm = diagonal * ROUTE_DISPLAY_MIN_DIAGONAL_FRACTION;
+  if (!(diagonalMm > 0)) return physicalRadiusMm;
+  const minimumAtFitMm = diagonalMm * ROUTE_DISPLAY_MIN_DIAGONAL_FRACTION;
   const maximumEnvelopeMm = physicalRadiusMm * ROUTE_DISPLAY_MAX_PHYSICAL_MULTIPLIER;
   return Math.max(physicalRadiusMm, Math.min(minimumAtFitMm, maximumEnvelopeMm));
-}
-
-function engineeringDiagonal(backend) {
-  const bounds = backend?.engineeringBounds;
-  if (!(bounds instanceof THREE.Box3) || bounds.isEmpty()) return null;
-  const diagonal = bounds.getSize(new THREE.Vector3()).length();
-  return Number.isFinite(diagonal) && diagonal > 0 ? diagonal : null;
 }
 
 function governedRoutePickRadius(configuration, displayRadiusMm, endDisplayRadiusMm) {
