@@ -38,10 +38,10 @@ export class TopologyEditNavigationHudViewportBackend extends TopologyEditSuppor
   }
 
   /**
-   * The ID-buffer sample at the exact cursor is authoritative and the same pass
-   * supplies the governed screen-space acquisition radius. Only the winning
-   * object is ray-intersected to recover an engineering point. A whole-scene
-   * CPU raycast is retained solely for unavailable/failed GPU picking.
+   * A center-pixel ID-buffer hit is the frontmost rendered identity and takes
+   * the allocation-free fast path. Radius-only GPU acquisition still checks
+   * the exact cursor ray first, preserving the established rule that a direct
+   * object under the pointer cannot be replaced by a nearby proxy.
    */
   pickAt(clientX, clientY) {
     if (this.contextLost || this.configurationError) return null;
@@ -54,14 +54,22 @@ export class TopologyEditNavigationHudViewportBackend extends TopologyEditSuppor
       rect: context.rect,
       camera: this.activeCamera,
     });
-    if (gpuHit) {
+    if (isExactGpuSample(gpuHit)) {
       const point = this.resolveGpuPickPoint(
         gpuHit,
         gpuHit.samplePointer ?? context.pointer,
       );
       if (point) return this.pickReceipt(gpuHit.target, point);
     }
-    return this.pickWithRaycaster(context.pointer);
+
+    const rayReceipt = this.pickWithRaycaster(context.pointer);
+    if (rayReceipt) return rayReceipt;
+    if (!gpuHit) return null;
+    const point = this.resolveGpuPickPoint(
+      gpuHit,
+      gpuHit.samplePointer ?? context.pointer,
+    );
+    return point ? this.pickReceipt(gpuHit.target, point) : null;
   }
 
   renderSession(model) {
@@ -172,4 +180,8 @@ export class TopologyEditNavigationHudViewportBackend extends TopologyEditSuppor
 export function engineeringBasisQuaternion() {
   const matrix = new THREE.Matrix4().fromArray([...ENGINEERING_TO_RENDER_MATRIX4_ELEMENTS]);
   return new THREE.Quaternion().setFromRotationMatrix(matrix).normalize();
+}
+
+function isExactGpuSample(hit) {
+  return Number(hit?.sample?.distanceSquared) === 0;
 }
