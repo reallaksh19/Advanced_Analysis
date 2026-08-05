@@ -90,6 +90,15 @@ assert(rigidCase.numericalEvidence.reciprocalConditionEstimate > 0);
 assert(rigidCase.numericalEvidence.scaledResidual <= 1e-12);
 
 const rigidBySite = bySupportSite(rigidCase.supportResults);
+console.log('WP5_RIGID_DIAGNOSTIC', JSON.stringify({
+  supportResults: rigidCase.supportResults.map((row) => ({
+    supportSiteId: row.supportSiteId,
+    reactionComponentN: row.reactionComponentN,
+    displacementM: row.displacementM,
+    trialFreeMovementM: row.trialFreeMovementM,
+  })),
+  memberActions: rigidCase.memberActions,
+}, null, 2));
 const leftExpected = EA * 1e-5 * 100;
 const rightExpected = (
   0.1 * 1e-5 * 100 + 0.5 * 2e-5 * 100
