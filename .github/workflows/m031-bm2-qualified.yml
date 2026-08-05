@@ -7,6 +7,7 @@ on:
     paths:
       - 'benchmarks/LFEA/BM2/**'
       - 'scripts/lfea-m031-bm2-qualified-*.mjs'
+      - 'scripts/lfea-m031-bm2-app-nonfriction-*.mjs'
       - 'scripts/lfea-b3.26-bm2-output-comparison*.mjs'
       - 'scripts/lfea-b3.26-bm2-solve-comparison-check.mjs'
       - 'scripts/lfea-b3.26-bm2-solve-fixtures.mjs'
@@ -18,6 +19,7 @@ on:
       - 'src/core/linear-fea-piping-components/**'
       - 'src/core/linear-fea-solver/**'
       - 'src/core/linear-fea-result-recovery/**'
+      - 'src/core/linear-piping-analysis-consumer/**'
       - '.github/workflows/m031-bm2-qualified.yml'
   workflow_dispatch:
 
@@ -62,6 +64,8 @@ jobs:
           set -euo pipefail
           node --check scripts/lfea-m031-bm2-qualified-runtime.mjs
           node --check scripts/lfea-m031-bm2-qualified-check.mjs
+          node --check scripts/lfea-m031-bm2-app-nonfriction-runtime.mjs
+          node --check scripts/lfea-m031-bm2-app-nonfriction-check.mjs
           node --check scripts/lfea-b3.26-bm2-output-comparison-runtime.mjs
           node --check scripts/lfea-b3.26-bm2-solve-comparison-check.mjs
           node --check scripts/lfea-b3.26-bm2-solve-fixtures.mjs
@@ -84,6 +88,12 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/lfea-bm2-consolidated-latest-output-check.mjs --write | tee /tmp/m031-bm2-consolidated.log
+
+      - name: Production app non-friction node reverse engineering
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/lfea-m031-bm2-app-nonfriction-check.mjs --write | tee /tmp/m031-bm2-app-nonfriction.log
 
       - name: BM1 comparison regression
         run: npm run check:lfea-bm1-cii-comparison
@@ -108,8 +118,11 @@ jobs:
             reports/bm2-consolidated-latest-output.json \
             reports/bm2-nonfriction-linear-fea-out-of-tolerance.json \
             reports/bm2-nonfriction-linear-fea-out-of-tolerance.csv \
+            reports/bm2-app-nonfriction-node-reverse-engineering.json \
+            reports/bm2-app-nonfriction-node-reverse-engineering.csv \
             > /tmp/m031-bm2-report.sha256
           node scripts/lfea-bm2-consolidated-latest-output-check.mjs --write > /tmp/m031-bm2-consolidated-replay.log
+          node scripts/lfea-m031-bm2-app-nonfriction-check.mjs --write > /tmp/m031-bm2-app-nonfriction-replay.log
           sha256sum --check /tmp/m031-bm2-report.sha256
 
       - name: Upload deterministic qualification evidence
@@ -120,8 +133,11 @@ jobs:
             reports/bm2-consolidated-latest-output.json
             reports/bm2-nonfriction-linear-fea-out-of-tolerance.json
             reports/bm2-nonfriction-linear-fea-out-of-tolerance.csv
+            reports/bm2-app-nonfriction-node-reverse-engineering.json
+            reports/bm2-app-nonfriction-node-reverse-engineering.csv
             /tmp/m031-bm2-qualified.log
             /tmp/m031-bm2-consolidated.log
+            /tmp/m031-bm2-app-nonfriction.log
             /tmp/m031-bm2-report.sha256
           if-no-files-found: error
           retention-days: 30
