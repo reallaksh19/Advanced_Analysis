@@ -5,10 +5,6 @@ import {
 import { SupportRestraintStore } from './support-restraint-store.js';
 import { semanticHash } from '../core/shared-piping-model/index.js';
 import {
-  deriveAllSupportRestraintGeometry,
-  projectSupportGeometryToViewport,
-} from './topology-edit/support-restraint-family.js';
-import {
   engineeringDirectionToRender,
   renderDirectionToEngineering,
 } from './topology-edit/topology-edit-coordinate-transform.js';
@@ -22,6 +18,9 @@ import { deriveSjsonCompleteVisualGeometry } from './topology-edit/topology-edit
 import {
   applySjsonParentBranchDiametersToSupportTopology,
 } from './topology-edit/topology-edit-sjson-support-parent-branch-diameter.js';
+import {
+  deriveSjsonTopoValidatorSupportProjection,
+} from './topology-edit/topology-edit-sjson-restraint-projection.js';
 
 const BENCHMARK_SOURCE_HASH = 'fnv1a64:0fa77fc2c202d8ae';
 const TOPO_VALIDATOR_ENGINEERING_CAMERA_DIRECTION = Object.freeze({ x: 1, y: 1, z: 0.8 });
@@ -69,15 +68,16 @@ export class TopologyEdit3DViewController extends ProfessionalController {
       this.workspaceDataset,
       draftVisual?.parentBranchDiameterIndex,
     );
-    const overlays = deriveAllSupportRestraintGeometry({
-      canonicalTopology: supportTopology,
-      verticalAxis: 'Z',
-    });
     const markerSizeMm = Number(backend.navigationConfiguration?.supportMarkerSize);
     if (!Number.isFinite(markerSizeMm) || markerSizeMm <= 0) {
       throw new Error('TOPOLOGY_EDIT_SUPPORT_MARKER_POLICY_MISSING: Approved supportMarkerSize is required.');
     }
-    const supportProjection = projectSupportGeometryToViewport(overlays, { markerSizeMm });
+    const supportAuthority = deriveSjsonTopoValidatorSupportProjection({
+      canonicalTopology: supportTopology,
+      verticalAxis: 'Z',
+      markerSizeMm,
+    });
+    const { overlays, projection: supportProjection } = supportAuthority;
 
     backend.clearGroup(supportGroup);
     backend.renderProjection(supportGroup, supportProjection, 0x22d3ee, 1, markerSizeMm);
@@ -85,7 +85,7 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     this.sjsonBenchmarkView = canonical.sourceHash === BENCHMARK_SOURCE_HASH
       ? applyTopoValidatorBenchmarkFit(backend)
       : null;
-    backend.invalidate?.('sjson-exact-support-projection');
+    backend.invalidate?.('sjson-topo-validator-restraint-projection');
 
     this.visualDiagnostics = [
       ...(draftVisual?.model?.diagnostics || []),
@@ -95,6 +95,8 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     this.visualModelHash = semanticHash({
       draftVisualGeometryHash: draftVisual?.model?.visualGeometryHash || '',
       supportProjection,
+      supportRestraintAuthorityHash: supportAuthority.authorityHash,
+      supportRestraintMetrics: supportAuthority.metrics,
       supportVisualDiameterIndexHash: supportTopology.supportVisualDiameterIndexHash || '',
       supportVisualDiameterAdaptations: supportTopology.supportVisualDiameterAdaptations || [],
       benchmarkView: this.sjsonBenchmarkView,
@@ -102,10 +104,16 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     this.updatePresentationBasis(canonical);
     this.presentationRuntime?.apply(this.presentationState);
     this.renderCheckerPanel();
-    this.publishSjsonFidelityEvidence(canonical, supportProjection, draftVisual?.model, supportTopology);
+    this.publishSjsonFidelityEvidence(
+      canonical,
+      supportProjection,
+      draftVisual?.model,
+      supportTopology,
+      supportAuthority,
+    );
   }
 
-  publishSjsonFidelityEvidence(canonical, supportProjection, visualModel, supportTopology) {
+  publishSjsonFidelityEvidence(canonical, supportProjection, visualModel, supportTopology, supportAuthority) {
     const host = this.canvasMount;
     if (!host) return;
     const counts = visualPrimitiveKindCounts(visualModel);
@@ -119,6 +127,20 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     host.dataset.topologyEditDiagnosticPrimitiveCount = String(counts.DIAGNOSTIC_CENTERLINE || 0);
     host.dataset.topologyEditExactSupportOriginCount = String(distinctExactSupportOriginCount(canonical));
     host.dataset.topologyEditDistinctSupportOriginCount = String(distinctProjectionOrigins(supportProjection));
+    host.dataset.topologyEditRawSupportCount = String(
+      supportAuthority?.metrics?.rawSupportCount || 0,
+    );
+    host.dataset.topologyEditNativeRestraintRecordCount = String(
+      supportAuthority?.metrics?.nativeRestraintRecordCount || 0,
+    );
+    host.dataset.topologyEditExcludedSupportCount = String(
+      supportAuthority?.metrics?.excludedSupportCount || 0,
+    );
+    host.dataset.topologyEditProjectedRestraintDirectionCount = String(
+      supportAuthority?.metrics?.projectedRestraintDirectionCount || 0,
+    );
+    host.dataset.topologyEditSupportRestraintAuthority = supportAuthority?.authority || '';
+    host.dataset.topologyEditSupportRestraintAuthorityHash = supportAuthority?.authorityHash || '';
     host.dataset.topologyEditVisualProxyWarningCount = String(
       diagnostics.filter((row) => row.code === 'VISUAL_NOMINAL_BORE_PROXY_USED').length,
     );
