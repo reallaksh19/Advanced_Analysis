@@ -1,0 +1,72 @@
+name: M027 BM2 Directional Restraint Active Set
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/m027-bm2-restraint-active-set.yml'
+      - 'scripts/lfea-b3.26-bm2-output-comparison.mjs'
+      - 'scripts/lfea-b3.26-bm2-output-comparison-runtime.mjs'
+      - 'scripts/lfea-b3.26-bm2-solve-fixtures.mjs'
+      - 'scripts/lfea-b3.26-bm2-solve-runtime.mjs'
+      - 'scripts/lfea-b3.27-bm2-restraint-active-set-runtime.mjs'
+      - 'scripts/lfea-b3.27-bm2-restraint-comparison-runtime.mjs'
+      - 'scripts/lfea-b3.27-bm2-restraint-active-set-check.mjs'
+      - 'src/core/geometry/adapters/inputXmlToCanonicalGeometry.js'
+      - 'src/core/geometry/adapters/inputxml-restraint-type-mutation.js'
+      - 'benchmarks/LFEA/BM2/Input_BM2.xml'
+      - 'benchmarks/LFEA/BM2/Output_BM2.xml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m027-bm2-restraint-active-set-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  directional-restraint-active-set:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify exact source
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
+          node --check scripts/lfea-b3.27-bm2-restraint-active-set-runtime.mjs
+          node --check scripts/lfea-b3.27-bm2-restraint-comparison-runtime.mjs
+          node --check scripts/lfea-b3.27-bm2-restraint-active-set-check.mjs
+          git diff --check
+
+      - name: Corrected BM2 directional-restraint qualification
+        run: node scripts/lfea-b3.27-bm2-restraint-active-set-check.mjs
+
+      - name: Linear-core regression aggregate
+        run: npm run check:lfea-linear-core
+
+      - name: Publish directional-restraint comparison ledger
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m027-bm2-directional-restraint-comparison
+          path: reports/lfea-bm2-directional-restraint-comparison.json
+          if-no-files-found: error
+          retention-days: 30
