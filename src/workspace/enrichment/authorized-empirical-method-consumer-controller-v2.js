@@ -1,5 +1,4 @@
 import { deepFreeze } from '../../core/shared-piping-model/immutable.js';
-import { configuredEmpiricalMethodControllerV2 } from '../engineering-loads/configured-empirical-method-controller-v2.js';
 import { requireAuthorizedEmpiricalRuntimePackageV2 } from '../engineering-loads/authorized-empirical-runtime-package-v2.js';
 import { masterDataController } from '../master-data-controller.js';
 
@@ -9,7 +8,7 @@ export const AUTHORIZED_EMPIRICAL_METHOD_CONSUMER_REQUEST_SCHEMA =
 /** Explicit method-bound consumer; it is not wired into the ordinary UI/bootstrap. */
 export class AuthorizedEmpiricalMethodConsumerControllerV2 {
   constructor({
-    configuredController = configuredEmpiricalMethodControllerV2,
+    configuredController,
     masters = masterDataController,
   } = {}) {
     requireFunction(configuredController, 'configure');
@@ -95,6 +94,3 @@ function fail(message, code, details = null) {
   error.details = details === null ? null : deepFreeze(details);
   throw error;
 }
-
-export const authorizedEmpiricalMethodConsumerControllerV2 =
-  new AuthorizedEmpiricalMethodConsumerControllerV2();
