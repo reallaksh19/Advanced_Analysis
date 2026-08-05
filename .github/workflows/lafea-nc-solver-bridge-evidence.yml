@@ -3,7 +3,7 @@ name: LAFEA-NC Solver Bridge Evidence
 on:
   pull_request:
     branches:
-      - agent/lafea-nc-solver-container-evidence
+      - main
     paths:
       - '.github/workflows/lafea-nc-solver-bridge-evidence.yml'
       - 'docs/nonlinear-shell-contact/LAFEA_NC_SOLVER_BRIDGE_EVIDENCE.md'
@@ -22,7 +22,7 @@ on:
         required: true
         type: string
       base_sha:
-        description: Exact immutable-container evidence base SHA
+        description: Exact merged immutable-container evidence base SHA
         required: true
         type: string
 
@@ -39,11 +39,11 @@ jobs:
       PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
       DISPATCH_HEAD_SHA: ${{ inputs.head_sha }}
       DISPATCH_BASE_SHA: ${{ inputs.base_sha }}
-      BASE_BRANCH: agent/lafea-nc-solver-container-evidence
-      CUSTODY_RUN_ID: '31003696654'
-      CUSTODY_ARTIFACT_ID: '8929389138'
-      CUSTODY_ARTIFACT_NAME: lafea-nc-solver-container-8ae900d078d797b02aa82074e4bf485a5f1156e0-1
-      CUSTODY_ARTIFACT_DIGEST: sha256:86a3e3fa66fe88e0eb47627418205a9d4ed22e9ede6b4517ffb6518fa9d54a30
+      BASE_BRANCH: main
+      CUSTODY_RUN_ID: '31020771678'
+      CUSTODY_ARTIFACT_ID: '8936496053'
+      CUSTODY_ARTIFACT_NAME: lafea-nc-solver-container-2826cac45acc13fdd9634c861f9910e339f9d5d5-1
+      CUSTODY_ARTIFACT_DIGEST: sha256:e14b467cd43f38218f3dba750b6c5f4f1ee83ed8ea9d241bf65673b9e7caf9b8
     steps:
       - name: Resolve exact head
         id: exact
@@ -139,7 +139,7 @@ jobs:
           test "$(jq -r .name <<<"$metadata")" = "$CUSTODY_ARTIFACT_NAME"
           test "$(jq -r .digest <<<"$metadata")" = "$CUSTODY_ARTIFACT_DIGEST"
           test "$(jq -r .workflow_run.id <<<"$metadata")" = "$CUSTODY_RUN_ID"
-          test "$(jq -r .workflow_run.head_sha <<<"$metadata")" = '8ae900d078d797b02aa82074e4bf485a5f1156e0'
+          test "$(jq -r .workflow_run.head_sha <<<"$metadata")" = '2826cac45acc13fdd9634c861f9910e339f9d5d5'
           rm -rf "$RUNNER_TEMP/solver-custody"
           mkdir -p "$RUNNER_TEMP/solver-custody"
           gh run download "$CUSTODY_RUN_ID" \
