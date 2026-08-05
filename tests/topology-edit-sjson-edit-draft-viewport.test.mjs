@@ -67,13 +67,13 @@ test('SJSON Edit Draft backend renders compact route curves without rich fitting
   backend.destroy();
 });
 
-test('SJSON compact supports render one small marker and one directional arrow', () => {
+test('SJSON compact supports render one enlarged marker and one two-OD directional arrow', () => {
   const backend = new TopologyEditSjsonEditDraftViewportBackend({
     navigationConfiguration: CONFIGURATION,
   });
   const projection = {
     renderStyle: TOPOLOGY_EDIT_SUPPORT_RENDER_STYLES.TOPO_VALIDATOR_COMPACT,
-    compactMarkerRadiusMm: 12.6,
+    compactMarkerRadiusMm: 37.8,
     elements: [{
       id: 'support:1',
       entityId: 'support:1',
@@ -89,7 +89,7 @@ test('SJSON compact supports render one small marker and one directional arrow',
       entityId: 'restraint:1',
       type: 'RESTRAINT_DIRECTION',
       start: { x: 0, y: 0, z: 0 },
-      end: { x: 80, y: 0, z: 0 },
+      end: { x: 240, y: 0, z: 0 },
       radiusMm: 5,
       colorInt: 0xef4444,
       pickTarget: {
@@ -118,8 +118,23 @@ test('SJSON compact supports render one small marker and one directional arrow',
   const marker = backend.groups.supportGroup.children.find(
     (object) => object.name === 'topology-edit-compact-support-marker:support:1',
   );
-  assert.equal(marker.geometry.parameters.radius, 12.6);
+  assert.ok(marker, 'compact support marker is required');
+  assert.ok(Math.abs(maxVertexRadius(marker.geometry) - 37.8) < 1e-5);
   assert.ok(picks.some((row) => row.objectKind === 'support'));
   assert.ok(picks.some((row) => row.objectKind === 'restraint'));
   backend.destroy();
 });
+
+function maxVertexRadius(geometry) {
+  const positions = geometry?.getAttribute?.('position');
+  assert.ok(positions, 'compact support marker position attribute is required');
+  let maximum = 0;
+  for (let index = 0; index < positions.count; index += 1) {
+    maximum = Math.max(maximum, Math.hypot(
+      positions.getX(index),
+      positions.getY(index),
+      positions.getZ(index),
+    ));
+  }
+  return maximum;
+}

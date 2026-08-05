@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test';
 const SJSON_BYTES = readFileSync(new URL('../public/Sjson.json', import.meta.url));
 const VIEWPORT = Object.freeze({ width: 1637, height: 869 });
 
-test('SJSON uses one governed packet with visibly selectable OD routes, exact tees, sphere nodes and support overlays', async ({ page }, testInfo) => {
+test('SJSON uses one governed packet with selectable OD routes, typed equipment, sphere nodes and enlarged supports', async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   await page.setViewportSize(VIEWPORT);
   await page.addInitScript(() => globalThis.localStorage?.clear());
@@ -36,13 +36,18 @@ test('SJSON uses one governed packet with visibly selectable OD routes, exact te
     'data-topology-edit-route-display-envelope-policy',
     'BOUNDED_MODEL_DIAGONAL_MINIMUM_V2',
   );
+  await expect(host).toHaveAttribute(
+    'data-topology-edit-equipment-geometry-authority',
+    'GOVERNED_TYPED_INLINE_EQUIPMENT_PROFILE_V1',
+  );
   await expect(host).toHaveAttribute('data-topology-edit-node-visual-and-pick-geometry-separated', 'true');
   await expect(host).toHaveAttribute('data-topology-edit-visible-node-marker-geometry', 'TRANSLUCENT_SPHERE');
   await expect(host).toHaveAttribute('data-topology-edit-support-overlay-depth-independent', 'true');
   await expect(host).toHaveAttribute(
     'data-topology-edit-support-arrow-placement-authority',
-    'HOST_OD_HALF_CONTACT_PLUS_TWO_THIRDS_OD_GLYPH_V1',
+    'HOST_OD_HALF_CONTACT_PLUS_TWO_OD_GLYPH_V2',
   );
+  await expect(host).toHaveAttribute('data-topology-edit-support-display-scale', '3');
   await expect(host).toHaveAttribute('data-topology-edit-camera-clipping-mode', 'AUTO');
   await expect(host).toHaveAttribute(
     'data-topology-edit-camera-clipping-authority',
@@ -61,6 +66,18 @@ test('SJSON uses one governed packet with visibly selectable OD routes, exact te
     solid: await integerAttribute(host, 'data-topology-edit-visible-route-solid-mesh-count'),
     directlyPickable: await integerAttribute(host, 'data-topology-edit-direct-pick-route-mesh-count'),
   })).toEqual(await expectedRouteCounts(host));
+  await expect.poll(() => integerAttribute(host, 'data-topology-edit-typed-equipment-solid-count'))
+    .toBeGreaterThan(20);
+  await expect.poll(() => integerAttribute(host, 'data-topology-edit-typed-flange-solid-count'))
+    .toBeGreaterThanOrEqual(18);
+  await expect.poll(() => integerAttribute(host, 'data-topology-edit-typed-valve-solid-count'))
+    .toBeGreaterThanOrEqual(4);
+  await expect.poll(() => integerAttribute(host, 'data-topology-edit-typed-instrument-solid-count'))
+    .toBeGreaterThanOrEqual(2);
+  await expect(host).toHaveAttribute(
+    'data-topology-edit-coincident-port-equipment-count',
+    /^\d+$/,
+  );
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-exact-tee-count')).toBe(3);
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-exact-tee-segment-count')).toBe(9);
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-visible-node-marker-count')).toBeGreaterThan(100);
@@ -70,6 +87,10 @@ test('SJSON uses one governed packet with visibly selectable OD routes, exact te
   );
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-gpu-pick-radius-css-px')).toBeGreaterThanOrEqual(8);
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-rendered-support-marker-count')).toBe(34);
+  await expect.poll(() => numberAttribute(host, 'data-topology-edit-rendered-support-base-marker-radius-mm'))
+    .toBeCloseTo(12.6, 6);
+  await expect.poll(() => numberAttribute(host, 'data-topology-edit-rendered-support-marker-radius-mm'))
+    .toBeCloseTo(37.8, 6);
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-rendered-restraint-arrow-count')).toBe(47);
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-rendered-directional-arrow-count')).toBeGreaterThan(47);
   await expect.poll(() => integerAttribute(host, 'data-topology-edit-rendered-bidirectional-restraint-count')).toBeGreaterThan(0);

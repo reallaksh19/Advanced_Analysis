@@ -21,6 +21,7 @@ import {
 export const SJSON_BENCHMARK_SOURCE_HASH = 'fnv1a64:0fa77fc2c202d8ae';
 export const SJSON_SUPPORT_RENDER_AUTHORITY =
   'TOPO_VALIDATOR_SUPPORT_MARKER_AND_DIRECTION_GEOMETRY';
+export const SJSON_SUPPORT_DISPLAY_SCALE = 3;
 const CAMERA_DIRECTION = Object.freeze({ x: 1, y: 1, z: 0.8 });
 const MARKER_RADIUS_RATIO = 0.18;
 
@@ -53,6 +54,7 @@ export function deriveGovernedSjsonSupportBundle({ canonical, dataset, draftVisu
     renderStyle: TOPOLOGY_EDIT_SUPPORT_RENDER_STYLES.TOPO_VALIDATOR_COMPACT,
     renderAuthority: SJSON_SUPPORT_RENDER_AUTHORITY,
     compactMarkerRadiusMm: Math.max(markerSizeMm * MARKER_RADIUS_RATIO, 1),
+    compactMarkerDisplayScale: SJSON_SUPPORT_DISPLAY_SCALE,
   });
   return Object.freeze({
     supportTopology,

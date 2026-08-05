@@ -48,7 +48,28 @@ function validateNodes(topology, errors) {
       `Node ${node.id} has duplicate port keys.`, [node.id]));
   }
 }
-function validateEdges(topology, errors) {
+function edgeLength(edge, nodes) {
+  const from = nodes.get(edge?.fromNodeId); const to = nodes.get(edge?.toNodeId);
+  if (!finitePoint(from?.position) || !finitePoint(to?.position)) return null;
+  return Math.hypot(
+    to.position.x - from.position.x,
+    to.position.y - from.position.y,
+    to.position.z - from.position.z,
+  );
+}
+function isInheritedZeroLengthEdge(edge, topologyNodes, baseTopology) {
+  const baseEdge = (baseTopology.edges ?? []).find((row) => row.id === edge.id);
+  if (!baseEdge
+      || baseEdge.fromNodeId !== edge.fromNodeId
+      || baseEdge.toNodeId !== edge.toNodeId) return false;
+  const baseNodes = new Map((baseTopology.nodes ?? []).map((node) => [node.id, node]));
+  if (!(edgeLength(baseEdge, baseNodes) === 0)) return false;
+  return samePoint(topologyNodes.get(edge.fromNodeId)?.position,
+    baseNodes.get(baseEdge.fromNodeId)?.position)
+    && samePoint(topologyNodes.get(edge.toNodeId)?.position,
+      baseNodes.get(baseEdge.toNodeId)?.position);
+}
+function validateEdges(topology, baseTopology, errors, warnings) {
   const nodes = new Map((topology.nodes ?? []).map((node) => [node.id, node]));
   const pairs = new Map();
   for (const edge of topology.edges ?? []) {
@@ -60,9 +81,18 @@ function validateEdges(topology, errors) {
     }
     if (edge.fromNodeId === edge.toNodeId) errors.push(finding('EDGE_SELF_LOOP',
       `Edge ${edge.id} is a self-loop.`, [edge.id, edge.fromNodeId]));
-    const length = Math.hypot(to.position.x - from.position.x,
-      to.position.y - from.position.y, to.position.z - from.position.z);
-    if (!(length > 0)) errors.push(finding('EDGE_ZERO_LENGTH', `Edge ${edge.id} has zero length.`, [edge.id]));
+    const length = edgeLength(edge, nodes);
+    if (!(length > 0)) {
+      const inherited = isInheritedZeroLengthEdge(edge, nodes, baseTopology);
+      const row = finding(
+        inherited ? 'INHERITED_EDGE_ZERO_LENGTH' : 'EDGE_ZERO_LENGTH',
+        inherited
+          ? `Edge ${edge.id} retains an unchanged zero-length source representation.`
+          : `Edge ${edge.id} has zero length.`,
+        [edge.id],
+      );
+      (inherited ? warnings : errors).push(row);
+    }
     const pair = unorderedPair(edge.fromNodeId, edge.toNodeId);
     if (pairs.has(pair)) errors.push(finding('EDGE_DUPLICATE_PAIR',
       `Edges ${pairs.get(pair)} and ${edge.id} connect the same node pair.`, [pairs.get(pair), edge.id]));
@@ -214,7 +244,7 @@ function runCandidateChecks(candidate, baseTopology) {
   validateBasis(candidate, baseTopology, errors);
   validateIdentities(candidate.canonicalTopology, errors);
   validateNodes(candidate.canonicalTopology, errors);
-  validateEdges(candidate.canonicalTopology, errors);
+  validateEdges(candidate.canonicalTopology, baseTopology, errors, warnings);
   validateJunctions(candidate.canonicalTopology, errors);
   validateSupports(candidate.canonicalTopology, errors);
   validateGenericReferences(candidate.canonicalTopology, errors);
