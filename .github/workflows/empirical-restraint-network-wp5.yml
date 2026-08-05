@@ -1,0 +1,84 @@
+name: empirical-restraint-network-wp5
+
+on:
+  push:
+    branches:
+      - agent/empirical-restraint-network-wp5
+    paths:
+      - 'src/workspace/engineering-loads/empirical-restraint-network-*.js'
+      - 'src/workspace/engineering-loads/empirical-method-registry.js'
+      - 'src/workspace/engineering-loads/adapters/sjson-to-empirical-piping-request.js'
+      - 'src/core/empirical-piping-mechanics/**'
+      - 'scripts/empirical-restraint-network-check.mjs'
+      - 'benchmarks/LFEA/BM2/Input_BM2.xml'
+      - '.github/workflows/empirical-restraint-network-wp5.yml'
+  pull_request:
+    paths:
+      - 'src/workspace/engineering-loads/empirical-restraint-network-*.js'
+      - 'src/workspace/engineering-loads/empirical-method-registry.js'
+      - 'src/workspace/engineering-loads/adapters/sjson-to-empirical-piping-request.js'
+      - 'src/core/empirical-piping-mechanics/**'
+      - 'scripts/empirical-restraint-network-check.mjs'
+      - 'benchmarks/LFEA/BM2/Input_BM2.xml'
+      - '.github/workflows/empirical-restraint-network-wp5.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: empirical-restraint-network-wp5-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Prove exact-head execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
+          git diff --check
+          git diff --exit-code
+
+      - name: Syntax contracts
+        shell: bash
+        run: |
+          node --check src/workspace/engineering-loads/empirical-restraint-network-profile.js
+          node --check src/workspace/engineering-loads/empirical-restraint-network-runtime.js
+          node --check src/workspace/engineering-loads/empirical-method-registry.js
+          node --check scripts/empirical-restraint-network-check.mjs
+
+      - name: Restricted global restraint-network qualification
+        run: node scripts/empirical-restraint-network-check.mjs
+
+      - name: Adapter and scenario regression
+        shell: bash
+        run: |
+          node scripts/empirical-sjson-adapter-contract-check.mjs
+          node scripts/empirical-load-calc-scenario-check.mjs
+
+      - name: Source and benchmark isolation
+        run: node scripts/empirical-piping-source-boundary-check.mjs
+
+      - name: Import graph
+        run: npm run check:imports
