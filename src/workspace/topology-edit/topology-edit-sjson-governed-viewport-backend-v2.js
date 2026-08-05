@@ -10,7 +10,7 @@ import { renderGovernedSjsonRoute } from './topology-edit-sjson-governed-route-r
 import { renderGovernedSjsonSupports } from './topology-edit-sjson-governed-support-renderer-v2.js';
 
 /** One render transaction for SJSON route, nodes, and support overlays. */
-export class TopologyEditSjsonGovernedViewportBackendV2
+export class TopologyEditSjsonGovernedNavigationHudViewportBackendV2
   extends TopologyEditNavigationHudViewportBackend {
   constructor(options = {}) {
     super(options);
@@ -64,5 +64,8 @@ export class TopologyEditSjsonGovernedViewportBackendV2
   }
 }
 
+export const TopologyEditSjsonGovernedViewportBackendV2 =
+  TopologyEditSjsonGovernedNavigationHudViewportBackendV2;
+
 export const TopologyEditSjsonGovernedViewportBackend =
-  TopologyEditSjsonGovernedViewportBackendV2;
+  TopologyEditSjsonGovernedNavigationHudViewportBackendV2;
