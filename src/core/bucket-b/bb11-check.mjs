@@ -43,6 +43,7 @@ const BB11_ALLOWED_PATHS = Object.freeze([
   'docs/Bucket_B_BB11_Flange_Hub_Qualification_Record.md',
   'src/core/bucket-b/bb11-check.mjs',
   'src/core/bucket-b/bb11-flange-hub.js',
+  'src/core/bucket-b/bb11-shared-gate-replay.mjs',
   'src/core/bucket-b/flange-hub-authority.js',
   'src/core/bucket-b/flange-hub-convergence.js',
   'src/core/bucket-b/flange-hub-geometry.js',
