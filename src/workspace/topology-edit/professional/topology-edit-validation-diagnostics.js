@@ -31,6 +31,11 @@ export function topologyEditDiagnosticsHash(value) {
   return semanticHash(normalizeTopologyEditDiagnostics(value));
 }
 
+export function topologyEditDiagnosticFingerprint(value) {
+  if (!isPlainRecord(value)) fail('diagnostic must be an object.');
+  return semanticHash(normalizeValue(value, 'diagnostic'));
+}
+
 export function topologyEditDiagnosticTargetIds(value) {
   if (!isPlainRecord(value)) return deepFreeze([]);
   const result = [];
@@ -91,7 +96,7 @@ function diagnosticTouchesScope(row, scope) {
 
 function diagnosticIdentity(row) {
   const id = stringValue(row.id);
-  return id || semanticHash(normalizeValue(row, 'diagnostic'));
+  return id || topologyEditDiagnosticFingerprint(row);
 }
 
 function diagnosticOrderKey(row) {

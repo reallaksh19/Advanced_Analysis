@@ -9,6 +9,7 @@ import { assertTopologyEditOperationPlan } from './topology-edit-operation-plan.
 import {
   compareTopologyEditDiagnostics,
   mergeTopologyEditIncrementalDiagnostics,
+  normalizeTopologyEditDiagnostics,
   topologyEditDiagnosticsHash,
 } from './topology-edit-validation-diagnostics.js';
 import {
@@ -26,6 +27,7 @@ export function runTopologyEditIncrementalValidation(input = {}) {
     input.previousDiagnostics,
     'previousDiagnostics',
   );
+  const baselineDiagnostics = normalizeTopologyEditDiagnostics(previousDiagnostics);
   const checker = input.checker ?? checkCanonicalTopology;
   if (typeof checker !== 'function') fail('checker must be a function.');
   const now = input.now;
@@ -81,6 +83,10 @@ export function runTopologyEditIncrementalValidation(input = {}) {
       projectionHash: projection.projectionHash,
       ids: projection.ids,
     },
+    baseline: {
+      issueCount: baselineDiagnostics.length,
+      issueHash: topologyEditDiagnosticsHash(baselineDiagnostics),
+    },
     incremental: {
       issueCount: incrementalStage.value.length,
       issueHash: topologyEditDiagnosticsHash(incrementalStage.value),
@@ -115,6 +121,7 @@ export function runTopologyEditIncrementalValidation(input = {}) {
     ...authority,
     validationHash: semanticHash(authority),
     performanceEvidence,
+    baselineDiagnostics: cloneJson(baselineDiagnostics),
     finalDiagnostics: cloneJson(finalDiagnostics),
   });
 }
@@ -127,6 +134,16 @@ export function assertTopologyEditIncrementalValidationReceipt(value) {
   const authority = authorityMaterial(value);
   if (value.validationHash !== semanticHash(authority)) {
     fail('validation hash does not match semantic authority.', RangeError);
+  }
+  const baselineDiagnostics = diagnosticRows(
+    value.baselineDiagnostics,
+    'baselineDiagnostics',
+  );
+  if (value.baseline?.issueHash !== topologyEditDiagnosticsHash(baselineDiagnostics)) {
+    fail('baseline diagnostics differ from receipt authority.', RangeError);
+  }
+  if (value.baseline?.issueCount !== baselineDiagnostics.length) {
+    fail('baseline issue count differs from baseline diagnostics.', RangeError);
   }
   if (value.finalIssueHash !== topologyEditDiagnosticsHash(value.finalDiagnostics)) {
     fail('final diagnostics differ from receipt authority.', RangeError);
@@ -155,6 +172,7 @@ function authorityMaterial(value) {
     changedScopeHash: value.changedScopeHash,
     catalogueCompatibility: value.catalogueCompatibility,
     validationScope: value.validationScope,
+    baseline: value.baseline,
     incremental: value.incremental,
     candidate: value.candidate,
     full: value.full,

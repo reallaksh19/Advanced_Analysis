@@ -65,6 +65,43 @@ function validateSplit(context) {
   }
   return findings;
 }
+function validateInline(context) {
+  const { candidate, delta, additionsByCommand, nodeChanges, edgeChanges, otherChanges } = context;
+  const findings = [];
+  const inserted = (candidate.canonicalTopology.edges ?? []).filter((edge) => (
+    edge.createdByCommandId === candidate.commandId
+    && edge.topologyOperation === 'INSERT_INLINE_COMPONENT'
+  ));
+  const valid = delta.nodes.addedIds.length === 2
+    && delta.nodes.removedIds.length === 0
+    && delta.edges.addedIds.length === 3
+    && delta.edges.removedIds.length === 1
+    && otherChanges.length === 0;
+  if (!valid) findings.push(finding(
+    'INSERT_INLINE_COMPONENT_DELTA_INVALID',
+    'INSERT_INLINE_COMPONENT must add two nodes and three edges while replacing one host edge.',
+    [...nodeChanges, ...edgeChanges],
+  ));
+  if (!sameIds(additionsByCommand, [...delta.nodes.addedIds, ...delta.edges.addedIds])) {
+    findings.push(finding(
+      'INSERT_INLINE_COMPONENT_PROVENANCE_INVALID',
+      'Inline insertion additions do not carry exact command provenance.',
+      additionsByCommand,
+    ));
+  }
+  if (inserted.length !== 1
+    || !inserted[0].catalogueRecordId
+    || !inserted[0].catalogueRecordHash
+    || !inserted[0].catalogueHash
+    || !inserted[0].catalogueSourceHash) {
+    findings.push(finding(
+      'INSERT_INLINE_COMPONENT_CATALOGUE_PROVENANCE_INVALID',
+      'Inline insertion must create exactly one catalogue-bound component edge.',
+      inserted.map((edge) => edge.id),
+    ));
+  }
+  return findings;
+}
 function validateDisconnect(context) {
   const { delta, additionsByCommand, nodeChanges, edgeChanges, otherChanges } = context;
   const findings = [];
@@ -129,7 +166,8 @@ function validateTrim(candidate) {
 const VALIDATORS = Object.freeze({
   MOVE_NODE: validateMove, MERGE_NODES: validateMerge,
   BRIDGE_GAP: validateAddedEdge, ADD_STRAIGHT_ELEMENT: validateAddedEdge,
-  SPLIT_EDGE: validateSplit, DISCONNECT_ENDPOINT: validateDisconnect,
+  SPLIT_EDGE: validateSplit, INSERT_INLINE_COMPONENT: validateInline,
+  DISCONNECT_ENDPOINT: validateDisconnect,
   DELETE_EDGE: validateDelete, ADD_BEND_DEFINITION: validateBendDefinition,
   ADD_JUNCTION_DEFINITION: validateJunctionDefinition, TRIM_EDGE: validateTrim,
 });
