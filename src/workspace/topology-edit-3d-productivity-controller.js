@@ -1,3 +1,4 @@
+import './topology-edit-productivity.css';
 import {
   TopologyEdit3DViewController as ProfessionalController,
 } from './topology-edit-3d-professional-controller.js';
@@ -53,11 +54,11 @@ export class TopologyEdit3DViewController extends ProfessionalController {
 
   updateLifecycleEvidence() {
     super.updateLifecycleEvidence();
-    this.cleanShellRuntime.updateDraftStatus();
+    this.cleanShellRuntime?.updateDraftStatus();
   }
 
   updateActionButtons() {
     super.updateActionButtons();
-    this.cleanShellRuntime.updateAvailability();
+    this.cleanShellRuntime?.updateAvailability();
   }
 }
