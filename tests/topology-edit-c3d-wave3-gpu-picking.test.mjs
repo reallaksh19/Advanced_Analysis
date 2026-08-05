@@ -48,15 +48,35 @@ test('nearest nonzero sample wins deterministically', () => {
   assert.equal(selectNearestTopologyEditPickId(tie, 3, 3), 31);
 });
 
-test('pick viewport honors pixel ratio, bounds, and WebGL Y origin', () => {
+test('pick viewport honors CSS radius, pixel ratio, bounds, and WebGL Y origin', () => {
   const renderer = new FakeRenderer({ pixelRatio: 2 });
   assert.deepEqual(
     resolveTopologyEditPickViewport(renderer, 0, 0, RECT, 2),
-    { x: 0, y: 157, width: 3, height: 3, fullWidth: 200, fullHeight: 160 },
+    {
+      x: 0,
+      y: 155,
+      width: 5,
+      height: 5,
+      fullWidth: 200,
+      fullHeight: 160,
+      cssRadius: 2,
+      physicalRadius: 4,
+      pixelRatio: 2,
+    },
   );
   assert.deepEqual(
     resolveTopologyEditPickViewport(renderer, 50, 40, RECT, 2),
-    { x: 98, y: 77, width: 5, height: 5, fullWidth: 200, fullHeight: 160 },
+    {
+      x: 96,
+      y: 75,
+      width: 9,
+      height: 9,
+      fullWidth: 200,
+      fullHeight: 160,
+      cssRadius: 2,
+      physicalRadius: 4,
+      pixelRatio: 2,
+    },
   );
 });
 
