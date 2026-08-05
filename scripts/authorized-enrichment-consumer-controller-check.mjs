@@ -4,6 +4,9 @@ import { semanticHash } from '../src/core/shared-piping-model/canonical-json.js'
 import {
   EMPIRICAL_COMPONENT_LOAD_AUTHORITY_AUDIT_SCHEMA,
 } from '../src/workspace/engineering-loads/empirical-component-load-authority.js';
+import {
+  EMPIRICAL_COMPONENT_MOMENT_DEMAND_SCHEMA,
+} from '../src/workspace/engineering-loads/empirical-component-moment-demand.js';
 import { EMPIRICAL_FORMULA_REGISTER } from '../src/workspace/engineering-loads/empirical-formula-register.js';
 import { computeAuthorizedEmpiricalLoadInputSemanticHash } from '../src/workspace/engineering-loads/authorized-empirical-load-input.js';
 import {
@@ -25,6 +28,9 @@ import {
   AUTHORIZED_EMPIRICAL_CONSUMER_REQUEST_SCHEMA,
   AuthorizedEnrichmentConsumerController,
 } from '../src/workspace/enrichment/authorized-enrichment-consumer-controller.js';
+import {
+  AUTHORIZED_EMPIRICAL_METHOD_CONSUMER_REQUEST_SCHEMA,
+} from '../src/workspace/enrichment/authorized-empirical-method-consumer-controller-v2.js';
 
 const sharedRunner = await readFile(
   new URL('./run-authorized-enrichment-consumer-controller-checks.mjs', import.meta.url),
@@ -40,12 +46,25 @@ assert.equal(
   true,
   'shared controller suite no longer qualifies authorized empirical execution',
 );
+const empiricalRunner = await readFile(
+  new URL('./run-authorized-empirical-load-execution-checks.mjs', import.meta.url),
+  'utf8',
+);
+assert.equal(
+  empiricalRunner.includes('empirical-appendix-s-vertical-benchmark.mjs'),
+  true,
+  'shared empirical suite no longer runs standalone Appendix S vertical benchmark',
+);
 assert.equal(EMPIRICAL_FORMULA_REGISTER.schema, 'empirical-formula-register/v1');
 assert.equal(EMPIRICAL_FORMULA_REGISTER.method, 'CHAINAGE_TRIBUTARY_SPAN_V2');
 assert.equal(EMPIRICAL_FORMULA_REGISTER.validation.detailedAnalysisSubstitution, false);
 assert.equal(
   EMPIRICAL_COMPONENT_LOAD_AUTHORITY_AUDIT_SCHEMA,
   'empirical-component-load-authority-audit/v1',
+);
+assert.equal(
+  EMPIRICAL_COMPONENT_MOMENT_DEMAND_SCHEMA,
+  'empirical-component-moment-demand/v1',
 );
 assert.equal(SUPPORT_LOAD_DISTRIBUTION_COG_SCHEMA, 'support-load-distribution/v4');
 assert.equal(EMPIRICAL_LOAD_COG_METHOD, 'CHAINAGE_TRIBUTARY_SPAN_V3_COG');
@@ -60,6 +79,10 @@ assert.equal(
 assert.equal(
   AUTHORIZED_EMPIRICAL_RUNTIME_PACKAGE_V2_SCHEMA,
   'authorized-empirical-runtime-package/v2',
+);
+assert.equal(
+  AUTHORIZED_EMPIRICAL_METHOD_CONSUMER_REQUEST_SCHEMA,
+  'authorized-empirical-method-consumer-request/v1',
 );
 
 const masterData = Object.freeze({ marker: 'MASTER-DATA-EMP01' });
@@ -141,11 +164,14 @@ console.log(JSON.stringify({
   formulaRegisterMethod: EMPIRICAL_FORMULA_REGISTER.method,
   formulaRegisterSemanticHash: EMPIRICAL_FORMULA_REGISTER.semanticHash,
   componentLoadAuthorityAuditSchema: EMPIRICAL_COMPONENT_LOAD_AUTHORITY_AUDIT_SCHEMA,
+  componentMomentDemandSchema: EMPIRICAL_COMPONENT_MOMENT_DEMAND_SCHEMA,
   cogDistributionSchema: SUPPORT_LOAD_DISTRIBUTION_COG_SCHEMA,
   cogDistributionMethod: EMPIRICAL_LOAD_COG_METHOD,
   methodSelectingRequestSchema: AUTHORIZED_EMPIRICAL_LOAD_EXECUTION_V2_REQUEST_SCHEMA,
   methodSelectingReceiptSchema: AUTHORIZED_EMPIRICAL_LOAD_EXECUTION_V2_SCHEMA,
   methodBoundRuntimePackageSchema: AUTHORIZED_EMPIRICAL_RUNTIME_PACKAGE_V2_SCHEMA,
+  configuredMethodConsumerSchema: AUTHORIZED_EMPIRICAL_METHOD_CONSUMER_REQUEST_SCHEMA,
+  standaloneAppendixSVerticalBenchmarkRegistered: true,
 }, null, 2));
 
 function makeRuntimePackage() {
