@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import {
   TopologyEdit3DViewController as ProfessionalController,
 } from './topology-edit-3d-professional-controller.js';
@@ -7,6 +8,10 @@ import {
   deriveAllSupportRestraintGeometry,
   projectSupportGeometryToViewport,
 } from './topology-edit/support-restraint-family.js';
+import {
+  engineeringDirectionToRender,
+  renderDirectionToEngineering,
+} from './topology-edit/topology-edit-coordinate-transform.js';
 import {
   distinctExactSupportOriginCount,
   enrichCanonicalSupportsWithExactOrigins,
@@ -18,6 +23,12 @@ import {
   applySjsonParentBranchDiametersToSupportTopology,
 } from './topology-edit/topology-edit-sjson-support-parent-branch-diameter.js';
 
+const TOPO_VALIDATOR_ENGINEERING_CAMERA_DIRECTION = Object.freeze({
+  x: 1,
+  y: 1,
+  z: 0.8,
+});
+
 /**
  * Production adapter for staged SJSON visual fidelity. Engineering topology,
  * command certification, journaling, Undo/Redo, and persistence remain owned
@@ -27,6 +38,7 @@ export class TopologyEdit3DViewController extends ProfessionalController {
   constructor(eventBus, lifecycleOptions = {}) {
     super(eventBus, lifecycleOptions);
     this.sjsonVisualByRole = new Map();
+    this.sjsonBenchmarkView = null;
   }
 
   buildWorkspaceCanonical(dataset, graph) {
@@ -80,6 +92,7 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     backend.clearGroup(supportGroup);
     backend.renderProjection(supportGroup, supportProjection, 0x22d3ee, 1, markerSizeMm);
     backend.engineeringRoot?.updateMatrixWorld(true);
+    this.sjsonBenchmarkView = applyTopoValidatorBenchmarkFit(backend);
     backend.invalidate?.('sjson-exact-support-projection');
 
     this.visualDiagnostics = [
@@ -94,6 +107,7 @@ export class TopologyEdit3DViewController extends ProfessionalController {
       supportProjection,
       supportVisualDiameterIndexHash: supportTopology.supportVisualDiameterIndexHash || '',
       supportVisualDiameterAdaptations: supportTopology.supportVisualDiameterAdaptations || [],
+      benchmarkView: this.sjsonBenchmarkView,
     });
     this.updatePresentationBasis(canonical);
     this.presentationRuntime?.apply(this.presentationState);
@@ -138,6 +152,17 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     host.dataset.topologyEditSupportParentBranchDiameterCount = String(
       supportTopology?.supportVisualDiameterAdaptations?.length || 0,
     );
+    host.dataset.topologyEditBenchmarkCameraAuthority =
+      this.sjsonBenchmarkView?.authority || '';
+    host.dataset.topologyEditBenchmarkCameraEngineeringDirection = JSON.stringify(
+      this.sjsonBenchmarkView?.engineeringDirection || null,
+    );
+    host.dataset.topologyEditBenchmarkCameraRenderDirection = JSON.stringify(
+      this.sjsonBenchmarkView?.renderDirection || null,
+    );
+    host.dataset.topologyEditBenchmarkBounds = JSON.stringify(
+      this.sjsonBenchmarkView?.renderBounds || null,
+    );
     host.dataset.topologyEditVisualModelHash = this.visualModelHash || '';
     host.dataset.topologyEditSupportProjectionHash = semanticHash(supportProjection);
     host.dataset.topologyEditJournalHash = this.session?.journal?.journalHash || '';
@@ -145,8 +170,67 @@ export class TopologyEdit3DViewController extends ProfessionalController {
 
   deactivate() {
     this.sjsonVisualByRole.clear();
+    this.sjsonBenchmarkView = null;
     super.deactivate();
   }
+}
+
+function applyTopoValidatorBenchmarkFit(backend) {
+  const bounds = backend.lastBounds && !backend.lastBounds.isEmpty()
+    ? backend.lastBounds.clone()
+    : new THREE.Box3().setFromObject(backend.engineeringRoot);
+  if (!backend.camera || !backend.controls || bounds.isEmpty()) return null;
+  const center = bounds.getCenter(new THREE.Vector3());
+  const size = bounds.getSize(new THREE.Vector3());
+  const renderDirectionValue = engineeringDirectionToRender(
+    TOPO_VALIDATOR_ENGINEERING_CAMERA_DIRECTION,
+  );
+  const renderDirection = new THREE.Vector3(
+    renderDirectionValue.x,
+    renderDirectionValue.y,
+    renderDirectionValue.z,
+  );
+  const seedDistance = Math.max(size.length(), 1);
+  backend.camera.up.set(0, 1, 0);
+  backend.camera.position.copy(center).addScaledVector(renderDirection, seedDistance);
+  backend.camera.lookAt(center);
+  backend.controls.target.copy(center);
+  backend.controls.update();
+  backend.sceneBoundsCache = bounds.clone();
+  backend.fitAll({ remember: false });
+  backend.initialCameraState = backend.captureCameraState?.() || backend.initialCameraState;
+
+  const fittedRenderDirection = backend.camera.position.clone()
+    .sub(backend.controls.target)
+    .normalize();
+  const engineeringDirection = renderDirectionToEngineering({
+    x: fittedRenderDirection.x,
+    y: fittedRenderDirection.y,
+    z: fittedRenderDirection.z,
+  });
+  return Object.freeze({
+    authority: 'TOPO_VALIDATOR_FIT_ALL_ENGINEERING_DIRECTION_1_1_0_8',
+    engineeringDirection,
+    renderDirection: {
+      x: fittedRenderDirection.x,
+      y: fittedRenderDirection.y,
+      z: fittedRenderDirection.z,
+    },
+    renderBounds: {
+      min: { x: bounds.min.x, y: bounds.min.y, z: bounds.min.z },
+      max: { x: bounds.max.x, y: bounds.max.y, z: bounds.max.z },
+      size: { x: size.x, y: size.y, z: size.z },
+    },
+    cameraPosition: {
+      x: backend.camera.position.x,
+      y: backend.camera.position.y,
+      z: backend.camera.position.z,
+    },
+    target: { x: center.x, y: center.y, z: center.z },
+    fovDeg: Number(backend.camera.fov) || null,
+    near: backend.camera.near,
+    far: backend.camera.far,
+  });
 }
 
 function distinctProjectionOrigins(projection) {
