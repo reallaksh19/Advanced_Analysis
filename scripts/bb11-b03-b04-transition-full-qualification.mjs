@@ -51,6 +51,8 @@ const temporaryOraclePath = path.join(
   `.bb11-transition-candidate-oracle-${process.pid}.mjs`,
 );
 
+const EXPLICIT_RESIDUAL_REPLACEMENT_INTERVAL = 100;
+
 const governedMeshImport = `import {
   createFlangeHubMesh,
   FLANGE_HUB_MESH_LEVELS,
@@ -71,6 +73,11 @@ const correctedOracleBlockMap = `function blockMap(block) {
   if (block.kind === 'STRIP') {
     const outer = profile(block.profile);
     return (u, v) => {`;
+const governedOraclePolicyTail = `  diagnosticInterval: 1000,
+});`;
+const correctedOraclePolicyTail = `  diagnosticInterval: 1000,
+  explicitResidualReplacementInterval: ${EXPLICIT_RESIDUAL_REPLACEMENT_INTERVAL},
+});`;
 const governedOracleCurvatureGuard = `    const product = multiply(direction);
     const curvature = dot(direction, product);
     if (!Number.isFinite(curvature) || !(curvature > 0)) {
@@ -82,6 +89,10 @@ const correctedOracleCurvatureGuard = `    let product = multiply(direction);
     if (!Number.isFinite(curvature) || !(curvature > 0)) {
       const certified = explicitResidual(multiply, rhs, x);
       explicitResidualNorm = norm(certified);
+      diagnostic(
+        \`ORACLE_PCG_CURVATURE_RESTART:iterations=\${iteration - 1}:\`
+        + \`explicitRelativeResidual=\${explicitResidualNorm / denominator}\`,
+      );
       if (explicitResidualNorm <= tolerance) {
         return {
           x,
@@ -108,7 +119,47 @@ const correctedOracleCurvatureGuard = `    let product = multiply(direction);
       bestResidualNorm = explicitResidualNorm;
       lastMaterialImprovement = iteration;
     }
-    const alpha = residualPreconditioned / curvature;`;
+    const alpha = residualPreconditioned / curvature;
+    if (!Number.isFinite(alpha)) {
+      throw new RangeError('ORACLE_NONFINITE_PCG_STEP');
+    }`;
+const governedOracleRecursiveResidual = `    const recursiveResidualNorm = norm(residualVector);
+    if (recursiveResidualNorm
+      <= bestResidualNorm * (1 - policy.minimumStagnationReduction)) {`;
+const correctedOracleRecursiveResidual = `    let recursiveResidualNorm = norm(residualVector);
+    if (iteration % policy.explicitResidualReplacementInterval === 0) {
+      const certified = explicitResidual(multiply, rhs, x);
+      explicitResidualNorm = norm(certified);
+      diagnostic(
+        \`ORACLE_PCG_CERTIFIED_REPLACEMENT:iterations=\${iteration}:\`
+        + \`recursiveRelativeResidual=\${recursiveResidualNorm / denominator}:\`
+        + \`explicitRelativeResidual=\${explicitResidualNorm / denominator}\`,
+      );
+      if (explicitResidualNorm <= tolerance) {
+        return {
+          x,
+          iterations: iteration,
+          relativeResidual: explicitResidualNorm / denominator,
+          explicitResidualNorm,
+          residualReplacementCount,
+        };
+      }
+      residualVector = certified;
+      recursiveResidualNorm = explicitResidualNorm;
+      z = precondition(residualVector);
+      direction = Float64Array.from(z);
+      residualPreconditioned = dot(residualVector, z);
+      if (!Number.isFinite(residualPreconditioned)
+        || !(residualPreconditioned > 0)) {
+        throw new RangeError('ORACLE_NONPOSITIVE_PRECONDITIONED_RESIDUAL');
+      }
+      residualReplacementCount += 1;
+      bestResidualNorm = explicitResidualNorm;
+      lastMaterialImprovement = iteration;
+      continue;
+    }
+    if (recursiveResidualNorm
+      <= bestResidualNorm * (1 - policy.minimumStagnationReduction)) {`;
 
 await mkdir(outputDirectory, { recursive: true });
 const source = await readFile(SOURCE_PATH, 'utf8');
@@ -129,17 +180,35 @@ assert.equal(
   'BB11_TRANSITION_GOVERNED_ORACLE_BLOCK_MAP_COUNT',
 );
 assert.equal(
+  occurrences(oracleSource, governedOraclePolicyTail),
+  1,
+  'BB11_TRANSITION_GOVERNED_ORACLE_POLICY_COUNT',
+);
+assert.equal(
   occurrences(oracleSource, governedOracleCurvatureGuard),
   1,
   'BB11_TRANSITION_GOVERNED_ORACLE_CURVATURE_GUARD_COUNT',
+);
+assert.equal(
+  occurrences(oracleSource, governedOracleRecursiveResidual),
+  1,
+  'BB11_TRANSITION_GOVERNED_ORACLE_RECURSIVE_RESIDUAL_COUNT',
 );
 let correctedOracleSource = oracleSource.replace(
   governedOracleBlockMap,
   correctedOracleBlockMap,
 );
 correctedOracleSource = correctedOracleSource.replace(
+  governedOraclePolicyTail,
+  correctedOraclePolicyTail,
+);
+correctedOracleSource = correctedOracleSource.replace(
   governedOracleCurvatureGuard,
   correctedOracleCurvatureGuard,
+);
+correctedOracleSource = correctedOracleSource.replace(
+  governedOracleRecursiveResidual,
+  correctedOracleRecursiveResidual,
 );
 assert.notEqual(
   correctedOracleSource,
@@ -237,6 +306,10 @@ const payload = {
       'DEFER_PROFILE_RESOLUTION_UNTIL_BLOCK_KIND_IS_STRIP',
       'CERTIFIED_RESIDUAL_RESTART_ON_NONPOSITIVE_PCG_CURVATURE',
     ],
+    additionalCorrection:
+      'FIXED_INTERVAL_CERTIFIED_EXPLICIT_RESIDUAL_REPLACEMENT',
+    explicitResidualReplacementInterval:
+      EXPLICIT_RESIDUAL_REPLACEMENT_INTERVAL,
     mechanicalInputsModified: false,
     oracleFormulationModified: false,
     oracleSolverControlFlowModified: true,
@@ -304,7 +377,10 @@ function runCoreChild(modulePath) {
     ['--input-type=module', '--eval', program],
     {
       cwd: ROOT,
-      env: process.env,
+      env: {
+        ...process.env,
+        BB11_DIAGNOSTICS: '1',
+      },
       encoding: 'utf8',
       maxBuffer: 512 * 1024 * 1024,
       timeout: 25 * 60 * 1000,
