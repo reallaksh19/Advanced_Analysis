@@ -65,9 +65,10 @@ export function createCompletedStructuralOutputFixture({
 }) {
   const statusLines = [];
   model.loadSteps.forEach((step, index) => {
-    statusLines.push(`STEP ${step.stepId} INCREMENT 1`);
-    statusLines.push(`STEP ${step.stepId} INCREMENT 2`);
-    statusLines.push(`STEP ${step.stepId} COMPLETED ${index + 1}`);
+    statusLines.push(`STEP ${step.stepId}`);
+    statusLines.push('INCREMENT 1');
+    statusLines.push('INCREMENT 2');
+    statusLines.push(`STEP_COMPLETED ${index + 1}`);
   });
   statusLines.push('JOB FINISHED');
   const status = Buffer.from(`${statusLines.join('\n')}\n`, 'utf8');
@@ -79,7 +80,7 @@ export function createCompletedStructuralOutputFixture({
   ].join('\n'), 'utf8');
   const frd = Buffer.from([
     ...model.loadSteps.flatMap((step, stepIndex) => [
-      `    1PSTEP      ${stepIndex + 1}`,
+      `    1PSTEP      ${stepIndex + 1}           1           ${stepIndex + 1}`,
       ' -4  DISP        3    1',
       ' -5  D1          1',
       ' -5  D2          2',
