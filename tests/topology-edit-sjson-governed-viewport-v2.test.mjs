@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  TOPOLOGY_EDIT_ISSUE_OVERLAY_SCHEMA,
+} from '../src/workspace/topology-edit/topology-edit-issue-overlay.js';
+import {
   TopologyEditSjsonGovernedViewportBackend,
 } from '../src/workspace/topology-edit/topology-edit-sjson-governed-viewport-backend-v2.js';
 import {
@@ -95,6 +98,32 @@ test('governed supports are depth-independent overlays with outlined heads and p
   assert.equal(head.material.opacity, 0.5);
   assert.equal(head.material.depthTest, false);
   assert.equal(arrowProxy.userData.pickTarget.objectKind, 'restraint');
+  backend.destroy();
+});
+
+test('governed SJSON checker issues use compact wireframe HUD markers', () => {
+  const backend = new TopologyEditSjsonGovernedViewportBackend({ navigationConfiguration: CONFIGURATION });
+  backend.setGovernedSupportProjection({ renderStyle: 'TOPO_VALIDATOR_COMPACT' });
+  const count = backend.renderIssues({
+    schema: TOPOLOGY_EDIT_ISSUE_OVERLAY_SCHEMA,
+    overlayHash: 'fnv1a64:test',
+    entries: [{
+      issueId: 'issue:1',
+      severity: 'HIGH',
+      position: { x: 10, y: 20, z: 30 },
+      canonicalIds: ['edge:1'],
+    }],
+  });
+  assert.equal(count, 1);
+  const marker = namedObjects(backend.groups.issueGroup)
+    .get('topology-edit-sjson-issue-marker:issue:1');
+  assert.equal(marker?.isLineSegments, true);
+  assert.equal(marker.material.opacity, 0.5);
+  assert.equal(marker.material.depthTest, false);
+  assert.equal(marker.userData.visualRadiusMm, 4.2);
+  assert.equal(marker.userData.pickTarget.objectKind, 'issue');
+  assert.equal(marker.userData.renderAuthority, 'SJSON_COMPACT_WIREFRAME_ISSUE_OVERLAY_V2');
+  assert.equal(backend.groups.issueGroup.userData.issueOverlayHash, 'fnv1a64:test');
   backend.destroy();
 });
 
