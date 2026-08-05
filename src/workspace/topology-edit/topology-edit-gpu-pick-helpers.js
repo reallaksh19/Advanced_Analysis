@@ -28,8 +28,8 @@ export function decodeTopologyEditPickId(bytes, offset = 0) {
     | Number(bytes[offset + 2]);
 }
 
-export function selectNearestTopologyEditPickId(bytes, width, height) {
-  if (!validPixelBuffer(bytes, width, height)) return 0;
+export function selectNearestTopologyEditPickSample(bytes, width, height) {
+  if (!validPixelBuffer(bytes, width, height)) return null;
   const centerX = (width - 1) / 2;
   const centerY = (height - 1) / 2;
   let selected = null;
@@ -38,13 +38,17 @@ export function selectNearestTopologyEditPickId(bytes, width, height) {
       const pixel = y * width + x;
       const id = decodeTopologyEditPickId(bytes, pixel * 4);
       if (!id) continue;
-      const distance = ((x - centerX) ** 2) + ((y - centerY) ** 2);
-      if (preferSample(selected, distance, pixel)) {
-        selected = { id, distance, pixel };
+      const distanceSquared = ((x - centerX) ** 2) + ((y - centerY) ** 2);
+      if (preferSample(selected, distanceSquared, pixel)) {
+        selected = { id, x, y, pixel, distanceSquared };
       }
     }
   }
-  return selected?.id ?? 0;
+  return selected ? Object.freeze(selected) : null;
+}
+
+export function selectNearestTopologyEditPickId(bytes, width, height) {
+  return selectNearestTopologyEditPickSample(bytes, width, height)?.id ?? 0;
 }
 
 export function resolveTopologyEditPickViewport(
@@ -77,6 +81,16 @@ export function resolveTopologyEditPickViewport(
     cssRadius,
     physicalRadius: radius,
     pixelRatio: ratio,
+  });
+}
+
+export function resolveTopologyEditPickSamplePointer(viewport, sample) {
+  if (!validPickViewport(viewport) || !validPickSample(sample, viewport)) return null;
+  const pixelX = viewport.x + sample.x;
+  const pixelY = viewport.y + sample.y;
+  return Object.freeze({
+    x: ((pixelX + 0.5) / viewport.fullWidth) * 2 - 1,
+    y: ((pixelY + 0.5) / viewport.fullHeight) * 2 - 1,
   });
 }
 
@@ -182,10 +196,40 @@ function validPixelBuffer(bytes, width, height) {
     && bytes.length >= width * height * 4;
 }
 
-function preferSample(selected, distance, pixel) {
+function preferSample(selected, distanceSquared, pixel) {
   return !selected
-    || distance < selected.distance
-    || (distance === selected.distance && pixel < selected.pixel);
+    || distanceSquared < selected.distanceSquared
+    || (distanceSquared === selected.distanceSquared && pixel < selected.pixel);
+}
+
+function validPickViewport(viewport) {
+  return viewport
+    && Number.isInteger(viewport.x)
+    && Number.isInteger(viewport.y)
+    && Number.isInteger(viewport.width)
+    && Number.isInteger(viewport.height)
+    && Number.isInteger(viewport.fullWidth)
+    && Number.isInteger(viewport.fullHeight)
+    && viewport.x >= 0
+    && viewport.y >= 0
+    && viewport.width > 0
+    && viewport.height > 0
+    && viewport.fullWidth > 0
+    && viewport.fullHeight > 0
+    && viewport.x + viewport.width <= viewport.fullWidth
+    && viewport.y + viewport.height <= viewport.fullHeight;
+}
+
+function validPickSample(sample, viewport) {
+  return sample
+    && Number.isInteger(sample.id)
+    && sample.id > 0
+    && Number.isInteger(sample.x)
+    && Number.isInteger(sample.y)
+    && sample.x >= 0
+    && sample.y >= 0
+    && sample.x < viewport.width
+    && sample.y < viewport.height;
 }
 
 function validRect(rect) {
