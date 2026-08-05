@@ -11,21 +11,15 @@ import {
 import { FLANGE_HUB_MATERIAL_PROFILE } from './flange-hub-geometry.js';
 
 export const FLANGE_HUB_SOLVER_POLICY = deepFreeze({
-  solverPolicyId: 'BKT-B-FLANGE-HUB-DETERMINISTIC-SGS-PCG-REFINED-V10',
+  solverPolicyId: 'BKT-B-FLANGE-HUB-DETERMINISTIC-JACOBI-PCG-V3',
   relativeResidualTolerance: 1e-10,
   absoluteResidualTolerance: 1e-8,
   maximumIterationMultiplier: 8,
   minimumMaximumIterations: 2000,
   residualReplacementInterval: 0,
-  preconditionerId: 'SYMMETRIC_GAUSS_SEIDEL',
-  summationPolicyId: 'KAHAN_COMPENSATED_DETERMINISTIC_ORDER',
   stoppingCriterion: 'EXPLICIT_REDUCED_SYSTEM_RESIDUAL',
   constraintMethod: 'EXACT_ZERO_DISPLACEMENT_ELIMINATION',
-  reducedMatrixStorage: 'DETERMINISTIC_SORTED_TYPED_SPARSE_ROWS',
-  iterativeRefinementMaximumRounds: 2,
-  iterativeRefinementTargetRelativeResidual: 1e-13,
-  correctionRelativeResidualTolerance: 1e-4,
-  correctionAbsoluteResidualTolerance: 1e-12,
+  reducedMatrixStorage: 'DETERMINISTIC_TYPED_SPARSE_ROWS',
 });
 
 export function solveFlangeHubLoadCase({ mesh, loadCaseId } = {}) {
@@ -97,12 +91,12 @@ export function solveFlangeHubLoadCase({ mesh, loadCaseId } = {}) {
     freeDofs,
     globalToLocal,
   });
-  const solution = solveIterativelyRefinedSgsPcg({
-    rows: reducedRows,
+  const multiply = createTypedSparseMultiplier(reducedRows);
+  const solution = solveJacobiPcg({
+    multiply,
     rhs,
     diagonal,
     policy: FLANGE_HUB_SOLVER_POLICY,
-    context: `${loadCaseId}:${mesh.levelId}`,
   });
   const displacement = new Float64Array(dofCount);
   freeDofs.forEach((dof, index) => {
@@ -111,51 +105,31 @@ export function solveFlangeHubLoadCase({ mesh, loadCaseId } = {}) {
   const internal = multiplySparse(stiffnessRows, displacement);
 
   let strainEnergy = 0;
-  let strainEnergyCorrection = 0;
   let externalWork = 0;
-  let externalWorkCorrection = 0;
   for (let dof = 0; dof < dofCount; dof += 1) {
-    const energyTerm = 0.5 * displacement[dof] * internal[dof];
-    const energyAdjusted = energyTerm - strainEnergyCorrection;
-    const nextEnergy = strainEnergy + energyAdjusted;
-    strainEnergyCorrection = (nextEnergy - strainEnergy) - energyAdjusted;
-    strainEnergy = nextEnergy;
-    const workTerm = force[dof] * displacement[dof];
-    const workAdjusted = workTerm - externalWorkCorrection;
-    const nextWork = externalWork + workAdjusted;
-    externalWorkCorrection = (nextWork - externalWork) - workAdjusted;
-    externalWork = nextWork;
+    strainEnergy += 0.5 * displacement[dof] * internal[dof];
+    externalWork += force[dof] * displacement[dof];
   }
   const reactions = constrainedDofs.map((constraint) => ({
     ...constraint,
     reaction: internal[constraint.dof] - force[constraint.dof],
   }));
-  const axialReaction = compensatedScalarSum(
-    reactions.map((row) => row.reaction),
-  );
+  const axialReaction = reactions.reduce((sum, row) => sum + row.reaction, 0);
   const appliedAxial = loadEvidence.totalQuadratureResultant.axial;
   const axialForceImbalance = Math.abs(appliedAxial + axialReaction)
     / Math.max(1, Math.abs(appliedAxial), Math.abs(axialReaction));
   const energyRelativeDifference = Math.abs(2 * strainEnergy - externalWork)
     / Math.max(1, Math.abs(2 * strainEnergy), Math.abs(externalWork));
   const freeResidual = freeResidualNorm({ internal, force, freeDofs });
-  const forceNorm = vectorNorm(force);
-  const freeResidualTolerance = Math.max(
-    FLANGE_HUB_SOLVER_POLICY.absoluteResidualTolerance,
-    FLANGE_HUB_SOLVER_POLICY.relativeResidualTolerance * forceNorm,
-  );
-  const freeResidualRelative = freeResidual / Math.max(1, forceNorm);
+  const freeResidualRelative = freeResidual / Math.max(1, vectorNorm(force));
   if (axialForceImbalance > 1e-8) {
     throw new RangeError(`FH_AXIAL_FORCE_IMBALANCE:${axialForceImbalance}`);
   }
   if (energyRelativeDifference > 1e-8) {
     throw new RangeError(`FH_ENERGY_IDENTITY_FAILURE:${energyRelativeDifference}`);
   }
-  if (freeResidual > freeResidualTolerance) {
-    throw new RangeError(
-      `FH_FREE_DOF_RESIDUAL_FAILURE:${loadCaseId}:${mesh.levelId}:`
-      + `${freeResidualRelative}`,
-    );
+  if (freeResidualRelative > 1e-10) {
+    throw new RangeError(`FH_FREE_DOF_RESIDUAL_FAILURE:${freeResidualRelative}`);
   }
 
   const nodalDisplacements = nodes.map((node, index) => deepFreeze({
@@ -214,12 +188,6 @@ export function solveFlangeHubLoadCase({ mesh, loadCaseId } = {}) {
         0,
       ),
       iterations: solution.iterations,
-      primaryIterations: solution.primaryIterations,
-      refinementRounds: solution.refinementRounds,
-      refinementIterations: solution.refinementIterations,
-      preRefinementResidualNorm: solution.preRefinementResidualNorm,
-      preRefinementRelativeResidual: solution.preRefinementRelativeResidual,
-      iterativeRefinementTargetMet: solution.iterativeRefinementTargetMet,
       residualNorm: solution.residualNorm,
       relativeResidual: solution.relativeResidual,
       recursiveResidualNorm: solution.recursiveResidualNorm,
@@ -251,8 +219,7 @@ export function solveFlangeHubLoadCase({ mesh, loadCaseId } = {}) {
     residual: {
       freeResidualNorm: freeResidual,
       freeResidualRelative,
-      freeResidualTolerance,
-      accepted: freeResidual <= freeResidualTolerance,
+      accepted: freeResidualRelative <= 1e-10,
     },
   };
   return deepFreeze({ ...payload, semanticHash: semanticHash(payload) });
@@ -260,17 +227,18 @@ export function solveFlangeHubLoadCase({ mesh, loadCaseId } = {}) {
 
 function createReducedSparseRows({ stiffnessRows, freeDofs, globalToLocal }) {
   return freeDofs.map((globalRow) => {
-    const entries = [];
+    const columns = [];
+    const values = [];
     stiffnessRows[globalRow].forEach((value, globalColumn) => {
       const localColumn = globalToLocal[globalColumn];
-      if (localColumn >= 0 && value !== 0) {
-        entries.push({ column: localColumn, value });
+      if (localColumn >= 0) {
+        columns.push(localColumn);
+        values.push(value);
       }
     });
-    entries.sort((left, right) => left.column - right.column);
     return {
-      columns: Int32Array.from(entries.map((entry) => entry.column)),
-      values: Float64Array.from(entries.map((entry) => entry.value)),
+      columns: Int32Array.from(columns),
+      values: Float64Array.from(values),
     };
   });
 }
@@ -284,374 +252,13 @@ function createTypedSparseMultiplier(rows) {
     for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
       const row = rows[rowIndex];
       let sum = 0;
-      let correction = 0;
       for (let entry = 0; entry < row.values.length; entry += 1) {
-        const term = row.values[entry] * vector[row.columns[entry]];
-        const adjusted = term - correction;
-        const next = sum + adjusted;
-        correction = (next - sum) - adjusted;
-        sum = next;
+        sum += row.values[entry] * vector[row.columns[entry]];
       }
       result[rowIndex] = sum;
     }
     return result;
   };
-}
-
-function createSymmetricGaussSeidelPreconditioner(rows, diagonal) {
-  const count = rows.length;
-  const forward = new Float64Array(count);
-  const result = new Float64Array(count);
-  return (residual) => {
-    if (!residual || residual.length !== count) {
-      throw new TypeError('FH_SGS_PRECONDITIONER_SHAPE_MISMATCH');
-    }
-    for (let rowIndex = 0; rowIndex < count; rowIndex += 1) {
-      let lowerSum = 0;
-      let lowerCorrection = 0;
-      const row = rows[rowIndex];
-      for (let entryIndex = 0; entryIndex < row.values.length; entryIndex += 1) {
-        const column = row.columns[entryIndex];
-        if (column >= rowIndex) break;
-        const term = row.values[entryIndex] * forward[column];
-        const adjusted = term - lowerCorrection;
-        const next = lowerSum + adjusted;
-        lowerCorrection = (next - lowerSum) - adjusted;
-        lowerSum = next;
-      }
-      forward[rowIndex] = (residual[rowIndex] - lowerSum) / diagonal[rowIndex];
-    }
-    for (let rowIndex = count - 1; rowIndex >= 0; rowIndex -= 1) {
-      let upperSum = 0;
-      let upperCorrection = 0;
-      const row = rows[rowIndex];
-      for (let entryIndex = row.values.length - 1; entryIndex >= 0; entryIndex -= 1) {
-        const column = row.columns[entryIndex];
-        if (column <= rowIndex) break;
-        const term = row.values[entryIndex] * result[column];
-        const adjusted = term - upperCorrection;
-        const next = upperSum + adjusted;
-        upperCorrection = (next - upperSum) - adjusted;
-        upperSum = next;
-      }
-      result[rowIndex] = (
-        diagonal[rowIndex] * forward[rowIndex] - upperSum
-      ) / diagonal[rowIndex];
-    }
-    return result;
-  };
-}
-
-function createJacobiPreconditioner(diagonal) {
-  const result = new Float64Array(diagonal.length);
-  return (residual) => {
-    if (!residual || residual.length !== diagonal.length) {
-      throw new TypeError('FH_JACOBI_PRECONDITIONER_SHAPE_MISMATCH');
-    }
-    for (let index = 0; index < diagonal.length; index += 1) {
-      result[index] = residual[index] / diagonal[index];
-    }
-    return result;
-  };
-}
-
-export function solveSgsPcg({
-  rows,
-  rhs,
-  diagonal,
-  policy = FLANGE_HUB_SOLVER_POLICY,
-  context = 'UNSCOPED',
-} = {}) {
-  validateLinearSystemInputs({ rows, rhs, diagonal });
-  return solvePreconditionedPcg({
-    multiply: createTypedSparseMultiplier(rows),
-    rhs,
-    precondition: createSymmetricGaussSeidelPreconditioner(rows, diagonal),
-    policy,
-    context,
-  });
-}
-
-export function solveIterativelyRefinedSgsPcg({
-  rows,
-  rhs,
-  diagonal,
-  policy = FLANGE_HUB_SOLVER_POLICY,
-  context = 'UNSCOPED_REFINED',
-} = {}) {
-  validateLinearSystemInputs({ rows, rhs, diagonal });
-  const multiply = createTypedSparseMultiplier(rows);
-  const precondition = createSymmetricGaussSeidelPreconditioner(rows, diagonal);
-  const primary = solvePreconditionedPcg({
-    multiply,
-    rhs,
-    precondition,
-    policy,
-    context,
-  });
-  const vector = Float64Array.from(primary.vector);
-  const rhsNorm = vectorNorm(rhs);
-  const denominatorNorm = Math.max(1, rhsNorm);
-  const maximumRounds = Number.isInteger(policy.iterativeRefinementMaximumRounds)
-    && policy.iterativeRefinementMaximumRounds > 0
-    ? policy.iterativeRefinementMaximumRounds
-    : 0;
-  const targetRelativeResidual = Number.isFinite(
-    policy.iterativeRefinementTargetRelativeResidual,
-  ) && policy.iterativeRefinementTargetRelativeResidual > 0
-    ? policy.iterativeRefinementTargetRelativeResidual
-    : policy.relativeResidualTolerance;
-  const correctionPolicy = {
-    ...policy,
-    relativeResidualTolerance: policy.correctionRelativeResidualTolerance,
-    absoluteResidualTolerance: policy.correctionAbsoluteResidualTolerance,
-    residualReplacementInterval: 0,
-  };
-  const residualAtCurrentVector = () => {
-    const product = multiply(vector);
-    const residual = new Float64Array(rhs.length);
-    for (let index = 0; index < rhs.length; index += 1) {
-      residual[index] = rhs[index] - product[index];
-    }
-    return residual;
-  };
-
-  let residual = residualAtCurrentVector();
-  const preRefinementResidualNorm = vectorNorm(residual);
-  const preRefinementRelativeResidual = preRefinementResidualNorm / denominatorNorm;
-  const refinementIterations = [];
-  let residualReplacementCount = primary.residualReplacementCount;
-  let recursiveResidualNorm = primary.recursiveResidualNorm;
-
-  for (let round = 1; round <= maximumRounds; round += 1) {
-    const relativeResidual = vectorNorm(residual) / denominatorNorm;
-    if (relativeResidual <= targetRelativeResidual) break;
-    const correction = solvePreconditionedPcg({
-      multiply,
-      rhs: residual,
-      precondition,
-      policy: correctionPolicy,
-      context: `${context}:REFINEMENT-${round}`,
-    });
-    for (let index = 0; index < vector.length; index += 1) {
-      vector[index] += correction.vector[index];
-    }
-    refinementIterations.push(correction.iterations);
-    residualReplacementCount += correction.residualReplacementCount;
-    recursiveResidualNorm = correction.recursiveResidualNorm;
-    residual = residualAtCurrentVector();
-  }
-
-  const explicitResidualNorm = vectorNorm(residual);
-  const relativeResidual = explicitResidualNorm / denominatorNorm;
-  return {
-    vector,
-    iterations: primary.iterations
-      + refinementIterations.reduce((sum, value) => sum + value, 0),
-    primaryIterations: primary.iterations,
-    refinementRounds: refinementIterations.length,
-    refinementIterations,
-    preRefinementResidualNorm,
-    preRefinementRelativeResidual,
-    iterativeRefinementTargetRelativeResidual: targetRelativeResidual,
-    iterativeRefinementTargetMet: relativeResidual <= targetRelativeResidual,
-    residualNorm: explicitResidualNorm,
-    relativeResidual,
-    recursiveResidualNorm,
-    explicitResidualNorm,
-    residualReplacementCount,
-  };
-}
-
-export function solveJacobiPcg({
-  multiply,
-  rhs,
-  diagonal,
-  policy = FLANGE_HUB_SOLVER_POLICY,
-  context = 'UNIT_JACOBI',
-} = {}) {
-  if (typeof multiply !== 'function') {
-    throw new TypeError('FH_PCG_MULTIPLY_REQUIRED');
-  }
-  validateDiagonalAndRhs({ rhs, diagonal });
-  return solvePreconditionedPcg({
-    multiply,
-    rhs,
-    precondition: createJacobiPreconditioner(diagonal),
-    policy,
-    context,
-  });
-}
-
-function solvePreconditionedPcg({
-  multiply,
-  rhs,
-  precondition,
-  policy,
-  context,
-}) {
-  if (typeof multiply !== 'function' || typeof precondition !== 'function') {
-    throw new TypeError('FH_PCG_OPERATOR_REQUIRED');
-  }
-  if (!rhs || rhs.length === 0) {
-    throw new TypeError('FH_PCG_VECTOR_SHAPE_MISMATCH');
-  }
-  const n = rhs.length;
-  const x = new Float64Array(n);
-  let r = Float64Array.from(rhs);
-  let z = precondition(r);
-  if (!z || z.length !== n) {
-    throw new TypeError('FH_PCG_PRECONDITIONER_SHAPE_MISMATCH');
-  }
-  let p = Float64Array.from(z);
-  let rz = dot(r, z);
-  const rhsNorm = vectorNorm(rhs);
-  const denominatorNorm = Math.max(1, rhsNorm);
-  const tolerance = Math.max(
-    policy.absoluteResidualTolerance,
-    policy.relativeResidualTolerance * rhsNorm,
-  );
-  const replacementInterval = Number.isInteger(policy.residualReplacementInterval)
-    && policy.residualReplacementInterval > 0
-    ? policy.residualReplacementInterval
-    : 0;
-  let recursiveResidualNorm = vectorNorm(r);
-  let explicitResidualNorm = recursiveResidualNorm;
-  let residualReplacementCount = 0;
-  const maximumIterations = Math.max(
-    policy.minimumMaximumIterations,
-    policy.maximumIterationMultiplier * n,
-  );
-
-  const explicitResidual = () => {
-    const product = multiply(x);
-    if (!product || product.length !== n) {
-      throw new TypeError('FH_PCG_MULTIPLY_SHAPE_MISMATCH');
-    }
-    const value = new Float64Array(n);
-    for (let index = 0; index < n; index += 1) {
-      value[index] = rhs[index] - product[index];
-    }
-    return value;
-  };
-  const replaceResidual = (value) => {
-    r = value;
-    z = precondition(r);
-    if (!z || z.length !== n) {
-      throw new TypeError('FH_PCG_PRECONDITIONER_SHAPE_MISMATCH');
-    }
-    p = Float64Array.from(z);
-    rz = dot(r, z);
-    if (!Number.isFinite(rz) || !(rz > 0)) {
-      throw new RangeError('FH_PCG_NONPOSITIVE_PRECONDITIONED_RESIDUAL');
-    }
-    residualReplacementCount += 1;
-  };
-  const result = (iterations) => ({
-    vector: x,
-    iterations,
-    residualNorm: explicitResidualNorm,
-    relativeResidual: explicitResidualNorm / denominatorNorm,
-    recursiveResidualNorm,
-    explicitResidualNorm,
-    residualReplacementCount,
-  });
-
-  if (recursiveResidualNorm <= tolerance) {
-    const certified = explicitResidual();
-    explicitResidualNorm = vectorNorm(certified);
-    if (explicitResidualNorm <= tolerance) return result(0);
-    replaceResidual(certified);
-  } else if (!Number.isFinite(rz) || !(rz > 0)) {
-    throw new RangeError('FH_PCG_NONPOSITIVE_PRECONDITIONED_RESIDUAL');
-  }
-
-  for (let iteration = 1; iteration <= maximumIterations; iteration += 1) {
-    const Ap = multiply(p);
-    if (!Ap || Ap.length !== n) {
-      throw new TypeError('FH_PCG_MULTIPLY_SHAPE_MISMATCH');
-    }
-    const curvature = dot(p, Ap);
-    if (!Number.isFinite(curvature) || !(curvature > 0)) {
-      throw new RangeError('FH_PCG_NONPOSITIVE_CURVATURE');
-    }
-    const alpha = rz / curvature;
-    for (let index = 0; index < n; index += 1) {
-      x[index] += alpha * p[index];
-      r[index] -= alpha * Ap[index];
-    }
-    recursiveResidualNorm = vectorNorm(r);
-    const certificationRequired = recursiveResidualNorm <= tolerance
-      || (replacementInterval > 0 && iteration % replacementInterval === 0);
-    if (certificationRequired) {
-      const certified = explicitResidual();
-      explicitResidualNorm = vectorNorm(certified);
-      if (explicitResidualNorm <= tolerance) return result(iteration);
-      replaceResidual(certified);
-      continue;
-    }
-    z = precondition(r);
-    if (!z || z.length !== n) {
-      throw new TypeError('FH_PCG_PRECONDITIONER_SHAPE_MISMATCH');
-    }
-    const nextRz = dot(r, z);
-    if (!Number.isFinite(nextRz) || !(nextRz > 0)) {
-      throw new RangeError('FH_PCG_NONPOSITIVE_PRECONDITIONED_RESIDUAL');
-    }
-    const beta = nextRz / rz;
-    for (let index = 0; index < n; index += 1) {
-      p[index] = z[index] + beta * p[index];
-    }
-    rz = nextRz;
-  }
-  const certified = explicitResidual();
-  explicitResidualNorm = vectorNorm(certified);
-  throw new RangeError(
-    `FH_PCG_DID_NOT_CONVERGE:${context}:${maximumIterations}:`
-    + `${explicitResidualNorm / denominatorNorm}`,
-  );
-}
-
-function validateLinearSystemInputs({ rows, rhs, diagonal }) {
-  if (!Array.isArray(rows) || rows.length === 0 || rows.length !== rhs?.length
-    || rows.length !== diagonal?.length) {
-    throw new TypeError('FH_PCG_ROW_SHAPE_MISMATCH');
-  }
-  rows.forEach((row, rowIndex) => {
-    if (!(row?.columns instanceof Int32Array)
-      || !(row?.values instanceof Float64Array)
-      || row.columns.length !== row.values.length) {
-      throw new TypeError('FH_PCG_TYPED_ROW_REQUIRED');
-    }
-    let previous = -1;
-    let hasPositiveDiagonal = false;
-    for (let entry = 0; entry < row.columns.length; entry += 1) {
-      const column = row.columns[entry];
-      const value = row.values[entry];
-      if (!Number.isInteger(column) || column < 0 || column >= rows.length
-        || column <= previous || !Number.isFinite(value)) {
-        throw new TypeError('FH_PCG_TYPED_ROW_INVALID');
-      }
-      previous = column;
-      if (column === rowIndex && value > 0) hasPositiveDiagonal = true;
-    }
-    if (!hasPositiveDiagonal) {
-      throw new RangeError('FH_PCG_NONPOSITIVE_PRECONDITIONER');
-    }
-  });
-  validateDiagonalAndRhs({ rhs, diagonal });
-}
-
-function validateDiagonalAndRhs({ rhs, diagonal }) {
-  if (!rhs || !diagonal || rhs.length !== diagonal.length || rhs.length === 0) {
-    throw new TypeError('FH_PCG_VECTOR_SHAPE_MISMATCH');
-  }
-  for (let index = 0; index < diagonal.length; index += 1) {
-    if (!Number.isFinite(diagonal[index]) || !(diagonal[index] > 0)
-      || !Number.isFinite(rhs[index])) {
-      throw new RangeError('FH_PCG_NONPOSITIVE_PRECONDITIONER');
-    }
-  }
 }
 
 function assembleLoads({ mesh, loadDefinition, nodesById, nodeIndex, force }) {
@@ -774,20 +381,128 @@ function deriveConstrainedDofs({ mesh, loadDefinition, nodeIndex }) {
   return result;
 }
 
+export function solveJacobiPcg({
+  multiply,
+  rhs,
+  diagonal,
+  policy = FLANGE_HUB_SOLVER_POLICY,
+} = {}) {
+  if (typeof multiply !== 'function') {
+    throw new TypeError('FH_PCG_MULTIPLY_REQUIRED');
+  }
+  if (!rhs || !diagonal || rhs.length !== diagonal.length || rhs.length === 0) {
+    throw new TypeError('FH_PCG_VECTOR_SHAPE_MISMATCH');
+  }
+  const n = rhs.length;
+  const x = new Float64Array(n);
+  let r = Float64Array.from(rhs);
+  const z = new Float64Array(n);
+  let p;
+  for (let i = 0; i < n; i += 1) {
+    if (!Number.isFinite(diagonal[i]) || !(diagonal[i] > 0)) {
+      throw new RangeError('FH_PCG_NONPOSITIVE_PRECONDITIONER');
+    }
+    z[i] = r[i] / diagonal[i];
+  }
+  p = Float64Array.from(z);
+  let rz = dot(r, z);
+  const rhsNorm = vectorNorm(rhs);
+  const denominatorNorm = Math.max(1, rhsNorm);
+  const tolerance = Math.max(
+    policy.absoluteResidualTolerance,
+    policy.relativeResidualTolerance * rhsNorm,
+  );
+  const replacementInterval = Number.isInteger(policy.residualReplacementInterval)
+    && policy.residualReplacementInterval > 0
+    ? policy.residualReplacementInterval
+    : 0;
+  let recursiveResidualNorm = vectorNorm(r);
+  let explicitResidualNorm = recursiveResidualNorm;
+  let residualReplacementCount = 0;
+  const maximumIterations = Math.max(
+    policy.minimumMaximumIterations,
+    policy.maximumIterationMultiplier * n,
+  );
+
+  const explicitResidual = () => {
+    const product = multiply(x);
+    if (!product || product.length !== n) {
+      throw new TypeError('FH_PCG_MULTIPLY_SHAPE_MISMATCH');
+    }
+    const value = new Float64Array(n);
+    for (let i = 0; i < n; i += 1) value[i] = rhs[i] - product[i];
+    return value;
+  };
+  const replaceResidual = (value) => {
+    r = value;
+    for (let i = 0; i < n; i += 1) z[i] = r[i] / diagonal[i];
+    p = Float64Array.from(z);
+    rz = dot(r, z);
+    residualReplacementCount += 1;
+  };
+  const result = (iterations) => ({
+    vector: x,
+    iterations,
+    residualNorm: explicitResidualNorm,
+    relativeResidual: explicitResidualNorm / denominatorNorm,
+    recursiveResidualNorm,
+    explicitResidualNorm,
+    residualReplacementCount,
+  });
+
+  if (recursiveResidualNorm <= tolerance) {
+    const certified = explicitResidual();
+    explicitResidualNorm = vectorNorm(certified);
+    if (explicitResidualNorm <= tolerance) return result(0);
+    replaceResidual(certified);
+  }
+
+  for (let iteration = 1; iteration <= maximumIterations; iteration += 1) {
+    const Ap = multiply(p);
+    if (!Ap || Ap.length !== n) {
+      throw new TypeError('FH_PCG_MULTIPLY_SHAPE_MISMATCH');
+    }
+    const curvature = dot(p, Ap);
+    if (!Number.isFinite(curvature) || !(curvature > 0)) {
+      throw new RangeError('FH_PCG_NONPOSITIVE_CURVATURE');
+    }
+    const alpha = rz / curvature;
+    for (let i = 0; i < n; i += 1) {
+      x[i] += alpha * p[i];
+      r[i] -= alpha * Ap[i];
+    }
+    recursiveResidualNorm = vectorNorm(r);
+    const certificationRequired = recursiveResidualNorm <= tolerance
+      || (replacementInterval > 0 && iteration % replacementInterval === 0);
+    if (certificationRequired) {
+      const certified = explicitResidual();
+      explicitResidualNorm = vectorNorm(certified);
+      if (explicitResidualNorm <= tolerance) return result(iteration);
+      replaceResidual(certified);
+      continue;
+    }
+    for (let i = 0; i < n; i += 1) z[i] = r[i] / diagonal[i];
+    const nextRz = dot(r, z);
+    if (!Number.isFinite(nextRz) || !(nextRz > 0)) {
+      throw new RangeError('FH_PCG_NONPOSITIVE_PRECONDITIONED_RESIDUAL');
+    }
+    const beta = nextRz / rz;
+    for (let i = 0; i < n; i += 1) p[i] = z[i] + beta * p[i];
+    rz = nextRz;
+  }
+  const certified = explicitResidual();
+  explicitResidualNorm = vectorNorm(certified);
+  throw new RangeError(
+    `FH_PCG_DID_NOT_CONVERGE:${explicitResidualNorm / denominatorNorm}`,
+  );
+}
+
 function multiplySparse(rows, vector) {
   const result = new Float64Array(rows.length);
   rows.forEach((row, index) => {
-    const entries = [...row.entries()].sort(
-      ([leftColumn], [rightColumn]) => leftColumn - rightColumn,
-    );
     let sum = 0;
-    let correction = 0;
-    entries.forEach(([column, value]) => {
-      const term = value * vector[column];
-      const adjusted = term - correction;
-      const next = sum + adjusted;
-      correction = (next - sum) - adjusted;
-      sum = next;
+    row.forEach((value, column) => {
+      sum += value * vector[column];
     });
     result[index] = sum;
   });
@@ -796,14 +511,9 @@ function multiplySparse(rows, vector) {
 
 function freeResidualNorm({ internal, force, freeDofs }) {
   let squared = 0;
-  let correction = 0;
   freeDofs.forEach((dof) => {
     const residual = internal[dof] - force[dof];
-    const term = residual ** 2;
-    const adjusted = term - correction;
-    const next = squared + adjusted;
-    correction = (next - squared) - adjusted;
-    squared = next;
+    squared += residual ** 2;
   });
   return Math.sqrt(squared);
 }
@@ -823,29 +533,11 @@ function edgeWithinRadius(edge, nodesById, minimum, maximum) {
 }
 function dot(left, right) {
   let sum = 0;
-  let correction = 0;
-  for (let index = 0; index < left.length; index += 1) {
-    const term = left[index] * right[index];
-    const adjusted = term - correction;
-    const next = sum + adjusted;
-    correction = (next - sum) - adjusted;
-    sum = next;
-  }
+  for (let i = 0; i < left.length; i += 1) sum += left[i] * right[i];
   return sum;
 }
 function vectorNorm(value) {
   return Math.sqrt(dot(value, value));
-}
-function compensatedScalarSum(values) {
-  let sum = 0;
-  let correction = 0;
-  values.forEach((value) => {
-    const adjusted = value - correction;
-    const next = sum + adjusted;
-    correction = (next - sum) - adjusted;
-    sum = next;
-  });
-  return sum;
 }
 function requireMesh(mesh) {
   if (!mesh || mesh.schema !== 'flange-hub-mesh-evidence/v1'
