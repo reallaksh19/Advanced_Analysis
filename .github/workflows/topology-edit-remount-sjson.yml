@@ -15,6 +15,8 @@ on:
       - 'src/workspace/topology-edit/topology-edit-sjson-point-component-projection.js'
       - 'src/workspace/topology-edit/topology-edit-sjson-parent-branch-diameter.js'
       - 'src/workspace/topology-edit/topology-edit-sjson-support-parent-branch-diameter.js'
+      - 'src/workspace/topology-edit/topology-edit-sjson-restraint-projection.js'
+      - 'tests/topology-edit-sjson-restraint-projection.test.mjs'
       - 'src/workspace/topology-edit-clean.css'
       - 'e2e/topology-edit-remount-sjson.spec.js'
       - 'e2e/topology-edit-sjson-render-authority.spec.js'
@@ -69,11 +71,16 @@ jobs:
           node --check src/workspace/topology-edit/topology-edit-sjson-point-component-projection.js
           node --check src/workspace/topology-edit/topology-edit-sjson-parent-branch-diameter.js
           node --check src/workspace/topology-edit/topology-edit-sjson-support-parent-branch-diameter.js
+          node --check src/workspace/topology-edit/topology-edit-sjson-restraint-projection.js
+          node --check tests/topology-edit-sjson-restraint-projection.test.mjs
           node --check src/workspace/tree-panel-events.js
           node --check e2e/topology-edit-remount-sjson.spec.js
           node --check e2e/topology-edit-sjson-render-authority.spec.js
           node --check e2e/topology-edit-clean-layout.spec.js
           git diff --check
+
+      - name: Execute Topo validator support parity unit contract
+        run: node --test tests/topology-edit-sjson-restraint-projection.test.mjs
 
       - name: Execute SJSON import and clean-shell remount qualification
         run: |
