@@ -1,0 +1,77 @@
+name: M027 BM2 Bend Curvature and Stations
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/m027-bm2-bend-curvature.yml'
+      - 'scripts/lfea-b3.29-bm2-bend-geometry-runtime.mjs'
+      - 'scripts/lfea-b3.29-bm2-bend-geometry-check.mjs'
+      - 'scripts/lfea-b3.29-bm2-bend-solve-runtime.mjs'
+      - 'scripts/lfea-b3.29-bm2-bend-comparison-runtime.mjs'
+      - 'scripts/lfea-b3.29-bm2-bend-check.mjs'
+      - 'scripts/lfea-b3.28-bm2-junction-surface-node-runtime.mjs'
+      - 'benchmarks/LFEA/BM2/Input_BM2.xml'
+      - 'benchmarks/LFEA/BM2/Output_BM2.xml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m027-bm2-bend-curvature-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bend-curvature:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify exact source
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
+          node --check scripts/lfea-b3.29-bm2-bend-geometry-runtime.mjs
+          node --check scripts/lfea-b3.29-bm2-bend-geometry-check.mjs
+          if test -f scripts/lfea-b3.29-bm2-bend-solve-runtime.mjs; then
+            node --check scripts/lfea-b3.29-bm2-bend-solve-runtime.mjs
+            node --check scripts/lfea-b3.29-bm2-bend-comparison-runtime.mjs
+            node --check scripts/lfea-b3.29-bm2-bend-check.mjs
+          fi
+          git diff --check
+
+      - name: Qualify bend geometry and factor authority
+        run: node scripts/lfea-b3.29-bm2-bend-geometry-check.mjs
+
+      - name: Solve and compare expanded bend model
+        if: ${{ hashFiles('scripts/lfea-b3.29-bm2-bend-check.mjs') != '' }}
+        run: node scripts/lfea-b3.29-bm2-bend-check.mjs
+
+      - name: Linear-core regression aggregate
+        run: npm run check:lfea-linear-core
+
+      - name: Publish bend comparison ledger
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m027-bm2-bend-curvature-comparison
+          path: reports/lfea-bm2-bend-curvature-comparison.json
+          if-no-files-found: warn
+          retention-days: 30
