@@ -14,6 +14,9 @@ import {
   visualPrimitiveKindCounts,
 } from './topology-edit/topology-edit-sjson-visual-authority.js';
 import { deriveSjsonCompleteVisualGeometry } from './topology-edit/topology-edit-sjson-parent-branch-diameter.js';
+import {
+  applySjsonParentBranchDiametersToSupportTopology,
+} from './topology-edit/topology-edit-sjson-support-parent-branch-diameter.js';
 
 /**
  * Production adapter for staged SJSON visual fidelity. Engineering topology,
@@ -55,7 +58,13 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     const supportGroup = backend?.groups?.supportGroup;
     if (!backend || !supportGroup) return;
 
-    const supportTopology = supportTopologyForExactOrigins(canonical);
+    const draftVisual = this.sjsonVisualByRole.get('DRAFT');
+    const exactSupportTopology = supportTopologyForExactOrigins(canonical);
+    const supportTopology = applySjsonParentBranchDiametersToSupportTopology(
+      exactSupportTopology,
+      this.workspaceDataset,
+      draftVisual?.parentBranchDiameterIndex,
+    );
     const overlays = deriveAllSupportRestraintGeometry({
       canonicalTopology: supportTopology,
       verticalAxis: 'Z',
@@ -73,7 +82,6 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     backend.engineeringRoot?.updateMatrixWorld(true);
     backend.invalidate?.('sjson-exact-support-projection');
 
-    const draftVisual = this.sjsonVisualByRole.get('DRAFT');
     this.visualDiagnostics = [
       ...(draftVisual?.model?.diagnostics || []),
       ...overlays.flatMap((row) => row.diagnostics || []),
@@ -84,14 +92,21 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     this.visualModelHash = semanticHash({
       draftVisualGeometryHash: draftVisual?.model?.visualGeometryHash || '',
       supportProjection,
+      supportVisualDiameterIndexHash: supportTopology.supportVisualDiameterIndexHash || '',
+      supportVisualDiameterAdaptations: supportTopology.supportVisualDiameterAdaptations || [],
     });
     this.updatePresentationBasis(canonical);
     this.presentationRuntime?.apply(this.presentationState);
     this.renderCheckerPanel();
-    this.publishSjsonFidelityEvidence(canonical, supportProjection, draftVisual?.model);
+    this.publishSjsonFidelityEvidence(
+      canonical,
+      supportProjection,
+      draftVisual?.model,
+      supportTopology,
+    );
   }
 
-  publishSjsonFidelityEvidence(canonical, supportProjection, visualModel) {
+  publishSjsonFidelityEvidence(canonical, supportProjection, visualModel, supportTopology) {
     const host = this.canvasMount;
     if (!host) return;
     const counts = visualPrimitiveKindCounts(visualModel);
@@ -119,6 +134,9 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     );
     host.dataset.topologyEditReferencedBranchDiameterCount = String(
       diagnostics.filter((row) => row.code === 'VISUAL_REFERENCED_BRANCH_DIAMETER_USED').length,
+    );
+    host.dataset.topologyEditSupportParentBranchDiameterCount = String(
+      supportTopology?.supportVisualDiameterAdaptations?.length || 0,
     );
     host.dataset.topologyEditVisualModelHash = this.visualModelHash || '';
     host.dataset.topologyEditSupportProjectionHash = semanticHash(supportProjection);
