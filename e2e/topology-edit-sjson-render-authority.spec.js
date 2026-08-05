@@ -77,6 +77,12 @@ test('production Sjson opens 3D Edit with complete typed fittings and spatially 
   await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-visual-proxy-warning-count'), {
     timeout: 60_000,
   }).toBeGreaterThan(0);
+  await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-parent-branch-diameter-count'), {
+    timeout: 60_000,
+  }).toBeGreaterThanOrEqual(100);
+  await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-referenced-branch-diameter-count'), {
+    timeout: 60_000,
+  }).toBeGreaterThanOrEqual(13);
   await expect.poll(() => integerAttribute(canvasHost, 'data-topology-edit-geometry-diagnostic-count'), {
     timeout: 60_000,
   }).toBe(0);
@@ -100,6 +106,11 @@ test('production Sjson opens 3D Edit with complete typed fittings and spatially 
     journalHash: element.dataset.topologyEditJournalHash || '',
     typedPrimitiveCount: Number(element.dataset.topologyEditTypedPrimitiveCount || 0),
     geometryDiagnosticCount: Number(element.dataset.topologyEditGeometryDiagnosticCount || 0),
+    diameterAuthorityCounts: {
+      parentBranch: Number(element.dataset.topologyEditParentBranchDiameterCount || 0),
+      referencedBranch: Number(element.dataset.topologyEditReferencedBranchDiameterCount || 0),
+      visualProxy: Number(element.dataset.topologyEditVisualProxyWarningCount || 0),
+    },
     primitiveCounts: {
       pipe: Number(element.dataset.topologyEditPipePrimitiveCount || 0),
       elbow: Number(element.dataset.topologyEditElbowPrimitiveCount || 0),
@@ -125,6 +136,8 @@ test('production Sjson opens 3D Edit with complete typed fittings and spatially 
   expect(ledger.canonicalHash).not.toBe('');
   expect(ledger.visualModelHash).not.toBe('');
   expect(ledger.supportProjectionHash).not.toBe('');
+  expect(ledger.diameterAuthorityCounts.parentBranch).toBeGreaterThanOrEqual(100);
+  expect(ledger.diameterAuthorityCounts.referencedBranch).toBeGreaterThanOrEqual(13);
 
   const ledgerPath = testInfo.outputPath('sjson-3d-edit-render-ledger.json');
   writeFileSync(ledgerPath, `${JSON.stringify(ledger, null, 2)}\n`, 'utf8');
