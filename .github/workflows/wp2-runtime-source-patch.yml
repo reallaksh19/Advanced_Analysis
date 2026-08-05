@@ -1,0 +1,41 @@
+name: wp2-runtime-source-patch
+
+on:
+  push:
+    branches:
+      - agent/empirical-beam-contact-runtime-wp2
+    paths:
+      - 'scripts/wp2-runtime-source-patch.mjs'
+      - '.github/workflows/wp2-runtime-source-patch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/empirical-beam-contact-runtime-wp2
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Apply bounded source patch
+        run: node scripts/wp2-runtime-source-patch.mjs
+
+      - name: Commit patched runtime
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/workspace/engineering-loads/empirical-beam-contact-runtime.js
+          git diff --cached --quiet && exit 0
+          git commit -m 'Fix WP2 elbow units and region planarity'
+          git push origin HEAD:agent/empirical-beam-contact-runtime-wp2
