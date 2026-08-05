@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   BM2_BEND_EXPANSION_PROFILE,
   buildBm2BendExpandedAuthorities,
-} from './lfea-b3.29-bm2-bend-geometry-runtime.mjs';
+} from './lfea-b3.29-bm2-bend-geometry-authority.mjs';
 
 console.log('\n--- LFEA B-3.29 M027 BM2 bend geometry on B31J surface topology ---');
 
