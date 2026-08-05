@@ -69,6 +69,7 @@ export class EmpiricalLoadCalcScenarioController {
   }
 
   authorize(value = {}) {
+    this.refresh();
     return this.#run('authorize', () => this.store.authorize({
       authorizationId: value.authorizationId || generatedId('AUTH'),
       authorizedAt: value.authorizedAt || new Date().toISOString(),
@@ -76,6 +77,7 @@ export class EmpiricalLoadCalcScenarioController {
   }
 
   calculate(value = {}) {
+    this.refresh();
     return this.#run('calculate', () => this.store.execute({
       executionId: value.executionId || generatedId('EXEC'),
       executedAt: value.executedAt || new Date().toISOString(),

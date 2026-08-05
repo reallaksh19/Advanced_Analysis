@@ -343,7 +343,7 @@ export class EmpiricalLoadCalcScenarioStore {
 }
 
 function proposalBlockers(request, profile, registration) {
-  const rows = [...(request.blockers || [])];
+  const rows = (request.blockers || []).filter((row) => row.severity === 'ERROR');
   if (!registration || registration.runtimeStatus !== 'REGISTERED') {
     rows.push(blocker(
       'EMPIRICAL_METHOD_NOT_REGISTERED',

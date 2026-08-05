@@ -34,6 +34,19 @@ import {
   renderEmpiricalScenarioResults,
 } from '../src/workspace/engineering-loads/empirical-load-calc-scenario-view.js';
 
+class FakeEventBus {
+  constructor() { this.listeners = new Map(); }
+  subscribe(topic, callback) {
+    const rows = this.listeners.get(topic) || new Set();
+    rows.add(callback);
+    this.listeners.set(topic, rows);
+    return () => rows.delete(callback);
+  }
+  publish(topic, payload) {
+    [...(this.listeners.get(topic) || [])].forEach((callback) => callback(payload));
+  }
+}
+
 const fixture = buildFixture();
 let executionCount = 0;
 const executor = (value) => {
@@ -413,15 +426,3 @@ function fixtureSharedModel() {
   });
 }
 
-class FakeEventBus {
-  constructor() { this.listeners = new Map(); }
-  subscribe(topic, callback) {
-    const rows = this.listeners.get(topic) || new Set();
-    rows.add(callback);
-    this.listeners.set(topic, rows);
-    return () => rows.delete(callback);
-  }
-  publish(topic, payload) {
-    [...(this.listeners.get(topic) || [])].forEach((callback) => callback(payload));
-  }
-}
