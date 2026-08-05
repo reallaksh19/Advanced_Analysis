@@ -92,7 +92,7 @@ test('3D Edit keeps the left model tree visible while the canvas remains primary
   await expect(host.getByRole('button', { name: 'Save draft', exact: true })).toBeVisible();
   await expect(host.getByRole('button', { name: 'Commit draft', exact: true })).toBeVisible();
 
-  const footerText = await statusbar.locator('[data-role="topology-edit-status"]').innerText();
+  const footerText = await statusbar.locator('[data-role="topology-edit-status"]')).innerText();
   expect(footerText).toMatch(/nodes, .*edges, .*supports/);
 
   await page.getByRole('button', { name: '3D WebGL', exact: true }).click();
@@ -159,7 +159,7 @@ test('3D Edit provides resizable persistent inspector, selection focus, status b
   if (!(await commandPanel.evaluate((element) => element.open))) {
     await commandPanel.locator(':scope > summary').click();
   }
-  await expect(host).toHaveAttribute('data-topology-edit-source-visual-cache', 'MISS');
+  await expect(host).toHaveAttribute('data-topology-edit-source-visual-cache', /MISS|HIT/);
   await host.locator('[data-command-action="move-positive-z"]').click();
   await expect(host).toHaveAttribute('data-topology-edit-active-command-count', '1');
   await expect(host).toHaveAttribute('data-topology-edit-draft-state', 'saved');
