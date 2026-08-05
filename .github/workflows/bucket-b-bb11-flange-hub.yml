@@ -242,7 +242,21 @@ jobs:
           BB11_BB09_REPORT_PATH: ${{ steps.bb09.outputs.present == 'true' && 'reports/bucket-b-bb09-report.json' || '' }}
           TZ: UTC
           LC_ALL: C
-        run: node src/core/bucket-b/bb11-check.mjs
+        shell: bash
+        run: |
+          set +e
+          mkdir -p reports/bb11
+          timeout --signal=INT --kill-after=30s 300s \
+            node --cpu-prof \
+              --cpu-prof-dir=reports/bb11 \
+              --cpu-prof-name=bucket-b-bb11-core-profile.cpuprofile \
+              src/core/bucket-b/bb11-check.mjs --core \
+              > reports/bb11/bucket-b-bb11-profile-stdout.log \
+              2> reports/bb11/bucket-b-bb11-profile-stderr.log
+          status=$?
+          printf '{\n  "exitCode": %s,\n  "signal": "SIGINT",\n  "timeoutSeconds": 300\n}\n' "$status" \
+            > reports/bb11/bucket-b-bb11-profile-termination.json
+          exit "$status"
 
       - name: Upload raw BB-11 evidence
         if: always()
