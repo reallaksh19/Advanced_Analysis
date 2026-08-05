@@ -119,7 +119,7 @@ test('SJSON compact supports render one enlarged marker and one two-OD direction
     (object) => object.name === 'topology-edit-compact-support-marker:support:1',
   );
   assert.ok(marker, 'compact support marker is required');
-  assert.equal(maxVertexRadius(marker.geometry), 37.8);
+  assert.ok(Math.abs(maxVertexRadius(marker.geometry) - 37.8) < 1e-5);
   assert.ok(picks.some((row) => row.objectKind === 'support'));
   assert.ok(picks.some((row) => row.objectKind === 'restraint'));
   backend.destroy();
