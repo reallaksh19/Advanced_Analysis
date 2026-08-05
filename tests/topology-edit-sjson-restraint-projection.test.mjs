@@ -62,30 +62,35 @@ test('production Sjson projects Topo validator native restraint records only', a
     markerSizeMm: 70,
     verticalAxis: 'Z',
   });
-  const deduplicationEvidence = restraintDeduplicationEvidence(first.overlays);
-  console.log(`SJSON_RESTRAINT_DEDUPLICATION_EVIDENCE=${JSON.stringify({
-    metrics: first.metrics,
-    deduplicationEvidence,
-  })}`);
 
   assert.equal(first.authority, 'TOPO_VALIDATOR_NATIVE_RESTRAINT_RECORDS');
+  assert.equal(first.groupingAuthority, 'EXACT_SITE_HOST_AND_RESTRAINT_FAMILY');
   assert.equal(first.authorityHash, second.authorityHash);
   assert.deepEqual(first.projection, second.projection);
   assert.equal(first.metrics.rawSupportCount, 139);
   assert.equal(first.metrics.nativeRestraintRecordCount, 47);
-  assert.equal(first.metrics.excludedSupportCount, 92);
+  assert.equal(first.metrics.collapsedSourceSupportCount, 92);
   assert.equal(first.metrics.projectedSupportMarkerCount, 47);
   assert.equal(first.metrics.distinctOriginCount, 37);
+  assert.equal(first.metrics.resolvedNativeRestraintCount, 36);
+  assert.equal(first.metrics.diagnosticNativeRestraintCount, 11);
   assert.equal(first.projection.glyphOverlays.length, 47);
+  assert.equal(first.groups.length, 47);
   assert.equal(first.decisions.length, canonical.supports.length);
-  assert.ok(first.decisions.every((row) => row.supportId));
-  assert.ok(first.decisions.some((row) => row.disposition === 'EXCLUDE'));
-  assert.ok(first.decisions.filter((row) => row.disposition === 'INCLUDE')
-    .every((row) => [
-      'EXPLICITLY_RESOLVED',
-      'TYPE_CLASSIFIED',
-      'PARTIALLY_RESOLVED',
-    ].includes(row.qualification)));
+  assert.equal(
+    first.decisions.filter((row) => row.disposition === 'REPRESENTATIVE').length,
+    47,
+  );
+  assert.equal(
+    first.decisions.filter((row) => row.disposition === 'COLLAPSED_TO_REPRESENTATIVE').length,
+    92,
+  );
+  assert.equal(
+    new Set(first.groups.flatMap((row) => row.memberSupportIds)).size,
+    canonical.supports.length,
+  );
+  assert.ok(first.groups.every((row) => row.representativeSupportId));
+  assert.ok(first.groups.every((row) => row.memberSupportIds.length >= 1));
   assert.equal(
     first.overlays.flatMap((row) => row.restraints || [])
       .flatMap((row) => row.diagnostics || [])
@@ -93,29 +98,3 @@ test('production Sjson projects Topo validator native restraint records only', a
     0,
   );
 });
-
-function restraintDeduplicationEvidence(overlays) {
-  const origin = (point) => [point.x, point.y, point.z]
-    .map((value) => Number(value).toFixed(6)).join('|');
-  const direction = (vector) => vector
-    ? [vector.x, vector.y, vector.z].map((value) => Number(value).toFixed(6)).join('|')
-    : 'NONE';
-  const records = overlays.flatMap((overlay) => (
-    (overlay.restraints || []).map((restraint) => ({ overlay, restraint }))
-  ));
-  return {
-    restraintRows: records.length,
-    uniqueSiteFamily: new Set(records.map(({ overlay, restraint }) => (
-      `${origin(overlay.origin)}|${restraint.family}`
-    ))).size,
-    uniqueSiteFamilyDirection: new Set(records.map(({ overlay, restraint }) => (
-      `${origin(overlay.origin)}|${restraint.family}|${direction(restraint.direction)}`
-    ))).size,
-    uniqueSiteDirection: new Set(records.map(({ overlay, restraint }) => (
-      `${origin(overlay.origin)}|${direction(restraint.direction)}`
-    ))).size,
-    uniqueSiteHostFamily: new Set(records.map(({ overlay, restraint }) => (
-      `${origin(overlay.origin)}|${overlay.hostEntityId}|${restraint.family}`
-    ))).size,
-  };
-}
