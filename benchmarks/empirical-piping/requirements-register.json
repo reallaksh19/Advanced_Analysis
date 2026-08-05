@@ -1,0 +1,15 @@
+{
+  "schema": "empirical-piping-requirements-register/v1",
+  "requirements": [
+    {"id":"EMP-R-001","requirement":"No LFEA numerical or runtime dependency","tests":["empirical-piping-source-boundary-check.mjs"]},
+    {"id":"EMP-R-010","requirement":"Preserve total force and moment from weight","tests":["empirical-piping-closed-form-check.mjs"]},
+    {"id":"EMP-R-020","requirement":"Recover member actions and internal extrema","tests":["empirical-piping-action-recovery-check.mjs"]},
+    {"id":"EMP-R-030","requirement":"Release tensile unilateral rests through recalculation","tests":["empirical-piping-contact-check.mjs"]},
+    {"id":"EMP-R-040","requirement":"Use physical bend station tangent","tests":["empirical-piping-action-recovery-check.mjs"]},
+    {"id":"EMP-R-050","requirement":"Calculate B31.3 sustained stress using edition-bound dataset","tests":["empirical-piping-s302.6.3-check.mjs"]},
+    {"id":"EMP-R-060","requirement":"Guard near-zero percentage metrics","tests":["empirical-piping-anti-drift-check.mjs"]},
+    {"id":"EMP-R-070","requirement":"Produce deterministic semantic identity","tests":["empirical-piping-determinism-check.mjs"]},
+    {"id":"EMP-R-080","requirement":"Retain complete active-set history","tests":["empirical-piping-contact-check.mjs"]},
+    {"id":"EMP-R-090","requirement":"Qualify elbow 8-to-16 convergence","tests":["empirical-piping-elbow-convergence-check.mjs"]}
+  ]
+}
