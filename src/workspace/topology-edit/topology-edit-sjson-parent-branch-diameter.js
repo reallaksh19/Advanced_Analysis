@@ -32,36 +32,35 @@ const POINT_EXTENT_POLICY = deepFreeze({
   maximumDiameterMultiplier: 1.5,
 });
 
-/**
- * Builds the same parent-branch bore authority used by Topo validator's
- * Edit Draft geometry: a branch's declared bore is preferred, with the first
- * route child's ABORE/LBORE used as the deterministic fallback. Explicit
- * branch OD remains authoritative when supplied. The result is immutable and
- * visual-only; it never mutates canonical engineering dimensions.
- */
+const RELATION = Object.freeze({
+  ENDPOINT_EVIDENCE: 'REFERENCED_BRANCH_ENDPOINT_EVIDENCE',
+  EXPLICIT_REFERENCE: 'EXPLICIT_REFERENCED_BRANCH_ID',
+  COMPONENT_REFERENCE: 'COMPONENT_ENDPOINT_REFERENCE',
+  PARENT_FALLBACK: 'PARENT_BRANCH_FALLBACK_NO_INCLUDED_REFERENCE',
+});
+
 export function buildSjsonParentBranchDiameterIndex(dataset = {}) {
   const contexts = [];
-  const sourcePackage = dataset?.sourceSnapshot?.sourcePackage;
-  visitSourcePackage(sourcePackage, '$', contexts);
+  visitSourcePackage(dataset?.sourceSnapshot?.sourcePackage, '$', contexts);
   appendDatasetFallbackContexts(dataset?.entities || [], contexts);
 
   const sorted = contexts
     .filter((row) => row.branchId && row.diameterMm > 0)
     .sort(compareContext);
-  const byBranchIdRows = groupRows(sorted, (row) => row.branchId);
-  const byEndpointEvidenceRows = groupRows(
+  const byBranchRows = groupRows(sorted, (row) => row.branchId);
+  const endpointEvidenceRows = groupRows(
     sorted.flatMap((row) => row.endpointEvidenceIds.map((id) => ({ id, row }))),
     (entry) => entry.id,
   );
-  const byEndpointReferenceRows = groupRows(
+  const endpointReferenceRows = groupRows(
     sorted.flatMap((row) => row.endpointReferences.map((reference) => ({ reference, row }))),
     (entry) => entry.reference,
   );
 
-  const conflicts = [];
   const byBranchId = {};
-  for (const [branchId, rows] of Object.entries(byBranchIdRows)) {
-    const ranked = rows.sort(compareContext);
+  const conflicts = [];
+  for (const [branchId, rows] of Object.entries(byBranchRows)) {
+    const ranked = [...rows].sort(compareContext);
     byBranchId[branchId] = ranked[0];
     const diameters = [...new Set(ranked.map((row) => row.diameterMm.toFixed(6)))];
     if (diameters.length > 1) {
@@ -74,15 +73,15 @@ export function buildSjsonParentBranchDiameterIndex(dataset = {}) {
   }
 
   const byEndpointEvidenceId = Object.fromEntries(
-    Object.entries(byEndpointEvidenceRows).map(([id, entries]) => [
+    Object.entries(endpointEvidenceRows).map(([id, rows]) => [
       id,
-      entries.map((entry) => entry.row).sort(compareContext)[0],
+      rows.map((entry) => entry.row).sort(compareContext)[0],
     ]),
   );
   const byEndpointReference = Object.fromEntries(
-    Object.entries(byEndpointReferenceRows).map(([reference, entries]) => [
+    Object.entries(endpointReferenceRows).map(([reference, rows]) => [
       reference,
-      entries.map((entry) => entry.row).sort(compareContext),
+      rows.map((entry) => entry.row).sort(compareContext),
     ]),
   );
   const payload = {
@@ -115,7 +114,7 @@ export function referencedBranchDiameterForEntity(index, entity, primitive = nul
   const attributes = entityAttributes(entity);
   const evidenceId = stringValue(primitive?.parameters?.branchReferenceId);
   if (evidenceId && index?.byEndpointEvidenceId?.[evidenceId]) {
-    return index.byEndpointEvidenceId[evidenceId];
+    return related(index.byEndpointEvidenceId[evidenceId], RELATION.ENDPOINT_EVIDENCE);
   }
 
   for (const branchId of [
@@ -125,7 +124,7 @@ export function referencedBranchDiameterForEntity(index, entity, primitive = nul
     attributes.CONNECTED_BRANCH,
   ].map(stringValue).filter(Boolean)) {
     const context = index?.byBranchId?.[branchId];
-    if (context) return context;
+    if (context) return related(context, RELATION.EXPLICIT_REFERENCE);
   }
 
   const parent = parentBranchDiameterForEntity(index, entity);
@@ -139,14 +138,11 @@ export function referencedBranchDiameterForEntity(index, entity, primitive = nul
   const candidates = (index?.byEndpointReference?.[componentReference] || [])
     .filter((row) => row.branchId !== parent?.branchId)
     .sort(compareContext);
-  return candidates[0] || null;
+  if (candidates[0]) return related(candidates[0], RELATION.COMPONENT_REFERENCE);
+
+  return parent ? related(parent, RELATION.PARENT_FALLBACK) : null;
 }
 
-/**
- * Final immutable diameter adapter. It reuses all existing tee restoration,
- * point-component, support, picking, and command paths, and changes only the
- * visual primitive diameter parameters and their evidence/diagnostics.
- */
 export function deriveSjsonCompleteVisualGeometry(input = {}) {
   const base = derivePointComponentVisualGeometry(input);
   const index = buildSjsonParentBranchDiameterIndex(input.dataset);
@@ -166,48 +162,39 @@ export function deriveSjsonCompleteVisualGeometry(input = {}) {
     const parentBranch = parentBranchDiameterForEntity(index, entity);
     const adaptedPrimitives = [];
     let runApplied = false;
-    let referenceApplied = false;
-    let referencedBranch = null;
+    let outletApplied = false;
+    let outletBranch = null;
 
     for (const primitive of component.primitives || []) {
-      const result = adaptPrimitiveDiameters({
-        primitive,
-        entity,
-        parentBranch,
-        index,
-      });
+      const result = adaptPrimitiveDiameters({ primitive, entity, parentBranch, index });
       adaptedPrimitives.push(result.primitive);
       runApplied ||= result.runApplied;
-      referenceApplied ||= result.referenceApplied;
-      referencedBranch ||= result.referencedBranch;
-      if (result.runApplied || result.referenceApplied) {
+      outletApplied ||= result.outletApplied;
+      outletBranch ||= result.outletBranch;
+      if (result.runApplied || result.outletApplied) {
         adaptations.push({
           primitiveId: primitive.primitiveId,
           canonicalEntityId: primitive.canonicalEntityId,
           kind: primitive.kind,
           parentBranchId: parentBranch?.branchId || null,
           parentBranchDiameterMm: result.runApplied ? parentBranch?.diameterMm || null : null,
-          referencedBranchId: result.referencedBranch?.branchId || null,
-          referencedBranchDiameterMm: result.referenceApplied
-            ? result.referencedBranch?.diameterMm || null
+          outletBranchId: result.outletBranch?.branchId || null,
+          outletBranchDiameterMm: result.outletApplied
+            ? result.outletBranch?.diameterMm || null
             : null,
+          outletRelationAuthority: result.outletBranch?.relationAuthority || null,
         });
       }
     }
 
-    if (!runApplied && !referenceApplied) return component;
-    const diagnostics = (component.diagnostics || []).filter((row) => (
-      row.code !== 'VISUAL_NOMINAL_BORE_PROXY_USED'
-    ));
+    if (!runApplied && !outletApplied) return component;
+    const diagnostics = (component.diagnostics || [])
+      .filter((row) => row.code !== 'VISUAL_NOMINAL_BORE_PROXY_USED');
     if (runApplied && parentBranch) {
       diagnostics.push(parentBranchDiagnostic(component, parentBranch));
-      if (parentBranch.visualProxy) {
-        diagnostics.push(parentBranchProxyDiagnostic(component, parentBranch));
-      }
+      if (parentBranch.visualProxy) diagnostics.push(parentBranchProxyDiagnostic(component, parentBranch));
     }
-    if (referenceApplied && referencedBranch) {
-      diagnostics.push(referencedBranchDiagnostic(component, referencedBranch));
-    }
+    if (outletApplied && outletBranch) diagnostics.push(outletBranchDiagnostic(component, outletBranch));
 
     for (const entityId of component.workspaceEntityIds || []) {
       const current = evidence[entityId] || {};
@@ -216,9 +203,10 @@ export function deriveSjsonCompleteVisualGeometry(input = {}) {
         parentBranchId: parentBranch?.branchId || null,
         parentBranchDiameterMm: parentBranch?.diameterMm || null,
         parentBranchDiameterBasis: parentBranch?.dimensionBasis || null,
-        referencedBranchId: referencedBranch?.branchId || null,
-        referencedBranchDiameterMm: referencedBranch?.diameterMm || null,
-        referencedBranchDiameterBasis: referencedBranch?.dimensionBasis || null,
+        referencedBranchId: outletBranch?.branchId || null,
+        referencedBranchDiameterMm: outletBranch?.diameterMm || null,
+        referencedBranchDiameterBasis: outletBranch?.dimensionBasis || null,
+        referencedBranchRelationAuthority: outletBranch?.relationAuthority || null,
       };
     }
 
@@ -281,8 +269,8 @@ export function deriveSjsonCompleteVisualGeometry(input = {}) {
 function adaptPrimitiveDiameters({ primitive, entity, parentBranch, index }) {
   const parameters = { ...(primitive.parameters || {}) };
   let runApplied = false;
-  let referenceApplied = false;
-  let referencedBranch = null;
+  let outletApplied = false;
+  let outletBranch = null;
 
   if (RUN_DIAMETER_KINDS.has(primitive.kind) && parentBranch?.diameterMm > 0) {
     parameters.outsideDiameterMm = parentBranch.diameterMm;
@@ -297,30 +285,38 @@ function adaptPrimitiveDiameters({ primitive, entity, parentBranch, index }) {
       parameters.runOutsideDiameterAuthority = 'SOURCE_PARENT_BRANCH';
       runApplied = true;
     }
-    referencedBranch = referencedBranchDiameterForEntity(index, entity, primitive);
-    if (referencedBranch?.diameterMm > 0) {
-      parameters.branchOutsideDiameterMm = referencedBranch.diameterMm;
-      parameters.branchDiameterBasis = referencedBranch.dimensionBasis;
-      parameters.branchOutsideDiameterAuthority = 'SOURCE_REFERENCED_PARENT_BRANCH';
-      referenceApplied = true;
+    outletBranch = referencedBranchDiameterForEntity(index, entity, primitive);
+    if (outletBranch?.diameterMm > 0) {
+      parameters.branchOutsideDiameterMm = outletBranch.diameterMm;
+      parameters.branchDiameterBasis = outletBranch.dimensionBasis;
+      parameters.branchOutsideDiameterAuthority = outletAuthority(outletBranch);
+      parameters.branchRelationAuthority = outletBranch.relationAuthority;
+      outletApplied = true;
     }
   } else if (primitive.kind === 'OLET_BRANCH') {
-    referencedBranch = referencedBranchDiameterForEntity(index, entity, primitive);
-    if (referencedBranch?.diameterMm > 0) {
-      parameters.branchOutsideDiameterMm = referencedBranch.diameterMm;
-      parameters.dimensionBasis = referencedBranch.dimensionBasis;
-      parameters.branchOutsideDiameterAuthority = 'SOURCE_REFERENCED_PARENT_BRANCH';
-      updatePointExtent(primitive.kind, parameters, referencedBranch.diameterMm);
-      referenceApplied = true;
+    outletBranch = referencedBranchDiameterForEntity(index, entity, primitive);
+    if (outletBranch?.diameterMm > 0) {
+      parameters.branchOutsideDiameterMm = outletBranch.diameterMm;
+      parameters.dimensionBasis = outletBranch.dimensionBasis;
+      parameters.branchOutsideDiameterAuthority = outletAuthority(outletBranch);
+      parameters.branchRelationAuthority = outletBranch.relationAuthority;
+      updatePointExtent(primitive.kind, parameters, outletBranch.diameterMm);
+      outletApplied = true;
     }
   }
 
   return {
     primitive: createVisualPrimitive({ ...primitive, parameters }),
     runApplied,
-    referenceApplied,
-    referencedBranch,
+    outletApplied,
+    outletBranch,
   };
+}
+
+function outletAuthority(context) {
+  return context.relationAuthority === RELATION.PARENT_FALLBACK
+    ? 'SOURCE_PARENT_BRANCH_FALLBACK'
+    : 'SOURCE_REFERENCED_PARENT_BRANCH';
 }
 
 function updatePointExtent(kind, parameters, diameterMm) {
@@ -390,22 +386,31 @@ function parentBranchProxyDiagnostic(component, context) {
   });
 }
 
-function referencedBranchDiagnostic(component, context) {
+function outletBranchDiagnostic(component, context) {
+  const fallback = context.relationAuthority === RELATION.PARENT_FALLBACK;
   return createVisualDiagnostic({
     code: 'VISUAL_REFERENCED_BRANCH_DIAMETER_USED',
     severity: context.visualProxy ? 'WARNING' : 'INFO',
-    message: '3D outlet diameter is inherited from the connected branch parent record.',
+    message: fallback
+      ? 'The referenced outlet branch is outside the staged package; Topo validator parity uses the component parent-branch diameter fallback.'
+      : '3D outlet diameter is inherited from the connected branch parent record.',
     canonicalEntityId: component.canonicalEntityId,
     sourceEvidenceIds: [...component.sourcePaths, context.sourceEvidenceId],
     details: {
-      referencedBranchId: context.branchId,
+      referencedBranchId: fallback ? null : context.branchId,
+      fallbackParentBranchId: fallback ? context.branchId : null,
       diameterMm: context.diameterMm,
       dimensionBasis: context.dimensionBasis,
+      relationAuthority: context.relationAuthority,
       authorityBoundary: context.visualProxy
         ? 'VISUAL_ONLY_DO_NOT_USE_FOR_ENGINEERING'
         : 'SOURCE_REFERENCED_BRANCH_DIMENSION',
     },
   });
+}
+
+function related(context, relationAuthority) {
+  return deepFreeze({ ...context, relationAuthority });
 }
 
 function visitSourcePackage(value, path, contexts) {
@@ -429,9 +434,8 @@ function branchContextFromSource(branch, path) {
   const attributes = branch.attributes || {};
   const branchId = stringValue(branch.name || attributes.NAME || attributes.REF);
   if (!branchId) return null;
-  const children = Array.isArray(branch.children) ? branch.children : [];
-  const firstRouteChildDiameterMm = children
-    .map((child) => childDiameter(child))
+  const firstRouteChildDiameterMm = (Array.isArray(branch.children) ? branch.children : [])
+    .map(childDiameter)
     .find((value) => value > 0) || null;
   const explicitOutsideDiameterMm = firstPositive(
     branch.outsideDiameterMm,
@@ -450,11 +454,7 @@ function branchContextFromSource(branch, path) {
     attributes.ABORE,
     attributes.LBORE,
   );
-  const diameterMm = firstPositive(
-    explicitOutsideDiameterMm,
-    declaredBoreMm,
-    firstRouteChildDiameterMm,
-  );
+  const diameterMm = firstPositive(explicitOutsideDiameterMm, declaredBoreMm, firstRouteChildDiameterMm);
   if (!diameterMm) return null;
   return deepFreeze({
     branchId,
@@ -469,9 +469,7 @@ function branchContextFromSource(branch, path) {
       ? 'SOURCE_PARENT_BRANCH_OUTSIDE_DIAMETER'
       : 'SOURCE_PARENT_BRANCH_NOMINAL_BORE_VISUAL_PROXY',
     visualProxy: !explicitOutsideDiameterMm,
-    endpointReferences: [attributes.HREF, attributes.TREF]
-      .map(stringValue)
-      .filter(Boolean),
+    endpointReferences: [attributes.HREF, attributes.TREF].map(stringValue).filter(Boolean),
     endpointEvidenceIds: [
       stringValue(attributes.HREF) ? `${path}:HREF` : '',
       stringValue(attributes.TREF) ? `${path}:TREF` : '',
@@ -493,11 +491,11 @@ function appendDatasetFallbackContexts(entities, contexts) {
       || stringValue(left.sourcePath).localeCompare(stringValue(right.sourcePath))
     ));
     const branchEntity = ordered.find((entity) => canonicalType(entity.entityType) === 'BRANCH');
-    const branchAttributes = entityAttributes(branchEntity);
+    const attributes = entityAttributes(branchEntity);
     const explicitOutsideDiameterMm = firstPositive(
       branchEntity?.outsideDiameterMm,
-      branchAttributes.OUTSIDE_DIAMETER_MM,
-      branchAttributes.OUTSIDE_DIAMETER,
+      attributes.OUTSIDE_DIAMETER_MM,
+      attributes.OUTSIDE_DIAMETER,
     );
     const firstRouteChildDiameterMm = ordered
       .filter((entity) => canonicalType(entity.entityType) !== 'BRANCH')
@@ -506,15 +504,11 @@ function appendDatasetFallbackContexts(entities, contexts) {
     const declaredBoreMm = firstPositive(
       branchEntity?.boreMm,
       branchEntity?.nominalDiameterMm,
-      branchAttributes.HBOR,
-      branchAttributes.TBOR,
-      branchAttributes.BORE,
+      attributes.HBOR,
+      attributes.TBOR,
+      attributes.BORE,
     );
-    const diameterMm = firstPositive(
-      explicitOutsideDiameterMm,
-      declaredBoreMm,
-      firstRouteChildDiameterMm,
-    );
+    const diameterMm = firstPositive(explicitOutsideDiameterMm, declaredBoreMm, firstRouteChildDiameterMm);
     if (!diameterMm) continue;
     contexts.push(deepFreeze({
       branchId,
@@ -523,15 +517,13 @@ function appendDatasetFallbackContexts(entities, contexts) {
       explicitOutsideDiameterMm,
       declaredBoreMm,
       firstRouteChildDiameterMm,
-      headDiameterMm: firstPositive(branchAttributes.HBOR, declaredBoreMm, firstRouteChildDiameterMm),
-      tailDiameterMm: firstPositive(branchAttributes.TBOR, declaredBoreMm, firstRouteChildDiameterMm),
+      headDiameterMm: firstPositive(attributes.HBOR, declaredBoreMm, firstRouteChildDiameterMm),
+      tailDiameterMm: firstPositive(attributes.TBOR, declaredBoreMm, firstRouteChildDiameterMm),
       dimensionBasis: explicitOutsideDiameterMm
         ? 'SOURCE_PARENT_BRANCH_OUTSIDE_DIAMETER'
         : 'SOURCE_PARENT_BRANCH_NOMINAL_BORE_VISUAL_PROXY',
       visualProxy: !explicitOutsideDiameterMm,
-      endpointReferences: [branchAttributes.HREF, branchAttributes.TREF]
-        .map(stringValue)
-        .filter(Boolean),
+      endpointReferences: [attributes.HREF, attributes.TREF].map(stringValue).filter(Boolean),
       endpointEvidenceIds: [],
     }));
   }
@@ -573,8 +565,7 @@ function canonicalType(value) {
 function groupRows(rows, keyFor) {
   return rows.reduce((groups, row) => {
     const key = stringValue(keyFor(row));
-    if (!key) return groups;
-    (groups[key] ||= []).push(row);
+    if (key) (groups[key] ||= []).push(row);
     return groups;
   }, {});
 }
