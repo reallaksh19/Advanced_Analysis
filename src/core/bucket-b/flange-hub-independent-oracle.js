@@ -42,6 +42,7 @@ const LEVELS = Object.freeze([
   Object.freeze({ levelId: 'O1', refinement: 2 }),
   Object.freeze({ levelId: 'O2', refinement: 4 }),
   Object.freeze({ levelId: 'O3', refinement: 8 }),
+  Object.freeze({ levelId: 'O4', refinement: 16 }),
 ]);
 const GAUSS2 = Object.freeze([
   Object.freeze({ value: -1 / Math.sqrt(3), weight: 1 }),
@@ -213,6 +214,7 @@ function solveLevel(definition, loadCaseId) {
     nodeCount: mesh.nodes.length,
     elementCount: mesh.elements.length,
     globalH: mesh.globalH,
+    connectivity: mesh.connectivity,
     meshHash: oracleHash(mesh),
     solver: {
       solverId: 'DETERMINISTIC_SGS_PCG_EXPLICIT_RESIDUAL_V2',
@@ -306,17 +308,64 @@ function q4Mesh(level) {
     }
     q4Element(elementNodes, constitutive());
   });
+const connectivity = meshConnectivity(nodes, finalElements);
+  if (!connectivity.accepted) {
+    throw new RangeError(
+      `ORACLE_DISCONNECTED_MESH:${level.levelId}:`
+      + `${connectivity.componentCount}`,
+    );
+  }
   return freeze({
     nodes,
     elements: finalElements,
     boundaries: finalBoundaries,
     globalH,
+    connectivity,
   });
 }
 
+function meshConnectivity(nodes, elements) {
+  const adjacency = new Map(nodes.map((node) => [node.id, new Set()]));
+  const blockIdsByNode = new Map(nodes.map((node) => [node.id, new Set()]));
+  elements.forEach((element) => {
+    element.nodeIds.forEach((nodeId) => {
+      blockIdsByNode.get(nodeId).add(element.blockId);
+      element.nodeIds.forEach((otherId) => {
+        if (otherId !== nodeId) adjacency.get(nodeId).add(otherId);
+      });
+    });
+  });
+  const unvisited = new Set(
+    nodes.filter((node) => blockIdsByNode.get(node.id).size > 0)
+      .map((node) => node.id),
+  );
+  const components = [];
+  while (unvisited.size > 0) {
+    const seed = [...unvisited].sort()[0];
+    const queue = [seed];
+    const blockIds = new Set();
+    let nodeCount = 0;
+    unvisited.delete(seed);
+    while (queue.length > 0) {
+      const nodeId = queue.shift();
+      nodeCount += 1;
+      blockIdsByNode.get(nodeId).forEach((id) => blockIds.add(id));
+      [...adjacency.get(nodeId)].sort().forEach((otherId) => {
+        if (unvisited.delete(otherId)) queue.push(otherId);
+      });
+    }
+    components.push({ nodeCount, blockIds: [...blockIds].sort() });
+  }
+  return {
+    componentCount: components.length,
+    components,
+    accepted: components.length === 1,
+  };
+}
+
 function blockMap(block) {
-  const outer = profile(block.profile);
   if (block.kind === 'STRIP') {
+    const outer = profile(block.profile);
     return (u, v) => {
       const outerPoint = outer(u);
       return point(50 + v * (outerPoint.r - 50), outerPoint.z);
@@ -353,14 +402,18 @@ function profile(id) {
       { r: 60, z: GEOMETRY.smallCenter.z },
     );
   }
-  if (id === 'SMALL_ARC') {
-    return arc(
-      GEOMETRY.smallCenter,
-      6,
-      GEOMETRY.smallStartAngle,
-      GEOMETRY.smallSweep,
-    );
-  }
+if (id === 'SMALL_ARC') {
+  const endAngle = Math.atan2(
+    GEOMETRY.smallHubTangent.z - GEOMETRY.smallCenter.z,
+    GEOMETRY.smallHubTangent.r - GEOMETRY.smallCenter.r,
+  );
+  return arc(
+    GEOMETRY.smallCenter,
+    GEOMETRY.smallRadius,
+    Math.PI,
+    endAngle - Math.PI,
+  );
+}
   if (id === 'HUB_SMALL') {
     return line(GEOMETRY.smallHubTangent, { r: 66, z: 0 });
   }
@@ -370,14 +423,18 @@ function profile(id) {
   if (id === 'HUB_LARGE') {
     return line({ r: 75.5, z: 30 }, GEOMETRY.largeHubTangent);
   }
-  if (id === 'LARGE_ARC') {
-    return arc(
-      GEOMETRY.largeCenter,
-      10,
-      GEOMETRY.largeStartAngle,
-      GEOMETRY.largeSweep,
-    );
-  }
+if (id === 'LARGE_ARC') {
+  const startAngle = Math.atan2(
+    GEOMETRY.largeHubTangent.z - GEOMETRY.largeCenter.z,
+    GEOMETRY.largeHubTangent.r - GEOMETRY.largeCenter.r,
+  );
+  return arc(
+    GEOMETRY.largeCenter,
+    GEOMETRY.largeRadius,
+    startAngle,
+    Math.PI / 2 - startAngle,
+  );
+}
   throw new TypeError('ORACLE_UNKNOWN_PROFILE');
 }
 
@@ -469,27 +526,49 @@ function constitutive() {
 function applyLoads(mesh, load, nodeById, nodeIndex, force) {
   let radial = 0;
   let axial = 0;
-  const addEdge = (edge, tractionAt) => {
-    const nodes = edge.nodeIds.map((id) => nodeById.get(id));
-    GL4.forEach((gauss) => {
-      const N = [(1 - gauss.value) / 2, (1 + gauss.value) / 2];
-      const dN = [-0.5, 0.5];
-      const r = N[0] * nodes[0].r + N[1] * nodes[1].r;
-      const z = N[0] * nodes[0].z + N[1] * nodes[1].z;
-      const dr = dN[0] * nodes[0].r + dN[1] * nodes[1].r;
-      const dz = dN[0] * nodes[0].z + dN[1] * nodes[1].z;
-      const jacobian = Math.hypot(dr, dz);
-      const traction = tractionAt(r, z);
-      const factor = gauss.weight * 2 * Math.PI * r * jacobian;
-      for (let index = 0; index < 2; index += 1) {
-        const node = nodeIndex.get(nodes[index].id);
-        force[2 * node] += N[index] * traction[0] * factor;
-        force[2 * node + 1] += N[index] * traction[1] * factor;
-      }
-      radial += traction[0] * factor;
-      axial += traction[1] * factor;
-    });
-  };
+const addEdge = (edge, tractionAt, parameterRange = [0, 1]) => {
+  const nodes = edge.nodeIds.map((id) => nodeById.get(id));
+  const [q0, q1] = parameterRange;
+  const half = (q1 - q0) / 2;
+  const middle = (q1 + q0) / 2;
+  GL4.forEach((gauss) => {
+    const q = middle + half * gauss.value;
+    const N = [1 - q, q];
+    const r = N[0] * nodes[0].r + N[1] * nodes[1].r;
+    const z = N[0] * nodes[0].z + N[1] * nodes[1].z;
+    const jacobian = Math.hypot(
+      nodes[1].r - nodes[0].r,
+      nodes[1].z - nodes[0].z,
+    ) * half;
+    const traction = tractionAt(r, z);
+    const factor = gauss.weight * 2 * Math.PI * r * jacobian;
+    for (let index = 0; index < 2; index += 1) {
+      const node = nodeIndex.get(nodes[index].id);
+      force[2 * node] += N[index] * traction[0] * factor;
+      force[2 * node + 1] += N[index] * traction[1] * factor;
+    }
+    radial += traction[0] * factor;
+    axial += traction[1] * factor;
+  });
+};
+const clippedRadialRange = (edge, minimum, maximum) => {
+  const nodes = edge.nodeIds.map((id) => nodeById.get(id));
+  const first = nodes[0].r;
+  const second = nodes[1].r;
+  const delta = second - first;
+  if (Math.abs(delta) <= 1e-15) return null;
+  const lower = Math.max(0, Math.min(1, (minimum - first) / delta));
+  const upper = Math.max(0, Math.min(1, (maximum - first) / delta));
+  const q0 = Math.min(lower, upper);
+  const q1 = Math.max(lower, upper);
+  const edgeMinimum = Math.min(first, second);
+  const edgeMaximum = Math.max(first, second);
+  if (edgeMaximum <= minimum || edgeMinimum >= maximum
+    || q1 - q0 <= 1e-15) {
+    return null;
+  }
+  return [q0, q1];
+};
   if (load.id === 'FH-PRES-001') {
     mesh.boundaries.filter((edge) => edge.type === 'BORE')
       .forEach((edge) => addEdge(edge, () => [10, 0]));
@@ -498,12 +577,13 @@ function applyLoads(mesh, load, nodeById, nodeIndex, force) {
   } else if (load.id === 'FH-AXIAL-001') {
     mesh.boundaries.filter((edge) => edge.type === 'PIPE_END')
       .forEach((edge) => addEdge(edge, () => [0, load.endTraction]));
-  } else {
-    mesh.boundaries
-      .filter((edge) => edge.type === 'FACE'
-        && edgeRange(edge, nodeById, 65, 95))
-      .forEach((edge) => addEdge(edge, () => [0, -20]));
-  }
+} else {
+  mesh.boundaries.filter((edge) => edge.type === 'FACE')
+    .forEach((edge) => {
+      const range = clippedRadialRange(edge, 65, 95);
+      if (range) addEdge(edge, () => [0, -20], range);
+    });
+}
   return { radial, axial };
 }
 
@@ -597,11 +677,7 @@ function oracleProbePoints() {
 }
 
 function midpointToBore(outer) {
-  const direction = unit({ r: 19, z: 60 });
-  const inward = { r: -direction.z, z: direction.r };
-  const length = (outer.r - 50) / (-inward.r);
-  const inner = add(outer, scale(inward, length));
-  return { r: (inner.r + outer.r) / 2, z: (inner.z + outer.z) / 2 };
+  return { r: (50 + outer.r) / 2, z: outer.z };
 }
 
 function invertQ4(nodes, target) {
@@ -668,30 +744,134 @@ function q4Mapping(nodes, xi, eta) {
 }
 
 function oracleConvergence(levels) {
-  const pairs = [
-    ['ENERGY', (row) => row.strainEnergy, 0.01],
-    ['REACTION', (row) => row.axialReaction, 0.001],
-    ['PIPE_UR', (row) => probe(row, 'P-PIPE-REMOTE').displacement.radial, 0.01],
-    ['HUB_UR', (row) => probe(row, 'P-HUB-MID').displacement.radial, 0.02],
-    ['FLANGE_UZ', (row) => probe(row, 'P-FLANGE-MID').displacement.axial, 0.02],
-    ['PIPE_HOOP', (row) => probe(row, 'P-PIPE-REMOTE').stress.sigmaTheta, 0.025],
-    ['HUB_HOOP', (row) => probe(row, 'P-HUB-MID').stress.sigmaTheta, 0.04],
+  const definitions = [
+    {
+      quantityId: 'ENERGY',
+      getter: (row) => row.strainEnergy,
+      limit: 0.01,
+      normalization: 'SCALAR_RELATIVE',
+    },
+    {
+      quantityId: 'REACTION',
+      getter: (row) => row.axialReaction,
+      limit: 0.001,
+      normalization: 'SCALAR_RELATIVE',
+    },
+    {
+      quantityId: 'PIPE_UR',
+      probeId: 'P-PIPE-REMOTE',
+      field: 'displacement',
+      component: 'radial',
+      limit: 0.01,
+      normalization: 'SAME_POINT_DISPLACEMENT_VECTOR_NORM',
+    },
+    {
+      quantityId: 'HUB_UR',
+      probeId: 'P-HUB-MID',
+      field: 'displacement',
+      component: 'radial',
+      limit: 0.02,
+      normalization: 'SAME_POINT_DISPLACEMENT_VECTOR_NORM',
+    },
+    {
+      quantityId: 'FLANGE_UZ',
+      probeId: 'P-FLANGE-MID',
+      field: 'displacement',
+      component: 'axial',
+      limit: 0.02,
+      normalization: 'SAME_POINT_DISPLACEMENT_VECTOR_NORM',
+    },
+    {
+      quantityId: 'PIPE_HOOP',
+      probeId: 'P-PIPE-REMOTE',
+      field: 'stress',
+      component: 'sigmaTheta',
+      limit: 0.025,
+      normalization: 'SAME_POINT_STRESS_TENSOR_NORM',
+    },
+    {
+      quantityId: 'HUB_HOOP',
+      probeId: 'P-HUB-MID',
+      field: 'stress',
+      component: 'sigmaTheta',
+      limit: 0.04,
+      normalization: 'SAME_POINT_STRESS_TENSOR_NORM',
+    },
   ];
-  const rows = pairs.map(([quantityId, getter, limit]) => {
-    const values = levels.map((row) => ({
-      levelId: row.levelId,
-      value: getter(row),
+  const rows = definitions.map((definition) => {
+    const values = levels.map((level) => ({
+      levelId: level.levelId,
+      value: oracleQuantityValue(level, definition),
     }));
-    const finestChange = relative(values.at(-1).value, values.at(-2).value);
+    const coarse = levels.at(-2);
+    const fine = levels.at(-1);
+    const coarseValue = values.at(-2).value;
+    const fineValue = values.at(-1).value;
+    const rawScalarRelativeChange = relative(fineValue, coarseValue);
+    const denominator = oracleConvergenceDenominator(
+      coarse,
+      fine,
+      definition,
+    );
+    const finestChange = Math.abs(fineValue - coarseValue) / denominator;
     return {
-      quantityId,
+      quantityId: definition.quantityId,
       values,
+      rawScalarRelativeChange,
+      normalization: definition.normalization,
+      denominator,
       finestChange,
-      limit,
-      accepted: finestChange <= limit,
+      limit: definition.limit,
+      accepted: finestChange <= definition.limit,
     };
   });
   return { rows, accepted: rows.every((row) => row.accepted) };
+}
+
+function oracleQuantityValue(level, definition) {
+  if (definition.getter) return definition.getter(level);
+  return probe(level, definition.probeId)[definition.field][definition.component];
+}
+
+function oracleConvergenceDenominator(coarse, fine, definition) {
+  if (definition.normalization === 'SCALAR_RELATIVE') {
+    return Math.max(
+      1e-30,
+      Math.abs(oracleQuantityValue(coarse, definition)),
+      Math.abs(oracleQuantityValue(fine, definition)),
+    );
+  }
+  const coarseProbe = probe(coarse, definition.probeId);
+  const fineProbe = probe(fine, definition.probeId);
+  if (definition.normalization
+    === 'SAME_POINT_DISPLACEMENT_VECTOR_NORM') {
+    return Math.max(
+      1e-9,
+      displacementNorm(coarseProbe.displacement),
+      displacementNorm(fineProbe.displacement),
+    );
+  }
+  if (definition.normalization === 'SAME_POINT_STRESS_TENSOR_NORM') {
+    return Math.max(
+      1e-9,
+      axisymmetricStressNorm(coarseProbe.stress),
+      axisymmetricStressNorm(fineProbe.stress),
+    );
+  }
+  throw new TypeError('ORACLE_UNKNOWN_CONVERGENCE_NORMALIZATION');
+}
+
+function displacementNorm(value) {
+  return Math.hypot(value.radial, value.axial);
+}
+
+function axisymmetricStressNorm(value) {
+  return Math.sqrt(
+    value.sigmaR ** 2
+    + value.sigmaZ ** 2
+    + value.sigmaTheta ** 2
+    + 2 * value.tauRZ ** 2,
+  );
 }
 
 function pcg(multiply, rhs, precondition, policy) {
