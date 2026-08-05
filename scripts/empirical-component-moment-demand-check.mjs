@@ -51,7 +51,7 @@ for (const record of eccentric.records) {
   assert.equal(record.applicationChainageMm, 500);
   assert.deepEqual(record.offsetMm, { x: 0, y: 25, z: 0 });
   assert.equal(record.componentMassKg, 10);
-  assert.equal(record.gravityForceN, 98.0665);
+  assert.ok(Math.abs(record.gravityForceN - 98.0665) < 1e-12);
   assert.ok(Math.abs(record.vectorNm.x + 2.4516625) < 1e-12);
   assert.ok(Math.abs(record.vectorNm.y) < 1e-12);
   assert.ok(Math.abs(record.vectorNm.z) < 1e-12);
@@ -74,6 +74,20 @@ const zeroExplicitInput = fixture({
 const zeroExplicit = capture(zeroExplicitInput, audit(zeroExplicitInput));
 assert.equal(zeroExplicit.status, 'NO_MOMENT_DEMAND');
 assert.equal(zeroExplicit.summary.sourceExplicitMomentCount, 0);
+
+const invalidExplicitInput = fixture({
+  cogMm: { x: 500, y: 0, z: 0 },
+  explicitMomentNm: -1,
+  momentAxis: 'LOCAL_Z',
+});
+const invalidExplicitAudit = audit(invalidExplicitInput);
+assert.equal(invalidExplicitAudit.status, 'BLOCKED');
+const invalidExplicit = capture(invalidExplicitInput, invalidExplicitAudit);
+assert.equal(invalidExplicit.status, 'BLOCKED');
+assert.equal(
+  hasBlocker(invalidExplicit, 'EMPIRICAL_COMPONENT_EXPLICIT_MOMENT_INVALID'),
+  true,
+);
 
 const ambiguousInput = ambiguousFixture();
 const ambiguous = capture(ambiguousInput, audit(ambiguousInput));
@@ -119,6 +133,7 @@ console.log(JSON.stringify({
   eccentricMomentMagnitudeNm: eccentric.records[0].magnitudeNm,
   eccentricLoadCases: eccentric.records.map((row) => row.loadCaseId),
   zeroMomentStatus: zero.status,
+  invalidMomentBlocker: invalidExplicit.blockers[0].code,
   ambiguousBlocker: ambiguous.blockers[0].code,
   verticalReactionDistributionPerformed: explicitFirst.verticalReactionDistributionPerformed,
   numericalVerticalReactionMethodChanged: explicitFirst.numericalVerticalReactionMethodChanged,
@@ -227,7 +242,12 @@ function sharedComponent(cogMm, explicitMomentNm, momentAxis) {
 }
 
 function evidence(value, unit, sourcePath) {
-  return { value, unit, sourcePath, sourceKind: 'EXPLICIT_SOURCE_EVIDENCE' };
+  return {
+    value,
+    unit,
+    sourcePath,
+    sourceKind: 'EXPLICIT_SOURCE_EVIDENCE',
+  };
 }
 
 function sealSharedModel(components) {
@@ -246,7 +266,9 @@ function entity(entityId, entityType, category, catalogKey = null) {
     entityType,
     category,
     sourceEntityId: `SOURCE-${entityId}`,
-    properties: catalogKey ? { attributes: { CATALOG_KEY: catalogKey } } : {},
+    properties: catalogKey
+      ? { attributes: { CATALOG_KEY: catalogKey } }
+      : {},
   };
 }
 
