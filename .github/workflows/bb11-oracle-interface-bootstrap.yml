@@ -33,6 +33,7 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          from textwrap import dedent
           import re
 
           path = Path('src/core/bucket-b/flange-hub-independent-oracle.js')
@@ -52,42 +53,47 @@ jobs:
 
           sub_once(
               r"  if \(id === 'SMALL_ARC'\) \{\s*return arc\(\s*GEOMETRY\.smallCenter,\s*6,\s*GEOMETRY\.smallStartAngle,\s*GEOMETRY\.smallSweep,\s*\);\s*\}",
-              """  if (id === 'SMALL_ARC') {
-            const endAngle = Math.atan2(
-              GEOMETRY.smallHubTangent.z - GEOMETRY.smallCenter.z,
-              GEOMETRY.smallHubTangent.r - GEOMETRY.smallCenter.r,
-            );
-            return arc(
-              GEOMETRY.smallCenter,
-              GEOMETRY.smallRadius,
-              Math.PI,
-              endAngle - Math.PI,
-            );
-          }""",
+              dedent("""
+              if (id === 'SMALL_ARC') {
+                const endAngle = Math.atan2(
+                  GEOMETRY.smallHubTangent.z - GEOMETRY.smallCenter.z,
+                  GEOMETRY.smallHubTangent.r - GEOMETRY.smallCenter.r,
+                );
+                return arc(
+                  GEOMETRY.smallCenter,
+                  GEOMETRY.smallRadius,
+                  Math.PI,
+                  endAngle - Math.PI,
+                );
+              }
+              """).strip(),
               'small-arc-exact-tangent',
           )
 
           sub_once(
               r"  if \(id === 'LARGE_ARC'\) \{\s*return arc\(\s*GEOMETRY\.largeCenter,\s*10,\s*GEOMETRY\.largeStartAngle,\s*GEOMETRY\.largeSweep,\s*\);\s*\}",
-              """  if (id === 'LARGE_ARC') {
-            const startAngle = Math.atan2(
-              GEOMETRY.largeHubTangent.z - GEOMETRY.largeCenter.z,
-              GEOMETRY.largeHubTangent.r - GEOMETRY.largeCenter.r,
-            );
-            return arc(
-              GEOMETRY.largeCenter,
-              GEOMETRY.largeRadius,
-              startAngle,
-              Math.PI / 2 - startAngle,
-            );
-          }""",
+              dedent("""
+              if (id === 'LARGE_ARC') {
+                const startAngle = Math.atan2(
+                  GEOMETRY.largeHubTangent.z - GEOMETRY.largeCenter.z,
+                  GEOMETRY.largeHubTangent.r - GEOMETRY.largeCenter.r,
+                );
+                return arc(
+                  GEOMETRY.largeCenter,
+                  GEOMETRY.largeRadius,
+                  startAngle,
+                  Math.PI / 2 - startAngle,
+                );
+              }
+              """).strip(),
               'large-arc-exact-tangent',
           )
 
           marker = 'export function runIndependentFlangeHubOracle(loadCaseId) {'
           if source.count(marker) != 1:
               raise SystemExit('mesh-inspection-export: marker count mismatch')
-          inspection = """export function inspectIndependentFlangeHubOracleMesh(levelId = 'O0') {
+          inspection = dedent("""
+          export function inspectIndependentFlangeHubOracleMesh(levelId = 'O0') {
             const definition = LEVELS.find((row) => row.levelId === levelId);
             if (!definition) throw new TypeError(`ORACLE_UNKNOWN_LEVEL:${levelId}`);
             const mesh = q4Mesh(definition);
@@ -103,80 +109,83 @@ jobs:
             });
           }
 
-          """
+          """).lstrip()
           source = source.replace(marker, inspection + marker, 1)
 
           sub_once(
               r"  return freeze\(\{\s*nodes,\s*elements: finalElements,\s*boundaries: finalBoundaries,\s*globalH,\s*\}\);\s*\}\s*\nfunction blockMap",
-              """  const connectivity = meshConnectivity(nodes, finalElements);
-            if (!connectivity.accepted) {
-              throw new RangeError(
-                `ORACLE_DISCONNECTED_MESH:${level.levelId}:`
-                + `${connectivity.componentCount}`,
-              );
+              dedent("""
+              const connectivity = meshConnectivity(nodes, finalElements);
+              if (!connectivity.accepted) {
+                throw new RangeError(
+                  `ORACLE_DISCONNECTED_MESH:${level.levelId}:`
+                  + `${connectivity.componentCount}`,
+                );
+              }
+              return freeze({
+                nodes,
+                elements: finalElements,
+                boundaries: finalBoundaries,
+                globalH,
+                connectivity,
+              });
             }
-            return freeze({
-              nodes,
-              elements: finalElements,
-              boundaries: finalBoundaries,
-              globalH,
-              connectivity,
-            });
-          }
 
-          function meshConnectivity(nodes, elements) {
-            const adjacency = new Map(nodes.map((node) => [node.id, new Set()]));
-            const blockIdsByNode = new Map(nodes.map((node) => [node.id, new Set()]));
-            elements.forEach((element) => {
-              element.nodeIds.forEach((nodeId) => {
-                blockIdsByNode.get(nodeId).add(element.blockId);
-                element.nodeIds.forEach((otherId) => {
-                  if (otherId !== nodeId) adjacency.get(nodeId).add(otherId);
+            function meshConnectivity(nodes, elements) {
+              const adjacency = new Map(nodes.map((node) => [node.id, new Set()]));
+              const blockIdsByNode = new Map(nodes.map((node) => [node.id, new Set()]));
+              elements.forEach((element) => {
+                element.nodeIds.forEach((nodeId) => {
+                  blockIdsByNode.get(nodeId).add(element.blockId);
+                  element.nodeIds.forEach((otherId) => {
+                    if (otherId !== nodeId) adjacency.get(nodeId).add(otherId);
+                  });
                 });
               });
-            });
-            const unvisited = new Set(
-              nodes.filter((node) => blockIdsByNode.get(node.id).size > 0)
-                .map((node) => node.id),
-            );
-            const components = [];
-            while (unvisited.size > 0) {
-              const seed = [...unvisited].sort()[0];
-              const queue = [seed];
-              const nodeIds = [];
-              const blockIds = new Set();
-              unvisited.delete(seed);
-              while (queue.length > 0) {
-                const nodeId = queue.shift();
-                nodeIds.push(nodeId);
-                blockIdsByNode.get(nodeId).forEach((id) => blockIds.add(id));
-                [...adjacency.get(nodeId)].sort().forEach((otherId) => {
-                  if (unvisited.delete(otherId)) queue.push(otherId);
+              const unvisited = new Set(
+                nodes.filter((node) => blockIdsByNode.get(node.id).size > 0)
+                  .map((node) => node.id),
+              );
+              const components = [];
+              while (unvisited.size > 0) {
+                const seed = [...unvisited].sort()[0];
+                const queue = [seed];
+                const nodeIds = [];
+                const blockIds = new Set();
+                unvisited.delete(seed);
+                while (queue.length > 0) {
+                  const nodeId = queue.shift();
+                  nodeIds.push(nodeId);
+                  blockIdsByNode.get(nodeId).forEach((id) => blockIds.add(id));
+                  [...adjacency.get(nodeId)].sort().forEach((otherId) => {
+                    if (unvisited.delete(otherId)) queue.push(otherId);
+                  });
+                }
+                components.push({
+                  nodeCount: nodeIds.length,
+                  minimumNodeId: [...nodeIds].sort()[0],
+                  blockIds: [...blockIds].sort(),
                 });
               }
-              components.push({
-                nodeCount: nodeIds.length,
-                minimumNodeId: [...nodeIds].sort()[0],
-                blockIds: [...blockIds].sort(),
-              });
+              components.sort((left, right) => (
+                left.minimumNodeId.localeCompare(right.minimumNodeId)
+              ));
+              return {
+                componentCount: components.length,
+                components,
+                accepted: components.length === 1,
+              };
             }
-            components.sort((left, right) => (
-              left.minimumNodeId.localeCompare(right.minimumNodeId)
-            ));
-            return {
-              componentCount: components.length,
-              components,
-              accepted: components.length === 1,
-            };
-          }
 
-          function blockMap""",
+            function blockMap
+              """).strip(),
               'connectivity-certificate',
           )
 
           path.write_text(source)
 
-          Path('tests/bucket-b-bb11-independent-oracle-interface.test.mjs').write_text("""import assert from 'node:assert/strict';
+          test_source = dedent("""
+          import assert from 'node:assert/strict';
           import test from 'node:test';
           import {
             inspectIndependentFlangeHubOracleMesh,
@@ -212,7 +221,8 @@ jobs:
             assert.ok(Math.abs(solved.x[1] - 7 / 11) <= 1e-12);
             assert.ok(solved.explicitResidualNorm <= 1e-10);
           });
-          """.replace(/^          /gm, ''))
+          """).lstrip()
+          Path('tests/bucket-b-bb11-independent-oracle-interface.test.mjs').write_text(test_source)
 
           Path('.github/workflows/bb11-oracle-interface-bootstrap.yml').unlink()
           PY
