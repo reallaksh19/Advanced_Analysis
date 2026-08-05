@@ -1,4 +1,4 @@
-name: BB-11 independent-oracle matrix diagnostic
+name: BB-11 independent-oracle interface diagnostic
 
 on:
   push:
@@ -10,12 +10,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: bb11-oracle-matrix-${{ github.ref }}
+  group: bb11-oracle-interface-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   diagnose:
-    name: Certify FH-PRES-001 O0 reduced matrix
+    name: Map FH-PRES-001 O0 block interfaces
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -41,25 +41,25 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node --check scripts/bb11-independent-oracle-matrix-diagnostic.mjs
+          node --check scripts/bb11-independent-oracle-interface-diagnostic.mjs
           git diff --check HEAD^
           mapfile -t paths < <(git diff --name-only HEAD^ HEAD)
           test "${#paths[@]}" -eq 2
           printf '%s\n' "${paths[@]}" | sort > /tmp/actual-paths
           printf '%s\n' \
             '.github/workflows/bb11-independent-oracle-jacobi-diagnostic.yml' \
-            'scripts/bb11-independent-oracle-matrix-diagnostic.mjs' \
+            'scripts/bb11-independent-oracle-interface-diagnostic.mjs' \
             | sort > /tmp/expected-paths
           cmp /tmp/actual-paths /tmp/expected-paths
 
-      - name: Run O0 reduced-matrix diagnostic
-        run: node scripts/bb11-independent-oracle-matrix-diagnostic.mjs
+      - name: Run O0 interface-identity diagnostic
+        run: node scripts/bb11-independent-oracle-interface-diagnostic.mjs
 
-      - name: Upload matrix evidence
+      - name: Upload interface evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bb11-oracle-matrix-${{ github.sha }}-${{ github.run_attempt }}
-          path: reports/bb11-oracle-matrix
+          name: bb11-oracle-interface-${{ github.sha }}-${{ github.run_attempt }}
+          path: reports/bb11-oracle-interface
           if-no-files-found: warn
           retention-days: 30
