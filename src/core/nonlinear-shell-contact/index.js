@@ -15,3 +15,8 @@ export * from './result-reconstruction.js';
 export * from './execution-receipt.js';
 export * from './nc00-report.js';
 export * from './independent-checker.js';
+export * from './shell-formulation-contract.js';
+export * from './shell-benchmark-catalog.js';
+export * from './shell-qualification-evaluator.js';
+export * from './nc01-fixtures.js';
+export * from './nc01-negative-controls.js';
