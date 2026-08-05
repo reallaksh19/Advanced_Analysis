@@ -1,0 +1,406 @@
+name: BB-11 governed oracle repair bootstrap
+
+on:
+  push:
+    branches:
+      - fix/bb11-governed-oracle-certification
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test-and-publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      TZ: UTC
+      LC_ALL: C
+      BB11_DIAGNOSTICS: '1'
+    steps:
+      - name: Check out repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/bb11-governed-oracle-certification
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Apply governed oracle repair
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source_path = Path('src/core/bucket-b/flange-hub-independent-oracle.js')
+          source = source_path.read_text()
+
+          def replace_once(old, new, label):
+              global source
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected one occurrence, found {count}')
+              source = source.replace(old, new, 1)
+
+          replace_once(
+              "linearSolver: 'DETERMINISTIC_SGS_PCG_EXPLICIT_RESIDUAL_V2',",
+              "linearSolver: 'DETERMINISTIC_SGS_PCG_CERTIFIED_RESTART_V3',",
+              'descriptor',
+          )
+          replace_once(
+              """const ORACLE_SOLVER_POLICY = Object.freeze({
+            relativeResidualTolerance: 1e-10,
+            absoluteResidualTolerance: 1e-8,
+            maximumIterations: 12000,
+            stagnationWindow: 500,
+            minimumStagnationReduction: 1e-4,
+            diagnosticInterval: 1000,
+          });""",
+              """const ORACLE_SOLVER_POLICY = Object.freeze({
+            relativeResidualTolerance: 1e-10,
+            absoluteResidualTolerance: 1e-8,
+            minimumMaximumIterations: 12000,
+            maximumIterationMultiplier: 8,
+            residualCertificationInterval: 200,
+            maximumCertifiedStagnationCycles: 24,
+            minimumCertifiedReduction: 1e-6,
+            diagnosticInterval: 1000,
+          });""",
+              'policy',
+          )
+          replace_once(
+              """function blockMap(block) {
+            const outer = profile(block.profile);
+            if (block.kind === 'STRIP') {
+              return (u, v) => {""",
+              """function blockMap(block) {
+            if (block.kind === 'STRIP') {
+              const outer = profile(block.profile);
+              return (u, v) => {""",
+              'block-map',
+          )
+          replace_once(
+              "solverId: 'DETERMINISTIC_SGS_PCG_EXPLICIT_RESIDUAL_V2',",
+              "solverId: 'DETERMINISTIC_SGS_PCG_CERTIFIED_RESTART_V3',",
+              'solver-id',
+          )
+
+          start = source.index('function pcg(multiply, rhs, precondition, policy) {')
+          end = source.index('\nfunction createSymmetricGaussSeidelPreconditioner', start)
+          new_pcg = r'''function pcg(multiply, rhs, precondition, policy) {
+            const count = rhs.length;
+            const x = new Float64Array(count);
+            let residualVector = Float64Array.from(rhs);
+            let z = precondition(residualVector);
+            let direction = Float64Array.from(z);
+            let residualPreconditioned = dot(residualVector, z);
+            if (!Number.isFinite(residualPreconditioned)
+              || !(residualPreconditioned > 0)) {
+              throw new RangeError('ORACLE_NONPOSITIVE_PRECONDITIONED_RESIDUAL');
+            }
+            const rhsNorm = norm(rhs);
+            const denominator = Math.max(1, rhsNorm);
+            const tolerance = Math.max(
+              policy.absoluteResidualTolerance,
+              policy.relativeResidualTolerance * rhsNorm,
+            );
+            const maximumIterations = Math.max(
+              policy.minimumMaximumIterations,
+              policy.maximumIterationMultiplier * count,
+            );
+            const certificationInterval = policy.residualCertificationInterval;
+            let recursiveResidualNorm = norm(residualVector);
+            let explicitResidualNorm = recursiveResidualNorm;
+            let residualReplacementCount = 0;
+            let certificationCount = 0;
+            let bestCertifiedResidualNorm = explicitResidualNorm;
+            let certifiedStagnationCycles = 0;
+
+            const result = (iterations) => ({
+              x,
+              iterations,
+              relativeResidual: explicitResidualNorm / denominator,
+              recursiveResidualNorm,
+              explicitResidualNorm,
+              residualReplacementCount,
+              certificationCount,
+            });
+
+            const certifyAndRestart = (iteration, reason) => {
+              const certified = explicitResidual(multiply, rhs, x);
+              explicitResidualNorm = norm(certified);
+              certificationCount += 1;
+              if (!Number.isFinite(explicitResidualNorm)) {
+                throw new RangeError(`ORACLE_NONFINITE_EXPLICIT_RESIDUAL:${iteration}`);
+              }
+              diagnostic(
+                `ORACLE_PCG_CERTIFIED:iterations=${iteration}:reason=${reason}:`
+                + `explicitRelativeResidual=${explicitResidualNorm / denominator}`,
+              );
+              if (explicitResidualNorm <= tolerance) {
+                return { converged: true, value: result(iteration) };
+              }
+              if (explicitResidualNorm
+                <= bestCertifiedResidualNorm * (1 - policy.minimumCertifiedReduction)) {
+                bestCertifiedResidualNorm = explicitResidualNorm;
+                certifiedStagnationCycles = 0;
+              } else {
+                certifiedStagnationCycles += 1;
+              }
+              if (certifiedStagnationCycles
+                >= policy.maximumCertifiedStagnationCycles) {
+                throw new RangeError(
+                  `ORACLE_PCG_CERTIFIED_STAGNATION:${iteration}:`
+                  + `${explicitResidualNorm / denominator}`,
+                );
+              }
+              residualVector = certified;
+              z = precondition(residualVector);
+              direction = Float64Array.from(z);
+              residualPreconditioned = dot(residualVector, z);
+              if (!Number.isFinite(residualPreconditioned)
+                || !(residualPreconditioned > 0)) {
+                throw new RangeError('ORACLE_NONPOSITIVE_PRECONDITIONED_RESIDUAL');
+              }
+              residualReplacementCount += 1;
+              recursiveResidualNorm = explicitResidualNorm;
+              return { converged: false };
+            };
+
+            if (recursiveResidualNorm <= tolerance) {
+              const certified = certifyAndRestart(0, 'INITIAL');
+              if (certified.converged) return certified.value;
+            }
+
+            for (let iteration = 1; iteration <= maximumIterations; iteration += 1) {
+              let product = multiply(direction);
+              let curvature = dot(direction, product);
+              if (!Number.isFinite(curvature) || !(curvature > 0)) {
+                const certified = certifyAndRestart(
+                  iteration - 1,
+                  'NONPOSITIVE_CURVATURE',
+                );
+                if (certified.converged) return certified.value;
+                product = multiply(direction);
+                curvature = dot(direction, product);
+                if (!Number.isFinite(curvature) || !(curvature > 0)) {
+                  throw new RangeError(
+                    'ORACLE_NONPOSITIVE_PCG_CURVATURE_AFTER_CERTIFIED_RESTART',
+                  );
+                }
+              }
+              const alpha = residualPreconditioned / curvature;
+              if (!Number.isFinite(alpha)) {
+                throw new RangeError('ORACLE_NONFINITE_PCG_ALPHA');
+              }
+              for (let index = 0; index < count; index += 1) {
+                x[index] += alpha * direction[index];
+                residualVector[index] -= alpha * product[index];
+              }
+              recursiveResidualNorm = norm(residualVector);
+              const certificationRequired = recursiveResidualNorm <= tolerance
+                || iteration % certificationInterval === 0;
+              if (certificationRequired) {
+                const certified = certifyAndRestart(
+                  iteration,
+                  recursiveResidualNorm <= tolerance
+                    ? 'RECURSIVE_TOLERANCE'
+                    : 'PERIODIC',
+                );
+                if (certified.converged) return certified.value;
+                continue;
+              }
+              if (iteration % policy.diagnosticInterval === 0) {
+                diagnostic(
+                  `ORACLE_PCG_PROGRESS:iterations=${iteration}:`
+                  + `recursiveRelativeResidual=${recursiveResidualNorm / denominator}`,
+                );
+              }
+              z = precondition(residualVector);
+              const next = dot(residualVector, z);
+              if (!Number.isFinite(next) || !(next > 0)) {
+                const certified = certifyAndRestart(
+                  iteration,
+                  'NONPOSITIVE_PRECONDITIONED_RESIDUAL',
+                );
+                if (certified.converged) return certified.value;
+                continue;
+              }
+              const beta = next / residualPreconditioned;
+              if (!Number.isFinite(beta)) {
+                throw new RangeError('ORACLE_NONFINITE_PCG_BETA');
+              }
+              for (let index = 0; index < count; index += 1) {
+                direction[index] = z[index] + beta * direction[index];
+              }
+              residualPreconditioned = next;
+            }
+            const certified = explicitResidual(multiply, rhs, x);
+            explicitResidualNorm = norm(certified);
+            throw new RangeError(
+              `ORACLE_PCG_FAILURE:${maximumIterations}:`
+              + `${explicitResidualNorm / denominator}`,
+            );
+          }
+          '''
+          source = source[:start] + new_pcg + source[end:]
+          source_path.write_text(source)
+
+          test_path = Path('tests/bucket-b-bb11-independent-oracle-repair.test.mjs')
+          test_path.write_text(r'''import assert from 'node:assert/strict';
+          import test from 'node:test';
+          import {
+            FLANGE_HUB_INDEPENDENT_ORACLE_DESCRIPTOR,
+            solveIndependentOracleLinearSystem,
+          } from '../src/core/bucket-b/flange-hub-independent-oracle.js';
+
+          test('BB-11 governed oracle uses certified residual restart V3', () => {
+            assert.equal(
+              FLANGE_HUB_INDEPENDENT_ORACLE_DESCRIPTOR.linearSolver,
+              'DETERMINISTIC_SGS_PCG_CERTIFIED_RESTART_V3',
+            );
+          });
+
+          test('BB-11 governed oracle solves a coupled SPD system with certified residual', () => {
+            const rows = [
+              [{ column: 0, value: 4 }, { column: 1, value: 1 }],
+              [{ column: 0, value: 1 }, { column: 1, value: 3 }],
+            ];
+            const solved = solveIndependentOracleLinearSystem({ rows, rhs: [1, 2] });
+            assert.ok(Math.abs(solved.x[0] - 1 / 11) <= 1e-12);
+            assert.ok(Math.abs(solved.x[1] - 7 / 11) <= 1e-12);
+            assert.ok(solved.explicitResidualNorm <= 1e-10);
+            assert.ok(Number.isInteger(solved.certificationCount));
+          });
+
+          test('BB-11 governed oracle remains deterministic on a scaled SPD chain', () => {
+            const count = 256;
+            const rows = Array.from({ length: count }, (_, row) => {
+              const scale = 10 ** (6 * row / (count - 1));
+              const entries = [{ column: row, value: 2 * scale }];
+              if (row > 0) entries.push({ column: row - 1, value: -Math.sqrt(scale * 10 ** (6 * (row - 1) / (count - 1))) });
+              if (row + 1 < count) entries.push({ column: row + 1, value: -Math.sqrt(scale * 10 ** (6 * (row + 1) / (count - 1))) });
+              return entries.sort((a, b) => a.column - b.column);
+            });
+            const rhs = Array.from({ length: count }, (_, index) => 1 + index / count);
+            const first = solveIndependentOracleLinearSystem({ rows, rhs });
+            const second = solveIndependentOracleLinearSystem({ rows, rhs });
+            assert.deepEqual(Array.from(first.x), Array.from(second.x));
+            assert.equal(first.iterations, second.iterations);
+            assert.equal(first.explicitResidualNorm, second.explicitResidualNorm);
+            assert.ok(first.explicitResidualNorm <= 1e-8);
+          });
+          '''.replace(/^          /gm, ''))
+
+          workflow_path = Path('.github/workflows/bb11-governed-oracle-repair.yml')
+          workflow_path.write_text(r'''name: BB-11 governed independent-oracle repair
+
+          on:
+            pull_request:
+              branches:
+                - agent/bucket-b-bb11-flange-hub
+              paths:
+                - src/core/bucket-b/flange-hub-independent-oracle.js
+                - tests/bucket-b-bb11-independent-oracle-repair.test.mjs
+                - .github/workflows/bb11-governed-oracle-repair.yml
+
+          permissions:
+            contents: read
+
+          jobs:
+            qualify-governed-oracle-repair:
+              runs-on: ubuntu-24.04
+              timeout-minutes: 45
+              env:
+                TZ: UTC
+                LC_ALL: C
+                BB11_DIAGNOSTICS: '1'
+              steps:
+                - uses: actions/checkout@v4
+                  with:
+                    fetch-depth: 0
+                - uses: actions/setup-node@v4
+                  with:
+                    node-version: 22
+                    cache: npm
+                - run: npm ci
+                - name: Enforce changed-path containment
+                  shell: bash
+                  run: |
+                    set -euo pipefail
+                    git diff --check "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"
+                    mapfile -t paths < <(git diff --name-only "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}")
+                    test "${#paths[@]}" -eq 3
+                    for path in "${paths[@]}"; do
+                      case "$path" in
+                        src/core/bucket-b/flange-hub-independent-oracle.js|tests/bucket-b-bb11-independent-oracle-repair.test.mjs|.github/workflows/bb11-governed-oracle-repair.yml) ;;
+                        *) echo "Unexpected path: $path" >&2; exit 1 ;;
+                      esac
+                    done
+                - run: node --check src/core/bucket-b/flange-hub-independent-oracle.js
+                - run: node --test tests/bucket-b-bb11-independent-oracle-repair.test.mjs
+                - name: Execute axial oracle twice
+                  shell: bash
+                  run: |
+                    set -euo pipefail
+                    mkdir -p reports
+                    for run in a b; do
+                      timeout --signal=TERM --kill-after=60s 35m node --input-type=module <<'NODE' > "reports/oracle-${run}.json"
+                    import { runIndependentFlangeHubOracle } from './src/core/bucket-b/flange-hub-independent-oracle.js';
+                    process.stdout.write(JSON.stringify(runIndependentFlangeHubOracle('FH-AXIAL-001')));
+                    NODE
+                    done
+                    cmp reports/oracle-a.json reports/oracle-b.json
+                    node --input-type=module <<'NODE'
+                    import assert from 'node:assert/strict';
+                    import { readFile } from 'node:fs/promises';
+                    const report = JSON.parse(await readFile('reports/oracle-a.json', 'utf8'));
+                    assert.equal(report.status, 'PASS');
+                    report.levels.forEach((level) => {
+                      assert.ok(level.solver.explicitResidualNorm <= 1e-8);
+                    });
+                    NODE
+                - uses: actions/upload-artifact@v4
+                  with:
+                    name: bb11-governed-oracle-${{ github.event.pull_request.head.sha }}
+                    path: reports
+                    retention-days: 30
+          '''.replace(/^          /gm, ''))
+
+          Path('.github/workflows/bb11-oracle-repair-bootstrap.yml').unlink()
+          PY
+
+      - name: Verify source, focused tests, and axial oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check src/core/bucket-b/flange-hub-independent-oracle.js
+          node --test tests/bucket-b-bb11-independent-oracle-repair.test.mjs
+          timeout --signal=TERM --kill-after=60s 35m node --input-type=module <<'NODE' > /tmp/bb11-oracle-axial.json
+          import { runIndependentFlangeHubOracle } from './src/core/bucket-b/flange-hub-independent-oracle.js';
+          process.stdout.write(JSON.stringify(runIndependentFlangeHubOracle('FH-AXIAL-001')));
+          NODE
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFile } from 'node:fs/promises';
+          const report = JSON.parse(await readFile('/tmp/bb11-oracle-axial.json', 'utf8'));
+          assert.equal(report.status, 'PASS');
+          report.levels.forEach((level) => assert.ok(level.solver.explicitResidualNorm <= 1e-8));
+          NODE
+
+      - name: Commit governed repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'BB-11 Oracle Repair Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'Fix BB-11 independent oracle residual certification'
+          git push origin HEAD:fix/bb11-governed-oracle-certification
