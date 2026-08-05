@@ -70,9 +70,8 @@ jobs:
           node --check src/core/piping-topology/topology-graph.js
           node --check src/core/piping-topology/explicit-stage.js
           node --check scripts/empirical-restraint-network-check.mjs
-          node --check scripts/wp5-runtime-analysis-direction-patch.mjs
 
-      - name: Branch-junction global restraint-network qualification
+      - name: Restricted global restraint-network qualification
         run: node scripts/empirical-restraint-network-check.mjs
 
       - name: Adapter and scenario regression
