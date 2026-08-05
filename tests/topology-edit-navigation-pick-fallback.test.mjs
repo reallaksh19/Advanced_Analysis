@@ -9,64 +9,63 @@ const cursorPointer = Object.freeze({ x: 0.1, y: -0.2 });
 const samplePointer = Object.freeze({ x: 0.125, y: -0.175 });
 
 {
-  const backend = backendHarness({
-    gpuHit: { target: exactTarget, samplePointer },
-    gpuPoint: Object.freeze({ x: 1, y: 2, z: 3 }),
-    rayReceipt,
-  });
-  assert.equal(
-    backend.pickAt(100, 200),
-    rayReceipt,
-    'The exact ray identity under the pointer must precede nearby GPU-radius candidates.',
-  );
-  assert.equal(backend.calls.raycaster, 1);
-  assert.equal(backend.calls.gpu, 0);
-  assert.equal(backend.calls.receipt, 0);
-  assert.equal(backend.calls.resolvedPointer, null);
-}
-
-{
   const point = Object.freeze({ x: 1, y: 2, z: 3 });
   const gpuReceipt = Object.freeze({ objectId: 'edge:gpu', point });
   const backend = backendHarness({
     gpuHit: { target: exactTarget, samplePointer },
     gpuPoint: point,
     gpuReceipt,
-    rayReceipt: null,
+    rayReceipt,
   });
   assert.equal(
     backend.pickAt(100, 200),
     gpuReceipt,
-    'GPU radius sampling remains the fallback when no exact ray target exists.',
+    'The exact ID-buffer sample and its governed screen-space radius must precede a whole-scene CPU raycast.',
   );
-  assert.equal(backend.calls.raycaster, 1);
   assert.equal(backend.calls.gpu, 1);
+  assert.equal(backend.calls.raycaster, 0);
   assert.equal(backend.calls.receipt, 1);
+  assert.equal(backend.calls.resolvedPointer, samplePointer);
+}
+
+{
+  const backend = backendHarness({
+    gpuHit: null,
+    gpuPoint: null,
+    rayReceipt,
+  });
   assert.equal(
-    backend.calls.resolvedPointer,
-    samplePointer,
-    'The governed receipt must resolve through the winning GPU sample ray.',
+    backend.pickAt(100, 200),
+    rayReceipt,
+    'The exact CPU ray remains the compatibility fallback when the GPU pass has no identity.',
   );
+  assert.equal(backend.calls.gpu, 1);
+  assert.equal(backend.calls.raycaster, 1);
+  assert.equal(backend.calls.receipt, 0);
 }
 
 {
   const backend = backendHarness({
     gpuHit: { target: exactTarget },
     gpuPoint: null,
-    rayReceipt: null,
+    rayReceipt,
   });
-  assert.equal(backend.pickAt(100, 200), null);
-  assert.equal(backend.calls.raycaster, 1);
+  assert.equal(
+    backend.pickAt(100, 200),
+    rayReceipt,
+    'A GPU identity without an exact engineering intersection must fall back to the CPU ray.',
+  );
   assert.equal(backend.calls.gpu, 1);
+  assert.equal(backend.calls.raycaster, 1);
   assert.equal(backend.calls.receipt, 0);
   assert.equal(
     backend.calls.resolvedPointer,
     cursorPointer,
-    'Legacy GPU receipts without sample lineage retain the exact cursor ray fallback.',
+    'Legacy GPU receipts without sample lineage retain the cursor pointer for point resolution.',
   );
 }
 
-console.log('PASS topology-edit exact-ray then deterministic GPU sample authority');
+console.log('PASS topology-edit GPU-first exact sample then CPU fallback authority');
 
 function backendHarness({ gpuHit, gpuPoint, gpuReceipt = null, rayReceipt: fallback }) {
   const backend = Object.create(TopologyEditNavigationHudViewportBackend.prototype);
