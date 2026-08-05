@@ -8,6 +8,9 @@ test.beforeEach(async ({ page }) => {
 test('3D Edit keeps the canvas primary and defers dense controls into inspector drawers', async ({ page }) => {
   await openProductionDemo(page);
 
+  const outerShell = page.locator('.workspace-shell');
+  const treePanel = outerShell.locator('.tree-panel');
+  const propertiesPanel = outerShell.locator('.properties-panel');
   const host = page.locator('[data-role="topology-edit-render-host"]');
   const workspace = host.locator('[data-role="topology-edit-workspace"]');
   const canvas = host.locator('.topology-edit-3d-canvas');
@@ -16,22 +19,28 @@ test('3D Edit keeps the canvas primary and defers dense controls into inspector 
   const compactDock = page.locator('[data-role="load-calc-consumer-root"]');
 
   await expect(host).toHaveAttribute('data-topology-edit-clean-shell', 'true');
+  await expect(outerShell).toHaveAttribute('data-topology-edit-focus-layout', 'true');
+  await expect(treePanel).toHaveClass(/workspace-panel--collapsed/);
+  await expect(propertiesPanel).toHaveClass(/workspace-panel--collapsed/);
   await expect(workspace).toBeVisible();
   await expect(canvas).toBeVisible();
   await expect(sidecar).toBeVisible();
   await expect(statusbar).toBeVisible();
   await expect(compactDock).toHaveClass(/load-calc-dock--compact/);
 
-  const [workspaceBox, canvasBox, sidecarBox] = await Promise.all([
+  const [outerBox, workspaceBox, canvasBox, sidecarBox] = await Promise.all([
+    outerShell.boundingBox(),
     workspace.boundingBox(),
     canvas.boundingBox(),
     sidecar.boundingBox(),
   ]);
+  expect(outerBox).not.toBeNull();
   expect(workspaceBox).not.toBeNull();
   expect(canvasBox).not.toBeNull();
   expect(sidecarBox).not.toBeNull();
-  expect(canvasBox.width).toBeGreaterThan(sidecarBox.width * 1.5);
-  expect(canvasBox.width / workspaceBox.width).toBeGreaterThan(0.6);
+  expect(workspaceBox.width / outerBox.width).toBeGreaterThan(0.9);
+  expect(canvasBox.width).toBeGreaterThan(sidecarBox.width * 2.5);
+  expect(canvasBox.width / workspaceBox.width).toBeGreaterThan(0.7);
   expect(canvasBox.height).toBeGreaterThan(650);
 
   await expect(compactDock.locator('.empirical-load-calc__facts')).toBeHidden();
@@ -55,6 +64,11 @@ test('3D Edit keeps the canvas primary and defers dense controls into inspector 
 
   const footerText = await statusbar.locator('[data-role="topology-edit-status"]').innerText();
   expect(footerText).toMatch(/nodes, .*edges, .*supports/);
+
+  await page.getByRole('button', { name: '3D WebGL', exact: true }).click();
+  await expect(outerShell).toHaveAttribute('data-topology-edit-focus-layout', 'false');
+  await expect(treePanel).not.toHaveClass(/workspace-panel--collapsed/);
+  await expect(propertiesPanel).not.toHaveClass(/workspace-panel--collapsed/);
 });
 
 async function openProductionDemo(page) {
