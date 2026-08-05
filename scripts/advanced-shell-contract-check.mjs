@@ -62,9 +62,23 @@ const loadCalcViewSource = await readFile(path.join(root, 'src/workspace/load-ca
 const loadCalcTabs = [...loadCalcViewSource.matchAll(/tab\('([^']+)'/g)].map((match) => match[1]);
 assert.deepEqual(loadCalcTabs, ['loads', 'preflight', 'project-data', 'masters', 'json-trace']);
 const loadCalcControllerSource = await readFile(path.join(root, 'src/workspace/load-calc-consumer-controller.js'), 'utf8');
-for (const requiredView of ['empirical-preflight-view.js', 'project-data/project-data-view.js', 'master-data-ui.js', 'json-trace-ui.js', 'topology-edit-3d-professional-controller.js']) {
+for (const requiredView of ['empirical-preflight-view.js', 'project-data/project-data-view.js', 'master-data-ui.js', 'json-trace-ui.js', 'topology-edit-3d-sjson-fidelity-controller.js']) {
   assert.equal(loadCalcControllerSource.includes(requiredView), true, `Load Calc must mount ${requiredView}.`);
 }
+const sjsonFidelityControllerSource = await readFile(
+  path.join(root, 'src/workspace/topology-edit-3d-sjson-fidelity-controller.js'),
+  'utf8',
+);
+assert.equal(
+  sjsonFidelityControllerSource.includes("from './topology-edit-3d-professional-controller.js'"),
+  true,
+  'SJSON fidelity controller must inherit the professional 3D controller.',
+);
+assert.match(
+  sjsonFidelityControllerSource,
+  /export class TopologyEdit3DViewController extends ProfessionalController/u,
+  'SJSON fidelity controller must preserve professional controller ownership.',
+);
 const jsonTraceSource = await readFile(path.join(root, 'src/workspace/json-trace-ui.js'), 'utf8');
 assert.doesNotMatch(jsonTraceSource, /fixture|fetch\(/iu, 'JSON Trace must not load a fixture or external fallback.');
 
