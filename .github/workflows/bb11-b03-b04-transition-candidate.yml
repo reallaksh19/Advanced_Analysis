@@ -1,0 +1,171 @@
+name: BB-11 B03/B04 conforming transition candidate
+
+on:
+  pull_request:
+    branches:
+      - agent/bucket-b-bb11-flange-hub
+    paths:
+      - '.github/workflows/bb11-b03-b04-transition-candidate.yml'
+      - 'scripts/bb11-b03-b04-transition-screen.mjs'
+      - 'src/core/bucket-b/flange-hub-diagnostic-solver.js'
+      - 'src/core/bucket-b/flange-hub-transition-candidate.js'
+      - 'tests/bucket-b-bb11-transition-candidate.test.mjs'
+
+permissions:
+  contents: read
+
+env:
+  BB11_PRODUCTION_PARENT_SHA: 6ad8a7b19b8ed339e5847b7fb93df9caf107e3fe
+
+jobs:
+  axial-screen:
+    name: Non-authorizing B03/B04 transition axial screen
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify exact parent and changed-path containment
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          test "$EVENT_BASE_SHA" = "$BB11_PRODUCTION_PARENT_SHA"
+          test "$(git merge-base "$EVENT_BASE_SHA" "$EXPECTED_HEAD_SHA")" = "$EVENT_BASE_SHA"
+          git diff --check "${EVENT_BASE_SHA}...${EXPECTED_HEAD_SHA}"
+          mapfile -t paths < <(git diff --name-only "${EVENT_BASE_SHA}...${EXPECTED_HEAD_SHA}")
+          test "${#paths[@]}" -eq 5
+          for changed in "${paths[@]}"; do
+            case "$changed" in
+              .github/workflows/bb11-b03-b04-transition-candidate.yml|\
+              scripts/bb11-b03-b04-transition-screen.mjs|\
+              src/core/bucket-b/flange-hub-diagnostic-solver.js|\
+              src/core/bucket-b/flange-hub-transition-candidate.js|\
+              tests/bucket-b-bb11-transition-candidate.test.mjs) ;;
+              *)
+                echo "BB-11 transition candidate changed-path violation: $changed" >&2
+                exit 1
+                ;;
+            esac
+          done
+          test -z "$(git diff --name-only "${EVENT_BASE_SHA}...${EXPECTED_HEAD_SHA}" -- \
+            src/core/bucket-b/flange-hub-mesh.js \
+            src/core/bucket-b/flange-hub-geometry.js \
+            src/core/bucket-b/flange-hub-loads.js \
+            src/core/bucket-b/flange-hub-solver.js \
+            src/core/bucket-b/flange-hub-recovery.js \
+            src/core/bucket-b/flange-hub-convergence.js)"
+
+      - name: Verify syntax, determinism, conformity, and frozen production isolation
+        run: |
+          set -euo pipefail
+          node --check src/core/bucket-b/flange-hub-diagnostic-solver.js
+          node --check src/core/bucket-b/flange-hub-transition-candidate.js
+          node --check scripts/bb11-b03-b04-transition-screen.mjs
+          node --check tests/bucket-b-bb11-transition-candidate.test.mjs
+          node --test tests/bucket-b-bb11-transition-candidate.test.mjs
+
+      - name: Execute bounded M0-M3 axial screen
+        id: screen
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BB11_TRANSITION_REPORT_PATH: reports/bb11-b03-b04-transition-candidate.json
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: |
+          set +e
+          mkdir -p reports
+          timeout --signal=TERM --kill-after=60s 50m \
+            node scripts/bb11-b03-b04-transition-screen.mjs \
+            > >(tee reports/bb11-b03-b04-transition.stdout.log) \
+            2> >(tee reports/bb11-b03-b04-transition.stderr.log >&2)
+          status=$?
+          printf '%s\n' "$status" > reports/bb11-b03-b04-transition.exit-code.txt
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Enforce candidate axial acceptance
+        shell: bash
+        env:
+          SCREEN_EXIT_CODE: ${{ steps.screen.outputs.exit_code }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$SCREEN_EXIT_CODE" = '0'
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFile } from 'node:fs/promises';
+          const report = JSON.parse(await readFile(
+            'reports/bb11-b03-b04-transition-candidate.json',
+            'utf8',
+          ));
+          assert.equal(report.schema, 'bb11-b03-b04-transition-screen/v1');
+          assert.equal(report.exactHeadSha, process.env.EXPECTED_HEAD_SHA);
+          assert.equal(
+            report.productionParentSha,
+            process.env.BB11_PRODUCTION_PARENT_SHA,
+          );
+          assert.equal(report.levels.length, 4);
+          assert.equal(report.certificateFailures.length, 0);
+          assert.equal(report.hardRegisteredFailure, false);
+          assert.equal(report.physicalTailEvaluation.accepted, true);
+          assert.ok(report.physicalTailEvaluation.normalizedChange <= 0.005);
+          assert.notEqual(report.registeredEvaluation.disposition, 'OSCILLATORY');
+          assert.notEqual(
+            report.registeredEvaluation.disposition,
+            'REFERENCE_ERROR_FAILURE',
+          );
+          assert.notEqual(
+            report.registeredEvaluation.disposition,
+            'EQUILIBRIUM_ONLY',
+          );
+          assert.equal(report.accepted, true);
+          assert.equal(
+            report.decision,
+            'AXIAL_SCREEN_PASS_RUN_COMPLETE_BB11_QUALIFICATION',
+          );
+          report.levels.forEach((level) => {
+            assert.equal(level.quality.accepted, true);
+            assert.equal(level.interfaceEvidence.allConforming, true);
+            assert.equal(level.interfaceEvidence.hangingNodeCount, 0);
+            assert.equal(
+              level.probeEvidence.positiveZOwnershipVerified,
+              true,
+            );
+            assert.equal(level.equilibrium.accepted, true);
+            assert.equal(level.energy.accepted, true);
+            assert.equal(level.residual.accepted, true);
+          });
+          assert.deepEqual(report.authority, {
+            qualificationAuthorityGranted: false,
+            productionAuthorityGranted: false,
+            productionMeshSelected: false,
+            mergeAuthorityGranted: false,
+            bb12Authorized: false,
+          });
+          NODE
+
+      - name: Upload non-authorizing candidate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bb11-b03-b04-transition-${{ github.event.pull_request.head.sha }}-${{ github.run_attempt }}
+          path: reports
+          if-no-files-found: warn
+          retention-days: 14
