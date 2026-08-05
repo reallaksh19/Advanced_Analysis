@@ -22,6 +22,7 @@ import { semanticHash } from '../shared-piping-model/index.js';
 
 const ROOT = resolve(new URL('../../..', import.meta.url).pathname);
 const SCRIPT = resolve(new URL(import.meta.url).pathname);
+const CORE_CHILD_TIMEOUT_MS = 14 * 60 * 1000;
 const GOVERNED_BB10_PATHS = Object.freeze([
   'src/core/bucket-b/q8-kernel.js',
   'src/core/bucket-b/axisymmetric-q8-kernel.js',
@@ -73,10 +74,10 @@ function createEvidenceAndApproval() {
   const outputDir = resolve(process.env.BB11_OUTPUT_DIR ?? 'reports/bb11');
   mkdirSync(outputDir, { recursive: true });
 
-  const coreA = runChild(['--core']);
-  const coreB = runChild(['--core']);
-  assert.equal(coreA.status, 0, coreA.stderr);
-  assert.equal(coreB.status, 0, coreB.stderr);
+  const coreA = runChild(['--core'], 'core-a', outputDir);
+  assertChildSuccess(coreA, 'BB-11 core A');
+  const coreB = runChild(['--core'], 'core-b', outputDir);
+  assertChildSuccess(coreB, 'BB-11 core B');
   assert.equal(coreA.stdout, coreB.stdout, 'BB-11 core stdout replay is not byte-identical.');
   assert.equal(coreA.stderr, coreB.stderr, 'BB-11 core stderr replay is not byte-identical.');
   const core = JSON.parse(coreA.stdout);
@@ -336,7 +337,34 @@ function gitChangedPaths(baseSha, headSha) {
     return { status: fields[0], path: fields[1] };
   }).sort((a, b) => a.path.localeCompare(b.path));
 }
-function runChild(args) { return spawnSync(process.execPath, [SCRIPT, ...args], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1024 ** 3, env: { ...process.env } }); }
+function runChild(args, label, outputDir) {
+  const result = spawnSync(process.execPath, [SCRIPT, ...args], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    maxBuffer: 1024 ** 3,
+    timeout: CORE_CHILD_TIMEOUT_MS,
+    killSignal: 'SIGKILL',
+    env: { ...process.env, BB11_DIAGNOSTICS: '1' },
+  });
+  writeFileSync(resolve(outputDir, `bucket-b-bb11-${label}-partial-stdout.log`), result.stdout ?? '');
+  writeFileSync(resolve(outputDir, `bucket-b-bb11-${label}-partial-stderr.log`), result.stderr ?? '');
+  writeJson(outputDir, `bucket-b-bb11-${label}-termination.json`, {
+    status: result.status,
+    signal: result.signal,
+    errorCode: result.error?.code ?? null,
+    errorMessage: result.error?.message ?? null,
+    timeoutMs: CORE_CHILD_TIMEOUT_MS,
+  });
+  return result;
+}
+function assertChildSuccess(result, label) {
+  assert.equal(
+    result.error,
+    undefined,
+    `${label} process error: ${result.error?.code ?? 'UNKNOWN'}: ${result.error?.message ?? ''}\n${result.stderr ?? ''}`,
+  );
+  assert.equal(result.status, 0, `${label} failed with signal ${result.signal ?? 'none'}:\n${result.stderr ?? ''}`);
+}
 function runBb10Core() { return spawnSync(process.execPath, [resolve(ROOT, 'src/core/bucket-b/bb10-check.mjs'), '--core'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1024 ** 3, env: { ...process.env } }); }
 function resolveExactHead() { const head = git(['rev-parse', 'HEAD']); const expected = process.env.EXPECTED_HEAD_SHA ?? head; assert.equal(head, expected); return head; }
 function resolveBaseSha() { const value = process.env.EXPECTED_BASE_SHA ?? git(['merge-base', 'origin/main', 'HEAD']); assert.match(value, /^[0-9a-f]{40}$/u); return value; }
