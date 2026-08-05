@@ -20,6 +20,15 @@ export class TopologyEdit3DViewController extends ProfessionalController {
 
   buildShell() {
     super.buildShell();
+    const primaryNavigation = this.hostElement?.querySelector(
+      '.topology-edit-clean-shell__navigation-primary',
+    );
+    const fitSelection = this.hostElement?.querySelector(
+      '[data-navigation-action="fit-selection"]',
+    );
+    if (primaryNavigation && fitSelection) primaryNavigation.append(fitSelection);
+    const sidecar = this.hostElement?.querySelector('[data-role="topology-edit-sidecar"]');
+    if (sidecar) sidecar.tabIndex = -1;
     this.cleanShellRuntime.mount(this.hostElement);
   }
 
