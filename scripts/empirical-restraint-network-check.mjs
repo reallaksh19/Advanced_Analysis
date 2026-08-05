@@ -187,17 +187,7 @@ assert.equal(unqualifiedResult.status, 'BLOCKED');
 assert(hasBlocker(unqualifiedResult, EMPIRICAL_FAILURE_CODES.EMPIRICAL_PROFILE_UNQUALIFIED));
 
 const branchProfile = profileFor(['L1', 'L2', 'L3']);
-const branchFixture = buildBranchFixture(branchProfile);
-const branchResult = execute(branchFixture);
-console.log('WP5_BRANCH_DIAGNOSTIC', JSON.stringify({
-  status: branchResult.status,
-  blockers: branchResult.loadCases.map((row) => ({
-    loadCaseId: row.loadCaseId,
-    blockers: row.blockers,
-  })),
-  connections: branchFixture.topologyGraph.connections,
-  unresolvedPorts: branchFixture.topologyGraph.unresolvedPorts,
-}, null, 2));
+const branchResult = execute(buildBranchFixture(branchProfile));
 assert.equal(branchResult.status, 'BLOCKED');
 assert(hasBlocker(branchResult, EMPIRICAL_FAILURE_CODES.TOPOLOGY_BRANCH_PROFILE_REQUIRED));
 assert.equal(branchResult.summary.calculatedCaseCount, 0);
@@ -638,6 +628,7 @@ function port(componentKey, role, position) {
   if (peerMap[portKey]) sourceReference.explicitPeerPortKey = peerMap[portKey];
   const branchCenter = role === 'FROM' && ['ARM-Z', 'ARM-X', 'ARM-Y'].includes(componentKey);
   if (branchCenter) sourceReference.explicitConnectionId = 'WP5-BRANCH-JUNCTION';
+  if (branchCenter && componentKey === 'ARM-Z') sourceReference.multiConnection = true;
   return {
     portKey,
     role,
