@@ -173,7 +173,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: lafea-nc-solver-bridge-debug-${{ steps.exact.outputs.head_sha }}-${{ github.run_attempt }}
-          path: artifacts/lafea-nc-solver-bridge-debug
+          path: |
+            artifacts/lafea-nc-solver-bridge-debug
+            artifacts/lafea-nc-solver-bridge
           if-no-files-found: error
           retention-days: 14
 
