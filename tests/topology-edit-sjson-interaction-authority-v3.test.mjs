@@ -7,6 +7,7 @@ import {
   projectGovernedSjsonSupportGlyphs,
 } from '../src/workspace/topology-edit/topology-edit-sjson-support-glyph-projection-v3.js';
 import {
+  SJSON_CAMERA_CLIPPING_AUTHORITY,
   applyGovernedCameraClipping,
   createGovernedCameraClippingPolicy,
 } from '../src/workspace/topology-edit/topology-edit-sjson-camera-clipping-v3.js';
@@ -79,11 +80,8 @@ test('GPU pick radius is expressed in CSS pixels and scales with DPR', () => {
   assert.equal(viewport.height, 49);
 });
 
-test('automatic clipping follows camera motion and manual clipping is exact', () => {
+test('automatic clipping remains conservative outside and inside scene bounds', () => {
   const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1_000_000);
-  camera.position.set(0, 0, 1000);
-  camera.lookAt(0, 0, 0);
-  camera.updateMatrixWorld(true);
   const backend = {
     activeCamera: camera,
     navigationConfiguration: { cameraNearMm: 0.1, cameraFarMm: 1_000_000 },
@@ -96,16 +94,26 @@ test('automatic clipping follows camera motion and manual clipping is exact', ()
     backend.navigationConfiguration,
     { mode: 'AUTO' },
   );
+
+  positionCamera(camera, 1000);
   const fitted = applyGovernedCameraClipping(backend);
+  assert.equal(fitted.authority, SJSON_CAMERA_CLIPPING_AUTHORITY);
+  assert.equal(fitted.cameraInsideBounds, false);
   assert.ok(fitted.appliedNearMm < fitted.nearestDepthMm);
   assert.ok(fitted.appliedFarMm > fitted.farthestDepthMm);
 
-  camera.position.set(0, 0, 150);
-  camera.lookAt(0, 0, 0);
-  camera.updateMatrixWorld(true);
+  positionCamera(camera, 500);
   const zoomed = applyGovernedCameraClipping(backend);
+  assert.equal(zoomed.cameraInsideBounds, false);
   assert.ok(zoomed.appliedNearMm < fitted.appliedNearMm);
   assert.ok(zoomed.appliedNearMm < zoomed.nearestDepthMm);
+
+  positionCamera(camera, 150);
+  const inside = applyGovernedCameraClipping(backend);
+  assert.equal(inside.cameraInsideBounds, true);
+  assert.equal(inside.nearestDepthMm, 0);
+  assert.equal(inside.appliedNearMm, 0.1);
+  assert.ok(inside.appliedFarMm > inside.farthestDepthMm);
 
   backend.governedCameraClippingPolicy = createGovernedCameraClippingPolicy(
     backend.navigationConfiguration,
@@ -117,3 +125,9 @@ test('automatic clipping follows camera motion and manual clipping is exact', ()
   assert.equal(camera.near, 2);
   assert.equal(camera.far, 5000);
 });
+
+function positionCamera(camera, z) {
+  camera.position.set(0, 0, z);
+  camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld(true);
+}
