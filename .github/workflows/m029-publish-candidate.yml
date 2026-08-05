@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-          fetch-depth: 4
+          fetch-depth: 8
 
       - uses: actions/setup-node@v4
         with:
@@ -65,37 +65,45 @@ jobs:
             reports/m028-bm3-qualification.json \
             reports/m030-inputxml-restraint-mutation.json
 
-      - name: Commit only the qualified sixteen-file candidate
+      - name: Build and publish only the qualified sixteen-file tree
         shell: bash
         run: |
           set -euo pipefail
           BASE=a9a4b0cb0acfa5794e45fcaebd190e8d7c3141d6
-          cat > /tmp/expected.txt <<'EOF'
-          .github/workflows/m029-programmed-spring-hangers.yml
-          docs/qualification/M029_PROGRAMMED_SPRING_HANGER_RECORD.md
-          scripts/lfea-b3.3-solver-check.mjs
-          scripts/lfea-m028-bm3-comparison.mjs
-          scripts/lfea-m028-bm3-fixtures.mjs
-          scripts/lfea-m029-bm3-hanger-check.mjs
-          scripts/lfea-m029-bm3-hangers.mjs
-          src/core/linear-fea-solver/README.md
-          src/core/linear-fea-solver/qualification.js
-          src/core/linear-fea-solver/solve.js
-          src/core/linear-fea-variable-spring-hanger/README.md
-          src/core/linear-fea-variable-spring-hanger/catalog.js
-          src/core/linear-fea-variable-spring-hanger/compile.js
-          src/core/linear-fea-variable-spring-hanger/design.js
-          src/core/linear-fea-variable-spring-hanger/index.js
-          src/core/linear-fea-variable-spring-hanger/recover.js
-          EOF
-          sed -i 's/^          //' /tmp/expected.txt
-          sort -o /tmp/expected.txt /tmp/expected.txt
-          git diff --name-only "$BASE" | sort > /tmp/actual.txt
-          diff -u /tmp/expected.txt /tmp/actual.txt
+          paths=(
+            .github/workflows/m029-programmed-spring-hangers.yml
+            docs/qualification/M029_PROGRAMMED_SPRING_HANGER_RECORD.md
+            scripts/lfea-b3.3-solver-check.mjs
+            scripts/lfea-m028-bm3-comparison.mjs
+            scripts/lfea-m028-bm3-fixtures.mjs
+            scripts/lfea-m029-bm3-hanger-check.mjs
+            scripts/lfea-m029-bm3-hangers.mjs
+            src/core/linear-fea-solver/README.md
+            src/core/linear-fea-solver/qualification.js
+            src/core/linear-fea-solver/solve.js
+            src/core/linear-fea-variable-spring-hanger/README.md
+            src/core/linear-fea-variable-spring-hanger/catalog.js
+            src/core/linear-fea-variable-spring-hanger/compile.js
+            src/core/linear-fea-variable-spring-hanger/design.js
+            src/core/linear-fea-variable-spring-hanger/index.js
+            src/core/linear-fea-variable-spring-hanger/recover.js
+          )
+          for path in "${paths[@]}"; do
+            test -f "$path"
+          done
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add -A
-          git diff --cached --name-only "$BASE" | sort > /tmp/staged.txt
-          diff -u /tmp/expected.txt /tmp/staged.txt
-          git commit -m 'M029: implement program-designed variable spring hangers'
-          git push origin HEAD:agent/m029-publish-staging
+          git read-tree "$BASE"
+          git add -- "${paths[@]}"
+          tree=$(git write-tree)
+          commit=$(printf '%s\n\n%s\n' \
+            'M029: implement program-designed variable spring hangers' \
+            'First-principles restrained-weight design, operating travel, catalog selection, spring/preload compilation, and grounded-spring reaction/equilibrium recovery.' \
+            | git commit-tree "$tree" -p "$BASE")
+          printf '%s\n' "${paths[@]}" | sort > /tmp/expected.txt
+          git diff-tree --no-commit-id --name-only -r "$commit" | sort > /tmp/actual.txt
+          diff -u /tmp/expected.txt /tmp/actual.txt
+          test "$(wc -l < /tmp/actual.txt)" -eq 16
+          git push \
+            --force-with-lease=refs/heads/agent/m029-publish-staging:${{ github.sha }} \
+            origin "$commit":refs/heads/agent/m029-publish-staging
