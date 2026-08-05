@@ -1,0 +1,89 @@
+name: BB-11 axial tail B05-B06 diagnostic
+
+on:
+  push:
+    branches:
+      - diagnostic/bb11-axial-tail-b05-b06
+    paths:
+      - '.github/workflows/bb11-axial-tail-diagnostic.yml'
+      - 'scripts/bb11-axial-tail-diagnostic.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    name: Non-authorizing axial M0-M3 diagnostic
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Check out diagnostic head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Apply workspace-only B05-B06 refinement
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/core/bucket-b/flange-hub-mesh.js')
+          text = path.read_text()
+          replacements = [
+              (
+                  "export const FLANGE_HUB_MESH_FAMILY_ID = 'BKT-B-FLANGE-Q8-MESH-FAMILY-V1';",
+                  "export const FLANGE_HUB_MESH_FAMILY_ID = 'BKT-B-FLANGE-Q8-DIAGNOSTIC-B05-B06-V1';",
+              ),
+              (
+                  'return piecewiseBreakpoints(segmentLengths, [4, 6, 2]);',
+                  'return piecewiseBreakpoints(segmentLengths, [8, 12, 4]);',
+              ),
+              (
+                  'return piecewiseBreakpoints([horizontalLength, verticalLength], [4, 6]);',
+                  'return piecewiseBreakpoints([horizontalLength, verticalLength], [8, 12]);',
+              ),
+          ]
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected one diagnostic replacement for {old!r}; found {count}')
+              text = text.replace(old, new)
+          path.write_text(text)
+          PY
+          git diff --check
+          git diff -- src/core/bucket-b/flange-hub-mesh.js
+
+      - name: Verify diagnostic syntax
+        run: |
+          node --check src/core/bucket-b/flange-hub-mesh.js
+          node --check scripts/bb11-axial-tail-diagnostic.mjs
+
+      - name: Execute axial-only diagnostic
+        env:
+          BB11_DIAGNOSTIC_MESH_FAMILY_ID: BKT-B-FLANGE-Q8-DIAGNOSTIC-B05-B06-V1
+          BB11_AXIAL_DIAGNOSTIC_REPORT_PATH: reports/bb11-axial-tail-b05-b06.json
+          TZ: UTC
+          LC_ALL: C
+        run: node scripts/bb11-axial-tail-diagnostic.mjs
+
+      - name: Upload non-authorizing evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bb11-axial-tail-b05-b06-${{ github.sha }}-${{ github.run_attempt }}
+          path: reports/bb11-axial-tail-b05-b06.json
+          if-no-files-found: warn
+          retention-days: 14
