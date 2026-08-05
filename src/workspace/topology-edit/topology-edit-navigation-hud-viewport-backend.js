@@ -37,6 +37,8 @@ export class TopologyEditNavigationHudViewportBackend extends TopologyEditSuppor
    * An exact ray hit is authoritative for a direct pointer click. GPU radius
    * sampling remains the dense-scene fallback, but cannot replace a different
    * exact node/edge under the cursor with a nearby proxy from the search window.
+   * A fallback receipt resolves through the deterministic winning GPU sample,
+   * not the original cursor ray, so the configured screen-space tolerance is real.
    */
   pickAt(clientX, clientY) {
     if (this.contextLost || this.configurationError) return null;
@@ -53,7 +55,10 @@ export class TopologyEditNavigationHudViewportBackend extends TopologyEditSuppor
       camera: this.activeCamera,
     });
     if (!gpuHit) return null;
-    const point = this.resolveGpuPickPoint(gpuHit, context.pointer);
+    const point = this.resolveGpuPickPoint(
+      gpuHit,
+      gpuHit.samplePointer ?? context.pointer,
+    );
     return point ? this.pickReceipt(gpuHit.target, point) : null;
   }
 
