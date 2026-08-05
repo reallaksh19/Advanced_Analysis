@@ -19,6 +19,9 @@ import {
 } from './topology-edit-sjson-governed-projection-v2.js';
 
 const NODE_VISUAL_OPACITY = 0.18;
+const ROUTE_SOLID_RENDER_AUTHORITY = 'GOVERNED_OD_SOLID_ROUTE_MESH_V4';
+const ROUTE_SOLID_PICK_AUTHORITY = 'GOVERNED_DRAFT_OD_SOLID_PICK_TARGET_V4';
+const ROUTE_RADIUS_AUTHORITY = 'CANONICAL_PROJECTED_RADIUS_OR_OUTSIDE_DIAMETER_V1';
 
 export function renderGovernedSjsonRoute({
   backend,
@@ -31,18 +34,66 @@ export function renderGovernedSjsonRoute({
   const bounds = new THREE.Box3();
   const lineMaterials = new Map();
   const meshMaterials = new Map();
+  const routeMaterials = new Map();
   const pickMaterial = invisiblePickMaterial();
   const isDraft = group === backend.groups.draftGroup;
   let lineCount = 0;
+  let solidMeshCount = 0;
+  let directPickMeshCount = 0;
   let pickProxyCount = 0;
   try {
     for (const segment of projection.compactSegments || []) {
       const points = routePoints(segment);
       if (points.length < 2) continue;
       const color = Number.isInteger(segment.colorInt) ? segment.colorInt : fallbackColor;
+      const visualRadiusMm = routeVisualRadius(segment);
+      const endRadiusMm = routeEndRadius(segment);
+      const solid = visualRadiusMm === null
+        ? null
+        : routeSolidMesh(
+          segment,
+          points,
+          routeMeshMaterial(routeMaterials, color, opacity),
+          visualRadiusMm,
+          endRadiusMm,
+          backend.navigationConfiguration.meshRadialSegments,
+        );
+      if (solid) {
+        solid.name = `topology-edit-visible-route-solid:${segment.id || ''}`;
+        solid.userData = isDraft
+          ? {
+            ...pickUserData(segment),
+            directPickMesh: true,
+            visualRouteSolid: true,
+            routeRadiusMm: visualRadiusMm,
+            routeEndRadiusMm: endRadiusMm,
+            radiusAuthority: ROUTE_RADIUS_AUTHORITY,
+            renderAuthority: ROUTE_SOLID_PICK_AUTHORITY,
+          }
+          : {
+            nonPickable: true,
+            visualRouteSolid: true,
+            routeRadiusMm: visualRadiusMm,
+            routeEndRadiusMm: endRadiusMm,
+            radiusAuthority: ROUTE_RADIUS_AUTHORITY,
+            renderAuthority: ROUTE_SOLID_RENDER_AUTHORITY,
+          };
+        staging.add(solid);
+        solidMeshCount += 1;
+        if (isDraft) directPickMeshCount += 1;
+        expandRouteBounds(bounds, points, Math.max(visualRadiusMm, endRadiusMm || 0));
+      } else {
+        points.forEach((point) => bounds.expandByPoint(point));
+      }
+
       const line = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints(points),
-        lineMaterial(lineMaterials, color, routeOpacity(segment, opacity), true),
+        lineMaterial(
+          lineMaterials,
+          color,
+          centerlineOpacity(segment, opacity, Boolean(solid)),
+          true,
+        ),
       );
       line.name = `topology-edit-edit-draft-centerline:${segment.id || ''}`;
       line.userData = isDraft
@@ -56,14 +107,13 @@ export function renderGovernedSjsonRoute({
         };
       staging.add(line);
       lineCount += 1;
-      points.forEach((point) => bounds.expandByPoint(point));
 
       if (isDraft) {
         const proxy = routePickProxy(
           segment,
           points,
           pickMaterial,
-          routePickRadius(backend.navigationConfiguration),
+          governedRoutePickRadius(backend.navigationConfiguration, visualRadiusMm, endRadiusMm),
           backend.navigationConfiguration.meshRadialSegments,
         );
         if (proxy) {
@@ -87,6 +137,8 @@ export function renderGovernedSjsonRoute({
     backend.applySectionPlanesToGroup(group);
     publishRouteEvidence(backend.hostElement, projection, {
       lineCount,
+      solidMeshCount,
+      directPickMeshCount,
       pickProxyCount,
       ...nodeMetrics,
     }, isDraft);
@@ -95,6 +147,7 @@ export function renderGovernedSjsonRoute({
     disposeStaging(staging, [
       ...lineMaterials.values(),
       ...meshMaterials.values(),
+      ...routeMaterials.values(),
       pickMaterial,
     ]);
     throw error;
@@ -186,6 +239,40 @@ function routePoints(segment) {
     .getPoints(Math.max(8, Math.floor(Number(segment.curveSegments) || 12)));
 }
 
+function routeSolidMesh(segment, points, material, radiusMm, endRadiusMm, radialSegments) {
+  let geometry;
+  let position = null;
+  let quaternion = null;
+  const governedRadialSegments = Math.max(12, radialSegments);
+  if (segment.curveKind === 'CUBIC_BEZIER') {
+    geometry = new THREE.TubeGeometry(
+      new THREE.CatmullRomCurve3(points, false, 'centripetal'),
+      Math.max(12, points.length - 1),
+      radiusMm,
+      governedRadialSegments,
+      false,
+    );
+  } else {
+    const start = points[0];
+    const end = points[points.length - 1];
+    const direction = end.clone().sub(start);
+    const lengthMm = direction.length();
+    if (lengthMm <= MIN_LENGTH_MM) return null;
+    geometry = new THREE.CylinderGeometry(
+      endRadiusMm || radiusMm,
+      radiusMm,
+      lengthMm,
+      governedRadialSegments,
+    );
+    position = start.clone().add(end).multiplyScalar(0.5);
+    quaternion = new THREE.Quaternion().setFromUnitVectors(Y_AXIS, direction.normalize());
+  }
+  const mesh = new THREE.Mesh(geometry, material);
+  if (position) mesh.position.copy(position);
+  if (quaternion) mesh.quaternion.copy(quaternion);
+  return mesh;
+}
+
 function routePickProxy(segment, points, material, radiusMm, radialSegments) {
   let geometry;
   let position = null;
@@ -215,15 +302,76 @@ function routePickProxy(segment, points, material, radiusMm, radialSegments) {
   proxy.userData = {
     ...pickUserData(segment),
     pickProxy: true,
-    renderAuthority: 'GOVERNED_ROUTE_PICK_PROXY_V3',
+    renderAuthority: 'GOVERNED_ROUTE_PICK_PROXY_V4',
   };
   return proxy;
+}
+
+function routeMeshMaterial(cache, colorValue, opacity) {
+  const color = Number.isInteger(colorValue) ? colorValue : 0x64748b;
+  const governedOpacity = Math.min(Math.max(Number(opacity) || 0, 0.12), 1);
+  const key = `${color}:${governedOpacity}`;
+  if (!cache.has(key)) {
+    cache.set(key, new THREE.MeshStandardMaterial({
+      color,
+      roughness: 0.38,
+      metalness: 0.12,
+      transparent: governedOpacity < 1,
+      opacity: governedOpacity,
+      depthTest: true,
+      depthWrite: governedOpacity >= 0.98,
+    }));
+  }
+  return cache.get(key);
+}
+
+function routeVisualRadius(segment) {
+  return firstPositive(
+    segment?.radiusMm,
+    halfPositive(segment?.sourceOutsideDiameterMm),
+    halfPositive(segment?.outsideDiameterMm),
+  );
+}
+
+function routeEndRadius(segment) {
+  return firstPositive(
+    segment?.endRadiusMm,
+    halfPositive(segment?.endOutsideDiameterMm),
+  );
+}
+
+function governedRoutePickRadius(configuration, visualRadiusMm, endRadiusMm) {
+  const configured = routePickRadius(configuration);
+  const visible = Math.max(visualRadiusMm || 0, endRadiusMm || 0);
+  return visible > 0 ? Math.max(configured, visible + Math.min(configured * 0.5, 8)) : configured;
+}
+
+function expandRouteBounds(bounds, points, radiusMm) {
+  points.forEach((point) => expandPointRadius(bounds, point, radiusMm));
+}
+
+function centerlineOpacity(segment, opacity, hasSolid) {
+  if (!hasSolid) return routeOpacity(segment, opacity);
+  return Math.min(Number(opacity) || 0, 0.26);
 }
 
 function routeOpacity(segment, opacity) {
   const kind = String(segment?.kind || '');
   const fitting = !['PIPE', 'ELBOW', 'ELBOW_ENTRY', 'ELBOW_EXIT'].includes(kind);
   return Math.min(opacity, fitting ? 0.9 : 0.72);
+}
+
+function firstPositive(...values) {
+  for (const value of values) {
+    const number = Number(value);
+    if (Number.isFinite(number) && number > 0) return number;
+  }
+  return null;
+}
+
+function halfPositive(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number / 2 : null;
 }
 
 function publishRouteEvidence(host, projection, metrics, isDraft) {
@@ -239,9 +387,12 @@ function publishRouteEvidence(host, projection, metrics, isDraft) {
   );
   host.dataset.topologyEditRichTypedPrimitiveRenderCount = '0';
   host.dataset.topologyEditVisibleRouteLineCount = String(metrics.lineCount);
+  host.dataset.topologyEditVisibleRouteSolidMeshCount = String(metrics.solidMeshCount);
+  host.dataset.topologyEditDirectPickRouteMeshCount = String(metrics.directPickMeshCount);
   host.dataset.topologyEditRoutePickProxyCount = String(metrics.pickProxyCount);
   host.dataset.topologyEditDraftCenterlinePickable = 'true';
-  host.dataset.topologyEditVisibleRouteSolidMeshCount = '0';
+  host.dataset.topologyEditDraftSolidMeshPickable = String(metrics.directPickMeshCount > 0);
+  host.dataset.topologyEditRouteRadiusAuthority = ROUTE_RADIUS_AUTHORITY;
   host.dataset.topologyEditVisibleNodeMarkerCount = String(metrics.nodeCount);
   host.dataset.topologyEditCompactNodePickProxyCount = String(metrics.nodeCount);
   host.dataset.topologyEditVisibleNodeMarkerRadiusMm = String(metrics.nodeVisualRadiusMm);
