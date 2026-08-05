@@ -1,0 +1,60 @@
+name: empirical-result-overlays-wp4
+
+on:
+  pull_request:
+    paths:
+      - 'src/workspace/engineering-loads/empirical-result-overlay*.js'
+      - 'src/workspace/engineering-loads/empirical-load-calc-scenario-controller.js'
+      - 'src/workspace/engineering-loads/empirical-load-calc-scenario-view.js'
+      - 'src/workspace/topology-edit/topology-edit-empirical-result-renderer-v1.js'
+      - 'src/workspace/topology-edit/topology-edit-sjson-governed-viewport-backend-v2.js'
+      - 'src/workspace/load-calc-consumer-controller.js'
+      - 'src/workspace/bootstrap.js'
+      - 'scripts/empirical-result-overlay-check.mjs'
+      - '.github/workflows/empirical-result-overlays-wp4.yml'
+      - '.github/workflows/empirical-piping-exact-head.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  result-overlays:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Prove exact-head execution
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          git diff --exit-code
+
+      - name: Syntax contracts
+        shell: bash
+        run: |
+          node --check src/workspace/engineering-loads/empirical-result-overlay.js
+          node --check src/workspace/engineering-loads/empirical-result-overlay-store.js
+          node --check src/workspace/topology-edit/topology-edit-empirical-result-renderer-v1.js
+          node --check src/workspace/topology-edit/topology-edit-sjson-governed-viewport-backend-v2.js
+          node --check src/workspace/load-calc-consumer-controller.js
+
+      - name: Result projection, renderer, picking and stale clearing
+        run: node scripts/empirical-result-overlay-check.mjs
+
+      - name: Scenario and UI regression
+        run: node scripts/empirical-load-calc-scenario-check.mjs
+
+      - name: Import graph
+        run: npm run check:imports
+
+      - name: Load Calc shell invariants
+        run: node scripts/advanced-shell-contract-check.mjs
