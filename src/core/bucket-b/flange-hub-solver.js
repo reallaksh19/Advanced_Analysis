@@ -11,9 +11,9 @@ import {
 import { FLANGE_HUB_MATERIAL_PROFILE } from './flange-hub-geometry.js';
 
 export const FLANGE_HUB_SOLVER_POLICY = deepFreeze({
-  solverPolicyId: 'BKT-B-FLANGE-HUB-DETERMINISTIC-JACOBI-PCG-V3',
-  relativeResidualTolerance: 1e-10,
-  absoluteResidualTolerance: 1e-8,
+  solverPolicyId: 'BKT-B-FLANGE-HUB-DETERMINISTIC-JACOBI-PCG-V4',
+  relativeResidualTolerance: 1e-12,
+  absoluteResidualTolerance: 1e-10,
   maximumIterationMultiplier: 8,
   minimumMaximumIterations: 2000,
   residualReplacementInterval: 0,
@@ -128,7 +128,7 @@ export function solveFlangeHubLoadCase({ mesh, loadCaseId } = {}) {
   if (energyRelativeDifference > 1e-8) {
     throw new RangeError(`FH_ENERGY_IDENTITY_FAILURE:${energyRelativeDifference}`);
   }
-  if (freeResidualRelative > 1e-10) {
+  if (freeResidualRelative > FLANGE_HUB_SOLVER_POLICY.relativeResidualTolerance) {
     throw new RangeError(`FH_FREE_DOF_RESIDUAL_FAILURE:${freeResidualRelative}`);
   }
 
@@ -219,7 +219,8 @@ export function solveFlangeHubLoadCase({ mesh, loadCaseId } = {}) {
     residual: {
       freeResidualNorm: freeResidual,
       freeResidualRelative,
-      accepted: freeResidualRelative <= 1e-10,
+      accepted: freeResidualRelative
+        <= FLANGE_HUB_SOLVER_POLICY.relativeResidualTolerance,
     },
   };
   return deepFreeze({ ...payload, semanticHash: semanticHash(payload) });
