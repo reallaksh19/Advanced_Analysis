@@ -32,6 +32,7 @@ export function renderGovernedSjsonRoute({
   const lineMaterials = new Map();
   const meshMaterials = new Map();
   const pickMaterial = invisiblePickMaterial();
+  const isDraft = group === backend.groups.draftGroup;
   let lineCount = 0;
   let pickProxyCount = 0;
   try {
@@ -44,29 +45,36 @@ export function renderGovernedSjsonRoute({
         lineMaterial(lineMaterials, color, routeOpacity(segment, opacity), true),
       );
       line.name = `topology-edit-edit-draft-centerline:${segment.id || ''}`;
-      line.userData = {
-        nonPickable: true,
-        renderAuthority: TOPOLOGY_EDIT_SJSON_GOVERNED_RENDER_AUTHORITY,
-      };
+      line.userData = isDraft
+        ? {
+          ...pickUserData(segment),
+          renderAuthority: 'GOVERNED_DRAFT_CENTERLINE_PICK_TARGET_V3',
+        }
+        : {
+          nonPickable: true,
+          renderAuthority: TOPOLOGY_EDIT_SJSON_GOVERNED_RENDER_AUTHORITY,
+        };
       staging.add(line);
       lineCount += 1;
       points.forEach((point) => bounds.expandByPoint(point));
 
-      const proxy = routePickProxy(
-        segment,
-        points,
-        pickMaterial,
-        routePickRadius(backend.navigationConfiguration),
-        backend.navigationConfiguration.meshRadialSegments,
-      );
-      if (proxy) {
-        staging.add(proxy);
-        pickProxyCount += 1;
+      if (isDraft) {
+        const proxy = routePickProxy(
+          segment,
+          points,
+          pickMaterial,
+          routePickRadius(backend.navigationConfiguration),
+          backend.navigationConfiguration.meshRadialSegments,
+        );
+        if (proxy) {
+          staging.add(proxy);
+          pickProxyCount += 1;
+        }
       }
     }
 
     let nodeMetrics = emptyNodeMetrics(backend);
-    if (group === backend.groups.draftGroup) {
+    if (isDraft) {
       nodeMetrics = addGovernedNodes(
         staging,
         bounds,
@@ -81,7 +89,7 @@ export function renderGovernedSjsonRoute({
       lineCount,
       pickProxyCount,
       ...nodeMetrics,
-    }, group === backend.groups.draftGroup);
+    }, isDraft);
     return bounds;
   } catch (error) {
     disposeStaging(staging, [
@@ -232,6 +240,7 @@ function publishRouteEvidence(host, projection, metrics, isDraft) {
   host.dataset.topologyEditRichTypedPrimitiveRenderCount = '0';
   host.dataset.topologyEditVisibleRouteLineCount = String(metrics.lineCount);
   host.dataset.topologyEditRoutePickProxyCount = String(metrics.pickProxyCount);
+  host.dataset.topologyEditDraftCenterlinePickable = 'true';
   host.dataset.topologyEditVisibleRouteSolidMeshCount = '0';
   host.dataset.topologyEditVisibleNodeMarkerCount = String(metrics.nodeCount);
   host.dataset.topologyEditCompactNodePickProxyCount = String(metrics.nodeCount);
