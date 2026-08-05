@@ -1,0 +1,45 @@
+name: BM2 Auto Source Export
+
+on:
+  push:
+    branches:
+      - agent/bm2-restraint-axis-bend-flexibility
+    paths:
+      - '.github/workflows/bm2-auto-source-export.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Verify exact checkout
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
+          git rev-parse HEAD > /tmp/exact-head.txt
+      - name: Archive exact source
+        run: |
+          set -euo pipefail
+          tar \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='dist' \
+            --exclude='test-results' \
+            -czf /tmp/bm2-auto-exact-source.tar.gz .
+          sha256sum /tmp/bm2-auto-exact-source.tar.gz > /tmp/bm2-auto-exact-source.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bm2-auto-exact-source-${{ github.sha }}
+          path: |
+            /tmp/bm2-auto-exact-source.tar.gz
+            /tmp/bm2-auto-exact-source.sha256
+            /tmp/exact-head.txt
+          if-no-files-found: error
+          retention-days: 7
