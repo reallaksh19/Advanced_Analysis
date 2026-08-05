@@ -207,10 +207,13 @@ export function formatNumber(value) {
     throw new TypeError('Deck numbers must be finite.');
   }
   const normalized = Object.is(value, -0) ? 0 : value;
-  const [mantissa, exponent] = normalized.toExponential(16).split('e');
+  const [mantissa, exponent] = normalized.toExponential(14).split('e');
   const exponentNumber = Number(exponent);
+  if (Math.abs(exponentNumber) > 99) {
+    throw new TypeError('Deck number exponent exceeds the CalculiX field-20 profile.');
+  }
   const sign = exponentNumber >= 0 ? '+' : '-';
-  return `${mantissa}E${sign}${String(Math.abs(exponentNumber)).padStart(3, '0')}`;
+  return `${mantissa}E${sign}${String(Math.abs(exponentNumber)).padStart(2, '0')}`;
 }
 
 function appendRigidSurfaceDefinitions(lines, model, nodeMap, elementMap) {

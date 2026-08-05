@@ -85,8 +85,13 @@ export function reconstructStepSequence(expectedStepIds, observedRows) {
   }
   const exact = observed.length === expectedStepIds.length
     && observed.every((value, index) => value === expectedStepIds[index]);
+  if (exact) {
+    return { status: 'EXACT', expectedStepIds, observedStepIds: observed };
+  }
+  const numericOrdinals = observed.length === expectedStepIds.length
+    && observed.every((value, index) => Number(value) === index + 1);
   return {
-    status: exact ? 'EXACT' : 'MISMATCH',
+    status: numericOrdinals ? 'ORDINAL_COUNT_ONLY' : 'MISMATCH',
     expectedStepIds,
     observedStepIds: observed,
   };

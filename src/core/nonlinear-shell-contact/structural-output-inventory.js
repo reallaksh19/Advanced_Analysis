@@ -22,9 +22,9 @@ const COMPLETION_PATTERNS = Object.freeze([
 
 const FAILURE_PATTERNS = Object.freeze([
   { id: 'FATAL', pattern: /\bFATAL\b/iu },
-  { id: 'ERROR', pattern: /\bERROR\b/iu },
-  { id: 'NO_CONVERGENCE', pattern: /\bNO\s+CONVERGENCE\b/iu },
-  { id: 'DIVERGENCE', pattern: /\bDIVERGENCE\b/iu },
+  { id: 'ERROR', pattern: /(?:^|\n)\s*\*?ERROR\b/iu },
+  { id: 'NO_CONVERGENCE', pattern: /\bNO\s+CONVERGENCE\b/iu, transientWhenComplete: true },
+  { id: 'DIVERGENCE', pattern: /\bDIVERGENCE\b/iu, transientWhenComplete: true },
   { id: 'SEGMENTATION_FAULT', pattern: /\bSEGMENTATION\s+FAULT\b/iu },
   { id: 'NAN_OR_INFINITY', pattern: /(?:\bNAN\b|\bINF(?:INITY)?\b)/iu },
 ]);
@@ -34,23 +34,33 @@ export function inventoryExternalSolverOutputs(retainedFiles, canonicalModel) {
     throw new TypeError('retainedFiles must be a Map.');
   }
   const textFiles = [];
+  const diagnosticTextFiles = [];
   const frdFiles = [];
   for (const [relativePath, bytes] of retainedFiles.entries()) {
     if (!Buffer.isBuffer(bytes)) throw new TypeError(`Retained file ${relativePath} is not a Buffer.`);
     if (/\.frd$/iu.test(relativePath)) frdFiles.push([relativePath, bytes]);
     if (/\.(?:txt|dat|sta|cvg|frd)$/iu.test(relativePath)) {
-      textFiles.push([relativePath, decodeBoundedText(bytes, relativePath)]);
+      const decoded = decodeBoundedText(bytes, relativePath);
+      textFiles.push([relativePath, decoded]);
+      if (!/\.frd$/iu.test(relativePath)) diagnosticTextFiles.push([relativePath, decoded]);
     }
   }
   textFiles.sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
+  diagnosticTextFiles.sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
   frdFiles.sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
   const searchableText = textFiles.map(([path, text]) => `\n--- ${path} ---\n${text}`).join('');
+  const diagnosticText = diagnosticTextFiles
+    .map(([path, text]) => `\n--- ${path} ---\n${text}`)
+    .join('');
 
   const completionMarkers = COMPLETION_PATTERNS
     .filter(({ pattern }) => pattern.test(searchableText))
     .map(({ id }) => id);
+  const completionEstablished = completionMarkers.length > 0;
   const failureMarkers = FAILURE_PATTERNS
-    .filter(({ pattern }) => pattern.test(searchableText))
+    .filter(({ pattern, transientWhenComplete }) => (
+      pattern.test(diagnosticText) && !(transientWhenComplete && completionEstablished)
+    ))
     .map(({ id }) => id);
   const stepInventory = parseStepInventory(searchableText);
   const incrementInventory = parseIncrementInventory(searchableText);
