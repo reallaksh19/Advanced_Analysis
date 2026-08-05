@@ -3,7 +3,7 @@ name: LAFEA-NC Solver Custody Evidence
 on:
   pull_request:
     branches:
-      - agent/lafea-nc00-shell-contact-foundation
+      - main
     paths:
       - '.github/workflows/lafea-nc-solver-custody-evidence.yml'
       - 'docs/nonlinear-shell-contact/LAFEA_NC_SOLVER_CUSTODY_EVIDENCE.md'
@@ -33,7 +33,7 @@ jobs:
       PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
       DISPATCH_HEAD_SHA: ${{ inputs.head_sha }}
       DISPATCH_BASE_SHA: ${{ inputs.base_sha }}
-      NC00_BASE_BRANCH: agent/lafea-nc00-shell-contact-foundation
+      NC00_BASE_BRANCH: main
     steps:
       - name: Resolve exact head
         id: exact
