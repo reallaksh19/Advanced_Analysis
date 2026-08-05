@@ -347,9 +347,28 @@ async function compareExternalExecutionArtifacts(rootA, rootB) {
       ]);
       assert.equal(existsA, existsB, `${fixtureId}:${fileName} presence drift.`);
       if (!existsA) continue;
-      const [hashA, hashB] = await Promise.all([hashFile(pathA), hashFile(pathB)]);
-      assert.equal(hashA, hashB, `${fixtureId}:${fileName} byte drift.`);
-      stableFiles.push({ fileName, sha256: hashA });
+      const [bytesA, bytesB] = await Promise.all([readFile(pathA), readFile(pathB)]);
+      const rawSha256A = sha256(bytesA);
+      const rawSha256B = sha256(bytesB);
+      if (fileName === 'model.frd') {
+        const normalizedA = normalizeFrdTimeHeader(bytesA);
+        const normalizedB = normalizeFrdTimeHeader(bytesB);
+        assert.equal(normalizedA, normalizedB, `${fixtureId}:${fileName} normalized byte drift.`);
+        stableFiles.push({
+          fileName,
+          comparisonMode: 'FRD_1UTIME_HEADER_NORMALIZED',
+          rawSha256A,
+          rawSha256B,
+          normalizedSha256: sha256(Buffer.from(normalizedA, 'utf8')),
+        });
+      } else {
+        assert.equal(rawSha256A, rawSha256B, `${fixtureId}:${fileName} byte drift.`);
+        stableFiles.push({
+          fileName,
+          comparisonMode: 'BYTE_IDENTICAL',
+          rawSha256: rawSha256A,
+        });
+      }
     }
     const stdoutA = normalizeSolverStdout(await readFile(join(rawA, 'solver.stdout.txt'), 'utf8'));
     const stdoutB = normalizeSolverStdout(await readFile(join(rawB, 'solver.stdout.txt'), 'utf8'));
@@ -363,6 +382,17 @@ async function compareExternalExecutionArtifacts(rootA, rootB) {
   assert.ok(fixtures.length >= 7, `Expected at least seven governed external fixtures; received ${fixtures.length}.`);
   const payload = { status: 'PASS', fixtureCount: fixtures.length, fixtures: rows };
   return { ...payload, semanticHash: semanticHash(payload) };
+}
+
+function normalizeFrdTimeHeader(bytes) {
+  const value = bytes.toString('utf8');
+  if (value.includes('\uFFFD')) throw new TypeError('Malformed UTF-8 in FRD replay evidence.');
+  const matches = value.match(/^\s*1UTIME\s+[0-9]{2}:[0-9]{2}:[0-9]{2}\s*$/gmu) ?? [];
+  assert.equal(matches.length, 1, 'FRD evidence must contain exactly one governed 1UTIME header.');
+  return value.replace(
+    /^(\s*1UTIME\s+)[0-9]{2}:[0-9]{2}:[0-9]{2}\s*$/gmu,
+    '$1<NORMALIZED>',
+  );
 }
 
 function normalizeSolverStdout(value) {
