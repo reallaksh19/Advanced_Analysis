@@ -65,16 +65,6 @@ test('production Sjson matches Topo validator support anchors and restraint arra
     verticalAxis: 'Z',
   });
 
-  console.log(`SJSON_TOPO_VALIDATOR_SUPPORT_METRICS=${JSON.stringify({
-    metrics: first.metrics,
-    anchorRestraintCounts: first.anchors.map((anchor) => ({
-      anchorKey: anchor.anchorKey,
-      restraintTypes: anchor.restraintTypes,
-      memberCount: anchor.memberSupportIds.length,
-    })),
-    decisionCounts: Object.groupBy(first.decisions, (decision) => decision.disposition),
-  })}`);
-
   assert.equal(first.authority, 'TOPO_VALIDATOR_SUPPORT_HIERARCHY_POSITION_RESTRAINT_ARRAY');
   assert.equal(
     first.groupingAuthority,
@@ -84,16 +74,23 @@ test('production Sjson matches Topo validator support anchors and restraint arra
   assert.equal(first.authorityHash, second.authorityHash);
   assert.deepEqual(first.projection, second.projection);
   assert.equal(first.metrics.rawSupportCount, 139);
-  assert.equal(first.metrics.supportAnchorCount, 37);
+  assert.equal(first.metrics.projectedSourceSupportCount, 137);
+  assert.equal(first.metrics.deferredSourceSupportCount, 2);
+  assert.equal(first.metrics.supportAnchorCount, 34);
   assert.equal(first.metrics.nativeRestraintRecordCount, 47);
-  assert.equal(first.metrics.projectedSupportMarkerCount, 37);
-  assert.equal(first.metrics.distinctOriginCount, 37);
-  assert.equal(
-    first.metrics.collapsedSourceSupportCount,
-    first.metrics.projectedSourceSupportCount - first.metrics.supportAnchorCount,
-  );
-  assert.equal(first.projection.glyphOverlays.length, 37);
-  assert.equal(first.anchors.length, 37);
+  assert.equal(first.metrics.collapsedSourceSupportCount, 103);
+  assert.equal(first.metrics.hierarchyMergeCount, 42);
+  assert.equal(first.metrics.positionMergeCount, 61);
+  assert.equal(first.metrics.projectedSupportMarkerCount, 34);
+  assert.equal(first.metrics.projectedRestraintDirectionCount, 47);
+  assert.equal(first.metrics.distinctOriginCount, 34);
+  assert.deepEqual(first.metrics.restraintTypeCounts, {
+    '+Z': 34,
+    GUI: 5,
+    LIM: 8,
+  });
+  assert.equal(first.projection.glyphOverlays.length, 34);
+  assert.equal(first.anchors.length, 34);
   assert.equal(first.decisions.length, canonical.supports.length);
   assert.equal(
     first.anchors.reduce((sum, anchor) => sum + anchor.restraintCount, 0),
@@ -102,6 +99,10 @@ test('production Sjson matches Topo validator support anchors and restraint arra
   assert.equal(
     new Set(first.anchors.flatMap((anchor) => anchor.memberSupportIds)).size,
     first.metrics.projectedSourceSupportCount,
+  );
+  assert.equal(
+    first.decisions.filter((decision) => decision.disposition === 'DEFER_NON_RESTRAINT_ATTACHMENT').length,
+    2,
   );
   assert.ok(first.anchors.every((anchor) => anchor.representativeSupportId));
   assert.ok(first.anchors.every((anchor) => anchor.memberSupportIds.length >= 1));
