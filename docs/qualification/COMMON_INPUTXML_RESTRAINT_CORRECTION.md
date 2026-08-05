@@ -15,7 +15,7 @@ The profile is enabled by default and applies at most one correction row to the 
 | Label | Exported TYPE | Corrected TYPE |
 |---|---:|---:|
 | `+Y` | 17 | 14 |
-| `LIM` | 7 | 8 |
+| `GUI` | 7 | 9 |
 | `GUI` | 10 | 9 |
 | `X` | 1 | 2 |
 | `Y` | 2 | 3 |

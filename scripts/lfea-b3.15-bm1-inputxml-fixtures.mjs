@@ -82,7 +82,7 @@ export function buildBm1InputXmlAuthorities() {
   const parsed = inputXmlToCanonicalGeometry(content, {
     unit: 'mm',
     source: SOURCE_ID,
-    restraintTypeCodeMap: { 0: 'ANCHOR', 14: 'GUIDE', 8: 'GUIDE' },
+    restraintTypeCodeMap: { 0: 'ANCHOR', 14: 'GUIDE', 8: 'GUIDE', 9: 'GUIDE' },
     bendRadiusTolerance: 1e-6,
   });
   const unitProfile = sealLinearPipingInputXmlUnitProfile({
@@ -540,7 +540,7 @@ function constraintDeclarations(geometry, kernelNodeByReference) {
     }
     for (const restraint of node.meta.restraints ?? []) {
       if (restraint.typeCode === '14') add(node.id, 'UY');
-      if (restraint.typeCode === '8') {
+      if (restraint.typeCode === '9') {
         const direction = [
           Math.abs(restraint.xCosine ?? 0),
           Math.abs(restraint.yCosine ?? 0),
