@@ -17,6 +17,9 @@ import {
 import {
   renderTopologyEditInteractionPanel,
 } from './viewport-productivity/topology-edit-interaction-panel.js';
+import {
+  installTopologyEditOperationSnapIndex,
+} from './viewport-interaction/topology-edit-operation-snap-index.js';
 
 export class TopologyEdit3DViewController extends ReviewResponseController {
   constructor(eventBus, lifecycleOptions = {}) {
@@ -28,6 +31,7 @@ export class TopologyEdit3DViewController extends ReviewResponseController {
     this.nudgeIncrementMm = 1;
     this.interactionControllerRuntime =
       new TopologyEditInteractionControllerRuntime(this);
+    installTopologyEditOperationSnapIndex(this.interactionControllerRuntime);
     this.interactionKeyHandler = (event) => this.handleInteractionKey(event);
   }
 
