@@ -3,7 +3,7 @@ name: LAFEA-NC Solver Interpreter Custody Evidence
 on:
   pull_request:
     branches:
-      - agent/lafea-nc-solver-build-evidence
+      - main
     paths:
       - '.github/workflows/lafea-nc-solver-interpreter-evidence.yml'
       - 'docs/nonlinear-shell-contact/LAFEA_NC_SOLVER_INTERPRETER_EVIDENCE.md'
@@ -16,7 +16,7 @@ on:
         required: true
         type: string
       base_sha:
-        description: Exact controlled-build evidence base SHA
+        description: Exact merged controlled-build evidence base SHA
         required: true
         type: string
 
@@ -32,10 +32,10 @@ jobs:
       PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
       DISPATCH_HEAD_SHA: ${{ inputs.head_sha }}
       DISPATCH_BASE_SHA: ${{ inputs.base_sha }}
-      BASE_BRANCH: agent/lafea-nc-solver-build-evidence
-      BUILD_EVIDENCE_RUN_ID: '30999218704'
-      BUILD_EVIDENCE_ARTIFACT: lafea-nc-solver-build-d06ab8a516865a5b31a2bc26ff1e290ce859b7bb-1
-      BUILD_EVIDENCE_ARTIFACT_DIGEST: sha256:1376414aef5febf71da1d268c21d8adabf3145e0a0e8d43530dadc13cd6d491c
+      BASE_BRANCH: main
+      BUILD_EVIDENCE_RUN_ID: '31019579268'
+      BUILD_EVIDENCE_ARTIFACT: lafea-nc-solver-build-7f9c524771b1c54f77480408d67f29b1a60cb764-1
+      BUILD_EVIDENCE_ARTIFACT_DIGEST: sha256:8facca6939031150ba667569055a064a5fdbb6fba6b4b9e1a2f9bceab87efbad
       EXECUTABLE_HASH: sha256:9a33d293706a66bee86f2f0ecf996a66758f904c20d61ad8c83ddc0f92ae4b7e
     steps:
       - name: Resolve exact head
