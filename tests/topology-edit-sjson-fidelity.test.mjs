@@ -18,14 +18,27 @@ import {
   projectSupportGeometryToViewport,
 } from '../src/workspace/topology-edit/support-restraint-family.js';
 import {
+  buildSjsonParentBranchDiameterIndex,
+  deriveSjsonCompleteVisualGeometry,
+  parentBranchDiameterForEntity,
+  referencedBranchDiameterForEntity,
+} from '../src/workspace/topology-edit/topology-edit-sjson-parent-branch-diameter.js';
+import {
   distinctExactSupportOriginCount,
   enrichCanonicalSupportsWithExactOrigins,
   supportTopologyForExactOrigins,
   visualPrimitiveKindCounts,
 } from '../src/workspace/topology-edit/topology-edit-sjson-visual-authority.js';
-import { deriveSjsonCompleteVisualGeometry } from '../src/workspace/topology-edit/topology-edit-sjson-point-component-projection.js';
 
 const SJSON_URL = new URL('../public/Sjson.json', import.meta.url);
+const RUN_DIAMETER_KINDS = new Set([
+  'PIPE_CYLINDER',
+  'ELBOW_ARC',
+  'FLANGE_DISC',
+  'VALVE_BODY',
+  'GASKET_DISC',
+  'INSTRUMENT_MARKER',
+]);
 
 async function loadProductionSjson() {
   const bytes = new Uint8Array(await readFile(SJSON_URL));
@@ -46,11 +59,11 @@ async function loadProductionSjson() {
     dataset,
     attachments,
   );
-  return { dataset, graph, attachments, restraints, baseCanonical, canonical };
+  return { raw, dataset, graph, attachments, restraints, baseCanonical, canonical };
 }
 
 test('production Sjson materializes fittings and exact support sites deterministically', async () => {
-  const { dataset, baseCanonical, canonical } = await loadProductionSjson();
+  const { raw, dataset, baseCanonical, canonical } = await loadProductionSjson();
   assert.equal(canonical.sourceHash, baseCanonical.sourceHash);
   assert.equal(canonical.supports.length, baseCanonical.supports.length);
   assert.deepEqual(
@@ -75,6 +88,22 @@ test('production Sjson materializes fittings and exact support sites determinist
   });
   assert.equal(first.model.visualGeometryHash, second.model.visualGeometryHash);
   assert.deepEqual(first.projection.primitives, second.projection.primitives);
+  assert.equal(
+    first.parentBranchDiameterIndex.indexHash,
+    second.parentBranchDiameterIndex.indexHash,
+  );
+
+  const independentBranchIndex = buildSjsonParentBranchDiameterIndex(dataset);
+  assert.equal(first.parentBranchDiameterIndex.indexHash, independentBranchIndex.indexHash);
+  assert.deepEqual(independentBranchIndex.conflicts, []);
+  const sourceBranches = raw.filter((row) => canonicalType(row.type) === 'BRANCH');
+  assert.equal(independentBranchIndex.contexts.length, sourceBranches.length);
+  for (const branch of sourceBranches) {
+    const expected = expectedTopoValidatorBranchDiameter(branch);
+    const actual = independentBranchIndex.byBranchId[branch.name];
+    assert.ok(actual, `Parent branch ${branch.name} must be indexed.`);
+    assert.equal(actual.diameterMm, expected, `Parent branch ${branch.name} diameter mismatch.`);
+  }
 
   const counts = visualPrimitiveKindCounts(first.model);
   assert.ok((counts.PIPE_CYLINDER || 0) >= 40, `Expected production pipe bodies, got ${counts.PIPE_CYLINDER || 0}.`);
@@ -102,9 +131,82 @@ test('production Sjson materializes fittings and exact support sites determinist
     (counts.OLET_BRANCH || 0) >= 10,
     `Expected production OLET bodies, got ${counts.OLET_BRANCH || 0}.`,
   );
+
+  const entities = new Map(dataset.entities.map((entity) => [entity.entityId, entity]));
+  let parentBranchApplicationCount = 0;
+  let referencedBranchApplicationCount = 0;
+  for (const component of first.model.components) {
+    const entity = component.workspaceEntityIds.map((id) => entities.get(id)).find(Boolean);
+    if (!entity) continue;
+    const parentBranch = parentBranchDiameterForEntity(independentBranchIndex, entity);
+    for (const primitive of component.primitives) {
+      if (RUN_DIAMETER_KINDS.has(primitive.kind)) {
+        assert.ok(parentBranch, `${primitive.kind} ${primitive.canonicalEntityId} needs a parent branch.`);
+        assert.equal(primitive.parameters.outsideDiameterMm, parentBranch.diameterMm);
+        assert.equal(primitive.parameters.outsideDiameterAuthority, 'SOURCE_PARENT_BRANCH');
+        parentBranchApplicationCount += 1;
+      }
+      if (primitive.kind === 'TEE_JUNCTION') {
+        assert.ok(parentBranch, `TEE ${primitive.canonicalEntityId} needs a run parent branch.`);
+        assert.equal(primitive.parameters.runOutsideDiameterMm, parentBranch.diameterMm);
+        assert.equal(primitive.parameters.runOutsideDiameterAuthority, 'SOURCE_PARENT_BRANCH');
+        const referenced = referencedBranchDiameterForEntity(
+          independentBranchIndex,
+          entity,
+          primitive,
+        );
+        assert.ok(referenced, `TEE ${primitive.canonicalEntityId} needs a referenced branch.`);
+        assert.equal(primitive.parameters.branchOutsideDiameterMm, referenced.diameterMm);
+        assert.equal(
+          primitive.parameters.branchOutsideDiameterAuthority,
+          'SOURCE_REFERENCED_PARENT_BRANCH',
+        );
+        parentBranchApplicationCount += 1;
+        referencedBranchApplicationCount += 1;
+      }
+      if (primitive.kind === 'OLET_BRANCH') {
+        const referenced = referencedBranchDiameterForEntity(
+          independentBranchIndex,
+          entity,
+          primitive,
+        );
+        assert.ok(referenced, `OLET ${primitive.canonicalEntityId} needs a referenced branch.`);
+        assert.equal(primitive.parameters.branchOutsideDiameterMm, referenced.diameterMm);
+        assert.equal(
+          primitive.parameters.branchOutsideDiameterAuthority,
+          'SOURCE_REFERENCED_PARENT_BRANCH',
+        );
+        referencedBranchApplicationCount += 1;
+      }
+      if (['CONICAL_REDUCER', 'ECCENTRIC_REDUCER'].includes(primitive.kind)) {
+        const attributes = entityAttributes(entity);
+        const expectedEnds = [positive(attributes.ABORE), positive(attributes.LBORE)]
+          .filter(Boolean)
+          .sort((left, right) => left - right);
+        const actualEnds = [
+          primitive.parameters.startOutsideDiameterMm,
+          primitive.parameters.endOutsideDiameterMm,
+        ].filter(Boolean).sort((left, right) => left - right);
+        assert.deepEqual(actualEnds, expectedEnds, 'Reducer end bores must retain source asymmetry.');
+      }
+    }
+  }
+  assert.ok(parentBranchApplicationCount >= 100);
+  assert.equal(
+    referencedBranchApplicationCount,
+    (counts.TEE_JUNCTION || 0) + (counts.OLET_BRANCH || 0),
+  );
+
   assert.ok(
     first.model.diagnostics.some((row) => row.code === 'VISUAL_NOMINAL_BORE_PROXY_USED'),
-    'Visual-only nominal-bore proxy use must remain explicit in diagnostics.',
+    'Visual-only parent-branch bore proxy use must remain explicit in diagnostics.',
+  );
+  assert.ok(
+    first.model.diagnostics.filter((row) => row.code === 'VISUAL_PARENT_BRANCH_DIAMETER_USED').length >= 100,
+  );
+  assert.equal(
+    first.model.diagnostics.filter((row) => row.code === 'VISUAL_REFERENCED_BRANCH_DIAMETER_USED').length,
+    (counts.TEE_JUNCTION || 0) + (counts.OLET_BRANCH || 0),
   );
   assert.equal(
     first.model.diagnostics.filter((row) => row.code === 'VISUAL_TWO_PORT_TEE_PROMOTED').length,
@@ -170,3 +272,45 @@ test('production Sjson materializes fittings and exact support sites determinist
   assert.ok(supportProjection.glyphOverlays.every((row) => row.origin));
   assert.ok(supportProjection.glyphOverlays.some((row) => row.hostEntityId));
 });
+
+function expectedTopoValidatorBranchDiameter(branch) {
+  const attributes = branch.attributes || {};
+  const firstRouteChildDiameter = (branch.children || [])
+    .map((child) => {
+      const childAttributes = child.attributes || {};
+      return Math.max(
+        positive(childAttributes.ABORE) || 0,
+        positive(childAttributes.LBORE) || 0,
+      );
+    })
+    .find((value) => value > 0);
+  return positive(branch.outsideDiameterMm)
+    || positive(attributes.OUTSIDE_DIAMETER_MM)
+    || positive(attributes.OUTSIDE_DIAMETER)
+    || positive(branch._boreValue)
+    || positive(branch.bore)
+    || positive(attributes.HBOR)
+    || positive(attributes.TBOR)
+    || firstRouteChildDiameter
+    || null;
+}
+
+function entityAttributes(entity) {
+  return {
+    ...(entity?.properties?.sourceAttributes || {}),
+    ...(entity?.properties?.attributes || {}),
+    ...(entity?.properties?.enrichedAttributes || {}),
+    ...(entity?.properties?.nativeParams || {}),
+  };
+}
+
+function canonicalType(value) {
+  return String(value || '').trim().toUpperCase().replace(/[\s/-]+/gu, '_');
+}
+
+function positive(value) {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value;
+  const match = String(value ?? '').replace(/,/gu, '').match(/[-+]?\d*\.?\d+(?:e[-+]?\d+)?/iu);
+  const number = Number(match?.[0]);
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
