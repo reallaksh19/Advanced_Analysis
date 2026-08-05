@@ -9,6 +9,7 @@ on:
       - 'scripts/lfea-m031-bm2-qualified-*.mjs'
       - 'scripts/lfea-b3.26-bm2-output-comparison*.mjs'
       - 'scripts/lfea-b3.26-bm2-solve-comparison-check.mjs'
+      - 'scripts/lfea-b3.26-bm2-solve-fixtures.mjs'
       - 'scripts/lfea-bm2-consolidated-latest-output-check.mjs'
       - 'scripts/lfea-b3.28-bm2-*.mjs'
       - 'scripts/lfea-b3.29-bm2-*.mjs'
@@ -63,7 +64,10 @@ jobs:
           node --check scripts/lfea-m031-bm2-qualified-check.mjs
           node --check scripts/lfea-b3.26-bm2-output-comparison-runtime.mjs
           node --check scripts/lfea-b3.26-bm2-solve-comparison-check.mjs
+          node --check scripts/lfea-b3.26-bm2-solve-fixtures.mjs
+          node --check scripts/lfea-b3.29-bm2-bend-geometry-authority-v2.mjs
           node --check scripts/lfea-bm2-consolidated-latest-output-check.mjs
+          node --check src/core/linear-fea-solver/solve.js
           git diff --check
 
       - name: M031 matrix mechanics and full station custody
@@ -96,6 +100,14 @@ jobs:
       - name: Full linear-core regression
         run: npm run check:lfea-linear-core
 
+      - name: Deterministic evidence replay
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum reports/bm2-consolidated-latest-output.json > /tmp/m031-bm2-report.sha256
+          node scripts/lfea-bm2-consolidated-latest-output-check.mjs --write > /tmp/m031-bm2-consolidated-replay.log
+          sha256sum --check /tmp/m031-bm2-report.sha256
+
       - name: Upload deterministic qualification evidence
         uses: actions/upload-artifact@v4
         with:
@@ -104,5 +116,6 @@ jobs:
             reports/bm2-consolidated-latest-output.json
             /tmp/m031-bm2-qualified.log
             /tmp/m031-bm2-consolidated.log
+            /tmp/m031-bm2-report.sha256
           if-no-files-found: error
           retention-days: 30
