@@ -21,7 +21,17 @@ export function publishSjsonFidelityEvidence({
   const counts = visualPrimitiveKindCounts(visualModel);
   const diagnostics = visualModel?.diagnostics || [];
   const supportMetrics = supportAuthority?.metrics || {};
+  const typedPrimitiveCount = Object.values(counts).reduce((sum, value) => (
+    sum + (Number.isFinite(Number(value)) ? Number(value) : 0)
+  ), 0);
+  const supportOverlays = supportProjection?.glyphOverlays || [];
   const set = (name, value) => { host.dataset[name] = String(value ?? ''); };
+
+  set('topologyEditTypedPrimitiveCount', typedPrimitiveCount);
+  set('topologyEditFlangePrimitiveCount', counts.FLANGE_DISC || 0);
+  set('topologyEditValvePrimitiveCount', counts.VALVE_BODY || 0);
+  set('topologyEditSupportOverlayCount', supportOverlays.length);
+  set('topologyEditResolvedSupportOriginCount', supportOverlays.filter((row) => row?.origin).length);
 
   set('topologyEditPipePrimitiveCount', counts.PIPE_CYLINDER || 0);
   set('topologyEditElbowPrimitiveCount', counts.ELBOW_ARC || 0);
