@@ -4,10 +4,11 @@
  * LFEA B-1 geometry conditioning and node seeding check.
  *
  * Covers `src/core/centerline-beam-fea/{geometry-conditioning,node-seeding,
- * bend-geometry}.js`: mandatory node insertion, span/curvature seeding,
- * rejection of an undeclared limit, branch connectivity (via the existing
- * `piping-topology` connected-components algorithm, not a new graph walker),
- * bend discretisation convergence, and idempotence.
+ * bend-geometry}.js`: mandatory node insertion, exact-coincident station
+ * custody, span/curvature seeding, rejection of an undeclared limit, branch
+ * connectivity (via the existing `piping-topology` connected-components
+ * algorithm, not a new graph walker), bend discretisation convergence, and
+ * idempotence.
  */
 
 import assert from 'node:assert/strict';
@@ -29,6 +30,8 @@ checkMissingSpanSeedingLimitRejected();
 checkTeeBranchConnectivity();
 checkBendConvergence();
 checkIdempotence();
+checkCoincidentAttachmentCustody();
+checkConflictingCoincidentRestraintsRejected();
 checkSourceGuard();
 console.log('\n✅ LFEA B-1 geometry conditioning check passed.\n');
 
@@ -252,6 +255,67 @@ function checkIdempotence() {
   const third = conditionGeometry(first.geometry, [], useProfile);
   assert.equal(third.semanticHash, first.semanticHash);
   console.log('✅ Conditioning an already-conditioned model is idempotent, with or without re-supplying satisfied attachment points.');
+}
+
+function checkCoincidentAttachmentCustody() {
+  // Test 8. Exact-coincident retained stations share one physical node but
+  // retain every station identity; opposite boundaries must both be tagged.
+  const geometry = baseGeometry(
+    [node('N1', 0, 0, 0), node('N2', 1000, 0, 0)],
+    [segment('S1', 'N1', 'N2', 'PIPE', { length: 1000 })],
+  );
+  const requiredAttachmentPoints = [
+    { attachmentPointId: 'REPORT-B', segmentId: 'S1', fraction: 0.5, kind: 'ATTACHMENT_LOAD_EXTRACTION' },
+    { attachmentPointId: 'GUIDE-A', segmentId: 'S1', fraction: 0.5, kind: 'GUIDE' },
+    { attachmentPointId: 'END-I', segmentId: 'S1', fraction: 0, kind: 'EQUIPMENT_NOZZLE' },
+    { attachmentPointId: 'END-J', segmentId: 'S1', fraction: 1, kind: 'EQUIPMENT_NOZZLE' },
+  ];
+  const first = conditionGeometry(geometry, requiredAttachmentPoints, profile());
+  const coincidentRows = first.report.attachmentPointsInserted
+    .filter((row) => row.attachmentPointId === 'GUIDE-A' || row.attachmentPointId === 'REPORT-B');
+  assert.equal(new Set(coincidentRows.map((row) => row.nodeId)).size, 1, 'coincident stations must map to one node');
+  const stationNode = first.geometry.nodes.find((row) => row.id === coincidentRows[0].nodeId);
+  assert.deepEqual(stationNode.meta.attachmentPoints, [
+    { attachmentPointId: 'GUIDE-A', kind: 'GUIDE' },
+    { attachmentPointId: 'REPORT-B', kind: 'ATTACHMENT_LOAD_EXTRACTION' },
+  ]);
+  assert.equal(stationNode.meta.attachmentPointId, 'GUIDE-A', 'legacy primary custody must be deterministic');
+  assert.equal(stationNode.restraint, 'GUIDE');
+  assert.deepEqual(first.geometry.nodes.find((row) => row.id === 'N1').meta.attachmentPoints, [
+    { attachmentPointId: 'END-I', kind: 'EQUIPMENT_NOZZLE' },
+  ]);
+  assert.deepEqual(first.geometry.nodes.find((row) => row.id === 'N2').meta.attachmentPoints, [
+    { attachmentPointId: 'END-J', kind: 'EQUIPMENT_NOZZLE' },
+  ]);
+  assert.equal(first.geometry.segments.length, 2, 'one exact-coincident fraction creates one split');
+  assert.equal(first.geometry.segments.filter((row) => row.length === 0).length, 0, 'coincident custody must not create a zero-length span');
+  assert.equal(
+    first.geometry.diagnostics.filter((row) => row.code === 'ATTACHMENT_POINT_COINCIDENT_CUSTODY').length,
+    1,
+  );
+
+  const replay = conditionGeometry(first.geometry, requiredAttachmentPoints, profile());
+  assert.equal(replay.semanticHash, first.semanticHash, 'coincident station custody must be idempotent');
+  assert.equal(replay.report.attachmentPointsInserted.length, 0);
+  console.log('✅ Exact-coincident stations retain all identities on one node, preserve both boundaries, create no zero-length span and replay exactly.');
+}
+
+function checkConflictingCoincidentRestraintsRejected() {
+  // Test 9. Do not choose a stronger restraint silently when exact-coincident
+  // authorities disagree mechanically.
+  const geometry = baseGeometry(
+    [node('N1', 0, 0, 0), node('N2', 1000, 0, 0)],
+    [segment('S1', 'N1', 'N2', 'PIPE', { length: 1000 })],
+  );
+  assert.throws(
+    () => conditionGeometry(geometry, [
+      { attachmentPointId: 'ANCHOR-A', segmentId: 'S1', fraction: 0.5, kind: 'ANCHOR' },
+      { attachmentPointId: 'GUIDE-B', segmentId: 'S1', fraction: 0.5, kind: 'GUIDE' },
+    ], profile()),
+    (error) => error instanceof SharedAnalysisContractError
+      && error.code === 'ATTACHMENT_POINT_RESTRAINT_CONFLICT',
+  );
+  console.log('✅ Exact-coincident ANCHOR and GUIDE/SUPPORT declarations are rejected instead of silently merged.');
 }
 
 function checkSourceGuard() {
