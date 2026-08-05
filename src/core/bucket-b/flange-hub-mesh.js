@@ -35,8 +35,8 @@ const BLOCKS = Object.freeze([
   { id: 'FH-B00', kind: 'STRIP', segment: 'PIPE', baseUCount: 16 },
   { id: 'FH-B01', kind: 'STRIP', segment: 'SMALL_ARC', baseUCount: 4 },
   { id: 'FH-B02', kind: 'STRIP', segment: 'HUB_SMALL', baseUCount: 4 },
-  { id: 'FH-B03', kind: 'STRIP', segment: 'HUB_MID', baseUCount: 8 },
-  { id: 'FH-B04', kind: 'GRADING_TRANSITION', baseUCount: 2 },
+  { id: 'FH-B03', kind: 'STRIP', segment: 'HUB_MID', baseUCount: 16 },
+  { id: 'FH-B04', kind: 'GRADING_TRANSITION', baseUCount: 4 },
   { id: 'FH-B05', kind: 'HUB_FILLET_TRANSITION' },
   { id: 'FH-B06', kind: 'FLANGE' },
 ]);
