@@ -10,6 +10,10 @@ on:
       - 'src/workspace/engineering-loads/empirical-method-registry.js'
       - 'src/workspace/engineering-loads/empirical-beam-contact-*.js'
       - 'src/workspace/engineering-loads/authorized-empirical-beam-contact-execution.js'
+      - 'src/workspace/engineering-loads/empirical-load-calc-scenario-*.js'
+      - 'src/workspace/load-calc-consumer-controller.js'
+      - 'src/workspace/load-calc-consumer-view.js'
+      - 'src/workspace/bootstrap.js'
       - 'benchmarks/empirical-piping/**'
       - 'docs/empirical-piping-agent-qualification-and-work-pack.md'
       - 'docs/empirical-piping-engineering-basis-and-benchmark.md'
@@ -17,9 +21,11 @@ on:
       - 'scripts/empirical-sjson-adapter-contract-check.mjs'
       - 'scripts/empirical-beam-contact-runtime-check.mjs'
       - 'scripts/empirical-beam-contact-elbow-runtime-check.mjs'
+      - 'scripts/empirical-load-calc-scenario-check.mjs'
       - '.github/workflows/empirical-piping-exact-head.yml'
       - '.github/workflows/empirical-sjson-adapter-wp1.yml'
       - '.github/workflows/empirical-beam-contact-wp2.yml'
+      - '.github/workflows/empirical-load-calc-wp3.yml'
 
 permissions:
   contents: read
@@ -51,7 +57,7 @@ jobs:
           git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" > /tmp/empirical-paths.txt
           while IFS= read -r changed; do
             case "$changed" in
-              src/core/empirical-piping-mechanics/*|src/core/empirical-support-frame-screen/*|src/workspace/engineering-loads/contracts/empirical-sjson-contracts.js|src/workspace/engineering-loads/adapters/sjson-to-empirical-piping-request.js|src/workspace/engineering-loads/empirical-method-registry.js|src/workspace/engineering-loads/empirical-beam-contact-*.js|src/workspace/engineering-loads/authorized-empirical-beam-contact-execution.js|benchmarks/empirical-piping/*|docs/empirical-piping-agent-qualification-and-work-pack.md|docs/empirical-piping-engineering-basis-and-benchmark.md|scripts/empirical-piping-*.mjs|scripts/empirical-sjson-adapter-contract-check.mjs|scripts/empirical-beam-contact-runtime-check.mjs|scripts/empirical-beam-contact-elbow-runtime-check.mjs|.github/workflows/empirical-piping-exact-head.yml|.github/workflows/empirical-sjson-adapter-wp1.yml|.github/workflows/empirical-beam-contact-wp2.yml) ;;
+              src/core/empirical-piping-mechanics/*|src/core/empirical-support-frame-screen/*|src/workspace/engineering-loads/contracts/empirical-sjson-contracts.js|src/workspace/engineering-loads/adapters/sjson-to-empirical-piping-request.js|src/workspace/engineering-loads/empirical-method-registry.js|src/workspace/engineering-loads/empirical-beam-contact-*.js|src/workspace/engineering-loads/authorized-empirical-beam-contact-execution.js|src/workspace/engineering-loads/empirical-load-calc-scenario-*.js|src/workspace/load-calc-consumer-controller.js|src/workspace/load-calc-consumer-view.js|src/workspace/bootstrap.js|benchmarks/empirical-piping/*|docs/empirical-piping-agent-qualification-and-work-pack.md|docs/empirical-piping-engineering-basis-and-benchmark.md|scripts/empirical-piping-*.mjs|scripts/empirical-sjson-adapter-contract-check.mjs|scripts/empirical-beam-contact-runtime-check.mjs|scripts/empirical-beam-contact-elbow-runtime-check.mjs|scripts/empirical-load-calc-scenario-check.mjs|.github/workflows/empirical-piping-exact-head.yml|.github/workflows/empirical-sjson-adapter-wp1.yml|.github/workflows/empirical-beam-contact-wp2.yml|.github/workflows/empirical-load-calc-wp3.yml) ;;
               *) echo "Forbidden changed path for this work-pack slice: $changed"; exit 1 ;;
             esac
           done < /tmp/empirical-paths.txt
@@ -67,6 +73,9 @@ jobs:
 
       - name: Elbow and region-planarity runtime bridge
         run: node scripts/empirical-beam-contact-elbow-runtime-check.mjs
+
+      - name: Load Calc scenario and UI contracts
+        run: node scripts/empirical-load-calc-scenario-check.mjs
 
       - name: Closed-form mechanics
         run: node scripts/empirical-piping-closed-form-check.mjs
