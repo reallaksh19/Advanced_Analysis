@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import * as THREE from 'three';
 
 import {
   TOPOLOGY_EDIT_ISSUE_OVERLAY_SCHEMA,
@@ -30,8 +31,12 @@ const CONFIGURATION = {
   cameraFarMm: 1_000_000,
 };
 
-test('governed route renders OD solids with direct picks, translucent nodes, and larger invisible proxies', () => {
+test('governed route renders visible envelopes with direct picks, physical radius lineage, and larger proxies', () => {
   const backend = new TopologyEditSjsonGovernedViewportBackend({ navigationConfiguration: CONFIGURATION });
+  backend.engineeringBounds = new THREE.Box3(
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(100_000, 0, 0),
+  );
   backend.renderProjection(backend.groups.draftGroup, {
     schema: TOPOLOGY_EDIT_SJSON_GOVERNED_PROJECTION_SCHEMA,
     renderStyle: TOPOLOGY_EDIT_SJSON_EDIT_DRAFT_RENDER_STYLE,
@@ -52,21 +57,28 @@ test('governed route renders OD solids with direct picks, translucent nodes, and
   const solid = objects.get('topology-edit-visible-route-solid:pipe:1');
   assert.equal(solid?.isMesh, true);
   assert.equal(solid.geometry.type, 'CylinderGeometry');
-  assert.equal(solid.geometry.parameters.radiusTop, 50);
-  assert.equal(solid.geometry.parameters.radiusBottom, 50);
-  assert.equal(solid.material.isMeshStandardMaterial, true);
+  assert.equal(solid.geometry.parameters.radiusTop, 250);
+  assert.equal(solid.geometry.parameters.radiusBottom, 250);
+  assert.equal(solid.material.isMeshBasicMaterial, true);
+  assert.equal(solid.material.depthWrite, false);
   assert.equal(solid.userData.pickTarget.objectId, 'edge:1');
   assert.equal(solid.userData.directPickMesh, true);
-  assert.equal(solid.userData.radiusAuthority, 'CANONICAL_PROJECTED_RADIUS_OR_OUTSIDE_DIAMETER_V1');
-  assert.equal(solid.userData.renderAuthority, 'GOVERNED_DRAFT_OD_SOLID_PICK_TARGET_V4');
+  assert.equal(solid.userData.routePhysicalRadiusMm, 50);
+  assert.equal(solid.userData.routeDisplayRadiusMm, 250);
+  assert.equal(solid.userData.displayEnvelopeApplied, true);
+  assert.equal(
+    solid.userData.radiusAuthority,
+    'CANONICAL_PROJECTED_RADIUS_WITH_BOUNDED_DISPLAY_ENVELOPE_V2',
+  );
+  assert.equal(solid.userData.renderAuthority, 'GOVERNED_DRAFT_OD_SOLID_PICK_TARGET_V5');
 
   const routeProxy = objects.get('topology-edit-route-pick-proxy:pipe:1');
   assert.equal(routeProxy?.isMesh, true);
-  assert.ok(Math.abs(routeProxy.geometry.parameters.radiusTop - 56.3) < 1e-9);
+  assert.ok(Math.abs(routeProxy.geometry.parameters.radiusTop - 256.3) < 1e-9);
   assert.ok(routeProxy.geometry.parameters.radiusTop > solid.geometry.parameters.radiusTop);
   assert.equal(routeProxy.material.opacity, 0);
   assert.equal(routeProxy.userData.pickTarget.objectId, 'edge:1');
-  assert.equal(routeProxy.userData.renderAuthority, 'GOVERNED_ROUTE_PICK_PROXY_V4');
+  assert.equal(routeProxy.userData.renderAuthority, 'GOVERNED_ROUTE_PICK_PROXY_V5');
 
   const marker = objects.get('topology-edit-visible-node-marker:node:1');
   const nodeProxy = objects.get('topology-edit-node-pick-proxy:node:1');
