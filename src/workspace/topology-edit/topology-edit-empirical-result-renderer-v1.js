@@ -147,10 +147,9 @@ function zeroForceMarker(arrow, start, material, pickMaterial, radialSegments) {
   object.name = `topology-edit-empirical-zero-force-marker:${arrow.overlayId}`;
   object.userData = resultUserData(arrow, false);
   object.renderOrder = RESULT_RENDER_ORDER;
-  const geometry = new THREE.EdgesGeometry(
-    new THREE.SphereGeometry(ZERO_FORCE_MARKER_RADIUS_MM, 8, 6),
-    1,
-  );
+  const sphere = new THREE.SphereGeometry(ZERO_FORCE_MARKER_RADIUS_MM, 8, 6);
+  const geometry = new THREE.EdgesGeometry(sphere, 1);
+  sphere.dispose();
   const marker = new THREE.LineSegments(geometry, material);
   marker.position.copy(start);
   marker.name = `topology-edit-empirical-zero-force-wire:${arrow.overlayId}`;
@@ -196,6 +195,9 @@ function resultUserData(arrow, pickable) {
     sourceRestraintArrow: false,
     separateFromSourceRestraintProjection: true,
     renderRole: EMPIRICAL_RESULT_FORCE_ARROW_ROLE,
+    objectKind: 'result',
+    objectId: arrow.overlayId,
+    entityId: arrow.entityId,
     resultType: arrow.resultType,
     loadCaseId: arrow.loadCaseId,
     resultClass: arrow.resultClass,

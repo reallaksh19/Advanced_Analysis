@@ -168,6 +168,7 @@ export class LoadCalcConsumerController {
         authorization: empiricalLoadCalcScenarioStore.getAuthorization(),
         execution: empiricalLoadCalcScenarioStore.getExecution(),
         overlaySnapshot: empiricalResultOverlayStore.getSnapshot(),
+        selectedEntityId: this.context?.selectedEntityId || null,
       };
       if (tab === 'overview') {
         renderEmpiricalScenarioOverview(pane, empiricalState);

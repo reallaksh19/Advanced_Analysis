@@ -149,6 +149,15 @@ function createResultArrow({ loadCase, result, occurrence, policy }) {
     overrideId: result.overrideId || null,
     geometryChanged: false,
     sourceRestraintArrowChanged: false,
+    pickTarget: {
+      modelRole: 'result',
+      objectKind: 'result',
+      objectId: overlayId,
+      nodeId: '',
+      supportId: result.supportSiteId,
+      restraintId: result.restraintId,
+      workspaceEntityIds: [...(result.sourceEntityIds || [])],
+    },
     pickIdentity: {
       objectKind: 'result',
       objectId: overlayId,

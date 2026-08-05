@@ -135,6 +135,8 @@ group.traverse((object) => {
 });
 assert.equal(proxies.length, 2);
 assert(proxies.every((object) => object.userData.objectKind === 'result'));
+assert(proxies.every((object) => object.userData.pickTarget?.objectKind === 'result'));
+assert(proxies.every((object) => object.userData.pickTarget?.workspaceEntityIds?.length === 1));
 assert(proxies.every((object) => object.userData.restraintId));
 assert.equal(hostElement.dataset.topologyEditEmpiricalResultOverlayCurrent, 'true');
 assert.equal(hostElement.dataset.topologyEditEmpiricalResultOverlayHash, overlay.semanticHash);
