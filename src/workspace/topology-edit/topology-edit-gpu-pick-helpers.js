@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 
 export const TOPOLOGY_EDIT_MAX_GPU_PICK_ID = 0xffffff;
-export const TOPOLOGY_EDIT_GPU_PICK_PIXEL_RADIUS = 2;
+// Public contract is CSS pixels. resolveTopologyEditPickViewport converts this
+// to physical render-target pixels using the active devicePixelRatio.
+export const TOPOLOGY_EDIT_GPU_PICK_PIXEL_RADIUS = 8;
+export const TOPOLOGY_EDIT_GPU_PICK_MAX_PIXEL_RADIUS = 24;
 
 export function encodeTopologyEditPickId(id) {
   const value = Number(id);
@@ -25,8 +28,8 @@ export function decodeTopologyEditPickId(bytes, offset = 0) {
     | Number(bytes[offset + 2]);
 }
 
-export function selectNearestTopologyEditPickId(bytes, width, height) {
-  if (!validPixelBuffer(bytes, width, height)) return 0;
+export function selectNearestTopologyEditPickSample(bytes, width, height) {
+  if (!validPixelBuffer(bytes, width, height)) return null;
   const centerX = (width - 1) / 2;
   const centerY = (height - 1) / 2;
   let selected = null;
@@ -35,13 +38,17 @@ export function selectNearestTopologyEditPickId(bytes, width, height) {
       const pixel = y * width + x;
       const id = decodeTopologyEditPickId(bytes, pixel * 4);
       if (!id) continue;
-      const distance = ((x - centerX) ** 2) + ((y - centerY) ** 2);
-      if (preferSample(selected, distance, pixel)) {
-        selected = { id, distance, pixel };
+      const distanceSquared = ((x - centerX) ** 2) + ((y - centerY) ** 2);
+      if (preferSample(selected, distanceSquared, pixel)) {
+        selected = { id, x, y, pixel, distanceSquared };
       }
     }
   }
-  return selected?.id ?? 0;
+  return selected ? Object.freeze(selected) : null;
+}
+
+export function selectNearestTopologyEditPickId(bytes, width, height) {
+  return selectNearestTopologyEditPickSample(bytes, width, height)?.id ?? 0;
 }
 
 export function resolveTopologyEditPickViewport(
@@ -58,7 +65,8 @@ export function resolveTopologyEditPickViewport(
   const pixelX = clamp(Math.floor((clientX - rect.left) * ratio), 0, fullWidth - 1);
   const topY = clamp(Math.floor((clientY - rect.top) * ratio), 0, fullHeight - 1);
   const pixelY = fullHeight - 1 - topY;
-  const radius = normalizeRadius(pixelRadius);
+  const cssRadius = normalizeRadius(pixelRadius);
+  const radius = Math.max(1, Math.ceil(cssRadius * ratio));
   const x = Math.max(0, pixelX - radius);
   const y = Math.max(0, pixelY - radius);
   const maxX = Math.min(fullWidth - 1, pixelX + radius);
@@ -70,6 +78,19 @@ export function resolveTopologyEditPickViewport(
     height: maxY - y + 1,
     fullWidth,
     fullHeight,
+    cssRadius,
+    physicalRadius: radius,
+    pixelRatio: ratio,
+  });
+}
+
+export function resolveTopologyEditPickSamplePointer(viewport, sample) {
+  if (!validPickViewport(viewport) || !validPickSample(sample, viewport)) return null;
+  const pixelX = viewport.x + sample.x;
+  const pixelY = viewport.y + sample.y;
+  return Object.freeze({
+    x: ((pixelX + 0.5) / viewport.fullWidth) * 2 - 1,
+    y: ((pixelY + 0.5) / viewport.fullHeight) * 2 - 1,
   });
 }
 
@@ -175,10 +196,40 @@ function validPixelBuffer(bytes, width, height) {
     && bytes.length >= width * height * 4;
 }
 
-function preferSample(selected, distance, pixel) {
+function preferSample(selected, distanceSquared, pixel) {
   return !selected
-    || distance < selected.distance
-    || (distance === selected.distance && pixel < selected.pixel);
+    || distanceSquared < selected.distanceSquared
+    || (distanceSquared === selected.distanceSquared && pixel < selected.pixel);
+}
+
+function validPickViewport(viewport) {
+  return viewport
+    && Number.isInteger(viewport.x)
+    && Number.isInteger(viewport.y)
+    && Number.isInteger(viewport.width)
+    && Number.isInteger(viewport.height)
+    && Number.isInteger(viewport.fullWidth)
+    && Number.isInteger(viewport.fullHeight)
+    && viewport.x >= 0
+    && viewport.y >= 0
+    && viewport.width > 0
+    && viewport.height > 0
+    && viewport.fullWidth > 0
+    && viewport.fullHeight > 0
+    && viewport.x + viewport.width <= viewport.fullWidth
+    && viewport.y + viewport.height <= viewport.fullHeight;
+}
+
+function validPickSample(sample, viewport) {
+  return sample
+    && Number.isInteger(sample.id)
+    && sample.id > 0
+    && Number.isInteger(sample.x)
+    && Number.isInteger(sample.y)
+    && sample.x >= 0
+    && sample.y >= 0
+    && sample.x < viewport.width
+    && sample.y < viewport.height;
 }
 
 function validRect(rect) {
@@ -190,9 +241,9 @@ function validRect(rect) {
 }
 
 function normalizeRadius(value) {
-  const radius = Number(value);
-  return Number.isInteger(radius) && radius >= 0 && radius <= 8
-    ? radius
+  const radius = Math.round(Number(value));
+  return Number.isFinite(radius) && radius >= 0
+    ? clamp(radius, 0, TOPOLOGY_EDIT_GPU_PICK_MAX_PIXEL_RADIUS)
     : TOPOLOGY_EDIT_GPU_PICK_PIXEL_RADIUS;
 }
 

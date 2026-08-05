@@ -6,9 +6,15 @@ import {
   TOPOLOGY_EDIT_SJSON_EDIT_DRAFT_RENDER_STYLE,
   TOPOLOGY_EDIT_SJSON_GOVERNED_PROJECTION_SCHEMA,
 } from './topology-edit-sjson-governed-projection-v2.js';
+import {
+  applyGovernedCameraClipping,
+  createGovernedCameraClippingPolicy,
+} from './topology-edit-sjson-camera-clipping-v3.js';
 import { renderGovernedSjsonIssues } from './topology-edit-sjson-governed-issue-renderer-v2.js';
 import { renderGovernedSjsonRoute } from './topology-edit-sjson-governed-route-renderer-v2.js';
 import { renderGovernedSjsonSupports } from './topology-edit-sjson-governed-support-renderer-v2.js';
+
+const DEFAULT_NODE_MARKER_RADIUS_MM = 4.2;
 
 /** One render transaction for SJSON route, nodes, supports, and transient checker HUD. */
 export class TopologyEditSjsonGovernedNavigationHudViewportBackendV2
@@ -16,6 +22,37 @@ export class TopologyEditSjsonGovernedNavigationHudViewportBackendV2
   constructor(options = {}) {
     super(options);
     this.governedSupportProjection = null;
+    this.governedNodeMarkerRadiusMm = DEFAULT_NODE_MARKER_RADIUS_MM;
+    this.governedCameraClippingPolicy = createGovernedCameraClippingPolicy(
+      this.navigationConfiguration,
+      options.cameraClippingPolicy,
+    );
+    this.governedCameraClippingEvidence = null;
+    this.lastGovernedRenderModel = null;
+  }
+
+  mount(host) {
+    super.mount(host);
+    if (this.gpuPicker) {
+      this.gpuPicker.pixelRadius = Math.max(
+        8,
+        Math.min(24, Math.ceil(this.navigationConfiguration.clickTravelTolerancePx * 2)),
+      );
+    }
+    this.updateGovernedCameraClipping();
+  }
+
+  createNavigation(target) {
+    super.createNavigation(target);
+    if (!this.controls) return;
+    if (this.controlsChangeHandler) {
+      this.controls.removeEventListener('change', this.controlsChangeHandler);
+    }
+    this.controlsChangeHandler = () => {
+      this.updateGovernedCameraClipping();
+      this.invalidate('controls-change');
+    };
+    this.controls.addEventListener('change', this.controlsChangeHandler);
   }
 
   setGovernedSupportProjection(projection) {
@@ -25,14 +62,51 @@ export class TopologyEditSjsonGovernedNavigationHudViewportBackendV2
     this.governedSupportProjection = projection;
   }
 
+  setGovernedNodeMarkerRadiusMm(value) {
+    const radiusMm = Number(value);
+    if (!Number.isFinite(radiusMm) || radiusMm < 1 || radiusMm > 20) {
+      throw new RangeError('Governed node marker radius must be from 1 mm to 20 mm.');
+    }
+    if (radiusMm === this.governedNodeMarkerRadiusMm) return radiusMm;
+    this.governedNodeMarkerRadiusMm = radiusMm;
+    if (this.lastGovernedRenderModel) this.renderSession(this.lastGovernedRenderModel);
+    return radiusMm;
+  }
+
+  setGovernedCameraClippingPolicy(policy) {
+    this.governedCameraClippingPolicy = createGovernedCameraClippingPolicy(
+      this.navigationConfiguration,
+      policy,
+    );
+    this.updateGovernedCameraClipping();
+    this.invalidate('camera-clipping-policy');
+    return this.governedCameraClippingSnapshot();
+  }
+
+  updateGovernedCameraClipping() {
+    if (!this.activeCamera) return null;
+    return applyGovernedCameraClipping(this);
+  }
+
+  governedCameraClippingSnapshot() {
+    return this.governedCameraClippingEvidence
+      ? Object.freeze({ ...this.governedCameraClippingEvidence })
+      : null;
+  }
+
   renderSession(model) {
+    this.lastGovernedRenderModel = model;
     const packet = this.governedSupportProjection
       ? { ...model, supports: this.governedSupportProjection }
       : model;
     super.renderSession(packet);
+    this.updateGovernedCameraClipping();
     if (this.hostElement) {
       this.hostElement.dataset.topologyEditSjsonSingleRenderPacket = 'true';
       this.hostElement.dataset.topologyEditSjsonProjectionSchema = model?.draft?.schema || '';
+      this.hostElement.dataset.topologyEditGpuPickRadiusCssPx = String(
+        this.gpuPicker?.pixelRadius || 0,
+      );
     }
   }
 
@@ -68,6 +142,8 @@ export class TopologyEditSjsonGovernedNavigationHudViewportBackendV2
 
   destroy() {
     this.governedSupportProjection = null;
+    this.governedCameraClippingEvidence = null;
+    this.lastGovernedRenderModel = null;
     super.destroy();
   }
 }

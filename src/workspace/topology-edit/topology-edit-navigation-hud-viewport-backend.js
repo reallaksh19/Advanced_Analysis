@@ -34,26 +34,32 @@ export class TopologyEditNavigationHudViewportBackend extends TopologyEditSuppor
   }
 
   /**
-   * Keep the GPU picker as the preferred dense-scene identity source, but do
-   * not allow its pixel-radius candidate to suppress a valid exact ray hit.
-   * A nearby GPU object can legitimately fail exact-point resolution; in that
-   * case the governed raycaster fallback must still decide the selection.
+   * An exact ray hit is authoritative for a direct pointer click. GPU radius
+   * sampling remains the dense-scene fallback, but cannot replace a different
+   * exact node/edge under the cursor with a nearby proxy from the search window.
+   * A fallback receipt resolves through the deterministic winning GPU sample,
+   * not the original cursor ray, so the configured screen-space tolerance is real.
    */
   pickAt(clientX, clientY) {
     if (this.contextLost || this.configurationError) return null;
     const context = this.pickContext(clientX, clientY);
     if (!context) return null;
+
+    const rayReceipt = this.pickWithRaycaster(context.pointer);
+    if (rayReceipt) return rayReceipt;
+
     const gpuHit = this.gpuPicker?.pick({
       clientX,
       clientY,
       rect: context.rect,
       camera: this.activeCamera,
     });
-    if (gpuHit) {
-      const point = this.resolveGpuPickPoint(gpuHit, context.pointer);
-      if (point) return this.pickReceipt(gpuHit.target, point);
-    }
-    return this.pickWithRaycaster(context.pointer);
+    if (!gpuHit) return null;
+    const point = this.resolveGpuPickPoint(
+      gpuHit,
+      gpuHit.samplePointer ?? context.pointer,
+    );
+    return point ? this.pickReceipt(gpuHit.target, point) : null;
   }
 
   renderSession(model) {
