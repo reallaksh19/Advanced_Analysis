@@ -213,9 +213,10 @@ function hierarchyRoot(record, byName) {
     const reference = ['MDSSREF', 'MDSGUIDEREF', 'PREV-NAME']
       .map((field) => stringValue(current.attributes[field]))
       .find((value) => value && value !== currentName && byName.has(value));
-    current = reference ? byName.get(reference) : null;
+    if (!reference) break;
+    current = byName.get(reference);
   }
-  return current || record;
+  return current;
 }
 
 function groupSupportsByPosition(records) {
