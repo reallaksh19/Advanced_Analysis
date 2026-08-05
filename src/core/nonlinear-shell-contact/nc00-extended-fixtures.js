@@ -15,18 +15,22 @@ export function createNc00ExtendedRigidFixtureInputs(baseContactInput) {
     'NC00-F2-PLANE': {
       surfaceType: 'RIGID_PLANE',
       dimensions: { radius: null, length: 200, width: 200, angle: null },
+      referencePoint: null,
     },
     'NC00-F2-SPHERE': {
       surfaceType: 'RIGID_SPHERE',
       dimensions: { radius: 75, length: null, width: null, angle: 70 },
+      referencePoint: null,
     },
     'NC00-F2-CYLINDER': {
       surfaceType: 'RIGID_CYLINDER',
       dimensions: { radius: 75, length: 200, width: null, angle: 120 },
+      referencePoint: null,
     },
     'NC00-F2-SADDLE': {
       surfaceType: 'RIGID_SADDLE',
       dimensions: { radius: 75, length: 200, width: 100, angle: null },
+      referencePoint: [50, 50, -25],
     },
   };
   return Object.fromEntries(Object.entries(definitions).map(([fixtureId, definition]) => {
@@ -35,6 +39,9 @@ export function createNc00ExtendedRigidFixtureInputs(baseContactInput) {
     input.rigidSurfaces[0].rigidSurfaceId = `${fixtureId}-RIGID`;
     input.rigidSurfaces[0].surfaceType = definition.surfaceType;
     input.rigidSurfaces[0].dimensions = definition.dimensions;
+    if (definition.referencePoint) {
+      input.rigidSurfaces[0].referencePoint = [...definition.referencePoint];
+    }
     input.contactPairs[0].rigidSurfaceId = input.rigidSurfaces[0].rigidSurfaceId;
     input.loadSteps.forEach((step) => step.prescribedMotions.forEach((motion) => {
       motion.targetId = input.rigidSurfaces[0].rigidSurfaceId;
