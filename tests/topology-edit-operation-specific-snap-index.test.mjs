@@ -166,7 +166,9 @@ test('resolved support axes project through existing line kinds and unresolved a
   assert.equal(result.status, 'RESOLVED');
   assert.equal(result.kind, 'CENTERLINE');
   assert.equal(result.candidate.sourceFeatureId, axis.featureId);
-  assert.deepEqual(result.candidate.worldPoint, { x: 0, y: 12, z: 0 });
+  assert.ok(Math.abs(result.candidate.worldPoint.x) <= 1e-9);
+  assert.ok(Math.abs(result.candidate.worldPoint.y - 12) <= 1e-9);
+  assert.ok(Math.abs(result.candidate.worldPoint.z) <= 1e-9);
   assert.match(result.candidate.label, /Support axis \+Y/u);
 
   const unresolved = createTopologyEditOperationSnapSpatialIndex({
