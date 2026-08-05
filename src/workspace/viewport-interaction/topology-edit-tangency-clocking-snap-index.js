@@ -203,7 +203,7 @@ function branchGeometry(junction, nodes) {
   let runIds;
   let branchNodeId;
   if (explicitBranch && explicitRun.length === 2) {
-    runIds = explicitRun;
+    runIds = [...explicitRun].sort(compareText);
     branchNodeId = explicitBranch;
   } else {
     const ids = [...new Set((junction.nodeIds ?? []).map(text).filter(Boolean))].sort(compareText);
