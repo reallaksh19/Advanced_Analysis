@@ -1171,9 +1171,16 @@ Behavior-preserving work:
 ## 14.3 Q1 — complete Bucket B
 
 - BB-09 nozzle/repad controlled procedure;
-- BB-11 flange/hub controlled axisymmetric application;
-- BB-12 final current-main exact-head adjudication;
-- no code or production promotion unless separately approved.
+- BB-11 flange/hub uses the governed conforming Q8 mesh family
+  `BKT-B-FLANGE-Q8-B03-B04-CONFORMING-TRANSITION-V2`, the repaired
+  source-separated Q4 oracle, and physical vector/tensor comparison
+  normalization with every numerical limit unchanged;
+- BB-11 application and numerical authority are granted only by its
+  final zero-behind, exact-current-main qualification receipt;
+- BB-12 may begin only when that receipt explicitly records
+  `BB12_AUTHORIZED = true`;
+- code assessment, module promotion, and production switching remain
+  outside BB-11 authority.
 
 ## 14.4 Q2 — registry adoption
 
