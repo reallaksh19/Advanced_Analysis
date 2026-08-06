@@ -1,0 +1,24 @@
+{
+  "schema": "wp-pf1-changed-path-allowlist/v1",
+  "allowed": [
+    ".github/workflows/lfea-prefea-exact-head.yml",
+    "evidence/wp-pf1/**",
+    "scripts/lfea-prefea-qualification.mjs",
+    "src/analyze/analyze-controller.js",
+    "test/lfea-prefea-gateway.test.js",
+    "test/lfea-prefea-public-call-sites.test.js",
+    "src/core/linear-fea-solver/index.js",
+    "src/core/linear-fea-solver/stiffness-preflight.js",
+    "src/core/linear-piping-analysis-consumer/index.js",
+    "src/core/linear-piping-analysis-consumer/generic-inputxml-solve.js",
+    "src/core/linear-piping-analysis-consumer/inputxml-*.js"
+  ],
+  "excluded": [
+    "authorized solver executor activation",
+    "beam and piping stiffness equations",
+    "distributed-load integration",
+    "thermal-strain equations",
+    "B31 stress/result packaging",
+    "public default runtime selection"
+  ]
+}
