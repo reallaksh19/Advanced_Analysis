@@ -14,6 +14,11 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     super(eventBus, lifecycleOptions);
     this.authoringElement = null;
     this.authoringRuntime = new TopologyEditAuthoringRuntime(this);
+    const reconcileSelection = this.authoringRuntime.reconcileSelection.bind(this.authoringRuntime);
+    this.authoringRuntime.reconcileSelection = (...args) => {
+      normalizeControllerNodeSelection(this);
+      return reconcileSelection(...args);
+    };
     const applyOperation = this.authoringRuntime.applyOperation.bind(this.authoringRuntime);
     this.authoringRuntime.applyOperation = async (...args) => {
       const result = await applyOperation(...args);
@@ -124,10 +129,20 @@ export class TopologyEdit3DViewController extends ProfessionalController {
       .map((bend) => bend.id));
     let authoredPartCount = 0;
     draftGroup.traverse((object) => {
-      const canonicalId = object.userData?.pickTarget?.objectId
+      const directTarget = object.userData?.pickTarget ?? null;
+      const pickTable = Array.isArray(object.userData?.pickTable)
+        ? object.userData.pickTable
+        : [];
+      const authoredTarget = [directTarget, ...pickTable].find((target) => (
+        target?.partRole === 'authored-elbow-arc'
+        || authoredBendIds.has(target?.objectId)
+      ));
+      const canonicalId = directTarget?.objectId
         ?? object.userData?.canonicalId
+        ?? authoredTarget?.objectId
         ?? null;
-      const partRole = object.userData?.pickTarget?.partRole
+      const partRole = directTarget?.partRole
+        ?? authoredTarget?.partRole
         ?? (authoredBendIds.has(canonicalId) ? 'authored-elbow-arc' : null);
       if (!partRole) return;
       object.userData.partRole = partRole;
@@ -199,10 +214,17 @@ export class TopologyEdit3DViewController extends ProfessionalController {
 
 function normalizeControllerNodeSelection(controller) {
   const nodeIds = controller?.selection?.nodeIds;
-  if (typeof nodeIds !== 'string') return;
+  const normalized = typeof nodeIds === 'string'
+    ? (nodeIds ? [nodeIds] : [])
+    : nodeIds instanceof Set
+      ? [...nodeIds]
+      : Array.isArray(nodeIds)
+        ? nodeIds
+        : [];
+  if (nodeIds === normalized) return;
   controller.selection = {
     ...controller.selection,
-    nodeIds: nodeIds ? [nodeIds] : [],
+    nodeIds: normalized,
   };
 }
 
