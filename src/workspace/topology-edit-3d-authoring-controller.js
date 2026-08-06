@@ -6,15 +6,15 @@ import {
   deriveTopologyEditAuthoredBendProjection,
 } from './topology-edit/authoring/topology-edit-authored-bend-geometry.js';
 import {
-  TopologyEditBlindFlangeAuthoringRuntime,
-} from './viewport-productivity/topology-edit-blind-flange-authoring-runtime.js';
+  TopologyEditStartRouteAuthoringRuntime,
+} from './viewport-productivity/topology-edit-start-route-authoring-runtime.js';
 
 /** Production authoring layer; interaction state remains transient and topology authority stays journal-owned. */
 export class TopologyEdit3DViewController extends ProfessionalController {
   constructor(eventBus, lifecycleOptions = {}) {
     super(eventBus, lifecycleOptions);
     this.authoringElement = null;
-    this.authoringRuntime = new TopologyEditBlindFlangeAuthoringRuntime(this);
+    this.authoringRuntime = new TopologyEditStartRouteAuthoringRuntime(this);
     const reconcileSelection = this.authoringRuntime.reconcileSelection.bind(this.authoringRuntime);
     this.authoringRuntime.reconcileSelection = (...args) => {
       normalizeControllerNodeSelection(this);
@@ -58,7 +58,7 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     details.dataset.authoringContextual = 'true';
     details.open = false;
     const summary = documentRef.createElement('summary');
-    summary.textContent = 'Authoring tools — Move · Stretch · Route + elbow · Valve assembly · Flange · Reducer · Tee / Olet branch · Blind flange';
+    summary.textContent = 'Authoring tools — Start Route · Move · Stretch · Route + elbow · Valve assembly · Flange · Reducer · Tee / Olet branch · Blind flange';
     const body = documentRef.createElement('div');
     body.className = 'topology-edit-clean-shell__panel-body';
     const section = documentRef.createElement('section');
@@ -233,7 +233,9 @@ function renderAuthoringCandidateGhost(controller, candidate) {
   const segments = Array.isArray(projection.compactSegments)
     ? projection.compactSegments
     : (projection.segments || []);
-  const changed = new Set(candidate.changedCanonicalIds);
+  const changedIds = candidate.changedCanonicalIds
+    ?? Object.values(candidate.operationBindings ?? {});
+  const changed = new Set(changedIds);
   const accepted = (row) => changed.has(
     row.pickTarget?.objectId ?? row.entityId ?? row.id,
   );
