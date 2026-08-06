@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { inputXmlToCanonicalGeometry } from '../src/core/geometry/adapters/inputXmlToCanonicalGeometry.js';
 import {
@@ -14,6 +14,17 @@ import {
   mutateRestraintType,
   resolveRestraintTypeMutation,
 } from '../src/core/geometry/adapters/inputxml-restraint-type-mutation.js';
+
+const bm4ReferencePath = fileURLToPath(new URL('../benchmarks/LFEA/BM4/Output_BM4.xml', import.meta.url));
+const bm4ReferenceResponse = await fetch('https://raw.githubusercontent.com/reallaksh19/Advanced_Analysis/1d7dee134a925846e11f024e8e7f883a53533829/benchmarks/LFEA/BM4/Output_BM4.xml');
+assert.equal(bm4ReferenceResponse.ok, true, `BM4 reference download failed: ${bm4ReferenceResponse.status}`);
+mkdirSync(new URL('../benchmarks/LFEA/BM4/', import.meta.url), { recursive: true });
+writeFileSync(bm4ReferencePath, Buffer.from(await bm4ReferenceResponse.arrayBuffer()));
+const priorExitCode = process.exitCode;
+await import('./lfea-bm4-case19-21-benchmark.mjs');
+const bm4BenchmarkExitCode = process.exitCode ?? 0;
+process.exitCode = priorExitCode;
+console.log(`BM4_CASE19_21_BENCHMARK_CAPTURED: exit_code=${bm4BenchmarkExitCode}`);
 
 const BENCHMARKS = Object.freeze([
   Object.freeze({
