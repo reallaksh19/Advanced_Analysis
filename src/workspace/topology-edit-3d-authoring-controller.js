@@ -14,6 +14,18 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     super(eventBus, lifecycleOptions);
     this.authoringElement = null;
     this.authoringRuntime = new TopologyEditAuthoringRuntime(this);
+
+    // Final subclasses such as the governed SJSON controller own their source
+    // visual derivation. Decorate that exact downstream result instead of
+    // introducing a second render packet or renderer authority.
+    const downstreamDeriveVisual = this.deriveVisual;
+    if (downstreamDeriveVisual !== TopologyEdit3DViewController.prototype.deriveVisual) {
+      this.deriveVisual = (canonical, modelRole) => this.decorateAuthoringVisualResult(
+        downstreamDeriveVisual.call(this, canonical, modelRole),
+        canonical,
+        modelRole,
+      );
+    }
   }
 
   buildShell() {
@@ -54,14 +66,41 @@ export class TopologyEdit3DViewController extends ProfessionalController {
   }
 
   deriveVisual(canonical, modelRole) {
-    const result = super.deriveVisual(canonical, modelRole);
-    return Object.freeze({
-      ...result,
-      projection: applyTopologyEditAuthoredBendProjection(
-        result.projection,
-        canonical,
-      ),
-    });
+    return this.decorateAuthoringVisualResult(
+      super.deriveVisual(canonical, modelRole),
+      canonical,
+      modelRole,
+    );
+  }
+
+  decorateAuthoringVisualResult(result, canonical, modelRole) {
+    if (!result?.projection) {
+      throw new Error('TopologyEditAuthoringController: governed visual projection is unavailable.');
+    }
+    const alreadyDecorated = authoredProjectionSegments(result.projection)
+      .some((segment) => segment?.pickTarget?.partRole === 'authored-elbow-arc');
+    const projection = alreadyDecorated
+      ? result.projection
+      : applyTopologyEditAuthoredBendProjection(result.projection, canonical);
+    const decorated = projection === result.projection
+      ? result
+      : Object.freeze({ ...result, projection });
+    const role = String(modelRole || 'DRAFT').toUpperCase();
+
+    // Keep downstream role caches aligned with the exact packet returned to
+    // the sole production renderer. This remains disposable presentation data.
+    if (this.sjsonVisualByRole instanceof Map
+      && this.sjsonVisualByRole.get(role) === result) {
+      this.sjsonVisualByRole.set(role, decorated);
+    }
+    if (role === 'DRAFT' && this.hostElement) {
+      this.hostElement.dataset.topologyEditAuthoredBendProjectionHash =
+        projection.authoredBendProjectionHash ?? '';
+      this.hostElement.dataset.topologyEditAuthoredBendArcCount = String(
+        projection.authoredBendArcCount ?? 0,
+      );
+    }
+    return decorated;
   }
 
   refreshView(canonical) {
@@ -132,4 +171,11 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     this.authoringRuntime.clear(false, true);
     return super.acceptAutofix();
   }
+}
+
+function authoredProjectionSegments(projection) {
+  return [
+    ...(Array.isArray(projection?.segments) ? projection.segments : []),
+    ...(Array.isArray(projection?.compactSegments) ? projection.compactSegments : []),
+  ];
 }
