@@ -1,7 +1,7 @@
 {
   "schema": "nonfea-piping-project-defaults/v1",
   "projectId": "1885S",
-  "revision": 2,
+  "revision": 3,
   "status": "PROJECT_SCREENING_ONLY",
   "resolutionPolicy": [
     "SOURCE_EXPLICIT",
@@ -15,6 +15,46 @@
     "wallThicknessMm": 0.05
   },
   "configuredDefaults": [
+    {
+      "id": "DEFAULT-1885-DN20-SCH80-SECTION",
+      "enabled": true,
+      "field": "section.dimensionsMm",
+      "value": { "outsideDiameterMm": 26.67, "wallThicknessMm": 3.9116, "nps": 0.75 },
+      "unit": "mm",
+      "scope": { "projectId": "1885S", "nominalBoreMm": 20, "schedule": "80" },
+      "reason": "Project-configured DN 20 / NPS 3/4 Schedule 80 section where the current shared master has no exact row.",
+      "qualification": "PROJECT_SCREENING_ONLY"
+    },
+    {
+      "id": "DEFAULT-1885-DN80-SCH80-SECTION",
+      "enabled": true,
+      "field": "section.dimensionsMm",
+      "value": { "outsideDiameterMm": 88.9, "wallThicknessMm": 5.4864, "nps": 3 },
+      "unit": "mm",
+      "scope": { "projectId": "1885S", "nominalBoreMm": 80, "schedule": "80" },
+      "reason": "Project-configured DN 80 / NPS 3 Schedule 80 section where the current shared master has no exact row.",
+      "qualification": "PROJECT_SCREENING_ONLY"
+    },
+    {
+      "id": "DEFAULT-1885-DN200-SCH100-SECTION",
+      "enabled": true,
+      "field": "section.dimensionsMm",
+      "value": { "outsideDiameterMm": 219.075, "wallThicknessMm": 15.0876, "nps": 8 },
+      "unit": "mm",
+      "scope": { "projectId": "1885S", "nominalBoreMm": 200, "schedule": "100" },
+      "reason": "Project-configured DN 200 / NPS 8 Schedule 100 section where the current shared master has no exact row.",
+      "qualification": "PROJECT_SCREENING_ONLY"
+    },
+    {
+      "id": "DEFAULT-1885-DN250-SCH100-SECTION",
+      "enabled": true,
+      "field": "section.dimensionsMm",
+      "value": { "outsideDiameterMm": 273.05, "wallThicknessMm": 18.2626, "nps": 10 },
+      "unit": "mm",
+      "scope": { "projectId": "1885S", "nominalBoreMm": 250, "schedule": "100" },
+      "reason": "Project-configured DN 250 / NPS 10 Schedule 100 section where the current shared master has no exact row.",
+      "qualification": "PROJECT_SCREENING_ONLY"
+    },
     {
       "id": "DEFAULT-1885-MATERIAL-FAMILY",
       "enabled": true,
