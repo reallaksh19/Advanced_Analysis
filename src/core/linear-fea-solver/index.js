@@ -71,11 +71,3 @@ export {
   executionSemanticProjection,
   requireSolverExecution,
 } from './solve.js';
-
-export {
-  LINEAR_STIFFNESS_PREFLIGHT_SCHEMA,
-  LINEAR_STIFFNESS_PREFLIGHT_STATUSES,
-  compileLinearStiffnessPreflight,
-  preflightSemanticProjection,
-  requireLinearStiffnessPreflight,
-} from './stiffness-preflight.js';
