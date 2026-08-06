@@ -1,0 +1,92 @@
+name: BB-11 V2 production integration
+
+on:
+  pull_request:
+    branches:
+      - agent/bucket-b-bb11-flange-hub
+    paths:
+      - .github/workflows/bb11-v2-production-integration.yml
+      - docs/conceptcumroadmapLAFEA.md
+      - src/core/bucket-b/bb11-check.mjs
+      - src/core/bucket-b/index.js
+      - src/core/bucket-b/registry.js
+      - tests/bucket-b-bb11-flange-hub.test.mjs
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-v2-integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Enforce ancestry and exact six-file integration scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='${{ github.event.pull_request.base.sha }}'
+          head='${{ github.event.pull_request.head.sha }}'
+          test "$(git rev-parse HEAD)" = "$head"
+          test "$(git merge-base "$base" "$head")" = "$base"
+          git diff --check "${base}...${head}"
+          mapfile -t paths < <(git diff --name-only "${base}...${head}")
+          expected=(
+            '.github/workflows/bb11-v2-production-integration.yml'
+            'docs/conceptcumroadmapLAFEA.md'
+            'src/core/bucket-b/bb11-check.mjs'
+            'src/core/bucket-b/index.js'
+            'src/core/bucket-b/registry.js'
+            'tests/bucket-b-bb11-flange-hub.test.mjs'
+          )
+          test "${#paths[@]}" -eq "${#expected[@]}"
+          for index in "${!expected[@]}"; do
+            test "${paths[$index]}" = "${expected[$index]}"
+          done
+          test -z "$(git diff --name-only "${base}...${head}" -- \
+            src/core/bucket-b/flange-hub-geometry.js \
+            src/core/bucket-b/flange-hub-mesh.js \
+            src/core/bucket-b/flange-hub-mesh-v2.js \
+            src/core/bucket-b/flange-hub-loads.js \
+            src/core/bucket-b/flange-hub-solver.js \
+            src/core/bucket-b/flange-hub-recovery.js \
+            src/core/bucket-b/flange-hub-convergence.js \
+            src/core/bucket-b/flange-hub-independent-oracle.js \
+            src/core/bucket-b/axisymmetric-q8-kernel.js)"
+      - name: Verify registry, public export, evidence path and tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check src/core/bucket-b/registry.js
+          node --check src/core/bucket-b/index.js
+          node --check src/core/bucket-b/bb11-check.mjs
+          node --test tests/bucket-b-bb11-production-mesh-v2.test.mjs
+          node --test tests/bucket-b-bb11-flange-hub.test.mjs
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {
+            FLANGE_HUB_MESH_FAMILY_ID,
+            MODULE_REGISTRY,
+            createFlangeHubMesh,
+          } from './src/core/bucket-b/index.js';
+          const mesh = createFlangeHubMesh('M0');
+          assert.equal(
+            FLANGE_HUB_MESH_FAMILY_ID,
+            'BKT-B-FLANGE-Q8-B03-B04-CONFORMING-TRANSITION-V2',
+          );
+          assert.equal(mesh.meshFamilyId, FLANGE_HUB_MESH_FAMILY_ID);
+          assert.equal(
+            MODULE_REGISTRY['C2D-FLANGE-HUB'].meshFamilyId,
+            FLANGE_HUB_MESH_FAMILY_ID,
+          );
+          assert.equal(mesh.meshV2Metadata.interfaceEvidence.allConforming, true);
+          assert.equal(mesh.meshV2Metadata.interfaceEvidence.hangingNodeCount, 0);
+          NODE

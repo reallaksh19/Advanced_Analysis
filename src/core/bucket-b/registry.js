@@ -63,7 +63,9 @@ export const MODULE_REGISTRY = Object.freeze(Object.fromEntries(MODULE_ROWS.map(
     elementProfile: axisymmetric
       ? ELEMENT_PROFILES.AXI_Q8_FULL_3X3
       : ELEMENT_PROFILES.Q8_FULL_3X3,
-    meshFamilyId: `BKT-B-${token}-Q8-MESH-FAMILY-V1`,
+    meshFamilyId: moduleId === 'C2D-FLANGE-HUB'
+    ? 'BKT-B-FLANGE-Q8-B03-B04-CONFORMING-TRANSITION-V2'
+    : `BKT-B-${token}-Q8-MESH-FAMILY-V1`,
     recoveryProfileId: axisymmetric
       ? 'AXI_Q8_GAUSS_POINT_STRESS_RECOVERY_V1'
       : 'Q8_GAUSS_POINT_IN_PLANE_STRESS_RECOVERY_V1',

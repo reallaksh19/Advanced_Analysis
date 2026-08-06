@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   FLANGE_HUB_FROZEN_INPUT,
+  FLANGE_HUB_MESH_FAMILY_ID,
+  MODULE_REGISTRY,
   createBenchmarkRecord,
   createCanonicalFlangeHubGeometry,
   createFlangeHubLoadDefinition,
@@ -235,6 +237,22 @@ test('BB-11 independent oracle SGS-PCG solves an SPD system with explicit residu
   });
   assert.ok(solved.relativeResidual <= 1e-10);
   assert.ok(solved.explicitResidualNorm <= 1e-8);
+});
+
+
+test('BB-11 registry and public mesh export bind production V2', () => {
+  const mesh = createFlangeHubMesh('M0');
+  assert.equal(
+    FLANGE_HUB_MESH_FAMILY_ID,
+    'BKT-B-FLANGE-Q8-B03-B04-CONFORMING-TRANSITION-V2',
+  );
+  assert.equal(mesh.meshFamilyId, FLANGE_HUB_MESH_FAMILY_ID);
+  assert.equal(
+    MODULE_REGISTRY['C2D-FLANGE-HUB'].meshFamilyId,
+    FLANGE_HUB_MESH_FAMILY_ID,
+  );
+  assert.equal(mesh.meshV2Metadata.interfaceEvidence.allConforming, true);
+  assert.equal(mesh.meshV2Metadata.interfaceEvidence.hangingNodeCount, 0);
 });
 
 test('BB-11 registry rejects direct caller state', () => {

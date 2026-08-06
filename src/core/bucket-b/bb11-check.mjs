@@ -50,12 +50,15 @@ const BB11_ALLOWED_PATHS = Object.freeze([
   'src/core/bucket-b/flange-hub-independent-oracle.js',
   'src/core/bucket-b/flange-hub-loads.js',
   'src/core/bucket-b/flange-hub-mesh.js',
+  'src/core/bucket-b/flange-hub-mesh-v2.js',
   'src/core/bucket-b/flange-hub-recovery.js',
   'src/core/bucket-b/flange-hub-reference.js',
   'src/core/bucket-b/flange-hub-solver.js',
   'src/core/bucket-b/index.js',
   'src/core/bucket-b/registry.js',
   'tests/bucket-b-bb11-flange-hub.test.mjs',
+  'tests/bucket-b-bb11-production-mesh-v2.test.mjs',
+  'docs/conceptcumroadmapLAFEA.md',
 ]);
 
 if (process.argv.includes('--core')) {
