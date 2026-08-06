@@ -109,6 +109,7 @@ export {
   diagnoseInputXmlLinearModelHealth,
   diagnoseInputXmlModelHealthProximity,
   diagnoseInputXmlModelHealthTopology,
+  prepareInputXmlLinearSolve,
 } from './inputxml-model-health.js';
 
 export {
@@ -125,3 +126,22 @@ export {
   INPUTXML_MODEL_HEALTH_CAPABILITY_DEPENDENCIES,
   STRICT_INPUTXML_LINEAR_STATIC_PROFILE,
 } from './inputxml-model-health-profile.js';
+
+export {
+  INPUTXML_LINEAR_SOLVE_PREPARATION_SCHEMA,
+  requireInputXmlLinearSolvePreparation,
+  sealInputXmlLinearSolvePreparation,
+} from './inputxml-linear-solve-preparation-contract.js';
+
+export {
+  INPUTXML_GRAVITY_ACCELERATION,
+  INPUTXML_INSTALLATION_TEMPERATURE,
+  INPUTXML_LINEAR_SOLVE_PREPARATION_PROFILE_SCHEMA,
+  InputXmlLinearSolvePreparationError,
+  requireInputXmlLinearSolvePreparationProfile,
+} from './inputxml-linear-preparation-profile.js';
+
+export {
+  INPUTXML_THERMAL_EXPANSION_AUTHORITY_SCHEMA,
+  resolveInputXmlThermalExpansionAuthority,
+} from './inputxml-thermal-authority.js';
