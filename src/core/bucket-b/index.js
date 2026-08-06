@@ -22,6 +22,7 @@ export * from './current-main-baseline.js';
 export * from './bb06-lug-clamp.js';
 export * from './bb07-bracket-gusset.js';
 export * from './bb08-pipe-pad.js';
+export * from './bb09-nozzle-repad.js';
 export * from './flange-hub-geometry.js';
 export * from './flange-hub-mesh-v2.js';
 export * from './flange-hub-loads.js';
