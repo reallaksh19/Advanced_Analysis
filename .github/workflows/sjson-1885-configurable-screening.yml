@@ -5,19 +5,45 @@ on:
     branches:
       - agent/sjson-1885-configurable-screening
     paths:
+      - project-data/1885s-nonfea-piping-defaults.json
+      - src/workspace/project-data/project-data-fields.js
+      - src/workspace/project-data/project-data-contract.js
+      - src/core/empirical-piping-mechanics/configured-resolution.js
+      - src/core/empirical-piping-mechanics/sustained-simple-span.js
+      - src/core/empirical-piping-mechanics/vertical-retention.js
+      - src/core/empirical-piping-mechanics/index.js
+      - src/calc-workspace/cii-standalone-port/core/branch-schedule-resolution.js
+      - src/calc-workspace/cii-standalone-port/core/pos-section-material-resolution.js
+      - scripts/nonfea-piping-foundation-check.mjs
+      - scripts/empirical-sjson-1885-pos-section-material-run.mjs
+      - scripts/empirical-sjson-1885-pos-section-material-check.mjs
       - benchmarks/1885Sjson/empirical-screening-profile.config.json
       - benchmarks/1885Sjson/empirical-screening-result.configurable.json
       - benchmarks/1885Sjson/empirical-screening-result.configurable.csv
       - docs/evidence/SJSON_1885_CONFIGURABLE_SCREENING.md
+      - docs/NonFEAHandcalc_Emperical.md
       - scripts/empirical-sjson-1885-configurable-screening-run.mjs
       - scripts/empirical-sjson-1885-configurable-screening-check.mjs
       - .github/workflows/sjson-1885-configurable-screening.yml
   pull_request:
     paths:
+      - project-data/1885s-nonfea-piping-defaults.json
+      - src/workspace/project-data/project-data-fields.js
+      - src/workspace/project-data/project-data-contract.js
+      - src/core/empirical-piping-mechanics/configured-resolution.js
+      - src/core/empirical-piping-mechanics/sustained-simple-span.js
+      - src/core/empirical-piping-mechanics/vertical-retention.js
+      - src/core/empirical-piping-mechanics/index.js
+      - src/calc-workspace/cii-standalone-port/core/branch-schedule-resolution.js
+      - src/calc-workspace/cii-standalone-port/core/pos-section-material-resolution.js
+      - scripts/nonfea-piping-foundation-check.mjs
+      - scripts/empirical-sjson-1885-pos-section-material-run.mjs
+      - scripts/empirical-sjson-1885-pos-section-material-check.mjs
       - benchmarks/1885Sjson/empirical-screening-profile.config.json
       - benchmarks/1885Sjson/empirical-screening-result.configurable.json
       - benchmarks/1885Sjson/empirical-screening-result.configurable.csv
       - docs/evidence/SJSON_1885_CONFIGURABLE_SCREENING.md
+      - docs/NonFEAHandcalc_Emperical.md
       - scripts/empirical-sjson-1885-configurable-screening-run.mjs
       - scripts/empirical-sjson-1885-configurable-screening-check.mjs
       - .github/workflows/sjson-1885-configurable-screening.yml
@@ -40,10 +66,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Run non-FEA piping foundation hand checks
+        run: node scripts/nonfea-piping-foundation-check.mjs
       - name: Materialize exact enriched benchmark sources
         run: |
           git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson > /tmp/EnrichedSjson
           git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson.topology.input.xml > /tmp/EnrichedSjson.topology.input.xml
+      - name: Resolve exact POS section and material authority
+        run: |
+          node scripts/empirical-sjson-1885-pos-section-material-run.mjs \
+            project-data/1885s-nonfea-piping-defaults.json \
+            /tmp/EnrichedSjson \
+            /tmp/pos-section-material.json
+          node scripts/empirical-sjson-1885-pos-section-material-check.mjs \
+            /tmp/pos-section-material.json
       - name: Recalculate exact benchmark twice
         run: |
           node scripts/empirical-sjson-1885-configurable-screening-run.mjs \
@@ -56,15 +92,4 @@ jobs:
             /tmp/EnrichedSjson \
             /tmp/EnrichedSjson.topology.input.xml \
             /tmp/result-b.json
-          cmp /tmp/result-a.json /tmp/result-b.json
-          cmp /tmp/result-a.json benchmarks/1885Sjson/empirical-screening-result.configurable.json
-          node scripts/empirical-sjson-1885-configurable-screening-check.mjs /tmp/result-a.json
-      - name: Upload calculation evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: empirical-sjson-1885-configurable-screening
-          path: |
-            /tmp/result-a.json
-            benchmarks/1885Sjson/empirical-screening-result.configurable.csv
-            docs/evidence/SJSON_1885_CONFIGURABLE_SCREENING.md
-          if-no-files-found: error
+         Û\İ\Ü™\İ[XKšœÛÛˆİ\Ü™\İ[X‹šœÛÛ‚ˆÛ\İ\Ü™\İ[XKšœÛÛˆ™[˜ÚX\šÜËÌNTÚœÛÛ‹Ù[\\šXØ[\ØÜ™Y[š[™Ë\™\İ[˜ÛÛ™šYİ\˜X›KšœÛÛ‚ˆ›ÙHØÜš\ËÙ[\\šXØ[\ÚœÛÛ‹LNKXÛÛ™šYİ\˜X›K\ØÜ™Y[š[™ËXÚXÚË›ZœÈİ\Ü™\İ[XKšœÛÛ‚ˆH˜[YNˆ\ØYØ[İ[][Ûˆ]šY[˜ÙBˆ\Ù\ÎˆXİ[ÛœËİ\ØYX\Y˜XİˆÚ]‚ˆ˜[YNˆ[\\šXØ[\ÚœÛÛ‹LNKXÛÛ™šYİ\˜X›K\ØÜ™Y[š[™Âˆ]ˆˆİ\Ü™\İ[XKšœÛÛ‚ˆİ\ÜÜË\ÙXİ[Û‹[X]\šX[šœÛÛ‚ˆ™[˜ÚX\šÜËÌNTÚœÛÛ‹Ù[\\šXØ[\ØÜ™Y[š[™Ë\™\İ[˜ÛÛ™šYİ\˜X›K˜Üİ‚ˆØÜËÙ]šY[˜ÙKÔÒ”ÓÓ—ÌNWĞÓÓ‘’QÕTP“WÔĞÔ‘QS’S‘Ë›YˆY‹[›ËYš[\ËY›İ[™ˆ\œ›Ü‚

@@ -8,7 +8,16 @@ export {
 export { EMPIRICAL_FAILURE_CODES, EmpiricalPipingError } from './failure-codes.js';
 export { canonicalize, freezeWithIdentity, semanticHash, stableStringify } from './identity.js';
 export { calculateAnnularSection, resolveSectionStates } from './section.js';
+export {
+  EMPIRICAL_RESOLUTION_SCHEMA,
+  RESOLUTION_KINDS,
+  RESOLUTION_STATUSES,
+  createConfiguredResolutionSession,
+  normalizeConfiguredDefaults,
+} from './configured-resolution.js';
 export { buildDistributedWeight, compileEccentricPointMass } from './weight.js';
+export { calculateSimpleSpanSustained } from './sustained-simple-span.js';
+export { calculateVerticalRetention, redistributeReleasedReaction } from './vertical-retention.js';
 export {
   buildPlanarMemberAxes,
   projectGlobalVectorToLocal,

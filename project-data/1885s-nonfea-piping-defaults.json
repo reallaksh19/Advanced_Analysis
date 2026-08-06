@@ -1,0 +1,85 @@
+{
+  "schema": "nonfea-piping-project-defaults/v1",
+  "projectId": "1885S",
+  "revision": 1,
+  "status": "PROJECT_SCREENING_ONLY",
+  "resolutionPolicy": [
+    "SOURCE_EXPLICIT",
+    "SOURCE_INHERITED",
+    "CONFIGURED_DERIVATION",
+    "PROJECT_CONFIGURED_DEFAULT",
+    "BLOCK"
+  ],
+  "configuredDefaults": [
+    {
+      "id": "DEFAULT-1885-MATERIAL-FAMILY",
+      "enabled": true,
+      "field": "material.family",
+      "value": "CARBON_STEEL",
+      "unit": null,
+      "scope": { "projectId": "1885S" },
+      "reason": "1885S Project Data material-family screening rule.",
+      "qualification": "PROJECT_SCREENING_ONLY"
+    },
+    {
+      "id": "DEFAULT-1885-CS-E",
+      "enabled": true,
+      "field": "material.elasticModulusPa",
+      "value": 203400000000,
+      "unit": "Pa",
+      "scope": { "projectId": "1885S", "materialFamily": "CARBON_STEEL" },
+      "reason": "1885S Project Data carbon-steel elastic modulus.",
+      "qualification": "PROJECT_SCREENING_ONLY"
+    },
+    {
+      "id": "DEFAULT-1885-CS-NU",
+      "enabled": true,
+      "field": "material.poissonsRatio",
+      "value": 0.3,
+      "unit": "ratio",
+      "scope": { "projectId": "1885S", "materialFamily": "CARBON_STEEL" },
+      "reason": "1885S Project Data carbon-steel Poisson ratio.",
+      "qualification": "PROJECT_SCREENING_ONLY"
+    },
+    {
+      "id": "DEFAULT-1885-CS-DENSITY",
+      "enabled": true,
+      "field": "material.densityKgM3",
+      "value": 7850,
+      "unit": "kg/m3",
+      "scope": { "projectId": "1885S", "materialFamily": "CARBON_STEEL" },
+      "reason": "1885S Project Data carbon-steel density.",
+      "qualification": "PROJECT_SCREENING_ONLY"
+    },
+    {
+      "id": "DEFAULT-1885-CS-ALPHA",
+      "enabled": true,
+      "field": "material.thermalExpansionPerC",
+      "value": 0.0000128,
+      "unit": "1/C",
+      "scope": { "projectId": "1885S", "materialFamily": "CARBON_STEEL" },
+      "reason": "1885S Project Data mean thermal-expansion coefficient for the screening state.",
+      "qualification": "PROJECT_SCREENING_ONLY"
+    },
+    {
+      "id": "DEFAULT-1885-CA",
+      "enabled": true,
+      "field": "section.corrosionAllowanceMm",
+      "value": 0,
+      "unit": "mm",
+      "scope": { "projectId": "1885S" },
+      "reason": "1885S Project Data screening corrosion allowance.",
+      "qualification": "PROJECT_SCREENING_ONLY"
+    },
+    {
+      "id": "DEFAULT-1885-CODE-WALL",
+      "enabled": true,
+      "field": "section.codeStressWallRule",
+      "value": "NOMINAL_MINUS_CORROSION",
+      "unit": null,
+      "scope": { "projectId": "1885S" },
+      "reason": "1885S Project Data code-stress section rule.",
+      "qualification": "PROJECT_SCREENING_ONLY"
+    }
+  ]
+}
