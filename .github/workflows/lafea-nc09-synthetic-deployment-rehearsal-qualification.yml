@@ -1,0 +1,110 @@
+name: LAFEA-NC NC-09 Exact-Head Synthetic Deployment Rehearsal Qualification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/lafea-nc09-synthetic-deployment-rehearsal-qualification.yml'
+      - 'docs/nonlinear-shell-contact/LAFEA_NC09_SYNTHETIC_DEPLOYMENT_REHEARSAL_QUALIFICATION.md'
+      - 'scripts/lafea-nc09-deployment.mjs'
+      - 'scripts/lafea-nc09-check.mjs'
+      - 'scripts/nc09-deployment/**'
+      - 'src/core/nonlinear-shell-contact/synthetic-deployment-rehearsal-contract.js'
+      - 'src/core/nonlinear-shell-contact/synthetic-deployment-rehearsal-evaluator.js'
+      - 'src/core/nonlinear-shell-contact/nc09-negative-controls.js'
+      - 'tests/nonlinear-shell-contact-nc09-qualification.test.mjs'
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  exact-head-nc09:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NC08_ARTIFACT_ID: '8960959555'
+      NC08_ARTIFACT_DIGEST: sha256:6d39eee81da5a469f8a8455056ceabf413831fc7550ec2518c9d18989a472755
+    steps:
+      - name: Resolve exact head and base
+        id: refs
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          echo "head=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          echo "base=$BASE_SHA" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.refs.outputs.head }}
+          fetch-depth: 0
+      - name: Verify live base, ancestry and phase paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          test "$(git rev-parse HEAD)" = "${{ steps.refs.outputs.head }}"
+          test "$(git rev-parse origin/main)" = "${{ steps.refs.outputs.base }}"
+          git merge-base --is-ancestor "${{ steps.refs.outputs.base }}" HEAD
+          mapfile -t paths < <(git diff --name-only "${{ steps.refs.outputs.base }}...HEAD")
+          test "${#paths[@]}" = 11
+          for path in "${paths[@]}"; do
+            case "$path" in
+              .github/workflows/lafea-nc09-synthetic-deployment-rehearsal-qualification.yml|docs/nonlinear-shell-contact/LAFEA_NC09_SYNTHETIC_DEPLOYMENT_REHEARSAL_QUALIFICATION.md|scripts/lafea-nc09-deployment.mjs|scripts/lafea-nc09-check.mjs|scripts/nc09-deployment/config.mjs|scripts/nc09-deployment/engine.mjs|scripts/nc09-deployment/prepare-binding.mjs|src/core/nonlinear-shell-contact/synthetic-deployment-rehearsal-contract.js|src/core/nonlinear-shell-contact/synthetic-deployment-rehearsal-evaluator.js|src/core/nonlinear-shell-contact/nc09-negative-controls.js|tests/nonlinear-shell-contact-nc09-qualification.test.mjs) ;;
+              *) echo "Unexpected path: $path" >&2; exit 1;;
+            esac
+          done
+          git diff --check "${{ steps.refs.outputs.base }}...HEAD"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Download and validate NC-08 custody
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/nc08
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${NC08_ARTIFACT_ID}/zip" -o artifacts/nc08.zip
+          test "sha256:$(sha256sum artifacts/nc08.zip | cut -d' ' -f1)" = "$NC08_ARTIFACT_DIGEST"
+          unzip -q artifacts/nc08.zip -d artifacts/nc08
+          node scripts/nc09-deployment/prepare-binding.mjs --artifact-dir=artifacts/nc08 --output=artifacts/nc09-upstream.json
+      - name: Run syntax, unit and fail-closed controls
+        run: |
+          set -euo pipefail
+          node --check scripts/lafea-nc09-deployment.mjs
+          node --check scripts/lafea-nc09-check.mjs
+          for f in scripts/nc09-deployment/*.mjs src/core/nonlinear-shell-contact/{synthetic-deployment-rehearsal-contract,synthetic-deployment-rehearsal-evaluator,nc09-negative-controls}.js; do node --check "$f"; done
+          node tests/nonlinear-shell-contact-nc09-qualification.test.mjs
+      - name: Execute two isolated deployment rehearsals
+        run: |
+          set -euo pipefail
+          export NC09_EXACT_HEAD_SHA="${{ steps.refs.outputs.head }}"
+          export NC09_IMPLEMENTATION_HASH="sha256:$(sha256sum scripts/lafea-nc09-deployment.mjs scripts/lafea-nc09-check.mjs scripts/nc09-deployment/*.mjs src/core/nonlinear-shell-contact/{synthetic-deployment-rehearsal-contract,synthetic-deployment-rehearsal-evaluator,nc09-negative-controls}.js | sha256sum | cut -d' ' -f1)"
+          echo "$NC09_IMPLEMENTATION_HASH" > artifacts/nc09-implementation-hash.txt
+          node scripts/lafea-nc09-deployment.mjs --upstream=artifacts/nc09-upstream.json --output=artifacts/nc09-run-a
+          node scripts/lafea-nc09-deployment.mjs --upstream=artifacts/nc09-upstream.json --output=artifacts/nc09-run-b
+          diff -qr artifacts/nc09-run-a artifacts/nc09-run-b
+      - name: Evaluate qualification twice
+        run: |
+          set -euo pipefail
+          export NC09_EXACT_HEAD_SHA="${{ steps.refs.outputs.head }}"
+          export NC09_IMPLEMENTATION_HASH="$(cat artifacts/nc09-implementation-hash.txt)"
+          node scripts/lafea-nc09-check.mjs --upstream=artifacts/nc09-upstream.json --run=artifacts/nc09-run-a --output=artifacts/nc09-eval-a
+          node scripts/lafea-nc09-check.mjs --upstream=artifacts/nc09-upstream.json --run=artifacts/nc09-run-b --output=artifacts/nc09-eval-b
+          cmp artifacts/nc09-eval-a/nc09-report.canonical.json artifacts/nc09-eval-b/nc09-report.canonical.json
+          jq -e '.status=="NC09_SYNTHETIC_DEPLOYMENT_REHEARSAL_QUALIFIED" and (.blockers|length)==0 and .authority.syntheticDeploymentRehearsalQualified==true and .authority.productionExecutionAuthorized==false and .authority.nc10Authorized==false' artifacts/nc09-eval-a/nc09-report.json
+      - name: Verify clean source tree
+        run: git diff --exit-code
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lafea-nc09-debug-${{ steps.refs.outputs.head }}-${{ github.run_attempt }}
+          path: artifacts
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: lafea-nc09-${{ steps.refs.outputs.head }}-${{ github.run_attempt }}
+          path: artifacts
+          retention-days: 30

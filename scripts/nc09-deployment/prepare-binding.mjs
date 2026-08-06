@@ -1,0 +1,16 @@
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { semanticHash } from '../../src/core/nonlinear-shell-contact/contracts.js';
+import { BUILD_ID, EXPECTED_NC08 } from './config.mjs';
+const args=Object.fromEntries(process.argv.slice(2).map(x=>x.replace(/^--/u,'').split('=')));
+const root=resolve(args['artifact-dir']??'artifacts/nc08');
+const out=resolve(args.output??'artifacts/nc09-upstream.json');
+const report=JSON.parse(await readFile(resolve(root,'nc08-a/nc08-report.json'),'utf8'));
+const build=JSON.parse(await readFile(resolve(root,'nc08-build-a/build-record.json'),'utf8'));
+if(report.status!=='NC08_SYNTHETIC_REFERENCE_MODULE_QUALIFIED'||report.reportSemanticHash!==EXPECTED_NC08.reportHash)throw new Error('NC08 report mismatch');
+if(report.authority.syntheticReferenceModuleQualified!==true||report.authority.moduleQualified!==false||report.authority.nc09Authorized!==false)throw new Error('NC08 authority mismatch');
+if(build.id!==BUILD_ID||build.buildRecordHash!==EXPECTED_NC08.buildRecordHash||build.buildArtifactHash!==EXPECTED_NC08.buildArtifactHash)throw new Error('NC08 build mismatch');
+const payload={schema:'nonlinear-shell-contact-nc09-upstream-binding/v1',nc08ExactHeadSha:EXPECTED_NC08.exactHeadSha,nc08ReportHash:EXPECTED_NC08.reportHash,nc08ArtifactDigest:EXPECTED_NC08.artifactDigest,nc08BuildRecordHash:EXPECTED_NC08.buildRecordHash,nc08BuildArtifactHash:EXPECTED_NC08.buildArtifactHash,nc08UpstreamBindingHash:EXPECTED_NC08.upstreamBindingHash,syntheticBuildId:BUILD_ID,syntheticReferenceModuleQualified:true,moduleQualified:false,nc09Authorized:false};
+const sealed={...payload,semanticHash:semanticHash(payload)};
+await mkdir(resolve(out,'..'),{recursive:true});await writeFile(out,`${JSON.stringify(sealed,null,2)}\n`);
+console.log(JSON.stringify(sealed));
