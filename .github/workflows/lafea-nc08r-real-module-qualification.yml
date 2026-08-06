@@ -1,0 +1,113 @@
+name: LAFEA NC-08R real-module qualification gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/lafea-nc08r-real-module-qualification.yml'
+      - 'docs/nonlinear-shell-contact/LAFEA_NC08R_REAL_MODULE_QUALIFICATION.md'
+      - 'scripts/lafea-nc08r-check.mjs'
+      - 'src/core/nonlinear-shell-contact/real-module-qualification-contract.js'
+      - 'src/core/nonlinear-shell-contact/real-module-qualification-evaluator.js'
+      - 'src/core/nonlinear-shell-contact/nc08r-fixtures.js'
+      - 'src/core/nonlinear-shell-contact/nc08r-negative-controls.js'
+      - 'tests/nonlinear-shell-contact-nc08r-real-module-qualification.test.mjs'
+  workflow_dispatch:
+    inputs:
+      head_sha:
+        description: Exact NC-08R candidate head SHA
+        required: true
+        type: string
+      base_sha:
+        description: Exact current-main base SHA
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-contract-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      DISPATCH_HEAD_SHA: ${{ inputs.head_sha }}
+      DISPATCH_BASE_SHA: ${{ inputs.base_sha }}
+
+    steps:
+      - name: Resolve exact head and base
+        id: exact
+        shell: bash
+        run: |
+          set -euo pipefail
+          head_sha="${DISPATCH_HEAD_SHA:-${PR_HEAD_SHA:-}}"
+          base_sha="${DISPATCH_BASE_SHA:-${PR_BASE_SHA:-}}"
+          [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$base_sha" =~ ^[0-9a-f]{40}$ ]]
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.exact.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Verify live base, ancestry and governed paths
+        id: custody
+        shell: bash
+        env:
+          HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
+          BASE_SHA: ${{ steps.exact.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          test "$(git rev-parse refs/remotes/origin/main)" = "$BASE_SHA"
+          git merge-base --is-ancestor "$BASE_SHA" "$HEAD_SHA"
+          git diff --check "$BASE_SHA...$HEAD_SHA"
+          mapfile -t paths < <(git diff --name-only "$BASE_SHA...$HEAD_SHA")
+          test "${#paths[@]}" = 8
+          for path in "${paths[@]}"; do
+            case "$path" in
+              .github/workflows/lafea-nc08r-real-module-qualification.yml|\
+              docs/nonlinear-shell-contact/LAFEA_NC08R_REAL_MODULE_QUALIFICATION.md|\
+              scripts/lafea-nc08r-check.mjs|\
+              src/core/nonlinear-shell-contact/real-module-qualification-contract.js|\
+              src/core/nonlinear-shell-contact/real-module-qualification-evaluator.js|\
+              src/core/nonlinear-shell-contact/nc08r-fixtures.js|\
+              src/core/nonlinear-shell-contact/nc08r-negative-controls.js|\
+              tests/nonlinear-shell-contact-nc08r-real-module-qualification.test.mjs) ;;
+              *) echo "NC-08R path violation: $path" >&2; exit 1 ;;
+            esac
+          done
+          echo "source_tree_sha=$(git rev-parse HEAD^{tree})" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate exact-head NC-08R gate
+        env:
+          CANDIDATE_HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
+          CANDIDATE_SOURCE_TREE_SHA: ${{ steps.custody.outputs.source_tree_sha }}
+        run: |
+          set -euo pipefail
+          node --check scripts/lafea-nc08r-check.mjs
+          node --check src/core/nonlinear-shell-contact/real-module-qualification-contract.js
+          node --check src/core/nonlinear-shell-contact/real-module-qualification-evaluator.js
+          node --check src/core/nonlinear-shell-contact/nc08r-fixtures.js
+          node --check src/core/nonlinear-shell-contact/nc08r-negative-controls.js
+          node scripts/lafea-nc08r-check.mjs
+          git diff --exit-code
+          test -z "$(git status --porcelain --untracked-files=no)"
+
+      - name: Upload blocked contract receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc08r-contract-${{ steps.exact.outputs.head_sha }}
+          path: artifacts/nc08r/nc08r-contract-report.json
+          if-no-files-found: error
+          retention-days: 30
