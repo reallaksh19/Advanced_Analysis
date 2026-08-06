@@ -20,9 +20,12 @@ on:
       - scripts/nonfea-piping-foundation-check.mjs
       - scripts/empirical-sjson-1885-pos-section-material-run.mjs
       - scripts/empirical-sjson-1885-pos-section-material-check.mjs
+      - scripts/empirical-pos-section-material-csv.mjs
       - benchmarks/1885Sjson/empirical-screening-profile.config.json
       - benchmarks/1885Sjson/empirical-screening-result.configurable.json
       - benchmarks/1885Sjson/empirical-screening-result.configurable.csv
+      - benchmarks/1885Sjson/empirical-pos-section-material.csv
+      - benchmarks/1885Sjson/empirical-configured-default-usage.csv
       - docs/evidence/SJSON_1885_CONFIGURABLE_SCREENING.md
       - docs/NonFEAHandcalc_Emperical.md
       - scripts/empirical-sjson-1885-configurable-screening-run.mjs
@@ -45,9 +48,12 @@ on:
       - scripts/nonfea-piping-foundation-check.mjs
       - scripts/empirical-sjson-1885-pos-section-material-run.mjs
       - scripts/empirical-sjson-1885-pos-section-material-check.mjs
+      - scripts/empirical-pos-section-material-csv.mjs
       - benchmarks/1885Sjson/empirical-screening-profile.config.json
       - benchmarks/1885Sjson/empirical-screening-result.configurable.json
       - benchmarks/1885Sjson/empirical-screening-result.configurable.csv
+      - benchmarks/1885Sjson/empirical-pos-section-material.csv
+      - benchmarks/1885Sjson/empirical-configured-default-usage.csv
       - docs/evidence/SJSON_1885_CONFIGURABLE_SCREENING.md
       - docs/NonFEAHandcalc_Emperical.md
       - scripts/empirical-sjson-1885-configurable-screening-run.mjs
@@ -87,6 +93,10 @@ jobs:
             /tmp/pos-section-material.json
           node scripts/empirical-sjson-1885-pos-section-material-check.mjs \
             /tmp/pos-section-material.json
+          node scripts/empirical-pos-section-material-csv.mjs \
+            /tmp/pos-section-material.json \
+            /tmp/empirical-pos-section-material.csv \
+            /tmp/empirical-configured-default-usage.csv
       - name: Recalculate exact benchmark twice
         run: |
           node scripts/empirical-sjson-1885-configurable-screening-run.mjs \
@@ -100,8 +110,20 @@ jobs:
             /tmp/EnrichedSjson.topology.input.xml \
             /tmp/result-b.json
           cmp /tmp/result-a.json /tmp/result-b.json
-          cmp /tmp/result-a.json benchmarks/1885Sjson/empirical-screening-result.configurable.json
           node scripts/empirical-sjson-1885-configurable-screening-check.mjs /tmp/result-a.json
+      - name: Upload recalculated candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: empirical-sjson-1885-recalculated-candidate
+          path: |
+            /tmp/result-a.json
+            /tmp/result-b.json
+            /tmp/pos-section-material.json
+            /tmp/empirical-pos-section-material.csv
+            /tmp/empirical-configured-default-usage.csv
+          if-no-files-found: error
+      - name: Verify checked-in golden result
+        run: cmp /tmp/result-a.json benchmarks/1885Sjson/empirical-screening-result.configurable.json
       - name: Upload calculation evidence
         uses: actions/upload-artifact@v4
         with:
@@ -109,6 +131,8 @@ jobs:
           path: |
             /tmp/result-a.json
             /tmp/pos-section-material.json
+            /tmp/empirical-pos-section-material.csv
+            /tmp/empirical-configured-default-usage.csv
             benchmarks/1885Sjson/empirical-screening-result.configurable.csv
             docs/evidence/SJSON_1885_CONFIGURABLE_SCREENING.md
           if-no-files-found: error
