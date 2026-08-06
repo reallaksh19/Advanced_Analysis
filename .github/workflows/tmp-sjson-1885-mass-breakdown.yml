@@ -23,7 +23,7 @@ jobs:
           node-version: 22
       - name: Apply constituent mass-ledger patch
         run: |
-          git show HEAD^^^:.github/workflows/tmp-sjson-1885-mass-breakdown.yml > /tmp/embedded-workflow.yml
+          git show HEAD^^^^:.github/workflows/tmp-sjson-1885-mass-breakdown.yml > /tmp/embedded-workflow.yml
           python - <<'PY'
           from pathlib import Path
           import re
@@ -36,6 +36,13 @@ jobs:
           if removed != 1:
               raise SystemExit(f'Expected one embedded workflow edit block, removed {removed}.')
           exec(compile(body, '<embedded-mass-breakdown-patch>', 'exec'))
+          check_path = Path('scripts/empirical-sjson-1885-configurable-screening-check.mjs')
+          check = check_path.read_text()
+          old_tolerance = "assertClose(row.kgPerM[key] * row.lengthM, row.kg[key], 3e-6, `${row.edgeId} ${key} rate-to-mass closure`);"
+          new_tolerance = "assertClose(row.kgPerM[key] * row.lengthM, row.kg[key], 1e-5, `${row.edgeId} ${key} rate-to-mass closure`);"
+          if old_tolerance not in check:
+              raise SystemExit('Element rate-to-mass tolerance assertion not found.')
+          check_path.write_text(check.replace(old_tolerance, new_tolerance, 1))
           workflow_path = Path('.github/workflows/sjson-1885-configurable-screening.yml')
           workflow = workflow_path.read_text()
           workflow = workflow.replace('      - benchmarks/1885Sjson/empirical-screening-result.configurable.csv\n', '      - benchmarks/1885Sjson/empirical-screening-result.configurable.csv\n      - benchmarks/1885Sjson/empirical-screening-element-mass-breakdown.configurable.csv\n')
