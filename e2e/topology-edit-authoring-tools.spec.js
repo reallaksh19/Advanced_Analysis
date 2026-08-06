@@ -67,8 +67,9 @@ test('production 3D Edit completes Move, Stretch and atomic Route + Elbow from v
   expect(completed.authoredBendArcCount).toBeGreaterThanOrEqual(1);
   expect(completed.transactionHash).not.toBe('');
 
+  const completedScreenshot = await page.screenshot({ fullPage: true });
   await testInfo.attach('topology-edit-move-stretch-route-elbow', {
-    body: await page.screenshot({ fullPage: true }),
+    body: completedScreenshot,
     contentType: 'image/png',
   });
 
@@ -95,7 +96,9 @@ test('production 3D Edit completes Move, Stretch and atomic Route + Elbow from v
     stretched,
     completed,
   }, null, 2)}\n`);
-  await page.evaluate(() => globalThis.__AUTHORING_CONTROLLER__?.deactivate());
+  await page.evaluate(() => {
+    delete globalThis.__AUTHORING_CONTROLLER__;
+  });
 });
 
 async function openProductionAuthoringController(page) {
@@ -108,17 +111,15 @@ async function openProductionAuthoringController(page) {
   ))).toBe(20);
   await page.getByRole('button', { name: '3D Edit', exact: true }).click();
   await expect(page.locator('[data-role="topology-edit-render-host"]')).toBeVisible();
-  await page.evaluate(async () => {
-    const { APPLICATION_EVENTS } = await import('/src/workspace/event-topics.js');
-    globalThis.EventBus.publish(APPLICATION_EVENTS.CHANGED, {
-      state: { activeViewId: 'AUTHORING_QUALIFICATION' },
-    });
-    const { TopologyEdit3DViewController } = await import(
-      '/src/workspace/topology-edit-3d-sjson-fidelity-controller.js'
-    );
-    const controller = new TopologyEdit3DViewController(globalThis.EventBus);
+  await expect.poll(() => page.evaluate(() => Boolean(
+    document.querySelector('[data-role="topology-edit-render-host"]')
+      ?.__topologyEditAuthoringController
+  ))).toBe(true);
+  await page.evaluate(() => {
+    const host = document.querySelector('[data-role="topology-edit-render-host"]');
+    const controller = host?.__topologyEditAuthoringController;
+    if (!controller) throw new Error('Mounted production authoring controller is unavailable.');
     globalThis.__AUTHORING_CONTROLLER__ = controller;
-    await controller.activate();
   });
   const host = page.locator('[data-role="topology-edit-render-host"]');
   await expect(page.locator('[data-role="topology-edit-authoring"]')).toBeVisible();
@@ -294,7 +295,9 @@ async function clickCanonicalNode(page, nodeId) {
 }
 
 async function selectedNodeId(page) {
-  return page.evaluate(() => globalThis.__AUTHORING_CONTROLLER__?.selection?.nodeIds?.[0] ?? null);
+  return page.evaluate(() => (
+    globalThis.__AUTHORING_CONTROLLER__?.selection?.nodeIds?.[0] ?? null
+  ));
 }
 
 async function controllerCanonicalHash(page) {
