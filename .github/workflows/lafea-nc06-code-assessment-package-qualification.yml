@@ -1,0 +1,124 @@
+name: LAFEA-NC NC-06 Exact-Head Assessment Package Qualification
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/lafea-nc06-code-assessment-package-qualification.yml'
+      - 'docs/nonlinear-shell-contact/LAFEA_NC06_CODE_ASSESSMENT_PACKAGE_QUALIFICATION.md'
+      - 'scripts/lafea-nc06-check.mjs'
+      - 'scripts/lafea-nc06-package.mjs'
+      - 'scripts/nc06-package/**'
+      - 'src/core/nonlinear-shell-contact/code-assessment-package-contract.js'
+      - 'src/core/nonlinear-shell-contact/code-assessment-package-qualification-evaluator.js'
+      - 'src/core/nonlinear-shell-contact/nc06-fixtures.js'
+      - 'src/core/nonlinear-shell-contact/nc06-negative-controls.js'
+      - 'tests/nonlinear-shell-contact-nc06-qualification.test.mjs'
+permissions: {contents: read, actions: read}
+concurrency:
+  group: lafea-nc06-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  exact-head-nc06:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NC05_MERGE_SHA: da682b70387f95510b4ca060d43796f592459c7a
+      NC05_ARTIFACT_ID: '8957523502'
+      NC05_ARTIFACT_DIGEST: sha256:fbc569f73b12e64d2017b3a94b751ea1a86458d99a4c9cf0ff63be4839843ca4
+      TZ: UTC
+      LC_ALL: C
+    steps:
+      - name: Resolve exact head and base
+        id: refs
+        run: |
+          set -euo pipefail
+          echo "head_sha=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          echo "base_sha=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with: {ref: '${{ steps.refs.outputs.head_sha }}', fetch-depth: 0}
+      - name: Verify live base, ancestry and phase paths
+        env: {HEAD_SHA: '${{ steps.refs.outputs.head_sha }}', BASE_SHA: '${{ steps.refs.outputs.base_sha }}'}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          test "$(git rev-parse origin/main)" = "$BASE_SHA"
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          git merge-base --is-ancestor "$BASE_SHA" "$HEAD_SHA"
+          git merge-base --is-ancestor "$NC05_MERGE_SHA" "$HEAD_SHA"
+          test "$(git rev-list --count "${HEAD_SHA}..origin/main")" = 0
+          mapfile -t p < <(git diff --name-only "$BASE_SHA...$HEAD_SHA")
+          test "${#p[@]}" = 15
+          for x in "${p[@]}"; do case "$x" in
+            .github/workflows/lafea-nc06-code-assessment-package-qualification.yml|docs/nonlinear-shell-contact/LAFEA_NC06_CODE_ASSESSMENT_PACKAGE_QUALIFICATION.md|scripts/lafea-nc06-check.mjs|scripts/lafea-nc06-package.mjs|scripts/nc06-package/benchmarks.mjs|scripts/nc06-package/config.mjs|scripts/nc06-package/engine.mjs|scripts/nc06-package/evidence.mjs|scripts/nc06-package/oracle.mjs|scripts/nc06-package/prepare-binding.mjs|src/core/nonlinear-shell-contact/code-assessment-package-contract.js|src/core/nonlinear-shell-contact/code-assessment-package-qualification-evaluator.js|src/core/nonlinear-shell-contact/nc06-fixtures.js|src/core/nonlinear-shell-contact/nc06-negative-controls.js|tests/nonlinear-shell-contact-nc06-qualification.test.mjs) ;;
+            *) echo "forbidden path $x"; exit 1;; esac; done
+          git diff --check "$BASE_SHA...$HEAD_SHA"
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Download and validate NC-05 custody
+        env: {GH_TOKEN: '${{ github.token }}'}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/nc05
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${NC05_ARTIFACT_ID}" > /tmp/nc05-meta.json
+          test "$(jq -r .digest /tmp/nc05-meta.json)" = "$NC05_ARTIFACT_DIGEST"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${NC05_ARTIFACT_ID}/zip" > /tmp/nc05.zip
+          unzip -q /tmp/nc05.zip -d /tmp/nc05
+          cmp /tmp/nc05/nc05-a/nc05-report.canonical.json /tmp/nc05/nc05-b/nc05-report.canonical.json
+          cmp /tmp/nc05/nc05-real-a/real-plastic-denting-summary.canonical.json /tmp/nc05/nc05-real-b/real-plastic-denting-summary.canonical.json
+          node scripts/nc06-package/prepare-binding.mjs /tmp/nc05 /tmp/nc06-upstream.json
+      - name: Run syntax, unit and fail-closed controls
+        run: |
+          set -euo pipefail
+          for f in scripts/lafea-nc06-check.mjs scripts/lafea-nc06-package.mjs scripts/nc06-package/{benchmarks,config,engine,evidence,oracle,prepare-binding}.mjs src/core/nonlinear-shell-contact/{code-assessment-package-contract,code-assessment-package-qualification-evaluator,nc06-fixtures,nc06-negative-controls}.js; do node --check "$f"; done
+          node --test tests/nonlinear-shell-contact-nc06-qualification.test.mjs
+      - name: Execute two isolated package replays
+        env: {HEAD_SHA: '${{ steps.refs.outputs.head_sha }}'}
+        run: |
+          set -euo pipefail
+          node scripts/lafea-nc06-package.mjs /tmp/nc06-upstream.json /tmp/nc06-real-a "$HEAD_SHA"
+          node scripts/lafea-nc06-package.mjs /tmp/nc06-upstream.json /tmp/nc06-real-b "$HEAD_SHA"
+          cmp /tmp/nc06-real-a/nc06-package-summary.canonical.json /tmp/nc06-real-b/nc06-package-summary.canonical.json
+          mapfile -t a < <(find /tmp/nc06-real-a -maxdepth 1 -name 'NC06-PKG-*.json' -printf '%f\n' | sort)
+          mapfile -t b < <(find /tmp/nc06-real-b -maxdepth 1 -name 'NC06-PKG-*.json' -printf '%f\n' | sort)
+          test "${#a[@]}" = 10; test "${a[*]}" = "${b[*]}"
+          for f in "${a[@]}"; do cmp "/tmp/nc06-real-a/$f" "/tmp/nc06-real-b/$f"; done
+      - name: Evaluate qualification twice
+        env: {HEAD_SHA: '${{ steps.refs.outputs.head_sha }}'}
+        run: |
+          set -euo pipefail
+          node scripts/lafea-nc06-check.mjs /tmp/nc06-real-a /tmp/nc06-upstream.json /tmp/nc06-real-a/nc06-package-summary.json "$HEAD_SHA" /tmp/nc06-a
+          node scripts/lafea-nc06-check.mjs /tmp/nc06-real-b /tmp/nc06-upstream.json /tmp/nc06-real-b/nc06-package-summary.json "$HEAD_SHA" /tmp/nc06-b
+          cmp /tmp/nc06-a/nc06-report.canonical.json /tmp/nc06-b/nc06-report.canonical.json
+          r=/tmp/nc06-a/nc06-report.json
+          test "$(jq -r .status "$r")" = NC06_PACKAGE_QUALIFIED
+          test "$(jq -r '.blockers|length' "$r")" = 0
+          test "$(jq -r .evaluatedDomainCount "$r")" = 10
+          test "$(jq -r .authority.codeAssessmentPackageQualified "$r")" = true
+          test "$(jq -r .authority.nc07Authorized "$r")" = true
+          for f in externalCodeComplianceQualified codeAssessmentQualified fitnessForServiceQualified remainingStrengthQualified failurePressureQualified collapseQualified damageQualified fractureQualified fatigueQualified moduleQualified productionExecutionAuthorized automaticAssetAcceptanceAuthorized autonomousCaseDispositionAuthorized; do test "$(jq -r ".authority.$f" "$r")" = false; done
+      - name: Verify clean source tree
+        run: git diff --exit-code && test -z "$(git status --porcelain=v1)"
+      - name: Upload diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc06-debug-${{ steps.refs.outputs.head_sha }}-${{ github.run_attempt }}
+          path: |
+            /tmp/nc06-real-a
+            /tmp/nc06-real-b
+            /tmp/nc06-a
+            /tmp/nc06-b
+            /tmp/nc06-upstream.json
+          retention-days: 30
+      - name: Upload authoritative NC-06 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc06-${{ steps.refs.outputs.head_sha }}-${{ github.run_attempt }}
+          path: |
+            /tmp/nc06-real-a
+            /tmp/nc06-real-b
+            /tmp/nc06-a
+            /tmp/nc06-b
+            /tmp/nc06-upstream.json
+          retention-days: 30
