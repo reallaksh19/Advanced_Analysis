@@ -62,9 +62,9 @@ assert.throws(
     ${fixtureReports('OPE', 5)}
     ${fixtureReports('SUS', 2, '2')}
   </OUTPUT>`),
-  /restraint type differs/u,
+  /BM2 restraint .*EXP derivation is blocked/u,
 );
-console.log('✅ OPE/SUS row-identity or restraint-type drift blocks derivation.');
+console.log('✅ OPE/SUS row-identity drift blocks derivation before arithmetic.');
 
 console.log(JSON.stringify({
   status: 'PASS',
