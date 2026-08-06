@@ -88,6 +88,8 @@ function parseTopologyElements(text) {
       name: decodeXml(attrs.NAME || ''),
       lineId: decodeXml(attrs.LINE_ID || ''),
       sourceType: String(attrs.SOURCE_TYPE || 'PIPE').toUpperCase(),
+      outsideDiameterMm: finiteOrNull(attrs.DIAMETER),
+      wallThicknessMm: finiteOrNull(attrs.WALL_THICK),
       corrosionAllowanceMm: finiteOrNull(attrs.CORR_ALLOW),
     }));
   }
