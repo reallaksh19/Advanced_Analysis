@@ -45,7 +45,13 @@ function accepted(commandType, payload) {
   return { base, session, transition };
 }
 
-test('production session consumes all seven governed commands', () => {
+test('production session consumes all eight native governed commands', () => {
+  accepted('CREATE_NODE', {
+    position: { x: 500, y: 100, z: 0 },
+    creationRole: 'ROUTE_ENDPOINT',
+    coordinateAuthority: 'USER_NUMERIC_ENTRY',
+    sourceOperationId: 'integration:create-node',
+  });
   accepted('MOVE_NODE', { nodeId: 'node:n1', position: { x: 10, y: 0, z: 0 } });
   accepted('MERGE_NODES', { sourceNodeId: 'node:n3', targetNodeId: 'node:n2' });
   accepted('BRIDGE_GAP', { fromNodeId: 'node:n2', toNodeId: 'node:n3' });
@@ -94,9 +100,13 @@ test('active production session fails closed when workspace authority changes', 
 });
 
 test('controller production path cannot bypass certified Wave 1 authority', async () => {
-  const source = await readFile('src/workspace/topology-edit-3d-view-controller.js', 'utf8');
-  assert.match(source, /TopologyEditCertifiedSession/);
-  assert.match(source, /TOPOLOGY_EDIT_COMMAND_ACTIONS/);
+  const [controllerSource, coreSource] = await Promise.all([
+    readFile('src/workspace/topology-edit-3d-view-controller.js', 'utf8'),
+    readFile('src/workspace/topology-edit-3d-view-controller-core.js', 'utf8'),
+  ]);
+  const productionPath = `${controllerSource}\n${coreSource}`;
+  assert.match(productionPath, /TopologyEditCertifiedSession/);
+  assert.match(productionPath, /TOPOLOGY_EDIT_COMMAND_ACTIONS/);
   for (const prohibited of [
     'commitDraftToWorkspace',
     'applyCanonicalTopologyToWorkspaceEntities',
@@ -104,6 +114,6 @@ test('controller production path cannot bypass certified Wave 1 authority', asyn
     'Date.now',
     'TopologyEditCommandJournal',
   ]) {
-    assert.equal(source.includes(prohibited), false, `controller must not reference ${prohibited}`);
+    assert.equal(controllerSource.includes(prohibited), false, `controller must not reference ${prohibited}`);
   }
 });
