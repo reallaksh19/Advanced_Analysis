@@ -45,7 +45,7 @@ text = text.replace(marker, injected, 1)
 
 start = text.index("    new_section = r'''function sectionProperties(edge, source, config) {")
 end = text.index("'''\n    text = replace_once(text, old_section, new_section, 'runner section authority')", start)
-new_section_assignment = r'''    new_section = r'''function sectionProperties(edge, source, config) {
+new_section_assignment = """    new_section = r'''function sectionProperties(edge, source, config) {
   const positionRow = nodePositionTraceByEdgeId.get(edge.id);
   if (!positionRow || positionRow.scheduleResolutionStatus !== 'RESOLVED_EXACT') {
     throw new Error(`Missing resolved node/POS section for ${edge.id}.`);
@@ -68,7 +68,7 @@ new_section_assignment = r'''    new_section = r'''function sectionProperties(ed
   };
 }
 '''
-'''
+"""
 text = text[:start] + new_section_assignment + text[end + 3:]
 
 old_call = "        run('node', str(RUNNER.relative_to(ROOT)), str(PROFILE.relative_to(ROOT)), str(enriched), str(xml), f'/tmp/result-{suffix}.json')"
