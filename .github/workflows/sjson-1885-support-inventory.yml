@@ -5,7 +5,7 @@ on:
     branches:
       - agent/sjson-1885-configurable-screening
     paths:
-      - scripts/empirical-sjson-1885-support-inventory.mjs
+      - scripts/empirical-sjson-1885-support-inventory-compact.mjs
       - .github/workflows/sjson-1885-support-inventory.yml
   workflow_dispatch:
 
@@ -26,5 +26,15 @@ jobs:
         run: |
           git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson > /tmp/EnrichedSjson
           git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson.topology.input.xml > /tmp/EnrichedSjson.topology.input.xml
-      - name: Inventory all support encodings
-        run: node scripts/empirical-sjson-1885-support-inventory.mjs /tmp/EnrichedSjson /tmp/EnrichedSjson.topology.input.xml
+      - name: Reconcile parent and XML support authorities
+        run: |
+          node scripts/empirical-sjson-1885-support-inventory-compact.mjs \
+            /tmp/EnrichedSjson \
+            /tmp/EnrichedSjson.topology.input.xml \
+            /tmp/sjson-1885-support-inventory-compact.json
+      - name: Upload compact support reconciliation
+        uses: actions/upload-artifact@v4
+        with:
+          name: sjson-1885-support-inventory-compact
+          path: /tmp/sjson-1885-support-inventory-compact.json
+          if-no-files-found: error
