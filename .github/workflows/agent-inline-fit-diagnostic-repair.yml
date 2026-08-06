@@ -26,20 +26,16 @@ jobs:
           from pathlib import Path
           path = Path('src/workspace/topology-edit/topology-edit-inline-component-command.js')
           text = path.read_text(encoding='utf-8')
-          old = """  if (!validPlacement) {
-    fail(`inline ${payload.placement.toLowerCase()} placement does not fit the host edge.`, RangeError);
-  }
-"""
-          new = """  if (!validPlacement) {
-    if (payload.placement === 'INTERIOR') {
-      fail('inline component must fit strictly inside the host edge for INTERIOR placement.', RangeError);
-    }
-    fail(`inline ${payload.placement.toLowerCase()} placement does not fit the host edge.`, RangeError);
-  }
-"""
+          old = "    fail(`inline ${payload.placement.toLowerCase()} placement does not fit the host edge.`, RangeError);"
+          new = "\n".join([
+              "    if (payload.placement === 'INTERIOR') {",
+              "      fail('inline component must fit strictly inside the host edge for INTERIOR placement.', RangeError);",
+              "    }",
+              old,
+          ])
           count = text.count(old)
           if count != 1:
-              raise SystemExit(f'expected one placement diagnostic block, found {count}')
+              raise SystemExit(f'expected one placement diagnostic line, found {count}')
           path.write_text(text.replace(old, new, 1), encoding='utf-8')
           PY
           node --check src/workspace/topology-edit/topology-edit-inline-component-command.js
