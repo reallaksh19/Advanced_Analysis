@@ -51,9 +51,10 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     const details = documentRef.createElement('details');
     details.className = 'topology-edit-clean-shell__panel';
     details.dataset.panelKind = 'authoring';
-    details.open = true;
+    details.dataset.authoringContextual = 'true';
+    details.open = false;
     const summary = documentRef.createElement('summary');
-    summary.textContent = 'Authoring HUD';
+    summary.textContent = 'Authoring tools — Move · Stretch · Route + elbow';
     const body = documentRef.createElement('div');
     body.className = 'topology-edit-clean-shell__panel-body';
     const section = documentRef.createElement('section');
