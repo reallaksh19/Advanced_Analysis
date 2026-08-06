@@ -4,8 +4,21 @@ export const BM2_CII_OUTPUT_PATH = fileURLToPath(
   new URL('../benchmarks/LFEA/BM2/Output_BM2.xml', import.meta.url),
 );
 
+export const BM2_REPORT_FAMILIES = Object.freeze([
+  'displacement',
+  'restraint',
+  'globalForce',
+  'localForce',
+]);
+
+const LAST_PHYSICAL_OCCURRENCE = Object.freeze({
+  expectedPhysicalOccurrencesPerFamily: 2,
+  selectedOccurrenceOrdinal: 1,
+  selectionRule: 'LAST_PHYSICAL_REPORT_OCCURRENCE',
+});
+
 export const BM2_BENCHMARK_CASE_AUTHORITY = Object.freeze({
-  schema: 'lfea-bm2-benchmark-case-authority/v1',
+  schema: 'lfea-bm2-benchmark-case-authority/v2',
   benchmarkId: 'BM2',
   commercialProgram: 'CAESAR II',
   commercialVersion: '14.00.00.0910',
@@ -17,13 +30,15 @@ export const BM2_BENCHMARK_CASE_AUTHORITY = Object.freeze({
       caseNumber: 3,
       category: 'OPE',
       formula: 'W+T1+P1',
-      custody: 'EXPLICIT_SOURCE_REPORT',
+      custody: 'EXPLICIT_PHYSICAL_SOURCE_REPORT_LAST_OCCURRENCE_SELECTED',
+      sourceReportSelection: LAST_PHYSICAL_OCCURRENCE,
     }),
     SUS: Object.freeze({
       caseNumber: 4,
       category: 'SUS',
       formula: 'W+P1',
-      custody: 'EXPLICIT_SOURCE_REPORT',
+      custody: 'EXPLICIT_PHYSICAL_SOURCE_REPORT_LAST_OCCURRENCE_SELECTED',
+      sourceReportSelection: LAST_PHYSICAL_OCCURRENCE,
     }),
     EXP: Object.freeze({
       caseNumber: 6,
@@ -44,7 +59,7 @@ export const BM2_BENCHMARK_CASE_AUTHORITY = Object.freeze({
 export const BM2_CASE_LABELS = Object.freeze(Object.keys(BM2_BENCHMARK_CASE_AUTHORITY.cases));
 export const BM2_EXPLICIT_CASE_LABELS = Object.freeze(
   BM2_CASE_LABELS.filter((label) => (
-    BM2_BENCHMARK_CASE_AUTHORITY.cases[label].custody === 'EXPLICIT_SOURCE_REPORT'
+    BM2_BENCHMARK_CASE_AUTHORITY.cases[label].sourceReportSelection != null
   )),
 );
 
