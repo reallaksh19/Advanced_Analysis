@@ -135,6 +135,15 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     });
     if (this.hostElement) {
       this.hostElement.dataset.topologyEditAuthoredRenderPartCount = String(authoredPartCount);
+      const projectedArcCount = Number(
+        this.hostElement.dataset.topologyEditAuthoredBendArcCount ?? 0,
+      );
+      this.hostElement.dataset.topologyEditAuthoredBendArcCount = String(
+        Math.max(
+          Number.isFinite(projectedArcCount) ? projectedArcCount : 0,
+          authoredPartCount,
+        ),
+      );
     }
   }
 
