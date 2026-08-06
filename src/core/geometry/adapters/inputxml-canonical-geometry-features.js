@@ -14,4 +14,5 @@ export {
   cleanNodeId,
   distance,
   rawFiniteNumber,
+  translate,
 } from './inputxml-canonical-geometry-values.js';
