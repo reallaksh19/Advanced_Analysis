@@ -1,7 +1,5 @@
 import { deepFreeze, semanticHash } from '../../core/shared-piping-model/index.js';
-import {
-  assertTopologyEditSpecificationCatalogue,
-} from './professional/topology-edit-spec-catalog.js';
+import { assertTopologyEditSpecificationCatalogue } from './professional/topology-edit-spec-catalog.js';
 
 export const INSERT_PIPE_SEGMENT = 'INSERT_PIPE_SEGMENT';
 export const PIPE_SEGMENT_BINDING_SCHEMA = 'TopologyEditPipeSegmentBinding.v1';
@@ -115,6 +113,30 @@ export function assertPipeSegmentCatalogueBinding(value) {
   return rebuilt;
 }
 
+function policy(value = {}) {
+  const material = {
+    minimumLengthMm: positive(value.minimumLengthMm, 'minimumLengthMm'),
+    overlapToleranceMm: nonNegative(value.overlapToleranceMm, 'overlapToleranceMm'),
+  };
+  const rebuilt = deepFreeze({ ...material, policyHash: semanticHash(material) });
+  if (value.policyHash !== undefined && value.policyHash !== rebuilt.policyHash) {
+    fail('segment policy differs from immutable authority.', RangeError);
+  }
+  return rebuilt;
+}
+
+export function normalizePipeSegmentCommandPayload(input = {}) {
+  const fromNodeId = requiredText(input.fromNodeId, 'fromNodeId');
+  const toNodeId = requiredText(input.toNodeId, 'toNodeId');
+  if (fromNodeId === toNodeId) fail('endpoints must be different.', RangeError);
+  return deepFreeze({
+    fromNodeId,
+    toNodeId,
+    catalogueBinding: assertPipeSegmentCatalogueBinding(input.catalogueBinding),
+    segmentPolicy: policy(input.segmentPolicy),
+  });
+}
+
 function revisionMap(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     fail('expectedTargetRevisions must be an object.');
@@ -124,19 +146,10 @@ function revisionMap(value) {
     requiredText(revision, `expectedTargetRevisions.${id}`),
   ]).sort(([left], [right]) => left.localeCompare(right)));
 }
-function policy(value = {}) {
-  const material = {
-    minimumLengthMm: positive(value.minimumLengthMm, 'minimumLengthMm'),
-    overlapToleranceMm: nonNegative(value.overlapToleranceMm, 'overlapToleranceMm'),
-  };
-  return deepFreeze({ ...material, policyHash: semanticHash(material) });
-}
 function requestMaterial(input) {
-  const fromNodeId = requiredText(input.fromNodeId, 'fromNodeId');
-  const toNodeId = requiredText(input.toNodeId, 'toNodeId');
-  if (fromNodeId === toNodeId) fail('endpoints must be different.', RangeError);
+  const payload = normalizePipeSegmentCommandPayload(input);
   const expectedTargetRevisions = revisionMap(input.expectedTargetRevisions);
-  const expectedIds = [fromNodeId, toNodeId].sort();
+  const expectedIds = [payload.fromNodeId, payload.toNodeId].sort();
   const suppliedIds = Object.keys(expectedTargetRevisions).sort();
   if (suppliedIds.length !== 2
     || suppliedIds.some((id, index) => id !== expectedIds[index])) {
@@ -145,10 +158,7 @@ function requestMaterial(input) {
   return {
     schema: PIPE_SEGMENT_REQUEST_SCHEMA,
     commandType: INSERT_PIPE_SEGMENT,
-    fromNodeId,
-    toNodeId,
-    catalogueBinding: assertPipeSegmentCatalogueBinding(input.catalogueBinding),
-    segmentPolicy: policy(input.segmentPolicy),
+    ...payload,
     expectedTargetRevisions,
   };
 }
