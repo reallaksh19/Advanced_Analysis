@@ -5,11 +5,15 @@ on:
     paths:
       - 'src/core/empirical-piping-mechanics/**'
       - 'src/core/empirical-support-frame-screen/**'
+      - 'src/workspace/engineering-loads/contracts/empirical-sjson-contracts.js'
+      - 'src/workspace/engineering-loads/adapters/sjson-to-empirical-piping-request.js'
       - 'benchmarks/empirical-piping/**'
       - 'docs/empirical-piping-agent-qualification-and-work-pack.md'
       - 'docs/empirical-piping-engineering-basis-and-benchmark.md'
       - 'scripts/empirical-piping-*.mjs'
+      - 'scripts/empirical-sjson-adapter-contract-check.mjs'
       - '.github/workflows/empirical-piping-exact-head.yml'
+      - '.github/workflows/empirical-sjson-adapter-wp1.yml'
 
 permissions:
   contents: read
@@ -41,13 +45,16 @@ jobs:
           git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" > /tmp/empirical-paths.txt
           while IFS= read -r changed; do
             case "$changed" in
-              src/core/empirical-piping-mechanics/*|src/core/empirical-support-frame-screen/*|benchmarks/empirical-piping/*|docs/empirical-piping-agent-qualification-and-work-pack.md|docs/empirical-piping-engineering-basis-and-benchmark.md|scripts/empirical-piping-*.mjs|.github/workflows/empirical-piping-exact-head.yml) ;;
+              src/core/empirical-piping-mechanics/*|src/core/empirical-support-frame-screen/*|src/workspace/engineering-loads/contracts/empirical-sjson-contracts.js|src/workspace/engineering-loads/adapters/sjson-to-empirical-piping-request.js|benchmarks/empirical-piping/*|docs/empirical-piping-agent-qualification-and-work-pack.md|docs/empirical-piping-engineering-basis-and-benchmark.md|scripts/empirical-piping-*.mjs|scripts/empirical-sjson-adapter-contract-check.mjs|.github/workflows/empirical-piping-exact-head.yml|.github/workflows/empirical-sjson-adapter-wp1.yml) ;;
               *) echo "Forbidden changed path for this work-pack slice: $changed"; exit 1 ;;
             esac
           done < /tmp/empirical-paths.txt
 
       - name: Source and benchmark isolation
         run: node scripts/empirical-piping-source-boundary-check.mjs
+
+      - name: SJSON adapter contracts
+        run: node scripts/empirical-sjson-adapter-contract-check.mjs
 
       - name: Closed-form mechanics
         run: node scripts/empirical-piping-closed-form-check.mjs

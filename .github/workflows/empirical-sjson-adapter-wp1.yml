@@ -1,0 +1,37 @@
+name: empirical-sjson-adapter-wp1
+
+on:
+  pull_request:
+    paths:
+      - 'src/workspace/engineering-loads/contracts/empirical-sjson-contracts.js'
+      - 'src/workspace/engineering-loads/adapters/sjson-to-empirical-piping-request.js'
+      - 'src/core/empirical-piping-mechanics/failure-codes.js'
+      - 'scripts/empirical-sjson-adapter-contract-check.mjs'
+      - '.github/workflows/empirical-sjson-adapter-wp1.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Prove exact-head execution
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          git diff --exit-code
+
+      - name: Run SJSON empirical adapter contract check
+        run: node scripts/empirical-sjson-adapter-contract-check.mjs
