@@ -55,7 +55,7 @@ This ledger is diagnostic evidence only. Exact acceptance remains the complete 5
 
 ## Exact-head execution
 
-The pull-request head is qualified through the stacked M031/M032 workflow. The workflow must check out the immutable PR SHA, execute the complete comparator, run BM1/BM3/linear-core regressions, and upload deterministic evidence before this candidate can advance.
+The authoritative pull request is #807 on branch `agent/m032-bm2-transverse-axis-v2`. The workflow must check out its immutable head SHA, execute the complete comparator, run BM1/BM3/linear-core regressions, and upload deterministic evidence before this candidate can advance.
 
 ## Acceptance
 
