@@ -1,0 +1,143 @@
+{
+  "schema": "sjson-empirical-preflight-evidence/v2",
+  "source": {
+    "repository": "reallaksh19/Advanced_Analysis",
+    "commit": "07ce017eb7113517cc032771f7717f88c0a93d4c",
+    "enrichedSjsonPath": "benchmarks/1885Sjson/EnrichedSjson",
+    "enrichedSjsonBlobSha": "d6fbe847772b4418305a309a8e0752000729b2f8",
+    "topologyInputXmlPath": "benchmarks/1885Sjson/EnrichedSjson.topology.input.xml",
+    "topologyInputXmlBlobSha": "c0e8536ea7dc83fedbb1f6ff812a38676d49c03d",
+    "provenancePath": "benchmarks/1885Sjson/EnrichedSjson.topology.input.xml.PROVENANCE.md"
+  },
+  "supersedes": {
+    "path": "docs/evidence/SJSON_F2183CA_EMPIRICAL_PREFLIGHT.json",
+    "reason": "The earlier audit inspected public/Sjson.json in isolation and did not resolve the benchmark EnrichedSjson hierarchy at the parent branch level."
+  },
+  "status": "BLOCKED",
+  "loadsPublished": false,
+  "zeroReactionsImplied": false,
+  "corrections": [
+    {
+      "withdrawnFinding": "No usable mechanical section data",
+      "correctedFinding": "Usable section data is present in enrichedAttributes and must be resolved with branch-parent inheritance.",
+      "example": {
+        "branchNominalBoreMm": 150,
+        "pipeOdMm": 168.3,
+        "wallThicknessMm": 7.11,
+        "insideDiameterMm": 154.08,
+        "materialDensityKgM3": 7850,
+        "pipeWeightKgPerM": 28.263584
+      }
+    },
+    {
+      "withdrawnFinding": "Material is absent",
+      "correctedFinding": "Raw component attributes include MTXX material descriptions, while enrichedAttributes.material may remain null; the resolver must inspect both levels.",
+      "examples": [
+        "ASTM A234-WPB",
+        "ASTM A105"
+      ]
+    },
+    {
+      "withdrawnFinding": "Elastic modulus is absent from the governed benchmark package",
+      "correctedFinding": "The companion topology InputXML applies owner-approved YMOD=203400000 kPa and PRAT=0.3 to every component. These values are not native EnrichedSjson material lookup results and must retain that provenance."
+    }
+  ],
+  "hierarchicalResolutionOrder": [
+    "child.enrichedAttributes",
+    "child.attributes",
+    "parent branch attributes and branch bore",
+    "explicit companion topology InputXML values with provenance",
+    "no silent fallback beyond these authorities"
+  ],
+  "availableAuthorities": {
+    "coordinateUnit": "mm",
+    "nominalBore": "PRESENT_BRANCH_AND_CHILD",
+    "outsideDiameter": "PRESENT_ENRICHED_CHILD",
+    "wallThickness": "PRESENT_ENRICHED_CHILD",
+    "insideDiameter": "PRESENT_ENRICHMENT_TRACE",
+    "materialDescription": "PRESENT_RAW_MTXX",
+    "materialDensity": "PRESENT_ENRICHED_CHILD",
+    "pipeWeightPerLength": "PRESENT_CALCULATED",
+    "componentWeight": "PARTIAL_SOURCE_ATTRIBUTE",
+    "insulationThickness": "PRESENT_RAW_ATTRIBUTE_BUT_REQUIRES_CONFLICT_REVIEW",
+    "elasticModulus": "PRESENT_OWNER_APPROVED_TOPOLOGY_XML",
+    "poissonsRatio": "PRESENT_OWNER_APPROVED_TOPOLOGY_XML",
+    "topology": "PRESENT_COMPANION_INPUT_XML"
+  },
+  "topologyMetrics": {
+    "sourceBranches": 20,
+    "sourceRealBranches": 13,
+    "externalBoundaryStubBranches": 7,
+    "routeComponents": 127,
+    "canonicalNodes": 164,
+    "canonicalEdges": 163,
+    "junctions": 13,
+    "boundaries": 3,
+    "supports": 36,
+    "restraints": 49,
+    "restraintBreakdown": {
+      "positiveY": 36,
+      "guide": 5,
+      "limitLineStop": 8,
+      "explicitAnchor": 0
+    },
+    "adapterDiagnostics": 0
+  },
+  "remainingBlockers": [
+    {
+      "code": "BOUNDARY_CONDITION_UNRESOLVED",
+      "message": "The governed restraint set contains +Y rests, guides and limits but no explicit anchor. The empirical coupled-restraint runtime must not promote a guide, limit, external stub or branch endpoint to an anchor without authority."
+    },
+    {
+      "code": "THERMAL_EXPANSION_AUTHORITY_UNRESOLVED",
+      "message": "No governed coefficient of thermal expansion is identified in EnrichedSjson or its documented topology companion."
+    },
+    {
+      "code": "PROCESS_CASE_PARTIAL",
+      "message": "The provenance records 58 source components with no process data and 105 of 163 emitted elements carrying native unset sentinels for the first process case. Temperature and pressure inheritance was not implemented for these fields at fixture creation."
+    },
+    {
+      "code": "REFERENCE_TEMPERATURE_UNRESOLVED",
+      "message": "A governed reference temperature for thermal strain is not identified."
+    },
+    {
+      "code": "COMPONENT_COMPLIANCE_SCOPE_UNRESOLVED",
+      "message": "Flange, gasket, valve, reducer, tee, olet and instrument compliance treatments require explicit qualified profiles rather than silent pipe substitution."
+    },
+    {
+      "code": "INSULATION_CONFLICT_REVIEW",
+      "message": "Raw component attributes may declare insulation such as INSU=80mm while some enrichedAttributes examples report insulationThicknessMm=0; the calculation must resolve this conflict before vertical load publication."
+    }
+  ],
+  "analysisResults": [
+    {
+      "analysis": "MECHANICAL_SECTION_PRECHECK",
+      "status": "PASS_WITH_HIERARCHICAL_RESOLUTION",
+      "resultRows": 127
+    },
+    {
+      "analysis": "W_HOT_VERTICAL_SUPPORT_REACTIONS",
+      "status": "BLOCKED",
+      "resultRows": 0,
+      "primaryReasons": [
+        "BOUNDARY_CONDITION_UNRESOLVED",
+        "PROCESS_CASE_PARTIAL",
+        "INSULATION_CONFLICT_REVIEW",
+        "COMPONENT_COMPLIANCE_SCOPE_UNRESOLVED"
+      ]
+    },
+    {
+      "analysis": "EXP_THERMAL_SUPPORT_REACTIONS",
+      "status": "BLOCKED",
+      "resultRows": 0,
+      "primaryReasons": [
+        "BOUNDARY_CONDITION_UNRESOLVED",
+        "THERMAL_EXPANSION_AUTHORITY_UNRESOLVED",
+        "REFERENCE_TEMPERATURE_UNRESOLVED",
+        "PROCESS_CASE_PARTIAL",
+        "COMPONENT_COMPLIANCE_SCOPE_UNRESOLVED"
+      ]
+    }
+  ],
+  "disposition": "The mechanical-section blocker is withdrawn. No support reactions are yet published because the remaining boundary, thermal-case and component-compliance authorities are unresolved. NOT_CALCULATED does not mean zero."
+}
