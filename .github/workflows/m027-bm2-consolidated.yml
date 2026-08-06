@@ -110,6 +110,33 @@ jobs:
       - name: Latest strict and diagnostic output policy
         run: node scripts/lfea-bm2-consolidated-latest-output-check.mjs --write
 
+      - name: Verify source integrity before aggregate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
+          git diff --exit-code -- \
+            package.json \
+            package-lock.json \
+            scripts/lfea-b3.26-bm2-solve-comparison-check.mjs \
+            scripts/lfea-b3.26-bm2-output-comparison.mjs \
+            scripts/lfea-b3.26-bm2-output-comparison-runtime.mjs
+          test "$(node -p "JSON.parse(require('node:fs').readFileSync('package.json','utf8')).version")" = "0.0.0"
+          grep -F "passed: 768" scripts/lfea-b3.26-bm2-solve-comparison-check.mjs
+          grep -F "failed: 1464" scripts/lfea-b3.26-bm2-solve-comparison-check.mjs
+          printf 'package version: '
+          node -p "JSON.parse(require('node:fs').readFileSync('package.json','utf8')).version"
+          printf 'aggregate command: '
+          node -p "JSON.parse(require('node:fs').readFileSync('package.json','utf8')).scripts['check:lfea-linear-core']"
+          printf 'BM2 command: '
+          node -p "JSON.parse(require('node:fs').readFileSync('package.json','utf8')).scripts['check:lfea-b3.26'] ?? 'UNDECLARED'"
+          sha256sum \
+            package.json \
+            scripts/lfea-b3.26-bm2-solve-comparison-check.mjs \
+            scripts/lfea-b3.26-bm2-output-comparison.mjs
+          node scripts/lfea-b3.26-bm2-solve-comparison-check.mjs > /tmp/bm2-pre-aggregate.log
+          tail -n 25 /tmp/bm2-pre-aggregate.log
+
       - name: Full linear-core regression
         run: npm run check:lfea-linear-core
 
