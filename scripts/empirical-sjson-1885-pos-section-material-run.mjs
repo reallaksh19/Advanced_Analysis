@@ -16,8 +16,14 @@ const sourceRoot = JSON.parse(sourceText.replace(/^\uFEFF/u, ''));
 const configuredDefaults = profile.schema === 'project-data-profile/v1'
   ? profile.loadCalculation?.configuredDefaults?.value
   : profile.configuredDefaults;
+const dimensionVerificationTolerancesMm = profile.schema === 'project-data-profile/v1'
+  ? profile.loadCalculation?.dimensionVerificationTolerancesMm?.value
+  : profile.dimensionVerificationTolerancesMm;
 if (!Array.isArray(configuredDefaults)) {
   throw new Error('Configured defaults must be an array in the Project Data profile or standalone defaults package.');
+}
+if (!dimensionVerificationTolerancesMm || typeof dimensionVerificationTolerancesMm !== 'object') {
+  throw new Error('Dimension verification tolerances must be configured in Project Data or the standalone defaults package.');
 }
 
 const calculation = resolvePosSectionMaterialStates({
@@ -27,6 +33,7 @@ const calculation = resolvePosSectionMaterialStates({
   projectDataRevision: profile.revision,
   projectDataSemanticHash: semanticHash(profile),
   configuredDefaults,
+  dimensionVerificationTolerancesMm,
 });
 const receipt = {
   schema: 'empirical-sjson-1885-pos-section-material-audit/v1',
@@ -46,9 +53,11 @@ console.log(JSON.stringify({
   status: calculation.status,
   resolvedRowCount: calculation.resolvedRowCount,
   blockedRowCount: calculation.blockedRowCount,
+  dimensionVerificationTolerancesMm: calculation.dimensionVerificationTolerancesMm,
+  dimensionVerificationStatusCounts: calculation.dimensionVerificationStatusCounts,
   branchScheduleSummary: calculation.branchScheduleSummary,
   blockedDimensionInputs: countBy(
-    calculation.rows.filter((row) => row.blockers.some((item) => item.field === 'section.dimensionsMm')),
+    calculation.rows.filter((row) => row.blockers.some((item) => item.field.startsWith('section.dimension'))),
     (row) => `DN=${row.nominalBoreMm}|SCH=${row.schedule}|BRANCH=${row.branchPath}`,
   ),
   defaultUsageSummary: calculation.resolutionReceipt.summary,
@@ -63,7 +72,7 @@ if (calculation.blockedRowCount > 0) {
       `source=${row.sourceRecordMatched ? `${row.sourceRecordName}:${row.branchPath}` : 'UNMATCHED'}`,
       `DN=${row.nominalBoreMm}`,
       `SCH=${row.schedule}`,
-      `dimensionReason=${row.resolutions?.dimensionsMm?.reason || 'NONE'}`,
+      `dimensionStatus=${row.dimensionVerification?.status || 'NONE'}`,
       `blockers=${row.blockers.map((item) => `${item.field}=${item.status}:${item.reason}`).join(', ')}`,
     ].join(' '));
   throw new Error(`POS section/material resolution blocked ${calculation.blockedRowCount} row(s). ${sample.join(' | ')}`);
