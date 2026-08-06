@@ -19,11 +19,22 @@ import {
 } from './topology-edit-support-viewport-backend.js';
 
 export const SJSON_BENCHMARK_SOURCE_HASH = 'fnv1a64:0fa77fc2c202d8ae';
+export const TOPOLOGY_EDIT_20_ELEMENT_DEMO_SOURCE_HASH = 'fnv1a64:78394ad6facc83be';
+export const GOVERNED_SJSON_EDIT_DRAFT_SOURCE_HASHES = Object.freeze([
+  SJSON_BENCHMARK_SOURCE_HASH,
+  TOPOLOGY_EDIT_20_ELEMENT_DEMO_SOURCE_HASH,
+]);
 export const SJSON_SUPPORT_RENDER_AUTHORITY =
   'TOPO_VALIDATOR_SUPPORT_MARKER_AND_DIRECTION_GEOMETRY';
 export const SJSON_SUPPORT_DISPLAY_SCALE = 3;
+const GOVERNED_SOURCE_HASH_SET = new Set(GOVERNED_SJSON_EDIT_DRAFT_SOURCE_HASHES);
 const CAMERA_DIRECTION = Object.freeze({ x: 1, y: 1, z: 0.8 });
 const MARKER_RADIUS_RATIO = 0.18;
+
+/** Fail closed: only exact, qualified source hashes may use the governed compact packet. */
+export function isGovernedSjsonEditDraftSourceHash(value) {
+  return typeof value === 'string' && GOVERNED_SOURCE_HASH_SET.has(value);
+}
 
 export function deriveGovernedSjsonSupportBundle({ canonical, dataset, draftVisual, backend }) {
   const exactSupportTopology = supportTopologyForExactOrigins(canonical);
