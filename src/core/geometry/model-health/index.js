@@ -15,3 +15,17 @@ export {
 } from './topology-graph-diagnostics-contract.js';
 
 export { diagnoseInputXmlTopologyGraph } from './topology-graph-diagnostics.js';
+
+export {
+  aabbDistanceSquared,
+  buildSegmentGeometry,
+  classifySegmentPair,
+} from './segment-proximity-3d.js';
+
+export {
+  TOPOLOGY_PROXIMITY_DIAGNOSTICS_SCHEMA,
+  requireTopologyProximityDiagnostics,
+  sealTopologyProximityDiagnostics,
+} from './topology-proximity-diagnostics-contract.js';
+
+export { diagnoseInputXmlTopologyProximity } from './topology-proximity-diagnostics.js';
