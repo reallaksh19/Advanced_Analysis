@@ -68,6 +68,7 @@ export function topologyEditInlineAuthoringCatalogueOptions(input = {}) {
   const options = [];
   for (const record of catalogue.records) {
     if (record.componentType !== componentType) continue;
+    if (tool === 'FLANGE' && record.flangeType === 'BLIND') continue;
     const componentLengthMm = record.componentType === 'VALVE'
       ? record.valveFaceToFaceMm
       : record.componentLengthMm;
