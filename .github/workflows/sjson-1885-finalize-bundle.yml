@@ -7,7 +7,10 @@ on:
     paths:
       - .tmp/sjson-1885-final-bundle.part00
       - .tmp/sjson-1885-final-bundle.part01a
-      - .tmp/sjson-1885-final-bundle.part01b
+      - .tmp/sjson-1885-final-bundle.part01b0
+      - .tmp/sjson-1885-final-bundle.part01b1
+      - .tmp/sjson-1885-final-bundle.part01b2
+      - .tmp/sjson-1885-final-bundle.part01b3
       - .tmp/sjson-1885-final-bundle.part02a
       - .tmp/sjson-1885-final-bundle.part02b
       - .tmp/sjson-1885-final-bundle.part03
@@ -32,7 +35,10 @@ jobs:
           cat > /tmp/sjson-1885-bundle.sha256 <<'EOF'
           d9b6f85200f57d6b16a80fa64fb92f52218c11ad353d1dc4796448512fbc6ac6  .tmp/sjson-1885-final-bundle.part00
           300b524726f5b4b476e57b17e0cd933d0dd9cb5289524ecbda0487188dfc9cc3  .tmp/sjson-1885-final-bundle.part01a
-          7ba52b515933191aec6d0244e5c8d0851a02b223bde6b81ac8b860a518e02ead  .tmp/sjson-1885-final-bundle.part01b
+          30af8e505c9465b26db7abda89019927622531c45eaba23175ba608bab75eabe  .tmp/sjson-1885-final-bundle.part01b0
+          dfdafd25288c4ea1c18310c23f91596e29df0774ab4afbddbdd04432cb68bfd7  .tmp/sjson-1885-final-bundle.part01b1
+          b5b204fae0c31b36f28375a4ff7d8f9da42dacef3f0a13d3701b0a212fb8d02c  .tmp/sjson-1885-final-bundle.part01b2
+          87ad6a6ec207b1e9b6b12e203043f398d09f642fc88c98dbc12708185a72ae68  .tmp/sjson-1885-final-bundle.part01b3
           57c9f52e0cd64b21d09e6d786054aefc532e9f1caadfd292c0a02d43578d5574  .tmp/sjson-1885-final-bundle.part02a
           09b315fd69cc9dd8136d6b3ebb85677c1199d9d7c8acf6af9f4f2ad899e2cf98  .tmp/sjson-1885-final-bundle.part02b
           465ee9494b5aed9e0b11aadf21a9606b6f9b604286fbf9966a373021fd72406b  .tmp/sjson-1885-final-bundle.part03
@@ -41,7 +47,10 @@ jobs:
           cat \
             .tmp/sjson-1885-final-bundle.part00 \
             .tmp/sjson-1885-final-bundle.part01a \
-            .tmp/sjson-1885-final-bundle.part01b \
+            .tmp/sjson-1885-final-bundle.part01b0 \
+            .tmp/sjson-1885-final-bundle.part01b1 \
+            .tmp/sjson-1885-final-bundle.part01b2 \
+            .tmp/sjson-1885-final-bundle.part01b3 \
             .tmp/sjson-1885-final-bundle.part02a \
             .tmp/sjson-1885-final-bundle.part02b \
             .tmp/sjson-1885-final-bundle.part03 \
