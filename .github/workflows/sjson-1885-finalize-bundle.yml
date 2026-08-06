@@ -7,7 +7,8 @@ on:
     paths:
       - .tmp/sjson-1885-final-bundle.part00
       - .tmp/sjson-1885-final-bundle.part01
-      - .tmp/sjson-1885-final-bundle.part02
+      - .tmp/sjson-1885-final-bundle.part02a
+      - .tmp/sjson-1885-final-bundle.part02b
       - .tmp/sjson-1885-final-bundle.part03
       - .github/workflows/sjson-1885-finalize-bundle.yml
   workflow_dispatch:
@@ -25,9 +26,23 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Install exact qualified bundle
+      - name: Verify and install exact qualified bundle
         run: |
-          cat .tmp/sjson-1885-final-bundle.part* | base64 --decode > /tmp/sjson-1885-final-bundle.tar.gz
+          cat > /tmp/sjson-1885-bundle.sha256 <<'EOF'
+          d9b6f85200f57d6b16a80fa64fb92f52218c11ad353d1dc4796448512fbc6ac6  .tmp/sjson-1885-final-bundle.part00
+          4afd83ba3cf6a698eaf7df4a4577978a4f8fc07a14d6f001a744e4ad7ed91c36  .tmp/sjson-1885-final-bundle.part01
+          57c9f52e0cd64b21d09e6d786054aefc532e9f1caadfd292c0a02d43578d5574  .tmp/sjson-1885-final-bundle.part02a
+          09b315fd69cc9dd8136d6b3ebb85677c1199d9d7c8acf6af9f4f2ad899e2cf98  .tmp/sjson-1885-final-bundle.part02b
+          465ee9494b5aed9e0b11aadf21a9606b6f9b604286fbf9966a373021fd72406b  .tmp/sjson-1885-final-bundle.part03
+          EOF
+          sha256sum --check /tmp/sjson-1885-bundle.sha256
+          cat \
+            .tmp/sjson-1885-final-bundle.part00 \
+            .tmp/sjson-1885-final-bundle.part01 \
+            .tmp/sjson-1885-final-bundle.part02a \
+            .tmp/sjson-1885-final-bundle.part02b \
+            .tmp/sjson-1885-final-bundle.part03 \
+            | base64 --decode > /tmp/sjson-1885-final-bundle.tar.gz
           tar -xzf /tmp/sjson-1885-final-bundle.tar.gz -C .
           rm -rf .tmp
           rm -f scripts/empirical-sjson-1885-support-inventory.mjs
