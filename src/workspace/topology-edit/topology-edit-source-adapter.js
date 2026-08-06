@@ -17,6 +17,10 @@
  */
 
 import { deepFreeze, semanticHash, stringValue } from '../../core/shared-piping-model/index.js';
+import {
+  NATIVE_PIPE_WRITEBACK_SCHEMA,
+  recoverNativePipeCanonicalRecords,
+} from './topology-edit-native-pipe-writeback.js';
 
 export const TOPOLOGY_EDIT_CANONICAL_SCHEMA = 'topology-edit-canonical-topology/v1';
 
@@ -33,24 +37,41 @@ export function buildCanonicalTopologyFromWorkspaceDataset(dataset, topologyGrap
   if (!topologyGraph?.ports || !topologyGraph?.components) throw new TypeError('buildCanonicalTopologyFromWorkspaceDataset requires a piping topology graph.');
 
   const entitiesById = new Map(dataset.entities.map((entity) => [entity.entityId, entity]));
+  const nativeNodesById = nativeNodeRecords(dataset);
   const nodeGroups = groupPortsIntoNodes(topologyGraph);
   const portToNode = new Map();
   const nodes = nodeGroups.map((group) => {
-    const nodeId = deriveNodeId(dataset.datasetId, group.portKeys);
+    const nodeId = group.explicitNodeId || deriveNodeId(dataset.datasetId, group.portKeys);
     group.portKeys.forEach((portKey) => portToNode.set(portKey, nodeId));
+    const native = nativeNodesById.get(nodeId);
+    if (native) {
+      if (semanticHash(native.position) !== semanticHash(group.position)) {
+        throw new Error(`Native node ${nodeId} position differs from topology projection.`);
+      }
+      return freezeNode({
+        ...native,
+        position: group.position,
+        portKeys: [...group.portKeys].sort(),
+      });
+    }
     return freezeNode({ id: nodeId, position: group.position, portKeys: [...group.portKeys].sort() });
   }).sort((left, right) => left.id.localeCompare(right.id));
 
   const { edges, junctions } = buildEdgesAndJunctions(topologyGraph, entitiesById, portToNode);
   const supports = buildSupports(dataset, topologyGraph, portToNode, attachmentModel, restraintModel);
   const crosswalk = buildCrosswalk(nodes, edges, junctions, supports);
+  const canonicalDatasetVersion = Number(
+    dataset.nativeAuthoring?.canonicalDatasetVersion ?? dataset.version ?? 0,
+  );
+  const topologyGraphHash = dataset.nativeAuthoring?.topologyGraphAuthorityHash
+    ?? topologyGraph.semanticHash;
 
   const base = {
     schema: TOPOLOGY_EDIT_CANONICAL_SCHEMA,
     datasetId: dataset.datasetId,
-    datasetVersion: dataset.version || 0,
+    datasetVersion: canonicalDatasetVersion,
     sourceHash: dataset.sourceSnapshot?.sourceSemanticHash || null,
-    topologyGraphHash: topologyGraph.semanticHash,
+    topologyGraphHash,
     nodes,
     edges,
     junctions,
@@ -164,14 +185,39 @@ function groupPortsIntoNodes(topologyGraph) {
     groups.set(root, bucket);
   });
 
-  return [...groups.values()].map((portKeys) => ({
-    portKeys,
-    position: portsByKey.get(portKeys[0])?.position || null,
-  })).filter((group) => group.position);
+  return [...groups.values()].map((portKeys) => {
+    const explicitNodeIds = [...new Set(portKeys.map((portKey) => (
+      stringValue(portsByKey.get(portKey)?.sourceEndpointIdentity)
+    )).filter(Boolean))];
+    if (explicitNodeIds.length > 1) {
+      throw new Error(`Connected native ports disagree on node identity: ${explicitNodeIds.sort().join(', ')}.`);
+    }
+    return {
+      portKeys,
+      explicitNodeId: explicitNodeIds[0] || null,
+      position: portsByKey.get(portKeys[0])?.position || null,
+    };
+  }).filter((group) => group.position);
 }
 
 function deriveNodeId(datasetId, portKeys) {
   return `node:${semanticHash({ datasetId, portKeys: [...portKeys].sort() }).slice(0, 20)}`;
+}
+
+function nativeNodeRecords(dataset) {
+  const result = new Map();
+  for (const entity of dataset.entities ?? []) {
+    if (entity.properties?.nativeParams?.schema !== NATIVE_PIPE_WRITEBACK_SCHEMA) continue;
+    const recovered = recoverNativePipeCanonicalRecords(entity);
+    for (const node of recovered.nodes) {
+      const existing = result.get(node.id);
+      if (existing && semanticHash(existing) !== semanticHash(node)) {
+        throw new Error(`Native node ${node.id} has conflicting writeback records.`);
+      }
+      result.set(node.id, node);
+    }
+  }
+  return result;
 }
 
 // ---- edges / junctions ----------------------------------------------------
@@ -226,6 +272,15 @@ function buildEdgesAndJunctions(topologyGraph, entitiesById, portToNode) {
 }
 
 function buildCanonicalEdge(component, entity, fromNodeId, toNodeId) {
+  if (entity.properties?.nativeParams?.schema === NATIVE_PIPE_WRITEBACK_SCHEMA) {
+    const recovered = recoverNativePipeCanonicalRecords(entity).edge;
+    if (recovered.componentKey !== component.componentKey
+      || recovered.fromNodeId !== fromNodeId
+      || recovered.toNodeId !== toNodeId) {
+      throw new Error(`Native pipe ${component.componentKey} topology identity differs from writeback.`);
+    }
+    return freezeEdge(recovered);
+  }
   const outsideDiameterMm = resolveOutsideDiameterMm(entity);
   return freezeEdge({
     id: deriveCanonicalId('edge', component.componentKey),
