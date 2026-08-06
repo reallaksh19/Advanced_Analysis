@@ -3,7 +3,7 @@ import { deepFreeze, semanticHash } from '../../core/shared-piping-model/index.j
 import { checkCanonicalTopology } from './topology-edit-checker.js';
 import { topologyEditCheckerIssueLineageEquivalent } from './topology-edit-checker-lineage.js';
 import { assertResolvedTopologyEditCommand } from './topology-edit-command-resolver.js';
-import { applyResolvedTopologyEditCommand } from './topology-edit-pure-reducer.js';
+import { applyResolvedTopologyEditCommand } from './topology-edit-pure-reducer-dispatch.js';
 import { assertCanonicalTopologyHash, canonicalTopologyStateHash } from './topology-edit-canonical-state.js';
 
 export const TOPOLOGY_EDIT_CANDIDATE_SCHEMA = 'TopologyEditCandidate.v1';
