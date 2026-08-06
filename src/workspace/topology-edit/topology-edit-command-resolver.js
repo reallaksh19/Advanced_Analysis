@@ -9,6 +9,9 @@ import { assertCanonicalTopologyHash, canonicalTopologyStateHash } from './topol
 import {
   assertTopologyEditInlineComponentTarget,
 } from './topology-edit-inline-component-command.js';
+import {
+  assertTopologyEditBranchComponentTarget,
+} from './topology-edit-branch-component-command.js';
 
 function requiredText(value, label) {
   const text = String(value ?? '').trim();
@@ -114,6 +117,13 @@ function resolveInline(topology, request) {
   const to = nodeTarget(topology, validated.to.id, 'TO');
   return targets([from, to], [edge]);
 }
+function resolveBranchComponent(topology, request) {
+  const validated = assertTopologyEditBranchComponentTarget(topology, request.payload);
+  const edge = edgeTarget(topology, validated.edge.id, 'BRANCH_HOST');
+  const from = nodeTarget(topology, validated.from.id, 'FROM');
+  const to = nodeTarget(topology, validated.to.id, 'TO');
+  return targets([from, to], [edge], [], validated.effect.symbolicOutputs);
+}
 function resolveDisconnect(topology, request) {
   const edge = edgeTarget(topology, request.payload.edgeId, 'DISCONNECT');
   const nodeId = request.payload.endpoint === 'FROM' ? edge.record.fromNodeId : edge.record.toNodeId;
@@ -196,6 +206,7 @@ const TARGET_RESOLVERS = Object.freeze({
   MOVE_NODE: resolveMove, MERGE_NODES: resolveMerge, BRIDGE_GAP: resolveAddedEdge,
   ADD_STRAIGHT_ELEMENT: resolveAddedEdge, SPLIT_EDGE: resolveSplit,
   INSERT_INLINE_COMPONENT: resolveInline,
+  INSERT_BRANCH_COMPONENT: resolveBranchComponent,
   DISCONNECT_ENDPOINT: resolveDisconnect, DELETE_EDGE: resolveDelete,
   ADD_BEND_DEFINITION: resolveBend, ADD_JUNCTION_DEFINITION: resolveJunction,
   TRIM_EDGE: resolveTrim,

@@ -22,14 +22,17 @@ function request(overrides = {}) {
     hostFrom: { x: 0, y: 0, z: 0 },
     hostTo: { x: 1200, y: 0, z: 0 },
     catalogueHash: HASH_B,
+    catalogueSourceHash: `sha256:${'d'.repeat(64)}`,
     catalogueVersion: '2026.08.06',
     catalogueRecordId: 'OLET-DN100-DN50-600-A',
     catalogueRecordHash: HASH_C,
+    sourceReference: { documentId: 'SPEC-DEMO', revision: '8', path: '/olet/test' },
     branchFamily: 'OLET',
     hostNominalSizeMm: 100,
     hostOutsideDiameterMm: 114.3,
     branchNominalSizeMm: 50,
     branchOutsideDiameterMm: 60.3,
+    branchAngleDeg: 90,
     pipingClass: '600',
     pressureClass: '600',
     materialSpecification: 'ASTM A105',
@@ -66,6 +69,7 @@ test('effect removes one host and creates exact degree-three branch topology', (
   assert.deepEqual(effect.removedEdgeIds, ['edge:P-005']);
   assert.equal(effect.nodes.length, 3);
   assert.equal(effect.edges.length, 4);
+  assert.equal(effect.generatedJunctionIds.length, 1);
   assert.equal(new Set(effect.generatedNodeIds).size, 3);
   assert.equal(new Set(effect.generatedEdgeIds).size, 4);
 

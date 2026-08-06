@@ -3,6 +3,9 @@ import {
   semanticHash,
   stringValue,
 } from '../../../core/shared-piping-model/index.js';
+import {
+  assertTopologyEditSpecificationCatalogue,
+} from '../professional/topology-edit-spec-catalog.js';
 
 export const TOPOLOGY_EDIT_AUTHORING_BRANCH_CATALOGUE_OPTIONS_SCHEMA =
   'TopologyEditAuthoringBranchCatalogueOptions.v1';
@@ -10,7 +13,7 @@ export const TOPOLOGY_EDIT_AUTHORING_BRANCH_CATALOGUE_OPTIONS_SCHEMA =
 const BRANCH_TYPES = new Set(['TEE', 'OLET']);
 
 export function deriveTopologyEditAuthoringBranchCatalogueOptions(input = {}) {
-  const catalogue = catalogueValue(input.catalogue);
+  const catalogue = assertTopologyEditSpecificationCatalogue(input.catalogue);
   const branchFamily = optionalBranchFamily(input.branchFamily);
   const hostNominalSizeMm = positiveNumber(
     input.hostNominalSizeMm,
@@ -21,8 +24,6 @@ export function deriveTopologyEditAuthoringBranchCatalogueOptions(input = {}) {
     'hostOutsideDiameterMm',
   );
   const pipingClass = optionalUpper(input.pipingClass);
-  const pressureClass = optionalUpper(input.pressureClass);
-  const materialSpecification = optionalUpper(input.materialSpecification);
 
   const family = catalogue.records
     .filter((record) => BRANCH_TYPES.has(record.componentType))
@@ -32,27 +33,21 @@ export function deriveTopologyEditAuthoringBranchCatalogueOptions(input = {}) {
     record.nominalSizeMm === hostNominalSizeMm
     && record.outsideDiameterMm === hostOutsideDiameterMm
     && (!pipingClass || upper(record.pipingClass) === pipingClass)
-    && (!pressureClass || upper(record.pressureClass) === pressureClass)
-    && (
-      !materialSpecification
-      || upper(record.materialSpecification) === materialSpecification
-    )
   ));
 
   const material = {
     schema: TOPOLOGY_EDIT_AUTHORING_BRANCH_CATALOGUE_OPTIONS_SCHEMA,
     catalogueHash: catalogue.catalogueHash,
-    catalogueVersion: catalogue.version,
+    catalogueVersion: catalogue.catalogueVersion,
+    catalogueSourceHash: catalogue.authority.sourceHash,
     branchFamily,
     hostNominalSizeMm,
     hostOutsideDiameterMm,
     pipingClass,
-    pressureClass,
-    materialSpecification,
     status: compatible.length ? 'AVAILABLE' : 'UNAVAILABLE',
     familyRecordIds: family.map((record) => record.recordId),
     optionRecordIds: compatible.map((record) => record.recordId),
-    options: compatible.map(optionValue),
+    options: compatible.map((record) => optionValue(catalogue, record)),
   };
   return deepFreeze({
     ...material,
@@ -99,99 +94,29 @@ export function requireTopologyEditAuthoringBranchCatalogueRecord(
   return matches[0];
 }
 
-function catalogueValue(value) {
-  if (!value || typeof value !== 'object' || !Array.isArray(value.records)) {
-    throw new TypeError(
-      'TopologyEditAuthoringBranchCatalogueOptions: catalogue records are required.',
-    );
-  }
-  const catalogueHash = requiredHash(value.catalogueHash, 'catalogueHash');
-  const version = requiredText(
-    value.catalogueVersion ?? value.version,
-    'catalogueVersion',
-  );
-  const identities = new Set();
-  const hashes = new Set();
-  const records = value.records.map((record) => {
-    const normalized = branchRecordValue(record);
-    if (identities.has(normalized.recordId)) {
-      throw new RangeError(
-        `TopologyEditAuthoringBranchCatalogueOptions: duplicate record ID ${normalized.recordId}.`,
-      );
-    }
-    if (hashes.has(normalized.recordHash)) {
-      throw new RangeError(
-        `TopologyEditAuthoringBranchCatalogueOptions: duplicate record hash ${normalized.recordHash}.`,
-      );
-    }
-    identities.add(normalized.recordId);
-    hashes.add(normalized.recordHash);
-    return normalized;
-  });
-  return { catalogueHash, version, records };
-}
-
-function branchRecordValue(record) {
-  const componentType = requiredText(
-    record?.componentType,
-    'componentType',
-  ).toUpperCase();
-  if (!BRANCH_TYPES.has(componentType)) {
-    return {
-      ...record,
-      recordId: requiredText(record?.recordId, 'recordId'),
-      recordHash: requiredHash(record?.recordHash, 'recordHash'),
-      componentType,
-    };
-  }
+function optionValue(catalogue, record) {
+  const componentLengthMm = record.componentType === 'TEE'
+    ? record.centerToBranchMm
+    : record.projectionMm;
   return {
-    recordId: requiredText(record.recordId, 'recordId'),
-    recordHash: requiredHash(record.recordHash, 'recordHash'),
-    componentType,
-    nominalSizeMm: positiveNumber(record.nominalSizeMm, 'nominalSizeMm'),
-    outsideDiameterMm: positiveNumber(
-      record.outsideDiameterMm,
-      'outsideDiameterMm',
-    ),
-    secondaryNominalSizeMm: positiveNumber(
-      record.secondaryNominalSizeMm,
-      'secondaryNominalSizeMm',
-    ),
-    secondaryOutsideDiameterMm: positiveNumber(
-      record.secondaryOutsideDiameterMm,
-      'secondaryOutsideDiameterMm',
-    ),
-    pipingClass: optionalUpper(record.pipingClass),
-    pressureClass: optionalUpper(record.pressureClass),
-    materialSpecification: optionalUpper(record.materialSpecification),
-    endConnectionFrom: optionalUpper(record.endConnectionFrom),
-    endConnectionTo: optionalUpper(record.endConnectionTo),
-    componentLengthMm: positiveNumber(
-      record.componentLengthMm,
-      'componentLengthMm',
-    ),
-    componentMassKg: positiveNumber(
-      record.componentMassKg,
-      'componentMassKg',
-    ),
-  };
-}
-
-function optionValue(record) {
-  return {
+    catalogueHash: catalogue.catalogueHash,
+    catalogueVersion: catalogue.catalogueVersion,
+    catalogueSourceHash: catalogue.authority.sourceHash,
     recordId: record.recordId,
     recordHash: record.recordHash,
+    sourceReference: { ...record.sourceReference },
     branchFamily: record.componentType,
     hostNominalSizeMm: record.nominalSizeMm,
     hostOutsideDiameterMm: record.outsideDiameterMm,
-    branchNominalSizeMm: record.secondaryNominalSizeMm,
-    branchOutsideDiameterMm: record.secondaryOutsideDiameterMm,
+    branchNominalSizeMm: record.branchNominalSizeMm,
+    branchOutsideDiameterMm: record.branchOutsideDiameterMm,
+    branchAngleDeg: record.branchAngleDeg,
     pipingClass: record.pipingClass,
     pressureClass: record.pressureClass,
     materialSpecification: record.materialSpecification,
     hostEndConnection: record.endConnectionFrom,
-    branchEndConnection: record.endConnectionTo,
-    componentLengthMm: record.componentLengthMm,
+    branchEndConnection: record.branchConnection,
+    componentLengthMm,
     componentMassKg: record.componentMassKg,
   };
 }
@@ -211,16 +136,6 @@ function requiredText(value, field) {
   if (!normalized) {
     throw new TypeError(
       `TopologyEditAuthoringBranchCatalogueOptions: ${field} is required.`,
-    );
-  }
-  return normalized;
-}
-
-function requiredHash(value, field) {
-  const normalized = requiredText(value, field);
-  if (!/^sha256:[0-9a-f]{64}$/u.test(normalized)) {
-    throw new RangeError(
-      `TopologyEditAuthoringBranchCatalogueOptions: ${field} must be a sha256 hash.`,
     );
   }
   return normalized;
