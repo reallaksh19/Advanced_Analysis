@@ -18,6 +18,8 @@ import {
   createConfiguredResolutionSessionFromProjectData,
   resolveProjectDataConfiguredDefaultsAuthority,
 } from '../src/workspace/project-data/project-data-configured-resolution.js';
+import { projectDataStore } from '../src/workspace/project-data/project-data-store.js';
+import { renderProjectDataView } from '../src/workspace/project-data/project-data-view.js';
 
 const resolution = createConfiguredResolutionSession({
   projectDataRevision: 1,
@@ -118,6 +120,18 @@ const unapprovedProjectData = replaceProjectDataValue(
 assert.equal(
   createConfiguredResolutionSessionFromProjectData(unapprovedProjectData).status,
   'BLOCKED_INVALID_PROJECT_DATA',
+);
+
+const bundledProfile = projectDataStore.getProfile();
+const bundledAuthority = resolveProjectDataConfiguredDefaultsAuthority(bundledProfile);
+assert.equal(bundledAuthority.status, 'READY');
+assert.equal(bundledAuthority.projectId, '1885S');
+assert.equal(bundledAuthority.summary.configuredDefaultCount, 11);
+assert.equal(bundledAuthority.summary.enabledConfiguredDefaultCount, 11);
+assert.equal(typeof renderProjectDataView, 'function');
+assert.match(
+  projectDataStore.getOrigin().source,
+  /1885s-project-data-profile\.json \+ project-data\/1885s-nonfea-piping-defaults\.json/,
 );
 
 const posReceipt = resolvePosSectionMaterialStates({
