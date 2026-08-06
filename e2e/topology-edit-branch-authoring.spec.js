@@ -53,7 +53,7 @@ for (const scenario of CASES) {
     expect(applied.components).toHaveLength(1);
     expect(applied.components[0].entityType).toBe(scenario.family);
     expect(applied.components[0].catalogueRecordId).toBe(scenario.recordId);
-    expect(applied.components[0].catalogueRecordHash).toMatch(/^sha256:/u);
+    expect(applied.components[0].catalogueRecordHash).toMatch(/^fnv1a64:[0-9a-f]{16}$/u);
     expect(applied.components[0].catalogueSourceHash).toMatch(/^sha256:/u);
     expect(applied.components[0].diameterMm).toBe(scenario.branchSize);
     expect(applied.junctionDegree).toBe(3);
