@@ -1,31 +1,17 @@
-name: M027 BM2 Consolidated Qualification
+name: M032 Exact-Head Accuracy Qualification
 
 on:
   pull_request:
     branches:
       - main
-      - agent/common-inputxml-restraint-correction
     paths:
-      - 'benchmarks/LFEA/BM2/**'
-      - 'docs/qualification/M027_BM2_CONSOLIDATED_RECORD.md'
-      - 'scripts/lfea-b3.25-bm2-*.mjs'
-      - 'scripts/lfea-b3.26-bm2-*.mjs'
-      - 'scripts/lfea-b3.28-bm2-*.mjs'
-      - 'scripts/lfea-b3.29-bm2-*.mjs'
-      - 'scripts/lfea-bm2-consolidated-latest-output-check.mjs'
-      - 'scripts/lfea-common-inputxml-restraint-correction-check.mjs'
-      - 'src/core/geometry/adapters/inputxml-ingestion-audit.js'
-      - 'src/core/geometry/adapters/inputxml-restraint-type-mutation.js'
-      - 'src/core/geometry/adapters/inputXmlToCanonicalGeometry.js'
-      - 'src/core/centerline-beam-fea/geometry-conditioning.js'
       - '.github/workflows/m027-bm2-consolidated.yml'
-  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: m027-bm2-consolidated-${{ github.event.pull_request.number || github.ref }}
+  group: m032-exact-head-accuracy-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -33,10 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      TARGET_HEAD_SHA: 1c07108bdeab4bffe622b15f2f7ae052368ed9a0
 
     steps:
-      - name: Checkout exact head
+      - name: Checkout M032 exact head
         uses: actions/checkout@v4
         with:
           ref: ${{ env.TARGET_HEAD_SHA }}
@@ -56,64 +42,54 @@ jobs:
 
       - run: npm ci
 
-      - name: Syntax-check consolidated sources
+      - name: Syntax and baseline contract
         shell: bash
         run: |
           set -euo pipefail
-          for file in \
-            scripts/lfea-b3.25-bm2-inputxml-ingestion-check.mjs \
-            scripts/lfea-b3.26-bm2-output-comparison.mjs \
-            scripts/lfea-b3.26-bm2-output-comparison-runtime.mjs \
-            scripts/lfea-b3.26-bm2-solve-fixtures.mjs \
-            scripts/lfea-b3.26-bm2-solve-runtime.mjs \
-            scripts/lfea-b3.26-bm2-solve-comparison-check.mjs \
-            scripts/lfea-b3.28-bm2-junction-source-audit.mjs \
-            scripts/lfea-b3.28-bm2-junction-surface-node-runtime-base.mjs \
-            scripts/lfea-b3.28-bm2-junction-surface-node-runtime.mjs \
-            scripts/lfea-b3.28-bm2-junction-surface-node-check.mjs \
-            scripts/lfea-b3.29-bm2-bend-geometry-authority-v2.mjs \
-            scripts/lfea-b3.29-bm2-bend-geometry-check.mjs \
-            scripts/lfea-b3.29-bm2-collapsed-span-audit.mjs \
-            scripts/lfea-bm2-consolidated-latest-output-check.mjs; do
-            node --check "$file"
-          done
+          node --check scripts/lfea-m032-bm2-accuracy-program-check.mjs
+          node --check scripts/lfea-m031-bm2-qualified-check.mjs
+          node --check scripts/lfea-m031-bm2-qualified-runtime.mjs
+          node --check scripts/lfea-b3.26-bm2-output-comparison-runtime.mjs
+          python -m json.tool benchmarks/LFEA/BM2/accuracy-program-baseline-v1.json > /dev/null
           git diff --check
 
-      - name: Common InputXML restraint export correction
-        run: node scripts/lfea-common-inputxml-restraint-correction-check.mjs
+      - name: Reproduce M031 qualified mechanics
+        run: node scripts/lfea-m031-bm2-qualified-check.mjs
 
-      - name: BM2 ingestion and diagnostics
-        run: node scripts/lfea-b3.25-bm2-inputxml-ingestion-check.mjs
+      - name: Freeze M032 denominator and generate clusters
+        run: node scripts/lfea-m032-bm2-accuracy-program-check.mjs --freeze --write
 
-      - name: BM2 occurrence-preserving baseline comparison
-        run: node scripts/lfea-b3.26-bm2-solve-comparison-check.mjs
+      - name: BM1 comparison regression
+        run: npm run check:lfea-bm1-cii-comparison
 
-      - name: BM2 B31J junction topology
-        shell: bash
-        run: |
-          set -euo pipefail
-          node scripts/lfea-b3.28-bm2-junction-source-audit.mjs > /tmp/bm2-junction-source-audit.json
-          node scripts/lfea-b3.28-bm2-junction-surface-node-check.mjs
+      - name: BM3 coupled-spring regression
+        run: node scripts/lfea-m028-bm3-check.mjs
 
-      - name: BM2 bend geometry and station authority
-        shell: bash
-        run: |
-          set -euo pipefail
-          node scripts/lfea-b3.29-bm2-collapsed-span-audit.mjs
-          node scripts/lfea-b3.29-bm2-bend-geometry-check.mjs
-
-      - name: Latest strict and diagnostic output policy
-        run: node scripts/lfea-bm2-consolidated-latest-output-check.mjs --write
+      - name: BM3 hanger regression
+        run: node scripts/lfea-m029-bm3-hanger-check.mjs
 
       - name: Full linear-core regression
         run: npm run check:lfea-linear-core
 
-      - name: Upload deterministic BM2 evidence
+      - name: Deterministic replay
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum \
+            reports/bm2-accuracy-program-clusters.json \
+            reports/bm2-accuracy-program-clusters.csv \
+            > /tmp/m032-bm2-accuracy.sha256
+          node scripts/lfea-m032-bm2-accuracy-program-check.mjs --freeze --write > /tmp/m032-bm2-accuracy-replay.log
+          sha256sum --check /tmp/m032-bm2-accuracy.sha256
+
+      - name: Upload exact-head evidence
         uses: actions/upload-artifact@v4
         with:
-          name: m027-bm2-consolidated-${{ env.TARGET_HEAD_SHA }}
+          name: m032-bm2-accuracy-${{ env.TARGET_HEAD_SHA }}
           path: |
-            reports/bm2-consolidated-latest-output.json
-            reports/lfea-bm2-*.json
+            benchmarks/LFEA/BM2/accuracy-program-baseline-v1.json
+            reports/bm2-accuracy-program-clusters.json
+            reports/bm2-accuracy-program-clusters.csv
+            /tmp/m032-bm2-accuracy.sha256
           if-no-files-found: error
           retention-days: 30
