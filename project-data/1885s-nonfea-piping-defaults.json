@@ -1,7 +1,7 @@
 {
   "schema": "nonfea-piping-project-defaults/v1",
   "projectId": "1885S",
-  "revision": 1,
+  "revision": 2,
   "status": "PROJECT_SCREENING_ONLY",
   "resolutionPolicy": [
     "SOURCE_EXPLICIT",
@@ -10,6 +10,10 @@
     "PROJECT_CONFIGURED_DEFAULT",
     "BLOCK"
   ],
+  "dimensionVerificationTolerancesMm": {
+    "outsideDiameterMm": 0.1,
+    "wallThicknessMm": 0.05
+  },
   "configuredDefaults": [
     {
       "id": "DEFAULT-1885-MATERIAL-FAMILY",
