@@ -1,8 +1,18 @@
 /**
  * Defines every configurable Project Data field used by normalization, editing,
- * empirical loads, WebGL interaction, and benchmark acceptance.
+ * empirical loads, LFEA InputXML, WebGL interaction, and benchmark acceptance.
  */
 export const PROJECT_DATA_PROFILE_SCHEMA = 'project-data-profile/v1';
+
+export const PROJECT_DATA_CONSUMERS = Object.freeze({
+  SHARED_PIPING: 'SHARED_PIPING',
+  EMPIRICAL_PIPING: 'EMPIRICAL_PIPING',
+  LFEA_INPUTXML: 'LFEA_INPUTXML',
+});
+
+export const PROJECT_DATA_CONSUMER_IDS = Object.freeze(
+  Object.values(PROJECT_DATA_CONSUMERS),
+);
 
 export const PROJECT_DATA_GROUPS = Object.freeze([
   group('sourcesAndUnits', 'Sources and units', [
@@ -10,6 +20,7 @@ export const PROJECT_DATA_GROUPS = Object.freeze([
     field('sourceUpAxis', 'Source up axis', 'text', 'Normalization'),
     field('coordinateTransform', 'Rendering coordinate transform', 'json', 'Rendering'),
     field('datasetSource', 'SJSON source', 'source', 'Normalization'),
+    field('inputXmlSource', 'InputXML source', 'source', 'LFEA InputXML'),
     field('lineListSource', 'Line-list source', 'source', 'Loads'),
     field('pipingClassSource', 'Piping-class source', 'source', 'Loads'),
     field('componentWeightSource', 'Component-weight source', 'source', 'Editing and loads'),
@@ -51,35 +62,35 @@ export const PROJECT_DATA_GROUPS = Object.freeze([
       'dimensionVerificationTolerancesMm',
       'Dimension verification tolerances',
       'dimension-tolerances',
-      'Explicit OD and wall verification tolerances. No internal tolerance is permitted.',
+      'Explicit empirical OD and wall verification tolerances. No internal tolerance is permitted.',
     ),
     field(
       'configuredDefaults',
       'Configured default definitions',
       'configured-defaults',
-      'Approved, scoped engineering defaults and their qualification basis.',
+      'Approved, consumer-owned, scoped engineering defaults and their qualification basis.',
     ),
     field(
       'verticalContactScreening',
       'Vertical contact screening',
       'json',
-      'Configurable retained-load model. A null or disabled record means the feature is not available.',
+      'Configurable empirical retained-load model. A null or disabled record means unavailable.',
     ),
     field(
       'pDeltaScreening',
       'P-delta screening',
       'json',
-      'Optional one-pass second-order screening configuration.',
+      'Optional empirical one-pass second-order screening configuration.',
     ),
     field(
       'solverTolerances',
-      'Solver and equilibrium tolerances',
+      'Empirical solver and equilibrium tolerances',
       'json',
-      'Direct-solve, equilibrium, state-change, and reporting tolerances.',
+      'Direct-solve, equilibrium, state-change, and reporting tolerances for empirical piping.',
     ),
     field(
       'applicabilityLimits',
-      'Applicability limits',
+      'Empirical applicability limits',
       'json',
       'Qualified topology, temperature, restraint, support, and compression-ratio limits.',
     ),
@@ -89,6 +100,20 @@ export const PROJECT_DATA_GROUPS = Object.freeze([
       'json',
       'Controls default-usage disclosure, raw-value retention, rounding, and blocked-result presentation.',
     ),
+  ]),
+  group('lfeaInputXml', 'LFEA InputXML analysis profiles', [
+    field('analysisProfileId', 'Analysis profile', 'text', 'STRICT or disclosed-approximation LFEA profile'),
+    field('unitProfile', 'Unit-normalization profile', 'json', 'LFEA InputXML unit registry and accepted source units'),
+    field('installationTemperatureK', 'Installation temperature', 'number', 'K'),
+    field('gravityDirection', 'Gravity direction', 'json', 'Finite global unit vector; never auto-normalized'),
+    field('thermalExpansionAuthorities', 'Thermal-expansion authorities', 'json', 'Material-number to alpha authority registry'),
+    field('sourceAbsencePolicies', 'Source-absence policies', 'json', 'Explicit block, inactive-zero, or configured-default rules'),
+    field('topologyDiagnosticsProfile', 'Topology diagnostics profile', 'json', 'Graph/proximity tolerances and capability policy'),
+    field('structuralConditioningProfile', 'Structural conditioning profile', 'json', 'Span, bend, minimum-length, and direction policies'),
+    field('loadCaseProfile', 'Physical load-case profile', 'json', 'Gravity, pressure, thermal, and combination policies'),
+    field('solverProfile', 'Stiffness and solver profile', 'json', 'Residual, equilibrium, energy, pivot, and condition thresholds'),
+    field('codeEvaluationProfile', 'B31 code-evaluation profile', 'json', 'Code edition, datasets, section/SIF, and allowable authority'),
+    field('resultPackagePolicy', 'Result-package custody policy', 'json', 'Project Data ancestry, usage disclosure, and runtime-state exclusion'),
   ]),
   group('webglNavigation', 'WebGL and navigation', [
     field('supportMarkerSize', 'Support marker size', 'number', 'model units'),
@@ -139,10 +164,30 @@ export const PROJECT_DATA_REQUIREMENTS = Object.freeze({
     'loadCalculation.componentWeightsKg', 'loadCalculation.equilibriumTolerances',
     'loadCalculation.activeLoadCases',
   ]),
+  configuredDefaults: Object.freeze([
+    'engineeringCalculationDefaults.resolutionPolicy',
+    'engineeringCalculationDefaults.configuredDefaults',
+  ]),
   nonFeaPipingDefaults: Object.freeze([
     'engineeringCalculationDefaults.resolutionPolicy',
     'engineeringCalculationDefaults.dimensionVerificationTolerancesMm',
     'engineeringCalculationDefaults.configuredDefaults',
+  ]),
+  lfeaInputXml: Object.freeze([
+    'sourcesAndUnits.inputXmlSource',
+    'loadCalculation.gravityMPerS2',
+    'lfeaInputXml.analysisProfileId',
+    'lfeaInputXml.unitProfile',
+    'lfeaInputXml.installationTemperatureK',
+    'lfeaInputXml.gravityDirection',
+    'lfeaInputXml.thermalExpansionAuthorities',
+    'lfeaInputXml.sourceAbsencePolicies',
+    'lfeaInputXml.topologyDiagnosticsProfile',
+    'lfeaInputXml.structuralConditioningProfile',
+    'lfeaInputXml.loadCaseProfile',
+    'lfeaInputXml.solverProfile',
+    'lfeaInputXml.codeEvaluationProfile',
+    'lfeaInputXml.resultPackagePolicy',
   ]),
   webgl: Object.freeze([
     'webglNavigation.supportMarkerSize', 'webglNavigation.pickingRadius',
