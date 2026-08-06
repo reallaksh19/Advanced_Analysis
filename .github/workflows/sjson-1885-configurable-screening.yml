@@ -15,6 +15,7 @@ on:
       - src/core/empirical-piping-mechanics/index.js
       - src/calc-workspace/cii-standalone-port/core/branch-schedule-resolution.js
       - src/calc-workspace/cii-standalone-port/core/pos-topology-crosswalk.js
+      - src/calc-workspace/cii-standalone-port/core/pos-section-source-authority.js
       - src/calc-workspace/cii-standalone-port/core/pos-section-material-resolution.js
       - scripts/nonfea-piping-foundation-check.mjs
       - scripts/empirical-sjson-1885-pos-section-material-run.mjs
@@ -39,6 +40,7 @@ on:
       - src/core/empirical-piping-mechanics/index.js
       - src/calc-workspace/cii-standalone-port/core/branch-schedule-resolution.js
       - src/calc-workspace/cii-standalone-port/core/pos-topology-crosswalk.js
+      - src/calc-workspace/cii-standalone-port/core/pos-section-source-authority.js
       - src/calc-workspace/cii-standalone-port/core/pos-section-material-resolution.js
       - scripts/nonfea-piping-foundation-check.mjs
       - scripts/empirical-sjson-1885-pos-section-material-run.mjs
@@ -71,40 +73,43 @@ jobs:
         with:
           node-version: 22
       - name: Run non-FEA piping foundation hand checks
-        id: foundation
-        continue-on-error: true
-        run: |
-          set +e
-          node scripts/nonfea-piping-foundation-check.mjs > /tmp/nonfea-foundation.log 2>&1
-          code=$?
-          cat /tmp/nonfea-foundation.log
-          echo "$code" > /tmp/nonfea-foundation.exit-code
-          exit "$code"
-      - name: Upload foundation diagnostic
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nonfea-foundation-diagnostic
-          path: |
-            /tmp/nonfea-foundation.log
-            /tmp/nonfea-foundation.exit-code
-          if-no-files-found: error
-      - name: Fail when foundation hand checks fail
-        if: steps.foundation.outcome == 'failure'
-        run: exit 1
+        run: node scripts/nonfea-piping-foundation-check.mjs
       - name: Materialize exact enriched benchmark sources
         run: |
           git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson > /tmp/EnrichedSjson
           git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson.topology.input.xml > /tmp/EnrichedSjson.topology.input.xml
       - name: Resolve exact POS section and material authority
+        id: pos_resolution
+        continue-on-error: true
         run: |
+          set +e
           node scripts/empirical-sjson-1885-pos-section-material-run.mjs \
             project-data/1885s-nonfea-piping-defaults.json \
             /tmp/EnrichedSjson \
             /tmp/EnrichedSjson.topology.input.xml \
+            /tmp/pos-section-material.json > /tmp/pos-resolution.log 2>&1
+          code=$?
+          if [ "$code" -eq 0 ]; then
+            node scripts/empirical-sjson-1885-pos-section-material-check.mjs \
+              /tmp/pos-section-material.json >> /tmp/pos-resolution.log 2>&1
+            code=$?
+          fi
+          cat /tmp/pos-resolution.log
+          echo "$code" > /tmp/pos-resolution.exit-code
+          exit "$code"
+      - name: Upload POS resolution diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pos-resolution-diagnostic
+          path: |
+            /tmp/pos-resolution.log
+            /tmp/pos-resolution.exit-code
             /tmp/pos-section-material.json
-          node scripts/empirical-sjson-1885-pos-section-material-check.mjs \
-            /tmp/pos-section-material.json
+          if-no-files-found: warn
+      - name: Fail when POS resolution fails
+        if: steps.pos_resolution.outcome == 'failure'
+        run: exit 1
       - name: Recalculate exact benchmark twice
         run: |
           node scripts/empirical-sjson-1885-configurable-screening-run.mjs \
