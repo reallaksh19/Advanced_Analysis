@@ -20,7 +20,7 @@ jobs:
           ref: agent/empirical-coupled-network-wp6
           fetch-depth: 0
 
-      - name: Patch adapter and registry
+      - name: Patch adapter, scenario authority and registry
         shell: bash
         run: |
           set -euo pipefail
@@ -31,9 +31,10 @@ jobs:
           text = adapter.read_text()
           old = "if (!['EMPIRICAL_BEAM_CONTACT_V1', 'EMPIRICAL_RESTRAINT_NETWORK_V1'].includes(value)) {"
           new = "if (!['EMPIRICAL_BEAM_CONTACT_V1', 'EMPIRICAL_RESTRAINT_NETWORK_V1', 'EMPIRICAL_RESTRAINT_NETWORK_V2'].includes(value)) {"
-          if old not in text:
-              raise SystemExit('adapter admission anchor not found')
-          adapter.write_text(text.replace(old, new, 1))
+          if 'EMPIRICAL_RESTRAINT_NETWORK_V2' not in text:
+              if old not in text:
+                  raise SystemExit('adapter admission anchor not found')
+              adapter.write_text(text.replace(old, new, 1))
 
           registry = Path('src/workspace/engineering-loads/empirical-method-registry.js')
           text = registry.read_text()
@@ -55,9 +56,41 @@ jobs:
               qualifiedDofs: ['ONE_TRANSLATIONAL_DIRECTION_COUPLED_GRAPH'],
             }),
           """
-          if anchor not in text:
-              raise SystemExit('registry insertion anchor not found')
-          registry.write_text(text.replace(anchor, addition, 1))
+          if "methodId: 'EMPIRICAL_RESTRAINT_NETWORK_V2'" not in text:
+              if anchor not in text:
+                  raise SystemExit('registry insertion anchor not found')
+              registry.write_text(text.replace(anchor, addition, 1))
+
+          contracts = Path('src/workspace/engineering-loads/contracts/empirical-sjson-contracts.js')
+          text = contracts.read_text()
+          method_anchor = """  'EMPIRICAL_RESTRAINT_NETWORK_V1',
+          ]);
+          """
+          method_addition = """  'EMPIRICAL_RESTRAINT_NETWORK_V1',
+            'EMPIRICAL_RESTRAINT_NETWORK_V2',
+          ]);
+          """
+          if "'EMPIRICAL_RESTRAINT_NETWORK_V2'," not in text:
+              if method_anchor not in text:
+                  raise SystemExit('scenario method-list anchor not found')
+              text = text.replace(method_anchor, method_addition, 1)
+          ownership_old = "if (scenario.method === 'EMPIRICAL_RESTRAINT_NETWORK_V1') {"
+          ownership_new = "if (['EMPIRICAL_RESTRAINT_NETWORK_V1', 'EMPIRICAL_RESTRAINT_NETWORK_V2'].includes(scenario.method)) {"
+          if ownership_new not in text:
+              if ownership_old not in text:
+                  raise SystemExit('scenario ownership anchor not found')
+              text = text.replace(ownership_old, ownership_new, 1)
+          text = text.replace(
+              'EMPIRICAL_RESTRAINT_NETWORK_V1 may emit thermal line-stop screening results only.',
+              'Empirical restraint-network methods may emit thermal line-stop screening results only.',
+              1,
+          )
+          text = text.replace(
+              'The restricted restraint-network method requires thermal-strain-only load ownership.',
+              'Empirical restraint-network methods require thermal-strain-only load ownership.',
+              1,
+          )
+          contracts.write_text(text)
           PY
 
       - name: Commit patch
@@ -67,6 +100,11 @@ jobs:
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add src/workspace/engineering-loads/adapters/sjson-to-empirical-piping-request.js \
+            src/workspace/engineering-loads/contracts/empirical-sjson-contracts.js \
             src/workspace/engineering-loads/empirical-method-registry.js
-          git commit -m 'Register WP6 coupled restraint network'
+          if git diff --cached --quiet; then
+            echo 'WP6 shared authorities already patched.'
+            exit 0
+          fi
+          git commit -m 'Authorize WP6 coupled restraint scenarios'
           git push origin HEAD:agent/empirical-coupled-network-wp6
