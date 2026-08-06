@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { inputXmlToCanonicalGeometry } from '../src/core/geometry/adapters/inputXmlToCanonicalGeometry.js';
 import {
@@ -167,3 +168,39 @@ console.log(JSON.stringify({
 }, null, 2));
 console.log('SOURCE_CORRECTION_CONTRACT: PASS');
 console.log('BENCHMARK_PARITY: NOT_EVALUATED_BY_THIS_CHECK');
+
+console.log('\n--- BM4 non-friction CASE 19/20/21 execution ---');
+const referenceResponse = await fetch(
+  'https://api.github.com/repos/reallaksh19/Advanced_Analysis/git/blobs/5be0cc70f0d608b0afdfb9878e4085982192bc72',
+  {
+    headers: {
+      Accept: 'application/vnd.github.raw+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+    },
+  },
+);
+assert.equal(referenceResponse.ok, true, `BM4 reference download failed: ${referenceResponse.status}`);
+writeFileSync('benchmarks/LFEA/BM4/Output_BM4.xml', await referenceResponse.text(), 'utf8');
+
+const bm4Execution = spawnSync(
+  process.execPath,
+  ['scripts/lfea-bm4-case19-21-benchmark.mjs'],
+  { encoding: 'utf8' },
+);
+process.stdout.write(bm4Execution.stdout ?? '');
+process.stderr.write(bm4Execution.stderr ?? '');
+
+const bm4Report = JSON.parse(readFileSync('reports/bm4-case19-21-benchmark.json', 'utf8'));
+console.log('BM4_CASE19_21_REPORT_BEGIN');
+console.log(JSON.stringify(bm4Report, null, 2));
+console.log('BM4_CASE19_21_REPORT_END');
+assert.deepEqual(
+  bm4Report.scope.selectedCases.map(({ caseNumber, category }) => ({ caseNumber, category })),
+  [
+    { caseNumber: 19, category: 'SUS' },
+    { caseNumber: 20, category: 'OPE' },
+    { caseNumber: 21, category: 'EXP' },
+  ],
+);
+assert.equal(bm4Report.scope.frictionBenchmark, false);
+assert.notEqual(bm4Report.disposition, 'EXECUTION_ERROR', JSON.stringify(bm4Report.error ?? null));
