@@ -1,0 +1,73 @@
+name: Catalogue Pipe Segment Exact Head
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/catalogue-pipe-segment-exact-head.yml'
+      - 'src/workspace/topology-edit/topology-edit-pipe-segment-*.js'
+      - 'src/workspace/topology-edit/topology-edit-native-pipe-writeback.js'
+      - 'tests/topology-edit-pipe-segment-command.test.mjs'
+      - 'docs/catalogue-pipe-segment-primitive.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: catalogue-pipe-segment-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  catalogue-pipe-segment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verify exact sources and module limits
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
+          files=(
+            src/workspace/topology-edit/topology-edit-pipe-segment-contract.js
+            src/workspace/topology-edit/topology-edit-pipe-segment-geometry.js
+            src/workspace/topology-edit/topology-edit-pipe-segment-resolver.js
+            src/workspace/topology-edit/topology-edit-pipe-segment-reducer.js
+            src/workspace/topology-edit/topology-edit-native-pipe-writeback.js
+            src/workspace/topology-edit/topology-edit-pipe-segment-command.js
+            tests/topology-edit-pipe-segment-command.test.mjs
+          )
+          for file in "${files[@]}"; do
+            node --check "$file"
+            test "$(wc -l < "$file")" -lt 300
+          done
+          git diff --check
+
+      - name: Execute governed pipe contracts
+        run: |
+          set -o pipefail
+          node --test --test-reporter=tap \
+            tests/topology-edit-pipe-segment-command.test.mjs \
+            2>&1 | tee catalogue-pipe-segment-test-output.txt
+          test "$(grep -c '^ok ' catalogue-pipe-segment-test-output.txt)" -gt 0
+
+      - name: Upload exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: catalogue-pipe-segment-${{ github.sha }}-${{ github.run_attempt }}
+          path: catalogue-pipe-segment-test-output.txt
+          if-no-files-found: error
+          retention-days: 30
