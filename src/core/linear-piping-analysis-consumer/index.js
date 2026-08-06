@@ -100,6 +100,7 @@ export {
 
 export {
   compileLinearPipingInputXmlAnalysisContext,
+  parseInputXmlModelHealthSource,
   runLinearPipingAnalysisFromInputXml,
   validateLinearPipingInputXmlAnalysisRequest,
 } from './inputxml-source-binding.js';

@@ -1,7 +1,9 @@
 import { requireDeclaredValue } from '../shared-analysis-contract/declared-value.js';
 import { canonicalStringify, semanticHash } from '../shared-piping-model/canonical-json.js';
 import { deepFreeze } from '../shared-piping-model/immutable.js';
-import { inputXmlToCanonicalGeometry } from '../geometry/adapters/inputXmlToCanonicalGeometry.js';
+import {
+  parseInputXmlModelHealthSource as parseInputXmlModelHealthSourceAdapter,
+} from '../geometry/adapters/inputxml-model-health-source.js';
 import { conditionGeometry } from '../centerline-beam-fea/index.js';
 import {
   CANONICAL_ANALYSIS_UNIT,
@@ -23,10 +25,16 @@ export { validateLinearPipingInputXmlAnalysisRequest } from './inputxml-request-
 // The single point of entry for raw InputXML text into this directory's
 // governed Phase 2A binding below and into the generic (non-benchmark)
 // solve path. Any other file needing InputXML text parsed to canonical
-// geometry must go through this export rather than importing the adapter
+// geometry must go through this export rather than importing an adapter
 // directly -- see linear-piping-analysis-consumer-anti-drift-check.mjs.
+export function parseInputXmlModelHealthSource(content, options) {
+  return parseInputXmlModelHealthSourceAdapter(content, options);
+}
+
+// Compatibility projection for existing geometry-only callers. The source
+// bundle is authoritative; this function does not create a second parse path.
 export function parseInputXmlToCanonicalGeometry(content, options) {
-  return inputXmlToCanonicalGeometry(content, options);
+  return parseInputXmlModelHealthSource(content, options).geometry;
 }
 
 export function runLinearPipingAnalysisFromInputXml(request, runtime) {
@@ -63,7 +71,7 @@ function compileBoundInputXml(request, runtime) {
     'bendRadiusTolerance',
     { exclusiveMinimum: 0 },
   );
-  const parsedGeometry = inputXmlToCanonicalGeometry(source.content, {
+  const sourceBundle = parseInputXmlModelHealthSourceAdapter(source.content, {
     unit: accepted.ingestionOptions.unit,
     source: accepted.ingestionOptions.source,
     componentOrigins: accepted.ingestionOptions.componentOrigins,
@@ -72,6 +80,7 @@ function compileBoundInputXml(request, runtime) {
     bendRadiusTolerance,
     fileName: source.fileName,
   });
+  const parsedGeometry = sourceBundle.geometry;
   const unitNormalization = accepted.ingestionOptions.unitNormalizationProfile === null
     ? null
     : normalizeLinearPipingInputXmlGeometry(
@@ -97,6 +106,7 @@ function compileBoundInputXml(request, runtime) {
   const sourceAnalysisContext = compileLinearPipingSourceAnalysisContext(boundSourceRequest, runtime);
   return Object.freeze({
     source,
+    sourceBundle,
     geometry,
     conditionedTopology,
     sourceAnalysisContext,

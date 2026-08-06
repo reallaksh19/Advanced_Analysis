@@ -1,0 +1,46 @@
+name: empirical-load-calc-wp3
+
+on:
+  pull_request:
+    paths:
+      - 'src/workspace/engineering-loads/empirical-load-calc-scenario-*.js'
+      - 'src/workspace/load-calc-consumer-controller.js'
+      - 'src/workspace/load-calc-consumer-view.js'
+      - 'src/workspace/bootstrap.js'
+      - 'scripts/empirical-load-calc-scenario-check.mjs'
+      - 'scripts/advanced-shell-contract-check.mjs'
+      - '.github/workflows/empirical-load-calc-wp3.yml'
+      - '.github/workflows/empirical-piping-exact-head.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  configuration-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Prove exact-head execution
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          git diff --exit-code
+
+      - name: Scenario and UI contracts
+        run: node scripts/empirical-load-calc-scenario-check.mjs
+
+      - name: Import graph
+        run: npm run check:imports
+
+      - name: Load Calc shell invariants
+        run: node scripts/advanced-shell-contract-check.mjs
