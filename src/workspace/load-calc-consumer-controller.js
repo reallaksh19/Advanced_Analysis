@@ -3,6 +3,21 @@ import { APPLICATION_EVENTS, EVENT_TOPICS } from './event-topics.js';
 import { ENGINEERING_MODEL_EVENTS } from './engineering-model-controller.js';
 import { engineeringModelStore } from './engineering-model-store.js';
 import { renderEngineeringLoadPane, renderLoadCalcConsumer } from './load-calc-consumer-view.js';
+import {
+  EMPIRICAL_LOAD_CALC_SCENARIO_EVENTS,
+} from './engineering-loads/empirical-load-calc-scenario-controller.js';
+import {
+  empiricalLoadCalcScenarioStore,
+} from './engineering-loads/empirical-load-calc-scenario-store.js';
+import {
+  renderEmpiricalScenarioEvidence,
+  renderEmpiricalScenarioLoadCases,
+  renderEmpiricalScenarioMethods,
+  renderEmpiricalScenarioModel3d,
+  renderEmpiricalScenarioOverview,
+  renderEmpiricalScenarioRestraints,
+  renderEmpiricalScenarioResults,
+} from './engineering-loads/empirical-load-calc-scenario-view.js';
 
 /** Coordinates the real empirical load workflow without generating inputs. */
 export class LoadCalcConsumerController {
@@ -30,6 +45,11 @@ export class LoadCalcConsumerController {
       this.eventBus.subscribe(ENGINEERING_MODEL_EVENTS.CHANGED, ({ reason, distribution }) => this.handleEngineeringChange(reason, distribution)),
       this.eventBus.subscribe(ENGINEERING_MODEL_EVENTS.FAILED, ({ message }) => this.handleFailure(message)),
       this.eventBus.subscribe(EVENT_TOPICS.LOAD_CALC_SUBTAB_REQUESTED, ({ tab }) => { this.activeTab = tab; this.render(); }),
+      this.eventBus.subscribe(EMPIRICAL_LOAD_CALC_SCENARIO_EVENTS.CHANGED, ({ snapshot }) => {
+        this.message = empiricalScenarioMessage(snapshot);
+        this.render();
+      }),
+      this.eventBus.subscribe(EMPIRICAL_LOAD_CALC_SCENARIO_EVENTS.FAILED, ({ message }) => this.handleFailure(message)),
     ];
     this.render();
   }
@@ -58,6 +78,35 @@ export class LoadCalcConsumerController {
     if (supportEntityId) { this.eventBus.publish(EVENT_TOPICS.VIEWPORT_SELECTION_REQUESTED, { entityId: supportEntityId, source: 'load-table' }); return; }
     const tab = event.target.closest('[data-load-calc-tab]')?.dataset.loadCalcTab;
     if (tab) { this.activeTab = tab; this.render(); return; }
+    const restraintId = event.target.closest('[data-empirical-restraint-select]')?.dataset.empiricalRestraintSelect;
+    if (restraintId) {
+      const occurrence = empiricalLoadCalcScenarioStore.getProposal()?.adaptedRequest?.restraintOccurrences
+        ?.find((row) => row.restraintId === restraintId);
+      const entityId = occurrence?.sourceEntityIds?.[0]
+        || occurrence?.hostSourceEntityId
+        || occurrence?.hostEntityId;
+      if (entityId) this.eventBus.publish(EVENT_TOPICS.VIEWPORT_SELECTION_REQUESTED, { entityId, source: 'load-table' });
+      return;
+    }
+    if (event.target.closest('[data-empirical-open-sjson-viewport]')) {
+      this.activeTab = '3d';
+      this.render();
+      return;
+    }
+    if (event.target.closest('[data-empirical-clone-profile]')) {
+      this.eventBus.publish(EMPIRICAL_LOAD_CALC_SCENARIO_EVENTS.CLONE_PROFILE_REQUESTED, {});
+      return;
+    }
+    if (event.target.closest('[data-empirical-authorize]')) {
+      this.message = 'Authorizing the current empirical scenario…';
+      this.eventBus.publish(EMPIRICAL_LOAD_CALC_SCENARIO_EVENTS.AUTHORIZE_REQUESTED, {});
+      return;
+    }
+    if (event.target.closest('[data-empirical-calculate]')) {
+      this.message = 'Executing the current authorized empirical method…';
+      this.eventBus.publish(EMPIRICAL_LOAD_CALC_SCENARIO_EVENTS.CALCULATE_REQUESTED, {});
+      return;
+    }
     if (event.target.closest('[data-engineering-load-calculate]')) {
       const authorization = engineeringModelStore.getEmpiricalAuthorizationState();
       if (!authorization.calculationEligible) {
@@ -87,6 +136,7 @@ export class LoadCalcConsumerController {
       authorizationState,
       supportSiteModel: engineeringModelStore.getSupportSiteModel(),
       routePartitionModel: engineeringModelStore.getRoutePartitionModel(),
+      empiricalScenarioState: empiricalLoadCalcScenarioStore.getSnapshot(),
     });
     this.rootElement.replaceChildren(view);
     const pane = view.querySelector('[data-load-calc-pane]');
@@ -103,7 +153,27 @@ export class LoadCalcConsumerController {
 
   async renderDeferredPane(tab, pane, revision) {
     try {
-      if (tab === 'preflight') {
+      const empiricalState = {
+        snapshot: empiricalLoadCalcScenarioStore.getSnapshot(),
+        proposal: empiricalLoadCalcScenarioStore.getProposal(),
+        authorization: empiricalLoadCalcScenarioStore.getAuthorization(),
+        execution: empiricalLoadCalcScenarioStore.getExecution(),
+      };
+      if (tab === 'overview') {
+        renderEmpiricalScenarioOverview(pane, empiricalState);
+      } else if (tab === 'restraints') {
+        renderEmpiricalScenarioRestraints(pane, empiricalState);
+      } else if (tab === 'load-cases') {
+        renderEmpiricalScenarioLoadCases(pane, empiricalState);
+      } else if (tab === 'methods') {
+        renderEmpiricalScenarioMethods(pane, empiricalState);
+      } else if (tab === 'results') {
+        renderEmpiricalScenarioResults(pane, empiricalState);
+      } else if (tab === 'evidence') {
+        renderEmpiricalScenarioEvidence(pane, empiricalState);
+      } else if (tab === 'model-3d') {
+        renderEmpiricalScenarioModel3d(pane, empiricalState);
+      } else if (tab === 'preflight') {
         const { renderEmpiricalPreflightView } = await import('./empirical-preflight-view.js');
         if (revision === this.renderRevision) renderEmpiricalPreflightView(pane, this.context);
       } else if (tab === 'project-data') {
@@ -185,6 +255,19 @@ function availabilityMessage(state) {
     DATASET_REPLACED: 'The active dataset changed; a new authorized empirical package is required.',
   };
   return messages[reason] || `Load calculation is disabled: ${reason}.`;
+}
+
+function empiricalScenarioMessage(snapshot) {
+  const messages = {
+    NOT_CONFIGURED: 'Configure an empirical scenario before authorization.',
+    DRAFT_BLOCKED: 'Empirical scenario is blocked; review the Overview and Evidence panes.',
+    DRAFT_READY: 'Empirical scenario is ready for explicit authorization.',
+    AUTHORIZED_CURRENT: 'Empirical scenario is authorized and ready to calculate.',
+    AUTHORIZED_STALE: 'Empirical scenario authorization is stale.',
+    EXECUTED_CURRENT: 'Empirical method execution is current.',
+    EXECUTED_STALE: 'Empirical method results are stale and are not current overlays.',
+  };
+  return messages[snapshot?.state] || '';
 }
 
 function resetTopologyEditCleanShell(documentRef) {
