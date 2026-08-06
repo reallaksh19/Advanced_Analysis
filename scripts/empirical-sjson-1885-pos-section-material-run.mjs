@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { semanticHash } from '../src/core/empirical-piping-mechanics/identity.js';
 import { resolvePosSectionMaterialStates } from '../src/calc-workspace/cii-standalone-port/core/pos-section-material-resolution.js';
+import { resolveProjectDataConfiguredDefaultsAuthority } from '../src/workspace/project-data/project-data-configured-resolution.js';
 
 const [profilePath, enrichedPath, topologyXmlPath, outputPath = '/tmp/empirical-sjson-1885-pos-section-material.json'] = process.argv.slice(2);
 if (!profilePath || !enrichedPath || !topologyXmlPath) {
@@ -13,11 +14,18 @@ const sourceText = await readFile(enrichedPath, 'utf8');
 const topologyXmlText = await readFile(topologyXmlPath, 'utf8');
 const profile = JSON.parse(profileText.replace(/^\uFEFF/u, ''));
 const sourceRoot = JSON.parse(sourceText.replace(/^\uFEFF/u, ''));
-const configuredDefaults = profile.schema === 'project-data-profile/v1'
-  ? profile.loadCalculation?.configuredDefaults?.value
+const projectDataAuthority = profile.schema === 'project-data-profile/v1'
+  ? resolveProjectDataConfiguredDefaultsAuthority(profile)
+  : null;
+if (projectDataAuthority && projectDataAuthority.status !== 'READY') {
+  throw new Error(`Project Data configured-default authority is blocked: ${projectDataAuthority.blockers
+    .map((row) => `${row.path}=${row.code}:${row.message}`).join(' | ')}`);
+}
+const configuredDefaults = projectDataAuthority
+  ? projectDataAuthority.configuredDefaults
   : profile.configuredDefaults;
-const dimensionVerificationTolerancesMm = profile.schema === 'project-data-profile/v1'
-  ? profile.loadCalculation?.dimensionVerificationTolerancesMm?.value
+const dimensionVerificationTolerancesMm = projectDataAuthority
+  ? projectDataAuthority.dimensionVerificationTolerancesMm
   : profile.dimensionVerificationTolerancesMm;
 if (!Array.isArray(configuredDefaults)) {
   throw new Error('Configured defaults must be an array in the Project Data profile or standalone defaults package.');
@@ -30,8 +38,8 @@ const calculation = resolvePosSectionMaterialStates({
   sourceRoot,
   topologyXmlText,
   projectId: profile.projectId,
-  projectDataRevision: profile.revision,
-  projectDataSemanticHash: semanticHash(profile),
+  projectDataRevision: projectDataAuthority?.projectDataRevision ?? profile.revision,
+  projectDataSemanticHash: projectDataAuthority?.projectDataSemanticHash ?? semanticHash(profile),
   configuredDefaults,
   dimensionVerificationTolerancesMm,
 });
@@ -44,6 +52,13 @@ const receipt = {
     profileSha256: sha256(profileText),
     enrichedSha256: sha256(sourceText),
     topologyXmlSha256: sha256(topologyXmlText),
+    projectDataConfiguredDefaultsAuthority: projectDataAuthority
+      ? {
+        schema: projectDataAuthority.schema,
+        semanticIdentity: projectDataAuthority.semanticIdentity,
+        projectDataPath: projectDataAuthority.projectDataPaths.configuredDefaults,
+      }
+      : null,
   },
   calculation,
 };
