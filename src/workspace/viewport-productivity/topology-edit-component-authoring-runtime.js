@@ -19,6 +19,9 @@ import {
   topologyEditValveAssemblyCatalogueOptions,
 } from '../topology-edit/authoring/topology-edit-authoring-valve-assembly.js';
 import {
+  topologyEditBranchAuthoringCatalogueOptions,
+} from '../topology-edit/authoring/topology-edit-authoring-branch.js';
+import {
   executeTopologyEditAuthoringTransaction,
   prepareTopologyEditAuthoringCandidate,
   topologyEditAuthoringCandidateChangedIds,
@@ -27,11 +30,12 @@ import {
   TopologyEditAuthoringRuntime,
 } from './topology-edit-authoring-runtime.js';
 
-const COMPONENT_TOOLS = new Set(['FLANGE', 'REDUCER', 'VALVE_ASSEMBLY']);
+const COMPONENT_TOOLS = new Set(['FLANGE', 'REDUCER', 'VALVE_ASSEMBLY', 'BRANCH']);
 const COMPONENT_TOOL_BUTTONS = Object.freeze([
   { id: 'VALVE_ASSEMBLY', label: 'Valve assembly' },
   { id: 'FLANGE', label: 'Flange' },
   { id: 'REDUCER', label: 'Reducer' },
+  { id: 'BRANCH', label: 'Tee / Olet branch' },
 ]);
 const USER_FIELDS = Object.freeze({
   FLANGE: new Set(['stationMm', 'catalogueRecordId']),
@@ -41,6 +45,12 @@ const USER_FIELDS = Object.freeze({
     'valveRecordId',
     'upstreamFlangeRecordId',
     'downstreamFlangeRecordId',
+  ]),
+  BRANCH: new Set([
+    'stationMm',
+    'catalogueRecordId',
+    'clockingDeg',
+    'branchPipeLengthMm',
   ]),
 });
 const RECORD_FIELDS = new Set([
@@ -203,6 +213,7 @@ export class TopologyEditComponentAuthoringRuntime extends TopologyEditAuthoring
     }
     if (!COMPONENT_TOOLS.has(this.state.tool)) return;
     if (this.state.tool === 'VALVE_ASSEMBLY') this.renderAssemblySelectors();
+    else if (this.state.tool === 'BRANCH') this.renderBranchCatalogueSelector();
     else this.renderInlineCatalogueSelector();
     this.lockGovernedFields();
     const targetText = this.element.querySelector('.topology-edit-authoring-hud__target span');
@@ -222,6 +233,12 @@ export class TopologyEditComponentAuthoringRuntime extends TopologyEditAuthoring
             authoringSession: this.state,
             catalogue: this.catalogue(),
           }).compatibleAssemblyCount;
+        } else if (this.state.tool === 'BRANCH') {
+          optionCount = topologyEditBranchAuthoringCatalogueOptions({
+            topology: this.controller.session?.currentTopology(),
+            authoringSession: this.state,
+            catalogue: this.catalogue(),
+          }).length;
         } else {
           optionCount = topologyEditInlineAuthoringCatalogueOptions({
             topology: this.controller.session?.currentTopology(),
@@ -241,6 +258,10 @@ export class TopologyEditComponentAuthoringRuntime extends TopologyEditAuthoring
     host.dataset.topologyEditAuthoringDownstreamFlangeRecordId = this.state.properties.downstreamFlangeRecordId ?? '';
     host.dataset.topologyEditAuthoringAssemblyLengthMm = String(this.state.properties.assemblyLengthMm ?? '');
     host.dataset.topologyEditAuthoringAssemblyMassKg = String(this.state.properties.assemblyMassKg ?? '');
+    host.dataset.topologyEditAuthoringBranchFamily = this.state.properties.branchFamily ?? '';
+    host.dataset.topologyEditAuthoringBranchClockingDeg = String(this.state.properties.clockingDeg ?? '');
+    host.dataset.topologyEditAuthoringBranchPipeLengthMm = String(this.state.properties.branchPipeLengthMm ?? '');
+    host.dataset.topologyEditAuthoringBranchReachMm = String(this.state.properties.totalBranchReachMm ?? '');
   }
 
   handleFieldChange(event) {
@@ -275,6 +296,8 @@ export class TopologyEditComponentAuthoringRuntime extends TopologyEditAuthoring
       valveRecordId: overrides.valveRecordId,
       upstreamFlangeRecordId: overrides.upstreamFlangeRecordId,
       downstreamFlangeRecordId: overrides.downstreamFlangeRecordId,
+      clockingDeg: overrides.clockingDeg,
+      branchPipeLengthMm: overrides.branchPipeLengthMm,
     });
     const userFields = USER_FIELDS[this.state.tool];
     const definition = topologyEditAuthoringToolDefinition(this.state.tool);
@@ -325,6 +348,27 @@ export class TopologyEditComponentAuthoringRuntime extends TopologyEditAuthoring
       selected: row.recordId === this.state.properties.catalogueRecordId
         && (this.state.tool !== 'REDUCER' || row.direction === this.state.properties.inlineDirection),
       data: { inlineDirection: row.direction },
+    }));
+  }
+
+  renderBranchCatalogueSelector() {
+    const input = this.element.querySelector('[data-authoring-field="catalogueRecordId"]');
+    const catalogue = this.catalogue();
+    if (!input || !catalogue || !this.state.target) return;
+    let options = [];
+    try {
+      options = topologyEditBranchAuthoringCatalogueOptions({
+        topology: this.controller.session?.currentTopology(),
+        authoringSession: this.state,
+        catalogue,
+      });
+    } catch {
+      options = [];
+    }
+    replaceWithSelect(input, options, this.state.properties.catalogueRecordId, this.pending, (row) => ({
+      value: row.recordId,
+      label: row.label,
+      selected: row.recordId === this.state.properties.catalogueRecordId,
     }));
   }
 
