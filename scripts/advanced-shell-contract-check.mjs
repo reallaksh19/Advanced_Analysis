@@ -60,11 +60,71 @@ for (const forbidden of [
 
 const loadCalcViewSource = await readFile(path.join(root, 'src/workspace/load-calc-consumer-view.js'), 'utf8');
 const loadCalcTabs = [...loadCalcViewSource.matchAll(/tab\('([^']+)'/g)].map((match) => match[1]);
-assert.deepEqual(loadCalcTabs, ['loads', 'preflight', 'project-data', 'masters', 'json-trace']);
+const empiricalTabs = [
+  'overview',
+  '3d',
+  'restraints',
+  'load-cases',
+  'methods',
+  'results',
+  'evidence',
+];
+const legacyTabs = ['loads', 'preflight', 'project-data', 'masters', 'json-trace'];
+assert.deepEqual(loadCalcTabs, [...empiricalTabs, ...legacyTabs]);
+assert.deepEqual(
+  loadCalcTabs.filter((tab) => legacyTabs.includes(tab)),
+  legacyTabs,
+  'The existing Load Calc tabs must remain present in their prior order.',
+);
+assert.match(loadCalcViewSource, /Load Evaluation/u);
+assert.doesNotMatch(loadCalcViewSource, /Legacy Load Evaluation/u);
+assert.match(loadCalcViewSource, /Empirical scenario:/u);
+
 const loadCalcControllerSource = await readFile(path.join(root, 'src/workspace/load-calc-consumer-controller.js'), 'utf8');
-for (const requiredView of ['empirical-preflight-view.js', 'project-data/project-data-view.js', 'master-data-ui.js', 'json-trace-ui.js', 'topology-edit-3d-sjson-fidelity-controller.js']) {
+for (const requiredView of [
+  'empirical-load-calc-scenario-view.js',
+  'empirical-preflight-view.js',
+  'project-data/project-data-view.js',
+  'master-data-ui.js',
+  'json-trace-ui.js',
+  'topology-edit-3d-sjson-fidelity-controller.js',
+]) {
   assert.equal(loadCalcControllerSource.includes(requiredView), true, `Load Calc must mount ${requiredView}.`);
 }
+for (const requiredAction of [
+  'data-empirical-authorize',
+  'data-empirical-calculate',
+  'data-empirical-clone-profile',
+]) {
+  assert.equal(loadCalcControllerSource.includes(requiredAction), true, `Load Calc must govern ${requiredAction}.`);
+}
+
+const scenarioViewSource = await readFile(
+  path.join(root, 'src/workspace/engineering-loads/empirical-load-calc-scenario-view.js'),
+  'utf8',
+);
+for (const requiredLabel of [
+  'Source and effective custody',
+  'Explicit ownership',
+  'Methods and profile authority',
+  'Separate result family',
+  'Immutable trace',
+]) {
+  assert.equal(scenarioViewSource.includes(requiredLabel), true, `Empirical Load Calc must render ${requiredLabel}.`);
+}
+assert.match(scenarioViewSource, /data-empirical-authorize/u);
+assert.match(scenarioViewSource, /data-empirical-calculate/u);
+assert.match(scenarioViewSource, /geometryChanged/u);
+
+const scenarioStoreSource = await readFile(
+  path.join(root, 'src/workspace/engineering-loads/empirical-load-calc-scenario-store.js'),
+  'utf8',
+);
+assert.match(scenarioStoreSource, /explicitAuthorization: true/u);
+assert.match(scenarioStoreSource, /autoExecution: false/u);
+assert.match(scenarioStoreSource, /combinedOperatingReactionPermitted: false/u);
+assert.match(scenarioStoreSource, /EXECUTED_STALE/u);
+
 const sjsonFidelityControllerSource = await readFile(
   path.join(root, 'src/workspace/topology-edit-3d-sjson-fidelity-controller.js'),
   'utf8',
@@ -123,7 +183,7 @@ for (const packageName of ['react', 'react-dom', 'zustand', 'lucide-react', '@re
   assert.equal(declaredPackages.has(packageName), false, `${packageName} is a removed legacy UI dependency.`);
 }
 
-console.log('Advanced four-tab shell and benchmark registry reconciliation passed.');
+console.log('Advanced four-tab shell, additive Load Calc navigation and benchmark registry reconciliation passed.');
 
 async function pathExists(targetPath) {
   try {
