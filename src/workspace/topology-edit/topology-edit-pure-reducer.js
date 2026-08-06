@@ -6,6 +6,9 @@ import {
   applyTopologyEditInlineComponent,
 } from './topology-edit-inline-component-command.js';
 import {
+  applyTopologyEditBranchComponent,
+} from './topology-edit-branch-component-command.js';
+import {
   assertCanonicalTopologyHash,
   canonicalTopologyStateHash,
   finalizeCanonicalTopology,
@@ -255,6 +258,7 @@ const REDUCERS = Object.freeze({
   BRIDGE_GAP: addEdge, ADD_STRAIGHT_ELEMENT: addEdge,
   SPLIT_EDGE: splitEdge,
   INSERT_INLINE_COMPONENT: applyTopologyEditInlineComponent,
+  INSERT_BRANCH_COMPONENT: applyTopologyEditBranchComponent,
   DISCONNECT_ENDPOINT: disconnectEndpoint,
   DELETE_EDGE: deleteEdge, ADD_BEND_DEFINITION: addBendDefinition,
   ADD_JUNCTION_DEFINITION: addJunctionDefinition, TRIM_EDGE: trimEdge,

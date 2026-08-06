@@ -158,6 +158,62 @@ function validateInline(context) {
   }
   return findings;
 }
+function validateBranchComponent(candidate) {
+  const delta = candidate.topologyDelta;
+  const payload = candidate.resolvedPayload
+    ?? candidate.resolvedCommand?.payload
+    ?? candidate.request?.payload
+    ?? {};
+  const nodes = (candidate.canonicalTopology.nodes ?? []).filter((row) => (
+    row.createdByCommandId === candidate.commandId
+    && row.topologyOperation === 'INSERT_BRANCH_COMPONENT'
+  ));
+  const edges = (candidate.canonicalTopology.edges ?? []).filter((row) => (
+    row.createdByCommandId === candidate.commandId
+    && row.topologyOperation === 'INSERT_BRANCH_COMPONENT'
+  ));
+  const junctions = (candidate.canonicalTopology.junctions ?? []).filter((row) => (
+    row.createdByCommandId === candidate.commandId
+    && row.topologyOperation === 'INSERT_BRANCH_COMPONENT'
+  ));
+  const validDelta = delta.nodes.addedIds.length === 3
+    && delta.nodes.removedIds.length === 0
+    && delta.edges.addedIds.length === 4
+    && delta.edges.removedIds.length === 1
+    && delta.junctions.addedIds.length === 1
+    && delta.junctions.removedIds.length === 0
+    && noChanges(delta, ['supports', 'boundaries', 'rigids', 'bends']);
+  const component = edges.find((edge) => edge.branchComponentRole === 'BRANCH_COMPONENT');
+  const junction = junctions[0];
+  const incident = component && junction
+    ? edges.filter((edge) => (
+      edge.fromNodeId === junction.nodeId || edge.toNodeId === junction.nodeId
+    ))
+    : [];
+  const exactAuthority = component
+    && component.catalogueHash === payload.catalogueHash
+    && component.catalogueSourceHash === payload.catalogueSourceHash
+    && component.catalogueRecordId === payload.catalogueRecordId
+    && component.catalogueRecordHash === payload.catalogueRecordHash
+    && component.branchGeometryHash === payload.geometry?.geometryHash
+    && junction?.catalogueRecordHash === payload.catalogueRecordHash
+    && junction?.branchComponentRequestHash === payload.requestHash;
+  const valid = validDelta
+    && nodes.length === 3
+    && edges.length === 4
+    && junctions.length === 1
+    && incident.length === 3
+    && exactAuthority;
+  return valid ? [] : [finding(
+    'INSERT_BRANCH_COMPONENT_DELTA_INVALID',
+    'INSERT_BRANCH_COMPONENT must replace one host edge with exact degree-three catalogue-bound branch topology.',
+    [
+      ...changes(delta.nodes),
+      ...changes(delta.edges),
+      ...changes(delta.junctions),
+    ],
+  )];
+}
 function validateDisconnect(context) {
   const { delta, additionsByCommand, nodeChanges, edgeChanges, otherChanges } = context;
   const findings = [];
@@ -223,6 +279,7 @@ const VALIDATORS = Object.freeze({
   MOVE_NODE: validateMove, MERGE_NODES: validateMerge,
   BRIDGE_GAP: validateAddedEdge, ADD_STRAIGHT_ELEMENT: validateAddedEdge,
   SPLIT_EDGE: validateSplit, INSERT_INLINE_COMPONENT: validateInline,
+  INSERT_BRANCH_COMPONENT: validateBranchComponent,
   DISCONNECT_ENDPOINT: validateDisconnect,
   DELETE_EDGE: validateDelete, ADD_BEND_DEFINITION: validateBendDefinition,
   ADD_JUNCTION_DEFINITION: validateJunctionDefinition, TRIM_EDGE: validateTrim,
@@ -231,6 +288,11 @@ export function validateTopologyEditCommandEffect(candidate) {
   const validator = VALIDATORS[candidate.commandType];
   if (!validator) return [finding('COMMAND_TYPE_UNSUPPORTED',
     `Unsupported command type ${candidate.commandType}.`, [candidate.commandType])];
-  return ['ADD_BEND_DEFINITION', 'ADD_JUNCTION_DEFINITION', 'TRIM_EDGE'].includes(candidate.commandType)
+  return [
+    'ADD_BEND_DEFINITION',
+    'ADD_JUNCTION_DEFINITION',
+    'INSERT_BRANCH_COMPONENT',
+    'TRIM_EDGE',
+  ].includes(candidate.commandType)
     ? validator(candidate) : validator(effectContext(candidate));
 }

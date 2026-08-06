@@ -1,5 +1,8 @@
 /** Immutable request contracts for governed topology-edit native commands. */
 import { deepFreeze, semanticHash } from '../../core/shared-piping-model/index.js';
+import {
+  normalizeTopologyEditBranchComponentRequest,
+} from './topology-edit-branch-component-command.js';
 
 export const TOPOLOGY_EDIT_COMMAND_REQUEST_SCHEMA = 'TopologyEditCommandRequest.v1';
 export const TOPOLOGY_EDIT_RESOLVED_COMMAND_SCHEMA = 'TopologyEditResolvedCommand.v1';
@@ -12,6 +15,7 @@ export const TOPOLOGY_EDIT_WAVE3_ENGINEERING_COMMANDS = Object.freeze([
 ]);
 export const TOPOLOGY_EDIT_PROFESSIONAL_COMMANDS = Object.freeze([
   'INSERT_INLINE_COMPONENT',
+  'INSERT_BRANCH_COMPONENT',
 ]);
 // Compatibility alias retained for the merged Wave 3B controller surface.
 export const TOPOLOGY_EDIT_AUTOFIX_COMMANDS = TOPOLOGY_EDIT_WAVE3_ENGINEERING_COMMANDS;
@@ -363,6 +367,7 @@ const PAYLOAD_NORMALIZERS = Object.freeze({
   DELETE_EDGE: normalizeDelete, ADD_BEND_DEFINITION: normalizeBend,
   ADD_JUNCTION_DEFINITION: normalizeJunction, TRIM_EDGE: normalizeTrim,
   INSERT_INLINE_COMPONENT: normalizeInlineComponent,
+  INSERT_BRANCH_COMPONENT: normalizeTopologyEditBranchComponentRequest,
 });
 function normalizePayload(commandType, value) {
   const payload = immutableJson(value ?? {}, `${commandType} payload`);

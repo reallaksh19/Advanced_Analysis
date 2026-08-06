@@ -13,6 +13,11 @@ import {
   topologyEditValveAssemblyDefaultProperties,
 } from './topology-edit-authoring-valve-assembly.js';
 import {
+  deriveTopologyEditBranchAuthoringTarget,
+  planTopologyEditBranchAuthoringOperation,
+  topologyEditBranchAuthoringDefaultProperties,
+} from './topology-edit-authoring-branch.js';
+import {
   topologyEditOperationReference,
 } from './topology-edit-operation-graph.js';
 import {
@@ -44,6 +49,13 @@ export function createTopologyEditAuthoringOperationPlan(input = {}) {
       catalogue: input.catalogue,
     });
   }
+  if (session.tool === 'BRANCH') {
+    return planTopologyEditBranchAuthoringOperation({
+      topology,
+      authoringSession: session,
+      catalogue: input.catalogue,
+    });
+  }
   if (INLINE_TOOLS.has(session.tool)) {
     return planTopologyEditInlineAuthoringOperation({
       topology,
@@ -66,6 +78,12 @@ export function deriveTopologyEditAuthoringTarget(input = {}) {
   const tool = String(input.tool ?? '').trim().toUpperCase();
   if (tool === 'VALVE_ASSEMBLY') {
     return deriveTopologyEditValveAssemblyTarget({
+      topology,
+      edgeId: input.edgeId,
+    });
+  }
+  if (tool === 'BRANCH') {
+    return deriveTopologyEditBranchAuthoringTarget({
       topology,
       edgeId: input.edgeId,
     });
@@ -118,6 +136,17 @@ export function topologyEditAuthoringDefaultProperties(input = {}) {
       upstreamFlangeRecordId: input.upstreamFlangeRecordId,
       downstreamFlangeRecordId: input.downstreamFlangeRecordId,
       stationMm: input.stationMm,
+    });
+  }
+  if (session.tool === 'BRANCH') {
+    return topologyEditBranchAuthoringDefaultProperties({
+      topology,
+      authoringSession: session,
+      catalogue: input.catalogue,
+      catalogueRecordId: input.catalogueRecordId,
+      stationMm: input.stationMm,
+      clockingDeg: input.clockingDeg,
+      branchPipeLengthMm: input.branchPipeLengthMm,
     });
   }
   if (INLINE_TOOLS.has(session.tool)) {

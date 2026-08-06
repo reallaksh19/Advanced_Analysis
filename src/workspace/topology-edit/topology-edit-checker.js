@@ -273,7 +273,9 @@ function pairGeometryIssues(canonical, graph, policy) {
         issues.push(pairIssue('CENTERLINE_CLASH', 'HIGH', a, b, separation,
           `Edge centerlines are ${separation.toFixed(2)}mm apart.`));
       }
-      const required = requiredPhysicalClearance(a, b, policy.physicalClearanceMm);
+      const required = governedBranchMatingPair(a, b)
+        ? null
+        : requiredPhysicalClearance(a, b, policy.physicalClearanceMm);
       if (required !== null && separation < required) {
         issues.push(pairIssue('PHYSICAL_CLEARANCE_CLASH', 'HIGH', a, b, separation,
           `Physical clearance ${separation.toFixed(2)}mm is below ${required.toFixed(2)}mm.`));
@@ -438,6 +440,19 @@ function isPipe(edge) {
 function shareNode(a, b) {
   return a.fromNodeId === b.fromNodeId || a.fromNodeId === b.toNodeId
     || a.toNodeId === b.fromNodeId || a.toNodeId === b.toNodeId;
+}
+
+function governedBranchMatingPair(a, b) {
+  const operationId = String(a.branchComponentOperationId ?? '').trim();
+  if (!operationId || operationId !== String(b.branchComponentOperationId ?? '').trim()) {
+    return false;
+  }
+  const roles = new Set([
+    String(a.branchComponentRole ?? '').toUpperCase(),
+    String(b.branchComponentRole ?? '').toUpperCase(),
+  ]);
+  return roles.has('BRANCH_PIPE')
+    && (roles.has('HOST_FROM') || roles.has('HOST_TO'));
 }
 
 function collinearOverlap(a, b, tolerance) {
