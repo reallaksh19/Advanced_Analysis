@@ -239,3 +239,20 @@ export {
   deriveInputXmlLinearCase,
   deriveInputXmlLinearCases,
 } from './inputxml-linear-derived-cases.js';
+
+export {
+  INPUTXML_LINEAR_B31_EVALUATION_KEYS,
+  INPUTXML_LINEAR_B31_EVALUATION_SCHEMA,
+  INPUTXML_LINEAR_B31_RESULT_KEYS,
+  InputXmlLinearB31EvaluationError,
+  inputXmlB31EvidenceProjection,
+  inputXmlB31SemanticProjection,
+  requireInputXmlLinearB31Evaluation,
+  sealInputXmlLinearB31Evaluation,
+} from './inputxml-linear-b31-evaluation-contract.js';
+
+export {
+  INPUTXML_LINEAR_B31_CHECK_KEYS,
+  INPUTXML_LINEAR_B31_EVALUATION_REQUEST_SCHEMA,
+  evaluateInputXmlLinearB31,
+} from './inputxml-linear-b31-evaluation.js';
