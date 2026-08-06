@@ -83,7 +83,17 @@ test('valve HUD resolves one exact record and exposes only valve fields', async 
     entityType: 'VALVE',
     diameterMm: 100,
     outsideDiameterMm: 114.3,
-  }, await catalogue());
+  }, await catalogue(), {
+    entities: [{
+      entityId: 'V-001',
+      properties: {
+        attributes: {
+          VALVE_TYPE: 'GATE',
+          FACE_TO_FACE_MM: 600,
+        },
+      },
+    }],
+  });
 
   assert.equal(context.status, 'RESOLVED');
   assert.equal(context.recommendedRecordId, 'VALVE-DN100-GATE-600-A');
@@ -170,7 +180,10 @@ test('available but mismatched source evidence is incompatible rather than neare
   }, await catalogue());
 
   assert.equal(context.status, 'INCOMPATIBLE');
-  assert.deepEqual(context.candidateRecordIds, ['VALVE-DN100-GATE-600-A']);
+  assert.deepEqual(context.candidateRecordIds, [
+    'VALVE-DN100-GATE-600-A',
+    'VALVE-DN100-GLOBE-600-B',
+  ]);
   assert.equal(context.recommendedRecordId, null);
   assert.equal(context.exactCandidateCount, 0);
 });
@@ -230,5 +243,6 @@ test('panel renders a typed HUD and only filtered catalogue choices', async () =
   assert.match(element.innerHTML, /data-field-key="valveFaceToFaceMm"/u);
   assert.doesNotMatch(element.innerHTML, /data-field-key="flangeClass"/u);
   assert.match(element.innerHTML, /VALVE-DN100-GATE-600-A/u);
+  assert.match(element.innerHTML, /VALVE-DN100-GLOBE-600-B/u);
   assert.doesNotMatch(element.innerHTML, /FLANGE-DN100-600-RF-A/u);
 });
