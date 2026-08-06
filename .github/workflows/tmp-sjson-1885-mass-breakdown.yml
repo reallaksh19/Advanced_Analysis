@@ -1,4 +1,4 @@
-name: Audit SJSON node and POS schedule trace
+name: Finalize SJSON node and POS schedule authority
 
 on:
   push:
@@ -8,10 +8,10 @@ on:
       - .github/workflows/tmp-sjson-1885-mass-breakdown.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  trace:
+  finalize:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Correct branch, bore and section custody in audit workspace
+      - name: Install permanent branch schedule resolver
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -46,10 +46,11 @@ jobs:
             const dimensions = target.nominalBoreMm == null
               ? null
               : getPipeDimensions(target.nominalBoreMm, source.directSchedule);
+            const targetNps = dnToNpsLocal(target.nominalBoreMm);
             const packageValid = dimensions?.exact
               && Number.isFinite(dimensions.od)
               && Number.isFinite(dimensions.wt)
-              && Math.abs(Number(dimensions.nps) - Number(dnToNpsLocal(target.nominalBoreMm))) < 1e-9;
+              && Math.abs(Number(dimensions.nps) - Number(targetNps)) < 1e-9;
             const localEntry = ASME_B36_10[String(Math.round(target.nominalBoreMm))];
             const localWallMm = finiteOrNull(localEntry?.schedules?.[source.directSchedule]);
             const localTableValid = finiteOrNull(localEntry?.od) > 0 && localWallMm > 0;
@@ -81,7 +82,7 @@ jobs:
               basis,
               dimensionBasis,
               nominalBoreMm: target.nominalBoreMm,
-              nps: dnToNpsLocal(target.nominalBoreMm),
+              nps: targetNps,
               outsideDiameterMm: packageValid
                 ? dimensions.od
                 : (localTableValid ? localEntry.od : (fittingSectionValid ? fittingOdMm : null)),
@@ -93,7 +94,7 @@ jobs:
           }
 
           function dnToNpsLocal(boreMm) {
-            const map = { 25: 1, 40: 1.5, 50: 2, 80: 3, 100: 4, 150: 6, 200: 8, 250: 10, 300: 12, 400: 16, 600: 24 };
+            const map = { 15: 0.5, 20: 0.75, 25: 1, 40: 1.5, 50: 2, 80: 3, 100: 4, 150: 6, 200: 8, 250: 10, 300: 12, 350: 14, 400: 16, 450: 18, 500: 20, 600: 24, 750: 30, 900: 36 };
             return map[Math.round(Number(boreMm))] ?? null;
           }
           '''
@@ -153,24 +154,363 @@ jobs:
               raise SystemExit('Expected compareRank block not found.')
           path.write_text(text.replace(old_compare, new_compare, 1))
           PY
-      - name: Materialize exact benchmark source
+      - name: Route production runner through branch schedule authority
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/empirical-sjson-1885-configurable-screening-run.mjs')
+          text = path.read_text()
+          import_line = "import { buildBranchScheduleIndex } from '../src/calc-workspace/cii-standalone-port/core/branch-schedule-resolution.js';\n"
+          marker = "import { fileURLToPath } from 'node:url';\n"
+          if import_line not in text:
+              text = text.replace(marker, marker + import_line, 1)
+          text = text.replace(
+            "const sourceIndex = indexEnrichedSource(enriched, profile);",
+            "const branchScheduleIndex = buildBranchScheduleIndex(enriched);\nconst sourceIndex = indexEnrichedSource(enriched, profile, branchScheduleIndex);",
+            1,
+          )
+          text = text.replace(
+            "function indexEnrichedSource(root, config) {\n  const componentRecords = [];",
+            "function indexEnrichedSource(root, config, branchScheduleIndex) {\n  const componentRecords = [];\n  const scheduleResolutionByItem = new Map(branchScheduleIndex.items.map((record) => [record.item, branchScheduleIndex.resolutions.get(record)]));",
+            1,
+          )
+          text = text.replace(
+            "        sourceOrder: sourceOrder++,\n        name,",
+            "        sourceOrder: sourceOrder++,\n        sourceItem: value,\n        scheduleResolution: scheduleResolutionByItem.get(value) || null,\n        name,",
+            1,
+          )
+          old_section = '''function sectionProperties(edge, source, config) {
+            const odMm = positive(edge.diameterMm) ? edge.diameterMm : source?.pipeOdMm;
+            const wallMm = positive(edge.wallMm) ? edge.wallMm : source?.wallThicknessMm;
+            if (!positive(odMm) || !positive(wallMm) || odMm <= 2 * wallMm) throw new Error(`Invalid section for ${edge.id}: OD=${odMm}, wall=${wallMm}`);
+            const odM = odMm / 1000;
+            const idM = (odMm - 2 * wallMm) / 1000;
+            return {
+              odM,
+              idM,
+              areaM2: Math.PI / 4 * (odM ** 2 - idM ** 2),
+              inertiaM4: Math.PI / 64 * (odM ** 4 - idM ** 4),
+              densityKgM3: source?.materialDensityKgM3 || config.weight.pipeMetalDensityKgM3,
+              E: positive(edge.modulusPa) ? edge.modulusPa : config.material.elasticModulusPa,
+            };
+          }
+          '''
+          new_section = '''function sectionProperties(edge, source, config) {
+            const resolution = source?.scheduleResolution;
+            if (resolution && resolution.status !== 'RESOLVED_EXACT') {
+              throw new Error(`Unresolved branch schedule/section for ${edge.id}: ${resolution.status}`);
+            }
+            const odMm = positive(resolution?.outsideDiameterMm)
+              ? resolution.outsideDiameterMm
+              : (positive(edge.diameterMm) ? edge.diameterMm : source?.pipeOdMm);
+            const wallMm = positive(resolution?.wallThicknessMm)
+              ? resolution.wallThicknessMm
+              : (positive(edge.wallMm) ? edge.wallMm : source?.wallThicknessMm);
+            if (!positive(odMm) || !positive(wallMm) || odMm <= 2 * wallMm) throw new Error(`Invalid section for ${edge.id}: OD=${odMm}, wall=${wallMm}`);
+            const odM = odMm / 1000;
+            const idM = (odMm - 2 * wallMm) / 1000;
+            return {
+              odM,
+              idM,
+              areaM2: Math.PI / 4 * (odM ** 2 - idM ** 2),
+              inertiaM4: Math.PI / 64 * (odM ** 4 - idM ** 4),
+              densityKgM3: source?.materialDensityKgM3 || config.weight.pipeMetalDensityKgM3,
+              E: positive(edge.modulusPa) ? edge.modulusPa : config.material.elasticModulusPa,
+              schedule: resolution?.schedule || null,
+              dimensionBasis: resolution?.dimensionBasis || 'LEGACY_SOURCE_SECTION',
+            };
+          }
+          '''
+          if old_section not in text:
+              raise SystemExit('Expected sectionProperties block not found.')
+          text = text.replace(old_section, new_section, 1)
+          source_marker = "    sourceInsulationPositiveCount: sourceIndex.componentRecords.filter((record) => positive(record.insulationThicknessMm)).length,\n"
+          source_insert = source_marker + "    branchScheduleResolution: branchScheduleIndex.summary,\n"
+          if 'branchScheduleResolution: branchScheduleIndex.summary' not in text:
+              text = text.replace(source_marker, source_insert, 1)
+          warning_marker = "    'Input XML density values are converted from configured kg/cm3 to kg/m3 before fluid mass is calculated.',\n"
+          schedule_warning = "    'Element OD and wall are resolved node/POS-wise from branch-local fitting schedule evidence before weight and stiffness calculations.',\n"
+          if schedule_warning not in text:
+              text = text.replace(warning_marker, warning_marker + schedule_warning, 1)
+          path.write_text(text)
+          PY
+      - name: Extend POS trace fields
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/empirical-sjson-1885-node-pos-trace.mjs')
+          text = path.read_text()
+          text = text.replace(
+            "    scheduleResolutionBasis: resolution?.basis || 'SOURCE_RECORD_UNMATCHED',\n",
+            "    scheduleResolutionBasis: resolution?.basis || 'SOURCE_RECORD_UNMATCHED',\n    dimensionResolutionBasis: resolution?.dimensionBasis || 'UNRESOLVED',\n    scheduleSourceNominalBoreMm: resolution?.sourceNominalBoreMm ?? null,\n",
+            1,
+          )
+          text = text.replace(
+            "'NPS','DN mm','Schedule','Resolution Status','Resolution Basis',",
+            "'NPS','DN mm','Schedule','Resolution Status','Resolution Basis','Dimension Basis','Schedule Source DN mm',",
+            1,
+          )
+          text = text.replace(
+            "row.sourceBranchPath,row.sourceGlobalIndex,row.nps,row.nominalBoreMm,row.schedule,row.scheduleResolutionStatus,\n    row.scheduleResolutionBasis,row.scheduleSourceName,",
+            "row.sourceBranchPath,row.sourceGlobalIndex,row.nps,row.nominalBoreMm,row.schedule,row.scheduleResolutionStatus,\n    row.scheduleResolutionBasis,row.dimensionResolutionBasis,row.scheduleSourceNominalBoreMm,row.scheduleSourceName,",
+            1,
+          )
+          path.write_text(text)
+          PY
+      - name: Materialize exact source and calculate
         run: |
           git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson > /tmp/EnrichedSjson
           git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson.topology.input.xml > /tmp/EnrichedSjson.topology.input.xml
-      - name: Generate node and POS trace
-        id: trace
-        run: |
           node scripts/empirical-sjson-1885-node-pos-trace.mjs \
             benchmarks/1885Sjson/empirical-screening-profile.config.json \
-            /tmp/EnrichedSjson \
-            /tmp/EnrichedSjson.topology.input.xml \
-            /tmp/node-pos-trace.json \
-            /tmp/node-pos-trace.csv
-      - name: Upload trace
+            /tmp/EnrichedSjson /tmp/EnrichedSjson.topology.input.xml \
+            /tmp/node-pos-a.json /tmp/node-pos-a.csv
+          node scripts/empirical-sjson-1885-node-pos-trace.mjs \
+            benchmarks/1885Sjson/empirical-screening-profile.config.json \
+            /tmp/EnrichedSjson /tmp/EnrichedSjson.topology.input.xml \
+            /tmp/node-pos-b.json /tmp/node-pos-b.csv
+          cmp /tmp/node-pos-a.json /tmp/node-pos-b.json
+          cmp /tmp/node-pos-a.csv /tmp/node-pos-b.csv
+          node scripts/empirical-sjson-1885-configurable-screening-run.mjs \
+            benchmarks/1885Sjson/empirical-screening-profile.config.json \
+            /tmp/EnrichedSjson /tmp/EnrichedSjson.topology.input.xml /tmp/result-a.json
+          node scripts/empirical-sjson-1885-configurable-screening-run.mjs \
+            benchmarks/1885Sjson/empirical-screening-profile.config.json \
+            /tmp/EnrichedSjson /tmp/EnrichedSjson.topology.input.xml /tmp/result-b.json
+          cmp /tmp/result-a.json /tmp/result-b.json
+          cp /tmp/node-pos-a.json benchmarks/1885Sjson/empirical-screening-node-position-trace.configurable.json
+          cp /tmp/node-pos-a.csv benchmarks/1885Sjson/empirical-screening-node-position-trace.configurable.csv
+          cp /tmp/result-a.json benchmarks/1885Sjson/empirical-screening-result.configurable.json
+      - name: Generate support CSV, evidence, check and permanent workflow
+        run: |
+          python - <<'PY'
+          import csv, json
+          from pathlib import Path
+          result = json.loads(Path('/tmp/result-a.json').read_text())
+          trace = json.loads(Path('/tmp/node-pos-a.json').read_text())
+          out = Path('benchmarks/1885Sjson/empirical-screening-result.configurable.csv')
+          with out.open('w', newline='') as handle:
+              writer = csv.writer(handle)
+              writer.writerow(['Site ID','Support Tag','Node ID','X mm','Y mm','Z mm','Capabilities','Fx thermal kN','Fy thermal kN','Fz weight kN','Vector screening kN'])
+              for row in result['supportRows']:
+                  p = row['sourceCoordinateMm']; r = row['reactionsKn']
+                  writer.writerow([row['siteId'],row['supportTag'],row['nodeId'],p['x'],p['y'],p['z'],'|'.join(row['capabilities']),r['FxThermal'],r['FyThermal'],r['FzWeight'],row['componentVectorMagnitudeKn']])
+
+          sample_ids = ['POS-001','POS-003','POS-028','POS-030','POS-105','POS-107']
+          sample = {row['positionRef']: row for row in trace['rows'] if row['positionRef'] in sample_ids}
+          evidence = f'''# SJSON 1885 configurable empirical screening evidence
+
+**Source commit:** `{result['source']['commit']}`  
+**Method status:** `{result['status']}`  
+**Trace schema:** `{trace['schema']}`
+
+## Node/POS property authority
+
+- Existing `runStandaloneResolverJsonTrace` remains the upstream branch/POS custody path.
+- Schedule is parsed from fitting engineering text and inherited only within the enclosing branch.
+- Candidate fitting selection is deterministic and prioritizes matching nominal bore before source order and geometric distance.
+- OD/wall are resolved for the target POS bore through the exact repository pipe data or local ASME B36.10 table.
+- Where the schedule database has no exact row, the selected same-branch, same-bore fitting's enriched OD/wall is used.
+- Generic Sch 40 fallback is prohibited.
+
+## Resolution summary
+
+| Metric | Value |
+|---|---:|
+| POS rows | {trace['summary']['topologyElementCount']} |
+| Resolved rows | {trace['summary']['resolvedRowCount']} |
+| Unresolved rows | {trace['summary']['unresolvedRowCount']} |
+| DN150 / Sch 80 rows | {trace['summary']['sch80Dn150RowCount']} |
+| Legacy 28.263584 kg/m rows | {trace['summary']['legacySch40MetalRateRowCount']} |
+| Total model mass | {result['verticalWeight']['totalModelMassKg']:.6f} kg |
+| Total vertical weight | {result['verticalWeight']['totalWeightKn']:.6f} kN |
+| Vertical equilibrium error | {result['verticalWeight']['equilibriumErrorKn']:.9f} kN |
+
+## Representative populated rows
+
+| POS | Nodes | NPS | Sch | OD mm | Wall mm | Metal kg/m | Fluid kg/m | Insulation kg/m | Total kg | Weight kN | Schedule source |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+'''
+          for pid in sample_ids:
+              row = sample[pid]
+              evidence += f"| {pid} | {row['fromNode']}→{row['toNode']} | {row['nps']} | {row['schedule']} | {row['outsideDiameterMm']:.4f} | {row['wallThicknessMm']:.4f} | {row['kgPerM']['metal']:.6f} | {row['kgPerM']['fluid']:.6f} | {row['kgPerM']['insulation']:.6f} | {row['kg']['total']:.6f} | {row['verticalWeightKn']:.6f} | {row['scheduleSourceName']} |\n"
+          evidence += '''
+## Qualification boundary
+
+The vertical distribution remains graph-tributary screening, not a flexural beam/frame solution. Thermal X and Y are independent scalar compatibility screens. Pressure, friction, gaps and complete operating-load coupling remain excluded.
+'''
+          Path('docs/evidence/SJSON_1885_CONFIGURABLE_SCREENING.md').write_text(evidence)
+
+          key_sites = ['N10230','N20120','N50120','N70040','N60080']
+          expected_sites = {row['siteId']: row['reactionsKn'] for row in result['supportRows'] if row['siteId'] in key_sites}
+          expected = {
+              'mass': result['verticalWeight']['totalModelMassKg'],
+              'weight': result['verticalWeight']['totalWeightKn'],
+              'thermalX': result['thermalX']['maxAbsReactionKn'],
+              'thermalY': result['thermalY']['maxAbsReactionKn'],
+              'maxSite': result['componentVectorScreening']['maximumSiteId'],
+              'maxVector': result['componentVectorScreening']['maximumMagnitudeKn'],
+              'sites': expected_sites,
+          }
+          check = f'''import {{ readFile }} from 'node:fs/promises';
+const [resultPath, tracePath] = process.argv.slice(2);
+if (!resultPath || !tracePath) throw new Error('Usage: node empirical-sjson-1885-configurable-screening-check.mjs <result.json> <node-pos-trace.json>');
+const result = JSON.parse(await readFile(resultPath, 'utf8'));
+const trace = JSON.parse(await readFile(tracePath, 'utf8'));
+const expected = {json.dumps(expected, indent=2)};
+assertEqual(result.schema, 'empirical-sjson-screening-result/v1', 'result schema');
+assertEqual(result.status, 'EXPERIMENTAL_CONFIGURABLE_SCREENING', 'result status');
+assertEqual(result.qualification.anchorSynthesized, false, 'anchor synthesis');
+assertEqual(result.source.commit, '07ce017eb7113517cc032771f7717f88c0a93d4c', 'source commit');
+assertEqual(result.sourceResolution.inputXmlElements, 163, 'element count');
+assertEqual(result.sourceResolution.inputXmlNodes, 164, 'node count');
+assertEqual(result.sourceResolution.physicalSupportSites, 36, 'support count');
+assertEqual(result.sourceResolution.inputXmlFluidDensityToKgM3, 1000000, 'density conversion');
+assertClose(result.sourceResolution.resolvedFluidDensityKgM3.min, 300, 1e-12, 'fluid density');
+assertEqual(result.sourceResolution.branchScheduleResolution.statusCounts.RESOLVED_EXACT, 279, 'source schedule resolutions');
+assertClose(result.verticalWeight.totalModelMassKg, expected.mass, 1e-6, 'total mass');
+assertClose(result.verticalWeight.totalWeightKn, expected.weight, 1e-6, 'total weight');
+assertClose(result.verticalWeight.reactionSumKn, result.verticalWeight.totalWeightKn, 1e-9, 'vertical equilibrium');
+assertClose(result.verticalWeight.equilibriumErrorKn, 0, 1e-9, 'vertical equilibrium error');
+assertClose(result.thermalX.maxAbsReactionKn, expected.thermalX, 2e-5, 'thermal X maximum');
+assertClose(result.thermalY.maxAbsReactionKn, expected.thermalY, 2e-5, 'thermal Y maximum');
+assertEqual(result.supportRows.length, 36, 'support row count');
+const supportRows = new Map(result.supportRows.map((row) => [row.siteId, row]));
+for (const [siteId, reaction] of Object.entries(expected.sites)) {{
+  const row = supportRows.get(siteId);
+  if (!row) throw new Error(`Missing support row ${{siteId}}.`);
+  for (const [key, value] of Object.entries(reaction)) assertClose(row.reactionsKn[key], value, 0.001, `${{siteId}} ${{key}}`);
+}}
+assertEqual(result.componentVectorScreening.maximumSiteId, expected.maxSite, 'maximum vector site');
+assertClose(result.componentVectorScreening.maximumMagnitudeKn, expected.maxVector, 0.001, 'maximum vector');
+assertEqual(trace.schema, 'empirical-sjson-node-position-property-trace/v1', 'trace schema');
+assertEqual(trace.status, 'RESOLVED_EXACT', 'trace status');
+assertEqual(trace.summary.topologyElementCount, 163, 'trace element count');
+assertEqual(trace.summary.resolvedRowCount, 163, 'resolved POS count');
+assertEqual(trace.summary.unresolvedRowCount, 0, 'unresolved POS count');
+assertEqual(trace.summary.sch80Dn150RowCount, 95, 'DN150 Sch80 count');
+assertEqual(trace.summary.legacySch40MetalRateRowCount, 0, 'legacy Sch40 mass rate count');
+const pos = new Map(trace.rows.map((row) => [row.positionRef, row]));
+assertSection(pos, 'POS-003', 6, '80', 168.275, 10.9728, 42.566877098);
+assertSection(pos, 'POS-028', 3, '80', 88.9, 7.62, 15.27419025);
+assertSection(pos, 'POS-107', 8, '100', 219.1, 12.7, 64.644702829);
+for (const row of trace.rows) {{
+  const rates = row.kgPerM;
+  const masses = row.kg;
+  assertClose(rates.total, rates.metal + rates.fluid + rates.insulation, 1e-6, `${{row.positionRef}} kg/m closure`);
+  assertClose(masses.total, masses.metal + masses.fluid + masses.insulation, 1e-6, `${{row.positionRef}} kg closure`);
+}}
+console.log('SJSON 1885 configurable empirical screening and node/POS trace qualification passed.');
+function assertSection(rows, id, nps, schedule, od, wall, metalRate) {{
+  const row = rows.get(id); if (!row) throw new Error(`Missing ${{id}}.`);
+  assertEqual(row.nps, nps, `${{id}} NPS`); assertEqual(row.schedule, schedule, `${{id}} schedule`);
+  assertClose(row.outsideDiameterMm, od, 0.001, `${{id}} OD`); assertClose(row.wallThicknessMm, wall, 1e-6, `${{id}} wall`);
+  assertClose(row.kgPerM.metal, metalRate, 1e-6, `${{id}} metal kg/m`);
+}}
+function assertEqual(actual, expected, label) {{ if (actual !== expected) throw new Error(`${{label}}: expected ${{JSON.stringify(expected)}}, received ${{JSON.stringify(actual)}}.`); }}
+function assertClose(actual, expected, tolerance, label) {{ if (!Number.isFinite(actual) || Math.abs(actual - expected) > tolerance) throw new Error(`${{label}}: expected ${{expected}} ± ${{tolerance}}, received ${{actual}}.`); }}
+'''
+          Path('scripts/empirical-sjson-1885-configurable-screening-check.mjs').write_text(check)
+
+          workflow = '''name: SJSON 1885 configurable empirical screening
+
+on:
+  push:
+    branches: [agent/sjson-1885-configurable-screening]
+    paths:
+      - benchmarks/1885Sjson/empirical-screening-profile.config.json
+      - benchmarks/1885Sjson/empirical-screening-result.configurable.json
+      - benchmarks/1885Sjson/empirical-screening-result.configurable.csv
+      - benchmarks/1885Sjson/empirical-screening-node-position-trace.configurable.json
+      - benchmarks/1885Sjson/empirical-screening-node-position-trace.configurable.csv
+      - docs/evidence/SJSON_1885_CONFIGURABLE_SCREENING.md
+      - scripts/empirical-sjson-1885-configurable-screening-run.mjs
+      - scripts/empirical-sjson-1885-configurable-screening-check.mjs
+      - scripts/empirical-sjson-1885-node-pos-trace.mjs
+      - src/calc-workspace/cii-standalone-port/core/branch-schedule-resolution.js
+      - .github/workflows/sjson-1885-configurable-screening.yml
+  pull_request:
+    paths:
+      - benchmarks/1885Sjson/empirical-screening-profile.config.json
+      - benchmarks/1885Sjson/empirical-screening-result.configurable.json
+      - benchmarks/1885Sjson/empirical-screening-result.configurable.csv
+      - benchmarks/1885Sjson/empirical-screening-node-position-trace.configurable.json
+      - benchmarks/1885Sjson/empirical-screening-node-position-trace.configurable.csv
+      - docs/evidence/SJSON_1885_CONFIGURABLE_SCREENING.md
+      - scripts/empirical-sjson-1885-configurable-screening-run.mjs
+      - scripts/empirical-sjson-1885-configurable-screening-check.mjs
+      - scripts/empirical-sjson-1885-node-pos-trace.mjs
+      - src/calc-workspace/cii-standalone-port/core/branch-schedule-resolution.js
+      - .github/workflows/sjson-1885-configurable-screening.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sjson-1885-configurable-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  calculate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Materialize exact enriched benchmark sources
+        run: |
+          git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson > /tmp/EnrichedSjson
+          git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson.topology.input.xml > /tmp/EnrichedSjson.topology.input.xml
+      - name: Recalculate node/POS trace and screening twice
+        run: |
+          node scripts/empirical-sjson-1885-node-pos-trace.mjs benchmarks/1885Sjson/empirical-screening-profile.config.json /tmp/EnrichedSjson /tmp/EnrichedSjson.topology.input.xml /tmp/trace-a.json /tmp/trace-a.csv
+          node scripts/empirical-sjson-1885-node-pos-trace.mjs benchmarks/1885Sjson/empirical-screening-profile.config.json /tmp/EnrichedSjson /tmp/EnrichedSjson.topology.input.xml /tmp/trace-b.json /tmp/trace-b.csv
+          cmp /tmp/trace-a.json /tmp/trace-b.json
+          cmp /tmp/trace-a.csv /tmp/trace-b.csv
+          cmp /tmp/trace-a.json benchmarks/1885Sjson/empirical-screening-node-position-trace.configurable.json
+          cmp /tmp/trace-a.csv benchmarks/1885Sjson/empirical-screening-node-position-trace.configurable.csv
+          node scripts/empirical-sjson-1885-configurable-screening-run.mjs benchmarks/1885Sjson/empirical-screening-profile.config.json /tmp/EnrichedSjson /tmp/EnrichedSjson.topology.input.xml /tmp/result-a.json
+          node scripts/empirical-sjson-1885-configurable-screening-run.mjs benchmarks/1885Sjson/empirical-screening-profile.config.json /tmp/EnrichedSjson /tmp/EnrichedSjson.topology.input.xml /tmp/result-b.json
+          cmp /tmp/result-a.json /tmp/result-b.json
+          cmp /tmp/result-a.json benchmarks/1885Sjson/empirical-screening-result.configurable.json
+          node scripts/empirical-sjson-1885-configurable-screening-check.mjs /tmp/result-a.json /tmp/trace-a.json
+      - name: Upload calculation evidence
         uses: actions/upload-artifact@v4
         with:
-          name: sjson-1885-node-pos-trace
+          name: empirical-sjson-1885-configurable-screening
           path: |
-            /tmp/node-pos-trace.json
-            /tmp/node-pos-trace.csv
+            /tmp/result-a.json
+            /tmp/trace-a.json
+            /tmp/trace-a.csv
+            benchmarks/1885Sjson/empirical-screening-result.configurable.csv
+            docs/evidence/SJSON_1885_CONFIGURABLE_SCREENING.md
           if-no-files-found: error
+'''
+          Path('.github/workflows/sjson-1885-configurable-screening.yml').write_text(workflow)
+          PY
+      - name: Qualify final package
+        run: |
+          node scripts/empirical-sjson-1885-configurable-screening-check.mjs /tmp/result-a.json /tmp/node-pos-a.json
+          cmp /tmp/result-a.json benchmarks/1885Sjson/empirical-screening-result.configurable.json
+          cmp /tmp/node-pos-a.json benchmarks/1885Sjson/empirical-screening-node-position-trace.configurable.json
+          cmp /tmp/node-pos-a.csv benchmarks/1885Sjson/empirical-screening-node-position-trace.configurable.csv
+      - name: Commit permanent package and remove finalizer
+        run: |
+          rm .github/workflows/tmp-sjson-1885-mass-breakdown.yml
+          git config user.name reallaksh19
+          git config user.email reallaksh19@gmail.com
+          git add .github/workflows/sjson-1885-configurable-screening.yml \
+            benchmarks/1885Sjson/empirical-screening-result.configurable.json \
+            benchmarks/1885Sjson/empirical-screening-result.configurable.csv \
+            benchmarks/1885Sjson/empirical-screening-node-position-trace.configurable.json \
+            benchmarks/1885Sjson/empirical-screening-node-position-trace.configurable.csv \
+            docs/evidence/SJSON_1885_CONFIGURABLE_SCREENING.md \
+            scripts/empirical-sjson-1885-configurable-screening-run.mjs \
+            scripts/empirical-sjson-1885-configurable-screening-check.mjs \
+            scripts/empirical-sjson-1885-node-pos-trace.mjs \
+            src/calc-workspace/cii-standalone-port/core/branch-schedule-resolution.js \
+            .github/workflows/tmp-sjson-1885-mass-breakdown.yml
+          git commit -m "Resolve empirical sections from node and POS schedule trace"
+          git push origin HEAD:agent/sjson-1885-configurable-screening
