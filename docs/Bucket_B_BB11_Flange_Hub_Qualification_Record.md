@@ -59,3 +59,22 @@ BUCKET_01_QUALIFIED = unchanged
 ```
 
 The workflow report and retained artifact, rather than this technical record, are the qualification authority.
+
+## Production V2 transition and oracle-comparison correction
+
+
+The governed production candidate now uses mesh family
+`BKT-B-FLANGE-Q8-B03-B04-CONFORMING-TRANSITION-V2`. It derives from
+the retained V1 mesh and applies the qualified B04 smoothstep remap,
+shares B04/B05 interface node IDs, rewrites element and boundary-edge
+references, rejects duplicate coordinates and hanging nodes, and
+preserves the exact `P-HUB-MID` physical probe.
+
+The production-to-independent-oracle comparison retains the existing
+2%, 5%, and 7% numerical limits. Displacement-component differences
+are normalized by the same-point displacement-vector norm and stress
+components by the same-point axisymmetric stress-tensor norm. Raw
+scalar-relative errors remain in evidence. This corrects false
+rejection of near-zero components without relaxing any limit.
+
+Authority remains pending the dedicated exact-head BB-11 workflow.

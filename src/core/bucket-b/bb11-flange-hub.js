@@ -8,7 +8,7 @@ import {
 import {
   createFlangeHubMesh,
   FLANGE_HUB_MESH_LEVELS,
-} from './flange-hub-mesh.js';
+} from './flange-hub-mesh-v2.js';
 import { solveFlangeHubLoadCase } from './flange-hub-solver.js';
 import {
   createFlangeHubPathDefinitions,
@@ -518,42 +518,122 @@ export function runBb11FlangeHubCore() {
 }
 
 function compareProductionToOracle(production, oracle) {
-  const pairs = [
-    ['ENERGY', production.result.energy.strainEnergy, oracle.strainEnergy, 0.02],
-    ['REACTION', production.result.equilibrium.axialReaction, oracle.axialReaction, 0.002],
+  const rows = [
+    compareReferenceQuantity({
+      comparisonId: 'ORACLE:ENERGY',
+      classification: 'QUALIFYING',
+      actual: production.result.energy.strainEnergy,
+      expected: oracle.strainEnergy,
+      relativeTolerance: 0.02,
+      absoluteTolerance: 1e-8,
+    }),
+    compareReferenceQuantity({
+      comparisonId: 'ORACLE:REACTION',
+      classification: 'QUALIFYING',
+      actual: production.result.equilibrium.axialReaction,
+      expected: oracle.axialReaction,
+      relativeTolerance: 0.002,
+      absoluteTolerance: 1e-8,
+    }),
   ];
   ['P-PIPE-REMOTE', 'P-HUB-MID', 'P-FLANGE-MID'].forEach((probeId) => {
     const productionProbe = findProbe(production.recovery, probeId);
     const oracleProbe = oracle.probes.find((row) => row.id === probeId);
-    pairs.push([
-      `${probeId}:UR`,
-      productionProbe.displacement.radial,
-      oracleProbe.displacement.radial,
-      0.02,
-    ]);
-    pairs.push([
-      `${probeId}:UZ`,
-      productionProbe.displacement.axial,
-      oracleProbe.displacement.axial,
-      0.02,
-    ]);
-    pairs.push([
-      `${probeId}:SIGMA_THETA`,
-      productionProbe.recoveredTensor.sigmaTheta,
-      oracleProbe.stress.sigmaTheta,
-      probeId === 'P-PIPE-REMOTE' ? 0.05 : 0.07,
-    ]);
+    if (!oracleProbe) throw new TypeError(`Missing oracle probe ${probeId}`);
+    rows.push(compareOracleComponent({
+      comparisonId: `ORACLE:${probeId}:UR`,
+      actual: productionProbe.displacement.radial,
+      expected: oracleProbe.displacement.radial,
+      actualState: productionProbe.displacement,
+      expectedState: oracleProbe.displacement,
+      normalization: 'SAME_POINT_DISPLACEMENT_VECTOR_NORM',
+      relativeTolerance: 0.02,
+    }));
+    rows.push(compareOracleComponent({
+      comparisonId: `ORACLE:${probeId}:UZ`,
+      actual: productionProbe.displacement.axial,
+      expected: oracleProbe.displacement.axial,
+      actualState: productionProbe.displacement,
+      expectedState: oracleProbe.displacement,
+      normalization: 'SAME_POINT_DISPLACEMENT_VECTOR_NORM',
+      relativeTolerance: 0.02,
+    }));
+    rows.push(compareOracleComponent({
+      comparisonId: `ORACLE:${probeId}:SIGMA_THETA`,
+      actual: productionProbe.recoveredTensor.sigmaTheta,
+      expected: oracleProbe.stress.sigmaTheta,
+      actualState: productionProbe.recoveredTensor,
+      expectedState: oracleProbe.stress,
+      normalization: 'SAME_POINT_STRESS_TENSOR_NORM',
+      relativeTolerance: probeId === 'P-PIPE-REMOTE' ? 0.05 : 0.07,
+    }));
   });
-  return pairs.map(([comparisonId, actual, expected, tolerance]) => (
-    compareReferenceQuantity({
-      comparisonId: `ORACLE:${comparisonId}`,
-      classification: 'QUALIFYING',
-      actual,
-      expected,
-      relativeTolerance: tolerance,
-      absoluteTolerance: 1e-8,
-    })
-  ));
+  return rows;
+}
+
+function compareOracleComponent({
+  comparisonId,
+  actual,
+  expected,
+  actualState,
+  expectedState,
+  normalization,
+  relativeTolerance,
+}) {
+  const absoluteTolerance = 1e-8;
+  const absoluteError = Math.abs(actual - expected);
+  const denominator = oracleComparisonDenominator(
+    actualState,
+    expectedState,
+    normalization,
+  );
+  const normalizedDifference = absoluteError / denominator;
+  const rawScalarRelativeError = absoluteError
+    / Math.max(1e-30, Math.abs(expected));
+  const accepted = absoluteError
+    <= absoluteTolerance + relativeTolerance * denominator;
+  return seal({
+    comparisonId,
+    classification: 'QUALIFYING',
+    actual,
+    expected,
+    absoluteError,
+    rawScalarRelativeError,
+    normalization,
+    denominator,
+    normalizedDifference,
+    absoluteTolerance,
+    relativeTolerance,
+    accepted,
+    grantsNumericalQualification: accepted,
+  });
+}
+
+function oracleComparisonDenominator(actual, expected, normalization) {
+  if (normalization === 'SAME_POINT_DISPLACEMENT_VECTOR_NORM') {
+    return Math.max(
+      1e-9,
+      Math.hypot(actual.radial, actual.axial),
+      Math.hypot(expected.radial, expected.axial),
+    );
+  }
+  if (normalization === 'SAME_POINT_STRESS_TENSOR_NORM') {
+    return Math.max(
+      1e-9,
+      axisymmetricStressNorm(actual),
+      axisymmetricStressNorm(expected),
+    );
+  }
+  throw new TypeError('BB11_ORACLE_COMPARISON_NORMALIZATION_UNKNOWN');
+}
+
+function axisymmetricStressNorm(value) {
+  return Math.sqrt(
+    value.sigmaR ** 2
+    + value.sigmaZ ** 2
+    + value.sigmaTheta ** 2
+    + 2 * value.tauRZ ** 2,
+  );
 }
 
 function referenceComparison(comparisonId, actual, expected, tolerance) {

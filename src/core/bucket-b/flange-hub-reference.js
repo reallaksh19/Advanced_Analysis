@@ -167,7 +167,7 @@ export function createReferenceRegistry() {
       { referenceId: 'BB11_PRISMATIC_ANNULAR_AXIAL_V1', classification: 'QUALIFYING', displacementTolerance: 0.01, stressResultantTolerance: 0.01, energyTolerance: 0.01 },
       { referenceId: 'BB11_ANNULAR_FACE_RESULTANT_V1', classification: 'QUALIFYING', resultantTolerance: 1e-10 },
       { referenceId: 'BB11_ANNULAR_PLATE_SANITY_V1', classification: 'TREND_ONLY', numericalQualificationAuthority: false },
-      { referenceId: 'BB11_INDEPENDENT_APPLICATION_ORACLE_V1', classification: 'QUALIFYING', displacementTolerance: 0.02, energyTolerance: 0.02, stressTolerance: 0.05 },
+      { referenceId: 'BB11_INDEPENDENT_APPLICATION_ORACLE_V2', classification: 'QUALIFYING', displacementTolerance: 0.02, energyTolerance: 0.02, stressTolerance: 0.05, displacementNormalization: 'SAME_POINT_DISPLACEMENT_VECTOR_NORM', stressNormalization: 'SAME_POINT_STRESS_TENSOR_NORM' },
     ],
   };
   return deepFreeze({ ...payload, semanticHash: semanticHash(payload) });

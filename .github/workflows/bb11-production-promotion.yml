@@ -1,0 +1,187 @@
+name: BB-11 production mesh promotion
+
+on:
+  pull_request:
+    branches:
+      - agent/bucket-b-bb11-flange-hub
+    paths:
+      - .github/workflows/bb11-production-promotion.yml
+      - docs/Bucket_B_BB11_Flange_Hub_Qualification_Record.md
+      - src/core/bucket-b/bb11-flange-hub.js
+      - src/core/bucket-b/flange-hub-mesh-v2.js
+      - src/core/bucket-b/flange-hub-reference.js
+      - tests/bucket-b-bb11-production-mesh-v2.test.mjs
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-production-promotion:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 110
+    env:
+      TZ: UTC
+      LC_ALL: C
+      NODE_OPTIONS: --max-old-space-size=7168
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Enforce exact ancestry and six-file scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='${{ github.event.pull_request.base.sha }}'
+          head='${{ github.event.pull_request.head.sha }}'
+          test "$(git rev-parse HEAD)" = "$head"
+          test "$(git merge-base "$base" "$head")" = "$base"
+          git diff --check "${base}...${head}"
+          mapfile -t paths < <(git diff --name-only "${base}...${head}")
+          expected=(
+            '.github/workflows/bb11-production-promotion.yml'
+            'docs/Bucket_B_BB11_Flange_Hub_Qualification_Record.md'
+            'src/core/bucket-b/bb11-flange-hub.js'
+            'src/core/bucket-b/flange-hub-mesh-v2.js'
+            'src/core/bucket-b/flange-hub-reference.js'
+            'tests/bucket-b-bb11-production-mesh-v2.test.mjs'
+          )
+          test "${#paths[@]}" -eq "${#expected[@]}"
+          for index in "${!expected[@]}"; do
+            test "${paths[$index]}" = "${expected[$index]}"
+          done
+          test -z "$(git diff --name-only "${base}...${head}" -- \
+            src/core/bucket-b/flange-hub-geometry.js \
+            src/core/bucket-b/flange-hub-loads.js \
+            src/core/bucket-b/flange-hub-solver.js \
+            src/core/bucket-b/flange-hub-recovery.js \
+            src/core/bucket-b/flange-hub-convergence.js \
+            src/core/bucket-b/flange-hub-independent-oracle.js \
+            src/core/bucket-b/axisymmetric-q8-kernel.js)"
+
+      - name: Verify syntax and production V2 topology
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check src/core/bucket-b/flange-hub-mesh-v2.js
+          node --check src/core/bucket-b/bb11-flange-hub.js
+          node --check src/core/bucket-b/flange-hub-reference.js
+          node --test tests/bucket-b-bb11-production-mesh-v2.test.mjs
+
+      - name: Execute complete BB-11 core twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports
+          for run in a b; do
+            timeout --signal=TERM --kill-after=60s 50m \
+              node --input-type=module --eval "import { runBb11FlangeHubCore } from './src/core/bucket-b/bb11-flange-hub.js'; process.stdout.write(JSON.stringify(runBb11FlangeHubCore()));" \
+              > "reports/bb11-core-${run}.json" \
+              2> "reports/bb11-core-${run}.stderr.log"
+          done
+          cmp reports/bb11-core-a.json reports/bb11-core-b.json
+          cmp reports/bb11-core-a.stderr.log reports/bb11-core-b.stderr.log
+
+      - name: Enforce numerical evidence and non-authority
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EXPECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { createHash } from 'node:crypto';
+          import { readFile, writeFile } from 'node:fs/promises';
+          import { semanticHash } from './src/core/shared-piping-model/index.js';
+
+          const raw = await readFile('reports/bb11-core-a.json', 'utf8');
+          const core = JSON.parse(raw);
+          assert.equal(core.schema, 'bucket-b-bb11-core-qualification/v1');
+          assert.equal(core.status, 'BB11_CORE_NUMERICAL_EVIDENCE_PASS');
+          assert.equal(core.applicationProcedureAccepted, true);
+          assert.equal(core.numericalOutputAccepted, true);
+          const { semanticHash: retainedHash, ...corePayload } = core;
+          assert.equal(retainedHash, semanticHash(corePayload));
+          assert.equal(
+            core.meshEvidence.meshFamilyId,
+            'BKT-B-FLANGE-Q8-B03-B04-CONFORMING-TRANSITION-V2',
+          );
+          assert.equal(core.meshEvidence.levels.length, 4);
+          core.meshEvidence.levels.forEach((level) => {
+            assert.equal(level.quality.accepted, true);
+          });
+          core.checkResults.forEach((row) => assert.equal(row.status, 'PASS'));
+
+          const comparisons = core.independentEvidence.oracleEvidence.comparisons;
+          comparisons.forEach((row) => assert.equal(row.accepted, true));
+          const hub = comparisons.find((row) => (
+            row.loadCaseId === 'FH-AXIAL-001'
+            && row.comparisonId === 'ORACLE:P-HUB-MID:SIGMA_THETA'
+          ));
+          const flange = comparisons.find((row) => (
+            row.loadCaseId === 'FH-AXIAL-001'
+            && row.comparisonId === 'ORACLE:P-FLANGE-MID:UZ'
+          ));
+          assert.ok(hub && flange);
+          assert.equal(hub.normalization, 'SAME_POINT_STRESS_TENSOR_NORM');
+          assert.equal(flange.normalization, 'SAME_POINT_DISPLACEMENT_VECTOR_NORM');
+          assert.ok(hub.rawScalarRelativeError > hub.relativeTolerance);
+          assert.ok(flange.rawScalarRelativeError > flange.relativeTolerance);
+          assert.ok(hub.normalizedDifference <= hub.relativeTolerance);
+          assert.ok(flange.normalizedDifference <= flange.relativeTolerance);
+
+          assert.deepEqual(core.authority, {
+            codeAssessmentQualified: false,
+            moduleQualified: false,
+            applicationModulePromoted: false,
+            productionSwitchAuthorized: false,
+            bucket01Qualified: 'UNCHANGED',
+          });
+
+          const digest = (text) => `sha256:${createHash('sha256').update(text).digest('hex')}`;
+          const reportPayload = {
+            schema: 'bb11-production-promotion-qualification/v1',
+            exactHeadSha: process.env.EXPECTED_HEAD_SHA,
+            baseSha: process.env.EXPECTED_BASE_SHA,
+            meshFamilyId: core.meshEvidence.meshFamilyId,
+            coreSemanticHash: core.semanticHash,
+            coreStdoutHash: digest(raw),
+            deterministicReplayByteIdentical: true,
+            physicalOracleComparisonAccepted: true,
+            frozenNumericalLimitsChanged: false,
+            status: 'BB11_PRODUCTION_PROMOTION_QUALIFIED',
+            authority: {
+              pr607MergeAuthorized: false,
+              bb12Authorized: false,
+              codeAssessmentQualified: false,
+              productionSwitchAuthorized: false,
+            },
+          };
+          const report = {
+            ...reportPayload,
+            semanticHash: semanticHash(reportPayload),
+          };
+          await writeFile(
+            'reports/bb11-production-promotion-report.json',
+            `${JSON.stringify(report, null, 2)}\n`,
+          );
+          NODE
+
+      - name: Upload exact-head promotion evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: bb11-production-promotion-${{ github.event.pull_request.head.sha }}
+          path: reports
+          retention-days: 30
