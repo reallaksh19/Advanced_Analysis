@@ -1,0 +1,30 @@
+name: SJSON 1885 support inventory
+
+on:
+  push:
+    branches:
+      - agent/sjson-1885-configurable-screening
+    paths:
+      - scripts/empirical-sjson-1885-support-inventory.mjs
+      - .github/workflows/sjson-1885-support-inventory.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Materialize exact benchmark inputs
+        run: |
+          git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson > /tmp/EnrichedSjson
+          git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson.topology.input.xml > /tmp/EnrichedSjson.topology.input.xml
+      - name: Inventory all support encodings
+        run: node scripts/empirical-sjson-1885-support-inventory.mjs /tmp/EnrichedSjson /tmp/EnrichedSjson.topology.input.xml
