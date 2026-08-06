@@ -63,7 +63,7 @@ test('production 3D Edit completes Move, Stretch and atomic Route + Elbow from v
   expect(completed.nodeCount).toBe(stretched.nodeCount + 2);
   expect(completed.edgeCount).toBe(stretched.edgeCount + 2);
   expect(completed.bendCount).toBe(stretched.bendCount + 1);
-  expect(completed.issueKinds).not.toContain('RIGHT_ANGLE_WITHOUT_BEND');
+  expect(completed.rightAngleIssueIds).toEqual(stretched.rightAngleIssueIds);
   expect(completed.authoredBendArcCount).toBeGreaterThanOrEqual(1);
   expect(completed.transactionHash).not.toBe('');
 
@@ -324,6 +324,10 @@ async function evidence(page) {
       edgeCount: topology.edges.length,
       bendCount: topology.bends?.length ?? 0,
       issueKinds: controller.issues.map((row) => row.kind),
+      rightAngleIssueIds: controller.issues
+        .filter((row) => row.kind === 'RIGHT_ANGLE_WITHOUT_BEND')
+        .map((row) => row.id)
+        .sort(),
       transactionHash: controller.hostElement.dataset.topologyEditAuthoringTransactionHash || '',
       authoredBendProjectionHash: controller.hostElement.dataset.topologyEditAuthoredBendProjectionHash || '',
       authoredBendArcCount,
