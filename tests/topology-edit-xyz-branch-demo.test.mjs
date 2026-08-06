@@ -68,17 +68,14 @@ function exactEdgeByComponent(edges, componentKey) {
   return rows[0];
 }
 
-function sharedNodeId(left, right) {
-  return [left.fromNodeId, left.toNodeId].find((nodeId) => (
-    nodeId === right.fromNodeId || nodeId === right.toNodeId
-  )) ?? null;
+function exactJunctionByComponent(junctions, componentKey) {
+  const rows = junctions.filter((junction) => junction.componentKey === componentKey);
+  assert.equal(rows.length, 1, `Expected one canonical junction for ${componentKey}.`);
+  return rows[0];
 }
 
-function incidentComponentKeys(edges, nodeId) {
-  return edges
-    .filter((edge) => edge.fromNodeId === nodeId || edge.toNodeId === nodeId)
-    .map((edge) => edge.componentKey)
-    .sort();
+function endpointInNodeSet(edge, nodeIds) {
+  return [edge.fromNodeId, edge.toNodeId].find((nodeId) => nodeIds.has(nodeId)) ?? null;
 }
 
 test('embedded XYZ branch retains ten piping elements, full component coverage, and two distinct supports', async () => {
@@ -107,6 +104,15 @@ test('embedded XYZ branch retains ten piping elements, full component coverage, 
     assert.ok(piping.some((row) => row.type === type), `Missing ${type} in XYZ branch.`);
   }
 
+  const olet = objectById(piping, 'O-002');
+  assert.deepEqual(olet.nativeParams.startPoint, [7260, 1650, 3450]);
+  assert.deepEqual(olet.nativeParams.endPoint, [7460, 1650, 3450]);
+  assert.deepEqual(olet.nativeParams.branchPoints, [[7360, 1850, 3450]]);
+  assert.equal(olet.nativeParams.bore, 25);
+  assert.equal(olet.nativeParams.branchOutsideDiameterMm, 21.3);
+  assert.equal(olet.attributes.BRANCH_ID, 'DEMO-L100/XYZ-10');
+  assert.equal(olet.attributes.HOST_ENTITY_ID, 'P-011');
+
   const rest = objectById(supports, 'S-006');
   const guide = objectById(supports, 'S-007');
   assert.equal(rest.type, 'REST');
@@ -129,7 +135,7 @@ test('embedded XYZ branch retains ten piping elements, full component coverage, 
   assert.deepEqual(axes, new Set(['X', 'Y', 'Z']));
 });
 
-test('XYZ scenario materializes a source-hashed 32-object dataset with exact Olet connectivity and seven resolved supports', async () => {
+test('XYZ scenario materializes a source-hashed 32-object dataset with a three-port Olet and seven resolved supports', async () => {
   const fixture = JSON.parse(new TextDecoder().decode(await fixtureBytes()));
   const materialized = materializeTopologyEditDemoScenario(fixture);
   const sourceBytes = new TextEncoder().encode(`${JSON.stringify(materialized)}\n`);
@@ -156,6 +162,10 @@ test('XYZ scenario materializes a source-hashed 32-object dataset with exact Ole
 
   const graph = buildPipingPortTopologyGraph(dataset.sharedModel);
   assert.equal(graph.components.length, 25);
+  const oletGraphComponent = graph.components.find((row) => row.componentKey === 'O-002');
+  assert.ok(oletGraphComponent, 'O-002 must exist in the topology graph.');
+  assert.equal(oletGraphComponent.portKeys.length, 3);
+
   const attachments = buildSupportAttachmentModel(dataset.sharedModel, graph);
   assert.deepEqual(
     {
@@ -185,33 +195,30 @@ test('XYZ scenario materializes a source-hashed 32-object dataset with exact Ole
   );
   assert.equal(canonical.supports.length, 7);
   assert.equal(canonical.supports.every((row) => row.resolved), true);
-  assert.ok(canonical.junctions.length >= 1, 'The existing Tee junction must remain canonical.');
 
-  const representedBranchIds = canonical.edges
-    .map((edge) => edge.componentKey)
-    .filter((componentKey) => BRANCH_ELEMENT_IDS.includes(componentKey))
-    .sort();
+  const representedBranchIds = [
+    ...canonical.edges.map((edge) => edge.componentKey),
+    ...canonical.junctions.map((junction) => junction.componentKey),
+  ].filter((componentKey) => BRANCH_ELEMENT_IDS.includes(componentKey)).sort();
   assert.deepEqual(representedBranchIds, [...BRANCH_ELEMENT_IDS].sort());
+
+  const existingTee = exactJunctionByComponent(canonical.junctions, 'T-001');
+  assert.equal(existingTee.nodeIds.length, 3);
+  const oletJunction = exactJunctionByComponent(canonical.junctions, 'O-002');
+  assert.equal(oletJunction.entityType, 'OLET');
+  assert.equal(oletJunction.nodeIds.length, 3);
+  const oletNodeIds = new Set(oletJunction.nodeIds);
 
   const hostPipe = exactEdgeByComponent(canonical.edges, 'P-011');
   const valve = exactEdgeByComponent(canonical.edges, 'V-002');
-  const olet = exactEdgeByComponent(canonical.edges, 'O-002');
   const branchPipe = exactEdgeByComponent(canonical.edges, 'P-012');
-  const hostNodeId = sharedNodeId(hostPipe, olet);
-  assert.ok(hostNodeId, 'O-002 must share one exact node with P-011.');
-  assert.equal(sharedNodeId(valve, olet), hostNodeId);
-  assert.deepEqual(
-    incidentComponentKeys(canonical.edges, hostNodeId),
-    ['O-002', 'P-011', 'V-002'],
-  );
-
-  const branchFaceNodeId = sharedNodeId(olet, branchPipe);
-  assert.ok(branchFaceNodeId, 'O-002 must share its other node with P-012.');
-  assert.notEqual(branchFaceNodeId, hostNodeId);
-  assert.deepEqual(
-    incidentComponentKeys(canonical.edges, branchFaceNodeId),
-    ['O-002', 'P-012'],
-  );
+  const hostNodeId = endpointInNodeSet(hostPipe, oletNodeIds);
+  const valveNodeId = endpointInNodeSet(valve, oletNodeIds);
+  const branchNodeId = endpointInNodeSet(branchPipe, oletNodeIds);
+  assert.ok(hostNodeId, 'O-002 must connect to P-011.');
+  assert.ok(valveNodeId, 'O-002 must connect to V-002.');
+  assert.ok(branchNodeId, 'O-002 must connect to P-012.');
+  assert.equal(new Set([hostNodeId, valveNodeId, branchNodeId]).size, 3);
 });
 
 test('XYZ branch loader publishes the materialized package and matching source bytes', async () => {
