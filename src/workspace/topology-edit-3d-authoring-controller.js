@@ -27,6 +27,10 @@ export class TopologyEdit3DViewController extends ProfessionalController {
       this.authoringRuntime.selectionChanged();
       return result;
     };
+    this.authoringRuntime.renderCandidateGhost = () => renderAuthoringCandidateGhost(
+      this,
+      this.authoringRuntime.candidate,
+    );
 
     // Final subclasses such as the governed SJSON controller own their source
     // visual derivation. Decorate that exact downstream result instead of
@@ -215,6 +219,28 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     this.authoringRuntime.clear(false, true);
     return super.acceptAutofix();
   }
+}
+
+function renderAuthoringCandidateGhost(controller, candidate) {
+  if (!candidate) return;
+  const projection = controller.deriveVisual(
+    candidate.canonicalTopology,
+    'DRAFT',
+  ).projection;
+  const elements = Array.isArray(projection.compactElements)
+    ? projection.compactElements
+    : (projection.elements || []);
+  const segments = Array.isArray(projection.compactSegments)
+    ? projection.compactSegments
+    : (projection.segments || []);
+  const changed = new Set(candidate.changedCanonicalIds);
+  const accepted = (row) => changed.has(
+    row.pickTarget?.objectId ?? row.entityId ?? row.id,
+  );
+  controller.viewportBackend?.renderGhost({
+    elements: elements.filter(accepted),
+    segments: segments.filter(accepted),
+  });
 }
 
 function normalizeControllerNodeSelection(controller) {
