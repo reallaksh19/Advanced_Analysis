@@ -1,0 +1,292 @@
+name: Finalize corrected SJSON density units and vertical reactions
+
+on:
+  push:
+    branches:
+      - agent/sjson-1885-configurable-screening
+    paths:
+      - .github/workflows/tmp-sjson-1885-density-unit-fix.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Correct the governed XML density-unit conversion
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          profile_path = Path('benchmarks/1885Sjson/empirical-screening-profile.config.json')
+          profile = json.loads(profile_path.read_text())
+          process = profile['processResolution']
+          process['inputXmlDensityUnit'] = 'kg/cm3'
+          process['inputXmlDensityToKgM3'] = 1_000_000
+          profile_path.write_text(json.dumps(profile, indent=2) + '\n')
+
+          runner_path = Path('scripts/empirical-sjson-1885-configurable-screening-run.mjs')
+          runner = runner_path.read_text()
+          old_normalizer = 'function normalizeFluidDensity(value) { return value < 20 ? value * 1000 : value; }'
+          new_normalizer = '''function normalizeFluidDensity(value) {
+            const scale = number(profile.processResolution.inputXmlDensityToKgM3);
+            if (!(scale > 0)) throw new Error('A positive processResolution.inputXmlDensityToKgM3 is required.');
+            return value * scale;
+          }'''
+          if runner.count(old_normalizer) != 1:
+              raise SystemExit('Expected exactly one legacy fluid-density normalizer.')
+          runner = runner.replace(old_normalizer, new_normalizer)
+
+          old_resolution = '''    temperatureResolution: countBy(model.edges, (edge) => edge.temperatureAuthority),
+              fluidDensityResolution: countBy(model.edges, (edge) => edge.fluidDensityAuthority),
+              processResolutionAudit,'''
+          new_resolution = '''    temperatureResolution: countBy(model.edges, (edge) => edge.temperatureAuthority),
+              fluidDensityResolution: countBy(model.edges, (edge) => edge.fluidDensityAuthority),
+              inputXmlFluidDensityUnit: profile.processResolution.inputXmlDensityUnit,
+              inputXmlFluidDensityToKgM3: profile.processResolution.inputXmlDensityToKgM3,
+              resolvedFluidDensityKgM3: summarizeNumbers(model.edges.map((edge) => edge.fluidDensityKgM3)),
+              processResolutionAudit,'''
+          if runner.count(old_resolution) != 1:
+              raise SystemExit('Expected exactly one source-resolution insertion point.')
+          runner = runner.replace(old_resolution, new_resolution)
+
+          old_warning = "    'All sentinel process values inherit from connected previous-node explicit values; no configured temperature or fluid fallback is used.',"
+          new_warning = old_warning + "\n    'Input XML density values are converted from configured kg/cm3 to kg/m3 before fluid mass is calculated.',"
+          if runner.count(old_warning) != 1:
+              raise SystemExit('Expected exactly one process-resolution warning insertion point.')
+          runner = runner.replace(old_warning, new_warning)
+          runner_path.write_text(runner)
+          PY
+      - name: Materialize exact enriched benchmark sources
+        run: |
+          git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson > /tmp/EnrichedSjson
+          git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson.topology.input.xml > /tmp/EnrichedSjson.topology.input.xml
+      - name: Recalculate the corrected permanent receipt
+        run: |
+          node scripts/empirical-sjson-1885-configurable-screening-run.mjs \
+            benchmarks/1885Sjson/empirical-screening-profile.config.json \
+            /tmp/EnrichedSjson \
+            /tmp/EnrichedSjson.topology.input.xml \
+            benchmarks/1885Sjson/empirical-screening-result.configurable.json \
+            > /tmp/corrected-screening.log
+      - name: Regenerate CSV and engineering evidence
+        run: |
+          python - <<'PY'
+          import csv
+          import json
+          from pathlib import Path
+
+          result_path = Path('benchmarks/1885Sjson/empirical-screening-result.configurable.json')
+          result = json.loads(result_path.read_text())
+          rows = result['supportRows']
+
+          csv_path = Path('benchmarks/1885Sjson/empirical-screening-result.configurable.csv')
+          with csv_path.open('w', newline='') as handle:
+              writer = csv.writer(handle)
+              writer.writerow([
+                  'siteId', 'supportTag', 'xMm', 'yMm', 'zMm', 'capabilities', 'directionAxes',
+                  'FxThermal_kN', 'FyThermal_kN', 'FzWeight_kN', 'componentVectorMagnitude_kN',
+                  'thermalMovementX_mm', 'thermalMovementY_mm',
+              ])
+              for row in rows:
+                  point = row['sourceCoordinateMm']
+                  writer.writerow([
+                      row['siteId'], row['supportTag'], point['x'], point['y'], point['z'],
+                      '+'.join(row['capabilities']),
+                      '+'.join(f"{item['capability']}:{item['axis']}" for item in row['inferredDirections']),
+                      row['reactionsKn']['FxThermal'], row['reactionsKn']['FyThermal'],
+                      row['reactionsKn']['FzWeight'], row['componentVectorMagnitudeKn'],
+                      row['thermalMovementMm']['X'], row['thermalMovementMm']['Y'],
+                  ])
+
+          top = sorted(rows, key=lambda row: row['componentVectorMagnitudeKn'], reverse=True)[:12]
+          vertical = result['verticalWeight']
+          source = result['sourceResolution']
+          n50120 = next(row for row in rows if row['siteId'] == 'N50120')
+          lines = [
+              '# SJSON 1885 configurable empirical screening evidence',
+              '',
+              'This evidence package applies the editable `1885-SJSON-CS-CONFIGURABLE-SCREENING-V1` profile to the enriched SJSON and companion topology XML at commit `07ce017eb7113517cc032771f7717f88c0a93d4c`.',
+              '',
+              '## Scope',
+              '',
+              '- Graph-tributary vertical weight screening.',
+              '- Independent scalar global X and Y thermal compatibility solves.',
+              '- No synthesized anchor; directional restraints remove rigid-body modes only when the assembled system is full rank.',
+              '- Pressure and pressure stress excluded.',
+              '- This is an experimental configurable screening result, not beam/frame FEA or a code operating load case.',
+              '',
+              '## Density-unit correction',
+              '',
+              '- The topology XML stores density in `kg/cm³`: steel is `0.007850` and explicit process fluid is `0.000300`.',
+              '- The governed conversion is therefore `kg/cm³ × 1,000,000 = kg/m³`; the resolved process-fluid density is **300 kg/m³**.',
+              '- The earlier `× 1,000` conversion incorrectly produced **0.3 kg/m³**, understating fluid mass by a factor of 1,000.',
+              '- At N50120 / PS-12169, the adjacent half-span tributary check is 158.276 kg steel + 31.325 kg fluid, giving **1.859 kN**. The superseded **1.552 kN** value was effectively steel-only.',
+              '',
+              '## Configurable assumptions',
+              '',
+              '- Carbon steel: `E = 203.4 GPa`, reference temperature `21 °C`, interpolated mean expansion coefficient.',
+              '- All 105 sentinel temperatures and fluid densities inherit from connected previous-node explicit values; all 58 explicit temperatures are `325 °C`.',
+              '- Input XML density unit: `kg/cm³`; configured conversion to `kg/m³`: `1,000,000`.',
+              '- Insulation density: `210 kg/m³`.',
+              '- Gasket mass: zero.',
+              '- Positive source flange/valve/instrument weights are preferred, but none are present; same-section pipe-equivalent span mass is used.',
+              '- Tee and olet use the host pipe OD and wall thickness.',
+              '- Compliance coefficient `C2E = 2.55`; component multipliers remain editable in the profile.',
+              '',
+              '## Global checks',
+              '',
+              f"- Physical support sites: **{source['physicalSupportSites']}**",
+              f"- Resolved process-fluid density: **{source['resolvedFluidDensityKgM3']['min']:.0f} kg/m³**",
+              f"- Total screened mass: **{vertical['totalModelMassKg']:.3f} kg**",
+              f"- Total screened weight: **{vertical['totalWeightKn']:.3f} kN**",
+              f"- Vertical equilibrium error: **{vertical['equilibriumErrorKn']:.6f} kN**",
+              f"- X reaction equilibrium error: **{result['thermalX']['reactionSumKn']:.6f} kN**",
+              f"- Y reaction equilibrium error: **{result['thermalY']['reactionSumKn']:.6f} kN**",
+              f"- N50120 vertical reaction: **{n50120['reactionsKn']['FzWeight']:.3f} kN**",
+              f"- Maximum independent-component vector: **{result['componentVectorScreening']['maximumMagnitudeKn']:.3f} kN** at **{result['componentVectorScreening']['maximumSiteId']} / {result['componentVectorScreening']['maximumSupportTag']}**",
+              '',
+              '## Largest support vectors',
+              '',
+              '| Node | Support | Capabilities | Fx thermal (kN) | Fy thermal (kN) | Fz weight (kN) | Component vector (kN) |',
+              '|---|---|---|---:|---:|---:|---:|',
+          ]
+          for row in top:
+              reactions = row['reactionsKn']
+              lines.append(
+                  f"| {row['siteId']} | {row['supportTag']} | {' + '.join(row['capabilities'])} | "
+                  f"{reactions['FxThermal']:.3f} | {reactions['FyThermal']:.3f} | "
+                  f"{reactions['FzWeight']:.3f} | {row['componentVectorMagnitudeKn']:.3f} |"
+              )
+          lines.extend([
+              '',
+              'The full 36-node table is retained in `empirical-screening-result.configurable.csv` and the complete calculation receipt is retained in `empirical-screening-result.configurable.json`.',
+              '',
+              'The component vector is a presentation-only combination of independently solved X, Y and vertical screening components. It is not a qualified simultaneous operating-load resultant.',
+              '',
+          ])
+          Path('docs/evidence/SJSON_1885_CONFIGURABLE_SCREENING.md').write_text('\n'.join(lines))
+          PY
+      - name: Replace fixed qualification assertions
+        run: |
+          cat > scripts/empirical-sjson-1885-configurable-screening-check.mjs <<'EOF'
+          import { readFile } from 'node:fs/promises';
+
+          const [resultPath] = process.argv.slice(2);
+          if (!resultPath) throw new Error('Usage: node empirical-sjson-1885-configurable-screening-check.mjs <result.json>');
+          const result = JSON.parse(await readFile(resultPath, 'utf8'));
+
+          assertEqual(result.schema, 'empirical-sjson-screening-result/v1', 'result schema');
+          assertEqual(result.status, 'EXPERIMENTAL_CONFIGURABLE_SCREENING', 'result status');
+          assertEqual(result.qualification.anchorSynthesized, false, 'anchor synthesis');
+          assertEqual(result.qualification.pressureIncluded, false, 'pressure inclusion');
+          assertEqual(result.source.commit, '07ce017eb7113517cc032771f7717f88c0a93d4c', 'source commit');
+          assertEqual(result.source.hashes.enrichedSjsonSha256, 'e9a51723444e9490f5dff9c1ff4a5c56191873033d11a289946746ff1072c5da', 'enriched source hash');
+          assertEqual(result.source.hashes.topologyInputXmlSha256, 'b46fbc765c71a63eb5d156eeaed3ae3be56584bd753b563d76fb10df21ff652a', 'topology source hash');
+
+          const source = result.sourceResolution;
+          assertEqual(source.inputXmlElements, 163, 'element count');
+          assertEqual(source.inputXmlNodes, 164, 'node count');
+          assertEqual(source.physicalSupportSites, 36, 'physical support count');
+          assertEqual(source.operatingTemperature.min, 325, 'minimum resolved temperature');
+          assertEqual(source.operatingTemperature.max, 325, 'maximum resolved temperature');
+          assertEqual(source.temperatureResolution.SOURCE_EXPLICIT, 58, 'explicit temperature count');
+          assertEqual(source.temperatureResolution.SENTINEL_PREVIOUS_CONNECTED_NODE, 105, 'inherited temperature count');
+          assertEqual(source.fluidDensityResolution.SOURCE_EXPLICIT, 58, 'explicit fluid-density count');
+          assertEqual(source.fluidDensityResolution.SENTINEL_PREVIOUS_CONNECTED_NODE, 105, 'inherited fluid-density count');
+          assertEqual(source.inputXmlFluidDensityUnit, 'kg/cm3', 'input XML fluid-density unit');
+          assertEqual(source.inputXmlFluidDensityToKgM3, 1000000, 'input XML density conversion');
+          assertClose(source.resolvedFluidDensityKgM3.min, 300, 1e-12, 'minimum resolved fluid density');
+          assertClose(source.resolvedFluidDensityKgM3.max, 300, 1e-12, 'maximum resolved fluid density');
+          assertEqual(source.processResolutionAudit.temperature.fallbackUsed, false, 'temperature fallback');
+          assertEqual(source.processResolutionAudit.fluidDensity.fallbackUsed, false, 'fluid-density fallback');
+          assertEqual(source.sourceComponentWeightPositiveCount, 0, 'positive source component weights');
+
+          assertEqual(result.configurableAssumptions.processResolution.inputXmlDensityUnit, 'kg/cm3', 'profile density unit');
+          assertEqual(result.configurableAssumptions.processResolution.inputXmlDensityToKgM3, 1000000, 'profile density conversion');
+          assertEqual(result.verticalWeight.status, 'CALCULATED_CONFIGURABLE_SCREENING', 'vertical calculation status');
+          assertClose(result.verticalWeight.totalModelMassKg, 5388.84094, 1e-6, 'total model mass');
+          assertClose(result.verticalWeight.totalWeightKn, 52.846477, 1e-6, 'total model weight');
+          assertClose(result.verticalWeight.reactionSumKn, result.verticalWeight.totalWeightKn, 1e-9, 'vertical equilibrium');
+          assertClose(result.verticalWeight.equilibriumErrorKn, 0, 1e-9, 'vertical equilibrium error');
+          assertEqual(result.verticalWeight.elementCountByTreatment.GASKET_ZERO, 22, 'zero-weight gasket count');
+          assertEqual(result.verticalWeight.elementCountByTreatment.FLAN_PIPE_EQUIVALENT_FALLBACK, 20, 'flange fallback count');
+          assertEqual(result.verticalWeight.elementCountByTreatment.VALV_PIPE_EQUIVALENT_FALLBACK, 4, 'valve fallback count');
+          assertEqual(result.verticalWeight.elementCountByTreatment.INST_PIPE_EQUIVALENT_FALLBACK, 3, 'instrument fallback count');
+
+          for (const [axis, expectedSites, expectedMax] of [['thermalX', 6, 31.567638], ['thermalY', 7, 34.904555]]) {
+            const row = result[axis];
+            assertEqual(row.status, 'CALCULATED_CONFIGURABLE_SCREENING', `${axis} status`);
+            assertEqual(row.constrainedSiteCount, expectedSites, `${axis} constrained sites`);
+            assertClose(row.maxAbsReactionKn, expectedMax, 2e-5, `${axis} maximum reaction`);
+            assertClose(row.temperatureSummary.min, 325, 1e-12, `${axis} minimum temperature`);
+            assertClose(row.temperatureSummary.max, 325, 1e-12, `${axis} maximum temperature`);
+            if (Math.abs(row.reactionSumKn) > 1e-3) throw new Error(`${axis} reaction equilibrium exceeds 0.001 kN: ${row.reactionSumKn}`);
+            if (row.maxFreeResidualN > 0.2) throw new Error(`${axis} free residual exceeds 0.2 N: ${row.maxFreeResidualN}`);
+          }
+
+          assertEqual(result.supportRows.length, 36, 'support row count');
+          assertEqual(new Set(result.supportRows.map((row) => row.siteId)).size, 36, 'unique support row count');
+          const rows = new Map(result.supportRows.map((row) => [row.siteId, row]));
+          assertReaction(rows, 'N10230', 31.568, -0.770, 0.693);
+          assertReaction(rows, 'N20120', -22.000, 0, 1.328);
+          assertReaction(rows, 'N50120', -0.991, -34.905, 1.859);
+          assertReaction(rows, 'N70040', -1.858, 23.712, 4.704);
+          assertReaction(rows, 'N60080', 0, 8.968, 3.193);
+          if (rows.get('N50120').reactionsKn.FzWeight < 1.85) throw new Error('N50120 vertical reaction regressed toward the superseded steel-only value.');
+          assertEqual(result.componentVectorScreening.maximumSiteId, 'N50120', 'maximum component-vector site');
+          assertClose(result.componentVectorScreening.maximumMagnitudeKn, 34.968, 0.001, 'maximum component-vector magnitude');
+
+          console.log('SJSON 1885 configurable empirical screening qualification passed.');
+
+          function assertReaction(rows, siteId, fx, fy, fz) {
+            const row = rows.get(siteId);
+            if (!row) throw new Error(`Missing support row ${siteId}.`);
+            assertClose(row.reactionsKn.FxThermal, fx, 0.001, `${siteId} Fx`);
+            assertClose(row.reactionsKn.FyThermal, fy, 0.001, `${siteId} Fy`);
+            assertClose(row.reactionsKn.FzWeight, fz, 0.001, `${siteId} Fz`);
+          }
+          function assertEqual(actual, expected, label) {
+            if (actual !== expected) throw new Error(`${label}: expected ${JSON.stringify(expected)}, received ${JSON.stringify(actual)}.`);
+          }
+          function assertClose(actual, expected, tolerance, label) {
+            if (!Number.isFinite(actual) || Math.abs(actual - expected) > tolerance) {
+              throw new Error(`${label}: expected ${expected} ± ${tolerance}, received ${actual}.`);
+            }
+          }
+          EOF
+      - name: Qualify exact corrected result twice
+        run: |
+          node scripts/empirical-sjson-1885-configurable-screening-run.mjs \
+            benchmarks/1885Sjson/empirical-screening-profile.config.json \
+            /tmp/EnrichedSjson \
+            /tmp/EnrichedSjson.topology.input.xml \
+            /tmp/result-a.json > /tmp/result-a.log
+          node scripts/empirical-sjson-1885-configurable-screening-run.mjs \
+            benchmarks/1885Sjson/empirical-screening-profile.config.json \
+            /tmp/EnrichedSjson \
+            /tmp/EnrichedSjson.topology.input.xml \
+            /tmp/result-b.json > /tmp/result-b.log
+          cmp /tmp/result-a.json /tmp/result-b.json
+          cmp /tmp/result-a.json benchmarks/1885Sjson/empirical-screening-result.configurable.json
+          node scripts/empirical-sjson-1885-configurable-screening-check.mjs /tmp/result-a.json
+          jq '{totalModelMassKg: .verticalWeight.totalModelMassKg, totalWeightKn: .verticalWeight.totalWeightKn, N50120: (.supportRows[] | select(.siteId == "N50120") | .reactionsKn.FzWeight), resolvedFluidDensityKgM3: .sourceResolution.resolvedFluidDensityKgM3}' /tmp/result-a.json
+      - name: Remove temporary diagnostics and publish correction
+        run: |
+          rm -f scripts/tmp-sjson-50120-vertical-unit-audit.mjs
+          rm -f .github/workflows/tmp-sjson-50120-vertical-unit-audit.yml
+          rm -f .github/workflows/tmp-sjson-1885-density-unit-fix.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "Correct SJSON fluid-density units and vertical reactions"
+          git push
