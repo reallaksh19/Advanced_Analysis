@@ -1,6 +1,6 @@
 {
   "schema": "empirical-sjson-screening-result/v1",
-  "profileId": "1885-SJSON-CS-CONFIGURABLE-SCREENING-V1",
+  "profileId": "1885-SJSON-CS-CONFIGURABLE-SCREENING-V2",
   "status": "EXPERIMENTAL_CONFIGURABLE_SCREENING",
   "qualification": {
     "qualifiedWp6ProfileModified": false,
@@ -11,25 +11,38 @@
   "source": {
     "commit": "07ce017eb7113517cc032771f7717f88c0a93d4c",
     "enrichedSjsonPath": "benchmarks/1885Sjson/EnrichedSjson",
-    "topologyInputXmlPath": "benchmarks/1885Sjson/EnrichedSjson.topology.input.xml",
+    "topologyInputXmlPath": "GENERATED:COMMON_POS_SECTION_MATERIAL_V1",
     "hashes": {
       "enrichedSjsonSha256": "e9a51723444e9490f5dff9c1ff4a5c56191873033d11a289946746ff1072c5da",
       "topologyInputXmlSha256": "b46fbc765c71a63eb5d156eeaed3ae3be56584bd753b563d76fb10df21ff652a",
-      "profileFileSha256": "1ae578dbb44aea3369c8da0f73b8a4d406c747f0c84f24b4db7197fec9329af9",
-      "profileCanonicalSha256": "52036b8a074e1a90959ca66485eaa07c461a62ca184d033d96346dd2d70e007c",
+      "profileFileSha256": "3a6b3cfc20e3618590604a86dc33da2841a818f61ad5c6298a41ff25278bf75b",
+      "profileCanonicalSha256": "811f89c8d6b45da1e2d1ace395b03bc57404d16c9e5279a9ff86b21d273402d1",
       "runnerSha256": "3e77303e196b85264e6c02ff41b99429643adc1c4a67795e7d0ba2e83a6924a7"
     }
   },
   "configurableAssumptions": {
     "schema": "empirical-sjson-screening-profile/v1",
-    "profileId": "1885-SJSON-CS-CONFIGURABLE-SCREENING-V1",
+    "profileId": "1885-SJSON-CS-CONFIGURABLE-SCREENING-V2",
     "status": "EXPERIMENTAL_CONFIGURABLE_SCREENING",
     "source": {
       "commit": "07ce017eb7113517cc032771f7717f88c0a93d4c",
       "enrichedSjsonPath": "benchmarks/1885Sjson/EnrichedSjson",
-      "topologyInputXmlPath": "benchmarks/1885Sjson/EnrichedSjson.topology.input.xml",
+      "originalTopologyInputXmlPath": "benchmarks/1885Sjson/EnrichedSjson.topology.input.xml",
+      "topologyInputXmlPath": "GENERATED:COMMON_POS_SECTION_MATERIAL_V1",
+      "projectDataDefaultsPath": "project-data/1885s-nonfea-piping-defaults.json",
       "coordinateUnit": "mm",
       "sourceVerticalAxis": "Z"
+    },
+    "sectionResolution": {
+      "method": "COMMON_POS_SECTION_MATERIAL_V1",
+      "positionAuthority": "TOPOLOGY_PIPINGELEMENT_ORDER_AND_IDENTITY",
+      "scheduleAuthority": "SAME_BRANCH_FITTING_SCHEDULE",
+      "nominalSizeAuthority": "TOPOLOGY_OD_EXACT_STANDARD_CROSSWALK",
+      "dimensionAuthority": "SCHEDULE_MASTER_ELSE_EXACT_SCOPED_PROJECT_CONFIGURED_SECTION",
+      "topologyWallTreatment": "AUDIT_COMPARISON_ONLY_NOT_CALCULATION_AUTHORITY",
+      "governedProjectionSchema": "empirical-sjson-governed-section-projection/v1",
+      "scheduleDefaultPolicy": "PROHIBITED",
+      "blockedPolicy": "BLOCK_CALCULATION"
     },
     "material": {
       "family": "CARBON_STEEL",
