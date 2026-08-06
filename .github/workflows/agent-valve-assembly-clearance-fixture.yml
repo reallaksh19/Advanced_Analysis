@@ -1,0 +1,112 @@
+name: Add checker-safe valve assembly catalogue fixture
+
+on:
+  push:
+    branches:
+      - agent/valve-assembly-authoring
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/valve-assembly-authoring
+          fetch-depth: 0
+
+      - name: Add compact catalogue option and update qualification
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          catalog_path = Path('public/fixtures/topology-edit-professional-spec-catalog.json')
+          catalog = json.loads(catalog_path.read_text(encoding='utf-8'))
+          record_id = 'VALVE-DN100-GLOBE-600-B'
+          if any(row.get('recordId') == record_id for row in catalog['records']):
+              raise SystemExit(f'{record_id} already exists')
+          gate_index = next(
+              index for index, row in enumerate(catalog['records'])
+              if row.get('recordId') == 'VALVE-DN100-GATE-600-A'
+          )
+          catalog['records'].insert(gate_index + 1, {
+              'recordId': record_id,
+              'componentType': 'VALVE',
+              'nominalSizeMm': 100,
+              'outsideDiameterMm': 114.3,
+              'pressureClass': '600',
+              'materialSpecification': 'ASTM A216 WCB',
+              'componentLengthMm': 500,
+              'componentMassKg': 120,
+              'valveType': 'GLOBE',
+              'valveFaceToFaceMm': 500,
+              'endConnectionFrom': 'FLANGED_RF',
+              'endConnectionTo': 'FLANGED_RF',
+              'pipingClass': 'DEMO-600',
+              'sourceReference': {
+                  'documentId': 'SPEC-DEMO',
+                  'revision': '8',
+                  'path': '/valve/dn100/globe/class600-compact',
+              },
+          })
+          catalog_path.write_text(
+              json.dumps(catalog, indent=2, ensure_ascii=False) + '\n',
+              encoding='utf-8',
+          )
+
+          test_path = Path('tests/topology-edit-valve-assembly-authoring.test.mjs')
+          test_text = test_path.read_text(encoding='utf-8')
+          old_options = """  assert.deepEqual(options.valveOptions.map((row) => row.recordId), [
+    'VALVE-DN100-GATE-600-A',
+  ]);"""
+          new_options = """  assert.deepEqual(options.valveOptions.map((row) => row.recordId), [
+    'VALVE-DN100-GATE-600-A',
+    'VALVE-DN100-GLOBE-600-B',
+  ]);"""
+          if test_text.count(old_options) != 1:
+              raise SystemExit('expected one valve option assertion')
+          test_path.write_text(test_text.replace(old_options, new_options, 1), encoding='utf-8')
+
+          e2e_path = Path('e2e/topology-edit-valve-assembly-authoring.spec.js')
+          e2e = e2e_path.read_text(encoding='utf-8')
+          replacements = {
+              "const VALVE_RECORD_ID = 'VALVE-DN100-GATE-600-A';":
+                  "const VALVE_RECORD_ID = 'VALVE-DN100-GLOBE-600-B';",
+              "const target = await eligibleHostEdge(page, 100, 114.3, 840, 'P-005');":
+                  "const target = await eligibleHostEdge(page, 100, 114.3, 740, 'P-005');",
+              "await expect(host).toHaveAttribute('data-topology-edit-authoring-catalogue-option-count', '4');":
+                  "await expect(host).toHaveAttribute('data-topology-edit-authoring-catalogue-option-count', '8');",
+              "await expect(page.locator('[data-authoring-field=\"assemblyLengthMm\"]')).toHaveValue('840');":
+                  "await expect(page.locator('[data-authoring-field=\"assemblyLengthMm\"]')).toHaveValue('740');",
+              "await expect(page.locator('[data-authoring-field=\"assemblyMassKg\"]')).toHaveValue('207');":
+                  "await expect(page.locator('[data-authoring-field=\"assemblyMassKg\"]')).toHaveValue('179');",
+              "expect(applied.assembly.every((edge) => edge.assemblyLengthMm === 840)).toBe(true);":
+                  "expect(applied.assembly.every((edge) => edge.assemblyLengthMm === 740)).toBe(true);",
+              "expect(applied.assembly.every((edge) => edge.assemblyMassKg === 207)).toBe(true);":
+                  "expect(applied.assembly.every((edge) => edge.assemblyMassKg === 179)).toBe(true);",
+          }
+          for old, new in replacements.items():
+              count = e2e.count(old)
+              if count != 1:
+                  raise SystemExit(f'expected one E2E replacement for: {old}; found {count}')
+              e2e = e2e.replace(old, new, 1)
+          e2e_path.write_text(e2e, encoding='utf-8')
+          PY
+
+          node --check tests/topology-edit-valve-assembly-authoring.test.mjs
+          node --check e2e/topology-edit-valve-assembly-authoring.spec.js
+          node -e "JSON.parse(require('node:fs').readFileSync('public/fixtures/topology-edit-professional-spec-catalog.json', 'utf8'))"
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/fixtures/topology-edit-professional-spec-catalog.json \
+            tests/topology-edit-valve-assembly-authoring.test.mjs \
+            e2e/topology-edit-valve-assembly-authoring.spec.js
+          git commit -m 'Add checker-safe valve assembly catalogue option'
+          git push origin HEAD:agent/valve-assembly-authoring
