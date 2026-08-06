@@ -2,6 +2,9 @@ import { deepFreeze, semanticHash } from '../shared-piping-model/index.js';
 import {
   validateAxisymmetricRegistrationApprovalReceipt,
 } from './axisymmetric-registration.js';
+import {
+  validateAxisymmetricRegistrationAdoptionReceipt,
+} from './flange-hub-authority.js';
 
 export const BUCKET_B_SCHEMA = 'bucket-b-benchmark-registry/v2';
 export const BUCKET_B_ENGINEERING_LEVEL = 'LINEAR_2D_CONTINUUM';
@@ -60,7 +63,9 @@ export const MODULE_REGISTRY = Object.freeze(Object.fromEntries(MODULE_ROWS.map(
     elementProfile: axisymmetric
       ? ELEMENT_PROFILES.AXI_Q8_FULL_3X3
       : ELEMENT_PROFILES.Q8_FULL_3X3,
-    meshFamilyId: `BKT-B-${token}-Q8-MESH-FAMILY-V1`,
+    meshFamilyId: moduleId === 'C2D-FLANGE-HUB'
+    ? 'BKT-B-FLANGE-Q8-B03-B04-CONFORMING-TRANSITION-V2'
+    : `BKT-B-${token}-Q8-MESH-FAMILY-V1`,
     recoveryProfileId: axisymmetric
       ? 'AXI_Q8_GAUSS_POINT_STRESS_RECOVERY_V1'
       : 'Q8_GAUSS_POINT_IN_PLANE_STRESS_RECOVERY_V1',
@@ -165,12 +170,25 @@ export function advanceQualificationState(record, nextState, evidence = {}) {
     );
   }
   let axisymmetricApproval = null;
+  let axisymmetricAdoption = null;
   if (record.state
     === QUALIFICATION_STATES.BLOCKED_PENDING_AXISYMMETRIC_REGISTRATION) {
-    axisymmetricApproval = evidence.axisymmetricRegistrationApprovalReceipt;
-    validateAxisymmetricRegistrationApprovalReceipt(axisymmetricApproval, {
-      expectedHeadSha: record.bindings?.exactHeadSha,
-    });
+    if (evidence.axisymmetricRegistrationAdoptionReceipt !== undefined) {
+      if (record.moduleId !== 'C2D-FLANGE-HUB') {
+        throw new TypeError('Axisymmetric adoption authority is limited to C2D-FLANGE-HUB.');
+      }
+      axisymmetricAdoption = evidence.axisymmetricRegistrationAdoptionReceipt;
+      validateAxisymmetricRegistrationAdoptionReceipt(axisymmetricAdoption, {
+        expectedModuleId: record.moduleId,
+        expectedHeadSha: record.bindings?.exactHeadSha,
+        expectedBaseSha: record.bindings?.currentBaseSha,
+      });
+    } else {
+      axisymmetricApproval = evidence.axisymmetricRegistrationApprovalReceipt;
+      validateAxisymmetricRegistrationApprovalReceipt(axisymmetricApproval, {
+        expectedHeadSha: record.bindings?.exactHeadSha,
+      });
+    }
   }
   if (nextState === QUALIFICATION_STATES.MODULE_QUALIFIED) {
     const required = [
@@ -212,6 +230,11 @@ export function advanceQualificationState(record, nextState, evidence = {}) {
       axisymmetricApproval.semanticHash;
     payload.bindings.axisymmetricRegistrationBaseSha = axisymmetricApproval.baseSha;
   }
+  if (axisymmetricAdoption) {
+    payload.bindings.axisymmetricRegistrationAdoptionReceipt = clone(axisymmetricAdoption);
+    payload.bindings.axisymmetricRegistrationAdoptionHash = axisymmetricAdoption.semanticHash;
+    payload.bindings.axisymmetricRegistrationBaseSha = axisymmetricAdoption.currentBaseSha;
+  }
   if (evidence.sharedGateQualificationReceipt?.semanticHash) {
     payload.bindings.sharedGateQualificationReceiptHash =
       evidence.sharedGateQualificationReceipt.semanticHash;
@@ -251,6 +274,18 @@ function validateAxisymmetricRecordAuthority(record) {
       === QUALIFICATION_STATES.BLOCKED_PENDING_AXISYMMETRIC_REGISTRATION) {
     return;
   }
+  const adoption = record.bindings?.axisymmetricRegistrationAdoptionReceipt;
+  if (adoption) {
+    validateAxisymmetricRegistrationAdoptionReceipt(adoption, {
+      expectedModuleId: record.moduleId,
+      expectedHeadSha: record.bindings?.exactHeadSha,
+      expectedBaseSha: record.bindings?.axisymmetricRegistrationBaseSha,
+    });
+    if (record.bindings.axisymmetricRegistrationAdoptionHash !== adoption.semanticHash) {
+      throw new TypeError('C2D-FLANGE-HUB axisymmetric registration adoption hash mismatch.');
+    }
+    return;
+  }
   const receipt = record.bindings?.axisymmetricRegistrationApprovalReceipt;
   validateAxisymmetricRegistrationApprovalReceipt(receipt, {
     expectedHeadSha: record.bindings?.exactHeadSha,
@@ -273,9 +308,14 @@ function validateBindings(bindings, allowIncomplete) {
   if (bindings.exactHeadSha !== undefined && !isGitSha(bindings.exactHeadSha)) {
     throw new TypeError('exactHeadSha must be a 40-character Git SHA.');
   }
+  if (bindings.currentBaseSha !== undefined && !isGitSha(bindings.currentBaseSha)) {
+    throw new TypeError('currentBaseSha must be a 40-character Git SHA.');
+  }
   for (const [key, value] of Object.entries(bindings)) {
     if (key === 'exactHeadSha'
+      || key === 'currentBaseSha'
       || key === 'axisymmetricRegistrationApprovalReceipt'
+      || key === 'axisymmetricRegistrationAdoptionReceipt'
       || key === 'axisymmetricRegistrationBaseSha') {
       continue;
     }
