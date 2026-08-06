@@ -53,6 +53,10 @@ A local replay of the retained detailed ledger for pair `130-140`, end I, evalua
 
 This ledger is diagnostic evidence only. Exact acceptance remains the complete 5,598-scalar comparator.
 
+## Exact-head execution
+
+The pull-request head is qualified through the stacked M031/M032 workflow. The workflow must check out the immutable PR SHA, execute the complete comparator, run BM1/BM3/linear-core regressions, and upload deterministic evidence before this candidate can advance.
+
 ## Acceptance
 
 - denominator remains 5,598;
