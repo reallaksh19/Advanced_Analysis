@@ -47,7 +47,15 @@ jobs:
           node --check src/workspace/dataset-types.js
           node --check src/workspace/load-calc-consumer-controller.js
           node --check src/workspace/workspace-shell-controller.js
+          node --check src/workspace/topology-edit-3d-productivity-controller.js
           node --check src/workspace/topology-edit-3d-sjson-fidelity-controller.js
+          node --check src/workspace/viewport-productivity/topology-edit-clean-shell-runtime.js
+          node --check src/workspace/viewport-productivity/topology-edit-object-tree-runtime.js
+          node --check src/workspace/viewport-productivity/topology-edit-object-tree-styles.js
+          node --check src/workspace/viewport-presentation/topology-edit-presentation-runtime.js
+          node --check src/workspace/topology-edit/topology-edit-large-model-policy.js
+          node --check src/workspace/topology-edit/topology-edit-gpu-picker.js
+          node --check src/workspace/topology-edit/topology-edit-navigation-hud-viewport-backend.js
           node --check src/workspace/topology-edit/topology-edit-candidate-builder.js
           node --check src/workspace/topology-edit/topology-edit-checker-lineage.js
           node --check src/workspace/topology-edit/topology-edit-source-adapter.js
@@ -70,6 +78,9 @@ jobs:
           node --check src/workspace/topology-edit/topology-edit-sjson-parent-branch-diameter.js
           node --check src/workspace/topology-edit/topology-edit-sjson-support-parent-branch-diameter.js
           node --check src/workspace/topology-edit/topology-edit-sjson-restraint-projection.js
+          node --check tests/topology-edit-clean-shell-productivity.test.mjs
+          node --check tests/topology-edit-large-model-policy.test.mjs
+          node --check tests/topology-edit-navigation-pick-fallback.test.mjs
           node --check tests/topology-edit-sjson-production-editability.test.mjs
           node --check tests/topology-edit-sjson-governed-projection-v2.test.mjs
           node --check tests/topology-edit-sjson-governed-viewport-v2.test.mjs
@@ -80,9 +91,12 @@ jobs:
           node --check e2e/topology-edit-clean-layout.spec.js
           git diff --check
 
-      - name: Execute canonical, governed projection, support, and lineage tests
+      - name: Execute canonical, governed projection, support, and productivity tests
         run: |
           node --test \
+            tests/topology-edit-clean-shell-productivity.test.mjs \
+            tests/topology-edit-large-model-policy.test.mjs \
+            tests/topology-edit-navigation-pick-fallback.test.mjs \
             tests/topology-edit-sjson-production-editability.test.mjs \
             tests/topology-edit-sjson-governed-projection-v2.test.mjs \
             tests/topology-edit-sjson-governed-viewport-v2.test.mjs \

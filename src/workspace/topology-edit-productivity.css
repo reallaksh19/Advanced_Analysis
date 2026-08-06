@@ -1,0 +1,262 @@
+/* High-ROI presentation-only productivity additions for the 3D Edit shell. */
+.topology-edit-clean-shell .topology-edit-clean-shell__workspace {
+  --topology-edit-sidecar-width: 320px;
+  grid-template-columns: minmax(0, 1fr) 6px minmax(248px, var(--topology-edit-sidecar-width));
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.topology-edit-clean-shell .topology-edit-clean-shell__workspace > .topology-edit-3d-canvas {
+  grid-column: 1;
+  grid-row: 1;
+  border-right: 0;
+}
+
+.topology-edit-clean-shell .topology-edit-clean-shell__resizer {
+  position: relative;
+  z-index: 14;
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 6px;
+  cursor: col-resize;
+  touch-action: none;
+  background: #081321;
+  border-left: 1px solid #162a40;
+  border-right: 1px solid #162a40;
+}
+
+.topology-edit-clean-shell .topology-edit-clean-shell__sidecar {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.topology-edit-clean-shell__resizer::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 42px;
+  border-radius: 2px;
+  background: #315070;
+  transform: translate(-50%, -50%);
+}
+
+.topology-edit-clean-shell__resizer:hover,
+.topology-edit-clean-shell__resizer:focus-visible,
+.topology-edit-clean-shell--resizing .topology-edit-clean-shell__resizer {
+  background: #10233a;
+  outline: none;
+}
+
+.topology-edit-clean-shell__resizer:hover::after,
+.topology-edit-clean-shell__resizer:focus-visible::after,
+.topology-edit-clean-shell--resizing .topology-edit-clean-shell__resizer::after {
+  background: #38bdf8;
+}
+
+.topology-edit-clean-shell--resizing,
+.topology-edit-clean-shell--resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+.topology-edit-clean-shell.topology-edit-clean-shell--inspector-closed .topology-edit-clean-shell__workspace {
+  grid-template-columns: minmax(0, 1fr) 0 0;
+}
+
+.topology-edit-clean-shell--inspector-closed .topology-edit-clean-shell__sidecar,
+.topology-edit-clean-shell--inspector-closed .topology-edit-clean-shell__resizer {
+  display: none;
+}
+
+.topology-edit-clean-shell__selection {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 220px;
+  padding-left: 7px;
+  border-left: 1px solid #1e344c;
+}
+
+.topology-edit-clean-shell__selection output {
+  min-width: 0;
+  overflow: hidden;
+  color: #bae6fd;
+  font: 10px/1.2 'JetBrains Mono', monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topology-edit-clean-shell__selection button {
+  min-height: 24px;
+  padding: 3px 6px;
+}
+
+.topology-edit-clean-shell__draft-state {
+  flex: 0 0 auto;
+  min-width: 74px;
+  padding: 4px 7px;
+  border: 1px solid #263c55;
+  border-radius: 999px;
+  color: #aebed0;
+  background: #081321;
+  font: 700 9px/1.2 'JetBrains Mono', monospace;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.topology-edit-clean-shell__draft-state[data-state='saved'] {
+  border-color: #047857;
+  color: #a7f3d0;
+  background: #052e2a;
+}
+
+.topology-edit-clean-shell__draft-state[data-state='dirty'],
+.topology-edit-clean-shell__draft-state[data-state='preview'] {
+  border-color: #a16207;
+  color: #fde68a;
+  background: #342006;
+}
+
+.topology-edit-clean-shell__draft-state[data-state='error'],
+.topology-edit-clean-shell__draft-state[data-state='blocked'] {
+  border-color: #b91c1c;
+  color: #fecaca;
+  background: #3b0a0a;
+}
+
+.topology-edit-clean-shell__utilities {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+}
+
+.topology-edit-clean-shell__utilities [aria-pressed='false'] {
+  color: #94a3b8;
+}
+
+.topology-edit-clean-shell__shortcuts {
+  position: absolute;
+  top: 52px;
+  right: 12px;
+  z-index: 60;
+  width: min(360px, calc(100% - 24px));
+  padding: 10px;
+  border: 1px solid #315070;
+  border-radius: 9px;
+  background: rgba(6, 11, 20, 0.99);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.62);
+  color: #cbd5e1;
+  box-sizing: border-box;
+}
+
+.topology-edit-clean-shell__shortcuts[hidden] {
+  display: none;
+}
+
+.topology-edit-clean-shell__shortcuts header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: #f8fafc;
+}
+
+.topology-edit-clean-shell__shortcuts header button {
+  min-width: 28px;
+  padding: 2px 6px;
+  font-size: 15px;
+}
+
+.topology-edit-clean-shell__shortcuts dl {
+  display: grid;
+  grid-template-columns: minmax(92px, 0.7fr) minmax(0, 1.3fr);
+  gap: 6px 10px;
+  margin: 0;
+  font-size: 11px;
+}
+
+.topology-edit-clean-shell__shortcuts dt {
+  color: #7dd3fc;
+  font: 700 10px/1.4 'JetBrains Mono', monospace;
+}
+
+.topology-edit-clean-shell__shortcuts dd {
+  margin: 0;
+  color: #aebed0;
+}
+
+.topology-edit-clean-shell [data-role='topology-edit-panel-badge'] {
+  margin-left: auto;
+  padding: 2px 6px;
+  border: 1px solid #854d0e;
+  border-radius: 999px;
+  background: #301b05;
+  color: #fde68a;
+  font: 700 9px/1.1 'JetBrains Mono', monospace;
+}
+
+.topology-edit-clean-shell [data-role='topology-edit-panel-badge'][hidden] {
+  display: none;
+}
+
+.topology-edit-clean-shell__sidecar:focus {
+  outline: none;
+}
+
+@media (max-width: 1250px) {
+  .topology-edit-clean-shell__selection {
+    max-width: 145px;
+  }
+
+  .topology-edit-clean-shell__draft-state {
+    min-width: 0;
+  }
+
+  .topology-edit-clean-shell__utilities [data-action='toggle-shortcuts'] {
+    padding-inline: 6px;
+  }
+}
+
+@media (max-width: 1050px) {
+  .topology-edit-clean-shell .topology-edit-clean-shell__workspace {
+    grid-template-columns: minmax(0, 1fr) 6px minmax(248px, var(--topology-edit-sidecar-width));
+  }
+
+  .topology-edit-clean-shell__selection {
+    display: none;
+  }
+
+  .topology-edit-clean-shell__draft-state {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .topology-edit-clean-shell .topology-edit-clean-shell__workspace {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(420px, 62vh) auto;
+    overflow: auto;
+  }
+
+  .topology-edit-clean-shell .topology-edit-clean-shell__workspace > .topology-edit-3d-canvas {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .topology-edit-clean-shell .topology-edit-clean-shell__sidecar {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .topology-edit-clean-shell .topology-edit-clean-shell__resizer {
+    display: none;
+  }
+
+  .topology-edit-clean-shell.topology-edit-clean-shell--inspector-closed .topology-edit-clean-shell__workspace {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(520px, 1fr);
+  }
+}

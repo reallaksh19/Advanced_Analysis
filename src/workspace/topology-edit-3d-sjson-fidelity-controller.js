@@ -1,6 +1,6 @@
 import {
   TopologyEdit3DViewController as ProfessionalController,
-} from './topology-edit-3d-professional-controller.js';
+} from './topology-edit-3d-productivity-controller.js';
 import { SupportRestraintStore } from './support-restraint-store.js';
 import { semanticHash } from '../core/shared-piping-model/index.js';
 import {
@@ -26,6 +26,9 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     this.sjsonVisualByRole = new Map();
     this.sjsonBenchmarkView = null;
     this.sjsonSupportBundle = null;
+    this.sjsonSourceVisualCache = null;
+    this.sjsonSourceVisualCacheDataset = null;
+    this.sjsonSourceVisualCacheKey = '';
   }
 
   async activate() {
@@ -124,6 +127,18 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     if (!this.isGovernedSjsonCanonical(canonical)) {
       return super.deriveVisual(canonical, modelRole);
     }
+    const role = String(modelRole || 'DRAFT').toUpperCase();
+    const cacheKey = `${String(canonical?.sourceHash || '')}:${String(canonical?.canonicalTopologyHash || '')}`;
+    if (
+      role === 'SOURCE'
+      && this.sjsonSourceVisualCache
+      && this.sjsonSourceVisualCacheDataset === this.workspaceDataset
+      && this.sjsonSourceVisualCacheKey === cacheKey
+    ) {
+      this.sjsonVisualByRole.set(role, this.sjsonSourceVisualCache);
+      if (this.hostElement) this.hostElement.dataset.topologyEditSjsonSourceVisualCache = 'HIT';
+      return this.sjsonSourceVisualCache;
+    }
     const result = adaptSjsonVisualToGovernedEditDraftProjection({
       visualResult: deriveSjsonCompleteVisualGeometry({
         canonicalTopology: canonical,
@@ -132,8 +147,13 @@ export class TopologyEdit3DViewController extends ProfessionalController {
       }),
       dataset: this.workspaceDataset,
     });
-    const role = String(modelRole || 'DRAFT').toUpperCase();
     this.sjsonVisualByRole.set(role, result);
+    if (role === 'SOURCE') {
+      this.sjsonSourceVisualCache = result;
+      this.sjsonSourceVisualCacheDataset = this.workspaceDataset;
+      this.sjsonSourceVisualCacheKey = cacheKey;
+      if (this.hostElement) this.hostElement.dataset.topologyEditSjsonSourceVisualCache = 'MISS';
+    }
     if (role === 'DRAFT') {
       this.sjsonSupportBundle = deriveGovernedSjsonSupportBundle({
         canonical,
@@ -210,6 +230,9 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     this.sjsonVisualByRole.clear();
     this.sjsonBenchmarkView = null;
     this.sjsonSupportBundle = null;
+    this.sjsonSourceVisualCache = null;
+    this.sjsonSourceVisualCacheDataset = null;
+    this.sjsonSourceVisualCacheKey = '';
     super.deactivate();
   }
 }

@@ -6,6 +6,9 @@ import {
   ensureTopologyEditObjectTreeStyles,
 } from './topology-edit-object-tree-styles.js';
 
+const FALLBACK_INITIAL_ROWS = 240;
+const FALLBACK_ROW_INCREMENT = 160;
+
 export class TopologyEditObjectTreeRuntime {
   constructor(controller) {
     if (!controller) {
@@ -21,6 +24,8 @@ export class TopologyEditObjectTreeRuntime {
     this.query = '';
     this.busy = false;
     this.openGroups = new Set(['nodes', 'edges']);
+    this.visibleLimits = new Map();
+    this.scheduledRender = 0;
     this.handleClick = (event) => this.onClick(event);
     this.handleInput = (event) => this.onInput(event);
   }
@@ -42,6 +47,7 @@ export class TopologyEditObjectTreeRuntime {
   }
 
   destroy() {
+    this.cancelScheduledRender();
     this.element?.removeEventListener('click', this.handleClick);
     this.element?.removeEventListener('input', this.handleInput);
     this.element?.replaceChildren();
@@ -52,17 +58,34 @@ export class TopologyEditObjectTreeRuntime {
     this.statusOutput = null;
     this.tree = null;
     this.busy = false;
+    this.visibleLimits.clear();
   }
 
   refresh(topology = this.controller.session?.currentTopology?.()) {
     if (!this.element || !topology) return;
-    this.tree = createTopologyEditObjectTree(topology);
+    const nextTree = createTopologyEditObjectTree(topology);
+    if (this.tree?.treeHash === nextTree.treeHash) {
+      this.tree = nextTree;
+      this.selectionChanged();
+      return;
+    }
+    this.tree = nextTree;
+    this.visibleLimits.clear();
     this.render();
   }
 
   selectionChanged() {
     if (!this.element || !this.tree) return;
-    this.render();
+    const selection = this.currentSelection();
+    const renderedIds = new Set(
+      [...this.element.querySelectorAll('[data-object-tree-select]')]
+        .map((button) => button.dataset.objectTreeSelect),
+    );
+    if (selection.canonicalIds.some((canonicalId) => !renderedIds.has(canonicalId))) {
+      this.render();
+      return;
+    }
+    this.patchSelectionState();
   }
 
   viewState() {
@@ -77,6 +100,7 @@ export class TopologyEditObjectTreeRuntime {
     this.openGroups = new Set(Array.isArray(value.openGroups)
       ? value.openGroups
       : ['nodes', 'edges']);
+    this.visibleLimits.clear();
     if (this.filterInput) this.filterInput.value = this.query;
     this.render();
   }
@@ -117,18 +141,23 @@ export class TopologyEditObjectTreeRuntime {
   }
 
   render() {
+    this.cancelScheduledRender();
     if (!this.element || !this.tree || !this.groupsElement) return;
     this.captureOpenGroups();
     const documentRef = this.element.ownerDocument;
     const filtered = filterTopologyEditObjectTree(this.tree, this.query);
-    const selected = new Set(
-      this.controller.editorStore?.getState?.().selection?.canonicalIds ?? [],
-    );
-    const primaryId = this.controller.editorStore?.getState?.().selection?.primaryId ?? null;
+    const selection = this.currentSelection();
+    const selected = new Set(selection.canonicalIds);
+    const primaryId = selection.primaryId;
     const fragment = documentRef.createDocumentFragment();
+    let renderedRowCount = 0;
+    let windowedGroupCount = 0;
     filtered.groups.forEach((group) => {
       if (!group.count && this.query) return;
-      fragment.append(this.renderGroup(documentRef, group, selected, primaryId));
+      const rendered = this.renderGroup(documentRef, group, selected, primaryId);
+      renderedRowCount += rendered.renderedRowCount;
+      if (rendered.windowed) windowedGroupCount += 1;
+      fragment.append(rendered.element);
     });
     if (!filtered.totalCount) {
       const empty = documentRef.createElement('p');
@@ -140,16 +169,16 @@ export class TopologyEditObjectTreeRuntime {
     }
     this.groupsElement.replaceChildren(fragment);
     this.countOutput.textContent = `${filtered.totalCount} / ${this.tree.totalCount}`;
-    this.statusOutput.textContent = primaryId
-      ? `Primary selection: ${primaryId}`
-      : 'No canonical object selected.';
+    this.publishSelectionEvidence(selected, primaryId);
     this.element.dataset.busy = String(this.busy);
     this.element.dataset.topologyEditObjectTreeHash = this.tree.treeHash;
     this.element.dataset.topologyEditObjectTreeCanonicalHash =
       this.tree.canonicalTopologyHash;
     this.element.dataset.topologyEditObjectTreeCount = String(this.tree.totalCount);
     this.element.dataset.topologyEditObjectTreeFilteredCount = String(filtered.totalCount);
-    this.element.dataset.topologyEditObjectTreeSelectedIds = [...selected].join(',');
+    this.element.dataset.topologyEditObjectTreeRenderedRowCount = String(renderedRowCount);
+    this.element.dataset.topologyEditObjectTreeWindowedGroupCount = String(windowedGroupCount);
+    this.element.dataset.topologyEditObjectTreeWindowed = String(windowedGroupCount > 0);
   }
 
   renderGroup(documentRef, group, selected, primaryId) {
@@ -166,7 +195,9 @@ export class TopologyEditObjectTreeRuntime {
     summary.append(label, count);
     const list = documentRef.createElement('ul');
     list.className = 'topology-edit-object-tree__list';
-    group.items.forEach((item) => list.append(
+    const limit = this.visibleLimit(group.key);
+    const window = selectTopologyEditObjectTreeWindow(group.items, selected, limit);
+    window.items.forEach((item) => list.append(
       this.renderItem(documentRef, item, selected, primaryId),
     ));
     if (!group.items.length) {
@@ -176,8 +207,30 @@ export class TopologyEditObjectTreeRuntime {
       details.append(summary, empty);
     } else {
       details.append(summary, list);
+      if (window.remainingCount > 0) {
+        details.append(this.renderMoreButton(
+          documentRef,
+          group.key,
+          window.remainingCount,
+        ));
+      }
     }
-    return details;
+    return {
+      element: details,
+      renderedRowCount: window.items.length,
+      windowed: window.remainingCount > 0,
+    };
+  }
+
+  renderMoreButton(documentRef, groupKey, remainingCount) {
+    const increment = this.rowIncrement();
+    const button = documentRef.createElement('button');
+    button.type = 'button';
+    button.className = 'topology-edit-object-tree__more';
+    button.dataset.objectTreeMore = groupKey;
+    button.textContent = `Show next ${Math.min(increment, remainingCount)} · ${remainingCount} remaining`;
+    button.setAttribute('aria-label', `Show more ${groupKey} objects`);
+    return button;
   }
 
   renderItem(documentRef, item, selected, primaryId) {
@@ -224,6 +277,56 @@ export class TopologyEditObjectTreeRuntime {
     return row;
   }
 
+  patchSelectionState() {
+    if (!this.element) return;
+    const selection = this.currentSelection();
+    const selected = new Set(selection.canonicalIds);
+    const primaryId = selection.primaryId;
+    this.element.querySelectorAll('[data-object-tree-select]').forEach((button) => {
+      button.setAttribute('aria-pressed', String(selected.has(button.dataset.objectTreeSelect)));
+    });
+    this.element.querySelectorAll('[data-object-tree-action]').forEach((button) => {
+      if (button.dataset.objectTreeTargetId === primaryId) {
+        button.dataset.primarySelection = 'true';
+      } else {
+        delete button.dataset.primarySelection;
+      }
+    });
+    this.publishSelectionEvidence(selected, primaryId);
+  }
+
+  publishSelectionEvidence(selected, primaryId) {
+    if (!this.element) return;
+    if (this.statusOutput) {
+      this.statusOutput.textContent = primaryId
+        ? `Primary selection: ${primaryId}`
+        : 'No canonical object selected.';
+    }
+    this.element.dataset.topologyEditObjectTreeSelectedIds = [...selected].join(',');
+  }
+
+  currentSelection() {
+    const selection = this.controller.editorStore?.getState?.().selection ?? {};
+    return {
+      canonicalIds: Array.isArray(selection.canonicalIds) ? selection.canonicalIds : [],
+      primaryId: selection.primaryId ?? null,
+    };
+  }
+
+  visibleLimit(groupKey) {
+    return this.visibleLimits.get(groupKey) ?? this.initialRowLimit();
+  }
+
+  initialRowLimit() {
+    const value = Number(this.controller.viewportBackend?.largeModelPolicy?.objectTreeInitialRows);
+    return Number.isInteger(value) && value > 0 ? value : FALLBACK_INITIAL_ROWS;
+  }
+
+  rowIncrement() {
+    const value = Number(this.controller.viewportBackend?.largeModelPolicy?.objectTreeRowIncrement);
+    return Number.isInteger(value) && value > 0 ? value : FALLBACK_ROW_INCREMENT;
+  }
+
   captureOpenGroups() {
     if (!this.groupsElement) return;
     this.groupsElement.querySelectorAll('details[data-object-tree-group]').forEach((details) => {
@@ -235,10 +338,46 @@ export class TopologyEditObjectTreeRuntime {
   onInput(event) {
     if (event.target !== this.filterInput) return;
     this.query = this.filterInput.value;
-    this.render();
+    this.visibleLimits.clear();
+    this.scheduleRender();
+  }
+
+  scheduleRender() {
+    if (this.scheduledRender) return;
+    const render = () => {
+      this.scheduledRender = 0;
+      this.render();
+    };
+    if (typeof globalThis.requestAnimationFrame === 'function') {
+      this.scheduledRender = globalThis.requestAnimationFrame(render);
+    } else {
+      this.scheduledRender = globalThis.setTimeout(render, 0);
+    }
+  }
+
+  cancelScheduledRender() {
+    if (!this.scheduledRender) return;
+    if (typeof globalThis.cancelAnimationFrame === 'function') {
+      globalThis.cancelAnimationFrame(this.scheduledRender);
+    } else {
+      globalThis.clearTimeout?.(this.scheduledRender);
+    }
+    this.scheduledRender = 0;
   }
 
   async onClick(event) {
+    const moreButton = event.target.closest?.('[data-object-tree-more]');
+    if (moreButton && this.element.contains(moreButton)) {
+      event.preventDefault();
+      event.stopPropagation();
+      const groupKey = moreButton.dataset.objectTreeMore;
+      this.visibleLimits.set(
+        groupKey,
+        this.visibleLimit(groupKey) + this.rowIncrement(),
+      );
+      this.render();
+      return;
+    }
     const actionButton = event.target.closest?.('[data-object-tree-action]');
     if (actionButton && this.element.contains(actionButton)) {
       event.preventDefault();
@@ -292,4 +431,18 @@ export class TopologyEditObjectTreeRuntime {
       this.refresh();
     }
   }
+}
+
+export function selectTopologyEditObjectTreeWindow(items, selectedIds, limitInput) {
+  const rows = Array.isArray(items) ? items : [];
+  const selected = selectedIds instanceof Set ? selectedIds : new Set(selectedIds || []);
+  const limit = Math.max(1, Math.floor(Number(limitInput) || FALLBACK_INITIAL_ROWS));
+  const accepted = rows.filter((item, index) => (
+    index < limit || selected.has(item.canonicalId)
+  ));
+  return Object.freeze({
+    items: Object.freeze(accepted),
+    remainingCount: Math.max(0, rows.length - accepted.length),
+    requestedLimit: limit,
+  });
 }

@@ -5,6 +5,12 @@ const SJSON_BYTES = readFileSync(new URL('../public/Sjson.json', import.meta.url
 const EXPECTED_URL = new URL('../Temp/3D EDIT RENDER/EXPECTED.png', import.meta.url);
 const EXPECTED_BYTES = readFileSync(EXPECTED_URL);
 const VIEWPORT = Object.freeze({ width: 1637, height: 869 });
+const EXPECTED_CANVAS_CROP = Object.freeze({
+  x: 52,
+  y: 221.171875,
+  width: 1207,
+  height: 531.828125,
+});
 const ROUTE_STYLE = 'TOPO_VALIDATOR_EDIT_DRAFT_COMPACT';
 const ROUTE_AUTHORITY = 'TOPO_VALIDATOR_EDIT_DRAFT_APOS_POS_LPOS_COMPACT_GEOMETRY_V1';
 const ELBOW_AUTHORITY = 'TOPO_VALIDATOR_EDIT_DRAFT_TANGENT_INTERSECTION_CUBIC_BEZIER_V1';
@@ -141,7 +147,10 @@ test('production SJSON uses Edit Draft bends, compact fittings and visible suppo
     page,
     EXPECTED_BYTES,
     candidateBytes,
-    rect,
+    {
+      expected: EXPECTED_CANVAS_CROP,
+      candidate: rect,
+    },
   );
 
   expect(visualMetrics.candidate.brightPixelRatio)
@@ -168,8 +177,8 @@ test('production SJSON uses Edit Draft bends, compact fittings and visible suppo
   });
 });
 
-async function compareCanvasVisuals(page, expectedBytes, candidateBytes, rect) {
-  return page.evaluate(async ({ expectedBase64, candidateBase64, crop }) => {
+async function compareCanvasVisuals(page, expectedBytes, candidateBytes, crops) {
+  return page.evaluate(async ({ expectedBase64, candidateBase64, cropByImage }) => {
     const largestComponent = (mask, width, height) => {
       const visited = new Uint8Array(mask.length);
       const queue = new Int32Array(mask.length);
@@ -203,7 +212,7 @@ async function compareCanvasVisuals(page, expectedBytes, candidateBytes, rect) {
       }
       return largest;
     };
-    const metrics = async (base64) => {
+    const metrics = async (base64, crop) => {
       const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
       const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
       const width = Math.max(1, Math.round(crop.width));
@@ -250,18 +259,26 @@ async function compareCanvasVisuals(page, expectedBytes, candidateBytes, rect) {
       };
     };
     return {
-      crop,
-      expected: await metrics(expectedBase64),
-      candidate: await metrics(candidateBase64),
+      crops: cropByImage,
+      expected: await metrics(expectedBase64, cropByImage.expected),
+      candidate: await metrics(candidateBase64, cropByImage.candidate),
     };
   }, {
     expectedBase64: expectedBytes.toString('base64'),
     candidateBase64: candidateBytes.toString('base64'),
-    crop: {
-      x: rect.x,
-      y: rect.y,
-      width: rect.width,
-      height: rect.height,
+    cropByImage: {
+      expected: {
+        x: crops.expected.x,
+        y: crops.expected.y,
+        width: crops.expected.width,
+        height: crops.expected.height,
+      },
+      candidate: {
+        x: crops.candidate.x,
+        y: crops.candidate.y,
+        width: crops.candidate.width,
+        height: crops.candidate.height,
+      },
     },
   });
 }

@@ -5,6 +5,7 @@ import { APPLICATION_EVENTS, EVENT_TOPICS } from './event-topics.js';
 const STORAGE_KEY = 'workspace-layout-prefs/v2';
 const PANEL_MINIMUM_PX = 200;
 const FOCUS_PANEL_WIDTH_PX = 48;
+const TOPOLOGY_EDIT_LEFT_PANEL_DEFAULT_PX = 260;
 
 /** Owns layout, shared-view switching, and panel resizing only. */
 export class WorkspaceShellController {
@@ -12,7 +13,15 @@ export class WorkspaceShellController {
     if (!rootElement) throw new TypeError('WorkspaceShellController requires a root element.');
     this.rootElement = rootElement;
     this.shellElement = null;
-    this.state = { leftPanelWidth: 300, rightPanelWidth: 350, activeViewportTab: 'webgl', treeCollapsed: false, propertiesCollapsed: false, topologyEdit3DActive: false };
+    this.state = {
+      leftPanelWidth: 300,
+      topologyEditLeftPanelWidth: TOPOLOGY_EDIT_LEFT_PANEL_DEFAULT_PX,
+      rightPanelWidth: 350,
+      activeViewportTab: 'webgl',
+      treeCollapsed: false,
+      propertiesCollapsed: false,
+      topologyEdit3DActive: false,
+    };
     this.dragContext = null;
     this.unsubscribers = [];
     this.handlePointerDown = (event) => this.pointerDown(event);
@@ -133,11 +142,14 @@ export class WorkspaceShellController {
 
   pointerDown(event) {
     const resizer = event.target.closest('.panel-resizer');
-    if (!resizer || this.state.topologyEdit3DActive) return;
+    if (!resizer) return;
+    const action = resizer.dataset.action;
+    if (this.state.topologyEdit3DActive && action !== 'resize-left') return;
     const tree = this.shellElement.querySelector('.tree-panel');
     const properties = this.shellElement.querySelector('.properties-panel');
     this.dragContext = {
-      action: resizer.dataset.action,
+      action,
+      topologyEdit3DActive: this.state.topologyEdit3DActive,
       startX: event.clientX,
       leftWidth: tree.getBoundingClientRect().width,
       rightWidth: properties.getBoundingClientRect().width,
@@ -152,7 +164,16 @@ export class WorkspaceShellController {
     if (!this.dragContext) return;
     event.preventDefault();
     const delta = event.clientX - this.dragContext.startX;
-    if (this.dragContext.action === 'resize-left') this.state.leftPanelWidth = clamp(this.dragContext.leftWidth + delta, PANEL_MINIMUM_PX, this.dragContext.maximumWidth);
+    if (this.dragContext.action === 'resize-left') {
+      const key = this.dragContext.topologyEdit3DActive
+        ? 'topologyEditLeftPanelWidth'
+        : 'leftPanelWidth';
+      this.state[key] = clamp(
+        this.dragContext.leftWidth + delta,
+        PANEL_MINIMUM_PX,
+        this.dragContext.maximumWidth,
+      );
+    }
     if (this.dragContext.action === 'resize-right') this.state.rightPanelWidth = clamp(this.dragContext.rightWidth - delta, PANEL_MINIMUM_PX, this.dragContext.maximumWidth);
     this.applyPanelLayout();
   }
@@ -169,12 +190,17 @@ export class WorkspaceShellController {
   applyPanelLayout() {
     if (!this.shellElement) return;
     const focus = this.state.topologyEdit3DActive;
-    const treeCollapsed = focus || this.state.treeCollapsed;
+    const treeCollapsed = this.state.treeCollapsed;
     const propertiesCollapsed = focus || this.state.propertiesCollapsed;
-    const left = treeCollapsed ? FOCUS_PANEL_WIDTH_PX : this.state.leftPanelWidth;
+    const expandedLeft = focus
+      ? this.state.topologyEditLeftPanelWidth
+      : this.state.leftPanelWidth;
+    const left = treeCollapsed ? FOCUS_PANEL_WIDTH_PX : expandedLeft;
     const right = propertiesCollapsed ? FOCUS_PANEL_WIDTH_PX : this.state.rightPanelWidth;
     this.shellElement.style.gridTemplateColumns = `${left}px 4px minmax(360px,1fr) 4px ${right}px`;
     this.shellElement.dataset.topologyEditFocusLayout = String(focus);
+    this.shellElement.dataset.topologyEditLeftPanelVisible = String(!treeCollapsed);
+    this.shellElement.dataset.topologyEditLeftPanelWidthPx = String(left);
     this.shellElement.querySelector('.tree-panel').classList.toggle('workspace-panel--collapsed', treeCollapsed);
     this.shellElement.querySelector('.properties-panel').classList.toggle('workspace-panel--collapsed', propertiesCollapsed);
   }
@@ -195,13 +221,21 @@ export class WorkspaceShellController {
       const saved = JSON.parse(globalThis.localStorage?.getItem(STORAGE_KEY) || 'null');
       if (!saved) return;
       if (Number.isFinite(saved.leftPanelWidth)) this.state.leftPanelWidth = saved.leftPanelWidth;
+      if (Number.isFinite(saved.topologyEditLeftPanelWidth)) {
+        this.state.topologyEditLeftPanelWidth = saved.topologyEditLeftPanelWidth;
+      }
       if (Number.isFinite(saved.rightPanelWidth)) this.state.rightPanelWidth = saved.rightPanelWidth;
       if (['webgl', 'svg', 'split'].includes(saved.activeViewportTab)) this.state.activeViewportTab = saved.activeViewportTab;
     } catch { globalThis.localStorage?.removeItem(STORAGE_KEY); }
   }
 
   saveState() {
-    globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify({ leftPanelWidth: this.state.leftPanelWidth, rightPanelWidth: this.state.rightPanelWidth, activeViewportTab: this.state.activeViewportTab }));
+    globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify({
+      leftPanelWidth: this.state.leftPanelWidth,
+      topologyEditLeftPanelWidth: this.state.topologyEditLeftPanelWidth,
+      rightPanelWidth: this.state.rightPanelWidth,
+      activeViewportTab: this.state.activeViewportTab,
+    }));
   }
 
   destroy() {
