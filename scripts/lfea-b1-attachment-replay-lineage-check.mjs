@@ -35,12 +35,18 @@ assert.deepEqual(retainedNode.meta.attachmentPoints, [
   {
     attachmentPointId: SOURCE_POINT.attachmentPointId,
     kind: SOURCE_POINT.kind,
+  },
+]);
+assert.deepEqual(retainedNode.meta.attachmentPointCustody, [
+  {
+    attachmentPointId: SOURCE_POINT.attachmentPointId,
+    kind: SOURCE_POINT.kind,
     sourceSegmentId: SOURCE_POINT.segmentId,
     sourceFraction: SOURCE_POINT.fraction,
   },
 ]);
 assert.equal(first.geometry.segments.some((row) => row.id === SOURCE_POINT.segmentId), false);
-console.log('✅ First conditioning retains exact source segment and fraction custody.');
+console.log('✅ First conditioning retains exact source lineage without changing legacy custody rows.');
 
 const replay = conditionGeometry(first.geometry, [SOURCE_POINT], PROFILE);
 assert.equal(replay.semanticHash, first.semanticHash);
@@ -74,10 +80,7 @@ console.log('✅ Duplicate incoming identities are rejected even when the identi
 const legacyWithoutLineage = structuredClone(first.geometry);
 delete legacyWithoutLineage.nodes
   .find((row) => row.meta?.attachmentPointId === SOURCE_POINT.attachmentPointId)
-  .meta.attachmentPoints[0].sourceSegmentId;
-delete legacyWithoutLineage.nodes
-  .find((row) => row.meta?.attachmentPointId === SOURCE_POINT.attachmentPointId)
-  .meta.attachmentPoints[0].sourceFraction;
+  .meta.attachmentPointCustody;
 expectCode(
   () => conditionGeometry(legacyWithoutLineage, [SOURCE_POINT], PROFILE),
   'ATTACHMENT_POINT_REPLAY_LINEAGE_UNAVAILABLE',

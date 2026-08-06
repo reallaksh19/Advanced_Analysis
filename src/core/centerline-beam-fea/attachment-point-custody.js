@@ -13,6 +13,11 @@ import {
  * makes that idempotence safe by retaining the original segment/fraction
  * lineage and requiring an exact replay before the identity may be skipped.
  *
+ * Compatibility note: `meta.attachmentPoints` remains the lightweight legacy
+ * identity/kind list. Complete replay authority is retained separately in
+ * `meta.attachmentPointCustody`, so existing topology consumers do not acquire
+ * a new record shape implicitly.
+ *
  * @param {object} geometry Canonical geometry.
  * @param {Array<{attachmentPointId:string,segmentId:string,fraction:number,kind:string}>} points
  * @returns {{geometry:object,inserted:Array<object>,diagnostics:Array<object>}}
@@ -125,6 +130,9 @@ function indexRetainedCustody(nodes) {
 
 function custodyRows(node) {
   const meta = node.meta && typeof node.meta === 'object' ? node.meta : {};
+  if (Array.isArray(meta.attachmentPointCustody)) {
+    return [...meta.attachmentPointCustody];
+  }
   const rows = Array.isArray(meta.attachmentPoints) ? [...meta.attachmentPoints] : [];
   if (typeof meta.attachmentPointId === 'string'
     && meta.attachmentPointId.length > 0
@@ -183,32 +191,41 @@ function requireExactReplay(point, retained) {
 function enrichNodeCustody(node, pointById) {
   const meta = node.meta && typeof node.meta === 'object' ? node.meta : {};
   if (!Array.isArray(meta.attachmentPoints)) return node;
-  let changed = false;
-  const attachmentPoints = meta.attachmentPoints.map((row) => {
+  const existingById = new Map(
+    (Array.isArray(meta.attachmentPointCustody) ? meta.attachmentPointCustody : [])
+      .map((row) => [row?.attachmentPointId, row]),
+  );
+  const attachmentPointCustody = [];
+  for (const row of meta.attachmentPoints) {
     const point = pointById.get(row?.attachmentPointId);
-    if (!point) return row;
-    const enriched = {
-      ...row,
-      attachmentPointId: point.attachmentPointId,
-      kind: point.kind,
-      sourceSegmentId: point.segmentId,
-      sourceFraction: point.fraction,
-    };
-    if (row.kind !== enriched.kind
-      || row.sourceSegmentId !== enriched.sourceSegmentId
-      || row.sourceFraction !== enriched.sourceFraction) {
-      changed = true;
+    if (point) {
+      attachmentPointCustody.push({
+        attachmentPointId: point.attachmentPointId,
+        kind: point.kind,
+        sourceSegmentId: point.segmentId,
+        sourceFraction: point.fraction,
+      });
+      continue;
     }
-    return enriched;
-  });
-  if (!changed) return node;
+    const existing = existingById.get(row?.attachmentPointId);
+    if (existing) attachmentPointCustody.push(existing);
+  }
+  if (attachmentPointCustody.length === 0) return node;
+  attachmentPointCustody.sort((left, right) => compareAscii(
+    left.attachmentPointId,
+    right.attachmentPointId,
+  ));
   return {
     ...node,
     meta: {
       ...meta,
-      attachmentPoints,
+      attachmentPointCustody,
     },
   };
+}
+
+function compareAscii(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 function info(code, scope, data) {
