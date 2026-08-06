@@ -507,7 +507,7 @@ function addCurrentMethodScopeBlockers(scenario, restraints, blockers) {
 }
 
 function requireAdapterMethod(value) {
-  if (!['EMPIRICAL_BEAM_CONTACT_V1', 'EMPIRICAL_RESTRAINT_NETWORK_V1'].includes(value)) {
+  if (!['EMPIRICAL_BEAM_CONTACT_V1', 'EMPIRICAL_RESTRAINT_NETWORK_V1', 'EMPIRICAL_RESTRAINT_NETWORK_V2'].includes(value)) {
     throw new TypeError(
       'The SJSON empirical piping adapter accepts beam/contact or restraint-network methods only.',
     );

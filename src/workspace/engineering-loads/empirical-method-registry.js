@@ -35,6 +35,14 @@ const METHODS = Object.freeze([
     resultClasses: ['THERMAL_LINE_STOP_SCREENING_RESULT'],
     qualifiedDofs: ['ONE_TRANSLATIONAL_DIRECTION'],
   }),
+  method({
+    methodId: 'EMPIRICAL_RESTRAINT_NETWORK_V2',
+    purpose: 'COUPLED_BRANCH_LOOP_THERMAL_SCREENING',
+    runtimeStatus: 'REGISTERED',
+    qualificationStatus: 'QUALIFIED_RESTRICTED_DOMAIN',
+    resultClasses: ['THERMAL_LINE_STOP_SCREENING_RESULT'],
+    qualifiedDofs: ['ONE_TRANSLATIONAL_DIRECTION_COUPLED_GRAPH'],
+  }),
 ]);
 
 export const EMPIRICAL_METHOD_REGISTRY = deepFreeze({
