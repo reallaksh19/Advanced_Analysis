@@ -116,3 +116,5 @@ reports/bm2-consolidated-latest-output.json
 ```
 
 Its `qualificationStatus` is the benchmark disposition. Source-custody checks may pass while numerical parity remains `INCOMPLETE_BLOCKED`.
+
+<!-- Temporary documentation-only trigger for exact-current-main BM2 qualification on 2026-08-06. -->
