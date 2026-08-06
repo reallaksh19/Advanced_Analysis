@@ -105,4 +105,7 @@ export {
   validateLinearPipingInputXmlAnalysisRequest,
 } from './inputxml-source-binding.js';
 
-export { diagnoseInputXmlModelHealthTopology } from './inputxml-model-health.js';
+export {
+  diagnoseInputXmlModelHealthProximity,
+  diagnoseInputXmlModelHealthTopology,
+} from './inputxml-model-health.js';
