@@ -26,33 +26,46 @@ jobs:
         run: |
           git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson > /tmp/EnrichedSjson
           git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson.topology.input.xml > /tmp/EnrichedSjson.topology.input.xml
-      - name: Confirm raw density values and source unit metadata
+      - name: Apply corrected XML density unit scale in working tree
         run: |
-          echo 'RAW_FLUID_DENSITY_VALUES'
-          grep -o 'FLUID_DENSITY="[^"]*"' /tmp/EnrichedSjson.topology.input.xml | sort | uniq -c
-          echo 'UNIT_METADATA'
-          grep -oE '(DENSITY|MASS|LENGTH|FORCE|UNIT)[A-Z0-9_:-]*="[^"]*"' /tmp/EnrichedSjson.topology.input.xml | sort | uniq -c | head -100 || true
-      - name: Audit duplicate enriched records for N50120 line
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/empirical-sjson-1885-configurable-screening-run.mjs')
+          text = path.read_text()
+          old = 'function normalizeFluidDensity(value) { return value < 20 ? value * 1000 : value; }'
+          new = 'function normalizeFluidDensity(value) { return value * number(profile.processResolution.inputXmlDensityToKgM3); }'
+          if text.count(old) != 1:
+              raise SystemExit('Expected exactly one legacy density normalization function.')
+          path.write_text(text.replace(old, new))
+          PY
+          jq '.processResolution.inputXmlDensityUnit = "kg/cm3" | .processResolution.inputXmlDensityToKgM3 = 1000000' \
+            benchmarks/1885Sjson/empirical-screening-profile.config.json > /tmp/profile.json
+      - name: Recalculate corrected result
         run: |
-          echo 'MATCHING_ENRICHED_RECORDS'
-          jq -c '
-            .. | objects
-            | select(((.name? // "") | tostring | contains("S8810111-91261M7-HC-01/B2 3")))
-            | {
-                name,
-                type,
-                attrName: .attributes.NAME,
-                insu: .attributes.INSU,
-                lpos: .attributes.LPOS,
-                pos: .attributes.POS,
-                apos: .attributes.APOS,
-                enrichedInsulation: .enrichedAttributes.insulationThicknessMm,
-                enrichedFluidDensity: .enrichedAttributes.fluidDensityOpeKgM3,
-                pipeOdMm: .enrichedAttributes.pipeOdMm,
-                wallThicknessMm: .enrichedAttributes.wallThicknessMm
-              }' /tmp/EnrichedSjson
-      - name: Audit N50120 incident mass and units
-        run: |
-          node scripts/tmp-sjson-50120-vertical-unit-audit.mjs \
+          node scripts/empirical-sjson-1885-configurable-screening-run.mjs \
+            /tmp/profile.json \
             /tmp/EnrichedSjson \
-            /tmp/EnrichedSjson.topology.input.xml
+            /tmp/EnrichedSjson.topology.input.xml \
+            /tmp/corrected-result.json > /tmp/full-output.log
+          echo 'CORRECTED_VERTICAL_SUMMARY_BEGIN'
+          jq '{
+            verticalWeight,
+            resolvedFluidDensity: .sourceResolution.processResolutionAudit.fluidDensity,
+            N50120: (.supportRows[] | select(.siteId == "N50120")),
+            largestVertical: ([.supportRows[]] | sort_by(.reactionsKn.FzWeight) | reverse | .[:12]),
+            largestVectors: ([.supportRows[]] | sort_by(.componentVectorMagnitudeKn) | reverse | .[:12])
+          }' /tmp/corrected-result.json
+          echo 'CORRECTED_VERTICAL_SUMMARY_END'
+      - name: Confirm N50120 local hand check
+        run: |
+          python - <<'PY'
+          import math
+          od = 168.3 / 1000
+          wall = 7.11 / 1000
+          inside = od - 2 * wall
+          length = (6.586226999999956 + 4.6138000000000465) / 2
+          steel = math.pi / 4 * (od**2 - inside**2) * 7850 * length
+          fluid = math.pi / 4 * inside**2 * 300 * length
+          reaction = (steel + fluid) * 9.80665 / 1000
+          print({'steelMassKg': steel, 'fluidMassKg': fluid, 'correctedLocalReactionKn': reaction})
+          PY
