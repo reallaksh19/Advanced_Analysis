@@ -6,7 +6,8 @@ on:
       - agent/sjson-1885-configurable-screening
     paths:
       - .tmp/sjson-1885-final-bundle.part00
-      - .tmp/sjson-1885-final-bundle.part01
+      - .tmp/sjson-1885-final-bundle.part01a
+      - .tmp/sjson-1885-final-bundle.part01b
       - .tmp/sjson-1885-final-bundle.part02a
       - .tmp/sjson-1885-final-bundle.part02b
       - .tmp/sjson-1885-final-bundle.part03
@@ -30,7 +31,8 @@ jobs:
         run: |
           cat > /tmp/sjson-1885-bundle.sha256 <<'EOF'
           d9b6f85200f57d6b16a80fa64fb92f52218c11ad353d1dc4796448512fbc6ac6  .tmp/sjson-1885-final-bundle.part00
-          4afd83ba3cf6a698eaf7df4a4577978a4f8fc07a14d6f001a744e4ad7ed91c36  .tmp/sjson-1885-final-bundle.part01
+          300b524726f5b4b476e57b17e0cd933d0dd9cb5289524ecbda0487188dfc9cc3  .tmp/sjson-1885-final-bundle.part01a
+          7ba52b515933191aec6d0244e5c8d0851a02b223bde6b81ac8b860a518e02ead  .tmp/sjson-1885-final-bundle.part01b
           57c9f52e0cd64b21d09e6d786054aefc532e9f1caadfd292c0a02d43578d5574  .tmp/sjson-1885-final-bundle.part02a
           09b315fd69cc9dd8136d6b3ebb85677c1199d9d7c8acf6af9f4f2ad899e2cf98  .tmp/sjson-1885-final-bundle.part02b
           465ee9494b5aed9e0b11aadf21a9606b6f9b604286fbf9966a373021fd72406b  .tmp/sjson-1885-final-bundle.part03
@@ -38,7 +40,8 @@ jobs:
           sha256sum --check /tmp/sjson-1885-bundle.sha256
           cat \
             .tmp/sjson-1885-final-bundle.part00 \
-            .tmp/sjson-1885-final-bundle.part01 \
+            .tmp/sjson-1885-final-bundle.part01a \
+            .tmp/sjson-1885-final-bundle.part01b \
             .tmp/sjson-1885-final-bundle.part02a \
             .tmp/sjson-1885-final-bundle.part02b \
             .tmp/sjson-1885-final-bundle.part03 \
