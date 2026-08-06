@@ -1,0 +1,42 @@
+name: SJSON 1885 configurable empirical screening
+
+on:
+  push:
+    branches:
+      - agent/sjson-1885-configurable-screening
+    paths:
+      - benchmarks/1885Sjson/empirical-screening-profile.config.json
+      - scripts/empirical-sjson-1885-configurable-screening-run.mjs
+      - .github/workflows/sjson-1885-configurable-screening.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  calculate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Materialize exact enriched benchmark sources
+        run: |
+          git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson > /tmp/EnrichedSjson
+          git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson.topology.input.xml > /tmp/EnrichedSjson.topology.input.xml
+      - name: Run configurable empirical screening
+        run: |
+          node scripts/empirical-sjson-1885-configurable-screening-run.mjs \
+            benchmarks/1885Sjson/empirical-screening-profile.config.json \
+            /tmp/EnrichedSjson \
+            /tmp/EnrichedSjson.topology.input.xml \
+            /tmp/empirical-sjson-1885-screening-result.json
+      - name: Upload calculation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: empirical-sjson-1885-configurable-screening
+          path: /tmp/empirical-sjson-1885-screening-result.json
+          if-no-files-found: error
