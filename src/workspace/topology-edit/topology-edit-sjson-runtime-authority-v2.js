@@ -13,7 +13,10 @@ import {
 import {
   projectGovernedSjsonSupportGlyphs,
 } from './topology-edit-sjson-support-glyph-projection-v3.js';
-import { fitPerspectiveCameraToRenderBounds } from './topology-edit-sjson-benchmark-camera.js';
+import {
+  fitPerspectiveCameraToRenderBounds,
+  projectRenderBoundsToNdc,
+} from './topology-edit-sjson-benchmark-camera.js';
 import {
   TOPOLOGY_EDIT_SUPPORT_RENDER_STYLES,
 } from './topology-edit-support-viewport-backend.js';
@@ -27,6 +30,10 @@ export const GOVERNED_SJSON_EDIT_DRAFT_SOURCE_HASHES = Object.freeze([
 export const SJSON_SUPPORT_RENDER_AUTHORITY =
   'TOPO_VALIDATOR_SUPPORT_MARKER_AND_DIRECTION_GEOMETRY';
 export const SJSON_SUPPORT_DISPLAY_SCALE = 3;
+export const SJSON_ACTIVE_ORTHOGRAPHIC_CAMERA_AUTHORITY =
+  'TOPOLOGY_EDIT_ACTIVE_ORTHOGRAPHIC_PROJECTION_PRESERVED';
+export const SJSON_ACTIVE_ORTHOGRAPHIC_CAMERA_FIT_ALGORITHM =
+  'GOVERNED_THREE_VIEW_ORTHOGRAPHIC_FIT_V1';
 const GOVERNED_SOURCE_HASH_SET = new Set(GOVERNED_SJSON_EDIT_DRAFT_SOURCE_HASHES);
 const CAMERA_DIRECTION = Object.freeze({ x: 1, y: 1, z: 0.8 });
 const MARKER_RADIUS_RATIO = 0.18;
@@ -85,13 +92,15 @@ export function applySjsonBenchmarkCameraFit(backend) {
       'TOPOLOGY_EDIT_CAMERA_FIT_MARGIN_INVALID: Approved cameraFitMargin is required.',
     );
   }
-  const cameraFit = fitPerspectiveCameraToRenderBounds({
-    camera: backend.camera,
-    controls: backend.controls,
-    bounds,
-    direction: engineeringDirectionToRender(CAMERA_DIRECTION),
-    fitMargin,
-  });
+  const cameraFit = backend.camera.isOrthographicCamera
+    ? fitActiveOrthographicCamera({ backend, bounds, fitMargin })
+    : fitPerspectiveCameraToRenderBounds({
+      camera: backend.camera,
+      controls: backend.controls,
+      bounds,
+      direction: engineeringDirectionToRender(CAMERA_DIRECTION),
+      fitMargin,
+    });
   backend.lastBounds = bounds.clone();
   backend.sceneBoundsCache = bounds.clone();
   backend.updateGovernedCameraClipping?.();
@@ -102,4 +111,49 @@ export function applySjsonBenchmarkCameraFit(backend) {
     sourceHash: SJSON_BENCHMARK_SOURCE_HASH,
     engineeringDirection: renderDirectionToEngineering(cameraFit.renderDirection),
   });
+}
+
+function fitActiveOrthographicCamera({ backend, bounds, fitMargin }) {
+  if (!backend.camera?.isOrthographicCamera) {
+    throw new TypeError('Governed orthographic fit requires an active orthographic camera.');
+  }
+  if (typeof backend.fitAll !== 'function') {
+    throw new TypeError('Governed orthographic fit requires the shared viewport fit operation.');
+  }
+  backend.lastBounds = bounds.clone();
+  backend.sceneBoundsCache = bounds.clone();
+  backend.fitAll({ remember: false });
+  const camera = backend.camera;
+  const target = backend.controls.target;
+  const renderDirectionVector = camera.position.clone().sub(target);
+  if (!(renderDirectionVector.lengthSq() > 1e-24)) {
+    throw new Error('TOPOLOGY_EDIT_ORTHOGRAPHIC_CAMERA_DIRECTION_INVALID');
+  }
+  renderDirectionVector.normalize();
+  const size = bounds.getSize(new THREE.Vector3());
+  const renderDirection = freezePoint(renderDirectionVector);
+  return Object.freeze({
+    authority: SJSON_ACTIVE_ORTHOGRAPHIC_CAMERA_AUTHORITY,
+    fitAlgorithm: SJSON_ACTIVE_ORTHOGRAPHIC_CAMERA_FIT_ALGORITHM,
+    projection: 'ORTHOGRAPHIC',
+    cameraDistanceMm: camera.position.distanceTo(target),
+    fitMargin,
+    renderDirection,
+    renderBounds: Object.freeze({
+      min: freezePoint(bounds.min),
+      max: freezePoint(bounds.max),
+      size: freezePoint(size),
+      diagonalMm: size.length(),
+    }),
+    screenBoundsNdc: projectRenderBoundsToNdc(bounds, camera, fitMargin),
+    cameraPosition: freezePoint(camera.position),
+    target: freezePoint(target),
+    aspect: (camera.right - camera.left) / (camera.top - camera.bottom),
+    near: camera.near,
+    far: camera.far,
+  });
+}
+
+function freezePoint(point) {
+  return Object.freeze({ x: point.x, y: point.y, z: point.z });
 }
