@@ -4,6 +4,7 @@ import {
   BM2_CASE_LABELS,
   BM2_CII_OUTPUT_PATH,
   BM2_EXPLICIT_CASE_LABELS,
+  BM2_REPORT_FAMILIES,
 } from './lfea-b3.26-bm2-case-authority.mjs';
 
 export { BM2_CII_OUTPUT_PATH };
@@ -23,10 +24,27 @@ export const BM2_COMPARISON_POLICY = Object.freeze({
   }),
 });
 
-function caseAbbrev(loadcase) {
-  const match = /\(([A-Z]+)\)/u.exec(String(loadcase ?? ''));
+function parseCaseIdentity(loadcase) {
+  const match = /^CASE\s+(\d+)\s+\(([A-Z]+)\)\s+(.+)$/u.exec(String(loadcase ?? '').trim());
   if (!match) throw new Error(`Unrecognised BM2 LOADCASE label: ${loadcase}`);
-  return match[1];
+  const caseNumber = Number(match[1]);
+  const caseLabel = BM2_CASE_LABELS.find((label) => (
+    BM2_BENCHMARK_CASE_AUTHORITY.cases[label].caseNumber === caseNumber
+  ));
+  if (!caseLabel) throw new Error(`BM2 LOADCASE ${caseNumber} is outside retained case authority.`);
+  const authority = BM2_BENCHMARK_CASE_AUTHORITY.cases[caseLabel];
+  if (match[2] !== authority.category || match[3] !== authority.formula) {
+    throw new Error(
+      `BM2 CASE ${caseNumber} identity mismatch: expected (${authority.category}) ${authority.formula}.`,
+    );
+  }
+  return Object.freeze({
+    caseLabel,
+    caseNumber,
+    category: match[2],
+    formula: match[3],
+    loadcase: String(loadcase),
+  });
 }
 
 function num(attributes, key) {
@@ -66,6 +84,10 @@ function stableRowUid({ caseLabel, reportFamily, sourceRowOrdinal, nodeId = null
   return `${caseLabel}:${reportFamily}:${sourceRowOrdinal}:${location}`;
 }
 
+function physicalSourceRowUid(rowUid, sourceReportOccurrenceOrdinal) {
+  return `${rowUid}:physical-report-occurrence:${sourceReportOccurrenceOrdinal}`;
+}
+
 function reportStatistics(rows, grouped, sourceReportRows = rows.length) {
   return {
     declaredReportRows: rows.length,
@@ -77,12 +99,20 @@ function reportStatistics(rows, grouped, sourceReportRows = rows.length) {
   };
 }
 
-function displacementReport(rows, sourceReportRows = rows.length) {
+function physicalSelectionMetadata(sourceReportOccurrenceOrdinal) {
+  return Object.freeze({
+    sourceReportOccurrenceOrdinal,
+    sourceReportSelectionRule: 'PHYSICAL_REPORT_OCCURRENCE',
+  });
+}
+
+function displacementReport(rows, sourceReportRows = rows.length, metadata = {}) {
   const frozenRows = Object.freeze(rows);
   const byNode = groupRows(frozenRows, (row) => row.nodeId);
   return Object.freeze({
     rows: frozenRows,
     byNode,
+    ...metadata,
     ...reportStatistics(frozenRows, byNode, sourceReportRows),
   });
 }
@@ -92,6 +122,7 @@ function aggregateRestraintsByNode(rows) {
   return immutableMap([...grouped].map(([nodeId, entries]) => [nodeId, Object.freeze({
     nodeId,
     sourceRowUids: Object.freeze(entries.map((row) => row.rowUid)),
+    sourcePhysicalRowUids: Object.freeze(entries.map((row) => row.sourcePhysicalRowUid)),
     sourceRowOrdinals: Object.freeze(entries.map((row) => row.sourceRowOrdinal)),
     types: Object.freeze(entries.map((row) => row.type)),
     type: entries.map((row) => row.type).join(' + '),
@@ -104,25 +135,90 @@ function aggregateRestraintsByNode(rows) {
   })]));
 }
 
-function restraintReport(rows, sourceReportRows = rows.length) {
+function restraintReport(rows, sourceReportRows = rows.length, metadata = {}) {
   const frozenRows = Object.freeze(rows);
   const byNode = groupRows(frozenRows, (row) => row.nodeId);
   return Object.freeze({
     rows: frozenRows,
     byNode,
     aggregatedByNode: aggregateRestraintsByNode(frozenRows),
+    ...metadata,
     ...reportStatistics(frozenRows, byNode, sourceReportRows),
   });
 }
 
-function elementReport(rows, sourceReportRows = rows.length) {
+function elementReport(rows, sourceReportRows = rows.length, metadata = {}) {
   const frozenRows = Object.freeze(rows);
   const byPair = groupRows(frozenRows, (row) => row.coarsePairKey);
   return Object.freeze({
     rows: frozenRows,
     byPair,
+    ...metadata,
     ...reportStatistics(frozenRows, byPair, sourceReportRows),
   });
+}
+
+function addOccurrence(occurrences, caseLabel, report) {
+  if (!occurrences.has(caseLabel)) occurrences.set(caseLabel, []);
+  occurrences.get(caseLabel).push(report);
+}
+
+function selectGovernedOccurrences(occurrences, reportFamily) {
+  const reports = new Map();
+  const custody = {};
+  for (const label of BM2_CASE_LABELS) {
+    const authority = BM2_BENCHMARK_CASE_AUTHORITY.cases[label];
+    const physicalReports = occurrences.get(label) ?? [];
+    if (authority.sourceReportSelection) {
+      const expected = authority.sourceReportSelection.expectedPhysicalOccurrencesPerFamily;
+      if (physicalReports.length !== expected) {
+        throw new Error(
+          `BM2 ${reportFamily} ${label} physical report occurrence count ${physicalReports.length} != ${expected}.`,
+        );
+      }
+      const selectedOrdinal = authority.sourceReportSelection.selectedOccurrenceOrdinal;
+      const selected = physicalReports[selectedOrdinal];
+      if (!selected) {
+        throw new Error(`BM2 ${reportFamily} ${label} selected occurrence ${selectedOrdinal} is unavailable.`);
+      }
+      reports.set(label, selected);
+      custody[label] = Object.freeze({
+        physicalOccurrenceCount: physicalReports.length,
+        selectedOccurrenceOrdinal: selectedOrdinal,
+        selectionRule: authority.sourceReportSelection.selectionRule,
+      });
+      continue;
+    }
+    if (physicalReports.length > 1) {
+      throw new Error(`BM2 ${reportFamily} ${label} has multiple explicit physical reports.`);
+    }
+    if (physicalReports.length === 1) reports.set(label, physicalReports[0]);
+    custody[label] = Object.freeze({
+      physicalOccurrenceCount: physicalReports.length,
+      selectedOccurrenceOrdinal: physicalReports.length === 1 ? 0 : null,
+      selectionRule: physicalReports.length === 1 ? 'ONLY_PHYSICAL_REPORT_OCCURRENCE' : null,
+    });
+  }
+  return Object.freeze({ reports, custody: Object.freeze(custody) });
+}
+
+function rowMetadata(identity, reportFamily, sourceRowOrdinal, sourceReportOccurrenceOrdinal, location) {
+  const rowUid = stableRowUid({
+    caseLabel: identity.caseLabel,
+    reportFamily,
+    sourceRowOrdinal,
+    ...location,
+  });
+  return {
+    caseLabel: identity.caseLabel,
+    caseNumber: identity.caseNumber,
+    caseFormula: identity.formula,
+    reportFamily,
+    sourceReportOccurrenceOrdinal,
+    sourceRowOrdinal,
+    rowUid,
+    sourcePhysicalRowUid: physicalSourceRowUid(rowUid, sourceReportOccurrenceOrdinal),
+  };
 }
 
 function parseEndActions(row, metadata) {
@@ -160,27 +256,107 @@ function parseEndActions(row, metadata) {
 }
 
 function parseElementReports(xmlText, tagName, reportFamily) {
-  const reports = new Map();
+  const occurrences = new Map();
   for (const report of findElements(xmlText, tagName)) {
-    const caseLabel = caseAbbrev(report.attributes.LOADCASE);
-    const rawRows = findElements(report.inner, 'ELEMENT').map((row, sourceRowOrdinal) => parseEndActions(row, {
-      caseLabel,
+    const identity = parseCaseIdentity(report.attributes.LOADCASE);
+    const sourceReportOccurrenceOrdinal = occurrences.get(identity.caseLabel)?.length ?? 0;
+    const rawRows = findElements(report.inner, 'ELEMENT').map((row, sourceRowOrdinal) => parseEndActions(row, rowMetadata(
+      identity,
       reportFamily,
       sourceRowOrdinal,
-      rowUid: stableRowUid({
-        caseLabel,
-        reportFamily,
-        sourceRowOrdinal,
-        fromNode: row.attributes.FROM_NODE,
-        toNode: row.attributes.TO_NODE,
-      }),
-    }));
-    reports.set(
-      caseLabel,
-      elementReport(occurrenceOrdinals(rawRows, (row) => row.coarsePairKey)),
+      sourceReportOccurrenceOrdinal,
+      { fromNode: row.attributes.FROM_NODE, toNode: row.attributes.TO_NODE },
+    )));
+    addOccurrence(
+      occurrences,
+      identity.caseLabel,
+      elementReport(
+        occurrenceOrdinals(rawRows, (row) => row.coarsePairKey),
+        rawRows.length,
+        physicalSelectionMetadata(sourceReportOccurrenceOrdinal),
+      ),
     );
   }
-  return reports;
+  return selectGovernedOccurrences(occurrences, reportFamily);
+}
+
+function parseDisplacementReports(xmlText) {
+  const occurrences = new Map();
+  for (const report of findElements(xmlText, 'DISPLACEMENT_REPORT')) {
+    const identity = parseCaseIdentity(report.attributes.LOADCASE);
+    const sourceReportOccurrenceOrdinal = occurrences.get(identity.caseLabel)?.length ?? 0;
+    const rawRows = findElements(report.inner, 'NODE').map((node, sourceRowOrdinal) => {
+      const translations = findElements(node.inner, 'TRANSLATIONS')[0];
+      const rotations = findElements(node.inner, 'ROTATIONS')[0];
+      const nodeId = node.attributes.NUMBER;
+      return Object.freeze({
+        ...rowMetadata(
+          identity,
+          'displacement',
+          sourceRowOrdinal,
+          sourceReportOccurrenceOrdinal,
+          { nodeId },
+        ),
+        nodeId,
+        DX: num(translations.attributes, 'DX'),
+        DY: num(translations.attributes, 'DY'),
+        DZ: num(translations.attributes, 'DZ'),
+        RX: num(rotations.attributes, 'RX'),
+        RY: num(rotations.attributes, 'RY'),
+        RZ: num(rotations.attributes, 'RZ'),
+      });
+    });
+    addOccurrence(
+      occurrences,
+      identity.caseLabel,
+      displacementReport(
+        occurrenceOrdinals(rawRows, (row) => row.nodeId),
+        rawRows.length,
+        physicalSelectionMetadata(sourceReportOccurrenceOrdinal),
+      ),
+    );
+  }
+  return selectGovernedOccurrences(occurrences, 'displacement');
+}
+
+function parseRestraintReports(xmlText) {
+  const occurrences = new Map();
+  for (const report of findElements(xmlText, 'RESTRAINT_REPORT')) {
+    const identity = parseCaseIdentity(report.attributes.LOADCASE);
+    const sourceReportOccurrenceOrdinal = occurrences.get(identity.caseLabel)?.length ?? 0;
+    const rawRows = findElements(report.inner, 'RESTRAINT').map((row, sourceRowOrdinal) => {
+      const forces = findElements(row.inner, 'FORCES')[0];
+      const moments = findElements(row.inner, 'MOMENTS')[0];
+      const nodeId = row.attributes.NODE;
+      return Object.freeze({
+        ...rowMetadata(
+          identity,
+          'restraint',
+          sourceRowOrdinal,
+          sourceReportOccurrenceOrdinal,
+          { nodeId },
+        ),
+        nodeId,
+        type: row.attributes.TYPE,
+        FX: num(forces.attributes, 'FX'),
+        FY: num(forces.attributes, 'FY'),
+        FZ: num(forces.attributes, 'FZ'),
+        MX: num(moments.attributes, 'MX'),
+        MY: num(moments.attributes, 'MY'),
+        MZ: num(moments.attributes, 'MZ'),
+      });
+    });
+    addOccurrence(
+      occurrences,
+      identity.caseLabel,
+      restraintReport(
+        occurrenceOrdinals(rawRows, (row) => row.nodeId),
+        rawRows.length,
+        physicalSelectionMetadata(sourceReportOccurrenceOrdinal),
+      ),
+    );
+  }
+  return selectGovernedOccurrences(occurrences, 'restraint');
 }
 
 function rowIndex(rows, keyOf, label) {
@@ -221,10 +397,12 @@ function elementOccurrenceKey(row) {
 
 function derivationEvidence(left, right) {
   return Object.freeze({
-    rule: 'MATCHED_ROW_OPE_MINUS_SUS_V1',
+    rule: 'MATCHED_ROW_OPE_MINUS_SUS_V2',
     formula: BM2_BENCHMARK_CASE_AUTHORITY.cases.EXP.formula,
     leftRowUid: left.rowUid,
     rightRowUid: right.rowUid,
+    leftPhysicalRowUid: left.sourcePhysicalRowUid,
+    rightPhysicalRowUid: right.sourcePhysicalRowUid,
   });
 }
 
@@ -232,7 +410,10 @@ function deriveDisplacementExpansion(ope, sus) {
   const rows = matchedRows(ope, sus, nodeOccurrenceKey, 'BM2 displacement')
     .map(({ left, right }) => Object.freeze({
       caseLabel: 'EXP',
+      caseNumber: BM2_BENCHMARK_CASE_AUTHORITY.cases.EXP.caseNumber,
+      caseFormula: BM2_BENCHMARK_CASE_AUTHORITY.cases.EXP.formula,
       reportFamily: 'displacement',
+      sourceReportOccurrenceOrdinal: null,
       sourceRowOrdinal: left.sourceRowOrdinal,
       occurrenceOrdinalWithinCaseFamilyAndPair: left.occurrenceOrdinalWithinCaseFamilyAndPair,
       rowUid: stableRowUid({
@@ -241,11 +422,15 @@ function deriveDisplacementExpansion(ope, sus) {
         sourceRowOrdinal: left.sourceRowOrdinal,
         nodeId: left.nodeId,
       }),
+      sourcePhysicalRowUid: null,
       nodeId: left.nodeId,
       ...Object.fromEntries(DISPLACEMENT_FIELDS.map((field) => [field, left[field] - right[field]])),
       derivation: derivationEvidence(left, right),
     }));
-  return displacementReport(rows, 0);
+  return displacementReport(rows, 0, Object.freeze({
+    sourceReportOccurrenceOrdinal: null,
+    sourceReportSelectionRule: 'DERIVED_CASE_NO_PHYSICAL_REPORT',
+  }));
 }
 
 function deriveRestraintExpansion(ope, sus) {
@@ -258,7 +443,10 @@ function deriveRestraintExpansion(ope, sus) {
       }
       return Object.freeze({
         caseLabel: 'EXP',
+        caseNumber: BM2_BENCHMARK_CASE_AUTHORITY.cases.EXP.caseNumber,
+        caseFormula: BM2_BENCHMARK_CASE_AUTHORITY.cases.EXP.formula,
         reportFamily: 'restraint',
+        sourceReportOccurrenceOrdinal: null,
         sourceRowOrdinal: left.sourceRowOrdinal,
         occurrenceOrdinalWithinCaseFamilyAndPair: left.occurrenceOrdinalWithinCaseFamilyAndPair,
         rowUid: stableRowUid({
@@ -267,13 +455,17 @@ function deriveRestraintExpansion(ope, sus) {
           sourceRowOrdinal: left.sourceRowOrdinal,
           nodeId: left.nodeId,
         }),
+        sourcePhysicalRowUid: null,
         nodeId: left.nodeId,
         type: left.type,
         ...Object.fromEntries(RESTRAINT_FIELDS.map((field) => [field, left[field] - right[field]])),
         derivation: derivationEvidence(left, right),
       });
     });
-  return restraintReport(rows, 0);
+  return restraintReport(rows, 0, Object.freeze({
+    sourceReportOccurrenceOrdinal: null,
+    sourceReportSelectionRule: 'DERIVED_CASE_NO_PHYSICAL_REPORT',
+  }));
 }
 
 function subtractAction(left, right) {
@@ -286,7 +478,10 @@ function deriveElementExpansion(ope, sus, reportFamily) {
   const rows = matchedRows(ope, sus, elementOccurrenceKey, `BM2 ${reportFamily}`)
     .map(({ left, right }) => Object.freeze({
       caseLabel: 'EXP',
+      caseNumber: BM2_BENCHMARK_CASE_AUTHORITY.cases.EXP.caseNumber,
+      caseFormula: BM2_BENCHMARK_CASE_AUTHORITY.cases.EXP.formula,
       reportFamily,
+      sourceReportOccurrenceOrdinal: null,
       sourceRowOrdinal: left.sourceRowOrdinal,
       occurrenceOrdinalWithinCaseFamilyAndPair: left.occurrenceOrdinalWithinCaseFamilyAndPair,
       rowUid: stableRowUid({
@@ -296,6 +491,7 @@ function deriveElementExpansion(ope, sus, reportFamily) {
         fromNode: left.reportFromNode,
         toNode: left.reportToNode,
       }),
+      sourcePhysicalRowUid: null,
       reportFromNode: left.reportFromNode,
       reportToNode: left.reportToNode,
       coarsePairKey: left.coarsePairKey,
@@ -304,7 +500,10 @@ function deriveElementExpansion(ope, sus, reportFamily) {
       J: subtractAction(left.J, right.J),
       derivation: derivationEvidence(left, right),
     }));
-  return elementReport(rows, 0);
+  return elementReport(rows, 0, Object.freeze({
+    sourceReportOccurrenceOrdinal: null,
+    sourceReportSelectionRule: 'DERIVED_CASE_NO_PHYSICAL_REPORT',
+  }));
 }
 
 function completeExpansionCase(reportMaps) {
@@ -344,7 +543,7 @@ function completeExpansionCase(reportMaps) {
   return true;
 }
 
-function actualCaseCustody(expansionDerived) {
+function actualCaseCustody(expansionDerived, sourceReportOccurrenceCustody) {
   return Object.freeze(Object.fromEntries(BM2_CASE_LABELS.map((label) => {
     const authority = BM2_BENCHMARK_CASE_AUTHORITY.cases[label];
     const actualCustody = label === 'EXP' && !expansionDerived
@@ -355,6 +554,10 @@ function actualCaseCustody(expansionDerived) {
       manifestCustody: authority.custody,
       actualCustody,
       sourceReportPresent: label !== 'EXP' || !expansionDerived,
+      reportFamilyOccurrences: Object.freeze(Object.fromEntries(BM2_REPORT_FAMILIES.map((family) => [
+        family,
+        sourceReportOccurrenceCustody[family][label],
+      ]))),
     })];
   })));
 }
@@ -362,65 +565,22 @@ function actualCaseCustody(expansionDerived) {
 export function parseBm2CiiOutput(xmlText) {
   if (typeof xmlText !== 'string') throw new TypeError('parseBm2CiiOutput requires XML text.');
 
-  const displacement = new Map();
-  for (const report of findElements(xmlText, 'DISPLACEMENT_REPORT')) {
-    const caseLabel = caseAbbrev(report.attributes.LOADCASE);
-    const rows = findElements(report.inner, 'NODE').map((node, sourceRowOrdinal) => {
-      const translations = findElements(node.inner, 'TRANSLATIONS')[0];
-      const rotations = findElements(node.inner, 'ROTATIONS')[0];
-      const nodeId = node.attributes.NUMBER;
-      return Object.freeze({
-        caseLabel,
-        reportFamily: 'displacement',
-        sourceRowOrdinal,
-        occurrenceOrdinalWithinCaseFamilyAndPair: 0,
-        rowUid: stableRowUid({ caseLabel, reportFamily: 'displacement', sourceRowOrdinal, nodeId }),
-        nodeId,
-        DX: num(translations.attributes, 'DX'),
-        DY: num(translations.attributes, 'DY'),
-        DZ: num(translations.attributes, 'DZ'),
-        RX: num(rotations.attributes, 'RX'),
-        RY: num(rotations.attributes, 'RY'),
-        RZ: num(rotations.attributes, 'RZ'),
-      });
-    });
-    displacement.set(caseLabel, displacementReport(rows));
-  }
-
-  const restraint = new Map();
-  for (const report of findElements(xmlText, 'RESTRAINT_REPORT')) {
-    const caseLabel = caseAbbrev(report.attributes.LOADCASE);
-    const rawRows = findElements(report.inner, 'RESTRAINT').map((row, sourceRowOrdinal) => {
-      const forces = findElements(row.inner, 'FORCES')[0];
-      const moments = findElements(row.inner, 'MOMENTS')[0];
-      const nodeId = row.attributes.NODE;
-      return Object.freeze({
-        caseLabel,
-        reportFamily: 'restraint',
-        sourceRowOrdinal,
-        rowUid: stableRowUid({ caseLabel, reportFamily: 'restraint', sourceRowOrdinal, nodeId }),
-        nodeId,
-        type: row.attributes.TYPE,
-        FX: num(forces.attributes, 'FX'),
-        FY: num(forces.attributes, 'FY'),
-        FZ: num(forces.attributes, 'FZ'),
-        MX: num(moments.attributes, 'MX'),
-        MY: num(moments.attributes, 'MY'),
-        MZ: num(moments.attributes, 'MZ'),
-      });
-    });
-    restraint.set(
-      caseLabel,
-      restraintReport(occurrenceOrdinals(rawRows, (row) => row.nodeId)),
-    );
-  }
-
+  const displacementSelection = parseDisplacementReports(xmlText);
+  const restraintSelection = parseRestraintReports(xmlText);
+  const globalForceSelection = parseElementReports(xmlText, 'GLOBAL_FORCE_REPORT', 'globalForce');
+  const localForceSelection = parseElementReports(xmlText, 'LOCAL_FORCE_REPORT', 'localForce');
   const reportMaps = {
-    displacement,
-    restraint,
-    globalForce: parseElementReports(xmlText, 'GLOBAL_FORCE_REPORT', 'globalForce'),
-    localForce: parseElementReports(xmlText, 'LOCAL_FORCE_REPORT', 'localForce'),
+    displacement: displacementSelection.reports,
+    restraint: restraintSelection.reports,
+    globalForce: globalForceSelection.reports,
+    localForce: localForceSelection.reports,
   };
+  const sourceReportOccurrenceCustody = Object.freeze({
+    displacement: displacementSelection.custody,
+    restraint: restraintSelection.custody,
+    globalForce: globalForceSelection.custody,
+    localForce: localForceSelection.custody,
+  });
   const expansionDerived = completeExpansionCase(reportMaps);
 
   for (const label of BM2_CASE_LABELS) {
@@ -430,9 +590,10 @@ export function parseBm2CiiOutput(xmlText) {
   }
 
   return Object.freeze({
-    schema: 'fea-caesar-output-row-custody/v1',
+    schema: 'fea-caesar-output-row-custody/v2',
     benchmarkCaseAuthority: BM2_BENCHMARK_CASE_AUTHORITY,
-    caseCustody: actualCaseCustody(expansionDerived),
+    sourceReportOccurrenceCustody,
+    caseCustody: actualCaseCustody(expansionDerived, sourceReportOccurrenceCustody),
     expansionDerived,
     ...reportMaps,
   });
