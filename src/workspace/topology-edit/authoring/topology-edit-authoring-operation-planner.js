@@ -3,6 +3,11 @@ import {
   assertTopologyEditAuthoringSession,
 } from './topology-edit-authoring-session.js';
 import {
+  deriveTopologyEditInlineAuthoringTarget,
+  planTopologyEditInlineAuthoringOperation,
+  topologyEditInlineAuthoringDefaultProperties,
+} from './topology-edit-authoring-inline-component.js';
+import {
   topologyEditOperationReference,
 } from './topology-edit-operation-graph.js';
 import {
@@ -13,12 +18,20 @@ import {
 } from '../professional/topology-edit-change-scope.js';
 
 const TOLERANCE = 1e-8;
+const INLINE_TOOLS = new Set(['FLANGE', 'REDUCER']);
 
 export function createTopologyEditAuthoringOperationPlan(input = {}) {
   const topology = assertTopology(input.topology);
   const session = assertTopologyEditAuthoringSession(input.authoringSession);
   if (!session.tool || !session.target) {
     fail('an active tool and exact target are required.', RangeError);
+  }
+  if (INLINE_TOOLS.has(session.tool)) {
+    return planTopologyEditInlineAuthoringOperation({
+      topology,
+      authoringSession: session,
+      catalogue: input.catalogue,
+    });
   }
   const planners = {
     MOVE: planMove,
@@ -33,6 +46,13 @@ export function createTopologyEditAuthoringOperationPlan(input = {}) {
 export function deriveTopologyEditAuthoringTarget(input = {}) {
   const topology = assertTopology(input.topology);
   const tool = String(input.tool ?? '').trim().toUpperCase();
+  if (INLINE_TOOLS.has(tool)) {
+    return deriveTopologyEditInlineAuthoringTarget({
+      topology,
+      tool,
+      edgeId: input.edgeId,
+    });
+  }
   const nodeId = String(input.nodeId ?? '').trim();
   const node = exactNode(topology, nodeId);
   const incident = incidentEdges(topology, node.id);
@@ -65,6 +85,16 @@ export function deriveTopologyEditAuthoringTarget(input = {}) {
 export function topologyEditAuthoringDefaultProperties(input = {}) {
   const topology = assertTopology(input.topology);
   const session = assertTopologyEditAuthoringSession(input.authoringSession);
+  if (INLINE_TOOLS.has(session.tool)) {
+    return topologyEditInlineAuthoringDefaultProperties({
+      topology,
+      authoringSession: session,
+      catalogue: input.catalogue,
+      catalogueRecordId: input.catalogueRecordId,
+      inlineDirection: input.inlineDirection,
+      stationMm: input.stationMm,
+    });
+  }
   const nodeId = session.target?.canonicalIds.find((id) => id.startsWith('node:'));
   const node = exactNode(topology, nodeId);
   if (session.tool === 'MOVE') return { deltaX: 0, deltaY: 0, deltaZ: 0, axisLock: 'FREE' };

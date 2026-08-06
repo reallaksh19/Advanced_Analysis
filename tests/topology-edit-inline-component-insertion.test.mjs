@@ -130,6 +130,9 @@ test('valve insertion uses exact catalogue face-to-face and one atomic governed 
   assert.equal(plan.commandIntents.length, 1);
   assert.equal(plan.parameters.insertionLengthMm, 600);
   assert.equal(plan.parameters.lengthAuthority, 'CATALOGUE_VALVE_FACE_TO_FACE');
+  assert.equal(plan.parameters.componentMassKg, 148);
+  assert.equal(plan.parameters.materialSpecification, 'ASTM A216 WCB');
+  assert.equal(plan.parameters.pressureClass, '600');
   assert.equal(
     plan.parameters.catalogueCompatibility.selectionAuthority,
     'EXACT_RECORD_ID_AND_HASH',
@@ -143,6 +146,9 @@ test('valve insertion uses exact catalogue face-to-face and one atomic governed 
   assert.equal(candidate.canonicalTopology.edges.length, 3);
   assert.equal(valve.entityType, 'VALVE');
   assert.equal(valve.componentLengthMm, 600);
+  assert.equal(valve.componentMassKg, 148);
+  assert.equal(valve.materialSpecification, 'ASTM A216 WCB');
+  assert.equal(valve.pressureClass, '600');
   assert.equal(valve.valveFaceToFaceMm, 600);
   assert.equal(valve.catalogueRecordId, 'VALVE-DN100-GATE-600-A');
   assert.equal(valve.catalogueHash, catalogueValue.catalogueHash);
@@ -164,7 +170,6 @@ test('duplicate flange catalogue rows remain selectable by exact record ID and h
     baseTopology(),
     catalogueValue,
     'FLANGE-DN100-600-RF-B',
-    { insertionLengthMm: 120 },
   );
   const session = new TopologyEditCertifiedSession(baseTopology());
   const candidate = prepareTopologyEditOperationCandidate({ session, operationPlan: plan });
@@ -172,10 +177,19 @@ test('duplicate flange catalogue rows remain selectable by exact record ID and h
 
   assert.equal(plan.unresolvedEvidence.length, 0);
   assert.equal(plan.parameters.catalogueRecordId, 'FLANGE-DN100-600-RF-B');
+  assert.equal(plan.parameters.insertionLengthMm, 120);
+  assert.equal(plan.parameters.lengthAuthority, 'CATALOGUE_COMPONENT_LENGTH');
   assert.equal(flange.entityType, 'FLANGE');
   assert.equal(flange.componentLengthMm, 120);
+  assert.equal(flange.componentMassKg, 29.5);
   assert.equal(flange.flangeClass, '600');
   assert.equal(flange.flangeFacing, 'RF');
+  assert.equal(flange.flangeType, 'WELD_NECK');
+  assert.equal(flange.flangeThicknessMm, 52);
+  assert.equal(flange.flangeOutsideDiameterMm, 273);
+  assert.equal(flange.boltCircleDiameterMm, 215.9);
+  assert.equal(flange.boltHoleCount, 8);
+  assert.equal(flange.boltHoleDiameterMm, 25.4);
 });
 
 test('reducer insertion preserves directional primary and secondary diameters', async () => {
@@ -185,7 +199,7 @@ test('reducer insertion preserves directional primary and secondary diameters', 
     topology,
     catalogueValue,
     'REDUCER-DN150-DN100-CONC-A',
-    { insertionLengthMm: 300, inlineDirection: 'FROM_TO' },
+    { inlineDirection: 'FROM_TO' },
   );
   const candidate = prepareTopologyEditOperationCandidate({
     session: new TopologyEditCertifiedSession(topology),
@@ -199,7 +213,11 @@ test('reducer insertion preserves directional primary and secondary diameters', 
     edge.fromNodeId === reducer.toNodeId && edge.id !== reducer.id
   ));
 
+  assert.equal(plan.parameters.insertionLengthMm, 300);
+  assert.equal(plan.parameters.lengthAuthority, 'CATALOGUE_COMPONENT_LENGTH');
   assert.equal(reducer.entityType, 'REDUCER');
+  assert.equal(reducer.componentLengthMm, 300);
+  assert.equal(reducer.componentMassKg, 11.8);
   assert.equal(reducer.outsideDiameterMm, 168.3);
   assert.equal(reducer.secondaryOutsideDiameterMm, 114.3);
   assert.equal(reducer.reducerType, 'CONCENTRIC');
@@ -242,7 +260,7 @@ test('atomic apply and grouped undo redo reproduce exact inline insertion hashes
   assert.equal(insertedComponent({ canonicalTopology: session.currentTopology() }).entityType, 'VALVE');
 });
 
-test('insertion rejects host dependants, out-of-bounds placement, and valve length overrides', async () => {
+test('insertion rejects host dependants, out-of-bounds placement, and catalogue length overrides', async () => {
   const catalogueValue = await catalogue();
 
   assert.throws(
@@ -262,6 +280,24 @@ test('insertion rejects host dependants, out-of-bounds placement, and valve leng
       { insertionLengthMm: 500 },
     ),
     /face-to-face/i,
+  );
+  assert.throws(
+    () => operationPlan(
+      baseTopology(),
+      catalogueValue,
+      'FLANGE-DN100-600-RF-A',
+      { insertionLengthMm: 100 },
+    ),
+    /catalogue component length/i,
+  );
+  assert.throws(
+    () => operationPlan(
+      baseTopology({ nominalSizeMm: 150, outsideDiameterMm: 168.3 }),
+      catalogueValue,
+      'REDUCER-DN150-DN100-CONC-A',
+      { insertionLengthMm: 250 },
+    ),
+    /catalogue component length/i,
   );
 
   const dependentTopology = baseTopology({ dependants: true });

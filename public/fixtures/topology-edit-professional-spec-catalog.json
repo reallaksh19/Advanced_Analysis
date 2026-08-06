@@ -1,10 +1,10 @@
 {
   "catalogueId": "DEMO-PIPING-CATALOGUE",
-  "catalogueVersion": "2026.08.02",
+  "catalogueVersion": "2026.08.06",
   "authority": {
     "sourceId": "SPEC-DEMO",
-    "sourceVersion": "7",
-    "sourceHash": "sha256:6961552d0273fbc4efe9b6125363405055ed8e9fdf1dbd996cf05300d1a8562e"
+    "sourceVersion": "8",
+    "sourceHash": "sha256:46ca94c8eb55fbb66e206ca2eed11b23440f4be93b9e83b8dca0f8d35e54bf86"
   },
   "records": [
     {
@@ -14,22 +14,37 @@
       "outsideDiameterMm": 114.3,
       "schedule": "SCH40",
       "wallThicknessMm": 6.02,
+      "pressureClass": "150",
+      "materialSpecification": "ASTM A106 GR B",
+      "componentLengthMm": 6000,
+      "componentMassKg": 96.2,
       "endConnectionFrom": "BW",
       "endConnectionTo": "BW",
       "pipingClass": "DEMO-150",
-      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/pipe/dn100/sch40" }
+      "sourceReference": {
+        "documentId": "SPEC-DEMO",
+        "revision": "8",
+        "path": "/pipe/dn100/sch40"
+      }
     },
     {
       "recordId": "ELBOW-DN100-LR90-A",
       "componentType": "ELBOW",
       "nominalSizeMm": 100,
       "outsideDiameterMm": 114.3,
+      "pressureClass": "150",
+      "materialSpecification": "ASTM A234 WPB",
+      "componentMassKg": 8.4,
       "elbowRadiusMm": 152.4,
       "elbowAngleDeg": 90,
       "endConnectionFrom": "BW",
       "endConnectionTo": "BW",
       "pipingClass": "DEMO-150",
-      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/elbow/dn100/lr90" }
+      "sourceReference": {
+        "documentId": "SPEC-DEMO",
+        "revision": "8",
+        "path": "/elbow/dn100/lr90"
+      }
     },
     {
       "recordId": "REDUCER-DN150-DN100-CONC-A",
@@ -38,48 +53,114 @@
       "outsideDiameterMm": 168.3,
       "secondaryNominalSizeMm": 100,
       "secondaryOutsideDiameterMm": 114.3,
+      "pressureClass": "150",
+      "materialSpecification": "ASTM A234 WPB",
+      "componentLengthMm": 300,
+      "componentMassKg": 11.8,
       "reducerType": "CONCENTRIC",
       "reducerOrientation": "CONCENTRIC",
       "endConnectionFrom": "BW",
       "endConnectionTo": "BW",
       "pipingClass": "DEMO-150",
-      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/reducer/dn150-dn100/concentric" }
+      "sourceReference": {
+        "documentId": "SPEC-DEMO",
+        "revision": "8",
+        "path": "/reducer/dn150-dn100/concentric"
+      }
+    },
+    {
+      "recordId": "REDUCER-DN100-DN50-CONC-A",
+      "componentType": "REDUCER",
+      "nominalSizeMm": 100,
+      "outsideDiameterMm": 114.3,
+      "secondaryNominalSizeMm": 50,
+      "secondaryOutsideDiameterMm": 60.3,
+      "pressureClass": "150",
+      "materialSpecification": "ASTM A234 WPB",
+      "componentLengthMm": 203,
+      "componentMassKg": 4.6,
+      "reducerType": "CONCENTRIC",
+      "reducerOrientation": "CONCENTRIC",
+      "endConnectionFrom": "BW",
+      "endConnectionTo": "BW",
+      "pipingClass": "DEMO-150",
+      "sourceReference": {
+        "documentId": "SPEC-DEMO",
+        "revision": "8",
+        "path": "/reducer/dn100-dn50/concentric"
+      }
     },
     {
       "recordId": "VALVE-DN100-GATE-600-A",
       "componentType": "VALVE",
       "nominalSizeMm": 100,
       "outsideDiameterMm": 114.3,
+      "pressureClass": "600",
+      "materialSpecification": "ASTM A216 WCB",
+      "componentLengthMm": 600,
+      "componentMassKg": 148,
       "valveType": "GATE",
       "valveFaceToFaceMm": 600,
       "endConnectionFrom": "FLANGED_RF",
       "endConnectionTo": "FLANGED_RF",
       "pipingClass": "DEMO-600",
-      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/valve/dn100/gate/class600" }
+      "sourceReference": {
+        "documentId": "SPEC-DEMO",
+        "revision": "8",
+        "path": "/valve/dn100/gate/class600"
+      }
     },
     {
       "recordId": "FLANGE-DN100-600-RF-A",
       "componentType": "FLANGE",
       "nominalSizeMm": 100,
       "outsideDiameterMm": 114.3,
+      "pressureClass": "600",
+      "materialSpecification": "ASTM A105",
+      "componentLengthMm": 120,
+      "componentMassKg": 29.5,
       "flangeClass": "600",
       "flangeFacing": "RF",
+      "flangeType": "WELD_NECK",
+      "flangeThicknessMm": 52,
+      "flangeOutsideDiameterMm": 273,
+      "boltCircleDiameterMm": 215.9,
+      "boltHoleCount": 8,
+      "boltHoleDiameterMm": 25.4,
       "endConnectionFrom": "BW",
       "endConnectionTo": "FLANGED_RF",
       "pipingClass": "DEMO-600",
-      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/flange/dn100/600/rf/a" }
+      "sourceReference": {
+        "documentId": "SPEC-DEMO",
+        "revision": "8",
+        "path": "/flange/dn100/600/rf/a"
+      }
     },
     {
       "recordId": "FLANGE-DN100-600-RF-B",
       "componentType": "FLANGE",
       "nominalSizeMm": 100,
       "outsideDiameterMm": 114.3,
+      "pressureClass": "600",
+      "materialSpecification": "ASTM A105",
+      "componentLengthMm": 120,
+      "componentMassKg": 29.5,
       "flangeClass": "600",
       "flangeFacing": "RF",
+      "flangeType": "WELD_NECK",
+      "flangeThicknessMm": 52,
+      "flangeOutsideDiameterMm": 273,
+      "boltCircleDiameterMm": 215.9,
+      "boltHoleCount": 8,
+      "boltHoleDiameterMm": 25.4,
       "endConnectionFrom": "BW",
       "endConnectionTo": "FLANGED_RF",
       "pipingClass": "DEMO-600",
-      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/flange/dn100/600/rf/b" }
+      "sourceReference": {
+        "documentId": "SPEC-DEMO",
+        "revision": "8",
+        "path": "/flange/dn100/600/rf/b"
+      }
     },
     {
       "recordId": "TEE-DN100-DN50-BW-A",
@@ -88,6 +169,9 @@
       "outsideDiameterMm": 114.3,
       "branchNominalSizeMm": 50,
       "branchOutsideDiameterMm": 60.3,
+      "pressureClass": "150",
+      "materialSpecification": "ASTM A234 WPB",
+      "componentMassKg": 12.1,
       "branchAngleDeg": 90,
       "centerToRunMm": 86,
       "centerToBranchMm": 64,
@@ -95,7 +179,11 @@
       "endConnectionFrom": "BW",
       "endConnectionTo": "BW",
       "pipingClass": "DEMO-150",
-      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/tee/dn100-dn50/reducing" }
+      "sourceReference": {
+        "documentId": "SPEC-DEMO",
+        "revision": "8",
+        "path": "/tee/dn100-dn50/reducing"
+      }
     },
     {
       "recordId": "OLET-DN100-DN25-WELDOLET-A",
@@ -104,6 +192,9 @@
       "outsideDiameterMm": 114.3,
       "branchNominalSizeMm": 25,
       "branchOutsideDiameterMm": 33.4,
+      "pressureClass": "150",
+      "materialSpecification": "ASTM A105",
+      "componentMassKg": 1.8,
       "branchAngleDeg": 90,
       "branchConnection": "SW",
       "oletType": "WELDOLET",
@@ -112,7 +203,11 @@
       "endConnectionFrom": "HOST_WELD",
       "endConnectionTo": "SW",
       "pipingClass": "DEMO-150",
-      "sourceReference": { "documentId": "SPEC-DEMO", "revision": "7", "path": "/olet/dn100-dn25/weldolet" }
+      "sourceReference": {
+        "documentId": "SPEC-DEMO",
+        "revision": "8",
+        "path": "/olet/dn100-dn25/weldolet"
+      }
     }
   ]
 }
