@@ -202,3 +202,24 @@ export {
   requireInputXmlLinearCaseExecution,
   sealInputXmlLinearCaseExecution,
 } from './inputxml-linear-case-execution-contract.js';
+
+export {
+  INPUTXML_LINEAR_RECOVERED_CASE_KEYS,
+  INPUTXML_LINEAR_RECOVERED_CASE_SCHEMA,
+  InputXmlLinearRecoveryError,
+  recoveredCaseEvidenceProjection,
+  recoveredCaseSemanticProjection,
+  requireInputXmlLinearRecoveredCase,
+  sealInputXmlLinearRecoveredCase,
+} from './inputxml-linear-recovered-case-contract.js';
+
+export {
+  INPUTXML_LINEAR_RECOVERY_PROFILE_SOURCE,
+  inputXmlLinearRecoveryProfile,
+} from './inputxml-linear-recovery-profile.js';
+
+export {
+  INPUTXML_LINEAR_SOURCE_MAPPING_POLICY_ID,
+  recoverInputXmlLinearCaseResult,
+  recoverInputXmlLinearCaseResults,
+} from './inputxml-linear-result-recovery.js';
