@@ -14,6 +14,7 @@ on:
       - 'src/workspace/engineering-loads/empirical-result-overlay*.js'
       - 'src/workspace/engineering-loads/empirical-restraint-network-*.js'
       - 'src/workspace/engineering-loads/empirical-coupled-restraint-network-*.js'
+      - 'src/workspace/engineering-loads/empirical-operating-reaction-*.js'
       - 'src/workspace/topology-edit/topology-edit-empirical-result-renderer-v1.js'
       - 'src/workspace/topology-edit/topology-edit-sjson-governed-viewport-backend-v2.js'
       - 'src/workspace/load-calc-consumer-controller.js'
@@ -30,6 +31,7 @@ on:
       - 'scripts/empirical-result-overlay-check.mjs'
       - 'scripts/empirical-restraint-network-check.mjs'
       - 'scripts/empirical-coupled-restraint-network-check.mjs'
+      - 'scripts/empirical-operating-reaction-check.mjs'
       - 'scripts/advanced-shell-contract-check.mjs'
       - '.github/workflows/empirical-piping-exact-head.yml'
       - '.github/workflows/empirical-sjson-adapter-wp1.yml'
@@ -38,6 +40,7 @@ on:
       - '.github/workflows/empirical-result-overlays-wp4.yml'
       - '.github/workflows/empirical-restraint-network-wp5.yml'
       - '.github/workflows/empirical-coupled-restraint-network-wp6.yml'
+      - '.github/workflows/empirical-operating-reaction-wp7.yml'
 
 permissions:
   contents: read
@@ -74,7 +77,7 @@ jobs:
           git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" > /tmp/empirical-paths.txt
           while IFS= read -r changed; do
             case "$changed" in
-              src/core/empirical-piping-mechanics/*|src/core/empirical-support-frame-screen/*|src/workspace/engineering-loads/contracts/empirical-sjson-contracts.js|src/workspace/engineering-loads/adapters/sjson-to-empirical-piping-request.js|src/workspace/engineering-loads/empirical-method-registry.js|src/workspace/engineering-loads/empirical-beam-contact-*.js|src/workspace/engineering-loads/authorized-empirical-beam-contact-execution.js|src/workspace/engineering-loads/empirical-load-calc-scenario-*.js|src/workspace/engineering-loads/empirical-result-overlay*.js|src/workspace/engineering-loads/empirical-restraint-network-*.js|src/workspace/engineering-loads/empirical-coupled-restraint-network-*.js|src/workspace/topology-edit/topology-edit-empirical-result-renderer-v1.js|src/workspace/topology-edit/topology-edit-sjson-governed-viewport-backend-v2.js|src/workspace/load-calc-consumer-controller.js|src/workspace/load-calc-consumer-view.js|src/workspace/bootstrap.js|benchmarks/empirical-piping/*|docs/empirical-piping-agent-qualification-and-work-pack.md|docs/empirical-piping-engineering-basis-and-benchmark.md|scripts/empirical-piping-*.mjs|scripts/empirical-sjson-adapter-contract-check.mjs|scripts/empirical-beam-contact-runtime-check.mjs|scripts/empirical-beam-contact-elbow-runtime-check.mjs|scripts/empirical-load-calc-scenario-check.mjs|scripts/empirical-result-overlay-check.mjs|scripts/empirical-restraint-network-check.mjs|scripts/empirical-coupled-restraint-network-check.mjs|scripts/advanced-shell-contract-check.mjs|.github/workflows/empirical-piping-exact-head.yml|.github/workflows/empirical-sjson-adapter-wp1.yml|.github/workflows/empirical-beam-contact-wp2.yml|.github/workflows/empirical-load-calc-wp3.yml|.github/workflows/empirical-result-overlays-wp4.yml|.github/workflows/empirical-restraint-network-wp5.yml|.github/workflows/empirical-coupled-restraint-network-wp6.yml) ;;
+              src/core/empirical-piping-mechanics/*|src/core/empirical-support-frame-screen/*|src/workspace/engineering-loads/contracts/empirical-sjson-contracts.js|src/workspace/engineering-loads/adapters/sjson-to-empirical-piping-request.js|src/workspace/engineering-loads/empirical-method-registry.js|src/workspace/engineering-loads/empirical-beam-contact-*.js|src/workspace/engineering-loads/authorized-empirical-beam-contact-execution.js|src/workspace/engineering-loads/empirical-load-calc-scenario-*.js|src/workspace/engineering-loads/empirical-result-overlay*.js|src/workspace/engineering-loads/empirical-restraint-network-*.js|src/workspace/engineering-loads/empirical-coupled-restraint-network-*.js|src/workspace/engineering-loads/empirical-operating-reaction-*.js|src/workspace/topology-edit/topology-edit-empirical-result-renderer-v1.js|src/workspace/topology-edit/topology-edit-sjson-governed-viewport-backend-v2.js|src/workspace/load-calc-consumer-controller.js|src/workspace/load-calc-consumer-view.js|src/workspace/bootstrap.js|benchmarks/empirical-piping/*|docs/empirical-piping-agent-qualification-and-work-pack.md|docs/empirical-piping-engineering-basis-and-benchmark.md|scripts/empirical-piping-*.mjs|scripts/empirical-sjson-adapter-contract-check.mjs|scripts/empirical-beam-contact-runtime-check.mjs|scripts/empirical-beam-contact-elbow-runtime-check.mjs|scripts/empirical-load-calc-scenario-check.mjs|scripts/empirical-result-overlay-check.mjs|scripts/empirical-restraint-network-check.mjs|scripts/empirical-coupled-restraint-network-check.mjs|scripts/empirical-operating-reaction-check.mjs|scripts/advanced-shell-contract-check.mjs|.github/workflows/empirical-piping-exact-head.yml|.github/workflows/empirical-sjson-adapter-wp1.yml|.github/workflows/empirical-beam-contact-wp2.yml|.github/workflows/empirical-load-calc-wp3.yml|.github/workflows/empirical-result-overlays-wp4.yml|.github/workflows/empirical-restraint-network-wp5.yml|.github/workflows/empirical-coupled-restraint-network-wp6.yml|.github/workflows/empirical-operating-reaction-wp7.yml) ;;
               *) echo "Forbidden changed path for this work-pack slice: $changed"; exit 1 ;;
             esac
           done < /tmp/empirical-paths.txt
@@ -102,6 +105,9 @@ jobs:
 
       - name: Coupled branch and loop restraint-network runtime
         run: node scripts/empirical-coupled-restraint-network-check.mjs
+
+      - name: Qualified combined operating reaction
+        run: node scripts/empirical-operating-reaction-check.mjs
 
       - name: Load Calc shell invariants
         run: node scripts/advanced-shell-contract-check.mjs
