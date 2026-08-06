@@ -1,6 +1,7 @@
 import { diagnoseInputXmlLoad } from '../core/geometry/adapters/inputxml-load-diagnostics.js';
-import { solveInputXmlGeneric } from '../core/linear-piping-analysis-consumer/generic-inputxml-solve.js';
 import { createAnalyzeLayout, renderLoadedBar, renderReport } from './analyze-view.js';
+
+const PREFEA_AUTHORIZATION_REQUIRED = 'PREFEA_AUTHORIZATION_REQUIRED';
 
 export class AnalyzeController {
   constructor(applicationRoot, documentRef) {
@@ -10,16 +11,18 @@ export class AnalyzeController {
     this.applicationRoot = applicationRoot;
     this.documentRef = documentRef ?? applicationRoot.ownerDocument ?? document;
     this.fileName = null;
-    this.xmlText = null;
     this.report = null;
     this.error = null;
     this.sectionState = { restraints: true, topology: false, diagnostics: false, config: false };
-    this.solveState = { status: 'idle' };
     this.elements = null;
   }
 
   init() {
     this.elements = createAnalyzeLayout(this.documentRef);
+    const subtitle = this.elements.root.querySelector('.ixa__subtitle');
+    if (subtitle) {
+      subtitle.textContent = 'Load a CAESAR II InputXML file to inspect parsed topology, restraint classification, load-time diagnostics, and governed pre-FEA readiness.';
+    }
     this.applicationRoot.append(this.elements.root);
     this.wireDropzone();
     this.render();
@@ -54,16 +57,13 @@ export class AnalyzeController {
 
   async loadFile(file) {
     this.error = null;
-    this.solveState = { status: 'idle' };
     try {
       const text = await file.text();
-      this.xmlText = text;
       this.report = diagnoseInputXmlLoad(text, { fileName: file.name });
       this.fileName = file.name;
       this.sectionState = { restraints: true, topology: false, diagnostics: false, config: false };
     } catch (error) {
       this.report = null;
-      this.xmlText = null;
       this.fileName = file.name;
       this.error = describeError(error, file.name);
     }
@@ -72,28 +72,8 @@ export class AnalyzeController {
 
   clear() {
     this.report = null;
-    this.xmlText = null;
     this.fileName = null;
     this.error = null;
-    this.solveState = { status: 'idle' };
-    this.render();
-  }
-
-  async runSolve() {
-    if (!this.xmlText || this.solveState.status === 'running') return;
-    this.solveState = { status: 'running' };
-    this.render();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    try {
-      const result = solveInputXmlGeneric(this.xmlText, { modelId: 'IXA', fileName: this.fileName ?? undefined });
-      this.solveState = { status: 'success', result };
-    } catch (error) {
-      this.solveState = {
-        status: 'error',
-        message: error instanceof Error ? error.message : String(error),
-        code: error?.code ?? null,
-      };
-    }
     this.render();
   }
 
@@ -121,9 +101,10 @@ export class AnalyzeController {
     reportRoot.replaceChildren();
     if (this.report) {
       renderReport(this.documentRef, reportRoot, this.report, this.sectionState, {
-        solveState: this.solveState,
-        onSolve: () => this.runSolve(),
+        solveState: Object.freeze({ status: 'idle' }),
+        onSolve: failClosedAnalyzeSolve,
       });
+      replaceResultantsWithAuthorizationNotice(this.documentRef, reportRoot);
       for (const section of reportRoot.querySelectorAll('[data-section-key]')) {
         const header = section.querySelector('.ixa__section-header');
         header.addEventListener('click', () => this.toggleSection(section.dataset.sectionKey));
@@ -134,6 +115,38 @@ export class AnalyzeController {
 
 export function mountAnalyzePage(applicationRoot, documentRef) {
   return new AnalyzeController(applicationRoot, documentRef).init();
+}
+
+function replaceResultantsWithAuthorizationNotice(documentRef, reportRoot) {
+  const resultants = [...reportRoot.querySelectorAll('.ixa__section')].find(
+    (section) => section.querySelector('.ixa__section-title')?.textContent?.trim() === 'Resultants',
+  );
+  if (!resultants) {
+    throw new Error('ANALYZE_RESULTANTS_SECTION_NOT_FOUND');
+  }
+
+  const header = documentRef.createElement('div');
+  header.className = 'ixa__section-header';
+  header.style.cursor = 'default';
+  const title = documentRef.createElement('h2');
+  title.className = 'ixa__section-title';
+  title.textContent = 'Solve authorization';
+  header.append(title);
+
+  const body = documentRef.createElement('div');
+  body.className = 'ixa__section-body';
+  const notice = documentRef.createElement('p');
+  notice.className = 'ixa__dropzone-hint';
+  notice.textContent = `${PREFEA_AUTHORIZATION_REQUIRED}: Raw InputXML execution is disabled. This page is diagnostics-only until a prepared source, sealed authorization, and explicit solver executor are supplied through the governed gateway.`;
+  body.append(notice);
+
+  resultants.replaceChildren(header, body);
+}
+
+function failClosedAnalyzeSolve() {
+  const error = new Error('Raw InputXML analysis requires governed pre-FEA authorization and an explicit executor.');
+  error.code = PREFEA_AUTHORIZATION_REQUIRED;
+  throw error;
 }
 
 function describeError(error, fileName) {

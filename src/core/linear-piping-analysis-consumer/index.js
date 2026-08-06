@@ -98,14 +98,93 @@ export {
   sealLinearPipingInputXmlAnalysisContext,
 } from './inputxml-analysis-context.js';
 
+// Raw InputXML parsing remains public for diagnostics custody. Legacy public
+// analysis/solve exports are intentionally absent; authorized execution is
+// exposed only through solveInputXmlLinearAnalysis below.
 export {
-  compileLinearPipingInputXmlAnalysisContext,
   parseInputXmlModelHealthSource,
-  runLinearPipingAnalysisFromInputXml,
   validateLinearPipingInputXmlAnalysisRequest,
 } from './inputxml-source-binding.js';
 
 export {
+  diagnoseInputXmlLinearModelHealth,
   diagnoseInputXmlModelHealthProximity,
   diagnoseInputXmlModelHealthTopology,
+  prepareInputXmlLinearSolve,
 } from './inputxml-model-health.js';
+
+export {
+  INPUTXML_LINEAR_MODEL_HEALTH_SCHEMA,
+  requireInputXmlLinearModelHealth,
+  sealInputXmlLinearModelHealth,
+} from './inputxml-linear-model-health-contract.js';
+
+export {
+  DISCLOSED_GENERIC_ANALYZER_APPROXIMATION_PROFILE,
+  INPUTXML_CAPABILITY_EFFECT_DISPOSITIONS,
+  INPUTXML_FEATURE_DISPOSITIONS,
+  INPUTXML_MODEL_HEALTH_CAPABILITIES,
+  INPUTXML_MODEL_HEALTH_CAPABILITY_DEPENDENCIES,
+  STRICT_INPUTXML_LINEAR_STATIC_PROFILE,
+} from './inputxml-model-health-profile.js';
+
+export {
+  INPUTXML_LINEAR_SOLVE_PREPARATION_SCHEMA,
+  requireInputXmlLinearSolvePreparation,
+  sealInputXmlLinearSolvePreparation,
+} from './inputxml-linear-solve-preparation-contract.js';
+
+export {
+  INPUTXML_GRAVITY_ACCELERATION,
+  INPUTXML_INSTALLATION_TEMPERATURE,
+  INPUTXML_LINEAR_SOLVE_PREPARATION_PROFILE_SCHEMA,
+  InputXmlLinearSolvePreparationError,
+  requireInputXmlLinearSolvePreparationProfile,
+} from './inputxml-linear-preparation-profile.js';
+
+export {
+  INPUTXML_THERMAL_EXPANSION_AUTHORITY_SCHEMA,
+  resolveInputXmlThermalExpansionAuthority,
+} from './inputxml-thermal-authority.js';
+
+export { compileInputXmlLinearStructure } from './inputxml-linear-structural-preparation.js';
+export {
+  INPUTXML_LINEAR_STRUCTURAL_PREPARATION_SCHEMA,
+  requireInputXmlLinearStructuralPreparation,
+  sealInputXmlLinearStructuralPreparation,
+} from './inputxml-linear-structural-preparation-contract.js';
+export {
+  INPUTXML_LINEAR_IDENTITY_CONDITIONING_PROFILE,
+  INPUTXML_LINEAR_STRUCTURAL_PROFILE_SCHEMA,
+  InputXmlLinearStructuralPreparationError,
+  requireInputXmlLinearStructuralProfile,
+} from './inputxml-linear-structural-profile.js';
+
+export { compileInputXmlLinearPhysicalCases } from './inputxml-linear-physical-cases.js';
+export {
+  INPUTXML_LINEAR_PHYSICAL_CASE_PREPARATION_SCHEMA,
+  requireInputXmlLinearPhysicalCasePreparation,
+  sealInputXmlLinearPhysicalCasePreparation,
+} from './inputxml-linear-physical-cases-contract.js';
+export {
+  INPUTXML_DEFAULT_GRAVITY_DIRECTION,
+  INPUTXML_LINEAR_PHYSICAL_CASE_PROFILE_SCHEMA,
+  inputXmlLinearPhysicalLoadCaseProfile,
+  resolveInputXmlGravityDirection,
+} from './inputxml-linear-physical-profile.js';
+
+export { preflightInputXmlLinearSolve } from './inputxml-linear-stiffness-preflight.js';
+export {
+  INPUTXML_LINEAR_STIFFNESS_PREFLIGHT_SCHEMA,
+  INPUTXML_LINEAR_STIFFNESS_PREFLIGHT_STATUSES,
+  requireInputXmlLinearStiffnessPreflight,
+  sealInputXmlLinearStiffnessPreflight,
+  stiffnessAssessmentProjection,
+} from './inputxml-linear-stiffness-preflight-contract.js';
+export {
+  INPUTXML_STIFFNESS_PREFLIGHT_PROFILE_ID,
+  inputXmlStiffnessFrameElementProfile,
+  inputXmlStiffnessSolverProfile,
+} from './inputxml-linear-stiffness-profile.js';
+
+export * from './inputxml-linear-prefea.js';
