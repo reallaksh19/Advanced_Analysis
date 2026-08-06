@@ -71,7 +71,27 @@ jobs:
         with:
           node-version: 22
       - name: Run non-FEA piping foundation hand checks
-        run: node scripts/nonfea-piping-foundation-check.mjs
+        id: foundation
+        continue-on-error: true
+        run: |
+          set +e
+          node scripts/nonfea-piping-foundation-check.mjs > /tmp/nonfea-foundation.log 2>&1
+          code=$?
+          cat /tmp/nonfea-foundation.log
+          echo "$code" > /tmp/nonfea-foundation.exit-code
+          exit "$code"
+      - name: Upload foundation diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nonfea-foundation-diagnostic
+          path: |
+            /tmp/nonfea-foundation.log
+            /tmp/nonfea-foundation.exit-code
+          if-no-files-found: error
+      - name: Fail when foundation hand checks fail
+        if: steps.foundation.outcome == 'failure'
+        run: exit 1
       - name: Materialize exact enriched benchmark sources
         run: |
           git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson > /tmp/EnrichedSjson
