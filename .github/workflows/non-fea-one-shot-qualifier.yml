@@ -1,4 +1,4 @@
-# repair-and-qualify revision 3
+# repair-and-qualify revision 4
 name: non-fea-one-shot-qualifier
 
 on:
@@ -27,26 +27,89 @@ jobs:
           node-version: '22'
           cache: npm
 
-      - name: Apply targeted Input Check syntax correction
+      - name: Apply targeted qualification corrections
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
-          path = Path('src/workspace/non-fea-input-check-view.js')
-          text = path.read_text()
-          old = 'A legacy calculation authorization is not a substitute for `common-enriched-piping-input/v1` and its exact readiness receipt.'
-          new = 'A legacy calculation authorization is not a substitute for <code>common-enriched-piping-input/v1</code> and its exact readiness receipt.'
-          if old in text:
-              path.write_text(text.replace(old, new, 1))
-          elif new not in text:
-              raise SystemExit('Target syntax text not found; refusing broad mutation.')
+
+          input_path = Path('src/workspace/non-fea-input-check-view.js')
+          input_text = input_path.read_text()
+          input_old = 'A legacy calculation authorization is not a substitute for `common-enriched-piping-input/v1` and its exact readiness receipt.'
+          input_new = 'A legacy calculation authorization is not a substitute for <code>common-enriched-piping-input/v1</code> and its exact readiness receipt.'
+          if input_old in input_text:
+              input_path.write_text(input_text.replace(input_old, input_new, 1))
+          elif input_new not in input_text:
+              raise SystemExit('Input Check syntax target not found; refusing broad mutation.')
+
+          contract_path = Path('scripts/advanced-shell-contract-check.mjs')
+          contract_text = contract_path.read_text()
+          old_tabs = """const empiricalTabs = [
+            'overview',
+            '3d',
+            'restraints',
+            'load-cases',
+            'methods',
+            'results',
+            'evidence',
+          ];
+          const legacyTabs = ['loads', 'preflight', 'project-data', 'masters', 'json-trace'];
+          assert.deepEqual(loadCalcTabs, [...empiricalTabs, ...legacyTabs]);
+          assert.deepEqual(
+            loadCalcTabs.filter((tab) => legacyTabs.includes(tab)),
+            legacyTabs,
+            'The existing Load Calc tabs must remain present in their prior order.',
+          );"""
+          new_tabs = """const expectedLoadCalcTabs = [
+            'overview',
+            '3d',
+            'preflight',
+            'project-data',
+            'masters',
+            'enrichment',
+            'method-basis',
+            'seal-export',
+            'restraints',
+            'load-cases',
+            'methods',
+            'results',
+            'evidence',
+            'loads',
+            'json-trace',
+          ];
+          assert.deepEqual(loadCalcTabs, expectedLoadCalcTabs);
+          for (const requiredTab of ['overview', '3d', 'restraints', 'load-cases', 'methods', 'results', 'evidence', 'loads', 'preflight', 'project-data', 'masters', 'json-trace']) {
+            assert.equal(loadCalcTabs.includes(requiredTab), true, `Load Calc must retain ${requiredTab}.`);
+          }
+          for (const governedTab of ['enrichment', 'method-basis', 'seal-export']) {
+            assert.equal(loadCalcTabs.includes(governedTab), true, `Load Calc must mount governed Non-FEA tab ${governedTab}.`);
+          }"""
+          if old_tabs in contract_text:
+              contract_text = contract_text.replace(old_tabs, new_tabs, 1)
+          elif new_tabs not in contract_text:
+              raise SystemExit('Load Calc tab contract target not found; refusing broad mutation.')
+
+          old_views = """  'master-data-ui.js',
+            'json-trace-ui.js',
+            'topology-edit-3d-sjson-fidelity-controller.js',"""
+          new_views = """  'master-data-ui.js',
+            'enrichment/non-fea-enrichment-view.js',
+            'non-fea-method-basis-view.js',
+            'non-fea-seal-export-view.js',
+            'json-trace-ui.js',
+            'topology-edit-3d-sjson-fidelity-controller.js',"""
+          if old_views in contract_text:
+              contract_text = contract_text.replace(old_views, new_views, 1)
+          elif new_views not in contract_text:
+              raise SystemExit('Load Calc deferred-view contract target not found; refusing broad mutation.')
+          contract_path.write_text(contract_text)
           PY
           git diff --check
           if ! git diff --quiet; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add src/workspace/non-fea-input-check-view.js
-            git commit -m "fix(non-fea): repair Input Check contract label syntax"
+            git add src/workspace/non-fea-input-check-view.js scripts/advanced-shell-contract-check.mjs
+            git commit -m "fix(non-fea): align integrated Load Calc shell contract"
             git push origin HEAD:feat/load-calc-non-fea-input-check-ui
           fi
           git fetch origin feat/load-calc-non-fea-input-check-ui main
@@ -68,7 +131,7 @@ jobs:
           base_sha="$(git merge-base origin/main HEAD)"
           changed="$(git diff --name-only "$base_sha"...HEAD)"
           printf '%s\n' "$changed"
-          unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(doc/prelight_roamap\.md|src/core/non-fea-enrichment/.*|src/core/non-fea-common-checker/.*|src/core/non-fea-method-consumption/.*|src/workspace/bootstrap\.js|src/workspace/workspace-layout\.js|src/workspace/load-calc-consumer-controller\.js|src/workspace/load-calc-consumer-view\.js|src/workspace/non-fea-input-check-view\.js|src/workspace/non-fea-common-input-store\.js|src/workspace/non-fea-common-input-runtime\.js|src/workspace/non-fea-common-input-check-adapter\.js|src/workspace/non-fea-method-basis-view\.js|src/workspace/non-fea-seal-export-view\.js|src/workspace/empirical-preflight-view\.js|src/workspace/engineering-model-controller\.js|src/workspace/engineering-loads/empirical-load-calc-scenario-controller\.js|src/workspace/enrichment/authorized-enrichment-consumer-controller\.js|src/workspace/enrichment/authorized-enrichment-runtime\.js|src/workspace/enrichment/non-fea-enrichment-store\.js|src/workspace/enrichment/non-fea-enrichment-view\.js|src/workspace/enrichment/non-fea-enrichment-input-check-adapter\.js|src/workspace/project-data/project-data-fields\.js|src/workspace/project-data/project-data-contract\.js|src/workspace/project-data/project-data-store\.js|src/workspace/project-data/non-fea-field-registry\.js|src/workspace/project-data/project-data-view\.js|src/workspace/project-data/project-data-view-full\.js|src/workspace/project-data/non-fea-project-data-view\.js|src/workspace/project-data/non-fea-project-data-view-v2\.js|scripts/non-fea-project-data-authority-check\.mjs|scripts/non-fea-enrichment-migration-check\.mjs|scripts/non-fea-common-checker-check\.mjs|scripts/non-fea-method-consumption-check\.mjs|scripts/non-fea-release-qualification-check\.mjs|scripts/first-cut-workbench-launcher-source-guard\.mjs|e2e/non-fea-input-check-load-calc\.spec\.js|\.github/workflows/non-fea-input-check-load-calc\.yml)$' || true)"
+          unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(doc/prelight_roamap\.md|src/core/non-fea-enrichment/.*|src/core/non-fea-common-checker/.*|src/core/non-fea-method-consumption/.*|src/workspace/bootstrap\.js|src/workspace/workspace-layout\.js|src/workspace/load-calc-consumer-controller\.js|src/workspace/load-calc-consumer-view\.js|src/workspace/non-fea-input-check-view\.js|src/workspace/non-fea-common-input-store\.js|src/workspace/non-fea-common-input-runtime\.js|src/workspace/non-fea-common-input-check-adapter\.js|src/workspace/non-fea-method-basis-view\.js|src/workspace/non-fea-seal-export-view\.js|src/workspace/empirical-preflight-view\.js|src/workspace/engineering-model-controller\.js|src/workspace/engineering-loads/empirical-load-calc-scenario-controller\.js|src/workspace/enrichment/authorized-enrichment-consumer-controller\.js|src/workspace/enrichment/authorized-enrichment-runtime\.js|src/workspace/enrichment/non-fea-enrichment-store\.js|src/workspace/enrichment/non-fea-enrichment-view\.js|src/workspace/enrichment/non-fea-enrichment-input-check-adapter\.js|src/workspace/project-data/project-data-fields\.js|src/workspace/project-data/project-data-contract\.js|src/workspace/project-data/project-data-store\.js|src/workspace/project-data/non-fea-field-registry\.js|src/workspace/project-data/project-data-view\.js|src/workspace/project-data/project-data-view-full\.js|src/workspace/project-data/non-fea-project-data-view\.js|src/workspace/project-data/non-fea-project-data-view-v2\.js|scripts/advanced-shell-contract-check\.mjs|scripts/non-fea-project-data-authority-check\.mjs|scripts/non-fea-enrichment-migration-check\.mjs|scripts/non-fea-common-checker-check\.mjs|scripts/non-fea-method-consumption-check\.mjs|scripts/non-fea-release-qualification-check\.mjs|scripts/first-cut-workbench-launcher-source-guard\.mjs|e2e/non-fea-input-check-load-calc\.spec\.js|\.github/workflows/non-fea-input-check-load-calc\.yml)$' || true)"
           test -z "$unexpected"
           imports="$(grep '^import ' src/core/non-fea-enrichment/index.js src/core/non-fea-common-checker/index.js src/core/non-fea-common-checker/integrity.js src/core/non-fea-method-consumption/index.js src/workspace/non-fea-common-input-runtime.js src/workspace/non-fea-method-basis-view.js src/workspace/non-fea-seal-export-view.js src/workspace/enrichment/non-fea-enrichment-store.js src/workspace/enrichment/non-fea-enrichment-view.js src/workspace/enrichment/non-fea-enrichment-input-check-adapter.js src/workspace/project-data/non-fea-field-registry.js || true)"
           if printf '%s\n' "$imports" | grep -Eiq '(linear-fea|lafea|lfea|shell|continuum|solver)'; then
@@ -109,6 +172,7 @@ jobs:
           node --check src/workspace/enrichment/non-fea-enrichment-view.js
           node --check src/workspace/enrichment/non-fea-enrichment-input-check-adapter.js
           node --check src/workspace/project-data/non-fea-field-registry.js
+          node --check scripts/advanced-shell-contract-check.mjs
           node --check scripts/non-fea-project-data-authority-check.mjs
           node --check scripts/non-fea-enrichment-migration-check.mjs
           node --check scripts/non-fea-common-checker-check.mjs
