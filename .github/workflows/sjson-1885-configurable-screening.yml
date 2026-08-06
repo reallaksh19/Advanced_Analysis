@@ -26,6 +26,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: sjson-1885-configurable-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   calculate:
     runs-on: ubuntu-24.04
