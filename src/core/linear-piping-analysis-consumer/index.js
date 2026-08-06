@@ -150,3 +150,20 @@ export {
   requireInputXmlLinearStructuralPreparation,
   sealInputXmlLinearStructuralPreparation,
 } from './inputxml-linear-structural-preparation-contract.js';
+
+export {
+  INPUTXML_DEFAULT_GRAVITY_DIRECTION,
+  INPUTXML_GRAVITATIONAL_ACCELERATION,
+  INPUTXML_LINEAR_LOAD_PREPARATION_PROFILE_SCHEMA,
+  inputXmlLinearLoadCaseProfile,
+  requireInputXmlLinearLoadPreparationProfile,
+  resolveInputXmlGravityDirection,
+} from './inputxml-linear-load-profile.js';
+
+export { prepareInputXmlLinearSolve } from './inputxml-linear-solve-preparation.js';
+
+export {
+  INPUTXML_LINEAR_SOLVE_PREPARATION_SCHEMA,
+  requireInputXmlLinearSolvePreparation,
+  sealInputXmlLinearSolvePreparation,
+} from './inputxml-linear-solve-preparation-contract.js';

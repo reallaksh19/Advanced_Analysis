@@ -58,7 +58,7 @@ test('MH-RP-01', 'clean straight pipe is structurally preparable', () => {
   assert.equal(Object.hasOwn(context.report, 'status'), false);
   assert.equal(
     context.report.executionAvailability.STRICT_INPUTXML_LINEAR_STATIC_V1,
-    'STRUCTURAL_PREPARATION_AVAILABLE_LOAD_CUSTODY_NOT_IMPLEMENTED',
+    'LOAD_CASE_PREPARATION_AVAILABLE_STIFFNESS_PREFLIGHT_NOT_IMPLEMENTED',
   );
 });
 

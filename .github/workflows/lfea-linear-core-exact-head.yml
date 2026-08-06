@@ -17,6 +17,7 @@ on:
       - 'scripts/lfea-inputxml-topology-diagnostics-check.mjs'
       - 'scripts/lfea-inputxml-representability-check.mjs'
       - 'scripts/lfea-inputxml-structural-preparation-check.mjs'
+      - 'scripts/lfea-inputxml-load-preparation-check.mjs'
       - 'scripts/lfea-linear-core-exact-head-evidence.mjs'
       - 'scripts/linear-piping-inputxml-unit-normalization-check.mjs'
       - '.github/workflows/lfea-linear-core-exact-head.yml'
@@ -52,7 +53,7 @@ jobs:
           git diff --name-only "$merge_base" "${{ github.event.pull_request.head.sha }}" > /tmp/lfea-linear-core-paths.txt
           while IFS= read -r changed; do
             case "$changed" in
-              src/core/centerline-beam-fea/*|src/core/geometry/adapters/inputXmlToCanonicalGeometry.js|src/core/geometry/adapters/inputxml-canonical-geometry-*.js|src/core/geometry/adapters/inputxml-feature-registry.js|src/core/geometry/adapters/inputxml-load-diagnostics.js|src/core/geometry/adapters/inputxml-source-*.js|src/core/geometry/model-health/*|src/core/linear-fea-*/*|src/core/linear-piping-analysis-consumer/*|scripts/lfea-b1-conditioning-check.mjs|scripts/lfea-inputxml-load-diagnostics-check.mjs|scripts/lfea-inputxml-topology-diagnostics-check.mjs|scripts/lfea-inputxml-representability-check.mjs|scripts/lfea-inputxml-structural-preparation-check.mjs|scripts/lfea-linear-core-exact-head-evidence.mjs|scripts/linear-piping-inputxml-unit-normalization-check.mjs|.github/workflows/lfea-linear-core-exact-head.yml) ;;
+              src/core/centerline-beam-fea/*|src/core/geometry/adapters/inputXmlToCanonicalGeometry.js|src/core/geometry/adapters/inputxml-canonical-geometry-*.js|src/core/geometry/adapters/inputxml-feature-registry.js|src/core/geometry/adapters/inputxml-load-diagnostics.js|src/core/geometry/adapters/inputxml-source-*.js|src/core/geometry/model-health/*|src/core/linear-fea-*/*|src/core/linear-piping-analysis-consumer/*|scripts/lfea-b1-conditioning-check.mjs|scripts/lfea-inputxml-load-diagnostics-check.mjs|scripts/lfea-inputxml-topology-diagnostics-check.mjs|scripts/lfea-inputxml-representability-check.mjs|scripts/lfea-inputxml-structural-preparation-check.mjs|scripts/lfea-inputxml-load-preparation-check.mjs|scripts/lfea-linear-core-exact-head-evidence.mjs|scripts/linear-piping-inputxml-unit-normalization-check.mjs|.github/workflows/lfea-linear-core-exact-head.yml) ;;
               *) echo "Forbidden changed path for the linear-core qualification slice: $changed"; exit 1 ;;
             esac
           done < /tmp/lfea-linear-core-paths.txt
@@ -68,6 +69,9 @@ jobs:
 
       - name: InputXML profile-specific structural preparation
         run: node scripts/lfea-inputxml-structural-preparation-check.mjs
+
+      - name: InputXML profile-specific load and physical-case preparation
+        run: node scripts/lfea-inputxml-load-preparation-check.mjs
 
       - name: InputXML unit normalization
         run: node scripts/linear-piping-inputxml-unit-normalization-check.mjs
