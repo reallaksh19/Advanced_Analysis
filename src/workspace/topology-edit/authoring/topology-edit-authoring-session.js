@@ -70,13 +70,23 @@ const TOOL_DEFINITIONS = deepFreeze({
     label: 'Valve with two flanges',
     targetKinds: ['straight-edge'],
     fields: [
-      numberField('stationMm', 'Insertion station', 'mm', null, { positive: true }),
+      numberField('stationMm', 'Assembly centre station', 'mm', null, { positive: true }),
       textField('valveRecordId', 'Valve catalogue record'),
       textField('upstreamFlangeRecordId', 'Upstream flange record'),
       textField('downstreamFlangeRecordId', 'Downstream flange record'),
       textField('valveType', 'Valve type', { authority: 'CATALOGUE' }),
       textField('pressureClass', 'Rating', { authority: 'CATALOGUE' }),
+      textField('facing', 'Flange facing', { authority: 'CATALOGUE' }),
+      textField('valveMaterialSpecification', 'Valve material', { authority: 'CATALOGUE' }),
+      textField('upstreamFlangeMaterialSpecification', 'Upstream flange material', { authority: 'CATALOGUE' }),
+      textField('downstreamFlangeMaterialSpecification', 'Downstream flange material', { authority: 'CATALOGUE' }),
       numberField('faceToFaceMm', 'Valve face-to-face', 'mm', null, { positive: true, authority: 'CATALOGUE' }),
+      numberField('upstreamFlangeLengthMm', 'Upstream flange length', 'mm', null, { positive: true, authority: 'CATALOGUE' }),
+      numberField('downstreamFlangeLengthMm', 'Downstream flange length', 'mm', null, { positive: true, authority: 'CATALOGUE' }),
+      numberField('upstreamFlangeMassKg', 'Upstream flange weight', 'kg', null, { positive: true, authority: 'CATALOGUE' }),
+      numberField('valveMassKg', 'Valve weight', 'kg', null, { positive: true, authority: 'CATALOGUE' }),
+      numberField('downstreamFlangeMassKg', 'Downstream flange weight', 'kg', null, { positive: true, authority: 'CATALOGUE' }),
+      numberField('assemblyLengthMm', 'Assembly length', 'mm', null, { positive: true, authority: 'DERIVED' }),
       numberField('assemblyMassKg', 'Assembly weight', 'kg', null, { positive: true, authority: 'DERIVED' }),
     ],
   },
@@ -144,13 +154,12 @@ const TOOL_DEFINITIONS = deepFreeze({
 });
 
 export function topologyEditAuthoringToolDefinition(toolInput) {
-  const tool = normalizeTool(toolInput);
-  return TOOL_DEFINITIONS[tool];
+  return TOOL_DEFINITIONS[normalizeTool(toolInput)];
 }
 
 export function createTopologyEditAuthoringSession(input = {}) {
   const tool = input.tool ? normalizeTool(input.tool) : null;
-  const material = {
+  return freezeSession({
     schema: TOPOLOGY_EDIT_AUTHORING_SESSION_SCHEMA,
     revision: nonNegativeInteger(input.revision ?? 0, 'revision'),
     phase: tool ? 'TARGET_REQUIRED' : 'IDLE',
@@ -163,34 +172,25 @@ export function createTopologyEditAuthoringSession(input = {}) {
     validation: null,
     diagnostics: [],
     lastAppliedTransactionHash: null,
-  };
-  return freezeSession(material);
+  });
 }
 
 export function activateTopologyEditAuthoringTool(sessionInput, toolInput) {
   const session = assertTopologyEditAuthoringSession(sessionInput);
   const tool = normalizeTool(toolInput);
   return transition(session, {
-    phase: 'TARGET_REQUIRED',
-    tool,
-    target: null,
+    phase: 'TARGET_REQUIRED', tool, target: null,
     properties: defaultProperties(tool),
     propertyAuthorities: defaultAuthorities(tool),
-    preview: null,
-    validation: null,
-    diagnostics: [],
+    preview: null, validation: null, diagnostics: [],
   });
 }
 
 export function setTopologyEditAuthoringSelection(sessionInput, selectionInput) {
   const session = assertTopologyEditAuthoringSession(sessionInput);
-  const selection = normalizeSelection(selectionInput);
   return transition(session, {
-    selection,
-    target: null,
-    preview: null,
-    validation: null,
-    diagnostics: [],
+    selection: normalizeSelection(selectionInput),
+    target: null, preview: null, validation: null, diagnostics: [],
     phase: session.tool ? 'TARGET_REQUIRED' : 'IDLE',
   });
 }
@@ -199,29 +199,19 @@ export function setTopologyEditAuthoringTarget(sessionInput, targetInput) {
   const session = assertTopologyEditAuthoringSession(sessionInput);
   if (!session.tool) fail('a tool must be active before selecting a target.', RangeError);
   const target = normalizeTarget(targetInput);
-  const allowed = new Set(TOOL_DEFINITIONS[session.tool].targetKinds);
-  if (!allowed.has(target.kind)) {
+  if (!new Set(TOOL_DEFINITIONS[session.tool].targetKinds).has(target.kind)) {
     fail(`${session.tool} does not accept target kind ${target.kind}.`, RangeError);
   }
   return transition(session, {
-    target,
-    phase: 'PARAMETERS_REQUIRED',
-    preview: null,
-    validation: null,
-    diagnostics: [],
+    target, phase: 'PARAMETERS_REQUIRED', preview: null, validation: null, diagnostics: [],
   });
 }
 
 export function updateTopologyEditAuthoringProperties(sessionInput, patchInput, authority = 'USER_INPUT') {
   const session = assertTopologyEditAuthoringSession(sessionInput);
-  if (!session.tool || !session.target) {
-    fail('tool and target are required before editing properties.', RangeError);
-  }
-  if (!patchInput || typeof patchInput !== 'object' || Array.isArray(patchInput)) {
-    fail('property patch must be an object.');
-  }
-  const definition = TOOL_DEFINITIONS[session.tool];
-  const fields = new Map(definition.fields.map((field) => [field.key, field]));
+  if (!session.tool || !session.target) fail('tool and target are required before editing properties.', RangeError);
+  if (!patchInput || typeof patchInput !== 'object' || Array.isArray(patchInput)) fail('property patch must be an object.');
+  const fields = new Map(TOOL_DEFINITIONS[session.tool].fields.map((field) => [field.key, field]));
   const properties = { ...session.properties };
   const propertyAuthorities = { ...session.propertyAuthorities };
   for (const [key, value] of Object.entries(patchInput)) {
@@ -231,35 +221,23 @@ export function updateTopologyEditAuthoringProperties(sessionInput, patchInput, 
     propertyAuthorities[key] = normalizeAuthority(authority);
   }
   return transition(session, {
-    properties,
-    propertyAuthorities,
-    phase: 'PARAMETERS_REQUIRED',
-    preview: null,
-    validation: null,
-    diagnostics: [],
+    properties, propertyAuthorities, phase: 'PARAMETERS_REQUIRED',
+    preview: null, validation: null, diagnostics: [],
   });
 }
 
 export function publishTopologyEditAuthoringPreview(sessionInput, previewInput) {
   const session = assertTopologyEditAuthoringSession(sessionInput);
   if (!session.tool || !session.target) fail('tool and target are required for preview.', RangeError);
-  const preview = normalizePreview(previewInput);
   return transition(session, {
-    preview,
-    validation: null,
-    diagnostics: [],
-    phase: 'PREVIEW_READY',
+    preview: normalizePreview(previewInput), validation: null, diagnostics: [], phase: 'PREVIEW_READY',
   });
 }
 
 export function beginTopologyEditAuthoringValidation(sessionInput) {
   const session = assertTopologyEditAuthoringSession(sessionInput);
   if (!session.preview) fail('preview is required before validation.', RangeError);
-  return transition(session, {
-    phase: 'VALIDATING',
-    validation: null,
-    diagnostics: [],
-  });
+  return transition(session, { phase: 'VALIDATING', validation: null, diagnostics: [] });
 }
 
 export function completeTopologyEditAuthoringValidation(sessionInput, validationInput) {
@@ -276,10 +254,9 @@ export function completeTopologyEditAuthoringValidation(sessionInput, validation
 export function markTopologyEditAuthoringApplied(sessionInput, transactionHashInput) {
   const session = assertTopologyEditAuthoringSession(sessionInput);
   if (session.phase !== 'READY_TO_APPLY') fail('validated authoring state is not ready to apply.', RangeError);
-  const transactionHash = requiredText(transactionHashInput, 'transactionHash');
   return transition(session, {
     phase: 'APPLIED',
-    lastAppliedTransactionHash: transactionHash,
+    lastAppliedTransactionHash: requiredText(transactionHashInput, 'transactionHash'),
   });
 }
 
@@ -292,9 +269,7 @@ export function cancelTopologyEditAuthoring(sessionInput) {
 }
 
 export function assertTopologyEditAuthoringSession(value) {
-  if (!value || value.schema !== TOPOLOGY_EDIT_AUTHORING_SESSION_SCHEMA) {
-    fail(`session must use ${TOPOLOGY_EDIT_AUTHORING_SESSION_SCHEMA}.`);
-  }
+  if (!value || value.schema !== TOPOLOGY_EDIT_AUTHORING_SESSION_SCHEMA) fail(`session must use ${TOPOLOGY_EDIT_AUTHORING_SESSION_SCHEMA}.`);
   if (!PHASE_SET.has(value.phase)) fail(`unsupported phase ${value.phase}.`, RangeError);
   if (value.tool !== null && !TOOL_SET.has(value.tool)) fail(`unsupported tool ${value.tool}.`, RangeError);
   const supplied = { ...value };
@@ -304,33 +279,13 @@ export function assertTopologyEditAuthoringSession(value) {
 }
 
 function transition(session, patch) {
-  const material = {
-    ...session,
-    ...patch,
-    revision: session.revision + 1,
-  };
+  const material = { ...session, ...patch, revision: session.revision + 1 };
   delete material.sessionHash;
   return freezeSession(material);
 }
-
-function freezeSession(material) {
-  return deepFreeze({ ...material, sessionHash: semanticHash(material) });
-}
-
-function defaultProperties(tool) {
-  return Object.fromEntries(TOOL_DEFINITIONS[tool].fields.map((field) => [
-    field.key,
-    field.defaultValue,
-  ]));
-}
-
-function defaultAuthorities(tool) {
-  return Object.fromEntries(TOOL_DEFINITIONS[tool].fields.map((field) => [
-    field.key,
-    field.authority,
-  ]));
-}
-
+function freezeSession(material) { return deepFreeze({ ...material, sessionHash: semanticHash(material) }); }
+function defaultProperties(tool) { return Object.fromEntries(TOOL_DEFINITIONS[tool].fields.map((field) => [field.key, field.defaultValue])); }
+function defaultAuthorities(tool) { return Object.fromEntries(TOOL_DEFINITIONS[tool].fields.map((field) => [field.key, field.authority])); }
 function normalizeSelection(value) {
   const canonicalIds = Array.isArray(value?.canonicalIds)
     ? [...new Set(value.canonicalIds.map((id) => requiredText(id, 'selection canonical ID')))].sort()
@@ -340,7 +295,6 @@ function normalizeSelection(value) {
   canonicalIds.sort();
   return { canonicalIds, primaryId };
 }
-
 function normalizeTarget(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) fail('target must be an object.');
   return {
@@ -354,22 +308,17 @@ function normalizeTarget(value) {
     targetHash: requiredText(value.targetHash, 'target.targetHash'),
   };
 }
-
 function normalizePreview(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) fail('preview must be an object.');
   return {
     previewHash: requiredText(value.previewHash, 'preview.previewHash'),
     planHash: requiredText(value.planHash, 'preview.planHash'),
-    candidateCanonicalHash: requiredText(
-      value.candidateCanonicalHash,
-      'preview.candidateCanonicalHash',
-    ),
+    candidateCanonicalHash: requiredText(value.candidateCanonicalHash, 'preview.candidateCanonicalHash'),
     changedCanonicalIds: Array.isArray(value.changedCanonicalIds)
       ? [...new Set(value.changedCanonicalIds.map((id) => requiredText(id, 'preview changed ID')))].sort()
       : [],
   };
 }
-
 function normalizeValidation(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) fail('validation must be an object.');
   const diagnostics = Array.isArray(value.diagnostics)
@@ -390,7 +339,6 @@ function normalizeValidation(value) {
     diagnostics,
   };
 }
-
 function normalizeFieldValue(field, value) {
   if (value === null || value === '') return null;
   if (field.type === 'number') {
@@ -400,88 +348,49 @@ function normalizeFieldValue(field, value) {
     return Object.is(number, -0) ? 0 : number;
   }
   const text = requiredText(value, field.label);
-  if (field.type === 'enum' && !field.options.includes(text.toUpperCase())) {
-    fail(`${field.label} has unsupported value ${text}.`, RangeError);
-  }
+  if (field.type === 'enum' && !field.options.includes(text.toUpperCase())) fail(`${field.label} has unsupported value ${text}.`, RangeError);
   return field.type === 'enum' ? text.toUpperCase() : text;
 }
-
 function normalizeTool(value) {
   const tool = requiredText(value, 'tool').toUpperCase();
   if (!TOOL_SET.has(tool)) fail(`unsupported tool ${tool}.`, RangeError);
   return tool;
 }
-
 function normalizeAuthority(value) {
   const authority = requiredText(value, 'property authority').toUpperCase();
-  if (!['SOURCE', 'CATALOGUE', 'DERIVED', 'USER_INPUT', 'USER_OVERRIDE'].includes(authority)) {
-    fail(`unsupported property authority ${authority}.`, RangeError);
-  }
+  if (!['SOURCE', 'CATALOGUE', 'DERIVED', 'USER_INPUT', 'USER_OVERRIDE'].includes(authority)) fail(`unsupported property authority ${authority}.`, RangeError);
   return authority;
 }
-
 function finitePoint(value, label) {
   const point = { x: Number(value?.x), y: Number(value?.y), z: Number(value?.z) };
   if (!Object.values(point).every(Number.isFinite)) fail(`${label} must contain finite x, y and z.`, RangeError);
   return point;
 }
-
 function optionalFinite(value, label) {
   if (value === null || value === undefined || value === '') return null;
   const number = Number(value);
   if (!Number.isFinite(number)) fail(`${label} must be finite.`, RangeError);
   return Object.is(number, -0) ? 0 : number;
 }
-
 function numberField(key, label, unit, defaultValue, options = {}) {
-  return {
-    key,
-    label,
-    unit,
-    type: 'number',
-    defaultValue,
-    positive: Boolean(options.positive),
-    authority: options.authority ?? 'USER_INPUT',
-  };
+  return { key, label, unit, type: 'number', defaultValue, positive: Boolean(options.positive), authority: options.authority ?? 'USER_INPUT' };
 }
-
 function enumField(key, label, options, defaultValue, fieldOptions = {}) {
-  return {
-    key,
-    label,
-    unit: null,
-    type: 'enum',
-    options,
-    defaultValue,
-    positive: false,
-    authority: fieldOptions.authority ?? 'USER_INPUT',
-  };
+  return { key, label, unit: null, type: 'enum', options, defaultValue, positive: false, authority: fieldOptions.authority ?? 'USER_INPUT' };
 }
-
 function textField(key, label, options = {}) {
-  return {
-    key,
-    label,
-    unit: null,
-    type: 'text',
-    defaultValue: null,
-    positive: false,
-    authority: options.authority ?? 'USER_INPUT',
-  };
+  return { key, label, unit: null, type: 'text', defaultValue: null, positive: false, authority: options.authority ?? 'USER_INPUT' };
 }
-
 function nonNegativeInteger(value, label) {
   const number = Number(value);
   if (!Number.isInteger(number) || number < 0) fail(`${label} must be a non-negative integer.`, RangeError);
   return number;
 }
-
 function requiredText(value, label) {
   const text = String(value ?? '').trim();
   if (!text) fail(`${label} is required.`);
   return text;
 }
-
 function fail(message, Constructor = TypeError) {
   throw new Constructor(`TopologyEditAuthoringSession: ${message}`);
 }

@@ -8,6 +8,11 @@ import {
   topologyEditInlineAuthoringDefaultProperties,
 } from './topology-edit-authoring-inline-component.js';
 import {
+  deriveTopologyEditValveAssemblyTarget,
+  planTopologyEditValveAssemblyAuthoringOperation,
+  topologyEditValveAssemblyDefaultProperties,
+} from './topology-edit-authoring-valve-assembly.js';
+import {
   topologyEditOperationReference,
 } from './topology-edit-operation-graph.js';
 import {
@@ -16,6 +21,12 @@ import {
 import {
   deriveTopologyEditChangedScope,
 } from '../professional/topology-edit-change-scope.js';
+import {
+  planTopologyEditInlineComponentOperation,
+} from '../professional/topology-edit-inline-component-operation.js';
+import {
+  assertTopologyEditSpecificationCatalogue,
+} from '../professional/topology-edit-spec-catalog.js';
 
 const TOLERANCE = 1e-8;
 const INLINE_TOOLS = new Set(['FLANGE', 'REDUCER']);
@@ -25,6 +36,13 @@ export function createTopologyEditAuthoringOperationPlan(input = {}) {
   const session = assertTopologyEditAuthoringSession(input.authoringSession);
   if (!session.tool || !session.target) {
     fail('an active tool and exact target are required.', RangeError);
+  }
+  if (session.tool === 'VALVE_ASSEMBLY') {
+    return planTopologyEditValveAssemblyAuthoringOperation({
+      topology,
+      authoringSession: session,
+      catalogue: input.catalogue,
+    });
   }
   if (INLINE_TOOLS.has(session.tool)) {
     return planTopologyEditInlineAuthoringOperation({
@@ -46,6 +64,12 @@ export function createTopologyEditAuthoringOperationPlan(input = {}) {
 export function deriveTopologyEditAuthoringTarget(input = {}) {
   const topology = assertTopology(input.topology);
   const tool = String(input.tool ?? '').trim().toUpperCase();
+  if (tool === 'VALVE_ASSEMBLY') {
+    return deriveTopologyEditValveAssemblyTarget({
+      topology,
+      edgeId: input.edgeId,
+    });
+  }
   if (INLINE_TOOLS.has(tool)) {
     return deriveTopologyEditInlineAuthoringTarget({
       topology,
@@ -85,6 +109,17 @@ export function deriveTopologyEditAuthoringTarget(input = {}) {
 export function topologyEditAuthoringDefaultProperties(input = {}) {
   const topology = assertTopology(input.topology);
   const session = assertTopologyEditAuthoringSession(input.authoringSession);
+  if (session.tool === 'VALVE_ASSEMBLY') {
+    return topologyEditValveAssemblyDefaultProperties({
+      topology,
+      authoringSession: session,
+      catalogue: input.catalogue,
+      valveRecordId: input.valveRecordId,
+      upstreamFlangeRecordId: input.upstreamFlangeRecordId,
+      downstreamFlangeRecordId: input.downstreamFlangeRecordId,
+      stationMm: input.stationMm,
+    });
+  }
   if (INLINE_TOOLS.has(session.tool)) {
     return topologyEditInlineAuthoringDefaultProperties({
       topology,
@@ -314,6 +349,84 @@ function planRouteElbow(topology, session) {
   });
 }
 
+function planFlange(topology, session, catalogueInput) {
+  const catalogue = assertTopologyEditSpecificationCatalogue(catalogueInput);
+  const recordId = String(session.properties.catalogueRecordId ?? '').trim();
+  const matches = catalogue.records.filter((record) => (
+    record.componentType === 'FLANGE' && record.recordId === recordId
+  ));
+  if (matches.length !== 1) {
+    fail(`flange catalogue record ${recordId || '(none)'} resolved ${matches.length} records.`, RangeError);
+  }
+  return planInlineComponent(topology, session, catalogue, matches[0], 'FROM_TO');
+}
+
+function planReducer(topology, session, catalogueInput) {
+  const catalogue = assertTopologyEditSpecificationCatalogue(catalogueInput);
+  const fromNominalSizeMm = positive(session.properties.fromNominalSizeMm);
+  const toNominalSizeMm = positive(session.properties.toNominalSizeMm);
+  if (!fromNominalSizeMm || !toNominalSizeMm) fail('Reducer from and to sizes are required.', RangeError);
+  const reducerType = String(session.properties.reducerType ?? '').trim().toUpperCase();
+  const orientation = String(session.properties.orientation ?? '').trim().toUpperCase();
+  const matches = catalogue.records.filter((record) => (
+    record.componentType === 'REDUCER'
+    && record.reducerType === reducerType
+    && record.reducerOrientation === orientation
+    && (
+      (samePositive(record.nominalSizeMm, fromNominalSizeMm)
+        && samePositive(record.secondaryNominalSizeMm, toNominalSizeMm))
+      || (samePositive(record.nominalSizeMm, toNominalSizeMm)
+        && samePositive(record.secondaryNominalSizeMm, fromNominalSizeMm))
+    )
+  ));
+  if (matches.length !== 1) {
+    fail(`reducer catalogue evidence resolved ${matches.length} exact records.`, RangeError);
+  }
+  const record = matches[0];
+  const direction = samePositive(record.nominalSizeMm, fromNominalSizeMm)
+    ? 'FROM_TO'
+    : 'TO_FROM';
+  return planInlineComponent(topology, session, catalogue, record, direction);
+}
+
+function planInlineComponent(topology, session, catalogue, record, direction) {
+  const edgeId = exactTargetId(session, 'edge:');
+  const plan = planTopologyEditInlineComponentOperation({
+    topology,
+    catalogue,
+    catalogueRecord: record,
+    edgeId,
+    centerDistanceMm: requiredPositive(session.properties.stationMm, 'Insertion station'),
+    insertionLengthMm: session.tool === 'REDUCER'
+      ? session.properties.componentLengthMm
+      : null,
+    direction,
+  });
+  return createTopologyEditOperationPlan({
+    ...plan,
+    parameters: {
+      ...plan.parameters,
+      authoringTool: session.tool,
+    },
+  });
+}
+
+function compatibleInlineRecords(catalogue, edge, componentType) {
+  const matchesEnd = (nominalSizeMm, outsideDiameterMm) => (
+    (edge.diameterMm == null || samePositive(edge.diameterMm, nominalSizeMm))
+    && (edge.outsideDiameterMm == null
+      || samePositive(edge.outsideDiameterMm, outsideDiameterMm))
+  );
+  return catalogue.records.filter((record) => {
+    if (record.componentType !== componentType) return false;
+    if (componentType === 'REDUCER') {
+      return matchesEnd(record.nominalSizeMm, record.outsideDiameterMm)
+        || matchesEnd(record.secondaryNominalSizeMm, record.secondaryOutsideDiameterMm);
+    }
+    return matchesEnd(record.nominalSizeMm, record.outsideDiameterMm);
+  }).sort((left, right) => left.recordId.localeCompare(right.recordId));
+}
+
 function target(kind, topology, node, incident, direction) {
   const canonicalIds = [node.id, ...incident.map((edge) => edge.id)].sort();
   return {
@@ -403,6 +516,16 @@ function finite(value) {
 function positive(value) {
   const number = finite(value);
   return number !== null && number > 0 ? number : null;
+}
+function requiredPositive(value, label) {
+  const number = positive(value);
+  if (number === null) fail(`${label} must be positive.`, RangeError);
+  return number;
+}
+function samePositive(left, right) {
+  const a = positive(left);
+  const b = positive(right);
+  return a !== null && b !== null && Math.abs(a - b) <= 1e-9;
 }
 function requiredFinite(value, label) {
   const number = finite(value);

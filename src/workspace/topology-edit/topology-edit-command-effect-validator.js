@@ -102,18 +102,23 @@ function validateSplit(context) {
 function validateInline(context) {
   const { candidate, delta, additionsByCommand, nodeChanges, edgeChanges, otherChanges } = context;
   const findings = [];
+  const payload = candidate.resolvedCommand?.payload ?? candidate.request?.payload ?? {};
+  const placement = String(payload.placement ?? 'INTERIOR').toUpperCase();
+  const boundary = placement !== 'INTERIOR';
+  const expectedNodeCount = boundary ? 1 : 2;
+  const expectedEdgeCount = boundary ? 2 : 3;
   const inserted = (candidate.canonicalTopology.edges ?? []).filter((edge) => (
     edge.createdByCommandId === candidate.commandId
     && edge.topologyOperation === 'INSERT_INLINE_COMPONENT'
   ));
-  const valid = delta.nodes.addedIds.length === 2
+  const valid = delta.nodes.addedIds.length === expectedNodeCount
     && delta.nodes.removedIds.length === 0
-    && delta.edges.addedIds.length === 3
+    && delta.edges.addedIds.length === expectedEdgeCount
     && delta.edges.removedIds.length === 1
     && otherChanges.length === 0;
   if (!valid) findings.push(finding(
     'INSERT_INLINE_COMPONENT_DELTA_INVALID',
-    'INSERT_INLINE_COMPONENT must add two nodes and three edges while replacing one host edge.',
+    `INSERT_INLINE_COMPONENT ${placement} must add ${expectedNodeCount} node(s) and ${expectedEdgeCount} edges while replacing one host edge.`,
     [...nodeChanges, ...edgeChanges],
   ));
   if (!sameIds(additionsByCommand, [...delta.nodes.addedIds, ...delta.edges.addedIds])) {
@@ -123,15 +128,29 @@ function validateInline(context) {
       additionsByCommand,
     ));
   }
+  const component = inserted[0];
   if (inserted.length !== 1
-    || !inserted[0].catalogueRecordId
-    || !inserted[0].catalogueRecordHash
-    || !inserted[0].catalogueHash
-    || !inserted[0].catalogueSourceHash) {
+    || !component?.catalogueRecordId
+    || !component?.catalogueRecordHash
+    || !component?.catalogueHash
+    || !component?.catalogueSourceHash
+    || component.inlinePlacement !== placement) {
     findings.push(finding(
       'INSERT_INLINE_COMPONENT_CATALOGUE_PROVENANCE_INVALID',
-      'Inline insertion must create exactly one catalogue-bound component edge.',
+      'Inline insertion must create exactly one placement-accurate catalogue-bound component edge.',
       inserted.map((edge) => edge.id),
+    ));
+  }
+  const expectedAssembly = payload.assemblyBinding ?? null;
+  if (expectedAssembly) {
+    const validAssembly = component?.assemblyId === expectedAssembly.assemblyId
+      && component?.assemblyHash === expectedAssembly.assemblyHash
+      && component?.assemblyRole === expectedAssembly.role
+      && semanticHash(component?.assemblyBinding ?? null) === semanticHash(expectedAssembly);
+    if (!validAssembly) findings.push(finding(
+      'INSERT_INLINE_COMPONENT_ASSEMBLY_PROVENANCE_INVALID',
+      'Assembly-bound insertion must preserve exact assembly identity, role, and derived evidence.',
+      component ? [component.id] : [],
     ));
   }
   return findings;
@@ -159,7 +178,6 @@ function validateDelete(context) {
     'DELETE_EDGE must remove exactly one edge and no other record.',
     [...nodeChanges, ...edgeChanges])];
 }
-
 function changes(delta = {}) {
   return [...(delta.addedIds ?? []), ...(delta.removedIds ?? []), ...(delta.changedIds ?? [])];
 }

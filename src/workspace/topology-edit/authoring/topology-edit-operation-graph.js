@@ -97,11 +97,7 @@ export async function executeTopologyEditOperationGraph(input = {}) {
     ))),
     resultingCanonicalHash: topology?.canonicalTopologyHash ?? null,
   };
-  return deepFreeze({
-    ...material,
-    executionHash: semanticHash(material),
-    topology,
-  });
+  return deepFreeze({ ...material, executionHash: semanticHash(material), topology });
 }
 
 export function materializeTopologyEditOperationPayload(value, bindingsInput) {
@@ -128,7 +124,6 @@ export function deriveTopologyEditOperationOutputs(input = {}) {
   const addedJunctions = addedRecords(before.junctions, after.junctions)
     .filter((row) => row.createdByCommandId === commandId)
     .sort((left, right) => left.id.localeCompare(right.id));
-
   const outputs = {
     CREATE_NODE: () => exactRoles(['created-node'], addedNodes),
     BRIDGE_GAP: () => exactRoles(['created-edge'], addedEdges),
@@ -139,28 +134,24 @@ export function deriveTopologyEditOperationOutputs(input = {}) {
     SPLIT_EDGE: () => splitOutputs(addedNodes, addedEdges),
     INSERT_INLINE_COMPONENT: () => inlineOutputs(addedNodes, addedEdges),
   }[commandType];
-  if (!outputs) return deepFreeze({});
-  return deepFreeze(outputs());
+  return deepFreeze(outputs ? outputs() : {});
 }
 
 function normalizeSteps(value) {
   if (!Array.isArray(value) || value.length === 0) fail('steps must be a non-empty array.');
   const ids = new Set();
   return value.map((row, index) => {
-    if (!row || typeof row !== 'object' || Array.isArray(row)) {
-      fail(`steps[${index}] must be an object.`);
-    }
+    if (!row || typeof row !== 'object' || Array.isArray(row)) fail(`steps[${index}] must be an object.`);
     const stepId = requiredText(row.stepId ?? `step-${index + 1}`, `steps[${index}].stepId`);
     if (ids.has(stepId)) fail(`duplicate stepId ${stepId}.`, RangeError);
     ids.add(stepId);
     const commandType = requiredText(row.commandType, `steps[${index}].commandType`).toUpperCase();
-    const outputRoles = COMMAND_OUTPUT_ROLES[commandType] ?? [];
     return {
       sequence: index,
       stepId,
       commandType,
       payload: normalizeJson(row.payload ?? {}, `steps[${index}].payload`),
-      outputRoles,
+      outputRoles: COMMAND_OUTPUT_ROLES[commandType] ?? [],
     };
   });
 }
@@ -174,10 +165,7 @@ function normalizeJson(value, path) {
   }
   if (Array.isArray(value)) return value.map((row, index) => normalizeJson(row, `${path}[${index}]`));
   if (value && typeof value === 'object') {
-    return Object.fromEntries(Object.keys(value).sort().map((key) => [
-      key,
-      normalizeJson(value[key], `${path}.${key}`),
-    ]));
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, normalizeJson(value[key], `${path}.${key}`)]));
   }
   fail(`${path} contains unsupported ${typeof value}.`);
 }
@@ -191,18 +179,12 @@ function materialize(value, bindings, path) {
   }
   if (Array.isArray(value)) return value.map((row, index) => materialize(row, bindings, `${path}[${index}]`));
   if (value && typeof value === 'object') {
-    return Object.fromEntries(Object.entries(value).map(([key, row]) => [
-      key,
-      materialize(row, bindings, `${path}.${key}`),
-    ]));
+    return Object.fromEntries(Object.entries(value).map(([key, row]) => [key, materialize(row, bindings, `${path}.${key}`)]));
   }
   return value;
 }
 
-function isReference(value) {
-  return value?.schema === TOPOLOGY_EDIT_OPERATION_REFERENCE_SCHEMA;
-}
-
+function isReference(value) { return value?.schema === TOPOLOGY_EDIT_OPERATION_REFERENCE_SCHEMA; }
 function assertReference(value, path) {
   const material = {
     schema: TOPOLOGY_EDIT_OPERATION_REFERENCE_SCHEMA,
@@ -212,11 +194,8 @@ function assertReference(value, path) {
   if (value.referenceHash !== semanticHash(material)) fail(`${path} reference hash mismatch.`, RangeError);
   return deepFreeze({ ...material, referenceHash: value.referenceHash });
 }
-
 function normalizeExecutionReceipt(value, stepId) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    fail(`execute result for ${stepId} must be an object.`);
-  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) fail(`execute result for ${stepId} must be an object.`);
   if (!value.topology) fail(`execute result for ${stepId} requires topology.`);
   return {
     commandId: requiredText(value.commandId, `${stepId}.commandId`),
@@ -224,64 +203,52 @@ function normalizeExecutionReceipt(value, stepId) {
     topology: value.topology,
   };
 }
-
 function addedRecords(beforeRows = [], afterRows = []) {
   const before = new Set((beforeRows ?? []).map((row) => row?.id));
   return (afterRows ?? []).filter((row) => !before.has(row?.id));
 }
-
 function exactRoles(roles, records) {
-  if (records.length !== roles.length) {
-    fail(`expected ${roles.length} generated record(s), received ${records.length}.`, RangeError);
-  }
+  if (records.length !== roles.length) fail(`expected ${roles.length} generated record(s), received ${records.length}.`, RangeError);
   return Object.fromEntries(roles.map((role, index) => [role, records[index].id]));
 }
-
 function splitOutputs(nodes, edges) {
-  if (nodes.length !== 1 || edges.length !== 2) {
-    fail('SPLIT_EDGE output shape must be one node and two edges.', RangeError);
-  }
+  if (nodes.length !== 1 || edges.length !== 2) fail('SPLIT_EDGE output shape must be one node and two edges.', RangeError);
   const ordered = [...edges].sort((left, right) => left.id.localeCompare(right.id));
-  return {
-    'split-node': nodes[0].id,
-    'split-left-edge': ordered[0].id,
-    'split-right-edge': ordered[1].id,
-  };
+  return { 'split-node': nodes[0].id, 'split-left-edge': ordered[0].id, 'split-right-edge': ordered[1].id };
 }
-
 function inlineOutputs(nodes, edges) {
-  if (nodes.length !== 2 || edges.length !== 3) {
-    fail('INSERT_INLINE_COMPONENT output shape must be two nodes and three edges.', RangeError);
+  if (![1, 2].includes(nodes.length) || ![2, 3].includes(edges.length)) {
+    fail('INSERT_INLINE_COMPONENT output shape must match interior or boundary placement.', RangeError);
   }
   const component = edges.find((edge) => edge.topologyOperation === 'INSERT_INLINE_COMPONENT');
   if (!component) fail('inline component output is missing its component edge.', RangeError);
-  const sideEdges = edges.filter((edge) => edge.id !== component.id)
-    .sort((left, right) => left.id.localeCompare(right.id));
-  const orderedNodes = [...nodes].sort((left, right) => (
-    String(left.inlineComponentEndpoint).localeCompare(String(right.inlineComponentEndpoint))
-      || left.id.localeCompare(right.id)
-  ));
-  return {
-    'inline-from-node': orderedNodes.find((node) => node.inlineComponentEndpoint === 'FROM')?.id
-      ?? orderedNodes[0].id,
-    'inline-to-node': orderedNodes.find((node) => node.inlineComponentEndpoint === 'TO')?.id
-      ?? orderedNodes[1].id,
-    'inline-left-edge': sideEdges[0].id,
+  const sideEdges = edges.filter((edge) => edge.id !== component.id);
+  const left = sideEdges.find((edge) => edge.toNodeId === component.fromNodeId) ?? null;
+  const right = sideEdges.find((edge) => edge.fromNodeId === component.toNodeId) ?? null;
+  const result = {
+    'inline-from-node': component.fromNodeId,
+    'inline-to-node': component.toNodeId,
     'inline-component-edge': component.id,
-    'inline-right-edge': sideEdges[1].id,
   };
+  if (left) result['inline-left-edge'] = left.id;
+  if (right) result['inline-right-edge'] = right.id;
+  if (component.inlinePlacement === 'INTERIOR' && (!left || !right)) {
+    fail('INTERIOR inline output requires both side edges.', RangeError);
+  }
+  if (component.inlinePlacement === 'FROM_BOUNDARY' && (!right || left)) {
+    fail('FROM_BOUNDARY inline output requires only a right side edge.', RangeError);
+  }
+  if (component.inlinePlacement === 'TO_BOUNDARY' && (!left || right)) {
+    fail('TO_BOUNDARY inline output requires only a left side edge.', RangeError);
+  }
+  return result;
 }
-
-function bindingKey(stepId, role) {
-  return `${stepId}.${role}`;
-}
-
+function bindingKey(stepId, role) { return `${stepId}.${role}`; }
 function requiredText(value, label) {
   const text = String(value ?? '').trim();
   if (!text) fail(`${label} is required.`);
   return text;
 }
-
 function fail(message, Constructor = TypeError) {
   throw new Constructor(`TopologyEditOperationGraph: ${message}`);
 }
