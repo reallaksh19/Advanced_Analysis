@@ -24,7 +24,8 @@ jobs:
           set -euo pipefail
           cat .agent-payload/part-* | base64 -d > /tmp/valve-assembly-payload.tar.gz
           tar -xzf /tmp/valve-assembly-payload.tar.gz
-          rm -rf .agent-payload .github/workflows/agent-valve-assembly-bootstrap.yml
+          rm -rf .agent-payload
+          rm -f .github/workflows/topology-edit-valve-assembly-authoring.yml
           while IFS= read -r file; do
             node --check "$file"
           done < <(find src e2e tests -type f \( -name '*.js' -o -name '*.mjs' \) | sort)
