@@ -21,5 +21,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Run exact-source finalizer
-        run: python scripts/tmp-finalize-sjson-node-pos.py
+      - name: Run POS-trace finalizer
+        run: python scripts/tmp-finalize-sjson-node-pos-v2.py
