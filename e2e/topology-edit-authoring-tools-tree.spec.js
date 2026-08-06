@@ -65,8 +65,10 @@ test('production 3D Edit completes Move, Stretch and atomic Route + Elbow from v
   expect(completed.bendCount).toBe(stretched.bendCount + 1);
   expect(completed.rightAngleIssueIds).toEqual(stretched.rightAngleIssueIds);
   expect(completed.projectedAuthoredBendArcCount).toBeGreaterThanOrEqual(1);
-  expect(completed.governedElbowRenderCount)
-    .toBe(stretched.governedElbowRenderCount + 1);
+  expect(
+    completed.governedElbowRenderCount,
+    `Governed render packet diagnostics:\n${JSON.stringify(completed.renderDiagnostics, null, 2)}`,
+  ).toBe(stretched.governedElbowRenderCount + 1);
   expect(completed.transactionHash).not.toBe('');
 
   await testInfo.attach('topology-edit-move-stretch-route-elbow', {
@@ -325,6 +327,11 @@ async function evidence(page) {
       }
     });
     const renderEvidence = controller.viewportBackend.hostElement?.dataset ?? {};
+    const cachedDraft = controller.sjsonVisualByRole?.get?.('DRAFT')?.projection ?? null;
+    const renderedDraft = controller.viewportBackend.lastGovernedRenderModel?.draft ?? null;
+    const curveCount = (projection, field) => Array.isArray(projection?.[field])
+      ? projection[field].filter((segment) => segment?.curveKind === 'CUBIC_BEZIER').length
+      : -1;
     return {
       canonicalHash: topology.canonicalTopologyHash,
       journalHash: controller.session.journal.journalHash,
@@ -347,6 +354,23 @@ async function evidence(page) {
         renderEvidence.topologyEditCompactRouteElbowCount || 0,
       ),
       renderedAuthoredPartCount,
+      renderDiagnostics: {
+        topologySourceHash: topology.sourceHash || '',
+        baseSourceHash: controller.session.baseCanonicalTopology?.sourceHash || '',
+        governedCanonical: Boolean(controller.isGovernedSjsonCanonical?.(topology)),
+        hostProjectionSchema: renderEvidence.topologyEditSjsonProjectionSchema || '',
+        cachedDraftSchema: cachedDraft?.schema || '',
+        cachedDraftRenderStyle: cachedDraft?.renderStyle || '',
+        cachedDraftCompactSegmentCount: cachedDraft?.compactSegments?.length ?? -1,
+        cachedDraftCompactCurveCount: curveCount(cachedDraft, 'compactSegments'),
+        cachedDraftStandardCurveCount: curveCount(cachedDraft, 'segments'),
+        renderedDraftSchema: renderedDraft?.schema || '',
+        renderedDraftRenderStyle: renderedDraft?.renderStyle || '',
+        renderedDraftCompactSegmentCount: renderedDraft?.compactSegments?.length ?? -1,
+        renderedDraftCompactCurveCount: curveCount(renderedDraft, 'compactSegments'),
+        renderedDraftStandardCurveCount: curveCount(renderedDraft, 'segments'),
+        renderedAuthoredPartCount,
+      },
     };
   });
 }
