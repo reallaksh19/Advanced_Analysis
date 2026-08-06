@@ -135,11 +135,16 @@ export class TopologyEdit3DViewController extends ProfessionalController {
       && this.sjsonSourceVisualCacheDataset === this.workspaceDataset
       && this.sjsonSourceVisualCacheKey === cacheKey
     ) {
-      this.sjsonVisualByRole.set(role, this.sjsonSourceVisualCache);
+      const cachedResult = this.decorateAuthoringVisualResult(
+        this.sjsonSourceVisualCache,
+        canonical,
+        role,
+      );
+      this.sjsonVisualByRole.set(role, cachedResult);
       if (this.hostElement) this.hostElement.dataset.topologyEditSjsonSourceVisualCache = 'HIT';
-      return this.sjsonSourceVisualCache;
+      return cachedResult;
     }
-    const result = adaptSjsonVisualToGovernedEditDraftProjection({
+    const governedResult = adaptSjsonVisualToGovernedEditDraftProjection({
       visualResult: deriveSjsonCompleteVisualGeometry({
         canonicalTopology: canonical,
         dataset: this.workspaceDataset,
@@ -147,6 +152,14 @@ export class TopologyEdit3DViewController extends ProfessionalController {
       }),
       dataset: this.workspaceDataset,
     });
+    // Decorate the exact governed packet before any role cache, support bundle,
+    // or renderer consumes it. This keeps authored bends inside the sole SJSON
+    // render authority rather than publishing presentation-only side evidence.
+    const result = this.decorateAuthoringVisualResult(
+      governedResult,
+      canonical,
+      role,
+    );
     this.sjsonVisualByRole.set(role, result);
     if (role === 'SOURCE') {
       this.sjsonSourceVisualCache = result;
