@@ -26,6 +26,12 @@ jobs:
         run: |
           git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson > /tmp/EnrichedSjson
           git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson.topology.input.xml > /tmp/EnrichedSjson.topology.input.xml
+      - name: Confirm raw density values and source unit metadata
+        run: |
+          echo 'RAW_FLUID_DENSITY_VALUES'
+          grep -o 'FLUID_DENSITY="[^"]*"' /tmp/EnrichedSjson.topology.input.xml | sort | uniq -c
+          echo 'UNIT_METADATA'
+          grep -oE '(DENSITY|MASS|LENGTH|FORCE|UNIT)[A-Z0-9_:-]*="[^"]*"' /tmp/EnrichedSjson.topology.input.xml | sort | uniq -c | head -100 || true
       - name: Audit N50120 incident mass and units
         run: |
           node scripts/tmp-sjson-50120-vertical-unit-audit.mjs \
