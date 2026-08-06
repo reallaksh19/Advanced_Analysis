@@ -185,3 +185,20 @@ export {
   sealInputXmlLinearStiffnessPreflight,
   stiffnessAssessmentProjection,
 } from './inputxml-linear-stiffness-preflight-contract.js';
+
+export {
+  INPUTXML_LINEAR_SOLVE_RUNTIME_SCHEMA,
+  createInputXmlLinearSolveRuntime,
+  requireInputXmlLinearSolveRuntime,
+} from './inputxml-linear-solve-runtime.js';
+
+export {
+  solveInputXmlLinearPhysicalCase,
+  solveInputXmlLinearPhysicalCases,
+} from './inputxml-linear-case-execution.js';
+
+export {
+  INPUTXML_LINEAR_CASE_EXECUTION_SCHEMA,
+  requireInputXmlLinearCaseExecution,
+  sealInputXmlLinearCaseExecution,
+} from './inputxml-linear-case-execution-contract.js';
