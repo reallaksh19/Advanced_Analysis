@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { solveBm2InputXmlConditioned } from './lfea-b3.26-bm2-solve-runtime.mjs';
+import { BM2_BENCHMARK_CASE_AUTHORITY } from './lfea-b3.26-bm2-case-authority.mjs';
 import {
   BM2_CII_OUTPUT_PATH,
   BM2_COMPARISON_POLICY,
@@ -104,7 +105,13 @@ assert.equal(
 );
 
 const output = parseBm2CiiOutput(readFileSync(BM2_CII_OUTPUT_PATH, 'utf8'));
-assert.equal(output.schema, 'fea-caesar-output-row-custody/v1');
+assert.equal(output.schema, 'fea-caesar-output-row-custody/v2');
+for (const family of BM2_COMPARISON_FAMILIES) {
+  for (const label of ['OPE', 'SUS']) {
+    assert.equal(output.sourceReportOccurrenceCustody[family][label].physicalOccurrenceCount, 2);
+    assert.equal(output.sourceReportOccurrenceCustody[family][label].selectedOccurrenceOrdinal, 1);
+  }
+}
 for (const label of ['OPE', 'SUS', 'EXP']) {
   assert.equal(output.displacement.get(label).rows.length, 61);
   assert.equal(output.globalForce.get(label).rows.length, 61);
@@ -119,24 +126,34 @@ const actionBlock = (fromNode, toNode, fx) => `
     <FORCES><FROM FX="${fx}" FY="0" FZ="0"/><TO FX="${-fx}" FY="0" FZ="0"/></FORCES>
     <MOMENTS><FROM MX="0" MY="0" MZ="0"/><TO MX="0" MY="0" MZ="0"/></MOMENTS>
   </ELEMENT>`;
-const reportFixture = (label) => `
-<DISPLACEMENT_REPORT LOADCASE="L1 (${label})">
+const fixtureLoadcase = (label) => {
+  const authority = BM2_BENCHMARK_CASE_AUTHORITY.cases[label];
+  return `CASE ${authority.caseNumber} (${authority.category}) ${authority.formula}`;
+};
+const reportFixture = (label) => {
+  const loadcase = fixtureLoadcase(label);
+  return `
+<DISPLACEMENT_REPORT LOADCASE="${loadcase}">
   <NODE NUMBER="1"><TRANSLATIONS DX="0" DY="0" DZ="0"/><ROTATIONS RX="0" RY="0" RZ="0"/></NODE>
 </DISPLACEMENT_REPORT>
-<RESTRAINT_REPORT LOADCASE="L1 (${label})">
+<RESTRAINT_REPORT LOADCASE="${loadcase}">
   <RESTRAINT NODE="1" TYPE="+Y"><FORCES FX="0" FY="1" FZ="0"/><MOMENTS MX="0" MY="0" MZ="0"/></RESTRAINT>
 </RESTRAINT_REPORT>
-<GLOBAL_FORCE_REPORT LOADCASE="L1 (${label})">
+<GLOBAL_FORCE_REPORT LOADCASE="${loadcase}">
   ${actionBlock('1', '2', 1)}
   ${actionBlock('1', '2', 2)}
   ${actionBlock('2', '1', 3)}
 </GLOBAL_FORCE_REPORT>
-<LOCAL_FORCE_REPORT LOADCASE="L1 (${label})">
+<LOCAL_FORCE_REPORT LOADCASE="${loadcase}">
   ${actionBlock('1', '2', 1)}
   ${actionBlock('1', '2', 2)}
   ${actionBlock('2', '1', 3)}
 </LOCAL_FORCE_REPORT>`;
-const fixture = parseBm2CiiOutput(`<OUTPUT>${['OPE', 'SUS', 'EXP'].map(reportFixture).join('\n')}</OUTPUT>`);
+};
+const fixtureLabels = ['OPE', 'SUS', 'OPE', 'SUS', 'EXP'];
+const fixture = parseBm2CiiOutput(
+  `<OUTPUT>${fixtureLabels.map(reportFixture).join('\n')}</OUTPUT>`,
+);
 for (const label of ['OPE', 'SUS', 'EXP']) {
   const global = fixture.globalForce.get(label);
   assert.equal(global.rows.length, 3, 'Duplicate and reversed report rows must all survive.');
@@ -147,6 +164,9 @@ for (const label of ['OPE', 'SUS', 'EXP']) {
   assert.equal(global.duplicateRowOccurrences, 1);
   assert.equal(new Set(global.rows.map((row) => row.rowUid)).size, 3);
 }
+assert.equal(fixture.globalForce.get('OPE').sourceReportOccurrenceOrdinal, 1);
+assert.equal(fixture.globalForce.get('SUS').sourceReportOccurrenceOrdinal, 1);
+assert.equal(fixture.globalForce.get('EXP').sourceReportOccurrenceOrdinal, 0);
 
 const comparison = buildBm2CiiComparisonConditioned();
 assert.equal(comparison.schema, 'lfea-bm2-cii-output-comparison/v4');
