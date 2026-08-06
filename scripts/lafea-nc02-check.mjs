@@ -1,0 +1,22 @@
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { canonicalJson } from '../src/core/nonlinear-shell-contact/contracts.js';
+import { DEFAULT_CONTACT_PROCEDURE } from '../src/core/nonlinear-shell-contact/contact-procedure-contract.js';
+import { evaluateContactQualification } from '../src/core/nonlinear-shell-contact/contact-qualification-evaluator.js';
+
+const args = Object.fromEntries(process.argv.slice(2).map((arg) => { const m = /^--([^=]+)=(.*)$/u.exec(arg); if (!m) throw new TypeError(`Invalid argument ${arg}.`); return [m[1],m[2]]; }));
+if (!/^[0-9a-f]{40}$/u.test(args['head-sha'] ?? '')) throw new TypeError('--head-sha is required.');
+if (!args['upstream-binding'] || !args['evidence-root']) throw new TypeError('Upstream binding and evidence root are required.');
+const outputDir = resolve(args['output-dir'] ?? 'artifacts/nc02');
+await mkdir(outputDir, { recursive: true });
+const upstreamBinding = JSON.parse(await readFile(resolve(args['upstream-binding']), 'utf8'));
+const evidenceRoot = resolve(args['evidence-root']);
+const files = (await readdir(evidenceRoot)).filter((name) => name.endsWith('.json')).sort();
+const benchmarkEvidence = await Promise.all(files.map(async (name) => JSON.parse(await readFile(resolve(evidenceRoot,name), 'utf8'))));
+const report = evaluateContactQualification({ contract: DEFAULT_CONTACT_PROCEDURE, upstreamBinding, candidateExactHeadSha: args['head-sha'], benchmarkEvidence });
+await writeFile(resolve(outputDir,'nc02-report.json'), `${JSON.stringify(report,null,2)}\n`, 'utf8');
+await writeFile(resolve(outputDir,'nc02-report.canonical.json'), `${canonicalJson(report)}\n`, 'utf8');
+await writeFile(resolve(outputDir,'nc02-contract.json'), `${JSON.stringify(DEFAULT_CONTACT_PROCEDURE,null,2)}\n`, 'utf8');
+await writeFile(resolve(outputDir,'nc02-upstream-binding.json'), `${JSON.stringify(upstreamBinding,null,2)}\n`, 'utf8');
+process.stdout.write(`${JSON.stringify(report)}\n`);
+if (report.status !== 'NC02_QUALIFIED') process.exitCode = 2;
