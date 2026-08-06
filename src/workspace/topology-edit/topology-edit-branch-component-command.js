@@ -17,6 +17,9 @@ const STRAIGHT_TYPES = new Set(['PIPE', 'STRAIGHT', 'STRAIGHT_ELEMENT']);
 const DEPENDANT_COLLECTIONS = ['junctions', 'supports', 'boundaries', 'rigids', 'bends'];
 
 export function normalizeTopologyEditBranchComponentRequest(input = {}) {
+  if (input?.schema === TOPOLOGY_EDIT_BRANCH_COMPONENT_REQUEST_SCHEMA) {
+    return assertTopologyEditBranchComponentRequest(input);
+  }
   const operationId = requiredText(input.operationId, 'operationId');
   const hostEdgeId = requiredText(input.hostEdgeId, 'hostEdgeId');
   const hostEdgeHash = requiredContentHash(input.hostEdgeHash, 'hostEdgeHash');
@@ -170,7 +173,7 @@ export function createTopologyEditBranchComponentEffect(requestInput) {
   const request = requestInput?.schema
     ? assertTopologyEditBranchComponentRequest(requestInput)
     : normalizeTopologyEditBranchComponentRequest(requestInput);
-  const token = request.requestHash.replace(/^sha256:/u, '').slice(0, 16);
+  const token = request.requestHash.split(':').at(-1).slice(0, 16);
   const junctionNodeId = `node:branch-junction:${token}`;
   const componentFaceNodeId = `node:branch-component-face:${token}`;
   const branchEndNodeId = `node:branch-end:${token}`;
