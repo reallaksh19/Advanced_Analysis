@@ -1,15 +1,9 @@
-import { ASME_B36_10 } from './pipeSchedules.js';
-
-const DN_TO_NPS = Object.freeze({
-  15: 0.5, 20: 0.75, 25: 1, 40: 1.5, 50: 2, 80: 3,
-  100: 4, 150: 6, 200: 8, 250: 10, 300: 12, 350: 14,
-  400: 16, 450: 18, 500: 20, 600: 24, 750: 30, 900: 36,
-});
+import { pipeScheduleData } from '../../data/pipe_schedule_data.js';
 
 /**
- * Resolves nominal DN/NPS from a source-explicit outside diameter. This is an
- * exact source derivation, not a nearest-size fallback: one and only one
- * standard OD must lie inside the declared measurement tolerance.
+ * Resolves nominal DN/NPS from a source-explicit outside diameter. One and only
+ * one nominal size in the governed pipe-size dataset must lie inside the
+ * configured measurement tolerance. This is not a nearest-size fallback.
  */
 export function resolveNominalPipeSizeFromOutsideDiameter(outsideDiameterMm, toleranceMm = 0.1) {
   const outsideDiameter = Number(outsideDiameterMm);
@@ -24,15 +18,25 @@ export function resolveNominalPipeSizeFromOutsideDiameter(outsideDiameterMm, tol
       diagnostics: Object.freeze(['INVALID_OUTSIDE_DIAMETER_OR_TOLERANCE']),
     });
   }
-  const candidates = Object.entries(ASME_B36_10)
-    .map(([dn, row]) => ({
-      dn: Number(dn),
-      nps: DN_TO_NPS[Number(dn)] ?? null,
-      standardOutsideDiameterMm: Number(row.od),
-      residualMm: outsideDiameter - Number(row.od),
-    }))
-    .filter((row) => row.nps != null && Math.abs(row.residualMm) <= tolerance);
-  if (candidates.length !== 1) {
+
+  const identities = new Map();
+  for (const row of pipeScheduleData.rows) {
+    const dn = Number(row.dn);
+    const nps = Number(row.nps_num ?? row.nps);
+    const standardOutsideDiameterMm = Number(row.od_mm);
+    if (![dn, nps, standardOutsideDiameterMm].every(Number.isFinite)) continue;
+    const key = `${dn}|${nps}|${standardOutsideDiameterMm}`;
+    if (!identities.has(key)) {
+      identities.set(key, Object.freeze({ dn, nps, standardOutsideDiameterMm }));
+    }
+  }
+  const candidates = [...identities.values()]
+    .map((row) => Object.freeze({ ...row, residualMm: outsideDiameter - row.standardOutsideDiameterMm }))
+    .filter((row) => Math.abs(row.residualMm) <= tolerance)
+    .sort((a, b) => Math.abs(a.residualMm) - Math.abs(b.residualMm) || a.dn - b.dn);
+  const nominalIdentities = [...new Set(candidates.map((row) => `${row.dn}|${row.nps}`))];
+
+  if (nominalIdentities.length !== 1) {
     return Object.freeze({
       status: candidates.length === 0
         ? 'BLOCKED_OUTSIDE_DIAMETER_NOT_IN_STANDARD_SIZE_TABLE'
@@ -41,18 +45,22 @@ export function resolveNominalPipeSizeFromOutsideDiameter(outsideDiameterMm, tol
       dn: null,
       nps: null,
       outsideDiameterMm: outsideDiameter,
-      diagnostics: Object.freeze(candidates.map((row) => `DN${row.dn}:RESIDUAL=${row.residualMm}`)),
+      diagnostics: Object.freeze(candidates.map((row) => `DN${row.dn}:NPS${row.nps}:RESIDUAL=${row.residualMm}`)),
+      source: pipeScheduleData.source,
     });
   }
+
+  const match = candidates[0];
   return Object.freeze({
     status: 'RESOLVED_EXACT_SOURCE_OD',
     exact: true,
-    dn: candidates[0].dn,
-    nps: candidates[0].nps,
+    dn: match.dn,
+    nps: match.nps,
     outsideDiameterMm: outsideDiameter,
-    standardOutsideDiameterMm: candidates[0].standardOutsideDiameterMm,
-    residualMm: candidates[0].residualMm,
+    standardOutsideDiameterMm: match.standardOutsideDiameterMm,
+    residualMm: match.residualMm,
     toleranceMm: tolerance,
     diagnostics: Object.freeze([]),
+    source: pipeScheduleData.source,
   });
 }
