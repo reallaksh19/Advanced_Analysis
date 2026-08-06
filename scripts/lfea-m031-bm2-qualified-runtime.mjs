@@ -90,6 +90,13 @@ function reportAxisCandidate(element, positions, planeNormal) {
   return Object.freeze({ generic, owned, transverseFrameIsExactlyReversed });
 }
 
+function remoteReportEnd(solved, element) {
+  const fromIsJunction = solved.junctionMechanics.reportingPlaneByNodeId.has(String(element.fromNode));
+  const toIsJunction = solved.junctionMechanics.reportingPlaneByNodeId.has(String(element.toNode));
+  if (fromIsJunction === toIsJunction) return null;
+  return fromIsJunction ? 'J' : 'I';
+}
+
 function project(global, axes) {
   const force = [global.fx, global.fy, global.fz];
   const moment = [global.mx, global.my, global.mz];
@@ -103,12 +110,12 @@ function project(global, axes) {
   });
 }
 
-function correctCase(caseResult, axes) {
+function correctCase(caseResult, axes, remoteEnd) {
   return Object.freeze({
     ...caseResult,
     local: Object.freeze({
-      I: project(caseResult.global.I, axes),
-      J: project(caseResult.global.J, axes),
+      ...caseResult.local,
+      [remoteEnd]: project(caseResult.global[remoteEnd], axes),
     }),
   });
 }
@@ -116,15 +123,19 @@ function correctCase(caseResult, axes) {
 function correctElement(solved, element, positions) {
   const planeNormal = reportingPlaneForElement(solved, element);
   if (planeNormal === null) return element;
+  const remoteEnd = remoteReportEnd(solved, element);
+  if (remoteEnd === null) return element;
   const candidate = reportAxisCandidate(element, positions, planeNormal);
   if (!candidate.transverseFrameIsExactlyReversed) return element;
   return Object.freeze({
     ...element,
-    sustained: correctCase(element.sustained, candidate.owned),
-    operating: correctCase(element.operating, candidate.owned),
+    sustained: correctCase(element.sustained, candidate.owned, remoteEnd),
+    operating: correctCase(element.operating, candidate.owned, remoteEnd),
     reportingAxisCustody: Object.freeze({
       profile: AXIS_CUSTODY_PROFILE,
-      basis: 'CORRECT_ONLY_EXACT_180_DEGREE_TRANSVERSE_FRAME_DISCONTINUITY',
+      basis: 'CORRECT_ONLY_REMOTE_END_OF_EXACT_180_DEGREE_TRANSVERSE_FRAME_DISCONTINUITY',
+      junctionEnd: remoteEnd === 'I' ? 'J' : 'I',
+      correctedRemoteEnd: remoteEnd,
       priorAxes: candidate.generic,
       correctedAxes: candidate.owned,
     }),
@@ -146,7 +157,7 @@ function correctReport(solved) {
     ...solved.report,
     localForceReportingAuthority: Object.freeze({
       ...solved.report.localForceReportingAuthority,
-      junctionAdjacentStraight: 'correct exact 180-degree transverse-frame discontinuity using the element-owned junction plane at both endpoints',
+      junctionAdjacentStraight: 'correct only the remote endpoint of an exact 180-degree transverse-frame discontinuity',
       junctionAdjacentStraightProfile: AXIS_CUSTODY_PROFILE,
       correctedPairs,
     }),
