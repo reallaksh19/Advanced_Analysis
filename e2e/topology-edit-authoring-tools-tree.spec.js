@@ -64,7 +64,9 @@ test('production 3D Edit completes Move, Stretch and atomic Route + Elbow from v
   expect(completed.edgeCount).toBe(stretched.edgeCount + 2);
   expect(completed.bendCount).toBe(stretched.bendCount + 1);
   expect(completed.rightAngleIssueIds).toEqual(stretched.rightAngleIssueIds);
-  expect(completed.authoredBendArcCount).toBeGreaterThanOrEqual(1);
+  expect(completed.projectedAuthoredBendArcCount).toBeGreaterThanOrEqual(1);
+  expect(completed.governedElbowRenderCount)
+    .toBe(stretched.governedElbowRenderCount + 1);
   expect(completed.transactionHash).not.toBe('');
 
   await testInfo.attach('topology-edit-move-stretch-route-elbow', {
@@ -311,10 +313,13 @@ async function evidence(page) {
   return page.evaluate(() => {
     const controller = globalThis.__AUTHORING_CONTROLLER__;
     const topology = controller.session.currentTopology();
-    let authoredBendArcCount = 0;
+    let renderedAuthoredPartCount = 0;
     controller.viewportBackend.groups.draftGroup.traverse((object) => {
-      if (object.userData?.partRole === 'authored-elbow-arc') authoredBendArcCount += 1;
+      if (object.userData?.partRole === 'authored-elbow-arc') {
+        renderedAuthoredPartCount += 1;
+      }
     });
+    const renderEvidence = controller.viewportBackend.hostElement?.dataset ?? {};
     return {
       canonicalHash: topology.canonicalTopologyHash,
       journalHash: controller.session.journal.journalHash,
@@ -330,7 +335,13 @@ async function evidence(page) {
         .sort(),
       transactionHash: controller.hostElement.dataset.topologyEditAuthoringTransactionHash || '',
       authoredBendProjectionHash: controller.hostElement.dataset.topologyEditAuthoredBendProjectionHash || '',
-      authoredBendArcCount,
+      projectedAuthoredBendArcCount: Number(
+        controller.hostElement.dataset.topologyEditAuthoredBendArcCount || 0,
+      ),
+      governedElbowRenderCount: Number(
+        renderEvidence.topologyEditCompactRouteElbowCount || 0,
+      ),
+      renderedAuthoredPartCount,
     };
   });
 }
