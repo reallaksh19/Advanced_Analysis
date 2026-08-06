@@ -2,7 +2,11 @@ import { requireDeclaredValue } from '../shared-analysis-contract/declared-value
 import { canonicalStringify, semanticHash } from '../shared-piping-model/canonical-json.js';
 import { deepFreeze } from '../shared-piping-model/immutable.js';
 import {
-  parseInputXmlModelHealthSource as parseInputXmlModelHealthSourceAdapter,
+  inputXmlToCanonicalGeometry,
+  parseInputXmlSourceBundle,
+} from '../geometry/adapters/inputXmlToCanonicalGeometry.js';
+import {
+  parseInputXmlModelHealthSource as parseInputXmlDiagnosticSource,
 } from '../geometry/adapters/inputxml-model-health-source.js';
 import { conditionGeometry } from '../centerline-beam-fea/index.js';
 import {
@@ -22,17 +26,20 @@ import { validateLinearPipingInputXmlAnalysisRequest } from './inputxml-request-
 
 export { validateLinearPipingInputXmlAnalysisRequest } from './inputxml-request-validation.js';
 
-// The single point of entry for raw InputXML text into this directory's
-// governed Phase 2A binding below and into the generic (non-benchmark)
-// solve path. Any other file needing InputXML text parsed to canonical
-// geometry must go through this export rather than importing an adapter
-// directly -- see linear-piping-analysis-consumer-anti-drift-check.mjs.
+// Preserve the current-main diagnostic source contract for existing callers.
+// It is intentionally distinct from the richer governed solve source bundle.
 export function parseInputXmlModelHealthSource(content, options) {
-  return parseInputXmlModelHealthSourceAdapter(content, options);
+  return parseInputXmlDiagnosticSource(content, options);
 }
 
-// Compatibility projection for existing geometry-only callers. The source
-// bundle is authoritative; this function does not create a second parse path.
+// The governed preparation chain consumes the complete retained source bundle.
+// Raw InputXML enters that chain only through this named boundary.
+export function parseGovernedInputXmlSourceBundle(content, options) {
+  return parseInputXmlSourceBundle(content, options);
+}
+
+// Compatibility projection for existing geometry-only callers. The current
+// diagnostic source bundle remains authoritative for this public API.
 export function parseInputXmlToCanonicalGeometry(content, options) {
   return parseInputXmlModelHealthSource(content, options).geometry;
 }
@@ -71,7 +78,7 @@ function compileBoundInputXml(request, runtime) {
     'bendRadiusTolerance',
     { exclusiveMinimum: 0 },
   );
-  const sourceBundle = parseInputXmlModelHealthSourceAdapter(source.content, {
+  const sourceBundle = parseGovernedInputXmlSourceBundle(source.content, {
     unit: accepted.ingestionOptions.unit,
     source: accepted.ingestionOptions.source,
     componentOrigins: accepted.ingestionOptions.componentOrigins,

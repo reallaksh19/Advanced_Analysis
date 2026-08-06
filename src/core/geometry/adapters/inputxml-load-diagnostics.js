@@ -1,5 +1,5 @@
-import { inputXmlToCanonicalGeometry } from './inputXmlToCanonicalGeometry.js';
-import { auditInputXmlIngestion } from './inputxml-ingestion-audit.js';
+import { parseInputXmlSourceBundle } from './inputXmlToCanonicalGeometry.js';
+import { auditInputXmlSourceBundle } from './inputxml-source-bundle-audit.js';
 import { DEFAULT_RESTRAINT_TYPE_CODE_MAP, restraintTypeCodeLabel } from './inputxml-restraint-type-mutation.js';
 
 export const INPUTXML_LOAD_DIAGNOSTICS_SCHEMA = 'fea-inputxml-load-diagnostics/v1';
@@ -9,20 +9,8 @@ const AXIS_LABELS = Object.freeze({ xCosine: 'X', yCosine: 'Y', zCosine: 'Z' });
 
 /**
  * Single entry point for "a file was just loaded" diagnostics on any real
- * CAESAR InputXML — not tied to BM1/BM2/BM3 or any other specific fixture.
- *
- * Runs geometry ingestion with the project's canonical restraint-type
- * defaults (DEFAULT_RESTRAINT_TYPE_CODE_MAP), then the generic ingestion
- * audit, then enriches every restraint record with a human-readable label
- * and dominant direction (derived from its own direction cosines, never
- * guessed) so a UI can render the restraint table directly without any
- * caller having to re-derive restraint semantics.
- *
- * This never throws for engineering-content problems (unknown restraint
- * type, header/actual count mismatch, unresolved SIF, etc.) — those come
- * back as diagnostics with `valid: false` when any are fatal. It only
- * throws for structurally invalid input (not a string, not parseable at
- * all) or a genuinely missing unit system the caller must supply.
+ * CAESAR InputXML. Geometry, source custody and ingestion audit all consume
+ * one parsed source bundle; no second raw-XML interpretation path is used.
  */
 export function diagnoseInputXmlLoad(xmlText, options = {}) {
   if (typeof xmlText !== 'string' || xmlText.trim().length === 0) {
@@ -32,7 +20,7 @@ export function diagnoseInputXmlLoad(xmlText, options = {}) {
     ...DEFAULT_RESTRAINT_TYPE_CODE_MAP,
     ...(options.restraintTypeCodeMap ?? {}),
   };
-  const geometry = inputXmlToCanonicalGeometry(xmlText, {
+  const sourceBundle = parseInputXmlSourceBundle(xmlText, {
     unit: options.unit,
     source: options.source ?? 'inputxml-load',
     fileName: options.fileName ?? null,
@@ -40,7 +28,8 @@ export function diagnoseInputXmlLoad(xmlText, options = {}) {
     restraintTypeCodeMap,
     bendRadiusTolerance: options.bendRadiusTolerance ?? 1e-6,
   });
-  const audit = auditInputXmlIngestion(xmlText, geometry);
+  const geometry = sourceBundle.geometry;
+  const audit = auditInputXmlSourceBundle(sourceBundle);
   const restraints = audit.restraintRecords.map((row) => enrichRestraintRow(row, geometry));
   const unresolvedRestraints = restraints.filter((row) => row.classification === 'UNKNOWN');
   const unresolvedSifs = audit.sifRecords.filter((row) => row.classification === 'UNKNOWN');
@@ -51,6 +40,7 @@ export function diagnoseInputXmlLoad(xmlText, options = {}) {
     schema: INPUTXML_LOAD_DIAGNOSTICS_SCHEMA,
     valid: audit.valid,
     fileName: options.fileName ?? null,
+    sourceSemanticHash: sourceBundle.source.sourceSemanticHash,
     unitSystem: Object.freeze({
       declared: geometry.summary.inputXmlUnitsDeclared,
       lengthUnit: geometry.summary.inputXmlLengthUnit,
@@ -82,6 +72,7 @@ export function diagnoseInputXmlLoad(xmlText, options = {}) {
     diagnostics: audit.diagnostics,
     errorCount: errorDiagnostics.length,
     warnCount: warnDiagnostics.length,
+    sourceBundle,
     geometry,
   });
 }

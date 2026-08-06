@@ -71,3 +71,18 @@ export {
   executionSemanticProjection,
   requireSolverExecution,
 } from './solve.js';
+
+export {
+  LINEAR_STIFFNESS_PREFLIGHT_SCHEMA,
+  LINEAR_STIFFNESS_PREFLIGHT_STATUSES,
+  compileLinearStiffnessPreflight,
+  preflightSemanticProjection,
+  requireLinearStiffnessPreflight,
+} from './stiffness-preflight.js';
+
+export {
+  LINEAR_FACTORIZATION_RUNTIME_SCHEMA,
+  createLinearFactorizationRuntime,
+  factorizationCacheFromRuntime,
+  requireLinearFactorizationRuntime,
+} from './factorization-runtime.js';

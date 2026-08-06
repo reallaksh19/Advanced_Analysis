@@ -29,3 +29,12 @@ export {
 } from './topology-proximity-diagnostics-contract.js';
 
 export { diagnoseInputXmlTopologyProximity } from './topology-proximity-diagnostics.js';
+
+export { diagnoseCanonicalTopology } from './topology-diagnostics.js';
+export { diagnoseInputXmlTopology } from './inputxml-topology-diagnostics.js';
+export {
+  MODEL_TOPOLOGY_DIAGNOSTICS_SCHEMA,
+  STRICT_LINEAR_STATIC_PROFILE,
+  requireModelTopologyDiagnostics,
+  sealModelTopologyDiagnostics,
+} from './topology-diagnostics-contract.js';

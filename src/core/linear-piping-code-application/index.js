@@ -47,6 +47,17 @@ export {
 } from './public-api.js';
 
 export {
+  LONGITUDINAL_PRESSURE_STRESS_FORMULA_ID,
+  PRESSURE_BASIS_NOT_DERIVABLE_CODE,
+  PRESSURE_CODE_STRESS_NOT_AUTHORIZED_CODE,
+  PRESSURE_EFFECT_NOT_IMPLEMENTED_CODE,
+  PRESSURE_STRESS_CONFLICT_CODE,
+  derivePressureStressContribution,
+  derivePressureStressContributionFromCustody,
+  resolvePressureStressContribution,
+} from './pressure-stress-derivation.js';
+
+export {
   APPLICATION_RESULT_INPUT_KEYS,
   APPLICATION_RESULT_KEYS,
   ASSESSMENT_SUMMARY_KEYS,
