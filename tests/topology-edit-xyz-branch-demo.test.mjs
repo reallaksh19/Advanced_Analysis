@@ -122,8 +122,26 @@ test('XYZ scenario materializes a source-hashed 32-object dataset with seven res
   assert.equal(graph.components.length, 25);
   const attachments = buildSupportAttachmentModel(dataset.sharedModel, graph);
   assert.deepEqual(
-    attachments.summary,
-    { supportCount: 7, attachedCount: 7, unattachedCount: 0 },
+    {
+      supportCount: attachments.summary.supportCount,
+      attachmentCount: attachments.summary.attachmentCount,
+      attachedCount: attachments.summary.attachedCount,
+      ambiguousCount: attachments.summary.ambiguousCount,
+      unattachedCount: attachments.summary.unattachedCount,
+      invalidPositionCount: attachments.summary.invalidPositionCount,
+      identityConflictCount: attachments.summary.identityConflictCount,
+      unitBlockedCount: attachments.summary.unitBlockedCount,
+    },
+    {
+      supportCount: 7,
+      attachmentCount: 7,
+      attachedCount: 7,
+      ambiguousCount: 0,
+      unattachedCount: 0,
+      invalidPositionCount: 0,
+      identityConflictCount: 0,
+      unitBlockedCount: 0,
+    },
   );
   const restraints = buildRestraintCapabilityModel(attachments);
   const canonical = finalizeCanonicalTopology(
