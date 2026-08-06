@@ -121,8 +121,13 @@ async function openProductionAuthoringController(page) {
     if (!controller) throw new Error('Mounted production authoring controller is unavailable.');
     globalThis.__AUTHORING_CONTROLLER__ = controller;
   });
+  const panel = host.locator('details[data-panel-kind="authoring"]');
+  await expect(panel).toBeVisible();
+  await expect(panel).toHaveAttribute('data-authoring-contextual', 'true');
+  await expect(panel.locator(':scope > summary')).toContainText('Move · Stretch · Route + elbow');
+  expect(await panel.evaluate((element) => element.open)).toBe(false);
+  await panel.locator(':scope > summary').click();
   await expect(page.locator('[data-role="topology-edit-authoring"]')).toBeVisible();
-  await expect(page.getByText('Authoring HUD', { exact: true })).toBeVisible();
   return host;
 }
 
