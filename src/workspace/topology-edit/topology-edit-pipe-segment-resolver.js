@@ -1,11 +1,10 @@
 import { deepFreeze, semanticHash } from '../../core/shared-piping-model/index.js';
-import {
-  assertTopologyEditSpecificationCatalogue,
-} from './professional/topology-edit-spec-catalog.js';
+import { assertTopologyEditSpecificationCatalogue } from './professional/topology-edit-spec-catalog.js';
 import {
   assertPipeSegmentRequest,
   createPipeSegmentCatalogueBinding,
   INSERT_PIPE_SEGMENT,
+  normalizePipeSegmentCommandPayload,
   PIPE_SEGMENT_RESOLVED_SCHEMA,
 } from './topology-edit-pipe-segment-contract.js';
 import {
@@ -30,9 +29,16 @@ function exactNode(topology, id, role) {
   }
   const record = matches[0];
   return deepFreeze({
+    kind: 'NODE',
     id,
     role,
     revision: semanticHash({ kind: 'NODE', record }),
+    adjacencyHash: semanticHash({
+      nodeId: id,
+      edgeIds: (topology.edges ?? []).filter((edge) => (
+        edge.fromNodeId === id || edge.toNodeId === id
+      )).map((edge) => edge.id).sort(),
+    }),
     record,
   });
 }
@@ -66,8 +72,42 @@ function generatedIdentities(topology, commandId) {
   if (portKeys.has(generated.fromPortKey) || portKeys.has(generated.toPortKey)) {
     fail(`generated port identity collision ${componentKey}.`, Error);
   }
-  return deepFreeze(generated);
+  return generated;
 }
+function targetMaterial(topology, payloadInput, commandId) {
+  const payload = normalizePipeSegmentCommandPayload(payloadInput);
+  const from = exactNode(topology, payload.fromNodeId, 'FROM');
+  const to = exactNode(topology, payload.toNodeId, 'TO');
+  const geometry = createPipeSegmentGeometryEvidence(from.record.position, to.record.position);
+  assertPipeSegmentMinimumLength(geometry, payload.segmentPolicy.minimumLengthMm);
+  assertNoDuplicateOrOverlappingPipeSegment(
+    topology,
+    from.id,
+    to.id,
+    geometry,
+    payload.segmentPolicy.overlapToleranceMm,
+  );
+  return {
+    payload,
+    from,
+    to,
+    geometry,
+    generated: generatedIdentities(topology, commandId),
+  };
+}
+
+export function resolvePipeSegmentCommandTargets(topology, request) {
+  assertCanonicalTopologyHash(topology);
+  const commandId = requiredText(request?.commandId, 'commandId');
+  const resolved = targetMaterial(topology, request?.payload, commandId);
+  return deepFreeze({
+    nodes: [resolved.from, resolved.to],
+    edges: [],
+    endpointPortKeys: [],
+    generated: { ...resolved.generated, geometry: resolved.geometry },
+  });
+}
+
 function assertExpectedRevisions(expected, targets) {
   const actual = Object.fromEntries(targets.map((target) => [target.id, target.revision]));
   for (const [id, revision] of Object.entries(expected)) {
@@ -95,18 +135,8 @@ export function resolvePipeSegment({
   if (expectedBinding.bindingHash !== request.catalogueBinding.bindingHash) {
     fail('catalogue binding is stale or changed.', RangeError);
   }
-  const from = exactNode(canonicalTopology, request.fromNodeId, 'FROM');
-  const to = exactNode(canonicalTopology, request.toNodeId, 'TO');
-  assertExpectedRevisions(request.expectedTargetRevisions, [from, to]);
-  const geometry = createPipeSegmentGeometryEvidence(from.record.position, to.record.position);
-  assertPipeSegmentMinimumLength(geometry, request.segmentPolicy.minimumLengthMm);
-  assertNoDuplicateOrOverlappingPipeSegment(
-    canonicalTopology,
-    from.id,
-    to.id,
-    geometry,
-    request.segmentPolicy.overlapToleranceMm,
-  );
+  const resolved = targetMaterial(canonicalTopology, request, commandId);
+  assertExpectedRevisions(request.expectedTargetRevisions, [resolved.from, resolved.to]);
   const material = {
     schema: PIPE_SEGMENT_RESOLVED_SCHEMA,
     commandId,
@@ -115,12 +145,15 @@ export function resolvePipeSegment({
     priorCanonicalHash: canonicalTopology.canonicalTopologyHash,
     sourceHash: canonicalTopology.sourceHash,
     catalogueHash: currentCatalogue.catalogueHash,
-    targets: { from, to },
-    targetRevisions: { [from.id]: from.revision, [to.id]: to.revision },
+    targets: { from: resolved.from, to: resolved.to },
+    targetRevisions: {
+      [resolved.from.id]: resolved.from.revision,
+      [resolved.to.id]: resolved.to.revision,
+    },
     catalogueBinding: expectedBinding,
     segmentPolicy: request.segmentPolicy,
-    geometry,
-    generated: generatedIdentities(canonicalTopology, commandId),
+    geometry: resolved.geometry,
+    generated: resolved.generated,
   };
   return deepFreeze({ ...material, resolutionHash: semanticHash(material) });
 }
