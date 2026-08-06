@@ -55,6 +55,7 @@ function normalizedLabel(value) {
     .replace(/KN\.?[-·*\s]*M\.?/gu, 'KNM')
     .replace(/N\.?[-·*\s]*M\.?/gu, 'NM')
     .replace(/N\.?\s*\/\s*SQ\.?\s*MM\.?/gu, 'N/SQMM')
+    .replace(/KG\.?\s*CU\.?\s*CM\.?/gu, 'KG/CUCM')
     .replace(/KG\.?\s*\/\s*CU\.?\s*CM\.?/gu, 'KG/CUCM')
     .replace(/KG\.?\s*\/\s*M(?:\^?3|3)\.?/gu, 'KG/M3')
     .replace(/LB\.?\s*\/\s*CU\.?\s*IN\.?/gu, 'LB/CUIN')
