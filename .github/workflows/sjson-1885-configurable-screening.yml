@@ -13,6 +13,7 @@ on:
       - src/core/empirical-piping-mechanics/vertical-retention.js
       - src/core/empirical-piping-mechanics/index.js
       - src/calc-workspace/cii-standalone-port/core/branch-schedule-resolution.js
+      - src/calc-workspace/cii-standalone-port/core/pos-topology-crosswalk.js
       - src/calc-workspace/cii-standalone-port/core/pos-section-material-resolution.js
       - scripts/nonfea-piping-foundation-check.mjs
       - scripts/empirical-sjson-1885-pos-section-material-run.mjs
@@ -35,6 +36,7 @@ on:
       - src/core/empirical-piping-mechanics/vertical-retention.js
       - src/core/empirical-piping-mechanics/index.js
       - src/calc-workspace/cii-standalone-port/core/branch-schedule-resolution.js
+      - src/calc-workspace/cii-standalone-port/core/pos-topology-crosswalk.js
       - src/calc-workspace/cii-standalone-port/core/pos-section-material-resolution.js
       - scripts/nonfea-piping-foundation-check.mjs
       - scripts/empirical-sjson-1885-pos-section-material-run.mjs
@@ -77,6 +79,7 @@ jobs:
           node scripts/empirical-sjson-1885-pos-section-material-run.mjs \
             project-data/1885s-nonfea-piping-defaults.json \
             /tmp/EnrichedSjson \
+            /tmp/EnrichedSjson.topology.input.xml \
             /tmp/pos-section-material.json
           node scripts/empirical-sjson-1885-pos-section-material-check.mjs \
             /tmp/pos-section-material.json
