@@ -139,7 +139,10 @@ rejectedImportStore.destroy();
 
 const workspace = path.join(ROOT, 'src', 'workspace');
 const read = (name) => fs.readFileSync(path.join(workspace, name), 'utf8');
-const facadeSource = read('lafea-lifecycle-workbench-store.js');
+const facadeSource = [
+  read('lafea-lifecycle-workbench-store.js'),
+  read('lafea-lifecycle-workbench-store-core.js'),
+].join('\n');
 const sourceAuthoritySource = read('lafea-source-authority.js');
 const producerSource = read('lafea-lifecycle-producers.js');
 assert.match(facadeSource, /stage\.lastEditResult\?\.audit\?\.descriptorDigest/u);

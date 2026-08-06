@@ -11,6 +11,9 @@ const CHECKS = Object.freeze([
   { scope: 'NB-T2', path: 'scripts/lafea-nb-t2-source-producer-check.mjs' },
   { scope: 'NB-T3', path: 'scripts/lafea-nb-t3-composition-root-check.mjs' },
   { scope: 'NB-T4A', path: 'scripts/lafea-nb-t4a-analysis-mesh-evidence-check.mjs' },
+  { scope: 'WP-MC1', path: 'scripts/lafea-nb-t4a-analysis-mesh-custody-check.mjs' },
+  { scope: 'WP-MC1', path: 'scripts/lafea-nb-t4a-analysis-mesh-custody-controller-check.mjs' },
+  { scope: 'WP-MC1', path: 'scripts/lafea-nb-t4a-analysis-mesh-live-store-check.mjs' },
   { scope: 'NB-T4B', path: 'scripts/lafea-nb-t4b-recovery-render-check.mjs' },
   { scope: 'NB-T6B', path: 'scripts/lafea-nb-t6b-lug-pinhole-mesh-ladder-check.mjs' },
   { scope: 'NB-T6C', path: 'scripts/lafea-nb-t6c-physical-problem-batch-check.mjs' },
@@ -90,7 +93,7 @@ for (const row of CHECKS) {
 }
 
 const report = Object.freeze({
-  schema: 'lafea-nonbucket-stack-report/v13',
+  schema: 'lafea-nonbucket-stack-report/v14',
   check: 'lafea-nonbucket-stack-certification',
   status: failures.length ? 'FAIL' : 'PASS',
   exactHead: gitHead(),
@@ -112,6 +115,8 @@ const report = Object.freeze({
   compositionRootIntegrated: true,
   analyticalProductEvidenceIntegrated: true,
   analysisMeshEvidenceIntegrated: true,
+  analysisMeshCustodyIntegrated: true,
+  analysisMeshCustodyLiveStoreIntegrated: true,
   recoveryRenderEvidenceIntegrated: true,
   productionMeshGenerationIntegrated: true,
   productionMeshGeometryClass: 'CONCENTRIC_ANNULAR_LUG_PINHOLE',
