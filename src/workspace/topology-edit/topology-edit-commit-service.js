@@ -4,7 +4,7 @@ import { EventBus } from '../event-bus.js';
 import { EVENT_TOPICS } from '../event-topics.js';
 import { rebuildWorkspaceDataset } from '../dataset-adapter.js';
 import { deepFreeze, semanticHash } from '../../core/shared-piping-model/index.js';
-import { applyCanonicalTopologyToWorkspaceEntities } from './topology-edit-source-adapter.js';
+import { applyCanonicalTopologyToWorkspaceEntities } from './topology-edit-source-adapter-dispatch.js';
 import { assertCanonicalTopologyHash } from './topology-edit-canonical-state.js';
 import { assertPreparedTopologyEditExport } from './topology-edit-export.js';
 

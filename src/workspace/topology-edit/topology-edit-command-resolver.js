@@ -12,6 +12,9 @@ import {
 import {
   assertTopologyEditBranchComponentTarget,
 } from './topology-edit-branch-component-command.js';
+import {
+  resolvePipeSegmentCommandTargets,
+} from './topology-edit-pipe-segment-resolver.js';
 
 function requiredText(value, label) {
   const text = String(value ?? '').trim();
@@ -207,6 +210,7 @@ const TARGET_RESOLVERS = Object.freeze({
   ADD_STRAIGHT_ELEMENT: resolveAddedEdge, SPLIT_EDGE: resolveSplit,
   INSERT_INLINE_COMPONENT: resolveInline,
   INSERT_BRANCH_COMPONENT: resolveBranchComponent,
+  INSERT_PIPE_SEGMENT: resolvePipeSegmentCommandTargets,
   DISCONNECT_ENDPOINT: resolveDisconnect, DELETE_EDGE: resolveDelete,
   ADD_BEND_DEFINITION: resolveBend, ADD_JUNCTION_DEFINITION: resolveJunction,
   TRIM_EDGE: resolveTrim,
