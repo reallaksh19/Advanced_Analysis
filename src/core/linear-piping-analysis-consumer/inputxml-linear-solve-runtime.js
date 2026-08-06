@@ -79,7 +79,9 @@ export function createInputXmlLinearSolveRuntime(solvePreparation, preflight, op
       solveExecution: acceptedPreflight.status === 'WARN'
         ? 'CONDITIONAL_AUTHORIZED'
         : 'AUTHORIZED',
-      resultRecovery: 'NOT_AUTHORIZED_IN_THIS_SLICE',
+      resultRecovery: acceptedPreflight.status === 'WARN'
+        ? 'CONDITIONAL_AUTHORIZED'
+        : 'AUTHORIZED',
     }),
   };
   publicRecord.runtimeId = `IXRT-${semanticHash(runtimeIdentityProjection(publicRecord))}`;
