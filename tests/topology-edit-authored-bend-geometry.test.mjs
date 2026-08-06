@@ -92,7 +92,7 @@ test('authored bend projection preserves governed compact packet authority', () 
   assert.ok(arc.controlPoint1);
   assert.ok(arc.controlPoint2);
   assert.equal(result.authoredBendArcCount, 1);
-  assert.match(result.authoredBendProjectionHash, /^[a-f0-9]{64}$/);
+  assert.match(result.authoredBendProjectionHash, /^fnv1a64:[a-f0-9]{16}$/);
 
   const repeated = applyTopologyEditAuthoredBendProjection(result, topology());
   assert.equal(repeated.compactSegments.length, 3);
