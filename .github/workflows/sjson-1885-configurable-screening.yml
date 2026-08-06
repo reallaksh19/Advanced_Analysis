@@ -23,6 +23,7 @@ on:
       - scripts/empirical-sjson-1885-governed-section-projection.mjs
       - scripts/empirical-sjson-1885-governed-section-projection-check.mjs
       - scripts/empirical-sjson-1885-governed-screening-run.mjs
+      - scripts/empirical-sjson-1885-screening-csv.mjs
       - scripts/empirical-pos-section-material-csv.mjs
       - benchmarks/1885Sjson/empirical-screening-profile.config.json
       - benchmarks/1885Sjson/empirical-screening-result.configurable.json
@@ -54,6 +55,7 @@ on:
       - scripts/empirical-sjson-1885-governed-section-projection.mjs
       - scripts/empirical-sjson-1885-governed-section-projection-check.mjs
       - scripts/empirical-sjson-1885-governed-screening-run.mjs
+      - scripts/empirical-sjson-1885-screening-csv.mjs
       - scripts/empirical-pos-section-material-csv.mjs
       - benchmarks/1885Sjson/empirical-screening-profile.config.json
       - benchmarks/1885Sjson/empirical-screening-result.configurable.json
@@ -128,6 +130,9 @@ jobs:
             /tmp/governed-section-projection.json \
             /tmp/result-b.json
           cmp /tmp/result-a.json /tmp/result-b.json
+          node scripts/empirical-sjson-1885-screening-csv.mjs \
+            /tmp/result-a.json \
+            /tmp/empirical-screening-result.configurable.csv
       - name: Upload recalculated candidate
         uses: actions/upload-artifact@v4
         with:
@@ -135,6 +140,7 @@ jobs:
           path: |
             /tmp/result-a.json
             /tmp/result-b.json
+            /tmp/empirical-screening-result.configurable.csv
             /tmp/pos-section-material.json
             /tmp/EnrichedSjson.governed.topology.input.xml
             /tmp/governed-section-projection.json
@@ -143,19 +149,21 @@ jobs:
           if-no-files-found: error
       - name: Verify governed engineering assertions
         run: node scripts/empirical-sjson-1885-configurable-screening-check.mjs /tmp/result-a.json
-      - name: Verify checked-in golden result
-        run: cmp /tmp/result-a.json benchmarks/1885Sjson/empirical-screening-result.configurable.json
+      - name: Verify checked-in governed evidence
+        run: |
+          cmp /tmp/result-a.json benchmarks/1885Sjson/empirical-screening-result.configurable.json
+          cmp /tmp/empirical-screening-result.configurable.csv benchmarks/1885Sjson/empirical-screening-result.configurable.csv
       - name: Upload calculation evidence
         uses: actions/upload-artifact@v4
         with:
           name: empirical-sjson-1885-configurable-screening
           path: |
             /tmp/result-a.json
+            /tmp/empirical-screening-result.configurable.csv
             /tmp/pos-section-material.json
             /tmp/EnrichedSjson.governed.topology.input.xml
             /tmp/governed-section-projection.json
             /tmp/empirical-pos-section-material.csv
             /tmp/empirical-configured-default-usage.csv
-            benchmarks/1885Sjson/empirical-screening-result.configurable.csv
             docs/evidence/SJSON_1885_CONFIGURABLE_SCREENING.md
           if-no-files-found: error
