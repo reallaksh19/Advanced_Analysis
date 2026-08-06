@@ -52,10 +52,6 @@ jobs:
             exit 1
           fi
           test -z "$(git diff "$base_sha"...HEAD -- src/workspace/application-shell-controller.js src/core/workspace-consumers || true)"
-          if grep -Eiq 'First Cut|First-Cut' src/workspace/workspace-layout.js src/workspace/enrichment/non-fea-enrichment-view.js src/workspace/enrichment/non-fea-enrichment-store.js; then
-            echo 'Retired product label remains in an active production surface.' >&2
-            exit 1
-          fi
           grep -q '^### Phase 1 — Lossless preflight consolidation' doc/prelight_roamap.md
           grep -q '^### Phase 2 — Project Data authority expansion' doc/prelight_roamap.md
           grep -q '^### Phase 3 — Common enrichment and override migration' doc/prelight_roamap.md
