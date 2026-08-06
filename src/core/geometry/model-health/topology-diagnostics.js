@@ -26,6 +26,7 @@ export function diagnoseCanonicalTopology(input, options = {}) {
   const tolerances = resolveTolerances(options);
   const nodeById = new Map(geometry.nodes.map((node) => [String(node.id), node]));
   const graph = buildTopologyGraph(geometry);
+  const localScaleByNode = buildLocalScaleByNode(geometry, graph);
   const findings = [];
 
   for (const row of graph.unboundSegments) {
@@ -62,15 +63,15 @@ export function diagnoseCanonicalTopology(input, options = {}) {
     }));
   }
 
-  const nodeProximities = collectNodeProximities(geometry.nodes, tolerances);
+  const nodeProximities = collectNodeProximities(geometry.nodes, tolerances, localScaleByNode);
   for (const row of nodeProximities) {
     const exact = row.classification === 'EXACT_COINCIDENT';
-    const withinTolerance = row.classification === 'COINCIDENT_WITHIN_TOLERANCE';
+    const withinTolerance = row.classification === 'NUMERIC_COINCIDENCE';
     findings.push(finding({
       code: exact
         ? 'TOPOLOGY_DISTINCT_NODES_EXACTLY_COINCIDENT'
         : withinTolerance
-          ? 'TOPOLOGY_DISTINCT_NODES_COINCIDENT_WITHIN_TOLERANCE'
+          ? 'TOPOLOGY_DISTINCT_NODES_NUMERIC_COINCIDENCE'
           : 'TOPOLOGY_DISTINCT_NODES_NEAR_COINCIDENT',
       severity: exact || withinTolerance ? 'error' : 'warning',
       blocks: exact || withinTolerance,
@@ -124,7 +125,7 @@ export function diagnoseCanonicalTopology(input, options = {}) {
     isolatedNodeCount: graph.isolatedNodeIds.length,
     unboundSegmentCount: graph.unboundSegments.length,
     exactCoincidentNodePairCount: nodeClassCounts.EXACT_COINCIDENT ?? 0,
-    toleranceCoincidentNodePairCount: nodeClassCounts.COINCIDENT_WITHIN_TOLERANCE ?? 0,
+    numericCoincidentNodePairCount: nodeClassCounts.NUMERIC_COINCIDENCE ?? 0,
     nearCoincidentNodePairCount: nodeClassCounts.NEAR_COINCIDENT ?? 0,
     coordinateClosureMismatchCount: coordinateClosure.filter((row) => row.status === 'MISMATCH').length,
     segmentPairClassCounts: Object.freeze(segmentResult.classCounts),
@@ -150,7 +151,7 @@ export function diagnoseCanonicalTopology(input, options = {}) {
   });
 }
 
-function collectNodeProximities(nodes, tolerances) {
+function collectNodeProximities(nodes, tolerances, localScaleByNode) {
   const sorted = [...nodes]
     .filter(finiteNode)
     .sort((left, right) => compareAscii(left.id, right.id));
@@ -165,11 +166,14 @@ function collectNodeProximities(nodes, tolerances) {
           const prior = buckets.get(cellKey(cell.x + dx, cell.y + dy, cell.z + dz)) ?? [];
           for (const candidate of prior) {
             const separation = distance(node, candidate);
-            const scale = Math.max(normPoint(node), normPoint(candidate), 1);
+            const scale = Math.max(
+              localScaleByNode.get(String(node.id)) ?? 1,
+              localScaleByNode.get(String(candidate.id)) ?? 1,
+            );
             const exactTolerance = tolerances.absolute + tolerances.relative * scale;
             let classification = null;
             if (separation === 0) classification = 'EXACT_COINCIDENT';
-            else if (separation <= exactTolerance) classification = 'COINCIDENT_WITHIN_TOLERANCE';
+            else if (separation <= exactTolerance) classification = 'NUMERIC_COINCIDENCE';
             else if (separation <= tolerances.near) classification = 'NEAR_COINCIDENT';
             if (classification) {
               rows.push(Object.freeze({
@@ -265,6 +269,7 @@ function interactionFinding(classification) {
     remediation: 'Revise the source topology and create explicit shared nodes where physical connectivity is intended.',
   };
   if (classification === 'EXACT_DUPLICATE') return { ...common, code: 'TOPOLOGY_EXACT_DUPLICATE_SEGMENTS' };
+  if (classification === 'NUMERIC_DUPLICATE') return { ...common, code: 'TOPOLOGY_NUMERIC_DUPLICATE_SEGMENTS' };
   if (classification === 'COLLINEAR_OVERLAP') return { ...common, code: 'TOPOLOGY_COLLINEAR_SEGMENT_OVERLAP' };
   if (classification === 'INTERIOR_INTERSECTION') return { ...common, code: 'TOPOLOGY_UNNODED_INTERIOR_INTERSECTION' };
   if (classification === 'ENDPOINT_ON_INTERIOR') return { ...common, code: 'TOPOLOGY_ENDPOINT_ON_SEGMENT_INTERIOR' };
@@ -349,8 +354,37 @@ function cellKey(x, y, z) {
   return `${x}:${y}:${z}`;
 }
 
-function normPoint(value) {
-  return Math.sqrt(value.x * value.x + value.y * value.y + value.z * value.z);
+function buildLocalScaleByNode(geometry, graph) {
+  const nodeById = new Map(geometry.nodes.filter(finiteNode).map((node) => [String(node.id), node]));
+  const segmentById = new Map(geometry.segments.map((segment) => [String(segment.id), segment]));
+  const scaleByNode = new Map();
+  for (const component of graph.components) {
+    const nodes = component.nodeIds.map((nodeId) => nodeById.get(nodeId)).filter(finiteNode);
+    const bounds = componentBounds(nodes);
+    let maximumSegmentLength = 0;
+    for (const segmentId of component.segmentIds) {
+      const segment = segmentById.get(segmentId);
+      const start = segment ? nodeById.get(String(segment.startNodeId)) : null;
+      const end = segment ? nodeById.get(String(segment.endNodeId)) : null;
+      if (finiteNode(start) && finiteNode(end)) maximumSegmentLength = Math.max(maximumSegmentLength, distance(start, end));
+    }
+    const componentScale = Math.max(1, bounds.diagonal, maximumSegmentLength);
+    for (const nodeId of component.nodeIds) scaleByNode.set(nodeId, componentScale);
+  }
+  return scaleByNode;
+}
+
+function componentBounds(nodes) {
+  if (nodes.length === 0) return { diagonal: 0 };
+  const min = { x: Infinity, y: Infinity, z: Infinity };
+  const max = { x: -Infinity, y: -Infinity, z: -Infinity };
+  for (const node of nodes) {
+    for (const axis of ['x', 'y', 'z']) {
+      min[axis] = Math.min(min[axis], node[axis]);
+      max[axis] = Math.max(max[axis], node[axis]);
+    }
+  }
+  return { diagonal: distance(min, max) };
 }
 
 function distance(left, right) {

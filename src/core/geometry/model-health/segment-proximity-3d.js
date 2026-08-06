@@ -52,9 +52,16 @@ export function classifySegmentPair(left, right, options = {}) {
 
   const collinear = collinearEvidence(left, right, hitTolerance, angularTolerance);
   if (collinear.collinear && collinear.overlapLength > hitTolerance) {
-    const exactDuplicate = Math.abs(left.length - right.length) <= hitTolerance
-      && endpointsMatch(left, right, hitTolerance);
-    return pairRecord(exactDuplicate ? 'EXACT_DUPLICATE' : 'COLLINEAR_OVERLAP', left, right, sharedNodeIds, {
+    const exactDuplicate = endpointsMatchExactly(left, right);
+    const numericDuplicate = !exactDuplicate
+      && Math.abs(left.length - right.length) <= hitTolerance
+      && endpointsMatchWithinTolerance(left, right, hitTolerance);
+    const classification = exactDuplicate
+      ? 'EXACT_DUPLICATE'
+      : numericDuplicate
+        ? 'NUMERIC_DUPLICATE'
+        : 'COLLINEAR_OVERLAP';
+    return pairRecord(classification, left, right, sharedNodeIds, {
       distance: collinear.lineDistance,
       hitTolerance,
       nearTolerance: effectiveNearTolerance,
@@ -136,10 +143,20 @@ function collinearEvidence(left, right, hitTolerance, angularTolerance) {
   };
 }
 
-function endpointsMatch(left, right, tolerance) {
+function endpointsMatchWithinTolerance(left, right, tolerance) {
   const direct = distance(left.start, right.start) <= tolerance && distance(left.end, right.end) <= tolerance;
   const reverse = distance(left.start, right.end) <= tolerance && distance(left.end, right.start) <= tolerance;
   return direct || reverse;
+}
+
+function endpointsMatchExactly(left, right) {
+  const direct = pointsEqual(left.start, right.start) && pointsEqual(left.end, right.end);
+  const reverse = pointsEqual(left.start, right.end) && pointsEqual(left.end, right.start);
+  return direct || reverse;
+}
+
+function pointsEqual(left, right) {
+  return left.x === right.x && left.y === right.y && left.z === right.z;
 }
 
 function closestPointsOnSegments(p0, p1, q0, q1) {

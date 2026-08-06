@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { parseInputXmlSourceBundle } from '../src/core/geometry/adapters/inputXmlToCanonicalGeometry.js';
 import {
+  diagnoseCanonicalTopology,
   diagnoseInputXmlTopology,
   requireModelTopologyDiagnostics,
 } from '../src/core/geometry/model-health/index.js';
@@ -82,7 +83,7 @@ test('MH-TOP-03', 'distinct exact-coincident nodes and exact duplicate spans are
   assert.ok(report.findings.some((row) => row.code === 'TOPOLOGY_EXACT_DUPLICATE_SEGMENTS'));
 });
 
-test('MH-TOP-04', 'near and tolerance-coincident node classes are not collapsed together', () => {
+test('MH-TOP-04', 'near and numeric-coincident node classes are not collapsed together', () => {
   const toleranceXml = inputXml([
     element({ from: 10, to: 20, dx: 100 }),
     element({ from: 10, to: 30, dx: 100.0000005 }),
@@ -93,9 +94,9 @@ test('MH-TOP-04', 'near and tolerance-coincident node classes are not collapsed 
   ]);
   const within = diagnose(toleranceXml, { topology: tolerances }).report;
   const near = diagnose(nearXml, { topology: tolerances }).report;
-  assert.equal(within.summary.toleranceCoincidentNodePairCount, 1);
+  assert.equal(within.summary.numericCoincidentNodePairCount, 1);
   assert.equal(near.summary.nearCoincidentNodePairCount, 1);
-  assert.ok(within.findings.some((row) => row.code === 'TOPOLOGY_DISTINCT_NODES_COINCIDENT_WITHIN_TOLERANCE'));
+  assert.ok(within.findings.some((row) => row.code === 'TOPOLOGY_DISTINCT_NODES_NUMERIC_COINCIDENCE'));
   assert.ok(near.findings.some((row) => row.code === 'TOPOLOGY_DISTINCT_NODES_NEAR_COINCIDENT'));
 });
 
@@ -182,6 +183,45 @@ test('MH-TOP-11', 'invalid tolerance policy fails closed', () => {
     () => diagnoseInputXmlTopology(sourceBundle, { absoluteTolerance: 1, nearTolerance: 0.5 }),
     /nearTolerance/u,
   );
+});
+
+test('MH-TOP-12', 'numerically equivalent spans are not mislabeled as exact duplicates', () => {
+  const xml = inputXml([
+    element({ from: 10, to: 20, dx: 100 }),
+    element({ from: 10, to: 30, dx: 100.0000005 }),
+  ]);
+  const { report } = diagnose(xml, { topology: tolerances });
+  assert.equal(report.summary.segmentPairClassCounts.NUMERIC_DUPLICATE, 1);
+  assert.equal(report.summary.segmentPairClassCounts.EXACT_DUPLICATE ?? 0, 0);
+  assert.ok(report.findings.some((row) => row.code === 'TOPOLOGY_NUMERIC_DUPLICATE_SEGMENTS'));
+});
+
+test('MH-TOP-13', 'numeric coincidence predicates are invariant to coordinate translation', () => {
+  const model = (offset) => ({
+    sourceBundleSemanticHash: `source-${offset}`,
+    sourceBundleEvidenceHash: `evidence-${offset}`,
+    geometry: {
+      schemaVersion: 'canonical-geometry/v1',
+      unit: 'm',
+      nodes: [
+        { id: 'A', x: offset, y: offset, z: offset },
+        { id: 'B', x: offset + 100, y: offset, z: offset },
+        { id: 'C', x: offset + 100.05, y: offset, z: offset },
+      ],
+      segments: [
+        { id: 'S1', startNodeId: 'A', endNodeId: 'B' },
+        { id: 'S2', startNodeId: 'A', endNodeId: 'C' },
+      ],
+    },
+    sourceElements: [],
+  });
+  const origin = diagnoseCanonicalTopology(model(0), tolerances);
+  const translated = diagnoseCanonicalTopology(model(100000000), tolerances);
+  const originPair = origin.nodeProximities.find((row) => row.nodeIds.join('|') === 'B|C');
+  const translatedPair = translated.nodeProximities.find((row) => row.nodeIds.join('|') === 'B|C');
+  assert.equal(originPair.classification, 'NEAR_COINCIDENT');
+  assert.equal(translatedPair.classification, originPair.classification);
+  assert.ok(Math.abs(translatedPair.exactTolerance - originPair.exactTolerance) < 1e-15);
 });
 
 console.log('LFEA InputXML topology diagnostics check PASS.');
