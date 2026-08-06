@@ -40,6 +40,56 @@ export const PROJECT_DATA_GROUPS = Object.freeze([
     field('equilibriumTolerances', 'Equilibrium tolerances', 'json', 'Loads'),
     field('activeLoadCases', 'Active load cases', 'json', 'Loads'),
   ]),
+  group('engineeringCalculationDefaults', 'Engineering calculation defaults', [
+    field(
+      'resolutionPolicy',
+      'Resolution policy',
+      'resolution-policy',
+      'Fixed authority order. Values unresolved after the configured default stage block calculation.',
+    ),
+    field(
+      'dimensionVerificationTolerancesMm',
+      'Dimension verification tolerances',
+      'dimension-tolerances',
+      'Explicit OD and wall verification tolerances. No internal tolerance is permitted.',
+    ),
+    field(
+      'configuredDefaults',
+      'Configured default definitions',
+      'configured-defaults',
+      'Approved, scoped engineering defaults and their qualification basis.',
+    ),
+    field(
+      'verticalContactScreening',
+      'Vertical contact screening',
+      'json',
+      'Configurable retained-load model. A null or disabled record means the feature is not available.',
+    ),
+    field(
+      'pDeltaScreening',
+      'P-delta screening',
+      'json',
+      'Optional one-pass second-order screening configuration.',
+    ),
+    field(
+      'solverTolerances',
+      'Solver and equilibrium tolerances',
+      'json',
+      'Direct-solve, equilibrium, state-change, and reporting tolerances.',
+    ),
+    field(
+      'applicabilityLimits',
+      'Applicability limits',
+      'json',
+      'Qualified topology, temperature, restraint, support, and compression-ratio limits.',
+    ),
+    field(
+      'reporting',
+      'Reporting and fallback disclosure',
+      'json',
+      'Controls default-usage disclosure, raw-value retention, rounding, and blocked-result presentation.',
+    ),
+  ]),
   group('webglNavigation', 'WebGL and navigation', [
     field('supportMarkerSize', 'Support marker size', 'number', 'model units'),
     field('pickingRadius', 'Picking radius', 'number', 'model mm'),
@@ -88,6 +138,11 @@ export const PROJECT_DATA_REQUIREMENTS = Object.freeze({
     'loadCalculation.insulationDensitiesKgPerM3',
     'loadCalculation.componentWeightsKg', 'loadCalculation.equilibriumTolerances',
     'loadCalculation.activeLoadCases',
+  ]),
+  nonFeaPipingDefaults: Object.freeze([
+    'engineeringCalculationDefaults.resolutionPolicy',
+    'engineeringCalculationDefaults.dimensionVerificationTolerancesMm',
+    'engineeringCalculationDefaults.configuredDefaults',
   ]),
   webgl: Object.freeze([
     'webglNavigation.supportMarkerSize', 'webglNavigation.pickingRadius',
