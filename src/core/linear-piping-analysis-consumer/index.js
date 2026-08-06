@@ -98,10 +98,11 @@ export {
   sealLinearPipingInputXmlAnalysisContext,
 } from './inputxml-analysis-context.js';
 
-// Raw InputXML parsing remains public for diagnostics custody. Legacy public
-// analysis/solve exports are intentionally absent; authorized execution is
-// exposed only through solveInputXmlLinearAnalysis below.
+// Raw InputXML parsing and sealed context compilation remain public for
+// governed diagnostics/workbench custody. Legacy public solve exports remain
+// absent; authorized execution is exposed only through the governed solve path.
 export {
+  compileLinearPipingInputXmlAnalysisContext,
   parseInputXmlModelHealthSource,
   validateLinearPipingInputXmlAnalysisRequest,
 } from './inputxml-source-binding.js';
@@ -139,7 +140,7 @@ export {
   INPUTXML_INSTALLATION_TEMPERATURE,
   INPUTXML_LINEAR_SOLVE_PREPARATION_PROFILE_SCHEMA,
   InputXmlLinearSolvePreparationError,
-  requireInputXmlLinearSolvePreparationProfile,
+  requireLinearPipingInputXmlSolvePreparationProfile,
 } from './inputxml-linear-preparation-profile.js';
 
 export {
