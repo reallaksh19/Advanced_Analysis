@@ -7,6 +7,7 @@ on:
       - 'src/core/linear-fea-*/**'
       - 'src/core/linear-piping-analysis-consumer/**'
       - 'scripts/lfea-b1-conditioning-check.mjs'
+      - 'scripts/lfea-b1-attachment-replay-lineage-check.mjs'
       - 'scripts/lfea-linear-core-exact-head-evidence.mjs'
       - 'scripts/linear-piping-inputxml-unit-normalization-check.mjs'
       - '.github/workflows/lfea-linear-core-exact-head.yml'
@@ -42,7 +43,7 @@ jobs:
           git diff --name-only "$merge_base" "${{ github.event.pull_request.head.sha }}" > /tmp/lfea-linear-core-paths.txt
           while IFS= read -r changed; do
             case "$changed" in
-              src/core/centerline-beam-fea/*|src/core/linear-fea-*/*|src/core/linear-piping-analysis-consumer/*|scripts/lfea-b1-conditioning-check.mjs|scripts/lfea-linear-core-exact-head-evidence.mjs|scripts/linear-piping-inputxml-unit-normalization-check.mjs|.github/workflows/lfea-linear-core-exact-head.yml) ;;
+              src/core/centerline-beam-fea/*|src/core/linear-fea-*/*|src/core/linear-piping-analysis-consumer/*|scripts/lfea-b1-conditioning-check.mjs|scripts/lfea-b1-attachment-replay-lineage-check.mjs|scripts/lfea-linear-core-exact-head-evidence.mjs|scripts/linear-piping-inputxml-unit-normalization-check.mjs|.github/workflows/lfea-linear-core-exact-head.yml) ;;
               *) echo "Forbidden changed path for the linear-core qualification slice: $changed"; exit 1 ;;
             esac
           done < /tmp/lfea-linear-core-paths.txt
@@ -51,7 +52,9 @@ jobs:
         run: node scripts/linear-piping-inputxml-unit-normalization-check.mjs
 
       - name: Conditioned topology and retained-station custody
-        run: node scripts/lfea-b1-conditioning-check.mjs
+        run: |
+          node scripts/lfea-b1-conditioning-check.mjs
+          node scripts/lfea-b1-attachment-replay-lineage-check.mjs
 
       - name: DOF conventions and mechanical-model compilation
         run: npm run check:lfea-b2.0 && npm run check:lfea-b2.5
