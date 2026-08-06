@@ -4,8 +4,14 @@ on:
   pull_request:
     branches:
       - main
+      - agent/m031-bm2-strict-gaps
+      - agent/m032-bm2-accuracy-program
     paths:
       - 'benchmarks/LFEA/BM2/**'
+      - 'docs/qualification/M032_BM2_ACCURACY_PROGRAM.md'
+      - 'docs/qualification/M032_BM2_JUNCTION_REPORTING_AXIS.md'
+      - 'evidence/m032-b/**'
+      - 'scripts/lfea-m032-bm2-*.mjs'
       - 'scripts/lfea-m031-bm2-qualified-*.mjs'
       - 'scripts/lfea-m031-bm2-app-nonfriction-*.mjs'
       - 'scripts/lfea-b3.26-bm2-output-comparison*.mjs'
@@ -62,8 +68,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          node --check scripts/lfea-m032-bm2-accuracy-program-check.mjs
           node --check scripts/lfea-m031-bm2-qualified-runtime.mjs
+          if test -f scripts/lfea-m031-bm2-qualified-runtime-base.mjs; then
+            node --check scripts/lfea-m031-bm2-qualified-runtime-base.mjs
+          fi
           node --check scripts/lfea-m031-bm2-qualified-check.mjs
+          if test -f scripts/lfea-m032-bm2-junction-reporting-axis-check.mjs; then
+            node --check scripts/lfea-m032-bm2-junction-reporting-axis-check.mjs
+          fi
           node --check scripts/lfea-m031-bm2-app-nonfriction-runtime.mjs
           node --check scripts/lfea-m031-bm2-app-nonfriction-check.mjs
           node --check scripts/lfea-b3.26-bm2-output-comparison-runtime.mjs
@@ -72,6 +85,10 @@ jobs:
           node --check scripts/lfea-b3.29-bm2-bend-geometry-authority-v2.mjs
           node --check scripts/lfea-bm2-consolidated-latest-output-check.mjs
           node --check src/core/linear-fea-solver/solve.js
+          python -m json.tool benchmarks/LFEA/BM2/accuracy-program-baseline-v1.json > /dev/null
+          if test -f evidence/m032-b/bm2-junction-reporting-axis-what-if.json; then
+            python -m json.tool evidence/m032-b/bm2-junction-reporting-axis-what-if.json > /dev/null
+          fi
           git diff --check
 
       - name: M031 matrix mechanics and full station custody
@@ -79,6 +96,26 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/lfea-m031-bm2-qualified-check.mjs | tee /tmp/m031-bm2-qualified.log
+
+      - name: M032 junction reporting-axis candidate
+        if: ${{ hashFiles('scripts/lfea-m032-bm2-junction-reporting-axis-check.mjs') != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/lfea-m032-bm2-junction-reporting-axis-check.mjs \
+            | tee /tmp/m032-bm2-junction-reporting-axis.log
+
+      - name: M032 accuracy baseline and deterministic clusters
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test "$GITHUB_BASE_REF" = "agent/m032-bm2-accuracy-program"; then
+            node scripts/lfea-m032-bm2-accuracy-program-check.mjs --write \
+              | tee /tmp/m032-bm2-accuracy.log
+          else
+            node scripts/lfea-m032-bm2-accuracy-program-check.mjs --freeze --write \
+              | tee /tmp/m032-bm2-accuracy.log
+          fi
 
       - name: BM2 comparison contract regression
         run: node scripts/lfea-b3.26-bm2-solve-comparison-check.mjs
@@ -120,24 +157,37 @@ jobs:
             reports/bm2-nonfriction-linear-fea-out-of-tolerance.csv \
             reports/bm2-app-nonfriction-node-reverse-engineering.json \
             reports/bm2-app-nonfriction-node-reverse-engineering.csv \
+            reports/bm2-accuracy-program-clusters.json \
+            reports/bm2-accuracy-program-clusters.csv \
             > /tmp/m031-bm2-report.sha256
           node scripts/lfea-bm2-consolidated-latest-output-check.mjs --write > /tmp/m031-bm2-consolidated-replay.log
           node scripts/lfea-m031-bm2-app-nonfriction-check.mjs --write > /tmp/m031-bm2-app-nonfriction-replay.log
+          if test "$GITHUB_BASE_REF" = "agent/m032-bm2-accuracy-program"; then
+            node scripts/lfea-m032-bm2-accuracy-program-check.mjs --write > /tmp/m032-bm2-accuracy-replay.log
+          else
+            node scripts/lfea-m032-bm2-accuracy-program-check.mjs --freeze --write > /tmp/m032-bm2-accuracy-replay.log
+          fi
           sha256sum --check /tmp/m031-bm2-report.sha256
 
       - name: Upload deterministic qualification evidence
         uses: actions/upload-artifact@v4
         with:
-          name: m031-bm2-qualified-${{ env.TARGET_HEAD_SHA }}
+          name: m031-m032-bm2-accuracy-${{ env.TARGET_HEAD_SHA }}
           path: |
+            benchmarks/LFEA/BM2/accuracy-program-baseline-v1.json
+            evidence/m032-b/bm2-junction-reporting-axis-what-if.json
             reports/bm2-consolidated-latest-output.json
             reports/bm2-nonfriction-linear-fea-out-of-tolerance.json
             reports/bm2-nonfriction-linear-fea-out-of-tolerance.csv
             reports/bm2-app-nonfriction-node-reverse-engineering.json
             reports/bm2-app-nonfriction-node-reverse-engineering.csv
+            reports/bm2-accuracy-program-clusters.json
+            reports/bm2-accuracy-program-clusters.csv
             /tmp/m031-bm2-qualified.log
             /tmp/m031-bm2-consolidated.log
             /tmp/m031-bm2-app-nonfriction.log
+            /tmp/m032-bm2-accuracy.log
+            /tmp/m032-bm2-junction-reporting-axis.log
             /tmp/m031-bm2-report.sha256
           if-no-files-found: error
           retention-days: 30
