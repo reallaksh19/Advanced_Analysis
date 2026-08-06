@@ -256,3 +256,24 @@ export {
   INPUTXML_LINEAR_B31_EVALUATION_REQUEST_SCHEMA,
   evaluateInputXmlLinearB31,
 } from './inputxml-linear-b31-evaluation.js';
+
+export {
+  INPUTXML_LINEAR_ANALYSIS_RESULT_PACKAGE_KEYS,
+  INPUTXML_LINEAR_ANALYSIS_RESULT_PACKAGE_SCHEMA,
+  InputXmlLinearAnalysisResultPackageError,
+  inputXmlAnalysisResultPackageEvidenceProjection,
+  inputXmlAnalysisResultPackageSemanticProjection,
+  requireInputXmlLinearAnalysisResultPackage,
+  sealInputXmlLinearAnalysisResultPackage,
+} from './inputxml-linear-analysis-result-package-contract.js';
+
+export {
+  INPUTXML_LINEAR_ANALYSIS_RESULT_PACKAGE_REQUEST_KEYS,
+  INPUTXML_LINEAR_ANALYSIS_RESULT_PACKAGE_REQUEST_SCHEMA,
+  packageInputXmlLinearAnalysisResults,
+} from './inputxml-linear-analysis-result-package.js';
+
+export {
+  exportInputXmlLinearAnalysisResultEvidenceCsv,
+  exportInputXmlLinearAnalysisResultPackageJson,
+} from './inputxml-linear-analysis-result-export.js';
