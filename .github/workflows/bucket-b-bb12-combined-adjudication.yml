@@ -1,0 +1,469 @@
+name: Bucket B BB-12 combined adjudication
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/bucket-b-bb12-combined-adjudication.yml'
+      - 'docs/Bucket_B_BB12_Combined_Adjudication_Record.md'
+      - 'docs/LAFEA_BB12_Combined_Adjudication_Qualification_and_Work_Pack.md'
+      - 'src/core/bucket-b/bb12-check.mjs'
+      - 'src/core/bucket-b/bb12-combined-adjudication.js'
+      - 'src/core/bucket-b/index.js'
+      - 'tests/bucket-b-bb12-combined-adjudication.test.mjs'
+  workflow_dispatch:
+    inputs:
+      expected_head_sha:
+        description: Exact candidate head SHA; defaults to the dispatched ref.
+        required: false
+        type: string
+      expected_base_sha:
+        description: Exact live current-main base SHA.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: bucket-b-bb12-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  BB10_ARTIFACT_ID: '8901921021'
+  BB10_ARTIFACT_DIGEST: sha256:317731aefd35b87bce2b7221704a1e34753aba97bb4513310001b407346b74b7
+  BB10_MERGE_SHA: 1e7cbb13a9da66bad2d27da3fc31d7edebad5ed4
+  BB11_FINAL_ARTIFACT_ID: '8954712183'
+  BB11_FINAL_ARTIFACT_DIGEST: sha256:7dc5619ab867bcb7a977a8169c814a158bad2fe63f92999e7985a78f6d555ed1
+  BB11_RAW_ARTIFACT_ID: '8954711905'
+  BB11_RAW_ARTIFACT_DIGEST: sha256:6d11e67172b7f09303ee52d007e5f2de11d929fc72b954b0b080f1ec316ed248
+  BB11_MERGE_SHA: 07ce017eb7113517cc032771f7717f88c0a93d4c
+  NODE_OPTIONS: --max-old-space-size=7168
+  TZ: UTC
+  LC_ALL: C
+
+jobs:
+  preflight:
+    name: BB-12 exact-head preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      head_sha: ${{ steps.refs.outputs.head_sha }}
+      base_sha: ${{ steps.base.outputs.base_sha }}
+    steps:
+      - name: Resolve exact candidate head
+        id: refs
+        shell: bash
+        env:
+          DISPATCH_HEAD_SHA: ${{ inputs.expected_head_sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          head_sha="${DISPATCH_HEAD_SHA:-${PR_HEAD_SHA:-${GITHUB_SHA}}}"
+          [[ "$head_sha" =~ ^[0-9a-fA-F]{40}$ ]]
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.refs.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Resolve and enforce live current-main base
+        id: base
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_BASE_SHA: ${{ inputs.expected_base_sha }}
+          EXACT_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          current_main="$(git rev-parse origin/main)"
+          if [[ "$EVENT_NAME" == 'workflow_dispatch' ]]; then
+            base_sha="$DISPATCH_BASE_SHA"
+          else
+            base_sha="$(git merge-base origin/main "$EXACT_HEAD_SHA")"
+          fi
+          [[ "$base_sha" =~ ^[0-9a-fA-F]{40}$ ]]
+          test "$base_sha" = "$current_main"
+          test "$(git rev-parse HEAD)" = "$EXACT_HEAD_SHA"
+          git merge-base --is-ancestor "$base_sha" "$EXACT_HEAD_SHA"
+          git merge-base --is-ancestor "$BB10_MERGE_SHA" "$EXACT_HEAD_SHA"
+          git merge-base --is-ancestor "$BB11_MERGE_SHA" "$EXACT_HEAD_SHA"
+          test "$(git rev-list --count "${EXACT_HEAD_SHA}..origin/main")" = '0'
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify exact seven-path scope
+        shell: bash
+        env:
+          EXACT_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          BASE_SHA: ${{ steps.base.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          git diff --check "${BASE_SHA}...${EXACT_HEAD_SHA}"
+          mapfile -t paths < <(git diff --name-only "${BASE_SHA}...${EXACT_HEAD_SHA}")
+          test "${#paths[@]}" -eq 7
+          for path in "${paths[@]}"; do
+            case "$path" in
+              .github/workflows/bucket-b-bb12-combined-adjudication.yml|\
+              docs/Bucket_B_BB12_Combined_Adjudication_Record.md|\
+              docs/LAFEA_BB12_Combined_Adjudication_Qualification_and_Work_Pack.md|\
+              src/core/bucket-b/bb12-check.mjs|\
+              src/core/bucket-b/bb12-combined-adjudication.js|\
+              src/core/bucket-b/index.js|\
+              tests/bucket-b-bb12-combined-adjudication.test.mjs) ;;
+              *) echo "BB-12 changed-path violation: $path" >&2; exit 1 ;;
+            esac
+          done
+          mkdir -p reports/preflight/prerequisites
+          git diff --name-status "${BASE_SHA}...${EXACT_HEAD_SHA}" > reports/preflight/changed-paths.tsv
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const rows = readFileSync('reports/preflight/changed-paths.tsv', 'utf8')
+            .trim().split('\n').filter(Boolean).map((line) => {
+              const fields = line.split('\t');
+              return fields[0].startsWith('R')
+                ? { status: 'R', oldPath: fields[1], path: fields[2] }
+                : { status: fields[0], path: fields[1] };
+            }).sort((a, b) => a.path.localeCompare(b.path));
+          writeFileSync('reports/preflight/changed-paths.json', `${JSON.stringify(rows, null, 2)}\n`);
+          NODE
+
+      - name: Verify BB-12 syntax and contract tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check src/core/bucket-b/bb12-combined-adjudication.js
+          node --check src/core/bucket-b/bb12-check.mjs
+          node --test tests/bucket-b-bb12-combined-adjudication.test.mjs
+
+      - name: Replay BB-00 through BB-05 at exact head
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          BB11_UPSTREAM_BB10_APPROVED_HEAD_SHA: bcd0add8859a08c322d23595f788a1f99afd539a
+          BB11_SHARED_REPLAY_REPORT_PATH: reports/preflight/prerequisites/bucket-b-bb00-bb05-report.json
+        run: |
+          node src/core/bucket-b/bb11-shared-gate-replay.mjs \
+            > reports/preflight/prerequisites/bb00-bb05.stdout.log \
+            2> reports/preflight/prerequisites/bb00-bb05.stderr.log
+
+      - name: Replay BB-06 through BB-09 at exact head
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          BB06_REPORT_PATH: reports/preflight/prerequisites/bucket-b-bb06-report.json
+          BB07_REPORT_PATH: reports/preflight/prerequisites/bucket-b-bb07-report.json
+          BB08_REPORT_PATH: reports/preflight/prerequisites/bucket-b-bb08-report.json
+          BB09_REPORT_PATH: reports/preflight/prerequisites/bucket-b-bb09-report.json
+        run: |
+          set -euo pipefail
+          node src/core/bucket-b/bb06-check.mjs
+          node src/core/bucket-b/bb07-check.mjs
+          node src/core/bucket-b/bb08-check.mjs
+          node src/core/bucket-b/bb09-check.mjs
+
+      - name: Upload preflight evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: bucket-b-bb12-preflight-${{ steps.refs.outputs.head_sha }}-${{ github.run_attempt }}
+          path: reports/preflight
+          if-no-files-found: error
+          retention-days: 30
+
+  core-replay:
+    name: ${{ matrix.label }}
+    needs: preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - label: BB-10 core replay A
+            package: bb10
+            suffix: a
+          - label: BB-10 core replay B
+            package: bb10
+            suffix: b
+          - label: BB-11 core replay A
+            package: bb11
+            suffix: a
+          - label: BB-11 core replay B
+            package: bb11
+            suffix: b
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.preflight.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Execute isolated core replay
+        shell: bash
+        env:
+          EXACT_HEAD_SHA: ${{ needs.preflight.outputs.head_sha }}
+          PACKAGE: ${{ matrix.package }}
+          SUFFIX: ${{ matrix.suffix }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXACT_HEAD_SHA"
+          mkdir -p reports/core
+          node "src/core/bucket-b/${PACKAGE}-check.mjs" --core \
+            > "reports/core/${PACKAGE}-run-${SUFFIX}.json" \
+            2> "reports/core/${PACKAGE}-run-${SUFFIX}.stderr.log"
+
+      - name: Upload isolated core replay
+        uses: actions/upload-artifact@v4
+        with:
+          name: bucket-b-bb12-core-${{ matrix.package }}-${{ matrix.suffix }}-${{ needs.preflight.outputs.head_sha }}-${{ github.run_attempt }}
+          path: reports/core
+          if-no-files-found: error
+          retention-days: 30
+
+  qualify-bb12:
+    name: Exact-head BB-12 combined adjudication
+    needs: [preflight, core-replay]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.preflight.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Re-enforce live current-main base after core replay
+        id: base
+        shell: bash
+        env:
+          EXACT_HEAD_SHA: ${{ needs.preflight.outputs.head_sha }}
+          QUALIFIED_BASE_SHA: ${{ needs.preflight.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          current_main="$(git rev-parse origin/main)"
+          test "$current_main" = "$QUALIFIED_BASE_SHA"
+          test "$(git rev-parse HEAD)" = "$EXACT_HEAD_SHA"
+          test "$(git merge-base origin/main "$EXACT_HEAD_SHA")" = "$QUALIFIED_BASE_SHA"
+          test "$(git rev-list --count "${EXACT_HEAD_SHA}..origin/main")" = '0'
+          git merge-base --is-ancestor "$BB10_MERGE_SHA" "$EXACT_HEAD_SHA"
+          git merge-base --is-ancestor "$BB11_MERGE_SHA" "$EXACT_HEAD_SHA"
+          echo "base_sha=$QUALIFIED_BASE_SHA" >> "$GITHUB_OUTPUT"
+          echo "current_main=$current_main" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Download preflight evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: bucket-b-bb12-preflight-${{ needs.preflight.outputs.head_sha }}-${{ github.run_attempt }}
+          path: reports/preflight
+
+      - name: Download isolated core replays
+        uses: actions/download-artifact@v4
+        with:
+          pattern: bucket-b-bb12-core-*-${{ needs.preflight.outputs.head_sha }}-${{ github.run_attempt }}
+          path: reports/same-head-core
+          merge-multiple: true
+
+      - name: Download and validate retained BB-10 and BB-11 artifacts
+        id: retained
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p retained/bb10 retained/bb11
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${BB10_ARTIFACT_ID}" > retained/bb10-meta.json
+          test "$(jq -r .digest retained/bb10-meta.json)" = "$BB10_ARTIFACT_DIGEST"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${BB10_ARTIFACT_ID}/zip" > retained/bb10.zip
+          unzip -q retained/bb10.zip -d retained/bb10
+          bb10_report="$(find retained/bb10 -type f -name 'bucket-b-bb10-axisymmetric-registration-report.json' -print -quit)"
+          test -n "$bb10_report"
+
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${BB11_FINAL_ARTIFACT_ID}" > retained/bb11-meta.json
+          test "$(jq -r .digest retained/bb11-meta.json)" = "$BB11_FINAL_ARTIFACT_DIGEST"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${BB11_FINAL_ARTIFACT_ID}/zip" > retained/bb11.zip
+          unzip -q retained/bb11.zip -d retained/bb11
+          bb11_report="$(find retained/bb11 -type f -name 'bucket-b-bb11-report.json' -print -quit)"
+          test -n "$bb11_report"
+          test "$(sha256sum "$bb11_report" | awk '{print "sha256:"$1}')" = 'sha256:8c934ab946d212f8f9b5415f40f185c5eb7bf5f467a4211caf31a5d91c42e1fe'
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${BB11_RAW_ARTIFACT_ID}" > retained/bb11-raw-meta.json
+          test "$(jq -r .digest retained/bb11-raw-meta.json)" = "$BB11_RAW_ARTIFACT_DIGEST"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${BB11_RAW_ARTIFACT_ID}/zip" > retained/bb11-raw.zip
+          mkdir -p retained/bb11-raw
+          unzip -q retained/bb11-raw.zip -d retained/bb11-raw
+          bb11_core_stdout="$(find retained/bb11-raw -type f -name 'bucket-b-bb11-stdout.json' -print -quit)"
+          test -n "$bb11_core_stdout"
+          echo "bb10_report=$bb10_report" >> "$GITHUB_OUTPUT"
+          echo "bb11_report=$bb11_report" >> "$GITHUB_OUTPUT"
+          echo "bb11_core_stdout=$bb11_core_stdout" >> "$GITHUB_OUTPUT"
+
+      - name: Validate byte-identical BB-10 and BB-11 core replay
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmp reports/same-head-core/bb10-run-a.json reports/same-head-core/bb10-run-b.json
+          cmp reports/same-head-core/bb10-run-a.stderr.log reports/same-head-core/bb10-run-b.stderr.log
+          cmp reports/same-head-core/bb11-run-a.json reports/same-head-core/bb11-run-b.json
+          cmp reports/same-head-core/bb11-run-a.stderr.log reports/same-head-core/bb11-run-b.stderr.log
+          cmp reports/same-head-core/bb11-run-a.json '${{ steps.retained.outputs.bb11_core_stdout }}'
+
+      - name: Upload BB-12 prerequisite custody
+        id: prerequisite_artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bucket-b-bb12-prerequisites-${{ needs.preflight.outputs.head_sha }}-${{ github.run_attempt }}
+          path: |
+            reports/preflight/prerequisites
+            reports/same-head-core
+            retained/bb10-meta.json
+            retained/bb11-meta.json
+            retained/bb11-raw-meta.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Execute BB-12 combined adjudication twice
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ needs.preflight.outputs.head_sha }}
+          EXPECTED_BASE_SHA: ${{ steps.base.outputs.base_sha }}
+          CURRENT_MAIN_SHA: ${{ steps.base.outputs.current_main }}
+          BB12_CHANGED_PATHS_PATH: reports/preflight/changed-paths.json
+          BB12_BB00_BB05_REPORT_PATH: reports/preflight/prerequisites/bucket-b-bb00-bb05-report.json
+          BB12_BB06_REPORT_PATH: reports/preflight/prerequisites/bucket-b-bb06-report.json
+          BB12_BB07_REPORT_PATH: reports/preflight/prerequisites/bucket-b-bb07-report.json
+          BB12_BB08_REPORT_PATH: reports/preflight/prerequisites/bucket-b-bb08-report.json
+          BB12_BB09_REPORT_PATH: reports/preflight/prerequisites/bucket-b-bb09-report.json
+          BB12_RETAINED_BB10_REPORT_PATH: ${{ steps.retained.outputs.bb10_report }}
+          BB12_RETAINED_BB11_REPORT_PATH: ${{ steps.retained.outputs.bb11_report }}
+          BB12_SAME_HEAD_BB10_RUN_A_PATH: reports/same-head-core/bb10-run-a.json
+          BB12_SAME_HEAD_BB10_RUN_B_PATH: reports/same-head-core/bb10-run-b.json
+          BB12_SAME_HEAD_BB10_STDERR_A_PATH: reports/same-head-core/bb10-run-a.stderr.log
+          BB12_SAME_HEAD_BB10_STDERR_B_PATH: reports/same-head-core/bb10-run-b.stderr.log
+          BB12_SAME_HEAD_BB11_RUN_A_PATH: reports/same-head-core/bb11-run-a.json
+          BB12_SAME_HEAD_BB11_RUN_B_PATH: reports/same-head-core/bb11-run-b.json
+          BB12_SAME_HEAD_BB11_STDERR_A_PATH: reports/same-head-core/bb11-run-a.stderr.log
+          BB12_SAME_HEAD_BB11_STDERR_B_PATH: reports/same-head-core/bb11-run-b.stderr.log
+          BB12_BB10_ARTIFACT_ID: ${{ env.BB10_ARTIFACT_ID }}
+          BB12_BB10_ARTIFACT_DIGEST: ${{ env.BB10_ARTIFACT_DIGEST }}
+          BB12_BB11_FINAL_ARTIFACT_ID: ${{ env.BB11_FINAL_ARTIFACT_ID }}
+          BB12_BB11_FINAL_ARTIFACT_DIGEST: ${{ env.BB11_FINAL_ARTIFACT_DIGEST }}
+        run: |
+          set -euo pipefail
+          mkdir -p reports/bb12
+          BB12_OUTPUT_DIR=reports/bb12/run-a node src/core/bucket-b/bb12-check.mjs \
+            > reports/bb12/run-a.stdout.log 2> reports/bb12/run-a.stderr.log
+          BB12_OUTPUT_DIR=reports/bb12/run-b node src/core/bucket-b/bb12-check.mjs \
+            > reports/bb12/run-b.stdout.log 2> reports/bb12/run-b.stderr.log
+          diff -r reports/bb12/run-a reports/bb12/run-b
+          cmp reports/bb12/run-a.stdout.log reports/bb12/run-b.stdout.log
+          cmp reports/bb12/run-a.stderr.log reports/bb12/run-b.stderr.log
+
+      - name: Upload raw BB-12 evidence
+        id: raw_artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bucket-b-bb12-raw-${{ needs.preflight.outputs.head_sha }}-${{ github.run_attempt }}
+          path: |
+            reports/preflight/changed-paths.json
+            reports/bb12/run-a
+            reports/bb12/run-b
+            reports/bb12/run-a.stdout.log
+            reports/bb12/run-b.stdout.log
+            reports/bb12/run-a.stderr.log
+            reports/bb12/run-b.stderr.log
+            reports/preflight/prerequisites
+            reports/same-head-core
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Generate byte-identical finalized BB-12 reports
+        shell: bash
+        env:
+          BB12_RUN_A_DIR: reports/bb12/run-a
+          BB12_RUN_B_DIR: reports/bb12/run-b
+          BB12_RUN_A_STDOUT_PATH: reports/bb12/run-a.stdout.log
+          BB12_RUN_B_STDOUT_PATH: reports/bb12/run-b.stdout.log
+          BB12_RUN_A_STDERR_PATH: reports/bb12/run-a.stderr.log
+          BB12_RUN_B_STDERR_PATH: reports/bb12/run-b.stderr.log
+          BB12_ARTIFACT_ID: ${{ steps.raw_artifact.outputs.artifact-id }}
+          BB12_ARTIFACT_DIGEST: sha256:${{ steps.raw_artifact.outputs.artifact-digest }}
+        run: |
+          set -euo pipefail
+          BB12_OUTPUT_DIR=reports/bb12/final-a node src/core/bucket-b/bb12-check.mjs --finalize \
+            > reports/bb12/final-a.stdout.json
+          BB12_OUTPUT_DIR=reports/bb12/final-b node src/core/bucket-b/bb12-check.mjs --finalize \
+            > reports/bb12/final-b.stdout.json
+          cmp reports/bb12/final-a/bucket-b-bb12-report.json reports/bb12/final-b/bucket-b-bb12-report.json
+          cmp reports/bb12/final-a.stdout.json reports/bb12/final-b.stdout.json
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFile } from 'node:fs/promises';
+          const report = JSON.parse(await readFile('reports/bb12/final-a/bucket-b-bb12-report.json', 'utf8'));
+          assert.equal(report.status, 'BB12_BUCKET_B_PROGRAMME_ADJUDICATED');
+          assert.equal(report.bucketBProgrammeEvidenceComplete, true);
+          assert.equal(report.bucketBCombinedAdjudicationQualified, true);
+          assert.equal(report.bucketBProgrammeCompletionRecorded, true);
+          assert.equal(report.codeAssessmentQualified, false);
+          assert.equal(report.moduleQualified, false);
+          assert.equal(report.applicationModulePromoted, false);
+          assert.equal(report.productionSwitchAuthorized, false);
+          assert.equal(report.bucket01Qualified, 'UNCHANGED');
+          assert.equal(report.commitsBehindMain, 0);
+          NODE
+
+      - name: Upload final BB-12 report
+        id: final_artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bucket-b-bb12-final-${{ needs.preflight.outputs.head_sha }}-${{ github.run_attempt }}
+          path: |
+            reports/bb12/final-a/bucket-b-bb12-report.json
+            reports/bb12/final-b/bucket-b-bb12-report.json
+            reports/bb12/final-a.stdout.json
+            reports/bb12/final-b.stdout.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish BB-12 workflow custody summary
+        shell: bash
+        run: |
+          {
+            echo '### BB-12 exact-head custody'
+            echo ''
+            echo '- Exact head: `${{ needs.preflight.outputs.head_sha }}`'
+            echo '- Base/current main: `${{ steps.base.outputs.base_sha }}`'
+            echo '- Prerequisite artifact ID: `${{ steps.prerequisite_artifact.outputs.artifact-id }}`'
+            echo '- Prerequisite digest: `sha256:${{ steps.prerequisite_artifact.outputs.artifact-digest }}`'
+            echo '- Raw artifact ID: `${{ steps.raw_artifact.outputs.artifact-id }}`'
+            echo '- Raw artifact digest: `sha256:${{ steps.raw_artifact.outputs.artifact-digest }}`'
+            echo '- Final artifact ID: `${{ steps.final_artifact.outputs.artifact-id }}`'
+            echo '- Final artifact digest: `sha256:${{ steps.final_artifact.outputs.artifact-digest }}`'
+          } >> "$GITHUB_STEP_SUMMARY"
