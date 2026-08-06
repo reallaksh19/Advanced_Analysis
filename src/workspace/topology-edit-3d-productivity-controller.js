@@ -33,6 +33,7 @@ export class TopologyEdit3DViewController extends AuthoringController {
     const sidecar = this.hostElement?.querySelector('[data-role="topology-edit-sidecar"]');
     if (sidecar) sidecar.tabIndex = -1;
     this.cleanShellRuntime.mount(this.hostElement);
+    this.cleanShellRuntime.openPanel('authoring');
   }
 
   deriveVisual(canonical, modelRole) {
@@ -72,6 +73,7 @@ export class TopologyEdit3DViewController extends AuthoringController {
   restoreDisplayState(viewState = {}) {
     super.restoreDisplayState(viewState);
     this.cleanShellRuntime.restoreViewState(viewState.cleanShell);
+    this.cleanShellRuntime.openPanel('authoring');
   }
 
   reloadDraft() {
