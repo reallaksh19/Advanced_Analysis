@@ -43,7 +43,7 @@ test('production HUD authors a governed reducer with preview, validation, undo, 
   const diagnostics = collectBrowserDiagnostics(page);
   const host = await openProductionController(page);
   const initial = await topologySnapshot(page);
-  const target = await eligibleHostEdge(page, 150, 168.3, 300);
+  const target = await eligibleHostEdge(page, 150, 168.3, 300, 'P-003');
 
   await selectCanonicalEdgeFromTree(page, host, target.id);
   await page.locator('[data-action="activate-authoring-reducer"]').click();
@@ -118,8 +118,14 @@ async function selectCanonicalEdgeFromTree(page, host, edgeId) {
   await filter.fill('');
 }
 
-async function eligibleHostEdge(page, nominalSizeMm, outsideDiameterMm, componentLengthMm) {
-  return page.evaluate(({ nominal, outside, length }) => {
+async function eligibleHostEdge(
+  page,
+  nominalSizeMm,
+  outsideDiameterMm,
+  componentLengthMm,
+  preferredComponentKey = null,
+) {
+  return page.evaluate(({ nominal, outside, length, preferred }) => {
     const topology = globalThis.__COMPONENT_AUTHORING_CONTROLLER__.session.currentTopology();
     const nodes = new Map(topology.nodes.map((node) => [node.id, node]));
     const dependentEdgeIds = new Set();
@@ -133,6 +139,7 @@ async function eligibleHostEdge(page, nominalSizeMm, outsideDiameterMm, componen
       const type = String(edge.entityType ?? '').toUpperCase();
       if (!['PIPE', 'STRAIGHT', 'STRAIGHT_ELEMENT'].includes(type)) return [];
       if (dependentEdgeIds.has(edge.id)) return [];
+      if (preferred && edge.componentKey !== preferred) return [];
       if (Math.abs(Number(edge.diameterMm) - nominal) > 1e-9) return [];
       if (Math.abs(Number(edge.outsideDiameterMm) - outside) > 1e-9) return [];
       const from = nodes.get(edge.fromNodeId)?.position;
@@ -145,7 +152,12 @@ async function eligibleHostEdge(page, nominalSizeMm, outsideDiameterMm, componen
       throw new Error(`No dependency-free DN${nominal} host edge accepts ${length} mm.`);
     }
     return candidates[0];
-  }, { nominal: nominalSizeMm, outside: outsideDiameterMm, length: componentLengthMm });
+  }, {
+    nominal: nominalSizeMm,
+    outside: outsideDiameterMm,
+    length: componentLengthMm,
+    preferred: preferredComponentKey,
+  });
 }
 
 async function previewValidateApply(page, host, commandCount) {
