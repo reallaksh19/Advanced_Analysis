@@ -66,7 +66,23 @@ export class TopologyEdit3DViewController extends ProfessionalController {
 
   refreshView(canonical) {
     super.refreshView(canonical);
+    this.exposeAuthoredRenderRoles();
     this.authoringRuntime.canonicalChanged(canonical);
+  }
+
+  exposeAuthoredRenderRoles() {
+    const draftGroup = this.viewportBackend?.groups?.draftGroup;
+    if (!draftGroup) return;
+    let authoredPartCount = 0;
+    draftGroup.traverse((object) => {
+      const partRole = object.userData?.pickTarget?.partRole;
+      if (!partRole) return;
+      object.userData.partRole = partRole;
+      if (String(partRole).startsWith('authored-')) authoredPartCount += 1;
+    });
+    if (this.hostElement) {
+      this.hostElement.dataset.topologyEditAuthoredRenderPartCount = String(authoredPartCount);
+    }
   }
 
   handleHostClick(event) {
