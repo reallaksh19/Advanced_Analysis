@@ -47,17 +47,23 @@ console.log(JSON.stringify({
   resolvedRowCount: calculation.resolvedRowCount,
   blockedRowCount: calculation.blockedRowCount,
   branchScheduleSummary: calculation.branchScheduleSummary,
-  sourceCrosswalkSummary: countBy(calculation.rows, (row) => `${row.sourceRecordMatched ? 'MATCHED' : 'UNMATCHED'}:${row.sourceRecordName || 'NONE'}:${row.branchPath || 'NO_BRANCH'}:${row.componentType || 'NO_TYPE'}`),
+  blockedDimensionInputs: countBy(
+    calculation.rows.filter((row) => row.blockers.some((item) => item.field === 'section.dimensionsMm')),
+    (row) => `DN=${row.nominalBoreMm}|SCH=${row.schedule}|BRANCH=${row.branchPath}`,
+  ),
   defaultUsageSummary: calculation.resolutionReceipt.summary,
 }, null, 2));
 console.log('EMPIRICAL_SJSON_1885_POS_SECTION_MATERIAL_END');
 
 if (calculation.blockedRowCount > 0) {
-  const sample = calculation.rows.filter((row) => row.status !== 'RESOLVED').slice(0, 20)
+  const sample = calculation.rows.filter((row) => row.status !== 'RESOLVED').slice(0, 30)
     .map((row) => [
       row.posId,
       `topology=${row.componentType}:${row.componentName}`,
       `source=${row.sourceRecordMatched ? `${row.sourceRecordName}:${row.branchPath}` : 'UNMATCHED'}`,
+      `DN=${row.nominalBoreMm}`,
+      `SCH=${row.schedule}`,
+      `dimensionReason=${row.resolutions?.dimensionsMm?.reason || 'NONE'}`,
       `blockers=${row.blockers.map((item) => `${item.field}=${item.status}:${item.reason}`).join(', ')}`,
     ].join(' '));
   throw new Error(`POS section/material resolution blocked ${calculation.blockedRowCount} row(s). ${sample.join(' | ')}`);
