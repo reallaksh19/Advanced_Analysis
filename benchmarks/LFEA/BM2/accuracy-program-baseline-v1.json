@@ -1,0 +1,29 @@
+{
+  "schema": "lfea-bm2-accuracy-program-baseline/v1",
+  "benchmark": "BM2",
+  "baselineId": "M032_BM2_M031_QUALIFIED_HEAD_14043398",
+  "sourceBranch": "agent/m031-bm2-strict-gaps",
+  "sourceHeadSha": "140433982e60dbc6add0b4b8b1785a494fbe69b5",
+  "sourceWorkflowRunId": 31055441682,
+  "comparisonPolicyAuthority": "scripts/lfea-b3.26-bm2-output-comparison-runtime.mjs",
+  "comparisonScope": "FULL_RETAINED_STATION_ROWS",
+  "coverageMetric": "FULL_RETAINED_STATION_SCALARS",
+  "strictCases": [
+    "OPE",
+    "SUS",
+    "EXP"
+  ],
+  "fullStationScalarDenominator": 5598,
+  "baselinePassingScalars": 4404,
+  "baselineFailingScalars": 1194,
+  "minimumPassingScalars": 4404,
+  "maximumFailingScalars": 1194,
+  "requiredCoverageStatus": "COMPLETE",
+  "requiredUnresolvedClassificationRows": 0,
+  "requiredUnmatchedSolverRows": 0,
+  "requiredUntracedScalars": 0,
+  "promotionRule": "UNCHANGED_DENOMINATOR_AND_COVERAGE_WITH_NO_PASS_COUNT_REGRESSION",
+  "parityRule": "ALL_5598_SCALARS_MUST_PASS_THE_UNCHANGED_COMPARISON_POLICY",
+  "equationChanges": [],
+  "toleranceChanges": []
+}
