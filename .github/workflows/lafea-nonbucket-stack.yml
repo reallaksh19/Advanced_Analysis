@@ -1,0 +1,66 @@
+name: LAFEA Non-Bucket Stack Certification
+
+on:
+  pull_request:
+    paths:
+      - 'src/workspace/lafea-**'
+      - 'src/workspace/fea-**'
+      - 'src/core/lafea-**'
+      - 'scripts/lafea-**'
+      - 'docs/LAFEA_**'
+      - '.github/workflows/lafea-nonbucket-stack.yml'
+      - 'package.json'
+      - 'package-lock.json'
+
+permissions:
+  contents: read
+
+jobs:
+  wp-mc1-exact-head:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: WP-MC1 focused contracts
+        run: |
+          node scripts/lafea-nb-t4a-analysis-mesh-custody-check.mjs
+          node scripts/lafea-nb-t4a-analysis-mesh-custody-controller-check.mjs
+          node scripts/lafea-nb-t4a-analysis-mesh-live-store-check.mjs
+          node scripts/lafea-nb-t4a-analysis-mesh-adversarial-check.mjs
+          node scripts/lafea-nb-t4a-analysis-mesh-live-transaction-check.mjs
+          node scripts/lafea-nb-t4a-analysis-mesh-public-facade-check.mjs
+      - name: Bounded non-bucket aggregate
+        continue-on-error: true
+        run: npm run check:lafea-nonbucket-stack
+      - name: Retained LAFEA core and workbench
+        run: |
+          npm run check:lafea-core
+          npm run check:lafea-workbench
+      - name: Syntax and imports
+        run: |
+          npm run syntax:strict
+          npm run check:imports
+      - name: Production build attribution
+        continue-on-error: true
+        run: npm run build
+      - name: Hybrid workbench browser scope
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: '0'
+        run: |
+          npx playwright install --with-deps chromium
+          node scripts/run-playwright.mjs e2e/lafea-hybrid-workbench.spec.js
+      - name: Repository integration attribution
+        continue-on-error: true
+        run: npm run gate
+      - name: Patch hygiene
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git diff --check "$PR_BASE_SHA...HEAD"
+          test -z "$(git status --short)"

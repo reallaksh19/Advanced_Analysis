@@ -146,6 +146,18 @@ export {
   registerLafeaAnalysisMeshEvidence,
 } from './lafea-analysis-mesh-evidence.js';
 export {
+  LAFEA_ANALYSIS_MESH_CUSTODY_SCHEMA,
+  LAFEA_ANALYSIS_MESH_CUSTODY_STATES,
+  selectLafeaAnalysisMeshCustody,
+} from './lafea-analysis-mesh-custody.js';
+export {
+  LAFEA_ANALYSIS_MESH_CUSTODY_PROJECTION_SCHEMA,
+  buildAnalysisMeshCustodyProjection,
+} from './lafea-analysis-mesh-custody-projection.js';
+export {
+  validateLafeaAnalysisMeshEvidence,
+} from './lafea-analysis-mesh-evidence-validator.js';
+export {
   LAFEA_RECOVERY_RENDER_DISPLAY_FIELD_SCHEMA,
   LAFEA_RECOVERY_RENDER_FEA_STAGES,
   LAFEA_RECOVERY_RENDER_FIELD_REQUEST_SCHEMA,

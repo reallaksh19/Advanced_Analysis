@@ -14,7 +14,11 @@ const productProducers = read('../src/workspace/lafea-analytical-product-produce
 const productComponents = read('../src/workspace/lafea-stage-product-components.js');
 const foundationCompiler = read('../src/core/local-load-foundation/compile.js');
 const screeningProduct = read('../src/core/local-attachment-screening/product-assessment.js');
-const lifecycleStore = read('../src/workspace/lafea-lifecycle-workbench-store.js');
+const lifecycleStore = [
+  read('../src/workspace/lafea-lifecycle-workbench-store.js'),
+  read('../src/workspace/lafea-lifecycle-workbench-store-core.js'),
+  read('../src/workspace/lafea-analysis-mesh-workbench-store.js'),
+].join('\n');
 const registry = read('../src/workspace/lafea-stage-registry.js');
 const bindings = read('../src/workspace/lafea-stage-composition-bindings.js');
 const compositionRoot = read('../src/workspace/lafea-stage-composition-root.js');
@@ -23,8 +27,8 @@ const presenterIndex = read('../src/workspace/lafea-result-presenters/index.js')
 
 const registeredChecks = [...aggregator.matchAll(/['"](scripts\/[A-Za-z0-9._-]+\.mjs)['"]/gu)]
   .map((match) => match[1]);
-assert.ok(registeredChecks.length >= 34,
-  'The non-bucket aggregate must retain NB-T0 through PR-NB1-A and U0-U4.');
+assert.ok(registeredChecks.length >= 37,
+  'The non-bucket aggregate must retain NB-T0 through PR-NB1-A, WP-MC1 and U0-U4.');
 assert.equal(new Set(registeredChecks).size, registeredChecks.length,
   'The non-bucket aggregate cannot register duplicate checks.');
 
@@ -33,6 +37,9 @@ for (const required of [
   'scripts/lafea-nonbucket-lifecycle-profiles-check.mjs',
   'scripts/lafea-nb-t2-source-producer-check.mjs',
   'scripts/lafea-nb-t3-composition-root-check.mjs',
+  'scripts/lafea-nb-t4a-analysis-mesh-custody-check.mjs',
+  'scripts/lafea-nb-t4a-analysis-mesh-custody-controller-check.mjs',
+  'scripts/lafea-nb-t4a-analysis-mesh-live-store-check.mjs',
   'scripts/lafea-nb1-analytical-verticals-check.mjs',
   'scripts/lafea-u1-stage-registry-check.mjs',
   'scripts/lafea-u1b-registry-consumer-check.mjs',
@@ -107,6 +114,8 @@ assert.match(lifecycleStore, /CALCULATION_ACCEPTED_BY_STAGE_CONTRACT/u);
 assert.match(lifecycleStore, /RESULT_READY/u);
 assert.match(lifecycleStore, /CODE_NOT_READY/u);
 assert.match(lifecycleStore, /RELEASE_NOT_QUALIFIED/u);
+assert.match(lifecycleStore, /registerAnalysisMeshEvidence/u);
+assert.match(lifecycleStore, /recoverAnalysisMeshEvidence/u);
 assert.doesNotMatch(lifecycleStore, /RELEASE_QUALIFIED'\s*:/u);
 
 assert.match(registry, /lafea-stage-registry\/v2/u);
@@ -143,6 +152,7 @@ console.log(JSON.stringify({
   canonicalSha256SourceAuthority: true,
   currentCoreProducerAdapters: true,
   analyticalProductEvidenceIntegrated: true,
+  analysisMeshCustodyIntegrated: true,
   finiteFoundationResultantClosure: true,
   screeningApplicabilityStates: ['PASS', 'ESCALATE', 'BLOCKED'],
   typedSourceEvents: true,

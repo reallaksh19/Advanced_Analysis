@@ -81,13 +81,8 @@ export class LafeaWorkbenchController {
     return this;
   }
 
-  runBenchmark() {
-    return this.benchmarkPanel.run();
-  }
-
-  getBenchmarkReport() {
-    return this.benchmarkPanel.getReport();
-  }
+  runBenchmark() { return this.benchmarkPanel.run(); }
+  getBenchmarkReport() { return this.benchmarkPanel.getReport(); }
 
   async loadFile(file) {
     if (!file) return this.getState();
@@ -108,28 +103,41 @@ export class LafeaWorkbenchController {
     return this.importDocument(createLafeaMockDocument(stageId), stageId);
   }
 
-  exportDocument() {
-    return this.store.exportDocument();
-  }
-
-  exportLifecycle() {
-    return this.store.exportLifecycle();
-  }
-
+  exportDocument() { return this.store.exportDocument(); }
+  exportLifecycle() { return this.store.exportLifecycle(); }
   initializeLifecycle(sourceHash, originRef) {
     return this.store.initializeLifecycle(sourceHash, originRef);
   }
-
-  applyLifecycleEvent(event) {
-    return this.store.applyLifecycleEvent(event);
-  }
-
+  applyLifecycleEvent(event) { return this.store.applyLifecycleEvent(event); }
   registerLifecycleArtifact(record, registrationId) {
     return this.store.registerLifecycleArtifact(record, registrationId);
   }
-
   revalidateLifecycleBinding(sourceHash, originRef) {
     return this.store.revalidateLifecycleBinding(sourceHash, originRef);
+  }
+  validateLafeaAnalysisMeshEvidence(value) {
+    return this.store.validateLafeaAnalysisMeshEvidence(value);
+  }
+  registerAnalysisMeshEvidence(value) {
+    return this.store.registerAnalysisMeshEvidence(value);
+  }
+  selectRetainedAnalysisMeshEvidence(stageId) {
+    return this.store.selectRetainedAnalysisMeshEvidence(stageId);
+  }
+
+  buildAnalysisMeshCustodyProjection(stageId = this.getState().activeStageId) {
+    const stage = this.getState().stages[stageId];
+    return this.store.buildAnalysisMeshCustodyProjection(
+      stage,
+      stage?.retainedAnalysisMeshEvidence ?? null,
+    );
+  }
+
+  exportAnalysisMeshEvidence(stageId = this.getState().activeStageId) {
+    return this.store.exportAnalysisMeshEvidence(stageId);
+  }
+  recoverAnalysisMeshEvidence(value) {
+    return this.store.recoverAnalysisMeshEvidence(value);
   }
 
   getDisplayViewportContext() {
@@ -180,25 +188,18 @@ export class LafeaWorkbenchController {
     }
   }
 
-  run() {
-    return this.store.run();
-  }
-
-  undo() {
-    return this.store.undo();
-  }
-
-  redo() {
-    return this.store.redo();
-  }
-
-  getState() {
-    return this.store.getState();
-  }
+  run() { return this.store.run(); }
+  undo() { return this.store.undo(); }
+  redo() { return this.store.redo(); }
+  getState() { return this.store.getState(); }
 
   downloadDocument() {
     const value = this.exportDocument();
-    downloadJson(this.documentRef, value, `${value.stageId.toLowerCase().replace('.', '-')}-document.json`);
+    downloadJson(
+      this.documentRef,
+      value,
+      `${value.stageId.toLowerCase().replace('.', '-')}-document.json`,
+    );
     return value;
   }
 
@@ -244,7 +245,10 @@ function parseJsonObject(text, label) {
 
 function downloadJson(documentRef, value, filename) {
   if (!documentRef || typeof Blob === 'undefined' || typeof URL === 'undefined') return;
-  const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' }));
+  const url = URL.createObjectURL(new Blob(
+    [JSON.stringify(value, null, 2)],
+    { type: 'application/json' },
+  ));
   const anchor = documentRef.createElement('a');
   anchor.href = url;
   anchor.download = filename;
