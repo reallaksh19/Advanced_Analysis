@@ -95,11 +95,20 @@ function targetMaterial(topology, payloadInput, commandId) {
     generated: generatedIdentities(topology, commandId),
   };
 }
+function assertExactRevisionKeys(request, resolved) {
+  const expectedIds = [resolved.from.id, resolved.to.id].sort();
+  const suppliedIds = Object.keys(request.expectedTargetRevisions ?? {}).sort();
+  if (suppliedIds.length !== 2
+    || suppliedIds.some((id, index) => id !== expectedIds[index])) {
+    fail('expectedTargetRevisions must contain exactly both endpoint IDs.', RangeError);
+  }
+}
 
 export function resolvePipeSegmentCommandTargets(topology, request) {
   assertCanonicalTopologyHash(topology);
   const commandId = requiredText(request?.commandId, 'commandId');
   const resolved = targetMaterial(topology, request?.payload, commandId);
+  assertExactRevisionKeys(request, resolved);
   return deepFreeze({
     nodes: [resolved.from, resolved.to],
     edges: [],
@@ -136,6 +145,7 @@ export function resolvePipeSegment({
     fail('catalogue binding is stale or changed.', RangeError);
   }
   const resolved = targetMaterial(canonicalTopology, request, commandId);
+  assertExactRevisionKeys(request, resolved);
   assertExpectedRevisions(request.expectedTargetRevisions, [resolved.from, resolved.to]);
   const material = {
     schema: PIPE_SEGMENT_RESOLVED_SCHEMA,
