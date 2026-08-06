@@ -1,3 +1,4 @@
+// Guards the corrected kg/cm3-to-kg/m3 source conversion and vertical reactions.
 import { readFile } from 'node:fs/promises';
 
 const [resultPath] = process.argv.slice(2);
