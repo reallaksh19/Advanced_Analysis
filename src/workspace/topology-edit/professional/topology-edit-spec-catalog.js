@@ -22,7 +22,7 @@ const VALVE_TYPES = new Set([
   'BALL', 'BUTTERFLY', 'CHECK', 'CONTROL', 'GATE', 'GLOBE', 'NEEDLE', 'PLUG',
 ]);
 const FLANGE_TYPES = new Set([
-  'WELD_NECK', 'SLIP_ON', 'SOCKET_WELD', 'THREADED', 'LAP_JOINT',
+  'WELD_NECK', 'SLIP_ON', 'SOCKET_WELD', 'THREADED', 'LAP_JOINT', 'BLIND',
 ]);
 const OLET_TYPES = new Set([
   'ELBOLET', 'LATROLET', 'NIPOLET', 'SOCKOLET', 'SWEEPOLET', 'THREDOLET', 'WELDOLET',
@@ -215,6 +215,29 @@ function assertComponentEvidence(record) {
     && record.componentLengthMm !== null
     && Math.abs(record.componentLengthMm - record.valveFaceToFaceMm) > 1e-9) {
     fail('VALVE.componentLengthMm must equal valveFaceToFaceMm.', RangeError);
+  }
+  if (record.componentType === 'FLANGE' && record.flangeType === 'BLIND') {
+    const blindFields = [
+      'componentLengthMm',
+      'componentMassKg',
+      'flangeThicknessMm',
+      'flangeOutsideDiameterMm',
+      'boltCircleDiameterMm',
+      'boltHoleCount',
+      'boltHoleDiameterMm',
+    ];
+    blindFields.forEach((field) => {
+      if (record[field] === null) fail(`FLANGE.BLIND.${field} is required.`, RangeError);
+    });
+    if (Math.abs(record.componentLengthMm - record.flangeThicknessMm) > 1e-9) {
+      fail('FLANGE.BLIND componentLengthMm must equal flangeThicknessMm.', RangeError);
+    }
+    if (record.endConnectionFrom !== 'PIPE_TERMINAL') {
+      fail('FLANGE.BLIND endConnectionFrom must be PIPE_TERMINAL.', RangeError);
+    }
+    if (record.endConnectionTo !== `CLOSED_${record.flangeFacing}`) {
+      fail('FLANGE.BLIND endConnectionTo must equal CLOSED_<facing>.', RangeError);
+    }
   }
   rejectForeignFields(record, 'REDUCER', [
     'secondaryNominalSizeMm', 'secondaryOutsideDiameterMm', 'reducerType', 'reducerOrientation',

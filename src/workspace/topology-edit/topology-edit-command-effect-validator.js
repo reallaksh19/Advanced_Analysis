@@ -156,7 +156,65 @@ function validateInline(context) {
       component ? [component.id] : [],
     ));
   }
+  findings.push(...validateBlindFlangeTerminalEffect(candidate, payload, component, placement));
   return findings;
+}
+function validateBlindFlangeTerminalEffect(candidate, payload, component, placement) {
+  const binding = payload.catalogueBinding ?? {};
+  const blind = String(binding.componentType ?? '').toUpperCase() === 'FLANGE'
+    && String(binding.flangeType ?? '').toUpperCase() === 'BLIND';
+  if (!blind) return [];
+  const facing = String(binding.flangeFacing ?? '').trim().toUpperCase();
+  const closedConnection = facing ? `CLOSED_${facing}` : '';
+  const expectedDirection = placement === 'FROM_BOUNDARY' ? 'TO_FROM' : 'FROM_TO';
+  const terminalNodeId = placement === 'FROM_BOUNDARY'
+    ? component?.fromNodeId
+    : component?.toNodeId;
+  const incident = terminalNodeId
+    ? (candidate.canonicalTopology.edges ?? []).filter((edge) => (
+      edge.fromNodeId === terminalNodeId || edge.toNodeId === terminalNodeId
+    ))
+    : [];
+  const dependants = terminalNodeId ? terminalNodeDependants(
+    candidate.canonicalTopology,
+    terminalNodeId,
+  ) : [];
+  const connectionValid = placement === 'FROM_BOUNDARY'
+    ? component?.endConnectionFrom === closedConnection
+      && component?.endConnectionTo === 'PIPE_TERMINAL'
+    : component?.endConnectionFrom === 'PIPE_TERMINAL'
+      && component?.endConnectionTo === closedConnection;
+  const valid = ['FROM_BOUNDARY', 'TO_BOUNDARY'].includes(placement)
+    && String(payload.direction ?? '').toUpperCase() === expectedDirection
+    && payload.assemblyBinding == null
+    && component?.entityType === 'FLANGE'
+    && component?.flangeType === 'BLIND'
+    && component?.inlinePlacement === placement
+    && component?.catalogueBinding?.recordHash === binding.recordHash
+    && binding.endConnectionFrom === 'PIPE_TERMINAL'
+    && binding.endConnectionTo === closedConnection
+    && Number(binding.componentLengthMm) > 0
+    && Number(binding.flangeThicknessMm) > 0
+    && Math.abs(Number(binding.componentLengthMm) - Number(binding.flangeThicknessMm)) <= 1e-9
+    && connectionValid
+    && incident.length === 1
+    && incident[0]?.id === component?.id
+    && dependants.length === 0;
+  return valid ? [] : [finding(
+    'INSERT_BLIND_FLANGE_TERMINAL_INVALID',
+    'Blind flange insertion must close one dependency-free graph-open pipe endpoint with exact boundary orientation and catalogue connection evidence.',
+    [component?.id, terminalNodeId, ...incident.map((edge) => edge.id), ...dependants]
+      .filter(Boolean),
+  )];
+}
+function terminalNodeDependants(topology, nodeId) {
+  const collections = ['junctions', 'supports', 'boundaries', 'rigids', 'bends'];
+  return collections.flatMap((key) => (topology[key] ?? []).filter((record) => (
+    ['nodeId', 'fromNodeId', 'toNodeId'].some((field) => record?.[field] === nodeId)
+    || ['nodeIds', 'fromNodeIds', 'toNodeIds'].some((field) => (
+      record?.[field]?.includes?.(nodeId)
+    ))
+  )).map((record) => `${key}:${record.id}`));
 }
 function validateBranchComponent(candidate) {
   const delta = candidate.topologyDelta;

@@ -1,0 +1,98 @@
+name: 3D Edit Blind Flange Authoring
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/topology-edit-blind-flange-authoring.yml'
+      - 'public/fixtures/topology-edit-professional-spec-catalog.json'
+      - 'src/workspace/topology-edit-3d-authoring-controller.js'
+      - 'src/workspace/topology-edit/authoring/topology-edit-authoring-blind-flange.js'
+      - 'src/workspace/topology-edit/authoring/topology-edit-authoring-inline-component.js'
+      - 'src/workspace/topology-edit/professional/topology-edit-spec-catalog.js'
+      - 'src/workspace/topology-edit/topology-edit-command-effect-validator.js'
+      - 'src/workspace/viewport-productivity/topology-edit-blind-flange-authoring-runtime.js'
+      - 'tests/topology-edit-blind-flange-authoring.test.mjs'
+      - 'tests/topology-edit-component-authoring.test.mjs'
+      - 'tests/topology-edit-inline-component-insertion.test.mjs'
+      - 'tests/topology-edit-valve-assembly-authoring.test.mjs'
+      - 'e2e/topology-edit-blind-flange-authoring.spec.js'
+      - 'docs/topology-edit-blind-flange-authoring.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: topology-edit-blind-flange-authoring-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  blind-flange-authoring:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PLAYWRIGHT_BROWSER_CHANNEL: chromium
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies and Chromium
+        run: |
+          set -euo pipefail
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Verify exact blind flange sources
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+          node --check src/workspace/topology-edit/authoring/topology-edit-authoring-blind-flange.js
+          node --check src/workspace/viewport-productivity/topology-edit-blind-flange-authoring-runtime.js
+          node --check src/workspace/topology-edit/authoring/topology-edit-authoring-inline-component.js
+          node --check src/workspace/topology-edit/professional/topology-edit-spec-catalog.js
+          node --check src/workspace/topology-edit/topology-edit-command-effect-validator.js
+          node --check src/workspace/topology-edit-3d-authoring-controller.js
+          node --check tests/topology-edit-blind-flange-authoring.test.mjs
+          node --check e2e/topology-edit-blind-flange-authoring.spec.js
+          git diff --check
+
+      - name: Execute governed blind flange contracts
+        run: |
+          set -o pipefail
+          node --test --test-reporter=tap \
+            tests/topology-edit-blind-flange-authoring.test.mjs \
+            tests/topology-edit-component-authoring.test.mjs \
+            tests/topology-edit-inline-component-insertion.test.mjs \
+            tests/topology-edit-valve-assembly-authoring.test.mjs \
+            tests/topology-edit-authoring-session.test.mjs \
+            tests/topology-edit-authoring-composite-operation.test.mjs \
+            2>&1 | tee topology-edit-blind-flange-test-output.txt
+
+      - name: Execute production Chromium blind flange walkthrough
+        run: |
+          npx playwright test \
+            e2e/topology-edit-blind-flange-authoring.spec.js \
+            --project=chromium --workers=1 --retries=0 --reporter=line
+
+      - name: Upload blind flange qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-blind-flange-authoring-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            topology-edit-blind-flange-test-output.txt
+            playwright-report
+            test-results
+          if-no-files-found: warn
+          retention-days: 30

@@ -183,6 +183,32 @@
       }
     },
     {
+      "recordId": "BLIND-FLANGE-DN50-150-RF-A",
+      "componentType": "FLANGE",
+      "nominalSizeMm": 50,
+      "outsideDiameterMm": 60.3,
+      "pressureClass": "150",
+      "materialSpecification": "ASTM A105",
+      "componentLengthMm": 24,
+      "componentMassKg": 5.6,
+      "flangeClass": "150",
+      "flangeFacing": "RF",
+      "flangeType": "BLIND",
+      "flangeThicknessMm": 24,
+      "flangeOutsideDiameterMm": 165,
+      "boltCircleDiameterMm": 127,
+      "boltHoleCount": 4,
+      "boltHoleDiameterMm": 19.05,
+      "endConnectionFrom": "PIPE_TERMINAL",
+      "endConnectionTo": "CLOSED_RF",
+      "pipingClass": "DEMO-150",
+      "sourceReference": {
+        "documentId": "SPEC-DEMO",
+        "revision": "8",
+        "path": "/flange/blind/dn50/150/rf/a"
+      }
+    },
+    {
       "recordId": "TEE-DN100-DN50-BW-A",
       "componentType": "TEE",
       "nominalSizeMm": 100,
