@@ -26,6 +26,7 @@ const INLINE_COMPONENT_TYPES = new Set(['FLANGE', 'VALVE', 'REDUCER']);
 const INLINE_DIRECTIONS = new Set(['FROM_TO', 'TO_FROM']);
 const INLINE_LENGTH_AUTHORITIES = new Set([
   'CATALOGUE_VALVE_FACE_TO_FACE',
+  'CATALOGUE_COMPONENT_LENGTH',
   'USER_DECLARED_COMPONENT_LENGTH',
 ]);
 
@@ -66,6 +67,14 @@ function positiveNumber(value, label) {
 }
 function optionalPositiveNumber(value, label) {
   return value === null || value === undefined || value === '' ? null : positiveNumber(value, label);
+}
+function optionalPositiveInteger(value, label) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  if (!Number.isInteger(number) || number <= 0) {
+    fail(`${label} must be a positive integer.`, RangeError);
+  }
+  return number;
 }
 function enumText(value, allowed, label) {
   const text = requiredText(value, label).toUpperCase();
@@ -215,12 +224,22 @@ function normalizeInlineBinding(value) {
     secondaryNominalSizeMm,
     secondaryOutsideDiameterMm,
     pipingClass: requiredText(value.pipingClass, 'INSERT_INLINE_COMPONENT.catalogueBinding.pipingClass').toUpperCase(),
+    pressureClass: optionalText(value.pressureClass, true),
+    materialSpecification: optionalText(value.materialSpecification, true),
+    componentLengthMm: optionalPositiveNumber(value.componentLengthMm, 'INSERT_INLINE_COMPONENT.catalogueBinding.componentLengthMm'),
+    componentMassKg: optionalPositiveNumber(value.componentMassKg, 'INSERT_INLINE_COMPONENT.catalogueBinding.componentMassKg'),
     endConnectionFrom: requiredText(value.endConnectionFrom, 'INSERT_INLINE_COMPONENT.catalogueBinding.endConnectionFrom').toUpperCase(),
     endConnectionTo: requiredText(value.endConnectionTo, 'INSERT_INLINE_COMPONENT.catalogueBinding.endConnectionTo').toUpperCase(),
     valveType: optionalText(value.valveType, true),
     valveFaceToFaceMm: optionalPositiveNumber(value.valveFaceToFaceMm, 'INSERT_INLINE_COMPONENT.catalogueBinding.valveFaceToFaceMm'),
     flangeClass: optionalText(value.flangeClass, true),
     flangeFacing: optionalText(value.flangeFacing, true),
+    flangeType: optionalText(value.flangeType, true),
+    flangeThicknessMm: optionalPositiveNumber(value.flangeThicknessMm, 'INSERT_INLINE_COMPONENT.catalogueBinding.flangeThicknessMm'),
+    flangeOutsideDiameterMm: optionalPositiveNumber(value.flangeOutsideDiameterMm, 'INSERT_INLINE_COMPONENT.catalogueBinding.flangeOutsideDiameterMm'),
+    boltCircleDiameterMm: optionalPositiveNumber(value.boltCircleDiameterMm, 'INSERT_INLINE_COMPONENT.catalogueBinding.boltCircleDiameterMm'),
+    boltHoleCount: optionalPositiveInteger(value.boltHoleCount, 'INSERT_INLINE_COMPONENT.catalogueBinding.boltHoleCount'),
+    boltHoleDiameterMm: optionalPositiveNumber(value.boltHoleDiameterMm, 'INSERT_INLINE_COMPONENT.catalogueBinding.boltHoleDiameterMm'),
     reducerType: optionalText(value.reducerType, true),
     reducerOrientation: optionalText(value.reducerOrientation, true),
     sourceReference: normalizeInlineSourceReference(value.sourceReference),
@@ -266,6 +285,14 @@ function normalizeInlineComponent(payload) {
   if (catalogueBinding.componentType !== 'VALVE'
     && lengthAuthority === 'CATALOGUE_VALVE_FACE_TO_FACE') {
     fail('CATALOGUE_VALVE_FACE_TO_FACE is valid only for VALVE.', RangeError);
+  }
+  if (lengthAuthority === 'CATALOGUE_COMPONENT_LENGTH') {
+    if (catalogueBinding.componentLengthMm === null) {
+      fail('CATALOGUE_COMPONENT_LENGTH requires catalogueBinding.componentLengthMm.', RangeError);
+    }
+    if (Math.abs(insertionLengthMm - catalogueBinding.componentLengthMm) > 1e-9) {
+      fail('INSERT_INLINE_COMPONENT length must equal catalogue component length.', RangeError);
+    }
   }
   return {
     edgeId: requiredText(payload.edgeId, 'INSERT_INLINE_COMPONENT.edgeId'),
