@@ -27,6 +27,9 @@ function samePoint(left, right) {
   return semanticHash(finitePoint(left, 'left point'))
     === semanticHash(finitePoint(right, 'right point'));
 }
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
 function catalogueEvidence(edge) {
   return {
     catalogueId: edge.catalogueId,
@@ -73,28 +76,21 @@ export function createNativePipeWorkspaceEntity(canonicalTopology, edgeId) {
     start: finitePoint(from.position, 'FROM position'),
     end: finitePoint(to.position, 'TO position'),
   };
-  const midpointEvidence = {
+  const lengthMm = Math.hypot(
+    geometry.end.x - geometry.start.x,
+    geometry.end.y - geometry.start.y,
+    geometry.end.z - geometry.start.z,
+  );
+  geometry.center = pipeSegmentMidpoint({
     startPointMm: geometry.start,
     endPointMm: geometry.end,
-    lengthMm: Math.hypot(
-      geometry.end.x - geometry.start.x,
-      geometry.end.y - geometry.start.y,
-      geometry.end.z - geometry.start.z,
-    ),
-    unitDirection: (() => {
-      const length = Math.hypot(
-        geometry.end.x - geometry.start.x,
-        geometry.end.y - geometry.start.y,
-        geometry.end.z - geometry.start.z,
-      );
-      return {
-        x: (geometry.end.x - geometry.start.x) / length,
-        y: (geometry.end.y - geometry.start.y) / length,
-        z: (geometry.end.z - geometry.start.z) / length,
-      };
-    })(),
-  };
-  geometry.center = pipeSegmentMidpoint(midpointEvidence);
+    lengthMm,
+    unitDirection: {
+      x: (geometry.end.x - geometry.start.x) / lengthMm,
+      y: (geometry.end.y - geometry.start.y) / lengthMm,
+      z: (geometry.end.z - geometry.start.z) / lengthMm,
+    },
+  });
   const nativeParams = {
     schema: NATIVE_PIPE_WRITEBACK_SCHEMA,
     identityKind: edge.identityKind,
@@ -103,6 +99,7 @@ export function createNativePipeWorkspaceEntity(canonicalTopology, edgeId) {
     createdByCommandId: edge.createdByCommandId,
     fromNodeId: edge.fromNodeId,
     toNodeId: edge.toNodeId,
+    endpointNodes: [clone(from), clone(to)],
     ports: [
       { portKey: portKeys[0], role: 'start', nodeId: edge.fromNodeId, position: geometry.start },
       { portKey: portKeys[1], role: 'end', nodeId: edge.toNodeId, position: geometry.end },
@@ -142,6 +139,19 @@ export function createNativePipeWorkspaceEntity(canonicalTopology, edgeId) {
   });
 }
 
+function recoveredNode(params, port, index) {
+  const records = Array.isArray(params.endpointNodes) ? params.endpointNodes : [];
+  const record = records[index];
+  if (!record || record.id !== port.nodeId) {
+    fail(`endpoint node ${index} differs from explicit port identity.`);
+  }
+  if (!samePoint(record.position, port.position)
+    || !(record.portKeys ?? []).includes(port.portKey)) {
+    fail(`endpoint node ${record.id} differs from explicit port evidence.`);
+  }
+  return deepFreeze(clone(record));
+}
+
 export function recoverNativePipeCanonicalRecords(entity) {
   const params = entity?.properties?.nativeParams;
   if (params?.schema !== NATIVE_PIPE_WRITEBACK_SCHEMA) {
@@ -168,23 +178,13 @@ export function recoverNativePipeCanonicalRecords(entity) {
     || !samePoint(geometry?.end, toPort.position)) {
     fail('workspace geometry differs from explicit native port evidence.');
   }
-  const engineering = params.engineering ?? {};
-  const catalogue = params.catalogue ?? {};
-  const nodes = [
-    {
-      id: requiredText(fromPort.nodeId, 'from port nodeId'),
-      position: finitePoint(fromPort.position, 'from port position'),
-      portKeys: [requiredText(fromPort.portKey, 'from portKey')],
-    },
-    {
-      id: requiredText(toPort.nodeId, 'to port nodeId'),
-      position: finitePoint(toPort.position, 'to port position'),
-      portKeys: [requiredText(toPort.portKey, 'to portKey')],
-    },
-  ];
-  if (nodes[0].id === nodes[1].id || fromPort.portKey === toPort.portKey) {
+  if (fromPort.nodeId === toPort.nodeId || fromPort.portKey === toPort.portKey) {
     fail('native pipe endpoint identities must be distinct.');
   }
+  const nodes = [
+    recoveredNode(params, fromPort, 0),
+    recoveredNode(params, toPort, 1),
+  ];
   const edge = {
     id: requiredText(params.edgeId, 'edgeId'),
     componentKey,
@@ -192,8 +192,8 @@ export function recoverNativePipeCanonicalRecords(entity) {
     toNodeId: nodes[1].id,
     entityType: 'PIPE',
     identityKind: 'NATIVE_COMMAND',
-    ...engineering,
-    ...catalogue,
+    ...(params.engineering ?? {}),
+    ...(params.catalogue ?? {}),
     nativePortKeys: [fromPort.portKey, toPort.portKey],
     createdByCommandId: requiredText(params.createdByCommandId, 'createdByCommandId'),
     topologyOperation: 'INSERT_PIPE_SEGMENT',
