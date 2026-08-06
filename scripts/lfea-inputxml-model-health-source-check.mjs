@@ -80,13 +80,16 @@ assert.deepEqual(compatibilityGeometry, bundle.geometry);
 console.log('✅ Existing geometry-only API remains an exact bundle projection.');
 
 const malformed = parseInputXmlModelHealthSource(`<PIPINGMODEL>
-  <PIPINGELEMENT FROM_NODE="" TO_NODE="20" DELTA_X="1"/>
+  <PIPINGELEMENT FROM_NODE="10" TO_NODE="20" DELTA_X="1" DIAMETER="10"/>
+  <PIPINGELEMENT FROM_NODE="" TO_NODE="30" DELTA_X="1"/>
 </PIPINGMODEL>`, { unit: 'mm' });
-assert.equal(malformed.sourceRecordCount, 1);
-assert.equal(malformed.canonicalSegmentCount, 0);
-assert.equal(malformed.elementRecords[0].canonicalStatus, 'UNRESOLVED');
+assert.equal(malformed.sourceRecordCount, 2);
+assert.equal(malformed.canonicalSegmentCount, 1);
+assert.equal(malformed.elementRecords[1].canonicalStatus, 'UNRESOLVED');
+assert.equal(malformed.elementRecords[1].fieldEvidence.DIAMETER.disposition, 'ABSENT');
+assert.equal(malformed.elementRecords[1].fieldEvidence.DIAMETER.effectiveSourceFeatureId, null);
 assert.equal(malformed.geometry.valid, false);
-console.log('✅ Invalid source rows remain inventoried instead of disappearing silently.');
+console.log('✅ Invalid source rows remain inventoried without claiming canonical inheritance.');
 
 assert.throws(
   () => parseInputXmlModelHealthSource(null, options),
