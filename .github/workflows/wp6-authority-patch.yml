@@ -75,17 +75,16 @@ jobs:
                   raise SystemExit('containment workflow anchor not found')
               text = text.replace(old_workflow_case, new_workflow_case, 1)
 
-          execution_anchor = """      - name: Restricted global restraint-network runtime
-                run: node scripts/empirical-restraint-network-check.mjs
-          """
-          execution_addition = execution_anchor + """
-              - name: Coupled branch and loop restraint-network runtime
-                run: node scripts/empirical-coupled-restraint-network-check.mjs
-          """
+          execution_marker = "        run: node scripts/empirical-restraint-network-check.mjs\n"
+          execution_addition = (
+              execution_marker
+              + "\n      - name: Coupled branch and loop restraint-network runtime\n"
+              + "        run: node scripts/empirical-coupled-restraint-network-check.mjs\n"
+          )
           if 'Coupled branch and loop restraint-network runtime' not in text:
-              if execution_anchor not in text:
-                  raise SystemExit('execution-step anchor not found')
-              text = text.replace(execution_anchor, execution_addition, 1)
+              if execution_marker not in text:
+                  raise SystemExit('execution-step marker not found')
+              text = text.replace(execution_marker, execution_addition, 1)
 
           workflow.write_text(text)
           PY
