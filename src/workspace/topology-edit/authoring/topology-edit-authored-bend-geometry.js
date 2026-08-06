@@ -28,7 +28,7 @@ export function deriveTopologyEditAuthoredBendProjection(topologyInput) {
     }
   }
   const material = {
-    schema: 'TopologyEditAuthoredBendProjection.v2',
+    schema: 'TopologyEditAuthoredBendProjection.v3',
     canonicalTopologyHash: topology.canonicalTopologyHash,
     elements: [],
     segments,
@@ -44,20 +44,50 @@ export function applyTopologyEditAuthoredBendProjection(projectionInput, topolog
   const authored = deriveTopologyEditAuthoredBendProjection(topologyInput);
   if (!authored.trims.length && !authored.segments.length) return projectionInput;
   const trimByEdge = new Map(authored.trims.map((trim) => [trim.edgeId, trim]));
-  const segments = projection.segments.map((segment) => {
+  const material = {
+    ...projection,
+    authoredBendProjectionHash: authored.projectionHash,
+    authoredBendArcCount: authored.segments.length,
+  };
+  if (Array.isArray(projection.segments)) {
+    material.segments = applyAuthoredBendsToSegments(
+      projection.segments,
+      trimByEdge,
+      authored.segments,
+    );
+  }
+  if (Array.isArray(projection.compactSegments)) {
+    material.compactSegments = applyAuthoredBendsToSegments(
+      projection.compactSegments,
+      trimByEdge,
+      authored.segments,
+    );
+  }
+  return deepFreeze(material);
+}
+
+function applyAuthoredBendsToSegments(rows, trimByEdge, authoredSegments) {
+  const existingIds = new Set(rows.map((row) => row?.id).filter(Boolean));
+  const trimmed = rows.map((segment) => {
     const edgeId = segment.pickTarget?.objectId ?? segment.entityId ?? null;
     const trim = trimByEdge.get(edgeId);
     if (!trim) return segment;
     const next = { ...segment };
     if (trim.endpoint === 'FROM') next.start = trim.tangentPoint;
     else next.end = trim.tangentPoint;
-    if (Array.isArray(next.points)) next.points = null;
+    if (Array.isArray(next.points) && next.points.length >= 2) {
+      next.points = next.points.map((point, index) => {
+        if (trim.endpoint === 'FROM' && index === 0) return trim.tangentPoint;
+        if (trim.endpoint === 'TO' && index === next.points.length - 1) return trim.tangentPoint;
+        return point;
+      });
+    }
     return next;
   });
-  return deepFreeze({
-    elements: projection.elements,
-    segments: [...segments, ...authored.segments],
-  });
+  return [
+    ...trimmed,
+    ...authoredSegments.filter((segment) => !existingIds.has(segment.id)),
+  ];
 }
 
 function bendGeometry(bend, nodes, edges) {
@@ -105,6 +135,10 @@ function bendGeometry(bend, nodes, edges) {
   const points = Array.from({ length: count + 1 }, (_, index) => (
     add(center, scale(rodrigues(startVector, normal, sweep * (index / count)), radiusMm))
   ));
+  const startTangent = unit(cross(normal, startVector));
+  const endTangent = unit(cross(normal, endVector));
+  if (!startTangent || !endTangent) fail(`bend ${bend.id} tangent directions are unresolved.`, RangeError);
+  const controlDistance = (4 / 3) * Math.tan(sweep / 4) * radiusMm;
   const outsideDiameterMm = positive(arms[0].outsideDiameterMm)
     ?? positive(arms[0].diameterMm)
     ?? positive(arms[1].outsideDiameterMm)
@@ -114,11 +148,19 @@ function bendGeometry(bend, nodes, edges) {
     segment: {
       id: `authored-bend:${bend.id}`,
       entityId: bend.id,
+      canonicalEntityId: bend.id,
       type: 'ELBOW_ARC',
+      kind: 'ELBOW',
+      curveKind: 'CUBIC_BEZIER',
       start: points[0],
       end: points.at(-1),
+      controlPoint1: add(points[0], scale(startTangent, controlDistance)),
+      controlPoint2: add(points.at(-1), scale(endTangent, -controlDistance)),
+      curveSegments: count,
       points,
       radiusMm: outsideDiameterMm / 2,
+      outsideDiameterMm,
+      sourceOutsideDiameterMm: outsideDiameterMm,
       pickTarget: {
         objectKind: 'component',
         objectId: bend.id,
@@ -137,8 +179,14 @@ function bendGeometry(bend, nodes, edges) {
 }
 
 function normalizeProjection(value) {
-  if (!value || !Array.isArray(value.elements) || !Array.isArray(value.segments)) {
-    fail('visual projection requires elements and segments arrays.');
+  const standard = value
+    && Array.isArray(value.elements)
+    && Array.isArray(value.segments);
+  const compact = value
+    && Array.isArray(value.compactElements)
+    && Array.isArray(value.compactSegments);
+  if (!standard && !compact) {
+    fail('visual projection requires standard or compact element and segment arrays.');
   }
   return value;
 }
