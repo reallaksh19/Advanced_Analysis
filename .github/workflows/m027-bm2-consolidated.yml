@@ -62,6 +62,8 @@ jobs:
           set -euo pipefail
           for file in \
             scripts/lfea-b3.25-bm2-inputxml-ingestion-check.mjs \
+            scripts/lfea-b3.26-bm2-case-authority.mjs \
+            scripts/lfea-b3.26-bm2-case-authority-check.mjs \
             scripts/lfea-b3.26-bm2-output-comparison.mjs \
             scripts/lfea-b3.26-bm2-output-comparison-runtime.mjs \
             scripts/lfea-b3.26-bm2-solve-fixtures.mjs \
@@ -84,6 +86,9 @@ jobs:
 
       - name: BM2 ingestion and diagnostics
         run: node scripts/lfea-b3.25-bm2-inputxml-ingestion-check.mjs
+
+      - name: BM2 source and derived-case custody
+        run: node scripts/lfea-b3.26-bm2-case-authority-check.mjs
 
       - name: BM2 occurrence-preserving baseline comparison
         run: node scripts/lfea-b3.26-bm2-solve-comparison-check.mjs
