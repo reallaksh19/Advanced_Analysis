@@ -1,0 +1,80 @@
+name: 3D Edit Authoring Foundation
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/topology-edit-authoring-foundation.yml'
+      - 'src/workspace/topology-edit/topology-edit-command-contract.js'
+      - 'src/workspace/topology-edit/topology-edit-command-resolver.js'
+      - 'src/workspace/topology-edit/topology-edit-pure-reducer.js'
+      - 'src/workspace/topology-edit/topology-edit-command-effect-validator.js'
+      - 'src/workspace/topology-edit/authoring/**'
+      - 'tests/topology-edit-create-node.test.mjs'
+      - 'tests/topology-edit-authoring-session.test.mjs'
+      - 'tests/topology-edit-operation-graph.test.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: topology-edit-authoring-foundation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  authoring-foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify exact source
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+          node --check src/workspace/topology-edit/topology-edit-command-contract.js
+          node --check src/workspace/topology-edit/topology-edit-command-resolver.js
+          node --check src/workspace/topology-edit/topology-edit-pure-reducer.js
+          node --check src/workspace/topology-edit/topology-edit-command-effect-validator.js
+          node --check src/workspace/topology-edit/authoring/topology-edit-authoring-session.js
+          node --check src/workspace/topology-edit/authoring/topology-edit-operation-graph.js
+          node --check tests/topology-edit-create-node.test.mjs
+          node --check tests/topology-edit-authoring-session.test.mjs
+          node --check tests/topology-edit-operation-graph.test.mjs
+          git diff --check
+
+      - name: Execute certified authoring foundation contracts
+        run: |
+          set -o pipefail
+          node --test --test-reporter=tap \
+            tests/topology-edit-create-node.test.mjs \
+            tests/topology-edit-authoring-session.test.mjs \
+            tests/topology-edit-operation-graph.test.mjs \
+            tests/topology-edit-wave1-pure-kernel.test.mjs \
+            tests/topology-edit-wave1-production-integration.test.mjs \
+            2>&1 | tee authoring-foundation-test-output.txt
+
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-authoring-foundation-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}-${{ github.run_attempt }}
+          path: authoring-foundation-test-output.txt
+          if-no-files-found: warn
+          retention-days: 30

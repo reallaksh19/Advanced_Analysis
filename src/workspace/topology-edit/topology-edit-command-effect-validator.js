@@ -23,6 +23,40 @@ function effectContext(candidate) {
       .flatMap(recordChanges),
   };
 }
+function validateCreateNode(context) {
+  const { candidate, delta, additionsByCommand, nodeChanges, edgeChanges, otherChanges } = context;
+  const created = candidate.canonicalTopology.nodes.filter((node) => (
+    node.createdByCommandId === candidate.commandId
+    && node.topologyOperation === 'CREATE_NODE'
+  ));
+  const findings = [];
+  const valid = delta.nodes.addedIds.length === 1
+    && delta.nodes.removedIds.length === 0
+    && delta.nodes.changedIds.length === 0
+    && edgeChanges.length === 0
+    && otherChanges.length === 0;
+  if (!valid) findings.push(finding(
+    'CREATE_NODE_DELTA_INVALID',
+    'CREATE_NODE must add exactly one isolated canonical node and no other record.',
+    [...nodeChanges, ...edgeChanges],
+  ));
+  if (!sameIds(additionsByCommand, delta.nodes.addedIds)) findings.push(finding(
+    'CREATE_NODE_PROVENANCE_INVALID',
+    'Created node provenance does not match the command identity.',
+    additionsByCommand,
+  ));
+  if (created.length !== 1
+      || !String(created[0].creationRole ?? '').trim()
+      || !String(created[0].coordinateAuthority ?? '').trim()
+      || !String(created[0].sourceOperationId ?? '').trim()) {
+    findings.push(finding(
+      'CREATE_NODE_ENGINEERING_EVIDENCE_INVALID',
+      'CREATE_NODE must preserve creation role, coordinate authority, and source operation evidence.',
+      created.map((node) => node.id),
+    ));
+  }
+  return findings;
+}
 function validateMove(context) {
   const { delta, nodeChanges, edgeChanges, otherChanges } = context;
   const valid = delta.nodes.changedIds.length === 1
@@ -164,6 +198,7 @@ function validateTrim(candidate) {
     [...changes(delta.nodes), ...changes(delta.edges)])];
 }
 const VALIDATORS = Object.freeze({
+  CREATE_NODE: validateCreateNode,
   MOVE_NODE: validateMove, MERGE_NODES: validateMerge,
   BRIDGE_GAP: validateAddedEdge, ADD_STRAIGHT_ELEMENT: validateAddedEdge,
   SPLIT_EDGE: validateSplit, INSERT_INLINE_COMPONENT: validateInline,

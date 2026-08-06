@@ -44,6 +44,21 @@ function replaceNodeReferences(record, sourceNodeId, targetNodeId) {
 function remapCollection(rows, sourceNodeId, targetNodeId) {
   return cloneRows(rows).map((row) => replaceNodeReferences(row, sourceNodeId, targetNodeId));
 }
+function createNode(topology, command) {
+  const id = generatedId('node', command.commandId, 'created-node');
+  assertUnusedId(topology, id);
+  const node = {
+    id,
+    position: { ...command.payload.position },
+    portKeys: [],
+    createdByCommandId: command.commandId,
+    topologyOperation: 'CREATE_NODE',
+    creationRole: command.payload.creationRole,
+    coordinateAuthority: command.payload.coordinateAuthority,
+    sourceOperationId: command.payload.sourceOperationId,
+  };
+  return { ...topology, nodes: [...cloneRows(topology.nodes), node] };
+}
 function moveNode(topology, command) {
   const nodes = cloneRows(topology.nodes);
   const index = exactIndex(nodes, command.payload.nodeId, 'node');
@@ -235,6 +250,7 @@ function trimEdge(topology, command) {
   return { ...topology, nodes, edges };
 }
 const REDUCERS = Object.freeze({
+  CREATE_NODE: createNode,
   MOVE_NODE: moveNode, MERGE_NODES: mergeNodes,
   BRIDGE_GAP: addEdge, ADD_STRAIGHT_ELEMENT: addEdge,
   SPLIT_EDGE: splitEdge,
