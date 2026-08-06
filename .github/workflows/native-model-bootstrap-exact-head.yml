@@ -1,0 +1,63 @@
+name: Native Model Bootstrap Exact Head
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/native-model-bootstrap-exact-head.yml'
+      - 'src/workspace/topology-edit/native-model-bootstrap.js'
+      - 'tests/native-model-bootstrap.test.mjs'
+      - 'docs/native-model-bootstrap-custody.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-model-bootstrap-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-model-bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verify exact source and module limits
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
+          node --check src/workspace/topology-edit/native-model-bootstrap.js
+          node --check tests/native-model-bootstrap.test.mjs
+          test "$(wc -l < src/workspace/topology-edit/native-model-bootstrap.js)" -lt 300
+          test "$(wc -l < tests/native-model-bootstrap.test.mjs)" -lt 300
+          git diff --check
+
+      - name: Execute bootstrap custody contracts
+        run: |
+          set -o pipefail
+          node --test --test-reporter=tap \
+            tests/native-model-bootstrap.test.mjs \
+            2>&1 | tee native-model-bootstrap-test-output.txt
+          test "$(grep -c '^ok ' native-model-bootstrap-test-output.txt)" -gt 0
+
+      - name: Upload exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-model-bootstrap-${{ github.sha }}-${{ github.run_attempt }}
+          path: native-model-bootstrap-test-output.txt
+          if-no-files-found: error
+          retention-days: 30
