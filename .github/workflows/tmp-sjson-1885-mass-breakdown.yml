@@ -21,12 +21,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Correct branch and section custody in audit workspace
+      - name: Correct branch, bore and section custody in audit workspace
         run: |
           python - <<'PY'
           from pathlib import Path
           path = Path('src/calc-workspace/cii-standalone-port/core/branch-schedule-resolution.js')
           text = path.read_text()
+          text = text.replace(
+            "import { getPipeDimensions } from '../../../core/geometry/pipeSchedules.js';",
+            "import { ASME_B36_10, getPipeDimensions } from '../../../core/geometry/pipeSchedules.js';",
+            1,
+          )
           replacements = {
             "branchPath: String(enriched.sourceBranchPath || attrs.sourceBranchPath || branchPath || branchName || 'ROOT'),": "branchPath: String(branchPath || branchName || 'ROOT'),",
             ": String(enriched.sourceBranchPath || attrs.sourceBranchPath || parent.branchPath || 'ROOT');": ": String(parent.branchPath || 'ROOT');",
@@ -41,15 +46,27 @@ jobs:
             const dimensions = target.nominalBoreMm == null
               ? null
               : getPipeDimensions(target.nominalBoreMm, source.directSchedule);
-            const packageValid = dimensions?.exact && Number.isFinite(dimensions.od) && Number.isFinite(dimensions.wt);
+            const packageValid = dimensions?.exact
+              && Number.isFinite(dimensions.od)
+              && Number.isFinite(dimensions.wt)
+              && Math.abs(Number(dimensions.nps) - Number(dnToNpsLocal(target.nominalBoreMm))) < 1e-9;
+            const localEntry = ASME_B36_10[String(Math.round(target.nominalBoreMm))];
+            const localWallMm = finiteOrNull(localEntry?.schedules?.[source.directSchedule]);
+            const localTableValid = finiteOrNull(localEntry?.od) > 0 && localWallMm > 0;
             const sourceEnriched = source.item?.enrichedAttributes || {};
             const fittingOdMm = finiteOrNull(sourceEnriched.pipeOdMm);
             const fittingWallMm = finiteOrNull(sourceEnriched.wallThicknessMm);
-            const fittingSectionValid = fittingOdMm > 0 && fittingWallMm > 0 && fittingOdMm > 2 * fittingWallMm;
-            const valid = packageValid || fittingSectionValid;
+            const fittingBoreMm = finiteOrNull(source.nominalBoreMm);
+            const fittingSectionValid = fittingOdMm > 0
+              && fittingWallMm > 0
+              && fittingOdMm > 2 * fittingWallMm
+              && Math.abs(fittingBoreMm - target.nominalBoreMm) < 1e-9;
+            const valid = packageValid || localTableValid || fittingSectionValid;
             const dimensionBasis = packageValid
               ? 'PIPE_COMPONENT_DATA_EXACT_SCHEDULE'
-              : (fittingSectionValid ? 'SAME_BRANCH_FITTING_ENRICHED_SECTION' : 'UNRESOLVED');
+              : (localTableValid
+                ? 'ASME_B36_10_LOCAL_EXACT_SCHEDULE'
+                : (fittingSectionValid ? 'SAME_BRANCH_SAME_BORE_FITTING_ENRICHED_SECTION' : 'UNRESOLVED'));
             return Object.freeze({
               status: valid ? 'RESOLVED_EXACT' : 'BLOCKED_PIPE_DIMENSION_LOOKUP',
               schedule: source.directSchedule,
@@ -58,27 +75,89 @@ jobs:
               sourceBranchPath: source.branchPath,
               sourceGlobalIndex: source.sourceGlobalIndex,
               sourcePosition: source.position,
+              sourceNominalBoreMm: source.nominalBoreMm,
               sourceRaw: source.directScheduleRaw,
               sourceField: source.directScheduleField,
               basis,
               dimensionBasis,
               nominalBoreMm: target.nominalBoreMm,
-              nps: dimensions?.nps ?? null,
-              outsideDiameterMm: packageValid ? dimensions.od : (fittingSectionValid ? fittingOdMm : null),
-              wallThicknessMm: packageValid ? dimensions.wt : (fittingSectionValid ? fittingWallMm : null),
+              nps: dnToNpsLocal(target.nominalBoreMm),
+              outsideDiameterMm: packageValid
+                ? dimensions.od
+                : (localTableValid ? localEntry.od : (fittingSectionValid ? fittingOdMm : null)),
+              wallThicknessMm: packageValid
+                ? dimensions.wt
+                : (localTableValid ? localWallMm : (fittingSectionValid ? fittingWallMm : null)),
               diagnostics: Object.freeze(valid ? [] : ['PIPE_DIMENSION_LOOKUP_BLOCKED']),
             });
           }
+
+          function dnToNpsLocal(boreMm) {
+            const map = { 25: 1, 40: 1.5, 50: 2, 80: 3, 100: 4, 150: 6, 200: 8, 250: 10, 300: 12, 400: 16, 600: 24 };
+            return map[Math.round(Number(boreMm))] ?? null;
+          }
           '''
           text = text[:start] + replacement + text[end:]
-          path.write_text(text)
+          old_rank = '''function evidenceRank(target, candidate) {
+            const targetIndex = target.sourceGlobalIndex;
+            const candidateIndex = candidate.sourceGlobalIndex;
+            const indexDistance = Number.isFinite(targetIndex) && Number.isFinite(candidateIndex)
+              ? Math.abs(targetIndex - candidateIndex)
+              : Number.POSITIVE_INFINITY;
+            const positionDistance = target.position && candidate.position
+              ? Math.hypot(
+                target.position.x - candidate.position.x,
+                target.position.y - candidate.position.y,
+                target.position.z - candidate.position.z,
+              )
+              : Number.POSITIVE_INFINITY;
+            return [indexDistance, positionDistance];
+          }
+          '''
+          new_rank = '''function evidenceRank(target, candidate) {
+            const targetIndex = target.sourceGlobalIndex;
+            const candidateIndex = candidate.sourceGlobalIndex;
+            const boreDistance = Number.isFinite(target.nominalBoreMm) && Number.isFinite(candidate.nominalBoreMm)
+              ? Math.abs(target.nominalBoreMm - candidate.nominalBoreMm)
+              : Number.POSITIVE_INFINITY;
+            const indexDistance = Number.isFinite(targetIndex) && Number.isFinite(candidateIndex)
+              ? Math.abs(targetIndex - candidateIndex)
+              : Number.POSITIVE_INFINITY;
+            const positionDistance = target.position && candidate.position
+              ? Math.hypot(
+                target.position.x - candidate.position.x,
+                target.position.y - candidate.position.y,
+                target.position.z - candidate.position.z,
+              )
+              : Number.POSITIVE_INFINITY;
+            return [boreDistance, indexDistance, positionDistance];
+          }
+          '''
+          if old_rank not in text:
+              raise SystemExit('Expected evidenceRank block not found.')
+          text = text.replace(old_rank, new_rank, 1)
+          old_compare = '''function compareRank(a, b) {
+            if (a[0] !== b[0]) return a[0] - b[0];
+            if (a[1] !== b[1]) return a[1] - b[1];
+            return 0;
+          }
+          '''
+          new_compare = '''function compareRank(a, b) {
+            for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+              if (a[index] !== b[index]) return a[index] - b[index];
+            }
+            return 0;
+          }
+          '''
+          if old_compare not in text:
+              raise SystemExit('Expected compareRank block not found.')
+          path.write_text(text.replace(old_compare, new_compare, 1))
           PY
       - name: Materialize exact benchmark source
         run: |
           git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson > /tmp/EnrichedSjson
           git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson.topology.input.xml > /tmp/EnrichedSjson.topology.input.xml
       - name: Generate node and POS trace
-        continue-on-error: true
         id: trace
         run: |
           node scripts/empirical-sjson-1885-node-pos-trace.mjs \
@@ -88,7 +167,6 @@ jobs:
             /tmp/node-pos-trace.json \
             /tmp/node-pos-trace.csv
       - name: Upload trace
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: sjson-1885-node-pos-trace
@@ -96,6 +174,3 @@ jobs:
             /tmp/node-pos-trace.json
             /tmp/node-pos-trace.csv
           if-no-files-found: error
-      - name: Preserve failure status
-        if: steps.trace.outcome != 'success'
-        run: exit 1
