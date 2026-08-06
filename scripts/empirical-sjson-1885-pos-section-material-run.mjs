@@ -3,13 +3,14 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { semanticHash } from '../src/core/empirical-piping-mechanics/identity.js';
 import { resolvePosSectionMaterialStates } from '../src/calc-workspace/cii-standalone-port/core/pos-section-material-resolution.js';
 
-const [profilePath, enrichedPath, outputPath = '/tmp/empirical-sjson-1885-pos-section-material.json'] = process.argv.slice(2);
-if (!profilePath || !enrichedPath) {
-  throw new Error('Usage: node empirical-sjson-1885-pos-section-material-run.mjs <project-data-profile.json> <EnrichedSjson> [output.json]');
+const [profilePath, enrichedPath, topologyXmlPath, outputPath = '/tmp/empirical-sjson-1885-pos-section-material.json'] = process.argv.slice(2);
+if (!profilePath || !enrichedPath || !topologyXmlPath) {
+  throw new Error('Usage: node empirical-sjson-1885-pos-section-material-run.mjs <project-data-or-defaults.json> <EnrichedSjson> <topology.xml> [output.json]');
 }
 
 const profileText = await readFile(profilePath, 'utf8');
 const sourceText = await readFile(enrichedPath, 'utf8');
+const topologyXmlText = await readFile(topologyXmlPath, 'utf8');
 const profile = JSON.parse(profileText.replace(/^\uFEFF/u, ''));
 const sourceRoot = JSON.parse(sourceText.replace(/^\uFEFF/u, ''));
 const configuredDefaults = profile.schema === 'project-data-profile/v1'
@@ -21,6 +22,7 @@ if (!Array.isArray(configuredDefaults)) {
 
 const calculation = resolvePosSectionMaterialStates({
   sourceRoot,
+  topologyXmlText,
   projectId: profile.projectId,
   projectDataRevision: profile.revision,
   projectDataSemanticHash: semanticHash(profile),
@@ -31,8 +33,10 @@ const receipt = {
   source: {
     profilePath,
     enrichedPath,
+    topologyXmlPath,
     profileSha256: sha256(profileText),
     enrichedSha256: sha256(sourceText),
+    topologyXmlSha256: sha256(topologyXmlText),
   },
   calculation,
 };
