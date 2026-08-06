@@ -1,0 +1,198 @@
+name: LAFEA-NC NC-02 Exact-Head Contact Qualification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/lafea-nc02-contact-qualification.yml"
+      - "docs/nonlinear-shell-contact/LAFEA_NC02_CONTACT_QUALIFICATION.md"
+      - "scripts/lafea-nc02-check.mjs"
+      - "scripts/lafea-nc02-contact-benchmarks.mjs"
+      - "scripts/nc02-contact/**"
+      - "src/core/nonlinear-shell-contact/contact-procedure-contract.js"
+      - "src/core/nonlinear-shell-contact/contact-qualification-evaluator.js"
+      - "src/core/nonlinear-shell-contact/nc02-fixtures.js"
+      - "src/core/nonlinear-shell-contact/nc02-negative-controls.js"
+      - "tests/nonlinear-shell-contact-nc02-qualification.test.mjs"
+  workflow_dispatch:
+    inputs:
+      head_sha:
+        required: true
+        type: string
+      base_sha:
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  exact-head-nc02:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      DISPATCH_HEAD_SHA: ${{ inputs.head_sha }}
+      DISPATCH_BASE_SHA: ${{ inputs.base_sha }}
+      NC01_HEAD_SHA: 798602384663816f2724d503991aa80c1e48352a
+      NC01_MERGE_SHA: 8a084b337b65bbbd853636348abf8722727286f1
+      NC01_RUN_ID: "31057675449"
+      NC01_ARTIFACT_ID: "8950884756"
+      NC01_ARTIFACT_NAME: lafea-nc01-798602384663816f2724d503991aa80c1e48352a-1
+      NC01_ARTIFACT_DIGEST: "sha256:d9f586d079b28b345d704841c250f40c84228d610bbc8fb11e1a843c261b11f0"
+      NC01_REPORT_HASH: "sha256:788f1147864d7cad9eda5f46b4fd333332cda50e393da88519d3e9250bc622db"
+      NC01_RUN_HASH: "sha256:41193e02a1b5bb5342d9b5437b09b0cefeb4ce1f7c2d218fccbb79a3579107b6"
+      CUSTODY_HEAD_SHA: 2826cac45acc13fdd9634c861f9910e339f9d5d5
+      CUSTODY_RUN_ID: "31020771678"
+      CUSTODY_ARTIFACT_ID: "8936496053"
+      CUSTODY_ARTIFACT_NAME: lafea-nc-solver-container-2826cac45acc13fdd9634c861f9910e339f9d5d5-1
+      CUSTODY_ARTIFACT_DIGEST: "sha256:e14b467cd43f38218f3dba750b6c5f4f1ee83ed8ea9d241bf65673b9e7caf9b8"
+      SOLVER_DIGEST: "sha256:9a33d293706a66bee86f2f0ecf996a66758f904c20d61ad8c83ddc0f92ae4b7e"
+
+    steps:
+      - name: Resolve exact head and base
+        id: exact
+        shell: bash
+        run: |
+          set -euo pipefail
+          head_sha="${DISPATCH_HEAD_SHA:-${PR_HEAD_SHA:-${GITHUB_SHA}}}"
+          base_sha="${DISPATCH_BASE_SHA:-${PR_BASE_SHA:-}}"
+          [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$base_sha" =~ ^[0-9a-f]{40}$ ]]
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.exact.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Verify live base, ancestry and phase paths
+        shell: bash
+        env:
+          HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
+          BASE_SHA: ${{ steps.exact.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          test "$(git rev-parse refs/remotes/origin/main)" = "$BASE_SHA"
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          git merge-base --is-ancestor "$BASE_SHA" "$HEAD_SHA"
+          git merge-base --is-ancestor "$NC01_MERGE_SHA" "$HEAD_SHA"
+          git diff --check "$BASE_SHA...$HEAD_SHA"
+          mapfile -t paths < <(git diff --name-only "$BASE_SHA...$HEAD_SHA")
+          test "${#paths[@]}" -gt 0
+          for path in "${paths[@]}"; do
+            case "$path" in
+              .github/workflows/lafea-nc02-contact-qualification.yml|docs/nonlinear-shell-contact/LAFEA_NC02_CONTACT_QUALIFICATION.md|scripts/lafea-nc02-check.mjs|scripts/lafea-nc02-contact-benchmarks.mjs|scripts/nc02-contact/*|src/core/nonlinear-shell-contact/contact-procedure-contract.js|src/core/nonlinear-shell-contact/contact-qualification-evaluator.js|src/core/nonlinear-shell-contact/nc02-fixtures.js|src/core/nonlinear-shell-contact/nc02-negative-controls.js|tests/nonlinear-shell-contact-nc02-qualification.test.mjs) ;;
+              *) echo "NC-02 path violation: $path" >&2; exit 1 ;;
+            esac
+          done
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install governed runtime dependencies
+        run: |
+          set -euo pipefail
+          npm ci
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libblas3 liblapack3 libgfortran5
+
+      - name: Download and validate NC-01 and solver custody
+        id: custody
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          verify_artifact() {
+            local id="$1" name="$2" digest="$3" run="$4" head="$5" meta
+            meta="$(gh api "/repos/$GITHUB_REPOSITORY/actions/artifacts/$id")"
+            test "$(jq -r .name <<<"$meta")" = "$name"
+            test "$(jq -r .digest <<<"$meta")" = "$digest"
+            test "$(jq -r .expired <<<"$meta")" = "false"
+            test "$(jq -r .workflow_run.id <<<"$meta")" = "$run"
+            test "$(jq -r .workflow_run.head_sha <<<"$meta")" = "$head"
+          }
+          verify_artifact "$NC01_ARTIFACT_ID" "$NC01_ARTIFACT_NAME" "$NC01_ARTIFACT_DIGEST" "$NC01_RUN_ID" "$NC01_HEAD_SHA"
+          verify_artifact "$CUSTODY_ARTIFACT_ID" "$CUSTODY_ARTIFACT_NAME" "$CUSTODY_ARTIFACT_DIGEST" "$CUSTODY_RUN_ID" "$CUSTODY_HEAD_SHA"
+          nc01="$RUNNER_TEMP/nc01"
+          custody="$RUNNER_TEMP/custody"
+          mkdir -p "$nc01" "$custody" artifacts/nc02-input artifacts/nc02-debug
+          gh run download "$NC01_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$NC01_ARTIFACT_NAME" --dir "$nc01"
+          gh run download "$CUSTODY_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$CUSTODY_ARTIFACT_NAME" --dir "$custody"
+          cmp "$nc01/nc01-a/nc01-report.canonical.json" "$nc01/nc01-b/nc01-report.canonical.json"
+          node scripts/nc02-contact/prepare-binding.mjs "$nc01" artifacts/nc02-input/upstream-binding.json
+          solver="$custody/binary/ccx_2.22"
+          chmod 0755 "$solver"
+          test "sha256:$(sha256sum "$solver" | cut -d' ' -f1)" = "$SOLVER_DIGEST"
+          echo "solver=$solver" >> "$GITHUB_OUTPUT"
+
+      - name: Run syntax, unit and negative controls
+        run: |
+          set -euo pipefail
+          node --check scripts/lafea-nc02-check.mjs
+          node --check scripts/lafea-nc02-contact-benchmarks.mjs
+          find scripts/nc02-contact -type f -name "*.mjs" -print0 | sort -z | xargs -0 -n1 node --check
+          node --test tests/nonlinear-shell-contact-nc02-qualification.test.mjs
+
+      - name: Execute two isolated exact-solver replays
+        shell: bash
+        env:
+          HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
+          SOLVER: ${{ steps.custody.outputs.solver }}
+        run: |
+          set -euo pipefail
+          node_bin="$(command -v node)"
+          for tag in a b; do
+            sudo --preserve-env=HEAD_SHA,SOLVER,PATH unshare --net --mount-proc "$node_bin" scripts/lafea-nc02-contact-benchmarks.mjs \
+              --solver="$SOLVER" --head-sha="$HEAD_SHA" --output-root="$GITHUB_WORKSPACE/artifacts/nc02-real-$tag" \
+              >"artifacts/nc02-debug/real-$tag.stdout.log" 2>"artifacts/nc02-debug/real-$tag.stderr.log"
+          done
+          cmp artifacts/nc02-real-a/real-contact-summary.canonical.json artifacts/nc02-real-b/real-contact-summary.canonical.json
+          diff -ru artifacts/nc02-real-a/evidence artifacts/nc02-real-b/evidence
+          test "$(find artifacts/nc02-real-a/evidence -maxdepth 1 -type f -name '*.json' | wc -l)" = 10
+
+      - name: Evaluate qualification twice
+        shell: bash
+        env:
+          HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          node scripts/lafea-nc02-check.mjs --head-sha="$HEAD_SHA" --upstream-binding=artifacts/nc02-input/upstream-binding.json --evidence-root=artifacts/nc02-real-a/evidence --output-dir=artifacts/nc02-a >artifacts/nc02-debug/eval-a.stdout.log 2>artifacts/nc02-debug/eval-a.stderr.log
+          node scripts/lafea-nc02-check.mjs --head-sha="$HEAD_SHA" --upstream-binding=artifacts/nc02-input/upstream-binding.json --evidence-root=artifacts/nc02-real-b/evidence --output-dir=artifacts/nc02-b >artifacts/nc02-debug/eval-b.stdout.log 2>artifacts/nc02-debug/eval-b.stderr.log
+          cmp artifacts/nc02-a/nc02-report.canonical.json artifacts/nc02-b/nc02-report.canonical.json
+          node -e "const fs=require('node:fs');const r=JSON.parse(fs.readFileSync('artifacts/nc02-a/nc02-report.json'));if(r.status!=='NC02_QUALIFIED'||r.authority.contactProcedureQualified!==true||r.authority.nc03Authorized!==true||r.authority.productionExecutionAuthorized!==false)process.exit(1)"
+
+      - name: Verify clean source tree
+        if: always()
+        run: test -z "$(git status --porcelain --untracked-files=no)"
+
+      - name: Upload diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc02-debug-${{ steps.exact.outputs.head_sha }}-${{ github.run_attempt }}
+          path: artifacts
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload authoritative NC-02 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc02-${{ steps.exact.outputs.head_sha }}-${{ github.run_attempt }}
+          path: |
+            artifacts/nc02-a
+            artifacts/nc02-b
+            artifacts/nc02-real-a
+            artifacts/nc02-real-b
+            artifacts/nc02-input
+          if-no-files-found: error
+          retention-days: 30
