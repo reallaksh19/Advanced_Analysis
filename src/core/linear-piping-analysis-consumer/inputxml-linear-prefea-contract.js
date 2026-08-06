@@ -1,6 +1,6 @@
-import { createHash } from 'node:crypto';
 import { canonicalStringify, semanticHash } from '../shared-piping-model/canonical-json.js';
 import { deepFreeze } from '../shared-piping-model/immutable.js';
+import { sha256HexText } from '../shared-piping-model/sha256.js';
 
 export const INPUTXML_LINEAR_PREFEA_REQUEST_SCHEMA = 'fea-inputxml-linear-prefea-request/v1';
 export const INPUTXML_LINEAR_PREFEA_DIAGNOSTICS_SCHEMA = 'fea-inputxml-linear-prefea-diagnostics/v1';
@@ -78,7 +78,7 @@ export function makeFinding(value) {
     evidence: canonicalEvidence(value.evidence ?? {}),
   };
   const findingId = value.findingId === undefined
-    ? `PF-${sha256(canonicalStringify(identity)).slice(0, 24).toUpperCase()}`
+    ? `PF-${sha256HexText(canonicalStringify(identity)).slice(0, 24).toUpperCase()}`
     : nonempty(value.findingId, 'finding.findingId');
   return deepFreeze({
     findingId,
@@ -246,8 +246,4 @@ function nonempty(value, field) {
 function member(value, allowed, field) {
   if (!allowed.includes(value)) fail('PREFEA_ENUM_INVALID', `${field} is invalid.`, { field, value, allowed });
   return value;
-}
-
-function sha256(text) {
-  return createHash('sha256').update(text, 'utf8').digest('hex');
 }
