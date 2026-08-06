@@ -1,0 +1,42 @@
+name: empirical-beam-contact-wp2
+
+on:
+  pull_request:
+    paths:
+      - 'src/workspace/engineering-loads/empirical-method-registry.js'
+      - 'src/workspace/engineering-loads/empirical-beam-contact-*.js'
+      - 'src/workspace/engineering-loads/authorized-empirical-beam-contact-execution.js'
+      - 'scripts/empirical-beam-contact-runtime-check.mjs'
+      - 'scripts/empirical-beam-contact-elbow-runtime-check.mjs'
+      - '.github/workflows/empirical-beam-contact-wp2.yml'
+      - '.github/workflows/empirical-piping-exact-head.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-bridge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Prove exact-head execution
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          git diff --exit-code
+
+      - name: Run authorized beam/contact runtime bridge checks
+        run: node scripts/empirical-beam-contact-runtime-check.mjs
+
+      - name: Run elbow and region-planarity bridge checks
+        run: node scripts/empirical-beam-contact-elbow-runtime-check.mjs
