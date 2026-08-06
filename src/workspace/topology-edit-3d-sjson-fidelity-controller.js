@@ -235,7 +235,9 @@ export class TopologyEdit3DViewController extends ProfessionalController {
   }
 
   isGovernedSjsonCanonical(canonical) {
-    return canonical?.sourceHash === SJSON_BENCHMARK_SOURCE_HASH;
+    const baseSourceHash = this.session?.baseCanonicalTopology?.sourceHash;
+    return canonical?.sourceHash === SJSON_BENCHMARK_SOURCE_HASH
+      || baseSourceHash === SJSON_BENCHMARK_SOURCE_HASH;
   }
 
   deactivate() {
