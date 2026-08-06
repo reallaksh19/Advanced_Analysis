@@ -1,0 +1,3 @@
+target=1c07108bdeab4bffe622b15f2f7ae052368ed9a0
+purpose=M032 exact-head qualification only
+merge=prohibited
