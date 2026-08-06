@@ -6,15 +6,15 @@ import {
   deriveTopologyEditAuthoredBendProjection,
 } from './topology-edit/authoring/topology-edit-authored-bend-geometry.js';
 import {
-  TopologyEditAuthoringRuntime,
-} from './viewport-productivity/topology-edit-authoring-runtime.js';
+  TopologyEditComponentAuthoringRuntime,
+} from './viewport-productivity/topology-edit-component-authoring-runtime.js';
 
 /** Production authoring layer; interaction state remains transient and topology authority stays journal-owned. */
 export class TopologyEdit3DViewController extends ProfessionalController {
   constructor(eventBus, lifecycleOptions = {}) {
     super(eventBus, lifecycleOptions);
     this.authoringElement = null;
-    this.authoringRuntime = new TopologyEditAuthoringRuntime(this);
+    this.authoringRuntime = new TopologyEditComponentAuthoringRuntime(this);
     const reconcileSelection = this.authoringRuntime.reconcileSelection.bind(this.authoringRuntime);
     this.authoringRuntime.reconcileSelection = (...args) => {
       normalizeControllerNodeSelection(this);
@@ -58,7 +58,7 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     details.dataset.authoringContextual = 'true';
     details.open = false;
     const summary = documentRef.createElement('summary');
-    summary.textContent = 'Authoring tools — Move · Stretch · Route + elbow';
+    summary.textContent = 'Authoring tools — Move · Stretch · Route + elbow · Flange · Reducer';
     const body = documentRef.createElement('div');
     body.className = 'topology-edit-clean-shell__panel-body';
     const section = documentRef.createElement('section');

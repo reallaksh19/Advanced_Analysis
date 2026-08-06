@@ -82,27 +82,33 @@ const TOOL_DEFINITIONS = deepFreeze({
   },
   FLANGE: {
     label: 'Flange',
-    targetKinds: ['straight-edge', 'open-endpoint'],
+    targetKinds: ['straight-edge'],
     fields: [
       numberField('stationMm', 'Insertion station', 'mm', null, { positive: true }),
       textField('catalogueRecordId', 'Catalogue record'),
       textField('flangeType', 'Flange type', { authority: 'CATALOGUE' }),
       textField('pressureClass', 'Rating', { authority: 'CATALOGUE' }),
       textField('facing', 'Facing', { authority: 'CATALOGUE' }),
+      textField('materialSpecification', 'Material specification', { authority: 'CATALOGUE' }),
+      numberField('componentLengthMm', 'Length', 'mm', null, { positive: true, authority: 'CATALOGUE' }),
       numberField('componentMassKg', 'Weight', 'kg', null, { positive: true, authority: 'CATALOGUE' }),
     ],
   },
   REDUCER: {
     label: 'Reducer',
-    targetKinds: ['straight-edge', 'open-endpoint'],
+    targetKinds: ['straight-edge'],
     fields: [
       numberField('stationMm', 'Insertion station', 'mm', null, { positive: true }),
-      numberField('fromNominalSizeMm', 'From size', 'mm', null, { positive: true }),
-      numberField('toNominalSizeMm', 'To size', 'mm', null, { positive: true }),
-      enumField('reducerType', 'Reducer type', ['CONCENTRIC', 'ECCENTRIC'], 'CONCENTRIC'),
+      textField('catalogueRecordId', 'Catalogue record'),
+      enumField('inlineDirection', 'Insertion direction', ['FROM_TO', 'TO_FROM'], 'FROM_TO'),
+      numberField('fromNominalSizeMm', 'From size', 'mm', null, { positive: true, authority: 'CATALOGUE' }),
+      numberField('toNominalSizeMm', 'To size', 'mm', null, { positive: true, authority: 'CATALOGUE' }),
+      enumField('reducerType', 'Reducer type', ['CONCENTRIC', 'ECCENTRIC'], 'CONCENTRIC', { authority: 'CATALOGUE' }),
       enumField('orientation', 'Orientation', [
         'CONCENTRIC', 'FLAT_TOP', 'FLAT_BOTTOM', 'FLAT_LEFT', 'FLAT_RIGHT',
-      ], 'CONCENTRIC'),
+      ], 'CONCENTRIC', { authority: 'CATALOGUE' }),
+      textField('pressureClass', 'Rating', { authority: 'CATALOGUE' }),
+      textField('materialSpecification', 'Material specification', { authority: 'CATALOGUE' }),
       numberField('componentLengthMm', 'Length', 'mm', null, { positive: true, authority: 'CATALOGUE' }),
       numberField('componentMassKg', 'Weight', 'kg', null, { positive: true, authority: 'CATALOGUE' }),
     ],
@@ -439,7 +445,7 @@ function numberField(key, label, unit, defaultValue, options = {}) {
   };
 }
 
-function enumField(key, label, options, defaultValue) {
+function enumField(key, label, options, defaultValue, fieldOptions = {}) {
   return {
     key,
     label,
@@ -448,7 +454,7 @@ function enumField(key, label, options, defaultValue) {
     options,
     defaultValue,
     positive: false,
-    authority: 'USER_INPUT',
+    authority: fieldOptions.authority ?? 'USER_INPUT',
   };
 }
 
