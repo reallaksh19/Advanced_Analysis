@@ -134,22 +134,26 @@ test('preview/cancel preserve journal and canonical authority', async () => {
   assert.equal(cancelled.resultingCanonicalHash, canonicalHash);
 });
 
-test('Apply installs one atomic journal suffix and undo/redo preserve hashes', async () => {
+test('Apply installs one atomic journal suffix and undo/redo restore certified state', async () => {
   const { session, spec, plan, candidate } = await prepared();
   const preview = createStartRoutePreview({ plan, candidate });
   const validation = createStartRouteValidation({ candidate, diagnostics: [] });
   const transaction = await executeStartRouteTransaction({
     session, plan, candidate, preview, validation, catalogue: spec,
   });
+  const applied = session.snapshot();
   assert.equal(transaction.commandCount, 3);
   assert.deepEqual(session.journal.activeCommandIds.slice(-3), transaction.commandIds);
   assert.equal(session.currentTopology().nodes.length, 2);
   assert.equal(session.currentTopology().edges.length, 1);
+  assert.equal(applied.journalHash, transaction.resultingJournalHash);
   undoStartRouteTransaction(session, transaction);
   assert.equal(session.currentTopology().canonicalTopologyHash, transaction.priorCanonicalHash);
   redoStartRouteTransaction(session, transaction);
   assert.equal(session.currentTopology().canonicalTopologyHash, transaction.resultingCanonicalHash);
-  assert.equal(session.journal.journalHash, transaction.resultingJournalHash);
+  assert.equal(session.journal.activeLedgerHash, applied.activeLedgerHash);
+  assert.equal(session.journal.sessionVersion, applied.sessionVersion + 6);
+  assert.notEqual(session.journal.journalHash, transaction.resultingJournalHash);
 });
 
 test('stale session, changed catalogue, and blocking validation fail', async () => {
