@@ -1,0 +1,199 @@
+name: LAFEA-NC NC-03 Exact-Head Elastic Denting Qualification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/lafea-nc03-elastic-denting-qualification.yml"
+      - "docs/nonlinear-shell-contact/LAFEA_NC03_ELASTIC_DENTING_QUALIFICATION.md"
+      - "scripts/lafea-nc03-check.mjs"
+      - "scripts/lafea-nc03-elastic-denting.mjs"
+      - "scripts/nc03-denting/**"
+      - "src/core/nonlinear-shell-contact/elastic-denting-procedure-contract.js"
+      - "src/core/nonlinear-shell-contact/elastic-denting-qualification-evaluator.js"
+      - "src/core/nonlinear-shell-contact/nc03-fixtures.js"
+      - "src/core/nonlinear-shell-contact/nc03-negative-controls.js"
+      - "tests/nonlinear-shell-contact-nc03-qualification.test.mjs"
+  workflow_dispatch:
+    inputs:
+      head_sha:
+        required: true
+        type: string
+      base_sha:
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  exact-head-nc03:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      DISPATCH_HEAD_SHA: ${{ inputs.head_sha }}
+      DISPATCH_BASE_SHA: ${{ inputs.base_sha }}
+      NC02_HEAD_SHA: 5918997ab20e76d60cc7d6a5fadbf48d017e2360
+      NC02_MERGE_SHA: 8e6d920fcea03a9cf8612b4545c0bdabf7139ddf
+      NC02_RUN_ID: "31062276128"
+      NC02_ARTIFACT_ID: "8952540888"
+      NC02_ARTIFACT_NAME: lafea-nc02-5918997ab20e76d60cc7d6a5fadbf48d017e2360-1
+      NC02_ARTIFACT_DIGEST: "sha256:83016a3503b02f9db0b8dccdde31e276044447d7cbc0f0a73039ac7a8d7b48d7"
+      NC02_REPORT_HASH: "sha256:5d64e19c876c08b79c0f186f7ddf43191adc9be0a337047c539eab5c18865697"
+      NC02_RUN_HASH: "sha256:47d02dc5aa57472a1131c3272309def9b79a7a39121cfaba7b98b55b9d688b33"
+      NC02_CONTACT_HASH: "sha256:d42b9840a34ecfc5042d77c9933ff27bbbc17dbaed7955fe1faf793d283a016a"
+      CUSTODY_HEAD_SHA: 2826cac45acc13fdd9634c861f9910e339f9d5d5
+      CUSTODY_RUN_ID: "31020771678"
+      CUSTODY_ARTIFACT_ID: "8936496053"
+      CUSTODY_ARTIFACT_NAME: lafea-nc-solver-container-2826cac45acc13fdd9634c861f9910e339f9d5d5-1
+      CUSTODY_ARTIFACT_DIGEST: "sha256:e14b467cd43f38218f3dba750b6c5f4f1ee83ed8ea9d241bf65673b9e7caf9b8"
+      SOLVER_DIGEST: "sha256:9a33d293706a66bee86f2f0ecf996a66758f904c20d61ad8c83ddc0f92ae4b7e"
+
+    steps:
+      - name: Resolve exact head and base
+        id: exact
+        shell: bash
+        run: |
+          set -euo pipefail
+          head_sha="${DISPATCH_HEAD_SHA:-${PR_HEAD_SHA:-${GITHUB_SHA}}}"
+          base_sha="${DISPATCH_BASE_SHA:-${PR_BASE_SHA:-}}"
+          [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$base_sha" =~ ^[0-9a-f]{40}$ ]]
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.exact.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Verify live base, ancestry and phase paths
+        shell: bash
+        env:
+          HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
+          BASE_SHA: ${{ steps.exact.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          test "$(git rev-parse refs/remotes/origin/main)" = "$BASE_SHA"
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          git merge-base --is-ancestor "$BASE_SHA" "$HEAD_SHA"
+          git merge-base --is-ancestor "$NC02_MERGE_SHA" "$HEAD_SHA"
+          git diff --check "$BASE_SHA...$HEAD_SHA"
+          mapfile -t paths < <(git diff --name-only "$BASE_SHA...$HEAD_SHA")
+          test "${#paths[@]}" -gt 0
+          for path in "${paths[@]}"; do
+            case "$path" in
+              .github/workflows/lafea-nc03-elastic-denting-qualification.yml|docs/nonlinear-shell-contact/LAFEA_NC03_ELASTIC_DENTING_QUALIFICATION.md|scripts/lafea-nc03-check.mjs|scripts/lafea-nc03-elastic-denting.mjs|scripts/nc03-denting/*|src/core/nonlinear-shell-contact/elastic-denting-procedure-contract.js|src/core/nonlinear-shell-contact/elastic-denting-qualification-evaluator.js|src/core/nonlinear-shell-contact/nc03-fixtures.js|src/core/nonlinear-shell-contact/nc03-negative-controls.js|tests/nonlinear-shell-contact-nc03-qualification.test.mjs) ;;
+              *) echo "NC-03 path violation: $path" >&2; exit 1 ;;
+            esac
+          done
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install governed runtime dependencies
+        run: |
+          set -euo pipefail
+          npm ci
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libblas3 liblapack3 libgfortran5
+
+      - name: Download and validate NC-02 and solver custody
+        id: custody
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          verify_artifact() {
+            local id="$1" name="$2" digest="$3" run="$4" head="$5" meta
+            meta="$(gh api "/repos/$GITHUB_REPOSITORY/actions/artifacts/$id")"
+            test "$(jq -r .name <<<"$meta")" = "$name"
+            test "$(jq -r .digest <<<"$meta")" = "$digest"
+            test "$(jq -r .expired <<<"$meta")" = "false"
+            test "$(jq -r .workflow_run.id <<<"$meta")" = "$run"
+            test "$(jq -r .workflow_run.head_sha <<<"$meta")" = "$head"
+          }
+          verify_artifact "$NC02_ARTIFACT_ID" "$NC02_ARTIFACT_NAME" "$NC02_ARTIFACT_DIGEST" "$NC02_RUN_ID" "$NC02_HEAD_SHA"
+          verify_artifact "$CUSTODY_ARTIFACT_ID" "$CUSTODY_ARTIFACT_NAME" "$CUSTODY_ARTIFACT_DIGEST" "$CUSTODY_RUN_ID" "$CUSTODY_HEAD_SHA"
+          nc02="$RUNNER_TEMP/nc02"
+          custody="$RUNNER_TEMP/custody"
+          mkdir -p "$nc02" "$custody" artifacts/nc03-input artifacts/nc03-debug
+          gh run download "$NC02_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$NC02_ARTIFACT_NAME" --dir "$nc02"
+          gh run download "$CUSTODY_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$CUSTODY_ARTIFACT_NAME" --dir "$custody"
+          cmp "$nc02/nc02-a/nc02-report.canonical.json" "$nc02/nc02-b/nc02-report.canonical.json"
+          node scripts/nc03-denting/prepare-binding.mjs "$nc02" artifacts/nc03-input/upstream-binding.json
+          solver="$custody/binary/ccx_2.22"
+          chmod 0755 "$solver"
+          test "sha256:$(sha256sum "$solver" | cut -d' ' -f1)" = "$SOLVER_DIGEST"
+          echo "solver=$solver" >> "$GITHUB_OUTPUT"
+
+      - name: Run syntax, unit and negative controls
+        run: |
+          set -euo pipefail
+          node --check scripts/lafea-nc03-check.mjs
+          node --check scripts/lafea-nc03-elastic-denting.mjs
+          find scripts/nc03-denting -type f -name "*.mjs" -print0 | sort -z | xargs -0 -n1 node --check
+          node --test tests/nonlinear-shell-contact-nc03-qualification.test.mjs
+
+      - name: Execute two isolated exact-solver replays
+        shell: bash
+        env:
+          HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
+          SOLVER: ${{ steps.custody.outputs.solver }}
+        run: |
+          set -euo pipefail
+          node_bin="$(command -v node)"
+          for tag in a b; do
+            sudo --preserve-env=HEAD_SHA,SOLVER,PATH unshare --net --mount-proc "$node_bin" scripts/lafea-nc03-elastic-denting.mjs \
+              --solver="$SOLVER" --head-sha="$HEAD_SHA" --output-root="$GITHUB_WORKSPACE/artifacts/nc03-real-$tag" \
+              >"artifacts/nc03-debug/real-$tag.stdout.log" 2>"artifacts/nc03-debug/real-$tag.stderr.log"
+          done
+          cmp artifacts/nc03-real-a/real-denting-summary.canonical.json artifacts/nc03-real-b/real-denting-summary.canonical.json
+          diff -ru artifacts/nc03-real-a/evidence artifacts/nc03-real-b/evidence
+          test "$(find artifacts/nc03-real-a/evidence -maxdepth 1 -type f -name '*.json' | wc -l)" = 8
+
+      - name: Evaluate qualification twice
+        shell: bash
+        env:
+          HEAD_SHA: ${{ steps.exact.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          node scripts/lafea-nc03-check.mjs --head-sha="$HEAD_SHA" --upstream-binding=artifacts/nc03-input/upstream-binding.json --evidence-root=artifacts/nc03-real-a/evidence --output-dir=artifacts/nc03-a >artifacts/nc03-debug/eval-a.stdout.log 2>artifacts/nc03-debug/eval-a.stderr.log
+          node scripts/lafea-nc03-check.mjs --head-sha="$HEAD_SHA" --upstream-binding=artifacts/nc03-input/upstream-binding.json --evidence-root=artifacts/nc03-real-b/evidence --output-dir=artifacts/nc03-b >artifacts/nc03-debug/eval-b.stdout.log 2>artifacts/nc03-debug/eval-b.stderr.log
+          cmp artifacts/nc03-a/nc03-report.canonical.json artifacts/nc03-b/nc03-report.canonical.json
+          node -e "const fs=require('node:fs');const r=JSON.parse(fs.readFileSync('artifacts/nc03-a/nc03-report.json'));if(r.status!=='NC03_QUALIFIED'||r.authority.elasticDentingProcedureQualified!==true||r.authority.nc04Authorized!==true||r.authority.productionExecutionAuthorized!==false)process.exit(1)"
+
+      - name: Verify clean source tree
+        if: always()
+        run: test -z "$(git status --porcelain --untracked-files=no)"
+
+      - name: Upload diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc03-debug-${{ steps.exact.outputs.head_sha }}-${{ github.run_attempt }}
+          path: artifacts
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload authoritative NC-03 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc03-${{ steps.exact.outputs.head_sha }}-${{ github.run_attempt }}
+          path: |
+            artifacts/nc03-a
+            artifacts/nc03-b
+            artifacts/nc03-real-a
+            artifacts/nc03-real-b
+            artifacts/nc03-input
+          if-no-files-found: error
+          retention-days: 30
