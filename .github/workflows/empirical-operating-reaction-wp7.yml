@@ -1,0 +1,96 @@
+name: empirical-operating-reaction-wp7
+
+on:
+  push:
+    branches:
+      - agent/empirical-operating-reaction-wp7
+    paths:
+      - 'src/workspace/engineering-loads/empirical-operating-reaction-*.js'
+      - 'src/workspace/engineering-loads/empirical-beam-contact-*.js'
+      - 'src/workspace/engineering-loads/empirical-restraint-network-*.js'
+      - 'src/workspace/engineering-loads/empirical-coupled-restraint-network-*.js'
+      - 'src/workspace/engineering-loads/contracts/empirical-sjson-contracts.js'
+      - 'scripts/empirical-operating-reaction-check.mjs'
+      - 'scripts/empirical-beam-contact-runtime-check.mjs'
+      - 'scripts/empirical-coupled-restraint-network-check.mjs'
+      - '.github/workflows/empirical-piping-exact-head.yml'
+      - '.github/workflows/empirical-operating-reaction-wp7.yml'
+  pull_request:
+    paths:
+      - 'src/workspace/engineering-loads/empirical-operating-reaction-*.js'
+      - 'src/workspace/engineering-loads/empirical-beam-contact-*.js'
+      - 'src/workspace/engineering-loads/empirical-restraint-network-*.js'
+      - 'src/workspace/engineering-loads/empirical-coupled-restraint-network-*.js'
+      - 'src/workspace/engineering-loads/contracts/empirical-sjson-contracts.js'
+      - 'scripts/empirical-operating-reaction-check.mjs'
+      - 'scripts/empirical-beam-contact-runtime-check.mjs'
+      - 'scripts/empirical-coupled-restraint-network-check.mjs'
+      - '.github/workflows/empirical-piping-exact-head.yml'
+      - '.github/workflows/empirical-operating-reaction-wp7.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: empirical-operating-reaction-wp7-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Prove exact-head execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
+          git diff --check
+          git diff --exit-code
+
+      - name: Syntax contracts
+        shell: bash
+        run: |
+          node --check src/workspace/engineering-loads/empirical-operating-reaction-profile.js
+          node --check src/workspace/engineering-loads/empirical-operating-reaction-combiner.js
+          node --check scripts/empirical-operating-reaction-check.mjs
+
+      - name: Qualified component-wise operating reaction
+        run: node scripts/empirical-operating-reaction-check.mjs
+
+      - name: WP6 coupled-network regression
+        run: node scripts/empirical-coupled-restraint-network-check.mjs
+
+      - name: WP5 restricted-network regression
+        run: node scripts/empirical-restraint-network-check.mjs
+
+      - name: WP2 vertical/contact regression
+        run: node scripts/empirical-beam-contact-runtime-check.mjs
+
+      - name: Adapter, scenario and source isolation
+        shell: bash
+        run: |
+          node scripts/empirical-sjson-adapter-contract-check.mjs
+          node scripts/empirical-load-calc-scenario-check.mjs
+          node scripts/empirical-piping-source-boundary-check.mjs
+
+      - name: Import graph
+        run: npm run check:imports
