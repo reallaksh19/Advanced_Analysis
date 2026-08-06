@@ -3,6 +3,7 @@ import {
 } from './topology-edit-3d-professional-controller.js';
 import {
   applyTopologyEditAuthoredBendProjection,
+  deriveTopologyEditAuthoredBendProjection,
 } from './topology-edit/authoring/topology-edit-authored-bend-geometry.js';
 import {
   TopologyEditAuthoringRuntime,
@@ -122,11 +123,13 @@ export class TopologyEdit3DViewController extends ProfessionalController {
   }
 
   exposeAuthoredRenderRoles() {
+    const canonical = this.session?.currentTopology?.();
     const draftGroup = this.viewportBackend?.groups?.draftGroup;
-    if (!draftGroup) return;
-    const authoredBendIds = new Set((this.session?.currentTopology()?.bends ?? [])
-      .filter((bend) => Boolean(bend.createdByCommandId))
-      .map((bend) => bend.id));
+    if (!canonical || !draftGroup) return;
+    const authoredProjection = deriveTopologyEditAuthoredBendProjection(canonical);
+    const authoredBendIds = new Set(authoredProjection.segments.map((segment) => (
+      segment.pickTarget?.objectId
+    )).filter(Boolean));
     let authoredPartCount = 0;
     draftGroup.traverse((object) => {
       const directTarget = object.userData?.pickTarget ?? null;
@@ -149,16 +152,15 @@ export class TopologyEdit3DViewController extends ProfessionalController {
       if (String(partRole).startsWith('authored-')) authoredPartCount += 1;
     });
     if (this.hostElement) {
-      this.hostElement.dataset.topologyEditAuthoredRenderPartCount = String(authoredPartCount);
-      const projectedArcCount = Number(
-        this.hostElement.dataset.topologyEditAuthoredBendArcCount ?? 0,
-      );
+      this.hostElement.dataset.topologyEditAuthoredBendProjectionHash =
+        authoredProjection.projectionHash;
       this.hostElement.dataset.topologyEditAuthoredBendArcCount = String(
-        Math.max(
-          Number.isFinite(projectedArcCount) ? projectedArcCount : 0,
-          authoredPartCount,
-        ),
+        authoredProjection.segments.length,
       );
+      this.hostElement.dataset.topologyEditAuthoredBendDiagnosticCount = String(
+        authoredProjection.diagnostics.length,
+      );
+      this.hostElement.dataset.topologyEditAuthoredRenderPartCount = String(authoredPartCount);
     }
   }
 
