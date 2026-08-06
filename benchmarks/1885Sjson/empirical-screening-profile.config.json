@@ -1,13 +1,26 @@
 {
   "schema": "empirical-sjson-screening-profile/v1",
-  "profileId": "1885-SJSON-CS-CONFIGURABLE-SCREENING-V1",
+  "profileId": "1885-SJSON-CS-CONFIGURABLE-SCREENING-V2",
   "status": "EXPERIMENTAL_CONFIGURABLE_SCREENING",
   "source": {
     "commit": "07ce017eb7113517cc032771f7717f88c0a93d4c",
     "enrichedSjsonPath": "benchmarks/1885Sjson/EnrichedSjson",
-    "topologyInputXmlPath": "benchmarks/1885Sjson/EnrichedSjson.topology.input.xml",
+    "originalTopologyInputXmlPath": "benchmarks/1885Sjson/EnrichedSjson.topology.input.xml",
+    "topologyInputXmlPath": "GENERATED:COMMON_POS_SECTION_MATERIAL_V1",
+    "projectDataDefaultsPath": "project-data/1885s-nonfea-piping-defaults.json",
     "coordinateUnit": "mm",
     "sourceVerticalAxis": "Z"
+  },
+  "sectionResolution": {
+    "method": "COMMON_POS_SECTION_MATERIAL_V1",
+    "positionAuthority": "TOPOLOGY_PIPINGELEMENT_ORDER_AND_IDENTITY",
+    "scheduleAuthority": "SAME_BRANCH_FITTING_SCHEDULE",
+    "nominalSizeAuthority": "TOPOLOGY_OD_EXACT_STANDARD_CROSSWALK",
+    "dimensionAuthority": "SCHEDULE_MASTER_ELSE_EXACT_SCOPED_PROJECT_CONFIGURED_SECTION",
+    "topologyWallTreatment": "AUDIT_COMPARISON_ONLY_NOT_CALCULATION_AUTHORITY",
+    "governedProjectionSchema": "empirical-sjson-governed-section-projection/v1",
+    "scheduleDefaultPolicy": "PROHIBITED",
+    "blockedPolicy": "BLOCK_CALCULATION"
   },
   "material": {
     "family": "CARBON_STEEL",
@@ -16,33 +29,15 @@
     "thermalExpansionModel": "CS_MEAN_SECANT_INTERPOLATED",
     "referenceTemperatureC": 21,
     "meanAlphaTablePerC": [
-      {
-        "temperatureC": 20,
-        "alpha": 1.17e-05
-      },
-      {
-        "temperatureC": 100,
-        "alpha": 1.2e-05
-      },
-      {
-        "temperatureC": 200,
-        "alpha": 1.24e-05
-      },
-      {
-        "temperatureC": 300,
-        "alpha": 1.28e-05
-      },
-      {
-        "temperatureC": 400,
-        "alpha": 1.32e-05
-      }
+      { "temperatureC": 20, "alpha": 0.0000117 },
+      { "temperatureC": 100, "alpha": 0.000012 },
+      { "temperatureC": 200, "alpha": 0.0000124 },
+      { "temperatureC": 300, "alpha": 0.0000128 },
+      { "temperatureC": 400, "alpha": 0.0000132 }
     ]
   },
   "processResolution": {
-    "sentinelValues": [
-      -1.0101,
-      -2.0202
-    ],
+    "sentinelValues": [-1.0101, -2.0202],
     "sentinelTolerance": 0.001,
     "policy": "INHERIT_PREVIOUS_CONNECTED_NODE",
     "scope": "CONNECTED_TOPOLOGY",
@@ -105,10 +100,7 @@
   "supportProjection": {
     "authority": "COMPANION_TOPOLOGY_XML_RESTRAINTS",
     "reconciliationEvidence": "36 coordinate-distinct XML sites; repeated support tags remain separate sites",
-    "consolidateBy": [
-      "baseSupportTag",
-      "coordinateWithinTolerance"
-    ],
+    "consolidateBy": ["baseSupportTag", "coordinateWithinTolerance"],
     "genericSupportCapabilityAsRest": true,
     "coordinateToleranceMm": 2,
     "expectedPhysicalSupportSiteCount": 36,
