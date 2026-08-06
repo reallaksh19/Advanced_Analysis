@@ -69,15 +69,29 @@ const sjsonFidelityControllerSource = await readFile(
   path.join(root, 'src/workspace/topology-edit-3d-sjson-fidelity-controller.js'),
   'utf8',
 );
+const productivityControllerSource = await readFile(
+  path.join(root, 'src/workspace/topology-edit-3d-productivity-controller.js'),
+  'utf8',
+);
 assert.equal(
-  sjsonFidelityControllerSource.includes("from './topology-edit-3d-professional-controller.js'"),
+  sjsonFidelityControllerSource.includes("from './topology-edit-3d-productivity-controller.js'"),
   true,
-  'SJSON fidelity controller must inherit the professional 3D controller.',
+  'SJSON fidelity controller must inherit the governed productivity controller.',
 );
 assert.match(
   sjsonFidelityControllerSource,
   /export class TopologyEdit3DViewController extends ProfessionalController/u,
-  'SJSON fidelity controller must preserve professional controller ownership.',
+  'SJSON fidelity controller must preserve its imported controller ownership.',
+);
+assert.equal(
+  productivityControllerSource.includes("from './topology-edit-3d-professional-controller.js'"),
+  true,
+  'Productivity controller must inherit the professional 3D controller.',
+);
+assert.match(
+  productivityControllerSource,
+  /export class TopologyEdit3DViewController extends ProfessionalController/u,
+  'Productivity controller must preserve professional controller ownership.',
 );
 const jsonTraceSource = await readFile(path.join(root, 'src/workspace/json-trace-ui.js'), 'utf8');
 assert.doesNotMatch(jsonTraceSource, /fixture|fetch\(/iu, 'JSON Trace must not load a fixture or external fallback.');
