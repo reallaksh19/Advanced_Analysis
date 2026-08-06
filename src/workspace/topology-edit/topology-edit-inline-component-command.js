@@ -226,7 +226,10 @@ export function applyTopologyEditInlineComponent(topology, command) {
 
 export function validateTopologyEditInlineComponentEffect(candidate) {
   const delta = candidate.topologyDelta;
-  const placement = candidate.resolvedCommand?.payload?.placement ?? 'INTERIOR';
+  const resolvedPayload = candidate.resolvedPayload
+    ?? candidate.resolvedCommand?.payload
+    ?? {};
+  const placement = resolvedPayload.placement ?? 'INTERIOR';
   const expectedNodeCount = placement === 'INTERIOR' ? 2 : 1;
   const expectedEdgeCount = placement === 'INTERIOR' ? 3 : 2;
   const additions = [
@@ -247,9 +250,9 @@ export function validateTopologyEditInlineComponentEffect(candidate) {
     && componentEdges.length === 1
     && componentEdges[0].inlinePlacement === placement
     && semanticHash(componentEdges[0].assemblyBinding)
-      === semanticHash(candidate.resolvedCommand?.payload?.assemblyBinding ?? null)
+      === semanticHash(resolvedPayload.assemblyBinding ?? null)
     && componentEdges[0].catalogueBinding?.recordHash
-      === candidate.resolvedCommand?.payload?.catalogueBinding?.recordHash;
+      === resolvedPayload.catalogueBinding?.recordHash;
   const findings = [];
   if (!validShape) findings.push({
     code: 'INSERT_INLINE_COMPONENT_DELTA_INVALID',

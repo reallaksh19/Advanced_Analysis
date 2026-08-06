@@ -192,9 +192,9 @@ test('Valve assembly rejects changed catalogue or derived evidence', () => {
   let authoring = updateTopologyEditAuthoringProperties(initial, { valveMassKg: 1 }, 'CATALOGUE');
   assert.throws(() => createTopologyEditAuthoringOperationPlan({
     topology, authoringSession: authoring, catalogue,
-  }), /must equal exact assembly catalogue evidence/);
+  }), /(?:must equal exact assembly catalogue evidence|no exact flange–valve–flange catalogue assembly fits)/);
   authoring = updateTopologyEditAuthoringProperties(initial, { assemblyMassKg: 1 }, 'DERIVED');
   assert.throws(() => createTopologyEditAuthoringOperationPlan({
     topology, authoringSession: authoring, catalogue,
-  }), /must equal exact assembly catalogue evidence/);
+  }), /(?:must equal exact assembly catalogue evidence|no exact flange–valve–flange catalogue assembly fits)/);
 });

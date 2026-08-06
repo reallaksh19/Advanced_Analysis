@@ -102,7 +102,10 @@ function validateSplit(context) {
 function validateInline(context) {
   const { candidate, delta, additionsByCommand, nodeChanges, edgeChanges, otherChanges } = context;
   const findings = [];
-  const payload = candidate.resolvedCommand?.payload ?? candidate.request?.payload ?? {};
+  const payload = candidate.resolvedPayload
+    ?? candidate.resolvedCommand?.payload
+    ?? candidate.request?.payload
+    ?? {};
   const placement = String(payload.placement ?? 'INTERIOR').toUpperCase();
   const boundary = placement !== 'INTERIOR';
   const expectedNodeCount = boundary ? 1 : 2;
