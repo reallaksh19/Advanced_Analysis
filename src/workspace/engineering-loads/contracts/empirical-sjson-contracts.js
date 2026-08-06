@@ -15,6 +15,7 @@ export const EMPIRICAL_ANALYSIS_METHODS = Object.freeze([
   'CHAINAGE_TRIBUTARY_SPAN_V3_COG',
   'EMPIRICAL_BEAM_CONTACT_V1',
   'EMPIRICAL_RESTRAINT_NETWORK_V1',
+  'EMPIRICAL_RESTRAINT_NETWORK_V2',
 ]);
 
 export const EMPIRICAL_LOAD_CASE_IDS = Object.freeze([
@@ -341,17 +342,17 @@ function validateMethodResultOwnership(scenario) {
   const lineStop = scenario.loadCases.filter((row) => (
     row.resultClass === 'THERMAL_LINE_STOP_SCREENING_RESULT'
   ));
-  if (scenario.method === 'EMPIRICAL_RESTRAINT_NETWORK_V1') {
+  if (['EMPIRICAL_RESTRAINT_NETWORK_V1', 'EMPIRICAL_RESTRAINT_NETWORK_V2'].includes(scenario.method)) {
     if (lineStop.length !== scenario.loadCases.length) {
       throw new TypeError(
-        'EMPIRICAL_RESTRAINT_NETWORK_V1 may emit thermal line-stop screening results only.',
+        'Empirical restraint-network methods may emit thermal line-stop screening results only.',
       );
     }
     scenario.loadCases.forEach((row) => {
       if (!row.effects.thermalStrain || row.effects.weight
         || row.effects.pressureCompatibility || row.effects.pressureStress) {
         throw new TypeError(
-          'The restricted restraint-network method requires thermal-strain-only load ownership.',
+          'Empirical restraint-network methods require thermal-strain-only load ownership.',
         );
       }
     });
