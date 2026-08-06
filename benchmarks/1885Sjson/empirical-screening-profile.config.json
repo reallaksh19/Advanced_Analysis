@@ -69,6 +69,7 @@
   },
   "supportProjection": {
     "authority": "COMPANION_TOPOLOGY_XML_RESTRAINTS",
+    "reconciliationEvidence": "36 coordinate-distinct XML sites; repeated support tags remain separate sites",
     "consolidateBy": ["baseSupportTag", "coordinateWithinTolerance"],
     "genericSupportCapabilityAsRest": true,
     "coordinateToleranceMm": 2,
