@@ -1,0 +1,11 @@
+import { readFile, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { semanticHash } from '../../src/core/nonlinear-shell-contact/contracts.js';
+const [nc05Root,nc06Root,out]=process.argv.slice(2);if(!out)throw Error('usage: prepare-binding <nc05-root> <nc06-root> <out>');
+const nc05=JSON.parse(await readFile(resolve(nc05Root,'nc05-a/nc05-report.json'),'utf8'));
+const nc06=JSON.parse(await readFile(resolve(nc06Root,'nc06-a/nc06-report.json'),'utf8'));
+const basis=JSON.parse(await readFile(resolve(nc06Root,'nc06-real-a/assessment-basis.json'),'utf8'));
+if(nc05.status!=='NC05_QUALIFIED'||nc05.blockers.length||nc05.authority.plasticDentingProcedureQualified!==true)throw Error('NC05 unqualified');
+if(nc06.status!=='NC06_PACKAGE_QUALIFIED'||nc06.blockers.length||nc06.authority.codeAssessmentPackageQualified!==true||nc06.authority.nc07Authorized!==true)throw Error('NC06 unqualified');
+const payload={schema:'nonlinear-shell-contact-nc07-upstream-binding/v2',nc05ExactHeadSha:nc05.candidateExactHeadSha,nc06ExactHeadSha:nc06.candidateExactHeadSha,nc05ReportHash:nc05.reportSemanticHash,nc06ReportHash:nc06.reportSemanticHash,nc05ArtifactDigest:process.env.NC05_ARTIFACT_DIGEST,nc06ArtifactDigest:process.env.NC06_ARTIFACT_DIGEST,plasticDentingProcedureQualified:true,codeAssessmentPackageQualified:true,nc07Authorized:true,qualifiedCellId:'NC05-CELL-DT40-LD2-PER0.04',assessmentBasisId:basis.id,assessmentBasisHash:basis.basisHash};
+await writeFile(out,`${JSON.stringify({...payload,semanticHash:semanticHash(payload)},null,2)}\n`,'utf8');
