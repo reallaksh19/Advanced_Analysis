@@ -1,0 +1,72 @@
+name: wp6-authority-patch
+
+on:
+  push:
+    branches:
+      - agent/empirical-coupled-network-wp6
+    paths:
+      - '.github/workflows/wp6-authority-patch.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/empirical-coupled-network-wp6
+          fetch-depth: 0
+
+      - name: Patch adapter and registry
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          adapter = Path('src/workspace/engineering-loads/adapters/sjson-to-empirical-piping-request.js')
+          text = adapter.read_text()
+          old = "if (!['EMPIRICAL_BEAM_CONTACT_V1', 'EMPIRICAL_RESTRAINT_NETWORK_V1'].includes(value)) {"
+          new = "if (!['EMPIRICAL_BEAM_CONTACT_V1', 'EMPIRICAL_RESTRAINT_NETWORK_V1', 'EMPIRICAL_RESTRAINT_NETWORK_V2'].includes(value)) {"
+          if old not in text:
+              raise SystemExit('adapter admission anchor not found')
+          adapter.write_text(text.replace(old, new, 1))
+
+          registry = Path('src/workspace/engineering-loads/empirical-method-registry.js')
+          text = registry.read_text()
+          anchor = """  method({
+              methodId: 'EMPIRICAL_RESTRAINT_NETWORK_V1',
+              purpose: 'GUIDE_LINE_STOP_THERMAL_SCREENING',
+              runtimeStatus: 'REGISTERED',
+              qualificationStatus: 'QUALIFIED_RESTRICTED_DOMAIN',
+              resultClasses: ['THERMAL_LINE_STOP_SCREENING_RESULT'],
+              qualifiedDofs: ['ONE_TRANSLATIONAL_DIRECTION'],
+            }),
+          """
+          addition = anchor + """  method({
+              methodId: 'EMPIRICAL_RESTRAINT_NETWORK_V2',
+              purpose: 'COUPLED_BRANCH_LOOP_THERMAL_SCREENING',
+              runtimeStatus: 'REGISTERED',
+              qualificationStatus: 'QUALIFIED_RESTRICTED_DOMAIN',
+              resultClasses: ['THERMAL_LINE_STOP_SCREENING_RESULT'],
+              qualifiedDofs: ['ONE_TRANSLATIONAL_DIRECTION_COUPLED_GRAPH'],
+            }),
+          """
+          if anchor not in text:
+              raise SystemExit('registry insertion anchor not found')
+          registry.write_text(text.replace(anchor, addition, 1))
+          PY
+
+      - name: Commit patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/workspace/engineering-loads/adapters/sjson-to-empirical-piping-request.js \
+            src/workspace/engineering-loads/empirical-method-registry.js
+          git commit -m 'Register WP6 coupled restraint network'
+          git push origin HEAD:agent/empirical-coupled-network-wp6
