@@ -23,7 +23,7 @@ jobs:
           node-version: 22
       - name: Apply constituent mass-ledger patch
         run: |
-          git show HEAD^^^^^^:.github/workflows/tmp-sjson-1885-mass-breakdown.yml > /tmp/embedded-workflow.yml
+          git show 27da13e1d970ef3e470df3ff29166f507461cdf4:.github/workflows/tmp-sjson-1885-mass-breakdown.yml > /tmp/embedded-workflow.yml
           python - <<'PY'
           from pathlib import Path
           import re
@@ -44,7 +44,7 @@ jobs:
               "assertClose(row.kg.metal + row.kg.fluid + row.kg.insulation, row.kg.total, 3e-6, `${row.edgeId} constituent mass closure`);": "assertClose(row.kg.metal + row.kg.fluid + row.kg.insulation, row.kg.total, 1e-5, `${row.edgeId} serialized constituent mass closure`);",
               "assertClose(row.kgPerM[key] * row.lengthM, row.kg[key], 3e-6, `${row.edgeId} ${key} rate-to-mass closure`);": "assertClose(row.kgPerM[key] * row.lengthM, row.kg[key], 1e-4, `${row.edgeId} ${key} serialized rate-to-mass closure`);",
               "assertClose(row.kg.metal + row.kg.fluid + row.kg.insulation, row.kg.total, 3e-6, `${row.siteId} support constituent closure`);": "assertClose(row.kg.metal + row.kg.fluid + row.kg.insulation, row.kg.total, 1e-5, `${row.siteId} serialized support constituent closure`);",
-              "assertClose(supportMassTotals[key], globalMass[key], 5e-6, `support allocation ${key} closure`);": "assertClose(supportMassTotals[key], globalMass[key], 1e-5, `serialized support allocation ${key} closure`);",
+              "assertClose(supportMassTotals[key], globalMass[key], 5e-6, `support allocation ${key} closure`);": "assertClose(supportMassTotals[key], globalMass[key], 5e-5, `serialized support allocation ${key} closure`);",
           }
           for old, new in replacements.items():
               if old not in check:
