@@ -1,0 +1,27 @@
+name: SJSON empirical exact run f2183ca
+
+on:
+  push:
+    branches:
+      - agent/sjson-empirical-exact-run-f2183ca
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Materialize exact SJSON revision
+        run: git show f2183ca419d487cb5f174d04e985bcd4be9c5e2c:public/Sjson.json > /tmp/Sjson-f2183ca.json
+      - name: Audit governed calculation authorities
+        run: node scripts/empirical-piping-sjson-exact-source-audit.mjs /tmp/Sjson-f2183ca.json
