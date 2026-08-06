@@ -1,0 +1,100 @@
+name: 3D Edit Valve Assembly Authoring
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/topology-edit-valve-assembly-authoring.yml'
+      - 'public/fixtures/topology-edit-professional-spec-catalog.json'
+      - 'src/workspace/topology-edit/authoring/topology-edit-authoring-session.js'
+      - 'src/workspace/topology-edit/authoring/topology-edit-authoring-operation-planner.js'
+      - 'src/workspace/topology-edit/authoring/topology-edit-authoring-valve-assembly.js'
+      - 'src/workspace/topology-edit/authoring/topology-edit-operation-graph.js'
+      - 'src/workspace/topology-edit/professional/topology-edit-inline-component-operation.js'
+      - 'src/workspace/topology-edit/topology-edit-command-contract.js'
+      - 'src/workspace/topology-edit/topology-edit-inline-component-command.js'
+      - 'src/workspace/topology-edit/topology-edit-command-effect-validator.js'
+      - 'src/workspace/viewport-productivity/topology-edit-component-authoring-runtime.js'
+      - 'tests/topology-edit-valve-assembly-authoring.test.mjs'
+      - 'tests/topology-edit-inline-component-insertion.test.mjs'
+      - 'e2e/topology-edit-valve-assembly-authoring.spec.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: topology-edit-valve-assembly-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  valve-assembly-authoring:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PLAYWRIGHT_BROWSER_CHANNEL: chromium
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies and Chromium
+        run: |
+          set -euo pipefail
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Verify exact valve assembly sources
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+          node --check src/workspace/topology-edit/authoring/topology-edit-authoring-session.js
+          node --check src/workspace/topology-edit/authoring/topology-edit-authoring-operation-planner.js
+          node --check src/workspace/topology-edit/authoring/topology-edit-authoring-valve-assembly.js
+          node --check src/workspace/topology-edit/authoring/topology-edit-operation-graph.js
+          node --check src/workspace/topology-edit/professional/topology-edit-inline-component-operation.js
+          node --check src/workspace/topology-edit/topology-edit-command-contract.js
+          node --check src/workspace/topology-edit/topology-edit-inline-component-command.js
+          node --check src/workspace/topology-edit/topology-edit-command-effect-validator.js
+          node --check src/workspace/viewport-productivity/topology-edit-component-authoring-runtime.js
+          node --check tests/topology-edit-valve-assembly-authoring.test.mjs
+          node --check e2e/topology-edit-valve-assembly-authoring.spec.js
+          git diff --check
+
+      - name: Execute governed valve assembly contracts
+        run: |
+          set -o pipefail
+          node --test --test-reporter=tap \
+            tests/topology-edit-valve-assembly-authoring.test.mjs \
+            tests/topology-edit-component-authoring.test.mjs \
+            tests/topology-edit-authoring-session.test.mjs \
+            tests/topology-edit-inline-component-insertion.test.mjs \
+            tests/topology-edit-authoring-composite-operation.test.mjs \
+            2>&1 | tee topology-edit-valve-assembly-test-output.txt
+
+      - name: Execute production Chromium valve assembly walkthrough
+        run: |
+          npx playwright test \
+            e2e/topology-edit-valve-assembly-authoring.spec.js \
+            --project=chromium --workers=1 --retries=0 --reporter=line
+
+      - name: Upload valve assembly qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-valve-assembly-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            topology-edit-valve-assembly-test-output.txt
+            playwright-report
+            test-results
+          if-no-files-found: warn
+          retention-days: 30

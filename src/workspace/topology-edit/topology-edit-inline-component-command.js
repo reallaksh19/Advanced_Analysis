@@ -13,10 +13,15 @@ export const TOPOLOGY_EDIT_INLINE_LENGTH_AUTHORITIES = Object.freeze([
   'CATALOGUE_COMPONENT_LENGTH',
   'USER_DECLARED_COMPONENT_LENGTH',
 ]);
+export const TOPOLOGY_EDIT_INLINE_PLACEMENTS = Object.freeze([
+  'INTERIOR', 'FROM_BOUNDARY', 'TO_BOUNDARY',
+]);
 
 const COMPONENT_TYPES = new Set(TOPOLOGY_EDIT_INLINE_COMPONENT_TYPES);
 const DIRECTIONS = new Set(TOPOLOGY_EDIT_INLINE_DIRECTIONS);
 const LENGTH_AUTHORITIES = new Set(TOPOLOGY_EDIT_INLINE_LENGTH_AUTHORITIES);
+const PLACEMENTS = new Set(TOPOLOGY_EDIT_INLINE_PLACEMENTS);
+const ASSEMBLY_ROLES = new Set(['UPSTREAM_FLANGE', 'VALVE', 'DOWNSTREAM_FLANGE']);
 const STRAIGHT_TYPES = new Set(['PIPE', 'STRAIGHT', 'STRAIGHT_ELEMENT']);
 const EPSILON = 1e-9;
 
@@ -27,6 +32,7 @@ export function normalizeTopologyEditInlineComponentPayload(input = {}) {
     'catalogueBinding.componentType',
   );
   const direction = enumText(input.direction ?? 'FROM_TO', DIRECTIONS, 'direction');
+  const placement = enumText(input.placement ?? 'INTERIOR', PLACEMENTS, 'placement');
   const lengthAuthority = enumText(
     input.lengthAuthority,
     LENGTH_AUTHORITIES,
@@ -34,6 +40,7 @@ export function normalizeTopologyEditInlineComponentPayload(input = {}) {
   );
   const insertionLengthMm = positive(input.insertionLengthMm, 'insertionLengthMm');
   const binding = normalizeBinding(input.catalogueBinding, componentType);
+  const assemblyBinding = normalizeAssemblyBinding(input.assemblyBinding, binding);
   if (
     componentType === 'VALVE'
     && lengthAuthority === 'CATALOGUE_VALVE_FACE_TO_FACE'
@@ -61,11 +68,14 @@ export function normalizeTopologyEditInlineComponentPayload(input = {}) {
     insertionLengthMm,
     lengthAuthority,
     direction,
+    placement,
     catalogueBinding: binding,
+    assemblyBinding,
   });
 }
 
-export function assertTopologyEditInlineComponentTarget(topology, payload) {
+export function assertTopologyEditInlineComponentTarget(topology, payloadInput) {
+  const payload = normalizeTopologyEditInlineComponentPayload(payloadInput);
   const edge = exact(topology?.edges, payload.edgeId, 'host edge');
   if (!STRAIGHT_TYPES.has(normalizedType(edge.entityType))) {
     fail(`host edge ${edge.id} must be a straight pipe edge.`, RangeError);
@@ -78,8 +88,16 @@ export function assertTopologyEditInlineComponentTarget(topology, payload) {
   const halfFraction = payload.insertionLengthMm / (2 * lengthMm);
   const startFraction = payload.centerFraction - halfFraction;
   const endFraction = payload.centerFraction + halfFraction;
-  if (!(startFraction > EPSILON && endFraction < 1 - EPSILON)) {
-    fail('inline component must fit strictly inside the host edge.', RangeError);
+  const validPlacement = {
+    INTERIOR: startFraction > EPSILON && endFraction < 1 - EPSILON,
+    FROM_BOUNDARY: Math.abs(startFraction) <= EPSILON && endFraction < 1 - EPSILON,
+    TO_BOUNDARY: startFraction > EPSILON && Math.abs(endFraction - 1) <= EPSILON,
+  }[payload.placement];
+  if (!validPlacement) {
+    if (payload.placement === 'INTERIOR') {
+      fail('inline component must fit strictly inside the host edge for INTERIOR placement.', RangeError);
+    }
+    fail(`inline ${payload.placement.toLowerCase()} placement does not fit the host edge.`, RangeError);
   }
   assertHostCompatibility(edge, payload.catalogueBinding, payload.direction);
   return deepFreeze({
@@ -87,15 +105,16 @@ export function assertTopologyEditInlineComponentTarget(topology, payload) {
     from,
     to,
     lengthMm,
-    startFraction,
-    endFraction,
+    startFraction: payload.placement === 'FROM_BOUNDARY' ? 0 : startFraction,
+    endFraction: payload.placement === 'TO_BOUNDARY' ? 1 : endFraction,
+    placement: payload.placement,
   });
 }
 
 export function applyTopologyEditInlineComponent(topology, command) {
   const payload = normalizeTopologyEditInlineComponentPayload(command.payload);
   const target = assertTopologyEditInlineComponentTarget(topology, payload);
-  const ids = generatedIds(topology, command.commandId);
+  const ids = generatedIds(topology, command.commandId, payload.placement);
   const start = interpolate(target.from.position, target.to.position, target.startFraction);
   const end = interpolate(target.from.position, target.to.position, target.endFraction);
   const binding = payload.catalogueBinding;
@@ -109,7 +128,13 @@ export function applyTopologyEditInlineComponent(topology, command) {
   const fromOutside = primaryFrom ? primaryOutside : secondaryOutside;
   const toNominal = primaryFrom ? secondaryNominal : primaryNominal;
   const toOutside = primaryFrom ? secondaryOutside : primaryOutside;
-  const sourceSide = sourceComponentSide(target.edge, binding, payload.direction);
+  const sourceSide = sourceComponentSide(target.edge, binding, payload.direction, payload.placement);
+  const fromNodeId = payload.placement === 'FROM_BOUNDARY'
+    ? target.edge.fromNodeId
+    : ids.fromNodeId;
+  const toNodeId = payload.placement === 'TO_BOUNDARY'
+    ? target.edge.toNodeId
+    : ids.toNodeId;
   const commonSide = {
     entityType: target.edge.entityType ?? 'PIPE',
     sourcePath: target.edge.sourcePath ?? null,
@@ -117,22 +142,22 @@ export function applyTopologyEditInlineComponent(topology, command) {
     derivedFromEdgeId: target.edge.id,
     sourceComponentKey: target.edge.componentKey ?? target.edge.sourceComponentKey ?? null,
   };
-  const left = {
+  const left = payload.placement === 'FROM_BOUNDARY' ? null : {
     ...target.edge,
     ...commonSide,
     id: ids.leftEdgeId,
     fromNodeId: target.edge.fromNodeId,
-    toNodeId: ids.fromNodeId,
+    toNodeId: fromNodeId,
     componentKey: sourceSide === 'LEFT' ? target.edge.componentKey ?? null : null,
     diameterMm: fromNominal,
     outsideDiameterMm: fromOutside,
     diameterAuthority: 'OUTSIDE_DIAMETER',
   };
-  const right = {
+  const right = payload.placement === 'TO_BOUNDARY' ? null : {
     ...target.edge,
     ...commonSide,
     id: ids.rightEdgeId,
-    fromNodeId: ids.toNodeId,
+    fromNodeId: toNodeId,
     toNodeId: target.edge.toNodeId,
     componentKey: sourceSide === 'RIGHT' ? target.edge.componentKey ?? null : null,
     diameterMm: toNominal,
@@ -142,8 +167,8 @@ export function applyTopologyEditInlineComponent(topology, command) {
   const component = {
     id: ids.componentEdgeId,
     componentKey: null,
-    fromNodeId: ids.fromNodeId,
-    toNodeId: ids.toNodeId,
+    fromNodeId,
+    toNodeId,
     diameterMm: primaryNominal,
     outsideDiameterMm: primaryOutside,
     secondaryNominalSizeMm: reducer ? secondaryNominal : null,
@@ -160,15 +185,23 @@ export function applyTopologyEditInlineComponent(topology, command) {
     pressureClass: binding.pressureClass,
     lengthAuthority: payload.lengthAuthority,
     insertionDirection: payload.direction,
+    inlinePlacement: payload.placement,
     topologyOperation: 'INSERT_INLINE_COMPONENT',
+    assemblyBinding: payload.assemblyBinding,
+    assemblyId: payload.assemblyBinding?.assemblyId ?? null,
+    assemblyHash: payload.assemblyBinding?.assemblyHash ?? null,
+    assemblyRole: payload.assemblyBinding?.role ?? null,
+    assemblyRecordIds: payload.assemblyBinding?.recordIds ?? [],
+    assemblyLengthMm: payload.assemblyBinding?.assemblyLengthMm ?? null,
+    assemblyMassKg: payload.assemblyBinding?.assemblyMassKg ?? null,
     catalogueBinding: binding,
     catalogueRecordId: binding.recordId,
     catalogueRecordHash: binding.recordHash,
     catalogueHash: binding.catalogueHash,
     catalogueSourceHash: binding.sourceHash,
     pipingClass: binding.pipingClass,
-    endConnectionFrom: binding.endConnectionFrom,
-    endConnectionTo: binding.endConnectionTo,
+    endConnectionFrom: primaryFrom ? binding.endConnectionFrom : binding.endConnectionTo,
+    endConnectionTo: primaryFrom ? binding.endConnectionTo : binding.endConnectionFrom,
     valveType: binding.valveType,
     valveFaceToFaceMm: binding.valveFaceToFaceMm,
     flangeClass: binding.flangeClass,
@@ -184,23 +217,31 @@ export function applyTopologyEditInlineComponent(topology, command) {
   };
   const nodes = clone(topology.nodes);
   const edges = clone(topology.edges).filter((edge) => edge.id !== target.edge.id);
-  nodes.push(
-    inlineNode(ids.fromNodeId, start, command.commandId, target.edge.id, 'FROM'),
-    inlineNode(ids.toNodeId, end, command.commandId, target.edge.id, 'TO'),
-  );
-  edges.push(left, component, right);
+  if (payload.placement !== 'FROM_BOUNDARY') {
+    nodes.push(inlineNode(ids.fromNodeId, start, command.commandId, target.edge.id, 'FROM'));
+  }
+  if (payload.placement !== 'TO_BOUNDARY') {
+    nodes.push(inlineNode(ids.toNodeId, end, command.commandId, target.edge.id, 'TO'));
+  }
+  edges.push(...[left, component, right].filter(Boolean));
   return { ...topology, nodes, edges };
 }
 
 export function validateTopologyEditInlineComponentEffect(candidate) {
   const delta = candidate.topologyDelta;
+  const resolvedPayload = candidate.resolvedPayload
+    ?? candidate.resolvedCommand?.payload
+    ?? {};
+  const placement = resolvedPayload.placement ?? 'INTERIOR';
+  const expectedNodeCount = placement === 'INTERIOR' ? 2 : 1;
+  const expectedEdgeCount = placement === 'INTERIOR' ? 3 : 2;
   const additions = [
     ...(candidate.canonicalTopology.nodes ?? []),
     ...(candidate.canonicalTopology.edges ?? []),
   ].filter((row) => row.createdByCommandId === candidate.commandId);
-  const validShape = delta.nodes.addedIds.length === 2
+  const validShape = delta.nodes.addedIds.length === expectedNodeCount
     && delta.nodes.removedIds.length === 0
-    && delta.edges.addedIds.length === 3
+    && delta.edges.addedIds.length === expectedEdgeCount
     && delta.edges.removedIds.length === 1
     && noChanges(delta, ['junctions', 'supports', 'boundaries', 'rigids', 'bends']);
   const addedIds = [...delta.nodes.addedIds, ...delta.edges.addedIds].sort();
@@ -210,20 +251,56 @@ export function validateTopologyEditInlineComponentEffect(candidate) {
   ));
   const validProvenance = semanticHash(addedIds) === semanticHash(provenanceIds)
     && componentEdges.length === 1
+    && componentEdges[0].inlinePlacement === placement
+    && semanticHash(componentEdges[0].assemblyBinding)
+      === semanticHash(resolvedPayload.assemblyBinding ?? null)
     && componentEdges[0].catalogueBinding?.recordHash
-      === candidate.resolvedCommand?.payload?.catalogueBinding?.recordHash;
+      === resolvedPayload.catalogueBinding?.recordHash;
   const findings = [];
   if (!validShape) findings.push({
     code: 'INSERT_INLINE_COMPONENT_DELTA_INVALID',
-    message: 'INSERT_INLINE_COMPONENT must add two nodes and three edges while replacing exactly one edge.',
+    message: `INSERT_INLINE_COMPONENT ${placement} must add ${expectedNodeCount} node(s) and ${expectedEdgeCount} edge(s) while replacing exactly one edge.`,
     targetIds: [...changes(delta.nodes), ...changes(delta.edges)].sort(),
   });
   if (!validProvenance) findings.push({
     code: 'INSERT_INLINE_COMPONENT_PROVENANCE_INVALID',
-    message: 'Inline insertion additions must carry exact command and catalogue provenance.',
+    message: 'Inline insertion additions must carry exact placement, command, and catalogue provenance.',
     targetIds: provenanceIds,
   });
   return findings;
+}
+
+function normalizeAssemblyBinding(value, catalogueBinding) {
+  if (value === null || value === undefined) return null;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    fail('assemblyBinding must be an object.');
+  }
+  const role = enumText(value.role, ASSEMBLY_ROLES, 'assemblyBinding.role');
+  if (!Array.isArray(value.recordIds) || value.recordIds.length !== 3) {
+    fail('assemblyBinding.recordIds must contain three ordered record IDs.', RangeError);
+  }
+  const recordIds = value.recordIds.map((row, index) => requiredText(
+    row,
+    `assemblyBinding.recordIds[${index}]`,
+  ));
+  const roleIndex = { UPSTREAM_FLANGE: 0, VALVE: 1, DOWNSTREAM_FLANGE: 2 }[role];
+  if (recordIds[roleIndex] !== catalogueBinding.recordId) {
+    fail('assembly role record differs from catalogue binding.', RangeError);
+  }
+  if ((role === 'VALVE') !== (catalogueBinding.componentType === 'VALVE')) {
+    fail('VALVE assembly role requires a valve catalogue binding.', RangeError);
+  }
+  if ((role !== 'VALVE') !== (catalogueBinding.componentType === 'FLANGE')) {
+    fail('Assembly flange roles require flange catalogue bindings.', RangeError);
+  }
+  return deepFreeze({
+    assemblyId: requiredText(value.assemblyId, 'assemblyBinding.assemblyId'),
+    assemblyHash: requiredText(value.assemblyHash, 'assemblyBinding.assemblyHash'),
+    role,
+    recordIds,
+    assemblyLengthMm: positive(value.assemblyLengthMm, 'assemblyBinding.assemblyLengthMm'),
+    assemblyMassKg: positive(value.assemblyMassKg, 'assemblyBinding.assemblyMassKg'),
+  });
 }
 
 function normalizeBinding(value, componentType) {
@@ -346,7 +423,9 @@ function assertHostCompatibility(edge, binding, direction) {
   }
 }
 
-function sourceComponentSide(edge, binding, direction) {
+function sourceComponentSide(edge, binding, direction, placement = 'INTERIOR') {
+  if (placement === 'FROM_BOUNDARY') return 'RIGHT';
+  if (placement === 'TO_BOUNDARY') return 'LEFT';
   if (binding.componentType !== 'REDUCER') return 'LEFT';
   const hostOutside = positiveOrNull(edge.outsideDiameterMm);
   if (hostOutside === null) return direction === 'FROM_TO' ? 'LEFT' : 'RIGHT';
@@ -356,15 +435,23 @@ function sourceComponentSide(edge, binding, direction) {
   return direction === 'FROM_TO' ? 'RIGHT' : 'LEFT';
 }
 
-function generatedIds(topology, commandId) {
+function generatedIds(topology, commandId, placement = 'INTERIOR') {
   const ids = {
-    fromNodeId: generatedId('node', commandId, 'inline-from-node'),
-    toNodeId: generatedId('node', commandId, 'inline-to-node'),
-    leftEdgeId: generatedId('edge', commandId, 'inline-left-edge'),
+    fromNodeId: placement === 'FROM_BOUNDARY'
+      ? null
+      : generatedId('node', commandId, 'inline-from-node'),
+    toNodeId: placement === 'TO_BOUNDARY'
+      ? null
+      : generatedId('node', commandId, 'inline-to-node'),
+    leftEdgeId: placement === 'FROM_BOUNDARY'
+      ? null
+      : generatedId('edge', commandId, 'inline-left-edge'),
     componentEdgeId: generatedId('edge', commandId, 'inline-component-edge'),
-    rightEdgeId: generatedId('edge', commandId, 'inline-right-edge'),
+    rightEdgeId: placement === 'TO_BOUNDARY'
+      ? null
+      : generatedId('edge', commandId, 'inline-right-edge'),
   };
-  Object.values(ids).forEach((id) => assertUnusedId(topology, id));
+  Object.values(ids).filter(Boolean).forEach((id) => assertUnusedId(topology, id));
   return ids;
 }
 

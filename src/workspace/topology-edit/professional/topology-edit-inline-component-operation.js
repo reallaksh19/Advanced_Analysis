@@ -12,6 +12,7 @@ import { createTopologyEditOperationPlan } from './topology-edit-operation-plan.
 
 const COMPONENT_TYPES = new Set(['FLANGE', 'VALVE', 'REDUCER']);
 const DIRECTIONS = new Set(['FROM_TO', 'TO_FROM']);
+const PLACEMENTS = new Set(['INTERIOR', 'FROM_BOUNDARY', 'TO_BOUNDARY']);
 
 export function planTopologyEditInlineComponentOperation(input = {}) {
   const topology = input.topology;
@@ -38,7 +39,8 @@ export function planTopologyEditInlineComponentOperation(input = {}) {
     fail('centerDistanceMm must be inside the host edge.', RangeError);
   }
   const direction = enumText(input.direction ?? 'FROM_TO', DIRECTIONS, 'direction');
-  const length = insertionLength(record, input.insertionLengthMm);
+  const placement = enumText(input.placement ?? 'INTERIOR', PLACEMENTS, 'placement');
+  const length = topologyEditInlineInsertionLength(record, input.insertionLengthMm);
   const centerFraction = centerDistanceMm / edgeLengthMm;
   const payload = normalizeTopologyEditInlineComponentPayload({
     edgeId,
@@ -46,7 +48,8 @@ export function planTopologyEditInlineComponentOperation(input = {}) {
     insertionLengthMm: length.value,
     lengthAuthority: length.authority,
     direction,
-    catalogueBinding: catalogueBinding(catalogue, record),
+    placement,
+    catalogueBinding: topologyEditInlineCatalogueBinding(catalogue, record),
   });
   assertTopologyEditInlineComponentTarget(topology, payload);
   const changedScope = deriveTopologyEditChangedScope(topology, {
@@ -63,6 +66,7 @@ export function planTopologyEditInlineComponentOperation(input = {}) {
       insertionLengthMm: payload.insertionLengthMm,
       lengthAuthority: payload.lengthAuthority,
       direction: payload.direction,
+      placement: payload.placement,
       entityType: record.componentType,
       diameterMm: record.nominalSizeMm,
       componentMassKg: record.componentMassKg,
@@ -89,7 +93,9 @@ export function planTopologyEditInlineComponentOperation(input = {}) {
   });
 }
 
-function catalogueBinding(catalogue, record) {
+export function topologyEditInlineCatalogueBinding(catalogueInput, recordInput) {
+  const catalogue = assertTopologyEditSpecificationCatalogue(catalogueInput);
+  const record = assertTopologyEditSpecificationRecord(recordInput);
   return {
     catalogueHash: catalogue.catalogueHash,
     sourceHash: catalogue.authority.sourceHash,
@@ -123,7 +129,8 @@ function catalogueBinding(catalogue, record) {
   };
 }
 
-function insertionLength(record, value) {
+export function topologyEditInlineInsertionLength(recordInput, value) {
+  const record = assertTopologyEditSpecificationRecord(recordInput);
   if (record.componentType === 'VALVE') {
     const requested = empty(value)
       ? record.valveFaceToFaceMm

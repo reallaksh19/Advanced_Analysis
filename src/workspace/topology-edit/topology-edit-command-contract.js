@@ -24,6 +24,8 @@ const COMMAND_SET = new Set(TOPOLOGY_EDIT_GOVERNED_COMMANDS);
 const ENDPOINTS = new Set(['FROM', 'TO']);
 const INLINE_COMPONENT_TYPES = new Set(['FLANGE', 'VALVE', 'REDUCER']);
 const INLINE_DIRECTIONS = new Set(['FROM_TO', 'TO_FROM']);
+const INLINE_PLACEMENTS = new Set(['INTERIOR', 'FROM_BOUNDARY', 'TO_BOUNDARY']);
+const INLINE_ASSEMBLY_ROLES = new Set(['UPSTREAM_FLANGE', 'VALVE', 'DOWNSTREAM_FLANGE']);
 const INLINE_LENGTH_AUTHORITIES = new Set([
   'CATALOGUE_VALVE_FACE_TO_FACE',
   'CATALOGUE_COMPONENT_LENGTH',
@@ -260,6 +262,48 @@ function normalizeInlineBinding(value) {
   }
   return binding;
 }
+function normalizeInlineAssemblyBinding(value, catalogueBinding) {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    fail('INSERT_INLINE_COMPONENT.assemblyBinding must be an object.');
+  }
+  const role = enumText(
+    value.role,
+    INLINE_ASSEMBLY_ROLES,
+    'INSERT_INLINE_COMPONENT.assemblyBinding.role',
+  );
+  if (!Array.isArray(value.recordIds) || value.recordIds.length !== 3) {
+    fail('INSERT_INLINE_COMPONENT.assemblyBinding.recordIds must contain three ordered record IDs.', RangeError);
+  }
+  const recordIds = value.recordIds.map((row, index) => requiredText(
+    row,
+    `INSERT_INLINE_COMPONENT.assemblyBinding.recordIds[${index}]`,
+  ));
+  const roleIndex = { UPSTREAM_FLANGE: 0, VALVE: 1, DOWNSTREAM_FLANGE: 2 }[role];
+  if (recordIds[roleIndex] !== catalogueBinding.recordId) {
+    fail('INSERT_INLINE_COMPONENT assembly role record differs from catalogueBinding.recordId.', RangeError);
+  }
+  if ((role === 'VALVE') !== (catalogueBinding.componentType === 'VALVE')) {
+    fail('INSERT_INLINE_COMPONENT assembly VALVE role requires a valve catalogue binding.', RangeError);
+  }
+  if ((role !== 'VALVE') !== (catalogueBinding.componentType === 'FLANGE')) {
+    fail('INSERT_INLINE_COMPONENT assembly flange roles require flange catalogue bindings.', RangeError);
+  }
+  return {
+    assemblyId: requiredText(value.assemblyId, 'INSERT_INLINE_COMPONENT.assemblyBinding.assemblyId'),
+    assemblyHash: requiredText(value.assemblyHash, 'INSERT_INLINE_COMPONENT.assemblyBinding.assemblyHash'),
+    role,
+    recordIds,
+    assemblyLengthMm: positiveNumber(
+      value.assemblyLengthMm,
+      'INSERT_INLINE_COMPONENT.assemblyBinding.assemblyLengthMm',
+    ),
+    assemblyMassKg: positiveNumber(
+      value.assemblyMassKg,
+      'INSERT_INLINE_COMPONENT.assemblyBinding.assemblyMassKg',
+    ),
+  };
+}
 function normalizeInlineComponent(payload) {
   const centerFraction = Number(payload.centerFraction);
   if (!Number.isFinite(centerFraction) || centerFraction <= 0 || centerFraction >= 1) {
@@ -276,6 +320,11 @@ function normalizeInlineComponent(payload) {
     payload.direction ?? 'FROM_TO',
     INLINE_DIRECTIONS,
     'INSERT_INLINE_COMPONENT.direction',
+  );
+  const placement = enumText(
+    payload.placement ?? 'INTERIOR',
+    INLINE_PLACEMENTS,
+    'INSERT_INLINE_COMPONENT.placement',
   );
   if (catalogueBinding.componentType === 'VALVE'
     && lengthAuthority === 'CATALOGUE_VALVE_FACE_TO_FACE'
@@ -294,13 +343,16 @@ function normalizeInlineComponent(payload) {
       fail('INSERT_INLINE_COMPONENT length must equal catalogue component length.', RangeError);
     }
   }
+  const assemblyBinding = normalizeInlineAssemblyBinding(payload.assemblyBinding, catalogueBinding);
   return {
     edgeId: requiredText(payload.edgeId, 'INSERT_INLINE_COMPONENT.edgeId'),
     centerFraction,
     insertionLengthMm,
     lengthAuthority,
     direction,
+    placement,
     catalogueBinding,
+    assemblyBinding,
   };
 }
 const PAYLOAD_NORMALIZERS = Object.freeze({

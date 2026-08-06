@@ -155,8 +155,8 @@ function candidateMaterial(command, currentHash, policy, evidence) {
   return {
     schema: TOPOLOGY_EDIT_CANDIDATE_SCHEMA,
     commandId: command.commandId, commandType: command.commandType,
-    basis: command.basis, requestHash: command.requestHash,
-    resolutionHash: command.resolutionHash,
+    basis: command.basis, resolvedPayload: command.payload,
+    requestHash: command.requestHash, resolutionHash: command.resolutionHash,
     priorCanonicalTopologyHash: currentHash,
     canonicalTopologyHash: evidence.candidateTopology.canonicalTopologyHash,
     checkerPolicy: policy, beforeChecker: evidence.beforeChecker,
