@@ -22,7 +22,8 @@ export function buildBranchScheduleIndex(root) {
       name: String(item.name || attrs.NAME || `${type}-${items.length + 1}`),
       type,
       branchName,
-      branchPath: String(enriched.sourceBranchPath || attrs.sourceBranchPath || branchPath || branchName || 'ROOT'),
+      branchPath: String(branchPath || branchName || 'ROOT'),
+      declaredSourceBranchPath: String(enriched.sourceBranchPath || attrs.sourceBranchPath || ''),
       sourcePath: String(enriched.sourcePath || attrs.sourcePath || sourcePath || ''),
       sourceGlobalIndex,
       position,
@@ -184,7 +185,7 @@ export function walkSource(root, callback) {
       : parent.branchName;
     const branchPath = type === 'BRANCH'
       ? String(enriched.sourceBranchPath || attrs.sourceBranchPath || sourcePath)
-      : String(enriched.sourceBranchPath || attrs.sourceBranchPath || parent.branchPath || 'ROOT');
+      : String(parent.branchPath || 'ROOT');
     callback({ item, branchName, branchPath, sourcePath });
     if (Array.isArray(item.children)) {
       item.children.forEach((child, childIndex) => visit(child, {
