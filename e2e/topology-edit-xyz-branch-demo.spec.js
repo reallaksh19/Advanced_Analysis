@@ -58,12 +58,16 @@ test('3D Edit loads and renders the governed 10-element XYZ branch with separate
         attached: entity.properties.attributes.ATTACHED_COMPONENT_ID,
       };
     });
+    const olet = byId.get('O-002');
     return {
       sourceName: snapshot.dataset.sourceName,
       summary: snapshot.dataset.summary,
       axes: [...axes].sort(),
       branchTypes: [...new Set(branchIds.map((id) => byId.get(id).entityType))].sort(),
       supports,
+      oletBranchPointCount: olet.properties.nativeParams.branchPoints.length,
+      oletHostBore: olet.properties.nativeParams.bore,
+      oletBranchOutsideDiameterMm: olet.properties.nativeParams.branchOutsideDiameterMm,
     };
   }, { branchIds: BRANCH_IDS, supportIds: SUPPORT_IDS });
 
@@ -86,6 +90,9 @@ test('3D Edit loads and renders the governed 10-element XYZ branch with separate
     { id: 'S-006', type: 'REST', attached: 'P-009' },
     { id: 'S-007', type: 'GUIDE', attached: 'P-011' },
   ]);
+  expect(datasetEvidence.oletBranchPointCount).toBe(1);
+  expect(datasetEvidence.oletHostBore).toBe(25);
+  expect(datasetEvidence.oletBranchOutsideDiameterMm).toBe(21.3);
 
   await page.getByRole('button', { name: '3D Edit', exact: true }).click();
   const host = page.locator('[data-role="topology-edit-render-host"]');
@@ -102,6 +109,9 @@ test('3D Edit loads and renders the governed 10-element XYZ branch with separate
       .__topologyEditAuthoringController;
     const topology = controller.session.currentTopology();
     const edgeByComponent = new Map(topology.edges.map((edge) => [edge.componentKey, edge]));
+    const junctionByComponent = new Map(
+      topology.junctions.map((junction) => [junction.componentKey, junction]),
+    );
     const nodes = new Map(topology.nodes.map((node) => [node.id, node]));
     const lengths = topology.edges.map((edge) => {
       const from = nodes.get(edge.fromNodeId).position;
@@ -113,36 +123,40 @@ test('3D Edit loads and renders the governed 10-element XYZ branch with separate
       if (!edge) throw new Error(`Missing canonical XYZ edge ${componentKey}.`);
       return edge;
     };
-    const sharedNode = (left, right) => (
-      [left.fromNodeId, left.toNodeId].find((nodeId) => (
-        nodeId === right.fromNodeId || nodeId === right.toNodeId
-      )) ?? null
+    const exactJunction = (componentKey) => {
+      const junction = junctionByComponent.get(componentKey);
+      if (!junction) throw new Error(`Missing canonical XYZ junction ${componentKey}.`);
+      return junction;
+    };
+    const endpointInSet = (edge, nodeIds) => (
+      [edge.fromNodeId, edge.toNodeId].find((nodeId) => nodeIds.has(nodeId)) ?? null
     );
-    const incidentKeys = (nodeId) => topology.edges
-      .filter((edge) => edge.fromNodeId === nodeId || edge.toNodeId === nodeId)
-      .map((edge) => edge.componentKey)
-      .sort();
 
-    const hostPipe = exactEdge('P-011');
-    const valve = exactEdge('V-002');
-    const olet = exactEdge('O-002');
-    const branchPipe = exactEdge('P-012');
-    const oletHostNodeId = sharedNode(hostPipe, olet);
-    const valveHostNodeId = sharedNode(valve, olet);
-    const oletBranchFaceNodeId = sharedNode(olet, branchPipe);
-    if (!oletHostNodeId || !oletBranchFaceNodeId) {
-      throw new Error('XYZ Olet canonical node connectivity is incomplete.');
+    const existingTee = exactJunction('T-001');
+    const olet = exactJunction('O-002');
+    const oletNodeIds = new Set(olet.nodeIds);
+    const hostNodeId = endpointInSet(exactEdge('P-011'), oletNodeIds);
+    const valveNodeId = endpointInSet(exactEdge('V-002'), oletNodeIds);
+    const branchNodeId = endpointInSet(exactEdge('P-012'), oletNodeIds);
+    if (!hostNodeId || !valveNodeId || !branchNodeId) {
+      throw new Error('XYZ Olet canonical three-port connectivity is incomplete.');
     }
 
+    const representedComponentKeys = new Set([
+      ...topology.edges.map((edge) => edge.componentKey),
+      ...topology.junctions.map((junction) => junction.componentKey),
+    ]);
     return {
-      representedBranchIds: branchIds.filter((id) => edgeByComponent.has(id)).sort(),
+      representedBranchIds: branchIds
+        .filter((id) => representedComponentKeys.has(id))
+        .sort(),
       supportCount: topology.supports.length,
       resolvedSupportCount: topology.supports.filter((row) => row.resolved).length,
       junctionCount: topology.junctions.length,
-      oletHostNodeMatchesValve: oletHostNodeId === valveHostNodeId,
-      oletHostIncidentKeys: incidentKeys(oletHostNodeId),
-      oletBranchFaceIncidentKeys: incidentKeys(oletBranchFaceNodeId),
-      distinctOletNodes: oletHostNodeId !== oletBranchFaceNodeId,
+      existingTeeNodeCount: existingTee.nodeIds.length,
+      oletEntityType: olet.entityType,
+      oletNodeCount: olet.nodeIds.length,
+      distinctOletConnectionCount: new Set([hostNodeId, valveNodeId, branchNodeId]).size,
       minimumEdgeLengthMm: Math.min(...lengths),
       canonicalHash: topology.canonicalTopologyHash,
     };
@@ -151,11 +165,11 @@ test('3D Edit loads and renders the governed 10-element XYZ branch with separate
   expect(topologyEvidence.representedBranchIds).toEqual([...BRANCH_IDS].sort());
   expect(topologyEvidence.supportCount).toBe(7);
   expect(topologyEvidence.resolvedSupportCount).toBe(7);
-  expect(topologyEvidence.junctionCount).toBeGreaterThanOrEqual(1);
-  expect(topologyEvidence.oletHostNodeMatchesValve).toBe(true);
-  expect(topologyEvidence.oletHostIncidentKeys).toEqual(['O-002', 'P-011', 'V-002']);
-  expect(topologyEvidence.oletBranchFaceIncidentKeys).toEqual(['O-002', 'P-012']);
-  expect(topologyEvidence.distinctOletNodes).toBe(true);
+  expect(topologyEvidence.junctionCount).toBeGreaterThanOrEqual(2);
+  expect(topologyEvidence.existingTeeNodeCount).toBe(3);
+  expect(topologyEvidence.oletEntityType).toBe('OLET');
+  expect(topologyEvidence.oletNodeCount).toBe(3);
+  expect(topologyEvidence.distinctOletConnectionCount).toBe(3);
   expect(topologyEvidence.minimumEdgeLengthMm).toBeGreaterThan(0);
   expect(topologyEvidence.canonicalHash).toBeTruthy();
 
