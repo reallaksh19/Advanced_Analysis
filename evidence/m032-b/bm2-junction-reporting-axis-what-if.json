@@ -1,0 +1,161 @@
+{
+  "schema": "m032-bm2-local-what-if/v1",
+  "sourceHead": "140433982e60dbc6add0b4b8b1785a494fbe69b5",
+  "sourceArtifactId": 8950075013,
+  "sourceArtifactDigest": "sha256:ec5949210805141946fcd22896d31f618aba71975c7e19546d9ee04f481269d6",
+  "frozenDenominator": 5598,
+  "frozenPassed": 4404,
+  "frozenFailed": 1194,
+  "scope": "DETAILED_CONSOLIDATED_LEDGER_TARGET_PAIR_ONLY_NOT_ACCEPTANCE_DENOMINATOR",
+  "hypothesis": "VERTICAL_JUNCTION_ADJACENT_ELEMENT_USES_OWNED_JUNCTION_PLANE_AT_BOTH_ENDPOINTS",
+  "target": {
+    "pair": "130-140",
+    "end": "I"
+  },
+  "evaluatedFailureRows": 14,
+  "candidateStrictPasses": 8,
+  "candidateRemainingFailures": 6,
+  "globalActionChanges": 0,
+  "rows": [
+    {
+      "caseNumber": 3,
+      "field": "fy",
+      "reference": -706.853821,
+      "baselineSolver": 703.1840159132989,
+      "candidateSolver": -703.1840159132989,
+      "baselineAbsolutePercentError": 199.48082545815356,
+      "candidateAbsolutePercentError": 0.5191745418464822,
+      "candidatePassed": true
+    },
+    {
+      "caseNumber": 3,
+      "field": "fz",
+      "reference": 115.648476,
+      "baselineSolver": -68.94829684383512,
+      "candidateSolver": 68.94829684383512,
+      "baselineAbsolutePercentError": 159.61885467806349,
+      "candidateAbsolutePercentError": 40.381145321936515,
+      "candidatePassed": false
+    },
+    {
+      "caseNumber": 3,
+      "field": "mx",
+      "reference": 172.175125,
+      "baselineSolver": 161.62943917298912,
+      "candidateSolver": 161.62943917298912,
+      "baselineAbsolutePercentError": 6.124976431415911,
+      "candidateAbsolutePercentError": 6.124976431415911,
+      "candidatePassed": false
+    },
+    {
+      "caseNumber": 3,
+      "field": "my",
+      "reference": -72.275635,
+      "baselineSolver": 17.63796150292717,
+      "candidateSolver": -17.63796150292717,
+      "baselineAbsolutePercentError": 124.40374477917376,
+      "candidateAbsolutePercentError": 75.59625522082627,
+      "candidatePassed": false
+    },
+    {
+      "caseNumber": 3,
+      "field": "mz",
+      "reference": -800.237244,
+      "baselineSolver": 801.3784783072824,
+      "candidateSolver": -801.3784783072824,
+      "baselineAbsolutePercentError": 200.1426119961098,
+      "candidateAbsolutePercentError": 0.14261199610979225,
+      "candidatePassed": true
+    },
+    {
+      "caseNumber": 4,
+      "field": "fy",
+      "reference": 73.581894,
+      "baselineSolver": -74.10662249726738,
+      "candidateSolver": 74.10662249726738,
+      "baselineAbsolutePercentError": 200.71312175963743,
+      "candidateAbsolutePercentError": 0.7131217596374665,
+      "candidatePassed": true
+    },
+    {
+      "caseNumber": 4,
+      "field": "fz",
+      "reference": 242.32608,
+      "baselineSolver": -242.31863090328895,
+      "candidateSolver": 242.31863090328895,
+      "baselineAbsolutePercentError": 199.99692600288375,
+      "candidateAbsolutePercentError": 0.0030739971162171663,
+      "candidatePassed": true
+    },
+    {
+      "caseNumber": 4,
+      "field": "my",
+      "reference": -147.680573,
+      "baselineSolver": 148.06849486657353,
+      "candidateSolver": -148.06849486657353,
+      "baselineAbsolutePercentError": 200.2626763010823,
+      "candidateAbsolutePercentError": 0.26267630108228307,
+      "candidatePassed": true
+    },
+    {
+      "caseNumber": 4,
+      "field": "mz",
+      "reference": -392.640198,
+      "baselineSolver": 391.29887851596,
+      "candidateSolver": -391.29887851596,
+      "baselineAbsolutePercentError": 199.658384574256,
+      "candidateAbsolutePercentError": 0.3416154257440584,
+      "candidatePassed": true
+    },
+    {
+      "caseNumber": 6,
+      "field": "fx",
+      "reference": -116.86328099999992,
+      "baselineSolver": -93.6698896475225,
+      "candidateSolver": -93.6698896475225,
+      "baselineAbsolutePercentError": 19.8466029312299,
+      "candidateAbsolutePercentError": 19.8466029312299,
+      "candidatePassed": false
+    },
+    {
+      "caseNumber": 6,
+      "field": "fy",
+      "reference": -780.4357150000001,
+      "baselineSolver": 777.2906384105663,
+      "candidateSolver": -777.2906384105663,
+      "baselineAbsolutePercentError": 199.59701016637436,
+      "candidateAbsolutePercentError": 0.4029898336256633,
+      "candidatePassed": true
+    },
+    {
+      "caseNumber": 6,
+      "field": "fz",
+      "reference": -126.677604,
+      "baselineSolver": 173.37033405945385,
+      "candidateSolver": -173.37033405945385,
+      "baselineAbsolutePercentError": 236.8594989051529,
+      "candidateAbsolutePercentError": 36.85949890515284,
+      "candidatePassed": false
+    },
+    {
+      "caseNumber": 6,
+      "field": "my",
+      "reference": 75.40493800000002,
+      "baselineSolver": -130.43053336364636,
+      "candidateSolver": 130.43053336364636,
+      "baselineAbsolutePercentError": 272.9734641034336,
+      "candidateAbsolutePercentError": 72.97346410343356,
+      "candidatePassed": false
+    },
+    {
+      "caseNumber": 6,
+      "field": "mz",
+      "reference": -407.597046,
+      "baselineSolver": 410.0795997913224,
+      "candidateSolver": -410.0795997913224,
+      "baselineAbsolutePercentError": 200.60907060433465,
+      "candidateAbsolutePercentError": 0.6090706043346552,
+      "candidatePassed": true
+    }
+  ]
+}
