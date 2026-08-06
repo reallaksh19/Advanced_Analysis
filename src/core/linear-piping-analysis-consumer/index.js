@@ -140,7 +140,7 @@ export {
   INPUTXML_INSTALLATION_TEMPERATURE,
   INPUTXML_LINEAR_SOLVE_PREPARATION_PROFILE_SCHEMA,
   InputXmlLinearSolvePreparationError,
-  requireLinearPipingInputXmlSolvePreparationProfile,
+  requireInputXmlLinearSolvePreparationProfile,
 } from './inputxml-linear-preparation-profile.js';
 
 export {
