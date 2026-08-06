@@ -1,0 +1,126 @@
+name: LAFEA-NC NC-07 Exact-Head Synthetic Case Qualification
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/lafea-nc07-synthetic-case-qualification.yml'
+      - 'docs/nonlinear-shell-contact/LAFEA_NC07_SYNTHETIC_CASE_QUALIFICATION.md'
+      - 'scripts/lafea-nc07-check.mjs'
+      - 'scripts/lafea-nc07-case.mjs'
+      - 'scripts/nc07-case/**'
+      - 'src/core/nonlinear-shell-contact/synthetic-case-assessment-contract.js'
+      - 'src/core/nonlinear-shell-contact/synthetic-case-assessment-evaluator.js'
+      - 'src/core/nonlinear-shell-contact/nc07-fixtures.js'
+      - 'src/core/nonlinear-shell-contact/nc07-negative-controls.js'
+      - 'tests/nonlinear-shell-contact-nc07-qualification.test.mjs'
+permissions: {contents: read, actions: read}
+concurrency:
+  group: lafea-nc07-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  exact-head-nc07:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NC05_MERGE_SHA: da682b70387f95510b4ca060d43796f592459c7a
+      NC05_ARTIFACT_ID: '8957523502'
+      NC05_ARTIFACT_DIGEST: sha256:fbc569f73b12e64d2017b3a94b751ea1a86458d99a4c9cf0ff63be4839843ca4
+      NC06_MERGE_SHA: ce6860094ce5388cb49289ce0b7f5cee786425e5
+      NC06_ARTIFACT_ID: '8959220688'
+      NC06_ARTIFACT_DIGEST: sha256:27fb3949ad7d47441bed3ce769bccd1b42cc0c8779746ebccc2f965d2ec8c7f6
+      TZ: UTC
+      LC_ALL: C
+    steps:
+      - name: Resolve exact head and base
+        id: refs
+        run: |
+          set -euo pipefail
+          echo "head_sha=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          echo "base_sha=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with: {ref: '${{ steps.refs.outputs.head_sha }}', fetch-depth: 0}
+      - name: Verify live base, ancestry and phase paths
+        env: {HEAD_SHA: '${{ steps.refs.outputs.head_sha }}', BASE_SHA: '${{ steps.refs.outputs.base_sha }}'}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          test "$(git rev-parse origin/main)" = "$BASE_SHA"
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          git merge-base --is-ancestor "$BASE_SHA" "$HEAD_SHA"
+          git merge-base --is-ancestor "$NC05_MERGE_SHA" "$HEAD_SHA"
+          git merge-base --is-ancestor "$NC06_MERGE_SHA" "$HEAD_SHA"
+          test "$(git rev-list --count "${HEAD_SHA}..origin/main")" = 0
+          mapfile -t p < <(git diff --name-only "$BASE_SHA...$HEAD_SHA")
+          test "${#p[@]}" = 14
+          for x in "${p[@]}"; do case "$x" in
+            .github/workflows/lafea-nc07-synthetic-case-qualification.yml|docs/nonlinear-shell-contact/LAFEA_NC07_SYNTHETIC_CASE_QUALIFICATION.md|scripts/lafea-nc07-check.mjs|scripts/lafea-nc07-case.mjs|scripts/nc07-case/config.mjs|scripts/nc07-case/engine.mjs|scripts/nc07-case/evidence.mjs|scripts/nc07-case/prepare-binding.mjs|scripts/nc07-case/review-oracle.mjs|src/core/nonlinear-shell-contact/synthetic-case-assessment-contract.js|src/core/nonlinear-shell-contact/synthetic-case-assessment-evaluator.js|src/core/nonlinear-shell-contact/nc07-fixtures.js|src/core/nonlinear-shell-contact/nc07-negative-controls.js|tests/nonlinear-shell-contact-nc07-qualification.test.mjs) ;;
+            *) echo "forbidden path $x"; exit 1;; esac; done
+          git diff --check "$BASE_SHA...$HEAD_SHA"
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Download and validate upstream custody
+        env: {GH_TOKEN: '${{ github.token }}'}
+        run: |
+          set -euo pipefail
+          for phase in 05 06; do idvar="NC${phase}_ARTIFACT_ID"; digvar="NC${phase}_ARTIFACT_DIGEST"; id="${!idvar}"; digest="${!digvar}"; mkdir -p "/tmp/nc${phase}"; gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}" > "/tmp/nc${phase}-meta.json"; test "$(jq -r .digest "/tmp/nc${phase}-meta.json")" = "$digest"; gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}/zip" > "/tmp/nc${phase}.zip"; unzip -q "/tmp/nc${phase}.zip" -d "/tmp/nc${phase}"; done
+          cmp /tmp/nc05/nc05-a/nc05-report.canonical.json /tmp/nc05/nc05-b/nc05-report.canonical.json
+          cmp /tmp/nc06/nc06-a/nc06-report.canonical.json /tmp/nc06/nc06-b/nc06-report.canonical.json
+          cmp /tmp/nc06/nc06-real-a/nc06-package-summary.canonical.json /tmp/nc06/nc06-real-b/nc06-package-summary.canonical.json
+          node scripts/nc07-case/prepare-binding.mjs /tmp/nc05 /tmp/nc06 /tmp/nc07-upstream.json
+      - name: Run syntax, unit and fail-closed controls
+        run: |
+          set -euo pipefail
+          for f in scripts/lafea-nc07-check.mjs scripts/lafea-nc07-case.mjs scripts/nc07-case/{config,engine,evidence,prepare-binding,review-oracle}.mjs src/core/nonlinear-shell-contact/{synthetic-case-assessment-contract,synthetic-case-assessment-evaluator,nc07-fixtures,nc07-negative-controls}.js; do node --check "$f"; done
+          node --test tests/nonlinear-shell-contact-nc07-qualification.test.mjs
+      - name: Execute two isolated synthetic case replays
+        env: {HEAD_SHA: '${{ steps.refs.outputs.head_sha }}'}
+        run: |
+          set -euo pipefail
+          node scripts/lafea-nc07-case.mjs /tmp/nc07-upstream.json /tmp/nc07-real-a "$HEAD_SHA"
+          node scripts/lafea-nc07-case.mjs /tmp/nc07-upstream.json /tmp/nc07-real-b "$HEAD_SHA"
+          cmp /tmp/nc07-real-a/nc07-synthetic-summary.canonical.json /tmp/nc07-real-b/nc07-synthetic-summary.canonical.json
+          mapfile -t a < <(find /tmp/nc07-real-a -maxdepth 1 -name 'NC07-CASE-*.json' -printf '%f\n' | sort)
+          mapfile -t b < <(find /tmp/nc07-real-b -maxdepth 1 -name 'NC07-CASE-*.json' -printf '%f\n' | sort)
+          test "${#a[@]}" = 10; test "${a[*]}" = "${b[*]}"
+          for f in "${a[@]}" caseRecord.json calculationLedger.json measurementRecord.json modelReceipt.json reviewRecord.json ownerDisposition.json caseReport.json retentionRecord.json; do cmp "/tmp/nc07-real-a/$f" "/tmp/nc07-real-b/$f"; done
+      - name: Evaluate qualification twice
+        env: {HEAD_SHA: '${{ steps.refs.outputs.head_sha }}'}
+        run: |
+          set -euo pipefail
+          node scripts/lafea-nc07-check.mjs /tmp/nc07-real-a /tmp/nc07-upstream.json "$HEAD_SHA" /tmp/nc07-a
+          node scripts/lafea-nc07-check.mjs /tmp/nc07-real-b /tmp/nc07-upstream.json "$HEAD_SHA" /tmp/nc07-b
+          cmp /tmp/nc07-a/nc07-report.canonical.json /tmp/nc07-b/nc07-report.canonical.json
+          r=/tmp/nc07-a/nc07-report.json
+          test "$(jq -r .status "$r")" = NC07_SYNTHETIC_CASE_QUALIFIED
+          test "$(jq -r '.blockers|length' "$r")" = 0
+          test "$(jq -r .evaluatedDomainCount "$r")" = 10
+          test "$(jq -r .registeredSyntheticCaseCount "$r")" = 1
+          test "$(jq -r .authority.syntheticCaseAssessmentQualified "$r")" = true
+          test "$(jq -r .authority.nc08Authorized "$r")" = true
+          for f in codeAssessmentQualified realAssetAssessmentQualified externalCodeComplianceQualified fitnessForServiceQualified remainingStrengthQualified failurePressureQualified moduleQualified productionExecutionAuthorized automaticAssetAcceptanceAuthorized autonomousCaseDispositionAuthorized; do test "$(jq -r ".authority.$f" "$r")" = false; done
+      - name: Verify clean source tree
+        run: git diff --exit-code && test -z "$(git status --porcelain=v1)"
+      - name: Upload diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc07-debug-${{ steps.refs.outputs.head_sha }}-${{ github.run_attempt }}
+          path: |
+            /tmp/nc07-real-a
+            /tmp/nc07-real-b
+            /tmp/nc07-a
+            /tmp/nc07-b
+            /tmp/nc07-upstream.json
+          retention-days: 30
+      - name: Upload authoritative NC-07 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc07-${{ steps.refs.outputs.head_sha }}-${{ github.run_attempt }}
+          path: |
+            /tmp/nc07-real-a
+            /tmp/nc07-real-b
+            /tmp/nc07-a
+            /tmp/nc07-b
+            /tmp/nc07-upstream.json
+          retention-days: 30
