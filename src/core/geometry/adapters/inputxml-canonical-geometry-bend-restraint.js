@@ -7,6 +7,7 @@ import {
   caesarNumberOrNull,
   cleanNodeId,
   distance,
+  rawFiniteNumber,
 } from './inputxml-canonical-geometry-values.js';
 
 const CAESAR_SENTINEL_VALUE = INPUTXML_SENTINELS.UNSET;
@@ -197,11 +198,4 @@ export function finalizeNode(node, diagnostics) {
     addDiagnostic(diagnostics, 'error', 'INPUTXML_NODE_COORDINATE_UNRESOLVED', `Node ${node.id} could not be solved to a coordinate.`, { nodeId: node.id });
   }
   return node;
-}
-
-function rawFiniteNumber(value) {
-  const text = String(value ?? '').trim();
-  if (!text) return null;
-  const numeric = Number(text);
-  return Number.isFinite(numeric) ? numeric : null;
 }
