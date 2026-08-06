@@ -1,0 +1,95 @@
+name: Patch SJSON 1885 configurable support authority
+
+on:
+  push:
+    branches:
+      - agent/sjson-1885-configurable-screening
+    paths:
+      - .github/workflows/sjson-1885-configurable-authority-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use exact companion XML support sites and fix type aliases
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/empirical-sjson-1885-configurable-screening-run.mjs')
+          text = path.read_text()
+          old = "const sites = consolidateSupportSites(sourceIndex.supportRecords, profile);\nattachSitesToModel(sites, model);\nassignSiteAxes(sites, model);\nassignSiteIds(sites);"
+          new = "const sites = buildSupportSitesFromXml(model, profile);\nassignSiteAxes(sites, model);\nassignSiteIds(sites);"
+          if old not in text:
+              raise SystemExit('site authority call anchor not found')
+          text = text.replace(old, new, 1)
+          anchor = "function consolidateSupportSites(records, config) {"
+          insert = r'''function buildSupportSitesFromXml(model, config) {
+            const sites = [];
+            const capabilityByType = new Map([[14, 'REST'], [8, 'GUIDE'], [9, 'LINESTOP']]);
+            for (const restraint of model.restraints) {
+              const capability = capabilityByType.get(restraint.type);
+              if (!capability) continue;
+              let site = sites.find((candidate) => candidate.baseTag === restraint.tag
+                && distance(candidate.coordinate, restraint.sourceCoordinate) <= config.supportProjection.coordinateToleranceMm);
+              if (!site) {
+                site = {
+                  key: `${restraint.tag}@${round(restraint.sourceCoordinate.x, 3)},${round(restraint.sourceCoordinate.y, 3)},${round(restraint.sourceCoordinate.z, 3)}`,
+                  baseTag: restraint.tag,
+                  coordinate: restraint.sourceCoordinate,
+                  sourceOrder: sites.length,
+                  capabilities: new Set(),
+                  directionByCapability: new Map(),
+                  branchNames: new Set(),
+                  nodeId: restraint.nodeId,
+                  nodeResidualMm: 0,
+                  hostEdgeIds: [],
+                  restraintIds: [],
+                  supportIds: [],
+                };
+                sites.push(site);
+              }
+              site.capabilities.add(capability);
+              if (!site.hostEdgeIds.includes(restraint.hostEdgeId)) site.hostEdgeIds.push(restraint.hostEdgeId);
+              if (!site.restraintIds.includes(restraint.id)) site.restraintIds.push(restraint.id);
+              if (!site.supportIds.includes(restraint.supportId)) site.supportIds.push(restraint.supportId);
+              if (site.nodeId !== restraint.nodeId) {
+                throw new Error(`Support site ${site.key} resolves to multiple XML nodes: ${site.nodeId}, ${restraint.nodeId}.`);
+              }
+            }
+            if (sites.length !== config.supportProjection.expectedPhysicalSupportSiteCount) {
+              throw new Error(`Expected ${config.supportProjection.expectedPhysicalSupportSiteCount} physical XML support sites, resolved ${sites.length}.`);
+            }
+            return sites;
+          }
+
+          '''
+          if anchor not in text:
+              raise SystemExit('support function insertion anchor not found')
+          text = text.replace(anchor, insert + anchor, 1)
+          start = text.index('function assignSiteIds(sites) {')
+          end = text.index('\nfunction buildAsciiTemplates()', start)
+          replacement = "function assignSiteIds(sites) {\n  for (const site of sites) site.siteId = `N${site.nodeId}`;\n}\n"
+          text = text[:start] + replacement + text[end:]
+          old_alias = "function complianceMultiplier(type, config) {\n  const key = String(type || 'PIPE').toLowerCase();\n  return config.compliance[`${key}Multiplier`] ?? config.compliance.pipeMultiplier;\n}"
+          new_alias = "function complianceMultiplier(type, config) {\n  const aliases = { ELBO: 'elbow', BEND: 'elbow', FLAN: 'flange', VALV: 'valve', INST: 'instrument', REDU: 'reducer', TEE: 'tee', OLET: 'olet', GASK: 'gasket', PIPE: 'pipe' };\n  const key = aliases[String(type || 'PIPE').toUpperCase()] || 'pipe';\n  return config.compliance[`${key}Multiplier`] ?? config.compliance.pipeMultiplier;\n}"
+          if old_alias not in text:
+              raise SystemExit('compliance alias anchor not found')
+          text = text.replace(old_alias, new_alias, 1)
+          path.write_text(text)
+
+          profile = Path('benchmarks/1885Sjson/empirical-screening-profile.config.json')
+          p = profile.read_text()
+          p = p.replace('"consolidateBy": ["baseSupportTag", "coordinateWithinTolerance"],', '"authority": "COMPANION_TOPOLOGY_XML_RESTRAINTS",\n    "consolidateBy": ["baseSupportTag", "coordinateWithinTolerance"],')
+          p = p.replace('"expectedPhysicalSupportSiteCount": 34,', '"expectedPhysicalSupportSiteCount": 36,')
+          p = p.replace('"siteIdOrder": "NORTH_CENTRAL_THEN_SOUTH_ASCII_V1"', '"siteIdOrder": "EXACT_XML_NODE_ID"')
+          profile.write_text(p)
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add scripts/empirical-sjson-1885-configurable-screening-run.mjs benchmarks/1885Sjson/empirical-screening-profile.config.json
+          git commit -m "Use exact XML support-site authority for configurable screening"
+          git push
