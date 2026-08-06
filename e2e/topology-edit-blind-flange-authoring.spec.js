@@ -187,7 +187,8 @@ async function eligibleBlindFlangeEndpoint(page) {
       const type = String(edge.entityType ?? '').toUpperCase();
       if (!['PIPE', 'STRAIGHT', 'STRAIGHT_ELEMENT'].includes(type)) return [];
       if (Number(edge.diameterMm) !== 50 || Number(edge.outsideDiameterMm) !== 60.3) return [];
-      if (String(edge.pipingClass ?? '').toUpperCase() !== 'DEMO-150') return [];
+      const pipingClass = String(edge.pipingClass ?? '').trim().toUpperCase();
+      if (pipingClass && pipingClass !== 'DEMO-150') return [];
       if (dependentEdgeIds.has(edge.id)) return [];
       const from = nodes.get(edge.fromNodeId);
       const to = nodes.get(edge.toNodeId);
