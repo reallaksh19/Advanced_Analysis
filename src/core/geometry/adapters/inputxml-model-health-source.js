@@ -126,6 +126,16 @@ function fieldEvidenceFor({
   let disposition;
   let effectiveSourceFeatureId = null;
 
+  if (!segment) {
+    return freezeDeep({
+      disposition: rawState,
+      rawAttributeName: raw?.name ?? null,
+      rawValue: raw?.value ?? null,
+      effectiveSourceFeatureId: null,
+      canonicalValue: null,
+    });
+  }
+
   if (rawState === 'EXPLICIT') {
     disposition = 'EXPLICIT';
     effectiveSourceFeatureId = sourceFeatureId;
