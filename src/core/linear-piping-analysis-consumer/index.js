@@ -167,3 +167,21 @@ export {
   requireInputXmlLinearSolvePreparation,
   sealInputXmlLinearSolvePreparation,
 } from './inputxml-linear-solve-preparation-contract.js';
+
+export {
+  INPUTXML_STIFFNESS_CONDITIONING_SOURCE,
+  INPUTXML_STIFFNESS_PREFLIGHT_PROFILE_ID,
+  INPUTXML_STIFFNESS_PREFLIGHT_SOURCE,
+  inputXmlStiffnessFrameElementProfile,
+  inputXmlStiffnessSolverProfile,
+} from './inputxml-linear-stiffness-profile.js';
+
+export { preflightInputXmlLinearSolve } from './inputxml-linear-stiffness-preflight.js';
+
+export {
+  INPUTXML_LINEAR_STIFFNESS_PREFLIGHT_SCHEMA,
+  INPUTXML_LINEAR_STIFFNESS_PREFLIGHT_STATUSES,
+  requireInputXmlLinearStiffnessPreflight,
+  sealInputXmlLinearStiffnessPreflight,
+  stiffnessAssessmentProjection,
+} from './inputxml-linear-stiffness-preflight-contract.js';
