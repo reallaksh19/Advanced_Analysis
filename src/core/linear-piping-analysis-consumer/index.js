@@ -128,3 +128,25 @@ export {
   INPUTXML_MODEL_HEALTH_CAPABILITY_DEPENDENCIES,
   STRICT_INPUTXML_LINEAR_STATIC_PROFILE,
 } from './inputxml-model-health-profile.js';
+
+export {
+  INPUTXML_THERMAL_EXPANSION_AUTHORITY_SCHEMA,
+  INPUTXML_THERMAL_EXPANSION_COEFFICIENT_BY_MATERIAL,
+  resolveInputXmlThermalExpansionAuthority,
+} from './inputxml-thermal-authority.js';
+
+export {
+  INPUTXML_INSTALLATION_TEMPERATURE,
+  INPUTXML_LINEAR_CONDITIONING_PROFILE,
+  INPUTXML_LINEAR_PREPARATION_PROFILE_SCHEMA,
+  InputXmlLinearPreparationError,
+  requireInputXmlLinearPreparationProfile,
+} from './inputxml-linear-preparation-profile.js';
+
+export { prepareInputXmlLinearStructure } from './inputxml-linear-structural-preparation.js';
+
+export {
+  INPUTXML_LINEAR_STRUCTURAL_PREPARATION_SCHEMA,
+  requireInputXmlLinearStructuralPreparation,
+  sealInputXmlLinearStructuralPreparation,
+} from './inputxml-linear-structural-preparation-contract.js';

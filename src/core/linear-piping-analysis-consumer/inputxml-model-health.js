@@ -7,9 +7,7 @@ import {
   INPUTXML_LINEAR_MODEL_HEALTH_SCHEMA,
   sealInputXmlLinearModelHealth,
 } from './inputxml-model-health-contract.js';
-import {
-  INPUTXML_MODEL_HEALTH_CAPABILITY_DEPENDENCIES,
-} from './inputxml-model-health-profile.js';
+import { INPUTXML_MODEL_HEALTH_CAPABILITY_DEPENDENCIES } from './inputxml-model-health-profile.js';
 import { buildInputXmlFeatureInventory } from './inputxml-feature-inventory.js';
 import { buildInputXmlRepresentabilityFindings } from './inputxml-representability-findings.js';
 import { buildInputXmlAuthorityFindings } from './inputxml-authority-findings.js';
@@ -48,8 +46,8 @@ export function diagnoseInputXmlLinearModelHealth(sourceBundle, options) {
     findings,
     summary: summaryOf(inventory, findings, capabilityById),
     executionAvailability: {
-      STRICT_INPUTXML_LINEAR_STATIC_V1: 'PROFILE_SPECIFIC_PREPARATION_NOT_IMPLEMENTED',
-      DISCLOSED_GENERIC_ANALYZER_APPROXIMATION_V1: 'LEGACY_RAW_TEXT_CONVENIENCE_API_NOT_REPORT_GOVERNED',
+      STRICT_INPUTXML_LINEAR_STATIC_V1: 'STRUCTURAL_PREPARATION_AVAILABLE_LOAD_CUSTODY_NOT_IMPLEMENTED',
+      DISCLOSED_GENERIC_ANALYZER_APPROXIMATION_V1: 'STRUCTURAL_PREPARATION_AVAILABLE_LOAD_CUSTODY_NOT_IMPLEMENTED',
     },
   });
 }

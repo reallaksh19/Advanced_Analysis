@@ -1,9 +1,9 @@
-import { semanticHash } from '../shared-piping-model/canonical-json.js';
 import {
   createInputXmlModelHealthFinding as finding,
   inputXmlCapabilityEffect as effect,
   inputXmlBothProfileEffects as bothProfiles,
 } from './inputxml-model-health-finding.js';
+import { resolveInputXmlThermalExpansionAuthority } from './inputxml-thermal-authority.js';
 
 const DOFS = Object.freeze(['UX', 'UY', 'UZ', 'RX', 'RY', 'RZ']);
 
@@ -17,7 +17,6 @@ export function buildInputXmlAuthorityFindings(sourceBundle, inventory) {
 
 function materialFindings(sourceBundle) {
   const rows = [];
-  const signatures = new Map();
   for (const element of sourceBundle.elementRecords) {
     const fields = element.fields;
     const invalid = [];
@@ -26,42 +25,17 @@ function materialFindings(sourceBundle) {
     if (!(fields.elasticModulus?.canonicalValue > 0)) invalid.push('elasticModulus');
     if (!(fields.poissonRatio?.canonicalValue > 0 && fields.poissonRatio.canonicalValue < 0.5)) invalid.push('poissonRatio');
     if (!(fields.pipeDensity?.canonicalValue > 0)) invalid.push('pipeDensity');
-    if (invalid.length > 0) {
-      rows.push(finding({
-        code: 'MODEL_MATERIAL_OR_SECTION_FIELD_INVALID',
-        category: 'AUTHORITY',
-        severity: 'error',
-        message: `Source element ${element.sourceElementNumber} has invalid required fields: ${invalid.join(', ')}.`,
-        entities: { segmentIds: [element.segmentId], sourceElementIndices: [element.sourceElementIndex] },
-        evidence: { invalidFields: invalid, sourcePath: element.sourcePath },
-        authority: 'INPUTXML_SOURCE_BUNDLE',
-        remediation: 'Declare valid pipe dimensions, modulus, Poisson ratio, and pipe density.',
-        capabilityEffects: bothProfiles('BLOCK', 'MODEL_MATERIAL_OR_SECTION_FIELD_INVALID'),
-      }));
-      continue;
-    }
-    const signature = semanticHash({
-      elasticModulus: fields.elasticModulus.canonicalValue,
-      poissonRatio: fields.poissonRatio.canonicalValue,
-      pipeDensity: fields.pipeDensity.canonicalValue,
-    });
-    if (!signatures.has(signature)) signatures.set(signature, []);
-    signatures.get(signature).push(element.segmentId);
-  }
-  if (signatures.size > 1) {
+    if (invalid.length === 0) continue;
     rows.push(finding({
-      code: 'MODEL_PER_ELEMENT_MATERIAL_BINDING_REQUIRED',
+      code: 'MODEL_MATERIAL_OR_SECTION_FIELD_INVALID',
       category: 'AUTHORITY',
       severity: 'error',
-      message: `The model contains ${signatures.size} distinct material states; the current generic compiler binds one material state to every element.`,
-      entities: { segmentIds: [...signatures.values()].flat() },
-      evidence: { materialStateCount: signatures.size, groups: [...signatures.entries()] },
-      authority: 'GENERIC_INPUTXML_CURRENT_COMPILER',
-      remediation: 'Use per-element material authority binding before strict analysis.',
-      capabilityEffects: {
-        STRICT_LINEAR_STATIC: effect('BLOCK', 'MODEL_PER_ELEMENT_MATERIAL_BINDING_REQUIRED'),
-        APPROXIMATE_LINEAR_STATIC: effect('CONDITIONAL', 'GENERIC_APPROX_SINGLE_MATERIAL_STATE'),
-      },
+      message: `Source element ${element.sourceElementNumber} has invalid required fields: ${invalid.join(', ')}.`,
+      entities: { segmentIds: [element.segmentId], sourceElementIndices: [element.sourceElementIndex] },
+      evidence: { invalidFields: invalid, sourcePath: element.sourcePath },
+      authority: 'INPUTXML_SOURCE_BUNDLE',
+      remediation: 'Declare valid pipe dimensions, modulus, Poisson ratio, and pipe density.',
+      capabilityEffects: bothProfiles('BLOCK', 'MODEL_MATERIAL_OR_SECTION_FIELD_INVALID'),
     }));
   }
   return rows;
@@ -119,18 +93,35 @@ function thermalFindings(sourceBundle) {
       },
     })];
   }
+  const unresolved = sourceBundle.elementRecords
+    .map((element) => ({
+      element,
+      authority: resolveInputXmlThermalExpansionAuthority(
+        element.fields.materialNumber?.canonicalValue,
+      ),
+    }))
+    .filter((row) => row.authority.status !== 'RESOLVED');
+  if (unresolved.length === 0) return [];
   return [finding({
-    code: 'MODEL_THERMAL_AUTHORITY_NOT_PROFILE_BOUND',
+    code: 'MODEL_THERMAL_EXPANSION_AUTHORITY_UNRESOLVED',
     category: 'AUTHORITY',
     severity: 'error',
-    message: 'Temperature records are retained, but per-element thermal-expansion authority is not yet bound by the model-health preparation pipeline.',
+    message: `${unresolved.length} source element(s) have no qualified thermal-expansion authority.`,
     entities: {
-      sourceFeatureIds: active.map((row) => row.sourceFeatureId),
-      segmentIds: active.map((row) => row.segmentId),
+      segmentIds: unresolved.map((row) => row.element.segmentId),
+      sourceElementIndices: unresolved.map((row) => row.element.sourceElementIndex),
     },
-    evidence: { activeTemperatureRecordCount: active.length },
-    authority: 'MODEL_HEALTH_IMPLEMENTATION_BOUNDARY',
-    remediation: 'Bind each element to a resolved material and thermal-expansion state before operating analysis.',
-    capabilityEffects: { THERMAL_AUTHORITY: effect('BLOCK', 'MODEL_THERMAL_AUTHORITY_NOT_PROFILE_BOUND') },
+    evidence: {
+      unresolvedMaterials: unresolved.map((row) => ({
+        sourceElementIndex: row.element.sourceElementIndex,
+        materialNumber: row.authority.materialNumber,
+      })),
+      activeTemperatureRecordCount: active.length,
+    },
+    authority: 'INPUTXML_THERMAL_EXPANSION_AUTHORITY_REGISTRY',
+    remediation: 'Add a reviewed material-specific thermal-expansion authority before operating analysis.',
+    capabilityEffects: {
+      THERMAL_AUTHORITY: effect('BLOCK', 'MODEL_THERMAL_EXPANSION_AUTHORITY_UNRESOLVED'),
+    },
   })];
 }
