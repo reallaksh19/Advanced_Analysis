@@ -38,9 +38,18 @@ assert.ok(targetBefore && targetAfter, `${TARGET_PAIR} report pair`);
 assert.equal(targetAfter.reportingAxisCustody.profile, 'M032_BM2_JUNCTION_ADJACENT_REPORTING_PLANE_V1');
 assert.equal(
   targetAfter.reportingAxisCustody.basis,
-  'CORRECT_ONLY_EXACT_180_DEGREE_TRANSVERSE_FRAME_DISCONTINUITY',
+  'CORRECT_ONLY_REMOTE_END_OF_EXACT_180_DEGREE_TRANSVERSE_FRAME_DISCONTINUITY',
 );
+assert.equal(targetAfter.reportingAxisCustody.junctionEnd, 'J');
+assert.equal(targetAfter.reportingAxisCustody.correctedRemoteEnd, 'I');
 assert.notDeepEqual(targetAfter.sustained.local.I, targetBefore.sustained.local.I);
+assert.notDeepEqual(targetAfter.operating.local.I, targetBefore.operating.local.I);
+assert.deepEqual(targetAfter.sustained.local.J, targetBefore.sustained.local.J);
+assert.deepEqual(targetAfter.operating.local.J, targetBefore.operating.local.J);
+assert.equal(targetAfter.sustained.local.I.fx, targetBefore.sustained.local.I.fx);
+assert.equal(targetAfter.sustained.local.I.mx, targetBefore.sustained.local.I.mx);
+assert.equal(targetAfter.operating.local.I.fx, targetBefore.operating.local.I.fx);
+assert.equal(targetAfter.operating.local.I.mx, targetBefore.operating.local.I.mx);
 assert.deepEqual(targetAfter.sustained.global.I, targetBefore.sustained.global.I);
 
 const comparison = buildBm2CiiComparisonConditioned();
@@ -72,7 +81,7 @@ for (const [caseLabel, field] of requiredPasses) {
 
 console.log(JSON.stringify({
   status: 'PASS',
-  hypothesis: 'EXACT_180_DEGREE_TRANSVERSE_FRAME_DISCONTINUITY',
+  hypothesis: 'REMOTE_END_EXACT_180_DEGREE_TRANSVERSE_FRAME_DISCONTINUITY',
   denominator: comparison.totals.comparisons,
   before: BASELINE,
   after: comparison.totals,
@@ -82,5 +91,6 @@ console.log(JSON.stringify({
   },
   correctedPairs: corrected.report.localForceReportingAuthority.correctedPairs,
   targetPair: TARGET_PAIR,
+  correctedRemoteEnd: targetAfter.reportingAxisCustody.correctedRemoteEnd,
   requiredPasses,
 }, null, 2));
