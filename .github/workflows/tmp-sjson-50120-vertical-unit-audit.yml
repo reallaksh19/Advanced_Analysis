@@ -1,0 +1,33 @@
+name: Temporary SJSON N50120 vertical unit audit
+
+on:
+  push:
+    branches:
+      - agent/sjson-1885-configurable-screening
+    paths:
+      - scripts/tmp-sjson-50120-vertical-unit-audit.mjs
+      - .github/workflows/tmp-sjson-50120-vertical-unit-audit.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Materialize exact benchmark sources
+        run: |
+          git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson > /tmp/EnrichedSjson
+          git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson.topology.input.xml > /tmp/EnrichedSjson.topology.input.xml
+      - name: Audit N50120 incident mass and units
+        run: |
+          node scripts/tmp-sjson-50120-vertical-unit-audit.mjs \
+            /tmp/EnrichedSjson \
+            /tmp/EnrichedSjson.topology.input.xml
