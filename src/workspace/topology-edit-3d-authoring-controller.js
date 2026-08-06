@@ -90,11 +90,13 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     if (!result?.projection) {
       throw new Error('TopologyEditAuthoringController: governed visual projection is unavailable.');
     }
-    const alreadyDecorated = authoredProjectionSegments(result.projection)
-      .some((segment) => segment?.pickTarget?.partRole === 'authored-elbow-arc');
-    const projection = alreadyDecorated
-      ? result.projection
-      : applyTopologyEditAuthoredBendProjection(result.projection, canonical);
+    // The governed SJSON packet carries both standard and compact segment
+    // arrays. Apply the idempotent adapter every time so one pre-decorated
+    // array cannot suppress authored bends in the renderer-owned compact list.
+    const projection = applyTopologyEditAuthoredBendProjection(
+      result.projection,
+      canonical,
+    );
     const decorated = projection === result.projection
       ? result
       : Object.freeze({ ...result, projection });
@@ -228,11 +230,4 @@ function normalizeControllerNodeSelection(controller) {
     ...controller.selection,
     nodeIds: normalized,
   };
-}
-
-function authoredProjectionSegments(projection) {
-  return [
-    ...(Array.isArray(projection?.segments) ? projection.segments : []),
-    ...(Array.isArray(projection?.compactSegments) ? projection.compactSegments : []),
-  ];
 }
