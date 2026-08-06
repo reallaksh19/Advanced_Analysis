@@ -1,0 +1,58 @@
+name: Finalize SJSON 1885 configurable screening bundle
+
+on:
+  push:
+    branches:
+      - agent/sjson-1885-configurable-screening
+    paths:
+      - .tmp/sjson-1885-final-bundle.part00
+      - .tmp/sjson-1885-final-bundle.part01
+      - .tmp/sjson-1885-final-bundle.part02
+      - .tmp/sjson-1885-final-bundle.part03
+      - .github/workflows/sjson-1885-finalize-bundle.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install exact qualified bundle
+        run: |
+          cat .tmp/sjson-1885-final-bundle.part* | base64 --decode > /tmp/sjson-1885-final-bundle.tar.gz
+          tar -xzf /tmp/sjson-1885-final-bundle.tar.gz -C .
+          rm -rf .tmp
+          rm -f scripts/empirical-sjson-1885-support-inventory.mjs
+          rm -f scripts/empirical-sjson-1885-support-inventory-compact.mjs
+      - name: Recalculate exact benchmark twice
+        run: |
+          git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson > /tmp/EnrichedSjson
+          git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson.topology.input.xml > /tmp/EnrichedSjson.topology.input.xml
+          node scripts/empirical-sjson-1885-configurable-screening-run.mjs \
+            benchmarks/1885Sjson/empirical-screening-profile.config.json \
+            /tmp/EnrichedSjson \
+            /tmp/EnrichedSjson.topology.input.xml \
+            /tmp/result-a.json
+          node scripts/empirical-sjson-1885-configurable-screening-run.mjs \
+            benchmarks/1885Sjson/empirical-screening-profile.config.json \
+            /tmp/EnrichedSjson \
+            /tmp/EnrichedSjson.topology.input.xml \
+            /tmp/result-b.json
+          cmp /tmp/result-a.json /tmp/result-b.json
+          cmp /tmp/result-a.json benchmarks/1885Sjson/empirical-screening-result.configurable.json
+          node scripts/empirical-sjson-1885-configurable-screening-check.mjs /tmp/result-a.json
+      - name: Commit permanent configurable calculation package
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "Finalize configurable SJSON 1885 empirical screening" || exit 0
+          git push
