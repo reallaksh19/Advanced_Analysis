@@ -7,6 +7,8 @@ on:
       - 'scripts/advanced-shell-contract-check.mjs'
       - 'src/workspace/topology-edit-3d-authoring-controller.js'
       - 'src/workspace/topology-edit-3d-productivity-controller.js'
+      - 'src/workspace/topology-edit-3d-sjson-fidelity-controller.js'
+      - 'src/workspace/topology-edit/topology-edit-sjson-runtime-authority-v2.js'
       - 'src/workspace/topology-edit/authoring/topology-edit-authoring-composite-operation.js'
       - 'src/workspace/topology-edit/authoring/topology-edit-authoring-operation-planner.js'
       - 'src/workspace/topology-edit/authoring/topology-edit-authored-bend-geometry.js'
@@ -15,6 +17,7 @@ on:
       - 'tests/topology-edit-authoring-composite-operation.test.mjs'
       - 'tests/topology-edit-authoring-planner.test.mjs'
       - 'tests/topology-edit-authored-bend-geometry.test.mjs'
+      - 'tests/topology-edit-governed-sjson-source-authority.test.mjs'
       - 'e2e/topology-edit-authoring-tools.spec.js'
       - 'e2e/topology-edit-authoring-tools-tree.spec.js'
   workflow_dispatch:
@@ -59,6 +62,8 @@ jobs:
           test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
           node --check src/workspace/topology-edit-3d-authoring-controller.js
           node --check src/workspace/topology-edit-3d-productivity-controller.js
+          node --check src/workspace/topology-edit-3d-sjson-fidelity-controller.js
+          node --check src/workspace/topology-edit/topology-edit-sjson-runtime-authority-v2.js
           node --check src/workspace/topology-edit/authoring/topology-edit-authoring-composite-operation.js
           node --check src/workspace/topology-edit/authoring/topology-edit-authoring-operation-planner.js
           node --check src/workspace/topology-edit/authoring/topology-edit-authored-bend-geometry.js
@@ -67,6 +72,7 @@ jobs:
           node --check tests/topology-edit-authoring-composite-operation.test.mjs
           node --check tests/topology-edit-authoring-planner.test.mjs
           node --check tests/topology-edit-authored-bend-geometry.test.mjs
+          node --check tests/topology-edit-governed-sjson-source-authority.test.mjs
           node --check e2e/topology-edit-authoring-tools-tree.spec.js
           node scripts/advanced-shell-contract-check.mjs
           git diff --check
@@ -81,6 +87,7 @@ jobs:
             tests/topology-edit-authoring-planner.test.mjs \
             tests/topology-edit-authoring-composite-operation.test.mjs \
             tests/topology-edit-authored-bend-geometry.test.mjs \
+            tests/topology-edit-governed-sjson-source-authority.test.mjs \
             tests/topology-edit-professional-operation-transaction.test.mjs \
             tests/topology-edit-wave1-production-integration.test.mjs \
             2>&1 | tee topology-edit-authoring-tools-test-output.txt
