@@ -1,0 +1,61 @@
+name: 3D Edit Branch Command
+
+on:
+  pull_request:
+    paths:
+      - 'src/workspace/topology-edit/topology-edit-branch-component-command.js'
+      - 'src/workspace/topology-edit/authoring/topology-edit-authoring-branch-geometry.js'
+      - 'tests/topology-edit-branch-component-command.test.mjs'
+      - 'tests/topology-edit-authoring-branch-geometry.test.mjs'
+      - '.github/workflows/topology-edit-branch-command.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  branch-command:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify exact sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check src/workspace/topology-edit/topology-edit-branch-component-command.js
+          node --check src/workspace/topology-edit/authoring/topology-edit-authoring-branch-geometry.js
+          node --check tests/topology-edit-branch-component-command.test.mjs
+          node --check tests/topology-edit-authoring-branch-geometry.test.mjs
+          git diff --check
+
+      - name: Execute branch command contracts
+        shell: bash
+        run: |
+          set -o pipefail
+          node --test --test-reporter=tap \
+            tests/topology-edit-authoring-branch-geometry.test.mjs \
+            tests/topology-edit-branch-component-command.test.mjs \
+            2>&1 | tee branch-command-test-output.txt
+
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-branch-command-${{ github.sha }}-${{ github.run_attempt }}
+          path: branch-command-test-output.txt
+          if-no-files-found: warn
+          retention-days: 30
