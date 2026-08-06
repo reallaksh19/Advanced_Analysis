@@ -15,9 +15,9 @@
     "hashes": {
       "enrichedSjsonSha256": "e9a51723444e9490f5dff9c1ff4a5c56191873033d11a289946746ff1072c5da",
       "topologyInputXmlSha256": "b46fbc765c71a63eb5d156eeaed3ae3be56584bd753b563d76fb10df21ff652a",
-      "profileFileSha256": "ab6d937dd34ffd46cdee8388a266e36984e542107de4670b72f3ed1fc93da252",
-      "profileCanonicalSha256": "fd7ce4b70906b3028be70566462d0748ecc30adce064e10ab7c7226e9b9459ec",
-      "runnerSha256": "0bff4c9db163b633e66fcd0b370ce4e6cf7ef89e435ccdfc9aeff0b594a1bdf6"
+      "profileFileSha256": "1ae578dbb44aea3369c8da0f73b8a4d406c747f0c84f24b4db7197fec9329af9",
+      "profileCanonicalSha256": "52036b8a074e1a90959ca66485eaa07c461a62ca184d033d96346dd2d70e007c",
+      "runnerSha256": "3e77303e196b85264e6c02ff41b99429643adc1c4a67795e7d0ba2e83a6924a7"
     }
   },
   "configurableAssumptions": {
@@ -72,7 +72,9 @@
       "unresolvedPolicy": "BLOCK",
       "temperatureConflictToleranceC": 0.001,
       "fluidDensityConflictToleranceKgM3": 0.001,
-      "pressureExcludedFromReactionScreening": true
+      "pressureExcludedFromReactionScreening": true,
+      "inputXmlDensityUnit": "kg/cm3",
+      "inputXmlDensityToKgM3": 1000000
     },
     "weight": {
       "gravityMPerS2": 9.80665,
@@ -167,6 +169,16 @@
       "SENTINEL_PREVIOUS_CONNECTED_NODE": 105,
       "SOURCE_EXPLICIT": 58
     },
+    "inputXmlFluidDensityUnit": "kg/cm3",
+    "inputXmlFluidDensityToKgM3": 1000000,
+    "resolvedFluidDensityKgM3": {
+      "count": 163,
+      "min": 300,
+      "max": 300,
+      "unique": [
+        300
+      ]
+    },
     "processResolutionAudit": {
       "temperature": {
         "policy": "INHERIT_PREVIOUS_CONNECTED_NODE",
@@ -191,10 +203,10 @@
         "inheritedSentinelCount": 105,
         "explicitSeedSummary": {
           "count": 58,
-          "min": 0.3,
-          "max": 0.3,
+          "min": 300,
+          "max": 300,
           "unique": [
-            0.3
+            300
           ]
         },
         "fallbackUsed": false,
@@ -252,20 +264,20 @@
   },
   "verticalWeight": {
     "status": "CALCULATED_CONFIGURABLE_SCREENING",
-    "totalModelMassKg": 4702.209369,
-    "totalWeightKn": 46.112922,
-    "reactionSumKn": 46.112922,
+    "totalModelMassKg": 5388.84094,
+    "totalWeightKn": 52.846477,
+    "reactionSumKn": 52.846477,
     "equilibriumErrorKn": 0,
     "massByTreatmentKg": {
-      "ELBO_PIPE_SPAN": 409.858719,
-      "PIPE_PIPE_SPAN": 3889.556459,
-      "FLAN_PIPE_EQUIVALENT_FALLBACK": 109.98528,
+      "ELBO_PIPE_SPAN": 459.361845,
+      "PIPE_PIPE_SPAN": 4480.997221,
+      "FLAN_PIPE_EQUIVALENT_FALLBACK": 122.794239,
       "GASKET_ZERO": 0,
-      "VALV_PIPE_EQUIVALENT_FALLBACK": 34.375822,
-      "INST_PIPE_EQUIVALENT_FALLBACK": 50.875301,
-      "REDU_PIPE_SPAN": 55.427368,
-      "TEE_PIPE_EQUIVALENT": 101.271443,
-      "OLET_PIPE_EQUIVALENT": 50.858976
+      "VALV_PIPE_EQUIVALENT_FALLBACK": 37.855645,
+      "INST_PIPE_EQUIVALENT_FALLBACK": 57.226594,
+      "REDU_PIPE_SPAN": 61.522085,
+      "TEE_PIPE_EQUIVALENT": 112.671092,
+      "OLET_PIPE_EQUIVALENT": 56.412219
     },
     "elementCountByTreatment": {
       "ELBO_PIPE_SPAN": 28,
@@ -337,7 +349,7 @@
   },
   "componentVectorScreening": {
     "status": "INDEPENDENT_COMPONENT_VECTOR_SCREENING_ONLY",
-    "maximumMagnitudeKn": 34.953,
+    "maximumMagnitudeKn": 34.968,
     "maximumSiteId": "N50120",
     "maximumSupportTag": "PS-12169"
   },
@@ -363,9 +375,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 0.168
+        "FzWeight": 0.17
       },
-      "componentVectorMagnitudeKn": 0.168,
+      "componentVectorMagnitudeKn": 0.17,
       "thermalMovementMm": {
         "X": 4.578,
         "Y": 14.259
@@ -392,9 +404,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 0.47
+        "FzWeight": 0.551
       },
-      "componentVectorMagnitudeKn": 0.47,
+      "componentVectorMagnitudeKn": 0.551,
       "thermalMovementMm": {
         "X": -35.42,
         "Y": 1.059
@@ -421,9 +433,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 0.671
+        "FzWeight": 0.792
       },
-      "componentVectorMagnitudeKn": 0.671,
+      "componentVectorMagnitudeKn": 0.792,
       "thermalMovementMm": {
         "X": -29.933,
         "Y": 1.868
@@ -450,9 +462,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 0.774
+        "FzWeight": 0.916
       },
-      "componentVectorMagnitudeKn": 0.774,
+      "componentVectorMagnitudeKn": 0.916,
       "thermalMovementMm": {
         "X": -20.085,
         "Y": 1.687
@@ -479,9 +491,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 0.426
+        "FzWeight": 0.499
       },
-      "componentVectorMagnitudeKn": 0.426,
+      "componentVectorMagnitudeKn": 0.499,
       "thermalMovementMm": {
         "X": -12.889,
         "Y": 1.41
@@ -508,9 +520,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 0.461
+        "FzWeight": 0.54
       },
-      "componentVectorMagnitudeKn": 0.461,
+      "componentVectorMagnitudeKn": 0.54,
       "thermalMovementMm": {
         "X": -8.437,
         "Y": 1.399
@@ -547,9 +559,9 @@
       "reactionsKn": {
         "FxThermal": 31.568,
         "FyThermal": -0.77,
-        "FzWeight": 0.583
+        "FzWeight": 0.693
       },
-      "componentVectorMagnitudeKn": 31.582,
+      "componentVectorMagnitudeKn": 31.585,
       "thermalMovementMm": {
         "X": 0,
         "Y": 0
@@ -576,9 +588,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 0.545
+        "FzWeight": 0.608
       },
-      "componentVectorMagnitudeKn": 0.545,
+      "componentVectorMagnitudeKn": 0.608,
       "thermalMovementMm": {
         "X": 8.226,
         "Y": -0.359
@@ -605,9 +617,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 0.371
+        "FzWeight": 0.417
       },
-      "componentVectorMagnitudeKn": 0.371,
+      "componentVectorMagnitudeKn": 0.417,
       "thermalMovementMm": {
         "X": 22.189,
         "Y": -3.847
@@ -634,9 +646,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 3.432
+        "FzWeight": 3.801
       },
-      "componentVectorMagnitudeKn": 3.432,
+      "componentVectorMagnitudeKn": 3.801,
       "thermalMovementMm": {
         "X": 1.581,
         "Y": 14.259
@@ -663,9 +675,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 3.845
+        "FzWeight": 4.259
       },
-      "componentVectorMagnitudeKn": 3.845,
+      "componentVectorMagnitudeKn": 4.259,
       "thermalMovementMm": {
         "X": 4.878,
         "Y": 14.355
@@ -692,9 +704,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 2.887
+        "FzWeight": 3.249
       },
-      "componentVectorMagnitudeKn": 2.887,
+      "componentVectorMagnitudeKn": 3.249,
       "thermalMovementMm": {
         "X": -5.324,
         "Y": 13.628
@@ -726,9 +738,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 1.892,
-        "FzWeight": 0.659
+        "FzWeight": 0.781
       },
-      "componentVectorMagnitudeKn": 2.004,
+      "componentVectorMagnitudeKn": 2.047,
       "thermalMovementMm": {
         "X": 26.659,
         "Y": 0
@@ -755,9 +767,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 0.765
+        "FzWeight": 0.916
       },
-      "componentVectorMagnitudeKn": 0.765,
+      "componentVectorMagnitudeKn": 0.916,
       "thermalMovementMm": {
         "X": 14.897,
         "Y": 12.723
@@ -789,9 +801,9 @@
       "reactionsKn": {
         "FxThermal": -22,
         "FyThermal": 0,
-        "FzWeight": 1.118
+        "FzWeight": 1.328
       },
-      "componentVectorMagnitudeKn": 22.029,
+      "componentVectorMagnitudeKn": 22.04,
       "thermalMovementMm": {
         "X": 0,
         "Y": 19.542
@@ -818,9 +830,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 0.915
+        "FzWeight": 1.095
       },
-      "componentVectorMagnitudeKn": 0.915,
+      "componentVectorMagnitudeKn": 1.095,
       "thermalMovementMm": {
         "X": 16.952,
         "Y": -9.741
@@ -847,9 +859,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 1.046
+        "FzWeight": 1.241
       },
-      "componentVectorMagnitudeKn": 1.046,
+      "componentVectorMagnitudeKn": 1.241,
       "thermalMovementMm": {
         "X": 26.36,
         "Y": -10.58
@@ -886,9 +898,9 @@
       "reactionsKn": {
         "FxThermal": -8.138,
         "FyThermal": -2.185,
-        "FzWeight": 0.516
+        "FzWeight": 0.618
       },
-      "componentVectorMagnitudeKn": 8.442,
+      "componentVectorMagnitudeKn": 8.449,
       "thermalMovementMm": {
         "X": 0,
         "Y": 0
@@ -915,9 +927,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 0.299
+        "FzWeight": 0.354
       },
-      "componentVectorMagnitudeKn": 0.299,
+      "componentVectorMagnitudeKn": 0.354,
       "thermalMovementMm": {
         "X": 0,
         "Y": 4
@@ -944,9 +956,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 1.016
+        "FzWeight": 1.205
       },
-      "componentVectorMagnitudeKn": 1.016,
+      "componentVectorMagnitudeKn": 1.205,
       "thermalMovementMm": {
         "X": -7.379,
         "Y": 12.382
@@ -983,9 +995,9 @@
       "reactionsKn": {
         "FxThermal": 1.42,
         "FyThermal": 3.287,
-        "FzWeight": 0.62
+        "FzWeight": 0.742
       },
-      "componentVectorMagnitudeKn": 3.634,
+      "componentVectorMagnitudeKn": 3.657,
       "thermalMovementMm": {
         "X": 0,
         "Y": 0
@@ -1012,9 +1024,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 0.339
+        "FzWeight": 0.402
       },
-      "componentVectorMagnitudeKn": 0.339,
+      "componentVectorMagnitudeKn": 0.402,
       "thermalMovementMm": {
         "X": 0,
         "Y": -5.134
@@ -1041,9 +1053,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 0.932
+        "FzWeight": 1.113
       },
-      "componentVectorMagnitudeKn": 0.932,
+      "componentVectorMagnitudeKn": 1.113,
       "thermalMovementMm": {
         "X": 21.061,
         "Y": 28.952
@@ -1070,9 +1082,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 1.304
+        "FzWeight": 1.562
       },
-      "componentVectorMagnitudeKn": 1.304,
+      "componentVectorMagnitudeKn": 1.562,
       "thermalMovementMm": {
         "X": 2.42,
         "Y": 10.144
@@ -1099,9 +1111,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 1.064
+        "FzWeight": 1.275
       },
-      "componentVectorMagnitudeKn": 1.064,
+      "componentVectorMagnitudeKn": 1.275,
       "thermalMovementMm": {
         "X": -15.807,
         "Y": -7.433
@@ -1128,9 +1140,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 1.264
+        "FzWeight": 1.491
       },
-      "componentVectorMagnitudeKn": 1.264,
+      "componentVectorMagnitudeKn": 1.491,
       "thermalMovementMm": {
         "X": -27.673,
         "Y": -12.283
@@ -1157,9 +1169,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 1.035
+        "FzWeight": 1.216
       },
-      "componentVectorMagnitudeKn": 1.035,
+      "componentVectorMagnitudeKn": 1.216,
       "thermalMovementMm": {
         "X": -36.435,
         "Y": -5.323
@@ -1186,9 +1198,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 0.775
+        "FzWeight": 0.916
       },
-      "componentVectorMagnitudeKn": 0.775,
+      "componentVectorMagnitudeKn": 0.916,
       "thermalMovementMm": {
         "X": -16.186,
         "Y": -23.942
@@ -1215,9 +1227,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 1.42
+        "FzWeight": 1.689
       },
-      "componentVectorMagnitudeKn": 1.42,
+      "componentVectorMagnitudeKn": 1.689,
       "thermalMovementMm": {
         "X": -20.607,
         "Y": -25.505
@@ -1254,9 +1266,9 @@
       "reactionsKn": {
         "FxThermal": -0.991,
         "FyThermal": -34.905,
-        "FzWeight": 1.552
+        "FzWeight": 1.859
       },
-      "componentVectorMagnitudeKn": 34.953,
+      "componentVectorMagnitudeKn": 34.968,
       "thermalMovementMm": {
         "X": 0,
         "Y": 0
@@ -1283,9 +1295,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 0.923
+        "FzWeight": 1.106
       },
-      "componentVectorMagnitudeKn": 0.923,
+      "componentVectorMagnitudeKn": 1.106,
       "thermalMovementMm": {
         "X": 23.102,
         "Y": 18.087
@@ -1312,9 +1324,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 0.567
+        "FzWeight": 0.671
       },
-      "componentVectorMagnitudeKn": 0.567,
+      "componentVectorMagnitudeKn": 0.671,
       "thermalMovementMm": {
         "X": 25.117,
         "Y": 26.109
@@ -1341,9 +1353,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 2.895
+        "FzWeight": 3.193
       },
-      "componentVectorMagnitudeKn": 2.895,
+      "componentVectorMagnitudeKn": 3.193,
       "thermalMovementMm": {
         "X": 10.921,
         "Y": 12.379
@@ -1375,9 +1387,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 8.968,
-        "FzWeight": 2.895
+        "FzWeight": 3.193
       },
-      "componentVectorMagnitudeKn": 9.424,
+      "componentVectorMagnitudeKn": 9.519,
       "thermalMovementMm": {
         "X": 10.921,
         "Y": 0
@@ -1414,9 +1426,9 @@
       "reactionsKn": {
         "FxThermal": -1.858,
         "FyThermal": 23.712,
-        "FzWeight": 4.241
+        "FzWeight": 4.704
       },
-      "componentVectorMagnitudeKn": 24.16,
+      "componentVectorMagnitudeKn": 24.245,
       "thermalMovementMm": {
         "X": 0,
         "Y": 0
@@ -1443,9 +1455,9 @@
       "reactionsKn": {
         "FxThermal": 0,
         "FyThermal": 0,
-        "FzWeight": 3.319
+        "FzWeight": 3.682
       },
-      "componentVectorMagnitudeKn": 3.319,
+      "componentVectorMagnitudeKn": 3.682,
       "thermalMovementMm": {
         "X": 0.635,
         "Y": 10.269
@@ -1458,6 +1470,7 @@
     "Vertical reactions use graph tributary weight, not flexural beam analysis.",
     "Guide and line-stop axes are inferred from the host route tangent because the exported TYPE 8/9 cosine fields are zero.",
     "All sentinel process values inherit from connected previous-node explicit values; no configured temperature or fluid fallback is used.",
+    "Input XML density values are converted from configured kg/cm3 to kg/m3 before fluid mass is calculated.",
     "No positive flange, valve, or instrument source weights are present; configurable same-section pipe-equivalent fallback is used.",
     "Component vector magnitudes combine independently screened Fx, Fy, and Fz components and are not a code operating load case.",
     "Pressure load and pressure stress are excluded."

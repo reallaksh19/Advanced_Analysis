@@ -50,7 +50,9 @@
     "unresolvedPolicy": "BLOCK",
     "temperatureConflictToleranceC": 0.001,
     "fluidDensityConflictToleranceKgM3": 0.001,
-    "pressureExcludedFromReactionScreening": true
+    "pressureExcludedFromReactionScreening": true,
+    "inputXmlDensityUnit": "kg/cm3",
+    "inputXmlDensityToKgM3": 1000000
   },
   "weight": {
     "gravityMPerS2": 9.80665,

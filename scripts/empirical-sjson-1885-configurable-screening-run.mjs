@@ -87,6 +87,9 @@ const report = {
     operatingTemperature: summarizeNumbers(model.edges.map((edge) => edge.temperatureC)),
     temperatureResolution: countBy(model.edges, (edge) => edge.temperatureAuthority),
     fluidDensityResolution: countBy(model.edges, (edge) => edge.fluidDensityAuthority),
+    inputXmlFluidDensityUnit: profile.processResolution.inputXmlDensityUnit,
+    inputXmlFluidDensityToKgM3: profile.processResolution.inputXmlDensityToKgM3,
+    resolvedFluidDensityKgM3: summarizeNumbers(model.edges.map((edge) => edge.fluidDensityKgM3)),
     processResolutionAudit,
     sourceComponentWeightPositiveCount: sourceIndex.componentRecords.filter((record) => positive(record.componentWeightKg)).length,
     sourceComponentWeightAvailabilityByType: countPositiveWeightAvailabilityByType(sourceIndex.componentRecords),
@@ -111,6 +114,7 @@ const report = {
     'Vertical reactions use graph tributary weight, not flexural beam analysis.',
     'Guide and line-stop axes are inferred from the host route tangent because the exported TYPE 8/9 cosine fields are zero.',
     'All sentinel process values inherit from connected previous-node explicit values; no configured temperature or fluid fallback is used.',
+    'Input XML density values are converted from configured kg/cm3 to kg/m3 before fluid mass is calculated.',
     'No positive flange, valve, or instrument source weights are present; configurable same-section pipe-equivalent fallback is used.',
     'Component vector magnitudes combine independently screened Fx, Fy, and Fz components and are not a code operating load case.',
     'Pressure load and pressure stress are excluded.',
@@ -880,7 +884,11 @@ function parseAttrs(text) {
 }
 function decodeXml(value) { return String(value).replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>'); }
 function cleanNode(value) { return String(Math.round(number(value))); }
-function normalizeFluidDensity(value) { return value < 20 ? value * 1000 : value; }
+function normalizeFluidDensity(value) {
+  const scale = number(profile.processResolution.inputXmlDensityToKgM3);
+  if (!(scale > 0)) throw new Error('A positive processResolution.inputXmlDensityToKgM3 is required.');
+  return value * scale;
+}
 function isSentinel(value, config) { return config.processResolution.sentinelValues.some((item) => Math.abs(value - item) <= config.processResolution.sentinelTolerance); }
 function baseSupportTag(value) { return String(value || '').replace(/^SUPPORT\s+/i, '').replace(/\/SREF.*$/i, '').trim(); }
 function nameKeys(name, alternate = '') { return [...new Set([name, alternate, String(name).replace(/^[A-Z]+\s+/i, ''), String(alternate).replace(/^[A-Z]+\s+/i, '')].filter(Boolean).map((value) => String(value).trim().toUpperCase()))]; }

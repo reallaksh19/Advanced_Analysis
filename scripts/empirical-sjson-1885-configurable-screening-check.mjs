@@ -22,13 +22,19 @@ assertEqual(source.temperatureResolution.SOURCE_EXPLICIT, 58, 'explicit temperat
 assertEqual(source.temperatureResolution.SENTINEL_PREVIOUS_CONNECTED_NODE, 105, 'inherited temperature count');
 assertEqual(source.fluidDensityResolution.SOURCE_EXPLICIT, 58, 'explicit fluid-density count');
 assertEqual(source.fluidDensityResolution.SENTINEL_PREVIOUS_CONNECTED_NODE, 105, 'inherited fluid-density count');
+assertEqual(source.inputXmlFluidDensityUnit, 'kg/cm3', 'input XML fluid-density unit');
+assertEqual(source.inputXmlFluidDensityToKgM3, 1000000, 'input XML density conversion');
+assertClose(source.resolvedFluidDensityKgM3.min, 300, 1e-12, 'minimum resolved fluid density');
+assertClose(source.resolvedFluidDensityKgM3.max, 300, 1e-12, 'maximum resolved fluid density');
 assertEqual(source.processResolutionAudit.temperature.fallbackUsed, false, 'temperature fallback');
 assertEqual(source.processResolutionAudit.fluidDensity.fallbackUsed, false, 'fluid-density fallback');
 assertEqual(source.sourceComponentWeightPositiveCount, 0, 'positive source component weights');
 
+assertEqual(result.configurableAssumptions.processResolution.inputXmlDensityUnit, 'kg/cm3', 'profile density unit');
+assertEqual(result.configurableAssumptions.processResolution.inputXmlDensityToKgM3, 1000000, 'profile density conversion');
 assertEqual(result.verticalWeight.status, 'CALCULATED_CONFIGURABLE_SCREENING', 'vertical calculation status');
-assertClose(result.verticalWeight.totalModelMassKg, 4702.209369, 1e-6, 'total model mass');
-assertClose(result.verticalWeight.totalWeightKn, 46.112922, 1e-6, 'total model weight');
+assertClose(result.verticalWeight.totalModelMassKg, 5388.84094, 1e-6, 'total model mass');
+assertClose(result.verticalWeight.totalWeightKn, 52.846477, 1e-6, 'total model weight');
 assertClose(result.verticalWeight.reactionSumKn, result.verticalWeight.totalWeightKn, 1e-9, 'vertical equilibrium');
 assertClose(result.verticalWeight.equilibriumErrorKn, 0, 1e-9, 'vertical equilibrium error');
 assertEqual(result.verticalWeight.elementCountByTreatment.GASKET_ZERO, 22, 'zero-weight gasket count');
@@ -50,13 +56,14 @@ for (const [axis, expectedSites, expectedMax] of [['thermalX', 6, 31.567638], ['
 assertEqual(result.supportRows.length, 36, 'support row count');
 assertEqual(new Set(result.supportRows.map((row) => row.siteId)).size, 36, 'unique support row count');
 const rows = new Map(result.supportRows.map((row) => [row.siteId, row]));
-assertReaction(rows, 'N10230', 31.568, -0.770, 0.583);
-assertReaction(rows, 'N20120', -22.000, 0, 1.118);
-assertReaction(rows, 'N50120', -0.991, -34.905, 1.552);
-assertReaction(rows, 'N70040', -1.858, 23.712, 4.241);
-assertReaction(rows, 'N60080', 0, 8.968, 2.895);
+assertReaction(rows, 'N10230', 31.568, -0.770, 0.693);
+assertReaction(rows, 'N20120', -22.000, 0, 1.328);
+assertReaction(rows, 'N50120', -0.991, -34.905, 1.859);
+assertReaction(rows, 'N70040', -1.858, 23.712, 4.704);
+assertReaction(rows, 'N60080', 0, 8.968, 3.193);
+if (rows.get('N50120').reactionsKn.FzWeight < 1.85) throw new Error('N50120 vertical reaction regressed toward the superseded steel-only value.');
 assertEqual(result.componentVectorScreening.maximumSiteId, 'N50120', 'maximum component-vector site');
-assertClose(result.componentVectorScreening.maximumMagnitudeKn, 34.953, 0.001, 'maximum component-vector magnitude');
+assertClose(result.componentVectorScreening.maximumMagnitudeKn, 34.968, 0.001, 'maximum component-vector magnitude');
 
 console.log('SJSON 1885 configurable empirical screening qualification passed.');
 
