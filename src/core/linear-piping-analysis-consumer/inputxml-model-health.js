@@ -2,6 +2,7 @@ import {
   diagnoseInputXmlTopologyGraph,
   diagnoseInputXmlTopologyProximity,
 } from '../geometry/model-health/index.js';
+import { diagnoseInputXmlLinearModelHealth } from './inputxml-linear-model-health.js';
 
 /**
  * Diagnose a previously parsed InputXML source bundle.
@@ -17,3 +18,5 @@ export function diagnoseInputXmlModelHealthTopology(sourceBundle, options = {}) 
 export function diagnoseInputXmlModelHealthProximity(sourceBundle, options = {}) {
   return diagnoseInputXmlTopologyProximity(sourceBundle, options);
 }
+
+export { diagnoseInputXmlLinearModelHealth };
