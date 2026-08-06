@@ -20,14 +20,14 @@ export function normalizeTopologyEditBranchComponentRequest(input = {}) {
   const operationId = requiredText(input.operationId, 'operationId');
   const hostEdgeId = requiredText(input.hostEdgeId, 'hostEdgeId');
   const hostEdgeHash = requiredContentHash(input.hostEdgeHash, 'hostEdgeHash');
-  const catalogueHash = requiredHash(input.catalogueHash, 'catalogueHash');
+  const catalogueHash = requiredContentHash(input.catalogueHash, 'catalogueHash');
   const catalogueSourceHash = requiredHash(
     input.catalogueSourceHash,
     'catalogueSourceHash',
   );
   const catalogueVersion = requiredText(input.catalogueVersion, 'catalogueVersion');
   const catalogueRecordId = requiredText(input.catalogueRecordId, 'catalogueRecordId');
-  const catalogueRecordHash = requiredHash(
+  const catalogueRecordHash = requiredContentHash(
     input.catalogueRecordHash,
     'catalogueRecordHash',
   );
