@@ -8,6 +8,7 @@ on:
       - project-data/1885s-nonfea-piping-defaults.json
       - src/workspace/project-data/project-data-fields.js
       - src/workspace/project-data/project-data-contract.js
+      - src/core/geometry/nominal-pipe-size-resolution.js
       - src/core/empirical-piping-mechanics/configured-resolution.js
       - src/core/empirical-piping-mechanics/sustained-simple-span.js
       - src/core/empirical-piping-mechanics/vertical-retention.js
@@ -31,6 +32,7 @@ on:
       - project-data/1885s-nonfea-piping-defaults.json
       - src/workspace/project-data/project-data-fields.js
       - src/workspace/project-data/project-data-contract.js
+      - src/core/geometry/nominal-pipe-size-resolution.js
       - src/core/empirical-piping-mechanics/configured-resolution.js
       - src/core/empirical-piping-mechanics/sustained-simple-span.js
       - src/core/empirical-piping-mechanics/vertical-retention.js
