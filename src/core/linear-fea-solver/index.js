@@ -79,3 +79,10 @@ export {
   preflightSemanticProjection,
   requireLinearStiffnessPreflight,
 } from './stiffness-preflight.js';
+
+export {
+  LINEAR_FACTORIZATION_RUNTIME_SCHEMA,
+  createLinearFactorizationRuntime,
+  factorizationCacheFromRuntime,
+  requireLinearFactorizationRuntime,
+} from './factorization-runtime.js';
