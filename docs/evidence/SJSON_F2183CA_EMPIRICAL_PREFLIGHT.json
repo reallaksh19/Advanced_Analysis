@@ -1,0 +1,153 @@
+{
+  "schema": "sjson-empirical-preflight-evidence/v1",
+  "source": {
+    "repository": "reallaksh19/Advanced_Analysis",
+    "path": "public/Sjson.json",
+    "commit": "f2183ca419d487cb5f174d04e985bcd4be9c5e2c",
+    "sha256": "6b2c8b01ab0ba6ec8e9e7c42eb4a719668ffd2dc4dbe4790d27cf426a1f60288"
+  },
+  "status": "BLOCKED",
+  "loadsPublished": false,
+  "zeroReactionsImplied": false,
+  "coordinateConvention": "Z_UP",
+  "sourceMetrics": {
+    "components": 127,
+    "rawSupports": 139,
+    "supportAttachments": 139,
+    "rawRestraintCapabilities": 139,
+    "solverEligibleRawRestraints": 139,
+    "explicitAnchors": 0,
+    "topologyConnectedComponents": 42,
+    "topologyConnections": 85,
+    "topologyPorts": 254,
+    "largestConnectedComponentSize": 16
+  },
+  "displayProjection": {
+    "physicalSupportSites": 34,
+    "displayedRestraintDirections": 47,
+    "verticalRests": 34,
+    "guides": 5,
+    "lineStops": 8
+  },
+  "componentTypeCounts": {
+    "PIPE": 43,
+    "ELBO": 14,
+    "FLAN": 22,
+    "GASK": 22,
+    "INST": 5,
+    "OLET": 10,
+    "REDU": 4,
+    "TEE": 3,
+    "VALV": 4
+  },
+  "rawRestraintTypeCounts": {
+    "REST": 91,
+    "SUPPORT": 31,
+    "LINESTOP": 11,
+    "GUIDE": 6
+  },
+  "authorities": {
+    "lengthUnit": "UNRESOLVED",
+    "forceUnit": "UNRESOLVED",
+    "massUnit": "UNRESOLVED",
+    "usableOutsideDiameterAndWall": "ABSENT",
+    "material": "ABSENT",
+    "elasticModulus": "ABSENT",
+    "thermalExpansion": "ABSENT",
+    "referenceTemperature": "ABSENT",
+    "operatingTemperature": "ABSENT",
+    "massOrWeight": "ABSENT",
+    "fluid": "ABSENT",
+    "insulation": "ABSENT",
+    "pressure": "ABSENT",
+    "explicitBoundaryAnchor": "ABSENT"
+  },
+  "analysisResults": [
+    {
+      "analysis": "W-HOT_VERTICAL_BEAM_CONTACT",
+      "status": "BLOCKED",
+      "resultRows": 0,
+      "blockers": [
+        {
+          "code": "GEOMETRY_INVALID",
+          "message": "Source length units and usable pipe section dimensions are unresolved."
+        },
+        {
+          "code": "MASS_SOURCE_UNRESOLVED",
+          "message": "No governed pipe, component, fluid or insulation mass/weight authority is present."
+        },
+        {
+          "code": "BOUNDARY_CONDITION_UNRESOLVED",
+          "message": "No explicit qualified bilateral anchor/fixity is present."
+        },
+        {
+          "code": "OUTSIDE_QUALIFIED_SCOPE",
+          "message": "The source includes fittings and components requiring qualified runtime profiles beyond PIPE and ELBO."
+        }
+      ]
+    },
+    {
+      "analysis": "EXP_THERMAL_X",
+      "status": "BLOCKED",
+      "resultRows": 0,
+      "blockers": [
+        {
+          "code": "BOUNDARY_CONDITION_UNRESOLVED",
+          "message": "EMPIRICAL_RESTRAINT_NETWORK_V2 requires at least one explicit anchor; source anchor count is zero."
+        },
+        {
+          "code": "EMPIRICAL_PROFILE_UNQUALIFIED",
+          "message": "Elastic modulus, thermal expansion, usable pipe section and temperature authorities are absent."
+        },
+        {
+          "code": "BOUNDARY_CONDITION_UNRESOLVED",
+          "message": "Included restraints do not form one governed connected region; normalized topology has 42 connected components."
+        }
+      ]
+    },
+    {
+      "analysis": "EXP_THERMAL_Y",
+      "status": "BLOCKED",
+      "resultRows": 0,
+      "blockers": [
+        {
+          "code": "BOUNDARY_CONDITION_UNRESOLVED",
+          "message": "EMPIRICAL_RESTRAINT_NETWORK_V2 requires at least one explicit anchor; source anchor count is zero."
+        },
+        {
+          "code": "EMPIRICAL_PROFILE_UNQUALIFIED",
+          "message": "Elastic modulus, thermal expansion, usable pipe section and temperature authorities are absent."
+        },
+        {
+          "code": "BOUNDARY_CONDITION_UNRESOLVED",
+          "message": "Included restraints do not form one governed connected region; normalized topology has 42 connected components."
+        }
+      ]
+    },
+    {
+      "analysis": "OPE_HOT_COMBINED",
+      "status": "NOT_AUTHORIZED",
+      "resultRows": 0,
+      "blockers": [
+        {
+          "code": "LOAD_CASE_OWNERSHIP_MISMATCH",
+          "message": "Neither the vertical source result nor the thermal source result exists, so operating superposition is prohibited."
+        }
+      ]
+    }
+  ],
+  "supportSiteDisposition": {
+    "S01-S34": "NOT_CALCULATED",
+    "reason": "Required source authorities and boundary conditions are unresolved. NOT_CALCULATED is not zero."
+  },
+  "requiredForCalculation": [
+    "Authoritative length, force and mass units",
+    "Usable outside diameter and wall thickness by line/component",
+    "Material, elastic modulus and thermal expansion authority",
+    "Reference and operating temperatures",
+    "Pipe, component, fluid and insulation mass/weight authority",
+    "Explicit nozzle, equipment or anchor boundary conditions",
+    "Approved topology repair or source connectivity resolving the 42 connected regions",
+    "Qualified compliance profiles for flange, gasket, valve, reducer, tee, olet and instrument components"
+  ]
+}
