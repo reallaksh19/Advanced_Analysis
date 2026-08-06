@@ -1,0 +1,203 @@
+name: LAFEA-NC NC-04 Exact-Head Plastic Material Qualification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/lafea-nc04-plastic-material-qualification.yml'
+      - 'docs/nonlinear-shell-contact/LAFEA_NC04_PLASTIC_MATERIAL_QUALIFICATION.md'
+      - 'scripts/lafea-nc04-check.mjs'
+      - 'scripts/lafea-nc04-plastic-material.mjs'
+      - 'scripts/nc04-material/**'
+      - 'src/core/nonlinear-shell-contact/plastic-material-contract.js'
+      - 'src/core/nonlinear-shell-contact/plastic-material-qualification-evaluator.js'
+      - 'src/core/nonlinear-shell-contact/nc04-fixtures.js'
+      - 'src/core/nonlinear-shell-contact/nc04-negative-controls.js'
+      - 'tests/nonlinear-shell-contact-nc04-qualification.test.mjs'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: lafea-nc04-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  exact-head-nc04:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      NC03_HEAD_SHA: bbf101c01e086bd5f3dad24258d4f2b2a0e90c55
+      NC03_MERGE_SHA: b0461bc654fff23b427a3d1a8d0e81b9405ef9a1
+      NC03_RUN_ID: '31069772039'
+      NC03_ARTIFACT_ID: '8955351814'
+      NC03_ARTIFACT_DIGEST: sha256:ccfba81409b977ea32ce9b4b74887f0d58bbd0d3472dd9576c11c12890341dda
+      SOLVER_ARTIFACT_ID: '8936496053'
+      SOLVER_ARTIFACT_DIGEST: sha256:e14b467cd43f38218f3dba750b6c5f4f1ee83ed8ea9d241bf65673b9e7caf9b8
+      SOLVER_BINARY_HASH: sha256:9a33d293706a66bee86f2f0ecf996a66758f904c20d61ad8c83ddc0f92ae4b7e
+      SOLVER_CONTAINER_DIGEST: sha256:e6a82117027ef72afbecd597b81ebd83e5b40bdcfc63a70422b799aeb79270fb
+      SOLVER_SOURCE_COMMIT: cff1bb12ec7d24ad9048a1f54ae243a18d1a0b54
+      TZ: UTC
+      LC_ALL: C
+
+    steps:
+      - name: Resolve exact head and base
+        id: refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          head_sha='${{ github.event.pull_request.head.sha }}'
+          base_sha='${{ github.event.pull_request.base.sha }}'
+          [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$base_sha" =~ ^[0-9a-f]{40}$ ]]
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.refs.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Verify live base, ancestry and phase paths
+        shell: bash
+        env:
+          EXACT_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          EVENT_BASE_SHA: ${{ steps.refs.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          live_base="$(git rev-parse origin/main)"
+          test "$EVENT_BASE_SHA" = "$live_base"
+          test "$(git rev-parse HEAD)" = "$EXACT_HEAD_SHA"
+          git merge-base --is-ancestor "$live_base" "$EXACT_HEAD_SHA"
+          test "$(git rev-list --count "${EXACT_HEAD_SHA}..origin/main")" = 0
+          mapfile -t paths < <(git diff --name-only "${live_base}...${EXACT_HEAD_SHA}")
+          test "${#paths[@]}" = 14
+          for path in "${paths[@]}"; do
+            case "$path" in
+              .github/workflows/lafea-nc04-plastic-material-qualification.yml|docs/nonlinear-shell-contact/LAFEA_NC04_PLASTIC_MATERIAL_QUALIFICATION.md|scripts/lafea-nc04-check.mjs|scripts/lafea-nc04-plastic-material.mjs|scripts/nc04-material/benchmarks.mjs|scripts/nc04-material/config.mjs|scripts/nc04-material/engine.mjs|scripts/nc04-material/evidence.mjs|scripts/nc04-material/prepare-binding.mjs|src/core/nonlinear-shell-contact/plastic-material-contract.js|src/core/nonlinear-shell-contact/plastic-material-qualification-evaluator.js|src/core/nonlinear-shell-contact/nc04-fixtures.js|src/core/nonlinear-shell-contact/nc04-negative-controls.js|tests/nonlinear-shell-contact-nc04-qualification.test.mjs) ;;
+              *) echo "Forbidden NC-04 path: $path"; exit 1 ;;
+            esac
+          done
+          git diff --check "${live_base}...${EXACT_HEAD_SHA}"
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Download and validate NC-03 and solver custody
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/nc03 /tmp/solver
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${NC03_ARTIFACT_ID}" > /tmp/nc03-meta.json
+          test "$(jq -r .digest /tmp/nc03-meta.json)" = "$NC03_ARTIFACT_DIGEST"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${NC03_ARTIFACT_ID}/zip" > /tmp/nc03.zip
+          unzip -q /tmp/nc03.zip -d /tmp/nc03
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOLVER_ARTIFACT_ID}" > /tmp/solver-meta.json
+          test "$(jq -r .digest /tmp/solver-meta.json)" = "$SOLVER_ARTIFACT_DIGEST"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOLVER_ARTIFACT_ID}/zip" > /tmp/solver.zip
+          unzip -q /tmp/solver.zip -d /tmp/solver
+          test "sha256:$(sha256sum /tmp/solver/binary/ccx_2.22 | cut -d' ' -f1)" = "$SOLVER_BINARY_HASH"
+          chmod +x /tmp/solver/binary/ccx_2.22 /tmp/solver/libraries/ld-linux-x86-64.so.2
+          cat > /tmp/solver/ccx-2.22-custody <<'SH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          exec /tmp/solver/libraries/ld-linux-x86-64.so.2 \
+            --library-path /tmp/solver/libraries \
+            /tmp/solver/binary/ccx_2.22 "$@"
+          SH
+          chmod +x /tmp/solver/ccx-2.22-custody
+          cmp /tmp/nc03/nc03-a/nc03-report.canonical.json /tmp/nc03/nc03-b/nc03-report.canonical.json
+          cmp /tmp/nc03/nc03-real-a/real-denting-summary.canonical.json /tmp/nc03/nc03-real-b/real-denting-summary.canonical.json
+          node scripts/nc04-material/prepare-binding.mjs /tmp/nc03 /tmp/nc04-upstream-binding.json
+          cat > /tmp/nc04-solver-custody.json <<JSON
+          {
+            "solverVersion": "2.22",
+            "solverSourceCommit": "${SOLVER_SOURCE_COMMIT}",
+            "binaryHash": "${SOLVER_BINARY_HASH}",
+            "containerDigest": "${SOLVER_CONTAINER_DIGEST}"
+          }
+          JSON
+
+      - name: Run syntax, unit and negative controls
+        run: |
+          set -euo pipefail
+          node --check scripts/lafea-nc04-check.mjs
+          node --check scripts/lafea-nc04-plastic-material.mjs
+          node --check scripts/nc04-material/benchmarks.mjs
+          node --check scripts/nc04-material/engine.mjs
+          node --check scripts/nc04-material/evidence.mjs
+          node --check scripts/nc04-material/prepare-binding.mjs
+          node --check src/core/nonlinear-shell-contact/plastic-material-contract.js
+          node --check src/core/nonlinear-shell-contact/plastic-material-qualification-evaluator.js
+          node --test tests/nonlinear-shell-contact-nc04-qualification.test.mjs
+
+      - name: Execute two isolated exact-solver replays
+        shell: bash
+        env:
+          EXACT_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          node scripts/lafea-nc04-plastic-material.mjs /tmp/solver/ccx-2.22-custody /tmp/nc04-real-a
+          node scripts/lafea-nc04-plastic-material.mjs /tmp/solver/ccx-2.22-custody /tmp/nc04-real-b
+          cmp /tmp/nc04-real-a/real-material-summary.canonical.json /tmp/nc04-real-b/real-material-summary.canonical.json
+          mapfile -t a < <(find /tmp/nc04-real-a -maxdepth 1 -name 'NC04-MAT-*.json' -printf '%f\n' | sort)
+          mapfile -t b < <(find /tmp/nc04-real-b -maxdepth 1 -name 'NC04-MAT-*.json' -printf '%f\n' | sort)
+          test "${#a[@]}" = 9
+          test "${a[*]}" = "${b[*]}"
+          for name in "${a[@]}"; do cmp "/tmp/nc04-real-a/$name" "/tmp/nc04-real-b/$name"; done
+
+      - name: Evaluate qualification twice
+        shell: bash
+        env:
+          EXACT_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          node scripts/lafea-nc04-check.mjs /tmp/nc04-real-a /tmp/nc04-upstream-binding.json /tmp/nc04-solver-custody.json /tmp/nc04-real-a/real-material-summary.json "$EXACT_HEAD_SHA" /tmp/nc04-a
+          node scripts/lafea-nc04-check.mjs /tmp/nc04-real-b /tmp/nc04-upstream-binding.json /tmp/nc04-solver-custody.json /tmp/nc04-real-b/real-material-summary.json "$EXACT_HEAD_SHA" /tmp/nc04-b
+          cmp /tmp/nc04-a/nc04-report.canonical.json /tmp/nc04-b/nc04-report.canonical.json
+          report=/tmp/nc04-a/nc04-report.json
+          test "$(jq -r .status "$report")" = NC04_QUALIFIED
+          test "$(jq -r '.blockers | length' "$report")" = 0
+          test "$(jq -r .evaluatedBenchmarkCount "$report")" = 9
+          test "$(jq -r .authority.plasticMaterialQualified "$report")" = true
+          test "$(jq -r .authority.nc05Authorized "$report")" = true
+          for field in plasticDentingProcedureQualified codeAssessmentQualified moduleQualified productionExecutionAuthorized automaticAssetAcceptanceAuthorized autonomousCaseDispositionAuthorized fitnessForServiceQualified remainingStrengthQualified; do
+            test "$(jq -r ".authority.${field}" "$report")" = false
+          done
+
+      - name: Verify clean source tree
+        run: git diff --exit-code && test -z "$(git status --porcelain=v1)"
+
+      - name: Upload diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc04-debug-${{ steps.refs.outputs.head_sha }}-${{ github.run_attempt }}
+          path: |
+            /tmp/nc04-real-a
+            /tmp/nc04-real-b
+            /tmp/nc04-a
+            /tmp/nc04-b
+            /tmp/nc04-upstream-binding.json
+            /tmp/nc04-solver-custody.json
+          retention-days: 30
+
+      - name: Upload authoritative NC-04 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc04-${{ steps.refs.outputs.head_sha }}-${{ github.run_attempt }}
+          path: |
+            /tmp/nc04-real-a
+            /tmp/nc04-real-b
+            /tmp/nc04-a
+            /tmp/nc04-b
+            /tmp/nc04-upstream-binding.json
+            /tmp/nc04-solver-custody.json
+          retention-days: 30
