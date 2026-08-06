@@ -1,4 +1,3 @@
-import { getPipeDimensions } from '../../../core/geometry/pipeSchedules.js';
 import {
   RESOLUTION_KINDS,
   RESOLUTION_STATUSES,
@@ -7,7 +6,8 @@ import {
 import { deepFreeze } from '../../../core/empirical-piping-mechanics/contracts.js';
 import { semanticHash } from '../../../core/empirical-piping-mechanics/identity.js';
 import { resolveSectionStates } from '../../../core/empirical-piping-mechanics/section.js';
-import { buildBranchScheduleIndex, resolveNominalBoreMm } from './branch-schedule-resolution.js';
+import { buildBranchScheduleIndex } from './branch-schedule-resolution.js';
+import { resolvePosSectionSourceAuthority } from './pos-section-source-authority.js';
 import { buildSourceRecordTargets, buildTopologyPositionTargets } from './pos-topology-crosswalk.js';
 
 export const POS_SECTION_MATERIAL_SCHEMA = 'empirical-pos-section-material-state/v1';
@@ -26,7 +26,12 @@ export function resolvePosSectionMaterialStates(input) {
   const targets = input.topologyXmlText
     ? buildTopologyPositionTargets(input.topologyXmlText, scheduleIndex)
     : buildSourceRecordTargets(scheduleIndex, (record) => SECTION_TYPE.test(record.type));
-  const rows = targets.map((target) => resolveTarget(target, session, input.projectId ?? null));
+  const rows = targets.map((target) => resolveTarget(
+    target,
+    session,
+    input.projectId ?? null,
+    input.dimensionVerificationTolerancesMm ?? null,
+  ));
   const resolutionReceipt = session.receipt();
   const blockedRowCount = rows.filter((row) => row.status !== 'RESOLVED').length;
   const result = {
@@ -37,6 +42,8 @@ export function resolvePosSectionMaterialStates(input) {
     targetAuthority: input.topologyXmlText ? 'TOPOLOGY_PIPINGELEMENT_POSITIONS' : 'ENRICHED_SOURCE_RECORDS',
     topologyElementCount: input.topologyXmlText ? targets.length : null,
     sourceRecordCount: scheduleIndex.items.length,
+    dimensionVerificationTolerancesMm: input.dimensionVerificationTolerancesMm ?? null,
+    dimensionVerificationStatusCounts: countBy(rows, (row) => row.dimensionVerification?.status),
     rows: Object.freeze(rows),
     resolvedRowCount: rows.length - blockedRowCount,
     blockedRowCount,
@@ -46,7 +53,7 @@ export function resolvePosSectionMaterialStates(input) {
   return deepFreeze({ ...result, semanticIdentity: semanticHash(result) });
 }
 
-function resolveTarget(target, session, projectId) {
+function resolveTarget(target, session, projectId, dimensionVerificationTolerancesMm) {
   const record = target.record;
   const item = record?.item || {};
   const attrs = { ...(item.engineeringProperties || {}), ...(item.attributes || {}) };
@@ -54,35 +61,70 @@ function resolveTarget(target, session, projectId) {
   const entity = buildEntity(target, attrs, enriched, projectId);
   const values = {};
 
-  values.nominalBoreMm = resolveField(session, {
-    field: 'section.nominalBoreMm', entity, unit: 'mm',
-    value: record ? resolveNominalBoreMm(item) : null,
-    kind: RESOLUTION_KINDS.SOURCE_EXPLICIT,
-    authority: 'SOURCE_NOMINAL_BORE', sourcePath: sourcePath(target, 'nominal bore'),
-    missing: record ? 'SOURCE_NOMINAL_BORE_UNRESOLVED' : 'SOURCE_RECORD_UNMATCHED',
-    validate: positive('Nominal bore must be positive.'),
-    affected: ['SECTION_LOOKUP', 'WEIGHT', 'STIFFNESS', 'STRESS'],
-  });
   values.schedule = session.resolve({
-    field: 'section.schedule', entity: addScope(entity, { nominalBoreMm: read(values.nominalBoreMm) }),
+    field: 'section.schedule',
+    entity,
     candidates: scheduleCandidates(record, target.scheduleEvidence),
-    sourceMissingReason: target.scheduleEvidence?.status || (record ? 'SOURCE_SCHEDULE_UNRESOLVED' : 'SOURCE_RECORD_UNMATCHED'),
+    sourceMissingReason: target.scheduleEvidence?.status
+      || (record ? 'SOURCE_SCHEDULE_UNRESOLVED' : 'SOURCE_RECORD_UNMATCHED'),
     validate: text('Schedule must be a non-empty string.'),
     affectedCalculations: ['SECTION_LOOKUP', 'WEIGHT', 'STIFFNESS', 'STRESS'],
   });
-  const dn = read(values.nominalBoreMm);
   const schedule = read(values.schedule);
-  const lookup = dn != null && schedule != null ? getPipeDimensions(dn, schedule) : null;
+  const sourceSection = resolvePosSectionSourceAuthority({
+    target,
+    schedule,
+    tolerancesMm: dimensionVerificationTolerancesMm,
+  });
+
+  values.nominalBoreMm = resolveField(session, {
+    field: 'section.nominalBoreMm',
+    entity,
+    unit: 'mm',
+    value: sourceSection.nominalSize?.exact ? sourceSection.nominalSize.dn : null,
+    kind: target.edge ? RESOLUTION_KINDS.CONFIGURED_DERIVATION : RESOLUTION_KINDS.SOURCE_EXPLICIT,
+    authority: target.edge ? 'TOPOLOGY_OD_TO_STANDARD_NOMINAL_SIZE' : 'SOURCE_NOMINAL_BORE',
+    sourcePath: target.edge ? `${target.positionRef}.DIAMETER` : sourcePath(target, 'nominal bore'),
+    reason: target.edge
+      ? 'Exact nominal size derived from source-explicit topology OD within configured tolerance.'
+      : 'Nominal bore resolved from the enriched source record.',
+    missing: sourceSection.nominalSize?.status || 'NOMINAL_SIZE_UNRESOLVED',
+    validate: positive('Nominal bore must be positive.'),
+    affected: ['SECTION_LOOKUP', 'WEIGHT', 'STIFFNESS', 'STRESS'],
+  });
+  const dn = read(values.nominalBoreMm);
+
   values.dimensionsMm = resolveField(session, {
-    field: 'section.dimensionsMm', entity: addScope(entity, { nominalBoreMm: dn, schedule }), unit: 'mm',
-    value: lookup?.exact ? { outsideDiameterMm: lookup.od, wallThicknessMm: lookup.wt, nps: lookup.nps } : null,
-    kind: RESOLUTION_KINDS.CONFIGURED_DERIVATION,
-    authority: lookup?.source?.id || 'ENGINEERING_PIPE_SCHEDULE_DATASET',
-    sourcePath: `getPipeDimensions(DN=${dn}, schedule=${schedule})`,
-    reason: 'Exact schedule-dataset lookup from resolved nominal bore and schedule.',
-    missing: lookup?.diagnostics?.map((row) => row.code).join(',') || 'PIPE_DIMENSION_LOOKUP_UNRESOLVED',
+    field: 'section.dimensionsMm',
+    entity: addScope(entity, { nominalBoreMm: dn, schedule }),
+    unit: 'mm',
+    value: sourceSection.dimensions,
+    kind: target.edge ? RESOLUTION_KINDS.SOURCE_EXPLICIT : RESOLUTION_KINDS.CONFIGURED_DERIVATION,
+    authority: sourceSection.dimensionAuthority,
+    sourcePath: target.edge
+      ? `${target.positionRef}.DIAMETER|WALL_THICK`
+      : `getPipeDimensions(DN=${dn}, schedule=${schedule})`,
+    reason: target.edge
+      ? 'Source-explicit topology OD and wall are the common calculation section authority.'
+      : 'Exact schedule-dataset lookup from resolved nominal bore and schedule.',
+    missing: sourceSection.verification?.status || 'PIPE_DIMENSION_UNRESOLVED',
     validate: dimensions,
     affected: ['SECTION_PROPERTIES', 'WEIGHT', 'STIFFNESS', 'STRESS'],
+  });
+  values.dimensionVerification = resolveField(session, {
+    field: 'section.dimensionVerification',
+    entity: addScope(entity, { nominalBoreMm: dn, schedule }),
+    value: sourceSection.verification,
+    kind: RESOLUTION_KINDS.CONFIGURED_DERIVATION,
+    authority: 'SOURCE_SECTION_VS_SCHEDULE_MASTER_VERIFICATION',
+    sourcePath: target.edge
+      ? `${target.positionRef}.DIAMETER|WALL_THICK vs DN=${dn}|SCH=${schedule}`
+      : `getPipeDimensions(DN=${dn}, schedule=${schedule})`,
+    reason: sourceSection.verification?.message,
+    missing: sourceSection.verification?.status || 'DIMENSION_VERIFICATION_UNRESOLVED',
+    validate: (value) => value?.acceptable === true
+      ? true : value?.message || 'Source section verification failed.',
+    affected: ['SECTION_QUALITY_GATE', 'WEIGHT', 'STIFFNESS', 'STRESS'],
   });
 
   values.materialFamily = resolveField(session, {
@@ -123,7 +165,8 @@ function resolveTarget(target, session, projectId) {
     kind: RESOLUTION_KINDS.SOURCE_EXPLICIT,
     authority: target.edge?.corrosionAllowanceMm != null ? 'TOPOLOGY_CORROSION_ALLOWANCE' : 'SOURCE_CORROSION_ALLOWANCE',
     sourcePath: sourcePath(target, 'corrosion allowance'),
-    validate: nonNegative('Corrosion allowance must be zero or positive.'), affected: ['CODE_STRESS_SECTION'],
+    validate: nonNegative('Corrosion allowance must be zero or positive.'),
+    affected: ['CODE_STRESS_SECTION'],
   });
   values.codeStressWallRule = resolveField(session, {
     field: 'section.codeStressWallRule', entity,
@@ -140,20 +183,23 @@ function resolveTarget(target, session, projectId) {
       value: finite(first([enriched.codeStressWallMm, attrs.CODE_STRESS_WALL_MM])),
       kind: RESOLUTION_KINDS.SOURCE_EXPLICIT,
       authority: 'SOURCE_CODE_STRESS_WALL', sourcePath: sourcePath(target, 'explicit code stress wall'),
-      validate: positive('Explicit code-stress wall must be positive.'), affected: ['CODE_STRESS_SECTION'],
+      validate: positive('Explicit code-stress wall must be positive.'),
+      affected: ['CODE_STRESS_SECTION'],
     });
   }
 
   const blocked = Object.values(values).filter((value) => value.status !== RESOLUTION_STATUSES.RESOLVED);
   const identity = identityFields(entity, target);
-  if (blocked.length) return blockedRow(identity, dn, schedule, values, blocked);
+  if (blocked.length) return blockedRow(identity, dn, schedule, values, blocked, sourceSection.verification);
 
   const d = values.dimensionsMm.value;
   const wallM = d.wallThicknessMm / 1000;
   const rule = values.codeStressWallRule.value;
   const sectionInput = {
     outsideDiameterM: d.outsideDiameterMm / 1000,
-    nominalWallM: wallM, stiffnessWallM: wallM, weightWallM: wallM,
+    nominalWallM: wallM,
+    stiffnessWallM: wallM,
+    weightWallM: wallM,
     corrosionAllowanceM: values.corrosionAllowanceMm.value / 1000,
     codeStressWallRule: rule,
     authority: {
@@ -166,11 +212,26 @@ function resolveTarget(target, session, projectId) {
   };
   if (rule === 'EXPLICIT') sectionInput.codeStressWallM = values.codeStressWallMm.value / 1000;
   let sectionStates;
-  try { sectionStates = resolveSectionStates(sectionInput); }
-  catch (error) {
-    return freezeRow({ schema: POS_SECTION_MATERIAL_SCHEMA, status: 'BLOCKED_SECTION_INVALID', ...identity,
-      nominalBoreMm: dn, schedule, sectionStates: null, material: null, resolutions: values,
-      blockers: [{ field: 'section.states', status: 'BLOCKED_SECTION_INVALID', reason: String(error.message || error), diagnostics: [] }] });
+  try {
+    sectionStates = resolveSectionStates(sectionInput);
+  } catch (error) {
+    return freezeRow({
+      schema: POS_SECTION_MATERIAL_SCHEMA,
+      status: 'BLOCKED_SECTION_INVALID',
+      ...identity,
+      nominalBoreMm: dn,
+      schedule,
+      dimensionVerification: sourceSection.verification,
+      sectionStates: null,
+      material: null,
+      resolutions: values,
+      blockers: [{
+        field: 'section.states',
+        status: 'BLOCKED_SECTION_INVALID',
+        reason: String(error.message || error),
+        diagnostics: [],
+      }],
+    });
   }
   const material = deepFreeze({
     family: values.materialFamily.value,
@@ -180,79 +241,181 @@ function resolveTarget(target, session, projectId) {
     thermalExpansionPerC: values.thermalExpansionPerC.value,
   });
   return freezeRow({
-    schema: POS_SECTION_MATERIAL_SCHEMA, status: 'RESOLVED', ...identity,
-    nominalBoreMm: dn, nps: d.nps, schedule,
-    outsideDiameterMm: d.outsideDiameterMm, wallThicknessMm: d.wallThicknessMm,
-    sectionStates, material,
+    schema: POS_SECTION_MATERIAL_SCHEMA,
+    status: 'RESOLVED',
+    ...identity,
+    nominalBoreMm: dn,
+    nps: d.nps,
+    schedule,
+    outsideDiameterMm: d.outsideDiameterMm,
+    wallThicknessMm: d.wallThicknessMm,
+    dimensionVerification: sourceSection.verification,
+    sectionStates,
+    material,
     metalMassPerLengthKgM: sectionStates.weight.areaM2 * material.densityKgM3,
-    resolutions: values, blockers: [],
+    resolutions: values,
+    blockers: [],
   });
 }
 
-function resolveField(session, x) {
+function resolveField(session, input) {
   return session.resolve({
-    field: x.field, entity: x.entity, unit: x.unit,
-    candidates: x.value == null || x.value === '' ? [] : [{
-      kind: x.kind, value: x.value, authority: x.authority, sourcePath: x.sourcePath, reason: x.reason,
+    field: input.field,
+    entity: input.entity,
+    unit: input.unit,
+    candidates: input.value == null || input.value === '' ? [] : [{
+      kind: input.kind,
+      value: input.value,
+      authority: input.authority,
+      sourcePath: input.sourcePath,
+      reason: input.reason,
     }],
-    sourceMissingReason: x.missing, validate: x.validate,
-    affectedCalculations: x.affected || [],
+    sourceMissingReason: input.missing,
+    validate: input.validate,
+    affectedCalculations: input.affected || [],
   });
 }
+
 function materialNumber(session, entity, target, field, unit, value, label, affected) {
-  return resolveField(session, { field, entity, unit, value: finite(value),
+  return resolveField(session, {
+    field,
+    entity,
+    unit,
+    value: finite(value),
     kind: RESOLUTION_KINDS.SOURCE_EXPLICIT,
     authority: `SOURCE_${label.toUpperCase().replace(/\s+/g, '_')}`,
-    sourcePath: sourcePath(target, label), validate: positive(`${label} must be positive.`), affected });
+    sourcePath: sourcePath(target, label),
+    validate: positive(`${label} must be positive.`),
+    affected,
+  });
 }
+
 function scheduleCandidates(record, evidence) {
   if (!record || !evidence?.schedule) return [];
-  return [{ kind: evidence.basis === 'SOURCE_EXPLICIT_SCHEDULE'
-    ? RESOLUTION_KINDS.SOURCE_EXPLICIT : RESOLUTION_KINDS.SOURCE_INHERITED,
-  value: evidence.schedule, authority: evidence.sourceName || evidence.basis,
-  sourcePath: evidence.sourceField || evidence.sourceBranchPath || record.sourcePath, reason: evidence.basis }];
+  return [{
+    kind: evidence.basis === 'SOURCE_EXPLICIT_SCHEDULE'
+      ? RESOLUTION_KINDS.SOURCE_EXPLICIT : RESOLUTION_KINDS.SOURCE_INHERITED,
+    value: evidence.schedule,
+    authority: evidence.sourceName || evidence.basis,
+    sourcePath: evidence.sourceField || evidence.sourceBranchPath || record.sourcePath,
+    reason: evidence.basis,
+  }];
 }
+
 function buildEntity(target, attrs, enriched, projectId) {
-  const e = target.edge; const r = target.record;
-  const posId = e ? target.positionRef : String(first([enriched.posId, attrs.POS_ID, attrs.POSITION_ID, attrs.POS_NO, r?.name]) || target.positionRef);
-  const entityId = e ? String(e.id || posId)
-    : String(first([enriched.entityId, attrs.ENTITY_ID, attrs.ID, r?.sourcePath, posId]) || posId);
-  return { entityId, posId,
-    fromNode: e?.fromNode ?? first([attrs.FROM_NODE, attrs.FROM, enriched.fromNode]) ?? null,
-    toNode: e?.toNode ?? first([attrs.TO_NODE, attrs.TO, enriched.toNode]) ?? null,
-    scope: { entityId, posId, projectId: String(projectId ?? ''),
-      lineId: String(e?.lineId ?? first([attrs.LINE_ID, attrs.LINE, enriched.lineId]) ?? ''),
-      branchPath: r?.branchPath || 'SOURCE_RECORD_UNMATCHED',
+  const edge = target.edge;
+  const record = target.record;
+  const posId = edge ? target.positionRef
+    : String(first([enriched.posId, attrs.POS_ID, attrs.POSITION_ID, attrs.POS_NO, record?.name]) || target.positionRef);
+  const entityId = edge ? String(edge.id || posId)
+    : String(first([enriched.entityId, attrs.ENTITY_ID, attrs.ID, record?.sourcePath, posId]) || posId);
+  return {
+    entityId,
+    posId,
+    fromNode: edge?.fromNode ?? first([attrs.FROM_NODE, attrs.FROM, enriched.fromNode]) ?? null,
+    toNode: edge?.toNode ?? first([attrs.TO_NODE, attrs.TO, enriched.toNode]) ?? null,
+    scope: {
+      entityId,
+      posId,
+      projectId: String(projectId ?? ''),
+      lineId: String(edge?.lineId ?? first([attrs.LINE_ID, attrs.LINE, enriched.lineId]) ?? ''),
+      branchPath: record?.branchPath || 'SOURCE_RECORD_UNMATCHED',
       pipingClass: String(first([enriched.pipingClass, attrs.PIPING_CLASS, attrs.PCLS, attrs.CLASS]) ?? ''),
-      componentType: e?.sourceType || r?.type || 'UNKNOWN' } };
+      componentType: edge?.sourceType || record?.type || 'UNKNOWN',
+    },
+  };
 }
+
 function identityFields(entity, target) {
-  const e = target.edge; const r = target.record;
-  return { entityId: entity.entityId, posId: entity.posId,
+  const edge = target.edge;
+  const record = target.record;
+  return {
+    entityId: entity.entityId,
+    posId: entity.posId,
     fromNode: entity.fromNode == null ? null : String(entity.fromNode),
     toNode: entity.toNode == null ? null : String(entity.toNode),
-    branchName: r?.branchName || null, branchPath: r?.branchPath || null,
-    sourcePath: r?.sourcePath || null, sourceRecordMatched: Boolean(r), sourceRecordName: r?.name || null,
-    componentType: e?.sourceType || r?.type || null, componentName: e?.name || r?.name || target.positionRef,
-    lineId: e?.lineId || null };
+    branchName: record?.branchName || null,
+    branchPath: record?.branchPath || null,
+    sourcePath: record?.sourcePath || null,
+    sourceRecordMatched: Boolean(record),
+    sourceRecordName: record?.name || null,
+    componentType: edge?.sourceType || record?.type || null,
+    componentName: edge?.name || record?.name || target.positionRef,
+    lineId: edge?.lineId || null,
+  };
 }
-function blockedRow(identity, dn, schedule, values, blocked) {
-  return freezeRow({ schema: POS_SECTION_MATERIAL_SCHEMA, status: blocked[0].status, ...identity,
-    nominalBoreMm: dn, schedule, sectionStates: null, material: null, resolutions: values,
-    blockers: blocked.map((x) => ({ field: x.field, status: x.status, reason: x.reason, diagnostics: x.diagnostics || [] })) });
+
+function blockedRow(identity, dn, schedule, values, blocked, dimensionVerification) {
+  return freezeRow({
+    schema: POS_SECTION_MATERIAL_SCHEMA,
+    status: blocked[0].status,
+    ...identity,
+    nominalBoreMm: dn,
+    schedule,
+    dimensionVerification,
+    sectionStates: null,
+    material: null,
+    resolutions: values,
+    blockers: blocked.map((value) => ({
+      field: value.field,
+      status: value.status,
+      reason: value.reason,
+      diagnostics: value.diagnostics || [],
+    })),
+  });
 }
-function addScope(entity, additions) { return { ...entity,
-  scope: Object.fromEntries(Object.entries({ ...entity.scope, ...additions }).filter(([, value]) => value != null && value !== '')) };
+
+function addScope(entity, additions) {
+  return {
+    ...entity,
+    scope: Object.fromEntries(Object.entries({ ...entity.scope, ...additions })
+      .filter(([, value]) => value != null && value !== '')),
+  };
 }
-function freezeRow(value) { return deepFreeze({ ...value, semanticIdentity: semanticHash(value) }); }
-function read(value) { return value?.status === RESOLUTION_STATUSES.RESOLVED ? value.value : null; }
-function first(values) { return values.find((value) => value !== undefined && value !== null && value !== ''); }
-function finite(value) { if (value == null || value === '') return null; const n = Number(value); return Number.isFinite(n) ? n : null; }
-function positive(message) { return (value) => Number.isFinite(Number(value)) && Number(value) > 0 ? true : message; }
-function nonNegative(message) { return (value) => Number.isFinite(Number(value)) && Number(value) >= 0 ? true : message; }
-function text(message) { return (value) => typeof value === 'string' && value.trim() ? true : message; }
-function dimensions(value) { const od = Number(value?.outsideDiameterMm); const wall = Number(value?.wallThicknessMm);
-  return od > 0 && wall > 0 && od > 2 * wall ? true : 'Pipe dimensions must define a positive annulus.'; }
-function authority(value) { return `${value.kind}:${value.authority || value.sourcePath || 'UNSPECIFIED'}`; }
-function sourcePath(target, label) { const r = target.record;
-  return `${r?.sourcePath || r?.branchPath || r?.name || target.positionRef}:${label}`; }
+
+function countBy(values, keyFn) {
+  const counts = {};
+  for (const value of values) {
+    const key = keyFn(value);
+    if (!key) continue;
+    counts[key] = (counts[key] || 0) + 1;
+  }
+  return deepFreeze(counts);
+}
+
+function freezeRow(value) {
+  return deepFreeze({ ...value, semanticIdentity: semanticHash(value) });
+}
+function read(value) {
+  return value?.status === RESOLUTION_STATUSES.RESOLVED ? value.value : null;
+}
+function first(values) {
+  return values.find((value) => value !== undefined && value !== null && value !== '');
+}
+function finite(value) {
+  if (value == null || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+function positive(message) {
+  return (value) => Number.isFinite(Number(value)) && Number(value) > 0 ? true : message;
+}
+function nonNegative(message) {
+  return (value) => Number.isFinite(Number(value)) && Number(value) >= 0 ? true : message;
+}
+function text(message) {
+  return (value) => typeof value === 'string' && value.trim() ? true : message;
+}
+function dimensions(value) {
+  const outsideDiameterMm = Number(value?.outsideDiameterMm);
+  const wallThicknessMm = Number(value?.wallThicknessMm);
+  return outsideDiameterMm > 0 && wallThicknessMm > 0 && outsideDiameterMm > 2 * wallThicknessMm
+    ? true : 'Pipe dimensions must define a positive annulus.';
+}
+function authority(value) {
+  return `${value.kind}:${value.authority || value.sourcePath || 'UNSPECIFIED'}`;
+}
+function sourcePath(target, label) {
+  const record = target.record;
+  return `${record?.sourcePath || record?.branchPath || record?.name || target.positionRef}:${label}`;
+}
