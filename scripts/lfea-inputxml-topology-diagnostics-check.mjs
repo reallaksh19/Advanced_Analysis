@@ -171,10 +171,11 @@ test('MH-TOP-10', 'the consumer gateway returns the same source bundle and topol
     unit: 'mm',
     topology: tolerances,
   });
-  assert.equal(modelHealth.schema, 'fea-inputxml-model-health-source/v1');
-  assert.equal(modelHealth.status, 'PASS');
+  assert.equal(modelHealth.schema, 'fea-inputxml-model-health-context/v1');
   assert.equal(modelHealth.sourceBundleSemanticHash, modelHealth.sourceBundle.semanticHash);
   assert.equal(modelHealth.topology.sourceBundleSemanticHash, modelHealth.sourceBundle.semanticHash);
+  assert.equal(modelHealth.report.sourceBundleSemanticHash, modelHealth.sourceBundle.semanticHash);
+  assert.equal(modelHealth.report.topologySemanticHash, modelHealth.topology.semanticHash);
 });
 
 test('MH-TOP-11', 'invalid tolerance policy fails closed', () => {
@@ -184,6 +185,7 @@ test('MH-TOP-11', 'invalid tolerance policy fails closed', () => {
     /nearTolerance/u,
   );
 });
+
 
 test('MH-TOP-12', 'numerically equivalent spans are not mislabeled as exact duplicates', () => {
   const xml = inputXml([
