@@ -9,16 +9,21 @@ if (!profilePath || !enrichedPath || !projectedXmlPath || !projectionEvidencePat
   throw new Error('Usage: node empirical-sjson-1885-governed-screening-run.mjs <profile.json> <EnrichedSjson> <governed-topology.xml> <projection-evidence.json> [output.json]');
 }
 
-const [profileText, projectedXml, evidenceText] = await Promise.all([
+const governedRunnerPath = fileURLToPath(import.meta.url);
+const [profileText, projectedXml, evidenceText, governedRunnerText] = await Promise.all([
   readFile(profilePath, 'utf8'),
   readFile(projectedXmlPath, 'utf8'),
   readFile(projectionEvidencePath, 'utf8'),
+  readFile(governedRunnerPath, 'utf8'),
 ]);
 const profile = JSON.parse(profileText.replace(/^\uFEFF/u, ''));
 const evidence = JSON.parse(evidenceText.replace(/^\uFEFF/u, ''));
-const sectionAudit = validateGovernedInput(profile, projectedXml, evidence);
+const sectionAudit = Object.freeze({
+  ...validateGovernedInput(profile, projectedXml, evidence),
+  governedRunnerSha256: sha256(governedRunnerText),
+});
 
-const scriptDirectory = dirname(fileURLToPath(import.meta.url));
+const scriptDirectory = dirname(governedRunnerPath);
 const legacyRunnerPath = resolve(scriptDirectory, 'empirical-sjson-1885-configurable-screening-run.mjs');
 const run = spawnSync(process.execPath, [legacyRunnerPath, profilePath, enrichedPath, projectedXmlPath, outputPath], {
   encoding: 'utf8',
@@ -111,7 +116,7 @@ function validateGovernedInput(profile, projectedXml, evidence) {
     schedules[attrs.SECTION_SCHEDULE] = (schedules[attrs.SECTION_SCHEDULE] || 0) + 1;
   }
 
-  return Object.freeze({
+  return {
     method: requiredMethod,
     projectionSchema: evidence.schema,
     projectionSemanticIdentity: evidence.semanticIdentity,
@@ -126,7 +131,7 @@ function validateGovernedInput(profile, projectedXml, evidence) {
     scheduleDefaultApplicationCount: evidence.scheduleDefaultApplicationCount,
     changedOutsideDiameterCount: evidence.changedOutsideDiameterCount,
     changedWallThicknessCount: evidence.changedWallThicknessCount,
-  });
+  };
 }
 
 function parseAttrs(text) {
