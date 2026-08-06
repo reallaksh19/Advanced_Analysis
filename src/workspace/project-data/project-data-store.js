@@ -1,9 +1,12 @@
 import approved1885sProfile from '../../../project-data/1885s-project-data-profile.json' with { type: 'json' };
+import approved1885sNonFeaDefaults from '../../../project-data/1885s-nonfea-piping-defaults.json' with { type: 'json' };
 import { semanticHash } from '../../core/shared-piping-model/canonical-json.js';
 import { clonePlain, freezeDeep } from '../dataset-utils.js';
 import {
   createEmptyProjectDataProfile,
+  createEvidenceValue,
   replaceProjectDataValue,
+  upgradeProjectDataProfile,
   validateProjectDataProfile,
 } from './project-data-contract.js';
 
@@ -31,13 +34,20 @@ export class ProjectDataStore {
   }
 
   importProfile(profile, sourceName) {
-    if (typeof sourceName !== 'string' || !sourceName.trim()) throw new TypeError('Project Data import source name is required.');
-    const audit = validateProjectDataProfile(profile, 'normalization', null);
+    if (typeof sourceName !== 'string' || !sourceName.trim()) {
+      throw new TypeError('Project Data import source name is required.');
+    }
+    const upgraded = upgradeProjectDataProfile(profile);
+    const audit = validateProjectDataProfile(upgraded, 'normalization', null);
     if (audit.errors.some((row) => row.code === 'INVALID_SCHEMA' || row.code === 'INVALID_FIELD')) {
       throw new TypeError(`Project Data import failed: ${audit.errors.map((row) => row.message).join(' ')}`);
     }
-    this.#profile = freezeDeep(clonePlain(profile));
-    this.#origin = freezeDeep({ kind: 'EXPLICIT_FILE_IMPORT', source: sourceName.trim(), profileSemanticHash: semanticHash(this.#profile) });
+    this.#profile = freezeDeep(clonePlain(upgraded));
+    this.#origin = freezeDeep({
+      kind: 'EXPLICIT_FILE_IMPORT',
+      source: sourceName.trim(),
+      profileSemanticHash: semanticHash(this.#profile),
+    });
     this.#publish('imported');
     return this.#profile;
   }
@@ -58,7 +68,11 @@ export class ProjectDataStore {
 
   clear() {
     this.#profile = createEmptyProjectDataProfile();
-    this.#origin = freezeDeep({ kind: 'EMPTY', source: 'User-cleared Project Data', profileSemanticHash: semanticHash(this.#profile) });
+    this.#origin = freezeDeep({
+      kind: 'EMPTY',
+      source: 'User-cleared Project Data',
+      profileSemanticHash: semanticHash(this.#profile),
+    });
     this.#publish('cleared');
     return this.#profile;
   }
@@ -70,7 +84,9 @@ export class ProjectDataStore {
 
   subscribe(listener) {
     this.#ensureInit();
-    if (typeof listener !== 'function') throw new TypeError('Project Data listener must be a function.');
+    if (typeof listener !== 'function') {
+      throw new TypeError('Project Data listener must be a function.');
+    }
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);
   }
@@ -84,18 +100,78 @@ export class ProjectDataStore {
 export const projectDataStore = new ProjectDataStore();
 
 function approvedProfile() {
-  const profile = freezeDeep(clonePlain(approved1885sProfile));
-  for (const workflow of ['normalization', 'topology', 'editing', 'webgl', 'benchmark']) {
+  const upgraded = upgradeProjectDataProfile(approved1885sProfile);
+  const profile = mergeBundledEngineeringDefaults(upgraded, approved1885sNonFeaDefaults);
+  for (const workflow of [
+    'normalization',
+    'topology',
+    'editing',
+    'nonFeaPipingDefaults',
+    'webgl',
+    'benchmark',
+  ]) {
     const audit = validateProjectDataProfile(profile, workflow, null);
-    if (!audit.valid) throw new TypeError(`Bundled 1885S Project Data is invalid for ${workflow}: ${audit.errors.map((row) => `${row.path} ${row.message}`).join('; ')}`);
+    if (!audit.valid) {
+      throw new TypeError(
+        `Bundled 1885S Project Data is invalid for ${workflow}: ${audit.errors
+          .map((row) => `${row.path} ${row.message}`).join('; ')}`,
+      );
+    }
   }
   return profile;
+}
+
+function mergeBundledEngineeringDefaults(profile, extension) {
+  const merged = clonePlain(profile);
+  merged.revision = Math.max(Number(merged.revision) || 0, Number(extension.revision) || 0);
+  merged.updatedAt = extension.updatedAt || merged.updatedAt;
+  const source = 'project-data/1885s-nonfea-piping-defaults.json';
+  const evidence = (locator) => ({
+    source: 'Bundled 1885S non-FEA piping Project Data extension',
+    sourceKey: 'projectData',
+    locator: `${source}#${locator}`,
+    revision: extension.revision,
+  });
+  merged.engineeringCalculationDefaults = {
+    ...merged.engineeringCalculationDefaults,
+    resolutionPolicy: createEvidenceValue(
+      extension.resolutionPolicy,
+      evidence('resolutionPolicy'),
+      true,
+    ),
+    dimensionVerificationTolerancesMm: createEvidenceValue(
+      extension.dimensionVerificationTolerancesMm,
+      evidence('dimensionVerificationTolerancesMm'),
+      true,
+    ),
+    configuredDefaults: createEvidenceValue(
+      extension.configuredDefaults,
+      evidence('configuredDefaults'),
+      true,
+    ),
+  };
+  for (const optional of [
+    'verticalContactScreening',
+    'pDeltaScreening',
+    'solverTolerances',
+    'applicabilityLimits',
+    'reporting',
+  ]) {
+    if (Object.hasOwn(extension, optional)) {
+      merged.engineeringCalculationDefaults[optional] = createEvidenceValue(
+        extension[optional],
+        evidence(optional),
+        extension[optional]?.approved === true,
+      );
+    }
+  }
+  return freezeDeep(merged);
 }
 
 function bundledOrigin(profile) {
   return freezeDeep({
     kind: 'BUNDLED_APPROVED_PROJECT_ARTIFACT',
-    source: 'project-data/1885s-project-data-profile.json',
+    source: 'project-data/1885s-project-data-profile.json + project-data/1885s-nonfea-piping-defaults.json',
     profileSemanticHash: semanticHash(profile),
   });
 }
