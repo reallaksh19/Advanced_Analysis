@@ -2,7 +2,8 @@ import { requireDeclaredValue } from '../shared-analysis-contract/declared-value
 import { SharedAnalysisContractError } from '../shared-analysis-contract/errors.js';
 import { validateCanonicalGeometry } from '../geometry/validateCanonicalGeometry.js';
 import { deepFreeze, semanticHash } from '../shared-piping-model/index.js';
-import { seedIntermediateNodes, seedRequiredAttachmentPoints } from './node-seeding.js';
+import { seedRequiredAttachmentPointsWithCustody } from './attachment-point-custody.js';
+import { seedIntermediateNodes } from './node-seeding.js';
 
 /**
  * Geometry conditioning — LFEA B-1, the mesher.
@@ -11,9 +12,10 @@ import { seedIntermediateNodes, seedRequiredAttachmentPoints } from './node-seed
  * into a model with a node everywhere the plan requires one, ready for beam
  * model assembly (B-2). Two passes, in order:
  *
- * 1. `seedRequiredAttachmentPoints` — nodes for supports, restraints and
- *    LAFEA attachment-load extraction points that fall partway along a
- *    segment (mandatory rules 1 and 5).
+ * 1. `seedRequiredAttachmentPointsWithCustody` — validates retained station
+ *    identity/lineage, then inserts nodes for supports, restraints and LAFEA
+ *    attachment-load extraction points that fall partway along a segment
+ *    (mandatory rules 1 and 5).
  * 2. `seedIntermediateNodes` — subdivide every segment to the declared span
  *    and curvature seeding limits (the intermediate seeding rule).
  *
@@ -43,10 +45,10 @@ const CANONICAL_GEOMETRY_SCHEMA = 'canonical-geometry-v1';
  * subdivide to the declared span and curvature limits.
  *
  * Idempotent (LFEA B-1 test 7): conditioning an already-conditioned model
- * with the same inputs changes nothing, because attachment points already
- * seeded are recognised by their tag rather than re-resolved by segment id,
- * and every segment produced by the first pass already satisfies the
- * seeding limits the second pass enforces.
+ * with the same inputs changes nothing, because retained attachment custody
+ * proves the original identity, kind, source segment and exact source fraction
+ * before an already-seeded point is skipped; every segment produced by the
+ * first pass already satisfies the seeding limits the second pass enforces.
  *
  * @param {object} geometry Canonical geometry (`schemaVersion: 'canonical-geometry-v1'`).
  * @param {Array<{attachmentPointId:string, segmentId:string, fraction:number, kind:string}>} requiredAttachmentPoints
@@ -70,7 +72,10 @@ export function conditionGeometry(geometry, requiredAttachmentPoints, profile) {
   const bendSegments = requireDeclaredValue(profile, 'bendSeedingSegments', { minimum: 2 });
   const bendLengthErrorLimit = requireDeclaredValue(profile, 'bendLengthErrorLimit', { exclusiveMinimum: 0 });
 
-  const attachment = seedRequiredAttachmentPoints(geometry, requiredAttachmentPoints || []);
+  const attachment = seedRequiredAttachmentPointsWithCustody(
+    geometry,
+    requiredAttachmentPoints || [],
+  );
   const intermediate = seedIntermediateNodes(attachment.geometry, spanLimit, bendSegments, bendLengthErrorLimit);
 
   const conditioned = {
