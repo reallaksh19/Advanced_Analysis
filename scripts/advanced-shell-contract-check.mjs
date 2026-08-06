@@ -133,6 +133,10 @@ const productivityControllerSource = await readFile(
   path.join(root, 'src/workspace/topology-edit-3d-productivity-controller.js'),
   'utf8',
 );
+const authoringControllerSource = await readFile(
+  path.join(root, 'src/workspace/topology-edit-3d-authoring-controller.js'),
+  'utf8',
+);
 assert.equal(
   sjsonFidelityControllerSource.includes("from './topology-edit-3d-productivity-controller.js'"),
   true,
@@ -144,14 +148,24 @@ assert.match(
   'SJSON fidelity controller must preserve its imported controller ownership.',
 );
 assert.equal(
-  productivityControllerSource.includes("from './topology-edit-3d-professional-controller.js'"),
+  productivityControllerSource.includes("from './topology-edit-3d-authoring-controller.js'"),
   true,
-  'Productivity controller must inherit the professional 3D controller.',
+  'Productivity controller must inherit the certified authoring controller.',
 );
 assert.match(
   productivityControllerSource,
+  /export class TopologyEdit3DViewController extends AuthoringController/u,
+  'Productivity controller must preserve authoring controller ownership.',
+);
+assert.equal(
+  authoringControllerSource.includes("from './topology-edit-3d-professional-controller.js'"),
+  true,
+  'Authoring controller must inherit the professional 3D controller.',
+);
+assert.match(
+  authoringControllerSource,
   /export class TopologyEdit3DViewController extends ProfessionalController/u,
-  'Productivity controller must preserve professional controller ownership.',
+  'Authoring controller must preserve professional controller ownership.',
 );
 const jsonTraceSource = await readFile(path.join(root, 'src/workspace/json-trace-ui.js'), 'utf8');
 assert.doesNotMatch(jsonTraceSource, /fixture|fetch\(/iu, 'JSON Trace must not load a fixture or external fallback.');
@@ -183,7 +197,7 @@ for (const packageName of ['react', 'react-dom', 'zustand', 'lucide-react', '@re
   assert.equal(declaredPackages.has(packageName), false, `${packageName} is a removed legacy UI dependency.`);
 }
 
-console.log('Advanced four-tab shell, additive Load Calc navigation and benchmark registry reconciliation passed.');
+console.log('Advanced four-tab shell, additive Load Calc navigation, certified authoring chain and benchmark registry reconciliation passed.');
 
 async function pathExists(targetPath) {
   try {

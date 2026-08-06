@@ -1,13 +1,13 @@
 import {
-  TopologyEdit3DViewController as ProfessionalController,
-} from './topology-edit-3d-professional-controller.js';
+  TopologyEdit3DViewController as AuthoringController,
+} from './topology-edit-3d-authoring-controller.js';
 import {
   TopologyEditCleanShellRuntime,
 } from './viewport-productivity/topology-edit-clean-shell-runtime.js';
 import './topology-edit-productivity.css';
 
 /** Adds presentation-only productivity behavior without acquiring topology authority. */
-export class TopologyEdit3DViewController extends ProfessionalController {
+export class TopologyEdit3DViewController extends AuthoringController {
   constructor(eventBus, lifecycleOptions = {}) {
     super(eventBus, lifecycleOptions);
     this.cleanShellRuntime = new TopologyEditCleanShellRuntime(this);

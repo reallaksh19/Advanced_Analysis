@@ -80,15 +80,17 @@ export function invisiblePickMaterial() {
 export function pickUserData(value) {
   const objectId = value?.entityId || value?.canonicalEntityId || value?.id;
   const isNode = String(value?.type || value?.kind || '').toLowerCase() === 'node';
+  const pickTarget = value?.pickTarget || {
+    modelRole: isNode ? 'draft' : undefined,
+    objectKind: isNode ? 'node' : 'component',
+    objectId,
+    nodeId: isNode ? objectId : '',
+  };
   return {
     canonicalId: objectId,
     type: value?.type || value?.kind,
-    pickTarget: value?.pickTarget || {
-      modelRole: isNode ? 'draft' : undefined,
-      objectKind: isNode ? 'node' : 'component',
-      objectId,
-      nodeId: isNode ? objectId : '',
-    },
+    partRole: pickTarget.partRole ?? value?.partRole ?? null,
+    pickTarget,
   };
 }
 

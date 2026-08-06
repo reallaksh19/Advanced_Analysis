@@ -1,6 +1,10 @@
 /** Resolve immutable command intent against one exact canonical topology. */
 import { deepFreeze, semanticHash } from '../../core/shared-piping-model/index.js';
-import { assertTopologyEditCommandRequest, TOPOLOGY_EDIT_RESOLVED_COMMAND_SCHEMA } from './topology-edit-command-contract.js';
+import {
+  assertTopologyEditCommandRequest,
+  deterministicTopologyEditId,
+  TOPOLOGY_EDIT_RESOLVED_COMMAND_SCHEMA,
+} from './topology-edit-command-contract.js';
 import { assertCanonicalTopologyHash, canonicalTopologyStateHash } from './topology-edit-canonical-state.js';
 import {
   assertTopologyEditInlineComponentTarget,
@@ -68,7 +72,26 @@ function endpointPortKeys(edge, node, endpoint) {
   if (candidates.length !== 1) throw new RangeError(`TopologyEditCommandResolver: DISCONNECT_ENDPOINT requires one ${expectedRole} port key for ${edge.id}; resolved ${candidates.length}.`);
   return candidates;
 }
-function targets(nodes = [], edges = [], endpointKeys = []) { return { nodes, edges, endpointPortKeys: endpointKeys }; }
+function targets(nodes = [], edges = [], endpointKeys = [], generated = null) {
+  const result = { nodes, edges, endpointPortKeys: endpointKeys };
+  if (generated && Object.keys(generated).length) result.generated = generated;
+  return result;
+}
+function assertUnusedGeneratedId(topology, id) {
+  for (const collection of ['nodes', 'edges', 'junctions', 'supports', 'boundaries', 'rigids', 'bends']) {
+    if ((topology[collection] ?? []).some((row) => row?.id === id)) {
+      throw new Error(`TopologyEditCommandResolver: generated identity collision ${id}.`);
+    }
+  }
+}
+function resolveCreateNode(topology, request) {
+  const nodeId = `node:${deterministicTopologyEditId(
+    request.commandId,
+    'created-node',
+  ).split(':').at(-1)}`;
+  assertUnusedGeneratedId(topology, nodeId);
+  return targets([], [], [], { createdNodeId: nodeId });
+}
 function resolveMove(topology, request) { return targets([nodeTarget(topology, request.payload.nodeId, 'MOVE')]); }
 function resolveMerge(topology, request) {
   const source = nodeTarget(topology, request.payload.sourceNodeId, 'SOURCE');
@@ -169,6 +192,7 @@ function resolveTrim(topology, request) {
   return targets([node], [edge]);
 }
 const TARGET_RESOLVERS = Object.freeze({
+  CREATE_NODE: resolveCreateNode,
   MOVE_NODE: resolveMove, MERGE_NODES: resolveMerge, BRIDGE_GAP: resolveAddedEdge,
   ADD_STRAIGHT_ELEMENT: resolveAddedEdge, SPLIT_EDGE: resolveSplit,
   INSERT_INLINE_COMPONENT: resolveInline,

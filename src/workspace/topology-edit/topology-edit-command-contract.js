@@ -4,7 +4,7 @@ import { deepFreeze, semanticHash } from '../../core/shared-piping-model/index.j
 export const TOPOLOGY_EDIT_COMMAND_REQUEST_SCHEMA = 'TopologyEditCommandRequest.v1';
 export const TOPOLOGY_EDIT_RESOLVED_COMMAND_SCHEMA = 'TopologyEditResolvedCommand.v1';
 export const TOPOLOGY_EDIT_NATIVE_COMMANDS = Object.freeze([
-  'MOVE_NODE', 'MERGE_NODES', 'BRIDGE_GAP', 'ADD_STRAIGHT_ELEMENT',
+  'CREATE_NODE', 'MOVE_NODE', 'MERGE_NODES', 'BRIDGE_GAP', 'ADD_STRAIGHT_ELEMENT',
   'SPLIT_EDGE', 'DISCONNECT_ENDPOINT', 'DELETE_EDGE',
 ]);
 export const TOPOLOGY_EDIT_WAVE3_ENGINEERING_COMMANDS = Object.freeze([
@@ -100,6 +100,18 @@ function normalizeExpectedTargetRevisions(value) {
     requiredText(key, 'expected target id'),
     requiredText(revision, `expectedTargetRevisions.${key}`),
   ]).sort(([left], [right]) => left.localeCompare(right)));
+}
+function normalizeCreateNode(payload) {
+  return {
+    position: finitePoint(payload.position, 'CREATE_NODE.position'),
+    creationRole: requiredText(payload.creationRole, 'CREATE_NODE.creationRole')
+      .toUpperCase().replace(/[^A-Z0-9]+/gu, '_'),
+    coordinateAuthority: requiredText(
+      payload.coordinateAuthority,
+      'CREATE_NODE.coordinateAuthority',
+    ),
+    sourceOperationId: requiredText(payload.sourceOperationId, 'CREATE_NODE.sourceOperationId'),
+  };
 }
 function normalizeMove(payload) {
   return { nodeId: requiredText(payload.nodeId, 'MOVE_NODE.nodeId'), position: finitePoint(payload.position) };
@@ -265,6 +277,7 @@ function normalizeInlineComponent(payload) {
   };
 }
 const PAYLOAD_NORMALIZERS = Object.freeze({
+  CREATE_NODE: normalizeCreateNode,
   MOVE_NODE: normalizeMove, MERGE_NODES: normalizeMerge,
   BRIDGE_GAP: normalizeAddedEdge, ADD_STRAIGHT_ELEMENT: normalizeAddedEdge,
   SPLIT_EDGE: normalizeSplit, DISCONNECT_ENDPOINT: normalizeDisconnect,

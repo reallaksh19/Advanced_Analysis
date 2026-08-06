@@ -14,9 +14,9 @@ import {
   TopologyEditSjsonGovernedViewportBackend,
 } from './topology-edit/topology-edit-sjson-governed-viewport-backend-v2.js';
 import {
-  SJSON_BENCHMARK_SOURCE_HASH,
   applySjsonBenchmarkCameraFit,
   deriveGovernedSjsonSupportBundle,
+  isGovernedSjsonEditDraftSourceHash,
 } from './topology-edit/topology-edit-sjson-runtime-authority-v2.js';
 import { publishSjsonFidelityEvidence } from './topology-edit/topology-edit-sjson-fidelity-evidence-v2.js';
 
@@ -135,11 +135,16 @@ export class TopologyEdit3DViewController extends ProfessionalController {
       && this.sjsonSourceVisualCacheDataset === this.workspaceDataset
       && this.sjsonSourceVisualCacheKey === cacheKey
     ) {
-      this.sjsonVisualByRole.set(role, this.sjsonSourceVisualCache);
-      if (this.hostElement) this.hostElement.dataset.topologyEditSjsonSourceVisualCache = 'HIT';
-      return this.sjsonSourceVisualCache;
+      const cachedResult = this.decorateAuthoringVisualResult(
+        this.sjsonSourceVisualCache,
+        canonical,
+        role,
+      );
+      this.sjsonVisualByRole.set(role, cachedResult);
+      publishSourceVisualCacheEvidence(this.hostElement, 'HIT');
+      return cachedResult;
     }
-    const result = adaptSjsonVisualToGovernedEditDraftProjection({
+    const governedResult = adaptSjsonVisualToGovernedEditDraftProjection({
       visualResult: deriveSjsonCompleteVisualGeometry({
         canonicalTopology: canonical,
         dataset: this.workspaceDataset,
@@ -147,12 +152,20 @@ export class TopologyEdit3DViewController extends ProfessionalController {
       }),
       dataset: this.workspaceDataset,
     });
+    // Decorate the exact governed packet before any role cache, support bundle,
+    // or renderer consumes it. This keeps authored bends inside the sole SJSON
+    // render authority rather than publishing presentation-only side evidence.
+    const result = this.decorateAuthoringVisualResult(
+      governedResult,
+      canonical,
+      role,
+    );
     this.sjsonVisualByRole.set(role, result);
     if (role === 'SOURCE') {
       this.sjsonSourceVisualCache = result;
       this.sjsonSourceVisualCacheDataset = this.workspaceDataset;
       this.sjsonSourceVisualCacheKey = cacheKey;
-      if (this.hostElement) this.hostElement.dataset.topologyEditSjsonSourceVisualCache = 'MISS';
+      publishSourceVisualCacheEvidence(this.hostElement, 'MISS');
     }
     if (role === 'DRAFT') {
       this.sjsonSupportBundle = deriveGovernedSjsonSupportBundle({
@@ -222,7 +235,9 @@ export class TopologyEdit3DViewController extends ProfessionalController {
   }
 
   isGovernedSjsonCanonical(canonical) {
-    return canonical?.sourceHash === SJSON_BENCHMARK_SOURCE_HASH;
+    const baseSourceHash = this.session?.baseCanonicalTopology?.sourceHash;
+    return isGovernedSjsonEditDraftSourceHash(canonical?.sourceHash)
+      || isGovernedSjsonEditDraftSourceHash(baseSourceHash);
   }
 
   deactivate() {
@@ -235,6 +250,12 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     this.sjsonSourceVisualCacheKey = '';
     super.deactivate();
   }
+}
+
+function publishSourceVisualCacheEvidence(host, status) {
+  if (!host) return;
+  host.dataset.topologyEditSjsonSourceVisualCache = status;
+  host.dataset.topologyEditSourceVisualCache = status;
 }
 
 function sjsonDisplayControlsMarkup() {
