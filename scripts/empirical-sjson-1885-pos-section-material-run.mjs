@@ -52,13 +52,13 @@ const receipt = {
     profileSha256: sha256(profileText),
     enrichedSha256: sha256(sourceText),
     topologyXmlSha256: sha256(topologyXmlText),
-    projectDataConfiguredDefaultsAuthority: projectDataAuthority
-      ? {
+    ...(projectDataAuthority ? {
+      projectDataConfiguredDefaultsAuthority: {
         schema: projectDataAuthority.schema,
         semanticIdentity: projectDataAuthority.semanticIdentity,
         projectDataPath: projectDataAuthority.projectDataPaths.configuredDefaults,
-      }
-      : null,
+      },
+    } : {}),
   },
   calculation,
 };
