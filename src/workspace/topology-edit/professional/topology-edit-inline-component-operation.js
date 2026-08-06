@@ -38,16 +38,13 @@ export function planTopologyEditInlineComponentOperation(input = {}) {
     fail('centerDistanceMm must be inside the host edge.', RangeError);
   }
   const direction = enumText(input.direction ?? 'FROM_TO', DIRECTIONS, 'direction');
-  const insertionLengthMm = insertionLength(record, input.insertionLengthMm);
-  const lengthAuthority = record.componentType === 'VALVE'
-    ? 'CATALOGUE_VALVE_FACE_TO_FACE'
-    : 'USER_DECLARED_COMPONENT_LENGTH';
+  const length = insertionLength(record, input.insertionLengthMm);
   const centerFraction = centerDistanceMm / edgeLengthMm;
   const payload = normalizeTopologyEditInlineComponentPayload({
     edgeId,
     centerFraction,
-    insertionLengthMm,
-    lengthAuthority,
+    insertionLengthMm: length.value,
+    lengthAuthority: length.authority,
     direction,
     catalogueBinding: catalogueBinding(catalogue, record),
   });
@@ -68,6 +65,9 @@ export function planTopologyEditInlineComponentOperation(input = {}) {
       direction: payload.direction,
       entityType: record.componentType,
       diameterMm: record.nominalSizeMm,
+      componentMassKg: record.componentMassKg,
+      materialSpecification: record.materialSpecification,
+      pressureClass: record.pressureClass,
       catalogueRecordId: record.recordId,
       catalogueRecordHash: record.recordHash,
       catalogueCompatibility: {
@@ -101,12 +101,22 @@ function catalogueBinding(catalogue, record) {
     secondaryNominalSizeMm: record.secondaryNominalSizeMm,
     secondaryOutsideDiameterMm: record.secondaryOutsideDiameterMm,
     pipingClass: record.pipingClass,
+    pressureClass: record.pressureClass,
+    materialSpecification: record.materialSpecification,
+    componentLengthMm: record.componentLengthMm,
+    componentMassKg: record.componentMassKg,
     endConnectionFrom: record.endConnectionFrom,
     endConnectionTo: record.endConnectionTo,
     valveType: record.valveType,
     valveFaceToFaceMm: record.valveFaceToFaceMm,
     flangeClass: record.flangeClass,
     flangeFacing: record.flangeFacing,
+    flangeType: record.flangeType,
+    flangeThicknessMm: record.flangeThicknessMm,
+    flangeOutsideDiameterMm: record.flangeOutsideDiameterMm,
+    boltCircleDiameterMm: record.boltCircleDiameterMm,
+    boltHoleCount: record.boltHoleCount,
+    boltHoleDiameterMm: record.boltHoleDiameterMm,
     reducerType: record.reducerType,
     reducerOrientation: record.reducerOrientation,
     sourceReference: record.sourceReference,
@@ -115,15 +125,33 @@ function catalogueBinding(catalogue, record) {
 
 function insertionLength(record, value) {
   if (record.componentType === 'VALVE') {
-    const requested = value === null || value === undefined || value === ''
+    const requested = empty(value)
       ? record.valveFaceToFaceMm
       : positive(value, 'insertionLengthMm');
     if (Math.abs(requested - record.valveFaceToFaceMm) > 1e-9) {
       fail('valve insertion length must equal catalogue face-to-face.', RangeError);
     }
-    return record.valveFaceToFaceMm;
+    return {
+      value: record.valveFaceToFaceMm,
+      authority: 'CATALOGUE_VALVE_FACE_TO_FACE',
+    };
   }
-  return positive(value, 'insertionLengthMm');
+  if (record.componentLengthMm !== null) {
+    const requested = empty(value)
+      ? record.componentLengthMm
+      : positive(value, 'insertionLengthMm');
+    if (Math.abs(requested - record.componentLengthMm) > 1e-9) {
+      fail(`${record.componentType.toLowerCase()} insertion length must equal catalogue component length.`, RangeError);
+    }
+    return {
+      value: record.componentLengthMm,
+      authority: 'CATALOGUE_COMPONENT_LENGTH',
+    };
+  }
+  return {
+    value: positive(value, 'insertionLengthMm'),
+    authority: 'USER_DECLARED_COMPONENT_LENGTH',
+  };
 }
 
 function exact(rows, id, label) {
@@ -137,6 +165,9 @@ function distance(left, right) {
     right.y - left.y,
     right.z - left.z,
   );
+}
+function empty(value) {
+  return value === null || value === undefined || value === '';
 }
 function positive(value, label) {
   const number = Number(value);

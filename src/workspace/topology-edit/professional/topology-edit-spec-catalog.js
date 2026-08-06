@@ -6,9 +6,9 @@ import {
 } from '../../../core/shared-piping-model/index.js';
 
 export const TOPOLOGY_EDIT_SPEC_CATALOGUE_SCHEMA =
-  'TopologyEditSpecificationCatalogue.v2';
+  'TopologyEditSpecificationCatalogue.v3';
 export const TOPOLOGY_EDIT_SPEC_RECORD_SCHEMA =
-  'TopologyEditSpecificationRecord.v2';
+  'TopologyEditSpecificationRecord.v3';
 
 const SHA256 = /^sha256:[a-f0-9]{64}$/u;
 const COMPONENT_TYPES = new Set([
@@ -20,6 +20,9 @@ const REDUCER_ORIENTATIONS = new Set([
 ]);
 const VALVE_TYPES = new Set([
   'BALL', 'BUTTERFLY', 'CHECK', 'CONTROL', 'GATE', 'GLOBE', 'NEEDLE', 'PLUG',
+]);
+const FLANGE_TYPES = new Set([
+  'WELD_NECK', 'SLIP_ON', 'SOCKET_WELD', 'THREADED', 'LAP_JOINT',
 ]);
 const OLET_TYPES = new Set([
   'ELBOLET', 'LATROLET', 'NIPOLET', 'SOCKOLET', 'SWEEPOLET', 'THREDOLET', 'WELDOLET',
@@ -34,6 +37,10 @@ const FIELDS = Object.freeze([
   'branchOutsideDiameterMm',
   'schedule',
   'wallThicknessMm',
+  'pressureClass',
+  'materialSpecification',
+  'componentLengthMm',
+  'componentMassKg',
   'elbowRadiusMm',
   'elbowAngleDeg',
   'reducerType',
@@ -42,6 +49,12 @@ const FIELDS = Object.freeze([
   'valveFaceToFaceMm',
   'flangeClass',
   'flangeFacing',
+  'flangeType',
+  'flangeThicknessMm',
+  'flangeOutsideDiameterMm',
+  'boltCircleDiameterMm',
+  'boltHoleCount',
+  'boltHoleDiameterMm',
   'branchAngleDeg',
   'centerToRunMm',
   'centerToBranchMm',
@@ -93,6 +106,10 @@ export function createTopologyEditSpecificationRecord(input = {}) {
     branchOutsideDiameterMm: optionalPositiveNumber(input.branchOutsideDiameterMm, 'branchOutsideDiameterMm'),
     schedule: optionalText(input.schedule, true),
     wallThicknessMm: optionalPositiveNumber(input.wallThicknessMm, 'wallThicknessMm'),
+    pressureClass: optionalText(input.pressureClass, true),
+    materialSpecification: optionalText(input.materialSpecification, true),
+    componentLengthMm: optionalPositiveNumber(input.componentLengthMm, 'componentLengthMm'),
+    componentMassKg: optionalPositiveNumber(input.componentMassKg, 'componentMassKg'),
     elbowRadiusMm: optionalPositiveNumber(input.elbowRadiusMm, 'elbowRadiusMm'),
     elbowAngleDeg: optionalAngle(input.elbowAngleDeg, 'elbowAngleDeg'),
     reducerType: optionalEnum(input.reducerType, REDUCER_TYPES, 'reducerType'),
@@ -101,6 +118,12 @@ export function createTopologyEditSpecificationRecord(input = {}) {
     valveFaceToFaceMm: optionalPositiveNumber(input.valveFaceToFaceMm, 'valveFaceToFaceMm'),
     flangeClass: optionalText(input.flangeClass, true),
     flangeFacing: optionalText(input.flangeFacing, true),
+    flangeType: optionalEnum(input.flangeType, FLANGE_TYPES, 'flangeType'),
+    flangeThicknessMm: optionalPositiveNumber(input.flangeThicknessMm, 'flangeThicknessMm'),
+    flangeOutsideDiameterMm: optionalPositiveNumber(input.flangeOutsideDiameterMm, 'flangeOutsideDiameterMm'),
+    boltCircleDiameterMm: optionalPositiveNumber(input.boltCircleDiameterMm, 'boltCircleDiameterMm'),
+    boltHoleCount: optionalPositiveInteger(input.boltHoleCount, 'boltHoleCount'),
+    boltHoleDiameterMm: optionalPositiveNumber(input.boltHoleDiameterMm, 'boltHoleDiameterMm'),
     branchAngleDeg: optionalAngle(input.branchAngleDeg, 'branchAngleDeg'),
     centerToRunMm: optionalPositiveNumber(input.centerToRunMm, 'centerToRunMm'),
     centerToBranchMm: optionalPositiveNumber(input.centerToBranchMm, 'centerToBranchMm'),
@@ -188,11 +211,19 @@ function assertComponentEvidence(record) {
   requiredByType[record.componentType].forEach((field) => {
     if (record[field] === null) fail(`${record.componentType}.${field} is required.`, RangeError);
   });
+  if (record.componentType === 'VALVE'
+    && record.componentLengthMm !== null
+    && Math.abs(record.componentLengthMm - record.valveFaceToFaceMm) > 1e-9) {
+    fail('VALVE.componentLengthMm must equal valveFaceToFaceMm.', RangeError);
+  }
   rejectForeignFields(record, 'REDUCER', [
     'secondaryNominalSizeMm', 'secondaryOutsideDiameterMm', 'reducerType', 'reducerOrientation',
   ]);
   rejectForeignFields(record, 'VALVE', ['valveType', 'valveFaceToFaceMm']);
-  rejectForeignFields(record, 'FLANGE', ['flangeClass', 'flangeFacing']);
+  rejectForeignFields(record, 'FLANGE', [
+    'flangeClass', 'flangeFacing', 'flangeType', 'flangeThicknessMm',
+    'flangeOutsideDiameterMm', 'boltCircleDiameterMm', 'boltHoleCount', 'boltHoleDiameterMm',
+  ]);
   rejectForeignFields(record, ['TEE', 'OLET'], [
     'branchNominalSizeMm', 'branchOutsideDiameterMm', 'branchAngleDeg', 'branchConnection',
   ]);
@@ -217,6 +248,14 @@ function optionalAngle(value, label) {
 }
 function optionalPositiveNumber(value, label) {
   return empty(value) ? null : positiveNumber(value, label);
+}
+function optionalPositiveInteger(value, label) {
+  if (empty(value)) return null;
+  const number = Number(value);
+  if (!Number.isInteger(number) || number <= 0) {
+    fail(`${label} must be a positive integer.`, RangeError);
+  }
+  return number;
 }
 function positiveNumber(value, label) {
   const number = Number(value);

@@ -10,6 +10,7 @@ export const TOPOLOGY_EDIT_INLINE_DIRECTIONS = Object.freeze([
 ]);
 export const TOPOLOGY_EDIT_INLINE_LENGTH_AUTHORITIES = Object.freeze([
   'CATALOGUE_VALVE_FACE_TO_FACE',
+  'CATALOGUE_COMPONENT_LENGTH',
   'USER_DECLARED_COMPONENT_LENGTH',
 ]);
 
@@ -45,6 +46,14 @@ export function normalizeTopologyEditInlineComponentPayload(input = {}) {
   }
   if (componentType !== 'VALVE' && lengthAuthority === 'CATALOGUE_VALVE_FACE_TO_FACE') {
     fail('CATALOGUE_VALVE_FACE_TO_FACE is valid only for VALVE.', RangeError);
+  }
+  if (lengthAuthority === 'CATALOGUE_COMPONENT_LENGTH') {
+    if (binding.componentLengthMm === null) {
+      fail('CATALOGUE_COMPONENT_LENGTH requires catalogueBinding.componentLengthMm.', RangeError);
+    }
+    if (!nearlyEqual(insertionLengthMm, binding.componentLengthMm)) {
+      fail('insertionLengthMm must equal the catalogue component length.', RangeError);
+    }
   }
   return deepFreeze({
     edgeId: requiredText(input.edgeId, 'edgeId'),
@@ -146,6 +155,9 @@ export function applyTopologyEditInlineComponent(topology, command) {
     derivedFromEdgeId: target.edge.id,
     sourceComponentKey: target.edge.componentKey ?? target.edge.sourceComponentKey ?? null,
     componentLengthMm: payload.insertionLengthMm,
+    componentMassKg: binding.componentMassKg,
+    materialSpecification: binding.materialSpecification,
+    pressureClass: binding.pressureClass,
     lengthAuthority: payload.lengthAuthority,
     insertionDirection: payload.direction,
     topologyOperation: 'INSERT_INLINE_COMPONENT',
@@ -161,6 +173,12 @@ export function applyTopologyEditInlineComponent(topology, command) {
     valveFaceToFaceMm: binding.valveFaceToFaceMm,
     flangeClass: binding.flangeClass,
     flangeFacing: binding.flangeFacing,
+    flangeType: binding.flangeType,
+    flangeThicknessMm: binding.flangeThicknessMm,
+    flangeOutsideDiameterMm: binding.flangeOutsideDiameterMm,
+    boltCircleDiameterMm: binding.boltCircleDiameterMm,
+    boltHoleCount: binding.boltHoleCount,
+    boltHoleDiameterMm: binding.boltHoleDiameterMm,
     reducerType: binding.reducerType,
     reducerOrientation: binding.reducerOrientation,
   };
@@ -234,6 +252,16 @@ function normalizeBinding(value, componentType) {
     secondaryNominalSizeMm,
     secondaryOutsideDiameterMm,
     pipingClass: requiredText(value.pipingClass, 'catalogueBinding.pipingClass').toUpperCase(),
+    pressureClass: optionalText(value.pressureClass),
+    materialSpecification: optionalText(value.materialSpecification),
+    componentLengthMm: optionalPositive(
+      value.componentLengthMm,
+      'catalogueBinding.componentLengthMm',
+    ),
+    componentMassKg: optionalPositive(
+      value.componentMassKg,
+      'catalogueBinding.componentMassKg',
+    ),
     endConnectionFrom: requiredText(
       value.endConnectionFrom,
       'catalogueBinding.endConnectionFrom',
@@ -249,6 +277,27 @@ function normalizeBinding(value, componentType) {
     ),
     flangeClass: optionalText(value.flangeClass),
     flangeFacing: optionalText(value.flangeFacing),
+    flangeType: optionalText(value.flangeType),
+    flangeThicknessMm: optionalPositive(
+      value.flangeThicknessMm,
+      'catalogueBinding.flangeThicknessMm',
+    ),
+    flangeOutsideDiameterMm: optionalPositive(
+      value.flangeOutsideDiameterMm,
+      'catalogueBinding.flangeOutsideDiameterMm',
+    ),
+    boltCircleDiameterMm: optionalPositive(
+      value.boltCircleDiameterMm,
+      'catalogueBinding.boltCircleDiameterMm',
+    ),
+    boltHoleCount: optionalPositiveInteger(
+      value.boltHoleCount,
+      'catalogueBinding.boltHoleCount',
+    ),
+    boltHoleDiameterMm: optionalPositive(
+      value.boltHoleDiameterMm,
+      'catalogueBinding.boltHoleDiameterMm',
+    ),
     reducerType: optionalText(value.reducerType),
     reducerOrientation: optionalText(value.reducerOrientation),
     sourceReference: normalizeSourceReference(value.sourceReference),
@@ -409,6 +458,12 @@ function optionalText(value) {
 }
 function optionalPositive(value, label) {
   return value === null || value === undefined || value === '' ? null : positive(value, label);
+}
+function optionalPositiveInteger(value, label) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  if (!Number.isInteger(number) || number <= 0) fail(`${label} must be a positive integer.`, RangeError);
+  return number;
 }
 function positive(value, label) {
   const number = Number(value);
