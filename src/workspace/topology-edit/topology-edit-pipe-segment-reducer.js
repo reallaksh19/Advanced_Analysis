@@ -6,6 +6,7 @@ import {
 import {
   assertResolvedPipeSegment,
   INSERT_PIPE_SEGMENT,
+  normalizePipeSegmentCommandPayload,
 } from './topology-edit-pipe-segment-contract.js';
 
 function fail(message, Constructor = RangeError) {
@@ -26,18 +27,18 @@ function addPort(node, portKey) {
     portKeys: [...new Set([...(node.portKeys ?? []), portKey])].sort(),
   };
 }
-function governedEdge(resolved) {
-  const binding = resolved.catalogueBinding;
-  const { edgeId, componentKey, fromPortKey, toPortKey } = resolved.generated;
+function governedEdge(command) {
+  const binding = command.payload.catalogueBinding;
+  const { edgeId, componentKey, fromPortKey, toPortKey, geometry } = command.generated;
   const engineeringEvidenceHash = semanticHash({
     bindingHash: binding.bindingHash,
-    geometryHash: resolved.geometry.geometryHash,
+    geometryHash: geometry.geometryHash,
   });
   return {
     id: edgeId,
     componentKey,
-    fromNodeId: resolved.targets.from.id,
-    toNodeId: resolved.targets.to.id,
+    fromNodeId: command.payload.fromNodeId,
+    toNodeId: command.payload.toNodeId,
     entityType: 'PIPE',
     identityKind: 'NATIVE_COMMAND',
     nominalSizeMm: binding.nominalSizeMm,
@@ -57,11 +58,45 @@ function governedEdge(resolved) {
     catalogueRecordHash: binding.recordHash,
     catalogueSourceReference: binding.sourceReference,
     nativePortKeys: [fromPortKey, toPortKey],
-    createdByCommandId: resolved.commandId,
+    createdByCommandId: command.commandId,
     topologyOperation: INSERT_PIPE_SEGMENT,
-    geometryHash: resolved.geometry.geometryHash,
+    geometryHash: geometry.geometryHash,
     engineeringEvidenceHash,
   };
+}
+function reducePipeSegment(topologyInput, command) {
+  const topology = clone(topologyInput);
+  const fromIndex = exactIndex(topology.nodes, command.payload.fromNodeId, 'FROM node');
+  const toIndex = exactIndex(topology.nodes, command.payload.toNodeId, 'TO node');
+  topology.nodes[fromIndex] = addPort(
+    topology.nodes[fromIndex],
+    command.generated.fromPortKey,
+  );
+  topology.nodes[toIndex] = addPort(
+    topology.nodes[toIndex],
+    command.generated.toPortKey,
+  );
+  topology.edges.push(governedEdge(command));
+  return topology;
+}
+
+export function applyPipeSegmentCommand(topology, command) {
+  if (command?.commandType !== INSERT_PIPE_SEGMENT) {
+    fail(`commandType must be ${INSERT_PIPE_SEGMENT}.`);
+  }
+  const payload = normalizePipeSegmentCommandPayload(command.payload);
+  const generated = command.targets?.generated;
+  if (!generated?.edgeId || !generated?.componentKey
+    || !generated?.fromPortKey || !generated?.toPortKey
+    || !generated?.geometry?.geometryHash) {
+    fail('resolved command is missing generated pipe authority.');
+  }
+  return reducePipeSegment(topology, {
+    commandId: command.commandId,
+    commandType: command.commandType,
+    payload,
+    generated,
+  });
 }
 
 export function applyResolvedPipeSegment(canonicalTopology, input) {
@@ -70,19 +105,17 @@ export function applyResolvedPipeSegment(canonicalTopology, input) {
   if (canonicalTopology.canonicalTopologyHash !== resolved.priorCanonicalHash) {
     fail('resolved pipe segment is stale for canonical topology.', Error);
   }
-  const topology = clone(canonicalTopology);
-  const fromIndex = exactIndex(topology.nodes, resolved.targets.from.id, 'FROM node');
-  const toIndex = exactIndex(topology.nodes, resolved.targets.to.id, 'TO node');
-  topology.nodes[fromIndex] = addPort(
-    topology.nodes[fromIndex],
-    resolved.generated.fromPortKey,
-  );
-  topology.nodes[toIndex] = addPort(
-    topology.nodes[toIndex],
-    resolved.generated.toPortKey,
-  );
-  topology.edges.push(governedEdge(resolved));
-  return finalizeCanonicalTopology(topology);
+  return finalizeCanonicalTopology(reducePipeSegment(canonicalTopology, {
+    commandId: resolved.commandId,
+    commandType: resolved.commandType,
+    payload: {
+      fromNodeId: resolved.targets.from.id,
+      toNodeId: resolved.targets.to.id,
+      catalogueBinding: resolved.catalogueBinding,
+      segmentPolicy: resolved.segmentPolicy,
+    },
+    generated: { ...resolved.generated, geometry: resolved.geometry },
+  }));
 }
 
 function changedIds(beforeRows, afterRows) {
@@ -99,42 +132,80 @@ function sameList(left, right) {
   return left.length === right.length
     && left.every((value, index) => value === right[index]);
 }
+function effectErrors(before, after, command) {
+  const nodeDelta = changedIds(before.nodes, after.nodes);
+  const edgeDelta = changedIds(before.edges, after.edges);
+  const expectedNodes = [command.payload.fromNodeId, command.payload.toNodeId].sort();
+  const errors = [];
+  if (nodeDelta.added.length || nodeDelta.removed.length
+    || !sameList(nodeDelta.changed, expectedNodes)) {
+    errors.push('pipe segment must change exactly its two endpoint nodes');
+  }
+  if (!sameList(edgeDelta.added, [command.generated.edgeId])
+    || edgeDelta.removed.length || edgeDelta.changed.length) {
+    errors.push('pipe segment must add exactly one edge');
+  }
+  for (const key of ['junctions', 'supports', 'boundaries', 'rigids', 'bends']) {
+    const delta = changedIds(before[key], after[key]);
+    if (delta.added.length || delta.removed.length || delta.changed.length) {
+      errors.push(`pipe segment must not change ${key}`);
+    }
+  }
+  const edge = after.edges.find((row) => row.id === command.generated.edgeId);
+  const exact = edge?.componentKey === command.generated.componentKey
+    && edge?.createdByCommandId === command.commandId
+    && edge?.topologyOperation === INSERT_PIPE_SEGMENT
+    && edge?.catalogueHash === command.payload.catalogueBinding.catalogueHash
+    && edge?.catalogueRecordHash === command.payload.catalogueBinding.recordHash
+    && edge?.geometryHash === command.generated.geometry.geometryHash
+    && semanticHash(edge?.nativePortKeys ?? []) === semanticHash([
+      command.generated.fromPortKey,
+      command.generated.toPortKey,
+    ]);
+  if (!exact) errors.push('pipe segment edge evidence differs from resolved authority');
+  if (edge && after.crosswalk.edgeIdToComponentKey[edge.id] !== edge.componentKey) {
+    errors.push('pipe segment crosswalk does not preserve component identity');
+  }
+  return { errors, edge };
+}
+
+export function validatePipeSegmentCommandEffect(candidate, before) {
+  const payload = normalizePipeSegmentCommandPayload(candidate.resolvedPayload);
+  const generated = candidate.resolvedCommand?.targets?.generated
+    ?? candidate.targets?.generated;
+  if (!generated) {
+    return [{
+      code: 'INSERT_PIPE_SEGMENT_GENERATED_AUTHORITY_MISSING',
+      message: 'INSERT_PIPE_SEGMENT is missing generated identity and geometry evidence.',
+      targetIds: [],
+    }];
+  }
+  const { errors, edge } = effectErrors(before, candidate.canonicalTopology, {
+    commandId: candidate.commandId,
+    payload,
+    generated,
+  });
+  return errors.map((message) => ({
+    code: 'INSERT_PIPE_SEGMENT_EFFECT_INVALID',
+    message,
+    targetIds: [edge?.id, payload.fromNodeId, payload.toNodeId].filter(Boolean).sort(),
+  }));
+}
 
 export function assertPipeSegmentEffect(before, after, input) {
   assertCanonicalTopologyHash(before);
   assertCanonicalTopologyHash(after);
   const resolved = assertResolvedPipeSegment(input);
-  const nodeDelta = changedIds(before.nodes, after.nodes);
-  const edgeDelta = changedIds(before.edges, after.edges);
-  const expectedNodes = [resolved.targets.from.id, resolved.targets.to.id].sort();
-  if (nodeDelta.added.length || nodeDelta.removed.length
-    || !sameList(nodeDelta.changed, expectedNodes)) {
-    fail('pipe segment must change exactly its two endpoint nodes.');
-  }
-  if (!sameList(edgeDelta.added, [resolved.generated.edgeId])
-    || edgeDelta.removed.length || edgeDelta.changed.length) {
-    fail('pipe segment must add exactly one edge.');
-  }
-  for (const key of ['junctions', 'supports', 'boundaries', 'rigids', 'bends']) {
-    const delta = changedIds(before[key], after[key]);
-    if (delta.added.length || delta.removed.length || delta.changed.length) {
-      fail(`pipe segment must not change ${key}.`);
-    }
-  }
-  const edge = after.edges.find((row) => row.id === resolved.generated.edgeId);
-  const exact = edge?.componentKey === resolved.generated.componentKey
-    && edge?.createdByCommandId === resolved.commandId
-    && edge?.topologyOperation === INSERT_PIPE_SEGMENT
-    && edge?.catalogueHash === resolved.catalogueBinding.catalogueHash
-    && edge?.catalogueRecordHash === resolved.catalogueBinding.recordHash
-    && edge?.geometryHash === resolved.geometry.geometryHash
-    && semanticHash(edge?.nativePortKeys ?? []) === semanticHash([
-      resolved.generated.fromPortKey,
-      resolved.generated.toPortKey,
-    ]);
-  if (!exact) fail('pipe segment edge evidence differs from resolved authority.');
-  if (after.crosswalk.edgeIdToComponentKey[edge.id] !== edge.componentKey) {
-    fail('pipe segment crosswalk does not preserve component identity.');
-  }
+  const command = {
+    commandId: resolved.commandId,
+    payload: {
+      fromNodeId: resolved.targets.from.id,
+      toNodeId: resolved.targets.to.id,
+      catalogueBinding: resolved.catalogueBinding,
+    },
+    generated: { ...resolved.generated, geometry: resolved.geometry },
+  };
+  const { errors } = effectErrors(before, after, command);
+  if (errors.length) fail(errors.join('; '));
   return after;
 }
