@@ -1,0 +1,30 @@
+name: SJSON empirical support profile diagnostic
+
+on:
+  push:
+    branches:
+      - agent/sjson-empirical-run-f2183ca
+
+permissions:
+  contents: read
+
+jobs:
+  support-profile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout diagnostic head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Emit governed support profile
+        run: node scripts/empirical-piping-sjson-support-profile-report.mjs
