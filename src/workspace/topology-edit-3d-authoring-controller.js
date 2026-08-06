@@ -39,9 +39,15 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     sidecar.prepend(details);
     this.authoringElement = section;
     this.authoringRuntime.mount(section);
+    // Non-authoritative mounted-instance reference used by browser qualification.
+    // It does not serialize, own topology, or participate in journal history.
+    this.hostElement.__topologyEditAuthoringController = this;
   }
 
   deactivate() {
+    if (this.hostElement?.__topologyEditAuthoringController === this) {
+      delete this.hostElement.__topologyEditAuthoringController;
+    }
     this.authoringRuntime.destroy();
     this.authoringElement = null;
     super.deactivate();
