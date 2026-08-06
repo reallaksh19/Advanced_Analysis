@@ -38,3 +38,11 @@ jobs:
           name: sjson-1885-support-inventory-compact
           path: /tmp/sjson-1885-support-inventory-compact.json
           if-no-files-found: error
+      - name: Upload exact benchmark source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: sjson-1885-exact-source-snapshot
+          path: |
+            /tmp/EnrichedSjson
+            /tmp/EnrichedSjson.topology.input.xml
+          if-no-files-found: error
