@@ -141,7 +141,7 @@ export class TopologyEdit3DViewController extends ProfessionalController {
         role,
       );
       this.sjsonVisualByRole.set(role, cachedResult);
-      if (this.hostElement) this.hostElement.dataset.topologyEditSjsonSourceVisualCache = 'HIT';
+      publishSourceVisualCacheEvidence(this.hostElement, 'HIT');
       return cachedResult;
     }
     const governedResult = adaptSjsonVisualToGovernedEditDraftProjection({
@@ -165,7 +165,7 @@ export class TopologyEdit3DViewController extends ProfessionalController {
       this.sjsonSourceVisualCache = result;
       this.sjsonSourceVisualCacheDataset = this.workspaceDataset;
       this.sjsonSourceVisualCacheKey = cacheKey;
-      if (this.hostElement) this.hostElement.dataset.topologyEditSjsonSourceVisualCache = 'MISS';
+      publishSourceVisualCacheEvidence(this.hostElement, 'MISS');
     }
     if (role === 'DRAFT') {
       this.sjsonSupportBundle = deriveGovernedSjsonSupportBundle({
@@ -250,6 +250,12 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     this.sjsonSourceVisualCacheKey = '';
     super.deactivate();
   }
+}
+
+function publishSourceVisualCacheEvidence(host, status) {
+  if (!host) return;
+  host.dataset.topologyEditSjsonSourceVisualCache = status;
+  host.dataset.topologyEditSourceVisualCache = status;
 }
 
 function sjsonDisplayControlsMarkup() {
