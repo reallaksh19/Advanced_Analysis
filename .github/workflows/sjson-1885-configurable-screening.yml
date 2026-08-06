@@ -6,7 +6,20 @@ on:
       - agent/sjson-1885-configurable-screening
     paths:
       - benchmarks/1885Sjson/empirical-screening-profile.config.json
+      - benchmarks/1885Sjson/empirical-screening-result.configurable.json
+      - benchmarks/1885Sjson/empirical-screening-result.configurable.csv
+      - docs/evidence/SJSON_1885_CONFIGURABLE_SCREENING.md
       - scripts/empirical-sjson-1885-configurable-screening-run.mjs
+      - scripts/empirical-sjson-1885-configurable-screening-check.mjs
+      - .github/workflows/sjson-1885-configurable-screening.yml
+  pull_request:
+    paths:
+      - benchmarks/1885Sjson/empirical-screening-profile.config.json
+      - benchmarks/1885Sjson/empirical-screening-result.configurable.json
+      - benchmarks/1885Sjson/empirical-screening-result.configurable.csv
+      - docs/evidence/SJSON_1885_CONFIGURABLE_SCREENING.md
+      - scripts/empirical-sjson-1885-configurable-screening-run.mjs
+      - scripts/empirical-sjson-1885-configurable-screening-check.mjs
       - .github/workflows/sjson-1885-configurable-screening.yml
   workflow_dispatch:
 
@@ -27,16 +40,27 @@ jobs:
         run: |
           git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson > /tmp/EnrichedSjson
           git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson.topology.input.xml > /tmp/EnrichedSjson.topology.input.xml
-      - name: Run configurable empirical screening
+      - name: Recalculate exact benchmark twice
         run: |
           node scripts/empirical-sjson-1885-configurable-screening-run.mjs \
             benchmarks/1885Sjson/empirical-screening-profile.config.json \
             /tmp/EnrichedSjson \
             /tmp/EnrichedSjson.topology.input.xml \
-            /tmp/empirical-sjson-1885-screening-result.json
+            /tmp/result-a.json
+          node scripts/empirical-sjson-1885-configurable-screening-run.mjs \
+            benchmarks/1885Sjson/empirical-screening-profile.config.json \
+            /tmp/EnrichedSjson \
+            /tmp/EnrichedSjson.topology.input.xml \
+            /tmp/result-b.json
+          cmp /tmp/result-a.json /tmp/result-b.json
+          cmp /tmp/result-a.json benchmarks/1885Sjson/empirical-screening-result.configurable.json
+          node scripts/empirical-sjson-1885-configurable-screening-check.mjs /tmp/result-a.json
       - name: Upload calculation evidence
         uses: actions/upload-artifact@v4
         with:
           name: empirical-sjson-1885-configurable-screening
-          path: /tmp/empirical-sjson-1885-screening-result.json
+          path: |
+            /tmp/result-a.json
+            benchmarks/1885Sjson/empirical-screening-result.configurable.csv
+            docs/evidence/SJSON_1885_CONFIGURABLE_SCREENING.md
           if-no-files-found: error
