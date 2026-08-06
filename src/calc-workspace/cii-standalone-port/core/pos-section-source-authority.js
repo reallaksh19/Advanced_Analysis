@@ -3,55 +3,32 @@ import { resolveNominalPipeSizeFromOutsideDiameter } from '../../../core/geometr
 import { resolveNominalBoreMm } from './branch-schedule-resolution.js';
 
 /**
- * Resolves the section dimensions used by every piping calculation consumer.
- * Topology OD/wall are source-explicit authority. The schedule master verifies
- * them when covered; missing master coverage is reported and never replaced by
- * a different schedule or guessed dimensions.
+ * Branch/fitting schedule controls wall thickness. Topology OD identifies the
+ * nominal size and topology wall is retained only as comparison evidence.
  */
 export function resolvePosSectionSourceAuthority({ target, schedule, tolerancesMm }) {
-  const edge = target?.edge;
-  if (edge) return resolveTopologyAuthority(edge, schedule, tolerancesMm);
-  return resolveEnrichedAuthority(target?.record, schedule);
+  return target?.edge
+    ? resolveTopologyAuthority(target.edge, schedule, tolerancesMm)
+    : resolveEnrichedAuthority(target?.record, schedule);
 }
 
 function resolveTopologyAuthority(edge, schedule, tolerancesMm) {
   const tolerances = normalizeTolerances(tolerancesMm);
-  const outsideDiameterMm = finiteOrNull(edge.outsideDiameterMm);
-  const wallThicknessMm = finiteOrNull(edge.wallThicknessMm);
-  const sourceDimensionsValid = outsideDiameterMm > 0
-    && wallThicknessMm > 0
-    && outsideDiameterMm > 2 * wallThicknessMm;
-  if (!sourceDimensionsValid) {
-    return Object.freeze({
-      nominalSize: blockedNominal('BLOCKED_TOPOLOGY_SECTION_INVALID'),
-      dimensions: null,
-      dimensionAuthority: 'TOPOLOGY_DIAMETER_AND_WALL_THICKNESS',
-      verification: verification(false, 'BLOCKED_TOPOLOGY_SECTION_INVALID', {
-        message: 'Topology DIAMETER and WALL_THICK must define a positive annular section.',
-        sourceOutsideDiameterMm: outsideDiameterMm,
-        sourceWallThicknessMm: wallThicknessMm,
-        masterOutsideDiameterMm: null,
-        masterWallThicknessMm: null,
-        outsideDiameterResidualMm: null,
-        wallThicknessResidualMm: null,
-        masterCoverage: false,
-      }),
-    });
-  }
-
+  const sourceOutsideDiameterMm = finiteOrNull(edge.outsideDiameterMm);
+  const sourceWallThicknessMm = finiteOrNull(edge.wallThicknessMm);
   const nominalSize = resolveNominalPipeSizeFromOutsideDiameter(
-    outsideDiameterMm,
+    sourceOutsideDiameterMm,
     tolerances.outsideDiameterMm,
   );
   if (!nominalSize.exact) {
     return Object.freeze({
       nominalSize,
       dimensions: null,
-      dimensionAuthority: 'TOPOLOGY_DIAMETER_AND_WALL_THICKNESS',
+      dimensionAuthority: 'SCHEDULE_SECTION_UNRESOLVED',
       verification: verification(false, nominalSize.status, {
-        message: 'Topology outside diameter did not resolve one exact standard nominal size.',
-        sourceOutsideDiameterMm: outsideDiameterMm,
-        sourceWallThicknessMm: wallThicknessMm,
+        message: 'Topology OD did not resolve one exact governed nominal size.',
+        sourceOutsideDiameterMm,
+        sourceWallThicknessMm,
         masterOutsideDiameterMm: null,
         masterWallThicknessMm: null,
         outsideDiameterResidualMm: null,
@@ -62,20 +39,15 @@ function resolveTopologyAuthority(edge, schedule, tolerancesMm) {
   }
 
   const master = schedule == null ? null : getPipeDimensions(nominalSize.dn, schedule);
-  const dimensions = Object.freeze({
-    outsideDiameterMm,
-    wallThicknessMm,
-    nps: nominalSize.nps,
-  });
   if (!master?.exact) {
     return Object.freeze({
       nominalSize,
-      dimensions,
-      dimensionAuthority: 'TOPOLOGY_DIAMETER_AND_WALL_THICKNESS',
-      verification: verification(true, 'SOURCE_EXPLICIT_MASTER_COVERAGE_MISSING', {
-        message: `Source OD/wall retained; the schedule master has no exact DN ${nominalSize.dn} Sch ${schedule} row.`,
-        sourceOutsideDiameterMm: outsideDiameterMm,
-        sourceWallThicknessMm: wallThicknessMm,
+      dimensions: null,
+      dimensionAuthority: 'PROJECT_CONFIGURED_SCHEDULE_SECTION_REQUIRED',
+      verification: verification(true, 'SCHEDULE_MASTER_COVERAGE_MISSING_CONFIG_REQUIRED', {
+        message: `No exact master row exists for DN ${nominalSize.dn} Sch ${schedule}; an explicitly scoped Project Data section is required.`,
+        sourceOutsideDiameterMm,
+        sourceWallThicknessMm,
         masterOutsideDiameterMm: null,
         masterWallThicknessMm: null,
         outsideDiameterResidualMm: null,
@@ -86,26 +58,38 @@ function resolveTopologyAuthority(edge, schedule, tolerancesMm) {
     });
   }
 
-  const outsideDiameterResidualMm = outsideDiameterMm - master.od;
-  const wallThicknessResidualMm = wallThicknessMm - master.wt;
-  const agrees = Math.abs(outsideDiameterResidualMm) <= tolerances.outsideDiameterMm
-    && Math.abs(wallThicknessResidualMm) <= tolerances.wallThicknessMm;
+  const outsideDiameterResidualMm = sourceOutsideDiameterMm - master.od;
+  const wallThicknessResidualMm = sourceWallThicknessMm == null ? null : sourceWallThicknessMm - master.wt;
+  const outsideDiameterAgrees = Math.abs(outsideDiameterResidualMm) <= tolerances.outsideDiameterMm;
+  const wallAgrees = wallThicknessResidualMm == null
+    ? null : Math.abs(wallThicknessResidualMm) <= tolerances.wallThicknessMm;
   return Object.freeze({
     nominalSize,
-    dimensions,
-    dimensionAuthority: 'TOPOLOGY_DIAMETER_AND_WALL_THICKNESS',
-    verification: verification(agrees,
-      agrees ? 'SOURCE_EXPLICIT_MASTER_VERIFIED' : 'BLOCKED_SOURCE_MASTER_DIMENSION_CONFLICT', {
-        message: agrees
-          ? 'Topology OD/wall agree with the resolved nominal-size/schedule master within configured tolerances.'
-          : 'Topology OD/wall conflict with the resolved nominal-size/schedule master outside configured tolerances.',
-        sourceOutsideDiameterMm: outsideDiameterMm,
-        sourceWallThicknessMm: wallThicknessMm,
+    dimensions: Object.freeze({
+      outsideDiameterMm: master.od,
+      wallThicknessMm: master.wt,
+      nps: master.nps,
+    }),
+    dimensionAuthority: master.source?.id || 'ENGINEERING_PIPE_SCHEDULE_DATASET',
+    verification: verification(outsideDiameterAgrees,
+      outsideDiameterAgrees
+        ? (wallAgrees === false
+          ? 'SCHEDULE_MASTER_SELECTED_TOPOLOGY_WALL_DIFFERS'
+          : 'SCHEDULE_MASTER_VERIFIED')
+        : 'BLOCKED_TOPOLOGY_OD_MASTER_CONFLICT', {
+        message: outsideDiameterAgrees
+          ? (wallAgrees === false
+            ? 'Branch schedule/master wall selected; topology wall differs and is retained as audit evidence only.'
+            : 'Branch schedule/master dimensions agree with topology OD/wall within configured tolerances.')
+          : 'Topology OD conflicts with the schedule master outside the configured tolerance.',
+        sourceOutsideDiameterMm,
+        sourceWallThicknessMm,
         masterOutsideDiameterMm: master.od,
         masterWallThicknessMm: master.wt,
         outsideDiameterResidualMm,
         wallThicknessResidualMm,
         masterCoverage: true,
+        topologyWallUsedForCalculation: false,
         masterSource: master.source ?? null,
       }),
   });
@@ -122,9 +106,9 @@ function resolveEnrichedAuthority(record, schedule) {
         ? Object.freeze({ exact: true, status: 'SOURCE_NOMINAL_BORE', dn: nominalBoreMm, nps: master?.nps ?? null })
         : blockedNominal('SOURCE_NOMINAL_BORE_UNRESOLVED'),
       dimensions: null,
-      dimensionAuthority: 'ENGINEERING_PIPE_SCHEDULE_DATASET',
-      verification: verification(false, 'BLOCKED_PIPE_DIMENSION_LOOKUP', {
-        message: 'Source-only calculation requires exact nominal-bore/schedule master coverage.',
+      dimensionAuthority: 'PROJECT_CONFIGURED_SCHEDULE_SECTION_REQUIRED',
+      verification: verification(true, 'SCHEDULE_MASTER_COVERAGE_MISSING_CONFIG_REQUIRED', {
+        message: 'Exact nominal-bore/schedule master coverage is missing; an explicitly scoped Project Data section is required.',
         sourceOutsideDiameterMm: null,
         sourceWallThicknessMm: null,
         masterOutsideDiameterMm: null,
@@ -137,20 +121,11 @@ function resolveEnrichedAuthority(record, schedule) {
     });
   }
   return Object.freeze({
-    nominalSize: Object.freeze({
-      exact: true,
-      status: 'SOURCE_NOMINAL_BORE',
-      dn: nominalBoreMm,
-      nps: master.nps,
-    }),
-    dimensions: Object.freeze({
-      outsideDiameterMm: master.od,
-      wallThicknessMm: master.wt,
-      nps: master.nps,
-    }),
+    nominalSize: Object.freeze({ exact: true, status: 'SOURCE_NOMINAL_BORE', dn: nominalBoreMm, nps: master.nps }),
+    dimensions: Object.freeze({ outsideDiameterMm: master.od, wallThicknessMm: master.wt, nps: master.nps }),
     dimensionAuthority: master.source?.id || 'ENGINEERING_PIPE_SCHEDULE_DATASET',
-    verification: verification(true, 'MASTER_DERIVED_SOURCE_ONLY', {
-      message: 'Source-only fixture dimensions are derived from exact nominal-bore/schedule master coverage.',
+    verification: verification(true, 'SCHEDULE_MASTER_DERIVED', {
+      message: 'Section dimensions derive from exact nominal-bore/schedule master coverage.',
       sourceOutsideDiameterMm: null,
       sourceWallThicknessMm: null,
       masterOutsideDiameterMm: master.od,
@@ -175,16 +150,6 @@ function normalizeTolerances(value) {
   }
   return Object.freeze({ outsideDiameterMm, wallThicknessMm });
 }
-
-function verification(acceptable, status, data) {
-  return Object.freeze({ acceptable, status, ...data });
-}
-
-function blockedNominal(status) {
-  return Object.freeze({ exact: false, status, dn: null, nps: null, diagnostics: Object.freeze([status]) });
-}
-
-function finiteOrNull(value) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
+function verification(acceptable, status, data) { return Object.freeze({ acceptable, status, ...data }); }
+function blockedNominal(status) { return Object.freeze({ exact: false, status, dn: null, nps: null, diagnostics: Object.freeze([status]) }); }
+function finiteOrNull(value) { const number = Number(value); return Number.isFinite(number) ? number : null; }
