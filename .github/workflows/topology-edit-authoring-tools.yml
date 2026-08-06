@@ -16,6 +16,7 @@ on:
       - 'tests/topology-edit-authoring-planner.test.mjs'
       - 'tests/topology-edit-authored-bend-geometry.test.mjs'
       - 'e2e/topology-edit-authoring-tools.spec.js'
+      - 'e2e/topology-edit-authoring-tools-tree.spec.js'
   workflow_dispatch:
 
 permissions:
@@ -66,7 +67,7 @@ jobs:
           node --check tests/topology-edit-authoring-composite-operation.test.mjs
           node --check tests/topology-edit-authoring-planner.test.mjs
           node --check tests/topology-edit-authored-bend-geometry.test.mjs
-          node --check e2e/topology-edit-authoring-tools.spec.js
+          node --check e2e/topology-edit-authoring-tools-tree.spec.js
           node scripts/advanced-shell-contract-check.mjs
           git diff --check
 
@@ -87,7 +88,7 @@ jobs:
       - name: Execute production Chromium authoring walkthrough
         run: |
           npx playwright test \
-            e2e/topology-edit-authoring-tools.spec.js \
+            e2e/topology-edit-authoring-tools-tree.spec.js \
             --project=chromium --workers=1 --retries=0 --reporter=line
 
       - name: Upload authoring qualification evidence
