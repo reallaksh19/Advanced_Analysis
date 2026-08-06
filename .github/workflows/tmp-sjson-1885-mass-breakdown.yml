@@ -23,16 +23,58 @@ jobs:
           node-version: 22
       - name: Apply constituent mass-ledger patch
         run: |
-          git show HEAD^:.github/workflows/tmp-sjson-1885-mass-breakdown.yml > /tmp/embedded-workflow.yml
+          git show HEAD^^:.github/workflows/tmp-sjson-1885-mass-breakdown.yml > /tmp/embedded-workflow.yml
           python - <<'PY'
           from pathlib import Path
           import re
           text = Path('/tmp/embedded-workflow.yml').read_text()
           match = re.search(r"^          python - <<'PY'\n(.*?)^          PY\n", text, re.M | re.S)
           if not match:
-              raise SystemExit('Unable to recover embedded patch program from parent commit.')
+              raise SystemExit('Unable to recover embedded patch program from original commit.')
           body = '\n'.join(line[10:] if line.startswith('          ') else line for line in match.group(1).splitlines())
+          body, removed = re.subn(
+              r"\nworkflow_path = Path\('\.github/workflows/sjson-1885-configurable-screening\.yml'\).*?\nworkflow_path\.write_text\(workflow\)\n",
+              '\n',
+              body,
+              flags=re.S,
+          )
+          if removed != 1:
+              raise SystemExit(f'Expected to remove one embedded workflow edit block, removed {removed}.')
           exec(compile(body, '<embedded-mass-breakdown-patch>', 'exec'))
+
+          workflow_path = Path('.github/workflows/sjson-1885-configurable-screening.yml')
+          workflow = workflow_path.read_text()
+          workflow = workflow.replace(
+              '      - benchmarks/1885Sjson/empirical-screening-result.configurable.csv\n',
+              '      - benchmarks/1885Sjson/empirical-screening-result.configurable.csv\n      - benchmarks/1885Sjson/empirical-screening-element-mass-breakdown.configurable.csv\n',
+          )
+          workflow = workflow.replace(
+              '      - scripts/empirical-sjson-1885-configurable-screening-check.mjs\n',
+              '      - scripts/empirical-sjson-1885-configurable-screening-check.mjs\n      - scripts/empirical-sjson-1885-mass-csv.mjs\n',
+          )
+          old = '''          cmp /tmp/result-a.json /tmp/result-b.json
+          cmp /tmp/result-a.json benchmarks/1885Sjson/empirical-screening-result.configurable.json
+          node scripts/empirical-sjson-1885-configurable-screening-check.mjs /tmp/result-a.json
+'''
+          new = '''          cmp /tmp/result-a.json /tmp/result-b.json
+          cmp /tmp/result-a.json benchmarks/1885Sjson/empirical-screening-result.configurable.json
+          node scripts/empirical-sjson-1885-mass-csv.mjs /tmp/result-a.json /tmp/support-a.csv /tmp/element-a.csv
+          node scripts/empirical-sjson-1885-mass-csv.mjs /tmp/result-b.json /tmp/support-b.csv /tmp/element-b.csv
+          cmp /tmp/support-a.csv /tmp/support-b.csv
+          cmp /tmp/element-a.csv /tmp/element-b.csv
+          cmp /tmp/support-a.csv benchmarks/1885Sjson/empirical-screening-result.configurable.csv
+          cmp /tmp/element-a.csv benchmarks/1885Sjson/empirical-screening-element-mass-breakdown.configurable.csv
+          node scripts/empirical-sjson-1885-configurable-screening-check.mjs /tmp/result-a.json
+'''
+          if old not in workflow:
+              raise SystemExit('Permanent workflow recalculation block not found.')
+          workflow = workflow.replace(old, new, 1)
+          workflow = workflow.replace(
+              '            benchmarks/1885Sjson/empirical-screening-result.configurable.csv\n',
+              '            benchmarks/1885Sjson/empirical-screening-result.configurable.csv\n            benchmarks/1885Sjson/empirical-screening-element-mass-breakdown.configurable.csv\n',
+              1,
+          )
+          workflow_path.write_text(workflow)
           PY
       - name: Materialize exact source and regenerate governed receipts
         run: |
