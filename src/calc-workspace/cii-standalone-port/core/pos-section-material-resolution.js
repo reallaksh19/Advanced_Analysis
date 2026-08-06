@@ -1,5 +1,4 @@
 import { getPipeDimensions } from '../../../core/geometry/pipeSchedules.js';
-import { resolveNominalPipeSizeFromOutsideDiameter } from '../../../core/geometry/nominal-pipe-size-resolution.js';
 import {
   RESOLUTION_KINDS,
   RESOLUTION_STATUSES,
@@ -24,19 +23,10 @@ export function resolvePosSectionMaterialStates(input) {
     projectDataSemanticHash: input.projectDataSemanticHash ?? null,
     defaults: input.configuredDefaults ?? [],
   });
-  const dimensionVerificationTolerancesMm = normalizeDimensionVerificationTolerances(
-    input.dimensionVerificationTolerancesMm,
-    Boolean(input.topologyXmlText),
-  );
   const targets = input.topologyXmlText
     ? buildTopologyPositionTargets(input.topologyXmlText, scheduleIndex)
     : buildSourceRecordTargets(scheduleIndex, (record) => SECTION_TYPE.test(record.type));
-  const rows = targets.map((target) => resolveTarget(
-    target,
-    session,
-    input.projectId ?? null,
-    dimensionVerificationTolerancesMm,
-  ));
+  const rows = targets.map((target) => resolveTarget(target, session, input.projectId ?? null));
   const resolutionReceipt = session.receipt();
   const blockedRowCount = rows.filter((row) => row.status !== 'RESOLVED').length;
   const result = {
@@ -47,8 +37,6 @@ export function resolvePosSectionMaterialStates(input) {
     targetAuthority: input.topologyXmlText ? 'TOPOLOGY_PIPINGELEMENT_POSITIONS' : 'ENRICHED_SOURCE_RECORDS',
     topologyElementCount: input.topologyXmlText ? targets.length : null,
     sourceRecordCount: scheduleIndex.items.length,
-    dimensionVerificationTolerancesMm,
-    dimensionVerificationStatusCounts: countBy(rows, (row) => row.dimensionVerification?.status),
     rows: Object.freeze(rows),
     resolvedRowCount: rows.length - blockedRowCount,
     blockedRowCount,
@@ -58,31 +46,15 @@ export function resolvePosSectionMaterialStates(input) {
   return deepFreeze({ ...result, semanticIdentity: semanticHash(result) });
 }
 
-function resolveTarget(target, session, projectId, verificationTolerances) {
+function resolveTarget(target, session, projectId) {
   const record = target.record;
   const item = record?.item || {};
   const attrs = { ...(item.engineeringProperties || {}), ...(item.attributes || {}) };
   const enriched = item.enrichedAttributes || {};
   const entity = buildEntity(target, attrs, enriched, projectId);
   const values = {};
-  const nominalSize = target.edge
-    ? resolveNominalPipeSizeFromOutsideDiameter(
-      target.edge.outsideDiameterMm,
-      verificationTolerances.outsideDiameterMm,
-    )
-    : null;
 
-  values.nominalBoreMm = resolveField(session, target.edge ? {
-    field: 'section.nominalBoreMm', entity, unit: 'mm',
-    value: nominalSize?.exact ? nominalSize.dn : null,
-    kind: RESOLUTION_KINDS.CONFIGURED_DERIVATION,
-    authority: 'TOPOLOGY_OD_TO_STANDARD_NOMINAL_SIZE',
-    sourcePath: `${target.positionRef}.DIAMETER`,
-    reason: 'Exact nominal size derived from the source-explicit topology outside diameter within the configured verification tolerance.',
-    missing: nominalSize?.status || 'TOPOLOGY_OUTSIDE_DIAMETER_UNRESOLVED',
-    validate: positive('Nominal bore must be positive.'),
-    affected: ['SECTION_LOOKUP', 'WEIGHT', 'STIFFNESS', 'STRESS'],
-  } : {
+  values.nominalBoreMm = resolveField(session, {
     field: 'section.nominalBoreMm', entity, unit: 'mm',
     value: record ? resolveNominalBoreMm(item) : null,
     kind: RESOLUTION_KINDS.SOURCE_EXPLICIT,
@@ -101,52 +73,186 @@ function resolveTarget(target, session, projectId, verificationTolerances) {
   const dn = read(values.nominalBoreMm);
   const schedule = read(values.schedule);
   const lookup = dn != null && schedule != null ? getPipeDimensions(dn, schedule) : null;
-  const topologyDimensions = validTopologyDimensions(target.edge)
-    ? {
-      outsideDiameterMm: target.edge.outsideDiameterMm,
-      wallThicknessMm: target.edge.wallThicknessMm,
-      nps: nominalSize?.nps ?? lookup?.nps ?? null,
-    }
-    : null;
-  const effectiveDimensions = topologyDimensions || (lookup?.exact
-    ? { outsideDiameterMm: lookup.od, wallThicknessMm: lookup.wt, nps: lookup.nps }
-    : null);
-
   values.dimensionsMm = resolveField(session, {
     field: 'section.dimensionsMm', entity: addScope(entity, { nominalBoreMm: dn, schedule }), unit: 'mm',
-    value: effectiveDimensions,
-    kind: topologyDimensions ? RESOLUTION_KINDS.SOURCE_EXPLICIT : RESOLUTION_KINDS.CONFIGURED_DERIVATION,
-    authority: topologyDimensions ? 'TOPOLOGY_DIAMETER_AND_WALL_THICKNESS'
-      : lookup?.source?.id || 'ENGINEERING_PIPE_SCHEDULE_DATASET',
-    sourcePath: topologyDimensions ? `${target.positionRef}.DIAMETER|WALL_THICK`
-      : `getPipeDimensions(DN=${dn}, schedule=${schedule})`,
-    reason: topologyDimensions
-      ? 'Source-explicit topology OD and wall are the calculation section authority.'
-      : 'Exact schedule-dataset lookup from resolved nominal bore and schedule.',
-    missing: topologyDimensions ? 'TOPOLOGY_DIMENSIONS_INVALID'
-      : lookup?.diagnostics?.map((row) => row.code).join(',') || 'PIPE_DIMENSION_LOOKUP_UNRESOLVED',
+    value: lookup?.exact ? { outsideDiameterMm: lookup.od, wallThicknessMm: lookup.wt, nps: lookup.nps } : null,
+    kind: RESOLUTION_KINDS.CONFIGURED_DERIVATION,
+    authority: lookup?.source?.id || 'ENGINEERING_PIPE_SCHEDULE_DATASET',
+    sourcePath: `getPipeDimensions(DN=${dn}, schedule=${schedule})`,
+    reason: 'Exact schedule-dataset lookup from resolved nominal bore and schedule.',
+    missing: lookup?.diagnostics?.map((row) => row.code).join(',') || 'PIPE_DIMENSION_LOOKUP_UNRESOLVED',
     validate: dimensions,
     affected: ['SECTION_PROPERTIES', 'WEIGHT', 'STIFFNESS', 'STRESS'],
-  });
-  const dimensionVerification = verifyDimensions({
-    topologyDimensions,
-    lookup,
-    dn,
-    schedule,
-    tolerances: verificationTolerances,
-  });
-  values.dimensionVerification = resolveField(session, {
-    field: 'section.dimensionVerification', entity: addScope(entity, { nominalBoreMm: dn, schedule }),
-    value: dimensionVerification,
-    kind: RESOLUTION_KINDS.CONFIGURED_DERIVATION,
-    authority: 'SOURCE_SECTION_VS_SCHEDULE_MASTER_VERIFICATION',
-    sourcePath: `topology-vs-getPipeDimensions(DN=${dn}, schedule=${schedule})`,
-    reason: dimensionVerification.message,
-    missing: dimensionVerification.status,
-    validate: (value) => value?.acceptable === true ? true : value?.message || 'Source dimensions do not agree with the schedule master.',
-    affected: ['SECTION_QUALITY_GATE', 'WEIGHT', 'STIFFNESS', 'STRESS'],
   });
 
   values.materialFamily = resolveField(session, {
     field: 'material.family', entity,
-    value: first([enriched.materialFamily, enriched.material, attrs.MATERIAL_FAMILY, attrs.MATERIAL, attrs.MATM}οή…ªμ¶»§q«^
+    value: first([enriched.materialFamily, enriched.material, attrs.MATERIAL_FAMILY, attrs.MATERIAL, attrs.MATL]),
+    kind: RESOLUTION_KINDS.SOURCE_EXPLICIT,
+    authority: 'SOURCE_MATERIAL', sourcePath: sourcePath(target, 'material'),
+    validate: text('Material family must be a non-empty string.'),
+    affected: ['MATERIAL_PROPERTIES', 'WEIGHT', 'STIFFNESS', 'STRESS'],
+  });
+  const materialEntity = addScope(entity, {
+    materialFamily: read(values.materialFamily),
+    temperatureC: finite(first([enriched.operatingTemperatureC, attrs.OPERATING_TEMPERATURE_C, attrs.TEMPERATURE_C])),
+  });
+  values.elasticModulusPa = materialNumber(session, materialEntity, target,
+    'material.elasticModulusPa', 'Pa', first([enriched.elasticModulusPa, attrs.ELASTIC_MODULUS_PA, attrs.MODULUS_PA]),
+    'elastic modulus', ['EA', 'EI', 'THERMAL_REACTION', 'P_DELTA']);
+  values.poissonsRatio = resolveField(session, {
+    field: 'material.poissonsRatio', entity: materialEntity, unit: 'ratio',
+    value: finite(first([enriched.poissonsRatio, attrs.POISSONS_RATIO])),
+    kind: RESOLUTION_KINDS.SOURCE_EXPLICIT,
+    authority: 'SOURCE_POISSONS_RATIO', sourcePath: sourcePath(target, 'Poisson ratio'),
+    validate: (value) => Number(value) > 0 && Number(value) < 0.5
+      ? true : 'Poisson ratio must be greater than zero and less than 0.5.',
+    affected: ['SHEAR_MODULUS', 'TORSIONAL_STIFFNESS'],
+  });
+  values.densityKgM3 = materialNumber(session, materialEntity, target,
+    'material.densityKgM3', 'kg/m3', first([enriched.materialDensityKgM3, attrs.MATERIAL_DENSITY_KG_M3]),
+    'material density', ['PIPE_METAL_MASS', 'SUSTAINED_WEIGHT']);
+  values.thermalExpansionPerC = materialNumber(session, materialEntity, target,
+    'material.thermalExpansionPerC', '1/C', first([
+      enriched.thermalExpansionPerC, enriched.meanThermalExpansionPerC, attrs.THERMAL_EXPANSION_PER_C,
+    ]), 'thermal expansion', ['THERMAL_STRAIN', 'THERMAL_DISPLACEMENT', 'THERMAL_REACTION']);
+
+  values.corrosionAllowanceMm = resolveField(session, {
+    field: 'section.corrosionAllowanceMm', entity, unit: 'mm',
+    value: finite(first([target.edge?.corrosionAllowanceMm, enriched.corrosionAllowanceMm, attrs.CORROSION_ALLOWANCE_MM])),
+    kind: RESOLUTION_KINDS.SOURCE_EXPLICIT,
+    authority: target.edge?.corrosionAllowanceMm != null ? 'TOPOLOGY_CORROSION_ALLOWANCE' : 'SOURCE_CORROSION_ALLOWANCE',
+    sourcePath: sourcePath(target, 'corrosion allowance'),
+    validate: nonNegative('Corrosion allowance must be zero or positive.'), affected: ['CODE_STRESS_SECTION'],
+  });
+  values.codeStressWallRule = resolveField(session, {
+    field: 'section.codeStressWallRule', entity,
+    value: first([enriched.codeStressWallRule, attrs.CODE_STRESS_WALL_RULE]),
+    kind: RESOLUTION_KINDS.SOURCE_EXPLICIT,
+    authority: 'SOURCE_CODE_STRESS_WALL_RULE', sourcePath: sourcePath(target, 'code stress wall rule'),
+    validate: (value) => ['EXPLICIT', 'NOMINAL_MINUS_CORROSION'].includes(value)
+      ? true : 'Code-stress wall rule must be EXPLICIT or NOMINAL_MINUS_CORROSION.',
+    affected: ['CODE_STRESS_SECTION'],
+  });
+  if (read(values.codeStressWallRule) === 'EXPLICIT') {
+    values.codeStressWallMm = resolveField(session, {
+      field: 'section.codeStressWallMm', entity, unit: 'mm',
+      value: finite(first([enriched.codeStressWallMm, attrs.CODE_STRESS_WALL_MM])),
+      kind: RESOLUTION_KINDS.SOURCE_EXPLICIT,
+      authority: 'SOURCE_CODE_STRESS_WALL', sourcePath: sourcePath(target, 'explicit code stress wall'),
+      validate: positive('Explicit code-stress wall must be positive.'), affected: ['CODE_STRESS_SECTION'],
+    });
+  }
+
+  const blocked = Object.values(values).filter((value) => value.status !== RESOLUTION_STATUSES.RESOLVED);
+  const identity = identityFields(entity, target);
+  if (blocked.length) return blockedRow(identity, dn, schedule, values, blocked);
+
+  const d = values.dimensionsMm.value;
+  const wallM = d.wallThicknessMm / 1000;
+  const rule = values.codeStressWallRule.value;
+  const sectionInput = {
+    outsideDiameterM: d.outsideDiameterMm / 1000,
+    nominalWallM: wallM, stiffnessWallM: wallM, weightWallM: wallM,
+    corrosionAllowanceM: values.corrosionAllowanceMm.value / 1000,
+    codeStressWallRule: rule,
+    authority: {
+      nominalWall: authority(values.dimensionsMm),
+      stiffnessWall: `${authority(values.dimensionsMm)}:NOMINAL_WALL_FOR_STIFFNESS`,
+      weightWall: `${authority(values.dimensionsMm)}:NOMINAL_WALL_FOR_WEIGHT`,
+      codeStressWall: rule === 'EXPLICIT' ? authority(values.codeStressWallMm)
+        : `${authority(values.codeStressWallRule)}:NOMINAL_MINUS_CORROSION`,
+    },
+  };
+  if (rule === 'EXPLICIT') sectionInput.codeStressWallM = values.codeStressWallMm.value / 1000;
+  let sectionStates;
+  try { sectionStates = resolveSectionStates(sectionInput); }
+  catch (error) {
+    return freezeRow({ schema: POS_SECTION_MATERIAL_SCHEMA, status: 'BLOCKED_SECTION_INVALID', ...identity,
+      nominalBoreMm: dn, schedule, sectionStates: null, material: null, resolutions: values,
+      blockers: [{ field: 'section.states', status: 'BLOCKED_SECTION_INVALID', reason: String(error.message || error), diagnostics: [] }] });
+  }
+  const material = deepFreeze({
+    family: values.materialFamily.value,
+    elasticModulusPa: values.elasticModulusPa.value,
+    poissonsRatio: values.poissonsRatio.value,
+    densityKgM3: values.densityKgM3.value,
+    thermalExpansionPerC: values.thermalExpansionPerC.value,
+  });
+  return freezeRow({
+    schema: POS_SECTION_MATERIAL_SCHEMA, status: 'RESOLVED', ...identity,
+    nominalBoreMm: dn, nps: d.nps, schedule,
+    outsideDiameterMm: d.outsideDiameterMm, wallThicknessMm: d.wallThicknessMm,
+    sectionStates, material,
+    metalMassPerLengthKgM: sectionStates.weight.areaM2 * material.densityKgM3,
+    resolutions: values, blockers: [],
+  });
+}
+
+function resolveField(session, x) {
+  return session.resolve({
+    field: x.field, entity: x.entity, unit: x.unit,
+    candidates: x.value == null || x.value === '' ? [] : [{
+      kind: x.kind, value: x.value, authority: x.authority, sourcePath: x.sourcePath, reason: x.reason,
+    }],
+    sourceMissingReason: x.missing, validate: x.validate,
+    affectedCalculations: x.affected || [],
+  });
+}
+function materialNumber(session, entity, target, field, unit, value, label, affected) {
+  return resolveField(session, { field, entity, unit, value: finite(value),
+    kind: RESOLUTION_KINDS.SOURCE_EXPLICIT,
+    authority: `SOURCE_${label.toUpperCase().replace(/\s+/g, '_')}`,
+    sourcePath: sourcePath(target, label), validate: positive(`${label} must be positive.`), affected });
+}
+function scheduleCandidates(record, evidence) {
+  if (!record || !evidence?.schedule) return [];
+  return [{ kind: evidence.basis === 'SOURCE_EXPLICIT_SCHEDULE'
+    ? RESOLUTION_KINDS.SOURCE_EXPLICIT : RESOLUTION_KINDS.SOURCE_INHERITED,
+  value: evidence.schedule, authority: evidence.sourceName || evidence.basis,
+  sourcePath: evidence.sourceField || evidence.sourceBranchPath || record.sourcePath, reason: evidence.basis }];
+}
+function buildEntity(target, attrs, enriched, projectId) {
+  const e = target.edge; const r = target.record;
+  const posId = e ? target.positionRef : String(first([enriched.posId, attrs.POS_ID, attrs.POSITION_ID, attrs.POS_NO, r?.name]) || target.positionRef);
+  const entityId = e ? String(e.id || posId)
+    : String(first([enriched.entityId, attrs.ENTITY_ID, attrs.ID, r?.sourcePath, posId]) || posId);
+  return { entityId, posId,
+    fromNode: e?.fromNode ?? first([attrs.FROM_NODE, attrs.FROM, enriched.fromNode]) ?? null,
+    toNode: e?.toNode ?? first([attrs.TO_NODE, attrs.TO, enriched.toNode]) ?? null,
+    scope: { entityId, posId, projectId: String(projectId ?? ''),
+      lineId: String(e?.lineId ?? first([attrs.LINE_ID, attrs.LINE, enriched.lineId]) ?? ''),
+      branchPath: r?.branchPath || 'SOURCE_RECORD_UNMATCHED',
+      pipingClass: String(first([enriched.pipingClass, attrs.PIPING_CLASS, attrs.PCLS, attrs.CLASS]) ?? ''),
+      componentType: e?.sourceType || r?.type || 'UNKNOWN' } };
+}
+function identityFields(entity, target) {
+  const e = target.edge; const r = target.record;
+  return { entityId: entity.entityId, posId: entity.posId,
+    fromNode: entity.fromNode == null ? null : String(entity.fromNode),
+    toNode: entity.toNode == null ? null : String(entity.toNode),
+    branchName: r?.branchName || null, branchPath: r?.branchPath || null,
+    sourcePath: r?.sourcePath || null, sourceRecordMatched: Boolean(r), sourceRecordName: r?.name || null,
+    componentType: e?.sourceType || r?.type || null, componentName: e?.name || r?.name || target.positionRef,
+    lineId: e?.lineId || null };
+}
+function blockedRow(identity, dn, schedule, values, blocked) {
+  return freezeRow({ schema: POS_SECTION_MATERIAL_SCHEMA, status: blocked[0].status, ...identity,
+    nominalBoreMm: dn, schedule, sectionStates: null, material: null, resolutions: values,
+    blockers: blocked.map((x) => ({ field: x.field, status: x.status, reason: x.reason, diagnostics: x.diagnostics || [] })) });
+}
+function addScope(entity, additions) { return { ...entity,
+  scope: Object.fromEntries(Object.entries({ ...entity.scope, ...additions }).filter(([, value]) => value != null && value !== '')) };
+}
+function freezeRow(value) { return deepFreeze({ ...value, semanticIdentity: semanticHash(value) }); }
+function read(value) { return value?.status === RESOLUTION_STATUSES.RESOLVED ? value.value : null; }
+function first(values) { return values.find((value) => value !== undefined && value !== null && value !== ''); }
+function finite(value) { if (value == null || value === '') return null; const n = Number(value); return Number.isFinite(n) ? n : null; }
+function positive(message) { return (value) => Number.isFinite(Number(value)) && Number(value) > 0 ? true : message; }
+function nonNegative(message) { return (value) => Number.isFinite(Number(value)) && Number(value) >= 0 ? true : message; }
+function text(message) { return (value) => typeof value === 'string' && value.trim() ? true : message; }
+function dimensions(value) { const od = Number(value?.outsideDiameterMm); const wall = Number(value?.wallThicknessMm);
+  return od > 0 && wall > 0 && od > 2 * wall ? true : 'Pipe dimensions must define a positive annulus.'; }
+function authority(value) { return `${value.kind}:${value.authority || value.sourcePath || 'UNSPECIFIED'}`; }
+function sourcePath(target, label) { const r = target.record;
+  return `${r?.sourcePath || r?.branchPath || r?.name || target.positionRef}:${label}`; }
