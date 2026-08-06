@@ -121,6 +121,8 @@ jobs:
         run: npm run build
 
       - name: Install Chromium
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: '0'
         run: npx playwright install --with-deps chromium
 
       - name: Integrated Input Check browser test
