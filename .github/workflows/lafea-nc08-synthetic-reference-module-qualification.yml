@@ -1,0 +1,137 @@
+name: LAFEA-NC NC-08 Exact-Head Synthetic Reference Module Qualification
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/lafea-nc08-synthetic-reference-module-qualification.yml'
+      - 'docs/nonlinear-shell-contact/LAFEA_NC08_SYNTHETIC_REFERENCE_MODULE_QUALIFICATION.md'
+      - 'scripts/lafea-nc08-check.mjs'
+      - 'scripts/lafea-nc08-module.mjs'
+      - 'scripts/nc08-module/**'
+      - 'src/core/nonlinear-shell-contact/synthetic-reference-module-contract.js'
+      - 'src/core/nonlinear-shell-contact/synthetic-reference-module-evaluator.js'
+      - 'src/core/nonlinear-shell-contact/nc08-fixtures.js'
+      - 'src/core/nonlinear-shell-contact/nc08-negative-controls.js'
+      - 'tests/nonlinear-shell-contact-nc08-qualification.test.mjs'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: lafea-nc08-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  exact-head-nc08:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NC07_MERGE_SHA: 5b3914d01a5faa35bc2b39491cedbf13285e1cb3
+      NC07_ARTIFACT_ID: '8960018194'
+      NC07_ARTIFACT_DIGEST: sha256:fb2d63837a7ae922e61af92631f501dc73f696d3c9667ac3c6a7369c184efaf2
+      NC05_REPORT_HASH: sha256:7d3c2384f2376e7ea43f965e2d5f4a544ff5f2122202825f3cc4ccc0897923ef
+      NC06_REPORT_HASH: sha256:18ba056a9bdc4b27e100175e0efbf0ba7bbedd3b4423d1d2873f750158aa62e9
+      TZ: UTC
+      LC_ALL: C
+    steps:
+      - name: Resolve exact head and base
+        id: refs
+        run: |
+          set -euo pipefail
+          echo "head_sha=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          echo "base_sha=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.refs.outputs.head_sha }}
+          fetch-depth: 0
+      - name: Verify live base, ancestry and phase paths
+        env:
+          HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          BASE_SHA: ${{ steps.refs.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          test "$(git rev-parse origin/main)" = "$BASE_SHA"
+          git merge-base --is-ancestor "$BASE_SHA" "$HEAD_SHA"
+          git merge-base --is-ancestor "$NC07_MERGE_SHA" "$HEAD_SHA"
+          test "$(git rev-list --count "$HEAD_SHA"..origin/main)" = 0
+          mapfile -t paths < <(git diff --name-only "$BASE_SHA...$HEAD_SHA")
+          test "${#paths[@]}" = 15
+          for path in "${paths[@]}"; do case "$path" in
+            .github/workflows/lafea-nc08-synthetic-reference-module-qualification.yml|docs/nonlinear-shell-contact/LAFEA_NC08_SYNTHETIC_REFERENCE_MODULE_QUALIFICATION.md|scripts/lafea-nc08-check.mjs|scripts/lafea-nc08-module.mjs|scripts/nc08-module/builder.mjs|scripts/nc08-module/config.mjs|scripts/nc08-module/evidence.mjs|scripts/nc08-module/prepare-binding.mjs|scripts/nc08-module/release-oracle.mjs|scripts/nc08-module/runtime.mjs|src/core/nonlinear-shell-contact/synthetic-reference-module-contract.js|src/core/nonlinear-shell-contact/synthetic-reference-module-evaluator.js|src/core/nonlinear-shell-contact/nc08-fixtures.js|src/core/nonlinear-shell-contact/nc08-negative-controls.js|tests/nonlinear-shell-contact-nc08-qualification.test.mjs) ;;
+            *) echo "Forbidden NC-08 path: $path" >&2; exit 1;;
+          esac; done
+          git diff --check "$BASE_SHA...$HEAD_SHA"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Download and validate NC-07 custody
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/nc07
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${NC07_ARTIFACT_ID}" > /tmp/nc07-meta.json
+          test "$(jq -r .digest /tmp/nc07-meta.json)" = "$NC07_ARTIFACT_DIGEST"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${NC07_ARTIFACT_ID}/zip" > /tmp/nc07.zip
+          unzip -q /tmp/nc07.zip -d /tmp/nc07
+          cmp /tmp/nc07/nc07-a/nc07-report.canonical.json /tmp/nc07/nc07-b/nc07-report.canonical.json
+          cmp /tmp/nc07/nc07-real-a/nc07-synthetic-summary.canonical.json /tmp/nc07/nc07-real-b/nc07-synthetic-summary.canonical.json
+          cmp /tmp/nc07/nc07-real-a/caseRecord.json /tmp/nc07/nc07-real-b/caseRecord.json
+          node scripts/nc08-module/prepare-binding.mjs /tmp/nc07 /tmp/nc08-upstream.json
+      - name: Run syntax, unit and fail-closed controls
+        run: |
+          set -euo pipefail
+          for file in scripts/lafea-nc08-check.mjs scripts/lafea-nc08-module.mjs scripts/nc08-module/{builder,config,evidence,prepare-binding,release-oracle,runtime}.mjs src/core/nonlinear-shell-contact/{synthetic-reference-module-contract,synthetic-reference-module-evaluator,nc08-fixtures,nc08-negative-controls}.js; do node --check "$file"; done
+          node --test tests/nonlinear-shell-contact-nc08-qualification.test.mjs
+      - name: Execute two isolated reproducible builds
+        env:
+          HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          TREE_SHA=$(git rev-parse 'HEAD^{tree}')
+          node scripts/lafea-nc08-module.mjs /tmp/nc08-upstream.json /tmp/nc08-build-a "$HEAD_SHA" "$TREE_SHA"
+          node scripts/lafea-nc08-module.mjs /tmp/nc08-upstream.json /tmp/nc08-build-b "$HEAD_SHA" "$TREE_SHA"
+          diff -qr /tmp/nc08-build-a /tmp/nc08-build-b
+          cmp /tmp/nc08-build-a/nc08-module-summary.canonical.json /tmp/nc08-build-b/nc08-module-summary.canonical.json
+      - name: Evaluate qualification twice
+        env:
+          HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          IMPLEMENTATION_HASH="sha256:$(cat scripts/nc08-module/{builder,runtime,evidence,release-oracle}.mjs | sha256sum | cut -d' ' -f1)"
+          node scripts/lafea-nc08-check.mjs /tmp/nc08-build-a /tmp/nc08-build-b /tmp/nc08-upstream.json "$HEAD_SHA" "$IMPLEMENTATION_HASH" /tmp/nc08-a
+          node scripts/lafea-nc08-check.mjs /tmp/nc08-build-a /tmp/nc08-build-b /tmp/nc08-upstream.json "$HEAD_SHA" "$IMPLEMENTATION_HASH" /tmp/nc08-b
+          cmp /tmp/nc08-a/nc08-report.canonical.json /tmp/nc08-b/nc08-report.canonical.json
+          r=/tmp/nc08-a/nc08-report.json
+          test "$(jq -r .status "$r")" = NC08_SYNTHETIC_REFERENCE_MODULE_QUALIFIED
+          test "$(jq -r '(.blockers | length)' "$r")" = 0
+          test "$(jq -r .evaluatedDomainCount "$r")" = 10
+          test "$(jq -r .registeredBuildCount "$r")" = 1
+          test "$(jq -r .authority.syntheticReferenceModuleQualified "$r")" = true
+          for field in moduleQualified nc09Authorized codeAssessmentQualified realAssetAssessmentQualified externalCodeComplianceQualified fitnessForServiceQualified remainingStrengthQualified failurePressureQualified productionExecutionAuthorized automaticAssetAcceptanceAuthorized autonomousCaseDispositionAuthorized; do test "$(jq -r ".authority.${field}" "$r")" = false; done
+      - name: Verify clean source tree
+        run: git diff --exit-code && test -z "$(git status --porcelain=v1)"
+      - name: Upload diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc08-debug-${{ steps.refs.outputs.head_sha }}-${{ github.run_attempt }}
+          path: |
+            /tmp/nc08-build-a
+            /tmp/nc08-build-b
+            /tmp/nc08-a
+            /tmp/nc08-b
+            /tmp/nc08-upstream.json
+          retention-days: 30
+      - name: Upload authoritative NC-08 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc08-${{ steps.refs.outputs.head_sha }}-${{ github.run_attempt }}
+          path: |
+            /tmp/nc08-build-a
+            /tmp/nc08-build-b
+            /tmp/nc08-a
+            /tmp/nc08-b
+            /tmp/nc08-upstream.json
+          retention-days: 30
