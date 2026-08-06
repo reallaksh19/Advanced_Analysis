@@ -1,0 +1,145 @@
+name: LAFEA-NC NC-05 Exact-Head Plastic Denting Qualification
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/lafea-nc05-plastic-denting-qualification.yml'
+      - 'docs/nonlinear-shell-contact/LAFEA_NC05_PLASTIC_DENTING_QUALIFICATION.md'
+      - 'scripts/lafea-nc05-check.mjs'
+      - 'scripts/lafea-nc05-plastic-denting.mjs'
+      - 'scripts/nc05-denting/**'
+      - 'src/core/nonlinear-shell-contact/plastic-denting-procedure-contract.js'
+      - 'src/core/nonlinear-shell-contact/plastic-denting-qualification-evaluator.js'
+      - 'src/core/nonlinear-shell-contact/nc05-fixtures.js'
+      - 'src/core/nonlinear-shell-contact/nc05-negative-controls.js'
+      - 'tests/nonlinear-shell-contact-nc05-qualification.test.mjs'
+permissions: {contents: read, actions: read}
+concurrency:
+  group: lafea-nc05-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  exact-head-nc05:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      NC04_MERGE_SHA: da0ffe2d5f90bff02a5e8afd19c3ec8e181e47ef
+      NC04_ARTIFACT_ID: '8956607673'
+      NC04_ARTIFACT_DIGEST: sha256:66f191fd21e915fbb7f4cc5f98ebc49766b0b1c7802ff389e0e1280efa2fb06a
+      SOLVER_ARTIFACT_ID: '8936496053'
+      SOLVER_ARTIFACT_DIGEST: sha256:e14b467cd43f38218f3dba750b6c5f4f1ee83ed8ea9d241bf65673b9e7caf9b8
+      SOLVER_BINARY_HASH: sha256:9a33d293706a66bee86f2f0ecf996a66758f904c20d61ad8c83ddc0f92ae4b7e
+      SOLVER_CONTAINER_DIGEST: sha256:e6a82117027ef72afbecd597b81ebd83e5b40bdcfc63a70422b799aeb79270fb
+      SOLVER_SOURCE_COMMIT: cff1bb12ec7d24ad9048a1f54ae243a18d1a0b54
+      TZ: UTC
+      LC_ALL: C
+    steps:
+      - name: Resolve exact head and base
+        id: refs
+        run: |
+          set -euo pipefail
+          echo "head_sha=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          echo "base_sha=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with: {ref: '${{ steps.refs.outputs.head_sha }}', fetch-depth: 0}
+      - name: Verify live base, ancestry and phase paths
+        env: {HEAD_SHA: '${{ steps.refs.outputs.head_sha }}', BASE_SHA: '${{ steps.refs.outputs.base_sha }}'}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          test "$(git rev-parse origin/main)" = "$BASE_SHA"
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          git merge-base --is-ancestor "$BASE_SHA" "$HEAD_SHA"
+          git merge-base --is-ancestor "$NC04_MERGE_SHA" "$HEAD_SHA"
+          test "$(git rev-list --count "${HEAD_SHA}..origin/main")" = 0
+          mapfile -t p < <(git diff --name-only "$BASE_SHA...$HEAD_SHA")
+          test "${#p[@]}" = 14
+          for x in "${p[@]}"; do case "$x" in
+            .github/workflows/lafea-nc05-plastic-denting-qualification.yml|docs/nonlinear-shell-contact/LAFEA_NC05_PLASTIC_DENTING_QUALIFICATION.md|scripts/lafea-nc05-check.mjs|scripts/lafea-nc05-plastic-denting.mjs|scripts/nc05-denting/benchmarks.mjs|scripts/nc05-denting/config.mjs|scripts/nc05-denting/engine.mjs|scripts/nc05-denting/evidence.mjs|scripts/nc05-denting/prepare-binding.mjs|src/core/nonlinear-shell-contact/plastic-denting-procedure-contract.js|src/core/nonlinear-shell-contact/plastic-denting-qualification-evaluator.js|src/core/nonlinear-shell-contact/nc05-fixtures.js|src/core/nonlinear-shell-contact/nc05-negative-controls.js|tests/nonlinear-shell-contact-nc05-qualification.test.mjs) ;; *) echo "forbidden path $x"; exit 1;; esac; done
+          git diff --check "$BASE_SHA...$HEAD_SHA"
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Download and validate NC-04 and solver custody
+        env: {GH_TOKEN: '${{ github.token }}'}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/nc04 /tmp/solver
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${NC04_ARTIFACT_ID}" > /tmp/nc04-meta.json
+          test "$(jq -r .digest /tmp/nc04-meta.json)" = "$NC04_ARTIFACT_DIGEST"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${NC04_ARTIFACT_ID}/zip" > /tmp/nc04.zip
+          unzip -q /tmp/nc04.zip -d /tmp/nc04
+          cmp /tmp/nc04/nc04-a/nc04-report.canonical.json /tmp/nc04/nc04-b/nc04-report.canonical.json
+          cmp /tmp/nc04/nc04-real-a/real-material-summary.canonical.json /tmp/nc04/nc04-real-b/real-material-summary.canonical.json
+          node scripts/nc05-denting/prepare-binding.mjs /tmp/nc04 /tmp/nc05-upstream-binding.json
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOLVER_ARTIFACT_ID}" > /tmp/solver-meta.json
+          test "$(jq -r .digest /tmp/solver-meta.json)" = "$SOLVER_ARTIFACT_DIGEST"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOLVER_ARTIFACT_ID}/zip" > /tmp/solver.zip
+          unzip -q /tmp/solver.zip -d /tmp/solver
+          test "sha256:$(sha256sum /tmp/solver/binary/ccx_2.22 | cut -d' ' -f1)" = "$SOLVER_BINARY_HASH"
+          chmod +x /tmp/solver/binary/ccx_2.22 /tmp/solver/libraries/ld-linux-x86-64.so.2
+          cat > /tmp/solver/ccx-custody <<'SH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          exec /tmp/solver/libraries/ld-linux-x86-64.so.2 --library-path /tmp/solver/libraries /tmp/solver/binary/ccx_2.22 "$@"
+          SH
+          chmod +x /tmp/solver/ccx-custody
+          cat > /tmp/nc05-solver-custody.json <<JSON
+          {"solverVersion":"2.22","solverSourceCommit":"${SOLVER_SOURCE_COMMIT}","binaryHash":"${SOLVER_BINARY_HASH}","containerDigest":"${SOLVER_CONTAINER_DIGEST}"}
+          JSON
+      - name: Run syntax, unit and fail-closed controls
+        run: |
+          set -euo pipefail
+          for f in scripts/lafea-nc05-check.mjs scripts/lafea-nc05-plastic-denting.mjs scripts/nc05-denting/{benchmarks,config,engine,evidence,prepare-binding}.mjs src/core/nonlinear-shell-contact/{plastic-denting-procedure-contract,plastic-denting-qualification-evaluator,nc05-fixtures,nc05-negative-controls}.js; do node --check "$f"; done
+          node --test tests/nonlinear-shell-contact-nc05-qualification.test.mjs
+      - name: Execute two isolated exact-solver replays
+        env: {HEAD_SHA: '${{ steps.refs.outputs.head_sha }}'}
+        run: |
+          set -euo pipefail
+          node scripts/lafea-nc05-plastic-denting.mjs /tmp/solver/ccx-custody /tmp/nc05-real-a "$HEAD_SHA"
+          node scripts/lafea-nc05-plastic-denting.mjs /tmp/solver/ccx-custody /tmp/nc05-real-b "$HEAD_SHA"
+          cmp /tmp/nc05-real-a/real-plastic-denting-summary.canonical.json /tmp/nc05-real-b/real-plastic-denting-summary.canonical.json
+          mapfile -t a < <(find /tmp/nc05-real-a -maxdepth 1 -name 'NC05-PD-*.json' -printf '%f\n' | sort)
+          mapfile -t b < <(find /tmp/nc05-real-b -maxdepth 1 -name 'NC05-PD-*.json' -printf '%f\n' | sort)
+          test "${#a[@]}" = 10; test "${a[*]}" = "${b[*]}"
+          for f in "${a[@]}"; do cmp "/tmp/nc05-real-a/$f" "/tmp/nc05-real-b/$f"; done
+      - name: Evaluate qualification twice
+        env: {HEAD_SHA: '${{ steps.refs.outputs.head_sha }}'}
+        run: |
+          set -euo pipefail
+          node scripts/lafea-nc05-check.mjs /tmp/nc05-real-a /tmp/nc05-upstream-binding.json /tmp/nc05-solver-custody.json /tmp/nc05-real-a/real-plastic-denting-summary.json "$HEAD_SHA" /tmp/nc05-a
+          node scripts/lafea-nc05-check.mjs /tmp/nc05-real-b /tmp/nc05-upstream-binding.json /tmp/nc05-solver-custody.json /tmp/nc05-real-b/real-plastic-denting-summary.json "$HEAD_SHA" /tmp/nc05-b
+          cmp /tmp/nc05-a/nc05-report.canonical.json /tmp/nc05-b/nc05-report.canonical.json
+          r=/tmp/nc05-a/nc05-report.json
+          test "$(jq -r .status "$r")" = NC05_QUALIFIED
+          test "$(jq -r '.blockers|length' "$r")" = 0
+          test "$(jq -r .evaluatedBenchmarkCount "$r")" = 10
+          test "$(jq -r .authority.plasticDentingProcedureQualified "$r")" = true
+          test "$(jq -r .authority.nc06Authorized "$r")" = true
+          for f in collapseQualified failurePressureQualified damageQualified fractureQualified fatigueQualified codeAssessmentQualified moduleQualified productionExecutionAuthorized automaticAssetAcceptanceAuthorized autonomousCaseDispositionAuthorized fitnessForServiceQualified remainingStrengthQualified; do test "$(jq -r ".authority.$f" "$r")" = false; done
+      - name: Verify clean source tree
+        run: git diff --exit-code && test -z "$(git status --porcelain=v1)"
+      - name: Upload diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc05-debug-${{ steps.refs.outputs.head_sha }}-${{ github.run_attempt }}
+          path: |
+            /tmp/nc05-real-a
+            /tmp/nc05-real-b
+            /tmp/nc05-a
+            /tmp/nc05-b
+            /tmp/nc05-upstream-binding.json
+            /tmp/nc05-solver-custody.json
+          retention-days: 30
+      - name: Upload authoritative NC-05 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafea-nc05-${{ steps.refs.outputs.head_sha }}-${{ github.run_attempt }}
+          path: |
+            /tmp/nc05-real-a
+            /tmp/nc05-real-b
+            /tmp/nc05-a
+            /tmp/nc05-b
+            /tmp/nc05-upstream-binding.json
+            /tmp/nc05-solver-custody.json
+          retention-days: 30
