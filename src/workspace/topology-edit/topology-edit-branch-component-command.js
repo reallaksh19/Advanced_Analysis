@@ -19,7 +19,7 @@ const DEPENDANT_COLLECTIONS = ['junctions', 'supports', 'boundaries', 'rigids', 
 export function normalizeTopologyEditBranchComponentRequest(input = {}) {
   const operationId = requiredText(input.operationId, 'operationId');
   const hostEdgeId = requiredText(input.hostEdgeId, 'hostEdgeId');
-  const hostEdgeHash = requiredHash(input.hostEdgeHash, 'hostEdgeHash');
+  const hostEdgeHash = requiredContentHash(input.hostEdgeHash, 'hostEdgeHash');
   const catalogueHash = requiredHash(input.catalogueHash, 'catalogueHash');
   const catalogueSourceHash = requiredHash(
     input.catalogueSourceHash,
@@ -547,6 +547,16 @@ function requiredText(value, field) {
 function optionalText(value, uppercase = false) {
   const normalized = stringValue(value);
   return normalized ? (uppercase ? normalized.toUpperCase() : normalized) : null;
+}
+
+function requiredContentHash(value, field) {
+  const normalized = requiredText(value, field);
+  if (!/^(?:sha256:[0-9a-f]{64}|fnv1a64:[0-9a-f]{16})$/u.test(normalized)) {
+    throw new RangeError(
+      `TopologyEditBranchComponentRequest: ${field} must be a sha256 hash or fnv1a64 semantic hash.`,
+    );
+  }
+  return normalized;
 }
 
 function requiredHash(value, field) {

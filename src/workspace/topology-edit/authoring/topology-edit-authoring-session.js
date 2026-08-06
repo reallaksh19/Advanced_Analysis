@@ -132,7 +132,7 @@ const TOOL_DEFINITIONS = deepFreeze({
       numberField('clockingDeg', 'Clocking', 'deg', 0),
       numberField('branchPipeLengthMm', 'Branch pipe length', 'mm', 400, { positive: true }),
       enumField('branchFamily', 'Branch family', ['TEE', 'OLET'], 'TEE', { authority: 'CATALOGUE' }),
-      numberField('branchNominalSizeMm', 'Branch size', 'mm', null, { positive: true, authority: 'CATALOGUE' }),
+      numberField('branchNominalSizeMm', 'Branch size', 'mm', 50, { positive: true, authority: 'CATALOGUE' }),
       numberField('branchOutsideDiameterMm', 'Branch outside diameter', 'mm', null, { positive: true, authority: 'CATALOGUE' }),
       numberField('branchAngleDeg', 'Branch angle', 'deg', null, { positive: true, authority: 'CATALOGUE' }),
       textField('pressureClass', 'Rating', { authority: 'CATALOGUE' }),
