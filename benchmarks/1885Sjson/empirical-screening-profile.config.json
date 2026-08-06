@@ -1,0 +1,86 @@
+{
+  "schema": "empirical-sjson-screening-profile/v1",
+  "profileId": "1885-SJSON-CS-CONFIGURABLE-SCREENING-V1",
+  "status": "EXPERIMENTAL_CONFIGURABLE_SCREENING",
+  "source": {
+    "commit": "07ce017eb7113517cc032771f7717f88c0a93d4c",
+    "enrichedSjsonPath": "benchmarks/1885Sjson/EnrichedSjson",
+    "topologyInputXmlPath": "benchmarks/1885Sjson/EnrichedSjson.topology.input.xml",
+    "coordinateUnit": "mm",
+    "sourceVerticalAxis": "Z"
+  },
+  "material": {
+    "family": "CARBON_STEEL",
+    "elasticModulusPa": 203400000000,
+    "poissonsRatio": 0.3,
+    "thermalExpansionModel": "CS_MEAN_SECANT_INTERPOLATED",
+    "referenceTemperatureC": 21,
+    "fallbackOperatingTemperatureC": 120,
+    "meanAlphaTablePerC": [
+      { "temperatureC": 20, "alpha": 0.0000117 },
+      { "temperatureC": 100, "alpha": 0.0000120 },
+      { "temperatureC": 200, "alpha": 0.0000124 },
+      { "temperatureC": 300, "alpha": 0.0000128 },
+      { "temperatureC": 400, "alpha": 0.0000132 }
+    ]
+  },
+  "processResolution": {
+    "sentinelValues": [-1.0101, -2.0202],
+    "sentinelTolerance": 0.001,
+    "policy": "INHERIT_PREVIOUS_ELEMENT_WITHIN_LINE",
+    "initialSentinelPolicy": "PARENT_OR_FIRST_VALID_WITHIN_LINE_ELSE_CONFIG_FALLBACK",
+    "pressureExcludedFromReactionScreening": true
+  },
+  "weight": {
+    "gravityMPerS2": 9.80665,
+    "pipeMetalDensityKgM3": 7850,
+    "insulationDensityKgM3": 210,
+    "insulationThicknessPolicy": "RAW_INSU_POSITIVE_ELSE_ENRICHED",
+    "fluidDensityPolicy": "INHERITED_SOURCE_ELSE_ZERO",
+    "gasketWeightPolicy": "ZERO_NEGLIGIBLE",
+    "flangeWeightPolicy": "SOURCE_COMPONENT_WEIGHT_ELSE_PIPE_EQUIVALENT",
+    "valveWeightPolicy": "SOURCE_COMPONENT_WEIGHT_ELSE_PIPE_EQUIVALENT",
+    "instrumentWeightPolicy": "SOURCE_COMPONENT_WEIGHT_ELSE_PIPE_EQUIVALENT",
+    "teeOletWeightPolicy": "PIPE_EQUIVALENT_SAME_OD_WALL",
+    "reducerWeightPolicy": "AVERAGE_END_SECTION_PIPE_EQUIVALENT"
+  },
+  "compliance": {
+    "directionalFormula": "mu2*L/(E*A)+(1-mu2)*L^3/(C2E*E*I)",
+    "C2E": 2.55,
+    "pipeMultiplier": 1,
+    "elbowMultiplier": 1,
+    "flangeMultiplier": 0.05,
+    "gasketMultiplier": 0.01,
+    "valveMultiplier": 0.05,
+    "instrumentMultiplier": 0.05,
+    "teeMultiplier": 1,
+    "oletMultiplier": 1,
+    "reducerMultiplier": 1
+  },
+  "boundary": {
+    "anchorRequired": false,
+    "anchorlessPolicy": "FULL_RANK_DIRECTIONAL_RESTRAINTS",
+    "singularSystemPolicy": "BLOCK_AXIS",
+    "restBehavior": "UNILATERAL_COMPRESSION_VERTICAL",
+    "guideBehavior": "BILATERAL_HORIZONTAL_TRANSVERSE",
+    "lineStopBehavior": "BILATERAL_HORIZONTAL_LONGITUDINAL",
+    "frictionCoefficient": 0,
+    "gapMm": 0
+  },
+  "supportProjection": {
+    "consolidateBy": ["baseSupportTag", "coordinateWithinTolerance"],
+    "coordinateToleranceMm": 2,
+    "expectedPhysicalSupportSiteCount": 34,
+    "siteIdOrder": "NORTH_CENTRAL_THEN_SOUTH_ASCII_V1"
+  },
+  "verticalReactionMethod": {
+    "method": "GRAPH_TRIBUTARY_WEIGHT",
+    "description": "Each element weight is split between its two end nodes; nodal weight is distributed to nearest connected vertical-rest sites by graph distance, with equal sharing on ties. This is a support-load screening method, not beam FEA."
+  },
+  "reporting": {
+    "forceUnit": "kN",
+    "movementUnit": "mm",
+    "publishUnrestrainedAxes": false,
+    "roundingDecimals": 3
+  }
+}
