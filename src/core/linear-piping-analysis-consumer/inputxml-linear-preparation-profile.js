@@ -64,7 +64,7 @@ export function requireInputXmlLinearPreparationProfile(profileId) {
 export function inputXmlMechanicalModelCompilerProfile() {
   return sealMechanicalModelCompilerProfile({
     schema: 'fea-linear-model-compiler-profile/v1',
-    profileId: 'INPUTXML-LINEAR-MODEL-COMPILER-R1',
+    profileId: 'LINEAR-MODEL-COMPILER-R1',
     spanBindingRule: 'EXACTLY_ONE_BINDING_PER_SPAN_V1',
     zeroLengthLinkRule: 'ZERO_LENGTH_LINK_PROHIBITED_V1',
     constraintConflictRule: 'CONFLICTING_DEFINITION_BLOCKS_COMPILATION_V1',
