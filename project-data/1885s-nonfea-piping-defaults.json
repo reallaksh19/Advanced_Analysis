@@ -27,7 +27,7 @@
       "field": "material.elasticModulusPa",
       "value": 203400000000,
       "unit": "Pa",
-      "scope": { "projectId": "1885S", "materialFamily": "CARBON_STEEL" },
+      "scope": { "projectId": "1885S" },
       "reason": "1885S Project Data carbon-steel elastic modulus.",
       "qualification": "PROJECT_SCREENING_ONLY"
     },
@@ -37,7 +37,7 @@
       "field": "material.poissonsRatio",
       "value": 0.3,
       "unit": "ratio",
-      "scope": { "projectId": "1885S", "materialFamily": "CARBON_STEEL" },
+      "scope": { "projectId": "1885S" },
       "reason": "1885S Project Data carbon-steel Poisson ratio.",
       "qualification": "PROJECT_SCREENING_ONLY"
     },
@@ -47,7 +47,7 @@
       "field": "material.densityKgM3",
       "value": 7850,
       "unit": "kg/m3",
-      "scope": { "projectId": "1885S", "materialFamily": "CARBON_STEEL" },
+      "scope": { "projectId": "1885S" },
       "reason": "1885S Project Data carbon-steel density.",
       "qualification": "PROJECT_SCREENING_ONLY"
     },
@@ -57,7 +57,7 @@
       "field": "material.thermalExpansionPerC",
       "value": 0.0000128,
       "unit": "1/C",
-      "scope": { "projectId": "1885S", "materialFamily": "CARBON_STEEL" },
+      "scope": { "projectId": "1885S" },
       "reason": "1885S Project Data mean thermal-expansion coefficient for the screening state.",
       "qualification": "PROJECT_SCREENING_ONLY"
     },
