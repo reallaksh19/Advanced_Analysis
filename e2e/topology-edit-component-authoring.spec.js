@@ -9,42 +9,43 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => globalThis.localStorage?.clear());
 });
 
-test('production HUD authors governed flange and reducer transactions with preview, validation, undo, and redo', async ({ page }, testInfo) => {
-  const pageErrors = [];
-  const consoleErrors = [];
-  page.on('pageerror', (error) => pageErrors.push(error.message));
-  page.on('console', (message) => {
-    if (message.type() === 'error') consoleErrors.push(message.text());
-  });
-
+test('production HUD authors a governed flange with preview, validation, undo, and redo', async ({ page }, testInfo) => {
+  const diagnostics = collectBrowserDiagnostics(page);
   const host = await openProductionController(page);
   const initial = await topologySnapshot(page);
+  const target = await eligibleHostEdge(page, 100, 114.3, 120);
 
-  const flangeHost = await eligibleHostEdge(page, 100, 114.3, 120);
-  await selectCanonicalEdgeFromTree(page, host, flangeHost.id);
+  await selectCanonicalEdgeFromTree(page, host, target.id);
   await page.locator('[data-action="activate-authoring-flange"]').click();
   await expect(host).toHaveAttribute('data-topology-edit-authoring-tool', 'FLANGE');
   await expect(host).toHaveAttribute('data-topology-edit-authoring-catalogue-option-count', '2');
-  const flangeRecord = page.locator('[data-authoring-field="catalogueRecordId"]');
-  await flangeRecord.selectOption(FLANGE_RECORD_ID);
+  await page.locator('[data-authoring-field="catalogueRecordId"]')
+    .selectOption(FLANGE_RECORD_ID);
   await expect(page.locator('[data-authoring-field="flangeType"]')).toBeDisabled();
   await expect(page.locator('[data-authoring-field="componentLengthMm"]')).toHaveValue('120');
-  const flangeApplied = await previewValidateApply(page, host, 1);
-  expect(flangeApplied.inserted).toMatchObject({
+
+  const applied = await previewValidateApply(page, host, 1);
+  expect(applied.inserted).toMatchObject({
     entityType: 'FLANGE',
     catalogueRecordId: FLANGE_RECORD_ID,
     componentLengthMm: 120,
     componentMassKg: 29.5,
     flangeType: 'WELD_NECK',
-    derivedFromEdgeId: flangeHost.id,
+    derivedFromEdgeId: target.id,
   });
-  expect(flangeApplied.inserted.catalogueBinding.materialSpecification).toBe('ASTM A105');
-  await verifyUndoRedo(page, host, initial, flangeApplied);
-  await page.locator('[data-action="undo"]').click();
-  await expect.poll(() => controllerCanonicalHash(page)).toBe(initial.canonicalHash);
+  expect(applied.inserted.catalogueBinding.materialSpecification).toBe('ASTM A105');
+  await verifyUndoRedo(page, host, initial, applied);
+  await assertBrowserDiagnostics(diagnostics);
+  await attachScreenshot(page, testInfo, 'topology-edit-flange-authoring');
+});
 
-  const reducerHost = await eligibleHostEdge(page, 150, 168.3, 300);
-  await selectCanonicalEdgeFromTree(page, host, reducerHost.id);
+test('production HUD authors a governed reducer with preview, validation, undo, and redo', async ({ page }, testInfo) => {
+  const diagnostics = collectBrowserDiagnostics(page);
+  const host = await openProductionController(page);
+  const initial = await topologySnapshot(page);
+  const target = await eligibleHostEdge(page, 150, 168.3, 300);
+
+  await selectCanonicalEdgeFromTree(page, host, target.id);
   await page.locator('[data-action="activate-authoring-reducer"]').click();
   await expect(host).toHaveAttribute('data-topology-edit-authoring-tool', 'REDUCER');
   await page.locator('[data-authoring-field="catalogueRecordId"]')
@@ -52,25 +53,21 @@ test('production HUD authors governed flange and reducer transactions with previ
   await expect(page.locator('[data-authoring-field="inlineDirection"]')).toHaveValue('FROM_TO');
   await expect(page.locator('[data-authoring-field="fromNominalSizeMm"]')).toHaveValue('150');
   await expect(page.locator('[data-authoring-field="toNominalSizeMm"]')).toHaveValue('100');
-  const reducerApplied = await previewValidateApply(page, host, 1);
-  expect(reducerApplied.inserted).toMatchObject({
+
+  const applied = await previewValidateApply(page, host, 1);
+  expect(applied.inserted).toMatchObject({
     entityType: 'REDUCER',
     catalogueRecordId: REDUCER_RECORD_ID,
     componentLengthMm: 300,
     componentMassKg: 11.8,
     reducerType: 'CONCENTRIC',
     insertionDirection: 'FROM_TO',
-    derivedFromEdgeId: reducerHost.id,
+    derivedFromEdgeId: target.id,
   });
-  expect(reducerApplied.inserted.catalogueBinding.secondaryNominalSizeMm).toBe(100);
-  await verifyUndoRedo(page, host, initial, reducerApplied);
-
-  expect(pageErrors).toEqual([]);
-  expect(consoleErrors.filter(isCriticalConsoleError)).toEqual([]);
-  await testInfo.attach('topology-edit-component-authoring', {
-    body: await page.screenshot({ fullPage: true }),
-    contentType: 'image/png',
-  });
+  expect(applied.inserted.catalogueBinding.secondaryNominalSizeMm).toBe(100);
+  await verifyUndoRedo(page, host, initial, applied);
+  await assertBrowserDiagnostics(diagnostics);
+  await attachScreenshot(page, testInfo, 'topology-edit-reducer-authoring');
 });
 
 async function openProductionController(page) {
@@ -208,6 +205,28 @@ async function topologySnapshot(page) {
       edgeCount: topology.edges.length,
       inserted: insertedRows[0] ?? null,
     };
+  });
+}
+
+function collectBrowserDiagnostics(page) {
+  const pageErrors = [];
+  const consoleErrors = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+  });
+  return { pageErrors, consoleErrors };
+}
+
+async function assertBrowserDiagnostics(diagnostics) {
+  expect(diagnostics.pageErrors).toEqual([]);
+  expect(diagnostics.consoleErrors.filter(isCriticalConsoleError)).toEqual([]);
+}
+
+async function attachScreenshot(page, testInfo, name) {
+  await testInfo.attach(name, {
+    body: await page.screenshot({ fullPage: true }),
+    contentType: 'image/png',
   });
 }
 
