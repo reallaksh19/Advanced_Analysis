@@ -809,10 +809,10 @@ Registered applications are:
 | `C2D-CLAMP-EAR` | Plane stress | Controlled procedure merged through BB-06 |
 | `C2D-BRACKET-GUSSET` | Plane stress | Controlled procedure merged through BB-07 |
 | `C2D-PIPE-PAD-SECTION` | Plane strain | Controlled procedure merged through BB-08 |
-| `C2D-NOZZLE-REPAD-SECTION` | Plane strain | BB-09 pending at audited baseline |
-| `C2D-FLANGE-HUB` | Axisymmetric | Axisymmetric registration merged through BB-10; BB-11 application pending |
+| `C2D-NOZZLE-REPAD-SECTION` | Plane strain | Controlled procedure merged through BB-09 |
+| `C2D-FLANGE-HUB` | Axisymmetric | Controlled axisymmetric procedure merged through BB-11 |
 
-A final combined adjudication package, BB-12, remains required before claiming Bucket B programme completion.
+BB-12 is the final receipt-bound combined adjudication package. Bucket B programme completion may be claimed only by a valid exact-head `BB12_BUCKET_B_PROGRAMME_QUALIFIED` report; merged source or registry labels alone are insufficient.
 
 No Bucket B package currently grants automatic production execution or code compliance.
 
@@ -1186,7 +1186,8 @@ Behavior-preserving work:
 
 - receipt-bound projection from Bucket B reports into the application-template registry;
 - no manual release-status toggles;
-- expose exact limitations and qualified geometry envelope.
+- expose exact limitations and qualified geometry envelope;
+- BB-12 projects the six qualified Bucket B applications as `APPLICATION_QUALIFIED_RECEIPT_BOUND` without manually changing static production registry states.
 
 ## 14.5 Q3 — controlled template compilers
 

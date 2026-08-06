@@ -1,0 +1,172 @@
+name: Bucket B BB-12 combined adjudication
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/bucket-b-bb12-combined-adjudication.yml'
+      - 'docs/LAFEA_BB12_Combined_Adjudication_Record.md'
+      - 'docs/conceptcumroadmapLAFEA.md'
+      - 'src/core/bucket-b/bb12-check.mjs'
+      - 'src/core/bucket-b/bb12-combined-adjudication.js'
+      - 'src/core/bucket-b/index.js'
+  workflow_dispatch:
+    inputs:
+      expected_head_sha:
+        description: Exact repository head to adjudicate; defaults to dispatched ref SHA.
+        required: false
+        type: string
+      expected_base_sha:
+        description: Exact current-main parent/base SHA.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  adjudicate:
+    name: Exact-head BB-12 combined adjudication
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Resolve exact qualification refs
+        id: refs
+        shell: bash
+        env:
+          DISPATCH_HEAD_SHA: ${{ inputs.expected_head_sha }}
+          DISPATCH_BASE_SHA: ${{ inputs.expected_base_sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          head_sha="${DISPATCH_HEAD_SHA:-${PR_HEAD_SHA:-${GITHUB_SHA}}}"
+          base_sha="${DISPATCH_BASE_SHA:-${PR_BASE_SHA:-}}"
+          [[ "$head_sha" =~ ^[0-9a-fA-F]{40}$ ]]
+          [[ "$base_sha" =~ ^[0-9a-fA-F]{40}$ ]]
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Check out exact adjudication head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.refs.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify exact head and base objects
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          EXPECTED_BASE_SHA: ${{ steps.refs.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          git cat-file -e "${EXPECTED_HEAD_SHA}^{commit}"
+          git cat-file -e "${EXPECTED_BASE_SHA}^{commit}"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          git diff --check "${EXPECTED_BASE_SHA}...${EXPECTED_HEAD_SHA}"
+
+      - name: Replay BB-00 through BB-05 shared gates
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          EXPECTED_BASE_SHA: ${{ steps.refs.outputs.base_sha }}
+          EXPECTED_BASE_REF: ${{ steps.refs.outputs.base_sha }}
+          STRICT_REPOSITORY_DIFFERENTIAL: '1'
+          ENFORCE_CHANGED_PATH_ALLOWLIST: '0'
+          REPORT_PATH: reports/bucket-b-bb00-bb05-exact-head-report.json
+        run: node scripts/bucket-b-bb00-bb05-check.mjs
+
+      - name: Replay BB-06 lug and clamp procedure
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          BB06_REPORT_PATH: reports/bucket-b-bb06-lug-clamp-report.json
+        run: node src/core/bucket-b/bb06-check.mjs
+
+      - name: Replay BB-07 bracket and gusset procedure
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          BB06_REPORT_PATH: reports/bucket-b-bb06-lug-clamp-report.json
+          BB07_REPORT_PATH: reports/bucket-b-bb07-bracket-gusset-report.json
+        run: node src/core/bucket-b/bb07-check.mjs
+
+      - name: Replay BB-08 pipe and pad procedure
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          BB07_REPORT_PATH: reports/bucket-b-bb07-bracket-gusset-report.json
+          BB08_REPORT_PATH: reports/bucket-b-bb08-pipe-pad-report.json
+        run: node src/core/bucket-b/bb08-check.mjs
+
+      - name: Replay BB-09 nozzle and repad procedure
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          BB08_REPORT_PATH: reports/bucket-b-bb08-pipe-pad-report.json
+          BB09_REPORT_PATH: reports/bucket-b-bb09-nozzle-repad-report.json
+          BB09_DIAGNOSTIC_PATH: reports/bucket-b-bb09-nozzle-repad-diagnostic.json
+        run: node src/core/bucket-b/bb09-check.mjs
+
+      - name: Download retained qualified BB-11 artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p reports/bb11-retained
+          curl --fail --location \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "Accept: application/vnd.github+json" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/8954712183/zip" \
+            --output "${RUNNER_TEMP}/bb11-final-artifact.zip"
+          unzip -q "${RUNNER_TEMP}/bb11-final-artifact.zip" \
+            -d reports/bb11-retained
+          test -f reports/bb11-retained/bucket-b-bb11-report.json
+
+      - name: Run BB-12 combined adjudication
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          EXPECTED_BASE_SHA: ${{ steps.refs.outputs.base_sha }}
+          BB06_REPORT_PATH: reports/bucket-b-bb06-lug-clamp-report.json
+          BB07_REPORT_PATH: reports/bucket-b-bb07-bracket-gusset-report.json
+          BB08_REPORT_PATH: reports/bucket-b-bb08-pipe-pad-report.json
+          BB09_REPORT_PATH: reports/bucket-b-bb09-nozzle-repad-report.json
+          BB11_REPORT_PATH: reports/bb11-retained/bucket-b-bb11-report.json
+          BB12_REPORT_PATH: reports/bucket-b-bb12-combined-adjudication-report.json
+          BB12_DIAGNOSTIC_PATH: reports/bucket-b-bb12-combined-adjudication-diagnostic.json
+        run: |
+          set -uo pipefail
+          output_file="${RUNNER_TEMP}/bb12-output.log"
+          if node src/core/bucket-b/bb12-check.mjs 2>&1 | tee "$output_file"; then
+            exit 0
+          fi
+          message="$(tail -c 3500 "$output_file" | tr '\n' ' ' | sed -e 's/%/%25/g' -e 's/\r/%0D/g' -e 's/\n/%0A/g')"
+          echo "::error title=BB-12 combined adjudication failure::${message}"
+          exit 1
+
+      - name: Upload BB-12 adjudication custody
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bucket-b-bb12-combined-adjudication-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            reports/bucket-b-bb00-bb05-exact-head-report.json
+            reports/bucket-b-bb06-lug-clamp-report.json
+            reports/bucket-b-bb07-bracket-gusset-report.json
+            reports/bucket-b-bb08-pipe-pad-report.json
+            reports/bucket-b-bb09-nozzle-repad-report.json
+            reports/bucket-b-bb09-nozzle-repad-diagnostic.json
+            reports/bb11-retained/bucket-b-bb11-report.json
+            reports/bucket-b-bb12-combined-adjudication-report.json
+            reports/bucket-b-bb12-combined-adjudication-diagnostic.json
+          if-no-files-found: warn
