@@ -21,11 +21,25 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Correct enclosing-branch custody in audit workspace
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/calc-workspace/cii-standalone-port/core/branch-schedule-resolution.js')
+          text = path.read_text()
+          old = ": String(enriched.sourceBranchPath || attrs.sourceBranchPath || parent.branchPath || 'ROOT');"
+          new = ": String(parent.branchPath || 'ROOT');"
+          if old not in text:
+              raise SystemExit('Expected leaf branch-path expression not found.')
+          path.write_text(text.replace(old, new, 1))
+          PY
       - name: Materialize exact benchmark source
         run: |
           git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson > /tmp/EnrichedSjson
           git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson.topology.input.xml > /tmp/EnrichedSjson.topology.input.xml
       - name: Generate node and POS trace
+        continue-on-error: true
+        id: trace
         run: |
           node scripts/empirical-sjson-1885-node-pos-trace.mjs \
             benchmarks/1885Sjson/empirical-screening-profile.config.json \
@@ -34,6 +48,7 @@ jobs:
             /tmp/node-pos-trace.json \
             /tmp/node-pos-trace.csv
       - name: Upload trace
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: sjson-1885-node-pos-trace
@@ -41,3 +56,6 @@ jobs:
             /tmp/node-pos-trace.json
             /tmp/node-pos-trace.csv
           if-no-files-found: error
+      - name: Preserve failure status
+        if: steps.trace.outcome != 'success'
+        run: exit 1
