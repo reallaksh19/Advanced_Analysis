@@ -100,6 +100,17 @@ export function analyse({ modelId, geometry, entries, material, compilation, lab
     loadCase,
     solverProfile: solverProfile(),
   });
+  if (execution.status === 'BLOCKED') {
+    console.log('BM4_SOLVER_GATE_DIAGNOSTICS_BEGIN');
+    console.log(JSON.stringify({
+      label,
+      status: execution.status,
+      diagnostics: execution.diagnostics,
+      factorization: execution.factorization,
+      assembly: execution.assembly,
+    }, null, 2));
+    console.log('BM4_SOLVER_GATE_DIAGNOSTICS_END');
+  }
   const recovery = compileResultRecovery({
     compilation,
     execution,
