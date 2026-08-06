@@ -50,6 +50,8 @@ jobs:
         continue-on-error: true
         run: npm run build
       - name: Hybrid workbench browser scope
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: '0'
         run: |
           npx playwright install --with-deps chromium
           node scripts/run-playwright.mjs e2e/lafea-hybrid-workbench.spec.js
