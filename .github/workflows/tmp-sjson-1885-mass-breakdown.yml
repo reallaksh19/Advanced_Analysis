@@ -23,7 +23,7 @@ jobs:
           node-version: 22
       - name: Apply constituent mass-ledger patch
         run: |
-          git show HEAD^^:.github/workflows/tmp-sjson-1885-mass-breakdown.yml > /tmp/embedded-workflow.yml
+          git show HEAD^^^:.github/workflows/tmp-sjson-1885-mass-breakdown.yml > /tmp/embedded-workflow.yml
           python - <<'PY'
           from pathlib import Path
           import re
@@ -32,59 +32,27 @@ jobs:
           if not match:
               raise SystemExit('Unable to recover embedded patch program from original commit.')
           body = '\n'.join(line[10:] if line.startswith('          ') else line for line in match.group(1).splitlines())
-          body, removed = re.subn(
-              r"\nworkflow_path = Path\('\.github/workflows/sjson-1885-configurable-screening\.yml'\).*?\nworkflow_path\.write_text\(workflow\)\n",
-              '\n',
-              body,
-              flags=re.S,
-          )
+          body, removed = re.subn(r"\nworkflow_path = Path\('\.github/workflows/sjson-1885-configurable-screening\.yml'\).*?\nworkflow_path\.write_text\(workflow\)\n", '\n', body, flags=re.S)
           if removed != 1:
-              raise SystemExit(f'Expected to remove one embedded workflow edit block, removed {removed}.')
+              raise SystemExit(f'Expected one embedded workflow edit block, removed {removed}.')
           exec(compile(body, '<embedded-mass-breakdown-patch>', 'exec'))
-
           workflow_path = Path('.github/workflows/sjson-1885-configurable-screening.yml')
           workflow = workflow_path.read_text()
-          workflow = workflow.replace(
-              '      - benchmarks/1885Sjson/empirical-screening-result.configurable.csv\n',
-              '      - benchmarks/1885Sjson/empirical-screening-result.configurable.csv\n      - benchmarks/1885Sjson/empirical-screening-element-mass-breakdown.configurable.csv\n',
-          )
-          workflow = workflow.replace(
-              '      - scripts/empirical-sjson-1885-configurable-screening-check.mjs\n',
-              '      - scripts/empirical-sjson-1885-configurable-screening-check.mjs\n      - scripts/empirical-sjson-1885-mass-csv.mjs\n',
-          )
-          old = '''          cmp /tmp/result-a.json /tmp/result-b.json
-          cmp /tmp/result-a.json benchmarks/1885Sjson/empirical-screening-result.configurable.json
-          node scripts/empirical-sjson-1885-configurable-screening-check.mjs /tmp/result-a.json
-'''
-          new = '''          cmp /tmp/result-a.json /tmp/result-b.json
-          cmp /tmp/result-a.json benchmarks/1885Sjson/empirical-screening-result.configurable.json
-          node scripts/empirical-sjson-1885-mass-csv.mjs /tmp/result-a.json /tmp/support-a.csv /tmp/element-a.csv
-          node scripts/empirical-sjson-1885-mass-csv.mjs /tmp/result-b.json /tmp/support-b.csv /tmp/element-b.csv
-          cmp /tmp/support-a.csv /tmp/support-b.csv
-          cmp /tmp/element-a.csv /tmp/element-b.csv
-          cmp /tmp/support-a.csv benchmarks/1885Sjson/empirical-screening-result.configurable.csv
-          cmp /tmp/element-a.csv benchmarks/1885Sjson/empirical-screening-element-mass-breakdown.configurable.csv
-          node scripts/empirical-sjson-1885-configurable-screening-check.mjs /tmp/result-a.json
-'''
+          workflow = workflow.replace('      - benchmarks/1885Sjson/empirical-screening-result.configurable.csv\n', '      - benchmarks/1885Sjson/empirical-screening-result.configurable.csv\n      - benchmarks/1885Sjson/empirical-screening-element-mass-breakdown.configurable.csv\n')
+          workflow = workflow.replace('      - scripts/empirical-sjson-1885-configurable-screening-check.mjs\n', '      - scripts/empirical-sjson-1885-configurable-screening-check.mjs\n      - scripts/empirical-sjson-1885-mass-csv.mjs\n')
+          old = '          cmp /tmp/result-a.json /tmp/result-b.json\n          cmp /tmp/result-a.json benchmarks/1885Sjson/empirical-screening-result.configurable.json\n          node scripts/empirical-sjson-1885-configurable-screening-check.mjs /tmp/result-a.json\n'
+          new = '          cmp /tmp/result-a.json /tmp/result-b.json\n          cmp /tmp/result-a.json benchmarks/1885Sjson/empirical-screening-result.configurable.json\n          node scripts/empirical-sjson-1885-mass-csv.mjs /tmp/result-a.json /tmp/support-a.csv /tmp/element-a.csv\n          node scripts/empirical-sjson-1885-mass-csv.mjs /tmp/result-b.json /tmp/support-b.csv /tmp/element-b.csv\n          cmp /tmp/support-a.csv /tmp/support-b.csv\n          cmp /tmp/element-a.csv /tmp/element-b.csv\n          cmp /tmp/support-a.csv benchmarks/1885Sjson/empirical-screening-result.configurable.csv\n          cmp /tmp/element-a.csv benchmarks/1885Sjson/empirical-screening-element-mass-breakdown.configurable.csv\n          node scripts/empirical-sjson-1885-configurable-screening-check.mjs /tmp/result-a.json\n'
           if old not in workflow:
               raise SystemExit('Permanent workflow recalculation block not found.')
           workflow = workflow.replace(old, new, 1)
-          workflow = workflow.replace(
-              '            benchmarks/1885Sjson/empirical-screening-result.configurable.csv\n',
-              '            benchmarks/1885Sjson/empirical-screening-result.configurable.csv\n            benchmarks/1885Sjson/empirical-screening-element-mass-breakdown.configurable.csv\n',
-              1,
-          )
+          workflow = workflow.replace('            benchmarks/1885Sjson/empirical-screening-result.configurable.csv\n', '            benchmarks/1885Sjson/empirical-screening-result.configurable.csv\n            benchmarks/1885Sjson/empirical-screening-element-mass-breakdown.configurable.csv\n', 1)
           workflow_path.write_text(workflow)
           PY
       - name: Materialize exact source and regenerate governed receipts
         run: |
           git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson > /tmp/EnrichedSjson
           git show 07ce017eb7113517cc032771f7717f88c0a93d4c:benchmarks/1885Sjson/EnrichedSjson.topology.input.xml > /tmp/EnrichedSjson.topology.input.xml
-          node scripts/empirical-sjson-1885-configurable-screening-run.mjs \
-            benchmarks/1885Sjson/empirical-screening-profile.config.json \
-            /tmp/EnrichedSjson \
-            /tmp/EnrichedSjson.topology.input.xml \
-            /tmp/result.json
+          node scripts/empirical-sjson-1885-configurable-screening-run.mjs benchmarks/1885Sjson/empirical-screening-profile.config.json /tmp/EnrichedSjson /tmp/EnrichedSjson.topology.input.xml /tmp/result.json
           node scripts/empirical-sjson-1885-mass-csv.mjs /tmp/result.json /tmp/support.csv /tmp/element.csv
           cp /tmp/result.json benchmarks/1885Sjson/empirical-screening-result.configurable.json
           cp /tmp/support.csv benchmarks/1885Sjson/empirical-screening-result.configurable.csv
@@ -109,13 +77,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git rm .github/workflows/tmp-sjson-1885-mass-breakdown.yml
-          git add .github/workflows/sjson-1885-configurable-screening.yml \
-            benchmarks/1885Sjson/empirical-screening-result.configurable.json \
-            benchmarks/1885Sjson/empirical-screening-result.configurable.csv \
-            benchmarks/1885Sjson/empirical-screening-element-mass-breakdown.configurable.csv \
-            docs/evidence/SJSON_1885_CONFIGURABLE_SCREENING.md \
-            scripts/empirical-sjson-1885-configurable-screening-run.mjs \
-            scripts/empirical-sjson-1885-configurable-screening-check.mjs \
-            scripts/empirical-sjson-1885-mass-csv.mjs
+          git add .github/workflows/sjson-1885-configurable-screening.yml benchmarks/1885Sjson/empirical-screening-result.configurable.json benchmarks/1885Sjson/empirical-screening-result.configurable.csv benchmarks/1885Sjson/empirical-screening-element-mass-breakdown.configurable.csv docs/evidence/SJSON_1885_CONFIGURABLE_SCREENING.md scripts/empirical-sjson-1885-configurable-screening-run.mjs scripts/empirical-sjson-1885-configurable-screening-check.mjs scripts/empirical-sjson-1885-mass-csv.mjs
           git commit -m "Require constituent mass breakup for vertical reactions"
           git push origin HEAD:agent/sjson-1885-configurable-screening
