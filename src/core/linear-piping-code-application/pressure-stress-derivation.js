@@ -3,7 +3,7 @@ import { requireFrameElement } from '../linear-fea-frame-element/index.js';
 import { requireLoadPrimitive, requirePhysicalLoadCase } from '../linear-fea-load-case/index.js';
 import { requirePipeSectionResolution } from '../linear-fea-section/index.js';
 import { requireTraceableDeclaredValue } from '../linear-fea-b31-code-engine/index.js';
-import { deepFreeze } from '../shared-piping-model/immutable.js';
+import { deepFreeze, isPlainRecord } from '../shared-piping-model/immutable.js';
 import { failCodeApplication } from './contracts.js';
 
 export const PRESSURE_STRESS_CONFLICT_CODE = 'PIPING_B31_PRESSURE_STRESS_CONFLICT';
@@ -21,6 +21,9 @@ const UNIMPLEMENTED_PRESSURE_EFFECT_CODES = Object.freeze({
 const UNIMPLEMENTED_PRESSURE_EFFECTS = Object.freeze(
   Object.keys(UNIMPLEMENTED_PRESSURE_EFFECT_CODES),
 );
+const PRESSURE_EFFECT_KEYS = Object.freeze([
+  'codeStress', 'pressureStiffening', 'axialThrust', 'bourdon',
+]);
 
 function requirePressurePrimitive(value) {
   const primitive = requireLoadPrimitive(value);
@@ -57,21 +60,50 @@ function requireNoUnsupportedEffects(primitive) {
   }
 }
 
-/**
- * Derive the thin-wall longitudinal pressure-stress contribution for one pipe.
- *
- * The convention is S = P * Do / (4 * t), using gauge pressure and the outer
- * diameter / nominal wall thickness retained by the sealed B-2.3 section
- * resolution. No section property is reconstructed in this package.
- *
- * @param {object} args
- * @param {Readonly<object>} args.pressurePrimitive Sealed PRESSURE primitive.
- * @param {Readonly<object>} args.sectionResolution Sealed B-2.3 pipe-section resolution.
- * @returns {Readonly<{value:number, source:string}>}
- */
-export function derivePressureStressContribution({ pressurePrimitive, sectionResolution }) {
-  const primitive = requirePressurePrimitive(pressurePrimitive);
-  const section = requirePipeSectionResolution(sectionResolution);
+function requirePressureCustody(value) {
+  if (!isPlainRecord(value)) {
+    failCodeApplication(
+      'pressureCustody must be a portable record.',
+      'PIPING_B31_PRESSURE_CUSTODY_INVALID',
+    );
+  }
+  for (const key of [
+    'primitiveId', 'primitiveSemanticHash', 'elementId', 'pressure',
+    'pressureBasis', 'authorizedEffects', 'structuralEffect', 'futureUse',
+  ]) {
+    if (!Object.hasOwn(value, key)) {
+      failCodeApplication(
+        `pressureCustody is missing ${key}.`,
+        'PIPING_B31_PRESSURE_CUSTODY_INVALID',
+      );
+    }
+  }
+  if (typeof value.primitiveId !== 'string' || value.primitiveId.length === 0
+    || typeof value.primitiveSemanticHash !== 'string'
+    || value.primitiveSemanticHash.length === 0
+    || typeof value.elementId !== 'string' || value.elementId.length === 0
+    || typeof value.pressure !== 'number' || !Number.isFinite(value.pressure)
+    || !['GAUGE', 'ABSOLUTE'].includes(value.pressureBasis)
+    || !isPlainRecord(value.authorizedEffects)
+    || value.structuralEffect !== 'NONE'
+    || value.futureUse !== 'CODE_STRESS_CUSTODY_ONLY') {
+    failCodeApplication(
+      'pressureCustody is invalid or authorizes a structural effect.',
+      'PIPING_B31_PRESSURE_CUSTODY_INVALID',
+    );
+  }
+  for (const key of PRESSURE_EFFECT_KEYS) {
+    if (typeof value.authorizedEffects[key] !== 'boolean') {
+      failCodeApplication(
+        `pressureCustody.authorizedEffects.${key} must be boolean.`,
+        'PIPING_B31_PRESSURE_CUSTODY_INVALID',
+      );
+    }
+  }
+  return value;
+}
+
+function requireCodeStressAuthority(primitive) {
   requireNoUnsupportedEffects(primitive);
   if (primitive.authorizedEffects.codeStress !== true) {
     failCodeApplication(
@@ -91,7 +123,11 @@ export function derivePressureStressContribution({ pressurePrimitive, sectionRes
       },
     );
   }
+}
 
+function deriveLongitudinalPressureStress(primitive, sectionResolution) {
+  const section = requirePipeSectionResolution(sectionResolution);
+  requireCodeStressAuthority(primitive);
   const { outerDiameter, wallThickness } = section.dimensions;
   const value = (primitive.pressure * outerDiameter) / (4 * wallThickness);
   if (!Number.isFinite(value)) {
@@ -103,14 +139,23 @@ export function derivePressureStressContribution({ pressurePrimitive, sectionRes
   }
   return deepFreeze({
     value,
-    source: `${LONGITUDINAL_PRESSURE_STRESS_FORMULA_ID}:${primitive.primitiveId}:${primitive.semanticHash}:${section.semanticHash}`,
+    source: `${LONGITUDINAL_PRESSURE_STRESS_FORMULA_ID}:${primitive.primitiveId}:${primitive.primitiveSemanticHash ?? primitive.semanticHash}:${section.semanticHash}`,
   });
 }
 
-/**
- * Resolve the B31 check input from its cited physical case. With no matching
- * PRESSURE primitive, the existing explicit caller-supply path is unchanged.
- */
+export function derivePressureStressContribution({ pressurePrimitive, sectionResolution }) {
+  const primitive = requirePressurePrimitive(pressurePrimitive);
+  return deriveLongitudinalPressureStress(primitive, sectionResolution);
+}
+
+export function derivePressureStressContributionFromCustody({
+  pressureCustody,
+  sectionResolution,
+}) {
+  const custody = requirePressureCustody(pressureCustody);
+  return deriveLongitudinalPressureStress(custody, sectionResolution);
+}
+
 export function resolvePressureStressContribution({
   loadCase,
   frameElementRecord,
