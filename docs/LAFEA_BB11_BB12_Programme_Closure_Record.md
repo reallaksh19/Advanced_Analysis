@@ -2,6 +2,7 @@
 
 **Status:** `COMPLETED_AND_ARCHIVED`  
 **Recorded:** 2026-08-06  
+**Last reconciled:** 2026-08-06  
 **Repository:** `reallaksh19/Advanced_Analysis`
 
 ---
@@ -39,9 +40,10 @@ QUALIFIED_HEAD = 235ab47685beddecac7ff2b41d40eb20212dc943
 MERGE_COMMIT = 07ce017eb7113517cc032771f7717f88c0a93d4c
 EXACT_HEAD_WORKFLOW = 31067438610
 RAW_ARTIFACT = 8954711905
-RAW_ARTIFACT_DIGEST = sha256:6d11e67172b954b0b080f1ec316ed248
+RAW_ARTIFACT_DIGEST = sha256:6d11e67172b7f09303ee52d007e5f2de11d929fc72b954b0b080f1ec316ed248
 FINAL_ARTIFACT = 8954712183
 FINAL_ARTIFACT_DIGEST = sha256:7dc5619ab867bcb7a977a8169c814a158bad2fe63f92999e7985a78f6d555ed1
+FINAL_REPORT_RAW_SHA256 = sha256:8c934ab946d212f8f9b5415f40f185c5eb7bf5f467a4211caf31a5d91c42e1fe
 FINAL_REPORT_SEMANTIC_HASH = fnv1a64:876c92b5c24ee1c6
 ```
 
@@ -76,8 +78,11 @@ QUALIFIED_HEAD = baada414b4a147b1a74d8f3722a5136c1eea8388
 MERGE_COMMIT = fbf78ea7c5a372c4517156f9c193b9d8c601fd61
 EXACT_HEAD_WORKFLOW = 31085151908
 PREFLIGHT_ARTIFACT = 8961091850
+PREFLIGHT_ARTIFACT_DIGEST = sha256:feab07c48a09d2adbe291fca002db8dd796890bf8c4dc34ee5662bd5b911d143
 PREREQUISITE_CUSTODY_ARTIFACT = 8961324918
+PREREQUISITE_CUSTODY_ARTIFACT_DIGEST = sha256:9f83f911f47a3ad3558d56a4af262360c9ded8300cd925e2a9ca553f8100ce5c
 RAW_ARTIFACT = 8961325880
+RAW_ARTIFACT_DIGEST = sha256:2cddede026423621ccc25175004f8b667090ca58be1cf6b20f596adf681e3894
 FINAL_ARTIFACT = 8961326516
 FINAL_ARTIFACT_DIGEST = sha256:fc0c1427a21e491cf53fd2cdda97d3a3fc8b01caeaa040ff6d3ca28fe40b3365
 FINAL_REPORT_RAW_SHA256 = sha256:b6b344073f066d4b97dcf31e80bc207d580b36a4057f013e121810fa7c3f4583
@@ -107,9 +112,9 @@ BUCKET_B_PROGRAMME_COMPLETION_RECORDED = true
 
 ---
 
-## 4. Post-merge current-main evidence
+## 4. Post-BB-12 merged-main evidence
 
-At programme closure, current `main` was:
+At BB-12 programme adjudication closure, current `main` was:
 
 ```text
 fbf78ea7c5a372c4517156f9c193b9d8c601fd61
@@ -128,7 +133,29 @@ The Pages workflow executed `npm run build` successfully. The shared Bucket B wo
 
 ---
 
-## 5. Archived diagnostic and candidate PRs
+## 5. Subsequent NC-09 repository state
+
+The administrative closure of PRs #752, #710, #712, #713, and #714 did not modify or advance NC-09.
+
+NC-09 subsequently advanced through a separate, independently qualified synthetic deployment-rehearsal merge:
+
+```text
+NC09_SYNTHETIC_REHEARSAL_MERGE = d887c90bde0a6865fb678c09bafd0c127a5fd9bb
+NC09_EXACT_HEAD_WORKFLOW = 31089527469
+NC09_AUTHORITATIVE_ARTIFACT = 8962811688
+SYNTHETIC_DEPLOYMENT_REHEARSAL_QUALIFIED = true
+MODULE_QUALIFIED = false
+PRODUCTION_EXECUTION_AUTHORIZED = false
+NC10_AUTHORIZED = false
+```
+
+That later merge qualifies deterministic rehearsal mechanics only. It does not represent a real production environment, signed production artifact, human release approval, operator authorization, production execution, automatic asset acceptance, or autonomous case disposition.
+
+This independent NC-09 state does not alter the BB-11 or BB-12 closure authority recorded above.
+
+---
+
+## 6. Archived diagnostic and candidate PRs
 
 The following PRs were closed without merge after their investigative or candidate-screening purpose was superseded:
 
@@ -151,7 +178,7 @@ OPEN_BB12_PULL_REQUESTS = 0
 
 ---
 
-## 6. Authority that remains withheld
+## 7. Authority that remains withheld
 
 BB-11 and BB-12 completion does not grant broader LAFEA or production authority.
 
@@ -167,11 +194,11 @@ The BB-11 flange-hub result remains limited to its qualified geometry, load, mat
 
 BB-12 is an evidence-adjudication and programme-completion authority. It is not a code-compliance, general-purpose application-module, or production-execution authorization.
 
-NC-09 and later production-execution stages remain outside this completed work pack and require their own authority chain.
+The separately qualified NC-09 synthetic rehearsal does not change these withheld BB-11/BB-12 authorities and does not authorize production execution or NC-10.
 
 ---
 
-## 7. Reopening rule
+## 8. Reopening rule
 
 This programme may be reopened only when a new, reproducible defect or authority gap is identified.
 
@@ -190,7 +217,7 @@ The old selected-agent work pack shall not be silently reactivated or used as me
 
 ---
 
-## 8. Final disposition
+## 9. Final disposition
 
 ```text
 BB11_PROGRAMME_STATUS = QUALIFIED_AND_MERGED
@@ -199,4 +226,7 @@ SELECTED_AGENT_ASSIGNMENT = COMPLETE
 HISTORICAL_EVIDENCE_RETAINED = true
 ACTIVE_BB11_OR_BB12_REPAIR = false
 MERGE_ACTION_REQUIRED = false
+NC09_SYNTHETIC_REHEARSAL_QUALIFIED = true
+NC09_PRODUCTION_EXECUTION_AUTHORIZED = false
+NC10_AUTHORIZED = false
 ```
