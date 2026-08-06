@@ -12,6 +12,7 @@ import { createSharedPipingModel } from '../shared-piping-model.js';
 import { collectSupportEvidence } from '../support-evidence.js';
 
 const WORKSPACE_DATASET_SCHEMA = 'analysis-workspace-dataset/v1';
+const NATIVE_PIPE_WRITEBACK_SCHEMA = 'TopologyEditNativePipeWriteback.v1';
 const CONTAINER_TYPES = new Set(['BRANCH', 'GROUP', 'MODEL', 'ROOT', 'FOLDER', 'SYSTEM', 'ZONE']);
 
 export function buildSharedPipingModelFromWorkspaceDataset(dataset) {
@@ -50,7 +51,7 @@ function workspaceComponent(entity, evidence, diagnostics, lengthUnit) {
     name: entity.name,
     type: normalizedType(entity.entityType),
     identity: entityIdentity(entity),
-    geometry: { ...geometry, ports: componentPorts(entity.entityId, geometry) },
+    geometry: { ...geometry, ports: componentPorts(entity, geometry) },
     engineeringProperties: evidence.engineering.values,
     compatibilityEvidence: evidence.compatibility.values,
     ...(Object.keys(loadEvidence).length ? { loadEvidence } : {}),
@@ -131,11 +132,37 @@ function entityRoots(entity) {
   ];
 }
 
-function componentPorts(componentKey, geometry) {
+function componentPorts(entity, geometry) {
+  const native = entity.properties?.nativeParams;
+  if (native?.schema === NATIVE_PIPE_WRITEBACK_SCHEMA) {
+    if (!Array.isArray(native.ports) || native.ports.length !== 2) {
+      throw new RangeError('Native pipe writeback requires exactly two explicit ports.');
+    }
+    return native.ports.map((row, index) => {
+      const portKey = stringValue(row.portKey);
+      const role = stringValue(row.role);
+      const sourceNodeId = stringValue(row.nodeId);
+      const position = normalizePoint(row.position);
+      if (!portKey || !role || !sourceNodeId || !position) {
+        throw new RangeError(`Native pipe port ${index} is incomplete.`);
+      }
+      return deepFreeze({
+        portKey,
+        role,
+        position,
+        sourceReference: { sourceNodeId, writebackHash: native.writebackHash },
+      });
+    });
+  }
   const ports = [];
-  if (geometry.start) ports.push(port(componentKey, 'start', geometry.start, geometry.sources?.start));
-  if (geometry.end) ports.push(port(componentKey, 'end', geometry.end, geometry.sources?.end));
-  geometry.branchPoints.forEach((point, index) => ports.push(port(componentKey, `branch-${index + 1}`, point, geometry.sources?.branches?.[index])));
+  if (geometry.start) ports.push(port(entity.entityId, 'start', geometry.start, geometry.sources?.start));
+  if (geometry.end) ports.push(port(entity.entityId, 'end', geometry.end, geometry.sources?.end));
+  geometry.branchPoints.forEach((point, index) => ports.push(port(
+    entity.entityId,
+    `branch-${index + 1}`,
+    point,
+    geometry.sources?.branches?.[index],
+  )));
   return ports;
 }
 

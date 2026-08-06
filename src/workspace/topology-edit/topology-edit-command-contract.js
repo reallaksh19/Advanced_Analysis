@@ -3,6 +3,9 @@ import { deepFreeze, semanticHash } from '../../core/shared-piping-model/index.j
 import {
   normalizeTopologyEditBranchComponentRequest,
 } from './topology-edit-branch-component-command.js';
+import {
+  normalizePipeSegmentCommandPayload,
+} from './topology-edit-pipe-segment-contract.js';
 
 export const TOPOLOGY_EDIT_COMMAND_REQUEST_SCHEMA = 'TopologyEditCommandRequest.v1';
 export const TOPOLOGY_EDIT_RESOLVED_COMMAND_SCHEMA = 'TopologyEditResolvedCommand.v1';
@@ -16,6 +19,7 @@ export const TOPOLOGY_EDIT_WAVE3_ENGINEERING_COMMANDS = Object.freeze([
 export const TOPOLOGY_EDIT_PROFESSIONAL_COMMANDS = Object.freeze([
   'INSERT_INLINE_COMPONENT',
   'INSERT_BRANCH_COMPONENT',
+  'INSERT_PIPE_SEGMENT',
 ]);
 // Compatibility alias retained for the merged Wave 3B controller surface.
 export const TOPOLOGY_EDIT_AUTOFIX_COMMANDS = TOPOLOGY_EDIT_WAVE3_ENGINEERING_COMMANDS;
@@ -368,6 +372,7 @@ const PAYLOAD_NORMALIZERS = Object.freeze({
   ADD_JUNCTION_DEFINITION: normalizeJunction, TRIM_EDGE: normalizeTrim,
   INSERT_INLINE_COMPONENT: normalizeInlineComponent,
   INSERT_BRANCH_COMPONENT: normalizeTopologyEditBranchComponentRequest,
+  INSERT_PIPE_SEGMENT: normalizePipeSegmentCommandPayload,
 });
 function normalizePayload(commandType, value) {
   const payload = immutableJson(value ?? {}, `${commandType} payload`);

@@ -1,7 +1,7 @@
 /** Structural and checker-policy validation for one full candidate. */
 import { deepFreeze, semanticHash } from '../../core/shared-piping-model/index.js';
 import { assertTopologyEditCandidate } from './topology-edit-candidate-builder.js';
-import { validateTopologyEditCommandEffect } from './topology-edit-command-effect-validator.js';
+import { validateTopologyEditCommandEffect } from './topology-edit-command-effect-dispatch.js';
 import { canonicalTopologyStateHash, rebuildTopologyEditCrosswalk } from './topology-edit-canonical-state.js';
 
 export const TOPOLOGY_EDIT_CANDIDATE_VALIDATION_SCHEMA = 'TopologyEditCandidateValidation.v1';
