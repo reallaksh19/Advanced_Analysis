@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { DEFAULT_RESTRAINT_TYPE_CODE_MAP } from '../src/core/geometry/adapters/inputxml-restraint-type-mutation.js';
 import { fileURLToPath } from 'node:url';
 import { inputXmlToCanonicalGeometry } from '../src/core/geometry/adapters/inputXmlToCanonicalGeometry.js';
 import { auditInputXmlIngestion } from '../src/core/geometry/adapters/inputxml-ingestion-audit.js';
@@ -19,7 +20,7 @@ export function buildBm2IngestionAudit() {
   const geometry = inputXmlToCanonicalGeometry(xmlText, {
     unit: 'mm',
     source: 'CAESAR-II-BM2-INPUTXML',
-    restraintTypeCodeMap: { 0: 'ANCHOR', 14: 'GUIDE', 8: 'GUIDE', 9: 'GUIDE' },
+    restraintTypeCodeMap: DEFAULT_RESTRAINT_TYPE_CODE_MAP,
     bendRadiusTolerance: 1e-6,
   });
   return Object.freeze({ xmlText, geometry, audit: auditInputXmlIngestion(xmlText, geometry) });
@@ -74,9 +75,15 @@ assert.equal(
   unknownSifs.length,
 );
 
+// DEFAULT_RESTRAINT_TYPE_CODE_MAP now classifies corrected type 15 (raw 18)
+// as GUIDE (+Z), so BM2's own restraint set -- 6 occurrences across 5 nodes
+// -- resolves completely; there is no remaining UNKNOWN restraint in this
+// benchmark to assert against. The "an unmapped code stays UNKNOWN, never
+// guessed" behavior is covered against a synthetic unmapped code in
+// LD-05 (lfea-inputxml-load-diagnostics-check.mjs) instead.
 const unknownRestraints = audit.restraintRecords.filter((row) => row.classification === 'UNKNOWN');
-assert.ok(unknownRestraints.some((row) => row.sourceTypeCode === '18' && row.typeCode === '15'));
-assert.ok(audit.diagnostics.some((row) => row.code === 'INPUTXML_RESTRAINT_TYPE_UNKNOWN'));
+assert.equal(unknownRestraints.length, 0);
+assert.ok(audit.restraintRecords.some((row) => row.sourceTypeCode === '18' && row.typeCode === '15' && row.classification === 'GUIDE'));
 assert.ok(geometry.diagnostics.some((row) => row.code === 'INPUTXML_RESTRAINT_TYPE_MUTATED'));
 assert.ok(geometry.diagnostics.some((row) => row.code === 'INPUTXML_SIF_PRESENT_NOT_COMPILED'));
 

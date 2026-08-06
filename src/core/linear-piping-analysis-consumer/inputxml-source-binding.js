@@ -20,6 +20,15 @@ import { validateLinearPipingInputXmlAnalysisRequest } from './inputxml-request-
 
 export { validateLinearPipingInputXmlAnalysisRequest } from './inputxml-request-validation.js';
 
+// The single point of entry for raw InputXML text into this directory's
+// governed Phase 2A binding below and into the generic (non-benchmark)
+// solve path. Any other file needing InputXML text parsed to canonical
+// geometry must go through this export rather than importing the adapter
+// directly -- see linear-piping-analysis-consumer-anti-drift-check.mjs.
+export function parseInputXmlToCanonicalGeometry(content, options) {
+  return inputXmlToCanonicalGeometry(content, options);
+}
+
 export function runLinearPipingAnalysisFromInputXml(request, runtime) {
   const compiled = compileBoundInputXml(request, runtime);
   return sealInputXmlAnalysisResult({

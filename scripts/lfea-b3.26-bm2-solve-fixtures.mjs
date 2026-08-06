@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { DEFAULT_RESTRAINT_TYPE_CODE_MAP } from '../src/core/geometry/adapters/inputxml-restraint-type-mutation.js';
 import {
   conditionGeometry,
   FRAME_LOCAL_AXIS_PROFILE,
@@ -309,7 +310,7 @@ export function buildBm2SolveAuthorities() {
   const parsed = inputXmlToCanonicalGeometry(content, {
     unit: 'mm',
     source: BM2_SOURCE_ID,
-    restraintTypeCodeMap: { 0: 'ANCHOR', 14: 'GUIDE', 8: 'GUIDE', 9: 'GUIDE' },
+    restraintTypeCodeMap: DEFAULT_RESTRAINT_TYPE_CODE_MAP,
     bendRadiusTolerance: 1e-6,
   });
   const unitProfile = sealLinearPipingInputXmlUnitProfile({

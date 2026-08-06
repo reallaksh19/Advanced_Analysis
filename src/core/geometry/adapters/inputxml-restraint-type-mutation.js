@@ -88,6 +88,66 @@ export const DEFAULT_RESTRAINT_TYPE_MUTATION_ROWS = Object.freeze([
   Object.freeze({ label: '', from: '18', to: '15' }),
 ]);
 
+/**
+ * Single canonical restraintTypeCodeMap for inputXmlToCanonicalGeometry's
+ * conditioning-level classification (node.restraint: 'ANCHOR' | 'GUIDE' |
+ * 'UNKNOWN'). Every corrected code this project has actually observed in a
+ * real CAESAR InputXML/Output.xml pair is covered here.
+ *
+ * This exists because, before it did, every caller hand-rolled its own
+ * partial copy (e.g. `{0: 'ANCHOR', 14: 'GUIDE', 8: 'GUIDE'}`) — which is
+ * exactly how the raw-TYPE=7 misclassification (LIM instead of GUI, fixed in
+ * PR #725) went uncorrected in some consumers while it was being fixed in
+ * others. Import this instead of writing a new literal map. If ingestion
+ * reports INPUTXML_RESTRAINT_TYPE_UNKNOWN for a code not listed here, that is
+ * real, new evidence to add a row — not something to guess at or suppress.
+ */
+export const DEFAULT_RESTRAINT_TYPE_CODE_MAP = Object.freeze({
+  0: 'ANCHOR', // ANC
+  2: 'GUIDE', // X
+  3: 'GUIDE', // Y
+  5: 'GUIDE', // Z
+  8: 'GUIDE', // LIM
+  9: 'GUIDE', // GUI
+  10: 'GUIDE', // XSNB
+  11: 'GUIDE', // YSNB
+  12: 'GUIDE', // ZSNB
+  13: 'GUIDE', // +X
+  14: 'GUIDE', // +Y
+  15: 'GUIDE', // +Z
+  16: 'GUIDE', // -X
+  17: 'GUIDE', // -Y
+  18: 'GUIDE', // -Z
+});
+
+// CANONICAL_RESTRAINT_TYPE_CODES has more than one alias for some codes
+// (ANC/A/FIXED/FIX all resolve to 0; GUI/GUIDE both resolve to 9). Prefer
+// CAESAR's own short-form label for display — the form its own reports use
+// (e.g. Output_BM2.xml literally prints "Rigid GUI", never "Rigid GUIDE").
+const PREFERRED_RESTRAINT_TYPE_LABEL_ORDER = Object.freeze([
+  'ANC', 'X', 'Y', 'Z', 'LIM', 'GUI', 'XSNB', 'YSNB', 'ZSNB',
+  '+X', '+Y', '+Z', '-X', '-Y', '-Z', '+RX', '+RY', '+RZ', '-RX', '-RY', '-RZ',
+  '+LIM', '-LIM', 'XROD', 'YROD', 'ZROD',
+]);
+const CORRECTED_RESTRAINT_TYPE_LABELS = Object.freeze((() => {
+  const byCode = {};
+  for (const label of PREFERRED_RESTRAINT_TYPE_LABEL_ORDER) {
+    const code = String(CANONICAL_RESTRAINT_TYPE_CODES[label]);
+    if (!(code in byCode)) byCode[code] = label;
+  }
+  for (const [label, code] of Object.entries(CANONICAL_RESTRAINT_TYPE_CODES)) {
+    const key = String(code);
+    if (!(key in byCode)) byCode[key] = label;
+  }
+  return byCode;
+})());
+
+/** Human-readable label for a corrected restraint TYPE code, or null if unrecognized. */
+export function restraintTypeCodeLabel(correctedTypeCode) {
+  if (correctedTypeCode === null || correctedTypeCode === undefined) return null;
+  return CORRECTED_RESTRAINT_TYPE_LABELS[String(correctedTypeCode)] ?? null;
+}
+
 export const CAESAR_INPUTXML_RESTRAINT_TYPE_CORRECTION_SCHEMA =
   'caesar-inputxml-restraint-type-correction/v1';
 export const CAESAR_INPUTXML_RESTRAINT_TYPE_CORRECTION_PROFILE_ID =
