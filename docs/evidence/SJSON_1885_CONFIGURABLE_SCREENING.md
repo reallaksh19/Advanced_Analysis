@@ -24,6 +24,8 @@ This evidence package applies the editable `1885-SJSON-CS-CONFIGURABLE-SCREENING
 - The generated POS table is retained in `benchmarks/1885Sjson/empirical-pos-section-material.csv`.
 - The complete configured-default usage ledger contains **840** applications and is retained in `benchmarks/1885Sjson/empirical-configured-default-usage.csv`.
 
+The resolved POS receipt is projected into a governed topology before any weight or thermal calculation. The screening runner rejects an unprojected topology, a projection-hash mismatch, duplicate POS identity, schedule mismatch, section mismatch, or any schedule-default application. The calculation receipt records the original topology hash, projected topology hash, POS-receipt hash, projection semantic identity, POS-calculation semantic identity, and governed-runner hash.
+
 For NPS 6 / Sch 80, the governed section is:
 
 - outside diameter: **168.275 mm**
@@ -31,12 +33,14 @@ For NPS 6 / Sch 80, the governed section is:
 - carbon-steel metal mass: **42.566877 kg/m**
 - resolved positions: **95**
 
+The projection changes the calculation outside diameter at **153** POS rows and wall thickness at **163** POS rows relative to the source topology XML. Those changes are intentional: the branch-owned schedule is the section authority.
+
 ## Density-unit correction
 
 - The topology XML stores density in `kg/cm³`: steel is `0.007850` and explicit process fluid is `0.000300`.
 - The governed conversion is therefore `kg/cm³ × 1,000,000 = kg/m³`; the resolved process-fluid density is **300 kg/m³**.
 - The earlier `× 1,000` conversion incorrectly produced **0.3 kg/m³**, understating fluid mass by a factor of 1,000.
-- At N50120 / PS-12169, the adjacent half-span tributary check is 158.276 kg steel + 31.325 kg fluid, giving **1.859 kN**. The superseded **1.552 kN** value was effectively steel-only.
+- A density-only correction on the superseded XML-wall model increased N50120 / PS-12169 from **1.552 kN** to **1.859 kN**. Applying the branch-owned schedule sections to the actual calculation raises the governed N50120 vertical reaction further to **2.615 kN**.
 
 ## Configured inputs and usage ledger
 
@@ -54,31 +58,33 @@ For NPS 6 / Sch 80, the governed section is:
 
 - Physical support sites: **36**
 - Resolved process-fluid density: **300 kg/m³**
-- Total screened mass: **5388.841 kg**
-- Total screened weight: **52.846 kN**
+- Total screened mass: **6696.626 kg**
+- Total screened weight: **65.671 kN**
 - Vertical equilibrium error: **0.000000 kN**
-- X reaction equilibrium error: **0.000058 kN**
-- Y reaction equilibrium error: **-0.000012 kN**
-- N50120 vertical reaction: **1.859 kN**
-- Maximum independent-component vector: **34.968 kN** at **N50120 / PS-12169**
+- X reaction equilibrium error: **0.000095 kN**
+- Y reaction equilibrium error: **0.000022 kN**
+- Maximum X thermal reaction: **45.096 kN**
+- Maximum Y thermal reaction: **49.676 kN**
+- N50120 vertical reaction: **2.615 kN**
+- Maximum independent-component vector: **49.765 kN** at **N50120 / PS-12169**
 
 ## Largest support vectors
 
 | Node | Support | Capabilities | Fx thermal (kN) | Fy thermal (kN) | Fz weight (kN) | Component vector (kN) |
 |---|---|---|---:|---:|---:|---:|
-| N50120 | PS-12169 | GUIDE + LINESTOP + REST | -0.991 | -34.905 | 1.859 | 34.968 |
-| N10230 | PS-12248 | GUIDE + LINESTOP + REST | 31.568 | -0.770 | 0.693 | 31.585 |
-| N70040 | PS-12060 | GUIDE + LINESTOP + REST | -1.858 | 23.712 | 4.704 | 24.245 |
-| N20120 | PS-12321 | LINESTOP + REST | -22.000 | 0.000 | 1.328 | 22.040 |
-| N60080 | PS-12034 | LINESTOP + REST | 0.000 | 8.968 | 3.193 | 9.519 |
-| N20180 | PS-12268 | GUIDE + LINESTOP + REST | -8.138 | -2.185 | 0.618 | 8.449 |
-| N120020 | PS-12171 | REST | 0.000 | 0.000 | 4.259 | 4.259 |
-| N10530 | =1006649732/51465 | REST | 0.000 | 0.000 | 3.801 | 3.801 |
-| N70050 | PS-12059 | REST | 0.000 | 0.000 | 3.682 | 3.682 |
-| N30060 | PS-12034 | GUIDE + LINESTOP + REST | 1.420 | 3.287 | 0.742 | 3.657 |
-| N130050 | PS-12166 | REST | 0.000 | 0.000 | 3.249 | 3.249 |
-| N60070 | PS-12228 | REST | 0.000 | 0.000 | 3.193 | 3.193 |
+| N50120 | PS-12169 | GUIDE + LINESTOP + REST | -1.431 | -49.676 | 2.615 | 49.765 |
+| N10230 | PS-12248 | GUIDE + LINESTOP + REST | 45.096 | -1.235 | 0.963 | 45.123 |
+| N70040 | PS-12060 | GUIDE + LINESTOP + REST | -2.628 | 32.822 | 5.307 | 33.352 |
+| N20120 | PS-12321 | LINESTOP + REST | -31.331 | 0.000 | 1.843 | 31.385 |
+| N60080 | PS-12034 | LINESTOP + REST | 0.000 | 12.637 | 3.559 | 13.129 |
+| N20180 | PS-12268 | GUIDE + LINESTOP + REST | -11.708 | -3.142 | 0.868 | 12.154 |
+| N30060 | PS-12034 | GUIDE + LINESTOP + REST | 2.002 | 5.745 | 1.044 | 6.173 |
+| N120020 | PS-12171 | REST | 0.000 | 0.000 | 4.787 | 4.787 |
+| N70050 | PS-12059 | REST | 0.000 | 0.000 | 4.154 | 4.154 |
+| N130050 | PS-12166 | REST | 0.000 | 0.000 | 3.804 | 3.804 |
+| N10530 | =1006649732/51465 | REST | 0.000 | 0.000 | 3.668 | 3.668 |
+| N60070 | PS-12228 | REST | 0.000 | 0.000 | 3.558 | 3.558 |
 
-The full 36-site reaction table is retained in `benchmarks/1885Sjson/empirical-screening-result.configurable.csv`. The complete calculation receipt is retained in `benchmarks/1885Sjson/empirical-screening-result.configurable.json`.
+The full 36-site reaction table is retained in `benchmarks/1885Sjson/empirical-screening-result.configurable.csv`. The complete governed calculation receipt is retained in `benchmarks/1885Sjson/empirical-screening-result.configurable.json`.
 
 The component vector is a presentation-only combination of independently solved X, Y and vertical screening components. It is not a qualified simultaneous operating-load resultant.
