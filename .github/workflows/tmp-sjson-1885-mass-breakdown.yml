@@ -21,17 +21,57 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Correct enclosing-branch custody in audit workspace
+      - name: Correct branch and section custody in audit workspace
         run: |
           python - <<'PY'
           from pathlib import Path
           path = Path('src/calc-workspace/cii-standalone-port/core/branch-schedule-resolution.js')
           text = path.read_text()
-          old = ": String(enriched.sourceBranchPath || attrs.sourceBranchPath || parent.branchPath || 'ROOT');"
-          new = ": String(parent.branchPath || 'ROOT');"
-          if old not in text:
-              raise SystemExit('Expected leaf branch-path expression not found.')
-          path.write_text(text.replace(old, new, 1))
+          replacements = {
+            "branchPath: String(enriched.sourceBranchPath || attrs.sourceBranchPath || branchPath || branchName || 'ROOT'),": "branchPath: String(branchPath || branchName || 'ROOT'),",
+            ": String(enriched.sourceBranchPath || attrs.sourceBranchPath || parent.branchPath || 'ROOT');": ": String(parent.branchPath || 'ROOT');",
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f'Expected branch-custody expression not found: {old}')
+              text = text.replace(old, new, 1)
+          start = text.index('function makeResolved(target, source, basis) {')
+          end = text.index('\nfunction resolveEnrichedSchedule(item) {', start)
+          replacement = '''function makeResolved(target, source, basis) {
+            const dimensions = target.nominalBoreMm == null
+              ? null
+              : getPipeDimensions(target.nominalBoreMm, source.directSchedule);
+            const packageValid = dimensions?.exact && Number.isFinite(dimensions.od) && Number.isFinite(dimensions.wt);
+            const sourceEnriched = source.item?.enrichedAttributes || {};
+            const fittingOdMm = finiteOrNull(sourceEnriched.pipeOdMm);
+            const fittingWallMm = finiteOrNull(sourceEnriched.wallThicknessMm);
+            const fittingSectionValid = fittingOdMm > 0 && fittingWallMm > 0 && fittingOdMm > 2 * fittingWallMm;
+            const valid = packageValid || fittingSectionValid;
+            const dimensionBasis = packageValid
+              ? 'PIPE_COMPONENT_DATA_EXACT_SCHEDULE'
+              : (fittingSectionValid ? 'SAME_BRANCH_FITTING_ENRICHED_SECTION' : 'UNRESOLVED');
+            return Object.freeze({
+              status: valid ? 'RESOLVED_EXACT' : 'BLOCKED_PIPE_DIMENSION_LOOKUP',
+              schedule: source.directSchedule,
+              sourceName: source.name,
+              sourceType: source.type,
+              sourceBranchPath: source.branchPath,
+              sourceGlobalIndex: source.sourceGlobalIndex,
+              sourcePosition: source.position,
+              sourceRaw: source.directScheduleRaw,
+              sourceField: source.directScheduleField,
+              basis,
+              dimensionBasis,
+              nominalBoreMm: target.nominalBoreMm,
+              nps: dimensions?.nps ?? null,
+              outsideDiameterMm: packageValid ? dimensions.od : (fittingSectionValid ? fittingOdMm : null),
+              wallThicknessMm: packageValid ? dimensions.wt : (fittingSectionValid ? fittingWallMm : null),
+              diagnostics: Object.freeze(valid ? [] : ['PIPE_DIMENSION_LOOKUP_BLOCKED']),
+            });
+          }
+          '''
+          text = text[:start] + replacement + text[end:]
+          path.write_text(text)
           PY
       - name: Materialize exact benchmark source
         run: |
