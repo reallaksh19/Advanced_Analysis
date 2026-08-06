@@ -62,13 +62,17 @@ jobs:
 
           test_path = Path('tests/topology-edit-valve-assembly-authoring.test.mjs')
           test_text = test_path.read_text(encoding='utf-8')
-          old_options = """  assert.deepEqual(options.valveOptions.map((row) => row.recordId), [
-    'VALVE-DN100-GATE-600-A',
-  ]);"""
-          new_options = """  assert.deepEqual(options.valveOptions.map((row) => row.recordId), [
-    'VALVE-DN100-GATE-600-A',
-    'VALVE-DN100-GLOBE-600-B',
-  ]);"""
+          old_options = '\n'.join([
+              '  assert.deepEqual(options.valveOptions.map((row) => row.recordId), [',
+              "    'VALVE-DN100-GATE-600-A',",
+              '  ]);',
+          ])
+          new_options = '\n'.join([
+              '  assert.deepEqual(options.valveOptions.map((row) => row.recordId), [',
+              "    'VALVE-DN100-GATE-600-A',",
+              "    'VALVE-DN100-GLOBE-600-B',",
+              '  ]);',
+          ])
           if test_text.count(old_options) != 1:
               raise SystemExit('expected one valve option assertion')
           test_path.write_text(test_text.replace(old_options, new_options, 1), encoding='utf-8')
