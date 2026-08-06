@@ -12,6 +12,7 @@ const COMMAND_OUTPUT_ROLES = deepFreeze({
   CREATE_NODE: ['created-node'],
   BRIDGE_GAP: ['created-edge'],
   ADD_STRAIGHT_ELEMENT: ['created-edge'],
+  INSERT_PIPE_SEGMENT: ['created-edge'],
   SPLIT_EDGE: ['split-node', 'split-left-edge', 'split-right-edge'],
   DISCONNECT_ENDPOINT: ['disconnected-node'],
   ADD_BEND_DEFINITION: ['bend-definition'],
@@ -128,6 +129,7 @@ export function deriveTopologyEditOperationOutputs(input = {}) {
     CREATE_NODE: () => exactRoles(['created-node'], addedNodes),
     BRIDGE_GAP: () => exactRoles(['created-edge'], addedEdges),
     ADD_STRAIGHT_ELEMENT: () => exactRoles(['created-edge'], addedEdges),
+    INSERT_PIPE_SEGMENT: () => exactRoles(['created-edge'], addedEdges),
     DISCONNECT_ENDPOINT: () => exactRoles(['disconnected-node'], addedNodes),
     ADD_BEND_DEFINITION: () => exactRoles(['bend-definition'], addedBends),
     ADD_JUNCTION_DEFINITION: () => exactRoles(['junction-definition'], addedJunctions),
@@ -141,11 +143,16 @@ function normalizeSteps(value) {
   if (!Array.isArray(value) || value.length === 0) fail('steps must be a non-empty array.');
   const ids = new Set();
   return value.map((row, index) => {
-    if (!row || typeof row !== 'object' || Array.isArray(row)) fail(`steps[${index}] must be an object.`);
+    if (!row || typeof row !== 'object' || Array.isArray(row)) {
+      fail(`steps[${index}] must be an object.`);
+    }
     const stepId = requiredText(row.stepId ?? `step-${index + 1}`, `steps[${index}].stepId`);
     if (ids.has(stepId)) fail(`duplicate stepId ${stepId}.`, RangeError);
     ids.add(stepId);
-    const commandType = requiredText(row.commandType, `steps[${index}].commandType`).toUpperCase();
+    const commandType = requiredText(
+      row.commandType,
+      `steps[${index}].commandType`,
+    ).toUpperCase();
     return {
       sequence: index,
       stepId,
@@ -163,9 +170,14 @@ function normalizeJson(value, path) {
     if (!Number.isFinite(value)) fail(`${path} must contain finite numbers.`, RangeError);
     return Object.is(value, -0) ? 0 : value;
   }
-  if (Array.isArray(value)) return value.map((row, index) => normalizeJson(row, `${path}[${index}]`));
+  if (Array.isArray(value)) {
+    return value.map((row, index) => normalizeJson(row, `${path}[${index}]`));
+  }
   if (value && typeof value === 'object') {
-    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, normalizeJson(value[key], `${path}.${key}`)]));
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [
+      key,
+      normalizeJson(value[key], `${path}.${key}`),
+    ]));
   }
   fail(`${path} contains unsupported ${typeof value}.`);
 }
@@ -177,25 +189,36 @@ function materialize(value, bindings, path) {
     if (!bindings.has(key)) fail(`unresolved operation reference ${key}.`, RangeError);
     return bindings.get(key);
   }
-  if (Array.isArray(value)) return value.map((row, index) => materialize(row, bindings, `${path}[${index}]`));
+  if (Array.isArray(value)) {
+    return value.map((row, index) => materialize(row, bindings, `${path}[${index}]`));
+  }
   if (value && typeof value === 'object') {
-    return Object.fromEntries(Object.entries(value).map(([key, row]) => [key, materialize(row, bindings, `${path}.${key}`)]));
+    return Object.fromEntries(Object.entries(value).map(([key, row]) => [
+      key,
+      materialize(row, bindings, `${path}.${key}`),
+    ]));
   }
   return value;
 }
 
-function isReference(value) { return value?.schema === TOPOLOGY_EDIT_OPERATION_REFERENCE_SCHEMA; }
+function isReference(value) {
+  return value?.schema === TOPOLOGY_EDIT_OPERATION_REFERENCE_SCHEMA;
+}
 function assertReference(value, path) {
   const material = {
     schema: TOPOLOGY_EDIT_OPERATION_REFERENCE_SCHEMA,
     stepId: requiredText(value.stepId, `${path}.stepId`),
     role: requiredText(value.role, `${path}.role`).toLowerCase(),
   };
-  if (value.referenceHash !== semanticHash(material)) fail(`${path} reference hash mismatch.`, RangeError);
+  if (value.referenceHash !== semanticHash(material)) {
+    fail(`${path} reference hash mismatch.`, RangeError);
+  }
   return deepFreeze({ ...material, referenceHash: value.referenceHash });
 }
 function normalizeExecutionReceipt(value, stepId) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) fail(`execute result for ${stepId} must be an object.`);
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    fail(`execute result for ${stepId} must be an object.`);
+  }
   if (!value.topology) fail(`execute result for ${stepId} requires topology.`);
   return {
     commandId: requiredText(value.commandId, `${stepId}.commandId`),
@@ -208,13 +231,21 @@ function addedRecords(beforeRows = [], afterRows = []) {
   return (afterRows ?? []).filter((row) => !before.has(row?.id));
 }
 function exactRoles(roles, records) {
-  if (records.length !== roles.length) fail(`expected ${roles.length} generated record(s), received ${records.length}.`, RangeError);
+  if (records.length !== roles.length) {
+    fail(`expected ${roles.length} generated record(s), received ${records.length}.`, RangeError);
+  }
   return Object.fromEntries(roles.map((role, index) => [role, records[index].id]));
 }
 function splitOutputs(nodes, edges) {
-  if (nodes.length !== 1 || edges.length !== 2) fail('SPLIT_EDGE output shape must be one node and two edges.', RangeError);
+  if (nodes.length !== 1 || edges.length !== 2) {
+    fail('SPLIT_EDGE output shape must be one node and two edges.', RangeError);
+  }
   const ordered = [...edges].sort((left, right) => left.id.localeCompare(right.id));
-  return { 'split-node': nodes[0].id, 'split-left-edge': ordered[0].id, 'split-right-edge': ordered[1].id };
+  return {
+    'split-node': nodes[0].id,
+    'split-left-edge': ordered[0].id,
+    'split-right-edge': ordered[1].id,
+  };
 }
 function inlineOutputs(nodes, edges) {
   if (![1, 2].includes(nodes.length) || ![2, 3].includes(edges.length)) {
@@ -243,7 +274,9 @@ function inlineOutputs(nodes, edges) {
   }
   return result;
 }
-function bindingKey(stepId, role) { return `${stepId}.${role}`; }
+function bindingKey(stepId, role) {
+  return `${stepId}.${role}`;
+}
 function requiredText(value, label) {
   const text = String(value ?? '').trim();
   if (!text) fail(`${label} is required.`);
