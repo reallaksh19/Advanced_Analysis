@@ -101,27 +101,61 @@ test('3D Edit loads and renders the governed 10-element XYZ branch with separate
     const controller = document.querySelector('[data-role="topology-edit-render-host"]')
       .__topologyEditAuthoringController;
     const topology = controller.session.currentTopology();
-    const edgeKeys = new Set(topology.edges.map((edge) => edge.componentKey));
+    const edgeByComponent = new Map(topology.edges.map((edge) => [edge.componentKey, edge]));
     const nodes = new Map(topology.nodes.map((node) => [node.id, node]));
     const lengths = topology.edges.map((edge) => {
       const from = nodes.get(edge.fromNodeId).position;
       const to = nodes.get(edge.toNodeId).position;
       return Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z);
     });
+    const exactEdge = (componentKey) => {
+      const edge = edgeByComponent.get(componentKey);
+      if (!edge) throw new Error(`Missing canonical XYZ edge ${componentKey}.`);
+      return edge;
+    };
+    const sharedNode = (left, right) => (
+      [left.fromNodeId, left.toNodeId].find((nodeId) => (
+        nodeId === right.fromNodeId || nodeId === right.toNodeId
+      )) ?? null
+    );
+    const incidentKeys = (nodeId) => topology.edges
+      .filter((edge) => edge.fromNodeId === nodeId || edge.toNodeId === nodeId)
+      .map((edge) => edge.componentKey)
+      .sort();
+
+    const hostPipe = exactEdge('P-011');
+    const valve = exactEdge('V-002');
+    const olet = exactEdge('O-002');
+    const branchPipe = exactEdge('P-012');
+    const oletHostNodeId = sharedNode(hostPipe, olet);
+    const valveHostNodeId = sharedNode(valve, olet);
+    const oletBranchFaceNodeId = sharedNode(olet, branchPipe);
+    if (!oletHostNodeId || !oletBranchFaceNodeId) {
+      throw new Error('XYZ Olet canonical node connectivity is incomplete.');
+    }
+
     return {
-      representedBranchIds: branchIds.filter((id) => edgeKeys.has(id)).sort(),
+      representedBranchIds: branchIds.filter((id) => edgeByComponent.has(id)).sort(),
       supportCount: topology.supports.length,
       resolvedSupportCount: topology.supports.filter((row) => row.resolved).length,
       junctionCount: topology.junctions.length,
+      oletHostNodeMatchesValve: oletHostNodeId === valveHostNodeId,
+      oletHostIncidentKeys: incidentKeys(oletHostNodeId),
+      oletBranchFaceIncidentKeys: incidentKeys(oletBranchFaceNodeId),
+      distinctOletNodes: oletHostNodeId !== oletBranchFaceNodeId,
       minimumEdgeLengthMm: Math.min(...lengths),
       canonicalHash: topology.canonicalTopologyHash,
     };
   }, { branchIds: BRANCH_IDS });
 
-  expect(topologyEvidence.representedBranchIds.length).toBeGreaterThanOrEqual(8);
+  expect(topologyEvidence.representedBranchIds).toEqual([...BRANCH_IDS].sort());
   expect(topologyEvidence.supportCount).toBe(7);
   expect(topologyEvidence.resolvedSupportCount).toBe(7);
-  expect(topologyEvidence.junctionCount).toBeGreaterThanOrEqual(2);
+  expect(topologyEvidence.junctionCount).toBeGreaterThanOrEqual(1);
+  expect(topologyEvidence.oletHostNodeMatchesValve).toBe(true);
+  expect(topologyEvidence.oletHostIncidentKeys).toEqual(['O-002', 'P-011', 'V-002']);
+  expect(topologyEvidence.oletBranchFaceIncidentKeys).toEqual(['O-002', 'P-012']);
+  expect(topologyEvidence.distinctOletNodes).toBe(true);
   expect(topologyEvidence.minimumEdgeLengthMm).toBeGreaterThan(0);
   expect(topologyEvidence.canonicalHash).toBeTruthy();
 
