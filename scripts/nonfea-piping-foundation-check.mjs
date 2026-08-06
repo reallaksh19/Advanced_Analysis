@@ -9,6 +9,15 @@ import {
   redistributeReleasedReaction,
 } from '../src/core/empirical-piping-mechanics/vertical-retention.js';
 import { resolvePosSectionMaterialStates } from '../src/calc-workspace/cii-standalone-port/core/pos-section-material-resolution.js';
+import {
+  createEmptyProjectDataProfile,
+  replaceProjectDataValue,
+  validateProjectDataProfile,
+} from '../src/workspace/project-data/project-data-contract.js';
+import {
+  createConfiguredResolutionSessionFromProjectData,
+  resolveProjectDataConfiguredDefaultsAuthority,
+} from '../src/workspace/project-data/project-data-configured-resolution.js';
 
 const resolution = createConfiguredResolutionSession({
   projectDataRevision: 1,
@@ -27,6 +36,89 @@ assert.throws(() => createConfiguredResolutionSession({ defaults: [{
   id: 'BAD-SCHEDULE', enabled: true, field: 'section.schedule', value: '80', scope: {},
   reason: 'Forbidden global schedule.', qualification: 'TEST_ONLY',
 }] }), /exact scope fields/);
+
+let projectData = JSON.parse(JSON.stringify(createEmptyProjectDataProfile()));
+projectData.projectId = 'FIXTURE';
+projectData = replaceProjectDataValue(
+  projectData,
+  'engineeringCalculationDefaults.resolutionPolicy',
+  [
+    'SOURCE_EXPLICIT',
+    'SOURCE_INHERITED',
+    'CONFIGURED_DERIVATION',
+    'PROJECT_CONFIGURED_DEFAULT',
+    'BLOCK',
+  ],
+  { source: 'Fixture calculation basis', locator: 'resolutionPolicy' },
+  true,
+);
+projectData = replaceProjectDataValue(
+  projectData,
+  'engineeringCalculationDefaults.dimensionVerificationTolerancesMm',
+  { outsideDiameterMm: 0.1, wallThicknessMm: 0.05 },
+  { source: 'Fixture calculation basis', locator: 'dimensionVerificationTolerancesMm' },
+  true,
+);
+projectData = replaceProjectDataValue(
+  projectData,
+  'engineeringCalculationDefaults.configuredDefaults',
+  [{
+    id: 'DEFAULT-FIXTURE-REST-GAP',
+    enabled: true,
+    field: 'support.gapMm',
+    value: 0,
+    unit: 'mm',
+    scope: { projectId: 'FIXTURE', supportClass: 'REST' },
+    reason: 'Approved fixture zero-gap rule.',
+    qualification: 'TEST_ONLY',
+  }],
+  { source: 'Fixture calculation basis', locator: 'configuredDefaults' },
+  true,
+);
+const projectDataAudit = validateProjectDataProfile(projectData, 'nonFeaPipingDefaults', null);
+assert.equal(projectDataAudit.valid, true, JSON.stringify(projectDataAudit.errors));
+const projectAuthority = resolveProjectDataConfiguredDefaultsAuthority(projectData);
+assert.equal(projectAuthority.status, 'READY');
+assert.equal(projectAuthority.summary.enabledConfiguredDefaultCount, 1);
+const projectResolution = createConfiguredResolutionSessionFromProjectData(projectData);
+assert.equal(projectResolution.status, 'READY');
+const projectResolvedGap = projectResolution.session.resolve({
+  field: 'support.gapMm',
+  entity: {
+    entityId: 'SUP-FIXTURE',
+    scope: { projectId: 'FIXTURE', supportClass: 'REST' },
+  },
+  candidates: [],
+  validate: (value) => value >= 0,
+  affectedCalculations: ['VERTICAL_CONTACT'],
+});
+assert.equal(projectResolvedGap.kind, RESOLUTION_KINDS.PROJECT_CONFIGURED_DEFAULT);
+assert.equal(
+  projectResolvedGap.projectDataPath,
+  'engineeringCalculationDefaults.configuredDefaults',
+);
+const projectReceipt = projectResolution.session.receipt();
+assert.equal(projectReceipt.configuredDefaultUsages.length, 1);
+assert.equal(
+  projectReceipt.configuredDefaultUsages[0].projectDataPath,
+  'engineeringCalculationDefaults.configuredDefaults',
+);
+assert.equal(
+  projectReceipt.projectDataAuthoritySemanticIdentity,
+  projectAuthority.semanticIdentity,
+);
+
+const unapprovedProjectData = replaceProjectDataValue(
+  projectData,
+  'engineeringCalculationDefaults.configuredDefaults',
+  projectData.engineeringCalculationDefaults.configuredDefaults.value,
+  projectData.engineeringCalculationDefaults.configuredDefaults.evidence,
+  false,
+);
+assert.equal(
+  createConfiguredResolutionSessionFromProjectData(unapprovedProjectData).status,
+  'BLOCKED_INVALID_PROJECT_DATA',
+);
 
 const posReceipt = resolvePosSectionMaterialStates({
   projectId: '1885S',
