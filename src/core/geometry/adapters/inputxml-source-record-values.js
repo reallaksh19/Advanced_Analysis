@@ -127,7 +127,7 @@ function canonicalValue(quantity, value, unitSystem, diagnostics, sourceElementI
   return convertDeclaredValue(value, declaration, quantity, diagnostics, sourceElementIndex, field);
 }
 
-function convertDeclaredValue(value, declaration, quantity, diagnostics, sourceElementIndex, field) {
+export function convertDeclaredValue(value, declaration, quantity, diagnostics, sourceElementIndex, field) {
   if (value === null || value === undefined) return { value: null, unit: canonicalUnit(quantity), evidence: null };
   try {
     return {
@@ -232,7 +232,7 @@ function conversionDiagnostic(diagnostics, error, sourceElementIndex, field) {
   });
 }
 
-function sentinelRecord(value) {
+export function sentinelRecord(value) {
   if (value === null) return Object.freeze({ matched: false, kind: null });
   if (Math.abs(value - INPUTXML_SENTINELS.DOUBLE_UNSET) < INPUTXML_SENTINELS.TOLERANCE) {
     return Object.freeze({ matched: true, kind: 'DOUBLE_UNSET' });
