@@ -33,9 +33,13 @@ export const ATTACHMENT_POINT_KINDS = Object.freeze([
 /**
  * Insert a node at every required attachment point that does not already
  * have one, splitting the referenced segment. Idempotent: a point already
- * satisfied (tagged on an existing node by `attachmentPointId`) is skipped
- * without re-resolving the segment it originally targeted, which by a second
- * pass may no longer exist under that id.
+ * satisfied (retained in the node's attachment custody) is skipped without
+ * re-resolving the segment it originally targeted, which by a second pass may
+ * no longer exist under that id.
+ *
+ * Exact-coincident points share one topology node and retain one custody row
+ * per attachment identity. No geometric tolerance is applied here: points are
+ * coincident only when their declared fractions are exactly equal.
  *
  * @param {object} geometry Canonical geometry (nodes + segments).
  * @param {Array<{attachmentPointId:string, segmentId:string, fraction:number, kind:string}>} points
@@ -44,7 +48,7 @@ export const ATTACHMENT_POINT_KINDS = Object.freeze([
 export function seedRequiredAttachmentPoints(geometry, points) {
   const diagnostics = [];
   const satisfied = new Set(
-    geometry.nodes.map((node) => node.meta?.attachmentPointId).filter(Boolean),
+    geometry.nodes.flatMap(attachmentPointIdsOf),
   );
   const pending = points.filter((point) => {
     if (satisfied.has(point.attachmentPointId)) {
@@ -73,7 +77,10 @@ export function seedRequiredAttachmentPoints(geometry, points) {
     const endNode = requireNode(nodes, segment.endNodeId);
     const outcome = insertAttachmentPointsOnSegment(segment, startNode, endNode, segmentPoints);
     nodes = [...nodes, ...outcome.newNodes];
-    if (outcome.boundaryTag) nodes = nodes.map((node) => (node.id === outcome.boundaryTag.id ? outcome.boundaryTag : node));
+    if (outcome.boundaryTags.length > 0) {
+      const boundaryById = new Map(outcome.boundaryTags.map((node) => [node.id, node]));
+      nodes = nodes.map((node) => boundaryById.get(node.id) ?? node);
+    }
     segments = [...segments.slice(0, segmentIndex), ...outcome.newSegments, ...segments.slice(segmentIndex + 1)];
     inserted.push(...outcome.inserted);
     diagnostics.push(...outcome.diagnostics);
@@ -87,28 +94,41 @@ export function seedRequiredAttachmentPoints(geometry, points) {
 }
 
 function insertAttachmentPointsOnSegment(segment, startNode, endNode, points) {
-  const ordered = [...points].sort((a, b) => a.fraction - b.fraction);
+  const orderedGroups = groupByExactFraction(points);
   const newNodes = [];
   const newSegments = [];
   const inserted = [];
   const diagnostics = [];
-  let boundaryTag = null;
+  const boundaryById = new Map();
   const chain = [{ node: startNode, fraction: 0 }];
 
-  ordered.forEach((point, index) => {
-    if (!(point.fraction > 0 && point.fraction < 1)) {
-      const boundary = point.fraction <= 0 ? startNode : endNode;
-      boundaryTag = tagNode(boundary, point.attachmentPointId, point.kind);
-      inserted.push({ attachmentPointId: point.attachmentPointId, nodeId: boundary.id, kind: point.kind, coincidesWithBoundary: true });
-      diagnostics.push(info('ATTACHMENT_POINT_AT_SEGMENT_BOUNDARY', point.attachmentPointId, { nodeId: boundary.id }));
+  orderedGroups.forEach(({ fraction, points: coincidentPoints }, index) => {
+    requireCompatibleCoincidentRestraints(coincidentPoints);
+    if (!(fraction > 0 && fraction < 1)) {
+      const boundary = fraction <= 0 ? startNode : endNode;
+      const currentBoundary = boundaryById.get(boundary.id) ?? boundary;
+      boundaryById.set(boundary.id, tagNode(currentBoundary, coincidentPoints));
+      coincidentPoints.forEach((point) => {
+        inserted.push({ attachmentPointId: point.attachmentPointId, nodeId: boundary.id, kind: point.kind, coincidesWithBoundary: true });
+        diagnostics.push(info('ATTACHMENT_POINT_AT_SEGMENT_BOUNDARY', point.attachmentPointId, { nodeId: boundary.id }));
+      });
+      appendCoincidentCustodyDiagnostic(diagnostics, segment.id, boundary.id, fraction, coincidentPoints);
       return;
     }
     const nodeId = `${segment.id}/AP${index + 1}`;
-    const position = interpolate(startNode, endNode, point.fraction);
-    const node = tagNode({ id: nodeId, ...position, restraint: restraintFor(point.kind), meta: {} }, point.attachmentPointId, point.kind);
+    const position = interpolate(startNode, endNode, fraction);
+    const node = tagNode({
+      id: nodeId,
+      ...position,
+      restraint: restraintForCoincidentPoints(coincidentPoints),
+      meta: {},
+    }, coincidentPoints);
     newNodes.push(node);
-    inserted.push({ attachmentPointId: point.attachmentPointId, nodeId, kind: point.kind, coincidesWithBoundary: false });
-    chain.push({ node, fraction: point.fraction });
+    coincidentPoints.forEach((point) => {
+      inserted.push({ attachmentPointId: point.attachmentPointId, nodeId, kind: point.kind, coincidesWithBoundary: false });
+    });
+    appendCoincidentCustodyDiagnostic(diagnostics, segment.id, nodeId, fraction, coincidentPoints);
+    chain.push({ node, fraction });
   });
   chain.push({ node: endNode, fraction: 1 });
 
@@ -120,7 +140,13 @@ function insertAttachmentPointsOnSegment(segment, startNode, endNode, points) {
   }
   if (newSegments.length === 0) newSegments.push(segment);
 
-  return { newNodes, newSegments, inserted, diagnostics, boundaryTag };
+  return {
+    newNodes,
+    newSegments,
+    inserted,
+    diagnostics,
+    boundaryTags: [...boundaryById.values()].sort((left, right) => compareAscii(left.id, right.id)),
+  };
 }
 
 /**
@@ -281,13 +307,113 @@ function pointOf(node) {
   return { x: node.x, y: node.y, z: node.z };
 }
 
-function tagNode(node, attachmentPointId, kind) {
-  return { ...node, meta: { ...(node.meta || {}), attachmentPointId, attachmentPointKind: kind } };
+function attachmentPointIdsOf(node) {
+  const meta = node.meta && typeof node.meta === 'object' ? node.meta : {};
+  const ids = Array.isArray(meta.attachmentPoints)
+    ? meta.attachmentPoints.map((entry) => entry?.attachmentPointId).filter(Boolean)
+    : [];
+  if (typeof meta.attachmentPointId === 'string' && meta.attachmentPointId.length > 0) {
+    ids.push(meta.attachmentPointId);
+  }
+  return [...new Set(ids)];
 }
 
-function restraintFor(kind) {
-  if (kind === 'ANCHOR') return 'ANCHOR';
-  if (kind === 'GUIDE' || kind === 'SUPPORT') return 'GUIDE';
+function tagNode(node, points) {
+  const meta = node.meta && typeof node.meta === 'object' ? node.meta : {};
+  const custodyById = new Map();
+  const existing = Array.isArray(meta.attachmentPoints) ? meta.attachmentPoints : [];
+  for (const entry of existing) addCustodyEntry(custodyById, entry, node.id);
+  if (typeof meta.attachmentPointId === 'string' && meta.attachmentPointId.length > 0) {
+    addCustodyEntry(custodyById, {
+      attachmentPointId: meta.attachmentPointId,
+      kind: meta.attachmentPointKind,
+    }, node.id);
+  }
+  for (const point of points) addCustodyEntry(custodyById, point, node.id);
+  const attachmentPoints = [...custodyById.values()]
+    .sort((left, right) => compareAscii(left.attachmentPointId, right.attachmentPointId));
+  requireCompatibleCoincidentRestraints(attachmentPoints);
+  const primary = attachmentPoints[0];
+  return {
+    ...node,
+    meta: {
+      ...meta,
+      attachmentPointId: primary.attachmentPointId,
+      attachmentPointKind: primary.kind,
+      attachmentPoints,
+    },
+  };
+}
+
+function addCustodyEntry(custodyById, entry, nodeId) {
+  if (!entry || typeof entry.attachmentPointId !== 'string' || entry.attachmentPointId.length === 0) return;
+  const candidate = {
+    attachmentPointId: entry.attachmentPointId,
+    kind: entry.kind ?? null,
+  };
+  const current = custodyById.get(candidate.attachmentPointId);
+  if (current) {
+    if (current.kind !== null && candidate.kind !== null && current.kind !== candidate.kind) {
+      throw new SharedAnalysisContractError(
+        `Attachment point ${candidate.attachmentPointId} has conflicting custody kinds at node ${nodeId}.`,
+        'ATTACHMENT_POINT_CUSTODY_CONFLICT',
+      );
+    }
+    custodyById.set(candidate.attachmentPointId, {
+      attachmentPointId: candidate.attachmentPointId,
+      kind: current.kind ?? candidate.kind,
+    });
+    return;
+  }
+  custodyById.set(candidate.attachmentPointId, candidate);
+}
+
+function groupByExactFraction(points) {
+  const byFraction = new Map();
+  const ordered = [...points].sort((left, right) => (
+    left.fraction - right.fraction
+    || compareAscii(left.attachmentPointId, right.attachmentPointId)
+  ));
+  for (const point of ordered) {
+    if (!byFraction.has(point.fraction)) byFraction.set(point.fraction, []);
+    byFraction.get(point.fraction).push(point);
+  }
+  return [...byFraction.entries()].map(([fraction, groupedPoints]) => ({
+    fraction,
+    points: groupedPoints,
+  }));
+}
+
+function requireCompatibleCoincidentRestraints(points) {
+  const behaviors = new Set(points.map(restraintFor));
+  if (behaviors.has('ANCHOR') && behaviors.has('GUIDE')) {
+    throw new SharedAnalysisContractError(
+      `Exact-coincident attachment points ${points.map((point) => point.attachmentPointId).join(', ')} declare incompatible ANCHOR and GUIDE/SUPPORT restraint behavior.`,
+      'ATTACHMENT_POINT_RESTRAINT_CONFLICT',
+    );
+  }
+}
+
+function restraintForCoincidentPoints(points) {
+  const behaviors = new Set(points.map(restraintFor));
+  if (behaviors.has('ANCHOR')) return 'ANCHOR';
+  if (behaviors.has('GUIDE')) return 'GUIDE';
+  return 'FREE';
+}
+
+function appendCoincidentCustodyDiagnostic(diagnostics, segmentId, nodeId, fraction, points) {
+  if (points.length < 2) return;
+  diagnostics.push(info('ATTACHMENT_POINT_COINCIDENT_CUSTODY', nodeId, {
+    segmentId,
+    nodeId,
+    fraction,
+    attachmentPointIds: points.map((point) => point.attachmentPointId),
+  }));
+}
+
+function restraintFor(point) {
+  if (point.kind === 'ANCHOR') return 'ANCHOR';
+  if (point.kind === 'GUIDE' || point.kind === 'SUPPORT') return 'GUIDE';
   return 'FREE';
 }
 
@@ -298,6 +424,7 @@ function requireNode(nodesOrMap, nodeId) {
 }
 
 function validateAttachmentPoints(points) {
+  const byId = new Map();
   for (const point of points) {
     if (!ATTACHMENT_POINT_KINDS.includes(point.kind)) {
       throw new SharedAnalysisContractError(`Attachment point ${point.attachmentPointId} has unsupported kind ${point.kind}.`, 'ATTACHMENT_POINT_KIND_UNSUPPORTED');
@@ -305,6 +432,13 @@ function validateAttachmentPoints(points) {
     if (!(point.fraction >= 0 && point.fraction <= 1)) {
       throw new SharedAnalysisContractError(`Attachment point ${point.attachmentPointId} fraction must be in [0, 1].`, 'ATTACHMENT_POINT_FRACTION_OUT_OF_RANGE');
     }
+    if (byId.has(point.attachmentPointId)) {
+      throw new SharedAnalysisContractError(
+        `Attachment point identity ${point.attachmentPointId} is declared more than once.`,
+        'ATTACHMENT_POINT_ID_DUPLICATE',
+      );
+    }
+    byId.set(point.attachmentPointId, point);
   }
 }
 
@@ -315,7 +449,11 @@ function groupBy(items, keyFn) {
     if (!map.has(key)) map.set(key, []);
     map.get(key).push(item);
   }
-  return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  return [...map.entries()].sort((a, b) => compareAscii(a[0], b[0]));
+}
+
+function compareAscii(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 function info(code, scope, data) {
