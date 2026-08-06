@@ -15,20 +15,41 @@
     "poissonsRatio": 0.3,
     "thermalExpansionModel": "CS_MEAN_SECANT_INTERPOLATED",
     "referenceTemperatureC": 21,
-    "fallbackOperatingTemperatureC": 120,
     "meanAlphaTablePerC": [
-      { "temperatureC": 20, "alpha": 0.0000117 },
-      { "temperatureC": 100, "alpha": 0.0000120 },
-      { "temperatureC": 200, "alpha": 0.0000124 },
-      { "temperatureC": 300, "alpha": 0.0000128 },
-      { "temperatureC": 400, "alpha": 0.0000132 }
+      {
+        "temperatureC": 20,
+        "alpha": 1.17e-05
+      },
+      {
+        "temperatureC": 100,
+        "alpha": 1.2e-05
+      },
+      {
+        "temperatureC": 200,
+        "alpha": 1.24e-05
+      },
+      {
+        "temperatureC": 300,
+        "alpha": 1.28e-05
+      },
+      {
+        "temperatureC": 400,
+        "alpha": 1.32e-05
+      }
     ]
   },
   "processResolution": {
-    "sentinelValues": [-1.0101, -2.0202],
+    "sentinelValues": [
+      -1.0101,
+      -2.0202
+    ],
     "sentinelTolerance": 0.001,
-    "policy": "INHERIT_PREVIOUS_ELEMENT_WITHIN_LINE",
-    "initialSentinelPolicy": "PARENT_OR_FIRST_VALID_WITHIN_LINE_ELSE_CONFIG_FALLBACK",
+    "policy": "INHERIT_PREVIOUS_CONNECTED_NODE",
+    "scope": "CONNECTED_TOPOLOGY",
+    "conflictPolicy": "BLOCK",
+    "unresolvedPolicy": "BLOCK",
+    "temperatureConflictToleranceC": 0.001,
+    "fluidDensityConflictToleranceKgM3": 0.001,
     "pressureExcludedFromReactionScreening": true
   },
   "weight": {
@@ -42,7 +63,19 @@
     "valveWeightPolicy": "SOURCE_COMPONENT_WEIGHT_ELSE_PIPE_EQUIVALENT",
     "instrumentWeightPolicy": "SOURCE_COMPONENT_WEIGHT_ELSE_PIPE_EQUIVALENT",
     "teeOletWeightPolicy": "PIPE_EQUIVALENT_SAME_OD_WALL",
-    "reducerWeightPolicy": "AVERAGE_END_SECTION_PIPE_EQUIVALENT"
+    "reducerWeightPolicy": "AVERAGE_END_SECTION_PIPE_EQUIVALENT",
+    "gasketMassKgPerComponent": 0,
+    "componentWeightOverridesKgByName": {},
+    "pipeEquivalentMassFactorByType": {
+      "PIPE": 1,
+      "ELBO": 1,
+      "FLAN": 1,
+      "VALV": 1,
+      "INST": 1,
+      "REDU": 1,
+      "TEE": 1,
+      "OLET": 1
+    }
   },
   "compliance": {
     "directionalFormula": "mu2*L/(E*A)+(1-mu2)*L^3/(C2E*E*I)",
@@ -70,7 +103,10 @@
   "supportProjection": {
     "authority": "COMPANION_TOPOLOGY_XML_RESTRAINTS",
     "reconciliationEvidence": "36 coordinate-distinct XML sites; repeated support tags remain separate sites",
-    "consolidateBy": ["baseSupportTag", "coordinateWithinTolerance"],
+    "consolidateBy": [
+      "baseSupportTag",
+      "coordinateWithinTolerance"
+    ],
     "genericSupportCapabilityAsRest": true,
     "coordinateToleranceMm": 2,
     "expectedPhysicalSupportSiteCount": 36,

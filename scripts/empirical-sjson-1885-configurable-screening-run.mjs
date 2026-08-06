@@ -1,12 +1,15 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
 const [profilePath, enrichedPath, xmlPath, outputPath = '/tmp/empirical-sjson-1885-screening-result.json'] = process.argv.slice(2);
 if (!profilePath || !enrichedPath || !xmlPath) {
   throw new Error('Usage: node empirical-sjson-1885-configurable-screening-run.mjs <profile.json> <EnrichedSjson> <topology.xml> [output.json]');
 }
 
-const profile = JSON.parse(await readFile(profilePath, 'utf8'));
+const profileText = await readFile(profilePath, 'utf8');
+const profile = JSON.parse(profileText);
+const runnerText = await readFile(fileURLToPath(import.meta.url), 'utf8');
 const enrichedText = await readFile(enrichedPath, 'utf8');
 const xmlText = await readFile(xmlPath, 'utf8');
 const enriched = JSON.parse(enrichedText.replace(/^\uFEFF/u, ''));
@@ -14,12 +17,14 @@ const enriched = JSON.parse(enrichedText.replace(/^\uFEFF/u, ''));
 const sourceHashes = {
   enrichedSjsonSha256: sha256(enrichedText),
   topologyInputXmlSha256: sha256(xmlText),
-  profileSha256: sha256(JSON.stringify(profile)),
+  profileFileSha256: sha256(profileText),
+  profileCanonicalSha256: sha256(JSON.stringify(profile)),
+  runnerSha256: sha256(runnerText),
 };
 
 const sourceIndex = indexEnrichedSource(enriched, profile);
 const model = parseInputXml(xmlText);
-resolveProcessValues(model.edges, profile);
+const processResolutionAudit = resolveProcessValues(model, profile);
 const sites = buildSupportSitesFromXml(model, profile);
 assignSiteAxes(sites, model);
 assignSiteIds(sites);
@@ -30,25 +35,31 @@ const thermalY = calculateThermalAxis(model, sites, sourceIndex, profile, 'Y');
 
 const rows = sites
   .sort((a, b) => a.siteId.localeCompare(b.siteId))
-  .map((site) => ({
-    siteId: site.siteId,
-    supportTag: site.baseTag,
-    sourceCoordinateMm: roundPoint(site.coordinate, 3),
-    nodeId: site.nodeId,
-    capabilities: [...site.capabilities].sort(),
-    inferredDirections: [...site.directionByCapability.entries()]
-      .map(([capability, axis]) => ({ capability, axis }))
-      .sort((a, b) => a.capability.localeCompare(b.capability)),
-    reactionsKn: {
-      FxThermal: round(thermalX.reactionBySite.get(site.key) || 0, profile.reporting.roundingDecimals),
-      FyThermal: round(thermalY.reactionBySite.get(site.key) || 0, profile.reporting.roundingDecimals),
-      FzWeight: round(weightResult.reactionBySite.get(site.key) || 0, profile.reporting.roundingDecimals),
-    },
-    thermalMovementMm: {
-      X: round(thermalX.displacementByNode.get(site.nodeId) || 0, profile.reporting.roundingDecimals),
-      Y: round(thermalY.displacementByNode.get(site.nodeId) || 0, profile.reporting.roundingDecimals),
-    },
-  }));
+  .map((site) => {
+    const fx = thermalX.reactionBySite.get(site.key) || 0;
+    const fy = thermalY.reactionBySite.get(site.key) || 0;
+    const fz = weightResult.reactionBySite.get(site.key) || 0;
+    return {
+      siteId: site.siteId,
+      supportTag: site.baseTag,
+      sourceCoordinateMm: roundPoint(site.coordinate, 3),
+      nodeId: site.nodeId,
+      capabilities: [...site.capabilities].sort(),
+      inferredDirections: [...site.directionByCapability.entries()]
+        .map(([capability, axis]) => ({ capability, axis }))
+        .sort((a, b) => a.capability.localeCompare(b.capability)),
+      reactionsKn: {
+        FxThermal: round(fx, profile.reporting.roundingDecimals),
+        FyThermal: round(fy, profile.reporting.roundingDecimals),
+        FzWeight: round(fz, profile.reporting.roundingDecimals),
+      },
+      componentVectorMagnitudeKn: round(Math.hypot(fx, fy, fz), profile.reporting.roundingDecimals),
+      thermalMovementMm: {
+        X: round(thermalX.displacementByNode.get(site.nodeId) || 0, profile.reporting.roundingDecimals),
+        Y: round(thermalY.displacementByNode.get(site.nodeId) || 0, profile.reporting.roundingDecimals),
+      },
+    };
+  });
 
 const report = {
   schema: 'empirical-sjson-screening-result/v1',
@@ -75,7 +86,10 @@ const report = {
     componentRecords: sourceIndex.componentRecords.length,
     operatingTemperature: summarizeNumbers(model.edges.map((edge) => edge.temperatureC)),
     temperatureResolution: countBy(model.edges, (edge) => edge.temperatureAuthority),
+    fluidDensityResolution: countBy(model.edges, (edge) => edge.fluidDensityAuthority),
+    processResolutionAudit,
     sourceComponentWeightPositiveCount: sourceIndex.componentRecords.filter((record) => positive(record.componentWeightKg)).length,
+    sourceComponentWeightAvailabilityByType: countPositiveWeightAvailabilityByType(sourceIndex.componentRecords),
     sourceInsulationPositiveCount: sourceIndex.componentRecords.filter((record) => positive(record.insulationThicknessMm)).length,
   },
   verticalWeight: {
@@ -85,16 +99,20 @@ const report = {
     reactionSumKn: round(sum([...weightResult.reactionBySite.values()]), 6),
     equilibriumErrorKn: round(sum([...weightResult.reactionBySite.values()]) - weightResult.totalWeightN / 1000, 9),
     massByTreatmentKg: mapValues(weightResult.massByTreatmentKg, (value) => round(value, 6)),
+    elementCountByTreatment: weightResult.elementCountByTreatment,
   },
   thermalX: thermalSummary(thermalX),
   thermalY: thermalSummary(thermalY),
+  componentVectorScreening: summarizeComponentVectors(rows),
   supportRows: rows,
   warnings: [
     'Results depend on the editable benchmark profile and are not the locked WP6 qualification profile.',
     'Anchorless admission is based on actual directional-restraint matrix rank; no arbitrary datum node is fixed.',
     'Vertical reactions use graph tributary weight, not flexural beam analysis.',
     'Guide and line-stop axes are inferred from the host route tangent because the exported TYPE 8/9 cosine fields are zero.',
-    'Fluid is omitted where no inherited source density is available.',
+    'All sentinel process values inherit from connected previous-node explicit values; no configured temperature or fluid fallback is used.',
+    'No positive flange, valve, or instrument source weights are present; configurable same-section pipe-equivalent fallback is used.',
+    'Component vector magnitudes combine independently screened Fx, Fy, and Fz components and are not a code operating load case.',
     'Pressure load and pressure stress are excluded.',
   ],
 };
@@ -243,42 +261,88 @@ function parseInputXml(text) {
   return { edges, nodes, restraints, edgesByNode };
 }
 
-function resolveProcessValues(edges, config) {
-  const groups = groupBy(edges, (edge) => edge.lineId || '__NO_LINE__');
-  for (const rows of groups.values()) {
-    const validTemps = rows.map((edge) => edge.rawTemperatureC).filter((value) => !isSentinel(value, config) && Number.isFinite(value));
-    const firstValidTemp = validTemps[0] ?? null;
-    const validFluids = rows.map((edge) => edge.rawFluidDensity).filter((value) => !isSentinel(value, config) && Number.isFinite(value) && value >= 0);
-    const firstValidFluid = validFluids[0] ?? null;
-    let previousTemp = null;
-    let previousFluid = null;
-    for (const edge of rows) {
-      if (!isSentinel(edge.rawTemperatureC, config) && Number.isFinite(edge.rawTemperatureC)) {
-        previousTemp = edge.rawTemperatureC;
-        edge.temperatureC = edge.rawTemperatureC;
-        edge.temperatureAuthority = 'SOURCE_EXPLICIT';
-      } else if (previousTemp != null) {
-        edge.temperatureC = previousTemp;
-        edge.temperatureAuthority = 'SENTINEL_PREVIOUS_ELEMENT';
-      } else if (firstValidTemp != null) {
-        edge.temperatureC = firstValidTemp;
-        edge.temperatureAuthority = 'INITIAL_SENTINEL_FIRST_VALID_LINE';
-      } else {
-        edge.temperatureC = config.material.fallbackOperatingTemperatureC;
-        edge.temperatureAuthority = 'CONFIG_FALLBACK_NO_LINE_VALUE';
-      }
-      if (!isSentinel(edge.rawFluidDensity, config) && Number.isFinite(edge.rawFluidDensity) && edge.rawFluidDensity >= 0) {
-        previousFluid = normalizeFluidDensity(edge.rawFluidDensity);
-        edge.fluidDensityKgM3 = previousFluid;
-      } else if (previousFluid != null) {
-        edge.fluidDensityKgM3 = previousFluid;
-      } else if (firstValidFluid != null) {
-        edge.fluidDensityKgM3 = normalizeFluidDensity(firstValidFluid);
-      } else {
-        edge.fluidDensityKgM3 = 0;
-      }
+function resolveProcessValues(model, config) {
+  const temperature = propagateSentinelField(model, config, {
+    rawKey: 'rawTemperatureC',
+    resolvedKey: 'temperatureC',
+    authorityKey: 'temperatureAuthority',
+    fieldLabel: 'temperature',
+    explicitPredicate: (value) => Number.isFinite(value) && !isSentinel(value, config),
+    normalize: (value) => value,
+    valueTolerance: config.processResolution.temperatureConflictToleranceC ?? 0.001,
+  });
+  const fluidDensity = propagateSentinelField(model, config, {
+    rawKey: 'rawFluidDensity',
+    resolvedKey: 'fluidDensityKgM3',
+    authorityKey: 'fluidDensityAuthority',
+    fieldLabel: 'fluid density',
+    explicitPredicate: (value) => Number.isFinite(value) && value >= 0 && !isSentinel(value, config),
+    normalize: normalizeFluidDensity,
+    valueTolerance: config.processResolution.fluidDensityConflictToleranceKgM3 ?? 0.001,
+  });
+  return { temperature, fluidDensity };
+}
+
+function propagateSentinelField(model, config, options) {
+  const { rawKey, resolvedKey, authorityKey, fieldLabel, explicitPredicate, normalize, valueTolerance } = options;
+  const unresolved = new Set();
+  const resolved = new Set();
+  const explicitValues = [];
+  const edgesByNode = model.edgesByNode;
+  for (const edge of model.edges) {
+    const rawValue = edge[rawKey];
+    if (explicitPredicate(rawValue)) {
+      edge[resolvedKey] = normalize(rawValue);
+      edge[authorityKey] = 'SOURCE_EXPLICIT';
+      resolved.add(edge.id);
+      explicitValues.push(edge[resolvedKey]);
+    } else {
+      unresolved.add(edge.id);
     }
   }
+  if (resolved.size === 0) {
+    throw new Error(`No explicit ${fieldLabel} seed exists for connected sentinel inheritance.`);
+  }
+  let iterationCount = 0;
+  while (unresolved.size > 0) {
+    iterationCount += 1;
+    let progress = 0;
+    for (const edge of model.edges) {
+      if (!unresolved.has(edge.id)) continue;
+      const neighborValues = [];
+      for (const nodeId of [edge.fromNode, edge.toNode]) {
+        for (const neighbor of edgesByNode.get(nodeId) || []) {
+          if (neighbor.id === edge.id || !resolved.has(neighbor.id)) continue;
+          neighborValues.push(neighbor[resolvedKey]);
+        }
+      }
+      if (neighborValues.length === 0) continue;
+      const reference = neighborValues[0];
+      const conflicting = neighborValues.find((value) => Math.abs(value - reference) > valueTolerance);
+      if (conflicting != null) {
+        throw new Error(`Conflicting connected ${fieldLabel} values at ${edge.id}: ${neighborValues.join(', ')}.`);
+      }
+      edge[resolvedKey] = reference;
+      edge[authorityKey] = 'SENTINEL_PREVIOUS_CONNECTED_NODE';
+      unresolved.delete(edge.id);
+      resolved.add(edge.id);
+      progress += 1;
+    }
+    if (progress === 0) {
+      const unresolvedIds = [...unresolved].slice(0, 10).join(', ');
+      throw new Error(`Unable to resolve ${fieldLabel} sentinels from connected previous-node values; unresolved edges: ${unresolvedIds}.`);
+    }
+    if (iterationCount > model.edges.length) throw new Error(`${fieldLabel} sentinel propagation exceeded deterministic iteration limit.`);
+  }
+  return {
+    policy: config.processResolution.policy,
+    connectedComponentCount: graphComponents(model.edges, [...model.nodes.keys()]).length,
+    explicitSeedCount: explicitValues.length,
+    inheritedSentinelCount: model.edges.length - explicitValues.length,
+    explicitSeedSummary: summarizeNumbers(explicitValues),
+    fallbackUsed: false,
+    iterationCount,
+  };
 }
 
 function buildSupportSitesFromXml(model, config) {
@@ -401,12 +465,14 @@ function calculateTributaryWeight(model, sites, sourceIndex, config) {
   const supportSites = sites.filter((site) => site.capabilities.has('REST'));
   const nodalWeightN = new Map([...model.nodes.keys()].map((id) => [id, 0]));
   const massByTreatmentKg = {};
+  const elementCountByTreatment = {};
   let totalMassKg = 0;
   for (const edge of model.edges) {
     const source = resolveSourceRecord(edge, sourceIndex);
     const { massKg, treatment } = elementMass(edge, source, config);
     totalMassKg += massKg;
     massByTreatmentKg[treatment] = (massByTreatmentKg[treatment] || 0) + massKg;
+    elementCountByTreatment[treatment] = (elementCountByTreatment[treatment] || 0) + 1;
     const weightN = massKg * config.weight.gravityMPerS2;
     nodalWeightN.set(edge.fromNode, nodalWeightN.get(edge.fromNode) + weightN / 2);
     nodalWeightN.set(edge.toNode, nodalWeightN.get(edge.toNode) + weightN / 2);
@@ -435,6 +501,7 @@ function calculateTributaryWeight(model, sites, sourceIndex, config) {
     totalWeightN: totalMassKg * config.weight.gravityMPerS2,
     reactionBySite,
     massByTreatmentKg,
+    elementCountByTreatment,
   };
 }
 
@@ -485,10 +552,13 @@ function calculateThermalAxis(model, sites, sourceIndex, config, axis) {
     rhs[row] = b[i];
     for (const otherId of free) A[row][freeIndex.get(otherId)] = K[i][nodeIndex.get(otherId)];
   }
-  const solve = gaussianSolve(A, rhs);
+  const scaledSystem = diagonalScaleSystem(A, rhs);
+  const solve = gaussianSolve(scaledSystem.matrix, scaledSystem.vector);
   if (!solve.ok) return blockedThermal(axis, `Directional restraint matrix solve failed: ${solve.reason}`);
+  const freeSolution = new Float64Array(free.length);
+  for (let index = 0; index < free.length; index += 1) freeSolution[index] = solve.x[index] / scaledSystem.scale[index];
   const displacementM = new Float64Array(n);
-  for (const nodeId of free) displacementM[nodeIndex.get(nodeId)] = solve.x[freeIndex.get(nodeId)];
+  for (const nodeId of free) displacementM[nodeIndex.get(nodeId)] = freeSolution[freeIndex.get(nodeId)];
   const reactionByNodeN = new Map();
   for (const nodeId of constrainedNodes) {
     const i = nodeIndex.get(nodeId);
@@ -514,6 +584,7 @@ function calculateThermalAxis(model, sites, sourceIndex, config, axis) {
     reactionSumKn: sum([...reactionBySite.values()]),
     maxFreeResidualN: residual,
     pivotRatio: solve.pivotRatio,
+    diagonalScaleRatio: scaledSystem.scaleRatio,
     maxAbsReactionKn: Math.max(0, ...[...reactionBySite.values()].map(Math.abs)),
     maxAbsMovementMm: Math.max(0, ...[...displacementByNode.values()].map(Math.abs)),
     temperatureSummary: summarizeNumbers(edgeEvidence.map((row) => row.temperatureC)),
@@ -533,6 +604,7 @@ function blockedThermal(axis, reason) {
     reactionSumKn: 0,
     maxFreeResidualN: null,
     pivotRatio: null,
+    diagonalScaleRatio: null,
     maxAbsReactionKn: null,
     maxAbsMovementMm: null,
   };
@@ -540,7 +612,11 @@ function blockedThermal(axis, reason) {
 
 function elementMass(edge, source, config) {
   const type = edge.sourceType;
-  if (type === 'GASK') return { massKg: 0, treatment: 'GASKET_ZERO' };
+  const overrideWeight = configuredComponentWeight(edge, source, config);
+  if (type === 'GASK') {
+    const gasketMassKg = Math.max(0, Number(config.weight.gasketMassKgPerComponent || 0));
+    return { massKg: gasketMassKg, treatment: gasketMassKg > 0 ? 'GASK_CONFIG_OVERRIDE' : 'GASKET_ZERO' };
+  }
   const section = sectionProperties(edge, source, config);
   const pipeMetalMass = section.areaM2 * edge.lengthM * section.densityKgM3;
   const insulationThicknessM = (source?.insulationThicknessMm || 0) / 1000;
@@ -549,14 +625,29 @@ function elementMass(edge, source, config) {
   const insulationMass = insulationArea * edge.lengthM * config.weight.insulationDensityKgM3;
   const fluidArea = Math.PI / 4 * section.idM ** 2;
   const fluidMass = fluidArea * edge.lengthM * (edge.fluidDensityKgM3 || source?.fluidDensityKgM3 || 0);
+  if (overrideWeight > 0) {
+    return { massKg: overrideWeight + insulationMass + fluidMass, treatment: `${type}_CONFIG_OVERRIDE` };
+  }
   const availableComponentWeight = source?.componentWeightKg || 0;
   if (['FLAN', 'VALV', 'INST'].includes(type) && availableComponentWeight > 0) {
     return { massKg: availableComponentWeight + insulationMass + fluidMass, treatment: `${type}_SOURCE_WEIGHT` };
   }
+  const factor = Number(config.weight.pipeEquivalentMassFactorByType?.[type] ?? 1);
   return {
-    massKg: pipeMetalMass + insulationMass + fluidMass,
-    treatment: ['TEE', 'OLET'].includes(type) ? `${type}_PIPE_EQUIVALENT` : `${type}_PIPE_SPAN`,
+    massKg: factor * pipeMetalMass + insulationMass + fluidMass,
+    treatment: ['TEE', 'OLET'].includes(type)
+      ? `${type}_PIPE_EQUIVALENT`
+      : (['FLAN', 'VALV', 'INST'].includes(type) ? `${type}_PIPE_EQUIVALENT_FALLBACK` : `${type}_PIPE_SPAN`),
   };
+}
+
+function configuredComponentWeight(edge, source, config) {
+  const overrides = config.weight.componentWeightOverridesKgByName || {};
+  for (const key of nameKeys(edge.name, source?.name || '')) {
+    const value = Number(overrides[key]);
+    if (Number.isFinite(value) && value > 0) return value;
+  }
+  return 0;
 }
 
 function sectionProperties(edge, source, config) {
@@ -602,6 +693,34 @@ function interpolateAlpha(temperatureC, table) {
     }
   }
   return rows.at(-1).alpha;
+}
+
+function diagonalScaleSystem(matrix, vector) {
+  const n = vector.length;
+  const scale = new Float64Array(n);
+  let minimum = Infinity;
+  let maximum = 0;
+  for (let index = 0; index < n; index += 1) {
+    const diagonal = Math.abs(matrix[index][index]);
+    if (!Number.isFinite(diagonal) || diagonal <= 0) throw new Error(`Non-positive directional stiffness diagonal at row ${index}.`);
+    scale[index] = Math.sqrt(diagonal);
+    minimum = Math.min(minimum, scale[index]);
+    maximum = Math.max(maximum, scale[index]);
+  }
+  const scaledMatrix = Array.from({ length: n }, () => new Float64Array(n));
+  const scaledVector = new Float64Array(n);
+  for (let row = 0; row < n; row += 1) {
+    scaledVector[row] = vector[row] / scale[row];
+    for (let column = 0; column < n; column += 1) {
+      scaledMatrix[row][column] = matrix[row][column] / (scale[row] * scale[column]);
+    }
+  }
+  return {
+    matrix: scaledMatrix,
+    vector: scaledVector,
+    scale,
+    scaleRatio: maximum > 0 ? minimum / maximum : 1,
+  };
 }
 
 function gaussianSolve(matrix, vector) {
@@ -710,6 +829,28 @@ function dijkstra(adjacency, start) {
   return distances;
 }
 
+function countPositiveWeightAvailabilityByType(records) {
+  const result = {};
+  for (const record of records) {
+    const type = String(record.type || 'UNKNOWN').toUpperCase();
+    if (!result[type]) result[type] = { records: 0, positiveWeightRecords: 0 };
+    result[type].records += 1;
+    if (positive(record.componentWeightKg)) result[type].positiveWeightRecords += 1;
+  }
+  return result;
+}
+
+function summarizeComponentVectors(rows) {
+  const sorted = [...rows].sort((a, b) => b.componentVectorMagnitudeKn - a.componentVectorMagnitudeKn);
+  const maximum = sorted[0] || null;
+  return {
+    status: 'INDEPENDENT_COMPONENT_VECTOR_SCREENING_ONLY',
+    maximumMagnitudeKn: maximum?.componentVectorMagnitudeKn ?? 0,
+    maximumSiteId: maximum?.siteId ?? null,
+    maximumSupportTag: maximum?.supportTag ?? null,
+  };
+}
+
 function thermalSummary(result) {
   return {
     status: result.status,
@@ -721,6 +862,7 @@ function thermalSummary(result) {
     maxAbsMovementMm: result.maxAbsMovementMm == null ? null : round(result.maxAbsMovementMm, 6),
     maxFreeResidualN: result.maxFreeResidualN == null ? null : round(result.maxFreeResidualN, 6),
     pivotRatio: result.pivotRatio == null ? null : result.pivotRatio,
+    diagonalScaleRatio: result.diagonalScaleRatio == null ? null : result.diagonalScaleRatio,
     temperatureSummary: result.temperatureSummary,
     alphaSummary: result.alphaSummary,
   };

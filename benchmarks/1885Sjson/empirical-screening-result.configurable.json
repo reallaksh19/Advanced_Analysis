@@ -1,0 +1,1465 @@
+{
+  "schema": "empirical-sjson-screening-result/v1",
+  "profileId": "1885-SJSON-CS-CONFIGURABLE-SCREENING-V1",
+  "status": "EXPERIMENTAL_CONFIGURABLE_SCREENING",
+  "qualification": {
+    "qualifiedWp6ProfileModified": false,
+    "anchorSynthesized": false,
+    "pressureIncluded": false,
+    "methodStatement": "Graph-tributary vertical weight plus independent scalar global X/Y thermal compatibility. Not beam/frame FEA and not a code stress result."
+  },
+  "source": {
+    "commit": "07ce017eb7113517cc032771f7717f88c0a93d4c",
+    "enrichedSjsonPath": "benchmarks/1885Sjson/EnrichedSjson",
+    "topologyInputXmlPath": "benchmarks/1885Sjson/EnrichedSjson.topology.input.xml",
+    "hashes": {
+      "enrichedSjsonSha256": "e9a51723444e9490f5dff9c1ff4a5c56191873033d11a289946746ff1072c5da",
+      "topologyInputXmlSha256": "b46fbc765c71a63eb5d156eeaed3ae3be56584bd753b563d76fb10df21ff652a",
+      "profileFileSha256": "ab6d937dd34ffd46cdee8388a266e36984e542107de4670b72f3ed1fc93da252",
+      "profileCanonicalSha256": "fd7ce4b70906b3028be70566462d0748ecc30adce064e10ab7c7226e9b9459ec",
+      "runnerSha256": "0bff4c9db163b633e66fcd0b370ce4e6cf7ef89e435ccdfc9aeff0b594a1bdf6"
+    }
+  },
+  "configurableAssumptions": {
+    "schema": "empirical-sjson-screening-profile/v1",
+    "profileId": "1885-SJSON-CS-CONFIGURABLE-SCREENING-V1",
+    "status": "EXPERIMENTAL_CONFIGURABLE_SCREENING",
+    "source": {
+      "commit": "07ce017eb7113517cc032771f7717f88c0a93d4c",
+      "enrichedSjsonPath": "benchmarks/1885Sjson/EnrichedSjson",
+      "topologyInputXmlPath": "benchmarks/1885Sjson/EnrichedSjson.topology.input.xml",
+      "coordinateUnit": "mm",
+      "sourceVerticalAxis": "Z"
+    },
+    "material": {
+      "family": "CARBON_STEEL",
+      "elasticModulusPa": 203400000000,
+      "poissonsRatio": 0.3,
+      "thermalExpansionModel": "CS_MEAN_SECANT_INTERPOLATED",
+      "referenceTemperatureC": 21,
+      "meanAlphaTablePerC": [
+        {
+          "temperatureC": 20,
+          "alpha": 0.0000117
+        },
+        {
+          "temperatureC": 100,
+          "alpha": 0.000012
+        },
+        {
+          "temperatureC": 200,
+          "alpha": 0.0000124
+        },
+        {
+          "temperatureC": 300,
+          "alpha": 0.0000128
+        },
+        {
+          "temperatureC": 400,
+          "alpha": 0.0000132
+        }
+      ]
+    },
+    "processResolution": {
+      "sentinelValues": [
+        -1.0101,
+        -2.0202
+      ],
+      "sentinelTolerance": 0.001,
+      "policy": "INHERIT_PREVIOUS_CONNECTED_NODE",
+      "scope": "CONNECTED_TOPOLOGY",
+      "conflictPolicy": "BLOCK",
+      "unresolvedPolicy": "BLOCK",
+      "temperatureConflictToleranceC": 0.001,
+      "fluidDensityConflictToleranceKgM3": 0.001,
+      "pressureExcludedFromReactionScreening": true
+    },
+    "weight": {
+      "gravityMPerS2": 9.80665,
+      "pipeMetalDensityKgM3": 7850,
+      "insulationDensityKgM3": 210,
+      "insulationThicknessPolicy": "RAW_INSU_POSITIVE_ELSE_ENRICHED",
+      "fluidDensityPolicy": "INHERITED_SOURCE_ELSE_ZERO",
+      "gasketWeightPolicy": "ZERO_NEGLIGIBLE",
+      "flangeWeightPolicy": "SOURCE_COMPONENT_WEIGHT_ELSE_PIPE_EQUIVALENT",
+      "valveWeightPolicy": "SOURCE_COMPONENT_WEIGHT_ELSE_PIPE_EQUIVALENT",
+      "instrumentWeightPolicy": "SOURCE_COMPONENT_WEIGHT_ELSE_PIPE_EQUIVALENT",
+      "teeOletWeightPolicy": "PIPE_EQUIVALENT_SAME_OD_WALL",
+      "reducerWeightPolicy": "AVERAGE_END_SECTION_PIPE_EQUIVALENT",
+      "gasketMassKgPerComponent": 0,
+      "componentWeightOverridesKgByName": {},
+      "pipeEquivalentMassFactorByType": {
+        "PIPE": 1,
+        "ELBO": 1,
+        "FLAN": 1,
+        "VALV": 1,
+        "INST": 1,
+        "REDU": 1,
+        "TEE": 1,
+        "OLET": 1
+      }
+    },
+    "compliance": {
+      "directionalFormula": "mu2*L/(E*A)+(1-mu2)*L^3/(C2E*E*I)",
+      "C2E": 2.55,
+      "pipeMultiplier": 1,
+      "elbowMultiplier": 1,
+      "flangeMultiplier": 0.05,
+      "gasketMultiplier": 0.01,
+      "valveMultiplier": 0.05,
+      "instrumentMultiplier": 0.05,
+      "teeMultiplier": 1,
+      "oletMultiplier": 1,
+      "reducerMultiplier": 1
+    },
+    "boundary": {
+      "anchorRequired": false,
+      "anchorlessPolicy": "FULL_RANK_DIRECTIONAL_RESTRAINTS",
+      "singularSystemPolicy": "BLOCK_AXIS",
+      "restBehavior": "UNILATERAL_COMPRESSION_VERTICAL",
+      "guideBehavior": "BILATERAL_HORIZONTAL_TRANSVERSE",
+      "lineStopBehavior": "BILATERAL_HORIZONTAL_LONGITUDINAL",
+      "frictionCoefficient": 0,
+      "gapMm": 0
+    },
+    "supportProjection": {
+      "authority": "COMPANION_TOPOLOGY_XML_RESTRAINTS",
+      "reconciliationEvidence": "36 coordinate-distinct XML sites; repeated support tags remain separate sites",
+      "consolidateBy": [
+        "baseSupportTag",
+        "coordinateWithinTolerance"
+      ],
+      "genericSupportCapabilityAsRest": true,
+      "coordinateToleranceMm": 2,
+      "expectedPhysicalSupportSiteCount": 36,
+      "siteIdOrder": "EXACT_XML_NODE_ID"
+    },
+    "verticalReactionMethod": {
+      "method": "GRAPH_TRIBUTARY_WEIGHT",
+      "description": "Each element weight is split between its two end nodes; nodal weight is distributed to nearest connected vertical-rest sites by graph distance, with equal sharing on ties. This is a support-load screening method, not beam FEA."
+    },
+    "reporting": {
+      "forceUnit": "kN",
+      "movementUnit": "mm",
+      "publishUnrestrainedAxes": false,
+      "roundingDecimals": 3
+    }
+  },
+  "sourceResolution": {
+    "inputXmlElements": 163,
+    "inputXmlNodes": 164,
+    "rawSupportRecords": 108,
+    "physicalSupportSites": 36,
+    "componentRecords": 279,
+    "operatingTemperature": {
+      "count": 163,
+      "min": 325,
+      "max": 325,
+      "unique": [
+        325
+      ]
+    },
+    "temperatureResolution": {
+      "SENTINEL_PREVIOUS_CONNECTED_NODE": 105,
+      "SOURCE_EXPLICIT": 58
+    },
+    "fluidDensityResolution": {
+      "SENTINEL_PREVIOUS_CONNECTED_NODE": 105,
+      "SOURCE_EXPLICIT": 58
+    },
+    "processResolutionAudit": {
+      "temperature": {
+        "policy": "INHERIT_PREVIOUS_CONNECTED_NODE",
+        "connectedComponentCount": 1,
+        "explicitSeedCount": 58,
+        "inheritedSentinelCount": 105,
+        "explicitSeedSummary": {
+          "count": 58,
+          "min": 325,
+          "max": 325,
+          "unique": [
+            325
+          ]
+        },
+        "fallbackUsed": false,
+        "iterationCount": 3
+      },
+      "fluidDensity": {
+        "policy": "INHERIT_PREVIOUS_CONNECTED_NODE",
+        "connectedComponentCount": 1,
+        "explicitSeedCount": 58,
+        "inheritedSentinelCount": 105,
+        "explicitSeedSummary": {
+          "count": 58,
+          "min": 0.3,
+          "max": 0.3,
+          "unique": [
+            0.3
+          ]
+        },
+        "fallbackUsed": false,
+        "iterationCount": 3
+      }
+    },
+    "sourceComponentWeightPositiveCount": 0,
+    "sourceComponentWeightAvailabilityByType": {
+      "BRANCH": {
+        "records": 13,
+        "positiveWeightRecords": 0
+      },
+      "ELBO": {
+        "records": 14,
+        "positiveWeightRecords": 0
+      },
+      "PIPE": {
+        "records": 43,
+        "positiveWeightRecords": 0
+      },
+      "OLET": {
+        "records": 10,
+        "positiveWeightRecords": 0
+      },
+      "SUPPORT": {
+        "records": 139,
+        "positiveWeightRecords": 0
+      },
+      "FLAN": {
+        "records": 22,
+        "positiveWeightRecords": 0
+      },
+      "GASK": {
+        "records": 22,
+        "positiveWeightRecords": 0
+      },
+      "VALV": {
+        "records": 4,
+        "positiveWeightRecords": 0
+      },
+      "INST": {
+        "records": 5,
+        "positiveWeightRecords": 0
+      },
+      "REDU": {
+        "records": 4,
+        "positiveWeightRecords": 0
+      },
+      "TEE": {
+        "records": 3,
+        "positiveWeightRecords": 0
+      }
+    },
+    "sourceInsulationPositiveCount": 245
+  },
+  "verticalWeight": {
+    "status": "CALCULATED_CONFIGURABLE_SCREENING",
+    "totalModelMassKg": 4702.209369,
+    "totalWeightKn": 46.112922,
+    "reactionSumKn": 46.112922,
+    "equilibriumErrorKn": 0,
+    "massByTreatmentKg": {
+      "ELBO_PIPE_SPAN": 409.858719,
+      "PIPE_PIPE_SPAN": 3889.556459,
+      "FLAN_PIPE_EQUIVALENT_FALLBACK": 109.98528,
+      "GASKET_ZERO": 0,
+      "VALV_PIPE_EQUIVALENT_FALLBACK": 34.375822,
+      "INST_PIPE_EQUIVALENT_FALLBACK": 50.875301,
+      "REDU_PIPE_SPAN": 55.427368,
+      "TEE_PIPE_EQUIVALENT": 101.271443,
+      "OLET_PIPE_EQUIVALENT": 50.858976
+    },
+    "elementCountByTreatment": {
+      "ELBO_PIPE_SPAN": 28,
+      "PIPE_PIPE_SPAN": 71,
+      "FLAN_PIPE_EQUIVALENT_FALLBACK": 20,
+      "GASKET_ZERO": 22,
+      "VALV_PIPE_EQUIVALENT_FALLBACK": 4,
+      "INST_PIPE_EQUIVALENT_FALLBACK": 3,
+      "REDU_PIPE_SPAN": 4,
+      "TEE_PIPE_EQUIVALENT": 9,
+      "OLET_PIPE_EQUIVALENT": 2
+    }
+  },
+  "thermalX": {
+    "status": "CALCULATED_CONFIGURABLE_SCREENING",
+    "blockedReason": null,
+    "constrainedSiteCount": 6,
+    "constrainedNodeCount": 6,
+    "reactionSumKn": 0.000058237,
+    "maxAbsReactionKn": 31.567638,
+    "maxAbsMovementMm": 36.513076,
+    "maxFreeResidualN": 0.125,
+    "pivotRatio": 1.4325496344724795e-10,
+    "diagonalScaleRatio": 0.0000021851433068841095,
+    "temperatureSummary": {
+      "count": 163,
+      "min": 325,
+      "max": 325,
+      "unique": [
+        325
+      ]
+    },
+    "alphaSummary": {
+      "count": 163,
+      "min": 0.0000129,
+      "max": 0.0000129,
+      "unique": [
+        0.0000129
+      ]
+    }
+  },
+  "thermalY": {
+    "status": "CALCULATED_CONFIGURABLE_SCREENING",
+    "blockedReason": null,
+    "constrainedSiteCount": 7,
+    "constrainedNodeCount": 7,
+    "reactionSumKn": -0.000012451,
+    "maxAbsReactionKn": 34.904555,
+    "maxAbsMovementMm": 29.779426,
+    "maxFreeResidualN": 0.015625,
+    "pivotRatio": 2.9024575964875503e-8,
+    "diagonalScaleRatio": 0.0000025109531526009793,
+    "temperatureSummary": {
+      "count": 163,
+      "min": 325,
+      "max": 325,
+      "unique": [
+        325
+      ]
+    },
+    "alphaSummary": {
+      "count": 163,
+      "min": 0.0000129,
+      "max": 0.0000129,
+      "unique": [
+        0.0000129
+      ]
+    }
+  },
+  "componentVectorScreening": {
+    "status": "INDEPENDENT_COMPONENT_VECTOR_SCREENING_ONLY",
+    "maximumMagnitudeKn": 34.953,
+    "maximumSiteId": "N50120",
+    "maximumSupportTag": "PS-12169"
+  },
+  "supportRows": [
+    {
+      "siteId": "N100020",
+      "supportTag": "=1006649732/51478",
+      "sourceCoordinateMm": {
+        "x": 443962.832,
+        "y": -1159925.031,
+        "z": 1775.547
+      },
+      "nodeId": "100020",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 0.168
+      },
+      "componentVectorMagnitudeKn": 0.168,
+      "thermalMovementMm": {
+        "X": 4.578,
+        "Y": 14.259
+      }
+    },
+    {
+      "siteId": "N10010",
+      "supportTag": "=1006649732/51422",
+      "sourceCoordinateMm": {
+        "x": 421773.221,
+        "y": -1141354,
+        "z": 1184.15
+      },
+      "nodeId": "10010",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 0.47
+      },
+      "componentVectorMagnitudeKn": 0.47,
+      "thermalMovementMm": {
+        "X": -35.42,
+        "Y": 1.059
+      }
+    },
+    {
+      "siteId": "N10060",
+      "supportTag": "PS-12244",
+      "sourceCoordinateMm": {
+        "x": 423170.971,
+        "y": -1141125,
+        "z": 1184.15
+      },
+      "nodeId": "10060",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 0.671
+      },
+      "componentVectorMagnitudeKn": 0.671,
+      "thermalMovementMm": {
+        "X": -29.933,
+        "Y": 1.868
+      }
+    },
+    {
+      "siteId": "N10130",
+      "supportTag": "PS-12246",
+      "sourceCoordinateMm": {
+        "x": 425680.971,
+        "y": -1141125,
+        "z": 1184.15
+      },
+      "nodeId": "10130",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 0.774
+      },
+      "componentVectorMagnitudeKn": 0.774,
+      "thermalMovementMm": {
+        "X": -20.085,
+        "Y": 1.687
+      }
+    },
+    {
+      "siteId": "N10160",
+      "supportTag": "PS-12247",
+      "sourceCoordinateMm": {
+        "x": 427515.392,
+        "y": -1141125,
+        "z": 1184.15
+      },
+      "nodeId": "10160",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 0.426
+      },
+      "componentVectorMagnitudeKn": 0.426,
+      "thermalMovementMm": {
+        "X": -12.889,
+        "Y": 1.41
+      }
+    },
+    {
+      "siteId": "N10190",
+      "supportTag": "=1006649732/51254",
+      "sourceCoordinateMm": {
+        "x": 428650.592,
+        "y": -1141125,
+        "z": 1184.15
+      },
+      "nodeId": "10190",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 0.461
+      },
+      "componentVectorMagnitudeKn": 0.461,
+      "thermalMovementMm": {
+        "X": -8.437,
+        "Y": 1.399
+      }
+    },
+    {
+      "siteId": "N10230",
+      "supportTag": "PS-12248",
+      "sourceCoordinateMm": {
+        "x": 430800.971,
+        "y": -1141125,
+        "z": 1184.15
+      },
+      "nodeId": "10230",
+      "capabilities": [
+        "GUIDE",
+        "LINESTOP",
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "GUIDE",
+          "axis": "Y"
+        },
+        {
+          "capability": "LINESTOP",
+          "axis": "X"
+        },
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 31.568,
+        "FyThermal": -0.77,
+        "FzWeight": 0.583
+      },
+      "componentVectorMagnitudeKn": 31.582,
+      "thermalMovementMm": {
+        "X": 0,
+        "Y": 0
+      }
+    },
+    {
+      "siteId": "N10310",
+      "supportTag": "PS-12249",
+      "sourceCoordinateMm": {
+        "x": 432932.594,
+        "y": -1141125,
+        "z": 1144.45
+      },
+      "nodeId": "10310",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 0.545
+      },
+      "componentVectorMagnitudeKn": 0.545,
+      "thermalMovementMm": {
+        "X": 8.226,
+        "Y": -0.359
+      }
+    },
+    {
+      "siteId": "N10380",
+      "supportTag": "PS-12250",
+      "sourceCoordinateMm": {
+        "x": 436573.021,
+        "y": -1141125,
+        "z": 1144.45
+      },
+      "nodeId": "10380",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 0.371
+      },
+      "componentVectorMagnitudeKn": 0.371,
+      "thermalMovementMm": {
+        "X": 22.189,
+        "Y": -3.847
+      }
+    },
+    {
+      "siteId": "N10530",
+      "supportTag": "=1006649732/51465",
+      "sourceCoordinateMm": {
+        "x": 443198.681,
+        "y": -1159925,
+        "z": 1775.55
+      },
+      "nodeId": "10530",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 3.432
+      },
+      "componentVectorMagnitudeKn": 3.432,
+      "thermalMovementMm": {
+        "X": 1.581,
+        "Y": 14.259
+      }
+    },
+    {
+      "siteId": "N120020",
+      "supportTag": "PS-12171",
+      "sourceCoordinateMm": {
+        "x": 444039.151,
+        "y": -1159925,
+        "z": 1209.55
+      },
+      "nodeId": "120020",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 3.845
+      },
+      "componentVectorMagnitudeKn": 3.845,
+      "thermalMovementMm": {
+        "X": 4.878,
+        "Y": 14.355
+      }
+    },
+    {
+      "siteId": "N130050",
+      "supportTag": "PS-12166",
+      "sourceCoordinateMm": {
+        "x": 441437.5,
+        "y": -1159925,
+        "z": 1209.55
+      },
+      "nodeId": "130050",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 2.887
+      },
+      "componentVectorMagnitudeKn": 2.887,
+      "thermalMovementMm": {
+        "X": -5.324,
+        "Y": 13.628
+      }
+    },
+    {
+      "siteId": "N20040",
+      "supportTag": "PS-12231",
+      "sourceCoordinateMm": {
+        "x": 438023.221,
+        "y": -1140070.762,
+        "z": 1184.15
+      },
+      "nodeId": "20040",
+      "capabilities": [
+        "LINESTOP",
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "LINESTOP",
+          "axis": "Y"
+        },
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 1.892,
+        "FzWeight": 0.659
+      },
+      "componentVectorMagnitudeKn": 2.004,
+      "thermalMovementMm": {
+        "X": 26.659,
+        "Y": 0
+      }
+    },
+    {
+      "siteId": "N20080",
+      "supportTag": "PS-12311",
+      "sourceCoordinateMm": {
+        "x": 438023.221,
+        "y": -1136824.031,
+        "z": 1184.15
+      },
+      "nodeId": "20080",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 0.765
+      },
+      "componentVectorMagnitudeKn": 0.765,
+      "thermalMovementMm": {
+        "X": 14.897,
+        "Y": 12.723
+      }
+    },
+    {
+      "siteId": "N20120",
+      "supportTag": "PS-12321",
+      "sourceCoordinateMm": {
+        "x": 438688.25,
+        "y": -1135075,
+        "z": 1184.15
+      },
+      "nodeId": "20120",
+      "capabilities": [
+        "LINESTOP",
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "LINESTOP",
+          "axis": "X"
+        },
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": -22,
+        "FyThermal": 0,
+        "FzWeight": 1.118
+      },
+      "componentVectorMagnitudeKn": 22.029,
+      "thermalMovementMm": {
+        "X": 0,
+        "Y": 19.542
+      }
+    },
+    {
+      "siteId": "N20130",
+      "supportTag": "PS-12295",
+      "sourceCoordinateMm": {
+        "x": 443023.151,
+        "y": -1135075,
+        "z": 1184.15
+      },
+      "nodeId": "20130",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 0.915
+      },
+      "componentVectorMagnitudeKn": 0.915,
+      "thermalMovementMm": {
+        "X": 16.952,
+        "Y": -9.741
+      }
+    },
+    {
+      "siteId": "N20170",
+      "supportTag": "PS-12267",
+      "sourceCoordinateMm": {
+        "x": 445515.151,
+        "y": -1134225,
+        "z": 1184.15
+      },
+      "nodeId": "20170",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 1.046
+      },
+      "componentVectorMagnitudeKn": 1.046,
+      "thermalMovementMm": {
+        "X": 26.36,
+        "Y": -10.58
+      }
+    },
+    {
+      "siteId": "N20180",
+      "supportTag": "PS-12268",
+      "sourceCoordinateMm": {
+        "x": 445515.151,
+        "y": -1131525,
+        "z": 1184.15
+      },
+      "nodeId": "20180",
+      "capabilities": [
+        "GUIDE",
+        "LINESTOP",
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "GUIDE",
+          "axis": "X"
+        },
+        {
+          "capability": "LINESTOP",
+          "axis": "Y"
+        },
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": -8.138,
+        "FyThermal": -2.185,
+        "FzWeight": 0.516
+      },
+      "componentVectorMagnitudeKn": 8.442,
+      "thermalMovementMm": {
+        "X": 0,
+        "Y": 0
+      }
+    },
+    {
+      "siteId": "N20190",
+      "supportTag": "=1006649732/51378",
+      "sourceCoordinateMm": {
+        "x": 445515.151,
+        "y": -1130505.016,
+        "z": 1184.15
+      },
+      "nodeId": "20190",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 0.299
+      },
+      "componentVectorMagnitudeKn": 0.299,
+      "thermalMovementMm": {
+        "X": 0,
+        "Y": 4
+      }
+    },
+    {
+      "siteId": "N30050",
+      "supportTag": "PS-12228",
+      "sourceCoordinateMm": {
+        "x": 440660.219,
+        "y": -1160775,
+        "z": 3114
+      },
+      "nodeId": "30050",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 1.016
+      },
+      "componentVectorMagnitudeKn": 1.016,
+      "thermalMovementMm": {
+        "X": -7.379,
+        "Y": 12.382
+      }
+    },
+    {
+      "siteId": "N30060",
+      "supportTag": "PS-12034",
+      "sourceCoordinateMm": {
+        "x": 440660.219,
+        "y": -1163935.927,
+        "z": 3114
+      },
+      "nodeId": "30060",
+      "capabilities": [
+        "GUIDE",
+        "LINESTOP",
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "GUIDE",
+          "axis": "X"
+        },
+        {
+          "capability": "LINESTOP",
+          "axis": "Y"
+        },
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 1.42,
+        "FyThermal": 3.287,
+        "FzWeight": 0.62
+      },
+      "componentVectorMagnitudeKn": 3.634,
+      "thermalMovementMm": {
+        "X": 0,
+        "Y": 0
+      }
+    },
+    {
+      "siteId": "N30070",
+      "supportTag": "=1006657924/39580",
+      "sourceCoordinateMm": {
+        "x": 440660.219,
+        "y": -1165244.984,
+        "z": 3114
+      },
+      "nodeId": "30070",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 0.339
+      },
+      "componentVectorMagnitudeKn": 0.339,
+      "thermalMovementMm": {
+        "X": 0,
+        "Y": -5.134
+      }
+    },
+    {
+      "siteId": "N40020",
+      "supportTag": "PS-12061",
+      "sourceCoordinateMm": {
+        "x": 436479.221,
+        "y": -1144825,
+        "z": 2184.15
+      },
+      "nodeId": "40020",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 0.932
+      },
+      "componentVectorMagnitudeKn": 0.932,
+      "thermalMovementMm": {
+        "X": 21.061,
+        "Y": 28.952
+      }
+    },
+    {
+      "siteId": "N40030",
+      "supportTag": "PS-12240",
+      "sourceCoordinateMm": {
+        "x": 431723.221,
+        "y": -1144825,
+        "z": 2184.15
+      },
+      "nodeId": "40030",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 1.304
+      },
+      "componentVectorMagnitudeKn": 1.304,
+      "thermalMovementMm": {
+        "X": 2.42,
+        "Y": 10.144
+      }
+    },
+    {
+      "siteId": "N40040",
+      "supportTag": "PS-12242",
+      "sourceCoordinateMm": {
+        "x": 427073.221,
+        "y": -1144825,
+        "z": 2184.15
+      },
+      "nodeId": "40040",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 1.064
+      },
+      "componentVectorMagnitudeKn": 1.064,
+      "thermalMovementMm": {
+        "X": -15.807,
+        "Y": -7.433
+      }
+    },
+    {
+      "siteId": "N40050",
+      "supportTag": "PS-12263",
+      "sourceCoordinateMm": {
+        "x": 424045.97,
+        "y": -1144825,
+        "z": 2184.15
+      },
+      "nodeId": "40050",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 1.264
+      },
+      "componentVectorMagnitudeKn": 1.264,
+      "thermalMovementMm": {
+        "X": -27.673,
+        "Y": -12.283
+      }
+    },
+    {
+      "siteId": "N40170",
+      "supportTag": "PS-12243",
+      "sourceCoordinateMm": {
+        "x": 421773.221,
+        "y": -1142982,
+        "z": 1184.15
+      },
+      "nodeId": "40170",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 1.035
+      },
+      "componentVectorMagnitudeKn": 1.035,
+      "thermalMovementMm": {
+        "X": -36.435,
+        "Y": -5.323
+      }
+    },
+    {
+      "siteId": "N50040",
+      "supportTag": "PS-12156",
+      "sourceCoordinateMm": {
+        "x": 438667.219,
+        "y": -1159925,
+        "z": 1157.2
+      },
+      "nodeId": "50040",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 0.775
+      },
+      "componentVectorMagnitudeKn": 0.775,
+      "thermalMovementMm": {
+        "X": -16.186,
+        "Y": -23.942
+      }
+    },
+    {
+      "siteId": "N50110",
+      "supportTag": "PS-12170",
+      "sourceCoordinateMm": {
+        "x": 437523.219,
+        "y": -1158821.227,
+        "z": 2184.15
+      },
+      "nodeId": "50110",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 1.42
+      },
+      "componentVectorMagnitudeKn": 1.42,
+      "thermalMovementMm": {
+        "X": -20.607,
+        "Y": -25.505
+      }
+    },
+    {
+      "siteId": "N50120",
+      "supportTag": "PS-12169",
+      "sourceCoordinateMm": {
+        "x": 437523.219,
+        "y": -1152235,
+        "z": 2184.15
+      },
+      "nodeId": "50120",
+      "capabilities": [
+        "GUIDE",
+        "LINESTOP",
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "GUIDE",
+          "axis": "X"
+        },
+        {
+          "capability": "LINESTOP",
+          "axis": "Y"
+        },
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": -0.991,
+        "FyThermal": -34.905,
+        "FzWeight": 1.552
+      },
+      "componentVectorMagnitudeKn": 34.953,
+      "thermalMovementMm": {
+        "X": 0,
+        "Y": 0
+      }
+    },
+    {
+      "siteId": "N50130",
+      "supportTag": "PS-12165",
+      "sourceCoordinateMm": {
+        "x": 437523.219,
+        "y": -1147621.2,
+        "z": 2184.15
+      },
+      "nodeId": "50130",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 0.923
+      },
+      "componentVectorMagnitudeKn": 0.923,
+      "thermalMovementMm": {
+        "X": 23.102,
+        "Y": 18.087
+      }
+    },
+    {
+      "siteId": "N50140",
+      "supportTag": "PS-12297",
+      "sourceCoordinateMm": {
+        "x": 437523.219,
+        "y": -1145574.8,
+        "z": 2184.15
+      },
+      "nodeId": "50140",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 0.567
+      },
+      "componentVectorMagnitudeKn": 0.567,
+      "thermalMovementMm": {
+        "X": 25.117,
+        "Y": 26.109
+      }
+    },
+    {
+      "siteId": "N60070",
+      "supportTag": "PS-12228",
+      "sourceCoordinateMm": {
+        "x": 445580.151,
+        "y": -1160775,
+        "z": 3209.55
+      },
+      "nodeId": "60070",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 2.895
+      },
+      "componentVectorMagnitudeKn": 2.895,
+      "thermalMovementMm": {
+        "X": 10.921,
+        "Y": 12.379
+      }
+    },
+    {
+      "siteId": "N60080",
+      "supportTag": "PS-12034",
+      "sourceCoordinateMm": {
+        "x": 445580.151,
+        "y": -1163935.927,
+        "z": 3209.55
+      },
+      "nodeId": "60080",
+      "capabilities": [
+        "LINESTOP",
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "LINESTOP",
+          "axis": "Y"
+        },
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 8.968,
+        "FzWeight": 2.895
+      },
+      "componentVectorMagnitudeKn": 9.424,
+      "thermalMovementMm": {
+        "X": 10.921,
+        "Y": 0
+      }
+    },
+    {
+      "siteId": "N70040",
+      "supportTag": "PS-12060",
+      "sourceCoordinateMm": {
+        "x": 442973.151,
+        "y": -1163710,
+        "z": 3209.55
+      },
+      "nodeId": "70040",
+      "capabilities": [
+        "GUIDE",
+        "LINESTOP",
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "GUIDE",
+          "axis": "X"
+        },
+        {
+          "capability": "LINESTOP",
+          "axis": "Y"
+        },
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": -1.858,
+        "FyThermal": 23.712,
+        "FzWeight": 4.241
+      },
+      "componentVectorMagnitudeKn": 24.16,
+      "thermalMovementMm": {
+        "X": 0,
+        "Y": 0
+      }
+    },
+    {
+      "siteId": "N70050",
+      "supportTag": "PS-12059",
+      "sourceCoordinateMm": {
+        "x": 442973.151,
+        "y": -1161085,
+        "z": 3209.55
+      },
+      "nodeId": "70050",
+      "capabilities": [
+        "REST"
+      ],
+      "inferredDirections": [
+        {
+          "capability": "REST",
+          "axis": "Z"
+        }
+      ],
+      "reactionsKn": {
+        "FxThermal": 0,
+        "FyThermal": 0,
+        "FzWeight": 3.319
+      },
+      "componentVectorMagnitudeKn": 3.319,
+      "thermalMovementMm": {
+        "X": 0.635,
+        "Y": 10.269
+      }
+    }
+  ],
+  "warnings": [
+    "Results depend on the editable benchmark profile and are not the locked WP6 qualification profile.",
+    "Anchorless admission is based on actual directional-restraint matrix rank; no arbitrary datum node is fixed.",
+    "Vertical reactions use graph tributary weight, not flexural beam analysis.",
+    "Guide and line-stop axes are inferred from the host route tangent because the exported TYPE 8/9 cosine fields are zero.",
+    "All sentinel process values inherit from connected previous-node explicit values; no configured temperature or fluid fallback is used.",
+    "No positive flange, valve, or instrument source weights are present; configurable same-section pipe-equivalent fallback is used.",
+    "Component vector magnitudes combine independently screened Fx, Fy, and Fz components and are not a code operating load case.",
+    "Pressure load and pressure stress are excluded."
+  ]
+}
