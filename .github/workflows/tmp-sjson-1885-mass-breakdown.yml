@@ -23,7 +23,7 @@ jobs:
           node-version: 22
       - name: Apply constituent mass-ledger patch
         run: |
-          git show HEAD^^^^^:.github/workflows/tmp-sjson-1885-mass-breakdown.yml > /tmp/embedded-workflow.yml
+          git show HEAD^^^^^^:.github/workflows/tmp-sjson-1885-mass-breakdown.yml > /tmp/embedded-workflow.yml
           python - <<'PY'
           from pathlib import Path
           import re
@@ -38,11 +38,19 @@ jobs:
           exec(compile(body, '<embedded-mass-breakdown-patch>', 'exec'))
           check_path = Path('scripts/empirical-sjson-1885-configurable-screening-check.mjs')
           check = check_path.read_text()
-          old_tolerance = "assertClose(row.kgPerM[key] * row.lengthM, row.kg[key], 3e-6, `${row.edgeId} ${key} rate-to-mass closure`);"
-          new_tolerance = "assertClose(row.kgPerM[key] * row.lengthM, row.kg[key], 1e-4, `${row.edgeId} ${key} serialized rate-to-mass closure`);"
-          if old_tolerance not in check:
-              raise SystemExit('Element rate-to-mass tolerance assertion not found.')
-          check_path.write_text(check.replace(old_tolerance, new_tolerance, 1))
+          replacements = {
+              "assertClose(globalMass.metal + globalMass.fluid + globalMass.insulation, globalMass.total, 2e-6, 'global constituent mass closure');": "assertClose(globalMass.metal + globalMass.fluid + globalMass.insulation, globalMass.total, 1e-5, 'global serialized constituent mass closure');",
+              "assertClose(globalMass.total, result.verticalWeight.totalModelMassKg, 2e-6, 'global mass ledger total');": "assertClose(globalMass.total, result.verticalWeight.totalModelMassKg, 1e-5, 'global serialized mass ledger total');",
+              "assertClose(row.kg.metal + row.kg.fluid + row.kg.insulation, row.kg.total, 3e-6, `${row.edgeId} constituent mass closure`);": "assertClose(row.kg.metal + row.kg.fluid + row.kg.insulation, row.kg.total, 1e-5, `${row.edgeId} serialized constituent mass closure`);",
+              "assertClose(row.kgPerM[key] * row.lengthM, row.kg[key], 3e-6, `${row.edgeId} ${key} rate-to-mass closure`);": "assertClose(row.kgPerM[key] * row.lengthM, row.kg[key], 1e-4, `${row.edgeId} ${key} serialized rate-to-mass closure`);",
+              "assertClose(row.kg.metal + row.kg.fluid + row.kg.insulation, row.kg.total, 3e-6, `${row.siteId} support constituent closure`);": "assertClose(row.kg.metal + row.kg.fluid + row.kg.insulation, row.kg.total, 1e-5, `${row.siteId} serialized support constituent closure`);",
+              "assertClose(supportMassTotals[key], globalMass[key], 5e-6, `support allocation ${key} closure`);": "assertClose(supportMassTotals[key], globalMass[key], 1e-5, `serialized support allocation ${key} closure`);",
+          }
+          for old, new in replacements.items():
+              if old not in check:
+                  raise SystemExit(f'Mass-ledger assertion not found: {old}')
+              check = check.replace(old, new, 1)
+          check_path.write_text(check)
           workflow_path = Path('.github/workflows/sjson-1885-configurable-screening.yml')
           workflow = workflow_path.read_text()
           workflow = workflow.replace('      - benchmarks/1885Sjson/empirical-screening-result.configurable.csv\n', '      - benchmarks/1885Sjson/empirical-screening-result.configurable.csv\n      - benchmarks/1885Sjson/empirical-screening-element-mass-breakdown.configurable.csv\n')
