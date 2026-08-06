@@ -1,6 +1,18 @@
 name: LFEA WP-PF1 exact-head qualification
 
 on:
+  push:
+    branches:
+      - agent/lfea-prefea-checker-gateway
+    paths:
+      - 'src/analyze/analyze-controller.js'
+      - 'src/core/linear-fea-solver/**'
+      - 'src/core/linear-piping-analysis-consumer/**'
+      - 'test/lfea-prefea-gateway.test.js'
+      - 'test/lfea-prefea-public-call-sites.test.js'
+      - 'scripts/lfea-prefea-qualification.mjs'
+      - 'evidence/wp-pf1/**'
+      - '.github/workflows/lfea-prefea-exact-head.yml'
   pull_request:
     paths:
       - 'src/analyze/analyze-controller.js'
@@ -22,6 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PREFEA_BASE_SHA: 1d7dee134a925846e11f024e8e7f883a53533829
+      PREFEA_CANDIDATE_PARENT_SHA: dce5b32c3cccc7e5154bf54fa1ed6e80cc303a57
       PREFEA_EVIDENCE_DIR: artifacts/wp-pf1
       PREFEA_CHANGED_PATHS_FILE: artifacts/wp-pf1/changed-paths.txt
     steps:
@@ -31,7 +44,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
-      - name: Verify exact head and one-commit custody
+      - name: Verify exact head and custody chain
         shell: bash
         run: |
           set -euo pipefail
@@ -39,9 +52,11 @@ jobs:
           actual="$(git rev-parse HEAD)"
           test "$actual" = "$expected"
           git cat-file -e "$PREFEA_BASE_SHA^{commit}"
+          git cat-file -e "$PREFEA_CANDIDATE_PARENT_SHA^{commit}"
+          test "$(git rev-parse HEAD^)" = "$PREFEA_CANDIDATE_PARENT_SHA"
+          test "$(git rev-parse HEAD^^)" = "$PREFEA_BASE_SHA"
           count="$(git rev-list --count "$PREFEA_BASE_SHA..HEAD")"
-          test "$count" = '1'
-          test "$(git rev-parse HEAD^)" = "$PREFEA_BASE_SHA"
+          test "$count" = '2'
           echo "PREFEA_HEAD_SHA=$actual" >> "$GITHUB_ENV"
           echo "PREFEA_COMMIT_COUNT=$count" >> "$GITHUB_ENV"
           echo "PREFEA_SOURCE_TREE_SHA=$(git rev-parse HEAD^{tree})" >> "$GITHUB_ENV"
