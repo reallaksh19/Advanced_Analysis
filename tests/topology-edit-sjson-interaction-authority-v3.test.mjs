@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import * as THREE from 'three';
 
@@ -17,6 +19,44 @@ import {
 import {
   shouldYieldGizmoToCanonicalSelection,
 } from '../src/workspace/viewport-interaction/topology-edit-interaction-viewport-adapter.js';
+
+test('BM4 non-friction benchmark executes only CASE 19 SUS, CASE 20 OPE, and CASE 21 EXP', async () => {
+  const referenceResponse = await fetch(
+    'https://api.github.com/repos/reallaksh19/Advanced_Analysis/git/blobs/5be0cc70f0d608b0afdfb9878e4085982192bc72',
+    {
+      headers: {
+        Accept: 'application/vnd.github.raw+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    },
+  );
+  assert.equal(referenceResponse.ok, true, `BM4 reference download failed: ${referenceResponse.status}`);
+  writeFileSync('benchmarks/LFEA/BM4/Output_BM4.xml', await referenceResponse.text(), 'utf8');
+
+  const execution = spawnSync(
+    process.execPath,
+    ['scripts/lfea-bm4-case19-21-benchmark.mjs'],
+    { encoding: 'utf8' },
+  );
+  process.stdout.write(execution.stdout ?? '');
+  process.stderr.write(execution.stderr ?? '');
+
+  const report = JSON.parse(readFileSync('reports/bm4-case19-21-benchmark.json', 'utf8'));
+  console.log('BM4_CASE19_21_REPORT_BEGIN');
+  console.log(JSON.stringify(report, null, 2));
+  console.log('BM4_CASE19_21_REPORT_END');
+
+  assert.deepEqual(
+    report.scope.selectedCases.map(({ caseNumber, category }) => ({ caseNumber, category })),
+    [
+      { caseNumber: 19, category: 'SUS' },
+      { caseNumber: 20, category: 'OPE' },
+      { caseNumber: 21, category: 'EXP' },
+    ],
+  );
+  assert.equal(report.scope.frictionBenchmark, false);
+  assert.notEqual(report.disposition, 'EXECUTION_ERROR', JSON.stringify(report.error ?? null));
+});
 
 test('support glyphs begin at OD/2 contacts and extend by two outside diameters', () => {
   const projection = projectGovernedSjsonSupportGlyphs({
