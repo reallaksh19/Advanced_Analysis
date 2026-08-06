@@ -178,3 +178,5 @@ console.log(JSON.stringify({
 }, null, 2));
 console.log('SOURCE_CORRECTION_CONTRACT: PASS');
 console.log('BENCHMARK_PARITY: NOT_EVALUATED_BY_THIS_CHECK');
+
+// Synchronization marker for the exact-head BM4 CASE 19/20/21 execution request.
