@@ -1,0 +1,38 @@
+name: LAFEA-NC NC-08R real-module qualification gate
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/lafea-nc08r-real-module-qualification.yml'
+      - 'docs/nonlinear-shell-contact/LAFEA_NC08R_REAL_MODULE_QUALIFICATION.md'
+      - 'docs/nonlinear-shell-contact/LAFEA_NC08R_REAL_MODULE_QUALIFICATION_INPUT_TEMPLATE.md'
+      - 'scripts/lafea-nc08r-check.mjs'
+      - 'src/core/nonlinear-shell-contact/real-module-qualification-contract.js'
+      - 'src/core/nonlinear-shell-contact/real-module-qualification-evaluator.js'
+      - 'src/core/nonlinear-shell-contact/real-module-negative-controls.js'
+      - 'tests/nonlinear-shell-contact-nc08r-qualification.test.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify exact checked-out head
+        if: github.event_name == 'pull_request'
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+      - name: Validate NC-08R gate mechanics
+        run: node scripts/lafea-nc08r-check.mjs
+      - name: Preserve production authority boundary
+        run: |
+          ! grep -R "productionExecutionAuthorized: true" \
+            src/core/nonlinear-shell-contact/real-module-qualification-*.js \
+            tests/nonlinear-shell-contact-nc08r-qualification.test.mjs
