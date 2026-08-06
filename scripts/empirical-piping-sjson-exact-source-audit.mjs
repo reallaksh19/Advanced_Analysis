@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { readFile, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 
 import { buildPipingPortTopologyGraph } from '../src/core/piping-topology/index.js';
 import {
