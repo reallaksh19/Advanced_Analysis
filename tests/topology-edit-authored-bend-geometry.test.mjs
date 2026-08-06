@@ -5,6 +5,10 @@ import {
   applyTopologyEditAuthoredBendProjection,
   deriveTopologyEditAuthoredBendProjection,
 } from '../src/workspace/topology-edit/authoring/topology-edit-authored-bend-geometry.js';
+import {
+  normalizeTopologyEditCanonicalId,
+  topologyEditCanonicalIdKind,
+} from '../src/workspace/topology-edit/professional/topology-edit-canonical-id.js';
 
 function topology(radiusMm = 100) {
   return finalizeCanonicalTopology({
@@ -50,6 +54,15 @@ function routeSegments() {
     }),
   ];
 }
+
+test('governed bend definitions use an exact canonical identity', () => {
+  assert.equal(normalizeTopologyEditCanonicalId('bend:corner'), 'bend:corner');
+  assert.equal(topologyEditCanonicalIdKind('bend:corner'), 'bend');
+  assert.throws(
+    () => normalizeTopologyEditCanonicalId('bend:corner with-space'),
+    /exact canonical ID with no whitespace/,
+  );
+});
 
 test('authored bend projection trims both route arms and inserts one pickable arc', () => {
   const canonical = topology();
