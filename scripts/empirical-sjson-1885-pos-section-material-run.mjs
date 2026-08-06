@@ -46,16 +46,32 @@ console.log(JSON.stringify({
   status: calculation.status,
   resolvedRowCount: calculation.resolvedRowCount,
   blockedRowCount: calculation.blockedRowCount,
+  branchScheduleSummary: calculation.branchScheduleSummary,
+  sourceCrosswalkSummary: countBy(calculation.rows, (row) => `${row.sourceRecordMatched ? 'MATCHED' : 'UNMATCHED'}:${row.sourceRecordName || 'NONE'}:${row.branchPath || 'NO_BRANCH'}:${row.componentType || 'NO_TYPE'}`),
   defaultUsageSummary: calculation.resolutionReceipt.summary,
 }, null, 2));
 console.log('EMPIRICAL_SJSON_1885_POS_SECTION_MATERIAL_END');
 
 if (calculation.blockedRowCount > 0) {
-  const sample = calculation.rows.filter((row) => row.status !== 'RESOLVED').slice(0, 10)
-    .map((row) => `${row.posId}: ${row.blockers.map((item) => `${item.field}=${item.status}`).join(', ')}`);
+  const sample = calculation.rows.filter((row) => row.status !== 'RESOLVED').slice(0, 20)
+    .map((row) => [
+      row.posId,
+      `topology=${row.componentType}:${row.componentName}`,
+      `source=${row.sourceRecordMatched ? `${row.sourceRecordName}:${row.branchPath}` : 'UNMATCHED'}`,
+      `blockers=${row.blockers.map((item) => `${item.field}=${item.status}:${item.reason}`).join(', ')}`,
+    ].join(' '));
   throw new Error(`POS section/material resolution blocked ${calculation.blockedRowCount} row(s). ${sample.join(' | ')}`);
 }
 
 function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
+}
+
+function countBy(values, keyFn) {
+  const counts = {};
+  for (const value of values) {
+    const key = keyFn(value);
+    counts[key] = (counts[key] || 0) + 1;
+  }
+  return counts;
 }
