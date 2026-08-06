@@ -9,6 +9,9 @@ import {
   normalizeTopologyEditCanonicalId,
   topologyEditCanonicalIdKind,
 } from '../src/workspace/topology-edit/professional/topology-edit-canonical-id.js';
+import {
+  pickUserData,
+} from '../src/workspace/topology-edit/topology-edit-sjson-governed-render-common-v2.js';
 
 function topology(radiusMm = 100) {
   return finalizeCanonicalTopology({
@@ -78,6 +81,12 @@ test('authored bend projection trims both route arms and inserts one pickable ar
   assert.equal(arc.type, 'ELBOW_ARC');
   assert.equal(arc.curveKind, 'CUBIC_BEZIER');
   assert.ok(arc.points.length >= 9);
+  assert.deepEqual(pickUserData(arc), {
+    canonicalId: 'bend:corner',
+    type: 'ELBOW_ARC',
+    partRole: 'authored-elbow-arc',
+    pickTarget: arc.pickTarget,
+  });
   assert.equal(Object.isFrozen(result), true);
 });
 
