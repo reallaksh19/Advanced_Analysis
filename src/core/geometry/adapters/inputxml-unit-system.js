@@ -55,6 +55,7 @@ function normalizedLabel(value) {
     .replace(/KN\.?[-·*\s]*M\.?/gu, 'KNM')
     .replace(/N\.?[-·*\s]*M\.?/gu, 'NM')
     .replace(/N\.?\s*\/\s*SQ\.?\s*MM\.?/gu, 'N/SQMM')
+    // CAESAR II InputXML writes kg/cm³ density as the dotted label "kg.cu.cm.".
     .replace(/KG\.CU\.CM\./gu, 'KG/CUCM')
     .replace(/KG\.?\s*\/\s*CU\.?\s*CM\.?/gu, 'KG/CUCM')
     .replace(/KG\.?\s*\/\s*M(?:\^?3|3)\.?/gu, 'KG/M3')
