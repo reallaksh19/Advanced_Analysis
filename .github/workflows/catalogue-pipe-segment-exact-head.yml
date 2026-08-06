@@ -4,9 +4,15 @@ on:
   pull_request:
     paths:
       - '.github/workflows/catalogue-pipe-segment-exact-head.yml'
+      - 'src/workspace/topology-edit/topology-edit-command-contract.js'
+      - 'src/workspace/topology-edit/topology-edit-command-resolver.js'
+      - 'src/workspace/topology-edit/topology-edit-candidate-builder.js'
+      - 'src/workspace/topology-edit/topology-edit-candidate-validator.js'
+      - 'src/workspace/topology-edit/topology-edit-command-effect-dispatch.js'
+      - 'src/workspace/topology-edit/topology-edit-pure-reducer-dispatch.js'
       - 'src/workspace/topology-edit/topology-edit-pipe-segment-*.js'
       - 'src/workspace/topology-edit/topology-edit-native-pipe-writeback.js'
-      - 'tests/topology-edit-pipe-segment-command.test.mjs'
+      - 'tests/topology-edit-pipe-segment-*.test.mjs'
       - 'docs/catalogue-pipe-segment-primitive.md'
   workflow_dispatch:
 
@@ -40,26 +46,39 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
-          files=(
+          legacy=(
+            src/workspace/topology-edit/topology-edit-command-contract.js
+            src/workspace/topology-edit/topology-edit-command-resolver.js
+            src/workspace/topology-edit/topology-edit-candidate-builder.js
+            src/workspace/topology-edit/topology-edit-candidate-validator.js
+          )
+          limited=(
+            src/workspace/topology-edit/topology-edit-command-effect-dispatch.js
+            src/workspace/topology-edit/topology-edit-pure-reducer-dispatch.js
             src/workspace/topology-edit/topology-edit-pipe-segment-contract.js
             src/workspace/topology-edit/topology-edit-pipe-segment-geometry.js
             src/workspace/topology-edit/topology-edit-pipe-segment-resolver.js
             src/workspace/topology-edit/topology-edit-pipe-segment-reducer.js
+            src/workspace/topology-edit/topology-edit-pipe-segment-effect.js
             src/workspace/topology-edit/topology-edit-native-pipe-writeback.js
             src/workspace/topology-edit/topology-edit-pipe-segment-command.js
             tests/topology-edit-pipe-segment-command.test.mjs
+            tests/topology-edit-pipe-segment-certified-journal.test.mjs
           )
-          for file in "${files[@]}"; do
+          for file in "${legacy[@]}" "${limited[@]}"; do
             node --check "$file"
+          done
+          for file in "${limited[@]}"; do
             test "$(wc -l < "$file")" -lt 300
           done
           git diff --check
 
-      - name: Execute governed pipe contracts
+      - name: Execute governed pipe and journal contracts
         run: |
           set -o pipefail
           node --test --test-reporter=tap \
             tests/topology-edit-pipe-segment-command.test.mjs \
+            tests/topology-edit-pipe-segment-certified-journal.test.mjs \
             2>&1 | tee catalogue-pipe-segment-test-output.txt
           test "$(grep -c '^ok ' catalogue-pipe-segment-test-output.txt)" -gt 0
 
