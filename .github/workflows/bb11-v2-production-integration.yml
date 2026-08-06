@@ -1,4 +1,5 @@
 name: BB-11 V2 production integration
+# Exact-head source-truth integration gate.
 
 on:
   pull_request:
