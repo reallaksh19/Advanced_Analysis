@@ -106,6 +106,22 @@ export {
 } from './inputxml-source-binding.js';
 
 export {
+  diagnoseInputXmlLinearModelHealth,
   diagnoseInputXmlModelHealthProximity,
   diagnoseInputXmlModelHealthTopology,
 } from './inputxml-model-health.js';
+
+export {
+  INPUTXML_LINEAR_MODEL_HEALTH_SCHEMA,
+  requireInputXmlLinearModelHealth,
+  sealInputXmlLinearModelHealth,
+} from './inputxml-linear-model-health-contract.js';
+
+export {
+  DISCLOSED_GENERIC_ANALYZER_APPROXIMATION_PROFILE,
+  INPUTXML_CAPABILITY_EFFECT_DISPOSITIONS,
+  INPUTXML_FEATURE_DISPOSITIONS,
+  INPUTXML_MODEL_HEALTH_CAPABILITIES,
+  INPUTXML_MODEL_HEALTH_CAPABILITY_DEPENDENCIES,
+  STRICT_INPUTXML_LINEAR_STATIC_PROFILE,
+} from './inputxml-model-health-profile.js';
