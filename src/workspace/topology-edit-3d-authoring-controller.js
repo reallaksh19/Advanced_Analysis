@@ -14,6 +14,13 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     super(eventBus, lifecycleOptions);
     this.authoringElement = null;
     this.authoringRuntime = new TopologyEditAuthoringRuntime(this);
+    const applyOperation = this.authoringRuntime.applyOperation.bind(this.authoringRuntime);
+    this.authoringRuntime.applyOperation = async (...args) => {
+      const result = await applyOperation(...args);
+      normalizeControllerNodeSelection(this);
+      this.authoringRuntime.selectionChanged();
+      return result;
+    };
 
     // Final subclasses such as the governed SJSON controller own their source
     // visual derivation. Decorate that exact downstream result instead of
@@ -112,9 +119,16 @@ export class TopologyEdit3DViewController extends ProfessionalController {
   exposeAuthoredRenderRoles() {
     const draftGroup = this.viewportBackend?.groups?.draftGroup;
     if (!draftGroup) return;
+    const authoredBendIds = new Set((this.session?.currentTopology()?.bends ?? [])
+      .filter((bend) => Boolean(bend.createdByCommandId))
+      .map((bend) => bend.id));
     let authoredPartCount = 0;
     draftGroup.traverse((object) => {
-      const partRole = object.userData?.pickTarget?.partRole;
+      const canonicalId = object.userData?.pickTarget?.objectId
+        ?? object.userData?.canonicalId
+        ?? null;
+      const partRole = object.userData?.pickTarget?.partRole
+        ?? (authoredBendIds.has(canonicalId) ? 'authored-elbow-arc' : null);
       if (!partRole) return;
       object.userData.partRole = partRole;
       if (String(partRole).startsWith('authored-')) authoredPartCount += 1;
@@ -132,6 +146,7 @@ export class TopologyEdit3DViewController extends ProfessionalController {
 
   handleUnifiedSelectionChanged(payload) {
     super.handleUnifiedSelectionChanged(payload);
+    normalizeControllerNodeSelection(this);
     this.authoringRuntime?.selectionChanged();
   }
 
@@ -171,6 +186,15 @@ export class TopologyEdit3DViewController extends ProfessionalController {
     this.authoringRuntime.clear(false, true);
     return super.acceptAutofix();
   }
+}
+
+function normalizeControllerNodeSelection(controller) {
+  const nodeIds = controller?.selection?.nodeIds;
+  if (typeof nodeIds !== 'string') return;
+  controller.selection = {
+    ...controller.selection,
+    nodeIds: nodeIds ? [nodeIds] : [],
+  };
 }
 
 function authoredProjectionSegments(projection) {
