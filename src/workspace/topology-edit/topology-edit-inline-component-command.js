@@ -94,6 +94,9 @@ export function assertTopologyEditInlineComponentTarget(topology, payloadInput) 
     TO_BOUNDARY: startFraction > EPSILON && Math.abs(endFraction - 1) <= EPSILON,
   }[payload.placement];
   if (!validPlacement) {
+    if (payload.placement === 'INTERIOR') {
+      fail('inline component must fit strictly inside the host edge for INTERIOR placement.', RangeError);
+    }
     fail(`inline ${payload.placement.toLowerCase()} placement does not fit the host edge.`, RangeError);
   }
   assertHostCompatibility(edge, payload.catalogueBinding, payload.direction);
