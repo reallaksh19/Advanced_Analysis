@@ -152,7 +152,8 @@ function indexEnrichedSource(root, config) {
       for (const key of nameKeys(name, attrs.NAME)) {
         if (!byName.has(key)) byName.set(key, record);
       }
-      const capability = String(attrs.SUPPORT_KIND || attrs.SUPPORT_TYPE || '').toUpperCase();
+      const rawCapability = String(attrs.SUPPORT_KIND || attrs.SUPPORT_TYPE || '').toUpperCase();
+      const capability = rawCapability === 'SUPPORT' ? 'REST' : rawCapability;
       const tag = baseSupportTag(attrs.SUPPORT_TAG || name.replace(/^SUPPORT\s+/i, ''));
       const coordinate = firstPoint(attrs.LPOS, attrs.POS, attrs.APOS);
       if (tag && coordinate && ['REST', 'GUIDE', 'LINESTOP'].includes(capability)) {
