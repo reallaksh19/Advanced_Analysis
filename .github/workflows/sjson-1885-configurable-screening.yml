@@ -92,4 +92,16 @@ jobs:
             /tmp/EnrichedSjson \
             /tmp/EnrichedSjson.topology.input.xml \
             /tmp/result-b.json
-         Û\İ\Ü™\İ[XKšœÛÛˆİ\Ü™\İ[X‹šœÛÛ‚ˆÛ\İ\Ü™\İ[XKšœÛÛˆ™[˜ÚX\šÜËÌNTÚœÛÛ‹Ù[\\šXØ[\ØÜ™Y[š[™Ë\™\İ[˜ÛÛ™šYİ\˜X›KšœÛÛ‚ˆ›ÙHØÜš\ËÙ[\\šXØ[\ÚœÛÛ‹LNKXÛÛ™šYİ\˜X›K\ØÜ™Y[š[™ËXÚXÚË›ZœÈİ\Ü™\İ[XKšœÛÛ‚ˆH˜[YNˆ\ØYØ[İ[][Ûˆ]šY[˜ÙBˆ\Ù\ÎˆXİ[ÛœËİ\ØYX\Y˜XİˆÚ]‚ˆ˜[YNˆ[\\šXØ[\ÚœÛÛ‹LNKXÛÛ™šYİ\˜X›K\ØÜ™Y[š[™Âˆ]ˆˆİ\Ü™\İ[XKšœÛÛ‚ˆİ\ÜÜË\ÙXİ[Û‹[X]\šX[šœÛÛ‚ˆ™[˜ÚX\šÜËÌNTÚœÛÛ‹Ù[\\šXØ[\ØÜ™Y[š[™Ë\™\İ[˜ÛÛ™šYİ\˜X›K˜Üİ‚ˆØÜËÙ]šY[˜ÙKÔÒ”ÓÓ—ÌNWĞÓÓ‘’QÕTP“WÔĞÔ‘QS’S‘Ë›YˆY‹[›ËYš[\ËY›İ[™ˆ\œ›Ü‚
+          cmp /tmp/result-a.json /tmp/result-b.json
+          cmp /tmp/result-a.json benchmarks/1885Sjson/empirical-screening-result.configurable.json
+          node scripts/empirical-sjson-1885-configurable-screening-check.mjs /tmp/result-a.json
+      - name: Upload calculation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: empirical-sjson-1885-configurable-screening
+          path: |
+            /tmp/result-a.json
+            /tmp/pos-section-material.json
+            benchmarks/1885Sjson/empirical-screening-result.configurable.csv
+            docs/evidence/SJSON_1885_CONFIGURABLE_SCREENING.md
+          if-no-files-found: error
