@@ -105,3 +105,8 @@ export {
   runLinearPipingAnalysisFromInputXml,
   validateLinearPipingInputXmlAnalysisRequest,
 } from './inputxml-source-binding.js';
+
+export {
+  INPUTXML_MODEL_HEALTH_SOURCE_SCHEMA,
+  diagnoseInputXmlModelHealthSource,
+} from './inputxml-model-health.js';
