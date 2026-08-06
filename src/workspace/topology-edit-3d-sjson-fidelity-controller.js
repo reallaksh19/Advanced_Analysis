@@ -14,9 +14,9 @@ import {
   TopologyEditSjsonGovernedViewportBackend,
 } from './topology-edit/topology-edit-sjson-governed-viewport-backend-v2.js';
 import {
-  SJSON_BENCHMARK_SOURCE_HASH,
   applySjsonBenchmarkCameraFit,
   deriveGovernedSjsonSupportBundle,
+  isGovernedSjsonEditDraftSourceHash,
 } from './topology-edit/topology-edit-sjson-runtime-authority-v2.js';
 import { publishSjsonFidelityEvidence } from './topology-edit/topology-edit-sjson-fidelity-evidence-v2.js';
 
@@ -236,8 +236,8 @@ export class TopologyEdit3DViewController extends ProfessionalController {
 
   isGovernedSjsonCanonical(canonical) {
     const baseSourceHash = this.session?.baseCanonicalTopology?.sourceHash;
-    return canonical?.sourceHash === SJSON_BENCHMARK_SOURCE_HASH
-      || baseSourceHash === SJSON_BENCHMARK_SOURCE_HASH;
+    return isGovernedSjsonEditDraftSourceHash(canonical?.sourceHash)
+      || isGovernedSjsonEditDraftSourceHash(baseSourceHash);
   }
 
   deactivate() {
