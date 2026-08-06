@@ -14,6 +14,7 @@ on:
       - 'scripts/empirical-coupled-restraint-network-check.mjs'
       - 'scripts/empirical-restraint-network-check.mjs'
       - 'benchmarks/LFEA/BM2/Input_BM2.xml'
+      - '.github/workflows/empirical-piping-exact-head.yml'
       - '.github/workflows/empirical-coupled-restraint-network-wp6.yml'
   pull_request:
     paths:
@@ -26,6 +27,7 @@ on:
       - 'scripts/empirical-coupled-restraint-network-check.mjs'
       - 'scripts/empirical-restraint-network-check.mjs'
       - 'benchmarks/LFEA/BM2/Input_BM2.xml'
+      - '.github/workflows/empirical-piping-exact-head.yml'
       - '.github/workflows/empirical-coupled-restraint-network-wp6.yml'
   workflow_dispatch:
 
