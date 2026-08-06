@@ -32,6 +32,25 @@ jobs:
           grep -o 'FLUID_DENSITY="[^"]*"' /tmp/EnrichedSjson.topology.input.xml | sort | uniq -c
           echo 'UNIT_METADATA'
           grep -oE '(DENSITY|MASS|LENGTH|FORCE|UNIT)[A-Z0-9_:-]*="[^"]*"' /tmp/EnrichedSjson.topology.input.xml | sort | uniq -c | head -100 || true
+      - name: Audit duplicate enriched records for N50120 line
+        run: |
+          echo 'MATCHING_ENRICHED_RECORDS'
+          jq -c '
+            .. | objects
+            | select(((.name? // "") | tostring | contains("S8810111-91261M7-HC-01/B2 3")))
+            | {
+                name,
+                type,
+                attrName: .attributes.NAME,
+                insu: .attributes.INSU,
+                lpos: .attributes.LPOS,
+                pos: .attributes.POS,
+                apos: .attributes.APOS,
+                enrichedInsulation: .enrichedAttributes.insulationThicknessMm,
+                enrichedFluidDensity: .enrichedAttributes.fluidDensityOpeKgM3,
+                pipeOdMm: .enrichedAttributes.pipeOdMm,
+                wallThicknessMm: .enrichedAttributes.wallThicknessMm
+              }' /tmp/EnrichedSjson
       - name: Audit N50120 incident mass and units
         run: |
           node scripts/tmp-sjson-50120-vertical-unit-audit.mjs \
