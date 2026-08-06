@@ -20,77 +20,74 @@ jobs:
           ref: agent/empirical-coupled-network-wp6
           fetch-depth: 0
 
-      - name: Patch adapter, scenario authority and registry
+      - name: Extend exact-head qualification for WP6
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
 
-          adapter = Path('src/workspace/engineering-loads/adapters/sjson-to-empirical-piping-request.js')
-          text = adapter.read_text()
-          old = "if (!['EMPIRICAL_BEAM_CONTACT_V1', 'EMPIRICAL_RESTRAINT_NETWORK_V1'].includes(value)) {"
-          new = "if (!['EMPIRICAL_BEAM_CONTACT_V1', 'EMPIRICAL_RESTRAINT_NETWORK_V1', 'EMPIRICAL_RESTRAINT_NETWORK_V2'].includes(value)) {"
-          if 'EMPIRICAL_RESTRAINT_NETWORK_V2' not in text:
-              if old not in text:
-                  raise SystemExit('adapter admission anchor not found')
-              adapter.write_text(text.replace(old, new, 1))
+          workflow = Path('.github/workflows/empirical-piping-exact-head.yml')
+          text = workflow.read_text()
 
-          registry = Path('src/workspace/engineering-loads/empirical-method-registry.js')
-          text = registry.read_text()
-          anchor = """  method({
-              methodId: 'EMPIRICAL_RESTRAINT_NETWORK_V1',
-              purpose: 'GUIDE_LINE_STOP_THERMAL_SCREENING',
-              runtimeStatus: 'REGISTERED',
-              qualificationStatus: 'QUALIFIED_RESTRICTED_DOMAIN',
-              resultClasses: ['THERMAL_LINE_STOP_SCREENING_RESULT'],
-              qualifiedDofs: ['ONE_TRANSLATIONAL_DIRECTION'],
-            }),
-          """
-          addition = anchor + """  method({
-              methodId: 'EMPIRICAL_RESTRAINT_NETWORK_V2',
-              purpose: 'COUPLED_BRANCH_LOOP_THERMAL_SCREENING',
-              runtimeStatus: 'REGISTERED',
-              qualificationStatus: 'QUALIFIED_RESTRICTED_DOMAIN',
-              resultClasses: ['THERMAL_LINE_STOP_SCREENING_RESULT'],
-              qualifiedDofs: ['ONE_TRANSLATIONAL_DIRECTION_COUPLED_GRAPH'],
-            }),
-          """
-          if "methodId: 'EMPIRICAL_RESTRAINT_NETWORK_V2'" not in text:
+          def add_after(anchor, addition, label):
+              global text
+              if addition.strip() in text:
+                  return
               if anchor not in text:
-                  raise SystemExit('registry insertion anchor not found')
-              registry.write_text(text.replace(anchor, addition, 1))
+                  raise SystemExit(f'{label} anchor not found')
+              text = text.replace(anchor, anchor + addition, 1)
 
-          contracts = Path('src/workspace/engineering-loads/contracts/empirical-sjson-contracts.js')
-          text = contracts.read_text()
-          method_anchor = """  'EMPIRICAL_RESTRAINT_NETWORK_V1',
-          ]);
-          """
-          method_addition = """  'EMPIRICAL_RESTRAINT_NETWORK_V1',
-            'EMPIRICAL_RESTRAINT_NETWORK_V2',
-          ]);
-          """
-          if "'EMPIRICAL_RESTRAINT_NETWORK_V2'," not in text:
-              if method_anchor not in text:
-                  raise SystemExit('scenario method-list anchor not found')
-              text = text.replace(method_anchor, method_addition, 1)
-          ownership_old = "if (scenario.method === 'EMPIRICAL_RESTRAINT_NETWORK_V1') {"
-          ownership_new = "if (['EMPIRICAL_RESTRAINT_NETWORK_V1', 'EMPIRICAL_RESTRAINT_NETWORK_V2'].includes(scenario.method)) {"
-          if ownership_new not in text:
-              if ownership_old not in text:
-                  raise SystemExit('scenario ownership anchor not found')
-              text = text.replace(ownership_old, ownership_new, 1)
-          text = text.replace(
-              'EMPIRICAL_RESTRAINT_NETWORK_V1 may emit thermal line-stop screening results only.',
-              'Empirical restraint-network methods may emit thermal line-stop screening results only.',
-              1,
+          add_after(
+              "      - 'src/workspace/engineering-loads/empirical-restraint-network-*.js'\n",
+              "      - 'src/workspace/engineering-loads/empirical-coupled-restraint-network-*.js'\n",
+              'workflow production path',
           )
-          text = text.replace(
-              'The restricted restraint-network method requires thermal-strain-only load ownership.',
-              'Empirical restraint-network methods require thermal-strain-only load ownership.',
-              1,
+          add_after(
+              "      - 'scripts/empirical-restraint-network-check.mjs'\n",
+              "      - 'scripts/empirical-coupled-restraint-network-check.mjs'\n",
+              'workflow script path',
           )
-          contracts.write_text(text)
+          add_after(
+              "      - '.github/workflows/empirical-restraint-network-wp5.yml'\n",
+              "      - '.github/workflows/empirical-coupled-restraint-network-wp6.yml'\n",
+              'workflow authority path',
+          )
+
+          old_case = "src/workspace/engineering-loads/empirical-restraint-network-*.js|src/workspace/topology-edit/"
+          new_case = "src/workspace/engineering-loads/empirical-restraint-network-*.js|src/workspace/engineering-loads/empirical-coupled-restraint-network-*.js|src/workspace/topology-edit/"
+          if new_case not in text:
+              if old_case not in text:
+                  raise SystemExit('containment production-path anchor not found')
+              text = text.replace(old_case, new_case, 1)
+
+          old_script_case = "scripts/empirical-restraint-network-check.mjs|scripts/advanced-shell-contract-check.mjs"
+          new_script_case = "scripts/empirical-restraint-network-check.mjs|scripts/empirical-coupled-restraint-network-check.mjs|scripts/advanced-shell-contract-check.mjs"
+          if new_script_case not in text:
+              if old_script_case not in text:
+                  raise SystemExit('containment script anchor not found')
+              text = text.replace(old_script_case, new_script_case, 1)
+
+          old_workflow_case = ".github/workflows/empirical-restraint-network-wp5.yml) ;;"
+          new_workflow_case = ".github/workflows/empirical-restraint-network-wp5.yml|.github/workflows/empirical-coupled-restraint-network-wp6.yml) ;;"
+          if new_workflow_case not in text:
+              if old_workflow_case not in text:
+                  raise SystemExit('containment workflow anchor not found')
+              text = text.replace(old_workflow_case, new_workflow_case, 1)
+
+          execution_anchor = """      - name: Restricted global restraint-network runtime
+                run: node scripts/empirical-restraint-network-check.mjs
+          """
+          execution_addition = execution_anchor + """
+              - name: Coupled branch and loop restraint-network runtime
+                run: node scripts/empirical-coupled-restraint-network-check.mjs
+          """
+          if 'Coupled branch and loop restraint-network runtime' not in text:
+              if execution_anchor not in text:
+                  raise SystemExit('execution-step anchor not found')
+              text = text.replace(execution_anchor, execution_addition, 1)
+
+          workflow.write_text(text)
           PY
 
       - name: Commit patch
@@ -99,12 +96,10 @@ jobs:
           set -euo pipefail
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add src/workspace/engineering-loads/adapters/sjson-to-empirical-piping-request.js \
-            src/workspace/engineering-loads/contracts/empirical-sjson-contracts.js \
-            src/workspace/engineering-loads/empirical-method-registry.js
+          git add .github/workflows/empirical-piping-exact-head.yml
           if git diff --cached --quiet; then
-            echo 'WP6 shared authorities already patched.'
+            echo 'WP6 exact-head qualification already patched.'
             exit 0
           fi
-          git commit -m 'Authorize WP6 coupled restraint scenarios'
+          git commit -m 'Add WP6 to empirical exact-head qualification'
           git push origin HEAD:agent/empirical-coupled-network-wp6
