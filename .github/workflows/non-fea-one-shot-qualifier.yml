@@ -1,4 +1,4 @@
-# trigger revision 2
+# repair-and-qualify revision 3
 name: non-fea-one-shot-qualifier
 
 on:
@@ -8,7 +8,7 @@ on:
       - '.github/workflows/non-fea-one-shot-qualifier.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   qualify-current-feature-head:
@@ -26,6 +26,31 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+
+      - name: Apply targeted Input Check syntax correction
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/workspace/non-fea-input-check-view.js')
+          text = path.read_text()
+          old = 'A legacy calculation authorization is not a substitute for `common-enriched-piping-input/v1` and its exact readiness receipt.'
+          new = 'A legacy calculation authorization is not a substitute for <code>common-enriched-piping-input/v1</code> and its exact readiness receipt.'
+          if old in text:
+              path.write_text(text.replace(old, new, 1))
+          elif new not in text:
+              raise SystemExit('Target syntax text not found; refusing broad mutation.')
+          PY
+          git diff --check
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/workspace/non-fea-input-check-view.js
+            git commit -m "fix(non-fea): repair Input Check contract label syntax"
+            git push origin HEAD:feat/load-calc-non-fea-input-check-ui
+          fi
+          git fetch origin feat/load-calc-non-fea-input-check-ui main
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/feat/load-calc-non-fea-input-check-ui)"
 
       - name: Prove exact remote feature head
         shell: bash
