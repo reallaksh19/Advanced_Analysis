@@ -111,6 +111,26 @@
       }
     },
     {
+      "recordId": "VALVE-DN100-GLOBE-600-B",
+      "componentType": "VALVE",
+      "nominalSizeMm": 100,
+      "outsideDiameterMm": 114.3,
+      "pressureClass": "600",
+      "materialSpecification": "ASTM A216 WCB",
+      "componentLengthMm": 500,
+      "componentMassKg": 120,
+      "valveType": "GLOBE",
+      "valveFaceToFaceMm": 500,
+      "endConnectionFrom": "FLANGED_RF",
+      "endConnectionTo": "FLANGED_RF",
+      "pipingClass": "DEMO-600",
+      "sourceReference": {
+        "documentId": "SPEC-DEMO",
+        "revision": "8",
+        "path": "/valve/dn100/globe/class600-compact"
+      }
+    },
+    {
       "recordId": "FLANGE-DN100-600-RF-A",
       "componentType": "FLANGE",
       "nominalSizeMm": 100,

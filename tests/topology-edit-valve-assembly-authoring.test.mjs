@@ -95,6 +95,7 @@ test('Valve assembly derives exact compatible catalogue combinations and governe
   });
   assert.deepEqual(options.valveOptions.map((row) => row.recordId), [
     'VALVE-DN100-GATE-600-A',
+    'VALVE-DN100-GLOBE-600-B',
   ]);
   assert.deepEqual(options.upstreamFlangeOptions.map((row) => row.recordId), [
     'FLANGE-DN100-600-RF-A', 'FLANGE-DN100-600-RF-B',

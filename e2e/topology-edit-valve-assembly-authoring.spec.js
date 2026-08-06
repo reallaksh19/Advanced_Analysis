@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const VALVE_RECORD_ID = 'VALVE-DN100-GATE-600-A';
+const VALVE_RECORD_ID = 'VALVE-DN100-GLOBE-600-B';
 const UPSTREAM_FLANGE_ID = 'FLANGE-DN100-600-RF-A';
 const DOWNSTREAM_FLANGE_ID = 'FLANGE-DN100-600-RF-B';
 
@@ -14,12 +14,12 @@ test('production HUD authors one governed flange–valve–flange assembly atomi
   const diagnostics = collectBrowserDiagnostics(page);
   const host = await openProductionController(page);
   const initial = await topologySnapshot(page);
-  const target = await eligibleHostEdge(page, 100, 114.3, 840, 'P-005');
+  const target = await eligibleHostEdge(page, 100, 114.3, 740, 'P-005');
 
   await selectCanonicalEdgeFromTree(page, host, target.id);
   await page.locator('[data-action="activate-authoring-valve-assembly"]').click();
   await expect(host).toHaveAttribute('data-topology-edit-authoring-tool', 'VALVE_ASSEMBLY');
-  await expect(host).toHaveAttribute('data-topology-edit-authoring-catalogue-option-count', '4');
+  await expect(host).toHaveAttribute('data-topology-edit-authoring-catalogue-option-count', '8');
   await page.locator('[data-authoring-field="valveRecordId"]').selectOption(VALVE_RECORD_ID);
   await page.locator('[data-authoring-field="upstreamFlangeRecordId"]')
     .selectOption(UPSTREAM_FLANGE_ID);
@@ -27,8 +27,8 @@ test('production HUD authors one governed flange–valve–flange assembly atomi
     .selectOption(DOWNSTREAM_FLANGE_ID);
   await expect(page.locator('[data-authoring-field="faceToFaceMm"]')).toBeDisabled();
   await expect(page.locator('[data-authoring-field="assemblyLengthMm"]')).toBeDisabled();
-  await expect(page.locator('[data-authoring-field="assemblyLengthMm"]')).toHaveValue('840');
-  await expect(page.locator('[data-authoring-field="assemblyMassKg"]')).toHaveValue('207');
+  await expect(page.locator('[data-authoring-field="assemblyLengthMm"]')).toHaveValue('740');
+  await expect(page.locator('[data-authoring-field="assemblyMassKg"]')).toHaveValue('179');
 
   const priorTransactionHash = await host.getAttribute(
     'data-topology-edit-authoring-transaction-hash',
@@ -48,8 +48,8 @@ test('production HUD authors one governed flange–valve–flange assembly atomi
   const applied = await topologySnapshot(page);
   expect(applied.assembly).toHaveLength(3);
   expect(applied.roles).toEqual(['DOWNSTREAM_FLANGE', 'UPSTREAM_FLANGE', 'VALVE']);
-  expect(applied.assembly.every((edge) => edge.assemblyLengthMm === 840)).toBe(true);
-  expect(applied.assembly.every((edge) => edge.assemblyMassKg === 207)).toBe(true);
+  expect(applied.assembly.every((edge) => edge.assemblyLengthMm === 740)).toBe(true);
+  expect(applied.assembly.every((edge) => edge.assemblyMassKg === 179)).toBe(true);
   expect(new Set(applied.assembly.map((edge) => edge.assemblyId)).size).toBe(1);
   expect(applied.faceMated).toBe(true);
   expect(applied.minimumEdgeLengthMm).toBeGreaterThan(0);
