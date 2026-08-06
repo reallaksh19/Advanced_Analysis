@@ -20,8 +20,7 @@ const sourceHashes = {
 const sourceIndex = indexEnrichedSource(enriched, profile);
 const model = parseInputXml(xmlText);
 resolveProcessValues(model.edges, profile);
-const sites = consolidateSupportSites(sourceIndex.supportRecords, profile);
-attachSitesToModel(sites, model);
+const sites = buildSupportSitesFromXml(model, profile);
 assignSiteAxes(sites, model);
 assignSiteIds(sites);
 
@@ -282,6 +281,45 @@ function resolveProcessValues(edges, config) {
   }
 }
 
+function buildSupportSitesFromXml(model, config) {
+  const sites = [];
+  const capabilityByType = new Map([[14, 'REST'], [8, 'GUIDE'], [9, 'LINESTOP']]);
+  for (const restraint of model.restraints) {
+    const capability = capabilityByType.get(restraint.type);
+    if (!capability) continue;
+    let site = sites.find((candidate) => candidate.baseTag === restraint.tag
+      && distance(candidate.coordinate, restraint.sourceCoordinate) <= config.supportProjection.coordinateToleranceMm);
+    if (!site) {
+      site = {
+        key: `${restraint.tag}@${round(restraint.sourceCoordinate.x, 3)},${round(restraint.sourceCoordinate.y, 3)},${round(restraint.sourceCoordinate.z, 3)}`,
+        baseTag: restraint.tag,
+        coordinate: restraint.sourceCoordinate,
+        sourceOrder: sites.length,
+        capabilities: new Set(),
+        directionByCapability: new Map(),
+        branchNames: new Set(),
+        nodeId: restraint.nodeId,
+        nodeResidualMm: 0,
+        hostEdgeIds: [],
+        restraintIds: [],
+        supportIds: [],
+      };
+      sites.push(site);
+    }
+    site.capabilities.add(capability);
+    if (!site.hostEdgeIds.includes(restraint.hostEdgeId)) site.hostEdgeIds.push(restraint.hostEdgeId);
+    if (!site.restraintIds.includes(restraint.id)) site.restraintIds.push(restraint.id);
+    if (!site.supportIds.includes(restraint.supportId)) site.supportIds.push(restraint.supportId);
+    if (site.nodeId !== restraint.nodeId) {
+      throw new Error(`Support site ${site.key} resolves to multiple XML nodes: ${site.nodeId}, ${restraint.nodeId}.`);
+    }
+  }
+  if (sites.length !== config.supportProjection.expectedPhysicalSupportSiteCount) {
+    throw new Error(`Expected ${config.supportProjection.expectedPhysicalSupportSiteCount} physical XML support sites, resolved ${sites.length}.`);
+  }
+  return sites;
+}
+
 function consolidateSupportSites(records, config) {
   const sites = [];
   for (const record of records.sort((a, b) => a.sourceOrder - b.sourceOrder)) {
@@ -339,26 +377,7 @@ function assignSiteAxes(sites, model) {
 }
 
 function assignSiteIds(sites) {
-  const templates = buildAsciiTemplates();
-  const unmatched = new Set(sites);
-  for (const template of templates) {
-    let nearest = null;
-    for (const site of unmatched) {
-      const x = (site.coordinate.x - 421773.221) / 1000;
-      const y = (site.coordinate.y + 1163935.927) / 1000;
-      const residual = Math.hypot(x - template.x, y - template.y, site.coordinate.z / 1000 - template.z);
-      if (!nearest || residual < nearest.residual) nearest = { site, residual };
-    }
-    if (nearest) {
-      nearest.site.siteId = template.id;
-      unmatched.delete(nearest.site);
-    }
-  }
-  let next = 1;
-  for (const site of [...unmatched].sort((a, b) => a.sourceOrder - b.sourceOrder)) {
-    while (sites.some((row) => row.siteId === `S${String(next).padStart(2, '0')}`)) next += 1;
-    site.siteId = `S${String(next).padStart(2, '0')}`;
-  }
+  for (const site of sites) site.siteId = `N${site.nodeId}`;
 }
 
 function buildAsciiTemplates() {
@@ -565,7 +584,8 @@ function resolveSourceRecord(edge, sourceIndex) {
 }
 
 function complianceMultiplier(type, config) {
-  const key = String(type || 'PIPE').toLowerCase();
+  const aliases = { ELBO: 'elbow', BEND: 'elbow', FLAN: 'flange', VALV: 'valve', INST: 'instrument', REDU: 'reducer', TEE: 'tee', OLET: 'olet', GASK: 'gasket', PIPE: 'pipe' };
+  const key = aliases[String(type || 'PIPE').toUpperCase()] || 'pipe';
   return config.compliance[`${key}Multiplier`] ?? config.compliance.pipeMultiplier;
 }
 

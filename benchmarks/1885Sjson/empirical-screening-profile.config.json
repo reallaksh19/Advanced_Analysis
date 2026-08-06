@@ -68,11 +68,12 @@
     "gapMm": 0
   },
   "supportProjection": {
+    "authority": "COMPANION_TOPOLOGY_XML_RESTRAINTS",
     "consolidateBy": ["baseSupportTag", "coordinateWithinTolerance"],
     "genericSupportCapabilityAsRest": true,
     "coordinateToleranceMm": 2,
-    "expectedPhysicalSupportSiteCount": 34,
-    "siteIdOrder": "NORTH_CENTRAL_THEN_SOUTH_ASCII_V1"
+    "expectedPhysicalSupportSiteCount": 36,
+    "siteIdOrder": "EXACT_XML_NODE_ID"
   },
   "verticalReactionMethod": {
     "method": "GRAPH_TRIBUTARY_WEIGHT",
