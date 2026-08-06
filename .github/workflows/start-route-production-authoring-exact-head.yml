@@ -1,0 +1,106 @@
+name: Start Route Production Authoring Exact Head
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/start-route-production-authoring-exact-head.yml'
+      - 'src/workspace/topology-edit-3d-authoring-controller.js'
+      - 'src/workspace/topology-edit/professional/topology-edit-operation-plan.js'
+      - 'src/workspace/topology-edit/authoring/topology-edit-operation-graph.js'
+      - 'src/workspace/topology-edit/authoring/topology-edit-start-route-*.js'
+      - 'src/workspace/viewport-productivity/topology-edit-start-route-*.js'
+      - 'tests/topology-edit-start-route-*.test.mjs'
+      - 'e2e/topology-edit-start-route-authority.spec.js'
+      - 'docs/start-route-production-authoring.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: start-route-authoring-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  start-route-authoring:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PLAYWRIGHT_BROWSER_CHANNEL: chromium
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies and Chromium
+        run: |
+          set -euo pipefail
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Verify exact sources and module limits
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+          files=(
+            src/workspace/topology-edit-3d-authoring-controller.js
+            src/workspace/topology-edit/professional/topology-edit-operation-plan.js
+            src/workspace/topology-edit/authoring/topology-edit-operation-graph.js
+            src/workspace/topology-edit/authoring/topology-edit-start-route-intent.js
+            src/workspace/topology-edit/authoring/topology-edit-start-route-plan.js
+            src/workspace/topology-edit/authoring/topology-edit-start-route-candidate.js
+            src/workspace/topology-edit/authoring/topology-edit-start-route-transaction.js
+            src/workspace/topology-edit/authoring/topology-edit-start-route-validation-plan.js
+            src/workspace/viewport-productivity/topology-edit-start-route-runtime.js
+            src/workspace/viewport-productivity/topology-edit-start-route-hud.js
+            src/workspace/viewport-productivity/topology-edit-start-route-authoring-service.js
+            src/workspace/viewport-productivity/topology-edit-start-route-authoring-runtime.js
+            tests/topology-edit-start-route-authoring.test.mjs
+            tests/topology-edit-start-route-runtime.test.mjs
+            tests/topology-edit-start-route-production-adapter.test.mjs
+            e2e/topology-edit-start-route-authority.spec.js
+          )
+          for file in "${files[@]}"; do
+            node --check "$file"
+            test "$(wc -l < "$file")" -lt 300
+          done
+          git diff --check
+
+      - name: Execute deterministic Start Route contracts
+        run: |
+          set -o pipefail
+          node --test --test-reporter=tap \
+            tests/topology-edit-start-route-authoring.test.mjs \
+            tests/topology-edit-start-route-runtime.test.mjs \
+            tests/topology-edit-start-route-production-adapter.test.mjs \
+            2>&1 | tee start-route-test-output.txt
+          test "$(grep -c '^ok ' start-route-test-output.txt)" -gt 0
+
+      - name: Execute production Chromium and WebGL walkthrough
+        run: |
+          node scripts/run-playwright.mjs \
+            e2e/topology-edit-start-route-authority.spec.js \
+            --project=chromium --workers=1 --retries=0 --reporter=line
+
+      - name: Upload exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: start-route-authoring-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            start-route-test-output.txt
+            reports/qualification/start-route-authoring-core.json
+            playwright-report
+            test-results
+          if-no-files-found: warn
+          retention-days: 30

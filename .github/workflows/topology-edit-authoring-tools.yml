@@ -4,22 +4,29 @@ on:
   pull_request:
     paths:
       - '.github/workflows/topology-edit-authoring-tools.yml'
+      - '.github/workflows/start-route-production-authoring-exact-head.yml'
       - 'scripts/advanced-shell-contract-check.mjs'
       - 'src/workspace/topology-edit-3d-authoring-controller.js'
       - 'src/workspace/topology-edit-3d-productivity-controller.js'
       - 'src/workspace/topology-edit-3d-sjson-fidelity-controller.js'
       - 'src/workspace/topology-edit/topology-edit-sjson-runtime-authority-v2.js'
+      - 'src/workspace/topology-edit/professional/topology-edit-operation-plan.js'
       - 'src/workspace/topology-edit/authoring/topology-edit-authoring-composite-operation.js'
       - 'src/workspace/topology-edit/authoring/topology-edit-authoring-operation-planner.js'
       - 'src/workspace/topology-edit/authoring/topology-edit-authored-bend-geometry.js'
+      - 'src/workspace/topology-edit/authoring/topology-edit-start-route-*.js'
       - 'src/workspace/viewport-productivity/topology-edit-authoring-runtime.js'
       - 'src/workspace/viewport-productivity/topology-edit-authoring-styles.js'
+      - 'src/workspace/viewport-productivity/topology-edit-start-route-*.js'
       - 'tests/topology-edit-authoring-composite-operation.test.mjs'
       - 'tests/topology-edit-authoring-planner.test.mjs'
       - 'tests/topology-edit-authored-bend-geometry.test.mjs'
       - 'tests/topology-edit-governed-sjson-source-authority.test.mjs'
+      - 'tests/topology-edit-start-route-*.test.mjs'
       - 'e2e/topology-edit-authoring-tools.spec.js'
       - 'e2e/topology-edit-authoring-tools-tree.spec.js'
+      - 'e2e/topology-edit-start-route-authority.spec.js'
+      - 'docs/start-route-production-authoring.md'
   workflow_dispatch:
 
 permissions:
@@ -60,20 +67,56 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
-          node --check src/workspace/topology-edit-3d-authoring-controller.js
-          node --check src/workspace/topology-edit-3d-productivity-controller.js
-          node --check src/workspace/topology-edit-3d-sjson-fidelity-controller.js
-          node --check src/workspace/topology-edit/topology-edit-sjson-runtime-authority-v2.js
-          node --check src/workspace/topology-edit/authoring/topology-edit-authoring-composite-operation.js
-          node --check src/workspace/topology-edit/authoring/topology-edit-authoring-operation-planner.js
-          node --check src/workspace/topology-edit/authoring/topology-edit-authored-bend-geometry.js
-          node --check src/workspace/viewport-productivity/topology-edit-authoring-runtime.js
-          node --check src/workspace/viewport-productivity/topology-edit-authoring-styles.js
-          node --check tests/topology-edit-authoring-composite-operation.test.mjs
-          node --check tests/topology-edit-authoring-planner.test.mjs
-          node --check tests/topology-edit-authored-bend-geometry.test.mjs
-          node --check tests/topology-edit-governed-sjson-source-authority.test.mjs
-          node --check e2e/topology-edit-authoring-tools-tree.spec.js
+          files=(
+            src/workspace/topology-edit-3d-authoring-controller.js
+            src/workspace/topology-edit-3d-productivity-controller.js
+            src/workspace/topology-edit-3d-sjson-fidelity-controller.js
+            src/workspace/topology-edit/topology-edit-sjson-runtime-authority-v2.js
+            src/workspace/topology-edit/professional/topology-edit-operation-plan.js
+            src/workspace/topology-edit/authoring/topology-edit-authoring-composite-operation.js
+            src/workspace/topology-edit/authoring/topology-edit-authoring-operation-planner.js
+            src/workspace/topology-edit/authoring/topology-edit-authored-bend-geometry.js
+            src/workspace/topology-edit/authoring/topology-edit-start-route-intent.js
+            src/workspace/topology-edit/authoring/topology-edit-start-route-plan.js
+            src/workspace/topology-edit/authoring/topology-edit-start-route-candidate.js
+            src/workspace/topology-edit/authoring/topology-edit-start-route-transaction.js
+            src/workspace/topology-edit/authoring/topology-edit-start-route-validation-plan.js
+            src/workspace/viewport-productivity/topology-edit-authoring-runtime.js
+            src/workspace/viewport-productivity/topology-edit-authoring-styles.js
+            src/workspace/viewport-productivity/topology-edit-start-route-runtime.js
+            src/workspace/viewport-productivity/topology-edit-start-route-hud.js
+            src/workspace/viewport-productivity/topology-edit-start-route-authoring-service.js
+            src/workspace/viewport-productivity/topology-edit-start-route-authoring-runtime.js
+            tests/topology-edit-authoring-composite-operation.test.mjs
+            tests/topology-edit-authoring-planner.test.mjs
+            tests/topology-edit-authored-bend-geometry.test.mjs
+            tests/topology-edit-governed-sjson-source-authority.test.mjs
+            tests/topology-edit-start-route-authoring.test.mjs
+            tests/topology-edit-start-route-runtime.test.mjs
+            tests/topology-edit-start-route-production-adapter.test.mjs
+            e2e/topology-edit-authoring-tools-tree.spec.js
+            e2e/topology-edit-start-route-authority.spec.js
+          )
+          for file in "${files[@]}"; do node --check "$file"; done
+          limited=(
+            src/workspace/topology-edit-3d-authoring-controller.js
+            src/workspace/topology-edit/professional/topology-edit-operation-plan.js
+            src/workspace/topology-edit/authoring/topology-edit-operation-graph.js
+            src/workspace/topology-edit/authoring/topology-edit-start-route-intent.js
+            src/workspace/topology-edit/authoring/topology-edit-start-route-plan.js
+            src/workspace/topology-edit/authoring/topology-edit-start-route-candidate.js
+            src/workspace/topology-edit/authoring/topology-edit-start-route-transaction.js
+            src/workspace/topology-edit/authoring/topology-edit-start-route-validation-plan.js
+            src/workspace/viewport-productivity/topology-edit-start-route-runtime.js
+            src/workspace/viewport-productivity/topology-edit-start-route-hud.js
+            src/workspace/viewport-productivity/topology-edit-start-route-authoring-service.js
+            src/workspace/viewport-productivity/topology-edit-start-route-authoring-runtime.js
+            tests/topology-edit-start-route-authoring.test.mjs
+            tests/topology-edit-start-route-runtime.test.mjs
+            tests/topology-edit-start-route-production-adapter.test.mjs
+            e2e/topology-edit-start-route-authority.spec.js
+          )
+          for file in "${limited[@]}"; do test "$(wc -l < "$file")" -lt 300; done
           node scripts/advanced-shell-contract-check.mjs
           git diff --check
 
@@ -90,12 +133,17 @@ jobs:
             tests/topology-edit-governed-sjson-source-authority.test.mjs \
             tests/topology-edit-professional-operation-transaction.test.mjs \
             tests/topology-edit-wave1-production-integration.test.mjs \
+            tests/topology-edit-start-route-authoring.test.mjs \
+            tests/topology-edit-start-route-runtime.test.mjs \
+            tests/topology-edit-start-route-production-adapter.test.mjs \
             2>&1 | tee topology-edit-authoring-tools-test-output.txt
+          test "$(grep -c '^ok ' topology-edit-authoring-tools-test-output.txt)" -gt 0
 
-      - name: Execute production Chromium authoring walkthrough
+      - name: Execute production Chromium authoring walkthroughs
         run: |
           npx playwright test \
             e2e/topology-edit-authoring-tools-tree.spec.js \
+            e2e/topology-edit-start-route-authority.spec.js \
             --project=chromium --workers=1 --retries=0 --reporter=line
 
       - name: Upload authoring qualification evidence
@@ -106,6 +154,7 @@ jobs:
           path: |
             topology-edit-authoring-tools-test-output.txt
             reports/qualification/topology-edit-authoring-tools.json
+            reports/qualification/start-route-authoring-core.json
             playwright-report
             test-results
           if-no-files-found: warn
