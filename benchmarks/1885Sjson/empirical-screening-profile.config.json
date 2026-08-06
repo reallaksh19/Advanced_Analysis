@@ -69,6 +69,7 @@
   },
   "supportProjection": {
     "consolidateBy": ["baseSupportTag", "coordinateWithinTolerance"],
+    "genericSupportCapabilityAsRest": true,
     "coordinateToleranceMm": 2,
     "expectedPhysicalSupportSiteCount": 34,
     "siteIdOrder": "NORTH_CENTRAL_THEN_SOUTH_ASCII_V1"
