@@ -223,3 +223,19 @@ export {
   recoverInputXmlLinearCaseResult,
   recoverInputXmlLinearCaseResults,
 } from './inputxml-linear-result-recovery.js';
+
+export {
+  INPUTXML_LINEAR_DERIVED_CASE_KEYS,
+  INPUTXML_LINEAR_DERIVED_CASE_SCHEMA,
+  InputXmlLinearDerivedCaseError,
+  derivedCaseEvidenceProjection,
+  derivedCaseSemanticProjection,
+  requireInputXmlLinearDerivedCase,
+  sealInputXmlLinearDerivedCase,
+} from './inputxml-linear-derived-case-contract.js';
+
+export {
+  INPUTXML_LINEAR_DERIVED_CASE_PURPOSES,
+  deriveInputXmlLinearCase,
+  deriveInputXmlLinearCases,
+} from './inputxml-linear-derived-cases.js';
