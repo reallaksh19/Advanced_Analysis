@@ -29,6 +29,7 @@ assertEqual(authority.changedWallThicknessCount, 163, 'governed wall change coun
 assertTruthy(authority.projectionSemanticIdentity, 'projection semantic identity');
 assertTruthy(authority.posCalculationSemanticIdentity, 'POS calculation semantic identity');
 assertTruthy(authority.posReceiptSha256, 'POS receipt hash');
+assertTruthy(authority.governedRunnerSha256, 'governed screening runner hash');
 
 const source = result.sourceResolution;
 assertEqual(source.inputXmlElements, 163, 'element count');
