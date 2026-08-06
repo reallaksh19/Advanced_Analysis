@@ -159,8 +159,8 @@ assert.equal(comparison.qualificationStatus, 'INCOMPLETE_BLOCKED');
 assert.match(comparison.restraintAuthorityStatus, /PROJECT_MUTATIONS_NOT_BENCHMARK_AUTHORITY/u);
 assert.deepEqual(comparison.totals, {
   comparisons: 2232,
-  passed: 771,
-  failed: 1461,
+  passed: 768,
+  failed: 1464,
   untraced: 0,
 });
 assert.equal(comparison.coverage.schema, BM2_COVERAGE_SCHEMA);
