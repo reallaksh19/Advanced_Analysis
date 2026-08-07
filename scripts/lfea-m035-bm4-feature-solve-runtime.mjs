@@ -393,7 +393,7 @@ function analyseCase(authorities, loadCaseId, thermal) {
     loadCase,
     frameElements: frames,
     pipingComponents: loadedComponents,
-    recoveryProfile: recoveryProfile(),
+    recoveryProfile: recoveryProfile({ recoverComponentCodePoints: false }),
   });
   return Object.freeze({ loadCase, frames, pipingComponents: loadedComponents, execution, recovery });
 }
@@ -505,6 +505,7 @@ function buildReport(authorities, sustained, operating, expansion) {
     },
     limitations: [
       'M035 activates real-arc bend flexibility and B31J directional tee rotational flexibility generically.',
+      'BM4 component code-point resultants are intentionally not recovered in this forces/displacements work pack; code stress remains deferred, and no off-node station interpolation is invented.',
       'BM4 inline reducer transitions are detected but condensation is not activated because finite reducer geometry and CAESAR ten-cylinder stiffness/sampling parity are not established.',
       'One-way +Y supports remain represented by the M034 engaged bilateral UY state; lift-off belongs to M036/#668.',
       'Friction is not modeled in this M035 linear feature solve.',
