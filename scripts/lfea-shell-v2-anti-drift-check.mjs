@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LFEA_COLLECTION_PATHS } from '../src/workspace/lfea-workbench-model.js';
 import { LFEA_STRUCTURED_EDITOR_CONTRACTS } from '../src/workspace/lfea-structured-editor-contract.js';
+import { LFEA_RESULT_VIEW_IDS } from '../src/workspace/lfea-shell-v2/results-view-model.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SHELL_ROOT = path.join(ROOT, 'src', 'workspace', 'lfea-shell-v2');
@@ -53,6 +54,15 @@ assert.deepEqual(
   [...LFEA_COLLECTION_PATHS].sort(),
   'Structured editor contracts must cover exactly the existing editable collection paths.',
 );
+assert.deepEqual(LFEA_RESULT_VIEW_IDS, [
+  'OVERVIEW',
+  'DISPLACEMENTS',
+  'REACTIONS',
+  'RAW_STRESS',
+  'PROJECTED_STRESS',
+  'MESH_QUALITY',
+  'REVIEW',
+], 'Shell V2 UI-3 must retain the seven explicit result explorer views.');
 
 const editorContract = source('src/workspace/lfea-structured-editor-contract.js');
 assert.match(editorContract, /ELEMENT_TYPES/u);
@@ -68,11 +78,30 @@ assert.match(structuredEditor, /isLfeaEditorGuardCurrent/u);
 assert.match(structuredEditor, /handlers\.getCurrentState/u);
 const inspector = source('src/workspace/lfea-shell-v2/inspector.js');
 assert.match(inspector, /renderLfeaStructuredEditor/u);
+assert.match(inspector, /renderLfeaResultsExplorer/u);
+assert.doesNotMatch(inspector, /lfea-record-json/u,
+  'Raw JSON must not remain the normal per-record UI-2 editor.');
+assert.doesNotMatch(inspector, /lfeaResultTable/u,
+  'UI-3 results must not regress to the stacked generic result-table layout.');
+
+const resultsModel = source('src/workspace/lfea-shell-v2/results-view-model.js');
+assert.match(resultsModel, /AUTHORITIES\.RAW/u);
+assert.match(resultsModel, /AUTHORITIES\.PROJECTED/u);
+assert.match(resultsModel, /execution\.result\.nodalDisplacements/u);
+assert.match(resultsModel, /execution\.result\.reactions/u);
+assert.match(resultsModel, /execution\.stressProjection\.nodalValues/u);
+assert.match(resultsModel, /projectLfeaResultRows/u);
 assert.doesNotMatch(
-  inspector,
-  /lfea-record-json/u,
-  'Raw JSON must not remain the normal per-record UI-2 editor.',
+  implementationText(resultsModel),
+  /\b(?:vonMises|principalStress|constitutive|sigmaZ)\s*\(/u,
+  'Results explorer must select evidence, not recompute engineering quantities.',
 );
+const resultsTable = source('src/workspace/lfea-shell-v2/results-table.js');
+assert.match(resultsTable, /projectLfeaResultRows/u);
+assert.match(resultsTable, /100/u);
+const resultsExplorer = source('src/workspace/lfea-shell-v2/results-explorer.js');
+assert.match(resultsExplorer, /lfea-results-authority/u);
+assert.match(resultsExplorer, /view\.authority/u);
 
 const controller = source('src/workspace/lfea-workbench-controller.js');
 assert.match(controller, /LfeaShellV2View/u);
@@ -107,7 +136,7 @@ assert.match(embeddedHarness, /data-application-view="LFEA"/u);
 assert.doesNotMatch(
   embeddedHarness,
   /linear-piping-run-analysis|src\/core\//u,
-  'Embedded UI-1 browser harness must use only the real layout/controller boundary.',
+  'Embedded browser harness must use only the real layout/controller boundary.',
 );
 
 const navigator = source('src/workspace/lfea-shell-v2/analysis-navigator.js');
@@ -118,16 +147,15 @@ const layout = source('src/workspace/workspace-layout.js');
 assert.equal(occurrences(layout, 'data-role="lfea-consumer-root"'), 1,
   'embedded shell must retain exactly one LFEA consumer root');
 
-const forbiddenRoots = [
+for (const directory of [
   path.join(ROOT, 'src', 'core', 'geometry', 'adapters'),
   path.join(ROOT, 'src', 'core', 'linear-piping-analysis-consumer'),
-];
-for (const directory of forbiddenRoots) {
+]) {
   for (const file of javascriptFiles(directory)) {
     assert.doesNotMatch(
       fs.readFileSync(file, 'utf8'),
       /EnrichedSjson/u,
-      `UI-1 must not wire EnrichedSjson into piping FEA: ${relative(file)}`,
+      `Shell V2 must not wire EnrichedSjson into piping FEA: ${relative(file)}`,
     );
   }
 }
@@ -138,6 +166,7 @@ console.log(JSON.stringify({
   shellModules: shellFiles.length,
   tokenModules: tokenFiles.length,
   structuredEditorContracts: Object.keys(LFEA_STRUCTURED_EDITOR_CONTRACTS).length,
+  resultExplorerViews: LFEA_RESULT_VIEW_IDS.length,
   physicalLineLimit: 299,
   localNumericalFormatting: false,
   standaloneEntry: true,
