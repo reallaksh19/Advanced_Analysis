@@ -1,0 +1,44 @@
+name: Topology Edit Table Slice 2
+
+on:
+  push:
+    paths:
+      - 'src/workspace/topology-edit/table/**'
+      - 'tests/topology-edit-table-*.test.mjs'
+      - 'scripts/topology-edit-table-slice1-check.mjs'
+      - '.github/workflows/topology-edit-table-slice2.yml'
+  pull_request:
+    paths:
+      - 'src/workspace/topology-edit/table/**'
+      - 'tests/topology-edit-table-*.test.mjs'
+      - 'scripts/topology-edit-table-slice1-check.mjs'
+      - '.github/workflows/topology-edit-table-slice2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-table-batch-authority:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax
+        run: |
+          for file in src/workspace/topology-edit/table/*.js tests/topology-edit-table-*.test.mjs scripts/topology-edit-table-slice1-check.mjs; do
+            node --check "$file"
+          done
+      - name: Table authority contracts
+        run: |
+          node --test \
+            tests/topology-edit-table-projection.test.mjs \
+            tests/topology-edit-table-batch-plan.test.mjs \
+            tests/topology-edit-table-rebase.test.mjs \
+            tests/topology-edit-table-transaction.test.mjs
+      - name: Exact HEAD, line gate, and mutation-source guard
+        run: node scripts/topology-edit-table-slice1-check.mjs
