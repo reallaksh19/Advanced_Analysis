@@ -9,18 +9,29 @@ import {
   applyResolvedTopologyEditCommand as applyLegacyCommand,
 } from './topology-edit-pure-reducer.js';
 import { applyPipeSegmentCommand } from './topology-edit-pipe-segment-reducer.js';
+import {
+  applyTopologyEditInlineReplacement,
+} from './topology-edit-inline-component-replacement.js';
+import {
+  applyTopologyEditJunctionRelation,
+} from './topology-edit-junction-relation-command.js';
+
+const EXTENDED_REDUCERS = Object.freeze({
+  INSERT_PIPE_SEGMENT: applyPipeSegmentCommand,
+  REPLACE_INLINE_COMPONENT: applyTopologyEditInlineReplacement,
+  UPDATE_JUNCTION_BRANCH_RELATION: applyTopologyEditJunctionRelation,
+});
 
 export function applyResolvedTopologyEditCommand(canonicalTopology, commandInput) {
   assertCanonicalTopologyHash(canonicalTopology);
   const command = assertResolvedTopologyEditCommand(commandInput);
-  if (command.commandType !== 'INSERT_PIPE_SEGMENT') {
-    return applyLegacyCommand(canonicalTopology, command);
-  }
+  const reducer = EXTENDED_REDUCERS[command.commandType];
+  if (!reducer) return applyLegacyCommand(canonicalTopology, command);
   if (command.basis.priorDraftHash !== canonicalTopologyStateHash(canonicalTopology)) {
-    throw new Error('TopologyEditPureReducerDispatch: pipe command is stale.');
+    throw new Error(`TopologyEditPureReducerDispatch: ${command.commandType} command is stale.`);
   }
   const topology = JSON.parse(JSON.stringify(canonicalTopology));
-  return finalizeCanonicalTopology(applyPipeSegmentCommand(topology, command));
+  return finalizeCanonicalTopology(reducer(topology, command));
 }
 
 export function replayResolvedTopologyEditCommands(baseCanonicalTopology, commands = []) {

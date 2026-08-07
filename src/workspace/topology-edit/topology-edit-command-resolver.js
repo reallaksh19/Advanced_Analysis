@@ -10,6 +10,12 @@ import {
   assertTopologyEditInlineComponentTarget,
 } from './topology-edit-inline-component-command.js';
 import {
+  assertTopologyEditInlineReplacementTarget,
+} from './topology-edit-inline-component-replacement.js';
+import {
+  assertTopologyEditJunctionRelationTarget,
+} from './topology-edit-junction-relation-command.js';
+import {
   assertTopologyEditBranchComponentTarget,
 } from './topology-edit-branch-component-command.js';
 import {
@@ -47,6 +53,10 @@ function edgeTarget(topology, edgeId, role) {
   const record = exactRecord(topology.edges, edgeId, `${role} edge`);
   return { kind: 'EDGE', role, id: edgeId, revision: semanticHash({ kind: 'EDGE', record }), record };
 }
+function junctionTarget(topology, junctionId, role) {
+  const record = exactRecord(topology.junctions, junctionId, `${role} junction`);
+  return { kind: 'JUNCTION', role, id: junctionId, revision: semanticHash({ kind: 'JUNCTION', record }), record };
+}
 function unorderedPair(left, right) { return [left, right].sort().join('\u0000'); }
 function assertNoExistingConnection(topology, fromNodeId, toNodeId, commandType) {
   const pair = unorderedPair(fromNodeId, toNodeId);
@@ -78,9 +88,10 @@ function endpointPortKeys(edge, node, endpoint) {
   if (candidates.length !== 1) throw new RangeError(`TopologyEditCommandResolver: DISCONNECT_ENDPOINT requires one ${expectedRole} port key for ${edge.id}; resolved ${candidates.length}.`);
   return candidates;
 }
-function targets(nodes = [], edges = [], endpointKeys = [], generated = null) {
+function targets(nodes = [], edges = [], endpointKeys = [], generated = null, junctions = []) {
   const result = { nodes, edges, endpointPortKeys: endpointKeys };
   if (generated && Object.keys(generated).length) result.generated = generated;
+  if (junctions.length) result.junctions = junctions;
   return result;
 }
 function assertUnusedGeneratedId(topology, id) {
@@ -119,6 +130,27 @@ function resolveInline(topology, request) {
   const from = nodeTarget(topology, validated.from.id, 'FROM');
   const to = nodeTarget(topology, validated.to.id, 'TO');
   return targets([from, to], [edge]);
+}
+function resolveReplacement(topology, request) {
+  const validated = assertTopologyEditInlineReplacementTarget(topology, request.payload);
+  return targets([
+    nodeTarget(topology, validated.from.id, 'FROM'),
+    nodeTarget(topology, validated.to.id, 'TO'),
+  ], [edgeTarget(topology, validated.edge.id, 'REPLACED_COMPONENT')]);
+}
+function resolveJunctionRelation(topology, request) {
+  const validated = assertTopologyEditJunctionRelationTarget(topology, request.payload);
+  const nodeIds = [
+    validated.payload.branchNodeId,
+    ...validated.payload.runNodeIds,
+  ].sort();
+  return targets(
+    nodeIds.map((id, index) => nodeTarget(topology, id, `JUNCTION_PORT_${index + 1}`)),
+    [edgeTarget(topology, validated.reducer.id, 'EXPLICIT_BRANCH_REDUCER')],
+    [],
+    null,
+    [junctionTarget(topology, validated.junction.id, 'UPDATED_JUNCTION')],
+  );
 }
 function resolveBranchComponent(topology, request) {
   const validated = assertTopologyEditBranchComponentTarget(topology, request.payload);
@@ -209,6 +241,8 @@ const TARGET_RESOLVERS = Object.freeze({
   MOVE_NODE: resolveMove, MERGE_NODES: resolveMerge, BRIDGE_GAP: resolveAddedEdge,
   ADD_STRAIGHT_ELEMENT: resolveAddedEdge, SPLIT_EDGE: resolveSplit,
   INSERT_INLINE_COMPONENT: resolveInline,
+  REPLACE_INLINE_COMPONENT: resolveReplacement,
+  UPDATE_JUNCTION_BRANCH_RELATION: resolveJunctionRelation,
   INSERT_BRANCH_COMPONENT: resolveBranchComponent,
   INSERT_PIPE_SEGMENT: resolvePipeSegmentCommandTargets,
   DISCONNECT_ENDPOINT: resolveDisconnect, DELETE_EDGE: resolveDelete,
@@ -221,7 +255,11 @@ function resolveTargets(topology, request) {
   throw new RangeError(`TopologyEditCommandResolver: unsupported command ${request.commandType}.`);
 }
 function targetRevisionMap(resolvedTargets) {
-  return Object.fromEntries([...resolvedTargets.nodes, ...resolvedTargets.edges].map((target) => [target.id, target.revision]).sort(([left], [right]) => left.localeCompare(right)));
+  return Object.fromEntries([
+    ...resolvedTargets.nodes,
+    ...resolvedTargets.edges,
+    ...(resolvedTargets.junctions ?? []),
+  ].map((target) => [target.id, target.revision]).sort(([left], [right]) => left.localeCompare(right)));
 }
 function assertExpectedRevisions(expected, actual) {
   for (const [id, revision] of Object.entries(expected)) {

@@ -4,6 +4,9 @@ import { createTopologyEditChangedScope } from '../professional/topology-edit-ch
 import { createTopologyEditOperationPlan } from '../professional/topology-edit-operation-plan.js';
 import { planMoveConnectedRun } from '../professional/topology-edit-route-operations.js';
 import { assertTopologyEditTableBatch } from './topology-edit-table-batch.js';
+import {
+  compileTopologyEditTableEngineeringIntent,
+} from './topology-edit-table-engineering-planner.js';
 import { assertTopologyEditTableProjection } from './topology-edit-table-projection.js';
 
 export const TOPOLOGY_EDIT_TABLE_BATCH_PLAN_SCHEMA = 'TopologyEditTableBatchPlan.v1';
@@ -19,20 +22,23 @@ export function planTopologyEditTableBatch({
   const topology = assertCanonicalTopologyHash(canonicalTopology);
   assertBasis(batch, projection, topology);
   const childPlans = batch.intents.map((intent) => compileIntent(intent, topology));
-  assertNonOverlappingMoves(childPlans);
+  const engineering = batch.intents.some((intent) => intent.intentKind !== 'PIPE_LENGTH');
+  if (!engineering) assertNonOverlappingMoves(childPlans);
   const changedScope = combineChangedScopes(childPlans, topology.canonicalTopologyHash);
   const targetIds = uniqueSorted([
     ...batch.intents.map((intent) => intent.target.canonicalId),
     ...childPlans.flatMap((plan) => plan.targetIds),
   ]);
-  const commandIntents = childPlans.flatMap((plan) => plan.commandIntents);
+  const commandIntents = engineering
+    ? materializeCompositeEngineeringCommands(childPlans, topology)
+    : childPlans.flatMap((plan) => plan.commandIntents);
   const unresolvedEvidence = childPlans.flatMap((plan) => plan.unresolvedEvidence ?? []);
   const operationPlan = createTopologyEditOperationPlan({
-    operationType: 'MOVE_CONNECTED_RUN',
+    operationType: engineering ? 'COMPOSITE_ENGINEERING_EDIT' : 'MOVE_CONNECTED_RUN',
     basisHash: topology.canonicalTopologyHash,
     targetIds,
     parameters: {
-      aggregateKind: 'TABLE_PIPE_LENGTH_BATCH',
+      aggregateKind: engineering ? 'TABLE_ENGINEERING_BATCH' : 'TABLE_PIPE_LENGTH_BATCH',
       tableBatchHash: batch.batchHash,
       childPlanHashes: childPlans.map((plan) => plan.planHash),
       compositeCertification: { mode: 'FINAL_STATE' },
@@ -87,7 +93,7 @@ export function assertTopologyEditTableBatchPlan(value) {
 
 function compileIntent(intent, topology) {
   if (intent.intentKind === 'PIPE_LENGTH') return compilePipeLength(intent, topology);
-  throw new RangeError(`TopologyEditTableBatchPlanner: unsupported intent ${intent.intentKind}.`);
+  return compileTopologyEditTableEngineeringIntent(intent, topology);
 }
 
 function compilePipeLength(intent, topology) {
@@ -135,6 +141,37 @@ function compilePipeLength(intent, topology) {
     boundaryNodeIds: [anchorNodeId],
     deltaMm,
   });
+}
+
+function materializeCompositeEngineeringCommands(plans, topology) {
+  const nonMoves = [];
+  const moveDeltas = new Map();
+  for (const plan of plans) for (const intent of plan.commandIntents) {
+    if (intent.commandType !== 'MOVE_NODE') {
+      if (!['REPLACE_INLINE_COMPONENT', 'UPDATE_JUNCTION_BRANCH_RELATION'].includes(intent.commandType)) {
+        throw new RangeError(
+          `TopologyEditTableBatchPlanner: unsupported composite engineering command ${intent.commandType}.`,
+        );
+      }
+      nonMoves.push({ commandType: intent.commandType, payload: intent.payload });
+      continue;
+    }
+    const node = exact(topology.nodes, intent.payload.nodeId, 'moved node');
+    const delta = subtract(intent.payload.position, node.position);
+    const prior = moveDeltas.get(node.id) ?? { x: 0, y: 0, z: 0 };
+    moveDeltas.set(node.id, add(prior, delta));
+  }
+  const moves = [...moveDeltas.entries()].sort(([left], [right]) => left.localeCompare(right))
+    .map(([nodeId, delta]) => {
+      if (!(magnitude(delta) > EPSILON_MM)) {
+        throw new RangeError(
+          `TopologyEditTableBatchPlanner: composite translations cancel to a no-op for ${nodeId}.`,
+        );
+      }
+      const node = exact(topology.nodes, nodeId, 'moved node');
+      return { commandType: 'MOVE_NODE', payload: { nodeId, position: add(node.position, delta) } };
+    });
+  return [...nonMoves, ...moves];
 }
 
 function edgeComponentWithout(topology, startNodeId, blockedEdgeId) {
@@ -236,6 +273,7 @@ function exact(rows, id, label) {
 }
 function uniqueSorted(values) { return [...new Set(values)].sort((a, b) => a.localeCompare(b)); }
 function subtract(left, right) { return { x: left.x - right.x, y: left.y - right.y, z: left.z - right.z }; }
+function add(left, right) { return { x: left.x + right.x, y: left.y + right.y, z: left.z + right.z }; }
 function scale(value, factor) { return { x: value.x * factor, y: value.y * factor, z: value.z * factor }; }
 function magnitude(value) { return Math.hypot(value.x, value.y, value.z); }
 function nearlyEqual(left, right) { return Math.abs(Number(left) - Number(right)) <= EPSILON_MM; }

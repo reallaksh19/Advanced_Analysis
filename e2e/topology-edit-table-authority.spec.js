@@ -102,6 +102,35 @@ test('Table stays projection-only until certified pipe-length Apply', async ({ p
   }, null, 2)}\n`);
 });
 
+test('M06 and M10 production editors expose only explicit engineering authority', async ({ page }) => {
+  await page.setViewportSize({ width: 1720, height: 1080 });
+  await page.addInitScript(() => globalThis.localStorage?.clear());
+  const host = await openProductionController(page);
+  const panel = page.locator('details[data-panel-kind="table"]');
+  if (!(await panel.evaluate((node) => node.open))) await panel.locator(':scope > summary').click();
+  await expect.poll(() => host.getAttribute('data-topology-edit-table-projection-hash')).toBeTruthy();
+  const fixture = await engineeringEditorFixture(page);
+  const filter = page.locator('[data-table-filter]');
+  const table = page.locator('[data-role="topology-edit-table"]');
+
+  await filter.fill(fixture.gateId);
+  await table.locator(`[data-canonical-id="${fixture.gateId}"] [data-table-select]`).click();
+  await expect(page.locator('[data-table-edit-valve-catalogue]')).toBeVisible();
+  await expect(page.locator('[data-table-edit-valve-catalogue]')).toHaveValue('');
+  await expect(page.locator('[data-table-action="stage-valve-replacement"]')).toBeEnabled();
+
+  await filter.fill(fixture.teeId);
+  await table.locator(`[data-canonical-id="${fixture.teeId}"] [data-table-select]`).click();
+  const branchValues = await page.locator('[data-table-edit-tee-branch-port] option').evaluateAll(
+    (options) => options.slice(1).map((option) => option.value).sort(),
+  );
+  expect(branchValues).toEqual(fixture.branchPortKeys);
+  const reducerValues = await page.locator('[data-table-edit-tee-reducer] option').evaluateAll(
+    (options) => options.slice(1).map((option) => option.value).sort(),
+  );
+  expect(reducerValues).toEqual(fixture.exactReducerIds);
+});
+
 async function openProductionController(page) {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   const navigation = page.getByRole('navigation', { name: 'Application views' });
@@ -152,6 +181,28 @@ async function chooseSafeTerminalPipe(page) {
       if (degree.get(edge.fromNodeId) === 1) return { edgeId: edge.id, tag: row.fields.tag, currentLengthMm: row.fields.lengthMm, anchor: 'TO', propagation: 'UPSTREAM' };
     }
     throw new Error('No safe graph-terminal canonical PIPE is available outside intentional defect/support zones.');
+  });
+}
+
+async function engineeringEditorFixture(page) {
+  return page.evaluate(() => {
+    const projection = document.querySelector('[data-role="topology-edit-render-host"]')
+      ?.__topologyEditAuthoringController?.tableAdapter?.runtime?.projection;
+    if (!projection) throw new Error('Table projection unavailable for engineering editor check.');
+    const gate = projection.rows.find((row) => row.elementType === 'VALVE'
+      && String(row.fields?.valveType ?? '').toUpperCase() === 'GATE');
+    const tee = projection.rows.find((row) => row.elementType === 'TEE'
+      && row.identity?.canonicalKind === 'JUNCTION');
+    if (!gate || !tee) throw new Error('Demo must expose GATE valve and TEE rows.');
+    const exactReducerIds = projection.rows.filter((row) => row.elementType === 'REDUCER'
+      && row.custody?.catalogueAuthority === 'EXACT' && row.custody?.catalogue)
+      .map((row) => row.identity.canonicalId).sort();
+    return {
+      gateId: gate.identity.canonicalId,
+      teeId: tee.identity.canonicalId,
+      branchPortKeys: tee.identity.portBindings.map((entry) => entry.portKey).sort(),
+      exactReducerIds,
+    };
   });
 }
 

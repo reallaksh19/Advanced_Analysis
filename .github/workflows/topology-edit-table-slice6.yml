@@ -1,0 +1,127 @@
+name: Topology Edit Table Slice 6
+
+on:
+  push:
+    paths:
+      - 'src/workspace/topology-edit/topology-edit-inline-component-replacement.js'
+      - 'src/workspace/topology-edit/topology-edit-junction-relation-command.js'
+      - 'src/workspace/topology-edit/topology-edit-engineering-edit-effect.js'
+      - 'src/workspace/topology-edit/topology-edit-command-contract.js'
+      - 'src/workspace/topology-edit/topology-edit-command-resolver.js'
+      - 'src/workspace/topology-edit/topology-edit-command-effect-dispatch.js'
+      - 'src/workspace/topology-edit/topology-edit-pure-reducer-dispatch.js'
+      - 'src/workspace/topology-edit/professional/topology-edit-operation-plan.js'
+      - 'src/workspace/topology-edit/table/topology-edit-table-intent.js'
+      - 'src/workspace/topology-edit/table/topology-edit-table-engineering-planner.js'
+      - 'src/workspace/topology-edit/table/topology-edit-table-batch-planner.js'
+      - 'src/workspace/viewport-productivity/topology-edit-table-engineering-*.js'
+      - 'src/workspace/viewport-productivity/topology-edit-table-grid-view.js'
+      - 'src/workspace/viewport-productivity/topology-edit-table-runtime.js'
+      - 'src/workspace/viewport-productivity/topology-edit-table-styles.js'
+      - 'tests/topology-edit-component-relation-command.test.mjs'
+      - 'tests/topology-edit-table-m04-m06-m10.test.mjs'
+      - 'tests/topology-edit-table-engineering-editor.test.mjs'
+      - 'vite.config.js'
+      - 'scripts/bundle-chunk-ownership-check.mjs'
+      - '.github/workflows/topology-edit-table-slice6.yml'
+  pull_request:
+    paths:
+      - 'src/workspace/topology-edit/**'
+      - 'src/workspace/viewport-productivity/topology-edit-table-*.js'
+      - 'tests/topology-edit-component-relation-command.test.mjs'
+      - 'tests/topology-edit-table-m04-m06-m10.test.mjs'
+      - 'tests/topology-edit-table-engineering-editor.test.mjs'
+      - 'vite.config.js'
+      - 'scripts/bundle-chunk-ownership-check.mjs'
+      - '.github/workflows/topology-edit-table-slice6.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-component-relations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Exact HEAD line and architecture guards
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          files=(
+            src/workspace/topology-edit/topology-edit-inline-component-replacement.js
+            src/workspace/topology-edit/topology-edit-junction-relation-command.js
+            src/workspace/topology-edit/topology-edit-engineering-edit-effect.js
+            src/workspace/topology-edit/table/topology-edit-table-engineering-planner.js
+            src/workspace/viewport-productivity/topology-edit-table-engineering-editor.js
+            src/workspace/viewport-productivity/topology-edit-table-engineering-runtime.js
+            tests/topology-edit-component-relation-command.test.mjs
+            tests/topology-edit-table-m04-m06-m10.test.mjs
+            tests/topology-edit-table-engineering-editor.test.mjs
+          )
+          for file in "${files[@]}"; do
+            test "$(git show "HEAD:$file" | wc -l)" -lt 300
+            node --check "$file"
+          done
+          node --check src/workspace/topology-edit/topology-edit-command-contract.js
+          node --check src/workspace/topology-edit/topology-edit-command-resolver.js
+          node --check src/workspace/topology-edit/table/topology-edit-table-intent.js
+          node --check src/workspace/topology-edit/table/topology-edit-table-batch-planner.js
+          node --check src/workspace/viewport-productivity/topology-edit-table-grid-view.js
+          node --check src/workspace/viewport-productivity/topology-edit-table-runtime.js
+          ! grep -REn 'WorkspaceState|loadDataset\(|swapDataset\(|new (WebGLRenderer|TopologyEditViewportBackend)|session\.execute\(' \
+            src/workspace/topology-edit/topology-edit-inline-component-replacement.js \
+            src/workspace/topology-edit/topology-edit-junction-relation-command.js \
+            src/workspace/topology-edit/topology-edit-engineering-edit-effect.js \
+            src/workspace/topology-edit/table/topology-edit-table-engineering-planner.js \
+            src/workspace/viewport-productivity/topology-edit-table-engineering-*.js
+          ! grep -REn 'proximity|nearest|distance.*identity|geometry.*identity|last[-_ ]write[-_ ]wins' \
+            src/workspace/topology-edit/topology-edit-inline-component-replacement.js \
+            src/workspace/topology-edit/topology-edit-junction-relation-command.js \
+            src/workspace/topology-edit/table/topology-edit-table-engineering-planner.js \
+            src/workspace/viewport-productivity/topology-edit-table-engineering-*.js
+      - name: Governed M06 M10 and atomic M04 M06 M10 contracts
+        run: |
+          node --test tests/topology-edit-component-relation-command.test.mjs
+          node --test tests/topology-edit-table-m04-m06-m10.test.mjs
+          node --test tests/topology-edit-table-engineering-editor.test.mjs
+      - name: Retained Table transaction contracts
+        run: |
+          node --test tests/topology-edit-table-batch-plan.test.mjs
+          node --test tests/topology-edit-table-rebase.test.mjs
+          node --test tests/topology-edit-table-transaction.test.mjs
+      - name: Install dependencies
+        run: npm ci
+      - name: Bundle ownership contract
+        run: node scripts/bundle-chunk-ownership-check.mjs
+      - name: Production build
+        run: npm run build
+      - name: Install Chromium
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: '0'
+        run: npx playwright install --with-deps chromium
+      - name: Production Table Canvas Chromium regression
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: '0'
+          TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: npx playwright test e2e/topology-edit-table-authority.spec.js --project=chromium --workers=1 --retries=0 --reporter=line
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-table-slice6-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            reports/qualification/topology-edit-table-authority.json
+            playwright-report
+            test-results
+          if-no-files-found: warn

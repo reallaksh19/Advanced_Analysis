@@ -17,6 +17,7 @@ const expectedOwnership = new Map([
   ['/repo/src/core/local-shell/index.js', 'core-local-shell'],
   ['/repo/src/core/linear-piping-analysis/index.js', 'core-linear-piping'],
   ['/repo/src/core/support-engineering/index.js', 'core-support-engineering'],
+  ['/repo/src/workspace/topology-edit/topology-edit-inline-component-replacement.js', 'topology-edit-engineering-commands'],
 ]);
 
 const automaticWorkspaceOwnership = [
@@ -28,7 +29,7 @@ const automaticWorkspaceOwnership = [
   '/repo/src/workspace/enrichment/first-cut-workbench-controller.js',
   '/repo/src/workspace/linear-piping-results-workbench.js',
   '/repo/src/workspace/lafea-workbench.js',
-  '/repo/src/workspace/lfea-workbench.js',
+  '/repo/src/workspace/lafea-workbench.js',
   '/repo/src/workspace/topology-edit/topology-edit-controller.js',
   '/repo/src/workspace/sequential-sketcher/sequential-sketcher-controller.js',
   '/repo/src/workspace/viewport-panel.js',
@@ -67,6 +68,6 @@ console.log(JSON.stringify({
   ownershipAssertions: expectedOwnership.size,
   automaticWorkspaceOwnershipAssertions: automaticWorkspaceOwnership.length,
   distinctChunkOwners: new Set(expectedOwnership.values()).size,
-  workspaceOwnership: 'ROLLUP_GRAPH_AWARE',
+  workspaceOwnership: 'ROLLUP_GRAPH_AWARE_STATEFUL_WITH_STATELESS_ENGINEERING_COMMAND_EXCEPTION',
   correctnessPreferredOverTarget: true,
 }));
