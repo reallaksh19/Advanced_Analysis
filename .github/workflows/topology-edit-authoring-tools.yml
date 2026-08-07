@@ -10,6 +10,9 @@ on:
       - 'src/workspace/topology-edit-3d-productivity-controller.js'
       - 'src/workspace/topology-edit-3d-sjson-fidelity-controller.js'
       - 'src/workspace/topology-edit/topology-edit-sjson-runtime-authority-v2.js'
+      - 'src/workspace/topology-edit/topology-edit-bend-edge-crosswalk.js'
+      - 'src/workspace/topology-edit/topology-edit-pure-reducer.js'
+      - 'src/workspace/topology-edit/topology-edit-candidate-validator.js'
       - 'src/workspace/topology-edit/professional/topology-edit-operation-plan.js'
       - 'src/workspace/topology-edit/authoring/topology-edit-authoring-composite-operation.js'
       - 'src/workspace/topology-edit/authoring/topology-edit-authoring-operation-planner.js'
@@ -22,6 +25,7 @@ on:
       - 'tests/topology-edit-authoring-composite-operation.test.mjs'
       - 'tests/topology-edit-authoring-planner.test.mjs'
       - 'tests/topology-edit-authored-bend-geometry.test.mjs'
+      - 'tests/topology-edit-multi-bend-spool.test.mjs'
       - 'tests/topology-edit-governed-sjson-source-authority.test.mjs'
       - 'tests/topology-edit-start-route-*.test.mjs'
       - 'tests/topology-edit-continue-route-*.test.mjs'
@@ -30,6 +34,7 @@ on:
       - 'e2e/topology-edit-start-route-authority.spec.js'
       - 'docs/start-route-production-authoring.md'
       - 'docs/continue-route-core-authority.md'
+      - 'docs/continue-route-automatic-elbows.md'
   workflow_dispatch:
 
 permissions:
@@ -75,6 +80,9 @@ jobs:
             src/workspace/topology-edit-3d-productivity-controller.js
             src/workspace/topology-edit-3d-sjson-fidelity-controller.js
             src/workspace/topology-edit/topology-edit-sjson-runtime-authority-v2.js
+            src/workspace/topology-edit/topology-edit-bend-edge-crosswalk.js
+            src/workspace/topology-edit/topology-edit-pure-reducer.js
+            src/workspace/topology-edit/topology-edit-candidate-validator.js
             src/workspace/topology-edit/professional/topology-edit-operation-plan.js
             src/workspace/topology-edit/authoring/topology-edit-authoring-composite-operation.js
             src/workspace/topology-edit/authoring/topology-edit-authoring-operation-planner.js
@@ -86,6 +94,8 @@ jobs:
             src/workspace/topology-edit/authoring/topology-edit-start-route-validation-plan.js
             src/workspace/topology-edit/authoring/topology-edit-continue-route-intent.js
             src/workspace/topology-edit/authoring/topology-edit-continue-route-plan.js
+            src/workspace/topology-edit/authoring/topology-edit-continue-route-elbow-resolver.js
+            src/workspace/topology-edit/authoring/topology-edit-continue-route-fitted-plan.js
             src/workspace/topology-edit/authoring/topology-edit-continue-route-candidate.js
             src/workspace/topology-edit/authoring/topology-edit-continue-route-transaction.js
             src/workspace/viewport-productivity/topology-edit-authoring-runtime.js
@@ -97,17 +107,22 @@ jobs:
             tests/topology-edit-authoring-composite-operation.test.mjs
             tests/topology-edit-authoring-planner.test.mjs
             tests/topology-edit-authored-bend-geometry.test.mjs
+            tests/topology-edit-multi-bend-spool.test.mjs
             tests/topology-edit-governed-sjson-source-authority.test.mjs
             tests/topology-edit-start-route-authoring.test.mjs
             tests/topology-edit-start-route-runtime.test.mjs
             tests/topology-edit-start-route-production-adapter.test.mjs
             tests/topology-edit-continue-route-authoring.test.mjs
+            tests/topology-edit-continue-route-auto-elbow.test.mjs
             e2e/topology-edit-authoring-tools-tree.spec.js
             e2e/topology-edit-start-route-authority.spec.js
           )
           for file in "${files[@]}"; do node --check "$file"; done
           limited=(
             src/workspace/topology-edit-3d-authoring-controller.js
+            src/workspace/topology-edit/topology-edit-bend-edge-crosswalk.js
+            src/workspace/topology-edit/topology-edit-pure-reducer.js
+            src/workspace/topology-edit/topology-edit-candidate-validator.js
             src/workspace/topology-edit/professional/topology-edit-operation-plan.js
             src/workspace/topology-edit/authoring/topology-edit-operation-graph.js
             src/workspace/topology-edit/authoring/topology-edit-start-route-intent.js
@@ -117,6 +132,8 @@ jobs:
             src/workspace/topology-edit/authoring/topology-edit-start-route-validation-plan.js
             src/workspace/topology-edit/authoring/topology-edit-continue-route-intent.js
             src/workspace/topology-edit/authoring/topology-edit-continue-route-plan.js
+            src/workspace/topology-edit/authoring/topology-edit-continue-route-elbow-resolver.js
+            src/workspace/topology-edit/authoring/topology-edit-continue-route-fitted-plan.js
             src/workspace/topology-edit/authoring/topology-edit-continue-route-candidate.js
             src/workspace/topology-edit/authoring/topology-edit-continue-route-transaction.js
             src/workspace/viewport-productivity/topology-edit-start-route-runtime.js
@@ -127,6 +144,8 @@ jobs:
             tests/topology-edit-start-route-runtime.test.mjs
             tests/topology-edit-start-route-production-adapter.test.mjs
             tests/topology-edit-continue-route-authoring.test.mjs
+            tests/topology-edit-continue-route-auto-elbow.test.mjs
+            tests/topology-edit-multi-bend-spool.test.mjs
             e2e/topology-edit-start-route-authority.spec.js
           )
           for file in "${limited[@]}"; do test "$(wc -l < "$file")" -lt 300; done
@@ -143,6 +162,7 @@ jobs:
             tests/topology-edit-authoring-planner.test.mjs \
             tests/topology-edit-authoring-composite-operation.test.mjs \
             tests/topology-edit-authored-bend-geometry.test.mjs \
+            tests/topology-edit-multi-bend-spool.test.mjs \
             tests/topology-edit-governed-sjson-source-authority.test.mjs \
             tests/topology-edit-professional-operation-transaction.test.mjs \
             tests/topology-edit-wave1-production-integration.test.mjs \
@@ -150,6 +170,7 @@ jobs:
             tests/topology-edit-start-route-runtime.test.mjs \
             tests/topology-edit-start-route-production-adapter.test.mjs \
             tests/topology-edit-continue-route-authoring.test.mjs \
+            tests/topology-edit-continue-route-auto-elbow.test.mjs \
             2>&1 | tee topology-edit-authoring-tools-test-output.txt
           test "$(grep -c '^ok ' topology-edit-authoring-tools-test-output.txt)" -gt 0
 

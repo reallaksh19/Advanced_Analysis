@@ -1,6 +1,7 @@
 /** Structural and checker-policy validation for one full candidate. */
 import { deepFreeze, semanticHash } from '../../core/shared-piping-model/index.js';
 import { assertTopologyEditCandidate } from './topology-edit-candidate-builder.js';
+import { topologyEditEdgeReferencesBend } from './topology-edit-bend-edge-crosswalk.js';
 import { validateTopologyEditCommandEffect } from './topology-edit-command-effect-dispatch.js';
 import { canonicalTopologyStateHash, rebuildTopologyEditCrosswalk } from './topology-edit-canonical-state.js';
 
@@ -191,6 +192,9 @@ function sameIds(left, right) {
   const a = [...new Set(left ?? [])].sort(); const b = [...new Set(right ?? [])].sort();
   return a.length === b.length && a.every((id, index) => id === b[index]);
 }
+function edgeReferencesBend(edge, bendId) {
+  try { return topologyEditEdgeReferencesBend(edge, bendId); } catch { return false; }
+}
 function validateBendDefinitions(topology, errors) {
   const nodes = new Map((topology.nodes ?? []).map((node) => [node.id, node]));
   const existing = new Set([...(topology.nodes ?? []), ...(topology.edges ?? []),
@@ -215,7 +219,7 @@ function validateBendDefinitions(topology, errors) {
         || !String(bend.radiusAuthority ?? '').trim()) errors.push(finding(
       'BEND_ENGINEERING_EVIDENCE_INVALID',
       `Bend ${bend.id} requires positive radius, bounded angle, and radius authority.`, [bend.id]));
-    if (arms.some((edge) => edge.bendDefinition?.bendId !== bend.id)) errors.push(finding(
+    if (arms.some((edge) => !edgeReferencesBend(edge, bend.id))) errors.push(finding(
       'BEND_EDGE_CROSSWALK_INVALID', `Bend ${bend.id} is not cross-referenced by both route arms.`,
       [bend.id, ...arms.map((edge) => edge.id)]));
   }

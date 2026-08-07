@@ -1,19 +1,36 @@
 import { deepFreeze, semanticHash } from '../../../core/shared-piping-model/index.js';
 import { TopologyEditCertifiedSession } from '../topology-edit-certified-session.js';
+import { normalizeTopologyEditCheckerPolicy } from '../topology-edit-candidate-builder.js';
 import { assertTopologyEditSpecificationCatalogue } from '../professional/topology-edit-spec-catalog.js';
 import { executeTopologyEditOperationGraph } from './topology-edit-operation-graph.js';
-import { assertContinueRoutePlan } from './topology-edit-continue-route-plan.js';
+import { assertContinueRoutePlan, CONTINUE_ROUTE_PLAN_SCHEMA } from './topology-edit-continue-route-plan.js';
+import {
+  assertContinueRouteFittedPlan,
+  CONTINUE_ROUTE_FITTED_PLAN_SCHEMA,
+} from './topology-edit-continue-route-fitted-plan.js';
 
-export const CONTINUE_ROUTE_CANDIDATE_SCHEMA = 'TopologyEditContinueRouteCandidate.v1';
+export const CONTINUE_ROUTE_CANDIDATE_SCHEMA = 'TopologyEditContinueRouteCandidate.v2';
 
 function fail(message, Constructor = RangeError) {
   throw new Constructor(`TopologyEditContinueRouteCandidate: ${message}`);
+}
+function executablePlan(value) {
+  if (value?.schema === CONTINUE_ROUTE_FITTED_PLAN_SCHEMA) return assertContinueRouteFittedPlan(value);
+  if (value?.schema === CONTINUE_ROUTE_PLAN_SCHEMA) {
+    const plan = assertContinueRoutePlan(value);
+    if (plan.requiresAutoFitting) {
+      fail('route contains direction changes; governed automatic fitting insertion is required before Apply.');
+    }
+    return plan;
+  }
+  fail('plan is not a Continue Route raw or fitted plan.', TypeError);
 }
 function assertSession(value) {
   if (!(value instanceof TopologyEditCertifiedSession)) fail('session must be a TopologyEditCertifiedSession.', TypeError);
   value.assertUsable();
   return value;
 }
+function bendCount(plan) { return Number(plan.bendCount ?? 0); }
 function assertCurrentBasis(plan, session, catalogue) {
   const mismatches = [];
   const topology = session.currentTopology();
@@ -29,15 +46,37 @@ function assertCurrentBasis(plan, session, catalogue) {
   if (!node || semanticHash({ kind: 'NODE', record: node }) !== plan.basis.startNodeRevision) mismatches.push('startNodeRevision');
   if (mismatches.length) fail(`Continue Route plan is stale: ${mismatches.join(', ')}.`);
 }
-function sandboxFromSession(session) {
-  const sandbox = new TopologyEditCertifiedSession(session.baseCanonicalTopology, { checkerPolicy: session.checkerPolicy });
+function sandboxFromSession(session, composite) {
+  const checkerPolicy = composite
+    ? normalizeTopologyEditCheckerPolicy({
+        ...(session.checkerPolicy ?? {}),
+        rejectNewSeverities: [],
+        rejectNewIssueKinds: [],
+      })
+    : session.checkerPolicy;
+  const sandbox = new TopologyEditCertifiedSession(session.baseCanonicalTopology, { checkerPolicy });
   sandbox.reloadJournal(session.serializeJournal());
   return sandbox;
 }
-function nodeRevision(topology, id) {
-  const matches = (topology.nodes ?? []).filter((row) => row.id === id);
-  if (matches.length !== 1) fail(`node ${id} resolved ${matches.length} records.`);
-  return semanticHash({ kind: 'NODE', record: matches[0] });
+function targetRevision(topology, collection, id, kind) {
+  const matches = (topology[collection] ?? []).filter((row) => row.id === id);
+  if (matches.length !== 1) fail(`${kind.toLowerCase()} ${id} resolved ${matches.length} records.`);
+  return semanticHash({ kind, record: matches[0] });
+}
+function expectedRevisions(commandType, payload, topology) {
+  if (commandType === 'INSERT_PIPE_SEGMENT') {
+    return {
+      [payload.fromNodeId]: targetRevision(topology, 'nodes', payload.fromNodeId, 'NODE'),
+      [payload.toNodeId]: targetRevision(topology, 'nodes', payload.toNodeId, 'NODE'),
+    };
+  }
+  if (commandType === 'ADD_BEND_DEFINITION') {
+    return Object.fromEntries([
+      [payload.nodeId, targetRevision(topology, 'nodes', payload.nodeId, 'NODE')],
+      ...payload.edgeIds.map((id) => [id, targetRevision(topology, 'edges', id, 'EDGE')]),
+    ]);
+  }
+  return undefined;
 }
 function addedCount(before, after, collection) {
   const prior = new Set((before[collection] ?? []).map((row) => row.id));
@@ -51,27 +90,20 @@ function appendedIds(before, after) {
 }
 
 export async function prepareContinueRouteCandidate({ plan: input, session: sessionInput, catalogue: catalogueInput } = {}) {
-  const plan = assertContinueRoutePlan(input);
-  if (plan.requiresAutoFitting) {
-    fail('route contains direction changes; governed automatic fitting insertion is required before Apply.');
-  }
+  const plan = executablePlan(input);
   const session = assertSession(sessionInput);
   const catalogue = assertTopologyEditSpecificationCatalogue(catalogueInput);
   assertCurrentBasis(plan, session, catalogue);
-  const sandbox = sandboxFromSession(session);
+  const bends = bendCount(plan);
+  const sandbox = sandboxFromSession(session, bends > 0);
   const transitions = [];
   const execution = await executeTopologyEditOperationGraph({
     graph: plan.graph,
     initialTopology: sandbox.currentTopology(),
     execute: ({ commandType, payload, topology }) => {
-      const options = commandType === 'INSERT_PIPE_SEGMENT'
-        ? { expectedTargetRevisions: {
-            [payload.fromNodeId]: nodeRevision(topology, payload.fromNodeId),
-            [payload.toNodeId]: nodeRevision(topology, payload.toNodeId),
-          } }
-        : {};
+      const expectedTargetRevisions = expectedRevisions(commandType, payload, topology);
       const priorTopology = sandbox.currentTopology();
-      const transition = sandbox.execute(commandType, payload, options);
+      const transition = sandbox.execute(commandType, payload, { expectedTargetRevisions });
       if (transition.disposition !== 'ACCEPTED') {
         fail(`${commandType} rejected: ${transition.reason || transition.disposition}.`);
       }
@@ -81,7 +113,8 @@ export async function prepareContinueRouteCandidate({ plan: input, session: sess
   });
   const before = session.currentTopology();
   if (addedCount(before, execution.topology, 'nodes') !== plan.nodeCount
-    || addedCount(before, execution.topology, 'edges') !== plan.segmentCount) {
+    || addedCount(before, execution.topology, 'edges') !== plan.segmentCount
+    || addedCount(before, execution.topology, 'bends') !== bends) {
     fail('Continue Route candidate generated an unexpected topology shape.');
   }
   const commandIds = appendedIds(session.journal.activeCommandIds, sandbox.journal.activeCommandIds);
@@ -102,8 +135,10 @@ export async function prepareContinueRouteCandidate({ plan: input, session: sess
     graphHash: plan.graphHash,
     graphExecutionHash: execution.executionHash,
     catalogueHash: catalogue.catalogueHash,
+    certificationMode: bends ? 'FINAL_STATE_COMPOSITE' : 'SEQUENTIAL',
     segmentCount: plan.segmentCount,
     nodeCount: plan.nodeCount,
+    bendCount: bends,
     commandCount: plan.expectedCommandCount,
     priorSessionVersion: session.journal.sessionVersion,
     priorJournalHash: session.journal.journalHash,
@@ -140,7 +175,7 @@ export function assertContinueRouteCandidate(value) {
     || semanticHash(value.serializedJournal) !== value.serializedJournalHash
     || semanticHash(value.materializedCommands) !== value.materializedCommandHash
     || semanticHash(value.operationBindings) !== value.operationBindingsHash
-    || value.commandCount !== value.segmentCount * 2
+    || value.commandCount !== value.segmentCount * 2 + value.bendCount
     || value.nodeCount !== value.segmentCount
     || arrays.some((rows) => rows?.length !== value.commandCount)) {
     fail('candidate payload differs from immutable authority.');

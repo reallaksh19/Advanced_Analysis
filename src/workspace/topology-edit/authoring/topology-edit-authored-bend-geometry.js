@@ -43,7 +43,11 @@ export function applyTopologyEditAuthoredBendProjection(projectionInput, topolog
   const projection = normalizeProjection(projectionInput);
   const authored = deriveTopologyEditAuthoredBendProjection(topologyInput);
   if (!authored.trims.length && !authored.segments.length) return projectionInput;
-  const trimByEdge = new Map(authored.trims.map((trim) => [trim.edgeId, trim]));
+  const trimsByEdge = authored.trims.reduce((result, trim) => {
+    const current = result.get(trim.edgeId) ?? [];
+    result.set(trim.edgeId, [...current, trim]);
+    return result;
+  }, new Map());
   const material = {
     ...projection,
     authoredBendProjectionHash: authored.projectionHash,
@@ -52,33 +56,35 @@ export function applyTopologyEditAuthoredBendProjection(projectionInput, topolog
   if (Array.isArray(projection.segments)) {
     material.segments = applyAuthoredBendsToSegments(
       projection.segments,
-      trimByEdge,
+      trimsByEdge,
       authored.segments,
     );
   }
   if (Array.isArray(projection.compactSegments)) {
     material.compactSegments = applyAuthoredBendsToSegments(
       projection.compactSegments,
-      trimByEdge,
+      trimsByEdge,
       authored.segments,
     );
   }
   return deepFreeze(material);
 }
 
-function applyAuthoredBendsToSegments(rows, trimByEdge, authoredSegments) {
+function applyAuthoredBendsToSegments(rows, trimsByEdge, authoredSegments) {
   const existingIds = new Set(rows.map((row) => row?.id).filter(Boolean));
   const trimmed = rows.map((segment) => {
     const edgeId = segment.pickTarget?.objectId ?? segment.entityId ?? null;
-    const trim = trimByEdge.get(edgeId);
-    if (!trim) return segment;
+    const trims = trimsByEdge.get(edgeId) ?? [];
+    if (!trims.length) return segment;
+    const fromTrim = trims.find((row) => row.endpoint === 'FROM') ?? null;
+    const toTrim = trims.find((row) => row.endpoint === 'TO') ?? null;
     const next = { ...segment };
-    if (trim.endpoint === 'FROM') next.start = trim.tangentPoint;
-    else next.end = trim.tangentPoint;
+    if (fromTrim) next.start = fromTrim.tangentPoint;
+    if (toTrim) next.end = toTrim.tangentPoint;
     if (Array.isArray(next.points) && next.points.length >= 2) {
       next.points = next.points.map((point, index) => {
-        if (trim.endpoint === 'FROM' && index === 0) return trim.tangentPoint;
-        if (trim.endpoint === 'TO' && index === next.points.length - 1) return trim.tangentPoint;
+        if (fromTrim && index === 0) return fromTrim.tangentPoint;
+        if (toTrim && index === next.points.length - 1) return toTrim.tangentPoint;
         return point;
       });
     }
