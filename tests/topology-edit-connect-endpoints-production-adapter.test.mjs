@@ -173,6 +173,18 @@ test('production Apply Undo Redo is one exact connection transaction', async () 
   assert.equal(row.session.currentTopology().canonicalTopologyHash, transaction.resultingCanonicalHash);
 });
 
+test('endpoint capture rejects canonical terminal dependants before planning', async () => {
+  const row = await fixture();
+  const topology = row.session.currentTopology();
+  const closed = finalizeCanonicalTopology({
+    ...topology,
+    boundaries: [{ id: 'boundary:production-closed', nodeId: row.startEndpoint.nodeId }],
+  });
+  row.controller.session = new TopologyEditCertifiedSession(closed);
+  row.controller.selection = { nodeIds: [row.startEndpoint.nodeId], edgeId: null };
+  assert.throws(() => captureConnectEndpoint(row.controller), /constrained by boundaries record boundary:production-closed/u);
+});
+
 test('endpoint capture fails closed for ambiguous selection or closed graph nodes', async () => {
   const row = await fixture();
   row.controller.selection = { nodeIds: [row.startEndpoint.nodeId, row.endEndpoint.nodeId] };
