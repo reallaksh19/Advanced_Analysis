@@ -50,15 +50,24 @@ const bends = normalized.segments.filter((row) => row.type === 'BEND').map((row)
   toNode: String(row.endNodeId),
   radius: row.meta.bendDeclaredRadius,
 }));
-const tees = [...new Map(teeTags.map((row) => [row.segmentId, row])).values()];
+const canonicalTeeSegments = normalized.segments.filter((row) => row.type === 'TEE');
+const teeJunctionMap = new Map();
+for (const segment of canonicalTeeSegments) {
+  const junctionNodeId = inferThreeLegJunction(normalized, segment);
+  const row = teeJunctionMap.get(junctionNodeId) ?? { junctionNodeId, taggedSegmentIds: [], incidentSegmentIds: incidentIds(normalized, junctionNodeId) };
+  row.taggedSegmentIds.push(String(segment.id));
+  teeJunctionMap.set(junctionNodeId, row);
+}
+const teeJunctions = [...teeJunctionMap.values()]
+  .map((row) => ({ ...row, taggedSegmentIds: [...new Set(row.taggedSegmentIds)].sort() }))
+  .sort((a, b) => a.junctionNodeId.localeCompare(b.junctionNodeId));
 
 assert.equal(bends.length, 11, 'BM4 normalized geometry must expose the 11 M035 bend features.');
-assert.equal(tees.length, 2, 'BM4 source must expose two welding-tee/weldolet feature segments.');
+assert.equal(teeTags.length, 7, 'BM4 source evidence currently contains seven tee/weldolet SIF tags.');
+assert.equal(canonicalTeeSegments.length, 7, 'All seven tee/weldolet-tagged spans must retain canonical TEE classification.');
+assert.equal(teeJunctions.length, 2, 'Those source tags must resolve to the two physical BM4 three-leg tee junctions.');
 assert.equal(reducers.length, 7, 'BM4 source must expose seven reducer feature segments.');
-for (const tee of tees) {
-  const segment = normalized.segments.find((row) => row.id === tee.segmentId);
-  assert.equal(segment?.type, 'TEE', `${tee.segmentId} must retain tee classification in canonical geometry.`);
-}
+assert.ok(teeJunctions.every((row) => row.incidentSegmentIds.length === 3));
 for (const reducer of reducers) {
   assert.ok(normalized.segments.some((row) => row.id === reducer.segmentId), `${reducer.segmentId} must retain canonical segment custody.`);
 }
@@ -66,13 +75,32 @@ for (const reducer of reducers) {
 console.log(JSON.stringify({
   check: 'm035-bm4-feature-inventory',
   status: 'PASS',
-  counts: { bends: bends.length, tees: tees.length, reducers: reducers.length },
+  counts: {
+    bends: bends.length,
+    teeSifTags: teeTags.length,
+    canonicalTeeSegments: canonicalTeeSegments.length,
+    physicalTeeJunctions: teeJunctions.length,
+    reducers: reducers.length,
+  },
   bends,
-  tees,
+  teeTags,
+  teeJunctions,
   reducers,
 }, null, 2));
 console.log('M035 BM4 feature inventory PASS');
 
+function inferThreeLegJunction(geometry, segment) {
+  const candidates = [String(segment.startNodeId), String(segment.endNodeId)]
+    .filter((nodeId) => incidentIds(geometry, nodeId).length === 3);
+  assert.equal(candidates.length, 1, `TEE-tagged segment ${segment.id} must identify one physical three-leg junction.`);
+  return candidates[0];
+}
+function incidentIds(geometry, nodeId) {
+  return geometry.segments
+    .filter((row) => String(row.startNodeId) === nodeId || String(row.endNodeId) === nodeId)
+    .map((row) => String(row.id))
+    .sort();
+}
 function cleanNode(value) {
   const numeric = Number(String(value ?? '').trim());
   return Number.isFinite(numeric) ? String(numeric) : String(value ?? '').trim();
