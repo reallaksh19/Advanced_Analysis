@@ -19,8 +19,9 @@ const expectedOwnership = new Map([
   ['/repo/src/core/support-engineering/index.js', 'core-support-engineering'],
   ['/repo/src/workspace/topology-edit/topology-edit-inline-component-replacement.js', 'topology-edit-engineering-commands'],
   ['/repo/src/workspace/topology-edit/topology-edit-stagedjson-engineering-source.js', 'topology-edit-stagedjson-source-engineering'],
-  ['/repo/src/workspace/topology-edit/topology-edit-pipe-segment-contract.js', 'topology-edit-native-pipe-authority'],
-  ['/repo/src/workspace/topology-edit/topology-edit-native-pipe-writeback.js', 'topology-edit-native-pipe-authority'],
+  ['/repo/src/workspace/resolved-engineering-geometry.js', 'workspace-viewport-engineering-projections'],
+  ['/repo/src/workspace/viewport-render-model.js', 'workspace-viewport-engineering-projections'],
+  ['/repo/src/workspace/model-zone-viewport-projection.js', 'workspace-viewport-engineering-projections'],
 ]);
 
 const automaticWorkspaceOwnership = [
@@ -32,10 +33,10 @@ const automaticWorkspaceOwnership = [
   '/repo/src/workspace/enrichment/first-cut-workbench-controller.js',
   '/repo/src/workspace/linear-piping-results-workbench.js',
   '/repo/src/workspace/lafea-workbench.js',
-  '/repo/src/workspace/lafea-workbench.js',
   '/repo/src/workspace/topology-edit/topology-edit-controller.js',
   '/repo/src/workspace/sequential-sketcher/sequential-sketcher-controller.js',
   '/repo/src/workspace/viewport-panel.js',
+  '/repo/src/workspace/viewport-renderer.js',
 ];
 
 for (const [id, expected] of expectedOwnership) {
@@ -50,7 +51,6 @@ for (const id of automaticWorkspaceOwnership) {
 }
 
 assert.equal(manualChunk('/repo/src/main.js'), undefined);
-assert.equal(viteSource.includes("return 'workspace-"), false);
 assert.equal(viteSource.includes("return 'fea-workbenches'"), false);
 assert.equal(viteSource.includes("if (source.includes('/src/workspace/')) return undefined;"), true);
 assert.equal(viteSource.includes('onlyExplicitManualChunks: false'), true);
@@ -71,6 +71,6 @@ console.log(JSON.stringify({
   ownershipAssertions: expectedOwnership.size,
   automaticWorkspaceOwnershipAssertions: automaticWorkspaceOwnership.length,
   distinctChunkOwners: new Set(expectedOwnership.values()).size,
-  workspaceOwnership: 'ROLLUP_GRAPH_AWARE_STATEFUL_WITH_STATELESS_TOPOLOGY_EXCEPTIONS',
+  workspaceOwnership: 'ROLLUP_GRAPH_AWARE_STATEFUL_WITH_STATELESS_PROJECTION_EXCEPTIONS',
   correctnessPreferredOverTarget: true,
 }));
