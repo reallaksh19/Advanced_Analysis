@@ -4,7 +4,10 @@ import { semanticHash } from '../src/core/shared-piping-model/index.js';
 import { buildSharedPipingModelFromWorkspaceDataset } from '../src/core/shared-piping-model/adapters/workspace-dataset-to-shared.js';
 import { buildPipingPortTopologyGraph } from '../src/core/piping-topology/topology-graph.js';
 import { createTopologyEditSpecificationCatalogue } from '../src/workspace/topology-edit/professional/topology-edit-spec-catalog.js';
-import { finalizeCanonicalTopology } from '../src/workspace/topology-edit/topology-edit-canonical-state.js';
+import {
+  finalizeCanonicalTopology,
+  topologyEditCanonicalHashMaterial,
+} from '../src/workspace/topology-edit/topology-edit-canonical-state.js';
 import {
   applyCanonicalTopologyToWorkspaceEntities,
   buildCanonicalTopologyFromWorkspaceDataset,
@@ -157,6 +160,10 @@ test('native pipe writeback is session-independent and reopens identically', () 
   assert.deepEqual(reopened.nodes, edited.nodes);
   assert.deepEqual(reopened.edges, edited.edges);
   assert.deepEqual(reopened.crosswalk, edited.crosswalk);
+  assert.deepEqual(
+    topologyEditCanonicalHashMaterial(reopened),
+    topologyEditCanonicalHashMaterial(edited),
+  );
   assert.equal(reopened.canonicalTopologyHash, edited.canonicalTopologyHash);
 });
 
