@@ -367,6 +367,10 @@ function compactProbe(cases, nodeId, family, field = 'UY') {
   return result;
 }
 
+function flattenCaseForces(caseRecord) {
+  return ['restraint', 'globalForce', 'localForce'].flatMap((family) => caseRecord[family].rows);
+}
+
 function main() {
   console.log('\n--- M035 BM4 CASE 19/20/21 before/after CAESAR comparison ---\n');
   const cii = loadBm4CiiOutputCases1921();
@@ -420,12 +424,10 @@ function main() {
     solver: report.featureModel,
     probes: {
       node20300RestraintUY: { baseline: compactProbe(baselineCases, '20300', 'restraint'), m035: compactProbe(featureCases, '20300', 'restraint') },
-      node20170Rest...: undefined,
       node20170RestraintUY: { baseline: compactProbe(baselineCases, '20170', 'restraint'), m035: compactProbe(featureCases, '20170', 'restraint') },
-      node20090RestaintUY: { baseline: compactProbe(baselineCases, '20090', 'restraint'), m035: compactProbe(featureCases, '20090', 'restraint') },
+      node20090RestraintUY: { baseline: compactProbe(baselineCases, '20090', 'restraint'), m035: compactProbe(featureCases, '20090', 'restraint') },
     },
   };
-  delete compact.probes.node20170Rest...;
 
   mkdirSync(fileURLToPath(new URL('../reports', import.meta.url)), { recursive: true });
   writeFileSync(
@@ -437,14 +439,12 @@ function main() {
   for (const label of CASE_LABELS) {
     const b = report.baseline.caseSummary[label];
     const m = report.m035.caseSummary[label];
-    console.log(`CASE ${label}: baseline displacement 5%=${ratePct(b.displacement.raw).toFixed(2)}% forces 5%=${ratePct(summarizeRows(flattenCaseForces(baselineCases[label]), false)).toFixed(2)}% | M035 displacement 5%=${ratePct(m.displacement.raw).toFixed(2)}% forces 5%=${ratePct(summarizeRows(flattenCaseForces(featureCases[label]), false)).toFixed(2)}%`);
+    const baselineForces = summarizeRows(flattenCaseForces(baselineCases[label]), false);
+    const featureForces = summarizeRows(flattenCaseForces(featureCases[label]), false);
+    console.log(`CASE ${label}: baseline displacement 5%=${ratePct(b.displacement.raw).toFixed(2)}% forces 5%=${ratePct(baselineForces).toFixed(2)}% | M035 displacement 5%=${ratePct(m.displacement.raw).toFixed(2)}% forces 5%=${ratePct(featureForces).toFixed(2)}%`);
   }
   console.log('Full report written to reports/m035-bm4-before-after-cases-19-20-21.json');
   return report;
-}
-
-function flattenCaseForces(caseRecord) {
-  return ['restraint', 'globalForce', 'localForce'].flatMap((family) => caseRecord[family].rows);
 }
 
 main();
