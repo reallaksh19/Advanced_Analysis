@@ -1,0 +1,92 @@
+name: M022-C Governed StagedJSON Authority Composition
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/m022c-stagedjson-authority-composition.yml"
+      - "package.json"
+      - "benchmarks/1885Sjson/EnrichedSjson"
+      - "project-data/1885s-project-data-profile.json"
+      - "src/workspace/dataset-adapter.js"
+      - "src/workspace/support-sites/support-site-model.js"
+      - "src/workspace/analysis-authority-overlay/**"
+      - "scripts/m022a-stagedjson-*.mjs"
+      - "scripts/m022c-stagedjson-*.mjs"
+  push:
+    branches:
+      - "agent/m022c-governed-sjson-authority-composition"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-m022c:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Prove exact-head execution
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git diff --exit-code
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run M022-C real-branch authority composition
+        run: npm run check:m022c
+
+      - name: Re-run prerequisite M022-A contract and inventory gates
+        run: npm run check:m022a
+
+      - name: Re-run M008 authority, subset, extraction and material/section gates
+        run: |
+          npm run check:w11.1
+          npm run check:w11.2
+          npm run check:w11.3
+          npm run check:w11.4
+
+      - name: Syntax check changed JavaScript
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          base_sha="$(git merge-base origin/main HEAD)"
+          while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+            case "$file" in
+              *.js|*.mjs) node --check "$file" ;;
+            esac
+          done < <(git diff --name-only "$base_sha"...HEAD)
+
+      - name: Enforce Adapter Batch A custody
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          base_sha="$(git merge-base origin/main HEAD)"
+          changed="$(git diff --name-only "$base_sha"...HEAD)"
+          printf '%s\n' "$changed"
+          unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(\.github/workflows/m022c-stagedjson-authority-composition\.yml|package\.json|src/workspace/analysis-authority-overlay/(index|stagedjson-process-resolution|stagedjson-support-resolution|stagedjson-authority-composition)\.js|scripts/m022c-stagedjson-authority-(composition-check|source-guard)\.mjs)$' || true)"
+          test -z "$unexpected"
+          test -z "$(git diff "$base_sha"...HEAD -- src/core src/workspace/lfea-shell-v2 || true)"
+
+      - name: Whitespace check
+        run: git diff --check
