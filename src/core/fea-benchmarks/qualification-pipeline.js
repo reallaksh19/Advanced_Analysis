@@ -49,6 +49,7 @@ export function runGovernedBenchmarkQualification({
     preparation,
     ingestion: ingested,
   }), 'authorize');
+  requireAuthorizationCustody(authorization, preparation, caseIds);
 
   const cases = [];
   for (const caseId of caseIds) {
@@ -142,6 +143,26 @@ function requireIngestion(ingested, adapter) {
   }
   if (ingested.benchmarkId !== adapter.benchmarkId) {
     throw new TypeError('Adapter ingestion benchmark identity mismatch.');
+  }
+}
+
+function requireAuthorizationCustody(authorization, preparation, caseIds) {
+  if (authorization.preparationSemanticHash !== undefined
+    && authorization.preparationSemanticHash !== preparation.semanticHash) {
+    throw new TypeError('Benchmark authorization is stale or bound to another preparation.');
+  }
+  if (authorization.authorizedPhysicalCaseIds !== undefined) {
+    if (!Array.isArray(authorization.authorizedPhysicalCaseIds)) {
+      throw new TypeError('authorization.authorizedPhysicalCaseIds must be an array when supplied.');
+    }
+    const authorized = new Set(authorization.authorizedPhysicalCaseIds.map(String));
+    const unauthorized = caseIds.filter((caseId) => !authorized.has(caseId));
+    if (unauthorized.length > 0) {
+      throw new TypeError(`Benchmark authorization does not cover cases: ${unauthorized.join(', ')}.`);
+    }
+  }
+  if (authorization.executionBoundary?.authorizationIssued === false) {
+    throw new TypeError('Benchmark authorization record explicitly states that authorization was not issued.');
   }
 }
 
