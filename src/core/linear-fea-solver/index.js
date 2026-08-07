@@ -79,3 +79,22 @@ export {
   preflightSemanticProjection,
   requireLinearStiffnessPreflight,
 } from './stiffness-preflight.js';
+
+// M036: opt-in active-set layer. The sealed linear solve above remains the
+// only inner factorization path; zero unilateral declarations are an exact
+// one-call no-op proven by scripts/lfea-unilateral-linear-noop-check.mjs.
+export {
+  BM4_FRICTION_NOT_MODELED,
+  DEFAULT_UNILATERAL_POLICY,
+  UNILATERAL_EXECUTION_SCHEMA,
+  UNILATERAL_FREEZE_DIAGNOSTIC,
+  UNILATERAL_POLICY_SCHEMA,
+  UNILATERAL_SENSE,
+  UNILATERAL_STATUS,
+  compileUnilateralSolverExecution,
+  computeUnilateralExecutionSemanticHash,
+  evaluateSupportStatus,
+  normalizeUnilateralDeclarations,
+  requireUnilateralDeclaration,
+  resolveUnilateralPolicy,
+} from '../linear-fea-unilateral-solver/index.js';
