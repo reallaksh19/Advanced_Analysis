@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { BM4_COMPARISON_POLICY, loadBm4CiiOutputCases1921 } from './lfea-m034-bm4-output-comparison.mjs';
 import { solveBm4M035FeatureCases } from './lfea-m035-bm4-feature-solve-runtime.mjs';
 import { solveBm4M035M036Combined } from './lfea-m035-m036-bm4-integration-runtime.mjs';
+import { normalizeBm4CiiLocalForceForM035 } from './lfea-bm4-local-force-reference-normalization.mjs';
 import {
   M035_BEND_SCORING_EXCLUDED_NODE_IDS,
   M035_LIFTOFF_CROSS_EFFECT_WATCH_NODE_IDS,
@@ -212,7 +213,7 @@ function sensitivity(current, variant) {
   const movement = Math.abs(variant.ours - current.ours);
   const errorImprovement = Math.abs(current.absoluteDifference) - Math.abs(variant.absoluteDifference);
   return {
-    material: Number.isFinite(width) && movement >= width && errorImprovement > 0,
+    material: Number.isFinite(width) && movement >= width,
     movement, targetWidth: width, errorImprovement,
     variantOurs: variant.ours, variantPercentDifference: variant.percentDifference, variantPassed5pct: variant.passedTarget,
   };
@@ -245,8 +246,9 @@ function unmatchedReferenceRows(snapshot, cii) {
   return result;
 }
 
-const cii = loadBm4CiiOutputCases1921();
+const rawCii = loadBm4CiiOutputCases1921();
 const m035 = solveBm4M035FeatureCases();
+const cii = normalizeBm4CiiLocalForceForM035(rawCii, m035.authorities);
 const combined = solveBm4M035M036Combined();
 const m035Rows = allRows(compareSnapshot(featureSnapshot(m035), cii));
 const combinedSnapshot = featureSnapshot(combined);
@@ -257,9 +259,12 @@ const m035Forces = m035Rows.filter((row) => row.family !== 'displacement');
 assert.equal(m035Displacement.length, 1746, 'M035 displacement comparison row-count parity');
 assert.equal(m035Forces.length, 6516, 'M035 force comparison row-count parity');
 assert.ok(Math.abs(m035Displacement.filter((row) => row.passedTarget).length / m035Displacement.length * 100 - 18.499427262313862) < 1e-12, 'M035 raw displacement rate parity');
-assert.ok(Math.abs(m035Forces.filter((row) => row.passedTarget).length / m035Forces.length * 100 - 28.959484346224677) < 1e-12, 'M035 raw force rate parity');
+assert.ok(Math.abs(m035Forces.filter((row) => row.passedTarget).length / m035Forces.length * 100 - 31.49171270718232) < 1e-12, 'M035 raw force rate parity after local-axis reference normalization');
 
 const reducerNodes = new Set(combined.authorities.inlineReducers.transitions.map((row) => String(row.nodeId)));
+const rigidElementPairs = new Set(combined.authorities.base.entries
+  .filter((row) => row.rigidAuthority !== null)
+  .map((row) => `${row.sourceSegment.startNodeId}-${row.sourceSegment.endNodeId}`));
 const graph = adjacency(combined.authorities.sourceGeometry);
 const failures = combinedRows.filter((row) => !row.passedTarget).map((row) => {
   const nodes = touchedNodes(row);
@@ -269,17 +274,20 @@ const failures = combinedRows.filter((row) => !row.passedTarget).map((row) => {
   const directContact = row.family === 'restraint' && NONLINEAR.has(String(row.identifier));
   const bendBoundary = nodes.some((node) => BEND_EXCLUDED.has(String(node)));
   const contactSensitive = directContact || contact.material;
+  const directRigidElementResult = (row.family === 'globalForce' || row.family === 'localForce') && rigidElementPairs.has(String(row.identifier));
   let primaryCategory = 'UNEXPLAINED_MATCHED';
   if (historyBoundary) primaryCategory = 'CASE19_HISTORY_UNRESOLVED';
   else if (reducerDistanceEdges !== null) primaryCategory = 'REDUCER_ADJACENT';
+  else if (directRigidElementResult) primaryCategory = 'RIGID_ELEMENT_RESULT_SCOPE_BOUNDARY';
   else if (contactSensitive) primaryCategory = 'CONTACT_LOAD_PATH_SENSITIVE';
   else if (bendBoundary) primaryCategory = 'BEND_ENDPOINT_OR_STATION_SEMANTICS';
   return {
     ...row, primaryCategory, touchedNodes: nodes, reducerDistanceEdges, normalizedSeverity: normalizedSeverity(row),
-    m035ToCombinedSensitivity: contact, case19HistoryBoundary: historyBoundary,
+    m035ToCombinedSensitivity: contact, case19HistoryBoundary: historyBoundary, directRigidElementResult,
     evidenceFlags: [
       ...(historyBoundary ? ['CASE19_HISTORY_UNSERIALIZED_AFFECTS_CASE'] : []),
       ...(reducerDistanceEdges !== null ? [`REDUCER_WITHIN_${reducerDistanceEdges}_SOURCE_EDGES`] : []),
+      ...(directRigidElementResult ? ['M035_SCOPE_EXCLUDES_RIGID_ELEMENT_AUTHORITY_CHANGE'] : []),
       ...(contactSensitive ? ['M036_CONTACT_LOAD_PATH_SENSITIVE'] : []),
       ...(bendBoundary ? ['BEND_ENDPOINT_OR_STATION_SEMANTICS_BOUNDARY'] : []),
       ...(!row.m035Scope.included ? [`PREDECLARED_SCOPE:${row.m035Scope.code}`] : []),
@@ -289,7 +297,8 @@ const failures = combinedRows.filter((row) => !row.passedTarget).map((row) => {
 const unmatchedReference = unmatchedReferenceRows(combinedSnapshot, cii);
 const unexplained = failures.filter((row) => row.primaryCategory === 'UNEXPLAINED_MATCHED').sort((a, b) => b.normalizedSeverity - a.normalizedSeverity);
 const report = {
-  schema: 'm035-m036-bm4-failure-attribution/v1',
+  schema: 'm035-m036-bm4-failure-attribution/v2',
+  localForceReferenceNormalization: cii.localForceReferenceNormalization,
   policy: {
     targetTolerancePercent: BM4_COMPARISON_POLICY.targetTolerancePercent,
     reducerAdjacencyEdges: REDUCER_ADJACENCY_EDGES,
@@ -301,11 +310,12 @@ const report = {
       counterfactualStatus: 'BLOCKED_RECOVERY_NOT_USED',
       reason: 'InputXML does not serialize CAESAR CASE 19 history. Imposing the additional observed 21470 release produced a BLOCKED SUS execution, so no counterfactual recovery is accepted; SUS and derived EXP failures are withheld from mechanics fitting.',
     },
-    contactSensitivityRule: 'For OPE, M035-bilateral to combined-M036 movement must improve error by at least one row-specific 5% target-width; direct nonlinear restraint rows are also contact-tagged.',
-    mechanicsChangeRule: 'Only UNEXPLAINED_MATCHED rows may motivate additional mechanics work.',
+    contactSensitivityRule: 'For OPE, M035-bilateral to combined-M036 movement of at least one row-specific 5% target-width marks the row contact-load-path-sensitive, whether the movement improves or worsens CAESAR agreement; direct nonlinear restraint rows are also contact-tagged.',
+    mechanicsChangeRule: 'Only UNEXPLAINED_MATCHED rows may motivate additional M035 mechanics work. Direct rigid-element result rows are a scope boundary because #834 explicitly excludes rigid-element authority changes; this does not assert that rigid weight caused the discrepancy.',
   },
   evidence: {
     reducerNodes: [...reducerNodes].sort(),
+    rigidElementPairs: [...rigidElementPairs].sort(),
     normalReleaseStates: {
       SUS: combined.sustainedRun.convergedState.filter((row) => row.status === 'RELEASED').map((row) => sourceNodeId(row.nodeId)).sort(),
       OPE: combined.operatingRun.convergedState.filter((row) => row.status === 'RELEASED').map((row) => sourceNodeId(row.nodeId)).sort(),
