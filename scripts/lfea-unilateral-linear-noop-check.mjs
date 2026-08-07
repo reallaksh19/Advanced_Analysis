@@ -38,4 +38,6 @@ const bm4 = solveBm4InputXmlConditioned();
 evidence.push(proveNoOp('BM4-SUS', bm4.sustained.execution));
 evidence.push(proveNoOp('BM4-OPE', bm4.operating.execution));
 
-console.log(JSON.stringify({ check: 'lfea-unilateral-linear-noop', status: 'PASS', evidence }, null, 2));
+const report = { check: 'lfea-unilateral-linear-noop', status: 'PASS', evidence };
+console.log(JSON.stringify(report, null, 2));
+console.log(`M036_NOOP_SUMMARY=${JSON.stringify(evidence)}`);
