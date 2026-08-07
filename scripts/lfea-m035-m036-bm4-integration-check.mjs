@@ -71,7 +71,7 @@ assert.deepEqual(releasedTargetIds(d.operatingRun, M036_BM4_TARGETS), [...M036_B
 for (const nodeId of M036_BM4_TARGETS) {
   assert.ok(Math.abs(reactionUy(d.operating.execution, nodeId)) <= 1, `${nodeId} combined OPE reaction must be within 1 N zero band`);
 }
-assert.equal(d.authorities.bendExpansion.components.length, 11, 'combined model retains 11 bend components');
+assert.equal(d.authorities.bendExpansion.components.length, 12, 'combined model retains all 12 physical bend components');
 assert.equal(d.authorities.teeJunctions.length, 2, 'combined model retains 2 tee junctions');
 assert.equal(d.authorities.inlineReducers.transitionCount, 6, 'combined model retains 6 reducer candidates');
 assert.equal(d.inventory.gappedGuideEvidence.length, 6, 'combined model retains 6 nonzero guide gaps');
