@@ -48,6 +48,7 @@ jobs:
             src/workspace/viewport-productivity/topology-edit-table-styles.js
             src/workspace/viewport-productivity/topology-edit-table-runtime.js
             src/workspace/viewport-productivity/topology-edit-table-workflow.js
+            src/workspace/viewport-productivity/topology-edit-table-productivity-adapter.js
             tests/topology-edit-table-view-state.test.mjs
             e2e/topology-edit-table-authority.spec.js
           )
@@ -55,6 +56,7 @@ jobs:
             test "$(git show "HEAD:$file" | wc -l)" -lt 300
             node --check "$file"
           done
+          node --check src/workspace/topology-edit-3d-productivity-controller.js
           ! grep -REn 'new (WebGLRenderer|TopologyEditViewportBackend)|WorkspaceState|loadDataset\(|swapDataset\(|applyCanonicalTopologyToWorkspaceEntities|session\.execute\(' \
             src/workspace/viewport-productivity/topology-edit-table-*.js
       - name: Table authority Node contracts
