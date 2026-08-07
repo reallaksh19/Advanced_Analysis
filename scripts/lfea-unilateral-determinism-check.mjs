@@ -26,7 +26,7 @@ function support(declarationId, nodeId) {
 
 const U1 = support('C-01', 'N-01');
 const U2 = support('C-02', 'N-02');
-const BASE = [fixed('C-ROOT', 'N-ROOT')];
+const BASE = [fixed('C-BASE-02', 'N-BASE-02'), fixed('C-BASE-01', 'N-BASE-01')];
 
 function deterministicSolve(active) {
   const ids = active.map((row) => row.declarationId);
@@ -44,9 +44,9 @@ function deterministicSolve(active) {
   };
 }
 
-function run(unilateral) {
+function run(unilateral, baseDeclarations = BASE) {
   return compileUnilateralSolverExecution({
-    baseDeclarations: BASE,
+    baseDeclarations,
     unilateral,
     buildAndSolve: deterministicSolve,
     policy: { penetrationTolerance: 1e-12 },
@@ -55,7 +55,7 @@ function run(unilateral) {
 
 const first = run([U1, U2]);
 const repeat = run([U1, U2]);
-const reversed = run([U2, U1]);
+const reversed = run([U2, U1], [...BASE].reverse());
 for (const other of [repeat, reversed]) {
   assert.deepEqual(other.convergedState, first.convergedState, 'converged state must be permutation invariant');
   assert.deepEqual(other.trace.map((row) => row.semanticHash), first.trace.map((row) => row.semanticHash), 'trace hashes must be identical');
