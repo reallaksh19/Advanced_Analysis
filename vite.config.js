@@ -7,8 +7,8 @@ const buildTime = new Date().toISOString();
  * Keep manual chunking limited to dependency-oriented or calculation-core
  * domains. Workspace modules remain graph-owned because they contain stores,
  * controllers, views, and top-level singleton instances with cross-feature
- * imports. The narrow topology-edit exceptions below contain only stateless
- * pure contract/projection helpers and own no runtime singleton.
+ * imports. The narrow workspace exceptions below contain only stateless pure
+ * contract/projection helpers and own no runtime singleton.
  */
 export function manualChunk(id) {
   const source = id.replaceAll('\\', '/');
@@ -49,14 +49,12 @@ export function manualChunk(id) {
   if (source.endsWith('/src/workspace/topology-edit/topology-edit-stagedjson-engineering-source.js')) {
     return 'topology-edit-stagedjson-source-engineering';
   }
-  if (source.endsWith('/src/workspace/topology-edit/topology-edit-pipe-segment-contract.js')
-    || source.endsWith('/src/workspace/topology-edit/topology-edit-pipe-segment-geometry.js')
-    || source.endsWith('/src/workspace/topology-edit/topology-edit-pipe-segment-resolver.js')
-    || source.endsWith('/src/workspace/topology-edit/topology-edit-pipe-segment-reducer.js')
-    || source.endsWith('/src/workspace/topology-edit/topology-edit-pipe-segment-effect.js')
-    || source.endsWith('/src/workspace/topology-edit/topology-edit-pipe-segment-command.js')
-    || source.endsWith('/src/workspace/topology-edit/topology-edit-native-pipe-writeback.js')) {
-    return 'topology-edit-native-pipe-authority';
+  if (source.endsWith('/src/workspace/resolved-engineering-geometry.js')
+    || source.endsWith('/src/workspace/model-zone-selector.js')
+    || source.endsWith('/src/workspace/model-zone-viewport-projection.js')
+    || source.endsWith('/src/workspace/viewport-render-model.js')
+    || source.endsWith('/src/workspace/support-load-viewport-callout-projection.js')) {
+    return 'workspace-viewport-engineering-projections';
   }
 
   // Rollup must own the complete stateful workspace graph so evaluation order
