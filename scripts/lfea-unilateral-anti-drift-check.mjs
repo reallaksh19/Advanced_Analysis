@@ -51,6 +51,8 @@ assert.equal(
   packageValue.scripts['check:lfea-unilateral'],
   'node scripts/lfea-unilateral-closed-form-check.mjs && node scripts/lfea-unilateral-determinism-check.mjs && node scripts/lfea-m036-bm4-liftoff-check.mjs && node scripts/lfea-unilateral-anti-drift-check.mjs',
 );
-assert.match(packageValue.scripts['check:lfea-linear-core'], /check:lfea-unilateral/u);
+assert.doesNotMatch(packageValue.scripts['check:lfea-linear-core'], /check:lfea-unilateral/u,
+  'M036 must not rewrite the existing linear-core check definition');
+assert.match(packageValue.scripts.gate, /check:lfea-unilateral/u);
 
 console.log('M036 unilateral active-set anti-drift check PASS');
