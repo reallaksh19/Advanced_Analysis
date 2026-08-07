@@ -185,8 +185,9 @@ function hasTeeSif(features) {
   ));
 }
 
-function componentDispositions(componentKind, canonicalStatus = 'RECONCILED') {
-  if (canonicalStatus !== 'RECONCILED') return both(invalidDisposition('MODEL_COMPONENT_SOURCE_UNRECONCILED'));
+function componentDispositions(componentKind, canonicalStatus) {
+  const status = canonicalStatus === undefined ? 'RECONCILED' : canonicalStatus;
+  if (status !== 'RECONCILED') return both(invalidDisposition('MODEL_COMPONENT_SOURCE_UNRECONCILED'));
   if (componentKind === 'STRAIGHT_PIPE' || componentKind === 'RIGID') return both(exactDisposition());
   const limitation = componentKind === 'BEND'
     ? 'GENERIC_APPROX_BEND_STRAIGHT_CHORD'
