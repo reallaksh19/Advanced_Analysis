@@ -38,6 +38,7 @@ on:
       - 'docs/continue-route-core-authority.md'
       - 'docs/continue-route-automatic-elbows.md'
       - 'docs/connect-existing-ends-core.md'
+      - 'docs/connect-existing-ends-composition.md'
   workflow_dispatch:
 
 permissions:
@@ -103,6 +104,10 @@ jobs:
             src/workspace/topology-edit/authoring/topology-edit-continue-route-transaction.js
             src/workspace/topology-edit/authoring/topology-edit-connect-endpoints-intent.js
             src/workspace/topology-edit/authoring/topology-edit-connect-endpoints-plan.js
+            src/workspace/topology-edit/authoring/topology-edit-connect-endpoints-elbow-resolver.js
+            src/workspace/topology-edit/authoring/topology-edit-connect-endpoints-operation.js
+            src/workspace/topology-edit/authoring/topology-edit-connect-endpoints-candidate.js
+            src/workspace/topology-edit/authoring/topology-edit-connect-endpoints-transaction.js
             src/workspace/viewport-productivity/topology-edit-authoring-runtime.js
             src/workspace/viewport-productivity/topology-edit-authoring-styles.js
             src/workspace/viewport-productivity/topology-edit-start-route-runtime.js
@@ -120,6 +125,7 @@ jobs:
             tests/topology-edit-continue-route-authoring.test.mjs
             tests/topology-edit-continue-route-auto-elbow.test.mjs
             tests/topology-edit-connect-endpoints-plan.test.mjs
+            tests/topology-edit-connect-endpoints-transaction.test.mjs
             e2e/topology-edit-authoring-tools-tree.spec.js
             e2e/topology-edit-start-route-authority.spec.js
           )
@@ -144,6 +150,10 @@ jobs:
             src/workspace/topology-edit/authoring/topology-edit-continue-route-transaction.js
             src/workspace/topology-edit/authoring/topology-edit-connect-endpoints-intent.js
             src/workspace/topology-edit/authoring/topology-edit-connect-endpoints-plan.js
+            src/workspace/topology-edit/authoring/topology-edit-connect-endpoints-elbow-resolver.js
+            src/workspace/topology-edit/authoring/topology-edit-connect-endpoints-operation.js
+            src/workspace/topology-edit/authoring/topology-edit-connect-endpoints-candidate.js
+            src/workspace/topology-edit/authoring/topology-edit-connect-endpoints-transaction.js
             src/workspace/viewport-productivity/topology-edit-start-route-runtime.js
             src/workspace/viewport-productivity/topology-edit-start-route-hud.js
             src/workspace/viewport-productivity/topology-edit-start-route-authoring-service.js
@@ -155,6 +165,7 @@ jobs:
             tests/topology-edit-continue-route-auto-elbow.test.mjs
             tests/topology-edit-multi-bend-spool.test.mjs
             tests/topology-edit-connect-endpoints-plan.test.mjs
+            tests/topology-edit-connect-endpoints-transaction.test.mjs
             e2e/topology-edit-start-route-authority.spec.js
           )
           for file in "${limited[@]}"; do test "$(wc -l < "$file")" -lt 300; done
@@ -181,6 +192,7 @@ jobs:
             tests/topology-edit-continue-route-authoring.test.mjs \
             tests/topology-edit-continue-route-auto-elbow.test.mjs \
             tests/topology-edit-connect-endpoints-plan.test.mjs \
+            tests/topology-edit-connect-endpoints-transaction.test.mjs \
             2>&1 | tee topology-edit-authoring-tools-test-output.txt
           test "$(grep -c '^ok ' topology-edit-authoring-tools-test-output.txt)" -gt 0
 
