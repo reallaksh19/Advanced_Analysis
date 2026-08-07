@@ -1,6 +1,10 @@
 import {
   topologyEditTableVisibleRows,
 } from '../topology-edit/table/topology-edit-table-view-state.js';
+import {
+  describeTopologyEditTableIntent,
+  renderTopologyEditTableEngineeringEditor,
+} from './topology-edit-table-engineering-editor.js';
 
 const MAX_RENDERED_ROWS = 300;
 const COLUMNS = Object.freeze([
@@ -37,7 +41,7 @@ export function renderTopologyEditTableGrid(runtime) {
         </table>
       </div>
       ${rows.length > MAX_RENDERED_ROWS ? `<p class="topology-edit-table__notice">Showing first ${MAX_RENDERED_ROWS} filtered rows. Refine the filter to inspect more.</p>` : ''}
-      ${primary ? editorHtml(primary, staged.get(primary.identity.canonicalId)) : '<p class="topology-edit-table__notice">Select an exact canonical row to inspect or edit it.</p>'}
+      ${primary ? editorHtml(primary, staged.get(primary.identity.canonicalId), runtime.projection) : '<p class="topology-edit-table__notice">Select an exact canonical row to inspect or edit it.</p>'}
       ${stagedPanel(runtime)}
       ${validationPanel(runtime)}
       <footer class="topology-edit-table__workflow">
@@ -62,7 +66,9 @@ function rowHtml(row, isSelected, stagedIntent) {
   </tr>`;
 }
 
-function editorHtml(row, stagedIntent) {
+function editorHtml(row, stagedIntent, projection) {
+  const engineering = renderTopologyEditTableEngineeringEditor(row, stagedIntent, projection);
+  if (engineering) return engineering;
   const identity = `<div class="topology-edit-table__identity"><strong>${escapeHtml(row.fields.tag ?? row.identity.canonicalId)}</strong><code>${escapeHtml(row.identity.canonicalId)}</code><span>${escapeHtml(row.elementType)}</span></div>`;
   if (row.elementType !== 'PIPE' || row.identity.canonicalKind !== 'EDGE') {
     return `<section class="topology-edit-table__editor">${identity}<p>This row is read-only in the current implementation slice. Its exact identity and custody remain selectable.</p></section>`;
@@ -85,7 +91,7 @@ function editorHtml(row, stagedIntent) {
 function stagedPanel(runtime) {
   const intents = runtime.batch?.intents ?? [];
   if (!intents.length && !runtime.staleResult) return '';
-  const rows = intents.map((intent) => `<li><code>${escapeHtml(intent.target.canonicalId)}</code> length ${escapeHtml(intent.priorValue.lengthMm)} → ${escapeHtml(intent.requestedValue.lengthMm)} mm · ${escapeHtml(intent.geometryPolicy.anchor)} / ${escapeHtml(intent.geometryPolicy.propagation)}</li>`).join('');
+  const rows = intents.map((intent) => `<li><code>${escapeHtml(intent.target.canonicalId)}</code> ${escapeHtml(describeTopologyEditTableIntent(intent))}</li>`).join('');
   const stale = runtime.staleResult
     ? `<div class="topology-edit-table__conflict"><strong>Stale/conflicting batch</strong><ul>${runtime.staleResult.reasons.map((reason) => `<li>${escapeHtml(reason.code)}: ${escapeHtml(reason.message)}</li>`).join('')}</ul></div>`
     : '';
