@@ -29,6 +29,8 @@ export {
   augmentPipingComponentTemperatureAuthorities,
 } from './thermal-expansion-augmentation.js';
 
+export { compileInputXmlBendFeatureExpansion } from './inputxml-bend-feature-expansion.js';
+
 export {
   LINEAR_PIPING_SOURCE_ANALYSIS_REQUEST_SCHEMA,
   SOURCE_ANALYSIS_REQUEST_KEYS,
