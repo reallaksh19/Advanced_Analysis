@@ -156,6 +156,12 @@ assert.match(backendSource, /setGovernedResultProjection/u);
 assert.match(backendSource, /renderGovernedEmpiricalResults/u);
 assert.match(backendSource, /clearGovernedEmpiricalResultEvidence/u);
 assert.doesNotMatch(backendSource, /governedSupportProjection\s*=\s*this\.governedResultProjection/u);
+const resultSetter = backendSource.slice(
+  backendSource.indexOf('setGovernedResultProjection('),
+  backendSource.indexOf('setGovernedNodeMarkerRadiusMm('),
+);
+assert.match(resultSetter, /renderGovernedResultOverlay\(\)/u);
+assert.doesNotMatch(resultSetter, /renderSession\(/u);
 
 const loadCalcSource = readFileSync(
   new URL('../src/workspace/load-calc-consumer-controller.js', import.meta.url),
