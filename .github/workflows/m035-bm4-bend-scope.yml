@@ -1,0 +1,74 @@
+name: M035 BM4 Bend Scope Qualification
+
+on:
+  pull_request:
+    branches:
+      - claude/lfea-linear-static-fea-unfwjd
+    paths:
+      - 'scripts/lfea-m035-bm4-scope-policy.mjs'
+      - 'scripts/lfea-m035-bm4-scope-policy-check.mjs'
+      - 'scripts/lfea-m035-bm4-bend-authority-check.mjs'
+      - '.github/workflows/m035-bm4-bend-scope.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m035-bm4-bend-scope-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_HEAD_SHA }}
+          fetch-depth: 1
+
+      - name: Verify immutable checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
+          test -z "$(git status --porcelain)"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Syntax and M035 scope isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/lfea-m035-bm4-scope-policy.mjs
+          node --check scripts/lfea-m035-bm4-scope-policy-check.mjs
+          node --check scripts/lfea-m035-bm4-bend-authority-check.mjs
+          node scripts/lfea-m035-bm4-scope-policy-check.mjs
+
+      - name: B31 bend authority audit
+        run: node scripts/lfea-m035-bm4-bend-authority-check.mjs
+
+      - name: Existing B31 and bend regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run check:lfea-b3.19
+          npm run check:lfea-b3.18
+          npm run check:lfea-bm1-cii-comparison
+
+      - name: BM2 and BM3 solver regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/lfea-b3.26-bm2-solve-comparison-check.mjs
+          node scripts/lfea-m028-bm3-check.mjs
