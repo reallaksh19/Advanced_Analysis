@@ -4,15 +4,9 @@ import {
 
 const MAX_RENDERED_ROWS = 300;
 const COLUMNS = Object.freeze([
-  ['tag', 'Tag'],
-  ['elementType', 'Type'],
-  ['connectFrom', 'From'],
-  ['connectTo', 'To'],
-  ['dnInMm', 'DN In'],
-  ['dnOutMm', 'DN Out'],
-  ['lengthMm', 'Length'],
-  ['catalogueAuthority', 'Catalogue'],
-  ['sourceStatus', 'Source'],
+  ['tag', 'Tag'], ['elementType', 'Type'], ['connectFrom', 'From'], ['connectTo', 'To'],
+  ['dnInMm', 'DN In'], ['dnOutMm', 'DN Out'], ['lengthMm', 'Length'],
+  ['catalogueAuthority', 'Catalogue'], ['sourceStatus', 'Source'],
 ]);
 
 export function renderTopologyEditTableGrid(runtime) {
@@ -24,14 +18,12 @@ export function renderTopologyEditTableGrid(runtime) {
   }
   const rows = topologyEditTableVisibleRows(runtime.projection, runtime.viewState);
   const renderedRows = rows.slice(0, MAX_RENDERED_ROWS);
-  const primary = runtime.projection.rows.find((row) => (
-    row.rowId === runtime.viewState.primaryRowId
-  )) ?? null;
+  const primary = runtime.projection.rows.find((row) => row.rowId === runtime.viewState.primaryRowId) ?? null;
   const selected = new Set(runtime.viewState.selectedRowIds);
-  const staged = new Map((runtime.batch?.intents ?? []).map((intent) => [
-    intent.target.canonicalId,
-    intent,
-  ]));
+  const staged = new Map((runtime.batch?.intents ?? []).map((intent) => [intent.target.canonicalId, intent]));
+  const exportDisabled = runtime.pending || Boolean(
+    runtime.batch || runtime.batchPlan || runtime.preview || runtime.validation || runtime.staleResult,
+  );
   element.innerHTML = `
     <section class="topology-edit-table" data-table-phase="${escapeHtml(runtime.phase())}">
       <header class="topology-edit-table__header">
@@ -53,6 +45,9 @@ export function renderTopologyEditTableGrid(runtime) {
         <button type="button" data-table-action="validate" ${!runtime.preview || runtime.pending ? 'disabled' : ''}>Validate</button>
         <button type="button" data-table-action="apply" ${runtime.validation?.status !== 'READY_TO_APPLY' || runtime.pending ? 'disabled' : ''}>Apply</button>
         <button type="button" data-table-action="discard" ${!runtime.batch && !runtime.preview ? 'disabled' : ''}>Discard staged</button>
+        <span aria-hidden="true">│</span>
+        <button type="button" data-table-action="export-csv" ${exportDisabled ? 'disabled' : ''}>Export CSV</button>
+        <button type="button" data-table-action="export-xlsx" ${exportDisabled ? 'disabled' : ''}>Export XLSX</button>
       </footer>
       <output class="topology-edit-table__status" aria-live="polite">${escapeHtml(runtime.error || runtime.message)}</output>
     </section>`;
@@ -101,24 +96,17 @@ function validationPanel(runtime) {
   const validation = runtime.validation;
   if (!validation) return '';
   const blockers = validation.blockingDiagnostics ?? [];
-  if (!blockers.length) {
-    return '<section class="topology-edit-table__staged"><strong>Validation passed</strong><span>No new HIGH findings in the certified candidate.</span></section>';
-  }
+  if (!blockers.length) return '<section class="topology-edit-table__staged"><strong>Validation passed</strong><span>No new HIGH findings in the certified candidate.</span></section>';
   return `<section class="topology-edit-table__conflict" data-table-validation-blockers><strong>${blockers.length} blocking validation issue(s)</strong><ul>${blockers.map((row) => `<li>${escapeHtml(diagnosticCode(row))}: ${escapeHtml(row.message ?? row.details?.message ?? 'Candidate introduces a blocking HIGH finding.')}</li>`).join('')}</ul></section>`;
 }
 
-function diagnosticCode(row) {
-  return row.issueKind ?? row.kind ?? row.code ?? row.diagnosticKind ?? 'HIGH';
-}
+function diagnosticCode(row) { return row.issueKind ?? row.kind ?? row.code ?? row.diagnosticKind ?? 'HIGH'; }
 function sortHeader(key, label, state) {
   const active = state.sortKey === key;
   const marker = active ? (state.sortDirection === 'ASC' ? ' ▲' : ' ▼') : '';
   return `<th scope="col"><button type="button" data-table-sort="${escapeHtml(key)}">${escapeHtml(label)}${marker}</button></th>`;
 }
-function value(row, key) {
-  if (key === 'elementType') return row.elementType;
-  return row.fields?.[key] ?? null;
-}
+function value(row, key) { return key === 'elementType' ? row.elementType : row.fields?.[key] ?? null; }
 function displayValue(valueInput) {
   if (valueInput === null || valueInput === undefined || valueInput === '') return '—';
   if (typeof valueInput === 'number') return Number.isInteger(valueInput) ? String(valueInput) : String(Number(valueInput.toFixed(4)));
@@ -146,9 +134,9 @@ function publishEvidence(runtime, visibleCount, renderedCount) {
   host.dataset.topologyEditTableValidationBlockers = blockers.map(diagnosticCode).join(',');
   host.dataset.topologyEditTableTransactionHash = runtime.transaction?.tableTransactionHash ?? '';
   host.dataset.topologyEditTableStaleDisposition = runtime.staleResult?.disposition ?? '';
+  host.dataset.topologyEditTableLastExportHash = runtime.lastExport?.exportHash ?? '';
+  host.dataset.topologyEditTableLastExportFormat = runtime.lastExport?.format ?? '';
 }
 function escapeHtml(valueInput) {
-  return String(valueInput ?? '').replace(/[&<>"']/g, (char) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  })[char]);
+  return String(valueInput ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 }
