@@ -42,13 +42,20 @@ function exactNode(topology, id, role) {
     record,
   });
 }
-function digest(commandId, role) {
-  return semanticHash({ commandId, role }).split(':').at(-1).slice(0, 32);
+function digest(identityMaterial, role) {
+  return semanticHash({ ...identityMaterial, role }).split(':').at(-1).slice(0, 32);
 }
-function generatedIdentities(topology, commandId) {
-  const componentKey = `native-component:${digest(commandId, 'pipe-component')}`;
+function generatedIdentities(topology, payload, geometry) {
+  const identityMaterial = {
+    datasetId: topology.datasetId,
+    fromNodeId: payload.fromNodeId,
+    toNodeId: payload.toNodeId,
+    catalogueBindingHash: payload.catalogueBinding.bindingHash,
+    geometryHash: geometry.geometryHash,
+  };
+  const componentKey = `native-component:${digest(identityMaterial, 'pipe-component')}`;
   const generated = {
-    edgeId: `edge:${digest(commandId, 'pipe-edge')}`,
+    edgeId: `edge:native:${digest(identityMaterial, 'pipe-edge')}`,
     componentKey,
     fromPortKey: `${componentKey}:port:from`,
     toPortKey: `${componentKey}:port:to`,
@@ -74,7 +81,7 @@ function generatedIdentities(topology, commandId) {
   }
   return generated;
 }
-function targetMaterial(topology, payloadInput, commandId) {
+function targetMaterial(topology, payloadInput) {
   const payload = normalizePipeSegmentCommandPayload(payloadInput);
   const from = exactNode(topology, payload.fromNodeId, 'FROM');
   const to = exactNode(topology, payload.toNodeId, 'TO');
@@ -92,7 +99,7 @@ function targetMaterial(topology, payloadInput, commandId) {
     from,
     to,
     geometry,
-    generated: generatedIdentities(topology, commandId),
+    generated: generatedIdentities(topology, payload, geometry),
   };
 }
 function assertExactRevisionKeys(request, resolved) {
@@ -106,8 +113,8 @@ function assertExactRevisionKeys(request, resolved) {
 
 export function resolvePipeSegmentCommandTargets(topology, request) {
   assertCanonicalTopologyHash(topology);
-  const commandId = requiredText(request?.commandId, 'commandId');
-  const resolved = targetMaterial(topology, request?.payload, commandId);
+  requiredText(request?.commandId, 'commandId');
+  const resolved = targetMaterial(topology, request?.payload);
   assertExactRevisionKeys(request, resolved);
   return deepFreeze({
     nodes: [resolved.from, resolved.to],
@@ -144,7 +151,7 @@ export function resolvePipeSegment({
   if (expectedBinding.bindingHash !== request.catalogueBinding.bindingHash) {
     fail('catalogue binding is stale or changed.', RangeError);
   }
-  const resolved = targetMaterial(canonicalTopology, request, commandId);
+  const resolved = targetMaterial(canonicalTopology, request);
   assertExactRevisionKeys(request, resolved);
   assertExpectedRevisions(request.expectedTargetRevisions, [resolved.from, resolved.to]);
   const material = {
