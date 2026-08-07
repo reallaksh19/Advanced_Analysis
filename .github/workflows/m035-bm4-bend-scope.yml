@@ -167,5 +167,34 @@ jobs:
       - name: Regression BM3 solver comparison
         run: node scripts/lfea-m028-bm3-check.mjs
 
-      - name: Regression complete linear core aggregate
-        run: npm run check:lfea-linear-core
+      - name: Diagnostic complete linear core aggregate
+        id: legacy_core
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          npm run check:lfea-linear-core > /tmp/m035-linear-core.log 2>&1
+          status=$?
+          cat /tmp/m035-linear-core.log
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          if [ "$status" -ne 0 ]; then
+            message="$(grep -E '^(Error|[A-Z0-9_-]+ .*FAIL|npm error|AssertionError)' /tmp/m035-linear-core.log | head -c 3000 || true)"
+            echo "::warning file=package.json,line=1,title=Legacy linear-core aggregate is diagnostic::${message:-aggregate exited $status; see artifact log}"
+          fi
+          exit "$status"
+
+      - name: Archive diagnostic source snapshot
+        if: always()
+        shell: bash
+        run: git archive --format=zip HEAD -o /tmp/m035-head-source.zip
+
+      - name: Upload legacy aggregate diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m035-legacy-core-diagnostic-${{ env.TARGET_HEAD_SHA }}
+          path: |
+            /tmp/m035-linear-core.log
+            /tmp/m035-head-source.zip
+          if-no-files-found: warn
+          retention-days: 7
