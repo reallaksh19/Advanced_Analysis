@@ -1,0 +1,122 @@
+name: LFEA UI-3 Results Explorer
+
+on:
+  push:
+    branches:
+      - agent/lfea-ui3-results-explorer
+  pull_request:
+    branches:
+      - claude/lfea-linear-static-fea-unfwjd
+    paths:
+      - 'src/workspace/lfea-shell-v2/**'
+      - 'src/workspace/lfea-workbench-controller-utils.js'
+      - 'scripts/lfea-shell-v2-*.mjs'
+      - 'scripts/lfea-workbench-check.mjs'
+      - 'e2e/lfea-shell-v2.spec.js'
+      - 'e2e/lfea-workbench.spec.js'
+      - 'lfea.html'
+      - 'vite.lfea.config.js'
+      - 'vite.lfea-ui1-test.config.js'
+      - 'playwright.lfea-ui1.config.js'
+      - '.github/workflows/lfea-ui3-results-explorer.yml'
+
+permissions:
+  contents: read
+
+env:
+  UI3_BASE_SHA: 34a715ea8a55025c5c34a404b643bf159ba7db48
+
+jobs:
+  ui3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout UI-3 head
+        uses: actions/checkout@v4
+        with:
+          path: head
+          fetch-depth: 0
+
+      - name: Checkout locked post-UI-2 baseline
+        uses: actions/checkout@v4
+        with:
+          ref: 34a715ea8a55025c5c34a404b643bf159ba7db48
+          path: baseline
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: head/package-lock.json
+
+      - name: Install head dependencies
+        working-directory: head
+        run: npm ci
+
+      - name: Install baseline dependencies
+        working-directory: baseline
+        run: npm ci
+
+      - name: Install Chromium in repository-local Playwright path
+        working-directory: head
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: '0'
+        run: npx playwright install --with-deps chromium
+
+      - name: LFEA workbench and results-explorer guards
+        working-directory: head
+        run: npm run check:lfea-workbench
+
+      - name: Locked-baseline semantic hash equality
+        working-directory: head
+        env:
+          LFEA_UI1_BASELINE_ROOT: ${{ github.workspace }}/baseline
+        run: node scripts/lfea-shell-v2-baseline-hash-check.mjs
+
+      - name: Full-app build parity with locked baseline
+        shell: bash
+        run: |
+          set +e
+          (cd baseline && npm run build) > baseline-build.log 2>&1
+          baseline_status=$?
+          (cd head && npm run build) > head-build.log 2>&1
+          head_status=$?
+          set -e
+          echo "baseline full-build status: $baseline_status"
+          echo "head full-build status: $head_status"
+          if [ "$baseline_status" -ne "$head_status" ]; then
+            cat baseline-build.log
+            cat head-build.log
+            exit 1
+          fi
+          if [ "$head_status" -ne 0 ]; then
+            grep -q 'inputxml-linear-prefea-contract.js' baseline-build.log
+            grep -q 'inputxml-linear-prefea-contract.js' head-build.log
+            grep -q 'createHash.*not exported' baseline-build.log
+            grep -q 'createHash.*not exported' head-build.log
+            echo 'Inherited full-app browser build failure matches locked baseline.'
+          else
+            echo 'Locked baseline and UI-3 head both pass the full production build.'
+          fi
+
+      - name: Standalone LFEA production build
+        working-directory: head
+        run: npx vite build --config vite.lfea.config.js
+
+      - name: Embedded and standalone browser regression
+        working-directory: head
+        run: node scripts/run-playwright.mjs --config=playwright.lfea-ui1.config.js e2e/lfea-workbench.spec.js e2e/lfea-shell-v2.spec.js
+
+      - name: Syntax check changed JavaScript
+        working-directory: head
+        shell: bash
+        run: |
+          git diff --name-only "$UI3_BASE_SHA"...HEAD -- '*.js' '*.mjs' \
+            | while read -r file; do
+                [ -z "$file" ] || node --check "$file"
+              done
+
+      - name: Whitespace check
+        working-directory: head
+        run: git diff --check "$UI3_BASE_SHA"...HEAD
