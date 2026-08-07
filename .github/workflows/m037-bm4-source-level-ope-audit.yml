@@ -1,0 +1,75 @@
+name: M037 BM4 Source-Level OPE Audit
+
+on:
+  pull_request:
+    branches:
+      - agent/m035-bm4-bend-scope-isolation
+    paths:
+      - 'scripts/lfea-m037-bm4-source-level-ope-audit.mjs'
+      - 'scripts/lfea-m035-m036-bm4-failure-attribution.mjs'
+      - 'scripts/lfea-m035-m036-bm4-integration-runtime.mjs'
+      - 'src/core/geometry/adapters/inputXmlToCanonicalGeometry.js'
+      - 'benchmarks/LFEA/BM4/InputXML_BM4.xml'
+      - '.github/workflows/m037-bm4-source-level-ope-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_HEAD_SHA }}
+          fetch-depth: 1
+
+      - name: Verify immutable checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
+          test -z "$(git status --porcelain)"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Syntax
+        run: node --check scripts/lfea-m037-bm4-source-level-ope-audit.mjs
+
+      - name: Reproduce final M035+M036 row attribution
+        run: node scripts/lfea-m035-m036-bm4-failure-attribution.mjs
+
+      - name: Source-level residual OPE audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/lfea-m037-bm4-source-level-ope-audit.mjs | tee /tmp/m037-bm4-source-level-ope-audit.log
+
+      - name: Regression combined M035+M036 qualification
+        run: node scripts/lfea-m035-m036-bm4-integration-check.mjs
+
+      - name: Regression M036
+        run: npm run check:lfea-m036
+
+      - name: Upload audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m037-bm4-source-level-ope-audit-${{ env.TARGET_HEAD_SHA }}
+          path: |
+            /tmp/m037-bm4-source-level-ope-audit.log
+            reports/m035-m036-bm4-failure-attribution.json
+            reports/m037-bm4-source-level-ope-audit.json
+          if-no-files-found: warn
+          retention-days: 14
