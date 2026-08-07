@@ -1,0 +1,204 @@
+#!/usr/bin/env node
+
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { LFEA_COLLECTION_PATHS } from '../src/workspace/lfea-workbench-model.js';
+import { LFEA_STRUCTURED_EDITOR_CONTRACTS } from '../src/workspace/lfea-structured-editor-contract.js';
+import { LFEA_RESULT_VIEW_IDS } from '../src/workspace/lfea-shell-v2/results-view-model.js';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const SHELL_ROOT = path.join(ROOT, 'src', 'workspace', 'lfea-shell-v2');
+const TOKEN_ROOT = path.join(ROOT, 'src', 'workspace', 'design-tokens');
+const shellFiles = javascriptFiles(SHELL_ROOT);
+const tokenFiles = javascriptFiles(TOKEN_ROOT).filter((file) => file.endsWith('lfea-tokens.js'));
+const extraModules = [
+  path.join(ROOT, 'src', 'workspace', 'lfea-structured-editor-contract.js'),
+  path.join(ROOT, 'scripts', 'lfea-shell-v2-store-fidelity-check.mjs'),
+  path.join(ROOT, 'scripts', 'lfea-shell-v2-baseline-hash-check.mjs'),
+  path.join(ROOT, 'e2e', 'lfea-shell-v2.spec.js'),
+  path.join(ROOT, 'e2e', 'fixtures', 'ui1-embedded-shell-entry.js'),
+  path.join(ROOT, 'vite.lfea.config.js'),
+  path.join(ROOT, 'vite.lfea-ui1-test.config.js'),
+  path.join(ROOT, 'playwright.lfea-ui1.config.js'),
+];
+
+for (const file of [...shellFiles, ...tokenFiles, ...extraModules]) {
+  const text = fs.readFileSync(file, 'utf8');
+  const lines = text.split(/\r?\n/u).length;
+  assert.ok(lines < 300, `${relative(file)} has ${lines} physical lines; limit is <300`);
+}
+
+for (const file of shellFiles) {
+  const text = fs.readFileSync(file, 'utf8');
+  assert.doesNotMatch(
+    text,
+    /from\s+['"][^'"]*\/core\//u,
+    `Presentation module must not import core implementation directly: ${relative(file)}`,
+  );
+  assert.doesNotMatch(
+    implementationText(text),
+    /\b(?:solveContinuumModel|adaptMeshPackage|createEngineeringReview|createEvidenceExport|semanticHash)\s*\(/u,
+    `Presentation module must not implement or invoke engineering authority: ${relative(file)}`,
+  );
+  assert.doesNotMatch(
+    implementationText(text),
+    /(?:\.toFixed|\.toPrecision|Math\.round)\s*\(/u,
+    `Shell V2 must not introduce local numerical rounding/formatting: ${relative(file)}`,
+  );
+}
+
+assert.deepEqual(
+  Object.keys(LFEA_STRUCTURED_EDITOR_CONTRACTS).sort(),
+  [...LFEA_COLLECTION_PATHS].sort(),
+  'Structured editor contracts must cover exactly the existing editable collection paths.',
+);
+assert.deepEqual(LFEA_RESULT_VIEW_IDS, [
+  'OVERVIEW',
+  'DISPLACEMENTS',
+  'REACTIONS',
+  'RAW_STRESS',
+  'PROJECTED_STRESS',
+  'MESH_QUALITY',
+  'REVIEW',
+], 'Shell V2 UI-3 must retain the seven explicit result explorer views.');
+
+const editorContract = source('src/workspace/lfea-structured-editor-contract.js');
+assert.match(editorContract, /ELEMENT_TYPES/u);
+assert.match(editorContract, /CONSTRAINT_COMPONENT_TYPES/u);
+assert.doesNotMatch(
+  implementationText(editorContract),
+  /\b(?:solveContinuumModel|adaptMeshPackage|createEngineeringReview|createEvidenceExport|semanticHash)\s*\(/u,
+  'Editor contract may expose constants but must not invoke engineering authority.',
+);
+
+const structuredEditor = source('src/workspace/lfea-shell-v2/structured-editor.js');
+assert.match(structuredEditor, /isLfeaEditorGuardCurrent/u);
+assert.match(structuredEditor, /handlers\.getCurrentState/u);
+const inspector = source('src/workspace/lfea-shell-v2/inspector.js');
+assert.match(inspector, /renderLfeaStructuredEditor/u);
+assert.match(inspector, /renderLfeaResultsExplorer/u);
+assert.doesNotMatch(inspector, /lfea-record-json/u,
+  'Raw JSON must not remain the normal per-record UI-2 editor.');
+assert.doesNotMatch(inspector, /lfeaResultTable/u,
+  'UI-3 results must not regress to the stacked generic result-table layout.');
+
+const resultsModel = source('src/workspace/lfea-shell-v2/results-view-model.js');
+assert.match(resultsModel, /AUTHORITIES\.RAW/u);
+assert.match(resultsModel, /AUTHORITIES\.PROJECTED/u);
+assert.match(resultsModel, /execution\.result\.nodalDisplacements/u);
+assert.match(resultsModel, /execution\.result\.reactions/u);
+assert.match(resultsModel, /execution\.stressProjection\.nodalValues/u);
+assert.match(resultsModel, /projectLfeaResultRows/u);
+assert.doesNotMatch(
+  implementationText(resultsModel),
+  /\b(?:vonMises|principalStress|constitutive|sigmaZ)\s*\(/u,
+  'Results explorer must select evidence, not recompute engineering quantities.',
+);
+const resultsTable = source('src/workspace/lfea-shell-v2/results-table.js');
+assert.match(resultsTable, /projectLfeaResultRows/u);
+assert.match(resultsTable, /100/u);
+const resultsExplorer = source('src/workspace/lfea-shell-v2/results-explorer.js');
+assert.match(resultsExplorer, /lfea-results-authority/u);
+assert.match(resultsExplorer, /view\.authority/u);
+
+const controller = source('src/workspace/lfea-workbench-controller.js');
+assert.match(controller, /LfeaShellV2View/u);
+assert.doesNotMatch(controller, /new LfeaWorkbenchView/u);
+assert.match(controller, /createLfeaWorkbenchStore/u);
+assert.match(controller, /workerClient\?\.cancel\('MODEL_CHANGED'\)/u);
+
+const standalone = source('src/workspace/lfea-shell-v2/standalone-entry.js');
+assert.match(standalone, /LfeaWorkbenchController/u);
+assert.match(standalone, /new LfeaWorkbenchController\(root, undefined\)\.init\(\)/u);
+assert.doesNotMatch(
+  standalone,
+  /from\s+['"]\.\.\/lfea-workbench\.js['"]|createLfeaWorkbenchStore|executeLfeaWorkbench/u,
+  'Standalone entry must use the narrow controller graph, not the broad workbench barrel.',
+);
+
+const vite = source('vite.config.js');
+assert.match(vite, /lfea:\s*fileURLToPath\(new URL\('\.\/lfea\.html'/u);
+const standaloneVite = source('vite.lfea.config.js');
+assert.match(standaloneVite, /lfea:\s*fileURLToPath\(new URL\('\.\/lfea\.html'/u);
+assert.match(standaloneVite, /outDir:\s*'dist-lfea'/u);
+const html = source('lfea.html');
+assert.match(html, /lfea-shell-v2\/standalone-entry\.js/u);
+
+const testVite = source('vite.lfea-ui1-test.config.js');
+assert.match(testVite, /ui1-embedded-layout-harness/u);
+assert.match(testVite, /ui1-embedded-shell-entry\.js/u);
+const embeddedHarness = source('e2e/fixtures/ui1-embedded-shell-entry.js');
+assert.match(embeddedHarness, /renderWorkspaceLayout/u);
+assert.match(embeddedHarness, /LfeaWorkbenchController/u);
+assert.match(embeddedHarness, /data-application-view="LFEA"/u);
+assert.doesNotMatch(
+  embeddedHarness,
+  /linear-piping-run-analysis|src\/core\//u,
+  'Embedded browser harness must use only the real layout/controller boundary.',
+);
+
+const navigator = source('src/workspace/lfea-shell-v2/analysis-navigator.js');
+assert.match(navigator, /LFEA_ENRICHED_SJSON_PIPING_ADAPTER_NOT_WIRED/u);
+assert.match(navigator, /Blocked/u);
+
+const layout = source('src/workspace/workspace-layout.js');
+assert.equal(occurrences(layout, 'data-role="lfea-consumer-root"'), 1,
+  'embedded shell must retain exactly one LFEA consumer root');
+
+for (const directory of [
+  path.join(ROOT, 'src', 'core', 'geometry', 'adapters'),
+  path.join(ROOT, 'src', 'core', 'linear-piping-analysis-consumer'),
+]) {
+  for (const file of javascriptFiles(directory)) {
+    assert.doesNotMatch(
+      fs.readFileSync(file, 'utf8'),
+      /EnrichedSjson/u,
+      `Shell V2 must not wire EnrichedSjson into piping FEA: ${relative(file)}`,
+    );
+  }
+}
+
+console.log(JSON.stringify({
+  check: 'lfea-shell-v2-anti-drift',
+  status: 'PASS',
+  shellModules: shellFiles.length,
+  tokenModules: tokenFiles.length,
+  structuredEditorContracts: Object.keys(LFEA_STRUCTURED_EDITOR_CONTRACTS).length,
+  resultExplorerViews: LFEA_RESULT_VIEW_IDS.length,
+  physicalLineLimit: 299,
+  localNumericalFormatting: false,
+  standaloneEntry: true,
+  standaloneProductionBuildConfig: true,
+  embeddedEntryRetained: true,
+  browserHarness: 'REAL_WORKSPACE_LAYOUT_AND_LFEA_CONTROLLER',
+  enrichedSjsonPipingAdapter: false,
+}));
+
+function javascriptFiles(directory) {
+  if (!fs.existsSync(directory)) return [];
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const target = path.join(directory, entry.name);
+    if (entry.isDirectory()) return javascriptFiles(target);
+    return entry.isFile() && entry.name.endsWith('.js') ? [target] : [];
+  });
+}
+
+function source(relativePath) {
+  return fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
+}
+
+function relative(file) {
+  return path.relative(ROOT, file).replaceAll('\\', '/');
+}
+
+function implementationText(text) {
+  return text
+    .replace(/\/\*[\s\S]*?\*\//gu, '')
+    .replace(/(^|[^:])\/\/.*$/gmu, '$1');
+}
+
+function occurrences(text, needle) {
+  return text.split(needle).length - 1;
+}
