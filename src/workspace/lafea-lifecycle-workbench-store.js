@@ -1,6 +1,7 @@
-/** Public lifecycle workbench store with atomic analysis-mesh custody. */
-import { decorateLafeaAnalysisMeshWorkbenchStore } from './lafea-analysis-mesh-workbench-store.js';
-import { createLafeaWorkbenchStoreCore } from './lafea-lifecycle-workbench-store-core.js';
+/** Public lifecycle workbench store backed by one canonical orchestrator. */
+import {
+  createLafeaWorkbenchOrchestratorStore,
+} from './lafea-workbench-orchestrator-store.js';
 
 export {
   LAFEA_CALCULATION_STATES,
@@ -10,7 +11,7 @@ export {
   LAFEA_RELEASE_STATES,
   LAFEA_RESULT_STATES,
   LAFEA_WORKBENCH_STATE_SCHEMA,
-} from './lafea-lifecycle-workbench-store-core.js';
+} from './lafea-workbench-orchestrator-store.js';
 export {
   createLafeaAnalysisMeshCustodyController,
 } from './lafea-analysis-mesh-custody-controller.js';
@@ -21,9 +22,19 @@ export {
 export {
   validateLafeaAnalysisMeshEvidence,
 } from './lafea-analysis-mesh-evidence-validator.js';
+export {
+  LAFEA_STAGE_ANALYSIS_ADAPTER_SCHEMA,
+  lafeaStageAnalysisAdapter,
+  requireLafeaStageAnalysisAdapter,
+} from './lafea-stage-analysis-adapter.js';
+export {
+  LAFEA_WORKBENCH_ORCHESTRATION_ORDER,
+  LAFEA_WORKBENCH_ORCHESTRATION_SCHEMA,
+  LAFEA_WORKBENCH_ORCHESTRATION_SECTION_SCHEMA,
+  LAFEA_WORKBENCH_ORCHESTRATION_STATES,
+  buildLafeaWorkbenchOrchestrationProjection,
+} from './lafea-workbench-orchestration-projection.js';
 
 export function createLafeaWorkbenchStore(options) {
-  return decorateLafeaAnalysisMeshWorkbenchStore(
-    createLafeaWorkbenchStoreCore(options),
-  );
+  return createLafeaWorkbenchOrchestratorStore(options);
 }

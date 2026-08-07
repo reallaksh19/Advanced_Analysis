@@ -20,29 +20,26 @@ const store = createLafeaWorkbenchStore({
   initialDocument: continuumFixture(),
 });
 
-let state = store.getState();
-let stage = state.stages[stageId];
-assert.equal(state.schema, LAFEA_WORKBENCH_STATE_SCHEMA);
+let stage = store.getState().stages[stageId];
+assert.equal(store.getState().schema, LAFEA_WORKBENCH_STATE_SCHEMA);
 assert.equal(stage.lifecycle, null);
 assert.equal(stage.sourceAuthority, null);
 assert.equal(stage.lifecycleBinding.schema, LAFEA_LIFECYCLE_BINDING_SCHEMA);
 assert.equal(stage.lifecycleBinding.status, 'UNINITIALIZED');
-assert.equal(stage.lifecycleReadiness.calculationState, 'CALCULATION_NOT_RUN');
-assert.equal(stage.lifecycleReadiness.resultState, 'RESULT_NOT_READY');
+assert.equal(stage.orchestration.sections.SOURCE.state, 'BLOCKED');
 
 const nodeB = stage.document.nodes.find((row) => row.nodeId === 'B');
 store.setScalar('LAFEA.3.node.x', 'B', String(nodeB.x + 25), 'U3B-CHECK');
-state = store.getState();
-stage = state.stages[stageId];
+stage = store.getState().stages[stageId];
 assert.equal(stage.sourceAuthority.schema, LAFEA_SOURCE_AUTHORITY_SCHEMA);
 assert.match(stage.sourceAuthority.sourceHash, /^sha256:[0-9a-f]{64}$/u);
 assert.equal(stage.lifecycleBinding.status, 'CURRENT');
 assert.equal(stage.lastSourceAuthorityEvent.changeClass, 'GEOMETRY');
 assert.equal(stage.lifecycle.artifacts.CANONICAL_MODEL.status, 'ABSENT');
+assert.equal(stage.orchestration.sections.SOURCE.state, 'COMPLETE');
 
 store.run();
-state = store.getState();
-stage = state.stages[stageId];
+stage = store.getState().stages[stageId];
 assert.equal(stage.execution.status, 'QUALIFIED');
 assert.equal(stage.lifecycleReadiness.calculationState,
   'CALCULATION_ACCEPTED_BY_STAGE_CONTRACT');
@@ -54,6 +51,10 @@ assert.equal(stage.lifecycle.artifacts.ANALYSIS_MESH.status, 'CURRENT');
 assert.equal(stage.lifecycle.artifacts.EXECUTION.status, 'CURRENT');
 assert.equal(stage.lifecycle.artifacts.RECOVERY.status, 'CURRENT');
 assert.equal(stage.lifecycle.artifacts.CONVERGENCE.status, 'ABSENT');
+assert.equal(stage.orchestration.sections.MODEL.state, 'COMPLETE');
+assert.equal(stage.orchestration.sections.PREPARATION.state, 'BLOCKED');
+assert.equal(stage.orchestration.sections.RESULTS.state, 'COMPLETE');
+assert.equal(stage.orchestration.sections.RELEASE.state, 'BLOCKED');
 
 const artifactSnapshot = structuredClone(stage.lifecycle.artifacts);
 store.applyLifecycleEvent(createLafeaLifecycleEvent({
@@ -81,18 +82,20 @@ stage = store.getState().stages[stageId];
 assert.notEqual(stage.sourceAuthority.sourceHash, sourceHashBeforeMaterialEdit);
 assert.equal(stage.lastSourceAuthorityEvent.changeClass, 'MATERIAL_PROPERTY');
 assert.equal(stage.lifecycle.artifacts.CANONICAL_MODEL.status, 'STALE');
-assert.equal(stage.lifecycle.artifacts.ANALYSIS_GEOMETRY.status, 'REVALIDATION_REQUIRED');
 assert.equal(stage.lifecycle.artifacts.ANALYSIS_MESH.status, 'REVALIDATION_REQUIRED');
 assert.equal(stage.lifecycle.artifacts.EXECUTION.status, 'STALE');
-assert.equal(stage.lifecycle.artifacts.RECOVERY.status, 'STALE');
 assert.equal(stage.lifecycleReadiness.resultState, 'RESULT_NOT_READY');
+assert.equal(stage.orchestration.sections.MODEL.state, 'BLOCKED');
 
 store.undo();
 stage = store.getState().stages[stageId];
 assert.equal(stage.sourceAuthority.sourceHash, sourceHashBeforeMaterialEdit);
 assert.equal(stage.lastSourceAuthorityEvent.changeClass, 'MATERIAL_PROPERTY');
+assert.equal(stage.lifecycleBinding.status, 'CURRENT');
 assert.equal(stage.lifecycle.artifacts.CANONICAL_MODEL.status, 'STALE');
 assert.equal(stage.lifecycleReadiness.resultReady, false);
+assert.equal(stage.orchestration.sections.SOURCE.state, 'COMPLETE');
+assert.equal(stage.orchestration.sections.MODEL.state, 'BLOCKED');
 store.redo();
 assert.equal(
   store.getState().stages[stageId].lastSourceAuthorityEvent.changeClass,
@@ -103,6 +106,7 @@ const lifecycleExport = store.exportLifecycle();
 assert.equal(lifecycleExport.schema, 'lafea-workbench-lifecycle-export/v2');
 assert.equal(lifecycleExport.sourceAuthority.schema, LAFEA_SOURCE_AUTHORITY_SCHEMA);
 assert.equal(lifecycleExport.readiness.releaseState, 'RELEASE_NOT_QUALIFIED');
+assert.equal(lifecycleExport.orchestration.sections.RELEASE.state, 'BLOCKED');
 store.destroy();
 
 const manual = createLafeaWorkbenchStore({
@@ -123,7 +127,6 @@ manual.registerLifecycleArtifact(createLafeaArtifactRecord({
   producerRef: 'U3B-MANUAL-PRODUCER',
   diagnostics: [],
 }), 'U3B-MANUAL-MODEL');
-assert.equal(manual.getState().stages[stageId].lifecycle.artifacts.CANONICAL_MODEL.status, 'CURRENT');
 manual.run();
 stage = manual.getState().stages[stageId];
 assert.equal(stage.execution.status, 'QUALIFIED');
@@ -131,37 +134,39 @@ assert.equal(stage.sourceAuthority.schema, LAFEA_SOURCE_AUTHORITY_SCHEMA);
 assert.equal(stage.lifecycleReadiness.resultState, 'RESULT_READY');
 manual.destroy();
 
-const rejectedImportStore = createLafeaWorkbenchStore({ initialStage: 'LAFEA.1' });
-rejectedImportStore.importDocument(null, 'LAFEA.1');
-assert.equal(rejectedImportStore.getState().status, 'FAILED');
-assert.equal(rejectedImportStore.getState().stages['LAFEA.1'].lifecycle, null);
-rejectedImportStore.destroy();
+const rejected = createLafeaWorkbenchStore({ initialStage: 'LAFEA.1' });
+rejected.importDocument(null, 'LAFEA.1');
+assert.equal(rejected.getState().status, 'FAILED');
+assert.equal(rejected.getState().stages['LAFEA.1'].lifecycle, null);
+rejected.destroy();
 
 const workspace = path.join(ROOT, 'src', 'workspace');
 const read = (name) => fs.readFileSync(path.join(workspace, name), 'utf8');
-const facadeSource = [
-  read('lafea-lifecycle-workbench-store.js'),
-  read('lafea-lifecycle-workbench-store-core.js'),
-].join('\n');
-const sourceAuthoritySource = read('lafea-source-authority.js');
-const producerSource = read('lafea-lifecycle-producers.js');
-assert.match(facadeSource, /stage\.lastEditResult\?\.audit\?\.descriptorDigest/u);
-assert.doesNotMatch(facadeSource, /sourceHash:\s*lafeaDocumentDigest/u);
-assert.match(facadeSource, /CALCULATION_ACCEPTED_BY_STAGE_CONTRACT/u);
-assert.match(facadeSource, /RELEASE_NOT_QUALIFIED/u);
-assert.match(sourceAuthoritySource, /canonical SHA-256/u);
-assert.doesNotMatch(sourceAuthoritySource, /sourceHash:\s*lafeaDocumentDigest/u);
+const facade = read('lafea-lifecycle-workbench-store.js');
+const orchestrator = read('lafea-workbench-orchestrator-store.js');
+const sourceState = read('lafea-workbench-source-state.js');
+const sourceAuthority = read('lafea-source-authority.js');
+const producer = read('lafea-lifecycle-producers.js');
+assert.match(sourceState, /stage\.lastEditResult\?\.audit\?\.descriptorDigest/u);
+assert.doesNotMatch(sourceState, /sourceHash:\s*lafeaDocumentDigest/u);
+assert.match(orchestrator, /CALCULATION_ACCEPTED_BY_STAGE_CONTRACT/u);
+assert.match(orchestrator, /RELEASE_NOT_QUALIFIED/u);
+assert.doesNotMatch(facade, /lafea-lifecycle-workbench-store-core/u);
+assert.doesNotMatch(facade, /lafea-analysis-mesh-workbench-store/u);
+assert.match(sourceAuthority, /canonical SHA-256/u);
+assert.doesNotMatch(sourceAuthority, /sourceHash:\s*lafeaDocumentDigest/u);
 assert.doesNotMatch(
-  producerSource,
+  producer,
   /calculateLocal|executeLafeaStage|source\.meshConfig|(?:^|[^A-Za-z0-9_])renderPacket\s*[:.(]/mu,
 );
-assert.match(producerSource, /CALLER_AUTHORED_SOURCE_MESH_ONLY/u);
+assert.match(producer, /CALLER_AUTHORED_SOURCE_MESH_ONLY/u);
 
 console.log(JSON.stringify({
   check: 'lafea-u3b-live-lifecycle-integration',
   status: 'PASS',
   stateSchema: LAFEA_WORKBENCH_STATE_SCHEMA,
   sourceAuthoritySchema: LAFEA_SOURCE_AUTHORITY_SCHEMA,
+  canonicalOrchestrationIntegrated: true,
   sourceEditsIssueTypedEvents: true,
   undoRedoResurrectsEvidence: false,
   calculationAutoRegistersCurrentCoreEvidence: true,

@@ -8,9 +8,6 @@ import {
   createLafeaAnalysisMeshEvidence,
   lafeaAnalysisMeshContentHash,
 } from '../src/workspace/lafea-analysis-mesh-evidence.js';
-import {
-  decorateLafeaAnalysisMeshWorkbenchStore,
-} from '../src/workspace/lafea-analysis-mesh-workbench-store.js';
 import { canonicalLafeaSha256 } from '../src/workspace/lafea-canonical-sha256.js';
 import {
   createLafeaArtifactRecord,
@@ -18,6 +15,9 @@ import {
   createLafeaLifecycleEvent,
   registerLafeaArtifact,
 } from '../src/workspace/lafea-lifecycle.js';
+import {
+  createLafeaWorkbenchMeshState,
+} from '../src/workspace/lafea-workbench-mesh-state.js';
 
 const STAGE = 'LAFEA.3';
 const SOURCE = hash('SOURCE');
@@ -26,63 +26,29 @@ const GEOMETRY = hash('GEOMETRY');
 const PROFILE = meshProfile();
 const EVIDENCE = evidence();
 
-const base = failingBaseStore();
-const store = decorateLafeaAnalysisMeshWorkbenchStore(base);
-store.applyLifecycleEvent(profileEvent());
+let retainedState = freeze({
+  schema: 'lafea-workbench-state/v2',
+  activeStageId: STAGE,
+  status: 'READY',
+  diagnostics: [],
+  stages: {
+    [STAGE]: {
+      lifecycle: lifecycleWithGeometry(),
+      lifecycleBinding: { status: 'CURRENT' },
+      sourceAuthority: null,
+    },
+  },
+});
 let publications = 0;
-store.subscribe(() => { publications += 1; });
-const before = store.getState();
-assert.throws(
-  () => store.registerAnalysisMeshEvidence(EVIDENCE),
-  (error) => error?.code === 'INJECTED_REGISTRATION_FAILURE',
-);
-const after = store.getState();
-assert.equal(publications, 0);
-assert.deepEqual(after.stages[STAGE].lifecycle, before.stages[STAGE].lifecycle);
-assert.equal(after.stages[STAGE].retainedAnalysisMeshEvidence, null);
-assert.equal(after.stages[STAGE].analysisMeshCustodyProjection.state, 'ABSENT');
-assert.equal(after.status, 'FAILED');
-assert.equal(after.diagnostics[0].code, 'INJECTED_REGISTRATION_FAILURE');
-store.destroy();
+let meshState;
 
-console.log(JSON.stringify({
-  check: 'lafea-nb-t4a-analysis-mesh-live-transaction',
-  status: 'PASS',
-  failedRegistrationPublishes: false,
-  failedRegistrationChangesLifecycle: false,
-  failedRegistrationRetainsEvidence: false,
-  failClosedDiagnosticChannelUsed: true,
-}));
-
-function failingBaseStore() {
-  let state = freeze({
-    schema: 'lafea-workbench-state/v2',
-    activeStageId: STAGE,
-    status: 'READY',
-    diagnostics: [],
-    stages: {
-      [STAGE]: {
-        lifecycle: lifecycleWithGeometry(),
-        lifecycleBinding: { status: 'CURRENT' },
-        sourceAuthority: null,
-      },
-    },
-  });
-  const listeners = new Set();
-  const publish = () => {
-    for (const listener of listeners) listener(state);
-    return state;
-  };
-  return Object.freeze({
-    getState: () => state,
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
-    applyLifecycleEvent: () => publish(),
-    registerLifecycleArtifact: () => {
-      state = freeze({
-        ...state,
+const host = {
+  getActiveStageId: () => retainedState.activeStageId,
+  readStageState: () => stageState(),
+  invokeRetained: (method) => {
+    if (method === 'registerLifecycleArtifact') {
+      retainedState = freeze({
+        ...retainedState,
         status: 'FAILED',
         diagnostics: [{
           severity: 'ERROR',
@@ -92,9 +58,51 @@ function failingBaseStore() {
           message: 'Injected registration failure.',
         }],
       });
-      return publish();
-    },
-    destroy: () => listeners.clear(),
+    }
+    return retainedState;
+  },
+  publish: () => {
+    publications += 1;
+    return retainedState;
+  },
+};
+meshState = createLafeaWorkbenchMeshState([STAGE], host);
+meshState.afterLifecycleEvent(profileEvent(), true);
+
+const before = stageState();
+assert.throws(
+  () => meshState.registerAnalysisMeshEvidence(EVIDENCE),
+  (error) => error?.code === 'INJECTED_REGISTRATION_FAILURE',
+);
+const after = stageState();
+assert.equal(publications, 0);
+assert.deepEqual(after.lifecycle, before.lifecycle);
+assert.equal(after.retainedAnalysisMeshEvidence, null);
+assert.equal(
+  meshState.buildAnalysisMeshCustodyProjection(
+    after,
+    after.retainedAnalysisMeshEvidence,
+  ).state,
+  'ABSENT',
+);
+assert.equal(retainedState.status, 'FAILED');
+assert.equal(retainedState.diagnostics[0].code, 'INJECTED_REGISTRATION_FAILURE');
+
+console.log(JSON.stringify({
+  check: 'lafea-nb-t4a-analysis-mesh-live-transaction',
+  status: 'PASS',
+  meshStateIsStoreDecorator: false,
+  failedRegistrationPublishes: false,
+  failedRegistrationChangesLifecycle: false,
+  failedRegistrationRetainsEvidence: false,
+  failClosedDiagnosticChannelUsed: true,
+}));
+
+function stageState() {
+  return freeze({
+    ...retainedState.stages[STAGE],
+    stageId: STAGE,
+    ...meshState.fields(STAGE),
   });
 }
 

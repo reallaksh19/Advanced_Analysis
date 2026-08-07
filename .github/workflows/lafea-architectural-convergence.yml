@@ -1,0 +1,82 @@
+name: LAFEA Architectural Convergence Certification
+
+on:
+  pull_request:
+    paths:
+      - 'src/workspace/lafea-**'
+      - 'scripts/lafea-architecture-convergence-*.mjs'
+      - 'scripts/lafea-nb-t4a-analysis-mesh-live-transaction-check.mjs'
+      - 'docs/LAFEA_WP_AC1_Architectural_Convergence.md'
+      - '.github/workflows/lafea-architectural-convergence.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  wp-ac1-exact-head:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Architectural convergence contracts
+        run: |
+          node scripts/lafea-architecture-convergence-check.mjs
+          node scripts/lafea-architecture-convergence-source-guard.mjs
+          node scripts/lafea-nb-t4a-analysis-mesh-live-transaction-check.mjs
+      - name: Architectural compatibility hard gates
+        run: |
+          npm run check:lafea-core
+          npm run check:lafea-workbench
+          node scripts/lafea-nb-t4a-analysis-mesh-custody-check.mjs
+          node scripts/lafea-nb-t4a-analysis-mesh-custody-controller-check.mjs
+          node scripts/lafea-nb-t4a-analysis-mesh-live-store-check.mjs
+          node scripts/lafea-u3b-live-lifecycle-check.mjs
+          node scripts/lafea-u4g-live-workbench-viewport-check.mjs
+          node scripts/lafea-u4g-controller-render-evidence-check.mjs
+          node scripts/lafea-u4g-source-guard.mjs
+      - name: Legacy non-bucket aggregate attribution
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          npm run check:lafea-nonbucket-stack > /tmp/lafea-ac1-nonbucket.log 2>&1
+          status=$?
+          cat /tmp/lafea-ac1-nonbucket.log
+          if [ "$status" -ne 0 ]; then
+            tail -n 80 /tmp/lafea-ac1-nonbucket.log | while IFS= read -r line; do
+              printf '::warning title=Pre-existing LAFEA non-bucket attribution::%s\n' "$line"
+            done
+            exit "$status"
+          fi
+      - name: Strict syntax scan
+        run: npm run syntax:strict
+      - name: Import graph
+        run: npm run check:imports
+      - name: Advanced shell contract
+        run: npm run check:advanced-shell
+      - name: Vite production compile attribution
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          npx vite build > /tmp/lafea-ac1-vite.log 2>&1
+          status=$?
+          cat /tmp/lafea-ac1-vite.log
+          if [ "$status" -ne 0 ]; then
+            tail -n 30 /tmp/lafea-ac1-vite.log | while IFS= read -r line; do
+              printf '::warning title=LAFEA AC1 Vite attribution::%s\n' "$line"
+            done
+            exit "$status"
+          fi
+      - name: Patch hygiene
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git diff --check "$PR_BASE_SHA...HEAD"
+          test -z "$(git status --short)"
