@@ -10,7 +10,10 @@ import { checkCanonicalTopology } from '../src/workspace/topology-edit/topology-
 import { TopologyEditCertifiedSession } from '../src/workspace/topology-edit/topology-edit-certified-session.js';
 import { buildCanonicalTopologyFromWorkspaceDataset } from '../src/workspace/topology-edit/topology-edit-source-adapter.js';
 import { prepareTopologyEditStagedJsonWriteback } from '../src/workspace/topology-edit/export/topology-edit-stagedjson-writeback.js';
-import { qualifyTopologyEditStagedJsonRoundTrip } from '../src/workspace/topology-edit/export/topology-edit-stagedjson-roundtrip.js';
+import {
+  assertTopologyEditStagedJsonRoundTrip,
+  qualifyTopologyEditStagedJsonRoundTrip,
+} from '../src/workspace/topology-edit/export/topology-edit-stagedjson-roundtrip.js';
 import { runTopologyEditIncrementalValidation } from '../src/workspace/topology-edit/professional/topology-edit-incremental-validation.js';
 import { createTopologyEditTableBatch } from '../src/workspace/topology-edit/table/topology-edit-table-batch.js';
 import { planTopologyEditTableBatch } from '../src/workspace/topology-edit/table/topology-edit-table-batch-planner.js';
@@ -101,11 +104,9 @@ function validationReceipt(base, preview, plan) {
   });
 }
 
-test('certified Q3 M06 M10 engineering changes are blocked by geometry-only StagedJSON writeback', async () => {
-  const { dataset, canonical, projection } = await imported();
+async function certifiedQ3() {
+  const { dataset, canonical, projection, graph } = await imported();
   const session = new TopologyEditCertifiedSession(canonical);
-  const sourceHash = dataset.sourceSnapshot.sourceSemanticHash;
-  const sourceBefore = structuredClone(dataset.sourceSnapshot.sourcePackage);
   const batch = createTopologyEditTableBatch({ intents: q3Intents({ canonical, projection, session }) });
   const plan = planTopologyEditTableBatch({ batch, projection, canonicalTopology: canonical });
   const preview = await prepareTopologyEditTablePreview({ session, batchPlan: plan });
@@ -115,17 +116,77 @@ test('certified Q3 M06 M10 engineering changes are blocked by geometry-only Stag
   });
   assert.equal(tableValidation.status, 'READY_TO_APPLY');
   await applyTopologyEditTableTransaction({ session, batchPlan: plan, preview, tableValidation });
-  const edited = session.currentTopology();
-  assert.notEqual(edited.canonicalTopologyHash, canonical.canonicalTopologyHash);
-  assert.equal(edited.edges.find((row) => row.componentKey === 'V-M06').valveType, 'BALL');
+  return { dataset, canonical, projection, graph, edited: session.currentTopology() };
+}
+
+test('certified Q3 M04 M06 M10 surgically writes and production-reimports StagedJSON', async () => {
+  const { dataset, canonical, projection, edited } = await certifiedQ3();
+  const sourceHash = dataset.sourceSnapshot.sourceSemanticHash;
+  const sourceBefore = structuredClone(dataset.sourceSnapshot.sourcePackage);
+  const valve = edgeByComponent(edited, 'V-M06');
+  assert.equal(valve.valveType, 'BALL');
+  assert.equal(valve.catalogueBinding.recordHash, BALL.recordHash);
 
   const input = { dataset, baseCanonicalTopology: canonical, canonicalTopology: edited };
-  assert.throws(() => prepareTopologyEditStagedJsonWriteback(input), /outside the qualified geometry vocabulary/u);
-  assert.throws(() => qualifyTopologyEditStagedJsonRoundTrip(input), /outside the qualified geometry vocabulary/u);
+  const writeback = prepareTopologyEditStagedJsonWriteback(input);
+  assert.deepEqual(writeback.changedEdgeIds, [valve.id]);
+  assert.equal(writeback.changedJunctionIds.length, 1);
+  assert.ok(writeback.changedNodeIds.length > 0);
+  assert.notEqual(writeback.resultingSourceSemanticHash, sourceHash);
+
+  const output = writeback.surgical.sourcePackage;
+  const sourceValve = output.objects.find((row) => row.id === 'V-M06');
+  const sourceTee = output.objects.find((row) => row.id === 'T-001');
+  const sourceReducer = output.objects.find((row) => row.id === 'R-001');
+  assert.equal(sourceValve.attributes.VALVE_TYPE, 'BALL');
+  assert.equal(sourceValve.attributes.FACE_TO_FACE_MM, 300);
+  assert.equal(sourceValve.attributes.COMPONENT_WEIGHT_KG, 24);
+  assert.equal(sourceValve.nativeParams.catalogue.catalogueRecordHash, BALL.recordHash);
+  assert.equal(sourceValve.nativeParams.catalogue.vendorCatalogueToken, 'KEEP-VALVE-CATALOGUE-OPAQUE');
+  assert.equal(sourceTee.attributes.TOPOLOGY_EDIT_RELATION_POLICY, 'EXPLICIT_REDUCER');
+  assert.equal(sourceTee.attributes.TOPOLOGY_EDIT_REDUCER_RECORD_ID, 'RED-100-80');
+  assert.equal(sourceReducer.attributes.VENDOR_CUSTOM_FIELD, 'KEEP-REDUCER-FIELD');
+  assert.equal(sourceReducer.nativeParams.catalogue.vendorCatalogueToken, 'KEEP-REDUCER-CATALOGUE-OPAQUE');
+  assert.equal(output.vendorTopLevel.opaqueToken, 'KEEP-Q3-OPAQUE');
+
+  const receipt = qualifyTopologyEditStagedJsonRoundTrip(input);
+  assert.equal(receipt.status, 'QUALIFIED');
+  assert.equal(receipt.comparison.status, 'EQUIVALENT');
+  assert.equal(receipt.comparison.mismatchCount, 0);
+  assert.equal(edgeByComponent(receipt.reimportedCanonical, 'V-M06').valveType, 'BALL');
+  const reimportedTee = receipt.reimportedCanonical.junctions.find((row) => row.componentKey === 'T-001');
+  assert.equal(reimportedTee.branchRelation.relationPolicy, 'EXPLICIT_REDUCER');
+  assert.equal(reimportedTee.branchRelation.reducerRecordId, 'RED-100-80');
+  assertTopologyEditStagedJsonRoundTrip(receipt);
 
   assert.equal(dataset.sourceSnapshot.sourceSemanticHash, sourceHash);
   assert.equal(semanticHash(dataset.sourceSnapshot.sourcePackage), sourceHash);
   assert.deepEqual(dataset.sourceSnapshot.sourcePackage, sourceBefore);
-  assert.equal(dataset.sourceSnapshot.sourcePackage.vendorTopLevel.opaqueToken, 'KEEP-Q3-OPAQUE');
   assert.equal(rowByComponent(projection, 'R-001').custody.catalogueAuthority, 'EXACT');
+});
+
+test('engineering writer still fails closed when exact writable source fields are absent', async () => {
+  const { dataset, canonical, edited } = await certifiedQ3();
+  const sourcePackage = structuredClone(dataset.sourceSnapshot.sourcePackage);
+  const valve = sourcePackage.objects.find((row) => row.id === 'V-M06');
+  delete valve.attributes.TOPOLOGY_EDIT_LENGTH_AUTHORITY;
+  const reducedDataset = normalizeWorkspaceDataset(sourcePackage, dataset.sourceName);
+  const reducedGraph = buildPipingPortTopologyGraph(reducedDataset.sharedModel);
+  const reducedCanonical = finalizeCanonicalTopology(
+    buildCanonicalTopologyFromWorkspaceDataset(reducedDataset, reducedGraph),
+  );
+  const editedValve = edgeByComponent(edited, 'V-M06');
+  const reducedValve = edgeByComponent(reducedCanonical, 'V-M06');
+  const alignedEdited = finalizeCanonicalTopology({
+    ...edited,
+    sourceHash: reducedDataset.sourceSnapshot.sourceSemanticHash,
+    edges: edited.edges.map((row) => row.id === editedValve.id
+      ? { ...row, sourcePath: reducedValve.sourcePath }
+      : row),
+  });
+  assert.throws(() => prepareTopologyEditStagedJsonWriteback({
+    dataset: reducedDataset,
+    baseCanonicalTopology: reducedCanonical,
+    canonicalTopology: alignedEdited,
+  }), /not explicitly writable/u);
 });
