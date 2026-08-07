@@ -258,11 +258,11 @@ function solveOnce(plan, label, thermal, declarations, solveContext = { prescrib
   return Object.freeze({ compilation, loadCase, elements, execution });
 }
 
-export function solveBm4UnilateralCase({ plan = buildBm4UnilateralPlan(), label, thermal }) {
+export function solveBm4UnilateralCase({ plan = buildBm4UnilateralPlan(), label, thermal, unilateral = plan.unilateral }) {
   const analyses = new Map();
   const unilateralExecution = compileUnilateralSolverExecution({
     baseDeclarations: plan.baseDeclarations,
-    unilateral: plan.unilateral,
+    unilateral,
     buildAndSolve(declarations, context) {
       const analysis = solveOnce(plan, label, thermal, declarations, context);
       analyses.set(analysis.execution.semanticHash, analysis);
