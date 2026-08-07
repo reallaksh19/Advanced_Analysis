@@ -59,6 +59,7 @@ export default defineConfig({
       input: {
         main: fileURLToPath(new URL('./index.html', import.meta.url)),
         analyze: fileURLToPath(new URL('./analyze.html', import.meta.url)),
+        lfea: fileURLToPath(new URL('./lfea.html', import.meta.url)),
       },
       output: {
         manualChunks: manualChunk,
