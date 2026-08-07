@@ -30,6 +30,10 @@ export {
 } from './thermal-expansion-augmentation.js';
 
 export { compileInputXmlBendFeatureExpansion } from './inputxml-bend-feature-expansion.js';
+export {
+  INPUTXML_FEATURE_MECHANICS_PREPARATION_SCHEMA,
+  compileInputXmlFeatureMechanicsPreparation,
+} from './inputxml-feature-mechanics-preparation.js';
 
 export {
   LINEAR_PIPING_SOURCE_ANALYSIS_REQUEST_SCHEMA,
