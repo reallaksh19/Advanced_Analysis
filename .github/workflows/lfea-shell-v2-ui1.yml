@@ -59,8 +59,10 @@ jobs:
         working-directory: baseline
         run: npm ci
 
-      - name: Install Chromium
+      - name: Install Chromium in repository-local Playwright path
         working-directory: head
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: '0'
         run: npx playwright install --with-deps chromium
 
       - name: LFEA workbench and Shell V2 guards
