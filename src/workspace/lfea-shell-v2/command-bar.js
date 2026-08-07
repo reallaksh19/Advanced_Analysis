@@ -97,6 +97,8 @@ function resultMode(root, state, handlers) {
   const label = workbenchElement(root, 'label', 'lfea-shell-v2__control-label', 'View ');
   const select = workbenchElement(root, 'select');
   select.dataset.role = 'lfea-result-mode';
+  select.disabled = !state.execution?.result;
+  select.setAttribute('aria-disabled', String(select.disabled));
   for (const value of LFEA_RESULT_MODES) {
     const option = workbenchElement(root, 'option', null, value.replaceAll('_', ' '));
     option.value = value;
