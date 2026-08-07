@@ -95,7 +95,9 @@ function countBy(rows, selector) {
 function refinedCategory(row, sourceByKey, friction, graph) {
   const source = sourceByKey.get(rowKey(row));
   const sourceCategory = source?.sourceCandidate ?? row.primaryCategory;
-  if (sourceCategory !== 'SOURCE_LEVEL_RESIDUAL_UNEXPLAINED') return sourceCategory;
+  if (!['SOURCE_LEVEL_RESIDUAL_UNEXPLAINED', 'FRICTION_SOURCE_EVIDENCE_ADJACENT'].includes(sourceCategory)) {
+    return sourceCategory;
+  }
   const nearest = nearestFriction(row, friction, graph);
   if (nearest?.supports.some((support) => support.engagedByReaction)) return 'FRICTION_NOT_MODELED_CANDIDATE';
   return sourceCategory;
@@ -162,10 +164,11 @@ for (const caseLabel of CASES) {
   });
 }
 
-const residualSourceRows = sourceAudit.auditedPreviouslyUnexplainedOpeRows.filter((row) => (
-  row.sourceCandidate === 'SOURCE_LEVEL_RESIDUAL_UNEXPLAINED'
+const frictionSourceRows = sourceAudit.auditedPreviouslyUnexplainedOpeRows.filter((row) => (
+  row.sourceCandidate === 'FRICTION_SOURCE_EVIDENCE_ADJACENT'
+  || row.sourceCandidate === 'SOURCE_LEVEL_RESIDUAL_UNEXPLAINED'
 ));
-const frictionCandidates = residualSourceRows.map((row) => {
+const frictionCandidates = frictionSourceRows.map((row) => {
   const nearest = nearestFriction(row, friction, graph);
   const maxCapacity = Math.max(0, ...(nearest?.supports ?? []).map((support) => support.coulombCapacity));
   const forceLike = row.family === 'globalForce' || row.family === 'localForce' || row.family === 'restraint';
@@ -181,7 +184,7 @@ const frictionCandidates = residualSourceRows.map((row) => {
       : null,
     finalCandidate: nearest?.supports.some((support) => support.engagedByReaction)
       ? 'FRICTION_NOT_MODELED_CANDIDATE'
-      : 'SOURCE_LEVEL_RESIDUAL_UNEXPLAINED',
+      : 'FRICTION_SOURCE_EVIDENCE_ONLY',
   });
 });
 
@@ -193,11 +196,11 @@ assert.ok(node21470Sus, 'CASE 19 RCA must retain the known node 21470 UY contact
 assert.ok(friction.length > 0, 'BM4 source must retain frictional +Y supports.');
 assert.ok(
   (frictionCandidateCounts.FRICTION_NOT_MODELED_CANDIDATE ?? 0) > 0,
-  'Node-level RCA must identify at least one engaged friction-support candidate among source-level residual OPE rows.',
+  'Node-level RCA must identify at least one engaged friction-support candidate among friction-source OPE rows.',
 );
 
 const report = Object.freeze({
-  schema: 'm037-bm4-node-case-rca/v1',
+  schema: 'm037-bm4-node-case-rca/v2',
   benchmarkHead: solved.operating.execution.modelReference?.modelSemanticHash ?? null,
   cases: Object.freeze(cases),
   case19ContactHistoryAnchor: Object.freeze({
@@ -213,7 +216,7 @@ const report = Object.freeze({
     limitationCode: 'BM4_FRICTION_NOT_MODELED',
     operatingSupports: friction,
   }),
-  previouslySourceLevelResidualOpeRows: residualSourceRows.length,
+  frictionSourceOpeRows: frictionSourceRows.length,
   frictionCandidates: Object.freeze(frictionCandidates),
   frictionCandidateCounts: Object.freeze(frictionCandidateCounts),
 });
