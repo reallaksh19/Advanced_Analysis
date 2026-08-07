@@ -68,7 +68,7 @@ function contactConstraint({ declarationId, nodeId, dof, sense, gap }) {
       contactValue,
     });
   }
-  const slotId = `${declarationId}::CONTACT`;
+  const slotId = `${declarationId}-CONTACT`;
   return deepFreeze({
     constraintDeclaration: deepFreeze({
       declarationId: slotId,
