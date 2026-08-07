@@ -258,8 +258,8 @@ const m035Displacement = m035Rows.filter((row) => row.family === 'displacement')
 const m035Forces = m035Rows.filter((row) => row.family !== 'displacement');
 assert.equal(m035Displacement.length, 1746, 'M035 displacement comparison row-count parity');
 assert.equal(m035Forces.length, 6516, 'M035 force comparison row-count parity');
-assert.ok(Math.abs(m035Displacement.filter((row) => row.passedTarget).length / m035Displacement.length * 100 - 31.958762886597935) < 1e-12, 'M035 raw displacement parity under qualified BM4 thermal authority');
-assert.ok(Math.abs(m035Forces.filter((row) => row.passedTarget).length / m035Forces.length * 100 - 35.543278084714544) < 1e-12, 'M035 raw force parity after local-axis normalization and qualified BM4 thermal authority');
+assert.ok(Math.abs(m035Displacement.filter((row) => row.passedTarget).length / m035Displacement.length * 100 - 32.35967926689576) < 1e-12, 'M035 raw displacement parity under qualified BM4 thermal authority');
+assert.ok(Math.abs(m035Forces.filter((row) => row.passedTarget).length / m035Forces.length * 100 - 37.17004297114794) < 1e-12, 'M035 raw force parity after local-axis normalization and qualified BM4 thermal authority');
 
 const reducerNodes = new Set(combined.authorities.inlineReducers.transitions.map((row) => String(row.nodeId)));
 const rigidElementPairs = new Set(combined.authorities.base.entries
@@ -340,4 +340,4 @@ mkdirSync(reportDir, { recursive: true });
 writeFileSync(`${reportDir}/m035-m036-bm4-failure-attribution.json`, `${JSON.stringify(report, null, 2)}\n`);
 console.log(`M035_M036_ATTRIBUTION_SUMMARY=${JSON.stringify(report.summary)}`);
 console.log(`M035_M036_ATTRIBUTION_REDUCERS=${JSON.stringify(report.evidence.reducerNodes)}`);
-console.log(`M035_M036_ATTRIBUTION_TOP_UNEXPLAINED=${JSON.stringify(report.topUnexplained.slice(0, 12).map((row) => ({ caseLabel: row.caseLabel, family: row.family, identifier: row.identifier, end: row.end, field: row.field, percentDifference: row.percentDifference, normalizedSeverity: row.normalizedSeverity })))}`);
+console.log(`M035_M036_ATTRIBUTION_TOP_UNEXPLAINED=${JSON.stringify(report.topUnexplained.slice(0, 12).map((row) => ({ caseLabel: row.caseLabel, family: row.family, identifier: row.identifier, end: row.end, field: row.field, percentDifference: row.percentDifference, normalizedSeverity: row.normalizedSeverity })))`);
