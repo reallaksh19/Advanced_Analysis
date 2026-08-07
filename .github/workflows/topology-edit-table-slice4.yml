@@ -1,0 +1,88 @@
+name: Topology Edit Table Slice 4
+
+on:
+  push:
+    paths:
+      - 'src/workspace/topology-edit/table/topology-edit-table-human-*.js'
+      - 'src/workspace/viewport-productivity/topology-edit-table-export-download.js'
+      - 'src/workspace/viewport-productivity/topology-edit-table-grid-view.js'
+      - 'src/workspace/viewport-productivity/topology-edit-table-runtime.js'
+      - 'tests/topology-edit-table-human-*.test.mjs'
+      - 'e2e/topology-edit-table-human-export.spec.js'
+      - '.github/workflows/topology-edit-table-slice4.yml'
+  pull_request:
+    paths:
+      - 'src/workspace/topology-edit/table/topology-edit-table-human-*.js'
+      - 'src/workspace/viewport-productivity/topology-edit-table-export-download.js'
+      - 'src/workspace/viewport-productivity/topology-edit-table-grid-view.js'
+      - 'src/workspace/viewport-productivity/topology-edit-table-runtime.js'
+      - 'tests/topology-edit-table-human-*.test.mjs'
+      - 'e2e/topology-edit-table-human-export.spec.js'
+      - '.github/workflows/topology-edit-table-slice4.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-human-export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Exact HEAD line and source gates
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          files=(
+            src/workspace/topology-edit/table/topology-edit-table-human-export.js
+            src/workspace/topology-edit/table/topology-edit-table-human-xlsx.js
+            src/workspace/viewport-productivity/topology-edit-table-export-download.js
+            src/workspace/viewport-productivity/topology-edit-table-grid-view.js
+            src/workspace/viewport-productivity/topology-edit-table-runtime.js
+            tests/topology-edit-table-human-export.test.mjs
+            tests/topology-edit-table-human-xlsx.test.mjs
+            e2e/topology-edit-table-human-export.spec.js
+          )
+          for file in "${files[@]}"; do
+            test "$(git show "HEAD:$file" | wc -l)" -lt 300
+            node --check "$file"
+          done
+          ! grep -REn 'WorkspaceState|loadDataset\(|swapDataset\(|applyCanonicalTopologyToWorkspaceEntities|session\.execute\(|new (WebGLRenderer|TopologyEditViewportBackend)' \
+            src/workspace/topology-edit/table/topology-edit-table-human-*.js \
+            src/workspace/viewport-productivity/topology-edit-table-export-download.js
+      - name: Pure human export authority contracts
+        run: node --test tests/topology-edit-table-human-export.test.mjs
+      - name: Install dependencies
+        run: npm ci
+      - name: XLSX round-read contract
+        run: node --test tests/topology-edit-table-human-xlsx.test.mjs
+      - name: Production build and unchanged bundle ceiling
+        run: npm run build
+      - name: Install Chromium
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: '0'
+        run: npx playwright install --with-deps chromium
+      - name: Production CSV XLSX downloads
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: '0'
+          TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: npx playwright test e2e/topology-edit-table-human-export.spec.js --project=chromium --workers=1 --retries=0 --reporter=line
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-table-slice4-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: warn
