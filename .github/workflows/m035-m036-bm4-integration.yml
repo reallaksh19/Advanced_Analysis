@@ -5,6 +5,7 @@ on:
     branches:
       - m035-m036-bm4-integration
       - agent/m035-bm4-bend-scope-isolation
+      - agent/m035-bm4-ope-source-audit
   workflow_dispatch:
 
 permissions:
@@ -37,6 +38,7 @@ jobs:
           node --check scripts/lfea-m035-m036-bm4-integration-check.mjs
           node --check scripts/lfea-m035-m036-bm4-comparison.mjs
           node --check scripts/lfea-m035-m036-bm4-failure-attribution.mjs
+          node --check scripts/lfea-m035-bm4-ope-source-audit.mjs
 
       - name: Qualify CAESAR local-result reference normalization
         run: node scripts/lfea-bm4-local-force-reference-normalization-check.mjs
@@ -83,6 +85,19 @@ jobs:
           fi
           exit "$status"
 
+      - name: OPE source-level audit and +Y falsification
+        shell: bash
+        run: |
+          set +e
+          node scripts/lfea-m035-bm4-ope-source-audit.mjs > /tmp/m035-bm4-ope-source-audit.log 2>&1
+          status=$?
+          cat /tmp/m035-bm4-ope-source-audit.log
+          if [ "$status" -ne 0 ]; then
+            message="$(tr '\n' ' ' < /tmp/m035-bm4-ope-source-audit.log | head -c 3500)"
+            echo "::error file=scripts/lfea-m035-bm4-ope-source-audit.mjs,line=1,title=BM4 OPE source audit::${message}"
+          fi
+          exit "$status"
+
       - name: Regression M035 focused feature solve
         run: node scripts/lfea-m035-bm4-feature-solve-check.mjs
 
@@ -107,7 +122,10 @@ jobs:
             /tmp/m035-m036-integration.log
             /tmp/m035-m036-comparison.log
             /tmp/m035-m036-attribution.log
+            /tmp/m035-bm4-ope-source-audit.log
             reports/m035-m036-bm4-cases-19-20-21.json
             reports/m035-m036-bm4-failure-attribution.json
+            reports/m035-bm4-ope-source-audit.json
+            reports/m035-bm4-ope-source-audit.md
           if-no-files-found: warn
           retention-days: 14
