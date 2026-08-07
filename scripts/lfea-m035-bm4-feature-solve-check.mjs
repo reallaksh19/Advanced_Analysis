@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
+import { diagnoseBm4M035FeatureStiffness } from './lfea-m035-bm4-feature-solver-diagnostic.mjs';
 import { solveBm4M035FeatureCases } from './lfea-m035-bm4-feature-solve-runtime.mjs';
+
+console.log('\n--- M035 BM4 feature-model stiffness qualification ---');
+const stiffnessDiagnostic = diagnoseBm4M035FeatureStiffness();
+console.log(JSON.stringify(stiffnessDiagnostic, null, 2));
 
 console.log('\n--- M035 BM4 feature-aware bend/tee solve ---');
 const result = solveBm4M035FeatureCases();
@@ -39,6 +44,7 @@ assert.ok(bendArcEntries.every((row) => row.teeModifier === null), 'Tee flexibil
 
 console.log(JSON.stringify({
   status: 'PASS',
+  stiffnessDiagnostic,
   summary: report.summary,
   teeBendOverlap: {
     sourceSegmentId: 'IX-S36',
@@ -46,8 +52,8 @@ console.log(JSON.stringify({
     teeCarrierRole: teeCarriers[0].segment.meta.analysisRole,
     bendArcElementCount: bendArcEntries.length,
   },
-  sustainedSolver: sustained.execution.assessment ?? sustained.execution.status ?? null,
-  operatingSolver: operating.execution.assessment ?? operating.execution.status ?? null,
+  sustainedSolver: sustained.execution.status,
+  operatingSolver: operating.execution.status,
   reportFeatureHash: report.featureSemanticHash,
 }, null, 2));
 console.log('M035 BM4 feature-aware bend/tee solve PASS');
