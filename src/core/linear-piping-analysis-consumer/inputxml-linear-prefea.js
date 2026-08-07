@@ -14,6 +14,10 @@ export {
 } from './inputxml-linear-prefea-contract.js';
 
 export {
+  diagnoseInputXmlLinearPreFeaEngineeringSanity,
+} from './inputxml-linear-prefea-engineering-checks.js';
+
+export {
   diagnoseInputXmlLinearPreFea,
   requireInputXmlLinearPreFeaDiagnostics,
 } from './inputxml-linear-prefea-diagnostics.js';
