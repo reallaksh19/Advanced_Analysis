@@ -15,6 +15,7 @@ on:
       - 'src/workspace/topology-edit/authoring/topology-edit-authoring-operation-planner.js'
       - 'src/workspace/topology-edit/authoring/topology-edit-authored-bend-geometry.js'
       - 'src/workspace/topology-edit/authoring/topology-edit-start-route-*.js'
+      - 'src/workspace/topology-edit/authoring/topology-edit-continue-route-*.js'
       - 'src/workspace/viewport-productivity/topology-edit-authoring-runtime.js'
       - 'src/workspace/viewport-productivity/topology-edit-authoring-styles.js'
       - 'src/workspace/viewport-productivity/topology-edit-start-route-*.js'
@@ -23,10 +24,12 @@ on:
       - 'tests/topology-edit-authored-bend-geometry.test.mjs'
       - 'tests/topology-edit-governed-sjson-source-authority.test.mjs'
       - 'tests/topology-edit-start-route-*.test.mjs'
+      - 'tests/topology-edit-continue-route-*.test.mjs'
       - 'e2e/topology-edit-authoring-tools.spec.js'
       - 'e2e/topology-edit-authoring-tools-tree.spec.js'
       - 'e2e/topology-edit-start-route-authority.spec.js'
       - 'docs/start-route-production-authoring.md'
+      - 'docs/continue-route-core-authority.md'
   workflow_dispatch:
 
 permissions:
@@ -81,6 +84,10 @@ jobs:
             src/workspace/topology-edit/authoring/topology-edit-start-route-candidate.js
             src/workspace/topology-edit/authoring/topology-edit-start-route-transaction.js
             src/workspace/topology-edit/authoring/topology-edit-start-route-validation-plan.js
+            src/workspace/topology-edit/authoring/topology-edit-continue-route-intent.js
+            src/workspace/topology-edit/authoring/topology-edit-continue-route-plan.js
+            src/workspace/topology-edit/authoring/topology-edit-continue-route-candidate.js
+            src/workspace/topology-edit/authoring/topology-edit-continue-route-transaction.js
             src/workspace/viewport-productivity/topology-edit-authoring-runtime.js
             src/workspace/viewport-productivity/topology-edit-authoring-styles.js
             src/workspace/viewport-productivity/topology-edit-start-route-runtime.js
@@ -94,6 +101,7 @@ jobs:
             tests/topology-edit-start-route-authoring.test.mjs
             tests/topology-edit-start-route-runtime.test.mjs
             tests/topology-edit-start-route-production-adapter.test.mjs
+            tests/topology-edit-continue-route-authoring.test.mjs
             e2e/topology-edit-authoring-tools-tree.spec.js
             e2e/topology-edit-start-route-authority.spec.js
           )
@@ -107,6 +115,10 @@ jobs:
             src/workspace/topology-edit/authoring/topology-edit-start-route-candidate.js
             src/workspace/topology-edit/authoring/topology-edit-start-route-transaction.js
             src/workspace/topology-edit/authoring/topology-edit-start-route-validation-plan.js
+            src/workspace/topology-edit/authoring/topology-edit-continue-route-intent.js
+            src/workspace/topology-edit/authoring/topology-edit-continue-route-plan.js
+            src/workspace/topology-edit/authoring/topology-edit-continue-route-candidate.js
+            src/workspace/topology-edit/authoring/topology-edit-continue-route-transaction.js
             src/workspace/viewport-productivity/topology-edit-start-route-runtime.js
             src/workspace/viewport-productivity/topology-edit-start-route-hud.js
             src/workspace/viewport-productivity/topology-edit-start-route-authoring-service.js
@@ -114,6 +126,7 @@ jobs:
             tests/topology-edit-start-route-authoring.test.mjs
             tests/topology-edit-start-route-runtime.test.mjs
             tests/topology-edit-start-route-production-adapter.test.mjs
+            tests/topology-edit-continue-route-authoring.test.mjs
             e2e/topology-edit-start-route-authority.spec.js
           )
           for file in "${limited[@]}"; do test "$(wc -l < "$file")" -lt 300; done
@@ -136,6 +149,7 @@ jobs:
             tests/topology-edit-start-route-authoring.test.mjs \
             tests/topology-edit-start-route-runtime.test.mjs \
             tests/topology-edit-start-route-production-adapter.test.mjs \
+            tests/topology-edit-continue-route-authoring.test.mjs \
             2>&1 | tee topology-edit-authoring-tools-test-output.txt
           test "$(grep -c '^ok ' topology-edit-authoring-tools-test-output.txt)" -gt 0
 
