@@ -50,6 +50,20 @@ jobs:
             esac
           done < /tmp/lfea-linear-core-paths.txt
 
+      - name: M036 unilateral contact qualification
+        shell: bash
+        run: |
+          mkdir -p artifacts/lfea-linear-core-exact-head
+          set +e
+          npm run check:lfea-unilateral > artifacts/lfea-linear-core-exact-head/m036.log 2>&1
+          status=$?
+          cat artifacts/lfea-linear-core-exact-head/m036.log
+          if [ "$status" -ne 0 ]; then
+            message="$(tail -n 60 artifacts/lfea-linear-core-exact-head/m036.log | tr '\n' ' ' | sed 's/%/%25/g')"
+            echo "::error file=scripts/lfea-m036-bm4-liftoff-check.mjs::$message"
+            exit "$status"
+          fi
+
       - name: InputXML unit normalization
         run: node scripts/linear-piping-inputxml-unit-normalization-check.mjs
 
@@ -93,14 +107,11 @@ jobs:
       - name: Fixed-input commercial benchmark regression
         run: npm run check:lfea-bm1-cii-comparison
 
-      - name: M036 unilateral contact qualification
-        run: npm run check:lfea-unilateral
-
       - name: Retain exact-head JSON and CSV evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: lfea-linear-core-exact-head-${{ github.event.pull_request.head.sha }}
           path: artifacts/lfea-linear-core-exact-head/*
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 90
