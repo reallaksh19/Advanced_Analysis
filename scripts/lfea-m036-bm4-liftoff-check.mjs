@@ -32,14 +32,22 @@ for (const [label, execution] of [['SUS', direct.sustained.execution], ['OPE', d
   assert.equal(noOp.finalExecutionHash, execution.semanticHash, `T5 BM4 ${label} no-op hash`);
 }
 
-const solveState = (label, thermal) => compileUnilateralSolverExecution({
+const solveState = (label, thermal, unilateral = inventory.unilateral) => compileUnilateralSolverExecution({
   baseDeclarations: inventory.base,
-  unilateral: inventory.unilateral,
+  unilateral,
   buildAndSolve: (constraints, active) => analyseM036Bm4(authorities, constraints, label, thermal, active.prescribedMovements).execution,
 });
-const sus = solveState('SUS', false);
+const susCold = solveState('SUS', false);
 const ope = solveState('OPE', true);
-const finalSus = finalM036Bm4(authorities, inventory, sus, 'SUS', false);
+
+function seededFrom(run) {
+  const state = new Map(run.convergedState.map((row) => [row.declarationId, row.status === 'ENGAGED']));
+  return inventory.unilateral.map((row) => ({ ...row, initiallyEngaged: state.get(row.declarationId) ?? row.initiallyEngaged ?? true }));
+}
+
+const susHot = solveState('SUS', false, seededFrom(ope));
+const finalSusCold = finalM036Bm4(authorities, inventory, susCold, 'SUS', false);
+const finalSusHot = finalM036Bm4(authorities, inventory, susHot, 'SUS', false);
 const finalOpe = finalM036Bm4(authorities, inventory, ope, 'OPE', true);
 
 function targetReleaseIds(run) {
@@ -58,14 +66,35 @@ function nodeTrace(run, sourceNodeId) {
   }));
 }
 
-const releasedSus = targetReleaseIds(sus);
+const releasedSusCold = targetReleaseIds(susCold);
+const releasedSusHot = targetReleaseIds(susHot);
 const releasedOpe = targetReleaseIds(ope);
-const h1Confirmed = releasedSus.length === H1_RELEASED.size && releasedSus.every((id) => H1_RELEASED.has(id));
+const h1Confirmed = releasedSusCold.length === H1_RELEASED.size && releasedSusCold.every((id) => H1_RELEASED.has(id));
 assert.deepEqual(releasedOpe, [...M036_BM4_TARGETS].sort(), 'all four OPE lift-off shoes must release');
 
+const ciiSusReleased = M036_BM4_TARGETS.filter((nodeId) => {
+  const row = cii.restraint.get('SUS').get(nodeId);
+  return !row || Math.abs(-row.FY) <= 1;
+}).sort();
+assert.deepEqual(ciiSusReleased, ['20090', '21470'], 'CASE 19 target status evidence');
+const h2HotStartConfirmed = JSON.stringify(ciiSusReleased) === JSON.stringify(releasedSusHot);
+const susFork = {
+  h1Confirmed,
+  independentSusReleased: releasedSusCold,
+  ciiCase19Released: ciiSusReleased,
+  opeSeedReleased: releasedOpe,
+  hotStartedSusReleased: releasedSusHot,
+  h2HotStartConfirmed,
+  verdict: h2HotStartConfirmed
+    ? 'H1_FALSIFIED; H2_CONFIRMED_BY_OPE_STATUS_SEED_THEN_SUS_REITERATION'
+    : 'H1_FALSIFIED; H2_HOT_START_FALSIFIED; CASE_HISTORY_NOT_SERIALIZED_IN_BM4_INPUTXML',
+};
+
+const selectedSus = h2HotStartConfirmed ? finalSusHot : finalSusCold;
+const selectedSusRun = h2HotStartConfirmed ? susHot : susCold;
 const targetRows = [];
 for (const [label, beforeExecution, afterExecution] of [
-  ['SUS', direct.sustained.execution, finalSus.execution],
+  ['SUS', direct.sustained.execution, selectedSus.execution],
   ['OPE', direct.operating.execution, finalOpe.execution],
 ]) for (const nodeId of M036_BM4_TARGETS) {
   const ciiRow = cii.restraint.get(label).get(nodeId);
@@ -74,19 +103,6 @@ for (const [label, beforeExecution, afterExecution] of [
   targetRows.push({ label, nodeId, before: m036Bm4Reaction(beforeExecution, nodeId), after, cii: ciiReaction });
   if (label === 'OPE') assert.ok(Math.abs(after) <= 1, `${nodeId} OPE reaction must be within 1 N of zero`);
 }
-
-const ciiSusReleased = targetRows.filter((row) => row.label === 'SUS' && Math.abs(row.cii ?? Infinity) <= 1).map((row) => row.nodeId).sort();
-assert.deepEqual(ciiSusReleased, ['20090', '21470'], 'CASE 19 target status evidence');
-const h2Case20ReplayConfirmed = JSON.stringify(ciiSusReleased) === JSON.stringify(releasedOpe);
-assert.equal(h2Case20ReplayConfirmed, false, 'CASE 19 cannot be a literal replay of CASE 20 four-shoe status');
-const susFork = {
-  h1Confirmed,
-  independentSusReleased: releasedSus,
-  ciiCase19Released: ciiSusReleased,
-  case20Released: releasedOpe,
-  h2Case20ReplayConfirmed,
-  verdict: 'H1_FALSIFIED_AND_LITERAL_CASE20_STATUS_REPLAY_FALSIFIED; CASE_HISTORY_NOT_SERIALIZED_IN_BM4_INPUTXML',
-};
 
 const redistribution = M036_BM4_NEIGHBORS.map((nodeId) => {
   const ciiRow = cii.restraint.get('OPE').get(nodeId);
@@ -99,32 +115,24 @@ for (const row of redistribution) assert.ok(row.afterError < row.beforeError, `$
 for (const nodeId of M036_BM4_TARGETS) assert.ok(ope.limitations.some((row) => row.nodeId === `BM4.N${nodeId}` && row.code === 'BM4_FRICTION_NOT_MODELED'), `${nodeId} friction limitation`);
 
 const report = {
-  check: 'lfea-m036-bm4-liftoff',
-  status: 'PASS',
-  h1: { predictedReleased: [...H1_RELEASED].sort(), confirmed: h1Confirmed, actualReleased: releasedSus },
-  susFork,
-  opeReleased: releasedOpe,
+  check: 'lfea-m036-bm4-liftoff', status: 'PASS',
+  h1: { predictedReleased: [...H1_RELEASED].sort(), confirmed: h1Confirmed, actualReleased: releasedSusCold },
+  susFork, opeReleased: releasedOpe,
   inventory: {
-    contactDeclarationCount: inventory.unilateral.length,
-    targetOneWayCount: 4,
-    gappedGuideCount: inventory.gappedGuideEvidence.length,
-    frictionLimitations: ope.limitations.length,
+    contactDeclarationCount: inventory.unilateral.length, targetOneWayCount: 4,
+    gappedGuideCount: inventory.gappedGuideEvidence.length, frictionLimitations: ope.limitations.length,
     gappedGuideEvidence: inventory.gappedGuideEvidence.map((row) => ({ nodeId: row.nodeId, gap: row.gap })),
   },
   targetRows,
-  equilibrium: { SUS: auditM036Bm4Equilibrium(finalSus), OPE: auditM036Bm4Equilibrium(finalOpe) },
+  equilibrium: { SUS: auditM036Bm4Equilibrium(selectedSus), OPE: auditM036Bm4Equilibrium(finalOpe) },
   redistribution,
-  trace: { SUS: sus.trace, OPE: ope.trace },
+  trace: { SUS_COLD: susCold.trace, SUS_SELECTED: selectedSusRun.trace, OPE: ope.trace },
 };
 
 console.log(JSON.stringify(report, null, 2));
 console.log(`M036_SUMMARY=${JSON.stringify({
-  h1: report.h1,
-  susFork,
-  opeReleased: report.opeReleased,
-  targetRows,
-  equilibrium: report.equilibrium,
-  redistribution,
+  h1: report.h1, susFork, opeReleased: report.opeReleased, targetRows,
+  equilibrium: report.equilibrium, redistribution,
   gappedGuideEvidence: report.inventory.gappedGuideEvidence,
-  trace20090: { SUS: nodeTrace(sus, '20090'), OPE: nodeTrace(ope, '20090') },
+  trace20090: { SUS_COLD: nodeTrace(susCold, '20090'), SUS_SELECTED: nodeTrace(selectedSusRun, '20090'), OPE: nodeTrace(ope, '20090') },
 })}`);
