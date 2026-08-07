@@ -288,14 +288,19 @@ function normalizedSeverity(row) {
   return width > 0 ? Math.abs(row.absoluteDifference) / width : Number.POSITIVE_INFINITY;
 }
 function forcedCase19HistoryAnalysis(combined) {
-  const released = new Set(HISTORY_COUNTERFACTUAL_RELEASES);
-  const active = combined.inventory.unilateral.filter((row) => !released.has(sourceNodeId(row.nodeId)));
+  const normalState = new Map(combined.sustainedRun.convergedState.map((row) => [row.declarationId, row.status]));
+  const active = combined.inventory.unilateral
+    .filter((row) => normalState.get(row.declarationId) === 'ENGAGED')
+    .filter((row) => sourceNodeId(row.nodeId) !== '21470');
   return analyseM035M036Case(
     combined.authorities,
-    [...combined.inventory.base, ...active.map((row) => row.constraintDeclaration)],
+    [
+      ...combined.inventory.base,
+      ...active.map((row) => row.constraintDeclaration).filter((row) => row !== null && row !== undefined),
+    ],
     'BM4-M035-M036-SUS-HISTORY-SENSITIVITY',
     false,
-    active.map((row) => row.prescribedMovement).filter((row) => row !== null),
+    active.map((row) => row.prescribedMovement).filter((row) => row !== null && row !== undefined),
   );
 }
 function unmatchedReferenceRows(snapshot, cii) {
@@ -359,7 +364,8 @@ const historyByKey = new Map(historyRows.map((row) => [rowKey(row), row]));
 
 const m035Displacement = m035Rows.filter((row) => row.family === 'displacement');
 const m035Forces = m035Rows.filter((row) => row.family !== 'displacement');
-assert.equal(m035Displacement.length, 873, 'M035 displacement comparison row-count parity');
+assert.equal(m035Displacement.length, 1746, 'M035 displacement comparison row-count parity');
+assert.equal(m035Forces.length, 6516, 'M035 force comparison row-count parity');
 assert.ok(Math.abs(m035Displacement.filter((row) => row.passedTarget).length / m035Displacement.length * 100
   - 18.499427262313862) < 1e-12, 'M035 raw displacement rate parity');
 assert.ok(Math.abs(m035Forces.filter((row) => row.passedTarget).length / m035Forces.length * 100
