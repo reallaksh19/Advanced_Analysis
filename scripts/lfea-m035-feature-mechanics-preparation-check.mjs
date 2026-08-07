@@ -122,7 +122,7 @@ const sourcePreparation = sealInputXmlLinearSolvePreparation({
 const teeFactors = calculateB31Factors({
   schema: FACTOR_CALCULATION_REQUEST_SCHEMA,
   calculationId: 'M035-FEATURE-TEE-CALC',
-  componentId: 'TEE',
+  componentId: 'TJ',
   editionProfileId: 'B31_3_2020_B31J_2017',
   componentType: 'WELDING_TEE',
   geometry: {
@@ -185,7 +185,7 @@ const feature = compileInputXmlFeatureMechanicsPreparation({
   frameElementProfile: frameProfile,
   pipingComponentProfile: componentProfile({ bendPressureStiffeningRule: 'BEND_PRESSURE_STIFFENING_DECLARED_FACTOR_V1' }),
   localAxisProfile: FRAME_LOCAL_AXIS_PROFILE,
-  teeFactorResultBySegmentId: new Map([['TEE', teeFactors]]),
+  teeFactorResultByJunctionNodeId: new Map([['TJ', teeFactors]]),
   reducerRequestBySegmentId: new Map([['RED', reducerRequest]]),
   reducerSamplingQualification: reducerQualification,
 });
@@ -199,8 +199,11 @@ assert.equal(feature.executionBoundary.solveAuthorized, false);
 assert.ok(feature.sourceToAnalysisElementIds.BEND.length > 1);
 assert.deepEqual(feature.sourceToAnalysisElementIds.TEE, ['TEE']);
 assert.deepEqual(feature.sourceToAnalysisElementIds.RED, ['RED']);
+assert.deepEqual(feature.componentCoverage.teeTaggedSegments, ['TEE']);
+assert.deepEqual(feature.componentCoverage.teeJunctionNodeIds, ['TJ']);
 const tee = feature.teeJunctions[0];
 assert.equal(tee.junctionNodeId, 'TJ');
+assert.deepEqual(tee.taggedSegmentIds, ['TEE']);
 assert.equal(tee.modifiers.length, 3);
 assert.ok(tee.modifiers.every((row) => ['I','J'].includes(row.junctionEnd)));
 assert.ok(tee.modifiers.every((row) => row.rotationalSprings.every((spring) => spring.end === row.junctionEnd)));
@@ -219,7 +222,7 @@ assert.equal(new Set(stiffness.elementContributions.map((row) => row.elementId))
 assert.ok(stiffness.summary.bendElementCount > 1);
 assert.equal(stiffness.summary.teeModifiedElementCount, 3);
 assert.equal(stiffness.summary.reducerElementCount, 1);
-assert.ok(stiffness.elementLedger.filter((row) => row.kind === 'TEE_MODIFIED_FRAME').every((row) => !row.elementId.startsWith('M035-TEE-01.E')));
+assert.ok(stiffness.elementLedger.filter((row) => row.kind === 'TEE_MODIFIED_FRAME').every((row) => !row.elementId.startsWith('IXTEE.JUNCTION.')));
 const reducerLedger = stiffness.elementLedger.find((row) => row.kind === 'REDUCER_CONDENSED');
 assert.equal(reducerLedger.elementId, 'RED');
 
@@ -251,7 +254,7 @@ assert.throws(() => compileInputXmlFeatureMechanicsPreparation({
   smooth90FlexibilityCorrection: false,
   frameElementProfile: frameProfile,
   pipingComponentProfile: componentProfile({ bendPressureStiffeningRule: 'BEND_PRESSURE_STIFFENING_DECLARED_FACTOR_V1' }),
-  teeFactorResultBySegmentId: new Map(),
+  teeFactorResultByJunctionNodeId: new Map(),
   reducerRequestBySegmentId: new Map([['RED', reducerRequest]]),
   reducerSamplingQualification: reducerQualification,
 }), /must cover exactly/);
