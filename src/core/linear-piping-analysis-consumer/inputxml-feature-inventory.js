@@ -1,22 +1,25 @@
 import { semanticHash } from '../shared-piping-model/canonical-json.js';
 import {
+  resolveRestraintTypeMutation,
+  restraintTypeCodeLabel,
+} from '../geometry/adapters/inputxml-restraint-type-mutation.js';
+import {
   STRICT_INPUTXML_LINEAR_STATIC_PROFILE as STRICT,
   DISCLOSED_GENERIC_ANALYZER_APPROXIMATION_PROFILE as APPROXIMATE,
   exactDisposition,
   approximationDisposition,
   unsupportedDisposition,
+  nonlinearDisposition,
   codeOnlyDisposition,
   invalidDisposition,
   inactiveDisposition,
 } from './inputxml-model-health-profile.js';
-import {
-  classifyInputXmlRestraint,
-  inputXmlChildNodeIds,
-  inputXmlNumericAttribute,
-  inputXmlRestraintDispositions,
-} from './inputxml-restraint-inventory.js';
 
 const NUMERIC_TOLERANCE = 1e-12;
+const CAESAR_UNSET_SENTINEL = -1.0101;
+const CAESAR_SENTINEL_TOLERANCE = 0.001;
+const RESTRAINT_DOFS = Object.freeze(['UX', 'UY', 'UZ', 'RX', 'RY', 'RZ']);
+const GENERIC_LINEARIZED_UNILATERAL_CODES = new Set(['14', '15']);
 const SIF_TEE_CODES = new Set([3, 5]);
 
 export function buildInputXmlFeatureInventory(sourceBundle) {
@@ -54,7 +57,12 @@ export function buildInputXmlFeatureInventory(sourceBundle) {
     }));
 
     for (const feature of element.childFeatures ?? []) {
-      rows.push(childInventory({ element, feature, segment, componentInventoryId }));
+      rows.push(childInventory({
+        element,
+        feature,
+        segment,
+        componentInventoryId,
+      }));
     }
     rows.push(...fieldInventory(element, segment));
   }
@@ -73,7 +81,7 @@ function childInventory({ element, feature, segment, componentInventoryId }) {
     active: true,
     sourceIndex: element.sourceIndex,
     targetIds: {
-      nodeIds: inputXmlChildNodeIds(feature.rawAttributes, element),
+      nodeIds: childNodeIds(feature.rawAttributes, element),
       segmentIds: [element.canonicalSegmentId],
     },
     sourceRecord: feature,
@@ -81,34 +89,53 @@ function childInventory({ element, feature, segment, componentInventoryId }) {
   if (['BEND', 'REDUCER', 'RIGID'].includes(kind)) {
     return inventoryRow({
       ...common,
-      classification: { kind, mechanicsOwnedByInventoryId: componentInventoryId },
+      classification: {
+        kind,
+        mechanicsOwnedByInventoryId: componentInventoryId,
+      },
       dispositions: componentDispositions(kind, element.canonicalStatus),
     });
   }
   if (kind === 'SIF') {
-    const typeCode = inputXmlNumericAttribute(feature.rawAttributes, ['TYPE']);
+    const typeCode = numericAttribute(feature.rawAttributes, ['TYPE']);
     return inventoryRow({
       ...common,
-      classification: { kind, typeCode, codeInputSupported: typeCode !== null && SIF_TEE_CODES.has(typeCode) },
+      classification: {
+        kind,
+        typeCode,
+        codeInputSupported: typeCode !== null && SIF_TEE_CODES.has(typeCode),
+      },
       dispositions: both(codeOnlyDisposition('CODE_STRESS_INPUT_ONLY')),
     });
   }
   if (kind === 'ALLOWABLE_STRESS') {
-    return inventoryRow({ ...common, classification: { kind }, dispositions: both(codeOnlyDisposition('CODE_STRESS_INPUT_ONLY')) });
+    return inventoryRow({
+      ...common,
+      classification: { kind },
+      dispositions: both(codeOnlyDisposition('CODE_STRESS_INPUT_ONLY')),
+    });
   }
   if (kind === 'HANGER') {
-    return inventoryRow({ ...common, classification: { kind }, dispositions: both(unsupportedDisposition('MODEL_HANGER_UNSUPPORTED')) });
+    return inventoryRow({
+      ...common,
+      classification: { kind },
+      dispositions: both(unsupportedDisposition('MODEL_HANGER_UNSUPPORTED')),
+    });
   }
   if (kind === 'FORCES_MOMENTS') {
-    return inventoryRow({ ...common, classification: { kind }, dispositions: both(unsupportedDisposition('MODEL_NODAL_FORCE_VECTOR_NOT_COMPILED')) });
+    return inventoryRow({
+      ...common,
+      classification: { kind },
+      dispositions: both(unsupportedDisposition('MODEL_NODAL_FORCE_VECTOR_NOT_COMPILED')),
+    });
   }
   if (kind === 'RESTRAINT') {
-    const classification = classifyInputXmlRestraint(feature.rawAttributes, element, segment);
+    const classification = classifyRestraint(feature.rawAttributes, element, segment);
     return inventoryRow({
       ...common,
       active: classification.active,
       classification,
-      dispositions: inputXmlRestraintDispositions(classification),
+      dispositions: restraintDispositions(classification),
     });
   }
   return inventoryRow({
@@ -132,7 +159,9 @@ function fieldInventory(element, segment) {
       targetIds: { nodeIds: [], segmentIds: [element.canonicalSegmentId] },
       sourceRecord: temperature,
       classification: {
-        field: 'TEMP_EXP_C1', sourceDisposition: temperature.disposition, canonicalValue: temperature.canonicalValue,
+        field: 'TEMP_EXP_C1',
+        sourceDisposition: temperature.disposition,
+        canonicalValue: temperature.canonicalValue,
       },
       dispositions: active ? both(exactDisposition()) : both(inactiveDisposition()),
     }));
@@ -181,14 +210,17 @@ function componentKindOf(element, segment) {
 function hasTeeSif(features) {
   return features.some((feature) => (
     String(feature.kind).toUpperCase() === 'SIF'
-      && SIF_TEE_CODES.has(inputXmlNumericAttribute(feature.rawAttributes, ['TYPE']))
+      && SIF_TEE_CODES.has(numericAttribute(feature.rawAttributes, ['TYPE']))
   ));
 }
 
-function componentDispositions(componentKind, canonicalStatus) {
-  const status = canonicalStatus === undefined ? 'RECONCILED' : canonicalStatus;
-  if (status !== 'RECONCILED') return both(invalidDisposition('MODEL_COMPONENT_SOURCE_UNRECONCILED'));
-  if (componentKind === 'STRAIGHT_PIPE' || componentKind === 'RIGID') return both(exactDisposition());
+function componentDispositions(componentKind, canonicalStatus = 'RECONCILED') {
+  if (canonicalStatus !== 'RECONCILED') {
+    return both(invalidDisposition('MODEL_COMPONENT_SOURCE_UNRECONCILED'));
+  }
+  if (componentKind === 'STRAIGHT_PIPE' || componentKind === 'RIGID') {
+    return both(exactDisposition());
+  }
   const limitation = componentKind === 'BEND'
     ? 'GENERIC_APPROX_BEND_STRAIGHT_CHORD'
     : componentKind === 'REDUCER'
@@ -196,11 +228,120 @@ function componentDispositions(componentKind, canonicalStatus) {
       : componentKind === 'TEE'
         ? 'GENERIC_APPROX_TEE_FRAME_BRANCH_NO_FLEXIBILITY'
         : null;
-  if (limitation === null) return both(unsupportedDisposition('MODEL_COMPONENT_TYPE_UNSUPPORTED'));
+  if (limitation === null) {
+    return both(unsupportedDisposition('MODEL_COMPONENT_TYPE_UNSUPPORTED'));
+  }
   return {
     [STRICT]: unsupportedDisposition(`MODEL_${componentKind}_EXACT_MECHANICS_UNAVAILABLE`),
     [APPROXIMATE]: approximationDisposition(limitation),
   };
+}
+
+function classifyRestraint(attributes, element, segment) {
+  const rawType = attribute(attributes, ['TYPE']);
+  const mutation = resolveRestraintTypeMutation(rawType);
+  const typeCode = mutation.typeCode;
+  const nodeId = normalizedNodeAttribute(attributes, ['NODE'])
+    ?? element.toNodeId
+    ?? element.fromNodeId
+    ?? null;
+  const direction = directionOf(attributes);
+  const gap = caesarOptionalNumber(attributes, ['GAP', 'GAP1']);
+  const friction = caesarOptionalNumber(attributes, ['FRIC_COEF', 'FRICTION', 'MU']);
+  const connectingNodeId = normalizedNodeAttribute(attributes, ['CNODE', 'CONNECTING_NODE', 'NODE2']);
+  const stiffness = caesarOptionalNumber(attributes, ['STIFF', 'STIFFNESS', 'K']);
+  const targetDofs = targetDofsOf(typeCode, direction);
+  const targetDof = targetDofs.length === RESTRAINT_DOFS.length ? 'ALL' : targetDofs[0] ?? null;
+  const active = rawType !== null || nodeId !== null;
+  return Object.freeze({
+    active,
+    rawType,
+    typeCode,
+    typeLabel: restraintTypeCodeLabel(typeCode),
+    mutation,
+    nodeId,
+    targetDof,
+    targetDofs: Object.freeze(targetDofs),
+    direction,
+    gapActive: finiteNonzero(gap),
+    frictionActive: finitePositive(friction),
+    connectingNodeActive: connectingNodeId !== null,
+    connectingNodeId,
+    finiteStiffnessActive: finitePositive(stiffness),
+    canonicalNodeRestraint: canonicalNodeRestraint(segment, nodeId),
+  });
+}
+
+function restraintDispositions(classification) {
+  if (!classification.active) return both(inactiveDisposition());
+  if (classification.typeCode === null || classification.typeLabel === null || classification.nodeId === null) {
+    return both(invalidDisposition('MODEL_RESTRAINT_SOURCE_INVALID'));
+  }
+  if (classification.gapActive) return both(nonlinearDisposition('MODEL_RESTRAINT_GAP_UNSUPPORTED'));
+  if (classification.frictionActive) return both(nonlinearDisposition('MODEL_RESTRAINT_FRICTION_UNSUPPORTED'));
+  if (classification.connectingNodeActive) {
+    return both(unsupportedDisposition('MODEL_RESTRAINT_CONNECTING_NODE_UNSUPPORTED'));
+  }
+  if (classification.finiteStiffnessActive) {
+    return both(unsupportedDisposition('MODEL_RESTRAINT_FINITE_STIFFNESS_UNSUPPORTED'));
+  }
+  if (classification.typeCode === '0') return both(exactDisposition());
+  if (GENERIC_LINEARIZED_UNILATERAL_CODES.has(classification.typeCode)) {
+    if (!classification.direction.valid || classification.targetDofs.length !== 1) {
+      return both(invalidDisposition('MODEL_RESTRAINT_DIRECTION_INVALID'));
+    }
+    return {
+      [STRICT]: nonlinearDisposition('MODEL_RESTRAINT_UNILATERAL_UNSUPPORTED'),
+      [APPROXIMATE]: approximationDisposition('GENERIC_APPROX_UNILATERAL_LINEARIZED'),
+    };
+  }
+  return both(unsupportedDisposition('MODEL_RESTRAINT_TYPE_NOT_COMPILED'));
+}
+
+function targetDofsOf(typeCode, direction) {
+  if (typeCode === '0') return [...RESTRAINT_DOFS];
+  if (!direction.valid || direction.dominantAxis === null) return [];
+  return [direction.dominantAxis];
+}
+
+function directionOf(attributes) {
+  const vector = [
+    numericAttribute(attributes, ['XCOSINE']),
+    numericAttribute(attributes, ['YCOSINE']),
+    numericAttribute(attributes, ['ZCOSINE']),
+  ];
+  if (vector.every((value) => value === null)) {
+    return Object.freeze({ vector: Object.freeze(vector), valid: false, dominantAxis: null });
+  }
+  if (!vector.every((value) => value !== null)) {
+    return Object.freeze({ vector: Object.freeze(vector), valid: false, dominantAxis: null });
+  }
+  const magnitude = Math.hypot(...vector);
+  if (!(magnitude > NUMERIC_TOLERANCE)) {
+    return Object.freeze({ vector: Object.freeze(vector), magnitude, valid: false, dominantAxis: null });
+  }
+  const unit = vector.map((value) => value / magnitude);
+  const absolute = unit.map(Math.abs);
+  const dominantIndex = absolute.indexOf(Math.max(...absolute));
+  return Object.freeze({
+    vector: Object.freeze(vector),
+    unit: Object.freeze(unit),
+    magnitude,
+    valid: Math.abs(magnitude - 1) <= 1e-9,
+    dominantAxis: ['UX', 'UY', 'UZ'][dominantIndex],
+  });
+}
+
+function canonicalNodeRestraint(segment, nodeId) {
+  if (!segment || nodeId === null) return null;
+  if (String(segment.startNodeId) === String(nodeId)) return 'START_NODE';
+  if (String(segment.endNodeId) === String(nodeId)) return 'END_NODE';
+  return 'UNBOUND_NODE';
+}
+
+function childNodeIds(attributes, element) {
+  const nodeId = normalizedNodeAttribute(attributes, ['NODE', 'NODE_NUM']);
+  return [nodeId, element.fromNodeId, element.toNodeId];
 }
 
 function inventoryRow(value) {
@@ -223,7 +364,9 @@ function inventoryRow(value) {
 function requireUniqueInventory(rows) {
   const ids = new Set();
   for (const row of rows) {
-    if (ids.has(row.inventoryId)) throw new TypeError(`InputXML feature inventory identity ${row.inventoryId} is duplicated.`);
+    if (ids.has(row.inventoryId)) {
+      throw new TypeError(`InputXML feature inventory identity ${row.inventoryId} is duplicated.`);
+    }
     ids.add(row.inventoryId);
   }
 }
@@ -232,8 +375,49 @@ function both(disposition) {
   return Object.freeze({ [STRICT]: disposition, [APPROXIMATE]: disposition });
 }
 
+function attribute(attributes, names) {
+  for (const name of names) {
+    const key = Object.keys(attributes ?? {}).find((candidate) => candidate.toLowerCase() === name.toLowerCase());
+    if (key !== undefined) {
+      const text = String(attributes[key] ?? '').trim();
+      return text.length > 0 ? text : null;
+    }
+  }
+  return null;
+}
+
+function numericAttribute(attributes, names) {
+  const value = attribute(attributes, names);
+  if (value === null) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function caesarOptionalNumber(attributes, names) {
+  const value = numericAttribute(attributes, names);
+  if (value === null) return null;
+  return Math.abs(value - CAESAR_UNSET_SENTINEL) < CAESAR_SENTINEL_TOLERANCE
+    ? null
+    : value;
+}
+
+function normalizedNodeAttribute(attributes, names) {
+  const value = attribute(attributes, names);
+  if (value === null) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? String(number) : value;
+}
+
 function finiteNumber(value) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function finitePositive(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value > NUMERIC_TOLERANCE;
+}
+
+function finiteNonzero(value) {
+  return typeof value === 'number' && Number.isFinite(value) && Math.abs(value) > NUMERIC_TOLERANCE;
 }
 
 function uniqueAscii(values) {
