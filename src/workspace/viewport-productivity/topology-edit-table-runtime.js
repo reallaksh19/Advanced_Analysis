@@ -9,6 +9,10 @@ import {
   reduceTopologyEditTableViewState,
 } from '../topology-edit/table/topology-edit-table-view-state.js';
 import { TopologyEditValidationWorkerClient } from '../topology-edit/professional/topology-edit-validation-worker-client.js';
+import {
+  stageTopologyEditTeeReducerRelation,
+  stageTopologyEditValveReplacement,
+} from './topology-edit-table-engineering-runtime.js';
 import { renderTopologyEditTableGrid } from './topology-edit-table-grid-view.js';
 import { ensureTopologyEditTableStyles } from './topology-edit-table-styles.js';
 import {
@@ -140,6 +144,12 @@ export class TopologyEditTableRuntime {
     if (!action || !this.element?.contains(action)) return false;
     const kind = action.dataset.tableAction;
     if (kind === 'stage-pipe-length') return this.stagePipeLength(action.dataset.canonicalId);
+    if (kind === 'stage-valve-replacement') {
+      return stageTopologyEditValveReplacement(this, action.dataset.canonicalId);
+    }
+    if (kind === 'stage-tee-reducer-relation') {
+      return stageTopologyEditTeeReducerRelation(this, action.dataset.canonicalId);
+    }
     if (kind === 'preview') return this.previewBatch();
     if (kind === 'validate') return this.validatePreview();
     if (kind === 'apply') return this.applyBatch();
