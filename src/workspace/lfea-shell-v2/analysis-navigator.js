@@ -49,21 +49,26 @@ function importCapability(root) {
   const section = workbenchElement(root, 'section', 'lfea-shell-v2__blocked-capability');
   section.dataset.role = 'lfea-enriched-sjson-capability';
   section.dataset.status = 'BLOCKED';
+  const code = 'LFEA_ENRICHED_SJSON_PIPING_ADAPTER_NOT_WIRED';
+  const descriptionId = 'lfea-enriched-sjson-blocked-description';
+  const option = workbenchElement(root, 'button', null, 'Import EnrichedSjson');
+  option.type = 'button';
+  option.disabled = true;
+  option.dataset.role = 'lfea-enriched-sjson-import';
+  option.setAttribute('aria-describedby', descriptionId);
+  const description = workbenchElement(
+    root,
+    'p',
+    null,
+    'Workspace ingestion exists, but no EnrichedSjson-to-piping canonical-geometry adapter is wired to the linear piping FEA solver.',
+  );
+  description.id = descriptionId;
   section.append(
     workbenchElement(root, 'strong', null, 'EnrichedSjson → Piping FEA'),
     workbenchElement(root, 'span', null, 'Blocked'),
-    workbenchElement(
-      root,
-      'code',
-      null,
-      'LFEA_ENRICHED_SJSON_PIPING_ADAPTER_NOT_WIRED',
-    ),
-    workbenchElement(
-      root,
-      'p',
-      null,
-      'Workspace ingestion exists, but no EnrichedSjson-to-piping canonical-geometry adapter is wired to the linear piping FEA solver.',
-    ),
+    option,
+    workbenchElement(root, 'code', null, code),
+    description,
   );
   return section;
 }
