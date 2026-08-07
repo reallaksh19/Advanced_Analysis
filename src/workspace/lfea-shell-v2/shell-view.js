@@ -89,7 +89,8 @@ export class LfeaShellV2View {
       this.handlers,
       true,
     ));
-    section.append(legacyReviewSummary(this.rootElement, state.execution));
+    const reviewSummary = legacyReviewSummary(this.rootElement, state.execution);
+    if (reviewSummary) section.append(reviewSummary);
 
     this.rootElement.replaceChildren(section);
     restoreWorkbenchFocus(this.rootElement, focused);
@@ -139,10 +140,11 @@ export class LfeaShellV2View {
 }
 
 function legacyReviewSummary(root, execution) {
+  if (!execution) return null;
   const value = workbenchElement(root, 'pre');
   value.dataset.role = 'lfea-review-summary';
   value.className = 'lfea-shell-v2__contract-only';
-  value.textContent = execution ? JSON.stringify({
+  value.textContent = JSON.stringify({
     pipelineStatus: execution.status,
     failedStage: execution.failedStage,
     solverStatus: execution.result?.status ?? null,
@@ -151,6 +153,6 @@ function legacyReviewSummary(root, execution) {
     authorityPolicy: execution.authorityPolicy,
     equilibriumTotals: execution.result?.equilibriumTotals ?? null,
     energyConsistency: execution.result?.energyConsistency ?? null,
-  }, null, 2) : '';
+  }, null, 2);
   return value;
 }
