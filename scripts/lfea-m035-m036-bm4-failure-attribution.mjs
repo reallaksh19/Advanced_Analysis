@@ -4,10 +4,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { BM4_COMPARISON_POLICY, loadBm4CiiOutputCases1921 } from './lfea-m034-bm4-output-comparison.mjs';
 import { solveBm4M035FeatureCases } from './lfea-m035-bm4-feature-solve-runtime.mjs';
-import {
-  analyseM035M036Case,
-  solveBm4M035M036Combined,
-} from './lfea-m035-m036-bm4-integration-runtime.mjs';
+import { solveBm4M035M036Combined } from './lfea-m035-m036-bm4-integration-runtime.mjs';
 import {
   M035_BEND_SCORING_EXCLUDED_NODE_IDS,
   M035_LIFTOFF_CROSS_EFFECT_WATCH_NODE_IDS,
@@ -25,7 +22,8 @@ const CROSS_EFFECT = new Set([
   ...M035_NONLINEAR_SUPPORT_NODE_IDS,
   ...M035_LIFTOFF_CROSS_EFFECT_WATCH_NODE_IDS,
 ]);
-const HISTORY_COUNTERFACTUAL_RELEASES = Object.freeze(['20090', '21470']);
+const CASE19_HISTORY_AFFECTED_CASES = new Set(['SUS', 'EXP']);
+const HISTORY_OBSERVED_RELEASES = Object.freeze(['20090', '21470']);
 const REDUCER_ADJACENCY_EDGES = 1;
 
 function zeroDof() { return Object.fromEntries(DOFS.map((dof) => [dof, 0])); }
@@ -287,22 +285,6 @@ function normalizedSeverity(row) {
   const width = targetWidth(row);
   return width > 0 ? Math.abs(row.absoluteDifference) / width : Number.POSITIVE_INFINITY;
 }
-function forcedCase19HistoryAnalysis(combined) {
-  const normalState = new Map(combined.sustainedRun.convergedState.map((row) => [row.declarationId, row.status]));
-  const active = combined.inventory.unilateral
-    .filter((row) => normalState.get(row.declarationId) === 'ENGAGED')
-    .filter((row) => sourceNodeId(row.nodeId) !== '21470');
-  return analyseM035M036Case(
-    combined.authorities,
-    [
-      ...combined.inventory.base,
-      ...active.map((row) => row.constraintDeclaration).filter((row) => row !== null && row !== undefined),
-    ],
-    'BM4-M035-M036-SUS-HISTORY-SENSITIVITY',
-    false,
-    active.map((row) => row.prescribedMovement).filter((row) => row !== null && row !== undefined),
-  );
-}
 function unmatchedReferenceRows(snapshot, cii) {
   const result = [];
   const sourceNodes = new Set(snapshot.nodes.get('SUS').keys());
@@ -345,22 +327,13 @@ function unmatchedReferenceRows(snapshot, cii) {
 const cii = loadBm4CiiOutputCases1921();
 const m035 = solveBm4M035FeatureCases();
 const combined = solveBm4M035M036Combined();
-const historySustained = forcedCase19HistoryAnalysis(combined);
-const historyVariant = {
-  authorities: combined.authorities,
-  sustained: historySustained,
-  operating: combined.operating,
-};
 const m035Cases = compareSnapshot(featureSnapshot(m035), cii);
 const combinedSnapshot = featureSnapshot(combined);
 const combinedCases = compareSnapshot(combinedSnapshot, cii);
-const historyCases = compareSnapshot(featureSnapshot(historyVariant), cii);
 
 const m035Rows = allRows(m035Cases);
 const combinedRows = allRows(combinedCases);
-const historyRows = allRows(historyCases);
 const m035ByKey = new Map(m035Rows.map((row) => [rowKey(row), row]));
-const historyByKey = new Map(historyRows.map((row) => [rowKey(row), row]));
 
 const m035Displacement = m035Rows.filter((row) => row.family === 'displacement');
 const m035Forces = m035Rows.filter((row) => row.family !== 'displacement');
@@ -378,21 +351,19 @@ const failedRows = combinedRows.filter((row) => !row.passedTarget).map((row) => 
   const nodes = touchedNodes(row);
   const reducerDistanceEdges = distanceToSet(nodes, reducerNodes, adjacency, REDUCER_ADJACENCY_EDGES);
   const m035Sensitivity = sensitivity(row, m035ByKey.get(key));
-  const historySensitivity = row.caseLabel === 'SUS'
-    ? sensitivity(row, historyByKey.get(key))
-    : { material: false, movement: null, errorImprovement: null, variantPassed5pct: null };
+  const case19HistoryBoundary = CASE19_HISTORY_AFFECTED_CASES.has(row.caseLabel);
   const directNonlinearSupport = row.family === 'restraint' && NONLINEAR.has(String(row.identifier));
   const bendEndpointBoundary = nodes.some((nodeId) => BEND_EXCLUDED.has(nodeId));
   const contactSensitive = directNonlinearSupport || m035Sensitivity.material;
   const evidenceFlags = [
-    ...(historySensitivity.material ? ['CASE19_OBSERVED_21470_RELEASE_SENSITIVITY'] : []),
+    ...(case19HistoryBoundary ? ['CASE19_HISTORY_UNSERIALIZED_AFFECTS_CASE'] : []),
     ...(reducerDistanceEdges !== null ? [`REDUCER_WITHIN_${reducerDistanceEdges}_SOURCE_EDGES`] : []),
     ...(contactSensitive ? ['M036_CONTACT_LOAD_PATH_SENSITIVE'] : []),
     ...(bendEndpointBoundary ? ['BEND_ENDPOINT_OR_STATION_SEMANTICS_BOUNDARY'] : []),
     ...(!row.m035Scope.included ? [`PREDECLARED_SCOPE:${row.m035Scope.code}`] : []),
   ];
   let primaryCategory = 'UNEXPLAINED_MATCHED';
-  if (historySensitivity.material) primaryCategory = 'CASE19_HISTORY_SENSITIVE';
+  if (case19HistoryBoundary) primaryCategory = 'CASE19_HISTORY_UNRESOLVED';
   else if (reducerDistanceEdges !== null) primaryCategory = 'REDUCER_ADJACENT';
   else if (contactSensitive) primaryCategory = 'CONTACT_LOAD_PATH_SENSITIVE';
   else if (bendEndpointBoundary) primaryCategory = 'BEND_ENDPOINT_OR_STATION_SEMANTICS';
@@ -404,7 +375,7 @@ const failedRows = combinedRows.filter((row) => !row.passedTarget).map((row) => 
     reducerDistanceEdges,
     normalizedSeverity: normalizedSeverity(row),
     m035ToCombinedSensitivity: m035Sensitivity,
-    case19HistorySensitivity: historySensitivity,
+    case19HistoryBoundary,
   };
 });
 
@@ -417,14 +388,16 @@ const report = {
   policy: {
     targetTolerancePercent: BM4_COMPARISON_POLICY.targetTolerancePercent,
     reducerAdjacencyEdges: REDUCER_ADJACENCY_EDGES,
-    case19HistoryCounterfactual: {
-      authoritative: false,
-      purpose: 'Sensitivity only: reproduce CAESAR CASE 19 observed released targets without asserting unavailable load-case history.',
-      releasedTargets: HISTORY_COUNTERFACTUAL_RELEASES,
-      classificationRule: 'Current failed SUS row must move toward CAESAR by at least one row-specific 5% target-width.',
+    case19HistoryBoundary: {
+      authoritativeHistoryAvailable: false,
+      observedCaesarReleasedTargets: HISTORY_OBSERVED_RELEASES,
+      normalCombinedReleasedTargets: ['20090'],
+      affectedCases: ['SUS', 'EXP'],
+      counterfactualStatus: 'BLOCKED_RECOVERY_NOT_USED',
+      reason: 'The supplied InputXML does not serialize the CAESAR CASE 19 history. Imposing the additional observed 21470 release produces a BLOCKED SUS execution, so no recovery from that counterfactual is accepted. SUS and derived EXP failures are withheld from mechanics fitting.',
     },
-    contactSensitivityRule: 'M035-bilateral to combined-M036 change must move a failed row toward CAESAR by at least one row-specific 5% target-width; direct nonlinear restraint rows are also contact-tagged.',
-    mechanicsChangeRule: 'Only UNEXPLAINED_MATCHED rows are eligible to motivate additional mechanics work. Other categories are evidence boundaries or already-attributed mechanics.',
+    contactSensitivityRule: 'For clean OPE discrimination, M035-bilateral to combined-M036 change must move a failed row toward CAESAR by at least one row-specific 5% target-width; direct nonlinear restraint rows are also contact-tagged.',
+    mechanicsChangeRule: 'Only UNEXPLAINED_MATCHED rows are eligible to motivate additional mechanics work. CASE19/EXP history-boundary, reducer-adjacent, contact-sensitive, bend/station-boundary, and unmatched CAESAR rows are not fit targets.',
   },
   evidence: {
     reducerNodes: [...reducerNodes].sort(),
@@ -432,7 +405,6 @@ const report = {
       SUS: combined.sustainedRun.convergedState.filter((row) => row.status === 'RELEASED').map((row) => sourceNodeId(row.nodeId)).sort(),
       OPE: combined.operatingRun.convergedState.filter((row) => row.status === 'RELEASED').map((row) => sourceNodeId(row.nodeId)).sort(),
     },
-    case19ObservedReleaseSensitivityState: HISTORY_COUNTERFACTUAL_RELEASES,
   },
   summary: {
     matchedRows: combinedRows.length,
