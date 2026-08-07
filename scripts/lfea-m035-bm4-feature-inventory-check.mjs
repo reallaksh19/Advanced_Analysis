@@ -58,28 +58,39 @@ const bends = normalized.segments.filter((row) => row.type === 'BEND').map((row)
   radius: row.meta.bendDeclaredRadius,
 }));
 const canonicalTeeSegments = normalized.segments.filter((row) => row.type === 'TEE');
-const teeSet = new Set(canonicalTeeSegments.map((row) => String(row.id)));
+const sifTaggedSegments = normalized.segments.filter((row) =>
+  Array.isArray(row.meta?.analysis?.sifs)
+  && row.meta.analysis.sifs.some((sif) => Number(sif.typeCode) === 3 || Number(sif.typeCode) === 5));
+const sifTaggedSet = new Set(sifTaggedSegments.map((row) => String(row.id)));
 const physicalTeeJunctions = normalized.nodes.flatMap((node) => {
   const junctionNodeId = String(node.id);
   const incidentSegmentIds = incidentIds(normalized, junctionNodeId);
   if (incidentSegmentIds.length !== 3) return [];
-  const taggedSegmentIds = incidentSegmentIds.filter((id) => teeSet.has(id));
+  const taggedSegmentIds = incidentSegmentIds.filter((id) => sifTaggedSet.has(id));
   if (taggedSegmentIds.length === 0) return [];
   return [{ junctionNodeId, incidentSegmentIds, taggedSegmentIds }];
 }).sort((a, b) => a.junctionNodeId.localeCompare(b.junctionNodeId));
 const assignedTags = new Set(physicalTeeJunctions.flatMap((row) => row.taggedSegmentIds));
-const teeTagsWithoutBranchTopology = canonicalTeeSegments
+const teeTagsWithoutBranchTopology = sifTaggedSegments
   .map((row) => String(row.id))
   .filter((id) => !assignedTags.has(id))
   .sort();
+const mixedBendSif = normalized.segments.find((row) => String(row.startNodeId) === '20690' && String(row.endNodeId) === '20700');
 const inlineReducers = detectInputXmlInlineReducerTransitions({ canonicalGeometry: normalized });
 const allSectionChangeNodes = sectionChangeNodes(normalized);
 const degree2SectionChangeNodes = allSectionChangeNodes.filter((row) => row.nodeDegree === 2);
 const branchSectionChangeNodes = allSectionChangeNodes.filter((row) => row.nodeDegree > 2);
 
-assert.equal(bends.length, 11, 'BM4 normalized geometry must expose the 11 M035 bend features.');
+assert.equal(bends.length, 12, 'BM4 normalized geometry must expose all 12 physical bend features.');
 assert.equal(teeTags.length, 7, 'BM4 source evidence currently contains seven tee/weldolet SIF tags.');
-assert.equal(canonicalTeeSegments.length, 7, 'All seven tee/weldolet-tagged spans must retain canonical TEE classification.');
+assert.equal(sifTaggedSegments.length, 7, 'All seven tee/weldolet SIF records must remain attached as canonical source evidence.');
+assert.equal(canonicalTeeSegments.length, 6, 'Six SIF-tagged spans are geometry-classified as TEE; the mixed 20690-20700 span remains BEND.');
+assert.ok(mixedBendSif, 'Mixed BEND+SIF span 20690-20700 must remain present.');
+assert.equal(mixedBendSif.type, 'BEND', 'Mixed BEND+SIF span 20690-20700 must retain bend geometry classification.');
+assert.ok(
+  mixedBendSif.meta.analysis.sifs.some((row) => Number(row.typeCode) === 3),
+  'Mixed BEND+SIF span 20690-20700 must retain type-3 SIF evidence independently of geometry classification.',
+);
 assert.deepEqual(
   physicalTeeJunctions.map((row) => row.junctionNodeId),
   ['20160', '20295'],
@@ -91,8 +102,8 @@ assert.ok(
 );
 assert.equal(
   assignedTags.size + teeTagsWithoutBranchTopology.length,
-  canonicalTeeSegments.length,
-  'Every canonical tee/SIF-tagged span must be classified exactly once as junction evidence or stress/source-only evidence.',
+  sifTaggedSegments.length,
+  'Every SIF-tagged span must be classified exactly once as junction evidence or stress/source-only evidence.',
 );
 assert.equal(teeTagsWithoutBranchTopology.length, 4, 'Four tee/SIF-tagged spans are not incident to a degree-3 tee junction and remain stress/source-only evidence.');
 assert.ok(
@@ -122,6 +133,7 @@ console.log(JSON.stringify({
   counts: {
     bends: bends.length,
     teeSifTags: teeTags.length,
+    sifTaggedSegments: sifTaggedSegments.length,
     canonicalTeeSegments: canonicalTeeSegments.length,
     physicalTeeJunctions: physicalTeeJunctions.length,
     teeTagsAssignedToJunctions: assignedTags.size,
