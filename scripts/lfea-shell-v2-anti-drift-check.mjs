@@ -14,6 +14,7 @@ const extraModules = [
   path.join(ROOT, 'scripts', 'lfea-shell-v2-store-fidelity-check.mjs'),
   path.join(ROOT, 'scripts', 'lfea-shell-v2-baseline-hash-check.mjs'),
   path.join(ROOT, 'e2e', 'lfea-shell-v2.spec.js'),
+  path.join(ROOT, 'vite.lfea.config.js'),
 ];
 
 for (const file of [...shellFiles, ...tokenFiles, ...extraModules]) {
@@ -58,6 +59,9 @@ assert.doesNotMatch(
 
 const vite = source('vite.config.js');
 assert.match(vite, /lfea:\s*fileURLToPath\(new URL\('\.\/lfea\.html'/u);
+const standaloneVite = source('vite.lfea.config.js');
+assert.match(standaloneVite, /lfea:\s*fileURLToPath\(new URL\('\.\/lfea\.html'/u);
+assert.match(standaloneVite, /outDir:\s*'dist-lfea'/u);
 const html = source('lfea.html');
 assert.match(html, /lfea-shell-v2\/standalone-entry\.js/u);
 
@@ -91,6 +95,7 @@ console.log(JSON.stringify({
   physicalLineLimit: 299,
   localNumericalFormatting: false,
   standaloneEntry: true,
+  standaloneProductionBuildConfig: true,
   embeddedEntryRetained: true,
   enrichedSjsonPipingAdapter: false,
 }));
