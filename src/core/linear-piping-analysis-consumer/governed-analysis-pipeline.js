@@ -19,11 +19,11 @@ export const GOVERNED_ANALYSIS_PIPELINE_STAGES = Object.freeze([
 ]);
 
 export class GovernedAnalysisPipelineError extends Error {
-  constructor(message, code, data = {}) {
+  constructor(message, code, data) {
     super(message);
     this.name = 'GovernedAnalysisPipelineError';
     this.code = code;
-    this.data = deepFreeze(structuredClone(data));
+    this.data = deepFreeze(structuredClone(data ?? {}));
   }
 }
 
@@ -35,12 +35,12 @@ export class GovernedAnalysisPipelineError extends Error {
  * custody/order contract. Runtime state is deliberately not retained in the
  * returned record; only the normalized result and downstream evidence survive.
  */
-export function runGovernedAnalysisPipeline({
-  input,
-  reference = null,
-  context = {},
-  stages,
-}) {
+export function runGovernedAnalysisPipeline(options) {
+  requireRecord(options, 'options');
+  const { input, stages } = options;
+  const reference = options.reference ?? null;
+  const context = options.context ?? Object.freeze({});
+
   requireRecord(stages, 'stages');
   for (const stage of GOVERNED_ANALYSIS_PIPELINE_STAGES) {
     requireFunction(stages[stage.toLowerCase()], `stages.${stage.toLowerCase()}`);
@@ -124,24 +124,26 @@ export function runGovernedAnalysisPipeline({
 /**
  * Creates the reusable InputXML implementation of the governed pipeline.
  *
- * By default this is hard-bound to the production pre-FEA APIs. The optional
- * `prefeaApi` injection exists only to make the orchestration independently
- * testable; callers that omit it cannot replace or skip diagnose/prepare/
- * authorize/solve.
+ * Production use is bound to the existing pre-FEA APIs. `prefeaApi` is an
+ * explicit test seam only; replacing it requires an affirmative caller value,
+ * and never changes the seven-stage orchestration contract.
  */
-export function createGovernedInputXmlPipelineStages({
-  ingest,
-  requestedProfileId,
-  requestedCaseIds,
-  diagnosticsOptions = {},
-  preparationOptions = {},
-  approval,
-  executeAuthorizedCases,
-  normalize,
-  compare,
-  report,
-  prefeaApi = null,
-}) {
+export function createGovernedInputXmlPipelineStages(options) {
+  requireRecord(options, 'options');
+  const {
+    ingest,
+    requestedProfileId,
+    requestedCaseIds,
+    approval,
+    executeAuthorizedCases,
+    normalize,
+    compare,
+    report,
+  } = options;
+  const diagnosticsOptions = options.diagnosticsOptions ?? Object.freeze({});
+  const preparationOptions = options.preparationOptions ?? Object.freeze({});
+  const prefeaApi = options.prefeaApi ?? null;
+
   requireFunction(ingest, 'ingest');
   requireText(requestedProfileId, 'requestedProfileId');
   requireStringArray(requestedCaseIds, 'requestedCaseIds');
