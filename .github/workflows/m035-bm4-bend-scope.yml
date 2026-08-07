@@ -56,7 +56,19 @@ jobs:
           node scripts/lfea-m035-bm4-scope-policy-check.mjs
 
       - name: B31 bend authority audit
-        run: node scripts/lfea-m035-bm4-bend-authority-check.mjs
+        shell: bash
+        run: |
+          set +e
+          node scripts/lfea-m035-bm4-bend-authority-check.mjs > /tmp/m035-bend-audit.log 2>&1
+          status=$?
+          {
+            echo '### M035 BM4 bend authority audit'
+            echo '```text'
+            cat /tmp/m035-bend-audit.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat /tmp/m035-bend-audit.log
+          exit "$status"
 
       - name: Existing B31 and bend regressions
         shell: bash
