@@ -9,12 +9,14 @@ export function renderLfeaCommandBar(root, state, model, handlers) {
     statusBadge(root, state.status),
     identityText(root, model.identity),
   );
+  if (state.progress) identity.append(progressText(root, state.progress));
 
   const actions = workbenchElement(root, 'div', 'lfea-shell-v2__command-actions');
   actions.append(
     importControl(root, handlers),
     action(root, 'Run', 'lfea-run', handlers.onRun, !model.commands.canRun),
     action(root, 'Cancel', 'lfea-cancel-run', handlers.onCancelRun, !model.commands.canCancel),
+    action(root, 'Benchmark', 'lfea-benchmark', handlers.onBenchmark, false),
     action(root, 'Undo', 'lfea-undo', handlers.onUndo, !model.commands.canUndo),
     action(root, 'Redo', 'lfea-redo', handlers.onRedo, !model.commands.canRedo),
     resultMode(root, state, handlers),
@@ -47,6 +49,18 @@ export function renderLfeaCommandBar(root, state, model, handlers) {
 function statusBadge(root, status) {
   const value = workbenchElement(root, 'output', 'lfea-workbench__status', status);
   value.dataset.status = status;
+  value.setAttribute('aria-live', 'polite');
+  return value;
+}
+
+function progressText(root, progress) {
+  const value = workbenchElement(
+    root,
+    'output',
+    'lfea-workbench__progress',
+    `${progress.stage} ${progress.index}/${progress.total}`,
+  );
+  value.setAttribute('role', 'status');
   value.setAttribute('aria-live', 'polite');
   return value;
 }
