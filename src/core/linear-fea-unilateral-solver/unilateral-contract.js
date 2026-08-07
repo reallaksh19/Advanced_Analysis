@@ -53,6 +53,41 @@ export function compareDeclarationId(left, right) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
+function contactConstraint({ declarationId, nodeId, dof, sense, gap }) {
+  const contactValue = -sense * gap;
+  if (contactValue === 0) {
+    return deepFreeze({
+      constraintDeclaration: deepFreeze({
+        declarationId,
+        kind: 'NODAL_RESTRAINT',
+        nodeId,
+        dof,
+        behavior: 'FIXED',
+      }),
+      prescribedMovement: null,
+      contactValue,
+    });
+  }
+  const slotId = `${declarationId}::CONTACT`;
+  return deepFreeze({
+    constraintDeclaration: deepFreeze({
+      declarationId: slotId,
+      kind: 'NODAL_RESTRAINT',
+      nodeId,
+      dof,
+      behavior: 'PRESCRIBED_SLOT',
+    }),
+    prescribedMovement: deepFreeze({
+      prescribedSlotId: slotId,
+      nodeId,
+      dof,
+      value: contactValue,
+      declarationId,
+    }),
+    contactValue,
+  });
+}
+
 export function requireUnilateralDeclaration(value, field = 'unilateral') {
   if (!isPlainRecord(value)) fail(`${field} must be a plain record.`);
   const declarationId = requireIdentity(value.declarationId, `${field}.declarationId`);
@@ -64,13 +99,9 @@ export function requireUnilateralDeclaration(value, field = 'unilateral') {
   const frictionCoefficient = value.frictionCoefficient === undefined || value.frictionCoefficient === null
     ? null
     : requireNonNegative(value.frictionCoefficient, `${field}.frictionCoefficient`);
-  const constraintDeclaration = deepFreeze({
-    declarationId,
-    kind: 'NODAL_RESTRAINT',
-    nodeId,
-    dof: sense.dof,
-    behavior: 'FIXED',
-  });
+  const initiallyEngaged = value.initiallyEngaged === undefined ? true : value.initiallyEngaged;
+  if (typeof initiallyEngaged !== 'boolean') fail(`${field}.initiallyEngaged must be boolean.`);
+  const contact = contactConstraint({ declarationId, nodeId, dof: sense.dof, sense: sense.sense, gap });
   return deepFreeze({
     declarationId,
     nodeId,
@@ -78,8 +109,11 @@ export function requireUnilateralDeclaration(value, field = 'unilateral') {
     dof: sense.dof,
     sense: sense.sense,
     gap,
+    contactValue: contact.contactValue,
+    initiallyEngaged,
     frictionCoefficient,
-    constraintDeclaration,
+    constraintDeclaration: contact.constraintDeclaration,
+    prescribedMovement: contact.prescribedMovement,
   });
 }
 
