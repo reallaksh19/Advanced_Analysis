@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - m035-m036-bm4-integration
+      - agent/m035-bm4-bend-scope-isolation
   workflow_dispatch:
 
 permissions:
@@ -31,6 +32,7 @@ jobs:
           node --check scripts/lfea-m035-m036-bm4-integration-runtime.mjs
           node --check scripts/lfea-m035-m036-bm4-integration-check.mjs
           node --check scripts/lfea-m035-m036-bm4-comparison.mjs
+          node --check scripts/lfea-m035-m036-bm4-failure-attribution.mjs
 
       - name: Combined M035 M036 BM4 qualification
         shell: bash
@@ -58,6 +60,19 @@ jobs:
           fi
           exit "$status"
 
+      - name: Row-level remaining-failure attribution
+        shell: bash
+        run: |
+          set +e
+          node scripts/lfea-m035-m036-bm4-failure-attribution.mjs > /tmp/m035-m036-attribution.log 2>&1
+          status=$?
+          cat /tmp/m035-m036-attribution.log
+          if [ "$status" -ne 0 ]; then
+            message="$(tr '\n' ' ' < /tmp/m035-m036-attribution.log | head -c 3500)"
+            echo "::error file=scripts/lfea-m035-m036-bm4-failure-attribution.mjs,line=1,title=M035 M036 BM4 failure attribution::${message}"
+          fi
+          exit "$status"
+
       - name: Regression M035 focused feature solve
         run: node scripts/lfea-m035-bm4-feature-solve-check.mjs
 
@@ -81,6 +96,8 @@ jobs:
           path: |
             /tmp/m035-m036-integration.log
             /tmp/m035-m036-comparison.log
+            /tmp/m035-m036-attribution.log
             reports/m035-m036-bm4-cases-19-20-21.json
+            reports/m035-m036-bm4-failure-attribution.json
           if-no-files-found: warn
           retention-days: 14
