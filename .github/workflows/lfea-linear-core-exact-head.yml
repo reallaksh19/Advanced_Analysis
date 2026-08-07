@@ -3,12 +3,15 @@ name: lfea-linear-core-exact-head
 on:
   pull_request:
     paths:
+      - 'package.json'
       - 'src/core/centerline-beam-fea/**'
       - 'src/core/linear-fea-*/**'
       - 'src/core/linear-piping-analysis-consumer/**'
       - 'scripts/lfea-b1-conditioning-check.mjs'
       - 'scripts/lfea-linear-core-exact-head-evidence.mjs'
       - 'scripts/linear-piping-inputxml-unit-normalization-check.mjs'
+      - 'scripts/lfea-unilateral-*.mjs'
+      - 'scripts/lfea-m036-*.mjs'
       - '.github/workflows/lfea-linear-core-exact-head.yml'
 
 permissions:
@@ -42,7 +45,7 @@ jobs:
           git diff --name-only "$merge_base" "${{ github.event.pull_request.head.sha }}" > /tmp/lfea-linear-core-paths.txt
           while IFS= read -r changed; do
             case "$changed" in
-              src/core/centerline-beam-fea/*|src/core/linear-fea-*/*|src/core/linear-piping-analysis-consumer/*|scripts/lfea-b1-conditioning-check.mjs|scripts/lfea-linear-core-exact-head-evidence.mjs|scripts/linear-piping-inputxml-unit-normalization-check.mjs|.github/workflows/lfea-linear-core-exact-head.yml) ;;
+              package.json|src/core/centerline-beam-fea/*|src/core/linear-fea-*/*|src/core/linear-piping-analysis-consumer/*|scripts/lfea-b1-conditioning-check.mjs|scripts/lfea-linear-core-exact-head-evidence.mjs|scripts/linear-piping-inputxml-unit-normalization-check.mjs|scripts/lfea-unilateral-*.mjs|scripts/lfea-m036-*.mjs|.github/workflows/lfea-linear-core-exact-head.yml) ;;
               *) echo "Forbidden changed path for the linear-core qualification slice: $changed"; exit 1 ;;
             esac
           done < /tmp/lfea-linear-core-paths.txt
@@ -89,6 +92,9 @@ jobs:
 
       - name: Fixed-input commercial benchmark regression
         run: npm run check:lfea-bm1-cii-comparison
+
+      - name: M036 unilateral contact qualification
+        run: npm run check:lfea-unilateral
 
       - name: Retain exact-head JSON and CSV evidence
         if: always()
