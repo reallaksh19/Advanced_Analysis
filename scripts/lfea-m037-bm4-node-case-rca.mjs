@@ -11,6 +11,7 @@ const SOURCE_AUDIT_PATH = `${REPORT_DIR}/m037-bm4-source-level-ope-audit.json`;
 const OUTPUT_PATH = `${REPORT_DIR}/m037-bm4-node-case-rca.json`;
 const CASES = Object.freeze(['SUS', 'OPE', 'EXP']);
 const FRICTION_DISTANCE_LIMIT = 2;
+const lexical = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
 function rowKey(row) {
   return `${row.caseLabel}|${row.family}|${row.identifier}|${row.end ?? ''}|${row.field}`;
@@ -68,7 +69,7 @@ function frictionSupports(geometry, execution) {
       coulombCapacity: mu * Math.max(normalReactionUy, 0),
     }));
   }
-  return Object.freeze(result.sort((a, b) => a.nodeId.localeCompare(b.nodeId, 'en')));
+  return Object.freeze(result.sort((a, b) => lexical(a.nodeId, b.nodeId)));
 }
 
 function nearestFriction(row, supports, graph) {
@@ -132,7 +133,7 @@ function nodeSummary(rows, categoryOf) {
   }).sort((a, b) => (
     b.failedRowsTouchingNode - a.failedRowsTouchingNode
     || b.worst.normalizedSeverity - a.worst.normalizedSeverity
-    || a.nodeId.localeCompare(b.nodeId, 'en')
+    || lexical(a.nodeId, b.nodeId)
   ));
 }
 
