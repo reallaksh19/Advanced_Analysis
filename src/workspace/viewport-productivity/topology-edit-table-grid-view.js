@@ -47,6 +47,7 @@ export function renderTopologyEditTableGrid(runtime) {
       ${rows.length > MAX_RENDERED_ROWS ? `<p class="topology-edit-table__notice">Showing first ${MAX_RENDERED_ROWS} filtered rows. Refine the filter to inspect more.</p>` : ''}
       ${primary ? editorHtml(primary, staged.get(primary.identity.canonicalId)) : '<p class="topology-edit-table__notice">Select an exact canonical row to inspect or edit it.</p>'}
       ${stagedPanel(runtime)}
+      ${validationPanel(runtime)}
       <footer class="topology-edit-table__workflow">
         <button type="button" data-table-action="preview" ${!runtime.batchPlan || runtime.staleResult || runtime.pending ? 'disabled' : ''}>Preview</button>
         <button type="button" data-table-action="validate" ${!runtime.preview || runtime.pending ? 'disabled' : ''}>Validate</button>
@@ -96,6 +97,19 @@ function stagedPanel(runtime) {
   return `<section class="topology-edit-table__staged"><strong>${intents.length} staged change(s)</strong><ul>${rows}</ul>${stale}</section>`;
 }
 
+function validationPanel(runtime) {
+  const validation = runtime.validation;
+  if (!validation) return '';
+  const blockers = validation.blockingDiagnostics ?? [];
+  if (!blockers.length) {
+    return '<section class="topology-edit-table__staged"><strong>Validation passed</strong><span>No new HIGH findings in the certified candidate.</span></section>';
+  }
+  return `<section class="topology-edit-table__conflict" data-table-validation-blockers><strong>${blockers.length} blocking validation issue(s)</strong><ul>${blockers.map((row) => `<li>${escapeHtml(diagnosticCode(row))}: ${escapeHtml(row.message ?? row.details?.message ?? 'Candidate introduces a blocking HIGH finding.')}</li>`).join('')}</ul></section>`;
+}
+
+function diagnosticCode(row) {
+  return row.issueKind ?? row.kind ?? row.code ?? row.diagnosticKind ?? 'HIGH';
+}
 function sortHeader(key, label, state) {
   const active = state.sortKey === key;
   const marker = active ? (state.sortDirection === 'ASC' ? ' ▲' : ' ▼') : '';
@@ -118,6 +132,7 @@ function shortHash(valueInput) {
 function publishEvidence(runtime, visibleCount, renderedCount) {
   const host = runtime.controller.hostElement;
   if (!host) return;
+  const blockers = runtime.validation?.blockingDiagnostics ?? [];
   host.dataset.topologyEditTableProjectionHash = runtime.projection.projectionHash;
   host.dataset.topologyEditTableCanonicalHash = runtime.projection.authority.canonicalTopologyHash;
   host.dataset.topologyEditTableVisibleCount = String(visibleCount);
@@ -127,6 +142,8 @@ function publishEvidence(runtime, visibleCount, renderedCount) {
   host.dataset.topologyEditTablePlanHash = runtime.batchPlan?.planHash ?? '';
   host.dataset.topologyEditTablePreviewHash = runtime.preview?.previewHash ?? '';
   host.dataset.topologyEditTableValidationHash = runtime.validation?.tableValidationHash ?? '';
+  host.dataset.topologyEditTableValidationStatus = runtime.validation?.status ?? '';
+  host.dataset.topologyEditTableValidationBlockers = blockers.map(diagnosticCode).join(',');
   host.dataset.topologyEditTableTransactionHash = runtime.transaction?.tableTransactionHash ?? '';
   host.dataset.topologyEditTableStaleDisposition = runtime.staleResult?.disposition ?? '';
 }
