@@ -4,15 +4,24 @@ import {
   assertContinueRouteCandidate,
   recreateContinueRouteCandidate,
 } from './topology-edit-continue-route-candidate.js';
-import { assertContinueRoutePlan } from './topology-edit-continue-route-plan.js';
+import { assertContinueRoutePlan, CONTINUE_ROUTE_PLAN_SCHEMA } from './topology-edit-continue-route-plan.js';
+import {
+  assertContinueRouteFittedPlan,
+  CONTINUE_ROUTE_FITTED_PLAN_SCHEMA,
+} from './topology-edit-continue-route-fitted-plan.js';
 
-export const CONTINUE_ROUTE_PREVIEW_SCHEMA = 'TopologyEditContinueRoutePreview.v1';
-export const CONTINUE_ROUTE_VALIDATION_SCHEMA = 'TopologyEditContinueRouteValidation.v1';
-export const CONTINUE_ROUTE_TRANSACTION_SCHEMA = 'TopologyEditContinueRouteTransaction.v1';
-export const CONTINUE_ROUTE_CANCEL_SCHEMA = 'TopologyEditContinueRouteCancel.v1';
+export const CONTINUE_ROUTE_PREVIEW_SCHEMA = 'TopologyEditContinueRoutePreview.v2';
+export const CONTINUE_ROUTE_VALIDATION_SCHEMA = 'TopologyEditContinueRouteValidation.v2';
+export const CONTINUE_ROUTE_TRANSACTION_SCHEMA = 'TopologyEditContinueRouteTransaction.v2';
+export const CONTINUE_ROUTE_CANCEL_SCHEMA = 'TopologyEditContinueRouteCancel.v2';
 
 function fail(message, Constructor = RangeError) {
   throw new Constructor(`TopologyEditContinueRouteTransaction: ${message}`);
+}
+function executablePlan(value) {
+  if (value?.schema === CONTINUE_ROUTE_FITTED_PLAN_SCHEMA) return assertContinueRouteFittedPlan(value);
+  if (value?.schema === CONTINUE_ROUTE_PLAN_SCHEMA) return assertContinueRoutePlan(value);
+  fail('plan is not a Continue Route raw or fitted plan.', TypeError);
 }
 function assertSession(value) {
   if (!(value instanceof TopologyEditCertifiedSession)) fail('session must be a TopologyEditCertifiedSession.', TypeError);
@@ -40,7 +49,7 @@ function assertCurrentPreview(session, preview) {
 }
 
 export function createContinueRoutePreview({ plan: input, candidate: candidateInput } = {}) {
-  const plan = assertContinueRoutePlan(input);
+  const plan = executablePlan(input);
   const candidate = assertContinueRouteCandidate(candidateInput);
   if (candidate.planHash !== plan.planHash) fail('candidate differs from plan.');
   const material = {
@@ -49,6 +58,7 @@ export function createContinueRoutePreview({ plan: input, candidate: candidateIn
     candidateHash: candidate.candidateHash,
     segmentCount: candidate.segmentCount,
     nodeCount: candidate.nodeCount,
+    bendCount: candidate.bendCount,
     commandCount: candidate.commandCount,
     priorSessionVersion: candidate.priorSessionVersion,
     priorJournalHash: candidate.priorJournalHash,
@@ -96,7 +106,7 @@ export async function executeContinueRouteTransaction({
   preview: previewInput, validation: validationInput, catalogue,
 } = {}) {
   const session = assertSession(sessionInput);
-  const plan = assertContinueRoutePlan(input);
+  const plan = executablePlan(input);
   const candidate = assertContinueRouteCandidate(candidateInput);
   const preview = assertContinueRoutePreview(previewInput);
   const validation = assertContinueRouteValidation(validationInput);
@@ -124,6 +134,7 @@ export async function executeContinueRouteTransaction({
     candidateHash: recreated.candidateHash,
     segmentCount: recreated.segmentCount,
     nodeCount: recreated.nodeCount,
+    bendCount: recreated.bendCount,
     commandCount: recreated.commandCount,
     priorSessionVersion: prior.sessionVersion,
     priorJournalHash: prior.journalHash,
@@ -138,7 +149,8 @@ export async function executeContinueRouteTransaction({
 export function assertContinueRouteTransaction(value) {
   if (value?.schema !== CONTINUE_ROUTE_TRANSACTION_SCHEMA) fail(`transaction must use ${CONTINUE_ROUTE_TRANSACTION_SCHEMA}.`, TypeError);
   const material = { ...value }; delete material.transactionHash;
-  if (semanticHash(material) !== value.transactionHash || value.commandCount !== value.segmentCount * 2
+  if (semanticHash(material) !== value.transactionHash
+    || value.commandCount !== value.segmentCount * 2 + value.bendCount
     || value.nodeCount !== value.segmentCount || value.commandIds?.length !== value.commandCount) {
     fail('transaction payload differs from immutable authority.');
   }

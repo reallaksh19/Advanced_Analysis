@@ -2,6 +2,7 @@
 import { deepFreeze } from '../../core/shared-piping-model/index.js';
 import { deterministicTopologyEditId } from './topology-edit-command-contract.js';
 import { assertResolvedTopologyEditCommand } from './topology-edit-command-resolver.js';
+import { appendTopologyEditEdgeBendDefinition } from './topology-edit-bend-edge-crosswalk.js';
 import {
   applyTopologyEditInlineComponent,
 } from './topology-edit-inline-component-command.js';
@@ -213,7 +214,7 @@ function addBendDefinition(topology, command) {
     angleDeg: command.payload.angleDeg, radiusAuthority: command.payload.radiusAuthority };
   for (const arm of arms) {
     const index = exactIndex(edges, arm.id, 'bend arm');
-    edges[index] = { ...edges[index], bendDefinition: definition };
+    edges[index] = appendTopologyEditEdgeBendDefinition(edges[index], definition);
   }
   const bend = { id, nodeId: node.id, edgeIds: [...command.payload.edgeIds],
     position: { ...node.position }, radiusMm: command.payload.radiusMm,
