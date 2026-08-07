@@ -21,7 +21,14 @@
       "type": "TEE",
       "sourcePath": "/q3/T-001",
       "nativeParams": { "startPoint": [-500, 0, 0], "endPoint": [500, 0, 0], "center": [0, 0, 0], "branchPoints": [[0, 300, 0]], "bore": 150, "outerDiameter": 168.3 },
-      "attributes": { "TYPE": "TEE", "LINE_ID": "Q3-L100", "BRANCH_ID": "Q3-L100/RUN", "NOMINAL_BORE_MM": 150, "BORE": 150, "OUTSIDE_DIAMETER_MM": 168.3, "RUN_DN": 150, "BRANCH_DN": 100, "BRANCH_ANGLE": 90 }
+      "attributes": {
+        "TYPE": "TEE", "LINE_ID": "Q3-L100", "BRANCH_ID": "Q3-L100/RUN",
+        "NOMINAL_BORE_MM": 150, "BORE": 150, "OUTSIDE_DIAMETER_MM": 168.3,
+        "RUN_DN": 150, "BRANCH_DN": 100, "BRANCH_ANGLE": 90,
+        "TOPOLOGY_EDIT_RELATION_POLICY": "UNDECLARED",
+        "TOPOLOGY_EDIT_BRANCH_PORT_KEY": "",
+        "TOPOLOGY_EDIT_REDUCER_RECORD_ID": ""
+      }
     },
     {
       "id": "P-RUN-B",
@@ -43,7 +50,11 @@
           "catalogueSourceHash": "sha256:q3-reducers-source-v1",
           "catalogueRecordId": "RED-100-80",
           "catalogueRecordHash": "sha256:q3-red-100-80",
-          "catalogueSourceReference": { "documentId": "Q3-REDUCERS", "revision": "R1", "path": "/100/80" }
+          "catalogueSourceReference": { "documentId": "Q3-REDUCERS", "revision": "R1", "path": "/100/80" },
+          "componentType": "REDUCER",
+          "fromNominalSizeMm": 100,
+          "toNominalSizeMm": 80,
+          "vendorCatalogueToken": "KEEP-REDUCER-CATALOGUE-OPAQUE"
         },
         "vendorOpaqueNested": { "code": "KEEP-REDUCER-OPAQUE" }
       },
@@ -62,8 +73,38 @@
       "name": "Q3 M06 gate valve DN80",
       "type": "VALVE",
       "sourcePath": "/q3/V-M06",
-      "nativeParams": { "startPoint": [0, 2600, 0], "endPoint": [0, 2800, 0], "center": [0, 2700, 0], "bore": 80, "outerDiameter": 88.9 },
-      "attributes": { "TYPE": "VALVE", "LINE_ID": "Q3-L100", "BRANCH_ID": "Q3-L100/BRANCH", "NOMINAL_BORE_MM": 80, "BORE": 80, "OUTSIDE_DIAMETER_MM": 88.9, "VALVE_TYPE": "GATE", "PIPING_CLASS": "PCL-80", "PRESSURE_CLASS": "150", "END_CONNECTION_FROM": "FLANGED", "END_CONNECTION_TO": "FLANGED", "FACE_TO_FACE_MM": 200 }
+      "nativeParams": {
+        "startPoint": [0, 2600, 0], "endPoint": [0, 2800, 0], "center": [0, 2700, 0], "bore": 80, "outerDiameter": 88.9,
+        "catalogue": {
+          "catalogueHash": "sha256:q3-valves-v1",
+          "catalogueSourceHash": "sha256:q3-valves-source-v1",
+          "catalogueRecordId": "GATE-DN80-C150",
+          "catalogueRecordHash": "sha256:q3-gate-80-150",
+          "catalogueSourceReference": { "documentId": "Q3-VALVES", "revision": "R1", "path": "/GATE/80/150" },
+          "componentType": "VALVE",
+          "nominalSizeMm": 80,
+          "outsideDiameterMm": 88.9,
+          "pipingClass": "PCL-80",
+          "pressureClass": "150",
+          "materialSpecification": "A216-WCB",
+          "componentMassKg": 20,
+          "endConnectionFrom": "FLANGED",
+          "endConnectionTo": "FLANGED",
+          "valveType": "GATE",
+          "valveFaceToFaceMm": 200,
+          "vendorCatalogueToken": "KEEP-VALVE-CATALOGUE-OPAQUE"
+        }
+      },
+      "attributes": {
+        "TYPE": "VALVE", "LINE_ID": "Q3-L100", "BRANCH_ID": "Q3-L100/BRANCH",
+        "NOMINAL_BORE_MM": 80, "BORE": 80, "OUTSIDE_DIAMETER_MM": 88.9,
+        "VALVE_TYPE": "GATE", "PIPING_CLASS": "PCL-80", "PRESSURE_CLASS": "150",
+        "MATERIAL_SPECIFICATION": "A216-WCB", "COMPONENT_WEIGHT_KG": 20,
+        "END_CONNECTION_FROM": "FLANGED", "END_CONNECTION_TO": "FLANGED",
+        "FACE_TO_FACE_MM": 200,
+        "TOPOLOGY_EDIT_LENGTH_AUTHORITY": "SOURCE_FACE_TO_FACE",
+        "TOPOLOGY_EDIT_INSERTION_DIRECTION": "FROM_TO"
+      }
     },
     {
       "id": "P-TAIL",
