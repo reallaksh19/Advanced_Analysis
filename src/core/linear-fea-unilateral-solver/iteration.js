@@ -49,13 +49,17 @@ function statusSnapshot(unilateral, engaged, frozen) {
   })));
 }
 
-function activeConstraintDeclarations(baseDeclarations, unilateral, engaged) {
-  return [
-    ...baseDeclarations,
-    ...unilateral
-      .filter((declaration) => engaged.get(declaration.declarationId) === true)
-      .map((declaration) => declaration.constraintDeclaration),
-  ];
+function activeContactState(baseDeclarations, unilateral, engaged) {
+  const active = unilateral.filter((declaration) => engaged.get(declaration.declarationId) === true);
+  return deepFreeze({
+    constraintDeclarations: [
+      ...baseDeclarations,
+      ...active.map((declaration) => declaration.constraintDeclaration),
+    ],
+    prescribedMovements: active
+      .map((declaration) => declaration.prescribedMovement)
+      .filter((movement) => movement !== null),
+  });
 }
 
 function oscillatorList(unilateral, flipCounts) {
@@ -81,14 +85,14 @@ export function compileUnilateralSolverExecution({
   const acceptedPolicy = resolveUnilateralPolicy(policy, normalized.length);
   const limitations = unilateralLimitations(normalized);
 
-  const engaged = new Map(normalized.map((declaration) => [declaration.declarationId, true]));
+  const engaged = new Map(normalized.map((declaration) => [declaration.declarationId, declaration.initiallyEngaged]));
   const flipCounts = new Map(normalized.map((declaration) => [declaration.declarationId, 0]));
   const frozen = new Set();
   const trace = [];
 
   for (let iteration = 0; iteration < acceptedPolicy.maxIterations; iteration += 1) {
-    const activeDeclarations = activeConstraintDeclarations(base, normalized, engaged);
-    const execution = requireExecution(solve(activeDeclarations));
+    const active = activeContactState(base, normalized, engaged);
+    const execution = requireExecution(solve(active.constraintDeclarations, active));
     const before = statusSnapshot(normalized, engaged, frozen);
     const checked = checkSupportStatus({
       execution,
