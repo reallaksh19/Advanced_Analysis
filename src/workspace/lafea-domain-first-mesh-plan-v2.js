@@ -11,7 +11,7 @@ export const LAFEA_DOMAIN_FIRST_MESH_PLAN_POLICY_DISPOSITIONS =
 const KEYS = Object.freeze([
   'schema', 'stageId', 'intentHash', 'capabilityHash', 'qualificationHash',
   'producerId', 'producerRevision', 'sourceHash', 'analysisDomainHash',
-  'analysisGeometryHash', 'meshProfileHash', 'elementFamily',
+  'analysisGeometryHash', 'meshProfileHash', 'elementFamily', 'plannedMeshHash',
   'estimatedNodes', 'estimatedElements', 'estimatedDofs', 'boundaryCornerCount',
   'characteristicLengthMin', 'characteristicLengthMedian',
   'characteristicLengthMax', 'observedAdjacentSizeRatioMax',
@@ -38,6 +38,7 @@ export function createLafeaDomainFirstMeshPlanV2(value) {
     analysisGeometryHash: sha(value.analysisGeometryHash, 'ANALYSIS_GEOMETRY_HASH'),
     meshProfileHash: canonicalLafeaMeshProfileParentHash(value.meshProfileHash),
     elementFamily: 'T6',
+    plannedMeshHash: sha(value.plannedMeshHash, 'PLANNED_MESH_HASH'),
     estimatedNodes: integer(value.estimatedNodes, 'ESTIMATED_NODES'),
     estimatedElements: integer(value.estimatedElements, 'ESTIMATED_ELEMENTS'),
     estimatedDofs: integer(value.estimatedDofs, 'ESTIMATED_DOFS'),
@@ -88,6 +89,22 @@ export function validateLafeaDomainFirstMeshPlanV2(value, intent) {
   }
   if (JSON.stringify(plan.refinementFeatureIds) !== JSON.stringify(intent.refinementFeatureIds)) {
     fail('LAFEA_MP3_PLAN_REFINEMENT_FEATURES_MISMATCH');
+  }
+  const expectedReasons = [];
+  if (plan.estimatedNodes > intent.maximumNodes) expectedReasons.push('NODE_LIMIT_EXCEEDED');
+  if (plan.estimatedElements > intent.maximumElements) expectedReasons.push('ELEMENT_LIMIT_EXCEEDED');
+  if (plan.estimatedDofs > intent.maximumEstimatedDofs) expectedReasons.push('DOF_LIMIT_EXCEEDED');
+  if (plan.observedAdjacentSizeRatioMax > intent.growthLimit) expectedReasons.push('GROWTH_LIMIT_EXCEEDED');
+  if (JSON.stringify([...expectedReasons].sort()) !== JSON.stringify(plan.blockingReasons)) {
+    fail('LAFEA_MP3_PLAN_BLOCKING_REASONS_INVALID');
+  }
+  const resourceBlocked = expectedReasons.some((row) => /LIMIT_EXCEEDED$/u.test(row));
+  if (resourceBlocked !== (plan.resourceDisposition === 'BLOCK')) {
+    fail('LAFEA_MP3_PLAN_RESOURCE_DISPOSITION_INVALID');
+  }
+  const policyBlocked = expectedReasons.length > 0;
+  if (policyBlocked !== (plan.policyDisposition === 'BLOCK')) {
+    fail('LAFEA_MP3_PLAN_POLICY_DISPOSITION_INVALID');
   }
   return plan;
 }
