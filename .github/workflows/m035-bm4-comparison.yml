@@ -11,6 +11,10 @@ on:
       - 'scripts/lfea-m034-bm4-solve-runtime.mjs'
       - 'scripts/lfea-m034-bm4-output-comparison.mjs'
       - 'scripts/lfea-m034-bm4-solve-fixtures.mjs'
+      - 'scripts/lfea-bm4-local-force-reference-normalization.mjs'
+      - 'scripts/lfea-bm4-local-force-reference-normalization-check.mjs'
+      - 'scripts/lfea-bm4-thermal-expansion-authority.mjs'
+      - 'scripts/lfea-bm4-thermal-expansion-authority-check.mjs'
       - 'src/core/linear-fea-b31-factor-calculator/**'
       - 'src/core/linear-fea-piping-components/**'
       - 'src/core/linear-piping-analysis-consumer/inputxml-bend-feature-expansion.js'
@@ -53,8 +57,17 @@ jobs:
 
       - run: npm ci
 
-      - name: Syntax check comparison runner
-        run: node --check scripts/lfea-m035-bm4-run-analysis.mjs
+      - name: Syntax check comparison authorities
+        run: |
+          node --check scripts/lfea-m035-bm4-run-analysis.mjs
+          node --check scripts/lfea-bm4-local-force-reference-normalization.mjs
+          node --check scripts/lfea-bm4-thermal-expansion-authority.mjs
+
+      - name: Qualify CAESAR local-result reference normalization
+        run: node scripts/lfea-bm4-local-force-reference-normalization-check.mjs
+
+      - name: Qualify BM4 thermal expansion authority
+        run: node scripts/lfea-bm4-thermal-expansion-authority-check.mjs
 
       - name: Run CASE 19/20/21 before-after comparison
         shell: bash
