@@ -15,7 +15,9 @@ jobs:
     timeout-minutes: 30
     env:
       TARGET_HEAD_SHA: ${{ github.sha }}
-      ACCDB_ZIP: benchmarks/LFEA/BM4/BM4 accdb.zip
+      ACCDB_SOURCE_SHA: 3e5c5e20d9e8741faa08be4360cb7f79498f87b6
+      ACCDB_SOURCE_PATH: benchmarks/LFEA/BM4/BM4 accdb.zip
+      ACCDB_ZIP: /tmp/BM4-accdb-source.zip
     steps:
       - name: Checkout exact head
         uses: actions/checkout@v4
@@ -29,6 +31,16 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
           test -z "$(git status --porcelain)"
+
+      - name: Recover pinned ACCDB source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$ACCDB_SOURCE_SHA"
+          git show "$ACCDB_SOURCE_SHA:$ACCDB_SOURCE_PATH" > "$ACCDB_ZIP"
+          test -s "$ACCDB_ZIP"
+          echo "BM4_ACCDB_SOURCE=$ACCDB_SOURCE_SHA:$ACCDB_SOURCE_PATH"
+          sha256sum "$ACCDB_ZIP" | tee /tmp/bm4-accdb-source-sha256.txt
 
       - name: Install ACCDB reader
         shell: bash
@@ -70,7 +82,7 @@ jobs:
             base="$(basename "$csv")"
             if printf '%s' "$base" | grep -Eiq 'case|load|comb|static|force|moment|option|control|setup|config|bour|nonlinear|fric|restraint|temperature|pressure'; then
               echo "--- $base ---"
-              sed -n '1,80p' "$csv"
+              sed -n '1,100p' "$csv"
             fi
           done
 
@@ -86,6 +98,7 @@ jobs:
         with:
           name: m038-bm4-accdb-audit-${{ env.TARGET_HEAD_SHA }}
           path: |
+            /tmp/bm4-accdb-source-sha256.txt
             /tmp/bm4-accdb-tables.txt
             /tmp/bm4-accdb-authority-hits.txt
             /tmp/bm4-accdb-export/
