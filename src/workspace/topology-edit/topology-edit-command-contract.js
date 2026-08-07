@@ -4,6 +4,12 @@ import {
   normalizeTopologyEditBranchComponentRequest,
 } from './topology-edit-branch-component-command.js';
 import {
+  normalizeTopologyEditJunctionRelationPayload,
+} from './topology-edit-junction-relation-command.js';
+import {
+  normalizeTopologyEditInlineReplacementPayload,
+} from './topology-edit-inline-component-replacement.js';
+import {
   normalizePipeSegmentCommandPayload,
 } from './topology-edit-pipe-segment-contract.js';
 
@@ -18,6 +24,8 @@ export const TOPOLOGY_EDIT_WAVE3_ENGINEERING_COMMANDS = Object.freeze([
 ]);
 export const TOPOLOGY_EDIT_PROFESSIONAL_COMMANDS = Object.freeze([
   'INSERT_INLINE_COMPONENT',
+  'REPLACE_INLINE_COMPONENT',
+  'UPDATE_JUNCTION_BRANCH_RELATION',
   'INSERT_BRANCH_COMPONENT',
   'INSERT_PIPE_SEGMENT',
 ]);
@@ -371,6 +379,8 @@ const PAYLOAD_NORMALIZERS = Object.freeze({
   DELETE_EDGE: normalizeDelete, ADD_BEND_DEFINITION: normalizeBend,
   ADD_JUNCTION_DEFINITION: normalizeJunction, TRIM_EDGE: normalizeTrim,
   INSERT_INLINE_COMPONENT: normalizeInlineComponent,
+  REPLACE_INLINE_COMPONENT: normalizeTopologyEditInlineReplacementPayload,
+  UPDATE_JUNCTION_BRANCH_RELATION: normalizeTopologyEditJunctionRelationPayload,
   INSERT_BRANCH_COMPONENT: normalizeTopologyEditBranchComponentRequest,
   INSERT_PIPE_SEGMENT: normalizePipeSegmentCommandPayload,
 });
