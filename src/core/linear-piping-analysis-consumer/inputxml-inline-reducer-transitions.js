@@ -4,10 +4,10 @@ export const INPUTXML_INLINE_REDUCER_TRANSITIONS_SCHEMA =
   'fea-inputxml-inline-reducer-transitions/v1';
 
 /**
- * Detect source-order, degree-2 inline pipe section transitions. A transition
- * is evidence of a reducer location, not evidence of a finite reducer length
- * or of CAESAR's internal stiffness representation. Therefore this detector
- * never activates condensation by itself.
+ * Detect degree-2 inline pipe section transitions from topology rather than
+ * XML row adjacency. A transition is evidence of a reducer location, not
+ * evidence of a finite reducer length or of CAESAR's internal stiffness
+ * representation. Therefore this detector never activates condensation alone.
  */
 export function detectInputXmlInlineReducerTransitions({
   canonicalGeometry,
@@ -17,21 +17,18 @@ export function detectInputXmlInlineReducerTransitions({
   if (!(typeof relativeTolerance === 'number' && Number.isFinite(relativeTolerance) && relativeTolerance >= 0)) {
     throw new TypeError('relativeTolerance must be a finite nonnegative number.');
   }
-  const degreeByNode = new Map(canonicalGeometry.nodes.map((node) => [String(node.id), 0]));
+  const incidentByNode = new Map(canonicalGeometry.nodes.map((node) => [String(node.id), []]));
   for (const segment of canonicalGeometry.segments) {
-    increment(degreeByNode, segment.startNodeId);
-    increment(degreeByNode, segment.endNodeId);
+    pushIncident(incidentByNode, segment.startNodeId, segment);
+    pushIncident(incidentByNode, segment.endNodeId, segment);
   }
-  const ordered = [...canonicalGeometry.segments]
-    .filter(hasPhysicalSection)
-    .sort((left, right) => sourceIndex(left) - sourceIndex(right));
+
   const transitions = [];
-  for (let index = 1; index < ordered.length; index += 1) {
-    const upstream = ordered[index - 1];
-    const downstream = ordered[index];
-    const nodeId = String(downstream.startNodeId);
-    if (String(upstream.endNodeId) !== nodeId) continue;
-    if (degreeByNode.get(nodeId) !== 2) continue;
+  for (const [nodeId, incident] of [...incidentByNode.entries()].sort(([a], [b]) => compareAscii(a, b))) {
+    if (incident.length !== 2 || !incident.every(hasPhysicalSection)) continue;
+    const ordered = [...incident].sort((left, right) => sourceIndex(left) - sourceIndex(right));
+    const upstream = ordered[0];
+    const downstream = ordered[1];
     const outerDiameterChanged = differs(upstream.diameter, downstream.diameter, relativeTolerance);
     const wallThicknessChanged = differs(upstream.thickness, downstream.thickness, relativeTolerance);
     if (!outerDiameterChanged && !wallThicknessChanged) continue;
@@ -47,6 +44,7 @@ export function detectInputXmlInlineReducerTransitions({
         ...(wallThicknessChanged ? ['wallThickness'] : []),
       ]),
       sourceOrder: Object.freeze({ upstream: sourceIndex(upstream), downstream: sourceIndex(downstream) }),
+      topology: Object.freeze({ nodeDegree: 2, incidentSegmentIds: Object.freeze(ordered.map((row) => String(row.id))) }),
       condensationActivation: Object.freeze({
         status: 'BLOCKED_PENDING_FINITE_REDUCER_GEOMETRY_AND_PARITY',
         reducerLength: null,
@@ -67,6 +65,7 @@ export function detectInputXmlInlineReducerTransitions({
     transitions: Object.freeze(transitions),
     policy: Object.freeze({
       detectFromInlineSectionChange: true,
+      topologyRule: 'DEGREE_2_SECTION_TRANSITION_V1',
       inferFiniteLength: false,
       activateCondensationWithoutIndependentEvidence: false,
       fitToBenchmarkOutput: false,
@@ -83,14 +82,17 @@ function sourceIndex(segment) {
   const value = segment.meta?.sourceIndex;
   return Number.isInteger(value) ? value : Number.MAX_SAFE_INTEGER;
 }
-function increment(map, nodeId) {
+function pushIncident(map, nodeId, segment) {
   const id = String(nodeId);
-  map.set(id, (map.get(id) ?? 0) + 1);
+  const rows = map.get(id) ?? [];
+  rows.push(segment);
+  map.set(id, rows);
 }
 function differs(left, right, tolerance) {
   const scale = Math.max(Math.abs(left), Math.abs(right), Number.MIN_VALUE);
   return Math.abs(left - right) > tolerance * scale;
 }
+function compareAscii(left, right) { return left < right ? -1 : left > right ? 1 : 0; }
 function requireGeometry(value) {
   if (!value || value.unit !== 'm' || !Array.isArray(value.nodes) || !Array.isArray(value.segments)) {
     throw new TypeError('canonicalGeometry must be normalized to metres and carry nodes/segments.');
