@@ -38,7 +38,7 @@ jobs:
           node --check scripts/lfea-m035-m036-bm4-integration-check.mjs
           node --check scripts/lfea-m035-m036-bm4-comparison.mjs
           node --check scripts/lfea-m035-m036-bm4-failure-attribution.mjs
-          node --check scripts/lfea-m035-bm4-ope-source-audit.mjs
+          node --check scripts/lfea-m035-bm4-ope-source-audit-v2.mjs
 
       - name: Qualify CAESAR local-result reference normalization
         run: node scripts/lfea-bm4-local-force-reference-normalization-check.mjs
@@ -85,16 +85,16 @@ jobs:
           fi
           exit "$status"
 
-      - name: OPE source-level audit and +Y falsification
+      - name: OPE source-level evidence audit
         shell: bash
         run: |
           set +e
-          node scripts/lfea-m035-bm4-ope-source-audit.mjs > /tmp/m035-bm4-ope-source-audit.log 2>&1
+          node scripts/lfea-m035-bm4-ope-source-audit-v2.mjs > /tmp/m035-bm4-ope-source-audit.log 2>&1
           status=$?
           cat /tmp/m035-bm4-ope-source-audit.log
           if [ "$status" -ne 0 ]; then
             message="$(tr '\n' ' ' < /tmp/m035-bm4-ope-source-audit.log | head -c 3500)"
-            echo "::error file=scripts/lfea-m035-bm4-ope-source-audit.mjs,line=1,title=BM4 OPE source audit::${message}"
+            echo "::error file=scripts/lfea-m035-bm4-ope-source-audit-v2.mjs,line=1,title=BM4 OPE source audit::${message}"
           fi
           exit "$status"
 
