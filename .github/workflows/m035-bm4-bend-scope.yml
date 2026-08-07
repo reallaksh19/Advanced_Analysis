@@ -9,16 +9,22 @@ on:
       - 'src/core/linear-piping-analysis-consumer/inputxml-inline-reducer-transitions.js'
       - 'src/core/linear-piping-analysis-consumer/inputxml-feature-mechanics-preparation.js'
       - 'src/core/linear-piping-analysis-consumer/inputxml-feature-stiffness-authorities.js'
+      - 'src/core/linear-piping-analysis-consumer/generic-inputxml-solve-model.js'
       - 'src/core/linear-piping-analysis-consumer/index.js'
       - 'src/core/linear-fea-piping-components/directional-branch-flexibility.js'
       - 'src/core/linear-fea-piping-components/index.js'
       - 'src/core/linear-fea-reducer-condensation/**'
+      - 'src/core/linear-fea-result-recovery/recovery-contract.js'
+      - 'src/core/linear-fea-result-recovery/recovery.js'
+      - 'scripts/lfea-b3.4-recovery-fixtures.mjs'
       - 'scripts/lfea-m035-generic-bend-integration-check.mjs'
       - 'scripts/lfea-m035-b31j-directional-tee-check.mjs'
       - 'scripts/lfea-m035-reducer-sampling-qualification-check.mjs'
       - 'scripts/lfea-m035-feature-mechanics-preparation-check.mjs'
+      - 'scripts/lfea-m035-force-only-recovery-check.mjs'
       - 'scripts/lfea-m035-bm4-feature-inventory-check.mjs'
       - 'scripts/lfea-m035-bm4-feature-solve-runtime.mjs'
+      - 'scripts/lfea-m035-bm4-feature-solver-diagnostic.mjs'
       - 'scripts/lfea-m035-bm4-feature-solve-check.mjs'
       - 'scripts/lfea-m035-bm4-scope-policy.mjs'
       - 'scripts/lfea-m035-bm4-scope-policy-check.mjs'
@@ -69,15 +75,21 @@ jobs:
           node --check src/core/linear-piping-analysis-consumer/inputxml-inline-reducer-transitions.js
           node --check src/core/linear-piping-analysis-consumer/inputxml-feature-mechanics-preparation.js
           node --check src/core/linear-piping-analysis-consumer/inputxml-feature-stiffness-authorities.js
+          node --check src/core/linear-piping-analysis-consumer/generic-inputxml-solve-model.js
           node --check src/core/linear-fea-piping-components/directional-branch-flexibility.js
           node --check src/core/linear-fea-reducer-condensation/reducer-condensation.js
           node --check src/core/linear-fea-reducer-condensation/sampling-qualification.js
+          node --check src/core/linear-fea-result-recovery/recovery-contract.js
+          node --check src/core/linear-fea-result-recovery/recovery.js
+          node --check scripts/lfea-b3.4-recovery-fixtures.mjs
           node --check scripts/lfea-m035-generic-bend-integration-check.mjs
           node --check scripts/lfea-m035-b31j-directional-tee-check.mjs
           node --check scripts/lfea-m035-reducer-sampling-qualification-check.mjs
           node --check scripts/lfea-m035-feature-mechanics-preparation-check.mjs
+          node --check scripts/lfea-m035-force-only-recovery-check.mjs
           node --check scripts/lfea-m035-bm4-feature-inventory-check.mjs
           node --check scripts/lfea-m035-bm4-feature-solve-runtime.mjs
+          node --check scripts/lfea-m035-bm4-feature-solver-diagnostic.mjs
           node --check scripts/lfea-m035-bm4-feature-solve-check.mjs
           node --check scripts/lfea-m035-bm4-scope-policy.mjs
           node --check scripts/lfea-m035-bm4-scope-policy-check.mjs
@@ -136,6 +148,19 @@ jobs:
           fi
           exit "$status"
 
+      - name: Force-only component recovery scope
+        shell: bash
+        run: |
+          set +e
+          node scripts/lfea-m035-force-only-recovery-check.mjs > /tmp/m035-force-only-recovery.log 2>&1
+          status=$?
+          cat /tmp/m035-force-only-recovery.log
+          if [ "$status" -ne 0 ]; then
+            message="$(tr '\n' ' ' < /tmp/m035-force-only-recovery.log | head -c 3500)"
+            echo "::error file=src/core/linear-fea-result-recovery/recovery.js,line=1,title=M035 force-only recovery::${message}"
+          fi
+          exit "$status"
+
       - name: BM4 source feature inventory
         shell: bash
         run: |
@@ -185,6 +210,7 @@ jobs:
             /tmp/m035-tee.log
             /tmp/m035-reducer.log
             /tmp/m035-feature-preparation.log
+            /tmp/m035-force-only-recovery.log
             /tmp/m035-bm4-feature-inventory.log
             /tmp/m035-bm4-feature-solve.log
             /tmp/m035-bend-audit.log
@@ -197,6 +223,7 @@ jobs:
           set -euo pipefail
           npm run check:lfea-b3.1
           npm run check:lfea-b3.2
+          npm run check:lfea-b3.4
           npm run check:lfea-b3.19
           npm run check:lfea-b3.23
           npm run check:lfea-b3.18
