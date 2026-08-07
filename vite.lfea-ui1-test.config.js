@@ -2,6 +2,9 @@ import { defineConfig, mergeConfig } from 'vite';
 import baseConfig from './vite.config.js';
 
 const ui1TestOverlay = defineConfig({
+  optimizeDeps: {
+    noDiscovery: true,
+  },
   plugins: [
     {
       name: 'ui1-embedded-layout-harness',
