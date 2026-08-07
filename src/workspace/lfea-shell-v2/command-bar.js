@@ -14,9 +14,9 @@ export function renderLfeaCommandBar(root, state, model, handlers) {
   const actions = workbenchElement(root, 'div', 'lfea-shell-v2__command-actions');
   actions.append(
     importControl(root, handlers),
-    action(root, 'Run', 'lfea-run', handlers.onRun, !model.commands.canRun),
-    action(root, 'Cancel', 'lfea-cancel-run', handlers.onCancelRun, !model.commands.canCancel),
-    action(root, 'Benchmark', 'lfea-benchmark', handlers.onBenchmark, false),
+    action(root, 'Validate, adapt & solve', 'lfea-run', handlers.onRun, !model.commands.canRun),
+    action(root, 'Cancel run', 'lfea-cancel-run', handlers.onCancelRun, !model.commands.canCancel),
+    action(root, 'Run Benchmark', 'lfea-benchmark', handlers.onBenchmark, false),
     action(root, 'Undo', 'lfea-undo', handlers.onUndo, !model.commands.canUndo),
     action(root, 'Redo', 'lfea-redo', handlers.onRedo, !model.commands.canRedo),
     resultMode(root, state, handlers),
@@ -29,14 +29,14 @@ export function renderLfeaCommandBar(root, state, model, handlers) {
   exports.append(
     action(
       root,
-      'Export package',
+      'Export mesh package',
       'lfea-export-package',
       handlers.onExportDocument,
       !model.commands.canExportPackage,
     ),
     action(
       root,
-      'Export evidence',
+      'Export evidence bundle',
       'lfea-export-evidence',
       handlers.onExportEvidence,
       !model.commands.canExportEvidence,
@@ -75,7 +75,7 @@ function identityText(root, identity) {
 }
 
 function importControl(root, handlers) {
-  const label = workbenchElement(root, 'label', 'lfea-shell-v2__file-button', 'Import mesh');
+  const label = workbenchElement(root, 'label', 'lfea-shell-v2__file-button', 'Import mesh package');
   const input = workbenchElement(root, 'input');
   input.type = 'file';
   input.accept = '.json,application/json';
