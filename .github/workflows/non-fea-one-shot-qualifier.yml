@@ -20,29 +20,46 @@ jobs:
           ref: feat/load-calc-non-fea-input-check-ui
           fetch-depth: 0
 
-      - name: Repair normal Load Calc header and pane layout
+      - name: Give active Load Calc the central viewport
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          path = Path('src/workspace/workspace-shell-styles.js')
+          path = Path('src/workspace/workspace-shell-controller.js')
           text = path.read_text()
-          anchor = "    .load-calc-consumer { display: flex; flex-direction: column; height: 100%; min-width: 0; background: var(--bg-dark); }\n"
-          addition = """    .load-calc-consumer { display: flex; flex-direction: column; height: 100%; min-width: 0; min-height: 0; overflow: hidden; background: var(--bg-dark); }\n    .empirical-load-calc__header {\n      flex: 0 0 auto;\n      display: grid;\n      grid-template-columns: minmax(180px, auto) minmax(0, 1fr);\n      gap: 8px 16px;\n      min-width: 0;\n      padding: 10px 14px;\n      border-bottom: 1px solid var(--border-color);\n      background: var(--bg-panel-strong);\n      box-sizing: border-box;\n    }\n    .empirical-load-calc__header h1 { margin: 4px 0 0; font-size: 18px; font-weight: 800; color: #f8fafc; }\n    .empirical-load-calc__facts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; color: var(--text-muted); font-size: 10px; }\n    .empirical-load-calc__tabs { grid-column: 1 / -1; display: flex; align-items: center; gap: 3px; min-width: 0; overflow-x: auto; scrollbar-width: thin; }\n    .empirical-load-calc__tabs button { flex: 0 0 auto; min-height: 30px; border: 1px solid transparent; border-radius: 5px; padding: 4px 9px; background: transparent; color: var(--text-muted); font-size: 11px; font-weight: 700; cursor: pointer; }\n    .empirical-load-calc__tabs button:hover, .empirical-load-calc__tabs button:focus-visible, .empirical-load-calc__tabs button.is-active { border-color: #315070; background: #101b2b; color: var(--text-main); outline: none; }\n    .empirical-load-calc__actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; min-width: 0; }\n    .empirical-load-calc__actions output { min-width: 0; overflow-wrap: anywhere; color: var(--text-muted); font-size: 11px; }\n    .empirical-load-calc__pane { flex: 1 1 auto; min-width: 0; min-height: 0; overflow: hidden; position: relative; }\n    .empirical-load-calc__pane > * { min-width: 0; min-height: 0; }\n"""
-          if anchor in text:
-              text = text.replace(anchor, addition, 1)
-          elif '.empirical-load-calc__pane { flex: 1 1 auto;' not in text:
-              raise SystemExit('Load Calc shell style anchor not found; refusing broad mutation.')
-          path.write_text(text)
+          old = """    if (stage) {
+      // `.viewport-stage{display:flex}` (an author rule) outranks the UA
+      // `[hidden]{display:none}` rule, so the `hidden` attribute alone does
+      // not actually hide this element — it must be set inline explicitly.
+      stage.hidden = topologyEdit3DActive;
+      stage.style.display = topologyEdit3DActive ? 'none' : 'flex';
+      stage.style.flex = topologyEdit3DActive ? '0 0 0' : loadCalc ? '1 1 55%' : '1 1 100%';
+    }
+"""
+          new = """    if (stage) {
+      // Load Calc owns the central viewport while active. Its Model / 3D
+      // sub-tab activates the dedicated topology-edit host, so retaining the
+      // read-only workspace stage above every calculation pane creates a
+      // nested-scroll collision without adding calculation authority.
+      const hideSharedStage = loadCalc || topologyEdit3DActive;
+      stage.hidden = hideSharedStage;
+      stage.style.display = hideSharedStage ? 'none' : 'flex';
+      stage.style.flex = hideSharedStage ? '0 0 0' : '1 1 100%';
+    }
+"""
+          if old in text:
+              path.write_text(text.replace(old, new, 1))
+          elif new not in text:
+              raise SystemExit('Workspace stage allocation target not found; refusing broad mutation.')
           PY
           git diff --check
           if git diff --quiet; then
-            echo 'Shell layout correction already present.'
+            echo 'Load Calc viewport correction already present.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/workspace/workspace-shell-styles.js
-          git commit -m 'fix(non-fea): bound empirical Load Calc header and pane layout'
+          git add src/workspace/workspace-shell-controller.js
+          git commit -m 'fix(non-fea): give active Load Calc the central viewport'
           git push origin HEAD:feat/load-calc-non-fea-input-check-ui
