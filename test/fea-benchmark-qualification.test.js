@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   BM4_QUALIFICATION_CASE_IDS,
   compareBenchmarkResultRows,
+  createBenchmarkQualificationAdapter,
   createBm4QualificationAdapter,
   runGovernedBenchmarkQualification,
 } from '../src/core/fea-benchmarks/index.js';
@@ -64,9 +65,14 @@ test('governed BM4 qualification compares node results and reports unavailable s
       ledger.push(`PREPARE:${caseIds.join(',')}`);
       return { semanticHash: 'PREP-BM4' };
     },
-    authorize: ({ preparation }) => {
+    authorize: ({ preparation, caseIds }) => {
       ledger.push(`AUTHORIZE:${preparation.semanticHash}`);
-      return { semanticHash: 'AUTH-BM4' };
+      return {
+        semanticHash: 'AUTH-BM4',
+        preparationSemanticHash: preparation.semanticHash,
+        authorizedPhysicalCaseIds: caseIds,
+        executionBoundary: { authorizationIssued: true },
+      };
     },
     solve: ({ caseId, authorization }) => {
       ledger.push(`SOLVE:${caseId}:${authorization.semanticHash}`);
@@ -89,6 +95,44 @@ test('governed BM4 qualification compares node results and reports unavailable s
   const force = report.cases[0].comparison.rows.find((row) => row.quantity === 'FORCE');
   assert.equal(force.referenceValue, 100);
   assert.equal(force.actualValue, 100, 'support-on-pipe reaction convention must not be sign-flipped');
+});
+
+test('stale benchmark authorization blocks before solve', () => {
+  let solved = false;
+  const adapter = createBm4QualificationAdapter({ parseModel: (source) => source });
+  assert.throws(() => runGovernedBenchmarkQualification({
+    adapter,
+    source: bm4Source(),
+    tolerances,
+    optionalQuantities: ['STRESS'],
+    prepare: () => ({ semanticHash: 'PREP-CURRENT' }),
+    authorize: () => ({
+      semanticHash: 'AUTH-STALE',
+      preparationSemanticHash: 'PREP-OLD',
+      authorizedPhysicalCaseIds: ['CASE19', 'CASE21'],
+    }),
+    solve: () => { solved = true; return execution('CASE19'); },
+  }), /stale or bound to another preparation/u);
+  assert.equal(solved, false);
+});
+
+test('authorization missing a requested benchmark case blocks before solve', () => {
+  let solved = false;
+  const adapter = createBm4QualificationAdapter({ parseModel: (source) => source });
+  assert.throws(() => runGovernedBenchmarkQualification({
+    adapter,
+    source: bm4Source(),
+    tolerances,
+    optionalQuantities: ['STRESS'],
+    prepare: () => ({ semanticHash: 'PREP-CURRENT' }),
+    authorize: () => ({
+      semanticHash: 'AUTH-PARTIAL',
+      preparationSemanticHash: 'PREP-CURRENT',
+      authorizedPhysicalCaseIds: ['CASE19'],
+    }),
+    solve: () => { solved = true; return execution('CASE19'); },
+  }), /does not cover cases: CASE21/u);
+  assert.equal(solved, false);
 });
 
 test('required missing force fails while optional unexposed stress does not', () => {
@@ -120,18 +164,26 @@ test('unit mismatches fail instead of silently converting benchmark evidence', (
   assert.match(result.rows[0].note, /Unit mismatch/u);
 });
 
-test('generic pipeline accepts a future benchmark adapter without benchmark-specific branching', () => {
-  const adapter = Object.freeze({
-    adapterId: 'BM5-TEST', benchmarkId: 'BM5', caseIds: Object.freeze(['C1']),
-    ingest: () => Object.freeze({ benchmarkId: 'BM5', modelInput: {}, semanticHash: 'INGEST-BM5' }),
-    referenceRows: () => [{ entityKind: 'NODE', entityId: 'N1', quantity: 'FORCE', component: 'UX', value: 5, unit: 'N' }],
+test('generic adapter factory qualifies a future benchmark without shared-pipeline branching', () => {
+  const adapter = createBenchmarkQualificationAdapter({
+    adapterId: 'BM5-TEST',
+    benchmarkId: 'BM5',
+    caseIds: ['C1'],
+    parseModel: () => ({ semanticHash: 'BM5-MODEL' }),
+    parseReference: () => ({
+      C1: [{ entityKind: 'NODE', entityId: 'N1', quantity: 'FORCE', component: 'UX', value: 5, unit: 'N' }],
+    }),
   });
   const report = runGovernedBenchmarkQualification({
     adapter,
     source: {},
     tolerances,
     prepare: () => ({ semanticHash: 'PREP-BM5' }),
-    authorize: () => ({ semanticHash: 'AUTH-BM5' }),
+    authorize: ({ preparation, caseIds }) => ({
+      semanticHash: 'AUTH-BM5',
+      preparationSemanticHash: preparation.semanticHash,
+      authorizedPhysicalCaseIds: caseIds,
+    }),
     solve: () => ({
       semanticHash: 'EXEC-BM5', evidenceHash: 'EVID-BM5', displacement: [],
       reactions: [{ nodeId: 'N1', dof: 'UX', value: 5 }],
