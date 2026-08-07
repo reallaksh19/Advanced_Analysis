@@ -31,26 +31,20 @@ const DATUM_HASH = `sha256:${'e'.repeat(64)}`;
 const NUMERIC_TOLERANCE = 1e-9;
 
 function close(actual, expected) {
-  assert.ok(
-    Math.abs(actual - expected) <= NUMERIC_TOLERANCE,
-    `expected ${actual} to be within ${NUMERIC_TOLERANCE} of ${expected}`,
-  );
+  assert.ok(Math.abs(actual - expected) <= NUMERIC_TOLERANCE,
+    `expected ${actual} to be within ${NUMERIC_TOLERANCE} of ${expected}`);
 }
-function pipeRecord() {
+function pipeRecord(overrides = {}) {
   return {
     recordId: 'PIPE-DN100', componentType: 'PIPE', nominalSizeMm: 100,
     outsideDiameterMm: 114.3, schedule: 'SCH40', wallThicknessMm: 6.02,
     pressureClass: '150', materialSpecification: 'ASTM A106 GR B', pipingClass: 'DEMO-150',
     endConnectionFrom: 'BW', endConnectionTo: 'BW',
     sourceReference: { documentId: 'SPEC', revision: '1', path: '/pipe/dn100' },
+    ...overrides,
   };
 }
-function elbowRecord(
-  id = 'ELBOW-DN100-LR90-A',
-  radius = 152.4,
-  path = '/elbow/a',
-  angleDeg = 90,
-) {
+function elbowRecord(id = 'ELBOW-DN100-LR90-A', radius = 152.4, path = '/elbow/a', angleDeg = 90) {
   return {
     recordId: id, componentType: 'ELBOW', nominalSizeMm: 100, outsideDiameterMm: 114.3,
     pressureClass: '150', materialSpecification: 'ASTM A234 WPB', pipingClass: 'DEMO-150',
@@ -59,11 +53,11 @@ function elbowRecord(
     sourceReference: { documentId: 'SPEC', revision: '1', path },
   };
 }
-function catalogue(extra = []) {
+function catalogue(extra = [], pipeOverrides = {}) {
   return createTopologyEditSpecificationCatalogue({
     catalogueId: 'ROUTE-FITTINGS', catalogueVersion: '1',
     authority: { sourceId: 'SPEC', sourceVersion: '1', sourceHash: SOURCE_HASH },
-    records: [pipeRecord(), elbowRecord(), ...extra],
+    records: [pipeRecord(pipeOverrides), elbowRecord(), ...extra],
   });
 }
 function emptyTopology() {
@@ -81,7 +75,6 @@ function common(spec, minimumLengthMm = 6) {
   };
 }
 function revision(node) { return semanticHash({ kind: 'NODE', record: node }); }
-
 async function seeded(spec = catalogue()) {
   const session = new TopologyEditCertifiedSession(emptyTopology());
   const intent = compileTypedStartRouteIntent({
@@ -90,97 +83,70 @@ async function seeded(spec = catalogue()) {
   });
   const plan = createStartRoutePlan({ intent, session });
   const candidate = await prepareStartRouteCandidate({ plan, session, catalogue: spec });
-  await executeStartRouteTransaction({
-    session, plan, candidate, catalogue: spec,
+  await executeStartRouteTransaction({ session, plan, candidate, catalogue: spec,
     preview: createStartRoutePreview({ plan, candidate }),
-    validation: createStartRouteValidation({ candidate }),
-  });
+    validation: createStartRouteValidation({ candidate }) });
   const startNodeId = candidate.operationBindings['step-2.created-node'];
   const node = session.currentTopology().nodes.find((row) => row.id === startNodeId);
   return { spec, session, startNodeId, startNodeRevision: revision(node) };
 }
 function rawPlan(seed, points = [{ x: 2000, y: 0, z: 0 }, { x: 2000, y: 1000, z: 0 }], minimum = 6) {
-  const intent = compileTypedContinueRouteIntent({
-    ...common(seed.spec, minimum), startNodeId: seed.startNodeId,
-    startNodeRevision: seed.startNodeRevision, pointsMm: points,
-  });
+  const intent = compileTypedContinueRouteIntent({ ...common(seed.spec, minimum),
+    startNodeId: seed.startNodeId, startNodeRevision: seed.startNodeRevision, pointsMm: points });
   return createContinueRoutePlan({ intent, session: seed.session });
 }
-
 async function fittedFixture() {
-  const seed = await seeded();
-  const raw = rawPlan(seed);
+  const seed = await seeded(); const raw = rawPlan(seed);
   const fitted = createContinueRouteFittedPlan({ plan: raw, catalogue: seed.spec });
-  const candidate = await prepareContinueRouteCandidate({
-    plan: fitted, session: seed.session, catalogue: seed.spec,
-  });
+  const candidate = await prepareContinueRouteCandidate({ plan: fitted, session: seed.session, catalogue: seed.spec });
   return { ...seed, raw, fitted, candidate };
 }
 
 test('one exact 90-degree catalogue elbow resolves and consumes tangent length', async () => {
-  const seed = await seeded();
-  const raw = rawPlan(seed);
+  const seed = await seeded(); const raw = rawPlan(seed);
   const resolution = resolveContinueRouteElbows({ plan: raw, catalogue: seed.spec });
   assert.equal(resolution.bindings.length, 1);
   assert.equal(resolution.bindings[0].recordId, 'ELBOW-DN100-LR90-A');
   assert.equal(resolution.bindings[0].elbowRadiusMm, 152.4);
   const fitted = createContinueRouteFittedPlan({ plan: raw, catalogue: seed.spec });
-  assert.equal(fitted.bendCount, 1);
-  assert.equal(fitted.expectedCommandCount, 5);
+  assert.equal(fitted.bendCount, 1); assert.equal(fitted.expectedCommandCount, 5);
   close(fitted.turns[0].tangentDistanceMm, 152.4);
   close(fitted.effectiveSegments[0].effectiveLengthMm, 847.6);
   close(fitted.effectiveSegments[1].effectiveLengthMm, 847.6);
 });
 
 test('non-90-degree elbow uses radius times tan(deflection/2)', async () => {
-  const spec = catalogue([
-    elbowRecord('ELBOW-DN100-LR45-A', 152.4, '/elbow/45', 45),
-  ]);
+  const spec = catalogue([elbowRecord('ELBOW-DN100-LR45-A', 152.4, '/elbow/45', 45)]);
   const seed = await seeded(spec);
-  const raw = rawPlan(seed, [
-    { x: 2000, y: 0, z: 0 },
-    { x: 2707.1067811865476, y: 707.1067811865476, z: 0 },
-  ]);
+  const raw = rawPlan(seed, [{ x: 2000, y: 0, z: 0 }, { x: 2707.1067811865476, y: 707.1067811865476, z: 0 }]);
   const fitted = createContinueRouteFittedPlan({ plan: raw, catalogue: spec });
   const expectedTangent = 152.4 * Math.tan(Math.PI / 8);
   assert.equal(fitted.turns[0].elbowRecordId, 'ELBOW-DN100-LR45-A');
-  close(fitted.turns[0].angleDeg, 45);
-  close(fitted.turns[0].tangentDistanceMm, expectedTangent);
+  close(fitted.turns[0].angleDeg, 45); close(fitted.turns[0].tangentDistanceMm, expectedTangent);
   close(fitted.effectiveSegments[0].effectiveLengthMm, 1000 - expectedTangent);
   close(fitted.effectiveSegments[1].effectiveLengthMm, 1000 - expectedTangent);
 });
 
 test('fitted candidate creates two catalogue pipes and one governed bend in five commands', async () => {
   const { fitted, candidate } = await fittedFixture();
-  assert.equal(candidate.segmentCount, 2);
-  assert.equal(candidate.nodeCount, 2);
-  assert.equal(candidate.bendCount, 1);
-  assert.equal(candidate.commandCount, 5);
+  assert.equal(candidate.segmentCount, 2); assert.equal(candidate.nodeCount, 2);
+  assert.equal(candidate.bendCount, 1); assert.equal(candidate.commandCount, 5);
   assert.equal(candidate.certificationMode, 'FINAL_STATE_COMPOSITE');
-  assert.deepEqual(candidate.materializedCommands.map((row) => row.commandType), [
-    'CREATE_NODE', 'INSERT_PIPE_SEGMENT', 'CREATE_NODE', 'INSERT_PIPE_SEGMENT', 'ADD_BEND_DEFINITION',
-  ]);
+  assert.deepEqual(candidate.materializedCommands.map((row) => row.commandType),
+    ['CREATE_NODE', 'INSERT_PIPE_SEGMENT', 'CREATE_NODE', 'INSERT_PIPE_SEGMENT', 'ADD_BEND_DEFINITION']);
   assert.equal(candidate.canonicalTopology.bends.length, 1);
-  const bend = candidate.canonicalTopology.bends[0];
-  const binding = fitted.elbowResolution.bindings[0];
-  assert.equal(bend.radiusMm, 152.4);
-  assert.equal(bend.angleDeg, 90);
-  assert.equal(
-    bend.radiusAuthority,
-    `CATALOGUE:${binding.catalogueHash}:${binding.recordId}:${binding.recordHash}`,
-  );
+  const bend = candidate.canonicalTopology.bends[0]; const binding = fitted.elbowResolution.bindings[0];
+  assert.equal(bend.radiusMm, 152.4); assert.equal(bend.angleDeg, 90);
+  assert.equal(bend.radiusAuthority, `CATALOGUE:${binding.catalogueHash}:${binding.recordId}:${binding.recordHash}`);
 });
 
 test('automatic elbow route applies and undoes/redoes as one exact suffix', async () => {
   const { spec, session, fitted, candidate } = await fittedFixture();
-  const transaction = await executeContinueRouteTransaction({
-    session, plan: fitted, candidate, catalogue: spec,
+  const transaction = await executeContinueRouteTransaction({ session, plan: fitted, candidate, catalogue: spec,
     preview: createContinueRoutePreview({ plan: fitted, candidate }),
-    validation: createContinueRouteValidation({ candidate }),
-  });
+    validation: createContinueRouteValidation({ candidate }) });
   const applied = session.snapshot();
-  assert.equal(transaction.commandCount, 5);
-  assert.equal(transaction.bendCount, 1);
+  assert.equal(transaction.commandCount, 5); assert.equal(transaction.bendCount, 1);
   assert.equal(session.currentTopology().bends.length, 1);
   undoContinueRouteTransaction(session, transaction);
   assert.equal(session.currentTopology().canonicalTopologyHash, transaction.priorCanonicalHash);
@@ -202,36 +168,33 @@ test('missing compatible elbow fails closed', async () => {
     records: [pipeRecord(), { ...elbowRecord(), nominalSizeMm: 50, outsideDiameterMm: 60.3 }],
   });
   const seed = await seeded(incompatible);
-  assert.throws(() => createContinueRouteFittedPlan({
-    plan: rawPlan(seed), catalogue: incompatible,
-  }), /NO_COMPATIBLE_ELBOW/u);
+  assert.throws(() => createContinueRouteFittedPlan({ plan: rawPlan(seed), catalogue: incompatible }), /NO_COMPATIBLE_ELBOW/u);
+});
+
+test('asymmetric pipe ends reject an elbow that duplicates only one connection type', async () => {
+  const spec = catalogue([], { endConnectionFrom: 'BW', endConnectionTo: 'SW' });
+  const seed = await seeded(spec);
+  assert.throws(() => resolveContinueRouteElbows({ plan: rawPlan(seed), catalogue: spec }), /NO_COMPATIBLE_ELBOW/u);
 });
 
 test('multiple compatible elbows require an explicit deterministic selection', async () => {
   const spec = catalogue([elbowRecord('ELBOW-DN100-LR90-B', 200, '/elbow/b')]);
-  const seed = await seeded(spec);
-  const raw = rawPlan(seed);
+  const seed = await seeded(spec); const raw = rawPlan(seed);
   assert.throws(() => resolveContinueRouteElbows({ plan: raw, catalogue: spec }), /ELBOW_SELECTION_REQUIRED/u);
-  const selected = createContinueRouteFittedPlan({
-    plan: raw, catalogue: spec, elbowSelections: { 1: 'ELBOW-DN100-LR90-B' },
-  });
-  assert.equal(selected.turns[0].elbowRecordId, 'ELBOW-DN100-LR90-B');
-  close(selected.turns[0].tangentDistanceMm, 200);
-  const repeated = createContinueRouteFittedPlan({
-    plan: raw, catalogue: spec, elbowSelections: { 1: 'ELBOW-DN100-LR90-B' },
-  });
+  const selected = createContinueRouteFittedPlan({ plan: raw, catalogue: spec,
+    elbowSelections: { 1: 'ELBOW-DN100-LR90-B' } });
+  assert.equal(selected.turns[0].elbowRecordId, 'ELBOW-DN100-LR90-B'); close(selected.turns[0].tangentDistanceMm, 200);
+  const repeated = createContinueRouteFittedPlan({ plan: raw, catalogue: spec,
+    elbowSelections: { 1: 'ELBOW-DN100-LR90-B' } });
   assert.equal(repeated.planHash, selected.planHash);
 });
 
 test('candidate rejects a catalogue that differs from fitted-plan authority', async () => {
-  const seed = await seeded();
-  const fitted = createContinueRouteFittedPlan({ plan: rawPlan(seed), catalogue: seed.spec });
+  const seed = await seeded(); const fitted = createContinueRouteFittedPlan({ plan: rawPlan(seed), catalogue: seed.spec });
   const changed = createTopologyEditSpecificationCatalogue({
     catalogueId: 'ROUTE-FITTINGS', catalogueVersion: '2',
     authority: { sourceId: 'SPEC', sourceVersion: '2', sourceHash: `sha256:${'f'.repeat(64)}` },
     records: [pipeRecord(), elbowRecord()],
   });
-  await assert.rejects(prepareContinueRouteCandidate({
-    plan: fitted, session: seed.session, catalogue: changed,
-  }), /catalogueHash/u);
+  await assert.rejects(prepareContinueRouteCandidate({ plan: fitted, session: seed.session, catalogue: changed }), /catalogueHash/u);
 });

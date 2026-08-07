@@ -1,5 +1,9 @@
 import { deepFreeze, semanticHash } from '../../../core/shared-piping-model/index.js';
 import { TopologyEditCertifiedSession } from '../topology-edit-certified-session.js';
+import {
+  assertGraphOpenEndpoint,
+  routeContext,
+} from '../professional/topology-edit-route-operation-helpers.js';
 import { assertConnectEndpointsIntent } from './topology-edit-connect-endpoints-intent.js';
 
 export const CONNECT_ENDPOINTS_PLAN_SCHEMA = 'TopologyEditConnectEndpointsPlan.v1';
@@ -66,6 +70,7 @@ function endpoint(topology, nodeId, expectedRevision) {
   if (String(edge.componentType ?? edge.entityType ?? '').toUpperCase() !== 'PIPE') {
     fail(`endpoint ${nodeId} incident edge must be a governed PIPE.`);
   }
+  assertGraphOpenEndpoint(routeContext(topology, topology.canonicalTopologyHash), nodeId, edge.id);
   const otherNodeId = edge.fromNodeId === nodeId ? edge.toNodeId : edge.fromNodeId;
   const other = topology.nodes.find((row) => row.id === otherNodeId);
   if (!other) fail(`endpoint ${nodeId} incident pipe has a stale opposite node.`);
