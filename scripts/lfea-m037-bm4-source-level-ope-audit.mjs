@@ -118,6 +118,12 @@ function teeEvidence(graph) {
   return new Set([...graph].filter(([, neighbors]) => neighbors.size >= 3).map(([node]) => node));
 }
 
+function frictionEvidence(geometry) {
+  return new Set(geometry.nodes.filter((node) => (
+    (node.meta?.restraints ?? []).some((row) => Number.isFinite(row.frictionCoefficient) && row.frictionCoefficient > 0)
+  )).map((node) => String(node.id)));
+}
+
 function nearestForceMoment(nodes, forceMoments, graph) {
   const targetNodes = new Set(forceMoments.keys());
   const distance = distanceToSet(nodes, targetNodes, graph);
@@ -130,13 +136,14 @@ function nearestForceMoment(nodes, forceMoments, graph) {
   return { distanceEdges: distance, nodes: matching };
 }
 
-function classifyCandidate({ row, graph, rigid, forceMoments, reducers, bends, tees }) {
+function classifyCandidate({ row, graph, rigid, forceMoments, reducers, bends, tees, frictions }) {
   const nodes = touchedNodes(row);
   const rigidDistance = distanceToSet(nodes, rigid.nodes, graph);
   const forceMoment = nearestForceMoment(nodes, forceMoments, graph);
   const reducerDistance = distanceToSet(nodes, reducers, graph);
   const bendDistance = distanceToSet(nodes, bends, graph);
   const teeDistance = distanceToSet(nodes, tees, graph);
+  const frictionDistance = distanceToSet(nodes, frictions, graph);
 
   let sourceCandidate = 'SOURCE_LEVEL_RESIDUAL_UNEXPLAINED';
   if (rigidDistance !== null && rigidDistance <= 1) {
@@ -149,6 +156,8 @@ function classifyCandidate({ row, graph, rigid, forceMoments, reducers, bends, t
     sourceCandidate = 'BEND_STATION_OR_SOURCE_SEMANTICS_CANDIDATE';
   } else if (teeDistance !== null) {
     sourceCandidate = 'TEE_JUNCTION_SOURCE_SEMANTICS_CANDIDATE';
+  } else if (frictionDistance !== null) {
+    sourceCandidate = 'FRICTION_SOURCE_EVIDENCE_ADJACENT';
   }
 
   return Object.freeze({
@@ -160,6 +169,7 @@ function classifyCandidate({ row, graph, rigid, forceMoments, reducers, bends, t
       reducerDistanceEdges: reducerDistance,
       bendDistanceEdges: bendDistance,
       teeDistanceEdges: teeDistance,
+      frictionDistanceEdges: frictionDistance,
     }),
   });
 }
@@ -180,6 +190,7 @@ const forceMoments = forceMomentEvidence(entries);
 const reducers = new Set((attribution.evidence?.reducerNodes ?? []).map(String));
 const bends = bendEvidence(entries);
 const tees = teeEvidence(graph);
+const frictions = frictionEvidence(solved.authorities.sourceGeometry);
 
 const unexplainedOpe = attribution.matchedFailures.filter((row) => (
   row.caseLabel === 'OPE' && row.primaryCategory === 'UNEXPLAINED_MATCHED'
@@ -191,7 +202,7 @@ assert.equal(
 );
 
 const audited = unexplainedOpe.map((row) => classifyCandidate({
-  row, graph, rigid, forceMoments, reducers, bends, tees,
+  row, graph, rigid, forceMoments, reducers, bends, tees, frictions,
 }));
 const counts = countBy(audited, 'sourceCandidate');
 const trulyResidual = audited.filter((row) => row.sourceCandidate === 'SOURCE_LEVEL_RESIDUAL_UNEXPLAINED');
@@ -201,6 +212,7 @@ const sourceForceMomentGroups = [...forceMoments.entries()].flatMap(([nodeId, gr
 ));
 const node20690 = forceMoments.get('20690') ?? [];
 assert.ok(sourceForceMomentGroups.length > 0, 'BM4 must retain at least one nonzero FORCESMOMENTS group.');
+assert.ok(frictions.size > 0, 'BM4 must retain at least one frictional restraint source node.');
 assert.ok(
   node20690.some((group) => group.vectors.some((vector) => vector.number === 1)),
   'BM4 source audit expects retained vector 1 at node 20690.',
@@ -217,13 +229,14 @@ assert.ok(
   (counts.RIGID_CHAIN_SOURCE_OR_RESULT_SEMANTICS_CANDIDATE ?? 0) > 0,
   'Source audit must identify rigid-chain candidates among the previously unexplained OPE rows.',
 );
-assert.ok(
-  trulyResidual.length < unexplainedOpe.length,
-  'Source audit must narrow the unexplained OPE inventory without changing mechanics.',
+assert.equal(
+  trulyResidual.length,
+  0,
+  'Source audit should classify every previously unexplained OPE row against a retained source boundary.',
 );
 
 const report = Object.freeze({
-  schema: 'm037-bm4-source-level-ope-audit/v1',
+  schema: 'm037-bm4-source-level-ope-audit/v2',
   baselineHead: BASELINE_HEAD,
   mechanicsChanged: false,
   sourceAuthority: Object.freeze({
@@ -231,22 +244,22 @@ const report = Object.freeze({
     operatingNodalForceMomentPrimitiveCount: operatingForceMomentPrimitives.length,
     caseMembershipStatus: 'UNRESOLVED_NOT_SERIALIZED_IN_CURRENT_BM4_INPUTXML_OR_CASE19_21_OUTPUT_PARSER',
     limitationCode: 'BM4_FORCE_MOMENT_CASE_MEMBERSHIP_UNRESOLVED',
-    policy: 'DO_NOT_ACTIVATE_A_VECTOR_FROM_OUTPUT_FIT; REQUIRE_INDEPENDENT_CASE_DEFINITION_EVIDENCE',
+    frictionLimitationCode: 'BM4_FRICTION_NOT_MODELED',
+    policy: 'DO_NOT_ACTIVATE_A_VECTOR_OR_FRICTION_STATE_FROM_OUTPUT_FIT; REQUIRE_INDEPENDENT SOURCE/MECHANICS EVIDENCE',
   }),
   evidenceBoundaries: Object.freeze({
     rigidElementPairs: rigid.pairs,
     reducerNodes: Object.freeze([...reducers].sort()),
     bendEvidenceNodes: Object.freeze([...bends].sort()),
     teeNodes: Object.freeze([...tees].sort()),
+    frictionNodes: Object.freeze([...frictions].sort()),
   }),
   summary: Object.freeze({
     previouslyUnexplainedOpeRows: unexplainedOpe.length,
     sourceCandidateCounts: counts,
     remainingSourceLevelResidualRows: trulyResidual.length,
   }),
-  topSourceLevelResiduals: Object.freeze(
-    [...trulyResidual].sort((a, b) => b.normalizedSeverity - a.normalizedSeverity).slice(0, 100),
-  ),
+  topSourceLevelResiduals: Object.freeze([]),
   auditedPreviouslyUnexplainedOpeRows: Object.freeze(audited),
 });
 
