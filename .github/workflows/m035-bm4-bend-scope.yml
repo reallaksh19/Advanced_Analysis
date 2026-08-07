@@ -18,6 +18,8 @@ on:
       - 'scripts/lfea-m035-reducer-sampling-qualification-check.mjs'
       - 'scripts/lfea-m035-feature-mechanics-preparation-check.mjs'
       - 'scripts/lfea-m035-bm4-feature-inventory-check.mjs'
+      - 'scripts/lfea-m035-bm4-feature-solve-runtime.mjs'
+      - 'scripts/lfea-m035-bm4-feature-solve-check.mjs'
       - 'scripts/lfea-m035-bm4-scope-policy.mjs'
       - 'scripts/lfea-m035-bm4-scope-policy-check.mjs'
       - 'scripts/lfea-m035-bm4-bend-authority-check.mjs'
@@ -75,6 +77,8 @@ jobs:
           node --check scripts/lfea-m035-reducer-sampling-qualification-check.mjs
           node --check scripts/lfea-m035-feature-mechanics-preparation-check.mjs
           node --check scripts/lfea-m035-bm4-feature-inventory-check.mjs
+          node --check scripts/lfea-m035-bm4-feature-solve-runtime.mjs
+          node --check scripts/lfea-m035-bm4-feature-solve-check.mjs
           node --check scripts/lfea-m035-bm4-scope-policy.mjs
           node --check scripts/lfea-m035-bm4-scope-policy-check.mjs
           node --check scripts/lfea-m035-bm4-bend-authority-check.mjs
@@ -145,6 +149,19 @@ jobs:
           fi
           exit "$status"
 
+      - name: BM4 feature-aware bend and tee solve
+        shell: bash
+        run: |
+          set +e
+          node scripts/lfea-m035-bm4-feature-solve-check.mjs > /tmp/m035-bm4-feature-solve.log 2>&1
+          status=$?
+          cat /tmp/m035-bm4-feature-solve.log
+          if [ "$status" -ne 0 ]; then
+            message="$(tr '\n' ' ' < /tmp/m035-bm4-feature-solve.log | head -c 3500)"
+            echo "::error file=scripts/lfea-m035-bm4-feature-solve-runtime.mjs,line=1,title=M035 BM4 feature solve::${message}"
+          fi
+          exit "$status"
+
       - name: B31 bend authority audit
         shell: bash
         run: |
@@ -169,6 +186,7 @@ jobs:
             /tmp/m035-reducer.log
             /tmp/m035-feature-preparation.log
             /tmp/m035-bm4-feature-inventory.log
+            /tmp/m035-bm4-feature-solve.log
             /tmp/m035-bend-audit.log
           if-no-files-found: warn
           retention-days: 7
