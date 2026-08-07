@@ -40,7 +40,7 @@ test('Table stays projection-only until certified pipe-length Apply', async ({ p
   await expect(row).toBeVisible();
   await row.locator('[data-table-select]').click();
   await expect.poll(() => host.getAttribute('data-topology-edit-selection-primary-id')).toBe(editable.edgeId);
-  await page.locator('[data-table-edit-length]').fill(String(editable.currentLengthMm + 120));
+  await page.locator('[data-table-edit-length]').fill(String(editable.currentLengthMm - 120));
   await page.locator('[data-table-edit-anchor]').selectOption(editable.anchor);
   await page.locator('[data-table-edit-propagation]').selectOption(editable.propagation);
   await page.locator('[data-table-action="stage-pipe-length"]').click();
@@ -56,6 +56,7 @@ test('Table stays projection-only until certified pipe-length Apply', async ({ p
 
   await page.locator('[data-table-action="validate"]').click();
   await expect.poll(() => host.getAttribute('data-topology-edit-table-validation-hash')).toBeTruthy();
+  await expect.poll(() => host.getAttribute('data-topology-edit-table-validation-status')).toBe('READY_TO_APPLY');
   await expect(page.locator('[data-table-action="apply"]')).toBeEnabled();
   const validated = await evidence(page);
   expectAuthorityNoop(validated, before);
@@ -121,11 +122,11 @@ async function chooseTerminalPipe(page) {
     for (const edge of topology.edges ?? []) {
       if (String(edge.entityType ?? '').toUpperCase() !== 'PIPE') continue;
       const row = projection.rows.find((candidate) => candidate.identity.canonicalId === edge.id);
-      if (!row || !(row.fields.lengthMm > 0)) continue;
+      if (!row || !(row.fields.lengthMm > 240)) continue;
       if (degree.get(edge.toNodeId) === 1) return { edgeId: edge.id, tag: row.fields.tag, currentLengthMm: row.fields.lengthMm, anchor: 'FROM', propagation: 'DOWNSTREAM' };
       if (degree.get(edge.fromNodeId) === 1) return { edgeId: edge.id, tag: row.fields.tag, currentLengthMm: row.fields.lengthMm, anchor: 'TO', propagation: 'UPSTREAM' };
     }
-    throw new Error('No graph-terminal canonical PIPE is available for Table qualification.');
+    throw new Error('No safely-shortenable graph-terminal canonical PIPE is available for Table qualification.');
   });
 }
 
