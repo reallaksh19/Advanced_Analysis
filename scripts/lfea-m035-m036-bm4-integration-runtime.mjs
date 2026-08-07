@@ -1,5 +1,8 @@
 import { FRAME_LOCAL_AXIS_PROFILE, resolveFrameLocalAxes } from '../src/core/centerline-beam-fea/index.js';
-import { compileFrameElement } from '../src/core/linear-fea-frame-element/index.js';
+import {
+  augmentFrameElementUniformAxialInitialStrain,
+  compileFrameElement,
+} from '../src/core/linear-fea-frame-element/index.js';
 import { compilePhysicalLoadCase, modelReferenceFromCompilation } from '../src/core/linear-fea-load-case/index.js';
 import { compileMechanicalModel } from '../src/core/linear-fea-model-compiler/index.js';
 import {
@@ -27,6 +30,8 @@ import { buildBm4M035FeatureAuthorities } from './lfea-m035-bm4-feature-solve-ru
 import { buildM036Bm4Inventory } from './lfea-m036-bm4-runtime.mjs';
 
 const NODE_PREFIX = 'BM4M035.N';
+const M038_ACCDB_SOURCE = '3e5c5e20d9e8741faa08be4360cb7f79498f87b6:benchmarks/LFEA/BM4/BM4 accdb.zip';
+const M038_BOURDON_DISCLOSURE = 'ACCDB CASE19=W+P1 and CASE20=W+T1+P1; user-confirmed ACCDB Bourdon=yes. First qualification applies translational Bourdon only to non-rigid straight spans and bend incoming straights; bend-arc opening/translation and rigid-body pressure strain remain blocked.';
 
 function mapNodeId(nodeId) {
   return String(nodeId).replace(/^BM4\.N/u, NODE_PREFIX);
@@ -110,6 +115,21 @@ function physicalLineWeight(entry) {
   return pipe + contents + (analysis.insulationDensity ?? 0) * insulationArea * GRAVITY;
 }
 
+function bourdonEligible(entry) {
+  return entry.bendComponent === null && entry.sourceEntry.rigidAuthority === null;
+}
+
+function closedEndPipeBourdonAxialStrain(authorities, entry, pressure) {
+  const physical = entry.sourceEntry.physicalSection.dimensions;
+  const outerDiameter = physical.outerDiameter;
+  const innerDiameter = physical.innerDiameter;
+  const elasticModulus = authorities.material.materialState.elasticModulus;
+  const poissonRatio = entry.sourceEntry.sourceSegment.meta.analysis.poissonRatio;
+  const denominator = elasticModulus * (outerDiameter ** 2 - innerDiameter ** 2);
+  if (!(pressure > 0) || !(denominator > 0) || !Number.isFinite(poissonRatio)) return 0;
+  return (1 - 2 * poissonRatio) * pressure * innerDiameter ** 2 / denominator;
+}
+
 function compileCase(authorities, compilation, label, thermal, movements) {
   const primitives = [];
   for (const entry of authorities.entries) {
@@ -127,8 +147,11 @@ function compileCase(authorities, compilation, label, thermal, movements) {
     if (analysis.pressure > 0) primitives.push({
       schema: 'fea-linear-load-primitive/v1', primitiveId: `${label}-PRESSURE-${entry.elementId}`,
       kind: 'PRESSURE', elementId: entry.elementId, pressure: analysis.pressure, pressureBasis: 'GAUGE',
-      authorizedEffects: { codeStress: true, pressureStiffening: false, axialThrust: false, bourdon: false },
-      sourceEvidence: sourceEvidence({ sourceId: `${BM4_SOURCE_ID}-M035-M036-PRESSURE`, sourceRevision: `${entry.sourceSegmentId}:${analysis.pressure}` }),
+      authorizedEffects: { codeStress: true, pressureStiffening: false, axialThrust: false, bourdon: bourdonEligible(entry) },
+      sourceEvidence: sourceEvidence({
+        sourceId: `${BM4_SOURCE_ID}-M038-ACCDB-BOURDON`,
+        sourceRevision: `${M038_ACCDB_SOURCE}:${entry.sourceSegmentId}:${analysis.pressure}:${bourdonEligible(entry) ? 'TRANSLATION' : 'BLOCKED'}`,
+      }),
     });
     if (thermal) primitives.push({
       schema: 'fea-linear-load-primitive/v1', primitiveId: `${label}-TEMP-${entry.elementId}`,
@@ -148,7 +171,7 @@ function compileCase(authorities, compilation, label, thermal, movements) {
   return compilePhysicalLoadCase({
     loadCaseId: label,
     loadCaseClass: 'MIXED_PHYSICAL',
-    presentation: { label, description: 'M035 feature mechanics under M036 unilateral active-set state.' },
+    presentation: { label, description: 'M038 ACCDB-authorized P1 Bourdon translation over M035 feature mechanics and M036 unilateral state.' },
     modelReference: modelReferenceFromCompilation(compilation),
     primitives,
     profile: loadCaseProfile({ gravitationalAcceleration: { value: GRAVITY, source: 'SI-STANDARD-GRAVITY-EXACT' } }),
@@ -158,13 +181,26 @@ function compileCase(authorities, compilation, label, thermal, movements) {
 function loadElements(authorities, loadCase) {
   const distributed = new Map(loadCase.primitives.filter((row) => row.kind === 'DISTRIBUTED_LOAD').map((row) => [row.elementId, row]));
   const temperatures = new Map(loadCase.primitives.filter((row) => row.kind === 'TEMPERATURE').map((row) => [row.elementId, row]));
-  const frames = authorities.entries.filter((entry) => !entry.bendComponent).map((entry) => compileFrameElement({
-    elementId: entry.elementId, material: authorities.material, section: entry.analysisSection,
-    localAxes: { result: resolveEntryAxes(authorities, entry), profile: FRAME_LOCAL_AXIS_PROFILE },
-    profile: authorities.frameProfile, distributedLoads: [distributed.get(entry.elementId)],
-    temperature: temperatures.get(entry.elementId) ?? null, releases: [],
-    endSprings: entry.teeModifier?.endSprings ?? [], rigidOffsets: entry.teeModifier?.rigidOffsets ?? null,
-  }));
+  const pressures = new Map(loadCase.primitives.filter((row) => row.kind === 'PRESSURE').map((row) => [row.elementId, row]));
+  const frames = authorities.entries.filter((entry) => !entry.bendComponent).map((entry) => {
+    const baseFrame = compileFrameElement({
+      elementId: entry.elementId, material: authorities.material, section: entry.analysisSection,
+      localAxes: { result: resolveEntryAxes(authorities, entry), profile: FRAME_LOCAL_AXIS_PROFILE },
+      profile: authorities.frameProfile, distributedLoads: [distributed.get(entry.elementId)],
+      temperature: temperatures.get(entry.elementId) ?? null, releases: [],
+      endSprings: entry.teeModifier?.endSprings ?? [], rigidOffsets: entry.teeModifier?.rigidOffsets ?? null,
+    });
+    const pressure = pressures.get(entry.elementId);
+    if (!pressure?.authorizedEffects?.bourdon) return baseFrame;
+    const axialStrain = closedEndPipeBourdonAxialStrain(authorities, entry, pressure.pressure);
+    return augmentFrameElementUniformAxialInitialStrain({
+      frame: baseFrame,
+      profile: authorities.frameProfile,
+      primitive: pressure,
+      axialStrain,
+      disclosure: M038_BOURDON_DISCLOSURE,
+    });
+  });
   const components = authorities.bendExpansion.components.map((component) => {
     const elements = component.elements.map((componentElement) => {
       const entry = authorities.entryByElementId.get(componentElement.elementId);
