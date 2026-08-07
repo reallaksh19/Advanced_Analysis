@@ -73,7 +73,7 @@ assert.equal(solved.normalized.geometry.valid, true);
 assert.equal(solved.report.schema, 'm027-bm2-first-solve-report/v1');
 assert.equal(solved.report.counts.sourceElements, 35);
 assert.equal(solved.report.counts.rigidElements, 9);
-assert.equal(solved.report.counts.bendTaggedElements, 9);
+assert.equal(solved.report.counts.bendTaggedElements, 11);
 assert.equal(solved.report.counts.reducerTaggedElements, 0);
 assert.equal(solved.report.solverConditioningProfile.backend, 'FEA_SPARSE_DIRECT_CHOLESKY_LDLT_V1');
 assert.equal(solved.report.solverConditioningProfile.nearZeroPivotTolerance.value, 1e-12);
