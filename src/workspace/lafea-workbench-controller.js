@@ -1,12 +1,7 @@
-/**
- * Controller for the independent LAFEA editor and qualified calculation stages.
- *
- * DOM/file actions are translated into store-owned immutable edit commands. The
- * controller has no Workspace coupling and no numerical calculation logic.
- * Lifecycle evidence enters only through explicit producer-owned records/events.
- */
-import { createLafeaWorkbenchStore } from './lafea-lifecycle-workbench-store.js';
+/** Controller for the independent guided LAFEA workbench. */
+import { createLafeaWorkbenchOrchestratorStore } from './lafea-workbench-orchestrator-store.js';
 import { LAFEA_WORKBENCH_STYLES } from './lafea-workbench-styles.js';
+import { LAFEA_GUIDED_WORKBENCH_STYLES } from './lafea-guided-workbench-styles.js';
 import { FeaBenchmarkPanel } from './fea-benchmark-panel.js';
 import { FEA_BENCHMARK_STYLES } from './fea-benchmark-styles.js';
 import {
@@ -32,7 +27,7 @@ export class LafeaWorkbenchController {
     const { accessoryPanels, THREE, ...storeOptions } = configuration;
     this.rootElement = rootElement;
     this.documentRef = rootElement?.ownerDocument ?? globalThis.document;
-    this.store = createLafeaWorkbenchStore(storeOptions);
+    this.store = createLafeaWorkbenchOrchestratorStore(storeOptions);
     initializeLafeaWorkbenchRenderEvidence(this, THREE ?? null);
     this.view = new LafeaWorkbenchView(rootElement, {
       getRenderPacket: (stageId) => lafeaWorkbenchDisplayRenderPacket(this, stageId),
@@ -69,6 +64,9 @@ export class LafeaWorkbenchController {
       onApplyJson: (text) => this.applyDocumentText(text),
       onMoveNode: (path, nodeId, x, y) => this.store.moveNode(path, nodeId, x, y),
       onBenchmark: () => this.runBenchmark(),
+      onImportMeshEvidence: (file) => this.loadAnalysisMeshEvidenceFile(file),
+      onValidateMeshEvidence: () => this.validateRetainedAnalysisMeshEvidence(),
+      onExportMeshEvidence: () => this.downloadAnalysisMeshEvidence(),
     });
     this.benchmarkPanel.render();
     this.unsubscribe = this.store.subscribe((state) => this.view.render(state));
@@ -87,10 +85,20 @@ export class LafeaWorkbenchController {
   async loadFile(file) {
     if (!file) return this.getState();
     try {
-      const text = await readUtf8(file);
-      return this.importDocument(JSON.parse(text));
+      return this.importDocument(JSON.parse(await readUtf8(file)));
     } catch (error) {
       return this.store.reportEditError('document', null, error);
+    }
+  }
+
+  async loadAnalysisMeshEvidenceFile(file) {
+    if (!file) return this.getState();
+    try {
+      const value = JSON.parse(await readUtf8(file));
+      this.recoverAnalysisMeshEvidence(value);
+      return this.getState();
+    } catch (error) {
+      return this.store.reportEditError('analysisMeshEvidence', null, error);
     }
   }
 
@@ -138,6 +146,10 @@ export class LafeaWorkbenchController {
   }
   recoverAnalysisMeshEvidence(value) {
     return this.store.recoverAnalysisMeshEvidence(value);
+  }
+  validateRetainedAnalysisMeshEvidence(stageId = this.getState().activeStageId) {
+    const evidence = this.selectRetainedAnalysisMeshEvidence(stageId);
+    return evidence ? this.validateLafeaAnalysisMeshEvidence(evidence) : null;
   }
 
   getDisplayViewportContext() {
@@ -195,11 +207,14 @@ export class LafeaWorkbenchController {
 
   downloadDocument() {
     const value = this.exportDocument();
-    downloadJson(
-      this.documentRef,
-      value,
-      `${value.stageId.toLowerCase().replace('.', '-')}-document.json`,
-    );
+    downloadJson(this.documentRef, value, `${fileStage(value.stageId)}-document.json`);
+    return value;
+  }
+
+  downloadAnalysisMeshEvidence(stageId = this.getState().activeStageId) {
+    const value = this.exportAnalysisMeshEvidence(stageId);
+    if (!value) return null;
+    downloadJson(this.documentRef, value, `${fileStage(stageId)}-analysis-mesh-evidence.json`);
     return value;
   }
 
@@ -223,7 +238,7 @@ function installStyles(documentRef) {
   if (!documentRef || documentRef.querySelector('[data-lafea-workbench-styles]')) return;
   const style = documentRef.createElement('style');
   style.dataset.lafeaWorkbenchStyles = 'true';
-  style.textContent = `${LAFEA_WORKBENCH_STYLES}\n${FEA_BENCHMARK_STYLES}`;
+  style.textContent = `${LAFEA_WORKBENCH_STYLES}\n${LAFEA_GUIDED_WORKBENCH_STYLES}\n${FEA_BENCHMARK_STYLES}`;
   documentRef.head?.append(style);
 }
 
@@ -237,9 +252,7 @@ async function readUtf8(file) {
 
 function parseJsonObject(text, label) {
   const value = JSON.parse(text);
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new TypeError(`${label} must be a JSON object.`);
-  }
+  if (!isRecord(value)) throw new TypeError(`${label} must be a JSON object.`);
   return value;
 }
 
@@ -256,10 +269,10 @@ function downloadJson(documentRef, value, filename) {
   documentRef.body?.append(anchor);
   anchor.click();
   anchor.remove();
-  revokeObjectUrlAfterDownload(documentRef, url);
+  revokeObjectUrlAfterDownload(url);
 }
 
-function revokeObjectUrlAfterDownload(documentRef, url) {
+function revokeObjectUrlAfterDownload(url) {
   let revoked = false;
   const revoke = () => {
     if (revoked) return;
@@ -272,6 +285,5 @@ function revokeObjectUrlAfterDownload(documentRef, url) {
   globalThis.addEventListener?.('focus', revoke, { once: true });
 }
 
-function isRecord(value) {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
+function fileStage(stageId) { return stageId.toLowerCase().replace('.', '-'); }
+function isRecord(value) { return Boolean(value) && typeof value === 'object' && !Array.isArray(value); }
