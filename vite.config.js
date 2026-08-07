@@ -7,8 +7,8 @@ const buildTime = new Date().toISOString();
  * Keep manual chunking limited to dependency-oriented or calculation-core
  * domains. Workspace modules remain graph-owned because they contain stores,
  * controllers, views, and top-level singleton instances with cross-feature
- * imports. The narrow topology-edit exceptions below contain only stateless
- * pure contract/projection helpers and own no runtime singleton.
+ * imports. The narrow workspace exceptions below contain only stateless pure
+ * contract/projection helpers and own no runtime singleton.
  */
 export function manualChunk(id) {
   const source = id.replaceAll('\\', '/');
@@ -20,7 +20,7 @@ export function manualChunk(id) {
   if (source.includes('/src/core/local-shell/')) return 'core-local-shell';
   if (source.includes('/src/core/local-stress/')) return 'core-local-stress';
   if (source.includes('/src/core/local-attachment-screening/')) return 'core-attachment-screening';
-  if (source.includes('/src/core/local-trunnion-footprint/')) return 'core-trunnion-footprint';
+  if (source.includes('/src/core/local-trunnion-footprint/')) return 'core-local-trunnion-footprint';
   if (source.includes('/src/core/linear-fea-')) return 'core-linear-fea';
   if (source.includes('/src/core/linear-piping-')) return 'core-linear-piping';
   if (source.includes('/src/core/support-')) return 'core-support-engineering';
@@ -48,6 +48,13 @@ export function manualChunk(id) {
   }
   if (source.endsWith('/src/workspace/topology-edit/topology-edit-stagedjson-engineering-source.js')) {
     return 'topology-edit-stagedjson-source-engineering';
+  }
+  if (source.endsWith('/src/workspace/resolved-engineering-geometry.js')
+    || source.endsWith('/src/workspace/model-zone-selector.js')
+    || source.endsWith('/src/workspace/model-zone-viewport-projection.js')
+    || source.endsWith('/src/workspace/viewport-render-model.js')
+    || source.endsWith('/src/workspace/support-load-viewport-callout-projection.js')) {
+    return 'workspace-viewport-engineering-projections';
   }
 
   // Rollup must own the complete stateful workspace graph so evaluation order
