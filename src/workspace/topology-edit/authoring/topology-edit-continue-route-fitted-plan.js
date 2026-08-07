@@ -15,7 +15,7 @@ function fail(message, Constructor = RangeError) {
 }
 function tangentDistance(binding) {
   const halfAngle = Number(binding.elbowAngleDeg) * Math.PI / 360;
-  const distance = Number(binding.elbowRadiusMm) / Math.tan(halfAngle);
+  const distance = Number(binding.elbowRadiusMm) * Math.tan(halfAngle);
   if (!Number.isFinite(distance) || distance <= 0) fail(`invalid tangent distance for ${binding.recordId}.`);
   return distance;
 }
