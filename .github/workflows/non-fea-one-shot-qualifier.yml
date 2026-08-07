@@ -1,4 +1,3 @@
-# repair-and-qualify revision 4
 name: non-fea-one-shot-qualifier
 
 on:
@@ -11,204 +10,55 @@ permissions:
   contents: write
 
 jobs:
-  qualify-current-feature-head:
+  patch-current-feature-head:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
-      - name: Checkout feature branch with full history
+      - name: Checkout feature branch
         uses: actions/checkout@v4
         with:
           ref: feat/load-calc-non-fea-input-check-ui
           fetch-depth: 0
 
-      - name: Use Node.js 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-
-      - name: Apply targeted qualification corrections
+      - name: Repair Phase 3 responsive action layout
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          input_path = Path('src/workspace/non-fea-input-check-view.js')
-          input_text = input_path.read_text()
-          input_old = 'A legacy calculation authorization is not a substitute for `common-enriched-piping-input/v1` and its exact readiness receipt.'
-          input_new = 'A legacy calculation authorization is not a substitute for <code>common-enriched-piping-input/v1</code> and its exact readiness receipt.'
-          if input_old in input_text:
-              input_path.write_text(input_text.replace(input_old, input_new, 1))
-          elif input_new not in input_text:
-              raise SystemExit('Input Check syntax target not found; refusing broad mutation.')
+          path = Path('src/workspace/enrichment/non-fea-enrichment-view.js')
+          text = path.read_text()
 
-          contract_path = Path('scripts/advanced-shell-contract-check.mjs')
-          contract_text = contract_path.read_text()
-          old_tabs = """const empiricalTabs = [
-            'overview',
-            '3d',
-            'restraints',
-            'load-cases',
-            'methods',
-            'results',
-            'evidence',
-          ];
-          const legacyTabs = ['loads', 'preflight', 'project-data', 'masters', 'json-trace'];
-          assert.deepEqual(loadCalcTabs, [...empiricalTabs, ...legacyTabs]);
-          assert.deepEqual(
-            loadCalcTabs.filter((tab) => legacyTabs.includes(tab)),
-            legacyTabs,
-            'The existing Load Calc tabs must remain present in their prior order.',
-          );"""
-          new_tabs = """const expectedLoadCalcTabs = [
-            'overview',
-            '3d',
-            'preflight',
-            'project-data',
-            'masters',
-            'enrichment',
-            'method-basis',
-            'seal-export',
-            'restraints',
-            'load-cases',
-            'methods',
-            'results',
-            'evidence',
-            'loads',
-            'json-trace',
-          ];
-          assert.deepEqual(loadCalcTabs, expectedLoadCalcTabs);
-          for (const requiredTab of ['overview', '3d', 'restraints', 'load-cases', 'methods', 'results', 'evidence', 'loads', 'preflight', 'project-data', 'masters', 'json-trace']) {
-            assert.equal(loadCalcTabs.includes(requiredTab), true, `Load Calc must retain ${requiredTab}.`);
-          }
-          for (const governedTab of ['enrichment', 'method-basis', 'seal-export']) {
-            assert.equal(loadCalcTabs.includes(governedTab), true, `Load Calc must mount governed Non-FEA tab ${governedTab}.`);
-          }"""
-          if old_tabs in contract_text:
-              contract_text = contract_text.replace(old_tabs, new_tabs, 1)
-          elif new_tabs not in contract_text:
-              raise SystemExit('Load Calc tab contract target not found; refusing broad mutation.')
+          old_root = '.nfe{height:100%;overflow:auto;padding:16px;box-sizing:border-box;background:#07101e;color:#e2e8f0}'
+          new_root = '.nfe{height:100%;overflow:auto;padding:16px 16px 96px;scroll-padding-block:160px 96px;box-sizing:border-box;background:#07101e;color:#e2e8f0}'
+          if old_root in text:
+              text = text.replace(old_root, new_root, 1)
+          elif new_root not in text:
+              raise SystemExit('Enrichment scroll-container target not found; refusing broad mutation.')
 
-          old_views = """  'master-data-ui.js',
-            'json-trace-ui.js',
-            'topology-edit-3d-sjson-fidelity-controller.js',"""
-          new_views = """  'master-data-ui.js',
-            'enrichment/non-fea-enrichment-view.js',
-            'non-fea-method-basis-view.js',
-            'non-fea-seal-export-view.js',
-            'json-trace-ui.js',
-            'topology-edit-3d-sjson-fidelity-controller.js',"""
-          if old_views in contract_text:
-              contract_text = contract_text.replace(old_views, new_views, 1)
-          elif new_views not in contract_text:
-              raise SystemExit('Load Calc deferred-view contract target not found; refusing broad mutation.')
-          contract_path.write_text(contract_text)
+          old_columns = '.nfe__layout main,.nfe__layout aside{display:flex;flex-direction:column;gap:12px}'
+          new_columns = '.nfe__layout main,.nfe__layout aside{display:flex;flex-direction:column;gap:12px;min-width:0}'
+          if old_columns in text:
+              text = text.replace(old_columns, new_columns, 1)
+          elif new_columns not in text:
+              raise SystemExit('Enrichment column target not found; refusing broad mutation.')
+
+          old_form = '.nfe-form{display:grid;grid-template-columns:repeat(3,minmax(150px,1fr));gap:8px}'
+          new_form = '.nfe-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.nfe-form button[type="submit"]{min-height:36px;scroll-margin-block:160px 96px}'
+          if old_form in text:
+              text = text.replace(old_form, new_form, 1)
+          elif new_form not in text:
+              raise SystemExit('Enrichment form-grid target not found; refusing broad mutation.')
+
+          path.write_text(text)
           PY
           git diff --check
-          if ! git diff --quiet; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add src/workspace/non-fea-input-check-view.js scripts/advanced-shell-contract-check.mjs
-            git commit -m "fix(non-fea): align integrated Load Calc shell contract"
-            git push origin HEAD:feat/load-calc-non-fea-input-check-ui
+          if git diff --quiet; then
+            echo 'Layout correction already present.'
+            exit 0
           fi
-          git fetch origin feat/load-calc-non-fea-input-check-ui main
-          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/feat/load-calc-non-fea-input-check-ui)"
-
-      - name: Prove exact remote feature head
-        shell: bash
-        run: |
-          git fetch origin feat/load-calc-non-fea-input-check-ui main
-          expected="$(git rev-parse origin/feat/load-calc-non-fea-input-check-ui)"
-          actual="$(git rev-parse HEAD)"
-          printf 'EXPECTED_FEATURE_HEAD=%s\nACTUAL_HEAD=%s\n' "$expected" "$actual"
-          test "$actual" = "$expected"
-          git diff --exit-code
-
-      - name: Enforce phased Non-FEA scope
-        shell: bash
-        run: |
-          base_sha="$(git merge-base origin/main HEAD)"
-          changed="$(git diff --name-only "$base_sha"...HEAD)"
-          printf '%s\n' "$changed"
-          unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(doc/prelight_roamap\.md|src/core/non-fea-enrichment/.*|src/core/non-fea-common-checker/.*|src/core/non-fea-method-consumption/.*|src/workspace/bootstrap\.js|src/workspace/workspace-layout\.js|src/workspace/load-calc-consumer-controller\.js|src/workspace/load-calc-consumer-view\.js|src/workspace/non-fea-input-check-view\.js|src/workspace/non-fea-common-input-store\.js|src/workspace/non-fea-common-input-runtime\.js|src/workspace/non-fea-common-input-check-adapter\.js|src/workspace/non-fea-method-basis-view\.js|src/workspace/non-fea-seal-export-view\.js|src/workspace/empirical-preflight-view\.js|src/workspace/engineering-model-controller\.js|src/workspace/engineering-loads/empirical-load-calc-scenario-controller\.js|src/workspace/enrichment/authorized-enrichment-consumer-controller\.js|src/workspace/enrichment/authorized-enrichment-runtime\.js|src/workspace/enrichment/non-fea-enrichment-store\.js|src/workspace/enrichment/non-fea-enrichment-view\.js|src/workspace/enrichment/non-fea-enrichment-input-check-adapter\.js|src/workspace/project-data/project-data-fields\.js|src/workspace/project-data/project-data-contract\.js|src/workspace/project-data/project-data-store\.js|src/workspace/project-data/non-fea-field-registry\.js|src/workspace/project-data/project-data-view\.js|src/workspace/project-data/project-data-view-full\.js|src/workspace/project-data/non-fea-project-data-view\.js|src/workspace/project-data/non-fea-project-data-view-v2\.js|scripts/advanced-shell-contract-check\.mjs|scripts/non-fea-project-data-authority-check\.mjs|scripts/non-fea-enrichment-migration-check\.mjs|scripts/non-fea-common-checker-check\.mjs|scripts/non-fea-method-consumption-check\.mjs|scripts/non-fea-release-qualification-check\.mjs|scripts/first-cut-workbench-launcher-source-guard\.mjs|e2e/non-fea-input-check-load-calc\.spec\.js|\.github/workflows/non-fea-input-check-load-calc\.yml)$' || true)"
-          test -z "$unexpected"
-          imports="$(grep '^import ' src/core/non-fea-enrichment/index.js src/core/non-fea-common-checker/index.js src/core/non-fea-common-checker/integrity.js src/core/non-fea-method-consumption/index.js src/workspace/non-fea-common-input-runtime.js src/workspace/non-fea-method-basis-view.js src/workspace/non-fea-seal-export-view.js src/workspace/enrichment/non-fea-enrichment-store.js src/workspace/enrichment/non-fea-enrichment-view.js src/workspace/enrichment/non-fea-enrichment-input-check-adapter.js src/workspace/project-data/non-fea-field-registry.js || true)"
-          if printf '%s\n' "$imports" | grep -Eiq '(linear-fea|lafea|lfea|shell|continuum|solver)'; then
-            echo 'Prohibited FEA import detected.' >&2
-            exit 1
-          fi
-          test -z "$(git diff "$base_sha"...HEAD -- src/workspace/application-shell-controller.js src/core/workspace-consumers || true)"
-          grep -q '^### Phase 1 — Lossless preflight consolidation' doc/prelight_roamap.md
-          grep -q '^### Phase 2 — Project Data authority expansion' doc/prelight_roamap.md
-          grep -q '^### Phase 3 — Common enrichment and override migration' doc/prelight_roamap.md
-          grep -q '^### Phase 4 — Common checker, method readiness and seal' doc/prelight_roamap.md
-          grep -q '^### Phase 5 — Method consumption and First Cut retirement' doc/prelight_roamap.md
-          grep -q '^### Phase 6 — Qualification, performance and release' doc/prelight_roamap.md
-          grep -q 'common-enriched-piping-input/v1' doc/prelight_roamap.md
-
-      - name: Syntax check phased files
-        run: |
-          node --check src/core/non-fea-enrichment/index.js
-          node --check src/core/non-fea-common-checker/index.js
-          node --check src/core/non-fea-common-checker/integrity.js
-          node --check src/core/non-fea-method-consumption/index.js
-          node --check src/workspace/bootstrap.js
-          node --check src/workspace/workspace-layout.js
-          node --check src/workspace/load-calc-consumer-controller.js
-          node --check src/workspace/load-calc-consumer-view.js
-          node --check src/workspace/non-fea-input-check-view.js
-          node --check src/workspace/non-fea-common-input-store.js
-          node --check src/workspace/non-fea-common-input-runtime.js
-          node --check src/workspace/non-fea-common-input-check-adapter.js
-          node --check src/workspace/non-fea-method-basis-view.js
-          node --check src/workspace/non-fea-seal-export-view.js
-          node --check src/workspace/empirical-preflight-view.js
-          node --check src/workspace/engineering-model-controller.js
-          node --check src/workspace/engineering-loads/empirical-load-calc-scenario-controller.js
-          node --check src/workspace/enrichment/authorized-enrichment-consumer-controller.js
-          node --check src/workspace/enrichment/authorized-enrichment-runtime.js
-          node --check src/workspace/enrichment/non-fea-enrichment-store.js
-          node --check src/workspace/enrichment/non-fea-enrichment-view.js
-          node --check src/workspace/enrichment/non-fea-enrichment-input-check-adapter.js
-          node --check src/workspace/project-data/non-fea-field-registry.js
-          node --check scripts/advanced-shell-contract-check.mjs
-          node --check scripts/non-fea-project-data-authority-check.mjs
-          node --check scripts/non-fea-enrichment-migration-check.mjs
-          node --check scripts/non-fea-common-checker-check.mjs
-          node --check scripts/non-fea-method-consumption-check.mjs
-          node --check scripts/non-fea-release-qualification-check.mjs
-          node --check scripts/first-cut-workbench-launcher-source-guard.mjs
-          node --check e2e/non-fea-input-check-load-calc.spec.js
-
-      - name: Phase 2 authority contract check
-        run: node scripts/non-fea-project-data-authority-check.mjs
-
-      - name: Phase 3 enrichment migration check
-        run: node scripts/non-fea-enrichment-migration-check.mjs
-
-      - name: Phase 4 common checker and seal check
-        run: node scripts/non-fea-common-checker-check.mjs
-
-      - name: Phase 5 method consumption and retirement check
-        run: |
-          node scripts/non-fea-method-consumption-check.mjs
-          node scripts/first-cut-workbench-launcher-source-guard.mjs
-
-      - name: Phase 6 release qualification regression
-        run: node scripts/non-fea-release-qualification-check.mjs
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Import graph
-        run: npm run check:imports
-
-      - name: Production build
-        run: npm run build
-
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
-
-      - name: Integrated Input Check browser test
-        run: node scripts/run-playwright.mjs e2e/non-fea-input-check-load-calc.spec.js
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/workspace/enrichment/non-fea-enrichment-view.js
+          git commit -m 'fix(non-fea): keep enrichment actions clear of shell overlays'
+          git push origin HEAD:feat/load-calc-non-fea-input-check-ui
