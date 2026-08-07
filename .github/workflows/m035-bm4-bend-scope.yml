@@ -97,82 +97,22 @@ jobs:
           node scripts/lfea-m035-bm4-scope-policy-check.mjs
 
       - name: Generic bend feature integration
-        shell: bash
-        run: |
-          set +e
-          node scripts/lfea-m035-generic-bend-integration-check.mjs > /tmp/m035-generic-bend.log 2>&1
-          status=$?
-          cat /tmp/m035-generic-bend.log
-          if [ "$status" -ne 0 ]; then
-            message="$(tr '\n' ' ' < /tmp/m035-generic-bend.log | head -c 3500)"
-            echo "::error file=scripts/lfea-m035-generic-bend-integration-check.mjs,line=1,title=M035 generic bend integration::${message}"
-          fi
-          exit "$status"
+        run: node scripts/lfea-m035-generic-bend-integration-check.mjs
 
       - name: Generic B31J directional tee mechanics
-        shell: bash
-        run: |
-          set +e
-          node scripts/lfea-m035-b31j-directional-tee-check.mjs > /tmp/m035-tee.log 2>&1
-          status=$?
-          cat /tmp/m035-tee.log
-          if [ "$status" -ne 0 ]; then
-            message="$(tr '\n' ' ' < /tmp/m035-tee.log | head -c 3500)"
-            echo "::error file=scripts/lfea-m035-b31j-directional-tee-check.mjs,line=1,title=M035 B31J tee mechanics::${message}"
-          fi
-          exit "$status"
+        run: node scripts/lfea-m035-b31j-directional-tee-check.mjs
 
       - name: Generic reducer sampling qualification
-        shell: bash
-        run: |
-          set +e
-          node scripts/lfea-m035-reducer-sampling-qualification-check.mjs > /tmp/m035-reducer.log 2>&1
-          status=$?
-          cat /tmp/m035-reducer.log
-          if [ "$status" -ne 0 ]; then
-            message="$(tr '\n' ' ' < /tmp/m035-reducer.log | head -c 3500)"
-            echo "::error file=scripts/lfea-m035-reducer-sampling-qualification-check.mjs,line=1,title=M035 reducer sampling::${message}"
-          fi
-          exit "$status"
+        run: node scripts/lfea-m035-reducer-sampling-qualification-check.mjs
 
       - name: Mixed feature mechanics preparation
-        shell: bash
-        run: |
-          set +e
-          node scripts/lfea-m035-feature-mechanics-preparation-check.mjs > /tmp/m035-feature-preparation.log 2>&1
-          status=$?
-          cat /tmp/m035-feature-preparation.log
-          if [ "$status" -ne 0 ]; then
-            message="$(tr '\n' ' ' < /tmp/m035-feature-preparation.log | head -c 3500)"
-            echo "::error file=scripts/lfea-m035-feature-mechanics-preparation-check.mjs,line=1,title=M035 feature preparation::${message}"
-          fi
-          exit "$status"
+        run: node scripts/lfea-m035-feature-mechanics-preparation-check.mjs
 
       - name: Force-only component recovery scope
-        shell: bash
-        run: |
-          set +e
-          node scripts/lfea-m035-force-only-recovery-check.mjs > /tmp/m035-force-only-recovery.log 2>&1
-          status=$?
-          cat /tmp/m035-force-only-recovery.log
-          if [ "$status" -ne 0 ]; then
-            message="$(tr '\n' ' ' < /tmp/m035-force-only-recovery.log | head -c 3500)"
-            echo "::error file=src/core/linear-fea-result-recovery/recovery.js,line=1,title=M035 force-only recovery::${message}"
-          fi
-          exit "$status"
+        run: node scripts/lfea-m035-force-only-recovery-check.mjs
 
       - name: BM4 source feature inventory
-        shell: bash
-        run: |
-          set +e
-          node scripts/lfea-m035-bm4-feature-inventory-check.mjs > /tmp/m035-bm4-feature-inventory.log 2>&1
-          status=$?
-          cat /tmp/m035-bm4-feature-inventory.log
-          if [ "$status" -ne 0 ]; then
-            message="$(tr '\n' ' ' < /tmp/m035-bm4-feature-inventory.log | head -c 3500)"
-            echo "::error file=scripts/lfea-m035-bm4-feature-inventory-check.mjs,line=1,title=M035 BM4 feature inventory::${message}"
-          fi
-          exit "$status"
+        run: node scripts/lfea-m035-bm4-feature-inventory-check.mjs
 
       - name: BM4 feature-aware bend and tee solve
         shell: bash
@@ -188,17 +128,7 @@ jobs:
           exit "$status"
 
       - name: B31 bend authority audit
-        shell: bash
-        run: |
-          set +e
-          node scripts/lfea-m035-bm4-bend-authority-check.mjs > /tmp/m035-bend-audit.log 2>&1
-          status=$?
-          cat /tmp/m035-bend-audit.log
-          if [ "$status" -ne 0 ]; then
-            message="$(tr '\n' ' ' < /tmp/m035-bend-audit.log | head -c 3500)"
-            echo "::error file=scripts/lfea-m035-bm4-bend-authority-check.mjs,line=1,title=M035 bend authority audit::${message}"
-          fi
-          exit "$status"
+        run: node scripts/lfea-m035-bm4-bend-authority-check.mjs
 
       - name: Upload M035 mechanics evidence
         if: always()
@@ -206,32 +136,33 @@ jobs:
         with:
           name: m035-feature-mechanics-${{ env.TARGET_HEAD_SHA }}
           path: |
-            /tmp/m035-generic-bend.log
-            /tmp/m035-tee.log
-            /tmp/m035-reducer.log
-            /tmp/m035-feature-preparation.log
-            /tmp/m035-force-only-recovery.log
-            /tmp/m035-bm4-feature-inventory.log
             /tmp/m035-bm4-feature-solve.log
-            /tmp/m035-bend-audit.log
           if-no-files-found: warn
           retention-days: 7
 
-      - name: Existing component regressions
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run check:lfea-b3.1
-          npm run check:lfea-b3.2
-          npm run check:lfea-b3.4
-          npm run check:lfea-b3.19
-          npm run check:lfea-b3.23
-          npm run check:lfea-b3.18
-          npm run check:lfea-bm1-cii-comparison
+      - name: Regression B3.1 frame element
+        run: npm run check:lfea-b3.1
 
-      - name: BM2 and BM3 solver regressions
-        shell: bash
-        run: |
-          set -euo pipefail
-          node scripts/lfea-b3.26-bm2-solve-comparison-check.mjs
-          node scripts/lfea-m028-bm3-check.mjs
+      - name: Regression B3.2 piping components
+        run: npm run check:lfea-b3.2
+
+      - name: Regression B3.4 result recovery
+        run: npm run check:lfea-b3.4
+
+      - name: Regression B3.19 B31 factors
+        run: npm run check:lfea-b3.19
+
+      - name: Regression B3.23 reducer condensation
+        run: npm run check:lfea-b3.23
+
+      - name: Regression B3.18 BM1 bend
+        run: npm run check:lfea-b3.18
+
+      - name: Regression BM1 CAESAR comparison
+        run: npm run check:lfea-bm1-cii-comparison
+
+      - name: Regression BM2 solver comparison
+        run: node scripts/lfea-b3.26-bm2-solve-comparison-check.mjs
+
+      - name: Regression BM3 solver comparison
+        run: node scripts/lfea-m028-bm3-check.mjs
