@@ -1,5 +1,8 @@
 import { deepFreeze, semanticHash } from '../../../core/shared-piping-model/index.js';
 import {
+  compileTopologyEditStagedJsonEngineeringPatches,
+} from './topology-edit-stagedjson-engineering-writeback.js';
+import {
   createTopologyEditSourcePatch,
   prepareTopologyEditSourceSurgicalPatch,
   readTopologyEditSourceJsonPointer,
@@ -19,12 +22,16 @@ export function prepareTopologyEditStagedJsonWriteback(input = {}) {
   const base = assertCanonical(input.baseCanonicalTopology, 'baseCanonicalTopology');
   const edited = assertCanonical(input.canonicalTopology, 'canonicalTopology');
   assertSourceAuthority(dataset, base, edited);
-  assertSameEngineeringModel(base, edited);
+  const engineering = compileTopologyEditStagedJsonEngineeringPatches({
+    dataset,
+    baseCanonicalTopology: base,
+    canonicalTopology: edited,
+  });
 
   const entities = new Map((dataset.entities ?? []).map((row) => [row.entityId, row]));
   const baseNodes = new Map(base.nodes.map((row) => [row.id, row]));
   const editedNodes = new Map(edited.nodes.map((row) => [row.id, row]));
-  const patches = [];
+  const patches = [...engineering.patches];
   const changedNodeIds = [];
 
   for (const [nodeId, editedNode] of editedNodes) {
@@ -50,6 +57,8 @@ export function prepareTopologyEditStagedJsonWriteback(input = {}) {
     canonicalTopologyHash: edited.canonicalTopologyHash,
     sourceHash: dataset.sourceSnapshot.sourceSemanticHash,
     changedNodeIds: [...changedNodeIds].sort(),
+    changedEdgeIds: engineering.changedEdgeIds,
+    changedJunctionIds: engineering.changedJunctionIds,
     patchHashes: surgical.patchHashes,
     surgicalPatchHash: surgical.surgicalPatchHash,
     resultingSourceSemanticHash: surgical.resultingSourceSemanticHash,
@@ -165,28 +174,6 @@ function pointLike(before, point) {
   throw new RangeError('StagedJSON writeback: source point shape is not writable without regeneration.');
 }
 
-function assertSameEngineeringModel(base, edited) {
-  for (const collection of ['edges', 'junctions', 'supports', 'boundaries', 'rigids']) {
-    const left = (base[collection] ?? []).map(nonGeometryRecord);
-    const right = (edited[collection] ?? []).map(nonGeometryRecord);
-    if (semanticHash(left) !== semanticHash(right)) {
-      throw new RangeError(`StagedJSON writeback: ${collection} changed outside the qualified geometry vocabulary.`);
-    }
-  }
-  const leftIds = base.nodes.map((row) => row.id).sort();
-  const rightIds = edited.nodes.map((row) => row.id).sort();
-  if (semanticHash(leftIds) !== semanticHash(rightIds)) {
-    throw new RangeError('StagedJSON writeback: node creation/deletion is not source-representable in this slice.');
-  }
-}
-
-function nonGeometryRecord(row) {
-  const result = structuredClone(row);
-  for (const key of Object.keys(result)) {
-    if (/Hash$/u.test(key) || /^source[A-Z_]/u.test(key)) Reflect.deleteProperty(result, key);
-  }
-  return result;
-}
 function assertSourceAuthority(dataset, base, edited) {
   if (!STAGED_JSON_SCHEMAS.has(dataset.sourceSchema)) {
     throw new RangeError(`StagedJSON writeback: unsupported source schema ${dataset.sourceSchema}.`);
