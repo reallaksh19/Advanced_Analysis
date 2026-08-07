@@ -20,7 +20,7 @@ export function manualChunk(id) {
   if (source.includes('/src/core/local-shell/')) return 'core-local-shell';
   if (source.includes('/src/core/local-stress/')) return 'core-local-stress';
   if (source.includes('/src/core/local-attachment-screening/')) return 'core-attachment-screening';
-  if (source.includes('/src/core/local-trunnion-footprint/')) return 'core-trunnion-footprint';
+  if (source.includes('/src/core/local-trunnion-footprint/')) return 'core-local-trunnion-footprint';
   if (source.includes('/src/core/linear-fea-')) return 'core-linear-fea';
   if (source.includes('/src/core/linear-piping-')) return 'core-linear-piping';
   if (source.includes('/src/core/support-')) return 'core-support-engineering';
@@ -48,6 +48,15 @@ export function manualChunk(id) {
   }
   if (source.endsWith('/src/workspace/topology-edit/topology-edit-stagedjson-engineering-source.js')) {
     return 'topology-edit-stagedjson-source-engineering';
+  }
+  if (source.endsWith('/src/workspace/topology-edit/topology-edit-pipe-segment-contract.js')
+    || source.endsWith('/src/workspace/topology-edit/topology-edit-pipe-segment-geometry.js')
+    || source.endsWith('/src/workspace/topology-edit/topology-edit-pipe-segment-resolver.js')
+    || source.endsWith('/src/workspace/topology-edit/topology-edit-pipe-segment-reducer.js')
+    || source.endsWith('/src/workspace/topology-edit/topology-edit-pipe-segment-effect.js')
+    || source.endsWith('/src/workspace/topology-edit/topology-edit-pipe-segment-command.js')
+    || source.endsWith('/src/workspace/topology-edit/topology-edit-native-pipe-writeback.js')) {
+    return 'topology-edit-native-pipe-authority';
   }
 
   // Rollup must own the complete stateful workspace graph so evaluation order
