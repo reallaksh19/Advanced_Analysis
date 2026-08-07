@@ -258,8 +258,8 @@ const m035Displacement = m035Rows.filter((row) => row.family === 'displacement')
 const m035Forces = m035Rows.filter((row) => row.family !== 'displacement');
 assert.equal(m035Displacement.length, 1746, 'M035 displacement comparison row-count parity');
 assert.equal(m035Forces.length, 6516, 'M035 force comparison row-count parity');
-assert.ok(Math.abs(m035Displacement.filter((row) => row.passedTarget).length / m035Displacement.length * 100 - 18.499427262313862) < 1e-12, 'M035 raw displacement rate parity');
-assert.ok(Math.abs(m035Forces.filter((row) => row.passedTarget).length / m035Forces.length * 100 - 31.49171270718232) < 1e-12, 'M035 raw force rate parity after local-axis reference normalization');
+assert.ok(Math.abs(m035Displacement.filter((row) => row.passedTarget).length / m035Displacement.length * 100 - 31.958762886597935) < 1e-12, 'M035 raw displacement parity under qualified BM4 thermal authority');
+assert.ok(Math.abs(m035Forces.filter((row) => row.passedTarget).length / m035Forces.length * 100 - 35.543278084714544) < 1e-12, 'M035 raw force parity after local-axis normalization and qualified BM4 thermal authority');
 
 const reducerNodes = new Set(combined.authorities.inlineReducers.transitions.map((row) => String(row.nodeId)));
 const rigidElementPairs = new Set(combined.authorities.base.entries
