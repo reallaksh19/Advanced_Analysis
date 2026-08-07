@@ -47,6 +47,7 @@ jobs:
             src/workspace/viewport-productivity/topology-edit-table-grid-view.js
             src/workspace/viewport-productivity/topology-edit-table-styles.js
             src/workspace/viewport-productivity/topology-edit-table-runtime.js
+            src/workspace/viewport-productivity/topology-edit-table-workflow.js
             tests/topology-edit-table-view-state.test.mjs
             e2e/topology-edit-table-authority.spec.js
           )
