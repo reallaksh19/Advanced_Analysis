@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url';
 import { solveBm4InputXmlConditioned } from './lfea-m034-bm4-solve-runtime.mjs';
 import { BM4_COMPARISON_POLICY, loadBm4CiiOutputCases1921 } from './lfea-m034-bm4-output-comparison.mjs';
 
+// M034 Phase 2 remains the immutable bilateral before-baseline. M036's opt-in
+// active-set after-solve is qualified separately by lfea-m036-bm4-liftoff-check.mjs.
 // M034 Phase 2: real solve + CASE 19(SUS)/20(OPE)/21(EXP) comparison against
 // Output_BM4.xml, with a full nodewise/elementwise deviation report and
 // named root-cause tagging for every miss against the <5% target the Owner

@@ -46,6 +46,7 @@ import { eulerBernoulliProfile } from './lfea-b3.1-frame-element-fixtures.mjs';
 export const BM4_INPUT_PATH = fileURLToPath(new URL('../benchmarks/LFEA/BM4/InputXML_BM4.xml', import.meta.url));
 export const BM4_OUTPUT_PATH = fileURLToPath(new URL('../benchmarks/LFEA/BM4/Output_BM4.xml', import.meta.url));
 export const BM4_SOURCE_ID = 'CAESAR-II-BM4-LIVE-INPUTXML';
+export const BM4_M036_LIFTOFF_NODE_IDS = Object.freeze(['20090', '20350', '21470', '21610']);
 export const INSTALLATION_TEMPERATURE = 293.15;
 export const THERMAL_EXPANSION_COEFFICIENT = 1.17e-5;
 export const GRAVITY = 9.80665;

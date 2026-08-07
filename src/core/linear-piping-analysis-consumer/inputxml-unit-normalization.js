@@ -103,12 +103,21 @@ function normalizeNode(node, scale, index) {
   requireRecord(node, `inputXmlGeometry.nodes[${index}]`);
   rejectUnknownNumericMetadata(node.meta, NODE_META_FIELDS, `nodes[${index}].meta`);
   rejectUnknownNumericFields(node, new Set(['x', 'y', 'z']), `nodes[${index}]`);
-  return {
+  const result = {
     ...structuredClone(node),
     x: scaleNumber(node.x, scale, `nodes[${index}].x`),
     y: scaleNumber(node.y, scale, `nodes[${index}].y`),
     z: scaleNumber(node.z, scale, `nodes[${index}].z`),
   };
+  if (Array.isArray(result.meta?.restraints)) {
+    result.meta.restraints = result.meta.restraints.map((restraint, restraintIndex) => ({
+      ...restraint,
+      gap: typeof restraint.gap === 'number'
+        ? scaleNumber(restraint.gap, scale, `nodes[${index}].meta.restraints[${restraintIndex}].gap`)
+        : restraint.gap,
+    }));
+  }
+  return result;
 }
 
 function normalizeSegment(segment, scale, index) {

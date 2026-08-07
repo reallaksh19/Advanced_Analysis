@@ -586,6 +586,7 @@ function applyRestraints(edge, nodesById, restraintTypeCodeMap, mutationConfig, 
       xCosine: caesarNumberOrNull(attributeValue(restraint.attributes, 'XCOSINE')),
       yCosine: caesarNumberOrNull(attributeValue(restraint.attributes, 'YCOSINE')),
       zCosine: caesarNumberOrNull(attributeValue(restraint.attributes, 'ZCOSINE')),
+      gap: caesarNumberOrNull(attributeValue(restraint.attributes, 'GAP')),
       frictionCoefficient: caesarNumberOrNull(attributeValue(restraint.attributes, 'FRIC_COEF')),
     });
     const mapped = typeCode == null ? undefined : restraintTypeCodeMap[typeCode];
