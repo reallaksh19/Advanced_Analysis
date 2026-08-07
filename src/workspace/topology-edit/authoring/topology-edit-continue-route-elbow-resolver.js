@@ -16,13 +16,17 @@ function sourceReference(value) {
     path: String(value?.path ?? '').trim(),
   };
 }
+function connectionPair(value) {
+  return [value?.endConnectionFrom, value?.endConnectionTo]
+    .map((row) => String(row ?? '').trim().toUpperCase())
+    .sort();
+}
 function connectionCompatible(pipe, elbow) {
-  const pipeConnections = new Set([
-    String(pipe.endConnectionFrom ?? '').toUpperCase(),
-    String(pipe.endConnectionTo ?? '').toUpperCase(),
-  ]);
-  return pipeConnections.has(String(elbow.endConnectionFrom ?? '').toUpperCase())
-    && pipeConnections.has(String(elbow.endConnectionTo ?? '').toUpperCase());
+  const pipePair = connectionPair(pipe);
+  const elbowPair = connectionPair(elbow);
+  return pipePair.length === 2
+    && elbowPair.length === 2
+    && pipePair.every((value, index) => value && value === elbowPair[index]);
 }
 function compatibleRecord(record, pipe, turn) {
   return record.componentType === 'ELBOW'
