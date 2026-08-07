@@ -17,7 +17,8 @@ test('Table stays projection-only until certified pipe-length Apply', async ({ p
 
   const before = await evidence(page);
   const projectionHash = await host.getAttribute('data-topology-edit-table-projection-hash');
-  const firstRow = page.locator('[data-role="topology-edit-table"] tbody tr').first();
+  const table = page.locator('[data-role="topology-edit-table"]');
+  const firstRow = table.locator('tbody tr').first();
   await expect(firstRow).toBeVisible();
   const firstCanonicalId = await firstRow.getAttribute('data-canonical-id');
   await firstRow.locator('[data-table-select]').click();
@@ -35,7 +36,7 @@ test('Table stays projection-only until certified pipe-length Apply', async ({ p
 
   const editable = await chooseTerminalPipe(page);
   await filter.fill(editable.tag);
-  const row = page.locator(`[data-canonical-id="${editable.edgeId}"]`);
+  const row = table.locator(`[data-canonical-id="${editable.edgeId}"]`);
   await expect(row).toBeVisible();
   await row.locator('[data-table-select]').click();
   await expect.poll(() => host.getAttribute('data-topology-edit-selection-primary-id')).toBe(editable.edgeId);
