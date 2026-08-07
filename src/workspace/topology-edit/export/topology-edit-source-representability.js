@@ -27,6 +27,7 @@ export const SOURCE_CAPABILITY = Object.freeze({
   SUPPORT_GAP_MM: 'SUPPORT_GAP_MM',
   SUPPORT_TRAVEL_MM: 'SUPPORT_TRAVEL_MM',
   NATIVE_IDENTITY: 'NATIVE_IDENTITY',
+  SOURCE_RECORD_INSERTION: 'SOURCE_RECORD_INSERTION',
   OPAQUE_SOURCE_FIELDS: 'OPAQUE_SOURCE_FIELDS',
 });
 
@@ -120,6 +121,13 @@ function engineeringFacts(topology, dataset) {
     addCatalogue(facts, edge.id, edge);
     if (String(edge.identityKind ?? '').toUpperCase() === 'NATIVE_COMMAND') {
       add(facts, edge.id, 'nativeIdentity', SOURCE_CAPABILITY.NATIVE_IDENTITY, nativeIdentity(edge));
+      if (String(edge.topologyOperation ?? '').toUpperCase() === 'INSERT_PIPE_SEGMENT') {
+        add(facts, edge.id, 'sourceRecordInsertion', SOURCE_CAPABILITY.SOURCE_RECORD_INSERTION, {
+          componentKey: edge.componentKey ?? null,
+          fromNodeId: edge.fromNodeId,
+          toNodeId: edge.toNodeId,
+        });
+      }
     }
   }
   for (const junction of topology.junctions ?? []) {

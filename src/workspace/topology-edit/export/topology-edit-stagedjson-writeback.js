@@ -3,6 +3,11 @@ import {
   compileTopologyEditStagedJsonEngineeringPatches,
 } from './topology-edit-stagedjson-engineering-writeback.js';
 import {
+  assessTopologyEditSourceRecordInsertion,
+  assertTopologyEditSourceRecordInsertionCapability,
+  SOURCE_RECORD_INSERTION_FAMILY,
+} from './topology-edit-source-record-insertion-capability.js';
+import {
   createTopologyEditSourcePatch,
   prepareTopologyEditSourceSurgicalPatch,
   readTopologyEditSourceJsonPointer,
@@ -22,6 +27,7 @@ export function prepareTopologyEditStagedJsonWriteback(input = {}) {
   const base = assertCanonical(input.baseCanonicalTopology, 'baseCanonicalTopology');
   const edited = assertCanonical(input.canonicalTopology, 'canonicalTopology');
   assertSourceAuthority(dataset, base, edited);
+  assertNoSourceRecordInsertion(base, edited);
   const engineering = compileTopologyEditStagedJsonEngineeringPatches({
     dataset,
     baseCanonicalTopology: base,
@@ -89,6 +95,19 @@ export function assertTopologyEditStagedJsonWriteback(value) {
     throw new Error('StagedJSON writeback: authority hash mismatch.');
   }
   return value;
+}
+
+function assertNoSourceRecordInsertion(base, edited) {
+  const capability = assessTopologyEditSourceRecordInsertion({
+    family: SOURCE_RECORD_INSERTION_FAMILY.STAGED_JSON,
+    baseCanonicalTopology: base,
+    canonicalTopology: edited,
+  });
+  assertTopologyEditSourceRecordInsertionCapability(capability);
+  if (capability.status === 'BLOCKED') {
+    const rows = capability.blockers.map((row) => `${row.code}:${row.canonicalId}`).join(', ');
+    throw new RangeError(`StagedJSON writeback: source record insertion blocked: ${rows}.`);
+  }
 }
 
 function compileNodeEndpointPatches({ nodeId, position, base, dataset, entities, patches }) {

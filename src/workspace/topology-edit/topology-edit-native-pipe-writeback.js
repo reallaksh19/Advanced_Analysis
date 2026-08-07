@@ -1,7 +1,11 @@
 import { deepFreeze, semanticHash } from '../../core/shared-piping-model/index.js';
+import {
+  assertNativePipeWritebackEnvelope,
+  NATIVE_PIPE_WRITEBACK_SCHEMA,
+} from '../../core/shared-piping-model/native-pipe-writeback-envelope.js';
 import { pipeSegmentMidpoint } from './topology-edit-pipe-segment-geometry.js';
 
-export const NATIVE_PIPE_WRITEBACK_SCHEMA = 'TopologyEditNativePipeWriteback.v1';
+export { NATIVE_PIPE_WRITEBACK_SCHEMA };
 
 function fail(message, Constructor = RangeError) {
   throw new Constructor(`TopologyEditNativePipeWriteback: ${message}`);
@@ -140,56 +144,23 @@ export function createNativePipeWorkspaceEntity(canonicalTopology, edgeId) {
 }
 
 function recoveredNode(params, port, index) {
-  const records = Array.isArray(params.endpointNodes) ? params.endpointNodes : [];
-  const record = records[index];
-  if (!record || record.id !== port.nodeId) {
-    fail(`endpoint node ${index} differs from explicit port identity.`);
-  }
-  if (!samePoint(record.position, port.position)
-    || !(record.portKeys ?? []).includes(port.portKey)) {
-    fail(`endpoint node ${record.id} differs from explicit port evidence.`);
-  }
+  const record = params.endpointNodes[index];
   return deepFreeze(clone(record));
 }
 
 export function recoverNativePipeCanonicalRecords(entity) {
-  const params = entity?.properties?.nativeParams;
-  if (params?.schema !== NATIVE_PIPE_WRITEBACK_SCHEMA) {
-    fail(`nativeParams must use ${NATIVE_PIPE_WRITEBACK_SCHEMA}.`, TypeError);
-  }
-  const supplied = { ...params };
-  delete supplied.writebackHash;
-  if (semanticHash(supplied) !== params.writebackHash) {
-    fail('native writeback hash mismatch.');
-  }
+  assertNativePipeWritebackEnvelope(entity);
+  const params = entity.properties.nativeParams;
   const componentKey = requiredText(params.componentKey, 'componentKey');
-  if (entity.entityId !== componentKey || entity.sourceEntityId !== componentKey) {
-    fail('workspace identity differs from native component key.');
-  }
-  if (!Array.isArray(params.ports) || params.ports.length !== 2) {
-    fail('native pipe requires exactly two explicit ports.');
-  }
   const [fromPort, toPort] = params.ports;
-  if (fromPort.role !== 'start' || toPort.role !== 'end') {
-    fail('native pipe port roles must be start and end.');
-  }
-  const geometry = entity.properties?.geometry;
-  if (!samePoint(geometry?.start, fromPort.position)
-    || !samePoint(geometry?.end, toPort.position)) {
-    fail('workspace geometry differs from explicit native port evidence.');
-  }
-  if (fromPort.nodeId === toPort.nodeId || fromPort.portKey === toPort.portKey) {
-    fail('native pipe endpoint identities must be distinct.');
-  }
-  const nodes = [
-    recoveredNode(params, fromPort, 0),
-    recoveredNode(params, toPort, 1),
-  ];
+  const fromNode = recoveredNode(params, fromPort, 0);
+  const toNode = recoveredNode(params, toPort, 1);
+  const nodes = [fromNode, toNode].sort((left, right) => left.id.localeCompare(right.id));
   const edge = {
     id: requiredText(params.edgeId, 'edgeId'),
     componentKey,
-    fromNodeId: nodes[0].id,
-    toNodeId: nodes[1].id,
+    fromNodeId: fromNode.id,
+    toNodeId: toNode.id,
     entityType: 'PIPE',
     identityKind: 'NATIVE_COMMAND',
     ...(params.engineering ?? {}),

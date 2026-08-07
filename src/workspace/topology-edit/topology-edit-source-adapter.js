@@ -24,6 +24,7 @@ import {
 import {
   enrichTopologyEditStagedJsonEngineering,
 } from './topology-edit-stagedjson-engineering-source.js';
+import { finalizeCanonicalTopology } from './topology-edit-canonical-state.js';
 
 export const TOPOLOGY_EDIT_CANONICAL_SCHEMA = 'topology-edit-canonical-topology/v1';
 
@@ -94,7 +95,7 @@ export function buildCanonicalTopologyFromWorkspaceDataset(dataset, topologyGrap
     boundaries: [],
     rigids: [],
   };
-  return deepFreeze({ ...base, crosswalk, canonicalTopologyHash: semanticHash(base) });
+  return finalizeCanonicalTopology({ ...base, crosswalk });
 }
 
 /**

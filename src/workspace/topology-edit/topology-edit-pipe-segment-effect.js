@@ -8,18 +8,6 @@ import { createPipeSegmentGeometryEvidence } from './topology-edit-pipe-segment-
 function finding(code, message, targetIds = []) {
   return { code, message, targetIds: [...targetIds].filter(Boolean).sort() };
 }
-function digest(commandId, role) {
-  return semanticHash({ commandId, role }).split(':').at(-1).slice(0, 32);
-}
-function expectedIdentity(commandId) {
-  const componentKey = `native-component:${digest(commandId, 'pipe-component')}`;
-  return {
-    edgeId: `edge:${digest(commandId, 'pipe-edge')}`,
-    componentKey,
-    fromPortKey: `${componentKey}:port:from`,
-    toPortKey: `${componentKey}:port:to`,
-  };
-}
 function noChanges(delta, keys) {
   return keys.every((key) => [
     ...(delta[key]?.addedIds ?? []),
@@ -43,8 +31,16 @@ export function validatePipeSegmentCandidateEffect(candidate) {
       error instanceof Error ? error.message : String(error),
     )];
   }
+  const expected = candidate.resolvedTargets?.generated;
+  if (!expected?.edgeId || !expected?.componentKey
+    || !expected?.fromPortKey || !expected?.toPortKey
+    || !expected?.geometry?.geometryHash) {
+    return [finding(
+      'INSERT_PIPE_SEGMENT_GENERATED_AUTHORITY_MISSING',
+      'INSERT_PIPE_SEGMENT candidate is missing exact resolved generated authority.',
+    )];
+  }
   const delta = candidate.topologyDelta;
-  const expected = expectedIdentity(candidate.commandId);
   const created = (candidate.canonicalTopology.edges ?? []).filter((edge) => (
     edge.createdByCommandId === candidate.commandId
     && edge.topologyOperation === INSERT_PIPE_SEGMENT
@@ -87,6 +83,7 @@ export function validatePipeSegmentCandidateEffect(candidate) {
     && edge.catalogueRecordId === binding.recordId
     && edge.catalogueRecordHash === binding.recordHash
     && edge.geometryHash === geometry.geometryHash
+    && edge.geometryHash === expected.geometry.geometryHash
     && semanticHash(edge.nativePortKeys) === semanticHash([
       expected.fromPortKey,
       expected.toPortKey,
@@ -97,7 +94,7 @@ export function validatePipeSegmentCandidateEffect(candidate) {
       === expected.componentKey;
   return exact ? [] : [finding(
     'INSERT_PIPE_SEGMENT_AUTHORITY_INVALID',
-    'INSERT_PIPE_SEGMENT candidate differs from deterministic catalogue, geometry, identity, or crosswalk authority.',
+    'INSERT_PIPE_SEGMENT candidate differs from resolved catalogue, geometry, identity, or crosswalk authority.',
     [edge?.id, payload.fromNodeId, payload.toNodeId],
   )];
 }
