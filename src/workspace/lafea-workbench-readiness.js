@@ -6,6 +6,9 @@ export function projectLafeaWorkbenchReadiness(stageId, stage) {
     : stage.execution ? 'CALCULATION_NOT_ACCEPTED_BY_STAGE_CONTRACT' : 'CALCULATION_NOT_RUN';
   const lifecycle = stage.lifecycle;
   const binding = stage.lifecycleBinding;
+  const domainFirst = stage.domainFirstProfileActive === true;
+  const domainCurrent = domainFirst && stage.analysisDomainProjection?.state === 'CURRENT_PASS';
+  const geometryCurrent = domainFirst && stage.analysisGeometryProjection?.state === 'CURRENT_PASS';
   if (!lifecycle) return freeze({
     schema: 'lafea-workbench-lifecycle-readiness/v2',
     stageId,
@@ -17,7 +20,12 @@ export function projectLafeaWorkbenchReadiness(stageId, stage) {
     releaseState: 'RELEASE_NOT_QUALIFIED',
     sourceCurrent: false,
     modelCurrent: false,
-    meshApplicable: false,
+    preMeshModelCurrent: domainCurrent,
+    domainFirstProfileActive: domainFirst,
+    domainCurrent,
+    geometryCurrent,
+    solverModelCurrent: false,
+    meshApplicable: domainFirst,
     meshGenerated: false,
     meshQualified: false,
     resultReady: false,
@@ -33,8 +41,8 @@ export function projectLafeaWorkbenchReadiness(stageId, stage) {
   });
   const base = lafeaLifecycleReadiness(lifecycle);
   const current = binding.status === 'CURRENT';
-  const resultReady = current && base.resultReady;
-  const codeReady = current && base.codeReady;
+  const resultReady = current && base.resultReady && !domainFirst;
+  const codeReady = current && base.codeReady && !domainFirst;
   return freeze({
     ...base,
     schema: 'lafea-workbench-lifecycle-readiness/v2',
@@ -46,13 +54,18 @@ export function projectLafeaWorkbenchReadiness(stageId, stage) {
     releaseState: 'RELEASE_NOT_QUALIFIED',
     sourceCurrent: current && base.sourceCurrent,
     modelCurrent: current && base.modelCurrent,
-    meshQualified: current && base.meshQualified,
+    preMeshModelCurrent: domainFirst ? current && domainCurrent : current && base.modelCurrent,
+    domainFirstProfileActive: domainFirst,
+    domainCurrent: current && domainCurrent,
+    geometryCurrent: current && geometryCurrent,
+    solverModelCurrent: current && base.modelCurrent,
+    meshQualified: domainFirst ? false : current && base.meshQualified,
     resultReady,
-    assessmentReady: current && base.assessmentReady,
-    convergenceReady: current && base.convergenceReady,
+    assessmentReady: !domainFirst && current && base.assessmentReady,
+    convergenceReady: !domainFirst && current && base.convergenceReady,
     codeReady,
-    reportCurrent: current && base.reportCurrent,
-    reportQualified: current && base.reportQualified,
+    reportCurrent: !domainFirst && current && base.reportCurrent,
+    reportQualified: !domainFirst && current && base.reportQualified,
     blockingReasons: current ? [...base.blockingReasons] : [
       `LIFECYCLE_SOURCE_BINDING_${binding.status}`,
       ...base.blockingReasons,

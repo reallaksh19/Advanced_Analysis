@@ -1,5 +1,6 @@
 /** Canonical LAFEA workbench orchestrator with one public publication boundary. */
 import { createLafeaLifecycleProducerBatch } from './lafea-lifecycle-producers.js';
+import { lafeaDocumentDigest } from './lafea-edit-command.js';
 import {
   LAFEA_LIFECYCLE_BINDING_SCHEMA,
   LAFEA_LIFECYCLE_BINDING_STATUSES,
@@ -7,6 +8,10 @@ import {
   createLafeaWorkbenchStore as createRetainedStore,
 } from './lafea-lifecycle-workbench-store-retained.js';
 import { buildLafeaWorkbenchOrchestrationProjection } from './lafea-workbench-orchestration-projection.js';
+import { createLafeaWorkbenchGeometryState } from './lafea-workbench-geometry-state.js';
+import { buildLafeaDomainFirstMeshCustodyProjection } from './lafea-domain-first-mesh-custody.js';
+import { buildLafeaDomainPreparationProjection } from './lafea-domain-first-requests.js';
+import { createLafeaWorkbenchOrchestratorApi } from './lafea-workbench-orchestrator-api.js';
 import { createLafeaWorkbenchMeshState } from './lafea-workbench-mesh-state.js';
 import { createLafeaWorkbenchPreparationState } from './lafea-workbench-preparation-state.js';
 import { projectLafeaWorkbenchReadiness } from './lafea-workbench-readiness.js';
@@ -17,6 +22,8 @@ export const LAFEA_CALCULATION_STATES = Object.freeze(['CALCULATION_NOT_RUN', 'C
 export const LAFEA_RESULT_STATES = Object.freeze(['RESULT_NOT_READY', 'RESULT_READY']);
 export const LAFEA_CODE_STATES = Object.freeze(['CODE_NOT_READY', 'CODE_READY']);
 export const LAFEA_RELEASE_STATES = Object.freeze(['RELEASE_NOT_QUALIFIED', 'RELEASE_QUALIFIED']);
+
+const SOURCE_CHANGE_CLASSES = new Set(['MATERIAL_PROPERTY', 'GEOMETRY', 'LOAD_OR_BC', 'MODEL_METADATA']);
 
 export function createLafeaWorkbenchOrchestratorStore(options) {
   const retained = createRetainedStore(options);
@@ -31,6 +38,7 @@ export function createLafeaWorkbenchOrchestratorStore(options) {
     getActiveStageId: () => retainedState.activeStageId,
     invokeRetained,
   });
+  const geometry = createLafeaWorkbenchGeometryState(stageIds);
   const mesh = createLafeaWorkbenchMeshState(stageIds, {
     getActiveStageId: () => retainedState.activeStageId,
     readStageState,
@@ -46,16 +54,28 @@ export function createLafeaWorkbenchOrchestratorStore(options) {
   function rawStage(stageId) {
     const stage = retainedState.stages[stageId];
     if (!stage) throw storeError('LAFEA_WORKBENCH_STAGE_NOT_FOUND');
-    return freeze({ ...stage, stageId, ...source.fields(stageId), ...mesh.fields(stageId), ...preparation.fields(stageId) });
+    return freeze({
+      ...stage, stageId, ...source.fields(stageId), ...mesh.fields(stageId),
+      ...preparation.fields(stageId), ...geometry.fields(stageId),
+    });
   }
 
   function readStageState(stageId) {
-    const stage = rawStage(stageId);
-    const lifecycleReadiness = projectLafeaWorkbenchReadiness(stageId, stage);
-    const withReadiness = freeze({ ...stage, lifecycleReadiness });
-    const analysisMeshCustodyProjection = mesh.buildAnalysisMeshCustodyProjection(withReadiness, stage.retainedAnalysisMeshEvidence);
+    const raw = rawStage(stageId);
+    const withGeometry = freeze({ ...raw, ...geometry.buildProjections(raw) });
+    const lifecycleReadiness = projectLafeaWorkbenchReadiness(stageId, withGeometry);
+    const withReadiness = freeze({ ...withGeometry, lifecycleReadiness });
+    const legacyCustody = mesh.buildAnalysisMeshCustodyProjection(
+      withReadiness, withReadiness.retainedAnalysisMeshEvidence,
+    );
+    const analysisMeshCustodyProjection = withReadiness.domainFirstProfileActive
+      ? buildLafeaDomainFirstMeshCustodyProjection(withReadiness, null)
+      : legacyCustody;
     const withMesh = freeze({ ...withReadiness, analysisMeshCustodyProjection });
-    return freeze({ ...withMesh, preparationProjection: preparation.buildProjection(withMesh) });
+    const preparationProjection = withMesh.domainFirstProfileActive
+      ? buildLafeaDomainPreparationProjection(withMesh)
+      : preparation.buildProjection(withMesh);
+    return freeze({ ...withMesh, preparationProjection });
   }
 
   function deriveStage(stageId) {
@@ -92,16 +112,24 @@ export function createLafeaWorkbenchOrchestratorStore(options) {
 
   function mutateDocument(originRef, method, args, explicitClass = null) {
     const before = retainedState;
+    const stageId = before.activeStageId;
+    const beforeDocument = before.stages[stageId]?.document ?? null;
     invokeRetained(method, args);
     if (retainedState.status === 'FAILED') return publish();
     source.reconcileDocumentMutation(before, originRef, explicitClass);
+    const afterDocument = retainedState.stages[stageId]?.document ?? null;
+    if (documentDigest(beforeDocument) !== documentDigest(afterDocument)) geometry.invalidate(stageId);
     clearOrchestratorDiagnostic();
     return publish();
   }
 
   function run() {
-    invokeRetained('run');
     const stageId = retainedState.activeStageId;
+    if (rawStage(stageId).domainFirstProfileActive) {
+      failOrchestrator(storeError('LAFEA_DOMAIN_FIRST_SOLVER_MODEL_NOT_COMPILED'), 'LAFEA_DOMAIN_FIRST_SOLVER_MODEL_NOT_COMPILED');
+      return publish();
+    }
+    invokeRetained('run');
     let stage = retainedState.stages[stageId];
     try {
       if (stage.execution?.status === 'QUALIFIED') {
@@ -120,13 +148,19 @@ export function createLafeaWorkbenchOrchestratorStore(options) {
 
   function importDocument(value, stageId = retainedState.activeStageId, sourceHash = null) {
     invokeRetained('importDocument', [value, stageId, sourceHash]);
-    if (retainedState.status !== 'FAILED') { source.clear(stageId); clearOrchestratorDiagnostic(); }
+    if (retainedState.status !== 'FAILED') {
+      source.clear(stageId);
+      geometry.clear(stageId);
+      clearOrchestratorDiagnostic();
+    }
     return publish();
   }
 
   function initializeLifecycle(sourceHash, originRef = 'EXTERNAL_SOURCE_AUTHORITY') {
-    source.clear(retainedState.activeStageId);
+    const stageId = retainedState.activeStageId;
+    source.clear(stageId);
     invokeRetained('initializeLifecycle', [sourceHash, originRef]);
+    if (retainedState.status !== 'FAILED') geometry.invalidate(stageId);
     clearOrchestratorDiagnosticIfReady();
     return publish();
   }
@@ -136,6 +170,9 @@ export function createLafeaWorkbenchOrchestratorStore(options) {
     const succeeded = retainedState.status !== 'FAILED';
     source.afterLifecycleEvent(event, succeeded);
     mesh.afterLifecycleEvent(event, succeeded);
+    if (succeeded && SOURCE_CHANGE_CLASSES.has(event?.changeClass)) {
+      geometry.invalidate(retainedState.activeStageId);
+    }
     if (succeeded) clearOrchestratorDiagnostic();
     return publish();
   }
@@ -147,6 +184,9 @@ export function createLafeaWorkbenchOrchestratorStore(options) {
   }
 
   function registerPreparationEvidence(value) {
+    if (rawStage(value?.request?.stageId ?? retainedState.activeStageId).domainFirstProfileActive) {
+      throw storeError('LAFEA_DOMAIN_FIRST_PREPARATION_REQUIRES_V2_EVIDENCE');
+    }
     const result = preparation.registerEvidence(value);
     const stageId = result.evidence.request.stageId;
     const projection = result.changed ? publish().stages[stageId].preparationProjection : deriveStage(stageId).preparationProjection;
@@ -154,10 +194,39 @@ export function createLafeaWorkbenchOrchestratorStore(options) {
   }
 
   function registerPreparationApproval(value) {
+    if (rawStage(value?.stageId ?? retainedState.activeStageId).domainFirstProfileActive) {
+      throw storeError('LAFEA_DOMAIN_FIRST_PREPARATION_APPROVAL_NOT_QUALIFIED');
+    }
     const result = preparation.registerApproval(value);
     const stageId = result.approval.stageId;
     const projection = result.changed ? publish().stages[stageId].preparationProjection : deriveStage(stageId).preparationProjection;
     return freeze({ ...result, projection });
+  }
+
+  function activateDomainFirstProfile(stageId = retainedState.activeStageId) {
+    const result = geometry.activate(rawStage(stageId));
+    if (result.changed) clearOrchestratorDiagnostic();
+    return freeze({ ...result, stage: publish().stages[stageId] });
+  }
+
+  function registerAnalysisDomain(value) {
+    const stageId = value?.stageId ?? retainedState.activeStageId;
+    const result = geometry.registerDomain(value, readStageState(stageId));
+    return freeze({ ...result, projection: (result.changed ? publish() : deriveState()).stages[stageId].analysisDomainProjection });
+  }
+
+  function registerAnalysisGeometryEvidence(value) {
+    const stageId = value?.stageId ?? retainedState.activeStageId;
+    const result = geometry.registerGeometryEvidence(value, readStageState(stageId));
+    return freeze({ ...result, projection: (result.changed ? publish() : deriveState()).stages[stageId].analysisGeometryProjection });
+  }
+
+  function registerAnalysisMeshEvidence(value) {
+    const stageId = value?.stageId ?? retainedState.activeStageId;
+    if (rawStage(stageId).domainFirstProfileActive) {
+      throw storeError('LAFEA_DOMAIN_FIRST_ANALYSIS_MESH_REQUIRES_V2_CUSTODY');
+    }
+    return mesh.registerAnalysisMeshEvidence(value);
   }
 
   function exportLifecycle() {
@@ -168,6 +237,9 @@ export function createLafeaWorkbenchOrchestratorStore(options) {
       lastSourceAuthorityEvent: stage.lastSourceAuthorityEvent,
       readiness: stage.lifecycleReadiness,
       preparation: stage.preparationProjection,
+      domainFirstLifecycle: stage.domainFirstLifecycle,
+      analysisDomain: stage.analysisDomainProjection,
+      analysisGeometry: stage.analysisGeometryProjection,
       orchestration: stage.orchestration,
     });
   }
@@ -188,35 +260,18 @@ export function createLafeaWorkbenchOrchestratorStore(options) {
     })];
   }
 
-  return Object.freeze({
-    selectStage: (stageId) => delegate('selectStage', [stageId]),
-    importDocument,
-    applyEditCommand: (command) => mutateDocument(command?.commandId ?? 'APPLY_EDIT_COMMAND', 'applyEditCommand', [command]),
-    setScalar: (descriptorId, entityId, rawText, surface) => mutateDocument(`SET_SCALAR:${descriptorId}`, 'setScalar', [descriptorId, entityId, rawText, surface]),
-    replaceDocument: (value, surface) => mutateDocument('REPLACE_DOCUMENT', 'replaceDocument', [value, surface], 'GEOMETRY'),
-    moveNode: (path, nodeId, x, y) => mutateDocument(`MOVE_NODE:${nodeId}`, 'moveNode', [path, nodeId, x, y], 'GEOMETRY'),
-    reportEditError: (...args) => delegate('reportEditError', args), run,
-    undo: () => mutateDocument('UNDO', 'undo', []), redo: () => mutateDocument('REDO', 'redo', []),
-    exportDocument: () => retained.exportDocument(), initializeLifecycle, applyLifecycleEvent,
-    registerLifecycleArtifact: (...args) => delegate('registerLifecycleArtifact', args),
-    revalidateLifecycleBinding: (...args) => delegate('revalidateLifecycleBinding', args), exportLifecycle,
-    validateLafeaAnalysisMeshEvidence: mesh.validateLafeaAnalysisMeshEvidence,
-    registerAnalysisMeshEvidence: mesh.registerAnalysisMeshEvidence,
-    selectRetainedAnalysisMeshEvidence: mesh.selectRetainedAnalysisMeshEvidence,
-    buildAnalysisMeshCustodyProjection: mesh.buildAnalysisMeshCustodyProjection,
-    exportAnalysisMeshEvidence: mesh.exportAnalysisMeshEvidence,
-    recoverAnalysisMeshEvidence: mesh.recoverAnalysisMeshEvidence,
-    buildPreparationRequest: (requestedCaseIds = [], stageId = retainedState.activeStageId) => preparation.buildRequest(readStageState(stageId), requestedCaseIds),
-    registerPreparationEvidence,
-    selectRetainedPreparationEvidence: (stageId = retainedState.activeStageId) => preparation.selectEvidence(stageId),
-    registerPreparationApproval,
-    selectRetainedPreparationApproval: (stageId = retainedState.activeStageId) => preparation.selectApproval(stageId),
-    buildPreparationProjection: (stageId = retainedState.activeStageId) => deriveStage(stageId).preparationProjection,
-    buildOrchestrationProjection: (stageId = retainedState.activeStageId) => deriveStage(stageId).orchestration,
-    subscribe, getState: deriveState,
-    destroy: () => { unsubscribe(); retained.destroy(); listeners.clear(); },
+  return createLafeaWorkbenchOrchestratorApi({
+    retained, mesh, preparation, geometry, listeners, unsubscribe,
+    getRetainedState: () => retainedState,
+    readStageState, deriveStage, deriveState, publish, delegate, mutateDocument,
+    importDocument, run, initializeLifecycle, applyLifecycleEvent,
+    registerPreparationEvidence, registerPreparationApproval,
+    activateDomainFirstProfile, registerAnalysisDomain,
+    registerAnalysisGeometryEvidence, registerAnalysisMeshEvidence,
+    subscribe, exportLifecycle,
   });
 }
 
+function documentDigest(value) { return value ? lafeaDocumentDigest(value) : null; }
 function storeError(code) { const error = new Error(code); error.code = code; return error; }
 function freeze(value) { if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value; Object.values(value).forEach(freeze); return Object.freeze(value); }

@@ -56,5 +56,6 @@ export {
   LAFEA_WORKBENCH_ORCHESTRATION_STATES,
   buildLafeaWorkbenchOrchestrationProjection,
 } from './lafea-workbench-orchestration-projection.js';
+export * from './lafea-domain-geometry-public.js';
 
 export function createLafeaWorkbenchStore(options) { return createLafeaWorkbenchOrchestratorStore(options); }
