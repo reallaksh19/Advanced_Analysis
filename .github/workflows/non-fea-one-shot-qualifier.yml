@@ -20,45 +20,29 @@ jobs:
           ref: feat/load-calc-non-fea-input-check-ui
           fetch-depth: 0
 
-      - name: Repair Phase 3 responsive action layout
+      - name: Repair normal Load Calc header and pane layout
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          path = Path('src/workspace/enrichment/non-fea-enrichment-view.js')
+          path = Path('src/workspace/workspace-shell-styles.js')
           text = path.read_text()
-
-          old_root = '.nfe{height:100%;overflow:auto;padding:16px;box-sizing:border-box;background:#07101e;color:#e2e8f0}'
-          new_root = '.nfe{height:100%;overflow:auto;padding:16px 16px 96px;scroll-padding-block:160px 96px;box-sizing:border-box;background:#07101e;color:#e2e8f0}'
-          if old_root in text:
-              text = text.replace(old_root, new_root, 1)
-          elif new_root not in text:
-              raise SystemExit('Enrichment scroll-container target not found; refusing broad mutation.')
-
-          old_columns = '.nfe__layout main,.nfe__layout aside{display:flex;flex-direction:column;gap:12px}'
-          new_columns = '.nfe__layout main,.nfe__layout aside{display:flex;flex-direction:column;gap:12px;min-width:0}'
-          if old_columns in text:
-              text = text.replace(old_columns, new_columns, 1)
-          elif new_columns not in text:
-              raise SystemExit('Enrichment column target not found; refusing broad mutation.')
-
-          old_form = '.nfe-form{display:grid;grid-template-columns:repeat(3,minmax(150px,1fr));gap:8px}'
-          new_form = '.nfe-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.nfe-form button[type="submit"]{min-height:36px;scroll-margin-block:160px 96px}'
-          if old_form in text:
-              text = text.replace(old_form, new_form, 1)
-          elif new_form not in text:
-              raise SystemExit('Enrichment form-grid target not found; refusing broad mutation.')
-
+          anchor = "    .load-calc-consumer { display: flex; flex-direction: column; height: 100%; min-width: 0; background: var(--bg-dark); }\n"
+          addition = """    .load-calc-consumer { display: flex; flex-direction: column; height: 100%; min-width: 0; min-height: 0; overflow: hidden; background: var(--bg-dark); }\n    .empirical-load-calc__header {\n      flex: 0 0 auto;\n      display: grid;\n      grid-template-columns: minmax(180px, auto) minmax(0, 1fr);\n      gap: 8px 16px;\n      min-width: 0;\n      padding: 10px 14px;\n      border-bottom: 1px solid var(--border-color);\n      background: var(--bg-panel-strong);\n      box-sizing: border-box;\n    }\n    .empirical-load-calc__header h1 { margin: 4px 0 0; font-size: 18px; font-weight: 800; color: #f8fafc; }\n    .empirical-load-calc__facts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; color: var(--text-muted); font-size: 10px; }\n    .empirical-load-calc__tabs { grid-column: 1 / -1; display: flex; align-items: center; gap: 3px; min-width: 0; overflow-x: auto; scrollbar-width: thin; }\n    .empirical-load-calc__tabs button { flex: 0 0 auto; min-height: 30px; border: 1px solid transparent; border-radius: 5px; padding: 4px 9px; background: transparent; color: var(--text-muted); font-size: 11px; font-weight: 700; cursor: pointer; }\n    .empirical-load-calc__tabs button:hover, .empirical-load-calc__tabs button:focus-visible, .empirical-load-calc__tabs button.is-active { border-color: #315070; background: #101b2b; color: var(--text-main); outline: none; }\n    .empirical-load-calc__actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; min-width: 0; }\n    .empirical-load-calc__actions output { min-width: 0; overflow-wrap: anywhere; color: var(--text-muted); font-size: 11px; }\n    .empirical-load-calc__pane { flex: 1 1 auto; min-width: 0; min-height: 0; overflow: hidden; position: relative; }\n    .empirical-load-calc__pane > * { min-width: 0; min-height: 0; }\n"""
+          if anchor in text:
+              text = text.replace(anchor, addition, 1)
+          elif '.empirical-load-calc__pane { flex: 1 1 auto;' not in text:
+              raise SystemExit('Load Calc shell style anchor not found; refusing broad mutation.')
           path.write_text(text)
           PY
           git diff --check
           if git diff --quiet; then
-            echo 'Layout correction already present.'
+            echo 'Shell layout correction already present.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/workspace/enrichment/non-fea-enrichment-view.js
-          git commit -m 'fix(non-fea): keep enrichment actions clear of shell overlays'
+          git add src/workspace/workspace-shell-styles.js
+          git commit -m 'fix(non-fea): bound empirical Load Calc header and pane layout'
           git push origin HEAD:feat/load-calc-non-fea-input-check-ui
