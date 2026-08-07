@@ -1,7 +1,7 @@
 /** CAE-style presentation for the LFEA workbench. */
 export function lfeaShellV2Styles() {
   return `
-.lfea-shell-v2{display:flex;flex-direction:column;gap:0;min-height:100%;height:100%;max-width:none;margin:0;padding:0;background:var(--lfea-canvas);color:var(--lfea-text);overflow:hidden}
+.lfea-workbench.lfea-shell-v2{display:flex;flex-direction:column;gap:0;min-height:100%;height:100%;max-width:none;margin:0;padding:0;background:var(--lfea-canvas);color:var(--lfea-text);overflow:hidden}
 .lfea-shell-v2 button,.lfea-shell-v2 select,.lfea-shell-v2 input,.lfea-shell-v2 textarea{font:inherit}
 .lfea-shell-v2 button,.lfea-shell-v2 select,.lfea-shell-v2 input{border:1px solid var(--lfea-border-strong);border-radius:5px;background:#0a1424;color:var(--lfea-text)}
 .lfea-shell-v2 button{padding:6px 9px;cursor:pointer}.lfea-shell-v2 button:disabled{opacity:.45;cursor:not-allowed}
