@@ -1,5 +1,8 @@
 import { deepFreeze, semanticHash } from '../../../core/shared-piping-model/index.js';
 import {
+  compileTopologyEditStagedJsonEngineeringPatches,
+} from './topology-edit-stagedjson-engineering-writeback.js';
+import {
   createTopologyEditSourcePatch,
   prepareTopologyEditSourceSurgicalPatch,
   readTopologyEditSourceJsonPointer,
@@ -19,12 +22,16 @@ export function prepareTopologyEditStagedJsonWriteback(input = {}) {
   const base = assertCanonical(input.baseCanonicalTopology, 'baseCanonicalTopology');
   const edited = assertCanonical(input.canonicalTopology, 'canonicalTopology');
   assertSourceAuthority(dataset, base, edited);
-  assertSameEngineeringModel(base, edited);
+  const engineering = compileTopologyEditStagedJsonEngineeringPatches({
+    dataset,
+    baseCanonicalTopology: base,
+    canonicalTopology: edited,
+  });
 
   const entities = new Map((dataset.entities ?? []).map((row) => [row.entityId, row]));
   const baseNodes = new Map(base.nodes.map((row) => [row.id, row]));
   const editedNodes = new Map(edited.nodes.map((row) => [row.id, row]));
-  const patches = [];
+  const patches = [...engineering.patches];
   const changedNodeIds = [];
 
   for (const [nodeId, editedNode] of editedNodes) {
@@ -34,6 +41,14 @@ export function prepareTopologyEditStagedJsonWriteback(input = {}) {
     changedNodeIds.push(nodeId);
     compileNodeEndpointPatches({ nodeId, position: editedNode.position, base, dataset, entities, patches });
   }
+  compileChangedEdgeCenterPatches({
+    base,
+    editedNodes,
+    changedNodeIds: new Set(changedNodeIds),
+    dataset,
+    entities,
+    patches,
+  });
 
   if (!patches.length) {
     throw new RangeError('StagedJSON writeback: no source-representable changes were found.');
@@ -50,6 +65,8 @@ export function prepareTopologyEditStagedJsonWriteback(input = {}) {
     canonicalTopologyHash: edited.canonicalTopologyHash,
     sourceHash: dataset.sourceSnapshot.sourceSemanticHash,
     changedNodeIds: [...changedNodeIds].sort(),
+    changedEdgeIds: engineering.changedEdgeIds,
+    changedJunctionIds: engineering.changedJunctionIds,
     patchHashes: surgical.patchHashes,
     surgicalPatchHash: surgical.surgicalPatchHash,
     resultingSourceSemanticHash: surgical.resultingSourceSemanticHash,
@@ -83,11 +100,24 @@ function compileNodeEndpointPatches({ nodeId, position, base, dataset, entities,
     if (!entity) throw new RangeError(`StagedJSON writeback: missing source entity ${edge.componentKey}.`);
     patches.push(pointPatch(dataset, entity, role, position, edge.id));
     represented += 1;
-    const centerPatch = explicitCenterPatch(dataset, entity, edge, nodeId, position, base);
-    if (centerPatch) patches.push(centerPatch);
   }
   if (!represented) {
     throw new RangeError(`StagedJSON writeback: changed node ${nodeId} has no exact imported edge endpoint.`);
+  }
+}
+
+function compileChangedEdgeCenterPatches({
+  base, editedNodes, changedNodeIds, dataset, entities, patches,
+}) {
+  for (const edge of base.edges) {
+    if (!changedNodeIds.has(edge.fromNodeId) && !changedNodeIds.has(edge.toNodeId)) continue;
+    const entity = entities.get(edge.componentKey);
+    if (!entity?.properties?.geometry?.explicitCenter) continue;
+    const from = editedNodes.get(edge.fromNodeId)?.position;
+    const to = editedNodes.get(edge.toNodeId)?.position;
+    if (!from || !to) throw new RangeError(`StagedJSON writeback: missing final endpoints for ${edge.id}.`);
+    const patch = explicitCenterPatch(dataset, entity, edge, from, to);
+    if (patch) patches.push(patch);
   }
 }
 
@@ -109,25 +139,22 @@ function pointPatch(dataset, entity, role, position, canonicalId) {
   });
 }
 
-function explicitCenterPatch(dataset, entity, edge, movedNodeId, movedPosition, base) {
-  if (!entity.properties?.geometry?.explicitCenter) return null;
+function explicitCenterPatch(dataset, entity, edge, from, to) {
   const source = entity.properties?.geometry?.sources?.center ?? '';
   const suffix = sourceSuffix(source);
   if (!suffix) {
     throw new RangeError(`StagedJSON writeback: ${edge.id} explicit center source ${source || 'missing'} is not writable.`);
   }
-  const otherNodeId = edge.fromNodeId === movedNodeId ? edge.toNodeId : edge.fromNodeId;
-  const other = base.nodes.find((row) => row.id === otherNodeId)?.position;
-  if (!other) throw new RangeError(`StagedJSON writeback: missing peer node ${otherNodeId}.`);
-  const center = midpoint(movedPosition, other);
   const pointer = appendPointer(entity.jsonPointer, suffix);
   const before = readTopologyEditSourceJsonPointer(dataset.sourceSnapshot.sourcePackage, pointer);
+  const value = pointLike(before, midpoint(from, to));
+  if (semanticHash(before) === semanticHash(value)) return null;
   return createTopologyEditSourcePatch({
     pointer,
     canonicalId: edge.id,
     property: 'centerPosition',
     expectedPreimageHash: semanticHash(before),
-    value: pointLike(before, center),
+    value,
   });
 }
 
@@ -165,28 +192,6 @@ function pointLike(before, point) {
   throw new RangeError('StagedJSON writeback: source point shape is not writable without regeneration.');
 }
 
-function assertSameEngineeringModel(base, edited) {
-  for (const collection of ['edges', 'junctions', 'supports', 'boundaries', 'rigids']) {
-    const left = (base[collection] ?? []).map(nonGeometryRecord);
-    const right = (edited[collection] ?? []).map(nonGeometryRecord);
-    if (semanticHash(left) !== semanticHash(right)) {
-      throw new RangeError(`StagedJSON writeback: ${collection} changed outside the qualified geometry vocabulary.`);
-    }
-  }
-  const leftIds = base.nodes.map((row) => row.id).sort();
-  const rightIds = edited.nodes.map((row) => row.id).sort();
-  if (semanticHash(leftIds) !== semanticHash(rightIds)) {
-    throw new RangeError('StagedJSON writeback: node creation/deletion is not source-representable in this slice.');
-  }
-}
-
-function nonGeometryRecord(row) {
-  const result = structuredClone(row);
-  for (const key of Object.keys(result)) {
-    if (/Hash$/u.test(key) || /^source[A-Z_]/u.test(key)) Reflect.deleteProperty(result, key);
-  }
-  return result;
-}
 function assertSourceAuthority(dataset, base, edited) {
   if (!STAGED_JSON_SCHEMAS.has(dataset.sourceSchema)) {
     throw new RangeError(`StagedJSON writeback: unsupported source schema ${dataset.sourceSchema}.`);

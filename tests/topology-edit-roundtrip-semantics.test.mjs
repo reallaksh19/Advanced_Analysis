@@ -22,6 +22,11 @@ function topology(ids = {}) {
       fromNodeId: node1, toNodeId: node2, entityType: 'PIPE',
       diameterMm: 100, outsideDiameterMm: 114, material: 'A106-B', schedule: 'STD',
       sourcePath: ids.sourcePath ?? '/objects/P-1',
+      ...(ids.lineage ? {
+        topologyOperation: ids.lineage.topologyOperation,
+        lastModifiedByCommandId: ids.lineage.lastModifiedByCommandId,
+        editAncestry: ids.lineage.editAncestry,
+      } : {}),
       catalogueBinding: {
         catalogueId: 'PIPE', catalogueVersion: 'A', catalogueHash: 'sha256:cat',
         sourceHash: 'sha256:cat-source', recordId: 'PIPE-100', recordHash: 'sha256:record',
@@ -42,6 +47,34 @@ test('lineage/source serialization changes do not create engineering mismatches'
   assert.equal(result.status, 'EQUIVALENT');
   assert.equal(result.mismatchCount, 0);
   assert.equal(result.expectedEngineeringHash, result.actualEngineeringHash);
+});
+
+test('command journal markers are lineage while engineering fields remain comparable', () => {
+  const expected = topology({
+    lineage: {
+      topologyOperation: 'REPLACE_INLINE_COMPONENT',
+      lastModifiedByCommandId: 'cmd:123',
+      editAncestry: ['edge:p1', 'cmd:123'],
+    },
+  });
+  const reimported = topology();
+  const lineageOnly = compareTopologyEditRoundTripSemantics({
+    expectedTopology: expected,
+    actualTopology: reimported,
+  });
+  assert.equal(lineageOnly.status, 'EQUIVALENT');
+  assert.equal(lineageOnly.mismatchCount, 0);
+
+  const raw = structuredClone(reimported);
+  delete raw.canonicalTopologyHash;
+  raw.edges[0].diameterMm = 80;
+  const engineeringChanged = finalizeCanonicalTopology(raw);
+  const strict = compareTopologyEditRoundTripSemantics({
+    expectedTopology: expected,
+    actualTopology: engineeringChanged,
+  });
+  assert.equal(strict.status, 'MISMATCH');
+  assert.ok(strict.mismatches[0].paths.some((path) => path.includes('diameterMm')));
 });
 
 test('engineering coordinate change fails exactly unless an explicit conversion tolerance permits it', () => {

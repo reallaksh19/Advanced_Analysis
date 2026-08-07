@@ -21,6 +21,9 @@ import {
   NATIVE_PIPE_WRITEBACK_SCHEMA,
   recoverNativePipeCanonicalRecords,
 } from './topology-edit-native-pipe-writeback.js';
+import {
+  enrichTopologyEditStagedJsonEngineering,
+} from './topology-edit-stagedjson-engineering-source.js';
 
 export const TOPOLOGY_EDIT_CANONICAL_SCHEMA = 'topology-edit-canonical-topology/v1';
 
@@ -57,7 +60,16 @@ export function buildCanonicalTopologyFromWorkspaceDataset(dataset, topologyGrap
     return freezeNode({ id: nodeId, position: group.position, portKeys: [...group.portKeys].sort() });
   }).sort((left, right) => left.id.localeCompare(right.id));
 
-  const { edges, junctions } = buildEdgesAndJunctions(topologyGraph, entitiesById, portToNode);
+  const projected = buildEdgesAndJunctions(topologyGraph, entitiesById, portToNode);
+  const engineering = enrichTopologyEditStagedJsonEngineering({
+    dataset,
+    topologyGraph,
+    nodes,
+    edges: projected.edges,
+    junctions: projected.junctions,
+  });
+  const edges = engineering.edges;
+  const junctions = engineering.junctions;
   const supports = buildSupports(dataset, topologyGraph, portToNode, attachmentModel, restraintModel);
   const crosswalk = buildCrosswalk(nodes, edges, junctions, supports);
   const canonicalDatasetVersion = Number(

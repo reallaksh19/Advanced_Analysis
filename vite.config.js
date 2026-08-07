@@ -7,8 +7,8 @@ const buildTime = new Date().toISOString();
  * Keep manual chunking limited to dependency-oriented or calculation-core
  * domains. Workspace modules remain graph-owned because they contain stores,
  * controllers, views, and top-level singleton instances with cross-feature
- * imports. The narrow topology-edit engineering-command chunk below contains
- * only stateless pure contract/reducer helpers and owns no runtime singleton.
+ * imports. The narrow topology-edit exceptions below contain only stateless
+ * pure contract/projection helpers and own no runtime singleton.
  */
 export function manualChunk(id) {
   const source = id.replaceAll('\\', '/');
@@ -45,6 +45,9 @@ export function manualChunk(id) {
     || source.endsWith('/src/workspace/topology-edit/topology-edit-junction-relation-command.js')
     || source.endsWith('/src/workspace/topology-edit/topology-edit-engineering-edit-effect.js')) {
     return 'topology-edit-engineering-commands';
+  }
+  if (source.endsWith('/src/workspace/topology-edit/topology-edit-stagedjson-engineering-source.js')) {
+    return 'topology-edit-stagedjson-source-engineering';
   }
 
   // Rollup must own the complete stateful workspace graph so evaluation order
