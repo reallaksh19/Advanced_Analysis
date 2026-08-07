@@ -10,3 +10,4 @@ export * from './stagedjson-selected-branch-inventory.js';
 export * from './stagedjson-material-section-catalog.js';
 export * from './stagedjson-material-section-resolution.js';
 export * from './stagedjson-authority-composition.js';
+export * from './stagedjson-hot-authority-composition.js';
