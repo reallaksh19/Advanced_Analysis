@@ -16,10 +16,9 @@ export const INPUTXML_FEATURE_MECHANICS_PREPARATION_SCHEMA =
 
 /**
  * Build the feature-aware mechanical authority layer beside the legacy v1
- * one-source-span preparation. This record is intentionally not a solve: it
- * expands bends, derives tee end modifiers for existing spans, and promotes
- * reducer condensation only after a unique section-sampling rule has been
- * independently qualified.
+ * one-source-span preparation. Bend and reducer custody remains source-span
+ * based. Tee flexibility is keyed by the physical three-leg junction because
+ * CAESAR may attach multiple SIF tags to spans belonging to one junction.
  */
 export function compileInputXmlFeatureMechanicsPreparation({
   sourcePreparation,
@@ -29,15 +28,14 @@ export function compileInputXmlFeatureMechanicsPreparation({
   frameElementProfile,
   pipingComponentProfile,
   localAxisProfile = FRAME_LOCAL_AXIS_PROFILE,
-  teeFactorResultBySegmentId = new Map(),
+  teeFactorResultByJunctionNodeId = new Map(),
   reducerRequestBySegmentId = new Map(),
   reducerSamplingQualification = null,
 }) {
   const source = requireInputXmlLinearSolvePreparation(sourcePreparation);
-  requireMap(teeFactorResultBySegmentId, 'teeFactorResultBySegmentId');
+  requireMap(teeFactorResultByJunctionNodeId, 'teeFactorResultByJunctionNodeId');
   requireMap(reducerRequestBySegmentId, 'reducerRequestBySegmentId');
 
-  const bindingBySegment = new Map(source.segmentBindings.map((row) => [String(row.segmentId), row]));
   const materialByHash = new Map(source.materialResolutions.map((row) => [row.semanticHash, row]));
   const sectionByHash = new Map(source.sectionResolutions.map((row) => [row.semanticHash, row]));
   const materialBySegmentId = new Map();
@@ -56,7 +54,12 @@ export function compileInputXmlFeatureMechanicsPreparation({
   }
 
   const componentKinds = indexKinds(source.segmentBindings);
-  requireExactMapCoverage(teeFactorResultBySegmentId, componentKinds.TEE, 'teeFactorResultBySegmentId');
+  const teeGroups = groupPhysicalTeeJunctions(source.normalizedGeometry, componentKinds.TEE);
+  requireExactMapCoverage(
+    teeFactorResultByJunctionNodeId,
+    teeGroups.map((row) => row.junctionNodeId),
+    'teeFactorResultByJunctionNodeId',
+  );
   requireExactMapCoverage(reducerRequestBySegmentId, componentKinds.REDUCER, 'reducerRequestBySegmentId');
 
   const bendExpansion = compileInputXmlBendFeatureExpansion({
@@ -72,15 +75,14 @@ export function compileInputXmlFeatureMechanicsPreparation({
     segmentIds: componentKinds.BEND,
   });
 
-  const teeJunctions = componentKinds.TEE.map((teeSegmentId) => compileTeeJunction({
-    teeSegmentId,
+  const teeJunctions = teeGroups.map((group) => compileTeeJunction({
+    ...group,
     canonicalGeometry: source.normalizedGeometry,
-    factorResult: mapValue(teeFactorResultBySegmentId, teeSegmentId),
+    factorResult: mapValue(teeFactorResultByJunctionNodeId, group.junctionNodeId),
     materialBySegmentId,
     physicalSectionBySegmentId,
     pipingComponentProfile,
   }));
-  requireUniqueJunctions(teeJunctions);
   requireTeeBendNonOverlap(teeJunctions, new Set(componentKinds.BEND));
 
   const reducerAuthorities = compileReducers({
@@ -102,7 +104,9 @@ export function compileInputXmlFeatureMechanicsPreparation({
   for (const id of componentKinds.BEND) claim(claimedSourceSegments, id, 'BEND');
   for (const id of componentKinds.REDUCER) claim(claimedSourceSegments, id, 'REDUCER');
   for (const junction of teeJunctions) {
-    for (const modifier of junction.modifiers) claim(claimedSourceSegments, modifier.legId, `TEE@${junction.junctionNodeId}`, true);
+    for (const modifier of junction.modifiers) {
+      claim(claimedSourceSegments, modifier.legId, `TEE@${junction.junctionNodeId}`, true);
+    }
   }
 
   const draft = {
@@ -120,7 +124,8 @@ export function compileInputXmlFeatureMechanicsPreparation({
     sourceToAnalysisElementIds,
     componentCoverage: Object.freeze({
       bends: Object.freeze([...componentKinds.BEND]),
-      tees: Object.freeze([...componentKinds.TEE]),
+      teeTaggedSegments: Object.freeze([...componentKinds.TEE]),
+      teeJunctionNodeIds: Object.freeze(teeGroups.map((row) => row.junctionNodeId)),
       reducers: Object.freeze([...componentKinds.REDUCER]),
     }),
     ownership: Object.freeze({
@@ -141,8 +146,9 @@ export function compileInputXmlFeatureMechanicsPreparation({
       ]),
     }),
     limitations: Object.freeze([
-      'This v1 feature-mechanics preparation supplements rather than mutates the legacy one-source-span solve preparation.',
-      'Tee end modifiers must be applied to the existing incident analysis spans; duplicate overlapping tee leg elements are forbidden.',
+      'This feature-mechanics preparation supplements rather than mutates the legacy one-source-span solve preparation.',
+      'One qualified tee factor result is required per physical three-leg junction, not per SIF-tagged source span.',
+      'Tee end modifiers must be applied to existing incident analysis spans; duplicate overlapping tee leg elements are forbidden.',
       'Reducer authorities are emitted only when one predeclared section-sampling rule is uniquely qualified.',
       'One-way supports, gaps and friction remain outside this M035 feature-mechanics layer.',
     ]),
@@ -150,19 +156,35 @@ export function compileInputXmlFeatureMechanicsPreparation({
   return Object.freeze({ ...draft, semanticHash: semanticHash(draft) });
 }
 
+function groupPhysicalTeeJunctions(geometry, teeSegmentIds) {
+  const groups = new Map();
+  for (const teeSegmentId of teeSegmentIds) {
+    const teeSegment = geometry.segments.find((row) => String(row.id) === String(teeSegmentId));
+    if (!teeSegment || teeSegment.type !== 'TEE') {
+      fail('INPUTXML_FEATURE_MECHANICS_TEE_SEGMENT_INVALID', `TEE segment ${teeSegmentId} is not present in canonical geometry.`);
+    }
+    const junctionNodeId = inferTeeJunctionNode(geometry, teeSegment);
+    const existing = groups.get(junctionNodeId) ?? [];
+    existing.push(String(teeSegmentId));
+    groups.set(junctionNodeId, existing);
+  }
+  return [...groups.entries()]
+    .map(([junctionNodeId, taggedSegmentIds]) => Object.freeze({
+      junctionNodeId,
+      taggedSegmentIds: Object.freeze([...new Set(taggedSegmentIds)].sort(compareAscii)),
+    }))
+    .sort((left, right) => compareAscii(left.junctionNodeId, right.junctionNodeId));
+}
+
 function compileTeeJunction({
-  teeSegmentId,
+  junctionNodeId,
+  taggedSegmentIds,
   canonicalGeometry,
   factorResult,
   materialBySegmentId,
   physicalSectionBySegmentId,
   pipingComponentProfile,
 }) {
-  const teeSegment = canonicalGeometry.segments.find((row) => String(row.id) === String(teeSegmentId));
-  if (!teeSegment || teeSegment.type !== 'TEE') {
-    fail('INPUTXML_FEATURE_MECHANICS_TEE_SEGMENT_INVALID', `TEE segment ${teeSegmentId} is not present in canonical geometry.`);
-  }
-  const junctionNodeId = inferTeeJunctionNode(canonicalGeometry, teeSegment);
   const junctionPosition = nodePoint(canonicalGeometry, junctionNodeId);
   const incident = canonicalGeometry.segments.filter((row) =>
     String(row.startNodeId) === junctionNodeId || String(row.endNodeId) === junctionNodeId);
@@ -183,15 +205,15 @@ function compileTeeJunction({
     });
   });
   const result = deriveB31JDirectionalBranchEndModifiers({
-    componentId: `IXTEE.${safe(teeSegmentId)}`,
+    componentId: `IXTEE.JUNCTION.${safe(junctionNodeId)}`,
     factorResult,
     junctionPosition,
     legs,
     runCollinearityTolerance: pipingComponentProfile.runCollinearityTolerance,
   });
   return Object.freeze({
-    teeSegmentId: String(teeSegmentId),
     junctionNodeId,
+    taggedSegmentIds,
     semanticHash: result.semanticHash,
     formulationId: result.formulationId,
     geometry: result.geometry,
@@ -245,20 +267,13 @@ function inferTeeJunctionNode(geometry, teeSegment) {
   return candidates[0].nodeId;
 }
 
-function requireUniqueJunctions(junctions) {
-  const ids = junctions.map((row) => row.junctionNodeId);
-  if (new Set(ids).size !== ids.length) {
-    fail('INPUTXML_FEATURE_MECHANICS_TEE_JUNCTION_DUPLICATE', 'Multiple tee source tags resolve to the same physical junction.');
-  }
-}
-
 function requireTeeBendNonOverlap(junctions, bendIds) {
   for (const junction of junctions) {
     const overlap = junction.modifiers.map((row) => row.legId).filter((id) => bendIds.has(id));
     if (overlap.length > 0) {
       fail(
         'INPUTXML_FEATURE_MECHANICS_FEATURE_OVERLAP_UNSUPPORTED',
-        `TEE ${junction.teeSegmentId} shares source span(s) ${overlap.join(', ')} with a bend replacement; split the canonical features before assembly.`,
+        `TEE junction ${junction.junctionNodeId} shares source span(s) ${overlap.join(', ')} with a bend replacement; split the canonical features before assembly.`,
       );
     }
   }
@@ -299,7 +314,7 @@ function mapValue(map, key) {
   return map.get(String(key)) ?? map.get(key);
 }
 function requireMap(value, field) {
-  if (!(value instanceof Map)) throw new TypeError(`${field} must be a Map keyed by canonical source segment id.`);
+  if (!(value instanceof Map)) throw new TypeError(`${field} must be a Map keyed by its declared canonical identity.`);
 }
 function claim(index, segmentId, owner, allowShared = false) {
   const id = String(segmentId);
