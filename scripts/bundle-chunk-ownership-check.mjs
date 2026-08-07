@@ -18,6 +18,7 @@ const expectedOwnership = new Map([
   ['/repo/src/core/linear-piping-analysis/index.js', 'core-linear-piping'],
   ['/repo/src/core/support-engineering/index.js', 'core-support-engineering'],
   ['/repo/src/workspace/topology-edit/topology-edit-inline-component-replacement.js', 'topology-edit-engineering-commands'],
+  ['/repo/src/workspace/topology-edit/topology-edit-stagedjson-engineering-source.js', 'topology-edit-stagedjson-source-engineering'],
 ]);
 
 const automaticWorkspaceOwnership = [
@@ -68,6 +69,6 @@ console.log(JSON.stringify({
   ownershipAssertions: expectedOwnership.size,
   automaticWorkspaceOwnershipAssertions: automaticWorkspaceOwnership.length,
   distinctChunkOwners: new Set(expectedOwnership.values()).size,
-  workspaceOwnership: 'ROLLUP_GRAPH_AWARE_STATEFUL_WITH_STATELESS_ENGINEERING_COMMAND_EXCEPTION',
+  workspaceOwnership: 'ROLLUP_GRAPH_AWARE_STATEFUL_WITH_STATELESS_TOPOLOGY_EXCEPTIONS',
   correctnessPreferredOverTarget: true,
 }));
