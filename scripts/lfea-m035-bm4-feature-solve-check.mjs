@@ -14,8 +14,13 @@ assert.ok(Number.isFinite(stiffnessDiagnostic.factorization.conditionEstimate));
 console.log('\n--- M035 BM4 loaded SUS/OPE solver qualification ---');
 const physicalDiagnostics = diagnoseBm4M035PhysicalCases();
 console.log(JSON.stringify(physicalDiagnostics, null, 2));
-assert.ok(['QUALIFIED', 'CONDITIONAL', 'BLOCKED'].includes(physicalDiagnostics.sustained.status));
-assert.ok(['QUALIFIED', 'CONDITIONAL', 'BLOCKED'].includes(physicalDiagnostics.operating.status));
+assert.equal(physicalDiagnostics.sustained.status, 'CONDITIONAL', 'M035 SUS must remain visible as residual-WARN, not be silently promoted to QUALIFIED.');
+assert.equal(physicalDiagnostics.sustained.diagnostics.residual.status, 'WARN');
+assert.equal(physicalDiagnostics.sustained.diagnostics.forceEquilibrium.status, 'PASS');
+assert.equal(physicalDiagnostics.sustained.diagnostics.momentEquilibrium.status, 'PASS');
+assert.equal(physicalDiagnostics.sustained.diagnostics.energyBalance.status, 'PASS');
+assert.equal(physicalDiagnostics.operating.status, 'QUALIFIED');
+assert.ok(Object.values(physicalDiagnostics.operating.diagnostics).every((row) => row.status === 'PASS'));
 
 console.log('\n--- M035 BM4 feature-aware bend/tee solve ---');
 const result = solveBm4M035FeatureCases();
