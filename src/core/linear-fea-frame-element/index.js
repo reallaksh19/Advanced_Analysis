@@ -48,3 +48,5 @@ export {
   frameElementSemanticProjection,
   requireFrameElement,
 } from './frame-element.js';
+
+export { augmentFrameElementUniformAxialInitialStrain } from './uniform-axial-initial-strain.js';
