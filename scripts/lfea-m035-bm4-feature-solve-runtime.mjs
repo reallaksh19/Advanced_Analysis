@@ -33,15 +33,13 @@ import {
 import { semanticHash } from '../src/core/shared-piping-model/canonical-json.js';
 import { compilerProfile } from './lfea-b2.5-model-compiler-fixtures.mjs';
 import { componentProfile } from './lfea-b3.2-piping-component-fixtures.mjs';
-import { loadCaseProfile } from './lfea-b3.3-load-case-fixtures.mjs';
-import { solverProfile } from './lfea-b3.4-solver-fixtures.mjs';
-import { recoveryProfile } from './lfea-b3.5-result-recovery-fixtures.mjs';
+import { loadCaseProfile, solverProfile } from './lfea-b3.3-solver-fixtures.mjs';
+import { recoveryProfile } from './lfea-b3.4-recovery-fixtures.mjs';
 import {
   BM4_SOLVER_CONDITIONING_PROFILE,
   BM4_SOURCE_ID,
   GRAVITY,
   INSTALLATION_TEMPERATURE,
-  THERMAL_EXPANSION_COEFFICIENT,
   buildBm4SolveAuthorities,
   sourceEvidence,
 } from './lfea-m034-bm4-solve-fixtures.mjs';
@@ -56,6 +54,7 @@ const CONDITIONING_PROFILE = Object.freeze({
 const COMPONENT_PROFILE = componentProfile({
   bendPressureStiffeningRule: 'BEND_PRESSURE_STIFFENING_DECLARED_FACTOR_V1',
 });
+const NODE_DOFS = Object.freeze(['UX', 'UY', 'UZ', 'RX', 'RY', 'RZ']);
 
 export function buildBm4M035FeatureAuthorities() {
   const base = buildBm4SolveAuthorities();
@@ -157,6 +156,7 @@ export function buildBm4M035FeatureAuthorities() {
   });
   const inlineReducers = detectInputXmlInlineReducerTransitions({ canonicalGeometry: sourceGeometry });
   return Object.freeze({
+    base,
     ...base,
     sourceGeometry,
     analysisGeometry,
@@ -405,38 +405,36 @@ function compileCase(authorities, loadCaseId, thermal) {
 }
 
 function differenceCase(authorities, sustained, operating) {
-  const susByNode = new Map(sustained.recovery.nodalDisplacements.map((row) => [row.nodeId, row]));
-  const opeByNode = new Map(operating.recovery.nodalDisplacements.map((row) => [row.nodeId, row]));
+  const susDisp = displacementByNode(sustained.execution);
+  const opeDisp = displacementByNode(operating.execution);
+  const nodalDisplacements = [...opeDisp.keys()].sort().map((nodeId) => ({
+    nodeId,
+    displacement: subtractRecord(opeDisp.get(nodeId), susDisp.get(nodeId) ?? zeroDofRecord()),
+  }));
   const susByElement = sourceActionMap(authorities, sustained.recovery);
   const opeByElement = sourceActionMap(authorities, operating.recovery);
-  const nodalDisplacements = [...opeByNode].map(([nodeId, ope]) => {
-    const sus = susByNode.get(nodeId);
-    return { nodeId, displacement: subtractRecord(ope.displacement, sus.displacement) };
-  });
-  const elementActions = authorities.baseEntriesForReport.map((sourceEntry) => {
-    const sus = susByElement.get(String(sourceEntry.sourceSegment.id));
-    const ope = opeByElement.get(String(sourceEntry.sourceSegment.id));
+  const elementActions = authorities.base.entries.map((sourceEntry) => {
+    const sourceSegmentId = String(sourceEntry.sourceSegment.id);
+    const sus = susByElement.get(sourceSegmentId);
+    const ope = opeByElement.get(sourceSegmentId);
     return {
-      sourceSegmentId: String(sourceEntry.sourceSegment.id),
+      sourceSegmentId,
       local: { I: subtractRecord(ope.local.I, sus.local.I), J: subtractRecord(ope.local.J, sus.local.J) },
       global: { I: subtractRecord(ope.global.I, sus.global.I), J: subtractRecord(ope.global.J, sus.global.J) },
     };
   });
-  return Object.freeze({ nodalDisplacements, elementActions });
+  return Object.freeze({ nodalDisplacements: Object.freeze(nodalDisplacements), elementActions: Object.freeze(elementActions) });
 }
 
 function buildReport(authorities, sustained, operating, expansion) {
-  authorities.baseEntriesForReport = authorities.entries
-    .map((row) => row.sourceEntry)
-    .filter((row, index, all) => all.findIndex((candidate) => candidate.sourceSegment.id === row.sourceSegment.id) === index);
   const susSource = sourceActionMap(authorities, sustained.recovery);
   const opeSource = sourceActionMap(authorities, operating.recovery);
   const expSource = new Map(expansion.elementActions.map((row) => [row.sourceSegmentId, row]));
-  const susDisp = new Map(sustained.recovery.nodalDisplacements.map((row) => [row.nodeId, row]));
-  const opeDisp = new Map(operating.recovery.nodalDisplacements.map((row) => [row.nodeId, row]));
-  const expDisp = new Map(expansion.nodalDisplacements.map((row) => [row.nodeId, row]));
-  const susReact = new Map(sustained.recovery.reactionByNode.map((row) => [row.nodeId, row]));
-  const opeReact = new Map(operating.recovery.reactionByNode.map((row) => [row.nodeId, row]));
+  const susDisp = displacementByNode(sustained.execution);
+  const opeDisp = displacementByNode(operating.execution);
+  const expDisp = new Map(expansion.nodalDisplacements.map((row) => [row.nodeId, row.displacement]));
+  const susReact = reactionByNode(sustained.execution);
+  const opeReact = reactionByNode(operating.execution);
   const constraints = authorities.compilation.model.constraints;
   return Object.freeze({
     schema: 'm035-bm4-feature-solve-report/v1',
@@ -464,15 +462,12 @@ function buildReport(authorities, sustained, operating, expansion) {
     ],
     nodes: authorities.sourceGeometry.nodes.map((node) => {
       const kernel = `BM4M035.N${node.id}`;
-      const sus = susDisp.get(kernel)?.displacement ?? null;
-      const ope = opeDisp.get(kernel)?.displacement ?? null;
-      const exp = expDisp.get(kernel)?.displacement ?? null;
       return {
         referenceNodeId: String(node.id),
         position: [node.x, node.y, node.z],
-        sustained: sus,
-        operating: ope,
-        expansion: exp,
+        sustained: susDisp.get(kernel) ?? zeroDofRecord(),
+        operating: opeDisp.get(kernel) ?? zeroDofRecord(),
+        expansion: expDisp.get(kernel) ?? zeroDofRecord(),
       };
     }),
     restraints: constraints.map((constraint) => ({
@@ -480,8 +475,8 @@ function buildReport(authorities, sustained, operating, expansion) {
       referenceNodeId: constraint.nodeId.replace(/^BM4M035\.N/u, ''),
       dof: constraint.dof,
       behavior: constraint.behavior,
-      sustained: susReact.get(constraint.nodeId)?.reaction?.[constraint.dof] ?? 0,
-      operating: opeReact.get(constraint.nodeId)?.reaction?.[constraint.dof] ?? 0,
+      sustained: susReact.get(constraint.nodeId)?.[constraint.dof] ?? 0,
+      operating: opeReact.get(constraint.nodeId)?.[constraint.dof] ?? 0,
     })),
     elements: authorities.base.entries.map((sourceEntry) => {
       const id = String(sourceEntry.sourceSegment.id);
@@ -516,6 +511,25 @@ function sourceActionMap(authorities, recovery) {
   return result;
 }
 
+function displacementByNode(execution) {
+  return vectorByNode(execution.displacement);
+}
+function reactionByNode(execution) {
+  return vectorByNode(execution.reactions);
+}
+function vectorByNode(rows) {
+  const result = new Map();
+  for (const row of rows) {
+    const current = result.get(row.nodeId) ?? zeroDofRecord();
+    current[row.dof] = row.value;
+    result.set(row.nodeId, current);
+  }
+  return result;
+}
+function zeroDofRecord() {
+  return Object.fromEntries(NODE_DOFS.map((dof) => [dof, 0]));
+}
+
 function resolveEntryAxes(geometry, entry) {
   const rawI = point(geometry, entry.segment.startNodeId);
   const rawJ = point(geometry, entry.segment.endNodeId);
@@ -539,7 +553,7 @@ function constraintDeclarations(geometry) {
     behavior: 'FIXED',
   });
   for (const node of geometry.nodes) {
-    if (node.restraint === 'ANCHOR') for (const dof of ['UX', 'UY', 'UZ', 'RX', 'RY', 'RZ']) add(node.id, dof, 'ANCHOR');
+    if (node.restraint === 'ANCHOR') for (const dof of NODE_DOFS) add(node.id, dof, 'ANCHOR');
     for (const restraint of node.meta?.restraints ?? []) {
       if (restraint.typeCode === '14') add(node.id, 'UY', 'PLUS-Y-LINEARIZED');
       if (restraint.typeCode === '9') {
