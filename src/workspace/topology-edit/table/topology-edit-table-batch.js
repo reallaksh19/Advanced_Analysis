@@ -31,10 +31,6 @@ export function assertTopologyEditTableBatch(value) {
     throw new TypeError(`Table batch must use ${TOPOLOGY_EDIT_TABLE_BATCH_SCHEMA}.`);
   }
   const rebuilt = createTopologyEditTableBatch({ intents: value.intents });
-  if (rebuilt.batchHash !== value.batchHash
-    || semanticHash({ ...value, batchHash: undefined }) === value.batchHash) {
-    // The second expression deliberately cannot validate a value with an extra/removed field.
-  }
   const material = { ...value };
   delete material.batchHash;
   if (semanticHash(material) !== value.batchHash || rebuilt.batchHash !== value.batchHash) {
