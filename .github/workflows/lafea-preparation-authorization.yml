@@ -1,0 +1,62 @@
+name: LAFEA Preparation Authorization Certification
+
+on:
+  pull_request:
+    paths:
+      - 'src/workspace/lafea-preparation-**'
+      - 'src/workspace/lafea-workbench-preparation-state.js'
+      - 'src/workspace/lafea-stage-analysis-adapter.js'
+      - 'src/workspace/lafea-workbench-orchestration-projection.js'
+      - 'src/workspace/lafea-workbench-orchestrator-store.js'
+      - 'src/workspace/lafea-lifecycle-workbench-store.js'
+      - 'src/workspace/lafea-workbench.js'
+      - 'scripts/lafea-ac2-*.mjs'
+      - 'docs/LAFEA_WP_AC2_Preparation_Authorization.md'
+      - '.github/workflows/lafea-preparation-authorization.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  wp-ac2-exact-head:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: AC2 preparation and authorization contracts
+        run: |
+          node scripts/lafea-ac2-preparation-check.mjs
+          node scripts/lafea-ac2-source-guard.mjs
+      - name: Retained LAFEA architecture hard gates
+        run: |
+          npm run check:lafea-core
+          npm run check:lafea-workbench
+          node scripts/lafea-nb-t4a-analysis-mesh-custody-check.mjs
+          node scripts/lafea-nb-t4a-analysis-mesh-custody-controller-check.mjs
+          node scripts/lafea-nb-t4a-analysis-mesh-live-store-check.mjs
+          node scripts/lafea-u3b-live-lifecycle-check.mjs
+          node scripts/lafea-u4g-live-workbench-viewport-check.mjs
+          node scripts/lafea-u4g-controller-render-evidence-check.mjs
+          node scripts/lafea-u4g-source-guard.mjs
+      - name: Non-bucket aggregate
+        run: npm run check:lafea-nonbucket-stack
+      - name: Strict syntax scan
+        run: npm run syntax:strict
+      - name: Import graph
+        run: npm run check:imports
+      - name: Advanced shell contract
+        run: npm run check:advanced-shell
+      - name: Production build
+        run: npx vite build
+      - name: Patch hygiene
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git diff --check "$PR_BASE_SHA...HEAD"
+          test -z "$(git status --short)"
