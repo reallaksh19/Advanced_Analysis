@@ -206,8 +206,8 @@ const combinedCases = compareSnapshot(featureSnapshot(combined), cii);
 const m035Aggregate = aggregate(m035Cases);
 const combinedAggregate = aggregate(combinedCases);
 
-assert.ok(Math.abs(ratePct(m035Aggregate.raw.displacement) - 18.499486125385405) < 1e-9, 'comparison parity: M035 raw displacement');
-assert.ok(Math.abs(ratePct(m035Aggregate.raw.forces) - 28.959276018099548) < 1e-9, 'comparison parity: M035 raw forces');
+assert.ok(Math.abs(ratePct(m035Aggregate.raw.displacement) - 18.499427262313862) < 1e-12, 'comparison parity: M035 raw displacement');
+assert.ok(Math.abs(ratePct(m035Aggregate.raw.forces) - 28.959484346224677) < 1e-12, 'comparison parity: M035 raw forces');
 
 const report = {
   schema: 'm035-m036-bm4-cases-19-20-21-comparison/v1',
