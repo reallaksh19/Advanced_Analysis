@@ -14,7 +14,10 @@ const extraModules = [
   path.join(ROOT, 'scripts', 'lfea-shell-v2-store-fidelity-check.mjs'),
   path.join(ROOT, 'scripts', 'lfea-shell-v2-baseline-hash-check.mjs'),
   path.join(ROOT, 'e2e', 'lfea-shell-v2.spec.js'),
+  path.join(ROOT, 'e2e', 'fixtures', 'ui1-linear-piping-run-analysis-stub.js'),
   path.join(ROOT, 'vite.lfea.config.js'),
+  path.join(ROOT, 'vite.lfea-ui1-test.config.js'),
+  path.join(ROOT, 'playwright.lfea-ui1.config.js'),
 ];
 
 for (const file of [...shellFiles, ...tokenFiles, ...extraModules]) {
@@ -65,6 +68,18 @@ assert.match(standaloneVite, /outDir:\s*'dist-lfea'/u);
 const html = source('lfea.html');
 assert.match(html, /lfea-shell-v2\/standalone-entry\.js/u);
 
+const testVite = source('vite.lfea-ui1-test.config.js');
+assert.match(testVite, /ui1-isolate-inherited-piping-runner-defect/u);
+assert.match(testVite, /ui1-linear-piping-run-analysis-stub\.js/u);
+const testStub = source('e2e/fixtures/ui1-linear-piping-run-analysis-stub.js');
+assert.match(testStub, /UI1_TEST_PIPING_RUN_ANALYSIS_DISABLED/u);
+assert.match(testStub, /throw disabledError\(\)/u);
+assert.doesNotMatch(
+  `${standalone}\n${controller}`,
+  /ui1-linear-piping-run-analysis-stub/u,
+  'Test-only piping stub must never enter production LFEA modules.',
+);
+
 const navigator = source('src/workspace/lfea-shell-v2/analysis-navigator.js');
 assert.match(navigator, /LFEA_ENRICHED_SJSON_PIPING_ADAPTER_NOT_WIRED/u);
 assert.match(navigator, /Blocked/u);
@@ -97,6 +112,7 @@ console.log(JSON.stringify({
   standaloneEntry: true,
   standaloneProductionBuildConfig: true,
   embeddedEntryRetained: true,
+  browserHarnessPipingStub: 'TEST_ONLY_FAIL_FAST',
   enrichedSjsonPipingAdapter: false,
 }));
 
