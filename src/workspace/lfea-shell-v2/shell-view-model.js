@@ -88,7 +88,11 @@ function pipelineModel(state, runTrace) {
 }
 
 function runningPipeline(progress) {
-  const current = Math.max(0, LFEA_PIPELINE_STAGES.indexOf(progress.stage));
+  if (progress.stage === 'COMPLETE') {
+    return stages(() => STEP_STATE.COMPLETE);
+  }
+  const current = LFEA_PIPELINE_STAGES.indexOf(progress.stage);
+  if (current < 0) return stages(() => STEP_STATE.NOT_RUN);
   return stages((_, index) => {
     if (index < current) return STEP_STATE.COMPLETE;
     if (index === current) return STEP_STATE.RUNNING;
@@ -97,7 +101,8 @@ function runningPipeline(progress) {
 }
 
 function cancelledPipeline(trace) {
-  const current = Math.max(0, LFEA_PIPELINE_STAGES.indexOf(trace.stage));
+  const current = LFEA_PIPELINE_STAGES.indexOf(trace.stage);
+  if (current < 0) return stages(() => STEP_STATE.NOT_RUN);
   return stages((_, index) => {
     if (index < current) return STEP_STATE.COMPLETE;
     if (index === current) return STEP_STATE.WARNING;
