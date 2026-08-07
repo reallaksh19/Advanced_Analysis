@@ -85,6 +85,20 @@ assert.deepEqual(
   ['20160', '20295'],
   'Only the two degree>2 BM4 nodes identified by #834 are structural tee-flexibility targets.',
 );
+assert.ok(
+  physicalTeeJunctions.every((row) => row.incidentSegmentIds.length === 3 && row.taggedSegmentIds.length >= 1),
+  'Every structural tee-flexibility target must be degree-3 topology with at least one retained tee/SIF-tagged source span.',
+);
+assert.equal(
+  assignedTags.size + teeTagsWithoutBranchTopology.length,
+  canonicalTeeSegments.length,
+  'Every canonical tee/SIF-tagged span must be classified exactly once as junction evidence or stress/source-only evidence.',
+);
+assert.equal(teeTagsWithoutBranchTopology.length, 4, 'Four tee/SIF-tagged spans are not incident to a degree-3 tee junction and remain stress/source-only evidence.');
+assert.ok(
+  teeTagsWithoutBranchTopology.every((id) => !physicalTeeJunctions.some((junction) => junction.incidentSegmentIds.includes(id))),
+  'Stress/source-only tee tags must never be promoted to structural junction flexibility.',
+);
 assert.equal(explicitReducerTags.length, 0, 'BM4 must not invent explicit reducer tags that are absent from InputXML.');
 assert.equal(allSectionChangeNodes.length, 7, 'BM4 has seven raw section-change nodes under the historical node-based diagnostic.');
 assert.deepEqual(
@@ -99,8 +113,6 @@ assert.deepEqual(
   degree2SectionChangeNodes.map((row) => row.nodeId),
   'Inline reducer candidates must exactly match degree-2 section-change topology.',
 );
-assert.ok(physicalTeeJunctions.every((row) => row.incidentSegmentIds.length === 3));
-assert.equal(teeTagsWithoutBranchTopology.length, 5, 'Five SIF-tagged spans remain stress/source evidence without degree-3 branch topology.');
 assert.ok(inlineReducers.transitions.every((row) => row.condensationActivation.status === 'BLOCKED_PENDING_FINITE_REDUCER_GEOMETRY_AND_PARITY'));
 assert.ok(inlineReducers.transitions.every((row) => row.condensationActivation.reducerLength === null));
 
@@ -112,6 +124,7 @@ console.log(JSON.stringify({
     teeSifTags: teeTags.length,
     canonicalTeeSegments: canonicalTeeSegments.length,
     physicalTeeJunctions: physicalTeeJunctions.length,
+    teeTagsAssignedToJunctions: assignedTags.size,
     teeTagsWithoutBranchTopology: teeTagsWithoutBranchTopology.length,
     explicitReducerTags: explicitReducerTags.length,
     rawSectionChangeNodes: allSectionChangeNodes.length,
