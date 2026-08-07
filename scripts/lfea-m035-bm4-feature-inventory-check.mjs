@@ -74,12 +74,8 @@ const teeTagsWithoutBranchTopology = canonicalTeeSegments
   .sort();
 const inlineReducers = detectInputXmlInlineReducerTransitions({ canonicalGeometry: normalized });
 const allSectionChangeNodes = sectionChangeNodes(normalized);
-
-console.log(JSON.stringify({
-  diagnostic: 'm035-bm4-section-change-topology',
-  detectorTransitionNodes: inlineReducers.transitions.map((row) => row.nodeId),
-  allSectionChangeNodes,
-}, null, 2));
+const degree2SectionChangeNodes = allSectionChangeNodes.filter((row) => row.nodeDegree === 2);
+const branchSectionChangeNodes = allSectionChangeNodes.filter((row) => row.nodeDegree > 2);
 
 assert.equal(bends.length, 11, 'BM4 normalized geometry must expose the 11 M035 bend features.');
 assert.equal(teeTags.length, 7, 'BM4 source evidence currently contains seven tee/weldolet SIF tags.');
@@ -90,7 +86,19 @@ assert.deepEqual(
   'Only the two degree>2 BM4 nodes identified by #834 are structural tee-flexibility targets.',
 );
 assert.equal(explicitReducerTags.length, 0, 'BM4 must not invent explicit reducer tags that are absent from InputXML.');
-assert.equal(inlineReducers.transitionCount, 7, 'BM4 must expose seven inline section-transition reducer candidates.');
+assert.equal(allSectionChangeNodes.length, 7, 'BM4 has seven raw section-change nodes under the historical node-based diagnostic.');
+assert.deepEqual(
+  branchSectionChangeNodes.map((row) => row.nodeId),
+  ['20295'],
+  'The seventh raw section-change node is the physical tee junction 20295, not an inline reducer candidate.',
+);
+assert.equal(degree2SectionChangeNodes.length, 6, 'BM4 has six degree-2 inline section-transition candidates.');
+assert.equal(inlineReducers.transitionCount, 6, 'The generic inline-reducer detector must exclude degree-3 tee section changes.');
+assert.deepEqual(
+  inlineReducers.transitions.map((row) => row.nodeId),
+  degree2SectionChangeNodes.map((row) => row.nodeId),
+  'Inline reducer candidates must exactly match degree-2 section-change topology.',
+);
 assert.ok(physicalTeeJunctions.every((row) => row.incidentSegmentIds.length === 3));
 assert.equal(teeTagsWithoutBranchTopology.length, 5, 'Five SIF-tagged spans remain stress/source evidence without degree-3 branch topology.');
 assert.ok(inlineReducers.transitions.every((row) => row.condensationActivation.status === 'BLOCKED_PENDING_FINITE_REDUCER_GEOMETRY_AND_PARITY'));
@@ -106,6 +114,7 @@ console.log(JSON.stringify({
     physicalTeeJunctions: physicalTeeJunctions.length,
     teeTagsWithoutBranchTopology: teeTagsWithoutBranchTopology.length,
     explicitReducerTags: explicitReducerTags.length,
+    rawSectionChangeNodes: allSectionChangeNodes.length,
     inlineReducerTransitions: inlineReducers.transitionCount,
   },
   bends,
@@ -113,6 +122,8 @@ console.log(JSON.stringify({
   physicalTeeJunctions,
   teeTagsWithoutBranchTopology,
   explicitReducerTags,
+  rawSectionChangeNodes: allSectionChangeNodes,
+  excludedBranchSectionChangeNodes: branchSectionChangeNodes,
   inlineReducerTransitions: inlineReducers.transitions,
   reducerPolicy: inlineReducers.policy,
 }, null, 2));
