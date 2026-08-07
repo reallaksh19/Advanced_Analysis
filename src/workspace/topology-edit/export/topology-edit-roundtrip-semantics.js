@@ -10,6 +10,7 @@ const LINEAGE_KEYS = new Set([
   'sourcePath', 'sourceIndex', 'sourceEntityId', 'sourceNodeKey', 'jsonPointer',
   'componentKey', 'entityId', 'identityKind', 'portKeys', 'writebackHash',
   'geometryHash', 'evidenceHash', 'authorityHash', 'candidateHash', 'recordRevisionHash',
+  'topologyOperation', 'lastModifiedByCommandId', 'editAncestry',
 ]);
 
 export function projectTopologyEditEngineeringSemantics(topology, options = {}) {
