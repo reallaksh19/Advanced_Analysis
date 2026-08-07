@@ -14,7 +14,9 @@ test('CSV and XLSX export the certified Table projection without changing author
 
   const csvButton = page.locator('[data-table-action="export-csv"]');
   const xlsxButton = page.locator('[data-table-action="export-xlsx"]');
+  await expect(csvButton).toBeVisible();
   await expect(csvButton).toBeEnabled();
+  await expect(xlsxButton).toBeVisible();
   await expect(xlsxButton).toBeEnabled();
 
   const [csvDownload] = await Promise.all([
@@ -68,6 +70,12 @@ async function openProductionController(page) {
   await expect.poll(() => page.evaluate(() => Boolean(
     document.querySelector('[data-role="topology-edit-render-host"]')?.__topologyEditAuthoringController?.tableAdapter?.runtime,
   ))).toBe(true);
+  const tablePanel = page.locator('details[data-panel-kind="table"]');
+  await expect(tablePanel).toBeVisible();
+  if (!(await tablePanel.evaluate((element) => element.open))) {
+    await tablePanel.locator('summary').click();
+  }
+  await expect(tablePanel).toHaveJSProperty('open', true);
   return host;
 }
 
