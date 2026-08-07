@@ -8,6 +8,7 @@ on:
       - 'src/core/linear-piping-analysis-consumer/**'
       - 'scripts/lfea-b1-conditioning-check.mjs'
       - 'scripts/lfea-linear-core-exact-head-evidence.mjs'
+      - 'scripts/linear-piping-analysis-consumer-anti-drift-check.mjs'
       - 'scripts/linear-piping-inputxml-unit-normalization-check.mjs'
       - 'test/governed-analysis-pipeline.test.js'
       - '.github/workflows/lfea-linear-core-exact-head.yml'
@@ -43,7 +44,7 @@ jobs:
           git diff --name-only "$merge_base" "${{ github.event.pull_request.head.sha }}" > /tmp/lfea-linear-core-paths.txt
           while IFS= read -r changed; do
             case "$changed" in
-              src/core/centerline-beam-fea/*|src/core/linear-fea-*/*|src/core/linear-piping-analysis-consumer/*|scripts/lfea-b1-conditioning-check.mjs|scripts/lfea-linear-core-exact-head-evidence.mjs|scripts/linear-piping-inputxml-unit-normalization-check.mjs|test/governed-analysis-pipeline.test.js|.github/workflows/lfea-linear-core-exact-head.yml) ;;
+              src/core/centerline-beam-fea/*|src/core/linear-fea-*/*|src/core/linear-piping-analysis-consumer/*|scripts/lfea-b1-conditioning-check.mjs|scripts/lfea-linear-core-exact-head-evidence.mjs|scripts/linear-piping-analysis-consumer-anti-drift-check.mjs|scripts/linear-piping-inputxml-unit-normalization-check.mjs|test/governed-analysis-pipeline.test.js|.github/workflows/lfea-linear-core-exact-head.yml) ;;
               *) echo "Forbidden changed path for the linear-core qualification slice: $changed"; exit 1 ;;
             esac
           done < /tmp/lfea-linear-core-paths.txt
