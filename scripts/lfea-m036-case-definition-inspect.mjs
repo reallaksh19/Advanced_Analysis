@@ -6,15 +6,13 @@ import {
   BM4_OUTPUT_PATH,
 } from './lfea-m034-bm4-solve-fixtures.mjs';
 
-function interestingTags(text) {
+function tagRows(text) {
   const rows = [];
   const pattern = /<\s*([A-Za-z0-9_-]+)\b([^>]*)>/gu;
   for (const match of text.matchAll(pattern)) {
     const name = match[1].toUpperCase();
-    const attrs = match[2] ?? '';
-    if (!/(CASE|LOAD|SUS|OPE|ALT|NONLINEAR|RESTRAINT)/u.test(`${name} ${attrs.toUpperCase()}`)) continue;
-    const compact = attrs.replace(/\s+/gu, ' ').trim();
-    rows.push({ name, attrs: compact.slice(0, 900) });
+    const attrs = (match[2] ?? '').replace(/\s+/gu, ' ').trim();
+    rows.push({ name, attrs });
   }
   return rows;
 }
@@ -29,12 +27,23 @@ function unique(rows) {
   });
 }
 
-const input = unique(interestingTags(readFileSync(BM4_INPUT_PATH, 'utf8')));
-const output = unique(interestingTags(readFileSync(BM4_OUTPUT_PATH, 'utf8')));
-const selectedInput = input.filter((row) => /(CASE|LOAD|ALT|SUS|OPE)/u.test(`${row.name} ${row.attrs.toUpperCase()}`));
-const selectedOutput = output.filter((row) => /(CASE 19|CASE 20|CASE 21|ALTERNATE|ALT)/u.test(row.attrs.toUpperCase()));
+function loadCaseEvidence(text) {
+  return unique(tagRows(text).filter((row) => {
+    const haystack = `${row.name} ${row.attrs}`.toUpperCase();
+    const namedLoadCase = /(LOAD.*CASE|CASE.*LOAD|STATIC.*CASE)/u.test(row.name);
+    const formula = /(W\s*\+|T1|P1|SUS|OPE|EXP|ALTERNATE|ALT[_ -]?SUS|NONLINEAR)/u.test(haystack);
+    return namedLoadCase || formula;
+  })).slice(0, 100);
+}
+
+function outputEvidence(text) {
+  return unique(tagRows(text).filter((row) => {
+    const haystack = `${row.name} ${row.attrs}`.toUpperCase();
+    return /(CASE\s+(19|20|21)\b|ALTERNATE|ALT[_ -]?SUS)/u.test(haystack);
+  })).slice(0, 80);
+}
 
 console.log(JSON.stringify({
-  input: selectedInput.slice(0, 120),
-  output: selectedOutput.slice(0, 80),
+  input: loadCaseEvidence(readFileSync(BM4_INPUT_PATH, 'utf8')),
+  output: outputEvidence(readFileSync(BM4_OUTPUT_PATH, 'utf8')),
 }, null, 2));
