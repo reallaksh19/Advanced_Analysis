@@ -47,8 +47,14 @@ export function validateTopologyEditTablePreview({ preview: previewInput, worker
     validationHash: validation.validationHash,
     status: validation.status,
     blockingIssueCount: validation.blockingIssueCount,
+    blockingDiagnosticHash: validation.blockingDiagnosticHash,
   };
-  return deepFreeze({ ...material, tableValidationHash: semanticHash(material), validation });
+  return deepFreeze({
+    ...material,
+    tableValidationHash: semanticHash(material),
+    blockingDiagnostics: validation.blockingDiagnostics,
+    validation,
+  });
 }
 
 export async function applyTopologyEditTableTransaction({
@@ -121,12 +127,15 @@ export function assertTopologyEditTableValidation(value) {
   if (value?.schema !== TOPOLOGY_EDIT_TABLE_VALIDATION_SCHEMA) {
     throw new TypeError(`Table validation must use ${TOPOLOGY_EDIT_TABLE_VALIDATION_SCHEMA}.`);
   }
-  assertTopologyEditAuthoringValidationReceipt(value.validation);
+  const validation = assertTopologyEditAuthoringValidationReceipt(value.validation);
   const material = { ...value };
   delete material.tableValidationHash;
+  delete material.blockingDiagnostics;
   delete material.validation;
   if (semanticHash(material) !== value.tableValidationHash
-    || value.validationHash !== value.validation.validationHash) {
+    || value.validationHash !== validation.validationHash
+    || value.blockingDiagnosticHash !== validation.blockingDiagnosticHash
+    || semanticHash(value.blockingDiagnostics) !== value.blockingDiagnosticHash) {
     throw new Error('TopologyEditTableTransaction: validation hash mismatch.');
   }
   return value;

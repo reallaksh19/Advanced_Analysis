@@ -11,6 +11,8 @@ export class TopologyEdit3DViewController extends AuthoringController {
   constructor(eventBus, lifecycleOptions = {}) {
     super(eventBus, lifecycleOptions);
     this.cleanShellRuntime = new TopologyEditCleanShellRuntime(this);
+    this.tableAdapter = null;
+    this.tableAdapterPromise = null;
     this.sourceVisualCache = null;
     this.sourceVisualCacheDataset = null;
     this.sourceVisualCacheKey = '';
@@ -19,6 +21,26 @@ export class TopologyEdit3DViewController extends AuthoringController {
       ...getProfessionalViewState(),
       cleanShell: this.cleanShellRuntime.viewState(),
     });
+  }
+
+  async activate() {
+    await super.activate();
+    if (!this.hostElement) return;
+    await this.mountTableAdapter();
+  }
+
+  async mountTableAdapter() {
+    if (this.tableAdapter || this.tableAdapterPromise || !this.hostElement) return this.tableAdapter;
+    const activationHost = this.hostElement;
+    this.tableAdapterPromise = import(
+      './viewport-productivity/topology-edit-table-productivity-adapter.js'
+    ).then(({ createTopologyEditTableProductivityAdapter }) => {
+      if (!this.hostElement || this.hostElement !== activationHost) return null;
+      const adapter = createTopologyEditTableProductivityAdapter(this).mount();
+      this.tableAdapter = adapter;
+      return adapter;
+    }).finally(() => { this.tableAdapterPromise = null; });
+    return this.tableAdapterPromise;
   }
 
   buildShell() {
@@ -31,7 +53,8 @@ export class TopologyEdit3DViewController extends AuthoringController {
     );
     if (primaryNavigation && fitSelection) primaryNavigation.append(fitSelection);
     const sidecar = this.hostElement?.querySelector('[data-role="topology-edit-sidecar"]');
-    if (sidecar) sidecar.tabIndex = -1;
+    if (!sidecar) throw new Error('TopologyEditProductivityController: sidecar is unavailable.');
+    sidecar.tabIndex = -1;
     this.cleanShellRuntime.mount(this.hostElement);
   }
 
@@ -55,7 +78,15 @@ export class TopologyEdit3DViewController extends AuthoringController {
     return result;
   }
 
+  refreshView(canonical) {
+    super.refreshView(canonical);
+    this.tableAdapter?.canonicalChanged(canonical);
+  }
+
   deactivate() {
+    this.tableAdapter?.destroy();
+    this.tableAdapter = null;
+    this.tableAdapterPromise = null;
     this.cleanShellRuntime.destroy();
     this.sourceVisualCache = null;
     this.sourceVisualCacheDataset = null;
@@ -85,7 +116,33 @@ export class TopologyEdit3DViewController extends AuthoringController {
 
   handleUnifiedSelectionChanged(payload) {
     super.handleUnifiedSelectionChanged(payload);
+    this.tableAdapter?.selectionChanged(payload);
     this.cleanShellRuntime.selectionChanged(payload);
+  }
+
+  undo() {
+    if (this.tableAdapter?.undoIfCurrent()) return true;
+    return super.undo();
+  }
+
+  redo() {
+    if (this.tableAdapter?.redoIfCurrent()) return true;
+    return super.redo();
+  }
+
+  runCommandAction(actionId) {
+    this.tableAdapter?.clearCandidate();
+    return super.runCommandAction(actionId);
+  }
+
+  applyInteractionPreview() {
+    this.tableAdapter?.clearCandidate();
+    return super.applyInteractionPreview();
+  }
+
+  acceptAutofix() {
+    this.tableAdapter?.clearCandidate();
+    return super.acceptAutofix();
   }
 
   renderCheckerPanel() {

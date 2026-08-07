@@ -11,6 +11,7 @@ export const TOPOLOGY_EDIT_CANONICAL_SELECTION_SCHEMA =
 export const TOPOLOGY_EDIT_SELECTION_SOURCES = deepFreeze([
   'viewport',
   'tree',
+  'table',
   'search',
   'hud',
   'inspector',
