@@ -73,14 +73,20 @@ test('Table stays projection-only until certified pipe-length Apply', async ({ p
   await page.locator('[data-action="undo"]').click();
   await expect.poll(() => evidence(page).then((rowValue) => rowValue.canonicalHash)).toBe(before.canonicalHash);
   const undone = await evidence(page);
-  expect(undone.journalHash).toBe(before.journalHash);
   expect(undone.activeLedgerHash).toBe(before.activeLedgerHash);
+  expect(undone.activeCommandIds).toEqual(before.activeCommandIds);
+  expect(undone.activeCommandCount).toBe(before.activeCommandCount);
+  expect(undone.sourceHash).toBe(before.sourceHash);
+  expect(undone.sourceByteHash).toBe(before.sourceByteHash);
   expect(undone.rendererCount).toBe(1);
+  expect(undone.sessionVersion).toBeGreaterThan(before.sessionVersion);
 
   await page.locator('[data-action="redo"]').click();
   await expect.poll(() => evidence(page).then((rowValue) => rowValue.canonicalHash)).toBe(applied.canonicalHash);
   const redone = await evidence(page);
   expect(redone.activeLedgerHash).toBe(applied.activeLedgerHash);
+  expect(redone.activeCommandIds).toEqual(applied.activeCommandIds);
+  expect(redone.activeCommandCount).toBe(applied.activeCommandCount);
   expect(redone.rendererCount).toBe(1);
 
   expect(pageErrors).toEqual([]);
@@ -158,6 +164,8 @@ async function evidence(page) {
       canonicalHash: topology?.canonicalTopologyHash ?? null,
       journalHash: journal?.journalHash ?? null,
       activeLedgerHash: journal?.activeLedgerHash ?? null,
+      activeCommandIds: [...(journal?.activeCommandIds ?? [])],
+      sessionVersion: journal?.sessionVersion ?? null,
       sourceHash: controller?.workspaceDataset?.sourceSnapshot?.sourceSemanticHash ?? null,
       sourceByteHash: controller?.workspaceDataset?.sourceSnapshot?.sourceByteHash ?? null,
       activeCommandCount: journal?.activeCommandIds?.length ?? 0,
@@ -171,6 +179,8 @@ function expectAuthorityNoop(actual, expected) {
   expect(actual.canonicalHash).toBe(expected.canonicalHash);
   expect(actual.journalHash).toBe(expected.journalHash);
   expect(actual.activeLedgerHash).toBe(expected.activeLedgerHash);
+  expect(actual.activeCommandIds).toEqual(expected.activeCommandIds);
+  expect(actual.sessionVersion).toBe(expected.sessionVersion);
   expect(actual.sourceHash).toBe(expected.sourceHash);
   expect(actual.sourceByteHash).toBe(expected.sourceByteHash);
   expect(actual.activeCommandCount).toBe(expected.activeCommandCount);
