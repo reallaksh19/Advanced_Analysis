@@ -70,7 +70,7 @@ export class WorkspaceShellController {
     this.shellElement?.querySelectorAll('[data-action="switch-viewport-tab"]').forEach((button) => button.setAttribute('aria-selected', String(button.dataset.tab === selected)));
   }
 
-  /** Single source of truth for viewport-stack visibility, reconciling the workbench view (Workspace/Load Calc) and the 3D-active flag. */
+  /** Single source of truth for viewport-stack visibility and pointer ownership. */
   applyViewportLayout() {
     if (!this.shellElement) return;
     const loadCalc = this.shellElement.dataset.workbenchView === 'load-calc';
@@ -78,16 +78,38 @@ export class WorkspaceShellController {
     const host = this.shellElement.querySelector('[data-role="topology-edit-render-host"]');
     const dock = this.shellElement.querySelector('[data-role="load-calc-consumer-root"]');
     const stage = this.shellElement.querySelector('[data-role="viewport-stage"]');
-    if (host) host.hidden = !topologyEdit3DActive;
-    if (dock) { dock.hidden = !loadCalc; dock.classList.toggle('load-calc-dock--compact', topologyEdit3DActive); }
-    if (stage) {
-      // `.viewport-stage{display:flex}` (an author rule) outranks the UA
-      // `[hidden]{display:none}` rule, so the `hidden` attribute alone does
-      // not actually hide this element — it must be set inline explicitly.
-      stage.hidden = topologyEdit3DActive;
-      stage.style.display = topologyEdit3DActive ? 'none' : 'flex';
-      stage.style.flex = topologyEdit3DActive ? '0 0 0' : loadCalc ? '1 1 55%' : '1 1 100%';
+    const viewportPanel = this.shellElement.querySelector('[data-panel="viewport"]');
+
+    if (host) {
+      host.hidden = !topologyEdit3DActive;
+      host.toggleAttribute('inert', !topologyEdit3DActive);
     }
+    if (dock) {
+      dock.hidden = !loadCalc;
+      dock.toggleAttribute('inert', !loadCalc);
+      dock.classList.toggle('load-calc-dock--compact', topologyEdit3DActive);
+    }
+    if (stage) {
+      // Load Calc owns the central viewport while active. Model / 3D activates
+      // the dedicated topology-edit host, so retaining the shared read-only
+      // workspace stage creates overlapping scroll/pointer authority.
+      const hideSharedStage = loadCalc || topologyEdit3DActive;
+      stage.hidden = hideSharedStage;
+      stage.toggleAttribute('inert', hideSharedStage);
+      stage.style.display = hideSharedStage ? 'none' : 'flex';
+      stage.style.flex = hideSharedStage ? '0 0 0' : '1 1 100%';
+    }
+
+    // In ordinary Load Calc panes the read-only viewport toolbar/footer are not
+    // part of the active interaction surface. Keeping them in the flex stack
+    // previously allowed them (and the underlying workspace layer) to win hit
+    // testing after nested pane scrolling. Model / 3D deliberately restores
+    // the viewport chrome because that route owns the dedicated 3D host.
+    viewportPanel?.classList.toggle(
+      'viewport-panel--load-calc-owned',
+      loadCalc && !topologyEdit3DActive,
+    );
+
     globalThis.requestAnimationFrame?.(() => globalThis.dispatchEvent?.(new Event('resize')));
   }
 

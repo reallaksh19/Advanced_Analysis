@@ -3,6 +3,7 @@ import { APPLICATION_EVENTS, EVENT_TOPICS } from './event-topics.js';
 import { ENGINEERING_MODEL_EVENTS } from './engineering-model-controller.js';
 import { engineeringModelStore } from './engineering-model-store.js';
 import { renderEngineeringLoadPane, renderLoadCalcConsumer } from './load-calc-consumer-view.js';
+import { nonFeaCommonInputStore } from './non-fea-common-input-store.js';
 import {
   EMPIRICAL_LOAD_CALC_SCENARIO_EVENTS,
 } from './engineering-loads/empirical-load-calc-scenario-controller.js';
@@ -12,15 +13,10 @@ import {
 import {
   empiricalResultOverlayStore,
 } from './engineering-loads/empirical-result-overlay-store.js';
-import {
-  renderEmpiricalScenarioEvidence,
-  renderEmpiricalScenarioLoadCases,
-  renderEmpiricalScenarioMethods,
-  renderEmpiricalScenarioModel3d,
-  renderEmpiricalScenarioOverview,
-  renderEmpiricalScenarioRestraints,
-  renderEmpiricalScenarioResults,
-} from './engineering-loads/empirical-load-calc-scenario-view.js';
+
+const EMPIRICAL_SCENARIO_VIEW_TABS = new Set([
+  'overview', 'restraints', 'load-cases', 'methods', 'results', 'evidence', 'model-3d',
+]);
 
 /** Coordinates the real empirical load workflow without generating inputs. */
 export class LoadCalcConsumerController {
@@ -36,6 +32,7 @@ export class LoadCalcConsumerController {
     this.unsubscribers = [];
     this.renderRevision = 0;
     this.topologyEdit3DController = null;
+    this.pending3dInvestigationEntityId = null;
     this.clickHandler = (event) => this.handleClick(event);
   }
 
@@ -71,8 +68,8 @@ export class LoadCalcConsumerController {
 
   handleEngineeringChange(reason, distribution) {
     if (reason === 'calculated') this.message = distribution?.status === 'CALCULATED' ? 'Authorized calculation complete.' : 'Authorized calculation blocked; review the listed inputs.';
-    if (reason === 'project-data-changed') this.message = 'Project Data changed; authorization and previous calculations are stale.';
-    if (reason === 'master-data-changed') this.message = 'Master data changed; authorization and previous calculations are stale.';
+    if (reason === 'project-data-changed') this.message = 'Project Data changed; common seal, authorization and previous calculations require refresh.';
+    if (reason === 'master-data-changed') this.message = 'Master data changed; common seal, authorization and previous calculations require refresh.';
     if (reason === 'authorization-changed') this.message = availabilityMessage(engineeringModelStore.getEmpiricalAuthorizationState());
     this.render();
   }
@@ -85,8 +82,20 @@ export class LoadCalcConsumerController {
   handleClick(event) {
     const supportEntityId = event.target.closest('[data-load-support-entity-id]')?.dataset.loadSupportEntityId;
     if (supportEntityId) { this.eventBus.publish(EVENT_TOPICS.VIEWPORT_SELECTION_REQUESTED, { entityId: supportEntityId, source: 'load-table' }); return; }
+    const investigationEntityId = event.target.closest('[data-non-fea-investigation-entity-id]')?.dataset.nonFeaInvestigationEntityId;
+    if (investigationEntityId) {
+      this.pending3dInvestigationEntityId = investigationEntityId;
+      this.activeTab = '3d';
+      this.render();
+      return;
+    }
     const tab = event.target.closest('[data-load-calc-tab]')?.dataset.loadCalcTab;
-    if (tab) { this.activeTab = tab; this.render(); return; }
+    if (tab) {
+      this.pending3dInvestigationEntityId = null;
+      this.activeTab = tab;
+      this.render();
+      return;
+    }
     const restraintId = event.target.closest('[data-empirical-restraint-select]')?.dataset.empiricalRestraintSelect;
     if (restraintId) {
       const occurrence = empiricalLoadCalcScenarioStore.getProposal()?.adaptedRequest?.restraintOccurrences
@@ -98,6 +107,7 @@ export class LoadCalcConsumerController {
       return;
     }
     if (event.target.closest('[data-empirical-open-sjson-viewport]')) {
+      this.pending3dInvestigationEntityId = null;
       this.activeTab = '3d';
       this.render();
       return;
@@ -107,12 +117,12 @@ export class LoadCalcConsumerController {
       return;
     }
     if (event.target.closest('[data-empirical-authorize]')) {
-      this.message = 'Authorizing the current empirical scenario…';
+      this.message = 'Authorizing the current empirical scenario against the common seal…';
       this.eventBus.publish(EMPIRICAL_LOAD_CALC_SCENARIO_EVENTS.AUTHORIZE_REQUESTED, {});
       return;
     }
     if (event.target.closest('[data-empirical-calculate]')) {
-      this.message = 'Executing the current authorized empirical method…';
+      this.message = 'Executing the current common-seal-bound empirical method…';
       this.eventBus.publish(EMPIRICAL_LOAD_CALC_SCENARIO_EVENTS.CALCULATE_REQUESTED, {});
       return;
     }
@@ -123,7 +133,7 @@ export class LoadCalcConsumerController {
         this.render();
         return;
       }
-      this.message = 'Executing current authorized empirical package…';
+      this.message = 'Executing current authorized empirical package against the common seal…';
       this.eventBus.publish(ENGINEERING_MODEL_EVENTS.CALCULATE_REQUESTED, { source: 'load-calc' });
     }
   }
@@ -146,6 +156,7 @@ export class LoadCalcConsumerController {
       supportSiteModel: engineeringModelStore.getSupportSiteModel(),
       routePartitionModel: engineeringModelStore.getRoutePartitionModel(),
       empiricalScenarioState: empiricalLoadCalcScenarioStore.getSnapshot(),
+      commonInputState: nonFeaCommonInputStore.getSnapshot(),
     });
     this.rootElement.replaceChildren(view);
     const pane = view.querySelector('[data-load-calc-pane]');
@@ -170,20 +181,16 @@ export class LoadCalcConsumerController {
         overlaySnapshot: empiricalResultOverlayStore.getSnapshot(),
         selectedEntityId: this.context?.selectedEntityId || null,
       };
-      if (tab === 'overview') {
-        renderEmpiricalScenarioOverview(pane, empiricalState);
-      } else if (tab === 'restraints') {
-        renderEmpiricalScenarioRestraints(pane, empiricalState);
-      } else if (tab === 'load-cases') {
-        renderEmpiricalScenarioLoadCases(pane, empiricalState);
-      } else if (tab === 'methods') {
-        renderEmpiricalScenarioMethods(pane, empiricalState);
-      } else if (tab === 'results') {
-        renderEmpiricalScenarioResults(pane, empiricalState);
-      } else if (tab === 'evidence') {
-        renderEmpiricalScenarioEvidence(pane, empiricalState);
-      } else if (tab === 'model-3d') {
-        renderEmpiricalScenarioModel3d(pane, empiricalState);
+      if (EMPIRICAL_SCENARIO_VIEW_TABS.has(tab)) {
+        const scenarioView = await import('./engineering-loads/empirical-load-calc-scenario-view.js');
+        if (revision !== this.renderRevision) return;
+        if (tab === 'overview') scenarioView.renderEmpiricalScenarioOverview(pane, empiricalState);
+        else if (tab === 'restraints') scenarioView.renderEmpiricalScenarioRestraints(pane, empiricalState);
+        else if (tab === 'load-cases') scenarioView.renderEmpiricalScenarioLoadCases(pane, empiricalState);
+        else if (tab === 'methods') scenarioView.renderEmpiricalScenarioMethods(pane, empiricalState);
+        else if (tab === 'results') scenarioView.renderEmpiricalScenarioResults(pane, empiricalState);
+        else if (tab === 'evidence') scenarioView.renderEmpiricalScenarioEvidence(pane, empiricalState);
+        else scenarioView.renderEmpiricalScenarioModel3d(pane, empiricalState);
       } else if (tab === 'preflight') {
         const { renderEmpiricalPreflightView } = await import('./empirical-preflight-view.js');
         if (revision === this.renderRevision) renderEmpiricalPreflightView(pane, this.context);
@@ -193,6 +200,15 @@ export class LoadCalcConsumerController {
       } else if (tab === 'masters') {
         const { renderMasterDataUI } = await import('./master-data-ui.js');
         if (revision === this.renderRevision) pane.replaceChildren(renderMasterDataUI(pane.ownerDocument));
+      } else if (tab === 'enrichment') {
+        const { renderNonFeaEnrichmentView } = await import('./enrichment/non-fea-enrichment-view.js');
+        if (revision === this.renderRevision) renderNonFeaEnrichmentView(pane, () => this.render());
+      } else if (tab === 'method-basis') {
+        const { renderNonFeaMethodBasisView } = await import('./non-fea-method-basis-view.js');
+        if (revision === this.renderRevision) renderNonFeaMethodBasisView(pane, () => this.render());
+      } else if (tab === 'seal-export') {
+        const { renderNonFeaSealExportView } = await import('./non-fea-seal-export-view.js');
+        if (revision === this.renderRevision) renderNonFeaSealExportView(pane, () => this.render());
       } else if (tab === 'json-trace') {
         const { renderJsonTraceUI } = await import('./json-trace-ui.js');
         if (revision === this.renderRevision) pane.replaceChildren(renderJsonTraceUI(pane.ownerDocument));
@@ -218,6 +234,14 @@ export class LoadCalcConsumerController {
             overlaySnapshot.reasonCode || 'EMPIRICAL_EXECUTION_REQUIRED',
           );
           this.topologyEdit3DController.renderPane(pane);
+          const entityId = this.pending3dInvestigationEntityId;
+          this.pending3dInvestigationEntityId = null;
+          if (entityId) {
+            const focus = this.topologyEdit3DController.focusWorkspaceEntity?.(entityId);
+            if (focus && focus.status !== 'FOCUSED') {
+              this.message = `3D investigation target ${entityId} is not available in the current governed render projection.`;
+            }
+          }
         }
       } else {
         throw new RangeError(`Unknown Load Calc tab: ${tab}.`);
@@ -234,6 +258,7 @@ export class LoadCalcConsumerController {
   destroy() {
     this.topologyEdit3DController?.deactivate();
     this.topologyEdit3DController = null;
+    this.pending3dInvestigationEntityId = null;
     resetTopologyEditCleanShell(this.rootElement.ownerDocument);
     this.rootElement.removeEventListener('click', this.clickHandler);
     this.unsubscribers.forEach((unsubscribe) => unsubscribe());
@@ -266,11 +291,14 @@ function availabilityMessage(state) {
     NO_ACTIVE_DATASET: 'Load calculation requires an active normalized dataset.',
     EMPIRICAL_PACKAGE_REQUIRED: 'Load calculation requires an explicitly authorized empirical package.',
     AUTHORIZATION_BINDINGS_CHANGED: 'The authorized empirical package is stale; authorize a package for the current dataset and evidence.',
-    PROJECT_DATA_CHANGED: 'Project Data changed; a new authorized empirical package is required.',
-    MASTER_DATA_CHANGED: 'Master data changed; a new authorized empirical package is required.',
-    DATASET_EDITED: 'The dataset changed; a new authorized empirical package is required.',
-    DATASET_REBUILT: 'The dataset model was rebuilt; a new authorized empirical package is required.',
-    DATASET_REPLACED: 'The active dataset changed; a new authorized empirical package is required.',
+    PROJECT_DATA_CHANGED: 'Project Data changed; a new common seal and authorized empirical package are required.',
+    MASTER_DATA_CHANGED: 'Master data changed; a new common seal and authorized empirical package are required.',
+    DATASET_EDITED: 'The dataset changed; a new common seal and authorized empirical package are required.',
+    DATASET_REBUILT: 'The dataset model was rebuilt; a new common seal and authorized empirical package are required.',
+    DATASET_REPLACED: 'The active dataset changed; a new common seal and authorized empirical package are required.',
+    COMMON_INPUT_REQUIRED: 'A current common enriched piping input seal is required.',
+    COMMON_INPUT_STALE: 'The common enriched piping input seal is stale.',
+    COMMON_INPUT_METHOD_NOT_READY: 'The common input is not sealed for the requested empirical method.',
   };
   return messages[reason] || `Load calculation is disabled: ${reason}.`;
 }
@@ -279,10 +307,10 @@ function empiricalScenarioMessage(snapshot) {
   const messages = {
     NOT_CONFIGURED: 'Configure an empirical scenario before authorization.',
     DRAFT_BLOCKED: 'Empirical scenario is blocked; review the Overview and Evidence panes.',
-    DRAFT_READY: 'Empirical scenario is ready for explicit authorization.',
-    AUTHORIZED_CURRENT: 'Empirical scenario is authorized and ready to calculate.',
+    DRAFT_READY: 'Empirical scenario is ready for common-seal-bound authorization.',
+    AUTHORIZED_CURRENT: 'Empirical scenario is authorized against the current common seal.',
     AUTHORIZED_STALE: 'Empirical scenario authorization is stale.',
-    EXECUTED_CURRENT: 'Empirical method execution is current.',
+    EXECUTED_CURRENT: 'Empirical method execution is current and common-seal-bound.',
     EXECUTED_STALE: 'Empirical method results are stale and are not current overlays.',
   };
   return messages[snapshot?.state] || '';

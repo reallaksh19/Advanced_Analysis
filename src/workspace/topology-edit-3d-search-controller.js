@@ -7,6 +7,9 @@ import {
   updateTopologyEditSelection,
 } from './topology-edit/topology-edit-command-ui.js';
 import {
+  canonicalIdsForWorkspaceEntity,
+} from './topology-edit/editor-state/topology-edit-selection-coordinator.js';
+import {
   isTopologyEditCanonicalIdVisible,
 } from './viewport-presentation/topology-edit-visibility-model.js';
 import {
@@ -86,6 +89,81 @@ export class TopologyEdit3DViewController extends LifecycleController {
     return visibility
       ? isTopologyEditCanonicalIdVisible(visibility, canonicalId)
       : true;
+  }
+
+  /**
+   * Focuses the shared 3D viewport from an exact workspace entity identity.
+   * The existing canonical-selection coordinator owns the crosswalk; no geometry,
+   * proximity, row-order or result-value inference participates in navigation.
+   */
+  focusWorkspaceEntity(entityIdInput) {
+    const entityId = String(entityIdInput ?? '').trim();
+    const canonical = this.session?.currentTopology();
+    if (!entityId || !canonical) {
+      return Object.freeze({ status: 'NOT_AVAILABLE', entityId: entityId || null, canonicalIds: [] });
+    }
+    const canonicalIds = canonicalIdsForWorkspaceEntity(canonical, entityId);
+    if (!canonicalIds.length) {
+      this.setStatus(`Workspace entity ${entityId} has no exact canonical 3D target.`);
+      return Object.freeze({ status: 'NOT_FOUND', entityId, canonicalIds: [] });
+    }
+    const visibilityReset = canonicalIds.some((id) => !this.isSearchResultVisible(id));
+    if (visibilityReset) {
+      this.applyPresentationAction({ type: PRESENTATION_ACTIONS.SHOW_ALL_IDS });
+    }
+    const focus = focusTopologyEditCanonicalIds({
+      groups: this.viewportBackend?.groups,
+      camera: this.viewportBackend?.activeCamera,
+      canonicalIds,
+    });
+    if (focus.status !== 'FOCUSED') {
+      this.setStatus(`Exact targets for workspace entity ${entityId} are absent from the current visual projection.`);
+      return Object.freeze({
+        status: 'NOT_RENDERED',
+        entityId,
+        canonicalIds,
+        foundIds: Object.freeze([...(focus.foundIds || [])]),
+      });
+    }
+    if (this.selectionCoordinator) {
+      this.selectionCoordinator.requestCanonical(
+        'REPLACE',
+        focus.foundIds,
+        'inspector',
+        {
+          primaryId: focus.foundIds.at(-1),
+          anchorId: focus.foundIds[0],
+        },
+      );
+    } else {
+      const selectable = focus.foundIds.filter((id) => id.startsWith('node:') || id.startsWith('edge:'));
+      if (selectable.length === 1) {
+        this.selection = updateTopologyEditSelection(this.selection, selectable[0], false);
+        this.presentationToolbar?.update(this.presentationState);
+      }
+      this.eventBus.publish(EVENT_TOPICS.VIEWPORT_SELECTION_REQUESTED, {
+        entityId,
+        source: 'load-table',
+      });
+    }
+    this.refreshInspection?.();
+    this.refreshReview?.();
+    this.updateActionButtons();
+    if (this.hostElement) {
+      this.hostElement.dataset.nonFeaInvestigationEntityId = entityId;
+      this.hostElement.dataset.nonFeaInvestigationCanonicalIds = focus.foundIds.join(',');
+    }
+    this.setStatus(
+      `${visibilityReset ? 'Presentation visibility reset; ' : ''}`
+      + `focused ${focus.foundIds.length} exact canonical target(s) for workspace entity ${entityId}.`,
+    );
+    return Object.freeze({
+      status: 'FOCUSED',
+      entityId,
+      canonicalIds: Object.freeze([...canonicalIds]),
+      foundIds: Object.freeze([...focus.foundIds]),
+      visibilityReset,
+    });
   }
 
   activateSearchResult(result, options = {}) {

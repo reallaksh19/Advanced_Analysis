@@ -6,7 +6,9 @@ import { assertEventPayload } from './event-topics.js';
  * Storage contract: Map<string, Set<Function>>.
  * Publishing uses a listener snapshot so subscriptions may safely detach while
  * an event is being dispatched. Listener failures are reported only after every
- * callback has received the event.
+ * callback has received the event. Every propagated failure retains the topic
+ * that owned the failing listener so nested publication failures remain
+ * diagnosable instead of being misclassified by their caller.
  */
 class EventBusContract {
   #topics = new Map();
@@ -50,10 +52,18 @@ class EventBusContract {
     });
 
     if (failures.length === 1) {
-      throw failures[0];
+      throw contextualizeFailure(topic, failures[0]);
     }
     if (failures.length > 1) {
-      throw new AggregateError(failures, `EventBus listeners failed for topic: ${topic}`);
+      const details = failures.map((error, index) => {
+        const code = typeof error?.code === 'string' && error.code ? ` [${error.code}]` : '';
+        const message = error instanceof Error ? error.message : String(error);
+        return `${index + 1}${code}: ${message}`;
+      }).join(' | ');
+      throw new AggregateError(
+        failures,
+        `EventBus listeners failed for topic: ${topic}. ${details}`,
+      );
     }
   }
 
@@ -61,6 +71,17 @@ class EventBusContract {
     assertTopic(topic);
     return this.#topics.get(topic)?.size ?? 0;
   }
+}
+
+function contextualizeFailure(topic, failure) {
+  const message = failure instanceof Error ? failure.message : String(failure);
+  const wrapped = new Error(`EventBus listener failed for topic: ${topic}. ${message}`, {
+    cause: failure instanceof Error ? failure : undefined,
+  });
+  wrapped.code = typeof failure?.code === 'string' && failure.code
+    ? failure.code
+    : 'EVENT_BUS_LISTENER_FAILED';
+  return wrapped;
 }
 
 function assertTopic(topic) {

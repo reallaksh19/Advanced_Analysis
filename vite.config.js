@@ -15,6 +15,12 @@ export function manualChunk(id) {
   if (source.includes('vite/preload-helper')) return 'runtime';
   if (source.includes('/node_modules/three/examples/')) return 'vendor-three-examples';
   if (source.includes('/node_modules/three/')) return 'vendor-three-core';
+  // Keep xlsx on Rollup's existing dynamic-import boundary; it is already a
+  // large isolated chunk and must not be folded into the generic leaf vendor.
+  if (source.includes('/node_modules/xlsx/')) return undefined;
+  // Dependency-only partition. Workspace modules remain graph-owned below so
+  // this cannot create controller/store evaluation-order cycles.
+  if (source.includes('/node_modules/')) return 'vendor';
   if (source.includes('/src/core/element-fea/')) return 'core-element-fea';
   if (source.includes('/src/core/local-continuum/')) return 'core-local-continuum';
   if (source.includes('/src/core/local-shell/')) return 'core-local-shell';

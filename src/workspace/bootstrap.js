@@ -8,10 +8,8 @@ import { ApplicationShellController } from './application-shell-controller.js';
 import { DatasetController } from './dataset-controller.js';
 import { EventBus } from './event-bus.js';
 import { FirstCutResultStore } from './first-cut-result-store.js';
-import { FirstCutWorkbenchController } from './enrichment/first-cut-workbench-controller.js';
-import { FirstCutWorkbenchLauncherController } from './enrichment/first-cut-workbench-launcher.js';
-import { LafeaWorkbenchController } from './lafea-workbench.js';
-import { LfeaWorkbenchController } from './lfea-workbench.js';
+import { LafeaWorkbenchController } from './lafea-workbench-controller.js';
+import { LfeaWorkbenchController } from './lfea-workbench-controller.js';
 import { ModelCalculationController } from './model-calculation-controller.js';
 import { ModelCalculationPanel } from './model-calculation-panel.js';
 import { ModelCalculationStore } from './model-calculation-store.js';
@@ -19,7 +17,6 @@ import { ModelLoadController } from './model-load-controller.js';
 import { ModelLoadPanel } from './model-load-panel.js';
 import { ModelLoadStore } from './model-load-store.js';
 import { ModelSupportLoadController } from './model-support-load-controller.js';
-import { ModelSupportLoadPanel } from './model-support-load-panel.js';
 import { assessModelSupportLoadReadiness } from './model-support-load-readiness.js';
 import { PropertiesPanel } from './properties-panel.js';
 import { SettingsController } from './settings-controller.js';
@@ -32,7 +29,6 @@ import { SupportLoadScreeningStore } from './support-load-screening-store.js';
 import { SupportRestraintController } from './support-restraint-controller.js';
 import { SupportRestraintPanel } from './support-restraint-panel.js';
 import { SupportRestraintStore } from './support-restraint-store.js';
-import { TabBenchmarkStatusController } from './tab-benchmark-status-controller.js';
 import { TopologyController } from './topology-controller.js';
 import { TopologyPanel } from './topology-panel.js';
 import { TopologyStore } from './topology-store.js';
@@ -45,7 +41,6 @@ import { WorkspaceConsumerController } from './workspace-consumer-controller.js'
 import { renderWorkspaceLayout } from './workspace-layout.js';
 import { WorkspaceState } from './workspace-state.js';
 import { WorkspaceShellController } from './workspace-shell-controller.js';
-import { SequentialSketcherController } from './sequential-sketcher/sequential-sketcher-controller.js';
 import { EngineeringModelController } from './engineering-model-controller.js';
 import { engineeringModelStore } from './engineering-model-store.js';
 import {
@@ -54,8 +49,46 @@ import {
 import {
   empiricalLoadCalcScenarioStore,
 } from './engineering-loads/empirical-load-calc-scenario-store.js';
+import { nonFeaCommonInputStore } from './non-fea-common-input-store.js';
+import {
+  evaluateCurrentNonFeaCommonInput,
+  exportCurrentNonFeaCommonInput,
+  reimportNonFeaCommonInput,
+  sealCurrentNonFeaCommonInput,
+} from './non-fea-common-input-runtime.js';
 import { projectDataStore } from './project-data/project-data-store.js';
 import { masterDataController } from './master-data-controller.js';
+
+class DeferredController {
+  constructor(load, create) {
+    this.load = load;
+    this.create = create;
+    this.controller = null;
+    this.loadPromise = null;
+    this.destroyed = false;
+  }
+
+  init() {
+    if (this.destroyed || this.controller || this.loadPromise) return;
+    this.loadPromise = this.load().then((module) => {
+      if (this.destroyed) return null;
+      const controller = this.create(module);
+      this.controller = controller;
+      controller.init();
+      return controller;
+    });
+  }
+
+  getCurrent() {
+    return this.controller;
+  }
+
+  destroy() {
+    this.destroyed = true;
+    this.controller?.destroy();
+    this.controller = null;
+  }
+}
 
 export function requireUniqueRoot(root, selector) {
   const matches = root.querySelectorAll(selector);
@@ -68,7 +101,7 @@ export function requireUniqueRoot(root, selector) {
 export function bootstrapAnalysisWorkspace(rootElement) {
   if (!rootElement) throw new Error('Application root #root was not found.');
   WorkspaceState.clearDataset(); AnalysisSessions.clear(); AnalysisLedger.clear();
-  FirstCutResultStore.clear();
+  FirstCutResultStore.clear(); nonFeaCommonInputStore.clear();
   TopologyStore.clear(); SupportRestraintStore.clear(); ModelLoadStore.clear();
   SupportLoadScreeningStore.clear(); VerticalBeamStore.clear(); ModelCalculationStore.clear();
   empiricalLoadCalcScenarioStore.clear();
@@ -113,7 +146,13 @@ export function bootstrapAnalysisWorkspace(rootElement) {
   const supportLoadScreeningPanel = new SupportLoadScreeningPanel(rootElement.querySelector('[data-role="support-load-screening-summary"]'), EventBus);
   const verticalBeamPanel = new VerticalBeamPanel(rootElement.querySelector('[data-role="vertical-beam-summary"]'), EventBus);
   const modelCalculationPanel = new ModelCalculationPanel(rootElement.querySelector('[data-role="model-calculation-summary"]'), EventBus);
-  const modelSupportLoadPanel = new ModelSupportLoadPanel(rootElement.querySelector('[data-role="model-support-load-summary"]'), EventBus);
+  const modelSupportLoadPanelRoot = rootElement.querySelector('[data-role="model-support-load-summary"]');
+  const modelSupportLoadPanel = modelSupportLoadPanelRoot
+    ? new DeferredController(
+        () => import('./model-support-load-panel.js'),
+        ({ ModelSupportLoadPanel }) => new ModelSupportLoadPanel(modelSupportLoadPanelRoot, EventBus),
+      )
+    : null;
   const propertiesPanel = new PropertiesPanel(rootElement.querySelector('[data-panel="properties"]'), EventBus, WorkspaceState);
   const lafeaRoot = requireUniqueRoot(rootElement, '[data-role="lafea-consumer-root"]');
   const lfeaRoot = requireUniqueRoot(rootElement, '[data-role="lfea-consumer-root"]');
@@ -124,22 +163,23 @@ export function bootstrapAnalysisWorkspace(rootElement) {
   const lfeaWorkbenchController = new LfeaWorkbenchController(lfeaRoot,undefined);
   const applicationShellController = new ApplicationShellController(rootElement,workspaceConsumerController,EventBus,{ settingsController,lafeaController:lafeaWorkbenchController,lfeaController:lfeaWorkbenchController });
   const benchmarkReportUrl = new URL(`${import.meta.env.BASE_URL}qualification/advanced-tab-benchmarks.json`,rootElement.ownerDocument.baseURI).href;
-  const tabBenchmarkStatusController = new TabBenchmarkStatusController(rootElement,benchmarkReportUrl);
-  const workspaceShellController = new WorkspaceShellController(rootElement);
-  const firstCutRoot = requireUniqueRoot(rootElement, '[data-role="first-cut-workbench-root"]');
-  const browserWindow = rootElement.ownerDocument.defaultView;
-  const firstCutWorkbenchController = new FirstCutWorkbenchController(
-    firstCutRoot,
-    EventBus,
-    WorkspaceState,
-    rootElement.ownerDocument,
-    browserWindow?.navigator?.clipboard,
-    browserWindow?.URL,
+  const tabBenchmarkStatusController = new DeferredController(
+    () => import('./tab-benchmark-status-controller.js'),
+    ({ TabBenchmarkStatusController }) => new TabBenchmarkStatusController(rootElement, benchmarkReportUrl),
   );
-  const firstCutWorkbenchLauncherController = new FirstCutWorkbenchLauncherController(rootElement);
+  const workspaceShellController = new WorkspaceShellController(rootElement);
   const sequentialSketcherRoot = rootElement.querySelector('[data-role="sequential-sketcher-root"]');
-  const sequentialSketcherController = sequentialSketcherRoot ? new SequentialSketcherController(sequentialSketcherRoot, EventBus, WorkspaceState) : null;
-  const controllers = [workspaceShellController,firstCutWorkbenchController,firstCutWorkbenchLauncherController,datasetController,engineeringModelController,empiricalLoadCalcScenarioController,sharedModelController,topologyController,supportRestraintController,modelLoadController,supportLoadScreeningController,verticalBeamController,modelCalculationController,modelSupportLoadController,sessionController,analysisCoordinator,ledgerController,treePanel,viewportPanel,sharedModelPanel,topologyPanel,supportRestraintPanel,modelLoadPanel,supportLoadScreeningPanel,verticalBeamPanel,modelCalculationPanel,modelSupportLoadPanel,propertiesPanel,workspaceConsumerController,settingsController,applicationShellController,tabBenchmarkStatusController,sequentialSketcherController].filter(Boolean);
+  const sequentialSketcherController = sequentialSketcherRoot
+    ? new DeferredController(
+        () => import('./sequential-sketcher/sequential-sketcher-controller.js'),
+        ({ SequentialSketcherController }) => new SequentialSketcherController(
+          sequentialSketcherRoot,
+          EventBus,
+          WorkspaceState,
+        ),
+      )
+    : null;
+  const controllers = [workspaceShellController,datasetController,engineeringModelController,empiricalLoadCalcScenarioController,sharedModelController,topologyController,supportRestraintController,modelLoadController,supportLoadScreeningController,verticalBeamController,modelCalculationController,modelSupportLoadController,sessionController,analysisCoordinator,ledgerController,treePanel,viewportPanel,sharedModelPanel,topologyPanel,supportRestraintPanel,modelLoadPanel,supportLoadScreeningPanel,verticalBeamPanel,modelCalculationPanel,modelSupportLoadPanel,propertiesPanel,workspaceConsumerController,settingsController,applicationShellController,tabBenchmarkStatusController,sequentialSketcherController].filter(Boolean);
   controllers.forEach((controller) => controller.init());
   globalThis.EventBus = EventBus;
   return Object.freeze({
@@ -159,24 +199,29 @@ export function bootstrapAnalysisWorkspace(rootElement) {
     getEmpiricalLoadCalcScenarioProposal(){return empiricalLoadCalcScenarioController.getProposal();},
     getEmpiricalLoadCalcAuthorization(){return empiricalLoadCalcScenarioController.getAuthorization();},
     getEmpiricalLoadCalcExecution(){return empiricalLoadCalcScenarioController.getExecution();},
-    getEmpiricalLoadCalcResultOverlayState(){return empiricalLoadCalcScenarioController.getResultOverlaySnapshot();},
-    getEmpiricalLoadCalcResultOverlay(){return empiricalLoadCalcScenarioController.getResultOverlayProjection();},
+    getResultOverlayState(){return empiricalLoadCalcScenarioController.getResultOverlaySnapshot();},
+    getResultOverlayProjection(){return empiricalLoadCalcScenarioController.getResultOverlayProjection();},
     configureEmpiricalLoadCalcScenario(value){return empiricalLoadCalcScenarioController.configure(value);},
     authorizeEmpiricalLoadCalcScenario(value){return empiricalLoadCalcScenarioController.authorize(value);},
     calculateEmpiricalLoadCalcScenario(value){return empiricalLoadCalcScenarioController.calculate(value);},
     cloneEmpiricalLoadCalcProfile(value){return empiricalLoadCalcScenarioController.cloneProfile(value);},
     getProjectDataProfile(){return projectDataStore.getProfile();},
+    getNonFeaCommonInputState(){return nonFeaCommonInputStore.getSnapshot();},
+    evaluateNonFeaCommonInput(){return evaluateCurrentNonFeaCommonInput();},
+    sealNonFeaCommonInput(value){return sealCurrentNonFeaCommonInput(value);},
+    exportNonFeaCommonInput(){return exportCurrentNonFeaCommonInput();},
+    reimportNonFeaCommonInput(value){return reimportNonFeaCommonInput(value);},
     getSupportSiteModel(){return engineeringModelStore.getSupportSiteModel();},
     getRoutePartitionModel(){return engineeringModelStore.getRoutePartitionModel();},
     getEngineeringSupportLoadDistribution(){return engineeringModelStore.getDistribution();},
     getLafeaWorkbenchState(){return applicationShellController.getLafeaWorkbenchState();},getLfeaWorkbenchState(){return applicationShellController.getLfeaWorkbenchState();},
     importLafeaDocument(value,stageId){return lafeaWorkbenchController.importDocument(value,stageId);},exportLafeaDocument(){return lafeaWorkbenchController.exportDocument();},runLafea(){return lafeaWorkbenchController.run();},undoLafea(){return lafeaWorkbenchController.undo();},redoLafea(){return lafeaWorkbenchController.redo();},
     importLfeaDocument(value){return lfeaWorkbenchController.importDocument(value);},exportLfeaDocument(){return lfeaWorkbenchController.exportDocument();},exportLfeaEvidence(){return lfeaWorkbenchController.exportEvidence();},runLfea(){return lfeaWorkbenchController.run();},undoLfea(){return lfeaWorkbenchController.undo();},redoLfea(){return lfeaWorkbenchController.redo();},
-    getTabBenchmarkSuite(){return tabBenchmarkStatusController.getSuite();},
+    getTabBenchmarkSuite(){return tabBenchmarkStatusController.getCurrent()?.getSuite() ?? null;},
     getModelSupportLoadReadiness(){const snapshot=WorkspaceState.getSnapshot();return snapshot.status==='ready'&&snapshot.dataset?assessModelSupportLoadReadiness(snapshot.dataset):null;},
     getFirstCutCalculationPackage(){return FirstCutResultStore.getPackage();},
     getAnalysisSession(){return AnalysisSessions.getSnapshot();},getAnalysisLedger(){return AnalysisLedger.getSnapshot();},
     getAnalysisCapabilities(targetId){try{const entity=WorkspaceState.getEntity(targetId),snapshot=WorkspaceState.getSnapshot();if(!entity||snapshot.status!=='ready')return[];return capabilityRegistry.list({targetId:entity.entityId,entity,dataset:snapshot.dataset,selectedEntityId:snapshot.selectedEntityId,version:snapshot.version});}catch{return[];}},
-    destroy(){[...controllers].reverse().forEach((controller)=>controller.destroy());FirstCutResultStore.clear();ModelCalculationStore.clear();VerticalBeamStore.clear();SupportLoadScreeningStore.clear();ModelLoadStore.clear();SupportRestraintStore.clear();TopologyStore.clear();AnalysisLedger.clear();AnalysisSessions.clear();WorkspaceState.clearDataset();rootElement.replaceChildren();},
+    destroy(){[...controllers].reverse().forEach((controller)=>controller.destroy());nonFeaCommonInputStore.clear();FirstCutResultStore.clear();ModelCalculationStore.clear();VerticalBeamStore.clear();SupportLoadScreeningStore.clear();ModelLoadStore.clear();SupportRestraintStore.clear();TopologyStore.clear();AnalysisLedger.clear();AnalysisSessions.clear();WorkspaceState.clearDataset();rootElement.replaceChildren();},
   });
 }
