@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { LFEA_COLLECTION_PATHS } from '../src/workspace/lfea-workbench-model.js';
+import { LFEA_STRUCTURED_EDITOR_CONTRACTS } from '../src/workspace/lfea-structured-editor-contract.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SHELL_ROOT = path.join(ROOT, 'src', 'workspace', 'lfea-shell-v2');
@@ -11,6 +13,7 @@ const TOKEN_ROOT = path.join(ROOT, 'src', 'workspace', 'design-tokens');
 const shellFiles = javascriptFiles(SHELL_ROOT);
 const tokenFiles = javascriptFiles(TOKEN_ROOT).filter((file) => file.endsWith('lfea-tokens.js'));
 const extraModules = [
+  path.join(ROOT, 'src', 'workspace', 'lfea-structured-editor-contract.js'),
   path.join(ROOT, 'scripts', 'lfea-shell-v2-store-fidelity-check.mjs'),
   path.join(ROOT, 'scripts', 'lfea-shell-v2-baseline-hash-check.mjs'),
   path.join(ROOT, 'e2e', 'lfea-shell-v2.spec.js'),
@@ -44,6 +47,32 @@ for (const file of shellFiles) {
     `Shell V2 must not introduce local numerical rounding/formatting: ${relative(file)}`,
   );
 }
+
+assert.deepEqual(
+  Object.keys(LFEA_STRUCTURED_EDITOR_CONTRACTS).sort(),
+  [...LFEA_COLLECTION_PATHS].sort(),
+  'Structured editor contracts must cover exactly the existing editable collection paths.',
+);
+
+const editorContract = source('src/workspace/lfea-structured-editor-contract.js');
+assert.match(editorContract, /ELEMENT_TYPES/u);
+assert.match(editorContract, /CONSTRAINT_COMPONENT_TYPES/u);
+assert.doesNotMatch(
+  implementationText(editorContract),
+  /\b(?:solveContinuumModel|adaptMeshPackage|createEngineeringReview|createEvidenceExport|semanticHash)\s*\(/u,
+  'Editor contract may expose constants but must not invoke engineering authority.',
+);
+
+const structuredEditor = source('src/workspace/lfea-shell-v2/structured-editor.js');
+assert.match(structuredEditor, /isLfeaEditorGuardCurrent/u);
+assert.match(structuredEditor, /handlers\.getCurrentState/u);
+const inspector = source('src/workspace/lfea-shell-v2/inspector.js');
+assert.match(inspector, /renderLfeaStructuredEditor/u);
+assert.doesNotMatch(
+  inspector,
+  /lfea-record-json/u,
+  'Raw JSON must not remain the normal per-record UI-2 editor.',
+);
 
 const controller = source('src/workspace/lfea-workbench-controller.js');
 assert.match(controller, /LfeaShellV2View/u);
@@ -108,6 +137,7 @@ console.log(JSON.stringify({
   status: 'PASS',
   shellModules: shellFiles.length,
   tokenModules: tokenFiles.length,
+  structuredEditorContracts: Object.keys(LFEA_STRUCTURED_EDITOR_CONTRACTS).length,
   physicalLineLimit: 299,
   localNumericalFormatting: false,
   standaloneEntry: true,
