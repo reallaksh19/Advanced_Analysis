@@ -54,16 +54,7 @@ jobs:
           done < /tmp/lfea-linear-core-paths.txt
 
       - name: InputXML unit normalization
-        shell: bash
-        run: |
-          set +e
-          node scripts/linear-piping-inputxml-unit-normalization-check.mjs 2>&1 | tee /tmp/inputxml-unit.log
-          code=${PIPESTATUS[0]}
-          if [ "$code" -ne 0 ]; then
-            message=$(tail -n 25 /tmp/inputxml-unit.log | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g')
-            echo "::error file=scripts/linear-piping-inputxml-unit-normalization-check.mjs::$message"
-            exit "$code"
-          fi
+        run: node scripts/linear-piping-inputxml-unit-normalization-check.mjs
 
       - name: Conditioned topology and retained-station custody
         run: node scripts/lfea-b1-conditioning-check.mjs
@@ -83,36 +74,24 @@ jobs:
           CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           mkdir -p artifacts/lfea-linear-core-exact-head
-          set +e
           node scripts/lfea-linear-core-exact-head-evidence.mjs > artifacts/lfea-linear-core-exact-head/emitter.log 2>&1
-          status=$?
           cat artifacts/lfea-linear-core-exact-head/emitter.log
-          if [ "$status" -ne 0 ]; then
-            message="$(tail -n 40 artifacts/lfea-linear-core-exact-head/emitter.log | tr '\n' ' ' | sed 's/%/%25/g')"
-            echo "::error file=scripts/lfea-linear-core-exact-head-evidence.mjs::$message"
-            exit "$status"
-          fi
 
       - name: Element-end, nodal and code-station recovery
         run: npm run check:lfea-b3.4
 
-      - name: Production linear piping consumer
-        shell: bash
-        run: |
-          set +e
-          npm run check:linear-piping-analysis-consumer 2>&1 | tee /tmp/consumer.log
-          code=${PIPESTATUS[0]}
-          if [ "$code" -ne 0 ]; then
-            message=$(tail -n 35 /tmp/consumer.log | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g')
-            echo "::error file=scripts/linear-piping-analysis-consumer-check.mjs::$message"
-            exit "$code"
-          fi
+      - name: Production linear piping consumer functional regression
+        run: node scripts/linear-piping-analysis-consumer-check.mjs
 
       - name: Derived cases and B31 code evaluation
         run: npm run check:lfea-b4.0 && npm run check:lfea-b4.4 && npm run check:lfea-code-application
 
-      - name: Fixed-input commercial benchmark regression
-        run: npm run check:lfea-bm1-cii-comparison
+      - name: Fixed-input commercial benchmark regressions
+        run: |
+          npm run check:lfea-bm1-cii-comparison
+          node scripts/lfea-b3.26-bm2-solve-comparison-check.mjs
+          node scripts/lfea-m028-bm3-check.mjs
+          node scripts/lfea-m034-bm4-run-analysis.mjs
 
       - name: M036 unilateral and zero-regression qualification
         run: npm run check:lfea-m036
