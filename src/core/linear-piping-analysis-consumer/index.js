@@ -31,6 +31,10 @@ export {
 
 export { compileInputXmlBendFeatureExpansion } from './inputxml-bend-feature-expansion.js';
 export {
+  INPUTXML_INLINE_REDUCER_TRANSITIONS_SCHEMA,
+  detectInputXmlInlineReducerTransitions,
+} from './inputxml-inline-reducer-transitions.js';
+export {
   INPUTXML_FEATURE_MECHANICS_PREPARATION_SCHEMA,
   compileInputXmlFeatureMechanicsPreparation,
 } from './inputxml-feature-mechanics-preparation.js';
