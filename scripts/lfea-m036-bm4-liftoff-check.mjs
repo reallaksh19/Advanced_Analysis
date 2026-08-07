@@ -79,6 +79,15 @@ function targetAgreement(execution, cii, label) {
   ));
 }
 
+function targetEvidence({ cii, h1Execution, h2Execution }) {
+  return Object.fromEntries(BM4_LIFTOFF_NODES.map((nodeId) => [nodeId, {
+    bilateralSus: bm4Linear.report.nodes.find((row) => row.sourceNodeId === nodeId).sustained.reaction.UY,
+    h1Sus: reaction(h1Execution, nodeId),
+    h2Sus: h2Execution ? reaction(h2Execution, nodeId) : null,
+    ciiSus: ciiReaction(cii, 'SUS', nodeId),
+  }]));
+}
+
 function equilibrium(execution, totalWeight, label) {
   const sumVerticalReaction = execution.reactions
     .filter((row) => row.dof === 'UY')
@@ -126,7 +135,8 @@ if (!(h1StateMatches && h1CaseMatches)) {
     verdict = 'H2_OPE_CONTACT_STATUS_INHERITED';
     acceptedSusExecution = h2.execution;
   } else {
-    assert.fail(`BM4 SUS supports fit neither H1 nor H2: H1 released=[${susH1Released}], H1 CASE19=${h1CaseMatches}, H2 CASE19=${h2CaseMatches}`);
+    const evidence = targetEvidence({ cii, h1Execution: susH1.unilateralExecution.finalExecution, h2Execution: h2.execution });
+    assert.fail(`BM4 SUS supports fit neither H1 nor H2: OPE released=[${opeReleased}], H1 released=[${susH1Released}], targets=${JSON.stringify(evidence)}`);
   }
 }
 
