@@ -36,6 +36,18 @@ function compatible(record, pipe, turn) {
     && close(record.elbowAngleDeg, turn.angleDeg)
     && connectionsMatch;
 }
+function context({ turn, pipeBinding, catalogue: catalogueInput } = {}) {
+  const pipe = assertPipeSegmentCatalogueBinding(pipeBinding);
+  const catalogue = assertTopologyEditSpecificationCatalogue(catalogueInput);
+  const angleDeg = Number(turn?.angleDeg);
+  if (!Number.isFinite(angleDeg) || angleDeg <= TOLERANCE || angleDeg >= 180 - TOLERANCE) {
+    fail('turn angle must be strictly between 0 and 180 degrees.');
+  }
+  if (pipe.catalogueHash !== catalogue.catalogueHash) fail('pipe binding and elbow catalogue differ.');
+  const normalizedTurn = { ...turn, angleDeg };
+  const matches = catalogue.records.filter((record) => compatible(record, pipe, normalizedTurn));
+  return { pipe, catalogue, turn: normalizedTurn, matches };
+}
 function binding(catalogue, record, turn) {
   const material = {
     schema: CONNECT_ENDPOINTS_ELBOW_BINDING_SCHEMA,
@@ -64,17 +76,22 @@ function binding(catalogue, record, turn) {
   return deepFreeze({ ...material, bindingHash: semanticHash(material) });
 }
 
-export function resolveConnectEndpointsElbow({ turn, pipeBinding, catalogue: catalogueInput, selectedRecordId = null } = {}) {
-  const pipe = assertPipeSegmentCatalogueBinding(pipeBinding);
-  const catalogue = assertTopologyEditSpecificationCatalogue(catalogueInput);
-  const angleDeg = Number(turn?.angleDeg);
-  if (!Number.isFinite(angleDeg) || angleDeg <= TOLERANCE || angleDeg >= 180 - TOLERANCE) {
-    fail('turn angle must be strictly between 0 and 180 degrees.');
-  }
-  if (pipe.catalogueHash !== catalogue.catalogueHash) fail('pipe binding and elbow catalogue differ.');
-  const matches = catalogue.records.filter((record) => compatible(record, pipe, { ...turn, angleDeg }));
+export function connectEndpointsCompatibleElbowOptions(input = {}) {
+  const { matches } = context(input);
+  return deepFreeze(matches.map((record) => deepFreeze({
+    recordId: record.recordId,
+    recordHash: record.recordHash,
+    elbowAngleDeg: record.elbowAngleDeg,
+    elbowRadiusMm: record.elbowRadiusMm,
+    sourceReference: { ...record.sourceReference },
+    label: `${record.recordId} · ${record.elbowAngleDeg}° · R ${record.elbowRadiusMm} mm`,
+  })).sort((left, right) => left.recordId.localeCompare(right.recordId)));
+}
+
+export function resolveConnectEndpointsElbow(input = {}) {
+  const { catalogue, turn, matches } = context(input);
   if (!matches.length) fail(`NO_COMPATIBLE_ELBOW at ${turn.location}.`);
-  const selected = String(selectedRecordId ?? '').trim();
+  const selected = String(input.selectedRecordId ?? '').trim();
   let record;
   if (selected) {
     record = matches.find((row) => row.recordId === selected);
@@ -84,7 +101,7 @@ export function resolveConnectEndpointsElbow({ turn, pipeBinding, catalogue: cat
   } else {
     fail(`ELBOW_SELECTION_REQUIRED at ${turn.location}; ${matches.length} compatible records.`);
   }
-  return binding(catalogue, record, { ...turn, angleDeg });
+  return binding(catalogue, record, turn);
 }
 
 export function assertConnectEndpointsElbowBinding(value) {

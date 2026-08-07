@@ -23,6 +23,7 @@ on:
       - 'src/workspace/viewport-productivity/topology-edit-authoring-runtime.js'
       - 'src/workspace/viewport-productivity/topology-edit-authoring-styles.js'
       - 'src/workspace/viewport-productivity/topology-edit-start-route-*.js'
+      - 'src/workspace/viewport-productivity/topology-edit-connect-endpoints-*.js'
       - 'tests/topology-edit-authoring-composite-operation.test.mjs'
       - 'tests/topology-edit-authoring-planner.test.mjs'
       - 'tests/topology-edit-authored-bend-geometry.test.mjs'
@@ -34,11 +35,13 @@ on:
       - 'e2e/topology-edit-authoring-tools.spec.js'
       - 'e2e/topology-edit-authoring-tools-tree.spec.js'
       - 'e2e/topology-edit-start-route-authority.spec.js'
+      - 'e2e/topology-edit-connect-endpoints-authority.spec.js'
       - 'docs/start-route-production-authoring.md'
       - 'docs/continue-route-core-authority.md'
       - 'docs/continue-route-automatic-elbows.md'
       - 'docs/connect-existing-ends-core.md'
       - 'docs/connect-existing-ends-composition.md'
+      - 'docs/connect-existing-ends-production-authoring.md'
   workflow_dispatch:
 
 permissions:
@@ -108,12 +111,17 @@ jobs:
             src/workspace/topology-edit/authoring/topology-edit-connect-endpoints-operation.js
             src/workspace/topology-edit/authoring/topology-edit-connect-endpoints-candidate.js
             src/workspace/topology-edit/authoring/topology-edit-connect-endpoints-transaction.js
+            src/workspace/topology-edit/authoring/topology-edit-connect-endpoints-validation-plan.js
             src/workspace/viewport-productivity/topology-edit-authoring-runtime.js
             src/workspace/viewport-productivity/topology-edit-authoring-styles.js
             src/workspace/viewport-productivity/topology-edit-start-route-runtime.js
             src/workspace/viewport-productivity/topology-edit-start-route-hud.js
             src/workspace/viewport-productivity/topology-edit-start-route-authoring-service.js
             src/workspace/viewport-productivity/topology-edit-start-route-authoring-runtime.js
+            src/workspace/viewport-productivity/topology-edit-connect-endpoints-authoring-service.js
+            src/workspace/viewport-productivity/topology-edit-connect-endpoints-hud.js
+            src/workspace/viewport-productivity/topology-edit-connect-endpoints-runtime-support.js
+            src/workspace/viewport-productivity/topology-edit-connect-endpoints-authoring-runtime.js
             tests/topology-edit-authoring-composite-operation.test.mjs
             tests/topology-edit-authoring-planner.test.mjs
             tests/topology-edit-authored-bend-geometry.test.mjs
@@ -126,8 +134,10 @@ jobs:
             tests/topology-edit-continue-route-auto-elbow.test.mjs
             tests/topology-edit-connect-endpoints-plan.test.mjs
             tests/topology-edit-connect-endpoints-transaction.test.mjs
+            tests/topology-edit-connect-endpoints-production-adapter.test.mjs
             e2e/topology-edit-authoring-tools-tree.spec.js
             e2e/topology-edit-start-route-authority.spec.js
+            e2e/topology-edit-connect-endpoints-authority.spec.js
           )
           for file in "${files[@]}"; do node --check "$file"; done
           limited=(
@@ -154,10 +164,15 @@ jobs:
             src/workspace/topology-edit/authoring/topology-edit-connect-endpoints-operation.js
             src/workspace/topology-edit/authoring/topology-edit-connect-endpoints-candidate.js
             src/workspace/topology-edit/authoring/topology-edit-connect-endpoints-transaction.js
+            src/workspace/topology-edit/authoring/topology-edit-connect-endpoints-validation-plan.js
             src/workspace/viewport-productivity/topology-edit-start-route-runtime.js
             src/workspace/viewport-productivity/topology-edit-start-route-hud.js
             src/workspace/viewport-productivity/topology-edit-start-route-authoring-service.js
             src/workspace/viewport-productivity/topology-edit-start-route-authoring-runtime.js
+            src/workspace/viewport-productivity/topology-edit-connect-endpoints-authoring-service.js
+            src/workspace/viewport-productivity/topology-edit-connect-endpoints-hud.js
+            src/workspace/viewport-productivity/topology-edit-connect-endpoints-runtime-support.js
+            src/workspace/viewport-productivity/topology-edit-connect-endpoints-authoring-runtime.js
             tests/topology-edit-start-route-authoring.test.mjs
             tests/topology-edit-start-route-runtime.test.mjs
             tests/topology-edit-start-route-production-adapter.test.mjs
@@ -166,7 +181,9 @@ jobs:
             tests/topology-edit-multi-bend-spool.test.mjs
             tests/topology-edit-connect-endpoints-plan.test.mjs
             tests/topology-edit-connect-endpoints-transaction.test.mjs
+            tests/topology-edit-connect-endpoints-production-adapter.test.mjs
             e2e/topology-edit-start-route-authority.spec.js
+            e2e/topology-edit-connect-endpoints-authority.spec.js
           )
           for file in "${limited[@]}"; do test "$(wc -l < "$file")" -lt 300; done
           node scripts/advanced-shell-contract-check.mjs
@@ -193,6 +210,7 @@ jobs:
             tests/topology-edit-continue-route-auto-elbow.test.mjs \
             tests/topology-edit-connect-endpoints-plan.test.mjs \
             tests/topology-edit-connect-endpoints-transaction.test.mjs \
+            tests/topology-edit-connect-endpoints-production-adapter.test.mjs \
             2>&1 | tee topology-edit-authoring-tools-test-output.txt
           test "$(grep -c '^ok ' topology-edit-authoring-tools-test-output.txt)" -gt 0
 
@@ -201,6 +219,7 @@ jobs:
           npx playwright test \
             e2e/topology-edit-authoring-tools-tree.spec.js \
             e2e/topology-edit-start-route-authority.spec.js \
+            e2e/topology-edit-connect-endpoints-authority.spec.js \
             --project=chromium --workers=1 --retries=0 --reporter=line
 
       - name: Upload authoring qualification evidence
@@ -212,6 +231,7 @@ jobs:
             topology-edit-authoring-tools-test-output.txt
             reports/qualification/topology-edit-authoring-tools.json
             reports/qualification/start-route-authoring-core.json
+            reports/qualification/connect-existing-ends-authoring.json
             playwright-report
             test-results
           if-no-files-found: warn
