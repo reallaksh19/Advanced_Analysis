@@ -143,6 +143,19 @@ test('asymmetric pipe ends reject an elbow that duplicates only one connection t
   }), /NO_COMPATIBLE_ELBOW/u);
 });
 
+test('degree-one endpoint with a canonical boundary is not graph-open', async () => {
+  const seed = await seeded();
+  const topology = seed.session.currentTopology();
+  const closed = finalizeCanonicalTopology({
+    ...topology,
+    boundaries: [{ id: 'boundary:connect-closed', nodeId: seed.startNode.id }],
+  });
+  const closedSession = new TopologyEditCertifiedSession(closed);
+  assert.throws(() => createConnectEndpointsPlan({
+    intent: request(seed), session: closedSession,
+  }), /constrained by boundaries record boundary:connect-closed/u);
+});
+
 test('Connect Apply, Cancel, Undo and Redo preserve one exact certified suffix', async () => {
   const { spec, session, operation, candidate } = await orthogonalFixture('x>y');
   const before = session.snapshot(); const preview = createConnectEndpointsPreview({ operation, candidate });
