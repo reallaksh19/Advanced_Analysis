@@ -30,17 +30,26 @@ export class TopologyController {
 
   handleSharedModel(model) {
     this.sharedModel = model;
-    if (!model) {
-      this.store.clear();
-      this.publishGraph(null, 'clear');
-      return;
-    }
+    this.store.clear();
+    this.publishGraph(null, model ? 'source-changed' : 'clear');
+    if (!model) return;
     this.rebuildExact();
   }
 
   rebuildExact() {
     if (!this.sharedModel) return this.publishFailure('TOPOLOGY_MODEL_UNAVAILABLE', 'Import a dataset before rebuilding topology.');
-    this.buildAndCommit(createExactTopologyProfile(this.sharedModel.units.length), 'exact');
+    const lengthUnit = this.lengthUnit();
+    if (!lengthUnit) {
+      return this.publishFailure(
+        'TOPOLOGY_LENGTH_UNIT_MISSING',
+        'Shared piping model length-unit evidence is required before topology can be built.',
+      );
+    }
+    try {
+      this.buildAndCommit(createExactTopologyProfile(lengthUnit), 'exact');
+    } catch (error) {
+      this.publishFailure('TOPOLOGY_PROFILE_INVALID', error instanceof Error ? error.message : String(error));
+    }
   }
 
   rebuildTolerance(payload = {}) {
@@ -50,7 +59,19 @@ export class TopologyController {
       this.publishFailure('TOPOLOGY_TOLERANCE_INVALID', 'Tolerance must be a visible positive number.');
       return;
     }
-    this.buildAndCommit(createToleranceTopologyProfile(this.sharedModel.units.length, tolerance), 'tolerance');
+    const lengthUnit = this.lengthUnit();
+    if (!lengthUnit) {
+      this.publishFailure(
+        'TOPOLOGY_LENGTH_UNIT_MISSING',
+        'Shared piping model length-unit evidence is required before topology can be built.',
+      );
+      return;
+    }
+    try {
+      this.buildAndCommit(createToleranceTopologyProfile(lengthUnit, tolerance), 'tolerance');
+    } catch (error) {
+      this.publishFailure('TOPOLOGY_PROFILE_INVALID', error instanceof Error ? error.message : String(error));
+    }
   }
 
   buildAndCommit(profile, reason) {
@@ -59,6 +80,7 @@ export class TopologyController {
       this.store.setGraph(graph);
       this.publishGraph(graph, reason);
     } catch (error) {
+      this.store.clear();
       this.publishFailure('TOPOLOGY_REBUILD_FAILED', error instanceof Error ? error.message : String(error));
     }
   }
@@ -84,6 +106,11 @@ export class TopologyController {
 
   publishFailure(code, message) {
     this.eventBus.publish(TOPOLOGY_EVENTS.REBUILD_FAILED, { code, message });
+  }
+
+  lengthUnit() {
+    const value = this.sharedModel?.units?.length;
+    return typeof value === 'string' && value.trim() ? value.trim() : '';
   }
 
   destroy() {

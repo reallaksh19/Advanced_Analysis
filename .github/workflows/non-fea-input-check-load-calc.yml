@@ -3,6 +3,9 @@ name: non-fea-input-check-load-calc
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches:
+      - feat/load-calc-non-fea-input-check-ui
   workflow_dispatch:
 
 permissions:
@@ -17,28 +20,31 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Route the dedicated Non-FEA integration qualifier
+      - name: Route dedicated qualifier
         env:
           PR_NUMBER: ${{ github.event.pull_request.number || '' }}
           PR_HEAD: ${{ github.head_ref || '' }}
+          REF_NAME: ${{ github.ref_name }}
         shell: bash
         run: |
           set -euo pipefail
           if [[ "$GITHUB_EVENT_NAME" == 'workflow_dispatch' ]]; then
-            echo 'Manual execution: run the dedicated Non-FEA qualifier on the selected ref.'
+            echo 'Manual exact-ref qualification.'
+          elif [[ "$GITHUB_EVENT_NAME" == 'push' && "$REF_NAME" == 'feat/load-calc-non-fea-input-check-ui' ]]; then
+            echo 'Feature-branch exact-head qualification.'
           elif [[ "$PR_NUMBER" == '802' && "$PR_HEAD" == 'feat/load-calc-non-fea-input-check-ui' ]]; then
-            echo 'PR #802 is the governed Non-FEA integration target.'
+            echo 'PR #802 governed Non-FEA integration qualification.'
           else
-            echo "Not applicable: this qualifier was installed for PR #802, not repository-wide PR gating."
+            echo 'Not applicable: dedicated to PR #802 / its feature branch.'
           fi
 
   exact-head-ui:
     needs: route
-    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.number == 802 && github.head_ref == 'feat/load-calc-non-fea-input-check-ui')
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event.pull_request.number == 802 && github.head_ref == 'feat/load-calc-non-fea-input-check-ui')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Checkout exact pull-request head
+      - name: Checkout exact head
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -55,24 +61,30 @@ jobs:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         shell: bash
         run: |
+          set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           git diff --exit-code
 
-      - name: Enforce phased Non-FEA scope
+      - name: Enforce reconciled Non-FEA scope and authority boundaries
         shell: bash
         run: |
+          set -euo pipefail
           git fetch origin main
           base_sha="$(git merge-base origin/main HEAD)"
           changed="$(git diff --name-only "$base_sha"...HEAD)"
           printf '%s\n' "$changed"
-          unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(doc/prelight_roamap\.md|src/core/non-fea-enrichment/.*|src/core/non-fea-common-checker/.*|src/core/non-fea-method-consumption/.*|src/workspace/bootstrap\.js|src/workspace/workspace-layout\.js|src/workspace/workspace-shell-styles\.js|src/workspace/workspace-shell-controller\.js|src/workspace/load-calc-consumer-controller\.js|src/workspace/load-calc-consumer-view\.js|src/workspace/non-fea-input-check-view\.js|src/workspace/non-fea-common-input-store\.js|src/workspace/non-fea-common-input-runtime\.js|src/workspace/non-fea-common-input-check-adapter\.js|src/workspace/non-fea-method-basis-view\.js|src/workspace/non-fea-seal-export-view\.js|src/workspace/empirical-preflight-view\.js|src/workspace/engineering-model-controller\.js|src/workspace/engineering-loads/empirical-load-calc-scenario-controller\.js|src/workspace/enrichment/authorized-enrichment-consumer-controller\.js|src/workspace/enrichment/authorized-enrichment-runtime\.js|src/workspace/enrichment/non-fea-enrichment-store\.js|src/workspace/enrichment/non-fea-enrichment-view\.js|src/workspace/enrichment/non-fea-enrichment-input-check-adapter\.js|src/workspace/project-data/project-data-fields\.js|src/workspace/project-data/project-data-contract\.js|src/workspace/project-data/project-data-store\.js|src/workspace/project-data/non-fea-field-registry\.js|src/workspace/project-data/project-data-view\.js|src/workspace/project-data/project-data-view-full\.js|src/workspace/project-data/non-fea-project-data-view\.js|src/workspace/project-data/non-fea-project-data-view-v2\.js|scripts/advanced-shell-contract-check\.mjs|scripts/non-fea-project-data-authority-check\.mjs|scripts/non-fea-enrichment-migration-check\.mjs|scripts/non-fea-common-checker-check\.mjs|scripts/non-fea-method-consumption-check\.mjs|scripts/non-fea-release-qualification-check\.mjs|scripts/first-cut-workbench-launcher-source-guard\.mjs|e2e/non-fea-input-check-load-calc\.spec\.js|\.github/workflows/non-fea-input-check-load-calc\.yml)$' || true)"
+          unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(doc/prelight_roamap\.md|doc/non-fea-practical-end-to-end-plan\.md|vite\.config\.js|src/core/non-fea-enrichment/.*|src/core/non-fea-common-checker/.*|src/core/non-fea-analysis-plan/.*|src/core/non-fea-method-consumption/.*|src/core/non-fea-engineering-foundation/.*|src/core/first-cut-load-estimation/mass-ledger\.js|src/workspace/bootstrap\.js|src/workspace/event-bus\.js|src/workspace/canvas2d-viewport-backend\.js|src/workspace/topology-controller\.js|src/workspace/workspace-layout\.js|src/workspace/workspace-shell-styles\.js|src/workspace/workspace-shell-controller\.js|src/workspace/load-calc-consumer-controller\.js|src/workspace/load-calc-consumer-view\.js|src/workspace/non-fea-input-check-view\.js|src/workspace/non-fea-common-input-store\.js|src/workspace/non-fea-common-input-runtime\.js|src/workspace/non-fea-common-input-check-adapter\.js|src/workspace/non-fea-engineering-foundation-runtime\.js|src/workspace/non-fea-analysis-plan-runtime\.js|src/workspace/non-fea-method-execution-coordinator\.js|src/workspace/non-fea-method-basis-view\.js|src/workspace/non-fea-seal-export-view\.js|src/workspace/empirical-preflight-view\.js|src/workspace/engineering-model-controller\.js|src/workspace/engineering-loads/empirical-load-calc-scenario-controller\.js|src/workspace/engineering-loads/empirical-load-calc-scenario-view\.js|src/workspace/engineering-loads/non-fea-3d-investigation-projection\.js|src/workspace/engineering-loads/adapters/sjson-to-empirical-piping-request\.js|src/workspace/topology-edit-3d-search-controller\.js|src/workspace/enrichment/authorized-enrichment-consumer-controller\.js|src/workspace/enrichment/authorized-enrichment-runtime\.js|src/workspace/enrichment/non-fea-enrichment-store\.js|src/workspace/enrichment/non-fea-enrichment-view\.js|src/workspace/enrichment/non-fea-enrichment-input-check-adapter\.js|src/workspace/project-data/project-data-fields\.js|src/workspace/project-data/project-data-contract\.js|src/workspace/project-data/project-data-store\.js|src/workspace/project-data/non-fea-field-registry\.js|src/workspace/project-data/non-fea-configured-default-provider\.js|src/workspace/project-data/non-fea-load-case-authority\.js|src/workspace/project-data/project-data-view\.js|src/workspace/project-data/project-data-view-full\.js|src/workspace/project-data/non-fea-project-data-view\.js|src/workspace/project-data/non-fea-project-data-view-v2\.js|scripts/advanced-shell-contract-check\.mjs|scripts/empirical-load-calc-scenario-check\.mjs|scripts/non-fea-3d-investigation-check\.mjs|scripts/non-fea-canvas-v3-bootstrap-check\.mjs|scripts/non-fea-project-data-authority-check\.mjs|scripts/non-fea-configured-default-resolution-check\.mjs|scripts/non-fea-load-case-authority-check\.mjs|scripts/non-fea-mass-ledger-convergence-check\.mjs|scripts/non-fea-engineering-foundation-check\.mjs|scripts/non-fea-analysis-topology-check\.mjs|scripts/non-fea-thermal-free-movement-check\.mjs|scripts/non-fea-enrichment-migration-check\.mjs|scripts/non-fea-common-checker-check\.mjs|scripts/non-fea-analysis-plan-check\.mjs|scripts/non-fea-method-consumption-check\.mjs|scripts/non-fea-release-qualification-check\.mjs|scripts/first-cut-workbench-launcher-source-guard\.mjs|e2e/non-fea-dataset-bootstrap\.spec\.js|e2e/non-fea-input-check-load-calc\.spec\.js|\.github/workflows/non-fea-input-check-load-calc\.yml)$' || true)"
           test -z "$unexpected"
-          imports="$(grep '^import ' src/core/non-fea-enrichment/index.js src/core/non-fea-common-checker/index.js src/core/non-fea-common-checker/integrity.js src/core/non-fea-method-consumption/index.js src/workspace/non-fea-common-input-runtime.js src/workspace/non-fea-method-basis-view.js src/workspace/non-fea-seal-export-view.js src/workspace/enrichment/non-fea-enrichment-store.js src/workspace/enrichment/non-fea-enrichment-view.js src/workspace/enrichment/non-fea-enrichment-input-check-adapter.js src/workspace/project-data/non-fea-field-registry.js || true)"
-          if printf '%s\n' "$imports" | grep -Eiq '(linear-fea|lafea|lfea|shell|continuum|solver)'; then
-            echo 'Prohibited FEA import detected.' >&2
+          test -z "$(git diff "$base_sha"...HEAD -- src/workspace/application-shell-controller.js src/core/workspace-consumers || true)"
+          if grep -R -nE "(from[[:space:]]+|import\()[[:space:]]*['\"][^'\"]*(linear-fea|lafea|lfea|shell|continuum|solver)" \
+            src/core/non-fea-enrichment \
+            src/core/non-fea-common-checker \
+            src/core/non-fea-analysis-plan \
+            src/core/non-fea-method-consumption \
+            src/core/non-fea-engineering-foundation; then
+            echo 'Prohibited FEA/solver import detected in neutral Non-FEA core.' >&2
             exit 1
           fi
-          test -z "$(git diff "$base_sha"...HEAD -- src/workspace/application-shell-controller.js src/core/workspace-consumers || true)"
           grep -q '^### Phase 1 — Lossless preflight consolidation' doc/prelight_roamap.md
           grep -q '^### Phase 2 — Project Data authority expansion' doc/prelight_roamap.md
           grep -q '^### Phase 3 — Common enrichment and override migration' doc/prelight_roamap.md
@@ -80,45 +92,48 @@ jobs:
           grep -q '^### Phase 5 — Method consumption and First Cut retirement' doc/prelight_roamap.md
           grep -q '^### Phase 6 — Qualification, performance and release' doc/prelight_roamap.md
           grep -q 'common-enriched-piping-input/v1' doc/prelight_roamap.md
+          grep -q '^# Non-FEA Load Calc — Practical End-to-End Operating Plan' doc/non-fea-practical-end-to-end-plan.md
+          grep -q '^## 15. Release / merge gate' doc/non-fea-practical-end-to-end-plan.md
+          grep -q "source.includes('/node_modules/')" vite.config.js
+          grep -q "source.includes('/src/workspace/')" vite.config.js
 
-      - name: Syntax check phased files
+      - name: Syntax check every changed JavaScript module
+        shell: bash
         run: |
-          node --check src/core/non-fea-enrichment/index.js
-          node --check src/core/non-fea-common-checker/index.js
-          node --check src/core/non-fea-common-checker/integrity.js
-          node --check src/core/non-fea-method-consumption/index.js
-          node --check src/workspace/bootstrap.js
-          node --check src/workspace/workspace-layout.js
-          node --check src/workspace/workspace-shell-styles.js
-          node --check src/workspace/workspace-shell-controller.js
-          node --check src/workspace/load-calc-consumer-controller.js
-          node --check src/workspace/load-calc-consumer-view.js
-          node --check src/workspace/non-fea-input-check-view.js
-          node --check src/workspace/non-fea-common-input-store.js
-          node --check src/workspace/non-fea-common-input-runtime.js
-          node --check src/workspace/non-fea-common-input-check-adapter.js
-          node --check src/workspace/non-fea-method-basis-view.js
-          node --check src/workspace/non-fea-seal-export-view.js
-          node --check src/workspace/empirical-preflight-view.js
-          node --check src/workspace/engineering-model-controller.js
-          node --check src/workspace/engineering-loads/empirical-load-calc-scenario-controller.js
-          node --check src/workspace/enrichment/authorized-enrichment-consumer-controller.js
-          node --check src/workspace/enrichment/authorized-enrichment-runtime.js
-          node --check src/workspace/enrichment/non-fea-enrichment-store.js
-          node --check src/workspace/enrichment/non-fea-enrichment-view.js
-          node --check src/workspace/enrichment/non-fea-enrichment-input-check-adapter.js
-          node --check src/workspace/project-data/non-fea-field-registry.js
-          node --check scripts/advanced-shell-contract-check.mjs
-          node --check scripts/non-fea-project-data-authority-check.mjs
-          node --check scripts/non-fea-enrichment-migration-check.mjs
-          node --check scripts/non-fea-common-checker-check.mjs
-          node --check scripts/non-fea-method-consumption-check.mjs
-          node --check scripts/non-fea-release-qualification-check.mjs
-          node --check scripts/first-cut-workbench-launcher-source-guard.mjs
-          node --check e2e/non-fea-input-check-load-calc.spec.js
+          set -euo pipefail
+          git fetch origin main
+          base_sha="$(git merge-base origin/main HEAD)"
+          while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+            case "$file" in
+              *.js|*.mjs) node --check "$file" ;;
+            esac
+          done < <(git diff --name-only "$base_sha"...HEAD)
+          node --check vite.config.js
+
+      - name: Canvas2D render-model v3 bootstrap regression
+        run: node scripts/non-fea-canvas-v3-bootstrap-check.mjs
 
       - name: Phase 2 authority contract check
         run: node scripts/non-fea-project-data-authority-check.mjs
+
+      - name: Configured-default resolver convergence
+        run: node scripts/non-fea-configured-default-resolution-check.mjs
+
+      - name: Load-case authority convergence
+        run: node scripts/non-fea-load-case-authority-check.mjs
+
+      - name: Mass-ledger authority convergence
+        run: node scripts/non-fea-mass-ledger-convergence-check.mjs
+
+      - name: Common engineering foundation convergence
+        run: node scripts/non-fea-engineering-foundation-check.mjs
+
+      - name: Common analysis topology and implementation eligibility
+        run: node scripts/non-fea-analysis-topology-check.mjs
+
+      - name: Common thermal free-movement convergence
+        run: node scripts/non-fea-thermal-free-movement-check.mjs
 
       - name: Phase 3 enrichment migration check
         run: node scripts/non-fea-enrichment-migration-check.mjs
@@ -126,16 +141,27 @@ jobs:
       - name: Phase 4 common checker and seal check
         run: node scripts/non-fea-common-checker-check.mjs
 
-      - name: Phase 5 method consumption and retirement check
+      - name: Phase 5 analysis-plan, method consumption and empirical compatibility check
         run: |
+          node scripts/non-fea-analysis-plan-check.mjs
           node scripts/non-fea-method-consumption-check.mjs
+          node scripts/empirical-load-calc-scenario-check.mjs
+          node scripts/non-fea-3d-investigation-check.mjs
           node scripts/first-cut-workbench-launcher-source-guard.mjs
-
-      - name: Phase 6 release qualification regression
-        run: node scripts/non-fea-release-qualification-check.mjs
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Reconciled empirical runtime integration
+        run: |
+          node scripts/empirical-beam-contact-runtime-check.mjs
+          node scripts/empirical-restraint-network-check.mjs
+          node scripts/empirical-coupled-restraint-network-check.mjs
+          node scripts/empirical-operating-reaction-check.mjs
+          node scripts/empirical-result-overlay-check.mjs
+
+      - name: Phase 6 release qualification regression
+        run: node scripts/non-fea-release-qualification-check.mjs
 
       - name: Import graph
         run: npm run check:imports
@@ -148,5 +174,30 @@ jobs:
           PLAYWRIGHT_BROWSERS_PATH: '0'
         run: npx playwright install --with-deps chromium
 
+      - name: Dataset bootstrap browser contract
+        shell: bash
+        run: |
+          set -o pipefail
+          if node scripts/run-playwright.mjs e2e/non-fea-dataset-bootstrap.spec.js 2>&1 | tee non-fea-bootstrap-browser.log; then
+            exit 0
+          fi
+          summary="$(grep -E 'Error:|Timeout|Expected|Received|partial initialization' non-fea-bootstrap-browser.log | tail -n 14 | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
+          if [ -z "$summary" ]; then
+            summary="$(tail -n 14 non-fea-bootstrap-browser.log | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
+          fi
+          echo "::error title=Non-FEA dataset bootstrap failure::$summary"
+          exit 1
+
       - name: Integrated Input Check browser test
-        run: node scripts/run-playwright.mjs e2e/non-fea-input-check-load-calc.spec.js
+        shell: bash
+        run: |
+          set -o pipefail
+          if node scripts/run-playwright.mjs e2e/non-fea-input-check-load-calc.spec.js 2>&1 | tee non-fea-browser.log; then
+            exit 0
+          fi
+          summary="$(grep -E 'Error:|Timeout|Expected|Received|locator|expect\(' non-fea-browser.log | tail -n 12 | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
+          if [ -z "$summary" ]; then
+            summary="$(tail -n 12 non-fea-browser.log | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
+          fi
+          echo "::error title=Non-FEA browser qualification failure::$summary"
+          exit 1

@@ -16,6 +16,7 @@ function headerMarkup(state) {
   const freshness = state.distribution?.freshness?.status || 'NOT_CALCULATED';
   const authorization = state.authorizationState || {};
   const empiricalScenario = state.empiricalScenarioState || {};
+  const commonInput = state.commonInputState || {};
   const activeMethod = empiricalScenario.method || 'CHAINAGE_TRIBUTARY_SPAN_V2';
   const authority = authorization.packageSemanticHash
     ? 'AUTHORIZED_HANDOFF'
@@ -36,9 +37,11 @@ function headerMarkup(state) {
       <span>Execution freshness: ${escapeHtml(authorization.executionFreshness || 'NOT_APPLICABLE')}</span>
       <span>Empirical scenario: ${escapeHtml(empiricalScenario.state || 'NOT_CONFIGURED')}</span>
       <span>Empirical profile: ${escapeHtml(empiricalScenario.profile ? `${empiricalScenario.profile.profileId} v${empiricalScenario.profile.profileVersion}` : 'NOT_BOUND')}</span>
+      <span>Common checker: ${escapeHtml(commonInput.report?.packageState || 'NOT_EVALUATED')}</span>
+      <span>Common seal: ${escapeHtml(commonInput.commonInput ? (commonInput.staleness?.stale ? 'STALE' : 'CURRENT') : 'NOT_SEALED')}</span>
     </div>
     <nav class="empirical-load-calc__tabs" aria-label="Load calculation views">
-      ${tab('overview', 'Overview', state.activeTab)}${tab('3d', 'Model / 3D', state.activeTab)}${tab('restraints', 'Restraints', state.activeTab)}${tab('load-cases', 'Load Cases', state.activeTab)}${tab('methods', 'Methods', state.activeTab)}${tab('results', 'Results', state.activeTab)}${tab('evidence', 'Evidence', state.activeTab)}${tab('loads', 'Load Evaluation', state.activeTab)}${tab('preflight', 'Pre-flight', state.activeTab)}${tab('project-data', 'Project Data', state.activeTab)}${tab('masters', 'Masters', state.activeTab)}${tab('json-trace', 'JSON Trace', state.activeTab)}
+      ${tab('overview', 'Overview', state.activeTab)}${tab('3d', 'Model / 3D', state.activeTab)}${tab('preflight', 'Input Check', state.activeTab)}${tab('project-data', 'Project Data', state.activeTab)}${tab('masters', 'Masters', state.activeTab)}${tab('enrichment', 'Enrichment & Overrides', state.activeTab)}${tab('method-basis', 'Method Basis', state.activeTab)}${tab('seal-export', 'Seal & Export', state.activeTab)}${tab('restraints', 'Restraints', state.activeTab)}${tab('load-cases', 'Load Cases', state.activeTab)}${tab('methods', 'Methods', state.activeTab)}${tab('results', 'Results', state.activeTab)}${tab('evidence', 'Evidence', state.activeTab)}${tab('loads', 'Load Evaluation', state.activeTab)}${tab('json-trace', 'JSON Trace', state.activeTab)}
     </nav>
     <div class="empirical-load-calc__actions">
       <button type="button" data-engineering-load-calculate ${eligible ? '' : 'disabled'} aria-disabled="${eligible ? 'false' : 'true'}" title="${escapeHtml(eligible ? 'Execute the current authorized empirical package.' : disabledReason)}">${recalculate ? 'Recalculate authorized loads' : 'Calculate authorized loads'}</button>

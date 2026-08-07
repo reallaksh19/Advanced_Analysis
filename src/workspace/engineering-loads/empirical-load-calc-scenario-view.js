@@ -1,6 +1,9 @@
 import {
   EMPIRICAL_METHOD_REGISTRY,
 } from './empirical-method-registry.js';
+import {
+  createNonFea3dInvestigationProjection,
+} from './non-fea-3d-investigation-projection.js';
 
 export function renderEmpiricalScenarioOverview(container, state) {
   if (!container) return;
@@ -109,16 +112,19 @@ export function renderEmpiricalScenarioMethods(container, state) {
 
 export function renderEmpiricalScenarioResults(container, state) {
   if (!container) return;
-  const { execution, snapshot, selectedEntityId } = normalizeState(state);
+  const normalized = normalizeState(state);
+  const { execution, snapshot, selectedEntityId } = normalized;
   const core = execution?.coreResult || null;
   const cases = core?.loadCases || [];
+  const investigation = createNonFea3dInvestigationProjection(normalized);
   container.innerHTML = `
     <section class="engineering-card" data-empirical-scenario-results>
       <div class="engineering-card__header">
         <div><p class="eyebrow">Separate result family</p><h3>Beam/contact results</h3></div>
         ${badge(core?.status || snapshot.state)}
       </div>
-      ${cases.length ? cases.map((row) => resultCase(row, selectedEntityId)).join('') : emptyState(
+      <p class="engineering-note">Result values remain method-owned. “Inspect 3D” uses only exact restraint-to-workspace identity and does not reinterpret reactions or make stale results current.</p>
+      ${cases.length ? cases.map((row) => resultCase(row, investigation, selectedEntityId)).join('') : emptyState(
         'No current empirical execution is available.',
         'Authorization and calculation are separate explicit actions. Stale results are not presented as current.',
       )}
@@ -164,16 +170,30 @@ export function renderEmpiricalScenarioEvidence(container, state) {
 
 export function renderEmpiricalScenarioModel3d(container, state) {
   if (!container) return;
-  const { proposal } = normalizeState(state);
-  const count = proposal?.adaptedRequest?.restraintOccurrences?.length || 0;
+  const investigation = createNonFea3dInvestigationProjection(normalizeState(state));
   container.innerHTML = `
-    <section class="engineering-card" data-empirical-scenario-model-3d>
+    <section class="engineering-card" data-empirical-scenario-model-3d data-investigation-state="${escapeHtml(investigation.state)}" data-investigation-semantic-hash="${escapeHtml(investigation.semanticHash)}">
       <div class="engineering-card__header">
-        <div><p class="eyebrow">Governed SJSON projection</p><h3>Model / 3D</h3></div>
-        <span class="status-badge">${count} restraint overlays</span>
+        <div><p class="eyebrow">Read-only 3D investigation</p><h3>Model / 3D</h3></div>
+        <span class="status-badge">${investigation.summary.navigableCount}/${investigation.summary.investigationRowCount} exact targets</span>
       </div>
-      <p class="engineering-note">The existing SJSON viewport remains the geometry authority. This pane owns only disposable source-restraint, effective-override and result-overlay projections.</p>
-      <button type="button" class="button button--secondary" data-empirical-open-sjson-viewport>Open governed SJSON viewport</button>
+      <p class="engineering-note">The shared SJSON renderer displays governed geometry evidence but is not engineering, calculation or result authority. Navigation uses exact workspace identity only; no coordinate/proximity matching or topology repair is performed.</p>
+      <dl class="engineering-fact-grid">
+        ${fact('Projection', investigation.schema)}
+        ${fact('Result currentness', investigation.executionCurrentness)}
+        ${fact('Execution', investigation.executionId || 'NOT_AVAILABLE')}
+        ${fact('Execution hash', investigation.executionSemanticHash || 'NOT_AVAILABLE')}
+        ${fact('Result hash', investigation.resultSemanticHash || 'NOT_AVAILABLE')}
+        ${fact('Blockers', investigation.summary.blockerCount)}
+      </dl>
+      ${investigation.rows.length ? investigationTable(investigation) : emptyState(
+        'No exact 3D investigation rows are available.',
+        'Configure a scenario with exact restraint occurrence identity before cross-navigation.',
+      )}
+      ${investigation.blockers.length ? blockerList(investigation.blockers) : ''}
+      <div class="engineering-actions">
+        <button type="button" class="button button--secondary" data-empirical-open-sjson-viewport>Open shared governed SJSON viewport</button>
+      </div>
     </section>
   `;
 }
@@ -250,29 +270,50 @@ function profilePanel(snapshot, profile) {
   </div>`;
 }
 
-function resultCase(row, selectedEntityId) {
+function resultCase(row, investigation, selectedEntityId) {
   if (row.status === 'BLOCKED') {
     return `<article class="engineering-subcard"><h4>${escapeHtml(row.loadCaseId)} — blocked</h4>${blockerList(row.blockers || [])}</article>`;
   }
   return `<article class="engineering-subcard" data-result-load-case="${escapeHtml(row.loadCaseId)}">
     <div class="engineering-card__header"><h4>${escapeHtml(row.loadCaseId)}</h4><span class="status-badge">${escapeHtml(row.status)}</span></div>
     <div class="table-scroll"><table class="engineering-table">
-      <thead><tr><th>Support</th><th>Restraint</th><th>State</th><th>FX</th><th>FY</th><th>FZ</th><th>MX</th><th>MY</th><th>MZ</th></tr></thead>
-      <tbody>${(row.supportResults || []).map((result) => resultRow(result, selectedEntityId)).join('')}</tbody>
+      <thead><tr><th>Support</th><th>Restraint</th><th>State</th><th>FX</th><th>FY</th><th>FZ</th><th>MX</th><th>MY</th><th>MZ</th><th>3D</th></tr></thead>
+      <tbody>${(row.supportResults || []).map((result) => resultRow(result, investigation, selectedEntityId)).join('')}</tbody>
     </table></div>
   </article>`;
 }
 
-function resultRow(row, selectedEntityId) {
+function resultRow(row, investigation, selectedEntityId) {
   const selected = rowMatchesEntity(row, selectedEntityId);
   const force = row.globalReaction?.forceN || {};
   const moment = row.globalReaction?.momentNm || {};
+  const target = investigation.rows.find((candidate) => candidate.restraintId === row.restraintId);
+  const inspect = target?.navigationEntityId
+    ? `<button type="button" class="table-link" data-non-fea-investigation-entity-id="${escapeHtml(target.navigationEntityId)}">Inspect 3D</button>`
+    : 'Unavailable';
   return `<tr data-result-restraint-id="${escapeHtml(row.restraintId)}" data-viewport-selected="${selected}"${selected ? ' class="engineering-table__row--selected"' : ''}>
     <td>${escapeHtml(row.supportSiteId)}</td><td>${escapeHtml(row.restraintId)}</td>
     <td>${escapeHtml(row.contactState)}</td>
     <td>${number(force.x)}</td><td>${number(force.y)}</td><td>${number(force.z)}</td>
-    <td>${number(moment.x)}</td><td>${number(moment.y)}</td><td>${number(moment.z)}</td>
+    <td>${number(moment.x)}</td><td>${number(moment.y)}</td><td>${number(moment.z)}</td><td>${inspect}</td>
   </tr>`;
+}
+
+function investigationTable(investigation) {
+  return `<div class="table-scroll" data-role="non-fea-3d-investigation"><table class="engineering-table">
+    <thead><tr><th>Support site</th><th>Restraint</th><th>Exact workspace target</th><th>Result references</th><th>Currentness</th><th>3D</th></tr></thead>
+    <tbody>${investigation.rows.map((row) => `<tr data-investigation-restraint-id="${escapeHtml(row.restraintId)}">
+      <td>${escapeHtml(row.supportSiteId || '—')}</td><td>${escapeHtml(row.restraintId)}</td>
+      <td>${escapeHtml(row.navigationEntityId || 'UNAVAILABLE')}<br><small>${escapeHtml(row.navigationBasis || 'NO_EXACT_TARGET')}</small></td>
+      <td>${escapeHtml(resultReferenceText(row.resultRefs))}</td><td>${escapeHtml(investigation.executionCurrentness)}</td>
+      <td>${row.navigationEntityId ? `<button type="button" class="table-link" data-non-fea-investigation-entity-id="${escapeHtml(row.navigationEntityId)}">Inspect in shared 3D</button>` : 'Unavailable'}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+function resultReferenceText(rows) {
+  if (!rows.length) return 'No method result row';
+  return rows.map((row) => `${row.loadCaseId || 'UNBOUND'} · ${row.loadCaseStatus || 'UNKNOWN'} · ${row.contactState || 'UNKNOWN'}`).join('; ');
 }
 
 function normalizeState(state) {

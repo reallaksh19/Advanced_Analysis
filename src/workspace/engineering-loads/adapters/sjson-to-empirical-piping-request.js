@@ -10,6 +10,10 @@ import {
   validateSupportAttachmentModel,
 } from '../../../core/support-restraints/index.js';
 import {
+  createNonFeaEffectiveRestraintCapabilityModel,
+  validateNonFeaEffectiveRestraintCapabilityModel,
+} from '../../../core/non-fea-engineering-foundation/index.js';
+import {
   EMPIRICAL_FAILURE_CODES,
   EMPIRICAL_PIPING_SCHEMAS,
 } from '../../../core/empirical-piping-mechanics/index.js';
@@ -45,9 +49,10 @@ const REQUEST_KEYS = Object.freeze([
  * Builds a format-independent empirical mechanics request from normalized
  * workspace authorities. Raw SJSON is intentionally not accepted here.
  *
- * This WP1 adapter does not execute or register a mechanics method. It binds
- * source identity, coordinate authority, support custody and scenario-only
- * restraint overrides into an immutable request package for later runtime use.
+ * Scenario restraint overrides are retained only as a compatibility provider
+ * into the common effective-restraint contract. This adapter projects that
+ * governed contract into runtime geometry; it no longer owns override
+ * precedence or effective boundary-condition values.
  */
 export function buildSjsonEmpiricalPipingRequest(input) {
   requireInput(input);
@@ -55,14 +60,24 @@ export function buildSjsonEmpiricalPipingRequest(input) {
   requireAdapterMethod(scenario.method);
   assertAuthorities(input, scenario);
 
+  const effectiveRestraintCapabilityModel = createNonFeaEffectiveRestraintCapabilityModel({
+    restraintCapabilityModel: input.restraintCapabilityModel,
+    overrides: scenario.restraintOverrides,
+  });
+  assertValidation(
+    validateNonFeaEffectiveRestraintCapabilityModel(effectiveRestraintCapabilityModel),
+    'non-fea-effective-restraint-capability/v1',
+  );
+
   const components = buildComponents(input.sharedModel, input.topologyGraph);
   const sourceGeometryHash = semanticHash(components);
-  const blockers = [];
+  const blockers = effectiveRestraintCapabilityModel.blockers.map(effectiveRestraintBlocker);
   const restraintOccurrences = buildRestraintOccurrences({
     ...input,
     scenario,
     components,
     blockers,
+    effectiveRestraintCapabilityModel,
   });
   addTopologyBlockers(input.topologyGraph, scenario.method, blockers);
   addCurrentMethodScopeBlockers(scenario, restraintOccurrences, blockers);
@@ -99,6 +114,7 @@ export function buildSjsonEmpiricalPipingRequest(input) {
     sourceEntityIds: row.sourceEntityIds,
     hostEntityId: row.hostEntityId,
     overrideId: row.overrideId,
+    effectiveRestraintCapabilitySemanticHash: row.effectiveRestraintCapabilitySemanticHash,
   })));
   const adapterEvidence = createSjsonEmpiricalAdapterEvidence({
     datasetId: requestPayload.datasetId,
@@ -221,10 +237,9 @@ function buildRestraintOccurrences(context) {
     'supportKey',
   );
   const components = new Map(context.components.map((row) => [row.componentKey, row]));
-  const overrides = new Map(context.scenario.restraintOverrides.map((row) => [row.restraintId, row]));
-  return context.restraintCapabilityModel.restraints.map((restraint) => {
-    const support = supports.get(restraint.supportKey);
-    const supportAttachments = attachments.get(restraint.supportKey) || [];
+  return context.effectiveRestraintCapabilityModel.restraints.map((restraint) => {
+    const support = supports.get(restraint.supportSiteId);
+    const supportAttachments = attachments.get(restraint.supportSiteId) || [];
     const attachment = supportAttachments.length === 1 ? supportAttachments[0] : null;
     const component = attachment ? components.get(attachment.attachedComponentKey) : null;
     const tangentResolution = resolveHostTangent(component);
@@ -252,19 +267,6 @@ function buildRestraintOccurrences(context) {
         'The governed restraint capability is not solver-eligible.',
       ));
     }
-    const override = overrides.get(restraint.restraintId) || null;
-    if (override && override.supportSiteId !== restraint.supportKey) {
-      throw new TypeError(`Override ${override.overrideId} belongs to a different support site.`);
-    }
-    if (override && override.effectiveDirection !== sourceCapabilityDirection(restraint)
-      && !override.effectiveAxis) {
-      context.blockers.push(blocker(
-        EMPIRICAL_FAILURE_CODES.RESTRAINT_AXIS_AMBIGUOUS,
-        restraint.restraintId,
-        'ERROR',
-        'A direction-changing override requires an explicit effectiveAxis.',
-      ));
-    }
     const basis = tangentResolution.axis
       ? buildAnchorBasis(
         tangentResolution.axis,
@@ -272,18 +274,26 @@ function buildRestraintOccurrences(context) {
         context.scenario.coordinateFrame.analysisPlaneBasis.u,
       )
       : null;
-    const sourceCapability = sourceCapabilityRecord(restraint, tangentResolution.axis, basis);
-    const effectiveCapability = applyOverride(sourceCapability, override);
+    const sourceCapability = capabilityWithGeometry(
+      restraint.sourceCapability,
+      tangentResolution.axis,
+      basis,
+    );
+    const effectiveCapability = capabilityWithGeometry(
+      restraint.effectiveCapability,
+      tangentResolution.axis,
+      basis,
+    );
     return deepFreeze({
-      supportSiteId: restraint.supportKey,
+      supportSiteId: restraint.supportSiteId,
       restraintId: restraint.restraintId,
-      sourceSupportIds: [restraint.supportKey],
+      sourceSupportIds: [restraint.supportSiteId],
       sourceEntityIds: support?.sourceEntityId === null || support?.sourceEntityId === undefined
         ? []
         : [String(support.sourceEntityId)],
-      hostEntityId: attachment?.attachedComponentKey || null,
+      hostEntityId: attachment?.attachedComponentKey || restraint.attachedComponentKey || null,
       hostSourceEntityId: component?.sourceEntityId ?? null,
-      attachmentId: attachment?.attachmentId || null,
+      attachmentId: attachment?.attachmentId || restraint.attachmentId || null,
       attachmentPointMm: attachment?.projectedPointCanonical || support?.positionCanonical || null,
       hostTangent: tangentResolution.axis,
       hostTangentEvidence: tangentResolution.evidence,
@@ -292,67 +302,32 @@ function buildRestraintOccurrences(context) {
       sourceCapability,
       effectiveCapability,
       anchorBasis: basis,
-      overrideId: override?.overrideId || null,
-      overrideReason: override?.reason || null,
+      overrideId: restraint.overrideId,
+      overrideReason: restraint.overrideReason,
+      effectiveRestraintCapabilitySemanticHash:
+        context.effectiveRestraintCapabilityModel.semanticHash,
       geometryChanged: false,
-      qualification: restraint.qualification,
+      qualification: restraint.sourceQualification,
     });
   }).sort(byField('restraintId'));
 }
 
-function sourceCapabilityRecord(restraint, tangent, basis) {
-  const type = stringValue(restraint.supportType || 'SUPPORT');
-  const anchor = /(^|_)ANC(HOR)?($|_)/.test(type) || /ANCHOR/.test(type);
+function capabilityWithGeometry(capability, tangent, basis) {
+  const anchor = /ANCHOR|(^|_)ANC(HOR)?($|_)/.test(capability.type);
+  let axis = capability.explicitAxis || null;
+  if (!axis && anchor) axis = tangent;
+  if (!axis && capability.direction === 'LONGITUDINAL') axis = tangent;
+  if (!axis && capability.direction === 'VERTICAL') axis = basis?.vertical || null;
+  if (!axis && capability.direction === 'LATERAL') axis = basis?.guide || null;
   return deepFreeze({
-    type,
-    direction: sourceCapabilityDirection(restraint),
-    axis: anchor ? tangent : inferredAxis(restraint, tangent, basis),
-    gapMm: firstEvidenceNumber(restraint.gapEvidence),
-    stiffnessNPerM: firstEvidenceNumber(restraint.stiffnessEvidence),
-    friction: firstEvidenceNumber(restraint.frictionEvidence),
-    translationalStates: {
-      vertical: restraint.vertical.state,
-      lateral: restraint.lateral.state,
-      longitudinal: restraint.longitudinal.state,
-    },
+    type: capability.type,
+    direction: capability.direction,
+    axis,
+    gapMm: capability.gapMm,
+    stiffnessNPerM: capability.stiffnessNPerM,
+    friction: capability.friction,
+    translationalStates: structuredClone(capability.translationalStates),
   });
-}
-
-function applyOverride(source, override) {
-  if (!override) return source;
-  return deepFreeze({
-    ...source,
-    type: override.effectiveType,
-    direction: override.effectiveDirection,
-    axis: override.effectiveAxis || source.axis,
-    gapMm: override.effectiveGapMm,
-    stiffnessNPerM: override.effectiveStiffnessNPerM,
-    friction: override.effectiveFriction,
-  });
-}
-
-function sourceCapabilityDirection(restraint) {
-  const type = stringValue(restraint.supportType || 'SUPPORT');
-  return /(^|_)ANC(HOR)?($|_)/.test(type) || /ANCHOR/.test(type)
-    ? 'ANC'
-    : inferredDirection(restraint);
-}
-
-function inferredDirection(restraint) {
-  const active = [
-    ['VERTICAL', restraint.vertical.state],
-    ['LATERAL', restraint.lateral.state],
-    ['LONGITUDINAL', restraint.longitudinal.state],
-  ].filter(([, state]) => ['RESTRAINED', 'GAP', 'SPRING'].includes(state));
-  return active.length === 1 ? active[0][0] : active.length > 1 ? 'MULTI' : 'UNRESOLVED';
-}
-
-function inferredAxis(restraint, tangent, basis) {
-  const direction = inferredDirection(restraint);
-  if (direction === 'LONGITUDINAL') return tangent;
-  if (direction === 'VERTICAL') return basis?.vertical || null;
-  if (direction === 'LATERAL') return basis?.guide || null;
-  return null;
 }
 
 function buildAnchorBasis(tangent, vertical, deterministicTransverse) {
@@ -369,9 +344,7 @@ function buildAnchorBasis(tangent, vertical, deterministicTransverse) {
     });
   }
   const projected = subtract(deterministicTransverse, scale(ls, dot(deterministicTransverse, ls)));
-  if (magnitude(projected) <= 1e-8) {
-    return null;
-  }
+  if (magnitude(projected) <= 1e-8) return null;
   const t1 = normalize(projected);
   return deepFreeze({
     labels: ['LS', 'T1', 'T2'],
@@ -397,7 +370,7 @@ function resolveHostTangent(component) {
   if (validPorts.length !== 2) {
     return {
       axis: null,
-      evidence: 'PORT_COUNT_AMBIGUOUS',
+      evidence: 'PORT_COUNT_AMIGUOUS',
       message: 'A deterministic tangent requires an explicit tangent or exactly two positioned host ports.',
     };
   }
@@ -506,8 +479,19 @@ function addCurrentMethodScopeBlockers(scenario, restraints, blockers) {
   });
 }
 
+function effectiveRestraintBlocker(row) {
+  const code = row.code === 'EFFECTIVE_RESTRAINT_AXIS_REQUIRED'
+    ? EMPIRICAL_FAILURE_CODES.RESTRAINT_AXIS_AMBIGUOUS
+    : EMPIRICAL_FAILURE_CODES.BOUNDARY_CONDITION_UNRESOLVED;
+  return blocker(code, row.scope, row.severity || 'ERROR', row.message);
+}
+
 function requireAdapterMethod(value) {
-  if (!['EMPIRICAL_BEAM_CONTACT_V1', 'EMPIRICAL_RESTRAINT_NETWORK_V1', 'EMPIRICAL_RESTRAINT_NETWORK_V2'].includes(value)) {
+  if (![
+    'EMPIRICAL_BEAM_CONTACT_V1',
+    'EMPIRICAL_RESTRAINT_NETWORK_V1',
+    'EMPIRICAL_RESTRAINT_NETWORK_V2',
+  ].includes(value)) {
     throw new TypeError(
       'The SJSON empirical piping adapter accepts beam/contact or restraint-network methods only.',
     );
@@ -521,17 +505,6 @@ function datasetHash(dataset, sharedModel) {
     || sharedModel.sourceSnapshotRef?.sourceSemanticHash;
   const normalized = requiredString(value, 'dataset source hash');
   return normalized.includes(':') ? normalized : `sha256:${normalized}`;
-}
-
-function firstEvidenceNumber(value) {
-  const rows = Array.isArray(value)
-    ? value
-    : Object.values(value || {}).flatMap((row) => Array.isArray(row) ? row : []);
-  for (const row of rows) {
-    const number = Number(row?.value);
-    if (Number.isFinite(number)) return number;
-  }
-  return null;
 }
 
 function point(value) {

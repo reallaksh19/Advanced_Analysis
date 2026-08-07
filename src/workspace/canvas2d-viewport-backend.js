@@ -109,7 +109,7 @@ export class Canvas2DViewportBackend {
   handlePointerUp(event) {
     const start = this.pointerStart;
     this.pointerStart = null;
-    if (!start || event.button !== 0 || start.pointerId !== event.pointerId || !this.model) return;
+    if (!start || event.button !== 0 || start.pointerId !== event.pointerId || !this.model || !this.canvas) return;
     if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > MAX_POINTER_TRAVEL_PX) return;
 
     const rect = this.canvas.getBoundingClientRect();
@@ -143,25 +143,29 @@ export class Canvas2DViewportBackend {
     const width = parseFloat(this.canvas.style.width) || 1;
     const height = parseFloat(this.canvas.style.height) || 1;
     this.context.clearRect(0, 0, width, height);
-    if (!this.model || this.model.items.length === 0) return;
+    const items = viewportRenderItems(this.model);
+    if (!items.length) return;
 
     const projection = buildCanvasProjection(this.model, width, height);
-    this.model.items.forEach((item) => this.drawItem(item, projection));
+    items.forEach((item) => this.drawItem(item, projection));
   }
 
   drawItem(item, projection) {
-    const selected = item.entityId === this.selectedEntityId;
+    const selected = item.objectId === this.selectedEntityId;
     const color = selected ? '#fbbf24' : categoryColor(item.category);
     this.context.strokeStyle = color;
     this.context.fillStyle = color;
     this.context.lineWidth = selected ? 4 : item.resolutionStatus === 'fallback' ? 2 : 3;
     this.context.setLineDash(item.resolutionStatus === 'fallback' ? [6, 4] : []);
 
-    if (Array.isArray(item.path) && item.path.length > 1) {
-      this.drawPath(item.path, projection);
-    } else if (Array.isArray(item.legs) && item.legs.length) {
-      item.legs.forEach((leg) => this.drawSegment(leg.start, leg.end, projection));
-      this.drawMarker(item.center, projection, selected ? 7 : 5, 'circle');
+    const primitive = item.primitive || {};
+    if (Array.isArray(primitive.path) && primitive.path.length > 1) {
+      this.drawPath(primitive.path, projection);
+    } else if (Array.isArray(primitive.legs) && primitive.legs.length) {
+      primitive.legs.forEach((leg) => {
+        if (leg?.start && leg?.end) this.drawSegment(leg.start, leg.end, projection);
+      });
+      if (item.center) this.drawMarker(item.center, projection, selected ? 7 : 5, 'circle');
     } else if (item.start && item.end) {
       this.drawSegment(item.start, item.end, projection);
       this.drawBodySymbol(item, projection, selected);
@@ -244,6 +248,14 @@ export class Canvas2DViewportBackend {
     if (this.hostElement) this.hostElement.dataset.viewCommand = command;
     if (this.canvas) this.canvas.dataset.viewCommand = command;
   }
+}
+
+function viewportRenderItems(model) {
+  return [
+    ...(model?.physicalPrimitives ?? []),
+    ...(model?.supportOverlayPrimitives ?? []),
+    ...(model?.diagnosticPrimitives ?? []),
+  ];
 }
 
 function clearHostMetadata(hostElement) {

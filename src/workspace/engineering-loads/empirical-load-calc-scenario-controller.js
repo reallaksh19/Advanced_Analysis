@@ -1,5 +1,13 @@
 import { APPLICATION_EVENTS, EVENT_TOPICS } from '../event-topics.js';
 import {
+  nonFeaMethodExecutionCoordinator,
+} from '../non-fea-method-execution-coordinator.js';
+import {
+  assertEmpiricalCaseConfigurationsAuthorized,
+  createNonFeaLoadCaseAuthority,
+} from '../project-data/non-fea-load-case-authority.js';
+import { projectDataStore } from '../project-data/project-data-store.js';
+import {
   empiricalLoadCalcScenarioStore,
 } from './empirical-load-calc-scenario-store.js';
 import {
@@ -21,17 +29,36 @@ export class EmpiricalLoadCalcScenarioController {
     eventBus,
     authorityProvider = null,
     store = empiricalLoadCalcScenarioStore,
+    executionCoordinator = nonFeaMethodExecutionCoordinator,
+    loadCaseAuthorityProvider = () => createNonFeaLoadCaseAuthority(projectDataStore.getProfile()),
     resultOverlayStore = empiricalResultOverlayStore,
   ) {
     if (!eventBus || typeof eventBus.subscribe !== 'function'
       || typeof eventBus.publish !== 'function') {
       throw new TypeError('Empirical Load Calc scenario controller requires an event bus.');
     }
+    if (!executionCoordinator
+        || typeof executionCoordinator.prepareAuthorization !== 'function'
+        || typeof executionCoordinator.recordAuthorization !== 'function'
+        || typeof executionCoordinator.requireCurrentAuthorization !== 'function'
+        || typeof executionCoordinator.recordExecution !== 'function') {
+      throw new TypeError('Empirical Load Calc scenario controller requires the Non-FEA execution coordinator.');
+    }
+    if (typeof loadCaseAuthorityProvider !== 'function') {
+      throw new TypeError('Empirical Load Calc scenario controller requires a Load Case authority provider.');
+    }
+    if (!resultOverlayStore
+        || typeof resultOverlayStore.subscribe !== 'function'
+        || typeof resultOverlayStore.sync !== 'function') {
+      throw new TypeError('Empirical Load Calc scenario controller requires a governed result overlay store.');
+    }
     this.eventBus = eventBus;
     this.authorityProvider = typeof authorityProvider === 'function'
       ? authorityProvider
       : () => null;
     this.store = store;
+    this.executionCoordinator = executionCoordinator;
+    this.loadCaseAuthorityProvider = loadCaseAuthorityProvider;
     this.resultOverlayStore = resultOverlayStore;
     this.unsubscribers = [];
   }
@@ -63,6 +90,7 @@ export class EmpiricalLoadCalcScenarioController {
         APPLICATION_EVENTS.CONTEXT_CHANGED,
         () => this.refresh(),
       ),
+      projectDataStore.subscribe(() => this.refresh()),
       this.store.subscribe((snapshot) => this.#publishScenarioState(snapshot)),
       this.resultOverlayStore.subscribe(({ snapshot, projection, details }) => {
         this.eventBus.publish(
@@ -75,23 +103,70 @@ export class EmpiricalLoadCalcScenarioController {
   }
 
   configure(value) {
-    return this.#run('configure', () => this.store.configure(value));
+    return this.#run('configure', () => {
+      this.#assertLoadCaseAuthority(value?.caseConfigurations);
+      return this.store.configure(value);
+    });
   }
 
   authorize(value = {}) {
     this.refresh();
-    return this.#run('authorize', () => this.store.authorize({
-      authorizationId: value.authorizationId || generatedId('AUTH'),
-      authorizedAt: value.authorizedAt || new Date().toISOString(),
-    }));
+    return this.#run('authorize', () => {
+      const proposal = requireProposal(this.store.getProposal());
+      this.#assertLoadCaseAuthority(proposal.caseConfigurations);
+      const authorizationId = value.authorizationId || generatedId('AUTH');
+      const authorizedAt = value.authorizedAt || new Date().toISOString();
+      const prepared = this.executionCoordinator.prepareAuthorization({
+        authorizationId,
+        authorizedAt,
+        implementationId: proposal.method,
+        scenarioId: proposal.scenarioId,
+        methodRequestSemanticHash: proposal.semanticHash,
+        analysisPlanSemanticHash: value.analysisPlanSemanticHash || null,
+      });
+      const snapshot = this.store.authorize({ authorizationId, authorizedAt });
+      this.executionCoordinator.recordAuthorization(prepared.receipt);
+      return snapshot;
+    });
   }
 
   calculate(value = {}) {
     this.refresh();
-    return this.#run('calculate', () => this.store.execute({
-      executionId: value.executionId || generatedId('EXEC'),
-      executedAt: value.executedAt || new Date().toISOString(),
-    }));
+    return this.#run('calculate', () => {
+      const proposal = requireProposal(this.store.getProposal());
+      this.#assertLoadCaseAuthority(proposal.caseConfigurations);
+      const authorization = this.store.getAuthorization();
+      if (!authorization) {
+        throw codedError(
+          'A common-input-bound empirical authorization is required.',
+          'COMMON_INPUT_METHOD_AUTHORIZATION_REQUIRED',
+        );
+      }
+      this.executionCoordinator.requireCurrentAuthorization({
+        authorizationId: authorization.authorizationId,
+        implementationId: proposal.method,
+        analysisPlanSemanticHash: value.analysisPlanSemanticHash || null,
+      });
+      const executionId = value.executionId || generatedId('EXEC');
+      const executedAt = value.executedAt || new Date().toISOString();
+      const execution = this.store.execute({ executionId, executedAt });
+      try {
+        this.executionCoordinator.recordExecution({
+          authorizationId: authorization.authorizationId,
+          implementationId: proposal.method,
+          analysisPlanSemanticHash: value.analysisPlanSemanticHash || null,
+          executionId,
+          executedAt,
+          engineExecutionSemanticHash: execution.semanticHash,
+          resultSemanticHash: execution.coreResult?.semanticHash || null,
+          status: execution.coreResult?.status || 'UNKNOWN',
+        });
+      } catch (error) {
+        this.#forceScenarioStale(proposal, 'missing:common-execution-receipt');
+        throw error;
+      }
+      return execution;
+    });
   }
 
   cloneProfile(value = {}) {
@@ -113,25 +188,57 @@ export class EmpiricalLoadCalcScenarioController {
     const proposal = this.store.getProposal();
     if (!proposal) return this.store.getSnapshot();
     try {
+      this.#assertLoadCaseAuthority(proposal.caseConfigurations);
       const provided = this.authorityProvider(proposal);
-      if (!provided) return this.store.getSnapshot();
-      return this.store.refresh({
-        datasetId: provided.datasetId,
-        adaptedRequestSemanticHash: proposal.adaptedRequest.semanticHash,
-        runtimeProfileSemanticHash: proposal.runtimeProfile.semanticHash,
-        sharedModelSemanticHash: provided.sharedModel?.semanticHash || 'missing:shared-model',
-        topologySemanticHash: provided.topologyGraph?.semanticHash || 'missing:topology',
-        attachmentSemanticHash:
-          provided.supportAttachmentModel?.semanticHash || 'missing:attachment',
-        restraintSemanticHash:
-          provided.restraintCapabilityModel?.semanticHash || 'missing:restraint',
-        loadPrimitiveSetSemanticHash:
-          provided.sourceLoadPrimitiveSet?.semanticHash || 'missing:load-primitives',
-      });
+      if (provided) {
+        this.store.refresh({
+          datasetId: provided.datasetId,
+          adaptedRequestSemanticHash: proposal.adaptedRequest.semanticHash,
+          runtimeProfileSemanticHash: proposal.runtimeProfile.semanticHash,
+          sharedModelSemanticHash: provided.sharedModel?.semanticHash || 'missing:shared-model',
+          topologySemanticHash: provided.topologyGraph?.semanticHash || 'missing:topology',
+          attachmentSemanticHash:
+            provided.supportAttachmentModel?.semanticHash || 'missing:attachment',
+          restraintSemanticHash:
+            provided.restraintCapabilityModel?.semanticHash || 'missing:restraint',
+          loadPrimitiveSetSemanticHash:
+            provided.sourceLoadPrimitiveSet?.semanticHash || 'missing:load-primitives',
+        });
+      }
+      this.#refreshCommonInputBinding(proposal);
+      return this.store.getSnapshot();
     } catch (error) {
+      if (this.store.getAuthorization()) {
+        this.#forceScenarioStale(proposal, 'missing:current-project-data-load-case-authority');
+      }
       this.#publishFailure('refresh', error);
       return this.store.getSnapshot();
     }
+  }
+
+  #assertLoadCaseAuthority(caseConfigurations) {
+    const authority = this.loadCaseAuthorityProvider();
+    return assertEmpiricalCaseConfigurationsAuthorized(authority, caseConfigurations || []);
+  }
+
+  #refreshCommonInputBinding(proposal) {
+    const authorization = this.store.getAuthorization();
+    if (!authorization) return;
+    try {
+      this.executionCoordinator.requireCurrentAuthorization({
+        authorizationId: authorization.authorizationId,
+        implementationId: proposal.method,
+      });
+    } catch {
+      this.#forceScenarioStale(proposal, 'missing:current-common-input-or-implementation');
+    }
+  }
+
+  #forceScenarioStale(proposal, marker) {
+    this.store.refresh({
+      ...proposal.bindings,
+      adaptedRequestSemanticHash: marker,
+    });
   }
 
   getSnapshot() { return this.store.getSnapshot(); }
@@ -179,8 +286,17 @@ export class EmpiricalLoadCalcScenarioController {
   }
 }
 
+function requireProposal(value) {
+  if (!value) throw codedError('An empirical scenario proposal is required.', 'EMPIRICAL_SCENARIO_REQUIRED');
+  return value;
+}
 function generatedId(prefix) {
   const random = globalThis.crypto?.randomUUID?.()
     || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   return `${prefix}:${random}`;
+}
+function codedError(message, code) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
 }

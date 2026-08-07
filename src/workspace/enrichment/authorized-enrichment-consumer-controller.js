@@ -3,18 +3,10 @@ import { deepFreeze } from '../../core/shared-piping-model/immutable.js';
 import {
   requireAuthorizedEmpiricalRuntimePackage,
 } from '../engineering-loads/authorized-empirical-runtime-package.js';
+import { NonFeaMethodExecutionCoordinator } from '../non-fea-method-execution-coordinator.js';
 import {
   requireAuthorizedStagedJsonSidecar,
 } from './authorized-staged-json-sidecar.js';
-import {
-  AUTHORIZED_STAGED_JSON_WRITE_REQUEST_SCHEMA,
-  writeAuthorizedStagedJson,
-} from './authorized-staged-json-writer.js';
-import {
-  AUTHORIZED_STAGED_JSON_DOWNLOAD_REQUEST_SCHEMA,
-  createAuthorizedStagedJsonDownloadArtifact,
-  triggerAuthorizedStagedJsonDownload,
-} from './authorized-staged-json-download.js';
 
 export const AUTHORIZED_EMPIRICAL_CONSUMER_REQUEST_SCHEMA =
   'authorized-empirical-consumer-request/v2';
@@ -23,6 +15,7 @@ export const AUTHORIZED_STAGED_JSON_CONSUMER_REQUEST_SCHEMA =
 export const AUTHORIZED_STAGED_JSON_CONSUMER_RESULT_SCHEMA =
   'authorized-staged-json-consumer-result/v1';
 
+const AUTHORIZED_EMPIRICAL_METHOD_ID = 'AUTHORIZED_EMPIRICAL_SUPPORT_LOADS_V1';
 const EMPIRICAL_KEYS = Object.freeze(['schema', 'runtimePackage']);
 const STAGED_JSON_KEYS = Object.freeze([
   'schema', 'operationId', 'sidecar', 'source', 'mapping', 'formatting',
@@ -46,7 +39,7 @@ export function computeAuthorizedStagedJsonConsumerResultSemanticHash(value) {
 }
 
 export class AuthorizedEnrichmentConsumerController {
-  constructor({ engineeringModelStore, masterDataController }) {
+  constructor({ engineeringModelStore, masterDataController, commonInputStore = null }) {
     if (!engineeringModelStore
         || typeof engineeringModelStore.configureAuthorizedEmpiricalPackage !== 'function'
         || typeof engineeringModelStore.executeConfiguredAuthorized !== 'function'
@@ -61,8 +54,25 @@ export class AuthorizedEnrichmentConsumerController {
       fail('A master-data controller is required.',
         'AUTHORIZED_ENRICHMENT_MASTER_DATA_INVALID');
     }
+    if (commonInputStore !== null && (
+      typeof commonInputStore.requireReadyMethods !== 'function'
+      || typeof commonInputStore.recordConsumptionAuthorization !== 'function'
+      || typeof commonInputStore.recordConsumptionExecution !== 'function'
+      || typeof commonInputStore.getSnapshot !== 'function'
+      || typeof engineeringModelStore.getAuthorizedEmpiricalPackage !== 'function'
+    )) {
+      fail('Common-input-bound production execution requires a compatible common-input store.',
+        'AUTHORIZED_ENRICHMENT_COMMON_INPUT_STORE_INVALID');
+    }
     this.engineeringModelStore = engineeringModelStore;
     this.masterDataController = masterDataController;
+    this.commonInputStore = commonInputStore;
+    this.executionCoordinator = commonInputStore
+      ? new NonFeaMethodExecutionCoordinator({
+        commonInputStore,
+        commonInputProvider: (methodIds) => commonInputStore.requireReadyMethods(methodIds),
+      })
+      : null;
   }
 
   configureEmpirical(input) {
@@ -72,20 +82,69 @@ export class AuthorizedEnrichmentConsumerController {
         'AUTHORIZED_ENRICHMENT_SCHEMA_INVALID');
     }
     const runtimePackage = requireAuthorizedEmpiricalRuntimePackage(input.runtimePackage);
-    return this.engineeringModelStore.configureAuthorizedEmpiricalPackage(
+    const prepared = this.executionCoordinator?.prepareAuthorization({
+      authorizationId: runtimePackage.packageId,
+      authorizedAt: runtimePackage.configuredAt,
+      implementationId: AUTHORIZED_EMPIRICAL_METHOD_ID,
+      scenarioId: runtimePackage.packageId,
+      methodRequestSemanticHash: runtimePackage.authorizedInput.semanticHash,
+    }) || null;
+    const configured = this.engineeringModelStore.configureAuthorizedEmpiricalPackage(
       runtimePackage,
       this.masterDataController.getMasterData(),
     );
+    if (prepared) this.executionCoordinator.recordAuthorization(prepared.receipt);
+    return configured;
   }
 
   executeEmpirical(input = undefined) {
     if (input !== undefined) this.configureEmpirical(input);
-    return this.engineeringModelStore.executeConfiguredAuthorized(
+    const runtimePackage = this.engineeringModelStore.getAuthorizedEmpiricalPackage?.() || null;
+    if (this.executionCoordinator) {
+      if (!runtimePackage) {
+        fail('An authorized empirical runtime package is required.',
+          'AUTHORIZED_ENRICHMENT_RUNTIME_PACKAGE_REQUIRED');
+      }
+      this.executionCoordinator.requireCurrentAuthorization({
+        authorizationId: runtimePackage.packageId,
+        implementationId: AUTHORIZED_EMPIRICAL_METHOD_ID,
+      });
+    }
+    const execution = this.engineeringModelStore.executeConfiguredAuthorized(
       this.masterDataController.getMasterData(),
     );
+    if (this.executionCoordinator) {
+      this.executionCoordinator.recordExecution({
+        executionId: execution.executionId || runtimePackage.executionId,
+        executedAt: execution.executedAt || runtimePackage.executedAt,
+        authorizationId: runtimePackage.packageId,
+        implementationId: AUTHORIZED_EMPIRICAL_METHOD_ID,
+        engineExecutionSemanticHash: execution.semanticHash,
+        resultSemanticHash: execution.distribution?.semanticHash || null,
+        status: execution.distribution?.status || execution.status || 'UNKNOWN',
+      });
+    }
+    return execution;
   }
 
   refreshEmpirical() {
+    if (this.commonInputStore) {
+      const commonState = this.commonInputStore.getSnapshot();
+      if (!commonState.commonInput || commonState.staleness?.stale !== false) {
+        return this.engineeringModelStore.markEmpiricalStale('COMMON_INPUT_STALE');
+      }
+      const runtimePackage = this.engineeringModelStore.getAuthorizedEmpiricalPackage?.() || null;
+      if (runtimePackage) {
+        try {
+          this.executionCoordinator.requireCurrentAuthorization({
+            authorizationId: runtimePackage.packageId,
+            implementationId: AUTHORIZED_EMPIRICAL_METHOD_ID,
+          });
+        } catch {
+          return this.engineeringModelStore.markEmpiricalStale('COMMON_INPUT_AUTHORIZATION_STALE');
+        }
+      }
+    }
     return this.engineeringModelStore.refreshAuthorizedEmpiricalPackage(
       this.masterDataController.getMasterData(),
     );
@@ -105,10 +164,14 @@ export class AuthorizedEnrichmentConsumerController {
       fail('Unsupported authorized stagedJson consumer request.',
         'AUTHORIZED_ENRICHMENT_SCHEMA_INVALID');
     }
+    const [writer, downloader] = await Promise.all([
+      import('./authorized-staged-json-writer.js'),
+      import('./authorized-staged-json-download.js'),
+    ]);
     const operationId = identity(input.operationId, 'operationId');
     const sidecar = requireAuthorizedStagedJsonSidecar(input.sidecar);
-    const writeArtifact = await writeAuthorizedStagedJson({
-      schema: AUTHORIZED_STAGED_JSON_WRITE_REQUEST_SCHEMA,
+    const writeArtifact = await writer.writeAuthorizedStagedJson({
+      schema: writer.AUTHORIZED_STAGED_JSON_WRITE_REQUEST_SCHEMA,
       writeId: identity(input.writeId, 'writeId'),
       writtenAt: timestamp(input.writtenAt, 'writtenAt'),
       source: input.source,
@@ -117,9 +180,9 @@ export class AuthorizedEnrichmentConsumerController {
       formatting: input.formatting,
       outputFileName: input.outputFileName,
     });
-    const downloadArtifact = await createAuthorizedStagedJsonDownloadArtifact(writeArtifact);
-    const downloadReceipt = await triggerAuthorizedStagedJsonDownload({
-      schema: AUTHORIZED_STAGED_JSON_DOWNLOAD_REQUEST_SCHEMA,
+    const downloadArtifact = await downloader.createAuthorizedStagedJsonDownloadArtifact(writeArtifact);
+    const downloadReceipt = await downloader.triggerAuthorizedStagedJsonDownload({
+      schema: downloader.AUTHORIZED_STAGED_JSON_DOWNLOAD_REQUEST_SCHEMA,
       downloadId: identity(input.downloadId, 'downloadId'),
       triggeredAt: timestamp(input.triggeredAt, 'triggeredAt'),
       artifact: downloadArtifact,

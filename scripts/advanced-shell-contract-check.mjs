@@ -60,22 +60,30 @@ for (const forbidden of [
 
 const loadCalcViewSource = await readFile(path.join(root, 'src/workspace/load-calc-consumer-view.js'), 'utf8');
 const loadCalcTabs = [...loadCalcViewSource.matchAll(/tab\('([^']+)'/g)].map((match) => match[1]);
-const empiricalTabs = [
+const expectedLoadCalcTabs = [
   'overview',
   '3d',
+  'preflight',
+  'project-data',
+  'masters',
+  'enrichment',
+  'method-basis',
+  'seal-export',
   'restraints',
   'load-cases',
   'methods',
   'results',
   'evidence',
+  'loads',
+  'json-trace',
 ];
-const legacyTabs = ['loads', 'preflight', 'project-data', 'masters', 'json-trace'];
-assert.deepEqual(loadCalcTabs, [...empiricalTabs, ...legacyTabs]);
-assert.deepEqual(
-  loadCalcTabs.filter((tab) => legacyTabs.includes(tab)),
-  legacyTabs,
-  'The existing Load Calc tabs must remain present in their prior order.',
-);
+assert.deepEqual(loadCalcTabs, expectedLoadCalcTabs);
+for (const requiredTab of ['overview', '3d', 'restraints', 'load-cases', 'methods', 'results', 'evidence', 'loads', 'preflight', 'project-data', 'masters', 'json-trace']) {
+  assert.equal(loadCalcTabs.includes(requiredTab), true, `Load Calc must retain ${requiredTab}.`);
+}
+for (const governedTab of ['enrichment', 'method-basis', 'seal-export']) {
+  assert.equal(loadCalcTabs.includes(governedTab), true, `Load Calc must mount governed Non-FEA tab ${governedTab}.`);
+}
 assert.match(loadCalcViewSource, /Load Evaluation/u);
 assert.doesNotMatch(loadCalcViewSource, /Legacy Load Evaluation/u);
 assert.match(loadCalcViewSource, /Empirical scenario:/u);
@@ -86,6 +94,9 @@ for (const requiredView of [
   'empirical-preflight-view.js',
   'project-data/project-data-view.js',
   'master-data-ui.js',
+  'enrichment/non-fea-enrichment-view.js',
+  'non-fea-method-basis-view.js',
+  'non-fea-seal-export-view.js',
   'json-trace-ui.js',
   'topology-edit-3d-sjson-fidelity-controller.js',
 ]) {

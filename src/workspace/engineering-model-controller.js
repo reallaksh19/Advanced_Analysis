@@ -1,5 +1,6 @@
 import { EVENT_TOPICS } from './event-topics.js';
 import { engineeringModelStore } from './engineering-model-store.js';
+import { nonFeaCommonInputStore } from './non-fea-common-input-store.js';
 import { projectDataStore } from './project-data/project-data-store.js';
 import { authorizedEnrichmentConsumerController } from './enrichment/authorized-enrichment-runtime.js';
 
@@ -51,6 +52,7 @@ export class EngineeringModelController {
     const dataset = snapshot?.status === 'ready' ? snapshot.dataset : null;
     if (!dataset) {
       engineeringModelStore.deactivate('NO_ACTIVE_DATASET');
+      nonFeaCommonInputStore.markStale('NO_ACTIVE_DATASET', 'sourceDatasetSha256', 'The active dataset was cleared.');
       this.datasetId = '';
       this.datasetVersion = null;
       this.lastRebuiltDataset = null;
@@ -60,28 +62,57 @@ export class EngineeringModelController {
     let refreshRequired = false;
     if (distribution && distribution.datasetId !== dataset.datasetId) {
       engineeringModelStore.markEmpiricalStale('DATASET_REPLACED', dataset.version || null);
+      nonFeaCommonInputStore.markStale('DATASET_REPLACED', 'sourceDatasetSha256', 'A different dataset is active.');
       refreshRequired = true;
     } else if (distribution && distribution.datasetVersion !== (dataset.version || null)) {
       engineeringModelStore.markEmpiricalStale('DATASET_EDITED', dataset.version || null);
+      nonFeaCommonInputStore.markStale('DATASET_EDITED', 'sourceModelSemanticHash', 'The active dataset changed after sealing.');
       refreshRequired = true;
     }
     this.datasetId = dataset.datasetId;
     this.datasetVersion = dataset.version || null;
     if (dataset !== this.lastRebuiltDataset) {
-      engineeringModelStore.rebuild(dataset);
+      const previousDataset = this.lastRebuiltDataset;
       this.lastRebuiltDataset = dataset;
+      try {
+        engineeringModelStore.rebuild(dataset);
+      } catch (error) {
+        this.blockDerivedModels(error, dataset);
+        return;
+      }
+      if (previousDataset !== null) {
+        nonFeaCommonInputStore.markStale('DATASET_REBUILT', 'sourceModelSemanticHash', 'The governed dataset models were rebuilt.');
+      }
       refreshRequired = true;
     }
-    // A replacement object with unchanged governed bindings is not stale merely
-    // because its JavaScript identity changed. The authorized refresh performs
-    // the semantic binding comparison after the rebuilt models are available.
     if (refreshRequired) this.authorizedConsumerController.refreshEmpirical();
+  }
+
+  blockDerivedModels(error, dataset) {
+    engineeringModelStore.deactivate('ENGINEERING_MODELS_NOT_READY');
+    nonFeaCommonInputStore.markStale(
+      'ENGINEERING_MODELS_NOT_READY',
+      'sourceModelSemanticHash',
+      'Derived support-site or route evidence is not ready for the active dataset.',
+    );
+    this.authorizedConsumerController.refreshEmpirical();
+    this.eventBus.publish(ENGINEERING_MODEL_EVENTS.FAILED, {
+      message: error instanceof Error ? error.message : String(error),
+      code: error?.code || 'ENGINEERING_MODEL_REBUILD_BLOCKED',
+      datasetId: dataset?.datasetId || null,
+    });
   }
 
   handleProjectDataChanged() {
     const dataset = this.workspaceState.getSnapshot()?.dataset || null;
     engineeringModelStore.markEmpiricalStale('PROJECT_DATA_CHANGED', dataset?.version || null);
-    engineeringModelStore.rebuild(dataset);
+    nonFeaCommonInputStore.markStale('PROJECT_DATA_CHANGED', 'projectDataProfileSemanticHash', 'Project Data changed after sealing.');
+    try {
+      engineeringModelStore.rebuild(dataset);
+    } catch (error) {
+      this.blockDerivedModels(error, dataset);
+      return;
+    }
     this.authorizedConsumerController.refreshEmpirical();
     this.eventBus.publish(ENGINEERING_MODEL_EVENTS.CHANGED, { reason: 'project-data-changed' });
   }
@@ -89,6 +120,7 @@ export class EngineeringModelController {
   handleMasterDataChanged() {
     const dataset = this.workspaceState.getSnapshot()?.dataset || null;
     engineeringModelStore.markEmpiricalStale('MASTER_DATA_CHANGED', dataset?.version || null);
+    nonFeaCommonInputStore.markStale('MASTER_DATA_CHANGED', 'enrichmentSidecarSemanticHash', 'Master data changed after sealing.');
     this.authorizedConsumerController.refreshEmpirical();
     this.eventBus.publish(ENGINEERING_MODEL_EVENTS.CHANGED, { reason: 'master-data-changed' });
   }

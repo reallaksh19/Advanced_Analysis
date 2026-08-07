@@ -153,6 +153,40 @@ assert.notEqual(override.effectiveDirection, '');
 
 const eventBus = new FakeEventBus();
 const controllerStore = new EmpiricalLoadCalcScenarioStore(executor);
+const coordinatorCalls = {
+  prepareAuthorization: 0,
+  recordAuthorization: 0,
+  requireCurrentAuthorization: 0,
+  recordExecution: 0,
+};
+const isolatedCoordinator = {
+  prepareAuthorization(input) {
+    coordinatorCalls.prepareAuthorization += 1;
+    return Object.freeze({
+      receipt: Object.freeze({
+        authorizationId: input.authorizationId,
+        implementationId: input.implementationId,
+      }),
+    });
+  },
+  recordAuthorization(receipt) {
+    coordinatorCalls.recordAuthorization += 1;
+    return receipt;
+  },
+  requireCurrentAuthorization(input) {
+    coordinatorCalls.requireCurrentAuthorization += 1;
+    return Object.freeze({
+      receipt: Object.freeze({
+        authorizationId: input.authorizationId,
+        implementationId: input.implementationId,
+      }),
+    });
+  },
+  recordExecution(input) {
+    coordinatorCalls.recordExecution += 1;
+    return Object.freeze({ ...input });
+  },
+};
 const controller = new EmpiricalLoadCalcScenarioController(
   eventBus,
   () => ({
@@ -164,6 +198,7 @@ const controller = new EmpiricalLoadCalcScenarioController(
     sourceLoadPrimitiveSet: fixture.loadFoundation.loadPrimitiveSet,
   }),
   controllerStore,
+  isolatedCoordinator,
 );
 controller.init();
 const changed = [];
@@ -179,12 +214,16 @@ eventBus.publish(EMPIRICAL_LOAD_CALC_SCENARIO_EVENTS.AUTHORIZE_REQUESTED, {
 });
 assert.equal(controllerStore.getSnapshot().state, 'AUTHORIZED_CURRENT');
 assert.equal(executionCount, 1, 'authorize through controller must not execute');
+assert.equal(coordinatorCalls.prepareAuthorization, 1, 'controller authorization must prepare common-input binding');
+assert.equal(coordinatorCalls.recordAuthorization, 1, 'controller authorization must retain the prepared receipt');
 eventBus.publish(EMPIRICAL_LOAD_CALC_SCENARIO_EVENTS.CALCULATE_REQUESTED, {
   executionId: 'EXEC:CONTROLLER',
   executedAt: '2026-08-05T18:25:00.000Z',
 });
 assert.equal(executionCount, 2);
 assert.equal(controllerStore.getSnapshot().state, 'EXECUTED_CURRENT');
+assert(coordinatorCalls.requireCurrentAuthorization >= 2, 'refresh and execution must both revalidate current authorization');
+assert.equal(coordinatorCalls.recordExecution, 1, 'controller execution must retain the common-input-bound receipt');
 assert(changed.length >= 3);
 assert.equal(failures.length, 0);
 controller.destroy();
@@ -425,4 +464,3 @@ function fixtureSharedModel() {
     diagnostics: [],
   });
 }
-
