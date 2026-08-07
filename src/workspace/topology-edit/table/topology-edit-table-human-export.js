@@ -26,10 +26,7 @@ export function buildTopologyEditTableHumanExport(input = {}) {
       ['Canonical ID', 'Authority', 'Catalogue ID', 'Catalogue Version', 'Catalogue Hash', 'Source Hash', 'Record ID', 'Record Hash', 'Source Reference'],
       projection.rows.map(catalogueRow),
     ),
-    'Export Metadata': sheet(
-      ['Key', 'Value'],
-      metadataRows(authority, projection),
-    ),
+    'Export Metadata': sheet(['Key', 'Value'], metadataRows(authority, projection)),
   };
   const material = {
     schema: TOPOLOGY_EDIT_TABLE_HUMAN_EXPORT_SCHEMA,
@@ -63,7 +60,10 @@ function exportAuthority(input, projection) {
   if (!session || typeof session !== 'object') {
     throw new TypeError('TopologyEditTableHumanExport: sessionSnapshot is required.');
   }
-  const canonicalHash = session.activeCanonicalTopologyHash ?? session.currentCanonicalHash ?? null;
+  if (session.staleReason) {
+    throw new RangeError(`TopologyEditTableHumanExport: certified session is stale: ${session.staleReason}`);
+  }
+  const canonicalHash = session.activeCanonicalTopologyHash ?? null;
   if (!canonicalHash || canonicalHash !== projection.authority.canonicalTopologyHash) {
     throw new RangeError('TopologyEditTableHumanExport: projection is stale relative to certified canonical authority.');
   }
@@ -71,8 +71,12 @@ function exportAuthority(input, projection) {
     throw new RangeError('TopologyEditTableHumanExport: unapplied Table changes must be applied or discarded before export.');
   }
   const sourceHash = projection.authority.sourceHash ?? null;
-  if (session.sourceHash && sourceHash && session.sourceHash !== sourceHash) {
+  const base = session.baseAuthority ?? {};
+  if (base.sourceHash && sourceHash && base.sourceHash !== sourceHash) {
     throw new RangeError('TopologyEditTableHumanExport: source authority differs from the certified session.');
+  }
+  if (base.datasetId && projection.authority.datasetId && base.datasetId !== projection.authority.datasetId) {
+    throw new RangeError('TopologyEditTableHumanExport: dataset identity differs from the certified session.');
   }
   return deepFreeze({
     canonicalHash,
@@ -102,11 +106,7 @@ function connectionRows(row) {
   const bindings = row.identity.portBindings ?? [];
   if (bindings.length) {
     return bindings.map((binding) => [
-      row.identity.canonicalId,
-      row.elementType,
-      binding.portRole,
-      binding.portKey,
-      binding.nodeId,
+      row.identity.canonicalId, row.elementType, binding.portRole, binding.portKey, binding.nodeId,
     ].map(cellValue));
   }
   return (row.identity.nodeIds ?? []).map((nodeId) => [
@@ -124,30 +124,20 @@ function sourceRow(row) {
 function catalogueRow(row) {
   const catalogue = row.custody?.catalogue ?? {};
   return [
-    row.identity.canonicalId,
-    row.custody?.catalogueAuthority,
-    catalogue.catalogueId,
-    catalogue.catalogueVersion,
-    catalogue.catalogueHash,
-    catalogue.sourceHash,
-    catalogue.recordId,
-    catalogue.recordHash,
+    row.identity.canonicalId, row.custody?.catalogueAuthority, catalogue.catalogueId,
+    catalogue.catalogueVersion, catalogue.catalogueHash, catalogue.sourceHash,
+    catalogue.recordId, catalogue.recordHash,
     catalogue.sourceReference ? JSON.stringify(catalogue.sourceReference) : null,
   ].map(cellValue);
 }
 function metadataRows(authority, projection) {
   return [
     ['Schema', TOPOLOGY_EDIT_TABLE_HUMAN_EXPORT_SCHEMA],
-    ['Canonical Hash', authority.canonicalHash],
-    ['Projection Hash', authority.projectionHash],
-    ['Source Hash', authority.sourceHash],
-    ['Dataset ID', authority.datasetId],
-    ['Dataset Version', authority.datasetVersion],
-    ['Journal Hash', authority.journalHash],
-    ['Active Ledger Hash', authority.activeLedgerHash],
-    ['Session Version', authority.sessionVersion],
-    ['Row Count', projection.rows.length],
-    ['Ordering', 'DETERMINISTIC_CANONICAL_ROW_ID'],
+    ['Canonical Hash', authority.canonicalHash], ['Projection Hash', authority.projectionHash],
+    ['Source Hash', authority.sourceHash], ['Dataset ID', authority.datasetId],
+    ['Dataset Version', authority.datasetVersion], ['Journal Hash', authority.journalHash],
+    ['Active Ledger Hash', authority.activeLedgerHash], ['Session Version', authority.sessionVersion],
+    ['Row Count', projection.rows.length], ['Ordering', 'DETERMINISTIC_CANONICAL_ROW_ID'],
     ['Authority', 'CERTIFIED_CANONICAL_PROJECTION_ONLY'],
   ].map((row) => row.map(cellValue));
 }
