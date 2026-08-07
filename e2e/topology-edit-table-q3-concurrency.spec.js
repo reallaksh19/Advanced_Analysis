@@ -25,10 +25,6 @@ test.beforeEach(async ({ page }) => {
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 1720, height: 1080 });
   await page.addInitScript(() => globalThis.localStorage?.clear());
-  await page.route('**/fixtures/topology-edit-20-element-demo.staged.json', (route) => route.fulfill({
-    path: FIXTURE,
-    contentType: 'application/json',
-  }));
 });
 
 test('Q3 M04 M06 M10 completes one certified production Table transaction', async ({ page }) => {
@@ -106,7 +102,7 @@ async function openQ3(page) {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.getByRole('navigation', { name: 'Application views' })
     .getByRole('button', { name: 'Workspace', exact: true }).click();
-  await page.locator('[data-action="load-topology-edit-demo"]').click();
+  await page.locator('[data-role="dataset-file"]').setInputFiles(FIXTURE);
   await expect.poll(() => page.evaluate(() => (
     globalThis.AnalysisWorkspace?.getSnapshot?.()?.dataset?.entities?.length ?? 0
   ))).toBe(8);
