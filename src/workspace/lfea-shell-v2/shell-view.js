@@ -9,6 +9,7 @@ import { renderLfeaCommandBar } from './command-bar.js';
 import { renderLfeaDiagnosticsDrawer } from './diagnostics-drawer.js';
 import { renderLfeaInspector } from './inspector.js';
 import { renderLfeaPipelineStepper } from './pipeline-stepper.js';
+import { createLfeaResultsIdentity } from './results-view-model.js';
 import {
   captureRunTrace,
   createLfeaShellViewModel,
@@ -30,6 +31,7 @@ export class LfeaShellV2View {
       collectionPath: LFEA_COLLECTION_PATHS[0],
       selectedIndex: -1,
       sourceOpen: true,
+      results: defaultResultsUiState(),
     };
   }
 
@@ -125,6 +127,36 @@ export class LfeaShellV2View {
         this.uiState.selectedIndex = index;
         this.render(this.lastState);
       },
+      onResultsView: (viewId) => {
+        this.uiState.results = { ...defaultResultsUiState(), viewId };
+        this.render(this.lastState);
+      },
+      onResultsQuery: (query) => {
+        this.uiState.results.query = query;
+        this.uiState.results.page = 0;
+        this.render(this.lastState);
+      },
+      onResultsSortKey: (sortKey) => {
+        this.uiState.results.sortKey = sortKey;
+        this.uiState.results.page = 0;
+        this.render(this.lastState);
+      },
+      onResultsSortDirection: (sortDirection) => {
+        this.uiState.results.sortDirection = sortDirection;
+        this.uiState.results.page = 0;
+        this.render(this.lastState);
+      },
+      onResultsPage: (page) => {
+        this.uiState.results.page = Math.max(0, page);
+        this.render(this.lastState);
+      },
+      onResultsReset: () => {
+        this.uiState.results = {
+          ...defaultResultsUiState(),
+          viewId: this.uiState.results.viewId,
+        };
+        this.render(this.lastState);
+      },
     };
   }
 
@@ -137,6 +169,13 @@ export class LfeaShellV2View {
       this.runTrace = null;
       this.uiState.selectedIndex = -1;
     }
+    const previousResultsIdentity = this.lastState
+      ? createLfeaResultsIdentity(this.lastState)
+      : null;
+    const currentResultsIdentity = createLfeaResultsIdentity(state);
+    if (previousResultsIdentity !== null && previousResultsIdentity !== currentResultsIdentity) {
+      this.uiState.results = defaultResultsUiState();
+    }
     this.runTrace = captureRunTrace(state, this.runTrace);
   }
 
@@ -148,6 +187,16 @@ export class LfeaShellV2View {
     this.lastState = null;
     this.runTrace = null;
   }
+}
+
+function defaultResultsUiState() {
+  return {
+    viewId: 'OVERVIEW',
+    query: '',
+    sortKey: '',
+    sortDirection: 'asc',
+    page: 0,
+  };
 }
 
 function legacyReviewSummary(root, execution) {
