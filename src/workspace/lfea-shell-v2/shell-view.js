@@ -114,6 +114,8 @@ export class LfeaShellV2View {
   inspectorHandlers() {
     return {
       ...this.handlers,
+      getCurrentState: () => this.lastState,
+      onDraftStale: () => this.render(this.lastState),
       onCollectionPath: (path) => {
         this.uiState.collectionPath = path;
         this.uiState.selectedIndex = -1;

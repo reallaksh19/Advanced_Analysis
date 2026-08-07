@@ -1,14 +1,44 @@
 import { expect, test } from '@playwright/test';
-import { rectangularQ4Package } from '../scripts/lfea-005-fixtures.mjs';
+import {
+  pressure,
+  rectangularQ4Package,
+  resealPackage,
+  traction,
+} from '../scripts/lfea-005-fixtures.mjs';
 
-async function importFixture(workbench) {
-  const packageValue = rectangularQ4Package({});
+const EDITOR_PATHS = [
+  'nodes',
+  'elements',
+  'materials',
+  'regions',
+  'boundaries',
+  'points',
+  'analysisDefinition.materialAssignments',
+  'analysisDefinition.thicknessAssignments',
+  'analysisDefinition.loadCase.pointForces',
+  'analysisDefinition.loadCase.boundaryTractions',
+  'analysisDefinition.loadCase.boundaryPressures',
+  'analysisDefinition.constraints',
+];
+
+async function importFixture(workbench, packageValue = rectangularQ4Package({})) {
   await workbench.locator('[data-role="lfea-import"]').setInputFiles({
     name: 'lfea-shell-v2-q4.json',
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(packageValue)),
   });
   return packageValue;
+}
+
+function editorCoveragePackage() {
+  const value = structuredClone(rectangularQ4Package({}));
+  value.analysisDefinition.loadCase.boundaryTractions = [
+    traction('T_UI2', 'B_RIGHT', 1.5, -0.25),
+  ];
+  value.analysisDefinition.loadCase.boundaryPressures = [
+    pressure('P_UI2', 'B_TOP', 2.25),
+  ];
+  return resealPackage(value);
 }
 
 function captureBrowserErrors(page) {
@@ -83,4 +113,60 @@ test('standalone LFEA entry mounts the same controller/store workbench', async (
   await expect(workbench.locator('.lfea-workbench__status')).toHaveText('QUALIFIED');
   await expect(workbench.locator('[data-role="lfea-export-evidence"]')).toBeEnabled();
   await expect(workbench.locator('.lfea-shell-v2__pipeline-step[data-state="COMPLETE"]')).toHaveCount(7);
+});
+
+test('UI-2 structured editors round-trip every existing editable collection without semantic drift', async ({ page }) => {
+  const workbench = await openStandaloneShell(page);
+  await importFixture(workbench, editorCoveragePackage());
+
+  for (const path of EDITOR_PATHS) {
+    await workbench.locator('[data-role="lfea-collection-path"]').selectOption(path);
+    const rows = workbench.locator('.lfea-workbench__table tr[role="row"]');
+    expect(await rows.count(), `${path} fixture coverage`).toBeGreaterThan(0);
+    await rows.first().click();
+
+    const before = await page.evaluate(() => globalThis.LfeaStandalone.getState());
+    await expect(workbench.locator('[data-role="lfea-structured-record-editor"]')).toBeVisible();
+    await expect(workbench.locator('[data-role="lfea-record-json"]')).toHaveCount(0);
+    await workbench.getByRole('button', { name: 'Apply changes' }).click();
+    const after = await page.evaluate(() => globalThis.LfeaStandalone.getState());
+
+    expect(after.packageValue.semanticHash, path).toBe(before.packageValue.semanticHash);
+    expect(after.modelVersion, path).toBe(before.modelVersion + 1);
+    expect(after.execution, path).toBeNull();
+  }
+});
+
+test('UI-2 invalid structured material edit fails closed without mutating the package', async ({ page }) => {
+  const workbench = await openStandaloneShell(page);
+  await importFixture(workbench);
+  await workbench.locator('[data-role="lfea-collection-path"]').selectOption('materials');
+  await workbench.locator('.lfea-workbench__table tr[role="row"]').first().click();
+
+  const before = await page.evaluate(() => globalThis.LfeaStandalone.getState());
+  await workbench.locator('[data-field="nu"]').fill('0.75');
+  await workbench.getByRole('button', { name: 'Apply changes' }).click();
+  const after = await page.evaluate(() => globalThis.LfeaStandalone.getState());
+
+  expect(after.packageValue.semanticHash).toBe(before.packageValue.semanticHash);
+  expect(after.modelVersion).toBe(before.modelVersion);
+  expect(after.diagnostics.length).toBeGreaterThan(0);
+});
+
+test('UI-2 stale detached editor cannot overwrite a newer package identity', async ({ page }) => {
+  const workbench = await openStandaloneShell(page);
+  const original = await importFixture(workbench);
+  await workbench.locator('[data-role="lfea-collection-path"]').selectOption('nodes');
+  await workbench.locator('.lfea-workbench__table tr[role="row"]').first().click();
+  const staleApply = await workbench.getByRole('button', { name: 'Apply changes' }).elementHandle();
+
+  const newer = structuredClone(original);
+  newer.nodes[0].x += 0.25;
+  const resealed = resealPackage(newer);
+  await page.evaluate((value) => globalThis.LfeaStandalone.importDocument(value), resealed);
+  await staleApply.evaluate((button) => button.click());
+
+  const after = await page.evaluate(() => globalThis.LfeaStandalone.getState());
+  expect(after.packageValue.semanticHash).toBe(resealed.semanticHash);
+  expect(after.packageValue.nodes[0].x).toBe(resealed.nodes[0].x);
 });

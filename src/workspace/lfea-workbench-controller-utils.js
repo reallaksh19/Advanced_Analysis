@@ -1,13 +1,14 @@
 import { FEA_BENCHMARK_STYLES } from './fea-benchmark-styles.js';
 import { lfeaTokenStyles } from './design-tokens/lfea-tokens.js';
 import { LFEA_SHELL_V2_STYLES } from './lfea-shell-v2/styles.js';
+import { LFEA_STRUCTURED_EDITOR_STYLES } from './lfea-shell-v2/structured-editor-styles.js';
 import { LFEA_WORKBENCH_STYLES } from './lfea-workbench-styles.js';
 
 export function installLfeaWorkbenchStyles(documentRef) {
   if (!documentRef || documentRef.querySelector('[data-lfea-workbench-styles]')) return;
   const style = documentRef.createElement('style');
   style.dataset.lfeaWorkbenchStyles = 'true';
-  style.textContent = `${lfeaTokenStyles()}\n${LFEA_WORKBENCH_STYLES}\n${LFEA_SHELL_V2_STYLES}\n${FEA_BENCHMARK_STYLES}`;
+  style.textContent = `${lfeaTokenStyles()}\n${LFEA_WORKBENCH_STYLES}\n${LFEA_SHELL_V2_STYLES}\n${LFEA_STRUCTURED_EDITOR_STYLES}\n${FEA_BENCHMARK_STYLES}`;
   documentRef.head?.append(style);
 }
 

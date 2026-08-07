@@ -3,10 +3,10 @@ import { qualityEvidenceRows } from '../lfea-quality-adapter.js';
 import { lfeaRecordTable, lfeaResultTable } from '../lfea-workbench-tables.js';
 import {
   valueAtPath,
-  workbenchButton,
   workbenchElement,
   workbenchJsonBlock,
 } from '../workbench-dom.js';
+import { renderLfeaStructuredEditor } from './structured-editor.js';
 
 export function renderLfeaInspector(root, state, uiState, handlers) {
   const panel = workbenchElement(root, 'aside', 'lfea-shell-v2__inspector');
@@ -65,32 +65,17 @@ function recordInspector(root, state, uiState, handlers) {
 
   const rows = valueAtPath(state.packageValue, uiState.collectionPath);
   const table = lfeaRecordTable(root, rows, uiState.selectedIndex, handlers.onRecordSelect);
-  const textarea = workbenchElement(root, 'textarea');
-  textarea.dataset.role = 'lfea-record-json';
-  textarea.spellcheck = false;
-  textarea.value = uiState.selectedIndex >= 0
-    ? JSON.stringify(rows[uiState.selectedIndex], null, 2)
-    : '{}';
-
-  const actions = workbenchElement(root, 'div', 'lfea-workbench__record-actions');
-  const add = workbenchButton(root, 'Add record', () =>
-    handlers.onAddRecord(uiState.collectionPath, textarea.value));
-  const update = workbenchButton(root, 'Update record', () =>
-    handlers.onUpdateRecord(uiState.collectionPath, uiState.selectedIndex, textarea.value));
-  update.disabled = uiState.selectedIndex < 0;
-  const remove = workbenchButton(root, 'Delete record', () => {
-    handlers.onDeleteRecord(uiState.collectionPath, uiState.selectedIndex);
-    handlers.onRecordSelect(-1);
-  });
-  remove.disabled = uiState.selectedIndex < 0;
-  actions.append(add, update, remove);
-
   wrapper.append(
     workbenchElement(root, 'label', 'lfea-shell-v2__control-label', 'Collection '),
     select,
     table,
-    textarea,
-    actions,
+    renderLfeaStructuredEditor(
+      root,
+      state,
+      uiState.collectionPath,
+      uiState.selectedIndex,
+      handlers,
+    ),
   );
   return wrapper;
 }
