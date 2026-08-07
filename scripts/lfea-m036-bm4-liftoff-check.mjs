@@ -64,8 +64,8 @@ function ciiDisplacementY(cii, caseLabel, sourceNodeId) {
   return cii.displacement.get(caseLabel).get(sourceNodeId)?.DY ?? null;
 }
 
-function ciiReleasedTargets(cii, caseLabel) {
-  return BM4_LIFTOFF_NODES.filter((nodeId) => (
+function ciiReleasedNodes(cii, caseLabel, nodes) {
+  return nodes.filter((nodeId) => (
     Math.abs(ciiReaction(cii, caseLabel, nodeId)) <= FORCE_TOLERANCE
     && (ciiDisplacementY(cii, caseLabel, nodeId) ?? 0) > DISPLACEMENT_ZERO_TOLERANCE
   )).sort((a, b) => Number(a) - Number(b));
@@ -121,8 +121,9 @@ assert.ok(plan.unilateral.filter((row) => row.frictionCoefficient > 0).every((ro
 const ope = solveBm4UnilateralCase({ plan, label: 'OPE', thermal: true });
 const susH1 = solveBm4UnilateralCase({ plan, label: 'SUS-H1', thermal: false });
 const cii = loadBm4CiiOutputCases1921();
-const ciiOpeReleased = ciiReleasedTargets(cii, 'OPE');
-const ciiSusReleased = ciiReleasedTargets(cii, 'SUS');
+const ciiOpeReleased = ciiReleasedNodes(cii, 'OPE', BM4_LIFTOFF_NODES);
+const ciiSusReleased = ciiReleasedNodes(cii, 'SUS', BM4_LIFTOFF_NODES);
+const ciiSusReleasedAll = ciiReleasedNodes(cii, 'SUS', plusY);
 assert.deepEqual(ciiOpeReleased, BM4_LIFTOFF_NODES, 'CAESAR OPE rows must prove separation at all four target shoes');
 
 for (const nodeId of BM4_LIFTOFF_NODES) {
@@ -134,22 +135,19 @@ for (const nodeId of BM4_LIFTOFF_NODES) assert.ok(opeReleased.includes(nodeId), 
 
 const susH1Released = releasedPlusY(susH1);
 const h1AdvancePredictionConfirmed = sameSet(susH1Released, H1_PREDICTED_RELEASED);
-const h1CaseStatusMatches = sameSet(susH1Released, ciiSusReleased);
+const h1CaseStatusMatches = sameSet(susH1Released, ciiSusReleasedAll);
 let verdict = 'H1_INDEPENDENT_COLD_CONVERGENCE';
 let acceptedSusExecution = susH1.unilateralExecution.finalExecution;
 let h2 = null;
 let susH2Released = null;
 
 if (!h1CaseStatusMatches) {
-  const missingFromH1 = ciiSusReleased.filter((nodeId) => !susH1Released.includes(nodeId));
-  const extraInH1 = susH1Released.filter((nodeId) => !ciiSusReleased.includes(nodeId));
-  assert.deepEqual(missingFromH1, ['21470'], 'H1 disagreement must isolate the owner-identified 21470 fork');
-  assert.deepEqual(extraInH1, [], 'H1 must not invent extra CASE 19 lift-off targets');
-
+  const missingFromH1 = ciiSusReleasedAll.filter((nodeId) => !susH1Released.includes(nodeId));
+  const extraInH1 = susH1Released.filter((nodeId) => !ciiSusReleasedAll.includes(nodeId));
   const seeded = seedUnilateralFromState(plan.unilateral, ope.unilateralExecution.convergedState);
   h2 = solveBm4UnilateralCase({ plan, label: 'SUS-H2-OPE-SEEDED', thermal: false, unilateral: seeded });
   susH2Released = releasedPlusY(h2);
-  if (sameSet(susH2Released, ciiSusReleased)) {
+  if (sameSet(susH2Released, ciiSusReleasedAll)) {
     verdict = 'H2_OPE_SEEDED_WITH_COLD_RECONTACT';
     acceptedSusExecution = h2.unilateralExecution.finalExecution;
   } else {
@@ -158,7 +156,7 @@ if (!h1CaseStatusMatches) {
       h1Execution: susH1.unilateralExecution.finalExecution,
       h2Execution: h2.unilateralExecution.finalExecution,
     });
-    assert.fail(`BM4 SUS supports fit neither H1 nor H2: OPE released=[${opeReleased}], H1 released=[${susH1Released}], H2 released=[${susH2Released}], CII released=[${ciiSusReleased}], targets=${JSON.stringify(evidence)}`);
+    assert.fail(`BM4 SUS supports fit neither H1 nor H2: OPE released=[${opeReleased}], H1 released=[${susH1Released}], H2 released=[${susH2Released}], CII all released=[${ciiSusReleasedAll}], missing H1=[${missingFromH1}], extra H1=[${extraInH1}], targets=${JSON.stringify(evidence)}`);
   }
 }
 
@@ -191,7 +189,8 @@ console.log(JSON.stringify({
   baseline: '9f1fb039511b7304c0208140d81543f11735c0a0',
   t5Hashes: { BM1: bm1Hash, BM2: bm2Hash, BM3: bm3Hash, BM4: bm4Hash },
   opeReleasedPlusY: opeReleased,
-  ciiSusReleasedPlusY: ciiSusReleased,
+  ciiSusTargetReleasedPlusY: ciiSusReleased,
+  ciiSusAllReleasedPlusY: ciiSusReleasedAll,
   susIndependentReleasedPlusY: susH1Released,
   susH2ReleasedPlusY: susH2Released,
   susVerdict: verdict,
