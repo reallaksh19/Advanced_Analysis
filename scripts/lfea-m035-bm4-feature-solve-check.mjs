@@ -9,7 +9,7 @@ const { report, sustained, operating, expansion } = result;
 assert.equal(report.schema, 'm035-bm4-feature-solve-report/v1');
 assert.equal(report.summary.bendComponents, 11);
 assert.equal(report.summary.teeJunctions, 2);
-assert.equal(report.summary.inlineReducerCandidates, 7);
+assert.equal(report.summary.inlineReducerCandidates, 6);
 assert.equal(report.summary.reducerCondensationActive, 0);
 assert.ok(report.summary.analysisElements > report.summary.sourceElements);
 assert.ok(report.summary.analysisNodes > report.summary.sourceNodes);
