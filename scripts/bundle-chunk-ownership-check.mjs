@@ -19,6 +19,8 @@ const expectedOwnership = new Map([
   ['/repo/src/core/support-engineering/index.js', 'core-support-engineering'],
   ['/repo/src/workspace/topology-edit/topology-edit-inline-component-replacement.js', 'topology-edit-engineering-commands'],
   ['/repo/src/workspace/topology-edit/topology-edit-stagedjson-engineering-source.js', 'topology-edit-stagedjson-source-engineering'],
+  ['/repo/src/workspace/topology-edit/topology-edit-pipe-segment-contract.js', 'topology-edit-native-pipe-authority'],
+  ['/repo/src/workspace/topology-edit/topology-edit-native-pipe-writeback.js', 'topology-edit-native-pipe-authority'],
 ]);
 
 const automaticWorkspaceOwnership = [
@@ -57,7 +59,7 @@ assert.equal(viteSource.includes('chunkSizeWarningLimit'), false);
 assert.equal(policySource.includes('const targetBytes = 500 * 1024;'), true);
 assert.equal(policySource.includes('const maximumBytes = 1024 * 1024;'), true);
 assert.equal(policySource.includes('chunk.bytes <= maximumBytes'), true);
-assert.equal(new Set(expectedOwnership.values()).size >= 8, true);
+assert.equal(new Set(expectedOwnership.values()).size >= 9, true);
 
 console.log(JSON.stringify({
   check: 'bundle-chunk-ownership',
