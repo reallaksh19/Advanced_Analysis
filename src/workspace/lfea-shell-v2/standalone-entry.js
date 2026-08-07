@@ -1,9 +1,9 @@
-import { mountLfeaWorkbench } from '../lfea-workbench.js';
+import { LfeaWorkbenchController } from '../lfea-workbench-controller.js';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Standalone LFEA root #root was not found.');
 
-const controller = mountLfeaWorkbench(root, undefined);
+const controller = new LfeaWorkbenchController(root, undefined).init();
 
 globalThis.LfeaStandalone = Object.freeze({
   getState: () => controller.getState(),
