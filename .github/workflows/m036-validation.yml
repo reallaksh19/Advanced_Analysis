@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - m036-r2-unilateral-contact
+  pull_request:
+    branches:
+      - claude/lfea-linear-static-fea-unfwjd
   workflow_dispatch:
 
 jobs:
