@@ -14,7 +14,7 @@ const extraModules = [
   path.join(ROOT, 'scripts', 'lfea-shell-v2-store-fidelity-check.mjs'),
   path.join(ROOT, 'scripts', 'lfea-shell-v2-baseline-hash-check.mjs'),
   path.join(ROOT, 'e2e', 'lfea-shell-v2.spec.js'),
-  path.join(ROOT, 'e2e', 'fixtures', 'ui1-linear-piping-run-analysis-stub.js'),
+  path.join(ROOT, 'e2e', 'fixtures', 'ui1-embedded-shell-entry.js'),
   path.join(ROOT, 'vite.lfea.config.js'),
   path.join(ROOT, 'vite.lfea-ui1-test.config.js'),
   path.join(ROOT, 'playwright.lfea-ui1.config.js'),
@@ -69,15 +69,16 @@ const html = source('lfea.html');
 assert.match(html, /lfea-shell-v2\/standalone-entry\.js/u);
 
 const testVite = source('vite.lfea-ui1-test.config.js');
-assert.match(testVite, /ui1-isolate-inherited-piping-runner-defect/u);
-assert.match(testVite, /ui1-linear-piping-run-analysis-stub\.js/u);
-const testStub = source('e2e/fixtures/ui1-linear-piping-run-analysis-stub.js');
-assert.match(testStub, /UI1_TEST_PIPING_RUN_ANALYSIS_DISABLED/u);
-assert.match(testStub, /throw disabledError\(\)/u);
+assert.match(testVite, /ui1-embedded-layout-harness/u);
+assert.match(testVite, /ui1-embedded-shell-entry\.js/u);
+const embeddedHarness = source('e2e/fixtures/ui1-embedded-shell-entry.js');
+assert.match(embeddedHarness, /renderWorkspaceLayout/u);
+assert.match(embeddedHarness, /LfeaWorkbenchController/u);
+assert.match(embeddedHarness, /data-application-view=\\"LFEA\\"/u);
 assert.doesNotMatch(
-  `${standalone}\n${controller}`,
-  /ui1-linear-piping-run-analysis-stub/u,
-  'Test-only piping stub must never enter production LFEA modules.',
+  embeddedHarness,
+  /linear-piping-run-analysis|src\/core\//u,
+  'Embedded UI-1 browser harness must use only the real layout/controller boundary.',
 );
 
 const navigator = source('src/workspace/lfea-shell-v2/analysis-navigator.js');
@@ -112,7 +113,7 @@ console.log(JSON.stringify({
   standaloneEntry: true,
   standaloneProductionBuildConfig: true,
   embeddedEntryRetained: true,
-  browserHarnessPipingStub: 'TEST_ONLY_FAIL_FAST',
+  browserHarness: 'REAL_WORKSPACE_LAYOUT_AND_LFEA_CONTROLLER',
   enrichedSjsonPipingAdapter: false,
 }));
 
