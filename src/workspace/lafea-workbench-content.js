@@ -8,6 +8,7 @@ import { buildLafeaDiscretizationViewModel } from './lafea-discretization-view-m
 import { renderLafeaDiscretizationPanel } from './lafea-discretization-panel.js';
 import { buildLafeaGuidedWorkflow } from './lafea-guided-workflow.js';
 import { renderLafeaGuidedWorkflow } from './lafea-guided-workflow-view.js';
+import { renderLafeaNcPlaceholderPanel } from './lafea-nc-placeholder-panel.js';
 import { focusLafeaRetainedMeshElement } from './lafea-canvas/retained-mesh-overlay.js';
 
 export function renderLafeaWorkbenchContent(root, state, stage, options) {
@@ -120,6 +121,9 @@ export function renderLafeaWorkbenchContent(root, state, stage, options) {
     stage,
   ));
 
+  const ncCard = card(root, 'NC governance — evidence placeholders');
+  ncCard.body.append(renderLafeaNcPlaceholderPanel(ncCard.body));
+
   main.append(
     sourceCard.section,
     viewportCard.section,
@@ -127,6 +131,7 @@ export function renderLafeaWorkbenchContent(root, state, stage, options) {
     preflightCard.section,
     evidenceCard.section,
     lifecycleCard.section,
+    ncCard.section,
   );
 
   if (options.benchmarkHost) {
