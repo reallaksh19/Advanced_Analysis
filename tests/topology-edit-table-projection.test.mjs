@@ -146,6 +146,19 @@ test('reducer projection does not fabricate a missing secondary size', () => {
   assert.equal(row.fields.catalogueAuthority, 'UNRESOLVED');
 });
 
+test('partial catalogue provenance remains unresolved', () => {
+  const { topology, dataset, graph } = fixture();
+  const raw = structuredClone(topology);
+  delete raw.canonicalTopologyHash;
+  const reducer = raw.edges.find((row) => row.id === 'edge:reducer-1');
+  delete reducer.catalogueBinding.sourceHash;
+  const nextTopology = finalizeCanonicalTopology(raw);
+  const projection = buildTopologyEditTableProjection({ canonicalTopology: nextTopology, dataset, topologyGraph: graph });
+  const row = projection.rows.find((candidate) => candidate.identity.canonicalId === 'edge:reducer-1');
+  assert.equal(row.fields.catalogueAuthority, 'UNRESOLVED');
+  assert.equal(row.custody.catalogue, null);
+});
+
 test('identity index resolves only exact canonical/source/port identities', () => {
   const { topology, dataset, graph } = fixture();
   const projection = buildTopologyEditTableProjection({ canonicalTopology: topology, dataset, topologyGraph: graph });
