@@ -1,11 +1,17 @@
 import { discretiseBend, FRAME_LOCAL_AXIS_PROFILE } from '../centerline-beam-fea/index.js';
 import { resolveBendArcCentre } from '../geometry/adapters/inputxml-bend-arc.js';
-import { calculateB31FactorsFromCanonicalGeometry } from '../linear-fea-b31-factor-calculator/index.js';
-import { compilePipingComponent } from '../linear-fea-piping-components/index.js';
+import {
+  COMPONENT_GEOMETRY_SCHEMA,
+  FACTOR_CALCULATION_REQUEST_SCHEMA,
+  calculateB31Factors,
+} from '../linear-fea-b31-factor-calculator/index.js';
 import { requireFrameElementProfile } from '../linear-fea-frame-element/index.js';
 import { requireMaterialResolutionResult } from '../linear-fea-material/index.js';
+import {
+  compilePipingComponent,
+  requirePipingComponentProfile,
+} from '../linear-fea-piping-components/index.js';
 import { requirePipeSectionResolution } from '../linear-fea-section/index.js';
-import { requirePipingComponentProfile } from '../linear-fea-piping-components/index.js';
 import { semanticHash } from '../shared-piping-model/canonical-json.js';
 
 const POSITION_TOLERANCE = 1e-10;
@@ -13,13 +19,14 @@ const POSITION_TOLERANCE = 1e-10;
 /**
  * Expand canonical InputXML bend tags into real tangent-to-tangent arc geometry
  * and B-3.2 bend components. This is model-agnostic: the caller supplies the
- * code-edition profile and the qualified B-3.1/B-3.2 profiles; no benchmark or
- * node identity is embedded here.
+ * code-edition profile, smooth-90 policy and qualified B-3.1/B-3.2 profiles;
+ * no benchmark or node identity is embedded here.
  */
 export function compileInputXmlBendFeatureExpansion({
   canonicalGeometry,
   editionProfileId,
   momentDirectionMapping,
+  smooth90FlexibilityCorrection,
   materialBySegmentId,
   sectionBySegmentId,
   frameElementProfile,
@@ -28,6 +35,9 @@ export function compileInputXmlBendFeatureExpansion({
   segmentIds = null,
 }) {
   requireCanonicalGeometry(canonicalGeometry);
+  if (typeof smooth90FlexibilityCorrection !== 'boolean') {
+    throw new TypeError('smooth90FlexibilityCorrection must be explicitly declared true or false.');
+  }
   const frameProfile = requireFrameElementProfile(frameElementProfile);
   const componentProfile = requirePipingComponentProfile(pipingComponentProfile);
   requireMap(materialBySegmentId, 'materialBySegmentId');
@@ -44,30 +54,25 @@ export function compileInputXmlBendFeatureExpansion({
     }
   }
   if (bends.length === 0) {
-    return Object.freeze({
+    const draft = {
       schema: 'fea-inputxml-bend-feature-expansion/v1',
       sourceGeometrySemanticHash: semanticHash(geometryProjection(canonicalGeometry)),
       analysisGeometry: canonicalGeometry,
       components: Object.freeze([]),
       definitions: Object.freeze([]),
       sourceToAnalysisSegmentIds: Object.freeze({}),
-      semanticHash: semanticHash({ bendCount: 0, geometry: geometryProjection(canonicalGeometry) }),
-    });
+    };
+    return Object.freeze({ ...draft, semanticHash: semanticHash(draft) });
   }
 
-  const factorResults = calculateB31FactorsFromCanonicalGeometry({
-    canonicalGeometry,
-    editionProfileId,
-    momentDirectionMapping,
-    segmentIds: bends.map((row) => row.id),
-  });
-  const factorBySegment = new Map(factorResults.map((row) => [String(row.componentId), row]));
   const sourceNodes = new Map(canonicalGeometry.nodes.map((node) => [String(node.id), node]));
   const definitions = bends.map((segment) => compileDefinition({
     canonicalGeometry,
     segment,
     sourceNodes,
-    factorResult: factorBySegment.get(String(segment.id)),
+    editionProfileId,
+    momentDirectionMapping,
+    smooth90FlexibilityCorrection,
     material: requireAuthority(materialBySegmentId, segment.id, requireMaterialResolutionResult, 'material'),
     section: requireAuthority(sectionBySegmentId, segment.id, requirePipeSectionResolution, 'section'),
     frameProfile,
@@ -105,16 +110,15 @@ function compileDefinition({
   canonicalGeometry,
   segment,
   sourceNodes,
-  factorResult,
+  editionProfileId,
+  momentDirectionMapping,
+  smooth90FlexibilityCorrection,
   material,
   section,
   frameProfile,
   componentProfile,
   localAxisProfile,
 }) {
-  if (!factorResult || factorResult.status !== 'QUALIFIED' || !factorResult.componentFactorSet) {
-    fail('INPUTXML_BEND_EXPANSION_FACTOR_NOT_QUALIFIED', `Bend ${segment.id} has no qualified component flexibility factor.`);
-  }
   const outgoing = canonicalGeometry.segments.filter((candidate) =>
     String(candidate.startNodeId) === String(segment.endNodeId));
   if (outgoing.length !== 1) {
@@ -148,6 +152,36 @@ function compileDefinition({
   const tangentStart = subtract(intersection, scale(incomingDirection, tangentLength));
   const tangentEnd = add(intersection, scale(outgoingDirection, tangentLength));
   const componentId = `IXBEND.${safe(segment.id)}`;
+  const analysis = segment.meta?.analysis ?? {};
+  const pressure = Number.isFinite(analysis.pressure) && analysis.pressure >= 0 ? analysis.pressure : 0;
+  const factorResult = calculateB31Factors({
+    schema: FACTOR_CALCULATION_REQUEST_SCHEMA,
+    calculationId: `${componentId}.B31.FACTORS`,
+    componentId,
+    editionProfileId,
+    componentType: 'BEND',
+    geometry: {
+      schema: COMPONENT_GEOMETRY_SCHEMA,
+      componentType: 'BEND',
+      lengthUnit: 'm',
+      outerDiameter: section.dimensions.outerDiameter,
+      wallThickness: section.dimensions.wallThickness,
+      bendRadius: radius,
+      pressure,
+      elasticModulus: material.materialState.elasticModulus,
+      bendAngleDegrees: bendAngle * 180 / Math.PI,
+      smooth90FlexibilityCorrection,
+      sourceEvidence: {
+        sourceId: `${canonicalGeometry.source ?? 'INPUTXML'}:${segment.sourceComponentUid ?? segment.id}`,
+        sourceRevision: `${canonicalGeometry.summary?.jobName ?? canonicalGeometry.schemaVersion ?? 'canonical'}:${segment.id}`,
+      },
+    },
+    momentDirectionMapping,
+    semanticHash: '',
+  });
+  if (factorResult.status !== 'QUALIFIED' || !factorResult.componentFactorSet) {
+    fail('INPUTXML_BEND_EXPANSION_FACTOR_NOT_QUALIFIED', `Bend ${segment.id} has no qualified component flexibility factor.`);
+  }
   const component = compilePipingComponent({
     componentId,
     componentType: 'BEND',
@@ -179,8 +213,8 @@ function compileDefinition({
     fail('INPUTXML_BEND_EXPANSION_MID_STATION_UNRESOLVED', `Bend ${segment.id} subdivision must carry an exact mid-arc station.`);
   }
   const stationNodeIds = Array.from({ length: chain.points.length }, (_, index) => {
-    if (index === 0 && segment.meta?.bendStationNode2) return String(segment.meta.bendStationNode2);
-    if (index === middleIndex && segment.meta?.bendStationNode1) return String(segment.meta.bendStationNode1);
+    if (index === 0 && validStationNode(segment.meta?.bendStationNode2)) return String(segment.meta.bendStationNode2);
+    if (index === middleIndex && validStationNode(segment.meta?.bendStationNode1)) return String(segment.meta.bendStationNode1);
     if (index === component.subdivision.elementCount) return String(segment.endNodeId);
     return `${segment.id}.BEND.N${index}`;
   });
@@ -338,10 +372,12 @@ function position(nodes, nodeId) {
   return [node.x, node.y, node.z];
 }
 
-function asPoint(vector) {
-  return { x: vector[0], y: vector[1], z: vector[2] };
+function validStationNode(value) {
+  const text = String(value ?? '').trim();
+  return text.length > 0 && text !== '-1.0101' && text !== '-1.010100';
 }
 
+function asPoint(vector) { return { x: vector[0], y: vector[1], z: vector[2] }; }
 function add(a, b) { return a.map((value, index) => value + b[index]); }
 function subtract(a, b) { return a.map((value, index) => value - b[index]); }
 function scale(a, factor) { return a.map((value) => value * factor); }
