@@ -37,8 +37,9 @@ function bendRequest(authorities, segment, index) {
       bendRadius: radius,
       pressure,
       elasticModulus,
-      // #834's diagnostic baseline is the general 1.65/h bend flexibility.
-      // Do not silently opt into the B31J smooth-90 1.3/h note.
+      // #834's RCA cites the general 1.65/h rule. Pressure stiffening is then
+      // applied by the existing factor calculator; do not silently opt into
+      // the B31J smooth-90 1.3/h note.
       smooth90FlexibilityCorrection: false,
       sourceEvidence: {
         sourceId: `${authorities.source.sourceId}:${segment.sourceComponentUid}`,
@@ -70,9 +71,12 @@ const rows = bends.map((segment, index) => {
   assert.equal(result.componentFactorSet.componentType, 'BEND');
   assert.equal(result.componentFactorSet.flexibilityGeometryBasis, 'ARC_GEOMETRY_EXCLUDED_V1');
   assert.equal(result.componentFactorSet.directionalFlexibilityFactors, null);
+  assert.equal(result.factors.flexibilityRule.coefficient, 1.65);
+  assert.equal(result.factors.flexibilityRule.smooth90CorrectionApplied, false);
   assert.equal(result.factors.flexibility.torsional, 1);
   assert.equal(result.factors.flexibility.inPlane, result.factors.flexibility.outOfPlane);
   assert.ok(result.factors.flexibility.inPlane > 1, `${segment.id} must be more flexible than a straight pipe in bending.`);
+  assert.ok(result.factors.unpressurized.flexibility >= result.factors.flexibility.inPlane);
   assert.equal(result.stressFactorSets.length, 1, `${segment.id} must emit one separate stress-factor set.`);
   assert.notEqual(result.componentFactorSet.semanticHash, result.stressFactorSets[0].semanticHash);
 
@@ -81,10 +85,12 @@ const rows = bends.map((segment, index) => {
     sourceSegmentId: segment.id,
     fromNode: sourceNodes[0],
     toNode: sourceNodes[1],
-    kInPlane: result.factors.flexibility.inPlane,
-    kOutOfPlane: result.factors.flexibility.outOfPlane,
+    kRcaUnpressurized: result.factors.unpressurized.flexibility,
+    kAppliedInPlane: result.factors.flexibility.inPlane,
+    kAppliedOutOfPlane: result.factors.flexibility.outOfPlane,
     torsionalFlexibility: result.factors.flexibility.torsional,
     pressureCorrectionApplied: result.factors.pressureCorrection.applied,
+    pressureCorrectionDenominator: result.factors.pressureCorrection.flexibilityDenominator,
     flexibilityRuleId: result.factors.flexibilityRule.ruleId,
     componentFactorSetSemanticHash: result.componentFactorSet.semanticHash,
     stressFactorSetSemanticHash: result.stressFactorSets[0].semanticHash,
@@ -92,11 +98,17 @@ const rows = bends.map((segment, index) => {
   });
 });
 
-const kValues = rows.map((row) => row.kInPlane);
-assert.ok(kValues.every((value) => value > 1 && Number.isFinite(value)));
+const rcaValues = rows.map((row) => row.kRcaUnpressurized);
+const appliedValues = rows.map((row) => row.kAppliedInPlane);
+assert.ok(rcaValues.every((value) => value > 1 && Number.isFinite(value)));
+assert.ok(appliedValues.every((value) => value > 1 && Number.isFinite(value)));
 assert.ok(
-  kValues.every((value) => value >= 3.6 && value <= 4.2),
-  `M035 BM4 bend k values must remain near the RCA 3.7-4.1 band; got ${Math.min(...kValues)}..${Math.max(...kValues)}.`,
+  rcaValues.every((value) => value >= 3.65 && value <= 4.15),
+  `M035 BM4 unpressurized 1.65/h values must remain near the RCA 3.7-4.1 band; got ${Math.min(...rcaValues)}..${Math.max(...rcaValues)}.`,
+);
+assert.ok(
+  rows.every((row) => row.kAppliedInPlane <= row.kRcaUnpressurized),
+  'Pressure correction must not make a qualified bend more flexible than its unpressurized 1.65/h value.',
 );
 const liftOffEndpointBends = rows.filter((row) => row.hasM036LiftOffEndpoint);
 assert.equal(liftOffEndpointBends.length, 1, 'Exactly one BM4 bend must carry the node-20090 M036 endpoint disclosure.');
@@ -107,7 +119,8 @@ console.log(JSON.stringify({
   editionProfileId: EDITION_PROFILE_ID,
   normalizedBendCount: bends.length,
   liftOffEndpointBends: liftOffEndpointBends.map((row) => row.sourceSegmentId),
-  kRange: { minimum: Math.min(...kValues), maximum: Math.max(...kValues) },
+  rcaUnpressurizedKRange: { minimum: Math.min(...rcaValues), maximum: Math.max(...rcaValues) },
+  appliedPressureCorrectedKRange: { minimum: Math.min(...appliedValues), maximum: Math.max(...appliedValues) },
   rows,
 }, null, 2));
 console.log('M035 BM4 B31 bend-factor authority audit PASS');
