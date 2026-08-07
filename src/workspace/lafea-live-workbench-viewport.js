@@ -1,9 +1,8 @@
-/**
- * Live LAFEA workbench adapter for source authoring and qualified results.
- *
- * Blocked or absent render evidence retains the editable U4B SVG viewport.
- * READY U4D evidence is delegated to the isolated U4F WebGL coordinator.
- */
+/** Live LAFEA viewport for source, retained mesh inspection and qualified results. */
+import {
+  focusLafeaRetainedMeshElement,
+  renderLafeaRetainedMeshOverlay,
+} from './lafea-canvas/retained-mesh-overlay.js';
 import {
   createLafeaSourceWorkbenchViewportModel,
   mountLafeaSourceWorkbenchViewportModel,
@@ -57,6 +56,7 @@ export function mountLafeaLiveWorkbenchViewport(root, input) {
 
   let mounted;
   let blockedStatus = null;
+  let focusedMeshElementId = input.focusedMeshElementId ?? null;
   let destroyed = false;
 
   if (model.mode === 'QUALIFIED_RESULT') {
@@ -69,6 +69,7 @@ export function mountLafeaLiveWorkbenchViewport(root, input) {
       THREE: input.THREE ?? null,
       onSelectionChange: input.onSelectionChange,
     });
+    renderResultMeshOverlay();
   } else {
     mounted = mountLafeaSourceWorkbenchViewportModel(
       viewportHost,
@@ -91,6 +92,7 @@ export function mountLafeaLiveWorkbenchViewport(root, input) {
         renderer: state.renderer,
         blockingReasons: [...state.blockingReasons],
         selection: state.selection,
+        focusedMeshElementId,
       });
     }
     return freeze({
@@ -102,13 +104,38 @@ export function mountLafeaLiveWorkbenchViewport(root, input) {
       renderer: mounted.getRenderer(),
       blockingReasons: [...model.intake.blockingReasons],
       selection: mounted.getSelection(),
+      focusedMeshElementId,
     });
   }
 
   function refresh() {
     if (destroyed) throw liveViewportError('LAFEA_LIVE_VIEWPORT_DESTROYED');
-    if (model.mode === 'QUALIFIED_RESULT') mounted.refresh();
+    if (model.mode === 'QUALIFIED_RESULT') {
+      mounted.refresh();
+      renderResultMeshOverlay();
+    }
     return currentState();
+  }
+
+  function focusRetainedMeshElement(elementId) {
+    if (destroyed) throw liveViewportError('LAFEA_LIVE_VIEWPORT_DESTROYED');
+    focusedMeshElementId = elementId;
+    renderResultMeshOverlay();
+    const found = focusLafeaRetainedMeshElement(viewportHost, elementId);
+    input.onFocusMeshElement?.(elementId, found);
+    return found;
+  }
+
+  function renderResultMeshOverlay() {
+    if (model.mode !== 'QUALIFIED_RESULT' || !input.retainedMeshEvidence) return null;
+    return renderLafeaRetainedMeshOverlay({
+      target: viewportHost,
+      evidence: input.retainedMeshEvidence,
+      viewport: model.sourceModel.viewport,
+      focusedElementId: focusedMeshElementId,
+      custodyState: input.analysisMeshCustodyState ?? 'UNKNOWN',
+      onFocusElement: focusRetainedMeshElement,
+    });
   }
 
   return Object.freeze({
@@ -146,6 +173,10 @@ function sourceInput(input, selection = input.selection ?? null) {
     policy: input.policy,
     onMoveNode: input.onMoveNode,
     onSelectionChange: input.onSelectionChange,
+    retainedMeshEvidence: input.retainedMeshEvidence ?? null,
+    analysisMeshCustodyState: input.analysisMeshCustodyState ?? null,
+    focusedMeshElementId: input.focusedMeshElementId ?? null,
+    onFocusMeshElement: input.onFocusMeshElement,
   };
 }
 
