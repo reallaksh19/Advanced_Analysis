@@ -26,7 +26,7 @@ export function compileTopologyEditStagedJsonEngineeringPatches({
   assertNodeNonGeometry(base.nodes, edited.nodes);
   for (const key of ['supports', 'boundaries', 'rigids', 'bends']) {
     if (semanticHash(base?.[key] ?? []) !== semanticHash(edited?.[key] ?? [])) {
-      fail(`${key} changed outside the qualified source vocabulary.`);
+      unsupported(`${key} changed`);
     }
   }
 
@@ -38,9 +38,7 @@ export function compileTopologyEditStagedJsonEngineeringPatches({
   for (const edge of edited.edges) {
     const prior = baseEdges.get(edge.id);
     if (semanticHash(prior) === semanticHash(edge)) continue;
-    if (!isValveReplacement(prior, edge)) {
-      fail(`edge ${edge.id} changed outside the qualified source vocabulary.`);
-    }
+    if (!isValveReplacement(prior, edge)) unsupported(`edge ${edge.id} changed`);
     const entity = exactEntity(entities, edge.componentKey, edge.id);
     patches.push(...compileValvePatches(dataset, entity, edge));
     changedEdgeIds.push(edge.id);
@@ -50,9 +48,7 @@ export function compileTopologyEditStagedJsonEngineeringPatches({
   for (const junction of edited.junctions) {
     const prior = baseJunctions.get(junction.id);
     if (semanticHash(prior) === semanticHash(junction)) continue;
-    if (!isTeeRelationUpdate(prior, junction)) {
-      fail(`junction ${junction.id} changed outside the qualified source vocabulary.`);
-    }
+    if (!isTeeRelationUpdate(prior, junction)) unsupported(`junction ${junction.id} changed`);
     const entity = exactEntity(entities, junction.componentKey, junction.id);
     patches.push(...compileTeePatches(dataset, entity, junction));
     changedJunctionIds.push(junction.id);
@@ -195,7 +191,7 @@ function exactStableRecord(left, right, allowedKeys) {
 function assertSameIds(left, right, label) {
   const ids = (rows) => (rows ?? []).map((row) => row.id).sort();
   if (semanticHash(ids(left)) !== semanticHash(ids(right))) {
-    fail(`${label} identity changed outside the qualified source vocabulary.`);
+    unsupported(`${label} identity changed`);
   }
 }
 function assertNodeNonGeometry(left, right) {
@@ -205,7 +201,7 @@ function assertNodeNonGeometry(left, right) {
     const strip = (value) => Object.fromEntries(Object.entries(value ?? {})
       .filter(([key]) => key !== 'position'));
     if (semanticHash(strip(prior)) !== semanticHash(strip(row))) {
-      fail(`node ${row.id} changed outside the qualified source geometry vocabulary.`);
+      unsupported(`node ${row.id} changed`);
     }
   }
 }
@@ -221,4 +217,7 @@ function entityPointer(entity) {
 }
 function escapePointer(value) { return String(value).replace(/~/gu, '~0').replace(/\//gu, '~1'); }
 function token(value) { return String(value ?? '').trim().toUpperCase(); }
+function unsupported(label) {
+  fail(`${label} outside the qualified geometry vocabulary or explicit M06/M10 engineering vocabulary.`);
+}
 function fail(message) { throw new RangeError(`StagedJSON writeback: ${message}`); }
