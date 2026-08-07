@@ -89,18 +89,8 @@ export class TopologyEditSjsonGovernedNavigationHudViewportBackendV2
     this.governedResultClearReason = projection
       ? ''
       : String(reasonCode || 'EMPIRICAL_EXECUTION_REQUIRED');
-    this.clearGroup(this.groups.resultGroup);
-    if (!projection) {
-      clearGovernedEmpiricalResultEvidence(
-        this.hostElement,
-        this.governedResultClearReason,
-      );
-    }
-    if (this.lastGovernedRenderModel) {
-      this.renderSession(this.lastGovernedRenderModel);
-    } else {
-      this.invalidate(projection ? 'empirical-result-pending-render' : 'empirical-result-clear');
-    }
+    this.renderGovernedResultOverlay();
+    this.invalidate(projection ? 'empirical-result-overlay' : 'empirical-result-clear');
     return this.governedResultProjection;
   }
 
@@ -142,20 +132,7 @@ export class TopologyEditSjsonGovernedNavigationHudViewportBackendV2
       ? { ...model, supports: this.governedSupportProjection }
       : model;
     super.renderSession(packet);
-    this.clearGroup(this.groups.resultGroup);
-    if (this.governedResultProjection) {
-      renderGovernedEmpiricalResults({
-        backend: this,
-        group: this.groups.resultGroup,
-        projection: this.governedResultProjection,
-      });
-      this.engineeringRoot.updateMatrixWorld(true);
-    } else {
-      clearGovernedEmpiricalResultEvidence(
-        this.hostElement,
-        this.governedResultClearReason,
-      );
-    }
+    this.renderGovernedResultOverlay();
     this.updateGovernedCameraClipping();
     if (this.hostElement) {
       this.hostElement.dataset.topologyEditSjsonSingleRenderPacket = 'true';
@@ -165,6 +142,23 @@ export class TopologyEditSjsonGovernedNavigationHudViewportBackendV2
       );
     }
     this.invalidate('governed-sjson-result-packet');
+  }
+
+  renderGovernedResultOverlay() {
+    this.clearGroup(this.groups.resultGroup);
+    if (this.governedResultProjection) {
+      renderGovernedEmpiricalResults({
+        backend: this,
+        group: this.groups.resultGroup,
+        projection: this.governedResultProjection,
+      });
+      this.engineeringRoot.updateMatrixWorld(true);
+      return;
+    }
+    clearGovernedEmpiricalResultEvidence(
+      this.hostElement,
+      this.governedResultClearReason,
+    );
   }
 
   renderProjection(group, projection, colorHex, opacity, markerSize) {
