@@ -30,10 +30,10 @@ const METHODS = Object.freeze([
   method({
     methodId: 'EMPIRICAL_RESTRAINT_NETWORK_V1',
     purpose: 'GUIDE_LINE_STOP_THERMAL_SCREENING',
-    runtimeStatus: 'NOT_REGISTERED',
-    qualificationStatus: 'FUTURE_RESTRICTED_DOMAIN',
+    runtimeStatus: 'REGISTERED',
+    qualificationStatus: 'QUALIFIED_RESTRICTED_DOMAIN',
     resultClasses: ['THERMAL_LINE_STOP_SCREENING_RESULT'],
-    qualifiedDofs: ['ONE_TRANSLATIONAL_DIRECTION_FUTURE'],
+    qualifiedDofs: ['ONE_TRANSLATIONAL_DIRECTION'],
   }),
 ]);
 
