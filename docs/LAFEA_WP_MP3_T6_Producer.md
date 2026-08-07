@@ -1,6 +1,6 @@
-# LAFEA WP-MP3 — Qualified deterministic T6 producer and v2 mesh custody
+# LAFEA WP-MP3 — Qualified deterministic T6 producer and v2 custody
 
-WP-MP3 / issue #880 binds the existing deterministic continuum meshing kernel to the mesh-independent LAFEA.3 domain/geometry architecture introduced by WP-MP2.
+WP-MP3 / issue #880 binds the existing deterministic continuum meshing kernel to the mesh-independent LAFEA.3 domain/geometry authority introduced by WP-MP2.
 
 ## Authority path
 
@@ -11,7 +11,7 @@ lafea-mesh-generation-intent/v2
         ↓
 qualified MP3 T6 producer binding
         ↓
-lafea-mesh-plan/v2 (preview only)
+lafea-mesh-plan/v2 (preview only, commits plannedMeshHash)
         ↓
 existing constrained-delaunay-t6 kernel
         ↓
@@ -19,85 +19,65 @@ lafea-mesh-producer-output/v2
         ↓
 lafea-analysis-mesh-evidence/v2
         ↓
-domain-first retained mesh custody
+producer execution receipt
+        ↓
+independent custody replay + atomic retained registration
 ```
 
-The producer is executable programmatically through the canonical workbench API, but no Automatic Mesh UI control is enabled by this package.
+The producer is executable programmatically through the canonical workbench API. No Automatic Mesh UI control is enabled by this package.
 
 ## Qualified scope
 
-MP3.1 is intentionally narrow:
+MP3.1 is intentionally narrow: LAFEA.3 / T6 / one simple outer loop, with straight-line and circular-arc boundaries and concave simple regions. It reuses the existing deterministic boundary discretization, constrained triangulation and analytic T6 boundary-midside kernel under the existing `MESH-QUALITY-POLICY-V1` gates.
 
-- `LAFEA.3`;
-- `T6`;
-- one simple outer loop;
-- straight-line and circular-arc boundaries;
-- concave simple regions;
-- deterministic boundary target-size discretization;
-- analytic T6 midsides on circular boundaries;
-- deterministic constrained triangulation;
-- existing analysis-mesh quality gates;
-- no holes;
-- no local refinement;
-- no Q8 recombination;
-- no interior Steiner refinement.
-
-The target element length therefore governs boundary discretization in MP3.1. It is not claimed as a strict global interior edge-length guarantee. The plan reports the actual characteristic-length envelope, and quality/current resource policy remains fail-closed.
-
-Hole bridging is a separate qualification package (MP3H). The producer rejects hole loops explicitly rather than routing to the bounded lug/pinhole template.
+Holes, local refinement, Q8 recombination and interior Steiner refinement are not qualified here. Hole loops fail closed and are reserved for MP3H. Target element length is a boundary-discretization control in MP3.1, not a claimed strict global interior edge-length guarantee; the plan reports actual characteristic lengths and the observed adjacent characteristic-size ratio.
 
 ## Profile identity
 
-The repository's canonical mesh-profile contract already owns a deterministic `fnv1a64:*` semantic hash. MP2 had accidentally restricted the v2 mesh-profile parent to SHA-256 in the request/evidence path even though the domain-first lifecycle declares `meshProfileHash` as an opaque profile parent.
+The canonical mesh-profile contract already owns a deterministic `fnv1a64:*` semantic hash. MP2 accidentally restricted the v2 mesh-profile parent to SHA-256 even though the lifecycle contract treats `meshProfileHash` as an opaque profile parent.
 
-MP3 corrects that boundary: v2 mesh profile parent custody accepts the canonical profile semantic hash (`fnv1a64:*`) and retains SHA-256 compatibility for already-created MP2 request fixtures. No second profile identity is manufactured.
+MP3 aligns v2 request/evidence custody with the canonical profile semantic hash while retaining SHA-256 compatibility for already-created MP2 fixtures. No second profile identity is created and no legacy profile hash is rewritten.
 
-## Producer and qualification
-
-Producer:
+## Producer qualification
 
 ```text
 id       = LAFEA_DOMAIN_FIRST_CDT_T6
 revision = MP3.1
 mode     = AUTOMATIC_MESH
 family   = T6
+policy   = MESH-QUALITY-POLICY-V1
 ```
 
-The capability and qualification bind exact stage/family/mode scope, repeatability, quality policy, rollback/publication policy and explicit node/element/DOF ceilings. The producer binding is the first package that turns the MP1 contract-ready projection into actual mesh execution authority.
+Capability and qualification bind the exact stage/family/mode, repeatability, rollback/publication policy and node/element/DOF ceilings. The generation intent remains a request with `executionAuthorized=false`; execution authority comes only from the qualified producer binding.
 
-The input intent itself remains an immutable request record with `executionAuthorized=false`; execution authority comes from the separately qualified producer binding. This prevents a request object from becoming authority merely because a producer exists.
+## Deterministic plan and output
 
-## Deterministic assembly
+Planning performs a dry run and creates `lafea-mesh-plan/v2`. The plan remains `producesMesh=false` and `engineeringAuthority=false`, but commits to the dry-run canonical mesh through `plannedMeshHash` as well as counts, characteristic lengths, adjacent-size ratio, resource disposition and limitations.
 
-The core kernel returns element-local T6 point data. MP3 converts that output into one canonical shared-node analysis mesh:
+Execution regenerates independently. The second canonical mesh hash must equal `plannedMeshHash`. Producer-output validation reconstructs the analysis mesh, proves exact intent/plan/capability/qualification/producer parents, and checks both requested and qualified node/element/DOF ceilings.
 
-- corner node identities follow deterministic source-corner order;
-- one midside identity is allocated per unique corner edge;
-- adjacent elements share the same midside node;
-- boundary midsides preserve the kernel's analytic-curve position;
-- interior midsides are exact chord midpoints;
-- all LAFEA.3 node `z` coordinates are zero;
-- element IDs are deterministic.
+The kernel's element-local T6 points are assembled into one shared-node canonical mesh with deterministic corner IDs, one midside ID per unique corner edge, shared midsides across adjacent elements, analytic circular-boundary midsides, chord-midpoint interior midsides, deterministic element IDs and `z=0` for every LAFEA.3 node.
 
-Planning performs a deterministic dry run and records counts, characteristic-length range, observed adjacent characteristic-size ratio, resource disposition and explicit scope limitations. The plan carries no mesh and has no engineering authority. Execution repeats generation and requires the canonical mesh hash to match the dry-run mesh hash before producing evidence.
+## Execution-receipt custody
 
-## V2 mesh custody
+Raw v2 mesh evidence is inspectable but is not sufficient for domain-first custody. Domain-first registration requires the full `lafea-domain-first-t6-producer-execution/v1` receipt containing intent, plan, producer output and evidence.
 
-The canonical orchestrator now owns a listener-free domain-first mesh state slice in addition to the historical retained-mesh slice.
+Before any retained-state mutation, custody:
 
-Registration:
+1. reconstructs the evidence;
+2. requires a qualified/custody-eligible execution receipt;
+3. independently re-plans from the current retained analysis domain, geometry evidence and canonical mesh profile;
+4. requires the submitted plan hash to equal that reproduced plan;
+5. validates output against the reproduced plan and intent;
+6. requires output mesh hash to equal `plannedMeshHash`;
+7. proves evidence/output agreement for mesh, plan, capability, qualification, producer and profile parents;
+8. verifies exact current source/domain/geometry parents;
+9. preflights the complete derived lifecycle replacement;
+10. only then commits retained receipt/evidence and publishes through the existing canonical orchestrator.
 
-1. reconstructs full v2 evidence;
-2. requires `CURRENT/PASS`;
-3. checks exact source/domain/geometry parents;
-4. detects exact replay idempotently;
-5. rejects same-plan conflicting replay;
-6. commits only after every check succeeds;
-7. publishes through the existing single orchestrator boundary.
+Exact receipt replay is idempotent. A conflicting result for the same plan fails closed. A new qualified plan may replace the current mesh for the same domain/geometry. The lifecycle is rebuilt through DOMAIN → GEOMETRY → new MESH, so later CANONICAL_MODEL/EXECUTION/RECOVERY descendants are not resurrected.
 
-A later generation under a different plan may replace the current mesh for the same domain/geometry. The derived domain-first lifecycle is rebuilt through DOMAIN → GEOMETRY → new MESH, so future CANONICAL_MODEL/EXECUTION/RECOVERY descendants remain absent instead of being resurrected.
-
-Source/domain/geometry custody-epoch changes do not delete historical mesh evidence, but make it stale. Hash reappearance alone cannot make the retained mesh current.
+The custody epoch is part of currentness. Source/domain/geometry revalidation cannot make historical mesh evidence current merely because hashes reappear. Domain-first export/recovery uses the full producer execution receipt so the complete custody chain can be replayed.
 
 ## Explicit non-claims
 
@@ -114,4 +94,4 @@ codeReportAuthority            = false
 releaseQualified               = false
 ```
 
-The next numerical package after MP3.1 is either MP3H hole bridging or feature-to-mesh physics projection, depending on the selected product sequence. Solver-model compilation remains downstream of both a current mesh and governed physics projection.
+The immediate follow-on is MP3H for deterministic hole/multi-loop T6 meshing. Feature-to-mesh physics projection and solver-model compilation remain downstream of a qualified current mesh.
