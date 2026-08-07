@@ -1,0 +1,22 @@
+name: M036 branch validation
+
+on:
+  push:
+    branches:
+      - m036-r2-unilateral-contact
+  workflow_dispatch:
+
+jobs:
+  unilateral-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node scripts/lfea-unilateral-closed-form-check.mjs
+      - run: node scripts/lfea-unilateral-determinism-check.mjs
+      - run: node scripts/lfea-unilateral-anti-drift-check.mjs
+      - run: node scripts/syntax-check.mjs --strict
