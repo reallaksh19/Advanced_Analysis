@@ -24,6 +24,7 @@ const expansion = compileInputXmlBendFeatureExpansion({
   canonicalGeometry: geometry,
   editionProfileId: EDITION_PROFILE_ID,
   momentDirectionMapping: MOMENT_DIRECTION_MAPPING,
+  smooth90FlexibilityCorrection: false,
   materialBySegmentId,
   sectionBySegmentId,
   frameElementProfile: authorities.frameProfile,
