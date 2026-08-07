@@ -61,7 +61,17 @@ jobs:
           node scripts/lfea-m035-bm4-scope-policy-check.mjs
 
       - name: Generic bend feature integration
-        run: node scripts/lfea-m035-generic-bend-integration-check.mjs
+        shell: bash
+        run: |
+          set +e
+          node scripts/lfea-m035-generic-bend-integration-check.mjs > /tmp/m035-generic-bend.log 2>&1
+          status=$?
+          cat /tmp/m035-generic-bend.log
+          if [ "$status" -ne 0 ]; then
+            message="$(tr '\n' ' ' < /tmp/m035-generic-bend.log | head -c 3500)"
+            echo "::error file=scripts/lfea-m035-generic-bend-integration-check.mjs,line=1,title=M035 generic bend integration::${message}"
+          fi
+          exit "$status"
 
       - name: B31 bend authority audit
         shell: bash
@@ -81,7 +91,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: m035-bm4-bend-audit-${{ env.TARGET_HEAD_SHA }}
-          path: /tmp/m035-bend-audit.log
+          path: |
+            /tmp/m035-generic-bend.log
+            /tmp/m035-bend-audit.log
           if-no-files-found: warn
           retention-days: 7
 
