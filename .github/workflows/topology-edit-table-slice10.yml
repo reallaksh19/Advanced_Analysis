@@ -3,18 +3,29 @@ name: Topology Edit Table Slice 10
 on:
   push:
     paths:
+      - 'src/core/shared-piping-model/native-pipe-writeback-envelope.js'
+      - 'src/core/shared-piping-model/adapters/workspace-dataset-to-shared.js'
+      - 'src/workspace/topology-edit/topology-edit-native-pipe-writeback.js'
+      - 'src/workspace/topology-edit/topology-edit-source-adapter-dispatch.js'
       - 'src/workspace/topology-edit/export/topology-edit-source-representability.js'
       - 'src/workspace/topology-edit/export/topology-edit-source-record-insertion-capability.js'
       - 'src/workspace/topology-edit/export/topology-edit-stagedjson-writeback.js'
       - 'src/workspace/topology-edit/export/topology-edit-inputxml-engineering-capability.js'
       - 'src/workspace/topology-edit/export/topology-edit-inputxml-writeback.js'
       - 'tests/topology-edit-source-record-insertion-capability.test.mjs'
+      - 'tests/topology-edit-native-pipe-round-trip.test.mjs'
+      - 'tests/topology-edit-pipe-segment-command.test.mjs'
       - '.github/workflows/topology-edit-table-slice10.yml'
   pull_request:
     paths:
+      - 'src/core/shared-piping-model/native-pipe-writeback-envelope.js'
+      - 'src/core/shared-piping-model/adapters/workspace-dataset-to-shared.js'
+      - 'src/workspace/topology-edit/topology-edit-native-pipe-writeback.js'
+      - 'src/workspace/topology-edit/topology-edit-source-adapter-dispatch.js'
       - 'src/workspace/topology-edit/export/**'
       - 'tests/topology-edit-source-record-insertion-capability.test.mjs'
       - 'tests/topology-edit-native-pipe-round-trip.test.mjs'
+      - 'tests/topology-edit-pipe-segment-command.test.mjs'
       - '.github/workflows/topology-edit-table-slice10.yml'
   workflow_dispatch:
 
@@ -45,6 +56,7 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
           files=(
+            src/core/shared-piping-model/native-pipe-writeback-envelope.js
             src/workspace/topology-edit/export/topology-edit-source-record-insertion-capability.js
             tests/topology-edit-source-record-insertion-capability.test.mjs
           )
@@ -52,18 +64,25 @@ jobs:
             test "$(git show "HEAD:$file" | wc -l)" -lt 300
             node --check "$file"
           done
+          node --check src/core/shared-piping-model/adapters/workspace-dataset-to-shared.js
+          node --check src/workspace/topology-edit/topology-edit-native-pipe-writeback.js
+          node --check src/workspace/topology-edit/topology-edit-source-adapter-dispatch.js
           node --check src/workspace/topology-edit/export/topology-edit-source-representability.js
           node --check src/workspace/topology-edit/export/topology-edit-stagedjson-writeback.js
           node --check src/workspace/topology-edit/export/topology-edit-inputxml-writeback.js
           ! grep -REn 'WorkspaceState|loadDataset\(|swapDataset\(|session\.execute\(|new (WebGLRenderer|TopologyEditViewportBackend)' \
+            src/core/shared-piping-model/native-pipe-writeback-envelope.js \
             src/workspace/topology-edit/export/topology-edit-source-record-insertion-capability.js
           ! grep -REn 'proximity|nearest|distance.*identity|geometry.*identity|last[-_ ]write[-_ ]wins' \
+            src/core/shared-piping-model/native-pipe-writeback-envelope.js \
             src/workspace/topology-edit/export/topology-edit-source-record-insertion-capability.js
           git diff --check
       - name: New source record insertion capability custody
         run: node --test tests/topology-edit-source-record-insertion-capability.test.mjs
       - name: Native authoring persistence positive control
-        run: node --test tests/topology-edit-native-pipe-round-trip.test.mjs
+        run: |
+          node --test tests/topology-edit-native-pipe-round-trip.test.mjs
+          node --test tests/topology-edit-pipe-segment-command.test.mjs
       - name: Retained source exporter contracts
         run: |
           node --test tests/topology-edit-source-surgical-patch.test.mjs
