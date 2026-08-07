@@ -189,3 +189,11 @@ export {
 } from './inputxml-linear-stiffness-profile.js';
 
 export * from './inputxml-linear-prefea.js';
+
+export {
+  GOVERNED_ANALYSIS_PIPELINE_SCHEMA,
+  GOVERNED_ANALYSIS_PIPELINE_STAGES,
+  GovernedAnalysisPipelineError,
+  createGovernedInputXmlPipelineStages,
+  runGovernedAnalysisPipeline,
+} from './governed-analysis-pipeline.js';
