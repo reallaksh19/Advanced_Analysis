@@ -45,11 +45,16 @@ function pipeRecord() {
     sourceReference: { documentId: 'SPEC', revision: '1', path: '/pipe/dn100' },
   };
 }
-function elbowRecord(id = 'ELBOW-DN100-LR90-A', radius = 152.4, path = '/elbow/a') {
+function elbowRecord(
+  id = 'ELBOW-DN100-LR90-A',
+  radius = 152.4,
+  path = '/elbow/a',
+  angleDeg = 90,
+) {
   return {
     recordId: id, componentType: 'ELBOW', nominalSizeMm: 100, outsideDiameterMm: 114.3,
     pressureClass: '150', materialSpecification: 'ASTM A234 WPB', pipingClass: 'DEMO-150',
-    elbowRadiusMm: radius, elbowAngleDeg: 90, componentMassKg: 8.4,
+    elbowRadiusMm: radius, elbowAngleDeg: angleDeg, componentMassKg: 8.4,
     endConnectionFrom: 'BW', endConnectionTo: 'BW',
     sourceReference: { documentId: 'SPEC', revision: '1', path },
   };
@@ -125,6 +130,24 @@ test('one exact 90-degree catalogue elbow resolves and consumes tangent length',
   close(fitted.turns[0].tangentDistanceMm, 152.4);
   close(fitted.effectiveSegments[0].effectiveLengthMm, 847.6);
   close(fitted.effectiveSegments[1].effectiveLengthMm, 847.6);
+});
+
+test('non-90-degree elbow uses radius times tan(deflection/2)', async () => {
+  const spec = catalogue([
+    elbowRecord('ELBOW-DN100-LR45-A', 152.4, '/elbow/45', 45),
+  ]);
+  const seed = await seeded(spec);
+  const raw = rawPlan(seed, [
+    { x: 2000, y: 0, z: 0 },
+    { x: 2707.1067811865476, y: 707.1067811865476, z: 0 },
+  ]);
+  const fitted = createContinueRouteFittedPlan({ plan: raw, catalogue: spec });
+  const expectedTangent = 152.4 * Math.tan(Math.PI / 8);
+  assert.equal(fitted.turns[0].elbowRecordId, 'ELBOW-DN100-LR45-A');
+  close(fitted.turns[0].angleDeg, 45);
+  close(fitted.turns[0].tangentDistanceMm, expectedTangent);
+  close(fitted.effectiveSegments[0].effectiveLengthMm, 1000 - expectedTangent);
+  close(fitted.effectiveSegments[1].effectiveLengthMm, 1000 - expectedTangent);
 });
 
 test('fitted candidate creates two catalogue pipes and one governed bend in five commands', async () => {
