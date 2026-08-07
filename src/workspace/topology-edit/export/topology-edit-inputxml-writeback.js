@@ -5,6 +5,11 @@ import {
   assessTopologyEditInputXmlEngineeringDelta,
   assertTopologyEditInputXmlEngineeringCapability,
 } from './topology-edit-inputxml-engineering-capability.js';
+import {
+  assessTopologyEditSourceRecordInsertion,
+  assertTopologyEditSourceRecordInsertionCapability,
+  SOURCE_RECORD_INSERTION_FAMILY,
+} from './topology-edit-source-record-insertion-capability.js';
 
 export const TOPOLOGY_EDIT_INPUTXML_WRITEBACK_SCHEMA =
   'TopologyEditInputXmlWriteback.v1';
@@ -34,6 +39,7 @@ export function prepareTopologyEditInputXmlWriteback(input = {}) {
   }
   const base = assertCanonical(input.baseCanonicalTopology, 'baseCanonicalTopology');
   const edited = assertCanonical(input.canonicalTopology, 'canonicalTopology');
+  assertNoSourceRecordInsertion(base, edited);
   const engineeringCapability = assessTopologyEditInputXmlEngineeringDelta({
     baseCanonicalTopology: base,
     canonicalTopology: edited,
@@ -138,6 +144,19 @@ export function assertTopologyEditInputXmlWriteback(value) {
     throw new Error('InputXML writeback: authority hash mismatch.');
   }
   return value;
+}
+
+function assertNoSourceRecordInsertion(base, edited) {
+  const capability = assessTopologyEditSourceRecordInsertion({
+    family: SOURCE_RECORD_INSERTION_FAMILY.INPUT_XML,
+    baseCanonicalTopology: base,
+    canonicalTopology: edited,
+  });
+  assertTopologyEditSourceRecordInsertionCapability(capability);
+  if (capability.status === 'BLOCKED') {
+    const rows = capability.blockers.map((row) => `${row.code}:${row.canonicalId}`).join(', ');
+    throw new RangeError(`InputXML writeback: source record insertion blocked: ${rows}.`);
+  }
 }
 
 function assertGeometryOnlyEdit(base, edited) {
