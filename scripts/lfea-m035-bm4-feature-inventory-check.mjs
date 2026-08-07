@@ -34,13 +34,19 @@ for (const [index, element] of elements.entries()) {
   const fromNode = cleanNode(attributeValue(element.attributes, 'FROM_NODE'));
   const toNode = cleanNode(attributeValue(element.attributes, 'TO_NODE'));
   const reducer = findAnyElements(element.inner, ['REDUCER', 'REDUCERS', 'REDU', 'REDC', 'REDE'])[0] ?? null;
-  if (reducer) {
-    reducers.push({ sourceIndex: index, segmentId: `IX-S${index + 1}`, fromNode, toNode, tagAttributes: reducer.attributes });
-  }
+  if (reducer) reducers.push({ sourceIndex: index, segmentId: `IX-S${index + 1}`, fromNode, toNode, tagAttributes: reducer.attributes });
   for (const sif of findAnyElements(element.inner, ['SIF', 'SIFS'])) {
     const type = Number(attributeValue(sif.attributes, 'TYPE'));
     if (Math.abs(type - 3) < 0.001 || Math.abs(type - 5) < 0.001) {
-      teeTags.push({ sourceIndex: index, segmentId: `IX-S${index + 1}`, fromNode, toNode, sifType: type, tagAttributes: sif.attributes });
+      teeTags.push({
+        sourceIndex: index,
+        segmentId: `IX-S${index + 1}`,
+        fromNode,
+        toNode,
+        sifNode: cleanNode(attributeValue(sif.attributes, 'NODE')),
+        sifType: type,
+        tagAttributes: sif.attributes,
+      });
     }
   }
 }
@@ -51,23 +57,32 @@ const bends = normalized.segments.filter((row) => row.type === 'BEND').map((row)
   radius: row.meta.bendDeclaredRadius,
 }));
 const canonicalTeeSegments = normalized.segments.filter((row) => row.type === 'TEE');
-const teeJunctionMap = new Map();
-for (const segment of canonicalTeeSegments) {
-  const junctionNodeId = inferThreeLegJunction(normalized, segment);
-  const row = teeJunctionMap.get(junctionNodeId) ?? { junctionNodeId, taggedSegmentIds: [], incidentSegmentIds: incidentIds(normalized, junctionNodeId) };
-  row.taggedSegmentIds.push(String(segment.id));
-  teeJunctionMap.set(junctionNodeId, row);
-}
-const teeJunctions = [...teeJunctionMap.values()]
-  .map((row) => ({ ...row, taggedSegmentIds: [...new Set(row.taggedSegmentIds)].sort() }))
-  .sort((a, b) => a.junctionNodeId.localeCompare(b.junctionNodeId));
+const teeSet = new Set(canonicalTeeSegments.map((row) => String(row.id)));
+const physicalTeeJunctions = normalized.nodes.flatMap((node) => {
+  const junctionNodeId = String(node.id);
+  const incidentSegmentIds = incidentIds(normalized, junctionNodeId);
+  if (incidentSegmentIds.length !== 3) return [];
+  const taggedSegmentIds = incidentSegmentIds.filter((id) => teeSet.has(id));
+  if (taggedSegmentIds.length === 0) return [];
+  return [{ junctionNodeId, incidentSegmentIds, taggedSegmentIds }];
+}).sort((a, b) => a.junctionNodeId.localeCompare(b.junctionNodeId));
+const assignedTags = new Set(physicalTeeJunctions.flatMap((row) => row.taggedSegmentIds));
+const teeTagsWithoutBranchTopology = canonicalTeeSegments
+  .map((row) => String(row.id))
+  .filter((id) => !assignedTags.has(id))
+  .sort();
 
 assert.equal(bends.length, 11, 'BM4 normalized geometry must expose the 11 M035 bend features.');
 assert.equal(teeTags.length, 7, 'BM4 source evidence currently contains seven tee/weldolet SIF tags.');
 assert.equal(canonicalTeeSegments.length, 7, 'All seven tee/weldolet-tagged spans must retain canonical TEE classification.');
-assert.equal(teeJunctions.length, 2, 'Those source tags must resolve to the two physical BM4 three-leg tee junctions.');
+assert.deepEqual(
+  physicalTeeJunctions.map((row) => row.junctionNodeId),
+  ['20160', '20295'],
+  'Only the two degree>2 BM4 nodes identified by #834 are structural tee-flexibility targets.',
+);
 assert.equal(reducers.length, 7, 'BM4 source must expose seven reducer feature segments.');
-assert.ok(teeJunctions.every((row) => row.incidentSegmentIds.length === 3));
+assert.ok(physicalTeeJunctions.every((row) => row.incidentSegmentIds.length === 3));
+assert.equal(teeTagsWithoutBranchTopology.length, 5, 'Five SIF-tagged spans remain stress/source evidence without degree-3 branch topology.');
 for (const reducer of reducers) {
   assert.ok(normalized.segments.some((row) => row.id === reducer.segmentId), `${reducer.segmentId} must retain canonical segment custody.`);
 }
@@ -79,22 +94,18 @@ console.log(JSON.stringify({
     bends: bends.length,
     teeSifTags: teeTags.length,
     canonicalTeeSegments: canonicalTeeSegments.length,
-    physicalTeeJunctions: teeJunctions.length,
+    physicalTeeJunctions: physicalTeeJunctions.length,
+    teeTagsWithoutBranchTopology: teeTagsWithoutBranchTopology.length,
     reducers: reducers.length,
   },
   bends,
   teeTags,
-  teeJunctions,
+  physicalTeeJunctions,
+  teeTagsWithoutBranchTopology,
   reducers,
 }, null, 2));
 console.log('M035 BM4 feature inventory PASS');
 
-function inferThreeLegJunction(geometry, segment) {
-  const candidates = [String(segment.startNodeId), String(segment.endNodeId)]
-    .filter((nodeId) => incidentIds(geometry, nodeId).length === 3);
-  assert.equal(candidates.length, 1, `TEE-tagged segment ${segment.id} must identify one physical three-leg junction.`);
-  return candidates[0];
-}
 function incidentIds(geometry, nodeId) {
   return geometry.segments
     .filter((row) => String(row.startNodeId) === nodeId || String(row.endNodeId) === nodeId)
