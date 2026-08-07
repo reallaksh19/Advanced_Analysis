@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: m035-bm4-bend-scope-${{ github.event.pull_request.number || github.ref }}
@@ -69,6 +70,29 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           cat /tmp/m035-bend-audit.log
           exit "$status"
+
+      - name: Publish M035 audit failure evidence
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            if (!fs.existsSync('/tmp/m035-bend-audit.log')) return;
+            const text = fs.readFileSync('/tmp/m035-bend-audit.log', 'utf8');
+            const body = [
+              '<!-- m035-bend-audit-failure -->',
+              '### M035 bend authority audit failure',
+              '```text',
+              text.slice(0, 60000),
+              '```',
+              `Head: ${context.sha}`,
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
 
       - name: Existing B31 and bend regressions
         shell: bash
