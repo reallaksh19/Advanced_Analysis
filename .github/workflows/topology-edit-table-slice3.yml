@@ -78,6 +78,7 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Production Table Canvas lifecycle
         env:
+          PLAYWRIGHT_BROWSERS_PATH: '0'
           TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: npx playwright test e2e/topology-edit-table-authority.spec.js --project=chromium --workers=1 --retries=0 --reporter=line
       - name: Upload qualification evidence
