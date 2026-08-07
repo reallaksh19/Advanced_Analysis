@@ -20,8 +20,14 @@ import {
 } from './lfea-m034-bm4-solve-fixtures.mjs';
 
 const TARGETS = Object.freeze(['20090', '20350', '21470', '21610']);
+const TARGET_SET = new Set(TARGETS);
 const H1_RELEASED = new Set(TARGETS);
 const NEIGHBORS = Object.freeze(['20170', '21640']);
+const AXIS = Object.freeze({
+  UX: Object.freeze({ positive: 13, negative: 16 }),
+  UY: Object.freeze({ positive: 14, negative: 17 }),
+  UZ: Object.freeze({ positive: 15, negative: 18 }),
+});
 
 function point(geometry, nodeId) {
   const node = geometry.nodes.find((candidate) => candidate.id === nodeId);
@@ -51,6 +57,24 @@ function rawRestraints(content) {
   }).filter((row) => row.nodeId !== null && row.typeCode !== null);
 }
 
+function guideDof(restraint) {
+  const values = [Math.abs(restraint.xCosine ?? 0), Math.abs(restraint.yCosine ?? 0), Math.abs(restraint.zCosine ?? 0)];
+  return ['UX', 'UY', 'UZ'][values.indexOf(Math.max(...values))];
+}
+
+function gapFaces(nodeId, dof, raw) {
+  const common = {
+    nodeId: `BM4.N${nodeId}`,
+    gap: raw.gap,
+    frictionCoefficient: raw.frictionCoefficient,
+    initiallyEngaged: false,
+  };
+  return [
+    { ...common, declarationId: `BM4-GAP-${nodeId}-${dof}-LOWER`, typeCode: AXIS[dof].positive },
+    { ...common, declarationId: `BM4-GAP-${nodeId}-${dof}-UPPER`, typeCode: AXIS[dof].negative },
+  ];
+}
+
 function constraintInventory(authorities) {
   const base = new Map();
   const unilateral = [];
@@ -65,20 +89,24 @@ function constraintInventory(authorities) {
     kind: 'NODAL_RESTRAINT', nodeId: `BM4.N${nodeId}`, dof, behavior: 'FIXED',
   });
   for (const node of authorities.normalized.geometry.nodes) {
-    if (node.restraint === 'ANCHOR') for (const dof of ['UX', 'UY', 'UZ', 'RX', 'RY', 'RZ']) add(node.id, dof, 'ANCHOR');
+    if (node.restraint === 'ANCHOR') for (const dof of Object.keys(AXIS).concat(['RX', 'RY', 'RZ'])) add(node.id, dof, 'ANCHOR');
     const candidates = rawByNode.get(node.id) ?? [];
     const consumed = new Set();
     for (const restraint of node.meta.restraints ?? []) {
       const raw = candidates.find((row) => !consumed.has(row.index) && row.typeCode === restraint.typeCode) ?? null;
       if (raw) consumed.add(raw.index);
-      if (restraint.typeCode === '14') unilateral.push({
-        declarationId: `BM4-C-${node.id}-UY-PLUS-Y-LINEARIZED`, nodeId: `BM4.N${node.id}`,
-        typeCode: 14, gap: raw?.gap ?? 0,
-        frictionCoefficient: raw?.frictionCoefficient ?? restraint.frictionCoefficient ?? null,
-      });
+      if (restraint.typeCode === '14') {
+        if (TARGET_SET.has(node.id)) unilateral.push({
+          declarationId: `BM4-C-${node.id}-UY-PLUS-Y`, nodeId: `BM4.N${node.id}`,
+          typeCode: 14, gap: raw?.gap ?? 0,
+          frictionCoefficient: raw?.frictionCoefficient ?? restraint.frictionCoefficient ?? null,
+        });
+        else add(node.id, 'UY', 'PLUS-Y-LINEARIZED');
+      }
       if (restraint.typeCode === '9') {
-        const v = [Math.abs(restraint.xCosine ?? 0), Math.abs(restraint.yCosine ?? 0), Math.abs(restraint.zCosine ?? 0)];
-        add(node.id, ['UX', 'UY', 'UZ'][v.indexOf(Math.max(...v))], 'GUIDE');
+        const dof = guideDof(restraint);
+        if ((raw?.gap ?? 0) > 0) unilateral.push(...gapFaces(node.id, dof, raw));
+        else add(node.id, dof, 'GUIDE');
       }
     }
   }
@@ -129,7 +157,7 @@ function physicalLineWeight(entry) {
   return pipe + contents + (analysis.insulationDensity ?? 0) * insulationArea * GRAVITY;
 }
 
-function compileCase(authorities, compilation, label, thermal) {
+function compileCase(authorities, compilation, label, thermal, movements = []) {
   const primitives = [];
   for (const entry of authorities.entries) {
     const analysis = entry.sourceSegment.meta.analysis;
@@ -139,10 +167,7 @@ function compileCase(authorities, compilation, label, thermal) {
       kind: 'DISTRIBUTED_LOAD', elementId: entry.elementId, basis: 'GLOBAL', variation: 'UNIFORM',
       startIntensity: { fx: 0, fy: -lineWeight, fz: 0 }, endIntensity: { fx: 0, fy: -lineWeight, fz: 0 },
       units: { distributedForce: 'N/m', length: 'm' },
-      sourceEvidence: sourceEvidence({
-        sourceId: entry.rigidAuthority ? `${BM4_SOURCE_ID}-RIGID-WEIGHT` : `${BM4_SOURCE_ID}-PHYSICAL-WEIGHT`,
-        sourceRevision: `${entry.sourceSegment.id}:${lineWeight}`, rigidAuthorityHash: entry.rigidAuthority?.semanticHash ?? null,
-      }),
+      sourceEvidence: sourceEvidence({ sourceId: `${BM4_SOURCE_ID}-WEIGHT`, sourceRevision: `${entry.sourceSegment.id}:${lineWeight}` }),
     });
     if ((analysis.pressure ?? 0) > 0) primitives.push({
       schema: 'fea-linear-load-primitive/v1', primitiveId: `BM4-${label}-PRESSURE-${entry.elementId}`,
@@ -159,6 +184,12 @@ function compileCase(authorities, compilation, label, thermal) {
       sourceEvidence: sourceEvidence({ sourceId: `${BM4_SOURCE_ID}-TEMP_EXP_C1`, sourceRevision: `${entry.sourceSegment.id}:${analysis.operatingTemperature}` }),
     });
   }
+  for (const movement of movements) primitives.push({
+    schema: 'fea-linear-load-primitive/v1', primitiveId: `BM4-${label}-CONTACT-${movement.prescribedSlotId}`,
+    kind: 'PRESCRIBED_MOVEMENT', prescribedSlotId: movement.prescribedSlotId,
+    nodeId: movement.nodeId, dof: movement.dof, value: movement.value,
+    sourceEvidence: sourceEvidence({ sourceId: `${BM4_SOURCE_ID}-GAP-CONTACT`, sourceRevision: `${movement.prescribedSlotId}:${movement.value}` }),
+  });
   return compilePhysicalLoadCase({
     loadCaseId: `BM4-${label}`, loadCaseClass: 'MIXED_PHYSICAL',
     presentation: { label, description: `M036 BM4 ${label} unilateral solve.` },
@@ -167,9 +198,9 @@ function compileCase(authorities, compilation, label, thermal) {
   });
 }
 
-function analyse(authorities, constraints, label, thermal) {
+function analyse(authorities, constraints, label, thermal, movements = []) {
   const compilation = compileModel(authorities, constraints);
-  const loadCase = compileCase(authorities, compilation, label, thermal);
+  const loadCase = compileCase(authorities, compilation, label, thermal, movements);
   const distributed = new Map();
   const temperatures = new Map();
   for (const primitive of loadCase.primitives) {
@@ -201,10 +232,10 @@ function reaction(execution, nodeId) {
 }
 
 function finalAnalysis(authorities, inventory, unilateralExecution, label, thermal) {
-  const active = unilateralExecution.convergedState.filter((row) => row.status === 'ENGAGED')
-    .map((row) => inventory.unilateral.find((u) => u.declarationId === row.declarationId))
-    .map((u) => ({ declarationId: u.declarationId, kind: 'NODAL_RESTRAINT', nodeId: u.nodeId, dof: 'UY', behavior: 'FIXED' }));
-  const result = analyse(authorities, [...inventory.base, ...active], label, thermal);
+  const active = unilateralExecution.unilateral.filter((u) => unilateralExecution.convergedState
+    .some((row) => row.declarationId === u.declarationId && row.status === 'ENGAGED'));
+  const result = analyse(authorities, [...inventory.base, ...active.map((u) => u.constraintDeclaration)], label, thermal,
+    active.map((u) => u.prescribedMovement).filter((row) => row !== null));
   assert.equal(result.execution.semanticHash, unilateralExecution.finalExecutionHash, `${label} converged execution hash`);
   return result;
 }
@@ -231,25 +262,27 @@ const direct = solveBm4InputXmlConditioned();
 const authorities = buildBm4SolveAuthorities();
 const inventory = constraintInventory(authorities);
 const cii = loadBm4CiiOutputCases1921();
-assert.equal(inventory.unilateral.length, 29, 'BM4 must expose 29 canonical +Y supports');
-assert.equal(inventory.unilateral.filter((u) => u.gap > 0).length, 0, 'BM4 +Y family must not silently carry an unhandled nonzero gap');
+assert.equal(inventory.unilateral.filter((u) => TARGET_SET.has(u.nodeId.replace('BM4.N', ''))).length, 4, 'only four +Y lift-off targets');
+assert.equal(inventory.gappedGuideEvidence.length, 6, 'six nonzero BM4 guide gaps retained');
 
 for (const [label, execution] of [['SUS', direct.sustained.execution], ['OPE', direct.operating.execution]]) {
   const noOp = compileUnilateralSolverExecution({ baseDeclarations: [], unilateral: [], buildAndSolve: () => execution });
-  assert.equal(noOp.finalExecutionHash, execution.semanticHash, `T5 ${label} no-op hash`);
+  assert.equal(noOp.finalExecutionHash, execution.semanticHash, `T5 BM4 ${label} no-op hash`);
 }
 
 const solveState = (label, thermal) => compileUnilateralSolverExecution({
   baseDeclarations: inventory.base, unilateral: inventory.unilateral,
-  buildAndSolve: (constraints) => analyse(authorities, constraints, label, thermal).execution,
+  buildAndSolve: (constraints, active) => analyse(authorities, constraints, label, thermal, active.prescribedMovements).execution,
 });
 const sus = solveState('SUS', false);
 const ope = solveState('OPE', true);
 const finalSus = finalAnalysis(authorities, inventory, sus, 'SUS', false);
 const finalOpe = finalAnalysis(authorities, inventory, ope, 'OPE', true);
 
-const releasedSus = sus.convergedState.filter((row) => row.status === 'RELEASED').map((row) => row.nodeId.replace('BM4.N', '')).sort();
-const releasedOpe = ope.convergedState.filter((row) => row.status === 'RELEASED').map((row) => row.nodeId.replace('BM4.N', '')).sort();
+const targetReleaseIds = (run) => run.convergedState.filter((row) => row.status === 'RELEASED' && TARGET_SET.has(row.nodeId.replace('BM4.N', '')))
+  .map((row) => row.nodeId.replace('BM4.N', '')).sort();
+const releasedSus = targetReleaseIds(sus);
+const releasedOpe = targetReleaseIds(ope);
 const h1Confirmed = releasedSus.length === H1_RELEASED.size && releasedSus.every((id) => H1_RELEASED.has(id));
 const targetRows = [];
 for (const [label, beforeExecution, afterExecution] of [
@@ -278,9 +311,10 @@ const report = {
   h1: { predictedReleased: [...H1_RELEASED].sort(), confirmed: h1Confirmed, actualReleased: releasedSus },
   opeReleased: releasedOpe,
   inventory: {
-    unilateralCount: inventory.unilateral.length,
+    contactDeclarationCount: inventory.unilateral.length,
+    targetOneWayCount: 4,
+    gappedGuideCount: inventory.gappedGuideEvidence.length,
     frictionLimitations: ope.limitations.length,
-    nonzeroDirectionalGaps: inventory.unilateral.filter((u) => u.gap > 0),
     gappedGuideEvidence: inventory.gappedGuideEvidence.map((row) => ({ nodeId: row.nodeId, gap: row.gap })),
   },
   targetRows,
