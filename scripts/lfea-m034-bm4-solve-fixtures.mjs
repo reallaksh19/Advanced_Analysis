@@ -35,6 +35,11 @@ import {
 import { semanticHash } from '../src/core/shared-piping-model/canonical-json.js';
 import { compilerProfile } from './lfea-b2.5-model-compiler-fixtures.mjs';
 import { eulerBernoulliProfile } from './lfea-b3.1-frame-element-fixtures.mjs';
+import {
+  BM4_CAESAR_AMBIENT_TEMPERATURE_K,
+  BM4_T1_MEAN_ALPHA_PER_C,
+  BM4_THERMAL_EXPANSION_AUTHORITY,
+} from './lfea-bm4-thermal-expansion-authority.mjs';
 
 // M034: BM4 (GH TYPE-4) first onboarding solve. Mirrors M027/BM2's
 // "first solve" pattern exactly (bend-chord stiffness only, real rigid
@@ -47,8 +52,8 @@ export const BM4_INPUT_PATH = fileURLToPath(new URL('../benchmarks/LFEA/BM4/Inpu
 export const BM4_OUTPUT_PATH = fileURLToPath(new URL('../benchmarks/LFEA/BM4/Output_BM4.xml', import.meta.url));
 export const BM4_SOURCE_ID = 'CAESAR-II-BM4-LIVE-INPUTXML';
 export const BM4_M036_LIFTOFF_NODE_IDS = Object.freeze(['20090', '20350', '21470', '21610']);
-export const INSTALLATION_TEMPERATURE = 293.15;
-export const THERMAL_EXPANSION_COEFFICIENT = 1.17e-5;
+export const INSTALLATION_TEMPERATURE = BM4_CAESAR_AMBIENT_TEMPERATURE_K;
+export const THERMAL_EXPANSION_COEFFICIENT = BM4_T1_MEAN_ALPHA_PER_C;
 export const GRAVITY = 9.80665;
 
 export const BM4_SOLVER_CONDITIONING_PROFILE = Object.freeze({
@@ -136,7 +141,8 @@ function materialAuthority(geometry, source) {
       sourceId: `${BM4_SOURCE_ID}-MATERIAL`,
       sourceRevision: source.sourceRevision,
       point: pointValue,
-      installationTemperatureDisclosure: 'InputXML has no installation temperature or alpha; M034 declares 293.15 K and 1.17e-5 1/K, following M027/M028 precedent.',
+      installationTemperatureDisclosure: 'BM4 InputXML serializes T1=325C and A106 Grade B material 106 but no ambient override or alpha. Use CAESAR default ambient 70F and the ASME B31.3 Table C-3 carbon-steel mean coefficient interpolated to 617F; no benchmark-output fitting.',
+      thermalExpansionAuthority: BM4_THERMAL_EXPANSION_AUTHORITY,
     }),
     points: [pointValue],
     semanticHash: '',
