@@ -9,10 +9,6 @@ import {
   reduceTopologyEditTableViewState,
 } from '../topology-edit/table/topology-edit-table-view-state.js';
 import { TopologyEditValidationWorkerClient } from '../topology-edit/professional/topology-edit-validation-worker-client.js';
-import {
-  downloadTopologyEditTableCsv,
-  downloadTopologyEditTableXlsx,
-} from './topology-edit-table-export-download.js';
 import { renderTopologyEditTableGrid } from './topology-edit-table-grid-view.js';
 import { ensureTopologyEditTableStyles } from './topology-edit-table-styles.js';
 import {
@@ -203,8 +199,18 @@ export class TopologyEditTableRuntime {
   undoOperation() { return undoTopologyEditTableRuntime(this); }
   redoOperation() { return redoTopologyEditTableRuntime(this); }
 
-  exportCsv() { return this.runExport('CSV', () => downloadTopologyEditTableCsv(this)); }
-  exportXlsx() { return this.runExport('XLSX', () => downloadTopologyEditTableXlsx(this)); }
+  exportCsv() {
+    return this.runExport('CSV', async () => {
+      const { downloadTopologyEditTableCsv } = await import('./topology-edit-table-export-download.js');
+      return downloadTopologyEditTableCsv(this);
+    });
+  }
+  exportXlsx() {
+    return this.runExport('XLSX', async () => {
+      const { downloadTopologyEditTableXlsx } = await import('./topology-edit-table-export-download.js');
+      return downloadTopologyEditTableXlsx(this);
+    });
+  }
   async runExport(format, operation) {
     if (this.pending) return true;
     try {
