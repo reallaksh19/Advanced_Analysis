@@ -42,6 +42,7 @@ export function recoveryProfile(overrides = {}) {
     profileId: 'LINEAR-RESULT-RECOVERY-R1',
     elementForceStationsPerSpan: { value: 5, source: SOURCE },
     codePointConsistencyTolerance: { value: 1e-6, source: SOURCE },
+    recoverComponentCodePoints: true,
     retainLocalAndGlobalActions: true,
     semanticHash: '',
     ...overrides,

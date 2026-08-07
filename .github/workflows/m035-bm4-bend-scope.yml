@@ -1,0 +1,200 @@
+name: M035 Feature Mechanics Qualification
+
+on:
+  pull_request:
+    branches:
+      - claude/lfea-linear-static-fea-unfwjd
+    paths:
+      - 'src/core/linear-piping-analysis-consumer/inputxml-bend-feature-expansion.js'
+      - 'src/core/linear-piping-analysis-consumer/inputxml-inline-reducer-transitions.js'
+      - 'src/core/linear-piping-analysis-consumer/inputxml-feature-mechanics-preparation.js'
+      - 'src/core/linear-piping-analysis-consumer/inputxml-feature-stiffness-authorities.js'
+      - 'src/core/linear-piping-analysis-consumer/generic-inputxml-solve-model.js'
+      - 'src/core/linear-piping-analysis-consumer/index.js'
+      - 'src/core/linear-fea-piping-components/directional-branch-flexibility.js'
+      - 'src/core/linear-fea-piping-components/index.js'
+      - 'src/core/linear-fea-reducer-condensation/**'
+      - 'src/core/linear-fea-result-recovery/recovery-contract.js'
+      - 'src/core/linear-fea-result-recovery/recovery.js'
+      - 'scripts/lfea-b3.4-recovery-fixtures.mjs'
+      - 'scripts/lfea-m035-generic-bend-integration-check.mjs'
+      - 'scripts/lfea-m035-b31j-directional-tee-check.mjs'
+      - 'scripts/lfea-m035-reducer-sampling-qualification-check.mjs'
+      - 'scripts/lfea-m035-feature-mechanics-preparation-check.mjs'
+      - 'scripts/lfea-m035-force-only-recovery-check.mjs'
+      - 'scripts/lfea-m035-bm4-feature-inventory-check.mjs'
+      - 'scripts/lfea-m035-bm4-feature-solve-runtime.mjs'
+      - 'scripts/lfea-m035-bm4-feature-solver-diagnostic.mjs'
+      - 'scripts/lfea-m035-bm4-feature-solve-check.mjs'
+      - 'scripts/lfea-m035-bm4-scope-policy.mjs'
+      - 'scripts/lfea-m035-bm4-scope-policy-check.mjs'
+      - 'scripts/lfea-m035-bm4-bend-authority-check.mjs'
+      - '.github/workflows/m035-bm4-bend-scope.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m035-feature-mechanics-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_HEAD_SHA }}
+          fetch-depth: 1
+
+      - name: Verify immutable checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
+          test -z "$(git status --porcelain)"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Syntax and M035 scope isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check src/core/linear-piping-analysis-consumer/inputxml-bend-feature-expansion.js
+          node --check src/core/linear-piping-analysis-consumer/inputxml-inline-reducer-transitions.js
+          node --check src/core/linear-piping-analysis-consumer/inputxml-feature-mechanics-preparation.js
+          node --check src/core/linear-piping-analysis-consumer/inputxml-feature-stiffness-authorities.js
+          node --check src/core/linear-piping-analysis-consumer/generic-inputxml-solve-model.js
+          node --check src/core/linear-fea-piping-components/directional-branch-flexibility.js
+          node --check src/core/linear-fea-reducer-condensation/reducer-condensation.js
+          node --check src/core/linear-fea-reducer-condensation/sampling-qualification.js
+          node --check src/core/linear-fea-result-recovery/recovery-contract.js
+          node --check src/core/linear-fea-result-recovery/recovery.js
+          node --check scripts/lfea-b3.4-recovery-fixtures.mjs
+          node --check scripts/lfea-m035-generic-bend-integration-check.mjs
+          node --check scripts/lfea-m035-b31j-directional-tee-check.mjs
+          node --check scripts/lfea-m035-reducer-sampling-qualification-check.mjs
+          node --check scripts/lfea-m035-feature-mechanics-preparation-check.mjs
+          node --check scripts/lfea-m035-force-only-recovery-check.mjs
+          node --check scripts/lfea-m035-bm4-feature-inventory-check.mjs
+          node --check scripts/lfea-m035-bm4-feature-solve-runtime.mjs
+          node --check scripts/lfea-m035-bm4-feature-solver-diagnostic.mjs
+          node --check scripts/lfea-m035-bm4-feature-solve-check.mjs
+          node --check scripts/lfea-m035-bm4-scope-policy.mjs
+          node --check scripts/lfea-m035-bm4-scope-policy-check.mjs
+          node --check scripts/lfea-m035-bm4-bend-authority-check.mjs
+          node scripts/lfea-m035-bm4-scope-policy-check.mjs
+
+      - name: Generic bend feature integration
+        run: node scripts/lfea-m035-generic-bend-integration-check.mjs
+
+      - name: Generic B31J directional tee mechanics
+        run: node scripts/lfea-m035-b31j-directional-tee-check.mjs
+
+      - name: Generic reducer sampling qualification
+        run: node scripts/lfea-m035-reducer-sampling-qualification-check.mjs
+
+      - name: Mixed feature mechanics preparation
+        run: node scripts/lfea-m035-feature-mechanics-preparation-check.mjs
+
+      - name: Force-only component recovery scope
+        run: node scripts/lfea-m035-force-only-recovery-check.mjs
+
+      - name: BM4 source feature inventory
+        run: node scripts/lfea-m035-bm4-feature-inventory-check.mjs
+
+      - name: BM4 feature-aware bend and tee solve
+        shell: bash
+        run: |
+          set +e
+          node scripts/lfea-m035-bm4-feature-solve-check.mjs > /tmp/m035-bm4-feature-solve.log 2>&1
+          status=$?
+          cat /tmp/m035-bm4-feature-solve.log
+          if [ "$status" -ne 0 ]; then
+            message="$(tr '\n' ' ' < /tmp/m035-bm4-feature-solve.log | head -c 3500)"
+            echo "::error file=scripts/lfea-m035-bm4-feature-solve-runtime.mjs,line=1,title=M035 BM4 feature solve::${message}"
+          fi
+          exit "$status"
+
+      - name: B31 bend authority audit
+        run: node scripts/lfea-m035-bm4-bend-authority-check.mjs
+
+      - name: Upload M035 mechanics evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m035-feature-mechanics-${{ env.TARGET_HEAD_SHA }}
+          path: |
+            /tmp/m035-bm4-feature-solve.log
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Regression B3.1 frame element
+        run: npm run check:lfea-b3.1
+
+      - name: Regression B3.2 piping components
+        run: npm run check:lfea-b3.2
+
+      - name: Regression B3.4 result recovery
+        run: npm run check:lfea-b3.4
+
+      - name: Regression B3.19 B31 factors
+        run: npm run check:lfea-b3.19
+
+      - name: Regression B3.23 reducer condensation
+        run: npm run check:lfea-b3.23
+
+      - name: Regression B3.18 BM1 bend
+        run: npm run check:lfea-b3.18
+
+      - name: Regression BM1 CAESAR comparison
+        run: npm run check:lfea-bm1-cii-comparison
+
+      - name: Regression BM2 solver comparison
+        run: node scripts/lfea-b3.26-bm2-solve-comparison-check.mjs
+
+      - name: Regression BM3 solver comparison
+        run: node scripts/lfea-m028-bm3-check.mjs
+
+      - name: Diagnostic complete linear core aggregate
+        id: legacy_core
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          npm run check:lfea-linear-core > /tmp/m035-linear-core.log 2>&1
+          status=$?
+          cat /tmp/m035-linear-core.log
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          if [ "$status" -ne 0 ]; then
+            message="$(grep -E '^(Error|[A-Z0-9_-]+ .*FAIL|npm error|AssertionError)' /tmp/m035-linear-core.log | head -c 3000 || true)"
+            echo "::warning file=package.json,line=1,title=Legacy linear-core aggregate is diagnostic::${message:-aggregate exited $status; see artifact log}"
+          fi
+          exit "$status"
+
+      - name: Archive diagnostic source snapshot
+        if: always()
+        shell: bash
+        run: git archive --format=zip HEAD -o /tmp/m035-head-source.zip
+
+      - name: Upload legacy aggregate diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m035-legacy-core-diagnostic-${{ env.TARGET_HEAD_SHA }}
+          path: |
+            /tmp/m035-linear-core.log
+            /tmp/m035-head-source.zip
+          if-no-files-found: warn
+          retention-days: 7

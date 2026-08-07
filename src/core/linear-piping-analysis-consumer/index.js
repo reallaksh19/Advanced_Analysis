@@ -29,6 +29,21 @@ export {
   augmentPipingComponentTemperatureAuthorities,
 } from './thermal-expansion-augmentation.js';
 
+export { compileInputXmlBendFeatureExpansion } from './inputxml-bend-feature-expansion.js';
+export {
+  INPUTXML_INLINE_REDUCER_TRANSITIONS_SCHEMA,
+  detectInputXmlInlineReducerTransitions,
+} from './inputxml-inline-reducer-transitions.js';
+export {
+  INPUTXML_FEATURE_MECHANICS_PREPARATION_SCHEMA,
+  compileInputXmlFeatureMechanicsPreparation,
+} from './inputxml-feature-mechanics-preparation.js';
+export {
+  INPUTXML_FEATURE_STIFFNESS_AUTHORITIES_SCHEMA,
+  compileInputXmlFeatureStiffnessAuthorities,
+  reducerElementContributionForCase,
+} from './inputxml-feature-stiffness-authorities.js';
+
 export {
   LINEAR_PIPING_SOURCE_ANALYSIS_REQUEST_SCHEMA,
   SOURCE_ANALYSIS_REQUEST_KEYS,

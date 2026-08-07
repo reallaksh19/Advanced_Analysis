@@ -94,19 +94,19 @@ approximately(thinWall2023.factors.sustainedCorrection.denominator, 0.94);
 assert.ok(thinWall2023.factors.sustainedIndices.inPlaneBending
   > thinWall2023.factors.displacementSifs.inPlaneBending);
 
+const teeGeometry = {
+  runOuterDiameter: 0.6096,
+  runWallThickness: 0.00953,
+  branchOuterDiameter: 0.508,
+  branchWallThickness: 0.00953,
+  sourceEvidence,
+};
 const tee = calculateB31Factors(request({
   calculationId: 'B31-CALC-TEE-01',
   componentId: 'TEE-B31J-01',
   editionProfileId: 'B31_3_2020_B31J_2017',
   componentType: 'WELDING_TEE',
-  geometry: {
-    runOuterDiameter: 0.6096,
-    runWallThickness: 0.00953,
-    branchOuterDiameter: 0.508,
-    branchWallThickness: 0.00953,
-    fittingQuality: 'VERIFIED_B16_9',
-    sourceEvidence,
-  },
+  geometry: { ...teeGeometry, fittingQuality: 'VERIFIED_B16_9' },
 }));
 assert.equal(tee.status, 'QUALIFIED');
 assert.equal(tee.componentFactorSet, null);
@@ -123,6 +123,27 @@ assert.ok(tee.diagnostics.some(
   (entry) => entry.code === 'B31J_TEE_DIRECTIONAL_FLEXIBILITY_NOT_SEALED_FOR_B3_2',
 ));
 
+const unverifiedSameGeometry = calculateB31Factors(request({
+  calculationId: 'B31-CALC-TEE-UNVERIFIED-SAME-GEOMETRY',
+  componentId: 'TEE-B31J-UNVERIFIED-SAME-GEOMETRY',
+  editionProfileId: 'B31_3_2020_B31J_2017',
+  componentType: 'WELDING_TEE',
+  geometry: { ...teeGeometry, fittingQuality: 'UNVERIFIED' },
+}));
+assert.equal(unverifiedSameGeometry.status, 'QUALIFIED');
+assert.equal(unverifiedSameGeometry.factors.qualityReduction.applied, false);
+assert.equal(unverifiedSameGeometry.factors.qualityReduction.divisor, 1);
+assert.equal(unverifiedSameGeometry.factors.qualityReduction.ruleId, null);
+assert.equal(unverifiedSameGeometry.applicability.violations.length, 0);
+for (const leg of ['run', 'branch']) {
+  for (const direction of ['inPlane', 'outOfPlane', 'torsional']) {
+    assert.ok(
+      unverifiedSameGeometry.factors.flexibility[leg][direction] >= tee.factors.flexibility[leg][direction],
+      `Unverified ${leg}/${direction} flexibility must not be reduced below the same-geometry verified B16.9 result.`,
+    );
+  }
+}
+
 const unverifiedTee = calculateB31Factors(request({
   calculationId: 'B31-CALC-TEE-UNVERIFIED',
   componentId: 'TEE-B31J-UNVERIFIED',
@@ -137,10 +158,33 @@ const unverifiedTee = calculateB31Factors(request({
     sourceEvidence,
   },
 }));
-assert.equal(unverifiedTee.status, 'BLOCKED');
+assert.equal(unverifiedTee.status, 'QUALIFIED');
 assert.equal(unverifiedTee.componentFactorSet, null);
-assert.deepEqual(unverifiedTee.stressFactorSets, []);
-assert.ok(unverifiedTee.applicability.violations.some((entry) => entry.field === 'fittingQuality'));
+assert.equal(unverifiedTee.stressFactorSets.length, 2);
+assert.equal(unverifiedTee.factors.qualityReduction.applied, false);
+assert.equal(unverifiedTee.factors.qualityReduction.divisor, 1);
+assert.equal(unverifiedTee.factors.qualityReduction.ruleId, null);
+assert.equal(unverifiedTee.applicability.violations.length, 0);
+assert.ok(unverifiedTee.diagnostics.some(
+  (entry) => entry.code === 'B31J_TEE_DIRECTIONAL_FLEXIBILITY_NOT_SEALED_FOR_B3_2',
+));
+
+const damagedTee = calculateB31Factors(request({
+  calculationId: 'B31-CALC-TEE-DAMAGED',
+  componentId: 'TEE-B31J-DAMAGED',
+  editionProfileId: 'B31_3_2022_B31J_2017',
+  componentType: 'WELDING_TEE',
+  geometry: {
+    runOuterDiameter: 0.32385,
+    runWallThickness: 0.009525,
+    branchOuterDiameter: 0.2191,
+    branchWallThickness: 0.00818,
+    fittingQuality: 'IMPERFECT_OR_DAMAGED',
+    sourceEvidence,
+  },
+}));
+assert.equal(damagedTee.status, 'BLOCKED');
+assert.ok(damagedTee.applicability.violations.some((entry) => entry.field === 'fittingQuality'));
 
 const reducerRequest = request({
   calculationId: 'B31-CALC-REDUCER-01',
@@ -169,7 +213,6 @@ assert.equal(reducer.matchingPipeApplication.largeEnd.outerDiameter, 0.8);
 assert.equal(reducer.matchingPipeApplication.smallEnd.wallThickness, 0.01);
 assert.ok(reducer.factors.displacementSifs.torsional > 1);
 approximately(reducer.factors.displacementSifs.axial, reducer.factors.displacementSifs.outOfPlaneBending);
-
 
 const equalThicknessReducer = calculateB31Factors({
   ...reducerRequest,
@@ -219,6 +262,8 @@ console.log(JSON.stringify({
   bendK: bend.factors.flexibility.inPlane,
   bendInPlaneSif: bend.factors.displacementSifs.inPlaneBending,
   teeNote6Divisor: tee.factors.qualityReduction.divisor,
+  unverifiedSameGeometryDivisor: unverifiedSameGeometry.factors.qualityReduction.divisor,
+  unverifiedTeeDivisor: unverifiedTee.factors.qualityReduction.divisor,
   teeRunInPlaneSif: tee.factors.displacementSifs.run.inPlaneBending,
   teeBranchInPlaneSif: tee.factors.displacementSifs.branch.inPlaneBending,
   reducerTorsionalSif: reducer.factors.displacementSifs.torsional,

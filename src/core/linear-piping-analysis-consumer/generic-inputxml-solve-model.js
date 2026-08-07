@@ -148,6 +148,7 @@ export function recoveryProfile() {
     profileId: 'LINEAR-RESULT-RECOVERY-R1',
     elementForceStationsPerSpan: { value: 5, source: PROFILE_SOURCE },
     codePointConsistencyTolerance: { value: 1e-6, source: PROFILE_SOURCE },
+    recoverComponentCodePoints: true,
     retainLocalAndGlobalActions: true,
     semanticHash: '',
   });

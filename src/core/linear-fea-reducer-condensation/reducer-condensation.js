@@ -13,7 +13,6 @@ import {
 
 function annulus(outerDiameter, wallThickness) {
   const innerDiameter = outerDiameter - 2 * wallThickness;
-  // SOURCE: classical circular-annulus section identities.
   const area = Math.PI * (outerDiameter ** 2 - innerDiameter ** 2) / 4;
   const secondMoment = Math.PI * (outerDiameter ** 4 - innerDiameter ** 4) / 64;
   return {
@@ -29,6 +28,13 @@ function annulus(outerDiameter, wallThickness) {
 
 function interpolate(start, end, fraction) {
   return cleanNumber(start + fraction * (end - start));
+}
+
+export function reducerRepresentativeFraction(index, samplingRule) {
+  if (samplingRule === 'I_END_LINEAR_INTERPOLATION_CANDIDATE_V1') return index / REDUCER_SEGMENT_COUNT;
+  if (samplingRule === 'MIDPOINT_LINEAR_INTERPOLATION_CANDIDATE_V1') return (index + 0.5) / REDUCER_SEGMENT_COUNT;
+  if (samplingRule === 'J_END_LINEAR_INTERPOLATION_CANDIDATE_V1') return (index + 1) / REDUCER_SEGMENT_COUNT;
+  throw new Error(`REDUCER_CONDENSATION_SAMPLING_RULE_INVALID:${samplingRule}`);
 }
 
 function matrix(size, fill = 0) {
@@ -154,15 +160,7 @@ function condense(K, loads) {
   return { stiffness: flattenSymmetric(condensedK), loads: condensedLoads };
 }
 
-/**
- * Compile a ten-cylinder reducer and statically condense its nine internal
- * stations to the original two-node interface.
- *
- * SOURCE: Hexagon CAESAR II Users Guide, Reducer: ten successively changing
- * pipe cylinders. The midpoint sampling rule is intentionally labeled a
- * candidate because the public documentation does not publish the exact
- * representative section location.
- */
+/** Compile one of the three predeclared ten-cylinder section-sampling hypotheses. */
 export function compileTenCylinderReducerAuthority(request) {
   const accepted = requireReducerCondensationRequest(request);
   const segmentLength = accepted.length / REDUCER_SEGMENT_COUNT;
@@ -179,8 +177,7 @@ export function compileTenCylinderReducerAuthority(request) {
   let firstWeightMoment = 0;
 
   for (let index = 0; index < REDUCER_SEGMENT_COUNT; index += 1) {
-    // SOURCE STATUS: candidate midpoint sampling pending CAESAR parity extraction.
-    const fraction = (index + 0.5) / REDUCER_SEGMENT_COUNT;
+    const fraction = reducerRepresentativeFraction(index, accepted.samplingRule);
     const section = annulus(
       interpolate(accepted.fromSection.outerDiameter, accepted.toSection.outerDiameter, fraction),
       interpolate(accepted.fromSection.wallThickness, accepted.toSection.wallThickness, fraction),
@@ -235,8 +232,9 @@ export function compileTenCylinderReducerAuthority(request) {
     firstWeightMoment += segmentWeight * midpoint;
     segments.push({
       index,
-      midpointFraction: cleanNumber(fraction),
+      representativeFraction: cleanNumber(fraction),
       startFraction: index / REDUCER_SEGMENT_COUNT,
+      midpointFraction: (index + 0.5) / REDUCER_SEGMENT_COUNT,
       endFraction: (index + 1) / REDUCER_SEGMENT_COUNT,
       length: cleanNumber(segmentLength),
       section,
@@ -294,8 +292,8 @@ export function compileTenCylinderReducerAuthority(request) {
       stressSectionRule: 'CODE_SPECIFIC_REDUCER_NOT_CONDENSED_EQUIVALENT_SECTION',
     },
     limitations: [
-      'The public Hexagon documentation confirms ten cylinders but not the exact section sampling position.',
-      'MIDPOINT_LINEAR_INTERPOLATION_CANDIDATE_V1 is a controlled candidate and not a byte-for-byte CAESAR parity claim.',
+      'The public Hexagon documentation confirms ten cylinders but not the exact representative section sampling location.',
+      `${accepted.samplingRule} is a predeclared physical hypothesis and not a byte-for-byte CAESAR parity claim until independently qualified.`,
       'Eccentricity is represented by the caller-declared element axis; this authority varies section properties along that axis.',
     ],
     semanticHash: '',

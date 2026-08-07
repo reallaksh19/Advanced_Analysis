@@ -54,13 +54,18 @@ export function evaluateTeeApplicability(geometry, profile) {
       rule: 'D/T <= 100',
     });
   }
-  if (profile.factorStandard === 'ASME_B31J' && geometry.fittingQuality !== 'VERIFIED_B16_9') {
+  if (profile.factorStandard === 'ASME_B31J'
+      && geometry.fittingQuality === 'IMPERFECT_OR_DAMAGED') {
     violations.push({
       field: 'fittingQuality',
       value: geometry.fittingQuality,
-      rule: 'Sketch 2.1 verified B16.9 geometry required; imperfect tees use a different rule',
+      rule: 'imperfect/damaged tees require a distinct B31J damaged-tee rule that this calculator does not implement',
     });
   }
+  // B31J default/unverified welding tees use the direct Table 1-1 equations.
+  // VERIFIED_B16_9 additionally receives the Note (6) 1.26 reduction inside
+  // calculateB31JWeldingTeeFactors. Lack of verification is therefore not an
+  // applicability failure; it selects the unreduced/default rule instead.
   return violations.length === 0
     ? verdict('WITHIN_RANGE', `${profile.formulaFamily}_WELDING_TEE_APPLICABILITY`)
     : verdict('OUTSIDE_RANGE', `${profile.formulaFamily}_WELDING_TEE_APPLICABILITY`, violations);
