@@ -102,6 +102,7 @@ async function openProductionController(page) {
   const host = page.locator('[data-role="topology-edit-render-host"]');
   await expect(host).toBeVisible();
   await expect.poll(() => page.evaluate(() => Boolean(document.querySelector('[data-role="topology-edit-render-host"]')?.__topologyEditAuthoringController?.session))).toBe(true);
+  await expect.poll(() => page.evaluate(() => Boolean(document.querySelector('[data-role="topology-edit-render-host"]')?.__topologyEditAuthoringController?.tableAdapter?.runtime))).toBe(true);
   return host;
 }
 
@@ -109,7 +110,7 @@ async function chooseTerminalPipe(page) {
   return page.evaluate(() => {
     const controller = document.querySelector('[data-role="topology-edit-render-host"]')?.__topologyEditAuthoringController;
     const topology = controller?.session?.currentTopology?.();
-    const projection = controller?.tableRuntime?.projection;
+    const projection = controller?.tableAdapter?.runtime?.projection;
     if (!topology || !projection) throw new Error('Table production authority is unavailable.');
     const degree = new Map((topology.nodes ?? []).map((node) => [node.id, 0]));
     for (const edge of topology.edges ?? []) {
@@ -141,7 +142,7 @@ async function evidence(page) {
       activeCommandCount: journal?.activeCommandIds?.length ?? 0,
       rendererCount: controller?.viewportBackend?.renderer?.domElement ? 1 : 0,
       ghostChildCount: controller?.viewportBackend?.groups?.ghostGroup?.children?.length ?? 0,
-      projectionHash: controller?.tableRuntime?.projection?.projectionHash ?? null,
+      projectionHash: controller?.tableAdapter?.runtime?.projection?.projectionHash ?? null,
     };
   });
 }
