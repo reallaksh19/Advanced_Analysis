@@ -7,6 +7,11 @@ export const REDUCER_CONDENSATION_REQUEST_SCHEMA = 'fea-linear-reducer-condensat
 export const REDUCER_CONDENSATION_AUTHORITY_SCHEMA = 'fea-linear-reducer-condensation-authority/v1';
 export const REDUCER_SEGMENT_COUNT = 10;
 export const REDUCER_SAMPLING_RULE = 'MIDPOINT_LINEAR_INTERPOLATION_CANDIDATE_V1';
+export const REDUCER_SAMPLING_RULES = Object.freeze([
+  'I_END_LINEAR_INTERPOLATION_CANDIDATE_V1',
+  REDUCER_SAMPLING_RULE,
+  'J_END_LINEAR_INTERPOLATION_CANDIDATE_V1',
+]);
 
 export const REDUCER_REQUEST_KEYS = Object.freeze([
   'schema',
@@ -115,8 +120,8 @@ function validateRequestCore(request) {
   if (request.segmentCount !== REDUCER_SEGMENT_COUNT) {
     fail(`request.segmentCount must be ${REDUCER_SEGMENT_COUNT}.`, 'REDUCER_CONDENSATION_SEGMENT_COUNT_INVALID');
   }
-  if (request.samplingRule !== REDUCER_SAMPLING_RULE) {
-    fail(`request.samplingRule must be ${REDUCER_SAMPLING_RULE}.`, 'REDUCER_CONDENSATION_SAMPLING_RULE_INVALID');
+  if (!REDUCER_SAMPLING_RULES.includes(request.samplingRule)) {
+    fail(`request.samplingRule must be one of ${REDUCER_SAMPLING_RULES.join(', ')}.`, 'REDUCER_CONDENSATION_SAMPLING_RULE_INVALID');
   }
   requireExactKeys(request.material, MATERIAL_KEYS, 'request.material');
   requirePositive(request.material.elasticModulus, 'request.material.elasticModulus');
