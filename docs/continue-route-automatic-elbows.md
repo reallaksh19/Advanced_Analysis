@@ -23,10 +23,10 @@ The immutable elbow binding retains catalogue ID/version/hash/source hash, recor
 
 ## Tangent geometry
 
-For every elbow:
+For every circular elbow with route deflection angle `θ`:
 
 ```text
-tangentDistance = radius / tan(includedAngle / 2)
+tangentDistance = radius × tan(θ / 2)
 ```
 
 The fitted planner accounts for tangent consumption on both adjacent straight legs. A straight segment between two elbows therefore loses the outgoing tangent of the first elbow and incoming tangent of the second elbow.
@@ -68,4 +68,4 @@ Candidate preparation remains sandbox-only. Apply recreates the exact candidate 
 
 ## Qualification
 
-The Batch 2 tests cover exact elbow resolution, tangent evidence, topology/command counts, canonical bend radius/angle/provenance, atomic Apply/Undo/Redo, insufficient tangent length, missing compatible records, ambiguous compatible records, deterministic explicit selection and stale catalogue rejection.
+The Batch 2 tests cover exact elbow resolution, 90-degree and non-90-degree tangent evidence, topology/command counts, canonical bend radius/angle/provenance, atomic Apply/Undo/Redo, insufficient tangent length, missing compatible records, ambiguous compatible records, deterministic explicit selection and stale catalogue rejection.
