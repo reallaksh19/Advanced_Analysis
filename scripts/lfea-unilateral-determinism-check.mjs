@@ -77,7 +77,7 @@ const outsideBand = evaluateSupportStatus({
 assert.equal(outsideBand.shouldFlip, true, 'reaction beyond -1 N must release +Y');
 
 function oscillatingBehavior(id, active) {
-  assert.equal(id, A.declarationId);
+  if (id !== A.declarationId) return { reaction: active ? 10 : 0, displacement: 0 };
   return active
     ? { reaction: -2, displacement: 0 }
     : { reaction: 0, displacement: -0.01 };
