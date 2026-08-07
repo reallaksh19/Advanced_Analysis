@@ -1,0 +1,89 @@
+name: Topology Edit Table Slice 3
+
+on:
+  push:
+    paths:
+      - 'src/workspace/topology-edit/table/**'
+      - 'src/workspace/viewport-productivity/topology-edit-table-*.js'
+      - 'src/workspace/topology-edit-3d-productivity-controller.js'
+      - 'tests/topology-edit-table-*.test.mjs'
+      - 'e2e/topology-edit-table-authority.spec.js'
+      - '.github/workflows/topology-edit-table-slice3.yml'
+  pull_request:
+    paths:
+      - 'src/workspace/topology-edit/table/**'
+      - 'src/workspace/viewport-productivity/topology-edit-table-*.js'
+      - 'src/workspace/topology-edit-3d-productivity-controller.js'
+      - 'tests/topology-edit-table-*.test.mjs'
+      - 'e2e/topology-edit-table-authority.spec.js'
+      - '.github/workflows/topology-edit-table-slice3.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-table-canvas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Prove exact HEAD and line budget
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          files=(
+            src/workspace/topology-edit/table/topology-edit-table-view-state.js
+            src/workspace/viewport-productivity/topology-edit-table-canvas-coordinator.js
+            src/workspace/viewport-productivity/topology-edit-table-grid-view.js
+            src/workspace/viewport-productivity/topology-edit-table-styles.js
+            src/workspace/viewport-productivity/topology-edit-table-runtime.js
+            tests/topology-edit-table-view-state.test.mjs
+            e2e/topology-edit-table-authority.spec.js
+          )
+          for file in "${files[@]}"; do
+            test "$(git show "HEAD:$file" | wc -l)" -lt 300
+            node --check "$file"
+          done
+          ! grep -REn 'new (WebGLRenderer|TopologyEditViewportBackend)|WorkspaceState|loadDataset\(|swapDataset\(|applyCanonicalTopologyToWorkspaceEntities|session\.execute\(' \
+            src/workspace/viewport-productivity/topology-edit-table-*.js
+      - name: Table authority Node contracts
+        run: |
+          node --test \
+            tests/topology-edit-table-projection.test.mjs \
+            tests/topology-edit-table-batch-plan.test.mjs \
+            tests/topology-edit-table-rebase.test.mjs \
+            tests/topology-edit-table-transaction.test.mjs \
+            tests/topology-edit-table-view-state.test.mjs
+          node scripts/topology-edit-table-slice1-check.mjs
+      - name: Install dependencies
+        run: npm ci
+      - name: Production build
+        run: npm run build
+      - name: Install Chromium
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: '0'
+        run: npx playwright install --with-deps chromium
+      - name: Production Table Canvas lifecycle
+        env:
+          TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: npx playwright test e2e/topology-edit-table-authority.spec.js --project=chromium --workers=1 --retries=0 --reporter=line
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-table-slice3-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            reports/qualification/topology-edit-table-authority.json
+            playwright-report
+            test-results
+          if-no-files-found: warn
