@@ -1,0 +1,69 @@
+name: M035 M036 BM4 Integration Qualification
+
+on:
+  push:
+    branches:
+      - m035-m036-bm4-integration
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout exact integration head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Syntax
+        run: |
+          node --check scripts/lfea-m035-m036-bm4-integration-runtime.mjs
+          node --check scripts/lfea-m035-m036-bm4-integration-check.mjs
+
+      - name: Combined M035 M036 BM4 qualification
+        shell: bash
+        run: |
+          set +e
+          node scripts/lfea-m035-m036-bm4-integration-check.mjs > /tmp/m035-m036-integration.log 2>&1
+          status=$?
+          cat /tmp/m035-m036-integration.log
+          if [ "$status" -ne 0 ]; then
+            message="$(tr '\n' ' ' < /tmp/m035-m036-integration.log | head -c 3500)"
+            echo "::error file=scripts/lfea-m035-m036-bm4-integration-check.mjs,line=1,title=M035 M036 combined BM4 qualification::${message}"
+          fi
+          exit "$status"
+
+      - name: Regression M035 focused feature solve
+        run: node scripts/lfea-m035-bm4-feature-solve-check.mjs
+
+      - name: Regression M036
+        run: npm run check:lfea-m036
+
+      - name: Regression BM1
+        run: npm run check:lfea-bm1-cii-comparison
+
+      - name: Regression BM2
+        run: node scripts/lfea-b3.26-bm2-solve-comparison-check.mjs
+
+      - name: Regression BM3
+        run: node scripts/lfea-m028-bm3-check.mjs
+
+      - name: Upload integration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m035-m036-bm4-integration-${{ github.sha }}
+          path: /tmp/m035-m036-integration.log
+          if-no-files-found: warn
+          retention-days: 14
