@@ -21,6 +21,8 @@ export const SOURCE_CAPABILITY = Object.freeze({
   REDUCER_ORIENTATION: 'REDUCER_ORIENTATION',
   COMPONENT_LENGTH_MM: 'COMPONENT_LENGTH_MM',
   CATALOGUE_BINDING: 'CATALOGUE_BINDING',
+  VALVE_SUBTYPE: 'VALVE_SUBTYPE',
+  JUNCTION_BRANCH_RELATION: 'JUNCTION_BRANCH_RELATION',
   SUPPORT_ATTACHMENT: 'SUPPORT_ATTACHMENT',
   SUPPORT_GAP_MM: 'SUPPORT_GAP_MM',
   SUPPORT_TRAVEL_MM: 'SUPPORT_TRAVEL_MM',
@@ -113,6 +115,8 @@ function engineeringFacts(topology, dataset) {
       edge.reducerOrientation);
     addIf(facts, edge.id, 'componentLengthMm', SOURCE_CAPABILITY.COMPONENT_LENGTH_MM,
       edge.componentLengthMm);
+    addIf(facts, edge.id, 'valveSubtype', SOURCE_CAPABILITY.VALVE_SUBTYPE,
+      String(edge.entityType ?? '').toUpperCase() === 'VALVE' ? edge.valveType : null);
     addCatalogue(facts, edge.id, edge);
     if (String(edge.identityKind ?? '').toUpperCase() === 'NATIVE_COMMAND') {
       add(facts, edge.id, 'nativeIdentity', SOURCE_CAPABILITY.NATIVE_IDENTITY, nativeIdentity(edge));
@@ -122,6 +126,8 @@ function engineeringFacts(topology, dataset) {
     add(facts, junction.id, 'identity', SOURCE_CAPABILITY.TOPOLOGY_IDENTITY, junction.id);
     add(facts, junction.id, 'connectivity', SOURCE_CAPABILITY.CONNECTIVITY, junction.nodeIds ?? []);
     add(facts, junction.id, 'elementType', SOURCE_CAPABILITY.ELEMENT_TYPE, junction.entityType ?? 'JUNCTION');
+    addIf(facts, junction.id, 'branchRelation', SOURCE_CAPABILITY.JUNCTION_BRANCH_RELATION,
+      junction.branchRelation);
     addCatalogue(facts, junction.id, junction);
   }
   for (const support of topology.supports ?? []) {
