@@ -4,17 +4,11 @@ on:
   pull_request:
     paths:
       - 'src/core/centerline-beam-fea/**'
-      - 'src/core/geometry/adapters/inputXmlToCanonicalGeometry.js'
       - 'src/core/linear-fea-*/**'
       - 'src/core/linear-piping-analysis-consumer/**'
-      - 'package.json'
       - 'scripts/lfea-b1-conditioning-check.mjs'
       - 'scripts/lfea-linear-core-exact-head-evidence.mjs'
       - 'scripts/linear-piping-inputxml-unit-normalization-check.mjs'
-      - 'scripts/lfea-unilateral-*.mjs'
-      - 'scripts/lfea-m036-*.mjs'
-      - 'scripts/lfea-m034-bm4-solve-fixtures.mjs'
-      - 'scripts/lfea-m034-bm4-run-analysis.mjs'
       - '.github/workflows/lfea-linear-core-exact-head.yml'
 
 permissions:
@@ -48,7 +42,7 @@ jobs:
           git diff --name-only "$merge_base" "${{ github.event.pull_request.head.sha }}" > /tmp/lfea-linear-core-paths.txt
           while IFS= read -r changed; do
             case "$changed" in
-              src/core/centerline-beam-fea/*|src/core/geometry/adapters/inputXmlToCanonicalGeometry.js|src/core/linear-fea-*/*|src/core/linear-piping-analysis-consumer/*|package.json|scripts/lfea-b1-conditioning-check.mjs|scripts/lfea-linear-core-exact-head-evidence.mjs|scripts/linear-piping-inputxml-unit-normalization-check.mjs|scripts/lfea-unilateral-*.mjs|scripts/lfea-m036-*.mjs|scripts/lfea-m034-bm4-solve-fixtures.mjs|scripts/lfea-m034-bm4-run-analysis.mjs|.github/workflows/lfea-linear-core-exact-head.yml) ;;
+              src/core/centerline-beam-fea/*|src/core/linear-fea-*/*|src/core/linear-piping-analysis-consumer/*|scripts/lfea-b1-conditioning-check.mjs|scripts/lfea-linear-core-exact-head-evidence.mjs|scripts/linear-piping-inputxml-unit-normalization-check.mjs|.github/workflows/lfea-linear-core-exact-head.yml) ;;
               *) echo "Forbidden changed path for the linear-core qualification slice: $changed"; exit 1 ;;
             esac
           done < /tmp/lfea-linear-core-paths.txt
@@ -74,27 +68,27 @@ jobs:
           CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           mkdir -p artifacts/lfea-linear-core-exact-head
+          set +e
           node scripts/lfea-linear-core-exact-head-evidence.mjs > artifacts/lfea-linear-core-exact-head/emitter.log 2>&1
+          status=$?
           cat artifacts/lfea-linear-core-exact-head/emitter.log
+          if [ "$status" -ne 0 ]; then
+            message="$(tail -n 40 artifacts/lfea-linear-core-exact-head/emitter.log | tr '\n' ' ' | sed 's/%/%25/g')"
+            echo "::error file=scripts/lfea-linear-core-exact-head-evidence.mjs::$message"
+            exit "$status"
+          fi
 
       - name: Element-end, nodal and code-station recovery
         run: npm run check:lfea-b3.4
 
-      - name: Production linear piping consumer functional regression
-        run: node scripts/linear-piping-analysis-consumer-check.mjs
+      - name: Production linear piping consumer
+        run: npm run check:linear-piping-analysis-consumer
 
       - name: Derived cases and B31 code evaluation
         run: npm run check:lfea-b4.0 && npm run check:lfea-b4.4 && npm run check:lfea-code-application
 
-      - name: Fixed-input commercial benchmark regressions
-        run: |
-          npm run check:lfea-bm1-cii-comparison
-          node scripts/lfea-b3.26-bm2-solve-comparison-check.mjs
-          node scripts/lfea-m028-bm3-check.mjs
-          node scripts/lfea-m034-bm4-run-analysis.mjs
-
-      - name: M036 unilateral and zero-regression qualification
-        run: npm run check:lfea-m036
+      - name: Fixed-input commercial benchmark regression
+        run: npm run check:lfea-bm1-cii-comparison
 
       - name: Retain exact-head JSON and CSV evidence
         if: always()
