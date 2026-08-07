@@ -601,12 +601,15 @@ function classifyElementType(inner) {
   if (rigidType.includes('VALVE')) return 'VALVE';
   if (rigidType.includes('FLANGE') || rigidType.includes('BLIND') || rigidType.includes('GASK')) return 'FLANGE';
   if (firstElement(inner, REDUCER_TAGS)) return 'PIPE';
+  // Geometry-bearing bend tags take precedence over SIF metadata. A CAESAR
+  // element may carry a BEND plus an end-node SIF tag; the SIF is stress
+  // evidence and must not erase the physical elbow from canonical geometry.
+  if (firstElement(inner, BEND_TAGS)) return 'BEND';
   for (const sif of findAnyElements(inner, SIF_TAGS)) {
     const typeCode = caesarNumberOrNull(attributeValue(sif.attributes, 'TYPE'));
     if (typeCode != null && Math.abs(typeCode - SIF_TYPE_WELDING_TEE) < 0.001) return 'TEE';
     if (typeCode != null && Math.abs(typeCode - SIF_TYPE_WELDOLET) < 0.001) return 'TEE';
   }
-  if (firstElement(inner, BEND_TAGS)) return 'BEND';
   return 'PIPE';
 }
 
