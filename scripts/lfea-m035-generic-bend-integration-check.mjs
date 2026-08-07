@@ -42,7 +42,7 @@ const mixedBendSif = bendSegments.find((row) => String(row.startNodeId) === '206
 assert.ok(mixedBendSif, 'Mixed BEND+SIF span 20690->20700 must retain bend geometry classification.');
 assert.ok(
   Array.isArray(mixedBendSif.meta?.analysis?.sifs)
-    && mixedBendSif.meta.analysis.sifs.some((entry) => Number(entry.type) === 3),
+    && mixedBendSif.meta.analysis.sifs.some((entry) => Number(entry.typeCode) === 3),
   'Mixed BEND+SIF span 20690->20700 must retain its type-3 SIF evidence.',
 );
 
