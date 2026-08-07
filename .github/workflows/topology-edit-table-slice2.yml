@@ -38,6 +38,7 @@ jobs:
           node --test \
             tests/topology-edit-table-projection.test.mjs \
             tests/topology-edit-table-batch-plan.test.mjs \
-            tests/topology-edit-table-rebase.test.mjs
+            tests/topology-edit-table-rebase.test.mjs \
+            tests/topology-edit-table-transaction.test.mjs
       - name: Exact HEAD, line gate, and mutation-source guard
         run: node scripts/topology-edit-table-slice1-check.mjs
