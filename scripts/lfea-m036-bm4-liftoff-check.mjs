@@ -103,7 +103,7 @@ function equilibrium(execution, totalWeight, label) {
     .filter((row) => row.dof === 'UY')
     .reduce((sum, row) => sum + row.value, 0);
   const qualified = execution.diagnostics.forceEquilibrium;
-  assert.notEqual(qualified.status, 'BLOCK', `${label}: existing solver force-equilibrium qualification`);
+  assert.notEqual(qualified.status, 'FAIL', `${label}: existing solver force-equilibrium qualification`);
   return {
     sumVerticalReaction,
     totalWeight,
