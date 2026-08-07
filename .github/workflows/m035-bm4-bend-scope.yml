@@ -5,6 +5,9 @@ on:
     branches:
       - claude/lfea-linear-static-fea-unfwjd
     paths:
+      - 'src/core/linear-piping-analysis-consumer/inputxml-bend-feature-expansion.js'
+      - 'src/core/linear-piping-analysis-consumer/index.js'
+      - 'scripts/lfea-m035-generic-bend-integration-check.mjs'
       - 'scripts/lfea-m035-bm4-scope-policy.mjs'
       - 'scripts/lfea-m035-bm4-scope-policy-check.mjs'
       - 'scripts/lfea-m035-bm4-bend-authority-check.mjs'
@@ -50,10 +53,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          node --check src/core/linear-piping-analysis-consumer/inputxml-bend-feature-expansion.js
+          node --check scripts/lfea-m035-generic-bend-integration-check.mjs
           node --check scripts/lfea-m035-bm4-scope-policy.mjs
           node --check scripts/lfea-m035-bm4-scope-policy-check.mjs
           node --check scripts/lfea-m035-bm4-bend-authority-check.mjs
           node scripts/lfea-m035-bm4-scope-policy-check.mjs
+
+      - name: Generic bend feature integration
+        run: node scripts/lfea-m035-generic-bend-integration-check.mjs
 
       - name: B31 bend authority audit
         shell: bash
