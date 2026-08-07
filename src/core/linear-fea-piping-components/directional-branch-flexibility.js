@@ -4,7 +4,7 @@ import { requireMaterialResolutionResult } from '../linear-fea-material/index.js
 import { requirePipeSectionResolution } from '../linear-fea-section/index.js';
 import { semanticHash } from '../shared-piping-model/canonical-json.js';
 import { classifyBranchLegs } from './branch-component.js';
-import { requirePositive, requireRecord } from './piping-component-contract.js';
+import { requireRecord } from './piping-component-contract.js';
 
 export const B31J_DIRECTIONAL_BRANCH_SCHEMA = 'fea-linear-b31j-directional-branch/v1';
 export const B31J_DIRECTIONAL_BRANCH_FORMULATION = 'BRANCH_B31J_DIRECTIONAL_ROTATIONAL_SPRINGS_V1';
@@ -42,6 +42,9 @@ export function compileB31JDirectionalBranchFlexibility({
   if (!Array.isArray(legs) || legs.length !== 3) {
     fail('PIPING_COMPONENT_BRANCH_LEG_COUNT_INVALID', 'B31J directional branch flexibility requires exactly three connected legs.');
   }
+  if (!runCollinearityTolerance || !(runCollinearityTolerance.value >= 0)) {
+    throw new TypeError('runCollinearityTolerance must be a declared nonnegative tolerance.');
+  }
   const frameProfile = requireFrameElementProfile(frameElementProfile);
   const classification = classifyBranchLegs(legs, junctionPosition, runCollinearityTolerance);
   const roleById = new Map(classification.legs.map((row) => [row.legId, row.role]));
@@ -68,9 +71,7 @@ export function compileB31JDirectionalBranchFlexibility({
     const role = roleById.get(leg.legId);
     const authorities = accepted.get(leg.legId);
     const factors = role === 'RUN' ? directional.run : directional.branch;
-    const diameter = role === 'RUN'
-      ? authorities.section.dimensions.outerDiameter
-      : authorities.section.dimensions.outerDiameter;
+    const diameter = authorities.section.dimensions.outerDiameter;
     const springSet = directionalRotationalSprings({
       role,
       factors,
@@ -85,7 +86,7 @@ export function compileB31JDirectionalBranchFlexibility({
       profile: localAxisProfile,
     });
     const rigidOffsets = role === 'BRANCH'
-      ? { I: branchSurfaceOffset, J: null }
+      ? { I: asOffsetRecord(branchSurfaceOffset), J: null }
       : null;
     const frameElement = compileFrameElement({
       elementId: `${componentId}.E${index + 1}`,
@@ -212,6 +213,7 @@ function deepFreezeDirectional(value) {
   });
 }
 
+function asOffsetRecord(vector) { return { x: vector[0], y: vector[1], z: vector[2] }; }
 function add(a, b) { return a.map((value, index) => value + b[index]); }
 function scale(a, factor) { return a.map((value) => value * factor); }
 function cross(a, b) {
