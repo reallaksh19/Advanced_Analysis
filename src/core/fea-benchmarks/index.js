@@ -24,6 +24,7 @@ export {
 export { compareBenchmarkResultRows } from './qualification-comparison.js';
 export { normalizeLinearSolverBenchmarkResult } from './qualification-normalization.js';
 export { runGovernedBenchmarkQualification } from './qualification-pipeline.js';
+export { createBenchmarkQualificationAdapter } from './adapters/generic.js';
 export {
   BM4_QUALIFICATION_ADAPTER_ID,
   BM4_QUALIFICATION_CASE_IDS,
