@@ -21,6 +21,16 @@ jobs:
       - run: npm ci
       - run: node scripts/lfea-unilateral-closed-form-check.mjs
       - run: node scripts/lfea-unilateral-determinism-check.mjs
-      - run: node scripts/lfea-m036-bm4-liftoff-check.mjs
+      - name: BM4 lift-off validation
+        shell: bash
+        run: |
+          set +e
+          node scripts/lfea-m036-bm4-liftoff-check.mjs 2>&1 | tee bm4.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then
+            message=$(grep -E 'AssertionError|Error:' bm4.log | tail -n 1 | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')
+            echo "::error::$message"
+            exit "$code"
+          fi
       - run: node scripts/lfea-unilateral-anti-drift-check.mjs
       - run: node scripts/syntax-check.mjs --strict
