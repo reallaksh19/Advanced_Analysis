@@ -25,6 +25,7 @@ test('Shell V2 renders as the embedded LFEA workbench with explicit blocked Enri
   const blocked = workbench.locator('[data-role="lfea-enriched-sjson-capability"]');
   await expect(blocked).toHaveAttribute('data-status', 'BLOCKED');
   await expect(blocked).toContainText('LFEA_ENRICHED_SJSON_PIPING_ADAPTER_NOT_WIRED');
+  await expect(workbench.locator('[data-role="lfea-enriched-sjson-import"]')).toBeDisabled();
 });
 
 test('standalone LFEA entry mounts the same controller/store workbench', async ({ page }) => {
