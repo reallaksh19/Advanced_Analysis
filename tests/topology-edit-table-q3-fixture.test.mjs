@@ -28,7 +28,7 @@ function junctionByComponent(topology, componentKey) {
   return rows[0];
 }
 
-test('Q3 source fixture imports through production adapters with exact reducer custody', async () => {
+test('Q3 source fixture imports canonical engineering semantics before Table projection', async () => {
   const bytes = new Uint8Array(await readFile(FIXTURE));
   const raw = JSON.parse(new TextDecoder().decode(bytes));
   const dataset = normalizeWorkspaceDataset(raw, 'topology-edit-table-q3-exact.staged.json', {
@@ -49,6 +49,9 @@ test('Q3 source fixture imports through production adapters with exact reducer c
   const tee = junctionByComponent(topology, 'T-001');
   assert.equal(tee.entityType, 'TEE');
   assert.equal(tee.nodeIds.length, 3);
+  assert.equal(tee.runDiameterMm, 150);
+  assert.equal(tee.branchDiameterMm, 100);
+  assert.equal(tee.branchRelation, undefined);
 
   const reducer = edgeByComponent(topology, 'R-001');
   const m04 = edgeByComponent(topology, 'P-M04');
@@ -56,7 +59,22 @@ test('Q3 source fixture imports through production adapters with exact reducer c
   const tail = edgeByComponent(topology, 'P-TAIL');
   const disjoint = edgeByComponent(topology, 'P-R42');
   assert.equal(reducer.entityType, 'REDUCER');
+  assert.equal(reducer.secondaryNominalSizeMm, 80);
+  assert.equal(reducer.catalogueBinding.componentType, 'REDUCER');
+  assert.equal(reducer.catalogueBinding.recordId, 'RED-100-80');
+  assert.equal(reducer.catalogueBinding.recordHash, 'sha256:q3-red-100-80');
+  assert.equal(reducer.catalogueBinding.fromNominalSizeMm, 100);
+  assert.equal(reducer.catalogueBinding.toNominalSizeMm, 80);
+
   assert.equal(valve.entityType, 'VALVE');
+  assert.equal(valve.valveType, 'GATE');
+  assert.equal(valve.valveFaceToFaceMm, 200);
+  assert.equal(valve.componentMassKg, 20);
+  assert.equal(valve.lengthAuthority, 'SOURCE_FACE_TO_FACE');
+  assert.equal(valve.insertionDirection, 'FROM_TO');
+  assert.equal(valve.catalogueBinding.recordId, 'GATE-DN80-C150');
+  assert.equal(valve.catalogueBinding.recordHash, 'sha256:q3-gate-80-150');
+
   assert.equal(new Set([m04.fromNodeId, m04.toNodeId]).has(reducer.toNodeId), true);
   assert.equal(new Set([m04.fromNodeId, m04.toNodeId]).has(valve.fromNodeId), true);
   assert.equal(new Set([tail.fromNodeId, tail.toNodeId]).has(valve.toNodeId), true);
@@ -71,8 +89,10 @@ test('Q3 source fixture imports through production adapters with exact reducer c
   assert.equal(reducerRow.fields.dnOutMm, 80);
 
   const valveRow = rowByComponent(projection, 'V-M06');
+  assert.equal(valveRow.custody.catalogueAuthority, 'EXACT');
   assert.equal(valveRow.fields.valveType, 'GATE');
   assert.equal(valveRow.fields.lengthMm, 200);
+  assert.equal(valveRow.fields.componentLengthMm, 200);
   assert.equal(valveRow.fields.dnInMm, 80);
 
   const teeRow = rowByComponent(projection, 'T-001');
