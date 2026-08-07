@@ -227,15 +227,16 @@ export function createLafeaWorkbenchOrchestratorStore(options) {
   }
 
   function registerAnalysisMeshEvidence(value) {
-    const stageId = value?.stageId ?? retainedState.activeStageId;
+    const stageId = value?.intent?.stageId ?? value?.stageId ?? retainedState.activeStageId;
     if (rawStage(stageId).domainFirstProfileActive) {
       const stage = readStageState(stageId);
       const prepared = domainMesh.prepareRegistration(value, stage);
-      const evidence = domainMesh.commitRegistration(prepared, stage);
+      const receipt = domainMesh.commitRegistration(prepared, stage);
       const state = prepared.changed ? publish() : deriveState();
       return freeze({
         changed: prepared.changed,
-        evidence,
+        evidence: receipt.evidence,
+        receipt,
         projection: state.stages[stageId].analysisMeshCustodyProjection,
       });
     }
