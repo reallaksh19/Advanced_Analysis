@@ -17,19 +17,24 @@ function exactText(value, label) {
   if (!text) fail(`${label} is required.`, TypeError);
   return text;
 }
+function connectionPair(value) {
+  return [value?.endConnectionFrom, value?.endConnectionTo]
+    .map((row) => String(row ?? '').trim().toUpperCase())
+    .sort();
+}
 function compatible(record, pipe, turn) {
-  const pipeConnections = new Set([
-    String(pipe.endConnectionFrom ?? '').trim().toUpperCase(),
-    String(pipe.endConnectionTo ?? '').trim().toUpperCase(),
-  ].filter(Boolean));
+  const pipePair = connectionPair(pipe);
+  const recordPair = connectionPair(record);
+  const connectionsMatch = pipePair.length === 2
+    && recordPair.length === 2
+    && pipePair.every((value, index) => value && value === recordPair[index]);
   return record.componentType === 'ELBOW'
     && close(record.nominalSizeMm, pipe.nominalSizeMm)
     && close(record.outsideDiameterMm, pipe.outsideDiameterMm)
     && String(record.pipingClass ?? '').trim().toUpperCase() === String(pipe.pipingClass ?? '').trim().toUpperCase()
     && String(record.pressureClass ?? '').trim().toUpperCase() === String(pipe.pressureClass ?? '').trim().toUpperCase()
     && close(record.elbowAngleDeg, turn.angleDeg)
-    && pipeConnections.has(String(record.endConnectionFrom ?? '').trim().toUpperCase())
-    && pipeConnections.has(String(record.endConnectionTo ?? '').trim().toUpperCase());
+    && connectionsMatch;
 }
 function binding(catalogue, record, turn) {
   const material = {
