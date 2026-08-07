@@ -32,5 +32,7 @@ jobs:
             echo "::error::$message"
             exit "$code"
           fi
+          summary=$(grep '^M036_SUMMARY=' bm4.log | tail -n 1 | sed 's/^M036_SUMMARY=//; s/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')
+          echo "::notice title=M036 BM4 evidence::$summary"
       - run: node scripts/lfea-unilateral-anti-drift-check.mjs
       - run: node scripts/syntax-check.mjs --strict
