@@ -82,7 +82,6 @@ function createTablePanel(documentRef) {
   const details = documentRef.createElement('details');
   details.className = 'topology-edit-clean-shell__panel';
   details.dataset.panelKind = 'table';
-  details.open = true;
   const summary = documentRef.createElement('summary');
   summary.textContent = 'Engineering table — exact canonical projection';
   const body = documentRef.createElement('div');
