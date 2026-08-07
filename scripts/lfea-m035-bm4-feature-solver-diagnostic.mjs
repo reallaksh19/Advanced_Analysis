@@ -38,15 +38,34 @@ export function diagnoseBm4M035FeatureStiffness() {
       endSprings: entry.teeModifier?.endSprings ?? [],
       rigidOffsets: entry.teeModifier?.rigidOffsets ?? null,
     }));
+  const probeElementId = authorities.entries[0].elementId;
   const loadCase = compilePhysicalLoadCase({
-    loadCaseId: 'BM4-M035-STIFFNESS-DIAGNOSTIC-ZERO-LOAD',
+    loadCaseId: 'BM4-M035-STIFFNESS-DIAGNOSTIC-ZERO-RHS',
     loadCaseClass: 'MIXED_PHYSICAL',
     presentation: {
       label: 'M035 stiffness diagnostic',
-      description: 'Zero-load execution used only to expose feature-model numerical qualification gates.',
+      description: 'Zero-RHS execution used only to expose feature-model numerical qualification gates.',
     },
     modelReference: modelReferenceFromCompilation(authorities.compilation),
-    primitives: [],
+    primitives: [{
+      schema: 'fea-linear-load-primitive/v1',
+      primitiveId: 'BM4-M035-STIFFNESS-DIAGNOSTIC-P0',
+      kind: 'PRESSURE',
+      elementId: probeElementId,
+      pressure: 0,
+      pressureBasis: 'GAUGE',
+      authorizedEffects: {
+        codeStress: true,
+        pressureStiffening: false,
+        axialThrust: false,
+        bourdon: false,
+      },
+      sourceEvidence: {
+        sourceId: 'M035-BM4-STIFFNESS-DIAGNOSTIC',
+        sourceRevision: 'ZERO-PRESSURE-RHS-V1',
+        sourceSemanticHash: authorities.source.semanticHash,
+      },
+    }],
     profile: loadCaseProfile({
       gravitationalAcceleration: { value: GRAVITY, source: 'SI-STANDARD-GRAVITY-EXACT' },
     }),
