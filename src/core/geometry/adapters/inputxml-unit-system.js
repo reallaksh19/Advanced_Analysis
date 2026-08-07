@@ -56,6 +56,10 @@ function normalizedLabel(value) {
     .replace(/N\.?[-·*\s]*M\.?/gu, 'NM')
     .replace(/N\.?\s*\/\s*SQ\.?\s*MM\.?/gu, 'N/SQMM')
     .replace(/KG\.?\s*\/\s*CU\.?\s*CM\.?/gu, 'KG/CUCM')
+    // Some CAESAR II InputXML exports label this unit without the slash
+    // (e.g. "kg.cu.cm." rather than "kg. / cu.cm."); confirmed as the same
+    // physical unit by its FACTOR value, not a distinct declaration.
+    .replace(/KG\.?\s*CU\.?\s*CM\.?/gu, 'KG/CUCM')
     .replace(/KG\.?\s*\/\s*M(?:\^?3|3)\.?/gu, 'KG/M3')
     .replace(/LB\.?\s*\/\s*CU\.?\s*IN\.?/gu, 'LB/CUIN')
     .replace(/[.\s]/gu, '');
