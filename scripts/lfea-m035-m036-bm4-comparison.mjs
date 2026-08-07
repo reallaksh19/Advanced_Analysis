@@ -208,8 +208,8 @@ const combinedCases = compareSnapshot(featureSnapshot(combined), cii);
 const m035Aggregate = aggregate(m035Cases);
 const combinedAggregate = aggregate(combinedCases);
 
-assert.ok(Math.abs(ratePct(m035Aggregate.raw.displacement) - 18.499427262313862) < 1e-12, 'comparison parity: M035 raw displacement');
-assert.ok(Math.abs(ratePct(m035Aggregate.raw.forces) - 31.49171270718232) < 1e-12, 'comparison parity: M035 raw forces after local-axis reference normalization');
+assert.ok(Math.abs(ratePct(m035Aggregate.raw.displacement) - 31.958762886597935) < 1e-12, 'comparison parity: M035 raw displacement under qualified BM4 thermal authority');
+assert.ok(Math.abs(ratePct(m035Aggregate.raw.forces) - 35.543278084714544) < 1e-12, 'comparison parity: M035 raw forces after local-axis normalization and qualified BM4 thermal authority');
 
 const report = {
   schema: 'm035-m036-bm4-cases-19-20-21-comparison/v2',
