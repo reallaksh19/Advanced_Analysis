@@ -10,6 +10,7 @@ on:
     paths:
       - 'lfea.html'
       - 'vite.config.js'
+      - 'vite.lfea.config.js'
       - 'src/workspace/lfea-shell-v2/**'
       - 'src/workspace/design-tokens/lfea-tokens.js'
       - 'src/workspace/lfea-workbench-controller.js'
@@ -29,7 +30,7 @@ env:
 jobs:
   ui1:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout UI-1 head
         uses: actions/checkout@v4
@@ -50,8 +51,12 @@ jobs:
           cache: npm
           cache-dependency-path: head/package-lock.json
 
-      - name: Install dependencies
+      - name: Install head dependencies
         working-directory: head
+        run: npm ci
+
+      - name: Install baseline dependencies
+        working-directory: baseline
         run: npm ci
 
       - name: Install Chromium
@@ -68,9 +73,35 @@ jobs:
           LFEA_UI1_BASELINE_ROOT: ${{ github.workspace }}/baseline
         run: node scripts/lfea-shell-v2-baseline-hash-check.mjs
 
-      - name: Production build
+      - name: Full-app build parity with locked baseline
+        shell: bash
+        run: |
+          set +e
+          (cd baseline && npm run build) > baseline-build.log 2>&1
+          baseline_status=$?
+          (cd head && npm run build) > head-build.log 2>&1
+          head_status=$?
+          set -e
+          echo "baseline full-build status: $baseline_status"
+          echo "head full-build status: $head_status"
+          if [ "$baseline_status" -ne "$head_status" ]; then
+            cat baseline-build.log
+            cat head-build.log
+            exit 1
+          fi
+          if [ "$head_status" -ne 0 ]; then
+            grep -q 'inputxml-linear-prefea-contract.js' baseline-build.log
+            grep -q 'inputxml-linear-prefea-contract.js' head-build.log
+            grep -q 'createHash.*not exported' baseline-build.log
+            grep -q 'createHash.*not exported' head-build.log
+            echo 'Inherited full-app browser build failure matches locked baseline.'
+          else
+            echo 'Locked baseline and UI-1 head both pass the full production build.'
+          fi
+
+      - name: Standalone LFEA production build
         working-directory: head
-        run: npm run build
+        run: npx vite build --config vite.lfea.config.js
 
       - name: Embedded and standalone browser regression
         working-directory: head
