@@ -24,3 +24,5 @@ export * from './production-run-receipt-contract.js';
 export * from './production-run-receipt-evaluator.js';
 export * from './operational-surveillance-contract.js';
 export * from './operational-surveillance-evaluator.js';
+export * from './retirement-preservation-contract.js';
+export * from './retirement-preservation-evaluator.js';
