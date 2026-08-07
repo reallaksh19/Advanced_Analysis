@@ -13,7 +13,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: m035-bm4-bend-scope-${{ github.event.pull_request.number || github.ref }}
@@ -62,37 +61,17 @@ jobs:
           set +e
           node scripts/lfea-m035-bm4-bend-authority-check.mjs > /tmp/m035-bend-audit.log 2>&1
           status=$?
-          {
-            echo '### M035 BM4 bend authority audit'
-            echo '```text'
-            cat /tmp/m035-bend-audit.log
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
           cat /tmp/m035-bend-audit.log
           exit "$status"
 
-      - name: Publish M035 audit failure evidence
-        if: failure() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
+      - name: Upload M035 bend audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          script: |
-            const fs = require('fs');
-            if (!fs.existsSync('/tmp/m035-bend-audit.log')) return;
-            const text = fs.readFileSync('/tmp/m035-bend-audit.log', 'utf8');
-            const body = [
-              '<!-- m035-bend-audit-failure -->',
-              '### M035 bend authority audit failure',
-              '```text',
-              text.slice(0, 60000),
-              '```',
-              `Head: ${context.sha}`,
-            ].join('\n');
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body,
-            });
+          name: m035-bm4-bend-audit-${{ env.TARGET_HEAD_SHA }}
+          path: /tmp/m035-bend-audit.log
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Existing B31 and bend regressions
         shell: bash
