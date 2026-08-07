@@ -9,10 +9,11 @@ import { fail, uniqueAscii } from './inputxml-linear-prefea-contract.js';
  * A downstream activation PR must pass the production executor explicitly after
  * this function has validated the complete sealed parent chain.
  */
-export function solveInputXmlLinearAnalysis(preparation, authorization, runtimeOptions = {}) {
+export function solveInputXmlLinearAnalysis(preparation, authorization, runtimeOptions) {
+  const options = runtimeOptions ?? {};
   const acceptedPreparation = requireInputXmlLinearPreFeaPreparation(preparation);
   const requestedCaseIds = uniqueAscii(
-    runtimeOptions.requestedCaseIds ?? acceptedPreparation.requestedCaseIds,
+    options.requestedCaseIds ?? acceptedPreparation.requestedCaseIds,
   );
   const acceptedAuthorization = requireInputXmlLinearSolveAuthorization(
     authorization,
@@ -25,7 +26,7 @@ export function solveInputXmlLinearAnalysis(preparation, authorization, runtimeO
   if (acceptedPreparation.status === 'WARN' && acceptedAuthorization.approverIdentity === 'SYSTEM_POLICY') {
     fail('PREFEA_WARN_REQUIRES_EXPLICIT_APPROVER', 'WARN requires explicit conditional authorization.');
   }
-  const executeAuthorizedCases = runtimeOptions.executeAuthorizedCases;
+  const executeAuthorizedCases = options.executeAuthorizedCases;
   if (typeof executeAuthorizedCases !== 'function') {
     fail('PREFEA_RUNTIME_EXECUTOR_NOT_CONFIGURED',
       'No production runtime executor is configured; public-default activation is deferred.', {
