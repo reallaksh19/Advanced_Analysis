@@ -55,6 +55,7 @@ const COMPONENT_PROFILE = componentProfile({
   bendPressureStiffeningRule: 'BEND_PRESSURE_STIFFENING_DECLARED_FACTOR_V1',
 });
 const NODE_DOFS = Object.freeze(['UX', 'UY', 'UZ', 'RX', 'RY', 'RZ']);
+const AXIS_PARITY_TOLERANCE = 1e-12;
 
 export function buildBm4M035FeatureAuthorities() {
   const base = buildBm4SolveAuthorities();
@@ -121,12 +122,14 @@ export function buildBm4M035FeatureAuthorities() {
   requireTeeModifierCoverage(entries, teeModifierBySourceSegmentId);
   const entryByElementId = new Map(entries.map((row) => [row.elementId, row]));
   const conditioned = conditionGeometry(analysisGeometry, [], CONDITIONING_PROFILE);
-  const localAxisResults = entries.map((entry) => ({
-    evidenceIdentity: `AXIS-${entry.elementId}`,
-    result: entry.bendComponent
-      ? entry.bendComponent.elements[entry.componentElementIndex].frameElement.localAxes
-      : resolveEntryAxes(analysisGeometry, entry),
-  }));
+  const localAxisResults = entries.map((entry) => {
+    const result = resolveEntryAxes(analysisGeometry, entry);
+    if (entry.bendComponent) {
+      const sealedAxes = entry.bendComponent.elements[entry.componentElementIndex].frameElement.localAxes.axes;
+      requireAxisParity(entry.elementId, result.axes, sealedAxes);
+    }
+    return { evidenceIdentity: `AXIS-${entry.elementId}`, result };
+  });
   const sections = new Map();
   for (const entry of entries) sections.set(entry.analysisSection.semanticHash, entry.analysisSection);
   const compilation = compileMechanicalModel({
@@ -318,6 +321,16 @@ function requireTeeModifierCoverage(entries, teeModifierBySourceSegmentId) {
   }
 }
 
+function requireAxisParity(elementId, resolvedAxes, sealedAxes) {
+  for (const axis of ['x', 'y', 'z']) {
+    for (let component = 0; component < 3; component += 1) {
+      if (Math.abs(resolvedAxes[axis][component] - sealedAxes[axis][component]) > AXIS_PARITY_TOLERANCE) {
+        throw new Error(`M035 recomputed B-2.4 axes drift from B-3.2 bend element ${elementId} at ${axis}[${component}].`);
+      }
+    }
+  }
+}
+
 function analyseCase(authorities, loadCaseId, thermal) {
   const loadCase = compileCase(authorities, loadCaseId, thermal);
   const loadsByElement = new Map(
@@ -348,7 +361,7 @@ function analyseCase(authorities, loadCaseId, thermal) {
         elementId: componentElement.elementId,
         material: authorities.material,
         section: entry.analysisSection,
-        localAxes: { result: componentElement.frameElement.localAxes, profile: FRAME_LOCAL_AXIS_PROFILE },
+        localAxes: { result: resolveEntryAxes(authorities.analysisGeometry, entry), profile: FRAME_LOCAL_AXIS_PROFILE },
         profile: authorities.frameProfile,
         distributedLoads: [loadsByElement.get(componentElement.elementId)],
         temperature: temperatureByElement.get(componentElement.elementId) ?? null,
