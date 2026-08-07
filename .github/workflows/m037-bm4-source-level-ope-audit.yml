@@ -8,6 +8,7 @@ on:
       - 'scripts/lfea-m037-bm4-source-level-ope-audit.mjs'
       - 'scripts/lfea-m037-bm4-node-case-rca.mjs'
       - 'scripts/lfea-m037-bm4-rigid-result-semantics.mjs'
+      - 'scripts/lfea-m037-bm4-rigid-response-coherence.mjs'
       - 'scripts/lfea-m035-m036-bm4-failure-attribution.mjs'
       - 'scripts/lfea-m035-m036-bm4-integration-runtime.mjs'
       - 'src/core/geometry/adapters/inputXmlToCanonicalGeometry.js'
@@ -51,6 +52,7 @@ jobs:
           node --check scripts/lfea-m037-bm4-source-level-ope-audit.mjs
           node --check scripts/lfea-m037-bm4-node-case-rca.mjs
           node --check scripts/lfea-m037-bm4-rigid-result-semantics.mjs
+          node --check scripts/lfea-m037-bm4-rigid-response-coherence.mjs
 
       - name: Reproduce final M035+M036 row attribution
         run: node scripts/lfea-m035-m036-bm4-failure-attribution.mjs
@@ -73,6 +75,12 @@ jobs:
           set -euo pipefail
           node scripts/lfea-m037-bm4-rigid-result-semantics.mjs | tee /tmp/m037-bm4-rigid-result-semantics.log
 
+      - name: Rigid response-coherence audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/lfea-m037-bm4-rigid-response-coherence.mjs | tee /tmp/m037-bm4-rigid-response-coherence.log
+
       - name: Regression combined M035+M036 qualification
         run: node scripts/lfea-m035-m036-bm4-integration-check.mjs
 
@@ -88,9 +96,11 @@ jobs:
             /tmp/m037-bm4-source-level-ope-audit.log
             /tmp/m037-bm4-node-case-rca.log
             /tmp/m037-bm4-rigid-result-semantics.log
+            /tmp/m037-bm4-rigid-response-coherence.log
             reports/m035-m036-bm4-failure-attribution.json
             reports/m037-bm4-source-level-ope-audit.json
             reports/m037-bm4-node-case-rca.json
             reports/m037-bm4-rigid-result-semantics.json
+            reports/m037-bm4-rigid-response-coherence.json
           if-no-files-found: warn
           retention-days: 14
