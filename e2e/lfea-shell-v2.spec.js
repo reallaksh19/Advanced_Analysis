@@ -20,6 +20,15 @@ const EDITOR_PATHS = [
   'analysisDefinition.loadCase.boundaryPressures',
   'analysisDefinition.constraints',
 ];
+const RESULT_VIEWS = [
+  'OVERVIEW',
+  'DISPLACEMENTS',
+  'REACTIONS',
+  'RAW_STRESS',
+  'PROJECTED_STRESS',
+  'MESH_QUALITY',
+  'REVIEW',
+];
 
 async function importFixture(workbench, packageValue = rectangularQ4Package({})) {
   await workbench.locator('[data-role="lfea-import"]').setInputFiles({
@@ -80,6 +89,13 @@ async function openStandaloneShell(page) {
 async function bootFailure(page, label, detail, errors) {
   const body = (await page.locator('body').innerText()).slice(0, 3000);
   return `${label} failed to boot; ${detail}.\n${errors.join('\n')}\nBODY:\n${body}`;
+}
+
+async function runAndOpenResults(workbench) {
+  await workbench.locator('[data-role="lfea-run"]').click();
+  await expect(workbench.locator('.lfea-workbench__status')).toHaveText('QUALIFIED');
+  await workbench.locator('[data-navigator-item="RESULTS"]').click();
+  await expect(workbench.locator('[data-role="lfea-results-explorer"]')).toBeVisible();
 }
 
 test('Shell V2 renders as the embedded LFEA workbench with explicit blocked EnrichedSjson state', async ({ page }) => {
@@ -169,4 +185,65 @@ test('UI-2 stale detached editor cannot overwrite a newer package identity', asy
   const after = await page.evaluate(() => globalThis.LfeaStandalone.getState());
   expect(after.packageValue.semanticHash).toBe(resealed.semanticHash);
   expect(after.packageValue.nodes[0].x).toBe(resealed.nodes[0].x);
+});
+
+test('UI-3 results explorer separates raw/projected authority and preserves lossless table controls', async ({ page }) => {
+  const workbench = await openStandaloneShell(page);
+  await importFixture(workbench);
+  await runAndOpenResults(workbench);
+
+  await expect(workbench.locator('[data-role="lfea-results-view"]')).toHaveCount(7);
+  for (const viewId of RESULT_VIEWS) {
+    await workbench.locator(`[data-role="lfea-results-view"][data-view="${viewId}"]`).click();
+    await expect(workbench.locator('[data-role="lfea-results-view-body"]')).toHaveAttribute('data-view', viewId);
+  }
+
+  await workbench.locator('[data-role="lfea-results-view"][data-view="RAW_STRESS"]').click();
+  await expect(workbench.locator('[data-role="lfea-results-authority"]')).toContainText('AUTHORITATIVE_RAW_ELEMENT_OR_INTEGRATION_POINT_STRESS');
+  await workbench.locator('[data-role="lfea-results-view"][data-view="PROJECTED_STRESS"]').click();
+  await expect(workbench.locator('[data-role="lfea-results-authority"]')).toContainText('NON_AUTHORITATIVE_REVIEW_PROJECTION');
+
+  await workbench.locator('[data-role="lfea-results-view"][data-view="DISPLACEMENTS"]').click();
+  const sourceCount = await page.evaluate(() => globalThis.LfeaStandalone.getState().execution.result.nodalDisplacements.length);
+  await expect(workbench.locator('[data-role="lfea-results-row-count"]')).toContainText(`${sourceCount} of ${sourceCount} rows`);
+  await workbench.locator('[data-role="lfea-results-filter"]').fill('UX');
+  await expect(workbench.locator('[data-role="lfea-results-row-count"]')).not.toContainText(`${sourceCount} of ${sourceCount} rows`);
+  await workbench.locator('[data-role="lfea-results-sort-key"]').selectOption('value');
+  await workbench.locator('[data-role="lfea-results-sort-direction"]').selectOption('desc');
+  await workbench.locator('[data-role="lfea-results-reset"]').click();
+  await expect(workbench.locator('[data-role="lfea-results-filter"]')).toHaveValue('');
+  await expect(workbench.locator('[data-role="lfea-results-sort-key"]')).toHaveValue('');
+  await expect(workbench.locator('[data-role="lfea-results-row-count"]')).toContainText(`${sourceCount} of ${sourceCount} rows`);
+});
+
+test('UI-3 explorer is shared by embedded host and resets after model identity changes', async ({ page }) => {
+  await openEmbeddedShell(page);
+  const embedded = page.locator('[data-role="lfea-workbench"]');
+  await importFixture(embedded);
+  await runAndOpenResults(embedded);
+  await expect(embedded.locator('[data-role="lfea-results-view"]')).toHaveCount(7);
+  await embedded.locator('[data-role="lfea-results-view"][data-view="RAW_STRESS"]').click();
+  await expect(embedded.locator('[data-role="lfea-results-authority"]')).toContainText('AUTHORITATIVE_RAW_ELEMENT_OR_INTEGRATION_POINT_STRESS');
+
+  const standalone = await openStandaloneShell(page);
+  await importFixture(standalone);
+  await runAndOpenResults(standalone);
+  await standalone.locator('[data-role="lfea-results-view"][data-view="DISPLACEMENTS"]').click();
+  await standalone.locator('[data-role="lfea-results-filter"]').fill('UX');
+  await standalone.locator('[data-role="lfea-results-sort-key"]').selectOption('value');
+
+  await standalone.locator('[data-navigator-item="MODEL"]').click();
+  await standalone.locator('[data-role="lfea-collection-path"]').selectOption('nodes');
+  await standalone.locator('.lfea-workbench__table tr[role="row"]').first().click();
+  const x = standalone.locator('[data-field="x"]');
+  await x.fill(String(Number(await x.inputValue()) + 0.01));
+  await standalone.getByRole('button', { name: 'Apply changes' }).click();
+  await standalone.locator('[data-role="lfea-run"]').click();
+  await expect(standalone.locator('.lfea-workbench__status')).toHaveText('QUALIFIED');
+  await standalone.locator('[data-navigator-item="RESULTS"]').click();
+
+  await expect(standalone.locator('[data-role="lfea-results-view-body"]')).toHaveAttribute('data-view', 'OVERVIEW');
+  await standalone.locator('[data-role="lfea-results-view"][data-view="DISPLACEMENTS"]').click();
+  await expect(standalone.locator('[data-role="lfea-results-filter"]')).toHaveValue('');
+  await expect(standalone.locator('[data-role="lfea-results-sort-key"]')).toHaveValue('');
 });
