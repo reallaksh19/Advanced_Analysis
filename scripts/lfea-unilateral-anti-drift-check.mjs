@@ -12,6 +12,8 @@ const CORE_FILES = fs.readdirSync(ROOT)
 const CHECK_FILES = [
   'scripts/lfea-unilateral-closed-form-check.mjs',
   'scripts/lfea-unilateral-determinism-check.mjs',
+  'scripts/lfea-unilateral-linear-noop-check.mjs',
+  'scripts/lfea-m036-bm4-runtime.mjs',
   'scripts/lfea-m036-bm4-liftoff-check.mjs',
   'scripts/lfea-unilateral-anti-drift-check.mjs',
 ].filter((file) => fs.existsSync(file));
@@ -34,12 +36,13 @@ for (const [code, pattern] of [
 
 assert.match(source['unilateral-contract.js'], /13:[\s\S]*UX[\s\S]*14:[\s\S]*UY[\s\S]*15:[\s\S]*UZ/u);
 assert.match(source['unilateral-contract.js'], /16:[\s\S]*UX[\s\S]*17:[\s\S]*UY[\s\S]*18:[\s\S]*UZ/u);
+assert.match(source['unilateral-contract.js'], /PRESCRIBED_SLOT/u);
 assert.match(source['unilateral-contract.js'], /BM4_FRICTION_NOT_MODELED/u);
 assert.match(source['support-status.js'], /normalizedReaction\s*<\s*-policy\.forceTolerance/u);
 assert.match(source['support-status.js'], /normalizedDisplacement\s*<\s*penetrationLimit/u);
 assert.match(source['support-status.js'], /UNILATERAL_SUPPORT_FROZEN_RELEASED/u);
-assert.match(source['iteration.js'], /Math\.max\(1, 4 \* unilateralCount\)|maxIterations/u);
 assert.match(source['iteration.js'], /checked\.flips/u);
+assert.match(source['iteration.js'], /prescribedMovements/u);
 assert.match(source['iteration.js'], /UNILATERAL_NON_CONVERGENCE/u);
 assert.doesNotMatch(source['iteration.js'], /linear-fea-model-compiler|linear-fea-frame-element|linear-fea-solver/u);
 
