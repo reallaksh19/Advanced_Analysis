@@ -1,0 +1,93 @@
+name: M038 BM4 ACCDB Load-Case Reconstruction
+
+on:
+  push:
+    branches:
+      - agent/m038-bm4-accdb-loadcase-reconstruction
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  accdb-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TARGET_HEAD_SHA: ${{ github.sha }}
+      ACCDB_ZIP: benchmarks/LFEA/BM4/BM4 accdb.zip
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_HEAD_SHA }}
+          fetch-depth: 1
+
+      - name: Verify immutable checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
+          test -z "$(git status --porcelain)"
+
+      - name: Install ACCDB reader
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq mdbtools unzip
+          mdb-ver --version || true
+
+      - name: Export ACCDB tables
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/bm4-accdb /tmp/bm4-accdb-export
+          mkdir -p /tmp/bm4-accdb /tmp/bm4-accdb-export
+          unzip -o "$ACCDB_ZIP" -d /tmp/bm4-accdb
+          DB="$(find /tmp/bm4-accdb -type f \( -iname '*.accdb' -o -iname '*.mdb' \) -print -quit)"
+          test -n "$DB"
+          echo "BM4_ACCDB_PATH=$DB"
+          mdb-tables -1 "$DB" | sed '/^$/d' | tee /tmp/bm4-accdb-tables.txt
+          while IFS= read -r table; do
+            test -n "$table" || continue
+            safe="$(printf '%s' "$table" | tr '/\\ :()' '_______')"
+            mdb-export "$DB" "$table" > "/tmp/bm4-accdb-export/${safe}.csv" || {
+              echo "EXPORT_FAILED:$table" >&2
+              exit 1
+            }
+          done < /tmp/bm4-accdb-tables.txt
+          echo "BM4_ACCDB_TABLE_COUNT=$(wc -l < /tmp/bm4-accdb-tables.txt)"
+
+      - name: Print load-case candidate tables
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== TABLE NAMES ==='
+          cat /tmp/bm4-accdb-tables.txt
+          echo '=== CANDIDATE CONTENT ==='
+          for csv in /tmp/bm4-accdb-export/*.csv; do
+            base="$(basename "$csv")"
+            if printf '%s' "$base" | grep -Eiq 'case|load|comb|static|force|moment|option|control|setup|config|bour|nonlinear|fric|restraint|temperature|pressure'; then
+              echo "--- $base ---"
+              sed -n '1,80p' "$csv"
+            fi
+          done
+
+      - name: Search exported database for BM4 case authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -RniE 'CASE ?19|CASE ?20|CASE ?21|\bF1\b|\bF2\b|\bF3\b|\bF4\b|\bF5\b|\bF6\b|\bF7\b|Bourdon|Burdon|friction|load case|loadcase|SUS|OPE|EXP' /tmp/bm4-accdb-export | tee /tmp/bm4-accdb-authority-hits.txt || true
+
+      - name: Upload ACCDB evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m038-bm4-accdb-audit-${{ env.TARGET_HEAD_SHA }}
+          path: |
+            /tmp/bm4-accdb-tables.txt
+            /tmp/bm4-accdb-authority-hits.txt
+            /tmp/bm4-accdb-export/
+          if-no-files-found: error
+          retention-days: 14
