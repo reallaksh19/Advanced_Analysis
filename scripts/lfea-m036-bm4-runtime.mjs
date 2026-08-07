@@ -1,8 +1,5 @@
 import assert from 'node:assert/strict';
 import { FRAME_LOCAL_AXIS_PROFILE, resolveFrameLocalAxes } from '../src/core/centerline-beam-fea/index.js';
-import { attributeValue, findElements } from '../src/core/geometry/adapters/inputxml-tag-scanner.js';
-import { resolveRestraintTypeMutation } from '../src/core/geometry/adapters/inputxml-restraint-type-mutation.js';
-import { convertInputXmlLengthToMetres, parseInputXmlUnitSystem } from '../src/core/geometry/adapters/inputxml-unit-system.js';
 import { compileFrameElement } from '../src/core/linear-fea-frame-element/index.js';
 import { compilePhysicalLoadCase, modelReferenceFromCompilation } from '../src/core/linear-fea-load-case/index.js';
 import { compileMechanicalModel } from '../src/core/linear-fea-model-compiler/index.js';
@@ -28,33 +25,18 @@ function point(geometry, nodeId) {
   return [node.x, node.y, node.z];
 }
 
-function caesarNumber(value) {
-  const numeric = Number(String(value ?? '').trim());
-  return Number.isFinite(numeric) && Math.abs(numeric + 1.0101) >= 0.001 ? numeric : null;
-}
-
-function rawRestraints(content) {
-  const diagnostics = [];
-  const units = parseInputXmlUnitSystem(content, 'mm', diagnostics);
-  return findElements(content, 'RESTRAINT').map((tag, index) => {
-    const node = caesarNumber(attributeValue(tag.attributes, 'NODE'));
-    const mutation = resolveRestraintTypeMutation(attributeValue(tag.attributes, 'TYPE'));
-    const gapRaw = caesarNumber(attributeValue(tag.attributes, 'GAP'));
-    return {
-      index, nodeId: node == null ? null : String(node), typeCode: mutation.typeCode,
-      gap: gapRaw == null ? 0 : convertInputXmlLengthToMetres(gapRaw, units.lengthUnit),
-      frictionCoefficient: caesarNumber(attributeValue(tag.attributes, 'FRIC_COEF')),
-    };
-  }).filter((row) => row.nodeId !== null && row.typeCode !== null);
-}
-
 function guideDof(restraint) {
   const values = [Math.abs(restraint.xCosine ?? 0), Math.abs(restraint.yCosine ?? 0), Math.abs(restraint.zCosine ?? 0)];
   return ['UX', 'UY', 'UZ'][values.indexOf(Math.max(...values))];
 }
 
-function gapFaces(nodeId, dof, raw) {
-  const common = { nodeId: `BM4.N${nodeId}`, gap: raw.gap, frictionCoefficient: raw.frictionCoefficient, initiallyEngaged: false };
+function gapFaces(nodeId, dof, restraint) {
+  const common = {
+    nodeId: `BM4.N${nodeId}`,
+    gap: restraint.gap,
+    frictionCoefficient: restraint.frictionCoefficient,
+    initiallyEngaged: false,
+  };
   return [
     { ...common, declarationId: `BM4-GAP-${nodeId}-${dof}-LOWER`, typeCode: AXIS[dof].positive },
     { ...common, declarationId: `BM4-GAP-${nodeId}-${dof}-UPPER`, typeCode: AXIS[dof].negative },
@@ -64,40 +46,36 @@ function gapFaces(nodeId, dof, raw) {
 export function buildM036Bm4Inventory(authorities) {
   const base = new Map();
   const unilateral = [];
-  const rawRows = rawRestraints(authorities.content);
-  const rawByNode = new Map();
-  for (const row of rawRows) {
-    if (!rawByNode.has(row.nodeId)) rawByNode.set(row.nodeId, []);
-    rawByNode.get(row.nodeId).push(row);
-  }
+  const gappedGuideEvidence = [];
   const add = (nodeId, dof, reason) => base.set(`${nodeId}:${dof}`, {
     declarationId: `BM4-C-${nodeId}-${dof}-${reason}`, kind: 'NODAL_RESTRAINT',
     nodeId: `BM4.N${nodeId}`, dof, behavior: 'FIXED',
   });
   for (const node of authorities.normalized.geometry.nodes) {
     if (node.restraint === 'ANCHOR') for (const dof of Object.keys(AXIS).concat(['RX', 'RY', 'RZ'])) add(node.id, dof, 'ANCHOR');
-    const candidates = rawByNode.get(node.id) ?? [];
-    const consumed = new Set();
     for (const restraint of node.meta.restraints ?? []) {
-      const raw = candidates.find((row) => !consumed.has(row.index) && row.typeCode === restraint.typeCode) ?? null;
-      if (raw) consumed.add(raw.index);
       if (restraint.typeCode === '14') {
         if (TARGET_SET.has(node.id)) unilateral.push({
           declarationId: `BM4-C-${node.id}-UY-PLUS-Y`, nodeId: `BM4.N${node.id}`, typeCode: 14,
-          gap: raw?.gap ?? 0, frictionCoefficient: raw?.frictionCoefficient ?? restraint.frictionCoefficient ?? null,
+          gap: restraint.gap ?? 0, frictionCoefficient: restraint.frictionCoefficient ?? null,
         });
         else add(node.id, 'UY', 'PLUS-Y-LINEARIZED');
       }
       if (restraint.typeCode === '9') {
         const dof = guideDof(restraint);
-        if ((raw?.gap ?? 0) > 0) unilateral.push(...gapFaces(node.id, dof, raw));
-        else add(node.id, dof, 'GUIDE');
+        if ((restraint.gap ?? 0) > 0) {
+          unilateral.push(...gapFaces(node.id, dof, restraint));
+          gappedGuideEvidence.push({
+            nodeId: node.id, typeCode: restraint.typeCode, gap: restraint.gap,
+            frictionCoefficient: restraint.frictionCoefficient ?? null,
+          });
+        } else add(node.id, dof, 'GUIDE');
       }
     }
   }
   return Object.freeze({
     base: [...base.values()], unilateral: unilateral.sort((a, b) => a.declarationId < b.declarationId ? -1 : 1),
-    gappedGuideEvidence: rawRows.filter((row) => row.typeCode === '9' && row.gap > 0),
+    gappedGuideEvidence,
   });
 }
 
