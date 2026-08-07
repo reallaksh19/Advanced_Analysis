@@ -11,7 +11,7 @@ async function importFixture(workbench) {
   return packageValue;
 }
 
-async function openEmbeddedShell(page) {
+function captureBrowserErrors(page) {
   const errors = [];
   page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`));
   page.on('console', (message) => {
@@ -20,18 +20,36 @@ async function openEmbeddedShell(page) {
   page.on('requestfailed', (request) => {
     errors.push(`requestfailed: ${request.url()} — ${request.failure()?.errorText ?? 'unknown'}`);
   });
+  return errors;
+}
+
+async function openEmbeddedShell(page) {
+  const errors = captureBrowserErrors(page);
   await page.goto('/');
   await page.waitForTimeout(750);
   const nav = page.locator('[data-application-nav="LFEA"]');
   const navCount = await nav.count();
   if (navCount !== 1) {
-    const body = (await page.locator('body').innerText()).slice(0, 3000);
-    throw new Error(
-      `Embedded shell failed to boot; LFEA nav count=${navCount}.\n`
-      + `${errors.join('\n')}\nBODY:\n${body}`,
-    );
+    throw new Error(await bootFailure(page, 'Embedded shell', `LFEA nav count=${navCount}`, errors));
   }
   await nav.click();
+}
+
+async function openStandaloneShell(page) {
+  const errors = captureBrowserErrors(page);
+  await page.goto('/lfea.html');
+  await page.waitForTimeout(750);
+  const workbench = page.locator('[data-role="lfea-workbench"]');
+  const count = await workbench.count();
+  if (count !== 1) {
+    throw new Error(await bootFailure(page, 'Standalone LFEA', `workbench count=${count}`, errors));
+  }
+  return workbench;
+}
+
+async function bootFailure(page, label, detail, errors) {
+  const body = (await page.locator('body').innerText()).slice(0, 3000);
+  return `${label} failed to boot; ${detail}.\n${errors.join('\n')}\nBODY:\n${body}`;
 }
 
 test('Shell V2 renders as the embedded LFEA workbench with explicit blocked EnrichedSjson state', async ({ page }) => {
@@ -51,8 +69,7 @@ test('Shell V2 renders as the embedded LFEA workbench with explicit blocked Enri
 });
 
 test('standalone LFEA entry mounts the same controller/store workbench', async ({ page }) => {
-  await page.goto('/lfea.html');
-  const workbench = page.locator('[data-role="lfea-workbench"]');
+  const workbench = await openStandaloneShell(page);
   await expect(workbench).toBeVisible();
   await expect(workbench).toHaveClass(/lfea-shell-v2/u);
 
