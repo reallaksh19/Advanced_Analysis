@@ -74,7 +74,7 @@ assert.match(testVite, /ui1-embedded-shell-entry\.js/u);
 const embeddedHarness = source('e2e/fixtures/ui1-embedded-shell-entry.js');
 assert.match(embeddedHarness, /renderWorkspaceLayout/u);
 assert.match(embeddedHarness, /LfeaWorkbenchController/u);
-assert.match(embeddedHarness, /data-application-view=\\"LFEA\\"/u);
+assert.match(embeddedHarness, /data-application-view="LFEA"/u);
 assert.doesNotMatch(
   embeddedHarness,
   /linear-piping-run-analysis|src\/core\//u,
