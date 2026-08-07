@@ -10,6 +10,7 @@ import {
   normalizeLinearPipingInputXmlGeometry,
   sealLinearPipingInputXmlUnitProfile,
 } from '../src/core/linear-piping-analysis-consumer/index.js';
+import { detectInputXmlInlineReducerTransitions } from '../src/core/linear-piping-analysis-consumer/inputxml-inline-reducer-transitions.js';
 import { semanticHash } from '../src/core/shared-piping-model/canonical-json.js';
 
 const path = fileURLToPath(new URL('../benchmarks/LFEA/BM4/InputXML_BM4.xml', import.meta.url));
@@ -28,13 +29,13 @@ const normalized = normalizeLinearPipingInputXmlGeometry(parsed, sealLinearPipin
 })).geometry;
 
 const elements = findElements(xml, 'PIPINGELEMENT');
-const reducers = [];
+const explicitReducerTags = [];
 const teeTags = [];
 for (const [index, element] of elements.entries()) {
   const fromNode = cleanNode(attributeValue(element.attributes, 'FROM_NODE'));
   const toNode = cleanNode(attributeValue(element.attributes, 'TO_NODE'));
   const reducer = findAnyElements(element.inner, ['REDUCER', 'REDUCERS', 'REDU', 'REDC', 'REDE'])[0] ?? null;
-  if (reducer) reducers.push({ sourceIndex: index, segmentId: `IX-S${index + 1}`, fromNode, toNode, tagAttributes: reducer.attributes });
+  if (reducer) explicitReducerTags.push({ sourceIndex: index, segmentId: `IX-S${index + 1}`, fromNode, toNode, tagAttributes: reducer.attributes });
   for (const sif of findAnyElements(element.inner, ['SIF', 'SIFS'])) {
     const type = Number(attributeValue(sif.attributes, 'TYPE'));
     if (Math.abs(type - 3) < 0.001 || Math.abs(type - 5) < 0.001) {
@@ -71,6 +72,7 @@ const teeTagsWithoutBranchTopology = canonicalTeeSegments
   .map((row) => String(row.id))
   .filter((id) => !assignedTags.has(id))
   .sort();
+const inlineReducers = detectInputXmlInlineReducerTransitions({ canonicalGeometry: normalized });
 
 assert.equal(bends.length, 11, 'BM4 normalized geometry must expose the 11 M035 bend features.');
 assert.equal(teeTags.length, 7, 'BM4 source evidence currently contains seven tee/weldolet SIF tags.');
@@ -80,12 +82,12 @@ assert.deepEqual(
   ['20160', '20295'],
   'Only the two degree>2 BM4 nodes identified by #834 are structural tee-flexibility targets.',
 );
-assert.equal(reducers.length, 7, 'BM4 source must expose seven reducer feature segments.');
+assert.equal(explicitReducerTags.length, 0, 'BM4 must not invent explicit reducer tags that are absent from InputXML.');
+assert.equal(inlineReducers.transitionCount, 7, 'BM4 must expose seven inline section-transition reducer candidates.');
 assert.ok(physicalTeeJunctions.every((row) => row.incidentSegmentIds.length === 3));
 assert.equal(teeTagsWithoutBranchTopology.length, 5, 'Five SIF-tagged spans remain stress/source evidence without degree-3 branch topology.');
-for (const reducer of reducers) {
-  assert.ok(normalized.segments.some((row) => row.id === reducer.segmentId), `${reducer.segmentId} must retain canonical segment custody.`);
-}
+assert.ok(inlineReducers.transitions.every((row) => row.condensationActivation.status === 'BLOCKED_PENDING_FINITE_REDUCER_GEOMETRY_AND_PARITY'));
+assert.ok(inlineReducers.transitions.every((row) => row.condensationActivation.reducerLength === null));
 
 console.log(JSON.stringify({
   check: 'm035-bm4-feature-inventory',
@@ -96,13 +98,16 @@ console.log(JSON.stringify({
     canonicalTeeSegments: canonicalTeeSegments.length,
     physicalTeeJunctions: physicalTeeJunctions.length,
     teeTagsWithoutBranchTopology: teeTagsWithoutBranchTopology.length,
-    reducers: reducers.length,
+    explicitReducerTags: explicitReducerTags.length,
+    inlineReducerTransitions: inlineReducers.transitionCount,
   },
   bends,
   teeTags,
   physicalTeeJunctions,
   teeTagsWithoutBranchTopology,
-  reducers,
+  explicitReducerTags,
+  inlineReducerTransitions: inlineReducers.transitions,
+  reducerPolicy: inlineReducers.policy,
 }, null, 2));
 console.log('M035 BM4 feature inventory PASS');
 
