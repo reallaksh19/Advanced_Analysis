@@ -45,33 +45,70 @@ function section(id, outerDiameter, wallThickness) {
   });
 }
 
+function teeFactorRequest({ calculationId, componentId, runOuterDiameter, runWallThickness, branchOuterDiameter, branchWallThickness, fittingQuality = 'UNVERIFIED' }) {
+  return calculateB31Factors({
+    schema: FACTOR_CALCULATION_REQUEST_SCHEMA,
+    calculationId,
+    componentId,
+    editionProfileId: 'B31_3_2022_B31J_2017',
+    componentType: 'WELDING_TEE',
+    geometry: {
+      schema: COMPONENT_GEOMETRY_SCHEMA,
+      componentType: 'WELDING_TEE',
+      lengthUnit: 'm',
+      runOuterDiameter,
+      runWallThickness,
+      branchOuterDiameter,
+      branchWallThickness,
+      fittingQuality,
+      sourceEvidence,
+    },
+    momentDirectionMapping: mapping,
+    semanticHash: '',
+  });
+}
+
 console.log('\n--- M035 generic B31J directional tee flexibility ---');
 
 const runSection = section('M035-TEE-RUN', 0.6096, 0.00953);
 const branchSection = section('M035-TEE-BRANCH', 0.508, 0.00953);
-const factors = calculateB31Factors({
-  schema: FACTOR_CALCULATION_REQUEST_SCHEMA,
+const factors = teeFactorRequest({
   calculationId: 'M035-TEE-B31J-CALC',
   componentId: 'M035-TEE-01',
-  editionProfileId: 'B31_3_2020_B31J_2017',
-  componentType: 'WELDING_TEE',
-  geometry: {
-    schema: COMPONENT_GEOMETRY_SCHEMA,
-    componentType: 'WELDING_TEE',
-    lengthUnit: 'm',
-    runOuterDiameter: runSection.dimensions.outerDiameter,
-    runWallThickness: runSection.dimensions.wallThickness,
-    branchOuterDiameter: branchSection.dimensions.outerDiameter,
-    branchWallThickness: branchSection.dimensions.wallThickness,
-    fittingQuality: 'VERIFIED_B16_9',
-    sourceEvidence,
-  },
-  momentDirectionMapping: mapping,
-  semanticHash: '',
+  runOuterDiameter: runSection.dimensions.outerDiameter,
+  runWallThickness: runSection.dimensions.wallThickness,
+  branchOuterDiameter: branchSection.dimensions.outerDiameter,
+  branchWallThickness: branchSection.dimensions.wallThickness,
+  fittingQuality: 'VERIFIED_B16_9',
 });
 assert.equal(factors.status, 'QUALIFIED');
 assert.ok(factors.factors.flexibility.run);
 assert.ok(factors.factors.flexibility.branch);
+
+// Same nominal NPS can arrive through InputXML as exact-inch versus rounded
+// metric OD. This 0.015% representation difference must not turn an equal-size
+// tee into branch>run, but the physical frame sections remain exact elsewhere.
+const nearEqualNominal = teeFactorRequest({
+  calculationId: 'M035-TEE-NOMINAL-ROUNDING',
+  componentId: 'M035-TEE-NOMINAL-ROUNDING',
+  runOuterDiameter: 0.168274994,
+  runWallThickness: 0.0109728,
+  branchOuterDiameter: 0.168300003,
+  branchWallThickness: 0.0109728,
+});
+assert.equal(nearEqualNominal.status, 'QUALIFIED');
+assert.ok(nearEqualNominal.factors.ratios.branchToRunMeanDiameter <= 1);
+
+const realBranchOverRun = teeFactorRequest({
+  calculationId: 'M035-TEE-REAL-BRANCH-OVER-RUN',
+  componentId: 'M035-TEE-REAL-BRANCH-OVER-RUN',
+  runOuterDiameter: 0.168274994,
+  runWallThickness: 0.0109728,
+  branchOuterDiameter: 0.169,
+  branchWallThickness: 0.0109728,
+});
+assert.equal(realBranchOverRun.status, 'BLOCKED');
+assert.ok(realBranchOverRun.applicability.violations.some((row) => row.field === 'branchOuterDiameter'));
 
 const material = materialResolution();
 const junction = compileB31JDirectionalBranchFlexibility({
@@ -142,6 +179,8 @@ console.log(JSON.stringify({
   status: 'PASS',
   runFactors: factors.factors.flexibility.run,
   branchFactors: factors.factors.flexibility.branch,
+  nominalRoundingQualified: nearEqualNominal.status,
+  branchOverRunBlocked: realBranchOverRun.status,
   springTargets: junction.flexibilityOwnership.targets,
   branchSurfaceOffset: junction.geometry.branchSurfaceOffset,
   semanticHash: junction.semanticHash,
