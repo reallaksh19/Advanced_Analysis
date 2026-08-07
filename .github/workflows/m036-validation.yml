@@ -21,5 +21,6 @@ jobs:
       - run: npm ci
       - run: node scripts/lfea-unilateral-closed-form-check.mjs
       - run: node scripts/lfea-unilateral-determinism-check.mjs
+      - run: node scripts/lfea-m036-bm4-liftoff-check.mjs
       - run: node scripts/lfea-unilateral-anti-drift-check.mjs
       - run: node scripts/syntax-check.mjs --strict
