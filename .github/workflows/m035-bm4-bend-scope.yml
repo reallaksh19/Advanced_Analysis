@@ -6,6 +6,7 @@ on:
       - claude/lfea-linear-static-fea-unfwjd
     paths:
       - 'src/core/linear-piping-analysis-consumer/inputxml-bend-feature-expansion.js'
+      - 'src/core/linear-piping-analysis-consumer/inputxml-feature-mechanics-preparation.js'
       - 'src/core/linear-piping-analysis-consumer/index.js'
       - 'src/core/linear-fea-piping-components/directional-branch-flexibility.js'
       - 'src/core/linear-fea-piping-components/index.js'
@@ -13,6 +14,7 @@ on:
       - 'scripts/lfea-m035-generic-bend-integration-check.mjs'
       - 'scripts/lfea-m035-b31j-directional-tee-check.mjs'
       - 'scripts/lfea-m035-reducer-sampling-qualification-check.mjs'
+      - 'scripts/lfea-m035-feature-mechanics-preparation-check.mjs'
       - 'scripts/lfea-m035-bm4-scope-policy.mjs'
       - 'scripts/lfea-m035-bm4-scope-policy-check.mjs'
       - 'scripts/lfea-m035-bm4-bend-authority-check.mjs'
@@ -59,12 +61,14 @@ jobs:
         run: |
           set -euo pipefail
           node --check src/core/linear-piping-analysis-consumer/inputxml-bend-feature-expansion.js
+          node --check src/core/linear-piping-analysis-consumer/inputxml-feature-mechanics-preparation.js
           node --check src/core/linear-fea-piping-components/directional-branch-flexibility.js
           node --check src/core/linear-fea-reducer-condensation/reducer-condensation.js
           node --check src/core/linear-fea-reducer-condensation/sampling-qualification.js
           node --check scripts/lfea-m035-generic-bend-integration-check.mjs
           node --check scripts/lfea-m035-b31j-directional-tee-check.mjs
           node --check scripts/lfea-m035-reducer-sampling-qualification-check.mjs
+          node --check scripts/lfea-m035-feature-mechanics-preparation-check.mjs
           node --check scripts/lfea-m035-bm4-scope-policy.mjs
           node --check scripts/lfea-m035-bm4-scope-policy-check.mjs
           node --check scripts/lfea-m035-bm4-bend-authority-check.mjs
@@ -109,6 +113,19 @@ jobs:
           fi
           exit "$status"
 
+      - name: Mixed feature mechanics preparation
+        shell: bash
+        run: |
+          set +e
+          node scripts/lfea-m035-feature-mechanics-preparation-check.mjs > /tmp/m035-feature-preparation.log 2>&1
+          status=$?
+          cat /tmp/m035-feature-preparation.log
+          if [ "$status" -ne 0 ]; then
+            message="$(tr '\n' ' ' < /tmp/m035-feature-preparation.log | head -c 3500)"
+            echo "::error file=scripts/lfea-m035-feature-mechanics-preparation-check.mjs,line=1,title=M035 feature preparation::${message}"
+          fi
+          exit "$status"
+
       - name: B31 bend authority audit
         shell: bash
         run: |
@@ -131,6 +148,7 @@ jobs:
             /tmp/m035-generic-bend.log
             /tmp/m035-tee.log
             /tmp/m035-reducer.log
+            /tmp/m035-feature-preparation.log
             /tmp/m035-bend-audit.log
           if-no-files-found: warn
           retention-days: 7
