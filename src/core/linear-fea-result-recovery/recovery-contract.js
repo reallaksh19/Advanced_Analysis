@@ -48,6 +48,7 @@ export const RECOVERY_PROFILE_KEYS = Object.freeze([
   'profileId',
   'elementForceStationsPerSpan',
   'codePointConsistencyTolerance',
+  'recoverComponentCodePoints',
   'retainLocalAndGlobalActions',
   'semanticHash',
 ]);
@@ -222,10 +223,13 @@ function requireDeclaredInteger(entry, field) {
 }
 
 /**
- * Resolve the declared numeric/boolean policies section 13's `recoveryProfile`
- * names. Nothing is defaulted: an absent entry is `..._NOT_DECLARED`, and a
- * hidden-default source is refused exactly as every other LFEA profile
- * refuses one.
+ * Resolve the declared recovery policies. Code-point resultants are an
+ * explicitly selectable output because force/displacement-only workflows may
+ * need component element end actions while code-stress/code-station recovery
+ * is intentionally deferred. Disabling code points never changes element
+ * stiffness, execution, end actions or force fields; it only leaves each
+ * component resultant's `codePoints` array empty rather than inventing an
+ * off-node interpolation for a station outside the component-owned mesh.
  */
 export function resolveRecoveryPolicies(profile) {
   const elementForceStationsPerSpan = requireDeclaredInteger(
@@ -235,6 +239,9 @@ export function resolveRecoveryPolicies(profile) {
   const codePointConsistencyTolerance = requireTraceableSource(
     requireDeclaredValue(profile, 'codePointConsistencyTolerance', { exclusiveMinimum: 0, maximum: 1 }),
   );
+  if (typeof profile.recoverComponentCodePoints !== 'boolean') {
+    fail('profile.recoverComponentCodePoints must be declared true or false.', 'RECOVERY_PROFILE_INVALID');
+  }
   if (typeof profile.retainLocalAndGlobalActions !== 'boolean') {
     fail('profile.retainLocalAndGlobalActions must be declared true or false.', 'RECOVERY_PROFILE_INVALID');
   }
@@ -244,7 +251,11 @@ export function resolveRecoveryPolicies(profile) {
       'RECOVERY_RETAIN_BOTH_ACTIONS_REQUIRED',
     );
   }
-  return Object.freeze({ elementForceStationsPerSpan, codePointConsistencyTolerance });
+  return Object.freeze({
+    elementForceStationsPerSpan,
+    codePointConsistencyTolerance,
+    recoverComponentCodePoints: profile.recoverComponentCodePoints,
+  });
 }
 
 export function recoveryProfileSemanticProjection(profile) {
