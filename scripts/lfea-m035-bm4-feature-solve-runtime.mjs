@@ -91,10 +91,13 @@ export function buildBm4M035FeatureAuthorities() {
     if (bendComponent && (!componentElement || componentElement.elementId !== segment.id)) {
       throw new Error(`M035 bend component binding is stale for ${segment.id}.`);
     }
-    const teeModifier = teeModifierBySourceSegmentId.get(sourceSegmentId) ?? null;
-    if (bendComponent && teeModifier) {
-      throw new Error(`M035 source segment ${sourceSegmentId} cannot be both a bend arc and tee-modified span.`);
-    }
+    const sourceTeeModifier = teeModifierBySourceSegmentId.get(sourceSegmentId) ?? null;
+    const teeModifier = resolveAnalysisTeeModifier({
+      segment,
+      sourceEntry,
+      bendComponent,
+      sourceTeeModifier,
+    });
     const analysisSection = bendComponent || segment.meta?.analysisRole === 'BEND_INCOMING_STRAIGHT'
       ? sourceEntry.physicalSection
       : sourceEntry.analysisSection;
@@ -115,6 +118,7 @@ export function buildBm4M035FeatureAuthorities() {
         : teeModifier?.referenceVector ?? sourceEntry.referenceVector,
     });
   });
+  requireTeeModifierCoverage(entries, teeModifierBySourceSegmentId);
   const entryByElementId = new Map(entries.map((row) => [row.elementId, row]));
   const conditioned = conditionGeometry(analysisGeometry, [], CONDITIONING_PROFILE);
   const localAxisResults = entries.map((entry) => ({
@@ -271,6 +275,7 @@ function mergeTeeModifiers(junctions) {
       const existing = result.get(modifier.legId);
       if (existing) throw new Error(`BM4 M035 does not support source span ${modifier.legId} being modified by two tee junctions.`);
       result.set(modifier.legId, Object.freeze({
+        junctionEnd: modifier.junctionEnd,
         referenceVector: modifier.referenceVector,
         endSprings: modifier.rotationalSprings,
         rigidOffsets: modifier.rigidOffset === null ? null : modifier.junctionEnd === 'I'
@@ -280,6 +285,37 @@ function mergeTeeModifiers(junctions) {
     }
   }
   return result;
+}
+
+function resolveAnalysisTeeModifier({ segment, sourceEntry, bendComponent, sourceTeeModifier }) {
+  if (!sourceTeeModifier) return null;
+  if (bendComponent) return null;
+  if (segment.meta?.analysisRole !== 'BEND_INCOMING_STRAIGHT') return sourceTeeModifier;
+  if (sourceTeeModifier.junctionEnd !== 'I') {
+    throw new Error(
+      `M035 bend source ${sourceEntry.sourceSegment.id} has tee flexibility at source J; `
+      + 'the current bend expansion only preserves source-I junction compliance on its incoming straight and must fail closed.',
+    );
+  }
+  if (String(segment.startNodeId) !== String(sourceEntry.sourceSegment.startNodeId)) {
+    throw new Error(`M035 bend incoming straight ${segment.id} does not preserve source-I tee node identity.`);
+  }
+  return sourceTeeModifier;
+}
+
+function requireTeeModifierCoverage(entries, teeModifierBySourceSegmentId) {
+  for (const sourceSegmentId of teeModifierBySourceSegmentId.keys()) {
+    const descendants = entries.filter((row) => row.sourceSegmentId === sourceSegmentId);
+    const carriers = descendants.filter((row) => row.teeModifier !== null);
+    if (carriers.length !== 1) {
+      throw new Error(
+        `M035 tee-modified source ${sourceSegmentId} must resolve to exactly one non-arc analysis span; found ${carriers.length}.`,
+      );
+    }
+    if (carriers[0].bendComponent !== null) {
+      throw new Error(`M035 tee modifier for ${sourceSegmentId} leaked into a B-3.2 bend arc element.`);
+    }
+  }
 }
 
 function analyseCase(authorities, loadCaseId, thermal) {
