@@ -30,6 +30,7 @@ jobs:
         run: |
           node --check scripts/lfea-m035-m036-bm4-integration-runtime.mjs
           node --check scripts/lfea-m035-m036-bm4-integration-check.mjs
+          node --check scripts/lfea-m035-m036-bm4-comparison.mjs
 
       - name: Combined M035 M036 BM4 qualification
         shell: bash
@@ -41,6 +42,19 @@ jobs:
           if [ "$status" -ne 0 ]; then
             message="$(tr '\n' ' ' < /tmp/m035-m036-integration.log | head -c 3500)"
             echo "::error file=scripts/lfea-m035-m036-bm4-integration-check.mjs,line=1,title=M035 M036 combined BM4 qualification::${message}"
+          fi
+          exit "$status"
+
+      - name: Real CASE 19-21 combined comparison
+        shell: bash
+        run: |
+          set +e
+          node scripts/lfea-m035-m036-bm4-comparison.mjs > /tmp/m035-m036-comparison.log 2>&1
+          status=$?
+          cat /tmp/m035-m036-comparison.log
+          if [ "$status" -ne 0 ]; then
+            message="$(tr '\n' ' ' < /tmp/m035-m036-comparison.log | head -c 3500)"
+            echo "::error file=scripts/lfea-m035-m036-bm4-comparison.mjs,line=1,title=M035 M036 CASE 19-21 comparison::${message}"
           fi
           exit "$status"
 
@@ -64,6 +78,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: m035-m036-bm4-integration-${{ github.sha }}
-          path: /tmp/m035-m036-integration.log
+          path: |
+            /tmp/m035-m036-integration.log
+            /tmp/m035-m036-comparison.log
+            reports/m035-m036-bm4-cases-19-20-21.json
           if-no-files-found: warn
           retention-days: 14
