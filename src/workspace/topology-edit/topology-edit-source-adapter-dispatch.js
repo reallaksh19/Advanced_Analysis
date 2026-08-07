@@ -1,10 +1,13 @@
 import { semanticHash } from '../../core/shared-piping-model/index.js';
 import {
   applyCanonicalTopologyToWorkspaceEntities as applyLegacyWriteback,
+  buildCanonicalTopologyFromWorkspaceDataset,
 } from './topology-edit-source-adapter.js';
 import {
   createNativePipeWorkspaceEntity,
 } from './topology-edit-native-pipe-writeback.js';
+
+export { buildCanonicalTopologyFromWorkspaceDataset };
 
 function legacyEditEntityId(dataset, editSessionId, edgeId) {
   return `edit:${semanticHash({
