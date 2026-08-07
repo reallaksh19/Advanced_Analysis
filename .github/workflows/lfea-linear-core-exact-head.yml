@@ -50,20 +50,6 @@ jobs:
             esac
           done < /tmp/lfea-linear-core-paths.txt
 
-      - name: M036 unilateral contact qualification
-        shell: bash
-        run: |
-          mkdir -p artifacts/lfea-linear-core-exact-head
-          set +e
-          npm run check:lfea-unilateral > artifacts/lfea-linear-core-exact-head/m036.log 2>&1
-          status=$?
-          cat artifacts/lfea-linear-core-exact-head/m036.log
-          if [ "$status" -ne 0 ]; then
-            message="$(tail -n 60 artifacts/lfea-linear-core-exact-head/m036.log | tr '\n' ' ' | sed 's/%/%25/g')"
-            echo "::error file=scripts/lfea-m036-bm4-liftoff-check.mjs::$message"
-            exit "$status"
-          fi
-
       - name: InputXML unit normalization
         run: node scripts/linear-piping-inputxml-unit-normalization-check.mjs
 
@@ -113,5 +99,57 @@ jobs:
         with:
           name: lfea-linear-core-exact-head-${{ github.event.pull_request.head.sha }}
           path: artifacts/lfea-linear-core-exact-head/*
+          if-no-files-found: warn
+          retention-days: 90
+
+  m036:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Prove exact-head execution
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          git diff --exit-code
+
+      - name: M036 anti-drift and boundary guard
+        run: node scripts/lfea-unilateral-anti-drift-check.mjs
+
+      - name: M036 closed-form sign and thermal qualification
+        run: node scripts/lfea-unilateral-closed-form-check.mjs
+
+      - name: M036 determinism and fail-closed qualification
+        run: node scripts/lfea-unilateral-determinism-check.mjs
+
+      - name: M036 BM4 lift-off qualification
+        shell: bash
+        run: |
+          mkdir -p artifacts/lfea-m036
+          set +e
+          node scripts/lfea-m036-bm4-liftoff-check.mjs > artifacts/lfea-m036/bm4.log 2>&1
+          status=$?
+          cat artifacts/lfea-m036/bm4.log
+          if [ "$status" -ne 0 ]; then
+            message="$(tail -n 80 artifacts/lfea-m036/bm4.log | tr '\n' ' ' | sed 's/%/%25/g')"
+            echo "::error file=scripts/lfea-m036-bm4-liftoff-check.mjs::$message"
+            exit "$status"
+          fi
+
+      - name: Retain M036 benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lfea-m036-${{ github.event.pull_request.head.sha }}
+          path: artifacts/lfea-m036/*
           if-no-files-found: warn
           retention-days: 90
