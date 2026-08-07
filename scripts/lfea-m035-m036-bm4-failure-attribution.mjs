@@ -340,4 +340,4 @@ mkdirSync(reportDir, { recursive: true });
 writeFileSync(`${reportDir}/m035-m036-bm4-failure-attribution.json`, `${JSON.stringify(report, null, 2)}\n`);
 console.log(`M035_M036_ATTRIBUTION_SUMMARY=${JSON.stringify(report.summary)}`);
 console.log(`M035_M036_ATTRIBUTION_REDUCERS=${JSON.stringify(report.evidence.reducerNodes)}`);
-console.log(`M035_M036_ATTRIBUTION_TOP_UNEXPLAINED=${JSON.stringify(report.topUnexplained.slice(0, 12).map((row) => ({ caseLabel: row.caseLabel, family: row.family, identifier: row.identifier, end: row.end, field: row.field, percentDifference: row.percentDifference, normalizedSeverity: row.normalizedSeverity })))`);
+console.log(`M035_M036_ATTRIBUTION_TOP_UNEXPLAINED=${JSON.stringify(report.topUnexplained.slice(0, 12).map((row) => ({ caseLabel: row.caseLabel, family: row.family, identifier: row.identifier, end: row.end, field: row.field, percentDifference: row.percentDifference, normalizedSeverity: row.normalizedSeverity })))}`);
