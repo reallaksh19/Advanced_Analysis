@@ -146,14 +146,22 @@ test('InputXML writer rejects M06 before patching while geometry-only authority 
     nodes: { 'node:10': '10', 'node:20': '20' },
     edges: { 'edge:valve': { sourceIndex: 0, fromNodeId: '10', toNodeId: '20' } },
   };
-  assert.throws(() => prepareTopologyEditInputXmlWriteback({
-    inputXmlText: XML,
-    expectedSourceHash: semanticHash(XML),
-    baseCanonicalTopology: base,
-    canonicalTopology: edited,
-    bindings,
-    canonicalLengthUnit: 'mm',
-    fallbackInputXmlLengthUnit: 'mm',
-  }), /INPUTXML_GENERIC_RIGID_VALVE_HAS_NO_SUBTYPE.*INPUTXML_CATALOGUE_BINDING_NOT_ROUNDTRIPPABLE/u);
+  let failure = null;
+  try {
+    prepareTopologyEditInputXmlWriteback({
+      inputXmlText: XML,
+      expectedSourceHash: semanticHash(XML),
+      baseCanonicalTopology: base,
+      canonicalTopology: edited,
+      bindings,
+      canonicalLengthUnit: 'mm',
+      fallbackInputXmlLengthUnit: 'mm',
+    });
+  } catch (error) {
+    failure = error;
+  }
+  assert.ok(failure instanceof RangeError);
+  assert.match(failure.message, /INPUTXML_GENERIC_RIGID_VALVE_HAS_NO_SUBTYPE/u);
+  assert.match(failure.message, /INPUTXML_CATALOGUE_BINDING_NOT_ROUNDTRIPPABLE/u);
   assert.equal(semanticHash(XML), base.sourceHash);
 });
