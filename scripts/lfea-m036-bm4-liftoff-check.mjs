@@ -59,6 +59,10 @@ function ciiReaction(cii, caseLabel, sourceNodeId) {
   return row ? -row.FY : 0;
 }
 
+function ciiDisplacementY(cii, caseLabel, sourceNodeId) {
+  return cii.displacement.get(caseLabel).get(sourceNodeId)?.DY ?? null;
+}
+
 function plusYNode(support) {
   const match = /^BM4-C-(\d+)-UY-PLUS-Y-LINEARIZED$/u.exec(support.declarationId);
   return match?.[1] ?? null;
@@ -85,6 +89,8 @@ function targetEvidence({ cii, h1Execution, h2Execution }) {
     h1Sus: reaction(h1Execution, nodeId),
     h2Sus: h2Execution ? reaction(h2Execution, nodeId) : null,
     ciiSus: ciiReaction(cii, 'SUS', nodeId),
+    ciiOpeDY: ciiDisplacementY(cii, 'OPE', nodeId),
+    ciiSusDY: ciiDisplacementY(cii, 'SUS', nodeId),
   }]));
 }
 
