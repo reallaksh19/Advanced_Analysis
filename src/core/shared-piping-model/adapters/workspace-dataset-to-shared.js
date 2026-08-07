@@ -3,6 +3,10 @@ import { collectEvidence, normalizeGeometryEvidence, normalizePoint } from '../e
 import { createEvidenceIndex } from '../evidence-index.js';
 import { deepFreeze, isPlainRecord, stringValue } from '../immutable.js';
 import {
+  assertNativePipeWritebackEnvelope,
+  NATIVE_PIPE_WRITEBACK_SCHEMA,
+} from '../native-pipe-writeback-envelope.js';
+import {
   COMPATIBILITY_EVIDENCE_SPECS,
   ENGINEERING_PROPERTY_SPECS,
   LOAD_EVIDENCE_SPECS,
@@ -12,7 +16,6 @@ import { createSharedPipingModel } from '../shared-piping-model.js';
 import { collectSupportEvidence } from '../support-evidence.js';
 
 const WORKSPACE_DATASET_SCHEMA = 'analysis-workspace-dataset/v1';
-const NATIVE_PIPE_WRITEBACK_SCHEMA = 'TopologyEditNativePipeWriteback.v1';
 const CONTAINER_TYPES = new Set(['BRANCH', 'GROUP', 'MODEL', 'ROOT', 'FOLDER', 'SYSTEM', 'ZONE']);
 
 export function buildSharedPipingModelFromWorkspaceDataset(dataset) {
@@ -135,9 +138,7 @@ function entityRoots(entity) {
 function componentPorts(entity, geometry) {
   const native = entity.properties?.nativeParams;
   if (native?.schema === NATIVE_PIPE_WRITEBACK_SCHEMA) {
-    if (!Array.isArray(native.ports) || native.ports.length !== 2) {
-      throw new RangeError('Native pipe writeback requires exactly two explicit ports.');
-    }
+    assertNativePipeWritebackEnvelope(entity);
     return native.ports.map((row, index) => {
       const portKey = stringValue(row.portKey);
       const role = stringValue(row.role);
