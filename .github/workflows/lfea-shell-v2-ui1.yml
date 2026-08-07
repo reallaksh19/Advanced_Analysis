@@ -11,6 +11,8 @@ on:
       - 'lfea.html'
       - 'vite.config.js'
       - 'vite.lfea.config.js'
+      - 'vite.lfea-ui1-test.config.js'
+      - 'playwright.lfea-ui1.config.js'
       - 'src/workspace/lfea-shell-v2/**'
       - 'src/workspace/design-tokens/lfea-tokens.js'
       - 'src/workspace/lfea-workbench-controller.js'
@@ -19,6 +21,7 @@ on:
       - 'scripts/lfea-workbench-check.mjs'
       - 'e2e/lfea-shell-v2.spec.js'
       - 'e2e/lfea-workbench.spec.js'
+      - 'e2e/fixtures/ui1-linear-piping-run-analysis-stub.js'
       - '.github/workflows/lfea-shell-v2-ui1.yml'
 
 permissions:
@@ -107,7 +110,7 @@ jobs:
 
       - name: Embedded and standalone browser regression
         working-directory: head
-        run: node scripts/run-playwright.mjs e2e/lfea-workbench.spec.js e2e/lfea-shell-v2.spec.js --retries=0 --workers=1 --max-failures=1
+        run: node scripts/run-playwright.mjs --config=playwright.lfea-ui1.config.js e2e/lfea-workbench.spec.js e2e/lfea-shell-v2.spec.js --max-failures=1
 
       - name: Syntax check changed JavaScript
         working-directory: head
