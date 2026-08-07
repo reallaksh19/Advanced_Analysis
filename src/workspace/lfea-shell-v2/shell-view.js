@@ -29,6 +29,7 @@ export class LfeaShellV2View {
       activeSection: 'MODEL',
       collectionPath: LFEA_COLLECTION_PATHS[0],
       selectedIndex: -1,
+      sourceOpen: true,
     };
   }
 
@@ -83,12 +84,16 @@ export class LfeaShellV2View {
       this.convergenceHost,
       this.uiState.activeSection === 'VERIFICATION',
     ));
-    section.append(renderLfeaSourceDrawer(
+    const sourceDrawer = renderLfeaSourceDrawer(
       this.rootElement,
       state,
       this.handlers,
-      true,
-    ));
+      this.uiState.sourceOpen,
+    );
+    sourceDrawer.addEventListener('toggle', () => {
+      this.uiState.sourceOpen = sourceDrawer.open;
+    });
+    section.append(sourceDrawer);
     const reviewSummary = legacyReviewSummary(this.rootElement, state.execution);
     if (reviewSummary) section.append(reviewSummary);
 
@@ -101,6 +106,7 @@ export class LfeaShellV2View {
     if (id === 'MODEL') this.uiState.collectionPath = 'nodes';
     if (id === 'MATERIALS') this.uiState.collectionPath = 'materials';
     if (id === 'LOADS') this.uiState.collectionPath = 'analysisDefinition.constraints';
+    if (id === 'SOURCE') this.uiState.sourceOpen = true;
     this.uiState.selectedIndex = -1;
     this.render(this.lastState);
   }
@@ -125,7 +131,10 @@ export class LfeaShellV2View {
       ? `${this.lastState.packageValue?.semanticHash ?? ''}:${this.lastState.modelVersion}`
       : null;
     const currentIdentity = `${state.packageValue?.semanticHash ?? ''}:${state.modelVersion}`;
-    if (previousIdentity !== null && previousIdentity !== currentIdentity) this.runTrace = null;
+    if (previousIdentity !== null && previousIdentity !== currentIdentity) {
+      this.runTrace = null;
+      this.uiState.selectedIndex = -1;
+    }
     this.runTrace = captureRunTrace(state, this.runTrace);
   }
 
