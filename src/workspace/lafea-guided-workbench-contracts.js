@@ -23,3 +23,13 @@ export {
   LAFEA_MESH_REFINEMENT_KINDS,
   createLafeaMeshRefinementCommand,
 } from './lafea-mesh-refinement-command.js';
+export {
+  LAFEA_MESH_REQUEST_READINESS_SCHEMA,
+  LAFEA_MESH_STAGE_ADAPTER_SCHEMA,
+  lafeaMeshStageAdapter,
+  projectLafeaMeshRequestReadiness,
+} from './lafea-mesh-stage-adapter.js';
+export {
+  buildLafeaMeshGenerationIntentFromStage,
+  buildLafeaMeshRefinementCommandFromStage,
+} from './lafea-mesh-stage-request.js';
