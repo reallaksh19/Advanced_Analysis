@@ -14,11 +14,10 @@ const productProducers = read('../src/workspace/lafea-analytical-product-produce
 const productComponents = read('../src/workspace/lafea-stage-product-components.js');
 const foundationCompiler = read('../src/core/local-load-foundation/compile.js');
 const screeningProduct = read('../src/core/local-attachment-screening/product-assessment.js');
-const lifecycleStore = [
-  read('../src/workspace/lafea-lifecycle-workbench-store.js'),
-  read('../src/workspace/lafea-lifecycle-workbench-store-core.js'),
-  read('../src/workspace/lafea-analysis-mesh-workbench-store.js'),
-].join('\n');
+const lifecycleStore = read('../src/workspace/lafea-lifecycle-workbench-store.js');
+const orchestrator = read('../src/workspace/lafea-workbench-orchestrator-store.js');
+const legacyLifecycleAlias = read('../src/workspace/lafea-lifecycle-workbench-store-core.js');
+const legacyMeshAlias = read('../src/workspace/lafea-analysis-mesh-workbench-store.js');
 const registry = read('../src/workspace/lafea-stage-registry.js');
 const bindings = read('../src/workspace/lafea-stage-composition-bindings.js');
 const compositionRoot = read('../src/workspace/lafea-stage-composition-root.js');
@@ -110,13 +109,20 @@ assert.match(screeningProduct, /ESCALATE/u);
 assert.match(screeningProduct, /BLOCKED/u);
 assert.match(screeningProduct, /NO_NOMINAL_STRESS_TRANSFER_AS_FE_STRESS/u);
 assert.doesNotMatch(screeningProduct, /allowable|codeUtilization|RELEASE_QUALIFIED/u);
-assert.match(lifecycleStore, /CALCULATION_ACCEPTED_BY_STAGE_CONTRACT/u);
-assert.match(lifecycleStore, /RESULT_READY/u);
-assert.match(lifecycleStore, /CODE_NOT_READY/u);
-assert.match(lifecycleStore, /RELEASE_NOT_QUALIFIED/u);
-assert.match(lifecycleStore, /registerAnalysisMeshEvidence/u);
-assert.match(lifecycleStore, /recoverAnalysisMeshEvidence/u);
-assert.doesNotMatch(lifecycleStore, /RELEASE_QUALIFIED'\s*:/u);
+
+assert.match(lifecycleStore, /createLafeaWorkbenchOrchestratorStore/u);
+assert.doesNotMatch(lifecycleStore, /new Set\(\)|\.subscribe\(|function publish\s*\(/u);
+for (const compatibilityAlias of [legacyLifecycleAlias, legacyMeshAlias]) {
+  assert.doesNotMatch(compatibilityAlias, /new Set\(\)|\.subscribe\(|function publish\s*\(/u,
+    'Compatibility aliases must not own lifecycle or publication state.');
+}
+assert.match(orchestrator, /CALCULATION_ACCEPTED_BY_STAGE_CONTRACT/u);
+assert.match(orchestrator, /RESULT_READY/u);
+assert.match(orchestrator, /CODE_NOT_READY/u);
+assert.match(orchestrator, /RELEASE_NOT_QUALIFIED/u);
+assert.match(orchestrator, /registerAnalysisMeshEvidence/u);
+assert.match(orchestrator, /recoverAnalysisMeshEvidence/u);
+assert.doesNotMatch(orchestrator, /RELEASE_QUALIFIED'\s*:/u);
 
 assert.match(registry, /lafea-stage-registry\/v2/u);
 assert.match(registry, /lafeaRegisteredComposition/u);
@@ -153,6 +159,8 @@ console.log(JSON.stringify({
   currentCoreProducerAdapters: true,
   analyticalProductEvidenceIntegrated: true,
   analysisMeshCustodyIntegrated: true,
+  canonicalOrchestratorInspected: true,
+  compatibilityAliasesAuthorityFree: true,
   finiteFoundationResultantClosure: true,
   screeningApplicabilityStates: ['PASS', 'ESCALATE', 'BLOCKED'],
   typedSourceEvents: true,

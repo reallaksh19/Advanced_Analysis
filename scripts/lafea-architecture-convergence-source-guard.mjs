@@ -7,6 +7,8 @@ const publicSurface = read('../src/workspace/lafea-workbench.js');
 const orchestrator = read('../src/workspace/lafea-workbench-orchestrator-store.js');
 const sourceState = read('../src/workspace/lafea-workbench-source-state.js');
 const meshState = read('../src/workspace/lafea-workbench-mesh-state.js');
+const preparationState = read('../src/workspace/lafea-workbench-preparation-state.js');
+const preparationProfile = read('../src/workspace/lafea-preparation-profile.js');
 const projection = read('../src/workspace/lafea-workbench-orchestration-projection.js');
 const adapter = read('../src/workspace/lafea-stage-analysis-adapter.js');
 const legacyCore = read('../src/workspace/lafea-lifecycle-workbench-store-core.js');
@@ -20,21 +22,20 @@ assert.match(publicSurface, /requireLafeaStageAnalysisAdapter/u);
 assert.match(orchestrator, /createRetainedStore/u);
 assert.match(orchestrator, /createLafeaWorkbenchSourceState/u);
 assert.match(orchestrator, /createLafeaWorkbenchMeshState/u);
+assert.match(orchestrator, /createLafeaWorkbenchPreparationState/u);
 assert.match(orchestrator, /buildLafeaWorkbenchOrchestrationProjection/u);
-assert.equal((orchestrator.match(/new Set\(\)/gu) ?? []).length, 1,
-  'Only the canonical orchestrator may own a public listener set.');
-assert.equal(sourceState.includes('.subscribe('), false);
-assert.equal(meshState.includes('.subscribe('), false);
-assert.equal(sourceState.includes('new Set()'), false);
-assert.equal(meshState.includes('new Set()'), false);
+assert.equal((orchestrator.match(/new Set\(\)/gu) ?? []).length, 1, 'Only the canonical orchestrator may own a public listener set.');
+for (const stateSource of [sourceState, meshState, preparationState]) {
+  assert.equal(stateSource.includes('.subscribe('), false);
+  assert.equal(stateSource.includes('new Set()'), false);
+}
 assert.doesNotMatch(projection, /document\.querySelector|HTMLElement|addEventListener/u);
-assert.doesNotMatch(adapter,
-  /executeControlledLafea|registerLifecycleArtifact|createLafeaAnalysisMeshEvidence|(?:generate|refine)[A-Z][A-Za-z0-9_]*\s*\(/u);
+assert.doesNotMatch(adapter, /executeControlledLafea|registerLifecycleArtifact|createLafeaAnalysisMeshEvidence|(?:generate|refine)[A-Z][A-Za-z0-9_]*\s*\(/u);
 assert.match(adapter, /generationAuthorized:\s*false/u);
 assert.match(adapter, /refinementAuthorized:\s*false/u);
 assert.match(projection, /RELEASE_NOT_QUALIFIED/u);
-assert.match(adapter, /LAFEA_PREFEA_BRIDGE_NOT_QUALIFIED/u);
-assert.match(projection, /adapter\.preparation\.reason/u);
+assert.match(preparationProfile, /LAFEA_PREPARATION_PRODUCER_NOT_QUALIFIED/u);
+assert.match(projection, /preparation\?\.usableForAuthorization/u);
 
 for (const compatibilitySource of [legacyCore, legacyMesh]) {
   assert.doesNotMatch(compatibilitySource, /new Set\(\)|\.subscribe\(|function publish\s*\(/u);
@@ -48,6 +49,10 @@ assert.doesNotMatch(legacyMesh, /decorateLafeaAnalysisMeshWorkbenchStore/u);
 
 for (const path of [
   '../src/workspace/lafea-stage-analysis-adapter.js',
+  '../src/workspace/lafea-preparation-contract.js',
+  '../src/workspace/lafea-preparation-profile.js',
+  '../src/workspace/lafea-preparation-projection.js',
+  '../src/workspace/lafea-workbench-preparation-state.js',
   '../src/workspace/lafea-workbench-orchestration-projection.js',
   '../src/workspace/lafea-workbench-source-state.js',
   '../src/workspace/lafea-workbench-mesh-state.js',
@@ -63,22 +68,13 @@ for (const path of [
   const lines = read(path).trimEnd().split('\n').length;
   assert.ok(lines < 300, `${path} exceeds the 299-line architectural limit`);
 }
-
 console.log(JSON.stringify({
-  check: 'lafea-architecture-convergence-source-guard',
-  status: 'PASS',
-  facadeOnFacadeStoreComposition: false,
-  publicListenerSets: 1,
-  sourceStatePublishes: false,
-  meshStatePublishes: false,
-  legacyCoreImplementationRetained: false,
-  legacyMeshDecoratorRetained: false,
-  centralPublicOrchestrationSurface: true,
-  domAuthorityInputs: false,
-  meshExecutionAuthorityAdded: false,
+  check: 'lafea-architecture-convergence-source-guard', status: 'PASS',
+  facadeOnFacadeStoreComposition: false, publicListenerSets: 1,
+  sourceStatePublishes: false, meshStatePublishes: false, preparationStatePublishes: false,
+  legacyCoreImplementationRetained: false, legacyMeshDecoratorRetained: false,
+  centralPublicOrchestrationSurface: true, domAuthorityInputs: false,
+  preparationDiagnosticAuthorityManufactured: false, meshExecutionAuthorityAdded: false,
   releaseQualified: false,
 }));
-
-function read(relativePath) {
-  return fs.readFileSync(new URL(relativePath, import.meta.url), 'utf8');
-}
+function read(relativePath) { return fs.readFileSync(new URL(relativePath, import.meta.url), 'utf8'); }
