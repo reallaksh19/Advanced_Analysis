@@ -73,6 +73,7 @@ function exactCatalogueEvidence(record, entity) {
     sourceReference: binding?.sourceReference ?? record?.catalogueSourceReference
       ?? catalogue.catalogueSourceReference ?? null,
   };
-  if (!candidate.catalogueHash || !candidate.recordId || !candidate.recordHash) return null;
+  if (!candidate.catalogueHash || !candidate.sourceHash || !candidate.recordId
+    || !candidate.recordHash || !candidate.sourceReference) return null;
   return deepFreeze(candidate);
 }
