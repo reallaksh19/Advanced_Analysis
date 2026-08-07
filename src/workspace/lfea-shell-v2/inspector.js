@@ -28,6 +28,24 @@ export function renderLfeaInspector(root, state, uiState, handlers) {
   return panel;
 }
 
+export function createLfeaInspectorValueSnapshot(state) {
+  const execution = state.execution;
+  const result = execution?.result;
+  return Object.freeze({
+    pipelineStatus: execution?.status ?? null,
+    preflightStatus: execution?.preflight?.status ?? null,
+    solverStatus: result?.status ?? null,
+    reviewStatus: execution?.review?.status ?? null,
+    evidenceExportStatus: execution?.evidenceExport?.status ?? null,
+    displacements: result?.nodalDisplacements ?? [],
+    reactions: result?.reactions ?? [],
+    rawStress: rawStressRows(result),
+    qualityEvidence: result ? qualityEvidenceRows(result) : [],
+    projectedStress: execution?.stressProjection?.nodalValues ?? [],
+    reviewSummary: execution ? reviewSummary(execution) : null,
+  });
+}
+
 function recordInspector(root, state, uiState, handlers) {
   const wrapper = workbenchElement(root, 'div', 'lfea-shell-v2__record-inspector');
   if (!state.packageValue) {
@@ -79,42 +97,46 @@ function recordInspector(root, state, uiState, handlers) {
 
 function resultsInspector(root, state) {
   const wrapper = workbenchElement(root, 'div', 'lfea-shell-v2__results');
-  const execution = state.execution;
-  if (!execution) {
+  const snapshot = createLfeaInspectorValueSnapshot(state);
+  if (!state.execution) {
     wrapper.append(message(root, 'No current execution exists for this model.'));
     return wrapper;
   }
-  wrapper.append(summaryFacts(root, execution));
-  if (execution.result) {
+  wrapper.append(summaryFacts(root, snapshot));
+  if (state.execution.result) {
     wrapper.append(
-      lfeaResultTable(root, 'Displacements', execution.result.nodalDisplacements ?? []),
-      lfeaResultTable(root, 'Reactions', execution.result.reactions ?? []),
-      lfeaResultTable(root, 'Raw stress', rawStressRows(execution.result)),
+      lfeaResultTable(root, 'Displacements', snapshot.displacements),
+      lfeaResultTable(root, 'Reactions', snapshot.reactions),
+      lfeaResultTable(root, 'Raw stress', snapshot.rawStress),
       lfeaResultTable(
         root,
         'Mesh quality evidence — no acceptance threshold applied',
-        qualityEvidenceRows(execution.result),
+        snapshot.qualityEvidence,
       ),
     );
   }
-  if (execution.stressProjection) {
+  if (state.execution.stressProjection) {
     wrapper.append(
       workbenchElement(root, 'h3', null, 'Projected stress — NON-AUTHORITATIVE REVIEW PROJECTION'),
-      lfeaResultTable(root, 'Projected nodal stress', execution.stressProjection.nodalValues ?? []),
+      lfeaResultTable(root, 'Projected nodal stress', snapshot.projectedStress),
     );
   }
-  wrapper.append(workbenchJsonBlock(root, reviewSummary(execution), 'lfea-review-summary'));
+  wrapper.append(workbenchJsonBlock(
+    root,
+    snapshot.reviewSummary,
+    'lfea-review-summary-detail',
+  ));
   return wrapper;
 }
 
-function summaryFacts(root, execution) {
+function summaryFacts(root, snapshot) {
   const section = workbenchElement(root, 'section', 'lfea-shell-v2__result-summary');
   section.append(
-    fact(root, 'Pipeline', execution.status),
-    fact(root, 'Preflight', execution.preflight?.status ?? 'Not run'),
-    fact(root, 'Solver', execution.result?.status ?? 'Not run'),
-    fact(root, 'Review', execution.review?.status ?? 'Not run'),
-    fact(root, 'Export', execution.evidenceExport?.status ?? 'Not available'),
+    fact(root, 'Pipeline', snapshot.pipelineStatus ?? 'Not run'),
+    fact(root, 'Preflight', snapshot.preflightStatus ?? 'Not run'),
+    fact(root, 'Solver', snapshot.solverStatus ?? 'Not run'),
+    fact(root, 'Review', snapshot.reviewStatus ?? 'Not run'),
+    fact(root, 'Export', snapshot.evidenceExportStatus ?? 'Not available'),
   );
   return section;
 }
@@ -130,6 +152,7 @@ function message(root, text) {
 }
 
 function rawStressRows(result) {
+  if (!result) return [];
   return Array.isArray(result.integrationPointResults)
     ? result.integrationPointResults
     : result.elementStresses ?? [];
