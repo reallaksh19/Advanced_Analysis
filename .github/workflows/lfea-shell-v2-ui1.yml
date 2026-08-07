@@ -21,7 +21,7 @@ on:
       - 'scripts/lfea-workbench-check.mjs'
       - 'e2e/lfea-shell-v2.spec.js'
       - 'e2e/lfea-workbench.spec.js'
-      - 'e2e/fixtures/ui1-linear-piping-run-analysis-stub.js'
+      - 'e2e/fixtures/ui1-embedded-shell-entry.js'
       - '.github/workflows/lfea-shell-v2-ui1.yml'
 
 permissions:
