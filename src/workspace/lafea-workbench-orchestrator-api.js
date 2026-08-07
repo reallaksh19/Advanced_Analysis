@@ -72,7 +72,7 @@ export function createLafeaWorkbenchOrchestratorApi(context) {
       : c.mesh.exportAnalysisMeshEvidence(stageId),
     recoverAnalysisMeshEvidence: (value) => {
       const stageId = value?.intent?.stageId ?? value?.stageId ?? activeStageId();
-      if (domainFirst(stageId)) return c.registerDomainFirstMeshExecution(value);
+      if (domainFirst(stageId)) return c.registerAnalysisMeshEvidence(value);
       return c.mesh.recoverAnalysisMeshEvidence(value);
     },
     buildPreparationRequest: (caseIds = [], stageId = activeStageId()) => {
@@ -117,7 +117,7 @@ export function createLafeaWorkbenchOrchestratorApi(context) {
       if (!execution.custodyEligible) return execution;
       return freeze({
         ...execution,
-        custody: c.registerDomainFirstMeshExecution(execution),
+        custody: c.registerAnalysisMeshEvidence(execution),
       });
     },
     buildOrchestrationProjection: (stageId = activeStageId()) =>
