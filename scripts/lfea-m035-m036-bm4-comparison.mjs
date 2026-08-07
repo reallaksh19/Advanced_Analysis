@@ -4,6 +4,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { BM4_COMPARISON_POLICY, loadBm4CiiOutputCases1921 } from './lfea-m034-bm4-output-comparison.mjs';
 import { solveBm4M035FeatureCases } from './lfea-m035-bm4-feature-solve-runtime.mjs';
+import { normalizeBm4CiiLocalForceForM035 } from './lfea-bm4-local-force-reference-normalization.mjs';
 import { solveBm4M035M036Combined } from './lfea-m035-m036-bm4-integration-runtime.mjs';
 import {
   M035_BEND_SCORING_EXCLUDED_NODE_IDS,
@@ -198,8 +199,9 @@ function probe(cases, nodeId, label = 'OPE', family = 'restraint', field = 'UY')
   return row ? { ours: row.ours, cii: row.cii, percentDifference: row.percentDifference, passed5pct: row.passedTarget } : null;
 }
 
-const cii = loadBm4CiiOutputCases1921();
+const rawCii = loadBm4CiiOutputCases1921();
 const m035 = solveBm4M035FeatureCases();
+const cii = normalizeBm4CiiLocalForceForM035(rawCii, m035.authorities);
 const combined = solveBm4M035M036Combined();
 const m035Cases = compareSnapshot(featureSnapshot(m035), cii);
 const combinedCases = compareSnapshot(featureSnapshot(combined), cii);
@@ -207,10 +209,11 @@ const m035Aggregate = aggregate(m035Cases);
 const combinedAggregate = aggregate(combinedCases);
 
 assert.ok(Math.abs(ratePct(m035Aggregate.raw.displacement) - 18.499427262313862) < 1e-12, 'comparison parity: M035 raw displacement');
-assert.ok(Math.abs(ratePct(m035Aggregate.raw.forces) - 28.959484346224677) < 1e-12, 'comparison parity: M035 raw forces');
+assert.ok(Math.abs(ratePct(m035Aggregate.raw.forces) - 31.49171270718232) < 1e-12, 'comparison parity: M035 raw forces after local-axis reference normalization');
 
 const report = {
-  schema: 'm035-m036-bm4-cases-19-20-21-comparison/v1',
+  schema: 'm035-m036-bm4-cases-19-20-21-comparison/v2',
+  localForceReferenceNormalization: cii.localForceReferenceNormalization,
   m035: m035Aggregate,
   combined: combinedAggregate,
   deltaPercentagePoints: {
