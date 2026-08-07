@@ -10,6 +10,7 @@ import {
   diagnoseInputXmlModelHealthTopology,
 } from './inputxml-model-health.js';
 import { diagnoseInputXmlLinearModelHealth } from './inputxml-linear-model-health.js';
+import { diagnoseInputXmlLinearPreFeaEngineeringSanity } from './inputxml-linear-prefea-engineering-checks.js';
 import {
   INPUTXML_LINEAR_PREFEA_DIAGNOSTICS_SCHEMA,
   foldReadiness,
@@ -45,7 +46,11 @@ export function diagnoseInputXmlLinearPreFea(request, options = {}) {
     sourceBundle,
     { ...(options.representabilityOptions ?? {}), analysisProfileId: accepted.requestedProfileId },
   );
-  const findings = collectFindings({ sourceBundle, topology, proximity, representability });
+  const engineeringSanity = (options.diagnoseEngineeringSanity
+    ?? diagnoseInputXmlLinearPreFeaEngineeringSanity)(sourceBundle);
+  const findings = collectFindings({
+    sourceBundle, topology, proximity, representability, engineeringSanity,
+  });
   const folded = foldReadiness(findings, accepted.requestedCaseIds);
   const capabilities = normalizeCapabilities(representability.capabilities ?? []);
   const summary = summarize({
@@ -53,6 +58,7 @@ export function diagnoseInputXmlLinearPreFea(request, options = {}) {
     capabilities,
     sourceBundle,
     accepted,
+    engineeringSanity,
   });
 
   return sealPreFeaRecord({
@@ -106,7 +112,7 @@ export function requireInputXmlLinearPreFeaDiagnostics(record) {
   return accepted;
 }
 
-function collectFindings({ sourceBundle, topology, proximity, representability }) {
+function collectFindings({ sourceBundle, topology, proximity, representability, engineeringSanity }) {
   const rows = [];
   for (const diagnostic of sourceBundle.geometry?.diagnostics ?? []) {
     rows.push(normalizeFinding(diagnostic, 'GEOMETRY', ['CANONICAL_GEOMETRY']));
@@ -114,6 +120,7 @@ function collectFindings({ sourceBundle, topology, proximity, representability }
   appendReportFindings(rows, topology, 'TOPOLOGY', ['STRUCTURAL_GRAPH']);
   appendReportFindings(rows, proximity, 'GEOMETRY', ['STRUCTURAL_GRAPH']);
   appendReportFindings(rows, representability, 'COMPONENT', ['LINEAR_STRUCTURAL_MODEL']);
+  appendReportFindings(rows, engineeringSanity, 'SCHEMA', ['LINEAR_STRUCTURAL_MODEL']);
   for (const capability of representability.capabilities ?? []) {
     if (capability.status === 'BLOCK') {
       rows.push(makeFinding({
@@ -219,7 +226,7 @@ function normalizeCapabilities(rows) {
   })).sort((a, b) => a.capabilityId < b.capabilityId ? -1 : a.capabilityId > b.capabilityId ? 1 : 0));
 }
 
-function summarize({ folded, capabilities, sourceBundle, accepted }) {
+function summarize({ folded, capabilities, sourceBundle, accepted, engineeringSanity }) {
   const blocked = capabilities.filter((row) => row.status === 'BLOCK').map((row) => row.capabilityId);
   const conditional = capabilities.filter((row) => ['WARN', 'CONDITIONAL'].includes(row.status))
     .map((row) => row.capabilityId);
@@ -231,11 +238,15 @@ function summarize({ folded, capabilities, sourceBundle, accepted }) {
     requestedProfileId: accepted.requestedProfileId,
     requestedCaseIds: accepted.requestedCaseIds,
     findingCounts: folded.findingCounts,
+    findingCountsByDisposition: countBy(findings, 'disposition'),
+    findingCountsByCategory: countBy(findings, 'category'),
     blockedCapabilityIds: Object.freeze(uniqueAscii(blocked)),
     conditionalCapabilityIds: Object.freeze(uniqueAscii(conditional)),
     authorizedCapabilityIds: Object.freeze(uniqueAscii(authorized)),
     missingAuthorityCount: findings.filter((row) => /MISSING|UNRESOLVED|INCOMPLETE/u.test(row.code)).length,
     unsupportedFeatureCount: findings.filter((row) => row.category === 'UNSUPPORTED_FEATURE').length,
+    engineeringSanityFindingCount: engineeringSanity?.summary?.findingCount ?? 0,
+    engineeringSanityBlockingFindingCount: engineeringSanity?.summary?.blockingFindingCount ?? 0,
     affectedSourceFeatureCount: new Set(findings.flatMap((row) => row.sourceFeatureIds)).size,
     affectedComponentCount: new Set(findings.filter((row) => row.category === 'COMPONENT')
       .flatMap((row) => row.canonicalEntityIds)).size,
@@ -307,6 +318,14 @@ function deduplicate(rows) {
 
 function compact(values) {
   return values.filter((value) => value !== undefined && value !== null).map(String);
+}
+
+function countBy(rows, field) {
+  const counts = new Map();
+  for (const row of rows) counts.set(row[field], (counts.get(row[field]) ?? 0) + 1);
+  return Object.freeze(Object.fromEntries([...counts.entries()].sort(([left], [right]) => (
+    left < right ? -1 : left > right ? 1 : 0
+  ))));
 }
 
 function validCategory(value) {

@@ -11,6 +11,26 @@
 export {
   BENCHMARK_REPORT_SCHEMA, CASE_STATUS, compareBenchmarkReports, runBenchmarks,
 } from './runner.js';
+export {
+  BENCHMARK_ENTITY_KINDS,
+  BENCHMARK_QUALIFICATION_REPORT_SCHEMA,
+  BENCHMARK_RESULT_ROW_SCHEMA,
+  BENCHMARK_ROW_STATUSES,
+  benchmarkResultRowIdentity,
+  normalizeBenchmarkResultRows,
+  requireGovernedBenchmarkRecord,
+  sealBenchmarkQualificationReport,
+} from './qualification-contract.js';
+export { compareBenchmarkResultRows } from './qualification-comparison.js';
+export { normalizeLinearSolverBenchmarkResult } from './qualification-normalization.js';
+export { runGovernedBenchmarkQualification } from './qualification-pipeline.js';
+export { createBenchmarkQualificationAdapter } from './adapters/generic.js';
+export {
+  BM4_QUALIFICATION_ADAPTER_ID,
+  BM4_QUALIFICATION_CASE_IDS,
+  createBm4QualificationAdapter,
+  normalizeBm4ReferenceCase,
+} from './adapters/bm4.js';
 export { kernelBenchmarkCases } from './cases-kernel.js';
 export { presentationBenchmarkCases } from './cases-presentation.js';
 export { performanceBenchmarkCases } from './cases-performance.js';
