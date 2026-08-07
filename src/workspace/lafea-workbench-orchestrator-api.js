@@ -3,10 +3,32 @@ import {
   buildLafeaMeshGenerationIntentV2FromStage,
   buildLafeaPreparationRequestV2FromStage,
 } from './lafea-domain-first-requests.js';
+import { lafeaDomainFirstMeshProfileHash } from './lafea-domain-first-mesh-profile.js';
+import {
+  executeLafeaDomainFirstT6Mesh,
+  planLafeaDomainFirstT6Mesh,
+} from './lafea-domain-first-t6-producer.js';
 
 export function createLafeaWorkbenchOrchestratorApi(context) {
   const c = requireContext(context);
   const activeStageId = () => c.getRetainedState().activeStageId;
+  const domainFirst = (stageId = activeStageId()) => c.readStageState(stageId).domainFirstProfileActive;
+
+  function domainT6Input(configuration, meshProfile, stageId = activeStageId()) {
+    const stage = c.readStageState(stageId);
+    const meshProfileHash = lafeaDomainFirstMeshProfileHash(meshProfile);
+    const intent = buildLafeaMeshGenerationIntentV2FromStage(
+      stage,
+      { ...configuration, meshProfileHash },
+    );
+    return {
+      intent,
+      meshProfile,
+      analysisDomain: stage.retainedAnalysisDomain,
+      analysisGeometryEvidence: stage.retainedAnalysisGeometryEvidence,
+    };
+  }
+
   return Object.freeze({
     selectStage: (stageId) => c.delegate('selectStage', [stageId]),
     importDocument: c.importDocument,
@@ -32,16 +54,25 @@ export function createLafeaWorkbenchOrchestratorApi(context) {
     registerLifecycleArtifact: (...args) => c.delegate('registerLifecycleArtifact', args),
     revalidateLifecycleBinding: (...args) => c.delegate('revalidateLifecycleBinding', args),
     exportLifecycle: c.exportLifecycle,
-    validateLafeaAnalysisMeshEvidence: c.mesh.validateLafeaAnalysisMeshEvidence,
+    validateLafeaAnalysisMeshEvidence: (value) => domainFirst(value?.stageId)
+      ? c.domainMesh.validateEvidence(value)
+      : c.mesh.validateLafeaAnalysisMeshEvidence(value),
     registerAnalysisMeshEvidence: c.registerAnalysisMeshEvidence,
-    selectRetainedAnalysisMeshEvidence: c.mesh.selectRetainedAnalysisMeshEvidence,
-    buildAnalysisMeshCustodyProjection: c.mesh.buildAnalysisMeshCustodyProjection,
-    exportAnalysisMeshEvidence: c.mesh.exportAnalysisMeshEvidence,
+    selectRetainedAnalysisMeshEvidence: (stageId = activeStageId()) => domainFirst(stageId)
+      ? c.domainMesh.select(stageId)
+      : c.mesh.selectRetainedAnalysisMeshEvidence(stageId),
+    buildAnalysisMeshCustodyProjection: (stageId = activeStageId()) => {
+      const stage = c.readStageState(stageId);
+      return stage.domainFirstProfileActive
+        ? c.domainMesh.buildProjection(stage)
+        : c.mesh.buildAnalysisMeshCustodyProjection(stage, stage.retainedAnalysisMeshEvidence);
+    },
+    exportAnalysisMeshEvidence: (stageId = activeStageId()) => domainFirst(stageId)
+      ? c.domainMesh.exportEvidence(stageId)
+      : c.mesh.exportAnalysisMeshEvidence(stageId),
     recoverAnalysisMeshEvidence: (value) => {
       const stageId = value?.stageId ?? activeStageId();
-      if (c.readStageState(stageId).domainFirstProfileActive) {
-        throw apiError('LAFEA_DOMAIN_FIRST_ANALYSIS_MESH_REQUIRES_V2_CUSTODY');
-      }
+      if (domainFirst(stageId)) return c.registerAnalysisMeshEvidence(value);
       return c.mesh.recoverAnalysisMeshEvidence(value);
     },
     buildPreparationRequest: (caseIds = [], stageId = activeStageId()) => {
@@ -77,6 +108,18 @@ export function createLafeaWorkbenchOrchestratorApi(context) {
       buildLafeaPreparationRequestV2FromStage(c.readStageState(stageId), caseIds),
     buildDomainMeshGenerationIntent: (configuration, stageId = activeStageId()) =>
       buildLafeaMeshGenerationIntentV2FromStage(c.readStageState(stageId), configuration),
+    planDomainT6Mesh: (configuration, meshProfile, stageId = activeStageId()) =>
+      planLafeaDomainFirstT6Mesh(domainT6Input(configuration, meshProfile, stageId)),
+    generateDomainT6Mesh: (configuration, meshProfile, stageId = activeStageId()) => {
+      const execution = executeLafeaDomainFirstT6Mesh(
+        domainT6Input(configuration, meshProfile, stageId),
+      );
+      if (!execution.custodyEligible) return execution;
+      return freeze({
+        ...execution,
+        custody: c.registerAnalysisMeshEvidence(execution.evidence),
+      });
+    },
     buildOrchestrationProjection: (stageId = activeStageId()) =>
       c.deriveStage(stageId).orchestration,
     subscribe: c.subscribe,
@@ -94,4 +137,8 @@ function requireContext(value) {
   if (!value || typeof value !== 'object') throw new TypeError('LAFEA_ORCHESTRATOR_API_CONTEXT_INVALID');
   return value;
 }
-function freeze(value) { if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value; Object.values(value).forEach(freeze); return Object.freeze(value); }
+function freeze(value) {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+  Object.values(value).forEach(freeze);
+  return Object.freeze(value);
+}
