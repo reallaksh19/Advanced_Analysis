@@ -73,6 +73,13 @@ const teeTagsWithoutBranchTopology = canonicalTeeSegments
   .filter((id) => !assignedTags.has(id))
   .sort();
 const inlineReducers = detectInputXmlInlineReducerTransitions({ canonicalGeometry: normalized });
+const allSectionChangeNodes = sectionChangeNodes(normalized);
+
+console.log(JSON.stringify({
+  diagnostic: 'm035-bm4-section-change-topology',
+  detectorTransitionNodes: inlineReducers.transitions.map((row) => row.nodeId),
+  allSectionChangeNodes,
+}, null, 2));
 
 assert.equal(bends.length, 11, 'BM4 normalized geometry must expose the 11 M035 bend features.');
 assert.equal(teeTags.length, 7, 'BM4 source evidence currently contains seven tee/weldolet SIF tags.');
@@ -116,6 +123,21 @@ function incidentIds(geometry, nodeId) {
     .filter((row) => String(row.startNodeId) === nodeId || String(row.endNodeId) === nodeId)
     .map((row) => String(row.id))
     .sort();
+}
+function sectionChangeNodes(geometry) {
+  return geometry.nodes.flatMap((node) => {
+    const nodeId = String(node.id);
+    const incident = geometry.segments.filter((row) => String(row.startNodeId) === nodeId || String(row.endNodeId) === nodeId);
+    const physical = incident.filter((row) => Number.isFinite(row.diameter) && row.diameter > 0 && Number.isFinite(row.thickness) && row.thickness > 0);
+    if (physical.length < 2) return [];
+    const sectionKeys = new Set(physical.map((row) => `${row.diameter.toPrecision(15)}:${row.thickness.toPrecision(15)}`));
+    if (sectionKeys.size < 2) return [];
+    return [{
+      nodeId,
+      nodeDegree: incident.length,
+      incident: physical.map((row) => ({ segmentId: String(row.id), type: row.type, outerDiameter: row.diameter, wallThickness: row.thickness })),
+    }];
+  }).sort((a, b) => a.nodeId.localeCompare(b.nodeId));
 }
 function cleanNode(value) {
   const numeric = Number(String(value ?? '').trim());
