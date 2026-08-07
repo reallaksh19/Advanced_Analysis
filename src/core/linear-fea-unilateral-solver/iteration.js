@@ -61,7 +61,7 @@ function activeDeclarations(baseDeclarations, unilateral, engaged) {
   for (const support of unilateral) {
     if (engaged.get(support.declarationId) === true) active.push(support.constraint);
   }
-  return active;
+  return active.sort(compareDeclaration);
 }
 
 function supportProjection(unilateral) {
