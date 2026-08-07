@@ -26,7 +26,7 @@ test('Table stays projection-only until certified pipe-length Apply', async ({ p
   await page.locator('[data-table-sort="elementType"]').click();
   const filter = page.locator('[data-table-filter]');
   await filter.fill('PIPE');
-  await expect.poll(() => Number(host.getAttribute('data-topology-edit-table-visible-count'))).toBeGreaterThan(0);
+  await expect.poll(async () => Number(await host.getAttribute('data-topology-edit-table-visible-count'))).toBeGreaterThan(0);
   await tablePanel.locator(':scope > summary').click();
   await tablePanel.locator(':scope > summary').click();
   const afterPresentation = await evidence(page);
