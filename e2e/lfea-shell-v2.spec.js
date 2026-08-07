@@ -11,9 +11,31 @@ async function importFixture(workbench) {
   return packageValue;
 }
 
-test('Shell V2 renders as the embedded LFEA workbench with explicit blocked EnrichedSjson state', async ({ page }) => {
+async function openEmbeddedShell(page) {
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`));
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(`console: ${message.text()}`);
+  });
+  page.on('requestfailed', (request) => {
+    errors.push(`requestfailed: ${request.url()} — ${request.failure()?.errorText ?? 'unknown'}`);
+  });
   await page.goto('/');
-  await page.locator('[data-application-nav="LFEA"]').click();
+  await page.waitForTimeout(750);
+  const nav = page.locator('[data-application-nav="LFEA"]');
+  const navCount = await nav.count();
+  if (navCount !== 1) {
+    const body = (await page.locator('body').innerText()).slice(0, 3000);
+    throw new Error(
+      `Embedded shell failed to boot; LFEA nav count=${navCount}.\n`
+      + `${errors.join('\n')}\nBODY:\n${body}`,
+    );
+  }
+  await nav.click();
+}
+
+test('Shell V2 renders as the embedded LFEA workbench with explicit blocked EnrichedSjson state', async ({ page }) => {
+  await openEmbeddedShell(page);
   const workbench = page.locator('[data-role="lfea-workbench"]');
 
   await expect(workbench).toHaveClass(/lfea-shell-v2/u);
