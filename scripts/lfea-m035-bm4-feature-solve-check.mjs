@@ -6,6 +6,7 @@ import { solveBm4M035FeatureCases } from './lfea-m035-bm4-feature-solve-runtime.
 console.log('\n--- M035 BM4 feature-model stiffness qualification ---');
 const stiffnessDiagnostic = diagnoseBm4M035FeatureStiffness();
 console.log(JSON.stringify(stiffnessDiagnostic, null, 2));
+assert.ok(Number.isFinite(stiffnessDiagnostic.factorization.conditionEstimate));
 
 console.log('\n--- M035 BM4 feature-aware bend/tee solve ---');
 const result = solveBm4M035FeatureCases();
