@@ -166,3 +166,6 @@ jobs:
 
       - name: Regression BM3 solver comparison
         run: node scripts/lfea-m028-bm3-check.mjs
+
+      - name: Regression complete linear core aggregate
+        run: npm run check:lfea-linear-core
