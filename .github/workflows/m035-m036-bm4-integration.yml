@@ -29,10 +29,20 @@ jobs:
 
       - name: Syntax
         run: |
+          node --check scripts/lfea-bm4-local-force-reference-normalization.mjs
+          node --check scripts/lfea-bm4-local-force-reference-normalization-check.mjs
+          node --check scripts/lfea-bm4-thermal-expansion-authority.mjs
+          node --check scripts/lfea-bm4-thermal-expansion-authority-check.mjs
           node --check scripts/lfea-m035-m036-bm4-integration-runtime.mjs
           node --check scripts/lfea-m035-m036-bm4-integration-check.mjs
           node --check scripts/lfea-m035-m036-bm4-comparison.mjs
           node --check scripts/lfea-m035-m036-bm4-failure-attribution.mjs
+
+      - name: Qualify CAESAR local-result reference normalization
+        run: node scripts/lfea-bm4-local-force-reference-normalization-check.mjs
+
+      - name: Qualify BM4 thermal expansion authority
+        run: node scripts/lfea-bm4-thermal-expansion-authority-check.mjs
 
       - name: Combined M035 M036 BM4 qualification
         shell: bash
