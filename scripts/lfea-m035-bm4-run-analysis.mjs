@@ -5,6 +5,10 @@ import { solveBm4InputXmlConditioned } from './lfea-m034-bm4-solve-runtime.mjs';
 import { BM4_COMPARISON_POLICY, loadBm4CiiOutputCases1921 } from './lfea-m034-bm4-output-comparison.mjs';
 import { solveBm4M035FeatureCases } from './lfea-m035-bm4-feature-solve-runtime.mjs';
 import {
+  normalizeBm4CiiLocalForceForM034,
+  normalizeBm4CiiLocalForceForM035,
+} from './lfea-bm4-local-force-reference-normalization.mjs';
+import {
   M035_BEND_SCORING_EXCLUDED_NODE_IDS,
   M035_LIFTOFF_CROSS_EFFECT_WATCH_NODE_IDS,
   M035_NONLINEAR_SUPPORT_NODE_IDS,
@@ -331,11 +335,13 @@ function probe(cases, nodeId, family = 'restraint', field = 'UY') {
 
 function main() {
   console.log('\n--- M035 BM4 CASE 19/20/21 before/after CAESAR comparison ---\n');
-  const cii = loadBm4CiiOutputCases1921();
+  const rawCii = loadBm4CiiOutputCases1921();
   const baselineSolved = solveBm4InputXmlConditioned();
   const featureSolved = solveBm4M035FeatureCases();
-  const baselineCases = compareSnapshot(baselineSnapshot(baselineSolved), cii);
-  const featureCases = compareSnapshot(featureSnapshot(featureSolved), cii);
+  const baselineCii = normalizeBm4CiiLocalForceForM034(rawCii, baselineSolved);
+  const featureCii = normalizeBm4CiiLocalForceForM035(rawCii, featureSolved.authorities);
+  const baselineCases = compareSnapshot(baselineSnapshot(baselineSolved), baselineCii);
+  const featureCases = compareSnapshot(featureSnapshot(featureSolved), featureCii);
   const baselineAggregate = aggregate(baselineCases);
   const featureAggregate = aggregate(featureCases);
 
@@ -349,6 +355,7 @@ function main() {
         liftOffCrossEffectWatchNodeIds: M035_LIFTOFF_CROSS_EFFECT_WATCH_NODE_IDS,
       },
     },
+    localForceReferenceNormalization: { baseline: baselineCii.localForceReferenceNormalization, m035: featureCii.localForceReferenceNormalization },
     featureModel: {
       summary: featureSolved.report.summary,
       sustainedSolverStatus: featureSolved.sustained.execution.status,
