@@ -33,10 +33,18 @@ const expansion = compileInputXmlBendFeatureExpansion({
 });
 
 assert.equal(expansion.components.length, bendSegments.length);
-assert.equal(expansion.components.length, 11);
+assert.equal(expansion.components.length, 12, 'BM4 must expose all twelve physical bend features, including mixed BEND+SIF spans.');
 assert.ok(expansion.analysisGeometry.segments.length > geometry.segments.length);
 assert.ok(expansion.analysisGeometry.nodes.length > geometry.nodes.length);
 assert.ok(expansion.analysisGeometry.diagnostics.some((row) => row.code === 'INPUTXML_BEND_REAL_ARC_EXPANDED'));
+
+const mixedBendSif = bendSegments.find((row) => String(row.startNodeId) === '20690' && String(row.endNodeId) === '20700');
+assert.ok(mixedBendSif, 'Mixed BEND+SIF span 20690->20700 must retain bend geometry classification.');
+assert.ok(
+  Array.isArray(mixedBendSif.meta?.analysis?.sifs)
+    && mixedBendSif.meta.analysis.sifs.some((entry) => Number(entry.type) === 3),
+  'Mixed BEND+SIF span 20690->20700 must retain its type-3 SIF evidence.',
+);
 
 for (const definition of expansion.definitions) {
   const source = bendSegments.find((row) => String(row.id) === definition.sourceSegmentId);
