@@ -1,0 +1,90 @@
+name: Topology Edit Table Slice 9
+
+on:
+  push:
+    paths:
+      - 'src/workspace/topology-edit/export/topology-edit-source-representability.js'
+      - 'src/workspace/topology-edit/export/topology-edit-inputxml-engineering-capability.js'
+      - 'src/workspace/topology-edit/export/topology-edit-inputxml-writeback.js'
+      - 'tests/topology-edit-inputxml-engineering-capability.test.mjs'
+      - '.github/workflows/topology-edit-table-slice9.yml'
+  pull_request:
+    paths:
+      - 'src/workspace/topology-edit/export/topology-edit-source-representability.js'
+      - 'src/workspace/topology-edit/export/topology-edit-inputxml-*.js'
+      - 'tests/topology-edit-inputxml-*.test.mjs'
+      - 'tests/topology-edit-source-representability.test.mjs'
+      - '.github/workflows/topology-edit-table-slice9.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-inputxml-engineering-capability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PLAYWRIGHT_BROWSERS_PATH: '0'
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          fetch-depth: 0
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Exact HEAD line and architecture guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+          files=(
+            src/workspace/topology-edit/export/topology-edit-inputxml-engineering-capability.js
+            tests/topology-edit-inputxml-engineering-capability.test.mjs
+          )
+          for file in "${files[@]}"; do
+            test "$(git show "HEAD:$file" | wc -l)" -lt 300
+            node --check "$file"
+          done
+          node --check src/workspace/topology-edit/export/topology-edit-source-representability.js
+          node --check src/workspace/topology-edit/export/topology-edit-inputxml-writeback.js
+          ! grep -REn 'WorkspaceState|loadDataset\(|swapDataset\(|session\.execute\(|new (WebGLRenderer|TopologyEditViewportBackend)' \
+            src/workspace/topology-edit/export/topology-edit-inputxml-engineering-capability.js \
+            src/workspace/topology-edit/export/topology-edit-inputxml-writeback.js
+          ! grep -REn 'proximity|nearest|distance.*identity|geometry.*identity|last[-_ ]write[-_ ]wins' \
+            src/workspace/topology-edit/export/topology-edit-inputxml-engineering-capability.js
+          git diff --check
+      - name: Real InputXML M06 M10 capability adjudication
+        run: node --test tests/topology-edit-inputxml-engineering-capability.test.mjs
+      - name: Retained InputXML geometry and source representability contracts
+        run: |
+          node --test tests/topology-edit-inputxml-roundtrip.test.mjs
+          node --test tests/topology-edit-source-representability.test.mjs
+      - name: Install dependencies
+        run: npm ci
+      - name: Bundle ownership contract
+        run: node scripts/bundle-chunk-ownership-check.mjs
+      - name: Production build
+        run: npm run build
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Production Q3 and concurrency Chromium regression
+        run: npx playwright test e2e/topology-edit-table-q3-concurrency.spec.js --project=chromium --workers=1 --retries=0 --reporter=line
+      - name: Retained production Table Chromium lifecycle
+        run: npx playwright test e2e/topology-edit-table-authority.spec.js --project=chromium --workers=1 --retries=0 --reporter=line
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-table-slice9-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          path: |
+            reports/qualification/topology-edit-table-authority.json
+            playwright-report
+            test-results
+          if-no-files-found: warn
+          retention-days: 30

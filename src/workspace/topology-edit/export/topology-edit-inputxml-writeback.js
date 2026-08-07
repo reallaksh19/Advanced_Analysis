@@ -1,6 +1,10 @@
 import { deepFreeze, semanticHash } from '../../../core/shared-piping-model/index.js';
 import { parseInputXmlUnitSystem } from '../../../core/geometry/adapters/inputxml-unit-system.js';
 import { assertCanonicalTopologyHash } from '../topology-edit-canonical-state.js';
+import {
+  assessTopologyEditInputXmlEngineeringDelta,
+  assertTopologyEditInputXmlEngineeringCapability,
+} from './topology-edit-inputxml-engineering-capability.js';
 
 export const TOPOLOGY_EDIT_INPUTXML_WRITEBACK_SCHEMA =
   'TopologyEditInputXmlWriteback.v1';
@@ -30,6 +34,15 @@ export function prepareTopologyEditInputXmlWriteback(input = {}) {
   }
   const base = assertCanonical(input.baseCanonicalTopology, 'baseCanonicalTopology');
   const edited = assertCanonical(input.canonicalTopology, 'canonicalTopology');
+  const engineeringCapability = assessTopologyEditInputXmlEngineeringDelta({
+    baseCanonicalTopology: base,
+    canonicalTopology: edited,
+  });
+  assertTopologyEditInputXmlEngineeringCapability(engineeringCapability);
+  if (engineeringCapability.status === 'BLOCKED') {
+    const codes = engineeringCapability.blockers.map((row) => row.code).join(', ');
+    throw new RangeError(`InputXML writeback: engineering capability blocked: ${codes}.`);
+  }
   assertGeometryOnlyEdit(base, edited);
   const bindings = normalizeBindings(input.bindings, base);
   const canonicalLengthUnit = lengthUnit(input.canonicalLengthUnit, 'canonicalLengthUnit');
