@@ -6,6 +6,7 @@ on:
       - agent/m035-bm4-bend-scope-isolation
     paths:
       - 'scripts/lfea-m037-bm4-source-level-ope-audit.mjs'
+      - 'scripts/lfea-m037-bm4-node-case-rca.mjs'
       - 'scripts/lfea-m035-m036-bm4-failure-attribution.mjs'
       - 'scripts/lfea-m035-m036-bm4-integration-runtime.mjs'
       - 'src/core/geometry/adapters/inputXmlToCanonicalGeometry.js'
@@ -45,7 +46,9 @@ jobs:
       - run: npm ci
 
       - name: Syntax
-        run: node --check scripts/lfea-m037-bm4-source-level-ope-audit.mjs
+        run: |
+          node --check scripts/lfea-m037-bm4-source-level-ope-audit.mjs
+          node --check scripts/lfea-m037-bm4-node-case-rca.mjs
 
       - name: Reproduce final M035+M036 row attribution
         run: node scripts/lfea-m035-m036-bm4-failure-attribution.mjs
@@ -55,6 +58,12 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/lfea-m037-bm4-source-level-ope-audit.mjs | tee /tmp/m037-bm4-source-level-ope-audit.log
+
+      - name: Node-level case-by-case RCA
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/lfea-m037-bm4-node-case-rca.mjs | tee /tmp/m037-bm4-node-case-rca.log
 
       - name: Regression combined M035+M036 qualification
         run: node scripts/lfea-m035-m036-bm4-integration-check.mjs
@@ -69,7 +78,9 @@ jobs:
           name: m037-bm4-source-level-ope-audit-${{ env.TARGET_HEAD_SHA }}
           path: |
             /tmp/m037-bm4-source-level-ope-audit.log
+            /tmp/m037-bm4-node-case-rca.log
             reports/m035-m036-bm4-failure-attribution.json
             reports/m037-bm4-source-level-ope-audit.json
+            reports/m037-bm4-node-case-rca.json
           if-no-files-found: warn
           retention-days: 14
