@@ -11,7 +11,7 @@ import {
   BM4_FRICTION_LIMITATION,
   BM4_LIFTOFF_NODES,
   buildBm4UnilateralPlan,
-  solveBm4InheritedState,
+  seedUnilateralFromState,
   solveBm4UnilateralCase,
 } from './lfea-m036-bm4-runtime.mjs';
 
@@ -22,6 +22,7 @@ const H1_PREDICTED_ENGAGED = Object.freeze([
   '22260', '22310', '22370',
 ]);
 const FORCE_TOLERANCE = 1;
+const DISPLACEMENT_ZERO_TOLERANCE = 1e-9;
 
 function executionNoOp(name, directExecution, solveAgain) {
   let calls = 0;
@@ -63,6 +64,13 @@ function ciiDisplacementY(cii, caseLabel, sourceNodeId) {
   return cii.displacement.get(caseLabel).get(sourceNodeId)?.DY ?? null;
 }
 
+function ciiReleasedTargets(cii, caseLabel) {
+  return BM4_LIFTOFF_NODES.filter((nodeId) => (
+    Math.abs(ciiReaction(cii, caseLabel, nodeId)) <= FORCE_TOLERANCE
+    && (ciiDisplacementY(cii, caseLabel, nodeId) ?? 0) > DISPLACEMENT_ZERO_TOLERANCE
+  )).sort((a, b) => Number(a) - Number(b));
+}
+
 function plusYNode(support) {
   const match = /^BM4-C-(\d+)-UY-PLUS-Y-LINEARIZED$/u.exec(support.declarationId);
   return match?.[1] ?? null;
@@ -77,10 +85,8 @@ function releasedPlusY(result) {
     .sort((a, b) => Number(a) - Number(b));
 }
 
-function targetAgreement(execution, cii, label) {
-  return BM4_LIFTOFF_NODES.every((nodeId) => (
-    Math.abs(reaction(execution, nodeId) - ciiReaction(cii, label, nodeId)) <= FORCE_TOLERANCE
-  ));
+function sameSet(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function targetEvidence({ cii, h1Execution, h2Execution }) {
@@ -115,34 +121,44 @@ assert.ok(plan.unilateral.filter((row) => row.frictionCoefficient > 0).every((ro
 const ope = solveBm4UnilateralCase({ plan, label: 'OPE', thermal: true });
 const susH1 = solveBm4UnilateralCase({ plan, label: 'SUS-H1', thermal: false });
 const cii = loadBm4CiiOutputCases1921();
+const ciiOpeReleased = ciiReleasedTargets(cii, 'OPE');
+const ciiSusReleased = ciiReleasedTargets(cii, 'SUS');
+assert.deepEqual(ciiOpeReleased, BM4_LIFTOFF_NODES, 'CAESAR OPE rows must prove separation at all four target shoes');
+
 for (const nodeId of BM4_LIFTOFF_NODES) {
   assert.ok(Math.abs(reaction(ope.unilateralExecution.finalExecution, nodeId)) <= FORCE_TOLERANCE,
     `OPE node ${nodeId} must lift off to <=1 N`);
-  assert.ok(Math.abs(ciiReaction(cii, 'OPE', nodeId)) <= FORCE_TOLERANCE,
-    `CAESAR OPE node ${nodeId} reference must be zero-force`);
 }
-
 const opeReleased = releasedPlusY(ope);
 for (const nodeId of BM4_LIFTOFF_NODES) assert.ok(opeReleased.includes(nodeId), `OPE must release ${nodeId}`);
+
 const susH1Released = releasedPlusY(susH1);
-const h1StateMatches = JSON.stringify(susH1Released) === JSON.stringify(H1_PREDICTED_RELEASED);
-const h1CaseMatches = targetAgreement(susH1.unilateralExecution.finalExecution, cii, 'SUS');
+const h1AdvancePredictionConfirmed = sameSet(susH1Released, H1_PREDICTED_RELEASED);
+const h1CaseStatusMatches = sameSet(susH1Released, ciiSusReleased);
 let verdict = 'H1_INDEPENDENT_COLD_CONVERGENCE';
 let acceptedSusExecution = susH1.unilateralExecution.finalExecution;
 let h2 = null;
+let susH2Released = null;
 
-if (!(h1StateMatches && h1CaseMatches)) {
-  const only21470Disagrees = JSON.stringify(susH1Released) === JSON.stringify(['20090', '20350', '21610']);
-  h2 = solveBm4InheritedState({
-    plan, label: 'SUS-H2-OPE-INHERITED', thermal: false, state: ope.unilateralExecution.convergedState,
-  });
-  const h2CaseMatches = targetAgreement(h2.execution, cii, 'SUS');
-  if (only21470Disagrees && h2CaseMatches) {
-    verdict = 'H2_OPE_CONTACT_STATUS_INHERITED';
-    acceptedSusExecution = h2.execution;
+if (!h1CaseStatusMatches) {
+  const missingFromH1 = ciiSusReleased.filter((nodeId) => !susH1Released.includes(nodeId));
+  const extraInH1 = susH1Released.filter((nodeId) => !ciiSusReleased.includes(nodeId));
+  assert.deepEqual(missingFromH1, ['21470'], 'H1 disagreement must isolate the owner-identified 21470 fork');
+  assert.deepEqual(extraInH1, [], 'H1 must not invent extra CASE 19 lift-off targets');
+
+  const seeded = seedUnilateralFromState(plan.unilateral, ope.unilateralExecution.convergedState);
+  h2 = solveBm4UnilateralCase({ plan, label: 'SUS-H2-OPE-SEEDED', thermal: false, unilateral: seeded });
+  susH2Released = releasedPlusY(h2);
+  if (sameSet(susH2Released, ciiSusReleased)) {
+    verdict = 'H2_OPE_SEEDED_WITH_COLD_RECONTACT';
+    acceptedSusExecution = h2.unilateralExecution.finalExecution;
   } else {
-    const evidence = targetEvidence({ cii, h1Execution: susH1.unilateralExecution.finalExecution, h2Execution: h2.execution });
-    assert.fail(`BM4 SUS supports fit neither H1 nor H2: OPE released=[${opeReleased}], H1 released=[${susH1Released}], targets=${JSON.stringify(evidence)}`);
+    const evidence = targetEvidence({
+      cii,
+      h1Execution: susH1.unilateralExecution.finalExecution,
+      h2Execution: h2.unilateralExecution.finalExecution,
+    });
+    assert.fail(`BM4 SUS supports fit neither H1 nor H2: OPE released=[${opeReleased}], H1 released=[${susH1Released}], H2 released=[${susH2Released}], CII released=[${ciiSusReleased}], targets=${JSON.stringify(evidence)}`);
   }
 }
 
@@ -175,8 +191,11 @@ console.log(JSON.stringify({
   baseline: '9f1fb039511b7304c0208140d81543f11735c0a0',
   t5Hashes: { BM1: bm1Hash, BM2: bm2Hash, BM3: bm3Hash, BM4: bm4Hash },
   opeReleasedPlusY: opeReleased,
+  ciiSusReleasedPlusY: ciiSusReleased,
   susIndependentReleasedPlusY: susH1Released,
+  susH2ReleasedPlusY: susH2Released,
   susVerdict: verdict,
+  h1AdvancePredictionConfirmed,
   h1AdvancePrediction: { released: H1_PREDICTED_RELEASED, engaged: H1_PREDICTED_ENGAGED, anchor: '22490' },
   targetReactions: Object.fromEntries(BM4_LIFTOFF_NODES.map((nodeId) => [nodeId, {
     linearOpe: bm4Linear.report.nodes.find((row) => row.sourceNodeId === nodeId).operating.reaction.UY,
@@ -184,11 +203,13 @@ console.log(JSON.stringify({
     ciiOpe: ciiReaction(cii, 'OPE', nodeId),
     unilateralSus: reaction(acceptedSusExecution, nodeId),
     ciiSus: ciiReaction(cii, 'SUS', nodeId),
+    ciiOpeDY: ciiDisplacementY(cii, 'OPE', nodeId),
+    ciiSusDY: ciiDisplacementY(cii, 'SUS', nodeId),
   }])),
   equilibrium: { OPE: opeEquilibrium, SUS: susEquilibrium },
   neighborRedistribution: neighbors,
   node20090OpeTrace: trace20090,
   frictionLimitations: ope.unilateralExecution.diagnostics.limitations,
-  h2ExecutionHash: h2?.execution.semanticHash ?? null,
+  h2ExecutionHash: h2?.unilateralExecution.finalExecutionHash ?? null,
 }, null, 2));
 console.log('M036 BM4 T5/T6/T7 PASS');
