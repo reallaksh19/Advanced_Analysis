@@ -27,7 +27,7 @@ const result = solveBm4M035FeatureCases();
 const { report, sustained, operating, expansion, authorities } = result;
 
 assert.equal(report.schema, 'm035-bm4-feature-solve-report/v1');
-assert.equal(report.summary.bendComponents, 11);
+assert.equal(report.summary.bendComponents, 12);
 assert.equal(report.summary.teeJunctions, 2);
 assert.equal(report.summary.inlineReducerCandidates, 6);
 assert.equal(report.summary.reducerCondensationActive, 0);
