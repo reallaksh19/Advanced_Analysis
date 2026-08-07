@@ -37,7 +37,7 @@ async function openEmbeddedShell(page) {
 
 async function openStandaloneShell(page) {
   const errors = captureBrowserErrors(page);
-  await page.goto('/lfea.html');
+  await page.goto('/Advanced_Analysis/lfea.html');
   await page.waitForTimeout(750);
   const workbench = page.locator('[data-role="lfea-workbench"]');
   const count = await workbench.count();
