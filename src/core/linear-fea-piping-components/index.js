@@ -70,6 +70,14 @@ export {
 export { branchFlexibilityGuard, classifyBranchLegs } from './branch-component.js';
 
 export {
+  B31J_BRANCH_SURFACE_RULE,
+  B31J_DIRECTIONAL_BRANCH_FORMULATION,
+  B31J_DIRECTIONAL_BRANCH_SCHEMA,
+  B31J_DIRECTIONAL_SPRING_RULE,
+  compileB31JDirectionalBranchFlexibility,
+} from './directional-branch-flexibility.js';
+
+export {
   BEND_ARC_KEYS,
   BRANCH_LEG_KEYS,
   PIPING_COMPONENT_INPUT_KEYS,
