@@ -75,6 +75,7 @@ export {
   B31J_DIRECTIONAL_BRANCH_SCHEMA,
   B31J_DIRECTIONAL_SPRING_RULE,
   compileB31JDirectionalBranchFlexibility,
+  deriveB31JDirectionalBranchEndModifiers,
 } from './directional-branch-flexibility.js';
 
 export {
