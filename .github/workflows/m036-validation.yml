@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   unilateral-core:
@@ -22,24 +22,19 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Apply one-time production wiring
-        if: github.event_name == 'push' && github.event.head_commit.message == 'M036 trigger production wiring'
-        shell: bash
-        run: |
-          node scripts/m036-finalize-repo-patch.mjs
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add package.json src/core/geometry/adapters/inputXmlToCanonicalGeometry.js src/core/linear-piping-analysis-consumer/inputxml-unit-normalization.js scripts/lfea-m034-bm4-solve-fixtures.mjs scripts/lfea-m034-bm4-run-analysis.mjs
-          git commit -m 'M036 finalize production wiring'
-          git push origin HEAD:m036-r2-unilateral-contact
       - run: node scripts/lfea-unilateral-closed-form-check.mjs
       - run: node scripts/lfea-unilateral-determinism-check.mjs
-      - run: node scripts/lfea-unilateral-linear-noop-check.mjs
+      - name: T5 linear no-op hashes
+        shell: bash
+        run: |
+          node scripts/lfea-unilateral-linear-noop-check.mjs 2>&1 | tee noop.log
+          summary=$(grep '^M036_NOOP_SUMMARY=' noop.log | tail -n 1 | sed 's/^M036_NOOP_SUMMARY=//; s/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')
+          echo "::notice title=M036 T5 hashes::$summary"
       - name: BM4 case-definition evidence
         shell: bash
         run: |
           node scripts/lfea-m036-case-definition-inspect.mjs 2>&1 | tee case-definition.log
-          compact=$(tr '\n' ' ' < case-definition.log | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g' | cut -c1-7000)
+          compact=$(tr '\n' ' ' < case-definition.log | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g' | cut -c1-12000)
           echo "::notice title=M036 case definition::$compact"
       - name: BM4 lift-off validation
         shell: bash
@@ -55,4 +50,10 @@ jobs:
           summary=$(grep '^M036_SUMMARY=' bm4.log | tail -n 1 | sed 's/^M036_SUMMARY=//; s/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')
           echo "::notice title=M036 BM4 evidence::$summary"
       - run: node scripts/lfea-unilateral-anti-drift-check.mjs
+      - name: M036 physical line counts
+        shell: bash
+        run: |
+          wc -l src/core/linear-fea-unilateral-solver/*.js scripts/lfea-unilateral-closed-form-check.mjs scripts/lfea-unilateral-determinism-check.mjs scripts/lfea-unilateral-linear-noop-check.mjs scripts/lfea-m036-bm4-runtime.mjs scripts/lfea-m036-bm4-liftoff-check.mjs scripts/lfea-unilateral-anti-drift-check.mjs | tee lines.log
+          compact=$(tr '\n' ';' < lines.log | sed 's/%/%25/g')
+          echo "::notice title=M036 line counts::$compact"
       - run: node scripts/syntax-check.mjs --strict
