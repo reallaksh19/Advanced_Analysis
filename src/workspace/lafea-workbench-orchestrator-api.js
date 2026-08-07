@@ -68,11 +68,11 @@ export function createLafeaWorkbenchOrchestratorApi(context) {
         : c.mesh.buildAnalysisMeshCustodyProjection(stage, stage.retainedAnalysisMeshEvidence);
     },
     exportAnalysisMeshEvidence: (stageId = activeStageId()) => domainFirst(stageId)
-      ? c.domainMesh.exportEvidence(stageId)
+      ? c.domainMesh.exportReceipt(stageId)
       : c.mesh.exportAnalysisMeshEvidence(stageId),
     recoverAnalysisMeshEvidence: (value) => {
-      const stageId = value?.stageId ?? activeStageId();
-      if (domainFirst(stageId)) return c.registerAnalysisMeshEvidence(value);
+      const stageId = value?.intent?.stageId ?? value?.stageId ?? activeStageId();
+      if (domainFirst(stageId)) return c.registerDomainFirstMeshExecution(value);
       return c.mesh.recoverAnalysisMeshEvidence(value);
     },
     buildPreparationRequest: (caseIds = [], stageId = activeStageId()) => {
@@ -117,7 +117,7 @@ export function createLafeaWorkbenchOrchestratorApi(context) {
       if (!execution.custodyEligible) return execution;
       return freeze({
         ...execution,
-        custody: c.registerAnalysisMeshEvidence(execution.evidence),
+        custody: c.registerDomainFirstMeshExecution(execution),
       });
     },
     buildOrchestrationProjection: (stageId = activeStageId()) =>
