@@ -181,15 +181,14 @@ export function recoverNativePipeCanonicalRecords(entity) {
   if (fromPort.nodeId === toPort.nodeId || fromPort.portKey === toPort.portKey) {
     fail('native pipe endpoint identities must be distinct.');
   }
-  const nodes = [
-    recoveredNode(params, fromPort, 0),
-    recoveredNode(params, toPort, 1),
-  ];
+  const fromNode = recoveredNode(params, fromPort, 0);
+  const toNode = recoveredNode(params, toPort, 1);
+  const nodes = [fromNode, toNode].sort((left, right) => left.id.localeCompare(right.id));
   const edge = {
     id: requiredText(params.edgeId, 'edgeId'),
     componentKey,
-    fromNodeId: nodes[0].id,
-    toNodeId: nodes[1].id,
+    fromNodeId: fromNode.id,
+    toNodeId: toNode.id,
     entityType: 'PIPE',
     identityKind: 'NATIVE_COMMAND',
     ...(params.engineering ?? {}),
