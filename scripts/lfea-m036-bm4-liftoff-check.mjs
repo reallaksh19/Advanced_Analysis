@@ -11,7 +11,7 @@ import {
   BM4_FRICTION_LIMITATION,
   BM4_LIFTOFF_NODES,
   buildBm4UnilateralPlan,
-  seedUnilateralFromState,
+  solveBm4InheritedState,
   solveBm4UnilateralCase,
 } from './lfea-m036-bm4-runtime.mjs';
 
@@ -146,12 +146,13 @@ let unresolved = null;
 if (!h1CaseStatusMatches) {
   const missingFromH1 = ciiSusReleasedAll.filter((nodeId) => !susH1Released.includes(nodeId));
   const extraInH1 = susH1Released.filter((nodeId) => !ciiSusReleasedAll.includes(nodeId));
-  const seeded = seedUnilateralFromState(plan.unilateral, ope.unilateralExecution.convergedState);
-  h2 = solveBm4UnilateralCase({ plan, label: 'SUS-H2-OPE-SEEDED', thermal: false, unilateral: seeded });
-  susH2Released = releasedPlusY(h2);
+  h2 = solveBm4InheritedState({
+    plan, label: 'SUS-H2-OPE-STATUS-INHERITED', thermal: false, state: ope.unilateralExecution.convergedState,
+  });
+  susH2Released = opeReleased;
   if (sameSet(susH2Released, ciiSusReleasedAll)) {
-    verdict = 'H2_OPE_SEEDED_WITH_COLD_RECONTACT';
-    acceptedSusExecution = h2.unilateralExecution.finalExecution;
+    verdict = 'H2_OPE_CONTACT_STATUS_INHERITED';
+    acceptedSusExecution = h2.execution;
   } else {
     verdict = 'NEITHER_H1_NOR_H2';
     unresolved = { missingFromH1, extraInH1 };
@@ -188,7 +189,7 @@ const targetReactions = Object.fromEntries(BM4_LIFTOFF_NODES.map((nodeId) => [no
   unilateralOpe: reaction(ope.unilateralExecution.finalExecution, nodeId),
   ciiOpe: ciiReaction(cii, 'OPE', nodeId),
   h1Sus: reaction(susH1.unilateralExecution.finalExecution, nodeId),
-  h2Sus: h2 ? reaction(h2.unilateralExecution.finalExecution, nodeId) : null,
+  h2Sus: h2 ? reaction(h2.execution, nodeId) : null,
   ciiSus: ciiReaction(cii, 'SUS', nodeId),
   ciiSustainedEvidence: ciiSupportEvidence(cii, 'SUS', nodeId),
 }]));
@@ -212,11 +213,11 @@ const evidence = {
   neighborRedistribution: neighbors,
   node20090OpeTrace: trace20090,
   frictionLimitations: ope.unilateralExecution.diagnostics.limitations,
-  h2ExecutionHash: h2?.unilateralExecution.finalExecutionHash ?? null,
+  h2ExecutionHash: h2?.execution.semanticHash ?? null,
 };
 console.log(JSON.stringify(evidence, null, 2));
 if (unresolved) {
-  assert.fail(`BM4 SUS fork unresolved after H1 and H2; fail closed. Evidence: ${JSON.stringify({
+  assert.fail(`BM4 SUS fork unresolved after H1 and exact fixed-status H2; fail closed. Evidence: ${JSON.stringify({
     ciiSusReleasedAll, susH1Released, susH2Released, unresolved, targetReactions, neighbors,
   })}`);
 }
