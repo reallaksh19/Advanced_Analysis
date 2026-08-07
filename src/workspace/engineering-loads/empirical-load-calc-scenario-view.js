@@ -24,7 +24,7 @@ export function renderEmpiricalScenarioOverview(container, state) {
 
 export function renderEmpiricalScenarioRestraints(container, state) {
   if (!container) return;
-  const { proposal } = normalizeState(state);
+  const { proposal, selectedEntityId } = normalizeState(state);
   const rows = proposal?.adaptedRequest?.restraintOccurrences || [];
   container.innerHTML = `
     <section class="engineering-card" data-empirical-scenario-restraints>
@@ -39,7 +39,7 @@ export function renderEmpiricalScenarioRestraints(container, state) {
               <th>Support site</th><th>Restraint</th><th>Source</th><th>Effective</th>
               <th>Host</th><th>Gap</th><th>Stiffness</th><th>Override</th><th>Geometry</th>
             </tr></thead>
-            <tbody>${rows.map(restraintRow).join('')}</tbody>
+            <tbody>${rows.map((row) => restraintRow(row, selectedEntityId)).join('')}</tbody>
           </table>
         </div>
       ` : emptyState(
@@ -109,7 +109,7 @@ export function renderEmpiricalScenarioMethods(container, state) {
 
 export function renderEmpiricalScenarioResults(container, state) {
   if (!container) return;
-  const { execution, snapshot } = normalizeState(state);
+  const { execution, snapshot, selectedEntityId } = normalizeState(state);
   const core = execution?.coreResult || null;
   const cases = core?.loadCases || [];
   container.innerHTML = `
@@ -118,7 +118,7 @@ export function renderEmpiricalScenarioResults(container, state) {
         <div><p class="eyebrow">Separate result family</p><h3>Beam/contact results</h3></div>
         ${badge(core?.status || snapshot.state)}
       </div>
-      ${cases.length ? cases.map(resultCase).join('') : emptyState(
+      ${cases.length ? cases.map((row) => resultCase(row, selectedEntityId)).join('') : emptyState(
         'No current empirical execution is available.',
         'Authorization and calculation are separate explicit actions. Stale results are not presented as current.',
       )}
@@ -128,7 +128,7 @@ export function renderEmpiricalScenarioResults(container, state) {
 
 export function renderEmpiricalScenarioEvidence(container, state) {
   if (!container) return;
-  const { snapshot, proposal, authorization, execution } = normalizeState(state);
+  const { snapshot, proposal, authorization, execution, overlaySnapshot } = normalizeState(state);
   const evidence = {
     snapshot,
     proposal: proposal ? {
@@ -140,6 +140,7 @@ export function renderEmpiricalScenarioEvidence(container, state) {
       overrideJournal: proposal.overrideJournal,
     } : null,
     authorization,
+    resultOverlay: overlaySnapshot,
     execution: execution ? {
       method: execution.method,
       executionId: execution.executionId,
@@ -198,8 +199,9 @@ function overviewConfigured(snapshot, proposal) {
   `;
 }
 
-function restraintRow(row) {
-  return `<tr data-restraint-id="${escapeHtml(row.restraintId)}" data-support-site-id="${escapeHtml(row.supportSiteId)}">
+function restraintRow(row, selectedEntityId) {
+  const selected = rowMatchesEntity(row, selectedEntityId);
+  return `<tr data-restraint-id="${escapeHtml(row.restraintId)}" data-support-site-id="${escapeHtml(row.supportSiteId)}" data-viewport-selected="${selected}"${selected ? ' class="engineering-table__row--selected"' : ''}>
     <td>${escapeHtml(row.supportSiteId)}</td>
     <td><button type="button" class="table-link" data-empirical-restraint-select="${escapeHtml(row.restraintId)}">${escapeHtml(row.restraintId)}</button></td>
     <td>${escapeHtml(row.sourceDirection || '—')}</td>
@@ -248,7 +250,7 @@ function profilePanel(snapshot, profile) {
   </div>`;
 }
 
-function resultCase(row) {
+function resultCase(row, selectedEntityId) {
   if (row.status === 'BLOCKED') {
     return `<article class="engineering-subcard"><h4>${escapeHtml(row.loadCaseId)} — blocked</h4>${blockerList(row.blockers || [])}</article>`;
   }
@@ -256,15 +258,16 @@ function resultCase(row) {
     <div class="engineering-card__header"><h4>${escapeHtml(row.loadCaseId)}</h4><span class="status-badge">${escapeHtml(row.status)}</span></div>
     <div class="table-scroll"><table class="engineering-table">
       <thead><tr><th>Support</th><th>Restraint</th><th>State</th><th>FX</th><th>FY</th><th>FZ</th><th>MX</th><th>MY</th><th>MZ</th></tr></thead>
-      <tbody>${(row.supportResults || []).map(resultRow).join('')}</tbody>
+      <tbody>${(row.supportResults || []).map((result) => resultRow(result, selectedEntityId)).join('')}</tbody>
     </table></div>
   </article>`;
 }
 
-function resultRow(row) {
+function resultRow(row, selectedEntityId) {
+  const selected = rowMatchesEntity(row, selectedEntityId);
   const force = row.globalReaction?.forceN || {};
   const moment = row.globalReaction?.momentNm || {};
-  return `<tr data-result-restraint-id="${escapeHtml(row.restraintId)}">
+  return `<tr data-result-restraint-id="${escapeHtml(row.restraintId)}" data-viewport-selected="${selected}"${selected ? ' class="engineering-table__row--selected"' : ''}>
     <td>${escapeHtml(row.supportSiteId)}</td><td>${escapeHtml(row.restraintId)}</td>
     <td>${escapeHtml(row.contactState)}</td>
     <td>${number(force.x)}</td><td>${number(force.y)}</td><td>${number(force.z)}</td>
@@ -280,7 +283,16 @@ function normalizeState(state) {
     proposal: state?.proposal || null,
     authorization: state?.authorization || null,
     execution: state?.execution || null,
+    overlaySnapshot: state?.overlaySnapshot || null,
+    selectedEntityId: state?.selectedEntityId || null,
   };
+}
+
+function rowMatchesEntity(row, selectedEntityId) {
+  if (!selectedEntityId) return false;
+  return row.hostEntityId === selectedEntityId
+    || row.hostSourceEntityId === selectedEntityId
+    || (row.sourceEntityIds || []).includes(selectedEntityId);
 }
 
 function combinationNotice(policy) {

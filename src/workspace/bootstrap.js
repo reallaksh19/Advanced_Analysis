@@ -159,6 +159,8 @@ export function bootstrapAnalysisWorkspace(rootElement) {
     getEmpiricalLoadCalcScenarioProposal(){return empiricalLoadCalcScenarioController.getProposal();},
     getEmpiricalLoadCalcAuthorization(){return empiricalLoadCalcScenarioController.getAuthorization();},
     getEmpiricalLoadCalcExecution(){return empiricalLoadCalcScenarioController.getExecution();},
+    getEmpiricalLoadCalcResultOverlayState(){return empiricalLoadCalcScenarioController.getResultOverlaySnapshot();},
+    getEmpiricalLoadCalcResultOverlay(){return empiricalLoadCalcScenarioController.getResultOverlayProjection();},
     configureEmpiricalLoadCalcScenario(value){return empiricalLoadCalcScenarioController.configure(value);},
     authorizeEmpiricalLoadCalcScenario(value){return empiricalLoadCalcScenarioController.authorize(value);},
     calculateEmpiricalLoadCalcScenario(value){return empiricalLoadCalcScenarioController.calculate(value);},
