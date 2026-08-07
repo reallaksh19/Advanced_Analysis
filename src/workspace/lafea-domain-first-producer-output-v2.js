@@ -80,8 +80,16 @@ export function validateLafeaDomainFirstMeshProducerOutputV2(value, { intent, pl
   for (const [key, valueExpected] of Object.entries(expected)) {
     if (output[key] !== valueExpected) fail(`LAFEA_MP3_OUTPUT_${key.toUpperCase()}_MISMATCH`);
   }
-  if (output.mesh.nodes.length > binding.qualification.maximumNodes
-    || output.mesh.elements.length > binding.qualification.maximumElements) {
+  if (output.meshHash !== validPlan.plannedMeshHash) {
+    fail('LAFEA_MP3_OUTPUT_PLANNED_MESH_HASH_MISMATCH');
+  }
+  const nodes = output.mesh.nodes.length;
+  const elements = output.mesh.elements.length;
+  if (nodes > intent.maximumNodes || elements > intent.maximumElements
+    || nodes * 2 > intent.maximumEstimatedDofs
+    || nodes > binding.qualification.maximumNodes
+    || elements > binding.qualification.maximumElements
+    || nodes * 2 > binding.qualification.maximumEstimatedDofs) {
     fail('LAFEA_MP3_OUTPUT_RESOURCE_LIMIT_EXCEEDED');
   }
   return output;
