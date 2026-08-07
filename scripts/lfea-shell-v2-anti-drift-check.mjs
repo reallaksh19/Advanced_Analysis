@@ -10,11 +10,19 @@ const SHELL_ROOT = path.join(ROOT, 'src', 'workspace', 'lfea-shell-v2');
 const TOKEN_ROOT = path.join(ROOT, 'src', 'workspace', 'design-tokens');
 const shellFiles = javascriptFiles(SHELL_ROOT);
 const tokenFiles = javascriptFiles(TOKEN_ROOT).filter((file) => file.endsWith('lfea-tokens.js'));
+const extraModules = [
+  path.join(ROOT, 'scripts', 'lfea-shell-v2-store-fidelity-check.mjs'),
+  path.join(ROOT, 'e2e', 'lfea-shell-v2.spec.js'),
+];
 
-for (const file of [...shellFiles, ...tokenFiles]) {
+for (const file of [...shellFiles, ...tokenFiles, ...extraModules]) {
   const text = fs.readFileSync(file, 'utf8');
   const lines = text.split(/\r?\n/u).length;
   assert.ok(lines < 300, `${relative(file)} has ${lines} physical lines; limit is <300`);
+}
+
+for (const file of shellFiles) {
+  const text = fs.readFileSync(file, 'utf8');
   assert.doesNotMatch(
     text,
     /from\s+['"][^'"]*\/core\//u,
@@ -24,6 +32,11 @@ for (const file of [...shellFiles, ...tokenFiles]) {
     implementationText(text),
     /\b(?:solveContinuumModel|adaptMeshPackage|createEngineeringReview|createEvidenceExport|semanticHash)\s*\(/u,
     `Presentation module must not implement or invoke engineering authority: ${relative(file)}`,
+  );
+  assert.doesNotMatch(
+    implementationText(text),
+    /(?:\.toFixed|\.toPrecision|Math\.round)\s*\(/u,
+    `Shell V2 must not introduce local numerical rounding/formatting: ${relative(file)}`,
   );
 }
 
@@ -70,6 +83,7 @@ console.log(JSON.stringify({
   shellModules: shellFiles.length,
   tokenModules: tokenFiles.length,
   physicalLineLimit: 299,
+  localNumericalFormatting: false,
   standaloneEntry: true,
   embeddedEntryRetained: true,
   enrichedSjsonPipingAdapter: false,
