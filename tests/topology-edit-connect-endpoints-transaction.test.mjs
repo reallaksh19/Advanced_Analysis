@@ -13,6 +13,7 @@ import { createStartRoutePreview, createStartRouteValidation,
   executeStartRouteTransaction } from '../src/workspace/topology-edit/authoring/topology-edit-start-route-transaction.js';
 import { createConnectEndpointsIntent } from '../src/workspace/topology-edit/authoring/topology-edit-connect-endpoints-intent.js';
 import { createConnectEndpointsPlan } from '../src/workspace/topology-edit/authoring/topology-edit-connect-endpoints-plan.js';
+import { resolveConnectEndpointsElbow } from '../src/workspace/topology-edit/authoring/topology-edit-connect-endpoints-elbow-resolver.js';
 import { createConnectEndpointsOperation } from '../src/workspace/topology-edit/authoring/topology-edit-connect-endpoints-operation.js';
 import { prepareConnectEndpointsCandidate } from '../src/workspace/topology-edit/authoring/topology-edit-connect-endpoints-candidate.js';
 import { cancelConnectEndpointsPreview, createConnectEndpointsPreview, createConnectEndpointsValidation,
@@ -121,15 +122,25 @@ test('direct 45-degree endpoint turns consume radius times tan(deflection/2)', a
   const seed = await seeded({ spec });
   const plan = createConnectEndpointsPlan({ intent: request(seed), session: seed.session });
   const direct = alternative(plan, 'DIRECT');
-  const operation = createConnectEndpointsOperation({
-    plan, alternativeId: direct.alternativeId, catalogue: seed.spec,
-  });
+  const operation = createConnectEndpointsOperation({ plan, alternativeId: direct.alternativeId, catalogue: seed.spec });
   const expected = radius * Math.tan(Math.PI / 8);
   assert.equal(operation.bendCount, 2);
   assert.ok(Math.abs(operation.trim.startHostTrimMm - expected) < 1e-9);
   assert.ok(Math.abs(operation.trim.endHostTrimMm - expected) < 1e-9);
   assert.ok(Math.abs(operation.trim.effectiveSegments[0].startTrimMm - expected) < 1e-9);
   assert.ok(Math.abs(operation.trim.effectiveSegments[0].endTrimMm - expected) < 1e-9);
+});
+
+test('asymmetric pipe ends reject an elbow that duplicates only one connection type', () => {
+  const spec = createTopologyEditSpecificationCatalogue({
+    catalogueId: 'CONNECT-EXEC-SPEC', catalogueVersion: '1',
+    authority: { sourceId: 'CONNECT-SPEC', sourceVersion: '1', sourceHash: SOURCE_HASH },
+    records: [{ ...pipeRecord(), endConnectionFrom: 'BW', endConnectionTo: 'SW' }, elbowRecord()],
+  });
+  assert.throws(() => resolveConnectEndpointsElbow({
+    turn: { turnHash: 'asymmetric-turn', location: 'INTERNAL', vertexIndex: 1, angleDeg: 90 },
+    pipeBinding: binding(spec), catalogue: spec,
+  }), /NO_COMPATIBLE_ELBOW/u);
 });
 
 test('Connect Apply, Cancel, Undo and Redo preserve one exact certified suffix', async () => {
@@ -191,8 +202,7 @@ test('endpoint elbow fails closed when retained host length cannot satisfy tange
 test('aligned opposing endpoints compile to one direct pipe with no generated node or elbow', async () => {
   const seed = await seeded({ aligned: true });
   const plan = createConnectEndpointsPlan({ intent: request(seed), session: seed.session });
-  const direct = alternative(plan, 'DIRECT');
-  assert.equal(direct.turns.length, 0);
+  const direct = alternative(plan, 'DIRECT'); assert.equal(direct.turns.length, 0);
   const operation = createConnectEndpointsOperation({ plan, alternativeId: direct.alternativeId, catalogue: seed.spec });
   assert.equal(operation.segmentCount, 1); assert.equal(operation.newNodeCount, 0);
   assert.equal(operation.bendCount, 0); assert.equal(operation.expectedCommandCount, 1);
