@@ -98,11 +98,10 @@ export {
   sealLinearPipingInputXmlAnalysisContext,
 } from './inputxml-analysis-context.js';
 
-// Raw InputXML parsing remains public for diagnostics custody. The guarded
-// analysis-context compiler is also public because Phase 2F checks and the
-// consumer anti-drift contract require that governed compatibility surface.
+// Raw InputXML parsing remains public for diagnostics custody. Legacy public
+// analysis/solve exports are intentionally absent; authorized execution is
+// exposed only through solveInputXmlLinearAnalysis below.
 export {
-  compileLinearPipingInputXmlAnalysisContext,
   parseInputXmlModelHealthSource,
   validateLinearPipingInputXmlAnalysisRequest,
 } from './inputxml-source-binding.js';
@@ -134,6 +133,7 @@ export {
   requireInputXmlLinearSolvePreparation,
   sealInputXmlLinearSolvePreparation,
 } from './inputxml-linear-solve-preparation-contract.js';
+
 export {
   INPUTXML_GRAVITY_ACCELERATION,
   INPUTXML_INSTALLATION_TEMPERATURE,
