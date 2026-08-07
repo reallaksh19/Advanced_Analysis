@@ -1,0 +1,83 @@
+name: LFEA Shell V2 UI-1
+
+on:
+  pull_request:
+    branches:
+      - claude/lfea-linear-static-fea-unfwjd
+    paths:
+      - 'lfea.html'
+      - 'vite.config.js'
+      - 'src/workspace/lfea-shell-v2/**'
+      - 'src/workspace/design-tokens/lfea-tokens.js'
+      - 'src/workspace/lfea-workbench-controller.js'
+      - 'src/workspace/lfea-workbench-controller-utils.js'
+      - 'scripts/lfea-shell-v2-*.mjs'
+      - 'scripts/lfea-workbench-check.mjs'
+      - 'e2e/lfea-shell-v2.spec.js'
+      - 'e2e/lfea-workbench.spec.js'
+      - '.github/workflows/lfea-shell-v2-ui1.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ui1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout UI-1 head
+        uses: actions/checkout@v4
+        with:
+          path: head
+
+      - name: Checkout locked baseline
+        uses: actions/checkout@v4
+        with:
+          ref: claude/lfea-linear-static-fea-unfwjd
+          path: baseline
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: head/package-lock.json
+
+      - name: Install dependencies
+        working-directory: head
+        run: npm ci
+
+      - name: Install Chromium
+        working-directory: head
+        run: npx playwright install --with-deps chromium
+
+      - name: LFEA workbench and Shell V2 guards
+        working-directory: head
+        run: npm run check:lfea-workbench
+
+      - name: Locked-baseline semantic hash equality
+        working-directory: head
+        env:
+          LFEA_UI1_BASELINE_ROOT: ${{ github.workspace }}/baseline
+        run: node scripts/lfea-shell-v2-baseline-hash-check.mjs
+
+      - name: Production build
+        working-directory: head
+        run: npm run build
+
+      - name: Embedded and standalone browser regression
+        working-directory: head
+        run: node scripts/run-playwright.mjs e2e/lfea-workbench.spec.js e2e/lfea-shell-v2.spec.js
+
+      - name: Syntax check changed JavaScript
+        working-directory: head
+        shell: bash
+        run: |
+          git diff --name-only ${{ github.event.pull_request.base.sha }}...HEAD -- '*.js' '*.mjs' \
+            | while read -r file; do
+                [ -z "$file" ] || node --check "$file"
+              done
+
+      - name: Whitespace check
+        working-directory: head
+        run: git diff --check ${{ github.event.pull_request.base.sha }}...HEAD
