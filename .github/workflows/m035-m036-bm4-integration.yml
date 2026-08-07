@@ -39,6 +39,7 @@ jobs:
           node --check scripts/lfea-m035-m036-bm4-comparison.mjs
           node --check scripts/lfea-m035-m036-bm4-failure-attribution.mjs
           node --check scripts/lfea-m035-bm4-ope-source-audit-v2.mjs
+          node --check scripts/lfea-m035-bm4-nodewise-rca.mjs
 
       - name: Qualify CAESAR local-result reference normalization
         run: node scripts/lfea-bm4-local-force-reference-normalization-check.mjs
@@ -98,6 +99,19 @@ jobs:
           fi
           exit "$status"
 
+      - name: Node-wise elemental-force RCA
+        shell: bash
+        run: |
+          set +e
+          node scripts/lfea-m035-bm4-nodewise-rca.mjs > /tmp/m035-bm4-nodewise-rca.log 2>&1
+          status=$?
+          cat /tmp/m035-bm4-nodewise-rca.log
+          if [ "$status" -ne 0 ]; then
+            message="$(tr '\n' ' ' < /tmp/m035-bm4-nodewise-rca.log | head -c 3500)"
+            echo "::error file=scripts/lfea-m035-bm4-nodewise-rca.mjs,line=1,title=BM4 node-wise RCA::${message}"
+          fi
+          exit "$status"
+
       - name: Regression M035 focused feature solve
         run: node scripts/lfea-m035-bm4-feature-solve-check.mjs
 
@@ -123,9 +137,12 @@ jobs:
             /tmp/m035-m036-comparison.log
             /tmp/m035-m036-attribution.log
             /tmp/m035-bm4-ope-source-audit.log
+            /tmp/m035-bm4-nodewise-rca.log
             reports/m035-m036-bm4-cases-19-20-21.json
             reports/m035-m036-bm4-failure-attribution.json
             reports/m035-bm4-ope-source-audit.json
             reports/m035-bm4-ope-source-audit.md
+            reports/m035-bm4-nodewise-rca.json
+            reports/m035-bm4-nodewise-rca.md
           if-no-files-found: warn
           retention-days: 14
