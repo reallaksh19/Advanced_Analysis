@@ -6,11 +6,15 @@ import {
   t3PlatePackage,
 } from './lfea-005-fixtures.mjs';
 import {
+  createLfeaWorkbenchReviewProfile,
   createLfeaWorkbenchStore,
   executeLfeaWorkbench,
 } from '../src/workspace/lfea-workbench.js';
 import { createLfeaInspectorValueSnapshot } from '../src/workspace/lfea-shell-v2/inspector.js';
-import { createLfeaShellViewModel } from '../src/workspace/lfea-shell-v2/shell-view-model.js';
+import {
+  captureRunTrace,
+  createLfeaShellViewModel,
+} from '../src/workspace/lfea-shell-v2/shell-view-model.js';
 
 const fixtures = [rectangularQ4Package({}), t3PlatePackage({})];
 const evidence = [];
@@ -76,8 +80,82 @@ for (const packageValue of fixtures) {
   store.destroy();
 }
 
+checkCancellationPresentation();
+checkPreflightWarningSeparation();
+
 console.log(JSON.stringify({
   check: 'lfea-shell-v2-store-fidelity',
   status: 'PASS',
   fixtures: evidence,
+  userCancellationDistinct: true,
+  modelChangeCancellationInvalidatesTrace: true,
+  preflightWarningSeparateFromExportFreshness: true,
 }));
+
+function checkCancellationPresentation() {
+  const packageValue = rectangularQ4Package({});
+  const userStore = createLfeaWorkbenchStore({ initialDocument: packageValue });
+  const userRun = userStore.beginRun().activeRun;
+  userStore.updateRunProgress({
+    type: 'PROGRESS',
+    ...userRun,
+    progress: { stage: 'SOLVE', index: 3, total: 7 },
+  });
+  const userTrace = captureRunTrace(userStore.getState());
+  userStore.cancelRun({
+    type: 'CANCELLED',
+    ...userRun,
+    reason: 'USER',
+    code: 'LFEA_RUN_CANCELLED',
+  });
+  const userPipeline = createLfeaShellViewModel(userStore.getState(), userTrace).pipeline;
+  assert.equal(step(userPipeline, 'SOLVE').state, 'Warning');
+  assert.equal(step(userPipeline, 'PROJECT').state, 'Not run');
+  assert.equal(userStore.getState().diagnostics[0].reason, 'USER');
+  userStore.destroy();
+
+  const editStore = createLfeaWorkbenchStore({ initialDocument: packageValue });
+  const editRun = editStore.beginRun().activeRun;
+  editStore.updateRunProgress({
+    type: 'PROGRESS',
+    ...editRun,
+    progress: { stage: 'SOLVE', index: 3, total: 7 },
+  });
+  const editTrace = captureRunTrace(editStore.getState());
+  const index = editStore.getState().packageValue.nodes.findIndex((row) => row.nodeId === 'N2');
+  const node = editStore.getState().packageValue.nodes[index];
+  editStore.updateRecord('nodes', index, { ...node, x: node.x + 0.01 });
+  const editState = editStore.getState();
+  const editPipeline = createLfeaShellViewModel(editState, editTrace).pipeline;
+  assert.equal(editState.diagnostics[0].code, 'LFEA_RUN_CANCELLED_MODEL_CHANGED');
+  assert.ok(editPipeline.every((row) => row.state === 'Not run'),
+    'A committed model edit must invalidate previous-run step completion.');
+  editStore.destroy();
+}
+
+function checkPreflightWarningSeparation() {
+  const packageValue = rectangularQ4Package({});
+  const reviewProfile = {
+    ...createLfeaWorkbenchReviewProfile(true, false),
+    maximumExportBytes: 1,
+  };
+  const store = createLfeaWorkbenchStore({
+    initialDocument: packageValue,
+    pipelineOptions: { reviewProfile },
+  });
+  store.run();
+  const state = store.getState();
+  const shell = createLfeaShellViewModel(state);
+  assert.equal(state.execution.preflight.status, 'EXPORT_LIKELY_TO_EXCEED_BYTE_CAPACITY');
+  assert.equal(state.execution.result.status, 'QUALIFIED');
+  assert.equal(state.execution.evidenceExport, null);
+  assert.equal(step(shell.pipeline, 'PREFLIGHT').state, 'Warning');
+  assert.equal(step(shell.pipeline, 'SOLVE').state, 'Complete');
+  assert.equal(step(shell.pipeline, 'EXPORT').state, 'Blocked');
+  assert.equal(shell.commands.canExportEvidence, false);
+  store.destroy();
+}
+
+function step(pipeline, stage) {
+  return pipeline.find((row) => row.stage === stage);
+}
