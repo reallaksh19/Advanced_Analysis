@@ -33,6 +33,7 @@ function buildPreview(input) {
   const context = prepare(input);
   const kernel = triangulateLafeaDomainFirstT6(context);
   const mesh = assembleMesh(kernel.elements, context.intent);
+  const plannedMeshHash = lafeaAnalysisMeshContentHash(mesh);
   const stats = meshStats(kernel.elements, mesh);
   const binding = context.binding;
   const blockingReasons = [];
@@ -58,6 +59,7 @@ function buildPreview(input) {
     analysisGeometryHash: context.intent.analysisGeometryHash,
     meshProfileHash: context.intent.meshProfileHash,
     elementFamily: context.intent.elementFamily,
+    plannedMeshHash,
     estimatedNodes: stats.nodes,
     estimatedElements: stats.elements,
     estimatedDofs: stats.dofs,
@@ -72,7 +74,7 @@ function buildPreview(input) {
     blockingReasons,
     scopeLimitations: LIMITATIONS,
   });
-  return freeze({ plan, planningMeshHash: lafeaAnalysisMeshContentHash(mesh) });
+  return freeze({ plan });
 }
 
 export function executeLafeaDomainFirstT6Mesh(input) {
@@ -83,7 +85,7 @@ export function executeLafeaDomainFirstT6Mesh(input) {
   const kernel = triangulateLafeaDomainFirstT6(context);
   const mesh = assembleMesh(kernel.elements, context.intent);
   const meshHash = lafeaAnalysisMeshContentHash(mesh);
-  if (meshHash !== preview.planningMeshHash) fail('LAFEA_MP3_REPEATABILITY_FAILED');
+  if (meshHash !== preview.plan.plannedMeshHash) fail('LAFEA_MP3_REPEATABILITY_FAILED');
   const binding = context.binding;
   const rawOutput = createLafeaDomainFirstMeshProducerOutputV2({
     schema: LAFEA_DOMAIN_FIRST_MESH_PRODUCER_OUTPUT_SCHEMA,
@@ -133,6 +135,7 @@ export function executeLafeaDomainFirstT6Mesh(input) {
     schema: 'lafea-domain-first-t6-producer-execution/v1',
     status: evidence.qualification === 'PASS' ? 'QUALIFIED' : 'BLOCKED',
     custodyEligible: evidence.qualification === 'PASS',
+    intent: context.intent,
     plan: preview.plan,
     output,
     evidence,
