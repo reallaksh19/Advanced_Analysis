@@ -13,7 +13,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  route:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Route the dedicated Non-FEA integration qualifier
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number || '' }}
+          PR_HEAD: ${{ github.head_ref || '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == 'workflow_dispatch' ]]; then
+            echo 'Manual execution: run the dedicated Non-FEA qualifier on the selected ref.'
+          elif [[ "$PR_NUMBER" == '802' && "$PR_HEAD" == 'feat/load-calc-non-fea-input-check-ui' ]]; then
+            echo 'PR #802 is the governed Non-FEA integration target.'
+          else
+            echo "Not applicable: this qualifier was installed for PR #802, not repository-wide PR gating."
+          fi
+
   exact-head-ui:
+    needs: route
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.number == 802 && github.head_ref == 'feat/load-calc-non-fea-input-check-ui')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
