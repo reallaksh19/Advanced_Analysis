@@ -66,8 +66,8 @@ export function bindLafeaDomainFirstT6Producer(intent) {
   if (intent.elementFamily !== 'T6') fail('LAFEA_MP3_T6_FAMILY_REQUIRED');
   if (intent.refinementFeatureIds.length) fail('LAFEA_MP3_REFINEMENT_NOT_QUALIFIED');
   return freeze({
-    schema: 'lafea-domain-first-t6-producer-binding/v1',
     ...readiness,
+    schema: 'lafea-domain-first-t6-producer-binding/v1',
     executionAuthorized: true,
     reasons: [],
     producerRef: `${capability.producerId}@${capability.producerRevision}`,
