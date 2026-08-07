@@ -16,6 +16,7 @@ import { finalizeCanonicalTopology } from '../src/workspace/topology-edit/topolo
 import { semanticHash } from '../src/core/shared-piping-model/index.js';
 
 const SOURCE_HASH = `sha256:${'a'.repeat(64)}`;
+const SEGMENT_POLICY = Object.freeze({ minimumLengthMm: 6, overlapToleranceMm: 0.001 });
 
 function catalogue() {
   return createTopologyEditSpecificationCatalogue({
@@ -64,7 +65,7 @@ function resolveAndApply() {
     fromNodeId: 'node:start',
     toNodeId: 'node:end',
     catalogueBinding: binding,
-    segmentPolicy: { minimumLengthMm: 6, overlapToleranceMm: 0.001 },
+    segmentPolicy: SEGMENT_POLICY,
     expectedTargetRevisions: {
       'node:start': revision(topology, 'node:start'),
       'node:end': revision(topology, 'node:end'),
@@ -100,7 +101,7 @@ test('pipe segment identity is deterministic across command ids', () => {
   const binding = createPipeSegmentCatalogueBinding({ catalogue: spec, recordId: 'PIPE-DN50' });
   const request = createPipeSegmentRequest({
     fromNodeId: 'node:start', toNodeId: 'node:end', catalogueBinding: binding,
-    segmentPolicy: { minimumLengthMm: 6, overlapToleranceMm: 0.001 },
+    segmentPolicy: SEGMENT_POLICY,
     expectedTargetRevisions: {
       'node:start': revision(topology, 'node:start'),
       'node:end': revision(topology, 'node:end'),
@@ -120,6 +121,7 @@ test('pipe segment rejects stale node revisions and unsupported endpoint assumpt
   const binding = createPipeSegmentCatalogueBinding({ catalogue: spec, recordId: 'PIPE-DN50' });
   const request = createPipeSegmentRequest({
     fromNodeId: 'node:start', toNodeId: 'node:end', catalogueBinding: binding,
+    segmentPolicy: SEGMENT_POLICY,
     expectedTargetRevisions: { 'node:start': 'stale', 'node:end': revision(topology, 'node:end') },
   });
   assert.throws(
@@ -133,6 +135,7 @@ test('pipe segment rejects duplicate or overlapping authored segment', () => {
   const spec = catalogue();
   const request = createPipeSegmentRequest({
     fromNodeId: 'node:start', toNodeId: 'node:end', catalogueBinding: resolved.catalogueBinding,
+    segmentPolicy: SEGMENT_POLICY,
     expectedTargetRevisions: {
       'node:start': revision(result, 'node:start'),
       'node:end': revision(result, 'node:end'),
