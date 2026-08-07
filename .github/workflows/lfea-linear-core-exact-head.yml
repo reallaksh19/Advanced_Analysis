@@ -50,8 +50,27 @@ jobs:
             esac
           done < /tmp/lfea-linear-core-paths.txt
 
-      - name: InputXML unit normalization
-        run: node scripts/linear-piping-inputxml-unit-normalization-check.mjs
+      - name: InputXML unit normalization with base comparison
+        shell: bash
+        run: |
+          mkdir -p artifacts/lfea-linear-core-exact-head
+          set +e
+          node scripts/linear-piping-inputxml-unit-normalization-check.mjs > artifacts/lfea-linear-core-exact-head/unit-head.log 2>&1
+          head_status=$?
+          git worktree add --detach /tmp/lfea-pr-base "${{ github.event.pull_request.base.sha }}" >/dev/null 2>&1
+          (cd /tmp/lfea-pr-base && node scripts/linear-piping-inputxml-unit-normalization-check.mjs) > artifacts/lfea-linear-core-exact-head/unit-base.log 2>&1
+          base_status=$?
+          set -e
+          echo "HEAD unit-normalization exit: $head_status"
+          cat artifacts/lfea-linear-core-exact-head/unit-head.log
+          echo "BASE unit-normalization exit: $base_status"
+          cat artifacts/lfea-linear-core-exact-head/unit-base.log
+          echo "head_status=$head_status base_status=$base_status" > artifacts/lfea-linear-core-exact-head/unit-status.txt
+          if [ "$head_status" -ne 0 ]; then
+            message="HEAD=$head_status BASE=$base_status $(tail -n 50 artifacts/lfea-linear-core-exact-head/unit-head.log | tr '\n' ' ' | sed 's/%/%25/g')"
+            echo "::error file=scripts/linear-piping-inputxml-unit-normalization-check.mjs::$message"
+            exit "$head_status"
+          fi
 
       - name: Conditioned topology and retained-station custody
         run: node scripts/lfea-b1-conditioning-check.mjs
