@@ -24,6 +24,10 @@ function declarationId(value, field) {
   return value.declarationId;
 }
 
+function compareDeclaration(left, right) {
+  return left.declarationId < right.declarationId ? -1 : left.declarationId > right.declarationId ? 1 : 0;
+}
+
 function validateBaseDeclarations(baseDeclarations, unilateral) {
   if (!Array.isArray(baseDeclarations)) fail('baseDeclarations must be an array.');
   const ids = new Set();
@@ -40,6 +44,7 @@ function validateBaseDeclarations(baseDeclarations, unilateral) {
       );
     }
   }
+  return Object.freeze([...baseDeclarations].sort(compareDeclaration));
 }
 
 function stateSnapshot(unilateral, engaged, frozenReleased) {
@@ -128,7 +133,7 @@ function sealConverged({ accepted, acceptedPolicy, trace, engaged, frozenRelease
 export function compileUnilateralSolverExecution({ baseDeclarations, unilateral, buildAndSolve, policy }) {
   if (typeof buildAndSolve !== 'function') fail('buildAndSolve must be a function.');
   const accepted = requireUnilateralDeclarations(unilateral ?? []);
-  validateBaseDeclarations(baseDeclarations, accepted);
+  const acceptedBase = validateBaseDeclarations(baseDeclarations, accepted);
   const acceptedPolicy = sealUnilateralPolicy(policy);
   const engaged = new Map(accepted.map((support) => [support.declarationId, support.initiallyEngaged]));
   const flipCounts = new Map(accepted.map((support) => [support.declarationId, 0]));
@@ -138,7 +143,7 @@ export function compileUnilateralSolverExecution({ baseDeclarations, unilateral,
   const iterationLimit = accepted.length === 0 ? 1 : acceptedPolicy.maxIterationsFactor * accepted.length;
 
   for (let iteration = 0; iteration < iterationLimit; iteration += 1) {
-    const declarations = activeDeclarations(baseDeclarations, accepted, engaged);
+    const declarations = activeDeclarations(acceptedBase, accepted, engaged);
     const execution = requireExecution(buildAndSolve(declarations, solveContext(accepted, engaged)));
     const checked = checkSupportStatus({
       execution, unilateral: accepted, engaged, flipCounts, frozenReleased, policy: acceptedPolicy,
