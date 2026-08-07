@@ -67,6 +67,9 @@ const workbenchFiles = fs.readdirSync(path.join(ROOT, 'src', 'workspace'))
 const sourceText = workbenchFiles.map((name) => fs.readFileSync(path.join(ROOT, 'src', 'workspace', name), 'utf8')).join('\n');
 assert.doesNotMatch(sourceText, /EventBus|analysis-context|workspace-consumer-context/u);
 
+await import('./lfea-shell-v2-anti-drift-check.mjs');
+await import('./lfea-shell-v2-store-fidelity-check.mjs');
+
 console.log(JSON.stringify({
   check: 'lfea-workbench',
   evidenceBasis: '[SIMULATED]/ANALYTICAL',
