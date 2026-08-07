@@ -58,11 +58,10 @@ const bends = authorities.normalized.geometry.segments
   .filter((segment) => segment.type === 'BEND')
   .sort((left, right) => left.id < right.id ? -1 : left.id > right.id ? 1 : 0);
 
-// The InputXML header carries NUMBEND=12, but the normalized solver geometry
-// classifies 11 source segments as BEND. #834's RCA and acceptance language are
-// also explicitly based on these 11 bends, so this check binds to the actual
-// normalized authority rather than header metadata.
-assert.equal(bends.length, 11, 'BM4 normalized geometry must contain the 11 bends qualified by #834.');
+// The InputXML declares twelve physical bend spans. Bend geometry remains
+// authoritative even when a span also carries SIF metadata; SIF evidence is
+// retained separately and must not erase the bend from the stiffness model.
+assert.equal(bends.length, 12, 'BM4 normalized geometry must contain all twelve physical bends qualified by #834.');
 
 const rows = bends.map((segment, index) => {
   const result = calculateB31Factors(bendRequest(authorities, segment, index));
