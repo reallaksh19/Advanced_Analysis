@@ -5,7 +5,7 @@ export function ensureTopologyEditTableStyles(documentRef) {
   const style = documentRef.createElement('style');
   style.id = 'topology-edit-table-styles';
   style.textContent = `
-    .topology-edit-clean-shell:has([data-panel-kind="table"][open]) .topology-edit-clean-shell__workspace { grid-template-columns:minmax(0,1fr) minmax(500px,46vw); }
+    .topology-edit-clean-shell:has([data-panel-kind="table"][open]) .topology-edit-clean-shell__workspace { --topology-edit-sidecar-width:min(500px,46vw); }
     [data-panel-kind="table"] > .topology-edit-clean-shell__panel-body { padding:6px; }
     .topology-edit-table { display:grid; gap:.65rem; min-width:0; font-size:.78rem; color:#cbd5e1; }
     .topology-edit-table__header { display:flex; align-items:end; justify-content:space-between; gap:.75rem; }
@@ -35,8 +35,8 @@ export function ensureTopologyEditTableStyles(documentRef) {
     .topology-edit-table__workflow { display:flex; gap:.4rem; flex-wrap:wrap; }
     .topology-edit-table__workflow [data-table-action="apply"] { border-color:#047857; background:#064e3b; color:#d1fae5; }
     .topology-edit-table__status, .topology-edit-table__notice, .topology-edit-table__empty { color:#94a3b8; }
-    @media (max-width: 1100px) { .topology-edit-clean-shell:has([data-panel-kind="table"][open]) .topology-edit-clean-shell__workspace { grid-template-columns:minmax(0,1fr) minmax(380px,48vw); } .topology-edit-table__editor-grid { grid-template-columns:1fr 1fr; } }
-    @media (max-width: 760px) { .topology-edit-clean-shell:has([data-panel-kind="table"][open]) .topology-edit-clean-shell__workspace { grid-template-columns:1fr; grid-template-rows:minmax(260px,1fr) minmax(280px,45vh); } .topology-edit-clean-shell__sidecar { border-top:1px solid #1e344c; } .topology-edit-table__header { align-items:stretch; flex-direction:column; } }
+    @media (max-width: 1100px) { .topology-edit-clean-shell:has([data-panel-kind="table"][open]) .topology-edit-clean-shell__workspace { --topology-edit-sidecar-width:min(380px,48vw); } .topology-edit-table__editor-grid { grid-template-columns:1fr 1fr; } }
+    @media (max-width: 760px) { .topology-edit-clean-shell__sidecar { border-top:1px solid #1e344c; } .topology-edit-table__header { align-items:stretch; flex-direction:column; } }
   `;
   documentRef.head?.append(style);
   installed = true;
