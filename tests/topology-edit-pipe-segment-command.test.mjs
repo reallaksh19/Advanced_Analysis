@@ -81,8 +81,12 @@ test('catalogue-bound pipe creation is deterministic and exact', () => {
   assert.equal(left.result.canonicalTopologyHash, right.result.canonicalTopologyHash);
   assert.equal(left.result.nodes.length, 2);
   assert.equal(left.result.edges.length, 1);
-  assert.deepEqual(left.result.nodes[0].portKeys, [left.resolved.generated.fromPortKey]);
-  assert.deepEqual(left.result.nodes[1].portKeys, [left.resolved.generated.toPortKey]);
+  const fromNode = left.result.nodes.find((row) => row.id === left.request.fromNodeId);
+  const toNode = left.result.nodes.find((row) => row.id === left.request.toNodeId);
+  assert.ok(fromNode);
+  assert.ok(toNode);
+  assert.deepEqual(fromNode.portKeys, [left.resolved.generated.fromPortKey]);
+  assert.deepEqual(toNode.portKeys, [left.resolved.generated.toPortKey]);
   assert.equal(
     left.result.crosswalk.edgeIdToComponentKey[left.resolved.generated.edgeId],
     left.resolved.generated.componentKey,
