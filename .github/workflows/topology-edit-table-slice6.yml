@@ -14,14 +14,25 @@ on:
       - 'src/workspace/topology-edit/table/topology-edit-table-intent.js'
       - 'src/workspace/topology-edit/table/topology-edit-table-engineering-planner.js'
       - 'src/workspace/topology-edit/table/topology-edit-table-batch-planner.js'
+      - 'src/workspace/viewport-productivity/topology-edit-table-engineering-*.js'
+      - 'src/workspace/viewport-productivity/topology-edit-table-grid-view.js'
+      - 'src/workspace/viewport-productivity/topology-edit-table-runtime.js'
+      - 'src/workspace/viewport-productivity/topology-edit-table-styles.js'
       - 'tests/topology-edit-component-relation-command.test.mjs'
       - 'tests/topology-edit-table-m04-m06-m10.test.mjs'
+      - 'tests/topology-edit-table-engineering-editor.test.mjs'
+      - 'vite.config.js'
+      - 'scripts/bundle-chunk-ownership-check.mjs'
       - '.github/workflows/topology-edit-table-slice6.yml'
   pull_request:
     paths:
       - 'src/workspace/topology-edit/**'
+      - 'src/workspace/viewport-productivity/topology-edit-table-*.js'
       - 'tests/topology-edit-component-relation-command.test.mjs'
       - 'tests/topology-edit-table-m04-m06-m10.test.mjs'
+      - 'tests/topology-edit-table-engineering-editor.test.mjs'
+      - 'vite.config.js'
+      - 'scripts/bundle-chunk-ownership-check.mjs'
       - '.github/workflows/topology-edit-table-slice6.yml'
   workflow_dispatch:
 
@@ -52,8 +63,11 @@ jobs:
             src/workspace/topology-edit/topology-edit-junction-relation-command.js
             src/workspace/topology-edit/topology-edit-engineering-edit-effect.js
             src/workspace/topology-edit/table/topology-edit-table-engineering-planner.js
+            src/workspace/viewport-productivity/topology-edit-table-engineering-editor.js
+            src/workspace/viewport-productivity/topology-edit-table-engineering-runtime.js
             tests/topology-edit-component-relation-command.test.mjs
             tests/topology-edit-table-m04-m06-m10.test.mjs
+            tests/topology-edit-table-engineering-editor.test.mjs
           )
           for file in "${files[@]}"; do
             test "$(git show "HEAD:$file" | wc -l)" -lt 300
@@ -63,19 +77,24 @@ jobs:
           node --check src/workspace/topology-edit/topology-edit-command-resolver.js
           node --check src/workspace/topology-edit/table/topology-edit-table-intent.js
           node --check src/workspace/topology-edit/table/topology-edit-table-batch-planner.js
+          node --check src/workspace/viewport-productivity/topology-edit-table-grid-view.js
+          node --check src/workspace/viewport-productivity/topology-edit-table-runtime.js
           ! grep -REn 'WorkspaceState|loadDataset\(|swapDataset\(|new (WebGLRenderer|TopologyEditViewportBackend)|session\.execute\(' \
             src/workspace/topology-edit/topology-edit-inline-component-replacement.js \
             src/workspace/topology-edit/topology-edit-junction-relation-command.js \
             src/workspace/topology-edit/topology-edit-engineering-edit-effect.js \
-            src/workspace/topology-edit/table/topology-edit-table-engineering-planner.js
+            src/workspace/topology-edit/table/topology-edit-table-engineering-planner.js \
+            src/workspace/viewport-productivity/topology-edit-table-engineering-*.js
           ! grep -REn 'proximity|nearest|distance.*identity|geometry.*identity|last[-_ ]write[-_ ]wins' \
             src/workspace/topology-edit/topology-edit-inline-component-replacement.js \
             src/workspace/topology-edit/topology-edit-junction-relation-command.js \
-            src/workspace/topology-edit/table/topology-edit-table-engineering-planner.js
+            src/workspace/topology-edit/table/topology-edit-table-engineering-planner.js \
+            src/workspace/viewport-productivity/topology-edit-table-engineering-*.js
       - name: Governed M06 M10 and atomic M04 M06 M10 contracts
         run: |
           node --test tests/topology-edit-component-relation-command.test.mjs
           node --test tests/topology-edit-table-m04-m06-m10.test.mjs
+          node --test tests/topology-edit-table-engineering-editor.test.mjs
       - name: Retained Table transaction contracts
         run: |
           node --test tests/topology-edit-table-batch-plan.test.mjs
@@ -83,6 +102,8 @@ jobs:
           node --test tests/topology-edit-table-transaction.test.mjs
       - name: Install dependencies
         run: npm ci
+      - name: Bundle ownership contract
+        run: node scripts/bundle-chunk-ownership-check.mjs
       - name: Production build
         run: npm run build
       - name: Install Chromium
