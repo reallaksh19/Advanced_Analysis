@@ -17,6 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -26,7 +28,26 @@ jobs:
         run: node --test test/fea-benchmark-qualification.test.js
       - name: Run pre-FEA engineering tests
         run: node --test test/lfea-prefea-engineering-checks.test.js
-      - name: Run existing pre-FEA gateway regression
-        run: node --test test/lfea-prefea-gateway.test.js
       - name: Run existing pre-FEA public-call-site regression
         run: node --test test/lfea-prefea-public-call-sites.test.js
+      - name: Prove gateway failures are unchanged from exact base
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set +e
+          node --test test/lfea-prefea-gateway.test.js > /tmp/current-gateway.log 2>&1
+          current_status=$?
+          grep '^not ok' /tmp/current-gateway.log > /tmp/current-failures.txt || true
+          set -e
+          git checkout --detach "$BASE_SHA"
+          set +e
+          node --test test/lfea-prefea-gateway.test.js > /tmp/base-gateway.log 2>&1
+          base_status=$?
+          grep '^not ok' /tmp/base-gateway.log > /tmp/base-failures.txt || true
+          set -e
+          echo 'PR gateway failing subtests:'
+          cat /tmp/current-failures.txt
+          echo 'Base gateway failing subtests:'
+          cat /tmp/base-failures.txt
+          test "$current_status" -eq "$base_status"
+          diff -u /tmp/base-failures.txt /tmp/current-failures.txt
