@@ -167,26 +167,18 @@ test('certified Q3 M04 M06 M10 surgically writes and production-reimports Staged
 
 test('engineering writer still fails closed when exact writable source fields are absent', async () => {
   const { dataset, canonical, edited } = await certifiedQ3();
-  const sourcePackage = structuredClone(dataset.sourceSnapshot.sourcePackage);
-  const valve = sourcePackage.objects.find((row) => row.id === 'V-M06');
-  delete valve.attributes.TOPOLOGY_EDIT_LENGTH_AUTHORITY;
-  const reducedDataset = normalizeWorkspaceDataset(sourcePackage, dataset.sourceName);
-  const reducedGraph = buildPipingPortTopologyGraph(reducedDataset.sharedModel);
-  const reducedCanonical = finalizeCanonicalTopology(
-    buildCanonicalTopologyFromWorkspaceDataset(reducedDataset, reducedGraph),
-  );
-  const editedValve = edgeByComponent(edited, 'V-M06');
-  const reducedValve = edgeByComponent(reducedCanonical, 'V-M06');
-  const alignedEdited = finalizeCanonicalTopology({
-    ...edited,
-    sourceHash: reducedDataset.sourceSnapshot.sourceSemanticHash,
-    edges: edited.edges.map((row) => row.id === editedValve.id
-      ? { ...row, sourcePath: reducedValve.sourcePath }
-      : row),
-  });
+  const entity = dataset.entities.find((row) => row.entityId === 'V-M06');
+  assert.ok(entity, 'Q3 valve source entity is required.');
+  const attributes = { ...entity.properties.attributes };
+  delete attributes.TOPOLOGY_EDIT_LENGTH_AUTHORITY;
+  const badEntity = { ...entity, properties: { ...entity.properties, attributes } };
+  const badDataset = {
+    ...dataset,
+    entities: dataset.entities.map((row) => row.entityId === badEntity.entityId ? badEntity : row),
+  };
   assert.throws(() => prepareTopologyEditStagedJsonWriteback({
-    dataset: reducedDataset,
-    baseCanonicalTopology: reducedCanonical,
-    canonicalTopology: alignedEdited,
+    dataset: badDataset,
+    baseCanonicalTopology: canonical,
+    canonicalTopology: edited,
   }), /not explicitly writable/u);
 });
