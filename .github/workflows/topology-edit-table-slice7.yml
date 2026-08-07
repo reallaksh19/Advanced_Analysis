@@ -5,12 +5,14 @@ on:
     paths:
       - 'public/fixtures/topology-edit-table-q3-exact.staged.json'
       - 'tests/topology-edit-table-q3-fixture.test.mjs'
+      - 'tests/topology-edit-table-q3-source-capability.test.mjs'
       - 'e2e/topology-edit-table-q3-concurrency.spec.js'
       - '.github/workflows/topology-edit-table-slice7.yml'
   pull_request:
     paths:
       - 'public/fixtures/topology-edit-table-q3-exact.staged.json'
       - 'tests/topology-edit-table-q3-fixture.test.mjs'
+      - 'tests/topology-edit-table-q3-source-capability.test.mjs'
       - 'e2e/topology-edit-table-q3-concurrency.spec.js'
       - 'src/workspace/topology-edit/table/**'
       - 'src/workspace/viewport-productivity/topology-edit-table-*.js'
@@ -45,6 +47,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
           files=(
             tests/topology-edit-table-q3-fixture.test.mjs
+            tests/topology-edit-table-q3-source-capability.test.mjs
             e2e/topology-edit-table-q3-concurrency.spec.js
           )
           for file in "${files[@]}"; do
@@ -54,13 +57,17 @@ jobs:
           node -e "JSON.parse(require('fs').readFileSync('public/fixtures/topology-edit-table-q3-exact.staged.json','utf8'))"
           ! grep -REn 'WorkspaceState|loadDataset\(|swapDataset\(|session\.execute\(|new (WebGLRenderer|TopologyEditViewportBackend)' \
             tests/topology-edit-table-q3-fixture.test.mjs \
+            tests/topology-edit-table-q3-source-capability.test.mjs \
             e2e/topology-edit-table-q3-concurrency.spec.js
           ! grep -REn 'proximity|nearest|distance.*identity|geometry.*identity|last[-_ ]write[-_ ]wins' \
             tests/topology-edit-table-q3-fixture.test.mjs \
+            tests/topology-edit-table-q3-source-capability.test.mjs \
             e2e/topology-edit-table-q3-concurrency.spec.js
           git diff --check
-      - name: Source-shaped Q3 fixture contract
-        run: node --test tests/topology-edit-table-q3-fixture.test.mjs
+      - name: Source-shaped Q3 fixture and export capability contracts
+        run: |
+          node --test tests/topology-edit-table-q3-fixture.test.mjs
+          node --test tests/topology-edit-table-q3-source-capability.test.mjs
       - name: Retained stale custody and Q3 atomic contracts
         run: |
           node --test tests/topology-edit-table-rebase.test.mjs
