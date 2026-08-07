@@ -12,6 +12,7 @@ const shellFiles = javascriptFiles(SHELL_ROOT);
 const tokenFiles = javascriptFiles(TOKEN_ROOT).filter((file) => file.endsWith('lfea-tokens.js'));
 const extraModules = [
   path.join(ROOT, 'scripts', 'lfea-shell-v2-store-fidelity-check.mjs'),
+  path.join(ROOT, 'scripts', 'lfea-shell-v2-baseline-hash-check.mjs'),
   path.join(ROOT, 'e2e', 'lfea-shell-v2.spec.js'),
 ];
 
@@ -47,8 +48,13 @@ assert.match(controller, /createLfeaWorkbenchStore/u);
 assert.match(controller, /workerClient\?\.cancel\('MODEL_CHANGED'\)/u);
 
 const standalone = source('src/workspace/lfea-shell-v2/standalone-entry.js');
-assert.match(standalone, /mountLfeaWorkbench/u);
-assert.doesNotMatch(standalone, /createLfeaWorkbenchStore|executeLfeaWorkbench/u);
+assert.match(standalone, /LfeaWorkbenchController/u);
+assert.match(standalone, /new LfeaWorkbenchController\(root, undefined\)\.init\(\)/u);
+assert.doesNotMatch(
+  standalone,
+  /from\s+['"]\.\.\/lfea-workbench\.js['"]|createLfeaWorkbenchStore|executeLfeaWorkbench/u,
+  'Standalone entry must use the narrow controller graph, not the broad workbench barrel.',
+);
 
 const vite = source('vite.config.js');
 assert.match(vite, /lfea:\s*fileURLToPath\(new URL\('\.\/lfea\.html'/u);
