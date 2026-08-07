@@ -114,7 +114,9 @@ test('partial catalogue custody blocks even when the target claims catalogue sup
   const { topology, dataset } = fixture();
   const raw = structuredClone(topology);
   delete raw.canonicalTopologyHash;
-  delete raw.edges[1].catalogueBinding.sourceHash;
+  const valve = raw.edges.find((row) => row.id === 'edge:valve');
+  assert.ok(valve?.catalogueBinding);
+  delete valve.catalogueBinding.sourceHash;
   const partial = finalizeCanonicalTopology(raw);
   const report = buildTopologyEditSourceRepresentability({
     canonicalTopology: partial,
