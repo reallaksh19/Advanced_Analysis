@@ -29,6 +29,14 @@ const REDUCER_KEYS = Object.freeze([
   'sourceEvidence',
 ]);
 
+// InputXML models can carry the same nominal pipe OD through mixed exact-inch
+// and rounded-metric representations (for example 168.275 mm vs 168.300 mm).
+// B31J's branch/run applicability is a nominal geometry rule, while the FEA
+// section package must retain exact physical dimensions. Reconcile only the
+// factor-calculator tee geometry, and only for a sub-0.05% representation
+// difference; larger branch-over-run mismatches remain outside applicability.
+const TEE_NOMINAL_OD_REPRESENTATION_RELATIVE_TOLERANCE = 5e-4;
+
 function requireSourceEvidence(sourceEvidence) {
   requireExactKeys(sourceEvidence, SOURCE_KEYS, 'geometry.sourceEvidence', 'B31_FACTOR_GEOMETRY_SOURCE_INVALID');
   requireText(sourceEvidence.sourceId, 'geometry.sourceEvidence.sourceId', 'B31_FACTOR_GEOMETRY_SOURCE_INVALID');
@@ -97,8 +105,12 @@ function normalizeTeeGeometry(geometry) {
   requireMetreGeometry(geometry);
   const runOuterDiameter = requirePositive(geometry.runOuterDiameter, 'geometry.runOuterDiameter');
   const runWallThickness = requirePositive(geometry.runWallThickness, 'geometry.runWallThickness');
-  const branchOuterDiameter = requirePositive(geometry.branchOuterDiameter, 'geometry.branchOuterDiameter');
+  const sourceBranchOuterDiameter = requirePositive(geometry.branchOuterDiameter, 'geometry.branchOuterDiameter');
   const branchWallThickness = requirePositive(geometry.branchWallThickness, 'geometry.branchWallThickness');
+  const branchOuterDiameter = reconcileNominalTeeBranchOuterDiameter(
+    runOuterDiameter,
+    sourceBranchOuterDiameter,
+  );
   if (!(2 * runWallThickness < runOuterDiameter) || !(2 * branchWallThickness < branchOuterDiameter)) {
     fail('Tee wall thicknesses must leave positive bores.', 'B31_FACTOR_GEOMETRY_INVALID');
   }
@@ -116,6 +128,14 @@ function normalizeTeeGeometry(geometry) {
     branchWallThickness,
     sourceEvidence: { ...requireSourceEvidence(geometry.sourceEvidence) },
   };
+}
+
+function reconcileNominalTeeBranchOuterDiameter(runOuterDiameter, branchOuterDiameter) {
+  if (!(branchOuterDiameter > runOuterDiameter)) return branchOuterDiameter;
+  const relativeExcess = (branchOuterDiameter - runOuterDiameter) / runOuterDiameter;
+  return relativeExcess <= TEE_NOMINAL_OD_REPRESENTATION_RELATIVE_TOLERANCE
+    ? runOuterDiameter
+    : branchOuterDiameter;
 }
 
 function normalizeReducerGeometry(geometry) {
