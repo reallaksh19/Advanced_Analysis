@@ -48,6 +48,16 @@ function targetReleaseIds(run) {
     .map((row) => row.nodeId.replace('BM4.N', '')).sort();
 }
 
+function nodeTrace(run, sourceNodeId) {
+  const nodeId = `BM4.N${sourceNodeId}`;
+  return run.trace.map((iteration) => ({
+    iteration: iteration.iteration,
+    executionHash: iteration.executionHash,
+    evaluation: iteration.evaluations.find((row) => row.nodeId === nodeId),
+    flip: iteration.flips.find((row) => row.nodeId === nodeId) ?? null,
+  }));
+}
+
 const releasedSus = targetReleaseIds(sus);
 const releasedOpe = targetReleaseIds(ope);
 const h1Confirmed = releasedSus.length === H1_RELEASED.size && releasedSus.every((id) => H1_RELEASED.has(id));
@@ -65,6 +75,19 @@ for (const [label, beforeExecution, afterExecution] of [
   if (label === 'OPE') assert.ok(Math.abs(after) <= 1, `${nodeId} OPE reaction must be within 1 N of zero`);
 }
 
+const ciiSusReleased = targetRows.filter((row) => row.label === 'SUS' && Math.abs(row.cii ?? Infinity) <= 1).map((row) => row.nodeId).sort();
+assert.deepEqual(ciiSusReleased, ['20090', '21470'], 'CASE 19 target status evidence');
+const h2Case20ReplayConfirmed = JSON.stringify(ciiSusReleased) === JSON.stringify(releasedOpe);
+assert.equal(h2Case20ReplayConfirmed, false, 'CASE 19 cannot be a literal replay of CASE 20 four-shoe status');
+const susFork = {
+  h1Confirmed,
+  independentSusReleased: releasedSus,
+  ciiCase19Released: ciiSusReleased,
+  case20Released: releasedOpe,
+  h2Case20ReplayConfirmed,
+  verdict: 'H1_FALSIFIED_AND_LITERAL_CASE20_STATUS_REPLAY_FALSIFIED; CASE_HISTORY_NOT_SERIALIZED_IN_BM4_INPUTXML',
+};
+
 const redistribution = M036_BM4_NEIGHBORS.map((nodeId) => {
   const ciiRow = cii.restraint.get('OPE').get(nodeId);
   const ciiReaction = ciiRow ? -ciiRow.FY : null;
@@ -79,6 +102,7 @@ const report = {
   check: 'lfea-m036-bm4-liftoff',
   status: 'PASS',
   h1: { predictedReleased: [...H1_RELEASED].sort(), confirmed: h1Confirmed, actualReleased: releasedSus },
+  susFork,
   opeReleased: releasedOpe,
   inventory: {
     contactDeclarationCount: inventory.unilateral.length,
@@ -96,9 +120,11 @@ const report = {
 console.log(JSON.stringify(report, null, 2));
 console.log(`M036_SUMMARY=${JSON.stringify({
   h1: report.h1,
+  susFork,
   opeReleased: report.opeReleased,
   targetRows,
   equilibrium: report.equilibrium,
   redistribution,
   gappedGuideEvidence: report.inventory.gappedGuideEvidence,
+  trace20090: { SUS: nodeTrace(sus, '20090'), OPE: nodeTrace(ope, '20090') },
 })}`);
