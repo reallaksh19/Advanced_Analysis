@@ -71,7 +71,7 @@ test('production HUD completes certified Start Route lifecycle', async ({ page }
   await expect.poll(() => controllerEvidence(page).then((row) => row.canonicalHash))
     .toBe(before.canonicalHash);
   const undone = await controllerEvidence(page);
-  expect(undone.journalHash).toBe(before.journalHash);
+  expect(undone.activeLedgerHash).toBe(before.activeLedgerHash);
   expect(undone.nodeCount).toBe(before.nodeCount);
   expect(undone.edgeCount).toBe(before.edgeCount);
 
@@ -79,7 +79,7 @@ test('production HUD completes certified Start Route lifecycle', async ({ page }
   await expect.poll(() => controllerEvidence(page).then((row) => row.canonicalHash))
     .toBe(applied.canonicalHash);
   const redone = await controllerEvidence(page);
-  expect(redone.journalHash).toBe(applied.journalHash);
+  expect(redone.activeLedgerHash).toBe(applied.activeLedgerHash);
   expect(redone.nodeCount).toBe(applied.nodeCount);
   expect(redone.edgeCount).toBe(applied.edgeCount);
   expect(redone.activeCommandCount).toBe(applied.activeCommandCount);
@@ -161,6 +161,7 @@ async function controllerEvidence(page) {
     return {
       canonicalHash: topology?.canonicalTopologyHash ?? null,
       journalHash: journal?.journalHash ?? null,
+      activeLedgerHash: journal?.activeLedgerHash ?? null,
       nodeCount: topology?.nodes?.length ?? 0,
       edgeCount: topology?.edges?.length ?? 0,
       activeCommandCount: journal?.activeCommandIds?.length ?? 0,
