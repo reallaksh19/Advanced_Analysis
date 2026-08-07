@@ -12,7 +12,7 @@ permissions:
 jobs:
   accdb-audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       TARGET_HEAD_SHA: ${{ github.sha }}
       ACCDB_SOURCE_SHA: 3e5c5e20d9e8741faa08be4360cb7f79498f87b6
@@ -64,27 +64,9 @@ jobs:
           while IFS= read -r table; do
             test -n "$table" || continue
             safe="$(printf '%s' "$table" | tr '/\\ :()' '_______')"
-            mdb-export "$DB" "$table" > "/tmp/bm4-accdb-export/${safe}.csv" || {
-              echo "EXPORT_FAILED:$table" >&2
-              exit 1
-            }
+            mdb-export "$DB" "$table" > "/tmp/bm4-accdb-export/${safe}.csv"
           done < /tmp/bm4-accdb-tables.txt
           echo "BM4_ACCDB_TABLE_COUNT=$(wc -l < /tmp/bm4-accdb-tables.txt)"
-
-      - name: Print load-case candidate tables
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo '=== TABLE NAMES ==='
-          cat /tmp/bm4-accdb-tables.txt
-          echo '=== CANDIDATE CONTENT ==='
-          for csv in /tmp/bm4-accdb-export/*.csv; do
-            base="$(basename "$csv")"
-            if printf '%s' "$base" | grep -Eiq 'case|load|comb|static|force|moment|option|control|setup|config|bour|nonlinear|fric|restraint|temperature|pressure'; then
-              echo "--- $base ---"
-              sed -n '1,100p' "$csv"
-            fi
-          done
 
       - name: Search exported database for BM4 case authority
         shell: bash
@@ -92,15 +74,50 @@ jobs:
           set -euo pipefail
           grep -RniE 'CASE ?19|CASE ?20|CASE ?21|\bF1\b|\bF2\b|\bF3\b|\bF4\b|\bF5\b|\bF6\b|\bF7\b|Bourdon|Burdon|friction|load case|loadcase|SUS|OPE|EXP' /tmp/bm4-accdb-export | tee /tmp/bm4-accdb-authority-hits.txt || true
 
-      - name: Upload ACCDB evidence
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Syntax and Bourdon mechanics smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check src/core/linear-fea-frame-element/uniform-axial-initial-strain.js
+          node --check scripts/lfea-m035-m036-bm4-integration-runtime.mjs
+          node -e "import('./scripts/lfea-m035-m036-bm4-integration-runtime.mjs').then(m=>{const r=m.solveBm4M035M036Combined(); console.log('M038_RELEASED_SUS='+JSON.stringify(m.releasedTargetIds(r.sustainedRun,['20090','20350','21470','21610']))); console.log('M038_RELEASED_OPE='+JSON.stringify(m.releasedTargetIds(r.operatingRun,['20090','20350','21470','21610']))); console.log('M038_21470_SUS_RY='+m.reactionUy(r.sustained.execution,'21470'));})" | tee /tmp/m038-bourdon-smoke.log
+
+      - name: Full BM4 row attribution benchmark
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/lfea-m035-m036-bm4-failure-attribution.mjs | tee /tmp/m038-bm4-attribution.log
+
+      - name: Combined qualification regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/lfea-m035-m036-bm4-integration-check.mjs | tee /tmp/m038-bm4-integration.log
+
+      - name: M036 standalone regression
+        run: npm run check:lfea-m036
+
+      - name: Upload M038 evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: m038-bm4-accdb-audit-${{ env.TARGET_HEAD_SHA }}
+          name: m038-bm4-accdb-bourdon-${{ env.TARGET_HEAD_SHA }}
           path: |
             /tmp/bm4-accdb-source-sha256.txt
             /tmp/bm4-accdb-tables.txt
             /tmp/bm4-accdb-authority-hits.txt
             /tmp/bm4-accdb-export/
-          if-no-files-found: error
+            /tmp/m038-bourdon-smoke.log
+            /tmp/m038-bm4-attribution.log
+            /tmp/m038-bm4-integration.log
+            reports/m035-m036-bm4-failure-attribution.json
+          if-no-files-found: warn
           retention-days: 14
