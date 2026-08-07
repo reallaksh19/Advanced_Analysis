@@ -107,7 +107,7 @@ jobs:
 
       - name: Embedded and standalone browser regression
         working-directory: head
-        run: node scripts/run-playwright.mjs e2e/lfea-workbench.spec.js e2e/lfea-shell-v2.spec.js
+        run: node scripts/run-playwright.mjs e2e/lfea-workbench.spec.js e2e/lfea-shell-v2.spec.js --retries=0 --workers=1
 
       - name: Syntax check changed JavaScript
         working-directory: head
