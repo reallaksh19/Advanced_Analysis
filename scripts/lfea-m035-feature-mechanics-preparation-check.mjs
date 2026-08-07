@@ -16,6 +16,10 @@ import {
 import { semanticHash } from '../src/core/shared-piping-model/canonical-json.js';
 import { sealInputXmlLinearSolvePreparation } from '../src/core/linear-piping-analysis-consumer/inputxml-linear-solve-preparation-contract.js';
 import { compileInputXmlFeatureMechanicsPreparation } from '../src/core/linear-piping-analysis-consumer/inputxml-feature-mechanics-preparation.js';
+import {
+  compileInputXmlFeatureStiffnessAuthorities,
+  reducerElementContributionForCase,
+} from '../src/core/linear-piping-analysis-consumer/inputxml-feature-stiffness-authorities.js';
 import { FRAME_LOCAL_AXIS_PROFILE } from '../src/core/centerline-beam-fea/index.js';
 import { materialResolution, sectionResolution } from './lfea-b2.5-model-compiler-fixtures.mjs';
 import { reducedSectionResolution, componentProfile } from './lfea-b3.2-piping-component-fixtures.mjs';
@@ -172,12 +176,13 @@ const reducerQualification = qualifyReducerSamplingRules({
 assert.equal(reducerQualification.status, 'QUALIFIED');
 assert.equal(reducerQualification.qualifiedSamplingRule, reducerRequest.samplingRule);
 
+const frameProfile = eulerBernoulliProfile();
 const feature = compileInputXmlFeatureMechanicsPreparation({
   sourcePreparation,
   editionProfileId: 'B31_3_2020_B31J_2017',
   momentDirectionMapping: { inPlaneField: 'my', outOfPlaneField: 'mz' },
   smooth90FlexibilityCorrection: false,
-  frameElementProfile: eulerBernoulliProfile(),
+  frameElementProfile: frameProfile,
   pipingComponentProfile: componentProfile({ bendPressureStiffeningRule: 'BEND_PRESSURE_STIFFENING_DECLARED_FACTOR_V1' }),
   localAxisProfile: FRAME_LOCAL_AXIS_PROFILE,
   teeFactorResultBySegmentId: new Map([['TEE', teeFactors]]),
@@ -202,12 +207,49 @@ assert.ok(tee.modifiers.every((row) => row.rotationalSprings.every((spring) => s
 assert.ok(tee.modifiers.find((row) => row.role === 'BRANCH').rigidOffset);
 assert.equal(feature.reducerAuthorities[0].authority.samplingRule, reducerQualification.qualifiedSamplingRule);
 
+const stiffness = compileInputXmlFeatureStiffnessAuthorities({
+  sourcePreparation,
+  featurePreparation: feature,
+  frameElementProfile: frameProfile,
+  localAxisProfile: FRAME_LOCAL_AXIS_PROFILE,
+});
+assert.equal(stiffness.schema, 'fea-inputxml-feature-stiffness-authorities/v1');
+assert.equal(stiffness.elementContributions.length, feature.analysisGeometry.segments.length);
+assert.equal(new Set(stiffness.elementContributions.map((row) => row.elementId)).size, stiffness.elementContributions.length);
+assert.ok(stiffness.summary.bendElementCount > 1);
+assert.equal(stiffness.summary.teeModifiedElementCount, 3);
+assert.equal(stiffness.summary.reducerElementCount, 1);
+assert.ok(stiffness.elementLedger.filter((row) => row.kind === 'TEE_MODIFIED_FRAME').every((row) => !row.elementId.startsWith('M035-TEE-01.E')));
+const reducerLedger = stiffness.elementLedger.find((row) => row.kind === 'REDUCER_CONDENSED');
+assert.equal(reducerLedger.elementId, 'RED');
+
+const reducerSus = reducerElementContributionForCase({
+  elementId: 'RED',
+  authority: feature.reducerAuthorities[0].authority,
+  nodeIPosition: [0, 10, 0],
+  nodeJPosition: [1, 10, 0],
+  includeGravity: true,
+  includeThermal: false,
+});
+const reducerOpe = reducerElementContributionForCase({
+  elementId: 'RED',
+  authority: feature.reducerAuthorities[0].authority,
+  nodeIPosition: [0, 10, 0],
+  nodeJPosition: [1, 10, 0],
+  includeGravity: true,
+  includeThermal: true,
+});
+assert.deepEqual(reducerSus.globalStiffness, reducerOpe.globalStiffness, 'Reducer stiffness must not depend on physical load case selection.');
+assert.ok(reducerSus.equivalentLoadGlobal.some((value) => value !== 0));
+assert.ok(reducerSus.initialStrainLoadGlobal.every((value) => value === 0));
+assert.ok(reducerOpe.initialStrainLoadGlobal.some((value) => value !== 0));
+
 assert.throws(() => compileInputXmlFeatureMechanicsPreparation({
   sourcePreparation,
   editionProfileId: 'B31_3_2020_B31J_2017',
   momentDirectionMapping: { inPlaneField: 'my', outOfPlaneField: 'mz' },
   smooth90FlexibilityCorrection: false,
-  frameElementProfile: eulerBernoulliProfile(),
+  frameElementProfile: frameProfile,
   pipingComponentProfile: componentProfile({ bendPressureStiffeningRule: 'BEND_PRESSURE_STIFFENING_DECLARED_FACTOR_V1' }),
   teeFactorResultBySegmentId: new Map(),
   reducerRequestBySegmentId: new Map([['RED', reducerRequest]]),
@@ -222,7 +264,8 @@ console.log(JSON.stringify({
   bendComponents: feature.bendComponents.length,
   teeJunctions: feature.teeJunctions.length,
   reducerAuthorities: feature.reducerAuthorities.length,
-  semanticHash: feature.semanticHash,
+  stiffnessSummary: stiffness.summary,
+  semanticHash: stiffness.semanticHash,
 }, null, 2));
 console.log('M035 mixed-feature mechanics preparation PASS');
 
