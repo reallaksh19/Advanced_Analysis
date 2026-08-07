@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { semanticHash } from '../src/core/shared-piping-model/index.js';
 import { finalizeCanonicalTopology } from '../src/workspace/topology-edit/topology-edit-canonical-state.js';
 import { checkCanonicalTopology } from '../src/workspace/topology-edit/topology-edit-checker.js';
 import { TopologyEditCertifiedSession } from '../src/workspace/topology-edit/topology-edit-certified-session.js';
@@ -87,6 +88,9 @@ test('Table Preview → Validate → Apply delegates to certified transaction an
   const tableValidation = validateTopologyEditTablePreview({ preview, workerReceipt });
   assert.equal(tableValidation.status, 'READY_TO_APPLY');
   assert.equal(tableValidation.blockingIssueCount, 0);
+  assert.deepEqual(tableValidation.blockingDiagnostics, []);
+  assert.equal(tableValidation.blockingDiagnosticHash, semanticHash([]));
+  assert.equal(tableValidation.blockingDiagnosticHash, tableValidation.validation.blockingDiagnosticHash);
   assert.equal(session.currentTopology().canonicalTopologyHash, prior.activeCanonicalTopologyHash);
 
   const transaction = await applyTopologyEditTableTransaction({
