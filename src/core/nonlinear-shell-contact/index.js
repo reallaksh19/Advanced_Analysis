@@ -22,3 +22,5 @@ export * from './nc01-fixtures.js';
 export * from './nc01-negative-controls.js';
 export * from './production-run-receipt-contract.js';
 export * from './production-run-receipt-evaluator.js';
+export * from './operational-surveillance-contract.js';
+export * from './operational-surveillance-evaluator.js';
