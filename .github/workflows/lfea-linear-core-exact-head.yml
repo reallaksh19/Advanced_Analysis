@@ -54,7 +54,16 @@ jobs:
           done < /tmp/lfea-linear-core-paths.txt
 
       - name: InputXML unit normalization
-        run: node scripts/linear-piping-inputxml-unit-normalization-check.mjs
+        shell: bash
+        run: |
+          set +e
+          node scripts/linear-piping-inputxml-unit-normalization-check.mjs 2>&1 | tee /tmp/inputxml-unit.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then
+            message=$(tail -n 25 /tmp/inputxml-unit.log | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g')
+            echo "::error file=scripts/linear-piping-inputxml-unit-normalization-check.mjs::$message"
+            exit "$code"
+          fi
 
       - name: Conditioned topology and retained-station custody
         run: node scripts/lfea-b1-conditioning-check.mjs
