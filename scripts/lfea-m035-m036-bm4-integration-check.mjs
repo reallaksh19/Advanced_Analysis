@@ -28,16 +28,19 @@ function ciiReaction(cii, label, nodeId) {
 }
 
 function equilibrium(analysis) {
-  const nodeById = new Map(analysis.compilation.model.nodes.map((row) => [row.nodeId, row.position]));
-  const lengthByElement = new Map(analysis.compilation.model.elements.map((element) => {
-    const i = nodeById.get(element.nodeI);
-    const j = nodeById.get(element.nodeJ);
-    return [element.elementId, Math.hypot(j.x - i.x, j.y - i.y, j.z - i.z)];
-  }));
+  const lengthByElement = new Map();
+  for (const frame of analysis.frames) lengthByElement.set(frame.elementId, frame.geometry.length);
+  for (const component of analysis.pipingComponents) {
+    for (const element of component.elements) {
+      lengthByElement.set(element.elementId, element.frameElement.geometry.length);
+    }
+  }
   let appliedY = 0;
   for (const primitive of analysis.loadCase.primitives) {
     if (primitive.kind !== 'DISTRIBUTED_LOAD') continue;
-    appliedY += 0.5 * (primitive.startIntensity.fy + primitive.endIntensity.fy) * lengthByElement.get(primitive.elementId);
+    const length = lengthByElement.get(primitive.elementId);
+    assert.ok(Number.isFinite(length) && length > 0, `loaded element ${primitive.elementId} must have an actual frame length`);
+    appliedY += 0.5 * (primitive.startIntensity.fy + primitive.endIntensity.fy) * length;
   }
   const reactionY = analysis.execution.reactions
     .filter((row) => row.dof === 'UY')
