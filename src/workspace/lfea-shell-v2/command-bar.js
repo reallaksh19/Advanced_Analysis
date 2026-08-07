@@ -101,9 +101,11 @@ function resultMode(root, state, handlers) {
     const option = workbenchElement(root, 'option', null, value.replaceAll('_', ' '));
     option.value = value;
     option.selected = value === state.display.resultMode;
-    option.disabled = value === 'DEFORMED'
+    const unavailable = value === 'DEFORMED'
       ? !hasQualifiedDisplacements(state.execution)
       : value === 'PROJECTED_STRESS' && !state.execution?.stressProjection;
+    option.disabled = unavailable;
+    option.setAttribute('aria-disabled', String(unavailable));
     select.append(option);
   }
   select.addEventListener('change', () => handlers.onResultMode(select.value));
