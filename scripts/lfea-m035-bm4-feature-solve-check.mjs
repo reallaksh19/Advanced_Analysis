@@ -1,12 +1,21 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
-import { diagnoseBm4M035FeatureStiffness } from './lfea-m035-bm4-feature-solver-diagnostic.mjs';
+import {
+  diagnoseBm4M035FeatureStiffness,
+  diagnoseBm4M035PhysicalCases,
+} from './lfea-m035-bm4-feature-solver-diagnostic.mjs';
 import { solveBm4M035FeatureCases } from './lfea-m035-bm4-feature-solve-runtime.mjs';
 
 console.log('\n--- M035 BM4 feature-model stiffness qualification ---');
 const stiffnessDiagnostic = diagnoseBm4M035FeatureStiffness();
 console.log(JSON.stringify(stiffnessDiagnostic, null, 2));
 assert.ok(Number.isFinite(stiffnessDiagnostic.factorization.conditionEstimate));
+
+console.log('\n--- M035 BM4 loaded SUS/OPE solver qualification ---');
+const physicalDiagnostics = diagnoseBm4M035PhysicalCases();
+console.log(JSON.stringify(physicalDiagnostics, null, 2));
+assert.ok(['QUALIFIED', 'CONDITIONAL', 'BLOCKED'].includes(physicalDiagnostics.sustained.status));
+assert.ok(['QUALIFIED', 'CONDITIONAL', 'BLOCKED'].includes(physicalDiagnostics.operating.status));
 
 console.log('\n--- M035 BM4 feature-aware bend/tee solve ---');
 const result = solveBm4M035FeatureCases();
@@ -46,6 +55,7 @@ assert.ok(bendArcEntries.every((row) => row.teeModifier === null), 'Tee flexibil
 console.log(JSON.stringify({
   status: 'PASS',
   stiffnessDiagnostic,
+  physicalDiagnostics,
   summary: report.summary,
   teeBendOverlap: {
     sourceSegmentId: 'IX-S36',
