@@ -34,7 +34,7 @@ test('Table stays projection-only until certified pipe-length Apply', async ({ p
   expectAuthorityNoop(afterPresentation, before);
   expect(await host.getAttribute('data-topology-edit-table-projection-hash')).toBe(projectionHash);
 
-  const editable = await chooseTerminalPipe(page);
+  const editable = await chooseSafeTerminalPipe(page);
   await filter.fill(editable.tag);
   const row = table.locator(`[data-canonical-id="${editable.edgeId}"]`);
   await expect(row).toBeVisible();
@@ -56,7 +56,9 @@ test('Table stays projection-only until certified pipe-length Apply', async ({ p
 
   await page.locator('[data-table-action="validate"]').click();
   await expect.poll(() => host.getAttribute('data-topology-edit-table-validation-hash')).toBeTruthy();
-  await expect.poll(() => host.getAttribute('data-topology-edit-table-validation-status')).toBe('READY_TO_APPLY');
+  const validationStatus = await host.getAttribute('data-topology-edit-table-validation-status');
+  const blockerCodes = await host.getAttribute('data-topology-edit-table-validation-blockers');
+  expect(validationStatus, `unexpected Table validation blockers: ${blockerCodes || '(none)'}`).toBe('READY_TO_APPLY');
   await expect(page.locator('[data-table-action="apply"]')).toBeEnabled();
   const validated = await evidence(page);
   expectAuthorityNoop(validated, before);
@@ -108,25 +110,42 @@ async function openProductionController(page) {
   return host;
 }
 
-async function chooseTerminalPipe(page) {
+async function chooseSafeTerminalPipe(page) {
   return page.evaluate(() => {
     const controller = document.querySelector('[data-role="topology-edit-render-host"]')?.__topologyEditAuthoringController;
     const topology = controller?.session?.currentTopology?.();
     const projection = controller?.tableAdapter?.runtime?.projection;
-    if (!topology || !projection) throw new Error('Table production authority is unavailable.');
+    const dataset = controller?.workspaceDataset;
+    if (!topology || !projection || !dataset) throw new Error('Table production authority is unavailable.');
+    const excludedComponents = new Set(['P-001', 'P-003', 'P-006']);
+    for (const entity of dataset.entities ?? []) {
+      const type = String(entity.entityType ?? entity.type ?? '').toUpperCase();
+      if (!['REST', 'GUIDE', 'LINE_STOP', 'ANCHOR', 'SPRING', 'SUPPORT', 'RESTRAINT'].includes(type)) continue;
+      const attributes = entity.properties?.sourceAttributes ?? entity.properties?.attributes ?? {};
+      const attached = attributes.ATTACHED_COMPONENT_ID ?? attributes.SUPPORTED_COMPONENT_ID;
+      if (attached) excludedComponents.add(String(attached));
+    }
     const degree = new Map((topology.nodes ?? []).map((node) => [node.id, 0]));
     for (const edge of topology.edges ?? []) {
       degree.set(edge.fromNodeId, (degree.get(edge.fromNodeId) ?? 0) + 1);
       degree.set(edge.toNodeId, (degree.get(edge.toNodeId) ?? 0) + 1);
     }
-    for (const edge of topology.edges ?? []) {
-      if (String(edge.entityType ?? '').toUpperCase() !== 'PIPE') continue;
+    const candidates = (topology.edges ?? []).filter((edge) => (
+      String(edge.entityType ?? '').toUpperCase() === 'PIPE'
+      && !excludedComponents.has(String(edge.componentKey ?? '').replace(/^edge:/, ''))
+    ));
+    candidates.sort((left, right) => {
+      if (left.componentKey === 'P-007') return -1;
+      if (right.componentKey === 'P-007') return 1;
+      return left.id.localeCompare(right.id);
+    });
+    for (const edge of candidates) {
       const row = projection.rows.find((candidate) => candidate.identity.canonicalId === edge.id);
       if (!row || !(row.fields.lengthMm > 240)) continue;
       if (degree.get(edge.toNodeId) === 1) return { edgeId: edge.id, tag: row.fields.tag, currentLengthMm: row.fields.lengthMm, anchor: 'FROM', propagation: 'DOWNSTREAM' };
       if (degree.get(edge.fromNodeId) === 1) return { edgeId: edge.id, tag: row.fields.tag, currentLengthMm: row.fields.lengthMm, anchor: 'TO', propagation: 'UPSTREAM' };
     }
-    throw new Error('No safely-shortenable graph-terminal canonical PIPE is available for Table qualification.');
+    throw new Error('No safe graph-terminal canonical PIPE is available outside intentional defect/support zones.');
   });
 }
 
