@@ -5,7 +5,7 @@
  * package imports and local editor actions.
  */
 import { createLfeaWorkbenchStore } from './lfea-workbench-store.js';
-import { LfeaWorkbenchView } from './lfea-workbench-view.js';
+import { LfeaShellV2View } from './lfea-shell-v2/shell-view.js';
 import { FeaBenchmarkPanel } from './fea-benchmark-panel.js';
 import {
   createLfeaWorkbenchAdapterProfile,
@@ -43,7 +43,7 @@ export class LfeaWorkbenchController {
           code: 'LFEA_RUN_CANCELLED_MODEL_CHANGED',
         },
     });
-    this.view = new LfeaWorkbenchView(rootElement);
+    this.view = new LfeaShellV2View(rootElement);
     this.benchmarkHost = this.documentRef.createElement('div');
     this.benchmarkHost.dataset.role = 'lfea-benchmark-host';
     this.benchmarkPanel = new FeaBenchmarkPanel(this.benchmarkHost, { surface: 'LFEA' });
