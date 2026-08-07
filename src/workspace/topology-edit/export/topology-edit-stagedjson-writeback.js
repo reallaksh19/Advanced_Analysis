@@ -41,6 +41,14 @@ export function prepareTopologyEditStagedJsonWriteback(input = {}) {
     changedNodeIds.push(nodeId);
     compileNodeEndpointPatches({ nodeId, position: editedNode.position, base, dataset, entities, patches });
   }
+  compileChangedEdgeCenterPatches({
+    base,
+    editedNodes,
+    changedNodeIds: new Set(changedNodeIds),
+    dataset,
+    entities,
+    patches,
+  });
 
   if (!patches.length) {
     throw new RangeError('StagedJSON writeback: no source-representable changes were found.');
@@ -92,11 +100,24 @@ function compileNodeEndpointPatches({ nodeId, position, base, dataset, entities,
     if (!entity) throw new RangeError(`StagedJSON writeback: missing source entity ${edge.componentKey}.`);
     patches.push(pointPatch(dataset, entity, role, position, edge.id));
     represented += 1;
-    const centerPatch = explicitCenterPatch(dataset, entity, edge, nodeId, position, base);
-    if (centerPatch) patches.push(centerPatch);
   }
   if (!represented) {
     throw new RangeError(`StagedJSON writeback: changed node ${nodeId} has no exact imported edge endpoint.`);
+  }
+}
+
+function compileChangedEdgeCenterPatches({
+  base, editedNodes, changedNodeIds, dataset, entities, patches,
+}) {
+  for (const edge of base.edges) {
+    if (!changedNodeIds.has(edge.fromNodeId) && !changedNodeIds.has(edge.toNodeId)) continue;
+    const entity = entities.get(edge.componentKey);
+    if (!entity?.properties?.geometry?.explicitCenter) continue;
+    const from = editedNodes.get(edge.fromNodeId)?.position;
+    const to = editedNodes.get(edge.toNodeId)?.position;
+    if (!from || !to) throw new RangeError(`StagedJSON writeback: missing final endpoints for ${edge.id}.`);
+    const patch = explicitCenterPatch(dataset, entity, edge, from, to);
+    if (patch) patches.push(patch);
   }
 }
 
@@ -118,25 +139,22 @@ function pointPatch(dataset, entity, role, position, canonicalId) {
   });
 }
 
-function explicitCenterPatch(dataset, entity, edge, movedNodeId, movedPosition, base) {
-  if (!entity.properties?.geometry?.explicitCenter) return null;
+function explicitCenterPatch(dataset, entity, edge, from, to) {
   const source = entity.properties?.geometry?.sources?.center ?? '';
   const suffix = sourceSuffix(source);
   if (!suffix) {
     throw new RangeError(`StagedJSON writeback: ${edge.id} explicit center source ${source || 'missing'} is not writable.`);
   }
-  const otherNodeId = edge.fromNodeId === movedNodeId ? edge.toNodeId : edge.fromNodeId;
-  const other = base.nodes.find((row) => row.id === otherNodeId)?.position;
-  if (!other) throw new RangeError(`StagedJSON writeback: missing peer node ${otherNodeId}.`);
-  const center = midpoint(movedPosition, other);
   const pointer = appendPointer(entity.jsonPointer, suffix);
   const before = readTopologyEditSourceJsonPointer(dataset.sourceSnapshot.sourcePackage, pointer);
+  const value = pointLike(before, midpoint(from, to));
+  if (semanticHash(before) === semanticHash(value)) return null;
   return createTopologyEditSourcePatch({
     pointer,
     canonicalId: edge.id,
     property: 'centerPosition',
     expectedPreimageHash: semanticHash(before),
-    value: pointLike(before, center),
+    value,
   });
 }
 
