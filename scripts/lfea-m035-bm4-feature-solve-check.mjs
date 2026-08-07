@@ -4,7 +4,7 @@ import { solveBm4M035FeatureCases } from './lfea-m035-bm4-feature-solve-runtime.
 
 console.log('\n--- M035 BM4 feature-aware bend/tee solve ---');
 const result = solveBm4M035FeatureCases();
-const { report, sustained, operating, expansion } = result;
+const { report, sustained, operating, expansion, authorities } = result;
 
 assert.equal(report.schema, 'm035-bm4-feature-solve-report/v1');
 assert.equal(report.summary.bendComponents, 11);
@@ -23,9 +23,29 @@ assert.ok(report.elements.every((row) => ['sustained','operating','expansion'].e
 assert.ok(report.limitations.some((row) => row.includes('reducer')));
 assert.ok(report.limitations.some((row) => row.includes('One-way +Y')));
 
+// IX-S36 is both the branch leg of tee 20295 and a real bend. Tee compliance
+// belongs on the generated incoming straight at the junction; B-3.2 remains
+// the sole owner of every arc element. This proves the two flexibilities are in
+// series without applying the tee spring repeatedly across bend subdivisions.
+const teeBendOverlap = authorities.entries.filter((row) => row.sourceSegmentId === 'IX-S36');
+const teeCarriers = teeBendOverlap.filter((row) => row.teeModifier !== null);
+const bendArcEntries = teeBendOverlap.filter((row) => row.bendComponent !== null);
+assert.equal(teeCarriers.length, 1, 'IX-S36 tee flexibility must have exactly one analysis-span carrier.');
+assert.equal(teeCarriers[0].segment.meta.analysisRole, 'BEND_INCOMING_STRAIGHT');
+assert.equal(String(teeCarriers[0].segment.startNodeId), '20295');
+assert.ok(teeCarriers[0].teeModifier.endSprings.every((row) => row.end === 'I'));
+assert.ok(bendArcEntries.length > 0, 'IX-S36 must retain its B-3.2 bend arc elements.');
+assert.ok(bendArcEntries.every((row) => row.teeModifier === null), 'Tee flexibility must never leak into B-3.2 bend arc elements.');
+
 console.log(JSON.stringify({
   status: 'PASS',
   summary: report.summary,
+  teeBendOverlap: {
+    sourceSegmentId: 'IX-S36',
+    teeCarrierElementId: teeCarriers[0].elementId,
+    teeCarrierRole: teeCarriers[0].segment.meta.analysisRole,
+    bendArcElementCount: bendArcEntries.length,
+  },
   sustainedSolver: sustained.execution.assessment ?? sustained.execution.status ?? null,
   operatingSolver: operating.execution.assessment ?? operating.execution.status ?? null,
   reportFeatureHash: report.featureSemanticHash,
