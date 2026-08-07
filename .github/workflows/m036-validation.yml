@@ -21,6 +21,12 @@ jobs:
       - run: npm ci
       - run: node scripts/lfea-unilateral-closed-form-check.mjs
       - run: node scripts/lfea-unilateral-determinism-check.mjs
+      - name: BM4 case-definition evidence
+        shell: bash
+        run: |
+          node scripts/lfea-m036-case-definition-inspect.mjs 2>&1 | tee case-definition.log
+          compact=$(tr '\n' ' ' < case-definition.log | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g' | cut -c1-5000)
+          echo "::notice title=M036 case definition::$compact"
       - name: BM4 lift-off validation
         shell: bash
         run: |
