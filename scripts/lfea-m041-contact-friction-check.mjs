@@ -14,6 +14,7 @@ const POLICY = Object.freeze({
   directionCosineTolerance: 1e-8,
   maximumIterations: 16,
   maximumLineSearchSteps: 12,
+  maximumExactStateCandidates: 81,
 });
 
 function contact(id = 'C1', nodeId = 'N1', overrides = {}) {
@@ -52,7 +53,7 @@ function slipOf(request, declarationId, dof) {
     .find((row) => row.dof === dof)?.value ?? 0;
 }
 
-function singleBuilder({ normalReaction = 1000, openUy = 0.01, loadX = 0, loadZ = 0, structuralStiffness = 1000 } = {}) {
+function singleBuilder({ normalReaction = 1000, openUy = -0.01, loadX = 0, loadZ = 0, structuralStiffness = 1000 } = {}) {
   return (request) => {
     const state = stateOf(request, 'C1');
     const active = state !== CONTACT_FRICTION_STATE.OPEN;
@@ -86,13 +87,15 @@ function coupledBuilder(request) {
   const [u1, u2] = solve2x2(k1, -200, -200, k2, rhs1, rhs2);
   const z1 = slipOf(request, 'C1', 'UZ') / (1000 + springOf(request, 'C1', 'UZ'));
   const z2 = slipOf(request, 'C2', 'UZ') / (1000 + springOf(request, 'C2', 'UZ'));
+  const active1 = states[0] !== CONTACT_FRICTION_STATE.OPEN;
+  const active2 = states[1] !== CONTACT_FRICTION_STATE.OPEN;
   const displacement = [
-    { nodeId: 'N1', dof: 'UX', value: u1 }, { nodeId: 'N1', dof: 'UY', value: 0 }, { nodeId: 'N1', dof: 'UZ', value: z1 },
-    { nodeId: 'N2', dof: 'UX', value: u2 }, { nodeId: 'N2', dof: 'UY', value: 0 }, { nodeId: 'N2', dof: 'UZ', value: z2 },
+    { nodeId: 'N1', dof: 'UX', value: u1 }, { nodeId: 'N1', dof: 'UY', value: active1 ? 0 : -0.01 }, { nodeId: 'N1', dof: 'UZ', value: z1 },
+    { nodeId: 'N2', dof: 'UX', value: u2 }, { nodeId: 'N2', dof: 'UY', value: active2 ? 0 : -0.01 }, { nodeId: 'N2', dof: 'UZ', value: z2 },
   ];
   const reactions = [
-    { nodeId: 'N1', dof: 'UY', value: 1000 },
-    { nodeId: 'N2', dof: 'UY', value: 800 },
+    ...(active1 ? [{ nodeId: 'N1', dof: 'UY', value: 1000 }] : []),
+    ...(active2 ? [{ nodeId: 'N2', dof: 'UY', value: 800 }] : []),
   ];
   return executionRecord({ tag: { states, request, u1, u2, z1, z2 }, reactions, displacement });
 }
@@ -105,53 +108,54 @@ function expectCode(fn, code) {
   assert.throws(fn, (error) => error?.code === code, `expected ${code}`);
 }
 
+function assertUnique(result, candidates) {
+  assert.equal(result.qualification.method, 'EXACT_DISCRETE_STATE_ENUMERATION_V1');
+  assert.equal(result.qualification.candidateStateCount, candidates);
+  assert.equal(result.qualification.evaluatedCandidateCount, candidates);
+  assert.equal(result.qualification.admissibleCandidateCount, 1);
+  assert.equal(result.qualification.uniqueAdmissibleStateProven, true);
+}
+
 assert.ok(Math.abs(BM4_M040_FRICTION_STIFFNESS - 175126835.24647635) < 1e-6);
 
 const open = compileContactFrictionExecution({
   contacts: [contact('C1', 'N1', { initialState: 'OPEN' })],
-  buildAndSolve: singleBuilder({ openUy: 0.01 }),
-  policy: POLICY,
+  buildAndSolve: singleBuilder({ normalReaction: -100, openUy: 0.01 }), policy: POLICY,
 });
 assert.equal(selected(open).state, 'OPEN');
 assert.equal(selected(open).tangentialMagnitude, 0);
-assert.equal(open.classification, CONTACT_FRICTION_CLASSIFICATION.PHYSICAL_FRICTION);
+assertUnique(open, 3);
 
 const penetration = compileContactFrictionExecution({
   contacts: [contact('C1', 'N1', { initialState: 'OPEN' })],
-  buildAndSolve: singleBuilder({ openUy: -0.01 }),
-  policy: POLICY,
+  buildAndSolve: singleBuilder(), policy: POLICY,
 });
 assert.equal(selected(penetration).state, 'STICK');
 assert.equal(penetration.history[0].nextState[0].state, 'STICK');
+assertUnique(penetration, 3);
 
 const liftOff = compileContactFrictionExecution({
-  contacts: [contact()],
-  buildAndSolve: singleBuilder({ normalReaction: -100, openUy: 0.02 }),
-  policy: POLICY,
+  contacts: [contact()], buildAndSolve: singleBuilder({ normalReaction: -100, openUy: 0.02 }), policy: POLICY,
 });
 assert.equal(selected(liftOff).state, 'OPEN');
-assert.equal(liftOff.history[0].nextState[0].state, 'OPEN');
+assertUnique(liftOff, 3);
 
 const stick = compileContactFrictionExecution({
-  contacts: [contact()],
-  buildAndSolve: singleBuilder({ loadX: 300 }),
-  policy: POLICY,
+  contacts: [contact()], buildAndSolve: singleBuilder({ loadX: 300 }), policy: POLICY,
 });
 assert.equal(selected(stick).state, 'STICK');
 assert.ok(Math.abs(selected(stick).tangentialMagnitude - 150) < 1e-9);
 assert.ok(Math.abs(selected(stick).coulombLimit - 300) < 1e-9);
-assert.equal(stick.constitutiveResidualInfinityNorm, 0);
+assertUnique(stick, 3);
 
 const slip = compileContactFrictionExecution({
-  contacts: [contact()],
-  buildAndSolve: singleBuilder({ loadX: 900 }),
-  policy: POLICY,
+  contacts: [contact()], buildAndSolve: singleBuilder({ loadX: 900 }), policy: POLICY,
 });
 assert.equal(selected(slip).state, 'SLIP');
 assert.ok(Math.abs(selected(slip).tangentialMagnitude - 300) < 1e-6);
 assert.ok(selected(slip).oppositionCosine <= -1 + 1e-10);
 assert.ok(slip.constitutiveResidualInfinityNorm <= POLICY.forceTolerance);
-assert.equal(slip.history[0].nextState[0].state, 'SLIP');
+assertUnique(slip, 3);
 
 const frictionlessRequests = [];
 const frictionless = compileContactFrictionExecution({
@@ -166,22 +170,20 @@ assert.equal(selected(frictionless).state, 'STICK');
 assert.equal(selected(frictionless).tangentialMagnitude, 0);
 assert.ok(frictionlessRequests.every((request) => request.stickSprings.length === 0 && request.slipForces.length === 0));
 assert.equal(frictionless.classification, CONTACT_FRICTION_CLASSIFICATION.PHYSICAL_CONTACT);
+assertUnique(frictionless, 2);
 
 const coupledContacts = [contact('C1', 'N1'), contact('C2', 'N2')];
 const coupled = compileContactFrictionExecution({ contacts: coupledContacts, buildAndSolve: coupledBuilder, policy: POLICY });
 assert.deepEqual(coupled.selectedState.map((row) => row.state), ['SLIP', 'SLIP']);
 assert.ok(Math.abs(selected(coupled, 'C1').tangentialMagnitude - 300) < 1e-6);
 assert.ok(Math.abs(selected(coupled, 'C2').tangentialMagnitude - 240) < 1e-6);
-assert.deepEqual(coupled.history[0].nextState.map((row) => row.state), ['SLIP', 'SLIP']);
+assertUnique(coupled, 9);
 const coupledReordered = compileContactFrictionExecution({ contacts: [...coupledContacts].reverse(), buildAndSolve: coupledBuilder, policy: POLICY });
 assert.equal(coupled.semanticHash, coupledReordered.semanticHash, 'input contact ordering must not change the sealed result');
 
 expectCode(() => compileContactFrictionExecution({
-  contacts: [contact()],
-  buildAndSolve: singleBuilder({ loadX: 600 }),
-  policy: POLICY,
+  contacts: [contact()], buildAndSolve: singleBuilder({ loadX: 600 }), policy: POLICY,
 }), 'CONTACT_FRICTION_NON_UNIQUE_STATE');
-
 expectCode(() => compileContactFrictionExecution({
   contacts: [contact()],
   buildAndSolve: (request) => {
@@ -190,38 +192,36 @@ expectCode(() => compileContactFrictionExecution({
   },
   policy: POLICY,
 }), 'CONTACT_FRICTION_CYCLE');
-
 expectCode(() => compileContactFrictionExecution({
-  contacts: [contact()],
-  classification: CONTACT_FRICTION_CLASSIFICATION.PHYSICAL_CONTACT,
-  buildAndSolve: singleBuilder(),
-  policy: POLICY,
+  contacts: [contact()], classification: CONTACT_FRICTION_CLASSIFICATION.PHYSICAL_CONTACT,
+  buildAndSolve: singleBuilder(), policy: POLICY,
 }), 'CONTACT_FRICTION_CLASSIFICATION_MISMATCH');
 
-const derived = Object.freeze({
-  classification: CONTACT_FRICTION_CLASSIFICATION.DERIVED,
-  rule: 'L21=L20-L19',
-  operating: Object.freeze([10, -4, 7]),
-  sustained: Object.freeze([3, -1, 2]),
-});
-const expansion = derived.operating.map((value, index) => value - derived.sustained[index]);
+const fiveContacts = Array.from({ length: 5 }, (_, index) => contact(`C${index + 1}`, `N${index + 1}`));
+expectCode(() => compileContactFrictionExecution({
+  contacts: fiveContacts,
+  buildAndSolve: (request) => executionRecord({
+    tag: request.state,
+    reactions: request.activeContacts.map((row) => ({ nodeId: row.nodeId, dof: 'UY', value: 1000 })),
+    displacement: fiveContacts.flatMap((row) => [
+      { nodeId: row.nodeId, dof: 'UX', value: 0 },
+      { nodeId: row.nodeId, dof: 'UY', value: stateOf(request, row.declarationId) === 'OPEN' ? -0.01 : 0 },
+      { nodeId: row.nodeId, dof: 'UZ', value: 0 },
+    ]),
+  }),
+  policy: POLICY,
+}), 'CONTACT_FRICTION_UNIQUENESS_PROOF_LIMIT_EXCEEDED');
+
+const expansion = [10, -4, 7].map((value, index) => value - [3, -1, 2][index]);
 assert.deepEqual(expansion, [7, -3, 5]);
-assert.equal(derived.classification, 'LINEAR_DERIVED_FROM_NONLINEAR_BASES');
 
 console.log(JSON.stringify({
-  schema: 'm041-contact-friction-qualification/v1',
-  status: 'PASS',
+  schema: 'm041-contact-friction-qualification/v2', status: 'PASS',
+  uniqueProof: { singleStateCandidates: 3, frictionlessCandidates: 2, coupledCandidates: 9, boundedLimit: 81 },
   fixtures: {
-    open: selected(open),
-    penetration: selected(penetration),
-    liftOff: selected(liftOff),
-    stick: selected(stick),
-    slip: selected(slip),
-    frictionless: selected(frictionless),
-    coupled: coupled.selectedState,
-    permutationInvariantHash: coupled.semanticHash,
-    nonUniqueState: 'FAIL_CLOSED_PASS',
-    cycle: 'FAIL_CLOSED_PASS',
-    derivedExpansion: expansion,
+    open: selected(open), penetration: selected(penetration), liftOff: selected(liftOff),
+    stick: selected(stick), slip: selected(slip), frictionless: selected(frictionless), coupled: coupled.selectedState,
+    permutationInvariantHash: coupled.semanticHash, nonUniqueState: 'FAIL_CLOSED_PASS', cycle: 'FAIL_CLOSED_PASS',
+    oversizedUniquenessProof: 'FAIL_CLOSED_PASS', derivedExpansion: expansion,
   },
 }, null, 2));
