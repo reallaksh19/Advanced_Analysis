@@ -15,10 +15,14 @@ function nodalPrimitives(loadCase) {
   return loadCase.primitives.filter((row) => row.kind === 'NODAL_FORCE_MOMENT');
 }
 
+function primitiveVector(row) {
+  return [row.force.fx, row.force.fy, row.force.fz, row.moment.mx, row.moment.my, row.moment.mz];
+}
+
 function mechanicalRows(loadCase, prefix) {
   return nodalPrimitives(loadCase).map((row) => ({
     sourceNodeId: row.nodeId.replace(prefix, ''),
-    vector: [...row.vector],
+    vector: primitiveVector(row),
   })).sort((left, right) => left.sourceNodeId.localeCompare(right.sourceNodeId));
 }
 
