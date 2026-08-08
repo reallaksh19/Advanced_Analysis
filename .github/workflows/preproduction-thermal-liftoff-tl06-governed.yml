@@ -1,0 +1,87 @@
+name: preproduction-thermal-liftoff-tl06-governed
+
+on:
+  pull_request:
+    branches:
+      - agent/preproduction-thermal-liftoff-tl05-correlation
+    paths:
+      - src/workspace/engineering-loads/preproduction-thermal-liftoff-governed-execution.js
+      - src/workspace/engineering-loads/preproduction-thermal-liftoff-presenter.js
+      - scripts/preproduction-thermal-liftoff-tl06-governed-check.mjs
+      - scripts/preproduction-thermal-liftoff-tl06-governed-guard.mjs
+      - .github/workflows/preproduction-thermal-liftoff-tl06-governed.yml
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-preproduction-thermal-liftoff-tl06-governed:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact requested head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Prove exact head and clean worktree
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          git diff --exit-code
+
+      - name: Enforce five-path TL-06 containment
+        shell: bash
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="$(git rev-parse HEAD)"
+          git diff --name-only "$BASE_SHA" "$HEAD_SHA" > /tmp/tl06-paths.txt
+          while IFS= read -r changed; do
+            case "$changed" in
+              src/workspace/engineering-loads/preproduction-thermal-liftoff-governed-execution.js|src/workspace/engineering-loads/preproduction-thermal-liftoff-presenter.js|scripts/preproduction-thermal-liftoff-tl06-governed-check.mjs|scripts/preproduction-thermal-liftoff-tl06-governed-guard.mjs|.github/workflows/preproduction-thermal-liftoff-tl06-governed.yml) ;;
+              *) echo "Forbidden changed path for TL-06 governed integration: $changed"; exit 1 ;;
+            esac
+          done < /tmp/tl06-paths.txt
+          test "$(wc -l < /tmp/tl06-paths.txt)" -eq 5
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax check TL-06 batch
+        run: |
+          node --check src/workspace/engineering-loads/preproduction-thermal-liftoff-governed-execution.js
+          node --check src/workspace/engineering-loads/preproduction-thermal-liftoff-presenter.js
+          node --check scripts/preproduction-thermal-liftoff-tl06-governed-check.mjs
+          node --check scripts/preproduction-thermal-liftoff-tl06-governed-guard.mjs
+
+      - name: Requalify complete upstream thermal lift-off stack
+        run: |
+          node scripts/preproduction-thermal-liftoff-controlled-source-guard.mjs
+          node scripts/preproduction-thermal-liftoff-controlled-source-check.mjs
+          node scripts/preproduction-thermal-liftoff-controlled-influence-guard.mjs
+          node scripts/preproduction-thermal-liftoff-controlled-influence-check.mjs
+          node scripts/preproduction-thermal-liftoff-active-set-source-guard.mjs
+          node scripts/preproduction-thermal-liftoff-active-set-check.mjs
+          node scripts/preproduction-thermal-liftoff-tl05-correlation-guard.mjs
+          node scripts/preproduction-thermal-liftoff-tl05-correlation-check.mjs
+
+      - name: Enforce TL-06 governed integration boundary
+        run: node scripts/preproduction-thermal-liftoff-tl06-governed-guard.mjs
+
+      - name: Qualify opt-in receipt currentness and stale-safe presentation
+        run: node scripts/preproduction-thermal-liftoff-tl06-governed-check.mjs
+
+      - name: Import graph
+        run: npm run check:imports
+
+      - name: Production build
+        run: npm run build
+
+      - name: Whitespace check
+        run: git diff --check "${{ github.event.pull_request.base.sha }}" "$(git rev-parse HEAD)"
