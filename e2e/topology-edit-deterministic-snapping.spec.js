@@ -206,6 +206,8 @@ async function screenResolvedPortDragContext(page) {
     const topology = controller.session.currentTopology();
     const camera = controller.viewportBackend.activeCamera;
     const canvas = controller.viewportBackend.renderer.domElement;
+    const engineeringRoot = controller.viewportBackend.engineeringRoot;
+    engineeringRoot.updateMatrixWorld(true);
     const rect = canvas.getBoundingClientRect();
     const nodes = topology.nodes
       .filter((node) => node.portKeys?.length)
@@ -225,7 +227,10 @@ async function screenResolvedPortDragContext(page) {
       return null;
     };
     const project = (point) => {
-      const vector = camera.position.clone().set(point.x, point.y, point.z).project(camera);
+      const vector = camera.position.clone()
+        .set(point.x, point.y, point.z)
+        .applyMatrix4(engineeringRoot.matrixWorld)
+        .project(camera);
       return {
         x: ((vector.x + 1) / 2) * rect.width,
         y: ((1 - vector.y) / 2) * rect.height,
@@ -301,6 +306,8 @@ async function dragPoints(page, targetNodeId, mode) {
     const gizmo = runtime.gizmo;
     const camera = controller.viewportBackend.activeCamera;
     const canvas = controller.viewportBackend.renderer.domElement;
+    const engineeringRoot = controller.viewportBackend.engineeringRoot;
+    engineeringRoot.updateMatrixWorld(true);
     if (!target || !viewport || !gizmo || !camera || !canvas) {
       throw new Error('Phase B gizmo drag context is unavailable.');
     }
@@ -328,7 +335,10 @@ async function dragPoints(page, targetNodeId, mode) {
     }
     const rect = canvas.getBoundingClientRect();
     const project = (point) => {
-      const vector = camera.position.clone().set(point.x, point.y, point.z).project(camera);
+      const vector = camera.position.clone()
+        .set(point.x, point.y, point.z)
+        .applyMatrix4(engineeringRoot.matrixWorld)
+        .project(camera);
       return {
         x: rect.left + ((vector.x + 1) / 2) * rect.width,
         y: rect.top + ((1 - vector.y) / 2) * rect.height,
@@ -339,17 +349,10 @@ async function dragPoints(page, targetNodeId, mode) {
       point.x >= rect.left && point.x <= rect.right
       && point.y >= rect.top && point.y <= rect.bottom
     );
-    const isDesiredHandle = (point) => {
-      if (!inCanvas(point) || document.elementFromPoint(point.x, point.y) !== canvas) return false;
-      const event = { clientX: point.x, clientY: point.y };
-      if (viewport.pickHandleMode(event) !== dragMode) return false;
-      const canonicalHit = viewport.canonicalSelectionAt(event);
-      const objectId = String(canonicalHit?.objectId || '');
-      const objectKind = String(canonicalHit?.objectKind || '').toLowerCase();
-      return !objectId
-        || !['node', 'component'].includes(objectKind)
-        || objectId === gizmo.nodeId;
-    };
+    const isDesiredHandle = (point) => (
+      inCanvas(point)
+      && viewport.pickHandleMode({ clientX: point.x, clientY: point.y }) === dragMode
+    );
     let start = null;
     const offsets = [];
     for (let dy = -48; dy <= 48; dy += 2) {
@@ -381,7 +384,7 @@ async function dragPoints(page, targetNodeId, mode) {
       start = best ? { x: best.x, y: best.y } : null;
     }
     if (!start) {
-      throw new Error(`No unobscured rendered ${dragMode} gizmo hit point was found.`);
+      throw new Error(`No rendered ${dragMode} gizmo hit point was found.`);
     }
     const targetScreen = project(target.position);
     const directionScreen = project({
@@ -435,11 +438,11 @@ async function snapStatistics(host) {
 
 function isCriticalConsoleError(message) {
   return [
-    /ReferenceError/iu,
-    /Cannot access .* before initialization/iu,
-    /does not provide an export named/iu,
-    /Failed to fetch dynamically imported module/iu,
-    /circular import/iu,
-    /WebGL context lost/iu,
+    /ReferenceError/i,
+    /Cannot access .* before initialization/i,
+    /does not provide an export named/i,
+    /Failed to fetch dynamically imported module/i,
+    /circular import/i,
+    /WebGL context lost/i,
   ].some((pattern) => pattern.test(message));
 }
