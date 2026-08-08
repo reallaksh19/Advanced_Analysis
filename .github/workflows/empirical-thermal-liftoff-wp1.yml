@@ -1,0 +1,52 @@
+name: empirical-thermal-liftoff-wp1
+
+on:
+  pull_request:
+    paths:
+      - 'docs/empirical-thermal-liftoff-plan.md'
+      - 'src/workspace/engineering-loads/empirical-thermal-liftoff-*.js'
+      - 'src/workspace/engineering-loads/authorized-empirical-thermal-liftoff-screen.js'
+      - 'src/workspace/engineering-loads/empirical-formula-register.js'
+      - 'tests/empirical-thermal-liftoff-authority.test.mjs'
+      - 'tests/empirical-thermal-liftoff-local-screen.test.mjs'
+      - '.github/workflows/empirical-thermal-liftoff-wp1.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualification:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Prove exact-head execution
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          git diff --exit-code
+
+      - name: Check TL-00 through TL-03 syntax
+        run: |
+          node --check src/workspace/engineering-loads/empirical-thermal-liftoff-authority.js
+          node --check src/workspace/engineering-loads/empirical-thermal-liftoff-displacement-intake.js
+          node --check src/workspace/engineering-loads/empirical-thermal-liftoff-stiffness-registry.js
+          node --check src/workspace/engineering-loads/empirical-thermal-liftoff-local-screen.js
+          node --check src/workspace/engineering-loads/authorized-empirical-thermal-liftoff-screen.js
+          node --check src/workspace/engineering-loads/empirical-thermal-liftoff-formula-register.js
+
+      - name: Run TL-00 through TL-03 qualification tests
+        run: |
+          node --test tests/empirical-thermal-liftoff-authority.test.mjs tests/empirical-thermal-liftoff-local-screen.test.mjs
+
+      - name: Check whitespace
+        run: git diff --check origin/${{ github.event.pull_request.base.ref }}...HEAD
