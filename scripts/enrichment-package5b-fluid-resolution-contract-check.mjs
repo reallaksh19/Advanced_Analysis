@@ -129,8 +129,10 @@ assert.equal(density.status, 'RESOLVED_EXACT');
 assert.equal(density.value, 1000);
 assert.equal(density.unit, 'kg/m3');
 assert.equal(density.approved, true);
-assert.equal(density.evidence.sourceKind, 'FLUID_REGISTER');
-assert.equal(density.evidence.sourceHash, fluidSnapshot.sourceHash);
+assert.equal(density.sourceKind, 'FLUID_REGISTER');
+assert.equal(density.sourceKey, 'fluidRegister');
+assert.equal(density.sourceHash, fluidSnapshot.sourceHash);
+assert.equal(density.locator, 'Fluids!1:densityKgM3');
 
 const changedSnapshot = createEngineeringMasterSnapshot({
   ...withoutSemanticHash(fluidSnapshot),
