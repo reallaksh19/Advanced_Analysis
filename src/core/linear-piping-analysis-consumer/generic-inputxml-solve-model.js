@@ -32,7 +32,12 @@ export function constraintDeclarations(geometry, modelId) {
         const direction = [Math.abs(restraint.xCosine ?? 0), Math.abs(restraint.yCosine ?? 0), Math.abs(restraint.zCosine ?? 0)];
         const axis = direction.indexOf(Math.max(...direction));
         add(node.id, ['UX', 'UY', 'UZ'][axis], 'UNILATERAL-LINEARIZED');
-      } else if (restraint.classification === 'GUIDE') {
+      } else if (restraint.classification === 'GUIDE' || restraint.typeCode === '9') {
+        // Corrected canonical TYPE 9 is CAESAR GUI/GUIDE. Parsed active
+        // restraint records retain the corrected type and direction cosines,
+        // while node-level classification is stored on node.restraint rather
+        // than repeated on each record. Honor the canonical type directly so
+        // its declared directional constraint is not silently dropped.
         const direction = [Math.abs(restraint.xCosine ?? 0), Math.abs(restraint.yCosine ?? 0), Math.abs(restraint.zCosine ?? 0)];
         const magnitude = Math.max(...direction);
         const axis = magnitude > 0 ? direction.indexOf(magnitude) : null;
