@@ -1,0 +1,102 @@
+name: M022-B StagedJSON Hot Material Authority
+
+on:
+  push:
+    branches:
+      - agent/m022b-stagedjson-catalog-hot-material
+    paths:
+      - ".github/workflows/m022b-stagedjson-hot-material.yml"
+      - "src/workspace/analysis-authority-overlay/stagedjson-material-section-catalog.js"
+      - "src/workspace/analysis-authority-overlay/stagedjson-material-section-resolution.js"
+      - "src/workspace/analysis-authority-overlay/stagedjson-material-resolution-materializer.js"
+      - "src/workspace/analysis-authority-overlay/stagedjson-hot-authority-composition.js"
+      - "src/workspace/analysis-authority-overlay/index.js"
+      - "scripts/m022b-stagedjson-hot-material-*.mjs"
+  pull_request:
+    paths:
+      - ".github/workflows/m022b-stagedjson-hot-material.yml"
+      - "src/workspace/analysis-authority-overlay/stagedjson-material-section-catalog.js"
+      - "src/workspace/analysis-authority-overlay/stagedjson-material-section-resolution.js"
+      - "src/workspace/analysis-authority-overlay/stagedjson-material-resolution-materializer.js"
+      - "src/workspace/analysis-authority-overlay/stagedjson-hot-authority-composition.js"
+      - "src/workspace/analysis-authority-overlay/index.js"
+      - "scripts/m022b-stagedjson-hot-material-*.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-m022b:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+      STACK_BASE: agent/m022c-governed-sjson-authority-composition
+
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 0
+
+      - name: Prove exact-head execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git diff --exit-code
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run M022-B real-branch hot material authority
+        run: |
+          node scripts/m022b-stagedjson-hot-material-check.mjs
+          node scripts/m022b-stagedjson-hot-material-source-guard.mjs
+
+      - name: Re-run parent M022-C composition gate
+        run: npm run check:m022c
+
+      - name: Re-run M022-A contracts and inventory
+        run: npm run check:m022a
+
+      - name: Preserve M008-C historical acceptance oracle
+        run: npm run check:w11.4
+
+      - name: Syntax check Batch-B JavaScript
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in \
+            src/workspace/analysis-authority-overlay/stagedjson-material-section-catalog.js \
+            src/workspace/analysis-authority-overlay/stagedjson-material-section-resolution.js \
+            src/workspace/analysis-authority-overlay/stagedjson-material-resolution-materializer.js \
+            src/workspace/analysis-authority-overlay/stagedjson-hot-authority-composition.js \
+            scripts/m022b-stagedjson-hot-material-check.mjs \
+            scripts/m022b-stagedjson-hot-material-source-guard.mjs; do
+            node --check "$file"
+          done
+
+      - name: Enforce stacked Batch-B custody
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "$STACK_BASE"
+          base_sha="$(git merge-base "origin/$STACK_BASE" HEAD)"
+          changed="$(git diff --name-only "$base_sha"...HEAD)"
+          printf '%s\n' "$changed"
+          unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(\.github/workflows/m022b-stagedjson-hot-material\.yml|scripts/m022b-stagedjson-hot-material-(check|source-guard)\.mjs|src/workspace/analysis-authority-overlay/(index|stagedjson-material-section-catalog|stagedjson-material-section-resolution|stagedjson-material-resolution-materializer|stagedjson-hot-authority-composition)\.js)$' || true)"
+          test -z "$unexpected"
+          test -z "$(git diff "$base_sha"...HEAD -- src/core src/workspace/lfea-shell-v2 || true)"
+          test -z "$(git diff "$base_sha"...HEAD -- src/workspace/analysis-authority-overlay/material-section-resolution.js || true)"
+
+      - name: Whitespace check
+        run: git diff --check
