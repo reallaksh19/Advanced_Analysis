@@ -1,5 +1,12 @@
 import * as THREE from 'three';
 import {
+  ENGINEERING_TO_RENDER_MATRIX4_ELEMENTS,
+  engineeringPointToRender,
+  engineeringVectorToRender,
+  renderDirectionToEngineering,
+  renderPointToEngineering,
+} from '../topology-edit/topology-edit-coordinate-transform.js';
+import {
   clearTopologyEditGizmoGroup,
   renderTopologyEditGizmoGroup,
 } from './topology-edit-gizmo-three-renderer.js';
@@ -101,11 +108,7 @@ export class TopologyEditInteractionViewportAdapter {
     if (!mode) return;
     markHandled(event);
     this.canvas?.focus({ preventScroll: true });
-    const anchor = new THREE.Vector3(
-      this.gizmoModel.anchorPosition.x,
-      this.gizmoModel.anchorPosition.y,
-      this.gizmoModel.anchorPosition.z,
-    );
+    const anchor = renderPointVector(this.gizmoModel.anchorPosition);
     this.activeDrag = {
       pointerId: event.pointerId,
       mode,
@@ -190,15 +193,19 @@ export class TopologyEditInteractionViewportAdapter {
     const context = pointerContext(this.canvas, event, this.pointer);
     if (!context) return null;
     this.raycaster.setFromCamera(context, this.backend.activeCamera);
-    const point = this.raycaster.ray.intersectPlane(
+    const hit = this.raycaster.ray.intersectPlane(
       active.plane,
       new THREE.Vector3(),
     );
-    if (!point) return null;
-    const axis = axisForMode(active.mode);
-    if (!axis) return point;
-    const distance = point.clone().sub(active.anchor).dot(axis);
-    return active.anchor.clone().addScaledVector(axis, distance);
+    if (!hit) return null;
+    const axis = renderAxisForMode(active.mode);
+    const renderTarget = axis
+      ? active.anchor.clone().addScaledVector(
+        axis,
+        hit.clone().sub(active.anchor).dot(axis),
+      )
+      : hit;
+    return engineeringPointVector(renderTarget);
   }
 }
 
@@ -219,14 +226,19 @@ export function topologyEditCameraSnapshot(backend, canvas) {
     throw new TypeError('Camera snapshot requires a live topology-edit camera and canvas.');
   }
   camera.updateMatrixWorld?.(true);
-  const position = camera.getWorldPosition(new THREE.Vector3());
-  const forward = camera.getWorldDirection(new THREE.Vector3()).normalize();
+  const renderPosition = camera.getWorldPosition(new THREE.Vector3());
+  const renderForward = camera.getWorldDirection(new THREE.Vector3()).normalize();
+  const position = renderPointToEngineering(pointRecord(renderPosition));
+  const forward = renderDirectionToEngineering(pointRecord(renderForward));
+  const engineeringToRender = new THREE.Matrix4()
+    .fromArray(ENGINEERING_TO_RENDER_MATRIX4_ELEMENTS);
   const viewProjectionMatrix = new THREE.Matrix4()
-    .multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    .multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
+    .multiply(engineeringToRender);
   const base = {
     projectionType: camera.isOrthographicCamera ? 'ORTHOGRAPHIC' : 'PERSPECTIVE',
-    position: freezePoint(position),
-    forward: freezePoint(forward),
+    position: Object.freeze(position),
+    forward: Object.freeze(forward),
     viewportWidthPx: positiveDimension(canvas.clientWidth || canvas.width),
     viewportHeightPx: positiveDimension(canvas.clientHeight || canvas.height),
     devicePixelRatio: Number(backend.renderer?.getPixelRatio?.() ?? globalThis.devicePixelRatio ?? 1),
@@ -245,36 +257,53 @@ export function topologyEditCameraSnapshot(backend, canvas) {
 }
 
 function dragPlane(mode, anchor, camera) {
-  const planeNormal = planeNormalForMode(mode);
+  const planeNormal = renderPlaneNormalForMode(mode);
   if (planeNormal) {
     return new THREE.Plane().setFromNormalAndCoplanarPoint(
       planeNormal,
       anchor,
     );
   }
-  const axis = axisForMode(mode);
+  const axis = renderAxisForMode(mode);
   const cameraDirection = camera.getWorldDirection(new THREE.Vector3());
   let side = cameraDirection.clone().cross(axis);
   if (side.lengthSq() < 1e-10) {
-    side = Math.abs(axis.y) < 0.9
-      ? AXES.Y.clone().cross(axis)
-      : AXES.X.clone().cross(axis);
+    const fallback = Math.abs(axis.y) < 0.9
+      ? renderEngineeringVector(AXES.Y)
+      : renderEngineeringVector(AXES.X);
+    side = fallback.cross(axis);
   }
   const normal = axis.clone().cross(side).normalize();
   return new THREE.Plane().setFromNormalAndCoplanarPoint(normal, anchor);
 }
 
-function planeNormalForMode(mode) {
-  if (mode === 'PLANE_XY') return AXES.Z;
-  if (mode === 'PLANE_YZ') return AXES.X;
-  if (mode === 'PLANE_XZ') return AXES.Y;
+function renderPlaneNormalForMode(mode) {
+  if (mode === 'PLANE_XY') return renderEngineeringVector(AXES.Z);
+  if (mode === 'PLANE_YZ') return renderEngineeringVector(AXES.X);
+  if (mode === 'PLANE_XZ') return renderEngineeringVector(AXES.Y);
   return null;
 }
 
-function axisForMode(mode) {
-  return mode?.startsWith('AXIS_')
+function renderAxisForMode(mode) {
+  const axis = mode?.startsWith('AXIS_')
     ? AXES[mode.slice(-1)] ?? null
     : null;
+  return axis ? renderEngineeringVector(axis) : null;
+}
+
+function renderEngineeringVector(vector) {
+  const mapped = engineeringVectorToRender(pointRecord(vector));
+  return new THREE.Vector3(mapped.x, mapped.y, mapped.z);
+}
+
+function renderPointVector(point) {
+  const mapped = engineeringPointToRender(point);
+  return new THREE.Vector3(mapped.x, mapped.y, mapped.z);
+}
+
+function engineeringPointVector(point) {
+  const mapped = renderPointToEngineering(pointRecord(point));
+  return new THREE.Vector3(mapped.x, mapped.y, mapped.z);
 }
 
 function pointerContext(canvas, event, target) {
@@ -309,10 +338,6 @@ function interactionMode(object) {
 
 function pointRecord(point) {
   return { x: point.x, y: point.y, z: point.z };
-}
-
-function freezePoint(point) {
-  return Object.freeze({ x: point.x, y: point.y, z: point.z });
 }
 
 function positiveDimension(value) {
