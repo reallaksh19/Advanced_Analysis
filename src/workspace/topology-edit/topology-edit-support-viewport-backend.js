@@ -1,14 +1,14 @@
 /** M003 support/restraint glyph materialization layered on the M002 typed viewport. */
 import * as THREE from 'three';
 import { materializeTopologyEditSupportOverlay } from './topology-edit-support-glyph-geometry.js';
-import { TopologyEditTypedViewportBackend } from './topology-edit-typed-viewport-backend.js';
+import { TopologyEditReachableTypedViewportBackend } from './topology-edit-reachable-typed-viewport-backend.js';
 
 export const TOPOLOGY_EDIT_SUPPORT_RENDER_STYLES = Object.freeze({
   RICH_ENGINEERING_GLYPH: 'RICH_ENGINEERING_GLYPH',
   TOPO_VALIDATOR_COMPACT: 'TOPO_VALIDATOR_COMPACT',
 });
 
-export class TopologyEditSupportViewportBackend extends TopologyEditTypedViewportBackend {
+export class TopologyEditSupportViewportBackend extends TopologyEditReachableTypedViewportBackend {
   renderSession(model) {
     const supports = model?.supports;
     if (
