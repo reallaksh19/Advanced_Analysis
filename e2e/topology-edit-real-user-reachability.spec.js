@@ -132,9 +132,11 @@ test('XYZ Branch exposes truthful catalogue, endpoint and Table capability paths
   await expect(page.locator(
     '[data-table-capability-reason="TABLE_INTENT_NOT_CERTIFIED"]',
   ).first()).toBeVisible();
-  await selectTableRow(page, host, 'S-006');
-  await expect(page.locator('[data-table-capability-reason="SUPPORT_EDIT_NOT_CERTIFIED"]'))
-    .toBeVisible();
+  const tableFilter = page.locator('[data-table-filter]');
+  await tableFilter.fill('S-006');
+  await expect(page.locator('[data-role="topology-edit-table"] tbody tr').filter({ hasText: 'S-006' }))
+    .toHaveCount(0);
+  await expect(page.locator('[data-table-edit-support]')).toHaveCount(0);
 
   await selectTableRow(page, host, 'P-012');
   const length = page.locator('[data-table-edit-length]');
