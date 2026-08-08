@@ -6,8 +6,9 @@ export function deriveTopologyEditEndpointAffordances(projection, options = {}) 
   const modelRole = normalizeModelRole(options.modelRole ?? projection?.modelRole ?? 'draft');
   const stale = options.stale === true;
   const hiddenIds = new Set((options.hiddenCanonicalIds ?? []).map(String));
-  const presentationBindings = primitiveEndpointBindings(projection?.primitives ?? []);
-  const rows = (projection?.elements ?? [])
+  const elements = projectionElements(projection);
+  const presentationBindings = primitiveEndpointBindings(projectionPrimitives(projection));
+  const rows = elements
     .filter((element) => element?.type === 'node' && finitePoint(element))
     .map((element) => createAffordance(
       element,
@@ -32,6 +33,27 @@ export function assertTopologyEditEndpointAffordance(value) {
     throw new RangeError('TopologyEditEndpointAffordance: hash mismatch.');
   }
   return value;
+}
+
+function projectionElements(projection) {
+  if (Array.isArray(projection?.elements) && projection.elements.length) {
+    return projection.elements;
+  }
+  if (Array.isArray(projection?.compactElements)) return projection.compactElements;
+  if (Array.isArray(projection?.typedEvidenceProjection?.elements)) {
+    return projection.typedEvidenceProjection.elements;
+  }
+  return [];
+}
+
+function projectionPrimitives(projection) {
+  if (Array.isArray(projection?.primitives) && projection.primitives.length) {
+    return projection.primitives;
+  }
+  if (Array.isArray(projection?.typedEvidenceProjection?.primitives)) {
+    return projection.typedEvidenceProjection.primitives;
+  }
+  return [];
 }
 
 function createAffordance(element, modelRole, stale, hiddenIds, presentationBindings) {
