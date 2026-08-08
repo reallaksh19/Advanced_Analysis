@@ -212,6 +212,7 @@ async function screenResolvedPortDragContext(page) {
     const nodes = topology.nodes
       .filter((node) => node.portKeys?.length)
       .sort((left, right) => left.id.localeCompare(right.id));
+    const nodeById = new Map(topology.nodes.map((node) => [node.id, node]));
     const epsilon = 1e-7;
     const modeFor = (left, right) => {
       const dx = right.x - left.x;
@@ -225,6 +226,37 @@ async function screenResolvedPortDragContext(page) {
       if (Math.abs(dx) <= epsilon) return 'PLANE_YZ';
       if (Math.abs(dy) <= epsilon) return 'PLANE_XZ';
       return null;
+    };
+    const ridesTargetCenterline = (moving, anchor) => {
+      const approach = {
+        x: anchor.position.x - moving.position.x,
+        y: anchor.position.y - moving.position.y,
+        z: anchor.position.z - moving.position.z,
+      };
+      const approachLength = Math.hypot(approach.x, approach.y, approach.z);
+      return topology.edges.some((edge) => {
+        const otherId = edge.fromNodeId === anchor.id
+          ? edge.toNodeId
+          : edge.toNodeId === anchor.id
+            ? edge.fromNodeId
+            : null;
+        const other = otherId ? nodeById.get(otherId) : null;
+        if (!other) return false;
+        const tangent = {
+          x: other.position.x - anchor.position.x,
+          y: other.position.y - anchor.position.y,
+          z: other.position.z - anchor.position.z,
+        };
+        const tangentLength = Math.hypot(tangent.x, tangent.y, tangent.z);
+        if (!(approachLength > epsilon) || !(tangentLength > epsilon)) return false;
+        const cross = {
+          x: approach.y * tangent.z - approach.z * tangent.y,
+          y: approach.z * tangent.x - approach.x * tangent.z,
+          z: approach.x * tangent.y - approach.y * tangent.x,
+        };
+        return Math.hypot(cross.x, cross.y, cross.z)
+          <= epsilon * approachLength * tangentLength;
+      });
     };
     const project = (point) => {
       const vector = camera.position.clone()
@@ -245,7 +277,7 @@ async function screenResolvedPortDragContext(page) {
       for (const anchor of nodes) {
         if (moving.id === anchor.id) continue;
         const mode = modeFor(moving.position, anchor.position);
-        if (!mode) continue;
+        if (!mode || ridesTargetCenterline(moving, anchor)) continue;
         const movingScreen = project(moving.position);
         const anchorScreen = project(anchor.position);
         const screenDistancePx = Math.hypot(
