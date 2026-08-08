@@ -153,13 +153,13 @@ export class TopologyEditSelectionCoordinator {
       dataset: state.dataset,
     });
     this.eventBus.publish(TOPOLOGY_EDIT_SELECTION_EVENTS.CHANGED, payload);
+    this.onSelectionChanged?.(payload);
     if (primaryWorkspaceEntityId) {
       this.eventBus.publish(EVENT_TOPICS.VIEWPORT_SELECTION_REQUESTED, {
         entityId: primaryWorkspaceEntityId,
         source: 'topology-edit-3d',
       });
     }
-    this.onSelectionChanged?.(payload);
     return payload;
   }
 }
