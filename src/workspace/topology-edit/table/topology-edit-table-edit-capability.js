@@ -10,6 +10,12 @@ const CERTIFIED_EDITOR_TO_INTENT = Object.freeze({
 const SUPPORT_MUTATION_KEYS = new Set([
   'stationMm', 'supportType', 'direction', 'gapMm', 'travelMm',
 ]);
+const UNCERTIFIED_PROPERTIES = Object.freeze({
+  PIPE: new Set(['slopePercent']),
+  ELBOW: new Set(['angleDeg', 'radiusMm', 'turnIntent']),
+  FLANGE: new Set(['flangeType', 'flangeFacing', 'rating']),
+  REDUCER: new Set(['reducerType', 'reducerOrientation']),
+});
 
 export function deriveTopologyEditTableCellCapability(input = {}) {
   const row = input.row;
@@ -24,9 +30,6 @@ export function deriveTopologyEditTableCellCapability(input = {}) {
   }
   const descriptor = topologyEditTableColumnsFor(row.elementType)
     .find((column) => column.key === columnKey);
-  if (descriptor?.readOnly) {
-    return receipt('BLOCKED', 'READ_ONLY_PROPERTY', 'This property is explicitly read-only.', row, columnKey, context);
-  }
   if (row.elementType === 'SUPPORT' && SUPPORT_MUTATION_KEYS.has(columnKey)) {
     return receipt(
       'UNREPRESENTABLE',
@@ -36,6 +39,19 @@ export function deriveTopologyEditTableCellCapability(input = {}) {
       columnKey,
       context,
     );
+  }
+  if (UNCERTIFIED_PROPERTIES[row.elementType]?.has(columnKey)) {
+    return receipt(
+      'UNREPRESENTABLE',
+      'TABLE_INTENT_NOT_CERTIFIED',
+      `${descriptor?.label || columnKey} is visible but not yet backed by a certified Table intent.`,
+      row,
+      columnKey,
+      context,
+    );
+  }
+  if (descriptor?.readOnly) {
+    return receipt('BLOCKED', 'READ_ONLY_PROPERTY', 'This property is explicitly read-only.', row, columnKey, context);
   }
   if (!descriptor?.editor) {
     return receipt('BLOCKED', 'READ_ONLY_PROPERTY', 'No certified editor is declared for this property.', row, columnKey, context);
