@@ -1,0 +1,57 @@
+name: M046 BM4 20340 Boundary Authority
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/lfea-m046-bm4-20340-boundary-authority.mjs'
+      - '.github/workflows/m046-bm4-20340-boundary-authority.yml'
+  workflow_dispatch:
+
+jobs:
+  boundary-authority:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enforce evidence-only M046 diff
+        run: |
+          git fetch --no-tags --depth=1 origin a0e344942042c821bdc9ad2d574d11bc249c8949
+          git diff --name-only a0e344942042c821bdc9ad2d574d11bc249c8949 HEAD | sort > /tmp/m046-paths
+          printf '%s\n' \
+            .github/workflows/m046-bm4-20340-boundary-authority.yml \
+            scripts/lfea-m046-bm4-20340-boundary-authority.mjs | sort > /tmp/m046-allowed
+          diff -u /tmp/m046-allowed /tmp/m046-paths
+      - name: Syntax-check M046
+        run: node --check scripts/lfea-m046-bm4-20340-boundary-authority.mjs
+      - name: Run M046 20340 authority RCA
+        run: node scripts/lfea-m046-bm4-20340-boundary-authority.mjs --report /tmp/m046/lfea-m046-bm4-20340-boundary-authority.json
+      - name: Preserve M045/M044/M042 Level-1 boundaries
+        run: |
+          node scripts/lfea-m045-bm4-axial-discrepancy-transport.mjs
+          node scripts/lfea-m044-bm4-axial-end-force-equilibrium.mjs
+          node scripts/lfea-m042-bm4-first-divergence-rca.mjs
+      - name: Preserve M041/M040 friction fail-closed boundary
+        run: |
+          node scripts/lfea-m041-contact-friction-check.mjs
+          node scripts/lfea-m041-linear-kernel-bridge-check.mjs
+          node scripts/lfea-m041-bm4-activation-gate.mjs
+          node scripts/lfea-m040-bm4-friction-check.mjs
+      - name: Enforce bounded M046 script
+        run: |
+          lines=$(wc -l < scripts/lfea-m046-bm4-20340-boundary-authority.mjs)
+          test "$lines" -le 320 || { echo "M046 has $lines lines (>320)"; exit 1; }
+      - name: Upload deterministic M046 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m046-bm4-20340-boundary-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /tmp/m046/lfea-m046-bm4-20340-boundary-authority.json
+          if-no-files-found: error
+      - name: Verify clean worktree
+        run: git diff --exit-code && git status --porcelain | tee /tmp/m046-status && test ! -s /tmp/m046-status
