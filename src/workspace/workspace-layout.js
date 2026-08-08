@@ -27,6 +27,7 @@ function applicationMarkup() {
     <div data-application-view="LOAD_CALC" hidden aria-hidden="true"></div>
     <div class="application-view application-view--lafea" data-application-view="LAFEA" hidden aria-hidden="true"><div data-role="lafea-consumer-root"></div></div>
     <div class="application-view application-view--lfea" data-application-view="LFEA" hidden aria-hidden="true"><div data-role="lfea-consumer-root"></div></div>
+    ${nativeModelDialogMarkup()}
   </div>`;
 }
 
@@ -35,7 +36,7 @@ function workspaceMarkup() {
     <aside class="workspace-panel tree-panel" data-panel="tree">
       <header class="panel-header"><div><span class="panel-eyebrow">Workspace</span><h1>Dataset Tree</h1></div><button type="button" data-action="toggle-tree-collapse">Collapse</button></header>
       <section class="dataset-toolbar">
-        <div class="dataset-toolbar__actions"><button type="button" data-action="import-dataset">Import SJSON/JSON</button><button type="button" data-action="clear-dataset" disabled>Clear</button></div>
+        <div class="dataset-toolbar__actions"><button type="button" data-action="open-native-model">New model</button><button type="button" data-action="import-dataset">Import SJSON/JSON</button><button type="button" data-action="clear-dataset" disabled>Clear</button></div>
         <input data-role="dataset-file" type="file" accept=".json,application/json" hidden>
         <input data-role="tree-search" type="search" placeholder="Search source IDs, tags, branches">
         <output data-role="tree-status">No dataset loaded</output><p data-role="tree-error" class="dataset-error" hidden></p>
@@ -70,6 +71,26 @@ function workspaceMarkup() {
       </div>
     </aside>
   </main>`;
+}
+
+/** Provides the explicit authority fields required before empty-model authoring. */
+function nativeModelDialogMarkup() {
+  return `<dialog data-role="native-model-dialog" aria-labelledby="native-model-title">
+    <form data-role="native-model-form">
+      <header><div><span>3D authoring</span><h2 id="native-model-title">Create governed model</h2></div><button type="button" data-action="cancel-native-model" aria-label="Close new model dialog">Close</button></header>
+      <p>Create an empty canonical model, then enter the first governed pipe from exact XYZ coordinates.</p>
+      <div class="native-model-form__grid">
+        <label>Model key<input name="modelKey" required maxlength="80" value="MODEL-001" autocomplete="off"></label>
+        <label>Document ID<input name="documentId" required maxlength="120" value="NATIVE-3D-MODEL-001" autocomplete="off"></label>
+        <label>Revision<input name="revision" required maxlength="40" value="0" autocomplete="off"></label>
+        <label>Length unit<input value="mm" readonly aria-readonly="true"></label>
+        <label>Angle unit<input value="deg" readonly aria-readonly="true"></label>
+        <label>Coordinate frame<input value="Right-handed model XYZ" readonly aria-readonly="true"></label>
+      </div>
+      <p data-role="native-model-error" class="dataset-error" role="alert" hidden></p>
+      <footer><button type="button" data-action="cancel-native-model">Cancel</button><button type="button" data-action="create-native-model">Create and open 3D Edit</button></footer>
+    </form>
+  </dialog>`;
 }
 
 function viewportToolbar() {
@@ -108,7 +129,11 @@ function empiricalStyles() {
     .viewport-panel--load-calc-owned>.viewport-toolbar,
     .viewport-panel--load-calc-owned>.viewport-edit-bar,
     .viewport-panel--load-calc-owned>.viewport-table-dock,
-    .viewport-panel--load-calc-owned>.viewport-footer{display:none!important;pointer-events:none!important}
+    .viewport-panel--load-calc-owned>.viewport-footer,
+    .viewport-panel--topology-edit-owned>.viewport-toolbar,
+    .viewport-panel--topology-edit-owned>.viewport-edit-bar,
+    .viewport-panel--topology-edit-owned>.viewport-table-dock,
+    .viewport-panel--topology-edit-owned>.viewport-footer{display:none!important;pointer-events:none!important}
     .viewport-panel--load-calc-owned>.shared-viewport-stack{flex:1 1 100%;min-height:0}
     .viewport-panel--load-calc-owned .load-calc-dock{position:relative;z-index:30;flex:1 1 100%;min-height:0;border-top:0;pointer-events:auto}
     .viewport-panel--load-calc-owned .viewport-stage{pointer-events:none!important}
@@ -131,5 +156,16 @@ function empiricalStyles() {
     .topology-edit-render-host[hidden]{display:none}
     .load-calc-dock--compact{flex:0 0 auto!important;min-height:0!important}
     .load-calc-dock--compact .empirical-load-calc__pane{display:none}
+    [data-role="native-model-dialog"]{width:min(680px,calc(100vw - 32px));padding:0;border:1px solid #315070;border-radius:10px;background:#081321;color:#e2e8f0;box-shadow:0 24px 80px #020617cc}
+    [data-role="native-model-dialog"]::backdrop{background:#020617cc;backdrop-filter:blur(3px)}
+    [data-role="native-model-form"]{display:grid;gap:16px;padding:18px}
+    [data-role="native-model-form"] header,[data-role="native-model-form"] footer{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    [data-role="native-model-form"] h2,[data-role="native-model-form"] p{margin:0}
+    [data-role="native-model-form"] header span{color:#7dd3fc;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+    .native-model-form__grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .native-model-form__grid label{display:grid;gap:5px;color:#b8c7d9;font-size:12px}
+    .native-model-form__grid input{min-width:0;padding:8px;border:1px solid #315070;border-radius:5px;background:#050c16;color:#f8fafc}
+    .native-model-form__grid input[readonly]{color:#94a3b8;background:#0b1726}
+    @media(max-width:620px){.native-model-form__grid{grid-template-columns:1fr}}
   `;
 }

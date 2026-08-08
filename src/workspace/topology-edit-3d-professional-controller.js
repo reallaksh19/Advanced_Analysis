@@ -22,6 +22,7 @@ import {
 import {
   TopologyEditSelectionCoordinator,
 } from './topology-edit/editor-state/topology-edit-selection-coordinator.js';
+import { supportRestraintRows } from './topology-edit/support-restraint-family.js';
 
 const PRIMARY_NAVIGATION_SELECTORS = Object.freeze([
   '[data-navigation-mode="select"]',
@@ -428,11 +429,17 @@ function humanize(value) {
 }
 
 function canonicalSelectionIds(canonical) {
+  const restraintIds = (canonical.supports ?? []).flatMap((support) => {
+    return supportRestraintRows(support)
+      .map((row) => row.id ?? row.restraintId)
+      .filter(Boolean);
+  });
   return [
     ...(canonical.nodes ?? []).map((row) => row.id),
     ...(canonical.edges ?? []).map((row) => row.id),
     ...(canonical.junctions ?? []).map((row) => row.id),
     ...(canonical.supports ?? []).map((row) => row.id),
+    ...restraintIds,
     ...(canonical.boundaries ?? []).map((row) => row.id),
     ...(canonical.rigids ?? []).map((row) => row.id),
     ...(canonical.bends ?? []).map((row) => row.id),

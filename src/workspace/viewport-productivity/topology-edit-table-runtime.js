@@ -40,6 +40,11 @@ export class TopologyEditTableRuntime {
     this.redoTransaction = null;
     this.lastExport = null;
     this.pending = false;
+    this.emptyRouteValues = {
+      startX: '0', startY: '0', startZ: '0',
+      endX: '1000', endY: '0', endZ: '0',
+      catalogueRecordId: '',
+    };
     this.message = 'Table is a read-only projection until an explicit edit is staged.';
     this.error = null;
     this.validationClient = new TopologyEditValidationWorkerClient();
@@ -72,6 +77,7 @@ export class TopologyEditTableRuntime {
     try {
       this.projection = buildTopologyEditTableProjection({ canonicalTopology: canonical, dataset, topologyGraph });
       this.error = null;
+      this.message = 'Table is an exact canonical projection. Stage an edit to begin a governed transaction.';
       this.render();
     } catch (error) {
       this.error = errorMessage(error);
@@ -126,6 +132,14 @@ export class TopologyEditTableRuntime {
   }
 
   handleInput(event) {
+    const emptyRouteField = event.target.dataset?.emptyRouteField;
+    if (emptyRouteField) {
+      this.emptyRouteValues = {
+        ...this.emptyRouteValues,
+        [emptyRouteField]: event.target.value,
+      };
+      return;
+    }
     if (!event.target.matches?.('[data-table-filter]')) return;
     const caret = event.target.selectionStart;
     this.viewState = reduceTopologyEditTableViewState(this.viewState, { type: 'QUERY', query: event.target.value });
@@ -156,7 +170,69 @@ export class TopologyEditTableRuntime {
     if (kind === 'discard') return this.discardStaged();
     if (kind === 'export-csv') return this.exportCsv();
     if (kind === 'export-xlsx') return this.exportXlsx();
+    if (kind.startsWith('empty-route-')) return this.runEmptyRouteAction(kind);
     return false;
+  }
+
+  /** Lists the governed pipe records available to an empty canonical model. */
+  emptyRoutePipeOptions() {
+    const records = this.controller.professionalRuntime?.catalogue?.records ?? [];
+    const options = records.filter((record) => record.componentType === 'PIPE');
+    if (!this.emptyRouteValues.catalogueRecordId && options.length) {
+      this.emptyRouteValues = {
+        ...this.emptyRouteValues,
+        catalogueRecordId: options[0].recordId,
+      };
+    }
+    return options;
+  }
+
+  emptyRoutePhase() {
+    return this.controller.authoringRuntime?.startRouteRuntime?.phase ?? 'IDLE';
+  }
+
+  async runEmptyRouteAction(kind) {
+    const authoring = this.controller.authoringRuntime;
+    if (!authoring || this.pending) return true;
+    try {
+      this.pending = true;
+      this.error = null;
+      if (kind === 'empty-route-preview') {
+        authoring.activateStartRoute();
+        this.writeEmptyRouteToAuthoring(authoring);
+        await authoring.previewOperation();
+      } else if (kind === 'empty-route-validate') {
+        await authoring.validateOperation();
+      } else if (kind === 'empty-route-apply') {
+        await authoring.applyOperation();
+      } else if (kind === 'empty-route-cancel') {
+        authoring.clear(true, false);
+      }
+      this.error = authoring.error || null;
+      this.message = authoring.message || 'First-pipe authoring state updated.';
+    } catch (error) {
+      this.error = errorMessage(error);
+    } finally {
+      this.pending = false;
+      this.render();
+    }
+    return true;
+  }
+
+  writeEmptyRouteToAuthoring(authoring) {
+    const values = {
+      inputMode: 'TYPED',
+      ...this.emptyRouteValues,
+      axisLock: 'FREE',
+      minimumLengthMm: '6',
+      overlapToleranceMm: '0.001',
+    };
+    for (const [key, value] of Object.entries(values)) {
+      const control = authoring.element?.querySelector(`[data-start-route-field="${key}"]`);
+      if (!control) throw new Error(`First-pipe field ${key} is unavailable.`);
+      control.value = String(value);
+    }
+    authoring.handleFieldChange();
   }
 
   selectRow(rowId, event) {

@@ -38,7 +38,7 @@ test('SJSON uses one governed packet with selectable OD routes, typed equipment,
   );
   await expect(host).toHaveAttribute(
     'data-topology-edit-equipment-geometry-authority',
-    'GOVERNED_TYPED_INLINE_EQUIPMENT_PROFILE_V1',
+    'GOVERNED_TYPED_INLINE_EQUIPMENT_PROFILE_V2',
   );
   await expect(host).toHaveAttribute('data-topology-edit-node-visual-and-pick-geometry-separated', 'true');
   await expect(host).toHaveAttribute('data-topology-edit-visible-node-marker-geometry', 'TRANSLUCENT_SPHERE');

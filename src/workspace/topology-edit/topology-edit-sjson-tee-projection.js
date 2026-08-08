@@ -168,8 +168,12 @@ export function deriveSjsonFidelityVisualGeometry(input = {}) {
         branchFaceLengthMismatchMm: inferredBranch?.faceLengthMismatchMm ?? null,
       },
     });
+    const resolvedDiagnosticCodes = new Set([
+      'TEE_PORT_ROLES_MISSING',
+      'VISUAL_COMPONENT_TYPE_UNSUPPORTED',
+    ]);
     const diagnostics = (oldComponent?.diagnostics || [])
-      .filter((row) => row.code !== 'VISUAL_COMPONENT_TYPE_UNSUPPORTED');
+      .filter((row) => !resolvedDiagnosticCodes.has(row.code));
     diagnostics.push(createVisualDiagnostic({
       code: 'VISUAL_TWO_PORT_TEE_PROMOTED',
       severity: 'WARNING',

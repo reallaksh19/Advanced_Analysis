@@ -96,7 +96,10 @@ export class TopologyEdit3DViewController extends AuthoringController {
 
   handleHostClick(event) {
     const action = event.target.closest('[data-action]')?.dataset.action;
-    if (this.cleanShellRuntime.handleAction(action)) return;
+    if (this.cleanShellRuntime.handleAction(action)) {
+      if (action === 'open-engineering-table') this.tableAdapter?.runtime.render();
+      return;
+    }
     return super.handleHostClick(event);
   }
 

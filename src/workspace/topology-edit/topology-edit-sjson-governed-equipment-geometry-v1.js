@@ -1,7 +1,8 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export const TOPOLOGY_EDIT_SJSON_EQUIPMENT_GEOMETRY_AUTHORITY =
-  'GOVERNED_TYPED_INLINE_EQUIPMENT_PROFILE_V1';
+  'GOVERNED_TYPED_INLINE_EQUIPMENT_PROFILE_V2';
 
 const EQUIPMENT_KINDS = new Set(['FLANGE', 'GASKET', 'VALVE', 'INSTRUMENT']);
 
@@ -47,14 +48,7 @@ export function createGovernedSjsonEquipmentGeometry({
   }
 
   if (type === 'VALVE') {
-    return new THREE.LatheGeometry([
-      new THREE.Vector2(radius * 0.7, -length * 0.5),
-      new THREE.Vector2(radius * 0.78, -length * 0.32),
-      new THREE.Vector2(radius * 1.5, -length * 0.08),
-      new THREE.Vector2(radius * 1.5, length * 0.08),
-      new THREE.Vector2(radius * 0.78, length * 0.32),
-      new THREE.Vector2(radius * 0.7, length * 0.5),
-    ], segments);
+    return createValveGeometry(radius, length, segments);
   }
 
   const markerRadius = Math.max(radius * 1.35, length * 0.42);
@@ -64,6 +58,45 @@ export function createGovernedSjsonEquipmentGeometry({
     Math.max(8, Math.floor(segments * 0.75)),
   );
   geometry.scale(1, Math.max(0.8, length / (markerRadius * 2)), 1);
+  return geometry;
+}
+
+/** Builds a recognizable valve silhouette while preserving the governed length and bore envelope. */
+function createValveGeometry(radius, length, segments) {
+  const body = new THREE.LatheGeometry([
+    new THREE.Vector2(radius * 0.7, -length * 0.5),
+    new THREE.Vector2(radius * 0.78, -length * 0.32),
+    new THREE.Vector2(radius * 1.5, -length * 0.08),
+    new THREE.Vector2(radius * 1.5, length * 0.08),
+    new THREE.Vector2(radius * 0.78, length * 0.32),
+    new THREE.Vector2(radius * 0.7, length * 0.5),
+  ], segments);
+  const flangeThickness = Math.min(length * 0.1, radius * 0.24);
+  const endFlanges = [-1, 1].map((polarity) => {
+    const flange = new THREE.CylinderGeometry(
+      radius * 1.12,
+      radius * 1.12,
+      flangeThickness,
+      segments,
+    );
+    flange.translate(0, polarity * (length * 0.5 - flangeThickness * 0.5), 0);
+    return flange;
+  });
+  const bonnetHeight = Math.max(radius * 1.2, length * 0.28);
+  const bonnet = new THREE.CylinderGeometry(radius * 0.34, radius * 0.52, bonnetHeight, segments);
+  bonnet.rotateX(Math.PI / 2);
+  bonnet.translate(0, 0, radius * 1.5 + bonnetHeight * 0.45);
+  const stemLength = radius * 1.15;
+  const stem = new THREE.CylinderGeometry(radius * 0.12, radius * 0.12, stemLength, segments);
+  stem.rotateX(Math.PI / 2);
+  stem.translate(0, 0, radius * 1.5 + bonnetHeight + stemLength * 0.25);
+  const handwheel = new THREE.TorusGeometry(radius * 0.72, radius * 0.1, 8, segments);
+  handwheel.translate(0, 0, radius * 1.5 + bonnetHeight + stemLength * 0.72);
+
+  const parts = [body, ...endFlanges, bonnet, stem, handwheel];
+  const geometry = mergeGeometries(parts, false);
+  parts.forEach((part) => part.dispose());
+  if (!geometry) throw new Error('Governed valve presentation geometry could not be merged.');
   return geometry;
 }
 

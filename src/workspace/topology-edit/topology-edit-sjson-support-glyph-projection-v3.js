@@ -30,10 +30,13 @@ export function projectGovernedSjsonSupportGlyphs({
   for (const overlay of overlays) {
     const origin = finitePoint(overlay.origin);
     if (!origin) continue;
+    const supportFamily = primarySupportFamily(overlay.restraints);
     elements.push(deepFreeze({
       id: overlay.supportId,
       entityId: overlay.supportId,
       type: 'SUPPORT',
+      supportFamily,
+      colorInt: restraintColor(supportFamily),
       x: origin.x,
       y: origin.y,
       z: origin.z,
@@ -92,6 +95,29 @@ export function projectGovernedSjsonSupportGlyphs({
       markerCount: elements.length,
     },
   });
+}
+
+/** Selects one deterministic body symbol while directional glyphs retain every restraint family. */
+function primarySupportFamily(restraints) {
+  const families = new Set(
+    (restraints || []).map((restraint) => stringValue(restraint.family).toUpperCase()).filter(Boolean),
+  );
+  const priority = [
+    'ANCHOR',
+    'SPRING_HANGER',
+    'SPRING_WARNING',
+    'CAN',
+    'GUIDE',
+    'LINE_STOP',
+    'LIMIT',
+    'HOLDOWN',
+    'U_BOLT',
+    'SHOE',
+    'TRUNNION',
+    'HANGER',
+    'REST',
+  ];
+  return priority.find((family) => families.has(family)) || 'REST';
 }
 
 function directionalArrows(restraint, glyphLengthMm, outsideDiameterMm) {

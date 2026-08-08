@@ -3,6 +3,7 @@ import {
   deepFreeze,
   semanticHash,
 } from '../../core/shared-piping-model/index.js';
+import { supportRestraintRows } from './support-restraint-family.js';
 
 export const TOPOLOGY_EDIT_INSPECTION_SCHEMA = 'TopologyEditInspectionModel.v1';
 export const TOPOLOGY_EDIT_MEASUREMENT_SCHEMA = 'TopologyEditMeasurement.v1';
@@ -13,7 +14,7 @@ export function buildTopologyEditInspectionModel({
 } = {}) {
   assertTopology(canonicalTopology);
   const normalized = normalizeSelection(selection);
-  if (!normalized.nodeIds.length && !normalized.edgeId) {
+  if (!normalized.canonicalIds.length) {
     return sealInspection({
       status: 'EMPTY',
       canonicalTopologyHash: topologyHash(canonicalTopology),
@@ -22,6 +23,7 @@ export function buildTopologyEditInspectionModel({
       canonicalIds: [],
       nodes: [],
       edge: null,
+      entities: [],
       measurement: null,
       overlay: emptyOverlay(),
     });
@@ -33,9 +35,8 @@ export function buildTopologyEditInspectionModel({
   const edgesById = new Map(
     canonicalTopology.edges.map((edge) => [edge.id, edge]),
   );
-  const staleIds = selectedIds(normalized).filter((id) => (
-    id.startsWith('node:') ? !nodesById.has(id) : !edgesById.has(id)
-  ));
+  const canonicalIndex = buildCanonicalIndex(canonicalTopology);
+  const staleIds = selectedIds(normalized).filter((id) => !canonicalIndex.has(id));
   if (staleIds.length) {
     return sealInspection({
       status: 'STALE_SELECTION',
@@ -45,6 +46,7 @@ export function buildTopologyEditInspectionModel({
       canonicalIds: [],
       nodes: [],
       edge: null,
+      entities: [],
       measurement: null,
       overlay: emptyOverlay(),
     });
@@ -57,6 +59,9 @@ export function buildTopologyEditInspectionModel({
   const edgeRow = normalized.edgeId
     ? edgeInspection(edgesById.get(normalized.edgeId), nodesById)
     : null;
+  const entityRows = normalized.canonicalIds
+    .filter((id) => !id.startsWith('node:') && !id.startsWith('edge:'))
+    .map((id) => entityInspection(canonicalIndex.get(id)));
   if (edgeRow?.status === 'STALE_ENDPOINT') {
     return sealInspection({
       status: 'STALE_SELECTION',
@@ -66,6 +71,7 @@ export function buildTopologyEditInspectionModel({
       canonicalIds: [],
       nodes: [],
       edge: null,
+      entities: [],
       measurement: null,
       overlay: emptyOverlay(),
     });
@@ -89,6 +95,7 @@ export function buildTopologyEditInspectionModel({
     canonicalIds,
     nodes: nodeRows,
     edge: edgeRow,
+    entities: entityRows,
     measurement,
     overlay: buildOverlay(nodeRows, edgeRow, measurement),
   });
@@ -130,13 +137,75 @@ function edgeInspection(edge, nodesById) {
     fromNodeId: edge.fromNodeId,
     toNodeId: edge.toNodeId,
     componentKey: token(edge.componentKey),
-    componentType: token(edge.componentType ?? edge.type ?? edge.kind),
-    boreMm: finite(edge.boreMm ?? edge.bore),
+    componentType: token(edge.componentType ?? edge.entityType ?? edge.type ?? edge.kind),
+    boreMm: finite(edge.boreMm ?? edge.nominalBoreMm ?? edge.nominalSizeMm ?? edge.bore),
     outsideDiameterMm: finite(
       edge.outsideDiameterMm ?? edge.diameterMm ?? edge.outsideDiameter,
     ),
     measurement,
   });
+}
+
+function entityInspection(entry) {
+  const record = entry.record;
+  const support = entry.support ?? null;
+  const restraints = entry.kind === 'SUPPORT' ? supportRestraintRows(record) : [];
+  return deepFreeze({
+    canonicalId: entry.id,
+    canonicalKind: entry.kind,
+    entityType: token(
+      record.entityType ?? record.componentType ?? record.supportType
+      ?? record.type ?? record.kind ?? entry.kind,
+    ).toUpperCase(),
+    componentKey: token(record.componentKey ?? record.entityId),
+    nodeId: token(record.nodeId),
+    hostEdgeId: token(record.hostEdgeId ?? record.edgeId ?? record.hostId),
+    supportId: token(support?.id ?? record.supportId),
+    direction: token(record.direction ?? record.axis ?? record.directionToken),
+    gapMm: finite(record.gapMm ?? record.gap),
+    travelMm: finite(record.travelMm ?? record.travel),
+    stiffness: finite(record.stiffness ?? record.stiffnessNPerMm),
+    restraintCount: entry.kind === 'SUPPORT' ? restraints.length : null,
+    restraintFamilies: [...new Set(restraints.map((row) => token(
+      row.family ?? row.supportType ?? row.type ?? row.kind,
+    ).toUpperCase()).filter(Boolean))].sort(),
+    sourcePaths: sourcePaths(record),
+  });
+}
+
+function buildCanonicalIndex(topology) {
+  const index = new Map();
+  for (const node of topology.nodes) index.set(node.id, { id: node.id, kind: 'NODE', record: node });
+  for (const edge of topology.edges) index.set(edge.id, { id: edge.id, kind: 'EDGE', record: edge });
+  for (const [collection, kind] of [
+    ['junctions', 'JUNCTION'], ['supports', 'SUPPORT'], ['boundaries', 'BOUNDARY'],
+    ['rigids', 'RIGID'], ['bends', 'BEND'],
+  ]) {
+    for (const record of topology[collection] ?? []) {
+      index.set(record.id, { id: record.id, kind, record });
+      if (kind !== 'SUPPORT') continue;
+      for (const restraint of supportRestraintRows(record)) {
+        const restraintId = token(restraint.id ?? restraint.restraintId);
+        if (restraintId) {
+          index.set(restraintId, {
+            id: restraintId,
+            kind: 'RESTRAINT',
+            record: restraint,
+            support: record,
+          });
+        }
+      }
+    }
+  }
+  return index;
+}
+
+function sourcePaths(record) {
+  const values = [
+    ...(Array.isArray(record.sourcePaths) ? record.sourcePaths : []),
+    record.sourcePath,
+  ].map(token).filter(Boolean);
+  return [...new Set(values)].sort();
 }
 
 function measurementBetween(kind, fromId, toId, startValue, endValue) {
@@ -211,6 +280,13 @@ function emptyOverlay() {
 }
 
 function normalizeSelection(selection) {
+  if (Array.isArray(selection?.canonicalIds)) {
+    const canonicalIds = [...new Set(selection.canonicalIds.map(token).filter(Boolean))];
+    const nodeIds = canonicalIds.filter((id) => id.startsWith('node:')).slice(0, 2);
+    const edgeIds = canonicalIds.filter((id) => id.startsWith('edge:'));
+    const edgeId = canonicalIds.length === 1 && edgeIds.length === 1 ? edgeIds[0] : null;
+    return deepFreeze({ canonicalIds, nodeIds, edgeId });
+  }
   const nodeIds = Array.isArray(selection?.nodeIds)
     ? selection.nodeIds.map(token).filter(Boolean).slice(0, 2)
     : [];
@@ -224,11 +300,12 @@ function normalizeSelection(selection) {
   if (edgeId && !edgeId.startsWith('edge:')) {
     throw new TypeError('Inspection edge selection requires a canonical edge ID.');
   }
-  return deepFreeze({ nodeIds, edgeId: edgeId || null });
+  const canonicalIds = edgeId ? [edgeId] : [...nodeIds];
+  return deepFreeze({ canonicalIds, nodeIds, edgeId: edgeId || null });
 }
 
 function selectedIds(selection) {
-  return selection.edgeId ? [selection.edgeId] : [...selection.nodeIds];
+  return [...selection.canonicalIds];
 }
 
 function assertTopology(topology) {

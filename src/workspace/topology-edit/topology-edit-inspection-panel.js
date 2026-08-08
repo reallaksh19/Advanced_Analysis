@@ -12,7 +12,7 @@ export function topologyEditInspectionMarkup(model) {
   if (model.status === 'EMPTY') {
     return panelShell(
       'Canonical inspection',
-      '<p>Select one node, two nodes, or one edge in the 3D view.</p>',
+      '<p>Select a canonical node, component, junction, support, or restraint.</p>',
       false,
     );
   }
@@ -26,9 +26,33 @@ export function topologyEditInspectionMarkup(model) {
   const rows = [];
   for (const node of model.nodes) rows.push(nodeMarkup(node));
   if (model.edge) rows.push(edgeMarkup(model.edge));
+  for (const entity of model.entities ?? []) rows.push(entityMarkup(entity));
   if (model.measurement) rows.push(measurementMarkup(model.measurement));
   rows.push(`<p class="topology-edit-inspection__hash">Inspection hash: <code>${escapeHtml(model.inspectionHash)}</code></p>`);
   return panelShell('Canonical inspection', rows.join(''), true);
+}
+
+function entityMarkup(entity) {
+  const optional = [
+    ['Component key', entity.componentKey],
+    ['Node', entity.nodeId],
+    ['Host edge', entity.hostEdgeId],
+    ['Support', entity.supportId],
+    ['Direction', entity.direction],
+    ['Gap', nullableMillimetres(entity.gapMm)],
+    ['Travel', nullableMillimetres(entity.travelMm)],
+    ['Stiffness', nullableNumber(entity.stiffness, 'N/mm')],
+    ['Restraints', entity.restraintCount],
+    ['Restraint families', entity.restraintFamilies?.join(', ')],
+    ['Source paths', entity.sourcePaths?.join(', ')],
+  ].filter(([, value]) => value !== '' && value !== null && value !== undefined);
+  return `<section data-inspection-entity="${escapeHtml(entity.canonicalId)}">
+    <h4>${escapeHtml(entity.canonicalKind)} ${escapeHtml(entity.canonicalId)}</h4>
+    <dl>
+      ${evidence('Type', entity.entityType || 'Not declared')}
+      ${optional.map(([label, value]) => evidence(label, value)).join('')}
+    </dl>
+  </section>`;
 }
 
 function panelShell(title, content, hasSelection) {
@@ -98,6 +122,10 @@ function evidence(label, value) {
 
 function nullableMillimetres(value) {
   return value === null ? 'Not declared' : `${format(value)} mm`;
+}
+
+function nullableNumber(value, unit) {
+  return value === null ? 'Not declared' : `${format(value)} ${unit}`;
 }
 
 function direction(value) {

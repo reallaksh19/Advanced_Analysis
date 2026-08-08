@@ -33,7 +33,7 @@ test('3D Edit keeps the left model tree visible while the canvas remains primary
   await expect(canvas).toBeVisible();
   await expect(sidecar).toBeVisible();
   await expect(statusbar).toBeVisible();
-  await expect(compactDock).toHaveClass(/load-calc-dock--compact/);
+  await expect(compactDock).toBeHidden();
 
   const [outerBox, treeBox, workspaceBox, canvasBox, sidecarBox] = await Promise.all([
     outerShell.boundingBox(),
