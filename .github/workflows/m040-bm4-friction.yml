@@ -1,0 +1,36 @@
+name: M040 BM4 Friction Oracle
+
+on:
+  push:
+    branches:
+      - agent/m040-bm4-friction-oracle
+  pull_request:
+    paths:
+      - 'benchmarks/LFEA/BM4/InputXML_BM4.xml'
+      - 'scripts/lfea-m034-bm4-solve-fixtures.mjs'
+      - 'scripts/lfea-m040-bm4-friction-authority.mjs'
+      - 'scripts/lfea-m040-bm4-friction-check.mjs'
+      - '.github/workflows/m040-bm4-friction.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  friction-oracle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify BM4 friction source and oracle
+        run: node scripts/lfea-m040-bm4-friction-check.mjs
