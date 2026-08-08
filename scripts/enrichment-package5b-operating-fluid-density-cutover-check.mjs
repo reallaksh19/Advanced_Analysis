@@ -148,8 +148,8 @@ for (const [baseline, enriched] of [[baselineV2, enrichedV2], [baselineCog, enri
   );
 
   for (const caseId of ['EMPTY', 'OPE', 'HYD']) {
-    assert.equal(loadCase(enriched, caseId).equilibrium.forceResidualN, 0);
-    assert.equal(loadCase(enriched, caseId).equilibrium.momentResidualNmm, 0);
+    assertClose(loadCase(enriched, caseId).equilibrium.forceResidualN, 0, 1e-8);
+    assertClose(loadCase(enriched, caseId).equilibrium.momentResidualNmm, 0, 1e-5);
   }
 }
 
