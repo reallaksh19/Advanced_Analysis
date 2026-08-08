@@ -27,7 +27,7 @@ jobs:
       - name: Enforce evidence-only M042 diff
         run: |
           git fetch --no-tags --depth=1 origin b48962bfc01fec6c0778e40c0e10db64ddaa93ab
-          git diff --name-only b48962bfc01fec6c0778e40c0e10db64ddaa93ab...HEAD | sort > /tmp/m042-paths
+          git diff --name-only b48962bfc01fec6c0778e40c0e10db64ddaa93ab HEAD | sort > /tmp/m042-paths
           printf '%s\n' \
             .github/workflows/m042-bm4-first-divergence-rca.yml \
             scripts/lfea-m042-bm4-first-divergence-rca.mjs | sort > /tmp/m042-allowed
