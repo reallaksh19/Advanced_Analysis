@@ -1,0 +1,86 @@
+name: enrichment-package5d-pipe-section-cutover
+
+on:
+  pull_request:
+    paths:
+      - 'src/workspace/engineering-enrichment/production-pipe-section-overlay.js'
+      - 'src/workspace/engineering-loads/authorized-empirical-load-execution-v6.js'
+      - 'scripts/enrichment-package5d-pipe-section-resolution-contract-check.mjs'
+      - 'scripts/enrichment-package5d-pipe-section-cutover-check.mjs'
+      - '.github/workflows/enrichment-package5d-pipe-section-cutover.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-package5d:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Prove exact-head execution
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          git diff --exit-code
+
+      - name: Enforce Package 5D changed-path containment
+        shell: bash
+        run: |
+          git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" > /tmp/enrichment-package5d-paths.txt
+          while IFS= read -r changed; do
+            case "$changed" in
+              src/workspace/engineering-enrichment/production-pipe-section-overlay.js|src/workspace/engineering-loads/authorized-empirical-load-execution-v6.js|scripts/enrichment-package5d-pipe-section-resolution-contract-check.mjs|scripts/enrichment-package5d-pipe-section-cutover-check.mjs|.github/workflows/enrichment-package5d-pipe-section-cutover.yml) ;;
+              *) echo "Forbidden changed path for enrichment Package 5D: $changed"; exit 1 ;;
+            esac
+          done < /tmp/enrichment-package5d-paths.txt
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax check Package 5D
+        run: |
+          node --check src/workspace/engineering-enrichment/production-pipe-section-overlay.js
+          node --check src/workspace/engineering-loads/authorized-empirical-load-execution-v6.js
+          node --check scripts/enrichment-package5d-pipe-section-resolution-contract-check.mjs
+          node --check scripts/enrichment-package5d-pipe-section-cutover-check.mjs
+
+      - name: Qualify canonical exact piping-class section contract
+        run: node scripts/enrichment-package5d-pipe-section-resolution-contract-check.mjs
+
+      - name: Requalify Package 4A seal lifecycle
+        run: node scripts/enrichment-package4a-input-seal-check.mjs
+
+      - name: Requalify Package 5A component-weight cutover
+        run: node scripts/enrichment-package5a-component-weight-cutover-check.mjs
+
+      - name: Requalify Package 5B fluid resolver contract
+        run: node scripts/enrichment-package5b-fluid-resolution-contract-check.mjs
+
+      - name: Requalify Package 5B operating-fluid-density cutover
+        run: node scripts/enrichment-package5b-operating-fluid-density-cutover-check.mjs
+
+      - name: Requalify Package 5C material resolver contract
+        run: node scripts/enrichment-package5c-material-resolution-contract-check.mjs
+
+      - name: Requalify Package 5C material-density cutover
+        run: node scripts/enrichment-package5c-material-density-cutover-check.mjs
+
+      - name: Qualify sealed pipe-section cutover
+        run: node scripts/enrichment-package5d-pipe-section-cutover-check.mjs
+
+      - name: Import graph
+        run: npm run check:imports
+
+      - name: Production build
+        run: npm run build
