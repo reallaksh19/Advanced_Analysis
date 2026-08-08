@@ -119,12 +119,16 @@ jobs:
           )
           for test_file in "${TESTS[@]}"; do
             echo "===== ${test_file} =====" | tee -a topology-edit-r1-retained-unit-output.txt
-            node --test --test-reporter=tap "$test_file" 2>&1 | tee -a topology-edit-r1-retained-unit-output.txt
-            test_status=${PIPESTATUS[0]}
+            temp_output="$(mktemp)"
+            node --test --test-reporter=tap "$test_file" > "$temp_output" 2>&1
+            test_status=$?
+            cat "$temp_output" | tee -a topology-edit-r1-retained-unit-output.txt
             if [ "$test_status" -ne 0 ]; then
-              echo "::error title=Retained R1 unit regression failed::${test_file}"
+              detail="$(tail -n 24 "$temp_output" | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
+              echo "::error title=Retained R1 unit regression failed::${test_file} — ${detail}"
               status=1
             fi
+            rm -f "$temp_output"
           done
           exit "$status"
 
