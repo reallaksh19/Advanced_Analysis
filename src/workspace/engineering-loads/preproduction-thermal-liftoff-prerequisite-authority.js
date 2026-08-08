@@ -1,0 +1,72 @@
+import { semanticHash } from '../../core/shared-piping-model/canonical-json.js';
+import { deepFreeze, isPlainRecord } from '../../core/shared-piping-model/immutable.js';
+import { requirePreproductionSupportContactAuthority } from './preproduction-support-contact-authority.js';
+import { requirePreproductionThermalLiftoffDisplacementAuthority } from './preproduction-thermal-liftoff-displacement-authority.js';
+import { requirePreproductionThermalLiftoffStiffnessEvidence, requirePreproductionThermalLiftoffReactionToleranceAuthority } from './preproduction-thermal-liftoff-mechanics-authority.js';
+
+export const PREPRODUCTION_TL_PREREQUISITE_SCHEMA='engineering-preproduction-thermal-liftoff-prerequisite-authority/v1';
+export const PREPRODUCTION_TL_CURRENTNESS_SCHEMA='engineering-preproduction-thermal-liftoff-prerequisite-currentness/v1';
+export const PREPRODUCTION_TL_PREREQUISITE_BRIDGE_SCHEMA='engineering-preproduction-thermal-liftoff-prerequisite-bridge/v1';
+const MATRIX=new Set(['REDUCED_VERTICAL_STIFFNESS_MATRIX_EVIDENCE','REDUCED_VERTICAL_FLEXIBILITY_MATRIX_EVIDENCE']);
+const DISP='empirical-thermal-liftoff-used-displacement/v1', APP='empirical-thermal-liftoff-applicability-binding/v1', STIFF='empirical-thermal-liftoff-stiffness-entry/v1', REG='empirical-thermal-liftoff-stiffness-registry/v1', TOL='empirical-thermal-liftoff-reaction-tolerance-authority/v1';
+export function buildPreproductionThermalLiftoffPrerequisiteAuthority(input){
+  exact(input,['contactAuthority','displacements','stiffnessEntries','reactionTolerance'],'TL prerequisite input');
+  const contact=requirePreproductionSupportContactAuthority(input.contactAuthority);
+  const displacements=list(input.displacements,requirePreproductionThermalLiftoffDisplacementAuthority,'displacementId');
+  const stiffness=list(input.stiffnessEntries,requirePreproductionThermalLiftoffStiffnessEvidence,'entryId');
+  const tolerance=input.reactionTolerance?requirePreproductionThermalLiftoffReactionToleranceAuthority(input.reactionTolerance):null;
+  const readyContacts=contact.rows.filter(r=>r.tl03Status==='READY_FOR_TL03_CONTACT_INTAKE'); const blockers=[];
+  if(contact.status!=='READY_FOR_PREPRODUCTION_CONTACT_AUTHORITY') blockers.push(issue('PREPRODUCTION_TL_CONTACT_AUTHORITY_BLOCKED','authority'));
+  if(!tolerance||tolerance.qualification!=='QUALIFIED') blockers.push(issue('PREPRODUCTION_TL_REACTION_TOLERANCE_AUTHORITY_MISSING','authority'));
+  const dBy=group(displacements,'supportSiteId'), sBy=group(stiffness.filter(s=>s.tl03LocalStiffnessEligible),'supportSiteId');
+  const rows=readyContacts.map(c=>{
+    const rowBlockers=[]; const d=only(dBy.get(c.supportSiteId)); const s=only(sBy.get(c.supportSiteId));
+    if(!d||d.qualification!=='QUALIFIED') rowBlockers.push(issue('PREPRODUCTION_TL01_DISPLACEMENT_AUTHORITY_MISSING',c.supportSiteId));
+    if(!s) rowBlockers.push(issue('PREPRODUCTION_TL02_LOCAL_STIFFNESS_AUTHORITY_MISSING',c.supportSiteId));
+    if(!tolerance||tolerance.qualification!=='QUALIFIED') rowBlockers.push(issue('PREPRODUCTION_TL_REACTION_TOLERANCE_AUTHORITY_MISSING',c.supportSiteId));
+    if(s&&(s.applicability.contactAuthoritySemanticHash!==contact.semanticHash||s.applicability.contactRowSemanticHash!==c.semanticHash)) rowBlockers.push(issue('PREPRODUCTION_TL02_APPLICABILITY_STALE',c.supportSiteId));
+    if(d&&s&&d.coordinateFrame.semanticHash!==s.applicability.coordinateFrameSemanticHash) rowBlockers.push(issue('PREPRODUCTION_TL_PREREQUISITE_COORDINATE_FRAME_MISMATCH',c.supportSiteId));
+    const b=uniqueIssues(rowBlockers); blockers.push(...b); const material={supportKey:c.supportKey,supportSiteId:c.supportSiteId,routeChainageMm:c.routeChainageMm,contactRowSemanticHash:c.semanticHash,displacementSemanticHash:d?.semanticHash||null,stiffnessSemanticHash:s?.semanticHash||null,applicabilitySemanticHash:s?.applicability?.semanticHash||null,reactionToleranceSemanticHash:tolerance?.semanticHash||null,usedUpwardRelativeDisplacementM:b.length?null:d.usedUpwardRelativeDisplacementM,effectiveVerticalStiffnessNPerM:b.length?null:s.data.effectiveVerticalStiffnessNPerM,reactionToleranceN:b.length?null:tolerance.reactionToleranceN,status:b.length?'UNRESOLVED_GATE':'QUALIFIED',blockers:b}; return freezeHash(material);
+  }).sort((a,b)=>ascii(a.supportKey,b.supportKey));
+  const expected=new Set(readyContacts.map(r=>r.supportSiteId));
+  for(const d of displacements) if(!expected.has(d.supportSiteId)) blockers.push(issue('PREPRODUCTION_TL01_DISPLACEMENT_COVERAGE_MISMATCH',d.supportSiteId));
+  for(const s of stiffness.filter(x=>x.tl03LocalStiffnessEligible)) if(!expected.has(s.supportSiteId)) blockers.push(issue('PREPRODUCTION_TL02_STIFFNESS_COVERAGE_MISMATCH',s.supportSiteId));
+  if(new Set(displacements.map(d=>d.loadCaseId)).size>1) blockers.push(issue('PREPRODUCTION_TL01_LOAD_CASE_MISMATCH','authority'));
+  const finalBlockers=uniqueIssues(blockers), retainedInfluenceEvidenceSemanticHashes=stiffness.filter(s=>MATRIX.has(s.representation)).map(s=>s.semanticHash).sort(ascii);
+  const material={schema:PREPRODUCTION_TL_PREREQUISITE_SCHEMA,datasetId:contact.datasetId,contactAuthoritySemanticHash:contact.semanticHash,status:finalBlockers.length?'BLOCKED':'READY_FOR_TL03_PREREQUISITE_BRIDGE',loadCaseId:displacements.length&&new Set(displacements.map(d=>d.loadCaseId)).size===1?displacements[0].loadCaseId:null,reactionToleranceSemanticHash:tolerance?.semanticHash||null,rows,retainedInfluenceEvidenceSemanticHashes,blockers:finalBlockers,summary:{contactSiteCount:readyContacts.length,qualifiedRowCount:rows.filter(r=>r.status==='QUALIFIED').length,retainedInfluenceEvidenceCount:retainedInfluenceEvidenceSemanticHashes.length,blockerCount:finalBlockers.length},policy:{productionCalculationConsumptionEnabled:false,gravityMutationPermitted:false,displacementCalculationPerformed:false,stiffnessCalculationPerformed:false,matrixReductionPerformed:false,reactionToleranceInferred:false,localScreenExecutionPermitted:false,activeSetRedistributionPermitted:false,finalHotReactionPublicationPermitted:false,productionMethodRegistrationPermitted:false,tl03InputBridgePermitted:finalBlockers.length===0}};
+  return freezeHash(material);
+}
+export function requirePreproductionThermalLiftoffPrerequisiteAuthority(value){ if(value?.schema!==PREPRODUCTION_TL_PREREQUISITE_SCHEMA) throw coded('PREPRODUCTION_TL_PREREQUISITE_SCHEMA_INVALID'); const {semanticHash:actual,...material}=value; if(actual!==semanticHash(material)) throw coded('PREPRODUCTION_TL_PREREQUISITE_HASH_MISMATCH'); if(value.policy?.localScreenExecutionPermitted!==false||value.policy?.activeSetRedistributionPermitted!==false||value.policy?.productionCalculationConsumptionEnabled!==false||value.policy?.gravityMutationPermitted!==false) throw coded('PREPRODUCTION_TL_PREREQUISITE_POLICY_INVALID'); return deepFreeze(structuredClone(value)); }
+export function evaluatePreproductionThermalLiftoffPrerequisiteCurrentness(input){ exact(input,['authority','contactAuthority','displacements','stiffnessEntries','reactionTolerance'],'TL prerequisite currentness input'); const authority=requirePreproductionThermalLiftoffPrerequisiteAuthority(input.authority); const rebuilt=buildPreproductionThermalLiftoffPrerequisiteAuthority({contactAuthority:input.contactAuthority,displacements:input.displacements,stiffnessEntries:input.stiffnessEntries,reactionTolerance:input.reactionTolerance}); const differences=authority.semanticHash===rebuilt.semanticHash?[]:['authoritySemanticHash']; return freezeHash({schema:PREPRODUCTION_TL_CURRENTNESS_SCHEMA,authoritySemanticHash:authority.semanticHash,observedAuthoritySemanticHash:rebuilt.semanticHash,status:differences.length?'STALE_REBUILD_REQUIRED':'CURRENT',differences,productionCalculationConsumptionEnabled:false}); }
+export function buildPreproductionThermalLiftoffPrerequisiteBridge(input){
+  const authority=requirePreproductionThermalLiftoffPrerequisiteAuthority(input.authority);
+  const displacements=input.displacements.map(requirePreproductionThermalLiftoffDisplacementAuthority);
+  const stiffness=input.stiffnessEntries.map(requirePreproductionThermalLiftoffStiffnessEvidence);
+  const tolerance=input.reactionTolerance?requirePreproductionThermalLiftoffReactionToleranceAuthority(input.reactionTolerance):null;
+  const ready=authority.status==='READY_FOR_TL03_PREREQUISITE_BRIDGE';
+  const dBy=new Map(displacements.map(x=>[x.semanticHash,x])); const sBy=new Map(stiffness.map(x=>[x.semanticHash,x]));
+  const usedDisplacements=ready?authority.rows.map(r=>bridgeDisplacement(dBy.get(r.displacementSemanticHash),r)):[];
+  const entries=ready?authority.rows.map(r=>bridgeStiffness(sBy.get(r.stiffnessSemanticHash),r)):[];
+  if(ready&&(!tolerance||tolerance.semanticHash!==authority.reactionToleranceSemanticHash)) throw coded('PREPRODUCTION_TL_BRIDGE_TOLERANCE_BINDING_MISMATCH');
+  const stiffnessRegistry=ready?freezeHash({schema:REG,registryId:`CURRENT-HEAD-TL02:${authority.semanticHash}`,entries:[...entries].sort((a,b)=>a.entryId.localeCompare(b.entryId))}):null;
+  const reactionToleranceAuthority=ready?bridgeTolerance(tolerance):null;
+  const material={schema:PREPRODUCTION_TL_PREREQUISITE_BRIDGE_SCHEMA,sourcePrerequisiteAuthoritySemanticHash:authority.semanticHash,status:ready?'READY_FOR_TL03_INPUT_RECONCILIATION':'BLOCKED',usedDisplacements,stiffnessRegistry,reactionToleranceAuthority,blockers:ready?[]:authority.blockers,policy:{historicalRuntimeImported:false,localScreenExecutionPerformed:false,classificationPerformed:false,reactionReserveCalculated:false,activeSetRedistributionPerformed:false,recontactPerformed:false,finalHotReactionPublicationPermitted:false,productionCalculationConsumptionEnabled:false,productionMethodRegistrationPermitted:false,gravityMutationPermitted:false}};
+  return requirePreproductionThermalLiftoffPrerequisiteBridge(freezeHash(material));
+}
+export function requirePreproductionThermalLiftoffPrerequisiteBridge(value){
+  if(value?.schema!==PREPRODUCTION_TL_PREREQUISITE_BRIDGE_SCHEMA) throw coded('PREPRODUCTION_TL_BRIDGE_SCHEMA_INVALID');
+  const {semanticHash:actual,...material}=value; if(actual!==semanticHash(material)) throw coded('PREPRODUCTION_TL_BRIDGE_HASH_MISMATCH');
+  const p=value.policy||{}; if(p.historicalRuntimeImported!==false||p.localScreenExecutionPerformed!==false||p.activeSetRedistributionPerformed!==false||p.productionCalculationConsumptionEnabled!==false||p.gravityMutationPermitted!==false) throw coded('PREPRODUCTION_TL_BRIDGE_POLICY_INVALID');
+  if(value.status==='BLOCKED'&&(value.usedDisplacements.length||value.stiffnessRegistry||value.reactionToleranceAuthority)) throw coded('PREPRODUCTION_TL_BRIDGE_PARTIAL_INVALID');
+  return deepFreeze(structuredClone(value));
+}
+function bridgeDisplacement(d,row){ if(!d||d.semanticHash!==row.displacementSemanticHash) throw coded('PREPRODUCTION_TL_BRIDGE_DISPLACEMENT_BINDING_MISMATCH'); const frameMat={basis:'GLOBAL_Z_UP',verticalUnitVector:{x:0,y:0,z:1}}; const mappingEvidence=d.mappingAuthority?freezeHash({schema:'empirical-thermal-liftoff-displacement-mapping-evidence/v1',mappingId:d.mappingAuthority.mappingId,mappingRevision:d.mappingAuthority.mappingRevision,sourceFreeExpansionEvidenceSemanticHash:d.mappingAuthority.freeExpansionEvidenceSemanticHash,applicabilitySemanticHash:d.mappingAuthority.applicabilitySemanticHash,source:oldSource(d.mappingAuthority.source),qualification:'QUALIFIED'}):null; return freezeHash({schema:DISP,displacementId:d.displacementId,loadCaseId:d.loadCaseId,supportSiteId:d.supportSiteId,coordinateFrame:freezeHash(frameMat),pipeDisplacementM:d.pipeDisplacementM,supportDisplacementM:d.supportDisplacementM,relativeDisplacementM:d.relativeDisplacementM,usedUpwardRelativeDisplacementM:d.usedUpwardRelativeDisplacementM,horizontalRelativeMagnitudeM:d.horizontalRelativeMagnitudeM,provenance:d.provenance,source:oldSource(d.source),mappingEvidence,horizontalComponentAuthority:d.horizontalComponentAuthority,qualification:'QUALIFIED',blockers:[]}); }
+function bridgeStiffness(s,row){ if(!s||s.semanticHash!==row.stiffnessSemanticHash||!s.tl03LocalStiffnessEligible) throw coded('PREPRODUCTION_TL_BRIDGE_STIFFNESS_BINDING_MISMATCH'); const appMat={schema:APP,classId:s.applicability.classId,templateId:s.applicability.templateId,templateRevision:s.applicability.templateRevision,geometrySemanticHash:s.applicability.geometrySemanticHash,supportCapabilitySemanticHash:s.applicability.supportCapabilitySemanticHash,linePropertySemanticHash:s.applicability.linePropertySemanticHash,coordinateFrameSemanticHash:semanticHash({basis:'GLOBAL_Z_UP',verticalUnitVector:{x:0,y:0,z:1}})}; const applicability=freezeHash(appMat); return freezeHash({schema:STIFF,entryId:s.entryId,supportSiteId:s.supportSiteId,representation:s.representation,data:s.data,units:s.units,ordering:s.ordering,sourceKind:s.source.sourceKind,source:oldSource(s.source),benchmarkReference:s.benchmarkReference,applicability,qualification:'QUALIFIED'}); }
+function bridgeTolerance(t){return freezeHash({schema:TOL,toleranceId:t.toleranceId,reactionToleranceN:t.reactionToleranceN,source:oldSource(t.source),qualification:'QUALIFIED'});} function oldSource(s){return deepFreeze({sourceId:s.sourceId,sourceRevision:s.sourceRevision,sourceSemanticHash:s.sourceSemanticHash});}
+
+function list(v,fn,key){ if(!Array.isArray(v)) throw new TypeError('authority list must be an array.'); const a=v.map(fn).sort((x,y)=>ascii(x[key],y[key])); if(new Set(a.map(x=>x[key])).size!==a.length) throw new TypeError('authority IDs must be unique.'); return a; }
+function group(v,key){ const m=new Map(); for(const x of v){ const a=m.get(x[key])||[]; a.push(x); m.set(x[key],a);} return m; }
+function only(v){ return Array.isArray(v)&&v.length===1?v[0]:null; }
+function issue(code,scope){return deepFreeze({code,severity:'ERROR',scope,message:code,details:null});}
+function uniqueIssues(v){const m=new Map(); for(const x of v)m.set(`${x.code}|${x.scope}`,x); return [...m.values()].sort((a,b)=>ascii(`${a.code}|${a.scope}`,`${b.code}|${b.scope}`));}
+function exact(v,keys,label){if(!isPlainRecord(v)||JSON.stringify(Object.keys(v).sort())!==JSON.stringify([...keys].sort()))throw new TypeError(`${label} contains unexpected or missing keys.`);} function freezeHash(m){return deepFreeze({...m,semanticHash:semanticHash(m)});} function ascii(a,b){return String(a).localeCompare(String(b),'en',{numeric:false,sensitivity:'variant'});} function coded(code){const e=new Error(code);e.code=code;return e;}
