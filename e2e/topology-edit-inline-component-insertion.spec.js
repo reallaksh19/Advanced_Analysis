@@ -239,7 +239,7 @@ async function openPanel(host, kind) {
 }
 
 async function openAdvancedCanonicalEvidence(panel) {
-  const details = panel.locator('details.topology-edit-professional-fallback');
+  const details = panel.locator('[data-role="professional-canonical-evidence"]');
   await expect(details).toBeVisible();
   if (!(await details.evaluate((element) => element.open))) {
     await details.locator(':scope > summary').click();
