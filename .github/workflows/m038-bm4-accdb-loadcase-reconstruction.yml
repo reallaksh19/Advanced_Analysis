@@ -88,7 +88,14 @@ jobs:
           set -euo pipefail
           node --check src/core/linear-fea-frame-element/uniform-axial-initial-strain.js
           node --check scripts/lfea-m035-m036-bm4-integration-runtime.mjs
+          node --check scripts/lfea-m038-bm4-node-signal-check.mjs
           node -e "import('./scripts/lfea-m035-m036-bm4-integration-runtime.mjs').then(m=>{const r=m.solveBm4M035M036Combined(); console.log('M038_RELEASED_SUS='+JSON.stringify(m.releasedTargetIds(r.sustainedRun,['20090','20350','21470','21610']))); console.log('M038_RELEASED_OPE='+JSON.stringify(m.releasedTargetIds(r.operatingRun,['20090','20350','21470','21610']))); console.log('M038_21470_SUS_RY='+m.reactionUy(r.sustained.execution,'21470'));})" | tee /tmp/m038-bourdon-smoke.log
+
+      - name: Node-level 20340/20390 force regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/lfea-m038-bm4-node-signal-check.mjs | tee /tmp/m038-node-signal.log
 
       - name: Full BM4 row attribution benchmark
         shell: bash
@@ -116,6 +123,7 @@ jobs:
             /tmp/bm4-accdb-authority-hits.txt
             /tmp/bm4-accdb-export/
             /tmp/m038-bourdon-smoke.log
+            /tmp/m038-node-signal.log
             /tmp/m038-bm4-attribution.log
             /tmp/m038-bm4-integration.log
             reports/m035-m036-bm4-failure-attribution.json
