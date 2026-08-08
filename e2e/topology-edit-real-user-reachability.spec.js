@@ -128,7 +128,7 @@ test('XYZ Branch exposes truthful catalogue, endpoint and Table capability paths
   expect(nudgeApplied.canonicalHash).not.toBe(catalogueApplied.canonicalHash);
 
   await openTable(page);
-  await selectTableRow(page, host, 'E-003');
+  await selectTableRow(page, host, 'F-002');
   await expect(page.locator(
     '[data-table-capability-reason="TABLE_INTENT_NOT_CERTIFIED"]',
   ).first()).toBeVisible();
