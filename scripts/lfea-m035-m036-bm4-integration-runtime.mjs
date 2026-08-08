@@ -31,7 +31,8 @@ import { buildM036Bm4Inventory } from './lfea-m036-bm4-runtime.mjs';
 
 const NODE_PREFIX = 'BM4M035.N';
 const M038_ACCDB_SOURCE = '3e5c5e20d9e8741faa08be4360cb7f79498f87b6:benchmarks/LFEA/BM4/BM4 accdb.zip';
-const M038_BOURDON_DISCLOSURE = 'ACCDB CASE19=W+P1 and CASE20=W+T1+P1; user-confirmed ACCDB Bourdon=yes. First qualification applies translational Bourdon only to non-rigid straight spans and bend incoming straights; bend-arc opening/translation and rigid-body pressure strain remain blocked.';
+const M038_BOURDON_DISCLOSURE = 'ACCDB CASE19=W+P1 and CASE20=W+T1+P1+F1; user-confirmed ACCDB Bourdon=yes. First qualification applies translational Bourdon only to non-rigid straight spans and bend incoming straights; bend-arc opening/translation and rigid-body pressure strain remain blocked.';
+const M038_F1_DISCLOSURE = 'BM4 FORCESMOMENTS defines F1 as VECTOR NUMBER=1. CASE20 includes F1 only; CASE19 excludes FORCMNT, so CASE21=L20-L19 inherits F1.';
 
 function mapNodeId(nodeId) {
   return String(nodeId).replace(/^BM4\.N/u, NODE_PREFIX);
@@ -130,7 +131,44 @@ function closedEndPipeBourdonAxialStrain(authorities, entry, pressure) {
   return (1 - 2 * poissonRatio) * pressure * innerDiameter ** 2 / denominator;
 }
 
-function compileCase(authorities, compilation, label, thermal, movements) {
+function f1NodalPrimitives(authorities, label) {
+  const primitives = [];
+  for (const segment of authorities.sourceGeometry.segments) {
+    for (const record of segment.meta?.analysis?.forcesMoments ?? []) {
+      const vector = record.vectors.find((candidate) => Number(candidate.number) === 1);
+      if (!vector) continue;
+      const force = {
+        fx: vector.force.fx ?? 0,
+        fy: vector.force.fy ?? 0,
+        fz: vector.force.fz ?? 0,
+      };
+      const moment = {
+        mx: vector.moment.mx ?? 0,
+        my: vector.moment.my ?? 0,
+        mz: vector.moment.mz ?? 0,
+      };
+      if ([...Object.values(force), ...Object.values(moment)].every((value) => value === 0)) continue;
+      primitives.push({
+        schema: 'fea-linear-load-primitive/v1',
+        primitiveId: `${label}-F1-${record.nodeId}-${record.forceMomentNumber}`,
+        kind: 'NODAL_FORCE_MOMENT',
+        nodeId: `${NODE_PREFIX}${record.nodeId}`,
+        basis: { kind: 'GLOBAL' },
+        force,
+        moment,
+        units: { force: 'N', moment: 'N*m', length: 'm' },
+        signConvention: 'APPLIED_TO_STRUCTURE',
+        sourceEvidence: sourceEvidence({
+          sourceId: `${BM4_SOURCE_ID}-M038-F1`,
+          sourceRevision: `${M038_ACCDB_SOURCE}:${segment.id}:${record.forceMomentNumber}:${record.nodeId}:VECTOR1`,
+        }),
+      });
+    }
+  }
+  return primitives;
+}
+
+function compileCase(authorities, compilation, label, thermal, includeF1, movements) {
   const primitives = [];
   for (const entry of authorities.entries) {
     const analysis = entry.sourceEntry.sourceSegment.meta.analysis;
@@ -162,6 +200,7 @@ function compileCase(authorities, compilation, label, thermal, movements) {
       sourceEvidence: sourceEvidence({ sourceId: `${BM4_SOURCE_ID}-M035-M036-TEMP`, sourceRevision: `${entry.sourceSegmentId}:${analysis.operatingTemperature}` }),
     });
   }
+  if (includeF1) primitives.push(...f1NodalPrimitives(authorities, label));
   for (const movement of movements) primitives.push({
     schema: 'fea-linear-load-primitive/v1', primitiveId: `${label}-CONTACT-${movement.prescribedSlotId}`,
     kind: 'PRESCRIBED_MOVEMENT', prescribedSlotId: movement.prescribedSlotId,
@@ -171,7 +210,10 @@ function compileCase(authorities, compilation, label, thermal, movements) {
   return compilePhysicalLoadCase({
     loadCaseId: label,
     loadCaseClass: 'MIXED_PHYSICAL',
-    presentation: { label, description: 'M038 ACCDB-authorized P1 Bourdon translation over M035 feature mechanics and M036 unilateral state.' },
+    presentation: {
+      label,
+      description: `M038 ACCDB-authorized P1 Bourdon translation over M035 feature mechanics and M036 unilateral state. ${includeF1 ? M038_F1_DISCLOSURE : 'F1 excluded from this case.'}`,
+    },
     modelReference: modelReferenceFromCompilation(compilation),
     primitives,
     profile: loadCaseProfile({ gravitationalAcceleration: { value: GRAVITY, source: 'SI-STANDARD-GRAVITY-EXACT' } }),
@@ -219,9 +261,9 @@ function loadElements(authorities, loadCase) {
   return { frames, components };
 }
 
-export function analyseM035M036Case(authorities, constraints, label, thermal, movements = []) {
+export function analyseM035M036Case(authorities, constraints, label, thermal, includeF1, movements = []) {
   const compilation = compileModel(authorities, constraints);
-  const loadCase = compileCase(authorities, compilation, label, thermal, movements);
+  const loadCase = compileCase(authorities, compilation, label, thermal, includeF1, movements);
   const { frames, components } = loadElements(authorities, loadCase);
   const execution = compileSolverExecution({
     compilation,
@@ -239,7 +281,7 @@ export function analyseM035M036Case(authorities, constraints, label, thermal, mo
   return Object.freeze({ compilation, loadCase, execution, recovery, frames, pipingComponents: components });
 }
 
-function finalAnalysis(authorities, inventory, run, label, thermal) {
+function finalAnalysis(authorities, inventory, run, label, thermal, includeF1) {
   const state = new Map(run.convergedState.map((row) => [row.declarationId, row.status]));
   const active = run.unilateral.filter((row) => state.get(row.declarationId) === 'ENGAGED');
   const analysis = analyseM035M036Case(
@@ -247,6 +289,7 @@ function finalAnalysis(authorities, inventory, run, label, thermal) {
     [...inventory.base, ...active.map((row) => row.constraintDeclaration)],
     label,
     thermal,
+    includeF1,
     active.map((row) => row.prescribedMovement).filter((row) => row !== null),
   );
   if (analysis.execution.semanticHash !== run.finalExecutionHash) throw new Error(`${label} combined final execution hash drift.`);
@@ -256,15 +299,22 @@ function finalAnalysis(authorities, inventory, run, label, thermal) {
 export function solveBm4M035M036Combined() {
   const authorities = buildBm4M035FeatureAuthorities();
   const inventory = buildM035M036Inventory(authorities);
-  const solveState = (label, thermal, unilateral = inventory.unilateral) => compileUnilateralSolverExecution({
+  const solveState = (label, thermal, includeF1, unilateral = inventory.unilateral) => compileUnilateralSolverExecution({
     baseDeclarations: inventory.base,
     unilateral,
-    buildAndSolve: (constraints, active) => analyseM035M036Case(authorities, constraints, label, thermal, active.prescribedMovements).execution,
+    buildAndSolve: (constraints, active) => analyseM035M036Case(
+      authorities,
+      constraints,
+      label,
+      thermal,
+      includeF1,
+      active.prescribedMovements,
+    ).execution,
   });
-  const sustainedRun = solveState('BM4-M035-M036-SUS', false);
-  const operatingRun = solveState('BM4-M035-M036-OPE', true);
-  const sustained = finalAnalysis(authorities, inventory, sustainedRun, 'BM4-M035-M036-SUS', false);
-  const operating = finalAnalysis(authorities, inventory, operatingRun, 'BM4-M035-M036-OPE', true);
+  const sustainedRun = solveState('BM4-M035-M036-SUS', false, false);
+  const operatingRun = solveState('BM4-M035-M036-OPE', true, true);
+  const sustained = finalAnalysis(authorities, inventory, sustainedRun, 'BM4-M035-M036-SUS', false, false);
+  const operating = finalAnalysis(authorities, inventory, operatingRun, 'BM4-M035-M036-OPE', true, true);
   return Object.freeze({ authorities, inventory, sustainedRun, operatingRun, sustained, operating });
 }
 
