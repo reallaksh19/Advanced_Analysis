@@ -50,3 +50,4 @@ export {
 } from './frame-element.js';
 
 export { augmentFrameElementUniformAxialInitialStrain } from './uniform-axial-initial-strain.js';
+export { augmentFrameElementFreeJointDeformation } from './free-joint-deformation.js';
