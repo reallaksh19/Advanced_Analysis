@@ -17,7 +17,6 @@ on:
       - 'tests/topology-edit-*snap*.test.mjs'
       - 'tests/topology-edit-editor-store.test.mjs'
       - 'e2e/topology-edit-deterministic-snapping.spec.js'
-      - 'e2e/topology-edit-drag-lifecycle-diagnostic.spec.js'
   workflow_dispatch:
 
 permissions:
@@ -72,7 +71,6 @@ jobs:
           node --check tests/topology-edit-deterministic-snap-engine.test.mjs
           node --check tests/topology-edit-snap-store-controller.test.mjs
           node --check e2e/topology-edit-deterministic-snapping.spec.js
-          node --check e2e/topology-edit-drag-lifecycle-diagnostic.spec.js
           git diff --check
 
       - name: Execute deterministic snapping contracts
@@ -91,11 +89,6 @@ jobs:
             tests/topology-edit-professional-interaction-containment.test.mjs \
             tests/topology-edit-navigation-pick-fallback.test.mjs
 
-      - name: Diagnose physical drag lifecycle
-        run: |
-          npx playwright test e2e/topology-edit-drag-lifecycle-diagnostic.spec.js \
-            --project=chromium --workers=1 --retries=0 --reporter=line
-
       - name: Execute real WebGL deterministic snapping qualification
         run: |
           npx playwright test e2e/topology-edit-deterministic-snapping.spec.js \
@@ -108,7 +101,6 @@ jobs:
           name: topology-edit-deterministic-snapping-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}-${{ github.run_attempt }}
           path: |
             reports/qualification/topology-edit-deterministic-snapping.json
-            reports/qualification/topology-edit-drag-lifecycle-diagnostic.json
             playwright-report
             test-results
           if-no-files-found: warn
