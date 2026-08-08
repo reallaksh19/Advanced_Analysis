@@ -190,7 +190,7 @@ function loadElements(authorities, loadCase) {
   return { frames, components };
 }
 
-export function analyseM035M036Case(authorities, constraints, label, thermal, movements = []) {
+export function analyseM035M036Case(authorities, constraints, label, thermal, movements = [], options = {}) {
   const compilation = compileModel(authorities, constraints);
   const loadCase = compileCase(authorities, compilation, label, thermal, movements);
   const { frames, components } = loadElements(authorities, loadCase);
@@ -203,10 +203,12 @@ export function analyseM035M036Case(authorities, constraints, label, thermal, mo
     loadCase,
     solverProfile: solverProfile(BM4_SOLVER_CONDITIONING_PROFILE),
   });
-  const recovery = compileResultRecovery({
-    compilation, execution, loadCase, frameElements: frames, pipingComponents: components,
-    recoveryProfile: recoveryProfile({ recoverComponentCodePoints: false }),
-  });
+  const recovery = options.skipRecovery === true
+    ? null
+    : compileResultRecovery({
+      compilation, execution, loadCase, frameElements: frames, pipingComponents: components,
+      recoveryProfile: recoveryProfile({ recoverComponentCodePoints: false }),
+    });
   return Object.freeze({ compilation, loadCase, execution, recovery, frames, pipingComponents: components });
 }
 
