@@ -1,0 +1,70 @@
+name: enrichment-package5a-component-weight-cutover
+
+on:
+  pull_request:
+    paths:
+      - 'src/workspace/engineering-enrichment/production-component-weight-overlay.js'
+      - 'src/workspace/engineering-enrichment/index.js'
+      - 'src/workspace/engineering-loads/authorized-empirical-load-execution-v3.js'
+      - 'scripts/enrichment-package5a-component-weight-cutover-check.mjs'
+      - '.github/workflows/enrichment-package5a-component-weight-cutover.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-package5a:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Prove exact-head execution
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          git diff --exit-code
+
+      - name: Enforce Package 5A changed-path containment
+        shell: bash
+        run: |
+          git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" > /tmp/enrichment-package5a-paths.txt
+          while IFS= read -r changed; do
+            case "$changed" in
+              src/workspace/engineering-enrichment/production-component-weight-overlay.js|src/workspace/engineering-enrichment/index.js|src/workspace/engineering-loads/authorized-empirical-load-execution-v3.js|scripts/enrichment-package5a-component-weight-cutover-check.mjs|.github/workflows/enrichment-package5a-component-weight-cutover.yml) ;;
+              *) echo "Forbidden changed path for enrichment Package 5A: $changed"; exit 1 ;;
+            esac
+          done < /tmp/enrichment-package5a-paths.txt
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax check Package 5A
+        run: |
+          node --check src/workspace/engineering-enrichment/production-component-weight-overlay.js
+          node --check src/workspace/engineering-loads/authorized-empirical-load-execution-v3.js
+          node --check scripts/enrichment-package5a-component-weight-cutover-check.mjs
+
+      - name: Requalify Package 4A seal lifecycle
+        run: node scripts/enrichment-package4a-input-seal-check.mjs
+
+      - name: Requalify existing authorized empirical methods
+        run: node scripts/authorized-empirical-method-execution-check.mjs
+
+      - name: Qualify sealed component-weight production cutover
+        run: node scripts/enrichment-package5a-component-weight-cutover-check.mjs
+
+      - name: Import graph
+        run: npm run check:imports
+
+      - name: Production build
+        run: npm run build
