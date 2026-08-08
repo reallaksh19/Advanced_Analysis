@@ -16,7 +16,7 @@ test('clean shell state clamps inspector width and canonicalizes drawer state', 
   assert.deepEqual(state, {
     schema: 'TopologyEditCleanShellState.v1',
     inspectorOpen: false,
-    inspectorWidthPx: 520,
+    inspectorWidthPx: 760,
     openPanels: ['commands', 'display'],
   });
   assert.equal(Object.isFrozen(state), true);
