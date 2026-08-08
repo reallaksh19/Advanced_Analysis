@@ -111,7 +111,7 @@ function physicalLineWeight(entry) {
   return pipe + contents + (analysis.insulationDensity ?? 0) * insulationArea * GRAVITY;
 }
 
-function compileCase(authorities, compilation, label, thermal, movements) {
+function compileCase(authorities, compilation, label, thermal, movements, options = {}) {
   const primitives = [];
   for (const entry of authorities.entries) {
     const analysis = entry.sourceEntry.sourceSegment.meta.analysis;
@@ -140,12 +140,14 @@ function compileCase(authorities, compilation, label, thermal, movements) {
       sourceEvidence: sourceEvidence({ sourceId: `${BM4_SOURCE_ID}-M035-M036-TEMP`, sourceRevision: `${entry.sourceSegmentId}:${analysis.operatingTemperature}` }),
     });
   }
-  primitives.push(...bm4BaseWForcmntPrimitives({
-    baseEntries: authorities.base.entries,
-    loadCaseId: label,
-    nodeIdPrefix: NODE_PREFIX,
-    sourceEvidence,
-  }));
+  if (options.includeForcmnt !== false) {
+    primitives.push(...bm4BaseWForcmntPrimitives({
+      baseEntries: authorities.base.entries,
+      loadCaseId: label,
+      nodeIdPrefix: NODE_PREFIX,
+      sourceEvidence,
+    }));
+  }
   for (const movement of movements) primitives.push({
     schema: 'fea-linear-load-primitive/v1', primitiveId: `${label}-CONTACT-${movement.prescribedSlotId}`,
     kind: 'PRESCRIBED_MOVEMENT', prescribedSlotId: movement.prescribedSlotId,
@@ -192,7 +194,7 @@ function loadElements(authorities, loadCase) {
 
 export function analyseM035M036Case(authorities, constraints, label, thermal, movements = [], options = {}) {
   const compilation = compileModel(authorities, constraints);
-  const loadCase = compileCase(authorities, compilation, label, thermal, movements);
+  const loadCase = compileCase(authorities, compilation, label, thermal, movements, options);
   const { frames, components } = loadElements(authorities, loadCase);
   const execution = compileSolverExecution({
     compilation,
