@@ -1,0 +1,47 @@
+name: M045 BM4 Component Hierarchy
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/lfea-m045-bm4-component-authority-discovery.mjs'
+      - 'scripts/lfea-m045-bm4-component-hierarchy.mjs'
+      - 'scripts/lfea-m045-bm4-component-hierarchy-v2.mjs'
+      - '.github/workflows/m045-bm4-component-hierarchy.yml'
+  workflow_dispatch:
+
+jobs:
+  component-hierarchy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax-check M045
+        run: |
+          node --check scripts/lfea-m045-bm4-component-authority-discovery.mjs
+          node --check scripts/lfea-m045-bm4-component-hierarchy-v2.mjs
+      - name: Discover component factor and stress authority
+        run: node scripts/lfea-m045-bm4-component-authority-discovery.mjs > /tmp/m045-discovery.json
+      - name: Run component hierarchy
+        run: node scripts/lfea-m045-bm4-component-hierarchy-v2.mjs --report /tmp/m045-component-hierarchy.json
+      - name: Preserve M044A/M043/M042 evidence
+        run: |
+          node scripts/lfea-m044a-bm4-global-force-component-accuracy.mjs
+          node scripts/lfea-m043-bm4-axial-force-source-rca.mjs
+          node scripts/lfea-m042-bm4-first-divergence-rca.mjs
+      - name: Upload deterministic M045 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m045-bm4-component-hierarchy-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            /tmp/m045-discovery.json
+            /tmp/m045-component-hierarchy.json
+          if-no-files-found: error
+      - name: Verify clean worktree
+        run: git diff --exit-code && git status --porcelain | tee /tmp/m045-status && test ! -s /tmp/m045-status
