@@ -18,6 +18,11 @@ import {
   createSharedPipingModel,
   semanticHash,
 } from '../src/core/shared-piping-model/index.js';
+import {
+  ENRICHMENT_OPERATING_FLUID_DENSITY_PROJECTION_SCHEMA,
+  assertEnrichmentOperatingFluidDensityProjection,
+  buildEnrichmentOperatingFluidDensityProjection,
+} from '../src/workspace/engineering-enrichment/production-operating-fluid-density-overlay.js';
 
 const capturedAt = '2026-08-08T06:42:00.000Z';
 const sharedModel = createSharedPipingModel({
@@ -134,6 +139,42 @@ assert.equal(density.sourceKey, 'fluidRegister');
 assert.equal(density.sourceHash, fluidSnapshot.sourceHash);
 assert.equal(density.locator, 'Fluids!1:densityKgM3');
 
+const dataset = {
+  sourceSha256: '1'.repeat(64),
+  sharedModel,
+  entities: [{ entityId: 'PIPE-1', entityType: 'PIPE', lineKey: 'L-1' }],
+};
+const sourceStructuralHash = semanticHash({
+  scope: 'P5B-CANONICAL-FLUID-CONTRACT',
+  sourceSharedModelHash: sharedModel.semanticHash,
+});
+const projection = buildEnrichmentOperatingFluidDensityProjection({
+  fluidResolution: first,
+  dataset,
+  sourceStructuralHash,
+});
+const repeatedProjection = buildEnrichmentOperatingFluidDensityProjection({
+  fluidResolution: first,
+  dataset,
+  sourceStructuralHash,
+});
+assert.equal(projection.schema, ENRICHMENT_OPERATING_FLUID_DENSITY_PROJECTION_SCHEMA);
+assert.deepEqual(projection, repeatedProjection, 'fluid resolution projection must be deterministic');
+assert.equal(assertEnrichmentOperatingFluidDensityProjection(projection), projection);
+assert.equal(projection.sourceDatasetHash, dataset.sourceSha256);
+assert.equal(projection.sourceSharedModelHash, sharedModel.semanticHash);
+assert.equal(projection.sourceStructuralHash, sourceStructuralHash);
+assert.equal(projection.fluidResolutionHash, first.semanticHash);
+assert.equal(projection.summary.status, 'READY_FOR_STRUCTURAL_IMPACT');
+assert.equal(projection.summary.blockedCount, 0);
+assert.equal(projection.rows.length, 1);
+assert.equal(projection.rows[0].targetKind, 'LINE');
+assert.equal(projection.rows[0].targetId, 'L-1');
+assert.equal(projection.rows[0].fieldId, 'fluid.densityKgM3');
+assert.equal(projection.rows[0].proposedValue, 1000);
+assert.equal(projection.rows[0].sourceEvidence.sourceKind, 'FLUID_REGISTER');
+assert.equal(projection.rows[0].sourceEvidence.sourceHash, fluidSnapshot.sourceHash);
+
 const changedSnapshot = createEngineeringMasterSnapshot({
   ...withoutSemanticHash(fluidSnapshot),
   snapshotId: 'SNAP-P5B-FLUID-CHANGED',
@@ -146,6 +187,26 @@ const changed = createCommonEnrichedFluidResolution({
 });
 assert.notEqual(changed.snapshotSemanticHash, first.snapshotSemanticHash);
 assert.notEqual(changed.semanticHash, first.semanticHash);
+const changedProjection = buildEnrichmentOperatingFluidDensityProjection({
+  fluidResolution: changed,
+  dataset,
+  sourceStructuralHash,
+});
+assert.notEqual(changedProjection.fluidResolutionHash, projection.fluidResolutionHash);
+assert.notEqual(changedProjection.projectionHash, projection.projectionHash);
+
+const mismatchedDataset = {
+  ...dataset,
+  sharedModel: { ...sharedModel, semanticHash: semanticHash({ other: 'model' }) },
+};
+const blockedProjection = buildEnrichmentOperatingFluidDensityProjection({
+  fluidResolution: first,
+  dataset: mismatchedDataset,
+  sourceStructuralHash,
+});
+assert.equal(blockedProjection.summary.status, 'BLOCKED');
+assert.equal(blockedProjection.summary.blockedCount, 1);
+assert.equal(blockedProjection.rows[0].disposition, 'BLOCKED_FLUID_RESOLUTION');
 
 assert.throws(
   () => createCommonEnrichedFluidResolution({
@@ -156,16 +217,27 @@ assert.throws(
   'non-canonical binding order must fail closed',
 );
 
+const tamperedProjection = structuredClone(projection);
+tamperedProjection.rows[0].proposedValue = 999;
+assert.throws(
+  () => assertEnrichmentOperatingFluidDensityProjection(tamperedProjection),
+  (error) => error.code === 'ENRICHMENT_OPERATING_FLUID_PROJECTION_PROPOSAL_HASH_MISMATCH',
+);
+
 console.log(JSON.stringify({
   check: 'enrichment-package5b-fluid-resolution-contract',
   status: 'PASS',
   resolutionSemanticHash: first.semanticHash,
   snapshotSemanticHash: first.snapshotSemanticHash,
+  projectionHash: projection.projectionHash,
   resolvedLineKey: target.lineKey,
   resolvedDensityKgPerM3: density.value,
   canonicalBindingOrder: bindings.map((row) => row.targetField),
   sourceChangeInvalidatesResolutionIdentity: true,
+  sourceChangeInvalidatesProjectionIdentity: true,
+  sharedModelMismatchBlocksProjection: true,
   nonCanonicalOrderFailsClosed: true,
+  projectionTamperFailsClosed: true,
 }, null, 2));
 
 function component(componentKey, lineId) {
