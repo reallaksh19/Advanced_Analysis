@@ -165,6 +165,7 @@ export function buildEnrichmentProductionComponentWeightOverlay(input) {
     sealId: seal.sealId,
     sealHash: seal.sealHash,
     currentnessHash: currentness.currentnessHash,
+    observedAuthorityHash: currentness.observedAuthorityHash,
     candidateProjectionHash: candidate.projectionHash,
     sourceDatasetHash: seal.sourceDatasetHash,
     sourceSharedModelHash: seal.sourceSharedModelHash,
@@ -200,10 +201,11 @@ export function buildEnrichmentProductionComponentWeightOverlay(input) {
 
 export function assertEnrichmentProductionComponentWeightOverlay(value) {
   exactKeys(value, [
-    'schema', 'sealId', 'sealHash', 'currentnessHash', 'candidateProjectionHash',
-    'sourceDatasetHash', 'sourceSharedModelHash', 'activatedFieldFamilies', 'status',
-    'bindings', 'componentWeightsKg', 'blockers', 'summary', 'policy',
-    'sourceDatasetMutated', 'calculationExecutionPerformed', 'overlayHash',
+    'schema', 'sealId', 'sealHash', 'currentnessHash', 'observedAuthorityHash',
+    'candidateProjectionHash', 'sourceDatasetHash', 'sourceSharedModelHash',
+    'activatedFieldFamilies', 'status', 'bindings', 'componentWeightsKg',
+    'blockers', 'summary', 'policy', 'sourceDatasetMutated',
+    'calculationExecutionPerformed', 'overlayHash',
   ], 'production component-weight overlay');
   if (value.schema !== ENRICHMENT_PRODUCTION_COMPONENT_WEIGHT_OVERLAY_SCHEMA) {
     fail('ENRICHMENT_PRODUCTION_OVERLAY_SCHEMA_INVALID', 'Unexpected production component-weight overlay schema.');
@@ -212,6 +214,7 @@ export function assertEnrichmentProductionComponentWeightOverlay(value) {
     ['sealId', value.sealId],
     ['sealHash', value.sealHash],
     ['currentnessHash', value.currentnessHash],
+    ['observedAuthorityHash', value.observedAuthorityHash],
     ['candidateProjectionHash', value.candidateProjectionHash],
     ['sourceDatasetHash', value.sourceDatasetHash],
     ['sourceSharedModelHash', value.sourceSharedModelHash],
