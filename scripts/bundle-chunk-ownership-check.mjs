@@ -19,6 +19,10 @@ const expectedOwnership = new Map([
   ['/repo/src/core/support-engineering/index.js', 'core-support-engineering'],
   ['/repo/src/workspace/topology-edit/topology-edit-inline-component-replacement.js', 'topology-edit-engineering-commands'],
   ['/repo/src/workspace/topology-edit/topology-edit-stagedjson-engineering-source.js', 'topology-edit-stagedjson-source-engineering'],
+  ['/repo/src/workspace/topology-edit/editor-state/topology-edit-capability-contract.js', 'topology-edit-r1-pure-presentation'],
+  ['/repo/src/workspace/topology-edit/table/topology-edit-table-edit-capability.js', 'topology-edit-r1-pure-presentation'],
+  ['/repo/src/workspace/viewport-interaction/topology-edit-endpoint-affordance-model.js', 'topology-edit-r1-pure-presentation'],
+  ['/repo/src/workspace/viewport-interaction/topology-edit-endpoint-affordance-runtime.js', 'topology-edit-r1-pure-presentation'],
   ['/repo/src/workspace/resolved-engineering-geometry.js', 'workspace-viewport-engineering-projections'],
   ['/repo/src/workspace/viewport-render-model.js', 'workspace-viewport-engineering-projections'],
   ['/repo/src/workspace/model-zone-viewport-projection.js', 'workspace-viewport-engineering-projections'],
@@ -34,6 +38,8 @@ const automaticWorkspaceOwnership = [
   '/repo/src/workspace/linear-piping-results-workbench.js',
   '/repo/src/workspace/lafea-workbench.js',
   '/repo/src/workspace/topology-edit/topology-edit-controller.js',
+  '/repo/src/workspace/topology-edit/editor-state/topology-edit-capability-authority.js',
+  '/repo/src/workspace/topology-edit/topology-edit-reachable-typed-viewport-backend.js',
   '/repo/src/workspace/sequential-sketcher/sequential-sketcher-controller.js',
   '/repo/src/workspace/viewport-panel.js',
   '/repo/src/workspace/viewport-renderer.js',
@@ -59,7 +65,7 @@ assert.equal(viteSource.includes('chunkSizeWarningLimit'), false);
 assert.equal(policySource.includes('const targetBytes = 500 * 1024;'), true);
 assert.equal(policySource.includes('const maximumBytes = 1024 * 1024;'), true);
 assert.equal(policySource.includes('chunk.bytes <= maximumBytes'), true);
-assert.equal(new Set(expectedOwnership.values()).size >= 9, true);
+assert.equal(new Set(expectedOwnership.values()).size >= 10, true);
 
 console.log(JSON.stringify({
   check: 'bundle-chunk-ownership',

@@ -37,7 +37,7 @@ test('tree, search, HUD, and real WebGL share one canonical selection authority'
   await expect(host).toHaveAttribute('data-topology-edit-selection-ids', 'edge:P-001');
   await expect(firstTreeRow).toHaveAttribute('aria-selected', 'true');
   await openPanel(host, 'topology-edit-professional-operation');
-  await expect(page.locator('[data-role="professional-edge-id"]')).toHaveValue('edge:P-001');
+  await expectProfessionalTarget(page, 'P-001 · PIPE', 'edge:P-001');
 
   await selectBySearch(page, host, 'edge:P-003', true);
   await expect(host).toHaveAttribute(
@@ -50,13 +50,13 @@ test('tree, search, HUD, and real WebGL share one canonical selection authority'
 
   await selectBySearch(page, host, 'edge:P-004');
   await expect(host).toHaveAttribute('data-topology-edit-selection-ids', 'edge:P-004');
-  await expect(page.locator('[data-role="professional-edge-id"]')).toHaveValue('edge:P-004');
+  await expectProfessionalTarget(page, 'P-004 · PIPE', 'edge:P-004');
 
   const viewportTarget = await visiblePickPoint(page, 'edge:P-004');
   await page.mouse.click(viewportTarget.x, viewportTarget.y);
   await expect(host).toHaveAttribute('data-topology-edit-selection-source', 'viewport');
   await expect(host).toHaveAttribute('data-topology-edit-selection-ids', 'edge:P-004');
-  await expect(page.locator('[data-role="professional-edge-id"]')).toHaveValue('edge:P-004');
+  await expectProfessionalTarget(page, 'P-004 · PIPE', 'edge:P-004');
   await expect(treeEntity(page, 'P-004')).toHaveAttribute('aria-selected', 'true');
   evidence.selection = { viewport: 'PASS', tree: 'PASS', search: 'PASS', hud: 'PASS' };
 });
@@ -174,6 +174,8 @@ async function openProductionController(page) {
     'data-topology-edit-dataset-session-version',
     /\d+/,
   );
+  await expect.poll(() => host.getAttribute('data-topology-edit-professional-catalogue-hash'))
+    .not.toBe('');
   return host;
 }
 
@@ -192,6 +194,14 @@ async function selectBySearch(page, host, canonicalId, additive = false) {
   const result = page.locator(`[data-search-canonical-id="${canonicalId}"]`);
   await expect(result).toHaveCount(1);
   await result.click({ modifiers: additive ? ['Shift'] : [] });
+}
+
+async function expectProfessionalTarget(page, humanTarget, canonicalId) {
+  await expect(page.locator('[data-role="professional-human-target"]'))
+    .toHaveText(humanTarget);
+  const hud = page.locator('[data-role="topology-edit-component-hud"]');
+  await expect(hud).toHaveAttribute('data-context-status', 'UNSUPPORTED');
+  await expect(hud.locator('details code')).toHaveText(canonicalId);
 }
 
 function treeEntity(page, entityId) {

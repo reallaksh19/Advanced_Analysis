@@ -38,15 +38,17 @@ export class TopologyEditNavigationHudViewportBackend extends TopologyEditSuppor
   }
 
   /**
-   * A center-pixel ID-buffer hit is the frontmost rendered identity and takes
-   * the allocation-free fast path. Radius-only GPU acquisition still checks
-   * the exact cursor ray first, preserving the established rule that a direct
-   * object under the pointer cannot be replaced by a nearby proxy.
+   * Visible endpoint affordances are exact canonical pick geometry and receive
+   * deterministic priority when the user actually hits the marker. Otherwise
+   * the established GPU-first component/body picking path remains unchanged.
    */
   pickAt(clientX, clientY) {
     if (this.contextLost || this.configurationError) return null;
     const context = this.pickContext(clientX, clientY);
     if (!context) return null;
+
+    const endpointHit = this.pickVisibleEndpoint?.(context.pointer);
+    if (endpointHit) return endpointHit;
 
     const gpuHit = this.gpuPicker?.pick({
       clientX,

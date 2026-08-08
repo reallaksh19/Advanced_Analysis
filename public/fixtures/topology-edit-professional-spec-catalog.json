@@ -1,6 +1,6 @@
 {
   "catalogueId": "DEMO-PIPING-CATALOGUE",
-  "catalogueVersion": "2026.08.06",
+  "catalogueVersion": "2026.08.08-r1",
   "authority": {
     "sourceId": "SPEC-DEMO",
     "sourceVersion": "8",
@@ -91,6 +91,27 @@
       }
     },
     {
+      "recordId": "REDUCER-DN50-DN25-CONC-XYZ-A",
+      "componentType": "REDUCER",
+      "nominalSizeMm": 50,
+      "outsideDiameterMm": 60.3,
+      "secondaryNominalSizeMm": 25,
+      "secondaryOutsideDiameterMm": 33.4,
+      "pressureClass": "150",
+      "materialSpecification": "ASTM A234 WPB",
+      "componentLengthMm": 300,
+      "reducerType": "CONCENTRIC",
+      "reducerOrientation": "CONCENTRIC",
+      "endConnectionFrom": "BW",
+      "endConnectionTo": "BW",
+      "pipingClass": "DEMO-150",
+      "sourceReference": {
+        "documentId": "SPEC-DEMO",
+        "revision": "8",
+        "path": "/reducer/dn50-dn25/concentric"
+      }
+    },
+    {
       "recordId": "VALVE-DN100-GATE-600-A",
       "componentType": "VALVE",
       "nominalSizeMm": 100,
@@ -128,6 +149,46 @@
         "documentId": "SPEC-DEMO",
         "revision": "8",
         "path": "/valve/dn100/globe/class600-compact"
+      }
+    },
+    {
+      "recordId": "VALVE-DN25-GATE-150-XYZ-A",
+      "componentType": "VALVE",
+      "nominalSizeMm": 25,
+      "outsideDiameterMm": 33.4,
+      "pressureClass": "150",
+      "materialSpecification": "ASTM A216 WCB",
+      "componentLengthMm": 300,
+      "componentMassKg": 12.5,
+      "valveType": "GATE",
+      "valveFaceToFaceMm": 300,
+      "endConnectionFrom": "FLANGED_RF",
+      "endConnectionTo": "FLANGED_RF",
+      "pipingClass": "DEMO-150",
+      "sourceReference": {
+        "documentId": "SPEC-DEMO",
+        "revision": "8",
+        "path": "/valve/dn25/gate/demo-150"
+      }
+    },
+    {
+      "recordId": "VALVE-DN25-BALL-150-XYZ-B",
+      "componentType": "VALVE",
+      "nominalSizeMm": 25,
+      "outsideDiameterMm": 33.4,
+      "pressureClass": "150",
+      "materialSpecification": "ASTM A216 WCB",
+      "componentLengthMm": 250,
+      "componentMassKg": 9.8,
+      "valveType": "BALL",
+      "valveFaceToFaceMm": 250,
+      "endConnectionFrom": "FLANGED_RF",
+      "endConnectionTo": "FLANGED_RF",
+      "pipingClass": "DEMO-150",
+      "sourceReference": {
+        "documentId": "SPEC-DEMO",
+        "revision": "8",
+        "path": "/valve/dn25/ball/demo-150"
       }
     },
     {

@@ -1,0 +1,202 @@
+name: 3D Edit R1 Real User Reachability
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/topology-edit-real-user-reachability.yml'
+      - 'src/workspace/topology-edit/**'
+      - 'src/workspace/viewport-interaction/**'
+      - 'src/workspace/viewport-productivity/**'
+      - 'public/fixtures/topology-edit-professional-spec-catalog.json'
+      - 'tests/topology-edit-capability-authority.test.mjs'
+      - 'tests/topology-edit-endpoint-affordance.test.mjs'
+      - 'tests/topology-edit-demo-catalogue-coverage.test.mjs'
+      - 'e2e/topology-edit-real-user-reachability.spec.js'
+      - 'scripts/topology-edit-r1-line-budget-check.mjs'
+      - 'scripts/topology-edit-real-user-e2e-anti-cheat-check.mjs'
+      - 'scripts/topology-edit-real-user-evidence-report.mjs'
+      - 'scripts/bundle-chunk-ownership-check.mjs'
+      - 'vite.config.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: topology-edit-real-user-reachability-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  real-user-reachability:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      TOPOLOGY_EDIT_R1_BASE_SHA: ddc0d87aa5e1a02cb8b5bf10e71dbb1fb1ce9fb3
+      PLAYWRIGHT_BROWSER_CHANNEL: chromium
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Verify exact head and patch hygiene
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+          git diff --check
+
+      - name: Enforce new-module physical line budget
+        run: node scripts/topology-edit-r1-line-budget-check.mjs
+
+      - name: Enforce no-privilege E2E source policy
+        run: node scripts/topology-edit-real-user-e2e-anti-cheat-check.mjs
+
+      - name: Verify R1 source syntax
+        run: |
+          set -euo pipefail
+          node --check e2e/topology-edit-real-user-reachability.spec.js
+          node --check src/workspace/topology-edit/editor-state/topology-edit-capability-contract.js
+          node --check src/workspace/topology-edit/editor-state/topology-edit-capability-authority.js
+          node --check src/workspace/viewport-interaction/topology-edit-endpoint-affordance-model.js
+          node --check src/workspace/topology-edit/topology-edit-reachable-typed-viewport-backend.js
+
+      - name: Install dependencies and Chromium
+        run: |
+          set -euo pipefail
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Verify bundle ownership policy
+        run: node scripts/bundle-chunk-ownership-check.mjs
+
+      - name: Build production application
+        shell: bash
+        run: |
+          set +e
+          npm run build > topology-edit-r1-build-output.txt 2>&1
+          status=$?
+          cat topology-edit-r1-build-output.txt
+          if [ "$status" -ne 0 ]; then
+            detail="$(tail -n 18 topology-edit-r1-build-output.txt | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
+            echo "::error title=3D Edit R1 production build failed::${detail}"
+            exit "$status"
+          fi
+
+      - name: Execute new R1 unit contracts
+        run: |
+          set -euo pipefail
+          node --test --test-reporter=tap \
+            tests/topology-edit-capability-authority.test.mjs \
+            tests/topology-edit-endpoint-affordance.test.mjs \
+            tests/topology-edit-demo-catalogue-coverage.test.mjs \
+            2>&1 | tee topology-edit-r1-new-unit-output.txt
+
+      - name: Execute retained focused unit regressions
+        shell: bash
+        run: |
+          set +e
+          : > topology-edit-r1-retained-unit-output.txt
+          status=0
+          TESTS=(
+            tests/topology-edit-component-hud-context.test.mjs
+            tests/topology-edit-selection-coordinator.test.mjs
+            tests/topology-edit-selection-foundation-integration.test.mjs
+            tests/topology-edit-professional-interaction-containment.test.mjs
+            tests/topology-edit-professional-engineering-plan.test.mjs
+            tests/topology-edit-inline-component-insertion.test.mjs
+            tests/topology-edit-xyz-branch-demo.test.mjs
+            tests/topology-edit-table-m04-m06-m10.test.mjs
+            tests/topology-edit-table-q3-source-capability.test.mjs
+          )
+          for test_file in "${TESTS[@]}"; do
+            echo "===== ${test_file} =====" | tee -a topology-edit-r1-retained-unit-output.txt
+            temp_output="$(mktemp)"
+            node --test --test-reporter=tap "$test_file" > "$temp_output" 2>&1
+            test_status=$?
+            cat "$temp_output" | tee -a topology-edit-r1-retained-unit-output.txt
+            if [ "$test_status" -ne 0 ]; then
+              detail="$(tail -n 24 "$temp_output" | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
+              echo "::error title=Retained R1 unit regression failed::${test_file} — ${detail}"
+              status=1
+            fi
+            rm -f "$temp_output"
+          done
+          exit "$status"
+
+      - name: Execute no-privilege production Chromium qualification
+        shell: bash
+        run: |
+          set +e
+          : > topology-edit-r1-real-user-output.txt
+          status=0
+          JOURNEYS=(
+            '3D Demo is reachable through visible production controls only'
+            'XYZ Branch exposes truthful catalogue, endpoint and Table capability paths'
+          )
+          for journey in "${JOURNEYS[@]}"; do
+            echo "===== ${journey} =====" | tee -a topology-edit-r1-real-user-output.txt
+            temp_output="$(mktemp)"
+            npx playwright test e2e/topology-edit-real-user-reachability.spec.js \
+              --project=chromium \
+              --workers=1 \
+              --retries=0 \
+              --reporter=line \
+              --grep "$journey" > "$temp_output" 2>&1
+            test_status=$?
+            cat "$temp_output" | tee -a topology-edit-r1-real-user-output.txt
+            if [ "$test_status" -ne 0 ]; then
+              detail="$(tail -n 36 "$temp_output" | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
+              echo "::error title=No-privilege Chromium journey failed::${journey} — ${detail}"
+              status=1
+            fi
+            rm -f "$temp_output"
+          done
+          exit "$status"
+
+      - name: Execute retained high-signal regressions
+        run: |
+          set -euo pipefail
+          E2E_TESTS=(
+            e2e/topology-edit-xyz-branch-demo.spec.js
+            e2e/topology-edit-table-authority.spec.js
+            e2e/topology-edit-sjson-render-authority.spec.js
+            e2e/topology-edit-deterministic-snapping.spec.js
+            e2e/topology-edit-tool-audit.spec.js
+          )
+          npx playwright test "${E2E_TESTS[@]}" \
+            --project=chromium \
+            --workers=1 \
+            --retries=0 \
+            --reporter=line 2>&1 | tee topology-edit-r1-retained-e2e-output.txt
+
+      - name: Seal exact-head evidence
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+          node scripts/topology-edit-real-user-evidence-report.mjs
+
+      - name: Upload R1 qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-r1-real-user-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}-${{ github.run_attempt }}
+          path: |
+            topology-edit-r1-build-output.txt
+            topology-edit-r1-new-unit-output.txt
+            topology-edit-r1-retained-unit-output.txt
+            topology-edit-r1-real-user-output.txt
+            topology-edit-r1-retained-e2e-output.txt
+            reports/qualification
+            playwright-report
+            test-results
+          if-no-files-found: warn
+          retention-days: 30

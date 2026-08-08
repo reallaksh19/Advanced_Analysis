@@ -58,11 +58,13 @@ test('production WebGL drag uses deterministic snapping without canonical previe
   const drag = await dragPoints(page, context.anchorNodeId, context.mode);
   await page.mouse.move(drag.start.x, drag.start.y);
   await page.mouse.down();
-  await page.mouse.move(drag.target.x, drag.target.y, { steps: 12 });
+  await page.mouse.move(drag.target.x, drag.target.y);
 
   await expect(host).toHaveAttribute('data-topology-edit-interaction-snap-status', 'RESOLVED');
   await expect(host).toHaveAttribute('data-topology-edit-interaction-snap-evidence', 'PORT');
-  await expect(host).toHaveAttribute('data-topology-edit-interaction-snap-target', context.anchorNodeId);
+  await expect(host).toHaveAttribute('data-topology-edit-interaction-snap-target', /.+/);
+  const snapTarget = await host.getAttribute('data-topology-edit-interaction-snap-target');
+  expect(context.anchorPortTargetIds).toContain(snapTarget);
   await expect(host).toHaveAttribute('data-topology-edit-snap-index-hash', /.+/);
   await expect(host).toHaveAttribute('data-topology-edit-snap-result-hash', /.+/);
   await expect(host).toHaveAttribute('data-topology-edit-snap-query-id', /.+/);
@@ -204,12 +206,17 @@ async function screenResolvedPortDragContext(page) {
   return page.evaluate((controllerKey) => {
     const controller = globalThis[controllerKey];
     const topology = controller.session.currentTopology();
+    const runtime = controller.interactionControllerRuntime;
+    const snapIndex = runtime.ensureSnapIndex(topology);
     const camera = controller.viewportBackend.activeCamera;
     const canvas = controller.viewportBackend.renderer.domElement;
+    const engineeringRoot = controller.viewportBackend.engineeringRoot;
+    engineeringRoot.updateMatrixWorld(true);
     const rect = canvas.getBoundingClientRect();
     const nodes = topology.nodes
       .filter((node) => node.portKeys?.length)
       .sort((left, right) => left.id.localeCompare(right.id));
+    const nodeById = new Map(topology.nodes.map((node) => [node.id, node]));
     const epsilon = 1e-7;
     const modeFor = (left, right) => {
       const dx = right.x - left.x;
@@ -224,8 +231,54 @@ async function screenResolvedPortDragContext(page) {
       if (Math.abs(dy) <= epsilon) return 'PLANE_XZ';
       return null;
     };
+    const ridesTargetCenterline = (moving, anchor) => {
+      const approach = {
+        x: anchor.position.x - moving.position.x,
+        y: anchor.position.y - moving.position.y,
+        z: anchor.position.z - moving.position.z,
+      };
+      const approachLength = Math.hypot(approach.x, approach.y, approach.z);
+      return topology.edges.some((edge) => {
+        const otherId = edge.fromNodeId === anchor.id
+          ? edge.toNodeId
+          : edge.toNodeId === anchor.id
+            ? edge.fromNodeId
+            : null;
+        const other = otherId ? nodeById.get(otherId) : null;
+        if (!other) return false;
+        const tangent = {
+          x: other.position.x - anchor.position.x,
+          y: other.position.y - anchor.position.y,
+          z: other.position.z - anchor.position.z,
+        };
+        const tangentLength = Math.hypot(tangent.x, tangent.y, tangent.z);
+        if (!(approachLength > epsilon) || !(tangentLength > epsilon)) return false;
+        const cross = {
+          x: approach.y * tangent.z - approach.z * tangent.y,
+          y: approach.z * tangent.x - approach.x * tangent.z,
+          z: approach.x * tangent.y - approach.y * tangent.x,
+        };
+        return Math.hypot(cross.x, cross.y, cross.z)
+          <= epsilon * approachLength * tangentLength;
+      });
+    };
+    const exactPortTargetIds = (node) => [...new Set(
+      (snapIndex.pointFeatures ?? [])
+        .filter((feature) => (
+          feature.kind === 'PORT'
+          && Math.hypot(
+            feature.worldPoint.x - node.position.x,
+            feature.worldPoint.y - node.position.y,
+            feature.worldPoint.z - node.position.z,
+          ) <= epsilon
+        ))
+        .flatMap((feature) => feature.canonicalTargetIds ?? []),
+    )].sort();
     const project = (point) => {
-      const vector = camera.position.clone().set(point.x, point.y, point.z).project(camera);
+      const vector = camera.position.clone()
+        .set(point.x, point.y, point.z)
+        .applyMatrix4(engineeringRoot.matrixWorld)
+        .project(camera);
       return {
         x: ((vector.x + 1) / 2) * rect.width,
         y: ((1 - vector.y) / 2) * rect.height,
@@ -240,7 +293,9 @@ async function screenResolvedPortDragContext(page) {
       for (const anchor of nodes) {
         if (moving.id === anchor.id) continue;
         const mode = modeFor(moving.position, anchor.position);
-        if (!mode) continue;
+        if (!mode || ridesTargetCenterline(moving, anchor)) continue;
+        const anchorPortTargetIds = exactPortTargetIds(anchor);
+        if (!anchorPortTargetIds.length) continue;
         const movingScreen = project(moving.position);
         const anchorScreen = project(anchor.position);
         const screenDistancePx = Math.hypot(
@@ -253,6 +308,7 @@ async function screenResolvedPortDragContext(page) {
           anchorNodeId: anchor.id,
           movingPortKey: [...moving.portKeys].sort()[0],
           anchorPortKey: [...anchor.portKeys].sort()[0],
+          anchorPortTargetIds,
           mode,
           screenDistancePx,
           distanceMm: Math.hypot(
@@ -301,6 +357,8 @@ async function dragPoints(page, targetNodeId, mode) {
     const gizmo = runtime.gizmo;
     const camera = controller.viewportBackend.activeCamera;
     const canvas = controller.viewportBackend.renderer.domElement;
+    const engineeringRoot = controller.viewportBackend.engineeringRoot;
+    engineeringRoot.updateMatrixWorld(true);
     if (!target || !viewport || !gizmo || !camera || !canvas) {
       throw new Error('Phase B gizmo drag context is unavailable.');
     }
@@ -328,7 +386,10 @@ async function dragPoints(page, targetNodeId, mode) {
     }
     const rect = canvas.getBoundingClientRect();
     const project = (point) => {
-      const vector = camera.position.clone().set(point.x, point.y, point.z).project(camera);
+      const vector = camera.position.clone()
+        .set(point.x, point.y, point.z)
+        .applyMatrix4(engineeringRoot.matrixWorld)
+        .project(camera);
       return {
         x: rect.left + ((vector.x + 1) / 2) * rect.width,
         y: rect.top + ((1 - vector.y) / 2) * rect.height,

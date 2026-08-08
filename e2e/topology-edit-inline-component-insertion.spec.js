@@ -35,13 +35,20 @@ test('exact valve insertion applies, renders, undoes, and redoes as one governed
 
   await panel.locator('[data-role="professional-operation-type"]')
     .selectOption('INSERT_INLINE_COMPONENT');
-  await panel.locator('[data-role="professional-edge-id"]').fill(target.id);
-  await panel.locator('[data-role="professional-center-distance-mm"]')
-    .fill(String(target.lengthMm / 2));
-  await panel.locator('[data-role="professional-insertion-length-mm"]').fill('');
-  await panel.locator('[data-role="professional-inline-direction"]').selectOption('FROM_TO');
+  await openAdvancedCanonicalEvidence(panel);
+  const edgeInput = panel.locator('[data-role="professional-edge-id"]');
+  await edgeInput.fill(target.id);
+  await edgeInput.press('Tab');
+  await expect(panel.locator('[data-role="professional-edge-id"]')).toHaveValue(target.id);
+  const centerDistance = String(target.lengthMm / 2);
+  const centerInput = panel.locator('[data-role="professional-center-distance-mm"]');
+  await centerInput.fill(centerDistance);
+  await centerInput.press('Tab');
+  await expect(panel.locator('[data-role="professional-center-distance-mm"]'))
+    .toHaveValue(centerDistance);
   await panel.locator('[data-role="professional-catalogue-record"]')
     .selectOption(VALVE_RECORD_ID);
+  await expect(host).toHaveAttribute('data-topology-edit-professional-capability-status', 'AVAILABLE');
   await panel.locator('[data-action="plan-professional-operation"]').click();
 
   await expect.poll(() => host.getAttribute(
@@ -235,6 +242,14 @@ async function openPanel(host, kind) {
     await details.locator(':scope > summary').click();
   }
   return details.locator('[data-role="topology-edit-professional-operation"]');
+}
+
+async function openAdvancedCanonicalEvidence(panel) {
+  const details = panel.locator('[data-role="professional-canonical-evidence"]');
+  await expect(details).toBeVisible();
+  if (!(await details.evaluate((element) => element.open))) {
+    await details.locator(':scope > summary').click();
+  }
 }
 
 async function integerAttribute(locator, name) {

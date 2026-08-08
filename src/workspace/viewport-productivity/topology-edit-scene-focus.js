@@ -29,7 +29,7 @@ function collectGroupBounds(group, requested, found, bounds) {
   if (!group?.visible) return;
   group.updateWorldMatrix?.(true, true);
   group.traverse((object) => {
-    if (!object.visible || hasNonPickableAncestor(object)) return;
+    if (!object.visible || hasNonFocusableAncestor(object)) return;
     if (object.isInstancedMesh) collectInstanceBounds(object, requested, found, bounds);
     else collectObjectBounds(object, requested, found, bounds);
   });
@@ -89,10 +89,12 @@ function matrixScaleIsZero(matrix) {
   return scale.x === 0 || scale.y === 0 || scale.z === 0;
 }
 
-function hasNonPickableAncestor(object) {
+function hasNonFocusableAncestor(object) {
   let current = object;
   while (current) {
-    if (current.userData?.nonPickable) return true;
+    if (current.userData?.nonPickable && current.userData?.endpointAffordance !== true) {
+      return true;
+    }
     current = current.parent;
   }
   return false;

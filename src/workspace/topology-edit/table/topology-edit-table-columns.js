@@ -21,17 +21,17 @@ const COMMON = [
 const BY_TYPE = Object.freeze({
   PIPE: [
     column('lengthMm', 'Length', 'length', { editor: 'PIPE_LENGTH' }),
-    column('slopePercent', 'Slope %', 'number', { editor: 'PIPE_SLOPE' }),
+    column('slopePercent', 'Slope %', 'number', { readOnly: true }),
   ],
   ELBOW: [
-    column('angleDeg', 'Angle', 'angle', { editor: 'BEND_ANGLE' }),
-    column('radiusMm', 'Radius', 'length', { editor: 'BEND_RADIUS' }),
-    column('turnIntent', 'Turn Intent', 'enum', { editor: 'BEND_TURN' }),
+    column('angleDeg', 'Angle', 'angle', { readOnly: true }),
+    column('radiusMm', 'Radius', 'length', { readOnly: true }),
+    column('turnIntent', 'Turn Intent', 'enum', { readOnly: true }),
   ],
   FLANGE: [
-    column('flangeType', 'Flange Type', 'enum', { editor: 'FLANGE_REPLACE' }),
-    column('flangeFacing', 'Facing', 'enum', { editor: 'FLANGE_REPLACE' }),
-    column('rating', 'Rating', 'text', { editor: 'FLANGE_REPLACE' }),
+    column('flangeType', 'Flange Type', 'enum', { readOnly: true }),
+    column('flangeFacing', 'Facing', 'enum', { readOnly: true }),
+    column('rating', 'Rating', 'text', { readOnly: true }),
   ],
   VALVE: [
     column('valveType', 'Valve Type', 'enum', { editor: 'VALVE_REPLACE' }),
@@ -47,16 +47,16 @@ const BY_TYPE = Object.freeze({
     column('branchAngleDeg', 'Branch Angle', 'angle', { editor: 'BRANCH_RECONFIGURE' }),
   ],
   REDUCER: [
-    column('reducerType', 'Reducer Type', 'enum', { editor: 'REDUCER_REPLACE' }),
-    column('reducerOrientation', 'Orientation', 'enum', { editor: 'REDUCER_REPLACE' }),
+    column('reducerType', 'Reducer Type', 'enum', { readOnly: true }),
+    column('reducerOrientation', 'Orientation', 'enum', { readOnly: true }),
   ],
   SUPPORT: [
     column('hostEntityId', 'Host', 'identity', { readOnly: true }),
-    column('stationMm', 'Station', 'length'),
-    column('supportType', 'Support Type', 'enum'),
-    column('direction', 'Direction', 'vector'),
-    column('gapMm', 'Gap', 'length'),
-    column('travelMm', 'Travel', 'length'),
+    column('stationMm', 'Station', 'length', { readOnly: true }),
+    column('supportType', 'Support Type', 'enum', { readOnly: true }),
+    column('direction', 'Direction', 'vector', { readOnly: true }),
+    column('gapMm', 'Gap', 'length', { readOnly: true }),
+    column('travelMm', 'Travel', 'length', { readOnly: true }),
   ],
   COMPONENT: [],
   JUNCTION: [],

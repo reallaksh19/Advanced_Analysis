@@ -55,6 +55,12 @@ export function manualChunk(id) {
   if (source.endsWith('/src/workspace/topology-edit/topology-edit-stagedjson-engineering-source.js')) {
     return 'topology-edit-stagedjson-source-engineering';
   }
+  if (source.endsWith('/src/workspace/topology-edit/editor-state/topology-edit-capability-contract.js')
+    || source.endsWith('/src/workspace/topology-edit/table/topology-edit-table-edit-capability.js')
+    || source.endsWith('/src/workspace/viewport-interaction/topology-edit-endpoint-affordance-model.js')
+    || source.endsWith('/src/workspace/viewport-interaction/topology-edit-endpoint-affordance-runtime.js')) {
+    return 'topology-edit-r1-pure-presentation';
+  }
   if (source.endsWith('/src/workspace/resolved-engineering-geometry.js')
     || source.endsWith('/src/workspace/model-zone-selector.js')
     || source.endsWith('/src/workspace/model-zone-viewport-projection.js')

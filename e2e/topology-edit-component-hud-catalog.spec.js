@@ -26,19 +26,17 @@ test('flange, valve, and reducer selections expose distinct governed HUD schemas
   const valveId = await canonicalEdgeForComponent(page, 'V-001');
   await selectBySearch(page, host, valveId);
   await expect(host).toHaveAttribute('data-topology-edit-component-hud-type', 'VALVE');
-  await expect(host).toHaveAttribute('data-topology-edit-component-hud-status', 'RESOLVED');
-  await expect(host).toHaveAttribute('data-topology-edit-component-hud-candidate-count', '1');
+  await expect(host).toHaveAttribute('data-topology-edit-component-hud-status', 'INCOMPATIBLE');
+  await expect(host).toHaveAttribute('data-topology-edit-component-hud-candidate-count', '4');
   await expect(host).toHaveAttribute(
     'data-topology-edit-component-hud-recommended-record-id',
-    'VALVE-DN100-GATE-600-A',
+    '',
   );
   await expect(hud(page).locator('[data-field-key="valveType"]')).toContainText('GATE');
   await expect(hud(page).locator('[data-field-key="valveFaceToFaceMm"]')).toContainText('600 mm');
   await expect(hud(page).locator('[data-field-key="flangeClass"]')).toHaveCount(0);
-  await expect(nonEmptyCatalogueOptions(page)).toHaveCount(1);
-  await expect(page.locator('[data-role="professional-catalogue-record"]')).toHaveValue(
-    'VALVE-DN100-GATE-600-A',
-  );
+  await expect(nonEmptyCatalogueOptions(page)).toHaveCount(4);
+  await expect(page.locator('[data-role="professional-catalogue-record"]')).toHaveValue('');
 
   const reducerId = await canonicalEdgeForComponent(page, 'R-001');
   await selectBySearch(page, host, reducerId);
