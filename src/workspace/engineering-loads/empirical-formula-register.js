@@ -39,7 +39,7 @@ export function createEmpiricalFormulaRegister() {
         'elastic pipe/support stiffness distribution',
         'thermal or imposed-displacement reaction',
         'friction',
-        'gaps, line stops, guides and liftoff',
+        'gaps, line stops, guides and liftoff are not computed by CHAINAGE_TRIBUTARY_SPAN_V2; local non-final liftoff screening is separately defined by THERMAL_LIFTOFF_ACTIVE_SET_V1 shadow authority',
         'support steel or civil structural distribution',
         'dynamic, wind, seismic, surge, slug or relief loads',
         'code stress, LFEA, LAFEA or continuum FEA',
