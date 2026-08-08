@@ -1,6 +1,9 @@
 import {
   topologyEditTableColumnsFor,
 } from '../topology-edit/table/topology-edit-table-columns.js';
+import {
+  deriveTopologyEditTableCellCapability,
+} from '../topology-edit/table/topology-edit-table-edit-capability.js';
 
 const TYPE_ORDER = ['PIPE', 'ELBOW', 'FLANGE', 'VALVE', 'TEE', 'REDUCER', 'SUPPORT', 'COMPONENT', 'JUNCTION'];
 
@@ -31,6 +34,11 @@ export function renderTopologyEditTableAllProperties(row, runtime) {
     label: descriptors.get(key)?.label ?? humanLabel(key),
     value: row.fields?.[key],
     authority: row.fieldAuthority?.[key] ?? 'UNRESOLVED',
+    capability: deriveTopologyEditTableCellCapability({
+      row,
+      columnKey: key,
+      projection: runtime?.projection,
+    }),
   }));
   const identity = [
     ['Canonical ID', row.identity?.canonicalId],
@@ -47,7 +55,7 @@ export function renderTopologyEditTableAllProperties(row, runtime) {
   return `<section class="topology-edit-table__all-properties" data-table-all-properties>
     <header><strong>All properties</strong><span>${projected.length} projected · ${source.length} source/vendor</span></header>
     ${propertyTable('Identity', identity.map(([label, value]) => ({ label, value, authority: 'IDENTITY' })))}
-    ${propertyTable('Engineering properties', projected)}
+    ${propertyTable('Engineering properties', projected, true)}
     ${propertyTable('Custody', custody.map(([label, value]) => ({ label, value, authority: 'READ_ONLY' })))}
     ${source.length ? propertyTable('Source / vendor properties (read-only)', source.map(([label, value]) => ({
       label, value, authority: 'SOURCE_OBSERVED',
@@ -64,12 +72,12 @@ export function topologyEditTableTypeSummary(rows = []) {
     .join(' · ');
 }
 
-function propertyTable(title, rows) {
+function propertyTable(title, rows, showCapability = false) {
   return `<details class="topology-edit-table__property-group" open>
     <summary>${escapeHtml(title)}</summary>
     <div class="topology-edit-table__property-scroll"><table aria-label="${escapeHtml(title)}">
-      <thead><tr><th>Property</th><th>Value</th><th>Authority</th></tr></thead>
-      <tbody>${rows.map((row) => `<tr><th scope="row">${escapeHtml(row.label)}</th><td>${escapeHtml(display(row.value))}</td><td>${escapeHtml(row.authority)}</td></tr>`).join('')}</tbody>
+      <thead><tr><th>Property</th><th>Value</th><th>Authority</th>${showCapability ? '<th>Capability</th>' : ''}</tr></thead>
+      <tbody>${rows.map((row) => `<tr><th scope="row">${escapeHtml(row.label)}</th><td>${escapeHtml(display(row.value))}</td><td>${escapeHtml(row.authority)}</td>${showCapability ? `<td data-table-capability-status="${escapeHtml(row.capability?.status)}" data-table-capability-reason="${escapeHtml(row.capability?.reasonCode)}">${escapeHtml(capabilityText(row.capability))}</td>` : ''}</tr>`).join('')}</tbody>
     </table></div>
   </details>`;
 }
@@ -130,6 +138,11 @@ function orderedFieldKeys(row, descriptors) {
   return result;
 }
 
+function capabilityText(capability) {
+  if (!capability) return 'READ_ONLY';
+  if (capability.status === 'AVAILABLE') return 'AVAILABLE';
+  return `${capability.status} — ${capability.reason}`;
+}
 function addDescriptors(target, descriptors) {
   for (const descriptor of descriptors) if (!target.has(descriptor.key)) target.set(descriptor.key, descriptor);
 }
