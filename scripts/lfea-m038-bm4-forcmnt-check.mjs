@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
-import { BM4_COMPARISON_POLICY, loadBm4CiiOutputCases1921 } from './lfea-m034-bm4-output-comparison.mjs';
 import { solveBm4InputXmlConditioned } from './lfea-m034-bm4-solve-runtime.mjs';
-import { solveBm4M035M036Combined } from './lfea-m035-m036-bm4-integration-runtime.mjs';
+import { buildBm4M035FeatureAuthorities } from './lfea-m035-bm4-feature-solve-runtime.mjs';
+import {
+  analyseM035M036Case,
+  buildM035M036Inventory,
+} from './lfea-m035-m036-bm4-integration-runtime.mjs';
 import {
   BM4_M038_FORCMNT_AUTHORITY,
   BM4_M038_FORCMNT_NODE_IDS,
 } from './lfea-m038-bm4-forcmnt-authority.mjs';
-
-const DOFS = Object.freeze(['UX', 'UY', 'UZ', 'RX', 'RY', 'RZ']);
-const TRANSLATIONS = new Set(['UX', 'UY', 'UZ']);
 
 function nodalPrimitives(loadCase) {
   return loadCase.primitives.filter((row) => row.kind === 'NODAL_FORCE_MOMENT');
@@ -33,98 +33,70 @@ function assertMembership(label, loadCase, prefix) {
   return rows;
 }
 
-function displacementVector(execution, sourceNodeId) {
-  const kernelNodeId = `BM4M035.N${sourceNodeId}`;
-  return Object.fromEntries(DOFS.map((dof) => [
-    dof,
-    execution.displacement.find((row) => row.nodeId === kernelNodeId && row.dof === dof)?.value ?? 0,
-  ]));
-}
-
-function ciiVector(row) {
-  return {
-    UX: row.DX / 1000,
-    UY: row.DY / 1000,
-    UZ: row.DZ / 1000,
-    RX: row.RX * Math.PI / 180,
-    RY: row.RY * Math.PI / 180,
-    RZ: row.RZ * Math.PI / 180,
-  };
-}
-
-function passes(ours, reference, dof, percentLimit) {
-  if (Math.abs(reference) <= BM4_COMPARISON_POLICY.nearZeroReferenceThreshold) {
-    const tolerance = TRANSLATIONS.has(dof)
-      ? BM4_COMPARISON_POLICY.absoluteTolerance.translation
-      : BM4_COMPARISON_POLICY.absoluteTolerance.rotation;
-    return Math.abs(ours - reference) <= tolerance;
-  }
-  return Math.abs((ours - reference) / Math.abs(reference) * 100) <= percentLimit;
-}
-
-function displacementPassSummary(execution, ciiRows) {
-  let total = 0;
-  let targetPass = 0;
-  let standingBarPass = 0;
-  const nodes = [];
-  for (const sourceNodeId of BM4_M038_FORCMNT_NODE_IDS) {
-    const referenceRow = ciiRows.get(sourceNodeId);
-    assert.ok(referenceRow, `CAESAR displacement row missing FORCMNT node ${sourceNodeId}.`);
-    const ours = displacementVector(execution, sourceNodeId);
-    const reference = ciiVector(referenceRow);
-    let nodeTarget = 0;
-    let nodeStanding = 0;
-    for (const dof of DOFS) {
-      total += 1;
-      if (passes(ours[dof], reference[dof], dof, BM4_COMPARISON_POLICY.targetTolerancePercent)) {
-        targetPass += 1;
-        nodeTarget += 1;
-      }
-      if (passes(ours[dof], reference[dof], dof, BM4_COMPARISON_POLICY.relativeTolerancePercent)) {
-        standingBarPass += 1;
-        nodeStanding += 1;
-      }
+function assertSameMechanicalSet(label, left, right) {
+  assert.deepEqual(left, right, `${label} FORCMNT mechanics must be identical.`);
+  for (let row = 0; row < left.length; row += 1) {
+    for (let component = 0; component < 6; component += 1) {
+      assert.equal(
+        right[row].vector[component] - left[row].vector[component],
+        0,
+        `${label} algebraic cancellation failed at ${left[row].sourceNodeId} component ${component}.`,
+      );
     }
-    nodes.push({ sourceNodeId, targetPass: nodeTarget, standingBarPass: nodeStanding, total: DOFS.length });
   }
+}
+
+function assertBourdonDisabled(loadCase) {
+  for (const pressure of loadCase.primitives.filter((row) => row.kind === 'PRESSURE')) {
+    assert.equal(pressure.authorizedEffects.bourdon, false, 'M038 FORCMNT must not silently authorize Bourdon mechanics.');
+  }
+}
+
+function initialActiveState(inventory) {
+  const active = inventory.unilateral.filter((row) => row.initiallyEngaged !== false);
   return Object.freeze({
-    target: Object.freeze({ pass: targetPass, total, percent: targetPass / total * 100 }),
-    standingBar: Object.freeze({ pass: standingBarPass, total, percent: standingBarPass / total * 100 }),
-    nodes: Object.freeze(nodes),
+    declarations: Object.freeze([
+      ...inventory.base,
+      ...active.map((row) => row.constraintDeclaration),
+    ]),
+    movements: Object.freeze(active.map((row) => row.prescribedMovement).filter((row) => row !== null)),
   });
 }
 
 const baseline = solveBm4InputXmlConditioned();
 const baselineSus = assertMembership('M034 SUS', baseline.sustained.loadCase, 'BM4.N');
 const baselineOpe = assertMembership('M034 OPE', baseline.operating.loadCase, 'BM4.N');
-assert.deepEqual(baselineSus, baselineOpe, 'M034 SUS/OPE FORCMNT mechanics must be identical.');
+assertSameMechanicalSet('M034 SUS/OPE', baselineSus, baselineOpe);
+assertBourdonDisabled(baseline.sustained.loadCase);
+assertBourdonDisabled(baseline.operating.loadCase);
 
-const combined = solveBm4M035M036Combined();
-const combinedSus = assertMembership('M035+M036 SUS', combined.sustained.loadCase, 'BM4M035.N');
-const combinedOpe = assertMembership('M035+M036 OPE', combined.operating.loadCase, 'BM4M035.N');
-assert.deepEqual(combinedSus, combinedOpe, 'M035+M036 SUS/OPE FORCMNT mechanics must be identical.');
+const authorities = buildBm4M035FeatureAuthorities();
+const inventory = buildM035M036Inventory(authorities);
+const initial = initialActiveState(inventory);
+const diagnosticSus = analyseM035M036Case(
+  authorities,
+  initial.declarations,
+  'BM4-M038-DIAG-SUS',
+  false,
+  initial.movements,
+  { skipRecovery: true },
+);
+const diagnosticOpe = analyseM035M036Case(
+  authorities,
+  initial.declarations,
+  'BM4-M038-DIAG-OPE',
+  true,
+  initial.movements,
+  { skipRecovery: true },
+);
 
-for (let row = 0; row < combinedSus.length; row += 1) {
-  for (let component = 0; component < 6; component += 1) {
-    assert.equal(
-      combinedOpe[row].vector[component] - combinedSus[row].vector[component],
-      0,
-      `EXP cancellation failed at ${combinedSus[row].sourceNodeId} component ${component}.`,
-    );
-  }
-}
+const combinedSus = assertMembership('M035+M036 diagnostic SUS', diagnosticSus.loadCase, 'BM4M035.N');
+const combinedOpe = assertMembership('M035+M036 diagnostic OPE', diagnosticOpe.loadCase, 'BM4M035.N');
+assertSameMechanicalSet('M035+M036 SUS/OPE', combinedSus, combinedOpe);
+assertBourdonDisabled(diagnosticSus.loadCase);
+assertBourdonDisabled(diagnosticOpe.loadCase);
 
-for (const loadCase of [baseline.sustained.loadCase, baseline.operating.loadCase, combined.sustained.loadCase, combined.operating.loadCase]) {
-  for (const pressure of loadCase.primitives.filter((row) => row.kind === 'PRESSURE')) {
-    assert.equal(pressure.authorizedEffects.bourdon, false, 'M038 FORCMNT must not silently authorize Bourdon mechanics.');
-  }
-}
-
-const cii = loadBm4CiiOutputCases1921();
-const susPass = displacementPassSummary(combined.sustained.execution, cii.displacement.get('SUS'));
-const opePass = displacementPassSummary(combined.operating.execution, cii.displacement.get('OPE'));
-
-console.log(JSON.stringify({
+const report = {
   schema: 'm038-bm4-forcmnt-check/v1',
   authority: BM4_M038_FORCMNT_AUTHORITY,
   mechanics: {
@@ -134,12 +106,32 @@ console.log(JSON.stringify({
     expansionCancellationExact: true,
     bourdonStillDisabled: true,
   },
-  activeSet: {
-    sustained: combined.sustainedRun.convergedState,
-    operating: combined.operatingRun.convergedState,
+  initialActiveSetCount: initial.movements.length,
+  solverQualification: {
+    SUS: {
+      status: diagnosticSus.execution.status,
+      diagnostics: diagnosticSus.execution.diagnostics,
+      factorization: diagnosticSus.execution.factorization,
+      nodalForceDiagnostics: diagnosticSus.execution.nodalForceDiagnostics,
+    },
+    OPE: {
+      status: diagnosticOpe.execution.status,
+      diagnostics: diagnosticOpe.execution.diagnostics,
+      factorization: diagnosticOpe.execution.factorization,
+      nodalForceDiagnostics: diagnosticOpe.execution.nodalForceDiagnostics,
+    },
   },
-  forcmntNodeDisplacementComparison: {
-    SUS: susPass,
-    OPE: opePass,
-  },
-}, null, 2));
+};
+
+console.log(JSON.stringify(report, null, 2));
+
+assert.notEqual(
+  diagnosticSus.execution.status,
+  'BLOCKED',
+  'M038 corrected SUS inner solve is BLOCKED; inspect solverQualification.SUS above before active-set/recovery work.',
+);
+assert.notEqual(
+  diagnosticOpe.execution.status,
+  'BLOCKED',
+  'M038 corrected OPE inner solve is BLOCKED; inspect solverQualification.OPE above before active-set/recovery work.',
+);
