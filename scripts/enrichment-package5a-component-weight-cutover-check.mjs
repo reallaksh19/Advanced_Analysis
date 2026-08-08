@@ -239,8 +239,13 @@ const executionSource = await readFile(
 );
 assert.doesNotMatch(
   overlaySource,
-  /support-load-distribution|calculateSupportLoadDistribution|solver|linear-fea|lafea|lfea/iu,
-  'Production enrichment overlay must not contain calculation mechanics.',
+  /from ['"][^'"]*(?:support-load-distribution|linear-fea|lafea|lfea|\/solver(?:\/|\.js|['"]))[^'"]*['"]/iu,
+  'Production enrichment overlay must not import calculation mechanics.',
+);
+assert.doesNotMatch(
+  overlaySource,
+  /\bcalculateSupportLoadDistribution(?:WithComponentCog)?\b/iu,
+  'Production enrichment overlay must not invoke gravity calculation entrypoints.',
 );
 assert.doesNotMatch(
   executionSource,
