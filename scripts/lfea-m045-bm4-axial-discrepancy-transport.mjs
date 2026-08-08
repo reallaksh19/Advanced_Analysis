@@ -156,8 +156,8 @@ function nodeTransition({ solved, label, nodeId, incomingEntry, outgoingEntry, r
     outgoingSectionOffset: right.sectionOffset,
     offsetChange,
     reactionDiscrepancy,
-    expectedOffsetChangeFromReaction: -reactionDiscrepancy,
-    closureResidual: offsetChange + reactionDiscrepancy,
+    expectedOffsetChangeFromReaction: reactionDiscrepancy,
+    closureResidual: offsetChange - reactionDiscrepancy,
     frictionAuthority: FRICTION.has(nodeId),
   });
 }
@@ -254,6 +254,7 @@ const expPlateau = tracePlateau(solved, rows, 'EXP', largestExp);
 const collinearExp = transitions.filter((row) => row.label === 'EXP' && row.kind === 'COLLINEAR');
 const reactionDrivenExp = collinearExp.filter((row) => Math.abs(row.reactionDiscrepancy) > FORCE_EPS);
 const freeExp = collinearExp.filter((row) => Math.abs(row.reactionDiscrepancy) <= FORCE_EPS);
+const reactionClosureWorst = [...reactionDrivenExp].sort((a, b) => Math.abs(b.closureResidual) - Math.abs(a.closureResidual))[0] ?? null;
 const freeClosureWorst = [...freeExp].sort((a, b) => Math.abs(b.closureResidual) - Math.abs(a.closureResidual))[0] ?? null;
 
 assert.ok(largestExp, 'M045 requires at least one comparable EXP straight segment.');
@@ -262,9 +263,11 @@ assert.ok(Math.abs(largestExp.sectionOffset) > Math.abs(largestExp.netEndSumDisc
   'M045 expects the dominant EXP segment discrepancy to be self-equilibrating rather than a net distributed axial-load mismatch.');
 assert.ok(freeClosureWorst === null || Math.abs(freeClosureWorst.closureResidual) <= FORCE_EPS,
   'M045 free straight-node discrepancy transport must remain continuous after M044 convention correction.');
+assert.ok(reactionClosureWorst === null || Math.abs(reactionClosureWorst.closureResidual) <= FORCE_EPS,
+  'M045 reaction-driven straight-node discrepancy transport must close after M044 convention correction.');
 
 const report = Object.freeze({
-  schema: 'lfea-m045-bm4-axial-discrepancy-transport/v1',
+  schema: 'lfea-m045-bm4-axial-discrepancy-transport/v2',
   targetCases: Object.freeze({ SUS: 19, OPE: 20, EXP: 21 }),
   conventionAuthority: Object.freeze({
     source: 'M044',
@@ -279,6 +282,7 @@ const report = Object.freeze({
     reactionDrivenTransitionCount: reactionDrivenExp.length,
     freeTransitionCount: freeExp.length,
     largestReactionDrivenChanges: Object.freeze(topBy(reactionDrivenExp, 'reactionDiscrepancy')),
+    worstReactionDrivenTransitionClosure: reactionClosureWorst,
     worstFreeTransitionClosure: freeClosureWorst,
   }),
   disposition: Object.freeze({
@@ -305,4 +309,5 @@ console.log(`M045 largest EXP section offset: ${JSON.stringify(report.expansionT
 console.log(`M045 largest EXP plateau: ${JSON.stringify(report.expansionTransport.largestOffsetPlateau)}`);
 console.log(`M045 EXP reaction/free transitions: ${reactionDrivenExp.length}/${freeExp.length}`);
 console.log(`M045 top reaction-driven changes: ${JSON.stringify(report.expansionTransport.largestReactionDrivenChanges.slice(0, 5))}`);
+console.log(`M045 reaction/free worst closures: ${JSON.stringify({ reaction: reactionClosureWorst, free: freeClosureWorst })}`);
 console.log(`M045 conclusion: ${report.disposition.conclusion}`);
