@@ -21,6 +21,7 @@ export const DEFAULT_CONTACT_FRICTION_POLICY = Object.freeze({
   directionCosineTolerance: 1e-8,
   maximumIterations: 64,
   maximumLineSearchSteps: 18,
+  maximumExactStateCandidates: 81,
 });
 
 const TRANSLATION_DOFS = Object.freeze(['UX', 'UY', 'UZ']);
@@ -48,6 +49,11 @@ function positive(value, field) {
   const accepted = finite(value, field);
   if (!(accepted > 0)) fail(`${field} must be positive.`);
   return accepted;
+}
+
+function positiveInteger(value, field) {
+  if (!Number.isInteger(value) || value < 1) fail(`${field} must be a positive integer.`);
+  return value;
 }
 
 function identity(value, field) {
@@ -121,10 +127,18 @@ export function resolveContactFrictionPolicy(value, contactCount) {
   const forceTolerance = nonNegative(source.forceTolerance ?? DEFAULT_CONTACT_FRICTION_POLICY.forceTolerance, 'policy.forceTolerance');
   const penetrationTolerance = nonNegative(source.penetrationTolerance ?? DEFAULT_CONTACT_FRICTION_POLICY.penetrationTolerance, 'policy.penetrationTolerance');
   const directionCosineTolerance = nonNegative(source.directionCosineTolerance ?? DEFAULT_CONTACT_FRICTION_POLICY.directionCosineTolerance, 'policy.directionCosineTolerance');
-  const maximumIterations = source.maximumIterations ?? Math.max(DEFAULT_CONTACT_FRICTION_POLICY.maximumIterations, 4 * Math.max(1, contactCount));
-  const maximumLineSearchSteps = source.maximumLineSearchSteps ?? DEFAULT_CONTACT_FRICTION_POLICY.maximumLineSearchSteps;
-  if (!Number.isInteger(maximumIterations) || maximumIterations < 1) fail('policy.maximumIterations must be a positive integer.');
-  if (!Number.isInteger(maximumLineSearchSteps) || maximumLineSearchSteps < 1) fail('policy.maximumLineSearchSteps must be a positive integer.');
+  const maximumIterations = positiveInteger(
+    source.maximumIterations ?? Math.max(DEFAULT_CONTACT_FRICTION_POLICY.maximumIterations, 4 * Math.max(1, contactCount)),
+    'policy.maximumIterations',
+  );
+  const maximumLineSearchSteps = positiveInteger(
+    source.maximumLineSearchSteps ?? DEFAULT_CONTACT_FRICTION_POLICY.maximumLineSearchSteps,
+    'policy.maximumLineSearchSteps',
+  );
+  const maximumExactStateCandidates = positiveInteger(
+    source.maximumExactStateCandidates ?? DEFAULT_CONTACT_FRICTION_POLICY.maximumExactStateCandidates,
+    'policy.maximumExactStateCandidates',
+  );
   return deepFreeze({
     schema: CONTACT_FRICTION_POLICY_SCHEMA,
     forceTolerance,
@@ -132,6 +146,7 @@ export function resolveContactFrictionPolicy(value, contactCount) {
     directionCosineTolerance,
     maximumIterations,
     maximumLineSearchSteps,
+    maximumExactStateCandidates,
   });
 }
 
@@ -143,6 +158,7 @@ export function contactFrictionExecutionSemanticProjection(record) {
     contacts: record.contacts,
     selectedState: record.selectedState,
     history: record.history,
+    qualification: record.qualification,
     finalExecutionHash: record.finalExecutionHash,
     constitutiveResidualInfinityNorm: record.constitutiveResidualInfinityNorm,
   };
@@ -150,6 +166,19 @@ export function contactFrictionExecutionSemanticProjection(record) {
 
 export function computeContactFrictionExecutionSemanticHash(record) {
   return semanticHash(contactFrictionExecutionSemanticProjection(record));
+}
+
+function requireQualification(value) {
+  if (!isPlainRecord(value)) fail('execution.qualification must be a plain record.');
+  if (value.schema !== 'fea-contact-friction-uniqueness-proof/v1') fail('execution.qualification schema is unsupported.');
+  if (value.method !== 'EXACT_DISCRETE_STATE_ENUMERATION_V1') fail('execution.qualification method is unsupported.');
+  if (value.uniqueAdmissibleStateProven !== true || value.admissibleCandidateCount !== 1) {
+    fail('execution requires exactly one proven admissible state.', 'CONTACT_FRICTION_UNIQUENESS_NOT_PROVEN');
+  }
+  positiveInteger(value.candidateStateCount, 'execution.qualification.candidateStateCount');
+  positiveInteger(value.evaluatedCandidateCount, 'execution.qualification.evaluatedCandidateCount');
+  identity(value.selectedStateSignature, 'execution.qualification.selectedStateSignature');
+  return value;
 }
 
 export function sealContactFrictionExecution(record) {
@@ -160,6 +189,7 @@ export function sealContactFrictionExecution(record) {
   }
   if (!Array.isArray(record.history) || record.history.length < 1) fail('execution.history must contain at least one iteration.');
   if (!Array.isArray(record.selectedState)) fail('execution.selectedState must be an array.');
+  requireQualification(record.qualification);
   const finalExecutionHash = identity(record.finalExecutionHash, 'execution.finalExecutionHash');
   if (!record.finalExecution || record.finalExecution.semanticHash !== finalExecutionHash) {
     fail('execution.finalExecution must match finalExecutionHash.');
