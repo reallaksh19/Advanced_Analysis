@@ -10,6 +10,7 @@ import {
 } from './contact-friction-contract.js';
 import { solveFixedContactState } from './contact-response.js';
 import { evaluateContactFrictionState } from './state-evaluation.js';
+import { proveUniqueAdmissibleContactFrictionState } from './uniqueness.js';
 
 function requireBuildAndSolve(value) {
   if (typeof value !== 'function') {
@@ -20,6 +21,10 @@ function requireBuildAndSolve(value) {
 
 function stateSignature(contacts, states) {
   return contacts.map((contact) => `${contact.declarationId}:${states.get(contact.declarationId)}`).join('|');
+}
+
+function evaluationSignature(evaluations) {
+  return evaluations.map((row) => `${row.declarationId}:${row.state}`).join('|');
 }
 
 function stateRows(contacts, states) {
@@ -50,6 +55,34 @@ function acceptedClassification(requested, contacts) {
 
 function initialStates(contacts) {
   return new Map(contacts.map((contact) => [contact.declarationId, contact.initialState]));
+}
+
+function sealQualified({ normalized, solve, acceptedPolicy, acceptedCaseClass, history, checked }) {
+  const proof = proveUniqueAdmissibleContactFrictionState({
+    contacts: normalized,
+    buildAndSolve: solve,
+    policy: acceptedPolicy,
+  });
+  const iterativeSignature = evaluationSignature(checked.evaluations);
+  if (proof.qualification.selectedStateSignature !== iterativeSignature) {
+    failContactFriction(
+      `Iterative state ${iterativeSignature} differs from exact unique state ${proof.qualification.selectedStateSignature}.`,
+      'CONTACT_FRICTION_ITERATION_UNIQUENESS_MISMATCH',
+      { iterativeSignature, exactSignature: proof.qualification.selectedStateSignature, history },
+    );
+  }
+  return sealContactFrictionExecution({
+    schema: CONTACT_FRICTION_EXECUTION_SCHEMA,
+    classification: acceptedCaseClass,
+    policy: acceptedPolicy,
+    contacts: normalized,
+    selectedState: proof.selected.evaluations,
+    history: deepFreeze(history),
+    qualification: proof.qualification,
+    finalExecutionHash: proof.selected.fixed.execution.semanticHash,
+    finalExecution: proof.selected.fixed.execution,
+    constitutiveResidualInfinityNorm: proof.selected.fixed.residualInfinityNorm,
+  });
 }
 
 export function compileContactFrictionExecution({
@@ -93,16 +126,13 @@ export function compileContactFrictionExecution({
     }));
 
     if (checked.converged) {
-      return sealContactFrictionExecution({
-        schema: CONTACT_FRICTION_EXECUTION_SCHEMA,
-        classification: acceptedCaseClass,
-        policy: acceptedPolicy,
-        contacts: normalized,
-        selectedState: checked.evaluations,
-        history: deepFreeze(history),
-        finalExecutionHash: fixed.execution.semanticHash,
-        finalExecution: fixed.execution,
-        constitutiveResidualInfinityNorm: fixed.residualInfinityNorm,
+      return sealQualified({
+        normalized,
+        solve,
+        acceptedPolicy,
+        acceptedCaseClass,
+        history,
+        checked,
       });
     }
 
