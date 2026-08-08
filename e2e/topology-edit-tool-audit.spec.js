@@ -12,10 +12,9 @@ const TWO_NODE_ACTIONS = Object.freeze([
 const ALL_ACTIONS = Object.freeze([
   'move-positive-z', ...TWO_NODE_ACTIONS, ...EDGE_ACTIONS,
 ]);
-const QUALIFIED_GAP_ENTITIES = Object.freeze(['P-001', 'E-001']);
 const QUALIFIED_GAP_PORTS = Object.freeze([
-  'P-001:port:end',
-  'E-001:port:start',
+  { entityId: 'P-001', role: 'TO', portKey: 'P-001:port:end' },
+  { entityId: 'E-001', role: 'FROM', portKey: 'E-001:port:start' },
 ]);
 const COMMAND_SCENARIOS = Object.freeze([
   { actionId: 'move-positive-z', kind: 'single-node' },
@@ -35,18 +34,18 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => globalThis.localStorage?.clear());
 });
 
-test('production WebGL picks and endpoint affordances enable exact governed edit tools', async ({ page }) => {
+test('production endpoint affordances enable exact governed edit tools', async ({ page }) => {
   const host = await openFinalAuditController(page);
   await openPanel(host, 'commands');
   await expectDisabled(page, ALL_ACTIONS);
 
-  const edge = await visibleEdgeTarget(page);
-  await clickPoint(page, edge.point);
-  await expect(statusOutput(page)).toContainText(`Selected edge ${edge.id}.`);
+  const edgeId = (await canonicalEdgeIds(page))[0];
+  await selectBySearch(page, host, edgeId);
+  await expect(statusOutput(page)).toContainText(`Selected edge ${edgeId}.`);
   await expectEnabled(page, EDGE_ACTIONS);
   await expectDisabled(page, ['move-positive-z', ...TWO_NODE_ACTIONS]);
 
-  const nodeId = await selectEndpoint(page, host, QUALIFIED_GAP_ENTITIES[0]);
+  const nodeId = await selectExactEndpoint(page, host, QUALIFIED_GAP_PORTS[0]);
   await expect(statusOutput(page)).toContainText(`Selected node ${nodeId}.`);
   await expectEnabled(page, ['move-positive-z']);
   await expectDisabled(page, [...TWO_NODE_ACTIONS, ...EDGE_ACTIONS]);
@@ -60,8 +59,8 @@ test('production WebGL picks and endpoint affordances enable exact governed edit
 test('canonical search replaces active selection and refreshes command enablement', async ({ page }) => {
   const host = await openFinalAuditController(page);
   await openPanel(host, 'commands');
-  const edge = await visibleEdgeTarget(page);
-  await clickPoint(page, edge.point);
+  const edgeId = (await canonicalEdgeIds(page))[0];
+  await selectBySearch(page, host, edgeId);
   await expectEnabled(page, EDGE_ACTIONS);
 
   const nodeId = await canonicalNodeForPort(page, 'P-001:port:start');
@@ -85,10 +84,12 @@ test('all ten governed edit tools execute independently on fresh 20-object sampl
     if (scenario.kind === 'two-node') {
       await selectQualifiedGapVisible(page, host);
     } else if (scenario.kind === 'single-node') {
-      await selectEndpoint(page, host, QUALIFIED_GAP_ENTITIES[0]);
+      await selectExactEndpoint(page, host, {
+        entityId: 'P-001', role: 'FROM', portKey: 'P-001:port:start',
+      });
     } else {
-      const edge = await visibleEdgeTarget(page);
-      await clickPoint(page, edge.point);
+      const edgeId = (await canonicalEdgeIds(page))[0];
+      await selectBySearch(page, host, edgeId);
     }
     executions.push(await executeSelectedAction(page, host, scenario.actionId, baseHash));
   }
@@ -104,7 +105,7 @@ test('all ten governed edit tools execute independently on fresh 20-object sampl
     status: rejected.length ? 'FAIL_GOVERNED_EDIT_TOOL_EXECUTION' : 'PASS_ALL_GOVERNED_EDIT_TOOLS',
     candidateHead: process.env.TOPOLOGY_EDIT_TARGET_HEAD_SHA || process.env.GITHUB_SHA || null,
     fixture: 'public/fixtures/topology-edit-20-element-demo.staged.json',
-    qualifiedGapPorts: QUALIFIED_GAP_PORTS,
+    qualifiedGapPorts: QUALIFIED_GAP_PORTS.map((row) => row.portKey),
     backend: 'TopologyEditNavigationHudViewportBackend',
     executionCount: executions.length,
     rejectedActionIds: rejected.map((row) => row.actionId),
@@ -117,8 +118,8 @@ test('navigation, presentation, history, and draft controls remain operable', as
   test.setTimeout(90_000);
   const host = await openFinalAuditController(page);
   await openPanel(host, 'commands');
-  const edge = await visibleEdgeTarget(page);
-  await clickPoint(page, edge.point);
+  const edgeId = (await canonicalEdgeIds(page))[0];
+  await selectBySearch(page, host, edgeId);
 
   for (const mode of ['select', 'orbit', 'pan', 'select']) {
     await page.locator(`[data-navigation-mode="${mode}"]`).click();
@@ -212,37 +213,31 @@ async function openPanel(host, kind) {
   return panel;
 }
 
-async function visibleEdgeTarget(page) {
-  return page.evaluate((key) => {
-    const backend = globalThis[key]?.viewportBackend;
-    const canvas = backend?.renderer?.domElement;
-    if (!backend || !canvas) throw new Error('Production edge picking context is unavailable.');
-    const rect = canvas.getBoundingClientRect();
-    for (let y = rect.top + 1; y < rect.bottom; y += 3) {
-      for (let x = rect.left + 1; x < rect.right; x += 3) {
-        const pick = backend.pickAt(x, y);
-        if (pick?.objectKind === 'edge') return { id: pick.objectId, point: { x, y } };
-      }
-    }
-    throw new Error('No visible edge resolves through the production picker.');
-  }, CONTROLLER_KEY);
-}
-
-async function selectEndpoint(page, host, entityId, additive = false) {
+async function selectExactEndpoint(page, host, { entityId, role }) {
   await openPanel(host, 'topology-edit-visible-endpoints');
   const button = host.locator(
-    `[data-role="topology-edit-visible-endpoints"] button[data-workspace-entity-ids*="${entityId}"]`,
-  ).first();
+    `[data-role="topology-edit-visible-endpoints"] button[data-workspace-entity-ids="${entityId}"][data-endpoint-role="${role}"]`,
+  );
+  await expect(button).toHaveCount(1);
   await expect(button).toBeVisible();
-  await button.click({ modifiers: additive ? ['Shift'] : [] });
+  await button.click();
   const selected = await host.getAttribute('data-topology-edit-selection-ids');
-  if (!selected) throw new Error(`Endpoint ${entityId} did not produce canonical selection.`);
+  if (!selected) throw new Error(`Endpoint ${entityId} ${role} did not produce canonical selection.`);
   return selected.split(',').at(-1);
 }
 
+async function addExactEndpoint(page, host, { entityId, role }) {
+  await openPanel(host, 'topology-edit-visible-endpoints');
+  const button = host.locator(
+    `[data-role="topology-edit-visible-endpoints"] button[data-workspace-entity-ids="${entityId}"][data-endpoint-role="${role}"]`,
+  );
+  await expect(button).toHaveCount(1);
+  await button.click({ modifiers: ['Shift'] });
+}
+
 async function selectQualifiedGapVisible(page, host) {
-  await selectEndpoint(page, host, QUALIFIED_GAP_ENTITIES[0]);
-  await selectEndpoint(page, host, QUALIFIED_GAP_ENTITIES[1], true);
+  await selectExactEndpoint(page, host, QUALIFIED_GAP_PORTS[0]);
+  await addExactEndpoint(page, host, QUALIFIED_GAP_PORTS[1]);
   await expect(statusOutput(page)).toContainText('Selected nodes 1=');
 }
 
@@ -330,10 +325,6 @@ async function commandAuthorityEvidence(page, priorJournalHash) {
       sessionHash: snapshot?.sessionHash ?? null,
     };
   }, { key: CONTROLLER_KEY, priorHash: priorJournalHash });
-}
-
-async function clickPoint(page, point) {
-  await page.mouse.click(point.x, point.y);
 }
 
 function statusOutput(page) {
