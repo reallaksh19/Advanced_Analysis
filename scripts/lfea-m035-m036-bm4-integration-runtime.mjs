@@ -31,7 +31,7 @@ import { buildM036Bm4Inventory } from './lfea-m036-bm4-runtime.mjs';
 
 const NODE_PREFIX = 'BM4M035.N';
 const M038_ACCDB_SOURCE = '3e5c5e20d9e8741faa08be4360cb7f79498f87b6:benchmarks/LFEA/BM4/BM4 accdb.zip';
-const M038_BOURDON_DISCLOSURE = 'ACCDB CASE19=W+P1 and CASE20=W+T1+P1; user-confirmed ACCDB Bourdon=yes. First qualification applies translational Bourdon only to non-rigid straight spans and bend incoming straights; bend-arc opening/translation and rigid-body pressure strain remain blocked.';
+const M038_BOURDON_DISCLOSURE = 'ACCDB CASE19=W+P1 and CASE20=W+T1+P1; user-confirmed ACCDB Bourdon=yes. Translational closed-end Bourdon strain is applied to non-rigid straight spans and discretized bend-arc frame elements; bend opening/ovalization, pressure stiffening, axial pA thrust, and rigid-body pressure strain remain blocked.';
 
 function mapNodeId(nodeId) {
   return String(nodeId).replace(/^BM4\.N/u, NODE_PREFIX);
@@ -116,7 +116,7 @@ function physicalLineWeight(entry) {
 }
 
 function bourdonEligible(entry) {
-  return entry.bendComponent === null && entry.sourceEntry.rigidAuthority === null;
+  return entry.sourceEntry.rigidAuthority === null;
 }
 
 function closedEndPipeBourdonAxialStrain(authorities, entry, pressure) {
@@ -204,12 +204,22 @@ function loadElements(authorities, loadCase) {
   const components = authorities.bendExpansion.components.map((component) => {
     const elements = component.elements.map((componentElement) => {
       const entry = authorities.entryByElementId.get(componentElement.elementId);
-      const frameElement = compileFrameElement({
+      const baseFrame = compileFrameElement({
         elementId: componentElement.elementId, material: authorities.material, section: entry.analysisSection,
         localAxes: { result: resolveEntryAxes(authorities, entry), profile: FRAME_LOCAL_AXIS_PROFILE },
         profile: authorities.frameProfile, distributedLoads: [distributed.get(componentElement.elementId)],
         temperature: temperatures.get(componentElement.elementId) ?? null, releases: [], endSprings: [], rigidOffsets: null,
       });
+      const pressure = pressures.get(entry.elementId);
+      const frameElement = pressure?.authorizedEffects?.bourdon
+        ? augmentFrameElementUniformAxialInitialStrain({
+          frame: baseFrame,
+          profile: authorities.frameProfile,
+          primitive: pressure,
+          axialStrain: closedEndPipeBourdonAxialStrain(authorities, entry, pressure.pressure),
+          disclosure: M038_BOURDON_DISCLOSURE,
+        })
+        : baseFrame;
       return Object.freeze({ ...componentElement, frameElement });
     });
     const draft = { ...component, elements, semanticHash: '' };
