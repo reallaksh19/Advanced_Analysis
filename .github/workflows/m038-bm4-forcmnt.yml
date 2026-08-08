@@ -1,4 +1,4 @@
-name: M038 BM4 FORCMNT Mechanics
+name: M038 BM4 FORCMNT Case Authority
 
 on:
   push:
@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 jobs:
-  forcmnt-mechanics:
+  forcmnt-case-authority:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -32,5 +32,5 @@ jobs:
         with:
           node-version: 22
 
-      - name: Verify FORCMNT mechanics and BM4 evidence
+      - name: Verify F1 exclusion from BM4 target cases
         run: node scripts/lfea-m038-bm4-forcmnt-check.mjs
