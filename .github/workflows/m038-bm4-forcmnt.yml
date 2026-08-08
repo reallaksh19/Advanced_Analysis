@@ -1,0 +1,36 @@
+name: M038 BM4 FORCMNT Case Authority
+
+on:
+  push:
+    branches:
+      - codex/m038-bm4-forcmnt-mechanics
+  pull_request:
+    paths:
+      - 'scripts/lfea-m034-bm4-solve-runtime.mjs'
+      - 'scripts/lfea-m035-m036-bm4-integration-runtime.mjs'
+      - 'scripts/lfea-m038-bm4-forcmnt-authority.mjs'
+      - 'scripts/lfea-m038-bm4-forcmnt-check.mjs'
+      - '.github/workflows/m038-bm4-forcmnt.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  forcmnt-case-authority:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify F1 exclusion from BM4 target cases
+        run: node scripts/lfea-m038-bm4-forcmnt-check.mjs
