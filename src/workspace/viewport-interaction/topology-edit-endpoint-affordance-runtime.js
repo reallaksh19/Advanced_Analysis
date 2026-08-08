@@ -5,6 +5,7 @@ export class TopologyEditEndpointAffordanceRuntime {
     }
     this.onActivate = onActivate;
     this.element = null;
+    this.focusTarget = null;
     this.affordances = Object.freeze([]);
     this.clickHandler = (event) => this.handleClick(event);
   }
@@ -14,28 +15,22 @@ export class TopologyEditEndpointAffordanceRuntime {
       throw new TypeError('TopologyEditEndpointAffordanceRuntime: host element is required.');
     }
     this.destroy();
+    this.focusTarget = host.querySelector('canvas');
+    const container = host.closest('[data-role="topology-edit-render-host"]') || host;
     const element = host.ownerDocument.createElement('div');
     element.dataset.role = 'topology-edit-visible-endpoints';
     element.className = 'topology-edit-visible-endpoints';
     element.setAttribute('aria-label', 'Visible endpoint and port selection');
     element.style.cssText = [
-      'position:absolute',
-      'right:8px',
-      'bottom:8px',
-      'z-index:4',
-      'max-width:min(320px,45%)',
-      'max-height:32%',
+      'max-height:180px',
       'overflow:auto',
-      'padding:6px',
-      'border-radius:6px',
-      'background:rgba(2,6,23,.82)',
       'display:flex',
       'gap:4px',
       'flex-wrap:wrap',
+      'align-content:flex-start',
     ].join(';');
     element.addEventListener('click', this.clickHandler);
-    host.style.position ||= 'relative';
-    host.append(element);
+    container.append(element);
     this.element = element;
     this.render(this.affordances);
   }
@@ -59,13 +54,14 @@ export class TopologyEditEndpointAffordanceRuntime {
     const affordance = this.affordances[index];
     if (!affordance || affordance.stale) return;
     this.onActivate?.(affordance, event);
-    this.element.parentElement?.querySelector('canvas')?.focus({ preventScroll: true });
+    this.focusTarget?.focus({ preventScroll: true });
   }
 
   destroy() {
     this.element?.removeEventListener('click', this.clickHandler);
     this.element?.remove();
     this.element = null;
+    this.focusTarget = null;
   }
 }
 
