@@ -6,9 +6,16 @@ export function deriveTopologyEditEndpointAffordances(projection, options = {}) 
   const modelRole = normalizeModelRole(options.modelRole ?? projection?.modelRole ?? 'draft');
   const stale = options.stale === true;
   const hiddenIds = new Set((options.hiddenCanonicalIds ?? []).map(String));
+  const presentationBindings = primitiveEndpointBindings(projection?.primitives ?? []);
   const rows = (projection?.elements ?? [])
     .filter((element) => element?.type === 'node' && finitePoint(element))
-    .map((element) => createAffordance(element, modelRole, stale, hiddenIds))
+    .map((element) => createAffordance(
+      element,
+      modelRole,
+      stale,
+      hiddenIds,
+      presentationBindings,
+    ))
     .filter(Boolean)
     .sort((left, right) => left.accessibleLabel.localeCompare(right.accessibleLabel)
       || left.canonicalId.localeCompare(right.canonicalId));
@@ -27,13 +34,18 @@ export function assertTopologyEditEndpointAffordance(value) {
   return value;
 }
 
-function createAffordance(element, modelRole, stale, hiddenIds) {
+function createAffordance(element, modelRole, stale, hiddenIds, presentationBindings) {
   const canonicalId = text(element.entityId || element.id);
   if (!canonicalId || hiddenIds.has(canonicalId)) return null;
-  const workspaceEntityIds = stringList(
-    element.workspaceEntityIds ?? element.pickTarget?.workspaceEntityIds ?? [],
-  );
-  const portRoles = normalizePortRoles(element.portRoles ?? element.pickTarget?.portRoles ?? []);
+  const projected = exactPresentationBindings(element, presentationBindings);
+  const workspaceEntityIds = stringList([
+    ...(element.workspaceEntityIds ?? element.pickTarget?.workspaceEntityIds ?? []),
+    ...projected.flatMap((row) => row.workspaceEntityIds),
+  ]);
+  const portRoles = normalizePortRoles([
+    ...(element.portRoles ?? element.pickTarget?.portRoles ?? []),
+    ...projected.flatMap((row) => row.portRoles),
+  ]);
   const label = humanLabel(element, workspaceEntityIds, portRoles);
   const pickTarget = deepFreeze({
     ...(element.pickTarget ?? {}),
@@ -59,6 +71,40 @@ function createAffordance(element, modelRole, stale, hiddenIds) {
     pickTarget,
   };
   return deepFreeze({ ...material, affordanceHash: semanticHash(material) });
+}
+
+function primitiveEndpointBindings(primitives) {
+  const rows = [];
+  for (const primitive of primitives ?? []) {
+    const owners = stringList(primitive?.workspaceEntityIds ?? []);
+    if (!owners.length) continue;
+    const parameters = primitive?.parameters ?? {};
+    addBinding(rows, parameters.start, owners, ['FROM']);
+    addBinding(rows, parameters.end ?? parameters.sourceEnd, owners, ['TO']);
+    addBinding(rows, parameters.position, owners, ['PORT']);
+    for (const point of parameters.runEnds ?? []) addBinding(rows, point, owners, ['RUN']);
+    addBinding(rows, parameters.branchEnd, owners, ['BRANCH']);
+  }
+  return rows;
+}
+
+function addBinding(rows, point, workspaceEntityIds, portRoles) {
+  if (!finitePoint(point)) return;
+  rows.push({
+    point: { x: Number(point.x), y: Number(point.y), z: Number(point.z) },
+    workspaceEntityIds,
+    portRoles,
+  });
+}
+
+function exactPresentationBindings(element, rows) {
+  return rows.filter((row) => samePoint(element, row.point));
+}
+
+function samePoint(left, right) {
+  return Number(left.x) === Number(right.x)
+    && Number(left.y) === Number(right.y)
+    && Number(left.z) === Number(right.z);
 }
 
 function humanLabel(element, workspaceEntityIds, portRoles) {
