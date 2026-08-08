@@ -2,9 +2,9 @@
 
 **Repository:** `reallaksh19/Advanced_Analysis`  
 **Plan date:** 5 August 2026  
-**Implementation status updated:** 8 August 2026  
+**Implementation status updated:** 8 August 2026
 **Proposed method family:** `THERMAL_LIFTOFF_ACTIVE_SET_V1`  
-**Status:** TL-00 through TL-03 implemented as a non-production shadow spike; no production numerical authority, method registration, default UI exposure, seal/export eligibility or TL-04 redistribution authority  
+**Status:** TL-00 through TL-03 implemented as a non-production shadow spike; no production numerical authority, method registration, default UI exposure, seal/export eligibility or TL-04 redistribution authority
 **Relationship to current methods:** downstream of `CHAINAGE_TRIBUTARY_SPAN_V2` and `CHAINAGE_TRIBUTARY_SPAN_V3_COG`
 
 ---
