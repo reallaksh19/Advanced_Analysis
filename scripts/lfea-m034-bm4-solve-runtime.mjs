@@ -19,10 +19,6 @@ import {
   buildBm4SolveAuthorities,
   sourceEvidence,
 } from './lfea-m034-bm4-solve-fixtures.mjs';
-import {
-  BM4_M038_FORCMNT_AUTHORITY,
-  bm4BaseWForcmntPrimitives,
-} from './lfea-m038-bm4-forcmnt-authority.mjs';
 
 function point(geometry, nodeId) {
   const node = geometry.nodes.find((candidate) => candidate.id === nodeId);
@@ -43,7 +39,6 @@ function physicalLineWeight(entry) {
 }
 
 function compileCase(authorities, label, thermal) {
-  const loadCaseId = `BM4-${label}`;
   const primitives = [];
   for (const entry of authorities.entries) {
     const analysis = entry.sourceSegment.meta.analysis;
@@ -92,16 +87,10 @@ function compileCase(authorities, label, thermal) {
       });
     }
   }
-  primitives.push(...bm4BaseWForcmntPrimitives({
-    baseEntries: authorities.entries,
-    loadCaseId,
-    nodeIdPrefix: 'BM4.N',
-    sourceEvidence,
-  }));
   return compilePhysicalLoadCase({
-    loadCaseId,
+    loadCaseId: `BM4-${label}`,
     loadCaseClass: 'MIXED_PHYSICAL',
-    presentation: { label, description: `M038 BM4 ${label} solve with ACCDB-qualified base-W FORCE/MOMENT membership.` },
+    presentation: { label, description: `M034 BM4 ${label} first onboarding solve (CASE 19/20/21).` },
     modelReference: modelReferenceFromCompilation(authorities.compilation),
     primitives,
     profile: loadCaseProfile({ gravitationalAcceleration: { value: GRAVITY, source: 'SI-STANDARD-GRAVITY-EXACT' } }),
@@ -168,7 +157,6 @@ function buildReport(authorities, sustained, operating) {
   return Object.freeze({
     schema: 'm034-bm4-first-solve-report/v1',
     sourceSemanticHash: authorities.source.semanticHash,
-    loadAuthority: BM4_M038_FORCMNT_AUTHORITY,
     solverConditioningProfile: BM4_SOLVER_CONDITIONING_PROFILE,
     counts: {
       sourceNodes: authorities.normalized.geometry.nodes.length,
@@ -176,12 +164,12 @@ function buildReport(authorities, sustained, operating) {
       rigidElements: authorities.entries.filter((row) => row.rigidAuthority).length,
       bendTaggedElements: authorities.entries.filter((row) => row.sourceSegment.meta.bendDeclaredRadius != null).length,
       reducerTaggedElements: 0,
-      appliedForcmntVectors: BM4_M038_FORCMNT_AUTHORITY.expectedRealVectorRows,
     },
     limitations: [
       { code: 'BM4_BEND_CHORD_STIFFNESS_ONLY', cause: 'The first BM4 solve retains each InputXML PIPINGELEMENT as one straight frame chord; CAESAR internal bend stations and B31 bend flexibility are not yet applied.' },
       { code: 'BM4_RIGID_BODY_LOAD_DISTRIBUTION_ASSUMPTION', cause: 'Rigid-element body, fluid and insulation weight use the merged CAESAR rigid-element authority (#615) and a uniform consistent line load, for all 20 rigid elements (Flange/Flanged Valve/Unspecified).' },
       { code: 'BM4_NO_TRUE_REDUCER_CONDENSATION', cause: 'InputXML_BM4.xml has real inline diameter changes but no active REDUCER child tag drives the #618 ten-cylinder condensation candidate; reducers are passed through as plain chords in this first solve.' },
+      { code: 'BM4_DECLARED_FORCES_NOT_APPLIED', cause: '12 declared FORCESMOMENTS entries are parsed and retained but not applied as external nodal loads; none of CASE 19/20/21\'s formulas (W+P1 / W+T1+P1) show a declared-force "+F" term, so this is not expected to be material to this comparison, but is not independently confirmed zero-effect.' },
       { code: 'BM4_BRANCH_JUNCTION_FLEXIBILITY_NOT_APPLIED', cause: 'Shared-node topology is retained, but branch-junction flexibility and code SIF evidence are not applied to stiffness in this first solve.' },
       { code: 'BM4_CODE_STRESS_DEFERRED', cause: 'This phase compares displacement, restraint and global/local force truth; piping-code stress comparison remains unclaimed.' },
     ],
