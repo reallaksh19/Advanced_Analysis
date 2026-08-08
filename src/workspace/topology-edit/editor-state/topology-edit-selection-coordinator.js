@@ -215,7 +215,7 @@ export function workspaceEntityIdsForSelection(topology, canonicalIds = []) {
       );
       if (!ownsRestraint) continue;
       if (support.entityId) result.add(support.entityId);
-      if (support.componentKey) result.add(support.componentKey;
+      if (support.componentKey) result.add(support.componentKey);
       (support.sourceEntityIds ?? []).forEach((id) => result.add(id));
     }
   });
