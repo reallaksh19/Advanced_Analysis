@@ -1,0 +1,65 @@
+name: emp-prod-04-support-assembly-authority
+
+on:
+  pull_request:
+    paths:
+      - 'src/workspace/engineering-loads/empirical-support-assembly-authority.js'
+      - 'scripts/emp-prod-04-support-assembly-authority-check.mjs'
+      - '.github/workflows/emp-prod-04-support-assembly-authority.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-b1-authority:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Prove exact-head execution
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git diff --exit-code
+
+      - name: Enforce B1 changed-path containment
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed="$(git diff --name-only '${{ github.event.pull_request.base.sha }}' '${{ github.event.pull_request.head.sha }}')"
+          printf '%s\n' "$changed"
+          unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(src/workspace/engineering-loads/empirical-support-assembly-authority\.js|scripts/emp-prod-04-support-assembly-authority-check\.mjs|\.github/workflows/emp-prod-04-support-assembly-authority\.yml)$' || true)"
+          test -z "$unexpected"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax check B1 authority slice
+        run: |
+          node --check src/workspace/engineering-loads/empirical-support-assembly-authority.js
+          node --check scripts/emp-prod-04-support-assembly-authority-check.mjs
+
+      - name: Qualify support assembly authority
+        run: node scripts/emp-prod-04-support-assembly-authority-check.mjs
+
+      - name: Import graph
+        run: npm run check:imports
+
+      - name: Production build
+        run: npm run build
