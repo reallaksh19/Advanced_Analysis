@@ -1,0 +1,92 @@
+name: preproduction-thermal-liftoff-controlled-source
+
+on:
+  pull_request:
+    branches:
+      - agent/preproduction-thermal-liftoff-local-screen-reconciliation
+    paths:
+      - scripts/preproduction-thermal-liftoff-controlled-source-adapter.mjs
+      - scripts/preproduction-thermal-liftoff-controlled-source-validator.mjs
+      - scripts/preproduction-thermal-liftoff-controlled-source-check.mjs
+      - scripts/preproduction-thermal-liftoff-controlled-source-guard.mjs
+      - .github/workflows/preproduction-thermal-liftoff-controlled-source.yml
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-preproduction-thermal-liftoff-controlled-source:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact requested head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Prove exact head and clean worktree
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          git diff --exit-code
+
+      - name: Enforce five-path qualification-only containment
+        shell: bash
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="$(git rev-parse HEAD)"
+          git diff --name-only "$BASE_SHA" "$HEAD_SHA" > /tmp/tl-controlled-source-paths.txt
+          while IFS= read -r changed; do
+            case "$changed" in
+              scripts/preproduction-thermal-liftoff-controlled-source-adapter.mjs|scripts/preproduction-thermal-liftoff-controlled-source-validator.mjs|scripts/preproduction-thermal-liftoff-controlled-source-check.mjs|scripts/preproduction-thermal-liftoff-controlled-source-guard.mjs|.github/workflows/preproduction-thermal-liftoff-controlled-source.yml) ;;
+              *) echo "Forbidden changed path for controlled TL source qualification: $changed"; exit 1 ;;
+            esac
+          done < /tmp/tl-controlled-source-paths.txt
+          test "$(wc -l < /tmp/tl-controlled-source-paths.txt)" -eq 5
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax check qualification batch
+        run: |
+          node --check scripts/preproduction-thermal-liftoff-controlled-source-adapter.mjs
+          node --check scripts/preproduction-thermal-liftoff-controlled-source-validator.mjs
+          node --check scripts/preproduction-thermal-liftoff-controlled-source-check.mjs
+          node --check scripts/preproduction-thermal-liftoff-controlled-source-guard.mjs
+
+      - name: Requalify LFEA sealed execution contract and prescribed movement benchmark
+        run: node scripts/lfea-b3.3-solver-check.mjs
+
+      - name: Requalify support contact authority
+        run: |
+          node scripts/preproduction-support-contact-source-guard.mjs
+          node scripts/preproduction-support-contact-authority-check.mjs
+
+      - name: Requalify TL prerequisite authority
+        run: node scripts/preproduction-thermal-liftoff-prerequisites-check.mjs
+
+      - name: Requalify current TL-03 reconciliation
+        run: |
+          node scripts/preproduction-thermal-liftoff-local-screen-source-guard.mjs
+          node scripts/preproduction-thermal-liftoff-local-screen-check.mjs
+
+      - name: Enforce qualification-only source boundary
+        run: node scripts/preproduction-thermal-liftoff-controlled-source-guard.mjs
+
+      - name: Qualify controlled source adapter
+        run: node scripts/preproduction-thermal-liftoff-controlled-source-check.mjs
+
+      - name: Import graph
+        run: npm run check:imports
+
+      - name: Production build
+        run: npm run build
+
+      - name: Whitespace check
+        run: git diff --check "${{ github.event.pull_request.base.sha }}" "$(git rev-parse HEAD)"
