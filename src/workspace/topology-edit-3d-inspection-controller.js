@@ -111,7 +111,7 @@ export class TopologyEdit3DViewController extends IssueReviewController {
     try {
       this.inspectionModel = buildTopologyEditInspectionModel({
         canonicalTopology: canonical,
-        selection: this.selection,
+        selection: this.editorStore?.getState?.().selection ?? this.selection,
       });
       this.viewportBackend?.renderInspection(this.inspectionModel);
       renderTopologyEditInspectionPanel(this.inspectionElement, this.inspectionModel);

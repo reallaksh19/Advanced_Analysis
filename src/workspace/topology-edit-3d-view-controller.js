@@ -214,7 +214,22 @@ export class TopologyEdit3DViewController extends TopologyEdit3DViewControllerCo
     const backend = this.viewportBackend;
     if (!backend) return;
     if (action === 'fit') backend.fitAll();
-    else if (action === 'fit-selection') backend.fitSelection();
+    else if (action === 'fit-selection') {
+      const unifiedIds = this.editorStore?.getState?.().selection?.canonicalIds;
+      const legacyIds = [
+        ...(this.selection?.nodeIds ?? []),
+        this.selection?.edgeId,
+      ].filter(Boolean);
+      const canonicalIds = Array.isArray(unifiedIds) ? unifiedIds : legacyIds;
+      if (canonicalIds.length && typeof this.focusCanonicalIds === 'function') {
+        const result = this.focusCanonicalIds(canonicalIds);
+        this.setStatus(result.status === 'FOCUSED'
+          ? `Focused ${result.foundIds.length} canonical selection object(s).`
+          : 'The canonical selection is absent from the current visual projection.');
+        return;
+      }
+      backend.fitSelection();
+    }
     else if (action === 'home') backend.home();
     else if (action === 'previous') backend.previousView();
     else if (action === 'pivot-selection') backend.pivotSelection();

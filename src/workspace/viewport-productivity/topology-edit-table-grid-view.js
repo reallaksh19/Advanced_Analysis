@@ -21,6 +21,11 @@ export function renderTopologyEditTableGrid(runtime) {
     return;
   }
   const rows = topologyEditTableVisibleRows(runtime.projection, runtime.viewState);
+  if (runtime.projection.rows.length === 0) {
+    element.innerHTML = emptyModelHtml(runtime);
+    publishEvidence(runtime, 0, 0);
+    return;
+  }
   const renderedRows = rows.slice(0, MAX_RENDERED_ROWS);
   const primary = runtime.projection.rows.find((row) => row.rowId === runtime.viewState.primaryRowId) ?? null;
   const selected = new Set(runtime.viewState.selectedRowIds);
@@ -61,9 +66,45 @@ export function renderTopologyEditTableGrid(runtime) {
 function rowHtml(row, isSelected, stagedIntent) {
   const staged = stagedIntent ? ' data-staged="true"' : '';
   return `<tr data-table-row-id="${escapeHtml(row.rowId)}" data-canonical-id="${escapeHtml(row.identity.canonicalId)}"${staged}>
-    <td><button type="button" data-table-select="${escapeHtml(row.rowId)}" aria-pressed="${String(isSelected)}" title="${escapeHtml(row.identity.canonicalId)}">${isSelected ? '●' : '○'}</button></td>
+    <td><button type="button" data-table-select="${escapeHtml(row.rowId)}" aria-pressed="${String(isSelected)}" aria-label="${isSelected ? 'Deselect' : 'Select'} ${escapeHtml(row.identity.canonicalId)}">${isSelected ? 'Selected' : 'Select'}</button></td>
     ${COLUMNS.map(([key]) => `<td>${escapeHtml(displayValue(value(row, key)))}</td>`).join('')}
   </tr>`;
+}
+
+/** Renders the first governed row when the canonical topology is empty. */
+function emptyModelHtml(runtime) {
+  const values = runtime.emptyRouteValues;
+  const options = runtime.emptyRoutePipeOptions();
+  const phase = runtime.emptyRoutePhase();
+  const previewReady = phase === 'PREVIEW_READY';
+  const applyReady = phase === 'READY_TO_APPLY';
+  const active = !['IDLE', 'CANCELLED', 'APPLIED'].includes(phase);
+  const optionHtml = options.map((record) => `<option value="${escapeHtml(record.recordId)}" ${
+    values.catalogueRecordId === record.recordId ? 'selected' : ''
+  }>${escapeHtml(`${record.recordId} · DN ${record.nominalSizeMm} · ${record.schedule}`)}</option>`).join('');
+  return `<section class="topology-edit-table topology-edit-table--empty-model" data-table-phase="${escapeHtml(phase)}">
+    <header class="topology-edit-table__header"><div><strong>Create first pipe</strong><span>Empty canonical model · exact typed coordinates</span></div></header>
+    <p class="topology-edit-table__notice">Enter the first PIPE row. Preview and validation do not change the canonical model; Apply creates two nodes and one governed pipe atomically.</p>
+    <div class="topology-edit-table__first-pipe">
+      <fieldset><legend>Start point (mm)</legend>${pointInputs('start', values)}</fieldset>
+      <fieldset><legend>End point (mm)</legend>${pointInputs('end', values)}</fieldset>
+      <label class="topology-edit-table__wide">Pipe catalogue record<select data-empty-route-field="catalogueRecordId" ${options.length ? '' : 'disabled'}>${optionHtml || '<option>Catalogue is loading…</option>'}</select></label>
+    </div>
+    <footer class="topology-edit-table__workflow">
+      <button type="button" data-table-action="empty-route-preview" ${runtime.pending || !options.length ? 'disabled' : ''}>Preview first pipe</button>
+      <button type="button" data-table-action="empty-route-validate" ${runtime.pending || !previewReady ? 'disabled' : ''}>Validate</button>
+      <button type="button" data-table-action="empty-route-apply" ${runtime.pending || !applyReady ? 'disabled' : ''}>Apply</button>
+      <button type="button" data-table-action="empty-route-cancel" ${runtime.pending || !active ? 'disabled' : ''}>Cancel</button>
+    </footer>
+    <output class="topology-edit-table__status" aria-live="polite">${escapeHtml(runtime.error || runtime.message)}</output>
+  </section>`;
+}
+
+function pointInputs(role, values) {
+  return ['X', 'Y', 'Z'].map((axis) => {
+    const key = `${role}${axis}`;
+    return `<label>${axis}<input type="number" step="any" required data-empty-route-field="${key}" value="${escapeHtml(values[key])}"></label>`;
+  }).join('');
 }
 
 function editorHtml(row, stagedIntent, projection) {

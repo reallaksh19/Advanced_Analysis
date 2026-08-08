@@ -5,13 +5,14 @@ export const TOPOLOGY_EDIT_CANONICAL_ID_KINDS = deepFreeze([
   'edge',
   'junction',
   'support',
+  'restraint',
   'boundary',
   'rigid',
   'bend',
 ]);
 
 const KIND_SET = new Set(TOPOLOGY_EDIT_CANONICAL_ID_KINDS);
-const CANONICAL_ID = /^(node|edge|junction|support|boundary|rigid|bend):[^\s]+$/u;
+const CANONICAL_ID = /^(node|edge|junction|support|restraint|boundary|rigid|bend):[^\s]+$/u;
 
 export function normalizeTopologyEditCanonicalId(
   value,

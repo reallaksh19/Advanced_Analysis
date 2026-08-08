@@ -95,7 +95,7 @@ export function deriveSupportRestraintGeometry(input = {}) {
   if (host && !frame) {
     diagnostics.push(diag('SUPPORT_LOCAL_FRAME_UNRESOLVED', 'Support host local frame cannot be established.'));
   }
-  const restraints = restraintRows(support).map((restraint) => deriveRestraint({
+  const restraints = supportRestraintRows(support).map((restraint) => deriveRestraint({
     support, restraint, origin, host, frame,
   }));
   return deepFreeze({
@@ -247,10 +247,12 @@ function explicitDirection(token, frame) {
   if (token === 'LOCAL_Z') return frame?.z || null;
   return token === 'GLOBAL_VERTICAL' ? frame?.up || null : null;
 }
-function restraintRows(support) {
+/** Returns the declared restraint records without inventing missing support capability. */
+export function supportRestraintRows(support = {}) {
   if (Array.isArray(support.restraints)) return support.restraints;
   if (Array.isArray(support.restraint?.restraints)) return support.restraint.restraints;
-  return support.restraint ? [support.restraint] : [];
+  if (Array.isArray(support.restraint)) return support.restraint;
+  return support.restraint && typeof support.restraint === 'object' ? [support.restraint] : [];
 }
 function supportMarker(overlay, sizeMm) {
   return {

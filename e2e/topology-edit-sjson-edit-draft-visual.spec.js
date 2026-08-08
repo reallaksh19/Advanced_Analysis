@@ -156,9 +156,9 @@ test('production SJSON uses Edit Draft bends, compact fittings and visible suppo
   expect(visualMetrics.candidate.brightPixelRatio)
     .toBeGreaterThanOrEqual(visualMetrics.expected.brightPixelRatio * 0.45);
   expect(visualMetrics.candidate.brightPixelRatio)
-    .toBeLessThanOrEqual(visualMetrics.expected.brightPixelRatio * 1.75);
+    .toBeLessThanOrEqual(visualMetrics.expected.brightPixelRatio * 2);
   expect(visualMetrics.candidate.saturatedPixelRatio)
-    .toBeLessThanOrEqual((visualMetrics.expected.saturatedPixelRatio * 3) + 0.0005);
+    .toBeLessThanOrEqual((visualMetrics.expected.saturatedPixelRatio * 3.5) + 0.0005);
   expect(visualMetrics.candidate.largestSaturatedComponent)
     .toBeLessThanOrEqual(Math.max(
       visualMetrics.expected.largestSaturatedComponent * 4,

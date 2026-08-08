@@ -5,6 +5,7 @@ export const TOPOLOGY_EDIT_FOCUS_RESULT_SCHEMA = 'TopologyEditCanonicalFocusResu
 export function focusTopologyEditCanonicalIds({
   groups,
   camera,
+  controls,
   canonicalIds,
 } = {}) {
   if (!groups || !camera) throw new TypeError('Renderer groups and camera are required.');
@@ -20,7 +21,7 @@ export function focusTopologyEditCanonicalIds({
     bounds,
   ));
   if (bounds.isEmpty()) return freezeResult('NOT_FOUND', requestedIds, []);
-  frameCamera(camera, bounds);
+  frameCamera(camera, bounds, controls);
   return freezeResult('FOCUSED', requestedIds, [...found].sort());
 }
 
@@ -59,7 +60,7 @@ function collectInstanceBounds(mesh, requested, found, bounds) {
   }
 }
 
-function frameCamera(camera, bounds) {
+function frameCamera(camera, bounds, controls) {
   const center = bounds.getCenter(new THREE.Vector3());
   const size = bounds.getSize(new THREE.Vector3());
   const distance = Math.max(size.length() * 1.8, 10);
@@ -67,12 +68,14 @@ function frameCamera(camera, bounds) {
   if (direction.lengthSq() < 1e-9) direction.set(1, 1, 1);
   direction.normalize();
   camera.position.copy(center).addScaledVector(direction, distance);
+  controls?.target?.copy(center);
   camera.lookAt(center);
   if (camera.isPerspectiveCamera) {
     camera.near = Math.max(distance / 1000, 0.01);
     camera.far = Math.max(distance * 100, 1000);
   }
   camera.updateProjectionMatrix();
+  controls?.update?.();
 }
 
 function canonicalIdForTarget(target) {

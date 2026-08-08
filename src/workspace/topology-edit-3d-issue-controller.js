@@ -205,11 +205,14 @@ export class TopologyEdit3DViewController extends SearchController {
   }
 
   focusCanonicalIds(canonicalIds) {
-    return focusTopologyEditCanonicalIds({
+    const result = focusTopologyEditCanonicalIds({
       groups: this.viewportBackend?.groups,
       camera: this.viewportBackend?.activeCamera,
+      controls: this.viewportBackend?.controls,
       canonicalIds,
     });
+    if (result.status === 'FOCUSED') this.viewportBackend?.invalidate('canonical-selection-focus');
+    return result;
   }
 }
 

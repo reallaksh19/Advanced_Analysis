@@ -23,6 +23,7 @@ export class WorkspaceShellController {
       topologyEdit3DActive: false,
     };
     this.dragContext = null;
+    this.nativeModelPending = false;
     this.unsubscribers = [];
     this.handlePointerDown = (event) => this.pointerDown(event);
     this.handlePointerMove = (event) => this.pointerMove(event);
@@ -38,10 +39,12 @@ export class WorkspaceShellController {
     this.loadState();
     this.applyState();
     this.shellElement.addEventListener('pointerdown', this.handlePointerDown);
-    this.shellElement.addEventListener('click', this.handleClick);
+    this.rootElement.addEventListener('click', this.handleClick);
     this.rootElement.ownerDocument.addEventListener('keydown', this.handleKeyDown);
     this.unsubscribers = [
       EventBus.subscribe(EVENT_TOPICS.WORKSPACE_SNAPSHOT_CHANGED, ({ snapshot }) => this.updateDatasetLabel(snapshot)),
+      EventBus.subscribe(EVENT_TOPICS.DATASET_LOADED, () => this.handleDatasetLoaded()),
+      EventBus.subscribe(EVENT_TOPICS.DATASET_LOAD_FAILED, ({ message }) => this.handleDatasetLoadFailed(message)),
       EventBus.subscribe(APPLICATION_EVENTS.CHANGED, ({ state }) => this.switchWorkbenchView(state?.activeViewId)),
       EventBus.subscribe(EVENT_TOPICS.TOPOLOGY_EDIT_3D_MODE_CHANGED, ({ active }) => this.setTopologyEdit3DActive(active)),
     ];
@@ -54,7 +57,7 @@ export class WorkspaceShellController {
     this.applyViewportLayout();
   }
 
-  /** Gives the ported Topology Edit Draft 3D canvas the full viewport-stack height, hiding the shared read-only SVG/WebGL stage while it's active. The Load Calc dock stays visible (compacted to just its header/sub-nav) so the sub-nav tabs remain reachable to leave the 3D sub-tab. */
+  /** Gives 3D Edit sole ownership of the central workspace while its dedicated shell is active. */
   setTopologyEdit3DActive(active) {
     const next = Boolean(active);
     if (this.state.topologyEdit3DActive === next) return;
@@ -85,8 +88,9 @@ export class WorkspaceShellController {
       host.toggleAttribute('inert', !topologyEdit3DActive);
     }
     if (dock) {
-      dock.hidden = !loadCalc;
-      dock.toggleAttribute('inert', !loadCalc);
+      const showLoadCalcDock = loadCalc && !topologyEdit3DActive;
+      dock.hidden = !showLoadCalcDock;
+      dock.toggleAttribute('inert', !showLoadCalcDock);
       dock.classList.toggle('load-calc-dock--compact', topologyEdit3DActive);
     }
     if (stage) {
@@ -109,16 +113,28 @@ export class WorkspaceShellController {
       'viewport-panel--load-calc-owned',
       loadCalc && !topologyEdit3DActive,
     );
+    viewportPanel?.classList.toggle(
+      'viewport-panel--topology-edit-owned',
+      topologyEdit3DActive,
+    );
 
     globalThis.requestAnimationFrame?.(() => globalThis.dispatchEvent?.(new Event('resize')));
   }
 
   click(event) {
     const trigger = event.target.closest('[data-action]');
-    if (!trigger || !this.shellElement.contains(trigger)) return;
+    if (!trigger) return;
+    const nativeModelDialog = this.rootElement.querySelector('[data-role="native-model-dialog"]');
+    const inControllerScope = this.shellElement.contains(trigger)
+      || nativeModelDialog?.contains(trigger);
+    if (!inControllerScope) return;
     const action = trigger.dataset.action;
     if (action === 'switch-viewport-tab') this.switchViewportTab(trigger.dataset.tab);
     else if (action === 'toggle-viewport-table') this.toggleTable();
+    else if (action === 'open-native-model') this.openNativeModelDialog();
+    else if (action === 'cancel-native-model') this.closeNativeModelDialog();
+    else if (action === 'create-native-model') this.createNativeModel();
+    else if (action === 'exit-topology-edit') this.exitTopologyEdit();
     else if (action === 'toggle-tree-collapse') this.togglePanel('treeCollapsed');
     else if (action === 'toggle-properties-collapse') this.togglePanel('propertiesCollapsed');
   }
@@ -126,6 +142,10 @@ export class WorkspaceShellController {
   switchViewportTab(tab) {
     if (!['webgl', 'svg', 'split', 'topology-edit'].includes(tab)) throw new TypeError(`Unsupported viewport tab: ${tab}`);
     if (tab === 'topology-edit') {
+      if (WorkspaceState.getSnapshot().status !== 'ready') {
+        this.openNativeModelDialog();
+        return;
+      }
       if (this.shellElement.dataset.workbenchView !== 'load-calc') EventBus.publish(APPLICATION_EVENTS.CHANGE_REQUESTED, { viewId: 'LOAD_CALC', source: 'navigation' });
       EventBus.publish(EVENT_TOPICS.LOAD_CALC_SUBTAB_REQUESTED, { tab: '3d' });
       this.setTopologyEdit3DActive(true);
@@ -147,8 +167,71 @@ export class WorkspaceShellController {
   }
 
   toggleTable() {
+    if (this.state.topologyEdit3DActive) {
+      const panel = this.shellElement.querySelector('details[data-panel-kind="table"]');
+      const inspector = this.shellElement.querySelector('[data-action="toggle-inspector"]');
+      if (!panel) return;
+      if (this.shellElement.querySelector('[data-role="topology-edit-render-host"]')?.dataset.topologyEditInspectorOpen === 'false') {
+        inspector?.click();
+      }
+      panel.open = !panel.open;
+      if (panel.open) panel.scrollIntoView({ block: 'nearest' });
+      return;
+    }
     const dock = this.shellElement.querySelector('[data-role="viewport-table-dock"]');
     if (dock) dock.hidden = !dock.hidden;
+  }
+
+  /** Opens the governed empty-model setup without entering an unavailable view. */
+  openNativeModelDialog() {
+    const dialog = this.rootElement.querySelector('[data-role="native-model-dialog"]');
+    const error = dialog?.querySelector('[data-role="native-model-error"]');
+    if (error) {
+      error.hidden = true;
+      error.textContent = '';
+    }
+    if (dialog && !dialog.open) dialog.showModal();
+  }
+
+  closeNativeModelDialog() {
+    this.rootElement.querySelector('[data-role="native-model-dialog"]')?.close();
+  }
+
+  createNativeModel() {
+    const form = this.rootElement.querySelector('[data-role="native-model-form"]');
+    if (!form?.reportValidity()) return;
+    const values = new FormData(form);
+    this.nativeModelPending = true;
+    EventBus.publish(EVENT_TOPICS.NATIVE_MODEL_CREATE_REQUESTED, {
+      modelKey: String(values.get('modelKey')).trim(),
+      documentId: String(values.get('documentId')).trim(),
+      revision: String(values.get('revision')).trim(),
+    });
+  }
+
+  handleDatasetLoaded() {
+    if (!this.nativeModelPending) return;
+    this.nativeModelPending = false;
+    this.closeNativeModelDialog();
+    globalThis.queueMicrotask?.(() => this.switchViewportTab('topology-edit'));
+  }
+
+  handleDatasetLoadFailed(message) {
+    if (!this.nativeModelPending) return;
+    this.nativeModelPending = false;
+    const error = this.rootElement.querySelector('[data-role="native-model-error"]');
+    if (error) {
+      error.hidden = false;
+      error.textContent = message;
+    }
+  }
+
+  exitTopologyEdit() {
+    this.switchViewportTab('webgl');
+    EventBus.publish(APPLICATION_EVENTS.CHANGE_REQUESTED, {
+      viewId: 'WORKSPACE',
+      source: 'navigation',
+    });
   }
 
   togglePanel(key) {
@@ -219,7 +302,14 @@ export class WorkspaceShellController {
       : this.state.leftPanelWidth;
     const left = treeCollapsed ? FOCUS_PANEL_WIDTH_PX : expandedLeft;
     const right = propertiesCollapsed ? FOCUS_PANEL_WIDTH_PX : this.state.rightPanelWidth;
-    this.shellElement.style.gridTemplateColumns = `${left}px 4px minmax(360px,1fr) 4px ${right}px`;
+    const propertiesPanel = this.shellElement.querySelector('.properties-panel');
+    const rightResizer = this.shellElement.querySelector('.panel-resizer--right');
+    propertiesPanel.hidden = focus;
+    propertiesPanel.toggleAttribute('inert', focus);
+    rightResizer.hidden = focus;
+    this.shellElement.style.gridTemplateColumns = focus
+      ? `${left}px 4px minmax(360px,1fr)`
+      : `${left}px 4px minmax(360px,1fr) 4px ${right}px`;
     this.shellElement.dataset.topologyEditFocusLayout = String(focus);
     this.shellElement.dataset.topologyEditLeftPanelVisible = String(!treeCollapsed);
     this.shellElement.dataset.topologyEditLeftPanelWidthPx = String(left);
@@ -263,7 +353,7 @@ export class WorkspaceShellController {
   destroy() {
     this.pointerUp();
     this.shellElement?.removeEventListener('pointerdown', this.handlePointerDown);
-    this.shellElement?.removeEventListener('click', this.handleClick);
+    this.rootElement.removeEventListener('click', this.handleClick);
     this.rootElement.ownerDocument.removeEventListener('keydown', this.handleKeyDown);
     this.unsubscribers.forEach((unsubscribe) => unsubscribe());
     this.unsubscribers = [];

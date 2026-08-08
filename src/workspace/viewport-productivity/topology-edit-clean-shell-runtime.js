@@ -5,7 +5,8 @@ import {
 
 const DEFAULT_WIDTH_PX = 320;
 const MIN_WIDTH_PX = 248;
-const MAX_WIDTH_PX = 520;
+const MAX_WIDTH_PX = 760;
+const TABLE_WIDTH_PX = 640;
 const RESIZE_STEP_PX = 16;
 const LARGE_RESIZE_STEP_PX = 48;
 const NODE_ID_PATTERN = /^node:/;
@@ -109,8 +110,10 @@ export class TopologyEditCleanShellRuntime {
     utilities.setAttribute('role', 'group');
     utilities.setAttribute('aria-label', 'Workspace controls');
     utilities.innerHTML = `
+      <button type="button" data-action="open-engineering-table" aria-expanded="false">Engineering table</button>
       <button type="button" data-action="toggle-inspector" aria-keyshortcuts="I" aria-pressed="true">Inspector</button>
-      <button type="button" data-action="toggle-shortcuts" aria-keyshortcuts="?" aria-expanded="false">Shortcuts</button>`;
+      <button type="button" data-action="toggle-shortcuts" aria-keyshortcuts="?" aria-expanded="false">Shortcuts</button>
+      <button type="button" data-action="exit-topology-edit">Exit 3D Edit</button>`;
     toolbar.append(utilities);
 
     const shortcutPanel = element(documentRef, 'section', 'topology-edit-clean-shell__shortcuts');
@@ -165,6 +168,13 @@ export class TopologyEditCleanShellRuntime {
   }
 
   handleAction(action) {
+    if (action === 'open-engineering-table') {
+      this.setInspectorOpen(true);
+      this.setInspectorWidth(Math.max(this.state.inspectorWidthPx, TABLE_WIDTH_PX));
+      this.openPanel('table');
+      this.panel('table')?.scrollIntoView({ block: 'nearest' });
+      return true;
+    }
     if (action === 'toggle-inspector') {
       this.setInspectorOpen(!this.state.inspectorOpen);
       return true;
@@ -280,6 +290,8 @@ export class TopologyEditCleanShellRuntime {
     if (fitSelection) fitSelection.disabled = count === 0;
     const inspectorButton = this.host?.querySelector('[data-action="toggle-inspector"]');
     if (inspectorButton) inspectorButton.setAttribute('aria-pressed', String(this.state.inspectorOpen));
+    const tableButton = this.host?.querySelector('[data-action="open-engineering-table"]');
+    if (tableButton) tableButton.setAttribute('aria-expanded', String(Boolean(this.panel('table')?.open)));
     this.updateDraftStatus();
   }
 

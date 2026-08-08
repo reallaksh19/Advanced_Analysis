@@ -36,10 +36,16 @@ export function renderGovernedSjsonSupports({ backend, group, projection }) {
     for (const element of projection.elements || []) {
       const point = finiteVector(element);
       if (!point) continue;
-      const marker = supportCross(
+      const marker = supportMarker(
         point,
         markerRadiusMm,
-        lineMaterial(lineMaterials, 0x22d3ee, SUPPORT_MARKER_OPACITY, false),
+        element.supportFamily,
+        lineMaterial(
+          lineMaterials,
+          element.colorInt ?? 0x22d3ee,
+          SUPPORT_MARKER_OPACITY,
+          false,
+        ),
       );
       marker.name = `topology-edit-compact-support-marker:${element.id || element.entityId || ''}`;
       marker.userData = {
@@ -48,6 +54,7 @@ export function renderGovernedSjsonSupports({ backend, group, projection }) {
         baseMarkerRadiusMm,
         markerRadiusMm,
         displayScale,
+        supportFamily: element.supportFamily || 'REST',
       };
       marker.renderOrder = OVERLAY_RENDER_ORDER;
       staging.add(marker);
@@ -113,6 +120,20 @@ export function renderGovernedSjsonSupports({ backend, group, projection }) {
   }
 }
 
+/** Uses compact drafting symbols so support families remain distinguishable at model scale. */
+function supportMarker(point, radiusMm, family, material) {
+  const type = String(family || '').toUpperCase();
+  if (type === 'ANCHOR') return supportAnchor(point, radiusMm, material);
+  if (['GUIDE', 'HOLDOWN', 'U_BOLT'].includes(type)) {
+    return supportGuide(point, radiusMm, material);
+  }
+  if (['LINE_STOP', 'LIMIT'].includes(type)) return supportLineStop(point, radiusMm, material);
+  if (['SPRING_HANGER', 'SPRING_WARNING', 'CAN'].includes(type)) {
+    return supportSpring(point, radiusMm, material);
+  }
+  return supportCross(point, radiusMm, material);
+}
+
 function supportCross(point, radiusMm, material) {
   const geometry = new THREE.BufferGeometry().setFromPoints([
     new THREE.Vector3(point.x - radiusMm, point.y, point.z),
@@ -123,6 +144,58 @@ function supportCross(point, radiusMm, material) {
     new THREE.Vector3(point.x, point.y, point.z + radiusMm),
   ]);
   return new THREE.LineSegments(geometry, material);
+}
+
+function supportAnchor(point, radiusMm, material) {
+  const solid = new THREE.BoxGeometry(radiusMm * 1.55, radiusMm * 1.55, radiusMm * 1.55);
+  const marker = new THREE.LineSegments(new THREE.EdgesGeometry(solid), material);
+  solid.dispose();
+  marker.position.copy(point);
+  return marker;
+}
+
+function supportGuide(point, radiusMm, material) {
+  const half = radiusMm * 0.9;
+  const gap = radiusMm * 0.38;
+  const geometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(point.x - half, point.y - half, point.z - gap),
+    new THREE.Vector3(point.x + half, point.y - half, point.z - gap),
+    new THREE.Vector3(point.x + half, point.y + half, point.z - gap),
+    new THREE.Vector3(point.x - half, point.y + half, point.z - gap),
+    new THREE.Vector3(point.x - half, point.y - half, point.z + gap),
+    new THREE.Vector3(point.x + half, point.y - half, point.z + gap),
+    new THREE.Vector3(point.x + half, point.y + half, point.z + gap),
+    new THREE.Vector3(point.x - half, point.y + half, point.z + gap),
+  ]);
+  return new THREE.LineLoop(geometry, material);
+}
+
+function supportLineStop(point, radiusMm, material) {
+  const half = radiusMm;
+  const geometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(point.x - half, point.y, point.z),
+    new THREE.Vector3(point.x + half, point.y, point.z),
+    new THREE.Vector3(point.x, point.y - half, point.z - half),
+    new THREE.Vector3(point.x, point.y + half, point.z - half),
+    new THREE.Vector3(point.x, point.y - half, point.z + half),
+    new THREE.Vector3(point.x, point.y + half, point.z + half),
+  ]);
+  return new THREE.LineSegments(geometry, material);
+}
+
+function supportSpring(point, radiusMm, material) {
+  const turns = 4;
+  const divisions = 32;
+  const points = Array.from({ length: divisions + 1 }, (_, index) => {
+    const progress = index / divisions;
+    const angle = progress * turns * Math.PI * 2;
+    return new THREE.Vector3(
+      point.x + Math.cos(angle) * radiusMm * 0.52,
+      point.y + (progress - 0.5) * radiusMm * 2,
+      point.z + Math.sin(angle) * radiusMm * 0.52,
+    );
+  });
+  return new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), material);
 }
 
 function supportArrowGroup(segment, lineRow, pickMaterial, markerRadiusMm, radialSegments) {

@@ -1,6 +1,7 @@
 /** Coordinates canonical selection requests without acquiring topology authority. */
 import { EVENT_TOPICS } from '../../../workspace/event-topics.js';
 import { topologyEditEntityIdsForObject } from '../topology-edit-render-packet.js';
+import { supportRestraintRows } from '../support-restraint-family.js';
 import {
   createTopologyEditSelectionChanged,
   assertTopologyEditSelectionRequest,
@@ -85,7 +86,10 @@ export class TopologyEditSelectionCoordinator {
     if (!pick?.objectId) {
       return this.requestCanonical('CLEAR', [], 'viewport');
     }
-    if (!['node', 'component', 'edge'].includes(pick.objectKind)) {
+    if (![
+      'node', 'component', 'edge', 'junction', 'support', 'restraint',
+      'boundary', 'rigid', 'bend',
+    ].includes(pick.objectKind)) {
       return { disposition: 'IGNORED', selection: this.store.getState().selection };
     }
     const action = event.ctrlKey || event.metaKey
@@ -204,6 +208,15 @@ export function workspaceEntityIdsForSelection(topology, canonicalIds = []) {
       if (row?.entityId) result.add(row.entityId);
       if (row?.componentKey) result.add(row.componentKey);
       (row?.sourceEntityIds ?? []).forEach((id) => result.add(id));
+    }
+    for (const support of topology.supports ?? []) {
+      const ownsRestraint = supportRestraintRows(support).some(
+        (row) => (row.id ?? row.restraintId) === canonicalId,
+      );
+      if (!ownsRestraint) continue;
+      if (support.entityId) result.add(support.entityId);
+      if (support.componentKey) result.add(support.componentKey);
+      (support.sourceEntityIds ?? []).forEach((id) => result.add(id));
     }
   });
   return [...result].sort();
