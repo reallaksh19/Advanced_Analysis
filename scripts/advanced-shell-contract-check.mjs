@@ -59,25 +59,20 @@ for (const forbidden of [
 }
 
 const loadCalcViewSource = await readFile(path.join(root, 'src/workspace/load-calc-consumer-view.js'), 'utf8');
-const loadCalcTabs = [...loadCalcViewSource.matchAll(/tab\('([^']+)'/g)].map((match) => match[1]);
-const expectedLoadCalcTabs = [
-  'overview',
-  '3d',
-  'preflight',
-  'project-data',
-  'masters',
-  'enrichment',
-  'method-basis',
-  'seal-export',
-  'restraints',
-  'load-cases',
-  'methods',
-  'results',
-  'evidence',
-  'loads',
-  'json-trace',
-];
-assert.deepEqual(loadCalcTabs, expectedLoadCalcTabs);
+const loadCalcTabGroups = [...loadCalcViewSource.matchAll(/tabGroup\('([^']+)', \[([\s\S]*?)\], state\.activeTab\)/g)]
+  .map((match) => ({
+    label: match[1],
+    tabs: [...match[2].matchAll(/\['([^']+)',\s*'[^']+'\]/g)].map((tabMatch) => tabMatch[1]),
+  }));
+assert.deepEqual(loadCalcTabGroups, [
+  { label: 'Setup', tabs: ['overview', 'project-data', 'masters', 'enrichment'] },
+  { label: 'Scenario', tabs: ['restraints', 'load-cases', 'methods'] },
+  { label: 'Output', tabs: ['results', 'loads', 'evidence'] },
+  { label: 'Diagnostics', tabs: ['preflight', 'method-basis', 'seal-export', 'json-trace'] },
+  { label: 'Model', tabs: ['3d'] },
+]);
+const loadCalcTabs = loadCalcTabGroups.flatMap((group) => group.tabs);
+assert.equal(new Set(loadCalcTabs).size, 15, 'Load Calc must retain exactly fifteen unique governed tabs.');
 for (const requiredTab of ['overview', '3d', 'restraints', 'load-cases', 'methods', 'results', 'evidence', 'loads', 'preflight', 'project-data', 'masters', 'json-trace']) {
   assert.equal(loadCalcTabs.includes(requiredTab), true, `Load Calc must retain ${requiredTab}.`);
 }
@@ -87,6 +82,8 @@ for (const governedTab of ['enrichment', 'method-basis', 'seal-export']) {
 assert.match(loadCalcViewSource, /Load Evaluation/u);
 assert.doesNotMatch(loadCalcViewSource, /Legacy Load Evaluation/u);
 assert.match(loadCalcViewSource, /Empirical scenario:/u);
+assert.match(loadCalcViewSource, /Calculation state/u);
+assert.match(loadCalcViewSource, /Calculate — Authorized Gravity/u);
 
 const loadCalcControllerSource = await readFile(path.join(root, 'src/workspace/load-calc-consumer-controller.js'), 'utf8');
 for (const requiredView of [
@@ -208,7 +205,7 @@ for (const packageName of ['react', 'react-dom', 'zustand', 'lucide-react', '@re
   assert.equal(declaredPackages.has(packageName), false, `${packageName} is a removed legacy UI dependency.`);
 }
 
-console.log('Advanced four-tab shell, additive Load Calc navigation, certified authoring chain and benchmark registry reconciliation passed.');
+console.log('Advanced four-tab shell, grouped Load Calc navigation, certified authoring chain and benchmark registry reconciliation passed.');
 
 async function pathExists(targetPath) {
   try {

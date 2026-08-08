@@ -104,7 +104,8 @@ export function renderEmpiricalScenarioMethods(container, state) {
         <button type="button" class="button button--secondary" data-empirical-authorize
           ${snapshot.state === 'DRAFT_READY' ? '' : 'disabled'}>Authorize scenario</button>
         <button type="button" class="button button--primary" data-empirical-calculate
-          ${snapshot.calculationEligible ? '' : 'disabled'}>Calculate empirical method</button>
+          title="Execute the explicitly configured empirical scenario method. The header gravity action uses its separate authorization state."
+          ${snapshot.calculationEligible ? '' : 'disabled'}>Calculate — Configured Scenario</button>
       </div>
     </section>
   `;

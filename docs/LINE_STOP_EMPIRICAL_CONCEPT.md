@@ -1,9 +1,9 @@
 # Empirical Line-Stop and Restraint Load Concept
 
-**Status:** Integration concept and staged implementation specification  
+**Status:** Integration concept with current registered-runtime disposition  
 **Primary mechanics authority:** `EMPIRICAL_BEAM_CONTACT_V1`, merged through PR #709  
-**Future extension:** `EMPIRICAL_RESTRAINT_NETWORK_V1`  
-**Current runtime status:** Existing chainage methods are authorized; beam/contact and restraint-network execution are not yet registered in Load Calc.
+**Registered restraint-network extensions:** `EMPIRICAL_RESTRAINT_NETWORK_V1`, `EMPIRICAL_RESTRAINT_NETWORK_V2`  
+**Current runtime status:** Beam/contact and both restraint-network methods are `REGISTERED` with `QUALIFIED_RESTRICTED_DOMAIN` status in the empirical method registry. Registration does not authorize unqualified vector combination outside each method's result class and applicability domain.
 
 ## 1. Purpose and governing decision
 
@@ -11,15 +11,15 @@ This document defines how empirical piping restraint calculations are integrated
 
 It does **not** define a second implementation of section properties, weight, member stiffness, thermal initial strain, contact release, action recovery, bend stations, equilibrium, or sustained stress. Those capabilities already exist in the merged `EMPIRICAL_BEAM_CONTACT_V1` mechanics package.
 
-The line-stop work shall extend that authority in controlled stages:
+The original line-stop implementation sequence was:
 
 1. adapt normalized workspace/SJSON authorities into an immutable mechanics request;
 2. register the already merged planar beam/contact method in the existing authorized execution framework;
 3. expose scenario configuration inside the existing Load Calc shell;
 4. add a separately identified, restricted line-stop network method; and
-5. qualify a coupled three-dimensional branch/loop method before combined operating reactions are authorized.
+5. qualify a coupled branch/loop network method before combined operating reactions are authorized.
 
-The implementation is screening-oriented until its exact topology, contact, load-case, and profile domain has passed the stated qualification gates.
+Steps 1–5 now have registered restricted-domain runtime implementations. The remaining boundary is qualification breadth: each method remains screening-oriented and must fail closed outside its exact topology, contact, load-case, and profile domain. Registration must not be interpreted as general piping-flexibility or unrestricted combined-operating qualification.
 
 ## 2. Integration with Existing Empirical Mechanics and Load Calc Authority
 
@@ -65,7 +65,7 @@ No line-stop implementation shall duplicate the merged mechanics functions. New 
 
 ### 2.2 Present contact limitation
 
-The merged contact implementation currently qualifies only:
+The merged beam/contact implementation currently qualifies only:
 
 - planar positive-vertical rests;
 - contact in the planar vertical translation DOF;
@@ -73,7 +73,7 @@ The merged contact implementation currently qualifies only:
 - frictionless release; and
 - no finite-gap re-contact.
 
-Unsupported directions, finite gaps, friction, nonplanar regions, and unqualified re-contact rules shall return governed blockers rather than an estimated reaction.
+Unsupported directions, finite gaps, friction, nonplanar regions, and unqualified re-contact rules shall return governed blockers rather than an estimated beam/contact reaction. The separately registered restraint-network methods have their own restricted applicability profiles and must not be used to bypass these beam/contact limits.
 
 ### 2.3 Existing Load Calc authority
 
@@ -89,14 +89,17 @@ The current Load Calc workflow already provides:
 - table-to-viewport selection; and
 - an SJSON 3D projection controller.
 
-The method-bound V2 authorization currently permits only:
+The current empirical method registry contains:
 
 ```text
-CHAINAGE_TRIBUTARY_SPAN_V2
-CHAINAGE_TRIBUTARY_SPAN_V3_COG
+CHAINAGE_TRIBUTARY_SPAN_V2       REGISTERED
+CHAINAGE_TRIBUTARY_SPAN_V3_COG   REGISTERED
+EMPIRICAL_BEAM_CONTACT_V1        REGISTERED / QUALIFIED_RESTRICTED_DOMAIN
+EMPIRICAL_RESTRAINT_NETWORK_V1   REGISTERED / QUALIFIED_RESTRICTED_DOMAIN
+EMPIRICAL_RESTRAINT_NETWORK_V2   REGISTERED / QUALIFIED_RESTRICTED_DOMAIN
 ```
 
-`EMPIRICAL_BEAM_CONTACT_V1` shall be added by a dedicated runtime-bridge work pack after the SJSON adapter contract is established. `EMPIRICAL_RESTRAINT_NETWORK_V1` remains a future method and must not be represented as registered or qualified.
+Beam/contact and both restraint-network methods therefore no longer have a "registration pending" status. Their restricted qualification domains, result families, explicit scenario authorization, and no-silent-combination rules remain governing boundaries.
 
 ### 2.4 Mechanics boundary
 
@@ -119,10 +122,11 @@ The adapter owns format crosswalk and provenance. The mechanics core owns calcul
 
 | Method | Purpose | Status |
 |---|---|---|
-| `CHAINAGE_TRIBUTARY_SPAN_V2` | Basic vertical load distribution | Existing and authorized |
-| `CHAINAGE_TRIBUTARY_SPAN_V3_COG` | CoG-aware vertical distribution | Existing and authorized |
-| `EMPIRICAL_BEAM_CONTACT_V1` | Planar vertical beam/contact/actions | Core merged; runtime/UI registration pending |
-| `EMPIRICAL_RESTRAINT_NETWORK_V1` | Guide and line-stop thermal screening | Future, initially restricted |
+| `CHAINAGE_TRIBUTARY_SPAN_V2` | Basic vertical load distribution | `REGISTERED` |
+| `CHAINAGE_TRIBUTARY_SPAN_V3_COG` | CoG-aware vertical distribution | `REGISTERED` |
+| `EMPIRICAL_BEAM_CONTACT_V1` | Planar vertical beam/contact/actions | `REGISTERED`, `QUALIFIED_RESTRICTED_DOMAIN` |
+| `EMPIRICAL_RESTRAINT_NETWORK_V1` | Restricted guide/line-stop thermal screening | `REGISTERED`, `QUALIFIED_RESTRICTED_DOMAIN` |
+| `EMPIRICAL_RESTRAINT_NETWORK_V2` | Coupled scalar graph branch/loop thermal screening | `REGISTERED`, `QUALIFIED_RESTRICTED_DOMAIN` |
 
 Result families shall remain distinct:
 
@@ -216,7 +220,7 @@ An override requires a reason and `geometryMutation: false`.
 
 ## 5. WP1 contracts
 
-The initial SJSON adapter slice introduces these contracts:
+The initial SJSON adapter slice introduced these contracts:
 
 ```text
 empirical-coordinate-frame/v1
@@ -293,7 +297,7 @@ The adapter evidence binds:
 
 ## 6. SJSON-to-empirical request adapter
 
-Add:
+The governed adapter is:
 
 ```text
 src/workspace/engineering-loads/adapters/
@@ -381,7 +385,7 @@ RESTRAINT_AXIS_AMBIGUOUS
 
 and require explicit scenario resolution.
 
-## 8. Restraint compatibility and future network mechanics
+## 8. Restraint compatibility and network mechanics
 
 ### 8.1 Independent scalar restraint reactions are not a general solution
 
@@ -401,7 +405,7 @@ The active restraint set must be resolved as one system. Independent reactions c
 
 ### 8.2 Restricted network method
 
-The first `EMPIRICAL_RESTRAINT_NETWORK_V1` domain shall be:
+The registered `EMPIRICAL_RESTRAINT_NETWORK_V1` domain is restricted to the qualified profile, including:
 
 - open chain;
 - no tee/branch;
@@ -414,16 +418,11 @@ The first `EMPIRICAL_RESTRAINT_NETWORK_V1` domain shall be:
 
 Even in this domain, all restraints are assembled and solved together.
 
-### 8.3 Coupled branch/loop model
+### 8.3 Coupled branch/loop method
 
-A future junction model may use a positive-semidefinite parameterization:
+`EMPIRICAL_RESTRAINT_NETWORK_V2` provides the separately registered coupled scalar-graph branch/loop screening method. Its qualified profile uses a common graph system with shared junction displacement compatibility and closed-cycle compatibility. Its current restricted domain does not authorize finite gaps, finite support stiffness, friction, or general three-dimensional flexibility substitution.
 
-```text
-Klocal = L LT
-Kglobal = R Klocal RT
-```
-
-Positive semidefiniteness is necessary but not sufficient. The solver must also report/check:
+Where a coupled stiffness parameterization is used, positive semidefiniteness remains necessary but not sufficient. The solver must also report/check the governed conditioning and mechanism evidence appropriate to the implementation, including:
 
 ```text
 rank
@@ -490,7 +489,7 @@ Do not create a parallel short-code vocabulary such as `TOP`, `TEE`, `LOOP`, or 
 
 ## 11. Load Calc UI integration
 
-Do not create seven disconnected applications. Extend the existing Load Calc shell with:
+Do not create seven disconnected applications. Extend the existing Load Calc shell. The current shell has additional governed setup, output, and diagnostic surfaces beyond the original list below; this section remains the method-specific minimum:
 
 ```text
 Overview
@@ -560,85 +559,41 @@ Node 240 : ANC = R + G + LS
 
 The earlier independent-axis prototype produced some plausible resultants but incorrect signs in several components. For example, the node-40 reactions were comparatively close, while node 130 and several anchor components had reversed signs. This demonstrates that resultant agreement cannot qualify a coupled piping system.
 
-BM2 shall therefore be a held-out coupled-model benchmark. In restricted scalar/network mode it must return one or more of:
+BM2 remains a held-out coupled-model benchmark. A method may publish a result only when BM2 falls inside that method/profile's explicitly qualified topology and effect domain; otherwise it must return governed scope/topology blockers rather than a scalar best estimate.
 
-```text
-OUTSIDE_QUALIFIED_SCOPE
-TOPOLOGY_BRANCH_PROFILE_REQUIRED
-TOPOLOGY_LOOP_PROFILE_REQUIRED
-```
-
-It shall not publish a scalar best estimate.
-
-## 13. Work-pack plan
+## 13. Work-pack history and current disposition
 
 ### WP0 — Amend concept authority
 
-- identify PR #709 as the mechanics authority;
-- remove duplicate vertical mechanics claims;
-- establish JSON and coordinate-frame authority;
-- align failure codes;
-- define result-combination restrictions; and
-- integrate the UI plan into Load Calc.
-
-**Gate:** documentation only; no runtime claim.
+Delivered the mechanics-authority, JSON/coordinate-frame, failure-code, result-combination, and Load Calc integration boundaries.
 
 ### WP1 — SJSON adapter and scenario contracts
 
-- add the four exact-schema contracts;
-- add normalized-authority adapter;
-- preserve source/effective restraint values;
-- block ambiguous axes;
-- prove geometry hash identity; and
-- add deterministic contract tests.
-
-**Gate:** request construction only; runtime remains `NOT_REGISTERED`.
+Delivered the normalized-authority adapter and exact scenario/evidence contracts used by the registered methods.
 
 ### WP2 — Beam/contact runtime bridge
 
-- authorize `EMPIRICAL_BEAM_CONTACT_V1`;
-- select eligible planar route regions;
-- map zero-gap one-way vertical rests;
-- invoke merged mechanics and action recovery; and
-- map results back to stable support/restraint IDs.
-
-**Gate:** unsupported nonplanar/contact cases block; PR #709 tests remain green.
+Delivered the authorized `EMPIRICAL_BEAM_CONTACT_V1` bridge for its qualified planar domain.
 
 ### WP3 — Configuration UI
 
-- Overview, Restraints, Load Cases, and Methods integration;
-- explicit Authorize and Calculate actions;
-- override journal; and
-- profile lock/clone behavior.
+Delivered scenario configuration, explicit Authorize/Calculate actions, override/profile workflow, and method selection in Load Calc.
 
 ### WP4 — Results and SJSON overlays
 
-- result tables and governed overlays;
-- active/lifted styling;
-- bidirectional selection; and
-- stale-result removal.
+Delivered separate empirical result presentation/evidence surfaces without changing canonical topology.
 
 ### WP5 — Restricted line-stop network
 
-- open-chain global compatibility solution;
-- one direction;
-- strict topology/contact domain; and
-- BM2 fail-closed behavior.
+Delivered `EMPIRICAL_RESTRAINT_NETWORK_V1` as a registered restricted-domain method.
 
-### WP6 — Coupled branch/loop model
+### WP6 — Coupled branch/loop network
 
-- three-dimensional junction matrices;
-- deterministic local axes;
-- rank/mechanism/conditioning checks;
-- coupled contact and finite-gap qualification; and
-- held-out BM2 validation.
+Delivered `EMPIRICAL_RESTRAINT_NETWORK_V2` as a registered restricted-domain coupled scalar-graph method.
 
 ### WP7 — Combined operating-result qualification
 
-- shared weight/thermal/support state;
-- authorized OPE vector;
-- structural-support handoff; and
-- complete evidence export.
+Combined operating reaction remains separately governed. Registration of V1/V2 does not by itself authorize vector addition across independent result families. Any combined operating result must satisfy the shared geometry, stiffness, restraint, active-set, load-ownership, and evidence requirements below.
 
 ## 14. Release gates
 
@@ -656,12 +611,12 @@ The applicable slice shall not be promoted unless:
 10. result identity binds dataset, support, restraint, scenario, and profile hashes;
 11. PR #709 mechanics tests remain green;
 12. SJSON rendering and support-selection gates remain green;
-13. BM2 scalar/restricted mode blocks; and
+13. held-out coupled benchmarks fail closed whenever outside the selected qualified profile; and
 14. vertical and line-stop vectors are not combined before qualification.
 
 ## 15. Repository disposition
 
-- PR #722 is conditionally acceptable as this integration concept and shall remain documentation-only.
-- PR #709 is the merged authoritative mechanics implementation.
-- PR #708 is superseded by PR #709 and should be closed to avoid development against the wrong branch.
-- The next implementation slice is WP1, followed by the WP2 runtime bridge for the already merged planar mechanics.
+- PR #709 remains the authoritative merged beam/contact mechanics implementation.
+- `EMPIRICAL_BEAM_CONTACT_V1`, `EMPIRICAL_RESTRAINT_NETWORK_V1`, and `EMPIRICAL_RESTRAINT_NETWORK_V2` are registered restricted-domain empirical methods and must be documented as such.
+- Registration is not a claim of unrestricted piping-flexibility accuracy, finite-gap/friction coverage, or general combined-operating qualification.
+- The next production priority for the broader empirical programme is governed by `docs/empericalformulaconceptnote.md`; this line-stop concept no longer identifies WP1 as the next unimplemented slice.
