@@ -1,0 +1,89 @@
+name: preproduction-thermal-liftoff-active-set
+
+on:
+  pull_request:
+    branches:
+      - agent/preproduction-thermal-liftoff-local-screen-reconciliation
+    paths:
+      - src/workspace/engineering-loads/preproduction-thermal-liftoff-active-set-authority.js
+      - src/workspace/engineering-loads/preproduction-thermal-liftoff-active-set.js
+      - scripts/preproduction-thermal-liftoff-active-set-check.mjs
+      - scripts/preproduction-thermal-liftoff-active-set-source-guard.mjs
+      - .github/workflows/preproduction-thermal-liftoff-active-set.yml
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-preproduction-thermal-liftoff-active-set:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact requested head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Prove exact head and clean worktree
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          git diff --exit-code
+
+      - name: Enforce five-path TL-04 batch containment
+        shell: bash
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="$(git rev-parse HEAD)"
+          git diff --name-only "$BASE_SHA" "$HEAD_SHA" > /tmp/tl04-paths.txt
+          while IFS= read -r changed; do
+            case "$changed" in
+              src/workspace/engineering-loads/preproduction-thermal-liftoff-active-set-authority.js|src/workspace/engineering-loads/preproduction-thermal-liftoff-active-set.js|scripts/preproduction-thermal-liftoff-active-set-check.mjs|scripts/preproduction-thermal-liftoff-active-set-source-guard.mjs|.github/workflows/preproduction-thermal-liftoff-active-set.yml) ;;
+              *) echo "Forbidden changed path for TL-04 active-set batch: $changed"; exit 1 ;;
+            esac
+          done < /tmp/tl04-paths.txt
+          test "$(wc -l < /tmp/tl04-paths.txt)" -eq 5
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax check TL-04 batch
+        run: |
+          node --check src/workspace/engineering-loads/preproduction-thermal-liftoff-active-set-authority.js
+          node --check src/workspace/engineering-loads/preproduction-thermal-liftoff-active-set.js
+          node --check scripts/preproduction-thermal-liftoff-active-set-check.mjs
+          node --check scripts/preproduction-thermal-liftoff-active-set-source-guard.mjs
+
+      - name: Requalify current-head support/contact authority
+        run: |
+          node scripts/preproduction-support-contact-source-guard.mjs
+          node scripts/preproduction-support-contact-authority-check.mjs
+
+      - name: Requalify TL-01 TL-02 and reaction-tolerance prerequisites
+        run: node scripts/preproduction-thermal-liftoff-prerequisites-check.mjs
+
+      - name: Requalify TL-03 current-head local screen
+        run: |
+          node scripts/preproduction-thermal-liftoff-local-screen-source-guard.mjs
+          node scripts/preproduction-thermal-liftoff-local-screen-check.mjs
+
+      - name: Requalify Appendix S benchmark evidence
+        run: node scripts/empirical-appendix-s-vertical-benchmark.mjs
+
+      - name: Enforce TL-04 source boundary
+        run: node scripts/preproduction-thermal-liftoff-active-set-source-guard.mjs
+
+      - name: Qualify TL-04 active-set redistribution and re-contact
+        run: node scripts/preproduction-thermal-liftoff-active-set-check.mjs
+
+      - name: Import graph
+        run: npm run check:imports
+
+      - name: Production build
+        run: npm run build
