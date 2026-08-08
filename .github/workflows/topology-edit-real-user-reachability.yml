@@ -101,19 +101,32 @@ jobs:
             2>&1 | tee topology-edit-r1-new-unit-output.txt
 
       - name: Execute retained focused unit regressions
+        shell: bash
         run: |
-          set -euo pipefail
-          node --test --test-reporter=tap \
-            tests/topology-edit-component-hud-context.test.mjs \
-            tests/topology-edit-selection-coordinator.test.mjs \
-            tests/topology-edit-selection-foundation-integration.test.mjs \
-            tests/topology-edit-professional-interaction-containment.test.mjs \
-            tests/topology-edit-professional-engineering-plan.test.mjs \
-            tests/topology-edit-inline-component-insertion.test.mjs \
-            tests/topology-edit-xyz-branch-demo.test.mjs \
-            tests/topology-edit-table-m04-m06-m10.test.mjs \
-            tests/topology-edit-table-q3-source-capability.test.mjs \
-            2>&1 | tee topology-edit-r1-retained-unit-output.txt
+          set +e
+          : > topology-edit-r1-retained-unit-output.txt
+          status=0
+          TESTS=(
+            tests/topology-edit-component-hud-context.test.mjs
+            tests/topology-edit-selection-coordinator.test.mjs
+            tests/topology-edit-selection-foundation-integration.test.mjs
+            tests/topology-edit-professional-interaction-containment.test.mjs
+            tests/topology-edit-professional-engineering-plan.test.mjs
+            tests/topology-edit-inline-component-insertion.test.mjs
+            tests/topology-edit-xyz-branch-demo.test.mjs
+            tests/topology-edit-table-m04-m06-m10.test.mjs
+            tests/topology-edit-table-q3-source-capability.test.mjs
+          )
+          for test_file in "${TESTS[@]}"; do
+            echo "===== ${test_file} =====" | tee -a topology-edit-r1-retained-unit-output.txt
+            node --test --test-reporter=tap "$test_file" 2>&1 | tee -a topology-edit-r1-retained-unit-output.txt
+            test_status=${PIPESTATUS[0]}
+            if [ "$test_status" -ne 0 ]; then
+              echo "::error title=Retained R1 unit regression failed::${test_file}"
+              status=1
+            fi
+          done
+          exit "$status"
 
       - name: Execute no-privilege production Chromium qualification
         run: |
