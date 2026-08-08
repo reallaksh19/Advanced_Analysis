@@ -35,6 +35,7 @@ test('exact valve insertion applies, renders, undoes, and redoes as one governed
 
   await panel.locator('[data-role="professional-operation-type"]')
     .selectOption('INSERT_INLINE_COMPONENT');
+  await openAdvancedCanonicalEvidence(panel);
   await panel.locator('[data-role="professional-edge-id"]').fill(target.id);
   await panel.locator('[data-role="professional-center-distance-mm"]')
     .fill(String(target.lengthMm / 2));
@@ -235,6 +236,14 @@ async function openPanel(host, kind) {
     await details.locator(':scope > summary').click();
   }
   return details.locator('[data-role="topology-edit-professional-operation"]');
+}
+
+async function openAdvancedCanonicalEvidence(panel) {
+  const details = panel.locator('details.topology-edit-professional-fallback');
+  await expect(details).toBeVisible();
+  if (!(await details.evaluate((element) => element.open))) {
+    await details.locator(':scope > summary').click();
+  }
 }
 
 async function integerAttribute(locator, name) {
