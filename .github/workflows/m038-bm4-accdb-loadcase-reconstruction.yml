@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - agent/m038-bm4-accdb-loadcase-reconstruction
+      - agent/m038-bm4-node20340-thermal-strain-fix
   workflow_dispatch:
 
 permissions:
@@ -88,7 +89,7 @@ jobs:
           set -euo pipefail
           node --check src/core/linear-fea-frame-element/uniform-axial-initial-strain.js
           node --check scripts/lfea-m035-m036-bm4-integration-runtime.mjs
-          node -e "import('./scripts/lfea-m035-m036-bm4-integration-runtime.mjs').then(m=>{const r=m.solveBm4M035M036Combined(); console.log('M038_RELEASED_SUS='+JSON.stringify(m.releasedTargetIds(r.sustainedRun,['20090','20350','21470','21610']))); console.log('M038_RELEASED_OPE='+JSON.stringify(m.releasedTargetIds(r.operatingRun,['20090','20350','21470','21610']))); console.log('M038_21470_SUS_RY='+m.reactionUy(r.sustained.execution,'21470'));})" | tee /tmp/m038-bourdon-smoke.log
+          node -e "import('./scripts/lfea-bm4-thermal-expansion-authority.mjs').then(t=>console.log('M038_T1_THERMAL_STRAIN='+t.BM4_T1_THERMAL_STRAIN)); import('./scripts/lfea-m035-m036-bm4-integration-runtime.mjs').then(m=>{const r=m.solveBm4M035M036Combined(); console.log('M038_RELEASED_SUS='+JSON.stringify(m.releasedTargetIds(r.sustainedRun,['20090','20350','21470','21610']))); console.log('M038_RELEASED_OPE='+JSON.stringify(m.releasedTargetIds(r.operatingRun,['20090','20350','21470','21610']))); console.log('M038_21470_SUS_RY='+m.reactionUy(r.sustained.execution,'21470'));})" | tee /tmp/m038-bourdon-smoke.log
 
       - name: Full BM4 row attribution benchmark
         shell: bash
