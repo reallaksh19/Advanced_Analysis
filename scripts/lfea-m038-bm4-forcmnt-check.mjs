@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
+import { normalizeUnilateralDeclarations } from '../src/core/linear-fea-unilateral-solver/index.js';
 import { solveBm4InputXmlConditioned } from './lfea-m034-bm4-solve-runtime.mjs';
 import { buildBm4M035FeatureAuthorities } from './lfea-m035-bm4-feature-solve-runtime.mjs';
 import {
@@ -53,8 +54,10 @@ function assertBourdonDisabled(loadCase) {
 }
 
 function initialActiveState(inventory) {
-  const active = inventory.unilateral.filter((row) => row.initiallyEngaged !== false);
+  const normalized = normalizeUnilateralDeclarations(inventory.unilateral);
+  const active = normalized.filter((row) => row.initiallyEngaged);
   return Object.freeze({
+    normalized,
     declarations: Object.freeze([
       ...inventory.base,
       ...active.map((row) => row.constraintDeclaration),
@@ -106,7 +109,11 @@ const report = {
     expansionCancellationExact: true,
     bourdonStillDisabled: true,
   },
-  initialActiveSetCount: initial.movements.length,
+  initialContactState: {
+    unilateralCount: initial.normalized.length,
+    initiallyEngagedCount: initial.normalized.filter((row) => row.initiallyEngaged).length,
+    initiallyReleasedCount: initial.normalized.filter((row) => !row.initiallyEngaged).length,
+  },
   solverQualification: {
     SUS: {
       status: diagnosticSus.execution.status,
