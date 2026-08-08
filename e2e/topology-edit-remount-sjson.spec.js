@@ -39,8 +39,12 @@ test('uploaded SJSON survives 3D Edit leave and re-entry with the clean canvas s
   const sidecar = host.locator('[data-role="topology-edit-sidecar"]');
   await assertCleanTopologyEditShell(host, sidecar);
 
-  await page.getByRole('button', { name: 'Load Evaluation', exact: true }).click();
+  await host.getByRole('button', { name: 'Exit 3D Edit', exact: true }).click();
   await expect(host).toBeHidden();
+  await expect(editTab).toBeVisible();
+  await expect.poll(() => page.evaluate(() => (
+    globalThis.AnalysisWorkspace?.getSnapshot?.()?.dataset?.entities?.length ?? 0
+  ))).toBe(20);
 
   await editTab.click();
   await assertCleanTopologyEditShell(host, sidecar);
