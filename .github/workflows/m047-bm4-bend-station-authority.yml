@@ -1,0 +1,58 @@
+name: M047 BM4 Bend Station Authority
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/lfea-m047-bm4-bend-station-authority.mjs'
+      - '.github/workflows/m047-bm4-bend-station-authority.yml'
+  workflow_dispatch:
+
+jobs:
+  bend-station-authority:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enforce evidence-only M047 diff
+        run: |
+          git fetch --no-tags --depth=1 origin 2cdfc0436efecde4724466169f51a38f6d3f0400
+          git diff --name-only 2cdfc0436efecde4724466169f51a38f6d3f0400 HEAD | sort > /tmp/m047-paths
+          printf '%s\n' \
+            .github/workflows/m047-bm4-bend-station-authority.yml \
+            scripts/lfea-m047-bm4-bend-station-authority.mjs | sort > /tmp/m047-allowed
+          diff -u /tmp/m047-allowed /tmp/m047-paths
+      - name: Syntax-check M047
+        run: node --check scripts/lfea-m047-bm4-bend-station-authority.mjs
+      - name: Run M047 exact bend-station RCA
+        run: node scripts/lfea-m047-bm4-bend-station-authority.mjs --report /tmp/m047/lfea-m047-bm4-bend-station-authority.json
+      - name: Preserve M046/M045/M044/M042 Level-1 boundaries
+        run: |
+          node scripts/lfea-m046-bm4-20340-boundary-authority.mjs
+          node scripts/lfea-m045-bm4-axial-discrepancy-transport.mjs
+          node scripts/lfea-m044-bm4-axial-end-force-equilibrium.mjs
+          node scripts/lfea-m042-bm4-first-divergence-rca.mjs
+      - name: Preserve M041/M040 friction fail-closed boundary
+        run: |
+          node scripts/lfea-m041-contact-friction-check.mjs
+          node scripts/lfea-m041-linear-kernel-bridge-check.mjs
+          node scripts/lfea-m041-bm4-activation-gate.mjs
+          node scripts/lfea-m040-bm4-friction-check.mjs
+      - name: Enforce bounded M047 script
+        run: |
+          lines=$(wc -l < scripts/lfea-m047-bm4-bend-station-authority.mjs)
+          test "$lines" -le 340 || { echo "M047 has $lines lines (>340)"; exit 1; }
+      - name: Upload deterministic M047 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m047-bm4-bend-station-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /tmp/m047/lfea-m047-bm4-bend-station-authority.json
+          if-no-files-found: error
+      - name: Verify clean worktree
+        run: git diff --exit-code && git status --porcelain | tee /tmp/m047-status && test ! -s /tmp/m047-status
