@@ -25,6 +25,7 @@ import {
 } from './lfea-m034-bm4-solve-fixtures.mjs';
 import { buildBm4M035FeatureAuthorities } from './lfea-m035-bm4-feature-solve-runtime.mjs';
 import { buildM036Bm4Inventory } from './lfea-m036-bm4-runtime.mjs';
+import { bm4BaseWForcmntPrimitives } from './lfea-m038-bm4-forcmnt-authority.mjs';
 
 const NODE_PREFIX = 'BM4M035.N';
 
@@ -139,6 +140,12 @@ function compileCase(authorities, compilation, label, thermal, movements) {
       sourceEvidence: sourceEvidence({ sourceId: `${BM4_SOURCE_ID}-M035-M036-TEMP`, sourceRevision: `${entry.sourceSegmentId}:${analysis.operatingTemperature}` }),
     });
   }
+  primitives.push(...bm4BaseWForcmntPrimitives({
+    baseEntries: authorities.base.entries,
+    loadCaseId: label,
+    nodeIdPrefix: NODE_PREFIX,
+    sourceEvidence,
+  }));
   for (const movement of movements) primitives.push({
     schema: 'fea-linear-load-primitive/v1', primitiveId: `${label}-CONTACT-${movement.prescribedSlotId}`,
     kind: 'PRESCRIBED_MOVEMENT', prescribedSlotId: movement.prescribedSlotId,
@@ -148,7 +155,7 @@ function compileCase(authorities, compilation, label, thermal, movements) {
   return compilePhysicalLoadCase({
     loadCaseId: label,
     loadCaseClass: 'MIXED_PHYSICAL',
-    presentation: { label, description: 'M035 feature mechanics under M036 unilateral active-set state.' },
+    presentation: { label, description: 'M038 BM4 feature/contact mechanics with ACCDB-qualified base-W FORCE/MOMENT membership.' },
     modelReference: modelReferenceFromCompilation(compilation),
     primitives,
     profile: loadCaseProfile({ gravitationalAcceleration: { value: GRAVITY, source: 'SI-STANDARD-GRAVITY-EXACT' } }),
