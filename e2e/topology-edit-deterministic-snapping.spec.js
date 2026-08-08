@@ -58,7 +58,7 @@ test('production WebGL drag uses deterministic snapping without canonical previe
   const drag = await dragPoints(page, context.anchorNodeId, context.mode);
   await page.mouse.move(drag.start.x, drag.start.y);
   await page.mouse.down();
-  await page.mouse.move(drag.target.x, drag.target.y, { steps: 12 });
+  await page.mouse.move(drag.target.x, drag.target.y);
 
   await expect(host).toHaveAttribute('data-topology-edit-interaction-snap-status', 'RESOLVED');
   await expect(host).toHaveAttribute('data-topology-edit-interaction-snap-evidence', 'PORT');
