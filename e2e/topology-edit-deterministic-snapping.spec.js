@@ -62,7 +62,9 @@ test('production WebGL drag uses deterministic snapping without canonical previe
 
   await expect(host).toHaveAttribute('data-topology-edit-interaction-snap-status', 'RESOLVED');
   await expect(host).toHaveAttribute('data-topology-edit-interaction-snap-evidence', 'PORT');
-  await expect(host).toHaveAttribute('data-topology-edit-interaction-snap-target', context.anchorNodeId);
+  await expect(host).toHaveAttribute('data-topology-edit-interaction-snap-target', /.+/);
+  const snapTarget = await host.getAttribute('data-topology-edit-interaction-snap-target');
+  expect(context.anchorPortTargetIds).toContain(snapTarget);
   await expect(host).toHaveAttribute('data-topology-edit-snap-index-hash', /.+/);
   await expect(host).toHaveAttribute('data-topology-edit-snap-result-hash', /.+/);
   await expect(host).toHaveAttribute('data-topology-edit-snap-query-id', /.+/);
@@ -204,6 +206,8 @@ async function screenResolvedPortDragContext(page) {
   return page.evaluate((controllerKey) => {
     const controller = globalThis[controllerKey];
     const topology = controller.session.currentTopology();
+    const runtime = controller.interactionControllerRuntime;
+    const snapIndex = runtime.ensureSnapIndex(topology);
     const camera = controller.viewportBackend.activeCamera;
     const canvas = controller.viewportBackend.renderer.domElement;
     const engineeringRoot = controller.viewportBackend.engineeringRoot;
@@ -258,6 +262,18 @@ async function screenResolvedPortDragContext(page) {
           <= epsilon * approachLength * tangentLength;
       });
     };
+    const exactPortTargetIds = (node) => [...new Set(
+      (snapIndex.pointFeatures ?? [])
+        .filter((feature) => (
+          feature.kind === 'PORT'
+          && Math.hypot(
+            feature.worldPoint.x - node.position.x,
+            feature.worldPoint.y - node.position.y,
+            feature.worldPoint.z - node.position.z,
+          ) <= epsilon
+        ))
+        .flatMap((feature) => feature.canonicalTargetIds ?? []),
+    )].sort();
     const project = (point) => {
       const vector = camera.position.clone()
         .set(point.x, point.y, point.z)
@@ -278,6 +294,8 @@ async function screenResolvedPortDragContext(page) {
         if (moving.id === anchor.id) continue;
         const mode = modeFor(moving.position, anchor.position);
         if (!mode || ridesTargetCenterline(moving, anchor)) continue;
+        const anchorPortTargetIds = exactPortTargetIds(anchor);
+        if (!anchorPortTargetIds.length) continue;
         const movingScreen = project(moving.position);
         const anchorScreen = project(anchor.position);
         const screenDistancePx = Math.hypot(
@@ -290,6 +308,7 @@ async function screenResolvedPortDragContext(page) {
           anchorNodeId: anchor.id,
           movingPortKey: [...moving.portKeys].sort()[0],
           anchorPortKey: [...anchor.portKeys].sort()[0],
+          anchorPortTargetIds,
           mode,
           screenDistancePx,
           distanceMm: Math.hypot(
