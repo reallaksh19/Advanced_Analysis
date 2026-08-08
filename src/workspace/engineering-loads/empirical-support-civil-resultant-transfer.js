@@ -31,7 +31,6 @@ export function calculateEmpiricalSupportCivilResultantTransfer(input = {}) {
   const assemblyAuthority = requireEmpiricalSupportAssemblyAuthority(
     input.supportAssemblyAuthority,
   );
-
   const supportSiteModelSemanticHash = semanticHash(supportSiteModel);
   const globalBlockers = globalBindingBlockers({
     execution,
@@ -39,17 +38,16 @@ export function calculateEmpiricalSupportCivilResultantTransfer(input = {}) {
     supportSiteModelSemanticHash,
     assemblyAuthority,
   });
-
   const authorityBySite = indexAuthorityBySite(assemblyAuthority.records);
-  const siteById = new Map(
-    supportSiteModel.sites.map((site) => [site.siteId, site]),
-  );
-  const loadCases = execution.distribution.loadCases.map((loadCase) => buildLoadCase({
-    loadCase,
-    siteById,
-    authorityBySite,
-    globalBlockers,
-  }));
+  const siteById = new Map(supportSiteModel.sites.map((site) => [site.siteId, site]));
+  const loadCases = execution.distribution.loadCases
+    .map((loadCase) => buildLoadCase({
+      loadCase,
+      siteById,
+      authorityBySite,
+      globalBlockers,
+    }))
+    .sort((left, right) => compareCodeUnits(left.loadCaseId, right.loadCaseId));
   const blockers = dedupeRows([
     ...globalBlockers,
     ...loadCases.flatMap((loadCase) => loadCase.blockers.map((row) => ({
@@ -58,6 +56,12 @@ export function calculateEmpiricalSupportCivilResultantTransfer(input = {}) {
     }))),
   ]);
   const calculatedCaseCount = loadCases.filter((row) => row.status === 'CALCULATED').length;
+  const summary = summarize(loadCases);
+  const status = globalBlockers.length === 0
+    && loadCases.length > 0
+    && calculatedCaseCount === loadCases.length
+    ? 'CALCULATED'
+    : 'BLOCKED';
   const draft = {
     schema: EMPIRICAL_SUPPORT_CIVIL_RESULTANT_TRANSFER_SCHEMA,
     datasetId: execution.datasetId,
@@ -70,26 +74,10 @@ export function calculateEmpiricalSupportCivilResultantTransfer(input = {}) {
     supportAssemblyAuthoritySemanticHash: assemblyAuthority.semanticHash,
     sourceAxisBasis: 'Z_UP',
     conventions: EMPIRICAL_SUPPORT_CIVIL_RESULTANT_CONVENTION,
-    status: globalBlockers.length === 0
-      && loadCases.length > 0
-      && calculatedCaseCount === loadCases.length
-      ? 'CALCULATED'
-      : 'BLOCKED',
+    status,
     loadCases,
     blockers,
-    summary: {
-      loadCaseCount: loadCases.length,
-      calculatedCaseCount,
-      blockedCaseCount: loadCases.length - calculatedCaseCount,
-      civilResultantCount: loadCases.reduce(
-        (total, row) => total + row.civilResultants.length,
-        0,
-      ),
-      zeroReactionCount: loadCases.reduce(
-        (total, row) => total + row.completeness.zeroReactionCount,
-        0,
-      ),
-    },
+    summary,
     policy: {
       exactStaticsOnly: true,
       oneAssemblyPerLoadedSiteRequired: true,
@@ -113,16 +101,10 @@ export function calculateEmpiricalSupportCivilResultantTransfer(input = {}) {
 
 export function requireEmpiricalSupportCivilResultantTransfer(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    fail(
-      'EMPIRICAL_CIVIL_TRANSFER_INVALID',
-      'Civil resultant transfer must be an object.',
-    );
+    fail('EMPIRICAL_CIVIL_TRANSFER_INVALID', 'Civil resultant transfer must be an object.');
   }
   if (value.schema !== EMPIRICAL_SUPPORT_CIVIL_RESULTANT_TRANSFER_SCHEMA) {
-    fail(
-      'EMPIRICAL_CIVIL_TRANSFER_SCHEMA_INVALID',
-      'Unexpected civil resultant transfer schema.',
-    );
+    fail('EMPIRICAL_CIVIL_TRANSFER_SCHEMA_INVALID', 'Unexpected civil resultant transfer schema.');
   }
   if (!Array.isArray(value.loadCases) || !Array.isArray(value.blockers)) {
     fail(
@@ -137,6 +119,18 @@ export function requireEmpiricalSupportCivilResultantTransfer(value) {
     );
   }
   value.loadCases.forEach(validateLoadCase);
+  const expectedSummary = summarize(value.loadCases);
+  if (semanticHash(value.summary) !== semanticHash(expectedSummary)) {
+    fail('EMPIRICAL_CIVIL_TRANSFER_SUMMARY_INVALID', 'Civil resultant summary is stale.');
+  }
+  const expectedStatus = value.loadCases.length > 0
+    && value.loadCases.every((row) => row.status === 'CALCULATED')
+    && value.blockers.length === 0
+    ? 'CALCULATED'
+    : 'BLOCKED';
+  if (value.status !== expectedStatus) {
+    fail('EMPIRICAL_CIVIL_TRANSFER_STATUS_INVALID', 'Civil resultant status is stale.');
+  }
   if (value.policy?.exactStaticsOnly !== true
       || value.policy?.oneAssemblyPerLoadedSiteRequired !== true
       || value.policy?.multiAssemblyLoadSharingPermitted !== false
@@ -217,9 +211,7 @@ function globalBindingBlockers({
 function buildLoadCase({ loadCase, siteById, authorityBySite, globalBlockers }) {
   const loadCaseId = stringValue(loadCase?.loadCaseId);
   const caseBlockers = [...globalBlockers];
-  const supportResults = Array.isArray(loadCase?.supportResults)
-    ? loadCase.supportResults
-    : [];
+  const supportResults = Array.isArray(loadCase?.supportResults) ? loadCase.supportResults : [];
   if (!loadCaseId) {
     caseBlockers.push(blocker(
       'EMPIRICAL_CIVIL_TRANSFER_LOAD_CASE_ID_MISSING',
@@ -232,7 +224,6 @@ function buildLoadCase({ loadCase, siteById, authorityBySite, globalBlockers }) 
       'Only fully calculated upstream load cases may be transferred.',
     ));
   }
-
   const audits = supportResults
     .map((result) => auditSupportResult(result, siteById, authorityBySite))
     .sort((left, right) => compareCodeUnits(left.supportSiteId, right.supportSiteId));
@@ -252,12 +243,13 @@ function buildLoadCase({ loadCase, siteById, authorityBySite, globalBlockers }) 
     civilResultants,
     siteAudits: audits,
     blockers,
-    transferBalance: calculated
-      ? transferBalance(supportResults, civilResultants)
-      : null,
+    transferBalance: calculated ? transferBalance(supportResults, civilResultants) : null,
     completeness: {
       supportResultCount: supportResults.length,
-      nonzeroReactionCount: audits.filter((row) => row.status !== 'NO_LOAD').length,
+      nonzeroReactionCount: audits.filter((row) => (
+        row.sourceVerticalReactionOnPipeN !== null
+          && row.sourceVerticalReactionOnPipeN !== 0
+      )).length,
       zeroReactionCount: audits.filter((row) => row.status === 'NO_LOAD').length,
       qualifiedTransferCount: qualifiedCandidates.length,
       blockedTransferCount: audits.filter((row) => row.status === 'BLOCKED').length,
@@ -299,7 +291,6 @@ function auditSupportResult(result, siteById, authorityBySite) {
       blockers: [],
     });
   }
-
   const site = siteById.get(supportSiteId) || null;
   if (!site) {
     blockers.push(blocker(
@@ -307,14 +298,15 @@ function auditSupportResult(result, siteById, authorityBySite) {
       'Upstream support result does not exist in the active support-site model.',
     ));
   }
-  if (site && site.assemblyIds.length !== 1) {
+  const assemblyIds = Array.isArray(site?.assemblyIds) ? site.assemblyIds : [];
+  if (site && assemblyIds.length !== 1) {
     blockers.push(blocker(
       'EMPIRICAL_CIVIL_TRANSFER_MULTI_ASSEMBLY_LOAD_SHARE_UNRESOLVED',
       'A site-level piping reaction cannot be split across multiple structural assemblies in B2.',
-      { assemblyIds: [...site.assemblyIds] },
+      { assemblyIds: [...assemblyIds] },
     ));
   }
-  const assemblyId = site?.assemblyIds?.length === 1 ? site.assemblyIds[0] : null;
+  const assemblyId = assemblyIds.length === 1 ? assemblyIds[0] : null;
   const authorities = authorityBySite.get(supportSiteId) || [];
   const authority = assemblyId
     ? authorities.find((row) => row.assemblyId === assemblyId) || null
@@ -362,7 +354,6 @@ function auditSupportResult(result, siteById, authorityBySite) {
       blockers: dedupeRows(blockers),
     });
   }
-
   const civilResultant = buildCivilResultant({
     supportSiteId,
     reaction,
@@ -379,18 +370,11 @@ function auditSupportResult(result, siteById, authorityBySite) {
   });
 }
 
-function buildCivilResultant({
-  supportSiteId,
-  reaction,
-  authority,
-  pipePoint,
-  civilPoint,
-}) {
+function buildCivilResultant({ supportSiteId, reaction, authority, pipePoint, civilPoint }) {
   const sourceReactionOnPipeN = freezeDeep({ x: 0, y: 0, z: reaction });
   const structureActionAtPipeAttachmentN = freezeDeep({ x: 0, y: 0, z: -reaction });
   const offsetMm = freezeDeep(subtract(pipePoint, civilPoint));
-  const offsetM = scale(offsetMm, 0.001);
-  const momentNm = freezeDeep(cross(offsetM, structureActionAtPipeAttachmentN));
+  const momentNm = freezeDeep(cross(scale(offsetMm, 0.001), structureActionAtPipeAttachmentN));
   const payload = {
     transferId: `CIVIL:${supportSiteId}:${authority.structuralAssemblyId}`,
     supportSiteId,
@@ -416,17 +400,20 @@ function buildCivilResultant({
 }
 
 function transferBalance(supportResults, civilResultants) {
-  const sourceVerticalReactionOnPipeN = supportResults.reduce((total, row) => (
-    total + (finite(row?.verticalForceN) ?? 0)
-  ), 0);
-  const structureVerticalActionN = civilResultants.reduce((total, row) => (
-    total + row.civilReferenceResultant.forceN.z
-  ), 0);
+  const sourceVerticalReactionOnPipeN = supportResults.reduce((total, row) => {
+    const value = finite(row?.verticalForceN);
+    return total + (value === null ? 0 : value);
+  }, 0);
+  const structureVerticalActionN = civilResultants.reduce(
+    (total, row) => total + row.civilReferenceResultant.forceN.z,
+    0,
+  );
+  const actionReactionResidualN = sourceVerticalReactionOnPipeN + structureVerticalActionN;
   return freezeDeep({
     sourceVerticalReactionOnPipeN,
     structureVerticalActionN,
-    actionReactionResidualN: sourceVerticalReactionOnPipeN + structureVerticalActionN,
-    passed: sourceVerticalReactionOnPipeN + structureVerticalActionN === 0,
+    actionReactionResidualN,
+    passed: actionReactionResidualN === 0,
   });
 }
 
@@ -436,10 +423,7 @@ function validateLoadCase(value) {
       || !Array.isArray(value.civilResultants)
       || !Array.isArray(value.siteAudits)
       || !Array.isArray(value.blockers)) {
-    fail(
-      'EMPIRICAL_CIVIL_TRANSFER_LOAD_CASE_INVALID',
-      'Civil resultant load case is invalid.',
-    );
+    fail('EMPIRICAL_CIVIL_TRANSFER_LOAD_CASE_INVALID', 'Civil resultant load case is invalid.');
   }
   if (!isStrictlySorted(value.civilResultants.map((row) => row.supportSiteId))) {
     fail(
@@ -476,17 +460,23 @@ function validateCivilResultant(value) {
       'Civil resultants must remain exact-statics, no-load-sharing results.',
     );
   }
-  const expectedForce = scale(value.sourceReactionOnPipeN, -1);
-  if (!sameVector(expectedForce, value.structureActionAtPipeAttachmentN)
-      || !sameVector(expectedForce, value.civilReferenceResultant?.forceN)) {
+  const sourceReaction = vector(value.sourceReactionOnPipeN);
+  const structureAction = vector(value.structureActionAtPipeAttachmentN);
+  const civilForce = vector(value.civilReferenceResultant?.forceN);
+  const offsetMm = vector(value.offsetCivilToPipeMm);
+  const civilMoment = vector(value.civilReferenceResultant?.momentNm);
+  if (!sourceReaction || !structureAction || !civilForce || !offsetMm || !civilMoment) {
+    fail('EMPIRICAL_CIVIL_TRANSFER_RESULT_VECTOR_INVALID', 'Civil resultant vectors must be finite.');
+  }
+  const expectedForce = scale(sourceReaction, -1);
+  if (!sameVector(expectedForce, structureAction) || !sameVector(expectedForce, civilForce)) {
     fail(
       'EMPIRICAL_CIVIL_TRANSFER_FORCE_SIGN_INVALID',
       'Structural action must be equal and opposite to the source reaction on pipe.',
     );
   }
-  const offsetM = scale(value.offsetCivilToPipeMm, 0.001);
-  const expectedMoment = cross(offsetM, expectedForce);
-  if (!sameVector(expectedMoment, value.civilReferenceResultant?.momentNm)) {
+  const expectedMoment = cross(scale(offsetMm, 0.001), expectedForce);
+  if (!sameVector(expectedMoment, civilMoment)) {
     fail(
       'EMPIRICAL_CIVIL_TRANSFER_MOMENT_INVALID',
       'Civil reference moment must equal r cross F.',
@@ -499,6 +489,20 @@ function validateCivilResultant(value) {
       'Civil resultant semantic hash mismatch.',
     );
   }
+}
+
+function summarize(loadCases) {
+  const calculatedCaseCount = loadCases.filter((row) => row.status === 'CALCULATED').length;
+  return {
+    loadCaseCount: loadCases.length,
+    calculatedCaseCount,
+    blockedCaseCount: loadCases.length - calculatedCaseCount,
+    civilResultantCount: loadCases.reduce((total, row) => total + row.civilResultants.length, 0),
+    zeroReactionCount: loadCases.reduce(
+      (total, row) => total + row.completeness.zeroReactionCount,
+      0,
+    ),
+  };
 }
 
 function indexAuthorityBySite(records) {
@@ -531,23 +535,24 @@ function blocker(code, message, details = null) {
 }
 
 function point(value) {
+  const result = vector(value);
+  return result ? freezeDeep(result) : null;
+}
+
+function vector(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const x = finite(value.x);
   const y = finite(value.y);
   const z = finite(value.z);
-  return x === null || y === null || z === null ? null : freezeDeep({ x, y, z });
+  return x === null || y === null || z === null ? null : { x, y, z };
 }
 
 function subtract(left, right) {
   return { x: left.x - right.x, y: left.y - right.y, z: left.z - right.z };
 }
 
-function scale(vector, factor) {
-  return {
-    x: Number(vector?.x) * factor,
-    y: Number(vector?.y) * factor,
-    z: Number(vector?.z) * factor,
-  };
+function scale(value, factor) {
+  return { x: value.x * factor, y: value.y * factor, z: value.z * factor };
 }
 
 function cross(left, right) {
@@ -559,18 +564,17 @@ function cross(left, right) {
 }
 
 function samePoint(left, right) {
-  return sameVector(left, right);
+  const a = vector(left);
+  const b = vector(right);
+  return Boolean(a && b && sameVector(a, b));
 }
 
 function sameVector(left, right) {
-  return finite(left?.x) === finite(right?.x)
-    && finite(left?.y) === finite(right?.y)
-    && finite(left?.z) === finite(right?.z);
+  return left.x === right.x && left.y === right.y && left.z === right.z;
 }
 
 function finite(value) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
 function isStrictlySorted(values) {
