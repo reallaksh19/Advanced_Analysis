@@ -221,9 +221,15 @@ export class LoadCalcConsumerController {
           this.topologyEdit3DController = controller;
           await controller.activate();
           if (revision !== this.renderRevision) {
-            controller.deactivate();
-            if (this.topologyEdit3DController === controller) this.topologyEdit3DController = null;
-            resetTopologyEditCleanShell(this.rootElement.ownerDocument);
+            const stillCurrent3D = this.activeTab === '3d'
+              && this.topologyEdit3DController === controller;
+            if (!stillCurrent3D) {
+              controller.deactivate();
+              if (this.topologyEdit3DController === controller) {
+                this.topologyEdit3DController = null;
+              }
+              resetTopologyEditCleanShell(this.rootElement.ownerDocument);
+            }
             return;
           }
         }
