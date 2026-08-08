@@ -5,11 +5,25 @@ import {
   topologyEditBlockingDiagnostics,
 } from '../topology-edit/professional/topology-edit-validation-blocking.js';
 import {
+  deriveTopologyEditProfessionalCapability,
+} from '../topology-edit/editor-state/topology-edit-capability-authority.js';
+import {
   renderTopologyEditProfessionalOperationPanel,
 } from './topology-edit-professional-operation-panel.js';
 
 export const TOPOLOGY_EDIT_PROFESSIONAL_VIEW_STATE_SCHEMA =
   'TopologyEditProfessionalOperationViewState.v1';
+
+const PRESENTED_OPERATIONS = Object.freeze([
+  'EXTEND_EDGE',
+  'SHORTEN_EDGE',
+  'SPLIT_EDGE_FROM_DISTANCE',
+  'INSERT_INLINE_COMPONENT',
+  'RECONNECT_ENDPOINTS',
+  'MOVE_CONNECTED_RUN',
+  'CREATE_ORTHOGONAL_OFFSET',
+  'APPLY_DECLARED_SLOPE',
+]);
 
 export function createTopologyEditProfessionalInitialValues() {
   return {
@@ -69,11 +83,24 @@ export function reconcileTopologyEditProfessionalReceipts(runtime, canonical) {
 
 export function renderTopologyEditProfessionalRuntime(runtime) {
   if (!runtime.element) return;
-  const currentHash = runtime.controller.session?.currentTopology()?.canonicalTopologyHash;
+  const topology = runtime.controller.session?.currentTopology?.() ?? null;
+  const currentHash = topology?.canonicalTopologyHash;
+  const operationCapabilities = Object.fromEntries(PRESENTED_OPERATIONS.map((operationType) => [
+    operationType,
+    deriveTopologyEditProfessionalCapability({
+      topology,
+      selection: runtime.controller.selection,
+      values: { ...runtime.values, operationType },
+      catalogue: runtime.catalogue,
+    }),
+  ]));
+  const capability = operationCapabilities[runtime.values.operationType] ?? null;
   renderTopologyEditProfessionalOperationPanel(runtime.element, {
     values: runtime.values,
     catalogue: runtime.catalogue,
     componentContext: runtime.componentContext,
+    capability,
+    operationCapabilities,
     plan: runtime.plan,
     candidate: runtime.candidate,
     validation: runtime.validation,
@@ -95,6 +122,12 @@ export function updateTopologyEditProfessionalEvidence(runtime) {
   if (!host) return;
   const session = runtime.controller.session;
   const context = runtime.componentContext;
+  const capability = deriveTopologyEditProfessionalCapability({
+    topology: session?.currentTopology?.(),
+    selection: runtime.controller.selection,
+    values: runtime.values,
+    catalogue: runtime.catalogue,
+  });
   host.dataset.topologyEditCanonicalHash = session?.currentTopology()?.canonicalTopologyHash ?? '';
   host.dataset.topologyEditJournalHash = session?.journal?.journalHash ?? '';
   host.dataset.topologyEditSessionVersion = String(session?.journal?.sessionVersion ?? '');
@@ -108,6 +141,9 @@ export function updateTopologyEditProfessionalEvidence(runtime) {
   host.dataset.topologyEditProfessionalValidationHash = runtime.validation?.validationHash ?? '';
   host.dataset.topologyEditProfessionalTransactionPreviewHash = runtime.transactionPreview?.previewHash ?? '';
   host.dataset.topologyEditProfessionalTransactionHash = runtime.transaction?.transactionHash ?? '';
+  host.dataset.topologyEditProfessionalCapabilityStatus = capability.status;
+  host.dataset.topologyEditProfessionalCapabilityReason = capability.reasonCode;
+  host.dataset.topologyEditProfessionalCapabilityHash = capability.capabilityHash;
   host.dataset.topologyEditComponentHudStatus = context?.status ?? '';
   host.dataset.topologyEditComponentHudType = context?.componentType ?? '';
   host.dataset.topologyEditComponentHudCanonicalId = context?.selectedCanonicalId ?? '';
