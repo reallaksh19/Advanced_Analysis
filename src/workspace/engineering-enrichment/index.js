@@ -77,6 +77,17 @@ export {
   buildEnrichmentStalenessReport,
 } from './review-package-validation.js';
 export {
+  ENGINEERING_INPUT_SEAL_CURRENTNESS_SCHEMA,
+  ENGINEERING_INPUT_SEAL_SCHEMA,
+  ENRICHMENT_APPROVAL_SCHEMA,
+  assertEngineeringEnrichmentApproval,
+  assertEngineeringInputSeal,
+  assertEngineeringInputSealCurrentness,
+  buildEngineeringEnrichmentApproval,
+  buildEngineeringInputSeal,
+  evaluateEngineeringInputSealCurrentness,
+} from './input-seal.js';
+export {
   ENRICHMENT_PORTABLE_BUNDLE_SCHEMA,
   ENRICHMENT_PORTABLE_VERIFICATION_SCHEMA,
   assertEngineeringEnrichmentPortableBundle,
