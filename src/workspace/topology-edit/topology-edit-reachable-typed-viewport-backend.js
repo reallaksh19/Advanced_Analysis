@@ -45,7 +45,7 @@ export class TopologyEditReachableTypedViewportBackend extends TopologyEditTyped
       { modelRole },
     );
     if (!affordances.length) return;
-    const radius = Math.max(Number(markerSize) * 0.4, 4);
+    const radius = Math.max(Number(markerSize) * 0.32, 0.5);
     const geometry = new THREE.SphereGeometry(
       radius,
       Math.max(10, this.navigationConfiguration.meshRadialSegments),
@@ -56,7 +56,7 @@ export class TopologyEditReachableTypedViewportBackend extends TopologyEditTyped
       transparent: true,
       opacity: modelRole === 'draft' ? 0.9 : 0.35,
       depthWrite: false,
-      depthTest: false,
+      depthTest: true,
       wireframe: true,
     });
     for (const affordance of affordances) {
