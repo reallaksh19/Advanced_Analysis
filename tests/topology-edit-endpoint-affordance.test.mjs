@@ -75,6 +75,41 @@ test('typed primitive presentation evidence supplies human labels without supply
   assert.deepEqual(rows[0].workspaceEntityIds, ['V-002']);
 });
 
+test('governed compact nodes reuse typed evidence for human labels and exact pick identity', () => {
+  const rows = deriveTopologyEditEndpointAffordances({
+    elements: [],
+    primitives: [],
+    compactElements: [{
+      id: 'node:governed-end',
+      entityId: 'node:governed-end',
+      type: 'node',
+      x: 250,
+      y: 10,
+      z: 0,
+      pickTarget: {
+        objectKind: 'node',
+        objectId: 'node:governed-end',
+        nodeId: 'node:governed-end',
+      },
+    }],
+    typedEvidenceProjection: {
+      elements: [],
+      segments: [],
+      primitives: [{
+        workspaceEntityIds: ['P-012'],
+        parameters: {
+          start: { x: 0, y: 10, z: 0 },
+          end: { x: 250, y: 10, z: 0 },
+        },
+      }],
+    },
+  }, { modelRole: 'draft' });
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].accessibleLabel, 'P-012, TO');
+  assert.equal(rows[0].pickTarget.objectId, 'node:governed-end');
+});
+
 test('source affordances remain inspectable but are not advertised as editable', () => {
   const packet = buildTopologyEditRenderPacket(topology, topology);
   const rows = deriveTopologyEditEndpointAffordances(packet.source, { modelRole: 'source' });
