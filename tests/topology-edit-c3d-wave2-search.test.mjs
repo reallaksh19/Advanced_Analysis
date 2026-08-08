@@ -142,6 +142,46 @@ test('renderer focus uses exact canonical pick identities', () => {
   assert.ok(camera.position.x > 0);
 });
 
+test('renderer focus includes exact endpoint affordances but excludes generic non-pickable helpers', () => {
+  const group = new THREE.Group();
+  const endpoint = new THREE.Mesh(
+    new THREE.SphereGeometry(1),
+    new THREE.MeshBasicMaterial(),
+  );
+  endpoint.position.set(100, 0, 0);
+  endpoint.userData = {
+    nonPickable: true,
+    endpointAffordance: true,
+    pickTarget: { objectId: 'node:endpoint' },
+  };
+  const helper = new THREE.Mesh(
+    new THREE.SphereGeometry(1),
+    new THREE.MeshBasicMaterial(),
+  );
+  helper.position.set(-100, 0, 0);
+  helper.userData = {
+    nonPickable: true,
+    pickTarget: { objectId: 'node:helper' },
+  };
+  group.add(endpoint, helper);
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10000);
+  camera.position.set(0, 0, 1000);
+  const focused = focusTopologyEditCanonicalIds({
+    groups: { draftGroup: group },
+    camera,
+    canonicalIds: ['node:endpoint'],
+  });
+  assert.equal(focused.status, 'FOCUSED');
+  assert.deepEqual(focused.foundIds, ['node:endpoint']);
+  const excluded = focusTopologyEditCanonicalIds({
+    groups: { draftGroup: group },
+    camera,
+    canonicalIds: ['node:helper'],
+  });
+  assert.equal(excluded.status, 'NOT_FOUND');
+  assert.deepEqual(excluded.foundIds, []);
+});
+
 test('search panel exposes exact identities and forwards Shift activation', async () => {
   const source = await readFile(
     new URL('../src/workspace/viewport-productivity/topology-edit-search-panel.js', import.meta.url),
