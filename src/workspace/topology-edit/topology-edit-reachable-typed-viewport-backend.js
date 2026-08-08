@@ -12,6 +12,7 @@ export class TopologyEditReachableTypedViewportBackend extends TopologyEditTyped
   constructor(options = {}) {
     super(options);
     this.endpointAffordances = Object.freeze([]);
+    this.hasDraftEndpointProjection = false;
     this.endpointRuntime = new TopologyEditEndpointAffordanceRuntime({
       onActivate: (affordance, event) => this.activateEndpointAffordance(affordance, event),
     });
@@ -23,6 +24,7 @@ export class TopologyEditReachableTypedViewportBackend extends TopologyEditTyped
   }
 
   renderSession(model) {
+    this.hasDraftEndpointProjection = Boolean(model?.draft);
     this.endpointAffordances = deriveTopologyEditEndpointAffordances(
       model?.draft ?? model?.source ?? { elements: [] },
       { modelRole: model?.draft ? 'draft' : 'source' },
@@ -38,6 +40,7 @@ export class TopologyEditReachableTypedViewportBackend extends TopologyEditTyped
 
   buildNodePickProxyGroup(group, elements, markerSize) {
     const modelRole = group === this.groups.sourceGroup ? 'source' : 'draft';
+    if (modelRole === 'source' && this.hasDraftEndpointProjection) return;
     const affordances = deriveTopologyEditEndpointAffordances(
       { elements },
       { modelRole },
@@ -93,6 +96,7 @@ export class TopologyEditReachableTypedViewportBackend extends TopologyEditTyped
   destroy() {
     this.endpointRuntime.destroy();
     this.endpointAffordances = Object.freeze([]);
+    this.hasDraftEndpointProjection = false;
     super.destroy();
   }
 }
