@@ -1,0 +1,41 @@
+name: M046 BM4 Rigid Boundary RCA
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/lfea-m046-bm4-rigid-boundary-rca.mjs'
+      - '.github/workflows/m046-bm4-rigid-boundary-rca.yml'
+  workflow_dispatch:
+
+jobs:
+  rigid-boundary-rca:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax and line-count gate
+        run: |
+          node --check scripts/lfea-m046-bm4-rigid-boundary-rca.mjs
+          test "$(wc -l < scripts/lfea-m046-bm4-rigid-boundary-rca.mjs)" -le 300
+      - name: Run rigid-boundary RCA
+        run: node scripts/lfea-m046-bm4-rigid-boundary-rca.mjs --report /tmp/m046-rigid-boundary.json
+      - name: Preserve upstream component and axial RCA
+        run: |
+          node scripts/lfea-m045-bm4-component-hierarchy-v2.mjs
+          node scripts/lfea-m043-bm4-axial-force-source-rca.mjs
+          npm run check:lfea-m036
+      - name: Upload deterministic M046 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m046-bm4-rigid-boundary-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /tmp/m046-rigid-boundary.json
+          if-no-files-found: error
+      - name: Verify clean worktree
+        run: git diff --exit-code && git status --porcelain | tee /tmp/m046-status && test ! -s /tmp/m046-status
