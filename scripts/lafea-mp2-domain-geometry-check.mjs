@@ -276,7 +276,7 @@ const domainSources = guarded.slice(0, 10).map((path) => fs.readFileSync(path, '
 assert.doesNotMatch(domainSources, /\bexecuteLafeaStage\b|\bcalculateLocalContinuum\b|\bregisterLafeaArtifact\b|\brecoverLafea\b|releaseQualified\s*:\s*true/u);
 const orchestratorSource = fs.readFileSync('src/workspace/lafea-workbench-orchestrator-store.js', 'utf8');
 assert.match(orchestratorSource, /LAFEA_DOMAIN_FIRST_SOLVER_MODEL_NOT_COMPILED/u);
-assert.match(orchestratorSource, /LAFEA_DOMAIN_FIRST_ANALYSIS_MESH_REQUIRES_V2_CUSTODY/u);
+assert.doesNotMatch(orchestratorSource, /LAFEA_DOMAIN_FIRST_ANALYSIS_MESH_REQUIRES_V2_CUSTODY/u);
 
 console.log(JSON.stringify({
   check: 'lafea-mp2-domain-geometry',

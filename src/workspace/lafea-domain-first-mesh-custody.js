@@ -3,7 +3,11 @@ import { validateLafeaAnalysisMeshEvidenceV2 } from './lafea-analysis-mesh-evide
 
 export const LAFEA_DOMAIN_FIRST_MESH_CUSTODY_SCHEMA = 'lafea-domain-first-mesh-custody/v1';
 
-export function buildLafeaDomainFirstMeshCustodyProjection(stage, retainedEvidence = null) {
+export function buildLafeaDomainFirstMeshCustodyProjection(
+  stage,
+  retainedEvidence = null,
+  retainedEpoch = null,
+) {
   if (!stage?.domainFirstProfileActive) return freeze({
     schema: LAFEA_DOMAIN_FIRST_MESH_CUSTODY_SCHEMA,
     stageId: stage?.stageId ?? null,
@@ -19,6 +23,9 @@ export function buildLafeaDomainFirstMeshCustodyProjection(stage, retainedEviden
     return result('INVALID', false, [error.code ?? 'ANALYSIS_MESH_EVIDENCE_V2_INVALID']);
   }
   const reasons = [];
+  if (retainedEpoch !== null && retainedEpoch !== stage.domainFirstCustodyEpoch) {
+    reasons.push('DOMAIN_FIRST_EXPLICIT_REVALIDATION_REQUIRED');
+  }
   if (stage.analysisDomainProjection?.state !== 'CURRENT_PASS'
     || evidence.analysisDomainHash !== stage.analysisDomainProjection?.analysisDomainHash) {
     reasons.push('ANALYSIS_MESH_V2_DOMAIN_PARENT_STALE');
@@ -60,4 +67,8 @@ function result(state, usable, reasons, evidence = null) {
     blockingElementIds: evidence?.quality?.blockingElementIds ?? [],
   });
 }
-function freeze(value) { if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value; Object.values(value).forEach(freeze); return Object.freeze(value); }
+function freeze(value) {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+  Object.values(value).forEach(freeze);
+  return Object.freeze(value);
+}

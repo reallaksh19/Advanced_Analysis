@@ -1,5 +1,6 @@
 /** Domain-first LAFEA.3 preparation and mesh-generation requests. Both remain non-executable. */
 import { canonicalLafeaSha256 } from './lafea-canonical-sha256.js';
+import { canonicalLafeaMeshProfileParentHash } from './lafea-domain-first-mesh-profile.js';
 import { lafeaMeshCapabilities } from './lafea-mesh-capabilities.js';
 import { requireLafeaPreparationProfile } from './lafea-preparation-profile.js';
 import { requireLafeaStageAnalysisAdapter } from './lafea-stage-analysis-adapter.js';
@@ -61,7 +62,7 @@ export function createLafeaMeshGenerationIntentV2(value) {
     sourceHash: sha256(value.sourceHash, 'SOURCE_HASH'),
     analysisDomainHash: sha256(value.analysisDomainHash, 'ANALYSIS_DOMAIN_HASH'),
     analysisGeometryHash: sha256(value.analysisGeometryHash, 'ANALYSIS_GEOMETRY_HASH'),
-    meshProfileHash: sha256(value.meshProfileHash, 'MESH_PROFILE_HASH'),
+    meshProfileHash: canonicalLafeaMeshProfileParentHash(value.meshProfileHash),
     targetElementLength: positive(value.targetElementLength, 'TARGET_ELEMENT_LENGTH'),
     lengthUnit: text(value.lengthUnit, 'LENGTH_UNIT'),
     elementFamily: value.elementFamily,

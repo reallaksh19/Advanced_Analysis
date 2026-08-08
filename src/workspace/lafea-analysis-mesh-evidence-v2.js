@@ -1,4 +1,4 @@
-/** Domain-first LAFEA.3 analysis-mesh evidence contract. No lifecycle registration or generation. */
+/** Domain-first LAFEA.3 analysis-mesh evidence with canonical profile-parent custody. */
 import {
   LAFEA_ANALYSIS_MESH_SCHEMA,
   canonicalLafeaAnalysisMesh,
@@ -8,11 +8,16 @@ import {
   requireLafeaAnalysisMeshElementFamily,
 } from './lafea-analysis-mesh-contract.js';
 import { canonicalLafeaSha256 } from './lafea-canonical-sha256.js';
+import {
+  canonicalLafeaMeshProfileParentHash,
+  lafeaDomainFirstMeshProfileHash,
+} from './lafea-domain-first-mesh-profile.js';
 
 export const LAFEA_ANALYSIS_MESH_INTAKE_V2_SCHEMA = 'lafea-analysis-mesh-intake/v2';
 export const LAFEA_ANALYSIS_MESH_AUTHORITY_V2_SCHEMA = 'lafea-analysis-mesh-authority/v2';
 export const LAFEA_ANALYSIS_MESH_EVIDENCE_V2_SCHEMA = 'lafea-analysis-mesh-evidence/v2';
-export const LAFEA_ANALYSIS_MESH_AUTHORITY_V2_ROLE = 'DOMAIN_FIRST_STAGE_AUTHORIZED_ANALYSIS_MESH';
+export const LAFEA_ANALYSIS_MESH_AUTHORITY_V2_ROLE =
+  'DOMAIN_FIRST_STAGE_AUTHORIZED_ANALYSIS_MESH';
 
 const INTAKE_KEYS = Object.freeze([
   'schema', 'stageId', 'sourceHash', 'analysisDomainHash', 'analysisGeometryHash',
@@ -30,6 +35,7 @@ export function createLafeaAnalysisMeshEvidenceV2(value) {
     fail('LAFEA_ANALYSIS_MESH_V2_SCHEMA_OR_STAGE_INVALID');
   }
   const meshProfile = canonicalLafeaAnalysisMeshProfile(value.meshProfile);
+  const meshProfileHash = lafeaDomainFirstMeshProfileHash(meshProfile);
   const mesh = canonicalLafeaAnalysisMesh(value.mesh);
   if (mesh.schema !== LAFEA_ANALYSIS_MESH_SCHEMA) fail('LAFEA_ANALYSIS_MESH_V2_MESH_SCHEMA_INVALID');
   requireLafeaAnalysisMeshElementFamily('LAFEA.3', meshProfile, mesh.elements);
@@ -38,17 +44,25 @@ export function createLafeaAnalysisMeshEvidenceV2(value) {
   const analysisDomainHash = sha256(value.analysisDomainHash, 'ANALYSIS_DOMAIN_HASH');
   const analysisGeometryHash = sha256(value.analysisGeometryHash, 'ANALYSIS_GEOMETRY_HASH');
   const authority = validateAuthority(value.authority, {
-    sourceHash, analysisDomainHash, analysisGeometryHash,
-    meshProfileHash: meshProfile.semanticHash, meshHash,
+    sourceHash,
+    analysisDomainHash,
+    analysisGeometryHash,
+    meshProfileHash,
+    meshHash,
   });
   const quality = qualifyLafeaAnalysisMesh('LAFEA.3', mesh, meshProfile);
   const blocked = quality.worstStatus === 'BLOCK';
   const core = {
     schema: LAFEA_ANALYSIS_MESH_EVIDENCE_V2_SCHEMA,
     stageId: 'LAFEA.3',
-    sourceHash, analysisDomainHash, analysisGeometryHash,
-    meshProfile, mesh, authority, meshHash,
-    meshProfileHash: meshProfile.semanticHash,
+    sourceHash,
+    analysisDomainHash,
+    analysisGeometryHash,
+    meshProfile,
+    mesh,
+    authority,
+    meshHash,
+    meshProfileHash,
     quality,
     status: blocked ? 'BLOCKED' : 'CURRENT',
     qualification: blocked ? 'BLOCK' : 'PASS',
@@ -56,7 +70,8 @@ export function createLafeaAnalysisMeshEvidenceV2(value) {
   return freeze({
     ...core,
     artifactHash: canonicalLafeaSha256({
-      schema: 'lafea-analysis-mesh-artifact-hash-input/v2', evidence: core,
+      schema: 'lafea-analysis-mesh-artifact-hash-input/v2',
+      evidence: core,
     }),
     releaseQualified: false,
   });
@@ -99,7 +114,7 @@ function validateAuthority(value, expected) {
     sourceHash: sha256(value.sourceHash, 'SOURCE_HASH'),
     analysisDomainHash: sha256(value.analysisDomainHash, 'ANALYSIS_DOMAIN_HASH'),
     analysisGeometryHash: sha256(value.analysisGeometryHash, 'ANALYSIS_GEOMETRY_HASH'),
-    meshProfileHash: sha256(value.meshProfileHash, 'MESH_PROFILE_HASH'),
+    meshProfileHash: canonicalLafeaMeshProfileParentHash(value.meshProfileHash),
     meshHash: sha256(value.meshHash, 'MESH_HASH'),
     capabilityHash: sha256(value.capabilityHash, 'CAPABILITY_HASH'),
     qualificationHash: sha256(value.qualificationHash, 'QUALIFICATION_HASH'),
@@ -111,8 +126,26 @@ function validateAuthority(value, expected) {
   return canonical;
 }
 
-function exact(value, keys, code) { if (!value || typeof value !== 'object' || Array.isArray(value) || JSON.stringify(Object.keys(value).sort()) !== JSON.stringify([...keys].sort())) fail(code); }
-function text(value, field) { if (typeof value !== 'string' || !value.trim()) fail(`LAFEA_ANALYSIS_MESH_V2_${field}_INVALID`); return value.trim(); }
-function sha256(value, field) { const out = text(value, field); if (!/^sha256:[0-9a-f]{64}$/u.test(out)) fail(`LAFEA_ANALYSIS_MESH_V2_${field}_INVALID`); return out; }
-function fail(code) { const error = new TypeError(code); error.code = code; throw error; }
-function freeze(value) { if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value; Object.values(value).forEach(freeze); return Object.freeze(value); }
+function exact(value, keys, code) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)
+    || JSON.stringify(Object.keys(value).sort()) !== JSON.stringify([...keys].sort())) fail(code);
+}
+function text(value, field) {
+  if (typeof value !== 'string' || !value.trim()) fail(`LAFEA_ANALYSIS_MESH_V2_${field}_INVALID`);
+  return value.trim();
+}
+function sha256(value, field) {
+  const out = text(value, field);
+  if (!/^sha256:[0-9a-f]{64}$/u.test(out)) fail(`LAFEA_ANALYSIS_MESH_V2_${field}_INVALID`);
+  return out;
+}
+function fail(code) {
+  const error = new TypeError(code);
+  error.code = code;
+  throw error;
+}
+function freeze(value) {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+  Object.values(value).forEach(freeze);
+  return Object.freeze(value);
+}
