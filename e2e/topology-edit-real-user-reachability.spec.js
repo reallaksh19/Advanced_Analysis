@@ -207,6 +207,8 @@ async function selectObjectTreeItem(page, tag, kind) {
   const filter = page.locator('[data-role="topology-edit-object-tree-filter"]');
   await filter.fill(tag);
   const row = page.locator(`[data-object-kind="${kind}"]`).filter({ hasText: tag }).first();
+  const group = row.locator('xpath=ancestor::details[1]');
+  if ((await group.getAttribute('open')) === null) await group.locator(':scope > summary').click();
   await expect(row).toBeVisible();
   await row.locator('[data-object-tree-select]').click();
 }
