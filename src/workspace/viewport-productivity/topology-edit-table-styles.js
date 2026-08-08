@@ -7,7 +7,7 @@ export function ensureTopologyEditTableStyles(documentRef) {
   style.textContent = `
     .topology-edit-table-window { position:absolute; top:58px; right:14px; z-index:90; width:min(1120px,calc(100% - 28px)); height:min(720px,calc(100% - 82px)); min-width:420px; min-height:42px; max-width:calc(100% - 8px); max-height:calc(100% - 54px); overflow:hidden; resize:both; border:1px solid #315070; border-radius:8px; background:#06101c; box-shadow:0 18px 52px rgba(0,0,0,.58); color:#cbd5e1; box-sizing:border-box; }
     .topology-edit-table-window[open] { display:grid; grid-template-rows:40px minmax(0,1fr); }
-    .topology-edit-table-window:not([open]) { top:auto; bottom:14px; width:min(440px,calc(100% - 28px)); height:40px; min-height:40px; resize:none; }
+    .topology-edit-table-window:not([open]) { display:none; }
     .topology-edit-table-window__titlebar { display:flex; align-items:center; gap:.65rem; min-width:0; height:40px; padding:0 10px; border-bottom:1px solid #1e344c; background:linear-gradient(180deg,#10233a,#0a1626); cursor:move; user-select:none; list-style:none; box-sizing:border-box; }
     .topology-edit-table-window__titlebar::-webkit-details-marker { display:none; }
     .topology-edit-table-window__titlebar::after { content:'▾'; margin-left:auto; color:#7dd3fc; font-size:12px; }
