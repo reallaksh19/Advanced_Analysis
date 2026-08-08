@@ -1,0 +1,138 @@
+name: 3D Edit R1 Real User Reachability
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/topology-edit-real-user-reachability.yml'
+      - 'src/workspace/topology-edit/**'
+      - 'src/workspace/viewport-interaction/**'
+      - 'src/workspace/viewport-productivity/**'
+      - 'public/fixtures/topology-edit-professional-spec-catalog.json'
+      - 'tests/topology-edit-capability-authority.test.mjs'
+      - 'tests/topology-edit-endpoint-affordance.test.mjs'
+      - 'tests/topology-edit-demo-catalogue-coverage.test.mjs'
+      - 'e2e/topology-edit-real-user-reachability.spec.js'
+      - 'scripts/topology-edit-r1-line-budget-check.mjs'
+      - 'scripts/topology-edit-real-user-e2e-anti-cheat-check.mjs'
+      - 'scripts/topology-edit-real-user-evidence-report.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: topology-edit-real-user-reachability-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  real-user-reachability:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      TOPOLOGY_EDIT_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      TOPOLOGY_EDIT_R1_BASE_SHA: ddc0d87aa5e1a02cb8b5bf10e71dbb1fb1ce9fb3
+      PLAYWRIGHT_BROWSER_CHANNEL: chromium
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Verify exact-head source gates
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+          git diff --check
+          node scripts/topology-edit-r1-line-budget-check.mjs
+          node scripts/topology-edit-real-user-e2e-anti-cheat-check.mjs
+          node --check e2e/topology-edit-real-user-reachability.spec.js
+          node --check src/workspace/topology-edit/editor-state/topology-edit-capability-contract.js
+          node --check src/workspace/topology-edit/editor-state/topology-edit-capability-authority.js
+          node --check src/workspace/viewport-interaction/topology-edit-endpoint-affordance-model.js
+          node --check src/workspace/topology-edit/topology-edit-reachable-typed-viewport-backend.js
+
+      - name: Install dependencies and Chromium
+        run: |
+          set -euo pipefail
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Execute R1 focused unit contracts
+        run: |
+          set -euo pipefail
+          TESTS=(
+            tests/topology-edit-capability-authority.test.mjs
+            tests/topology-edit-endpoint-affordance.test.mjs
+            tests/topology-edit-demo-catalogue-coverage.test.mjs
+            tests/topology-edit-component-hud-context.test.mjs
+            tests/topology-edit-selection-coordinator.test.mjs
+            tests/topology-edit-selection-foundation-integration.test.mjs
+            tests/topology-edit-professional-interaction-containment.test.mjs
+            tests/topology-edit-professional-engineering-plan.test.mjs
+            tests/topology-edit-inline-component-insertion.test.mjs
+            tests/topology-edit-xyz-branch-demo.test.mjs
+            tests/topology-edit-table-m04-m06-m10.test.mjs
+            tests/topology-edit-table-q3-source-capability.test.mjs
+          )
+          node --test --test-reporter=tap "${TESTS[@]}" 2>&1 | tee topology-edit-r1-unit-output.txt
+
+      - name: Build production application
+        run: |
+          set -euo pipefail
+          npm run build 2>&1 | tee topology-edit-r1-build-output.txt
+
+      - name: Execute no-privilege production Chromium qualification
+        run: |
+          set -euo pipefail
+          npx playwright test \
+            e2e/topology-edit-real-user-reachability.spec.js \
+            --project=chromium \
+            --workers=1 \
+            --retries=0 \
+            --reporter=line 2>&1 | tee topology-edit-r1-real-user-output.txt
+
+      - name: Execute retained high-signal regressions
+        run: |
+          set -euo pipefail
+          E2E_TESTS=(
+            e2e/topology-edit-xyz-branch-demo.spec.js
+            e2e/topology-edit-table-authority.spec.js
+            e2e/topology-edit-sjson-render-authority.spec.js
+            e2e/topology-edit-deterministic-snapping.spec.js
+            e2e/topology-edit-tool-audit.spec.js
+          )
+          npx playwright test "${E2E_TESTS[@]}" \
+            --project=chromium \
+            --workers=1 \
+            --retries=0 \
+            --reporter=line 2>&1 | tee topology-edit-r1-retained-e2e-output.txt
+
+      - name: Seal exact-head evidence
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
+          node scripts/topology-edit-real-user-evidence-report.mjs
+
+      - name: Upload R1 qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: topology-edit-r1-real-user-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}-${{ github.run_attempt }}
+          path: |
+            topology-edit-r1-unit-output.txt
+            topology-edit-r1-build-output.txt
+            topology-edit-r1-real-user-output.txt
+            topology-edit-r1-retained-e2e-output.txt
+            reports/qualification
+            playwright-report
+            test-results
+          if-no-files-found: warn
+          retention-days: 30
