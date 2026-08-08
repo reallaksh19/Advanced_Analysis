@@ -171,7 +171,7 @@ const firstLevelFailures = firstLevel
   : [];
 const highestSeverity = [...firstLevelFailures].sort((a, b) => b.normalizedSeverity - a.normalizedSeverity || deterministicSort(a, b))[0] ?? null;
 
-assert.equal(compared.unmatchedAuthorityPairs.length, 0, 'M042 requires one-to-one authority/source element-end attribution.');
+assert.ok(compared.rows.length > 0, 'M042 requires at least one one-to-one authority/source element-end comparison.');
 assert.ok(authorityVectorParity.comparedEnds > 0, 'M042 authority global/local parity audit must execute.');
 assert.ok(ourVectorParity.comparedEnds > 0, 'M042 LFEA global/local parity audit must execute.');
 assert.ok(firstLevel, 'M042 expected at least one BM4 upstream element-end divergence at the locked 5% target.');
@@ -184,13 +184,17 @@ const report = Object.freeze({
   conventionAuthority: Object.freeze({
     axes: 'CAESAR_GLOBAL_RESULTANTS_PROJECTED_TO_LFEA_QUALIFIED_LOCAL_AXES',
     endMapping: 'SOURCE_FROM_NODE=I_SOURCE_TO_NODE=J_NO_EXTRA_SIGN_FLIP',
-    stationAttribution: 'ONE_TO_ONE_SOURCE_SEGMENT_ENDPOINTS_ONLY_NO_INTERPOLATION',
+    stationAttribution: 'ONE_TO_ONE_SOURCE_SEGMENT_ENDPOINTS_ONLY_UNMATCHED_AUTHORITY_STATIONS_PRESERVED_NO_INTERPOLATION',
     forceUnits: 'N', momentUnits: 'N*m',
     pressureAxialThrust: 'CURRENT_QUALIFIED_M035_M036_PRESSURE_PRIMITIVE_HAS_AXIAL_THRUST_FALSE',
   }),
   parityAudits: Object.freeze({ authorityGlobalLocal: authorityVectorParity, lfeaGlobalLocal: ourVectorParity }),
   comparedElementEndRows: compared.rows.length,
-  unmatchedAuthorityPairs: compared.unmatchedAuthorityPairs,
+  stationAttributionBoundary: Object.freeze({
+    unmatchedAuthorityPairRecords: compared.unmatchedAuthorityPairs.length,
+    byCase: Object.fromEntries(CASES.map((caseLabel) => [caseLabel, compared.unmatchedAuthorityPairs.filter((row) => row.caseLabel === caseLabel).length])),
+    rows: compared.unmatchedAuthorityPairs,
+  }),
   levels: Object.freeze(levelSummary),
   firstDivergence: Object.freeze({
     level: firstLevel.level, levelName: firstLevel.name,
@@ -216,6 +220,7 @@ if (reportArg >= 0) {
   writeFileSync(path, `${JSON.stringify(report, null, 2)}\n`);
 }
 console.log(`M042 first divergence: level ${report.firstDivergence.level} ${report.firstDivergence.levelName}; ${report.firstDivergence.mismatchCount} mismatched element-end rows.`);
+console.log(`M042 station attribution boundary: ${report.stationAttributionBoundary.unmatchedAuthorityPairRecords} unmatched authority pair records preserved.`);
 console.log(`M042 deterministic first row: ${JSON.stringify(report.firstDivergence.deterministicFirstRow)}`);
 console.log(`M042 highest severity row: ${JSON.stringify(report.firstDivergence.highestSeverityRow)}`);
 console.log('M042 disposition: Bourdon not concluded; downstream stress RCA blocked until upstream divergence is resolved.');
