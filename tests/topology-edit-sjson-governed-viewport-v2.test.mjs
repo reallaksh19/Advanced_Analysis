@@ -122,7 +122,7 @@ test('governed inline equipment retains distinct flange, gasket, valve, and inst
   const expectedGeometry = {
     FLANGE: 'LatheGeometry',
     GASKET: 'CylinderGeometry',
-    VALVE: 'LatheGeometry',
+    VALVE: 'BufferGeometry',
     INSTRUMENT: 'SphereGeometry',
   };
   for (const kind of kinds) {
@@ -143,6 +143,9 @@ test('governed inline equipment retains distinct flange, gasket, valve, and inst
       `edge:${kind.toLowerCase()}`,
     );
   }
+  const valve = objects.get('topology-edit-visible-equipment-solid:VALVE:valve:1');
+  valve.geometry.computeBoundingBox();
+  assert.ok(valve.geometry.boundingBox.max.z > 20, 'valve bonnet/handwheel profile missing');
   const instrument = objects.get(
     'topology-edit-visible-equipment-solid:INSTRUMENT:instrument:1',
   );
