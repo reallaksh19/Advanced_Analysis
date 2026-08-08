@@ -1,0 +1,34 @@
+name: M039 BM4 Bourdon Authority Disposition
+
+on:
+  push:
+    branches:
+      - agent/m039-bm4-bourdon-authority-disposition
+  pull_request:
+    paths:
+      - 'scripts/lfea-m039-bm4-bourdon-authority.mjs'
+      - 'scripts/lfea-m039-bm4-bourdon-check.mjs'
+      - '.github/workflows/m039-bm4-bourdon.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bourdon-authority-disposition:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify fail-closed BM4 Bourdon disposition
+        run: node scripts/lfea-m039-bm4-bourdon-check.mjs
