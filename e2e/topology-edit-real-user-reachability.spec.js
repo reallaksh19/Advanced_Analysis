@@ -39,6 +39,7 @@ test('3D Demo is reachable through visible production controls only', async ({ p
     .toBe(moved.canonicalHash);
 
   await selectObjectTreeItem(page, 'P-003', 'EDGE');
+  await openPanel(page, 'commands');
   const split = page.locator('[data-command-action="split-edge-half"]');
   await expect(split).toHaveAttribute('data-capability-status', 'AVAILABLE');
   await split.click();
@@ -100,6 +101,7 @@ test('XYZ Branch exposes truthful catalogue, endpoint and Table capability paths
   ]) await selectObjectTreeItem(page, tag, kind);
 
   await selectObjectTreeItem(page, 'P-011', 'EDGE');
+  await openPanel(page, 'topology-edit-professional-operation');
   await page.locator('[data-role="professional-operation-type"]')
     .selectOption('INSERT_INLINE_COMPONENT');
   await page.locator('[data-role="professional-center-distance-mm"]').fill('400');
@@ -201,9 +203,14 @@ async function expectEndpoint(page, label) {
   await expect(page.getByRole('button', { name: label, exact: true })).toBeVisible();
 }
 
-async function selectObjectTreeItem(page, tag, kind) {
-  const panel = page.locator('details[data-panel-kind="topology-edit-object-tree"]');
+async function openPanel(page, kind) {
+  const panel = page.locator(`details[data-panel-kind="${kind}"]`);
+  await expect(panel).toBeVisible();
   if ((await panel.getAttribute('open')) === null) await panel.locator(':scope > summary').click();
+}
+
+async function selectObjectTreeItem(page, tag, kind) {
+  await openPanel(page, 'topology-edit-object-tree');
   const filter = page.locator('[data-role="topology-edit-object-tree-filter"]');
   await filter.fill(tag);
   const row = page.locator(`[data-object-kind="${kind}"]`).filter({ hasText: tag }).first();
@@ -214,9 +221,7 @@ async function selectObjectTreeItem(page, tag, kind) {
 }
 
 async function openTable(page) {
-  const panel = page.locator('details[data-panel-kind="table"]');
-  await expect(panel).toBeVisible();
-  if ((await panel.getAttribute('open')) === null) await panel.locator(':scope > summary').click();
+  await page.locator('[data-action="open-engineering-table"]').click();
   await expect(page.locator('[data-role="topology-edit-table"]')).toBeVisible();
 }
 
