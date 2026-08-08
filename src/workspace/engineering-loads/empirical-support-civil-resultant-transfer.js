@@ -55,11 +55,10 @@ export function calculateEmpiricalSupportCivilResultantTransfer(input = {}) {
       loadCaseId: loadCase.loadCaseId,
     }))),
   ]);
-  const calculatedCaseCount = loadCases.filter((row) => row.status === 'CALCULATED').length;
   const summary = summarize(loadCases);
-  const status = globalBlockers.length === 0
+  const status = blockers.length === 0
     && loadCases.length > 0
-    && calculatedCaseCount === loadCases.length
+    && loadCases.every((row) => row.status === 'CALCULATED')
     ? 'CALCULATED'
     : 'BLOCKED';
   const draft = {
@@ -119,8 +118,7 @@ export function requireEmpiricalSupportCivilResultantTransfer(value) {
     );
   }
   value.loadCases.forEach(validateLoadCase);
-  const expectedSummary = summarize(value.loadCases);
-  if (semanticHash(value.summary) !== semanticHash(expectedSummary)) {
+  if (semanticHash(value.summary) !== semanticHash(summarize(value.loadCases))) {
     fail('EMPIRICAL_CIVIL_TRANSFER_SUMMARY_INVALID', 'Civil resultant summary is stale.');
   }
   const expectedStatus = value.loadCases.length > 0
@@ -224,8 +222,19 @@ function buildLoadCase({ loadCase, siteById, authorityBySite, globalBlockers }) 
       'Only fully calculated upstream load cases may be transferred.',
     ));
   }
+  if (supportResults.length === 0) {
+    caseBlockers.push(blocker(
+      'EMPIRICAL_CIVIL_TRANSFER_SUPPORT_RESULTS_MISSING',
+      'A calculated upstream load case must contain support results.',
+    ));
+  }
   const audits = supportResults
-    .map((result) => auditSupportResult(result, siteById, authorityBySite))
+    .map((result) => auditSupportResult({
+      loadCaseId,
+      result,
+      siteById,
+      authorityBySite,
+    }))
     .sort((left, right) => compareCodeUnits(left.supportSiteId, right.supportSiteId));
   caseBlockers.push(...audits.flatMap((audit) => audit.blockers.map((row) => ({
     ...row,
@@ -237,6 +246,7 @@ function buildLoadCase({ loadCase, siteById, authorityBySite, globalBlockers }) 
     .map((audit) => audit.civilResultant);
   const calculated = blockers.length === 0;
   const civilResultants = calculated ? qualifiedCandidates : [];
+  const completeness = completenessFor(audits, supportResults.length, qualifiedCandidates.length);
   return freezeDeep({
     loadCaseId: loadCaseId || 'UNBOUND',
     status: calculated ? 'CALCULATED' : 'BLOCKED',
@@ -244,20 +254,11 @@ function buildLoadCase({ loadCase, siteById, authorityBySite, globalBlockers }) 
     siteAudits: audits,
     blockers,
     transferBalance: calculated ? transferBalance(supportResults, civilResultants) : null,
-    completeness: {
-      supportResultCount: supportResults.length,
-      nonzeroReactionCount: audits.filter((row) => (
-        row.sourceVerticalReactionOnPipeN !== null
-          && row.sourceVerticalReactionOnPipeN !== 0
-      )).length,
-      zeroReactionCount: audits.filter((row) => row.status === 'NO_LOAD').length,
-      qualifiedTransferCount: qualifiedCandidates.length,
-      blockedTransferCount: audits.filter((row) => row.status === 'BLOCKED').length,
-    },
+    completeness,
   });
 }
 
-function auditSupportResult(result, siteById, authorityBySite) {
+function auditSupportResult({ loadCaseId, result, siteById, authorityBySite }) {
   const supportSiteId = stringValue(result?.supportSiteId);
   const reaction = finite(result?.verticalForceN);
   const blockers = [];
@@ -354,29 +355,37 @@ function auditSupportResult(result, siteById, authorityBySite) {
       blockers: dedupeRows(blockers),
     });
   }
-  const civilResultant = buildCivilResultant({
-    supportSiteId,
-    reaction,
-    authority,
-    pipePoint,
-    civilPoint,
-  });
   return freezeDeep({
     supportSiteId,
     status: 'QUALIFIED_TRANSFER',
     sourceVerticalReactionOnPipeN: reaction,
-    civilResultant,
+    civilResultant: buildCivilResultant({
+      loadCaseId,
+      supportSiteId,
+      reaction,
+      authority,
+      pipePoint,
+      civilPoint,
+    }),
     blockers: [],
   });
 }
 
-function buildCivilResultant({ supportSiteId, reaction, authority, pipePoint, civilPoint }) {
+function buildCivilResultant({
+  loadCaseId,
+  supportSiteId,
+  reaction,
+  authority,
+  pipePoint,
+  civilPoint,
+}) {
   const sourceReactionOnPipeN = freezeDeep({ x: 0, y: 0, z: reaction });
   const structureActionAtPipeAttachmentN = freezeDeep({ x: 0, y: 0, z: -reaction });
   const offsetMm = freezeDeep(subtract(pipePoint, civilPoint));
   const momentNm = freezeDeep(cross(scale(offsetMm, 0.001), structureActionAtPipeAttachmentN));
   const payload = {
-    transferId: `CIVIL:${supportSiteId}:${authority.structuralAssemblyId}`,
+    transferId: `CIVIL:${loadCaseId}:${supportSiteId}:${authority.structuralAssemblyId}`,
+    loadCaseId,
     supportSiteId,
     assemblyId: authority.assemblyId,
     structuralAssemblyId: authority.structuralAssemblyId,
@@ -399,24 +408,6 @@ function buildCivilResultant({ supportSiteId, reaction, authority, pipePoint, ci
   return freezeDeep({ ...payload, semanticHash: semanticHash(payload) });
 }
 
-function transferBalance(supportResults, civilResultants) {
-  const sourceVerticalReactionOnPipeN = supportResults.reduce((total, row) => {
-    const value = finite(row?.verticalForceN);
-    return total + (value === null ? 0 : value);
-  }, 0);
-  const structureVerticalActionN = civilResultants.reduce(
-    (total, row) => total + row.civilReferenceResultant.forceN.z,
-    0,
-  );
-  const actionReactionResidualN = sourceVerticalReactionOnPipeN + structureVerticalActionN;
-  return freezeDeep({
-    sourceVerticalReactionOnPipeN,
-    structureVerticalActionN,
-    actionReactionResidualN,
-    passed: actionReactionResidualN === 0,
-  });
-}
-
 function validateLoadCase(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)
       || !['CALCULATED', 'BLOCKED'].includes(value.status)
@@ -431,12 +422,43 @@ function validateLoadCase(value) {
       'Civil resultants must be unique and support-site sorted.',
     );
   }
-  value.civilResultants.forEach(validateCivilResultant);
+  if (!isStrictlySorted(value.siteAudits.map((row) => row.supportSiteId))) {
+    fail(
+      'EMPIRICAL_CIVIL_TRANSFER_AUDIT_ORDER_INVALID',
+      'Site audits must be unique and support-site sorted.',
+    );
+  }
+  value.civilResultants.forEach((row) => {
+    validateCivilResultant(row);
+    if (row.loadCaseId !== value.loadCaseId) {
+      fail(
+        'EMPIRICAL_CIVIL_TRANSFER_RESULT_LOAD_CASE_MISMATCH',
+        'Civil resultant loadCaseId must match its parent load case.',
+      );
+    }
+  });
+  const expectedCompleteness = completenessFor(
+    value.siteAudits,
+    value.siteAudits.length,
+    value.siteAudits.filter((row) => row.status === 'QUALIFIED_TRANSFER').length,
+  );
+  if (semanticHash(value.completeness) !== semanticHash(expectedCompleteness)) {
+    fail(
+      'EMPIRICAL_CIVIL_TRANSFER_COMPLETENESS_INVALID',
+      'Civil resultant completeness audit is stale.',
+    );
+  }
   if (value.status === 'CALCULATED') {
     if (value.blockers.length !== 0 || !value.transferBalance?.passed) {
       fail(
         'EMPIRICAL_CIVIL_TRANSFER_BALANCE_INVALID',
         'Calculated civil transfer must be blocker-free and action/reaction balanced.',
+      );
+    }
+    if (value.civilResultants.length !== value.completeness.qualifiedTransferCount) {
+      fail(
+        'EMPIRICAL_CIVIL_TRANSFER_RESULT_COUNT_INVALID',
+        'Calculated civil resultants must match the qualified site-transfer count.',
       );
     }
   } else if (value.civilResultants.length !== 0) {
@@ -450,6 +472,15 @@ function validateLoadCase(value) {
 function validateCivilResultant(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     fail('EMPIRICAL_CIVIL_TRANSFER_RESULT_INVALID', 'Civil resultant must be an object.');
+  }
+  if (!stringValue(value.loadCaseId)
+      || !stringValue(value.supportSiteId)
+      || !stringValue(value.structuralAssemblyId)
+      || value.transferId !== `CIVIL:${value.loadCaseId}:${value.supportSiteId}:${value.structuralAssemblyId}`) {
+    fail(
+      'EMPIRICAL_CIVIL_TRANSFER_RESULT_IDENTITY_INVALID',
+      'Civil resultant identity must bind load case, support site and structural assembly.',
+    );
   }
   if (value.distributionBasis?.kind
       !== EMPIRICAL_SUPPORT_ASSEMBLY_DISTRIBUTION_BASIS.EXACT_STATICS
@@ -465,8 +496,12 @@ function validateCivilResultant(value) {
   const civilForce = vector(value.civilReferenceResultant?.forceN);
   const offsetMm = vector(value.offsetCivilToPipeMm);
   const civilMoment = vector(value.civilReferenceResultant?.momentNm);
-  if (!sourceReaction || !structureAction || !civilForce || !offsetMm || !civilMoment) {
-    fail('EMPIRICAL_CIVIL_TRANSFER_RESULT_VECTOR_INVALID', 'Civil resultant vectors must be finite.');
+  if (!sourceReaction || !structureAction || !civilForce || !offsetMm || !civilMoment
+      || sourceReaction.x !== 0 || sourceReaction.y !== 0) {
+    fail(
+      'EMPIRICAL_CIVIL_TRANSFER_RESULT_VECTOR_INVALID',
+      'B2 civil resultant vectors must be finite and source reaction must be vertical.',
+    );
   }
   const expectedForce = scale(sourceReaction, -1);
   if (!sameVector(expectedForce, structureAction) || !sameVector(expectedForce, civilForce)) {
@@ -489,6 +524,37 @@ function validateCivilResultant(value) {
       'Civil resultant semantic hash mismatch.',
     );
   }
+}
+
+function completenessFor(audits, supportResultCount, qualifiedTransferCount) {
+  return {
+    supportResultCount,
+    nonzeroReactionCount: audits.filter((row) => (
+      row.sourceVerticalReactionOnPipeN !== null
+        && row.sourceVerticalReactionOnPipeN !== 0
+    )).length,
+    zeroReactionCount: audits.filter((row) => row.status === 'NO_LOAD').length,
+    qualifiedTransferCount,
+    blockedTransferCount: audits.filter((row) => row.status === 'BLOCKED').length,
+  };
+}
+
+function transferBalance(supportResults, civilResultants) {
+  const sourceVerticalReactionOnPipeN = supportResults.reduce((total, row) => {
+    const value = finite(row?.verticalForceN);
+    return total + (value === null ? 0 : value);
+  }, 0);
+  const structureVerticalActionN = civilResultants.reduce(
+    (total, row) => total + row.civilReferenceResultant.forceN.z,
+    0,
+  );
+  const actionReactionResidualN = sourceVerticalReactionOnPipeN + structureVerticalActionN;
+  return freezeDeep({
+    sourceVerticalReactionOnPipeN,
+    structureVerticalActionN,
+    actionReactionResidualN,
+    passed: actionReactionResidualN === 0,
+  });
 }
 
 function summarize(loadCases) {
@@ -525,6 +591,13 @@ function requireSupportSiteModel(value) {
     fail(
       'EMPIRICAL_CIVIL_TRANSFER_SUPPORT_MODEL_INVALID',
       'A Z_UP support-site-model/v1 is required.',
+    );
+  }
+  const siteIds = value.sites.map((site) => stringValue(site?.siteId));
+  if (siteIds.some((id) => !id) || new Set(siteIds).size !== siteIds.length) {
+    fail(
+      'EMPIRICAL_CIVIL_TRANSFER_SUPPORT_MODEL_INVALID',
+      'Support-site IDs must be non-empty and unique.',
     );
   }
   return value;
