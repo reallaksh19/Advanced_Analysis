@@ -174,6 +174,8 @@ async function openProductionController(page) {
     'data-topology-edit-dataset-session-version',
     /\d+/,
   );
+  await expect.poll(() => host.getAttribute('data-topology-edit-professional-catalogue-hash'))
+    .not.toBe('');
   return host;
 }
 
