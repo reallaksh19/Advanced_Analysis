@@ -24,7 +24,7 @@ const COMMAND_SCENARIOS = Object.freeze([
   { actionId: 'bridge-gap', kind: 'two-node' },
   { actionId: 'add-straight', kind: 'two-node' },
   { actionId: 'split-edge-half', kind: 'edge' },
-  { actionId: 'disconnect-from', kind: 'edge' },
+  { actionId: 'disconnect-from', kind: 'any-edge' },
   { actionId: 'disconnect-to', kind: 'any-edge' },
   { actionId: 'delete-edge', kind: 'edge' },
 ]);
