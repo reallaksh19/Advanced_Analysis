@@ -99,8 +99,6 @@ export class TopologyEditInteractionViewportAdapter {
     if (event.button !== 0 || !this.gizmoModel || this.activeDrag) return;
     const mode = this.pickHandleMode(event);
     if (!mode) return;
-    const canonicalHit = this.canonicalSelectionAt(event);
-    if (shouldYieldGizmoToCanonicalSelection(this.gizmoModel.nodeId, canonicalHit)) return;
     markHandled(event);
     this.canvas?.focus({ preventScroll: true });
     const anchor = new THREE.Vector3(
@@ -173,7 +171,12 @@ export class TopologyEditInteractionViewportAdapter {
     this.raycaster.setFromCamera(context, this.backend.activeCamera);
     const hit = this.raycaster.intersectObjects(this.group.children, true)
       .find((row) => interactionMode(row.object));
-    return hit ? interactionMode(hit.object) : null;
+    const mode = hit ? interactionMode(hit.object) : null;
+    if (!mode) return null;
+    const canonicalHit = this.canonicalSelectionAt(event);
+    return shouldYieldGizmoToCanonicalSelection(this.gizmoModel?.nodeId, canonicalHit)
+      ? null
+      : mode;
   }
 
   canonicalSelectionAt(event) {
