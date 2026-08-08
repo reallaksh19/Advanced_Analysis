@@ -1,0 +1,57 @@
+name: M045 BM4 Axial Discrepancy Transport
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/lfea-m045-bm4-axial-discrepancy-transport.mjs'
+      - '.github/workflows/m045-bm4-axial-discrepancy-transport.yml'
+  workflow_dispatch:
+
+jobs:
+  axial-discrepancy-transport:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enforce evidence-only M045 diff
+        run: |
+          git fetch --no-tags --depth=1 origin 9fb0482ae4e1d9fb9caf1d9fcb7724377729453e
+          git diff --name-only 9fb0482ae4e1d9fb9caf1d9fcb7724377729453e HEAD | sort > /tmp/m045-paths
+          printf '%s\n' \
+            .github/workflows/m045-bm4-axial-discrepancy-transport.yml \
+            scripts/lfea-m045-bm4-axial-discrepancy-transport.mjs | sort > /tmp/m045-allowed
+          diff -u /tmp/m045-allowed /tmp/m045-paths
+      - name: Syntax-check M045
+        run: node --check scripts/lfea-m045-bm4-axial-discrepancy-transport.mjs
+      - name: Run M045 discrepancy transport
+        run: node scripts/lfea-m045-bm4-axial-discrepancy-transport.mjs --report /tmp/m045/lfea-m045-bm4-axial-discrepancy-transport.json
+      - name: Preserve M044/M043/M042 boundaries
+        run: |
+          node scripts/lfea-m044-bm4-axial-end-force-equilibrium.mjs
+          node scripts/lfea-m043-bm4-axial-force-source-rca.mjs
+          node scripts/lfea-m042-bm4-first-divergence-rca.mjs
+      - name: Preserve M041/M040 friction boundaries
+        run: |
+          node scripts/lfea-m041-contact-friction-check.mjs
+          node scripts/lfea-m041-linear-kernel-bridge-check.mjs
+          node scripts/lfea-m041-bm4-activation-gate.mjs
+          node scripts/lfea-m040-bm4-friction-check.mjs
+      - name: Enforce bounded M045 script
+        run: |
+          lines=$(wc -l < scripts/lfea-m045-bm4-axial-discrepancy-transport.mjs)
+          test "$lines" -le 360 || { echo "M045 has $lines lines (>360)"; exit 1; }
+      - name: Upload deterministic M045 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m045-bm4-axial-transport-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /tmp/m045/lfea-m045-bm4-axial-discrepancy-transport.json
+          if-no-files-found: error
+      - name: Verify clean worktree
+        run: git diff --exit-code && git status --porcelain | tee /tmp/m045-status && test ! -s /tmp/m045-status
