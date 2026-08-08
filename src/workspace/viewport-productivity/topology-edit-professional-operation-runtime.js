@@ -12,12 +12,6 @@ import {
   deriveTopologyEditCommandCapability,
 } from '../topology-edit/editor-state/topology-edit-capability-authority.js';
 import {
-  TOPOLOGY_EDIT_SELECTION_EVENTS,
-} from '../topology-edit/editor-state/topology-edit-selection-events.js';
-import {
-  topologyEditLegacySelection,
-} from '../topology-edit/editor-state/topology-edit-selection-contract.js';
-import {
   TopologyEditValidationWorkerClient,
 } from '../topology-edit/professional/topology-edit-validation-worker-client.js';
 import {
@@ -57,8 +51,6 @@ export class TopologyEditProfessionalOperationRuntime {
     this.redoTransaction = null;
     this.message = '';
     this.error = null;
-    this.selectionReceipt = null;
-    this.unsubscribeSelectionChanged = null;
     this.validationClient = new TopologyEditValidationWorkerClient();
     this.valueChangeHandler = (event) => this.handleValueChange(event);
     this.originalUpdateActionButtons = null;
@@ -70,13 +62,8 @@ export class TopologyEditProfessionalOperationRuntime {
 
   mount(element) {
     this.element?.removeEventListener?.('change', this.valueChangeHandler);
-    this.unsubscribeSelectionChanged?.();
     this.element = element;
     this.element?.addEventListener?.('change', this.valueChangeHandler);
-    this.unsubscribeSelectionChanged = this.controller.eventBus.subscribe(
-      TOPOLOGY_EDIT_SELECTION_EVENTS.CHANGED,
-      ({ selection }) => this.selectionChanged(selection),
-    );
     this.installCommandCapabilityAdapter();
     this.render();
     this.refreshCommandCapabilities();
@@ -139,14 +126,10 @@ export class TopologyEditProfessionalOperationRuntime {
     this.updateEvidence();
   }
 
-  selectionChanged(selectionInput = null) {
-    if (selectionInput?.canonicalIds) this.selectionReceipt = selectionInput;
-    const selection = this.selectionReceipt
-      ? topologyEditLegacySelection(this.selectionReceipt)
-      : this.controller.selection;
+  selectionChanged() {
     this.values = {
       ...this.values,
-      ...topologyEditProfessionalOperationDefaults(selection),
+      ...topologyEditProfessionalOperationDefaults(this.controller.selection),
     };
     this.reconcileComponentContext();
     this.clear(false, false);
@@ -257,12 +240,9 @@ export class TopologyEditProfessionalOperationRuntime {
 
   restoreViewState(value) {
     restoreTopologyEditProfessionalViewState(this, value);
-    const selection = this.selectionReceipt
-      ? topologyEditLegacySelection(this.selectionReceipt)
-      : this.controller.selection;
     this.values = {
       ...this.values,
-      ...topologyEditProfessionalOperationDefaults(selection),
+      ...topologyEditProfessionalOperationDefaults(this.controller.selection),
     };
     this.reconcileComponentContext();
     this.render();
@@ -286,9 +266,6 @@ export class TopologyEditProfessionalOperationRuntime {
 
   destroy() {
     this.element?.removeEventListener?.('change', this.valueChangeHandler);
-    this.unsubscribeSelectionChanged?.();
-    this.unsubscribeSelectionChanged = null;
-    this.selectionReceipt = null;
     if (this.originalUpdateActionButtons) {
       this.controller.updateActionButtons = this.originalUpdateActionButtons;
       this.originalUpdateActionButtons = null;
