@@ -18,7 +18,7 @@ import {
   shouldYieldGizmoToCanonicalSelection,
 } from '../src/workspace/viewport-interaction/topology-edit-interaction-viewport-adapter.js';
 
-test('support glyphs begin at OD/2 contacts and extend by two outside diameters', () => {
+test('support glyphs preserve OD/2 contacts and 2OD/3 length while pointing inward', () => {
   const projection = projectGovernedSjsonSupportGlyphs({
     markerSizeMm: 70,
     supportTopology: {
@@ -43,29 +43,43 @@ test('support glyphs begin at OD/2 contacts and extend by two outside diameters'
           positiveContactPoint: null,
           negativeContactPoint: { x: 0, y: 0, z: -60 },
         },
+        {
+          restraintId: 'restraint:line-stop',
+          family: 'LINE_STOP',
+          direction: { x: 1, y: 0, z: 0 },
+          positiveContactPoint: { x: 4, y: 0, z: 0 },
+          negativeContactPoint: { x: -6, y: 0, z: 0 },
+        },
       ],
     }],
   });
 
-  assert.equal(projection.segments.length, 2);
-  assert.equal(projection.glyphMetrics.directionalArrowCount, 3);
-  assert.equal(projection.glyphMetrics.bidirectionalRestraintCount, 1);
+  assert.equal(projection.segments.length, 3);
+  assert.equal(projection.glyphMetrics.directionalArrowCount, 5);
+  assert.equal(projection.glyphMetrics.bidirectionalRestraintCount, 2);
   assert.equal(projection.glyphMetrics.placementAuthority, SJSON_SUPPORT_GLYPH_PLACEMENT_AUTHORITY);
 
   const guide = projection.segments.find((row) => row.entityId === 'restraint:guide');
   assert.equal(guide.contactOffsetMm, 60);
-  assert.equal(guide.glyphLengthMm, 240);
+  assert.equal(guide.glyphLengthMm, 80);
   assert.deepEqual(guide.directionalArrows.map((row) => row.polarity), ['POSITIVE', 'NEGATIVE']);
-  assert.deepEqual(guide.directionalArrows[0].start, { x: 0, y: 62, z: 0 });
-  assert.deepEqual(guide.directionalArrows[0].end, { x: 0, y: 302, z: 0 });
-  assert.deepEqual(guide.directionalArrows[1].start, { x: 0, y: -63, z: 0 });
-  assert.deepEqual(guide.directionalArrows[1].end, { x: 0, y: -303, z: 0 });
+  assert.deepEqual(guide.directionalArrows[0].start, { x: 0, y: 142, z: 0 });
+  assert.deepEqual(guide.directionalArrows[0].end, { x: 0, y: 62, z: 0 });
+  assert.deepEqual(guide.directionalArrows[1].start, { x: 0, y: -143, z: 0 });
+  assert.deepEqual(guide.directionalArrows[1].end, { x: 0, y: -63, z: 0 });
 
   const rest = projection.segments.find((row) => row.entityId === 'restraint:rest');
   assert.equal(rest.directionalArrows.length, 1);
   assert.equal(rest.directionalArrows[0].polarity, 'NEGATIVE');
-  assert.deepEqual(rest.directionalArrows[0].start, { x: 0, y: 0, z: -60 });
-  assert.deepEqual(rest.directionalArrows[0].end, { x: 0, y: 0, z: -300 });
+  assert.deepEqual(rest.directionalArrows[0].start, { x: 0, y: 0, z: -140 });
+  assert.deepEqual(rest.directionalArrows[0].end, { x: 0, y: 0, z: -60 });
+
+  const lineStop = projection.segments.find((row) => row.entityId === 'restraint:line-stop');
+  assert.equal(lineStop.glyphLengthMm, 80);
+  assert.deepEqual(lineStop.directionalArrows[0].start, { x: 84, y: 0, z: 0 });
+  assert.deepEqual(lineStop.directionalArrows[0].end, { x: 4, y: 0, z: 0 });
+  assert.deepEqual(lineStop.directionalArrows[1].start, { x: -86, y: 0, z: 0 });
+  assert.deepEqual(lineStop.directionalArrows[1].end, { x: -6, y: 0, z: 0 });
 });
 
 test('GPU pick radius is expressed in CSS pixels and scales with DPR', () => {
