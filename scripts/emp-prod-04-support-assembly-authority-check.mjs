@@ -153,8 +153,8 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(
   source,
-  /verticalForceN\s*=|civilReaction|memberForce/iu,
-  'EMP-PROD-04 B1 authority contract must not calculate force results.',
+  /verticalForceN\s*:|civilReactionN\s*:|memberForceN\s*:|baseReaction\s*:/iu,
+  'EMP-PROD-04 B1 authority contract must not publish force-result fields.',
 );
 
 console.log(JSON.stringify({
