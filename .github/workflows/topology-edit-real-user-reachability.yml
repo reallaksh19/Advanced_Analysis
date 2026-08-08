@@ -46,13 +46,21 @@ jobs:
           node-version: '22'
           cache: npm
 
-      - name: Verify exact-head source gates
+      - name: Verify exact head and patch hygiene
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$TOPOLOGY_EDIT_TARGET_HEAD_SHA"
           git diff --check
-          node scripts/topology-edit-r1-line-budget-check.mjs
-          node scripts/topology-edit-real-user-e2e-anti-cheat-check.mjs
+
+      - name: Enforce new-module physical line budget
+        run: node scripts/topology-edit-r1-line-budget-check.mjs
+
+      - name: Enforce no-privilege E2E source policy
+        run: node scripts/topology-edit-real-user-e2e-anti-cheat-check.mjs
+
+      - name: Verify R1 source syntax
+        run: |
+          set -euo pipefail
           node --check e2e/topology-edit-real-user-reachability.spec.js
           node --check src/workspace/topology-edit/editor-state/topology-edit-capability-contract.js
           node --check src/workspace/topology-edit/editor-state/topology-edit-capability-authority.js
