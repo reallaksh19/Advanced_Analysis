@@ -302,7 +302,15 @@ function relaxFrictionLoads(current, target) {
   }));
 }
 
-export function analyseM035M036Case(authorities, constraints, label, thermal, movements = [], frictionLoads = []) {
+export function analyseM035M036Case(
+  authorities,
+  constraints,
+  label,
+  thermal,
+  movements = [],
+  frictionLoads = [],
+  recover = true,
+) {
   const compilation = compileModel(authorities, constraints);
   const loadCase = compileCase(authorities, compilation, label, thermal, movements, frictionLoads);
   const { frames, components } = loadElements(authorities, loadCase);
@@ -315,22 +323,27 @@ export function analyseM035M036Case(authorities, constraints, label, thermal, mo
     loadCase,
     solverProfile: solverProfile(BM4_SOLVER_CONDITIONING_PROFILE),
   });
-  const recovery = compileResultRecovery({
-    compilation, execution, loadCase, frameElements: frames, pipingComponents: components,
-    recoveryProfile: recoveryProfile({ recoverComponentCodePoints: false }),
-  });
+  const recovery = recover
+    ? compileResultRecovery({
+      compilation, execution, loadCase, frameElements: frames, pipingComponents: components,
+      recoveryProfile: recoveryProfile({ recoverComponentCodePoints: false }),
+    })
+    : null;
   return Object.freeze({ compilation, loadCase, execution, recovery, frames, pipingComponents: components });
 }
 
-function analyseM038FrictionCase(authorities, constraints, label, thermal, movements = []) {
+function analyseM038FrictionCase(authorities, constraints, label, thermal, movements = [], recover = true) {
   const supports = frictionSupports(authorities);
   let frictionLoads = zeroFrictionLoads(supports);
   let lastResidual = Number.POSITIVE_INFINITY;
   for (let iteration = 0; iteration < FRICTION_MAX_ITERATIONS; iteration += 1) {
-    const analysis = analyseM035M036Case(authorities, constraints, label, thermal, movements, frictionLoads);
-    const target = deriveFrictionLoads(supports, analysis.execution);
+    const raw = analyseM035M036Case(authorities, constraints, label, thermal, movements, frictionLoads, false);
+    const target = deriveFrictionLoads(supports, raw.execution);
     lastResidual = frictionResidual(frictionLoads, target);
     if (lastResidual <= FRICTION_FORCE_TOLERANCE) {
+      const analysis = recover
+        ? analyseM035M036Case(authorities, constraints, label, thermal, movements, frictionLoads, true)
+        : raw;
       return Object.freeze({
         ...analysis,
         frictionEvidence: Object.freeze({
@@ -356,6 +369,7 @@ function finalAnalysis(authorities, inventory, run, label, thermal) {
     label,
     thermal,
     active.map((row) => row.prescribedMovement).filter((row) => row !== null),
+    true,
   );
   if (analysis.execution.semanticHash !== run.finalExecutionHash) throw new Error(`${label} combined final execution hash drift.`);
   return analysis;
@@ -367,7 +381,14 @@ export function solveBm4M035M036Combined() {
   const solveState = (label, thermal, unilateral = inventory.unilateral) => compileUnilateralSolverExecution({
     baseDeclarations: inventory.base,
     unilateral,
-    buildAndSolve: (constraints, active) => analyseM038FrictionCase(authorities, constraints, label, thermal, active.prescribedMovements).execution,
+    buildAndSolve: (constraints, active) => analyseM038FrictionCase(
+      authorities,
+      constraints,
+      label,
+      thermal,
+      active.prescribedMovements,
+      false,
+    ).execution,
   });
   const sustainedRun = solveState('BM4-M035-M036-SUS', false);
   const operatingRun = solveState('BM4-M035-M036-OPE', true);
