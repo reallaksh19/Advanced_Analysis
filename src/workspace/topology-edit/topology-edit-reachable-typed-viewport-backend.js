@@ -24,18 +24,19 @@ export class TopologyEditReachableTypedViewportBackend extends TopologyEditTyped
   }
 
   renderSession(model) {
+    const projection = model?.draft ?? model?.source ?? { elements: [] };
     this.hasDraftEndpointProjection = Boolean(model?.draft);
     this.endpointAffordances = deriveTopologyEditEndpointAffordances(
-      model?.draft ?? model?.source ?? { elements: [] },
+      projection,
       { modelRole: model?.draft ? 'draft' : 'source' },
     );
     super.renderSession(model);
     this.endpointRuntime.render(this.endpointAffordances);
-    if (this.hostElement) {
-      this.hostElement.dataset.topologyEditVisibleEndpointCount = String(
-        this.endpointAffordances.length,
-      );
-    }
+    publishEndpointReachabilityEvidence(
+      this.hostElement,
+      projection,
+      this.endpointAffordances,
+    );
   }
 
   buildNodePickProxyGroup(group, elements, markerSize) {
@@ -113,4 +114,25 @@ export class TopologyEditReachableTypedViewportBackend extends TopologyEditTyped
     this.hasDraftEndpointProjection = false;
     super.destroy();
   }
+}
+
+function publishEndpointReachabilityEvidence(host, projection, affordances) {
+  const typedEvidence = projection?.typedEvidenceProjection ?? null;
+  for (const evidenceHost of endpointEvidenceHosts(host)) {
+    evidenceHost.dataset.topologyEditVisibleEndpointCount = String(affordances.length);
+    evidenceHost.dataset.topologyEditEndpointProjectionElementCount = String(
+      projection?.elements?.length ?? 0,
+    );
+    evidenceHost.dataset.topologyEditEndpointCompactElementCount = String(
+      projection?.compactElements?.length ?? 0,
+    );
+    evidenceHost.dataset.topologyEditEndpointTypedEvidenceElementCount = String(
+      typedEvidence?.elements?.length ?? 0,
+    );
+  }
+}
+
+function endpointEvidenceHosts(host) {
+  const shell = host?.closest?.('[data-role="topology-edit-render-host"]');
+  return [...new Set([host, shell].filter(Boolean))];
 }
