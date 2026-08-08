@@ -131,7 +131,9 @@ test('navigation, presentation, history, and draft controls remain operable', as
 
   const views = host.locator('details[data-panel-kind="views"]');
   await views.locator(':scope > summary').click();
-  for (const action of ['fit-selection', 'home', 'previous', 'pivot-selection']) {
+  await page.locator('[data-navigation-action="fit-selection"]').click();
+  await expect(statusOutput(page)).toContainText('Focused 1 canonical selection object(s).');
+  for (const action of ['home', 'previous', 'pivot-selection']) {
     await page.locator(`[data-navigation-action="${action}"]`).click();
     await expect(statusOutput(page)).toContainText(`View command: ${action}.`);
   }
