@@ -46,6 +46,35 @@ test('endpoint affordance carries exact pickTarget and human accessible label', 
   assert.equal(endpoint.pickPriority, 100);
 });
 
+test('typed primitive presentation evidence supplies human labels without supplying identity', () => {
+  const rows = deriveTopologyEditEndpointAffordances({
+    elements: [{
+      id: 'node:typed-end',
+      entityId: 'node:typed-end',
+      type: 'node',
+      x: 100,
+      y: 0,
+      z: 0,
+      pickTarget: {
+        objectKind: 'node',
+        objectId: 'node:typed-end',
+        nodeId: 'node:typed-end',
+      },
+    }],
+    primitives: [{
+      workspaceEntityIds: ['V-002'],
+      parameters: {
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 100, y: 0, z: 0 },
+      },
+    }],
+  }, { modelRole: 'draft' });
+
+  assert.equal(rows[0].accessibleLabel, 'V-002, TO');
+  assert.equal(rows[0].pickTarget.objectId, 'node:typed-end');
+  assert.deepEqual(rows[0].workspaceEntityIds, ['V-002']);
+});
+
 test('source affordances remain inspectable but are not advertised as editable', () => {
   const packet = buildTopologyEditRenderPacket(topology, topology);
   const rows = deriveTopologyEditEndpointAffordances(packet.source, { modelRole: 'source' });
