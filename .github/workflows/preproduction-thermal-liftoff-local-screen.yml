@@ -1,0 +1,84 @@
+name: preproduction-thermal-liftoff-local-screen
+
+on:
+  pull_request:
+    branches:
+      - agent/preproduction-thermal-liftoff-prerequisites
+    paths:
+      - src/workspace/engineering-loads/preproduction-thermal-liftoff-local-screen.js
+      - src/workspace/engineering-loads/preproduction-thermal-liftoff-local-screen-execution.js
+      - scripts/preproduction-thermal-liftoff-local-screen-check.mjs
+      - scripts/preproduction-thermal-liftoff-local-screen-source-guard.mjs
+      - .github/workflows/preproduction-thermal-liftoff-local-screen.yml
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-preproduction-thermal-liftoff-local-screen:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact requested head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Prove exact head and clean worktree
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          git diff --exit-code
+
+      - name: Enforce five-path batch containment
+        shell: bash
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="$(git rev-parse HEAD)"
+          git diff --name-only "$BASE_SHA" "$HEAD_SHA" > /tmp/tl03-paths.txt
+          while IFS= read -r changed; do
+            case "$changed" in
+              src/workspace/engineering-loads/preproduction-thermal-liftoff-local-screen.js|src/workspace/engineering-loads/preproduction-thermal-liftoff-local-screen-execution.js|scripts/preproduction-thermal-liftoff-local-screen-check.mjs|scripts/preproduction-thermal-liftoff-local-screen-source-guard.mjs|.github/workflows/preproduction-thermal-liftoff-local-screen.yml) ;;
+              *) echo "Forbidden changed path for preproduction TL-03 batch: $changed"; exit 1 ;;
+            esac
+          done < /tmp/tl03-paths.txt
+          test "$(wc -l < /tmp/tl03-paths.txt)" -eq 5
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax check batch
+        run: |
+          node --check src/workspace/engineering-loads/preproduction-thermal-liftoff-local-screen.js
+          node --check src/workspace/engineering-loads/preproduction-thermal-liftoff-local-screen-execution.js
+          node --check scripts/preproduction-thermal-liftoff-local-screen-check.mjs
+          node --check scripts/preproduction-thermal-liftoff-local-screen-source-guard.mjs
+
+      - name: Requalify current-head support/contact authority
+        run: |
+          node scripts/preproduction-support-contact-source-guard.mjs
+          node scripts/preproduction-support-contact-authority-check.mjs
+
+      - name: Requalify TL-01 TL-02 and reaction-tolerance prerequisites
+        run: node scripts/preproduction-thermal-liftoff-prerequisites-check.mjs
+
+      - name: Requalify V8 authorized gravity receipt
+        run: node scripts/enrichment-package5f-material-support-authority-batch-check.mjs
+
+      - name: Enforce TL-03 source boundary
+        run: node scripts/preproduction-thermal-liftoff-local-screen-source-guard.mjs
+
+      - name: Qualify TL-03 local screen execution
+        run: node scripts/preproduction-thermal-liftoff-local-screen-check.mjs
+
+      - name: Import graph
+        run: npm run check:imports
+
+      - name: Production build
+        run: npm run build
