@@ -1,0 +1,42 @@
+name: M049 BM4 Contact Gap State RCA
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/lfea-m049-bm4-contact-gap-state-rca.mjs'
+      - '.github/workflows/m049-bm4-contact-gap-state-rca.yml'
+  workflow_dispatch:
+
+jobs:
+  contact-gap-state-rca:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax and line-count gate
+        run: |
+          node --check scripts/lfea-m049-bm4-contact-gap-state-rca.mjs
+          test "$(wc -l < scripts/lfea-m049-bm4-contact-gap-state-rca.mjs)" -le 300
+      - name: Audit CAESAR versus M036 contact states
+        run: node scripts/lfea-m049-bm4-contact-gap-state-rca.mjs --report /tmp/m049-contact-gap-state.json
+      - name: Preserve localization pressure and nonlinear baselines
+        run: |
+          node scripts/lfea-m048-bm4-pressure-residual-localization.mjs
+          node scripts/lfea-m047-bm4-pressure-elongation-ab.mjs
+          node scripts/lfea-m040-bm4-friction-check.mjs
+          npm run check:lfea-m036
+      - name: Upload deterministic M049 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m049-bm4-contact-gap-state-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /tmp/m049-contact-gap-state.json
+          if-no-files-found: error
+      - name: Verify clean worktree
+        run: git diff --exit-code && git status --porcelain | tee /tmp/m049-status && test ! -s /tmp/m049-status
