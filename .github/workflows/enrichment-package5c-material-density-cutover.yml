@@ -1,0 +1,80 @@
+name: enrichment-package5c-material-density-cutover
+
+on:
+  pull_request:
+    paths:
+      - 'src/workspace/engineering-enrichment/production-material-density-overlay.js'
+      - 'src/workspace/engineering-loads/authorized-empirical-load-execution-v5.js'
+      - 'scripts/enrichment-package5c-material-resolution-contract-check.mjs'
+      - 'scripts/enrichment-package5c-material-density-cutover-check.mjs'
+      - '.github/workflows/enrichment-package5c-material-density-cutover.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-package5c:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Prove exact-head execution
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          git diff --exit-code
+
+      - name: Enforce Package 5C changed-path containment
+        shell: bash
+        run: |
+          git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" > /tmp/enrichment-package5c-paths.txt
+          while IFS= read -r changed; do
+            case "$changed" in
+              src/workspace/engineering-enrichment/production-material-density-overlay.js|src/workspace/engineering-loads/authorized-empirical-load-execution-v5.js|scripts/enrichment-package5c-material-resolution-contract-check.mjs|scripts/enrichment-package5c-material-density-cutover-check.mjs|.github/workflows/enrichment-package5c-material-density-cutover.yml) ;;
+              *) echo "Forbidden changed path for enrichment Package 5C: $changed"; exit 1 ;;
+            esac
+          done < /tmp/enrichment-package5c-paths.txt
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax check Package 5C
+        run: |
+          node --check src/workspace/engineering-enrichment/production-material-density-overlay.js
+          node --check src/workspace/engineering-loads/authorized-empirical-load-execution-v5.js
+          node --check scripts/enrichment-package5c-material-resolution-contract-check.mjs
+          node --check scripts/enrichment-package5c-material-density-cutover-check.mjs
+
+      - name: Qualify canonical exact material-register contract
+        run: node scripts/enrichment-package5c-material-resolution-contract-check.mjs
+
+      - name: Requalify Package 4A seal lifecycle
+        run: node scripts/enrichment-package4a-input-seal-check.mjs
+
+      - name: Requalify Package 5A component-weight cutover
+        run: node scripts/enrichment-package5a-component-weight-cutover-check.mjs
+
+      - name: Requalify Package 5B fluid resolver contract
+        run: node scripts/enrichment-package5b-fluid-resolution-contract-check.mjs
+
+      - name: Requalify Package 5B operating-fluid-density cutover
+        run: node scripts/enrichment-package5b-operating-fluid-density-cutover-check.mjs
+
+      - name: Qualify sealed material-density cutover
+        run: node scripts/enrichment-package5c-material-density-cutover-check.mjs
+
+      - name: Import graph
+        run: npm run check:imports
+
+      - name: Production build
+        run: npm run build
