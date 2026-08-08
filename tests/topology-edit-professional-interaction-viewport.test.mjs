@@ -1,14 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
+import { engineeringPointToRender } from '../src/workspace/topology-edit/topology-edit-coordinate-transform.js';
 import { createTopologyEditGizmoModel } from '../src/workspace/viewport-interaction/topology-edit-gizmo-model.js';
-import { TopologyEditInteractionViewportAdapter } from '../src/workspace/viewport-interaction/topology-edit-interaction-viewport-adapter.js';
+import { projectTopologyEditWorldToScreen } from '../src/workspace/viewport-interaction/topology-edit-deterministic-snap-engine.js';
+import {
+  TopologyEditInteractionViewportAdapter,
+  topologyEditCameraSnapshot,
+} from '../src/workspace/viewport-interaction/topology-edit-interaction-viewport-adapter.js';
 
 class FakeCanvas {
   constructor() {
     this.attributes = new Map();
     this.listeners = new Map();
     this.captured = new Set();
+    this.clientWidth = 800;
     this.clientHeight = 500;
     this.tabIndex = -1;
     this.focused = false;
@@ -72,6 +78,24 @@ test('viewport adapter mounts six explicit disposable gizmo handles', () => {
   adapter.destroy();
   assert.equal(backend.groups.transientGroup.children.includes(adapter.group), false);
   assert.equal(adapter.group.children.length, 0);
+});
+
+test('snap camera snapshot projects engineering coordinates to rendered pixels', () => {
+  const { canvas, backend } = fixture();
+  const engineering = { x: 10, y: 20, z: 30 };
+  const render = engineeringPointToRender(engineering);
+  const rendered = new THREE.Vector3(render.x, render.y, render.z)
+    .project(backend.activeCamera);
+  const expected = {
+    x: ((rendered.x + 1) / 2) * canvas.clientWidth,
+    y: ((1 - rendered.y) / 2) * canvas.clientHeight,
+  };
+  const snapshot = topologyEditCameraSnapshot(backend, canvas);
+  const actual = projectTopologyEditWorldToScreen(snapshot, engineering);
+  assert.ok(actual);
+  assert.ok(Math.abs(actual.x - expected.x) < 1e-9);
+  assert.ok(Math.abs(actual.y - expected.y) < 1e-9);
+  assert.deepEqual(snapshot.position, { x: 100, y: -100, z: 100 });
 });
 
 test('keyboard events forward without creating command or workspace authority', () => {
