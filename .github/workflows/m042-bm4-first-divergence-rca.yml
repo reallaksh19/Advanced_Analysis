@@ -1,0 +1,59 @@
+name: M042 BM4 First Divergence RCA
+
+on:
+  push:
+    branches:
+      - agent/m042-bm4-first-divergence-rca
+  pull_request:
+    branches:
+      - agent/m041-coupled-contact-friction
+
+permissions:
+  contents: read
+
+jobs:
+  first-divergence-rca:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enforce evidence-only M042 diff
+        run: |
+          git fetch --no-tags --depth=1 origin b48962bfc01fec6c0778e40c0e10db64ddaa93ab
+          git diff --name-only b48962bfc01fec6c0778e40c0e10db64ddaa93ab HEAD | sort > /tmp/m042-paths
+          printf '%s\n' \
+            .github/workflows/m042-bm4-first-divergence-rca.yml \
+            scripts/lfea-m042-bm4-first-divergence-rca.mjs | sort > /tmp/m042-allowed
+          diff -u /tmp/m042-allowed /tmp/m042-paths
+      - name: Syntax-check M042 RCA
+        run: node --check scripts/lfea-m042-bm4-first-divergence-rca.mjs
+      - name: Run M042 first-upstream-divergence RCA
+        run: node scripts/lfea-m042-bm4-first-divergence-rca.mjs --report /tmp/m042/lfea-m042-bm4-first-divergence-rca.json
+      - name: Preserve M041 contact-friction qualification
+        run: |
+          node scripts/lfea-m041-contact-friction-check.mjs
+          node scripts/lfea-m041-linear-kernel-bridge-check.mjs
+          node scripts/lfea-m041-bm4-activation-gate.mjs
+      - name: Preserve M040 and M036 boundaries
+        run: |
+          node scripts/lfea-m040-bm4-friction-check.mjs
+          npm run check:lfea-m036
+      - name: Enforce bounded M042 script
+        run: |
+          lines=$(wc -l < scripts/lfea-m042-bm4-first-divergence-rca.mjs)
+          test "$lines" -le 300 || { echo "M042 RCA has $lines lines (>300)"; exit 1; }
+      - name: Upload deterministic M042 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m042-bm4-first-divergence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /tmp/m042/lfea-m042-bm4-first-divergence-rca.json
+          if-no-files-found: error
+      - name: Verify clean worktree
+        run: git diff --exit-code && git status --porcelain | tee /tmp/m042-status && test ! -s /tmp/m042-status
