@@ -1,0 +1,59 @@
+name: M048 BM4 Upstream Bend Transport
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/lfea-m048-bm4-upstream-bend-transport.mjs'
+      - '.github/workflows/m048-bm4-upstream-bend-transport.yml'
+  workflow_dispatch:
+
+jobs:
+  upstream-bend-transport:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enforce evidence-only M048 diff
+        run: |
+          git fetch --no-tags --depth=1 origin 95cfda9f41162f6d83371c3ccb86612a4b57a101
+          git diff --name-only 95cfda9f41162f6d83371c3ccb86612a4b57a101 HEAD | sort > /tmp/m048-paths
+          printf '%s\n' \
+            .github/workflows/m048-bm4-upstream-bend-transport.yml \
+            scripts/lfea-m048-bm4-upstream-bend-transport.mjs | sort > /tmp/m048-allowed
+          diff -u /tmp/m048-allowed /tmp/m048-paths
+      - name: Syntax-check M048
+        run: node --check scripts/lfea-m048-bm4-upstream-bend-transport.mjs
+      - name: Run M048 upstream bend transport
+        run: node scripts/lfea-m048-bm4-upstream-bend-transport.mjs --report /tmp/m048/lfea-m048-bm4-upstream-bend-transport.json
+      - name: Preserve M047/M046/M045/M044/M042 Level-1 boundaries
+        run: |
+          node scripts/lfea-m047-bm4-bend-station-authority.mjs
+          node scripts/lfea-m046-bm4-20340-boundary-authority.mjs
+          node scripts/lfea-m045-bm4-axial-discrepancy-transport.mjs
+          node scripts/lfea-m044-bm4-axial-end-force-equilibrium.mjs
+          node scripts/lfea-m042-bm4-first-divergence-rca.mjs
+      - name: Preserve M041/M040 friction fail-closed boundary
+        run: |
+          node scripts/lfea-m041-contact-friction-check.mjs
+          node scripts/lfea-m041-linear-kernel-bridge-check.mjs
+          node scripts/lfea-m041-bm4-activation-gate.mjs
+          node scripts/lfea-m040-bm4-friction-check.mjs
+      - name: Enforce bounded M048 script
+        run: |
+          lines=$(wc -l < scripts/lfea-m048-bm4-upstream-bend-transport.mjs)
+          test "$lines" -le 340 || { echo "M048 has $lines lines (>340)"; exit 1; }
+      - name: Upload deterministic M048 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m048-bm4-upstream-bend-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /tmp/m048/lfea-m048-bm4-upstream-bend-transport.json
+          if-no-files-found: error
+      - name: Verify clean worktree
+        run: git diff --exit-code && git status --porcelain | tee /tmp/m048-status && test ! -s /tmp/m048-status
