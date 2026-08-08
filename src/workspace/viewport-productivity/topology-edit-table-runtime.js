@@ -10,6 +10,12 @@ import {
 } from '../topology-edit/table/topology-edit-table-view-state.js';
 import { TopologyEditValidationWorkerClient } from '../topology-edit/professional/topology-edit-validation-worker-client.js';
 import {
+  topologyEditTableEmptyRoutePhase,
+  topologyEditTableEmptyRoutePipeOptions,
+  runTopologyEditTableEmptyRouteAction,
+  writeTopologyEditTableEmptyRouteToAuthoring,
+} from './topology-edit-table-empty-route-runtime.js';
+import {
   stageTopologyEditTeeReducerRelation,
   stageTopologyEditValveReplacement,
 } from './topology-edit-table-engineering-runtime.js';
@@ -175,64 +181,11 @@ export class TopologyEditTableRuntime {
   }
 
   /** Lists the governed pipe records available to an empty canonical model. */
-  emptyRoutePipeOptions() {
-    const records = this.controller.professionalRuntime?.catalogue?.records ?? [];
-    const options = records.filter((record) => record.componentType === 'PIPE');
-    if (!this.emptyRouteValues.catalogueRecordId && options.length) {
-      this.emptyRouteValues = {
-        ...this.emptyRouteValues,
-        catalogueRecordId: options[0].recordId,
-      };
-    }
-    return options;
-  }
-
-  emptyRoutePhase() {
-    return this.controller.authoringRuntime?.startRouteRuntime?.phase ?? 'IDLE';
-  }
-
-  async runEmptyRouteAction(kind) {
-    const authoring = this.controller.authoringRuntime;
-    if (!authoring || this.pending) return true;
-    try {
-      this.pending = true;
-      this.error = null;
-      if (kind === 'empty-route-preview') {
-        authoring.activateStartRoute();
-        this.writeEmptyRouteToAuthoring(authoring);
-        await authoring.previewOperation();
-      } else if (kind === 'empty-route-validate') {
-        await authoring.validateOperation();
-      } else if (kind === 'empty-route-apply') {
-        await authoring.applyOperation();
-      } else if (kind === 'empty-route-cancel') {
-        authoring.clear(true, false);
-      }
-      this.error = authoring.error || null;
-      this.message = authoring.message || 'First-pipe authoring state updated.';
-    } catch (error) {
-      this.error = errorMessage(error);
-    } finally {
-      this.pending = false;
-      this.render();
-    }
-    return true;
-  }
-
+  emptyRoutePipeOptions() { return topologyEditTableEmptyRoutePipeOptions(this); }
+  emptyRoutePhase() { return topologyEditTableEmptyRoutePhase(this); }
+  async runEmptyRouteAction(kind) { return runTopologyEditTableEmptyRouteAction(this, kind); }
   writeEmptyRouteToAuthoring(authoring) {
-    const values = {
-      inputMode: 'TYPED',
-      ...this.emptyRouteValues,
-      axisLock: 'FREE',
-      minimumLengthMm: '6',
-      overlapToleranceMm: '0.001',
-    };
-    for (const [key, value] of Object.entries(values)) {
-      const control = authoring.element?.querySelector(`[data-start-route-field="${key}"]`);
-      if (!control) throw new Error(`First-pipe field ${key} is unavailable.`);
-      control.value = String(value);
-    }
-    authoring.handleFieldChange();
+    return writeTopologyEditTableEmptyRouteToAuthoring(this, authoring);
   }
 
   selectRow(rowId, event) {
