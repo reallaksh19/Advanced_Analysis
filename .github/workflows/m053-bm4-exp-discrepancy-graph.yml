@@ -1,0 +1,64 @@
+name: M053 BM4 EXP Discrepancy Graph
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/lfea-m053-bm4-exp-discrepancy-graph.mjs'
+      - '.github/workflows/m053-bm4-exp-discrepancy-graph.yml'
+  workflow_dispatch:
+
+jobs:
+  exp-discrepancy-graph:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enforce evidence-only M053 diff
+        run: |
+          git fetch --no-tags --depth=1 origin 3e518a45826963eba8e1e40743af885231c3960f
+          git diff --name-only 3e518a45826963eba8e1e40743af885231c3960f HEAD | sort > /tmp/m053-paths
+          printf '%s\n' \
+            .github/workflows/m053-bm4-exp-discrepancy-graph.yml \
+            scripts/lfea-m053-bm4-exp-discrepancy-graph.mjs | sort > /tmp/m053-allowed
+          diff -u /tmp/m053-allowed /tmp/m053-paths
+      - name: Syntax-check M053
+        run: node --check scripts/lfea-m053-bm4-exp-discrepancy-graph.mjs
+      - name: Run M053 graph RCA
+        run: node scripts/lfea-m053-bm4-exp-discrepancy-graph.mjs --report /tmp/m053/lfea-m053-bm4-exp-discrepancy-graph.json
+      - name: Preserve M052 through M042 Level-1 boundaries
+        run: |
+          node scripts/lfea-m052-bm4-20295-incidence-end-authority.mjs
+          node scripts/lfea-m051-bm4-20295-branch-bend-authority.mjs
+          node scripts/lfea-m050-bm4-20295-node-free-body.mjs
+          node scripts/lfea-m049-bm4-upstream-discrepancy-provenance.mjs
+          node scripts/lfea-m048-bm4-upstream-bend-transport.mjs
+          node scripts/lfea-m047-bm4-bend-station-authority.mjs
+          node scripts/lfea-m046-bm4-20340-boundary-authority.mjs
+          node scripts/lfea-m045-bm4-axial-discrepancy-transport.mjs
+          node scripts/lfea-m044-bm4-axial-end-force-equilibrium.mjs
+          node scripts/lfea-m042-bm4-first-divergence-rca.mjs
+      - name: Preserve M041/M040 friction fail-closed boundary
+        run: |
+          node scripts/lfea-m041-contact-friction-check.mjs
+          node scripts/lfea-m041-linear-kernel-bridge-check.mjs
+          node scripts/lfea-m041-bm4-activation-gate.mjs
+          node scripts/lfea-m040-bm4-friction-check.mjs
+      - name: Enforce bounded M053 script
+        run: |
+          lines=$(wc -l < scripts/lfea-m053-bm4-exp-discrepancy-graph.mjs)
+          test "$lines" -le 330 || { echo "M053 has $lines lines (>330)"; exit 1; }
+      - name: Upload deterministic M053 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m053-bm4-exp-graph-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /tmp/m053/lfea-m053-bm4-exp-discrepancy-graph.json
+          if-no-files-found: error
+      - name: Verify clean worktree
+        run: git diff --exit-code && git status --porcelain | tee /tmp/m053-status && test ! -s /tmp/m053-status
