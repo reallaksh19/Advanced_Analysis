@@ -74,6 +74,7 @@ export class TopologyEditReachableTypedViewportBackend extends TopologyEditTyped
         pickTarget: affordance.pickTarget,
         pickProxy: true,
         endpointAffordance: true,
+        nonPickable: true,
         pickPriority: affordance.pickPriority,
         accessibleLabel: affordance.accessibleLabel,
         renderAuthority: 'CANONICAL_NODE_VISIBLE_AFFORDANCE',
