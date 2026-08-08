@@ -2,8 +2,9 @@
 
 **Repository:** `reallaksh19/Advanced_Analysis`  
 **Plan date:** 5 August 2026  
+**Implementation status updated:** 8 August 2026  
 **Proposed method family:** `THERMAL_LIFTOFF_ACTIVE_SET_V1`  
-**Status:** engineering plan only; no production numerical authority  
+**Status:** TL-00 through TL-03 implemented as a non-production shadow spike; no production numerical authority, method registration, default UI exposure, seal/export eligibility or TL-04 redistribution authority  
 **Relationship to current methods:** downstream of `CHAINAGE_TRIBUTARY_SPAN_V2` and `CHAINAGE_TRIBUTARY_SPAN_V3_COG`
 
 ---
@@ -439,3 +440,93 @@ source displacement intake
 ```
 
 This preserves the current gravity calculation while providing a technically defensible path to temperature-driven lift-off and reaction redistribution.
+
+---
+
+## 15. TL-00 through TL-03 shadow-spike implementation record — 8 August 2026
+
+Owner decision #12 changes the implementation sequencing without changing the governing mechanics above. TL-00 through TL-03 are implemented as a **non-production design/qualification shadow spike running in parallel with EMP-PROD-04**, not as a production dispatch ahead of EMP-PROD-04.
+
+The following restrictions are binding:
+
+```text
+NO_REGISTRATION_IN_EMPIRICAL_METHOD_REGISTRY = true
+NO_DEFAULT_UI_EXPOSURE = true
+NO_SEAL_OR_EXPORT_ELIGIBILITY = true
+NO_FINAL_HOT_REACTION_CLAIM = true
+NO_ALPHA_DT_L_TO_VERTICAL_DISPLACEMENT_INFERENCE = true
+```
+
+### 15.1 Implemented shadow modules
+
+```text
+src/workspace/engineering-loads/empirical-thermal-liftoff-authority.js
+src/workspace/engineering-loads/empirical-thermal-liftoff-displacement-intake.js
+src/workspace/engineering-loads/empirical-thermal-liftoff-stiffness-registry.js
+src/workspace/engineering-loads/empirical-thermal-liftoff-local-screen.js
+src/workspace/engineering-loads/authorized-empirical-thermal-liftoff-screen.js
+src/workspace/engineering-loads/empirical-thermal-liftoff-formula-register.js
+```
+
+These modules provide frozen sign/gap authority, evidence-only free expansion intake, a qualified applicability-bound stiffness registry, a local reaction-reserve screen, and an immutable hash-bound receipt. They do **not** provide active-set contact release, gravity re-bracketing, coupled redistribution, re-contact, final hot reactions, force/moment/complementarity closure for a redistributed state, or production presentation.
+
+### 15.2 Authority and finality boundary
+
+The TL-03 result is explicitly:
+
+```text
+stage = TL03_LOCAL_SCREEN_ONLY
+finality = NON_FINAL_NO_REDISTRIBUTION
+```
+
+The local candidate quantity is named `localTrialContactReserveN`. It is intentionally not named `verticalForceN`, `reactionN`, `finalReaction` or `redistributedReaction`. Negative local trial reserve is retained as evidence for `LIFTOFF_CANDIDATE`; it is never clamped with `max(0, R)`.
+
+The cold-gravity input remains a current, validated, read-only authorized execution of:
+
+```text
+CHAINAGE_TRIBUTARY_SPAN_V2
+or
+CHAINAGE_TRIBUTARY_SPAN_V3_COG
+```
+
+No V2/V3 result object is mutated or wrapped in place.
+
+### 15.3 Fail-closed unresolved authority
+
+Two numerical policy values remain intentionally uncreated by this work pack:
+
+```text
+reactionTolerance production numerical value = UNKNOWN — BLOCKING
+non-trivial horizontal displacement threshold = UNKNOWN — BLOCKING
+```
+
+The shadow implementation therefore has no reaction-tolerance default. A candidate classification requires a separately qualified reaction-tolerance authority. If none is supplied, TL-03 returns `UNRESOLVED_GATE`.
+
+Likewise, a non-zero horizontal component of pipe-to-support relative displacement is not silently projected away. Without an explicit qualified applicability assessment for that horizontal component, TL-01 marks the displacement unresolved and TL-03 returns `UNRESOLVED_GATE`.
+
+### 15.4 Evidence separation
+
+`alpha * DeltaT * L` is represented by `empirical-thermal-free-expansion-evidence/v1` with `tl03Eligibility = EVIDENCE_ONLY`. That schema contains no TL-03 used-upward-displacement field. It may reach TL-03 only through a separately qualified mapping evidence contract.
+
+TL-02 rejects guessed/global/default stiffness authority and binds each qualified entry to exact support-site identity, units, ordering, benchmark evidence, source identity and applicability semantic hashes. Multiple simultaneously applicable qualified local stiffness entries fail closed with `THERMAL_LIFTOFF_STIFFNESS_AUTHORITY_CONFLICT`; no averaging or first-wins rule exists.
+
+### 15.5 Staleness and tamper resistance
+
+The TL-03 result identity binds the current cold-gravity execution, stiffness registry, displacement set, support-contact authority set, applicability bindings and reaction-tolerance authority. Per-support records additionally bind the exact used stiffness and displacement evidence. A changed upstream authority makes the prior screen stale; it is not patched in place.
+
+The result validator re-derives `U_i = k_i,eff * delta_i,up`, `R_i,trial = R_i,cold - U_i` and the resulting classification in addition to checking semantic hashes. Rehashing a hand-edited `LIFTOFF_CANDIDATE` therefore does not create valid engineering evidence.
+
+### 15.6 Production boundary
+
+This shadow spike does not modify or consume production integration surfaces as new authority:
+
+```text
+empirical-method-registry.js                    unchanged
+Load Calc navigation / Calculate gating        unchanged
+seal/export wiring                              unchanged
+beam-contact runtime                            unchanged
+restraint-network runtime                       unchanged
+V2/V3 gravity numerical implementation          unchanged
+```
+
+Registration, default UI exposure, seal/export eligibility and governed production cutover remain TL-06 responsibilities and require a separate authorization/qualification decision.
