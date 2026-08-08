@@ -1,0 +1,51 @@
+name: M038 Bourdon Diagnostic
+
+on:
+  push:
+    branches:
+      - agent/m038-bm4-accdb-loadcase-reconstruction
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bourdon-diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TARGET_HEAD_SHA: ${{ github.sha }}
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_HEAD_SHA }}
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Capture Bourdon smoke failure
+        shell: bash
+        run: |
+          set -o pipefail
+          {
+            echo "M038_DIAGNOSTIC_HEAD=$(git rev-parse HEAD)"
+            node --check src/core/linear-fea-frame-element/uniform-axial-initial-strain.js
+            node --check scripts/lfea-m035-m036-bm4-integration-runtime.mjs
+            node -e "import('./scripts/lfea-m035-m036-bm4-integration-runtime.mjs').then(m=>{const r=m.solveBm4M035M036Combined(); console.log('M038_RELEASED_SUS='+JSON.stringify(m.releasedTargetIds(r.sustainedRun,['20090','20350','21470','21610']))); console.log('M038_RELEASED_OPE='+JSON.stringify(m.releasedTargetIds(r.operatingRun,['20090','20350','21470','21610']))); console.log('M038_21470_SUS_RY='+m.reactionUy(r.sustained.execution,'21470'));})"
+          } 2>&1 | tee /tmp/m038-bourdon-diagnostic.log
+
+      - name: Upload diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m038-bourdon-diagnostic-${{ env.TARGET_HEAD_SHA }}
+          path: /tmp/m038-bourdon-diagnostic.log
+          if-no-files-found: warn
+          retention-days: 7
