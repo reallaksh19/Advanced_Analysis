@@ -142,10 +142,9 @@ for (const [baseline, enriched] of [[baselineV2, enrichedV2], [baselineCog, enri
   const enrichedPipe = contribution(enriched, 'OPE', 'PIPE-1');
   assertClose(enrichedPipe.massKg - baselinePipe.massKg, expectedFluidMassDeltaKg);
   assertClose(enrichedPipe.formula.fluidKg - baselinePipe.formula.fluidKg, expectedFluidMassDeltaKg);
-  assert.deepEqual(
-    contribution(enriched, 'OPE', 'VALVE-1'),
+  assertComponentMechanicsInvariant(
     contribution(baseline, 'OPE', 'VALVE-1'),
-    'Package 5B must preserve the already-sealed component contribution.',
+    contribution(enriched, 'OPE', 'VALVE-1'),
   );
 
   for (const caseId of ['EMPTY', 'OPE', 'HYD']) {
@@ -311,7 +310,8 @@ console.log(JSON.stringify({
   expectedOpeReactionDeltaN: [expectedReactionDeltaN, expectedReactionDeltaN],
   emptyUnchanged: true,
   hydroUnchanged: true,
-  componentWeightsPreserved: true,
+  componentMechanicsPreserved: true,
+  componentCogAuditProvenanceRefreshPermitted: true,
   independentSealContextsRequiredToMatch: true,
   completeAuthorizedLineCoverageRequired: true,
   staleAuthorityFailsClosed: true,
@@ -776,6 +776,32 @@ function reactionDeltasForCase(base, enriched, caseId) {
 
 function contribution(execution, caseId, entityId) {
   return loadCase(execution, caseId).contributionLedger.find((row) => row.entityId === entityId);
+}
+
+function assertComponentMechanicsInvariant(baseline, enriched) {
+  assert.equal(enriched.contributionId, baseline.contributionId);
+  assert.equal(enriched.routeId, baseline.routeId);
+  assert.equal(enriched.entityId, baseline.entityId);
+  assert.deepEqual(enriched.source, baseline.source);
+  assertClose(enriched.massKg, baseline.massKg);
+  assertClose(enriched.verticalForceN, baseline.verticalForceN);
+  assertClose(enriched.chainageMm, baseline.chainageMm);
+  assert.equal(enriched.formula.catalogKey, baseline.formula.catalogKey);
+  assertClose(enriched.formula.massKg, baseline.formula.massKg);
+  assert.deepEqual(enriched.formula.projectDataSources, baseline.formula.projectDataSources);
+  assert.deepEqual(enriched.allocations, baseline.allocations);
+  assert.equal(enriched.currentMethodPointChainageMm, baseline.currentMethodPointChainageMm);
+  assert.deepEqual(
+    applicationPointMechanics(enriched.formula.applicationPointAuthority),
+    applicationPointMechanics(baseline.formula.applicationPointAuthority),
+    'Package 5B must preserve component CoG classification and application-point mechanics.',
+  );
+}
+
+function applicationPointMechanics(authority) {
+  if (!authority) return null;
+  const { auditSemanticHash: _auditSemanticHash, ...mechanics } = authority;
+  return mechanics;
 }
 
 function hasBlocker(value, code) {
