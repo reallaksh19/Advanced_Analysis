@@ -58,6 +58,7 @@ test('3D Demo is reachable through visible production controls only', async ({ p
   await page.locator('[data-action="save-draft"]').click();
   await expect(page.locator('[data-role="topology-edit-status"]')).toContainText('Draft saved:');
   const saved = await visibleEvidence(host);
+  await openPanel(page, 'draft');
   await page.locator('[data-action="reload-draft"]').click();
   await expect(page.locator('[data-role="topology-edit-status"]'))
     .toContainText('Draft restored at session version');
@@ -127,15 +128,15 @@ test('XYZ Branch exposes truthful catalogue, endpoint and Table capability paths
   expect(nudgeApplied.canonicalHash).not.toBe(catalogueApplied.canonicalHash);
 
   await openTable(page);
-  await selectTableRow(page, 'E-003');
+  await selectTableRow(page, host, 'E-003');
   await expect(page.locator(
     '[data-table-capability-reason="TABLE_INTENT_NOT_CERTIFIED"]',
   ).first()).toBeVisible();
-  await selectTableRow(page, 'S-006');
+  await selectTableRow(page, host, 'S-006');
   await expect(page.locator('[data-table-capability-reason="SUPPORT_EDIT_NOT_CERTIFIED"]'))
     .toBeVisible();
 
-  await selectTableRow(page, 'P-012');
+  await selectTableRow(page, host, 'P-012');
   const length = page.locator('[data-table-edit-length]');
   await expect(length).toBeVisible();
   const currentLength = Number(await length.inputValue());
@@ -225,12 +226,17 @@ async function openTable(page) {
   await expect(page.locator('[data-role="topology-edit-table"]')).toBeVisible();
 }
 
-async function selectTableRow(page, tag) {
+async function selectTableRow(page, host, tag) {
   const filter = page.locator('[data-table-filter]');
   await filter.fill(tag);
   const row = page.locator('[data-role="topology-edit-table"] tbody tr').filter({ hasText: tag }).first();
   await expect(row).toBeVisible();
+  const canonicalId = await row.getAttribute('data-canonical-id');
+  expect(canonicalId).toBeTruthy();
   await row.locator('[data-table-select]').click();
+  await expect.poll(() => host.getAttribute('data-topology-edit-selection-primary-id'))
+    .toBe(canonicalId);
+  await expect(page.locator('[data-table-all-properties]')).toBeVisible();
 }
 
 async function visibleEvidence(host) {
