@@ -17,6 +17,7 @@ on:
       - 'tests/topology-edit-*snap*.test.mjs'
       - 'tests/topology-edit-editor-store.test.mjs'
       - 'e2e/topology-edit-deterministic-snapping.spec.js'
+      - 'e2e/topology-edit-snap-target-diagnostic.spec.js'
   workflow_dispatch:
 
 permissions:
@@ -71,6 +72,7 @@ jobs:
           node --check tests/topology-edit-deterministic-snap-engine.test.mjs
           node --check tests/topology-edit-snap-store-controller.test.mjs
           node --check e2e/topology-edit-deterministic-snapping.spec.js
+          node --check e2e/topology-edit-snap-target-diagnostic.spec.js
           git diff --check
 
       - name: Execute deterministic snapping contracts
@@ -88,6 +90,11 @@ jobs:
           node --test \
             tests/topology-edit-professional-interaction-containment.test.mjs \
             tests/topology-edit-navigation-pick-fallback.test.mjs
+
+      - name: Diagnose resolved snap target
+        run: |
+          npx playwright test e2e/topology-edit-snap-target-diagnostic.spec.js \
+            --project=chromium --workers=1 --retries=0 --reporter=line
 
       - name: Execute real WebGL deterministic snapping qualification
         run: |
