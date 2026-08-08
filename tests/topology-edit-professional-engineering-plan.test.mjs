@@ -100,7 +100,7 @@ test('operation plan fails closed on stale scope, undeclared targets, bad comman
   assert.throws(() => createTopologyEditOperationPlan({
     ...input,
     targetIds: ['P-001'],
-  }), /exact canonical IDs/i);
+  }), /exact canonical ID/i);
 
   const plan = createTopologyEditOperationPlan(input);
   const tampered = { ...plan, parameters: { ...plan.parameters, distanceMm: 101 } };
