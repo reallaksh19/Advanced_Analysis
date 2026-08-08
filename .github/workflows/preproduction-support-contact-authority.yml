@@ -1,0 +1,81 @@
+name: preproduction-support-contact-authority
+
+on:
+  pull_request:
+    paths:
+      - 'src/workspace/engineering-loads/preproduction-support-contact-authority.js'
+      - 'src/workspace/engineering-loads/preproduction-support-contact-tl-bridge.js'
+      - 'scripts/preproduction-support-contact-authority-check.mjs'
+      - 'scripts/preproduction-support-contact-source-guard.mjs'
+      - '.github/workflows/preproduction-support-contact-authority.yml'
+  workflow_dispatch:
+
+jobs:
+  qualify-preproduction-support-contact-authority:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact requested head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Prove exact head and clean worktree
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          git diff --exit-code
+
+      - name: Enforce five-path batch containment
+        shell: bash
+        run: |
+          BASE_SHA="5c8a4558ece96d321bc6238a3f9719cddc2f381f"
+          HEAD_SHA="$(git rev-parse HEAD)"
+          git diff --name-only "$BASE_SHA" "$HEAD_SHA" > /tmp/preproduction-contact-paths.txt
+          while IFS= read -r changed; do
+            case "$changed" in
+              src/workspace/engineering-loads/preproduction-support-contact-authority.js|src/workspace/engineering-loads/preproduction-support-contact-tl-bridge.js|scripts/preproduction-support-contact-authority-check.mjs|scripts/preproduction-support-contact-source-guard.mjs|.github/workflows/preproduction-support-contact-authority.yml) ;;
+              *) echo "Forbidden changed path for preproduction support/contact batch: $changed"; exit 1 ;;
+            esac
+          done < /tmp/preproduction-contact-paths.txt
+          test "$(wc -l < /tmp/preproduction-contact-paths.txt)" -eq 5
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax check batch
+        run: |
+          node --check src/workspace/engineering-loads/preproduction-support-contact-authority.js
+          node --check src/workspace/engineering-loads/preproduction-support-contact-tl-bridge.js
+          node --check scripts/preproduction-support-contact-authority-check.mjs
+          node --check scripts/preproduction-support-contact-source-guard.mjs
+
+      - name: Guard non-executing preproduction boundary
+        run: node scripts/preproduction-support-contact-source-guard.mjs
+
+      - name: Requalify core support-restraint authority
+        run: node scripts/w10.3-restraint-capability-contract-check.mjs
+
+      - name: Requalify exact support station topology
+        run: node scripts/non-fea-analysis-topology-check.mjs
+
+      - name: Requalify Package 5F parent authority
+        run: node scripts/enrichment-package5f-material-support-authority-batch-check.mjs
+
+      - name: Qualify per-instance contact authority and TL-03 bridge
+        run: node scripts/preproduction-support-contact-authority-check.mjs
+
+      - name: Import graph
+        run: npm run check:imports
+
+      - name: Production build
+        run: npm run build
