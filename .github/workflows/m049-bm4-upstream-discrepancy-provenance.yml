@@ -1,0 +1,60 @@
+name: M049 BM4 Upstream Discrepancy Provenance
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/lfea-m049-bm4-upstream-discrepancy-provenance.mjs'
+      - '.github/workflows/m049-bm4-upstream-discrepancy-provenance.yml'
+  workflow_dispatch:
+
+jobs:
+  upstream-provenance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enforce evidence-only M049 diff
+        run: |
+          git fetch --no-tags --depth=1 origin 19dd85175f6e33e2e7d1b58734c270f896b3223e
+          git diff --name-only 19dd85175f6e33e2e7d1b58734c270f896b3223e HEAD | sort > /tmp/m049-paths
+          printf '%s\n' \
+            .github/workflows/m049-bm4-upstream-discrepancy-provenance.yml \
+            scripts/lfea-m049-bm4-upstream-discrepancy-provenance.mjs | sort > /tmp/m049-allowed
+          diff -u /tmp/m049-allowed /tmp/m049-paths
+      - name: Syntax-check M049
+        run: node --check scripts/lfea-m049-bm4-upstream-discrepancy-provenance.mjs
+      - name: Run M049 upstream provenance trace
+        run: node scripts/lfea-m049-bm4-upstream-discrepancy-provenance.mjs --report /tmp/m049/lfea-m049-bm4-upstream-discrepancy-provenance.json
+      - name: Preserve M048/M047/M046/M045/M044/M042 Level-1 boundaries
+        run: |
+          node scripts/lfea-m048-bm4-upstream-bend-transport.mjs
+          node scripts/lfea-m047-bm4-bend-station-authority.mjs
+          node scripts/lfea-m046-bm4-20340-boundary-authority.mjs
+          node scripts/lfea-m045-bm4-axial-discrepancy-transport.mjs
+          node scripts/lfea-m044-bm4-axial-end-force-equilibrium.mjs
+          node scripts/lfea-m042-bm4-first-divergence-rca.mjs
+      - name: Preserve M041/M040 friction fail-closed boundary
+        run: |
+          node scripts/lfea-m041-contact-friction-check.mjs
+          node scripts/lfea-m041-linear-kernel-bridge-check.mjs
+          node scripts/lfea-m041-bm4-activation-gate.mjs
+          node scripts/lfea-m040-bm4-friction-check.mjs
+      - name: Enforce bounded M049 script
+        run: |
+          lines=$(wc -l < scripts/lfea-m049-bm4-upstream-discrepancy-provenance.mjs)
+          test "$lines" -le 360 || { echo "M049 has $lines lines (>360)"; exit 1; }
+      - name: Upload deterministic M049 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m049-bm4-upstream-provenance-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /tmp/m049/lfea-m049-bm4-upstream-discrepancy-provenance.json
+          if-no-files-found: error
+      - name: Verify clean worktree
+        run: git diff --exit-code && git status --porcelain | tee /tmp/m049-status && test ! -s /tmp/m049-status
