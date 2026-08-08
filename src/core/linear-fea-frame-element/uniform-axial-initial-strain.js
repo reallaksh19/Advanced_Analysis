@@ -33,6 +33,12 @@ function addVectors(left, right) {
  * is passed through the same end-condition condensation, local/global transform
  * and rigid-offset transform as thermal strain, so result recovery can subtract
  * it consistently from K*u.
+ *
+ * `frame.appliedLoads` remains reserved for DISTRIBUTED_LOAD primitives because
+ * force-field recovery integrates that collection as distributed intensity.
+ * Initial-strain provenance is instead hash-bound through the limitation detail
+ * below; the sealed frame vectors carry the mechanics and recovery subtracts the
+ * combined `initialStrainLoadVector` directly.
  */
 export function augmentFrameElementUniformAxialInitialStrain({
   frame,
@@ -93,23 +99,12 @@ export function augmentFrameElementUniformAxialInitialStrain({
   const hasOffsets = acceptedFrame.rigidOffsets.I !== null || acceptedFrame.rigidOffsets.J !== null;
   if (hasOffsets) global = applyOffsetToLoad(global, frameOffsetMatrix(acceptedFrame.rigidOffsets));
 
-  const loadIdentity = {
-    primitiveId: acceptedPrimitive.primitiveId,
-    kind: acceptedPrimitive.kind,
-    semanticHash: acceptedPrimitive.semanticHash,
-  };
-  if (acceptedFrame.appliedLoads.some((entry) => entry.primitiveId === loadIdentity.primitiveId)) {
-    throw new Error(`Initial-strain primitive ${loadIdentity.primitiveId} is already applied to ${acceptedFrame.elementId}.`);
-  }
-
   const draft = {
     ...acceptedFrame,
     initialStrainLoadVector: {
       local: addVectors(acceptedFrame.initialStrainLoadVector.local, condensed.vectors[0]),
       global: addVectors(acceptedFrame.initialStrainLoadVector.global, global),
     },
-    appliedLoads: [...acceptedFrame.appliedLoads, loadIdentity]
-      .sort((left, right) => left.primitiveId < right.primitiveId ? -1 : left.primitiveId > right.primitiveId ? 1 : 0),
     limitations: [
       ...acceptedFrame.limitations,
       {
@@ -120,6 +115,7 @@ export function augmentFrameElementUniformAxialInitialStrain({
         details: {
           disclosure,
           primitiveId: acceptedPrimitive.primitiveId,
+          primitiveKind: acceptedPrimitive.kind,
           primitiveSemanticHash: acceptedPrimitive.semanticHash,
           axialStrain: strain,
           freeExtension: strain * acceptedFrame.geometry.length,
