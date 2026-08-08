@@ -24,6 +24,18 @@ jobs:
   qualify-m022c:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # A later stacked batch (e.g. M022-B / #892) re-triggers this workflow
+    # via the analysis-authority-overlay/** path filter while its PR base is
+    # the M022-C branch itself, not main. This workflow's own custody guard
+    # only recognizes Batch A's eight files, so re-running it against a
+    # stacked PR's superset diff would always fail even though nothing is
+    # wrong -- the stacked batch's own workflow already re-runs the real
+    # `npm run check:m022c` composition gate (see m022b's "Re-run parent
+    # M022-C composition gate" step). Only evaluate this workflow's own
+    # custody boundary against the PR it actually belongs to.
+    if: github.event_name != 'pull_request' || github.event.pull_request.base.ref == 'main'
+    env:
+      BASE_REF: ${{ github.event.pull_request.base.ref || 'main' }}
 
     steps:
       - name: Check out exact candidate head
@@ -67,8 +79,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git fetch origin main
-          base_sha="$(git merge-base origin/main HEAD)"
+          git fetch origin "$BASE_REF"
+          base_sha="$(git merge-base "origin/$BASE_REF" HEAD)"
           while IFS= read -r file; do
             [[ -z "$file" ]] && continue
             case "$file" in
@@ -80,8 +92,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git fetch origin main
-          base_sha="$(git merge-base origin/main HEAD)"
+          git fetch origin "$BASE_REF"
+          base_sha="$(git merge-base "origin/$BASE_REF" HEAD)"
           changed="$(git diff --name-only "$base_sha"...HEAD)"
           printf '%s\n' "$changed"
           unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(\.github/workflows/m022c-stagedjson-authority-composition\.yml|package\.json|src/workspace/analysis-authority-overlay/(index|stagedjson-process-resolution|stagedjson-support-resolution|stagedjson-authority-composition)\.js|scripts/m022c-stagedjson-authority-(composition-check|source-guard)\.mjs)$' || true)"
