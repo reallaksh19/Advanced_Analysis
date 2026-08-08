@@ -14,4 +14,8 @@ export {
 
 export { solveFixedContactState, stateSnapshot } from './contact-response.js';
 export { evaluateContactFrictionState } from './state-evaluation.js';
+export {
+  contactFrictionCandidateStateCount,
+  proveUniqueAdmissibleContactFrictionState,
+} from './uniqueness.js';
 export { compileContactFrictionExecution, contactFrictionStateFromRows } from './iteration.js';
