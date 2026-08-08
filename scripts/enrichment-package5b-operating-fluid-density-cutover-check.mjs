@@ -227,7 +227,7 @@ assert.throws(
 
 const duplicateFluidCandidate = operatingFluidProjection(fixtureInput.dataset, [
   fluidProjectionRow('L-1', 1000, 'FLUID_DENSITY:L-1:A'),
-  fluidProjectionRow('L-1', 1000, 'FLUID_DENSITY:L-1:B'),
+  fluidProjectionRow('L-1', 1001, 'FLUID_DENSITY:L-1:B'),
 ]);
 const duplicateGovernance = governedSeal(duplicateFluidCandidate, 'Duplicate fluid candidate test.');
 const duplicateOverlay = buildEnrichmentProductionOperatingFluidDensityOverlay({
