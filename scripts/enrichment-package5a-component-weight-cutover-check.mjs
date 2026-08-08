@@ -66,6 +66,7 @@ assert.equal(overlay.bindings.length, 1);
 assert.equal(overlay.bindings[0].targetId, 'VALVE-1');
 assert.equal(overlay.bindings[0].resolverKey, 'CV-1');
 assert.equal(overlay.bindings[0].resolverKeyBasis, 'CATALOG_KEY');
+assert.equal(overlay.observedAuthorityHash, governance.observed.observedAuthorityHash);
 assert.equal(overlay.policy.componentWeightsActivated, true);
 assert.equal(overlay.policy.fluidDensitiesActivated, false);
 assert.equal(overlay.policy.materialDensitiesActivated, false);
@@ -113,6 +114,10 @@ assert.equal(enrichedV2.engineeringInputSealHash, governance.seal.sealHash);
 assert.equal(
   enrichedV2.engineeringInputSealCurrentnessHash,
   governance.currentness.currentnessHash,
+);
+assert.equal(
+  enrichedV2.engineeringObservedAuthorityHash,
+  governance.observed.observedAuthorityHash,
 );
 assert.equal(enrichedV2.componentWeightOverlayHash, overlay.overlayHash);
 assert.deepEqual(enrichedV2.activatedEnrichmentFieldFamilies, ['COMPONENT_WEIGHTS']);
@@ -163,8 +168,25 @@ assert.equal(staleOverlay.status, 'BLOCKED');
 assert.deepEqual(staleOverlay.componentWeightsKg, {});
 assert.equal(hasBlocker(staleOverlay, 'ENRICHMENT_PRODUCTION_SEAL_NOT_CURRENT'), true);
 assert.throws(
-  () => executeV3(EMPIRICAL_LOAD_METHOD, staleOverlay),
+  () => executeV3(EMPIRICAL_LOAD_METHOD, staleOverlay, staleObserved),
   (error) => error.code === 'EMPIRICAL_EXECUTION_V3_ENRICHMENT_BLOCKED',
+);
+
+assert.throws(
+  () => executeV3(EMPIRICAL_LOAD_METHOD, overlay, staleObserved),
+  (error) => error.code === 'EMPIRICAL_EXECUTION_V3_OBSERVED_AUTHORITY_MISMATCH',
+  'A READY overlay must not survive a later observed-authority change.',
+);
+
+const changedProfile = {
+  ...structuredClone(fixtureInput.profile),
+  revision: fixtureInput.profile.revision + 1,
+  updatedAt: '2026-08-08T05:42:00.000Z',
+};
+assert.throws(
+  () => executeV3(EMPIRICAL_LOAD_METHOD, overlay, governance.observed, changedProfile),
+  (error) => error.code === 'EMPIRICAL_EXECUTION_V3_PROJECT_DATA_STALE',
+  'Active Project Data changes after sealing must block execution.',
 );
 
 const changedCandidate = candidateProjection(fixtureInput.dataset, [
@@ -259,6 +281,7 @@ console.log(JSON.stringify({
   overlaySchema: overlay.schema,
   executionSchema: enrichedV2.schema,
   sealHash: governance.seal.sealHash,
+  observedAuthorityHash: governance.observed.observedAuthorityHash,
   baseComponentWeightKg: authorizedInput.loadCalculationOverlay.componentWeightsKg['CV-1'],
   sealedComponentWeightKg: overlay.componentWeightsKg['CV-1'],
   v2ReactionDeltaN: v2Delta,
@@ -266,6 +289,8 @@ console.log(JSON.stringify({
   totalAppliedWeightDeltaN: sum(v2Delta),
   activatedFieldFamilies: enrichedV2.activatedEnrichmentFieldFamilies,
   staleSealFailsClosed: true,
+  lateObservedAuthorityChangeFailsClosed: true,
+  projectDataChangeFailsClosed: true,
   resolverKeyConflictFailsClosed: true,
   originalGravityMechanicsReused: true,
   sourceImmutable: true,
@@ -282,7 +307,12 @@ function executeV2(method) {
   });
 }
 
-function executeV3(method, sealedComponentWeightOverlay) {
+function executeV3(
+  method,
+  sealedComponentWeightOverlay,
+  observedAuthority = governance.observed,
+  profile = fixtureInput.profile,
+) {
   return calculateAuthorizedEmpiricalLoadExecutionV3({
     schema: AUTHORIZED_EMPIRICAL_LOAD_EXECUTION_V3_REQUEST_SCHEMA,
     executionId: `ENRICHED:${method}`,
@@ -290,7 +320,9 @@ function executeV3(method, sealedComponentWeightOverlay) {
     method,
     authorizedInput,
     sealedComponentWeightOverlay,
+    observedAuthority,
     ...fixtureInput,
+    profile,
   });
 }
 
@@ -384,7 +416,7 @@ function reviewPacket(candidateValue) {
     numericalImpactHash: hash(`numerical-impact:${candidateValue.projectionHash}`),
   };
   const contextIdentities = {
-    projectDataHash: hash('project-data'),
+    projectDataHash: semanticHash(fixtureInput.profile),
     overrideSetHash: hash('overrides'),
     approximationSetHash: hash('approximations'),
     selectorRegistryHash: hash('selectors'),
