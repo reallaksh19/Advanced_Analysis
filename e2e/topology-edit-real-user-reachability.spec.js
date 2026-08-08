@@ -126,8 +126,9 @@ test('XYZ Branch exposes truthful catalogue, endpoint and Table capability paths
 
   await openTable(page);
   await selectTableRow(page, 'E-003');
-  await expect(page.locator('[data-table-capability-reason="TABLE_INTENT_NOT_CERTIFIED"]'))
-    .toHaveCount(await countAtLeastOne(page, '[data-table-capability-reason="TABLE_INTENT_NOT_CERTIFIED"]'));
+  await expect(page.locator(
+    '[data-table-capability-reason="TABLE_INTENT_NOT_CERTIFIED"]',
+  ).first()).toBeVisible();
   await selectTableRow(page, 'S-006');
   await expect(page.locator('[data-table-capability-reason="SUPPORT_EDIT_NOT_CERTIFIED"]'))
     .toBeVisible();
@@ -190,8 +191,9 @@ async function openDataset(page, kind) {
   const host = page.locator('[data-role="topology-edit-render-host"]');
   await expect(host).toBeVisible();
   await expect.poll(() => host.getAttribute('data-topology-edit-canonical-hash')).toBeTruthy();
-  await expect.poll(() => Number(host.getAttribute('data-topology-edit-visible-endpoint-count')))
-    .toBeGreaterThan(0);
+  await expect.poll(async () => Number(
+    await host.getAttribute('data-topology-edit-visible-endpoint-count') || 0,
+  )).toBeGreaterThan(0);
   return host;
 }
 
@@ -222,11 +224,6 @@ async function selectTableRow(page, tag) {
   const row = page.locator('[data-role="topology-edit-table"] tbody tr').filter({ hasText: tag }).first();
   await expect(row).toBeVisible();
   await row.locator('[data-table-select]').click();
-}
-
-async function countAtLeastOne(page, selector) {
-  await expect.poll(() => page.locator(selector).count()).toBeGreaterThan(0);
-  return page.locator(selector).count();
 }
 
 async function visibleEvidence(host) {
