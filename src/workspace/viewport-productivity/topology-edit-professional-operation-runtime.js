@@ -240,6 +240,10 @@ export class TopologyEditProfessionalOperationRuntime {
 
   restoreViewState(value) {
     restoreTopologyEditProfessionalViewState(this, value);
+    this.values = {
+      ...this.values,
+      ...topologyEditProfessionalOperationDefaults(this.controller.selection),
+    };
     this.reconcileComponentContext();
     this.render();
     this.updateEvidence();
