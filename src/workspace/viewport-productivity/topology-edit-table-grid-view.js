@@ -5,13 +5,13 @@ import {
   describeTopologyEditTableIntent,
   renderTopologyEditTableEngineeringEditor,
 } from './topology-edit-table-engineering-editor.js';
+import {
+  renderTopologyEditTableAllProperties,
+  topologyEditTableTypeSummary,
+  topologyEditTableVisibleColumns,
+} from './topology-edit-table-properties-view.js';
 
 const MAX_RENDERED_ROWS = 300;
-const COLUMNS = Object.freeze([
-  ['tag', 'Tag'], ['elementType', 'Type'], ['connectFrom', 'From'], ['connectTo', 'To'],
-  ['dnInMm', 'DN In'], ['dnOutMm', 'DN Out'], ['lengthMm', 'Length'],
-  ['catalogueAuthority', 'Catalogue'], ['sourceStatus', 'Source'],
-]);
 
 export function renderTopologyEditTableGrid(runtime) {
   const element = runtime.element;
@@ -27,26 +27,34 @@ export function renderTopologyEditTableGrid(runtime) {
     return;
   }
   const renderedRows = rows.slice(0, MAX_RENDERED_ROWS);
+  const columns = topologyEditTableVisibleColumns(runtime.projection);
   const primary = runtime.projection.rows.find((row) => row.rowId === runtime.viewState.primaryRowId) ?? null;
   const selected = new Set(runtime.viewState.selectedRowIds);
   const staged = new Map((runtime.batch?.intents ?? []).map((intent) => [intent.target.canonicalId, intent]));
   const exportDisabled = runtime.pending || Boolean(
     runtime.batch || runtime.batchPlan || runtime.preview || runtime.validation || runtime.staleResult,
   );
+  const typeSummary = topologyEditTableTypeSummary(runtime.projection.rows);
   element.innerHTML = `
     <section class="topology-edit-table" data-table-phase="${escapeHtml(runtime.phase())}">
       <header class="topology-edit-table__header">
-        <div><strong>Engineering table</strong><span>${rows.length} / ${runtime.projection.rows.length} rows</span></div>
-        <label>Filter <input type="search" data-table-filter value="${escapeHtml(runtime.viewState.query)}" placeholder="Tag, type, ID, source…"></label>
+        <div><strong>Engineering table</strong><span>${rows.length} / ${runtime.projection.rows.length} rows · ${escapeHtml(typeSummary)}</span></div>
+        <label>Filter <input type="search" data-table-filter value="${escapeHtml(runtime.viewState.query)}" placeholder="Tag, type, ID, property, source…"></label>
       </header>
       <div class="topology-edit-table__scroll">
         <table role="grid" aria-label="Certified canonical engineering table">
-          <thead><tr><th scope="col">Select</th>${COLUMNS.map(([key, label]) => sortHeader(key, label, runtime.viewState)).join('')}</tr></thead>
-          <tbody>${renderedRows.map((row) => rowHtml(row, selected.has(row.rowId), staged.get(row.identity.canonicalId))).join('')}</tbody>
+          <thead><tr><th scope="col">Select</th>${columns.map((column) => sortHeader(column.key, column.label, runtime.viewState)).join('')}</tr></thead>
+          <tbody>${renderedRows.map((row) => rowHtml(
+            row,
+            columns,
+            selected.has(row.rowId),
+            staged.get(row.identity.canonicalId),
+          )).join('')}</tbody>
         </table>
       </div>
       ${rows.length > MAX_RENDERED_ROWS ? `<p class="topology-edit-table__notice">Showing first ${MAX_RENDERED_ROWS} filtered rows. Refine the filter to inspect more.</p>` : ''}
       ${primary ? editorHtml(primary, staged.get(primary.identity.canonicalId), runtime.projection) : '<p class="topology-edit-table__notice">Select an exact canonical row to inspect or edit it.</p>'}
+      ${primary ? renderTopologyEditTableAllProperties(primary, runtime) : ''}
       ${stagedPanel(runtime)}
       ${validationPanel(runtime)}
       <footer class="topology-edit-table__workflow">
@@ -63,11 +71,11 @@ export function renderTopologyEditTableGrid(runtime) {
   publishEvidence(runtime, rows.length, renderedRows.length);
 }
 
-function rowHtml(row, isSelected, stagedIntent) {
+function rowHtml(row, columns, isSelected, stagedIntent) {
   const staged = stagedIntent ? ' data-staged="true"' : '';
-  return `<tr data-table-row-id="${escapeHtml(row.rowId)}" data-canonical-id="${escapeHtml(row.identity.canonicalId)}"${staged}>
+  return `<tr data-table-row-id="${escapeHtml(row.rowId)}" data-canonical-id="${escapeHtml(row.identity.canonicalId)}" data-element-type="${escapeHtml(row.elementType)}" data-selected="${String(isSelected)}"${staged}>
     <td><button type="button" data-table-select="${escapeHtml(row.rowId)}" aria-pressed="${String(isSelected)}" aria-label="${isSelected ? 'Deselect' : 'Select'} ${escapeHtml(row.identity.canonicalId)}">${isSelected ? 'Selected' : 'Select'}</button></td>
-    ${COLUMNS.map(([key]) => `<td>${escapeHtml(displayValue(value(row, key)))}</td>`).join('')}
+    ${columns.map((column) => `<td data-table-property="${escapeHtml(column.key)}">${escapeHtml(displayValue(value(row, column.key)))}</td>`).join('')}
   </tr>`;
 }
 
@@ -112,7 +120,7 @@ function editorHtml(row, stagedIntent, projection) {
   if (engineering) return engineering;
   const identity = `<div class="topology-edit-table__identity"><strong>${escapeHtml(row.fields.tag ?? row.identity.canonicalId)}</strong><code>${escapeHtml(row.identity.canonicalId)}</code><span>${escapeHtml(row.elementType)}</span></div>`;
   if (row.elementType !== 'PIPE' || row.identity.canonicalKind !== 'EDGE') {
-    return `<section class="topology-edit-table__editor">${identity}<p>This row is read-only in the current implementation slice. Its exact identity and custody remain selectable.</p></section>`;
+    return `<section class="topology-edit-table__editor">${identity}<p>This row is read-only in the current implementation slice. Its exact identity, engineering properties and custody remain visible below.</p></section>`;
   }
   const length = stagedIntent?.requestedValue?.lengthMm ?? row.fields.lengthMm ?? '';
   const anchor = stagedIntent?.geometryPolicy?.anchor ?? 'FROM';
