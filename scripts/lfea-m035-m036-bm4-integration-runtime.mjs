@@ -31,7 +31,7 @@ import { buildM036Bm4Inventory } from './lfea-m036-bm4-runtime.mjs';
 
 const NODE_PREFIX = 'BM4M035.N';
 const M038_ACCDB_SOURCE = '3e5c5e20d9e8741faa08be4360cb7f79498f87b6:benchmarks/LFEA/BM4/BM4 accdb.zip';
-const M038_BOURDON_DISCLOSURE = 'ACCDB CASE19=W+P1 and CASE20=W+T1+P1; ACCDB Bourdon execution option is active. Translational Bourdon is represented as the closed-end pressure strain on every non-rigid physical pipe span. The qualified M035 bend arc is a straight-span chain, so applying one uniform scalar strain to every arc descendant preserves zero relative rotation and produces resultant endpoint translation epsilon*sum(delta-x)=epsilon*(tangentEnd-tangentStart), i.e. along the CAESAR translation-only bend chord. Rigid-body pressure strain remains blocked pending independent rigid Bourdon authority.';
+const M038_BOURDON_DISCLOSURE = 'ACCDB CASE19=W+P1 and CASE20=W+T1+P1; user-confirmed ACCDB Bourdon=yes. First qualification applies translational Bourdon only to non-rigid straight spans and bend incoming straights; bend-arc opening/translation and rigid-body pressure strain remain blocked.';
 
 function mapNodeId(nodeId) {
   return String(nodeId).replace(/^BM4\.N/u, NODE_PREFIX);
@@ -116,7 +116,7 @@ function physicalLineWeight(entry) {
 }
 
 function bourdonEligible(entry) {
-  return entry.sourceEntry.rigidAuthority === null;
+  return entry.bendComponent === null && entry.sourceEntry.rigidAuthority === null;
 }
 
 function closedEndPipeBourdonAxialStrain(authorities, entry, pressure) {
@@ -150,7 +150,7 @@ function compileCase(authorities, compilation, label, thermal, movements) {
       authorizedEffects: { codeStress: true, pressureStiffening: false, axialThrust: false, bourdon: bourdonEligible(entry) },
       sourceEvidence: sourceEvidence({
         sourceId: `${BM4_SOURCE_ID}-M038-ACCDB-BOURDON`,
-        sourceRevision: `${M038_ACCDB_SOURCE}:${entry.sourceSegmentId}:${analysis.pressure}:${bourdonEligible(entry) ? 'TRANSLATION' : 'BLOCKED_RIGID'}`,
+        sourceRevision: `${M038_ACCDB_SOURCE}:${entry.sourceSegmentId}:${analysis.pressure}:${bourdonEligible(entry) ? 'TRANSLATION' : 'BLOCKED'}`,
       }),
     });
     if (thermal) primitives.push({
@@ -178,17 +178,6 @@ function compileCase(authorities, compilation, label, thermal, movements) {
   });
 }
 
-function applyBourdonIfAuthorized(authorities, entry, frame, pressure) {
-  if (!pressure?.authorizedEffects?.bourdon) return frame;
-  return augmentFrameElementUniformAxialInitialStrain({
-    frame,
-    profile: authorities.frameProfile,
-    primitive: pressure,
-    axialStrain: closedEndPipeBourdonAxialStrain(authorities, entry, pressure.pressure),
-    disclosure: M038_BOURDON_DISCLOSURE,
-  });
-}
-
 function loadElements(authorities, loadCase) {
   const distributed = new Map(loadCase.primitives.filter((row) => row.kind === 'DISTRIBUTED_LOAD').map((row) => [row.elementId, row]));
   const temperatures = new Map(loadCase.primitives.filter((row) => row.kind === 'TEMPERATURE').map((row) => [row.elementId, row]));
@@ -201,23 +190,26 @@ function loadElements(authorities, loadCase) {
       temperature: temperatures.get(entry.elementId) ?? null, releases: [],
       endSprings: entry.teeModifier?.endSprings ?? [], rigidOffsets: entry.teeModifier?.rigidOffsets ?? null,
     });
-    return applyBourdonIfAuthorized(authorities, entry, baseFrame, pressures.get(entry.elementId));
+    const pressure = pressures.get(entry.elementId);
+    if (!pressure?.authorizedEffects?.bourdon) return baseFrame;
+    const axialStrain = closedEndPipeBourdonAxialStrain(authorities, entry, pressure.pressure);
+    return augmentFrameElementUniformAxialInitialStrain({
+      frame: baseFrame,
+      profile: authorities.frameProfile,
+      primitive: pressure,
+      axialStrain,
+      disclosure: M038_BOURDON_DISCLOSURE,
+    });
   });
   const components = authorities.bendExpansion.components.map((component) => {
     const elements = component.elements.map((componentElement) => {
       const entry = authorities.entryByElementId.get(componentElement.elementId);
-      const baseFrame = compileFrameElement({
+      const frameElement = compileFrameElement({
         elementId: componentElement.elementId, material: authorities.material, section: entry.analysisSection,
         localAxes: { result: resolveEntryAxes(authorities, entry), profile: FRAME_LOCAL_AXIS_PROFILE },
         profile: authorities.frameProfile, distributedLoads: [distributed.get(componentElement.elementId)],
         temperature: temperatures.get(componentElement.elementId) ?? null, releases: [], endSprings: [], rigidOffsets: null,
       });
-      const frameElement = applyBourdonIfAuthorized(
-        authorities,
-        entry,
-        baseFrame,
-        pressures.get(componentElement.elementId),
-      );
       return Object.freeze({ ...componentElement, frameElement });
     });
     const draft = { ...component, elements, semanticHash: '' };
