@@ -59,6 +59,7 @@ export class TopologyEditEndpointAffordanceRuntime {
     const affordance = this.affordances[index];
     if (!affordance || affordance.stale) return;
     this.onActivate?.(affordance, event);
+    this.element.parentElement?.querySelector('canvas')?.focus({ preventScroll: true });
   }
 
   destroy() {
