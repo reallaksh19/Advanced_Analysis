@@ -66,6 +66,34 @@ function initialActiveState(inventory) {
   });
 }
 
+function qualificationSummary(analysis) {
+  const factorization = analysis.execution.factorization;
+  return Object.freeze({
+    status: analysis.execution.status,
+    stiffnessStateHash: analysis.compilation.stiffnessStateHash,
+    diagnostics: analysis.execution.diagnostics,
+    factorization: Object.freeze({
+      backend: factorization.backend,
+      scaling: factorization.scaling,
+      kind: factorization.kind,
+      cacheKey: factorization.cacheKey,
+      reused: factorization.reused,
+      pivotStatistics: factorization.pivotStatistics,
+      conditionEstimate: factorization.conditionEstimate,
+      conditionEstimateMethod: factorization.conditionEstimateMethod,
+    }),
+    nodalForcePrimitiveCount: analysis.execution.nodalForceDiagnostics.length,
+  });
+}
+
+function sameFactorizationState(left, right) {
+  assert.equal(left.compilation.stiffnessStateHash, right.compilation.stiffnessStateHash, 'A/B stiffnessStateHash drifted.');
+  assert.equal(left.execution.factorization.cacheKey, right.execution.factorization.cacheKey, 'A/B factorization cache key drifted.');
+  assert.equal(left.execution.factorization.kind, right.execution.factorization.kind, 'A/B factorization kind drifted.');
+  assert.equal(left.execution.factorization.conditionEstimate, right.execution.factorization.conditionEstimate, 'A/B condition estimate drifted.');
+  assert.deepEqual(left.execution.factorization.pivotStatistics, right.execution.factorization.pivotStatistics, 'A/B pivot statistics drifted.');
+}
+
 const baseline = solveBm4InputXmlConditioned();
 const baselineSus = assertMembership('M034 SUS', baseline.sustained.loadCase, 'BM4.N');
 const baselineOpe = assertMembership('M034 OPE', baseline.operating.loadCase, 'BM4.N');
@@ -76,28 +104,37 @@ assertBourdonDisabled(baseline.operating.loadCase);
 const authorities = buildBm4M035FeatureAuthorities();
 const inventory = buildM035M036Inventory(authorities);
 const initial = initialActiveState(inventory);
-const diagnosticSus = analyseM035M036Case(
-  authorities,
-  initial.declarations,
-  'BM4-M038-DIAG-SUS',
-  false,
-  initial.movements,
-  { skipRecovery: true },
-);
-const diagnosticOpe = analyseM035M036Case(
-  authorities,
-  initial.declarations,
-  'BM4-M038-DIAG-OPE',
-  true,
-  initial.movements,
-  { skipRecovery: true },
-);
 
-const combinedSus = assertMembership('M035+M036 diagnostic SUS', diagnosticSus.loadCase, 'BM4M035.N');
-const combinedOpe = assertMembership('M035+M036 diagnostic OPE', diagnosticOpe.loadCase, 'BM4M035.N');
+function analysePair(label, thermal) {
+  const legacy = analyseM035M036Case(
+    authorities,
+    initial.declarations,
+    `${label}-LEGACY-RHS`,
+    thermal,
+    initial.movements,
+    { skipRecovery: true, includeForcmnt: false },
+  );
+  const corrected = analyseM035M036Case(
+    authorities,
+    initial.declarations,
+    `${label}-CORRECTED-RHS`,
+    thermal,
+    initial.movements,
+    { skipRecovery: true, includeForcmnt: true },
+  );
+  sameFactorizationState(legacy, corrected);
+  assert.equal(nodalPrimitives(legacy.loadCase).length, 0, `${label} legacy A/B side must omit FORCMNT only.`);
+  return Object.freeze({ legacy, corrected });
+}
+
+const sus = analysePair('BM4-M038-DIAG-SUS', false);
+const ope = analysePair('BM4-M038-DIAG-OPE', true);
+
+const combinedSus = assertMembership('M035+M036 corrected SUS', sus.corrected.loadCase, 'BM4M035.N');
+const combinedOpe = assertMembership('M035+M036 corrected OPE', ope.corrected.loadCase, 'BM4M035.N');
 assertSameMechanicalSet('M035+M036 SUS/OPE', combinedSus, combinedOpe);
-assertBourdonDisabled(diagnosticSus.loadCase);
-assertBourdonDisabled(diagnosticOpe.loadCase);
+assertBourdonDisabled(sus.corrected.loadCase);
+assertBourdonDisabled(ope.corrected.loadCase);
 
 const report = {
   schema: 'm038-bm4-forcmnt-check/v1',
@@ -114,18 +151,15 @@ const report = {
     initiallyEngagedCount: initial.normalized.filter((row) => row.initiallyEngaged).length,
     initiallyReleasedCount: initial.normalized.filter((row) => !row.initiallyEngaged).length,
   },
-  solverQualification: {
+  controlledRhsAB: {
+    statement: 'Each pair uses identical model, constraint set, stiffness hash and factorization state; only BM4 FORCMNT membership changes.',
     SUS: {
-      status: diagnosticSus.execution.status,
-      diagnostics: diagnosticSus.execution.diagnostics,
-      factorization: diagnosticSus.execution.factorization,
-      nodalForceDiagnostics: diagnosticSus.execution.nodalForceDiagnostics,
+      legacy: qualificationSummary(sus.legacy),
+      corrected: qualificationSummary(sus.corrected),
     },
     OPE: {
-      status: diagnosticOpe.execution.status,
-      diagnostics: diagnosticOpe.execution.diagnostics,
-      factorization: diagnosticOpe.execution.factorization,
-      nodalForceDiagnostics: diagnosticOpe.execution.nodalForceDiagnostics,
+      legacy: qualificationSummary(ope.legacy),
+      corrected: qualificationSummary(ope.corrected),
     },
   },
 };
@@ -133,12 +167,12 @@ const report = {
 console.log(JSON.stringify(report, null, 2));
 
 assert.notEqual(
-  diagnosticSus.execution.status,
+  sus.corrected.execution.status,
   'BLOCKED',
-  'M038 corrected SUS inner solve is BLOCKED; inspect solverQualification.SUS above before active-set/recovery work.',
+  'M038 corrected SUS inner solve is BLOCKED; controlledRhsAB proves whether this is RHS-exposed numerical accuracy.',
 );
 assert.notEqual(
-  diagnosticOpe.execution.status,
+  ope.corrected.execution.status,
   'BLOCKED',
-  'M038 corrected OPE inner solve is BLOCKED; inspect solverQualification.OPE above before active-set/recovery work.',
+  'M038 corrected OPE inner solve is BLOCKED; controlledRhsAB proves whether this is RHS-exposed numerical accuracy.',
 );
