@@ -5,6 +5,7 @@ on:
     paths:
       - 'src/workspace/engineering-enrichment/production-operating-fluid-density-overlay.js'
       - 'src/workspace/engineering-loads/authorized-empirical-load-execution-v4.js'
+      - 'scripts/enrichment-package5b-fluid-resolution-contract-check.mjs'
       - 'scripts/enrichment-package5b-operating-fluid-density-cutover-check.mjs'
       - '.github/workflows/enrichment-package5b-operating-fluid-density-cutover.yml'
 
@@ -39,7 +40,7 @@ jobs:
           git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" > /tmp/enrichment-package5b-paths.txt
           while IFS= read -r changed; do
             case "$changed" in
-              src/workspace/engineering-enrichment/production-operating-fluid-density-overlay.js|src/workspace/engineering-loads/authorized-empirical-load-execution-v4.js|scripts/enrichment-package5b-operating-fluid-density-cutover-check.mjs|.github/workflows/enrichment-package5b-operating-fluid-density-cutover.yml) ;;
+              src/workspace/engineering-enrichment/production-operating-fluid-density-overlay.js|src/workspace/engineering-loads/authorized-empirical-load-execution-v4.js|scripts/enrichment-package5b-fluid-resolution-contract-check.mjs|scripts/enrichment-package5b-operating-fluid-density-cutover-check.mjs|.github/workflows/enrichment-package5b-operating-fluid-density-cutover.yml) ;;
               *) echo "Forbidden changed path for enrichment Package 5B: $changed"; exit 1 ;;
             esac
           done < /tmp/enrichment-package5b-paths.txt
@@ -51,12 +52,11 @@ jobs:
         run: |
           node --check src/workspace/engineering-enrichment/production-operating-fluid-density-overlay.js
           node --check src/workspace/engineering-loads/authorized-empirical-load-execution-v4.js
+          node --check scripts/enrichment-package5b-fluid-resolution-contract-check.mjs
           node --check scripts/enrichment-package5b-operating-fluid-density-cutover-check.mjs
 
-      - name: Requalify exact fluid-register resolution
-        run: |
-          node scripts/common-enriched-exact-fluid-register-check.mjs
-          node scripts/common-enriched-exact-fluid-register-anti-drift-check.mjs
+      - name: Qualify canonical exact fluid-register contract
+        run: node scripts/enrichment-package5b-fluid-resolution-contract-check.mjs
 
       - name: Requalify Package 4A seal lifecycle
         run: node scripts/enrichment-package4a-input-seal-check.mjs
