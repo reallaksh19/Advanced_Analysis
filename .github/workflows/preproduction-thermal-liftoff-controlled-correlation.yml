@@ -1,0 +1,84 @@
+name: preproduction-thermal-liftoff-controlled-correlation
+
+on:
+  pull_request:
+    branches:
+      - agent/preproduction-thermal-liftoff-active-set-redistribution
+    paths:
+      - 'src/workspace/engineering-loads/preproduction-thermal-liftoff-correlation-authority.js'
+      - 'src/workspace/engineering-loads/preproduction-thermal-liftoff-correlation.js'
+      - 'scripts/preproduction-thermal-liftoff-correlation-reference-oracle.mjs'
+      - 'scripts/preproduction-thermal-liftoff-correlation-check.mjs'
+      - 'scripts/preproduction-thermal-liftoff-correlation-source-guard.mjs'
+      - '.github/workflows/preproduction-thermal-liftoff-controlled-correlation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-preproduction-thermal-liftoff-controlled-correlation:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact requested head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Prove exact head and clean worktree
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          git diff --exit-code
+      - name: Enforce six-path TL-05 batch containment
+        shell: bash
+        run: |
+          BASE_SHA="8d9ade54ff9642cfe026a39e575dfe35f1ec2deb"
+          git diff --name-only "$BASE_SHA" HEAD > /tmp/tl05-paths.txt
+          while IFS= read -r changed; do
+            case "$changed" in
+              src/workspace/engineering-loads/preproduction-thermal-liftoff-correlation-authority.js|src/workspace/engineering-loads/preproduction-thermal-liftoff-correlation.js|scripts/preproduction-thermal-liftoff-correlation-reference-oracle.mjs|scripts/preproduction-thermal-liftoff-correlation-check.mjs|scripts/preproduction-thermal-liftoff-correlation-source-guard.mjs|.github/workflows/preproduction-thermal-liftoff-controlled-correlation.yml) ;;
+              *) echo "Forbidden TL-05 path: $changed"; exit 1 ;;
+            esac
+          done < /tmp/tl05-paths.txt
+          test "$(wc -l < /tmp/tl05-paths.txt)" -eq 6
+      - name: Install dependencies
+        run: npm ci
+      - name: Syntax check TL-05 batch
+        run: |
+          node --check src/workspace/engineering-loads/preproduction-thermal-liftoff-correlation-authority.js
+          node --check src/workspace/engineering-loads/preproduction-thermal-liftoff-correlation.js
+          node --check scripts/preproduction-thermal-liftoff-correlation-reference-oracle.mjs
+          node --check scripts/preproduction-thermal-liftoff-correlation-check.mjs
+          node --check scripts/preproduction-thermal-liftoff-correlation-source-guard.mjs
+      - name: Requalify support contact authority
+        run: |
+          node scripts/preproduction-support-contact-source-guard.mjs
+          node scripts/preproduction-support-contact-authority-check.mjs
+      - name: Requalify TL-01 TL-02 and tolerance prerequisites
+        run: node scripts/preproduction-thermal-liftoff-prerequisites-check.mjs
+      - name: Requalify TL-03 local screen
+        run: |
+          node scripts/preproduction-thermal-liftoff-local-screen-source-guard.mjs
+          node scripts/preproduction-thermal-liftoff-local-screen-check.mjs
+      - name: Requalify Appendix S benchmark evidence
+        run: node scripts/empirical-appendix-s-vertical-benchmark.mjs
+      - name: Requalify TL-04 active set
+        run: |
+          node scripts/preproduction-thermal-liftoff-active-set-source-guard.mjs
+          node scripts/preproduction-thermal-liftoff-active-set-check.mjs
+      - name: Enforce TL-05 source boundary
+        run: node scripts/preproduction-thermal-liftoff-correlation-source-guard.mjs
+      - name: Qualify TL-05 controlled correlation
+        run: node scripts/preproduction-thermal-liftoff-correlation-check.mjs
+      - name: Import graph
+        run: npm run check:imports
+      - name: Production build
+        run: npm run build
