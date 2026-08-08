@@ -183,6 +183,8 @@ test('available but mismatched source evidence is incompatible rather than neare
   assert.deepEqual(context.candidateRecordIds, [
     'VALVE-DN100-GATE-600-A',
     'VALVE-DN100-GLOBE-600-B',
+    'VALVE-DN25-BALL-150-XYZ-B',
+    'VALVE-DN25-GATE-150-XYZ-A',
   ]);
   assert.equal(context.recommendedRecordId, null);
   assert.equal(context.exactCandidateCount, 0);
