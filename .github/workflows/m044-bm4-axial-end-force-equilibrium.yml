@@ -1,0 +1,56 @@
+name: M044 BM4 Axial End Force Equilibrium
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/lfea-m044-bm4-axial-end-force-equilibrium.mjs'
+      - '.github/workflows/m044-bm4-axial-end-force-equilibrium.yml'
+  workflow_dispatch:
+
+jobs:
+  axial-end-force-equilibrium:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enforce evidence-only M044 diff
+        run: |
+          git fetch --no-tags --depth=1 origin fae274f7a54c2acbdbe9483698645f8e29df7ecd
+          git diff --name-only fae274f7a54c2acbdbe9483698645f8e29df7ecd HEAD | sort > /tmp/m044-paths
+          printf '%s\n' \
+            .github/workflows/m044-bm4-axial-end-force-equilibrium.yml \
+            scripts/lfea-m044-bm4-axial-end-force-equilibrium.mjs | sort > /tmp/m044-allowed
+          diff -u /tmp/m044-allowed /tmp/m044-paths
+      - name: Syntax-check M044
+        run: node --check scripts/lfea-m044-bm4-axial-end-force-equilibrium.mjs
+      - name: Run M044 equilibrium reconstruction
+        run: node scripts/lfea-m044-bm4-axial-end-force-equilibrium.mjs --report /tmp/m044/lfea-m044-bm4-axial-end-force-equilibrium.json
+      - name: Preserve M043 and M042 RCA boundaries
+        run: |
+          node scripts/lfea-m043-bm4-axial-force-source-rca.mjs
+          node scripts/lfea-m042-bm4-first-divergence-rca.mjs
+      - name: Preserve M041/M040 friction boundaries
+        run: |
+          node scripts/lfea-m041-contact-friction-check.mjs
+          node scripts/lfea-m041-linear-kernel-bridge-check.mjs
+          node scripts/lfea-m041-bm4-activation-gate.mjs
+          node scripts/lfea-m040-bm4-friction-check.mjs
+      - name: Enforce bounded M044 script
+        run: |
+          lines=$(wc -l < scripts/lfea-m044-bm4-axial-end-force-equilibrium.mjs)
+          test "$lines" -le 360 || { echo "M044 has $lines lines (>360)"; exit 1; }
+      - name: Upload deterministic M044 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m044-bm4-axial-end-force-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /tmp/m044/lfea-m044-bm4-axial-end-force-equilibrium.json
+          if-no-files-found: error
+      - name: Verify clean worktree
+        run: git diff --exit-code && git status --porcelain | tee /tmp/m044-status && test ! -s /tmp/m044-status
