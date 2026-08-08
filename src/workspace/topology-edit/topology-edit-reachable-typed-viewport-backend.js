@@ -45,7 +45,7 @@ export class TopologyEditReachableTypedViewportBackend extends TopologyEditTyped
       { modelRole },
     );
     if (!affordances.length) return;
-    const radius = Math.max(Number(markerSize) * 0.7, 4);
+    const radius = Math.max(Number(markerSize) * 0.4, 4);
     const geometry = new THREE.SphereGeometry(
       radius,
       Math.max(10, this.navigationConfiguration.meshRadialSegments),
@@ -89,11 +89,12 @@ export class TopologyEditReachableTypedViewportBackend extends TopologyEditTyped
     this.pickRaycaster.params.Line.threshold = this.navigationConfiguration.pickingRadius;
     this.pickRaycaster.setFromCamera(pointer, this.activeCamera);
     const hit = this.pickRaycaster.intersectObjects(this.pickableGroups(), true).find((candidate) => (
-      candidate.object?.userData?.endpointAffordance === true
-      && candidate.object.userData.pickTarget?.objectId
+      candidate.object?.userData?.pickTarget?.objectId
       && this.isSectionHitAllowed(candidate.object, candidate.point)
     ));
-    return hit ? this.pickReceipt(hit.object.userData.pickTarget, hit.point) : null;
+    return hit?.object?.userData?.endpointAffordance === true
+      ? this.pickReceipt(hit.object.userData.pickTarget, hit.point)
+      : null;
   }
 
   activateEndpointAffordance(affordance, event) {
