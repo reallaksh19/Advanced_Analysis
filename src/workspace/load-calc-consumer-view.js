@@ -21,33 +21,75 @@ function headerMarkup(state) {
   const authority = authorization.packageSemanticHash
     ? 'AUTHORIZED_HANDOFF'
     : state.distribution ? 'UNAUTHORIZED_LEGACY_RESULT' : 'NOT_CALCULATED';
+  const commonSeal = commonInput.commonInput
+    ? (commonInput.staleness?.stale ? 'STALE' : 'CURRENT')
+    : 'NOT_SEALED';
   const eligible = authorization.calculationEligible === true;
   const recalculate = authorization.state === 'EXECUTED_CURRENT';
   const disabledReason = authorizationReason(authorization);
   return `<header class="empirical-load-calc__header">
     <div><span class="panel-eyebrow">${escapeHtml(activeMethod)}</span><h1>Empirical Support Loads</h1></div>
     <div class="empirical-load-calc__facts">
-      <span>Assemblies: ${integer(supportSummary?.supportAssemblyCount)}</span>
-      <span>Sites: ${integer(supportSummary?.physicalLocationCount)}</span>
-      <span>Routes: ${integer(routeSummary?.routeCount)}</span>
-      <span>Freshness: ${escapeHtml(freshness)}</span>
-      <span>Authority: ${escapeHtml(authority)}</span>
+      <span>Input seal: ${escapeHtml(commonSeal)}</span>
       <span>Authorization: ${escapeHtml(authorization.state || 'NOT_CONFIGURED')}</span>
-      <span>Authorization freshness: ${escapeHtml(authorization.authorizationFreshness || 'NOT_APPLICABLE')}</span>
-      <span>Execution freshness: ${escapeHtml(authorization.executionFreshness || 'NOT_APPLICABLE')}</span>
-      <span>Empirical scenario: ${escapeHtml(empiricalScenario.state || 'NOT_CONFIGURED')}</span>
-      <span>Empirical profile: ${escapeHtml(empiricalScenario.profile ? `${empiricalScenario.profile.profileId} v${empiricalScenario.profile.profileVersion}` : 'NOT_BOUND')}</span>
-      <span>Common checker: ${escapeHtml(commonInput.report?.packageState || 'NOT_EVALUATED')}</span>
-      <span>Common seal: ${escapeHtml(commonInput.commonInput ? (commonInput.staleness?.stale ? 'STALE' : 'CURRENT') : 'NOT_SEALED')}</span>
+      <span>Result: ${escapeHtml(freshness)}</span>
+      <details class="empirical-load-calc__state-details">
+        <summary>Calculation state</summary>
+        <div>
+          <span>Assemblies: ${integer(supportSummary?.supportAssemblyCount)}</span>
+          <span>Sites: ${integer(supportSummary?.physicalLocationCount)}</span>
+          <span>Routes: ${integer(routeSummary?.routeCount)}</span>
+          <span>Freshness: ${escapeHtml(freshness)}</span>
+          <span>Authority: ${escapeHtml(authority)}</span>
+          <span>Authorization: ${escapeHtml(authorization.state || 'NOT_CONFIGURED')}</span>
+          <span>Authorization freshness: ${escapeHtml(authorization.authorizationFreshness || 'NOT_APPLICABLE')}</span>
+          <span>Execution freshness: ${escapeHtml(authorization.executionFreshness || 'NOT_APPLICABLE')}</span>
+          <span>Empirical scenario: ${escapeHtml(empiricalScenario.state || 'NOT_CONFIGURED')}</span>
+          <span>Empirical profile: ${escapeHtml(empiricalScenario.profile ? `${empiricalScenario.profile.profileId} v${empiricalScenario.profile.profileVersion}` : 'NOT_BOUND')}</span>
+          <span>Common checker: ${escapeHtml(commonInput.report?.packageState || 'NOT_EVALUATED')}</span>
+          <span>Common seal: ${escapeHtml(commonSeal)}</span>
+        </div>
+      </details>
     </div>
     <nav class="empirical-load-calc__tabs" aria-label="Load calculation views">
-      ${tab('overview', 'Overview', state.activeTab)}${tab('3d', 'Model / 3D', state.activeTab)}${tab('preflight', 'Input Check', state.activeTab)}${tab('project-data', 'Project Data', state.activeTab)}${tab('masters', 'Masters', state.activeTab)}${tab('enrichment', 'Enrichment & Overrides', state.activeTab)}${tab('method-basis', 'Method Basis', state.activeTab)}${tab('seal-export', 'Seal & Export', state.activeTab)}${tab('restraints', 'Restraints', state.activeTab)}${tab('load-cases', 'Load Cases', state.activeTab)}${tab('methods', 'Methods', state.activeTab)}${tab('results', 'Results', state.activeTab)}${tab('evidence', 'Evidence', state.activeTab)}${tab('loads', 'Load Evaluation', state.activeTab)}${tab('json-trace', 'JSON Trace', state.activeTab)}
+      ${tabGroup('Setup', [
+        ['overview', 'Overview'],
+        ['project-data', 'Project Data'],
+        ['masters', 'Masters'],
+        ['enrichment', 'Enrichment & Overrides'],
+      ], state.activeTab)}
+      ${tabGroup('Scenario', [
+        ['restraints', 'Restraints'],
+        ['load-cases', 'Load Cases'],
+        ['methods', 'Methods'],
+      ], state.activeTab)}
+      ${tabGroup('Output', [
+        ['results', 'Results'],
+        ['loads', 'Load Evaluation'],
+        ['evidence', 'Evidence'],
+      ], state.activeTab)}
+      ${tabGroup('Diagnostics', [
+        ['preflight', 'Input Check'],
+        ['method-basis', 'Method Basis'],
+        ['seal-export', 'Seal & Export'],
+        ['json-trace', 'JSON Trace'],
+      ], state.activeTab)}
+      ${tabGroup('Model', [
+        ['3d', 'Model / 3D'],
+      ], state.activeTab)}
     </nav>
     <div class="empirical-load-calc__actions">
-      <button type="button" data-engineering-load-calculate ${eligible ? '' : 'disabled'} aria-disabled="${eligible ? 'false' : 'true'}" title="${escapeHtml(eligible ? 'Execute the current authorized empirical package.' : disabledReason)}">${recalculate ? 'Recalculate authorized loads' : 'Calculate authorized loads'}</button>
+      <button type="button" data-engineering-load-calculate ${eligible ? '' : 'disabled'} aria-disabled="${eligible ? 'false' : 'true'}" title="${escapeHtml(eligible ? 'Execute the current authorized gravity package. Configured scenario methods are calculated from the Methods tab.' : disabledReason)}">${recalculate ? 'Recalculate — Authorized Gravity' : 'Calculate — Authorized Gravity'}</button>
       <output data-engineering-load-status aria-live="polite">${escapeHtml(state.message || (!eligible ? disabledReason : ''))}</output>
     </div>
   </header>`;
+}
+
+function tabGroup(label, tabs, activeTab) {
+  return `<span class="empirical-load-calc__tab-group" role="group" aria-label="${escapeHtml(label)}">
+    <span class="panel-eyebrow">${escapeHtml(label)}</span>
+    ${tabs.map(([id, tabLabel]) => tab(id, tabLabel, activeTab)).join('')}
+  </span>`;
 }
 
 function tab(id, label, activeTab) {
