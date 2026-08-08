@@ -88,11 +88,6 @@ export {
   evaluateEngineeringInputSealCurrentness,
 } from './input-seal.js';
 export {
-  ENRICHMENT_PRODUCTION_COMPONENT_WEIGHT_OVERLAY_SCHEMA,
-  assertEnrichmentProductionComponentWeightOverlay,
-  buildEnrichmentProductionComponentWeightOverlay,
-} from './production-component-weight-overlay.js';
-export {
   ENRICHMENT_PORTABLE_BUNDLE_SCHEMA,
   ENRICHMENT_PORTABLE_VERIFICATION_SCHEMA,
   assertEngineeringEnrichmentPortableBundle,
