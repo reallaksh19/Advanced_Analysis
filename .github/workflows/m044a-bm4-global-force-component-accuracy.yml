@@ -1,0 +1,46 @@
+name: M044A BM4 Global Force Component Accuracy
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/lfea-m044a-bm4-global-force-component-accuracy.mjs'
+      - '.github/workflows/m044a-bm4-global-force-component-accuracy.yml'
+  workflow_dispatch:
+
+jobs:
+  global-force-component-accuracy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enforce evidence-only M044A diff
+        run: |
+          git fetch --no-tags --depth=1 origin fae274f7a54c2acbdbe9483698645f8e29df7ecd
+          git diff --name-only fae274f7a54c2acbdbe9483698645f8e29df7ecd HEAD | sort > /tmp/m044a-paths
+          printf '%s\n' \
+            .github/workflows/m044a-bm4-global-force-component-accuracy.yml \
+            scripts/lfea-m044a-bm4-global-force-component-accuracy.mjs | sort > /tmp/m044a-allowed
+          diff -u /tmp/m044a-allowed /tmp/m044a-paths
+      - name: Syntax-check M044A
+        run: node --check scripts/lfea-m044a-bm4-global-force-component-accuracy.mjs
+      - name: Run raw global force component audit
+        run: node scripts/lfea-m044a-bm4-global-force-component-accuracy.mjs --report /tmp/m044a/lfea-m044a-bm4-global-force-component-accuracy.json
+      - name: Preserve M043/M042 RCA evidence
+        run: |
+          node scripts/lfea-m043-bm4-axial-force-source-rca.mjs
+          node scripts/lfea-m042-bm4-first-divergence-rca.mjs
+      - name: Upload deterministic M044A evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m044a-bm4-global-force-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /tmp/m044a/lfea-m044a-bm4-global-force-component-accuracy.json
+          if-no-files-found: error
+      - name: Verify clean worktree
+        run: git diff --exit-code && git status --porcelain | tee /tmp/m044a-status && test ! -s /tmp/m044a-status
