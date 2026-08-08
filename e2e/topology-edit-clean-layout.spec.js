@@ -95,7 +95,8 @@ test('3D Edit keeps the left model tree visible while the canvas remains primary
   const footerText = await statusbar.locator('[data-role="topology-edit-status"]').innerText();
   expect(footerText).toMatch(/nodes, .*edges, .*supports/);
 
-  await page.getByRole('button', { name: '3D WebGL', exact: true }).click();
+  await host.getByRole('button', { name: 'Exit 3D Edit', exact: true }).click();
+  await expect(host).toBeHidden();
   await expect(outerShell).toHaveAttribute('data-topology-edit-focus-layout', 'false');
   await expect(treePanel).not.toHaveClass(/workspace-panel--collapsed/);
   await expect(propertiesPanel).not.toHaveClass(/workspace-panel--collapsed/);
@@ -143,7 +144,8 @@ test('3D Edit provides resizable persistent inspector, selection focus, status b
   await expect(host.locator('details[data-panel-kind="topology-edit-professional-interaction"]')).toHaveAttribute('open', '');
 
   await canvas.dispatchEvent('dblclick');
-  await expect(host.locator('[data-role="topology-edit-status"]')).toContainText('View command: fit-selection.');
+  await expect(host.locator('[data-role="topology-edit-status"]'))
+    .toContainText('Focused 1 canonical selection object(s).');
 
   const issueCount = await integerAttribute(host, 'data-topology-edit-visible-issue-count');
   expect(issueCount).toBeGreaterThan(0);
