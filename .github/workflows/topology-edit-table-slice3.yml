@@ -46,6 +46,7 @@ jobs:
           files=(
             src/workspace/topology-edit/table/topology-edit-table-view-state.js
             src/workspace/viewport-productivity/topology-edit-table-canvas-coordinator.js
+            src/workspace/viewport-productivity/topology-edit-table-empty-route-runtime.js
             src/workspace/viewport-productivity/topology-edit-table-grid-view.js
             src/workspace/viewport-productivity/topology-edit-table-styles.js
             src/workspace/viewport-productivity/topology-edit-table-runtime.js

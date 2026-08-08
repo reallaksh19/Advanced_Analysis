@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'src/workspace/topology-edit/table/topology-edit-table-human-*.js'
+      - 'src/workspace/viewport-productivity/topology-edit-table-empty-route-runtime.js'
       - 'src/workspace/viewport-productivity/topology-edit-table-export-download.js'
       - 'src/workspace/viewport-productivity/topology-edit-table-grid-view.js'
       - 'src/workspace/viewport-productivity/topology-edit-table-runtime.js'
@@ -13,6 +14,7 @@ on:
   pull_request:
     paths:
       - 'src/workspace/topology-edit/table/topology-edit-table-human-*.js'
+      - 'src/workspace/viewport-productivity/topology-edit-table-empty-route-runtime.js'
       - 'src/workspace/viewport-productivity/topology-edit-table-export-download.js'
       - 'src/workspace/viewport-productivity/topology-edit-table-grid-view.js'
       - 'src/workspace/viewport-productivity/topology-edit-table-runtime.js'
@@ -46,6 +48,7 @@ jobs:
           files=(
             src/workspace/topology-edit/table/topology-edit-table-human-export.js
             src/workspace/topology-edit/table/topology-edit-table-human-xlsx.js
+            src/workspace/viewport-productivity/topology-edit-table-empty-route-runtime.js
             src/workspace/viewport-productivity/topology-edit-table-export-download.js
             src/workspace/viewport-productivity/topology-edit-table-grid-view.js
             src/workspace/viewport-productivity/topology-edit-table-runtime.js
