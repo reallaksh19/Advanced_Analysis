@@ -331,7 +331,7 @@ function requireAxisParity(elementId, resolvedAxes, sealedAxes) {
   }
 }
 
-function analyseCase(authorities, loadCaseId, thermal) {
+export function analyseCase(authorities, loadCaseId, thermal) {
   const loadCase = compileCase(authorities, loadCaseId, thermal);
   const loadsByElement = new Map(
     loadCase.primitives.filter((row) => row.kind === 'DISTRIBUTED_LOAD').map((row) => [row.elementId, row]),
