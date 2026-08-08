@@ -54,7 +54,7 @@ export class TopologyEditReachableTypedViewportBackend extends TopologyEditTyped
     const material = new THREE.MeshBasicMaterial({
       color: modelRole === 'draft' ? 0xf8fafc : 0x94a3b8,
       transparent: true,
-      opacity: modelRole === 'draft' ? 0.9 : 0.35,
+      opacity: modelRole === 'draft' ? 0.75 : 0.35,
       depthWrite: false,
       depthTest: true,
       wireframe: true,
