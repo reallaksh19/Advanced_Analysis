@@ -1,0 +1,42 @@
+name: M050 BM4 Restraint Face Authority
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/lfea-m050-bm4-restraint-face-authority.mjs'
+      - '.github/workflows/m050-bm4-restraint-face-authority.yml'
+  workflow_dispatch:
+
+jobs:
+  restraint-face-authority:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax and line-count gate
+        run: |
+          node --check scripts/lfea-m050-bm4-restraint-face-authority.mjs
+          test "$(wc -l < scripts/lfea-m050-bm4-restraint-face-authority.mjs)" -le 300
+      - name: Resolve raw restraint sign face and reaction authority
+        run: node scripts/lfea-m050-bm4-restraint-face-authority.mjs --report /tmp/m050-restraint-face-authority.json
+      - name: Preserve contact localization pressure and M036 baselines
+        run: |
+          node scripts/lfea-m049-bm4-contact-gap-state-rca.mjs
+          node scripts/lfea-m048-bm4-pressure-residual-localization.mjs
+          node scripts/lfea-m047-bm4-pressure-elongation-ab.mjs
+          npm run check:lfea-m036
+      - name: Upload deterministic M050 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m050-bm4-restraint-face-authority-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /tmp/m050-restraint-face-authority.json
+          if-no-files-found: error
+      - name: Verify clean worktree
+        run: git diff --exit-code && git status --porcelain | tee /tmp/m050-status && test ! -s /tmp/m050-status
