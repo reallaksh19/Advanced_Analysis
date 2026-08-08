@@ -39,11 +39,6 @@ const CONTEXT_KEYS = Object.freeze([
   'selectorRegistryHash',
 ]);
 
-/**
- * Records an explicit human approval of one immutable shadow review packet.
- * Approval is necessary for sealing, but does not itself persist data, create a
- * seal, authorize calculation consumption, or execute any calculation.
- */
 export function buildEngineeringEnrichmentApproval(input) {
   exactKeys(input, [
     'reviewPacket',
@@ -115,14 +110,6 @@ export function assertEngineeringEnrichmentApproval(value) {
   return value;
 }
 
-/**
- * Creates a governed input seal from a reviewed shadow package only when the
- * complete observed evidence/context identity set is unchanged and at least one
- * explicit approval is bound to that exact packet.
- *
- * Package 4A deliberately stops at governance: a current seal does not enable
- * production calculation consumption or automatically execute a calculation.
- */
 export function buildEngineeringInputSeal(input) {
   exactKeys(input, [
     'reviewPacket',
@@ -204,13 +191,14 @@ export function assertEngineeringInputSeal(value) {
   requiredText(value.observedAuthorityHash, 'observedAuthorityHash');
   validateIdentities(value);
   if (!Array.isArray(value.approvalHashes) || value.approvalHashes.length === 0
+      || new Set(value.approvalHashes).size !== value.approvalHashes.length
+      || value.approvalHashes.some((row) => typeof row !== 'string' || row.length === 0)
       || !Array.isArray(value.approvalIds)
       || value.approvalIds.length !== value.approvalHashes.length
-      || !strictlySortedUnique(value.approvalIds)
-      || !strictlySortedUnique(value.approvalHashes)) {
+      || !strictlySortedUnique(value.approvalIds)) {
     fail(
       'ENRICHMENT_INPUT_SEAL_APPROVALS_INVALID',
-      'A seal requires non-empty unique sorted approval IDs and hashes.',
+      'A seal requires non-empty unique approval hashes and unique approval IDs sorted by identity.',
     );
   }
   if (value.status !== 'SEALED_CURRENT'
@@ -233,11 +221,6 @@ export function assertEngineeringInputSeal(value) {
   return value;
 }
 
-/**
- * Re-evaluates a governed seal against current observed identities. Any change
- * in source, master snapshots, proposals, resolution/projection/impact hashes,
- * Project Data, overrides, approximations, or selector registry requires reseal.
- */
 export function evaluateEngineeringInputSealCurrentness(input) {
   exactKeys(input, ['seal', 'observedAuthority'], 'Engineering input seal currentness input');
   const seal = assertEngineeringInputSeal(input.seal);
