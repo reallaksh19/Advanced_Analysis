@@ -4,6 +4,10 @@ import {
   describeTopologyEditTableIntent,
   renderTopologyEditTableEngineeringEditor,
 } from '../src/workspace/viewport-productivity/topology-edit-table-engineering-editor.js';
+import {
+  topologyEditTableTypeSummary,
+  topologyEditTableVisibleColumns,
+} from '../src/workspace/viewport-productivity/topology-edit-table-properties-view.js';
 
 function valveRow(type = 'GATE') {
   return {
@@ -93,4 +97,31 @@ test('staged descriptions disclose exact M06 and M10 engineering intent', () => 
       runNominalSizeMm: 150, teeBranchNominalSizeMm: 100, downstreamNominalSizeMm: 80,
     },
   }), /DN run 150 \/ branch 100 \/ downstream 80/);
+});
+
+test('Table property surface exposes support, flange, valve, tee and bend engineering columns', () => {
+  const projection = {
+    rows: [
+      { elementType: 'SUPPORT', fields: { supportType: 'GUIDE', direction: { x: 0, y: 1, z: 0 }, gapMm: 2, travelMm: 4 } },
+      { elementType: 'FLANGE', fields: { flangeType: 'WN', flangeFacing: 'RF', rating: '300' } },
+      { elementType: 'VALVE', fields: { valveType: 'GATE', operator: 'HANDWHEEL', flowDirection: 'FROM_TO' } },
+      { elementType: 'TEE', fields: { runDnMm: 150, branchDnMm: 100, branchAngleDeg: 90 } },
+      { elementType: 'ELBOW', fields: { angleDeg: 90, radiusMm: 228.6, turnIntent: 'LONG_RADIUS' } },
+    ],
+  };
+  const columns = new Set(topologyEditTableVisibleColumns(projection).map((column) => column.key));
+  for (const key of [
+    'supportType', 'direction', 'gapMm', 'travelMm',
+    'flangeType', 'flangeFacing', 'rating',
+    'valveType', 'operator', 'flowDirection',
+    'runDnMm', 'branchDnMm', 'branchAngleDeg',
+    'angleDeg', 'radiusMm', 'turnIntent',
+  ]) assert.equal(columns.has(key), true, `missing visible engineering column ${key}`);
+
+  const summary = topologyEditTableTypeSummary(projection.rows);
+  assert.match(summary, /SUPPORT 1/);
+  assert.match(summary, /FLANGE 1/);
+  assert.match(summary, /VALVE 1/);
+  assert.match(summary, /TEE 1/);
+  assert.match(summary, /BEND\/ELBOW 1/);
 });
