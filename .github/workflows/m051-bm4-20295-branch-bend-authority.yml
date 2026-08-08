@@ -1,0 +1,62 @@
+name: M051 BM4 20295 Branch Bend Authority
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/lfea-m051-bm4-20295-branch-bend-authority.mjs'
+      - '.github/workflows/m051-bm4-20295-branch-bend-authority.yml'
+  workflow_dispatch:
+
+jobs:
+  branch-bend-authority:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enforce evidence-only M051 diff
+        run: |
+          git fetch --no-tags --depth=1 origin 80b3826c6240145f3dad1361fb47233a27539d30
+          git diff --name-only 80b3826c6240145f3dad1361fb47233a27539d30 HEAD | sort > /tmp/m051-paths
+          printf '%s\n' \
+            .github/workflows/m051-bm4-20295-branch-bend-authority.yml \
+            scripts/lfea-m051-bm4-20295-branch-bend-authority.mjs | sort > /tmp/m051-allowed
+          diff -u /tmp/m051-allowed /tmp/m051-paths
+      - name: Syntax-check M051
+        run: node --check scripts/lfea-m051-bm4-20295-branch-bend-authority.mjs
+      - name: Run M051 branch-bend authority RCA
+        run: node scripts/lfea-m051-bm4-20295-branch-bend-authority.mjs --report /tmp/m051/lfea-m051-bm4-20295-branch-bend-authority.json
+      - name: Preserve M050 through M042 Level-1 boundaries
+        run: |
+          node scripts/lfea-m050-bm4-20295-node-free-body.mjs
+          node scripts/lfea-m049-bm4-upstream-discrepancy-provenance.mjs
+          node scripts/lfea-m048-bm4-upstream-bend-transport.mjs
+          node scripts/lfea-m047-bm4-bend-station-authority.mjs
+          node scripts/lfea-m046-bm4-20340-boundary-authority.mjs
+          node scripts/lfea-m045-bm4-axial-discrepancy-transport.mjs
+          node scripts/lfea-m044-bm4-axial-end-force-equilibrium.mjs
+          node scripts/lfea-m042-bm4-first-divergence-rca.mjs
+      - name: Preserve M041/M040 friction fail-closed boundary
+        run: |
+          node scripts/lfea-m041-contact-friction-check.mjs
+          node scripts/lfea-m041-linear-kernel-bridge-check.mjs
+          node scripts/lfea-m041-bm4-activation-gate.mjs
+          node scripts/lfea-m040-bm4-friction-check.mjs
+      - name: Enforce bounded M051 script
+        run: |
+          lines=$(wc -l < scripts/lfea-m051-bm4-20295-branch-bend-authority.mjs)
+          test "$lines" -le 340 || { echo "M051 has $lines lines (>340)"; exit 1; }
+      - name: Upload deterministic M051 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m051-bm4-20295-branch-bend-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /tmp/m051/lfea-m051-bm4-20295-branch-bend-authority.json
+          if-no-files-found: error
+      - name: Verify clean worktree
+        run: git diff --exit-code && git status --porcelain | tee /tmp/m051-status && test ! -s /tmp/m051-status
