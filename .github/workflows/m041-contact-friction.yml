@@ -29,11 +29,15 @@ jobs:
           node --check src/core/linear-fea-contact-friction-solver/contact-friction-contract.js
           node --check src/core/linear-fea-contact-friction-solver/contact-response.js
           node --check src/core/linear-fea-contact-friction-solver/state-evaluation.js
+          node --check src/core/linear-fea-contact-friction-solver/uniqueness.js
           node --check src/core/linear-fea-contact-friction-solver/iteration.js
           node --check src/core/linear-fea-contact-friction-solver/index.js
           node --check scripts/lfea-m041-contact-friction-check.mjs
-      - name: Run M041 closed-form and coupled qualification
+          node --check scripts/lfea-m041-linear-kernel-bridge-check.mjs
+      - name: Run M041 closed-form, coupled and uniqueness qualification
         run: node scripts/lfea-m041-contact-friction-check.mjs
+      - name: Run M041 real linear-kernel bridge qualification
+        run: node scripts/lfea-m041-linear-kernel-bridge-check.mjs
       - name: Preserve M040 source/oracle boundary
         run: node scripts/lfea-m040-bm4-friction-check.mjs
       - name: Preserve M036 frictionless unilateral qualification
@@ -44,9 +48,11 @@ jobs:
             src/core/linear-fea-contact-friction-solver/contact-friction-contract.js \
             src/core/linear-fea-contact-friction-solver/contact-response.js \
             src/core/linear-fea-contact-friction-solver/state-evaluation.js \
+            src/core/linear-fea-contact-friction-solver/uniqueness.js \
             src/core/linear-fea-contact-friction-solver/iteration.js \
             src/core/linear-fea-contact-friction-solver/index.js \
-            scripts/lfea-m041-contact-friction-check.mjs; do
+            scripts/lfea-m041-contact-friction-check.mjs \
+            scripts/lfea-m041-linear-kernel-bridge-check.mjs; do
             lines=$(wc -l < "$file")
             test "$lines" -le 300 || { echo "$file has $lines lines (>300)"; exit 1; }
           done
