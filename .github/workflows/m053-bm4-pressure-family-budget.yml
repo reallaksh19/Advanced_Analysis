@@ -1,0 +1,42 @@
+name: M053 BM4 Pressure Family Budget
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/lfea-m053-bm4-pressure-family-budget.mjs'
+      - '.github/workflows/m053-bm4-pressure-family-budget.yml'
+  workflow_dispatch:
+
+jobs:
+  pressure-family-budget:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax and line-count gate
+        run: |
+          node --check scripts/lfea-m053-bm4-pressure-family-budget.mjs
+          test "$(wc -l < scripts/lfea-m053-bm4-pressure-family-budget.mjs)" -le 300
+      - name: Quantify excluded pressure-deformation families
+        run: node scripts/lfea-m053-bm4-pressure-family-budget.mjs --report /tmp/m053-pressure-family-budget.json
+      - name: Preserve pressure friction component and M036 baselines
+        run: |
+          node scripts/lfea-m052-bm4-friction-equilibrium-residual.mjs
+          node scripts/lfea-m047-bm4-pressure-elongation-ab.mjs
+          node scripts/lfea-m045-bm4-component-hierarchy-v2.mjs
+          npm run check:lfea-m036
+      - name: Upload deterministic M053 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m053-bm4-pressure-family-budget-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /tmp/m053-pressure-family-budget.json
+          if-no-files-found: error
+      - name: Verify clean worktree
+        run: git diff --exit-code && git status --porcelain | tee /tmp/m053-status && test ! -s /tmp/m053-status
