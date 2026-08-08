@@ -1,0 +1,65 @@
+name: M043 BM4 Axial Force Source RCA
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/lfea-m043-bm4-axial-force-source-rca.mjs'
+      - '.github/workflows/m043-bm4-axial-force-source-rca.yml'
+  workflow_dispatch:
+
+jobs:
+  axial-force-source-rca:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enforce evidence-only M043 diff
+        run: |
+          git fetch --no-tags --depth=1 origin 06b27d750ec284ec87df06885d97b46d9724120a
+          git diff --name-only 06b27d750ec284ec87df06885d97b46d9724120a HEAD | sort > /tmp/m043-paths
+          printf '%s\n' \
+            .github/workflows/m043-bm4-axial-force-source-rca.yml \
+            scripts/lfea-m043-bm4-axial-force-source-rca.mjs | sort > /tmp/m043-allowed
+          diff -u /tmp/m043-allowed /tmp/m043-paths
+
+      - name: Syntax-check M043 RCA
+        run: node --check scripts/lfea-m043-bm4-axial-force-source-rca.mjs
+
+      - name: Run M043 axial-force source RCA
+        run: node scripts/lfea-m043-bm4-axial-force-source-rca.mjs --report /tmp/m043/lfea-m043-bm4-axial-force-source-rca.json
+
+      - name: Preserve M042 first-divergence qualification
+        run: node scripts/lfea-m042-bm4-first-divergence-rca.mjs
+
+      - name: Preserve M041 friction activation boundary
+        run: |
+          node scripts/lfea-m041-contact-friction-check.mjs
+          node scripts/lfea-m041-linear-kernel-bridge-check.mjs
+          node scripts/lfea-m041-bm4-activation-gate.mjs
+
+      - name: Preserve M040 source authority
+        run: node scripts/lfea-m040-bm4-friction-check.mjs
+
+      - name: Enforce bounded M043 script
+        run: |
+          lines=$(wc -l < scripts/lfea-m043-bm4-axial-force-source-rca.mjs)
+          test "$lines" -le 360 || { echo "M043 RCA has $lines lines (>360)"; exit 1; }
+
+      - name: Upload deterministic M043 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m043-bm4-axial-force-source-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /tmp/m043/lfea-m043-bm4-axial-force-source-rca.json
+          if-no-files-found: error
+
+      - name: Verify clean worktree
+        run: git diff --exit-code && git status --porcelain | tee /tmp/m043-status && test ! -s /tmp/m043-status
