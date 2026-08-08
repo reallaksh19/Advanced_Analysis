@@ -84,6 +84,9 @@ export class TopologyEditReachableTypedViewportBackend extends TopologyEditTyped
   }
 
   pickVisibleEndpoint(pointer) {
+    if (!this.pickRaycaster || !this.activeCamera || !this.endpointAffordances?.length) {
+      return null;
+    }
     this.pickRaycaster.params.Line.threshold = this.navigationConfiguration.pickingRadius;
     this.pickRaycaster.setFromCamera(pointer, this.activeCamera);
     const hit = this.pickRaycaster.intersectObjects(this.pickableGroups(), true).find((candidate) => (
