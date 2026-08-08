@@ -31,7 +31,12 @@ import { buildM036Bm4Inventory } from './lfea-m036-bm4-runtime.mjs';
 
 const NODE_PREFIX = 'BM4M035.N';
 const M038_ACCDB_SOURCE = '3e5c5e20d9e8741faa08be4360cb7f79498f87b6:benchmarks/LFEA/BM4/BM4 accdb.zip';
-const M038_BOURDON_DISCLOSURE = 'ACCDB CASE19=W+P1 and CASE20=W+T1+P1; user-confirmed ACCDB Bourdon=yes. Translational closed-end Bourdon strain is applied to non-rigid straight spans and discretized bend-arc frame elements; bend opening/ovalization, pressure stiffening, axial pA thrust, and rigid-body pressure strain remain blocked.';
+const M038_BOURDON_DISCLOSURE = 'ACCDB CASE19=W+P1 and CASE20=W+T1+P1; user-confirmed ACCDB Bourdon=yes. First qualification applies translational Bourdon only to non-rigid straight spans and bend incoming straights; bend-arc opening/translation and rigid-body pressure strain remain blocked.';
+const M038_FRICTION_DISCLOSURE = 'BM4 InputXML +Y shoes carry FRIC_COEF=0.3. This M038 node-level qualification iterates an isotropic Coulomb tangential force in the global XZ support plane, using the solved +Y normal reaction, the CAESAR default friction stiffness of 1,000,000 lb/in converted to SI, and the cap |Ft| <= mu*Fn.';
+const CAESAR_FRICTION_STIFFNESS = 175126835.24647635;
+const FRICTION_FORCE_TOLERANCE = 1e-4;
+const FRICTION_MAX_ITERATIONS = 80;
+const FRICTION_RELAXATION = 0.5;
 
 function mapNodeId(nodeId) {
   return String(nodeId).replace(/^BM4\.N/u, NODE_PREFIX);
@@ -116,7 +121,7 @@ function physicalLineWeight(entry) {
 }
 
 function bourdonEligible(entry) {
-  return entry.sourceEntry.rigidAuthority === null;
+  return entry.bendComponent === null && entry.sourceEntry.rigidAuthority === null;
 }
 
 function closedEndPipeBourdonAxialStrain(authorities, entry, pressure) {
@@ -130,7 +135,7 @@ function closedEndPipeBourdonAxialStrain(authorities, entry, pressure) {
   return (1 - 2 * poissonRatio) * pressure * innerDiameter ** 2 / denominator;
 }
 
-function compileCase(authorities, compilation, label, thermal, movements) {
+function compileCase(authorities, compilation, label, thermal, movements, frictionLoads) {
   const primitives = [];
   for (const entry of authorities.entries) {
     const analysis = entry.sourceEntry.sourceSegment.meta.analysis;
@@ -168,10 +173,20 @@ function compileCase(authorities, compilation, label, thermal, movements) {
     nodeId: movement.nodeId, dof: movement.dof, value: movement.value,
     sourceEvidence: sourceEvidence({ sourceId: `${BM4_SOURCE_ID}-M035-M036-CONTACT`, sourceRevision: `${movement.prescribedSlotId}:${movement.value}` }),
   });
+  for (const friction of frictionLoads) primitives.push({
+    schema: 'fea-linear-load-primitive/v1', primitiveId: `${label}-FRICTION-${friction.supportId}`,
+    kind: 'NODAL_FORCE_MOMENT', nodeId: friction.nodeId, basis: { kind: 'GLOBAL' },
+    force: { fx: friction.fx, fy: 0, fz: friction.fz }, moment: { mx: 0, my: 0, mz: 0 },
+    units: { force: 'N', moment: 'N*m', length: 'm' }, signConvention: 'APPLIED_TO_STRUCTURE',
+    sourceEvidence: sourceEvidence({
+      sourceId: `${BM4_SOURCE_ID}-M038-FRICTION`,
+      sourceRevision: `${M038_ACCDB_SOURCE}:${friction.supportId}:mu=${friction.mu}:fx=${friction.fx}:fz=${friction.fz}:k=${CAESAR_FRICTION_STIFFNESS}`,
+    }),
+  });
   return compilePhysicalLoadCase({
     loadCaseId: label,
     loadCaseClass: 'MIXED_PHYSICAL',
-    presentation: { label, description: 'M038 ACCDB-authorized P1 Bourdon translation over M035 feature mechanics and M036 unilateral state.' },
+    presentation: { label, description: `M038 ACCDB-authorized P1 Bourdon translation plus node-level Coulomb support friction. ${M038_FRICTION_DISCLOSURE}` },
     modelReference: modelReferenceFromCompilation(compilation),
     primitives,
     profile: loadCaseProfile({ gravitationalAcceleration: { value: GRAVITY, source: 'SI-STANDARD-GRAVITY-EXACT' } }),
@@ -204,22 +219,12 @@ function loadElements(authorities, loadCase) {
   const components = authorities.bendExpansion.components.map((component) => {
     const elements = component.elements.map((componentElement) => {
       const entry = authorities.entryByElementId.get(componentElement.elementId);
-      const baseFrame = compileFrameElement({
+      const frameElement = compileFrameElement({
         elementId: componentElement.elementId, material: authorities.material, section: entry.analysisSection,
         localAxes: { result: resolveEntryAxes(authorities, entry), profile: FRAME_LOCAL_AXIS_PROFILE },
         profile: authorities.frameProfile, distributedLoads: [distributed.get(componentElement.elementId)],
         temperature: temperatures.get(componentElement.elementId) ?? null, releases: [], endSprings: [], rigidOffsets: null,
       });
-      const pressure = pressures.get(entry.elementId);
-      const frameElement = pressure?.authorizedEffects?.bourdon
-        ? augmentFrameElementUniformAxialInitialStrain({
-          frame: baseFrame,
-          profile: authorities.frameProfile,
-          primitive: pressure,
-          axialStrain: closedEndPipeBourdonAxialStrain(authorities, entry, pressure.pressure),
-          disclosure: M038_BOURDON_DISCLOSURE,
-        })
-        : baseFrame;
       return Object.freeze({ ...componentElement, frameElement });
     });
     const draft = { ...component, elements, semanticHash: '' };
@@ -229,9 +234,77 @@ function loadElements(authorities, loadCase) {
   return { frames, components };
 }
 
-export function analyseM035M036Case(authorities, constraints, label, thermal, movements = []) {
+function frictionSupports(authorities) {
+  const supports = [];
+  for (const node of authorities.sourceGeometry.nodes) {
+    const restraints = node.meta?.restraints ?? [];
+    restraints.forEach((restraint, index) => {
+      const mu = restraint.frictionCoefficient ?? 0;
+      if (String(restraint.typeCode) !== '14' || !(mu > 0)) return;
+      supports.push(Object.freeze({
+        supportId: `${node.id}-PLUS-Y-${index + 1}`,
+        nodeId: `${NODE_PREFIX}${node.id}`,
+        sourceNodeId: String(node.id),
+        mu,
+      }));
+    });
+  }
+  return Object.freeze(supports.sort((left, right) => left.supportId.localeCompare(right.supportId)));
+}
+
+function executionValue(entries, nodeId, dof) {
+  return entries.find((row) => row.nodeId === nodeId && row.dof === dof)?.value ?? 0;
+}
+
+function deriveFrictionLoads(supports, execution) {
+  return supports.map((support) => {
+    const normalReaction = Math.max(0, executionValue(execution.reactions, support.nodeId, 'UY'));
+    const ux = executionValue(execution.displacement, support.nodeId, 'UX');
+    const uz = executionValue(execution.displacement, support.nodeId, 'UZ');
+    const trialFx = -CAESAR_FRICTION_STIFFNESS * ux;
+    const trialFz = -CAESAR_FRICTION_STIFFNESS * uz;
+    const trialMagnitude = Math.hypot(trialFx, trialFz);
+    const coulombLimit = support.mu * normalReaction;
+    const scale = trialMagnitude > coulombLimit && trialMagnitude > 0 ? coulombLimit / trialMagnitude : 1;
+    return Object.freeze({
+      ...support,
+      fx: trialFx * scale,
+      fz: trialFz * scale,
+      normalReaction,
+      coulombLimit,
+      slipMagnitude: Math.hypot(ux, uz),
+      regime: trialMagnitude > coulombLimit ? 'SLIDING' : 'STICKING',
+    });
+  });
+}
+
+function zeroFrictionLoads(supports) {
+  return supports.map((support) => Object.freeze({ ...support, fx: 0, fz: 0 }));
+}
+
+function frictionResidual(current, target) {
+  let worst = 0;
+  for (let index = 0; index < current.length; index += 1) {
+    worst = Math.max(
+      worst,
+      Math.abs(target[index].fx - current[index].fx),
+      Math.abs(target[index].fz - current[index].fz),
+    );
+  }
+  return worst;
+}
+
+function relaxFrictionLoads(current, target) {
+  return current.map((row, index) => Object.freeze({
+    ...target[index],
+    fx: row.fx + FRICTION_RELAXATION * (target[index].fx - row.fx),
+    fz: row.fz + FRICTION_RELAXATION * (target[index].fz - row.fz),
+  }));
+}
+
+export function analyseM035M036Case(authorities, constraints, label, thermal, movements = [], frictionLoads = []) {
   const compilation = compileModel(authorities, constraints);
-  const loadCase = compileCase(authorities, compilation, label, thermal, movements);
+  const loadCase = compileCase(authorities, compilation, label, thermal, movements, frictionLoads);
   const { frames, components } = loadElements(authorities, loadCase);
   const execution = compileSolverExecution({
     compilation,
@@ -249,10 +322,35 @@ export function analyseM035M036Case(authorities, constraints, label, thermal, mo
   return Object.freeze({ compilation, loadCase, execution, recovery, frames, pipingComponents: components });
 }
 
+function analyseM038FrictionCase(authorities, constraints, label, thermal, movements = []) {
+  const supports = frictionSupports(authorities);
+  let frictionLoads = zeroFrictionLoads(supports);
+  let lastResidual = Number.POSITIVE_INFINITY;
+  for (let iteration = 0; iteration < FRICTION_MAX_ITERATIONS; iteration += 1) {
+    const analysis = analyseM035M036Case(authorities, constraints, label, thermal, movements, frictionLoads);
+    const target = deriveFrictionLoads(supports, analysis.execution);
+    lastResidual = frictionResidual(frictionLoads, target);
+    if (lastResidual <= FRICTION_FORCE_TOLERANCE) {
+      return Object.freeze({
+        ...analysis,
+        frictionEvidence: Object.freeze({
+          disclosure: M038_FRICTION_DISCLOSURE,
+          iterationCount: iteration + 1,
+          residual: lastResidual,
+          stiffness: CAESAR_FRICTION_STIFFNESS,
+          loads: target,
+        }),
+      });
+    }
+    frictionLoads = relaxFrictionLoads(frictionLoads, target);
+  }
+  throw new Error(`${label} Coulomb friction iteration did not converge; residual=${lastResidual}.`);
+}
+
 function finalAnalysis(authorities, inventory, run, label, thermal) {
   const state = new Map(run.convergedState.map((row) => [row.declarationId, row.status]));
   const active = run.unilateral.filter((row) => state.get(row.declarationId) === 'ENGAGED');
-  const analysis = analyseM035M036Case(
+  const analysis = analyseM038FrictionCase(
     authorities,
     [...inventory.base, ...active.map((row) => row.constraintDeclaration)],
     label,
@@ -269,7 +367,7 @@ export function solveBm4M035M036Combined() {
   const solveState = (label, thermal, unilateral = inventory.unilateral) => compileUnilateralSolverExecution({
     baseDeclarations: inventory.base,
     unilateral,
-    buildAndSolve: (constraints, active) => analyseM035M036Case(authorities, constraints, label, thermal, active.prescribedMovements).execution,
+    buildAndSolve: (constraints, active) => analyseM038FrictionCase(authorities, constraints, label, thermal, active.prescribedMovements).execution,
   });
   const sustainedRun = solveState('BM4-M035-M036-SUS', false);
   const operatingRun = solveState('BM4-M035-M036-OPE', true);
