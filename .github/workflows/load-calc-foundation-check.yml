@@ -1,0 +1,79 @@
+name: load-calc-foundation-check
+
+on:
+  pull_request:
+    paths:
+      - 'src/workspace/load-calc-consumer-view.js'
+      - 'src/workspace/engineering-loads/empirical-load-calc-scenario-view.js'
+      - 'src/workspace/engineering-loads/empirical-method-basis-register.js'
+      - 'src/workspace/engineering-loads/empirical-method-registry.js'
+      - 'src/workspace/engineering-loads/empirical-formula-register.js'
+      - 'src/workspace/project-data/non-fea-project-data-view.js'
+      - 'docs/LINE_STOP_EMPIRICAL_CONCEPT.md'
+      - 'scripts/load-calc-ui-clarity-check.mjs'
+      - 'scripts/empirical-method-basis-register-check.mjs'
+      - 'scripts/run-authorized-empirical-load-execution-checks.mjs'
+      - 'scripts/run-non-fea-checks.mjs'
+      - 'scripts/advanced-shell-contract-check.mjs'
+      - '.github/workflows/load-calc-foundation-check.yml'
+      - '.github/workflows/empirical-piping-exact-head.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Prove exact-head execution
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git diff --exit-code
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax check foundation modules
+        run: |
+          node --check src/workspace/load-calc-consumer-view.js
+          node --check src/workspace/engineering-loads/empirical-load-calc-scenario-view.js
+          node --check src/workspace/engineering-loads/empirical-method-basis-register.js
+          node --check scripts/load-calc-ui-clarity-check.mjs
+          node --check scripts/empirical-method-basis-register-check.mjs
+          node --check scripts/run-non-fea-checks.mjs
+
+      - name: UI authority clarity
+        run: node scripts/load-calc-ui-clarity-check.mjs
+
+      - name: Registered method-basis coverage
+        run: node scripts/empirical-method-basis-register-check.mjs
+
+      - name: Non-FEA Load Calc umbrella checks
+        run: node scripts/run-non-fea-checks.mjs
+
+      - name: Advanced shell contract
+        run: node scripts/advanced-shell-contract-check.mjs
+
+      - name: Import graph
+        run: npm run check:imports
+
+      - name: Production build
+        run: npm run build
