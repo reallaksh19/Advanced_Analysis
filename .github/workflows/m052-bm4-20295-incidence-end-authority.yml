@@ -1,0 +1,63 @@
+name: M052 BM4 20295 Incidence End Authority
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/lfea-m052-bm4-20295-incidence-end-authority.mjs'
+      - '.github/workflows/m052-bm4-20295-incidence-end-authority.yml'
+  workflow_dispatch:
+
+jobs:
+  incidence-end-authority:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enforce evidence-only M052 diff
+        run: |
+          git fetch --no-tags --depth=1 origin b3f9f786e95bd881431953e51de8c7b871613418
+          git diff --name-only b3f9f786e95bd881431953e51de8c7b871613418 HEAD | sort > /tmp/m052-paths
+          printf '%s\n' \
+            .github/workflows/m052-bm4-20295-incidence-end-authority.yml \
+            scripts/lfea-m052-bm4-20295-incidence-end-authority.mjs | sort > /tmp/m052-allowed
+          diff -u /tmp/m052-allowed /tmp/m052-paths
+      - name: Syntax-check M052
+        run: node --check scripts/lfea-m052-bm4-20295-incidence-end-authority.mjs
+      - name: Run M052 incidence authority RCA
+        run: node scripts/lfea-m052-bm4-20295-incidence-end-authority.mjs --report /tmp/m052/lfea-m052-bm4-20295-incidence-end-authority.json
+      - name: Preserve M051 through M042 Level-1 boundaries
+        run: |
+          node scripts/lfea-m051-bm4-20295-branch-bend-authority.mjs
+          node scripts/lfea-m050-bm4-20295-node-free-body.mjs
+          node scripts/lfea-m049-bm4-upstream-discrepancy-provenance.mjs
+          node scripts/lfea-m048-bm4-upstream-bend-transport.mjs
+          node scripts/lfea-m047-bm4-bend-station-authority.mjs
+          node scripts/lfea-m046-bm4-20340-boundary-authority.mjs
+          node scripts/lfea-m045-bm4-axial-discrepancy-transport.mjs
+          node scripts/lfea-m044-bm4-axial-end-force-equilibrium.mjs
+          node scripts/lfea-m042-bm4-first-divergence-rca.mjs
+      - name: Preserve M041/M040 friction fail-closed boundary
+        run: |
+          node scripts/lfea-m041-contact-friction-check.mjs
+          node scripts/lfea-m041-linear-kernel-bridge-check.mjs
+          node scripts/lfea-m041-bm4-activation-gate.mjs
+          node scripts/lfea-m040-bm4-friction-check.mjs
+      - name: Enforce bounded M052 script
+        run: |
+          lines=$(wc -l < scripts/lfea-m052-bm4-20295-incidence-end-authority.mjs)
+          test "$lines" -le 300 || { echo "M052 has $lines lines (>300)"; exit 1; }
+      - name: Upload deterministic M052 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m052-bm4-20295-incidence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /tmp/m052/lfea-m052-bm4-20295-incidence-end-authority.json
+          if-no-files-found: error
+      - name: Verify clean worktree
+        run: git diff --exit-code && git status --porcelain | tee /tmp/m052-status && test ! -s /tmp/m052-status
