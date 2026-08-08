@@ -54,7 +54,9 @@ jobs:
           node --check scripts/enrichment-package5b-operating-fluid-density-cutover-check.mjs
 
       - name: Requalify exact fluid-register resolution
-        run: node scripts/run-common-enriched-exact-fluid-register-checks.mjs
+        run: |
+          node scripts/common-enriched-exact-fluid-register-check.mjs
+          node scripts/common-enriched-exact-fluid-register-anti-drift-check.mjs
 
       - name: Requalify Package 4A seal lifecycle
         run: node scripts/enrichment-package4a-input-seal-check.mjs
