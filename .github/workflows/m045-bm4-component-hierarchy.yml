@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'scripts/lfea-m045-bm4-component-authority-discovery.mjs'
+      - 'scripts/lfea-m045-bm4-component-hierarchy.mjs'
       - 'scripts/lfea-m045-bm4-component-hierarchy-v2.mjs'
       - '.github/workflows/m045-bm4-component-hierarchy.yml'
   workflow_dispatch:
