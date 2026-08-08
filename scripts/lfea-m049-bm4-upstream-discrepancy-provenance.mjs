@@ -233,15 +233,23 @@ for (let step = 0; step < MAX_SOURCES; step += 1) {
 assert.ok(chain[0]?.authorityComplete, 'M049 start source must retain one-to-one/exact CAESAR authority.');
 assert.ok(chain[0].maxNetEndSumNorm <= FORCE_TOL, 'M049 start source must not create net EXP force discrepancy.');
 assert.ok(boundaries.length > 0, 'M049 must traverse at least one upstream source boundary.');
-assert.ok(boundaries.every((row) => row.closure.closed), 'M049 all traversed source boundaries must close before provenance interpretation.');
 assert.ok(stop, 'M049 upstream trace must terminate with an explicit boundary code.');
+const nonClosingBoundaries = boundaries.filter((row) => !row.closure.closed);
+assert.ok(nonClosingBoundaries.length <= 1, 'M049 may preserve only the first non-closing boundary.');
+if (nonClosingBoundaries.length === 1) {
+  assert.equal(stop.code, 'SOURCE_BOUNDARY_EQUILIBRIUM_NOT_CLOSED', 'M049 first non-closing boundary must be the trace stop.');
+  assert.equal(boundaries.at(-1), nonClosingBoundaries[0], 'M049 non-closing boundary must be last in the trace.');
+} else {
+  assert.ok(boundaries.every((row) => row.closure.closed), 'M049 traversed prefix must close before any other stop reason.');
+}
 
 const report = Object.freeze({
-  schema: 'lfea-m049-bm4-upstream-discrepancy-provenance/v1',
+  schema: 'lfea-m049-bm4-upstream-discrepancy-provenance/v2',
   startSourceId: START_SOURCE_ID,
   policy: Object.freeze({ forceClosureToleranceN: FORCE_TOL, seedToleranceN: SEED_TOL, maxSources: MAX_SOURCES, stationInterpolationUsed: false }),
   tracedSourceCount: chain.length,
   traversedBoundaryCount: boundaries.length,
+  closedBoundaryCount: boundaries.length - nonClosingBoundaries.length,
   sourceChainDownstreamToUpstream: Object.freeze(chain),
   boundariesDownstreamToUpstream: Object.freeze(boundaries),
   stop,
@@ -269,8 +277,8 @@ if (arg >= 0) {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(report, null, 2)}\n`);
 }
-console.log(`M049 traced sources/boundaries: ${chain.length}/${boundaries.length}`);
+console.log(`M049 traced sources/boundaries: ${chain.length}/${boundaries.length}; closed=${report.closedBoundaryCount}`);
 console.log(`M049 source chain: ${JSON.stringify(chain.map((row) => ({ sourceId: row.sourceId, pair: row.pair, type: row.type, authorityComplete: row.authorityComplete, upstreamNorm: row.upstreamNorm, downstreamNorm: row.downstreamNorm, maxNetEndSumNorm: row.maxNetEndSumNorm, stations: row.exactNumericStations })))}`);
-console.log(`M049 boundaries: ${JSON.stringify(boundaries.map((row) => ({ nodeId: row.nodeId, predecessor: row.predecessorSourceId, downstream: row.downstreamSourceId, predecessorNorm: row.predecessorDownstreamNorm, downstreamNorm: row.downstreamSourceUpstreamNorm, reactionNorm: row.reaction.discrepancyNorm, closureNorm: row.closure.residualNorm })))}`);
+console.log(`M049 boundaries: ${JSON.stringify(boundaries.map((row) => ({ nodeId: row.nodeId, predecessor: row.predecessorSourceId, downstream: row.downstreamSourceId, predecessorNorm: row.predecessorDownstreamNorm, downstreamNorm: row.downstreamSourceUpstreamNorm, reactionNorm: row.reaction.discrepancyNorm, closureNorm: row.closure.residualNorm, closed: row.closure.closed })))}`);
 console.log(`M049 stop: ${JSON.stringify(stop)}`);
 console.log(`M049 conclusion: ${report.disposition.conclusion}`);
