@@ -200,9 +200,9 @@ async function openDataset(page, kind) {
 }
 
 async function expectEndpoint(page, label) {
+  await openPanel(page, 'topology-edit-visible-endpoints');
   await expect(page.getByRole('button', { name: label, exact: true })).toBeVisible();
 }
-
 async function openPanel(page, kind) {
   const panel = page.locator(`details[data-panel-kind="${kind}"]`);
   await expect(panel).toBeVisible();
