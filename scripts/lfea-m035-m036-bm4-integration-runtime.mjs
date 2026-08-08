@@ -203,7 +203,10 @@ export function analyseM035M036Case(authorities, constraints, label, thermal, mo
       ...components.flatMap(elementContributionsFromPipingComponent),
     ],
     loadCase,
-    solverProfile: solverProfile(BM4_SOLVER_CONDITIONING_PROFILE),
+    solverProfile: solverProfile({
+      ...BM4_SOLVER_CONDITIONING_PROFILE,
+      ...(options.backend ? { backend: options.backend } : {}),
+    }),
   });
   const recovery = options.skipRecovery === true
     ? null
