@@ -340,7 +340,7 @@ async function dragPoints(page, targetNodeId, mode) {
       && point.y >= rect.top && point.y <= rect.bottom
     );
     const isDesiredHandle = (point) => {
-      if (!inCanvas(point)) return false;
+      if (!inCanvas(point) || document.elementFromPoint(point.x, point.y) !== canvas) return false;
       const event = { clientX: point.x, clientY: point.y };
       if (viewport.pickHandleMode(event) !== dragMode) return false;
       const canonicalHit = viewport.canonicalSelectionAt(event);
