@@ -15,6 +15,8 @@ on:
       - 'scripts/topology-edit-r1-line-budget-check.mjs'
       - 'scripts/topology-edit-real-user-e2e-anti-cheat-check.mjs'
       - 'scripts/topology-edit-real-user-evidence-report.mjs'
+      - 'scripts/bundle-chunk-ownership-check.mjs'
+      - 'vite.config.js'
   workflow_dispatch:
 
 permissions:
@@ -72,6 +74,9 @@ jobs:
           set -euo pipefail
           npm ci
           npx playwright install --with-deps chromium
+
+      - name: Verify bundle ownership policy
+        run: node scripts/bundle-chunk-ownership-check.mjs
 
       - name: Build production application
         shell: bash
