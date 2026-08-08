@@ -39,11 +39,16 @@ export function selectProgrammedVariableSpringHanger({
   signedOperatingTravel,
   catalog,
   allowableLoadVariation = DEFAULT_ALLOWABLE_LOAD_VARIATION,
+  workingLoadReserveFraction = 0,
 }) {
   if (!designId || !nodeId) throw new VariableSpringHangerError('designId and nodeId are required.', 'VARIABLE_SPRING_INPUT_INVALID');
   requirePositive(hotLoad, 'hotLoad');
   requireFinite(signedOperatingTravel, 'signedOperatingTravel');
   requirePositive(allowableLoadVariation, 'allowableLoadVariation');
+  requireFinite(workingLoadReserveFraction, 'workingLoadReserveFraction');
+  if (workingLoadReserveFraction < 0 || workingLoadReserveFraction >= 0.5) {
+    throw new VariableSpringHangerError('workingLoadReserveFraction must be in [0, 0.5).', 'VARIABLE_SPRING_INPUT_INVALID');
+  }
   if (!catalog || !Array.isArray(catalog.entries) || catalog.entries.length === 0) {
     throw new VariableSpringHangerError('catalog.entries must be a non-empty array.', 'VARIABLE_SPRING_CATALOG_INVALID');
   }
@@ -63,8 +68,10 @@ export function selectProgrammedVariableSpringHanger({
     const variability = Math.abs(coldLoad - hotLoad) / hotLoad;
     const reasons = [];
     if (entry.seriesOrder < minimumSeriesOrder) reasons.push('TRAVEL_EXCEEDS_RECOMMENDED_SERIES_LIMIT');
-    if (hotLoad < entry.minimumWorkingLoad || hotLoad > entry.maximumWorkingLoad) reasons.push('HOT_LOAD_OUTSIDE_WORKING_RANGE');
-    if (coldLoad < entry.minimumWorkingLoad || coldLoad > entry.maximumWorkingLoad) reasons.push('COLD_LOAD_OUTSIDE_WORKING_RANGE');
+    const reservedMinimumWorkingLoad = entry.minimumWorkingLoad * (1 + workingLoadReserveFraction);
+    const reservedMaximumWorkingLoad = entry.maximumWorkingLoad * (1 - workingLoadReserveFraction);
+    if (hotLoad < reservedMinimumWorkingLoad || hotLoad > reservedMaximumWorkingLoad) reasons.push('HOT_LOAD_OUTSIDE_RESERVED_WORKING_RANGE');
+    if (coldLoad < reservedMinimumWorkingLoad || coldLoad > reservedMaximumWorkingLoad) reasons.push('COLD_LOAD_OUTSIDE_RESERVED_WORKING_RANGE');
     if (variability > allowableLoadVariation + 1e-12) reasons.push('ALLOWABLE_LOAD_VARIATION_EXCEEDED');
     candidates.push({
       entryId: entry.entryId,
@@ -78,6 +85,8 @@ export function selectProgrammedVariableSpringHanger({
       variability,
       minimumWorkingLoad: entry.minimumWorkingLoad,
       maximumWorkingLoad: entry.maximumWorkingLoad,
+      reservedMinimumWorkingLoad,
+      reservedMaximumWorkingLoad,
       accepted: reasons.length === 0,
       rejectionReasons: reasons,
     });
@@ -94,8 +103,9 @@ export function selectProgrammedVariableSpringHanger({
     catalogSemanticHash: catalog.semanticHash,
     criteria: {
       allowableLoadVariation,
+      workingLoadReserveFraction,
       minimumSeriesOrder,
-      selectionRule: 'FIRST_VALID_SERIES_THEN_SMALLEST_SIZE_V1',
+      selectionRule: 'FIRST_VALID_SERIES_THEN_SMALLEST_SIZE_WITH_DECLARED_WORKING_RANGE_RESERVE_V2',
       rigidSupportDisplacementCriterion: 0,
       constantSupportTravelCriterion: Math.max(...catalog.entries.map((entry) => entry.maximumRecommendedMovement)),
     },

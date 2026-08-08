@@ -7,6 +7,8 @@ import {
 } from '../src/core/linear-fea-variable-spring-hanger/index.js';
 import {
   BM3_BASE_CASES,
+  BM3_T1_SECANT_THERMAL_EXPANSION_COEFFICIENT,
+  BM3_T2_SECANT_THERMAL_EXPANSION_COEFFICIENT,
   BM3_SOURCE_ID,
   CASE_KEYS,
   analyseBaseCase,
@@ -24,6 +26,7 @@ export function solveBm3WithProgrammedHangers({ compareLegacyOutput = false } = 
   const sourceAuthorities = buildBm3Authorities({
     modelIdentity: 'BM3-M029-HANGER-SOURCE',
     modelRevision: 1,
+    thermalExpansionCoefficient: BM3_T1_SECANT_THERMAL_EXPANSION_COEFFICIENT,
   });
   const declarations = discoverProgrammedHangers(sourceAuthorities);
   const restrainedAuthorities = buildBm3Authorities({
@@ -36,6 +39,7 @@ export function solveBm3WithProgrammedHangers({ compareLegacyOutput = false } = 
     })),
     modelIdentity: 'BM3-M029-HANGER-RESTRAINED-WEIGHT',
     modelRevision: 1,
+    thermalExpansionCoefficient: BM3_T1_SECANT_THERMAL_EXPANSION_COEFFICIENT,
   });
   const restrainedWeight = analyseBaseCase(
     restrainedAuthorities,
@@ -57,6 +61,7 @@ export function solveBm3WithProgrammedHangers({ compareLegacyOutput = false } = 
   const travelAuthorities = buildBm3Authorities({
     modelIdentity: 'BM3-M029-HANGER-OPERATING-TRAVEL',
     modelRevision: 1,
+    thermalExpansionCoefficient: BM3_T1_SECANT_THERMAL_EXPANSION_COEFFICIENT,
   });
   const designHotLoadPrimitives = declarations.map((row) => nodalForcePrimitive({
     primitiveId: `M029-HANGER-${row.nodeId}-DESIGN-HOT-LOAD`,
@@ -88,6 +93,7 @@ export function solveBm3WithProgrammedHangers({ compareLegacyOutput = false } = 
     hotLoad: requiredHotLoads.get(row.nodeId),
     signedOperatingTravel: signedTravel.get(row.nodeId),
     catalog,
+    workingLoadReserveFraction: 0.005,
   }));
   const compiledHangers = designs.map((design) => compileProgrammedVariableSpringHanger({
     hangerId: design.designId,
@@ -103,15 +109,34 @@ export function solveBm3WithProgrammedHangers({ compareLegacyOutput = false } = 
     additionalConstraintDeclarations: compiledHangers.map((row) => row.constraintDeclaration),
     modelIdentity: 'BM3-RELIEF-FLANGED-M029-HANGERS',
     modelRevision: 1,
+    thermalExpansionCoefficient: BM3_T1_SECANT_THERMAL_EXPANSION_COEFFICIENT,
   });
   const preloadPrimitives = compiledHangers.map((row) => row.preloadPrimitive);
-  const baseCases = Object.fromEntries(Object.entries(BM3_BASE_CASES).map(([caseKey, policy]) => [
-    caseKey,
-    analyseBaseCase(finalAuthorities, caseKey, policy, {
+  const coldAuthorities = buildBm3Authorities({
+    additionalConstraintDeclarations: compiledHangers.map((row) => row.constraintDeclaration),
+    modelIdentity: 'BM3-RELIEF-FLANGED-M029-HANGERS-COLD',
+    modelRevision: 1,
+  });
+  const case4Authorities = buildBm3Authorities({
+    additionalConstraintDeclarations: compiledHangers.map((row) => row.constraintDeclaration),
+    modelIdentity: 'BM3-RELIEF-FLANGED-M029-HANGERS-T2',
+    modelRevision: 1,
+    thermalExpansionCoefficient: BM3_T2_SECANT_THERMAL_EXPANSION_COEFFICIENT,
+  });
+  const baseCases = {
+    CASE3_OPE: analyseBaseCase(finalAuthorities, 'CASE3_OPE', BM3_BASE_CASES.CASE3_OPE, {
       nodalLoads: preloadPrimitives,
-      description: `M029 BM3 ${policy.formula}; programmed variable spring hangers compiled; declared F1 remains omitted.`,
+      description: `M029 BM3 ${BM3_BASE_CASES.CASE3_OPE.formula}; programmed variable spring hangers compiled; declared F1 remains omitted.`,
     }),
-  ]));
+    CASE4_SUS: analyseBaseCase(case4Authorities, 'CASE4_SUS', BM3_BASE_CASES.CASE4_SUS, {
+      nodalLoads: preloadPrimitives,
+      description: `M029 BM3 ${BM3_BASE_CASES.CASE4_SUS.formula}; T2 thermal state and programmed variable spring hangers compiled; declared F1 remains omitted.`,
+    }),
+    CASE5_OCC: analyseBaseCase(coldAuthorities, 'CASE5_OCC', BM3_BASE_CASES.CASE5_OCC, {
+      nodalLoads: preloadPrimitives,
+      description: `M029 BM3 ${BM3_BASE_CASES.CASE5_OCC.formula}; programmed variable spring hangers compiled; declared F1 remains omitted.`,
+    }),
+  };
   const cases = {
     ...baseCases,
     CASE6_EXP: differenceCase('CASE6_EXP', baseCases.CASE3_OPE, baseCases.CASE5_OCC, 'L6=L3-L5'),
@@ -134,6 +159,7 @@ export function solveBm3WithProgrammedHangers({ compareLegacyOutput = false } = 
       operatingTravel,
       designs,
       compiledHangers,
+      caseAuthorities: Object.freeze({ CASE3_OPE: finalAuthorities, CASE4_SUS: case4Authorities, CASE5_OCC: coldAuthorities }),
     }),
   });
   const comparison = compareLegacyOutput
@@ -179,13 +205,6 @@ function unresolvedGaps(authorities) {
   return Object.freeze([
     { code: 'DECLARED_FORCE_F1_NOT_COMPILED', affectedCases: ['CASE5_OCC', 'CASE6_EXP', 'CASE7_EXP'], records: forceRecords },
     { code: 'REDUCER_CANDIDATE_PENDING_PARITY', affectedSourceSegments: [...authorities.reducerDefinitions.keys()] },
-    {
-      code: 'BEND_SOURCE_SPAN_COMPILED_AS_STRAIGHT_CHORD',
-      systemWide: true,
-      affectedCases: CASE_KEYS,
-      affectedSourceSegments: authorities.normalized.geometry.segments.filter((row) => row.type === 'BEND').map((row) => row.id),
-      rationale: 'Six straight-chord bend surrogates alter global geometry, flexibility, gravity centroids, travel, and all downstream element actions.',
-    },
   ]);
 }
 

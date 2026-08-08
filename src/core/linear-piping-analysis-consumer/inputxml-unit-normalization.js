@@ -23,7 +23,7 @@ import {
 const LENGTH_META_FIELDS = Object.freeze(['bendDeclaredRadius', 'bendComputedRadius']);
 const DIMENSIONLESS_META_FIELDS = new Set([
   'materialNumber', 'sourceType', 'sourceIndex', 'bendAngle1', 'bendAngle2',
-  'numMiter', 'bendCompoundMiter', 'bendAngle1Automatic',
+  'numMiter', 'bendKFactor', 'bendCompoundMiter', 'bendAngle1Automatic',
   'bendStationNode1', 'bendStationNode2', 'bendInternalStations',
   'analysis',
 ]);
