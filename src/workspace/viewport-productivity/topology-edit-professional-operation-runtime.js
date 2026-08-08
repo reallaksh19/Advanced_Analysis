@@ -19,6 +19,9 @@ import {
   validateTopologyEditProfessionalOperation,
 } from './topology-edit-professional-operation-actions.js';
 import {
+  readTopologyEditProfessionalOperationValues,
+} from './topology-edit-professional-operation-panel.js';
+import {
   createTopologyEditProfessionalInitialValues,
   createTopologyEditProfessionalViewState,
   reconcileTopologyEditProfessionalReceipts,
@@ -46,10 +49,13 @@ export class TopologyEditProfessionalOperationRuntime {
     this.message = '';
     this.error = null;
     this.validationClient = new TopologyEditValidationWorkerClient();
+    this.valueChangeHandler = (event) => this.handleValueChange(event);
   }
 
   mount(element) {
+    this.element?.removeEventListener?.('change', this.valueChangeHandler);
     this.element = element;
+    this.element?.addEventListener?.('change', this.valueChangeHandler);
     this.render();
   }
 
@@ -126,6 +132,19 @@ export class TopologyEditProfessionalOperationRuntime {
         ?? this.values.diameterMm,
     };
     return this.componentContext;
+  }
+
+  handleValueChange(event) {
+    if (!event.target?.closest?.('[data-role^="professional-"]')) return;
+    this.values = readTopologyEditProfessionalOperationValues(this.element);
+    this.plan = null;
+    this.candidate = null;
+    this.validation = null;
+    this.transactionPreview = null;
+    this.error = null;
+    this.message = 'Preflight updated for the current visible engineering inputs.';
+    this.render();
+    this.updateEvidence();
   }
 
   handleAction(action) {
@@ -221,6 +240,7 @@ export class TopologyEditProfessionalOperationRuntime {
   }
 
   destroy() {
+    this.element?.removeEventListener?.('change', this.valueChangeHandler);
     this.clear(false, true);
     this.validationClient.destroy();
     this.componentContext = null;
