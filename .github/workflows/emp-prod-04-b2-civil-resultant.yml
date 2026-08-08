@@ -1,0 +1,64 @@
+name: emp-prod-04-b2-civil-resultant
+
+on:
+  pull_request:
+    paths:
+      - 'src/workspace/engineering-loads/empirical-support-civil-resultant-transfer.js'
+      - 'scripts/emp-prod-04-b2-civil-resultant-check.mjs'
+      - '.github/workflows/emp-prod-04-b2-civil-resultant.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-b2-exact-statics:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Prove exact-head execution
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          git diff --exit-code
+
+      - name: Enforce B2 changed-path containment
+        shell: bash
+        run: |
+          git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" > /tmp/emp-prod-04-b2-paths.txt
+          while IFS= read -r changed; do
+            case "$changed" in
+              src/workspace/engineering-loads/empirical-support-civil-resultant-transfer.js|scripts/emp-prod-04-b2-civil-resultant-check.mjs|.github/workflows/emp-prod-04-b2-civil-resultant.yml) ;;
+              *) echo "Forbidden changed path for EMP-PROD-04 B2: $changed"; exit 1 ;;
+            esac
+          done < /tmp/emp-prod-04-b2-paths.txt
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax check B2 slice
+        run: |
+          node --check src/workspace/engineering-loads/empirical-support-civil-resultant-transfer.js
+          node --check scripts/emp-prod-04-b2-civil-resultant-check.mjs
+
+      - name: Requalify B1 structural assembly authority
+        run: node scripts/emp-prod-04-support-assembly-authority-check.mjs
+
+      - name: Qualify B2 exact-statical civil resultant transfer
+        run: node scripts/emp-prod-04-b2-civil-resultant-check.mjs
+
+      - name: Import graph
+        run: npm run check:imports
+
+      - name: Production build
+        run: npm run build
