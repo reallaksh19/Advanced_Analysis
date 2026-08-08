@@ -1,0 +1,62 @@
+name: enrichment-package4a-input-seal
+
+on:
+  pull_request:
+    paths:
+      - 'src/workspace/engineering-enrichment/input-seal.js'
+      - 'src/workspace/engineering-enrichment/index.js'
+      - 'scripts/enrichment-package4a-input-seal-check.mjs'
+      - '.github/workflows/enrichment-package4a-input-seal.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-package4a:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Prove exact-head execution
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          git diff --exit-code
+
+      - name: Enforce Package 4A changed-path containment
+        shell: bash
+        run: |
+          git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" > /tmp/enrichment-package4a-paths.txt
+          while IFS= read -r changed; do
+            case "$changed" in
+              src/workspace/engineering-enrichment/input-seal.js|src/workspace/engineering-enrichment/index.js|scripts/enrichment-package4a-input-seal-check.mjs|.github/workflows/enrichment-package4a-input-seal.yml) ;;
+              *) echo "Forbidden changed path for enrichment Package 4A: $changed"; exit 1 ;;
+            esac
+          done < /tmp/enrichment-package4a-paths.txt
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax check Package 4A
+        run: |
+          node --check src/workspace/engineering-enrichment/input-seal.js
+          node --check scripts/enrichment-package4a-input-seal-check.mjs
+
+      - name: Qualify approval, input seal and reseal lifecycle
+        run: node scripts/enrichment-package4a-input-seal-check.mjs
+
+      - name: Import graph
+        run: npm run check:imports
+
+      - name: Production build
+        run: npm run build
