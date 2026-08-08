@@ -25,7 +25,6 @@ import {
 } from './lfea-m034-bm4-solve-fixtures.mjs';
 import { buildBm4M035FeatureAuthorities } from './lfea-m035-bm4-feature-solve-runtime.mjs';
 import { buildM036Bm4Inventory } from './lfea-m036-bm4-runtime.mjs';
-import { bm4BaseWForcmntPrimitives } from './lfea-m038-bm4-forcmnt-authority.mjs';
 
 const NODE_PREFIX = 'BM4M035.N';
 
@@ -111,7 +110,7 @@ function physicalLineWeight(entry) {
   return pipe + contents + (analysis.insulationDensity ?? 0) * insulationArea * GRAVITY;
 }
 
-function compileCase(authorities, compilation, label, thermal, movements, options = {}) {
+function compileCase(authorities, compilation, label, thermal, movements) {
   const primitives = [];
   for (const entry of authorities.entries) {
     const analysis = entry.sourceEntry.sourceSegment.meta.analysis;
@@ -140,14 +139,6 @@ function compileCase(authorities, compilation, label, thermal, movements, option
       sourceEvidence: sourceEvidence({ sourceId: `${BM4_SOURCE_ID}-M035-M036-TEMP`, sourceRevision: `${entry.sourceSegmentId}:${analysis.operatingTemperature}` }),
     });
   }
-  if (options.includeForcmnt !== false) {
-    primitives.push(...bm4BaseWForcmntPrimitives({
-      baseEntries: authorities.base.entries,
-      loadCaseId: label,
-      nodeIdPrefix: NODE_PREFIX,
-      sourceEvidence,
-    }));
-  }
   for (const movement of movements) primitives.push({
     schema: 'fea-linear-load-primitive/v1', primitiveId: `${label}-CONTACT-${movement.prescribedSlotId}`,
     kind: 'PRESCRIBED_MOVEMENT', prescribedSlotId: movement.prescribedSlotId,
@@ -157,7 +148,7 @@ function compileCase(authorities, compilation, label, thermal, movements, option
   return compilePhysicalLoadCase({
     loadCaseId: label,
     loadCaseClass: 'MIXED_PHYSICAL',
-    presentation: { label, description: 'M038 BM4 feature/contact mechanics with ACCDB-qualified base-W FORCE/MOMENT membership.' },
+    presentation: { label, description: 'M035 feature mechanics under M036 unilateral active-set state.' },
     modelReference: modelReferenceFromCompilation(compilation),
     primitives,
     profile: loadCaseProfile({ gravitationalAcceleration: { value: GRAVITY, source: 'SI-STANDARD-GRAVITY-EXACT' } }),
@@ -192,9 +183,9 @@ function loadElements(authorities, loadCase) {
   return { frames, components };
 }
 
-export function analyseM035M036Case(authorities, constraints, label, thermal, movements = [], options = {}) {
+export function analyseM035M036Case(authorities, constraints, label, thermal, movements = []) {
   const compilation = compileModel(authorities, constraints);
-  const loadCase = compileCase(authorities, compilation, label, thermal, movements, options);
+  const loadCase = compileCase(authorities, compilation, label, thermal, movements);
   const { frames, components } = loadElements(authorities, loadCase);
   const execution = compileSolverExecution({
     compilation,
@@ -203,17 +194,12 @@ export function analyseM035M036Case(authorities, constraints, label, thermal, mo
       ...components.flatMap(elementContributionsFromPipingComponent),
     ],
     loadCase,
-    solverProfile: solverProfile({
-      ...BM4_SOLVER_CONDITIONING_PROFILE,
-      ...(options.backend ? { backend: options.backend } : {}),
-    }),
+    solverProfile: solverProfile(BM4_SOLVER_CONDITIONING_PROFILE),
   });
-  const recovery = options.skipRecovery === true
-    ? null
-    : compileResultRecovery({
-      compilation, execution, loadCase, frameElements: frames, pipingComponents: components,
-      recoveryProfile: recoveryProfile({ recoverComponentCodePoints: false }),
-    });
+  const recovery = compileResultRecovery({
+    compilation, execution, loadCase, frameElements: frames, pipingComponents: components,
+    recoveryProfile: recoveryProfile({ recoverComponentCodePoints: false }),
+  });
   return Object.freeze({ compilation, loadCase, execution, recovery, frames, pipingComponents: components });
 }
 
