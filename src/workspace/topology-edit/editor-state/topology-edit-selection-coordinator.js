@@ -153,13 +153,13 @@ export class TopologyEditSelectionCoordinator {
       dataset: state.dataset,
     });
     this.eventBus.publish(TOPOLOGY_EDIT_SELECTION_EVENTS.CHANGED, payload);
-    this.onSelectionChanged?.(payload);
     if (primaryWorkspaceEntityId) {
       this.eventBus.publish(EVENT_TOPICS.VIEWPORT_SELECTION_REQUESTED, {
         entityId: primaryWorkspaceEntityId,
         source: 'topology-edit-3d',
       });
     }
+    this.onSelectionChanged?.(payload);
     return payload;
   }
 }
@@ -215,7 +215,7 @@ export function workspaceEntityIdsForSelection(topology, canonicalIds = []) {
       );
       if (!ownsRestraint) continue;
       if (support.entityId) result.add(support.entityId);
-      if (support.componentKey) result.add(support.componentKey);
+      if (support.componentKey) result.add(support.componentKey;
       (support.sourceEntityIds ?? []).forEach((id) => result.add(id));
     }
   });
