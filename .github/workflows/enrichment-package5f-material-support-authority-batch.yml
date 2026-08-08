@@ -1,0 +1,108 @@
+name: enrichment-package5f-material-support-authority-batch
+
+on:
+  pull_request:
+    paths:
+      - 'src/workspace/engineering-enrichment/production-material-support-authority-overlays.js'
+      - 'src/workspace/engineering-loads/authorized-empirical-load-execution-v8.js'
+      - 'scripts/enrichment-package5f-material-support-resolution-check.mjs'
+      - 'scripts/enrichment-package5f-material-support-authority-batch-check.mjs'
+      - '.github/workflows/enrichment-package5f-material-support-authority-batch.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-package5f-batch:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Prove exact-head execution
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          git diff --exit-code
+
+      - name: Enforce Package 5F batch changed-path containment
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          git diff --name-only "$BASE_SHA" "$HEAD_SHA" > /tmp/enrichment-package5f-paths.txt
+          while IFS= read -r changed; do
+            case "$changed" in
+              src/workspace/engineering-enrichment/production-material-support-authority-overlays.js|src/workspace/engineering-loads/authorized-empirical-load-execution-v8.js|scripts/enrichment-package5f-material-support-resolution-check.mjs|scripts/enrichment-package5f-material-support-authority-batch-check.mjs|.github/workflows/enrichment-package5f-material-support-authority-batch.yml) ;;
+              *) echo "Forbidden changed path for enrichment Package 5F batch: $changed"; exit 1 ;;
+            esac
+          done < /tmp/enrichment-package5f-paths.txt
+          test "$(wc -l < /tmp/enrichment-package5f-paths.txt)" -eq 5
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax check Package 5F batch
+        run: |
+          node --check src/workspace/engineering-enrichment/production-material-support-authority-overlays.js
+          node --check src/workspace/engineering-loads/authorized-empirical-load-execution-v8.js
+          node --check scripts/enrichment-package5f-material-support-resolution-check.mjs
+          node --check scripts/enrichment-package5f-material-support-authority-batch-check.mjs
+
+      - name: Qualify material-selection and support-capability source contracts
+        run: node scripts/enrichment-package5f-material-support-resolution-check.mjs
+
+      - name: Requalify core support restraint authority
+        run: node scripts/w10.3-restraint-capability-contract-check.mjs
+
+      - name: Requalify Package 4A seal lifecycle
+        run: node scripts/enrichment-package4a-input-seal-check.mjs
+
+      - name: Requalify Package 5A component-weight cutover
+        run: node scripts/enrichment-package5a-component-weight-cutover-check.mjs
+
+      - name: Requalify Package 5B fluid resolver contract
+        run: node scripts/enrichment-package5b-fluid-resolution-contract-check.mjs
+
+      - name: Requalify Package 5B operating-fluid-density cutover
+        run: node scripts/enrichment-package5b-operating-fluid-density-cutover-check.mjs
+
+      - name: Requalify Package 5C material resolver contract
+        run: node scripts/enrichment-package5c-material-resolution-contract-check.mjs
+
+      - name: Requalify Package 5C material-density cutover
+        run: node scripts/enrichment-package5c-material-density-cutover-check.mjs
+
+      - name: Requalify Package 5D pipe-section resolver contract
+        run: node scripts/enrichment-package5d-pipe-section-resolution-contract-check.mjs
+
+      - name: Requalify Package 5D pipe-section cutover
+        run: node scripts/enrichment-package5d-pipe-section-cutover-check.mjs
+
+      - name: Requalify Package 5E secondary-density resolver contract
+        run: node scripts/enrichment-package5e-secondary-density-resolution-check.mjs
+
+      - name: Requalify Package 5E scalar-density batch
+        run: node scripts/enrichment-package5e-scalar-density-batch-check.mjs
+
+      - name: Qualify Package 5F material/support authority batch
+        run: node scripts/enrichment-package5f-material-support-authority-batch-check.mjs
+
+      - name: Import graph
+        run: npm run check:imports
+
+      - name: Production build
+        run: npm run build
