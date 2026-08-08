@@ -156,6 +156,9 @@ function deterministicSort(left, right) {
     || ENDS.indexOf(left.end) - ENDS.indexOf(right.end)
     || left.field.localeCompare(right.field);
 }
+function largestAbsoluteDelta(rows) {
+  return [...rows].sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || deterministicSort(a, b))[0] ?? null;
+}
 
 const solved = solveBm4M035M036Combined();
 const rawCii = loadBm4CiiOutputCases1921();
@@ -170,14 +173,20 @@ const firstLevelFailures = firstLevel
   ? compared.rows.filter((row) => row.level === firstLevel.level && !row.passed).sort(deterministicSort)
   : [];
 const highestSeverity = [...firstLevelFailures].sort((a, b) => b.normalizedSeverity - a.normalizedSeverity || deterministicSort(a, b))[0] ?? null;
+const largestAbsoluteDeltaRow = largestAbsoluteDelta(firstLevelFailures);
+const largestAbsoluteDeltaByCase = Object.fromEntries(CASES.map((caseLabel) => [
+  caseLabel,
+  largestAbsoluteDelta(firstLevelFailures.filter((row) => row.caseLabel === caseLabel)),
+]));
 
 assert.ok(compared.rows.length > 0, 'M042 requires at least one one-to-one authority/source element-end comparison.');
 assert.ok(authorityVectorParity.comparedEnds > 0, 'M042 authority global/local parity audit must execute.');
 assert.ok(ourVectorParity.comparedEnds > 0, 'M042 LFEA global/local parity audit must execute.');
+assert.ok(ourVectorParity.maxForceAbsoluteDifference <= 1e-8, 'M042 LFEA force local/global magnitude parity must hold before axial RCA.');
 assert.ok(firstLevel, 'M042 expected at least one BM4 upstream element-end divergence at the locked 5% target.');
 
 const report = Object.freeze({
-  schema: 'lfea-m042-bm4-first-divergence-rca/v1',
+  schema: 'lfea-m042-bm4-first-divergence-rca/v2',
   targetCases: Object.freeze({ SUS: 19, OPE: 20, EXP: 21 }),
   comparisonPolicy: BM4_COMPARISON_POLICY,
   rcaHierarchy: LEVELS,
@@ -188,7 +197,15 @@ const report = Object.freeze({
     forceUnits: 'N', momentUnits: 'N*m',
     pressureAxialThrust: 'CURRENT_QUALIFIED_M035_M036_PRESSURE_PRIMITIVE_HAS_AXIAL_THRUST_FALSE',
   }),
-  parityAudits: Object.freeze({ authorityGlobalLocal: authorityVectorParity, lfeaGlobalLocal: ourVectorParity }),
+  parityAudits: Object.freeze({
+    authorityGlobalLocal: authorityVectorParity,
+    lfeaGlobalLocal: ourVectorParity,
+    interpretation: Object.freeze({
+      forceVectorMagnitudeParityQualifiedForLevel1: true,
+      momentVectorMagnitudeParityUsedForCurrentConclusion: false,
+      momentParityDisposition: 'DEFERRED_BECAUSE_RCA_STOPS_AT_LEVEL_1',
+    }),
+  }),
   comparedElementEndRows: compared.rows.length,
   stationAttributionBoundary: Object.freeze({
     unmatchedAuthorityPairRecords: compared.unmatchedAuthorityPairs.length,
@@ -198,15 +215,20 @@ const report = Object.freeze({
   levels: Object.freeze(levelSummary),
   firstDivergence: Object.freeze({
     level: firstLevel.level, levelName: firstLevel.name,
+    comparedRows: firstLevel.comparedRows,
     mismatchCount: firstLevelFailures.length,
+    byCase: firstLevel.byCase,
     deterministicFirstRow: firstLevelFailures[0],
-    highestSeverityRow: highestSeverity,
+    highestNormalizedSeverityRow: highestSeverity,
+    largestAbsoluteDeltaRow,
+    largestAbsoluteDeltaByCase: Object.freeze(largestAbsoluteDeltaByCase),
     allRows: Object.freeze(firstLevelFailures),
   }),
   disposition: Object.freeze({
     bourdonErrorConcluded: false,
     finalStressRcaPermittedBeforeUpstreamClosure: false,
     mechanicsChangedByM042: false,
+    nextRcaBoundary: 'AXIAL_FORCE_CASE_HISTORY_FRICTION_PRESSURE_THRUST_OR_OTHER_UPSTREAM_AUTHORITY',
     conclusion: `FIRST_UPSTREAM_NUMERICAL_DIVERGENCE_AT_LEVEL_${firstLevel.level}_${firstLevel.name}`,
   }),
 });
@@ -219,8 +241,10 @@ if (reportArg >= 0) {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(report, null, 2)}\n`);
 }
-console.log(`M042 first divergence: level ${report.firstDivergence.level} ${report.firstDivergence.levelName}; ${report.firstDivergence.mismatchCount} mismatched element-end rows.`);
+console.log(`M042 first divergence: level ${report.firstDivergence.level} ${report.firstDivergence.levelName}; ${report.firstDivergence.mismatchCount}/${report.firstDivergence.comparedRows} mismatched element-end rows.`);
+console.log(`M042 first-divergence counts by case: ${JSON.stringify(report.firstDivergence.byCase)}`);
 console.log(`M042 station attribution boundary: ${report.stationAttributionBoundary.unmatchedAuthorityPairRecords} unmatched authority pair records preserved.`);
 console.log(`M042 deterministic first row: ${JSON.stringify(report.firstDivergence.deterministicFirstRow)}`);
-console.log(`M042 highest severity row: ${JSON.stringify(report.firstDivergence.highestSeverityRow)}`);
+console.log(`M042 largest absolute delta row: ${JSON.stringify(report.firstDivergence.largestAbsoluteDeltaRow)}`);
+console.log(`M042 largest absolute delta by case: ${JSON.stringify(report.firstDivergence.largestAbsoluteDeltaByCase)}`);
 console.log('M042 disposition: Bourdon not concluded; downstream stress RCA blocked until upstream divergence is resolved.');
