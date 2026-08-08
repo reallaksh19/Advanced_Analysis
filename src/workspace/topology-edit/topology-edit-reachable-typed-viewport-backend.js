@@ -32,11 +32,9 @@ export class TopologyEditReachableTypedViewportBackend extends TopologyEditTyped
     );
     super.renderSession(model);
     this.endpointRuntime.render(this.endpointAffordances);
-    publishEndpointReachabilityEvidence(
-      this.hostElement,
-      projection,
-      this.endpointAffordances,
-    );
+    for (const host of endpointEvidenceHosts(this.hostElement)) {
+      host.dataset.topologyEditVisibleEndpointCount = String(this.endpointAffordances.length);
+    }
   }
 
   buildNodePickProxyGroup(group, elements, markerSize) {
@@ -113,22 +111,6 @@ export class TopologyEditReachableTypedViewportBackend extends TopologyEditTyped
     this.endpointAffordances = Object.freeze([]);
     this.hasDraftEndpointProjection = false;
     super.destroy();
-  }
-}
-
-function publishEndpointReachabilityEvidence(host, projection, affordances) {
-  const typedEvidence = projection?.typedEvidenceProjection ?? null;
-  for (const evidenceHost of endpointEvidenceHosts(host)) {
-    evidenceHost.dataset.topologyEditVisibleEndpointCount = String(affordances.length);
-    evidenceHost.dataset.topologyEditEndpointProjectionElementCount = String(
-      projection?.elements?.length ?? 0,
-    );
-    evidenceHost.dataset.topologyEditEndpointCompactElementCount = String(
-      projection?.compactElements?.length ?? 0,
-    );
-    evidenceHost.dataset.topologyEditEndpointTypedEvidenceElementCount = String(
-      typedEvidence?.elements?.length ?? 0,
-    );
   }
 }
 
