@@ -1,0 +1,42 @@
+name: M052 BM4 Friction Equilibrium Residual
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/lfea-m052-bm4-friction-equilibrium-residual.mjs'
+      - '.github/workflows/m052-bm4-friction-equilibrium-residual.yml'
+  workflow_dispatch:
+
+jobs:
+  friction-equilibrium-residual:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax and line-count gate
+        run: |
+          node --check scripts/lfea-m052-bm4-friction-equilibrium-residual.mjs
+          test "$(wc -l < scripts/lfea-m052-bm4-friction-equilibrium-residual.mjs)" -le 300
+      - name: Recover unreported tangential support force from nodal equilibrium
+        run: node scripts/lfea-m052-bm4-friction-equilibrium-residual.mjs --report /tmp/m052-friction-equilibrium-residual.json
+      - name: Preserve raw friction face and M036 baselines
+        run: |
+          node scripts/lfea-m051-bm4-raw-friction-load-path.mjs
+          node scripts/lfea-m050-bm4-restraint-face-authority.mjs
+          node scripts/lfea-m040-bm4-friction-check.mjs
+          npm run check:lfea-m036
+      - name: Upload deterministic M052 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m052-bm4-friction-equilibrium-residual-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /tmp/m052-friction-equilibrium-residual.json
+          if-no-files-found: error
+      - name: Verify clean worktree
+        run: git diff --exit-code && git status --porcelain | tee /tmp/m052-status && test ! -s /tmp/m052-status
