@@ -4,7 +4,7 @@
 **Plan date:** 5 August 2026  
 **Implementation status updated:** 8 August 2026
 **Proposed method family:** `THERMAL_LIFTOFF_ACTIVE_SET_V1`  
-**Status:** TL-00 through TL-03 implemented as a non-production shadow spike; no production numerical authority, method registration, default UI exposure, seal/export eligibility or TL-04 redistribution authority
+**Status:** TL-00 through TL-03 shadow code implemented for contract qualification; engineering closure is `UNRESOLVED_GATE` pending qualified local stiffness/tolerance authority; no production numerical authority, method registration, default UI exposure, seal/export eligibility or TL-04 redistribution authority
 **Relationship to current methods:** downstream of `CHAINAGE_TRIBUTARY_SPAN_V2` and `CHAINAGE_TRIBUTARY_SPAN_V3_COG`
 
 ---
@@ -493,14 +493,19 @@ No V2/V3 result object is mutated or wrapped in place.
 
 ### 15.3 Fail-closed unresolved authority
 
-Two numerical policy values remain intentionally uncreated by this work pack:
+Three engineering authority gaps remain intentionally unresolved by this work pack:
 
 ```text
+qualified TL-02 local effective stiffness source in current fixture set = NONE FOUND — BLOCKING
 reactionTolerance production numerical value = UNKNOWN — BLOCKING
 non-trivial horizontal displacement threshold = UNKNOWN — BLOCKING
 ```
 
-The shadow implementation therefore has no reaction-tolerance default. A candidate classification requires a separately qualified reaction-tolerance authority. If none is supplied, TL-03 returns `UNRESOLVED_GATE`.
+The repository contains a generic Project Data `restraintStiffnessNPerM` authority field, including configured-default eligibility, but no existing benchmark/applicability-bound local `k_i,eff` source satisfying TL-02 admission was found. The Appendix S / `EMPIRICAL_BEAM_CONTACT_V1` basis derives coupled member stiffness internally; it does not publish a qualified local TL-02 coefficient and is not imported into this package.
+
+Therefore the work-pack stop condition for absent qualified stiffness authority is active. Production/engineering zero-temperature parity qualification is **not claimed** by this shadow spike. Unit tests that supply synthetic contract fixtures validate arithmetic, hashing, classification logic and exact preservation of the existing §6.1 cold values at zero displacement; those test-only objects are not engineering stiffness/tolerance authority and do not close this blocker.
+
+The shadow implementation has no reaction-tolerance default. A candidate classification requires a separately qualified reaction-tolerance authority. If none is supplied, TL-03 returns `UNRESOLVED_GATE`.
 
 Likewise, a non-zero horizontal component of pipe-to-support relative displacement is not silently projected away. Without an explicit qualified applicability assessment for that horizontal component, TL-01 marks the displacement unresolved and TL-03 returns `UNRESOLVED_GATE`.
 
@@ -530,3 +535,15 @@ V2/V3 gravity numerical implementation          unchanged
 ```
 
 Registration, default UI exposure, seal/export eligibility and governed production cutover remain TL-06 responsibilities and require a separate authorization/qualification decision.
+
+### 15.7 Current stop-work disposition
+
+```text
+SHADOW_CODE_STATUS = IMPLEMENTED_AND_TESTED
+ENGINEERING_QUALIFICATION_STATUS = UNRESOLVED_GATE
+STOP_WORK_TRIGGER = NO_QUALIFIED_TL02_LOCAL_STIFFNESS_SOURCE_IN_CURRENT_FIXTURE_SET
+OWNER_ADJUDICATION_REQUIRED_BEFORE_ENGINEERING_CLOSURE = true
+TL04_OR_PRODUCTION_SCOPE_CROSSED = false
+```
+
+No bounded stiffness template, global default, copied beam-contact coefficient or guessed tolerance is introduced to convert this blocker into a demonstration result.
