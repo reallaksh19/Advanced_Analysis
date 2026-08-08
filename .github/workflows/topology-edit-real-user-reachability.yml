@@ -73,29 +73,42 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
 
-      - name: Execute R1 focused unit contracts
-        run: |
-          set -euo pipefail
-          TESTS=(
-            tests/topology-edit-capability-authority.test.mjs
-            tests/topology-edit-endpoint-affordance.test.mjs
-            tests/topology-edit-demo-catalogue-coverage.test.mjs
-            tests/topology-edit-component-hud-context.test.mjs
-            tests/topology-edit-selection-coordinator.test.mjs
-            tests/topology-edit-selection-foundation-integration.test.mjs
-            tests/topology-edit-professional-interaction-containment.test.mjs
-            tests/topology-edit-professional-engineering-plan.test.mjs
-            tests/topology-edit-inline-component-insertion.test.mjs
-            tests/topology-edit-xyz-branch-demo.test.mjs
-            tests/topology-edit-table-m04-m06-m10.test.mjs
-            tests/topology-edit-table-q3-source-capability.test.mjs
-          )
-          node --test --test-reporter=tap "${TESTS[@]}" 2>&1 | tee topology-edit-r1-unit-output.txt
-
       - name: Build production application
+        shell: bash
+        run: |
+          set +e
+          npm run build > topology-edit-r1-build-output.txt 2>&1
+          status=$?
+          cat topology-edit-r1-build-output.txt
+          if [ "$status" -ne 0 ]; then
+            detail="$(tail -n 18 topology-edit-r1-build-output.txt | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
+            echo "::error title=3D Edit R1 production build failed::${detail}"
+            exit "$status"
+          fi
+
+      - name: Execute new R1 unit contracts
         run: |
           set -euo pipefail
-          npm run build 2>&1 | tee topology-edit-r1-build-output.txt
+          node --test --test-reporter=tap \
+            tests/topology-edit-capability-authority.test.mjs \
+            tests/topology-edit-endpoint-affordance.test.mjs \
+            tests/topology-edit-demo-catalogue-coverage.test.mjs \
+            2>&1 | tee topology-edit-r1-new-unit-output.txt
+
+      - name: Execute retained focused unit regressions
+        run: |
+          set -euo pipefail
+          node --test --test-reporter=tap \
+            tests/topology-edit-component-hud-context.test.mjs \
+            tests/topology-edit-selection-coordinator.test.mjs \
+            tests/topology-edit-selection-foundation-integration.test.mjs \
+            tests/topology-edit-professional-interaction-containment.test.mjs \
+            tests/topology-edit-professional-engineering-plan.test.mjs \
+            tests/topology-edit-inline-component-insertion.test.mjs \
+            tests/topology-edit-xyz-branch-demo.test.mjs \
+            tests/topology-edit-table-m04-m06-m10.test.mjs \
+            tests/topology-edit-table-q3-source-capability.test.mjs \
+            2>&1 | tee topology-edit-r1-retained-unit-output.txt
 
       - name: Execute no-privilege production Chromium qualification
         run: |
@@ -135,8 +148,9 @@ jobs:
         with:
           name: topology-edit-r1-real-user-${{ env.TOPOLOGY_EDIT_TARGET_HEAD_SHA }}-${{ github.run_attempt }}
           path: |
-            topology-edit-r1-unit-output.txt
             topology-edit-r1-build-output.txt
+            topology-edit-r1-new-unit-output.txt
+            topology-edit-r1-retained-unit-output.txt
             topology-edit-r1-real-user-output.txt
             topology-edit-r1-retained-e2e-output.txt
             reports/qualification
