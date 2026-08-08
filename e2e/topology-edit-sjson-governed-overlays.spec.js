@@ -45,7 +45,7 @@ test('SJSON uses one governed packet with selectable OD routes, typed equipment,
   await expect(host).toHaveAttribute('data-topology-edit-support-overlay-depth-independent', 'true');
   await expect(host).toHaveAttribute(
     'data-topology-edit-support-arrow-placement-authority',
-    'HOST_OD_HALF_CONTACT_PLUS_TWO_OD_GLYPH_V2',
+    'HOST_OD_HALF_CONTACT_PLUS_TWO_THIRDS_OD_GLYPH_V1',
   );
   await expect(host).toHaveAttribute('data-topology-edit-support-display-scale', '3');
   await expect(host).toHaveAttribute('data-topology-edit-camera-clipping-mode', 'AUTO');

@@ -2,12 +2,12 @@ import { deepFreeze, stringValue } from '../../core/shared-piping-model/index.js
 import { restraintColor } from './support-restraint-family.js';
 
 export const SJSON_SUPPORT_GLYPH_PLACEMENT_AUTHORITY =
-  'HOST_OD_HALF_CONTACT_PLUS_TWO_OD_GLYPH_V2';
+  'HOST_OD_HALF_CONTACT_PLUS_TWO_THIRDS_OD_GLYPH_V1';
 
 /**
  * Projects one stable restraint record into one or two screen glyph arrows.
- * Radial contacts begin at OD/2 plus the governed gap. Arrow length is 2*OD,
- * three times the previous compact presentation, without changing contact truth.
+ * Radial contacts remain at OD/2 plus the governed gap. Arrow length remains
+ * 2*OD/3, with each arrowhead terminating at its governed contact point.
  */
 export function projectGovernedSjsonSupportGlyphs({
   overlays,
@@ -52,7 +52,7 @@ export function projectGovernedSjsonSupportGlyphs({
     const host = edgeIndex.get(stringValue(overlay.hostEntityId));
     const outsideDiameterMm = positive(host?.outsideDiameterMm);
     if (outsideDiameterMm === null) continue;
-    const glyphLengthMm = outsideDiameterMm * 2;
+    const glyphLengthMm = (outsideDiameterMm * 2) / 3;
     for (const restraint of overlay.restraints || []) {
       const arrows = directionalArrows(restraint, glyphLengthMm, outsideDiameterMm);
       if (!arrows.length) continue;
@@ -127,19 +127,25 @@ function directionalArrows(restraint, glyphLengthMm, outsideDiameterMm) {
   const positive = finitePoint(restraint.positiveContactPoint);
   const negative = finitePoint(restraint.negativeContactPoint);
   if (positive) {
-    rows.push(arrow('POSITIVE', positive, direction, glyphLengthMm, outsideDiameterMm));
+    rows.push(inwardArrow('POSITIVE', positive, direction, glyphLengthMm, outsideDiameterMm));
   }
   if (negative) {
-    rows.push(arrow('NEGATIVE', negative, scale(direction, -1), glyphLengthMm, outsideDiameterMm));
+    rows.push(inwardArrow(
+      'NEGATIVE',
+      negative,
+      scale(direction, -1),
+      glyphLengthMm,
+      outsideDiameterMm,
+    ));
   }
   return rows;
 }
 
-function arrow(polarity, start, direction, glyphLengthMm, outsideDiameterMm) {
+function inwardArrow(polarity, contact, outwardDirection, glyphLengthMm, outsideDiameterMm) {
   return deepFreeze({
     polarity,
-    start,
-    end: add(start, scale(direction, glyphLengthMm)),
+    start: add(contact, scale(outwardDirection, glyphLengthMm)),
+    end: contact,
     hostOutsideDiameterMm: outsideDiameterMm,
     glyphLengthMm,
     placementAuthority: SJSON_SUPPORT_GLYPH_PLACEMENT_AUTHORITY,
