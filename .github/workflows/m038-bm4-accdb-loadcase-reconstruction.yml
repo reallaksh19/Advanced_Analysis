@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - agent/m038-bm4-accdb-loadcase-reconstruction
+      - agent/m038-bm4-f1-loadcase-correction
   workflow_dispatch:
 
 permissions:
@@ -82,13 +83,13 @@ jobs:
       - name: Install repository dependencies
         run: npm ci
 
-      - name: Syntax and Bourdon mechanics smoke test
+      - name: Syntax and Bourdon/F1 mechanics smoke test
         shell: bash
         run: |
           set -euo pipefail
           node --check src/core/linear-fea-frame-element/uniform-axial-initial-strain.js
           node --check scripts/lfea-m035-m036-bm4-integration-runtime.mjs
-          node -e "import('./scripts/lfea-m035-m036-bm4-integration-runtime.mjs').then(m=>{const r=m.solveBm4M035M036Combined(); console.log('M038_RELEASED_SUS='+JSON.stringify(m.releasedTargetIds(r.sustainedRun,['20090','20350','21470','21610']))); console.log('M038_RELEASED_OPE='+JSON.stringify(m.releasedTargetIds(r.operatingRun,['20090','20350','21470','21610']))); console.log('M038_21470_SUS_RY='+m.reactionUy(r.sustained.execution,'21470'));})" | tee /tmp/m038-bourdon-smoke.log
+          node -e "import('./scripts/lfea-m035-m036-bm4-integration-runtime.mjs').then(m=>{const r=m.solveBm4M035M036Combined(); const f1=r.operating.loadCase.primitives.filter(p=>p.kind==='NODAL_FORCE_MOMENT'); console.log('M038_F1='+JSON.stringify(f1.map(p=>({nodeId:p.nodeId,force:p.force,moment:p.moment})))); console.log('M038_RELEASED_SUS='+JSON.stringify(m.releasedTargetIds(r.sustainedRun,['20090','20350','21470','21610']))); console.log('M038_RELEASED_OPE='+JSON.stringify(m.releasedTargetIds(r.operatingRun,['20090','20350','21470','21610']))); console.log('M038_21470_SUS_RY='+m.reactionUy(r.sustained.execution,'21470'));})" | tee /tmp/m038-bourdon-smoke.log
 
       - name: Full BM4 row attribution benchmark
         shell: bash
