@@ -8,6 +8,9 @@ import {
 import {
   assertEnrichmentProductionComponentWeightOverlay,
 } from '../engineering-enrichment/production-component-weight-overlay.js';
+import {
+  assertEngineeringEnrichmentObservedAuthority,
+} from '../engineering-enrichment/review-package-validation.js';
 import { requireAuthorizedEmpiricalLoadInput } from './authorized-empirical-load-input.js';
 import { buildAuthorizedEmpiricalLoadProfile } from './authorized-empirical-load-execution.js';
 import {
@@ -26,17 +29,17 @@ export const AUTHORIZED_EMPIRICAL_LOAD_EXECUTION_V3_SCHEMA =
 
 const REQUEST_KEYS = [
   'schema', 'executionId', 'executedAt', 'method', 'authorizedInput',
-  'sealedComponentWeightOverlay', 'dataset', 'profile', 'supportSiteModel',
-  'routePartitionModel', 'masterData',
+  'sealedComponentWeightOverlay', 'observedAuthority', 'dataset', 'profile',
+  'supportSiteModel', 'routePartitionModel', 'masterData',
 ];
 const OUTPUT_KEYS = [
   'schema', 'executionId', 'executedAt', 'requestedMethod', 'executedMethod',
   'projectId', 'datasetId', 'datasetVersion', 'authorizedInputSemanticHash',
   'baseOverlaySemanticHash', 'engineeringInputSealHash',
-  'engineeringInputSealCurrentnessHash', 'componentWeightOverlayHash',
-  'activatedEnrichmentFieldFamilies', 'effectiveComponentWeightsSemanticHash',
-  'ephemeralProfileSemanticHash', 'distributionSemanticHash', 'status', 'summary',
-  'distribution', 'semanticHash',
+  'engineeringInputSealCurrentnessHash', 'engineeringObservedAuthorityHash',
+  'componentWeightOverlayHash', 'activatedEnrichmentFieldFamilies',
+  'effectiveComponentWeightsSemanticHash', 'ephemeralProfileSemanticHash',
+  'distributionSemanticHash', 'status', 'summary', 'distribution', 'semanticHash',
 ];
 
 export function authorizedEmpiricalLoadExecutionV3SemanticProjection(value) {
@@ -53,6 +56,11 @@ export function computeAuthorizedEmpiricalLoadExecutionV3SemanticHash(value) {
  * Package 5A production cutover. Executes the existing authorized gravity
  * method with exactly one additional sealed field family: component weights.
  * V2/V3 gravity mechanics are reused unchanged.
+ *
+ * The caller must also provide the currently observed enrichment authority.
+ * Its hash must still equal the authority snapshot used to create the sealed
+ * overlay, and its Project Data identity must match the active profile at the
+ * instant of execution. This closes the build-overlay/execute stale window.
  */
 export function calculateAuthorizedEmpiricalLoadExecutionV3(value) {
   exact(value, REQUEST_KEYS, 'authorizedEmpiricalLoadExecutionV3Request');
@@ -64,6 +72,7 @@ export function calculateAuthorizedEmpiricalLoadExecutionV3(value) {
   const enrichment = assertEnrichmentProductionComponentWeightOverlay(
     value.sealedComponentWeightOverlay,
   );
+  const observed = assertEngineeringEnrichmentObservedAuthority(value.observedAuthority);
   if (enrichment.status !== 'READY_FOR_PRODUCTION_CONSUMPTION') {
     fail(
       'Sealed component-weight enrichment overlay is not production-ready.',
@@ -71,11 +80,33 @@ export function calculateAuthorizedEmpiricalLoadExecutionV3(value) {
       { blockers: enrichment.blockers },
     );
   }
-  if (enrichment.sourceDatasetHash !== value.dataset?.sourceSha256
-      || enrichment.sourceSharedModelHash !== value.dataset?.sharedModel?.semanticHash) {
+  if (observed.observedAuthorityHash !== enrichment.observedAuthorityHash) {
     fail(
-      'Sealed component-weight overlay is bound to a different active dataset.',
+      'Observed enrichment authority changed after the production overlay was built.',
+      'EMPIRICAL_EXECUTION_V3_OBSERVED_AUTHORITY_MISMATCH',
+      {
+        overlayObservedAuthorityHash: enrichment.observedAuthorityHash,
+        executionObservedAuthorityHash: observed.observedAuthorityHash,
+      },
+    );
+  }
+  if (enrichment.sourceDatasetHash !== value.dataset?.sourceSha256
+      || enrichment.sourceSharedModelHash !== value.dataset?.sharedModel?.semanticHash
+      || observed.sourceDatasetHash !== enrichment.sourceDatasetHash
+      || observed.sourceSharedModelHash !== enrichment.sourceSharedModelHash) {
+    fail(
+      'Sealed enrichment authority is bound to a different active dataset.',
       'EMPIRICAL_EXECUTION_V3_ENRICHMENT_SOURCE_MISMATCH',
+    );
+  }
+  if (observed.contextIdentities?.projectDataHash !== semanticHash(value.profile)) {
+    fail(
+      'Active Project Data changed after the enrichment review/seal authority snapshot.',
+      'EMPIRICAL_EXECUTION_V3_PROJECT_DATA_STALE',
+      {
+        sealedProjectDataHash: observed.contextIdentities?.projectDataHash ?? null,
+        activeProjectDataHash: semanticHash(value.profile),
+      },
     );
   }
 
@@ -129,6 +160,7 @@ export function calculateAuthorizedEmpiricalLoadExecutionV3(value) {
     baseOverlaySemanticHash: authorizedInput.overlaySemanticHash,
     engineeringInputSealHash: enrichment.sealHash,
     engineeringInputSealCurrentnessHash: enrichment.currentnessHash,
+    engineeringObservedAuthorityHash: observed.observedAuthorityHash,
     componentWeightOverlayHash: enrichment.overlayHash,
     activatedEnrichmentFieldFamilies: ['COMPONENT_WEIGHTS'],
     effectiveComponentWeightsSemanticHash: semanticHash(effectiveComponentWeights),
@@ -165,6 +197,10 @@ export function requireAuthorizedEmpiricalLoadExecutionV3(value) {
     engineeringInputSealCurrentnessHash: hash(
       value.engineeringInputSealCurrentnessHash,
       'engineeringInputSealCurrentnessHash',
+    ),
+    engineeringObservedAuthorityHash: hash(
+      value.engineeringObservedAuthorityHash,
+      'engineeringObservedAuthorityHash',
     ),
     componentWeightOverlayHash: hash(value.componentWeightOverlayHash, 'componentWeightOverlayHash'),
     activatedEnrichmentFieldFamilies: fieldFamilies(value.activatedEnrichmentFieldFamilies),
@@ -229,6 +265,7 @@ function applyComponentWeightEnrichment(profile, enrichment) {
       sealId: enrichment.sealId,
       sealHash: enrichment.sealHash,
       currentnessHash: enrichment.currentnessHash,
+      observedAuthorityHash: enrichment.observedAuthorityHash,
       candidateProjectionHash: enrichment.candidateProjectionHash,
       overlayHash: enrichment.overlayHash,
       activatedFieldFamilies: enrichment.activatedFieldFamilies,
